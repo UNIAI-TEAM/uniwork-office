@@ -92,4 +92,7 @@ export const zhTW = {
 
   setCliLinkReady: '命令列工具已可使用。',
   setAutoSaveUniworkNote: '不適用於 UniWork 文件。',
+  uwLockNewerStoreTitle: '需要更新版本的應用程式',
+  uwLockNewerStore:
+    '這些資料需要更新版本的應用程式。請更新 UniWork Office；資料沒有被刪除，也沒有產生新的儲存。',
 } satisfies Record<keyof typeof zh, string>

@@ -52,4 +52,8 @@ export const ms = {
   aiWebStateProviderBody: 'Pembekal ini tidak disokong.',
   aiWebStateUnknownTitle: 'Permintaan AI gagal',
   aiWebStateUnknownBody: 'Sesuatu tidak kena. Cuba lagi.',
+
+  // U-02 catalogue S10: workbook over the web AI size limit
+  aiErrWorkbookTooLarge:
+    'Buku kerja ini terlalu besar untuk AI di web. Buka dalam apl UniWork Office.',
 } satisfies Record<keyof typeof zh, string>

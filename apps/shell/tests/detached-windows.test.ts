@@ -120,6 +120,8 @@ vi.mock('../src/main/tab-manager', () => ({
   canonicalPath: (p: string) => p.toLowerCase(),
 }))
 
+import { fakeSender } from './fixtures/ai-run-contract'
+
 type DetachedModule = typeof import('../src/main/detached-windows')
 
 let detached: DetachedModule
@@ -204,6 +206,56 @@ describe('detachedOpenDocuments', () => {
       ['pdf', true],
       ['slides', false],
     ])
+  })
+})
+
+describe('detachedEditorStates (AI run signal)', () => {
+  it('reports aiRunning for every kind from the same registry as tabs', async () => {
+    const registry = await import('../src/main/ai-run-registry')
+    const kinds = ['docs', 'sheets', 'slides', 'pdf', 'markdown', 'html'] as const
+    kinds.forEach((kind, i) =>
+      detached.createDetachedEditorWindow({
+        view: fakeView(60 + i) as never,
+        kind,
+        title: kind,
+        filePath: `C:/uw/${kind}.bin`,
+        applyMenuFor: () => {},
+      }),
+    )
+    for (const i of [0, 2, 4]) registry.noteAiRun(fakeSender(60 + i), { state: 'running' })
+    const states = await detached.detachedEditorStates((path) => path.startsWith('C:/uw/'))
+    expect(states.map((s) => [s.path, s.aiRunning])).toEqual(
+      kinds.map((kind, i) => [`C:/uw/${kind}.bin`, i % 2 === 0]),
+    )
+  })
+
+  it('a window closed mid-run drops out; files not wanted are skipped', async () => {
+    const registry = await import('../src/main/ai-run-registry')
+    detached.createDetachedEditorWindow({
+      view: fakeView(70) as never,
+      kind: 'docs',
+      title: 'c',
+      filePath: 'C:/uw/c.docx',
+      applyMenuFor: () => {},
+    })
+    detached.createDetachedEditorWindow({
+      view: fakeView(71) as never,
+      kind: 'pdf',
+      title: 'd',
+      filePath: 'C:/local/d.pdf',
+      applyMenuFor: () => {},
+    })
+    const sender = fakeSender(70)
+    registry.noteAiRun(sender, { state: 'running' })
+    const win = instances[0]!
+    const { docsQueryDirty } = await import('../../docs/src/main/docs-main')
+    vi.mocked(docsQueryDirty).mockImplementationOnce(async () => {
+      win.destroyed = true
+      sender.destroy()
+      return false
+    })
+    await expect(detached.detachedEditorStates((p) => p.startsWith('C:/uw/'))).resolves.toEqual([])
+    expect(registry.isAiRunning(70)).toBe(false)
   })
 })
 

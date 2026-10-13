@@ -65,6 +65,10 @@ export const pt = {
   aiToolReadRangeOf: 'Ler intervalo {range}',
   aiToolAggregate: 'Agregar intervalo',
   aiToolAggregateOf: 'Agregar intervalo {range}',
+  aiToolSummarize: 'Resumir intervalo',
+  aiToolSummarizeOf: 'Resumir intervalo {range}',
+  aiToolCompareRanges: 'Comparar intervalos',
+  aiToolCompareRangesOf: 'Comparar {left} com {right}',
   aiToolLoadGuide: 'Carregar guia',
   aiToolLoadGuideOf: 'Carregar guias {names}',
   aiToolReadFormats: 'Ler formatos',
@@ -74,6 +78,19 @@ export const pt = {
   aiToolReadCellsCount: 'Ler {count} células',
   aiToolPropose: 'Gerar visualização das alterações',
   aiToolCreateDocument: 'Criar novo arquivo',
+  // ask_clarification card (C-ASK)
+  aiClarifyTitle: 'Uma verificação rápida antes de continuar',
+  aiClarifyDecide: 'Decida por mim',
+  aiClarifyDecideAnswer: '(decida por mim)',
+  aiClarifyMulti: 'Seleção múltipla',
+  aiClarifyNext: 'Próxima',
+  aiClarifyPrev: 'Anterior',
+  aiClarifyOther: 'Outro (digite)',
+  aiClarifySelected: '{n} selecionados',
+  aiClarifySkip: 'Ignorar',
+  aiClarifySubmit: 'Confirmar',
+  aiToolClarify: 'Esclarecimento respondido',
+  aiToolClarifySkipped: 'Esclarecimento ignorado',
   aiToolCreatedDocument: '{name} criado',
   aiToolReadAttachment: 'Ler anexo',
   aiToolReadAttachmentOf: 'Ler anexo {name}',
@@ -102,4 +119,8 @@ export const pt = {
   aiScopeClearTitle: 'Remover o escopo do intervalo e usar a planilha inteira',
   aiViewOnlyNotice:
     'Documento somente leitura: a IA pode lê-lo e responder a perguntas, mas não pode editá-lo.',
+
+  // U-02 catalogue S9: cells summary under an edited result
+  aiResultCellsMeta:
+    'Células gravadas: {written} ({range}) · Células existentes substituídas: {overwritten}',
 } satisfies Record<keyof typeof zh, string>

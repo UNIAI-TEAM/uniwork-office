@@ -3,10 +3,18 @@ import { createDocsFrameClient, type DocsFrameClient, type DocsFrameClientOption
 import { createDocsFrameHost, type DocsFrameHost, type DocsFrameHostOptions } from '../host'
 import { Endpoint, validateOrigins, type RejectInfo } from '../endpoint'
 import {
+  CAPABILITY_KEYS,
   DocsProtocolError,
+  FRAME_EVENT_TYPES,
+  FRAME_REQUEST_TYPES,
+  HOST_EVENT_TYPES,
   PROTOCOL_NS,
   PROTOCOL_VERSION,
   errorFromHttpStatus,
+  isDecimalRevision,
+  isFileMeta,
+  openReplyRevision,
+  parseEnvelope,
   type InitPayload,
 } from '../types'
 import { FakeWindow, ORIGIN, flush, wirePair } from './fake-windows'
@@ -102,6 +110,8 @@ describe('handshake', () => {
         imageSearch: false,
         imageGeneration: false,
         desktopOpen: false,
+        download: false,
+        uniworkAi: false,
       },
     })
     expect(session).toMatchObject({
@@ -1028,5 +1038,379 @@ describe('token refresh (cookie-free auth)', () => {
     })
     // no await on host.whenReady(): the client queues behind init
     await expect(client.request('api.recents', {})).resolves.toEqual({ files: [] })
+  })
+})
+
+// ---------------------------------------------------------------- X-02 (UNI-1339)
+
+const REMOTE = {
+  document_id: 'doc-1',
+  revision: '6',
+  version_id: 'v2',
+  saved_at: '2026-10-12T10:00:00Z',
+}
+
+const bytesOf = (b: ArrayBuffer): number[] => [...new Uint8Array(b)]
+
+/** a host built before X-02: no `api.download` handler, no `aiRun` listener, ignores `versionId` */
+function legacyHost(
+  hostWin: FakeWindow,
+  frameWin: FakeWindow,
+  init: Omit<InitPayload, 'protocolVersion'> = baseInit(),
+): { ep: Endpoint; rejects: RejectInfo[]; opened: unknown[] } {
+  const rejects: RejectInfo[] = []
+  const opened: unknown[] = []
+  const ep = new Endpoint({
+    self: hostWin,
+    peer: () => frameWin,
+    allowedOrigins: [ORIGIN],
+    idPrefix: 'h',
+    timeoutMs: 1_000,
+    onReject: (r) => rejects.push(r),
+  })
+  let sent = false
+  ep.on('ready', () => {
+    if (sent) return
+    sent = true
+    void ep.request('init', { ...init, protocolVersion: PROTOCOL_VERSION }).catch(() => {})
+  })
+  // the pre-X-02 answer: the latest version, no `revision`, whatever the frame asked for
+  ep.handle('api.open', (p) => {
+    opened.push(p)
+    return {
+      file: { fileId: 'doc-1', name: 'R.docx', versionId: 'v9', etag: '9' },
+      source: { kind: 'bytes', data: new Uint8Array([9]).buffer },
+    }
+  })
+  live.push(ep)
+  return { ep, rejects, opened }
+}
+
+/** a frame built before X-02: answers init and doc.closeCheck, listens to nothing new */
+function legacyFrame(
+  frameWin: FakeWindow,
+  hostWin: FakeWindow,
+): { ep: Endpoint; rejects: RejectInfo[]; heard: unknown[] } {
+  const rejects: RejectInfo[] = []
+  const heard: unknown[] = []
+  const ep = new Endpoint({
+    self: frameWin,
+    peer: () => hostWin,
+    allowedOrigins: [ORIGIN],
+    idPrefix: 'f',
+    timeoutMs: 1_000,
+    onReject: (r) => rejects.push(r),
+  })
+  ep.handle('init', () => ({ protocolVersion: PROTOCOL_VERSION, capabilities: { save: true } }))
+  ep.handle('doc.closeCheck', () => ({ dirty: false, autoSave: false }))
+  for (const t of ['file.renamed', 'theme', 'language', 'token.update']) {
+    ep.on(t, (p) => heard.push([t, p]))
+  }
+  ep.emit('ready', { protocolVersion: PROTOCOL_VERSION, capabilities: { save: true } })
+  live.push(ep)
+  return { ep, rejects, heard }
+}
+
+describe('X-02 protocol shape', () => {
+  const env = (kind: string, type: string, payload: unknown) =>
+    parseEnvelope({ ns: PROTOCOL_NS, v: PROTOCOL_VERSION, id: 'x1', kind, type, payload })
+  const file = { fileId: 'doc-1', name: 'R.docx' }
+  const source = { kind: 'bytes', data: new ArrayBuffer(1) }
+
+  it('keeps PROTOCOL_VERSION 1 and adds the new types and keys', () => {
+    expect(PROTOCOL_VERSION).toBe(1)
+    expect(HOST_EVENT_TYPES).toContain('doc.remoteVersion')
+    expect(FRAME_REQUEST_TYPES).toContain('api.download')
+    expect(FRAME_EVENT_TYPES).toContain('aiRun')
+    expect(CAPABILITY_KEYS).toEqual(expect.arrayContaining(['download', 'uniworkAi']))
+  })
+
+  it('FileMeta.revision is optional and decimal', () => {
+    expect(isDecimalRevision('0')).toBe(true)
+    expect(isDecimalRevision('18446744073709551615')).toBe(true)
+    for (const bad of ['', '07', '-1', '1.5', '1e3', ' 1', 'abc', 6, null]) {
+      expect(isDecimalRevision(bad)).toBe(false)
+    }
+    expect(isFileMeta({ ...file, revision: '12' })).toBe(true)
+    expect(isFileMeta(file)).toBe(true)
+    expect(isFileMeta({ ...file, revision: 12 })).toBe(false)
+    expect(isFileMeta({ ...file, revision: 'v12' })).toBe(false)
+  })
+
+  it('api.open: optional versionId; a versionChanged answer must carry the revision', () => {
+    expect(env('request', 'api.open', { fileId: 'doc-1', versionId: 'v2' }).ok).toBe(true)
+    expect(env('request', 'api.open', { fileId: 'doc-1', versionId: '' }).ok).toBe(false)
+    expect(env('response', 'api.open', { file, source }).ok).toBe(true)
+    expect(
+      env('response', 'api.open', {
+        file: { ...file, revision: '7' },
+        source,
+        versionChanged: true,
+      }).ok,
+    ).toBe(true)
+    expect(env('response', 'api.open', { file, source, versionChanged: true }).ok).toBe(false)
+    expect(env('response', 'api.open', { file, source, versionChanged: 'yes' }).ok).toBe(false)
+    expect(openReplyRevision({ file: { ...file, revision: '7' } })).toBe('7')
+    expect(openReplyRevision({ file })).toBeNull()
+  })
+
+  it('doc.remoteVersion, api.download and aiRun validators', () => {
+    expect(env('event', 'doc.remoteVersion', REMOTE).ok).toBe(true)
+    expect(env('event', 'doc.remoteVersion', { ...REMOTE, author_name: 'An' }).ok).toBe(true)
+    expect(env('event', 'doc.remoteVersion', { ...REMOTE, revision: 'abc' }).ok).toBe(false)
+    expect(env('event', 'doc.remoteVersion', { ...REMOTE, revision: 6 }).ok).toBe(false)
+    expect(env('event', 'doc.remoteVersion', { ...REMOTE, version_id: undefined }).ok).toBe(false)
+    expect(env('request', 'api.download', { data: new ArrayBuffer(2) }).ok).toBe(true)
+    expect(env('request', 'api.download', { data: 'bytes' }).ok).toBe(false)
+    expect(env('response', 'api.download', { delivered: true }).ok).toBe(true)
+    expect(env('response', 'api.download', {}).ok).toBe(false)
+    expect(env('event', 'aiRun', { state: 'running', run_id: 'r1' }).ok).toBe(true)
+    expect(env('event', 'aiRun', { state: 'idle' }).ok).toBe(true)
+    expect(env('event', 'aiRun', { state: 'done' }).ok).toBe(false)
+    expect(env('event', 'aiRun', { state: 'idle', run_id: 3 }).ok).toBe(false)
+  })
+
+  it('download and uniworkAi are effective only when host grant AND frame claim', async () => {
+    const both = setup(
+      {
+        getInit: vi.fn(async () => baseInit({ capabilities: { download: true, uniworkAi: true } })),
+      },
+      { capabilities: { download: true, uniworkAi: true } },
+    )
+    expect((await both.client.whenInitialized()).capabilities).toMatchObject({
+      download: true,
+      uniworkAi: true,
+    })
+    const hostOnly = setup(
+      {
+        getInit: vi.fn(async () => baseInit({ capabilities: { download: true, uniworkAi: true } })),
+      },
+      { capabilities: { save: true } },
+    )
+    expect((await hostOnly.client.whenInitialized()).capabilities).toMatchObject({
+      download: false,
+      uniworkAi: false,
+    })
+  })
+})
+
+describe('X-02 new frame -> old host', () => {
+  function newFrame(hostWin: FakeWindow, frameWin: FakeWindow) {
+    const rejects: RejectInfo[] = []
+    const client = createDocsFrameClient({
+      self: frameWin,
+      parent: hostWin,
+      allowedOrigins: [ORIGIN],
+      capabilities: { save: true, download: true, uniworkAi: true },
+      now: () => NOW,
+      timeoutMs: 1_000,
+      onReject: (r) => rejects.push(r),
+    })
+    live.push(client)
+    return { client, rejects }
+  }
+
+  it('api.open with versionId is accepted; no revision in the reply -> the no-number path', async () => {
+    const { host: hostWin, frame: frameWin } = wirePair()
+    const old = legacyHost(hostWin, frameWin)
+    const { client } = newFrame(hostWin, frameWin)
+    await client.whenInitialized()
+    const reply = await client.request('api.open', { fileId: 'doc-1', versionId: 'v2' })
+    expect(old.opened).toEqual([{ fileId: 'doc-1', versionId: 'v2' }])
+    expect(reply.file.revision).toBeUndefined()
+    expect(reply.versionChanged).toBeUndefined()
+    // never the number the frame asked for (nor the etag): no number at all
+    expect(openReplyRevision(reply)).toBeNull()
+  })
+
+  it('an old host does not advertise download: the effective capability lacks it', async () => {
+    const { host: hostWin, frame: frameWin } = wirePair()
+    legacyHost(hostWin, frameWin)
+    const { client } = newFrame(hostWin, frameWin)
+    const session = await client.whenInitialized()
+    expect(session.capabilities.download).toBe(false)
+    expect(session.capabilities.uniworkAi).toBe(false)
+  })
+
+  it('api.download sent anyway -> unknown_type AND the host onReject hook', async () => {
+    const { host: hostWin, frame: frameWin } = wirePair()
+    const old = legacyHost(hostWin, frameWin)
+    const { client } = newFrame(hostWin, frameWin)
+    await client.whenInitialized()
+    await expect(
+      client.request('api.download', { data: new Uint8Array([1, 2]).buffer }),
+    ).rejects.toMatchObject({ code: 'unknown_type' })
+    expect(old.rejects).toEqual([
+      expect.objectContaining({ reason: 'unknown_type', detail: 'api.download' }),
+    ])
+  })
+
+  it('aiRun to an old host is dropped silently', async () => {
+    const { host: hostWin, frame: frameWin } = wirePair()
+    const old = legacyHost(hostWin, frameWin)
+    const { client, rejects } = newFrame(hostWin, frameWin)
+    await client.whenInitialized()
+    const before = hostWin.sent.length // what the host posts back
+    client.reportAiRun({ state: 'running', run_id: 'r1' })
+    client.reportAiRun({ state: 'idle', run_id: 'r1' })
+    await flush()
+    expect(old.rejects).toEqual([])
+    expect(rejects).toEqual([])
+    // nothing came back to the frame
+    expect(hostWin.sent.length).toBe(before)
+  })
+})
+
+describe('X-02 old frame <- new host', () => {
+  it('doc.remoteVersion reaches no listener, gets no reply, no reject; closeCheck still works', async () => {
+    const { host: hostWin, frame: frameWin } = wirePair()
+    const hostRejects: RejectInfo[] = []
+    const host = createDocsFrameHost({
+      self: hostWin,
+      frame: () => frameWin,
+      allowedOrigins: [ORIGIN],
+      getInit: async () => baseInit({ capabilities: { save: true, download: true } }),
+      refreshToken: async () => ({ token: 't', tokenExpiresAt: NOW + 60_000 }),
+      onReject: (r) => hostRejects.push(r),
+      timeoutMs: 1_000,
+    })
+    live.push(host)
+    const old = legacyFrame(frameWin, hostWin)
+    const ack = await host.whenReady()
+    // advertising download to an old frame changes nothing
+    expect(ack.capabilities).toEqual({ save: true })
+    const before = frameWin.sent.length // what the frame posts
+    host.notifyRemoteVersion(REMOTE)
+    await flush()
+    expect(frameWin.sent.length).toBe(before) // the frame answered nothing
+    expect(old.rejects).toEqual([])
+    expect(old.heard).toEqual([])
+    expect(hostRejects).toEqual([])
+    await expect(host.closeCheck()).resolves.toEqual({ dirty: false, autoSave: false })
+  })
+})
+
+describe('X-02 new frame <-> new host', () => {
+  it('doc.remoteVersion: this document only; a non-decimal revision is malformed', async () => {
+    const { host, client, frameRejects } = setup()
+    await host.whenReady()
+    await client.whenInitialized()
+    const heard: unknown[] = []
+    client.onRemoteVersion((p) => heard.push(p))
+    host.notifyRemoteVersion({ ...REMOTE, document_id: 'doc-2' })
+    host.notifyRemoteVersion({ ...REMOTE, revision: 'abc' })
+    host.notifyRemoteVersion({ ...REMOTE, author_name: 'An' })
+    await flush()
+    expect(heard).toEqual([{ ...REMOTE, author_name: 'An' }])
+    expect(frameRejects).toEqual([expect.objectContaining({ reason: 'malformed' })])
+  })
+
+  it('aiRun reaches the host listener', async () => {
+    const { host, client } = setup()
+    await host.whenReady()
+    const seen: unknown[] = []
+    host.on('aiRun', (p) => seen.push(p))
+    client.reportAiRun({ state: 'running', run_id: 'r1' })
+    client.reportAiRun({ state: 'idle' })
+    await flush()
+    expect(seen).toEqual([{ state: 'running', run_id: 'r1' }, { state: 'idle' }])
+  })
+
+  it('aiRun with an empty run_id omits the key, so the host accepts the idle', async () => {
+    const { host, client, hostRejects } = setup()
+    await host.whenReady()
+    const seen: unknown[] = []
+    host.on('aiRun', (p) => seen.push(p))
+    client.reportAiRun({ state: 'running', run_id: '' })
+    client.reportAiRun({ state: 'idle', run_id: '' })
+    await flush()
+    expect(seen).toEqual([{ state: 'running' }, { state: 'idle' }])
+    expect(hostRejects).toEqual([])
+  })
+
+  it('api.download goes to the host handler; without one it is unsupported', async () => {
+    const handler = vi.fn(async () => ({ delivered: true as const }))
+    const withHandler = setup({ api: { 'api.download': handler } })
+    await withHandler.host.whenReady()
+    await expect(
+      withHandler.client.request('api.download', { data: new Uint8Array([1, 2]).buffer }),
+    ).resolves.toEqual({ delivered: true })
+    expect(bytesOf((handler.mock.calls[0] as unknown as [{ data: ArrayBuffer }])[0].data)).toEqual([
+      1, 2,
+    ])
+    await expect(
+      withHandler.client.request('api.download', { data: 'x' } as unknown as { data: ArrayBuffer }),
+    ).rejects.toMatchObject({ code: 'malformed' })
+    expect(handler).toHaveBeenCalledTimes(1)
+
+    const without = setup()
+    await without.host.whenReady()
+    await expect(
+      without.client.request('api.download', { data: new ArrayBuffer(1) }),
+    ).rejects.toMatchObject({ code: 'unsupported' })
+  })
+})
+
+describe('X-02 OQ-P3: api.open for a version that is no longer the head (fake host)', () => {
+  /** the OQ-P3 host rule over an in-memory version list (the real host is G5-03w) */
+  function fakeDocument() {
+    const versions = [
+      { id: 'v1', revision: '5', bytes: [1] },
+      { id: 'v2', revision: '6', bytes: [2] },
+    ]
+    const apiOpen = async ({ fileId, versionId }: { fileId: string; versionId?: string }) => {
+      if (versionId !== undefined && !versions.some((v) => v.id === versionId)) {
+        throw new DocsProtocolError({ code: 'not_found', message: 'no such version' })
+      }
+      const head = versions[versions.length - 1]! // one read: bytes + revision + id of the head
+      return {
+        file: { fileId, name: 'R.docx', versionId: head.id, revision: head.revision },
+        source: { kind: 'bytes' as const, data: new Uint8Array(head.bytes).buffer },
+        ...(versionId !== undefined && versionId !== head.id ? { versionChanged: true } : {}),
+      }
+    }
+    const commit = (id: string, revision: string, bytes: number[]) =>
+      versions.push({ id, revision, bytes })
+    return { apiOpen, commit }
+  }
+
+  it('a commit between the event and api.open -> the head with its own revision', async () => {
+    const doc = fakeDocument()
+    const { host, client } = setup({ api: { 'api.open': doc.apiOpen } })
+    await host.whenReady()
+    await client.whenInitialized()
+    const events: Array<{ version_id: string; revision: string }> = []
+    client.onRemoteVersion((p) => events.push(p))
+    host.notifyRemoteVersion(REMOTE)
+    await flush()
+    doc.commit('v3', '7', [3]) // lands before the frame reloads
+    const reply = await client.request('api.open', {
+      fileId: 'doc-1',
+      versionId: events[0]!.version_id,
+    })
+    expect(reply.versionChanged).toBe(true)
+    expect(reply.file).toMatchObject({ versionId: 'v3', revision: '7' })
+    expect(bytesOf((reply.source as { data: ArrayBuffer }).data)).toEqual([3])
+    expect(openReplyRevision(reply)).toBe('7')
+    expect(openReplyRevision(reply)).not.toBe(events[0]!.revision)
+  })
+
+  it('the asked version is still the head -> no flag', async () => {
+    const doc = fakeDocument()
+    const { host, client } = setup({ api: { 'api.open': doc.apiOpen } })
+    await host.whenReady()
+    const reply = await client.request('api.open', { fileId: 'doc-1', versionId: 'v2' })
+    expect(reply.versionChanged).toBeUndefined()
+    expect(reply.file).toMatchObject({ versionId: 'v2', revision: '6' })
+    expect(bytesOf((reply.source as { data: ArrayBuffer }).data)).toEqual([2])
+  })
+
+  it('an unknown / purged / other-document version is refused with not_found', async () => {
+    const doc = fakeDocument()
+    const { host, client } = setup({ api: { 'api.open': doc.apiOpen } })
+    await host.whenReady()
+    await expect(
+      client.request('api.open', { fileId: 'doc-1', versionId: 'other-doc-v1' }),
+    ).rejects.toMatchObject({ code: 'not_found' })
   })
 })

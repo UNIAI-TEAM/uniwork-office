@@ -58,6 +58,10 @@ export const zh = {
   aiToolReadRangeOf: '读取范围 {range}',
   aiToolAggregate: '统计范围',
   aiToolAggregateOf: '统计范围 {range}',
+  aiToolSummarize: '条件汇总',
+  aiToolSummarizeOf: '条件汇总 {range}',
+  aiToolCompareRanges: '比较范围',
+  aiToolCompareRangesOf: '比较 {left} 与 {right}',
   aiToolLoadGuide: '加载指南',
   aiToolLoadGuideOf: '加载指南 {names}',
   aiToolReadFormats: '读取格式',
@@ -67,6 +71,19 @@ export const zh = {
   aiToolReadCellsCount: '读取 {count} 个单元格',
   aiToolPropose: '生成变更预览',
   aiToolCreateDocument: '新建文件',
+  // ask_clarification card (C-ASK)
+  aiClarifyTitle: '继续之前先确认几个问题',
+  aiClarifyDecide: '帮我决定',
+  aiClarifyDecideAnswer: '（帮我决定）',
+  aiClarifyMulti: '可多选',
+  aiClarifyNext: '下一题',
+  aiClarifyPrev: '上一题',
+  aiClarifyOther: '其他(可填写)',
+  aiClarifySelected: '已选 {n} 项',
+  aiClarifySkip: '跳过',
+  aiClarifySubmit: '确认',
+  aiToolClarify: '已回答确认问题',
+  aiToolClarifySkipped: '已跳过确认问题',
   aiToolCreatedDocument: '已创建 {name}',
   aiToolReadAttachment: '读取附件',
   aiToolReadAttachmentOf: '读取附件 {name}',
@@ -93,4 +110,7 @@ export const zh = {
   aiScopeRangeTip: 'AI 会把"这一列 / 这些行 / 选中部分"理解为该区域；发送后本轮固定不变',
   aiScopeClearTitle: '取消该区域范围，本次针对整张表',
   aiViewOnlyNotice: '仅查看文档:AI 可以阅读并回答问题,但无法编辑。',
+
+  // U-02 catalogue S9: cells summary under an edited result
+  aiResultCellsMeta: '已写入 {written} 个单元格（{range}）· 覆盖已有单元格 {overwritten} 个',
 }

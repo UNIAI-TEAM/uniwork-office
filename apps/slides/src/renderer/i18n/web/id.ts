@@ -3,8 +3,8 @@ import type { zh } from './zh'
 export const id = {
   webConflictTitle: 'Presentasi ini diubah di tempat lain',
   webConflictBody:
-    'Seseorang menyimpan versi yang lebih baru. Timpa menggantinya dengan perubahan Anda; Muat ulang terbaru membuang perubahan Anda dan membuka versi terbaru.',
-  webConflictOverwrite: 'Timpa',
+    'Perubahan Anda belum ada di UniWork dan disimpan di browser ini sampai Anda keluar.',
+  webConflictOverwrite: 'Timpa…',
   webConflictReload: 'Muat ulang terbaru',
   webConflictNotSaved: 'presentasi diubah di tempat lain',
   webDiscardTitle: 'Buang perubahan yang belum disimpan?',

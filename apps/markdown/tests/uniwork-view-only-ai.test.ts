@@ -45,7 +45,10 @@ describe('view-only skill (UniWork copy the user may only read)', () => {
       () => true,
     )
     const names = skill.tools.map((t) => t.name)
-    expect([...names].sort()).toEqual([...READ_ONLY_TOOLS].sort())
+    // ask_clarification is read-only but only offered while a panel hosts its card
+    expect([...names].sort()).toEqual(
+      [...READ_ONLY_TOOLS].filter((n) => n !== 'ask_clarification').sort(),
+    )
     // every writing tool of the catalogue is gone
     for (const name of ['apply_ops', 'write_document', 'insert_image', 'generate_image']) {
       expect(names).not.toContain(name)
@@ -72,7 +75,9 @@ describe('view-only skill (UniWork copy the user may only read)', () => {
       undefined,
       () => false,
     )
-    expect(skill.tools.map((t) => t.name)).toEqual(AGENT_TOOLS.map((t) => t.name))
+    expect(skill.tools.map((t) => t.name)).toEqual(
+      AGENT_TOOLS.map((t) => t.name).filter((n) => n !== 'ask_clarification'),
+    )
     expect(skill.systemPrompt).not.toContain('view-only')
   })
 
@@ -115,6 +120,8 @@ describe('view-only skill (UniWork copy the user may only read)', () => {
       undefined,
       undefined,
       () => readOnly,
+      // a panel hosting the ask_clarification card, so every read-only tool is offered
+      () => async () => ({ answers: '' }),
     )
     expect(skill.tools.length).toBe(READ_ONLY_TOOLS.size)
     readOnly = false

@@ -1,7 +1,7 @@
 import { useId } from 'react'
 
 /**
- * The uniAI mark ("helper"): the u of uni holding the dot of the i in AI, a figure reaching out
+ * The UniAI mark ("helper"): the u of uni holding the dot of the i in AI, a figure reaching out
  * to help. Sibling of the UniWork Office logo: same blue-cyan gradient, round head, soft body.
  *
  * - `tile`: white glyph on the brand gradient squircle (avatars, panel titles, AI entry points).

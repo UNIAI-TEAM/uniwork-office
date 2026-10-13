@@ -5,7 +5,9 @@ import {
   type UniworkConflictChoice,
   type UniworkDocFormat,
   type UniworkDocListQuery,
+  type UniworkDocLock,
 } from '../../shared/home-api'
+import { createLaunchPusher, createPushHolder } from './launch'
 import {
   applyUniworkProfile,
   authorizedRequest,
@@ -18,7 +20,6 @@ import {
 } from '../uniwork-auth'
 import { AccountBoundary } from './account-boundary'
 import { setUniworkCloseGuard } from './close-guard'
-import { createLaunchPusher } from './launch'
 import {
   UniworkDocsService,
   type ConflictUi,
@@ -39,6 +40,12 @@ export interface UniworkDocsWiring {
   shellWindow(): BrowserWindow | null
   shellContents(): WebContents | null
   openPath(path: string): boolean
+  /**
+   * True when `path` is a working copy whose folder declares a store this build
+   * does not read: the shell records the lock (S11 panel) instead of opening a
+   * module, and nothing is downloaded or written.
+   */
+  refuseLockedPath(path: string): boolean
   isPathOpen(path: string): boolean
   requestModuleSave(path: string, onNotWritten?: () => void): boolean
   reloadPath(path: string): void
@@ -219,7 +226,11 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     identity: () => uniworkSessionIdentity(),
     selectedOrgId: () => uniworkAccount().status().org?.id ?? null,
     authorized: (call) => authorizedRequest(call),
-    openPath: (path) => wiring.openPath(path),
+    openPath: (path) => {
+      // G5-04g: a newer store is refused before any module sees the path
+      if (wiring.refuseLockedPath(path)) return false
+      return wiring.openPath(path)
+    },
     isPathOpen: (path) => wiring.isPathOpen(path),
     requestModuleSave: (path, onNotWritten) => wiring.requestModuleSave(path, onNotWritten),
     reloadPath: (path) => wiring.reloadPath(path),
@@ -227,6 +238,15 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     ui: conflictUi(wiring),
     pushStatus: (status) => push(UNIWORK_DOC_CHANNELS.docStatusEvent, status),
     pushLaunch: createLaunchPusher(() => wiring.shellContents(), UNIWORK_DOC_CHANNELS.launchEvent),
+    // A lock can be pushed before the shell page has loaded (a cold-start open):
+    // main holds the latest one and sends it when the page finishes loading.
+    // The preload does NOT replay a held lock - the shell reads uniworkLocks()
+    // when it mounts, so a push missed before that is not lost and a lock the
+    // user dismissed in the meantime is not resurrected.
+    pushLock: createPushHolder<UniworkDocLock>(
+      () => wiring.shellContents(),
+      UNIWORK_DOC_CHANNELS.lock,
+    ),
     reveal: () => wiring.reveal(),
   })
 
@@ -245,6 +265,10 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   ipcMain.handle(UNIWORK_DOC_CHANNELS.resolveConflict, (_event, path: unknown) =>
     service.resolveConflict(path as string),
   )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.locks, () => service.currentLocks())
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.dismissLock, (_event, path: unknown) => {
+    if (typeof path === 'string') service.dismissLock(path)
+  })
   setUniworkCloseGuard(service)
   // Sign out and a sign-in as someone else close the previous account's
   // documents and delete their AI history (see account-boundary.ts)
@@ -256,6 +280,9 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     closeNow: (path) => wiring.closePathNow(path),
     aiHistoryPaths: () => wiring.aiHistoryPaths(),
     forgetAiHistory: (paths) => wiring.forgetAiHistory(paths),
+    // the previous account's locks go with its documents: the next session is
+    // not shown an S11 panel for a working copy it cannot explain
+    forgetLocks: (match) => service.forgetLocksWhere(match),
     closeConflictPrompt: () => service.closeConflictPrompt(),
   })
   setUniworkSignOutHooks({

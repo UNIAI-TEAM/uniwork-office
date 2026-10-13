@@ -1,0 +1,65 @@
+import type { zh } from './zh'
+
+export const vi = {
+  // S7 provider row, picker footer and composer notes
+  aiUniworkProvider: 'UniWork AI',
+  aiUniworkCreditsAria: 'Còn {remaining} trên {limit} tín dụng',
+  aiUniworkFooterSignIn: 'Đăng nhập UniWork để dùng UniWork AI',
+  aiUniworkSignedOut: 'Phiên UniWork đã đăng xuất. Chọn nhà cung cấp khác hoặc đăng nhập lại.',
+  aiUniworkOff: 'UniWork AI đang tắt cho tài liệu này. Chọn nhà cung cấp khác.',
+  aiUniworkViewOnly: 'Chế độ chỉ xem: AI trả lời được nhưng không sửa hoặc lưu tài liệu.',
+
+  // S8 disclosure
+  aiUniworkDisclosure:
+    'UniWork AI đọc nội dung đang mở trong tài liệu này, kể cả phần chưa lưu, và gửi tới UniWork cùng nhà cung cấp mô hình để trả lời. Mỗi lượt dùng tín dụng AI của {org}. AI không tự lưu: bạn xem lại rồi bấm Lưu.',
+  aiUniworkDisclosureLabel: 'Nội dung gửi tới UniWork AI',
+  aiUniworkDisclosureShort:
+    'Gửi nội dung đang mở (kể cả chưa lưu) tới UniWork · tín dụng của {org}',
+  aiUniworkLocalFile:
+    'Tệp này nằm trên máy bạn, chưa ở UniWork. Khi dùng UniWork AI, nội dung tệp đang mở được gửi tới UniWork và dùng tín dụng AI của {org}. Tệp không được tải lên thành tài liệu UniWork.',
+  aiUniworkAck: 'Đã hiểu',
+  aiUniworkLearnMore: 'Tìm hiểu thêm',
+  aiUniworkDetails: 'Chi tiết',
+  aiUniworkSendNeedsAck: 'Hãy đọc và xác nhận lời công bố trước khi gửi.',
+
+  // S9 result chips and run controls
+  aiResultAnswer: 'Trả lời',
+  aiResultClarify: 'Cần làm rõ',
+  aiResultEdited: 'Đã sửa trong tài liệu',
+  aiResultUnsupported: 'Chưa hỗ trợ',
+  aiResultError: 'Lỗi',
+  aiResultEditedHint: 'Chưa lưu — hoàn tác bằng Ctrl/⌘+Z hoặc bấm Lưu khi đã ổn.',
+  aiResultViewChanges: 'Xem thay đổi',
+  aiRunStop: 'Dừng',
+  aiRunSend: 'Gửi',
+  aiRunRunning: 'Đang chạy… Bấm Dừng hoặc Esc để dừng.',
+  aiRunStopped: 'Đã dừng. Thay đổi đã áp dụng (nếu có) vẫn trong tài liệu và hoàn tác được.',
+  aiRunAskAgain: 'Hỏi tiếp',
+  aiRunChooseOther: 'Chọn nhà cung cấp khác',
+  aiRunOpenInApp: 'Mở bằng ứng dụng',
+  aiConversationRestarted:
+    'Cuộc trò chuyện trước đã hết hạn nên UniWork AI bắt đầu cuộc mới và không còn nhớ các lượt trước. Gửi lại câu hỏi để tiếp tục.',
+  aiConversationBoundary:
+    'Cuộc trò chuyện mới với {provider}: các lượt phía trên không được gửi kèm.',
+
+  // S10 run errors (the panel shows one at a time; the document and Save keep working)
+  aiErrRunLimit:
+    'Lượt này đã chạm giới hạn số bước của UniWork AI. Kết quả tới đây vẫn được giữ; hãy chia nhỏ yêu cầu rồi hỏi tiếp.',
+  aiErrCredits: 'Tổ chức đã dùng hết tín dụng AI kỳ này. Lượt này đã dừng.',
+  aiErrEntitlement: 'Gói của tổ chức không còn bao gồm UniWork AI.',
+  aiErrRateLimited: 'Bạn đang gửi quá nhanh. Thử lại sau {seconds} giây.',
+  aiErrRateLimitedNoWait: 'Bạn đang gửi quá nhanh. Hãy thử lại sau ít phút.',
+  aiErrUnavailable: 'UniWork AI tạm thời không phản hồi. Tài liệu và nút Lưu vẫn dùng bình thường.',
+  aiErrDisconnected:
+    'Mất kết nối giữa chừng nên lượt này đã dừng. Thay đổi đã áp dụng (nếu có) vẫn trong tài liệu và hoàn tác được.',
+  aiErrOffline: 'Không có mạng. UniWork AI không chạy khi offline và yêu cầu không được xếp hàng.',
+  aiErrSession:
+    'Phiên đăng nhập UniWork đã hết hạn nên lượt này đã dừng. Đăng nhập lại để tiếp tục.',
+  aiErrRevoked: 'Bạn không còn quyền với tài liệu này nên lượt AI đã dừng.',
+  aiErrDowngraded:
+    'Quyền của bạn vừa đổi thành chỉ xem nên AI ngừng sửa tài liệu. Câu trả lời vẫn tiếp tục.',
+  aiErrCapabilityOff:
+    'UniWork AI vừa được tắt cho tài liệu này nên lượt đã dừng sau bước hiện tại.',
+  aiErrUnsupported: 'UniWork AI chưa làm được thao tác này trong {module}.',
+  aiErrViewOnlyEdit: 'Bạn chỉ có quyền xem tài liệu này nên AI không sửa được.',
+} satisfies Record<keyof typeof zh, string>

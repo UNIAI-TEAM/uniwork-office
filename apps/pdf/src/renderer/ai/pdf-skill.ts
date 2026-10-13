@@ -63,22 +63,28 @@ const VIEW_ONLY_NOTE =
 const IMAGE_GEN_OFF_NOTE =
   '\n\nNote: generate_image is currently unavailable (no image model is configured under Settings → AI media). Do not call or promise it; use image_search for imagery.'
 
+const BOUND_NOTE =
+  '\n\nNote: this document belongs to UniWork. create_document is unavailable here; do not call or promise it. Give results in your reply instead.'
+
 export function createPdfSkill(deps: PdfAiDeps): AgentSkill {
   return {
     id: 'pdf',
     // live like tools: the off-note overrides the prose that still mentions generate_image
     get systemPrompt() {
       if (deps.readOnly()) return SYSTEM_PROMPT + VIEW_ONLY_NOTE
-      return deps.imageGenAvailable?.() === false
-        ? SYSTEM_PROMPT + IMAGE_GEN_OFF_NOTE
-        : SYSTEM_PROMPT
+      let prompt = SYSTEM_PROMPT
+      if (deps.uniworkBound?.()) prompt += BOUND_NOTE
+      if (deps.imageGenAvailable?.() === false) prompt += IMAGE_GEN_OFF_NOTE
+      return prompt
     },
     // live view: the predicate is re-read before every model request
     get tools() {
       if (deps.readOnly()) return AGENT_TOOLS.filter((t) => READ_ONLY_TOOLS.has(t.name))
-      return deps.imageGenAvailable?.() === false
-        ? AGENT_TOOLS.filter((t) => t.name !== 'generate_image')
-        : AGENT_TOOLS
+      // C-BOUND: a UniWork-bound copy never gets the tool that writes a new file beside it
+      const hidden = new Set<string>()
+      if (deps.uniworkBound?.()) hidden.add('create_document')
+      if (deps.imageGenAvailable?.() === false) hidden.add('generate_image')
+      return hidden.size === 0 ? AGENT_TOOLS : AGENT_TOOLS.filter((t) => !hidden.has(t.name))
     },
     buildContext: () => {
       const parts = [

@@ -1507,8 +1507,8 @@ export const vi = {
   appWebViewOnly: 'Chỉ xem: bạn không thể lưu thay đổi cho sổ làm việc này.',
   appWebConflictTitle: 'Sổ làm việc này đã được thay đổi ở nơi khác',
   appWebConflictBody:
-    'Có người đã lưu phiên bản mới hơn trong lúc bạn chỉnh sửa. Ghi đè bằng phiên bản của bạn, hoặc tải lại phiên bản mới nhất (các thay đổi chưa lưu sẽ bị bỏ).',
-  appWebConflictOverwrite: 'Ghi đè',
+    'Thay đổi của bạn chưa lưu lên UniWork và vẫn được giữ trong trình duyệt này cho tới khi bạn đăng xuất.',
+  appWebConflictOverwrite: 'Ghi đè…',
   appWebConflictReload: 'Tải lại bản mới nhất',
   appWebConflictNotSaved: 'Chưa lưu: đã có phiên bản mới hơn.',
   appWebDiscardTitle: 'Bỏ các thay đổi chưa lưu?',

@@ -59,6 +59,10 @@ export const he = {
   aiToolReadRangeOf: 'קריאת הטווח {range}',
   aiToolAggregate: 'סיכום סטטיסטי של טווח',
   aiToolAggregateOf: 'סיכום סטטיסטי של הטווח {range}',
+  aiToolSummarize: 'סיכום מותנה של טווח',
+  aiToolSummarizeOf: 'סיכום מותנה של הטווח {range}',
+  aiToolCompareRanges: 'השוואת טווחים',
+  aiToolCompareRangesOf: 'השוואת {left} עם {right}',
   aiToolLoadGuide: 'טעינת מדריך',
   aiToolLoadGuideOf: 'טעינת המדריכים {names}',
   aiToolReadFormats: 'קריאת עיצובים',
@@ -68,6 +72,19 @@ export const he = {
   aiToolReadCellsCount: 'קריאת {count} תאים',
   aiToolPropose: 'יצירת תצוגה מקדימה של שינויים',
   aiToolCreateDocument: 'יצירת קובץ חדש',
+  // ask_clarification card (C-ASK)
+  aiClarifyTitle: 'בדיקה קצרה לפני שאמשיך',
+  aiClarifyDecide: 'החלט בשבילי',
+  aiClarifyDecideAnswer: '(החלט בשבילי)',
+  aiClarifyMulti: 'בחירה מרובה',
+  aiClarifyNext: 'הבא',
+  aiClarifyPrev: 'הקודם',
+  aiClarifyOther: 'אחר (הקלד)',
+  aiClarifySelected: 'נבחרו {n}',
+  aiClarifySkip: 'דלג',
+  aiClarifySubmit: 'אישור',
+  aiToolClarify: 'ההבהרה נענתה',
+  aiToolClarifySkipped: 'ההבהרה דולגה',
   aiToolCreatedDocument: '{name} נוצר',
   aiToolReadAttachment: 'קריאת קובץ מצורף',
   aiToolReadAttachmentOf: 'קריאת הקובץ המצורף {name}',
@@ -95,4 +112,7 @@ export const he = {
     'ה-AI מפרש "העמודה הזו / השורות האלה / החלק הנבחר" כטווח הזה, והוא מקובע לכל ההרצה עם השליחה',
   aiScopeClearTitle: 'ביטול טווח הבחירה ומיקוד בגיליון כולו',
   aiViewOnlyNotice: 'מסמך לצפייה בלבד: ה-AI יכול לקרוא אותו ולענות על שאלות, אך לא לערוך אותו.',
+
+  // U-02 catalogue S9: cells summary under an edited result
+  aiResultCellsMeta: 'תאים שנכתבו: {written} ({range}) · תאים קיימים שנדרסו: {overwritten}',
 } satisfies Record<keyof typeof zh, string>

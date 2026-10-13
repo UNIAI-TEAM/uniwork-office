@@ -65,6 +65,10 @@ export const nl = {
   aiToolReadRangeOf: 'Bereik {range} lezen',
   aiToolAggregate: 'Bereik aggregeren',
   aiToolAggregateOf: 'Bereik {range} aggregeren',
+  aiToolSummarize: 'Bereik samenvatten',
+  aiToolSummarizeOf: 'Bereik {range} samenvatten',
+  aiToolCompareRanges: 'Bereiken vergelijken',
+  aiToolCompareRangesOf: '{left} vergelijken met {right}',
   aiToolLoadGuide: 'Handleiding laden',
   aiToolLoadGuideOf: 'Handleidingen {names} laden',
   aiToolReadFormats: 'Opmaak lezen',
@@ -74,6 +78,19 @@ export const nl = {
   aiToolReadCellsCount: '{count} cellen lezen',
   aiToolPropose: 'Wijzigingsvoorbeeld maken',
   aiToolCreateDocument: 'Nieuw bestand maken',
+  // ask_clarification card (C-ASK)
+  aiClarifyTitle: 'Even checken voordat ik verder ga',
+  aiClarifyDecide: 'Beslis voor mij',
+  aiClarifyDecideAnswer: '(beslis voor mij)',
+  aiClarifyMulti: 'Meerdere keuzes',
+  aiClarifyNext: 'Volgende',
+  aiClarifyPrev: 'Vorige',
+  aiClarifyOther: 'Anders (typ zelf)',
+  aiClarifySelected: '{n} geselecteerd',
+  aiClarifySkip: 'Overslaan',
+  aiClarifySubmit: 'Bevestigen',
+  aiToolClarify: 'Vraag beantwoord',
+  aiToolClarifySkipped: 'Vraag overgeslagen',
   aiToolCreatedDocument: '{name} aangemaakt',
   aiToolReadAttachment: 'Bijlage lezen',
   aiToolReadAttachmentOf: 'Bijlage {name} lezen',
@@ -102,4 +119,8 @@ export const nl = {
   aiScopeClearTitle: 'Bereikbereik wissen en het hele blad gebruiken',
   aiViewOnlyNotice:
     'Alleen-lezen document: AI kan het lezen en vragen beantwoorden, maar niet bewerken.',
+
+  // U-02 catalogue S9: cells summary under an edited result
+  aiResultCellsMeta:
+    'Geschreven cellen: {written} ({range}) · Overschreven bestaande cellen: {overwritten}',
 } satisfies Record<keyof typeof zh, string>

@@ -526,8 +526,8 @@ export const de = {
   appStyleNamePlaceholder: 'Name der Formatvorlage',
   appWebConflictTitle: 'Dieses Dokument wurde an anderer Stelle geändert',
   appWebConflictBody:
-    'Während Sie bearbeitet haben, wurde eine neuere Version gespeichert. Mit Ihrer Version überschreiben oder die neueste Version neu laden und Ihre Änderungen verwerfen?',
-  appWebConflictOverwrite: 'Überschreiben',
+    'Ihre Änderungen sind noch nicht in UniWork und bleiben in diesem Browser, bis Sie sich abmelden.',
+  appWebConflictOverwrite: 'Überschreiben…',
   appWebConflictReload: 'Neueste Version laden',
   appWebConflictNotSaved: 'das Dokument wurde an anderer Stelle geändert',
   appWebDiscardTitle: 'Nicht gespeicherte Änderungen verwerfen?',

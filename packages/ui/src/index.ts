@@ -107,6 +107,7 @@ export {
   type ImageDialogLabels,
 } from './image-dialogs'
 export { CROP_EDGE_LABELS } from './strings-crop-edges'
+export { aiUniworkStrings, aiUniworkText, type AiUniworkStringKey } from './strings-ai-uniwork'
 export { ImageViewer, type ImageViewerLabels } from './image-viewer'
 export { trapTab, useModalKeys } from './modal-keys'
 export {

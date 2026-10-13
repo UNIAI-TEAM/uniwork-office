@@ -513,8 +513,8 @@ export const pt = {
   appStyleNamePlaceholder: 'Nome do estilo',
   appWebConflictTitle: 'Este documento foi alterado em outro lugar',
   appWebConflictBody:
-    'Uma versão mais recente foi salva enquanto você editava. Deseja substituí-la pela sua versão ou recarregar a versão mais recente e descartar suas alterações?',
-  appWebConflictOverwrite: 'Substituir',
+    'Suas alterações ainda não estão no UniWork e ficam neste navegador até você sair.',
+  appWebConflictOverwrite: 'Substituir…',
   appWebConflictReload: 'Recarregar a versão mais recente',
   appWebConflictNotSaved: 'o documento foi alterado em outro lugar',
   appWebDiscardTitle: 'Descartar as alterações não salvas?',

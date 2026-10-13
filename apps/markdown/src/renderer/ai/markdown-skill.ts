@@ -1,11 +1,13 @@
-import type { AgentSkill } from '@genoffice/agent-core'
+import type { AgentSkill, AgentToolDef } from '@genoffice/agent-core'
 import type { Editor } from '@tiptap/core'
+import { cap } from '../capabilities'
 import type { AiDocWriter } from './doc-writer'
 import {
   AGENT_TOOLS,
   buildDocContext,
   executeTool,
   markDocSeen,
+  type AskClarification,
   type FrontmatterAccess,
 } from './tools'
 
@@ -69,10 +71,22 @@ export const READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
   'get_document_context',
   'read_blocks',
   'read_frontmatter',
+  'ask_clarification',
 ])
 
 const VIEW_ONLY_NOTE =
   '\n\nNote: this document is view-only. You can read it and answer questions about it, but you cannot edit it: no edit tools are available. If the user asks for a change, explain that the document is view-only and that they can save a copy to edit it.'
+
+/** both land a downloaded picture beside the document (fetchImage + saveImage) */
+const IMAGE_FETCH_TOOLS: ReadonlySet<string> = new Set(['insert_image', 'generate_image'])
+
+/** tools the host cannot run (web: no image download route) are never offered */
+function hostOffers(name: string): boolean {
+  return !IMAGE_FETCH_TOOLS.has(name) || cap('aiImageFetch')
+}
+
+const IMAGE_FETCH_OFF_NOTE =
+  '\n\nNote: insert_image and generate_image are unavailable here (images cannot be downloaded into this document). Do not call or promise them; image_search results can be shared as links.'
 
 const IMAGE_GEN_OFF_NOTE =
   '\n\nNote: generate_image is currently unavailable (no image model is configured under Settings → AI media). Do not call or promise it; use image_search for imagery.'
@@ -86,21 +100,35 @@ export function createMarkdownSkill(
   getWriter?: () => AiDocWriter | undefined,
   /** live predicate: a view-only UniWork document, where the assistant may read but never edit */
   isReadOnly?: () => boolean,
+  /** the panel's questionnaire card behind ask_clarification; none hides the tool */
+  getAsk?: () => AskClarification | undefined,
 ): AgentSkill {
+  /** ask_clarification only exists while a panel hosts its card; it never edits, so view-only keeps it */
+  const withAsk = (tools: AgentToolDef[], readOnly: boolean): AgentToolDef[] =>
+    tools.filter((t) =>
+      t.name === 'ask_clarification' ? !!getAsk?.() : !readOnly || READ_ONLY_TOOLS.has(t.name),
+    )
   return {
     id: 'markdown',
     // live: the predicates are re-read before every model request
     get systemPrompt() {
       if (isReadOnly?.()) return AGENT_SYSTEM_PROMPT + VIEW_ONLY_NOTE
-      return imageGenAvailable?.() === false
-        ? AGENT_SYSTEM_PROMPT + IMAGE_GEN_OFF_NOTE
-        : AGENT_SYSTEM_PROMPT
+      const prompt =
+        imageGenAvailable?.() === false
+          ? AGENT_SYSTEM_PROMPT + IMAGE_GEN_OFF_NOTE
+          : AGENT_SYSTEM_PROMPT
+      return hostOffers('insert_image') ? prompt : prompt + IMAGE_FETCH_OFF_NOTE
     },
     get tools() {
-      if (isReadOnly?.()) return AGENT_TOOLS.filter((t) => READ_ONLY_TOOLS.has(t.name))
-      return imageGenAvailable?.() === false
-        ? AGENT_TOOLS.filter((t) => t.name !== 'generate_image')
-        : AGENT_TOOLS
+      if (isReadOnly?.()) return withAsk(AGENT_TOOLS, true)
+      const tools =
+        imageGenAvailable?.() === false
+          ? AGENT_TOOLS.filter((t) => t.name !== 'generate_image')
+          : AGENT_TOOLS
+      return withAsk(
+        tools.filter((t) => hostOffers(t.name)),
+        false,
+      )
     },
     buildContext: () => {
       const editor = getEditor()
@@ -116,11 +144,14 @@ export function createMarkdownSkill(
           summary: call.name,
         }
       }
+      if (!hostOffers(call.name)) {
+        return { output: `${call.name} is not available here.`, isError: true, summary: call.name }
+      }
       const editor = getEditor()
       if (!editor) {
         return { output: 'editor not ready', isError: true, summary: call.name }
       }
-      return executeTool(editor, call, signal, fm, getWriter?.())
+      return executeTool(editor, call, signal, fm, getWriter?.(), getAsk?.())
     },
   }
 }

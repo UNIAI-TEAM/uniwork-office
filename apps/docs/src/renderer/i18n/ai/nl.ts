@@ -187,4 +187,16 @@ export const nl = {
   aiCmdSkipped: ' ({count} beveiligde blok(ken) overgeslagen)',
   aiViewOnlyNotice:
     'Alleen-lezen document: AI kan het lezen en vragen beantwoorden, maar niet bewerken.',
+  aiClarifyTitle: 'Een paar vragen voordat ik verder ga',
+  aiClarifyDecide: 'Beslis voor mij',
+  aiClarifyDecideAnswer: '(beslis voor mij)',
+  aiClarifyMulti: 'Meerdere keuzes',
+  aiClarifyNext: 'Volgende',
+  aiClarifyPrev: 'Vorige',
+  aiClarifyOther: 'Anders (typ zelf)',
+  aiClarifySelected: '{n} geselecteerd',
+  aiClarifySkip: 'Overslaan',
+  aiClarifySubmit: 'Doorgaan',
+  aiSumClarify: 'Verduidelijking beantwoord',
+  aiSumClarifySkipped: 'Verduidelijking overgeslagen',
 } satisfies Record<keyof typeof zh, string>

@@ -1,5 +1,5 @@
 import type { IFunctionInfo } from '@univerjs/engine-formula'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ComponentProps } from 'react'
 import { platformShortcuts } from '@genoffice/i18n'
 import {
   Dropdown,
@@ -73,6 +73,7 @@ import type { ChartSeriesVisualState } from '@genoffice/xlsx-gateway/domain/char
 import type { ChangePlan } from '@genoffice/xlsx-gateway/domain/workbook.types'
 import type { AttachmentMeta } from '../shared/desktop-api'
 import { AiChatPanel, type AiChatMessage } from './ai/AiChatPanel'
+import { resolveCopilotOpen } from './ai/copilot-open'
 import { AiSelectionAsk } from './ai/AiSelectionAsk'
 import type { SelectionAskAnchor } from './ai/selection-ask'
 import {
@@ -315,6 +316,8 @@ interface ExcelShellProps {
   /// UniWork view-only workbook: the AI reads and answers but never edits, so the
   /// edit-capable AI actions are off (with the reason as tooltip).
   readonly aiViewOnly?: boolean
+  /// ask_clarification card waiting for the user (docked in the AI composer slot).
+  readonly aiClarify?: ComponentProps<typeof AiChatPanel>['clarify']
   /// Non-null while a floating chart is selected in the grid.
   readonly selectedChart: SelectedChartRibbon | null
   /// Non-null while an editable shape is selected (Shape Format tab).
@@ -539,6 +542,7 @@ export function ExcelShell({
   onAutoSaveChange,
   autoSaveHidden = false,
   aiViewOnly = false,
+  aiClarify = null,
   selectedChart,
   selectedShape,
   selectedTable,
@@ -569,9 +573,16 @@ export function ExcelShell({
     return false
   })
   // without the `ai` capability (web frame) the dock never opens
+  // a waiting ask_clarification keeps the dock open: its card lives there
+  const askingRef = useRef(aiClarify !== null)
+  askingRef.current = aiClarify !== null
   const setIsCopilotOpen: typeof setIsCopilotOpenState = (next) => {
-    if (cap('ai')) setIsCopilotOpenState(next)
+    if (cap('ai'))
+      setIsCopilotOpenState((prev) => resolveCopilotOpen(prev, next, askingRef.current))
   }
+  useEffect(() => {
+    if (aiClarify && !isCopilotOpen) setIsCopilotOpen(true)
+  })
   useEffect(() => {
     if (autoCollapsedRef.current) {
       if (!isCopilotOpen) return
@@ -1048,6 +1059,7 @@ export function ExcelShell({
             onExpand={() => setIsCopilotOpen(true)}
             onCollapse={() => setIsCopilotOpen(false)}
             viewOnly={aiViewOnly}
+            clarify={aiClarify}
           />
         )}
         <div className="sheet-main">

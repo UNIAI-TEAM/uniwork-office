@@ -1587,8 +1587,8 @@ export const fr = {
     'Lecture seule : vous ne pouvez pas enregistrer les modifications de ce classeur.',
   appWebConflictTitle: 'Ce classeur a été modifié ailleurs',
   appWebConflictBody:
-    "Quelqu'un a enregistré une version plus récente pendant votre modification. Remplacez-la par votre version ou rechargez la dernière version (vos modifications non enregistrées seront perdues).",
-  appWebConflictOverwrite: 'Remplacer',
+    'Vos modifications ne sont pas encore sur UniWork et sont conservées dans ce navigateur jusqu’à votre déconnexion.',
+  appWebConflictOverwrite: 'Écraser…',
   appWebConflictReload: 'Recharger la dernière version',
   appWebConflictNotSaved: 'Non enregistré : une version plus récente existe.',
   appWebDiscardTitle: 'Abandonner les modifications non enregistrées ?',

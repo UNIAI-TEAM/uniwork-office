@@ -50,4 +50,7 @@ export const th = {
   aiWebStateProviderBody: 'ไม่รองรับผู้ให้บริการนี้',
   aiWebStateUnknownTitle: 'คำขอ AI ล้มเหลว',
   aiWebStateUnknownBody: 'เกิดข้อผิดพลาด โปรดลองอีกครั้ง',
+
+  // U-02 catalogue S10: workbook over the web AI size limit
+  aiErrWorkbookTooLarge: 'เวิร์กบุ๊กนี้ใหญ่เกินไปสำหรับ AI บนเว็บ เปิดในแอป UniWork Office',
 } satisfies Record<keyof typeof zh, string>

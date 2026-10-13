@@ -30,6 +30,17 @@ import sendEnterOff from '../assets/send-enter-off.png'
 import sendStop from '../assets/send-stop.png'
 import { clearAiHighlights } from '../editor/aiHighlight'
 import { setInactiveSelectionShown } from '../editor/inactiveSelection'
+import { queueAnchorRange } from '../editor/aiQueueAnchors'
+import {
+  clearEditFence,
+  canRetryEntry,
+  restoredEntryState,
+  retryFence,
+  setEditFence,
+  turnFence,
+  type EntryFence,
+  type FenceRange,
+} from './edit-fence'
 import { createMarkdownSkill, MARKDOWN_RULES } from './markdown-skill'
 import {
   buildDocWriterRequest,
@@ -42,6 +53,9 @@ import {
 import { createSearchSkill } from './search-skill'
 import { createElectronTransport } from './transport'
 import { EditQueueCard } from './EditQueueCard'
+import { ClarifyCard } from '../components/ClarifyCard'
+import { withReceipt, withoutReceipts, type ClarifyQa } from './clarify-receipts'
+import type { AskClarification, ClarifyQuestion } from './tools'
 import {
   buildQueueInstruction,
   buildQueueSummary,
@@ -103,6 +117,12 @@ interface ChatEntry {
   tools?: ToolActivity[]
   /** the selection this user message targeted, frozen at send */
   scope?: AiScopeQuoteData
+  /** the edit fence of this user turn (selection scope or queue submission): a retry reuses it, never runs the turn unfenced */
+  fence?: EntryFence
+  /** restored from a stored transcript: no retry, its fence ranges are unknown */
+  restored?: true
+  /** answered ask_clarification cards of this message's run (view-only receipts) */
+  clarifyReceipts?: ClarifyQa[][]
 }
 
 /** longest selection excerpt echoed on a user bubble */
@@ -192,6 +212,24 @@ export function AiPanel({
   /** a streamed write stopped early: the draft stays in the document until the user keeps or discards it */
   const [activePartial, setActivePartial] = useState<{ blocks: number } | null>(null)
   const partialResolverRef = useRef<((keep: boolean) => void) | null>(null)
+  /** ask_clarification card docked in the composer slot while the run waits for the user */
+  const [activeClarify, setActiveClarify] = useState<ClarifyQuestion[] | null>(null)
+  const clarifyResolverRef = useRef<((r: { answers: string; cancelled?: boolean }) => void) | null>(
+    null,
+  )
+  /** settle an open card as skipped so the waiting tool call never dangles */
+  const dismissClarify = (): void => {
+    clarifyResolverRef.current?.({ answers: '', cancelled: true })
+    clarifyResolverRef.current = null
+    setActiveClarify(null)
+  }
+  const askClarification: AskClarification = (questions) =>
+    new Promise((resolve) => {
+      // a second card replaces a stale one; the stale call reads as skipped
+      clarifyResolverRef.current?.({ answers: '', cancelled: true })
+      clarifyResolverRef.current = resolve
+      setActiveClarify(questions)
+    })
   /** bumped by New chat / unmount: a writer resuming after its abort must not open the keep card */
   const writerEpochRef = useRef(0)
   const [prompt, setPrompt] = useState('')
@@ -234,8 +272,24 @@ export function AiPanel({
   const runInstructionRef = useRef('')
   /** what the user saw for that instruction (queue submissions show a summary) */
   const runDisplayRef = useRef('')
-  /** the scope quote of the last send, so a retry reuses it instead of re-reading the live selection */
-  const lastScopeRef = useRef<AiScopeQuoteData | undefined>(undefined)
+  /**
+   * the run ended (done, error or stop): the fence ends with it. Its mapped ranges go on the
+   * turn's user entry, so any retry of that entry (header or bubble) runs with the same fence.
+   */
+  const endRunFence = (editor: Editor): void => {
+    const ranges = clearEditFence(editor)
+    if (!ranges) return
+    setChat((prev) => {
+      for (let i = prev.length - 1; i >= 0; i--) {
+        const entry = prev[i]!
+        if (entry.role !== 'user') continue
+        const next = [...prev]
+        next[i] = { ...entry, fence: { fenced: true, ranges } }
+        return next
+      }
+      return prev
+    })
+  }
   const runMutatedRef = useRef(false)
   /** tool activity of the whole run, for transcript persistence */
   const runToolsRef = useRef<ToolActivity[]>([])
@@ -392,6 +446,7 @@ export function AiPanel({
             write: (spec, onProgress, signal) => runDocWriterRef.current(spec, onProgress, signal),
           }),
           () => readOnlyRef.current,
+          () => askClarification,
         ),
         createSearchSkill(),
       ]),
@@ -456,11 +511,16 @@ export function AiPanel({
           }))
           persistMessage('assistant', final, runToolsRef.current)
           const editor = depsRef.current.getEditor()
-          if (editor) clearAiHighlights(editor)
+          if (editor) {
+            clearAiHighlights(editor)
+            endRunFence(editor)
+          }
           depsRef.current.onRunDone(runMutatedRef.current)
           setBusy(false)
         },
         onError: (error) => {
+          const editor = depsRef.current.getEditor()
+          if (editor) endRunFence(editor)
           setChat((prev) => {
             const next = [...prev]
             for (let i = next.length - 1; i >= 0; i--) {
@@ -494,9 +554,14 @@ export function AiPanel({
     return () => {
       mountedRef.current = false
       partialResolverRef.current?.(false)
+      clarifyResolverRef.current?.({ answers: '', cancelled: true })
+      clarifyResolverRef.current = null
       loopRef.current?.cancel()
       const editor = depsRef.current.getEditor()
-      if (editor) clearAiHighlights(editor)
+      if (editor) {
+        clearAiHighlights(editor)
+        clearEditFence(editor)
+      }
     }
   }, [])
 
@@ -532,8 +597,10 @@ export function AiPanel({
               output: tool.output ? tool.output.slice(0, TOOL_OUTPUT_MAX_CHARS) : undefined,
             })),
             ...(m.scope ? { scope: m.scope } : {}),
+            ...restoredEntryState(m.role),
           }))
         })
+        if (applied) setChat((prev) => withoutReceipts(prev))
         if (applied && !loopRef.current?.busy) {
           loopRef.current?.restore(msgs.map((m) => ({ role: m.role, text: m.text })))
         }
@@ -544,6 +611,13 @@ export function AiPanel({
   }, [])
 
   /** after an untitled document's first save, bind the unsaved-* history to the real path */
+  // answered receipts belong to the document they were given for: drop them when another
+  // one opens (an untitled document getting its first path is the same document)
+  useEffect(() => {
+    const previous = filePathRef.current
+    if (previous && previous !== filePath) setChat((prev) => withoutReceipts(prev))
+  }, [filePath])
+
   useEffect(() => {
     filePathRef.current = filePath
     const ids = chatIdsRef.current
@@ -570,8 +644,16 @@ export function AiPanel({
     stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48
   }
 
-  /** retryScope: null = a retry that had no scope; undefined = capture the live selection */
-  const send = (text: string, displayText?: string, retryScope?: AiScopeQuoteData | null): void => {
+  /**
+   * retryOf: the user entry being retried (its scope quote and fence); undefined = a new turn,
+   * which captures the live selection. queueFence: the anchored ranges of a queue submission.
+   */
+  const send = (
+    text: string,
+    displayText?: string,
+    retryOf?: Pick<ChatEntry, 'scope' | 'fence'>,
+    queueFence?: FenceRange[],
+  ): void => {
     const instruction = text.trim()
     const loop = loopRef.current
     if (!instruction || !loop || loop.busy) return
@@ -581,18 +663,31 @@ export function AiPanel({
     runMutatedRef.current = false
     runToolsRef.current = []
     // a queue batch carries its own display text: no selection quote
-    const scope =
-      retryScope !== undefined
-        ? (retryScope ?? undefined)
-        : displayText === undefined
-          ? selectionScopeQuote()
-          : undefined
-    lastScopeRef.current = scope
+    const scope = retryOf
+      ? retryOf.scope
+      : displayText === undefined
+        ? selectionScopeQuote()
+        : undefined
+    // a scoped send (selection chip) or a queue submission may only edit its targets; tools
+    // enforce it in code. A new turn is fenced to its own scope; a retry, header or bubble, to
+    // the ranges its entry's run ended with, so a fenced turn is never retried unfenced.
+    const ed = depsRef.current.getEditor()
+    const fence = retryOf
+      ? retryFence(retryOf.fence ?? { fenced: scope !== undefined })
+      : ed
+        ? turnFence(ed, { scoped: scope !== undefined, queueFence })
+        : null
+    if (ed) setEditFence(ed, fence)
     // the popover input / composer own the DOM selection now: keep the targeted range visible until the run ends
     if (scope) setInactiveSelectionShown(depsRef.current.getEditor(), true)
     setChat((prev) => [
       ...prev,
-      { role: 'user', text: displayText ?? instruction, ...(scope ? { scope } : {}) },
+      {
+        role: 'user',
+        text: displayText ?? instruction,
+        ...(scope ? { scope } : {}),
+        ...(fence ? { fence: { fenced: true, ranges: fence } } : {}),
+      },
       { role: 'assistant', text: '', streaming: true },
     ])
     setPrompt('')
@@ -607,6 +702,8 @@ export function AiPanel({
         await loop.run(instruction)
       } catch (err) {
         if (!mountedRef.current) return
+        const editor = depsRef.current.getEditor()
+        if (editor) endRunFence(editor)
         patchLast({
           streaming: false,
           text: err instanceof Error ? err.message : String(err),
@@ -617,10 +714,17 @@ export function AiPanel({
     })()
   }
 
-  const stop = (): void => loopRef.current?.cancel()
+  const stop = (): void => {
+    dismissClarify()
+    loopRef.current?.cancel()
+  }
 
   const retry = (): void =>
-    send(runInstructionRef.current, runDisplayRef.current, lastScopeRef.current ?? null)
+    send(
+      runInstructionRef.current,
+      runDisplayRef.current,
+      chat.findLast((entry) => entry.role === 'user') ?? {},
+    )
 
   // keep the scope chip & queue rows in sync with the editor selection/content
   useEffect(() => {
@@ -700,10 +804,13 @@ export function AiPanel({
     }
     const instruction = buildQueueInstruction(entries)
     const display = buildQueueSummary(t('aiQueueSubmitted', { count: entries.length }), entries)
+    const fence = entries
+      .map((entry) => queueAnchorRange(current.state, entry.item.qid))
+      .filter((range): range is FenceRange => range !== null)
     // consumed at send: the run rewrites the anchored passages, which would
     // orphan the anchors anyway; a failed run is retried via the retry action
     onQueueConsume?.(editQueue.map((item) => item.qid))
-    send(instruction, display)
+    send(instruction, display, undefined, fence)
   }
 
   // ribbon presets auto-send; while a run is active they land in the composer instead
@@ -867,13 +974,23 @@ export function AiPanel({
               <div key={i} className="ai-msg ai-msg-user">
                 {entry.scope && <AiScopeQuote scope={entry.scope} />}
                 <span dir="auto">{entry.text}</span>
+                {entry.clarifyReceipts?.map((qa, k) => (
+                  <div key={`ca${k}`} className="ai-clarify-answered">
+                    {qa.map((pair, m) => (
+                      <div key={m} className="ai-clarify-answered-row">
+                        <div className="ai-clarify-answered-q">{pair.q}</div>
+                        <div className="ai-clarify-answered-a">{pair.a}</div>
+                      </div>
+                    ))}
+                  </div>
+                ))}
                 {entry.undelivered && (
                   <div className="ai-msg-undelivered">
                     {t('aiUndelivered')}
-                    {!busy && (
+                    {canRetryEntry(entry, busy) && (
                       <button
                         className="ai-retry-btn"
-                        onClick={() => send(entry.text, undefined, entry.scope ?? null)}
+                        onClick={() => send(entry.text, undefined, entry)}
                       >
                         {t('aiRetry')}
                       </button>
@@ -988,7 +1105,21 @@ export function AiPanel({
         </div>
       )}
 
-      <div className="ai-composer">
+      {activeClarify && (
+        <div className="ai-composer">
+          <ClarifyCard
+            questions={activeClarify}
+            onSubmit={(answers, qa) => {
+              setChat((prev) => withReceipt(prev, qa))
+              clarifyResolverRef.current?.({ answers })
+              clarifyResolverRef.current = null
+              setActiveClarify(null)
+            }}
+            onSkip={dismissClarify}
+          />
+        </div>
+      )}
+      <div className="ai-composer" style={activeClarify ? { display: 'none' } : undefined}>
         {readOnly && (
           <div className="ai-readonly-notice" role="note">
             {t('aiViewOnlyNotice')}

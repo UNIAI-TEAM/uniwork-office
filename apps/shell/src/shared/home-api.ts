@@ -186,6 +186,23 @@ export interface UniworkDocStatus {
 
 export type UniworkConflictChoice = 'overwrite' | 'save-local-copy' | 'open-latest' | 'later'
 
+/** why a working copy was refused before anything opened (S11 lock panel) */
+export type UniworkLockReason = 'store_newer'
+
+/**
+ * G5-04g: the folder of this working copy holds a binding.json with an integer
+ * schema >= 2, a store written by a newer app. This build does not read that
+ * store, so it neither opens the copy nor treats it as a plain local file: it
+ * records the lock and the shell shows the S11 panel.
+ */
+export interface UniworkDocLock {
+  /** the working copy path that was refused */
+  path: string
+  reason: UniworkLockReason
+  /** basename of the working copy (a schema >= 2 binding is not parsed, so no title) */
+  name: string
+}
+
 export type UniworkLaunchEvent =
   | { phase: 'opening'; title?: string }
   | { phase: 'opened'; path: string; title: string }
@@ -591,6 +608,12 @@ export interface HomeApi {
   uniworkSave(path: string): Promise<UniworkDocStatus | null>
   uniworkResolveConflict(path: string): Promise<UniworkDocStatus | null>
   onUniworkLaunch(cb: (event: UniworkLaunchEvent) => void): () => void
+  /** newer-store locks pushed from main; returns an unsubscribe */
+  onUniworkLock(cb: (lock: UniworkDocLock) => void): () => void
+  /** the locks main currently shows */
+  uniworkLocks(): Promise<UniworkDocLock[]>
+  /** close the lock panel for a path (nothing is deleted) */
+  dismissUniworkLock(path: string): Promise<void>
 }
 
 /** IndexedDB media blobs embedded in Workbench ZIP backup (optional). */
@@ -1148,6 +1171,12 @@ export const UNIWORK_DOC_CHANNELS = {
   save: 'uniwork-doc:save',
   resolveConflict: 'uniwork-doc:resolve-conflict',
   launchEvent: 'uniwork-doc:launch-event',
+  /** main -> shell renderer: a working copy refused by the newer-store guard */
+  lock: 'uniwork-doc:lock',
+  /** invoke -> the locks currently shown (shell window mount / reload) */
+  locks: 'uniwork-doc:locks',
+  /** invoke(path) -> forget the lock; nothing else */
+  dismissLock: 'uniwork-doc:dismiss-lock',
 } as const
 
 export const PROJECT_CHANNELS = {

@@ -64,6 +64,10 @@ export const hi = {
   aiToolReadRangeOf: 'श्रेणी {range} पढ़ें',
   aiToolAggregate: 'श्रेणी सांख्यिकी',
   aiToolAggregateOf: 'श्रेणी {range} की सांख्यिकी',
+  aiToolSummarize: 'श्रेणी का सशर्त सारांश',
+  aiToolSummarizeOf: 'श्रेणी {range} का सशर्त सारांश',
+  aiToolCompareRanges: 'श्रेणियों की तुलना',
+  aiToolCompareRangesOf: '{left} की {right} से तुलना',
   aiToolLoadGuide: 'मार्गदर्शिका लोड करें',
   aiToolLoadGuideOf: 'मार्गदर्शिकाएं {names} लोड करें',
   aiToolReadFormats: 'स्वरूप पढ़ें',
@@ -73,6 +77,19 @@ export const hi = {
   aiToolReadCellsCount: '{count} सेल पढ़ें',
   aiToolPropose: 'बदलाव पूर्वावलोकन बनाएं',
   aiToolCreateDocument: 'नई फ़ाइल बनाएँ',
+  // ask_clarification card (C-ASK)
+  aiClarifyTitle: 'आगे बढ़ने से पहले एक छोटी पुष्टि',
+  aiClarifyDecide: 'मेरे लिए तय करें',
+  aiClarifyDecideAnswer: '(मेरे लिए तय करें)',
+  aiClarifyMulti: 'एकाधिक चयन',
+  aiClarifyNext: 'अगला',
+  aiClarifyPrev: 'पिछला',
+  aiClarifyOther: 'अन्य (स्वयं लिखें)',
+  aiClarifySelected: '{n} चयनित',
+  aiClarifySkip: 'छोड़ें',
+  aiClarifySubmit: 'पुष्टि करें',
+  aiToolClarify: 'स्पष्टीकरण का उत्तर दिया गया',
+  aiToolClarifySkipped: 'स्पष्टीकरण छोड़ा गया',
   aiToolCreatedDocument: '{name} बनाई गई',
   aiToolReadAttachment: 'अनुलग्नक पढ़ें',
   aiToolReadAttachmentOf: 'अनुलग्नक {name} पढ़ें',
@@ -101,4 +118,7 @@ export const hi = {
   aiScopeClearTitle: 'श्रेणी दायरा हटाएँ और पूरी शीट पर काम करें',
   aiViewOnlyNotice:
     'केवल-देखने योग्य दस्तावेज़: AI इसे पढ़ सकता है और प्रश्नों के उत्तर दे सकता है, लेकिन संपादित नहीं कर सकता।',
+
+  // U-02 catalogue S9: cells summary under an edited result
+  aiResultCellsMeta: 'लिखी गई सेल: {written} ({range}) · ओवरराइट हुई मौजूदा सेल: {overwritten}',
 } satisfies Record<keyof typeof zh, string>

@@ -66,6 +66,10 @@ export const es = {
   aiToolReadRangeOf: 'Leer rango {range}',
   aiToolAggregate: 'Agregar rango',
   aiToolAggregateOf: 'Agregar rango {range}',
+  aiToolSummarize: 'Resumir rango',
+  aiToolSummarizeOf: 'Resumir rango {range}',
+  aiToolCompareRanges: 'Comparar rangos',
+  aiToolCompareRangesOf: 'Comparar {left} con {right}',
   aiToolLoadGuide: 'Cargar guía',
   aiToolLoadGuideOf: 'Cargar guías {names}',
   aiToolReadFormats: 'Leer formatos',
@@ -75,6 +79,19 @@ export const es = {
   aiToolReadCellsCount: 'Leer {count} celdas',
   aiToolPropose: 'Generar vista previa de cambios',
   aiToolCreateDocument: 'Crear archivo nuevo',
+  // ask_clarification card (C-ASK)
+  aiClarifyTitle: 'Una comprobación rápida antes de continuar',
+  aiClarifyDecide: 'Decide por mí',
+  aiClarifyDecideAnswer: '(decide por mí)',
+  aiClarifyMulti: 'Selección múltiple',
+  aiClarifyNext: 'Siguiente',
+  aiClarifyPrev: 'Anterior',
+  aiClarifyOther: 'Otro (escríbelo)',
+  aiClarifySelected: '{n} seleccionados',
+  aiClarifySkip: 'Omitir',
+  aiClarifySubmit: 'Confirmar',
+  aiToolClarify: 'Aclaración respondida',
+  aiToolClarifySkipped: 'Aclaración omitida',
   aiToolCreatedDocument: '{name} creado',
   aiToolReadAttachment: 'Leer datos adjuntos',
   aiToolReadAttachmentOf: 'Leer datos adjuntos {name}',
@@ -103,4 +120,8 @@ export const es = {
   aiScopeClearTitle: 'Quitar el ámbito del rango y usar toda la hoja',
   aiViewOnlyNotice:
     'Documento de solo lectura: la IA puede leerlo y responder preguntas, pero no puede editarlo.',
+
+  // U-02 catalogue S9: cells summary under an edited result
+  aiResultCellsMeta:
+    'Celdas escritas: {written} ({range}) · Celdas existentes sobrescritas: {overwritten}',
 } satisfies Record<keyof typeof zh, string>

@@ -18,8 +18,12 @@ import {
 } from '@genoffice/ai-provider/browser'
 import type { AiSettings, AttachmentAddResult, AttachmentMeta } from '../../shared/ipc'
 import { ATTACHMENT_IMAGE_EXTS } from '../../shared/ipc'
-import type { PmNode } from '../editor/convert'
-import { TABLE_TRAILING_SKIP } from '../editor/extensions'
+import {
+  captureRunSnapshot,
+  restoreRunSnapshot,
+  type AiRunSnapshot,
+  type AiSideState,
+} from './run-snapshot'
 import { countWords, findNumId, type NumIds } from './protocol'
 import { DOC_NAV_SCHEME, navigateToBlock, parseDocNavHref } from './doc-nav'
 import {
@@ -27,6 +31,8 @@ import {
   type AiCommentsAccess,
   type AiDocExtras,
   type AiHeaderFooterAccess,
+  type AskClarification,
+  type ClarifyQuestion,
 } from './tools'
 import type { AiPageSetupAccess } from './page-setup'
 import type { AiNotesAccess } from './note-ops'
@@ -40,6 +46,8 @@ import {
   type DocWriteSpec,
 } from './doc-writer'
 import { EditQueueCard } from './EditQueueCard'
+import { ClarifyCard } from '../components/ClarifyCard'
+import { withReceipt, withoutReceipts, type ClarifyQa } from './clarify-receipts'
 import {
   buildQueueInstruction,
   buildQueueSummary,
@@ -112,11 +120,13 @@ interface ChatEntry {
   /** tool executions performed during this assistant turn */
   tools?: ToolActivity[]
   /** document state before this turn's first edit — rendered as an inline roll-back action */
-  snapshot?: PmNode
+  snapshot?: AiRunSnapshot
   /** attachments consumed from the composer by this user message (read-only echo chips) */
   attachments?: AttachmentMeta[]
   /** the selection this user message targeted, frozen at send */
   scope?: AiScopeQuoteData
+  /** answered ask_clarification cards of this message's run (view-only receipts) */
+  clarifyReceipts?: ClarifyQa[][]
 }
 
 /** longest selection excerpt echoed on a user bubble */
@@ -334,6 +344,10 @@ interface AiPanelProps {
   notesAccess?: AiNotesAccess
   /** view-only UniWork document: the agent only reads, nothing here may edit the document */
   readOnly?: boolean
+  /** UniWork working copy: tools that write outside the document are hidden (C-BOUND) */
+  bound?: boolean
+  /** App state beside the PM doc that a run's Roll back restores with it */
+  sideState?: AiSideState
 }
 
 const MODEL_BRIDGE: AiModelPickerBridge = {
@@ -371,6 +385,8 @@ export function AiPanel({
   docExtras,
   notesAccess,
   readOnly = false,
+  bound = false,
+  sideState,
 }: AiPanelProps) {
   const { t, lang } = useI18n()
   // Panel chrome follows the UI language; message text follows its own content (dir=auto below)
@@ -384,6 +400,24 @@ export function AiPanel({
   const [chat, setChat] = useState<ChatEntry[]>([])
   /** a streamed write stopped early: the draft stays in the document until the user keeps or discards it */
   const [activePartial, setActivePartial] = useState<{ blocks: number } | null>(null)
+  /** ask_clarification card docked in the composer slot while the run waits for the user */
+  const [activeClarify, setActiveClarify] = useState<ClarifyQuestion[] | null>(null)
+  const clarifyResolverRef = useRef<((r: { answers: string; cancelled?: boolean }) => void) | null>(
+    null,
+  )
+  /** settle an open card as skipped so the waiting tool call never dangles */
+  const dismissClarify = (): void => {
+    clarifyResolverRef.current?.({ answers: '', cancelled: true })
+    clarifyResolverRef.current = null
+    setActiveClarify(null)
+  }
+  const askClarification: AskClarification = (questions) =>
+    new Promise((resolve) => {
+      // a second card replaces a stale one; the stale call reads as skipped
+      clarifyResolverRef.current?.({ answers: '', cancelled: true })
+      clarifyResolverRef.current = resolve
+      setActiveClarify(questions)
+    })
   const partialResolverRef = useRef<((keep: boolean) => void) | null>(null)
   /** bumped by New chat / unmount: a writer resuming after its abort must not open the keep card */
   const writerEpochRef = useRef(0)
@@ -483,6 +517,8 @@ export function AiPanel({
       writerEpochRef.current++
       partialResolverRef.current?.(false)
       partialResolverRef.current = null
+      clarifyResolverRef.current?.({ answers: '', cancelled: true })
+      clarifyResolverRef.current = null
     },
     [],
   )
@@ -526,6 +562,10 @@ export function AiPanel({
   }
   const readOnlyRef = useRef(readOnly)
   readOnlyRef.current = readOnly
+  const boundRef = useRef(bound)
+  boundRef.current = bound
+  const sideStateRef = useRef(sideState)
+  sideStateRef.current = sideState
   const trackChangesRef = useRef(trackChanges)
   trackChangesRef.current = trackChanges
   const commentsAccessRef = useRef(commentsAccess)
@@ -561,7 +601,7 @@ export function AiPanel({
   const instructionRef = useRef('')
   /** document state before the run's first edit — attached to the turn's final
       segment at run end (mid-turn segments never show the action toolbar) */
-  const runSnapshotRef = useRef<PmNode | null>(null)
+  const runSnapshotRef = useRef<AiRunSnapshot | null>(null)
   /** last sent instruction, for one-click retry */
   const lastInstructionRef = useRef('')
   /** Tool activity of the whole run (with args/output, accumulated across turns) — for full
@@ -583,6 +623,8 @@ export function AiPanel({
       })
       .then((msgs) => {
         if (msgs.length === 0) return
+        // answered receipts belong to the live turn they were given in: drop them with a reload
+        setChat((prev) => withoutReceipts(prev))
         setHistoricChat(
           msgs.map((m) => ({
             role: m.role,
@@ -627,6 +669,15 @@ export function AiPanel({
       .catch(() => {
         /* silent */
       })
+  }, [filePath])
+
+  // answered receipts belong to the document they were given for: drop them when another
+  // one opens (an untitled document getting its first path is the same document)
+  const receiptPathRef = useRef(filePath)
+  useEffect(() => {
+    const previous = receiptPathRef.current
+    receiptPathRef.current = filePath
+    if (previous && previous !== filePath) setChat((prev) => withoutReceipts(prev))
   }, [filePath])
 
   const persistMessage = (
@@ -759,13 +810,13 @@ export function AiPanel({
     decidePartial(false)
   }
 
-  const loopRef = useRef<AgentLoop<PmNode> | null>(null)
+  const loopRef = useRef<AgentLoop<AiRunSnapshot> | null>(null)
   if (!loopRef.current) {
     const numIds = (): NumIds => ({
       bullet: findNumId(blocksRef.current, 'bullet') ?? numIdFallbackRef.current?.bullet ?? null,
       ordered: findNumId(blocksRef.current, 'ordered') ?? numIdFallbackRef.current?.ordered ?? null,
     })
-    loopRef.current = new AgentLoop<PmNode>({
+    loopRef.current = new AgentLoop<AiRunSnapshot>({
       transport: transportRef.current,
       systemSuffix: aiLangDirective,
       skill: composeSkills('docs+files', '', [
@@ -784,10 +835,12 @@ export function AiPanel({
           () => notesAccessRef.current,
           () => mediaAnalysisAvailable(settingsRef.current, gskLoggedInRef.current),
           () => readOnlyRef.current,
+          () => boundRef.current,
+          () => askClarification,
         ),
         createFilesSkill(availableAttachments),
       ]),
-      captureSnapshot: () => editorRef.current.getJSON() as PmNode,
+      captureSnapshot: () => captureRunSnapshot(editorRef.current, sideStateRef.current),
       events: {
         onText: (text) => patchLastAssistant({ text }),
         onToolStart: (call) => {
@@ -1091,6 +1144,7 @@ export function AiPanel({
 
   const cancel = () => {
     if (pendingSendRef.current) pendingSendRef.current.aborted = true
+    dismissClarify()
     loopRef.current?.cancel()
   }
 
@@ -1127,6 +1181,7 @@ export function AiPanel({
       pendingSendRef.current = null
     }
     abandonWriter()
+    dismissClarify()
     loopRef.current?.reset()
     setBusy(false)
     setChat([])
@@ -1205,12 +1260,9 @@ export function AiPanel({
     if (!next) acceptChanges()
   }
 
-  const rollback = (entryIdx: number, snapshot: PmNode) => {
-    editor
-      .chain()
-      .setMeta(TABLE_TRAILING_SKIP, true)
-      .setContent(snapshot as never)
-      .run()
+  const rollback = (entryIdx: number, snapshot: AiRunSnapshot) => {
+    // the PM tree plus the state saved beside it (comments, header/footer, styles, page setup, watermark)
+    restoreRunSnapshot(editor, snapshot, sideStateRef.current)
     // The document rewound to before this turn, so this and every later
     // rollback point now describe discarded futures
     setChat((prev) =>
@@ -1435,6 +1487,16 @@ export function AiPanel({
               ) : (
                 <span dir="auto">{entry.text}</span>
               )}
+              {entry.clarifyReceipts?.map((qa, k) => (
+                <div key={`ca${k}`} className="ai-clarify-answered">
+                  {qa.map((pair, m) => (
+                    <div key={m} className="ai-clarify-answered-row">
+                      <div className="ai-clarify-answered-q">{pair.q}</div>
+                      <div className="ai-clarify-answered-a">{pair.a}</div>
+                    </div>
+                  ))}
+                </div>
+              ))}
               {entry.tools && entry.tools.length > 0 && <ToolChipList tools={entry.tools} />}
               {entry.error &&
                 (aiNoticeKind(entry.error) ? (
@@ -1536,7 +1598,21 @@ export function AiPanel({
         })}
       </div>
 
-      <div className="ai-composer">
+      {activeClarify && (
+        <div className="ai-composer">
+          <ClarifyCard
+            questions={activeClarify}
+            onSubmit={(answers, qa) => {
+              setChat((prev) => withReceipt(prev, qa))
+              clarifyResolverRef.current?.({ answers })
+              clarifyResolverRef.current = null
+              setActiveClarify(null)
+            }}
+            onSkip={dismissClarify}
+          />
+        </div>
+      )}
+      <div className="ai-composer" style={activeClarify ? { display: 'none' } : undefined}>
         {readOnly && (
           <div className="ai-readonly-notice" role="status">
             {t('aiViewOnlyNotice')}

@@ -65,6 +65,10 @@ export const de = {
   aiToolReadRangeOf: 'Bereich {range} lesen',
   aiToolAggregate: 'Bereich aggregieren',
   aiToolAggregateOf: 'Bereich {range} aggregieren',
+  aiToolSummarize: 'Bereich zusammenfassen',
+  aiToolSummarizeOf: 'Bereich {range} zusammenfassen',
+  aiToolCompareRanges: 'Bereiche vergleichen',
+  aiToolCompareRangesOf: '{left} mit {right} vergleichen',
   aiToolLoadGuide: 'Leitfaden laden',
   aiToolLoadGuideOf: 'Leitfäden {names} laden',
   aiToolReadFormats: 'Formate lesen',
@@ -74,6 +78,19 @@ export const de = {
   aiToolReadCellsCount: '{count} Zellen lesen',
   aiToolPropose: 'Änderungsvorschau erstellen',
   aiToolCreateDocument: 'Neue Datei erstellen',
+  // ask_clarification card (C-ASK)
+  aiClarifyTitle: 'Kurze Rückfrage, bevor ich weitermache',
+  aiClarifyDecide: 'Entscheide für mich',
+  aiClarifyDecideAnswer: '(entscheide für mich)',
+  aiClarifyMulti: 'Mehrfachauswahl',
+  aiClarifyNext: 'Weiter',
+  aiClarifyPrev: 'Zurück',
+  aiClarifyOther: 'Sonstiges (eingeben)',
+  aiClarifySelected: '{n} ausgewählt',
+  aiClarifySkip: 'Überspringen',
+  aiClarifySubmit: 'Bestätigen',
+  aiToolClarify: 'Rückfrage beantwortet',
+  aiToolClarifySkipped: 'Rückfrage übersprungen',
   aiToolCreatedDocument: '{name} erstellt',
   aiToolReadAttachment: 'Anlage lesen',
   aiToolReadAttachmentOf: 'Anlage {name} lesen',
@@ -102,4 +119,8 @@ export const de = {
   aiScopeClearTitle: 'Bereichsvorgabe aufheben und das ganze Blatt verwenden',
   aiViewOnlyNotice:
     'Schreibgeschütztes Dokument: Die KI kann es lesen und Fragen beantworten, aber nicht bearbeiten.',
+
+  // U-02 catalogue S9: cells summary under an edited result
+  aiResultCellsMeta:
+    'Geschriebene Zellen: {written} ({range}) · Überschriebene vorhandene Zellen: {overwritten}',
 } satisfies Record<keyof typeof zh, string>

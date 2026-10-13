@@ -179,6 +179,13 @@ export interface PdfAiDeps {
   stamps(): StampConfig | null
   /** Replace the session stamp configuration (null clears it); rendered on every page at save */
   setStamps(cfg: StampConfig | null): void
+  /** live predicate: the open PDF is a UniWork-bound copy (C-BOUND: no file written outside it); absent = plain local file */
+  uniworkBound?(): boolean
+  /** Questionnaire card shown in the panel; the run blocks until the user answers, skips, stops or starts a new chat (cancelled) */
+  askClarification?(
+    questions: ClarifyQuestion[],
+    signal?: AbortSignal,
+  ): Promise<{ answers: string; cancelled?: boolean }>
   /** AI create_document: write a new standalone file (pdf/docx/md) into the default folder and open it in a new tab */
   createDocument(request: CreateDocumentRequest): Promise<CreateDocumentResult>
   /** Inline confirmation card for a file-level operation; false when the user declines, the run is stopped, or the panel goes away */
@@ -202,6 +209,17 @@ export interface PdfAiDeps {
   ): Promise<NewFileResult>
 }
 
+/** One questionnaire question (same shape as html's ask_clarification card) */
+export interface ClarifyQuestion {
+  id: string
+  label: string
+  description?: string
+  /** option text (≤5 per question); the card appends "decide for me" and a free-text field */
+  options: string[]
+  /** multi-select (single-select by default) */
+  multi?: boolean
+}
+
 export interface FileOpConfirm {
   summary: string
   detail?: string
@@ -222,8 +240,8 @@ export type NewFileResult =
 export type SplitPdfOutcome =
   { ok: true; savedDir: string; count: number } | FileOpCanceled | { ok: false; error: string }
 
-/** App-side capability surface: everything but the confirmation card, which the panel renders */
-export type PdfAppDeps = Omit<PdfAiDeps, 'confirmFileOp'>
+/** App-side capability surface: everything but the confirmation and questionnaire cards, which the panel renders */
+export type PdfAppDeps = Omit<PdfAiDeps, 'confirmFileOp' | 'askClarification'>
 
 export const AGENT_TOOLS: AgentToolDef[] = [
   {
@@ -1077,6 +1095,33 @@ export const AGENT_TOOLS: AgentToolDef[] = [
     inputSchema: { type: 'object', properties: {} },
   },
   {
+    name: 'ask_clarification',
+    description:
+      '[When the request is ambiguous and a wrong guess would change the wrong thing] Show a questionnaire card so the user confirms the meaning, scope or target of the request: which pages or passage, what a term or column refers to, how far a change should go. Ask 1–4 questions that are real trade-offs for THIS document, ≤5 options each; the card adds "decide for me" and a free-text option itself. Skip it when the request already answers them or when reading the pages would settle it. Wait for the answers, then carry on. Do not repeat the questions in your reply.',
+    inputSchema: {
+      type: 'object',
+      required: ['questions'],
+      properties: {
+        questions: {
+          type: 'array',
+          minItems: 1,
+          maxItems: 4,
+          items: {
+            type: 'object',
+            required: ['id', 'label', 'options'],
+            properties: {
+              id: { type: 'string' },
+              label: { type: 'string' },
+              description: { type: 'string' },
+              options: { type: 'array', items: { type: 'string' }, maxItems: 5 },
+              multi: { type: 'boolean' },
+            },
+          },
+        },
+      },
+    },
+  },
+  {
     name: 'set_watermark',
     description:
       'Add or replace a text watermark drawn diagonally across every page (takes effect on save); pass text "" to remove the watermark added this session. It is stamped above the page content and cannot remove a watermark that is part of the original document.',
@@ -1160,6 +1205,9 @@ export const AGENT_TOOLS: AgentToolDef[] = [
     },
   },
 ]
+
+const BOUND_OUTPUT =
+  'This document belongs to UniWork; creating separate files from here is not available. Put the content in your reply or into the open document instead.'
 
 const READONLY_OUTPUT =
   'The document is encrypted and read-only; it cannot be modified. Inform the user.'
@@ -2774,6 +2822,53 @@ async function imageSearchTool(
   return { output: lines.join('\n') || '(no images found)', summary }
 }
 
+async function askClarificationTool(
+  deps: PdfAiDeps,
+  input: Record<string, unknown>,
+  signal?: AbortSignal,
+): Promise<ToolExecution> {
+  const summary = t('aiToolClarify')
+  if (!deps.askClarification)
+    return {
+      output: 'questionnaire cards are not available here; decide sensible defaults and continue',
+      isError: true,
+      mutated: false,
+      summary,
+    }
+  const raw = Array.isArray(input.questions) ? input.questions : []
+  const questions: ClarifyQuestion[] = raw
+    .map((q: Record<string, unknown>, i: number) => ({
+      id: String(q.id ?? `q${i + 1}`),
+      label: String(q.label ?? '').trim(),
+      description: q.description ? String(q.description) : undefined,
+      options: Array.isArray(q.options) ? q.options.map((o: unknown) => String(o)).slice(0, 5) : [],
+      multi: !!q.multi,
+    }))
+    .filter((q) => q.label && q.options.length > 0)
+    .slice(0, 4)
+  if (questions.length === 0)
+    return {
+      output: 'questions must be non-empty and every question needs options',
+      isError: true,
+      mutated: false,
+      summary,
+    }
+  const r = await deps.askClarification(questions, signal)
+  // asking changes nothing in the document
+  return r.cancelled
+    ? {
+        output:
+          'The user skipped the questionnaire. Pick the most reasonable reading yourself, say the assumption in one sentence, and continue.',
+        mutated: false,
+        summary: t('aiToolClarifySkipped'),
+      }
+    : {
+        output: `User answers:\n${r.answers}\nContinue with these choices.`,
+        mutated: false,
+        summary,
+      }
+}
+
 async function generateImageTool(
   deps: PdfAiDeps,
   input: Record<string, unknown>,
@@ -2788,6 +2883,8 @@ async function generateImageTool(
   if (!r.url) return err(`image generation failed: ${r.error ?? 'unknown error'}`, summary)
   return {
     output: `Generated image URL: ${r.url}\nInsert it into the document with insert_image.`,
+    // returns a URL only; the open document is untouched until insert_image
+    mutated: false,
     summary,
   }
 }
@@ -3592,7 +3689,11 @@ export async function executePdfTool(
         summary: t('aiToolOutline'),
       }
     }
+    case 'ask_clarification':
+      return askClarificationTool(deps, input, signal)
     case 'create_document': {
+      // C-BOUND: the skill already hides the tool; refuse a stale call too
+      if (deps.uniworkBound?.()) return err(BOUND_OUTPUT, t('aiToolCreateDocument'))
       const typeRaw = input.type === undefined ? 'pdf' : String(input.type)
       const summary = t('aiToolCreateDocument')
       if (typeRaw !== 'pdf' && typeRaw !== 'docx' && typeRaw !== 'md' && typeRaw !== 'html')
@@ -3613,6 +3714,8 @@ export async function executePdfTool(
         output: r.path
           ? `Created the new document at ${r.path} and opened it in a new tab.`
           : `Created the new document "${name}" in a new tab; it saves itself into the default folder.`,
+        // a NEW file is written; the open PDF is not modified
+        mutated: false,
         summary: t('aiToolCreatedDocument', { name }),
       }
     }

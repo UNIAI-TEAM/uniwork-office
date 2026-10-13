@@ -30,14 +30,16 @@ export const workbookToolsFor = (createDocument: boolean): typeof WORKBOOK_TOOLS
  * via load_guide.
  */
 export function createWorkbookSkill(deps: SheetsSkillDeps): AgentSkill {
+  // C-BOUND: a UniWork working copy never writes new files beside itself
+  const createDocument = (): boolean => cap('createDocument') && deps.isUniworkBound?.() !== true
   return {
     id: 'sheets',
     // live: the loop re-reads both before every request
     get systemPrompt() {
-      return basePromptFor(cap('createDocument'))
+      return basePromptFor(createDocument())
     },
     get tools() {
-      return workbookToolsFor(cap('createDocument'))
+      return workbookToolsFor(createDocument())
     },
     buildContext: () => buildWorkbookContext(deps),
     executeTool: (call) => executeWorkbookTool(call, deps),

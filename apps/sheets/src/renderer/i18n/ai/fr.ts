@@ -65,6 +65,10 @@ export const fr = {
   aiToolReadRangeOf: 'Lire la plage {range}',
   aiToolAggregate: 'Agréger la plage',
   aiToolAggregateOf: 'Agréger la plage {range}',
+  aiToolSummarize: 'Résumer la plage',
+  aiToolSummarizeOf: 'Résumer la plage {range}',
+  aiToolCompareRanges: 'Comparer des plages',
+  aiToolCompareRangesOf: 'Comparer {left} avec {right}',
   aiToolLoadGuide: 'Charger le guide',
   aiToolLoadGuideOf: 'Charger les guides {names}',
   aiToolReadFormats: 'Lire les formats',
@@ -74,6 +78,19 @@ export const fr = {
   aiToolReadCellsCount: 'Lire {count} cellules',
   aiToolPropose: "Générer l'aperçu des modifications",
   aiToolCreateDocument: 'Créer un nouveau fichier',
+  // ask_clarification card (C-ASK)
+  aiClarifyTitle: 'Petite vérification avant de continuer',
+  aiClarifyDecide: 'Décidez pour moi',
+  aiClarifyDecideAnswer: '(décidez pour moi)',
+  aiClarifyMulti: 'Choix multiple',
+  aiClarifyNext: 'Suivant',
+  aiClarifyPrev: 'Précédent',
+  aiClarifyOther: 'Autre (à saisir)',
+  aiClarifySelected: '{n} sélectionnés',
+  aiClarifySkip: 'Ignorer',
+  aiClarifySubmit: 'Confirmer',
+  aiToolClarify: 'Questions de vérification répondues',
+  aiToolClarifySkipped: 'Questions de vérification ignorées',
   aiToolCreatedDocument: '{name} créé',
   aiToolReadAttachment: 'Lire la pièce jointe',
   aiToolReadAttachmentOf: 'Lire la pièce jointe {name}',
@@ -102,4 +119,8 @@ export const fr = {
   aiScopeClearTitle: 'Retirer la portée de la plage et viser toute la feuille',
   aiViewOnlyNotice:
     'Document en lecture seule : l’IA peut le lire et répondre à des questions, mais ne peut pas le modifier.',
+
+  // U-02 catalogue S9: cells summary under an edited result
+  aiResultCellsMeta:
+    'Cellules écrites : {written} ({range}) · Cellules existantes remplacées : {overwritten}',
 } satisfies Record<keyof typeof zh, string>

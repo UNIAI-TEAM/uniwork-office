@@ -4,8 +4,8 @@ export const pt = {
   webCancel: 'Cancelar',
   webConflictTitle: 'Este documento foi alterado em outro lugar',
   webConflictBody:
-    'Uma versão mais recente foi salva enquanto você editava. Deseja substituí-la pela sua versão ou recarregar a versão mais recente e descartar suas alterações?',
-  webConflictOverwrite: 'Substituir',
+    'Suas alterações ainda não estão no UniWork e ficam neste navegador até você sair.',
+  webConflictOverwrite: 'Substituir…',
   webConflictReload: 'Recarregar a versão mais recente',
   webConflictNotSaved: 'o documento foi alterado em outro lugar',
   webFatalTitle: 'Não foi possível abrir o documento',
@@ -35,4 +35,95 @@ export const pt = {
   webSaveRateLimited: 'Muitas solicitações. Aguarde um momento e tente novamente.',
   webSaveServer: 'O UniWork teve um problema ao salvar. Tente novamente em instantes.',
   webSaveFailedGeneric: 'Não foi possível salvar o documento. Tente novamente.',
+
+  // S5 conflict dialog and S6 new-version bar (U-02 closed catalogue; same text as the desktop sync shard)
+  // S5 conflict dialog (web only)
+  webConflictBodySafe:
+    'Suas alterações ainda não estão no UniWork e ficam neste navegador até você sair.',
+  uwConflictReloadWebBody:
+    'O navegador não guarda rascunhos de conflito. Baixe sua versão para copiar dela depois ou descarte suas alterações.',
+  uwConflictDownloadThenReload: 'Baixar minha versão e depois recarregar',
+  uwConflictDiscardThenReload: 'Descartar alterações e recarregar',
+  uwConflictMineFileSuffix: '(minha versão)',
+  uwConflictDownloadCheck:
+    'Seu navegador recebeu o arquivo. Verifique se ele foi salvo e escolha Recarregar.',
+  uwConflictSessionWeb:
+    'Sua sessão expirou, então a substituição não aconteceu. Suas alterações continuam neste navegador; entre novamente e tente de novo.',
+  uwConflictTooLarge:
+    'Sua versão ultrapassa o limite de tamanho do UniWork, então não foi possível substituir.',
+  uwConflictDownloadFailed:
+    'Não foi possível baixar sua versão, então o documento não foi recarregado. Tente novamente.',
+  uwConflictOfflineWeb:
+    'Você está offline. Na web isto precisa de conexão; suas alterações continuam neste navegador.',
+
+  // S5 conflict dialog: two-column table
+  uwConflictColMine: 'Sua versão',
+  uwConflictColServer: 'Versão no UniWork',
+  uwConflictRowVersion: 'Versão',
+  uwConflictRowTime: 'Horário',
+  uwConflictRowBy: 'Salvo por',
+  uwConflictMineUnsaved: 'Você (não salvo)',
+  uwConflictBasedOn: 'com base na versão {n}',
+
+  // S5 conflict dialog: step 1 extras, confirmation step and results
+  uwConflictViewDiff: 'Ver diferenças',
+  uwConflictNoEdit: 'Você não tem mais permissão para editar este documento.',
+  uwConflictOverwriteTitle: 'Substituir pela sua versão?',
+  uwConflictOverwriteConfirm:
+    'O UniWork criará a versão {next} a partir da sua cópia. A versão {server} de {author} permanece no histórico.',
+  uwConflictOverwriteGo: 'Substituir',
+  uwConflictBack: 'Voltar',
+  uwConflictHeadMoved:
+    'Enquanto isso, o UniWork recebeu a versão {n}. A tabela foi atualizada; escolha novamente.',
+  uwConflictReloadTitle: 'Recarregar a mais recente',
+  uwConflictReloadGo: 'Recarregar',
+  uwConflictSaveCopy: 'Salvar como cópia…',
+  uwConflictSaveCopyTitle: 'Salvar como cópia?',
+  uwConflictSaveCopyConfirm:
+    'O UniWork criará um novo documento a partir da sua versão, com o mesmo proprietário e acesso deste documento. O documento atual e a versão {server} de {author} permanecem como estão.',
+  uwConflictSaveCopyGo: 'Criar cópia',
+  uwConflictSaveCopyDone:
+    'Sua versão foi salva como um novo documento: {title}. Este documento não mudou; você ainda pode recarregar ou substituir.',
+  uwConflictSaveCopyFailed:
+    'Não foi possível criar a cópia. Suas alterações continuam seguras; tente novamente.',
+  uwConflictSaveCopyOffline:
+    'Você está offline. Criar uma cópia precisa de conexão; suas alterações são mantidas.',
+  uwConflictReloadFailed:
+    'Não foi possível carregar a versão mais recente. Seu documento não mudou; tente novamente.',
+  uwConflictOverwriteFailed:
+    'Ainda não foi possível substituir. Seu documento não mudou; tente novamente.',
+  uwConflictClose: 'Fechar',
+
+  // S6 new-version bar
+  uwRemoteRegion: 'Nova versão',
+  uwRemoteUpdated: 'Atualizado para a versão {n}, salva por {author} às {time}.',
+  uwRemoteUpdatedNoRev: 'Atualizado para a versão mais recente no UniWork.',
+  uwRemoteNewerDirty:
+    'Há uma versão mais recente no UniWork (versão {n}). Você tem alterações não salvas, por isso o documento não foi recarregado.',
+  uwRemoteNewerAi:
+    'Há uma versão mais recente no UniWork (versão {n}). O UniWork AI está em execução, por isso o documento não foi recarregado; os resultados da IA se aplicam só à cópia aberta.',
+  uwRemoteNowClean:
+    'Você desfez todas as alterações. A versão {n} no UniWork é mais recente que a cópia aberta.',
+  uwRemoteStopAiConfirm:
+    'Parar a execução do UniWork AI para recarregar? As alterações que a IA já fez pertencem à cópia aberta.',
+  uwRemoteWaitCommit:
+    'Aguardando o salvamento em andamento terminar; depois você poderá recarregar.',
+  uwRemoteReload: 'Recarregar a mais recente…',
+  uwRemoteLater: 'Depois',
+  uwRemoteClose: 'Fechar',
+  uwRemoteReloadFailed:
+    'Não foi possível carregar a versão {n}. Você ainda está vendo a versão anterior.',
+  uwRemoteDeleted: 'Este documento foi excluído no UniWork. Os salvamentos na fila pararam.',
+  uwAuthorFallback: 'um membro',
+
+  // S6 new-version bar (web only)
+  uwRemoteRevokedWeb:
+    'Você não tem mais acesso a este documento. O salvamento parou; as alterações não salvas ficam neste navegador até você sair.',
+  uwRemoteOrgBlockedWeb:
+    'Não foi possível salvar: {reason}. As alterações não salvas ficam neste navegador até você sair.',
+
+  // {reason} of uwRemoteOrgBlockedWeb
+  uwReasonArchived: 'documento arquivado',
+  uwReasonSuspended: 'organização suspensa',
+  uwReasonDeactivated: 'sua conta está desativada nesta organização',
 } satisfies Record<keyof typeof zh, string>

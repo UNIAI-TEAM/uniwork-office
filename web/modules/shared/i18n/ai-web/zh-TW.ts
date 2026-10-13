@@ -48,4 +48,7 @@ export const zhTW = {
   aiWebStateProviderBody: '不支援此服務商。',
   aiWebStateUnknownTitle: 'AI 請求失敗',
   aiWebStateUnknownBody: '發生問題，請再試一次。',
+
+  // U-02 catalogue S10: workbook over the web AI size limit
+  aiErrWorkbookTooLarge: '此活頁簿太大，無法在網頁上使用 AI。請在 UniWork Office 應用程式中開啟。',
 } satisfies Record<keyof typeof zh, string>

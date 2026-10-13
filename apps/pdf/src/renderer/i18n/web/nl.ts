@@ -4,8 +4,8 @@ export const nl = {
   webCancel: 'Annuleren',
   webConflictTitle: 'Dit document is elders gewijzigd',
   webConflictBody:
-    'Tijdens het bewerken is een nieuwere versie opgeslagen. Wilt u die overschrijven met uw versie, of de nieuwste versie opnieuw laden en uw wijzigingen negeren?',
-  webConflictOverwrite: 'Overschrijven',
+    'Je wijzigingen staan nog niet op UniWork en blijven in deze browser tot je je afmeldt.',
+  webConflictOverwrite: 'Overschrijven…',
   webConflictReload: 'Nieuwste versie laden',
   webConflictNotSaved: 'het document is elders gewijzigd',
   webFatalTitle: 'Het document kan niet worden geopend',

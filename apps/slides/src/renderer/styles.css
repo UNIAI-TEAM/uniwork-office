@@ -3356,14 +3356,11 @@ body.vib .slide-list {
   outline-offset: -4px;
 }
 
-.ai-input-hint {
-  font-size: 11px;
-  color: var(--text-muted);
-  user-select: none;
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+/* need-hint row above the footer (shared markup, see packages/ui ai-model-picker.css): it wraps on
+ * its own line and lines up with the textarea text instead of sharing the chip row */
+.ai-input-box .ai-input-need {
+  padding: 0 14px 6px;
+  line-height: 1.4;
 }
 
 /* icon-only enter key: transparent button chrome, visuals come from brand-supplied PNGs

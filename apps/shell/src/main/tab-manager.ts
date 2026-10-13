@@ -60,6 +60,7 @@ import {
 } from '../../../slides/src/main/slides-main'
 import type { DocumentTabKind, OpenDocumentTab, TabKind, TabSummary } from '../shared/tabs-api'
 import { TAB_STRIP_HEIGHT } from '../shared/tab-drag-geometry'
+import { isAiRunning, type EditorState } from './ai-run-registry'
 import { isCloseTabChord } from './close-tab-chord'
 import { blankRetiredPage } from './retire-page'
 
@@ -445,20 +446,23 @@ export class TabManager {
   /**
    * Unsaved edits in the editor of every tab showing a file `wanted` accepts
    * (the UniWork chip's dirty state). null: the editor did not answer (docs
-   * busy saving), so the caller keeps what it last knew.
+   * busy saving), so the caller keeps what it last knew. aiRunning: the
+   * editor reported an AI turn in progress (ai-run-registry); read after the
+   * dirty answer, so a tab closed meanwhile reads false. Present tabs carry
+   * no file: their owner tab answers for the document.
    */
-  async editorDirtyStates(
-    wanted: (path: string) => boolean,
-  ): Promise<Array<{ path: string; dirty: boolean | null }>> {
+  async editorDirtyStates(wanted: (path: string) => boolean): Promise<EditorState[]> {
     const tabs = this.tabs.filter((t) => t.view && t.filePath && !t.present && wanted(t.filePath))
     return Promise.all(
-      tabs.map(async (tab) => ({
-        path: tab.filePath!,
-        dirty:
+      tabs.map(async (tab) => {
+        const dirty =
           tab.kind === 'docs' && tab.view && !tab.view.webContents.isDestroyed()
             ? await docsQueryEditorDirty(tab.view.webContents)
-            : await this.tabIsDirty(tab),
-      })),
+            : await this.tabIsDirty(tab)
+        const wc = tab.view?.webContents
+        const open = this.tabs.includes(tab) && !!wc && !wc.isDestroyed()
+        return { path: tab.filePath!, dirty, aiRunning: open && isAiRunning(wc.id) }
+      }),
     )
   }
 

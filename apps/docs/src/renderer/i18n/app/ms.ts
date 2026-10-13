@@ -516,8 +516,8 @@ export const ms = {
   appStyleNamePlaceholder: 'Nama gaya',
   appWebConflictTitle: 'Dokumen ini telah diubah di tempat lain',
   appWebConflictBody:
-    'Versi yang lebih baharu telah disimpan semasa anda menyunting. Tulis ganti dengan versi anda, atau muat semula versi terkini dan buang perubahan anda?',
-  appWebConflictOverwrite: 'Tulis ganti',
+    'Perubahan anda belum ada di UniWork dan disimpan dalam pelayar ini sehingga anda log keluar.',
+  appWebConflictOverwrite: 'Tulis ganti…',
   appWebConflictReload: 'Muat semula versi terkini',
   appWebConflictNotSaved: 'dokumen telah diubah di tempat lain',
   appWebDiscardTitle: 'Buang perubahan yang belum disimpan?',

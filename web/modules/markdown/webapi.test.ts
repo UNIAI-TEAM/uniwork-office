@@ -206,15 +206,21 @@ describe('markdownApi: save conflicts', () => {
     await vi.waitFor(() =>
       expect(document.querySelector('[data-office-web="conflict"]')).not.toBeNull(),
     )
-    const click = (choice: string) =>
-      (document.querySelector(`[data-choice="${choice}"]`) as HTMLButtonElement).click()
     return { ...s, text, pending, click }
   }
 
+  /** clicks a choice once it is on screen (a confirmation step renders after an await) */
+  async function click(choice: string): Promise<void> {
+    await vi.waitFor(() =>
+      expect(document.querySelector(`[data-choice="${choice}"]`)).not.toBeNull(),
+    )
+    ;(document.querySelector(`[data-choice="${choice}"]`) as HTMLButtonElement).click()
+  }
+
   it('shows Reload latest / Overwrite / Cancel in the UI language, Overwrite destructive, Reload latest primary, Cancel focused', async () => {
-    const { pending, click, mock } = await conflicted()
+    const { pending, mock } = await conflicted()
     const labels = [...document.querySelectorAll('[data-choice]')].map((b) => b.textContent)
-    expect(labels).toEqual(['Reload latest', 'Overwrite', 'Cancel'])
+    expect(labels).toEqual(['Reload latest', 'Overwrite…', 'Cancel'])
     expect(document.querySelector('.ow-dlg-btn.danger')?.getAttribute('data-choice')).toBe(
       'overwrite',
     )
@@ -224,34 +230,93 @@ describe('markdownApi: save conflicts', () => {
     expect((document.activeElement as HTMLElement).dataset.choice).toBe('cancel')
     expect(document.querySelector('.ow-dlg-close')).not.toBeNull()
     expect(mock.errors.at(-1)).toMatchObject({ fatal: false })
-    click('cancel')
+    await click('cancel')
     expect((await pending).ok).toBe(false)
   })
 
-  it('Overwrite re-reads the head etag and saves again', async () => {
-    const { pending, click, mock, file } = await conflicted()
-    click('overwrite')
+  it('Overwrite… asks to confirm, then re-reads the head etag and saves again', async () => {
+    const { pending, mock, file } = await conflicted()
+    await click('overwrite')
+    await click('go')
     expect(await pending).toMatchObject({ ok: true })
     expect(new TextDecoder().decode(mock.bytesOf(file.fileId)!)).toContain('mine')
   })
 
   it('Reload latest drops the edits and reloads the frame (the host re-runs the handshake)', async () => {
-    const { pending, click, reload, mock } = await conflicted()
-    click('reload')
+    const { pending, reload, mock } = await conflicted()
+    await click('reload')
+    await click('discard')
     expect((await pending).ok).toBe(false)
     expect(reload).toHaveBeenCalledOnce()
     expect(mock.dirty.at(-1)).toBe(false)
   })
 
-  it('a host `save` gets the conflict in its result and no dialog', async () => {
-    const { api, mock, file } = setup()
-    const { text } = await open(api)
-    api.onSaveRequest(() => void api.save({ text: `${text}x`, imageSources: [], mode: 'save' }))
-    api.setDirty(true)
-    mock.bumpRemote(file.fileId)
-    const res = await mock.host.save({ reason: 'user' })
-    expect(res).toMatchObject({ ok: false, error: { code: 'conflict' } })
-    expect(document.querySelector('[data-office-web="conflict"]')).toBeNull()
+  async function hostConflict(caps?: Capabilities) {
+    const s = setup(caps ? { caps } : {})
+    const { text } = await open(s.api)
+    s.api.onSaveRequest(() => void s.api.save({ text: `${text}x`, imageSources: [], mode: 'save' }))
+    s.api.setDirty(true)
+    s.mock.bumpRemote(s.file.fileId)
+    const res = s.mock.host.save({ reason: 'user' })
+    await vi.waitFor(() =>
+      expect(document.querySelector('[data-office-web="conflict"]')).not.toBeNull(),
+    )
+    return { ...s, res }
+  }
+
+  it('a host `save` opens the one conflict dialog in the frame and reports modal', async () => {
+    const { mock, res } = await hostConflict()
+    expect(document.querySelectorAll('[role="alertdialog"]')).toHaveLength(1)
+    expect(mock.modals).toEqual([true])
+    await click('cancel')
+    expect(await res).toMatchObject({ ok: false, error: { code: 'cancelled' } })
+    expect(mock.modals).toEqual([true, false])
+    expect(mock.errors).toHaveLength(0)
+  })
+
+  it('a host `save` -> Overwrite… confirmed answers ok with the new version', async () => {
+    const { res } = await hostConflict()
+    await click('overwrite')
+    await click('go')
+    expect(await res).toMatchObject({ ok: true, versionId: 'v3' })
+  })
+
+  it('a host `save` -> Reload answers ok without a versionId, then the frame reloads', async () => {
+    const { res, reload } = await hostConflict()
+    await click('reload')
+    await click('discard')
+    const answer = await res
+    expect(answer).toMatchObject({ ok: true })
+    expect(answer).not.toHaveProperty('versionId')
+    await vi.waitFor(() => expect(reload).toHaveBeenCalledOnce())
+  })
+
+  it('a host `save` -> Reload answers with the head that was loaded, not the stale file meta', async () => {
+    const { res, mock, file } = await hostConflict()
+    const head = (mock.openPayload(file.fileId) as { file: { etag?: string } }).file
+    expect(head.etag).not.toBe(file.etag)
+    await click('reload')
+    await click('discard')
+    const answer = await res
+    expect(answer).toMatchObject({ ok: true, file: { fileId: file.fileId, etag: head.etag } })
+  })
+
+  it('the download choice shows only with the download capability', async () => {
+    const plain = await hostConflict()
+    await click('reload')
+    await click('back')
+    expect(document.querySelector('[data-choice="download"]')).toBeNull()
+    await click('cancel')
+    await plain.res
+    document.body.replaceChildren()
+    const granted = await hostConflict({ ...FULL, download: true })
+    await click('reload')
+    await click('download')
+    await vi.waitFor(() =>
+      expect(granted.mock.calls.some((c) => c.type === 'api.download')).toBe(true),
+    )
+    await click('go')
+    expect(await granted.res).toMatchObject({ ok: true })
   })
 })
 
@@ -267,7 +332,10 @@ describe('markdownApi: host save conflict copy', () => {
     })
     api.setDirty(true)
     mock.bumpRemote(file.fileId)
-    await mock.host.save({ reason: 'user' })
+    const res = mock.host.save({ reason: 'user' })
+    await vi.waitFor(() => expect(document.querySelector('[data-choice="cancel"]')).not.toBeNull())
+    ;(document.querySelector('[data-choice="cancel"]') as HTMLButtonElement).click()
+    await res
     await vi.waitFor(() => expect(failure).not.toBe(''))
     expect(failure).toBe('the document was changed elsewhere')
     expect(failure).not.toMatch(/try again|stale etag|409/i)

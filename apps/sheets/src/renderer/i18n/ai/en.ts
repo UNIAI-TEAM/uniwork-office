@@ -64,6 +64,10 @@ export const en = {
   aiToolReadRangeOf: 'Read range {range}',
   aiToolAggregate: 'Aggregate range',
   aiToolAggregateOf: 'Aggregate range {range}',
+  aiToolSummarize: 'Summarize range',
+  aiToolSummarizeOf: 'Summarize range {range}',
+  aiToolCompareRanges: 'Compare ranges',
+  aiToolCompareRangesOf: 'Compare {left} with {right}',
   aiToolLoadGuide: 'Load guide',
   aiToolLoadGuideOf: 'Load guides {names}',
   aiToolReadFormats: 'Read formats',
@@ -73,6 +77,19 @@ export const en = {
   aiToolReadCellsCount: 'Read {count} cells',
   aiToolPropose: 'Build change plan',
   aiToolCreateDocument: 'Create new file',
+  // ask_clarification card (C-ASK)
+  aiClarifyTitle: 'A quick check before I continue',
+  aiClarifyDecide: 'Decide for me',
+  aiClarifyDecideAnswer: '(decide for me)',
+  aiClarifyMulti: 'Multiple choice',
+  aiClarifyNext: 'Next',
+  aiClarifyPrev: 'Previous',
+  aiClarifyOther: 'Other (type in)',
+  aiClarifySelected: '{n} selected',
+  aiClarifySkip: 'Skip',
+  aiClarifySubmit: 'Confirm',
+  aiToolClarify: 'Clarification answered',
+  aiToolClarifySkipped: 'Clarification skipped',
   aiToolCreatedDocument: 'Created {name}',
   aiToolReadAttachment: 'Read attachment',
   aiToolReadAttachmentOf: 'Read attachment {name}',
@@ -101,4 +118,8 @@ export const en = {
   aiScopeClearTitle: 'Drop the range scope and target the whole sheet',
   aiViewOnlyNotice:
     'View-only document: AI can read it and answer questions, but editing is turned off.',
+
+  // U-02 catalogue S9: cells summary under an edited result
+  aiResultCellsMeta:
+    'Cells written: {written} ({range}) · Existing cells overwritten: {overwritten}',
 } satisfies Record<keyof typeof zh, string>

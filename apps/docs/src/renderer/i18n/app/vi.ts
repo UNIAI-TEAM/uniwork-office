@@ -510,8 +510,8 @@ export const vi = {
   appStyleNamePlaceholder: 'Tên kiểu',
   appWebConflictTitle: 'Tài liệu này đã được thay đổi ở nơi khác',
   appWebConflictBody:
-    'Một phiên bản mới hơn đã được lưu trong khi bạn chỉnh sửa. Ghi đè bằng phiên bản của bạn, hay tải lại phiên bản mới nhất và bỏ các thay đổi của bạn?',
-  appWebConflictOverwrite: 'Ghi đè',
+    'Thay đổi của bạn chưa lưu lên UniWork và vẫn được giữ trong trình duyệt này cho tới khi bạn đăng xuất.',
+  appWebConflictOverwrite: 'Ghi đè…',
   appWebConflictReload: 'Tải lại bản mới nhất',
   appWebConflictNotSaved: 'tài liệu đã được thay đổi ở nơi khác',
   appWebDiscardTitle: 'Bỏ các thay đổi chưa lưu?',

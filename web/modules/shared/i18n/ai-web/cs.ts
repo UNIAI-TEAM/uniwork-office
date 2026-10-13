@@ -51,4 +51,8 @@ export const cs = {
   aiWebStateProviderBody: 'Tento poskytovatel není podporován.',
   aiWebStateUnknownTitle: 'Požadavek AI selhal',
   aiWebStateUnknownBody: 'Něco se pokazilo. Zkuste to znovu.',
+
+  // U-02 catalogue S10: workbook over the web AI size limit
+  aiErrWorkbookTooLarge:
+    'Tento sešit je pro AI na webu příliš velký. Otevřete ho v aplikaci UniWork Office.',
 } satisfies Record<keyof typeof zh, string>

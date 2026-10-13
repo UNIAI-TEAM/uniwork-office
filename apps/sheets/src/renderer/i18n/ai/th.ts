@@ -63,6 +63,10 @@ export const th = {
   aiToolReadRangeOf: 'อ่านช่วง {range}',
   aiToolAggregate: 'สรุปสถิติช่วง',
   aiToolAggregateOf: 'สรุปสถิติช่วง {range}',
+  aiToolSummarize: 'สรุปแบบมีเงื่อนไข',
+  aiToolSummarizeOf: 'สรุปแบบมีเงื่อนไขของช่วง {range}',
+  aiToolCompareRanges: 'เปรียบเทียบช่วง',
+  aiToolCompareRangesOf: 'เปรียบเทียบ {left} กับ {right}',
   aiToolLoadGuide: 'โหลดคู่มือ',
   aiToolLoadGuideOf: 'โหลดคู่มือ {names}',
   aiToolReadFormats: 'อ่านรูปแบบ',
@@ -72,6 +76,19 @@ export const th = {
   aiToolReadCellsCount: 'อ่านเซลล์ {count} เซลล์',
   aiToolPropose: 'สร้างตัวอย่างการเปลี่ยนแปลง',
   aiToolCreateDocument: 'สร้างไฟล์ใหม่',
+  // ask_clarification card (C-ASK)
+  aiClarifyTitle: 'ขอยืนยันสักครู่ก่อนดำเนินการต่อ',
+  aiClarifyDecide: 'ตัดสินใจให้ฉัน',
+  aiClarifyDecideAnswer: '(ตัดสินใจให้ฉัน)',
+  aiClarifyMulti: 'เลือกได้หลายข้อ',
+  aiClarifyNext: 'ถัดไป',
+  aiClarifyPrev: 'ก่อนหน้า',
+  aiClarifyOther: 'อื่น ๆ (พิมพ์เอง)',
+  aiClarifySelected: 'เลือกแล้ว {n}',
+  aiClarifySkip: 'ข้าม',
+  aiClarifySubmit: 'ยืนยัน',
+  aiToolClarify: 'ตอบคำถามยืนยันแล้ว',
+  aiToolClarifySkipped: 'ข้ามคำถามยืนยันแล้ว',
   aiToolCreatedDocument: 'สร้าง {name} แล้ว',
   aiToolReadAttachment: 'อ่านสิ่งที่แนบ',
   aiToolReadAttachmentOf: 'อ่านสิ่งที่แนบ {name}',
@@ -99,4 +116,7 @@ export const th = {
     'AI จะตีความ "คอลัมน์นี้ / แถวเหล่านี้ / ส่วนที่เลือก" เป็นช่วงนี้ และจะถูกตรึงไว้ตลอดการทำงานเมื่อคุณส่ง',
   aiScopeClearTitle: 'ยกเลิกขอบเขตช่วงนี้และใช้ทั้งแผ่นงาน',
   aiViewOnlyNotice: 'เอกสารแบบดูอย่างเดียว: AI อ่านและตอบคำถามได้ แต่แก้ไขไม่ได้',
+
+  // U-02 catalogue S9: cells summary under an edited result
+  aiResultCellsMeta: 'เซลล์ที่เขียน: {written} ({range}) · เซลล์เดิมที่ถูกเขียนทับ: {overwritten}',
 } satisfies Record<keyof typeof zh, string>

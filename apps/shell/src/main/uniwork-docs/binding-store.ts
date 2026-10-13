@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { mkdir, readFile, unlink } from 'node:fs/promises'
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type {
@@ -8,7 +8,7 @@ import type {
   UniworkSaveState,
 } from '../../shared/home-api'
 import { atomicWriteFile } from '../atomic-write'
-import { isDecimalString } from './formats'
+import { formatForName, isDecimalString } from './formats'
 
 /**
  * Working copies of UniWork documents and their binding metadata:
@@ -68,6 +68,49 @@ export interface BoundDocument {
   deploymentId: string
   userId: string
   binding: Binding
+}
+
+/**
+ * How this build reads a binding.json value, without parsing it: `current` is
+ * schema 1 (the store this build writes), `newer` an integer schema >= 2 (a
+ * store a newer app wrote: not read here, and never treated as a plain local
+ * file), `unrecognized` anything else (no or garbage schema, non-JSON).
+ */
+export type BindingKind = 'current' | 'newer' | 'unrecognized'
+
+/**
+ * min_app_version is deliberately not looked at: G5-04g refuses every integer
+ * schema >= 2 whatever that field says (OQ-P4).
+ */
+export function bindingKindOf(raw: unknown): BindingKind {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return 'unrecognized'
+  const schema = (raw as Record<string, unknown>).schema
+  if (typeof schema !== 'number' || !Number.isSafeInteger(schema)) return 'unrecognized'
+  if (schema === 1) return 'current'
+  return schema >= 2 ? 'newer' : 'unrecognized'
+}
+
+/** how `BindingStore.classify` reads a path: one binding.json read, three outcomes */
+export type PathBinding =
+  | { kind: 'newer'; path: string; name: string }
+  | { kind: 'bound'; doc: BoundDocument }
+  | { kind: 'plain' }
+
+/** a working copy whose folder declares a store this build does not read */
+export interface NewerStore {
+  /** the working copy, or its folder when the working-copy name is not known yet */
+  path: string
+  /** basename of the working copy (the binding is not parsed, so no title) */
+  name: string
+}
+
+/** how the binding.json of `dir` reads; null when there is none or it is unreadable */
+export function bindingKindAt(dir: string): BindingKind | null {
+  try {
+    return bindingKindOf(JSON.parse(readFileSync(join(dir, BINDING_FILE), 'utf8')))
+  } catch {
+    return null
+  }
 }
 
 const SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._@-]{0,127}$/
@@ -187,6 +230,80 @@ export class BindingStore {
     }
     if (!binding || binding.filename !== filename) return null
     return { path: full, dir, deploymentId, userId, binding }
+  }
+
+  /** the working-copy folder of `path` and its three segments, or null when the path is not one of ours */
+  private workingCopy(path: string): { dir: string; parts: string[] } | null {
+    const full = resolve(path)
+    const rel = relative(this.root, full)
+    if (!rel || rel.startsWith('..') || isAbsolute(rel)) return null
+    const parts = rel.split(sep)
+    if (parts.length !== 4) return null
+    if (!parts.slice(0, 3).every((part) => SEGMENT.test(part))) return null
+    return { dir: dirname(full), parts }
+  }
+
+  /**
+   * How this build reads the binding of the working copy `path` names, in ONE
+   * read of its binding.json. The module policy asks per open tab every second
+   * (isBound / isReadOnly), so classifying and then parsing must not cost two
+   * reads of the same file. `newer` is a store this build does not read,
+   * `bound` a schema-1 document of this file name, `plain` everything else
+   * (outside the root, not a working-copy folder, no or unreadable binding, a
+   * binding for another file name).
+   */
+  classify(path: string): PathBinding {
+    const found = this.workingCopy(path)
+    if (!found) return { kind: 'plain' }
+    let raw: unknown
+    try {
+      raw = JSON.parse(readFileSync(join(found.dir, BINDING_FILE), 'utf8'))
+    } catch {
+      return { kind: 'plain' }
+    }
+    const full = resolve(path)
+    if (bindingKindOf(raw) === 'newer') {
+      return { kind: 'newer', path: full, name: basename(full) }
+    }
+    const binding = parseBinding(raw)
+    if (!binding || binding.filename !== basename(full)) return { kind: 'plain' }
+    const [deploymentId, userId] = found.parts as [string, string, string, string]
+    return {
+      kind: 'bound',
+      doc: { path: full, dir: found.dir, deploymentId, userId, binding },
+    }
+  }
+
+  /**
+   * The lock for a path whose folder holds an integer schema >= 2 binding.json:
+   * this build does not read that store, so the working copy is neither opened
+   * nor treated as a plain local file. null for anything else (outside the
+   * root, schema 1, no or unreadable binding).
+   */
+  newerStoreAt(path: string): NewerStore | null {
+    const found = this.classify(path)
+    return found.kind === 'newer' ? { path: found.path, name: found.name } : null
+  }
+
+  /**
+   * The same from the folder alone, for the routes that know the folder before
+   * the file name (a launch ticket). The folder's document file names the lock
+   * (the first in sorted order, so the name is deterministic); a folder with
+   * none (or an unreadable one) is named by the folder itself.
+   */
+  newerStoreIn(dir: string): NewerStore | null {
+    if (bindingKindAt(dir) !== 'newer') return null
+    let name = basename(dir)
+    try {
+      // sorted, so the lock's name does not depend on the readdir order
+      name =
+        readdirSync(dir)
+          .sort()
+          .find((entry) => formatForName(entry) !== null) ?? name
+    } catch {
+      // unreadable folder: the folder's own name is all there is
+    }
+    return { path: join(dir, name), name }
   }
 
   /** the binding of a document folder (any working-copy name), or null */

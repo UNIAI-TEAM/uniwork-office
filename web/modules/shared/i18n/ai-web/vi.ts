@@ -51,4 +51,8 @@ export const vi = {
   aiWebStateProviderBody: 'Nhà cung cấp này không được hỗ trợ.',
   aiWebStateUnknownTitle: 'Yêu cầu AI thất bại',
   aiWebStateUnknownBody: 'Đã xảy ra lỗi. Hãy thử lại.',
+
+  // U-02 catalogue S10: workbook over the web AI size limit
+  aiErrWorkbookTooLarge:
+    'Bảng tính này quá lớn để AI xử lý trên web. Mở bằng ứng dụng UniWork Office.',
 } satisfies Record<keyof typeof zh, string>

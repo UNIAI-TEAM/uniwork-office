@@ -39,6 +39,7 @@ import {
   type OfficeModule,
   type ProtocolErrorShape,
   type ReadyPayload,
+  type RemoteVersionPayload,
   type Theme,
   type TokenPayload,
 } from './types'
@@ -107,12 +108,17 @@ export interface DocsFrameHost {
   closeCheck(options?: RequestOptions): Promise<HostRequests['doc.closeCheck']['result']>
   /** the open document was renamed outside the editor */
   notifyRenamed(file: FileMeta): void
+  /**
+   * a newer version was saved elsewhere (additive, X-02). A frame before X-02 has no listener and
+   * drops it silently (no reply, no reject).
+   */
+  notifyRemoteVersion(payload: RemoteVersionPayload): void
   /** live theme / language switches (no-ops before the handshake; getInit supplies the initial values) */
   setTheme(theme: Theme): void
   setLanguage(locale: string): void
   /** proactive token rotation */
   pushToken(token: TokenPayload): void
-  on<K extends 'dirty' | 'title' | 'modal' | 'resize' | 'saved' | 'error'>(
+  on<K extends 'dirty' | 'title' | 'modal' | 'resize' | 'saved' | 'error' | 'aiRun'>(
     type: K,
     listener: FrameEventListener<K>,
   ): () => void
@@ -295,6 +301,7 @@ export function createDocsFrameHost(options: DocsFrameHostOptions): DocsFrameHos
     print: (p = {}, o) => call('print', p, o),
     closeCheck: (o) => call('doc.closeCheck', {}, o),
     notifyRenamed: (file) => emitIfReady('file.renamed', { file }),
+    notifyRemoteVersion: (p) => emitIfReady('doc.remoteVersion', { ...p }),
     setTheme: (theme) => emitIfReady('theme', { theme }),
     setLanguage: (locale) => emitIfReady('language', { locale }),
     pushToken: (t) =>

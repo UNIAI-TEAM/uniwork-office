@@ -3,6 +3,7 @@ import {
   setUniworkUserSaveHook,
   uniworkDocState,
   uniworkIsBound,
+  uniworkRefusesOpen,
   uniworkSamePath,
   uniworkSaveDecision,
 } from './uniwork-policy'
@@ -95,7 +96,6 @@ import {
   aiStreamErrorFields,
   chatForProvider,
   defaultAiSettings,
-  activeProvider,
   probeOpenRouterKey,
   testMediaProvider,
   type AiMediaProviderConfig,
@@ -103,6 +103,7 @@ import {
   type AiSearchProviderId,
   refreshUniworkCloudStatus,
   resolveAiSettings,
+  selectedProvider,
   maxOutputTokensOf,
   sanitizeAiSettings,
   sanitizeCliPath,
@@ -3521,6 +3522,10 @@ async function loadDocx(
   password?: string,
 ): Promise<OpenDocxResult> {
   if (typeof filePath !== 'string' || !/\.docx$/i.test(filePath)) return null
+  // G5-04g: a working copy whose folder declares a store this build does not
+  // read is refused before any read of the file (the shell already pushed the
+  // S11 lock); the renderer must not treat it as a local file.
+  if (uniworkRefusesOpen(filePath)) return null
   if (!existsSync(filePath)) return null
   const size = (await stat(filePath)).size
   const lazy = await openLazyDocx(filePath, wcId)
@@ -3769,8 +3774,9 @@ export function registerAiIpc(): void {
   ipcMain.handle('ai:get-settings', async (): Promise<AiSettings> => {
     const stored = readJson<Partial<AiSettings> & LegacyAiSettings>(SETTINGS_PATH(), {})
     const settings = resolveAiSettings(stored, defaultAiSettings())
-    // a stored BYOK provider is honored when usable; half-filled configs fall back to genspark
-    settings.provider = activeProvider(settings)
+    // the stored provider stays selected even while its config is incomplete (the picker and
+    // Settings show what is missing); only an unknown id degrades to genspark
+    settings.provider = selectedProvider(settings)
     return settings
   })
 

@@ -93,4 +93,7 @@ export const id = {
 
   setCliLinkReady: 'Alat baris perintah tersedia.',
   setAutoSaveUniworkNote: 'Tidak berlaku untuk dokumen UniWork.',
+  uwLockNewerStoreTitle: 'Diperlukan versi aplikasi yang lebih baru',
+  uwLockNewerStore:
+    'Data ini memerlukan versi aplikasi yang lebih baru. Perbarui UniWork Office; tidak ada yang dihapus dan tidak ada penyimpanan baru yang dibuat.',
 } satisfies Record<keyof typeof zh, string>

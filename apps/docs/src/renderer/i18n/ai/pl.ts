@@ -186,4 +186,16 @@ export const pl = {
   aiCmdSkipped: ' (pominięto chronione bloki: {count})',
   aiViewOnlyNotice:
     'Dokument tylko do odczytu: AI może go czytać i odpowiadać na pytania, ale nie może go edytować.',
+  aiClarifyTitle: 'Kilka pytań, zanim przejdę dalej',
+  aiClarifyDecide: 'Zdecyduj za mnie',
+  aiClarifyDecideAnswer: '(zdecyduj za mnie)',
+  aiClarifyMulti: 'Wielokrotny wybór',
+  aiClarifyNext: 'Dalej',
+  aiClarifyPrev: 'Wstecz',
+  aiClarifyOther: 'Inne (wpisz)',
+  aiClarifySelected: 'wybrano: {n}',
+  aiClarifySkip: 'Pomiń',
+  aiClarifySubmit: 'Dalej',
+  aiSumClarify: 'Udzielono wyjaśnień',
+  aiSumClarifySkipped: 'Pominięto wyjaśnienia',
 } satisfies Record<keyof typeof zh, string>

@@ -185,4 +185,16 @@ export const ja = {
   aiCmdSkipped: '({count} 個の保護されたブロックをスキップ)',
   aiViewOnlyNotice:
     '閲覧専用のドキュメント: AI は内容の読み取りと質問への回答はできますが、編集はできません。',
+  aiClarifyTitle: '続ける前にいくつか確認させてください',
+  aiClarifyDecide: 'おまかせ',
+  aiClarifyDecideAnswer: '（おまかせ）',
+  aiClarifyMulti: '複数選択',
+  aiClarifyNext: '次へ',
+  aiClarifyPrev: '前へ',
+  aiClarifyOther: 'その他（自由記入）',
+  aiClarifySelected: '{n} 件選択',
+  aiClarifySkip: 'スキップ',
+  aiClarifySubmit: '続ける',
+  aiSumClarify: '確認の質問に回答済み',
+  aiSumClarifySkipped: '確認の質問をスキップ',
 } satisfies Record<keyof typeof zh, string>

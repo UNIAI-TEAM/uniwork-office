@@ -505,9 +505,8 @@ export const ar = {
   appNewStyleFromSelection: 'نمط جديد من التحديد الحالي',
   appStyleNamePlaceholder: 'اسم النمط',
   appWebConflictTitle: 'تم تعديل هذا المستند في مكان آخر',
-  appWebConflictBody:
-    'تم حفظ إصدار أحدث أثناء تحريرك. هل تريد استبداله بإصدارك، أم إعادة تحميل أحدث إصدار وتجاهل تغييراتك؟',
-  appWebConflictOverwrite: 'استبدال',
+  appWebConflictBody: 'تغييراتك ليست على UniWork بعد وتبقى في هذا المتصفح حتى تسجّل الخروج.',
+  appWebConflictOverwrite: 'استبدال…',
   appWebConflictReload: 'إعادة تحميل أحدث إصدار',
   appWebConflictNotSaved: 'تم تعديل المستند في مكان آخر',
   appWebDiscardTitle: 'تجاهل التغييرات غير المحفوظة؟',

@@ -44,6 +44,7 @@ import type {
   FileSearchSettings,
   UniworkDocErrorCode,
   UniworkDocListPage,
+  UniworkDocLock,
   UniworkDocStatus,
   UniworkLaunchEvent,
   UniworkResult,
@@ -67,6 +68,15 @@ ipcRenderer.on(
   UNIWORK_DOC_CHANNELS.launchEvent,
   (_event: IpcRendererEvent, event: UniworkLaunchEvent) => uniworkLaunches.deliver(event),
 )
+// a lock can be pushed before the renderer subscribes (a cold-start open); the
+// shell also reads uniworkLocks() when it mounts, so a missed push is not lost
+// and a dismissed lock is never resurrected
+const uniworkLockSubscribers = new Set<(lock: UniworkDocLock) => void>()
+ipcRenderer.on(UNIWORK_DOC_CHANNELS.lock, (_event: IpcRendererEvent, raw: unknown) => {
+  const lock = asUniworkLock(raw)
+  if (!lock) return
+  for (const cb of [...uniworkLockSubscribers]) cb(lock)
+})
 
 const UI_LANGUAGES: readonly UiLanguage[] = [
   'zh',
@@ -150,6 +160,20 @@ function asUniworkResult<T>(result: unknown): UniworkResult<T> {
     return result as UniworkResult<T>
   }
   return { ok: false, error: 'malformed_response' satisfies UniworkDocErrorCode }
+}
+
+/** a lock from main: path, reason and name only; anything else is dropped */
+function asUniworkLock(result: unknown): UniworkDocLock | null {
+  if (!result || typeof result !== 'object') return null
+  const r = result as Partial<UniworkDocLock>
+  if (typeof r.path !== 'string' || !r.path) return null
+  if (r.reason !== 'store_newer') return null
+  return { path: r.path, reason: r.reason, name: typeof r.name === 'string' ? r.name : '' }
+}
+
+function asUniworkLocks(result: unknown): UniworkDocLock[] {
+  if (!Array.isArray(result)) return []
+  return result.map(asUniworkLock).filter((lock): lock is UniworkDocLock => lock !== null)
 }
 
 function asUniworkStatus(result: unknown): UniworkDocStatus | null {
@@ -829,6 +853,18 @@ const homeApi: HomeApi = {
   },
   onUniworkLaunch(cb) {
     return uniworkLaunches.subscribe(cb)
+  },
+  onUniworkLock(cb) {
+    uniworkLockSubscribers.add(cb)
+    return () => {
+      uniworkLockSubscribers.delete(cb)
+    }
+  },
+  async uniworkLocks() {
+    return asUniworkLocks(await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.locks))
+  },
+  async dismissUniworkLock(path) {
+    await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.dismissLock, path)
   },
 }
 

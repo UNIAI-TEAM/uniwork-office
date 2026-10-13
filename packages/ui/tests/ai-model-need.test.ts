@@ -24,10 +24,15 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-function settingsWith(provider: 'custom' | 'openai', apiKey: string, model: string): AiSettings {
+function settingsWith(
+  provider: 'custom' | 'openai',
+  apiKey: string,
+  model: string,
+  baseUrl = 'https://router.example/v1',
+): AiSettings {
   const settings = { ...defaultAiSettings(), uniAiAvailable: false, provider }
   settings.providers[provider] = { ...settings.providers[provider], apiKey, model }
-  if (provider === 'custom') settings.providers.custom.baseUrl = 'https://router.example/v1'
+  if (provider === 'custom') settings.providers.custom.baseUrl = baseUrl
   return settings
 }
 
@@ -136,15 +141,48 @@ it('the hint goes away once a key and a model are known', async () => {
   expect(host.querySelector('.ai-input-need')).toBeNull()
 })
 
-it('a host that did not ask for the rule (desktop) is untouched', async () => {
-  const { send, hint } = await mount(settingsWith('custom', '…abcd', ''), false)
+it('desktop: a chosen vendor that cannot send yet says what is missing instead of becoming UniAI', async () => {
+  // UNI-1395: the chip and the request agree, so send is off with the same hint as a web frame
+  const model = await mount(settingsWith('custom', '…abcd', ''), false)
+  expect(model.chip).toBe(AI_MODEL_PICKER_STRINGS.en.choose)
+  expect(model.send.disabled).toBe(true)
+  expect(model.hint).toBe('Choose a model to send')
+  act(() => root.unmount())
+  root = createRoot(host)
+  const key = await mount(settingsWith('openai', '', 'gpt-x'), false)
+  expect(key.send.disabled).toBe(true)
+  expect(key.hint).toBe('Add an API key in AI settings to use the assistant.')
+})
+
+it('a host that did not ask for the rule keeps send on for the default UniAI selection', async () => {
+  const { send, hint } = await mount(
+    { ...defaultAiSettings(), uniAiAvailable: false, provider: 'genspark' },
+    false,
+  )
   expect(send.disabled).toBe(false)
   expect(hint).toBe('Enter to send')
 })
 
-it('every locale has both hints', () => {
+it('custom with a model but no server URL asks for the URL, not an API key (desktop and web frame)', async () => {
+  // UNI-1395 FE F2: a custom endpoint's key is optional, so "add an API key" pointed at the wrong field
+  for (const requireModel of [false, true]) {
+    act(() => root.unmount())
+    root = createRoot(host)
+    const { send, hint, chip } = await mount(settingsWith('custom', '', 'llama3', ''), requireModel)
+    expect(chip, String(requireModel)).toBe(AI_MODEL_PICKER_STRINGS.en.choose)
+    expect(send.disabled, String(requireModel)).toBe(true)
+    expect(hint, String(requireModel)).toBe(AI_MODEL_PICKER_STRINGS.en.needBaseUrl)
+    expect(hint, String(requireModel)).not.toBe(AI_MODEL_PICKER_STRINGS.en.needKey)
+  }
+})
+
+it('every locale has all three hints', () => {
   for (const [lang, strings] of Object.entries(AI_MODEL_PICKER_STRINGS)) {
     expect(strings.needModel, lang).toBeTruthy()
     expect(strings.needKey, lang).toBeTruthy()
+    expect(strings.needBaseUrl, lang).toBeTruthy()
   }
+  expect(AI_MODEL_PICKER_STRINGS.en.needBaseUrl).toBe(
+    'Add the server URL in AI settings to use the assistant.',
+  )
 })

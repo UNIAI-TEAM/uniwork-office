@@ -28,6 +28,12 @@ export interface UniworkModuleSeam {
   isBound(path: string): boolean
   isReadOnly(path: string): boolean
   onUserSave(path: string): void
+  /**
+   * G5-04g: true when the path's folder declares a store this build does not
+   * read, so the module's open chokepoint must not read the file at all. The
+   * service records and pushes the S11 lock as a side effect.
+   */
+  refuseLockedPath(path: string): boolean
 }
 
 /**
@@ -39,6 +45,7 @@ export function installUniworkModuleSeams(seam: UniworkModuleSeam | null): void 
     ? {
         isBound: (path: string) => seam.isBound(path),
         isReadOnly: (path: string) => seam.isReadOnly(path),
+        refuseOpen: (path: string) => seam.refuseLockedPath(path),
       }
     : null
   const hook = seam ? (path: string) => seam.onUserSave(path) : null

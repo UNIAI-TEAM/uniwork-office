@@ -93,4 +93,7 @@ export const pl = {
 
   setCliLinkReady: 'Narzędzie wiersza poleceń jest dostępne.',
   setAutoSaveUniworkNote: 'Nie dotyczy dokumentów UniWork.',
+  uwLockNewerStoreTitle: 'Potrzebna jest nowsza wersja aplikacji',
+  uwLockNewerStore:
+    'Te dane wymagają nowszej wersji aplikacji. Zaktualizuj UniWork Office; nic nie zostało usunięte i nie utworzono nowego zapisu.',
 } satisfies Record<keyof typeof zh, string>

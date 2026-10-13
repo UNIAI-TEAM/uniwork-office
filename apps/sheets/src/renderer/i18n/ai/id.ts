@@ -63,6 +63,10 @@ export const id = {
   aiToolReadRangeOf: 'Baca rentang {range}',
   aiToolAggregate: 'Agregasi rentang',
   aiToolAggregateOf: 'Agregasi rentang {range}',
+  aiToolSummarize: 'Ringkas rentang',
+  aiToolSummarizeOf: 'Ringkas rentang {range}',
+  aiToolCompareRanges: 'Bandingkan rentang',
+  aiToolCompareRangesOf: 'Bandingkan {left} dengan {right}',
   aiToolLoadGuide: 'Muat panduan',
   aiToolLoadGuideOf: 'Muat panduan {names}',
   aiToolReadFormats: 'Baca format',
@@ -72,6 +76,19 @@ export const id = {
   aiToolReadCellsCount: 'Baca {count} sel',
   aiToolPropose: 'Buat pratinjau perubahan',
   aiToolCreateDocument: 'Buat file baru',
+  // ask_clarification card (C-ASK)
+  aiClarifyTitle: 'Konfirmasi singkat sebelum melanjutkan',
+  aiClarifyDecide: 'Putuskan untuk saya',
+  aiClarifyDecideAnswer: '(putuskan untuk saya)',
+  aiClarifyMulti: 'Pilih beberapa',
+  aiClarifyNext: 'Berikutnya',
+  aiClarifyPrev: 'Sebelumnya',
+  aiClarifyOther: 'Lainnya (isi sendiri)',
+  aiClarifySelected: '{n} dipilih',
+  aiClarifySkip: 'Lewati',
+  aiClarifySubmit: 'Konfirmasi',
+  aiToolClarify: 'Klarifikasi dijawab',
+  aiToolClarifySkipped: 'Klarifikasi dilewati',
   aiToolCreatedDocument: '{name} dibuat',
   aiToolReadAttachment: 'Baca lampiran',
   aiToolReadAttachmentOf: 'Baca lampiran {name}',
@@ -100,4 +117,7 @@ export const id = {
   aiScopeClearTitle: 'Hapus cakupan rentang dan gunakan seluruh lembar',
   aiViewOnlyNotice:
     'Dokumen hanya-lihat: AI dapat membaca dan menjawab pertanyaan, tetapi tidak dapat mengedit.',
+
+  // U-02 catalogue S9: cells summary under an edited result
+  aiResultCellsMeta: 'Sel ditulis: {written} ({range}) · Sel yang ada ditimpa: {overwritten}',
 } satisfies Record<keyof typeof zh, string>

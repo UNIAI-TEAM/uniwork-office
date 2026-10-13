@@ -25,12 +25,12 @@ export {
   DEFAULT_MAX_OUTPUT_TOKENS,
   MAX_MAX_OUTPUT_TOKENS,
   MIN_MAX_OUTPUT_TOKENS,
-  activeProvider,
   clampMaxOutputTokens,
   cloudToolsEnabled,
   defaultAiSettings,
   maxOutputTokensOf,
   resolveAiSettings,
+  selectedProvider,
   uniAiOpenRouterKey,
   withUniAiOpenRouterAuth,
 } from './providers'

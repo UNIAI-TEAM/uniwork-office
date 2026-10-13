@@ -23,6 +23,7 @@ import { pdfIsDirty, requestPdfClose } from '../../../pdf/src/main/pdf-main'
 import { markdownIsDirty, requestMarkdownClose } from '../../../markdown/src/main/markdown-main'
 import { htmlIsDirty, requestHtmlClose } from '../../../html/src/main/html-main'
 import { blankRetiredPage } from './retire-page'
+import { isAiRunning, type EditorState } from './ai-run-registry'
 import { canonicalPath } from './tab-manager'
 import { confirmUniworkClose } from './uniwork-docs/close-guard'
 import type { DetachedTab } from './tab-manager'
@@ -324,6 +325,21 @@ export async function detachedOpenDocuments(): Promise<OpenDocumentTab[]> {
       active: rec.window.isFocused(),
       dirty,
     })
+  }
+  return out
+}
+
+/** the detached editors in the shape of TabManager.editorDirtyStates (UniWork
+ *  chip poll); a window closed while its dirty query yielded is left out */
+export async function detachedEditorStates(
+  wanted: (path: string) => boolean,
+): Promise<EditorState[]> {
+  const out: EditorState[] = []
+  for (const [wcId, rec] of [...detached]) {
+    if (rec.window.isDestroyed() || !rec.filePath || !wanted(rec.filePath)) continue
+    const dirty = await detachedIsDirty(rec)
+    if (rec.window.isDestroyed() || rec.view.webContents.isDestroyed()) continue
+    out.push({ path: rec.filePath, dirty, aiRunning: isAiRunning(wcId) })
   }
   return out
 }

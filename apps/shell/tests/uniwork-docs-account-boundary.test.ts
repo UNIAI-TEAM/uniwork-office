@@ -4,8 +4,8 @@ import { describe, expect, it, vi } from 'vitest'
 /**
  * GOA9-r3-04: on a shared computer, Sign out and a sign-in as another user
  * close the previous account's UniWork documents (through the normal close
- * prompts) and delete the AI chat history of those documents; local files and
- * the current account's documents are left alone.
+ * prompts), delete the AI chat history of those documents and forget their S11
+ * locks; local files and the current account's documents are left alone.
  */
 
 const electron = vi.hoisted(() => ({
@@ -39,11 +39,18 @@ const bDoc = copyOf('acc_b', 'doc_3', 'Plan.docx')
 const otherDeployment = join(root, 'staging', 'acc_b', 'doc_4', 'Old.pptx')
 const localFile = join('/home', 'me', 'Documents', 'local.docx')
 
-function harness(open: string[], history: string[], refuse: ReadonlySet<string> = new Set()) {
+function harness(
+  open: string[],
+  history: string[],
+  refuse: ReadonlySet<string> = new Set(),
+  locks: string[] = [],
+) {
   const shown = [...open]
   const known = [...history]
   const closed: string[] = []
   const forgotten: string[] = []
+  const shownLocks = [...locks]
+  const forgottenLocks: string[] = []
   const deps = {
     root,
     openPaths: () => [...shown],
@@ -64,9 +71,25 @@ function harness(open: string[], history: string[], refuse: ReadonlySet<string> 
       forgotten.push(...paths)
       for (const p of paths) known.splice(known.indexOf(p), 1)
     }),
+    // the lock map of the service (pathKey-keyed there; here the raw paths)
+    forgetLocks: vi.fn((match: (path: string) => boolean) => {
+      for (const path of [...shownLocks]) {
+        if (!match(path)) continue
+        shownLocks.splice(shownLocks.indexOf(path), 1)
+        forgottenLocks.push(path)
+      }
+    }),
     closeConflictPrompt: vi.fn(),
   }
-  return { boundary: new AccountBoundary(deps), deps, shown, closed, forgotten }
+  return {
+    boundary: new AccountBoundary(deps),
+    deps,
+    shown,
+    closed,
+    forgotten,
+    shownLocks,
+    forgottenLocks,
+  }
 }
 
 describe('workingCopyOwner', () => {
@@ -86,6 +109,29 @@ describe('Sign out', () => {
     expect(h.deps.closeConflictPrompt).toHaveBeenCalled()
     h.boundary.afterSignOut()
     expect(h.forgotten).toEqual([aSheet, aDoc])
+  })
+
+  it('forgets the S11 locks of every working copy, and never a local file (R1-be-6)', async () => {
+    const h = harness([localFile, aSheet], [], new Set(), [aSheet, localFile, bDoc])
+    expect(await h.boundary.beforeSignOut()).toBe(true)
+    // every working copy's lock goes (any account); a local path is not account data
+    expect(h.forgottenLocks).toEqual([aSheet, bDoc])
+    expect(h.shownLocks).toEqual([localFile])
+    h.boundary.afterSignOut()
+    // a second pass at the sign-out is idempotent
+    expect(h.shownLocks).toEqual([localFile])
+  })
+
+  it('a cancelled prompt closes nothing and keeps the locks: the account did not go away (R1-be-6)', async () => {
+    const h = harness([aSheet], [], new Set([aSheet]), [aSheet])
+    expect(await h.boundary.beforeSignOut()).toBe(false)
+    expect(h.closed).toEqual([])
+    expect(h.shown).toEqual([aSheet])
+    // the user cancelled the sign-out, so the same account keeps its panel
+    expect(h.shownLocks).toEqual([aSheet])
+    // ...and afterSignOut (the sign-out did go ahead) does forget them
+    h.boundary.afterSignOut()
+    expect(h.shownLocks).toEqual([])
   })
 
   it('a cancelled unsaved-changes prompt closes nothing, not even the clean tabs (GOA9-r4-02)', async () => {
@@ -161,6 +207,39 @@ describe('a sign-in that changes the account', () => {
     expect(h.closed).toEqual([aSheet, otherDeployment])
     expect(h.shown).toEqual([localFile, bDoc])
     expect(h.forgotten).toEqual([aSheet, aDoc, otherDeployment])
+  })
+
+  it('forgets the S11 locks of the account that went away, keeping its own (R1-be-6)', async () => {
+    const h = harness([localFile, aSheet, bDoc], [], new Set(), [
+      aSheet,
+      bDoc,
+      otherDeployment,
+      localFile,
+    ])
+    await h.boundary.enforce(ownerB)
+    // acc_a's and the other deployment's locks go; ownerB's own and the local path stay
+    expect(h.shownLocks).toEqual([bDoc, localFile])
+    expect(h.forgottenLocks).toEqual([aSheet, otherDeployment])
+  })
+
+  it('forgets the locks before it closes anything: panel state must not wait on a save prompt (F4 residual)', async () => {
+    const order: string[] = []
+    const h = harness([aSheet], [], new Set([aSheet]), [aSheet])
+    const forget = h.deps.forgetLocks.getMockImplementation()
+    h.deps.forgetLocks.mockImplementation((match: (path: string) => boolean) => {
+      order.push('forgetLocks')
+      forget?.(match)
+    })
+    const close = h.deps.closeDocument.getMockImplementation()
+    h.deps.closeDocument.mockImplementation(async (path: string) => {
+      order.push('closeDocument')
+      return close ? close(path) : true
+    })
+    await h.boundary.enforce(ownerB)
+    // the lock is forgotten first, so a renderer re-read on the account change
+    // never waits behind the close prompt; the cancelled prompt still forgot it
+    expect(order).toEqual(['forgetLocks', 'closeDocument'])
+    expect(h.shownLocks).toEqual([])
   })
 
   it('runs once per account, and again after a switch', async () => {

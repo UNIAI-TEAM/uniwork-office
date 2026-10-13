@@ -3,6 +3,7 @@ import {
   setUniworkUserSaveHook,
   uniworkIsBound,
   uniworkIsReadOnly,
+  uniworkRefusesOpen,
   uniworkRequestOrigin,
   uniworkSaveAsDefault,
   uniworkSaveDecision,
@@ -53,7 +54,6 @@ import {
   buildPrintableHtml,
   configuredDefaultSaveDir,
   contextMenuLabels,
-  fetchRemoteImage,
   installContextMenu,
   installNavigationGuard,
   isHeadlessMode,
@@ -78,10 +78,10 @@ import {
   aiStreamErrorFields,
   chatForProvider,
   defaultAiSettings,
-  activeProvider,
   maxOutputTokensOf,
   refreshUniworkCloudStatus,
   resolveAiSettings,
+  selectedProvider,
   aiNoticeBody,
   noModelMessage,
   setAiUserAgent,
@@ -162,6 +162,7 @@ import {
 } from '../shared/desktop-api'
 import { IPC_CHANNELS } from '../shared/ipc-channels'
 import { createOpenRetryPaths } from './open-retry-paths'
+import { fetchAiImage } from './ai-fetch-image'
 import { atomicWriteFile } from './atomic-write'
 import { closeGuardDecision, ShutdownLatch } from './close-guard'
 import { SaveEditsTransferStore } from './save-edits-transfer'
@@ -1634,8 +1635,6 @@ interface SheetsTabSession {
 /** per-tab session state, keyed by webContents.id — replaces the old single-window closures
  * that `registerIpcHandlers`/`validateSender` used to capture, which broke as soon as a second
  * tab (or a closed-then-reopened tab) registered and overwrote the previous closure. */
-/// Same ceiling as local add_image (readLocalImage's 20MB check)
-const MAX_REMOTE_IMAGE_BYTES = 20 * 1024 * 1024
 /** Max .csv/.tsv bytes converted on open: stops a 500MB text file OOMing main before sidecar limits. */
 const MAX_DELIMITED_IMPORT_BYTES = 32 * 1024 * 1024
 
@@ -2711,6 +2710,9 @@ export function registerSheetsIpc(): void {
       event.sender,
       dialogParent(event),
     )
+    // G5-04g: a locked working copy was refused on the original path; no
+    // session was derived and nothing opened
+    if (prepared === null) return null
     // The recovery prompt (or the file dialog / import conversion) can outlive
     // the tab: once the renderer is destroyed, its 'destroyed' handler has
     // already run closeAllSessions and dropped the tab entry, so a session
@@ -2729,6 +2731,8 @@ export function registerSheetsIpc(): void {
       emptySource: prepared.emptySource,
       unsavedNew: prepared.unsavedNew,
     })
+    // G5-04g: a refused working copy never opened a session; report it as such
+    if (result === null) return null
     // The sidecar open itself can also outlive the tab after the pre-open
     // check. Close the newly registered session instead of stranding it in
     // the detached entry map.
@@ -2809,6 +2813,8 @@ export function registerSheetsIpc(): void {
           dialogParent(event),
           { skipRecoveryPrompt: true },
         )
+        // G5-04g: a refused merge source is skipped, like a refused open
+        if (prepared === null) continue
         if (event.sender.isDestroyed()) {
           await discardPreparedOpen(prepared)
           break
@@ -2822,7 +2828,10 @@ export function registerSheetsIpc(): void {
           emptySource: prepared.emptySource,
           unsavedNew: prepared.unsavedNew,
         })
-        opened.push(result as { sessionId: string })
+        // G5-04g: a refused merge source opened no session; skip it rather than
+        // register a phantom entry
+        if (result === null) continue
+        opened.push(result)
         if (event.sender.isDestroyed()) break
       }
     } catch (error) {
@@ -3422,6 +3431,10 @@ export function registerSheetsIpc(): void {
             }
           : undefined,
     )
+    // G5-04g: the save gate above already refused a locked target, so this is
+    // unreachable in practice; a null here means the session could not be
+    // swapped over the bytes we just wrote.
+    if (file === null) throw new Error('the saved workbook could not be reopened')
     if (quietUnsavedNew && session.suggestSaveAs !== undefined) {
       // the temp path must not reach the title or recents; the recovery copy
       // is what a crash restores from, so it tracks the saved bytes
@@ -3704,8 +3717,9 @@ export function registerSheetsAiIpc(): void {
     sessionFor(event)
     const stored = readJson<Partial<AiSettings> & LegacyAiSettings>(SETTINGS_PATH(), {})
     const settings = resolveAiSettings(stored, defaultAiSettings())
-    // a stored BYOK provider is honored when usable; half-filled configs fall back to genspark
-    settings.provider = activeProvider(settings)
+    // the stored provider stays selected even while its config is incomplete (the picker and
+    // Settings show what is missing); only an unknown id degrades to genspark
+    settings.provider = selectedProvider(settings)
     return settings
   })
 
@@ -3865,47 +3879,9 @@ export function registerSheetsAiIpc(): void {
     }
   })
 
-  // Standalone parity with docs-main's shell-wide handler: AI-supplied URLs are
-  // prompt-injectable, so fetchRemoteImage refuses non-http schemes and
-  // private/link-local targets and validates every redirect hop. Size-capped to
-  // match the local add_image limit.
-  ipcMain.handle(
-    'ai:fetch-image',
-    async (_event, url: unknown): Promise<{ base64: string; mime: string } | null> => {
-      try {
-        const resp = await fetchRemoteImage(z.string().parse(url))
-        if (!resp || !resp.ok || !resp.body) return null
-        const declared = Number(resp.headers.get('content-length') ?? 0)
-        if (declared > MAX_REMOTE_IMAGE_BYTES) return null
-        // Stream with a running cap: a missing/understated Content-Length must
-        // not let a prompt-injected URL buffer unbounded bytes before a
-        // post-hoc size check
-        const reader = resp.body.getReader()
-        const chunks: Buffer[] = []
-        let received = 0
-        for (;;) {
-          const { done, value } = await reader.read()
-          if (done) break
-          received += value.byteLength
-          if (received > MAX_REMOTE_IMAGE_BYTES) {
-            await reader.cancel()
-            return null
-          }
-          chunks.push(Buffer.from(value))
-        }
-        const buf = Buffer.concat(chunks)
-        const ct = resp.headers.get('content-type') ?? ''
-        const mime = ct.includes('png')
-          ? 'image/png'
-          : ct.includes('gif')
-            ? 'image/gif'
-            : 'image/jpeg'
-        return { base64: buf.toString('base64'), mime }
-      } catch {
-        return null
-      }
-    },
-  )
+  // AI-supplied URLs are prompt-injectable: SSRF guard + size cap live in
+  // ai-fetch-image.ts (tests/g6-12-fetch-image-guard.test.ts pins both)
+  ipcMain.handle('ai:fetch-image', (_event, url: unknown) => fetchAiImage(url))
 }
 
 // ── project-store IPC (standalone mode) ────────────────────────────────────
@@ -4366,7 +4342,11 @@ async function openWorkbookSession(
     emptySource?: boolean | undefined
     unsavedNew?: boolean | undefined
   },
-): Promise<WorkbookFile> {
+): Promise<WorkbookFile | null> {
+  // G5-04g: a workbook whose folder declares a store this build does not read
+  // is refused before the snapshot copy or any sidecar read (the shell already
+  // pushed the S11 lock). null is this pipeline's not-opened result.
+  if (uniworkRefusesOpen(path)) return null
   const {
     suggestSaveAs,
     csvImport,
@@ -4497,7 +4477,13 @@ async function prepareWorkbookForOpen(
   restoreTarget?: string
   emptySource?: boolean
   unsavedNew?: boolean
-}> {
+} | null> {
+  // G5-04g: the ORIGINAL user path is refused before this pipeline derives a
+  // new one (the recovery-copy and empty-xlsx branches below rewrite openPath),
+  // so a locked working copy never reaches a session under a derived path. null
+  // is the pipeline's not-opened result; the guard in openWorkbookSession stays
+  // as the backstop for the derived path.
+  if (uniworkRefusesOpen(path)) return null
   // A shell-created "New spreadsheet" opens from a temp directory and has no
   // user-visible file yet: Save As produces it, and closing unsaved discards
   // the directory. The mark is consumed once the session exists (see

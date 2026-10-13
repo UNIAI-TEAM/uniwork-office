@@ -62,6 +62,7 @@ import { useI18n, t as tGlobal, aiLangDirective, type TFunc } from '../i18n/loca
 import {
   AiScopeQuote,
   Markdown,
+  useAiModelNeedAction,
   useAiModelNeedHint,
   useAiPanelPrefs,
   type AiScopeQuoteData,
@@ -311,6 +312,8 @@ interface AiPanelProps {
   onQueueConsume?: (keys: string[]) => void
   /** view-only UniWork deck: the agent only gets read-only tools, edit-only composer affordances are gone */
   readOnly?: boolean
+  /** UniWork-bound deck: AI generation writes nothing outside the document (no draft, no sidecar) */
+  uniworkBound?: boolean
 }
 
 /** Some locales already end the label with an ellipsis — normalize to exactly one. */
@@ -409,6 +412,7 @@ export function AiPanel({
   onQueueFocus,
   onQueueConsume,
   readOnly = false,
+  uniworkBound = false,
 }: AiPanelProps) {
   const { t, lang } = useI18n()
   // Panel chrome follows the UI language; message text follows its own content (dir=auto below)
@@ -421,6 +425,7 @@ export function AiPanel({
   const { spellcheck } = useAiPanelPrefs()
   // no key or no known model (web): send stays off and the hint says why, as in AiComposer
   const needModelHint = useAiModelNeedHint()
+  const needModelAction = useAiModelNeedAction()
   const [busy, setBusy] = useState(false)
   const [chat, setChat] = useState<ChatEntry[]>([])
   /** Past conversation restored from JSONL (read-only transcript, not fed to the model) */
@@ -526,6 +531,8 @@ export function AiPanel({
   slidesRef.current = slides
   const readOnlyRef = useRef(readOnly)
   readOnlyRef.current = readOnly
+  const uniworkBoundRef = useRef(uniworkBound)
+  uniworkBoundRef.current = uniworkBound
   const currentRef = useRef(current)
   currentRef.current = current
   const selectedRef = useRef(selectedIds)
@@ -932,6 +939,7 @@ export function AiPanel({
 
     const access: DeckAccess = {
       readOnly: () => readOnlyRef.current,
+      uniworkBound: () => uniworkBoundRef.current,
       getSlides: () => slidesRef.current,
       getCurrent: () => currentRef.current,
       // A queue run names its targets explicitly; whatever is selected on the
@@ -2506,11 +2514,20 @@ export function AiPanel({
               }}
               rows={1}
             />
+            {needModelHint !== null && !busy && (
+              // own full-width row above the footer (as in AiComposer): beside the chip it clipped
+              <div className="ai-input-need" role="status">
+                {needModelAction ? (
+                  <button type="button" className="ai-input-need-link" onClick={needModelAction}>
+                    {needModelHint}
+                  </button>
+                ) : (
+                  needModelHint
+                )}
+              </div>
+            )}
             <div className="ai-input-footer">
               <AiModelPicker bridge={MODEL_BRIDGE} lang={lang} />
-              {needModelHint !== null && !busy && (
-                <span className="ai-input-hint">{needModelHint}</span>
-              )}
               <button
                 className="ai-attach-btn"
                 onClick={pickAttachments}

@@ -185,4 +185,16 @@ export const cs = {
   aiCmdSkipped: ' (přeskočeno {count} chráněných bloků)',
   aiViewOnlyNotice:
     'Dokument jen pro čtení: AI jej může číst a odpovídat na otázky, ale nemůže jej upravovat.',
+  aiClarifyTitle: 'Pár otázek, než budu pokračovat',
+  aiClarifyDecide: 'Rozhodni za mě',
+  aiClarifyDecideAnswer: '(rozhodni za mě)',
+  aiClarifyMulti: 'Více možností',
+  aiClarifyNext: 'Další',
+  aiClarifyPrev: 'Předchozí',
+  aiClarifyOther: 'Jiné (napište)',
+  aiClarifySelected: 'Vybráno: {n}',
+  aiClarifySkip: 'Přeskočit',
+  aiClarifySubmit: 'Pokračovat',
+  aiSumClarify: 'Upřesnění zodpovězeno',
+  aiSumClarifySkipped: 'Upřesnění přeskočeno',
 } satisfies Record<keyof typeof zh, string>

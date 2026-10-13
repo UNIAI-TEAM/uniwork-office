@@ -50,4 +50,8 @@ export const en = {
   aiWebStateProviderBody: 'This provider is not supported.',
   aiWebStateUnknownTitle: 'AI request failed',
   aiWebStateUnknownBody: 'Something went wrong. Try again.',
+
+  // U-02 catalogue S10: workbook over the web AI size limit
+  aiErrWorkbookTooLarge:
+    'This workbook is too large for AI on the web. Open it in the UniWork Office app.',
 } satisfies Record<keyof typeof zh, string>

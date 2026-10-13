@@ -183,4 +183,16 @@ export const hi = {
   aiCmdSkipped: ' ({count} सुरक्षित ब्लॉक छोड़े गए)',
   aiViewOnlyNotice:
     'केवल-देखने योग्य दस्तावेज़: AI इसे पढ़ सकता है और प्रश्नों के उत्तर दे सकता है, लेकिन संपादित नहीं कर सकता।',
+  aiClarifyTitle: 'आगे बढ़ने से पहले कुछ सवाल',
+  aiClarifyDecide: 'मेरे लिए तय करें',
+  aiClarifyDecideAnswer: '(मेरे लिए तय करें)',
+  aiClarifyMulti: 'एकाधिक चयन',
+  aiClarifyNext: 'अगला',
+  aiClarifyPrev: 'पिछला',
+  aiClarifyOther: 'अन्य (स्वयं लिखें)',
+  aiClarifySelected: '{n} चयनित',
+  aiClarifySkip: 'छोड़ें',
+  aiClarifySubmit: 'जारी रखें',
+  aiSumClarify: 'स्पष्टीकरण का जवाब दिया गया',
+  aiSumClarifySkipped: 'स्पष्टीकरण छोड़ा गया',
 } satisfies Record<keyof typeof zh, string>

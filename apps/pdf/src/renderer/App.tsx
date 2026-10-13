@@ -5609,6 +5609,7 @@ export default function App() {
     pageCount: () => sizes.length,
     currentPage: () => (visList[currentPage - 1] ?? 0) + 1,
     readOnly: () => readOnly,
+    uniworkBound: () => uniwork.bound,
     ocrText: (origIdx) => ocrPages.get(origIdx)?.entry.text ?? null,
     selection: () => aiSelection,
     pendingSummary: aiPendingSummary,

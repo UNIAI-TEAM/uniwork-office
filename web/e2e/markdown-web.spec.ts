@@ -126,9 +126,15 @@ test('markdown: open -> save byte-identical -> type -> save -> reopen -> conflic
   await save(page)
   const dialog = frame.locator('[data-office-web="conflict"]')
   await expect(dialog).toBeVisible()
-  await expect(dialog.locator('[data-choice]')).toHaveText(['Reload latest', 'Overwrite', 'Cancel'])
+  await expect(dialog.locator('[data-choice]')).toHaveText([
+    'Reload latest',
+    'Overwrite…',
+    'Cancel',
+  ])
   await page.screenshot({ path: screenshotPath('markdown', 'conflict-light-en') })
   await dialog.locator('[data-choice="overwrite"]').click()
+  // Overwrite… opens its confirmation in the same dialog
+  await dialog.locator('[data-choice="go"]').click()
   await expect(dialog).toBeHidden()
   await expect.poll(async () => (await hostState(page)).lastSaved?.versionId).toBe('v6')
   expect(Buffer.from((await hostState(page)).lastSaved!.bytes).toString('utf8')).toContain(

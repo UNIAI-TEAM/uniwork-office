@@ -64,6 +64,10 @@ export const cs = {
   aiToolReadRangeOf: 'Načtení oblasti {range}',
   aiToolAggregate: 'Agregace oblasti',
   aiToolAggregateOf: 'Agregace oblasti {range}',
+  aiToolSummarize: 'Souhrn oblasti',
+  aiToolSummarizeOf: 'Souhrn oblasti {range}',
+  aiToolCompareRanges: 'Porovnat oblasti',
+  aiToolCompareRangesOf: 'Porovnat {left} s {right}',
   aiToolLoadGuide: 'Načtení průvodce',
   aiToolLoadGuideOf: 'Načtení průvodců {names}',
   aiToolReadFormats: 'Načtení formátů',
@@ -73,6 +77,19 @@ export const cs = {
   aiToolReadCellsCount: 'Načteno buněk: {count}',
   aiToolPropose: 'Sestavení plánu změn',
   aiToolCreateDocument: 'Vytvoření nového souboru',
+  // ask_clarification card (C-ASK)
+  aiClarifyTitle: 'Rychlé ověření, než budu pokračovat',
+  aiClarifyDecide: 'Rozhodni za mě',
+  aiClarifyDecideAnswer: '(rozhodni za mě)',
+  aiClarifyMulti: 'Více možností',
+  aiClarifyNext: 'Další',
+  aiClarifyPrev: 'Předchozí',
+  aiClarifyOther: 'Jiné (napište)',
+  aiClarifySelected: 'Vybráno: {n}',
+  aiClarifySkip: 'Přeskočit',
+  aiClarifySubmit: 'Potvrdit',
+  aiToolClarify: 'Upřesnění zodpovězeno',
+  aiToolClarifySkipped: 'Upřesnění přeskočeno',
   aiToolCreatedDocument: 'Vytvořeno: {name}',
   aiToolReadAttachment: 'Načtení přílohy',
   aiToolReadAttachmentOf: 'Načtení přílohy {name}',
@@ -101,4 +118,8 @@ export const cs = {
   aiScopeClearTitle: 'Zrušit omezení na oblast a pracovat s celým listem',
   aiViewOnlyNotice:
     'Dokument jen pro čtení: AI jej může číst a odpovídat na otázky, ale nemůže jej upravovat.',
+
+  // U-02 catalogue S9: cells summary under an edited result
+  aiResultCellsMeta:
+    'Zapsané buňky: {written} ({range}) · Přepsané existující buňky: {overwritten}',
 } satisfies Record<keyof typeof zh, string>

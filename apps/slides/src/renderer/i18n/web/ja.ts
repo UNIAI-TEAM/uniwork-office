@@ -2,9 +2,8 @@ import type { zh } from './zh'
 
 export const ja = {
   webConflictTitle: 'このプレゼンテーションは別の場所で変更されました',
-  webConflictBody:
-    '新しいバージョンが保存されています。上書きするとあなたの変更で置き換えます。最新を再読み込みすると変更を破棄して最新版を開きます。',
-  webConflictOverwrite: '上書き',
+  webConflictBody: '変更はまだ UniWork になく、ログアウトするまでこのブラウザーに保持されます。',
+  webConflictOverwrite: '上書き…',
   webConflictReload: '最新を再読み込み',
   webConflictNotSaved: 'プレゼンテーションは別の場所で変更されました',
   webDiscardTitle: '保存されていない変更を破棄しますか?',

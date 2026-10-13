@@ -94,4 +94,7 @@ export const ko = {
 
   setCliLinkReady: '명령줄 도구를 사용할 수 있습니다.',
   setAutoSaveUniworkNote: 'UniWork 문서에는 적용되지 않습니다.',
+  uwLockNewerStoreTitle: '더 새로운 앱 버전이 필요합니다',
+  uwLockNewerStore:
+    '이 데이터에는 더 새로운 앱 버전이 필요합니다. UniWork Office를 업데이트하세요. 데이터는 삭제되지 않았으며 새로 저장된 내용도 없습니다.',
 } satisfies Record<keyof typeof zh, string>

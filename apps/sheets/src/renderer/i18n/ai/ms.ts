@@ -64,6 +64,10 @@ export const ms = {
   aiToolReadRangeOf: 'Baca julat {range}',
   aiToolAggregate: 'Agregat julat',
   aiToolAggregateOf: 'Agregat julat {range}',
+  aiToolSummarize: 'Ringkaskan julat',
+  aiToolSummarizeOf: 'Ringkaskan julat {range}',
+  aiToolCompareRanges: 'Bandingkan julat',
+  aiToolCompareRangesOf: 'Bandingkan {left} dengan {right}',
   aiToolLoadGuide: 'Muatkan panduan',
   aiToolLoadGuideOf: 'Muatkan panduan {names}',
   aiToolReadFormats: 'Baca format',
@@ -73,6 +77,19 @@ export const ms = {
   aiToolReadCellsCount: 'Baca {count} sel',
   aiToolPropose: 'Jana pratonton perubahan',
   aiToolCreateDocument: 'Cipta fail baharu',
+  // ask_clarification card (C-ASK)
+  aiClarifyTitle: 'Semakan ringkas sebelum saya teruskan',
+  aiClarifyDecide: 'Putuskan untuk saya',
+  aiClarifyDecideAnswer: '(putuskan untuk saya)',
+  aiClarifyMulti: 'Pilihan berbilang',
+  aiClarifyNext: 'Seterusnya',
+  aiClarifyPrev: 'Sebelumnya',
+  aiClarifyOther: 'Lain-lain (taip sendiri)',
+  aiClarifySelected: '{n} dipilih',
+  aiClarifySkip: 'Langkau',
+  aiClarifySubmit: 'Sahkan',
+  aiToolClarify: 'Penjelasan dijawab',
+  aiToolClarifySkipped: 'Penjelasan dilangkau',
   aiToolCreatedDocument: '{name} dicipta',
   aiToolReadAttachment: 'Baca lampiran',
   aiToolReadAttachmentOf: 'Baca lampiran {name}',
@@ -101,4 +118,8 @@ export const ms = {
   aiScopeClearTitle: 'Buang skop julat dan gunakan seluruh helaian',
   aiViewOnlyNotice:
     'Dokumen lihat sahaja: AI boleh membaca dan menjawab soalan, tetapi tidak boleh mengedit.',
+
+  // U-02 catalogue S9: cells summary under an edited result
+  aiResultCellsMeta:
+    'Sel ditulis: {written} ({range}) · Sel sedia ada ditulis ganti: {overwritten}',
 } satisfies Record<keyof typeof zh, string>

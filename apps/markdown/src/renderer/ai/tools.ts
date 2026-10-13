@@ -12,6 +12,7 @@ import {
   validateOps,
   type FrontmatterAccess,
   type MdOp,
+  type OpsContext,
 } from '../editor/ops'
 import { t } from '../i18n/locale'
 import {
@@ -20,6 +21,13 @@ import {
   type DocWriteResult,
   type WritePosition,
 } from './doc-writer'
+import {
+  FENCE_REFUSAL,
+  fenceViolation,
+  fencedBlocks,
+  hasEditFence,
+  insertInsideFence,
+} from './edit-fence'
 
 export type { FrontmatterAccess } from '../editor/ops'
 export { blockIndexRange } from '../editor/ops'
@@ -115,12 +123,54 @@ export function buildDocContext(editor: Editor): string {
 
 // ── tool definitions ──
 
+/** one question on the ask_clarification card (same shape as html's) */
+export interface ClarifyQuestion {
+  id: string
+  label: string
+  description?: string
+  /** ≤5 options; the card appends "decide for me" and a free-text "other" itself */
+  options: string[]
+  multi?: boolean
+}
+
+/** the panel's questionnaire card; resolves with the answers, or cancelled when skipped / stopped */
+export type AskClarification = (
+  questions: ClarifyQuestion[],
+) => Promise<{ answers: string; cancelled?: boolean }>
+
 export const AGENT_TOOLS: AgentToolDef[] = [
   {
     name: 'get_document_context',
     description:
       'Refresh the document overview: a numbered list of top-level blocks (index | type | preview) plus the current selection. Call this before index-based edits when in doubt.',
     inputSchema: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    name: 'ask_clarification',
+    description:
+      'Ask the user before an edit or an answer when the request is ambiguous about meaning, scope or target (which section or blocks, what a term, heading or table column in the document means, how far a rewrite should go). Shows a questionnaire card: 1–4 questions, ≤5 options each; the card adds "decide for me" and a free-text option itself. Use it only when a guess would likely change the wrong thing; skip it when the request or the document already answers it. Wait for the answers, then continue. Do not repeat the questions in your reply.',
+    inputSchema: {
+      type: 'object',
+      required: ['questions'],
+      properties: {
+        questions: {
+          type: 'array',
+          minItems: 1,
+          maxItems: 4,
+          items: {
+            type: 'object',
+            required: ['id', 'label', 'options'],
+            properties: {
+              id: { type: 'string' },
+              label: { type: 'string' },
+              description: { type: 'string' },
+              options: { type: 'array', items: { type: 'string' }, maxItems: 5 },
+              multi: { type: 'boolean' },
+            },
+          },
+        },
+      },
+    },
   },
   {
     name: 'read_blocks',
@@ -141,7 +191,7 @@ export const AGENT_TOOLS: AgentToolDef[] = [
   },
   {
     name: 'apply_ops',
-    description: `Edit the document with a batch of ops — the same operations the editor's own toolbar performs. Ops run in order and stop at the first failure; the result lists what each op did.\n\n${buildOpsGuide()}`,
+    description: `Edit the document with a batch of ops — the same operations the editor's own toolbar performs. Ops run in order as one atomic batch: if any op fails, nothing is applied (the ops before it are undone) and the result names the failing op; otherwise the result lists what each op did.\n\n${buildOpsGuide()}`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -267,12 +317,26 @@ function opsSummary(ops: MdOp[], applied: number): string {
   return t('aiToolApplyOpsDone', { n: applied })
 }
 
+/** a selection-scoped turn's check for runOps: blocks outside the fence must not change */
+function fenceVerify(editor: Editor): OpsContext['verify'] {
+  if (!hasEditFence(editor)) return undefined
+  const spans = fencedBlocks(editor)
+  return (before, after) => fenceViolation(before, after, spans)
+}
+
 function applyOps(editor: Editor, input: unknown, fm?: FrontmatterAccess): ToolExecution {
   const label = t('aiToolApplyOps')
   const parsed = validateOps(input)
   if ('error' in parsed) return fail(parsed.error, label)
   if (usesBlockIndexes(parsed.ops) && editedExternally(editor)) return fail(STALE_DOC_ERROR, label)
-  const r = runOps(editor, parsed.ops, { source: 'ai', frontmatter: fm })
+  // the properties block sits outside every selection
+  if (hasEditFence(editor) && parsed.ops.some((op) => op.op === 'setFrontmatter'))
+    return fail(FENCE_REFUSAL, label)
+  const r = runOps(editor, parsed.ops, {
+    source: 'ai',
+    frontmatter: fm,
+    verify: fenceVerify(editor),
+  })
   const lines = r.results.map((res, i) =>
     res.ok
       ? `ops[${i}] ${parsed.ops[i]!.op}: ${res.message}`
@@ -280,12 +344,18 @@ function applyOps(editor: Editor, input: unknown, fm?: FrontmatterAccess): ToolE
   )
   const skipped = parsed.ops.length - r.results.length
   if (skipped > 0) lines.push(`${skipped} later op(s) were not executed.`)
+  if (r.refused) {
+    lines.push(`REFUSED: ${r.refused}`)
+  } else if (r.rolledBack) {
+    lines.push(
+      'Nothing was applied (atomic): the ops before the failure were undone and the document is unchanged. Fix the failing op and resend the whole batch.',
+    )
+  }
   if (r.blocksChanged) lines.push(INDEX_CHANGE_NOTICE)
   if (r.applied > 0) markDocSeen(editor)
-  const failed = r.applied < parsed.ops.length
   return {
     output: lines.join('\n'),
-    isError: failed || undefined,
+    isError: r.rolledBack || undefined,
     mutated: r.applied > 0,
     summary: opsSummary(parsed.ops, r.applied),
   }
@@ -347,9 +417,11 @@ async function insertImageFromUrl(
       : maxIndex
   const r = runOps(editor, [{ op: 'insertImage', after, src: rel, alt: String(input.alt ?? '') }], {
     source: 'ai',
+    verify: fenceVerify(editor),
   })
   const res = r.results[0]!
   if (!res.ok) return fail(res.error, labels.fail)
+  if (r.refused) return fail(r.refused, labels.fail)
   if (!userEditedDuringFetch) markDocSeen(editor)
   return {
     output: `Inserted the image (saved as ${rel}). ${INDEX_CHANGE_NOTICE}`,
@@ -384,6 +456,12 @@ async function writeDocument(
       label,
     )
   }
+  // a selection-scoped turn writes only next to (or into) its fenced blocks, never the whole document
+  if (
+    hasEditFence(editor) &&
+    (position.kind === 'whole' || !insertInsideFence(editor, position.index))
+  )
+    return fail(FENCE_REFUSAL, label)
   const str = (v: unknown) => (v === undefined || v === null ? undefined : String(v))
   const draft = new DraftLanding(editor, position)
   let result: DocWriteResult
@@ -424,9 +502,10 @@ async function writeDocument(
           markdown,
         }
       : { op: 'insertContent', after: draft.indexBefore(), markdown }
-  const r = runOps(editor, [op], { source: 'ai' })
+  const r = runOps(editor, [op], { source: 'ai', verify: fenceVerify(editor) })
   const res = r.results[0]!
   if (!res.ok) return fail(res.error, t('aiToolWriteDocFailed'))
+  if (r.refused) return fail(r.refused, t('aiToolWriteDocFailed'))
   markDocSeen(editor)
   const note = result.truncated
     ? ' The stream ended early, so the content is INCOMPLETE (the user chose to keep it): the tail is missing. Say so and offer to finish the missing sections with write_document (afterIndex at the end) or apply_ops insertContent.'
@@ -438,13 +517,66 @@ async function writeDocument(
   }
 }
 
+/** ask_clarification: the card blocks the run until the user answers or skips (result texts as html's) */
+async function askClarification(
+  call: AgentToolCall,
+  ask: AskClarification | undefined,
+): Promise<ToolExecution> {
+  if (!ask)
+    return {
+      output: 'questionnaire cards are not available here; decide sensible defaults and continue',
+      isError: true,
+      mutated: false,
+      summary: t('aiToolClarify'),
+    }
+  const raw: unknown[] = Array.isArray(call.input.questions) ? call.input.questions : []
+  const questions: ClarifyQuestion[] = raw
+    .map((item, i) => {
+      const q = (item ?? {}) as Record<string, unknown>
+      return {
+        id: String(q.id ?? `q${i + 1}`),
+        label: String(q.label ?? '').trim(),
+        description: q.description ? String(q.description) : undefined,
+        options: Array.isArray(q.options)
+          ? q.options.map((o: unknown) => String(o)).slice(0, 5)
+          : [],
+        multi: !!q.multi,
+      }
+    })
+    .filter((q) => q.label && q.options.length > 0)
+    .slice(0, 4)
+  if (questions.length === 0)
+    return {
+      output: 'questions must be non-empty and every question needs options',
+      isError: true,
+      mutated: false,
+      summary: t('aiToolClarify'),
+    }
+  const r = await ask(questions)
+  return r.cancelled
+    ? {
+        output:
+          'The user skipped the questionnaire. Decide sensible defaults yourself and continue.',
+        mutated: false,
+        summary: t('aiToolClarifySkipped'),
+      }
+    : {
+        output: `User answers:\n${r.answers}\nNow continue with the request following these answers.`,
+        mutated: false,
+        summary: t('aiToolClarify'),
+      }
+}
+
 export function executeTool(
   editor: Editor,
   call: AgentToolCall,
   signal?: AbortSignal,
   fm?: FrontmatterAccess,
   writer?: AiDocWriter,
+  /** the panel's questionnaire card; without one ask_clarification reports it is unavailable */
+  ask?: AskClarification,
 ): ToolExecution | Promise<ToolExecution> {
+  if (call.name === 'ask_clarification') return askClarification(call, ask)
   const doc = editor.state.doc
   const maxIndex = doc.childCount - 1
 

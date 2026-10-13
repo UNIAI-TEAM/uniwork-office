@@ -23,6 +23,8 @@
 import type { Capabilities, OfficeModule } from '../protocol/types'
 import browser from './browser'
 import { createCapabilityObject } from './capability-object'
+import { onFrameModal } from '../../modules/shared/frame-dialog'
+import { rememberRemoteVersion } from '../../modules/shared/conflict-dialog'
 import { bindHostAppearance, createFrameClient, frameVersionFromDocument } from './frame-boot'
 import type { FramePort } from './frame-port'
 import { hostGrants } from './hide'
@@ -58,6 +60,8 @@ export type ModuleBridgePort = Pick<
   | 'onLanguage'
   | 'setDirty'
   | 'setTitle'
+  | 'setModal'
+  | 'onRemoteVersion'
   | 'reportSaved'
   | 'reportError'
   | 'getToken'
@@ -114,6 +118,19 @@ export const MODULE_WEB_CAPABILITIES: Readonly<Record<string, unknown>> = Object
   viewOnlyChip: false,
 })
 
+/**
+ * What every frame (Docs and the five modules) claims in `ready` on top of its own keys; each is
+ * effective only with the host grant:
+ *   - the web AI keys (CONTRACT C16; `uniworkAi` stays false until the G6-05 adapter),
+ *   - `desktopOpen`: the host's "Open in desktop app" flow for `app.open` (A7),
+ *   - `download`: the host downloads the open bytes for `api.download` (X-02).
+ */
+export const FRAME_BASE_CAPABILITIES: Capabilities = Object.freeze({
+  ...AI_FRAME_CAPABILITIES,
+  desktopOpen: true,
+  download: true,
+})
+
 /** NO_AUTO_SAVE_DEFAULT of @genoffice/ui auto-save-pref.ts: autosave off, never set */
 const NO_AUTO_SAVE = Object.freeze({ on: false, updatedAt: 0 })
 
@@ -137,8 +154,7 @@ export function installModuleBridge(spec: ModuleBridgeSpec): InstalledModuleBrid
     spec.client ??
     createFrameClient({
       module: spec.module,
-      // desktopOpen: every module frame can ask the host for its "Open in desktop app" flow (A7)
-      capabilities: { ...AI_FRAME_CAPABILITIES, desktopOpen: true, ...spec.frameCapabilities },
+      capabilities: { ...FRAME_BASE_CAPABILITIES, ...spec.frameCapabilities },
       frameVersion: frameVersionFromDocument(),
     })
   const grants = spec.capabilities?.grants ?? hostGrants
@@ -154,6 +170,10 @@ export function installModuleBridge(spec: ModuleBridgeSpec): InstalledModuleBrid
     }),
   )
   bindHostAppearance(client)
+  // the frame's dialogs (save conflict, draft prompt…) tell the host so it inerts its own page and
+  // holds its save watchdog; the conflict table learns who saved a revision from doc.remoteVersion
+  onFrameModal((open) => client.setModal?.(open))
+  client.onRemoteVersion?.(rememberRemoteVersion)
   const ai = createWebAi({ port: client, capabilities })
 
   const ctx: ModuleBridgeContext = { module: spec.module, client, capabilities }

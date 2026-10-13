@@ -64,6 +64,10 @@ export const it = {
   aiToolReadRangeOf: "Lettura dell'intervallo {range}",
   aiToolAggregate: "Aggregazione dell'intervallo",
   aiToolAggregateOf: "Aggregazione dell'intervallo {range}",
+  aiToolSummarize: "Riepiloga l'intervallo",
+  aiToolSummarizeOf: "Riepiloga l'intervallo {range}",
+  aiToolCompareRanges: 'Confronta intervalli',
+  aiToolCompareRangesOf: 'Confronta {left} con {right}',
   aiToolLoadGuide: 'Caricamento della guida',
   aiToolLoadGuideOf: 'Caricamento delle guide {names}',
   aiToolReadFormats: 'Lettura dei formati',
@@ -73,6 +77,19 @@ export const it = {
   aiToolReadCellsCount: 'Lettura di {count} celle',
   aiToolPropose: "Creazione dell'anteprima delle modifiche",
   aiToolCreateDocument: 'Crea nuovo file',
+  // ask_clarification card (C-ASK)
+  aiClarifyTitle: 'Una breve verifica prima di continuare',
+  aiClarifyDecide: 'Decidi tu per me',
+  aiClarifyDecideAnswer: '(decidi tu per me)',
+  aiClarifyMulti: 'Scelta multipla',
+  aiClarifyNext: 'Avanti',
+  aiClarifyPrev: 'Indietro',
+  aiClarifyOther: 'Altro (da digitare)',
+  aiClarifySelected: '{n} selezionati',
+  aiClarifySkip: 'Salta',
+  aiClarifySubmit: 'Conferma',
+  aiToolClarify: 'Chiarimento risposto',
+  aiToolClarifySkipped: 'Chiarimento saltato',
   aiToolCreatedDocument: '{name} creato',
   aiToolReadAttachment: "Lettura dell'allegato",
   aiToolReadAttachmentOf: "Lettura dell'allegato {name}",
@@ -101,4 +118,8 @@ export const it = {
   aiScopeClearTitle: "Rimuovi l'ambito dell'intervallo e usa tutto il foglio",
   aiViewOnlyNotice:
     'Documento di sola lettura: l’IA può leggerlo e rispondere a domande, ma non può modificarlo.',
+
+  // U-02 catalogue S9: cells summary under an edited result
+  aiResultCellsMeta:
+    'Celle scritte: {written} ({range}) · Celle esistenti sovrascritte: {overwritten}',
 } satisfies Record<keyof typeof zh, string>

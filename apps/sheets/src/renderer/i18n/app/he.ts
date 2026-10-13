@@ -1455,9 +1455,8 @@ export const he = {
   appWebEngineHint: 'הקובץ שלך לא השתנה.',
   appWebViewOnly: 'צפייה בלבד: לא ניתן לשמור שינויים בחוברת העבודה הזו.',
   appWebConflictTitle: 'חוברת העבודה שונתה במקום אחר',
-  appWebConflictBody:
-    'מישהו שמר גרסה חדשה יותר בזמן שערכת. החלף אותה בגרסה שלך, או טען מחדש את הגרסה האחרונה (שינויים שלא נשמרו יימחקו).',
-  appWebConflictOverwrite: 'החלף',
+  appWebConflictBody: 'השינויים שלך עדיין לא ב-UniWork והם נשמרים בדפדפן הזה עד שתתנתק.',
+  appWebConflictOverwrite: 'דריסה…',
   appWebConflictReload: 'טען את הגרסה האחרונה',
   appWebConflictNotSaved: 'לא נשמר: קיימת גרסה חדשה יותר.',
   appWebDiscardTitle: 'לבטל שינויים שלא נשמרו?',

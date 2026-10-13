@@ -512,8 +512,8 @@ export const hi = {
   appStyleNamePlaceholder: 'शैली का नाम',
   appWebConflictTitle: 'यह दस्तावेज़ कहीं और बदला गया है',
   appWebConflictBody:
-    'आपके संपादन के दौरान एक नया संस्करण सहेजा गया। क्या आप इसे अपने संस्करण से अधिलेखित करना चाहते हैं, या नवीनतम संस्करण फिर से लोड करके अपने बदलाव छोड़ना चाहते हैं?',
-  appWebConflictOverwrite: 'अधिलेखित करें',
+    'आपके बदलाव अभी UniWork पर नहीं हैं और साइन आउट करने तक इस ब्राउज़र में रखे जाते हैं।',
+  appWebConflictOverwrite: 'अधिलेखित करें…',
   appWebConflictReload: 'नवीनतम संस्करण लोड करें',
   appWebConflictNotSaved: 'दस्तावेज़ कहीं और बदला गया है',
   appWebDiscardTitle: 'सहेजे न गए बदलाव छोड़ें?',

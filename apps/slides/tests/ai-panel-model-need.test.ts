@@ -96,7 +96,7 @@ describe('AiPanel model need (slides)', () => {
     const send = container.querySelector<HTMLButtonElement>('.ai-send-btn')!
     expect(send.disabled).toBe(true)
     expect(send.getAttribute('data-tip')).toBe(HINT)
-    expect(container.querySelector('.ai-input-hint')?.textContent).toBe(HINT)
+    expect(container.querySelector('.ai-input-need')?.textContent).toBe(HINT)
     act(() => {
       textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
     })
@@ -104,11 +104,33 @@ describe('AiPanel model need (slides)', () => {
     expect(textarea.value).toBe('make a deck')
   })
 
+  it('the hint has its own full-width row above the footer, not a slot beside the model chip', () => {
+    // UNI-1395 visual F1: in the 360px panel the chip row left the hint no room, so it clipped
+    const container = mount()
+    act(() => setAiModelNeedHint(HINT))
+    const need = container.querySelector('.ai-input-need')!
+    expect(need.getAttribute('role')).toBe('status')
+    const footer = container.querySelector('.ai-input-footer')!
+    expect(footer.contains(need)).toBe(false)
+    expect(container.querySelector('.ai-input-footer .ai-input-hint')).toBeNull()
+    expect(need.nextElementSibling).toBe(footer)
+  })
+
+  it('the hint opens the AI settings when the host offers that action', () => {
+    const container = mount()
+    const open = vi.fn()
+    act(() => setAiModelNeedHint(HINT, open))
+    const link = container.querySelector<HTMLButtonElement>('.ai-input-need button')!
+    expect(link.textContent).toBe(HINT)
+    act(() => link.click())
+    expect(open).toHaveBeenCalledTimes(1)
+  })
+
   it('a model is known: Send follows the text and there is no hint', () => {
     const container = mount()
     const textarea = container.querySelector<HTMLTextAreaElement>('textarea[data-slides-ai-input]')!
     typeInto(textarea, 'make a deck')
     expect(container.querySelector<HTMLButtonElement>('.ai-send-btn')!.disabled).toBe(false)
-    expect(container.querySelector('.ai-input-hint')).toBeNull()
+    expect(container.querySelector('.ai-input-need')).toBeNull()
   })
 })

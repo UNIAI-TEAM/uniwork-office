@@ -52,4 +52,8 @@ export const nl = {
   aiWebStateProviderBody: 'Deze aanbieder wordt niet ondersteund.',
   aiWebStateUnknownTitle: 'AI-verzoek mislukt',
   aiWebStateUnknownBody: 'Er ging iets mis. Probeer het opnieuw.',
+
+  // U-02 catalogue S10: workbook over the web AI size limit
+  aiErrWorkbookTooLarge:
+    'Deze werkmap is te groot voor AI op het web. Open hem in de UniWork Office-app.',
 } satisfies Record<keyof typeof zh, string>

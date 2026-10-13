@@ -123,8 +123,15 @@ export class SaveCoordinator {
    * document after the attempt (null for an unbound path); never throws.
    */
   async save(path: string): Promise<BoundDocument | null> {
-    const doc = this.deps.store.lookup(path)
-    if (!doc) return null
+    // G5-04g defence in depth: a working copy whose folder declares a store this
+    // build does not read never reaches the intent, the upload or the commit,
+    // even if a module somehow has it open.
+    // One classify (one binding.json read) decides both the newer-store refusal
+    // and the bound lookup, instead of newerStoreAt + lookup reading twice.
+    const found = this.deps.store.classify(path)
+    if (found.kind === 'newer') return null
+    if (found.kind !== 'bound') return null
+    const doc = found.doc
     if (this.saving.has(doc.path)) return doc
     const b = doc.binding
     if (b.access === 'view') return doc

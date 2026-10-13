@@ -53,4 +53,8 @@ export const es = {
   aiWebStateProviderBody: 'Este proveedor no es compatible.',
   aiWebStateUnknownTitle: 'Error en la solicitud de IA',
   aiWebStateUnknownBody: 'Algo salió mal. Inténtalo de nuevo.',
+
+  // U-02 catalogue S10: workbook over the web AI size limit
+  aiErrWorkbookTooLarge:
+    'Este libro es demasiado grande para la IA en la web. Ábrelo en la aplicación UniWork Office.',
 } satisfies Record<keyof typeof zh, string>

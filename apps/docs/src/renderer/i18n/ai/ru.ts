@@ -185,4 +185,16 @@ export const ru = {
   aiCmdSkipped: ' (пропущено защищенных блоков: {count})',
   aiViewOnlyNotice:
     'Документ только для просмотра: ИИ может читать его и отвечать на вопросы, но не может редактировать.',
+  aiClarifyTitle: 'Несколько вопросов, прежде чем продолжить',
+  aiClarifyDecide: 'Решите за меня',
+  aiClarifyDecideAnswer: '(решите за меня)',
+  aiClarifyMulti: 'Несколько вариантов',
+  aiClarifyNext: 'Далее',
+  aiClarifyPrev: 'Назад',
+  aiClarifyOther: 'Другое (впишите свой вариант)',
+  aiClarifySelected: 'выбрано: {n}',
+  aiClarifySkip: 'Пропустить',
+  aiClarifySubmit: 'Продолжить',
+  aiSumClarify: 'Уточнения получены',
+  aiSumClarifySkipped: 'Уточнения пропущены',
 } satisfies Record<keyof typeof zh, string>

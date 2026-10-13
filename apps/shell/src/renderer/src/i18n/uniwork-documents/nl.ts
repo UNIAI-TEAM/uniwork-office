@@ -95,4 +95,7 @@ export const nl = {
 
   setCliLinkReady: 'De opdrachtregeltool is beschikbaar.',
   setAutoSaveUniworkNote: 'Geldt niet voor UniWork-documenten.',
+  uwLockNewerStoreTitle: 'Een nieuwere appversie is nodig',
+  uwLockNewerStore:
+    'Deze gegevens hebben een nieuwere appversie nodig. Werk UniWork Office bij; er is niets verwijderd en er is geen nieuwe opslag gemaakt.',
 } satisfies Record<keyof typeof zh, string>

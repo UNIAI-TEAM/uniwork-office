@@ -160,7 +160,7 @@ describe('comment tools', () => {
       access,
     )
     expect(exec.isError).toBeFalsy()
-    expect(exec.mutated).toBe(false)
+    expect(exec.mutated).toBe(true)
     expect(comments[0].done).toBe(true)
   })
 

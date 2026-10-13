@@ -63,6 +63,10 @@ export const pl = {
   aiToolReadRangeOf: 'Odczyt zakresu {range}',
   aiToolAggregate: 'Agregacja zakresu',
   aiToolAggregateOf: 'Agregacja zakresu {range}',
+  aiToolSummarize: 'Podsumowanie zakresu',
+  aiToolSummarizeOf: 'Podsumowanie zakresu {range}',
+  aiToolCompareRanges: 'Porównaj zakresy',
+  aiToolCompareRangesOf: 'Porównaj {left} z {right}',
   aiToolLoadGuide: 'Ładowanie przewodnika',
   aiToolLoadGuideOf: 'Ładowanie przewodników {names}',
   aiToolReadFormats: 'Odczyt formatów',
@@ -72,6 +76,19 @@ export const pl = {
   aiToolReadCellsCount: 'Odczyt {count} komórek',
   aiToolPropose: 'Tworzenie podglądu zmian',
   aiToolCreateDocument: 'Utwórz nowy plik',
+  // ask_clarification card (C-ASK)
+  aiClarifyTitle: 'Szybkie pytania, zanim będę kontynuować',
+  aiClarifyDecide: 'Zdecyduj za mnie',
+  aiClarifyDecideAnswer: '(zdecyduj za mnie)',
+  aiClarifyMulti: 'Wielokrotny wybór',
+  aiClarifyNext: 'Dalej',
+  aiClarifyPrev: 'Wstecz',
+  aiClarifyOther: 'Inne (wpisz)',
+  aiClarifySelected: 'wybrano: {n}',
+  aiClarifySkip: 'Pomiń',
+  aiClarifySubmit: 'Potwierdź',
+  aiToolClarify: 'Odpowiedziano na pytania',
+  aiToolClarifySkipped: 'Pominięto pytania',
   aiToolCreatedDocument: 'Utworzono {name}',
   aiToolReadAttachment: 'Odczyt załącznika',
   aiToolReadAttachmentOf: 'Odczyt załącznika {name}',
@@ -100,4 +117,8 @@ export const pl = {
   aiScopeClearTitle: 'Usuń zakres zaznaczenia i obejmij cały arkusz',
   aiViewOnlyNotice:
     'Dokument tylko do odczytu: AI może go czytać i odpowiadać na pytania, ale nie może go edytować.',
+
+  // U-02 catalogue S9: cells summary under an edited result
+  aiResultCellsMeta:
+    'Zapisane komórki: {written} ({range}) · Nadpisane istniejące komórki: {overwritten}',
 } satisfies Record<keyof typeof zh, string>

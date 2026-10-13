@@ -523,8 +523,8 @@ export const nl = {
   appStyleNamePlaceholder: 'Stijlnaam',
   appWebConflictTitle: 'Dit document is elders gewijzigd',
   appWebConflictBody:
-    'Tijdens het bewerken is een nieuwere versie opgeslagen. Wilt u die overschrijven met uw versie, of de nieuwste versie opnieuw laden en uw wijzigingen negeren?',
-  appWebConflictOverwrite: 'Overschrijven',
+    'Je wijzigingen staan nog niet op UniWork en blijven in deze browser tot je je afmeldt.',
+  appWebConflictOverwrite: 'Overschrijven…',
   appWebConflictReload: 'Nieuwste versie laden',
   appWebConflictNotSaved: 'het document is elders gewijzigd',
   appWebDiscardTitle: 'Niet-opgeslagen wijzigingen negeren?',

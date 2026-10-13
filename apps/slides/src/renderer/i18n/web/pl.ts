@@ -3,8 +3,8 @@ import type { zh } from './zh'
 export const pl = {
   webConflictTitle: 'Ta prezentacja została zmieniona w innym miejscu',
   webConflictBody:
-    'Ktoś zapisał nowszą wersję. Zastąp zastępuje ją Twoimi zmianami; Wczytaj najnowszą odrzuca Twoje zmiany i otwiera najnowszą wersję.',
-  webConflictOverwrite: 'Zastąp',
+    'Twoich zmian nie ma jeszcze w UniWork; są przechowywane w tej przeglądarce do czasu wylogowania.',
+  webConflictOverwrite: 'Zastąp…',
   webConflictReload: 'Wczytaj najnowszą',
   webConflictNotSaved: 'prezentacja została zmieniona w innym miejscu',
   webDiscardTitle: 'Odrzucić niezapisane zmiany?',

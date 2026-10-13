@@ -59,6 +59,10 @@ export const zhTW = {
   aiToolReadRangeOf: '讀取範圍 {range}',
   aiToolAggregate: '統計範圍',
   aiToolAggregateOf: '統計範圍 {range}',
+  aiToolSummarize: '條件彙總',
+  aiToolSummarizeOf: '條件彙總 {range}',
+  aiToolCompareRanges: '比較範圍',
+  aiToolCompareRangesOf: '比較 {left} 與 {right}',
   aiToolLoadGuide: '載入指南',
   aiToolLoadGuideOf: '載入指南 {names}',
   aiToolReadFormats: '讀取格式',
@@ -68,6 +72,19 @@ export const zhTW = {
   aiToolReadCellsCount: '讀取 {count} 個儲存格',
   aiToolPropose: '產生變更預覽',
   aiToolCreateDocument: '建立新檔案',
+  // ask_clarification card (C-ASK)
+  aiClarifyTitle: '繼續之前先確認幾個問題',
+  aiClarifyDecide: '幫我決定',
+  aiClarifyDecideAnswer: '（幫我決定）',
+  aiClarifyMulti: '可複選',
+  aiClarifyNext: '下一題',
+  aiClarifyPrev: '上一題',
+  aiClarifyOther: '其他(可填寫)',
+  aiClarifySelected: '已選 {n} 項',
+  aiClarifySkip: '略過',
+  aiClarifySubmit: '確認',
+  aiToolClarify: '已回答確認問題',
+  aiToolClarifySkipped: '已略過確認問題',
   aiToolCreatedDocument: '已建立 {name}',
   aiToolReadAttachment: '讀取附件',
   aiToolReadAttachmentOf: '讀取附件 {name}',
@@ -94,4 +111,7 @@ export const zhTW = {
   aiScopeRangeTip: 'AI 會把「這一欄 / 這些列 / 選取部分」理解為該範圍；送出後本輪固定不變',
   aiScopeClearTitle: '取消該範圍，本次針對整張工作表',
   aiViewOnlyNotice: '唯讀文件:AI 可以閱讀並回答問題,但無法編輯。',
+
+  // U-02 catalogue S9: cells summary under an edited result
+  aiResultCellsMeta: '已寫入 {written} 個儲存格（{range}）· 覆寫既有儲存格 {overwritten} 個',
 } satisfies Record<keyof typeof zh, string>

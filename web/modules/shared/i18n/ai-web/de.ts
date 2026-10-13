@@ -55,4 +55,8 @@ export const de = {
   aiWebStateProviderBody: 'Dieser Anbieter wird nicht unterstützt.',
   aiWebStateUnknownTitle: 'KI-Anfrage fehlgeschlagen',
   aiWebStateUnknownBody: 'Etwas ist schiefgelaufen. Versuchen Sie es erneut.',
+
+  // U-02 catalogue S10: workbook over the web AI size limit
+  aiErrWorkbookTooLarge:
+    'Diese Arbeitsmappe ist für die KI im Web zu groß. Öffnen Sie sie in der UniWork Office-App.',
 } satisfies Record<keyof typeof zh, string>

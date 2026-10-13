@@ -184,4 +184,16 @@ export const ms = {
   aiCmdSkipped: ' ({count} blok dilindungi dilangkau)',
   aiViewOnlyNotice:
     'Dokumen lihat sahaja: AI boleh membaca dan menjawab soalan, tetapi tidak boleh mengedit.',
+  aiClarifyTitle: 'Beberapa soalan sebelum meneruskan',
+  aiClarifyDecide: 'Putuskan untuk saya',
+  aiClarifyDecideAnswer: '(putuskan untuk saya)',
+  aiClarifyMulti: 'Pilihan berbilang',
+  aiClarifyNext: 'Seterusnya',
+  aiClarifyPrev: 'Sebelumnya',
+  aiClarifyOther: 'Lain-lain (taip sendiri)',
+  aiClarifySelected: '{n} dipilih',
+  aiClarifySkip: 'Langkau',
+  aiClarifySubmit: 'Teruskan',
+  aiSumClarify: 'Penjelasan dijawab',
+  aiSumClarifySkipped: 'Penjelasan dilangkau',
 } satisfies Record<keyof typeof zh, string>

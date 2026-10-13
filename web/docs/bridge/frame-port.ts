@@ -14,6 +14,7 @@ import {
   type InitUser,
   type ProtocolErrorCode,
   type ProtocolErrorShape,
+  type RemoteVersionPayload,
   type SavedPayload,
   type Theme,
 } from '../protocol/types'
@@ -59,6 +60,8 @@ export interface FramePort {
   handlePrint(handler: HostHandler<'print'>): () => void
   handleCloseCheck(handler: HostHandler<'doc.closeCheck'>): () => void
   onFileRenamed(listener: (file: FileMeta) => void): () => void
+  /** host event `doc.remoteVersion` for this document (X-02; optional for older clients and mocks) */
+  onRemoteVersion?(listener: (payload: RemoteVersionPayload) => void): () => void
   /** host `theme` / `language` events (the host is authoritative for both) */
   onTheme(listener: (theme: Theme) => void): () => void
   onLanguage(listener: (locale: string) => void): () => void

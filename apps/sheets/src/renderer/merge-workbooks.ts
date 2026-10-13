@@ -18,12 +18,16 @@ import type { WorkbookFile } from '../shared/desktop-api'
 import { t } from './i18n/locale'
 import type { LazyWorkbookState, UniverRuntime } from './univer-state'
 import { characterWidthToPixels, toUniverStyle, workbookStructureLocked } from './univer-sync'
+import { undoStackDepth } from './undo-carry'
 
 /// Stay under the IPC schema's MAX_RANGE_CELLS (100k) with headroom.
 const READ_CHUNK_CELLS = 90_000
 const SET_RANGE_VALUES_COMMAND = 'sheet.command.set-range-values'
 const SET_COL_WIDTH_COMMAND = 'sheet.command.set-worksheet-col-width'
 const SET_ROW_HEIGHT_COMMAND = 'sheet.command.set-row-height'
+/// Univer's LocalUndoRedoService keeps at most this many items per unit and
+/// silently drops the oldest beyond it.
+const UNDO_STACK_CAPACITY = 20
 
 export interface MergeWorkbooksDeps {
   runtime: UniverRuntime
@@ -196,6 +200,9 @@ export interface MergeSourcesResult {
   files: number
   /** final (deduped) names of the sheets created in the current workbook */
   sheetNames: string[]
+  /** undo steps that revert the whole merge, or null when the bounded undo
+   * history may have dropped part of it (then undo cannot restore the workbook) */
+  undoSteps: number | null
 }
 
 /** Core import loop over already-opened source sessions; closes them when done. */
@@ -209,6 +216,7 @@ export async function mergeSourcesIntoCurrent(
     if (!workbook) throw new Error(t('appMergeWorkbooksFailed'))
     const commandService = runtime.univer.__getInjector().get(ICommandService)
     const unitId = workbook.getId()
+    const undoDepthBefore = undoStackDepth(runtime, unitId)
     const taken = new Set<string>(workbook.getSheets().map((sheet) => sheet.getSheetName()))
     const sheetNames: string[] = []
     let importedSheets = 0
@@ -286,7 +294,11 @@ export async function mergeSourcesIntoCurrent(
       }
     }
     setMessage(t('appMergeWorkbooksDone', { sheets: importedSheets, files: sources.length }))
-    return { importedSheets, files: sources.length, sheetNames }
+    // a full stack may have shifted out the merge's first items (or older ones)
+    const undoDepthAfter = undoStackDepth(runtime, unitId)
+    const undoSteps =
+      undoDepthAfter < UNDO_STACK_CAPACITY ? Math.max(0, undoDepthAfter - undoDepthBefore) : null
+    return { importedSheets, files: sources.length, sheetNames, undoSteps }
   } finally {
     for (const file of sources) {
       void window.desktopApi.closeWorkbook(file.sessionId).catch(() => {})

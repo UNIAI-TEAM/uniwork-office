@@ -64,6 +64,10 @@ export const ru = {
   aiToolReadRangeOf: 'Чтение диапазона {range}',
   aiToolAggregate: 'Агрегация диапазона',
   aiToolAggregateOf: 'Агрегация диапазона {range}',
+  aiToolSummarize: 'Сводка по диапазону',
+  aiToolSummarizeOf: 'Сводка по диапазону {range}',
+  aiToolCompareRanges: 'Сравнение диапазонов',
+  aiToolCompareRangesOf: 'Сравнение {left} с {right}',
   aiToolLoadGuide: 'Загрузка руководства',
   aiToolLoadGuideOf: 'Загрузка руководств {names}',
   aiToolReadFormats: 'Чтение форматов',
@@ -73,6 +77,19 @@ export const ru = {
   aiToolReadCellsCount: 'Чтение {count} ячеек',
   aiToolPropose: 'Создание предварительного просмотра изменений',
   aiToolCreateDocument: 'Создание нового файла',
+  // ask_clarification card (C-ASK)
+  aiClarifyTitle: 'Короткое уточнение перед продолжением',
+  aiClarifyDecide: 'Решите за меня',
+  aiClarifyDecideAnswer: '(решите за меня)',
+  aiClarifyMulti: 'Несколько вариантов',
+  aiClarifyNext: 'Далее',
+  aiClarifyPrev: 'Назад',
+  aiClarifyOther: 'Другое (впишите свой вариант)',
+  aiClarifySelected: 'выбрано: {n}',
+  aiClarifySkip: 'Пропустить',
+  aiClarifySubmit: 'Подтвердить',
+  aiToolClarify: 'Уточнение получено',
+  aiToolClarifySkipped: 'Уточнение пропущено',
   aiToolCreatedDocument: 'Создан {name}',
   aiToolReadAttachment: 'Чтение вложения',
   aiToolReadAttachmentOf: 'Чтение вложения {name}',
@@ -101,4 +118,8 @@ export const ru = {
   aiScopeClearTitle: 'Снять область диапазона и работать со всем листом',
   aiViewOnlyNotice:
     'Документ только для просмотра: ИИ может читать его и отвечать на вопросы, но не может редактировать.',
+
+  // U-02 catalogue S9: cells summary under an edited result
+  aiResultCellsMeta:
+    'Записано ячеек: {written} ({range}) · Перезаписано существующих ячеек: {overwritten}',
 } satisfies Record<keyof typeof zh, string>

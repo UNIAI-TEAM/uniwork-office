@@ -397,32 +397,47 @@ export function cloudToolsEnabled(settings: Pick<AiSettings, 'gskToolsEnabled'>)
   return uniworkCloudEnabled() && settings.gskToolsEnabled !== false
 }
 
+/** What an unusable provider is still missing; null from `providerNeed` means it can send a request. */
+export type ProviderNeed = 'key' | 'model' | 'base-url'
+
 /**
- * The stored provider selection is honored only when its config is usable
- * (api-key providers need a key and a model id; custom also needs a base URL).
- * Codex can auto-discover its executable. Anything else — including unknown
- * ids from a hand-edited
- * settings file — falls back to genspark, so a half-filled setup degrades
- * to the UniAI default instead of silently disabling AI.
+ * What a provider's stored config still lacks before it can send a request
+ * (api-key providers need a model id and a key; custom needs a model and a base
+ * URL, its key stays optional). Codex auto-discovers its executable, and UniAI
+ * authenticates through the cloud account, so neither reports a need here.
+ * Trim-aware: in-memory settings bypass the trimConfigs applied to persisted
+ * files, and a whitespace-only key/URL/model is a 401, not a config.
  */
-export function activeProvider(settings: AiSettings): AiProviderId {
-  const provider = settings.provider
-  if (provider === 'genspark') return 'genspark'
-  const meta = AI_PROVIDERS.find((m) => m.id === provider)
-  const config = settings.providers?.[provider]
-  if (!meta || !config) return 'genspark'
-  if (meta.needsCliPath) return provider
-  // Trim-aware: in-memory settings bypass the trimConfigs applied to
-  // persisted files, and a whitespace-only key/URL/model is a 401, not a config.
-  if (!config.model?.trim()) return 'genspark'
+export function providerNeed(settings: AiSettings, id: AiProviderId): ProviderNeed | null {
+  if (id === 'genspark') return null
+  const meta = AI_PROVIDERS.find((m) => m.id === id)
+  if (!meta) return 'key'
+  if (meta.needsCliPath) return null
+  const config = settings.providers?.[id]
+  if (!config?.model?.trim()) return 'model'
   if (meta.needsBaseUrl) {
     // Custom OpenAI-compatible endpoints (Ollama, LM Studio, vLLM) accept
     // anonymous requests: base URL + model suffice, the key stays optional.
-    if (!config.baseUrl?.trim()) return 'genspark'
-    return provider
+    return config.baseUrl?.trim() ? null : 'base-url'
   }
-  if (!config.apiKey?.trim()) return 'genspark'
-  return provider
+  return config.apiKey?.trim() ? null : 'key'
+}
+
+/** True when the provider's stored config can send a request right now. */
+export function isProviderUsable(settings: AiSettings, id: AiProviderId): boolean {
+  return providerNeed(settings, id) === null
+}
+
+/**
+ * The provider the user chose. It is never swapped for another when its config
+ * is incomplete: Settings and every module picker keep showing it with a
+ * needs-key / choose-model state (`providerNeed`), so a half-filled setup never
+ * silently turns into a UniAI request. Only an id this build does not know
+ * (a hand-edited file) degrades to genspark, the default of a fresh install.
+ */
+export function selectedProvider(settings: AiSettings): AiProviderId {
+  const provider = settings.provider
+  return AI_PROVIDERS.some((m) => m.id === provider) ? provider : 'genspark'
 }
 
 /** Only the provider key slots are read, so loosely typed (schema-parsed) settings fit too. */
@@ -568,6 +583,30 @@ function trimConfigs(providers: Record<string, unknown>): AiSettings['providers'
   return trimmed as AiSettings['providers']
 }
 
+/**
+ * A stored blank model of a provider that ships a default means "the default":
+ * the Settings page already shows it that way, and keeping the blank would make
+ * the provider look unconfigured. Providers without a default (custom, codex)
+ * keep the blank, which is the choose-model state.
+ */
+export function fillBlankModel(
+  id: AiProviderId,
+  config: AiProviderConfig | undefined,
+): AiProviderConfig | undefined {
+  if (!config || config.model?.trim()) return config
+  const fallback = AI_PROVIDERS.find((m) => m.id === id)?.defaultModel
+  return fallback ? { ...config, model: fallback } : config
+}
+
+function fillBlankModels(providers: AiSettings['providers']): AiSettings['providers'] {
+  const filled = { ...providers }
+  for (const id of Object.keys(filled) as AiProviderId[]) {
+    const config = fillBlankModel(id, filled[id])
+    if (config) filled[id] = config
+  }
+  return filled
+}
+
 function migrateRetiredModels(providers: AiSettings['providers']): AiSettings['providers'] {
   const migrated = { ...providers }
   for (const [id, replacements] of Object.entries(RETIRED_MODELS)) {
@@ -603,7 +642,11 @@ export function resolveAiSettings(stored: unknown, defaults: AiSettings): AiSett
     // the retired-id remap instead of being sent to the API verbatim.
     // Then mirror UniAI <-> OpenRouter Token Hub keys when only one slot is set.
     providers: syncUniAiOpenRouterKeys(
-      migrateRetiredModels(trimConfigs(mergeProviderConfigs(defaults.providers, storedProviders))),
+      fillBlankModels(
+        migrateRetiredModels(
+          trimConfigs(mergeProviderConfigs(defaults.providers, storedProviders)),
+        ),
+      ),
     ),
     gskToolsEnabled: settings.gskToolsEnabled ?? defaults.gskToolsEnabled ?? true,
     media: resolveAiMediaSettings(settings.media ?? defaults.media),

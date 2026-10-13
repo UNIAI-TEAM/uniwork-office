@@ -8,6 +8,7 @@
  */
 import type { AgentSkill } from '@genoffice/agent-core'
 import type { AttachmentMeta } from '../../shared/desktop-api'
+import type { AiChatMessage } from './AiChatPanel'
 import type { MergeSourcesResult } from '../merge-workbooks'
 
 export const SPREADSHEET_ATTACHMENT_EXTS = new Set(['xlsx', 'xlsm', 'xls', 'csv', 'tsv'])
@@ -31,6 +32,31 @@ export function spreadsheetAttachmentIndexes(list: readonly AttachmentMeta[]): n
 export interface MergeSkillDeps {
   getAttachments(): readonly AttachmentMeta[]
   mergePaths(paths: string[]): Promise<MergeSourcesResult>
+}
+
+/**
+ * The merge tool's `mergePaths` as the App wires it: runs the merge, then, when the undo history
+ * holds the whole merge, lands the same inline [Undo] an applied plan gets on the last assistant
+ * entry (`autoApplied.undoSteps`, which the panel renders as the button).
+ */
+export function mergePathsWithUndo(
+  merge: (paths: string[]) => Promise<MergeSourcesResult>,
+  patchLastAssistant: (patch: (entry: AiChatMessage) => AiChatMessage) => void,
+): (paths: string[]) => Promise<MergeSourcesResult> {
+  return async (paths) => {
+    const result = await merge(paths)
+    if (result.undoSteps) {
+      const undoSteps = result.undoSteps
+      patchLastAssistant((entry) => ({
+        ...entry,
+        autoApplied: {
+          opCount: (entry.autoApplied?.opCount ?? 0) + result.importedSheets,
+          undoSteps: (entry.autoApplied?.undoSteps ?? 0) + undoSteps,
+        },
+      }))
+    }
+    return result
+  }
 }
 
 export function createMergeSkill(deps: MergeSkillDeps): AgentSkill {
@@ -94,10 +120,15 @@ export function createMergeSkill(deps: MergeSkillDeps): AgentSkill {
           `Merged ${result.importedSheets} sheets from ${result.files} files into the current workbook.`,
           `New sheets: ${result.sheetNames.join(', ')}`,
           'Source formulas were imported as computed values.',
+          result.undoSteps === null
+            ? 'The merge is too large for the undo history: it cannot be undone with [Undo] or ⌘Z; to revert it, the new sheets must be deleted.'
+            : 'Undo via the side panel [Undo] button or ⌘Z reverts the merge.',
         ]
         if (skipped.length > 0) lines.push(`Skipped: ${skipped.join('; ')}`)
         return {
           output: lines.join('\n'),
+          // writes sheets into the open workbook
+          mutated: true,
           summary: `merged ${result.importedSheets} sheets`,
         }
       } catch (error: unknown) {

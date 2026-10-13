@@ -463,6 +463,14 @@ describe('time and path helpers', () => {
     expect(pathKey('C:\\Users\\a\\X.docx')).toBe(pathKey('c:/Users/a/X.docx'))
     expect(pathKey('/home/a/X.docx')).not.toBe(pathKey('/home/a/x.docx'))
   })
+
+  it('is the one shared implementation, so main and the renderer key a path alike (R1-be-10)', async () => {
+    // the renderer re-exports the shared function; main imports the same module
+    const { pathKey: sharedPathKey } = await import('../src/shared/path-key')
+    expect(pathKey).toBe(sharedPathKey)
+    const { pathKey: modelPathKey } = await import('../src/renderer/src/uniwork-docs-model')
+    expect(modelPathKey).toBe(sharedPathKey)
+  })
 })
 
 describe('openRecentEntry', () => {

@@ -63,6 +63,10 @@ export const vi = {
   aiToolReadRangeOf: 'Đọc dải ô {range}',
   aiToolAggregate: 'Tổng hợp dải ô',
   aiToolAggregateOf: 'Tổng hợp dải ô {range}',
+  aiToolSummarize: 'Tổng hợp có điều kiện',
+  aiToolSummarizeOf: 'Tổng hợp có điều kiện {range}',
+  aiToolCompareRanges: 'Đối chiếu dải ô',
+  aiToolCompareRangesOf: 'Đối chiếu {left} với {right}',
   aiToolLoadGuide: 'Tải hướng dẫn',
   aiToolLoadGuideOf: 'Tải hướng dẫn {names}',
   aiToolReadFormats: 'Đọc định dạng',
@@ -72,6 +76,19 @@ export const vi = {
   aiToolReadCellsCount: 'Đọc {count} ô',
   aiToolPropose: 'Tạo kế hoạch thay đổi',
   aiToolCreateDocument: 'Tạo tệp mới',
+  // ask_clarification card (C-ASK)
+  aiClarifyTitle: 'Xác nhận nhanh trước khi tiếp tục',
+  aiClarifyDecide: 'Quyết định giúp tôi',
+  aiClarifyDecideAnswer: '(quyết định giúp tôi)',
+  aiClarifyMulti: 'Nhiều lựa chọn',
+  aiClarifyNext: 'Tiếp theo',
+  aiClarifyPrev: 'Quay lại',
+  aiClarifyOther: 'Khác (nhập vào)',
+  aiClarifySelected: 'Đã chọn {n}',
+  aiClarifySkip: 'Bỏ qua',
+  aiClarifySubmit: 'Xác nhận',
+  aiToolClarify: 'Đã trả lời câu hỏi xác nhận',
+  aiToolClarifySkipped: 'Đã bỏ qua câu hỏi xác nhận',
   aiToolCreatedDocument: 'Đã tạo {name}',
   aiToolReadAttachment: 'Đọc tệp đính kèm',
   aiToolReadAttachmentOf: 'Đọc tệp đính kèm {name}',
@@ -100,4 +117,7 @@ export const vi = {
   aiScopeClearTitle: 'Bỏ phạm vi dải ô và áp dụng cho toàn bộ trang tính',
   aiViewOnlyNotice:
     'Tài liệu chỉ xem: AI có thể đọc và trả lời câu hỏi, nhưng không thể chỉnh sửa.',
+
+  // U-02 catalogue S9: cells summary under an edited result
+  aiResultCellsMeta: 'Đã ghi {written} ô ({range}) · {overwritten} ô có sẵn bị ghi đè',
 } satisfies Record<keyof typeof zh, string>

@@ -10,6 +10,8 @@ export const VIEW_ONLY_TOOLS: ReadonlySet<string> = new Set([
   'get_workbook_context',
   'read_range',
   'aggregate_range',
+  'summarize_range',
+  'compare_ranges',
   'load_guide',
   'read_formats',
   'read_sheet_features',
@@ -21,6 +23,8 @@ export const VIEW_ONLY_TOOLS: ReadonlySet<string> = new Set([
   'read_attachment',
   'web_search',
   'image_search',
+  // a question card changes nothing
+  'ask_clarification',
 ])
 
 const VIEW_ONLY_NOTE =

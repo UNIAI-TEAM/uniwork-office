@@ -63,6 +63,10 @@ export const ar = {
   aiToolReadRangeOf: 'قراءة النطاق {range}',
   aiToolAggregate: 'تجميع النطاق',
   aiToolAggregateOf: 'تجميع النطاق {range}',
+  aiToolSummarize: 'تلخيص النطاق',
+  aiToolSummarizeOf: 'تلخيص النطاق {range}',
+  aiToolCompareRanges: 'مقارنة النطاقات',
+  aiToolCompareRangesOf: 'مقارنة {left} مع {right}',
   aiToolLoadGuide: 'تحميل الدليل',
   aiToolLoadGuideOf: 'تحميل الأدلة {names}',
   aiToolReadFormats: 'قراءة التنسيقات',
@@ -72,6 +76,19 @@ export const ar = {
   aiToolReadCellsCount: 'قراءة {count} من الخلايا',
   aiToolPropose: 'إنشاء معاينة التغييرات',
   aiToolCreateDocument: 'إنشاء ملف جديد',
+  // ask_clarification card (C-ASK)
+  aiClarifyTitle: 'تحقّق سريع قبل المتابعة',
+  aiClarifyDecide: 'قرِّر بالنيابة عني',
+  aiClarifyDecideAnswer: '(قرِّر بالنيابة عني)',
+  aiClarifyMulti: 'اختيار متعدد',
+  aiClarifyNext: 'التالي',
+  aiClarifyPrev: 'السابق',
+  aiClarifyOther: 'أخرى (يمكن الكتابة)',
+  aiClarifySelected: 'تم تحديد {n}',
+  aiClarifySkip: 'تخطٍّ',
+  aiClarifySubmit: 'تأكيد',
+  aiToolClarify: 'تمت الإجابة عن الاستيضاح',
+  aiToolClarifySkipped: 'تم تخطي الاستيضاح',
   aiToolCreatedDocument: 'تم إنشاء {name}',
   aiToolReadAttachment: 'قراءة المرفق',
   aiToolReadAttachmentOf: 'قراءة المرفق {name}',
@@ -100,4 +117,8 @@ export const ar = {
   aiScopeClearTitle: 'إلغاء نطاق التحديد واستهداف الورقة بأكملها',
   aiViewOnlyNotice:
     'مستند للعرض فقط: يمكن للذكاء الاصطناعي قراءته والإجابة عن الأسئلة، لكنه لا يستطيع تعديله.',
+
+  // U-02 catalogue S9: cells summary under an edited result
+  aiResultCellsMeta:
+    'الخلايا المكتوبة: {written} ({range}) · الخلايا الموجودة التي تمت الكتابة فوقها: {overwritten}',
 } satisfies Record<keyof typeof zh, string>

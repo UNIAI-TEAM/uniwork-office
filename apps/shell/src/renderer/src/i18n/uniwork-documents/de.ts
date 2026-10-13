@@ -99,4 +99,7 @@ export const de = {
 
   setCliLinkReady: 'Das Befehlszeilenwerkzeug ist verfügbar.',
   setAutoSaveUniworkNote: 'Gilt nicht für UniWork-Dokumente.',
+  uwLockNewerStoreTitle: 'Eine neuere App-Version ist erforderlich',
+  uwLockNewerStore:
+    'Diese Daten erfordern eine neuere App-Version. Aktualisieren Sie UniWork Office; es wurde nichts gelöscht und keine neue Speicherung erstellt.',
 } satisfies Record<keyof typeof zh, string>

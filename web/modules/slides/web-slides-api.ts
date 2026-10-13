@@ -483,6 +483,7 @@ export function createWebSlidesApi(
     .then(async (s) => {
       userName = (s as { user?: { displayName?: string } }).user?.displayName || undefined
       initDocumentId = s.documentId
+      state.effective = s.capabilities
       return (
         s.open ??
         (await port.request('api.open', { fileId: s.documentId }, { timeoutMs: TIMEOUTS.transfer }))
@@ -551,8 +552,10 @@ export function createWebSlidesApi(
       const finish = (ok: boolean): void => {
         clearTimeout(timer)
         saveWaiters.delete(finish)
+        state.holdHostSave = null
         resolve(ok)
       }
+      state.holdHostSave = () => clearTimeout(timer)
       saveWaiters.add(finish)
       closeSaveEvents.emit()
     })
@@ -568,8 +571,10 @@ export function createWebSlidesApi(
     state.hostSaving = true
     lastSaveError = null
     state.lastFailure = null
+    state.hostAnswer = null
     try {
       const ok = await runRendererSave()
+      if (state.hostAnswer) return state.hostAnswer
       const file = current ? state.files.get(current) : undefined
       if (ok && file)
         return { ok: true, file, ...(file.versionId ? { versionId: file.versionId } : {}) }
@@ -579,6 +584,7 @@ export function createWebSlidesApi(
       }
     } finally {
       state.hostSaving = false
+      state.hostAnswer = null
     }
   })
 

@@ -27,6 +27,7 @@ import {
   moduleOf,
   errorFromHttpStatus,
   toProtocolError,
+  type AiRunPayload,
   type ApiMode,
   type Capabilities,
   type FileMeta,
@@ -41,6 +42,7 @@ import {
   type OfficeModule,
   type OpenPayload,
   type ProtocolErrorShape,
+  type RemoteVersionPayload,
   type SavedPayload,
   type Theme,
   type TokenPayload,
@@ -126,6 +128,12 @@ export interface DocsFrameClient {
   handlePrint(handler: HostRequestHandler<'print'>): () => void
   handleCloseCheck(handler: HostRequestHandler<'doc.closeCheck'>): () => void
   onFileRenamed(listener: (file: FileMeta) => void): () => void
+  /**
+   * a newer version of THIS document was saved elsewhere (additive, X-02); events for another
+   * `document_id` (or before `init`) never reach the listener. Reload with `api.open` and take the
+   * revision from its reply (`openReplyRevision`), not from the event.
+   */
+  onRemoteVersion(listener: (payload: RemoteVersionPayload) => void): () => void
   onTheme(listener: (theme: Theme) => void): () => void
   onLanguage(listener: (locale: string) => void): () => void
   /** de-duplicated; `force` re-sends an unchanged flag (the host's header left "unsaved" after a failed save) */
@@ -136,6 +144,8 @@ export interface DocsFrameClient {
   reportHeight(height: number): void
   reportSaved(payload: SavedPayload): void
   reportError(error: ProtocolErrorShape | unknown, fatal?: boolean): void
+  /** an AI turn started / ended (additive, X-02); a host before X-02 drops it silently */
+  reportAiRun(payload: AiRunPayload): void
   dispose(): void
 }
 
@@ -376,6 +386,11 @@ export function createDocsFrameClient(options: DocsFrameClientOptions): DocsFram
         h(p as HostRequests['doc.closeCheck']['payload'], ctx),
       ),
     onFileRenamed: (l) => ep.on('file.renamed', (p) => l((p as HostEvents['file.renamed']).file)),
+    onRemoteVersion: (l) =>
+      ep.on('doc.remoteVersion', (raw) => {
+        const p = raw as HostEvents['doc.remoteVersion']
+        if (session && p.document_id === session.documentId) l({ ...p })
+      }),
     onTheme: (l) => ep.on('theme', (p) => l((p as HostEvents['theme']).theme)),
     onLanguage: (l) => ep.on('language', (p) => l((p as HostEvents['language']).locale)),
     setDirty(dirty, opts) {
@@ -395,6 +410,9 @@ export function createDocsFrameClient(options: DocsFrameClientOptions): DocsFram
     reportError(error, fatal = false) {
       guarded(() => ep.emit('error', { error: toProtocolError(error).toShape(), fatal }))
     },
+    // an empty run_id is omitted: the host validator (isNonEmptyStr) would reject the event
+    reportAiRun: ({ state, run_id }) =>
+      guarded(() => ep.emit('aiRun', run_id ? { state, run_id } : { state })),
     dispose() {
       stopReady()
       token = null

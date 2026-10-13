@@ -1518,8 +1518,8 @@ export const cs = {
   appWebViewOnly: 'Pouze ke čtení: změny v tomto sešitu nelze uložit.',
   appWebConflictTitle: 'Tento sešit byl změněn jinde',
   appWebConflictBody:
-    'Během vašich úprav někdo uložil novější verzi. Přepište ji svou verzí, nebo načtěte nejnovější verzi (neuložené změny budou zahozeny).',
-  appWebConflictOverwrite: 'Přepsat',
+    'Vaše změny zatím nejsou v UniWork a zůstanou v tomto prohlížeči, dokud se neodhlásíte.',
+  appWebConflictOverwrite: 'Přepsat…',
   appWebConflictReload: 'Načíst nejnovější verzi',
   appWebConflictNotSaved: 'Neuloženo: existuje novější verze.',
   appWebDiscardTitle: 'Zahodit neuložené změny?',

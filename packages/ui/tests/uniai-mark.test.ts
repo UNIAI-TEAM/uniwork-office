@@ -28,9 +28,9 @@ it('draws the glyph in currentColor and is decorative unless titled', () => {
   expect(glyph).not.toContain('linearGradient')
   expect(glyph).toContain('aria-hidden="true"')
 
-  const titled = renderToStaticMarkup(createElement(UniAiMark, { title: 'uniAI' }))
+  const titled = renderToStaticMarkup(createElement(UniAiMark, { title: 'UniAI' }))
   expect(titled).toContain('role="img"')
-  expect(titled).toContain('aria-label="uniAI"')
+  expect(titled).toContain('aria-label="UniAI"')
   // no size: the outer <svg> carries no width, so its container sizes it
   expect(titled.slice(0, titled.indexOf('>'))).not.toContain('width=')
 })

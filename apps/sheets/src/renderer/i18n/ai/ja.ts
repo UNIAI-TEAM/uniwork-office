@@ -63,6 +63,10 @@ export const ja = {
   aiToolReadRangeOf: '範囲 {range} を読み取り',
   aiToolAggregate: '範囲を集計',
   aiToolAggregateOf: '範囲 {range} を集計',
+  aiToolSummarize: '条件付き集計',
+  aiToolSummarizeOf: '範囲 {range} を条件付き集計',
+  aiToolCompareRanges: '範囲を比較',
+  aiToolCompareRangesOf: '{left} と {right} を比較',
   aiToolLoadGuide: 'ガイドを読み込み',
   aiToolLoadGuideOf: 'ガイド {names} を読み込み',
   aiToolReadFormats: '書式を読み取り',
@@ -72,6 +76,19 @@ export const ja = {
   aiToolReadCellsCount: 'セル {count} 個を読み取り',
   aiToolPropose: '変更プレビューを生成',
   aiToolCreateDocument: '新規ファイルを作成',
+  // ask_clarification card (C-ASK)
+  aiClarifyTitle: '続ける前にいくつか確認させてください',
+  aiClarifyDecide: 'おまかせ',
+  aiClarifyDecideAnswer: '（おまかせ）',
+  aiClarifyMulti: '複数選択',
+  aiClarifyNext: '次へ',
+  aiClarifyPrev: '前へ',
+  aiClarifyOther: 'その他（自由記入）',
+  aiClarifySelected: '{n} 件選択',
+  aiClarifySkip: 'スキップ',
+  aiClarifySubmit: '確定',
+  aiToolClarify: '確認の質問に回答済み',
+  aiToolClarifySkipped: '確認の質問をスキップ',
   aiToolCreatedDocument: '{name} を作成しました',
   aiToolReadAttachment: '添付ファイルを読み取り',
   aiToolReadAttachmentOf: '添付ファイル {name} を読み取り',
@@ -100,4 +117,7 @@ export const ja = {
   aiScopeClearTitle: '範囲指定を解除してシート全体を対象にする',
   aiViewOnlyNotice:
     '閲覧専用のドキュメント: AI は内容の読み取りと質問への回答はできますが、編集はできません。',
+
+  // U-02 catalogue S9: cells summary under an edited result
+  aiResultCellsMeta: '書き込んだセル: {written}（{range}）· 上書きした既存セル: {overwritten}',
 } satisfies Record<keyof typeof zh, string>

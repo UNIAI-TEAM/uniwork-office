@@ -52,4 +52,8 @@ export const pl = {
   aiWebStateProviderBody: 'Ten dostawca nie jest obsługiwany.',
   aiWebStateUnknownTitle: 'Żądanie AI nie powiodło się',
   aiWebStateUnknownBody: 'Coś poszło nie tak. Spróbuj ponownie.',
+
+  // U-02 catalogue S10: workbook over the web AI size limit
+  aiErrWorkbookTooLarge:
+    'Ten skoroszyt jest za duży dla AI w przeglądarce. Otwórz go w aplikacji UniWork Office.',
 } satisfies Record<keyof typeof zh, string>

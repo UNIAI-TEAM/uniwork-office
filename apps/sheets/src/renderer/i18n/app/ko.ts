@@ -1538,8 +1538,8 @@ export const ko = {
   appWebViewOnly: '보기 전용: 이 통합 문서의 변경 내용을 저장할 수 없습니다.',
   appWebConflictTitle: '이 통합 문서가 다른 곳에서 변경되었습니다',
   appWebConflictBody:
-    '편집하는 동안 다른 사람이 새 버전을 저장했습니다. 내 버전으로 덮어쓰거나 최신 버전을 다시 불러오세요(저장하지 않은 변경 내용은 삭제됨).',
-  appWebConflictOverwrite: '덮어쓰기',
+    '변경 사항은 아직 UniWork에 없으며 로그아웃할 때까지 이 브라우저에 보관됩니다.',
+  appWebConflictOverwrite: '덮어쓰기…',
   appWebConflictReload: '최신 버전 다시 불러오기',
   appWebConflictNotSaved: '저장되지 않음: 더 새로운 버전이 있습니다.',
   appWebDiscardTitle: '저장하지 않은 변경 내용을 삭제할까요?',

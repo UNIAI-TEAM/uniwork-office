@@ -12,8 +12,10 @@ import {
 } from '@genoffice/xlsx-gateway/domain/cell-address'
 import type { CellScalar } from '@genoffice/xlsx-gateway/domain/workbook.types'
 import { isSheetRemoved, journalEntriesInRange } from '../edit-journal'
+import type { LazyWorkbookState } from '../univer-state'
 import { createRangeAggregator, type RangeAggregate } from './aggregate'
-import type { WorkbookReadContext } from './workbook-readers'
+import { sessionHasInputEdits } from './cell-read'
+import { rowVisibilityProbe, type WorkbookReadContext } from './workbook-readers'
 
 interface ConstantFill {
   readonly startRow: number
@@ -34,7 +36,7 @@ interface FillSegment {
   readonly priority: number
 }
 
-interface FillBand {
+export interface FillBand {
   readonly startRow: number
   endRow: number
   readonly segments: FillSegment[]
@@ -189,7 +191,7 @@ function buildFillBands(fills: readonly ConstantFill[], bounds: RangeBounds): Fi
   return bands
 }
 
-function fillSegmentAt(
+export function fillSegmentAt(
   bands: readonly FillBand[],
   row: number,
   column: number,
@@ -236,67 +238,32 @@ function filledAreaInRange(bands: readonly FillBand[], bounds: RangeBounds): num
   return area
 }
 
-export interface AggregateRangeOptions {
-  /**
-   * Leave out rows the file marks hidden (manual hide or a saved AutoFilter),
-   * read from the per-batch row properties so never-loaded windows count too.
-   */
-  skipFileHiddenRows?: boolean
+export interface PreparedLazyRange {
+  readonly ok: true
+  readonly sheetId: string
+  readonly sheetMeta: LazyWorkbookState['file']['sheets'][number]
+  /** the request clamped to the data extent (file + this session's writes) */
+  readonly clamped: RangeBounds
+  readonly fillBands: readonly FillBand[]
+  /** this session's explicit content entries in the range, keyed 'row:column' */
+  readonly journalValues: ReadonlyMap<
+    string,
+    { row: number; column: number; value: CellScalar; formula?: string | undefined }
+  >
 }
 
-export async function aggregateWorkbookRange(
+/**
+ * The shared preamble of the streamed range readers: resolve the sheet,
+ * refuse what they cannot read correctly, clamp to the data extent, and
+ * collect this session's fills and explicit cell values over the range.
+ */
+export function prepareLazyRange(
   ctx: WorkbookReadContext,
-  sheetIdArg: string | undefined,
+  state: LazyWorkbookState,
+  sheetId: string | undefined,
   bounds: RangeBounds,
-  options: AggregateRangeOptions = {},
-): Promise<{ ok: true; aggregate: RangeAggregate } | { ok: false; error: string }> {
-  const aggregator = createRangeAggregator()
-  const state = ctx.lazyWorkbookRef.current
-  const workbook = ctx.univerRef.current?.univerAPI.getActiveWorkbook()
-  const activeSheetId = workbook?.getActiveSheet()?.getSheetId()
-  if (!state) {
-    // Demo workbook: the snapshot holds every cell in memory.
-    const snapshot = ctx.adapterRef.current.getSnapshot()
-    const sheet = sheetIdArg
-      ? snapshot.sheets.find((candidate) => candidate.id === sheetIdArg)
-      : (snapshot.sheets.find((candidate) => candidate.id === activeSheetId) ?? snapshot.sheets[0])
-    if (!sheet) {
-      return {
-        ok: false,
-        error: sheetIdArg
-          ? `Unknown sheet: ${sheetIdArg} (use an id from get_workbook_context)`
-          : 'No workbook is open.',
-      }
-    }
-    const worksheet = workbook?.getSheetBySheetId(sheet.id)
-    let counted = 0
-    for (const [address, cell] of Object.entries(sheet.cells)) {
-      const position = parseAddress(address)
-      if (
-        position.row < bounds.startRow ||
-        position.row > bounds.endRow ||
-        position.column < bounds.startColumn ||
-        position.column > bounds.endColumn
-      ) {
-        continue
-      }
-      let value = cell.value
-      // The in-memory model stores value:null for formula cells; the computed
-      // value lives in Univer's formula engine — backfill like find_cells.
-      if (cell.formula && value === null && worksheet) {
-        try {
-          value = (worksheet.getRange(address).getValue() as CellScalar) ?? null
-        } catch {
-          /* fail-open: count the cell as empty */
-        }
-      }
-      aggregator.add(value)
-      counted += 1
-    }
-    aggregator.addEmpty(rangeCellCount(bounds) - counted)
-    return { ok: true, aggregate: aggregator.finish(50) }
-  }
-  const sheetId = sheetIdArg ?? activeSheetId
+  toolName: string,
+): PreparedLazyRange | { ok: false; error: string } {
   if (!sheetId) return { ok: false, error: 'No workbook is open.' }
   if (isSheetRemoved(state.editJournal, sheetId)) {
     return { ok: false, error: `Unknown sheet: ${sheetId}` }
@@ -305,15 +272,13 @@ export async function aggregateWorkbookRange(
   if (!sheetMeta) {
     return {
       ok: false,
-      error:
-        'aggregate_range only works on sheets that came with the file — read sheets added this session with read_range.',
+      error: `${toolName} only works on sheets that came with the file — read sheets added this session with read_range.`,
     }
   }
   if ((state.editJournal.structuralOps.get(sheetId) ?? []).length > 0) {
     return {
       ok: false,
-      error:
-        'aggregate_range is unavailable after row/column structural changes on this sheet in this session — save the file first, then retry.',
+      error: `${toolName} is unavailable after row/column structural changes on this sheet in this session — save the file first, then retry.`,
     }
   }
   // Cells and declarative fills written this session can sit below/right of
@@ -342,10 +307,13 @@ export async function aggregateWorkbookRange(
       error: `The range is outside the sheet data extent A1:${columnLabel(extentColumns - 1)}${extentRows}.`,
     }
   }
-  const worksheet = workbook?.getSheetBySheetId(sheetId)
+  const worksheet = ctx.univerRef.current?.univerAPI.getActiveWorkbook()?.getSheetBySheetId(sheetId)
   const fillBands = buildFillBands(bulkFills, clamped)
   // Explicit content entries win over every fill; style-only entries do not.
-  const journalValues = new Map<string, { row: number; column: number; value: CellScalar }>()
+  const journalValues = new Map<
+    string,
+    { row: number; column: number; value: CellScalar; formula?: string | undefined }
+  >()
   for (const entry of journalEntriesInRange(state.editJournal, sheetId, clamped)) {
     if (!entry.hasValue) continue
     let value = entry.value ?? null
@@ -364,13 +332,132 @@ export async function aggregateWorkbookRange(
       row: entry.row,
       column: entry.column,
       value,
+      ...(entry.formula ? { formula: entry.formula } : {}),
     })
   }
+
+  return { ok: true, sheetId, sheetMeta, clamped, fillBands, journalValues }
+}
+
+export interface AggregateRangeOptions {
+  /**
+   * Leave out rows the file marks hidden (manual hide or a saved AutoFilter),
+   * read from the per-batch row properties so never-loaded windows count too.
+   */
+  skipFileHiddenRows?: boolean
+  /**
+   * AI mode: count the hidden/filtered rows in the range (file-hidden rows,
+   * manual hides and rows the live filter hides) and either keep or drop
+   * them. The count comes back as `hiddenRows` so the answer can say what was
+   * done. Every batch is read for its row properties in this mode.
+   */
+  hiddenRows?: 'include' | 'skip'
+}
+
+export type AggregateRangeOutcome =
+  | {
+      ok: true
+      aggregate: RangeAggregate
+      /** hidden/filtered rows in the range; set only in `hiddenRows` mode */
+      hiddenRows?: number
+      /** lazy `hiddenRows` mode: counted formula cells whose value is the file's cached <v> */
+      cachedFormulaCells?: number
+      /** cachedFormulaCells > 0 while this session edited formula inputs */
+      staleCache?: boolean
+    }
+  | { ok: false; error: string }
+
+export async function aggregateWorkbookRange(
+  ctx: WorkbookReadContext,
+  sheetIdArg: string | undefined,
+  bounds: RangeBounds,
+  options: AggregateRangeOptions = {},
+): Promise<AggregateRangeOutcome> {
+  const aggregator = createRangeAggregator()
+  const tracking = options.hiddenRows !== undefined
+  const skipHidden = options.skipFileHiddenRows === true || options.hiddenRows === 'skip'
+
+  const state = ctx.lazyWorkbookRef.current
+  const workbook = ctx.univerRef.current?.univerAPI.getActiveWorkbook()
+  const activeSheetId = workbook?.getActiveSheet()?.getSheetId()
+  if (!state) {
+    // Demo workbook: the snapshot holds every cell in memory.
+    const snapshot = ctx.adapterRef.current.getSnapshot()
+    const sheet = sheetIdArg
+      ? snapshot.sheets.find((candidate) => candidate.id === sheetIdArg)
+      : (snapshot.sheets.find((candidate) => candidate.id === activeSheetId) ?? snapshot.sheets[0])
+    if (!sheet) {
+      return {
+        ok: false,
+        error: sheetIdArg
+          ? `Unknown sheet: ${sheetIdArg} (use an id from get_workbook_context)`
+          : 'No workbook is open.',
+      }
+    }
+    const worksheet = workbook?.getSheetBySheetId(sheet.id)
+    const demoHidden = new Set<number>()
+    if (tracking) {
+      const probe = rowVisibilityProbe(ctx, sheet.id)
+      for (let row = bounds.startRow; probe && row <= bounds.endRow; row += 1) {
+        if (probe(row)) demoHidden.add(row)
+      }
+    }
+    let counted = 0
+    for (const [address, cell] of Object.entries(sheet.cells)) {
+      const position = parseAddress(address)
+      if (
+        position.row < bounds.startRow ||
+        position.row > bounds.endRow ||
+        position.column < bounds.startColumn ||
+        position.column > bounds.endColumn ||
+        (skipHidden && demoHidden.has(position.row))
+      ) {
+        continue
+      }
+      let value = cell.value
+      // The in-memory model stores value:null for formula cells; the computed
+      // value lives in Univer's formula engine — backfill like find_cells.
+      if (cell.formula && value === null && worksheet) {
+        try {
+          value = (worksheet.getRange(address).getValue() as CellScalar) ?? null
+        } catch {
+          /* fail-open: count the cell as empty */
+        }
+      }
+      aggregator.add(value)
+      counted += 1
+    }
+    const skippedCells = skipHidden
+      ? demoHidden.size * (bounds.endColumn - bounds.startColumn + 1)
+      : 0
+    aggregator.addEmpty(rangeCellCount(bounds) - skippedCells - counted)
+    return {
+      ok: true,
+      aggregate: aggregator.finish(50),
+      ...(tracking ? { hiddenRows: demoHidden.size } : {}),
+    }
+  }
+  const prepared = prepareLazyRange(
+    ctx,
+    state,
+    sheetIdArg ?? activeSheetId,
+    bounds,
+    'aggregate_range',
+  )
+  if (!prepared.ok) return prepared
+  const { sheetId, sheetMeta, clamped, fillBands, journalValues } = prepared
 
   let counted = 0
   const fileEndRow = Math.min(clamped.endRow, sheetMeta.rowCount - 1)
   const fileEndColumn = Math.min(clamped.endColumn, sheetMeta.columnCount - 1)
   const hiddenRows = new Set<number>()
+  // AI mode also honours the live filter model, which owns row visibility
+  // for filters applied this session and for restored file filters.
+  const visibility = tracking ? rowVisibilityProbe(ctx, sheetId) : null
+  let cachedFormulaCells = 0
+  const formulaIndex = state.formulaText?.get(sheetId)
+  const sharedFormulas = state.sharedFormulaGroups?.get(sheetId)
+  const filterProbe = visibility ? (row: number): boolean => visibility(row) === 'filtered' : null
   if (clamped.startRow <= fileEndRow && clamped.startColumn <= fileEndColumn) {
     const width = fileEndColumn - clamped.startColumn + 1
     const batchRows = Math.max(1, Math.floor(18_000 / width))
@@ -386,7 +473,8 @@ export async function aggregateWorkbookRange(
       // progress. This is the common whole-column-fill path. Skipping hidden
       // rows still needs the batch's row properties, so that mode reads anyway.
       if (
-        !options.skipFileHiddenRows &&
+        !skipHidden &&
+        !tracking &&
         filledAreaInRange(fillBands, batchBounds) === rangeCellCount(batchBounds)
       )
         continue
@@ -409,9 +497,14 @@ export async function aggregateWorkbookRange(
           error: 'The range is still being indexed — retry after workbook indexing completes.',
         }
       }
-      if (options.skipFileHiddenRows) {
+      if (skipHidden || tracking) {
         for (const row of result.rows ?? []) {
           if (row.hidden && row.row >= startRow && row.row <= endRow) hiddenRows.add(row.row)
+        }
+      }
+      if (filterProbe) {
+        for (let row = startRow; row <= endRow; row += 1) {
+          if (filterProbe(row)) hiddenRows.add(row)
         }
       }
       for (const cell of result.cells) {
@@ -420,7 +513,7 @@ export async function aggregateWorkbookRange(
           cell.row > endRow ||
           cell.column < clamped.startColumn ||
           cell.column > fileEndColumn ||
-          hiddenRows.has(cell.row) ||
+          (skipHidden && hiddenRows.has(cell.row)) ||
           journalValues.has(`${cell.row}:${cell.column}`) ||
           fillSegmentAt(fillBands, cell.row, cell.column)
         ) {
@@ -428,19 +521,36 @@ export async function aggregateWorkbookRange(
         }
         aggregator.add(cell.value)
         counted += 1
+        // The sidecar serves the file's cached <v> for formula cells — shared
+        // followers carry no formula text there, the harvested index does.
+        if (
+          tracking &&
+          (cell.formula !== undefined ||
+            formulaIndex?.has(`${cell.row}:${cell.column}`) ||
+            sharedFormulas?.textAt(cell.row, cell.column) !== undefined)
+        ) {
+          cachedFormulaCells += 1
+        }
       }
     }
   }
+  // Rows past the file extent (journal-only) can still be filtered out.
+  if (filterProbe) {
+    for (let row = Math.max(clamped.startRow, fileEndRow + 1); row <= clamped.endRow; row += 1) {
+      if (filterProbe(row)) hiddenRows.add(row)
+    }
+  }
+  const dropped = skipHidden ? hiddenRows : new Set<number>()
   // Fills and journal values land after the reads so file-hidden rows are known.
   const fillOverrideCounts = new Map<FillSegment, number>()
   for (const entry of journalValues.values()) {
-    if (hiddenRows.has(entry.row)) continue
+    if (dropped.has(entry.row)) continue
     const segment = fillSegmentAt(fillBands, entry.row, entry.column)
     if (segment) fillOverrideCounts.set(segment, (fillOverrideCounts.get(segment) ?? 0) + 1)
   }
   for (const band of fillBands) {
     let rowCount = band.endRow - band.startRow + 1
-    for (const row of hiddenRows) if (row >= band.startRow && row <= band.endRow) rowCount -= 1
+    for (const row of dropped) if (row >= band.startRow && row <= band.endRow) rowCount -= 1
     for (const segment of band.segments) {
       const repetitions =
         rowCount * (segment.endColumn - segment.startColumn + 1) -
@@ -450,11 +560,21 @@ export async function aggregateWorkbookRange(
     }
   }
   for (const { row, value } of journalValues.values()) {
-    if (hiddenRows.has(row)) continue
+    if (dropped.has(row)) continue
     aggregator.add(value)
     counted += 1
   }
-  const hiddenCells = hiddenRows.size * (clamped.endColumn - clamped.startColumn + 1)
+  const hiddenCells = dropped.size * (clamped.endColumn - clamped.startColumn + 1)
   aggregator.addEmpty(rangeCellCount(clamped) - hiddenCells - counted)
-  return { ok: true, aggregate: aggregator.finish(50) }
+  return {
+    ok: true,
+    aggregate: aggregator.finish(50),
+    ...(tracking
+      ? {
+          hiddenRows: hiddenRows.size,
+          cachedFormulaCells,
+          staleCache: cachedFormulaCells > 0 && sessionHasInputEdits(state.editJournal),
+        }
+      : {}),
+  }
 }

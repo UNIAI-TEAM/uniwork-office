@@ -50,7 +50,7 @@ export const DEFINE_STYLE_TOOL: AgentToolDef = {
   name: 'define_style',
   description:
     'Create a style or change the definition of an existing one (paragraph, character or table style in styles.xml). Only the fields given change; everything else the style already defines is kept. ' +
-    'Paragraphs using the style pick the change up automatically. Use apply_style (or the applyStyle op) to put a style on paragraphs. Existing style ids are listed by list_styles / in the tool output.',
+    'Paragraphs using the style pick the change up automatically. To put a style on paragraphs, call apply_ops with the applyStyle op { op: "applyStyle", target, styleId }. Existing style ids are listed by list_styles / in the tool output.',
   inputSchema: {
     type: 'object',
     properties: {

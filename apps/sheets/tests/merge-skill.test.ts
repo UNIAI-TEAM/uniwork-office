@@ -28,7 +28,12 @@ describe('merge_attached_workbooks', () => {
       getAttachments: () => list,
       mergePaths: async (paths) => {
         merged.push(paths)
-        return { importedSheets: paths.length, files: paths.length, sheetNames: paths }
+        return {
+          importedSheets: paths.length,
+          files: paths.length,
+          sheetNames: paths,
+          undoSteps: paths.length,
+        }
       },
     })
     return skill.executeTool!({ name: 'merge_attached_workbooks', input, id: 't1' } as never)

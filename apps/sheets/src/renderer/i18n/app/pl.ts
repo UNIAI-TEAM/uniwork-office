@@ -1544,8 +1544,8 @@ export const pl = {
   appWebViewOnly: 'Tylko do odczytu: nie możesz zapisać zmian w tym skoroszycie.',
   appWebConflictTitle: 'Ten skoroszyt został zmieniony w innym miejscu',
   appWebConflictBody:
-    'Ktoś zapisał nowszą wersję podczas Twojej edycji. Zastąp ją swoją wersją lub wczytaj najnowszą wersję (niezapisane zmiany zostaną odrzucone).',
-  appWebConflictOverwrite: 'Zastąp',
+    'Twoich zmian nie ma jeszcze w UniWork; są przechowywane w tej przeglądarce do czasu wylogowania.',
+  appWebConflictOverwrite: 'Zastąp…',
   appWebConflictReload: 'Wczytaj najnowszą wersję',
   appWebConflictNotSaved: 'Nie zapisano: istnieje nowsza wersja.',
   appWebDiscardTitle: 'Odrzucić niezapisane zmiany?',

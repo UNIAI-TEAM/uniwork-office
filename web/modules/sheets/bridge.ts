@@ -13,7 +13,8 @@
  * | readPivotDefinition / recalcWorkbook        | transport, only when the engine has the feature (else rejected: hidden)   |
  * | saveWorkbookEdits                           | transport.serialize -> api.save {fileId, data, etag} (never `auto`, C10)  |
  * |                                             | or api.saveAs {name, data, sourceFileId}; then transport.replaceSession  |
- * |                                             | 'conflict' -> Overwrite / Reload latest / Cancel (./notice.ts)            |
+ * |                                             | 'conflict' (frame or host save) -> ../shared/conflict-dialog.ts; the host |
+ * |                                             | `save` gets its outcome (ok / ok w/o versionId / cancelled / error code)  |
  * | begin/send/abortSaveEditsTransfer           | in-frame accumulator (no IPC hop to batch around)                         |
  * | closeWorkbook                               | transport.close                                                           |
  * | notifyPendingEdits                          | `dirty` event                                                             |
@@ -46,6 +47,7 @@
  */
 import {
   toProtocolError,
+  type Capabilities,
   type FileMeta,
   type FileSource,
   type OpenPayload,
@@ -61,6 +63,17 @@ import { decodeDataUrl, idFromPath, pathFor } from '../../docs/bridge/webapi'
 import type { DraftHost, DraftRecovery } from '../../docs/bridge/draft-recovery'
 import { bridgeDraftRecovery } from '../shared/recovery-prompt'
 import { saveFailureDetail } from '../shared/save-failure'
+import {
+  conflictSaveResult,
+  downloadVia,
+  headFromFile,
+  overwriteHead,
+  readHeadFile,
+  revisionOf,
+  runConflictDialog,
+  type ConflictIo,
+  type ConflictOutcome,
+} from '../shared/conflict-dialog'
 import type {
   DesktopApi,
   MenuAction,
@@ -149,6 +162,8 @@ export interface SheetsWebApiOptions {
   capabilities: Readonly<Record<string, unknown>>
   /** in-frame choice dialog (default: ./notice.ts); injectable for tests */
   ask?: AskFn
+  /** the save conflict dialog (default: ../shared/conflict-dialog.ts); injectable for tests */
+  conflict?: (io: ConflictIo) => Promise<ConflictOutcome>
   print?: (html: string) => Promise<{ ok: boolean; error?: string }>
   download?: (name: string, blob: Blob) => void
   /** UI language for the engine's number/date display (default: <html lang>) */
@@ -171,6 +186,7 @@ const NOT_AVAILABLE = 'Not available in the web build'
 export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOptions) {
   const { transport, capabilities } = opts
   const ask = opts.ask ?? domAsk
+  const conflictDialog = opts.conflict ?? runConflictDialog
   const print = opts.print ?? printHtml
   const download = opts.download ?? downloadBlob
   const locale = opts.locale ?? (() => document.documentElement.lang || 'en')
@@ -191,10 +207,13 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
 
   /** the document `init` names: the only one the host's draft scope ("<user>:<document>") covers */
   let initDocumentId: string | null = null
+  /** the effective capabilities from `init` (`download` for the conflict dialog) */
+  let effective: Capabilities | undefined
   port
     .whenInitialized()
     .then((s) => {
       initDocumentId = s.documentId
+      effective = s.capabilities
     })
     .catch(() => {})
   /** the document whose draft is being offered (before it is opened) */
@@ -406,7 +425,13 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
   // ------------------------------------------------------------ save plumbing
 
   /** set while the host's `save` request runs the renderer's save flow */
-  let hostSave: { error: ProtocolErrorShape | null } | null = null
+  let hostSave: {
+    error: ProtocolErrorShape | null
+    /** the conflict dialog's answer (overwritten / reloaded / cancelled / failed) */
+    answer: SaveResult | null
+  } | null = null
+  /** stops the host save's renderer timer (the conflict dialog may stay open for long) */
+  let holdRendererSave: (() => void) | null = null
   /** set while the host's `saveAs` request waits for the renderer to reach saveWorkbookEdits */
   let hostSaveAs: { name?: string; settle: (r: SaveResult) => void; started: () => void } | null =
     null
@@ -420,9 +445,11 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
       const finish = (ok: boolean) => {
         clearTimeout(timer)
         closeSaveWaiters = closeSaveWaiters.filter((w) => w !== finish)
+        holdRendererSave = null
         resolve(ok)
       }
       const timer = setTimeout(() => finish(false), saveTimeoutMs)
+      holdRendererSave = () => clearTimeout(timer)
       closeSaveWaiters.push(finish)
       for (const handler of [...closeSaveHandlers]) handler()
     })
@@ -433,9 +460,10 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
     if (!current) return { ok: false, error: { code: 'not_ready', message: 'no workbook is open' } }
     if (hostSave)
       return { ok: false, error: { code: 'busy', message: 'a save is already running' } }
-    hostSave = { error: null }
+    hostSave = { error: null, answer: null }
     try {
       const ok = await runRendererSave()
+      if (hostSave.answer) return hostSave.answer
       const file = files.get(current)
       if (ok && file)
         return { ok: true, file, ...(file.versionId ? { versionId: file.versionId } : {}) }
@@ -506,15 +534,6 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
     }
   }
 
-  async function headMeta(fileId: string): Promise<FileMeta | null> {
-    try {
-      const open = await port.request('api.open', { fileId }, { timeoutMs: TIMEOUTS.short })
-      return open?.file?.fileId === fileId ? open.file : null
-    } catch {
-      return null
-    }
-  }
-
   function putSave(fileId: string, data: ArrayBuffer): Promise<SaveResult> {
     const etag = files.get(fileId)?.etag
     const payload = { fileId, data: copyBuffer(data), ...(etag ? { etag } : {}) }
@@ -525,37 +544,43 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
 
   type Landed = { file: FileMeta } | { canceled: true }
 
-  /** the user chose for a save that hit `conflict` (a host-initiated save gets the error instead) */
+  /**
+   * A save that hit `conflict` (frame-initiated or the host's `save`): the shared conflict dialog
+   * settles it in the frame; the host's `save` gets the outcome as its answer (hostSave.answer).
+   */
   async function resolveConflict(fileId: string, data: ArrayBuffer): Promise<Landed> {
-    const choice = await ask({
-      title: 'appWebConflictTitle',
-      body: 'appWebConflictBody',
-      choices: [
-        { id: 'cancel', label: 'appWebCancel' },
-        { id: 'reload', label: 'appWebConflictReload' },
-        { id: 'overwrite', label: 'appWebConflictOverwrite', danger: true },
-      ],
-      cancelId: 'cancel',
-      marker: 'conflict',
+    holdRendererSave?.()
+    const outcome = await conflictDialog({
+      title: text('appWebConflictTitle'),
+      body: text('appWebConflictBody'),
+      reloadLabel: text('appWebConflictReload'),
+      overwriteLabel: text('appWebConflictOverwrite'),
+      cancelLabel: text('appWebCancel'),
+      baseRevision: revisionOf(files.get(fileId)),
+      readHead: async () => headFromFile(await readHeadFile(port, fileId)),
+      overwrite: () => overwriteHead(port, fileId, data),
+      reload: async () => {
+        // the latest version replaces the workbook; the renderer re-runs its open flow. The edits
+        // are discarded on purpose, so their draft goes too and the reopen offers nothing.
+        const head = await port.request('api.open', { fileId }, { timeoutMs: TIMEOUTS.transfer })
+        remember(head.file)
+        queued = async () => head
+        reloadWithoutDraft = true
+        void drafts.saved()
+        dirty = false
+        restored = false
+        runMenu('open')
+        return true
+      },
+      canEdit: canSave,
+      download: downloadVia(port, effective, () => data),
+      markerAttr: 'data-sheets-web',
     })
-    if (choice === 'overwrite') {
-      const head = await headMeta(fileId)
-      if (head) {
-        remember(head)
-        const again = await putSave(fileId, data)
-        if (again.ok) return { file: again.file }
-      }
-    } else if (choice === 'reload') {
-      // the latest version replaces the workbook; the renderer re-runs its open flow. The edits
-      // are discarded on purpose, so their draft goes too and the reopen offers nothing.
-      queued = () => port.request('api.open', { fileId }, { timeoutMs: TIMEOUTS.transfer })
-      reloadWithoutDraft = true
-      void drafts.saved()
-      dirty = false
-      restored = false
-      runMenu('open')
-      return { canceled: true }
-    }
+    const file = files.get(fileId)
+    if (hostSave && file) hostSave.answer = conflictSaveResult(outcome, file)
+    if (outcome.kind === 'overwritten') return { file: outcome.file ?? file! }
+    if (outcome.kind === 'reloaded') return { canceled: true }
+    if (outcome.kind === 'failed') throw saveFailure({ code: outcome.code, message: '' })
     throw new Error(text('appWebConflictNotSaved'))
   }
 
@@ -565,10 +590,8 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
     if (res.ok) return { file: res.file }
     if (hostSave) hostSave.error = res.error
     if (res.error.code === 'conflict') {
-      port.reportError(res.error, false)
-      // the host owns the conflict UI; the frame only says so in the page language (the server's
-      // own message is in the account language and never shown)
-      if (hostSave) throw new Error(text('appWebConflictNotSaved'))
+      // the host's own `save` waits for the dialog's answer instead of an error event
+      if (!hostSave) port.reportError(res.error, false)
       return resolveConflict(fileId, data)
     }
     if (res.error.code === 'timeout' || res.error.code === 'network') {
