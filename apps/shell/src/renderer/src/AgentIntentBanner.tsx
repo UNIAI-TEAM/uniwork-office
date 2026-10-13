@@ -19,6 +19,8 @@ export function AgentIntentBanner({ practiceId, ensureWorkbench }: Props): React
 
   const [pending, setPending] = useState<AgentIntent | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  // an apply in flight: Allow stays disabled so one click creates one task
+  const [applying, setApplying] = useState(false)
 
   useEffect(() => {
     const off = window.aiOffice.onAgentIntent?.((dto) => {
@@ -28,7 +30,7 @@ export function AgentIntentBanner({ practiceId, ensureWorkbench }: Props): React
       if (intent.requireConsent) {
         setPending(intent)
       } else {
-        runApply(intent)
+        void runApply(intent) // never rejects: it acks 'failed' itself
       }
     })
     return off
@@ -39,14 +41,23 @@ export function AgentIntentBanner({ practiceId, ensureWorkbench }: Props): React
     [pending, practiceId, vi],
   )
 
-  const runApply = (intent: AgentIntent) => {
+  const runApply = async (intent: AgentIntent): Promise<void> => {
     // Switch into Workbench first; navigate bus keeps the tab switch if home mounts late.
     ensureWorkbench()
-    const result = applyAgentIntent(intent, practiceId)
-    emitAgentIntentNavigate(result.tabId, intent)
-    setPending(null)
-    setNotice(vi ? result.messageVi : result.messageEn)
-    void window.aiOffice.agentIntentAck?.(intent.intentId, result.ok ? 'applied' : 'failed')
+    setApplying(true)
+    try {
+      const result = await applyAgentIntent(intent, practiceId)
+      emitAgentIntentNavigate(result.tabId, intent)
+      setNotice(vi ? result.messageVi : result.messageEn)
+      void window.aiOffice.agentIntentAck?.(intent.intentId, result.ok ? 'applied' : 'failed')
+    } catch {
+      // the sender still learns the intent ended, so it never stays pending
+      setNotice(L('Không thực hiện được lệnh.', 'Could not apply the intent.'))
+      void window.aiOffice.agentIntentAck?.(intent.intentId, 'failed')
+    } finally {
+      setPending(null)
+      setApplying(false)
+    }
   }
 
   const dismiss = () => {
@@ -103,7 +114,12 @@ export function AgentIntentBanner({ practiceId, ensureWorkbench }: Props): React
         <button type="button" className="btn btn-secondary" onClick={dismiss}>
           {L('Từ chối', 'Reject')}
         </button>
-        <button type="button" className="btn btn-primary" onClick={() => runApply(pending)}>
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={applying}
+          onClick={() => void runApply(pending)}
+        >
           {L('Cho phép trên máy', 'Allow on device')}
         </button>
       </div>
