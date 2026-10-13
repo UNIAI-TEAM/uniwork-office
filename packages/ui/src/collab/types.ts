@@ -139,6 +139,8 @@ export interface CollabAnchorAdapter {
   goTo(anchor: CollabAnchor): void
   /** the active sheet name for xlsx labels; undefined otherwise */
   activeSheet?(): string | undefined
+  /** the display name of a sheet id in an xlsx anchor; undefined when the workbook has no such sheet */
+  sheetName?(sheetId: string): string | undefined
 }
 
 /** what the host knows about the document and the user */
