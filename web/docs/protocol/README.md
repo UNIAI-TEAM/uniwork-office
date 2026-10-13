@@ -52,6 +52,7 @@ gets no `init` within its retry budget (40 × 500 ms), or is opened top-level (`
 | `language`          | event   | {locale}                                                                                                                                                                                                                                                   |
 | `file.renamed`      | event   | {file: FileMeta}                                                                                                                                                                                                                                           |
 | `doc.remoteVersion` | event   | {document_id, revision (decimal), version_id, saved_at, author_name?} (additive, X-02)                                                                                                                                                                     |
+| `doc.blocked`       | event   | {document_id, reason} (additive, G5-03w)                                                                                                                                                                                                                   |
 | `cancel`            | event   | {id} — abort a host→frame request                                                                                                                                                                                                                          |
 | `comments.changed`  | event   | {document_id} — reload the comment list (additive, G8-08; see "Server comments")                                                                                                                                                                           |
 | `comments.reveal`   | request | {comment_id} → {revealed} (additive, G8-08; only after an InitAck with `comments`)                                                                                                                                                                         |
@@ -103,6 +104,12 @@ URL must widen `connect-src` in the CSP it serves (`csp.json`) for that origin.
 - `doc.remoteVersion` (host → frame): a newer version was saved elsewhere. The frame ignores it for another
   `document_id` (`client.onRemoteVersion` filters); a non-decimal `revision` is malformed. A frame before X-02 has no
   listener: the event is dropped silently, nothing is answered.
+- `doc.blocked` (host → frame, additive G5-03w): the open document can no longer be saved by this viewer. `reason`
+  is `permission_revoked`, `document_deleted`, `organization_suspended`, `member_deactivated` or `document_archived`
+  (validated as a non-empty string; a frame reads a value it does not know as `permission_revoked`). The frame ignores
+  it for another `document_id` (`client.onBlocked` filters); for its own it shows the reason's error bar, keeps the
+  content (dirty edits included) read-only and refuses Save / Save As. The host refuses `api.save` / `api.saveAs`
+  itself either way, so a frame without a listener (before G5-03w) drops the event and only learns at the next save.
 - `api.open {fileId, versionId?}` (OQ-P3, dev-uniwork `docs/office/g5g6g7/contract-p0.md` §7.3): the host always
   answers the **head**, its bytes and `file.revision` from one read, never an older version's bytes with the head
   revision. A `versionId` that is no longer the head → the head plus `versionChanged: true` (only together with

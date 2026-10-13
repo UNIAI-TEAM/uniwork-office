@@ -36,6 +36,7 @@ import {
   type Capabilities,
   type CommentsChangedPayload,
   type CommentsLevel,
+  type DocBlockedPayload,
   type FileMeta,
   type FrameRequestType,
   type FrameRequests,
@@ -156,6 +157,12 @@ export interface DocsFrameClient {
    * runs out.
    */
   handleCommentsReveal(handler: HostRequestHandler<'comments.reveal'>): () => void
+  /**
+   * THIS document is blocked for the viewer (additive, G5-03w): revoked, deleted, organisation
+   * suspended, member deactivated, archived. Events for another `document_id` (or before `init`)
+   * never reach the listener.
+   */
+  onBlocked(listener: (payload: DocBlockedPayload) => void): () => void
   onTheme(listener: (theme: Theme) => void): () => void
   onLanguage(listener: (locale: string) => void): () => void
   /** de-duplicated; `force` re-sends an unchanged flag (the host's header left "unsaved" after a failed save) */
@@ -493,6 +500,11 @@ export function createDocsFrameClient(options: DocsFrameClientOptions): DocsFram
       ep.handle('comments.reveal', async (p, ctx) => {
         await whenCommentsListed(ctx.signal)
         return h(p as HostRequests['comments.reveal']['payload'], ctx)
+      }),
+    onBlocked: (l) =>
+      ep.on('doc.blocked', (raw) => {
+        const p = raw as HostEvents['doc.blocked']
+        if (session && p.document_id === session.documentId) l({ ...p })
       }),
     onTheme: (l) => ep.on('theme', (p) => l((p as HostEvents['theme']).theme)),
     onLanguage: (l) => ep.on('language', (p) => l((p as HostEvents['language']).locale)),
