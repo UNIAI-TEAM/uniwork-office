@@ -18,6 +18,7 @@ import {
   QueueDispatcher,
   type QueueCapabilityRead,
   type QueueClient,
+  type QueueDispatcherDeps,
   type QueueDoc,
 } from '../src/main/uniwork-sync/queue/dispatcher'
 import { QUEUE_LIMITS } from '../src/main/uniwork-sync/queue/limits'
@@ -203,8 +204,11 @@ interface Harness {
   layer: StoreLayer
   lockTable: FakeLockTable
   statuses: UniworkDocStatus[]
+  /** every record the dispatchers published (one entry per `publish` call) */
+  published: IntentRecordV2[]
   makeDoc: (opts?: { key?: string; orgId?: string; payload?: string }) => QueueDoc
   newDispatcher: (owner: string) => QueueDispatcher
+  newDispatcherWith: (deps: Partial<QueueDispatcherDeps>) => QueueDispatcher
   setLocked: (value: boolean) => void
 }
 
@@ -239,24 +243,28 @@ async function harness(): Promise<Harness> {
   const store = new FakeBindingStore()
   const lockTable = new FakeLockTable()
   const statuses: UniworkDocStatus[] = []
+  const published: IntentRecordV2[] = []
   let locked = false
   const intentsAccess = async () =>
     locked ? { kind: 'keystore_locked' as const } : { kind: 'ok' as const, intents }
 
-  const makeDispatcher = (owner: string): QueueDispatcher =>
+  const makeDispatcherWith = (deps: Partial<QueueDispatcherDeps>): QueueDispatcher =>
     new QueueDispatcher({
       intents: intentsAccess,
       client: server.client,
       capability,
-      lock: fakeLock(lockTable, owner, () => clock.now),
+      lock: fakeLock(lockTable, 'win1', () => clock.now),
       pause,
       drafts,
       clock: () => clock.now,
       random: () => 0.5,
       limits: QUEUE_LIMITS,
-      publish: () => undefined,
+      publish: (record) => published.push(record),
       uuid: () => 'u1',
+      ...deps,
     })
+  const makeDispatcher = (owner: string): QueueDispatcher =>
+    makeDispatcherWith({ lock: fakeLock(lockTable, owner, () => clock.now) })
   const dispatcher = makeDispatcher('win1')
 
   const coordinator = new SaveCoordinator({
@@ -352,8 +360,10 @@ async function harness(): Promise<Harness> {
     layer,
     lockTable,
     statuses,
+    published,
     makeDoc,
     newDispatcher: makeDispatcher,
+    newDispatcherWith: makeDispatcherWith,
     setLocked: (value: boolean) => {
       locked = value
     },
@@ -803,10 +813,43 @@ describe('G5-06 W4a save queue (fakes)', () => {
     for (const id of ['d1', 'd2', 'd3']) {
       expect(await drafts.keep(doc.key, enc(id), { id, createdAt: ISO })).toBe('ok')
     }
+    const before = await stored(h.intents, doc)
     const state = await h.dispatcher.cancel(doc, { documentClosed: true })
     expect(state).toBe('failed')
-    expect(await stored(h.intents, doc)).not.toBeNull()
+    // the refusal is durable: the STORED record is exactly the pre-cancel one
+    // (still pending, byte for byte), never `cancelled`
+    expect(await stored(h.intents, doc)).toEqual(before)
+    expect((await stored(h.intents, doc))?.intent.state).toBe('queued')
+    expect(doc.record.lastError).toBe('drafts_full')
     expect(await drafts.list(doc.key)).toHaveLength(3)
+    // a restart (the store reopened, a fresh dispatcher over it) still sees the
+    // intent: the snapshot was never dropped for a draft that was refused
+    const reopened = await h.layer.open(SCOPE)
+    if (reopened.kind !== 'ok') throw new Error('store did not reopen')
+    const reopenedIntents = createIntentStore(reopened.store.records(INTENT_STORE_REGISTRATION.name))
+    const reopenedDrafts = createDraftStore(reopened.store.records(DRAFTS_STORE_REGISTRATION.name))
+    expect((await reopenedIntents.read(doc.key, factsOf(doc)))?.intent.state).toBe('queued')
+    expect(await reopenedDrafts.list(doc.key)).toHaveLength(3)
+
+    // discard on a stuck intent: the same refusal, the same durability
+    const stuck = h.makeDoc({ key: 'doc_stuck' })
+    await h.dispatcher.enqueue(stuck)
+    h.server.state.commitError = new UniworkDocError('timeout')
+    await h.dispatcher.dispatchAll([stuck])
+    h.server.state.commitError = null
+    h.server.state.lookupOutcome = 'unknown'
+    await h.dispatcher.reconcile(stuck)
+    expect(stuck.record.state).toBe('reconciling-stuck')
+    for (const id of ['s1', 's2', 's3']) {
+      expect(await drafts.keep(stuck.key, enc(id), { id, createdAt: ISO })).toBe('ok')
+    }
+    const stuckBefore = await stored(h.intents, stuck)
+    const discarded = await h.dispatcher.discard(stuck, {})
+    expect(discarded).toBe('failed')
+    expect(stuck.record.lastError).toBe('drafts_full')
+    expect(await stored(h.intents, stuck)).toEqual(stuckBefore)
+    expect((await stored(h.intents, stuck))?.intent.state).toBe('reconciling-stuck')
+    expect(await drafts.list(stuck.key)).toHaveLength(3)
   })
 
   it('user pause + offline -> online -> paused_user, no dispatch', async () => {

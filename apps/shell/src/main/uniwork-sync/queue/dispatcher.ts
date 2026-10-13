@@ -366,28 +366,23 @@ export class QueueDispatcher {
   /**
    * "Huy lan luu": only an intent that provably did not commit. When the
    * document is closed its snapshot becomes a kept draft; a draft the store
-   * refused (the cap or the budget) leaves the intent exactly as it was.
+   * refused (the cap, the budget, a locked keychain) leaves the STORED intent
+   * exactly as it was - nothing is cancelled until the draft is kept.
    */
   async cancel(
     doc: QueueDoc,
     options: { documentClosed: boolean; title?: string; now?: number } = { documentClosed: false },
   ): Promise<QueueState> {
     const now = options.now ?? this.deps.clock()
+    // the machine decides before anything is persisted: a cancel that cannot
+    // apply never touches the stored record
+    if (!(await this.wouldCancel(doc, 'cancel', now))) return doc.record.state
+    if (options.documentClosed && this.deps.drafts) {
+      const kept = await this.keepDraft(doc, options.title, now)
+      if (kept !== 'ok') return this.refuseCancel(doc, kept, now)
+    }
     const result = await this.apply(doc, { type: 'cancel' }, now)
     if (result.record?.state !== 'cancelled') return doc.record.state
-    if (options.documentClosed && this.deps.drafts) {
-      const kept = await this.deps.drafts.keep(doc.key, doc.payload, {
-        id: this.uuid(),
-        createdAt: new Date(now).toISOString(),
-        ...(options.title ? { title: options.title } : {}),
-      })
-      if (kept !== 'ok') {
-        // the cap or the budget refused the draft: the intent is kept, not lost
-        doc.record = { ...doc.record, state: 'failed' }
-        this.deps.publish(doc.record)
-        return doc.record.state
-      }
-    }
     await this.forget(doc)
     return 'cancelled'
   }
@@ -398,20 +393,13 @@ export class QueueDispatcher {
     options: { title?: string; now?: number } = {},
   ): Promise<QueueState> {
     const now = options.now ?? this.deps.clock()
+    if (!(await this.wouldCancel(doc, 'discard', now))) return doc.record.state
+    if (this.deps.drafts) {
+      const kept = await this.keepDraft(doc, options.title, now)
+      if (kept !== 'ok') return this.refuseCancel(doc, kept, now)
+    }
     const result = await this.apply(doc, { type: 'discard' }, now)
     if (result.record?.state !== 'cancelled') return doc.record.state
-    if (this.deps.drafts) {
-      const kept = await this.deps.drafts.keep(doc.key, doc.payload, {
-        id: this.uuid(),
-        createdAt: new Date(now).toISOString(),
-        ...(options.title ? { title: options.title } : {}),
-      })
-      if (kept !== 'ok') {
-        doc.record = { ...doc.record, state: 'reconciling-stuck' }
-        this.deps.publish(doc.record)
-        return doc.record.state
-      }
-    }
     await this.forget(doc)
     return 'cancelled'
   }
@@ -532,18 +520,70 @@ export class QueueDispatcher {
     await this.apply(doc, { type: 'commitFailed', error: code }, now)
   }
 
+  /** the machine context of one transition (the account's pause flag included) */
+  private async context(now: number): Promise<QueueContext> {
+    return {
+      now,
+      limits: this.limits,
+      random: this.random,
+      pausedUser: await this.userPaused(),
+    }
+  }
+
+  /**
+   * Whether a cancel/discard event would move this record, decided by the pure
+   * machine BEFORE anything is persisted: a refused kept draft must leave the
+   * stored record exactly as it was.
+   */
+  private async wouldCancel(
+    doc: QueueDoc,
+    event: 'cancel' | 'discard',
+    now: number,
+  ): Promise<boolean> {
+    const result = transition(doc.record, { type: event }, await this.context(now))
+    return result.record?.state === 'cancelled'
+  }
+
+  /** the snapshot of a cancelled intent, kept as a draft the user can restore */
+  private async keepDraft(
+    doc: QueueDoc,
+    title: string | undefined,
+    now: number,
+  ): Promise<'ok' | 'drafts_full' | 'store_full' | 'keystore_locked'> {
+    return this.deps.drafts!.keep(doc.key, doc.payload, {
+      id: this.uuid(),
+      createdAt: new Date(now).toISOString(),
+      ...(title ? { title } : {}),
+    })
+  }
+
+  /**
+   * A refused cancel/discard: the stored record does not move (the intent
+   * stays exactly as it was, so a restart still has it); this window shows the
+   * refusal and its reason.
+   */
+  private refuseCancel(
+    doc: QueueDoc,
+    reason: 'drafts_full' | 'store_full' | 'keystore_locked',
+    now: number,
+  ): QueueState {
+    doc.record = {
+      ...doc.record,
+      state: 'failed',
+      lastError: reason,
+      updatedAt: new Date(now).toISOString(),
+    }
+    this.deps.publish(doc.record)
+    return doc.record.state
+  }
+
   /**
    * Apply one event: run the machine, persist the record, publish it and
    * perform the machine's effects. A store that refuses the write leaves the
    * record where it was, so nothing downstream acts on a lost state.
    */
   private async apply(doc: QueueDoc, event: QueueEvent, now: number): Promise<TransitionResult> {
-    const context: QueueContext = {
-      now,
-      limits: this.limits,
-      random: this.random,
-      pausedUser: await this.userPaused(),
-    }
+    const context = await this.context(now)
     const result = transition(doc.record, event, context)
     if (!result.record) {
       doc.record = { ...doc.record, updatedAt: new Date(now).toISOString() }
