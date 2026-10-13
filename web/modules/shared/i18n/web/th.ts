@@ -106,6 +106,8 @@ export const th = {
   uwRemoteReloadFailed: 'โหลดเวอร์ชัน {n} ไม่ได้ คุณยังดูเวอร์ชันก่อนหน้าอยู่',
   uwRemoteDeleted: 'เอกสารนี้ถูกลบบน UniWork การบันทึกในคิวหยุดลงแล้ว',
   uwAuthorFallback: 'สมาชิกคนหนึ่ง',
+  uwLockRegion: 'สถานะเอกสาร',
+  uwActRetry: 'ลองอีกครั้ง',
 
   // S6 new-version bar (web only)
   uwRemoteRevokedWeb:

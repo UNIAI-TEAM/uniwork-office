@@ -114,6 +114,8 @@ export const cs = {
   uwRemoteReloadFailed: 'Verzi {n} se nepodařilo načíst. Stále vidíte předchozí verzi.',
   uwRemoteDeleted: 'Tento dokument byl v UniWork smazán. Uložení ve frontě byla zastavena.',
   uwAuthorFallback: 'člen týmu',
+  uwLockRegion: 'Stav dokumentu',
+  uwActRetry: 'Zkusit znovu',
 
   // S6 new-version bar (web only)
   uwRemoteRevokedWeb:

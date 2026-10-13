@@ -117,6 +117,8 @@ export const it = {
   uwRemoteDeleted:
     'Questo documento è stato eliminato su UniWork. I salvataggi in coda si sono interrotti.',
   uwAuthorFallback: 'un membro',
+  uwLockRegion: 'Stato del documento',
+  uwActRetry: 'Riprova',
 
   // S6 new-version bar (web only)
   uwRemoteRevokedWeb:

@@ -120,6 +120,8 @@ export const fr = {
   uwRemoteDeleted:
     'Ce document a été supprimé sur UniWork. Les enregistrements en attente sont arrêtés.',
   uwAuthorFallback: 'un membre',
+  uwLockRegion: 'État du document',
+  uwActRetry: 'Réessayer',
 
   // S6 new-version bar (web only)
   uwRemoteRevokedWeb:

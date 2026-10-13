@@ -112,6 +112,8 @@ export const hi = {
   uwRemoteReloadFailed: 'संस्करण {n} लोड नहीं हो सका। आप अभी भी पिछला संस्करण देख रहे हैं।',
   uwRemoteDeleted: 'यह दस्तावेज़ UniWork पर हटा दिया गया। कतार की सहेजें रुक गईं।',
   uwAuthorFallback: 'एक सदस्य',
+  uwLockRegion: 'दस्तावेज़ की स्थिति',
+  uwActRetry: 'फिर से कोशिश करें',
 
   // S6 new-version bar (web only)
   uwRemoteRevokedWeb:

@@ -110,6 +110,8 @@ export const en = {
   uwRemoteReloadFailed: 'Couldn’t load version {n}. You’re still viewing the previous version.',
   uwRemoteDeleted: 'This document was deleted on UniWork. Queued saves stopped.',
   uwAuthorFallback: 'a member',
+  uwLockRegion: 'Document status',
+  uwActRetry: 'Retry',
 
   // S6 new-version bar (web only)
   uwRemoteRevokedWeb:

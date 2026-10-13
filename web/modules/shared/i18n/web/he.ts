@@ -100,6 +100,8 @@ export const he = {
   uwRemoteReloadFailed: 'לא ניתן היה לטעון את גרסה {n}. אתה עדיין צופה בגרסה הקודמת.',
   uwRemoteDeleted: 'המסמך הזה נמחק ב-UniWork. השמירות שבתור נעצרו.',
   uwAuthorFallback: 'חבר צוות',
+  uwLockRegion: 'מצב המסמך',
+  uwActRetry: 'נסה שוב',
 
   // S6 new-version bar (web only)
   uwRemoteRevokedWeb:

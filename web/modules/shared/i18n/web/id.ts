@@ -113,6 +113,8 @@ export const id = {
   uwRemoteReloadFailed: 'Tidak dapat memuat versi {n}. Anda masih melihat versi sebelumnya.',
   uwRemoteDeleted: 'Dokumen ini dihapus di UniWork. Penyimpanan dalam antrean dihentikan.',
   uwAuthorFallback: 'seorang anggota',
+  uwLockRegion: 'Status dokumen',
+  uwActRetry: 'Coba lagi',
 
   // S6 new-version bar (web only)
   uwRemoteRevokedWeb:

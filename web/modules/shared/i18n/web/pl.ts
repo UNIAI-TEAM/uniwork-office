@@ -115,6 +115,8 @@ export const pl = {
   uwRemoteReloadFailed: 'Nie udało się wczytać wersji {n}. Nadal widzisz poprzednią wersję.',
   uwRemoteDeleted: 'Ten dokument został usunięty w UniWork. Zapisy w kolejce zostały zatrzymane.',
   uwAuthorFallback: 'członek zespołu',
+  uwLockRegion: 'Stan dokumentu',
+  uwActRetry: 'Spróbuj ponownie',
 
   // S6 new-version bar (web only)
   uwRemoteRevokedWeb:
