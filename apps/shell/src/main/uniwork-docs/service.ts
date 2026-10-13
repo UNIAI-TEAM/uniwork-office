@@ -297,6 +297,8 @@ export function coreSemver(version: string): string {
 type QueueEngineAccess =
   | {
       kind: 'ok'
+      /** the session's unique id (see isQueueSessionCurrent) */
+      id: string
       token: string
       dispatcher: QueueDispatcher
       lock: DocLock
@@ -369,6 +371,8 @@ export class UniworkDocsService {
    * scope and a per-window lock owner, so two windows contend for one document.
    */
   private queueSession: {
+    /** a unique id per built session; the dispatcher's canCommit guard reads it */
+    id: string
     token: string
     dispatcher: QueueDispatcher
     lock: DocLock
@@ -378,6 +382,10 @@ export class UniworkDocsService {
   } | null = null
   /** the per-window lock owner (one window = one service instance) */
   private readonly windowOwner = `${process.pid}:${randomUUID()}`
+  /** the document keys the current poll pass is dispatching (see dispatcherBusy) */
+  private readonly queueInFlight = new Set<string>()
+  /** the poll pass in flight right now, awaited by teardownSaveQueue (G506-be-4) */
+  private queuePass: Promise<void> | null = null
   /**
    * The one conflict dialog open (native dialogs are window-wide, not per
    * tab). `fromClose` = opened by the close prompt of that document's tab.
@@ -458,6 +466,9 @@ export class UniworkDocsService {
           (await this.queueEngineOrNull())?.tombstone(doc) ?? doc.record.state,
         isOtherWindow: (key) => this.queueSession?.dispatcher.isOtherWindow(key) === true,
       },
+      // the queue engine exposes no public in-flight state, so the service
+      // reports the keys its own poll pass is running right now (G506-be-1)
+      dispatcherBusy: (key) => this.queueInFlight.has(key),
       ...(deps.sleep ? { sleep: deps.sleep } : {}),
     })
     this.launch = new LaunchController({
@@ -797,7 +808,7 @@ export class UniworkDocsService {
       clock: () => Date.now(),
       publish: (record) => this.publishRecord(record),
     })
-    this.queueSession = { token, dispatcher, lock, intents, drafts, pause }
+    this.queueSession = { id: randomUUID(), token, dispatcher, lock, intents, drafts, pause }
     return { kind: 'ok', ...this.queueSession }
   }
 
@@ -921,6 +932,9 @@ export class UniworkDocsService {
         length: 0,
       })
       if (!stored || isTerminalQueueState(stored.intent.state)) continue
+      // the inline pipeline is saving this very key right now: one writer per
+      // intent, so the poll leaves it to the pipeline (G506-be-1)
+      if (this.coordinator.isSaving(join(dir, binding.filename))) continue
       docs.push({
         key,
         path: join(dir, binding.filename),
@@ -943,12 +957,35 @@ export class UniworkDocsService {
    * wiring's `onPoll`), never on its own timer.
    */
   async pollSaveQueue(): Promise<void> {
+    const pass = this.runQueuePass()
+    // teardownSaveQueue awaits this very pass, so it must be observable while it runs
+    this.queuePass = pass
+    try {
+      await pass
+    } finally {
+      if (this.queuePass === pass) this.queuePass = null
+    }
+  }
+
+  /** one poll pass; see pollSaveQueue */
+  private async runQueuePass(): Promise<void> {
     const access = await this.queueEngine()
     if (access.kind !== 'ok') return
+    // a teardown may have marked this session dead while the store was opening:
+    // a dead session dispatches nothing (G506-be-4)
+    if (!this.isQueueSessionCurrent(access)) return
     const docs = await this.pendingQueueDocs()
     if (docs.length === 0) return
+    if (!this.isQueueSessionCurrent(access)) return
     await access.dispatcher.tick(docs)
-    await access.dispatcher.dispatchAll(docs)
+    // the keys this pass is about to run: the inline pipeline skips them, so one
+    // intent never has two writers at once (G506-be-1)
+    for (const doc of docs) this.queueInFlight.add(doc.key)
+    try {
+      await access.dispatcher.dispatchAll(docs)
+    } finally {
+      for (const doc of docs) this.queueInFlight.delete(doc.key)
+    }
   }
 
   /**
@@ -961,6 +998,7 @@ export class UniworkDocsService {
   async setQueueOnline(online: boolean): Promise<void> {
     const access = await this.queueEngine()
     if (access.kind !== 'ok') return
+    if (!this.isQueueSessionCurrent(access)) return
     const docs = await this.pendingQueueDocs()
     if (docs.length === 0) return
     await access.dispatcher.setOnline(docs, online)
@@ -1056,21 +1094,45 @@ export class UniworkDocsService {
     }
   }
 
+  /** the queue sessions whose dispatcher must not commit any more (torn down) */
+  private readonly deadQueueSessions = new Set<string>()
+
+  /**
+   * Whether `session` is still the live queue session of this service. The
+   * dispatcher's `canCommit` guard reads this right before a request, so a
+   * torn-down session commits nothing (G506-be-4). The check is the session's
+   * unique id: the service hands the dispatcher its own session value.
+   */
+  private isQueueSessionCurrent(session: { id?: string } | null | undefined): boolean {
+    const id = session?.id
+    if (!id || !this.queueSession) return false
+    return this.queueSession.id === id && !this.deadQueueSessions.has(id)
+  }
+
   /**
    * The account boundary wiped this scope: stop the queue before the wipe. No
    * request runs after this, and the in-flight dispatch's lock is released.
    */
   private stopQueue(): void {
+    const session = this.queueSession
+    if (session) this.deadQueueSessions.add(session.id)
     this.queueSession = null
   }
 
   /**
-   * The account boundary is about to wipe the live scope: drop the queue's
-   * dispatcher and lock before the records go, so no dispatch is in flight and
-   * no request runs against a wiped store. A later open rebuilds the queue for
-   * the next session (the scope token changes).
+   * The account boundary is about to wipe the live scope: mark the session dead
+   * FIRST (so an in-flight dispatch's `canCommit` reads false and sends nothing
+   * more), await any in-flight poll/dispatch - whose own `finally` releases the
+   * document locks it took - and only then drop the queue. Nothing is torn down
+   * before the in-flight pass unwinds, so no request can outlive the boundary.
+   * A later open rebuilds the queue for the next session (the scope token moves).
    */
-  teardownSaveQueue(): void {
+  async teardownSaveQueue(): Promise<void> {
+    const session = this.queueSession
+    if (session) this.deadQueueSessions.add(session.id)
+    // the dispatcher's next `canCommit` reads false now; wait for the pass that
+    // is already running to unwind (and release its locks) before the records go
+    await this.queuePass?.catch(() => undefined)
     this.stopQueue()
   }
 

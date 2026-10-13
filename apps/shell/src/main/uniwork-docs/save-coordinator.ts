@@ -8,6 +8,7 @@ import { sha256Hex } from './formats'
 import type { CommitReceipt, DocumentDetail } from './parse'
 import type { IntentBindFacts, IntentRecordV2, IntentStore } from '../uniwork-sync/intent-store'
 import { isTerminalQueueState } from '../uniwork-sync/queue/record'
+import { transition, type QueueEvent } from '../uniwork-sync/queue/machine'
 import type {
   QueueCapabilityRead,
   QueueDispatcher,
@@ -125,6 +126,13 @@ export interface SaveCoordinatorDeps {
   drafts?: QueueDrafts
   /** the queue engine; absent = the legacy inline pipeline runs (see the module doc) */
   dispatcher?: SaveQueueEngine
+  /**
+   * Whether the queue engine is dispatching `docKey` right now. The dispatcher
+   * exposes no public in-flight state, so the service supplies this from the
+   * poll pass it drives; the inline pipeline never starts a second writer of a
+   * key the queue is already running (G506-be-1).
+   */
+  dispatcherBusy?(docKey: string): boolean
 }
 
 export function toStatus(doc: BoundDocument, pendingNext = false): UniworkDocStatus {
@@ -183,6 +191,12 @@ export class SaveCoordinator {
   private readonly running = new Map<string, Promise<BoundDocument>>()
   /** paths whose working copy has moved past their pending intent (an unsent N+1) */
   private readonly pendingNext = new Set<string>()
+  /**
+   * Per-document serialization of the binding writes. The inline pipeline and
+   * the dispatcher's `publish` both rewrite `binding.json` for the same key;
+   * chaining them per key keeps the last state in event order (G506-be-7).
+   */
+  private readonly bindingChains = new Map<string, Promise<unknown>>()
   private readonly now: () => Date
   private readonly uuid: () => string
   private readonly sleep: (ms: number) => Promise<void>
@@ -198,6 +212,16 @@ export class SaveCoordinator {
 
   isSaving(path: string): boolean {
     return this.saving.has(path)
+  }
+
+  /**
+   * Whether the queue engine is running this document key right now. The
+   * inline pipeline asks before it starts, so one intent never has two writers
+   * (G506-be-1). The dispatcher exposes no public in-flight state, so the
+   * service supplies this from the pass it drives (see `dispatcherBusy`).
+   */
+  private dispatcherActive(docKey: string): boolean {
+    return this.deps.dispatcherBusy?.(docKey) === true
   }
 
   /** resolves once the running save of `path` (if any) has finished */
@@ -262,6 +286,11 @@ export class SaveCoordinator {
       // intent, no request, no other save path
       const error = access.kind === 'keystore_locked' ? 'keystore_locked' : 'server_error'
       return this.commitState(doc, { ...doc.binding, state: 'error', error })
+    }
+    // the queue dispatcher is running this same key right now: the inline
+    // pipeline must not start a second writer of the one intent (G506-be-1)
+    if (this.dispatcherActive(doc.key)) {
+      return this.commitState(doc, { ...doc.binding, state: 'saving' })
     }
     const { intents } = access
     const facts = factsOf(doc, bytes.byteLength)
@@ -406,8 +435,34 @@ export class SaveCoordinator {
     delete settled.serverRevision
     this.pendingNext.delete(doc.path)
     const done = await this.commitState(doc, settled)
+    // the same cleanup the dispatcher's committed transition performs: the
+    // record is removed, so a committed intent is never left dispatchable
     await intents.delete(doc.key)
     return done
+  }
+
+  /**
+   * Drive the queue machine's own transition for an inline attempt that has
+   * settled, and persist it, so the durable record ends exactly where the
+   * dispatcher would leave it. A committed intent cleans its record up; a
+   * conflict keeps the SAME intent as a durable `conflict` (never `queued`, so
+   * a later poll cannot replay a save the card says must stop). A record that
+   * cannot be read or written is left as it is: nothing moves without being
+   * persisted.
+   */
+  private async settleRecord(
+    intents: IntentStore,
+    doc: BoundDocument,
+    event: QueueEvent,
+  ): Promise<void> {
+    const stored = await intents.read(doc.key, factsOf(doc, 0))
+    if (!stored) return
+    const result = transition(stored.intent, event, { now: this.now().getTime() })
+    if (!result.record || result.effects.some((effect) => effect.kind === 'cleanup')) {
+      await intents.delete(doc.key)
+      return
+    }
+    await intents.put(doc.key, result.record, stored.payload)
   }
 
   /**
@@ -499,7 +554,10 @@ export class SaveCoordinator {
     switch (error.code) {
       case 'conflict':
         // the working copy and the base stay; the user chooses what happens next.
-        // The intent is durable: the SAME record and key survive the conflict
+        // The intent is durable: the SAME record and key survive the conflict,
+        // and the record itself ends `conflict` (never `queued`) so the next
+        // poll never replays it (G506-be-1)
+        await this.settleRecord(intents, doc, { type: 'commitFailed', error: 'conflict' })
         return this.commitState(doc, {
           ...base,
           state: 'conflict',
@@ -645,6 +703,13 @@ export class SaveCoordinator {
    * chip shows.
    */
   async commitState(doc: BoundDocument, binding: Binding): Promise<BoundDocument> {
+    // one writer per document key: the inline pipeline and the dispatcher's
+    // `publish` both rewrite binding.json, so chain them (G506-be-7)
+    return this.serializeBinding(doc.key, () => this.writeBinding(doc, binding))
+  }
+
+  /** the binding write itself, always run inside the per-key chain */
+  private async writeBinding(doc: BoundDocument, binding: Binding): Promise<BoundDocument> {
     const next: BoundDocument = { ...doc, binding }
     let written: boolean
     try {
@@ -663,6 +728,26 @@ export class SaveCoordinator {
 
   private publish(doc: BoundDocument): void {
     this.deps.publish(toStatus(doc, this.pendingNext.has(doc.path)))
+  }
+
+  /**
+   * Run `run` after every binding write already queued for `key`, so the two
+   * writers (the inline pipeline's `commitState` and the dispatcher's
+   * `publish` -> `applyRecord`) never interleave: the later state wins in event
+   * order. The stored chain never rejects, so one failed write does not poison
+   * the next.
+   */
+  private serializeBinding<T>(key: string, run: () => Promise<T>): Promise<T> {
+    const previous = this.bindingChains.get(key) ?? Promise.resolve()
+    const result = previous.then(run)
+    this.bindingChains.set(
+      key,
+      result.then(
+        () => undefined,
+        () => undefined,
+      ),
+    )
+    return result
   }
 }
 

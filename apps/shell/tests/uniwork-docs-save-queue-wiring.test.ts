@@ -557,4 +557,62 @@ describe('G5-06 W4b save queue wiring', () => {
     expect(uploads(server)).toHaveLength(0)
     expect(commits(server)).toHaveLength(0)
   })
+
+  it('G506-be-1: an inline 409 conflict leaves the record non-dispatchable (poll sends nothing)', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    // someone saved on the web: the inline commit meets a base conflict
+    server.state.revision = 45
+    writeFileSync(path, 'mine')
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'conflict', error: 'conflict' })
+    // the durable record must end 'conflict' (the intent is kept), never 'queued'
+    expect((await storedIntent(ctx, path))?.intent).toMatchObject({
+      state: 'conflict',
+      documentId: DOC,
+      baseRevision: '41',
+    })
+    // the poll must not replay the conflicted save: no upload, no commit
+    const before = { upload: uploads(server).length, commit: commits(server).length }
+    await ctx.service.pollSaveQueue()
+    expect(uploads(server)).toHaveLength(before.upload)
+    expect(commits(server)).toHaveLength(before.commit)
+    expect((await storedIntent(ctx, path))?.intent.state).toBe('conflict')
+  })
+
+  it('G506-be-1: a poll during an in-flight inline save does not upload the same key twice', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    // gate the commit so the inline save is in flight while the poll runs
+    const realFetch = server.fetch.getMockImplementation()!
+    let releaseCommit!: () => void
+    const commitGate = new Promise<void>((resolve) => {
+      releaseCommit = resolve
+    })
+    let enteredCommit!: () => void
+    const inCommit = new Promise<void>((resolve) => {
+      enteredCommit = resolve
+    })
+    server.fetch.mockImplementation(async (url: string, init: RequestInit) => {
+      if (url.includes('/versions/commit') && (init.method ?? 'POST') === 'POST') {
+        enteredCommit()
+        await commitGate
+      }
+      return realFetch(url, init)
+    })
+    const saving = ctx.service.coordinator.save(path)
+    await inCommit
+    // the inline save holds the key: the poll enumerates the stored intent but
+    // must skip it (one writer per intent). Run it concurrently - a poll that
+    // wrongly dispatches would block on the same commit gate
+    const polling = ctx.service.pollSaveQueue()
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    releaseCommit()
+    await polling
+    await saving
+    expect(uploads(server)).toHaveLength(1)
+    expect(commits(server)).toHaveLength(1)
+  })
 })
