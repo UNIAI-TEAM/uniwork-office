@@ -427,3 +427,175 @@ describe('mountFrameDiscussion', () => {
     expect(document.querySelector('.uw-disc')).toBeNull()
   })
 })
+
+// ---------------------------------------------------------------- W11G webfix (G8-11 review + visual r1)
+
+describe('Esc follows the kit (F3)', () => {
+  /** a keydown on the panel's textarea (the root composer) as the kit leaves it */
+  async function escOn(p: ReturnType<typeof discussionPort>, consume: boolean) {
+    await mount(p)
+    await act(async () => toggle()!.click())
+    await flush()
+    const area = panel()!.querySelector('textarea')!
+    expect(area).not.toBeNull()
+    // a fake kit: a handler on the textarea that consumes (or ignores) Esc before it bubbles to the frame
+    const kit = (e: Event) => consume && e.preventDefault()
+    area.addEventListener('keydown', kit)
+    await act(async () => {
+      area.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+      )
+    })
+    await flush()
+    area.removeEventListener('keydown', kit)
+  }
+
+  it('Esc in the composer that the kit did not consume closes the panel and focuses the toggle', async () => {
+    const p = discussionPort()
+    await escOn(p, false)
+    expect(panel()).toBeNull()
+    expect(document.activeElement).toBe(toggle())
+  })
+
+  it('Esc that the kit consumed (picker, composer cancel) keeps the panel open', async () => {
+    const p = discussionPort()
+    await escOn(p, true)
+    expect(panel()).not.toBeNull()
+    expect(toggle()!.getAttribute('aria-expanded')).toBe('true')
+  })
+})
+
+describe('narrow overlay shields the editor (visual F2)', () => {
+  /** jsdom has no matchMedia: a stub whose `narrow` state the test flips */
+  function stubMedia(narrow: boolean) {
+    const listeners = new Set<() => void>()
+    const state = { narrow }
+    const win = window as unknown as { matchMedia?: unknown }
+    const prev = win.matchMedia
+    win.matchMedia = (query: string) => ({
+      get matches() {
+        return /max-width/.test(query) ? state.narrow : !state.narrow
+      },
+      media: query,
+      addEventListener: (_: string, l: () => void) => listeners.add(l),
+      removeEventListener: (_: string, l: () => void) => listeners.delete(l),
+    })
+    return {
+      set: (v: boolean) => {
+        state.narrow = v
+        listeners.forEach((l) => l())
+      },
+      restore: () => {
+        win.matchMedia = prev
+      },
+    }
+  }
+  const editor = () => document.getElementById('root')!
+
+  const withEditor = () => {
+    const root = document.createElement('div')
+    root.id = 'root'
+    root.innerHTML = '<button id="tb">tool</button>'
+    document.body.append(root)
+  }
+
+  it('below 640px the editor is inert + aria-hidden while the panel is open, restored on close', async () => {
+    const media = stubMedia(true)
+    try {
+      withEditor()
+      const p = discussionPort()
+      await mount(p)
+      expect(editor().hasAttribute('inert')).toBe(false)
+      await act(async () => toggle()!.click())
+      await flush()
+      expect(editor().hasAttribute('inert')).toBe(true)
+      expect(editor().getAttribute('aria-hidden')).toBe('true')
+      // the bar (toggle) stays outside the shielded editor
+      expect(editor().contains(toggle())).toBe(false)
+      await act(async () => toggle()!.click())
+      await flush()
+      expect(editor().hasAttribute('inert')).toBe(false)
+      expect(editor().hasAttribute('aria-hidden')).toBe(false)
+    } finally {
+      media.restore()
+    }
+  })
+
+  it('from 640px up the editor stays live (the panel sits beside it)', async () => {
+    const media = stubMedia(false)
+    try {
+      withEditor()
+      const p = discussionPort()
+      await mount(p)
+      await act(async () => toggle()!.click())
+      await flush()
+      expect(editor().hasAttribute('inert')).toBe(false)
+      expect(editor().hasAttribute('aria-hidden')).toBe(false)
+    } finally {
+      media.restore()
+    }
+  })
+
+  it('follows a viewport resize while open, and the dispose restores the editor', async () => {
+    const media = stubMedia(false)
+    try {
+      withEditor()
+      const p = discussionPort()
+      const dispose = await mount(p)
+      await act(async () => toggle()!.click())
+      await flush()
+      act(() => media.set(true))
+      expect(editor().hasAttribute('inert')).toBe(true)
+      act(() => media.set(false))
+      expect(editor().hasAttribute('inert')).toBe(false)
+      act(() => media.set(true))
+      expect(editor().hasAttribute('inert')).toBe(true)
+      act(() => dispose())
+      expect(editor().hasAttribute('inert')).toBe(false)
+      expect(editor().hasAttribute('aria-hidden')).toBe(false)
+    } finally {
+      media.restore()
+    }
+  })
+
+  it('the stylesheet lifts the panel above the editor chrome below 640px (own stacking context)', () => {
+    const css = readFileSync(join(__dirname, 'discussion.css'), 'utf8')
+    const narrow = /@media \(max-width: 639\.98px\)\s*{([\s\S]*?)\n}\n/.exec(css)?.[1] ?? ''
+    expect(narrow).toMatch(/html\.uw-disc-open #root\s*{[^}]*isolation:\s*isolate/)
+    const z = (sel: string) =>
+      Number(new RegExp(`${sel}\\s*{[^}]*z-index:\\s*(\\d+)`).exec(css)?.[1])
+    expect(z('\\.uw-disc')).toBeGreaterThan(0)
+  })
+})
+
+describe('toggle look matches the shell pill (visual F5)', () => {
+  it('has the chat icon (decorative) and a label span; the accessible name stays the label', async () => {
+    const p = discussionPort()
+    await mount(p)
+    const btn = toggle()!
+    const svg = btn.querySelector('svg')
+    expect(svg).not.toBeNull()
+    expect(svg!.getAttribute('aria-hidden')).toBe('true')
+    expect(btn.querySelector('.uw-disc-toggle-label')!.textContent).toBe('Discussion')
+    expect(btn.textContent).toBe('Discussion')
+  })
+
+  it('css: pill with border, accent-soft when open with --text label (contrast >= 4.5), tokens only', () => {
+    const css = readFileSync(join(__dirname, 'discussion.css'), 'utf8')
+    const rule = (sel: string) => {
+      const at = css.indexOf(`${sel} {`)
+      expect(at).toBeGreaterThanOrEqual(0)
+      return css.slice(css.indexOf('{', at) + 1, css.indexOf('}', at))
+    }
+    const base = rule('.uw-disc-toggle')
+    expect(base).toMatch(/border-radius:\s*14px/)
+    expect(base).toMatch(/border:\s*1px solid var\(--border\)/)
+    expect(base).toMatch(/display:\s*inline-flex/)
+    const open = rule(".uw-disc-toggle[aria-expanded='true']")
+    expect(open).toMatch(/background:\s*var\(--accent-soft\)/)
+    expect(open).toMatch(/border-color:\s*var\(--accent\)/)
+    // --accent on --accent-soft is 4.18:1 in markdown dark; --text on it is >= 8.4 in every app and theme
+    expect(open).toMatch(/color:\s*var\(--text\)/)
+    expect(css).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(/)
+  })
+})
