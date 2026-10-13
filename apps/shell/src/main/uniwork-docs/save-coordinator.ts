@@ -288,10 +288,10 @@ export class SaveCoordinator {
       return this.commitState(doc, { ...doc.binding, state: 'error', error })
     }
     // the queue dispatcher is running this same key right now: the inline
-    // pipeline must not start a second writer of the one intent (G506-be-1)
-    if (this.dispatcherActive(doc.key)) {
-      return this.commitState(doc, { ...doc.binding, state: 'saving' })
-    }
+    // pipeline must not start a second writer of the one intent. The dispatcher
+    // owns the record and the chip, so this returns the document untouched
+    // (G506-be-1)
+    if (this.dispatcherActive(doc.key)) return doc
     const { intents } = access
     const facts = factsOf(doc, bytes.byteLength)
 
