@@ -1580,10 +1580,13 @@ export class UniworkDocsService {
       return names
     } catch (error) {
       // a 403/404 is a stable answer ("names unavailable for this org"); a
-      // transient failure is not cached and is retried on the next open
+      // coded 403 maps to permission_revoked (errors.ts), so both spellings
+      // count. A transient failure is not cached and is retried on the next open.
       const stable =
         error instanceof UniworkDocError &&
-        (error.code === 'forbidden' || error.code === 'not_found')
+        (error.code === 'forbidden' ||
+          error.code === 'permission_revoked' ||
+          error.code === 'not_found')
       if (stable) {
         const empty = new Map<string, string>()
         this.orgMemberNames = empty
