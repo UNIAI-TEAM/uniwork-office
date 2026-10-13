@@ -462,6 +462,93 @@ describe('G5-06 W4a save queue (fakes)', () => {
     expect(new Set(h2.server.state.keys.commit)).toEqual(new Set([doc2.record.idempotencyKey]))
   })
 
+  it('cancel race: uploading / committing refuse it, a won cancel stops the pass', async () => {
+    // (a) the cancel arrives while the intent is uploading: refused (only an
+    // intent that provably did not commit can be cancelled), commit still lands
+    const h = await harness()
+    const doc = h.makeDoc()
+    await h.dispatcher.enqueue(doc)
+    let atUpload!: () => void
+    const uploading = new Promise<void>((resolve) => (atUpload = resolve))
+    let releaseUpload!: () => void
+    const uploadGate = new Promise<void>((resolve) => (releaseUpload = resolve))
+    const gatedUpload: QueueClient = {
+      upload: async (input) => {
+        atUpload()
+        await uploadGate
+        return h.server.client.upload(input)
+      },
+      commit: h.server.client.commit,
+      lookupCommit: h.server.client.lookupCommit,
+    }
+    const dispatcher = h.newDispatcherWith({ client: gatedUpload })
+    const pass = dispatcher.dispatchAll([doc])
+    await uploading
+    expect(await dispatcher.cancel(doc, { documentClosed: true })).toBe('uploading')
+    releaseUpload()
+    await pass
+    expect(doc.record.state).toBe('committed')
+    expect(h.server.state.counts.upload).toBe(1)
+    expect(h.server.state.counts.commit).toBe(1)
+    const opened = await h.layer.open(SCOPE)
+    if (opened.kind !== 'ok') throw new Error('store did not open')
+    const drafts = createDraftStore(opened.store.records(DRAFTS_STORE_REGISTRATION.name))
+    expect(await drafts.list(doc.key)).toHaveLength(0)
+
+    // (b) the same while the commit is in flight: refused, the receipt is kept
+    const c = await harness()
+    const doc2 = c.makeDoc({ key: 'doc_commit_race' })
+    await c.dispatcher.enqueue(doc2)
+    let atCommit!: () => void
+    const committing = new Promise<void>((resolve) => (atCommit = resolve))
+    let releaseCommit!: () => void
+    const commitGate = new Promise<void>((resolve) => (releaseCommit = resolve))
+    const gatedCommit: QueueClient = {
+      upload: c.server.client.upload,
+      commit: async (input) => {
+        atCommit()
+        await commitGate
+        return c.server.client.commit(input)
+      },
+      lookupCommit: c.server.client.lookupCommit,
+    }
+    const dispatcher2 = c.newDispatcherWith({ client: gatedCommit })
+    const pass2 = dispatcher2.dispatchAll([doc2])
+    await committing
+    expect(await dispatcher2.cancel(doc2, { documentClosed: true })).toBe('committing')
+    releaseCommit()
+    await pass2
+    expect(doc2.record.state).toBe('committed')
+    expect(c.server.state.counts.commit).toBe(1)
+
+    // (c) the cancel wins before the pass moves a byte: no version is created
+    const won = await harness()
+    const doc3 = won.makeDoc({ key: 'doc_won_cancel' })
+    await won.dispatcher.enqueue(doc3)
+    let atLock!: () => void
+    const acquiring = new Promise<void>((resolve) => (atLock = resolve))
+    let openLock!: () => void
+    const lockGate = new Promise<void>((resolve) => (openLock = resolve))
+    const realLock = fakeLock(won.lockTable, 'win1', () => won.clock.now)
+    const slowLock: DocLock = {
+      ...realLock,
+      acquire: async (key) => {
+        atLock()
+        await lockGate
+        return realLock.acquire(key)
+      },
+    }
+    const dispatcher3 = won.newDispatcherWith({ lock: slowLock })
+    const pass3 = dispatcher3.dispatchAll([doc3])
+    await acquiring
+    expect(await dispatcher3.cancel(doc3, { documentClosed: true })).toBe('cancelled')
+    openLock()
+    await pass3
+    expect(doc3.record.state).toBe('cancelled')
+    expect(won.server.state.counts.upload).toBe(0)
+    expect(won.server.state.counts.commit).toBe(0)
+  })
+
   it('one receipt/version: a replayed intent commits exactly one version', async () => {
     const h = await harness()
     const doc = h.makeDoc()

@@ -470,6 +470,20 @@ export class QueueDispatcher {
     return this.deps.canCommit?.(doc) !== false
   }
 
+  /**
+   * Whether the store still holds THIS intent: the same intentId and
+   * generation, whatever its state. A cancel, supersede or tombstone another
+   * window committed leaves nothing behind for this pass to send.
+   */
+  private async driving(doc: QueueDoc): Promise<boolean> {
+    const stored = await this.storedRecord(doc)
+    return (
+      stored !== null &&
+      stored.intentId === doc.record.intentId &&
+      stored.generation === doc.record.generation
+    )
+  }
+
   /** one document through validate -> upload -> lock check -> commit */
   private async runOne(doc: QueueDoc, now: number): Promise<QueueState> {
     const lock = await this.deps.lock.acquire(doc.key)
@@ -482,6 +496,12 @@ export class QueueDispatcher {
       return doc.record.state
     }
     this.otherWindow.delete(doc.key)
+    // the record may have been settled while this pass waited for the lock: a
+    // cancel, supersede or tombstone that won must leave exactly one outcome,
+    // and a record the store no longer holds (or holds for another intent) is
+    // not this pass's to send
+    if (!this.isDispatchable(doc.record.state)) return doc.record.state
+    if (!(await this.driving(doc))) return doc.record.state
     const generation = lock.generation
     const stopBeat = this.startHeartbeat(doc.key, generation)
     this.committing.add(doc.key)
