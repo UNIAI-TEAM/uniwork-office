@@ -42,15 +42,22 @@ import type {
   FileSearchPage,
   FileSearchRerank,
   FileSearchSettings,
+  UniworkCreateDocInput,
+  UniworkDocActionResult,
   UniworkDocErrorCode,
+  UniworkDocFolderRef,
   UniworkDocListPage,
   UniworkDocLock,
   UniworkDocProperties,
+  UniworkDocRenamedEvent,
   UniworkDocStatus,
+  UniworkDocSummary,
   UniworkLaunchEvent,
   UniworkResult,
   UniworkSharedPage,
   UniworkSharedQuery,
+  UniworkUploadDocInput,
+  UniworkUploadProgress,
   UniworkWorkspaceRef,
 } from '../shared/home-api'
 import { HOME_CHANNELS, PROJECT_CHANNELS, UNIWORK_DOC_CHANNELS } from '../shared/home-api'
@@ -88,6 +95,22 @@ ipcRenderer.on(UNIWORK_DOC_CHANNELS.locksChanged, (_event: IpcRendererEvent, raw
   if (!Array.isArray(raw)) return
   const locks = asUniworkLocks(raw)
   for (const cb of [...uniworkLocksSubscribers]) cb(locks)
+})
+// S18: a document's title changed (renamed here or elsewhere); no replay is
+// needed - the library reads titles again on open, this only updates a row
+// already on screen and drives the polite announce
+const docRenamedSubscribers = new Set<(event: UniworkDocRenamedEvent) => void>()
+ipcRenderer.on(UNIWORK_DOC_CHANNELS.docRenamed, (_event: IpcRendererEvent, raw: unknown) => {
+  const event = asDocRenamed(raw)
+  if (!event) return
+  for (const cb of [...docRenamedSubscribers]) cb(event)
+})
+// S18: upload bytes sent of the total, while the dialog is open
+const uploadProgressSubscribers = new Set<(event: UniworkUploadProgress) => void>()
+ipcRenderer.on(UNIWORK_DOC_CHANNELS.uploadProgress, (_event: IpcRendererEvent, raw: unknown) => {
+  const event = asUploadProgress(raw)
+  if (!event) return
+  for (const cb of [...uploadProgressSubscribers]) cb(event)
 })
 
 const UI_LANGUAGES: readonly UiLanguage[] = [
@@ -174,6 +197,22 @@ function asUniworkResult<T>(result: unknown): UniworkResult<T> {
   return { ok: false, error: 'malformed_response' satisfies UniworkDocErrorCode }
 }
 
+/**
+ * An S18 action result from main: the same shape as UniworkResult, but its
+ * error union also carries the two field errors. A malformed payload is a
+ * server_error (nothing applied).
+ */
+function asUniworkActionResult<T>(result: unknown): UniworkDocActionResult<T> {
+  if (
+    result &&
+    typeof result === 'object' &&
+    typeof (result as { ok?: unknown }).ok === 'boolean'
+  ) {
+    return result as UniworkDocActionResult<T>
+  }
+  return { ok: false, error: 'malformed_response' }
+}
+
 /** a lock from main: path, reason and name only; anything else is dropped */
 function asUniworkLock(result: unknown): UniworkDocLock | null {
   if (!result || typeof result !== 'object') return null
@@ -186,6 +225,25 @@ function asUniworkLock(result: unknown): UniworkDocLock | null {
 function asUniworkLocks(result: unknown): UniworkDocLock[] {
   if (!Array.isArray(result)) return []
   return result.map(asUniworkLock).filter((lock): lock is UniworkDocLock => lock !== null)
+}
+
+/** a renamed push from main: a document id and its new title only */
+function asDocRenamed(raw: unknown): UniworkDocRenamedEvent | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Partial<UniworkDocRenamedEvent>
+  if (typeof r.documentId !== 'string' || !r.documentId) return null
+  if (typeof r.title !== 'string' || !r.title) return null
+  return { documentId: r.documentId, title: r.title }
+}
+
+/** an upload-progress push: a local path plus finite, non-negative byte counts */
+function asUploadProgress(raw: unknown): UniworkUploadProgress | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Partial<UniworkUploadProgress>
+  if (typeof r.path !== 'string' || !r.path) return null
+  if (typeof r.loaded !== 'number' || !Number.isFinite(r.loaded) || r.loaded < 0) return null
+  if (typeof r.total !== 'number' || !Number.isFinite(r.total) || r.total < 0) return null
+  return { path: r.path, loaded: r.loaded, total: r.total }
 }
 
 function asUniworkStatus(result: unknown): UniworkDocStatus | null {
@@ -850,6 +908,56 @@ const homeApi: HomeApi = {
     return asUniworkResult<UniworkDocProperties>(
       await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.documentProperties, documentId),
     )
+  },
+  async uniworkCreateDocument(input: UniworkCreateDocInput) {
+    return asUniworkActionResult<UniworkDocSummary>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.createDocument, input),
+    )
+  },
+  async uniworkPickUploadFile() {
+    const picked = (await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.pickUploadFile)) as unknown
+    if (!picked || typeof picked !== 'object') return null
+    const r = picked as { path?: unknown; name?: unknown }
+    return typeof r.path === 'string' && r.path && typeof r.name === 'string' && r.name
+      ? { path: r.path, name: r.name }
+      : null
+  },
+  async uniworkUploadDocument(input: UniworkUploadDocInput) {
+    return asUniworkActionResult<UniworkDocSummary>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.uploadDocument, input),
+    )
+  },
+  onUniworkUploadProgress(cb: (event: UniworkUploadProgress) => void) {
+    uploadProgressSubscribers.add(cb)
+    return () => {
+      uploadProgressSubscribers.delete(cb)
+    }
+  },
+  async uniworkRenameDocument(documentId: string, name: string) {
+    return asUniworkActionResult<UniworkDocSummary>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.renameDocument, documentId, name),
+    )
+  },
+  async uniworkArchiveDocument(documentId: string) {
+    return asUniworkActionResult<UniworkDocSummary>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.archiveDocument, documentId),
+    )
+  },
+  async uniworkRestoreDocument(documentId: string) {
+    return asUniworkActionResult<UniworkDocSummary>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.restoreDocument, documentId),
+    )
+  },
+  async uniworkListFolders(workspaceId: string) {
+    return asUniworkResult<UniworkDocFolderRef[]>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.listFolders, workspaceId),
+    )
+  },
+  onUniworkDocRenamed(cb: (event: UniworkDocRenamedEvent) => void) {
+    docRenamedSubscribers.add(cb)
+    return () => {
+      docRenamedSubscribers.delete(cb)
+    }
   },
   async uniworkOpenDocument(documentId) {
     return asUniworkResult<{ path: string }>(

@@ -1,4 +1,4 @@
-import type { UniworkDocSummary } from '../../shared/home-api'
+import type { UniworkDocFolderRef, UniworkDocSummary } from '../../shared/home-api'
 import { UniworkDocError } from './errors'
 import { formatForName, isDecimalString } from './formats'
 
@@ -88,6 +88,42 @@ export interface LaunchDescriptor {
 
 const HEX64 = /^[0-9a-f]{64}$/
 
+/**
+ * S18 action flags off one list/detail row: `my_level` (view|edit|manage) and
+ * `archived_at`. Absent/unknown fields leave the flag false, so the renderer
+ * offers no action it cannot prove the person has.
+ */
+function summaryFlags(row: Record<string, unknown>): {
+  canEdit: boolean
+  canManage: boolean
+  archived: boolean
+} {
+  const level = typeof row.my_level === 'string' ? row.my_level : ''
+  const archivedAt = row.archived_at
+  return {
+    canEdit: level === 'edit' || level === 'manage',
+    canManage: level === 'manage',
+    archived: typeof archivedAt === 'string' && archivedAt.length > 0,
+  }
+}
+
+/** one list row as the renderer's summary (title is the only name the server sends) */
+function summaryRow(
+  row: Record<string, unknown>,
+  workspaceId: string,
+): UniworkDocSummary {
+  const title = str(row.title)
+  return {
+    id: str(row.id, 128),
+    workspaceId:
+      typeof row.workspace_id === 'string' && row.workspace_id ? row.workspace_id : workspaceId,
+    title,
+    format: formatForName(title),
+    updatedAt: str(row.updated_at, 64),
+    ...summaryFlags(row),
+  }
+}
+
 function bad(): never {
   throw new UniworkDocError('malformed_response')
 }
@@ -152,15 +188,7 @@ export function parseDocumentList(raw: unknown, workspaceId: string): DocumentLi
   for (const value of body.documents) {
     const row = record(value)
     if (row.kind !== 'file') continue
-    const title = str(row.title)
-    documents.push({
-      id: str(row.id, 128),
-      workspaceId:
-        typeof row.workspace_id === 'string' && row.workspace_id ? row.workspace_id : workspaceId,
-      title,
-      format: formatForName(title),
-      updatedAt: str(row.updated_at, 64),
-    })
+    documents.push(summaryRow(row, workspaceId))
   }
   return { documents, nextCursor: typeof next === 'string' && next ? next : null }
 }
@@ -285,15 +313,7 @@ export function parseSharedWithMe(raw: unknown, workspaceId: string): DocumentLi
   for (const value of body.documents) {
     const row = record(value)
     if (row.kind !== 'file') continue
-    const title = str(row.title)
-    documents.push({
-      id: str(row.id, 128),
-      workspaceId:
-        typeof row.workspace_id === 'string' && row.workspace_id ? row.workspace_id : workspaceId,
-      title,
-      format: formatForName(title),
-      updatedAt: str(row.updated_at, 64),
-    })
+    documents.push(summaryRow(row, workspaceId))
   }
   return { documents, nextCursor: typeof next === 'string' && next ? next : null }
 }
@@ -346,4 +366,55 @@ export function parseOrgMembers(raw: unknown): OrgMemberPage {
     members.push({ userId, displayName })
   }
   return { members, nextCursor: typeof next === 'string' && next ? next : null }
+}
+
+/**
+ * `POST .../documents/files[/blank]` and `PATCH /documents/{id}` answer with a
+ * full `DocumentSDO`. The library row only needs the summary fields plus the
+ * S18 action flags, so this reads exactly that and fails closed on a malformed
+ * core (id, title, revision, workspace).
+ */
+export function parseDocumentSummary(raw: unknown): UniworkDocSummary {
+  const doc = record(record(raw).document)
+  const title = str(doc.title)
+  const workspaceId = str(doc.workspace_id, 128)
+  const level = typeof doc.my_level === 'string' ? doc.my_level : ''
+  return {
+    id: str(doc.id, 128),
+    workspaceId,
+    title,
+    format: formatForName(title),
+    updatedAt: typeof doc.updated_at === 'string' ? doc.updated_at.slice(0, 64) : '',
+    canEdit: level === 'edit' || level === 'manage',
+    canManage: level === 'manage',
+    archived:
+      typeof doc.archived_at === 'string' && doc.archived_at.length > 0,
+  }
+}
+
+/**
+ * `GET /workspaces/{ws}/documents?kind=folder` -> the folder choices for the
+ * "Location" field. A row without a usable id or title is skipped rather than
+ * failing the dialog.
+ */
+export function parseFolders(raw: unknown): UniworkDocFolderRef[] {
+  const body = record(raw)
+  if (!Array.isArray(body.documents)) bad()
+  const out: UniworkDocFolderRef[] = []
+  for (const value of body.documents) {
+    if (!isRecord(value)) continue
+    if (value.kind !== 'folder') continue
+    const id = value.id
+    const title = value.title
+    if (typeof id !== 'string' || !id || typeof title !== 'string' || !title) continue
+    out.push({ id, title })
+  }
+  return out
+}
+
+/** the new title a rename answered with, or null when the server sent none */
+export function parseRenamedTitle(raw: unknown): string | null {
+  const doc = record(record(raw).document)
+  const title = doc.title
+  return typeof title === 'string' && title.length > 0 && title.length <= 512 ? title : null
 }

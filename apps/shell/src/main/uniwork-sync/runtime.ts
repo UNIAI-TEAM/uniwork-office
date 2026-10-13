@@ -214,6 +214,13 @@ export interface SyncRuntimeOptions {
   clock: { now(): number }
   /** a capability or feed 401: hand the session its chance to re-evaluate */
   onSessionExpired?(): void
+  /**
+   * A page the feed applied and the cache committed. G8-17 S18: a document
+   * renamed elsewhere is noticed from here, so its open working copy follows
+   * without waiting for its tab to gain focus. Announced only for a page that
+   * committed (a refused page is replayed, and would announce twice).
+   */
+  onFeedChange?(change: FeedChange): void
   intervalMs?: number
   /** test seam: schedule `run` on the interval, return the cancel */
   schedule?(run: () => void): () => void
@@ -341,11 +348,13 @@ export class SyncRuntime {
       scope,
       client,
       cursors: createStoreCursorStore(records(FEED_CURSORS_REGISTRATION.name)),
-      cache: createStoreDocCache({
-        records: records(DOC_INDEX_REGISTRATION.name),
-        scope,
-        keepDraft: (documentId) => this.options.keepDraft(documentId),
-      }),
+      cache: this.announcingCache(
+        createStoreDocCache({
+          records: records(DOC_INDEX_REGISTRATION.name),
+          scope,
+          keepDraft: (documentId) => this.options.keepDraft(documentId),
+        }),
+      ),
       clock: this.options.clock,
       // the flags of the capability read of this pass (off -> no request)
       capability: () => ({ sync_feed: this.capabilities.get(scope.orgId)?.sync_feed ?? false }),
@@ -353,5 +362,24 @@ export class SyncRuntime {
     })
     this.running.set(key, consumer)
     return consumer
+  }
+
+  /**
+   * The doc cache, plus the S18 change notice: every page the cache committed is
+   * handed to `onFeedChange` once, after the commit, so a rename on the web
+   * reaches an open desktop working copy. A page the cache refused announces
+   * nothing (it is replayed on the next tick).
+   */
+  private announcingCache(cache: DocCache): DocCache {
+    const notify = this.options.onFeedChange
+    if (!notify) return cache
+    return {
+      async applyPage(changes) {
+        const commit = await cache.applyPage(changes)
+        if (commit.kind === 'ok') for (const change of changes) notify(change)
+        return commit
+      },
+      reconcile: (ids, options) => cache.reconcile(ids, options),
+    }
   }
 }

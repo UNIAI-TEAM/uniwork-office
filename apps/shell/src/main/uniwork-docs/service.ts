@@ -1,16 +1,22 @@
 import { readFileSync, statSync } from 'node:fs'
-import { copyFile, readFile } from 'node:fs/promises'
-import { basename, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { copyFile, readFile, rename } from 'node:fs/promises'
+import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { randomUUID } from 'node:crypto'
 import type {
   RecentUniworkSource,
   UniworkConflictChoice,
+  UniworkCreateDocInput,
   UniworkDocAccess,
+  UniworkDocActionError,
+  UniworkDocActionResult,
+  UniworkDocFolderRef,
   UniworkDocErrorCode,
   UniworkDocFormat,
   UniworkDocListPage,
   UniworkDocListQuery,
   UniworkDocLock,
   UniworkDocProperties,
+  UniworkDocRenamedEvent,
   UniworkDocSummary,
   UniworkDocStatus,
   UniworkLaunchEvent,
@@ -18,6 +24,8 @@ import type {
   UniworkResult,
   UniworkSharedPage,
   UniworkSharedQuery,
+  UniworkUploadDocInput,
+  UniworkUploadProgress,
   UniworkWorkspaceRef,
 } from '../../shared/home-api'
 import {
@@ -153,6 +161,21 @@ export interface UniworkDocsServiceDeps {
   /** remounts the tab showing the path so it re-reads the file */
   reloadPath(path: string): void
   activePath(): string | undefined
+  /**
+   * S18: the native open dialog for an upload (Electron-free seam). Null when
+   * the person cancelled or the file is not usable.
+   */
+  pickUploadFile?(): Promise<{ path: string; name: string } | null>
+  /** S18: bytes sent while an upload runs (the renderer's progress bar) */
+  pushUploadProgress?(event: UniworkUploadProgress): void
+  /** S18: a document's title changed (renamed here, or renamed elsewhere) */
+  pushDocRenamed?(event: UniworkDocRenamedEvent): void
+  /**
+   * S18: the open tab/editor of a working copy must follow its new path (the
+   * shell re-keys the tab and tells the editor, the desktop host's equivalent
+   * of the X-02 `file.renamed` event). Absent in tests that do not open tabs.
+   */
+  notifyPathRenamed?(oldPath: string, newPath: string): void
   ui: ConflictUi
   pushStatus(status: UniworkDocStatus): void
   pushLaunch(event: UniworkLaunchEvent): void
@@ -237,6 +260,41 @@ async function result<T>(run: () => Promise<T>): Promise<UniworkResult<T>> {
 }
 
 /** one file (Windows paths compare case-insensitively) */
+/** a trimmed, non-empty document name; the empty case is S18's field error, not a request */
+function requireName(raw: string): string {
+  const name = typeof raw === 'string' ? raw.trim() : ''
+  if (!name) throw new UniworkDocError('name_empty' as UniworkDocErrorCode)
+  if (name.length > 500) throw new UniworkDocError('malformed_response')
+  return name
+}
+
+/**
+ * The S18 action result: like `result`, but the two name errors survive as
+ * themselves (`name_empty` / `name_taken`) so the renderer can show them at the
+ * field, and a server 409 `conflict` (a duplicate name) becomes `name_taken`.
+ */
+async function actionResult<T>(
+  run: () => Promise<T>,
+): Promise<UniworkDocActionResult<T>> {
+  try {
+    return { ok: true, value: await run() }
+  } catch (error) {
+    return { ok: false, error: actionErrorOf(error) }
+  }
+}
+
+function actionErrorOf(error: unknown): UniworkDocActionError {
+  if (error instanceof UniworkDocError) {
+    // the name errors are carried on the error's `code` even though they are not
+    // part of UniworkDocErrorCode; the cast is the one place that bridges them
+    const code = error.code as string
+    if (code === 'name_empty' || code === 'name_taken') return code
+    if (error.code === 'conflict' || error.serverCode === 'conflict') return 'name_taken'
+    return error.code
+  }
+  return 'server_error'
+}
+
 function samePath(a: string, b: string): boolean {
   const ra = resolve(a)
   const rb = resolve(b)
@@ -302,6 +360,12 @@ export class UniworkDocsService {
     fromClose: boolean
     done: Promise<unknown>
   } | null = null
+  /**
+   * S18: documents whose binding title this service just changed itself. A
+   * `document.updated` from the feed for one of these is this service's own
+   * write coming back, so it must not re-publish the rename a second time.
+   */
+  private readonly selfRenamed = new Set<string>()
 
   constructor(deps: UniworkDocsServiceDeps) {
     this.deps = deps
@@ -999,6 +1063,154 @@ export class UniworkDocsService {
     })
   }
 
+  // ---- S18: create, rename, archive ------------------------------------------
+
+  /** the folders of one workspace, for the "Location" field of create/upload */
+  listFolders(workspaceId: string): Promise<UniworkResult<UniworkDocFolderRef[]>> {
+    return result(async () => {
+      if (typeof workspaceId !== 'string' || !workspaceId) throw new UniworkDocError('not_found')
+      return this.api().listFolders(workspaceId)
+    })
+  }
+
+  /**
+   * Create a blank document (docx/xlsx/pptx) in a workspace/folder. The name is
+   * validated before any call (empty -> `name_empty`, no request), and the
+   * answer is the server document; the caller opens it by id, so no second local
+   * copy exists. A server refusal that means "that name is taken" maps to
+   * `name_taken`.
+   */
+  createDocument(input: UniworkCreateDocInput): Promise<UniworkDocActionResult<UniworkDocSummary>> {
+    return actionResult(async () => {
+      if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+      const target = this.docTarget(input)
+      const name = requireName(input.name)
+      return this.api().createBlank({
+        workspaceId: target.workspaceId,
+        format: input.format,
+        title: name,
+        parentId: target.folderId,
+        idempotencyKey: this.newIdempotencyKey(),
+      })
+    })
+  }
+
+  /**
+   * Upload one local file as a UniWork document. Main reads the bytes, sends
+   * them as the multipart `file` part and reports progress; the title is the
+   * file name (the server's own default). Nothing is written locally: the
+   * working copy is the download the open flow makes from the created document.
+   */
+  uploadDocument(input: UniworkUploadDocInput): Promise<UniworkDocActionResult<UniworkDocSummary>> {
+    return actionResult(async () => {
+      if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+      const target = this.docTarget(input)
+      if (typeof input.path !== 'string' || !input.path) throw new UniworkDocError('not_found')
+      const filename = basename(input.path)
+      if (!filename) throw new UniworkDocError('not_found')
+      let bytes: Uint8Array
+      try {
+        bytes = new Uint8Array(await readFile(input.path))
+      } catch {
+        throw new UniworkDocError('not_found')
+      }
+      const total = bytes.byteLength
+      this.deps.pushUploadProgress?.({ path: input.path, loaded: 0, total })
+      const created = await this.api().createFile({
+        workspaceId: target.workspaceId,
+        bytes,
+        filename,
+        title: filename,
+        parentId: target.folderId,
+        idempotencyKey: this.newIdempotencyKey(),
+      })
+      this.deps.pushUploadProgress?.({ path: input.path, loaded: total, total })
+      return created
+    })
+  }
+
+  /** S18: main shows the native open dialog for an upload */
+  pickUploadFile(): Promise<{ path: string; name: string } | null> {
+    return this.deps.pickUploadFile?.() ?? Promise.resolve(null)
+  }
+
+  /**
+   * Rename a document. A view-only document is refused before any write (the
+   * server is the real gate, but the person has no such action, so main does not
+   * even try). The current revision is read first because PATCH requires it.
+   */
+  renameDocument(documentId: string, name: string): Promise<UniworkDocActionResult<UniworkDocSummary>> {
+    return actionResult(async () => {
+      if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+      if (typeof documentId !== 'string' || !documentId) throw new UniworkDocError('not_found')
+      const title = requireName(name)
+      const detail = await this.api().getDocument(documentId)
+      if (detail.myLevel === 'view') throw new UniworkDocError('forbidden')
+      if (title === detail.title) return this.summaryOf(detail)
+      const renamed = await this.api().rename({ documentId, revision: detail.revision, title })
+      // this service's own rename: the feed echoing it must not re-announce it
+      this.selfRenamed.add(documentId)
+      await this.afterLocalRename(documentId, renamed.title)
+      return renamed
+    })
+  }
+
+  /** S18: archive a document (the server moves its subtree to the trash) */
+  archiveDocument(documentId: string): Promise<UniworkDocActionResult<UniworkDocSummary>> {
+    return actionResult(async () => {
+      if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+      if (typeof documentId !== 'string' || !documentId) throw new UniworkDocError('not_found')
+      await this.requireManage(documentId)
+      return this.api().archive(documentId, this.newIdempotencyKey())
+    })
+  }
+
+  /** S18: restore an archived document (only its own archive batch comes back) */
+  restoreDocument(documentId: string): Promise<UniworkDocActionResult<UniworkDocSummary>> {
+    return actionResult(async () => {
+      if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+      if (typeof documentId !== 'string' || !documentId) throw new UniworkDocError('not_found')
+      await this.requireManage(documentId)
+      return this.api().restore(documentId, this.newIdempotencyKey())
+    })
+  }
+
+  /** the workspace/folder a create or upload targets, validated before any call */
+  private docTarget(input: {
+    workspaceId?: unknown
+    folderId?: unknown
+  }): { workspaceId: string; folderId: string | null } {
+    const workspaceId = typeof input.workspaceId === 'string' ? input.workspaceId : ''
+    if (!workspaceId) throw new UniworkDocError('not_found')
+    const folderId =
+      typeof input.folderId === 'string' && input.folderId ? input.folderId : null
+    return { workspaceId, folderId }
+  }
+
+  /** archive/restore need manage; a view row (and an edit row) is refused without a call */
+  private async requireManage(documentId: string): Promise<void> {
+    const detail = await this.api().getDocument(documentId)
+    if (detail.myLevel !== 'manage') throw new UniworkDocError('forbidden')
+  }
+
+  /** the summary a rename/create answer already carries, without a second read */
+  private summaryOf(detail: DocumentDetail): UniworkDocSummary {
+    return {
+      id: detail.id,
+      workspaceId: detail.workspaceId,
+      title: detail.title,
+      format: formatForMime(detail.file.mimeType) ?? formatForName(detail.file.filename),
+      updatedAt: '',
+      canEdit: true,
+      canManage: false,
+      archived: false,
+    }
+  }
+
+  private newIdempotencyKey(): string {
+    return this.deps.now ? `uniwork-doc-${this.deps.now()}-${randomUUID()}` : `uniwork-doc-${randomUUID()}`
+  }
+
   /**
    * The org's member names (id -> display name), read across D's pages
    * (`next_cursor`, up to `MEMBERS_MAX_PAGES`). Only a success or a 403/404
@@ -1115,7 +1327,96 @@ export class UniworkDocsService {
   /** tab activation: bytes written outside the save hook show as dirty */
   async refreshPath(path: string | undefined): Promise<void> {
     const doc = path ? this.store.lookup(path) : null
-    if (doc && this.ownsLocally(doc)) await this.refreshDirty(doc)
+    if (!doc || !this.ownsLocally(doc)) return
+    await this.refreshDirty(doc)
+    // S18 renamed-elsewhere: a tab that gains focus re-reads the document's
+    // metadata, so a title changed on the web shows here without the feed
+    void this.refreshMetadataFor(doc.binding.documentId).catch(() => undefined)
+  }
+
+  // ---- S18: renamed elsewhere -------------------------------------------------
+
+  /**
+   * A change the G5-04 feed applied for `documentId` (wiring). A rename this
+   * service just made itself is skipped: its own write is echoing back.
+   */
+  noteFeedChange(documentId: string): void {
+    if (typeof documentId !== 'string' || !documentId) return
+    if (this.selfRenamed.delete(documentId)) return
+    void this.refreshMetadataFor(documentId).catch(() => undefined)
+  }
+
+  /**
+   * Re-read one document's metadata and, when its title changed, follow it: the
+   * binding's title (and the working-copy name, while the copy is clean and no
+   * editor holds it), the pushed status, the shell's tab/editor re-key and the
+   * renderer's S18 announce. Never runs for a document with local work (a
+   * rename must not disturb an unsaved copy) or for one this session does not
+   * own.
+   */
+  async refreshMetadataFor(documentId: string): Promise<void> {
+    if (typeof documentId !== 'string' || !documentId) return
+    const identity = this.liveIdentity()
+    if (!identity) return
+    const dir = this.store.dirFor(identity.deploymentId, identity.accountId, documentId)
+    const existing = await this.store.readDir(dir)
+    if (!existing || existing.documentId !== documentId) return
+    const local = join(dir, existing.filename)
+    if (!this.store.exists(local)) return
+    if (KEEP_LOCAL_STATES.has(existing.state) || this.coordinator.isSaving(local)) return
+    let detail: DocumentDetail
+    try {
+      detail = await this.api().getDocument(documentId)
+    } catch {
+      return
+    }
+    if (detail.title === existing.title) return
+    await this.applyTitle(existing, detail.title, local, true)
+  }
+
+  /** the binding rewrite that follows a title change, plus the pushes it owes */
+  private async applyTitle(
+    doc: Binding,
+    title: string,
+    local: string,
+    announce: boolean,
+  ): Promise<void> {
+    const dir = dirname(local)
+    let filename = doc.filename
+    let path = local
+    // an editor holding the copy keeps its file name: the shell re-keys a tab
+    // only for a path that actually moved, and Windows refuses a rename under an
+    // open handle
+    if (!this.deps.isPathOpen(local)) {
+      const candidate = workingCopyName(title, doc.filename, doc.format)
+      if (candidate !== doc.filename) {
+        const next = join(dir, candidate)
+        try {
+          await rename(local, next)
+          filename = candidate
+          path = next
+        } catch {
+          // the old name stays; the title still updates
+        }
+      }
+    }
+    const written = await this.store.write(dir, { ...doc, title, filename })
+    const fresh = written ? this.store.lookup(path) : null
+    if (fresh) this.publish(toStatus(fresh))
+    if (path !== local) this.deps.notifyPathRenamed?.(local, path)
+    if (announce) this.deps.pushDocRenamed?.({ documentId: doc.documentId, title })
+  }
+
+  /** a rename this service made: follow the binding, but do not re-announce it */
+  private async afterLocalRename(documentId: string, title: string): Promise<void> {
+    const identity = this.liveIdentity()
+    if (!identity) return
+    const dir = this.store.dirFor(identity.deploymentId, identity.accountId, documentId)
+    const existing = await this.store.readDir(dir)
+    if (!existing || existing.documentId !== documentId) return
+    const local = join(dir, existing.filename)
+    if (!this.store.exists(local) || existing.title === title) return
+    await this.applyTitle(existing, title, local, false)
   }
 
   /**

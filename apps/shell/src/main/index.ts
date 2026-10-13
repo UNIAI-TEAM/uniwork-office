@@ -3821,6 +3821,11 @@ function uniworkDocsWiring() {
     },
     aiHistoryPaths: () => projectFilePaths(),
     forgetAiHistory: (paths: string[]) => projectForgetFiles(paths),
+    // S18: a document renamed on the server renamed its working copy on disk;
+    // the shell re-keys the tab, the recents/project entries and tells the
+    // editor - exactly the path a Home-list rename takes (the desktop host's
+    // equivalent of the X-02 `file.renamed` frame event)
+    notifyPathRenamed: (oldPath, newPath) => afterFileMoved(oldPath, newPath),
   }
 }
 

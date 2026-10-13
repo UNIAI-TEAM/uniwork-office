@@ -1,4 +1,10 @@
-import type { UniworkDocFormat, UniworkWorkspaceRef } from '../../shared/home-api'
+import type {
+  UniworkDocFolderRef,
+  UniworkDocFormat,
+  UniworkDocNewFormat,
+  UniworkDocSummary,
+  UniworkWorkspaceRef,
+} from '../../shared/home-api'
 import { TransportError } from '../uniwork-auth/transport'
 import { UniworkDocError, errorFromResponse } from './errors'
 import { formatForName, isDecimalString, mimeForFormat } from './formats'
@@ -6,7 +12,9 @@ import {
   parseCommit,
   parseDetail,
   parseDocumentList,
+  parseDocumentSummary,
   parseExchange,
+  parseFolders,
   parseMembershipRole,
   parseOrgMembers,
   parseProperties,
@@ -74,6 +82,35 @@ export interface UniworkDocsClient {
   }): Promise<DocumentListResult>
   /** the properties panel of one document (ids/times/level/version, no names) */
   documentProperties(documentId: string): Promise<DocumentProperties>
+  /** the workspace's folders (S18 location field); one page of `kind=folder` rows */
+  listFolders(workspaceId: string): Promise<UniworkDocFolderRef[]>
+  /** create a blank document (S18); `format` must have a blank generator */
+  createBlank(input: {
+    workspaceId: string
+    format: UniworkDocNewFormat
+    title: string
+    parentId: string | null
+    idempotencyKey: string
+  }): Promise<UniworkDocSummary>
+  /** create one file document from local bytes (S18 upload) */
+  createFile(input: {
+    workspaceId: string
+    bytes: Uint8Array
+    filename: string
+    title: string
+    parentId: string | null
+    idempotencyKey: string
+  }): Promise<UniworkDocSummary>
+  /** rename a document (S18); the server compares `revision` and may answer a conflict */
+  rename(input: {
+    documentId: string
+    revision: string
+    title: string
+  }): Promise<UniworkDocSummary>
+  /** archive a document (S18); there is no hard-delete route */
+  archive(documentId: string, idempotencyKey: string): Promise<UniworkDocSummary>
+  /** restore an archived document (S18) */
+  restore(documentId: string, idempotencyKey: string): Promise<UniworkDocSummary>
   /**
    * one page of org members (id + display name) for resolving the properties
    * panel's names; `cursor` is D's opaque `next_cursor` and `limit` is capped
@@ -144,7 +181,7 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
   const transferTimeout = options.transferTimeoutMs ?? TRANSFER_TIMEOUT_MS
 
   interface Call<T> {
-    method: 'GET' | 'POST'
+    method: 'GET' | 'POST' | 'PATCH'
     route: string
     query?: URLSearchParams
     json?: unknown
@@ -290,6 +327,92 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       const properties = parseProperties(raw)
       if (properties.id !== documentId) throw new UniworkDocError('malformed_response')
       return properties
+    },
+
+    async listFolders(workspaceId) {
+      const params = new URLSearchParams()
+      params.set('kind', 'folder')
+      params.set('limit', '100')
+      const raw = await send({
+        method: 'GET',
+        route: `/workspaces/${id(workspaceId)}/documents`,
+        query: params,
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
+      return parseFolders(raw)
+    },
+
+    async createBlank(input) {
+      const raw = await send({
+        method: 'POST',
+        route: `/workspaces/${id(input.workspaceId)}/documents/files/blank`,
+        json: {
+          format: input.format,
+          title: input.title,
+          ...(input.parentId ? { parent_id: input.parentId } : {}),
+        },
+        idempotencyKey: input.idempotencyKey,
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
+      return parseDocumentSummary(raw)
+    },
+
+    async createFile(input) {
+      const form = new FormData()
+      // the text fields precede the file part: the server streams the file part
+      // and a title that trails it would fall back to the file name
+      if (input.parentId) form.set('parent_id', input.parentId)
+      form.set('title', input.title)
+      form.set(
+        'file',
+        new Blob([input.bytes as BlobPart], { type: 'application/octet-stream' }),
+        input.filename,
+      )
+      const raw = await send({
+        method: 'POST',
+        route: `/workspaces/${id(input.workspaceId)}/documents/files`,
+        form,
+        idempotencyKey: input.idempotencyKey,
+        timeoutMs: transferTimeout,
+        read: json,
+      })
+      return parseDocumentSummary(raw)
+    },
+
+    async rename(input) {
+      if (!isDecimalString(input.revision)) throw new UniworkDocError('malformed_response')
+      const raw = await send({
+        method: 'PATCH',
+        route: `/documents/${id(input.documentId)}`,
+        json: { revision: input.revision, title: input.title },
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
+      return parseDocumentSummary(raw)
+    },
+
+    async archive(documentId, idempotencyKey) {
+      const raw = await send({
+        method: 'POST',
+        route: `/documents/${id(documentId)}/archive`,
+        idempotencyKey,
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
+      return parseDocumentSummary(raw)
+    },
+
+    async restore(documentId, idempotencyKey) {
+      const raw = await send({
+        method: 'POST',
+        route: `/documents/${id(documentId)}/restore`,
+        idempotencyKey,
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
+      return parseDocumentSummary(raw)
     },
 
     async listOrgMembers(input) {
