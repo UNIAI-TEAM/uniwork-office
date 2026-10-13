@@ -135,6 +135,21 @@ async function render(opts: Parameters<typeof makeApi>[0] = {}, lang: Lang = 'en
 const select = () => host.querySelector<HTMLSelectElement>('.uw-pick-ws')!
 const rows = () => Array.from(host.querySelectorAll<HTMLElement>('.uw-pick-row'))
 const infoPanel = () => host.querySelector<HTMLElement>('.uw-info')
+const infoButtons = () => Array.from(host.querySelectorAll<HTMLButtonElement>('.uw-pick-info-btn'))
+const search = () => host.querySelector<HTMLInputElement>('.uw-pick-search')!
+
+/** type into the search box and press Enter, which searches without waiting for the debounce */
+async function searchFor(value: string) {
+  await act(async () => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+    setter.call(search(), value)
+    search().dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  await act(async () => {
+    search().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+  })
+  await flush()
+}
 
 async function choose(value: string) {
   await act(async () => {
@@ -274,7 +289,7 @@ describe('Open from UniWork: workspaces and Shared with me', () => {
 describe('Open from UniWork: details panel', () => {
   it('offers Details on every row at rest, not only on the hovered or active row', async () => {
     await render()
-    const buttons = rows().map((r) => r.querySelector<HTMLButtonElement>('.uw-pick-info-btn'))
+    const buttons = infoButtons()
     expect(buttons.length).toBeGreaterThan(1)
     for (const btn of buttons) {
       expect(btn).not.toBeNull()
@@ -288,15 +303,16 @@ describe('Open from UniWork: details panel', () => {
       return css.slice(start, css.indexOf('}', start))
     }
     const rest = block('.uw-pick-info-btn')
-    expect(rest).not.toMatch(/opacity:\s*0;/)
-    expect(rest).toMatch(/opacity:\s*0\.\d+;/)
-    const coarse = css.slice(css.indexOf('@media (pointer: coarse) {\n  .uw-pick-info-btn'))
-    expect(coarse.slice(0, coarse.indexOf('\n}'))).toMatch(/opacity:\s*1;/)
+    // full strength in the muted text token (>= 3:1 non-text contrast), never faded
+    expect(rest).not.toMatch(/opacity/)
+    expect(rest).toMatch(/color:\s*var\(--text-muted\);/)
+    const coarse = css.slice(css.indexOf('@media (pointer: coarse) {\n  .uw-pick-row'))
+    expect(coarse.slice(0, coarse.indexOf('\n}'))).toMatch(/\.uw-pick-info-btn \{\s*width: 44px;/)
   })
 
   it('opens a non-modal panel named by the document with a dl of its properties', async () => {
     await render()
-    const btn = rows()[0]!.querySelector<HTMLButtonElement>('.uw-pick-info-btn')!
+    const btn = infoButtons()[0]!
     expect(btn.getAttribute('aria-label')).toBe('Details for “Plan.docx”')
     await click(btn)
     expect(api.uniworkDocumentProperties).toHaveBeenCalledWith('d1')
@@ -319,14 +335,14 @@ describe('Open from UniWork: details panel', () => {
 
   it('shows "—" for every field the server did not send', async () => {
     await render({ info: EMPTY_INFO })
-    await click(rows()[1]!.querySelector('.uw-pick-info-btn')!)
+    await click(infoButtons()[1]!)
     const values = Array.from(infoPanel()!.querySelectorAll('dl dd')).map((d) => d.textContent)
     expect(values).toEqual(Array(5).fill('—'))
   })
 
   it('Escape closes the panel first and gives focus back to its Details button', async () => {
     await render()
-    const btn = rows()[0]!.querySelector<HTMLButtonElement>('.uw-pick-info-btn')!
+    const btn = infoButtons()[0]!
     await click(btn)
     await act(async () => {
       infoPanel()!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
@@ -342,7 +358,7 @@ describe('Open from UniWork: details panel', () => {
   it('a failed details read says why and retries', async () => {
     await render()
     api.uniworkDocumentProperties.mockResolvedValueOnce({ ok: false, error: 'network' } as never)
-    await click(rows()[0]!.querySelector('.uw-pick-info-btn')!)
+    await click(infoButtons()[0]!)
     expect(infoPanel()!.querySelector('[role="alert"]')?.textContent).toContain(en.uwErrNetwork)
     await click(
       Array.from(infoPanel()!.querySelectorAll('button')).find(
@@ -350,5 +366,86 @@ describe('Open from UniWork: details panel', () => {
       )!,
     )
     expect(infoPanel()!.querySelectorAll('dl dd')).toHaveLength(5)
+  })
+})
+
+describe('Open from UniWork: review fixes', () => {
+  it('keeps the Details button out of the option, still named and reachable', async () => {
+    await render()
+    const list = host.querySelector('[role="listbox"]')!
+    const options = Array.from(list.querySelectorAll('[role="option"]'))
+    expect(options).toHaveLength(2)
+    for (const option of options) {
+      expect(option.querySelector('button')).toBeNull()
+      expect(option.parentElement?.getAttribute('role')).toBe('presentation')
+    }
+    const buttons = infoButtons()
+    expect(buttons).toHaveLength(2)
+    for (const btn of buttons) {
+      expect(btn.closest('[role="option"]')).toBeNull()
+      expect(btn.parentElement).toBe(options[buttons.indexOf(btn)]!.parentElement)
+      expect(btn.getAttribute('aria-label')).toMatch(/^Details for /)
+    }
+    // roving tab stop: the live row's button is in the tab order
+    expect(buttons.map((b) => b.tabIndex)).toEqual([0, -1])
+    // the panel's own close control has its own name
+    await click(buttons[0]!)
+    const close = infoPanel()!.querySelector('.uw-pick-close')!
+    expect(close.getAttribute('aria-label')).toBe(en.uwDocInfoClose)
+    expect(en.uwDocInfoClose).not.toBe(en.uwPickClose)
+  })
+
+  it('a details read that returns after the source changed does not re-open the panel', async () => {
+    await render()
+    let release!: (r: UniworkResult<DocInfoFields>) => void
+    api.uniworkDocumentProperties.mockImplementationOnce(
+      () => new Promise<UniworkResult<DocInfoFields>>((resolve) => (release = resolve)) as never,
+    )
+    await click(infoButtons()[0]!)
+    expect(infoPanel()).not.toBeNull()
+    await choose(Array.from(select().options).at(-1)!.value)
+    expect(infoPanel()).toBeNull()
+    await act(async () => {
+      release(ok(FULL_INFO))
+    })
+    await flush()
+    expect(infoPanel()).toBeNull()
+  })
+
+  it('a search with no loaded match on a multi-page shared list can load the next page', async () => {
+    await render()
+    const page1: UniworkDocListPage = {
+      documents: [doc('s1', 'Alpha.docx')],
+      nextCursor: 'c2',
+    }
+    const page2: UniworkDocListPage = {
+      documents: [doc('s2', 'Zebra plan.docx')],
+      nextCursor: null,
+    }
+    api.uniworkListSharedWithMe.mockResolvedValueOnce(ok(page1)).mockResolvedValueOnce(ok(page2))
+    await choose(Array.from(select().options).at(-1)!.value)
+    await searchFor('zebra')
+    // nothing loaded matches, but more pages exist: say so and keep Load more reachable
+    const body = host.querySelector('.uw-pick-body')!
+    expect(body.textContent).toContain(en.uwLibSharedPartial)
+    const more = Array.from(body.querySelectorAll('button')).find(
+      (b) => b.textContent === en.uwPickLoadMore,
+    )!
+    expect(more).toBeDefined()
+    await click(more)
+    expect(api.uniworkListSharedWithMe.mock.calls[1]![0]).toEqual({ cursor: 'c2', limit: 50 })
+    expect(rows().map((r) => r.querySelector('.uw-pick-row-title')?.textContent)).toEqual([
+      'Zebra plan.docx',
+    ])
+  })
+
+  it('without more pages the shared no-results state carries no partial hint', async () => {
+    await render({ shared: { documents: [doc('s1', 'Alpha.docx')], nextCursor: null } })
+    await choose(Array.from(select().options).at(-1)!.value)
+    await searchFor('zebra')
+    const body = host.querySelector('.uw-pick-body')!
+    expect(body.textContent).toContain('zebra')
+    expect(body.textContent).not.toContain(en.uwLibSharedPartial)
+    expect(body.querySelector('.uw-pick-more')).toBeNull()
   })
 })
