@@ -61,10 +61,12 @@ async function mount(): Promise<void> {
   })
 }
 
-const allow = () =>
+const button = (label: string) =>
   Array.from(host.querySelectorAll<HTMLButtonElement>('button')).find(
-    (b) => b.textContent === 'Allow on device',
+    (b) => b.textContent === label,
   )
+const allow = () => button('Allow on device')
+const reject = () => button('Reject')
 
 beforeEach(() => {
   host = document.createElement('div')
@@ -115,5 +117,30 @@ describe('AgentIntentBanner', () => {
     await flush()
     expect(ack).toHaveBeenCalledWith(i.intentId, 'applied')
     expect(host.textContent).toContain('Added to tasks: Call the bank')
+  })
+  it('a second intent arriving mid-apply stays pending and Reject cannot double-ack', async () => {
+    let finish: (r: AgentIntentApplyResult) => void = () => undefined
+    apply.mockImplementationOnce(
+      () =>
+        new Promise<AgentIntentApplyResult>((resolve) => {
+          finish = resolve
+        }),
+    )
+    await mount()
+    const a = intent(true)
+    await act(async () => deliver(a))
+    await act(async () => allow()!.click())
+    expect(reject()!.disabled).toBe(true)
+    const c = intent(true)
+    await act(async () => deliver(c))
+    await act(async () => finish(DONE))
+    await flush()
+    expect(ack).toHaveBeenCalledTimes(1)
+    expect(ack).toHaveBeenCalledWith(a.intentId, 'applied')
+    // C is still on screen and can be answered
+    expect(reject()!.disabled).toBe(false)
+    await act(async () => reject()!.click())
+    expect(ack).toHaveBeenCalledWith(c.intentId, 'dismissed')
+    expect(ack).toHaveBeenCalledTimes(2)
   })
 })

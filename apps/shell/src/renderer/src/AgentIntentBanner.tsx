@@ -55,7 +55,8 @@ export function AgentIntentBanner({ practiceId, ensureWorkbench }: Props): React
       setNotice(L('Không thực hiện được lệnh.', 'Could not apply the intent.'))
       void window.aiOffice.agentIntentAck?.(intent.intentId, 'failed')
     } finally {
-      setPending(null)
+      // only clear the intent this apply ran; a newer one that arrived mid-apply stays pending
+      setPending((p) => (p?.intentId === intent.intentId ? null : p))
       setApplying(false)
     }
   }
@@ -111,7 +112,7 @@ export function AgentIntentBanner({ practiceId, ensureWorkbench }: Props): React
         </details>
       </div>
       <div className="agent-intent-actions">
-        <button type="button" className="btn btn-secondary" onClick={dismiss}>
+        <button type="button" className="btn btn-secondary" disabled={applying} onClick={dismiss}>
           {L('Từ chối', 'Reject')}
         </button>
         <button
