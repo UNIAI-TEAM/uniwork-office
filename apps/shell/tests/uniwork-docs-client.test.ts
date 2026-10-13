@@ -114,12 +114,12 @@ describe('egress', () => {
 
 describe('error envelope mapping', () => {
   const cases: Array<[Response, string]> = [
-    [envelope(403, 'forbidden'), 'forbidden'],
+    [envelope(403, 'forbidden'), 'permission_revoked'],
     [envelope(403, 'quota_exceeded'), 'quota_exceeded'],
     [new Response('denied', { status: 403 }), 'server_error'],
     [envelope(404, 'not_found'), 'not_found'],
     [new Response('', { status: 404 }), 'server_error'],
-    [envelope(410, 'document_deleted'), 'deleted'],
+    [envelope(410, 'document_deleted'), 'document_deleted'],
     // the change feed's cursor verdicts are about the cursor, never a document
     [envelope(410, 'change_cursor_expired'), 'server_error'],
     [envelope(400, 'change_cursor_invalid'), 'server_error'],

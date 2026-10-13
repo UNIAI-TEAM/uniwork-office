@@ -84,7 +84,20 @@ export function errorFromResponse(status: number, body: unknown): UniworkDocErro
   if (serverCode === 'idempotency_in_flight') return new UniworkDocError('network', at)
   if (serverCode === 'quota_exceeded') return new UniworkDocError('quota_exceeded', at)
   if (serverCode === 'engine_incompatible') return new UniworkDocError('engine_incompatible', at)
-  if (serverCode === 'document_deleted' || (status === 410 && serverCode)) {
+  // G5-06 (UNI-1352): the server's own verdicts, kept apart from the generic
+  // forbidden/deleted a caller would otherwise act on. A capability kill
+  // switch is a pause, not a permission denial; a swept intent is unknown,
+  // never deleted; only a real tombstone ends a document.
+  if (serverCode === 'office_capability_off') return new UniworkDocError('capability_off', at)
+  if (serverCode === 'commit_intent_unknown') return new UniworkDocError('intent_unknown', at)
+  if (serverCode === 'document_deleted') return new UniworkDocError('document_deleted', at)
+  if (serverCode === 'forbidden') return new UniworkDocError('permission_revoked', at)
+  if (serverCode === 'member_deactivated') return new UniworkDocError('member_deactivated', at)
+  if (serverCode === 'organization_suspended') {
+    return new UniworkDocError('organization_suspended', at)
+  }
+  // any other coded 410 keeps the tombstone verdict the open paths expect
+  if (status === 410 && serverCode) {
     return new UniworkDocError('deleted', at)
   }
   if (status === 413 || serverCode === 'file_too_large' || serverCode === 'payload_too_large') {
@@ -99,15 +112,20 @@ export function errorFromResponse(status: number, body: unknown): UniworkDocErro
 /** errors after which the intent is known never to have committed and is dropped */
 export function isTerminalRefusal(error: UniworkDocError): boolean {
   return (
-    error.code === 'conflict' ||
     error.code === 'idempotency_mismatch' ||
     error.code === 'forbidden' ||
+    error.code === 'permission_revoked' ||
+    error.code === 'member_deactivated' ||
+    error.code === 'organization_suspended' ||
     error.code === 'quota_exceeded' ||
     error.code === 'not_found' ||
     error.code === 'deleted' ||
+    error.code === 'document_deleted' ||
     error.code === 'too_large' ||
     error.code === 'engine_incompatible' ||
-    // a 409 the pipeline cannot recover by replaying (upload claim gone, ...)
+    // a 409 the pipeline cannot recover by replaying (upload claim gone, ...);
+    // a 409 base conflict is NOT here: its intent stays and can settle by
+    // replay, and capability_off / intent_unknown keep the intent too
     (error.code === 'server_error' && error.status === 409)
   )
 }
