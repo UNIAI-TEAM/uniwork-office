@@ -134,6 +134,9 @@ export async function installFrameComments(
   }
   if (!commentsAccess({ capabilities: session.capabilities ?? {} }).enabled) return null
   const api = createFrameCommentsApi(client, hooks)
+  // the editor serving the anchored comments registers its onReveal owner later: the reveal router
+  // waits for it instead of answering revealed:false for an id the editor owns
+  frameRevealRouter(client).expectEditor()
   target[COMMENTS_BRIDGE_KEY] = api
   return api
 }
