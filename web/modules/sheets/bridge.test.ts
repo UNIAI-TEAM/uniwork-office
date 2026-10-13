@@ -34,6 +34,7 @@ import {
 import { webLanguage } from '../../docs/bridge/browser'
 import { webText } from '../shared/i18n/strings-web'
 import { createFakeIdb } from '../../docs/bridge/testing/fake-idb'
+import { frameDocVersion } from '../shared/comments/doc-version'
 
 const flush = async () => {
   for (let i = 0; i < 10; i++) await Promise.resolve()
@@ -1168,5 +1169,26 @@ describe('new version on UniWork (doc.remoteVersion)', () => {
     await t.desktop.saveWorkbookEdits(saveRequest(wb.sessionId, [[0, 0, 1]]))
     off()
     expect(t.mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(1)
+  })
+})
+
+describe('the comments version notifier (G8-12 §3.3)', () => {
+  it('the open workbook and every landed save reach frameDocVersion; only the save is announced', async () => {
+    const heard: unknown[] = []
+    const off = frameDocVersion.onSaved((saved) => heard.push(saved))
+    try {
+      const t = setup()
+      const wb = await t.boot()
+      const path = pathFor(t.file)
+      expect(frameDocVersion.current()).toEqual({ path, versionId: t.file.versionId })
+      expect(heard).toEqual([])
+      await t.desktop.saveWorkbookEdits(saveRequest(wb.sessionId, [[0, 0, 1]]))
+      const saved = t.mock.saved.at(-1)!.file
+      expect(saved.versionId).not.toBe(t.file.versionId)
+      expect(heard).toEqual([{ path, versionId: saved.versionId }])
+      expect(frameDocVersion.current()).toEqual({ path, versionId: saved.versionId })
+    } finally {
+      off()
+    }
   })
 })
