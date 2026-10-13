@@ -10,7 +10,8 @@ import {
   type PracticeId,
   type WorkbenchModuleId,
 } from '@uniwork/practice-core'
-import { readCalendar, readNotes, readTasks } from './workbench-pins'
+import { readCalendar, readNotes } from './workbench-pins'
+import { cachedOpenTasks } from './work-cache'
 
 const MAX_PACK_CHARS = 6_000
 const MAX_LIST = 8
@@ -55,13 +56,16 @@ function packChunks(chunks: ContextChunk[]): ContextChunk[] {
 function moduleContext(practiceId: PracticeId, moduleId: WorkbenchModuleId): ContextChunk[] {
   const chunks: ContextChunk[] = []
   if (moduleId === 'tasks') {
-    const open = readTasks(practiceId).filter((t) => !t.done).slice(0, MAX_LIST)
+    const open = cachedOpenTasks()?.slice(0, MAX_LIST) ?? null
     chunks.push({
       id: 'tasks-open',
-      source: 'local:tasks',
-      text: open.length
-        ? `Open tasks (${open.length}): ${open.map((t) => t.title).join('; ')}`
-        : 'No open tasks.',
+      source: 'uniwork:tasks',
+      text:
+        open === null
+          ? 'Open tasks: not loaded from UniWork yet.'
+          : open.length
+            ? `Open tasks (${open.length}): ${open.map((t) => t.title).join('; ')}`
+            : 'No open tasks.',
     })
   } else if (moduleId === 'calendar') {
     const items = readCalendar(practiceId).slice(0, MAX_LIST)
@@ -80,11 +84,14 @@ function moduleContext(practiceId: PracticeId, moduleId: WorkbenchModuleId): Con
       text: clip(text ? `Sticky notes:\n${text}` : 'Notes board empty.', 1_500),
     })
   } else if (moduleId === 'desk') {
-    const tasks = readTasks(practiceId).filter((t) => !t.done).length
+    const open = cachedOpenTasks()
     chunks.push({
       id: 'desk',
-      source: 'local:desk',
-      text: `My Space pulse: openTasks=${tasks}`,
+      source: 'uniwork:desk',
+      text:
+        open === null
+          ? 'Overview pulse: open tasks not loaded from UniWork yet.'
+          : `Overview pulse: openTasks=${open.length}`,
     })
   } else {
     chunks.push({
@@ -122,17 +129,22 @@ export function buildMyAiContextPack(
   const vi = opts?.vi !== false
   const chunks: ContextChunk[] = []
 
-  const openTasks = readTasks(practiceId).filter((t) => !t.done).slice(0, MAX_LIST)
+  const openTasks = cachedOpenTasks()?.slice(0, MAX_LIST) ?? null
   chunks.push({
     id: 'tasks-open',
-    source: 'local:tasks',
-    text: openTasks.length
-      ? vi
-        ? `Việc đang mở (${openTasks.length}): ${openTasks.map((t) => t.title).join('; ')}`
-        : `Open tasks (${openTasks.length}): ${openTasks.map((t) => t.title).join('; ')}`
-      : vi
-        ? 'Không có việc đang mở.'
-        : 'No open tasks.',
+    source: 'uniwork:tasks',
+    text:
+      openTasks === null
+        ? vi
+          ? 'Danh sách việc chưa được tải từ UniWork.'
+          : 'Open tasks are not loaded from UniWork yet.'
+        : openTasks.length
+          ? vi
+            ? `Việc đang mở (${openTasks.length}): ${openTasks.map((t) => t.title).join('; ')}`
+            : `Open tasks (${openTasks.length}): ${openTasks.map((t) => t.title).join('; ')}`
+          : vi
+            ? 'Không có việc đang mở.'
+            : 'No open tasks.',
   })
 
   const notes = readNotes(practiceId)

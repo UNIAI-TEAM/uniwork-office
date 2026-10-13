@@ -64,7 +64,12 @@ describe('answerMyAiLocally', () => {
   })
 
   it('fallback offers AI for longer unclear questions', () => {
-    const r = answerMyAiLocally('Giúp mình sắp xếp công việc tuần này theo ưu tiên', empty, true, now)
+    const r = answerMyAiLocally(
+      'Giúp mình sắp xếp công việc tuần này theo ưu tiên',
+      empty,
+      true,
+      now,
+    )
     expect(r.topic).toBe('fallback')
     expect(r.offerAi).toBe(true)
   })
@@ -77,5 +82,12 @@ describe('answerMyAiLocally', () => {
     const r = answerMyAiLocally("What's on my calendar today?", snap, false, now)
     expect(r.topic).toBe('calendar')
     expect(r.text).toMatch(/Standup/)
+  })
+
+  it('says open tasks are not loaded yet, not that there are none, when UniWork was never read', () => {
+    const r = answerMyAiLocally('Việc đang mở là gì?', { ...empty, tasks: null }, true, now)
+    expect(r.topic).toBe('tasks')
+    expect(r.text).toMatch(/Chưa tải danh sách việc/)
+    expect(r.text).not.toMatch(/Không có việc đang mở/)
   })
 })

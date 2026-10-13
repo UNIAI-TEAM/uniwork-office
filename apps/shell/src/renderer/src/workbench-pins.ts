@@ -16,7 +16,6 @@ import {
   wbStoreSetRaw,
   wbStoreWrite,
 } from './workbench-store-client'
-import { wbMediaDbName } from './workbench-bucket'
 
 const PINS_PREFIX = 'uniwork.wb.pins.'
 const PILLAR_PINS_PREFIX = 'uniwork.wb.pillarPins.'
@@ -144,87 +143,6 @@ export function writeCalendarView(mode: CalendarViewMode): void {
   }
 }
 
-/** Personal task board — no approval workflow. */
-export type WbTaskStatus = 'todo' | 'doing' | 'done' | 'cancelled'
-export type WbTaskPriority = 'low' | 'medium' | 'high' | 'urgent'
-export type TasksViewId = 'list' | 'kanban' | 'calendar' | 'dashboard'
-
-export interface WbTaskAttachmentMeta {
-  id: string
-  name: string
-  mime?: string
-  size: number
-  addedAt: string
-}
-
-export interface WbTaskItem {
-  id: string
-  title: string
-  /** Kept in sync with status === 'done' for Desk / legacy readers. */
-  done: boolean
-  status: WbTaskStatus
-  priority: WbTaskPriority
-  description?: string
-  dueDate?: string
-  startDate?: string
-  tags?: string[]
-  attachments?: WbTaskAttachmentMeta[]
-  createdAt: string
-  updatedAt: string
-  completedAt?: string
-}
-
-export function normalizeTaskItem(
-  raw: Partial<WbTaskItem> & { id: string; title: string },
-): WbTaskItem {
-  const now = new Date().toISOString()
-  const status: WbTaskStatus =
-    raw.status === 'todo' ||
-    raw.status === 'doing' ||
-    raw.status === 'done' ||
-    raw.status === 'cancelled'
-      ? raw.status
-      : raw.done
-        ? 'done'
-        : 'todo'
-  const priority: WbTaskPriority =
-    raw.priority === 'low' ||
-    raw.priority === 'medium' ||
-    raw.priority === 'high' ||
-    raw.priority === 'urgent'
-      ? raw.priority
-      : 'medium'
-  const done = status === 'done'
-  return {
-    id: raw.id,
-    title: raw.title,
-    done,
-    status,
-    priority,
-    ...(raw.description?.trim() ? { description: raw.description.trim() } : {}),
-    ...(raw.dueDate ? { dueDate: raw.dueDate } : {}),
-    ...(raw.startDate ? { startDate: raw.startDate } : {}),
-    ...(raw.tags?.length ? { tags: raw.tags } : {}),
-    ...(raw.attachments?.length ? { attachments: raw.attachments } : {}),
-    createdAt: raw.createdAt || now,
-    updatedAt: raw.updatedAt || now,
-    ...(done && (raw.completedAt || now) ? { completedAt: raw.completedAt || now } : {}),
-  }
-}
-
-export function taskWithStatus(item: WbTaskItem, status: WbTaskStatus): WbTaskItem {
-  const done = status === 'done'
-  return {
-    ...item,
-    status,
-    done,
-    updatedAt: new Date().toISOString(),
-    ...(done
-      ? { completedAt: item.completedAt || new Date().toISOString() }
-      : { completedAt: undefined }),
-  }
-}
-
 function readJson<T>(key: string, fallback: T): T {
   return wbStoreRead(key, fallback)
 }
@@ -239,92 +157,6 @@ export function readCalendar(practiceId: PracticeId): WbCalendarItem[] {
 
 export function writeCalendar(practiceId: PracticeId, items: WbCalendarItem[]): void {
   writeJson(`uniwork.wb.calendar.${practiceId}`, items)
-}
-
-export function readTasks(practiceId: PracticeId): WbTaskItem[] {
-  const raw = readJson<Partial<WbTaskItem>[]>(`uniwork.wb.tasks.${practiceId}`, [])
-  if (!Array.isArray(raw)) return []
-  return raw
-    .filter((t): t is Partial<WbTaskItem> & { id: string; title: string } =>
-      Boolean(t && typeof t.id === 'string' && typeof t.title === 'string'),
-    )
-    .map((t) => normalizeTaskItem(t))
-}
-
-export function writeTasks(practiceId: PracticeId, items: WbTaskItem[]): void {
-  writeJson(
-    `uniwork.wb.tasks.${practiceId}`,
-    items.map((t) => normalizeTaskItem(t)),
-  )
-}
-
-export function readTasksView(): TasksViewId {
-  try {
-    const raw = wbStoreGetRaw('uniwork.wb.tasks.view')
-    if (raw === 'list' || raw === 'kanban' || raw === 'calendar' || raw === 'dashboard') return raw
-  } catch {
-    /* ignore */
-  }
-  return 'list'
-}
-
-export function writeTasksView(view: TasksViewId): void {
-  try {
-    wbStoreSetRaw('uniwork.wb.tasks.view', view)
-  } catch {
-    /* ignore */
-  }
-}
-
-const TASK_MEDIA_DB = 'uniwork.wb.tasks.media'
-const TASK_MEDIA_STORE = 'blobs'
-
-function openTaskMediaDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(wbMediaDbName(TASK_MEDIA_DB), 1)
-    req.onupgradeneeded = () => {
-      const db = req.result
-      if (!db.objectStoreNames.contains(TASK_MEDIA_STORE)) {
-        db.createObjectStore(TASK_MEDIA_STORE)
-      }
-    }
-    req.onsuccess = () => resolve(req.result)
-    req.onerror = () => reject(req.error ?? new Error('task_media_open_failed'))
-  })
-}
-
-export async function putTaskAttachmentBlob(id: string, blob: Blob): Promise<void> {
-  const db = await openTaskMediaDb()
-  await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(TASK_MEDIA_STORE, 'readwrite')
-    tx.objectStore(TASK_MEDIA_STORE).put(blob, id)
-    tx.oncomplete = () => resolve()
-    tx.onerror = () => reject(tx.error ?? new Error('task_media_put_failed'))
-  })
-  db.close()
-}
-
-export async function getTaskAttachmentBlob(id: string): Promise<Blob | null> {
-  const db = await openTaskMediaDb()
-  const value = await new Promise<Blob | null>((resolve, reject) => {
-    const tx = db.transaction(TASK_MEDIA_STORE, 'readonly')
-    const req = tx.objectStore(TASK_MEDIA_STORE).get(id)
-    req.onsuccess = () => resolve(req.result instanceof Blob ? req.result : null)
-    req.onerror = () => reject(req.error ?? new Error('task_media_get_failed'))
-  })
-  db.close()
-  return value
-}
-
-export async function deleteTaskAttachmentBlob(id: string): Promise<void> {
-  const db = await openTaskMediaDb()
-  await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(TASK_MEDIA_STORE, 'readwrite')
-    tx.objectStore(TASK_MEDIA_STORE).delete(id)
-    tx.oncomplete = () => resolve()
-    tx.onerror = () => reject(tx.error ?? new Error('task_media_delete_failed'))
-  })
-  db.close()
 }
 
 export type WbStickyColor = 'yellow' | 'peach' | 'mint' | 'sky' | 'lilac' | 'rose'
