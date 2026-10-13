@@ -4,6 +4,7 @@ import { getWorkbenchModule, type PracticeId, type WorkbenchModuleId } from '@un
 import type { UniworkWorkspaceRef } from '../../shared/home-api'
 import type { UniworkWorkError } from '../../shared/uniwork-work-api'
 import { NotesPane } from './NotesPane'
+import { LocalTag } from './LocalTag'
 import { WorkProfilePane } from './WorkProfilePane'
 import { escapeHtml, profileForDraft, profileMergeHtml } from './form-merge'
 import { WorkCalendarPane } from './WorkCalendarPane'
@@ -52,25 +53,17 @@ export function WorkbenchModulePane({
     return <p className="wb-empty">{label('Module không tồn tại.', 'Unknown module.')}</p>
   }
 
-  const hideChrome = moduleId === 'notes'
-
   return (
-    <section
-      className={`wb-panel wb-detail${hideChrome ? ' is-immersive' : ''}`}
-      aria-label={vi ? mod.labelVi : mod.labelEn}
-    >
-      {!hideChrome && (
-        <>
-          <h2>{vi ? mod.labelVi : mod.labelEn}</h2>
-          <p className="wb-hint">
-            {vi ? mod.hintVi : mod.hintEn}
-            {contextTitle ? ` · ${contextTitle}` : ''}
-          </p>
-        </>
-      )}
+    <section className="wb-panel wb-detail" aria-label={vi ? mod.labelVi : mod.labelEn}>
+      <h2>{vi ? mod.labelVi : mod.labelEn}</h2>
+      <p className="wb-hint">
+        {vi ? mod.hintVi : mod.hintEn}
+        {contextTitle ? ` · ${contextTitle}` : ''}
+      </p>
       {moduleId === 'calendar' && <WorkCalendarPane {...server} />}
       {moduleId === 'tasks' && <WorkTasksPane {...server} />}
-      {moduleId === 'notes' && <NotesPane practiceId={practiceId} vi={vi} />}
+      {moduleId === 'notes' && <NotesPane practiceId={practiceId} />}
+      {(moduleId === 'forms' || moduleId === 'notes') && <LocalTag />}
       {moduleId === 'forms' && (
         <FormsPane
           practiceId={practiceId}

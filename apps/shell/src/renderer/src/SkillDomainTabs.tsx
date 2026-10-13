@@ -4,11 +4,7 @@ import type {
   MouseEvent as ReactMouseEvent,
   ReactElement,
 } from 'react'
-import {
-  SKILL_DOMAINS,
-  getSkillDomain,
-  type SkillDomainId,
-} from '@uniwork/practice-core'
+import { SKILL_DOMAINS, getSkillDomain, type SkillDomainId } from '@uniwork/practice-core'
 import {
   pinSkillDomain,
   readActiveSkillDomain,
@@ -17,6 +13,7 @@ import {
   unpinSkillDomain,
   writeActiveSkillDomain,
 } from './skill-domain-pins'
+import { MODULE_TONES, tintStyle } from './module-tones'
 
 interface Props {
   vi: boolean
@@ -29,20 +26,13 @@ function DomainBadge({ id, size = 18 }: { id: SkillDomainId; size?: number }): R
   const def = getSkillDomain(id)
   const letter = (def?.labelEn ?? id).slice(0, 1).toUpperCase()
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden>
-      <rect width="24" height="24" rx="6" fill={def?.color ?? '#64748B'} />
-      <text
-        x="12"
-        y="16"
-        textAnchor="middle"
-        fill="#fff"
-        fontSize="12"
-        fontWeight="700"
-        fontFamily="system-ui, sans-serif"
-      >
-        {letter}
-      </text>
-    </svg>
+    <span
+      className="wb-domain-badge"
+      style={{ ...tintStyle(MODULE_TONES.skills), width: size, height: size }}
+      aria-hidden
+    >
+      {letter}
+    </span>
   )
 }
 
@@ -133,7 +123,10 @@ export function SkillDomainTabs({ vi, active, onSelect, onPinsChange }: Props): 
   }
 
   return (
-    <nav className="skill-domain-tabs" aria-label={label('Tab kỹ năng chuyên môn', 'Skill domain tabs')}>
+    <nav
+      className="skill-domain-tabs"
+      aria-label={label('Tab kỹ năng chuyên môn', 'Skill domain tabs')}
+    >
       {pins.map((id) => {
         const mod = getSkillDomain(id)
         if (!mod) return null

@@ -47,8 +47,8 @@ export const WORKBENCH_MODULES: readonly WorkbenchModuleDef[] = [
     id: 'notes',
     labelVi: 'Ghi chú',
     labelEn: 'Notes',
-    hintVi: 'Bảng ghim giấy note — kéo thả, đổi màu',
-    hintEn: 'Sticky pinboard — drag, recolor, pin notes',
+    hintVi: 'Ghi chú nhanh, lưu trên máy này',
+    hintEn: 'Quick notes, stored on this device',
     available: true,
   },
   {

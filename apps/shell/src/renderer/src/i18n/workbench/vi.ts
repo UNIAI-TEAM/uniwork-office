@@ -102,4 +102,10 @@ export const vi = {
   wbProfileTimezone: 'Múi giờ',
   wbProfileHint: 'UniAI dùng thông tin này khi soạn văn bản.',
   wbProfileEditOnWeb: 'Sửa trên web',
+  wbNotesPlaceholder: 'Viết ghi chú mới, nhấn Enter để thêm',
+  wbNotesAdd: 'Thêm ghi chú',
+  wbNotesEmpty: 'Chưa có ghi chú nào.',
+  wbNotesBodyLabel: 'Nội dung ghi chú',
+  wbNotesDelete: 'Xóa ghi chú',
+  wbNotesEdited: 'Sửa lúc {time}',
 } satisfies Record<keyof typeof zh, string>

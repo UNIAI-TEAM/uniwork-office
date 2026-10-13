@@ -9,13 +9,7 @@ import {
   type WorkbenchModuleId,
 } from '@uniwork/practice-core'
 
-import {
-  wbStoreGetRaw,
-  wbStoreRead,
-  wbStoreRemove,
-  wbStoreSetRaw,
-  wbStoreWrite,
-} from './workbench-store-client'
+import { wbStoreGetRaw, wbStoreRead, wbStoreSetRaw, wbStoreWrite } from './workbench-store-client'
 
 const PINS_PREFIX = 'uniwork.wb.pins.'
 const PILLAR_PINS_PREFIX = 'uniwork.wb.pillarPins.'
@@ -149,13 +143,9 @@ export interface WbStickyNote {
   updatedAt: string
 }
 
-function stickyKey(practiceId: PracticeId): string {
-  return `uniwork.wb.stickies.${practiceId}`
-}
-
-function legacyNotesKey(practiceId: PracticeId): string {
-  return `uniwork.wb.notes.${practiceId}`
-}
+/** Notes and forms belong to the user, not the role (spec 5.6): one list per Workbench bucket. */
+const STICKIES_KEY = 'uniwork.wb.stickies'
+const FORMS_KEY = 'uniwork.wb.forms'
 
 function clampPct(n: number): number {
   if (!Number.isFinite(n)) return 8
@@ -184,44 +174,10 @@ export function normalizeStickyNote(raw: Partial<WbStickyNote> & { id: string })
   }
 }
 
-function migrateLegacyNotes(practiceId: PracticeId): WbStickyNote[] | null {
+export function readStickyNotes(_practiceId: PracticeId): WbStickyNote[] {
   try {
-    const legacy = wbStoreGetRaw(legacyNotesKey(practiceId))
-    if (legacy == null) return null
-    const text = legacy.trim()
-    wbStoreRemove(legacyNotesKey(practiceId))
-    if (!text) return []
-    const now = new Date().toISOString()
-    return [
-      normalizeStickyNote({
-        id: `${Date.now().toString(36)}-legacy`,
-        body: text,
-        color: 'yellow',
-        x: 12,
-        y: 14,
-        rotate: -2,
-        z: 1,
-        createdAt: now,
-        updatedAt: now,
-      }),
-    ]
-  } catch {
-    return null
-  }
-}
-
-export function readStickyNotes(practiceId: PracticeId): WbStickyNote[] {
-  const key = stickyKey(practiceId)
-  try {
-    const raw = wbStoreGetRaw(key)
-    if (raw == null) {
-      const migrated = migrateLegacyNotes(practiceId)
-      if (migrated) {
-        writeStickyNotes(practiceId, migrated)
-        return migrated
-      }
-      return []
-    }
+    const raw = wbStoreGetRaw(STICKIES_KEY)
+    if (raw == null) return []
     const parsed: unknown = JSON.parse(raw)
     if (!Array.isArray(parsed)) return []
     return parsed
@@ -234,9 +190,9 @@ export function readStickyNotes(practiceId: PracticeId): WbStickyNote[] {
   }
 }
 
-export function writeStickyNotes(practiceId: PracticeId, items: WbStickyNote[]): void {
+export function writeStickyNotes(_practiceId: PracticeId, items: WbStickyNote[]): void {
   writeJson(
-    stickyKey(practiceId),
+    STICKIES_KEY,
     items.map((n) => normalizeStickyNote(n)),
   )
 }
@@ -305,10 +261,10 @@ export interface WbFormItem {
   templateId?: string
 }
 
-export function readForms(practiceId: PracticeId): WbFormItem[] {
-  return readJson(`uniwork.wb.forms.${practiceId}`, [])
+export function readForms(_practiceId: PracticeId): WbFormItem[] {
+  return readJson(FORMS_KEY, [])
 }
 
-export function writeForms(practiceId: PracticeId, items: WbFormItem[]): void {
-  writeJson(`uniwork.wb.forms.${practiceId}`, items)
+export function writeForms(_practiceId: PracticeId, items: WbFormItem[]): void {
+  writeJson(FORMS_KEY, items)
 }

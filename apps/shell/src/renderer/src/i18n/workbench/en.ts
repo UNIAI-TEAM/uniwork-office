@@ -102,4 +102,10 @@ export const en = {
   wbProfileTimezone: 'Time zone',
   wbProfileHint: 'UniAI uses this information when drafting documents.',
   wbProfileEditOnWeb: 'Edit on the web',
+  wbNotesPlaceholder: 'Write a new note and press Enter',
+  wbNotesAdd: 'Add note',
+  wbNotesEmpty: 'No notes yet.',
+  wbNotesBodyLabel: 'Note text',
+  wbNotesDelete: 'Delete note',
+  wbNotesEdited: 'Edited {time}',
 } satisfies Record<keyof typeof zh, string>

@@ -107,4 +107,10 @@ export const zh = {
   wbProfileTimezone: '时区',
   wbProfileHint: 'UniAI 起草文档时会使用这些信息。',
   wbProfileEditOnWeb: '在网页上编辑',
+  wbNotesPlaceholder: '输入新笔记，按 Enter 添加',
+  wbNotesAdd: '添加笔记',
+  wbNotesEmpty: '还没有笔记。',
+  wbNotesBodyLabel: '笔记内容',
+  wbNotesDelete: '删除笔记',
+  wbNotesEdited: '编辑于 {time}',
 }

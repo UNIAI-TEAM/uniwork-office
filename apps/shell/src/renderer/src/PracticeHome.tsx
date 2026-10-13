@@ -27,6 +27,7 @@ import { useI18n } from './locale'
 import { SkillDomainTabs } from './SkillDomainTabs'
 import { readActiveSkillDomain, readPinnedSkillDomains } from './skill-domain-pins'
 import { WorkbenchModulePane } from './WorkbenchModulePanes'
+import { LocalTag } from './LocalTag'
 import { WorkbenchTabs } from './WorkbenchTabs'
 import { WorkbenchTopBar, type WorkbenchNewItem } from './WorkbenchTopBar'
 import { pinPillar } from './workbench-pins'
@@ -632,6 +633,7 @@ export function PracticeHome({
 
       {tab === 'knowledge' && (
         <section className="wb-panel">
+          <LocalTag />
           <label className="wb-form-wide">
             <span>{label('Tìm', 'Search')}</span>
             <input
@@ -736,6 +738,7 @@ export function PracticeHome({
 
       {tab === 'materials' && (
         <section className="wb-panel wb-detail">
+          <LocalTag />
           {!selected || !meta ? (
             <p className="wb-empty">
               {label('Chọn gói ở Tri thức trước.', 'Select a Knowledge pack first.')}
@@ -870,6 +873,7 @@ export function PracticeHome({
 
       {tab === 'skills' && (
         <section className="wb-panel wb-detail">
+          <LocalTag />
           <h2>{label('Kỹ năng', 'Skills')}</h2>
           {!selected || !meta ? (
             <p className="wb-empty">
@@ -963,6 +967,7 @@ export function PracticeHome({
 
       {tab === 'compose' && (
         <section className="wb-panel wb-create">
+          <LocalTag />
           <h2>{label('Soạn gói mới', 'New pack')}</h2>
           <div className="wb-form">
             {practice.facets.map((f) => {

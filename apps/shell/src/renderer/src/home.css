@@ -21,38 +21,6 @@
   --shadow-btn-lift: 0 4px 16px rgb(0 0 0 / 12%);
   --shadow-btn-primary: 0 2px 6px rgb(10 82 230 / 28%), 0 6px 18px rgb(10 82 230 / 18%);
   --on-accent: #ffffff;
-
-  /* Sticky notes board (paper colors stay vivid in both themes) */
-  --wb-sticky-yellow: #ffe566;
-  --wb-sticky-peach: #ff9f68;
-  --wb-sticky-mint: #7ddea8;
-  --wb-sticky-sky: #6ec8ff;
-  --wb-sticky-lilac: #c4a8ff;
-  --wb-sticky-rose: #ff8fb8;
-  --wb-sticky-ink: #2a2418;
-  --wb-sticky-ink-soft: rgb(42 36 24 / 55%);
-  --wb-board-base: #c4a574;
-  --wb-board-deep: #a8844f;
-  --wb-board-light: #d8b88a;
-  --wb-board-pin: #d64545;
-  --wb-board-pin-shine: #ff7a7a;
-  --wb-board-white-22: rgb(255 255 255 / 22%);
-  --wb-board-white-26: rgb(255 255 255 / 26%);
-  --wb-board-white-28: rgb(255 255 255 / 28%);
-  --wb-board-white-35: rgb(255 255 255 / 35%);
-  --wb-board-white-40: rgb(255 255 255 / 40%);
-  --wb-board-white-45: rgb(255 255 255 / 45%);
-  --wb-board-white-55: rgb(255 255 255 / 55%);
-  --wb-board-white-70: rgb(255 255 255 / 70%);
-  --wb-board-white-92: rgb(255 255 255 / 92%);
-  --wb-board-black-04: rgb(0 0 0 / 4%);
-  --wb-board-black-10: rgb(0 0 0 / 10%);
-  --wb-board-black-12: rgb(0 0 0 / 12%);
-  --wb-board-black-18: rgb(0 0 0 / 18%);
-  --wb-board-black-24: rgb(0 0 0 / 24%);
-  --wb-board-black-28: rgb(0 0 0 / 28%);
-  --wb-board-black-35: rgb(0 0 0 / 35%);
-  --wb-board-white-05: rgb(255 255 255 / 5%);
 }
 
 /* ── Dark mode overrides ─────────────────────────────────── */
@@ -4045,363 +4013,6 @@ body.vib .home {
 }
 
 /* ── Sticky notes pinboard ─────────────────────────── */
-.wb-notes-root {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-height: min(72vh, 820px);
-}
-
-.wb-notes-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 14px 16px;
-  border-radius: 16px;
-  border: 1px solid var(--border);
-  background:
-    linear-gradient(
-      120deg,
-      color-mix(in srgb, var(--wb-sticky-yellow) 28%, transparent),
-      color-mix(in srgb, var(--wb-sticky-sky) 18%, transparent) 48%,
-      transparent 70%
-    ),
-    var(--surface);
-}
-
-.wb-notes-toolbar-copy strong {
-  display: block;
-  font-size: 17px;
-  color: var(--text);
-}
-
-.wb-notes-toolbar-copy p {
-  margin: 4px 0 0;
-  font-size: 13px;
-  color: var(--text-secondary);
-  max-width: 42ch;
-}
-
-.wb-notes-toolbar-actions {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 10px;
-}
-
-.wb-notes-compose {
-  display: flex;
-  gap: 8px;
-  width: min(420px, 100%);
-}
-
-.wb-notes-compose input {
-  flex: 1;
-  min-width: 0;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface);
-  color: var(--text);
-  padding: 9px 12px;
-  font: inherit;
-}
-
-.wb-notes-swatches {
-  display: flex;
-  gap: 7px;
-  align-items: center;
-}
-
-.wb-notes-swatches.is-compact {
-  gap: 5px;
-}
-
-.wb-notes-swatch {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  border: 2px solid var(--wb-board-white-70);
-  box-shadow: 0 0 0 1px var(--wb-board-black-12);
-  cursor: pointer;
-  padding: 0;
-  transition:
-    transform 0.12s ease,
-    box-shadow 0.12s ease;
-}
-
-.wb-notes-swatch.is-compact,
-.wb-notes-swatches.is-compact .wb-notes-swatch {
-  width: 12px;
-  height: 12px;
-}
-
-.wb-notes-swatch:hover {
-  transform: scale(1.12);
-}
-
-.wb-notes-swatch.is-active {
-  box-shadow: 0 0 0 2px var(--text);
-  transform: scale(1.08);
-}
-
-.wb-notes-swatch.is-yellow {
-  background: var(--wb-sticky-yellow);
-}
-
-.wb-notes-swatch.is-peach {
-  background: var(--wb-sticky-peach);
-}
-
-.wb-notes-swatch.is-mint {
-  background: var(--wb-sticky-mint);
-}
-
-.wb-notes-swatch.is-sky {
-  background: var(--wb-sticky-sky);
-}
-
-.wb-notes-swatch.is-lilac {
-  background: var(--wb-sticky-lilac);
-}
-
-.wb-notes-swatch.is-rose {
-  background: var(--wb-sticky-rose);
-}
-
-.wb-notes-board {
-  position: relative;
-  flex: 1;
-  min-height: min(62vh, 700px);
-  border-radius: 18px;
-  overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--wb-board-deep) 55%, var(--border));
-  background:
-    radial-gradient(
-      circle at 18% 22%,
-      color-mix(in srgb, var(--wb-board-light) 70%, transparent),
-      transparent 34%
-    ),
-    radial-gradient(
-      circle at 78% 68%,
-      color-mix(in srgb, var(--wb-board-deep) 45%, transparent),
-      transparent 40%
-    ),
-    linear-gradient(145deg, var(--wb-board-light), var(--wb-board-base) 42%, var(--wb-board-deep));
-  box-shadow:
-    inset 0 1px 0 var(--wb-board-white-22),
-    0 10px 28px var(--wb-board-black-12);
-}
-
-.wb-notes-board-grain {
-  pointer-events: none;
-  position: absolute;
-  inset: 0;
-  opacity: 0.22;
-  background-image:
-    repeating-linear-gradient(0deg, var(--wb-board-black-04) 0 1px, transparent 1px 3px),
-    repeating-linear-gradient(90deg, var(--wb-board-white-05) 0 1px, transparent 1px 4px);
-}
-
-.wb-notes-empty {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-content: center;
-  justify-items: center;
-  gap: 10px;
-  z-index: 1;
-  color: var(--wb-board-white-92);
-  text-align: center;
-  padding: 24px;
-}
-
-.wb-notes-empty p {
-  margin: 0;
-  max-width: 28ch;
-  font-size: 14px;
-  text-shadow: 0 1px 2px var(--wb-board-black-35);
-}
-
-.wb-notes-empty-pin {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, var(--wb-board-pin-shine), var(--wb-board-pin));
-  box-shadow: 0 4px 10px var(--wb-board-black-28);
-  display: grid;
-  place-items: center;
-}
-
-.wb-notes-empty-pin i {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--wb-board-white-55);
-}
-
-.wb-sticky {
-  position: absolute;
-  width: min(210px, 46vw);
-  min-height: 180px;
-  padding: 22px 14px 12px;
-  border-radius: 3px;
-  box-shadow:
-    0 1px 0 var(--wb-board-white-35) inset,
-    0 10px 18px var(--wb-board-black-18);
-  cursor: grab;
-  touch-action: none;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  transition:
-    box-shadow 0.15s ease,
-    filter 0.15s ease;
-  color: var(--wb-sticky-ink);
-}
-
-.wb-sticky:active {
-  cursor: grabbing;
-}
-
-.wb-sticky.is-active {
-  box-shadow:
-    0 1px 0 var(--wb-board-white-40) inset,
-    0 16px 28px var(--wb-board-black-24);
-  filter: saturate(1.05);
-}
-
-.wb-sticky.is-yellow {
-  background:
-    linear-gradient(180deg, var(--wb-board-white-28), transparent 28%), var(--wb-sticky-yellow);
-}
-
-.wb-sticky.is-peach {
-  background:
-    linear-gradient(180deg, var(--wb-board-white-26), transparent 28%), var(--wb-sticky-peach);
-}
-
-.wb-sticky.is-mint {
-  background:
-    linear-gradient(180deg, var(--wb-board-white-26), transparent 28%), var(--wb-sticky-mint);
-}
-
-.wb-sticky.is-sky {
-  background:
-    linear-gradient(180deg, var(--wb-board-white-26), transparent 28%), var(--wb-sticky-sky);
-}
-
-.wb-sticky.is-lilac {
-  background:
-    linear-gradient(180deg, var(--wb-board-white-26), transparent 28%), var(--wb-sticky-lilac);
-}
-
-.wb-sticky.is-rose {
-  background:
-    linear-gradient(180deg, var(--wb-board-white-26), transparent 28%), var(--wb-sticky-rose);
-}
-
-.wb-sticky-pin {
-  position: absolute;
-  top: 6px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, var(--wb-board-pin-shine), var(--wb-board-pin));
-  box-shadow: 0 2px 4px var(--wb-board-black-28);
-  pointer-events: none;
-}
-
-.wb-sticky-pin i {
-  position: absolute;
-  inset: 4px;
-  border-radius: 50%;
-  background: var(--wb-board-white-45);
-}
-
-.wb-sticky textarea {
-  flex: 1;
-  width: 100%;
-  min-height: 120px;
-  border: none;
-  resize: none;
-  background: transparent;
-  color: var(--wb-sticky-ink);
-  font: inherit;
-  font-size: 14.5px;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-  line-height: 1.4;
-  padding: 0;
-  outline: none;
-  cursor: text;
-}
-
-.wb-sticky textarea::placeholder {
-  color: var(--wb-sticky-ink-soft);
-}
-
-.wb-sticky-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-}
-
-.wb-sticky-del {
-  width: 24px;
-  height: 24px;
-  border: none;
-  border-radius: 50%;
-  background: var(--wb-board-black-10);
-  color: var(--wb-sticky-ink);
-  cursor: pointer;
-  font-size: 16px;
-  line-height: 1;
-}
-
-.wb-sticky-del:hover {
-  background: var(--wb-board-black-18);
-}
-
-.wb-notes-fab {
-  position: absolute;
-  right: 16px;
-  bottom: 16px;
-  z-index: 40;
-  border: none;
-  border-radius: 999px;
-  padding: 10px 16px;
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
-  font-weight: 600;
-  font-size: 13px;
-  box-shadow: var(--shadow-btn-lift);
-  cursor: pointer;
-}
-
-.wb-notes-fab:hover {
-  background: var(--hover);
-}
-
-@media (max-width: 720px) {
-  .wb-notes-toolbar-actions {
-    align-items: stretch;
-    width: 100%;
-  }
-
-  .wb-notes-compose {
-    width: 100%;
-  }
-
-  .wb-sticky {
-    width: min(190px, 58vw);
-  }
-}
 
 /* ── Workbench Overview (desk tab) ── */
 .wb-ov {
@@ -4777,14 +4388,6 @@ button.wb-ov-stat-body:hover {
   color: var(--text);
   font-size: 13px;
   transform: translateX(-50%);
-}
-
-/* ── Immersive module panes ── */
-.wb-detail.is-immersive {
-  padding: 0;
-  border: none;
-  background: transparent;
-  box-shadow: none;
 }
 
 .wb-module-form select {
@@ -5788,4 +5391,94 @@ html[dir='rtl'] .quick-title-row {
 .wb-profile dd {
   margin: 0;
   color: var(--text);
+}
+
+/* ── Local-only tabs (Forms / Notes / pillars) ───────────── */
+.wb-local-tag {
+  align-self: flex-start;
+  width: fit-content;
+  padding: 1px 8px;
+  border-radius: var(--radius-6);
+  background: var(--tint-gray);
+  color: var(--tint-gray-fg);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.wb-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.wb-notes-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wb-notes-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-8);
+  background: var(--surface);
+}
+
+.wb-notes-card:focus-within {
+  border-color: var(--accent);
+}
+
+.wb-notes-card textarea {
+  width: 100%;
+  min-height: 64px;
+  padding: 0;
+  border: none;
+  resize: vertical;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.wb-notes-card textarea:focus {
+  outline: none;
+}
+
+.wb-notes-card footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.wb-notes-delete {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.wb-notes-delete:hover {
+  color: var(--danger-text);
+}
+
+.wb-domain-badge {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-6);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
 }
