@@ -31,6 +31,7 @@ import { WorkbenchTabs } from './WorkbenchTabs'
 import { WorkbenchTopBar, type WorkbenchNewItem } from './WorkbenchTopBar'
 import { pinPillar } from './workbench-pins'
 import { WbDeleteBtn, WbOpenBtn, WbRowActions } from './WbRowActions'
+import { WB_REFRESH_EVENT, cacheWork, workCacheSlot } from './work-cache'
 import { WorkOverview } from './WorkOverview'
 
 interface PracticeHomeProps {
@@ -84,16 +85,21 @@ export function PracticeHome({
     workspaceError: null,
   })
   const { workspaces, workspaceId, workspaceError } = wsState
+  const workspace = workspaces?.find((w) => w.id === workspaceId) ?? null
   const [refreshTick, setRefreshTick] = useState(0)
 
   useEffect(() => {
     let live = true
+    const listSlot = workCacheSlot('workspaces') // taken before the call, like every cached answer
     void window.aiOffice
       .uniworkListWorkspaces()
       // a rejected bridge call reads as offline, like every other work call
       .catch((): UniworkResult<UniworkWorkspaceRef[]> => ({ ok: false, error: 'network' }))
       .then((result) => {
-        if (live) setWsState((prev) => afterWorkspaceList(prev, result, readActiveWorkspaceId()))
+        if (!live) return
+        // My AI reads the first listed workspace when none is stored (cachedOpenTasks)
+        if (result.ok) cacheWork(listSlot, result.value)
+        setWsState((prev) => afterWorkspaceList(prev, result, readActiveWorkspaceId()))
       })
     return () => {
       live = false
@@ -108,6 +114,7 @@ export function PracticeHome({
   const selectWorkspace = (id: string) => setWsState((s) => ({ ...s, workspaceId: id }))
 
   const refresh = () => {
+    window.dispatchEvent(new Event(WB_REFRESH_EVENT))
     onRefresh()
     setRefreshTick((n) => n + 1)
   }
@@ -606,6 +613,9 @@ export function PracticeHome({
           onReload={refresh}
           onCompose={openCompose}
         />
+      ) : isWorkbenchModuleId(tab) && workspaces === null && tab !== 'forms' && tab !== 'notes' ? (
+        // server tabs wait for the workspace list: null would read as "no workspace"
+        <div className="wb-work-skeleton" aria-busy="true" />
       ) : isWorkbenchModuleId(tab) ? (
         <WorkbenchModulePane
           moduleId={tab}
@@ -614,6 +624,7 @@ export function PracticeHome({
           contextTitle={meta?.title}
           packId={selectedId}
           onPackLinked={onRefresh}
+          workspace={workspace}
           workspaceError={workspaceError}
           onReload={refresh}
         />

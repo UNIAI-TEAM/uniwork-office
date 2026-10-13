@@ -39,8 +39,8 @@ export const WORKBENCH_MODULES: readonly WorkbenchModuleDef[] = [
     id: 'tasks',
     labelVi: 'Công việc',
     labelEn: 'Tasks',
-    hintVi: 'Tự quản trị việc cá nhân — List, Kanban, Lịch, Dashboard',
-    hintEn: 'Personal task board — list, kanban, calendar, dashboard',
+    hintVi: 'Việc của bạn trên UniWork, chia theo hạn',
+    hintEn: 'Your UniWork tasks, grouped by due date',
     available: true,
   },
   {

@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import type { ReactElement } from 'react'
 import { getWorkbenchModule, type PracticeId, type WorkbenchModuleId } from '@uniwork/practice-core'
+import type { UniworkWorkspaceRef } from '../../shared/home-api'
 import type { UniworkWorkError } from '../../shared/uniwork-work-api'
 import { CalendarPane } from './CalendarPane'
 import { NotesPane } from './NotesPane'
-import { TasksPane } from './TasksPane'
+import { WorkTasksPane } from './WorkTasksPane'
 import { WbDeleteBtn, WbDraftBtn, WbEditBtn, WbFileBtn, WbRowActions } from './WbRowActions'
 import {
   readForms,
@@ -14,6 +15,7 @@ import {
   type WbFormItem,
   type WbPersonalProfile,
 } from './workbench-pins'
+import type { WorkPaneProps } from './WorkErrorState'
 
 interface Props {
   moduleId: WorkbenchModuleId
@@ -23,6 +25,8 @@ interface Props {
   /** Selected Tri thức pack — Soạn from modules joins Tài liệu on first save. */
   packId?: string | null
   onPackLinked?: () => void
+  /** the active UniWork workspace; null = signed out or a member of none */
+  workspace: UniworkWorkspaceRef | null
   /** why the workspace list failed (the last good list stays); server tabs show it instead of "no workspace" */
   workspaceError: UniworkWorkError | null
   /** the top bar's Refresh: re-lists workspaces and reloads every server tab */
@@ -40,9 +44,14 @@ export function WorkbenchModulePane({
   contextTitle,
   packId = null,
   onPackLinked,
+  workspace,
+  workspaceError,
+  onReload,
 }: Props): ReactElement {
   const mod = getWorkbenchModule(moduleId)
   const label = (a: string, b: string) => (vi ? a : b)
+  // what every server tab gets (Tasks, Calendar, Profile)
+  const server: WorkPaneProps = { workspace, workspaceError, onReload }
 
   if (!mod) {
     return <p className="wb-empty">{label('Module không tồn tại.', 'Unknown module.')}</p>
@@ -65,7 +74,7 @@ export function WorkbenchModulePane({
         </>
       )}
       {moduleId === 'calendar' && <CalendarPane practiceId={practiceId} vi={vi} />}
-      {moduleId === 'tasks' && <TasksPane practiceId={practiceId} vi={vi} />}
+      {moduleId === 'tasks' && <WorkTasksPane {...server} />}
       {moduleId === 'notes' && <NotesPane practiceId={practiceId} vi={vi} />}
       {moduleId === 'forms' && (
         <FormsPane practiceId={practiceId} vi={vi} packId={packId} onPackLinked={onPackLinked} />

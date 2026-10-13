@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react'
+import type { UniworkWorkspaceRef } from '../../shared/home-api'
 import type { UniworkWorkError } from '../../shared/uniwork-work-api'
 import { useI18n, type StringKey } from './locale'
 import { clock } from './work-home'
@@ -98,4 +99,28 @@ export function WorkToast({
       </button>
     </div>
   )
+}
+
+/** What PracticeHome hands every server tab (Tasks, Calendar, Profile). */
+export interface WorkPaneProps {
+  /** the active workspace; null = signed out, in none, or the first list failed (workspaceError says why) */
+  workspace: UniworkWorkspaceRef | null
+  /** why the last workspace list failed; the last good list and pick stay, so this can come with a workspace */
+  workspaceError: UniworkWorkError | null
+  /** the top bar's Refresh: re-lists workspaces and reloads every server tab */
+  onReload: () => void
+}
+
+/** What a server tab shows instead of its data (lost access, sign in, an error, the skeleton); null when it has data. */
+export function workLoadState(load: {
+  value: unknown
+  error: UniworkWorkError | null
+  reload: () => void
+}): ReactElement | null {
+  if (load.error === 'signed-out' || load.error === 'forbidden') {
+    return <WorkErrorState state={load.error} onRetry={load.reload} />
+  }
+  if (load.value !== null) return null
+  if (load.error) return <WorkErrorState state={load.error} onRetry={load.reload} />
+  return <div className="wb-work-skeleton" aria-busy="true" />
 }
