@@ -478,6 +478,41 @@ describe('server mode: reveal', () => {
     expect(el.textContent).not.toContain(EN.collabCommentDeleted!)
   })
 
+  it('web frame (no path): a miss opens the panel with the S15 line and answers false', async () => {
+    const server = fakeServer()
+    const status = vi.fn()
+    let open = false
+    const render = (o: boolean) => {
+      open = o
+      root.render(
+        createElement(ServerCommentsHost, {
+          mode: { ...mode(server.api), path: '' },
+          editor,
+          lang: 'en',
+          panelOpen: o,
+          onOpenPanel: () => render(true),
+          onClosePanel: () => render(false),
+          onStatus: status,
+          selectTextMessage: 's',
+          saveFirstMessage: 'v',
+          inFileComments: [],
+          neutralAuthor: 'User',
+          handleRef: handle,
+        }),
+      )
+    }
+    await act(async () => render(false))
+    await flush()
+    let answer: unknown
+    await act(async () => {
+      answer = await server.reveal('gone')[0]
+    })
+    await flush()
+    expect(answer).toBe(false)
+    expect(open).toBe(true)
+    expect(el.textContent).toContain(EN.collabCommentDeleted!)
+  })
+
   it('a lost thread only opens: the selection does not move', async () => {
     const server = fakeServer()
     const row = server.add({
