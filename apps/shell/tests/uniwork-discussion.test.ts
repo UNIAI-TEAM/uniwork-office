@@ -386,9 +386,10 @@ describe('reveal for the shell panel: push when armed, else hold; delivered once
     handle.reveal(PATH, CMT) // held: the panel is not armed
     shell.reload()
     expect(await pull(PATH)).toBeNull()
-    // a reveal after the reload is held for the new realm as before
+    // the realm's armed state went with the reload: the pull above armed the
+    // new one, so a reveal now is pushed (not held) as for any fresh realm
     handle.reveal(PATH, CMT)
-    expect(await pull(PATH)).toEqual({ path: PATH, commentId: CMT })
+    expect(shell.sent.map((m) => m.channel)).toEqual([DISCUSSION_CHANNELS.reveal])
   })
 
   it('a crash drops the held reveal; an in-page navigation keeps it (W11A-1)', async () => {
