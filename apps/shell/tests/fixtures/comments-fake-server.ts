@@ -6,9 +6,14 @@
  *
  * It implements list (with `kind` and `since_token` -> `unchanged`), create
  * (with an Idempotency-Key), update, delete (tombstone when it has replies,
- * else hard remove), resolve/reopen, revisions, anchors, mention candidates,
- * and the fixed failures the §9 table keys on: 401, 403, 404, 409
- * `comment_deleted`, 400 `anchor_version_invalid`, and a 5xx.
+ * else hard remove), resolve/reopen, revisions, mention candidates, and the
+ * fixed failures the §9 table keys on: 401, 403, 404, 409 `comment_deleted`,
+ * 400 `anchor_version_invalid`, and a 5xx.
+ *
+ * `PUT .../comments/anchors` is NOT implemented here: the real root does not
+ * have it yet (G8-04 owns the route, not merged), so it answers exactly what
+ * the real server answers - 405 with an empty body. The client must read that
+ * as `unsupported`, never `internal`, and never invent the route.
  */
 import type { FetchLike } from '../../src/main/uniwork-docs/comments'
 
@@ -110,6 +115,10 @@ export function createFakeCommentServer(): FakeCommentServer {
     })
 
   const failBody = (code: string): unknown => ({ error: { code, message: code } })
+
+  /** Chi's default 405: an empty body and an Allow header, no JSON envelope */
+  const methodNotAllowed = (allow: string): Response =>
+    new Response(null, { status: 405, headers: { Allow: allow } })
 
   const server: FakeCommentServer = {
     calls,
@@ -224,15 +233,11 @@ export function createFakeCommentServer(): FakeCommentServer {
       }
 
       const commentId = tail[1]
-      // PUT /documents/{id}/comments/anchors
-      if (tail[0] === 'comments' && commentId === 'anchors' && method === 'PUT') {
-        const input = body as { version_id?: string; anchors?: Array<{ comment_id: string }> }
-        if (!input.version_id || !/^[A-Za-z0-9_-]{1,128}$/.test(input.version_id)) {
-          return json(400, failBody('anchor_version_invalid'))
-        }
-        const updated = (input.anchors ?? []).map((a) => a.comment_id)
-        s.version += 1
-        return json(200, { updated, skipped: [], list_token: token(s.version) })
+      // PUT /documents/{id}/comments/anchors: the route G8-04 owns is not on the
+      // merged root, so the real server answers 405 (the {commentID} node has no
+      // PUT). Mirror that; the client reads it as `unsupported`.
+      if (tail[0] === 'comments' && commentId === 'anchors') {
+        return methodNotAllowed('PATCH, DELETE')
       }
 
       const found = commentId ? s.comments.find((c) => c.id === commentId) : undefined

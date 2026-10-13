@@ -191,8 +191,22 @@ export function parseMentionsSearch(raw: unknown): MentionsSearchResult {
   return { candidates }
 }
 
-/** the ONE §9 mapping, shared with the web host through the protocol package */
+/**
+ * The §9 mapping plus the one row the table leaves out: a 405 means the route
+ * table does not serve this method - today `PUT .../comments/anchors`, which
+ * G8-04 owns and is not merged on the root. The frame reads that as
+ * `unsupported` (the capability is not here), never `internal` (a 5xx server
+ * fault); the client still sends the real contract route, it never invents one.
+ */
 export function mapCommentsError(status: number, body: unknown): DocsProtocolError {
+  if (status === 405) {
+    return new DocsProtocolError({
+      code: 'unsupported',
+      message: 'comments: HTTP 405 method not allowed',
+      status,
+      retryable: false,
+    })
+  }
   return commentsErrorFromHttp(status, body)
 }
 
@@ -284,7 +298,7 @@ export function createUniworkCommentsClient(
           }
           if (!response.ok) {
             const body: unknown = await response.json().catch(() => undefined)
-            throw commentsErrorFromHttp(response.status, body)
+            throw mapCommentsError(response.status, body)
           }
           try {
             return await call.read(response)

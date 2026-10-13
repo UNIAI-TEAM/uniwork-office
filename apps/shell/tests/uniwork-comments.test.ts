@@ -90,7 +90,7 @@ describe('the comments client routes every call to the contract §2 path', () =>
     expect(server.lastCall()?.body).toEqual({ kind: 'discussion', body: 'hello' })
   })
 
-  it('update/remove/resolve/reopen/revisions/anchors/searchMentions hit their routes', async () => {
+  it('update/remove/resolve/reopen/revisions/searchMentions hit their routes', async () => {
     const server = createFakeCommentServer()
     server.seed(DOC, [{ id: CMT, body: 'hi', kind: 'comment' }])
     const api = client(server.fetch)
@@ -99,25 +99,32 @@ describe('the comments client routes every call to the contract §2 path', () =>
     expect((await api.reopen(binding, CMT)).comment.resolved_at).toBeNull()
     expect((await api.revisions(binding, CMT)).revisions.length).toBe(1)
     expect(
-      (
-        await api.anchors(binding, {
-          path: PATH,
-          versionId: 'v1',
-          anchors: [{ commentId: CMT, anchor: { format: 'docx', v: 1 }, state: 'exact' }],
-        })
-      ).updated,
-    ).toEqual([CMT])
-    expect(
       (await api.searchMentions(binding, { path: PATH, q: 'an' })).candidates[0]?.user_id,
     ).toBeTruthy()
-    expect(server.calls.map((c) => c.method)).toEqual([
-      'PATCH',
-      'POST',
-      'DELETE',
-      'GET',
-      'PUT',
-      'GET',
-    ])
+    expect(server.calls.map((c) => c.method)).toEqual(['PATCH', 'POST', 'DELETE', 'GET', 'GET'])
+  })
+
+  it('anchors on the route G8-04 has not merged (405) reads `unsupported`, never `internal`', async () => {
+    const server = createFakeCommentServer()
+    server.seed(DOC, [{ id: CMT, body: 'hi', kind: 'comment' }])
+    const api = client(server.fetch)
+    const out = await shapeOf(
+      api.anchors(binding, {
+        path: PATH,
+        versionId: 'v1',
+        anchors: [{ commentId: CMT, anchor: { format: 'docx', v: 1 }, state: 'exact' }],
+      }),
+    )
+    // the client still sends the real route once; it just never crashes and
+    // never invents an anchors route of its own
+    expect(server.lastCall()?.method).toBe('PUT')
+    expect(server.lastCall()?.url).toContain(`/api/v1/documents/${DOC}/comments/anchors`)
+    expect(out).toMatchObject({
+      name: 'DocsProtocolError',
+      code: 'unsupported',
+      status: 405,
+      retryable: false,
+    })
   })
 
   it('a hard-deleted thread disappears on the next full list', async () => {
