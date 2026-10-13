@@ -19,7 +19,6 @@ import {
   CollabComposer,
   CollabPanel,
   collabStrings,
-  type AnchorLabelStrings,
   type CollabAnchorSlot,
 } from '@genoffice/ui/collab'
 import type { SlideComment } from '../../shared/ipc'
@@ -174,14 +173,18 @@ export function ServerCommentsPane({ server, slides, inFile, onCollapse }: Serve
 
   // the label names the slide where it is now (a reorder before Save keeps the server's old index)
   const renderAnchor = (slot: CollabAnchorSlot) => {
-    const at = isPptxAnchor(slot.anchor) ? slidePositionOf(slides, slot.anchor) : -1
+    // only a located thread follows its slide; lost and stale ones keep naming the slide they were on
+    const at =
+      isPptxAnchor(slot.anchor) && slot.anchorState === 'exact'
+        ? slidePositionOf(slides, slot.anchor)
+        : -1
     const anchor = at >= 0 ? { ...slot.anchor, slide_index: at } : slot.anchor
     return (
       <AnchorLabel
         anchor={anchor}
         state={slot.anchorState}
         lang={lang}
-        strings={strings as unknown as AnchorLabelStrings}
+        strings={strings}
         labelId={slot.labelId}
         stateId={slot.stateId}
       />
@@ -226,7 +229,9 @@ export function ServerCommentsPane({ server, slides, inFile, onCollapse }: Serve
         inFile={{ count: inFile.length, content: inFileContent }}
       />
       {!server.versionId && ctl.can.canWrite && ctl.state === 'ready' && (
-        <p className="comments-server-hint">{t('paneCommentsSaveFirst')}</p>
+        <p className="comments-server-hint" role="status">
+          {t('paneCommentsSaveFirst')}
+        </p>
       )}
     </div>
   )
@@ -280,7 +285,8 @@ export function ServerCommentsHost(p: HostProps) {
     startThread: (index, objectId) => {
       const started = server.startThread(index, objectId)
       // a root thread needs base_version_id: unknown until the first Save receipt (same rule as Docs)
-      if (!started && !server.versionId) onStatus(t('paneCommentsSaveFirst'))
+      if (!started)
+        onStatus(t(server.versionId ? 'paneCommentsNewNoSlide' : 'paneCommentsSaveFirst'))
       return started
     },
   }

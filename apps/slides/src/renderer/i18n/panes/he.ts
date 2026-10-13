@@ -64,6 +64,7 @@ export const he = {
   paneCommentsNeutralAuthor: 'משתמש',
   paneCommentsSaveFirst:
     'שמרו קודם את המצגת כדי להוסיף הערה. עדיין אפשר לקרוא את ההערות שלמטה, להגיב להן ולסגור אותן.',
+  paneCommentsNewNoSlide: 'לא ניתן להוסיף הערה לשקופית זו כרגע. בחרו שקופית אחרת ונסו שוב.',
 
   paneCsdTitle: 'הצגות מותאמות אישית',
   paneCsdDefaultName: 'הצגה מותאמת אישית {n}',

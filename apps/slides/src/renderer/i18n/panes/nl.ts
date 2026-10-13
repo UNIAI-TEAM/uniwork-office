@@ -65,6 +65,8 @@ export const nl = {
   paneCommentsNeutralAuthor: 'Gebruiker',
   paneCommentsSaveFirst:
     'Sla de presentatie eerst op om een opmerking toe te voegen. Je kunt de opmerkingen hieronder nog steeds lezen, beantwoorden en afhandelen.',
+  paneCommentsNewNoSlide:
+    'Aan deze dia kan nu geen opmerking worden toegevoegd. Selecteer een andere dia en probeer het opnieuw.',
 
   paneCsdTitle: 'Aangepaste voorstellingen',
   paneCsdDefaultName: 'Aangepaste voorstelling {n}',

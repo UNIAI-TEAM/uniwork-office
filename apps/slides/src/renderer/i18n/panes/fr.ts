@@ -65,6 +65,8 @@ export const fr = {
   paneCommentsNeutralAuthor: 'Utilisateur',
   paneCommentsSaveFirst:
     'Enregistrez d’abord la présentation pour ajouter un commentaire. Vous pouvez toujours lire, répondre et résoudre les commentaires ci-dessous.',
+  paneCommentsNewNoSlide:
+    'Impossible d’ajouter un commentaire à cette diapositive pour le moment. Sélectionnez une autre diapositive et réessayez.',
 
   paneCsdTitle: 'Diaporamas personnalisés',
   paneCsdDefaultName: 'Diaporama personnalisé {n}',

@@ -65,6 +65,8 @@ export const pl = {
   paneCommentsNeutralAuthor: 'Użytkownik',
   paneCommentsSaveFirst:
     'Najpierw zapisz prezentację, aby dodać komentarz. Komentarze poniżej nadal możesz czytać, odpowiadać na nie i rozwiązywać je.',
+  paneCommentsNewNoSlide:
+    'Teraz nie można dodać komentarza do tego slajdu. Zaznacz inny slajd i spróbuj ponownie.',
 
   paneCsdTitle: 'Pokazy niestandardowe',
   paneCsdDefaultName: 'Pokaz niestandardowy {n}',

@@ -97,9 +97,64 @@ export function selectedObjectId(
   return slide.nodes.find((n) => n.sourceId === selectedSourceIds[0])?.durableId || undefined
 }
 
+/** what a slide looked like when last seen: a slide that comes back unchanged (undo) is the same slide */
+function signatureOf(slide: SlideIdentity): string {
+  const nodes = (slide.nodes ?? []).map((n) => `${n.sourceId}~${n.durableId ?? ''}`)
+  return `${slide.partPath ?? ''}|${nodes.join(',')}`
+}
+
+/**
+ * Per open session: which slide ids were handed to a different slide since the last settled round.
+ * `nextSlideId` is max(current ids)+1, so deleting the last slide and adding another gives the new
+ * slide the old id (and the same part name); the id alone cannot tell them apart. The tracker watches
+ * the deck: an id that left and comes back unchanged (undo / redo) is the same slide, an id that
+ * comes back as something else is a different slide, and a thread anchored to the old one must not
+ * follow it (contract-collab: lost stays lost).
+ */
+export interface SlideTracker {
+  /** feed the deck as shown now (idempotent for the same deck) */
+  observe(slides: readonly SlideIdentity[]): void
+  /** when (ms) the id was first given to another slide since the last settle; undefined: not reused */
+  replacedAt(slideId: string): number | undefined
+  /** a round reached the server: the old threads are lost there now, forget the reuse marks */
+  settle(): void
+}
+
+export function createSlideTracker(now: () => number = Date.now): SlideTracker {
+  let last = new Map<string, string>()
+  const gone = new Map<string, string>()
+  const replaced = new Map<string, number>()
+  return {
+    observe(slides) {
+      const cur = new Map<string, string>()
+      for (const s of slides) {
+        const id = slideIdOf(s)
+        if (id !== undefined) cur.set(id, signatureOf(s))
+      }
+      for (const [id, sig] of last) if (!cur.has(id)) gone.set(id, sig)
+      for (const [id, sig] of cur) {
+        const was = gone.get(id)
+        if (was === undefined) continue
+        gone.delete(id)
+        if (was !== sig && !replaced.has(id)) replaced.set(id, now())
+      }
+      last = cur
+    },
+    replacedAt: (slideId) => replaced.get(slideId),
+    settle() {
+      gone.clear()
+      replaced.clear()
+    },
+  }
+}
+
 export interface SlidesAnchorNav {
   /** the deck as the renderer holds it now */
   slides(): readonly SlideIdentity[]
+  /** true when the thread of this anchor object is `lost` on the server: it never follows a slide */
+  isLost?(anchor: CollabAnchor): boolean
+  /** true when the anchor's slide id now names a different slide (id reuse before Save) */
+  isReplaced?(anchor: PptxAnchor): boolean
   /** show slide `index`; select the object with this source id when given */
   goTo(index: number, sourceId?: string): void
 }
@@ -110,19 +165,22 @@ export interface SlidesAnchorNav {
  * Pass a stable object to the kit: build it once per deck view (`useMemo`).
  */
 export function createSlidesAnchorAdapter(nav: SlidesAnchorNav): CollabAnchorAdapter {
+  // a lost thread, or one whose slide id now names another slide, is not on any slide of the deck
+  const locatedAt = (anchor: PptxAnchor): number =>
+    nav.isLost?.(anchor) || nav.isReplaced?.(anchor) ? -1 : slidePositionOf(nav.slides(), anchor)
   return {
     order(anchor) {
       if (!isPptxAnchor(anchor)) return Number.MAX_SAFE_INTEGER
-      const at = slidePositionOf(nav.slides(), anchor)
+      const at = locatedAt(anchor)
       return at >= 0 ? at : anchor.slide_index
     },
     locate(anchor) {
-      return isPptxAnchor(anchor) && slidePositionOf(nav.slides(), anchor) >= 0
+      return isPptxAnchor(anchor) && locatedAt(anchor) >= 0
     },
     goTo(anchor) {
       if (!isPptxAnchor(anchor)) return
       const slides = nav.slides()
-      const at = slidePositionOf(slides, anchor)
+      const at = locatedAt(anchor)
       if (at < 0) return
       const node = anchor.object_id
         ? slides[at]?.nodes?.find((n) => n.durableId === anchor.object_id)
@@ -140,19 +198,28 @@ export interface AnchorUpdate {
 
 /**
  * The `comments.anchors` round after a save: every live root comment with a pptx anchor gets its
- * slide's new position (`exact`), or keeps its old anchor as `lost` when the slide is gone.
+ * slide's new position (`exact`), or keeps its old anchor as `lost` when the slide is gone (or its
+ * id was reused by another slide: `replacedAt`, for roots created before the reuse).
+ * A root the server already holds as `lost` is skipped: lost stays lost (contract-collab), so it
+ * can never re-bind to a new slide that reuses the p:sldId; the server keeps its old anchor.
  * Replies, discussion posts and tombstones carry no anchor of their own and are skipped.
  */
 export function anchorUpdatesAfterSave(
   comments: readonly CollabComment[],
   slides: readonly SlideIdentity[],
+  replacedAt?: (slideId: string) => number | undefined,
 ): AnchorUpdate[] {
   const out: AnchorUpdate[] = []
   for (const c of comments) {
     if (c.parent_id || c.deleted_at || (c.kind !== undefined && c.kind !== 'comment')) continue
     const anchor = c.anchor
     if (!isPptxAnchor(anchor)) continue
-    const at = slidePositionOf(slides, anchor)
+    if (c.anchor_state === 'lost') continue
+    const since = replacedAt?.(anchor.slide_id)
+    const created = c.created_at ? Date.parse(c.created_at) : Number.NaN
+    // a thread older than the id's reuse belongs to the slide that is gone; a newer one to the new slide
+    const reused = since !== undefined && !(created >= since)
+    const at = reused ? -1 : slidePositionOf(slides, anchor)
     if (at < 0) {
       out.push({ commentId: c.id, anchor, state: 'lost' })
       continue
@@ -316,9 +383,10 @@ export async function sendAnchorsAfterSave(
   versionId: string,
   comments: readonly CollabComment[],
   slides: readonly SlideIdentity[],
+  replacedAt?: (slideId: string) => number | undefined,
 ): Promise<AnchorSyncOutcome> {
   const synced: AnchorSyncOutcome = { outcome: 'synced', updated: [], skipped: [], list_token: '' }
-  const anchors = anchorUpdatesAfterSave(comments, slides)
+  const anchors = anchorUpdatesAfterSave(comments, slides, replacedAt)
   for (let i = 0; i < anchors.length; i += MAX_ANCHORS) {
     let res
     try {

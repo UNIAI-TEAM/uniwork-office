@@ -65,6 +65,8 @@ export const ko = {
   paneCommentsNeutralAuthor: '사용자',
   paneCommentsSaveFirst:
     '댓글을 추가하려면 먼저 프레젠테이션을 저장하세요. 아래 댓글은 계속 읽고, 답글을 달고, 해결 처리할 수 있습니다.',
+  paneCommentsNewNoSlide:
+    '지금은 이 슬라이드에 메모를 추가할 수 없습니다. 다른 슬라이드를 선택한 후 다시 시도하세요.',
 
   paneCsdTitle: '쇼 재구성',
   paneCsdDefaultName: '쇼 재구성 {n}',

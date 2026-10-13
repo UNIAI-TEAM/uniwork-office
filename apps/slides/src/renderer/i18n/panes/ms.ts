@@ -65,6 +65,8 @@ export const ms = {
   paneCommentsNeutralAuthor: 'Pengguna',
   paneCommentsSaveFirst:
     'Simpan pembentangan dahulu untuk menambah komen. Anda masih boleh membaca, membalas dan menyelesaikan komen di bawah.',
+  paneCommentsNewNoSlide:
+    'Komen tidak dapat ditambah pada slaid ini sekarang. Pilih slaid lain dan cuba lagi.',
 
   paneCsdTitle: 'Persembahan Tersuai',
   paneCsdDefaultName: 'Persembahan Tersuai {n}',

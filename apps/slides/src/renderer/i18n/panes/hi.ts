@@ -65,6 +65,8 @@ export const hi = {
   paneCommentsNeutralAuthor: 'उपयोगकर्ता',
   paneCommentsSaveFirst:
     'टिप्पणी जोड़ने के लिए पहले प्रेज़ेंटेशन सहेजें। नीचे की टिप्पणियाँ आप अब भी पढ़ सकते हैं, उनका उत्तर दे सकते हैं और उन्हें हल कर सकते हैं।',
+  paneCommentsNewNoSlide:
+    'इस समय इस स्लाइड पर टिप्पणी नहीं जोड़ी जा सकती। कोई दूसरी स्लाइड चुनें और फिर कोशिश करें।',
 
   paneCsdTitle: 'कस्टम शो',
   paneCsdDefaultName: 'कस्टम शो {n}',

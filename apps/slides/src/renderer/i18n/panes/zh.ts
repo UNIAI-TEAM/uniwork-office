@@ -62,6 +62,7 @@ export const zh = {
   paneCommentsPost: '发布',
   paneCommentsNeutralAuthor: '用户',
   paneCommentsSaveFirst: '请先保存演示文稿，再添加批注。你仍可以阅读、回复和解决下面的批注。',
+  paneCommentsNewNoSlide: '目前无法在这张幻灯片上添加批注。请选择其他幻灯片后重试。',
 
   paneCsdTitle: '自定义放映',
   paneCsdDefaultName: '自定义放映 {n}',

@@ -65,6 +65,8 @@ export const it = {
   paneCommentsNeutralAuthor: 'Utente',
   paneCommentsSaveFirst:
     'Salva prima la presentazione per aggiungere un commento. Puoi comunque leggere, rispondere e risolvere i commenti qui sotto.',
+  paneCommentsNewNoSlide:
+    'Al momento non è possibile aggiungere un commento a questa diapositiva. Seleziona un’altra diapositiva e riprova.',
 
   paneCsdTitle: 'Presentazioni personalizzate',
   paneCsdDefaultName: 'Presentazione personalizzata {n}',

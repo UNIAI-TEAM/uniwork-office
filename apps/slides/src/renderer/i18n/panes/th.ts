@@ -65,6 +65,8 @@ export const th = {
   paneCommentsNeutralAuthor: 'ผู้ใช้',
   paneCommentsSaveFirst:
     'บันทึกงานนำเสนอก่อนจึงจะเพิ่มความคิดเห็นได้ คุณยังอ่าน ตอบกลับ และแก้ไขความคิดเห็นด้านล่างได้',
+  paneCommentsNewNoSlide:
+    'ตอนนี้ไม่สามารถเพิ่มความคิดเห็นในสไลด์นี้ได้ เลือกสไลด์อื่นแล้วลองอีกครั้ง',
 
   paneCsdTitle: 'การนำเสนอแบบกำหนดเอง',
   paneCsdDefaultName: 'การนำเสนอแบบกำหนดเอง {n}',

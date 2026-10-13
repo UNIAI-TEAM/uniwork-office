@@ -21,6 +21,7 @@ import {
 import { createCommentsPoll } from '@genoffice/electron-utils/comments-poll'
 import type { UniworkCommentsSeamApi } from './comments-seam'
 import {
+  createSlideTracker,
   createSlidesAnchorAdapter,
   createSlidesCommentSource,
   pptxAnchorFor,
@@ -81,20 +82,32 @@ export function useServerComments(o: ServerCommentsOptions): ServerComments {
     [context.documentId, context.level, context.myUserId, lang, platform],
   )
   const strings = useMemo(() => collabStrings(lang), [lang])
+  // which slide ids were given to another slide since the last settled round (p:sldId reuse)
+  const tracker = useMemo(() => createSlideTracker(), [path])
+  tracker.observe(slides)
+  // the roots the server holds as lost, by anchor object (the kit hands the adapter that same object)
+  const lostRef = useRef(new WeakSet<object>())
   // rebuilt when the slide order changes, so a reorder re-sorts the list (the kit memoises on it)
   const slideOrder = slides.map((s) => slideIdOf(s) ?? '').join('\n')
   const adapter = useMemo(
     () =>
       createSlidesAnchorAdapter({
         slides: () => slidesRef.current,
+        isLost: (anchor) => lostRef.current.has(anchor),
+        isReplaced: (anchor) => tracker.replacedAt(anchor.slide_id) !== undefined,
         goTo: (index, sourceId) => optsRef.current.goTo(index, sourceId),
       }),
     // the deck is read through the ref; only its order decides a new adapter
-    [slideOrder],
+    [slideOrder, tracker],
   )
   const controller = useCollabThreads(source, host, { adapter, strings })
   const ctlRef = useRef(controller)
   ctlRef.current = controller
+  const lost = new WeakSet<object>()
+  for (const t of [...controller.threads, ...controller.resolved]) {
+    if (t.root.anchor && t.root.anchor_state === 'lost') lost.add(t.root.anchor)
+  }
+  lostRef.current = lost
 
   // 30 s + focus while visible and open; the kit keeps the list token, the scheduler only times reloads
   const pollRef = useRef<ReturnType<typeof createCommentsPoll> | null>(null)
@@ -135,27 +148,51 @@ export function useServerComments(o: ServerCommentsOptions): ServerComments {
     [bridge, path],
   )
 
-  // after the save receipt: the new version is the base of new threads, and every anchor follows its slide
+  // after the save receipt: the new version is the base of new threads, and every anchor follows its slide.
+  // A receipt that lands while the list is not ready waits here (the latest one wins) and runs once it is.
+  const pendingRound = useRef<string | null>(null)
+  const runRound = useCallback(
+    (round: string) => {
+      const ctl = ctlRef.current
+      const roots = [...ctl.threads, ...ctl.resolved].filter((t) => !t.deleted).map((t) => t.root)
+      void sendAnchorsAfterSave(bridge, path, round, roots, slidesRef.current, (id) =>
+        tracker.replacedAt(id),
+      ).then(
+        (res) => {
+          if (res.outcome !== 'synced') return
+          // the server holds the lost threads now: a reused id can no longer pull them onto its slide
+          tracker.settle()
+          // contract §2.6: a round that changed rows is followed by a full reload
+          if (res.updated.length > 0) void ctlRef.current.reload()
+        },
+        // offline / server error: the shown anchors stay; the next save sends the map again
+        () => undefined,
+      )
+    },
+    [bridge, path, tracker],
+  )
   useEffect(
     () =>
       bridge.onSaved((receipt) => {
         if (receipt?.path !== path) return
         if (typeof receipt.versionId !== 'string' || receipt.versionId === '') return
         setVersionId(receipt.versionId)
-        const ctl = ctlRef.current
-        if (ctl.state !== 'ready') return
-        const roots = [...ctl.threads, ...ctl.resolved].filter((t) => !t.deleted).map((t) => t.root)
-        void sendAnchorsAfterSave(bridge, path, receipt.versionId, roots, slidesRef.current).then(
-          (res) => {
-            // contract §2.6: a round that changed rows is followed by a full reload
-            if (res.outcome === 'synced' && res.updated.length > 0) void ctlRef.current.reload()
-          },
-          // offline / server error: the shown anchors stay; the next save sends the map again
-          () => undefined,
-        )
+        if (ctlRef.current.state !== 'ready') {
+          pendingRound.current = receipt.versionId
+          return
+        }
+        pendingRound.current = null
+        runRound(receipt.versionId)
       }),
-    [bridge, path],
+    [bridge, path, runRound],
   )
+  const ready = controller.state === 'ready'
+  useEffect(() => {
+    const round = pendingRound.current
+    if (!ready || round === null) return
+    pendingRound.current = null
+    runRound(round)
+  }, [ready, runRound])
 
   const startThread = useCallback((index: number, objectId?: string): boolean => {
     const base = versionRef.current

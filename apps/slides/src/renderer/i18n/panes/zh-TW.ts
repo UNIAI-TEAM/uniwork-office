@@ -63,6 +63,7 @@ export const zhTW = {
   paneCommentsPost: '發佈',
   paneCommentsNeutralAuthor: '使用者',
   paneCommentsSaveFirst: '請先儲存簡報，再新增註解。你仍可以閱讀、回覆和解決下方的註解。',
+  paneCommentsNewNoSlide: '目前無法在這張投影片上新增註解。請選取其他投影片後再試一次。',
 
   paneCsdTitle: '自訂放映',
   paneCsdDefaultName: '自訂放映 {n}',

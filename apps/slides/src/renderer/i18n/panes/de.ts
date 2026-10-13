@@ -65,6 +65,8 @@ export const de = {
   paneCommentsNeutralAuthor: 'Benutzer',
   paneCommentsSaveFirst:
     'Speichern Sie die Präsentation zuerst, um einen Kommentar hinzuzufügen. Die Kommentare unten können Sie weiterhin lesen, beantworten und lösen.',
+  paneCommentsNewNoSlide:
+    'Zu dieser Folie kann gerade kein Kommentar hinzugefügt werden. Wählen Sie eine andere Folie aus und versuchen Sie es erneut.',
 
   paneCsdTitle: 'Zielgruppenorientierte Präsentationen',
   paneCsdDefaultName: 'Zielgruppenorientierte Präsentation {n}',
