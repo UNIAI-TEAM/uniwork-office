@@ -112,6 +112,7 @@ describe('handshake', () => {
         desktopOpen: false,
         download: false,
         uniworkAi: false,
+        comments: false,
       },
     })
     expect(session).toMatchObject({
