@@ -67,15 +67,21 @@ export type FeedSyncResult =
   | { kind: 'session_expired' }
   | { kind: 'cancelled' }
   | { kind: 'failed'; error: UniworkDocError }
+  /**
+   * The cache refused the page's commit: nothing of the page is on disk, the
+   * cursor stays on it and the cache's own failure rides along. `store_full` is
+   * the budget; `store_unavailable` is an interrupted (or wiped) scope - an
+   * account-boundary interruption, never a keychain lock.
+   */
+  | { kind: 'cache_refused'; failure: DocCacheCommitFailure }
 
 export const FEED_BACKOFF_BASE_MS = 30_000
 export const FEED_BACKOFF_MAX_MS = 30 * 60_000
 const KNOWN_PHASES = new Set(['snapshot', 'changes'])
 
-/** a commit that did not land: the page stays unapplied and the error is surfaced */
+/** a commit that did not land: the page stays unapplied and the cache's own verdict is carried */
 function commitFailed(commit: DocCacheCommit & { kind: 'failed' }): FeedSyncResult {
-  const code = commit.failure === 'store_full' ? 'store_full' : 'keystore_locked'
-  return { kind: 'failed', error: new UniworkDocError(code) }
+  return { kind: 'cache_refused', failure: commit.failure }
 }
 
 type PageRun =

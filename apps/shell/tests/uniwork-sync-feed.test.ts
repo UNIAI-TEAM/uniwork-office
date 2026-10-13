@@ -97,6 +97,7 @@ function memoryCache() {
   const drafts = new Set<string>()
   let effects = 0
   let refusedPage: DocCacheCommit | null = null
+  let refusedReconcile: DocCacheCommit | null = null
   const cache: DocCache = {
     async applyPage(changes: readonly FeedChange[]) {
       if (refusedPage) return refusedPage
@@ -110,6 +111,7 @@ function memoryCache() {
       return { kind: 'ok' }
     },
     async reconcile(ids, options) {
+      if (refusedReconcile) return refusedReconcile
       for (const id of [...entries.keys()]) {
         if (!ids.has(id) && !(options.keepDrafts && drafts.has(id))) entries.delete(id)
       }
@@ -126,6 +128,10 @@ function memoryCache() {
     /** the next page applies fail with this commit, as a full store would */
     refusePage: (commit: DocCacheCommit | null) => {
       refusedPage = commit
+    },
+    /** the next full-resync reconcile fails with this commit */
+    refuseReconcile: (commit: DocCacheCommit | null) => {
+      refusedReconcile = commit
     },
   }
 }
@@ -309,8 +315,8 @@ describe('feed consumer', () => {
     ])
     t.cache.refusePage({ kind: 'failed', failure: 'store_full' })
     const refused = await t.consumer.sync()
-    if (refused.kind !== 'failed') throw new Error(`expected a failure, got ${refused.kind}`)
-    expect(refused.error.code).toBe('store_full')
+    if (refused.kind !== 'cache_refused') throw new Error(`expected a refusal, got ${refused.kind}`)
+    expect(refused.failure).toBe('store_full')
     // nothing of the page is cached, and the cursor is still on it
     expect(t.cache.effects).toBe(0)
     expect(await t.cursors.get(cursorKey(SCOPE))).toBe('feed:0')
@@ -326,6 +332,27 @@ describe('feed consumer', () => {
       ['d2', '6'],
     ])
     expect(await t.cursors.get(cursorKey(SCOPE))).toBe('feed:1')
+  })
+
+  it('a refused commit keeps store_unavailable its own code, never keystore_locked (R2-be-2)', async () => {
+    // the scope was wiped (lockAndWipe) while the page was in flight: the cache
+    // reports an interrupted scope, which is not a keychain lock
+    const t = setup({ cursors: createMemoryCursorStore([[cursorKey(SCOPE), 'feed:0']]) })
+    t.server.incremental.push([['d1', '5']])
+    t.cache.refusePage({ kind: 'failed', failure: 'store_unavailable' })
+    expect(await t.consumer.sync()).toEqual({ kind: 'cache_refused', failure: 'store_unavailable' })
+    expect(t.cache.effects).toBe(0)
+    expect(await t.cursors.get(cursorKey(SCOPE))).toBe('feed:0')
+
+    // the resync's reconcile carries the same verdict: no cursor is saved
+    const resync = setup()
+    resync.server.rows.set(WS, [['d1', '1']])
+    resync.cache.refuseReconcile({ kind: 'failed', failure: 'store_unavailable' })
+    expect(await resync.consumer.sync()).toEqual({
+      kind: 'cache_refused',
+      failure: 'store_unavailable',
+    })
+    expect(await resync.cursors.get(cursorKey(SCOPE))).toBeNull()
   })
 
   it('a cancelled run stops before the next request and moves no cursor (G504-be-7)', async () => {
