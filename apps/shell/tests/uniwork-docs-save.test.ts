@@ -306,7 +306,7 @@ async function intentOf(
 }
 
 /** every file the store layer keeps on disk (no records = the store was never written to) */
-function storeFiles(ctx: ReturnType<typeof setup>): string[] {
+function storeFiles(): string[] {
   const found: string[] = []
   const visit = (current: string): void => {
     for (const entry of readdirSync(current, { withFileTypes: true })) {
@@ -1353,7 +1353,7 @@ describe('the durable store guards the save (W3b)', () => {
     })
     expect(server.calls.length).toBe(before)
     // the store was never written to (no record file exists)
-    expect(storeFiles(ctx)).toEqual([])
+    expect(storeFiles()).toEqual([])
     // once the keychain opens again the same save goes through
     ctx.safeStorage.unlock()
     expect(await ctx.service.save(path)).toMatchObject({ state: 'saved' })
@@ -1369,7 +1369,7 @@ describe('the durable store guards the save (W3b)', () => {
     expect(binding(path)).toMatchObject({ state: 'error', error: 'store_full' })
     expect(uploads(server)).toHaveLength(0)
     expect(commits(server)).toHaveLength(0)
-    expect(storeFiles(ctx)).toEqual([])
+    expect(storeFiles()).toEqual([])
   })
 })
 
