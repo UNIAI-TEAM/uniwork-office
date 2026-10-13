@@ -141,7 +141,7 @@ export const th = {
   uwDocRestore: 'กู้คืน',
   uwDocArchiveConfirm: 'เก็บถาวร “{name}” หรือไม่ คุณกู้คืนได้ภายหลัง',
   uwDocNameEmpty: 'โปรดป้อนชื่อเอกสาร',
-  uwDocNameTaken: 'มีเอกสารชื่อนี้อยู่ที่นี่แล้ว',
+  uwDocNameTooLong: 'ชื่อยาวเกินไป (ไม่เกิน 500 อักขระ)',
   uwDocRenamedAnnounce: 'เปลี่ยนชื่อเอกสารเป็น {name} แล้ว',
   uwDocActionFailed: 'ดำเนินการไม่สำเร็จ โปรดลองอีกครั้ง',
   uwDocActionsFor: 'การทำงานเพิ่มเติมสำหรับ “{name}”',

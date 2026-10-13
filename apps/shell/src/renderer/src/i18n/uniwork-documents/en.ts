@@ -139,7 +139,7 @@ export const en = {
   uwDocRestore: 'Restore',
   uwDocArchiveConfirm: 'Archive “{name}”? You can restore it later.',
   uwDocNameEmpty: 'Enter a document name.',
-  uwDocNameTaken: 'A document with this name already exists here.',
+  uwDocNameTooLong: 'The name is too long (500 characters at most).',
   uwDocRenamedAnnounce: 'The document was renamed to {name}.',
   uwDocActionFailed: 'That didn’t work. Try again.',
   uwDocActionsFor: 'More actions for “{name}”',

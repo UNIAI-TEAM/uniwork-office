@@ -277,9 +277,43 @@ describe('S18 new document', () => {
     expect(api.uniworkCreateDocument).not.toHaveBeenCalled()
   })
 
-  it('shows a taken name at the field, and any other failure as a toast', async () => {
+  it('sends a duplicate name: no field error, the request goes out', async () => {
+    // the library already holds "Plan"; duplicates are allowed, so the dialog does not compare
+    await render([row('d1', 'Plan.docx', { canEdit: true })])
+    await click(buttonByText(host, en.uwDocNew))
+    const dialog = modal()!
+    const name = dialog.querySelector<HTMLInputElement>('input[type="text"]')!
+    await type(name, 'Plan')
+    await click(buttonByText(dialog, en.uwDocCreate))
+    expect(api.uniworkCreateDocument).toHaveBeenCalledTimes(1)
+    expect(api.uniworkCreateDocument).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Plan' }),
+    )
+    expect(name.getAttribute('aria-invalid')).not.toBe('true')
+  })
+
+  it('shows a too-long name at the field without calling main', async () => {
     await render([])
-    api.uniworkCreateDocument.mockResolvedValueOnce(fail('name_taken'))
+    await click(buttonByText(host, en.uwDocNew))
+    const dialog = modal()!
+    const name = dialog.querySelector<HTMLInputElement>('input[type="text"]')!
+    await type(name, 'a'.repeat(501))
+    await click(buttonByText(dialog, en.uwDocCreate))
+    expect(api.uniworkCreateDocument).not.toHaveBeenCalled()
+    expect(name.getAttribute('aria-invalid')).toBe('true')
+    expect(document.getElementById(name.getAttribute('aria-describedby')!)!.textContent).toBe(
+      en.uwDocNameTooLong,
+    )
+    // 500 runes pass, even when they are astral characters of two UTF-16 units each
+    await type(name, '😀'.repeat(500))
+    expect(name.getAttribute('aria-invalid')).toBe('false')
+    await click(buttonByText(dialog, en.uwDocCreate))
+    expect(api.uniworkCreateDocument).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows a server too-long refusal at the field, and any other failure as a toast', async () => {
+    await render([])
+    api.uniworkCreateDocument.mockResolvedValueOnce(fail('name_too_long'))
     await click(buttonByText(host, en.uwDocNew))
     const dialog = modal()!
     const name = dialog.querySelector<HTMLInputElement>('input[type="text"]')!
@@ -287,7 +321,7 @@ describe('S18 new document', () => {
     await click(buttonByText(dialog, en.uwDocCreate))
     expect(name.getAttribute('aria-invalid')).toBe('true')
     expect(document.getElementById(name.getAttribute('aria-describedby')!)!.textContent).toBe(
-      en.uwDocNameTaken,
+      en.uwDocNameTooLong,
     )
     expect(host.querySelector('.uw-act-toast')).toBeNull()
 
@@ -403,7 +437,7 @@ describe('S18 row menu', () => {
     expect(document.activeElement).toBe(menuButton(rowOf('Plan.docx')))
   })
 
-  it('shows empty and taken names at the field', async () => {
+  it('shows empty and too-long names at the field, without calling main', async () => {
     await render([row('e', 'Plan.docx', { canEdit: true })])
     await openMenuItem('Plan.docx', en.uwDocRename)
     const input = host.querySelector<HTMLInputElement>('.uw-rename-input')!
@@ -415,14 +449,28 @@ describe('S18 row menu', () => {
     )
     expect(api.uniworkRenameDocument).not.toHaveBeenCalled()
 
-    api.uniworkRenameDocument.mockResolvedValueOnce(fail('name_taken'))
-    await type(input, 'Budget')
+    // the limit counts the extension too: 496 + ".docx" is 501
+    await type(input, 'a'.repeat(496))
     await key(input, 'Enter')
     const field = host.querySelector<HTMLInputElement>('.uw-rename-input')!
     expect(field.getAttribute('aria-invalid')).toBe('true')
     expect(document.getElementById(field.getAttribute('aria-describedby')!)!.textContent).toBe(
-      en.uwDocNameTaken,
+      en.uwDocNameTooLong,
     )
+    expect(api.uniworkRenameDocument).not.toHaveBeenCalled()
+  })
+
+  it('renames to a duplicate name: the request goes out, no field error', async () => {
+    await render([
+      row('e', 'Plan.docx', { canEdit: true }),
+      row('f', 'Budget.docx', { canEdit: true }),
+    ])
+    await openMenuItem('Plan.docx', en.uwDocRename)
+    const input = host.querySelector<HTMLInputElement>('.uw-rename-input')!
+    await type(input, 'Budget')
+    await key(input, 'Enter')
+    expect(api.uniworkRenameDocument).toHaveBeenCalledWith('e', 'Budget.docx')
+    expect(host.querySelector('.uw-rename-input')).toBeNull()
   })
 
   it('a server failure toasts and the row name reverts', async () => {
@@ -556,7 +604,7 @@ describe('S18 archived row and archive confirm (FX4)', () => {
     expect(host.querySelector('.uw-act-toast')).toBeNull()
   })
 
-  it('F7: empty and taken names set aria-invalid and point aria-describedby at the message', async () => {
+  it('F7: empty and too-long names set aria-invalid and point aria-describedby at the message', async () => {
     // New document
     await render([])
     await click(buttonByText(host, en.uwDocNew))
@@ -569,13 +617,12 @@ describe('S18 archived row and archive confirm (FX4)', () => {
     expect(name.getAttribute('aria-invalid')).toBe('true')
     expect(name.getAttribute('aria-describedby')).toBe(errorId)
     expect(document.getElementById(errorId)!.textContent).toBe(en.uwDocNameEmpty)
-    api.uniworkCreateDocument.mockResolvedValueOnce(fail('name_taken'))
-    await type(name, 'Plan')
+    await type(name, 'a'.repeat(501))
     expect(name.getAttribute('aria-invalid')).toBe('false')
     await click(buttonByText(dialog, en.uwDocCreate))
     expect(name.getAttribute('aria-invalid')).toBe('true')
     expect(name.getAttribute('aria-describedby')).toBe(errorId)
-    expect(document.getElementById(errorId)!.textContent).toBe(en.uwDocNameTaken)
+    expect(document.getElementById(errorId)!.textContent).toBe(en.uwDocNameTooLong)
   })
 })
 

@@ -148,7 +148,7 @@ export const de = {
   uwDocRestore: 'Wiederherstellen',
   uwDocArchiveConfirm: '„{name}“ archivieren? Sie können es später wiederherstellen.',
   uwDocNameEmpty: 'Geben Sie einen Dokumentnamen ein.',
-  uwDocNameTaken: 'Hier gibt es bereits ein Dokument mit diesem Namen.',
+  uwDocNameTooLong: 'Der Name ist zu lang (höchstens 500 Zeichen).',
   uwDocRenamedAnnounce: 'Das Dokument wurde in {name} umbenannt.',
   uwDocActionFailed: 'Das hat nicht geklappt. Versuchen Sie es erneut.',
   uwDocActionsFor: 'Weitere Aktionen für „{name}“',

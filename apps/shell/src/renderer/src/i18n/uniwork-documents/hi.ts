@@ -139,7 +139,7 @@ export const hi = {
   uwDocRestore: 'पुनर्स्थापित करें',
   uwDocArchiveConfirm: '“{name}” को संग्रहित करें? आप इसे बाद में पुनर्स्थापित कर सकते हैं।',
   uwDocNameEmpty: 'दस्तावेज़ का नाम दर्ज करें।',
-  uwDocNameTaken: 'यहाँ इस नाम का दस्तावेज़ पहले से मौजूद है।',
+  uwDocNameTooLong: 'नाम बहुत लंबा है (अधिकतम 500 अक्षर)।',
   uwDocRenamedAnnounce: 'दस्तावेज़ का नाम बदलकर {name} कर दिया गया।',
   uwDocActionFailed: 'यह नहीं हो सका। फिर से कोशिश करें।',
   uwDocActionsFor: '“{name}” के लिए और कार्रवाइयाँ',

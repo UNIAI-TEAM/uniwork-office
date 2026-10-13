@@ -137,7 +137,7 @@ export const he = {
   uwDocRestore: 'שחזור',
   uwDocArchiveConfirm: 'להעביר את “{name}” לארכיון? אפשר לשחזר אותו מאוחר יותר.',
   uwDocNameEmpty: 'יש להזין שם למסמך.',
-  uwDocNameTaken: 'כבר קיים כאן מסמך בשם הזה.',
+  uwDocNameTooLong: 'השם ארוך מדי (עד 500 תווים).',
   uwDocRenamedAnnounce: 'שם המסמך שונה ל-{name}.',
   uwDocActionFailed: 'הפעולה לא הצליחה. נסו שוב.',
   uwDocActionsFor: 'פעולות נוספות עבור “{name}”',

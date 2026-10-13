@@ -230,9 +230,9 @@ export interface UniworkDocProperties {
 }
 
 /** errors a name field shows in place; every other failure is a toast */
-export type UniworkDocNameError = 'name_empty' | 'name_taken'
+export type UniworkDocNameError = 'name_empty' | 'name_too_long'
 /**
- * What a create/rename/archive call may fail with. `name_empty` / `name_taken`
+ * What a create/rename/archive call may fail with. `name_empty` / `name_too_long`
  * are S18 field errors; they are NOT part of `UniworkDocErrorCode` because that
  * union is switched on exhaustively by the renderer's error copy table.
  */

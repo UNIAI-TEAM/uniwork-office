@@ -143,7 +143,7 @@ export const ja = {
   uwDocRestore: '復元',
   uwDocArchiveConfirm: '「{name}」をアーカイブしますか？後で復元できます。',
   uwDocNameEmpty: 'ドキュメント名を入力してください。',
-  uwDocNameTaken: 'ここには同じ名前のドキュメントがすでにあります。',
+  uwDocNameTooLong: '名前が長すぎます（最大500文字）。',
   uwDocRenamedAnnounce: 'ドキュメントの名前が {name} に変更されました。',
   uwDocActionFailed: '操作できませんでした。もう一度お試しください。',
   uwDocActionsFor: '「{name}」のその他の操作',

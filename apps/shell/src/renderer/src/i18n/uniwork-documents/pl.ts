@@ -141,7 +141,7 @@ export const pl = {
   uwDocRestore: 'Przywróć',
   uwDocArchiveConfirm: 'Zarchiwizować „{name}”? Możesz go później przywrócić.',
   uwDocNameEmpty: 'Wpisz nazwę dokumentu.',
-  uwDocNameTaken: 'Dokument o tej nazwie już tu istnieje.',
+  uwDocNameTooLong: 'Nazwa jest za długa (maksymalnie 500 znaków).',
   uwDocRenamedAnnounce: 'Nazwa dokumentu została zmieniona na {name}.',
   uwDocActionFailed: 'Nie udało się. Spróbuj ponownie.',
   uwDocActionsFor: 'Więcej działań dla „{name}”',

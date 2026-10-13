@@ -28,6 +28,7 @@ import {
   errorActionOf,
   hasRowActions,
   isDocNameError,
+  isDocTitleTooLong,
   initialPickerState,
   isOpenable,
   pickerBodyOf,
@@ -339,6 +340,11 @@ export function UniworkOpenDialog({
       return
     }
     const next = checked.name + ext
+    // the limit counts the whole title, so a long name plus its extension is caught here too
+    if (isDocTitleTooLong(next)) {
+      setRenaming({ id: doc.id, error: 'name_too_long', busy: false })
+      return
+    }
     if (next === doc.title) {
       endRename(doc.id)
       return

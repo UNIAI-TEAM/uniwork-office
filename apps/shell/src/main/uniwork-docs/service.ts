@@ -268,34 +268,52 @@ async function result<T>(run: () => Promise<T>): Promise<UniworkResult<T>> {
 }
 
 /** one file (Windows paths compare case-insensitively) */
-/** a trimmed, non-empty document name; the empty case is S18's field error, not a request */
+/** the longest document name D accepts, counted in runes (code points) like D's own check */
+const MAX_DOC_NAME_RUNES = 500
+
+/**
+ * a trimmed document name of 1..500 runes; the empty and the too-long cases are
+ * S18's field errors, not requests. A duplicate name is allowed (FD-D10 a), so
+ * there is no uniqueness check here.
+ */
 function requireName(raw: string): string {
   const name = typeof raw === 'string' ? raw.trim() : ''
   if (!name) throw new UniworkDocError('name_empty' as UniworkDocErrorCode)
-  if (name.length > 500) throw new UniworkDocError('malformed_response')
+  if (Array.from(name).length > MAX_DOC_NAME_RUNES) {
+    throw new UniworkDocError('name_too_long' as UniworkDocErrorCode)
+  }
   return name
 }
 
 /**
  * The S18 action result: like `result`, but the two name errors survive as
- * themselves (`name_empty` / `name_taken`) so the renderer can show them at the
- * field, and a server 409 `conflict` (a duplicate name) becomes `name_taken`.
+ * themselves (`name_empty` / `name_too_long`) so the renderer can show them at
+ * the field. Duplicate names are allowed (FD-D10 a), so a server 409 is an
+ * ordinary failure here, never a field error. `nameField` marks a call whose
+ * title D validates (create, rename): D answers a title over 500 runes with a
+ * bare 400 `invalid_request` (the message is not machine-readable), and the
+ * empty title is caught before the request, so that 400 is the too-long case.
  */
-async function actionResult<T>(run: () => Promise<T>): Promise<UniworkDocActionResult<T>> {
+async function actionResult<T>(
+  run: () => Promise<T>,
+  options: { nameField?: boolean } = {},
+): Promise<UniworkDocActionResult<T>> {
   try {
     return { ok: true, value: await run() }
   } catch (error) {
-    return { ok: false, error: actionErrorOf(error) }
+    return { ok: false, error: actionErrorOf(error, options.nameField === true) }
   }
 }
 
-function actionErrorOf(error: unknown): UniworkDocActionError {
+function actionErrorOf(error: unknown, nameField: boolean): UniworkDocActionError {
   if (error instanceof UniworkDocError) {
     // the name errors are carried on the error's `code` even though they are not
     // part of UniworkDocErrorCode; the cast is the one place that bridges them
     const code = error.code as string
-    if (code === 'name_empty' || code === 'name_taken') return code
-    if (error.code === 'conflict' || error.serverCode === 'conflict') return 'name_taken'
+    if (code === 'name_empty' || code === 'name_too_long') return code
+    if (nameField && error.status === 400 && error.serverCode === 'invalid_request') {
+      return 'name_too_long'
+    }
     return error.code
   }
   return 'server_error'
@@ -1081,24 +1099,27 @@ export class UniworkDocsService {
 
   /**
    * Create a blank document (docx/xlsx/pptx) in a workspace/folder. The name is
-   * validated before any call (empty -> `name_empty`, no request), and the
-   * answer is the server document; the caller opens it by id, so no second local
-   * copy exists. A server refusal that means "that name is taken" maps to
-   * `name_taken`.
+   * validated before any call (empty -> `name_empty`, over 500 runes ->
+   * `name_too_long`, no request), and the answer is the server document; the
+   * caller opens it by id, so no second local copy exists. A duplicate name is
+   * allowed: the request goes out and the server decides.
    */
   createDocument(input: UniworkCreateDocInput): Promise<UniworkDocActionResult<UniworkDocSummary>> {
-    return actionResult(async () => {
-      if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
-      const target = this.docTarget(input)
-      const name = requireName(input.name)
-      return this.api().createBlank({
-        workspaceId: target.workspaceId,
-        format: input.format,
-        title: name,
-        parentId: target.folderId,
-        idempotencyKey: this.newIdempotencyKey(),
-      })
-    })
+    return actionResult(
+      async () => {
+        if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+        const target = this.docTarget(input)
+        const name = requireName(input.name)
+        return this.api().createBlank({
+          workspaceId: target.workspaceId,
+          format: input.format,
+          title: name,
+          parentId: target.folderId,
+          idempotencyKey: this.newIdempotencyKey(),
+        })
+      },
+      { nameField: true },
+    )
   }
 
   /**
@@ -1149,19 +1170,22 @@ export class UniworkDocsService {
     documentId: string,
     name: string,
   ): Promise<UniworkDocActionResult<UniworkDocSummary>> {
-    return actionResult(async () => {
-      if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
-      if (typeof documentId !== 'string' || !documentId) throw new UniworkDocError('not_found')
-      const title = requireName(name)
-      const detail = await this.api().getDocument(documentId)
-      if (detail.myLevel === 'view') throw new UniworkDocError('forbidden')
-      if (title === detail.title) return this.summaryOf(detail)
-      const renamed = await this.api().rename({ documentId, revision: detail.revision, title })
-      // this service's own rename: the feed echoing it must not re-announce it
-      this.selfRenamed.add(documentId)
-      await this.afterLocalRename(documentId, renamed.title)
-      return renamed
-    })
+    return actionResult(
+      async () => {
+        if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+        if (typeof documentId !== 'string' || !documentId) throw new UniworkDocError('not_found')
+        const title = requireName(name)
+        const detail = await this.api().getDocument(documentId)
+        if (detail.myLevel === 'view') throw new UniworkDocError('forbidden')
+        if (title === detail.title) return this.summaryOf(detail)
+        const renamed = await this.api().rename({ documentId, revision: detail.revision, title })
+        // this service's own rename: the feed echoing it must not re-announce it
+        this.selfRenamed.add(documentId)
+        await this.afterLocalRename(documentId, renamed.title)
+        return renamed
+      },
+      { nameField: true },
+    )
   }
 
   /** S18: archive a document (the server moves its subtree to the trash) */

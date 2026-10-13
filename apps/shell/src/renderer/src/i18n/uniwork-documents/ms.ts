@@ -141,7 +141,7 @@ export const ms = {
   uwDocRestore: 'Pulihkan',
   uwDocArchiveConfirm: 'Arkibkan “{name}”? Anda boleh memulihkannya kemudian.',
   uwDocNameEmpty: 'Masukkan nama dokumen.',
-  uwDocNameTaken: 'Dokumen dengan nama ini sudah wujud di sini.',
+  uwDocNameTooLong: 'Nama terlalu panjang (maksimum 500 aksara).',
   uwDocRenamedAnnounce: 'Dokumen telah dinamakan semula kepada {name}.',
   uwDocActionFailed: 'Tidak berjaya. Cuba lagi.',
   uwDocActionsFor: 'Lagi tindakan untuk “{name}”',

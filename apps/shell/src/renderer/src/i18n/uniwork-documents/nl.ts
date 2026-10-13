@@ -144,7 +144,7 @@ export const nl = {
   uwDocRestore: 'Herstellen',
   uwDocArchiveConfirm: '“{name}” archiveren? Je kunt het later herstellen.',
   uwDocNameEmpty: 'Voer een documentnaam in.',
-  uwDocNameTaken: 'Hier bestaat al een document met deze naam.',
+  uwDocNameTooLong: 'De naam is te lang (maximaal 500 tekens).',
   uwDocRenamedAnnounce: 'Het document is hernoemd naar {name}.',
   uwDocActionFailed: 'Dat is niet gelukt. Probeer het opnieuw.',
   uwDocActionsFor: 'Meer acties voor “{name}”',

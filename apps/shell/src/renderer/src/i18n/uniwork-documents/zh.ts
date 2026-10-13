@@ -136,7 +136,7 @@ export const zh = {
   uwDocRestore: '恢复',
   uwDocArchiveConfirm: '归档“{name}”？之后可以恢复。',
   uwDocNameEmpty: '请输入文档名称。',
-  uwDocNameTaken: '这里已有同名文档。',
+  uwDocNameTooLong: '名称过长（最多 500 个字符）。',
   uwDocRenamedAnnounce: '文档已重命名为 {name}。',
   uwDocActionFailed: '操作未完成，请重试。',
   uwDocActionsFor: '“{name}”的更多操作',

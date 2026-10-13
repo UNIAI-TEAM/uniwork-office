@@ -139,7 +139,7 @@ export const cs = {
   uwDocRestore: 'Obnovit',
   uwDocArchiveConfirm: 'Archivovat „{name}“? Později ho můžete obnovit.',
   uwDocNameEmpty: 'Zadejte název dokumentu.',
-  uwDocNameTaken: 'Dokument s tímto názvem už tu existuje.',
+  uwDocNameTooLong: 'Název je příliš dlouhý (nejvýše 500 znaků).',
   uwDocRenamedAnnounce: 'Dokument byl přejmenován na {name}.',
   uwDocActionFailed: 'Nepodařilo se. Zkuste to znovu.',
   uwDocActionsFor: 'Další akce pro „{name}“',

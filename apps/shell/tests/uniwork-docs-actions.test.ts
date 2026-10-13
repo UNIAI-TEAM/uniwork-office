@@ -47,8 +47,10 @@ function fakeServer(
     myLevel?: string
     bytes?: Uint8Array
     title?: string
-    /** a conflict on create/rename: the name is taken */
+    /** a 409 `conflict` on create/rename (never a name error: duplicate names are allowed) */
     nameTaken?: boolean
+    /** D's bare 400 `invalid_request` for a title over 500 runes, on create/rename */
+    nameRefused?: boolean
     /** a conflict on archive/restore */
     lifecycleConflict?: boolean
   } = {},
@@ -108,6 +110,7 @@ function fakeServer(
     if (u.pathname === `/api/v1/workspaces/${WS}/documents/files/blank`) {
       call.body = JSON.parse(String(init.body))
       if (options.nameTaken) return envelope(409, 'conflict')
+      if (options.nameRefused) return envelope(400, 'invalid_request')
       const id = `new_${++seq}`
       const title = (call.body as { title: string }).title
       state.documents.set(id, { title, bytes: enc('blank') })
@@ -169,6 +172,7 @@ function fakeServer(
       const body = JSON.parse(String(init.body)) as { revision: string; title: string }
       call.body = body
       if (options.nameTaken) return envelope(409, 'conflict')
+      if (options.nameRefused) return envelope(400, 'invalid_request')
       if (body.revision !== String(state.revision)) {
         return json(422, {
           error: {
@@ -322,7 +326,44 @@ describe('create a blank document', () => {
     expect(server.calls).toHaveLength(0)
   })
 
-  it('maps a server conflict on the name to name_taken', async () => {
+  it('sends a duplicate name: duplicates are allowed, no name error', async () => {
+    const server = fakeServer({ title: 'Q4 plan.docx' })
+    const ctx = setup(server)
+    const input = { workspaceId: WS, folderId: null, name: 'Q4 plan.docx', format: 'docx' } as const
+    const first = await ctx.service.createDocument(input)
+    const second = await ctx.service.createDocument(input)
+    expect(first.ok).toBe(true)
+    expect(second.ok).toBe(true)
+    const blanks = server.calls.filter((c) => c.path.endsWith('/documents/files/blank'))
+    expect(blanks).toHaveLength(2)
+    expect(blanks[1]!.body).toMatchObject({ title: 'Q4 plan.docx' })
+  })
+
+  it('refuses a name over 500 runes before any request, counting runes not UTF-16 units', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const create = (name: string) =>
+      ctx.service.createDocument({ workspaceId: WS, folderId: null, name, format: 'docx' })
+    // 501 astral characters are 1002 UTF-16 units, 500 of them are still allowed
+    expect(await create('😀'.repeat(501))).toEqual({ ok: false, error: 'name_too_long' })
+    expect(server.calls).toHaveLength(0)
+    expect((await create('😀'.repeat(500))).ok).toBe(true)
+    expect(await create('a'.repeat(501))).toEqual({ ok: false, error: 'name_too_long' })
+  })
+
+  it("maps D's 400 for a refused title to name_too_long", async () => {
+    const server = fakeServer({ nameRefused: true })
+    const ctx = setup(server)
+    const result = await ctx.service.createDocument({
+      workspaceId: WS,
+      folderId: null,
+      name: 'Q4 plan',
+      format: 'docx',
+    })
+    expect(result).toEqual({ ok: false, error: 'name_too_long' })
+  })
+
+  it('treats a server 409 on create as an ordinary failure, not a name error', async () => {
     const server = fakeServer({ nameTaken: true })
     const ctx = setup(server)
     const result = await ctx.service.createDocument({
@@ -331,7 +372,7 @@ describe('create a blank document', () => {
       name: 'Q4 plan',
       format: 'docx',
     })
-    expect(result).toEqual({ ok: false, error: 'name_taken' })
+    expect(result).toEqual({ ok: false, error: 'server_error' })
   })
 })
 
@@ -410,11 +451,37 @@ describe('rename, archive and restore', () => {
     expect(server.calls).toHaveLength(0)
   })
 
-  it('maps a server conflict on the new name to name_taken', async () => {
+  it('renames to a name another document already has: the PATCH goes out', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const result = await ctx.service.renameDocument(DOC, 'Q4 plan v2.docx')
+    expect(result.ok).toBe(true)
+    expect(server.calls.find((c) => c.method === 'PATCH')!.body).toEqual({
+      revision: '41',
+      title: 'Q4 plan v2.docx',
+    })
+  })
+
+  it('refuses a rename over 500 runes before any request', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const result = await ctx.service.renameDocument(DOC, `${'a'.repeat(496)}.docx`)
+    expect(result).toEqual({ ok: false, error: 'name_too_long' })
+    expect(server.calls).toHaveLength(0)
+  })
+
+  it("maps D's 400 for a refused title on rename to name_too_long", async () => {
+    const server = fakeServer({ nameRefused: true })
+    const ctx = setup(server)
+    const result = await ctx.service.renameDocument(DOC, 'Other.docx')
+    expect(result).toEqual({ ok: false, error: 'name_too_long' })
+  })
+
+  it('treats a server 409 on rename as an ordinary failure, not a name error', async () => {
     const server = fakeServer({ nameTaken: true })
     const ctx = setup(server)
     const result = await ctx.service.renameDocument(DOC, 'Taken.docx')
-    expect(result).toEqual({ ok: false, error: 'name_taken' })
+    expect(result).toEqual({ ok: false, error: 'server_error' })
   })
 
   it('archives and restores through the lifecycle routes, never a delete', async () => {

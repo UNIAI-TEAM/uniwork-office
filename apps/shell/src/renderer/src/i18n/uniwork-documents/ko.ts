@@ -139,7 +139,7 @@ export const ko = {
   uwDocRestore: '복원',
   uwDocArchiveConfirm: '“{name}”을(를) 보관할까요? 나중에 복원할 수 있습니다.',
   uwDocNameEmpty: '문서 이름을 입력하세요.',
-  uwDocNameTaken: '이곳에 같은 이름의 문서가 이미 있습니다.',
+  uwDocNameTooLong: '이름이 너무 깁니다(최대 500자).',
   uwDocRenamedAnnounce: '문서 이름이 {name}(으)로 바뀌었습니다.',
   uwDocActionFailed: '작업을 완료하지 못했습니다. 다시 시도하세요.',
   uwDocActionsFor: '“{name}” 추가 작업',

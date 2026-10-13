@@ -137,7 +137,7 @@ export const zhTW = {
   uwDocRestore: '還原',
   uwDocArchiveConfirm: '封存「{name}」？之後可以還原。',
   uwDocNameEmpty: '請輸入文件名稱。',
-  uwDocNameTaken: '這裡已有同名文件。',
+  uwDocNameTooLong: '名稱過長（最多 500 個字元）。',
   uwDocRenamedAnnounce: '文件已重新命名為 {name}。',
   uwDocActionFailed: '操作未完成，請再試一次。',
   uwDocActionsFor: '「{name}」的更多動作',

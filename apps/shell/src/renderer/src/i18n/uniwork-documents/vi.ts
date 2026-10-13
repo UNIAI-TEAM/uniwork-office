@@ -138,7 +138,7 @@ export const vi = {
   uwDocRestore: 'Khôi phục',
   uwDocArchiveConfirm: 'Lưu trữ “{name}”? Bạn có thể khôi phục sau.',
   uwDocNameEmpty: 'Hãy nhập tên tài liệu.',
-  uwDocNameTaken: 'Đã có tài liệu cùng tên ở đây.',
+  uwDocNameTooLong: 'Tên tài liệu quá dài (tối đa 500 ký tự).',
   uwDocRenamedAnnounce: 'Tài liệu đã được đổi tên thành {name}.',
   uwDocActionFailed: 'Không thực hiện được. Hãy thử lại.',
   uwDocActionsFor: 'Thao tác khác cho “{name}”',

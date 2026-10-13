@@ -708,23 +708,33 @@ export function hasRowActions(doc: LibraryDocRow): boolean {
 }
 
 /** errors a name field shows in place; every other failure is a toast */
-export type DocNameError = 'name_empty' | 'name_taken'
+export type DocNameError = 'name_empty' | 'name_too_long'
 
 export const DOC_NAME_ERROR_KEYS: Record<DocNameError, StringKey> = {
   name_empty: 'uwDocNameEmpty',
-  name_taken: 'uwDocNameTaken',
+  name_too_long: 'uwDocNameTooLong',
 }
 
-/** the trimmed name, or the empty-name error before any call goes out */
+/** the longest name the server accepts, in runes (code points); a duplicate name is allowed */
+export const DOC_NAME_MAX_RUNES = 500
+
+/** whether a full title (name plus its extension) is over the server's limit */
+export function isDocTitleTooLong(title: string): boolean {
+  return Array.from(title).length > DOC_NAME_MAX_RUNES
+}
+
+/** the trimmed name, or the empty / too-long error before any call goes out */
 export function checkDocName(
   raw: string,
-): { ok: true; name: string } | { ok: false; error: 'name_empty' } {
+): { ok: true; name: string } | { ok: false; error: DocNameError } {
   const name = raw.trim()
-  return name ? { ok: true, name } : { ok: false, error: 'name_empty' }
+  if (!name) return { ok: false, error: 'name_empty' }
+  if (isDocTitleTooLong(name)) return { ok: false, error: 'name_too_long' }
+  return { ok: true, name }
 }
 
 export function isDocNameError(error: string): error is DocNameError {
-  return error === 'name_empty' || error === 'name_taken'
+  return error === 'name_empty' || error === 'name_too_long'
 }
 
 /**

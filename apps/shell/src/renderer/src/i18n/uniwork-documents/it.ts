@@ -141,7 +141,7 @@ export const it = {
   uwDocRestore: 'Ripristina',
   uwDocArchiveConfirm: 'Archiviare “{name}”? Potrai ripristinarlo in seguito.',
   uwDocNameEmpty: 'Inserisci un nome per il documento.',
-  uwDocNameTaken: 'Qui esiste già un documento con questo nome.',
+  uwDocNameTooLong: 'Il nome è troppo lungo (al massimo 500 caratteri).',
   uwDocRenamedAnnounce: 'Il documento è stato rinominato in {name}.',
   uwDocActionFailed: 'Operazione non riuscita. Riprova.',
   uwDocActionsFor: 'Altre azioni per “{name}”',

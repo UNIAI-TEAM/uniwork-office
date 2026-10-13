@@ -144,7 +144,7 @@ export const ru = {
   uwDocRestore: 'Восстановить',
   uwDocArchiveConfirm: 'Архивировать «{name}»? Позже его можно восстановить.',
   uwDocNameEmpty: 'Введите имя документа.',
-  uwDocNameTaken: 'Здесь уже есть документ с таким именем.',
+  uwDocNameTooLong: 'Имя слишком длинное (не более 500 символов).',
   uwDocRenamedAnnounce: 'Документ переименован в {name}.',
   uwDocActionFailed: 'Не получилось. Попробуйте ещё раз.',
   uwDocActionsFor: 'Другие действия для «{name}»',

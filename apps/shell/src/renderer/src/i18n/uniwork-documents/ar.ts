@@ -137,7 +137,7 @@ export const ar = {
   uwDocRestore: 'استعادة',
   uwDocArchiveConfirm: 'هل تريد أرشفة “{name}”؟ يمكنك استعادته لاحقًا.',
   uwDocNameEmpty: 'أدخل اسم المستند.',
-  uwDocNameTaken: 'يوجد مستند بهذا الاسم هنا بالفعل.',
+  uwDocNameTooLong: 'الاسم طويل جدًا (500 حرف كحد أقصى).',
   uwDocRenamedAnnounce: 'تمت إعادة تسمية المستند إلى {name}.',
   uwDocActionFailed: 'لم ينجح ذلك. حاول مرة أخرى.',
   uwDocActionsFor: 'مزيد من الإجراءات لـ “{name}”',

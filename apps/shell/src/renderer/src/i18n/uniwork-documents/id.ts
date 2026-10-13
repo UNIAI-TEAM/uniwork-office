@@ -141,7 +141,7 @@ export const id = {
   uwDocRestore: 'Pulihkan',
   uwDocArchiveConfirm: 'Arsipkan “{name}”? Anda dapat memulihkannya nanti.',
   uwDocNameEmpty: 'Masukkan nama dokumen.',
-  uwDocNameTaken: 'Sudah ada dokumen dengan nama ini di sini.',
+  uwDocNameTooLong: 'Nama terlalu panjang (maksimal 500 karakter).',
   uwDocRenamedAnnounce: 'Dokumen diganti namanya menjadi {name}.',
   uwDocActionFailed: 'Tidak berhasil. Coba lagi.',
   uwDocActionsFor: 'Tindakan lain untuk “{name}”',
