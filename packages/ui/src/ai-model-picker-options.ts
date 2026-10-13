@@ -18,7 +18,7 @@ export interface AiModelPickerSelection {
 }
 
 /**
- * Providers the composer chip may switch to: uniAI once its Token Hub key is
+ * Providers the composer chip may switch to: UniAI once its Token Hub key is
  * set (or while a cloud sign-in is reported), every
  * other vendor once its settings pass the same usability test the chat path
  * applies (`activeProvider`), so picking a row never lands on a 401. A model

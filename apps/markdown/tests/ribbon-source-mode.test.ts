@@ -6,7 +6,6 @@ import { buildExtensions } from '../src/renderer/editor/extensions'
 import { Ribbon } from '../src/renderer/components/Ribbon'
 
 // The assistant is unrelated to the formatting buttons under test.
-vi.mock('../src/renderer/ai/AiPanel', () => ({ GensparkMark: () => null }))
 
 beforeEach(() => vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true))
 const cleanups: Array<() => void> = []

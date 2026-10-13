@@ -10,7 +10,6 @@ import { resetForTest } from '../src/renderer/capabilities'
 import { LocaleProvider } from '../src/renderer/i18n/locale'
 
 vi.mock('../src/renderer/ai/AiPanel', () => ({
-  GensparkMark: () => null,
   AiPanel: () => null,
 }))
 

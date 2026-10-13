@@ -22,7 +22,7 @@ export const th = {
   aiQcPageSkipped: 'หน้า {n}: ข้ามการตรวจสอบเลย์เอาต์อัตโนมัติ',
   aiQcStopped: 'หยุดการตรวจสอบเลย์เอาต์แล้ว',
   aiQcCapped: 'อีก {count} หน้าไม่ได้ตรวจสอบ (ขีดจำกัดต่อครั้ง)',
-  aiPanelTitle: 'uniAI',
+  aiPanelTitle: 'UniAI',
   aiOpenAssistant: 'เปิดผู้ช่วย AI',
   aiFactCheckBtn: 'ตรวจสอบข้อเท็จจริง AI',
   aiFactCheckPrompt:

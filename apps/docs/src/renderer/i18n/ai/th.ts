@@ -9,7 +9,7 @@ export const th = {
   aiStarterContinue: 'เขียนต่อจากเนื้อหาที่มีอยู่',
   aiStarterFillTemplate: 'ค้นหาและกรอกตัวยึดตำแหน่งในเอกสาร',
   aiOpenSettingsBtn: 'Open AI settings',
-  aiPanelTitle: 'uniAI',
+  aiPanelTitle: 'UniAI',
   aiOpenAssistant: 'เปิดผู้ช่วย AI',
   aiSummarizeBtn: 'สรุปด้วย AI',
   aiSummarizePrompt: 'สรุปเนื้อหาหลักและประเด็นสำคัญของเอกสารนี้',

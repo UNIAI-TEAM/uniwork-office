@@ -9,8 +9,6 @@ import { createRoot } from 'react-dom/client'
 import { Ribbon } from '../src/renderer/components/Ribbon'
 import { appStrings } from '../src/renderer/i18n/strings-app'
 
-vi.mock('../src/renderer/ai/AiPanel', () => ({ GensparkMark: () => null }))
-
 beforeEach(() => vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true))
 const cleanups: Array<() => void> = []
 afterEach(() => {

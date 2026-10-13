@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactElement } from 'react'
 import QRCode from 'qrcode'
 import type { Lang } from '@genoffice/i18n'
 
-/** Production/staging host for the standalone uniAI PWA. */
+/** Production/staging host for the standalone UniAI PWA. */
 export const UNIAI_PWA_URL = 'https://uniwork.app/app'
 
 function L(lang: Lang, vi: string, en: string): string {
@@ -37,7 +37,7 @@ export function UniAiPwaPane({ lang }: Props): ReactElement {
 
   return (
     <div className="set-uniai">
-      <h3 className="set-pane-title">{L(lang, 'uniAI (PWA)', 'uniAI (PWA)')}</h3>
+      <h3 className="set-pane-title">{L(lang, 'UniAI (PWA)', 'UniAI (PWA)')}</h3>
       <p className="set-backup-lead">
         {L(
           lang,
@@ -54,25 +54,25 @@ export function UniAiPwaPane({ lang }: Props): ReactElement {
               src={qrDataUrl}
               width={160}
               height={160}
-              alt={L(lang, 'Mã QR mở uniAI', 'QR code to open uniAI')}
+              alt={L(lang, 'Mã QR mở UniAI', 'QR code to open UniAI')}
             />
           ) : (
             <div className="set-uniai-qr set-uniai-qr-placeholder" aria-hidden="true" />
           )}
           <div>
-            <strong>uniAI</strong>
+            <strong>UniAI</strong>
             <span className="set-uniai-url">{UNIAI_PWA_URL}</span>
             <p className="set-uniai-qr-hint">
               {L(
                 lang,
-                'Quét mã QR bằng điện thoại để mở / cài uniAI.',
-                'Scan this QR code with your phone to open or install uniAI.',
+                'Quét mã QR bằng điện thoại để mở / cài UniAI.',
+                'Scan this QR code with your phone to open or install UniAI.',
               )}
             </p>
           </div>
         </div>
         <button type="button" className="set-btn primary" onClick={openPwa}>
-          {L(lang, 'Mở & cài uniAI', 'Open & install uniAI')}
+          {L(lang, 'Mở & cài UniAI', 'Open & install UniAI')}
         </button>
       </div>
 
@@ -83,24 +83,24 @@ export function UniAiPwaPane({ lang }: Props): ReactElement {
         <li>
           {L(
             lang,
-            'Quét QR ở trên, hoặc nhấn “Mở & cài uniAI” trên máy này.',
-            'Scan the QR above, or click “Open & install uniAI” on this device.',
+            'Quét QR ở trên, hoặc nhấn “Mở & cài UniAI” trên máy này.',
+            'Scan the QR above, or click “Open & install UniAI” on this device.',
           )}
         </li>
         <li>
           <strong>Windows / Chrome hoặc Edge:</strong>{' '}
           {L(
             lang,
-            'menu ⋮ hoặc biểu tượng Install trên thanh địa chỉ → “Cài đặt uniAI” / “Install app”.',
-            'menu ⋮ or the Install icon in the address bar → “Install uniAI” / “Install app”.',
+            'menu ⋮ hoặc biểu tượng Install trên thanh địa chỉ → “Cài đặt UniAI” / “Install app”.',
+            'menu ⋮ or the Install icon in the address bar → “Install UniAI” / “Install app”.',
           )}
         </li>
         <li>
           <strong>macOS / Chrome hoặc Edge:</strong>{' '}
           {L(
             lang,
-            'biểu tượng Install trên thanh địa chỉ, hoặc File → “Install uniAI…”.',
-            'Install icon in the address bar, or File → “Install uniAI…”.',
+            'biểu tượng Install trên thanh địa chỉ, hoặc File → “Install UniAI…”.',
+            'Install icon in the address bar, or File → “Install UniAI…”.',
           )}
         </li>
         <li>

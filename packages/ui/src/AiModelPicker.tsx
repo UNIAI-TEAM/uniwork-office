@@ -85,7 +85,7 @@ export function AiModelPicker({
   )
   const current = settings ? aiModelPickerSelection(settings) : null
   const currentUsable = groups.some((g) => g.id === current?.provider)
-  // the wanted provider is read raw: the active one falls back to uniAI once it has no model
+  // the wanted provider is read raw: the active one falls back to UniAI once it has no model
   const wanted = settings?.provider
   const wantedConfig = wanted ? settings?.providers?.[wanted] : undefined
   const hasKey = (wantedConfig?.apiKey ?? '') !== ''

@@ -30,7 +30,7 @@ export const DEEPSEEK_V41_FLASH = 'deep-seek-v4.1-flash'
 export const AI_PROVIDERS: AiProviderMeta[] = [
   {
     id: 'genspark',
-    label: 'uniAI',
+    label: 'UniAI',
     // UniAI chat is OpenRouter behind the brand; model ids match the shared
     // Token Hub catalog (same as the explicit OpenRouter provider).
     models: [...OPENROUTER_CHAT_MODELS],

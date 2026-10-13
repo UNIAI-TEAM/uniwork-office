@@ -82,8 +82,8 @@ export const WORKBENCH_MODULES: readonly WorkbenchModuleDef[] = [
     id: 'assistant',
     labelVi: 'Trợ lý AI',
     labelEn: 'AI Assistant',
-    hintVi: 'Lối tắt vào uniAI (panel chung)',
-    hintEn: 'Shortcut to uniAI (shared panel)',
+    hintVi: 'Lối tắt vào UniAI (panel chung)',
+    hintEn: 'Shortcut to UniAI (shared panel)',
     available: true,
   },
   {

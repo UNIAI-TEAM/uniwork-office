@@ -22,7 +22,7 @@ export const it = {
   aiQcPageSkipped: 'Pagina {n}: controllo automatico del layout saltato',
   aiQcStopped: 'Controllo del layout interrotto',
   aiQcCapped: 'Altre {count} pagina/e non controllate (limite per esecuzione)',
-  aiPanelTitle: 'uniAI',
+  aiPanelTitle: 'UniAI',
   aiOpenAssistant: "Apri l'assistente IA",
   aiFactCheckBtn: 'Fact-check IA',
   aiFactCheckPrompt:

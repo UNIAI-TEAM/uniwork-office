@@ -167,7 +167,7 @@ scopes is in `office-g3g4/reports/go-a1/rebrand-table.md`; in short:
 - **Packaging**: `appId` (`com.uniwork.office`, `com.uniwork.<module>`), `artifactName` for dmg / nsis / AppImage / deb / rpm and the Docs app,
   linux `executableName`, deb / rpm `packageName`, maintainer / vendor, `desktopName`, `/opt/UniWork Office/...` in the post-install scripts,
   User-Agent token (`UniWorkOffice`).
-- **Vendor wording**: `Genspark` to `UniWork` in every locale (including `vi`), `Genspark AI` to `AI`, AI panel title `uniAI`,
+- **Vendor wording**: `Genspark` to `UniWork` in every locale (including `vi`), `Genspark AI` to `AI`, AI panel title `UniAI`,
   credits top-up links to `uniwork.app`, generic AI badge instead of the Genspark sparkle (`GensparkMark` name kept for call sites).
 - **Links**: only functional URLs remain (package homepage / repository, the updater download page, the PWA download links), all on
   `github.com/UNIAI-TEAM/uniwork-office`; the product UI shows no GitHub wording, repo link or star prompt. `drop-github-and-usage-strings`
@@ -194,7 +194,7 @@ scripts, string literals in `apps/*/src` and `packages/*/src` (comment lines ski
 (`packages/cli/bin/**`), the package recipes in `packaging/**`, `packages/cli/README.md` (published to npm) and `scripts/mcp-stdio-bridge.js`.
 Catalog values and source string literals are also checked for internal planning vocabulary: tracker ids (`GO-1`, `GO-A8`, `UNI-1002`),
 `Work Graph`, phase talk (`this phase`, `Phase 1`, `plan v2`) and spec-speak (`office runtime`, `platform integration`, vi `giai đoạn này`).
-The patterns are narrow (UNIAI, uniAI, Unicode, the Family `milestones` feature and a bare `phase` are fine); see `INTERNAL_COPY` in `brand-scan.mjs`.
+The patterns are narrow (UNIAI, UniAI, Unicode, the Family `milestones` feature and a bare `phase` are fine); see `INTERNAL_COPY` in `brand-scan.mjs`.
 Not scanned: LICENSE, NOTICE, `docs/`, the other READMEs, tests, `e2e/`, fixtures, `package-lock.json`.
 
 GitHub (the word, `github.com`) in catalog values and string literals is a violation too, as are analytics endpoints and GA4

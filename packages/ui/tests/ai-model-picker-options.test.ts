@@ -13,12 +13,12 @@ describe('aiModelPickerGroups', () => {
     expect(aiModelPickerGroups(defaultAiSettings(), false)).toEqual([])
   })
 
-  it('lists uniAI when signed in', () => {
+  it('lists UniAI when signed in', () => {
     const ids = aiModelPickerGroups(defaultAiSettings(), true).map((g) => g.id)
     expect(ids).toEqual(['genspark'])
   })
 
-  it('lists uniAI once a Token Hub key is set, from either key slot', () => {
+  it('lists UniAI once a Token Hub key is set, from either key slot', () => {
     const own = defaultAiSettings()
     own.providers.genspark = { ...own.providers.genspark, apiKey: 'sk-or-1' }
     expect(aiModelPickerGroups(own, false).map((g) => g.id)).toContain('genspark')
@@ -45,7 +45,7 @@ describe('aiModelPickerGroups', () => {
 })
 
 describe('hosts without the UniAI pool (web frames)', () => {
-  it('never lists uniAI nor names openrouter/auto, even while the cloud sign-in is reported', () => {
+  it('never lists UniAI nor names openrouter/auto, even while the cloud sign-in is reported', () => {
     const settings = { ...defaultAiSettings(), uniAiAvailable: false }
     expect(aiModelPickerGroups(settings, true)).toEqual([])
     settings.providers.genspark = { ...settings.providers.genspark, apiKey: 'sk-or-1' }
@@ -66,7 +66,7 @@ describe('hosts without the UniAI pool (web frames)', () => {
     })
   })
 
-  it('no stored key: the selection falls to uniAI but nothing is listed, so the chip says Choose model', () => {
+  it('no stored key: the selection falls to UniAI but nothing is listed, so the chip says Choose model', () => {
     const settings = { ...defaultAiSettings(), uniAiAvailable: false, provider: 'openai' as const }
     expect(aiModelPickerGroups(settings, true)).toEqual([])
     expect(
@@ -94,7 +94,7 @@ describe('selection round trip', () => {
     expect(settings.providers.anthropic.model).toBe(anthropicModels[0])
   })
 
-  it('falls back to uniAI when the stored provider is unusable', () => {
+  it('falls back to UniAI when the stored provider is unusable', () => {
     const settings = defaultAiSettings()
     settings.provider = 'anthropic'
     expect(aiModelPickerSelection(settings).provider).toBe('genspark')

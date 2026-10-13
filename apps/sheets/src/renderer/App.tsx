@@ -1559,7 +1559,7 @@ export function App({
     // web: the keys live in UniWork and never reach the frame (`apiKey` is always ''); a missing
     // or refused key comes back as a typed state card (credential_missing, provider_auth_failed)
     if (cap('aiCredentials')) return true
-    // the built-in uniAI provider's key never lands in the settings file; the
+    // the built-in UniAI provider's key never lands in the settings file; the
     // main process injects it. Missing access surfaces as a request error.
     return settings.provider === 'genspark' || !!config.apiKey
   }

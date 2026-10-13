@@ -1029,7 +1029,7 @@
   color: var(--danger);
 }
 
-/* ── uniAI PWA install ──────────────────────────────────── */
+/* ── UniAI PWA install ──────────────────────────────────── */
 .set-uniai {
   display: flex;
   flex-direction: column;

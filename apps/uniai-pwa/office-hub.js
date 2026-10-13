@@ -1,5 +1,5 @@
 /**
- * uniAI Office Hub — Bridge launch + on-device preview (local-only blobs).
+ * UniAI Office Hub — Bridge launch + on-device preview (local-only blobs).
  * Loaded before app.js; exposes window.UniAIOffice.
  */
 ;(() => {
@@ -51,9 +51,7 @@
 
   /** @param {OfficeKind|string} kind */
   function officeAppUrl(kind) {
-    const k = ['docs', 'sheets', 'slides', 'pdf', 'markdown', 'html'].includes(kind)
-      ? kind
-      : 'docs'
+    const k = ['docs', 'sheets', 'slides', 'pdf', 'markdown', 'html'].includes(kind) ? kind : 'docs'
     return `uniwork://office/app?kind=${k}`
   }
 

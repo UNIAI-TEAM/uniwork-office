@@ -22,7 +22,7 @@ export const pl = {
   aiQcPageSkipped: 'Strona {n}: pominięto automatyczne sprawdzanie układu',
   aiQcStopped: 'Sprawdzanie układu zatrzymane',
   aiQcCapped: 'Pozostałe {count} stron(y) nie sprawdzono (limit na uruchomienie)',
-  aiPanelTitle: 'uniAI',
+  aiPanelTitle: 'UniAI',
   aiOpenAssistant: 'Otwórz asystenta AI',
   aiFactCheckBtn: 'Weryfikacja AI',
   aiFactCheckPrompt:

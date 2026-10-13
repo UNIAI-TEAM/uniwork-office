@@ -112,12 +112,15 @@ export function WorkbenchModulePane({
       {moduleId === 'family' && <FamilyPane vi={vi} />}
       {moduleId === 'friends' && <FriendsPane vi={vi} />}
       {moduleId === 'pets' && <PetsPane vi={vi} />}
-      {moduleId === 'travel' && (
-        <TravelPane vi={vi} packId={packId} onPackLinked={onPackLinked} />
-      )}
+      {moduleId === 'travel' && <TravelPane vi={vi} packId={packId} onPackLinked={onPackLinked} />}
       {moduleId === 'clients' && <ClientsPane practiceId={practiceId} vi={vi} />}
       {moduleId === 'contracts' && (
-        <ContractsPane practiceId={practiceId} vi={vi} packId={packId} onPackLinked={onPackLinked} />
+        <ContractsPane
+          practiceId={practiceId}
+          vi={vi}
+          packId={packId}
+          onPackLinked={onPackLinked}
+        />
       )}
       {moduleId === 'matters' && (
         <MattersPane practiceId={practiceId} vi={vi} packId={packId} onPackLinked={onPackLinked} />
@@ -132,8 +135,8 @@ function AssistantPane({ vi, packId }: { vi: boolean; packId?: string | null }):
     <div className="wb-assistant">
       <p>
         {label(
-          'Trợ lý trên Home là “Trợ lý của bạn” (My AI). Trong Docs / Slides / Sheets dùng panel uniAI của tab đang mở.',
-          'Home assistant is My AI. Inside Docs / Slides / Sheets use that tab’s uniAI panel.',
+          'Trợ lý trên Home là “Trợ lý của bạn” (My AI). Trong Docs / Slides / Sheets dùng panel UniAI của tab đang mở.',
+          'Home assistant is My AI. Inside Docs / Slides / Sheets use that tab’s UniAI panel.',
         )}
       </p>
       <p className="teacher-hint">
@@ -170,7 +173,7 @@ function AssistantPane({ vi, packId }: { vi: boolean; packId?: string | null }):
           className="btn btn-secondary"
           onClick={() => void window.aiOffice.newDoc?.(packId ? { projectId: packId } : undefined)}
         >
-          {label('Mở Docs + uniAI', 'Open Docs + uniAI')}
+          {label('Mở Docs + UniAI', 'Open Docs + UniAI')}
         </button>
       </div>
     </div>
@@ -241,8 +244,7 @@ function FormsPane({
     const accepted = result.accepted[0]
     if (!accepted) {
       setUploadNotice(
-        result.rejected[0] ||
-          label('Không chọn được file hỗ trợ.', 'No supported file selected.'),
+        result.rejected[0] || label('Không chọn được file hỗ trợ.', 'No supported file selected.'),
       )
       window.setTimeout(() => setUploadNotice(null), 4000)
       return
@@ -355,7 +357,11 @@ function FormsPane({
           <input value={note} onChange={(e) => setNote(e.target.value)} />
         </label>
         <div className="teacher-chip-row">
-          <button type="button" className="btn btn-secondary" onClick={() => void pickTemplateFile()}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => void pickTemplateFile()}
+          >
             {draftFile
               ? label('Đổi file mẫu…', 'Replace template file…')
               : label('Tải file mẫu…', 'Upload template file…')}
@@ -374,7 +380,9 @@ function FormsPane({
         {uploadNotice ? <p className="teacher-hint">{uploadNotice}</p> : null}
         <div className="teacher-chip-row">
           <button type="button" className="btn btn-primary" onClick={save}>
-            {editingId ? label('Lưu biểu mẫu', 'Save form') : label('Thêm vào thư viện', 'Add to library')}
+            {editingId
+              ? label('Lưu biểu mẫu', 'Save form')
+              : label('Thêm vào thư viện', 'Add to library')}
           </button>
           {editingId ? (
             <button type="button" className="btn btn-secondary" onClick={clearForm}>
@@ -539,9 +547,7 @@ function EventsPane({ practiceId, vi }: { practiceId: PracticeId; vi: boolean })
       ...(place.trim() ? { place: place.trim() } : {}),
     }
     const sorted = (list: WbEventItem[]) =>
-      [...list].sort((a, b) =>
-        `${a.date}${a.time ?? ''}`.localeCompare(`${b.date}${b.time ?? ''}`),
-      )
+      [...list].sort((a, b) => `${a.date}${a.time ?? ''}`.localeCompare(`${b.date}${b.time ?? ''}`))
     if (editingId) {
       persist(sorted(items.map((x) => (x.id === editingId ? row : x))))
     } else {
@@ -694,7 +700,9 @@ function GrowthPane({ vi }: { vi: boolean }): ReactElement {
                     onChange={() =>
                       persist(
                         items.map((x) =>
-                          x.id === it.id ? { ...x, done: !x.done, progress: !x.done ? 100 : x.progress } : x,
+                          x.id === it.id
+                            ? { ...x, done: !x.done, progress: !x.done ? 100 : x.progress }
+                            : x,
                         ),
                       )
                     }
@@ -811,9 +819,7 @@ function TravelPane({
           ? t
           : {
               ...t,
-              checklist: t.checklist.map((c) =>
-                c.id === checkId ? { ...c, done: !c.done } : c,
-              ),
+              checklist: t.checklist.map((c) => (c.id === checkId ? { ...c, done: !c.done } : c)),
             },
       ),
     )
@@ -1013,7 +1019,11 @@ function TravelPane({
                           placeholder={label('VD: Đặt xe sân bay', 'e.g. Airport transfer')}
                         />
                       </label>
-                      <button type="button" className="btn btn-secondary" onClick={() => addCheck(it.id)}>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => addCheck(it.id)}
+                      >
                         {label('Thêm', 'Add')}
                       </button>
                     </div>
@@ -1170,9 +1180,7 @@ function ClientsPane({ practiceId, vi }: { practiceId: PracticeId; vi: boolean }
             <li key={it.id} className="wb-module-row">
               <div className="wb-module-meta">
                 <strong>{it.name}</strong>
-                <span>
-                  {[it.contact, it.phone, it.email].filter(Boolean).join(' · ')}
-                </span>
+                <span>{[it.contact, it.phone, it.email].filter(Boolean).join(' · ')}</span>
                 {it.note ? <span>{it.note}</span> : null}
               </div>
               <WbRowActions>
@@ -1337,7 +1345,10 @@ function ContractsPane({
         </label>
         <label>
           <span>{label('Trạng thái', 'Status')}</span>
-          <select value={status} onChange={(e) => setStatus(e.target.value as WbContractItem['status'])}>
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value as WbContractItem['status'])}
+          >
             <option value="draft">{label('Nháp', 'Draft')}</option>
             <option value="active">{label('Hiệu lực', 'Active')}</option>
             <option value="expired">{label('Hết hạn', 'Expired')}</option>
@@ -1358,7 +1369,9 @@ function ContractsPane({
         </label>
         <div className="teacher-chip-row">
           <button type="button" className="btn btn-primary" onClick={save}>
-            {editingId ? label('Lưu hợp đồng', 'Save contract') : label('Thêm hợp đồng', 'Add contract')}
+            {editingId
+              ? label('Lưu hợp đồng', 'Save contract')
+              : label('Thêm hợp đồng', 'Add contract')}
           </button>
           {editingId ? (
             <button type="button" className="btn btn-secondary" onClick={clearForm}>
@@ -1380,7 +1393,10 @@ function ContractsPane({
                     {it.title} · {statusLabel(it.status)}
                   </strong>
                   <span>
-                    {[it.party, it.startDate && it.endDate ? `${it.startDate} → ${it.endDate}` : it.endDate]
+                    {[
+                      it.party,
+                      it.startDate && it.endDate ? `${it.startDate} → ${it.endDate}` : it.endDate,
+                    ]
                       .filter(Boolean)
                       .join(' · ')}
                   </span>
@@ -1580,7 +1596,10 @@ function MattersPane({
         </label>
         <label>
           <span>{label('Trạng thái', 'Status')}</span>
-          <select value={status} onChange={(e) => setStatus(e.target.value as WbMatterItem['status'])}>
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value as WbMatterItem['status'])}
+          >
             <option value="open">{label('Đang xử lý', 'Open')}</option>
             <option value="pending">{label('Chờ', 'Pending')}</option>
             <option value="closed">{label('Đã đóng', 'Closed')}</option>
@@ -1618,7 +1637,11 @@ function MattersPane({
                     {it.title} · {statusLabel(it.status)}
                   </strong>
                   <span>
-                    {[it.client, it.matterType, it.nextDate ? `${label('Mốc', 'Next')}: ${it.nextDate}` : null]
+                    {[
+                      it.client,
+                      it.matterType,
+                      it.nextDate ? `${label('Mốc', 'Next')}: ${it.nextDate}` : null,
+                    ]
                       .filter(Boolean)
                       .join(' · ')}
                   </span>

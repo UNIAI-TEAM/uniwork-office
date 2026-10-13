@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { ReactElement } from 'react'
-import type { PracticeId, WorkbenchModuleId } from '@uniwork/practice-core'
-import { AiTypingIndicator, IconStop } from '@genoffice/ui'
+import type { KeyboardEvent, ReactElement, ReactNode } from 'react'
+import { getPractice, type PracticeId, type WorkbenchModuleId } from '@uniwork/practice-core'
+import { AiTypingIndicator, IconSend, IconStop, UniAiMark } from '@genoffice/ui'
 import { applyAgentIntent, undoAgentAddItem } from './agent-intent-apply'
 import { emitAgentIntentNavigate } from './agent-intent-bus'
 import { buildMyAiContextPack, type MyAiContextPack } from './context-manager'
@@ -56,6 +56,7 @@ import {
   softAiActivationMessage,
 } from './my-ai-activation'
 import type { RecentEntry } from '../../shared/home-api'
+import { FileBadge } from './FileBadge'
 import { FILE_EXCERPT_MAX_FILES, formatExcerptsForPrompt } from '../../shared/file-excerpt'
 
 type ChatRole = 'user' | 'assistant' | 'system'
@@ -78,6 +79,8 @@ interface ChatMessage {
   contextUsed?: boolean
   streaming?: boolean
   attachments?: AttachmentMeta[]
+  /** a failed action: rendered with danger tokens instead of the neutral notice look */
+  tone?: 'error'
 }
 
 const PASTE_MIME_EXT: Record<string, string> = {
@@ -87,100 +90,211 @@ const PASTE_MIME_EXT: Record<string, string> = {
   'image/webp': 'webp',
 }
 
+type SuggestionGroupId = 'write' | 'data' | 'present' | 'files' | 'plan'
+/** `role` is the active practice's playbook chips; the rest are fixed office work. */
+type GroupId = 'role' | SuggestionGroupId
+
 interface Suggestion {
   id: string
-  labelVi: string
-  labelEn: string
+  group: SuggestionGroupId
   promptVi: string
   promptEn: string
 }
 
+const SUGGESTION_GROUPS: readonly { id: SuggestionGroupId; labelVi: string; labelEn: string }[] = [
+  { id: 'write', labelVi: 'Soạn thảo', labelEn: 'Write' },
+  { id: 'data', labelVi: 'Bảng tính', labelEn: 'Sheets' },
+  { id: 'present', labelVi: 'Trình bày', labelEn: 'Present' },
+  { id: 'files', labelVi: 'Tài liệu', labelEn: 'Files' },
+  { id: 'plan', labelVi: 'Công việc', labelEn: 'Tasks' },
+]
+
+// Everyday enterprise office work; each prompt must still hit a my-ai-router branch.
 const SUGGESTIONS: readonly Suggestion[] = [
   {
     id: 'draft-doc',
-    labelVi: 'Soạn Word theo yêu cầu',
-    labelEn: 'Draft Word from brief',
-    promptVi: 'Soạn văn bản Word: thư mời họp khách hàng tuần tới',
-    promptEn: 'Draft a Word doc: client meeting invitation for next week',
+    group: 'write',
+    promptVi: 'Soạn văn bản Word: công văn gửi đối tác thông báo lịch giao hàng tháng tới',
+    promptEn: 'Draft a Word doc: letter to a partner announcing next month’s delivery schedule',
   },
   {
-    id: 'open-file',
-    labelVi: 'Mở file gần đây',
-    labelEn: 'Open a recent file',
-    promptVi: 'Mở file báo cáo',
-    promptEn: 'Open report file',
-  },
-  {
-    id: 'search',
-    labelVi: 'Tìm file',
-    labelEn: 'Find a file',
-    promptVi: 'Tìm file hợp đồng',
-    promptEn: 'Find contract file',
-  },
-  {
-    id: 'sum',
-    labelVi: 'Tóm tắt file gần đây',
-    labelEn: 'Summarize recents',
-    promptVi: 'Tóm tắt file gần đây',
-    promptEn: 'Summarize recent files',
-  },
-  {
-    id: 'task',
-    labelVi: 'Thêm việc',
-    labelEn: 'Add a task',
-    promptVi: 'Thêm công việc gọi khách lúc 15 giờ',
-    promptEn: 'Add a task to call the client at 3pm',
-  },
-  {
-    id: 'slide',
-    labelVi: 'Tạo Slide AI',
-    labelEn: 'AI Slides',
-    promptVi: 'Tạo bài thuyết trình về kế hoạch quý',
-    promptEn: 'Create a presentation about the quarterly plan',
-  },
-  {
-    id: 'pdf',
-    labelVi: 'Tạo PDF',
-    labelEn: 'New PDF',
-    promptVi: 'Tạo file PDF mới',
-    promptEn: 'Create a new PDF file',
-  },
-  {
-    id: 'cal',
-    labelVi: 'Mở lịch',
-    labelEn: 'Open calendar',
-    promptVi: 'Mở tab lịch của tôi',
-    promptEn: 'Open my calendar tab',
+    id: 'minutes',
+    group: 'write',
+    promptVi: 'Soạn văn bản Word: biên bản họp giao ban tuần, có mục kết luận và người phụ trách',
+    promptEn: 'Draft a Word doc: weekly team meeting minutes with decisions and owners',
   },
   {
     id: 'multi',
-    labelVi: '1 câu = nhiều bước',
-    labelEn: 'One shot, multi-step',
+    group: 'write',
     promptVi: 'Soạn báo giá Word và thêm công việc follow-up khách, mở tab Clients',
     promptEn: 'Draft a Word quote and add a follow-up task, open Clients tab',
   },
   {
-    id: 'continue',
-    labelVi: 'Tiếp tục tab đang mở',
-    labelEn: 'Continue open tab',
-    promptVi: 'Tiếp tục trên file đang mở: làm rõ phần kết luận',
-    promptEn: 'Continue on the open file: clarify the conclusion section',
+    id: 'revenue-sheet',
+    group: 'data',
+    promptVi: 'Tạo bảng Excel báo cáo doanh thu theo tháng và theo kênh bán',
+    promptEn: 'Create an Excel sheet reporting revenue by month and sales channel',
+  },
+  {
+    id: 'expense-sheet',
+    group: 'data',
+    promptVi: 'Tạo bảng Excel theo dõi chi phí phòng ban theo tháng',
+    promptEn: 'Create an Excel sheet tracking department expenses by month',
+  },
+  {
+    id: 'project-plan',
+    group: 'data',
+    promptVi: 'Tạo bảng Excel kế hoạch dự án có mốc thời gian, người phụ trách và trạng thái',
+    promptEn: 'Create an Excel project plan with milestones, owners and status',
+  },
+  {
+    id: 'quarter-slides',
+    group: 'present',
+    promptVi: 'Tạo bài thuyết trình báo cáo kết quả kinh doanh quý cho ban giám đốc',
+    promptEn: 'Create a slide deck on quarterly business results for the leadership team',
+  },
+  {
+    id: 'company-slides',
+    group: 'present',
+    promptVi: 'Tạo bài thuyết trình giới thiệu năng lực công ty cho khách hàng mới',
+    promptEn: 'Create a slide deck introducing our company to a new client',
+  },
+  {
+    id: 'search',
+    group: 'files',
+    promptVi: 'Tìm file hợp đồng',
+    promptEn: 'Find file: contract',
+  },
+  {
+    id: 'sum',
+    group: 'files',
+    promptVi: 'Tóm tắt file gần đây',
+    promptEn: 'Summarize recent files',
   },
   {
     id: 'sum-active',
-    labelVi: 'Tóm tắt tab đang mở',
-    labelEn: 'Summarize open tab',
+    group: 'files',
     promptVi: 'Tóm tắt file đang mở',
-    promptEn: 'Summarize the open file',
+    promptEn: 'Summarize the active file',
   },
   {
-    id: 'sheet-ai',
-    labelVi: 'Tạo Excel AI',
-    labelEn: 'AI Excel',
-    promptVi: 'Tạo bảng Excel theo dõi doanh số tháng này',
-    promptEn: 'Create an Excel sheet to track this month’s sales',
+    id: 'continue',
+    group: 'files',
+    promptVi:
+      'Tiếp tục trên file đang mở: rà soát câu chữ cho trang trọng, đúng văn phong doanh nghiệp',
+    promptEn: 'Continue on the open file: tighten the wording into a formal business tone',
+  },
+  {
+    id: 'task',
+    group: 'plan',
+    promptVi: 'Thêm công việc gửi báo cáo tuần cho trưởng phòng lúc 16 giờ',
+    promptEn: 'Add a task to send the weekly report to my manager at 4pm',
+  },
+  {
+    id: 'tasks-tab',
+    group: 'plan',
+    promptVi: 'Mở tab công việc của tôi',
+    promptEn: 'Open my tasks tab',
+  },
+  {
+    id: 'cal',
+    group: 'plan',
+    promptVi: 'Mở tab lịch của tôi',
+    promptEn: 'Open my calendar tab',
   },
 ]
+
+/** The sentence a suggestion row shows: the prompt minus its routing prefix. */
+function suggestionText(prompt: string): string {
+  const body = prompt.replace(/^(Soạn văn bản Word|Draft a Word doc):\s*/i, '')
+  return body.charAt(0).toUpperCase() + body.slice(1)
+}
+
+/** "2 giờ trước" / "2 hours ago"; past a week, a short date. */
+function relativeTime(ms: number, vi: boolean, now = Date.now()): string {
+  const locale = vi ? 'vi' : 'en'
+  const sec = Math.round((ms - now) / 1000)
+  const abs = Math.abs(sec)
+  const rtf = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' })
+  if (abs < 60) return rtf.format(0, 'second')
+  if (abs < 3600) return rtf.format(Math.round(sec / 60), 'minute')
+  if (abs < 86400) return rtf.format(Math.round(sec / 3600), 'hour')
+  if (abs < 7 * 86400) return rtf.format(Math.round(sec / 86400), 'day')
+  return new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short' }).format(ms)
+}
+
+function greeting(vi: boolean, hour = new Date().getHours()): string {
+  if (hour < 11) return vi ? 'Chào buổi sáng' : 'Good morning'
+  if (hour < 13) return vi ? 'Chào buổi trưa' : 'Good afternoon'
+  if (hour < 18) return vi ? 'Chào buổi chiều' : 'Good afternoon'
+  return vi ? 'Chào buổi tối' : 'Good evening'
+}
+
+/** 16px / 1.2 stroke grid, same as the @genoffice/ui icon set. */
+function Glyph({ children }: { children: ReactNode }): ReactElement {
+  return (
+    <svg
+      width={16}
+      height={16}
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      {children}
+    </svg>
+  )
+}
+
+const GROUP_GLYPHS: Record<GroupId, ReactElement> = {
+  role: (
+    <>
+      <rect x="2.5" y="5" width="11" height="8" rx="1.5" />
+      <path d="M6 5V3.8c0-.4.3-.8.8-.8h2.4c.5 0 .8.4.8.8V5M2.5 8.5h11" />
+    </>
+  ),
+  write: (
+    <>
+      <path d="M4 2.5h5.5L12 5v8.5H4z" />
+      <path d="M9.5 2.5V5H12M6 8h4M6 10.5h4" />
+    </>
+  ),
+  data: (
+    <>
+      <rect x="2.5" y="3" width="11" height="10" rx="1.5" />
+      <path d="M2.5 6.5h11M2.5 10h11M6.5 3v10" />
+    </>
+  ),
+  present: (
+    <>
+      <rect x="2" y="3" width="12" height="8" rx="1.2" />
+      <path d="M8 11v2.5M5.5 13.5h5" />
+    </>
+  ),
+  files: (
+    <>
+      <circle cx="7" cy="7" r="4" />
+      <path d="m10 10 3.5 3.5" />
+    </>
+  ),
+  plan: (
+    <>
+      <rect x="2.5" y="3.5" width="11" height="10" rx="1.5" />
+      <path d="M2.5 6.5h11M5.5 2v3M10.5 2v3M6 10l1.5 1.5 3-3" />
+    </>
+  ),
+}
+
+function IconPaperclip(): ReactElement {
+  return (
+    <Glyph>
+      <path d="M13.2 7.6 8 12.8a3.2 3.2 0 0 1-4.5-4.5l5.4-5.4a2.1 2.1 0 0 1 3 3L6.5 11.3a1.1 1.1 0 0 1-1.5-1.5l4.8-4.8" />
+    </Glyph>
+  )
+}
 
 function newId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
@@ -270,14 +384,62 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
   const streamCancelRef = useRef<(() => void) | null>(null)
   const skipPersistRef = useRef(false)
   const practiceChips = useMemo(() => practiceMyAiChips(practiceId), [practiceId])
+  const [openGroup, setOpenGroup] = useState<GroupId | null>(null)
+  const groupBtnRefs = useRef<Partial<Record<GroupId, HTMLButtonElement | null>>>({})
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [continueFiles, setContinueFiles] = useState<RecentEntry[]>([])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' })
   }, [messages, busy])
 
+  const hasThread = messages.length > 0
+
+  // "Pick up where you left off" on the empty screen: the three newest reachable recents
   useEffect(() => {
-    inputRef.current?.focus()
-  }, [])
+    if (hasThread) return
+    let alive = true
+    const refresh = () => {
+      loadRecents(12)
+        .then((entries) => {
+          if (alive) setContinueFiles(entries.slice(0, 3))
+        })
+        .catch(() => {
+          if (alive) setContinueFiles([])
+        })
+    }
+    // no recents-changed event exists; coming back from a document tab focuses/reveals Home
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refresh()
+    }
+    refresh()
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      alive = false
+      window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [hasThread])
+
+  useEffect(() => {
+    if (copiedId === null) return
+    const t = window.setTimeout(() => setCopiedId(null), 1600)
+    return () => window.clearTimeout(t)
+  }, [copiedId])
+
+  const copyMessage = async (m: ChatMessage) => {
+    try {
+      await navigator.clipboard.writeText(m.text)
+      setCopiedId(m.id)
+    } catch {
+      // clipboard denied: leave the button as is rather than claim success
+    }
+  }
+  // the composer remounts when the thread starts and is disabled while busy: hand focus back each time
+  useEffect(() => {
+    if (!busy) inputRef.current?.focus()
+  }, [busy, hasThread])
 
   useEffect(() => {
     skipPersistRef.current = true
@@ -513,7 +675,7 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
         patchMessage(msgId, {
           text,
           streaming: false,
-          ...(result.ok ? {} : { role: 'system' as const }),
+          ...(result.ok ? {} : { role: 'system' as const, tone: 'error' as const }),
         })
       }
       return { ...result, messageId: msgId }
@@ -532,7 +694,9 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
       if (looksLikeMissingAiActivation(error)) {
         return activationFailure(msgId, showBubble)
       }
-      if (msgId) patchMessage(msgId, { text: error, streaming: false, role: 'system' })
+      if (msgId) {
+        patchMessage(msgId, { text: error, streaming: false, role: 'system', tone: 'error' })
+      }
       return { ok: false, error, messageId: msgId }
     }
   }
@@ -609,6 +773,7 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
       pendingResumeRef.current = null
       push({
         role: 'system',
+        tone: 'error',
         text: label(
           `Lỗi: ${err instanceof Error ? err.message : String(err)}`,
           `Error: ${err instanceof Error ? err.message : String(err)}`,
@@ -1576,6 +1741,7 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
     } catch (err) {
       push({
         role: 'system',
+        tone: 'error',
         text: label(
           `Lỗi: ${err instanceof Error ? err.message : String(err)}`,
           `Error: ${err instanceof Error ? err.message : String(err)}`,
@@ -1638,140 +1804,35 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
 
   const empty = messages.length === 0
   const canSend = !busy && (Boolean(input.trim()) || attachments.length > 0)
+  const practice = getPractice(practiceId)
+  const groups: { id: GroupId; label: string }[] = [
+    ...(practiceChips.length > 0 && practice
+      ? [{ id: 'role' as const, label: vi ? practice.labelVi : practice.labelEn }]
+      : []),
+    ...SUGGESTION_GROUPS.map((g) => ({ id: g.id, label: vi ? g.labelVi : g.labelEn })),
+  ]
+  const groupPrompts: { id: string; prompt: string }[] =
+    openGroup === null
+      ? []
+      : openGroup === 'role'
+        ? practiceChips.map((c) => ({ id: `p-${c.id}`, prompt: vi ? c.promptVi : c.promptEn }))
+        : SUGGESTIONS.filter((s) => s.group === openGroup).map((s) => ({
+            id: s.id,
+            prompt: vi ? s.promptVi : s.promptEn,
+          }))
 
-  return (
-    <main className="new-chat" aria-label={label('Trợ lý của bạn', 'My AI')}>
-      <header className="new-chat-bar">
-        <div>
-          <strong>{label('Trợ lý của bạn', 'My AI')}</strong>
-          <span>
-            {label(
-              'Lưu theo vai · thêm mục trên máy có Hoàn tác · AI/Token hỏi trước khi chạy.',
-              'Saved per role · on-device adds support Undo · AI/Tokens ask first.',
-            )}
-          </span>
-        </div>
-        <button type="button" className="btn" onClick={resetChat} disabled={busy && empty}>
-          {label('Chat mới', 'New chat')}
-        </button>
-      </header>
+  // Esc closes the open list from the buttons or the list and returns focus to its button
+  const onGroupKeyDown = (e: KeyboardEvent) => {
+    if (e.key !== 'Escape' || openGroup === null) return
+    e.stopPropagation()
+    groupBtnRefs.current[openGroup]?.focus()
+    setOpenGroup(null)
+  }
 
-      <div className="new-chat-body">
-        {empty ? (
-          <div className="new-chat-hero">
-            <p className="new-chat-kicker">uniAI · UniWork Office</p>
-            <h1>{label('Bạn muốn làm gì hôm nay?', 'What do you want to get done?')}</h1>
-            <p className="new-chat-sub">
-              {label(
-                'Ví dụ: “Soạn báo giá Word và thêm việc follow-up, mở Clients”, “Tóm tắt file gần đây”.',
-                'e.g. “Draft a Word quote and add a follow-up task, open Clients”, “Summarize recent files”.',
-              )}
-            </p>
-            <div className="new-chat-suggestions" role="list">
-              {practiceChips.map((s) => (
-                <button
-                  key={`p-${s.id}`}
-                  type="button"
-                  className="new-chat-chip is-practice"
-                  role="listitem"
-                  disabled={busy}
-                  onClick={() => submit(vi ? s.promptVi : s.promptEn)}
-                >
-                  {vi ? s.labelVi : s.labelEn}
-                </button>
-              ))}
-              {SUGGESTIONS.map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  className="new-chat-chip"
-                  role="listitem"
-                  disabled={busy}
-                  onClick={() => submit(vi ? s.promptVi : s.promptEn)}
-                >
-                  {vi ? s.labelVi : s.labelEn}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="new-chat-thread" aria-live="polite">
-            {messages.map((m) => (
-              <article
-                key={m.id}
-                className={`new-chat-msg is-${m.role}${m.streaming ? ' is-streaming' : ''}`}
-                data-role={m.role}
-              >
-                <span className="new-chat-msg-role">
-                  {m.role === 'user'
-                    ? label('Bạn', 'You')
-                    : m.role === 'assistant'
-                      ? 'uniAI'
-                      : label('Hệ thống', 'System')}
-                </span>
-                {m.attachments && m.attachments.length > 0 ? (
-                  <div
-                    className="new-chat-msg-atts"
-                    aria-label={label('Tệp đính kèm', 'Attachments')}
-                  >
-                    {m.attachments.map((a) =>
-                      isImageAttachment(a) ? (
-                        <span key={a.path} className="new-chat-att-thumb" title={a.name}>
-                          {attachmentPreviews[a.path] ? (
-                            <img src={attachmentPreviews[a.path]} alt={a.name} />
-                          ) : (
-                            <span className="new-chat-att-thumb-fallback">
-                              {a.ext.toUpperCase()}
-                            </span>
-                          )}
-                        </span>
-                      ) : (
-                        <span key={a.path} className="new-chat-att-card" title={a.name}>
-                          <span className="new-chat-att-card-ext">{a.ext.toUpperCase()}</span>
-                          <span className="new-chat-att-card-meta">
-                            <span className="new-chat-att-card-name">{a.name}</span>
-                            <span className="new-chat-att-card-size">
-                              {formatAttachmentSize(a.sizeBytes)}
-                            </span>
-                          </span>
-                        </span>
-                      ),
-                    )}
-                  </div>
-                ) : null}
-                {m.streaming && !m.text ? (
-                  <AiTypingIndicator label={label('Đang suy nghĩ', 'Thinking')} />
-                ) : (
-                  <p className={m.streaming ? 'is-streaming-text' : undefined}>{m.text}</p>
-                )}
-                {m.choices && m.choices.length > 0 && !m.choicesResolved ? (
-                  <div className="new-chat-msg-choices" role="group">
-                    {m.choices.map((c) => (
-                      <button
-                        key={c.id}
-                        type="button"
-                        className="new-chat-chip"
-                        disabled={busy}
-                        onClick={() => onChoice(m.id, c)}
-                      >
-                        {c.label}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-              </article>
-            ))}
-            {busy && !messages.some((m) => m.streaming) ? (
-              <div className="new-chat-typing-row">
-                <AiTypingIndicator label={label('Đang xử lý', 'Working')} />
-              </div>
-            ) : null}
-            <div ref={bottomRef} />
-          </div>
-        )}
-      </div>
-
-      <footer className="new-chat-composer">
+  // One composer instance: under the greeting while empty, docked at the bottom once a thread exists.
+  const composer = (
+    <footer className="new-chat-composer">
+      <div className="new-chat-composer-box">
         {attachments.length > 0 ? (
           <div className="new-chat-composer-atts" role="list">
             {attachments.map((a) => (
@@ -1804,13 +1865,18 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
         {attachNotice ? <p className="new-chat-attach-notice">{attachNotice}</p> : null}
         <textarea
           ref={inputRef}
-          rows={2}
+          rows={1}
           value={input}
           disabled={busy}
-          placeholder={label(
-            'Soạn Word… · Đính kèm file/ảnh · Tóm tắt Recent…',
-            'Draft Word… · Attach files/images · Summarize Recents…',
-          )}
+          aria-label={label('Yêu cầu cho UniAI', 'Message UniAI')}
+          placeholder={
+            hasThread
+              ? label('Trả lời UniAI…', 'Reply to UniAI…')
+              : label(
+                  'Giao việc cho UniAI: soạn văn bản, lập bảng, tóm tắt tài liệu…',
+                  'Ask UniAI to draft a document, build a sheet, summarize a file…',
+                )
+          }
           onChange={(e) => setInput(e.target.value)}
           onPaste={(e) => {
             const items = e.clipboardData?.items
@@ -1861,45 +1927,290 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
           }}
         />
         <div className="new-chat-composer-actions">
-          <div className="new-chat-composer-left">
-            <button
-              type="button"
-              className="btn new-chat-attach-btn"
-              disabled={busy}
-              onClick={() => void pickFiles()}
-              title={label('Đính kèm file hoặc ảnh', 'Attach files or images')}
-            >
-              {label('Đính kèm', 'Attach')}
-            </button>
-            <span>
-              {label(
-                'Enter gửi · Shift+Enter xuống dòng',
-                'Enter to send · Shift+Enter for newline',
-              )}
-            </span>
-          </div>
+          <button
+            type="button"
+            className="new-chat-icon-btn"
+            disabled={busy}
+            onClick={() => void pickFiles()}
+            title={label('Đính kèm file hoặc ảnh', 'Attach files or images')}
+            aria-label={label('Đính kèm file hoặc ảnh', 'Attach files or images')}
+          >
+            <IconPaperclip />
+          </button>
           {busy ? (
             <button
               type="button"
-              className="btn"
+              className="new-chat-send is-stop"
               onClick={stopStream}
               title={label('Dừng', 'Stop')}
+              aria-label={label('Dừng', 'Stop')}
             >
-              <IconStop />
-              <span>{label('Dừng', 'Stop')}</span>
+              <IconStop size={14} />
             </button>
           ) : (
             <button
               type="button"
-              className="btn btn-primary"
+              className="new-chat-send"
               disabled={!canSend}
               onClick={() => submit()}
+              title={label(
+                'Gửi (Enter) · Shift+Enter xuống dòng',
+                'Send (Enter) · Shift+Enter for newline',
+              )}
+              aria-label={label('Gửi', 'Send')}
             >
-              {label('Gửi', 'Send')}
+              <IconSend size={16} />
             </button>
           )}
         </div>
-      </footer>
+      </div>
+    </footer>
+  )
+
+  const footnote = (
+    <p className="new-chat-footnote">
+      {label(
+        'UniAI hỏi trước khi dùng token AI · Thao tác thêm trên máy đều hoàn tác được · Lịch sử lưu theo vai trò',
+        'UniAI asks before spending AI tokens · On-device changes can be undone · History is kept per role',
+      )}
+    </p>
+  )
+
+  return (
+    <main
+      className={`new-chat${empty ? ' is-empty' : ''}`}
+      aria-label={label('Trợ lý của bạn', 'My AI')}
+    >
+      <header className="new-chat-bar">
+        <h1 className="new-chat-title">{label('Trợ lý của bạn', 'My AI')}</h1>
+        {empty ? null : (
+          <button type="button" className="new-chat-ghost-btn" onClick={resetChat} disabled={busy}>
+            <Glyph>
+              <path d="M8 3.5v9M3.5 8h9" />
+            </Glyph>
+            {label('Chat mới', 'New chat')}
+          </button>
+        )}
+      </header>
+
+      <div className="new-chat-body">
+        {empty ? (
+          <div className="new-chat-hero">
+            <h2 className="new-chat-greeting">
+              <UniAiMark size={28} />
+              {greeting(vi)}
+            </h2>
+            {composer}
+            <div
+              className="new-chat-groups"
+              role="group"
+              aria-label={label('Gợi ý theo nhóm việc', 'Suggestions by kind of work')}
+              onKeyDown={onGroupKeyDown}
+            >
+              {groups.map((g) => (
+                <button
+                  key={g.id}
+                  ref={(el) => {
+                    groupBtnRefs.current[g.id] = el
+                  }}
+                  type="button"
+                  className={`new-chat-group-btn${openGroup === g.id ? ' is-open' : ''}`}
+                  aria-expanded={openGroup === g.id}
+                  aria-controls="new-chat-group-list"
+                  disabled={busy}
+                  onClick={() => setOpenGroup((cur) => (cur === g.id ? null : g.id))}
+                >
+                  <Glyph>{GROUP_GLYPHS[g.id]}</Glyph>
+                  {g.label}
+                </button>
+              ))}
+            </div>
+            {groupPrompts.length > 0 ? (
+              <ul
+                id="new-chat-group-list"
+                key={openGroup}
+                className="new-chat-group-list"
+                aria-label={groups.find((g) => g.id === openGroup)?.label}
+                onKeyDown={onGroupKeyDown}
+              >
+                {groupPrompts.map((g) => (
+                  <li key={g.id}>
+                    <button
+                      type="button"
+                      className="new-chat-prompt"
+                      disabled={busy}
+                      title={suggestionText(g.prompt)}
+                      onClick={() => {
+                        setOpenGroup(null)
+                        submit(g.prompt)
+                      }}
+                    >
+                      <span>{suggestionText(g.prompt)}</span>
+                      <Glyph>
+                        <path d="M3.5 8h9M9 4.5 12.5 8 9 11.5" />
+                      </Glyph>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            {continueFiles.length > 0 ? (
+              <section className="new-chat-continue" aria-labelledby="new-chat-continue-title">
+                <h3 id="new-chat-continue-title" className="new-chat-continue-title">
+                  {label('Làm tiếp', 'Pick up where you left off')}
+                </h3>
+                <ul className="new-chat-continue-list">
+                  {continueFiles.map((f) => (
+                    <li key={f.path} className="new-chat-continue-row">
+                      <button
+                        type="button"
+                        className="new-chat-continue-open"
+                        title={f.path}
+                        onClick={() => {
+                          window.aiOffice.openPath(f.path).catch((err: unknown) => {
+                            push({
+                              role: 'system',
+                              tone: 'error',
+                              text: label(
+                                `Không mở được “${f.name}”: ${err instanceof Error ? err.message : String(err)}`,
+                                `Couldn’t open “${f.name}”: ${err instanceof Error ? err.message : String(err)}`,
+                              ),
+                            })
+                          })
+                        }}
+                      >
+                        <FileBadge ext={f.ext} size={28} />
+                        <span className="new-chat-continue-name">{f.name}</span>
+                        <span className="new-chat-continue-time">
+                          {relativeTime(f.mtimeMs, vi)}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        className="new-chat-continue-ask"
+                        disabled={busy}
+                        aria-label={label(`Tóm tắt ${f.name}`, `Summarize ${f.name}`)}
+                        onClick={() =>
+                          submit(vi ? `Tóm tắt file ${f.name}` : `Summarize file ${f.name}`)
+                        }
+                      >
+                        {label('Tóm tắt', 'Summarize')}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+          </div>
+        ) : null}
+        {empty ? footnote : null}
+        {empty ? null : (
+          <div className="new-chat-thread" aria-live="polite">
+            {messages.map((m) => (
+              <article
+                key={m.id}
+                className={`new-chat-msg is-${m.role}${m.streaming ? ' is-streaming' : ''}${m.tone === 'error' ? ' is-error' : ''}`}
+                data-role={m.role}
+              >
+                {m.role === 'user' ? null : (
+                  <span className="new-chat-msg-role">
+                    {m.role === 'assistant' ? <UniAiMark size={18} /> : null}
+                    {m.role === 'assistant'
+                      ? 'UniAI'
+                      : m.tone === 'error'
+                        ? label('Chưa thực hiện được', 'Couldn’t complete')
+                        : label('Hệ thống', 'System')}
+                  </span>
+                )}
+                {m.attachments && m.attachments.length > 0 ? (
+                  <div
+                    className="new-chat-msg-atts"
+                    aria-label={label('Tệp đính kèm', 'Attachments')}
+                  >
+                    {m.attachments.map((a) =>
+                      isImageAttachment(a) ? (
+                        <span key={a.path} className="new-chat-att-thumb" title={a.name}>
+                          {attachmentPreviews[a.path] ? (
+                            <img src={attachmentPreviews[a.path]} alt={a.name} />
+                          ) : (
+                            <span className="new-chat-att-thumb-fallback">
+                              {a.ext.toUpperCase()}
+                            </span>
+                          )}
+                        </span>
+                      ) : (
+                        <span key={a.path} className="new-chat-att-card" title={a.name}>
+                          <span className="new-chat-att-card-ext">{a.ext.toUpperCase()}</span>
+                          <span className="new-chat-att-card-meta">
+                            <span className="new-chat-att-card-name">{a.name}</span>
+                            <span className="new-chat-att-card-size">
+                              {formatAttachmentSize(a.sizeBytes)}
+                            </span>
+                          </span>
+                        </span>
+                      ),
+                    )}
+                  </div>
+                ) : null}
+                {m.streaming && !m.text ? (
+                  <AiTypingIndicator label={label('Đang suy nghĩ', 'Thinking')} />
+                ) : (
+                  <p className={m.streaming ? 'is-streaming-text' : undefined}>{m.text}</p>
+                )}
+                {m.choices && m.choices.length > 0 && !m.choicesResolved ? (
+                  <div className="new-chat-msg-choices" role="group">
+                    {m.choices.map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        className="new-chat-chip"
+                        disabled={busy}
+                        onClick={() => onChoice(m.id, c)}
+                      >
+                        {c.label}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+                {m.role === 'assistant' && !m.streaming && m.text ? (
+                  <div className="new-chat-msg-actions">
+                    <button
+                      type="button"
+                      className="new-chat-msg-action"
+                      onClick={() => void copyMessage(m)}
+                    >
+                      <Glyph>
+                        {copiedId === m.id ? (
+                          <path d="M3.5 8.5 6.5 11.5 12.5 4.5" />
+                        ) : (
+                          <>
+                            <rect x="5.5" y="5.5" width="8" height="8" rx="1.5" />
+                            <path d="M10.5 5.5V4a1.5 1.5 0 0 0-1.5-1.5H4A1.5 1.5 0 0 0 2.5 4v5A1.5 1.5 0 0 0 4 10.5h1.5" />
+                          </>
+                        )}
+                      </Glyph>
+                      <span aria-live="polite">
+                        {copiedId === m.id
+                          ? label('Đã sao chép', 'Copied')
+                          : label('Sao chép', 'Copy')}
+                      </span>
+                    </button>
+                  </div>
+                ) : null}
+              </article>
+            ))}
+            {busy && !messages.some((m) => m.streaming) ? (
+              <div className="new-chat-typing-row">
+                <AiTypingIndicator label={label('Đang xử lý', 'Working')} />
+              </div>
+            ) : null}
+            <div ref={bottomRef} />
+          </div>
+        )}
+      </div>
+
+      {empty ? null : composer}
+      {empty ? null : footnote}
     </main>
   )
 }

@@ -6,7 +6,7 @@ import type { CSSProperties, MouseEvent as ReactMouseEvent } from 'react'
 import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url'
-import { AiPanel, GensparkMark } from './ai/AiPanel'
+import { AiPanel } from './ai/AiPanel'
 import { AiAskPopover, type AskAnchorRect } from './AiAskPopover'
 import { AppOnlyNote } from './AppOnlyNote'
 import { narrowPane, widthFitScale } from './fit-scale'
@@ -132,6 +132,7 @@ import {
   rememberAiPanelOpen,
   useDismissablePopover,
   useRibbonCollapse,
+  UniAiMark,
 } from '@genoffice/ui'
 import { useI18n } from './i18n/locale'
 import { useAutosave } from './useAutosave'
@@ -6558,7 +6559,7 @@ export default function App() {
                       onClick={() => setAiCollapsed((v) => !v)}
                     >
                       <span className="rb-big-icon">
-                        <GensparkMark size={26} />
+                        <UniAiMark size={26} />
                       </span>
                       <span>AI</span>
                     </button>
@@ -6725,7 +6726,7 @@ export default function App() {
                     >
                       <span className="rb-big-icon">
                         <span className="ai-feature-icon" aria-hidden="true">
-                          <GensparkMark size={20} />
+                          <UniAiMark variant="glyph" size={20} />
                         </span>
                       </span>
                       <span>{t('aiProcessNotesBtn')}</span>
@@ -6944,7 +6945,7 @@ export default function App() {
                     >
                       <span className="rb-big-icon">
                         <span className="ai-feature-icon" aria-hidden="true">
-                          <GensparkMark size={20} />
+                          <UniAiMark variant="glyph" size={20} />
                         </span>
                       </span>
                       <span>{t('aiFillFormBtn')}</span>
@@ -7279,7 +7280,7 @@ export default function App() {
                 aria-label={t('aiOpenAssistant')}
                 onClick={() => setAiCollapsed(false)}
               >
-                <GensparkMark size={22} />
+                <UniAiMark size={22} />
               </button>
             )}
             <AiPanel

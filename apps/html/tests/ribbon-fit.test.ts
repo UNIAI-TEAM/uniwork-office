@@ -4,8 +4,6 @@ import { createRoot } from 'react-dom/client'
 import { Ribbon } from '../src/renderer/components/Ribbon'
 import { MAX_FIT_LEVEL, nextFitLevel } from '../src/renderer/components/ribbon-fit'
 
-vi.mock('../src/renderer/ai/AiPanel', () => ({ GensparkMark: () => null }))
-
 describe('nextFitLevel', () => {
   it('steps while the band overflows, stops when it fits or at the last level', () => {
     expect(nextFitLevel(0, { scrollWidth: 1300, clientWidth: 1100 })).toBe(1)

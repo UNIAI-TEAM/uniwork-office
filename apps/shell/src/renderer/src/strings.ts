@@ -204,7 +204,7 @@ export const strings = {
     setAboutLegalOpenFailed: '无法打开此文件。',
     setSecIntegrations: '集成',
     setSecBackup: '备份与存储',
-    setSecUniAi: 'uniAI',
+    setSecUniAi: 'UniAI',
     intgHeroTitle: '在 AI 助手里使用 UniWork Office',
     intgHeroDesc:
       '接好后，Claude Code、Codex、Cursor、Claude Desktop 等助手就能替你创建、转换、读取和编辑 Word、Excel、PowerPoint、PDF 和 Markdown 文件。全部在本机完成，不会上传任何内容。',
@@ -292,7 +292,7 @@ export const strings = {
     setAiKeyHint: '密钥仅保存在本机。',
     setAiBaseUrl: 'Base URL',
     setAiBaseUrlHint: '留空使用官方端点。',
-    setAiGensparkHint: 'uniAI 聊天走 OpenRouter。粘贴 OpenRouter Token Hub 密钥（sk-or-...）。',
+    setAiGensparkHint: 'UniAI 聊天走 OpenRouter。粘贴 OpenRouter Token Hub 密钥（sk-or-...）。',
     setAiCodexPath: 'Codex 可执行文件',
     setAiCodexPathHint: '仅自定义安装时填写；留空会自动检测。',
     setAiCodexAutoPlaceholder: '留空自动检测（推荐）',
@@ -573,7 +573,7 @@ export const strings = {
     setAboutLegalOpenFailed: 'Could not open this file.',
     setSecIntegrations: 'Integrations',
     setSecBackup: 'Backup & Storage',
-    setSecUniAi: 'uniAI',
+    setSecUniAi: 'UniAI',
     intgHeroTitle: 'Use UniWork Office from your AI assistant',
     intgHeroDesc:
       'Once connected, Claude Code, Codex, Cursor, Claude Desktop and similar assistants can create, convert, read and edit Word, Excel, PowerPoint, PDF and Markdown files for you. Everything runs on this computer; nothing is uploaded.',
@@ -669,7 +669,7 @@ export const strings = {
     setAiBaseUrl: 'Base URL',
     setAiBaseUrlHint: 'Leave empty for the official endpoint.',
     setAiGensparkHint:
-      'uniAI chats with your own AI key. Paste an OpenRouter key (sk-or-...); it stays on this device.',
+      'UniAI chats with your own AI key. Paste an OpenRouter key (sk-or-...); it stays on this device.',
     setAiCodexPath: 'Codex executable',
     setAiCodexPathHint: 'Only set this for a custom install; leave blank to auto-detect.',
     setAiCodexAutoPlaceholder: 'Auto-detect (recommended)',
@@ -962,7 +962,7 @@ export const strings = {
     setAboutLegalOpenFailed: 'このファイルを開けませんでした。',
     setSecIntegrations: '連携',
     setSecBackup: 'バックアップとストレージ',
-    setSecUniAi: 'uniAI',
+    setSecUniAi: 'UniAI',
     intgHeroTitle: 'AI アシスタントから UniWork Office を使う',
     intgHeroDesc:
       '接続すると、Claude Code、Codex、Cursor、Claude Desktop などのアシスタントが Word、Excel、PowerPoint、PDF、Markdown ファイルの作成・変換・読み取り・編集を代行します。すべてこの PC 上で完結し、何もアップロードされません。',
@@ -1062,7 +1062,7 @@ export const strings = {
     setAiBaseUrl: 'Base URL',
     setAiBaseUrlHint: '空欄で公式エンドポイントを使用します。',
     setAiGensparkHint:
-      'uniAI チャットは OpenRouter 経由です。OpenRouter Token Hub キー（sk-or-...）を貼り付けてください。',
+      'UniAI チャットは OpenRouter 経由です。OpenRouter Token Hub キー（sk-or-...）を貼り付けてください。',
     setAiCodexPath: 'Codex 実行ファイル',
     setAiCodexPathHint: 'カスタムインストール時のみ指定します。空欄なら自動検出します。',
     setAiCodexAutoPlaceholder: '自動検出（推奨）',
@@ -1356,7 +1356,7 @@ export const strings = {
     setAboutLegalOpenFailed: '이 파일을 열 수 없습니다.',
     setSecIntegrations: '연동',
     setSecBackup: '백업 및 저장공간',
-    setSecUniAi: 'uniAI',
+    setSecUniAi: 'UniAI',
     intgHeroTitle: 'AI 어시스턴트에서 UniWork Office 사용하기',
     intgHeroDesc:
       '연결하면 Claude Code, Codex, Cursor, Claude Desktop 등의 어시스턴트가 Word, Excel, PowerPoint, PDF, Markdown 파일을 대신 만들고 변환하고 읽고 편집합니다. 모두 이 컴퓨터에서 처리되며 어떤 내용도 업로드되지 않습니다.',
@@ -1451,7 +1451,7 @@ export const strings = {
     setAiBaseUrl: 'Base URL',
     setAiBaseUrlHint: '비워 두면 공식 엔드포인트를 사용합니다.',
     setAiGensparkHint:
-      'uniAI 채팅은 OpenRouter를 사용합니다. OpenRouter Token Hub 키(sk-or-...)를 붙여넣으세요.',
+      'UniAI 채팅은 OpenRouter를 사용합니다. OpenRouter Token Hub 키(sk-or-...)를 붙여넣으세요.',
     setAiCodexPath: 'Codex 실행 파일',
     setAiCodexPathHint: '사용자 지정 설치에만 입력하세요. 비워 두면 자동 감지합니다.',
     setAiCodexAutoPlaceholder: '자동 감지(권장)',
@@ -1750,7 +1750,7 @@ export const strings = {
     setAboutLegalOpenFailed: 'Impossible d’ouvrir ce fichier.',
     setSecIntegrations: 'Intégrations',
     setSecBackup: 'Sauvegarde et stockage',
-    setSecUniAi: 'uniAI',
+    setSecUniAi: 'UniAI',
     intgHeroTitle: 'Utiliser UniWork Office depuis votre assistant IA',
     intgHeroDesc:
       'Une fois connectés, Claude Code, Codex, Cursor, Claude Desktop et les assistants similaires peuvent créer, convertir, lire et modifier vos fichiers Word, Excel, PowerPoint, PDF et Markdown. Tout se passe sur cet ordinateur ; rien n’est envoyé.',
@@ -1850,7 +1850,7 @@ export const strings = {
     setAiBaseUrl: 'Base URL',
     setAiBaseUrlHint: 'Laisser vide pour le point de terminaison officiel.',
     setAiGensparkHint:
-      'Le chat uniAI utilise OpenRouter. Collez votre clé Token Hub OpenRouter (sk-or-...).',
+      'Le chat UniAI utilise OpenRouter. Collez votre clé Token Hub OpenRouter (sk-or-...).',
     setAiCodexPath: 'Exécutable Codex',
     setAiCodexPathHint:
       'À renseigner uniquement pour une installation personnalisée ; sinon, détection automatique.',
@@ -2155,7 +2155,7 @@ export const strings = {
     setAboutLegalOpenFailed: 'Diese Datei konnte nicht geöffnet werden.',
     setSecIntegrations: 'Integrationen',
     setSecBackup: 'Backup & Speicher',
-    setSecUniAi: 'uniAI',
+    setSecUniAi: 'UniAI',
     intgHeroTitle: 'UniWork Office aus Ihrem KI-Assistenten nutzen',
     intgHeroDesc:
       'Einmal verbunden, können Claude Code, Codex, Cursor, Claude Desktop und ähnliche Assistenten Word-, Excel-, PowerPoint-, PDF- und Markdown-Dateien für Sie erstellen, konvertieren, lesen und bearbeiten. Alles läuft auf diesem Rechner; nichts wird hochgeladen.',
@@ -2255,7 +2255,7 @@ export const strings = {
     setAiBaseUrl: 'Base URL',
     setAiBaseUrlHint: 'Leer lassen für den offiziellen Endpunkt.',
     setAiGensparkHint:
-      'uniAI-Chat nutzt OpenRouter. OpenRouter Token Hub-Schlüssel (sk-or-...) einfügen.',
+      'UniAI-Chat nutzt OpenRouter. OpenRouter Token Hub-Schlüssel (sk-or-...) einfügen.',
     setAiCodexPath: 'Codex-Programmdatei',
     setAiCodexPathHint:
       'Nur bei einer benutzerdefinierten Installation angeben; leer lassen für automatische Erkennung.',
@@ -2557,7 +2557,7 @@ export const strings = {
     setAboutLegalOpenFailed: 'No se pudo abrir este archivo.',
     setSecIntegrations: 'Integraciones',
     setSecBackup: 'Copia de seguridad y almacenamiento',
-    setSecUniAi: 'uniAI',
+    setSecUniAi: 'UniAI',
     intgHeroTitle: 'Usa UniWork Office desde tu asistente de IA',
     intgHeroDesc:
       'Una vez conectados, Claude Code, Codex, Cursor, Claude Desktop y asistentes similares pueden crear, convertir, leer y editar archivos Word, Excel, PowerPoint, PDF y Markdown por ti. Todo ocurre en este equipo; no se sube nada.',
@@ -2656,7 +2656,7 @@ export const strings = {
     setAiBaseUrl: 'Base URL',
     setAiBaseUrlHint: 'Deja vacío para usar el endpoint oficial.',
     setAiGensparkHint:
-      'El chat de uniAI usa OpenRouter. Pega tu clave Token Hub de OpenRouter (sk-or-...).',
+      'El chat de UniAI usa OpenRouter. Pega tu clave Token Hub de OpenRouter (sk-or-...).',
     setAiCodexPath: 'Ejecutable de Codex',
     setAiCodexPathHint:
       'Indícalo solo para una instalación personalizada; déjalo vacío para detectarlo automáticamente.',
@@ -2950,7 +2950,7 @@ export const strings = {
     setAboutLegalOpenFailed: 'ไม่สามารถเปิดไฟล์นี้ได้',
     setSecIntegrations: 'การเชื่อมต่อ',
     setSecBackup: 'สำรองและที่เก็บข้อมูล',
-    setSecUniAi: 'uniAI',
+    setSecUniAi: 'UniAI',
     intgHeroTitle: 'ใช้ UniWork Office จากผู้ช่วย AI ของคุณ',
     intgHeroDesc:
       'เมื่อเชื่อมต่อแล้ว Claude Code, Codex, Cursor, Claude Desktop และผู้ช่วยลักษณะเดียวกันจะสร้าง แปลง อ่าน และแก้ไขไฟล์ Word, Excel, PowerPoint, PDF และ Markdown แทนคุณได้ ทุกอย่างทำงานบนคอมพิวเตอร์เครื่องนี้ ไม่มีการอัปโหลดใด ๆ',
@@ -3043,7 +3043,7 @@ export const strings = {
     setAiKeyHint: 'จัดเก็บไว้ในเครื่องนี้เท่านั้น',
     setAiBaseUrl: 'Base URL',
     setAiBaseUrlHint: 'เว้นว่างเพื่อใช้ปลายทางอย่างเป็นทางการ',
-    setAiGensparkHint: 'แชท uniAI ใช้ OpenRouter วางคีย์ Token Hub ของ OpenRouter (sk-or-...)',
+    setAiGensparkHint: 'แชท UniAI ใช้ OpenRouter วางคีย์ Token Hub ของ OpenRouter (sk-or-...)',
     setAiCodexPath: 'ไฟล์ปฏิบัติการ Codex',
     setAiCodexPathHint: 'กรอกเฉพาะเมื่อติดตั้งแบบกำหนดเอง เว้นว่างไว้เพื่อค้นหาอัตโนมัติ',
     setAiCodexAutoPlaceholder: 'ค้นหาอัตโนมัติ (แนะนำ)',
@@ -3341,7 +3341,7 @@ export const strings = {
     setAboutLegalOpenFailed: 'File ini tidak dapat dibuka.',
     setSecIntegrations: 'Integrasi',
     setSecBackup: 'Cadangan & Penyimpanan',
-    setSecUniAi: 'uniAI',
+    setSecUniAi: 'UniAI',
     intgHeroTitle: 'Gunakan UniWork Office dari asisten AI Anda',
     intgHeroDesc:
       'Setelah terhubung, Claude Code, Codex, Cursor, Claude Desktop, dan asisten serupa dapat membuat, mengonversi, membaca, dan mengedit file Word, Excel, PowerPoint, PDF, dan Markdown untuk Anda. Semuanya berjalan di komputer ini; tidak ada yang diunggah.',
@@ -3439,7 +3439,7 @@ export const strings = {
     setAiBaseUrl: 'Base URL',
     setAiBaseUrlHint: 'Kosongkan untuk endpoint resmi.',
     setAiGensparkHint:
-      'Chat uniAI memakai OpenRouter. Tempel kunci Token Hub OpenRouter (sk-or-...).',
+      'Chat UniAI memakai OpenRouter. Tempel kunci Token Hub OpenRouter (sk-or-...).',
     setAiCodexPath: 'Berkas eksekusi Codex',
     setAiCodexPathHint: 'Isi hanya untuk instalasi khusus; kosongkan agar terdeteksi otomatis.',
     setAiCodexAutoPlaceholder: 'Deteksi otomatis (disarankan)',
@@ -3734,7 +3734,7 @@ export const strings = {
     setAboutLegalOpenFailed: 'Не удалось открыть этот файл.',
     setSecIntegrations: 'Интеграции',
     setSecBackup: 'Резервное копирование и хранилище',
-    setSecUniAi: 'uniAI',
+    setSecUniAi: 'UniAI',
     intgHeroTitle: 'Используйте UniWork Office из своего ИИ-ассистента',
     intgHeroDesc:
       'После подключения Claude Code, Codex, Cursor, Claude Desktop и похожие ассистенты смогут создавать, конвертировать, читать и редактировать файлы Word, Excel, PowerPoint, PDF и Markdown за вас. Всё выполняется на этом компьютере; ничего не загружается.',
@@ -3833,7 +3833,7 @@ export const strings = {
     setAiBaseUrl: 'Базовый URL',
     setAiBaseUrlHint: 'Оставьте пустым для официальной конечной точки.',
     setAiGensparkHint:
-      'Чат uniAI использует OpenRouter. Вставьте ключ Token Hub OpenRouter (sk-or-...).',
+      'Чат UniAI использует OpenRouter. Вставьте ключ Token Hub OpenRouter (sk-or-...).',
     setAiCodexPath: 'Исполняемый файл Codex',
     setAiCodexPathHint:
       'Указывайте только для нестандартной установки; оставьте пустым для автоопределения.',
@@ -4130,7 +4130,7 @@ export const strings = {
     setAboutLegalOpenFailed: 'تعذّر فتح هذا الملف.',
     setSecIntegrations: 'التكاملات',
     setSecBackup: 'النسخ الاحتياطي والتخزين',
-    setSecUniAi: 'uniAI',
+    setSecUniAi: 'UniAI',
     intgHeroTitle: 'استخدم UniWork Office من مساعد الذكاء الاصطناعي',
     intgHeroDesc:
       'بعد الربط، يمكن لـ Claude Code وCodex وCursor وClaude Desktop والمساعدين المشابهين إنشاء ملفات Word وExcel وPowerPoint وPDF وMarkdown وتحويلها وقراءتها وتحريرها نيابةً عنك. كل شيء يعمل على هذا الجهاز؛ لا يُرفع أي شيء.',
@@ -4224,7 +4224,7 @@ export const strings = {
     setAiBaseUrl: 'Base URL',
     setAiBaseUrlHint: 'اتركه فارغًا لاستخدام نقطة النهاية الرسمية.',
     setAiGensparkHint:
-      'دردشة uniAI تستخدم OpenRouter. الصق مفتاح Token Hub من OpenRouter (sk-or-...).',
+      'دردشة UniAI تستخدم OpenRouter. الصق مفتاح Token Hub من OpenRouter (sk-or-...).',
     setAiCodexPath: 'ملف Codex التنفيذي',
     setAiCodexPathHint: 'حدده فقط للتثبيت المخصص؛ اتركه فارغًا للاكتشاف التلقائي.',
     setAiCodexAutoPlaceholder: 'اكتشاف تلقائي (موصى به)',
@@ -4517,7 +4517,7 @@ export const strings = {
     setAboutLegalOpenFailed: 'Não foi possível abrir este arquivo.',
     setSecIntegrations: 'Integrações',
     setSecBackup: 'Backup e armazenamento',
-    setSecUniAi: 'uniAI',
+    setSecUniAi: 'UniAI',
     intgHeroTitle: 'Use o UniWork Office a partir do seu assistente de IA',
     intgHeroDesc:
       'Depois de conectados, Claude Code, Codex, Cursor, Claude Desktop e assistentes semelhantes podem criar, converter, ler e editar arquivos Word, Excel, PowerPoint, PDF e Markdown por você. Tudo roda neste computador; nada é enviado.',
@@ -4615,7 +4615,7 @@ export const strings = {
     setAiBaseUrl: 'Base URL',
     setAiBaseUrlHint: 'Deixe vazio para o endpoint oficial.',
     setAiGensparkHint:
-      'O chat uniAI usa OpenRouter. Cole sua chave Token Hub OpenRouter (sk-or-...).',
+      'O chat UniAI usa OpenRouter. Cole sua chave Token Hub OpenRouter (sk-or-...).',
     setAiCodexPath: 'Executável do Codex',
     setAiCodexPathHint:
       'Preencha apenas para uma instalação personalizada; deixe em branco para detectar automaticamente.',
@@ -4906,7 +4906,7 @@ export const strings = {
     setAboutLegalOpenFailed: 'Impossibile aprire questo file.',
     setSecIntegrations: 'Integrazioni',
     setSecBackup: 'Backup e archiviazione',
-    setSecUniAi: 'uniAI',
+    setSecUniAi: 'UniAI',
     intgHeroTitle: 'Usa UniWork Office dal tuo assistente IA',
     intgHeroDesc:
       'Una volta collegati, Claude Code, Codex, Cursor, Claude Desktop e assistenti simili possono creare, convertire, leggere e modificare file Word, Excel, PowerPoint, PDF e Markdown per te. Tutto avviene su questo computer; nulla viene caricato.',
@@ -5004,7 +5004,7 @@ export const strings = {
     setAiBaseUrl: 'Base URL',
     setAiBaseUrlHint: "Lascia vuoto per l'endpoint ufficiale.",
     setAiGensparkHint:
-      'La chat uniAI usa OpenRouter. Incolla la chiave Token Hub OpenRouter (sk-or-...).',
+      'La chat UniAI usa OpenRouter. Incolla la chiave Token Hub OpenRouter (sk-or-...).',
     setAiCodexPath: 'Eseguibile Codex',
     setAiCodexPathHint:
       'Compila solo per un’installazione personalizzata; lascia vuoto per il rilevamento automatico.',
@@ -5294,7 +5294,7 @@ export const strings = {
     setAboutLegalOpenFailed: 'Nie można otworzyć tego pliku.',
     setSecIntegrations: 'Integracje',
     setSecBackup: 'Kopia zapasowa i pamięć',
-    setSecUniAi: 'uniAI',
+    setSecUniAi: 'UniAI',
     intgHeroTitle: 'Używaj UniWork Office ze swojego asystenta AI',
     intgHeroDesc:
       'Po połączeniu Claude Code, Codex, Cursor, Claude Desktop i podobni asystenci mogą tworzyć, konwertować, czytać i edytować pliki Word, Excel, PowerPoint, PDF i Markdown za Ciebie. Wszystko działa na tym komputerze; nic nie jest przesyłane.',
@@ -5391,7 +5391,7 @@ export const strings = {
     setAiBaseUrl: 'Base URL',
     setAiBaseUrlHint: 'Pozostaw puste, aby użyć oficjalnego punktu końcowego.',
     setAiGensparkHint:
-      'Czat uniAI korzysta z OpenRouter. Wklej klucz Token Hub OpenRouter (sk-or-...).',
+      'Czat UniAI korzysta z OpenRouter. Wklej klucz Token Hub OpenRouter (sk-or-...).',
     setAiCodexPath: 'Plik wykonywalny Codex',
     setAiCodexPathHint:
       'Ustaw tylko dla instalacji niestandardowej; pozostaw puste, aby wykryć automatycznie.',
@@ -5641,7 +5641,7 @@ export const strings = {
     setAboutLegalOpenFailed: 'Tento soubor nelze otevřít.',
     setSecIntegrations: 'Integrace',
     setSecBackup: 'Záloha a úložiště',
-    setSecUniAi: 'uniAI',
+    setSecUniAi: 'UniAI',
     intgHeroTitle: 'Používejte UniWork Office ze svého AI asistenta',
     intgHeroDesc:
       'Po připojení mohou Claude Code, Codex, Cursor, Claude Desktop a podobní asistenti za vás vytvářet, převádět, číst a upravovat soubory Word, Excel, PowerPoint, PDF a Markdown. Vše běží na tomto počítači; nic se neodesílá.',
@@ -5738,7 +5738,7 @@ export const strings = {
     setAiBaseUrl: 'Základní URL',
     setAiBaseUrlHint: 'Pro oficiální koncový bod ponechte prázdné.',
     setAiGensparkHint:
-      'Chat uniAI používá OpenRouter. Vložte klíč Token Hub OpenRouter (sk-or-...).',
+      'Chat UniAI používá OpenRouter. Vložte klíč Token Hub OpenRouter (sk-or-...).',
     setAiCodexPath: 'Spustitelný soubor Codex',
     setAiCodexPathHint:
       'Vyplňte jen u vlastní instalace; prázdné pole znamená automatickou detekci.',
@@ -6067,7 +6067,7 @@ export const strings = {
     setAboutLegalOpenFailed: 'Dit bestand kan niet worden geopend.',
     setSecIntegrations: 'Integraties',
     setSecBackup: 'Back-up en opslag',
-    setSecUniAi: 'uniAI',
+    setSecUniAi: 'UniAI',
     intgHeroTitle: 'UniWork Office gebruiken vanuit uw AI-assistent',
     intgHeroDesc:
       'Eenmaal verbonden kunnen Claude Code, Codex, Cursor, Claude Desktop en vergelijkbare assistenten Word-, Excel-, PowerPoint-, PDF- en Markdown-bestanden voor je maken, converteren, lezen en bewerken. Alles draait op deze computer; er wordt niets geüpload.',
@@ -6165,7 +6165,7 @@ export const strings = {
     setAiBaseUrl: 'Base URL',
     setAiBaseUrlHint: 'Leeg laten voor het officiële eindpunt.',
     setAiGensparkHint:
-      'uniAI-chat gebruikt OpenRouter. Plak je OpenRouter Token Hub-sleutel (sk-or-...).',
+      'UniAI-chat gebruikt OpenRouter. Plak je OpenRouter Token Hub-sleutel (sk-or-...).',
     setAiCodexPath: 'Codex-uitvoerbaar bestand',
     setAiCodexPathHint:
       'Alleen invullen voor een aangepaste installatie; laat leeg voor automatische detectie.',
@@ -6457,7 +6457,7 @@ export const strings = {
     setAboutLegalOpenFailed: 'Fail ini tidak dapat dibuka.',
     setSecIntegrations: 'Integrasi',
     setSecBackup: 'Sandaran & Storan',
-    setSecUniAi: 'uniAI',
+    setSecUniAi: 'UniAI',
     intgHeroTitle: 'Gunakan UniWork Office daripada pembantu AI anda',
     intgHeroDesc:
       'Setelah disambungkan, Claude Code, Codex, Cursor, Claude Desktop dan pembantu serupa boleh mencipta, menukar, membaca dan mengedit fail Word, Excel, PowerPoint, PDF dan Markdown untuk anda. Semuanya berjalan di komputer ini; tiada apa yang dimuat naik.',
@@ -6557,7 +6557,7 @@ export const strings = {
     setAiBaseUrl: 'Base URL',
     setAiBaseUrlHint: 'Biarkan kosong untuk endpoint rasmi.',
     setAiGensparkHint:
-      'Sembang uniAI menggunakan OpenRouter. Tampal kunci Token Hub OpenRouter (sk-or-...).',
+      'Sembang UniAI menggunakan OpenRouter. Tampal kunci Token Hub OpenRouter (sk-or-...).',
     setAiCodexPath: 'Fail boleh laku Codex',
     setAiCodexPathHint:
       'Isi hanya untuk pemasangan tersuai; biarkan kosong untuk pengesanan automatik.',
@@ -6843,7 +6843,7 @@ export const strings = {
     setAboutLegalOpenFailed: 'לא ניתן לפתוח את הקובץ.',
     setSecIntegrations: 'שילובים',
     setSecBackup: 'גיבוי ואחסון',
-    setSecUniAi: 'uniAI',
+    setSecUniAi: 'UniAI',
     intgHeroTitle: 'שימוש ב-UniWork Office מתוך עוזר ה-AI שלכם',
     intgHeroDesc:
       'לאחר החיבור, Claude Code‏, Codex‏, Cursor‏, Claude Desktop ועוזרים דומים יכולים ליצור, להמיר, לקרוא ולערוך עבורך קובצי Word‏, Excel‏, PowerPoint‏, PDF ו‑Markdown. הכול פועל במחשב זה; דבר אינו נשלח.',
@@ -6936,7 +6936,7 @@ export const strings = {
     setAiBaseUrl: 'Base URL',
     setAiBaseUrlHint: 'השאר ריק לנקודת הקצה הרשמית.',
     setAiGensparkHint:
-      "צ'אט uniAI משתמש ב-OpenRouter. הדביקו מפתח Token Hub של OpenRouter (sk-or-...).",
+      "צ'אט UniAI משתמש ב-OpenRouter. הדביקו מפתח Token Hub של OpenRouter (sk-or-...).",
     setAiCodexPath: 'קובץ ההפעלה של Codex',
     setAiCodexPathHint: 'יש למלא רק בהתקנה מותאמת; השאר ריק לזיהוי אוטומטי.',
     setAiCodexAutoPlaceholder: 'זיהוי אוטומטי (מומלץ)',
@@ -7221,7 +7221,7 @@ export const strings = {
     setAboutLegalOpenFailed: 'यह फ़ाइल खोली नहीं जा सकी।',
     setSecIntegrations: 'इंटीग्रेशन',
     setSecBackup: 'बैकअप और संग्रहण',
-    setSecUniAi: 'uniAI',
+    setSecUniAi: 'UniAI',
     intgHeroTitle: 'अपने AI असिस्टेंट से UniWork Office इस्तेमाल करें',
     intgHeroDesc:
       'कनेक्ट होने के बाद Claude Code, Codex, Cursor, Claude Desktop और ऐसे ही सहायक आपके लिए Word, Excel, PowerPoint, PDF और Markdown फ़ाइलें बना, बदल, पढ़ और संपादित कर सकते हैं। सब कुछ इसी कंप्यूटर पर चलता है; कुछ भी अपलोड नहीं होता।',
@@ -7318,7 +7318,7 @@ export const strings = {
     setAiBaseUrl: 'Base URL',
     setAiBaseUrlHint: 'आधिकारिक एंडपॉइंट के लिए खाली छोड़ें।',
     setAiGensparkHint:
-      'uniAI चैट OpenRouter का उपयोग करता है। अपना OpenRouter Token Hub कुंजी (sk-or-...) चिपकाएँ।',
+      'UniAI चैट OpenRouter का उपयोग करता है। अपना OpenRouter Token Hub कुंजी (sk-or-...) चिपकाएँ।',
     setAiCodexPath: 'Codex निष्पादन फ़ाइल',
     setAiCodexPathHint: 'केवल कस्टम इंस्टॉलेशन के लिए भरें; स्वतः पहचान के लिए खाली छोड़ें।',
     setAiCodexAutoPlaceholder: 'स्वतः पहचान (अनुशंसित)',
@@ -7526,7 +7526,7 @@ export const strings = {
     setAboutLegalOpenFailed: 'Không thể mở tệp này.',
     setSecIntegrations: 'Tích hợp',
     setSecBackup: 'Backup & Lưu trữ',
-    setSecUniAi: 'uniAI',
+    setSecUniAi: 'UniAI',
     intgHeroTitle: 'Dùng UniWork Office từ trợ lý AI của bạn',
     intgHeroDesc:
       'Cài skill UniWork Office một lần, rồi Claude Code, Codex, Cursor và các trợ lý tương tự có thể tạo, chuyển đổi, đọc và chỉnh sửa tệp Word, Excel, PowerPoint, PDF và Markdown giúp bạn. Mọi thứ chạy trên máy này; không có gì được tải lên.',
@@ -7598,7 +7598,7 @@ export const strings = {
     setAiBaseUrl: 'Base URL',
     setAiBaseUrlHint: 'Để trống để dùng endpoint chính thức.',
     setAiGensparkHint:
-      'uniAI chat bằng khóa AI của riêng bạn. Dán khóa OpenRouter (sk-or-...); khóa chỉ lưu trên thiết bị này.',
+      'UniAI chat bằng khóa AI của riêng bạn. Dán khóa OpenRouter (sk-or-...); khóa chỉ lưu trên thiết bị này.',
     setAiCodexPath: 'Executable Codex',
     setAiCodexPathHint: 'Chỉ đặt khi cài tùy chỉnh; để trống để tự phát hiện.',
     setAiCodexAutoPlaceholder: 'Tự phát hiện (khuyến nghị)',
@@ -7976,7 +7976,7 @@ export const strings = {
     setAboutLegalOpenFailed: '無法開啟此檔案。',
     setSecIntegrations: '整合',
     setSecBackup: '備份與儲存',
-    setSecUniAi: 'uniAI',
+    setSecUniAi: 'UniAI',
     intgHeroTitle: '在 AI 助理中使用 UniWork Office',
     intgHeroDesc:
       '接好後，Claude Code、Codex、Cursor、Claude Desktop 等助理就能替你建立、轉換、讀取和編輯 Word、Excel、PowerPoint、PDF 和 Markdown 檔案。全部在本機完成，不會上傳任何內容。',
@@ -8064,7 +8064,7 @@ export const strings = {
     setAiKeyHint: '金鑰僅儲存在本機。',
     setAiBaseUrl: 'Base URL',
     setAiBaseUrlHint: '留空使用官方端點。',
-    setAiGensparkHint: 'uniAI 聊天走 OpenRouter。貼上 OpenRouter Token Hub 金鑰（sk-or-...）。',
+    setAiGensparkHint: 'UniAI 聊天走 OpenRouter。貼上 OpenRouter Token Hub 金鑰（sk-or-...）。',
     setAiCodexPath: 'Codex 可執行檔',
     setAiCodexPathHint: '僅自訂安裝時填寫；留空會自動偵測。',
     setAiCodexAutoPlaceholder: '留空自動偵測（建議）',

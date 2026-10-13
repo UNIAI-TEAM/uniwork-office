@@ -9,7 +9,7 @@ export const pl = {
   aiStarterContinue: 'Kontynuuj pisanie od miejsca, w którym kończy się dokument',
   aiStarterFillTemplate: 'Znajdź i uzupełnij symbole zastępcze w dokumencie',
   aiOpenSettingsBtn: 'Open AI settings',
-  aiPanelTitle: 'uniAI',
+  aiPanelTitle: 'UniAI',
   aiOpenAssistant: 'Otwórz asystenta AI',
   aiSummarizeBtn: 'Podsumowanie AI',
   aiSummarizePrompt: 'Podsumuj główną treść i kluczowe punkty tego dokumentu',

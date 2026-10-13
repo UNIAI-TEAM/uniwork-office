@@ -1,7 +1,7 @@
 /** Home tab of the slides ribbon. Extracted from Ribbon.tsx. */
 import { useState } from 'react'
 import { platformShortcuts } from '@genoffice/i18n'
-import { ColorPicker, isSymbolFontFamily, partitionFontFamilies } from '@genoffice/ui'
+import { ColorPicker, isSymbolFontFamily, partitionFontFamilies, UniAiMark } from '@genoffice/ui'
 import { saveEditSelection } from '../TextEditOverlay'
 import { armColorInput } from '../color-input'
 import { displayFontFamily } from '../konva-adapter'
@@ -9,7 +9,6 @@ import { useSystemFontFamilies } from '../system-fonts'
 import { useFontCatalog } from '../font-manager'
 import { cap } from '../capabilities'
 import {
-  GensparkMark,
   IconAiBeautify,
   IconAiFactCheck,
   IconAiImage,
@@ -238,7 +237,7 @@ export function RibbonHomeTab({ rb }: { rb: RibbonTabCtx }) {
               onClick={onToggleAi}
             >
               <span className="rb-big-icon">
-                <GensparkMark size={26} />
+                <UniAiMark size={26} />
               </span>
               <span>AI</span>
             </button>

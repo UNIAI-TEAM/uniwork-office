@@ -67,6 +67,7 @@ export {
 } from './ribbon-collapse'
 export { AiTypingIndicator } from './AiTypingIndicator'
 export { IconSend, IconStop, type IconProps } from './icons'
+export { UniAiMark } from './UniAiMark'
 export { Markdown, type MarkdownNav } from './Markdown'
 export { isSymbolFontFamily } from './symbol-fonts'
 export {
