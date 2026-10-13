@@ -111,9 +111,12 @@ export const pl = {
   uwOrgSettingsLabel: 'Organizacja robocza',
   uwLibShared: 'Udostępnione mi',
   uwLibSharedEmpty: 'Nikt jeszcze nie udostępnił Ci bezpośrednio żadnego dokumentu.',
+  uwLibSharedPartial:
+    'Przeszukano tylko dotąd wczytane dokumenty. Wczytaj więcej, aby szukać dalej.',
   uwLibWsRole: '{workspace} · {role}',
   uwDocInfo: 'Szczegóły',
   uwDocInfoFor: 'Szczegóły: „{name}”',
+  uwDocInfoClose: 'Zamknij szczegóły',
   uwDocInfoOwner: 'Właściciel',
   uwDocInfoCreated: 'Utworzono',
   uwDocInfoUpdated: 'Zaktualizowano',

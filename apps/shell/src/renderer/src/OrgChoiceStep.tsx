@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { useI18n } from './locale'
 import {
@@ -40,19 +40,28 @@ export function OrgChoiceStep({
   onSignOut: () => void
 }) {
   const { t } = useI18n()
-  const [choice, setChoice] = useState<string | null>(null)
+  const [picked, setPicked] = useState<string | null>(null)
   const groupRef = useRef<HTMLDivElement>(null)
+  const focusedOnce = useRef(false)
+  const uid = useId().replace(/:/g, '')
+  const titleId = `uw-org-title-${uid}`
+  const bodyId = `uw-org-body-${uid}`
   const firstId = firstSelectableOrg(orgs)
+  // a checked row that a status push has since locked (or removed) no longer counts
+  const pickedRow = orgs.find((o) => o.id === picked)
+  const choice = pickedRow && orgBlockKey(pickedRow) === null ? picked : null
   // the roving tab stop: the checked row, else the first one that can be chosen
   const tabStop = choice ?? firstId
   const blocked = allOrgsBlocked(orgs)
 
+  // focus lands on the first choosable row once, as soon as there is one (the
+  // rows may arrive after the step mounts); later status pushes leave focus alone
   useEffect(() => {
-    if (blocked || !firstId) return
+    if (blocked) focusedOnce.current = false
+    if (blocked || !firstId || focusedOnce.current) return
+    focusedOnce.current = true
     rowOf(groupRef.current, firstId)?.focus()
-    // focus once when the step appears, not on every status push
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [blocked])
+  }, [blocked, firstId])
 
   if (blocked) {
     return (
@@ -70,7 +79,7 @@ export function OrgChoiceStep({
 
   const pick = (id: string) => {
     if (orgBlockKey(orgs.find((o) => o.id === id)) !== null) return
-    setChoice(id)
+    setPicked(id)
     rowOf(groupRef.current, id)?.focus()
   }
 
@@ -108,12 +117,12 @@ export function OrgChoiceStep({
   const canContinue = choice !== null && !busy
 
   return (
-    <div className="uw-org-step" aria-labelledby="uw-org-title" role="group">
+    <div className="uw-org-step" aria-labelledby={titleId} role="group">
       <div className="uw-org-head">
-        <h5 className="uw-org-title" id="uw-org-title">
+        <h5 className="uw-org-title" id={titleId}>
           {t('uwOrgPickTitle')}
         </h5>
-        <p className="uw-org-body" id="uw-org-body">
+        <p className="uw-org-body" id={bodyId}>
           {t('uwOrgPickBody')}
         </p>
         {rememberedGone && (
@@ -125,8 +134,8 @@ export function OrgChoiceStep({
       <div
         className="uw-org-list"
         role="radiogroup"
-        aria-labelledby="uw-org-title"
-        aria-describedby="uw-org-body"
+        aria-labelledby={titleId}
+        aria-describedby={bodyId}
         ref={groupRef}
         onKeyDown={onKeyDown}
       >

@@ -8281,11 +8281,16 @@ html[dir='rtl'] .quick-title-row {
   list-style: none;
 }
 
+.uw-pick-item {
+  position: relative;
+}
+
 .uw-pick-row {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 8px;
+  /* the right padding keeps the row text clear of the Details button beside it */
+  padding: 8px 44px 8px 8px;
   border-radius: 8px;
   cursor: pointer;
 }
@@ -8422,25 +8427,20 @@ html[dir='rtl'] .quick-title-row {
 }
 
 .uw-pick-info-btn {
+  position: absolute;
+  top: 50%;
+  right: 8px;
   display: grid;
-  flex-shrink: 0;
   place-items: center;
   width: 28px;
   height: 28px;
+  transform: translateY(-50%);
   border: none;
   border-radius: 6px;
   background: transparent;
+  /* visible on every row at rest: the muted text token keeps the icon >= 3:1 on the row surface */
   color: var(--text-muted);
   cursor: pointer;
-  /* visible on every row at rest (low emphasis); full strength on the live row */
-  opacity: 0.65;
-}
-
-.uw-pick-row:hover .uw-pick-info-btn,
-.uw-pick-row.active .uw-pick-info-btn,
-.uw-pick-info-btn.on,
-.uw-pick-info-btn:focus-visible {
-  opacity: 1;
 }
 
 .uw-pick-info-btn:hover,
@@ -8549,10 +8549,13 @@ html[dir='rtl'] .quick-title-row {
 }
 
 @media (pointer: coarse) {
+  .uw-pick-row {
+    padding-right: 60px;
+  }
+
   .uw-pick-info-btn {
     width: 44px;
     height: 44px;
-    opacity: 1;
   }
 }
 

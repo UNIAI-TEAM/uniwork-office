@@ -109,9 +109,12 @@ export const hi = {
   uwOrgSettingsLabel: 'कार्य संगठन',
   uwLibShared: 'मेरे साथ साझा',
   uwLibSharedEmpty: 'अभी तक आपके साथ सीधे कुछ भी साझा नहीं किया गया है।',
+  uwLibSharedPartial:
+    'अब तक लोड किए गए दस्तावेज़ों में ही खोज की गई है। खोज जारी रखने के लिए और लोड करें।',
   uwLibWsRole: '{workspace} · {role}',
   uwDocInfo: 'विवरण',
   uwDocInfoFor: '“{name}” का विवरण',
+  uwDocInfoClose: 'विवरण बंद करें',
   uwDocInfoOwner: 'स्वामी',
   uwDocInfoCreated: 'बनाया गया',
   uwDocInfoUpdated: 'अपडेट किया गया',
