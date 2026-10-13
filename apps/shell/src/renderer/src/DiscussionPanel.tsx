@@ -151,7 +151,7 @@ function DiscussionBody(p: BodyProps) {
 }
 
 export function DiscussionPanel() {
-  const { lang } = useI18n()
+  const { lang, t } = useI18n()
   const account = useAccount()
   const [tabs, setTabs] = useState<TabSummary[]>([])
   const uniwork = useUniworkStatuses(tabs)
@@ -288,7 +288,7 @@ export function DiscussionPanel() {
         aria-valuemax={DISCUSSION_PANEL_LIMITS.max}
         aria-valuenow={width}
         aria-controls={DISCUSSION_PANEL_ID}
-        aria-label={collabStrings(lang).collabDiscussion}
+        aria-label={t('discussionResizeLabel')}
         tabIndex={0}
         onPointerDown={onHandleDown}
         onPointerMove={onHandleMove}

@@ -3,6 +3,7 @@
 
 .uw-discussion-toggle {
   -webkit-app-region: no-drag;
+  position: relative;
   box-sizing: border-box;
   display: inline-flex;
   align-items: center;
@@ -19,6 +20,16 @@
   line-height: 1.4;
   white-space: nowrap;
   cursor: pointer;
+}
+
+/* the pill stays inside the 40 px tab strip; the 44 px target is this invisible extension */
+.uw-discussion-toggle::after {
+  content: '';
+  position: absolute;
+  top: -8px;
+  right: -2px;
+  bottom: -8px;
+  left: -2px;
 }
 
 .uw-discussion-toggle:hover {
@@ -73,7 +84,12 @@
 
 @media (pointer: coarse) {
   .uw-discussion-toggle {
-    min-height: 44px;
+    height: 36px;
+  }
+
+  .uw-discussion-toggle::after {
+    top: -4px;
+    bottom: -4px;
   }
 
   .uw-discussion-handle {

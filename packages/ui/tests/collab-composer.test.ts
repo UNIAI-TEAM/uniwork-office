@@ -280,6 +280,64 @@ describe('draft', () => {
   })
 })
 
+describe('root composer: Esc and Cancel when empty (W11F)', () => {
+  it.each(['root', 'discussion'] as const)(
+    '%s: Esc in an empty composer is left to the host (not consumed, nothing cancelled)',
+    (mode) => {
+      const m = render({ mode })
+      const ev = key('Escape')
+      expect(ev.defaultPrevented).toBe(false)
+      expect(m.onCancel).not.toHaveBeenCalled()
+      expect(dialog()).toBeNull()
+    },
+  )
+
+  it.each(['root', 'discussion'] as const)(
+    '%s: Esc with text still asks before discarding, and is consumed',
+    (mode) => {
+      const m = render({ mode })
+      type('draft')
+      const ev = key('Escape')
+      expect(ev.defaultPrevented).toBe(true)
+      expect(dialog()).not.toBeNull()
+      expect(m.onCancel).not.toHaveBeenCalled()
+    },
+  )
+
+  it('root: Esc closes an open picker first and is consumed', async () => {
+    render({ mode: 'root' })
+    await openPicker()
+    expect(listbox()).not.toBeNull()
+    const ev = key('Escape')
+    expect(ev.defaultPrevented).toBe(true)
+    expect(listbox()).toBeNull()
+  })
+
+  it.each(['reply', 'edit'] as const)('%s: Esc keeps cancelling at once', (mode) => {
+    const m = render({ mode, initialBody: mode === 'edit' ? 'same' : undefined })
+    const ev = key('Escape')
+    expect(ev.defaultPrevented).toBe(true)
+    expect(m.onCancel).toHaveBeenCalledTimes(1)
+  })
+
+  it.each(['root', 'discussion'] as const)(
+    '%s: Cancel is not offered while empty, and appears once there is text',
+    (mode) => {
+      render({ mode })
+      expect(buttons().some((b) => b.textContent === 'Cancel')).toBe(false)
+      type('x')
+      expect(buttons().some((b) => b.textContent === 'Cancel')).toBe(true)
+      type('')
+      expect(buttons().some((b) => b.textContent === 'Cancel')).toBe(false)
+    },
+  )
+
+  it.each(['reply', 'edit'] as const)('%s keeps Cancel while empty', (mode) => {
+    render({ mode, initialBody: mode === 'edit' ? 'same' : undefined })
+    expect(buttons().some((b) => b.textContent === 'Cancel')).toBe(true)
+  })
+})
+
 describe('Esc and cancel', () => {
   it('Esc with no draft cancels at once', () => {
     const m = render()
