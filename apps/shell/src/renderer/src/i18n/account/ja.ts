@@ -81,6 +81,8 @@ export const ja = {
   acctErrWrongDeployment: 'このアカウントは別の UniWork サーバーのものです。',
   acctErrNotConfigured: 'このアプリは UniWork サーバーに接続されていません。',
   acctErrKeyringUnavailable: 'このコンピューターのセキュアストレージを利用できません。',
+  acctErrKeystoreLocked:
+    'このコンピューターのキーチェーンがロックされています。ロックを解除してからもう一度お試しください。',
   acctErrServerError: 'UniWork で問題が発生しました。しばらくしてからもう一度お試しください。',
   acctErrMalformedResponse:
     'UniWork から予期しない応答がありました。しばらくしてからもう一度お試しください。',

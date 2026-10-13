@@ -79,6 +79,7 @@ export const cs = {
   acctErrWrongDeployment: 'Tento účet patří jinému serveru UniWork.',
   acctErrNotConfigured: 'Tato aplikace není propojena se serverem UniWork.',
   acctErrKeyringUnavailable: 'Zabezpečené úložiště v tomto počítači není dostupné.',
+  acctErrKeystoreLocked: 'Klíčenka tohoto počítače je zamčená. Odemkněte ji a zkuste to znovu.',
   acctErrServerError: 'V UniWork došlo k problému. Zkuste to prosím později.',
   acctErrMalformedResponse: 'UniWork odeslal neočekávanou odpověď. Zkuste to prosím později.',
   wbLoadFailedTitle: 'Uložená data se nepodařilo načíst',

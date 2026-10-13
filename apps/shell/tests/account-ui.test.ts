@@ -572,13 +572,88 @@ describe('Settings → Account pane', () => {
   it('keystore locked: a refused sign-in attempt says the keychain is locked', async () => {
     await render(statusFor('keystore-locked', { error: 'keystore_locked' }), { open: true })
     await act(async () => api.login({ phase: 'error', error: 'keystore_locked' }))
-    expect(pane()?.querySelector('.acct-notice-error')?.textContent).toBe(sync.uwLockKeystoreTitle)
+    // its own sentence, not the notice title repeated under the title
+    const line = pane()?.querySelector('.acct-notice-error')?.textContent
+    expect(line).toBe(en.acctErrKeystoreLocked)
+    expect(line).not.toBe(sync.uwLockKeystoreTitle)
+    expect(line).toMatch(/[.!?]$/)
+    expect(ACCOUNT_ERROR_KEYS.keystore_locked).toBe('acctErrKeystoreLocked')
   })
 
-  it('keystore locked in Vietnamese reads from the sync shard', async () => {
+  it('keystore locked: Retry is disabled and aria-busy while pending; a double click makes one accountRetry call', async () => {
+    await render(statusFor('keystore-locked', { error: 'keystore_locked' }), { open: true })
+    let finish!: (s: AccountStatus) => void
+    api.accountRetry.mockImplementationOnce(
+      () => new Promise<AccountStatus>((res) => (finish = res)),
+    )
+    const retry = button(en.acctRetry)!
+    expect(retry.disabled).toBe(false)
+    expect(retry.hasAttribute('aria-busy')).toBe(false)
+    await act(async () => {
+      retry.click()
+      retry.click()
+    })
+    await flush()
+    expect(api.accountRetry).toHaveBeenCalledTimes(1)
+    const busyBtn = button(en.acctRetrying)!
+    expect(busyBtn.disabled).toBe(true)
+    expect(busyBtn.getAttribute('aria-busy')).toBe('true')
+    await act(async () => busyBtn.click())
+    expect(api.accountRetry).toHaveBeenCalledTimes(1)
+    await act(async () => finish(statusFor('keystore-locked', { error: 'keystore_locked' })))
+    await flush()
+    expect(button(en.acctRetry)!.disabled).toBe(false)
+    expect(button(en.acctRetry)!.hasAttribute('aria-busy')).toBe(false)
+  })
+
+  it('keystore locked: Enter and Space are not swallowed on Retry and activate it', async () => {
+    await render(statusFor('keystore-locked', { error: 'keystore_locked' }), { open: true })
+    // still locked after each retry, so the button stays
+    api.accountRetry.mockImplementation(async () =>
+      statusFor('keystore-locked', { error: 'keystore_locked' }),
+    )
+    const retry = button(en.acctRetry)!
+    expect(retry.type).toBe('button')
+    expect(retry.tabIndex).toBeGreaterThanOrEqual(0)
+    retry.focus()
+    expect(document.activeElement).toBe(retry)
+    for (const key of ['Enter', ' ']) {
+      api.accountRetry.mockClear()
+      const down = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true })
+      retry.dispatchEvent(down)
+      retry.dispatchEvent(new KeyboardEvent('keyup', { key, bubbles: true, cancelable: true }))
+      // nothing prevents the browser's own key activation (jsdom has none: it is the click it fires)
+      expect(down.defaultPrevented).toBe(false)
+      await click(retry)
+      expect(api.accountRetry).toHaveBeenCalledTimes(1)
+    }
+  })
+
+  it('keystore locked in Vietnamese reads from the sync shard, offers Thử lại and never reads as signed in', async () => {
     await render(statusFor('keystore-locked'), { open: true, lang: 'vi' })
-    expect(pane()?.textContent).toContain(syncVi.uwLockKeystoreTitle)
+    const text = pane()?.textContent ?? ''
+    expect(text).toContain(syncVi.uwLockKeystoreTitle)
     expect(button(vi_.acctRetry)).toBeDefined()
+    // no connected / signed-in wording, no profile, no sign-in or sign-out buttons (vi)
+    expect(text).not.toMatch(/online|trực tuyến/i)
+    expect(text).not.toContain(vi_.acctSignedInAs.replace('{name}', '').trim())
+    expect(text).not.toContain(PROFILE.email)
+    for (const label of [vi_.acctSignIn, vi_.acctSignInAgain, vi_.acctSignOut]) {
+      expect(button(label)).toBeUndefined()
+    }
+    await act(async () => api.login({ phase: 'error', error: 'keystore_locked' }))
+    expect(pane()?.querySelector('.acct-notice-error')?.textContent).toBe(vi_.acctErrKeystoreLocked)
+  })
+
+  it('keyring unavailable still shows Sign in again together with Retry, and the notice (not keystore copy)', async () => {
+    await render(statusFor('keyring-unavailable', { error: 'keyring_unavailable' }), {
+      open: true,
+    })
+    expect(button(en.acctRetry)).toBeDefined()
+    expect(button(en.acctSignInAgain)).toBeDefined()
+    expect(button(en.acctSignOut)).toBeUndefined()
+    expect(pane()?.textContent).toContain(en.acctKeyringTitle)
+    expect(pane()?.textContent).not.toContain(sync.uwLockKeystoreTitle)
   })
 
   it('a rejected sign-in link shows a passing notice and the attempt goes on', async () => {

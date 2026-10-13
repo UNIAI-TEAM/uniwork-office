@@ -81,6 +81,8 @@ export const fr = {
   acctErrWrongDeployment: 'Ce compte appartient à un autre serveur UniWork.',
   acctErrNotConfigured: 'Cette application n’est pas liée à un serveur UniWork.',
   acctErrKeyringUnavailable: 'Le stockage sécurisé de cet ordinateur est indisponible.',
+  acctErrKeystoreLocked:
+    'Le trousseau de cet ordinateur est verrouillé. Déverrouillez-le, puis réessayez.',
   acctErrServerError: 'UniWork a rencontré un problème. Veuillez réessayer plus tard.',
   acctErrMalformedResponse:
     'UniWork a envoyé une réponse inattendue. Veuillez réessayer plus tard.',

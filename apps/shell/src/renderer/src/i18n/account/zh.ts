@@ -70,6 +70,7 @@ export const zh = {
   acctErrWrongDeployment: '此账号属于另一个 UniWork 服务器。',
   acctErrNotConfigured: '此应用尚未关联 UniWork 服务器。',
   acctErrKeyringUnavailable: '此电脑上的安全存储不可用。',
+  acctErrKeystoreLocked: '此电脑的钥匙串已锁定。请解锁后重试。',
   acctErrServerError: 'UniWork 出现问题，请稍后再试。',
   acctErrMalformedResponse: 'UniWork 返回了意外的响应，请稍后再试。',
   wbLoadFailedTitle: '无法加载你保存的数据',
