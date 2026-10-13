@@ -16,6 +16,7 @@ import type {
 } from '@genoffice/ai-provider/browser'
 import type { AiStreamChunk, AiStreamRequest } from '@genoffice/ai-provider'
 import { installDropOpenBridge } from '@genoffice/electron-utils/drop-open'
+import { installUniworkDiscussionBridge } from '@genoffice/electron-utils/discussion-bridge'
 import type { UpdateUiState } from '../shared/update-api'
 import { normalizeAiPanelPrefs } from '@genoffice/ui/ai-panel-prefs'
 import type {
@@ -1073,3 +1074,8 @@ contextBridge.exposeInMainWorld('aiOfficeTabs', tabsApi)
 
 // open documents dragged from the OS anywhere over Home or the tab strip
 installDropOpenBridge()
+
+// G8-11: the Discussion panel lives in the shell renderer and talks to the
+// UniWork comments client through its own bridge (main checks the sender is
+// this shell and the path an open, bound tab of its window)
+installUniworkDiscussionBridge()
