@@ -24,7 +24,6 @@ import {
   type CollabHostState,
   type CollabNewThread,
 } from '@genoffice/ui/collab'
-import type { UniworkCommentsApi } from '@genoffice/electron-utils/comments-ipc'
 import { createCommentsPoll } from '@genoffice/electron-utils/comments-poll'
 import { createAnchorResend, type AnchorResend } from './anchor-resend'
 import {
@@ -32,21 +31,19 @@ import {
   fallbackPdfCommentsContext,
   followPdfUniworkSaves,
   loadPdfCommentsContext,
-  sendPdfAnchors,
+  sendPdfAnchorMap,
+  type PdfCommentsBridge,
   type PdfCommentsContext,
-  type PdfCommentsContextApi,
 } from './pdf-comments-source'
 import { makePdfAnchor, pointAnchorRect, type PdfAnchor } from './pdf-anchor'
 
 export interface PdfServerCommentsOptions {
-  bridge: UniworkCommentsApi
+  bridge: PdfCommentsBridge
   /** the working copy the editor shows */
   path: string
   lang: Lang
   /** the document is a view-only copy */
   readOnly: boolean
-  /** the optional preload surface for document / version / level / user (see pdf-comments-source) */
-  contextApi?: PdfCommentsContextApi
   adapter: CollabAnchorAdapter
   /** the panel is open (polling runs only then) */
   open: boolean
@@ -59,6 +56,8 @@ export interface PdfServerComments {
   context: PdfCommentsContext
   /** a new anchored thread can start: the version it is written against is known */
   canStartThread: boolean
+  /** the user may write but the open version is unknown (`versionId` null): ask to save first */
+  needsSave: boolean
   /** open the root composer at a point placement (the note tool click), optionally pre-filled by AI */
   startAt(page: number, at: readonly [number, number], aiText?: string): boolean
   /** the AI draft of the pending root composer, if any */
@@ -71,7 +70,7 @@ export interface PdfServerComments {
 export const rootDraftKey = (anchor: PdfAnchor): string => `root:${JSON.stringify(anchor)}`
 
 export function usePdfServerComments(o: PdfServerCommentsOptions): PdfServerComments {
-  const { bridge, path, lang, readOnly, contextApi, adapter, open } = o
+  const { bridge, path, lang, readOnly, adapter, open } = o
   const [context, setContext] = useState<PdfCommentsContext>(() =>
     fallbackPdfCommentsContext(path, readOnly),
   )
@@ -80,13 +79,13 @@ export function usePdfServerComments(o: PdfServerCommentsOptions): PdfServerComm
   useEffect(() => {
     let live = true
     setContext(fallbackPdfCommentsContext(path, readOnly))
-    void loadPdfCommentsContext(contextApi, path, readOnly).then((c) => {
+    void loadPdfCommentsContext(bridge, path, readOnly).then((c) => {
       if (live) setContext(c)
     })
     return () => {
       live = false
     }
-  }, [contextApi, path, readOnly])
+  }, [bridge, path, readOnly])
 
   const source = useMemo(() => createPdfCommentsSource(bridge, path), [bridge, path])
   const platform = useMemo<CollabHostState['platform']>(
@@ -98,11 +97,11 @@ export function usePdfServerComments(o: PdfServerCommentsOptions): PdfServerComm
       documentId: context.documentId,
       kind: 'comment',
       level: context.level,
-      myUserId: context.userId,
+      myUserId: context.myUserId,
       lang,
       platform,
     }),
-    [context.documentId, context.level, context.userId, lang, platform],
+    [context.documentId, context.level, context.myUserId, lang, platform],
   )
   const strings = useMemo(() => collabStrings(lang), [lang])
   const controller = useCollabThreads(source, host, { strings, adapter })
@@ -164,11 +163,11 @@ export function usePdfServerComments(o: PdfServerCommentsOptions): PdfServerComm
         const c = ctlRef.current
         return [...c.threads, ...c.resolved].map((t) => t.root)
       },
-      send: (versionId, items) => sendPdfAnchors(bridge, { path, versionId, anchors: items }),
+      send: (versionId, items) => sendPdfAnchorMap(bridge, path, versionId, items),
       onUpdated: () => void ctlRef.current.reload(),
     })
     resendRef.current = resend
-    const off = followPdfUniworkSaves(contextApi, (versionId) => {
+    const off = followPdfUniworkSaves(bridge, path, (versionId) => {
       // the saved version is what the editor has open now: new threads anchor against it
       setContext((c) => ({ ...c, versionId }))
       resend.receipt(versionId)
@@ -178,20 +177,22 @@ export function usePdfServerComments(o: PdfServerCommentsOptions): PdfServerComm
       resend.dispose()
       resendRef.current = null
     }
-  }, [bridge, contextApi, path])
+  }, [bridge, path])
 
   const saved = useCallback((pageMap: ReadonlyMap<number, number>) => {
     resendRef.current?.saved(pageMap)
   }, [])
 
   const canStartThread =
-    controller.state === 'ready' && controller.can.canWrite && context.versionId !== undefined
+    controller.state === 'ready' && controller.can.canWrite && context.versionId !== null
+  const needsSave =
+    controller.state === 'ready' && controller.can.canWrite && context.versionId === null
 
   const startAt = useCallback(
     (page: number, at: readonly [number, number], aiText?: string): boolean => {
       const c = ctlRef.current
       const versionId = context.versionId
-      if (c.state !== 'ready' || !c.can.canWrite || versionId === undefined) return false
+      if (c.state !== 'ready' || !c.can.canWrite || versionId === null) return false
       const anchor = makePdfAnchor(page, pointAnchorRect(at))
       const next: CollabNewThread = { anchor, base_version_id: versionId }
       setAiDraft(aiText ? { draftKey: rootDraftKey(anchor), text: aiText } : null)
@@ -209,7 +210,7 @@ export function usePdfServerComments(o: PdfServerCommentsOptions): PdfServerComm
     if (aiDraft && aiDraft.draftKey !== pendingKey) setAiDraft(null)
   }, [aiDraft, pendingKey])
 
-  return { controller, context, canStartThread, startAt, aiDraft, saved }
+  return { controller, context, canStartThread, needsSave, startAt, aiDraft, saved }
 }
 
 export interface PdfCommentsPanelProps {
@@ -220,8 +221,8 @@ export interface PdfCommentsPanelProps {
   onClose(): void
   /** the file's own notes, read-only */
   inFile?: { count: number; content: ReactNode }
-  /** the line under the header when a new thread cannot start (no version known) */
-  startUnavailable?: string
+  /** the line under the header while the open version is unknown: save the document first */
+  saveFirst?: string
 }
 
 export function PdfCommentsPanel(p: PdfCommentsPanelProps) {
@@ -246,7 +247,7 @@ export function PdfCommentsPanel(p: PdfCommentsPanelProps) {
           )
         }}
       />
-      {p.startUnavailable && <p className="pdf-server-comments-note">{p.startUnavailable}</p>}
+      {p.saveFirst && <p className="pdf-server-comments-note">{p.saveFirst}</p>}
     </div>
   )
 }
@@ -260,14 +261,13 @@ export interface PdfServerCommentsHostProps extends Omit<PdfServerCommentsOption
   onPendingAnchor(anchor: PdfAnchor | null): void
   inFile?: { count: number; content: ReactNode }
   panelId?: string
-  /** shown under the panel while a new thread cannot start */
-  startUnavailableText: string
+  /** shown under the panel while the open version is unknown ("save the document first") */
+  saveFirstText: string
 }
 
 /** mounted for the whole time a bound document is open; the panel itself draws only while `open` */
 export function PdfServerCommentsHost(p: PdfServerCommentsHostProps) {
-  const { apiRef, onPendingAnchor, open, onClose, inFile, panelId, startUnavailableText, ...opts } =
-    p
+  const { apiRef, onPendingAnchor, open, onClose, inFile, panelId, saveFirstText, ...opts } = p
   const comments = usePdfServerComments({ ...opts, open })
   apiRef.current = comments
   useEffect(
@@ -284,10 +284,6 @@ export function PdfServerCommentsHost(p: PdfServerCommentsHostProps) {
     onPendingRef.current(pendingKey ? (JSON.parse(pendingKey) as PdfAnchor) : null)
   }, [pendingKey])
   if (!open) return null
-  const showUnavailable =
-    comments.controller.state === 'ready' &&
-    comments.controller.can.canWrite &&
-    comments.context.versionId === undefined
   return (
     <PdfCommentsPanel
       comments={comments}
@@ -295,7 +291,7 @@ export function PdfServerCommentsHost(p: PdfServerCommentsHostProps) {
       lang={opts.lang}
       onClose={onClose}
       {...(inFile ? { inFile } : {})}
-      {...(showUnavailable ? { startUnavailable: startUnavailableText } : {})}
+      {...(comments.needsSave ? { saveFirst: saveFirstText } : {})}
     />
   )
 }

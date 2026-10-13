@@ -5,11 +5,14 @@
  * when the shell reports the upload (`receipt`). Whichever comes second sends
  * `comments.anchors` with that version. Two saves before one receipt compose
  * their page maps: the server still holds the anchors of the layout before the
- * first one. A receipt with nothing to pair waits for the next save.
+ * first one. A receipt with nothing to pair waits for the next save. When the server
+ * does not know the version (`retry_next_save`, the kit's `sendAnchorMap` outcome) the
+ * page map is kept and composes with the next save's: the server still holds the
+ * anchors of the old layout, and the shown anchors stay as the server has them.
  *
  * Pure: the transport is injected, so the tests drive it without React or IPC.
  */
-import { chunkAnchors, remapAnchorsAfterSave, type AnchorRemapItem } from './pdf-anchor'
+import { remapAnchorsAfterSave, type AnchorRemapItem } from './pdf-anchor'
 import type { CollabComment } from '@genoffice/ui/collab'
 
 /** a then b: an old page index -> its index after both saves; a page either save dropped is gone */
@@ -28,11 +31,14 @@ export function composePageMaps(
 export interface AnchorResendDeps {
   /** the anchored roots the server holds now (the controller's open + resolved threads) */
   roots(): ReadonlyArray<Pick<CollabComment, 'id' | 'anchor' | 'anchor_state'>>
-  /** one `comments.anchors` call; rejects with the protocol error */
-  send(versionId: string, items: AnchorRemapItem[]): Promise<{ updated: string[] }>
+  /** the whole map for one version (the sender chunks by 500); rejects only for an error other than `anchor_version_invalid` */
+  send(
+    versionId: string,
+    items: AnchorRemapItem[],
+  ): Promise<{ outcome: 'synced'; updated: string[] } | { outcome: 'retry_next_save' }>
   /** the server changed rows: reload the full list (never reuse the PUT's list_token) */
   onUpdated(): void
-  /** `anchor_version_invalid` or a transport failure: the shown anchors stay `stale`, the next Save retries */
+  /** a transport failure or an unexpected server error: the shown anchors stay as they are, nothing is retried */
   onError?(error: unknown): void
 }
 
@@ -47,21 +53,28 @@ export interface AnchorResend {
 export function createAnchorResend(deps: AnchorResendDeps): AnchorResend {
   let pendingMap: Map<number, number> | null = null
   let pendingVersion: string | null = null
+  /** the layout change of a send the server refused (`retry_next_save`): composed into the next one */
+  let carriedMap: Map<number, number> | null = null
   let live = true
 
   const flush = (): void => {
     if (!live || pendingMap === null || pendingVersion === null) return
-    const items: AnchorRemapItem[] = remapAnchorsAfterSave(deps.roots(), pendingMap)
+    const map = carriedMap ? composePageMaps(carriedMap, pendingMap) : pendingMap
+    const items: AnchorRemapItem[] = remapAnchorsAfterSave(deps.roots(), map)
     const versionId = pendingVersion
+    carriedMap = null
     pendingMap = null
     pendingVersion = null
     if (items.length === 0) return
     void (async () => {
       let updated = false
       try {
-        for (const chunk of chunkAnchors(items)) {
-          const r = await deps.send(versionId, chunk)
-          if (r.updated.length > 0) updated = true
+        const r = await deps.send(versionId, items)
+        if (r.outcome === 'retry_next_save') {
+          // the shown anchors stay as the server has them; the next Save sends this change again
+          if (live) carriedMap = map
+        } else {
+          updated = r.updated.length > 0
         }
       } catch (error) {
         if (live) deps.onError?.(error)
@@ -83,6 +96,7 @@ export function createAnchorResend(deps: AnchorResendDeps): AnchorResend {
       live = false
       pendingMap = null
       pendingVersion = null
+      carriedMap = null
     },
   }
 }

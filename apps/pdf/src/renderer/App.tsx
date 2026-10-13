@@ -143,10 +143,7 @@ import { collabStrings } from '@genoffice/ui/collab'
 import { PdfServerCommentsHost, type PdfServerComments } from './server-comments/PdfServerComments'
 import { createPdfAnchorAdapter } from './server-comments/pdf-adapter'
 import { withoutFileNoteWrites } from './server-comments/bound-save'
-import {
-  pdfCommentsBridge,
-  type PdfCommentsContextApi,
-} from './server-comments/pdf-comments-source'
+import { pdfCommentsBridge } from './server-comments/pdf-comments-source'
 import { FileNotesList, type FileNoteThread } from './server-comments/FileNotesList'
 import type { PdfRect } from './server-comments/pdf-anchor'
 import { isUniworkRefusal } from '../shared/uniwork-refusal'
@@ -1706,7 +1703,6 @@ export default function App() {
       }),
     [sizes.length, deleted, pageGeom],
   )
-  const commentsContextApi = window.pdfApi as unknown as PdfCommentsContextApi
   const commentStrings = useMemo(() => collabStrings(lang), [lang])
   /** The file's own note threads for the panel's read-only "Comments in the file" section;
       read from every page once the panel opens (the margin cache only holds visible pages) */
@@ -1734,7 +1730,8 @@ export default function App() {
     setServerPanelOpen(true)
     const server = serverRef.current
     if (!server?.startAt(origIdx + 1, at, aiText)) {
-      showNotice(t('serverCommentStartUnavailable'))
+      // an unknown open version asks to save first (like the Docs editor); anything else is the generic line
+      showNotice(t(server?.needsSave ? 'serverCommentSaveFirst' : 'serverCommentStartUnavailable'))
       return false
     }
     return true
@@ -9570,7 +9567,6 @@ export default function App() {
                 path={filePath}
                 lang={lang}
                 readOnly={readOnly}
-                contextApi={commentsContextApi}
                 adapter={commentAdapter}
                 open={serverPanelOpen}
                 panelId={SERVER_COMMENTS_PANEL_ID}
@@ -9603,7 +9599,7 @@ export default function App() {
                     />
                   ),
                 }}
-                startUnavailableText={t('serverCommentStartUnavailable')}
+                saveFirstText={t('serverCommentSaveFirst')}
               />
             )}
           </div>

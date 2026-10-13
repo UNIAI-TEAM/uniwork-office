@@ -7,16 +7,17 @@
  *   one working-copy path (snake_case kit <-> camelCase IPC); every reply is
  *   unwrapped in this realm, so a failure rejects with the protocol error
  *   (`code`, `details.code`, `retryable`) the kit maps (R1-1).
- * - `loadPdfCommentsContext()` asks for what the server mode needs beyond the
- *   comments themselves: the document id, the version the editor has open or
- *   just saved, the access level and the UniWork user id. The pdf preload does
- *   not expose these yet (residual R1 of the W15 report): the optional
- *   `window.pdfApi.uniworkCommentsContext()` / `onUniworkSaved()` pair is the
- *   contract a later shell piece fills, the same shape as the slides editor's
- *   `SlidesCommentsContextApi` so one main-process handler can serve every app.
- *   Like `getUsername()` it takes no path: main answers for the file the
- *   calling view shows. Until it exists the panel runs its documented fallback
- *   (no new anchored thread, own-comment edits hidden, no anchor re-send).
+ * - `loadPdfCommentsContext()` asks `window.uniworkComments.context({ path })`
+ *   (the shared G8-12 seam, contract §3.1) for what the server mode needs beyond
+ *   the comments themselves: the document id, the version the editor has open or
+ *   just saved (null while unknown), the access level and the UniWork user id.
+ *   `followPdfUniworkSaves()` listens to `window.uniworkComments.onSaved`, filtered
+ *   to this document's path. An error or an unbound path is the fallback (no
+ *   server context): no new anchored thread, own-comment edits hidden, no anchor
+ *   re-send.
+ * - `sendPdfAnchorMap()` is the post-Save anchor sender, with the behaviour of the
+ *   kit's `sendAnchorMap` (chunks of 500, merged answer, `anchor_version_invalid`
+ *   -> `retry_next_save`, never a throw for that code).
  */
 import type { CollabLevel, CollabSource } from '@genoffice/ui/collab'
 import { unwrapCommentsReply } from '@genoffice/electron-utils/comments-reply'
@@ -33,8 +34,45 @@ export type PdfAnchorsResult = Extract<
   { ok: true }
 >['value']
 
-export function pdfCommentsBridge(): UniworkCommentsApi | null {
-  const bridge = (window as unknown as Record<string, UniworkCommentsApi | undefined>)[
+/** what one post-Save anchor map round did (the shape of the kit's `AnchorSyncOutcome`) */
+export type PdfAnchorSyncOutcome =
+  | {
+      outcome: 'synced'
+      updated: string[]
+      skipped: PdfAnchorsResult['skipped']
+      list_token: string
+    }
+  /** the server does not know the version (400 `anchor_version_invalid`): anchors stay shown as stale, send again after the next Save */
+  | { outcome: 'retry_next_save' }
+
+/**
+ * TEMPORARY local structural type for the G8-12 context / saved seam (names and fields
+ * identical to `comments-ipc.ts` `CommentsContextResult` / `CommentsSavedPayload` and
+ * `UniworkCommentsApi.context` / `onSaved`, commit 9963cb1a). This branch is still on fork
+ * main, which lacks those exports: after the rebase onto G8-12 delete this block and import
+ * `UniworkCommentsApi` (with both methods) and `CommentsContextResult` from electron-utils.
+ */
+export interface PdfCommentsContextResult {
+  documentId: string
+  /** the server version the editor has open or last saved; null only while truly unknown */
+  versionId: string | null
+  /** the caller's effective level when main knows it */
+  level?: CollabLevel
+  /** the signed-in UniWork user id ("mine" only, never a permission) */
+  myUserId?: string
+}
+export interface PdfCommentsSavedPayload {
+  path: string
+  versionId: string
+}
+export interface PdfCommentsBridge extends UniworkCommentsApi {
+  context(input: { path: string }): Promise<CommentsReply<PdfCommentsContextResult>>
+  /** main pushes after a Save of `path` settled with a commit receipt; returns the unsubscribe */
+  onSaved(handler: (payload: PdfCommentsSavedPayload) => void): () => void
+}
+
+export function pdfCommentsBridge(): PdfCommentsBridge | null {
+  const bridge = (window as unknown as Record<string, PdfCommentsBridge | undefined>)[
     COMMENTS_BRIDGE_KEY
   ]
   return bridge ?? null
@@ -80,31 +118,61 @@ export function createPdfCommentsSource(bridge: UniworkCommentsApi, path: string
   }
 }
 
-/** `comments.anchors` for one path; rejects with the protocol error like the source calls */
-export function sendPdfAnchors(
-  bridge: UniworkCommentsApi,
-  input: CommentsAnchorsInput,
-): Promise<PdfAnchorsResult> {
-  return value(bridge.anchors(input))
+/** protocol `COMMENTS_MAX_ANCHORS`: the most anchors one `comments.anchors` call may carry */
+export const PDF_MAX_ANCHORS = 500
+
+function isVersionInvalid(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false
+  const e = error as { code?: unknown; details?: { code?: unknown } | null }
+  return e.code === 'anchor_version_invalid' || e.details?.code === 'anchor_version_invalid'
 }
 
 /**
- * What the editor needs to know about a bound document. `versionId` is the
- * version the editor has open (or just saved) and is required to start a new
- * anchored thread (`base_version_id`); `userId` only recognises "mine";
+ * Sends the anchor map for `versionId` (a Save receipt's version) in chunks of 500, one after
+ * the other, and merges the answers (`list_token` = the last one). `anchor_version_invalid`
+ * resolves to `retry_next_save` and never throws; any other failure rejects with the protocol
+ * error. Same behaviour as the kit's `sendAnchorMap`, which replaces this after the G8-12 rebase.
+ */
+export async function sendPdfAnchorMap(
+  bridge: UniworkCommentsApi,
+  path: string,
+  versionId: string,
+  anchors: CommentsAnchorsInput['anchors'],
+): Promise<PdfAnchorSyncOutcome> {
+  const synced: PdfAnchorSyncOutcome = {
+    outcome: 'synced',
+    updated: [],
+    skipped: [],
+    list_token: '',
+  }
+  for (let i = 0; i < anchors.length; i += PDF_MAX_ANCHORS) {
+    let result: PdfAnchorsResult
+    try {
+      result = await value(
+        bridge.anchors({ path, versionId, anchors: anchors.slice(i, i + PDF_MAX_ANCHORS) }),
+      )
+    } catch (error) {
+      if (isVersionInvalid(error)) return { outcome: 'retry_next_save' }
+      throw error
+    }
+    synced.updated.push(...result.updated)
+    synced.skipped.push(...result.skipped)
+    synced.list_token = result.list_token
+  }
+  return synced
+}
+
+/**
+ * What the editor needs to know about a bound document. `versionId` is the version the editor
+ * has open (or just saved) and is required to start a new anchored thread (`base_version_id`);
+ * null = unknown, so no new root until a Save receipt. `myUserId` only recognises "mine";
  * `level` is the caller's document level (a display hint, the server gates).
  */
 export interface PdfCommentsContext {
   documentId: string
-  versionId?: string
-  userId?: string
+  versionId: string | null
+  myUserId?: string
   level?: CollabLevel
-}
-
-/** the optional preload surface (absent until the shell serves it); `onUniworkSaved` fires after a Save's commit receipt */
-export interface PdfCommentsContextApi {
-  uniworkCommentsContext?(): Promise<PdfCommentsContext | null>
-  onUniworkSaved?(handler: (receipt: { versionId: string }) => void): () => void
 }
 
 const LEVELS: ReadonlySet<string> = new Set(['view', 'edit', 'manage'])
@@ -113,50 +181,51 @@ function boundedId(v: unknown): string | undefined {
   return typeof v === 'string' && v.length > 0 && v.length <= 128 ? v : undefined
 }
 
-/** the fallback without the shell's answer: the path keys drafts, a read-only copy reads `view` */
+/** the fallback without a server context: the path keys drafts, a read-only copy reads `view` */
 export function fallbackPdfCommentsContext(path: string, readOnly: boolean): PdfCommentsContext {
-  return { documentId: path, level: readOnly ? 'view' : 'edit' }
+  return { documentId: path, versionId: null, level: readOnly ? 'view' : 'edit' }
 }
 
 /**
- * The context of the bound document at `path`, every field validated. A missing
- * method, a failed call or an answer without a document id is the fallback; a
- * read-only copy never writes, whatever the answer says.
+ * The context of the bound document at `path`, every field validated. A missing bridge, an
+ * error envelope (unbound included), a failed call or an answer without a document id is the
+ * fallback; a read-only copy never writes, whatever the answer says.
  */
 export async function loadPdfCommentsContext(
-  api: PdfCommentsContextApi | undefined,
+  bridge: Pick<PdfCommentsBridge, 'context'> | null,
   path: string,
   readOnly: boolean,
 ): Promise<PdfCommentsContext> {
   const fallback = fallbackPdfCommentsContext(path, readOnly)
-  let raw: PdfCommentsContext | null
+  let raw: PdfCommentsContextResult | null = null
   try {
-    raw = (await api?.uniworkCommentsContext?.()) ?? null
+    if (bridge) raw = await value(bridge.context({ path }))
   } catch {
     raw = null
   }
   if (!raw || typeof raw !== 'object') return fallback
   const documentId = boundedId(raw.documentId)
   if (!documentId) return fallback
-  const versionId = boundedId(raw.versionId)
-  const userId = boundedId(raw.userId)
+  const myUserId = boundedId(raw.myUserId)
   const level =
     typeof raw.level === 'string' && LEVELS.has(raw.level) ? raw.level : ('edit' as const)
   return {
     documentId,
-    ...(versionId ? { versionId } : {}),
-    ...(userId ? { userId } : {}),
+    versionId: boundedId(raw.versionId) ?? null,
+    ...(myUserId ? { myUserId } : {}),
     level: readOnly ? 'view' : level,
   }
 }
 
-/** subscribe to save receipts; a no-op unsubscribe when the preload has no such event */
+/** subscribe to this document's save receipts; a no-op unsubscribe when the bridge has no such event */
 export function followPdfUniworkSaves(
-  api: PdfCommentsContextApi | undefined,
+  bridge: Pick<PdfCommentsBridge, 'onSaved'>,
+  path: string,
   handler: (versionId: string) => void,
 ): () => void {
-  const off = api?.onUniworkSaved?.((receipt) => {
-    const versionId = boundedId(receipt?.versionId)
+  const off = bridge.onSaved?.((payload) => {
+    if (payload?.path !== path) return
+    const versionId = boundedId(payload.versionId)
     if (versionId) handler(versionId)
   })
   return off ?? (() => undefined)
