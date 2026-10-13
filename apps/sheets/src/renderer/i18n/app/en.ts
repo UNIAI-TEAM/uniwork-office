@@ -1496,8 +1496,8 @@ export const en = {
   appWebViewOnly: "View only: you can't save changes to this workbook.",
   appWebConflictTitle: 'This workbook was changed elsewhere',
   appWebConflictBody:
-    'Someone saved a newer version while you were editing. Overwrite it with your version, or reload the latest version (your unsaved changes are discarded).',
-  appWebConflictOverwrite: 'Overwrite',
+    'Your changes aren’t on UniWork yet and are kept in this browser until you sign out.',
+  appWebConflictOverwrite: 'Overwrite…',
   appWebConflictReload: 'Reload latest',
   appWebConflictNotSaved: 'Not saved: a newer version exists.',
   appWebDiscardTitle: 'Discard unsaved changes?',

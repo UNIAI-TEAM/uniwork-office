@@ -518,8 +518,8 @@ export const it = {
   appStyleNamePlaceholder: 'Nome dello stile',
   appWebConflictTitle: 'Questo documento è stato modificato altrove',
   appWebConflictBody:
-    'Mentre modificavi è stata salvata una versione più recente. Vuoi sovrascriverla con la tua versione o ricaricare l’ultima versione e scartare le modifiche?',
-  appWebConflictOverwrite: 'Sovrascrivi',
+    'Le modifiche non sono ancora su UniWork e restano in questo browser finché non esci.',
+  appWebConflictOverwrite: 'Sovrascrivi…',
   appWebConflictReload: 'Ricarica l’ultima versione',
   appWebConflictNotSaved: 'il documento è stato modificato altrove',
   appWebDiscardTitle: 'Scartare le modifiche non salvate?',

@@ -4,8 +4,8 @@ export const es = {
   webCancel: 'Cancelar',
   webConflictTitle: 'Este documento se modificó en otro lugar',
   webConflictBody:
-    'Se guardó una versión más reciente mientras editabas. ¿Quieres sobrescribirla con tu versión o volver a cargar la última versión y descartar tus cambios?',
-  webConflictOverwrite: 'Sobrescribir',
+    'Tus cambios aún no están en UniWork y se conservan en este navegador hasta que cierres sesión.',
+  webConflictOverwrite: 'Sobrescribir…',
   webConflictReload: 'Cargar la última versión',
   webConflictNotSaved: 'el documento se modificó en otro lugar',
   webFatalTitle: 'No se pudo abrir el documento',

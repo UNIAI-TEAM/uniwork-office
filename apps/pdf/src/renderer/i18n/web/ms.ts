@@ -4,8 +4,8 @@ export const ms = {
   webCancel: 'Batal',
   webConflictTitle: 'Dokumen ini telah diubah di tempat lain',
   webConflictBody:
-    'Versi yang lebih baharu telah disimpan semasa anda menyunting. Tulis ganti dengan versi anda, atau muat semula versi terkini dan buang perubahan anda?',
-  webConflictOverwrite: 'Tulis ganti',
+    'Perubahan anda belum ada di UniWork dan disimpan dalam pelayar ini sehingga anda log keluar.',
+  webConflictOverwrite: 'Tulis ganti…',
   webConflictReload: 'Muat semula versi terkini',
   webConflictNotSaved: 'dokumen telah diubah di tempat lain',
   webFatalTitle: 'Dokumen tidak dapat dibuka',

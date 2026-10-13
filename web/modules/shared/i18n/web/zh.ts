@@ -1,9 +1,8 @@
 export const zh = {
   webCancel: '取消',
   webConflictTitle: '此文档已在其他地方被修改',
-  webConflictBody:
-    '在你编辑期间已保存了更新的版本。要用你的版本覆盖它,还是重新加载最新版本并放弃你的更改?',
-  webConflictOverwrite: '覆盖',
+  webConflictBody: '你的更改尚未存到 UniWork，会保留在此浏览器中，直到你退出登录。',
+  webConflictOverwrite: '覆盖…',
   webConflictReload: '重新加载最新版本',
   webConflictNotSaved: '文档已在其他地方被修改',
   webFatalTitle: '无法打开文档',

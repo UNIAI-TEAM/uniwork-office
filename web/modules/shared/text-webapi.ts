@@ -9,7 +9,8 @@
  * |                                    | (./text-codec.ts keeps BOM + EOL; the renderer's envelope does the rest)|
  * | save {mode:'save'}                 | api.save {fileId, data, etag}; never `auto` (CONTRACT C10)            |
  * | save {mode:'saveAs'} / untitled    | api.saveAs {name, data, sourceFileId} (host dialog; silent when named) |
- * | save conflict (frame-initiated)    | dialog Cancel / Reload latest / Overwrite (./notice.ts)               |
+ * | save conflict (frame or host save) | the shared conflict dialog (./conflict-dialog.ts); host `save` gets   |
+ * |                                    | its outcome (ok / ok without versionId / cancelled / failure code)    |
  * | setDirty                           | `dirty` event; host `doc.closeCheck` answers {dirty, autoSave:false}  |
  * | onSaveRequest / sendSaveRequestAck | host `save` {reason:'user'} / `saveAs`                                 |
  * | onCloseSaveRequest / sendClose...  | host `save` {reason:'navigate'} (the renderer's close-save flow)       |
@@ -50,7 +51,16 @@ import { ownHeadAfterUnknown } from '../../docs/bridge/head-match'
 import type { ModuleBridgePort } from '../../docs/bridge/module-bridge'
 import type { DraftHost, DraftRecovery } from '../../docs/bridge/draft-recovery'
 import { createAssetStore } from './assets'
-import { ask, hideFatal, showFatal, text } from './notice'
+import {
+  conflictSaveResult,
+  downloadVia,
+  headFromFile,
+  overwriteHead,
+  readHeadFile,
+  revisionOf,
+  runConflictDialog,
+} from './conflict-dialog'
+import { hideFatal, showFatal, text } from './notice'
 import { printHtmlDocument } from './print'
 import { bridgeDraftRecovery } from './recovery-prompt'
 import { saveFailureText } from './save-failure'
@@ -198,6 +208,7 @@ export function createTextWebApi(
   }
   let imagesGranted = false
   let desktopOpenGranted = false
+  let downloadGranted = false
 
   const viewOnly = (): boolean => !saveGranted || inexact
 
@@ -285,6 +296,7 @@ export function createTextWebApi(
       saveGranted = s.capabilities?.save === true
       imagesGranted = s.capabilities?.images === true
       desktopOpenGranted = s.capabilities?.desktopOpen === true
+      downloadGranted = s.capabilities?.download === true
       initDocumentId = s.documentId
       return s.open ? accept(s.open) : openById(s.documentId)
     })
@@ -471,16 +483,6 @@ export function createTextWebApi(
     return pathFor(file)
   }
 
-  async function headMeta(fileId: string): Promise<FileMeta | null> {
-    try {
-      const open = await port.request('api.open', { fileId }, { timeoutMs: TIMEOUTS.short })
-      return open?.file?.fileId === fileId ? open.file : null
-    } catch (err) {
-      console.warn('[office-web] reading the head version failed:', err)
-      return null
-    }
-  }
-
   /** a timed-out / network-failed save may still have landed: adopt the head when its bytes are ours */
   async function reconcileAfterUnknown(
     fileId: string,
@@ -507,13 +509,9 @@ export function createTextWebApi(
       return { ok: true, path }
     }
     if (res.error.code === 'conflict') {
-      // a host `save` gets the conflict in its result and owns the UI
-      if (host) {
-        host.settle(res)
-        return { ok: false, error: text('webConflictNotSaved') }
-      }
-      port.reportError(res.error, false)
-      return resolveConflict(fileId, data)
+      // the host's own `save` waits for the dialog's answer instead of an error event
+      if (!host) port.reportError(res.error, false)
+      return resolveConflict(fileId, data, host)
     }
     if (res.error.code === 'timeout' || res.error.code === 'network') {
       // `bytes` was transferred to the host (detached): encoding is deterministic, so rebuild them
@@ -523,34 +521,66 @@ export function createTextWebApi(
     return { ok: false, error: saveFailureText(res.error, text) }
   }
 
-  async function resolveConflict(fileId: string, data: string): Promise<TextSaveResult> {
-    const choice = await ask({
-      title: 'webConflictTitle',
-      body: 'webConflictBody',
-      choices: [
-        { id: 'cancel', label: 'webCancel' },
-        { id: 'reload', label: 'webConflictReload' },
-        { id: 'overwrite', label: 'webConflictOverwrite', danger: true },
-      ],
-      cancelId: 'cancel',
-      marker: 'conflict',
+  /**
+   * A save that hit `conflict` (frame-initiated or the host's `save`): the shared conflict dialog
+   * settles it in the frame and the host's `save` gets the outcome as its answer.
+   */
+  async function resolveConflict(
+    fileId: string,
+    data: string,
+    host: Waiter<SaveResult>,
+  ): Promise<TextSaveResult> {
+    // the dialog may stay open for long: the host request must not time out meanwhile
+    host?.started()
+    let loaded = null as FileMeta | null
+    const outcome = await runConflictDialog({
+      title: text('webConflictTitle'),
+      body: text('webConflictBody'),
+      reloadLabel: text('webConflictReload'),
+      overwriteLabel: text('webConflictOverwrite'),
+      cancelLabel: text('webCancel'),
+      baseRevision: revisionOf(files.get(fileId)),
+      readHead: async () => headFromFile(await readHeadFile(port, fileId)),
+      overwrite: async () => {
+        const res = await overwriteHead(port, fileId, encodeText(data))
+        if (res.ok && res.file) {
+          landed(
+            { ok: true, file: res.file, ...(res.versionId ? { versionId: res.versionId } : {}) },
+            host === null,
+          )
+        }
+        return res
+      },
+      // the frame reloads once the host has its answer (below): the renderer boots on the head, and
+      // the answer names that head
+      reload: async () => {
+        loaded = await readHeadFile(port, fileId)
+        return true
+      },
+      canEdit: () => !viewOnly(),
+      download: downloadVia(port, downloadGranted ? { download: true } : undefined, () =>
+        encodeText(data),
+      ),
     })
-    if (choice === 'overwrite') {
-      const head = await headMeta(fileId)
-      if (!head) return { ok: false, error: text('webConflictNotSaved') }
-      remember(head)
-      return saveExisting(fileId, data)
-    }
-    if (choice === 'reload') {
-      // the frame reloads and the host re-runs the handshake: the renderer boots on the newest
-      // version. The unsaved edits are dropped on purpose (that is what "Reload latest" means).
+    const file = (outcome.kind === 'reloaded' ? loaded : null) ?? files.get(fileId)
+    if (host && file) host.settle(conflictSaveResult(outcome, file))
+    if (outcome.kind === 'overwritten') return { ok: true, path: pathFor(files.get(fileId)!) }
+    if (outcome.kind === 'reloaded') {
+      // the unsaved edits are dropped on purpose (that is what "Reload latest" means); the host
+      // re-runs the handshake after the reload (host.ts: a later `ready` restarts it)
       dirty = false
       port.setDirty(false)
       // the dropped edits must not come back as a draft after the reload
       await drafts.saved()
       ;(opts.reload ?? (() => location.reload()))()
     }
-    return { ok: false, error: text('webConflictNotSaved') }
+    return {
+      ok: false,
+      error:
+        outcome.kind === 'failed'
+          ? saveFailureText({ code: outcome.code, message: '' }, text)
+          : text('webConflictNotSaved'),
+    }
   }
 
   async function saveNew(

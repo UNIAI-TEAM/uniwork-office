@@ -3,9 +3,8 @@ import type { zh } from './zh'
 export const zhTW = {
   webCancel: '取消',
   webConflictTitle: '此文件已在其他地方被修改',
-  webConflictBody:
-    '在你編輯期間已儲存了較新的版本。要用你的版本覆寫它,還是重新載入最新版本並捨棄你的變更?',
-  webConflictOverwrite: '覆寫',
+  webConflictBody: '你的變更尚未存到 UniWork，會保留在此瀏覽器中，直到你登出。',
+  webConflictOverwrite: '覆寫…',
   webConflictReload: '重新載入最新版本',
   webConflictNotSaved: '文件已在其他地方被修改',
   webFatalTitle: '無法開啟文件',

@@ -39,6 +39,7 @@ import browser from './browser'
 import { createWebApi } from './webapi'
 import { bindHostAppearance, createFrameClient } from './frame-boot'
 import { createCapabilityObject } from './capability-object'
+import { rememberRemoteVersion } from '../../modules/shared/conflict-dialog'
 import { mergeModules, safeApi, type BridgeObject } from './safe-api'
 import ai from './ai'
 import { createAppOpen } from './app-open'
@@ -76,6 +77,8 @@ const capabilities: DesktopCapabilities = createCapabilityObject<DesktopCapabili
 )
 // theme + language come from the host (never localStorage) and must be in place before boot
 bindHostAppearance(client)
+// the conflict table learns who saved a revision from doc.remoteVersion
+client.onRemoteVersion?.(rememberRemoteVersion)
 const webapi = createWebApi(client)
 
 export function installBridge(): void {

@@ -40,10 +40,11 @@
  * |                                   |   and say "use the app" (renderer AppOnlyNote)                           |
  * | openInApp (web only)              | host `app.open` (A7), only with the `desktopOpen` grant; else quiet      |
  *
- * Save conflicts (api.save answers `conflict`): a host `save` request gets the conflict in its
- * SaveResult and owns the UI. Otherwise the frame asks like Docs (./notice.ts): Overwrite (re-read
- * the head etag, save again), Reload latest (the renderer reopens the latest version, pending
- * edits are dropped) or Cancel (stays dirty, "Save failed"). Nothing is ever saved without an
+ * Save conflicts (api.save answers `conflict`): every save that hits it, the frame's own and the
+ * host's `save`, opens the shared conflict dialog (../shared/conflict-dialog.ts): Reload latest
+ * (the renderer reopens the latest version, pending edits are dropped), Overwrite… (re-read the
+ * head etag, save again) or Cancel (stays dirty, "Save failed"). The host's `save` gets the
+ * outcome as its answer. Nothing is ever saved without an
  * explicit user action: no `auto` save exists on the web (CONTRACT C10).
  *
  * Draft recovery (C18, web/docs/bridge/draft-recovery.ts): the draft is what a save would write
@@ -63,6 +64,7 @@ import type {
 import { DEFAULT_AI_PANEL_PREFS } from '@genoffice/ui'
 import {
   toProtocolError,
+  type Capabilities,
   type FileMeta,
   type FileSource,
   type OpenPayload,
@@ -80,6 +82,15 @@ import type { ModuleBridgePort } from '../../docs/bridge/module-bridge'
 import type { DraftHost, DraftRecovery } from '../../docs/bridge/draft-recovery'
 import { bridgeDraftRecovery, bridgeRecoveryGrant } from '../shared/recovery-prompt'
 import { saveFailureText } from '../shared/save-failure'
+import {
+  conflictSaveResult,
+  downloadVia,
+  headFromFile,
+  overwriteHead,
+  readHeadFile,
+  revisionOf,
+  runConflictDialog,
+} from '../shared/conflict-dialog'
 import type { PdfCore } from './core'
 import { ask, hideFatal, showFatal, text } from './notice'
 import { createSignatureStore } from './signatures'
@@ -208,6 +219,10 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
   let recoveredFlag = false
   /** the document `init` names: the only one the host's draft scope ("<user>:<document>") covers */
   let initDocumentId: string | null = null
+  /** the effective capabilities from `init` (`download` for the conflict dialog) */
+  let effective: Capabilities | undefined
+  /** stops the host save's renderer timer (the conflict dialog may stay open for long) */
+  let holdRendererSave: (() => void) | null = null
   let saveRequestProvider: (() => SavePdfRequest | null) | null = null
 
   const currentPath = (): string | null => (doc ? pathFor(doc.file) : null)
@@ -308,9 +323,11 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
       const finish = (ok: boolean) => {
         clearTimeout(t)
         closeSaveWaiters = closeSaveWaiters.filter((w) => w !== finish)
+        holdRendererSave = null
         resolve(ok)
       }
       const t = setTimeout(() => finish(false), deps.saveTimeoutMs ?? 180_000)
+      holdRendererSave = () => clearTimeout(t)
       closeSaveWaiters.push(finish)
       // a host save request is the user's explicit Save
       for (const h of closeSaveHandlers) h({ origin: 'user' })
@@ -324,6 +341,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
     .then(async (s) => {
       author = s.user?.displayName ?? ''
       initDocumentId = s.documentId
+      effective = s.capabilities
       const open =
         s.open ??
         (await port.request('api.open', { fileId: s.documentId }, { timeoutMs: TIMEOUTS.transfer }))
@@ -348,7 +366,11 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
   // ------------------------------------------------------------ saving
 
   /** set while the host's `save` request runs the renderer's save flow */
-  let hostSave: { error: ProtocolErrorShape | null } | null = null
+  let hostSave: {
+    error: ProtocolErrorShape | null
+    /** the conflict dialog's answer (overwritten / reloaded / cancelled / failed) */
+    answer: SaveResult | null
+  } | null = null
   /** set while the host's `saveAs` request waits for the renderer's Save As */
   let hostSaveAs: {
     name?: string
@@ -367,51 +389,66 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
     }
   }
 
-  /** api.open for the head metadata (etag); the bytes are not kept */
-  async function headMeta(fileId: string): Promise<FileMeta | null> {
-    try {
-      const open = await port.request('api.open', { fileId }, { timeoutMs: TIMEOUTS.short })
-      return open?.file?.fileId === fileId ? open.file : null
-    } catch (err) {
-      console.warn('[pdf-web] reading the head version failed:', err)
-      return null
-    }
-  }
-
   /** after a timed-out / network-failed save: adopt the head when its bytes are our own write */
   async function reconcileAfterUnknown(fileId: string, sent: Uint8Array): Promise<void> {
     const head = await ownHeadAfterUnknown(port, fileId, doc?.file.etag, sent)
     if (head && doc?.file.fileId === fileId) doc = { file: { ...doc.file, ...head }, bytes: sent }
   }
 
+  /**
+   * A save that hit `conflict` (frame-initiated or the host's `save`): the shared conflict dialog
+   * settles it in the frame; the host's `save` gets the outcome as its answer (hostSave.answer).
+   */
   async function resolveConflict(fileId: string, bytes: Uint8Array): Promise<{ ok: true } | Fail> {
-    const choice = await ask({
-      title: 'webConflictTitle',
-      body: 'webConflictBody',
-      choices: [
-        { id: 'cancel', label: 'webCancel' },
-        { id: 'reload', label: 'webConflictReload' },
-        { id: 'overwrite', label: 'webConflictOverwrite', danger: true },
-      ],
-      cancelId: 'cancel',
-      marker: 'conflict',
-    })
-    if (choice === 'overwrite') {
-      const head = await headMeta(fileId)
-      if (!head || doc?.file.fileId !== fileId) return fail(text('webConflictNotSaved'))
-      doc = { ...doc, file: { ...doc.file, ...head } }
-      return putBytes(fileId, bytes)
-    }
-    if (choice === 'reload') {
-      try {
+    holdRendererSave?.()
+    const outcome = await runConflictDialog({
+      title: text('webConflictTitle'),
+      body: text('webConflictBody'),
+      reloadLabel: text('webConflictReload'),
+      overwriteLabel: text('webConflictOverwrite'),
+      cancelLabel: text('webCancel'),
+      baseRevision: revisionOf(doc?.file),
+      readHead: async () => headFromFile(await readHeadFile(port, fileId)),
+      overwrite: async () => {
+        const res = await overwriteHead(port, fileId, bytes)
+        if (res.ok && res.file) {
+          stored(
+            { ok: true, file: res.file, ...(res.versionId ? { versionId: res.versionId } : {}) },
+            bytes,
+          )
+        }
+        return res
+      },
+      reload: async () => {
         const open = await port.request('api.open', { fileId }, { timeoutMs: TIMEOUTS.transfer })
         emitReload(await openPayload(open))
-        return fail(text('webReloaded'))
-      } catch (err) {
-        console.error('[pdf-web] reloading the latest version failed:', err)
-      }
-    }
+        return true
+      },
+      canEdit: () => can('edit'),
+      download: downloadVia(port, effective, () => bytes),
+      markerAttr: 'data-pdf-web',
+    })
+    if (hostSave && doc) hostSave.answer = conflictSaveResult(outcome, { ...doc.file })
+    if (outcome.kind === 'overwritten') return { ok: true }
+    if (outcome.kind === 'reloaded') return fail(text('webReloaded'))
+    if (outcome.kind === 'failed')
+      return fail(saveFailureText({ code: outcome.code, message: '' }, text))
     return fail(text('webConflictNotSaved'))
+  }
+
+  /** a save landed: the bytes become the working copy and the host hears `saved` */
+  function stored(res: Extract<SaveResult, { ok: true }>, bytes: Uint8Array): void {
+    const file: FileMeta = { ...(doc?.file ?? {}), ...res.file }
+    if (res.versionId && !res.file.versionId) file.versionId = res.versionId
+    adopt(file, bytes)
+    restored = false
+    recoveredFlag = false
+    void drafts.saved()
+    port.reportSaved({
+      file,
+      ...(file.versionId ? { versionId: file.versionId } : {}),
+      initiatedByFrame: hostSave === null,
+    })
   }
 
   /** upload new bytes of the open document as its next version (If-Match = working copy etag) */
@@ -426,24 +463,13 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
       ),
     )
     if (res.ok) {
-      const file: FileMeta = { ...(doc?.file ?? {}), ...res.file }
-      if (res.versionId && !res.file.versionId) file.versionId = res.versionId
-      adopt(file, bytes)
-      restored = false
-      recoveredFlag = false
-      void drafts.saved()
-      port.reportSaved({
-        file,
-        ...(file.versionId ? { versionId: file.versionId } : {}),
-        initiatedByFrame: hostSave === null,
-      })
+      stored(res, bytes)
       return { ok: true }
     }
     if (hostSave) hostSave.error = res.error
     if (res.error.code === 'conflict') {
-      // a host `save` request gets the conflict in its result and owns the UI
-      if (hostSave) return fail(text('webConflictNotSaved'))
-      port.reportError(res.error, false)
+      // the host's own `save` waits for the dialog's answer instead of an error event
+      if (!hostSave) port.reportError(res.error, false)
       return resolveConflict(fileId, bytes)
     }
     if (res.error.code === 'timeout' || res.error.code === 'network') {
@@ -558,9 +584,10 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
     if (!doc) return failure('not_ready', 'no document is open')
     if (!can('edit')) return failure('forbidden', 'the document is view-only')
     if (hostSave) return failure('busy', 'a save is already running')
-    hostSave = { error: null }
+    hostSave = { error: null, answer: null }
     try {
       const ok = await runRendererSave()
+      if (hostSave.answer) return hostSave.answer
       if (ok && doc) {
         return {
           ok: true,

@@ -4,8 +4,8 @@ export const fr = {
   webCancel: 'Annuler',
   webConflictTitle: 'Ce document a été modifié ailleurs',
   webConflictBody:
-    'Une version plus récente a été enregistrée pendant que vous modifiiez. Voulez-vous l’écraser avec votre version, ou recharger la dernière version et abandonner vos modifications ?',
-  webConflictOverwrite: 'Écraser',
+    'Vos modifications ne sont pas encore sur UniWork et sont conservées dans ce navigateur jusqu’à votre déconnexion.',
+  webConflictOverwrite: 'Écraser…',
   webConflictReload: 'Recharger la dernière version',
   webConflictNotSaved: 'le document a été modifié ailleurs',
   webFatalTitle: 'Impossible d’ouvrir le document',

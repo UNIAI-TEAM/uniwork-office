@@ -179,7 +179,9 @@ test.describe('slides web module', () => {
     const conflict = frame.locator('[data-slides-web="conflict"]')
     await expect(conflict).toBeVisible()
     await expect(conflict).toContainText('changed elsewhere')
-    await conflict.getByRole('button', { name: 'Overwrite' }).click()
+    await conflict.getByRole('button', { name: 'Overwrite…' }).click()
+    // Overwrite… opens its confirmation in the same dialog
+    await conflict.locator('[data-choice="go"]').click()
     await expect.poll(async () => (await hostSaved(page))?.versionId).toBe('v4')
     await expect(conflict).toHaveCount(0)
 

@@ -189,3 +189,166 @@
     align-items: stretch;
   }
 }
+
+/* ---- steps and slots (conflict dialog and its confirmation steps) ---- */
+
+.ow-dlg-title:focus {
+  outline: none;
+}
+
+.ow-dlg-title:focus-visible {
+  outline: 2px solid var(--color-dialog-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.ow-dlg-content:not(:empty) {
+  margin-top: 12px;
+}
+
+/* the dialog's own alert node: always in the tree, collapsed while empty (never display:none) */
+.ow-dlg-alert {
+  margin: 0;
+  color: var(--danger-text);
+  overflow-wrap: anywhere;
+}
+
+.ow-dlg-alert:not(:empty) {
+  margin-top: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--danger-border);
+  border-radius: 8px;
+  background: var(--danger-bg);
+}
+
+.ow-dlg-alert:empty {
+  height: 0;
+  overflow: hidden;
+}
+
+.ow-dlg-reason {
+  margin: 8px 0 0;
+  font-size: var(--text-caption);
+  color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+
+/* shown, reachable and described, but not runnable; a danger choice keeps its danger text */
+.ow-dlg-btn[aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.ow-dlg-btn[aria-disabled='true']:hover {
+  background: var(--surface);
+}
+
+.ow-dlg-btn.danger[aria-disabled='true'],
+.ow-dlg-btn.danger[aria-disabled='true']:hover {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+/* two-column comparison: your version | the version on UniWork */
+.ow-dlg-compare {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-caption);
+  table-layout: fixed;
+}
+
+.ow-dlg-compare th,
+.ow-dlg-compare td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  text-align: start;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.ow-dlg-compare thead th {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.ow-dlg-compare tbody th {
+  width: 28%;
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
+.ow-dlg-compare td {
+  color: var(--text);
+}
+
+.ow-dlg-note {
+  margin: 8px 0 0;
+  color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+
+/* narrow frames: one column, each value under its row label */
+@media (max-width: 767px) {
+  .ow-dlg-compare,
+  .ow-dlg-compare tbody,
+  .ow-dlg-compare tr,
+  .ow-dlg-compare th,
+  .ow-dlg-compare td {
+    display: block;
+    width: auto;
+  }
+
+  .ow-dlg-compare thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .ow-dlg-compare td::before {
+    content: attr(data-col) ': ';
+    color: var(--text-dim);
+  }
+
+  .ow-dlg-compare tbody th {
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+}
+
+/* touch: 44 px targets, and the close X sits inside the card without covering the title */
+@media (pointer: coarse) {
+  .ow-dlg-btn {
+    min-height: 44px;
+  }
+
+  .ow-dlg-close {
+    width: 44px;
+    height: 44px;
+    inset-block-start: 4px;
+    inset-inline-end: 4px;
+  }
+
+  .ow-dlg-title {
+    padding-inline-end: 48px;
+  }
+}
+
+/* short viewports (zoom 400 %): the whole card scrolls, the title is never cut off */
+@media (max-height: 480px) {
+  .ow-dlg-mask {
+    align-items: flex-start;
+    overflow-y: auto;
+  }
+
+  .ow-dlg {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .ow-dlg-head {
+    overflow: visible;
+  }
+}

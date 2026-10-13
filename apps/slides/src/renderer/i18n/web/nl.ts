@@ -3,8 +3,8 @@ import type { zh } from './zh'
 export const nl = {
   webConflictTitle: 'Deze presentatie is elders gewijzigd',
   webConflictBody:
-    'Iemand heeft een nieuwere versie opgeslagen. Overschrijven vervangt die door uw wijzigingen; Nieuwste laden verwijdert uw wijzigingen en opent de nieuwste versie.',
-  webConflictOverwrite: 'Overschrijven',
+    'Je wijzigingen staan nog niet op UniWork en blijven in deze browser tot je je afmeldt.',
+  webConflictOverwrite: 'Overschrijven…',
   webConflictReload: 'Nieuwste laden',
   webConflictNotSaved: 'de presentatie is elders gewijzigd',
   webDiscardTitle: 'Niet-opgeslagen wijzigingen verwijderen?',

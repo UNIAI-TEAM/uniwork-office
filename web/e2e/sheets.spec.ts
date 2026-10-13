@@ -430,6 +430,8 @@ test('save conflict: Overwrite saves over the newer version', async ({ page }) =
   await expect(dialog).toBeVisible({ timeout: 30_000 })
   await page.screenshot({ path: resolve(shots, 'conflict-en-dark.png') })
   await dialog.locator('button[data-choice="overwrite"]').click()
+  // Overwrite… opens its confirmation in the same dialog
+  await dialog.locator('[data-choice="go"]').click()
   await expect.poll(() => lastSaved(page), { timeout: 60_000 }).not.toBeNull()
   expect(await savedSheetXml(page)).toMatch(/<c r="A1"[^>]*><v>7<\/v><\/c>/)
   expect({ csp: await cspViolations(page, frame), ...problems }).toEqual({

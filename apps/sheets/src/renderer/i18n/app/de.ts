@@ -1574,8 +1574,8 @@ export const de = {
   appWebViewOnly: 'Nur Ansicht: Sie können Änderungen an dieser Arbeitsmappe nicht speichern.',
   appWebConflictTitle: 'Diese Arbeitsmappe wurde an anderer Stelle geändert',
   appWebConflictBody:
-    'Während Sie bearbeitet haben, wurde eine neuere Version gespeichert. Überschreiben Sie sie mit Ihrer Version oder laden Sie die neueste Version neu (nicht gespeicherte Änderungen gehen verloren).',
-  appWebConflictOverwrite: 'Überschreiben',
+    'Ihre Änderungen sind noch nicht in UniWork und bleiben in diesem Browser, bis Sie sich abmelden.',
+  appWebConflictOverwrite: 'Überschreiben…',
   appWebConflictReload: 'Neueste Version laden',
   appWebConflictNotSaved: 'Nicht gespeichert: Es gibt eine neuere Version.',
   appWebDiscardTitle: 'Nicht gespeicherte Änderungen verwerfen?',

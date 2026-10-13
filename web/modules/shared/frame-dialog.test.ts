@@ -1,7 +1,13 @@
 // The shared frame dialog (every web module): action order, tones, safe first focus, Escape, Tab
 // trap, focus return, marker attribute, blocking notice.
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { frameAsk, hideFrameNotices, showFrameNotice, toneOf } from './frame-dialog'
+import {
+  frameAsk,
+  hideFrameNotices,
+  openFrameDialog,
+  showFrameNotice,
+  toneOf,
+} from './frame-dialog'
 
 const keydown = (key: string, shiftKey = false) =>
   document.dispatchEvent(new KeyboardEvent('keydown', { key, shiftKey, bubbles: true }))
@@ -241,6 +247,164 @@ describe('frameAsk', () => {
     expect(onChange).toHaveBeenCalledTimes(1)
     btn('ok').click()
     expect(onChange).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('open dialog reflow and focus (S5)', () => {
+  it('the first focus never scrolls the card: the title and description stay in view', () => {
+    const focus = vi.spyOn(HTMLElement.prototype, 'focus')
+    void conflict()
+    const cancel = btn('cancel')
+    const call = focus.mock.calls.find((_, i) => focus.mock.contexts[i] === cancel)
+    expect(call?.[0]).toMatchObject({ preventScroll: true })
+    focus.mockRestore()
+  })
+
+  it('every step starts scrolled to the top of the dialog', async () => {
+    const scrollTop = vi.spyOn(Element.prototype, 'scrollTop', 'set')
+    const handle = openFrameDialog<string>({ marker: 'steps' })
+    const mask = document.querySelector('.ow-dlg-mask')!
+    void handle.step({
+      title: 'One',
+      body: 'First',
+      choices: [{ id: 'cancel', label: 'Cancel' }],
+      cancelId: 'cancel',
+    })
+    const topped = () =>
+      scrollTop.mock.contexts.filter((c, i) => c === mask && scrollTop.mock.calls[i]?.[0] === 0)
+    expect(topped().length).toBe(1)
+    void handle.step({
+      title: 'Two',
+      body: 'Second',
+      choices: [{ id: 'back', label: 'Back' }],
+      cancelId: 'back',
+    })
+    expect(topped().length).toBe(2)
+    handle.close()
+    scrollTop.mockRestore()
+  })
+
+  it('two disabled choices with the same reason show it once, both described by it', () => {
+    void frameAsk({
+      title: 't',
+      body: 'b',
+      choices: [
+        { id: 'reload', label: 'Reload', disabled: true, reason: 'You are offline.' },
+        {
+          id: 'overwrite',
+          label: 'Overwrite',
+          danger: true,
+          disabled: true,
+          reason: 'You are offline.',
+        },
+        { id: 'cancel', label: 'Cancel' },
+      ],
+      cancelId: 'cancel',
+      marker: 'offline',
+    })
+    const lines = [...document.querySelectorAll('.ow-dlg-reason')]
+    expect(lines.map((l) => l.textContent)).toEqual(['You are offline.'])
+    expect(btn('reload').getAttribute('aria-describedby')).toBe(lines[0]!.id)
+    expect(btn('overwrite').getAttribute('aria-describedby')).toBe(lines[0]!.id)
+  })
+
+  it('different reasons keep one line each', () => {
+    void frameAsk({
+      title: 't',
+      body: 'b',
+      choices: [
+        { id: 'a', label: 'A', disabled: true, reason: 'Reason A.' },
+        { id: 'b', label: 'B', disabled: true, reason: 'Reason B.' },
+        { id: 'cancel', label: 'Cancel' },
+      ],
+      cancelId: 'cancel',
+      marker: 'two',
+    })
+    expect([...document.querySelectorAll('.ow-dlg-reason')].map((l) => l.textContent)).toEqual([
+      'Reason A.',
+      'Reason B.',
+    ])
+  })
+
+  it('setChoiceDisabled flips a choice live and keeps the reason lines in step', () => {
+    const handle = openFrameDialog<string>({ marker: 'live' })
+    void handle.step({
+      title: 't',
+      body: 'b',
+      choices: [
+        { id: 'reload', label: 'Reload', primary: true },
+        { id: 'overwrite', label: 'Overwrite', danger: true },
+        { id: 'cancel', label: 'Cancel' },
+      ],
+      cancelId: 'cancel',
+    })
+    expect(document.querySelectorAll('.ow-dlg-reason').length).toBe(0)
+    handle.setChoiceDisabled('reload', 'Offline.')
+    handle.setChoiceDisabled('overwrite', 'Offline.')
+    expect(btn('reload').getAttribute('aria-disabled')).toBe('true')
+    expect(btn('overwrite').getAttribute('aria-disabled')).toBe('true')
+    expect([...document.querySelectorAll('.ow-dlg-reason')].map((l) => l.textContent)).toEqual([
+      'Offline.',
+    ])
+    expect(btn('reload').getAttribute('aria-describedby')).toBe(
+      document.querySelector('.ow-dlg-reason')!.id,
+    )
+    handle.setChoiceDisabled('reload', null)
+    handle.setChoiceDisabled('overwrite', null)
+    expect(btn('reload').hasAttribute('aria-disabled')).toBe(false)
+    expect(btn('reload').hasAttribute('aria-describedby')).toBe(false)
+    expect(document.querySelectorAll('.ow-dlg-reason').length).toBe(0)
+    handle.close()
+  })
+
+  it('focus that falls out of the dialog (backdrop click) returns to the last control', async () => {
+    void conflict()
+    expect(document.activeElement).toBe(btn('cancel'))
+    ;(document.activeElement as HTMLElement).blur()
+    expect(document.activeElement).toBe(document.body)
+    await new Promise((r) => setTimeout(r, 0))
+    expect(document.activeElement).toBe(btn('cancel'))
+    // the last focused control, not always Cancel
+    keydown('Tab')
+    const x = document.querySelector<HTMLElement>('.ow-dlg-close')!
+    expect(document.activeElement).toBe(x)
+    x.blur()
+    await new Promise((r) => setTimeout(r, 0))
+    expect(document.activeElement).toBe(x)
+  })
+
+  it('a step change that replaces the focused button does not fight the new first focus', async () => {
+    const handle = openFrameDialog<string>({ marker: 'steps2' })
+    void handle.step({
+      title: 'One',
+      body: 'b',
+      choices: [{ id: 'cancel', label: 'Cancel' }],
+      cancelId: 'cancel',
+    })
+    void handle.step({
+      title: 'Two',
+      body: 'b',
+      choices: [
+        { id: 'go', label: 'Go', primary: true },
+        { id: 'back', label: 'Back' },
+      ],
+      cancelId: 'back',
+      focusId: 'back',
+    })
+    await new Promise((r) => setTimeout(r, 0))
+    expect(document.activeElement).toBe(btn('back'))
+    handle.close()
+  })
+
+  it('once closed the dialog no longer pulls the focus back', async () => {
+    const opener = document.createElement('button')
+    document.body.append(opener)
+    opener.focus()
+    const done = conflict()
+    keydown('Escape')
+    await done
+    await new Promise((r) => setTimeout(r, 0))
+    expect(document.activeElement).toBe(opener)
   })
 })
 

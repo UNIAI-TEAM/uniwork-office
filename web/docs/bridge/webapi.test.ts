@@ -49,6 +49,8 @@ async function dialogShown(marker: string): Promise<HTMLElement> {
 
 async function choose(marker: string, choice: string): Promise<void> {
   const el = await dialogShown(marker)
+  // a confirmation step renders after an await: wait for the button too
+  for (let i = 0; i < 50 && !el.querySelector(`[data-choice="${choice}"]`); i++) await flush()
   el.querySelector<HTMLButtonElement>(`[data-choice="${choice}"]`)!.click()
 }
 
@@ -276,11 +278,15 @@ describe('saveDocx', () => {
     expect(mock.modals).toEqual([true, false])
   })
 
-  it('conflict -> Overwrite: re-reads the head etag and saves over the newer version', async () => {
+  it('conflict -> Overwrite… -> confirm: re-reads the head etag and saves over the newer version', async () => {
     const doc = await bootWith()
     const remote = mock.bumpRemote('f1') // v2 by someone else
     const pending = api.saveDocx(doc.path, buf([7, 7]))
     await choose('conflict', 'overwrite')
+    // the confirmation step replaces the content of the same dialog: nothing saved yet
+    expect(document.querySelectorAll('[role="alertdialog"]')).toHaveLength(1)
+    expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(1)
+    await choose('conflict', 'go')
     expect(await pending).toEqual({ ok: true })
     const saves = mock.calls.filter((c) => c.type === 'api.save')
     expect(saves.map((c) => (c.payload as { etag?: string }).etag)).toEqual([
@@ -300,6 +306,8 @@ describe('saveDocx', () => {
     mock.bumpRemote('f1')
     const pending = api.saveDocx(doc.path, buf([5]))
     await choose('conflict', 'reload')
+    // the web reload confirmation: discard the edits and reload (no download capability here)
+    await choose('conflict', 'discard')
     expect(await pending).toEqual({ ok: false, reason: 'external-modified' })
     const reopened = await Promise.all(
       seen.map(async (r) => `${r.name}:${(await bytesAt(r.dataUrl)).length}`),
@@ -730,14 +738,93 @@ describe('host save / saveAs requests (editor flows)', () => {
     expect(mock.saved.at(-1)!.initiatedByFrame).toBe(false)
   })
 
-  it('save conflict: answers ok:false with the conflict error (the host owns the UI)', async () => {
+  it('save conflict: the frame shows the one conflict dialog; Cancel answers cancelled', async () => {
     const doc = await bootWith()
     wireRenderer(() => doc.path)
     mock.bumpRemote('f1')
-    const res = await mock.host.save({ reason: 'navigate' })
-    expect(res).toMatchObject({ ok: false, error: { code: 'conflict' } })
+    const res = mock.host.save({ reason: 'user' })
+    await dialogShown('conflict')
+    expect(document.querySelectorAll('[role="alertdialog"]')).toHaveLength(1)
+    expect(mock.modals).toEqual([true])
+    await choose('conflict', 'cancel')
+    expect(await res).toMatchObject({ ok: false, error: { code: 'cancelled' } })
     expect(document.querySelector('[data-docs-web="conflict"]')).toBeNull()
+    expect(mock.modals).toEqual([true, false])
+    // the host's own save hears the answer, not an error event
     expect(mock.errors).toHaveLength(0)
+  })
+
+  it('save conflict -> Overwrite… confirmed: answers ok with the new version', async () => {
+    const doc = await bootWith()
+    wireRenderer(() => doc.path)
+    mock.bumpRemote('f1')
+    const res = mock.host.save({ reason: 'user' })
+    await choose('conflict', 'overwrite')
+    await choose('conflict', 'go')
+    expect(await res).toMatchObject({ ok: true, file: { fileId: 'f1' }, versionId: 'v3' })
+    expect(mock.saved.at(-1)).toMatchObject({ initiatedByFrame: false })
+  })
+
+  it('save conflict -> Reload latest: answers ok without a versionId', async () => {
+    const doc = await bootWith()
+    wireRenderer(() => doc.path)
+    mock.bumpRemote('f1')
+    const res = mock.host.save({ reason: 'navigate' })
+    await choose('conflict', 'reload')
+    await choose('conflict', 'discard')
+    const answer = await res
+    expect(answer).toMatchObject({ ok: true, file: { fileId: 'f1', versionId: 'v2' } })
+    expect(answer).not.toHaveProperty('versionId')
+  })
+
+  it('save conflict without the download capability: no download choice', async () => {
+    const doc = await bootWith()
+    wireRenderer(() => doc.path)
+    mock.bumpRemote('f1')
+    const res = mock.host.save({ reason: 'user' })
+    await choose('conflict', 'reload')
+    await choose('conflict', 'back')
+    expect(document.querySelector('[data-choice="download"]')).toBeNull()
+    await choose('conflict', 'cancel')
+    await res
+  })
+
+  it('save conflict with the download capability: the bytes go to api.download, then Reload', async () => {
+    const meta = mock.seed('Report.docx', DOCX)
+    mock.init({ documentId: meta.fileId, capabilities: { save: true, download: true } })
+    const doc = (await api.consumePendingOpenDocx()) as OpenFileResult
+    wireRenderer(
+      () => doc.path,
+      () => api.saveDocx(doc.path, buf([4, 4])),
+    )
+    mock.bumpRemote('f1')
+    const res = mock.host.save({ reason: 'user' })
+    await choose('conflict', 'reload')
+    await choose('conflict', 'download')
+    await dialogShown('conflict')
+    for (let i = 0; i < 20; i++) await flush()
+    const sent = mock.calls.find((c) => c.type === 'api.download')!
+    // bytes only: the host names, types and size-checks the file
+    expect(Object.keys(sent.payload as object)).toEqual(['data'])
+    expect(new Uint8Array((sent.payload as { data: ArrayBuffer }).data)).toEqual(
+      new Uint8Array([4, 4]),
+    )
+    // the frame waits for the user to confirm they have the file
+    expect(mock.calls.filter((c) => c.type === 'api.open')).toHaveLength(2)
+    await choose('conflict', 'go')
+    expect(await res).toMatchObject({ ok: true, file: { fileId: 'f1' } })
+  })
+
+  it('save conflict -> Overwrite gets 401: the session line, closing answers unauthorized', async () => {
+    const doc = await bootWith()
+    wireRenderer(() => doc.path)
+    mock.bumpRemote('f1')
+    const res = mock.host.save({ reason: 'user' })
+    await choose('conflict', 'overwrite')
+    mock.override('api.save', () => Promise.reject(protocolError('unauthorized', 'HTTP 401')))
+    await choose('conflict', 'go')
+    await choose('conflict', 'cancel')
+    expect(await res).toMatchObject({ ok: false, error: { code: 'unauthorized' } })
   })
 
   it('save conflict: the editor result carries the localized conflict sentence, not the server message', async () => {
@@ -753,8 +840,10 @@ describe('host save / saveAs requests (editor flows)', () => {
     mock.override('api.save', () =>
       Promise.reject(protocolError('conflict', 'stale etag (HTTP 409)')),
     )
-    await mock.host.save({ reason: 'navigate' })
-    expect(seen).toMatchObject({ ok: false, reason: 'external-modified' })
+    const res = mock.host.save({ reason: 'navigate' })
+    await choose('conflict', 'cancel')
+    await res
+    expect(seen).toMatchObject({ ok: false })
     expect(seen!.error).toBe(text('appWebConflictNotSaved'))
     expect(seen!.error).not.toMatch(/stale etag|409|try again/i)
   })

@@ -516,6 +516,8 @@ for (const d of DOCS) {
       await page.keyboard.press('Control+s')
       await expect(dialog).toBeVisible({ timeout: 15_000 })
       await dialog.locator('[data-choice="overwrite"]').click()
+      // Overwrite… opens its confirmation in the same dialog
+      await dialog.locator('[data-choice="go"]').click()
       let after: HostSave = null
       await expect
         .poll(async () => (after = await lastHostSave(page))?.versionId, {

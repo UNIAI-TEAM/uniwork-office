@@ -272,6 +272,8 @@ test.describe('pdf module on the web', () => {
     await expect(conflict).toBeVisible()
     await expect(conflict).toContainText('changed elsewhere')
     await conflict.locator('[data-choice="overwrite"]').click()
+    // Overwrite… opens its confirmation in the same dialog
+    await conflict.locator('[data-choice="go"]').click()
     await waitVersion(page, 'v4')
     expect(annotSubtypes((await savedPdf(page)).doc, 0)).toContain('Underline')
     expect(

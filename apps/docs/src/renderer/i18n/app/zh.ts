@@ -523,9 +523,8 @@ export const zh = {
   appNewStyleFromSelection: '从当前选区新建样式',
   appStyleNamePlaceholder: '样式名称',
   appWebConflictTitle: '此文档已在其他地方被修改',
-  appWebConflictBody:
-    '在你编辑期间已保存了更新的版本。要用你的版本覆盖它,还是重新加载最新版本并放弃你的更改?',
-  appWebConflictOverwrite: '覆盖',
+  appWebConflictBody: '你的更改尚未存到 UniWork，会保留在此浏览器中，直到你退出登录。',
+  appWebConflictOverwrite: '覆盖…',
   appWebConflictReload: '重新加载最新版本',
   appWebConflictNotSaved: '文档已在其他地方被修改',
   appWebDiscardTitle: '放弃未保存的更改?',

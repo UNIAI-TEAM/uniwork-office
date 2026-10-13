@@ -3,9 +3,8 @@ import type { zh } from './zh'
 export const ar = {
   webCancel: 'إلغاء',
   webConflictTitle: 'تم تعديل هذا المستند في مكان آخر',
-  webConflictBody:
-    'تم حفظ إصدار أحدث أثناء تحريرك. هل تريد استبداله بإصدارك، أم إعادة تحميل أحدث إصدار وتجاهل تغييراتك؟',
-  webConflictOverwrite: 'استبدال',
+  webConflictBody: 'تغييراتك ليست على UniWork بعد وتبقى في هذا المتصفح حتى تسجّل الخروج.',
+  webConflictOverwrite: 'استبدال…',
   webConflictReload: 'إعادة تحميل أحدث إصدار',
   webConflictNotSaved: 'تم تعديل المستند في مكان آخر',
   webFatalTitle: 'تعذر فتح المستند',

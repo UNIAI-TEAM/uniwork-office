@@ -20,6 +20,7 @@ import {
 } from './engine/transport'
 import { createUnavailableTransport } from './engine/unavailable'
 import type { AskFn } from './notice'
+import { runConflictDialog, type ConflictIo, type ConflictOutcome } from '../shared/conflict-dialog'
 import {
   DRAFTS_DB,
   DRAFTS_STORE,
@@ -110,6 +111,7 @@ function setup(
   opts: {
     grants?: Record<string, boolean>
     ask?: AskFn
+    conflict?: (io: ConflictIo) => Promise<ConflictOutcome>
     transport?: SheetsEngineTransport
     features?: Partial<SheetsEngineTransport['features']>
     drafts?: (host: import('../../docs/bridge/draft-recovery').DraftHost) => DraftRecovery
@@ -135,6 +137,7 @@ function setup(
           transport,
           capabilities: ctx.capabilities,
           ask: opts.ask ?? (async (o) => o.cancelId),
+          conflict: opts.conflict ?? (async () => ({ kind: 'cancelled' })),
           print,
           download,
           locale: () => 'en',
@@ -488,21 +491,33 @@ describe('save failures', () => {
 })
 
 describe('save conflicts', () => {
+  /** the conflict dialog choosing Overwrite (confirmed) */
+  const overwrite = vi.fn(async (io: ConflictIo): Promise<ConflictOutcome> => {
+    const res = await io.overwrite()
+    return res.ok
+      ? {
+          kind: 'overwritten',
+          ...(res.versionId ? { versionId: res.versionId } : {}),
+          ...(res.file ? { file: res.file } : {}),
+        }
+      : { kind: 'failed', code: 'internal' }
+  })
+  /** the conflict dialog choosing Reload latest -> discard and reload */
+  const reload = async (io: ConflictIo): Promise<ConflictOutcome> =>
+    (await io.reload()) ? { kind: 'reloaded' } : { kind: 'cancelled' }
+
   it('Overwrite re-reads the head etag and saves again', async () => {
-    const ask = vi.fn(async () => 'overwrite') as unknown as AskFn
-    const t = setup({ ask })
+    const t = setup({ conflict: overwrite })
     const wb = await t.boot()
     t.mock.bumpRemote(t.file.fileId) // someone else saved
     const result = await t.desktop.saveWorkbookEdits(saveRequest(wb.sessionId, [[0, 0, 1]]))
-    expect(ask).toHaveBeenCalledOnce()
     expect(result.canceled).toBe(false)
     expect(dec(t.mock.bytesOf(t.file.fileId))).toBe('v1|0:0=1')
     expect(t.mock.errors.some((e) => (e.error as { code?: string }).code === 'conflict')).toBe(true)
   })
 
   it('Reload latest cancels the save and reopens the newest version through the open action', async () => {
-    const ask = vi.fn(async () => 'reload') as unknown as AskFn
-    const t = setup({ ask })
+    const t = setup({ conflict: reload })
     const wb = await t.boot()
     t.mock.commit(t.file.fileId, enc('v2-remote'))
     const actions: string[] = []
@@ -525,43 +540,88 @@ describe('save conflicts', () => {
     expect(t.fake.sessions.has(wb.sessionId)).toBe(true)
   })
 
-  it('a host-initiated save gets the conflict in its result (the host owns the UI)', async () => {
-    const ask = vi.fn(async () => 'overwrite') as unknown as AskFn
-    const t = setup({ ask })
-    const wb = await t.boot()
-    t.mock.bumpRemote(t.file.fileId)
+  function hostSaving(t: ReturnType<typeof setup>, wb: WorkbookFile) {
     t.desktop.onCloseSaveRequest(() => {
       void t.desktop.saveWorkbookEdits(saveRequest(wb.sessionId, [[0, 0, 1]])).then(
         () => t.desktop.reportCloseSaveResult(true),
         () => t.desktop.reportCloseSaveResult(false),
       )
     })
-    const res = await t.mock.host.save({ reason: 'user' })
-    expect(res).toMatchObject({ ok: false, error: { code: 'conflict' } })
-    expect(ask).not.toHaveBeenCalled()
-  })
-})
+  }
 
-describe('host-initiated save conflict copy', () => {
-  it('fails the renderer save with the localized conflict sentence, never the server message', async () => {
-    const t = setup()
+  it('a host-initiated save opens the conflict dialog in the frame; Cancel answers cancelled', async () => {
+    const conflict = vi.fn(async (): Promise<ConflictOutcome> => ({ kind: 'cancelled' }))
+    const t = setup({ conflict })
     const wb = await t.boot()
     t.mock.bumpRemote(t.file.fileId)
-    let failure = ''
-    t.desktop.onCloseSaveRequest(() => {
-      void t.desktop.saveWorkbookEdits(saveRequest(wb.sessionId, [[0, 0, 1]])).then(
-        () => t.desktop.reportCloseSaveResult(true),
-        (err: Error) => {
-          failure = err.message
-          t.desktop.reportCloseSaveResult(false)
-        },
-      )
+    hostSaving(t, wb)
+    const res = await t.mock.host.save({ reason: 'user' })
+    expect(conflict).toHaveBeenCalledOnce()
+    expect(res).toMatchObject({ ok: false, error: { code: 'cancelled' } })
+    expect(t.mock.errors).toHaveLength(0)
+  })
+
+  it('a host-initiated save -> Overwrite answers ok with the new version', async () => {
+    const t = setup({ conflict: overwrite })
+    const wb = await t.boot()
+    t.mock.bumpRemote(t.file.fileId)
+    hostSaving(t, wb)
+    expect(await t.mock.host.save({ reason: 'user' })).toMatchObject({ ok: true, versionId: 'v3' })
+  })
+
+  it('a host-initiated save -> Reload answers ok without a versionId', async () => {
+    const t = setup({ conflict: reload })
+    const wb = await t.boot()
+    t.mock.bumpRemote(t.file.fileId)
+    hostSaving(t, wb)
+    const res = await t.mock.host.save({ reason: 'navigate' })
+    expect(res).toMatchObject({ ok: true, file: { fileId: t.file.fileId, versionId: 'v2' } })
+    expect(res).not.toHaveProperty('versionId')
+  })
+
+  it('a host-initiated save -> Overwrite failed with 403, closed: answers forbidden', async () => {
+    const t = setup({ conflict: async () => ({ kind: 'failed', code: 'forbidden' }) })
+    const wb = await t.boot()
+    t.mock.bumpRemote(t.file.fileId)
+    hostSaving(t, wb)
+    expect(await t.mock.host.save({ reason: 'user' })).toMatchObject({
+      ok: false,
+      error: { code: 'forbidden' },
     })
-    await t.mock.host.save({ reason: 'user' })
-    expect(failure).not.toBe('')
-    expect(failure).not.toMatch(/stale etag/)
-    expect(failure).toMatch(/newer version/)
-    expect(failure).not.toMatch(/try again/i)
+  })
+
+  it('the dialog stays open past the host-save timer without a timeout answer', async () => {
+    let close!: (o: ConflictOutcome) => void
+    const t = setup({ conflict: () => new Promise((r) => (close = r)) })
+    const wb = await t.boot()
+    t.mock.bumpRemote(t.file.fileId)
+    hostSaving(t, wb)
+    const res = t.mock.host.save({ reason: 'user' })
+    // saveTimeoutMs is 500 in these tests
+    await new Promise((r) => setTimeout(r, 700))
+    close({ kind: 'cancelled' })
+    expect(await res).toMatchObject({ ok: false, error: { code: 'cancelled' } })
+  })
+
+  it('the real dialog: workbook wording, DOM order Reload latest, Overwrite…, Cancel, focus Cancel; download only with the capability', async () => {
+    const t = setup({ conflict: runConflictDialog })
+    const wb = await t.boot()
+    t.mock.bumpRemote(t.file.fileId)
+    const pending = t.desktop.saveWorkbookEdits(saveRequest(wb.sessionId, [[0, 0, 1]]))
+    await vi.waitFor(() =>
+      expect(document.querySelector('[data-sheets-web="conflict"] [data-choice]')).not.toBeNull(),
+    )
+    expect(document.querySelector('h2')!.textContent).toBe('This workbook was changed elsewhere')
+    expect(
+      [...document.querySelectorAll('[data-choice]')].map((b) => (b as HTMLElement).dataset.choice),
+    ).toEqual(['reload', 'overwrite', 'cancel'])
+    expect((document.activeElement as HTMLElement).dataset.choice).toBe('cancel')
+    ;(document.querySelector('[data-choice="reload"]') as HTMLButtonElement).click()
+    await vi.waitFor(() => expect(document.querySelector('[data-choice="discard"]')).not.toBeNull())
+    // ALL_GRANTS has no `download`: no download choice
+    expect(document.querySelector('[data-choice="download"]')).toBeNull()
+    ;(document.querySelector('.ow-dlg-close') as HTMLButtonElement).click()
+    await expect(pending).rejects.toThrow(/newer version/)
   })
 })
 

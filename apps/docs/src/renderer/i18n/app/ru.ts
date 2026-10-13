@@ -518,8 +518,8 @@ export const ru = {
   appStyleNamePlaceholder: 'Имя стиля',
   appWebConflictTitle: 'Этот документ был изменён в другом месте',
   appWebConflictBody:
-    'Пока вы редактировали, была сохранена более новая версия. Перезаписать её вашей версией или загрузить последнюю версию и отменить ваши изменения?',
-  appWebConflictOverwrite: 'Перезаписать',
+    'Ваших изменений ещё нет в UniWork; они хранятся в этом браузере, пока вы не выйдете.',
+  appWebConflictOverwrite: 'Перезаписать…',
   appWebConflictReload: 'Загрузить последнюю версию',
   appWebConflictNotSaved: 'документ был изменён в другом месте',
   appWebDiscardTitle: 'Отменить несохранённые изменения?',

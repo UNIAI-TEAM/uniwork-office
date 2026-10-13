@@ -13,7 +13,7 @@
  * | commentAuthor          | init.user.displayName, else the generic "User" label                 |
  * | saveTarget.untitled    | a `uniwork://new/<name>` placeholder; writeDeck saves it with api.saveAs {silent} |
  * | saveTarget.saveAs      | api.saveAs (the host's name/folder dialog uploads the bytes at once) |
- * | writeDeck              | savePptx -> api.save {fileId, data, etag}; conflict -> Overwrite / Reload / Cancel |
+ * | writeDeck              | savePptx -> api.save {fileId, data, etag}; conflict -> ../shared/conflict-dialog.ts |
  * | saved                  | `saved` event, dirty, title, rename listeners                        |
  *
  * No autosave (CONTRACT C10): api.save is never sent with `auto`.
@@ -28,14 +28,28 @@ import type {
   SaveEvent,
 } from '../../../apps/slides/src/session/host-io'
 import { sessions } from '../../../apps/slides/src/session/state'
-import type { FileMeta, ProtocolErrorShape, SaveResult } from '../../docs/protocol/types'
+import type {
+  Capabilities,
+  FileMeta,
+  ProtocolErrorShape,
+  SaveResult,
+} from '../../docs/protocol/types'
 import { pickFiles } from '../../docs/bridge/browser'
 import { TIMEOUTS, errorCode, type FramePort } from '../../docs/bridge/frame-port'
 import { ownHeadAfterUnknown } from '../../docs/bridge/head-match'
 import { idFromPath, pathFor } from '../../docs/bridge/webapi'
 import { tm } from '../../../apps/slides/src/main/i18n-main'
-import { ask, choose, text } from './dialogs'
+import { choose, text } from './dialogs'
 import { saveFailureText } from '../shared/save-failure'
+import {
+  conflictSaveResult,
+  downloadVia,
+  headFromFile,
+  overwriteHead,
+  readHeadFile,
+  revisionOf,
+  runConflictDialog,
+} from '../shared/conflict-dialog'
 
 const IMAGE_ACCEPT = '.png,.jpg,.jpeg,.gif,.bmp,.webp,.tif,.tiff'
 const MEDIA_ACCEPT: Record<MediaPickKind, string> = {
@@ -54,10 +68,16 @@ export interface WebDocState {
   files: Map<string, FileMeta>
   /** set while the document could not be opened: every save is refused */
   fatal: ProtocolErrorShape | null
-  /** a host `save` / `saveAs` request runs the editor's flow: it owns the conflict UI */
+  /** a host `save` / `saveAs` request runs the editor's flow (its answer comes from the dialog) */
   hostSaving: boolean
   /** why the last save / save-as failed (the host request's SaveResult error) */
   lastFailure: ProtocolErrorShape | null
+  /** the conflict dialog's answer to the running host `save` (overwritten / reloaded / ...) */
+  hostAnswer: SaveResult | null
+  /** stops the host save's renderer timer (the conflict dialog may stay open for long) */
+  holdHostSave: (() => void) | null
+  /** the effective capabilities from `init` (`download` for the conflict dialog) */
+  effective: Capabilities | undefined
   remember(file: FileMeta): void
 }
 
@@ -68,6 +88,9 @@ export function createDocState(): WebDocState {
     fatal: null,
     hostSaving: false,
     lastFailure: null,
+    hostAnswer: null,
+    holdHostSave: null,
+    effective: undefined,
     remember(file) {
       files.set(file.fileId, { ...files.get(file.fileId), ...file })
     },
@@ -228,16 +251,7 @@ export function createWebHostIO(deps: WebHostDeps): HostIO {
     return meta
   }
 
-  async function headMeta(fileId: string): Promise<FileMeta | null> {
-    try {
-      const open = await deps.port.request('api.open', { fileId }, { timeoutMs: TIMEOUTS.short })
-      return open?.file?.fileId === fileId ? open.file : null
-    } catch {
-      return null
-    }
-  }
-
-  /** api.save of the current bytes; a conflict asks Overwrite / Reload latest / Cancel */
+  /** api.save of the current bytes; a conflict opens the shared conflict dialog */
   async function saveExisting(fileId: string, path: string, bytes: Uint8Array): Promise<void> {
     const etag = deps.state.files.get(fileId)?.etag
     const payload = { fileId, data: copyBuffer(bytes), ...(etag ? { etag } : {}) }
@@ -264,29 +278,40 @@ export function createWebHostIO(deps: WebHostDeps): HostIO {
       }
       throw saveFailure(res)
     }
-    // a host `save` request gets the conflict in its result and owns the UI
-    if (deps.state.hostSaving) throw saveFailure(res)
-    deps.port.reportError(res.error, false)
-    const choice = await ask({
-      title: 'webConflictTitle',
-      body: 'webConflictBody',
-      choices: [
-        // the safe choice takes the focus: Overwrite replaces someone else's version
-        { id: 'cancel', label: 'webCancel' },
-        { id: 'reload', label: 'webConflictReload' },
-        { id: 'overwrite', label: 'webConflictOverwrite', danger: true },
-      ],
-      cancelId: 'cancel',
-      marker: 'conflict',
+    // the frame's own save also tells the host; the host's `save` waits for the dialog's answer
+    if (!deps.state.hostSaving) deps.port.reportError(res.error, false)
+    deps.state.holdHostSave?.()
+    const outcome = await runConflictDialog({
+      title: text('webConflictTitle'),
+      body: text('webConflictBody'),
+      reloadLabel: text('webConflictReload'),
+      overwriteLabel: text('webConflictOverwrite'),
+      cancelLabel: text('webCancel'),
+      baseRevision: revisionOf(deps.state.files.get(fileId)),
+      readHead: async () => headFromFile(await readHeadFile(deps.port, fileId)),
+      overwrite: async () => {
+        const again = await overwriteHead(deps.port, fileId, bytes)
+        if (again.ok && again.file) {
+          const versionId = again.versionId
+          landed({ ok: true, file: again.file, ...(versionId ? { versionId } : {}) }, path, 'save')
+        }
+        return again
+      },
+      reload: async () => {
+        await deps.reload(fileId)
+        return true
+      },
+      // the host's grant now AND the file's own flag for the current token (as the Docs bridge)
+      canEdit: () =>
+        deps.capabilities.save !== false && deps.state.files.get(fileId)?.writable !== false,
+      download: downloadVia(deps.port, deps.state.effective, () => bytes),
+      markerAttr: 'data-slides-web',
     })
-    if (choice === 'overwrite') {
-      const head = await headMeta(fileId)
-      if (head) {
-        deps.state.remember(head)
-        return saveExisting(fileId, path, bytes)
-      }
-    } else if (choice === 'reload') {
-      await deps.reload(fileId)
+    const file = deps.state.files.get(fileId)
+    if (deps.state.hostSaving && file) deps.state.hostAnswer = conflictSaveResult(outcome, file)
+    if (outcome.kind === 'overwritten') return
+    if (outcome.kind === 'failed') {
+      throw saveFailure({ ok: false, error: { code: outcome.code, message: '' } })
     }
     deps.state.lastFailure = res.error
     throw new WebSaveError(text('webConflictNotSaved'), 'conflict')

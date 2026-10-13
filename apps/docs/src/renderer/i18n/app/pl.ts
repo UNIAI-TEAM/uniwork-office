@@ -518,8 +518,8 @@ export const pl = {
   appStyleNamePlaceholder: 'Nazwa stylu',
   appWebConflictTitle: 'Ten dokument został zmieniony w innym miejscu',
   appWebConflictBody:
-    'Podczas edycji zapisano nowszą wersję. Czy zastąpić ją swoją wersją, czy wczytać najnowszą wersję i odrzucić swoje zmiany?',
-  appWebConflictOverwrite: 'Zastąp',
+    'Twoich zmian nie ma jeszcze w UniWork; są przechowywane w tej przeglądarce do czasu wylogowania.',
+  appWebConflictOverwrite: 'Zastąp…',
   appWebConflictReload: 'Wczytaj najnowszą wersję',
   appWebConflictNotSaved: 'dokument został zmieniony w innym miejscu',
   appWebDiscardTitle: 'Odrzucić niezapisane zmiany?',

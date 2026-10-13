@@ -4,8 +4,8 @@ export const de = {
   webCancel: 'Abbrechen',
   webConflictTitle: 'Dieses Dokument wurde an anderer Stelle geändert',
   webConflictBody:
-    'Während Sie bearbeitet haben, wurde eine neuere Version gespeichert. Mit Ihrer Version überschreiben oder die neueste Version neu laden und Ihre Änderungen verwerfen?',
-  webConflictOverwrite: 'Überschreiben',
+    'Ihre Änderungen sind noch nicht in UniWork und bleiben in diesem Browser, bis Sie sich abmelden.',
+  webConflictOverwrite: 'Überschreiben…',
   webConflictReload: 'Neueste Version laden',
   webConflictNotSaved: 'das Dokument wurde an anderer Stelle geändert',
   webFatalTitle: 'Das Dokument konnte nicht geöffnet werden',

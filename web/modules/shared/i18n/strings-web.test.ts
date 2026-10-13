@@ -44,6 +44,10 @@ describe('web string shards', () => {
   })
 
   it('says what the catalogue says in vi and en', () => {
+    expect(webStrings.en.webConflictOverwrite).toBe('Overwrite…')
+    expect(webStrings.vi.webConflictOverwrite).toBe('Ghi đè…')
+    expect(webStrings.en.webConflictBody).toBe(webStrings.en.webConflictBodySafe)
+    expect(webStrings.vi.webConflictBody).toBe(webStrings.vi.webConflictBodySafe)
     expect(webStrings.en.webConflictBodySafe).toBe(
       'Your changes aren’t on UniWork yet and are kept in this browser until you sign out.',
     )

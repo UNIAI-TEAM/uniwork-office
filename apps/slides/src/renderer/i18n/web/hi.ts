@@ -3,8 +3,8 @@ import type { zh } from './zh'
 export const hi = {
   webConflictTitle: 'यह प्रस्तुति कहीं और बदली गई थी',
   webConflictBody:
-    'किसी ने नया संस्करण सहेजा है। अधिलेखित करें इसे आपके परिवर्तनों से बदल देता है; नवीनतम फिर से लोड करें आपके परिवर्तन हटाकर नवीनतम संस्करण खोलता है।',
-  webConflictOverwrite: 'अधिलेखित करें',
+    'आपके बदलाव अभी UniWork पर नहीं हैं और साइन आउट करने तक इस ब्राउज़र में रखे जाते हैं।',
+  webConflictOverwrite: 'अधिलेखित करें…',
   webConflictReload: 'नवीनतम फिर से लोड करें',
   webConflictNotSaved: 'प्रस्तुति कहीं और बदली गई थी',
   webDiscardTitle: 'सहेजे न गए परिवर्तन छोड़ें?',

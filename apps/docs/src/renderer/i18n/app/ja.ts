@@ -536,9 +536,8 @@ export const ja = {
   appNewStyleFromSelection: '選択範囲から新しいスタイルを作成',
   appStyleNamePlaceholder: 'スタイル名',
   appWebConflictTitle: 'このドキュメントは別の場所で変更されました',
-  appWebConflictBody:
-    '編集中に新しいバージョンが保存されました。自分のバージョンで上書きしますか?それとも最新バージョンを再読み込みして変更を破棄しますか?',
-  appWebConflictOverwrite: '上書き',
+  appWebConflictBody: '変更はまだ UniWork になく、ログアウトするまでこのブラウザーに保持されます。',
+  appWebConflictOverwrite: '上書き…',
   appWebConflictReload: '最新版を再読み込み',
   appWebConflictNotSaved: 'ドキュメントは別の場所で変更されています',
   appWebDiscardTitle: '保存されていない変更を破棄しますか?',

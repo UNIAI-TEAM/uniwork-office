@@ -509,8 +509,8 @@ export const th = {
   appStyleNamePlaceholder: 'ชื่อสไตล์',
   appWebConflictTitle: 'เอกสารนี้ถูกแก้ไขจากที่อื่น',
   appWebConflictBody:
-    'มีการบันทึกเวอร์ชันใหม่กว่าระหว่างที่คุณแก้ไข ต้องการเขียนทับด้วยเวอร์ชันของคุณ หรือโหลดเวอร์ชันล่าสุดใหม่และละทิ้งการเปลี่ยนแปลงของคุณ?',
-  appWebConflictOverwrite: 'เขียนทับ',
+    'การเปลี่ยนแปลงของคุณยังไม่อยู่บน UniWork และจะเก็บไว้ในเบราว์เซอร์นี้จนกว่าคุณจะออกจากระบบ',
+  appWebConflictOverwrite: 'เขียนทับ…',
   appWebConflictReload: 'โหลดเวอร์ชันล่าสุด',
   appWebConflictNotSaved: 'เอกสารถูกแก้ไขจากที่อื่น',
   appWebDiscardTitle: 'ละทิ้งการเปลี่ยนแปลงที่ยังไม่ได้บันทึก?',

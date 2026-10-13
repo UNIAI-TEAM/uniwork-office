@@ -3,8 +3,8 @@ import type { zh } from './zh'
 export const de = {
   webConflictTitle: 'Diese Präsentation wurde an anderer Stelle geändert',
   webConflictBody:
-    'Jemand hat eine neuere Version gespeichert. Überschreiben ersetzt sie durch Ihre Änderungen; Neueste laden verwirft Ihre Änderungen und öffnet die neueste Version.',
-  webConflictOverwrite: 'Überschreiben',
+    'Ihre Änderungen sind noch nicht in UniWork und bleiben in diesem Browser, bis Sie sich abmelden.',
+  webConflictOverwrite: 'Überschreiben…',
   webConflictReload: 'Neueste laden',
   webConflictNotSaved: 'die Präsentation wurde an anderer Stelle geändert',
   webDiscardTitle: 'Nicht gespeicherte Änderungen verwerfen?',
