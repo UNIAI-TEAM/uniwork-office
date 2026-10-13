@@ -918,6 +918,35 @@ describe('G5-06 W4a save queue (fakes)', () => {
     expect(h.server.state.keys.commit).toEqual([a.record.idempotencyKey])
   })
 
+  it('concurrency caps documents across ALL org lanes of one pass', async () => {
+    const h = await harness()
+    h.capability.set('org_a', true)
+    h.capability.set('org_b', true)
+    const docs: QueueDoc[] = []
+    for (const org of ['org_a', 'org_b']) {
+      for (const n of [1, 2, 3]) {
+        const doc = h.makeDoc({ key: `doc_${org}_${n}`, orgId: org })
+        await h.dispatcher.enqueue(doc)
+        docs.push(doc)
+      }
+    }
+    const before = await Promise.all(docs.map((doc) => stored(h.intents, doc)))
+    const result = await h.dispatcher.dispatchAll(docs)
+    // one global cap: 2 documents this pass, never 2 per lane (4 across orgs)
+    expect(result.dispatched).toBe(QUEUE_LIMITS.concurrency)
+    expect(result.parked).toBe(docs.length - QUEUE_LIMITS.concurrency)
+    expect(h.server.state.counts.upload).toBe(QUEUE_LIMITS.concurrency)
+    expect(h.server.state.counts.commit).toBe(QUEUE_LIMITS.concurrency)
+    // every later document is parked exactly as it was (still queued)
+    const after = await Promise.all(docs.map((doc) => stored(h.intents, doc)))
+    for (const [i, row] of after.entries()) {
+      if (row === null) continue
+      expect(row.intent.state).toBe('queued')
+      expect(row).toEqual(before[i])
+    }
+    expect(after.filter((row) => row !== null)).toHaveLength(4)
+  })
+
   it('offline 2 h (past capability TTL) -> Ctrl/Cmd+S -> paused_offline, not paused_admin', async () => {
     const h = await harness()
     h.capability.set('org_1', false) // the last known flags say sync_write off

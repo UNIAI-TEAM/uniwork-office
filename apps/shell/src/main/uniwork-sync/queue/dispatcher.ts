@@ -267,6 +267,9 @@ export class QueueDispatcher {
       lane.push(doc)
       lanes.set(doc.orgId, lane)
     }
+    // one global counter across every org lane of this pass: `concurrency`
+    // caps documents in flight for the WHOLE dispatch, never per lane
+    let inFlight = 0
     for (const [orgId, lane] of lanes) {
       const verdict = await this.readCapability(orgId)
       if (verdict !== 'ok') {
@@ -283,7 +286,6 @@ export class QueueDispatcher {
         }
         continue
       }
-      let inFlight = 0
       for (const doc of lane) {
         if (!this.isDispatchable(doc.record.state) || this.committing.has(doc.key)) {
           outcomes.set(doc.key, doc.record.state)
