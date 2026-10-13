@@ -75,8 +75,10 @@ function fakeServer(options: {
       if (options.fail === 'members') return json(500, { error: { code: 'server_error' } })
       return json(200, { members: options.members ?? [] })
     }
-    if (/^\/api\/v1\/documents\/[A-Za-z0-9_-]+$/.test(p)) {
-      return json(200, { document: options.document ?? {} })
+    const docMatch = /^\/api\/v1\/documents\/([A-Za-z0-9_-]+)$/.exec(p)
+    if (docMatch) {
+      // echo the requested id so one fake serves several documents
+      return json(200, { document: { ...(options.document ?? {}), id: docMatch[1]! } })
     }
     return json(404, { error: { code: 'not_found' } })
   })
@@ -114,6 +116,54 @@ function serviceWith(server: ReturnType<typeof fakeServer>, org: { id: string; s
     reveal: () => undefined,
   })
   return { service, dir }
+}
+
+const membersCalls = (server: ReturnType<typeof fakeServer>): number =>
+  server.calls.filter((c) => c.path === '/api/v1/orgs/acme/members').length
+
+/**
+ * A service whose members list answers `status`; every other route works, so
+ * the properties panel still returns ok:true with null names.
+ */
+function serviceWithFailingMembers(status: number, code: string) {
+  const server = fakeServer({ document: { id: 'd1', workspace_id: 'ws_1', title: 'P.docx', kind: 'file', revision: '1', current_version: 3, my_level: 'edit' } })
+  const inner = server.fetch
+  const fetch = (async (url: string, init: RequestInit) => {
+    if (new URL(url).pathname === '/api/v1/orgs/acme/members') {
+      server.calls.push({ path: '/api/v1/orgs/acme/members', query: '' })
+      return json(status, { error: { code } })
+    }
+    return inner(url, init)
+  }) as typeof inner
+  const dir = mkdtempSync(join(tmpdir(), 'uw-docs-library-'))
+  const service = new UniworkDocsService({
+    userDataDir: dir,
+    profile: () => profile,
+    channel: () => 'stable',
+    applyProfile: async () => 'unchanged',
+    identity: () => ({ accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' }),
+    keystoreLocked: () => false,
+    selectedOrg: () => ({ id: 'org_a', slug: 'acme' }),
+    authorized: <T>(call: (token: string) => Promise<T>) => call(TOKEN),
+    fetch,
+    openPath: () => true,
+    isPathOpen: () => false,
+    requestModuleSave: () => false,
+    reloadPath: () => undefined,
+    activePath: () => undefined,
+    ui: {
+      chooseConflict: async () => 'later',
+      confirmDiscard: async () => false,
+      pickCopyPath: async () => null,
+      showOpenLatestFailed: () => undefined,
+      showCopyFailed: () => undefined,
+      chooseUnsavedClose: async () => 'cancel',
+    },
+    pushStatus: () => undefined,
+    pushLaunch: () => undefined,
+    reveal: () => undefined,
+  })
+  return { service, server }
 }
 
 const docRow = (id: string, ws: string, title: string, updatedAt: string) => ({
@@ -310,63 +360,60 @@ describe('document properties (S17)', () => {
     expect(result.ok && result.value.versionByName).toBeNull()
   })
 
-  it('a members read failure leaves names null and is not cached', async () => {
-    let failing = true
-    const server = fakeServer({ document: { ...document, owner_kind: 'human' } })
-    const inner = server.fetch
-    const flaky: typeof inner = (async (url: string, init: RequestInit) => {
-      if (failing && new URL(url).pathname === '/api/v1/orgs/acme/members') {
-        server.calls.push({ path: '/api/v1/orgs/acme/members', query: '' })
-        return json(500, { error: { code: 'server_error' } })
-      }
-      return inner(url, init)
-    }) as typeof inner
-    const dir = mkdtempSync(join(tmpdir(), 'uw-docs-library-'))
-    const service = new UniworkDocsService({
-      userDataDir: dir,
-      profile: () => profile,
-      channel: () => 'stable',
-      applyProfile: async () => 'unchanged',
-      identity: () => ({ accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' }),
-      keystoreLocked: () => false,
-      selectedOrg: () => ({ id: 'org_a', slug: 'acme' }),
-      authorized: <T>(call: (token: string) => Promise<T>) => call(TOKEN),
-      fetch: flaky,
-      openPath: () => true,
-      isPathOpen: () => false,
-      requestModuleSave: () => false,
-      reloadPath: () => undefined,
-      activePath: () => undefined,
-      ui: {
-        chooseConflict: async () => 'later',
-        confirmDiscard: async () => false,
-        pickCopyPath: async () => null,
-        showOpenLatestFailed: () => undefined,
-        showCopyFailed: () => undefined,
-        chooseUnsavedClose: async () => 'cancel',
-      },
-      pushStatus: () => undefined,
-      pushLaunch: () => undefined,
-      reveal: () => undefined,
-    })
-    const failed = await service.documentProperties('d1')
-    expect(failed.ok).toBe(true)
-    if (!failed.ok) return
-    expect(failed.value.ownerName).toBeNull()
-    expect(failed.value.createdByName).toBeNull()
-    expect(failed.value.updatedByName).toBeNull()
-    // the server-sent facts still ride through
-    expect(failed.value.myLevel).toBe('edit')
-    expect(failed.value.version).toBe(3)
+  it('a transient members failure caches "unavailable": null names, one call per org', async () => {
+    const { service, server } = serviceWithFailingMembers(500, 'server_error')
+    const first = await service.documentProperties('d1')
+    expect(first.ok).toBe(true)
+    if (!first.ok) return
+    expect(first.value.ownerName).toBeNull()
+    expect(first.value.createdByName).toBeNull()
+    expect(first.value.updatedByName).toBeNull()
+    // the server-sent facts still ride through, no error result
+    expect(first.value.myLevel).toBe('edit')
+    expect(first.value.version).toBe(3)
 
-    // the failure was not cached: a later read tries the members list again
-    failing = false
-    const callsBefore = server.calls.filter((c) => c.path === '/api/v1/orgs/acme/members').length
-    const ok = await service.documentProperties('d1')
-    expect(server.calls.filter((c) => c.path === '/api/v1/orgs/acme/members')).toHaveLength(
-      callsBefore + 1,
-    )
-    expect(ok.ok && ok.value.ownerName).toBeNull()
+    // the failed answer is cached: a second document does not re-read members
+    await service.documentProperties('d2')
+    expect(membersCalls(server)).toBe(1)
+  })
+
+  it('a 403 from the members list is null names, never an error result', async () => {
+    const { service, server } = serviceWithFailingMembers(403, 'forbidden')
+    const result = await service.documentProperties('d1')
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.ownerName).toBeNull()
+    expect(result.value.createdByName).toBeNull()
+    expect(result.value.updatedByName).toBeNull()
+    // 403 is cached as "names unavailable for this org"
+    await service.documentProperties('d2')
+    expect(membersCalls(server)).toBe(1)
+  })
+
+  it('a 404 from the members list is null names, never an error result', async () => {
+    const { service, server } = serviceWithFailingMembers(404, 'not_found')
+    const result = await service.documentProperties('d1')
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.createdByName).toBeNull()
+    await service.documentProperties('d2')
+    expect(membersCalls(server)).toBe(1)
+  })
+
+  it('the members list is fetched once per org, not once per document', async () => {
+    const server = fakeServer({
+      document: { ...document, owner_kind: 'human' },
+      members: [{ user_id: 'u_creator', display_name: 'Creator Name' }],
+    })
+    const { service } = serviceWith(server)
+    await service.documentProperties('d1')
+    await service.documentProperties('d2')
+    await service.documentProperties('d3')
+    expect(membersCalls(server)).toBe(1)
+    // a library reload (the renderer re-reads the workspace list) retries it
+    await service.listWorkspaces()
+    await service.documentProperties('d4')
+    expect(membersCalls(server)).toBe(2)
   })
 
   it('missing server fields become null, never an error', async () => {
@@ -438,5 +485,9 @@ describe('member-name cache and org switch (S16)', () => {
     service.noteSelectedOrg('org_b')
     await service.documentProperties('d1')
     expect(server.calls.filter((c) => c.path === '/api/v1/orgs/acme/members')).toHaveLength(2)
+    // sign-out (org -> null) drops it too
+    service.noteSelectedOrg(null)
+    await service.documentProperties('d1')
+    expect(server.calls.filter((c) => c.path === '/api/v1/orgs/acme/members')).toHaveLength(3)
   })
 })

@@ -869,6 +869,9 @@ export class UniworkDocsService {
   listWorkspaces(): Promise<UniworkResult<UniworkWorkspaceRef[]>> {
     return result(async () => {
       if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+      // the renderer reloads the library through this call: a member-name read
+      // that failed earlier is retried here
+      this.noteLibraryReload()
       const org = this.deps.selectedOrg()
       if (!org) return []
       const workspaces = await this.api().listWorkspaces(org.id)
@@ -895,6 +898,7 @@ export class UniworkDocsService {
   listSharedWithMe(query: UniworkSharedQuery = {}): Promise<UniworkResult<UniworkSharedPage>> {
     return result(async () => {
       if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+      this.noteLibraryReload()
       const org = this.deps.selectedOrg()
       if (!org) return { documents: [], nextCursor: null }
       const api = this.api()
@@ -968,25 +972,39 @@ export class UniworkDocsService {
   }
 
   /**
-   * The org's member names (id -> display name), cached for the run and
-   * dropped when the selected org changes so a switch cannot show the old
-   * org's names. A read failure yields an empty map: names then show "—".
+   * The org's member names (id -> display name), fetched ONCE per org and
+   * cached; every document's properties panel reads this map, never the
+   * network. A 403/404 (a plain member the org will not list) or a transient
+   * failure caches an empty map — "names unavailable for this org" — so the
+   * panel shows "—" without an error and without one request per document.
+   * The cache is dropped on an org change / sign-out (`noteSelectedOrg`) and
+   * on the next library reload (`noteLibraryReload`), which is where a failed
+   * read is retried.
    */
   private async memberNames(): Promise<Map<string, string>> {
     const org = this.deps.selectedOrg()
     if (!org) return new Map()
     if (this.orgMemberNamesOrg === org.id) return this.orgMemberNames
-    let names: Map<string, string>
+    let names = new Map<string, string>()
     try {
       const members = await this.api().listOrgMembers(org.slug)
       names = new Map(members.map((m) => [m.userId, m.displayName]))
     } catch {
-      // a failed read is never cached: the next panel read tries again
-      return new Map()
+      // cached as "unavailable": not retried per document
     }
     this.orgMemberNames = names
     this.orgMemberNamesOrg = org.id
     return names
+  }
+
+  /**
+   * The renderer re-read the library (picker open, Retry, or the org-change
+   * status push): the org member-name cache is dropped so a read that failed
+   * earlier is retried at this point, not on every properties panel.
+   */
+  noteLibraryReload(): void {
+    this.orgMemberNames = new Map()
+    this.orgMemberNamesOrg = null
   }
 
   listDocuments(query: UniworkDocListQuery): Promise<UniworkResult<UniworkDocListPage>> {
