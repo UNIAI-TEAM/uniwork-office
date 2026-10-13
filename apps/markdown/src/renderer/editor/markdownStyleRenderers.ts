@@ -125,6 +125,18 @@ function renderItem(
 }
 
 export const StyledListItem = ListItem.extend({
+  // a tight item's paragraphs are block `text` tokens; the stock handler wraps only the first,
+  // so text after a fence became a bare text node in the item (invalid content)
+  parseMarkdown: (token, h) =>
+    ListItem.config.parseMarkdown!(
+      {
+        ...token,
+        tokens: token.tokens?.map((t) =>
+          t.type === 'text' && t.tokens ? { ...t, type: 'paragraph' } : t,
+        ),
+      },
+      h,
+    ),
   renderMarkdown: (node, h, ctx) => {
     const style = activeMarkdownStyle()
     let prefix = `${style.bullet} `

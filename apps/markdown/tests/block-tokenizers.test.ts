@@ -116,6 +116,21 @@ describe('review follow-ups', () => {
     expect(editor.state.doc.firstChild?.attrs.loose).toBe(false)
   })
 
+  it('text after a fence in a tight list item is a paragraph, not bare text', () => {
+    const editor = createEditor()
+    const src = '- a:\n  ```ts\n  x\n  ```\n  b:\n  ```ts\n  y\n  ```\n- c\n'
+    expect(openAndSave(editor, src)).toBe(src)
+    expect(() => editor.state.doc.check()).not.toThrow()
+    expect(editor.state.doc.firstChild?.attrs.loose).toBe(false)
+    const item = editor.state.doc.firstChild!.firstChild!
+    expect(item.content.content.map((n) => n.type.name)).toEqual([
+      'paragraph',
+      'codeBlock',
+      'paragraph',
+      'codeBlock',
+    ])
+  })
+
   it('an escaped backslash before a pipe still separates cells', () => {
     const editor = createEditor()
     editor.commands.setContent('| a\\\\ | b |\n| --- | --- |\n| c | d |\n', {
