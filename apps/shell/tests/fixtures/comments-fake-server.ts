@@ -8,7 +8,8 @@
  * (with an Idempotency-Key), update, delete (tombstone when it has replies,
  * else hard remove), resolve/reopen, revisions, mention candidates, and the
  * fixed failures the §9 table keys on: 401, 403, 404, 409 `comment_deleted`,
- * 400 `anchor_version_invalid`, and a 5xx.
+ * and a 5xx (a test may also inject any other status, e.g. 400
+ * `anchor_version_invalid`, with `fail`).
  *
  * `PUT .../comments/anchors` is NOT implemented here: the real root does not
  * have it yet (G8-04 owns the route, not merged), so it answers exactly what
@@ -236,7 +237,12 @@ export function createFakeCommentServer(): FakeCommentServer {
       // PUT /documents/{id}/comments/anchors: the route G8-04 owns is not on the
       // merged root, so the real server answers 405 (the {commentID} node has no
       // PUT). Mirror that; the client reads it as `unsupported`.
-      if (tail[0] === 'comments' && commentId === 'anchors') {
+      if (
+        tail.length === 2 &&
+        tail[0] === 'comments' &&
+        commentId === 'anchors' &&
+        method === 'PUT'
+      ) {
         return methodNotAllowed('PATCH, DELETE')
       }
 

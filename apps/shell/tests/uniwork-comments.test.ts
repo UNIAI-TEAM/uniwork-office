@@ -2,9 +2,10 @@
  * G8-08 (UNI-1403): the desktop main-side comments client and its IPC. Every
  * call here runs against the in-memory FAKE server (fixtures/comments-fake-
  * server.ts), never a real server: the G8-03/G8-06 routes are not merged yet.
- * The error mapping is the protocol's one shared function (commentsErrorFromHttp),
- * so a 409 comment_deleted reads as a `conflict` carrying details.code and is
- * never retryable (no reload path).
+ * The transport maps every non-ok answer through `mapCommentsError`, which adds
+ * a 405 -> `unsupported` branch and otherwise delegates to the protocol's shared
+ * `commentsErrorFromHttp`, so a 409 comment_deleted reads as a `conflict`
+ * carrying details.code and is never retryable (no reload path).
  */
 import { describe, expect, it, vi } from 'vitest'
 import type { IpcMain } from 'electron'
@@ -14,6 +15,7 @@ import {
 } from '../src/main/uniwork-docs/comments-wiring'
 import {
   createUniworkCommentsClient,
+  parseCommentsAnchors,
   parseCommentsRevisions,
 } from '../src/main/uniwork-docs/comments'
 import { COMMENTS_CHANNELS } from '@genoffice/electron-utils/comments-ipc'
@@ -566,6 +568,31 @@ describe('the desktop DTO parsers match the frame types (R1-4)', () => {
       ],
     })
     expect(out.revisions[0]?.created_by_id).toBeNull()
+  })
+
+  it('parseCommentsAnchors keeps updated, skipped (with reasons) and list_token', () => {
+    expect(
+      parseCommentsAnchors({
+        updated: ['c1', 'c2'],
+        skipped: [{ comment_id: 'c3', reason: 'older_version' }],
+        list_token: 'lt1:07',
+      }),
+    ).toEqual({
+      updated: ['c1', 'c2'],
+      skipped: [{ comment_id: 'c3', reason: 'older_version' }],
+      list_token: 'lt1:07',
+    })
+  })
+
+  it('parseCommentsAnchors refuses an unknown skip reason and a missing list_token', () => {
+    expect(() =>
+      parseCommentsAnchors({
+        updated: [],
+        skipped: [{ comment_id: 'c3', reason: 'because' }],
+        list_token: 'lt1:07',
+      }),
+    ).toThrow()
+    expect(() => parseCommentsAnchors({ updated: [], skipped: [] })).toThrow()
   })
 })
 
