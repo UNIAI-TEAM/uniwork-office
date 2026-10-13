@@ -328,7 +328,9 @@ export function ThreadHoverCard({
       {thread.replies.map((reply) => (
         <div key={reply.id} className="tc-entry reply">
           <div className="tc-entry-head">
-            <span className="tc-author">{reply.author}</span>
+            <span className="tc-author">
+              {displayCommentAuthor(reply.author, t('appThreadNeutralAuthor'))}
+            </span>
             <span className="tc-time">{formatStamp(reply.dT)}</span>
           </div>
           <div className="tc-text">{reply.text}</div>
