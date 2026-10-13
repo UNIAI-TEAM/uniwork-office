@@ -10,6 +10,7 @@ import {
   patchBodyPrAutofit,
   resolveSchemeColor,
   slideIdOfPath,
+  slideIdsByPath,
   type OpenedPptx,
   type Slide,
   type TextElement,
@@ -30,6 +31,9 @@ import { getFontMetrics, sessionPlatform } from './platform'
 import type { Session } from './state'
 
 export function buildAllRenderSlides(opened: OpenedPptx, fitWidthPx: number): RenderSlide[] {
+  // Read presentation.xml + its rels ONCE for the whole deck: a per-slide slideIdOfPath
+  // would re-parse them for every slide, making a full-deck rebuild O(N^2).
+  const sldIds = slideIdsByPath(opened)
   return opened.deck.slides.map((s, i) =>
     buildRenderSlide(s, opened.deck.size, {
       fitWidthPx,
@@ -37,7 +41,7 @@ export function buildAllRenderSlides(opened: OpenedPptx, fitWidthPx: number): Re
       metrics: getFontMetrics(),
       slideNo: i + 1,
       // the PPTX slide id: what server comments anchor a slide by
-      sldId: slideIdOfPath(opened, s.path),
+      sldId: sldIds.get(s.path),
     }),
   )
 }
