@@ -892,6 +892,76 @@ describe('G5-06 W4b save queue wiring', () => {
     await opener.release(key, 1)
   })
 
+  it("G506-be-d1-3: an inline Save during the poll's tick is excluded (one writer)", async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    const key = basename(dirname(path))
+    // a stored `reconciling` record: the poll's tick looks it up
+    const opened = await ctx.layer.open({ deploymentId: 'default', accountId: 'acc_1' })
+    if (opened.kind !== 'ok') throw new Error('store did not open')
+    await createIntentStore(opened.store.records(INTENT_STORE_REGISTRATION.name)).put(
+      key,
+      {
+        v: 2,
+        intentId: `intent_${key}`,
+        idempotencyKey: 'key_reconcile',
+        documentId: DOC,
+        orgId: 'org_a',
+        workspaceId: 'ws_1',
+        baseRevision: '41',
+        baseVersion: 3,
+        checksum: hex(enc('v3')),
+        length: enc('v3').byteLength,
+        generation: 1,
+        state: 'reconciling-stuck',
+        attempt: 1,
+        reconcileSince: '2026-10-13T00:00:00.000Z',
+        createdAt: '2026-10-13T00:00:00.000Z',
+        updatedAt: '2026-10-13T00:00:00.000Z',
+      },
+      enc('v3'),
+    )
+    // gate the tick's lookup so the poll is inside tick when the Save starts
+    const realFetch = server.fetch.getMockImplementation()!
+    let releaseLookup!: () => void
+    const lookupGate = new Promise<void>((resolve) => {
+      releaseLookup = resolve
+    })
+    let enteredLookup!: () => void
+    const inLookup = new Promise<void>((resolve) => {
+      enteredLookup = resolve
+    })
+    server.fetch.mockImplementation(async (url: string, init: RequestInit) => {
+      if (url.endsWith('/versions/commit') && (init.method ?? 'GET') === 'GET') {
+        enteredLookup()
+        await lookupGate
+      }
+      return realFetch(url, init)
+    })
+    const polling = ctx.service.pollSaveQueue()
+    await inLookup
+    // an inline Save of the same document starts while the poll is inside tick:
+    // the key is already marked in flight, so the inline pipeline is excluded
+    // (it never starts its own upload of the same intent)
+    writeFileSync(path, 'v4 inline')
+    const inline = ctx.service.coordinator.save(path)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(uploads(server)).toHaveLength(0)
+    releaseLookup()
+    await polling
+    await inline
+    // one writer: the poll's tick lookup settled the record, and only the poll
+    // dispatched it - never a second upload from the inline save
+    expect(
+      server.calls.filter((c) => c.path.endsWith('/versions/commit') && c.method === 'GET'),
+    ).toHaveLength(1)
+    expect(uploads(server)).toHaveLength(1)
+    expect(uploads(server)[0]!.headers['idempotency-key']).toBe('key_reconcile')
+    expect(commits(server)).toHaveLength(1)
+    expect(commits(server)[0]!.headers['idempotency-key']).toBe('key_reconcile')
+  })
+
   it('G506-be-d1-1: the account-boundary wipe awaits teardownSaveQueue before the wipe', () => {
     // the wiring source pins the order: the in-flight poll/dispatch must unwind
     // before the scope is wiped, so no settle lookup runs into a wiped scope

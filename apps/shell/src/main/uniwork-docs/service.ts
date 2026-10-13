@@ -1143,11 +1143,12 @@ export class UniworkDocsService {
     const docs = await this.pendingQueueDocs()
     if (docs.length === 0) return
     if (!this.isQueueSessionCurrent(access)) return
-    await access.dispatcher.tick(docs)
-    // the keys this pass is about to run: the inline pipeline skips them, so one
-    // intent never has two writers at once (G506-be-1)
+    // the keys this pass is about to run, marked BEFORE `tick`: the inline
+    // pipeline skips them for the WHOLE pass, so the poll's tick/reconcile and
+    // its dispatch never race a Save of the same intent (G506-be-1, d1-3)
     for (const doc of docs) this.queueInFlight.add(doc.key)
     try {
+      await access.dispatcher.tick(docs)
       await access.dispatcher.dispatchAll(docs)
     } finally {
       for (const doc of docs) this.queueInFlight.delete(doc.key)
