@@ -301,7 +301,7 @@ export function createWebSlidesApi(
 
   let current: string | null = null
   /** the "new version on UniWork" bar and its reload / lock rules (G5-03w); created below the open plumbing */
-  let remote: RemoteVersion | undefined
+  let remote: RemoteVersion | undefined = undefined
 
   // ------------------------------------------------------------ draft recovery (C18)
 

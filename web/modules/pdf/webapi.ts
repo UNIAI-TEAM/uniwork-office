@@ -229,7 +229,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
   let holdRendererSave: (() => void) | null = null
   let saveRequestProvider: (() => SavePdfRequest | null) | null = null
   /** the "new version on UniWork" bar and its reload / lock rules (G5-03w); created below the host requests */
-  let remote: RemoteVersion | undefined
+  let remote: RemoteVersion | undefined = undefined
 
   const currentPath = (): string | null => (doc ? pathFor(doc.file) : null)
   const owns = (path: unknown): boolean => typeof path === 'string' && path === currentPath()

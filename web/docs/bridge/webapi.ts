@@ -202,7 +202,7 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
     return fileId ? files.get(fileId)?.writable === false : false
   }
   /** the "new version on UniWork" bar and its reload / lock rules (G5-03w); created below, once the open plumbing exists */
-  let remote: RemoteVersion | undefined
+  let remote: RemoteVersion | undefined = undefined
   const session = createSession(
     {
       // the bar follows the editor's dirty state (dirty <-> "undone all changes")

@@ -205,7 +205,7 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
   let current: string | null = null
   let dirty = false
   /** the "new version on UniWork" bar and its reload / lock rules (G5-03w); created below the save plumbing */
-  let remote: RemoteVersion | undefined
+  let remote: RemoteVersion | undefined = undefined
 
   // ------------------------------------------------------------ draft recovery (C18)
 

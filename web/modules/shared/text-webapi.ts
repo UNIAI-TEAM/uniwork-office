@@ -185,7 +185,7 @@ export function createTextWebApi(
   let fatal: ProtocolErrorShape | null = null
   let booted = false
   /** the "new version on UniWork" bar and its reload / lock rules (G5-03w); created below the open plumbing */
-  let remote: RemoteVersion | undefined
+  let remote: RemoteVersion | undefined = undefined
 
   const assetListeners = new Set<() => void>()
   const assets = createAssetStore(port, {
