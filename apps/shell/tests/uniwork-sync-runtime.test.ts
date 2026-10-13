@@ -522,8 +522,15 @@ describe('the full resync keeps drafts through the real hasLocalDraft (wiring ke
     return path
   }
 
-  /** the service of dep_1/acc_1 over the runtime's own store layer */
-  function serviceOver(layer: StoreLayer): UniworkDocsService {
+  /**
+   * The service of dep_1/acc_1 over the runtime's own store layer.
+   * `wrapRecords` (optional) wraps the stores the SERVICE opens, so a test can
+   * hold one of its reads; the runtime's own handles are unaffected.
+   */
+  function serviceOver(
+    layer: StoreLayer,
+    wrapRecords?: (name: string, records: StoreRecords) => StoreRecords,
+  ): UniworkDocsService {
     const profile = {
       deploymentId: 'dep_1',
       apiOrigin: 'https://uniwork.example',
@@ -542,7 +549,22 @@ describe('the full resync keeps drafts through the real hasLocalDraft (wiring ke
     return new UniworkDocsService({
       userDataDir: base,
       syncStore: createSyncStoreAccess({
-        layer,
+        layer: wrapRecords
+          ? {
+              ...layer,
+              async open(scope) {
+                const opened = await layer.open(scope)
+                if (opened.kind !== 'ok') return opened
+                return {
+                  kind: 'ok',
+                  store: {
+                    scope: opened.store.scope,
+                    records: (name: string) => wrapRecords(name, opened.store.records(name)),
+                  },
+                }
+              },
+            }
+          : layer,
         scope: () => ({ deploymentId: identity.deploymentId, accountId: identity.accountId }),
       }),
       appVersion: () => '0.11.0',
@@ -624,6 +646,65 @@ describe('the full resync keeps drafts through the real hasLocalDraft (wiring ke
       IDS.listed,
     ])
     expect(Object.keys((await cacheOf(h, 'org_a', 'ws_1')).docs)).toEqual([IDS.listed])
+  })
+
+  /**
+   * R5-be-1: the editor-dirty signal is re-read after the intent-store await.
+   * The check before the await is one-shot, so an editor that turns dirty
+   * while the store is answering must not lose the tab's document: the intent
+   * read here is held open until the copy is reported dirty.
+   */
+  it('keeps a copy whose editor turns dirty while the intent store is answering (R5-be-1)', async () => {
+    const serviceRef: { current: UniworkDocsService | null } = { current: null }
+    const h = harness({
+      keepDraft: (documentId) => {
+        if (!serviceRef.current) throw new Error('service not built')
+        return serviceRef.current.hasLocalDraft(documentId)
+      },
+      pages: () => ({ ...PAGE, changes: [change(IDS.listed)], nextCursor: 'c1' }),
+    })
+    // the service's own intent store: its read is held until the copy is dirty
+    let entered!: () => void
+    const reading = new Promise<void>((resolve) => {
+      entered = resolve
+    })
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let held = false
+    const service = serviceOver(h.layer, (name, records) =>
+      name === INTENT_STORE_REGISTRATION.name
+        ? {
+            ...records,
+            async read(key) {
+              held = true
+              entered()
+              await gate
+              return records.read(key)
+            },
+          }
+        : records,
+    )
+    serviceRef.current = service
+
+    // a clean, ready copy the snapshot no longer lists: the sweep would evict it
+    const editorPath = seedCopy(IDS.editor, 'ready')
+    const cache = await recordsOf(h.layer, DOC_INDEX_REGISTRATION.name)
+    await cache.write(
+      'org_a/ws_1/index',
+      new TextEncoder().encode(JSON.stringify({ index: [IDS.editor, IDS.listed], docs: {} })),
+    )
+
+    const pass = h.runtime.tick()
+    await reading
+    // the editor turns dirty while the intent read is still in flight
+    service.noteEditorDirty(editorPath, true)
+    release()
+    await pass
+
+    expect(held).toBe(true)
+    expect(await indexOf(h, 'org_a', 'ws_1')).toEqual([IDS.editor, IDS.listed])
   })
 })
 

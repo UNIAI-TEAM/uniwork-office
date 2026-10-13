@@ -592,7 +592,13 @@ export class UniworkDocsService {
     const access = await this.intentAccess()
     // the store cannot answer: keep the copy rather than evict local work
     if (access.kind !== 'ok') return true
-    return (await access.intents.get(documentId)) !== null
+    // the editor signal was read before this await: an editor that turned
+    // dirty while the store was answering is local work too, so re-read it
+    // here instead of evicting the entry the tab still needs
+    return (
+      (await access.intents.get(documentId)) !== null ||
+      this.editorDirty.has(join(dir, binding.filename))
+    )
   }
 
   /** the binding belongs to the signed-in account and the active deployment */
