@@ -44,6 +44,8 @@ describe('the comments IPC channel contract', () => {
       searchMentions: 'uniwork:comments:search-mentions',
       reveal: 'uniwork:comments:reveal',
       revealPending: 'uniwork:comments:reveal:pending',
+      context: 'uniwork:comments:context',
+      saved: 'uniwork:comments:saved',
     })
     expect(COMMENTS_BRIDGE_KEY).toBe('uniworkComments')
   })
