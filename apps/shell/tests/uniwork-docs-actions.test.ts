@@ -182,11 +182,16 @@ function fakeServer(
       state.revision += 1
       return json(200, { document: docJson(DOC) })
     }
-    // detail: any document the server holds
+    // detail: any document the server holds. D's decideDocumentAccess hides an
+    // archived row from anyone below manage (404), while a manager still reads
+    // it with its archived_at.
     const detail = /^\/api\/v1\/documents\/([A-Za-z0-9_-]+)$/.exec(u.pathname)
     if (detail && call.method === 'GET') {
       const id = detail[1]!
       if (id !== DOC && !state.documents.has(id)) return envelope(404, 'not_found')
+      if (state.archived && id === DOC && state.myLevel !== 'manage') {
+        return envelope(404, 'not_found')
+      }
       return json(200, { document: docJson(id) })
     }
     // download (the open flow): the bytes of the requested document
@@ -212,14 +217,18 @@ beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'uw-docs-actions-'))
 })
 afterEach(() => {
-  rmSync(dir, { recursive: true, force: true })
+  // a fire-and-forget atomic write from a test can still be landing when the
+  // temp dir is removed (the write's temp file appears between the recursive
+  // walk and the rmdir): retry instead of racing it (F4)
+  rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })
 })
 
-function setup(server: ReturnType<typeof fakeServer>) {
+function setup(server: ReturnType<typeof fakeServer>, options: { pathOpen?: boolean } = {}) {
   const statuses: UniworkDocStatus[] = []
   const renamed: Array<{ documentId: string; title: string }> = []
   const progress: Array<{ path: string; loaded: number; total: number }> = []
   const pathRenames: Array<{ oldPath: string; newPath: string }> = []
+  const titleRenames: Array<{ path: string; title: string }> = []
   const uploadFile = join(dir, 'Q3 report.docx')
   writeFileSync(uploadFile, 'uploaded bytes')
   const ui: ConflictUi = {
@@ -242,7 +251,7 @@ function setup(server: ReturnType<typeof fakeServer>) {
     authorized: <T>(call: (token: string) => Promise<T>) => call(TOKEN),
     fetch: server.fetch,
     openPath: () => true,
-    isPathOpen: () => false,
+    isPathOpen: () => options.pathOpen === true,
     requestModuleSave: () => false,
     reloadPath: () => undefined,
     activePath: () => undefined,
@@ -250,12 +259,13 @@ function setup(server: ReturnType<typeof fakeServer>) {
     pushUploadProgress: (event) => progress.push(event),
     pushDocRenamed: (event) => renamed.push(event),
     notifyPathRenamed: (oldPath, newPath) => pathRenames.push({ oldPath, newPath }),
+    notifyTitleRenamed: (path, title) => titleRenames.push({ path, title }),
     ui,
     pushStatus: (s) => statuses.push(s),
     pushLaunch: () => undefined,
     reveal: () => undefined,
   })
-  return { service, statuses, renamed, progress, pathRenames, uploadFile }
+  return { service, statuses, renamed, progress, pathRenames, titleRenames, uploadFile }
 }
 
 const docDir = (documentId: string): string =>
@@ -423,6 +433,37 @@ describe('rename, archive and restore', () => {
     // no DELETE ever leaves main
     expect(server.calls.some((c) => c.method === 'DELETE')).toBe(false)
   })
+
+  // F6: restore reads GET /documents/{id} first. D answers a manager 200 with
+  // the archived row (only a below-manage caller gets 404), so the restore of a
+  // manager's own archived document works; this pins that against the mirror.
+  it('restores a manager own archived document, whose GET still answers 200', async () => {
+    const server = fakeServer({ myLevel: 'manage' })
+    const ctx = setup(server)
+    expect((await ctx.service.archiveDocument(DOC)).ok).toBe(true)
+    const restore = await ctx.service.restoreDocument(DOC)
+    expect(restore.ok).toBe(true)
+    if (!restore.ok) return
+    expect(restore.value.archived).toBe(false)
+    expect(server.calls.map((c) => c.path)).toEqual([
+      `/api/v1/documents/${DOC}`,
+      `/api/v1/documents/${DOC}/archive`,
+      `/api/v1/documents/${DOC}`,
+      `/api/v1/documents/${DOC}/restore`,
+    ])
+  })
+
+  // the below-manage case D hides with a 404: the restore stops at the detail
+  // read, so no lifecycle write ever leaves main
+  it('refuses a restore when the archived document reads not_found for the caller', async () => {
+    const server = fakeServer({ myLevel: 'edit' })
+    const ctx = setup(server)
+    server.state.archived = true
+    const restore = await ctx.service.restoreDocument(DOC)
+    expect(restore).toEqual({ ok: false, error: 'not_found' })
+    expect(server.calls.map((c) => c.path)).toEqual([`/api/v1/documents/${DOC}`])
+    expect(server.calls.some((c) => c.path.endsWith('/restore'))).toBe(false)
+  })
 })
 
 describe('my_level gating', () => {
@@ -459,8 +500,15 @@ describe('my_level gating', () => {
   })
 })
 
+/**
+ * Renamed elsewhere (S18). Two shapes: the document is NOT open (no tab holds
+ * it), so the working copy is renamed on disk and the shell re-keys; and the
+ * document IS open (F1), so the copy keeps its name and the tab is re-titled by
+ * path. Each shape's tests pin one of them, so a fix for the open case cannot
+ * quietly break the closed one.
+ */
 describe('renamed elsewhere', () => {
-  it('a feed change for an open document follows the title and announces it', async () => {
+  it('a feed change for a closed document follows the title, renames the file and announces it', async () => {
     const server = fakeServer()
     const ctx = setup(server)
     const opened = await ctx.service.openDocument(DOC)
@@ -505,7 +553,7 @@ describe('renamed elsewhere', () => {
     expect(ctx.renamed).toHaveLength(0)
   })
 
-  it('focus refresh picks up a title change without the feed', async () => {
+  it('focus refresh picks up a title change without the feed (closed document)', async () => {
     const server = fakeServer()
     const ctx = setup(server)
     const opened = await ctx.service.openDocument(DOC)
@@ -514,5 +562,49 @@ describe('renamed elsewhere', () => {
     await ctx.service.refreshPath(opened.value.path)
     await vi.waitFor(() => expect(ctx.renamed).toHaveLength(1))
     expect(ctx.renamed[0]!.title).toBe('Renamed on web.docx')
+  })
+
+  // F1: the document is OPEN in a tab, so its working copy keeps its file name
+  // (Windows refuses a rename under an open handle). The tab title and the
+  // editor must still follow the rename; today neither does.
+  it('a feed change re-titles an open tab without moving its file', async () => {
+    const server = fakeServer()
+    const ctx = setup(server, { pathOpen: true })
+    const opened = await ctx.service.openDocument(DOC)
+    if (!opened.ok) throw new Error(opened.error)
+    const before = opened.value.path
+
+    server.state.title = 'Renamed on web.docx'
+    ctx.service.noteFeedChange(DOC)
+    await vi.waitFor(() => expect(ctx.renamed).toHaveLength(1))
+
+    // the tab/window is re-titled by path, and the editor is told (file.renamed)
+    expect(ctx.titleRenames).toContainEqual({ path: before, title: 'Renamed on web.docx' })
+    expect(ctx.renamed[0]).toEqual({ documentId: DOC, title: 'Renamed on web.docx' })
+    // the file is NOT moved under the open editor: it keeps its name on disk
+    expect(copiesIn(DOC)).toEqual(['Q4 plan.docx'])
+    expect(binding(before)).toMatchObject({
+      title: 'Renamed on web.docx',
+      filename: 'Q4 plan.docx',
+    })
+    expect(ctx.pathRenames).toHaveLength(0)
+    // the status push carries the new title
+    expect(ctx.statuses.at(-1)).toMatchObject({ title: 'Renamed on web.docx' })
+  })
+
+  it('focus refresh re-titles an open tab without the feed', async () => {
+    const server = fakeServer()
+    const ctx = setup(server, { pathOpen: true })
+    const opened = await ctx.service.openDocument(DOC)
+    if (!opened.ok) throw new Error(opened.error)
+    const before = opened.value.path
+
+    server.state.title = 'Renamed on web.docx'
+    await ctx.service.refreshPath(before)
+    await vi.waitFor(() => expect(ctx.titleRenames).toHaveLength(1))
+
+    expect(ctx.titleRenames[0]).toEqual({ path: before, title: 'Renamed on web.docx' })
+    expect(copiesIn(DOC)).toEqual(['Q4 plan.docx'])
+    expect(ctx.pathRenames).toHaveLength(0)
   })
 })

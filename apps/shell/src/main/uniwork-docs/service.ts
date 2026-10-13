@@ -176,6 +176,14 @@ export interface UniworkDocsServiceDeps {
    * of the X-02 `file.renamed` event). Absent in tests that do not open tabs.
    */
   notifyPathRenamed?(oldPath: string, newPath: string): void
+  /**
+   * S18: the file of an open working copy keeps its name while an editor holds
+   * it (a rename under an open handle is refused on Windows), so the new title
+   * is carried to the shell directly: the open tab/window is re-titled by its
+   * path and the editor is told through the module's own rename IPC, without
+   * moving the file. Absent in tests that do not open tabs.
+   */
+  notifyTitleRenamed?(path: string, title: string): void
   ui: ConflictUi
   pushStatus(status: UniworkDocStatus): void
   pushLaunch(event: UniworkLaunchEvent): void
@@ -1386,10 +1394,11 @@ export class UniworkDocsService {
     const dir = dirname(local)
     let filename = doc.filename
     let path = local
+    const open = this.deps.isPathOpen(local)
     // an editor holding the copy keeps its file name: the shell re-keys a tab
     // only for a path that actually moved, and Windows refuses a rename under an
     // open handle
-    if (!this.deps.isPathOpen(local)) {
+    if (!open) {
       const candidate = workingCopyName(title, doc.filename, doc.format)
       if (candidate !== doc.filename) {
         const next = join(dir, candidate)
@@ -1406,6 +1415,10 @@ export class UniworkDocsService {
     const fresh = written ? this.store.lookup(path) : null
     if (fresh) this.publish(toStatus(fresh))
     if (path !== local) this.deps.notifyPathRenamed?.(local, path)
+    // the copy kept its name under an open editor: the title must still reach
+    // the tab and the editor, so the shell re-titles the open tab/window by path
+    // and the module follows through its own rename IPC (S18 `file.renamed`)
+    else if (open) this.deps.notifyTitleRenamed?.(local, title)
     if (announce) this.deps.pushDocRenamed?.({ documentId: doc.documentId, title })
   }
 

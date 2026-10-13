@@ -101,6 +101,12 @@ export interface UniworkDocsWiring {
    * module follows (the desktop equivalent of the X-02 `file.renamed` event).
    */
   notifyPathRenamed(oldPath: string, newPath: string): void
+  /**
+   * S18: an open working copy keeps its file name (an editor holds it), so the
+   * shell re-titles the open tab/window by path and the module follows through
+   * its own rename IPC; no file moves. Absent in tests that do not open tabs.
+   */
+  notifyTitleRenamed?(path: string, title: string): void
 }
 
 const CHOICES: readonly UniworkConflictChoice[] = [
@@ -486,6 +492,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     pushUploadProgress: (event) => push(UNIWORK_DOC_CHANNELS.uploadProgress, event),
     pushDocRenamed: (event) => push(UNIWORK_DOC_CHANNELS.docRenamed, event),
     notifyPathRenamed: (oldPath, newPath) => wiring.notifyPathRenamed(oldPath, newPath),
+    notifyTitleRenamed: (path, title) => wiring.notifyTitleRenamed?.(path, title),
     ui: conflictUi(wiring),
     pushStatus: (status) => push(UNIWORK_DOC_CHANNELS.docStatusEvent, status),
     pushLaunch: createLaunchPusher(() => wiring.shellContents(), UNIWORK_DOC_CHANNELS.launchEvent),

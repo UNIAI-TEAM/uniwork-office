@@ -378,6 +378,25 @@ export function detachedRenameFile(
   return undefined
 }
 
+/**
+ * A document's title changed on the server while the detached window's file
+ * keeps its name: set the window title (the native frame is the title bar) and
+ * hand the view back, so the caller can tell the embedded editor. The path is
+ * untouched — nothing moved on disk.
+ */
+export function detachedRetitleFile(
+  path: string,
+  title: string,
+): { kind: TabKind; webContents: WebContents } | undefined {
+  const wanted = canonicalPath(path)
+  for (const rec of detached.values()) {
+    if (!rec.filePath || canonicalPath(rec.filePath) !== wanted) continue
+    if (!rec.window.isDestroyed()) rec.window.setTitle(title)
+    return { kind: rec.kind, webContents: rec.view.webContents }
+  }
+  return undefined
+}
+
 /** every detached window's open file (agent/MCP open-documents publishing) */
 export function detachedFilePaths(): string[] {
   const paths: string[] = []
