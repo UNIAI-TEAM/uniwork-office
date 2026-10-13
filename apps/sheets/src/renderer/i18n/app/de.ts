@@ -1525,6 +1525,7 @@ export const de = {
   appCtxResolveComment: 'Kommentar auflösen',
   appThreadConverted: '{count} Kommentare in Notizen konvertiert.',
   appThreadNoneAtSelection: 'Kein Kommentarthread in der ausgewählten Zelle.',
+  appCommentSaveFirst: 'Speichern Sie zuerst die Arbeitsmappe, um einen Kommentar hinzuzufügen',
   appThreadCellHasNote:
     'Die ausgewählte Zelle hat bereits eine Notiz; ein Kommentar kann nicht hinzugefügt werden.',
   appThreadHoverHint: 'Im Kommentarbereich antworten',

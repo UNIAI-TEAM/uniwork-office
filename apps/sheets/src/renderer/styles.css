@@ -6614,6 +6614,30 @@ body > div:has([data-u-comp='find-replace-dialog']) {
   align-content: start;
 }
 
+/* G8-13: the server comment panel (shared collab kit) floats where the threaded-comments pane does */
+.collab-panel.sheets-server-comments {
+  position: fixed;
+  top: calc(96px + var(--uw-disc-bar-h, 0px));
+  right: 24px;
+  bottom: 48px;
+  z-index: 120;
+  box-sizing: border-box;
+  width: min(340px, calc(100vw - 32px));
+  height: auto;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  box-shadow: var(--shadow-modal);
+  overflow: hidden;
+}
+
+/* web frame: beside the docked Discussion panel, never under it (it covers the editor below 640px) */
+@media (min-width: 640px) {
+  html.uw-disc-open .collab-panel.sheets-server-comments {
+    right: calc(var(--uw-disc-w) + 24px);
+    width: min(340px, calc(100vw - var(--uw-disc-w) - 48px));
+  }
+}
+
 .tc-empty {
   margin: 12px 4px;
   color: var(--text-muted);

@@ -391,7 +391,11 @@ import { installInvalidDataMarkerSuppression } from './data-validation-marker'
 import { installThreadedCommentAffordances, type ThreadHover } from './threaded-comment-marker'
 import { followCommentAuthor } from './comment-author'
 import { threadPane, threadStore } from './threaded-comments'
-import { ThreadHoverCard, ThreadedCommentsPane } from './ThreadedCommentsPane'
+import { ThreadHoverCard } from './ThreadedCommentsPane'
+import { serverAnchorStore } from './server-comments/anchor-store'
+import { SheetsCommentsSurface } from './server-comments/CommentsSurface'
+import { serverComments } from './server-comments/SheetsServerComments'
+import { liveSheetNames } from './server-comments/univer-view'
 import { installFormulaNullResultFix } from './formula-null-result'
 import { installNumberFormatFix } from './numfmt-fix'
 import { installIfsEmptySetFix } from './ifs-empty-set'
@@ -2442,6 +2446,7 @@ export function App({
             if (typeof params.subUnitId === 'string') {
               recordSheetRemove(state.editJournal, params.subUnitId)
               threadStore.removeSheet(params.subUnitId)
+              serverAnchorStore.removeSheet(params.subUnitId)
             }
           } else if (event.id === 'sheet.mutation.set-worksheet-order') {
             recordSheetOrderChange(state.editJournal)
@@ -2503,6 +2508,7 @@ export function App({
           if (toSheet && toRange) journalRangeSnapshot(runtime, state, toSheet, toRange)
           if (fromSheet && fromRange && toSheet && toRange) {
             threadStore.moveRange(fromSheet, fromRange, toSheet, toRange)
+            serverAnchorStore.moveRange(fromSheet, fromRange, toSheet, toRange)
           }
           // Moved cells feed charts too, same as value mutations.
           if (fromSheet && fromRange) queueChartDataSync(fromSheet, fromRange)
@@ -2764,6 +2770,7 @@ export function App({
             outline.version += 1
           }
           threadStore.applyStructuralOp(structuralSheetId, structuralOp)
+          serverAnchorStore.applyStructuralOp(structuralSheetId, structuralOp)
           // File visuals shift on-screen too (the save shifts the file's own
           // anchors and c:f refs independently); keeping the in-memory copy in
           // the new space keeps the preview and the live data sync honest.
@@ -4315,6 +4322,8 @@ export function App({
       ),
     }
     const cellCounts = workbookCellCounts(selected.sheets)
+    // G8-13: a Save reopens the same document; server comment anchors follow the sheets by name
+    const previousSheetNames = opts?.continueChat ? liveSheetNames(univerRef.current) : null
     setWorkbookFile(selected)
     // Calculation mode is workbook state: the next file starts automatic,
     // in the engine and in the menu alike.
@@ -4475,7 +4484,10 @@ export function App({
     loadWorkbookSkeleton(univerRef.current, selected)
     applyWorkbookNotes(univerRef.current, selected)
     threadStore.load(selected)
-    threadPane.close()
+    if (previousSheetNames) serverAnchorStore.rebase(previousSheetNames, selected.sheets)
+    else serverAnchorStore.reset()
+    // the server comment panel stays open through the reopen a Save does
+    if (!(previousSheetNames && serverComments.handle)) threadPane.close()
     applyDefinedNames(univerRef.current, selected, state)
     const runtime = univerRef.current
     if (runtime) {
@@ -5292,7 +5304,7 @@ export function App({
         ) : (
           <WorkbookOpeningScreen />
         ))}
-      <ThreadedCommentsPane getRuntime={getRuntime} />
+      <SheetsCommentsSurface getRuntime={getRuntime} file={workbookFile} onStatus={setMessage} />
       <ThreadHoverCard hover={threadHover} />
       {findReplaceService && (
         <FindReplacePanel
