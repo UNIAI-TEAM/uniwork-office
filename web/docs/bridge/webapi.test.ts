@@ -1283,7 +1283,8 @@ describe('new version on UniWork (doc.remoteVersion)', () => {
       const { fileId } = payload as { fileId: string }
       const open = mock.openPayload(fileId)
       return {
-        file: { ...open.file, revision, versionId: `v${revision}` },
+        // the real host: the etag is the document revision of the same read
+        file: { ...open.file, etag: revision, revision, versionId: `v${revision}` },
         source: { kind: 'bytes', data: bytes.slice().buffer },
       }
     })
@@ -1311,6 +1312,23 @@ describe('new version on UniWork (doc.remoteVersion)', () => {
     expect(await bytesAt(delivered[0]!.dataUrl)).toEqual(head)
     expect(barText()).toContain('version 12')
     expect(barText()).toContain('Trần An')
+  })
+
+  it('the Save after a head reload is based on the reply (etag = its revision), not the old copy', async () => {
+    const delivered: OpenFileResult[] = []
+    await bootRevision('10')
+    api.onOpenDocx((r) => delivered.push(r))
+    guardDirty(false)
+    serveHead('12', new Uint8Array([0x50, 0x4b, 7]))
+    mock.sendRemoteVersion(event('12'))
+    await vi.waitFor(() => expect(delivered).toHaveLength(1))
+    const bases: unknown[] = []
+    mock.override('api.save', (payload) => {
+      bases.push((payload as { etag?: string }).etag)
+      return { ok: true, file: { ...mock.openPayload('f1').file, etag: '13', revision: '13' } }
+    })
+    expect((await api.saveDocx(delivered[0]!.path, buf([6]), false)).ok).toBe(true)
+    expect(bases).toEqual(['12'])
   })
 
   it('dirty: the content is not replaced and the warn bar shows', async () => {

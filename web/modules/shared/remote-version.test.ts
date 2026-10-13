@@ -215,6 +215,22 @@ describe('a clean frame with no AI turn', () => {
     expect(r.apply).toHaveBeenCalledTimes(1)
     expect(tone()).toBe('info')
   })
+
+  it('a head that is not found either is a deleted document: the deleted lock, not the Retry bar', async () => {
+    const r = rig({
+      reply: () => {
+        throw new DocsProtocolError({ code: 'not_found', message: 'gone' })
+      },
+    })
+    r.emit(event('12'))
+    await flush()
+    expect(r.request).toHaveBeenCalledTimes(2)
+    expect(r.apply).not.toHaveBeenCalled()
+    expect(r.rv.locked()).toBe('deleted')
+    expect(barText()).toBe(t('uwRemoteDeleted'))
+    expect(actions()).toEqual([])
+    expect(r.onLock).toHaveBeenCalledWith('deleted')
+  })
 })
 
 describe('a dirty frame', () => {
@@ -318,6 +334,25 @@ describe('an AI turn is running', () => {
     await flush()
     expect(r.apply).toHaveBeenCalledTimes(1)
     expect(tone()).toBe('info')
+  })
+
+  it('the frame unloads mid-turn: the reloaded clean frame loads the next version without a warning', async () => {
+    const before = rig()
+    before.ai.begin('s1')
+    before.emit(event('12'))
+    await flush()
+    expect(tone()).toBe('warn')
+    // unload: the page goes away without an idle; the reloaded frame starts with its own state
+    before.rv.dispose()
+    document.body.replaceChildren()
+    expect(bar()).toBeNull()
+    const after = rig()
+    after.emit(event('13'))
+    await flush()
+    expect(after.request).toHaveBeenCalledTimes(1)
+    expect(after.apply).toHaveBeenCalledTimes(1)
+    expect(tone()).toBe('info')
+    expect(actions()).toEqual(['close'])
   })
 
   it('idle on a document that became dirty shows the dirty bar instead of loading', async () => {
