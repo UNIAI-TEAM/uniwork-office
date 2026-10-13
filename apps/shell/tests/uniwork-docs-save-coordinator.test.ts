@@ -937,6 +937,61 @@ describe('G5-06 W4a save queue (fakes)', () => {
     expect(after?.intent.generation).toBe(2)
   })
 
+  it('in-flight records at rest settle by lookup: committed / not_committed / unknown', async () => {
+    // a stop (lost lock, canCommit false, crash) left the record mid-flight.
+    // dispatchAll never picks validating/uploading/committing, so the next poll
+    // must resolve them with ONE lookup each and the SAME idempotency key.
+    const seedInFlight = async (
+      h: Harness,
+      state: 'uploading' | 'committing',
+    ): Promise<QueueDoc> => {
+      const doc = h.makeDoc()
+      // the record at rest in the store AND the doc the poll builds from it
+      doc.record = { ...doc.record, state, attempt: 1 }
+      await h.intents.put(doc.key, doc.record, doc.payload)
+      return doc
+    }
+
+    // committed -> settle with the receipt, one lookup, no upload/commit
+    const committed = await harness()
+    const c = await seedInFlight(committed, 'uploading')
+    committed.server.state.lookupOutcome = 'committed'
+    const cResult = await committed.dispatcher.dispatchAll([c])
+    expect(cResult.dispatched).toBe(1)
+    expect(committed.server.state.counts.lookup).toBe(1)
+    expect(committed.server.state.counts.upload).toBe(0)
+    expect(committed.server.state.counts.commit).toBe(0)
+    expect(c.record.state).toBe('committed')
+    expect(await stored(committed.intents, c)).toBeNull()
+
+    // not_committed -> back to queued with the SAME key (re-sent, not re-minted)
+    const notCommitted = await harness()
+    const n = await seedInFlight(notCommitted, 'committing')
+    const keyBefore = n.record.idempotencyKey
+    notCommitted.server.state.lookupOutcome = 'not_committed'
+    const nResult = await notCommitted.dispatcher.dispatchAll([n])
+    expect(nResult.dispatched).toBe(1)
+    expect(notCommitted.server.state.counts.lookup).toBe(1)
+    expect(n.record.state).toBe('queued')
+    expect(n.record.idempotencyKey).toBe(keyBefore)
+    expect(n.record.attempt).toBe(2)
+    // the next pass re-sends the same key: exactly one upload, one commit
+    await notCommitted.dispatcher.dispatchAll([n])
+    expect(notCommitted.server.state.keys.upload).toEqual([keyBefore])
+    expect(notCommitted.server.state.keys.commit).toEqual([keyBefore])
+
+    // unknown -> reconciling-stuck, never a new attempt, no byte moved
+    const unknown = await harness()
+    const u = await seedInFlight(unknown, 'uploading')
+    unknown.server.state.lookupOutcome = 'unknown'
+    await unknown.dispatcher.dispatchAll([u])
+    expect(unknown.server.state.counts.lookup).toBe(1)
+    expect(unknown.server.state.counts.upload).toBe(0)
+    expect(unknown.server.state.counts.commit).toBe(0)
+    expect(u.record.state).toBe('reconciling-stuck')
+    expect((await stored(unknown.intents, u))?.intent.state).toBe('reconciling-stuck')
+  })
+
   it('lock holder crash -> the other window acquires after goneMs', async () => {
     const h = await harness()
     const doc = h.makeDoc()

@@ -287,7 +287,19 @@ export class QueueDispatcher {
         continue
       }
       for (const doc of lane) {
-        if (!this.isDispatchable(doc.record.state) || this.committing.has(doc.key)) {
+        if (this.committing.has(doc.key)) {
+          outcomes.set(doc.key, doc.record.state)
+          continue
+        }
+        if (this.isInFlightState(doc.record.state)) {
+          // a stop left this record mid-flight and THIS dispatcher is not
+          // running it: resolve it through the lookup, never a new key or a
+          // blind re-upload (G5-06 fix-C item 4)
+          outcomes.set(doc.key, await this.settleInFlight(doc, now))
+          dispatched += 1
+          continue
+        }
+        if (!this.isDispatchable(doc.record.state)) {
           outcomes.set(doc.key, doc.record.state)
           continue
         }
@@ -334,6 +346,44 @@ export class QueueDispatcher {
    */
   async reconcile(doc: QueueDoc, now = this.deps.clock()): Promise<QueueState> {
     // the store cannot record an outcome right now: the record stays where it is
+    if ((await this.deps.intents()).kind !== 'ok') return doc.record.state
+    let lookup: CommitLookup
+    try {
+      lookup = await this.deps.client.lookupCommit({
+        documentId: doc.record.documentId,
+        idempotencyKey: doc.record.idempotencyKey,
+      })
+    } catch (error) {
+      const code = error instanceof UniworkDocError ? error.code : 'server_error'
+      if (code === 'keystore_locked' || code === 'store_full') return doc.record.state
+      const retryAfterMs = error instanceof UniworkDocError ? error.retryAfterMs : undefined
+      await this.apply(
+        doc,
+        { type: 'lookup', error: code, ...(retryAfterMs === undefined ? {} : { retryAfterMs }) },
+        now,
+      )
+      return doc.record.state
+    }
+    const event: QueueEvent =
+      lookup.outcome === 'committed'
+        ? { type: 'lookup', outcome: 'committed', receipt: lookup.receipt }
+        : { type: 'lookup', outcome: lookup.outcome }
+    const result = await this.apply(doc, event, now)
+    if (result.record?.state === 'committed') await this.finishCleanup(doc)
+    return doc.record.state
+  }
+
+  /**
+   * Resolve a stored record that is sitting in an in-flight state
+   * (validating / uploading / committing) because its writer stopped - a lost
+   * lock, `canCommit` false, a crash - and no dispatcher is running it now.
+   * `dispatchAll` never picks these states, so without this a save would never
+   * settle. The G5-07 lookup with the SAME idempotency key decides: `committed`
+   * settles with the receipt, `not_committed` returns to `queued` (the same key
+   * is re-sent), `in_flight` stays `reconciling` (retried later), `unknown`
+   * becomes `reconciling-stuck`. Never a new key, never a blind re-upload.
+   */
+  private async settleInFlight(doc: QueueDoc, now: number): Promise<QueueState> {
     if ((await this.deps.intents()).kind !== 'ok') return doc.record.state
     let lookup: CommitLookup
     try {
@@ -463,6 +513,16 @@ export class QueueDispatcher {
 
   private isDispatchable(state: QueueState): boolean {
     return state === 'queued' || state === 'paused_offline'
+  }
+
+  /**
+   * A stored record in one of these states was mid-flight when its writer
+   * stopped (a lost lock, `canCommit` false, a crash): `dispatchAll` never
+   * picks it, so a session that is not running it must resolve it through the
+   * G5-07 lookup before it can settle (see `settleInFlight`).
+   */
+  private isInFlightState(state: QueueState): boolean {
+    return state === 'validating' || state === 'uploading' || state === 'committing'
   }
 
   /** the session/ownership verdict of the front: false stops the pass silently */
