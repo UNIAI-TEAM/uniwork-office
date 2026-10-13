@@ -62,13 +62,11 @@ export const UNIWORK_STATE_KEYS: Record<UniworkSaveState, StringKey> = {
 /**
  * A reason the document layer reports beyond the HTTP-level codes: the keychain
  * holding the sync store's key is locked (session state `keystore-locked`).
+ * Deferred (G504-fe-2): the document status badge for it (`uwBadgeKeystore`, and
+ * `uwBadgeBlocked` for store_full, EXPERIENCE l.212) goes with the S4 queue rows;
+ * the tab chip reads `blockedReasonKey`, the account entry already shows the badge.
  */
 export type UniworkLockReason = 'keystore_locked'
-
-/** the status-row badge for a lock reason (error tone; the action is Retry, `uwActRetry`) */
-export const UNIWORK_LOCK_BADGE_KEYS: Record<UniworkLockReason, StringKey> = {
-  keystore_locked: 'uwBadgeKeystore',
-}
 
 /** short reason shown after "Blocked:" */
 export function blockedReasonKey(
@@ -94,7 +92,12 @@ export function blockedReasonKey(
   }
 }
 
-/** what the person can do about an error: sign in again, try again, or nothing (just read it) */
+/**
+ * what the person can do about an error: sign in again, try again, or nothing (just read it).
+ * Deferred (G504-fe-3): a save refused with keystore_locked / store_full has its own S4 action
+ * ("Mở trung tâm đồng bộ" / Retry, EXPERIENCE l.156, l.212) once the sync center and the S4
+ * row exist in the shell; the Open dialog and launch notice never see these two codes.
+ */
 export type ErrorAction = 'sign-in' | 'retry' | 'none'
 
 export function errorActionOf(error: UniworkDocErrorCode): ErrorAction {

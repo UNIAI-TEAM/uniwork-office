@@ -8,7 +8,6 @@ import type {
 import {
   PICKER_SEARCH_DEBOUNCE_MS,
   UNIWORK_ERROR_KEYS,
-  UNIWORK_LOCK_BADGE_KEYS,
   blockedReasonKey,
   chipCopy,
   chipModelOf,
@@ -177,11 +176,9 @@ describe('chipModelOf: save state -> chip', () => {
 })
 
 describe('keystore_locked reason', () => {
-  it('maps to the keychain-locked reason and badge, not the generic ones', () => {
+  it('maps to the keychain-locked reason, not the generic one', () => {
     expect(blockedReasonKey('keystore_locked')).toBe('uwReasonKeystore')
-    expect(UNIWORK_LOCK_BADGE_KEYS.keystore_locked).toBe('uwBadgeKeystore')
     expect(t(blockedReasonKey('keystore_locked'))).toBe(syncStrings.en.uwReasonKeystore)
-    expect(t(UNIWORK_LOCK_BADGE_KEYS.keystore_locked)).toBe('Keychain locked')
     expect(blockedReasonKey('keystore_locked')).not.toBe(blockedReasonKey(undefined))
   })
 
