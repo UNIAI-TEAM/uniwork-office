@@ -193,6 +193,12 @@ export interface LaunchControllerDeps {
   }): Promise<LaunchDescriptor>
   /** the normal open flow with the descriptor's workspace and operation */
   open(descriptor: LaunchDescriptor): Promise<{ path: string; title: string }>
+  /**
+   * G8-08: the ticket named a comment (contract §2.9); after the editor shows
+   * the document, reveal that thread. The shell holds the push until the
+   * editor renderer is ready, so a cold start does not lose it.
+   */
+  revealComment?(path: string, commentId: string): void
   emit(event: UniworkLaunchEvent): void
   /** brings the shell window to the front */
   reveal(): void
@@ -341,6 +347,7 @@ export class LaunchController {
     try {
       const opened = await this.deps.open(descriptor)
       this.deps.emit({ phase: 'opened', path: opened.path, title: opened.title })
+      if (descriptor.commentId) this.deps.revealComment?.(opened.path, descriptor.commentId)
     } catch (error) {
       this.deps.emit({ phase: 'failed', error: codeOf(error) })
     }

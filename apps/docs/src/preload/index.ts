@@ -17,6 +17,7 @@ import type {
 } from '../shared/ipc'
 import type { ProjectApi } from '@genoffice/project-store'
 import { installAiRunBridge } from '@genoffice/electron-utils/ai-run-bridge'
+import { installUniworkCommentsBridge } from '@genoffice/electron-utils/comments-bridge'
 import { installDropOpenBridge } from '@genoffice/electron-utils/drop-open'
 
 const api: DesktopApi = {
@@ -279,4 +280,5 @@ contextBridge.exposeInMainWorld('projectApi', projectApi)
 installDropOpenBridge()
 
 // window.uniworkAiRun.reportAiRun: the shell learns when an AI turn runs here
+installUniworkCommentsBridge()
 installAiRunBridge()

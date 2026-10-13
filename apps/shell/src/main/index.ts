@@ -3773,6 +3773,8 @@ const requestUniworkModuleSave = createModuleSaveRequester({
 })
 
 function uniworkDocsWiring() {
+  /** every path a tab or detached editor window shows */
+  const openPaths = (): string[] => [...(tabManager?.openFilePaths() ?? []), ...detachedFilePaths()]
   return {
     shellWindow: () => (shellWindow && !shellWindow.isDestroyed() ? shellWindow : null),
     shellContents: () =>
@@ -3790,9 +3792,22 @@ function uniworkDocsWiring() {
     },
     activePath: () => tabManager?.activeFilePath(),
     reveal: revealShellWindow,
+    // G8-08: the editor showing the path (its preload listens for the reveal)
+    commentsTarget: (path: string) => webContentsForPath(path)?.webContents,
+    // G8-08/R1-2: the path the invoking editor window shows, so its held
+    // reveal is pulled for exactly that path and no other editor's
+    commentsPathFor: (sender: { id: number }) => {
+      for (const path of openPaths()) {
+        const target = webContentsForPath(path)
+        if (target && !target.webContents.isDestroyed() && target.webContents.id === sender.id) {
+          return path
+        }
+      }
+      return undefined
+    },
     lang: () => currentLang(),
     defaultSaveDir: () => defaultSaveDir(),
-    openPaths: () => [...(tabManager?.openFilePaths() ?? []), ...detachedFilePaths()],
+    openPaths,
     closePath: async (path: string) => {
       const tabsClosed = tabManager ? await tabManager.closeTabsShowing(path) : true
       return (await closeDetachedByPath(path)) && tabsClosed

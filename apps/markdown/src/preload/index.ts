@@ -4,6 +4,7 @@ import type { Lang } from '@genoffice/i18n'
 import type { AiStreamChunk } from '@genoffice/ai-provider'
 import type { ProjectApi } from '@genoffice/project-store'
 import { installAiRunBridge } from '@genoffice/electron-utils/ai-run-bridge'
+import { installUniworkCommentsBridge } from '@genoffice/electron-utils/comments-bridge'
 import { installDropOpenBridge } from '@genoffice/electron-utils/drop-open'
 import { AI_CHANNELS, MARKDOWN_CHANNELS } from '../shared/ipc'
 import type {
@@ -154,4 +155,5 @@ contextBridge.exposeInMainWorld('projectApi', projectApi)
 installDropOpenBridge()
 
 // window.uniworkAiRun.reportAiRun: the shell learns when an AI turn runs here
+installUniworkCommentsBridge()
 installAiRunBridge()

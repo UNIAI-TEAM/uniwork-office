@@ -306,6 +306,15 @@ describe('exchange receipt', () => {
       expect((error as UniworkDocError).code).toBe(expected_reason)
     }
   })
+  it('keeps a valid comment_id from the ticket and ignores a malformed one', () => {
+    const CMT = '01J8X4CMTN0N1P2Q3R4S5T6U7'
+    expect(parseExchange({ ...EXCHANGE.valid_response, comment_id: CMT }).commentId).toBe(CMT)
+    // the server drops a bad comment silently; the client never invents one
+    expect(parseExchange({ ...EXCHANGE.valid_response, comment_id: '' }).commentId).toBeUndefined()
+    expect(parseExchange({ ...EXCHANGE.valid_response, comment_id: 7 }).commentId).toBeUndefined()
+    expect(parseExchange(EXCHANGE.valid_response).commentId).toBeUndefined()
+  })
+
   it('a historical version must carry ?version=N', () => {
     const doc = { ...EXCHANGE.valid_response.document, version: 2, operation: 'view' }
     expect(() => parseExchange({ ...EXCHANGE.valid_response, document: doc })).toThrow()
@@ -400,6 +409,30 @@ describe('launch controller', () => {
       path: `/wc/${descriptor.id}/Q4 plan.docx`,
       title: 'Q4 plan',
     })
+  })
+
+  it('a ticket naming a comment reveals it after the editor is ready', async () => {
+    const CMT = '01J8X4CMTN0N1P2Q3R4S5T6U7'
+    const withComment = parseExchange({ ...EXCHANGE.valid_response, comment_id: CMT })
+    const ctx = setup({ exchange: async () => withComment })
+    const revealed = vi.fn()
+    // the shell holds the reveal until the editor renderer is ready; here the
+    // open already resolved, so the reveal fires once with the opened path
+    const controller = new LaunchController({
+      scheme: () => SCHEME,
+      applyProfile: async () => 'applied',
+      isSignedIn: () => true,
+      identity: () => ({ deviceSessionId: 'device-01', deploymentId: 'production-eu' }),
+      profile: () => ({ deploymentId: 'production-eu', clientId: 'uniwork-office' }),
+      exchange: async () => withComment,
+      open: async (d) => ({ path: `/wc/${d.id}/Q4 plan.docx`, title: d.title }),
+      emit: () => undefined,
+      reveal: () => undefined,
+      revealComment: revealed,
+    })
+    void ctx
+    await controller.handleUrl(link(TICKET))
+    expect(revealed).toHaveBeenCalledWith(`/wc/${withComment.id}/Q4 plan.docx`, CMT)
   })
 
   it('a malformed link fails without any exchange', async () => {

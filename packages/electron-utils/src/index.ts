@@ -110,3 +110,37 @@ export {
   type PrintDocumentOptions,
 } from './print-window'
 export { abortOnDestroyed, type DestroyableSender } from './abort-on-destroyed'
+export { createUniworkCommentsApi, installUniworkCommentsBridge } from './comments-bridge'
+export {
+  COMMENTS_BRIDGE_KEY,
+  COMMENTS_CHANNELS,
+  isCommentId,
+  parseCommentsAnchorsInput,
+  parseCommentsCreateInput,
+  parseCommentsIdInput,
+  parseCommentsListInput,
+  parseCommentsReveal,
+  parseCommentsUpdateInput,
+  parseMentionsSearchInput,
+  readCommentsPath,
+  type CommentKind,
+  type CommentsAnchorsInput,
+  type CommentsCreateInput,
+  type CommentsDocRef,
+  type CommentsIdInput,
+  type CommentsListInput,
+  type CommentsReply,
+  type CommentsRevealPayload,
+  type CommentsUpdateInput,
+  type MentionsSearchInput,
+  type UniworkCommentsApi,
+} from './comments-ipc'
+export {
+  COMMENTS_POLL_INTERVAL_MS,
+  commentsPollActive,
+  createCommentsPoll,
+  type CommentsPoll,
+  type CommentsPollDeps,
+  type CommentsPollFetch,
+  type CommentsPollState,
+} from './comments-poll'

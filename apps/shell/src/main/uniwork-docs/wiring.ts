@@ -1,5 +1,6 @@
 import { app, BrowserWindow, dialog, type IpcMain, type WebContents } from 'electron'
 import { join } from 'node:path'
+import { COMMENTS_CHANNELS } from '@genoffice/electron-utils/comments-ipc'
 import {
   UNIWORK_DOC_CHANNELS,
   type UniworkConflictChoice,
@@ -7,7 +8,7 @@ import {
   type UniworkDocListQuery,
   type UniworkDocLock,
 } from '../../shared/home-api'
-import { createLaunchPusher, createPushHolder } from './launch'
+import { createLaunchPusher, createPushHolder, type LaunchPushTarget } from './launch'
 import {
   applyUniworkProfile,
   authorizedRequest,
@@ -19,6 +20,8 @@ import {
   uniworkSessionIdentity,
 } from '../uniwork-auth'
 import { AccountBoundary } from './account-boundary'
+import { createUniworkComments, type UniworkCommentsHandle } from './comments-wiring'
+import type { CommentsRevealPayload } from '@genoffice/electron-utils/comments-ipc'
 import { setUniworkCloseGuard } from './close-guard'
 import {
   UniworkDocsService,
@@ -51,6 +54,16 @@ export interface UniworkDocsWiring {
   reloadPath(path: string): void
   activePath(): string | undefined
   reveal(): void
+  /**
+   * G8-08: the editor webContents showing `path` (tab or detached window), for
+   * the comments reveal push; undefined when nothing shows it.
+   */
+  commentsTarget?(path: string): LaunchPushTarget | undefined
+  /**
+   * G8-08/R1-2: the path an editor webContents shows, so its held reveal is
+   * pulled for exactly that path; undefined when nothing shows one.
+   */
+  commentsPathFor?(sender: { id: number }): string | undefined
   lang(): string
   defaultSaveDir(): string
   /** every file path a tab or detached editor window shows */
@@ -204,6 +217,8 @@ function blockedReasonKey(reason: string | undefined): Parameters<typeof tUniwor
 export interface UniworkDocsHandle {
   service: UniworkDocsService
   boundary: AccountBoundary
+  /** G8-08: the comments IPC/reveal handle (registered with the documents handlers) */
+  comments: UniworkCommentsHandle
   /**
    * At app ready, after the account started: redeems a held launch ticket
    * once sign-in completes, and routes launch links from now on.
@@ -217,6 +232,10 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     const wc = wiring.shellContents()
     if (wc && !wc.isDestroyed()) wc.send(channel, payload)
   }
+  // the comments handle is built after the service (it resolves bindings through
+  // it) but the service needs it for the launch-ticket reveal: a holder breaks
+  // the cycle, and the reveal only runs once both exist
+  let comments: UniworkCommentsHandle | null = null
   const service = new UniworkDocsService({
     userDataDir: app.getPath('userData'),
     profile: () => uniworkDeploymentProfile(),
@@ -248,6 +267,26 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
       UNIWORK_DOC_CHANNELS.lock,
     ),
     reveal: () => wiring.reveal(),
+    revealComment: (path, commentId) => comments?.reveal(path, commentId),
+  })
+
+  // G8-08: the UniWork comments IPC (one handler per frame request kind) and
+  // the reveal push for a launch ticket that named a comment
+  comments = createUniworkComments(ipcMain, {
+    service,
+    profile: () => uniworkDeploymentProfile(),
+    authorized: (call) => authorizedRequest(call),
+    isSignedIn: () => uniworkSessionIdentity() !== null,
+    sendReveal: (payload) => {
+      // a cold start opens the editor after the reveal is decided: the push is
+      // held until the editor renderer finished loading (same rule as a launch)
+      createPushHolder<CommentsRevealPayload>(
+        () => wiring.commentsTarget?.(payload.path) ?? null,
+        COMMENTS_CHANNELS.reveal,
+      )(payload)
+    },
+    // R1-2: the sender's own path scopes the pending-reveal pull
+    shownPath: (sender) => wiring.commentsPathFor?.(sender) ?? null,
   })
 
   ipcMain.handle(UNIWORK_DOC_CHANNELS.listWorkspaces, () => service.listWorkspaces())
@@ -293,6 +332,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   return {
     service,
     boundary,
+    comments,
     activate(startLaunch) {
       let signedIn = uniworkAccount().status().state === 'signed-in'
       onUniworkAccountStatus((status) => {
