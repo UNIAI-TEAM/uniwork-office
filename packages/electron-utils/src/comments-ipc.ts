@@ -18,6 +18,7 @@ import type {
   CommentsRevisionsResult,
   CommentResult,
   MentionsSearchResult,
+  ProtocolErrorShape,
 } from '../../../web/docs/protocol/types'
 
 /** one request kind of the frame protocol §10, plus the host -> editor reveal */
@@ -33,6 +34,11 @@ export const COMMENTS_CHANNELS = {
   searchMentions: 'uniwork:comments:search-mentions',
   /** main -> editor renderer: reveal a thread (deep link with comment_id) */
   reveal: 'uniwork:comments:reveal',
+  /**
+   * editor -> main (R1-2): pull the reveal main held for the sender's path; the
+   * answer is the held `CommentsRevealPayload` or null, and the hold is cleared
+   */
+  revealPending: 'uniwork:comments:reveal:pending',
 } as const
 
 export type CommentKind = 'comment' | 'discussion'
@@ -86,6 +92,15 @@ export interface CommentsRevealPayload {
   commentId: string
 }
 
+/**
+ * What every `uniwork:comments:*` handler answers (R1-1). Electron forwards
+ * only an `Error`'s `message` across `ipcMain.handle` -> `ipcRenderer.invoke`,
+ * so a thrown `DocsProtocolError` would lose `code`, `retryable` and
+ * `details`. The handlers therefore return the protocol error's serializable
+ * shape as data and the preload rehydrates a `DocsProtocolError` from it.
+ */
+export type CommentsReply<T> = { ok: true; value: T } | { ok: false; error: ProtocolErrorShape }
+
 /** the API the six editor preloads expose as `window.uniworkComments` */
 export interface UniworkCommentsApi {
   list(input: CommentsListInput): Promise<CommentsListResult>
@@ -97,7 +112,11 @@ export interface UniworkCommentsApi {
   revisions(input: CommentsIdInput): Promise<CommentsRevisionsResult>
   anchors(input: CommentsAnchorsInput): Promise<CommentsAnchorsResult>
   searchMentions(input: MentionsSearchInput): Promise<MentionsSearchResult>
-  /** the shell asks the editor to reveal a thread; returns the unsubscribe */
+  /**
+   * the shell asks the editor to reveal a thread; returns the unsubscribe.
+   * The first subscribe also pulls the reveal main held for this window (R1-2),
+   * so a cold-start reveal decided before the editor mounted is not lost.
+   */
   onReveal(handler: (payload: CommentsRevealPayload) => void): () => void
 }
 
@@ -118,7 +137,10 @@ function isKind(value: unknown): value is CommentKind {
   return value === 'comment' || value === 'discussion'
 }
 
-/** the launch-ticket deep link carries a comment id (contract §2.9): a plain ULID-shaped string */
+/**
+ * the launch-ticket deep link carries a comment id (contract §2.9): a bounded
+ * opaque id (1..128); the server validates the shape
+ */
 export function isCommentId(value: unknown): value is string {
   return isId(value)
 }
@@ -212,7 +234,9 @@ export function parseCommentsAnchorsInput(payload: unknown): CommentsAnchorsInpu
   if (!path) return null
   const { versionId, anchors } = payload
   if (!isId(versionId)) return null
-  if (!Array.isArray(anchors) || anchors.length === 0 || anchors.length > 500) return null
+  // an empty round is a server no-op (contract §2.6 asks for the field, not for
+  // a non-empty one); the 500 anchor cap stays
+  if (!Array.isArray(anchors) || anchors.length > 500) return null
   const items: CommentsAnchorsInput['anchors'] = []
   for (const entry of anchors) {
     if (!isRecord(entry)) return null

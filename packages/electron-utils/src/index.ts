@@ -129,6 +129,7 @@ export {
   type CommentsDocRef,
   type CommentsIdInput,
   type CommentsListInput,
+  type CommentsReply,
   type CommentsRevealPayload,
   type CommentsUpdateInput,
   type MentionsSearchInput,

@@ -59,6 +59,11 @@ export interface UniworkDocsWiring {
    * the comments reveal push; undefined when nothing shows it.
    */
   commentsTarget?(path: string): LaunchPushTarget | undefined
+  /**
+   * G8-08/R1-2: the path an editor webContents shows, so its held reveal is
+   * pulled for exactly that path; undefined when nothing shows one.
+   */
+  commentsPathFor?(sender: { id: number }): string | undefined
   lang(): string
   defaultSaveDir(): string
   /** every file path a tab or detached editor window shows */
@@ -280,6 +285,8 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
         COMMENTS_CHANNELS.reveal,
       )(payload)
     },
+    // R1-2: the sender's own path scopes the pending-reveal pull
+    shownPath: (sender) => wiring.commentsPathFor?.(sender) ?? null,
   })
 
   ipcMain.handle(UNIWORK_DOC_CHANNELS.listWorkspaces, () => service.listWorkspaces())

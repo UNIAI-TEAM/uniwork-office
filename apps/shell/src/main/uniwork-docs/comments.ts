@@ -154,7 +154,8 @@ export function parseCommentsRevisions(raw: unknown): CommentsRevisionsResult {
       id: str(r.id, 128),
       revision: num(r.revision),
       body: str(r.body, 100_000),
-      created_by_id: createdBy ?? '',
+      // a system / AI revision has no author id; the DTO says string | null
+      created_by_id: createdBy ?? null,
       created_by_kind: str(r.created_by_kind, 32),
       created_at: str(r.created_at, 64),
     }

@@ -13,10 +13,12 @@ import type {
   CommentsCreateInput,
   CommentsIdInput,
   CommentsListInput,
+  CommentsReply,
   CommentsUpdateInput,
   CommentsRevealPayload,
   MentionsSearchInput,
 } from '@genoffice/electron-utils/comments-ipc'
+import { DocsProtocolError, type ProtocolErrorShape } from '../../../../../web/docs/protocol/types'
 import type { UniworkDocsService } from './service'
 import {
   createUniworkCommentsClient,
@@ -44,6 +46,11 @@ export interface CommentsWiringDeps {
   isSignedIn(): boolean
   /** push a reveal to the editor showing `path`; no-op when nothing shows it */
   sendReveal(payload: CommentsRevealPayload): void
+  /**
+   * R1-2: the path the invoking editor window shows; its held reveal is pulled
+   * for exactly that path. undefined/null when nothing shows one.
+   */
+  shownPath?(sender: { id: number }): string | null
   /** injectable for tests */
   fetch?: (input: string, init: RequestInit) => Promise<Response>
   idempotencyKey?(): string
@@ -66,9 +73,20 @@ export function resolveCommentBinding(
 
 /** the §9 `not_found` shape for an unbound document: no request is made */
 function unbound(): never {
-  const error = new Error('comments: document is not bound to UniWork')
-  Object.assign(error, { name: 'DocsProtocolError', code: 'not_found', retryable: false })
-  throw error
+  throw new DocsProtocolError({
+    code: 'not_found',
+    message: 'comments: document is not bound to UniWork',
+    retryable: false,
+  })
+}
+
+/** the serializable §9 shape of anything a handler may throw (R1-1) */
+function errorShape(error: unknown): ProtocolErrorShape {
+  if (error instanceof DocsProtocolError) return error.toShape()
+  return {
+    code: 'internal',
+    message: error instanceof Error ? error.message : 'comments: internal error',
+  }
 }
 
 export function createUniworkComments(
@@ -104,14 +122,21 @@ export function createUniworkComments(
     parse: (payload: unknown) => I | null,
     run: (input: I) => Promise<R>,
   ): void => {
-    ipcMain.handle(channel, async (_event, payload: unknown) => {
+    ipcMain.handle(channel, async (_event, payload: unknown): Promise<CommentsReply<R>> => {
+      // R1-1: a protocol error is answered as plain data - thrown across
+      // Electron it would keep only its message - and the preload rehydrates it
       const input = parse(payload)
       if (!input) {
-        const error = new Error('comments: invalid request')
-        Object.assign(error, { name: 'DocsProtocolError', code: 'malformed', retryable: false })
-        throw error
+        return {
+          ok: false,
+          error: { code: 'malformed', message: 'comments: invalid request', retryable: false },
+        }
       }
-      return run(input)
+      try {
+        return { ok: true, value: await run(input) }
+      } catch (error) {
+        return { ok: false, error: errorShape(error) }
+      }
     })
   }
 
@@ -151,9 +176,26 @@ export function createUniworkComments(
     (input) => api().searchMentions(binding(input.path), input),
   )
 
+  // R1-2: the latest reveal per path, held until that editor pulls it. A push
+  // reaches a renderer that already subscribed; a renderer that subscribed
+  // afterwards (cold start) would never see it, so the hold survives the push.
+  const heldReveals = new Map<string, string>()
+
+  ipcMain.handle(COMMENTS_CHANNELS.revealPending, (event) => {
+    // scoped to the sender's own path: another editor's held reveal is neither
+    // returned nor cleared
+    const path = deps.shownPath?.(event.sender) ?? null
+    if (!path) return null
+    const commentId = heldReveals.get(path)
+    if (commentId === undefined) return null
+    heldReveals.delete(path)
+    return { path, commentId }
+  })
+
   return {
     reveal(path, commentId) {
       if (!resolveCommentBinding(deps.service, path)) return
+      heldReveals.set(path, commentId)
       deps.sendReveal({ path, commentId })
     },
   }
