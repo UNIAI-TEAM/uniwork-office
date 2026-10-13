@@ -116,7 +116,7 @@ export const cs = {
   aiNetworkError:
     'Problém se sítí: nepodařilo se připojit ke službě AI. Zkontrolujte připojení a zkuste to znovu',
   aiCreditsExhausted:
-    'Vaše kredity UniWork byly vyčerpány. Navštivte uniwork.app/pricing pro dobití a zkuste to znovu',
+    'Vaše kredity UniWork byly vyčerpány. Navštivte uniworkos.com/pricing pro dobití a zkuste to znovu',
   aiSumReadAttachment: 'Přečtena příloha',
   aiSumImageAttachment: 'Obrázková příloha {name}',
   aiSumRead: 'Přečteno {name}',

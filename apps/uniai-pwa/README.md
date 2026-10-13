@@ -10,9 +10,9 @@ Standalone ChatGPT-style shell for UniWork AI (Token Hub + UniOffice hub).
 
 ## Production / staging URL
 
-Serve this folder at **`https://uniwork.app/app/`** (trailing slash; `start_url` / `scope` are `/app/`).
+Serve this folder at **`https://uniworkos.com/app/`** (trailing slash; `start_url` / `scope` are `/app/`).
 
-Staging can mirror the same path on a preview host, e.g. `https://staging.uniwork.app/app/`.
+Staging can mirror the same path on a preview host, e.g. `https://staging.uniworkos.com/app/`.
 
 ## Local
 
@@ -27,4 +27,4 @@ Copy static assets (`index.html`, `fonts.css`, `styles.css`, `plans.js`, `office
 
 ## Install (users)
 
-Settings → **UniAI** in UniWork Office opens `https://uniwork.app/app` and lists Chrome / Edge / Safari install steps. Or open the URL and use the browser’s Install / Add to Home Screen.
+Settings → **UniAI** in UniWork Office opens `https://uniworkos.com/app` and lists Chrome / Edge / Safari install steps. Or open the URL and use the browser’s Install / Add to Home Screen.

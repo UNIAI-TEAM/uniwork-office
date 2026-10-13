@@ -360,7 +360,7 @@ export const strings = {
     aiTimeoutError: 'AI 请求超时：网络长时间无响应，已停止。请检查网络后重试',
     aiOverloadedError: 'AI 服务当前繁忙，请稍后重试',
     aiNetworkError: '网络有问题，无法连接 AI 服务。请检查网络后重试',
-    aiCreditsExhausted: 'UniWork 积分已用完，请前往 uniwork.app/pricing 充值后重试',
+    aiCreditsExhausted: 'UniWork 积分已用完，请前往 uniworkos.com/pricing 充值后重试',
     aiToolReadPages: '读取第 {start}-{end} 页',
     aiToolSearch: '搜索"{query}"（{count} 处）',
     aiToolGoto: '跳转到第 {page} 页',
@@ -712,7 +712,7 @@ export const strings = {
     aiNetworkError:
       'Network problem: could not reach the AI service. Check your connection and try again',
     aiCreditsExhausted:
-      'Your UniWork credits have run out. Visit uniwork.app/pricing to top up, then try again',
+      'Your UniWork credits have run out. Visit uniworkos.com/pricing to top up, then try again',
     aiToolReadPages: 'Read pages {start}-{end}',
     aiToolSearch: 'Search "{query}" ({count} hits)',
     aiToolGoto: 'Go to page {page}',
@@ -1069,7 +1069,7 @@ export const strings = {
     aiNetworkError:
       'Sự cố mạng: không thể kết nối tới dịch vụ AI. Kiểm tra kết nối của bạn và thử lại',
     aiCreditsExhausted:
-      'Tín dụng UniWork của bạn đã hết. Truy cập uniwork.app/pricing để nạp, rồi thử lại',
+      'Tín dụng UniWork của bạn đã hết. Truy cập uniworkos.com/pricing để nạp, rồi thử lại',
     aiToolReadPages: 'Đọc các trang {start}-{end}',
     aiToolSearch: 'Tìm kiếm "{query}" ({count} kết quả)',
     aiToolGoto: 'Đi tới trang {page}',
@@ -1425,7 +1425,7 @@ export const strings = {
     aiNetworkError:
       'ネットワークに問題があり、AI サービスに接続できません。接続を確認して再試行してください',
     aiCreditsExhausted:
-      'UniWorkクレジットを使い切りました。uniwork.app/pricing でチャージしてから再試行してください',
+      'UniWorkクレジットを使い切りました。uniworkos.com/pricing でチャージしてから再試行してください',
     aiToolReadPages: 'ページ {start}-{end} を読む',
     aiToolSearch: '「{query}」を検索（{count} 件）',
     aiToolGoto: 'ページ {page} へ移動',
@@ -1781,7 +1781,7 @@ export const strings = {
     aiNetworkError:
       '네트워크에 문제가 있어 AI 서비스에 연결할 수 없습니다. 연결을 확인한 후 다시 시도해 주세요',
     aiCreditsExhausted:
-      'UniWork 크레딧을 모두 사용했습니다. uniwork.app/pricing에서 충전한 후 다시 시도해 주세요',
+      'UniWork 크레딧을 모두 사용했습니다. uniworkos.com/pricing에서 충전한 후 다시 시도해 주세요',
     aiToolReadPages: '{start}-{end}쪽 읽기',
     aiToolSearch: '"{query}" 검색 ({count}건)',
     aiToolGoto: '{page}쪽으로 이동',
@@ -2140,7 +2140,7 @@ export const strings = {
     aiNetworkError:
       'Problème réseau : impossible de joindre le service IA. Vérifiez votre connexion et réessayez',
     aiCreditsExhausted:
-      'Vos crédits UniWork sont épuisés. Rechargez sur uniwork.app/pricing puis réessayez',
+      'Vos crédits UniWork sont épuisés. Rechargez sur uniworkos.com/pricing puis réessayez',
     aiToolReadPages: 'Lire les pages {start}-{end}',
     aiToolSearch: 'Rechercher « {query} » ({count} occurrences)',
     aiToolGoto: 'Aller à la page {page}',
@@ -2503,7 +2503,7 @@ export const strings = {
     aiNetworkError:
       'Netzwerkproblem: Der KI-Dienst ist nicht erreichbar. Prüfe deine Verbindung und versuche es erneut',
     aiCreditsExhausted:
-      'Deine UniWork-Credits sind aufgebraucht. Lade unter uniwork.app/pricing auf und versuche es erneut',
+      'Deine UniWork-Credits sind aufgebraucht. Lade unter uniworkos.com/pricing auf und versuche es erneut',
     aiToolReadPages: 'Seiten {start}-{end} lesen',
     aiToolSearch: '„{query}" suchen ({count} Treffer)',
     aiToolGoto: 'Zu Seite {page} springen',
@@ -2865,7 +2865,7 @@ export const strings = {
     aiNetworkError:
       'Problema de red: no se pudo conectar con el servicio de IA. Comprueba tu conexión e inténtalo de nuevo',
     aiCreditsExhausted:
-      'Tus créditos de UniWork se han agotado. Recarga en uniwork.app/pricing e inténtalo de nuevo',
+      'Tus créditos de UniWork se han agotado. Recarga en uniworkos.com/pricing e inténtalo de nuevo',
     aiToolReadPages: 'Leer páginas {start}-{end}',
     aiToolSearch: 'Buscar «{query}» ({count} resultados)',
     aiToolGoto: 'Ir a la página {page}',
@@ -3222,7 +3222,7 @@ export const strings = {
     aiNetworkError:
       'เครือข่ายมีปัญหา ไม่สามารถเชื่อมต่อบริการ AI ได้ โปรดตรวจสอบการเชื่อมต่อแล้วลองใหม่',
     aiCreditsExhausted:
-      'เครดิต UniWork ของคุณหมดแล้ว โปรดเติมเครดิตที่ uniwork.app/pricing แล้วลองใหม่',
+      'เครดิต UniWork ของคุณหมดแล้ว โปรดเติมเครดิตที่ uniworkos.com/pricing แล้วลองใหม่',
     aiToolReadPages: 'อ่านหน้า {start}-{end}',
     aiToolSearch: 'ค้นหา "{query}" ({count} แห่ง)',
     aiToolGoto: 'ไปที่หน้า {page}',
@@ -3578,7 +3578,7 @@ export const strings = {
     aiNetworkError:
       'Masalah jaringan: tidak dapat terhubung ke layanan AI. Periksa koneksi Anda lalu coba lagi',
     aiCreditsExhausted:
-      'Kredit UniWork Anda telah habis. Isi ulang di uniwork.app/pricing lalu coba lagi',
+      'Kredit UniWork Anda telah habis. Isi ulang di uniworkos.com/pricing lalu coba lagi',
     aiToolReadPages: 'Baca halaman {start}-{end}',
     aiToolSearch: 'Cari "{query}" ({count} temuan)',
     aiToolGoto: 'Ke halaman {page}',
@@ -3937,7 +3937,7 @@ export const strings = {
     aiNetworkError:
       'Проблема с сетью: не удалось подключиться к сервису ИИ. Проверьте подключение и повторите попытку',
     aiCreditsExhausted:
-      'Кредиты UniWork исчерпаны. Пополните баланс на uniwork.app/pricing и повторите попытку',
+      'Кредиты UniWork исчерпаны. Пополните баланс на uniworkos.com/pricing и повторите попытку',
     aiToolReadPages: 'Чтение страниц {start}-{end}',
     aiToolSearch: 'Поиск «{query}» ({count} совпадений)',
     aiToolGoto: 'Перейти на страницу {page}',
@@ -4294,7 +4294,7 @@ export const strings = {
     aiNetworkError:
       'مشكلة في الشبكة: تعذّر الوصول إلى خدمة الذكاء الاصطناعي. تحقق من الاتصال وحاول مجددًا',
     aiCreditsExhausted:
-      'نفدت أرصدة UniWork لديك. يرجى إعادة الشحن عبر uniwork.app/pricing ثم المحاولة مجددًا',
+      'نفدت أرصدة UniWork لديك. يرجى إعادة الشحن عبر uniworkos.com/pricing ثم المحاولة مجددًا',
     aiToolReadPages: 'قراءة الصفحات {start}-{end}',
     aiToolSearch: 'بحث عن "{query}" ({count} نتيجة)',
     aiToolGoto: 'الانتقال إلى الصفحة {page}',
@@ -4652,7 +4652,7 @@ export const strings = {
     aiNetworkError:
       'Problema de rede: não foi possível conectar ao serviço de IA. Verifique sua conexão e tente novamente',
     aiCreditsExhausted:
-      'Seus créditos UniWork acabaram. Recarregue em uniwork.app/pricing e tente novamente',
+      'Seus créditos UniWork acabaram. Recarregue em uniworkos.com/pricing e tente novamente',
     aiToolReadPages: 'Ler páginas {start}-{end}',
     aiToolSearch: 'Pesquisar "{query}" ({count} ocorrências)',
     aiToolGoto: 'Ir para a página {page}',
@@ -5014,7 +5014,7 @@ export const strings = {
     aiNetworkError:
       'Problema di rete: impossibile raggiungere il servizio IA. Controlla la connessione e riprova',
     aiCreditsExhausted:
-      'I tuoi crediti UniWork sono esauriti. Ricarica su uniwork.app/pricing e riprova',
+      'I tuoi crediti UniWork sono esauriti. Ricarica su uniworkos.com/pricing e riprova',
     aiToolReadPages: 'Leggi le pagine {start}-{end}',
     aiToolSearch: 'Cerca "{query}" ({count} risultati)',
     aiToolGoto: 'Vai alla pagina {page}',
@@ -5374,7 +5374,7 @@ export const strings = {
     aiNetworkError:
       'Problem z siecią: nie można połączyć się z usługą AI. Sprawdź połączenie i spróbuj ponownie',
     aiCreditsExhausted:
-      'Twoje kredyty UniWork wyczerpały się. Doładuj konto na uniwork.app/pricing i spróbuj ponownie',
+      'Twoje kredyty UniWork wyczerpały się. Doładuj konto na uniworkos.com/pricing i spróbuj ponownie',
     aiToolReadPages: 'Czytaj strony {start}-{end}',
     aiToolSearch: 'Szukaj „{query}" ({count} wyników)',
     aiToolGoto: 'Przejdź do strony {page}',
@@ -5732,7 +5732,7 @@ export const strings = {
     aiNetworkError:
       'Problém se sítí: službu AI se nepodařilo kontaktovat. Zkontrolujte připojení a zkuste to znovu',
     aiCreditsExhausted:
-      'Vaše kredity UniWork byly vyčerpány. Navštivte uniwork.app/pricing, dobijte je a zkuste to znovu',
+      'Vaše kredity UniWork byly vyčerpány. Navštivte uniworkos.com/pricing, dobijte je a zkuste to znovu',
     aiToolReadPages: 'Číst stránky {start}-{end}',
     aiToolSearch: 'Hledat „{query}“ ({count} výskytů)',
     aiToolGoto: 'Přejít na stránku {page}',
@@ -6091,7 +6091,7 @@ export const strings = {
     aiNetworkError:
       'Netwerkprobleem: kan de AI-service niet bereiken. Controleer je verbinding en probeer het opnieuw',
     aiCreditsExhausted:
-      'Je UniWork-credits zijn op. Waardeer op via uniwork.app/pricing en probeer het opnieuw',
+      'Je UniWork-credits zijn op. Waardeer op via uniworkos.com/pricing en probeer het opnieuw',
     aiToolReadPages: "Pagina's {start}-{end} lezen",
     aiToolSearch: 'Zoeken naar "{query}" ({count} resultaten)',
     aiToolGoto: 'Ga naar pagina {page}',
@@ -6449,7 +6449,7 @@ export const strings = {
     aiNetworkError:
       'Masalah rangkaian: tidak dapat menghubungi perkhidmatan AI. Semak sambungan anda dan cuba lagi',
     aiCreditsExhausted:
-      'Kredit UniWork anda telah habis. Tambah nilai di uniwork.app/pricing dan cuba lagi',
+      'Kredit UniWork anda telah habis. Tambah nilai di uniworkos.com/pricing dan cuba lagi',
     aiToolReadPages: 'Baca halaman {start}-{end}',
     aiToolSearch: 'Cari "{query}" ({count} padanan)',
     aiToolGoto: 'Pergi ke halaman {page}',
@@ -6801,7 +6801,7 @@ export const strings = {
     aiTimeoutError: 'תם הזמן לבקשת ה-AI: אין תגובה מהרשת וההרצה הופסקה. בדוק את החיבור ונסה שוב',
     aiOverloadedError: 'שירות ה-AI עמוס כרגע — נסו שוב בעוד רגע',
     aiNetworkError: 'בעיית רשת: לא ניתן להתחבר לשירות ה-AI. בדוק את החיבור ונסה שוב',
-    aiCreditsExhausted: 'קרדיטי UniWork שלך אזלו. טען מחדש ב-uniwork.app/pricing ונסה שוב',
+    aiCreditsExhausted: 'קרדיטי UniWork שלך אזלו. טען מחדש ב-uniworkos.com/pricing ונסה שוב',
     aiToolReadPages: 'קריאת עמודים {start}-{end}',
     aiToolSearch: 'חיפוש "{query}" ({count} תוצאות)',
     aiToolGoto: 'מעבר לעמוד {page}',
@@ -7154,7 +7154,7 @@ export const strings = {
     aiNetworkError:
       'नेटवर्क समस्या: AI सेवा से कनेक्ट नहीं हो सका। कनेक्शन जांचें और फिर से प्रयास करें',
     aiCreditsExhausted:
-      'आपके UniWork क्रेडिट समाप्त हो गए हैं। uniwork.app/pricing पर रिचार्ज करें और फिर से प्रयास करें',
+      'आपके UniWork क्रेडिट समाप्त हो गए हैं। uniworkos.com/pricing पर रिचार्ज करें और फिर से प्रयास करें',
     aiToolReadPages: 'पृष्ठ {start}-{end} पढ़ें',
     aiToolSearch: '"{query}" खोजें ({count} परिणाम)',
     aiToolGoto: 'पृष्ठ {page} पर जाएँ',
@@ -7504,7 +7504,7 @@ export const strings = {
     aiTimeoutError: 'AI 請求逾時：網路長時間無回應，已停止。請檢查網路後重試',
     aiOverloadedError: 'AI 服務目前繁忙，請稍後重試',
     aiNetworkError: '網路有問題，無法連接 AI 服務。請檢查網路後重試',
-    aiCreditsExhausted: 'UniWork 點數已用完，請前往 uniwork.app/pricing 儲值後重試',
+    aiCreditsExhausted: 'UniWork 點數已用完，請前往 uniworkos.com/pricing 儲值後重試',
     aiToolReadPages: '讀取第 {start}-{end} 頁',
     aiToolSearch: '搜尋「{query}」（{count} 處）',
     aiToolGoto: '跳至第 {page} 頁',

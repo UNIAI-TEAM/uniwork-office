@@ -114,7 +114,7 @@ export const en = {
   aiNetworkError:
     'Network problem: could not reach the AI service. Check your connection and try again',
   aiCreditsExhausted:
-    'Your UniWork credits have run out. Visit uniwork.app/pricing to top up, then try again',
+    'Your UniWork credits have run out. Visit uniworkos.com/pricing to top up, then try again',
   aiSumReadAttachment: 'Read attachment',
   aiSumImageAttachment: 'Image attachment {name}',
   aiSumRead: 'Read {name}',

@@ -117,7 +117,7 @@ export const fr = {
   aiNetworkError:
     'Problème réseau : impossible de joindre le service IA. Vérifiez votre connexion et réessayez',
   aiCreditsExhausted:
-    'Vos crédits UniWork sont épuisés. Rechargez sur uniwork.app/pricing puis réessayez',
+    'Vos crédits UniWork sont épuisés. Rechargez sur uniworkos.com/pricing puis réessayez',
   aiSumReadAttachment: 'Lire la pièce jointe',
   aiSumImageAttachment: 'Pièce jointe image {name}',
   aiSumRead: 'Lire {name}',

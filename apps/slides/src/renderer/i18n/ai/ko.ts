@@ -118,7 +118,7 @@ export const ko = {
   aiErrNetwork:
     '네트워크에 문제가 있어 AI 서비스에 연결할 수 없습니다. 연결을 확인한 후 다시 시도해 주세요',
   aiCreditsExhausted:
-    'UniWork 크레딧을 모두 사용했습니다. uniwork.app/pricing에서 충전한 후 다시 시도해 주세요',
+    'UniWork 크레딧을 모두 사용했습니다. uniworkos.com/pricing에서 충전한 후 다시 시도해 주세요',
   aiErrRequestFailed: '요청 전송 실패: {msg}',
   aiErrGenerateFailed: '생성 실패',
   aiErrRegenFailed: '페이지 다시 생성 실패',

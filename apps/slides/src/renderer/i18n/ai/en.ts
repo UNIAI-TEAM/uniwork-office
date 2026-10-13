@@ -118,7 +118,7 @@ export const en = {
   aiErrNetwork:
     'Network problem: could not reach the AI service. Check your connection and try again',
   aiCreditsExhausted:
-    'Your UniWork credits have run out. Visit uniwork.app/pricing to top up, then try again',
+    'Your UniWork credits have run out. Visit uniworkos.com/pricing to top up, then try again',
   aiErrRequestFailed: 'Failed to send request: {msg}',
   aiErrGenerateFailed: 'Generation failed',
   aiErrRegenFailed: 'Slide redo failed',

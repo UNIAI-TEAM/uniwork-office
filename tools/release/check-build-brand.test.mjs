@@ -206,7 +206,7 @@ async function writeAsar(root, resources, pkg) {
       name: '@genoffice/shell',
       productName: 'UniWork Office',
       author: { name: 'UniWork', email: 'hello@uniwork.app' },
-      homepage: 'https://uniwork.app',
+      homepage: 'https://uniworkos.com',
       description: 'UniWork Office shell',
       ...pkg,
     }),

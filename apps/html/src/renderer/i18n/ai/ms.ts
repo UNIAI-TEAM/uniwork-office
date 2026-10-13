@@ -4,7 +4,7 @@ export const ms = {
   aiCollapsePanel: 'Runtuhkan panel',
   aiComposerPlaceholder: 'Minta AI menulis atau menyunting…',
   aiCopyReplyTitle: 'Salin balasan',
-  aiCreditsExhausted: 'Kredit habis — tambah nilai di uniwork.app',
+  aiCreditsExhausted: 'Kredit habis — tambah nilai di uniworkos.com',
   aiEmptyTitle: 'Reka halaman dengan AI',
   aiEmptyBody:
     'Halaman pendaratan, laporan, poster: nyatakan tujuan dan khalayak; AI mencadangkan ringkasan dahulu, kemudian membina halaman',

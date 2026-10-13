@@ -119,7 +119,7 @@ export const de = {
   aiNetworkError:
     'Netzwerkproblem: Der KI-Dienst ist nicht erreichbar. Prüfe deine Verbindung und versuche es erneut',
   aiCreditsExhausted:
-    'Deine UniWork-Credits sind aufgebraucht. Lade unter uniwork.app/pricing auf und versuche es erneut',
+    'Deine UniWork-Credits sind aufgebraucht. Lade unter uniworkos.com/pricing auf und versuche es erneut',
   aiSumReadAttachment: 'Anlage lesen',
   aiSumImageAttachment: 'Bildanlage {name}',
   aiSumRead: '{name} lesen',

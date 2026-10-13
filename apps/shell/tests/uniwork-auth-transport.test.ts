@@ -420,12 +420,12 @@ describe('deployment profile', () => {
         userDataDir: '/ud',
         isPackaged: true,
         env: {},
-        settingsApiOrigin: 'https://uniwork.app',
+        settingsApiOrigin: 'https://uniworkos.com',
         readFile: files({}),
       }),
     ).toEqual({
       deploymentId: 'default',
-      apiOrigin: 'https://uniwork.app',
+      apiOrigin: 'https://uniworkos.com',
       clientId: 'uniwork-office',
       channel: 'stable',
     })

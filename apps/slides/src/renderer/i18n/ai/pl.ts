@@ -118,7 +118,7 @@ export const pl = {
   aiErrNetwork:
     'Problem z siecią: nie można połączyć się z usługą AI. Sprawdź połączenie i spróbuj ponownie',
   aiCreditsExhausted:
-    'Twoje kredyty UniWork wyczerpały się. Doładuj konto na uniwork.app/pricing i spróbuj ponownie',
+    'Twoje kredyty UniWork wyczerpały się. Doładuj konto na uniworkos.com/pricing i spróbuj ponownie',
   aiErrRequestFailed: 'Wysłanie żądania nie powiodło się: {msg}',
   aiErrGenerateFailed: 'Generowanie nie powiodło się',
   aiErrRegenFailed: 'Ponowne wygenerowanie slajdu nie powiodło się',

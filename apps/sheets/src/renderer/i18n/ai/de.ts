@@ -59,7 +59,7 @@ export const de = {
   aiNetworkError:
     'Netzwerkproblem: Der KI-Dienst ist nicht erreichbar. Prüfe deine Verbindung und versuche es erneut',
   aiCreditsExhausted:
-    'Deine UniWork-Credits sind aufgebraucht. Lade unter uniwork.app/pricing auf und versuche es erneut',
+    'Deine UniWork-Credits sind aufgebraucht. Lade unter uniworkos.com/pricing auf und versuche es erneut',
   aiToolWorkbookContext: 'Arbeitsmappeninformationen lesen',
   aiToolReadRange: 'Bereich lesen',
   aiToolReadRangeOf: 'Bereich {range} lesen',
