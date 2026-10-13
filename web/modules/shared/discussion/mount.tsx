@@ -110,7 +110,7 @@ function DiscussionRoot({ port, session, revealMissing, doc }: RootProps) {
     // one side panel at a time: the editor's panel opening closes this one
     const offSide = onFrameSidePanel(
       'discussion',
-      () => handle.current?.close(),
+      () => handle.current?.close({ focus: false }),
       doc.defaultView ?? undefined,
     )
     return () => {
