@@ -1,8 +1,10 @@
-import { mkdtempSync, readdirSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { UniworkDocError } from '../src/main/uniwork-docs/errors'
+import { BINDING_FILE } from '../src/main/uniwork-docs/binding-store'
+import { UniworkDocsService, type ConflictUi } from '../src/main/uniwork-docs/service'
 import { FeedError } from '../src/main/uniwork-sync/feed/errors'
 import type { FeedClient, FeedPage } from '../src/main/uniwork-sync/feed/client'
 import type { CapabilityRead } from '../src/main/uniwork-sync/capability/cache'
@@ -13,12 +15,13 @@ import {
   FEED_CURSORS_REGISTRATION,
   SyncRuntime,
 } from '../src/main/uniwork-sync/runtime'
+import { createSyncStoreAccess } from '../src/main/uniwork-sync/session-store'
 import {
   createStoreLayer,
   type StoreLayer,
   type StoreRecords,
 } from '../src/main/uniwork-sync/store'
-import { INTENT_STORE_REGISTRATION } from '../src/main/uniwork-sync/intent-store'
+import { createIntentStore, INTENT_STORE_REGISTRATION } from '../src/main/uniwork-sync/intent-store'
 import {
   createLockableSafeStorage,
   runStoreCompliance,
@@ -471,6 +474,156 @@ describe('the feed runtime', () => {
     expect(reads).toBe(2)
     expect(h.calls).toHaveLength(1)
     expect(await cursorOf(h, 'org_a', 'ws_1')).toBe('c1')
+  })
+})
+
+/**
+ * W3b: the doc index is reconciled with the REAL service, wired the way
+ * wiring.ts wires it (`keepDraft: (documentId) => service.hasLocalDraft(...)`).
+ * The sweep and the intent store are the service's own, so "has local work"
+ * is decided exactly as production decides it - and the editor's unsaved edits
+ * count as local work too (a ready binding whose file does not show them yet).
+ */
+describe('the full resync keeps drafts through the real hasLocalDraft (wiring keepDraft)', () => {
+  const IDS = {
+    clean: 'doc_clean',
+    dirty: 'doc_dirty',
+    saving: 'doc_saving',
+    intent: 'doc_intent',
+    editor: 'doc_editor',
+    listed: 'doc_listed',
+  }
+
+  /** a working copy of dep_1/acc_1 as the service reads one (schema 2, bound, editable) */
+  function seedCopy(documentId: string, state: string): string {
+    const folder = join(base, 'uniwork-documents', 'dep_1', 'acc_1', documentId)
+    const path = join(folder, 'Plan.docx')
+    mkdirSync(folder, { recursive: true })
+    writeFileSync(path, `local bytes of ${documentId}`)
+    writeFileSync(
+      join(folder, BINDING_FILE),
+      JSON.stringify({
+        schema: 2,
+        min_store_level: 2,
+        min_app_version: '0.11.0',
+        documentId,
+        workspaceId: 'ws_1',
+        orgId: 'org_a',
+        title: 'Plan.docx',
+        filename: 'Plan.docx',
+        format: 'docx',
+        access: 'edit',
+        baseRevision: '41',
+        baseVersion: 3,
+        baseChecksum: 'base',
+        state,
+      }),
+    )
+    return path
+  }
+
+  /** the service of dep_1/acc_1 over the runtime's own store layer */
+  function serviceOver(layer: StoreLayer): UniworkDocsService {
+    const profile = {
+      deploymentId: 'dep_1',
+      apiOrigin: 'https://uniwork.example',
+      clientId: 'uniwork-office',
+      channel: 'stable' as const,
+    }
+    const identity = { accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'dep_1' }
+    const ui: ConflictUi = {
+      chooseConflict: vi.fn(async () => 'later'),
+      confirmDiscard: vi.fn(async () => false),
+      pickCopyPath: vi.fn(async () => null),
+      showOpenLatestFailed: vi.fn(),
+      showCopyFailed: vi.fn(),
+      chooseUnsavedClose: vi.fn(async () => 'cancel'),
+    }
+    return new UniworkDocsService({
+      userDataDir: base,
+      syncStore: createSyncStoreAccess({
+        layer,
+        scope: () => ({ deploymentId: identity.deploymentId, accountId: identity.accountId }),
+      }),
+      appVersion: () => '0.11.0',
+      profile: () => profile,
+      channel: () => 'stable',
+      applyProfile: async () => 'unchanged',
+      identity: () => identity,
+      keystoreLocked: () => false,
+      selectedOrgId: () => 'org_a',
+      authorized: <T>(call: (token: string) => Promise<T>) => call('token'),
+      openPath: () => true,
+      isPathOpen: () => false,
+      requestModuleSave: () => false,
+      reloadPath: vi.fn(),
+      activePath: () => undefined,
+      ui,
+      pushStatus: vi.fn(),
+      pushLaunch: vi.fn(),
+      reveal: vi.fn(),
+    })
+  }
+
+  it('keeps dirty, saving, intent-held and editor-dirty copies; evicts a clean unlisted one', async () => {
+    const serviceRef: { current: UniworkDocsService | null } = { current: null }
+    const h = harness({
+      // exactly wiring.ts: keepDraft is the service's own answer
+      keepDraft: (documentId) => {
+        if (!serviceRef.current) throw new Error('service not built')
+        return serviceRef.current.hasLocalDraft(documentId)
+      },
+      pages: () => ({ ...PAGE, changes: [change(IDS.listed)], nextCursor: 'c1' }),
+    })
+    const service = serviceOver(h.layer)
+    serviceRef.current = service
+
+    // one copy per reason to keep local work, plus a clean one
+    seedCopy(IDS.dirty, 'dirty')
+    seedCopy(IDS.saving, 'saving')
+    seedCopy(IDS.intent, 'ready')
+    seedCopy(IDS.clean, 'ready')
+    const editorPath = seedCopy(IDS.editor, 'ready')
+    // the editor holds edits the file does not show yet: still local work
+    service.noteEditorDirty(editorPath, true)
+    // the intent-held copy is clean on disk; its intent record is the local work
+    const intents = createIntentStore(await recordsOf(h.layer, INTENT_STORE_REGISTRATION.name))
+    await intents.put(
+      IDS.intent,
+      {
+        intentId: 'intent_doc_intent',
+        idempotencyKey: 'key_doc_intent',
+        documentId: IDS.intent,
+        baseRevision: '41',
+        checksum: 'checksum',
+        createdAt: '2026-10-12T00:00:00.000Z',
+      },
+      new TextEncoder().encode('payload'),
+    )
+    // the index already lists every copy; the snapshot below lists only doc_listed
+    const cache = await recordsOf(h.layer, DOC_INDEX_REGISTRATION.name)
+    await cache.write(
+      'org_a/ws_1/index',
+      new TextEncoder().encode(
+        JSON.stringify({
+          index: [IDS.clean, IDS.dirty, IDS.saving, IDS.intent, IDS.editor, IDS.listed],
+          docs: {},
+        }),
+      ),
+    )
+
+    await h.runtime.tick()
+
+    // the clean, unlisted copy is evicted from the index (and its row with it);
+    // every copy with local work stays - including the editor-dirty one
+    expect(await indexOf(h, 'org_a', 'ws_1')).toEqual([
+      IDS.dirty,
+      IDS.saving,
+      IDS.intent,
+      IDS.editor,
+      IDS.listed,
+    ])
+    expect(Object.keys((await cacheOf(h, 'org_a', 'ws_1')).docs)).toEqual([IDS.listed])
   })
 })
 
