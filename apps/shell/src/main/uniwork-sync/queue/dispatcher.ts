@@ -439,8 +439,11 @@ export class QueueDispatcher {
   private async runOne(doc: QueueDoc, now: number): Promise<QueueState> {
     const lock = await this.deps.lock.acquire(doc.key)
     if (lock.kind === 'other_window') {
-      // another window edits this document: this one is read-only, never writes
+      // another window edits this document: this one is read-only. It writes
+      // NOTHING to the shared record (no transition, no park) - the record is
+      // left for the holder; the window only pushes its own status.
       this.otherWindow.add(doc.key)
+      this.publishOtherWindow(doc)
       return doc.record.state
     }
     this.otherWindow.delete(doc.key)
@@ -478,14 +481,16 @@ export class QueueDispatcher {
         await this.apply(doc, { type: 'capability', syncWrite: false }, now)
         return doc.record.state
       }
-      // the bytes are staged: the second `uploaded` advances uploading -> committing
-      await this.apply(doc, { type: 'uploaded' }, now)
-      // a lost generation (another window took the lock) stops before commit
+      // a lost generation (another window took the lock while the bytes moved)
+      // stops before the commit, still writing nothing: the record is left for
+      // the holder, never parked on a network reason (`paused_offline`)
       if (!(await this.deps.lock.check(doc.key, generation))) {
         this.otherWindow.add(doc.key)
-        await this.apply(doc, { type: 'commitFailed', error: 'other_window' }, now)
+        this.publishOtherWindow(doc)
         return doc.record.state
       }
+      // the bytes are staged: the second `uploaded` advances uploading -> committing
+      await this.apply(doc, { type: 'uploaded' }, now)
       let receipt: {
         documentId: string
         versionId: string
@@ -518,6 +523,15 @@ export class QueueDispatcher {
   private async failCommit(doc: QueueDoc, error: unknown, now: number): Promise<void> {
     const code = error instanceof UniworkDocError ? error.code : 'server_error'
     await this.apply(doc, { type: 'commitFailed', error: code }, now)
+  }
+
+  /**
+   * A read-only window's own status: `blocked` with `other_window`, so the
+   * chip reads the window lock (never `paused_offline`, which means the
+   * network). A status push only - the shared record is never written here.
+   */
+  private publishOtherWindow(doc: QueueDoc): void {
+    this.deps.publish({ ...doc.record, state: 'blocked', lastError: 'other_window' })
   }
 
   /** the machine context of one transition (the account's pause flag included) */

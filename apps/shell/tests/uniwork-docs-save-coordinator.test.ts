@@ -631,6 +631,60 @@ describe('G5-06 W4a save queue (fakes)', () => {
     expect(doc2.record.idempotencyKey).toBe(keyBefore)
   })
 
+  it('a window without the lock never writes the record: it publishes other_window, the holder commits', async () => {
+    // (a) the acquire is refused: the loser writes NOTHING and publishes blocked/other_window
+    const h = await harness()
+    const doc = h.makeDoc()
+    await h.dispatcher.enqueue(doc)
+    h.lockTable.leases.set(doc.key, { owner: 'win1', generation: 1, heartbeatAt: h.clock.now })
+    const before = await stored(h.intents, doc)
+    const loser = h.newDispatcher('win2')
+    await loser.dispatchAll([doc])
+    expect(loser.isOtherWindow(doc.key)).toBe(true)
+    // the record is left exactly as it was for the holder: same bytes/updatedAt
+    expect(await stored(h.intents, doc)).toEqual(before)
+    // and the loser's own status says why (a read-only window lock)
+    expect(h.published.at(-1)).toMatchObject({ state: 'blocked', lastError: 'other_window' })
+    // the holder dispatches the same record and commits exactly once
+    const holder = h.newDispatcher('win1')
+    await holder.dispatchAll([doc])
+    expect(doc.record.state).toBe('committed')
+    expect(h.server.state.counts.upload).toBe(1)
+    expect(h.server.state.counts.commit).toBe(1)
+
+    // (b) the lock is lost while the bytes move: the window stops before the
+    // commit, still without writing a paused_offline park
+    const lost = await harness()
+    const doc2 = lost.makeDoc()
+    await lost.dispatcher.enqueue(doc2)
+    let entered!: () => void
+    const atUpload = new Promise<void>((resolve) => (entered = resolve))
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const gated: QueueClient = {
+      upload: async (input) => {
+        entered()
+        await gate
+        return lost.server.client.upload(input)
+      },
+      commit: lost.server.client.commit,
+      lookupCommit: lost.server.client.lookupCommit,
+    }
+    const dispatcher = lost.newDispatcherWith({ client: gated })
+    const pass = dispatcher.dispatchAll([doc2])
+    await atUpload
+    // another window takes the lease while the upload is in flight
+    lost.lockTable.leases.set(doc2.key, { owner: 'win2', generation: 2, heartbeatAt: lost.clock.now })
+    release()
+    await pass
+    expect(dispatcher.isOtherWindow(doc2.key)).toBe(true)
+    expect(lost.server.state.counts.commit).toBe(0)
+    expect(lost.published.at(-1)).toMatchObject({ state: 'blocked', lastError: 'other_window' })
+    const after = await stored(lost.intents, doc2)
+    expect(after?.intent.lastError).toBeUndefined()
+    expect(after?.intent.state).not.toBe('paused_offline')
+  })
+
   it('lock holder crash -> the other window acquires after goneMs', async () => {
     const h = await harness()
     const doc = h.makeDoc()
