@@ -40,6 +40,7 @@ import {
   type AiMedia,
   type AiWebClient,
 } from './client'
+import type { AiRunTracker } from '../ai-run'
 import { AiWebError, isAiWebError } from './errors'
 import { createWebAiStreams, type WireProtocol, type WebAiStreams } from './stream'
 import { describeAiError, openAiSettingsDialog, showAiState } from './ui'
@@ -174,6 +175,8 @@ const SETUP_STATES: ReadonlySet<string> = new Set(['credential_missing', 'model_
 export function createWebAi(opts: {
   port: Pick<FramePort, 'whenInitialized' | 'getToken' | 'refreshToken'>
   capabilities: Record<string, unknown>
+  /** the frame's AI turn tracker (X-02 `aiRun`, the S6 bar); absent = chat turns are not tracked */
+  aiRun?: AiRunTracker
   /** test seams */
   fetch?: typeof fetch
   origin?: string
@@ -537,6 +540,7 @@ export function createWebAi(opts: {
       return SETUP_STATES.has(err.code) ? aiNoticeTagged('no_model', text) : text
     },
     onChatFailure: (err, provider) => showAiState(err, providerLabel(provider), { openSettings }),
+    ...(opts.aiRun ? { aiRun: opts.aiRun } : {}),
   })
 
   return {

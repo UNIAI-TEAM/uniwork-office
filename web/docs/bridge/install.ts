@@ -39,6 +39,7 @@ import browser from './browser'
 import { createWebApi } from './webapi'
 import { bindHostAppearance, createFrameClient } from './frame-boot'
 import { createCapabilityObject } from './capability-object'
+import { frameAiRun } from '../../modules/shared/ai-run'
 import { rememberRemoteVersion } from '../../modules/shared/conflict-dialog'
 import { mergeModules, safeApi, type BridgeObject } from './safe-api'
 import ai from './ai'
@@ -79,6 +80,8 @@ const capabilities: DesktopCapabilities = createCapabilityObject<DesktopCapabili
 bindHostAppearance(client)
 // the conflict table learns who saved a revision from doc.remoteVersion
 client.onRemoteVersion?.(rememberRemoteVersion)
+// the AI turns of this frame: the host hears `aiRun`, the new-version bar waits for idle
+frameAiRun.bind((payload) => client.reportAiRun?.(payload))
 const webapi = createWebApi(client)
 
 export function installBridge(): void {
@@ -96,7 +99,11 @@ export function installBridge(): void {
   // the headless entry has no frame token: AI stays off there
   const desktop = withWebAi(
     mergeModules(modules),
-    createWebAi({ port: client, capabilities: capabilities as Record<string, unknown> }),
+    createWebAi({
+      port: client,
+      capabilities: capabilities as Record<string, unknown>,
+      aiRun: frameAiRun,
+    }),
   )
   desktop.capabilities = capabilities
 

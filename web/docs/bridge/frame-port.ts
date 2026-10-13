@@ -13,6 +13,7 @@ import {
   type InitRecovery,
   type InitUser,
   type ProtocolErrorCode,
+  type AiRunPayload,
   type ProtocolErrorShape,
   type RemoteVersionPayload,
   type SavedPayload,
@@ -73,6 +74,8 @@ export interface FramePort {
   /** a bridge dialog opened / closed (protocol `modal` event; optional for older clients) */
   setModal?(open: boolean): void
   reportSaved(payload: SavedPayload): void
+  /** protocol `aiRun` event (X-02; optional for older clients, the headless port and mocks) */
+  reportAiRun?(payload: AiRunPayload): void
   reportError(error: ProtocolErrorShape | unknown, fatal?: boolean): void
   /**
    * The frame token for the direct AI calls (C16; the real client has both). Absent on ports with
