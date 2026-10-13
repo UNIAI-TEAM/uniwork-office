@@ -120,6 +120,11 @@ export interface CommentsContextResult {
   level?: CommentsLevel
   /** the signed-in UniWork user id ("mine" only, never a permission) */
   myUserId?: string
+  /**
+   * Web frame only (set by the frame comments API, never by desktop main): editors skip the
+   * desktop poll there, since the frame reloads on `comments.changed` (addendum §4.7).
+   */
+  frame?: true
 }
 
 /** main pushes this after a Save of `path` settled with a commit receipt */

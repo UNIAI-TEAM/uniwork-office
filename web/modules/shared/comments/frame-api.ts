@@ -105,6 +105,7 @@ export function createFrameCommentsApi(
           versionId: version.current().versionId ?? session.open?.file.versionId ?? null,
           ...(isLevel(session.commentsLevel) ? { level: session.commentsLevel } : {}),
           ...(typeof userId === 'string' && userId ? { myUserId: userId } : {}),
+          frame: true,
         }
       }),
     onSaved: (handler: (payload: CommentsSavedPayload) => void) =>
