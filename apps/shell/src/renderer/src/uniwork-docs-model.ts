@@ -761,14 +761,16 @@ export function allOrgsBlocked(orgs: OrgChoiceRow[]): boolean {
   return orgs.length > 0 && firstSelectableOrg(orgs) === null
 }
 
-/** arrow keys in the radio group: step over locked rows and wrap around */
+/** arrow keys in the radio group step over locked rows and wrap; Home / End jump to the ends */
 export function moveOrgChoice(
   orgs: OrgChoiceRow[],
   current: string | null,
-  to: 'next' | 'prev',
+  to: 'next' | 'prev' | 'first' | 'last',
 ): string | null {
   const ids = orgs.filter((o) => orgBlockKey(o) === null).map((o) => o.id)
   if (ids.length === 0) return null
+  if (to === 'first') return ids[0]!
+  if (to === 'last') return ids[ids.length - 1]!
   const at = current ? ids.indexOf(current) : -1
   if (at < 0) return to === 'next' ? ids[0]! : ids[ids.length - 1]!
   const step = to === 'next' ? 1 : -1
@@ -864,10 +866,12 @@ export function roleLabel(role: string | null | undefined, t: TFunc): string {
   return key ? t(key) : (role ?? '')
 }
 
-/** "Sales · Admin" for the workspace select; "Sales · —" when the role read failed */
+/** "Sales · Admin" for the workspace select; just "Sales" when the role is unknown or the read failed */
 export function workspaceLabel(ws: UniworkWorkspaceRef, t: TFunc): string {
   const myRole = (ws as UniworkWorkspaceRef & { myRole?: string | null }).myRole
-  // an older main build sends no role at all: just the name
-  if (myRole === undefined) return ws.name
-  return t('uwLibWsRole', { workspace: ws.name, role: roleLabel(myRole, t) || MISSING_VALUE })
+  // an older main build sends no role, or the role read failed: the name alone
+  // (a dash after the middot reads as unfinished)
+  const role = myRole ? roleLabel(myRole, t) : ''
+  if (!role) return ws.name
+  return t('uwLibWsRole', { workspace: ws.name, role })
 }

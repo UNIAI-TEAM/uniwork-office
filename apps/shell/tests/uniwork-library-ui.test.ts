@@ -1,6 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
@@ -165,10 +167,11 @@ describe('library model', () => {
   it('labels a workspace with my role, and falls back to the name', () => {
     expect(workspaceLabel(WORKSPACES[0]!, t)).toBe('Sales · Admin')
     expect(workspaceLabel({ id: 'w', name: 'Plain', orgId: 'o' }, t)).toBe('Plain')
-    // contract: myRole null = the role read failed
+    // contract: myRole null = the role read failed; a dash after the middot reads as unfinished
     expect(workspaceLabel({ id: 'w', name: 'Ops', orgId: 'o', myRole: null } as never, t)).toBe(
-      'Ops · —',
+      'Ops',
     )
+    expect(workspaceLabel({ id: 'w', name: 'Ops', orgId: 'o', myRole: '' } as never, t)).toBe('Ops')
     expect(roleLabel('owner', t)).toBe('Owner')
     expect(roleLabel('auditor', t)).toBe('auditor')
   })
@@ -269,6 +272,28 @@ describe('Open from UniWork: workspaces and Shared with me', () => {
 })
 
 describe('Open from UniWork: details panel', () => {
+  it('offers Details on every row at rest, not only on the hovered or active row', async () => {
+    await render()
+    const buttons = rows().map((r) => r.querySelector<HTMLButtonElement>('.uw-pick-info-btn'))
+    expect(buttons.length).toBeGreaterThan(1)
+    for (const btn of buttons) {
+      expect(btn).not.toBeNull()
+      expect(btn!.getAttribute('aria-label')).toMatch(/^Details for /)
+    }
+    // the stylesheet: shown at rest (never opacity 0), full size and strength on a coarse pointer
+    const css = readFileSync(resolve(__dirname, '../src/renderer/src/home.css'), 'utf8')
+    const block = (selector: string) => {
+      const start = css.indexOf(`\n${selector} {`)
+      expect(start).toBeGreaterThan(-1)
+      return css.slice(start, css.indexOf('}', start))
+    }
+    const rest = block('.uw-pick-info-btn')
+    expect(rest).not.toMatch(/opacity:\s*0;/)
+    expect(rest).toMatch(/opacity:\s*0\.\d+;/)
+    const coarse = css.slice(css.indexOf('@media (pointer: coarse) {\n  .uw-pick-info-btn'))
+    expect(coarse.slice(0, coarse.indexOf('\n}'))).toMatch(/opacity:\s*1;/)
+  })
+
   it('opens a non-modal panel named by the document with a dl of its properties', async () => {
     await render()
     const btn = rows()[0]!.querySelector<HTMLButtonElement>('.uw-pick-info-btn')!

@@ -264,9 +264,17 @@ export function AccountPane({ account }: { account: AccountController }) {
                 disabled={busy === 'switching' || view === 'server-unreachable'}
                 options={orgChoice.rows.map((o) => {
                   const reason = orgBlockKey(o)
+                  const label = reason ? `${o.name} · ${t(reason)}` : o.name
                   return {
                     value: o.id,
-                    label: reason ? `${o.name} · ${t(reason)}` : o.name,
+                    // the accessible name keeps the reason; the popup shows it as a second line
+                    label,
+                    render: reason ? (
+                      <span className="acct-org-opt">
+                        <span className="acct-org-opt-name">{o.name}</span>
+                        <span className="acct-org-opt-reason">{t(reason)}</span>
+                      </span>
+                    ) : undefined,
                     disabled: reason !== null,
                   }
                 })}

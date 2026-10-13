@@ -89,6 +89,12 @@ export function OrgChoiceStep({
       if (next) pick(next)
       return
     }
+    if (event.key === 'Home' || event.key === 'End') {
+      event.preventDefault()
+      const edge = moveOrgChoice(orgs, current, event.key === 'Home' ? 'first' : 'last')
+      if (edge) pick(edge)
+      return
+    }
     if (event.key !== ' ' && event.key !== 'Enter') return
     event.preventDefault()
     // Enter on the checked row continues; otherwise Space/Enter checks the focused row

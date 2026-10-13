@@ -1502,6 +1502,7 @@
 
 .acct-card {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   padding: 12px;
@@ -1528,7 +1529,8 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
-  flex: 1;
+  /* wraps under the avatar before the email has to break inside a word */
+  flex: 1 1 10rem;
 }
 
 .acct-card-name {
@@ -1541,7 +1543,8 @@
 .acct-card-email {
   font-size: 12px;
   color: var(--text-secondary);
-  overflow-wrap: anywhere;
+  /* only a single token wider than the whole card breaks inside a word */
+  overflow-wrap: break-word;
 }
 
 .acct-card-sync {
@@ -1627,6 +1630,40 @@
   outline-offset: 1px;
 }
 
+/* working-organization popup: grows leftwards from the trigger's right edge
+ * (the value sits at the row end), wide enough for a reason line, and never
+ * wider than the window */
+.acct-org-dd .gs-dd-pop {
+  left: auto;
+  right: anchor(right);
+  min-width: max(220px, anchor-size(width));
+  max-width: calc(100vw - 48px);
+}
+
+.acct-org-dd .gs-dd-item {
+  white-space: normal;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.acct-org-opt {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.acct-org-opt-name {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.acct-org-opt-reason {
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--danger-text);
+}
+
 /* organization step after sign-in (account in several organizations) */
 .uw-org-step {
   display: flex;
@@ -1660,7 +1697,11 @@
 }
 
 .uw-org-gone {
-  color: var(--danger-text);
+  padding: 6px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--text-primary);
 }
 
 .uw-org-list {
@@ -1761,22 +1802,35 @@
 }
 
 .uw-org-actions .set-btn:focus-visible,
-.uw-org-blocked .set-btn:focus-visible {
+.uw-org-blocked .set-btn:focus-visible,
+.uw-org-error .set-btn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
 
-.uw-org-blocked {
+.uw-org-blocked,
+.uw-org-error {
+  flex-wrap: wrap;
   align-items: center;
 }
 
-.uw-org-blocked .acct-notice-text {
-  flex: 1;
+.uw-org-blocked .acct-notice-text,
+.uw-org-error .acct-notice-text {
+  flex: 1 1 12rem;
+}
+
+.uw-org-error .acct-notice-title {
+  font-weight: 400;
+}
+
+.uw-org-error .set-btn {
+  flex-shrink: 0;
 }
 
 @media (pointer: coarse) {
   .uw-org-actions .set-btn,
-  .uw-org-blocked .set-btn {
+  .uw-org-blocked .set-btn,
+  .uw-org-error .set-btn {
     height: 44px;
   }
 }

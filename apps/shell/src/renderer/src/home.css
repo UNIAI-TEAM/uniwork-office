@@ -8432,7 +8432,8 @@ html[dir='rtl'] .quick-title-row {
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
-  opacity: 0;
+  /* visible on every row at rest (low emphasis); full strength on the live row */
+  opacity: 0.65;
 }
 
 .uw-pick-row:hover .uw-pick-info-btn,

@@ -1,6 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
@@ -159,6 +161,8 @@ describe('organization choice model', () => {
     expect(moveOrgChoice(rows, 'b', 'next')).toBe('a')
     expect(moveOrgChoice(rows, 'a', 'prev')).toBe('b')
     expect(moveOrgChoice(rows, null, 'next')).toBe('a')
+    expect(moveOrgChoice(rows, 'b', 'first')).toBe('a')
+    expect(moveOrgChoice(rows, 'a', 'last')).toBe('b')
   })
 
   it('is all blocked only when every row is locked', () => {
@@ -239,6 +243,17 @@ describe('organization step after sign-in', () => {
     expect(account.selectOrg).toHaveBeenCalledWith('org-3')
   })
 
+  it('Home and End check the first and last choosable row, skipping locked ones', async () => {
+    await render(controller(choosing([SUSPENDED, ACME, BETA, GAMMA, DEACTIVATED])))
+    await key(radio('Acme School'), 'End')
+    expect(radio('Gamma Labs').getAttribute('aria-checked')).toBe('true')
+    expect(document.activeElement).toBe(radio('Gamma Labs'))
+    await key(radio('Gamma Labs'), 'Home')
+    expect(radio('Acme School').getAttribute('aria-checked')).toBe('true')
+    expect(document.activeElement).toBe(radio('Acme School'))
+    expect(radios().filter((r) => r.getAttribute('aria-checked') === 'true')).toHaveLength(1)
+  })
+
   it('Space checks the focused row; Enter on the checked row continues', async () => {
     const account = controller(choosing([ACME, BETA]))
     await render(account)
@@ -251,6 +266,11 @@ describe('organization step after sign-in', () => {
   it('says why it asks again when the remembered organization is gone', async () => {
     await render(controller(choosing([ACME, BETA], { rememberedGone: true })))
     expect(host.textContent).toContain(en.uwOrgPickRememberedGone)
+    // guidance, not an error: it never uses the error tone of the locked-row reasons
+    const css = readFileSync(resolve(__dirname, '../src/renderer/src/settings.css'), 'utf8')
+    const start = css.indexOf('\n.uw-org-gone {')
+    expect(start).toBeGreaterThan(-1)
+    expect(css.slice(start, css.indexOf('}', start))).not.toContain('danger')
   })
 
   it('all organizations locked: the lock notice with Sign out, no radio group', async () => {
@@ -274,6 +294,10 @@ describe('organization step after sign-in', () => {
     const account = controller(choosing([], { orgsError: 'network' }))
     await render(account)
     expect(host.textContent).toContain(en.uwOrgPickError)
+    // same notice layout as the other panels: text left (grows), Retry right
+    const notice = host.querySelector<HTMLElement>('.acct-notice.uw-org-error')!
+    expect(notice.firstElementChild?.className).toBe('acct-notice-text')
+    expect(notice.lastElementChild?.tagName).toBe('BUTTON')
     const retry = Array.from(host.querySelectorAll('button')).find(
       (b) => b.textContent === en.acctRetry,
     )!
@@ -298,7 +322,17 @@ describe('Settings › Account › Working organization', () => {
     const locked = host.querySelector<HTMLButtonElement>('[role="option"][data-value="org-s"]')!
     expect(locked.disabled).toBe(true)
     expect(locked.getAttribute('aria-label')).toBe(`Paused Co · ${en.uwOrgRowSuspended}`)
-    await click(host.querySelector<HTMLElement>('[role="option"][data-value="org-2"]')!)
+    // the reason is its own line in the popup (no mid-word wrap of one long label)
+    expect(locked.querySelector('.acct-org-opt-name')?.textContent).toBe('Paused Co')
+    expect(locked.querySelector('.acct-org-opt-reason')?.textContent).toBe(en.uwOrgRowSuspended)
+    const open = host.querySelector<HTMLElement>('[role="option"][data-value="org-2"]')!
+    expect(open.querySelector('.acct-org-opt')).toBeNull()
+    const css = readFileSync(resolve(__dirname, '../src/renderer/src/settings.css'), 'utf8')
+    expect(css).toMatch(
+      /\.acct-org-dd \.gs-dd-item \{[^}]*white-space: normal;[^}]*overflow-wrap: normal;/,
+    )
+    expect(css).toMatch(/\.acct-org-dd \.gs-dd-pop \{[^}]*max-width: calc\(100vw/)
+    await click(open)
     expect(account.selectOrg).toHaveBeenCalledWith('org-2')
   })
 
