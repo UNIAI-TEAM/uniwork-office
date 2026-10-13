@@ -25,19 +25,50 @@
   font-size: var(--text-caption);
 }
 
-.collab-composer-input {
-  display: block;
-  box-sizing: border-box;
-  width: 100%;
-  min-height: 64px;
-  padding: 6px 8px;
-  border: 1px solid var(--border-strong);
+/* the box: a plain textarea over a screen-only mirror that tints the picked mentions. The
+ * mirror repeats the textarea's box metrics so the tint sits exactly under the typed text. */
+.collab-composer-field {
+  position: relative;
   border-radius: var(--radius-6);
   background: var(--surface);
-  color: var(--text);
+}
+
+.collab-composer-input,
+.collab-composer-mirror {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-6);
   font: inherit;
   line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.collab-composer-input {
+  position: relative;
+  display: block;
+  min-height: 64px;
+  border-color: var(--border-strong);
+  background: transparent;
+  color: var(--text);
   resize: vertical;
+}
+
+.collab-composer-mirror {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  color: transparent;
+  pointer-events: none;
+  scrollbar-color: transparent transparent;
+}
+
+.collab-composer-mirror mark {
+  border-radius: 3px;
+  background: var(--accent-soft);
+  color: transparent;
 }
 
 .collab-composer-input::placeholder {
@@ -51,8 +82,13 @@
   outline-offset: 2px;
 }
 
-.collab-composer-input[readonly] {
+.collab-composer-field:has(.collab-composer-input[readonly]) {
   background: var(--surface-subtle);
+}
+
+/* one ring while writing: the thread card's own focus-within border steps aside for the box's */
+.collab-thread:has(.collab-composer-input:focus-visible) {
+  border-color: var(--border);
 }
 
 .collab-composer-error {

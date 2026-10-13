@@ -454,7 +454,7 @@ describe('mention picker in the composer', () => {
     render()
     await openPicker()
     expect(key('Enter').defaultPrevented).toBe(true)
-    expect(ta().value).toBe(`Nhờ [@Minh Anh](mention://member/${ULID_A}) `)
+    expect(ta().value).toBe('Nhờ @Minh Anh ')
     expect(ta().selectionStart).toBe(ta().value.length)
     expect(listbox()).toBeNull()
     expect(ta().getAttribute('role')).toBeNull()
@@ -465,7 +465,8 @@ describe('mention picker in the composer', () => {
     await openPicker()
     key('ArrowDown')
     expect(key('Tab').defaultPrevented).toBe(true)
-    expect(ta().value).toContain('[@Mai Hương](mention://member/01J8X4USR0BBBBBBBBBBBBBBBB) ')
+    expect(ta().value).toContain('@Mai Hương ')
+    expect(ta().value).not.toContain('mention://')
     expect(document.activeElement).toBe(ta())
   })
 
@@ -473,7 +474,7 @@ describe('mention picker in the composer', () => {
     render()
     await openPicker()
     act(() => (listbox()!.querySelectorAll('[role=option]')[1] as HTMLElement).click())
-    expect(ta().value).toContain('[@Mai Hương](')
+    expect(ta().value).toContain('@Mai Hương ')
   })
 
   it('Esc closes the picker first and keeps the text; the next Esc cancels', async () => {
@@ -499,13 +500,14 @@ describe('mention picker in the composer', () => {
     expect(m.onSubmit).toHaveBeenCalledWith('Thanks @Minh')
   })
 
-  it('a pasted valid token is kept and does not open the picker', async () => {
+  it('a pasted valid token shows as @Name, does not open the picker, and submits as the token', async () => {
     const m = render()
     const token = `[@Nguyễn \\[An\\]](mention://member/${ULID_A})`
     type(`Xem ${token}`)
     await settle(act, 300)
     expect(listbox()).toBeNull()
-    expect(ta().value).toBe(`Xem ${token}`)
+    expect(ta().value).toBe('Xem @Nguyễn [An]')
+    expect(ta().selectionStart).toBe(ta().value.length)
     await act(async () => {
       sendKeys()
     })
@@ -574,6 +576,112 @@ describe('mention picker in the composer', () => {
   })
 })
 
+const tokenOf = (id: string, name: string) => `[@${name}](mention://member/${id})`
+const TOKEN_A = tokenOf(ULID_A, 'Minh Anh')
+
+describe('mention chip in the composer (the box never shows the id)', () => {
+  it('after a pick the box reads @Name and submit sends the token', async () => {
+    const m = render()
+    await openPicker()
+    key('Enter')
+    expect(ta().value).toBe('Nhờ @Minh Anh ')
+    expect(ta().value).not.toContain('mention://')
+    type(`${ta().value}xem giúp`)
+    await act(async () => {
+      sendKeys()
+    })
+    expect(m.onSubmit).toHaveBeenCalledWith(`Nhờ ${TOKEN_A} xem giúp`)
+  })
+
+  it('tints the mention range in a screen-only mirror (aria-hidden)', async () => {
+    render()
+    await openPicker()
+    key('Enter')
+    const mirror = host.querySelector('.collab-composer-mirror')!
+    expect(mirror.getAttribute('aria-hidden')).toBe('true')
+    expect([...mirror.querySelectorAll('mark')].map((n) => n.textContent)).toEqual(['@Minh Anh'])
+  })
+
+  it('typing inside a picked mention turns it into plain text on submit', async () => {
+    const m = render()
+    await openPicker()
+    key('Enter')
+    type('Nhờ @Minh Xnh ', 9)
+    expect(host.querySelector('.collab-composer-mirror mark')).toBeNull()
+    await act(async () => {
+      sendKeys()
+    })
+    expect(m.onSubmit).toHaveBeenCalledWith('Nhờ @Minh Xnh')
+  })
+
+  it('deleting part of a mention drops it; text typed before it keeps it', async () => {
+    const m = render()
+    await openPicker()
+    key('Enter')
+    type('Hôm nay: Nhờ @Minh Anh ', 10)
+    expect(host.querySelectorAll('.collab-composer-mirror mark')).toHaveLength(1)
+    await act(async () => {
+      sendKeys()
+    })
+    expect(m.onSubmit).toHaveBeenCalledWith(`Hôm nay: Nhờ ${TOKEN_A}`)
+  })
+
+  it('an @Name typed without picking stays plain text', async () => {
+    const m = render()
+    type('Cảm ơn @Minh Anh')
+    await settle(act, 300)
+    await act(async () => {
+      sendKeys()
+    })
+    expect(m.onSubmit).toHaveBeenCalledWith('Cảm ơn @Minh Anh')
+  })
+
+  it('the draft store holds the serialised body and a remount restores @Name + the chip', async () => {
+    render()
+    await openPicker()
+    key('Enter')
+    expect(loadDraft(DRAFT_KEY)).toBe(`Nhờ ${TOKEN_A} `)
+    act(() => root.unmount())
+    root = createRoot(host)
+    render()
+    expect(ta().value).toBe('Nhờ @Minh Anh ')
+    expect(host.querySelectorAll('.collab-composer-mirror mark')).toHaveLength(1)
+  })
+
+  it('initialBody with tokens shows @Name and serialises back byte-identical (not dirty)', async () => {
+    const body =
+      'Xem lại [@Nguyễn \\[An\\]](mention://member/01J8X4USR0AAAAAAAAAAAAAAAA) giúp nhé:\n' +
+      '**đậm**, *nghiêng*, `code [@x](mention://member/01J8X4USR0BBBBBBBBBBBBBBBB)`,\n' +
+      '[liên kết](https://example.com/a?b=1&c=2)  \nxuống dòng — <b>không HTML</b> ✓'
+    const m = render({ mode: 'edit', initialBody: body })
+    expect(ta().value).toContain('Xem lại @Nguyễn [An] giúp nhé:')
+    expect(sessionStorage.getItem(draftStorageKey(DRAFT_KEY))).toBeNull()
+    key('Escape')
+    expect(m.onCancel).toHaveBeenCalled() // unedited: no discard question
+    const m2 = render({ mode: 'edit', initialBody: body })
+    await act(async () => {
+      sendKeys()
+    })
+    expect(m2.onSubmit).toHaveBeenCalledWith(body)
+  })
+
+  it('a stored draft with a token restores as a chip', () => {
+    saveDraft(DRAFT_KEY, `Cc ${TOKEN_A}`)
+    render()
+    expect(ta().value).toBe('Cc @Minh Anh')
+    expect(host.querySelectorAll('.collab-composer-mirror mark')).toHaveLength(1)
+  })
+
+  it('does not open the picker with the caret on the @ of a chip', async () => {
+    render()
+    await openPicker()
+    key('Enter')
+    type('Nhờ @Minh Anh ', 9)
+    await settle(act, 300)
+    expect(listbox()).toBeNull()
+  })
+})
+
 describe('styles', () => {
   const css = readFileSync(
     resolve(import.meta.dirname, '../src/collab/collab-composer.css'),
@@ -606,6 +714,18 @@ describe('styles', () => {
       expect(light, `${t} in light`).toContain(`${t}:`)
       expect(dark, `${t} in dark`).toContain(`${t}:`)
     }
+  })
+
+  it('shows one focus ring: the thread card gives up its own while the box has focus', () => {
+    expect(css).toMatch(
+      /\.collab-thread:has\(\.collab-composer-input:focus-visible\)\s*\{[^}]*border-color:\s*var\(--border\)/s,
+    )
+  })
+
+  it('tints mentions with tokens only (no raw colour, text stays transparent in the mirror)', () => {
+    expect(css).toMatch(
+      /\.collab-composer-mirror mark\s*\{[^}]*background:\s*var\(--accent-soft\)/s,
+    )
   })
 
   it('buttons and options are >= 24px, >= 44px under pointer: coarse', () => {

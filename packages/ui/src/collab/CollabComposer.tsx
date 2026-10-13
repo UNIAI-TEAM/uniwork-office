@@ -3,7 +3,9 @@
  * with the S14 mention picker. Label = placeholder (edit: a hidden label);
  * Ctrl/Cmd+Enter sends; Esc closes the picker first, then cancels (a draft asks
  * first). The draft survives a reload and is cleared only after the server
- * accepted the text. Strings, announcements and the panel's status line arrive
+ * accepted the text. The box shows a picked person as `@Name` (tinted by a mirror
+ * behind it); the ranges that say which characters are a mention follow every edit,
+ * and what is sent and stored is the body with the tokens. Strings, announcements and the panel's status line arrive
  * as props: the panel owns the live region and the catalogue.
  */
 import { format } from '@genoffice/i18n'
@@ -31,7 +33,14 @@ import {
   useMentionSearch,
 } from './MentionPicker'
 import { buildMentionToken } from './body'
-import { findMentionTrigger, insertMention } from './mention-query'
+import {
+  type MentionDoc,
+  applyMentionEdit,
+  findMentionTrigger,
+  mentionDocFromBody,
+  mentionDocToBody,
+  pickMention,
+} from './mention-query'
 import { toCollabError, type CollabHostState, type CollabSource } from './types'
 
 export type CollabComposerMode = 'root' | 'reply' | 'edit' | 'discussion'
@@ -107,6 +116,7 @@ export function CollabComposer(props: CollabComposerProps) {
   const aiId = `${uid}-ai`
   const listboxId = `${uid}-mentions`
   const taRef = useRef<HTMLTextAreaElement>(null)
+  const mirrorRef = useRef<HTMLDivElement>(null)
   const sendingRef = useRef(false)
   const pendingCaret = useRef<number | null>(null)
 
@@ -115,15 +125,16 @@ export function CollabComposer(props: CollabComposerProps) {
     [host.documentId, draftKey],
   )
   const keyId = `${storeKey.documentId}\u0000${storeKey.threadKey}`
-  const startText = () => loadDraft(storeKey) ?? initialBody ?? ''
-  const [text, setText] = useState(startText)
+  const startBody = () => loadDraft(storeKey) ?? initialBody ?? ''
+  const [doc, setDoc] = useState<MentionDoc>(() => mentionDocFromBody(startBody()))
+  const text = doc.text
   const [loadedKey, setLoadedKey] = useState(keyId)
   if (loadedKey !== keyId) {
     // another thread's composer reusing this instance: show that thread's draft
     setLoadedKey(keyId)
-    setText(startText())
+    setDoc(mentionDocFromBody(startBody()))
   }
-  const [aiActive, setAiActive] = useState(() => !!aiDraft && startText() === initialBody)
+  const [aiActive, setAiActive] = useState(() => !!aiDraft && startBody() === initialBody)
   const [caret, setCaret] = useState(0)
   const [focused, setFocused] = useState(false)
   const [dismissedAt, setDismissedAt] = useState<number | null>(null)
@@ -132,7 +143,9 @@ export function CollabComposer(props: CollabComposerProps) {
   const [sendError, setSendError] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
 
-  const trigger = findMentionTrigger(text, caret)
+  const found = findMentionTrigger(text, caret)
+  // the `@` of a picked mention is a chip, not a search
+  const trigger = found && !doc.ranges.some((r) => r.start === found.start) ? found : null
   const open = focused && !confirmOpen && trigger !== null && dismissedAt !== trigger.start
   const search = useMentionSearch({
     source,
@@ -160,10 +173,12 @@ export function CollabComposer(props: CollabComposerProps) {
   })
 
   const base = initialBody ?? ''
-  const dirty = text.trim() !== '' && text !== base
+  const body = mentionDocToBody(doc)
+  const dirty = body.trim() !== '' && body !== base
 
-  function update(value: string) {
-    setText(value)
+  function update(next: MentionDoc) {
+    setDoc(next)
+    const value = mentionDocToBody(next)
     if (value.trim() === '' || value === base) clearDraft(storeKey)
     else saveDraft(storeKey, value)
     setAiActive(false)
@@ -178,27 +193,27 @@ export function CollabComposer(props: CollabComposerProps) {
     const at = taRef.current?.selectionStart ?? caret
     const t = findMentionTrigger(text, at)
     if (!t) return
-    const token = buildMentionToken(row.candidate.user_id, row.candidate.display_name)
-    const out = insertMention(text, t, at, token)
+    const { user_id: id, display_name: label } = row.candidate
+    const out = pickMention(doc, t, at, { id, label, raw: buildMentionToken(id, label) })
     pendingCaret.current = out.caret
     setCaret(out.caret)
-    update(out.text)
+    update(out.doc)
     taRef.current?.focus()
   }
 
-  const sendBlocked = pending || disabledReason !== undefined || text.trim() === ''
+  const sendBlocked = pending || disabledReason !== undefined || body.trim() === ''
 
   async function send() {
     if (sendBlocked || sendingRef.current) return
     sendingRef.current = true
     setPending(true)
     setSendError(false)
-    const body = text.trim()
+    const sent = body.trim()
     try {
-      await onSubmit(body)
+      await onSubmit(sent)
       clearDraft(storeKey)
       setAiActive(false)
-      if (mode !== 'edit') setText('')
+      if (mode !== 'edit') setDoc({ text: '', ranges: [] })
     } catch (e) {
       const err = toCollabError(e)
       // a deleted target is reported by the host next to the thread, not as a send failure
@@ -280,41 +295,52 @@ export function CollabComposer(props: CollabComposerProps) {
           {strings.collabAiDraftLabel}
         </p>
       ) : null}
-      <textarea
-        ref={taRef}
-        className="collab-composer-input"
-        rows={2}
-        value={text}
-        readOnly={pending}
-        aria-label={label}
-        placeholder={mode === 'edit' ? undefined : label}
-        aria-describedby={describedBy.join(' ')}
-        {...(open
-          ? {
-              role: 'combobox',
-              'aria-expanded': true,
-              'aria-controls': listboxId,
-              'aria-autocomplete': 'list' as const,
-              'aria-activedescendant':
-                effective >= 0 ? mentionOptionId(listboxId, effective) : undefined,
-            }
-          : {})}
-        onChange={(e) => {
-          setFocused(true)
-          setCaret(e.currentTarget.selectionStart)
-          update(e.currentTarget.value)
-        }}
-        onKeyDown={onKeyDown}
-        onKeyUp={(e) => setCaret(e.currentTarget.selectionStart)}
-        onClick={(e) => setCaret(e.currentTarget.selectionStart)}
-        onSelect={(e) => setCaret(e.currentTarget.selectionStart)}
-        onFocus={() => setFocused(true)}
-        onBlur={() => {
-          setFocused(false)
-          // coming back to the box must not reopen a picker the user left
-          if (trigger) setDismissedAt(trigger.start)
-        }}
-      />
+      <div className="collab-composer-field">
+        <div className="collab-composer-mirror" ref={mirrorRef} aria-hidden="true">
+          {mirrorParts(doc)}
+        </div>
+        <textarea
+          ref={taRef}
+          className="collab-composer-input"
+          rows={2}
+          value={text}
+          readOnly={pending}
+          aria-label={label}
+          placeholder={mode === 'edit' ? undefined : label}
+          aria-describedby={describedBy.join(' ')}
+          {...(open
+            ? {
+                role: 'combobox',
+                'aria-expanded': true,
+                'aria-controls': listboxId,
+                'aria-autocomplete': 'list' as const,
+                'aria-activedescendant':
+                  effective >= 0 ? mentionOptionId(listboxId, effective) : undefined,
+              }
+            : {})}
+          onChange={(e) => {
+            setFocused(true)
+            const edit = applyMentionEdit(doc, e.currentTarget.value)
+            const at = edit.mapCaret(e.currentTarget.selectionStart)
+            if (edit.doc.text !== e.currentTarget.value) pendingCaret.current = at
+            setCaret(at)
+            update(edit.doc)
+          }}
+          onScroll={(e) => {
+            if (mirrorRef.current) mirrorRef.current.scrollTop = e.currentTarget.scrollTop
+          }}
+          onKeyDown={onKeyDown}
+          onKeyUp={(e) => setCaret(e.currentTarget.selectionStart)}
+          onClick={(e) => setCaret(e.currentTarget.selectionStart)}
+          onSelect={(e) => setCaret(e.currentTarget.selectionStart)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => {
+            setFocused(false)
+            // coming back to the box must not reopen a picker the user left
+            if (trigger) setDismissedAt(trigger.start)
+          }}
+        />
+      </div>
       {sendError ? (
         <p className="collab-composer-error" id={errorId}>
           {strings.collabSendFailed}
@@ -363,6 +389,19 @@ export function CollabComposer(props: CollabComposerProps) {
         : null}
     </div>
   )
+}
+
+/** the text with each mention range in a `<mark>`; the trailing newline keeps the last line's height */
+function mirrorParts(doc: MentionDoc): ReactNode[] {
+  const parts: ReactNode[] = []
+  let at = 0
+  for (const r of doc.ranges) {
+    if (r.start > at) parts.push(doc.text.slice(at, r.start))
+    parts.push(<mark key={r.start}>{doc.text.slice(r.start, r.end)}</mark>)
+    at = r.end
+  }
+  parts.push(doc.text.slice(at) + '\n')
+  return parts
 }
 
 /** "Discard the draft?" — a modal question; "Keep writing" has the focus */

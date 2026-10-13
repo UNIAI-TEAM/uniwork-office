@@ -3,6 +3,7 @@
  * trigger starts, what the query is, and how a picked person replaces it.
  * The picker itself lives in MentionPicker.tsx; nothing here touches the DOM.
  */
+import { parseBody } from './body'
 
 /** wait after the last key before asking the server (spine S14) */
 export const MENTION_DEBOUNCE_MS = 150
@@ -45,5 +46,146 @@ export function insertMention(
   return {
     text: text.slice(0, trigger.start) + inserted + text.slice(caret),
     caret: trigger.start + inserted.length,
+  }
+}
+
+/**
+ * A picked or pasted mention as the composer holds it: the textarea shows `@label`, the range
+ * says which characters are that mention, and `raw` is the token the stored body carries.
+ */
+export interface MentionRange {
+  /** index of the `@` in the displayed text */
+  start: number
+  /** end of `@label` in the displayed text (exclusive) */
+  end: number
+  id: string
+  label: string
+  /** `[@label](mention://member/<id>)` exactly as it goes into the body */
+  raw: string
+}
+
+export interface MentionDoc {
+  /** what the textarea shows */
+  text: string
+  /** sorted, non-overlapping */
+  ranges: MentionRange[]
+}
+
+const displayOf = (label: string) => `@${label}`
+
+/** The displayed form of a stored body: top-level mention tokens become `@Name` + a range. */
+export function mentionDocFromBody(body: string): MentionDoc {
+  if (!body.includes('mention://member/')) return { text: body, ranges: [] }
+  let text = ''
+  const ranges: MentionRange[] = []
+  for (const token of parseBody(body)) {
+    if (token.type === 'mention') {
+      const shown = displayOf(token.label)
+      ranges.push({
+        start: text.length,
+        end: text.length + shown.length,
+        id: token.userId,
+        label: token.label,
+        raw: token.raw,
+      })
+      text += shown
+    } else {
+      text += token.raw
+    }
+  }
+  return { text, ranges }
+}
+
+/** The body to store or send: every range goes back to its token, the rest is verbatim. */
+export function mentionDocToBody(doc: MentionDoc): string {
+  let out = ''
+  let at = 0
+  for (const r of doc.ranges) {
+    out += doc.text.slice(at, r.start) + r.raw
+    at = r.end
+  }
+  return out + doc.text.slice(at)
+}
+
+/**
+ * Carry the ranges across one replacement of `text[from, to)` by `inserted` characters:
+ * a range wholly before it stays, one wholly after it shifts, one the edit touches is dropped
+ * (its characters stay as plain text).
+ */
+function shiftRanges(
+  ranges: MentionRange[],
+  from: number,
+  to: number,
+  inserted: number,
+): MentionRange[] {
+  const delta = inserted - (to - from)
+  const out: MentionRange[] = []
+  for (const r of ranges) {
+    if (r.end <= from) out.push(r)
+    else if (r.start >= to) out.push({ ...r, start: r.start + delta, end: r.end + delta })
+  }
+  return out
+}
+
+/**
+ * The doc after the user changed the textarea from `prev.text` to `next`. The edit is the
+ * region between the common prefix and suffix; ranges follow as in `shiftRanges`, and pasted
+ * text that holds mention tokens is converted to `@Name` + ranges. `mapCaret` translates a
+ * caret of `next` into the displayed text when a conversion changed its length.
+ */
+export function applyMentionEdit(
+  prev: MentionDoc,
+  next: string,
+): { doc: MentionDoc; mapCaret(caret: number): number } {
+  const same = (caret: number) => caret
+  let p = 0
+  const max = Math.min(prev.text.length, next.length)
+  while (p < max && prev.text.charCodeAt(p) === next.charCodeAt(p)) p++
+  let s = 0
+  while (
+    s < max - p &&
+    prev.text.charCodeAt(prev.text.length - 1 - s) === next.charCodeAt(next.length - 1 - s)
+  ) {
+    s++
+  }
+  const delEnd = prev.text.length - s
+  const insEnd = next.length - s
+  // a range whose characters no longer read `@label` is stale (never trust it)
+  const live = prev.ranges.filter((r) => prev.text.slice(r.start, r.end) === displayOf(r.label))
+  const ins = next.slice(p, insEnd)
+  const conv = mentionDocFromBody(ins)
+  const kept = shiftRanges(live, p, delEnd, conv.text.length)
+  const added = conv.ranges.map((r) => ({ ...r, start: r.start + p, end: r.end + p }))
+  const ranges = [...kept, ...added].sort((a, b) => a.start - b.start)
+  const text = next.slice(0, p) + conv.text + next.slice(insEnd)
+  if (conv.text.length === ins.length) return { doc: { text, ranges }, mapCaret: same }
+  const diff = conv.text.length - ins.length
+  return {
+    doc: { text, ranges },
+    mapCaret: (caret) =>
+      caret >= insEnd ? caret + diff : caret > p ? p + conv.text.length : caret,
+  }
+}
+
+/** A person picked for `trigger` (`@query` up to `caret`): `@Name` + one space, a new range, caret after the space. */
+export function pickMention(
+  doc: MentionDoc,
+  trigger: MentionTrigger,
+  caret: number,
+  who: { id: string; label: string; raw: string },
+): { doc: MentionDoc; caret: number } {
+  const shown = displayOf(who.label)
+  const out = insertMention(doc.text, trigger, caret, shown)
+  const kept = shiftRanges(doc.ranges, trigger.start, caret, shown.length + 1)
+  const range: MentionRange = {
+    start: trigger.start,
+    end: trigger.start + shown.length,
+    id: who.id,
+    label: who.label,
+    raw: who.raw,
+  }
+  return {
+    doc: { text: out.text, ranges: [...kept, range].sort((a, b) => a.start - b.start) },
+    caret: out.caret,
   }
 }
