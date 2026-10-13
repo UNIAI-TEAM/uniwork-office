@@ -94,6 +94,7 @@ describe('the S18 action IPC', () => {
       UNIWORK_DOC_CHANNELS.createDocument,
       UNIWORK_DOC_CHANNELS.pickUploadFile,
       UNIWORK_DOC_CHANNELS.uploadDocument,
+      UNIWORK_DOC_CHANNELS.cancelUpload,
       UNIWORK_DOC_CHANNELS.renameDocument,
       UNIWORK_DOC_CHANNELS.archiveDocument,
       UNIWORK_DOC_CHANNELS.restoreDocument,

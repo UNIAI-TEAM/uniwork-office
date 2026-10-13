@@ -550,6 +550,11 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   ipcMain.handle(UNIWORK_DOC_CHANNELS.uploadDocument, (_event, input: unknown) =>
     service.uploadDocument((input ?? {}) as UniworkUploadDocInput),
   )
+  // S18 cancel: a no-op for an id main does not hold, so a Cancel racing its own
+  // upload's settle (or a stale dialog's) is harmless
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.cancelUpload, (_event, uploadId: unknown) => {
+    if (typeof uploadId === 'string') service.cancelUpload(uploadId)
+  })
   ipcMain.handle(
     UNIWORK_DOC_CHANNELS.renameDocument,
     (_event, documentId: unknown, name: unknown) =>

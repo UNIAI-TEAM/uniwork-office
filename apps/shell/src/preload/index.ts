@@ -199,16 +199,21 @@ function asUniworkResult<T>(result: unknown): UniworkResult<T> {
 
 /**
  * An S18 action result from main: the same shape as UniworkResult, but its
- * error union also carries the two field errors. A malformed payload is a
- * server_error (nothing applied).
+ * error union also carries the two field errors and a cancelled upload. Both
+ * branches are checked the way the other pushes are checked - an `ok:true` must
+ * carry an object `value` (the renderer dereferences `value.title`) and an
+ * `ok:false` a string `error` - so a shape main never meant to send is
+ * `malformed_response` here instead of a crash in the renderer.
  */
 function asUniworkActionResult<T>(result: unknown): UniworkDocActionResult<T> {
-  if (
-    result &&
-    typeof result === 'object' &&
-    typeof (result as { ok?: unknown }).ok === 'boolean'
-  ) {
-    return result as UniworkDocActionResult<T>
+  if (result && typeof result === 'object') {
+    const r = result as { ok?: unknown; value?: unknown; error?: unknown }
+    if (r.ok === true && r.value && typeof r.value === 'object' && !Array.isArray(r.value)) {
+      return result as UniworkDocActionResult<T>
+    }
+    if (r.ok === false && typeof r.error === 'string' && r.error) {
+      return result as UniworkDocActionResult<T>
+    }
   }
   return { ok: false, error: 'malformed_response' }
 }
@@ -236,14 +241,15 @@ function asDocRenamed(raw: unknown): UniworkDocRenamedEvent | null {
   return { documentId: r.documentId, title: r.title }
 }
 
-/** an upload-progress push: a local path plus finite, non-negative byte counts */
+/** an upload-progress push: the upload's own id, a local path and finite, non-negative byte counts */
 function asUploadProgress(raw: unknown): UniworkUploadProgress | null {
   if (!raw || typeof raw !== 'object') return null
   const r = raw as Partial<UniworkUploadProgress>
+  if (typeof r.uploadId !== 'string' || !r.uploadId) return null
   if (typeof r.path !== 'string' || !r.path) return null
   if (typeof r.loaded !== 'number' || !Number.isFinite(r.loaded) || r.loaded < 0) return null
   if (typeof r.total !== 'number' || !Number.isFinite(r.total) || r.total < 0) return null
-  return { path: r.path, loaded: r.loaded, total: r.total }
+  return { uploadId: r.uploadId, path: r.path, loaded: r.loaded, total: r.total }
 }
 
 function asUniworkStatus(result: unknown): UniworkDocStatus | null {
@@ -932,6 +938,10 @@ const homeApi: HomeApi = {
     return () => {
       uploadProgressSubscribers.delete(cb)
     }
+  },
+  async uniworkCancelUploadDocument(uploadId: string) {
+    if (typeof uploadId !== 'string' || !uploadId) return
+    await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.cancelUpload, uploadId)
   },
   async uniworkRenameDocument(documentId: string, name: string) {
     return asUniworkActionResult<UniworkDocSummary>(

@@ -1,12 +1,20 @@
 import { createHash } from 'node:crypto'
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  truncateSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { UniworkDocSummary, UniworkDocStatus } from '../src/shared/home-api'
 import type { DeploymentProfile } from '../src/main/uniwork-auth/deployment'
 import { UniworkDocsService, type ConflictUi } from '../src/main/uniwork-docs/service'
-import { BINDING_FILE } from '../src/main/uniwork-docs/binding-store'
+import { BINDING_FILE, LAST_OWNER_FILE } from '../src/main/uniwork-docs/binding-store'
 import type { FetchLike } from '../src/main/uniwork-docs/client'
 
 /**
@@ -57,6 +65,11 @@ function fakeServer(
     omitMyLevel?: boolean
     /** an older row without the `file` block (omitempty): the title extension decides */
     omitListFile?: boolean
+    /**
+     * holds the upload POST open until it settles, so a test can cancel a
+     * request already in flight (the abort rejects it, as real fetch does)
+     */
+    uploadGate?: () => Promise<void>
   } = {},
 ) {
   const state = {
@@ -130,6 +143,20 @@ function fakeServer(
     }
     // upload (multipart)
     if (u.pathname === `/api/v1/workspaces/${WS}/documents/files`) {
+      // an in-flight request a test cancels mid-POST: fetch rejects an aborted
+      // signal, the body never being read here
+      if (options.uploadGate) {
+        await new Promise<void>((resolve, reject) => {
+          const abort = () => {
+            const error = new Error('The operation was aborted.')
+            error.name = 'AbortError'
+            reject(error)
+          }
+          if (init.signal?.aborted) abort()
+          else init.signal?.addEventListener('abort', abort, { once: true })
+          options.uploadGate!().then(resolve, reject)
+        })
+      }
       const form = init.body as FormData
       const file = form.get('file') as File
       const bytes = new Uint8Array(await file.arrayBuffer())
@@ -428,6 +455,7 @@ describe('upload a file', () => {
       workspaceId: WS,
       folderId: 'fold_1',
       path: picked!.path,
+      uploadId: 'up-1',
     })
     expect(uploaded.ok).toBe(true)
     if (!uploaded.ok) return
@@ -444,11 +472,75 @@ describe('upload a file', () => {
     if (!opened.ok) return
     expect(copiesIn(id)).toHaveLength(1)
     expect(binding(opened.value.path)).toMatchObject({ documentId: id })
-    // progress: a start event and a final one, both for the picked path
-    expect(ctx.progress[0]).toMatchObject({ path: ctx.uploadFile, loaded: 0 })
+    // progress: a start event and a final one, both for the picked path and the
+    // upload they belong to (the dialog filters by uploadId)
+    expect(ctx.progress[0]).toMatchObject({ uploadId: 'up-1', path: ctx.uploadFile, loaded: 0 })
     expect(ctx.progress[0]!.total).toBe(enc('uploaded bytes').byteLength)
-    expect(ctx.progress.at(-1)).toMatchObject({ path: ctx.uploadFile })
+    expect(ctx.progress.at(-1)).toMatchObject({ uploadId: 'up-1', path: ctx.uploadFile })
     expect(ctx.progress.at(-1)!.loaded).toBe(enc('uploaded bytes').byteLength)
+  })
+
+  // R1-10: D stages at most 50 MiB, so a bigger pick is refused before main
+  // reads it (a multi-GB file must not be buffered only to be told too_large).
+  it('refuses a pick past the server 50 MiB stage limit without reading it', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const huge = join(dir, 'huge.bin')
+    writeFileSync(huge, '')
+    truncateSync(huge, 50 * 1024 * 1024 + 1)
+    const result = await ctx.service.uploadDocument({
+      workspaceId: WS,
+      folderId: null,
+      path: huge,
+      uploadId: 'up-big',
+    })
+    expect(result).toEqual({ ok: false, error: 'too_large' })
+    expect(server.calls).toHaveLength(0)
+    expect(ctx.progress).toHaveLength(0)
+  })
+
+  // FX10: the dialog's Cancel aborts the request already in flight; the upload
+  // call answers upload_cancelled rather than the network failure the abort
+  // surfaces as, and no document is created from it.
+  it('cancels a running upload through its uploadId', async () => {
+    let release: () => void = () => undefined
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const server = fakeServer({ uploadGate: () => gate })
+    const ctx = setup(server)
+    const started = ctx.service.uploadDocument({
+      workspaceId: WS,
+      folderId: null,
+      path: ctx.uploadFile,
+      uploadId: 'up-cancel',
+    })
+    // the POST is in flight (the server holds it open)
+    await vi.waitFor(() =>
+      expect(server.calls.some((c) => c.path.endsWith('/documents/files'))).toBe(true),
+    )
+    ctx.service.cancelUpload('up-cancel')
+    release()
+    await expect(started).resolves.toEqual({ ok: false, error: 'upload_cancelled' })
+    // cancelling again (the upload already settled) is a no-op, never a throw
+    ctx.service.cancelUpload('up-cancel')
+    ctx.service.cancelUpload('never-started')
+  })
+
+  it('keeps the created document when the cancel lands after D answered', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const uploaded = await ctx.service.uploadDocument({
+      workspaceId: WS,
+      folderId: null,
+      path: ctx.uploadFile,
+      uploadId: 'up-late',
+    })
+    expect(uploaded.ok).toBe(true)
+    // the dialog's late Cancel names an upload main no longer holds (never a
+    // hidden delete of the document D already created)
+    ctx.service.cancelUpload('up-late')
+    expect(server.calls.some((c) => c.method === 'DELETE')).toBe(false)
   })
 })
 

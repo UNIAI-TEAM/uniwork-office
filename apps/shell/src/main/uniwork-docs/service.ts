@@ -1,5 +1,5 @@
 import { readFileSync, statSync } from 'node:fs'
-import { copyFile, readFile, rename } from 'node:fs/promises'
+import { copyFile, readFile, rename, stat } from 'node:fs/promises'
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import type {
@@ -272,6 +272,33 @@ async function result<T>(run: () => Promise<T>): Promise<UniworkResult<T>> {
 const MAX_DOC_NAME_RUNES = 500
 
 /**
+ * D stages at most 50 MiB per upload part (`files/registry.go`), so a bigger
+ * file is refused before it is read: main must not buffer a multi-GB pick only
+ * to be told too_large. Exactly 50 MiB is still sent.
+ */
+const MAX_UPLOAD_BYTES = 50 * 1024 * 1024
+
+/** the renderer's own id for one upload start; a Cancel names the upload through it */
+const MAX_UPLOAD_ID_LENGTH = 128
+
+/**
+ * The upload id of one upload: a non-empty string the renderer minted. Without
+ * one there is nothing a Cancel could name, so the upload is refused before any
+ * read (the renderer always sends it).
+ */
+function requireUploadId(raw: unknown): string {
+  if (typeof raw !== 'string' || !raw || raw.length > MAX_UPLOAD_ID_LENGTH) {
+    throw new UniworkDocError('not_found')
+  }
+  return raw
+}
+
+/** the upload a Cancel aborted: never part of UniworkDocErrorCode (see its action union) */
+function cancelledUpload(): UniworkDocError {
+  return new UniworkDocError('upload_cancelled' as UniworkDocErrorCode)
+}
+
+/**
  * a trimmed document name of 1..500 runes; the empty and the too-long cases are
  * S18's field errors, not requests. A duplicate name is allowed (FD-D10 a), so
  * there is no uniqueness check here.
@@ -307,10 +334,13 @@ async function actionResult<T>(
 
 function actionErrorOf(error: unknown, nameField: boolean): UniworkDocActionError {
   if (error instanceof UniworkDocError) {
-    // the name errors are carried on the error's `code` even though they are not
-    // part of UniworkDocErrorCode; the cast is the one place that bridges them
+    // the name errors and a cancelled upload are carried on the error's `code`
+    // even though they are not part of UniworkDocErrorCode; the cast is the one
+    // place that bridges them
     const code = error.code as string
-    if (code === 'name_empty' || code === 'name_too_long') return code
+    if (code === 'name_empty' || code === 'name_too_long' || code === 'upload_cancelled') {
+      return code
+    }
     if (nameField && error.status === 400 && error.serverCode === 'invalid_request') {
       return 'name_too_long'
     }
@@ -390,6 +420,12 @@ export class UniworkDocsService {
    * write coming back, so it must not re-publish the rename a second time.
    */
   private readonly selfRenamed = new Set<string>()
+  /**
+   * S18: the in-flight uploads by the renderer's own `uploadId`, so the dialog's
+   * Cancel can abort the one it started (the read, or the POST already running).
+   * An entry lives exactly as long as its upload call.
+   */
+  private readonly uploads = new Map<string, AbortController>()
 
   constructor(deps: UniworkDocsServiceDeps) {
     this.deps = deps
@@ -1123,37 +1159,81 @@ export class UniworkDocsService {
   }
 
   /**
-   * Upload one local file as a UniWork document. Main reads the bytes, sends
-   * them as the multipart `file` part and reports progress; the title is the
-   * file name (the server's own default). Nothing is written locally: the
-   * working copy is the download the open flow makes from the created document.
+   * Upload one local file as a UniWork document. Main stats the file first (a
+   * pick past the server's 50 MiB stage limit is refused unread with
+   * `too_large`), reads the bytes and sends them as the multipart `file` part
+   * while reporting progress; the title is the file name (the server's own
+   * default). Nothing is written locally: the working copy is the download the
+   * open flow makes from the created document.
+   *
+   * The upload is reachable for the dialog's Cancel through its own `uploadId`:
+   * `cancelUpload` aborts the read and the POST, and this call then answers
+   * `upload_cancelled`. An abort that lands after D already answered 2xx is
+   * ignored - the created document is returned as usual (never a hidden delete).
    */
   uploadDocument(input: UniworkUploadDocInput): Promise<UniworkDocActionResult<UniworkDocSummary>> {
     return actionResult(async () => {
       if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
       const target = this.docTarget(input)
+      const uploadId = requireUploadId(input.uploadId)
       if (typeof input.path !== 'string' || !input.path) throw new UniworkDocError('not_found')
       const filename = basename(input.path)
       if (!filename) throw new UniworkDocError('not_found')
-      let bytes: Uint8Array
+      let size: number
       try {
-        bytes = new Uint8Array(await readFile(input.path))
-      } catch {
-        throw new UniworkDocError('not_found')
+        const info = await stat(input.path)
+        if (!info.isFile()) throw new UniworkDocError('not_found')
+        size = info.size
+      } catch (error) {
+        throw error instanceof UniworkDocError ? error : new UniworkDocError('not_found')
       }
-      const total = bytes.byteLength
-      this.deps.pushUploadProgress?.({ path: input.path, loaded: 0, total })
-      const created = await this.api().createFile({
-        workspaceId: target.workspaceId,
-        bytes,
-        filename,
-        title: filename,
-        parentId: target.folderId,
-        idempotencyKey: this.newIdempotencyKey(),
-      })
-      this.deps.pushUploadProgress?.({ path: input.path, loaded: total, total })
-      return created
+      if (size > MAX_UPLOAD_BYTES) throw new UniworkDocError('too_large')
+      const controller = new AbortController()
+      this.uploads.set(uploadId, controller)
+      try {
+        let bytes: Uint8Array
+        try {
+          bytes = new Uint8Array(await readFile(input.path, { signal: controller.signal }))
+        } catch {
+          if (controller.signal.aborted) throw cancelledUpload()
+          throw new UniworkDocError('not_found')
+        }
+        const total = bytes.byteLength
+        this.deps.pushUploadProgress?.({ uploadId, path: input.path, loaded: 0, total })
+        const created = await this.api()
+          .createFile({
+            workspaceId: target.workspaceId,
+            bytes,
+            filename,
+            title: filename,
+            parentId: target.folderId,
+            idempotencyKey: this.newIdempotencyKey(),
+            signal: controller.signal,
+          })
+          .catch((error: unknown) => {
+            // the person cancelled while the POST was in flight: that is the
+            // answer, not the network failure the abort surfaced as
+            if (controller.signal.aborted) throw cancelledUpload()
+            throw error
+          })
+        this.deps.pushUploadProgress?.({ uploadId, path: input.path, loaded: total, total })
+        return created
+      } finally {
+        // a newer upload with the same id (never minted twice) keeps its controller
+        if (this.uploads.get(uploadId) === controller) this.uploads.delete(uploadId)
+      }
     })
+  }
+
+  /**
+   * S18: the dialog's Cancel/Esc. The abort ends this upload's file read or its
+   * running POST (whichever it is in); the upload call answers
+   * `upload_cancelled`. An unknown or already-finished id is a no-op, so a
+   * Cancel racing its own upload's settle is harmless.
+   */
+  cancelUpload(uploadId: string): void {
+    if (typeof uploadId !== 'string' || !uploadId) return
+    this.uploads.get(uploadId)?.abort()
   }
 
   /** S18: main shows the native open dialog for an upload */

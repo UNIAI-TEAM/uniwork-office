@@ -92,7 +92,7 @@ export interface UniworkDocsClient {
     parentId: string | null
     idempotencyKey: string
   }): Promise<UniworkDocSummary>
-  /** create one file document from local bytes (S18 upload) */
+  /** create one file document from local bytes (S18 upload); `signal` aborts the POST */
   createFile(input: {
     workspaceId: string
     bytes: Uint8Array
@@ -183,6 +183,8 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
     json?: unknown
     form?: FormData
     idempotencyKey?: string
+    /** the caller's abort (S18 upload cancel): aborts the request like a timeout */
+    signal?: AbortSignal
     timeoutMs: number
     read(response: Response): Promise<T>
   }
@@ -206,6 +208,13 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
           timedOut = true
           controller.abort()
         }, call.timeoutMs)
+        // the caller's own abort rides the same controller as the deadline: one
+        // signal ends the request body included, whatever started it
+        const abortFromCaller = () => controller.abort()
+        if (call.signal) {
+          if (call.signal.aborted) controller.abort()
+          else call.signal.addEventListener('abort', abortFromCaller, { once: true })
+        }
         try {
           let response: Response
           try {
@@ -250,6 +259,7 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
           }
         } finally {
           clearTimeout(timer)
+          call.signal?.removeEventListener('abort', abortFromCaller)
         }
       })
     } catch (error) {
@@ -371,6 +381,7 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
         route: `/workspaces/${id(input.workspaceId)}/documents/files`,
         form,
         idempotencyKey: input.idempotencyKey,
+        ...(input.signal ? { signal: input.signal } : {}),
         timeoutMs: transferTimeout,
         read: json,
       })

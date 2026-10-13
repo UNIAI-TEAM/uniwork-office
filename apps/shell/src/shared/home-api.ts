@@ -232,11 +232,13 @@ export interface UniworkDocProperties {
 /** errors a name field shows in place; every other failure is a toast */
 export type UniworkDocNameError = 'name_empty' | 'name_too_long'
 /**
- * What a create/rename/archive call may fail with. `name_empty` / `name_too_long`
- * are S18 field errors; they are NOT part of `UniworkDocErrorCode` because that
- * union is switched on exhaustively by the renderer's error copy table.
+ * What a create/rename/archive/upload call may fail with. `name_empty` /
+ * `name_too_long` are S18 field errors and `upload_cancelled` is an upload the
+ * person aborted; none of them is part of `UniworkDocErrorCode`, because that
+ * union is switched on exhaustively by the renderer's error copy table (a
+ * cancelled upload is not an error to show at all).
  */
-export type UniworkDocActionError = UniworkDocErrorCode | UniworkDocNameError
+export type UniworkDocActionError = UniworkDocErrorCode | UniworkDocNameError | 'upload_cancelled'
 export type UniworkDocActionResult<T> =
   { ok: true; value: T } | { ok: false; error: UniworkDocActionError }
 
@@ -256,6 +258,11 @@ export interface UniworkUploadDocInput {
   folderId: string | null
   /** the local file main's dialog returned; main reads the bytes and uploads them */
   path: string
+  /**
+   * renderer-minted, unique per upload start: `uniworkCancelUploadDocument`
+   * names the upload it aborts through this id (never a path).
+   */
+  uploadId: string
 }
 
 /** one folder the "Location" field of the create/upload dialog offers */
@@ -267,6 +274,8 @@ export interface UniworkDocFolderRef {
 
 /** upload progress: bytes sent of the total (0 when the total is not known yet) */
 export interface UniworkUploadProgress {
+  /** the upload this event belongs to (the dialog's own `uploadId`) */
+  uploadId: string
   path: string
   loaded: number
   total: number
@@ -723,6 +732,12 @@ export interface HomeApi {
   ): Promise<UniworkDocActionResult<UniworkDocSummary>>
   /** bytes sent while an upload runs; returns an unsubscribe */
   onUniworkUploadProgress(cb: (event: UniworkUploadProgress) => void): () => void
+  /**
+   * S18: abort the running upload started with this `uploadId` (Cancel/Esc of
+   * the dialog). The upload then answers `upload_cancelled`; an id main does
+   * not hold - already finished, or a stale dialog - is a no-op.
+   */
+  uniworkCancelUploadDocument(uploadId: string): Promise<void>
   /** S18: rename a document (the server keeps the title) */
   uniworkRenameDocument(
     documentId: string,
@@ -1338,6 +1353,8 @@ export const UNIWORK_DOC_CHANNELS = {
   uploadDocument: 'uniwork-doc:upload-document',
   /** push -> upload bytes sent of the total (S18) */
   uploadProgress: 'uniwork-doc:upload-progress',
+  /** invoke(uploadId) -> abort a running upload; an unknown/finished id is a no-op (S18) */
+  cancelUpload: 'uniwork-doc:cancel-upload',
   /** invoke(documentId, name) -> rename (S18) */
   renameDocument: 'uniwork-doc:rename-document',
   /** invoke(documentId) -> archive (S18; there is no delete) */
