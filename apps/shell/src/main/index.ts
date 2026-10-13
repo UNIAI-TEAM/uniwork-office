@@ -3825,7 +3825,7 @@ function uniworkDocsWiring() {
     // the shell re-keys the tab, the recents/project entries and tells the
     // editor - exactly the path a Home-list rename takes (the desktop host's
     // equivalent of the X-02 `file.renamed` frame event)
-    notifyPathRenamed: (oldPath, newPath) => afterFileMoved(oldPath, newPath),
+    notifyPathRenamed: (oldPath: string, newPath: string) => afterFileMoved(oldPath, newPath),
   }
 }
 
