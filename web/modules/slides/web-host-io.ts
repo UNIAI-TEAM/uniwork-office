@@ -78,6 +78,8 @@ export interface WebDocState {
   holdHostSave: (() => void) | null
   /** the effective capabilities from `init` (`download` for the conflict dialog) */
   effective: Capabilities | undefined
+  /** `init.downloadMaxBytes` (X-02 r2b): the largest file the host's `api.download` accepts */
+  downloadCap: () => number | undefined
   remember(file: FileMeta): void
 }
 
@@ -91,6 +93,7 @@ export function createDocState(): WebDocState {
     hostAnswer: null,
     holdHostSave: null,
     effective: undefined,
+    downloadCap: () => undefined,
     remember(file) {
       files.set(file.fileId, { ...files.get(file.fileId), ...file })
     },
@@ -304,7 +307,10 @@ export function createWebHostIO(deps: WebHostDeps): HostIO {
       // the host's grant now AND the file's own flag for the current token (as the Docs bridge)
       canEdit: () =>
         deps.capabilities.save !== false && deps.state.files.get(fileId)?.writable !== false,
-      download: downloadVia(deps.port, deps.state.effective, () => bytes),
+      download: downloadVia(deps.port, deps.state.effective, () => bytes, {
+        size: bytes.byteLength,
+        maxBytes: deps.state.downloadCap(),
+      }),
       markerAttr: 'data-slides-web',
     })
     const file = deps.state.files.get(fileId)

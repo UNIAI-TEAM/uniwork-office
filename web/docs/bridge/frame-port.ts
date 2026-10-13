@@ -38,6 +38,8 @@ export interface PortSession {
   user?: InitUser
   /** the host's draft-recovery grant from `init.recovery` (CONTRACT C18); absent = recovery off */
   recovery?: InitRecovery
+  /** `init.downloadMaxBytes` (X-02 r2b): the largest file `api.download` accepts; absent = unknown */
+  downloadMaxBytes?: number
   /** `init.apiBase` (additive, C16: the frame-token AI routes live under it); absent in tests */
   apiBase?: string
 }

@@ -342,9 +342,14 @@ describe('markdownApi: save conflicts', () => {
     await granted.res
   })
 
-  it('a cap at least as large as my version leaves the download choice enabled', async () => {
-    const { text } = { text: new TextDecoder().decode(FIXTURE) }
-    const size = new TextEncoder().encode(`${text}x`).byteLength
+  it('a cap equal to my version leaves the download choice enabled', async () => {
+    // measure the Save the dialog holds: overwrite it once and read what was sent
+    const probe = await hostConflict()
+    await click('overwrite')
+    await click('go')
+    await probe.res
+    const size = lastSave(probe.mock)!.data.byteLength
+    document.body.replaceChildren()
     const granted = await hostConflict({ ...FULL, download: true }, size)
     await click('reload')
     await vi.waitFor(() =>

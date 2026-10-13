@@ -84,6 +84,7 @@ import { bridgeDraftRecovery, bridgeRecoveryGrant } from '../shared/recovery-pro
 import { saveFailureText } from '../shared/save-failure'
 import {
   conflictSaveResult,
+  bridgeDownloadCap,
   downloadVia,
   headFromFile,
   overwriteHead,
@@ -221,6 +222,8 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
   let initDocumentId: string | null = null
   /** the effective capabilities from `init` (`download` for the conflict dialog) */
   let effective: Capabilities | undefined
+  /** `init.downloadMaxBytes`: the largest file the host's `api.download` accepts (X-02 r2b) */
+  const downloadCap = bridgeDownloadCap(port)
   /** stops the host save's renderer timer (the conflict dialog may stay open for long) */
   let holdRendererSave: (() => void) | null = null
   let saveRequestProvider: (() => SavePdfRequest | null) | null = null
@@ -425,7 +428,10 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
         return true
       },
       canEdit: () => can('edit'),
-      download: downloadVia(port, effective, () => bytes),
+      download: downloadVia(port, effective, () => bytes, {
+        size: bytes.byteLength,
+        maxBytes: downloadCap(),
+      }),
       markerAttr: 'data-pdf-web',
     })
     if (hostSave && doc) hostSave.answer = conflictSaveResult(outcome, { ...doc.file })
