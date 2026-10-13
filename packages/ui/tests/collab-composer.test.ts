@@ -474,7 +474,7 @@ describe('mention picker in the composer', () => {
     render()
     await openPicker()
     act(() => (listbox()!.querySelectorAll('[role=option]')[1] as HTMLElement).click())
-    expect(ta().value).toContain('[@Mai Hương](')
+    expect(ta().value).toContain('@Mai Hương ')
   })
 
   it('Esc closes the picker first and keeps the text; the next Esc cancels', async () => {
