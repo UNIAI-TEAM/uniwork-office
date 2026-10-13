@@ -5,7 +5,7 @@ import type { UniworkWorkspaceRef } from '../../shared/home-api'
 import type { UniworkWorkError } from '../../shared/uniwork-work-api'
 import { NotesPane } from './NotesPane'
 import { LocalTag } from './LocalTag'
-import { useI18n } from './locale'
+import { useI18n, type StringKey } from './locale'
 import { WorkProfilePane } from './WorkProfilePane'
 import { escapeHtml, profileForDraft, profileMergeHtml } from './form-merge'
 import { WorkCalendarPane } from './WorkCalendarPane'
@@ -103,7 +103,10 @@ function FormsPane({
     fileName: string
     fileExt: string
   } | null>(null)
-  const [uploadNotice, setUploadNotice] = useState<string | null>(null)
+  // a key (translated at render, so a language switch applies) or the main process's own text
+  const [uploadNotice, setUploadNotice] = useState<{ key: StringKey } | { text: string } | null>(
+    null,
+  )
 
   useEffect(() => {
     setItems(readForms(practiceId))
@@ -145,7 +148,9 @@ function FormsPane({
     if (!result) return
     const accepted = result.accepted[0]
     if (!accepted) {
-      setUploadNotice(result.rejected[0] || t('wbFormsNoSupportedFile'))
+      setUploadNotice(
+        result.rejected[0] ? { text: result.rejected[0] } : { key: 'wbFormsNoSupportedFile' },
+      )
       window.setTimeout(() => setUploadNotice(null), 4000)
       return
     }
@@ -260,7 +265,11 @@ function FormsPane({
             {t('wbFormsTemplateFile')} {draftFile.fileName}
           </p>
         ) : null}
-        {uploadNotice ? <p className="wb-hint">{uploadNotice}</p> : null}
+        {uploadNotice ? (
+          <p className="wb-hint">
+            {'key' in uploadNotice ? t(uploadNotice.key) : uploadNotice.text}
+          </p>
+        ) : null}
         <div className="wb-chip-row">
           <button type="button" className="btn btn-primary" onClick={save}>
             {editingId ? t('wbFormsSave') : t('wbFormsAdd')}
