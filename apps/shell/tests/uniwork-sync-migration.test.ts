@@ -238,6 +238,14 @@ describe('migrateLegacyIntents', () => {
     const plainBefore = readFileSync(join(plainDir, BINDING_FILE), 'utf8')
     const brokenDir = copyDir('broken')
     writeFileSync(join(brokenDir, BINDING_FILE), 'not json')
+    // R2-be-1: the payload beside an unreadable binding must survive the sweep
+    // exactly like the binding itself
+    writeFileSync(join(brokenDir, INTENT_PAYLOAD_FILE), PAYLOAD)
+    const brokenSnapshot = () =>
+      readdirSync(brokenDir)
+        .sort()
+        .map((name) => [name, readFileSync(join(brokenDir, name), 'utf8')] as const)
+    const brokenBefore = brokenSnapshot()
 
     const layer = makeLayer()
     const report = await migrateLegacyIntents({
@@ -255,6 +263,8 @@ describe('migrateLegacyIntents', () => {
     // a schema-1 copy without an intent is untouched (it upgrades on its next write)
     expect(readFileSync(join(plainDir, BINDING_FILE), 'utf8')).toBe(plainBefore)
     expect(readFileSync(join(brokenDir, BINDING_FILE), 'utf8')).toBe('not json')
+    // byte for byte, payload included: the unreadable folder is left alone
+    expect(brokenSnapshot()).toEqual(brokenBefore)
   })
 
   it('leaves a newer or unclassifiable store and its payload byte-for-byte alone (R1-be-9)', async () => {
