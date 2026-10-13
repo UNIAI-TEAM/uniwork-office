@@ -2485,6 +2485,8 @@ export function App({
             recordSheetRename(state.editJournal, params.subUnitId, params.name, originalName)
             if (previousName !== undefined && previousName !== params.name) {
               renameChartRefsForSheet(state, previousName, params.name)
+              // server comment / in-file labels name the live sheet
+              serverAnchorStore.sheetRenamed(params.subUnitId)
             }
           }
           setPendingEdits(journalSize(state.editJournal))

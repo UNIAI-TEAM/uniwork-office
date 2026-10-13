@@ -198,8 +198,11 @@ export class ServerAnchorStore {
   private entries = new Map<string, Located | null>()
   /** the list's anchor objects -> comment id: the kit adapter sees anchors, not ids */
   private byAnchor = new WeakMap<CollabAnchor, string>()
+  /** stable sheet id -> the last name this workbook showed for it (labels of sheets gone since) */
+  private knownNames = new Map<string, string>()
   private listeners = new Set<Listener>()
   private version = 0
+  private epoch = 0
 
   subscribe = (listener: Listener): (() => void) => {
     this.listeners.add(listener)
@@ -208,12 +211,26 @@ export class ServerAnchorStore {
 
   getVersion = (): number => this.version
 
-  /** another workbook opened: nothing carries over */
+  /** bumps on every reset: the panel re-tracks its listed roots against the reopened workbook */
+  getEpoch = (): number => this.epoch
+
+  /** another workbook opened (or the same one reopened without a Save): nothing carries over */
   reset(): void {
     this.byAnchor = new WeakMap()
-    if (this.entries.size === 0) return
     this.entries = new Map()
+    this.knownNames = new Map()
+    this.epoch += 1
     this.bump()
+  }
+
+  /** a sheet was renamed (or its name changed otherwise): labels must be recomputed */
+  sheetRenamed(_sheetId: string): void {
+    this.bump()
+  }
+
+  /** the last name a stable sheet id had in this workbook, when it had one */
+  knownName(stableId: string): string | undefined {
+    return this.knownNames.get(stableId)
   }
 
   /**
@@ -238,10 +255,14 @@ export class ServerAnchorStore {
 
   /**
    * The latest server roots: a new id is located once from its server anchor (a server-lost one
-   * stays lost); a known id keeps its live location. True when anything changed.
+   * stays lost); a known id keeps its live location. True when anything changed. Also remembers
+   * the names of the workbook's stable sheet ids for labels.
    */
   track(roots: readonly TrackedRoot[], sheets: readonly LiveSheet[]): boolean {
     let changed = false
+    for (const sheet of sheets) {
+      if (sheet.stableId) this.knownNames.set(sheet.stableId, sheet.name)
+    }
     for (const root of roots) {
       const anchor = asXlsxAnchor(root.anchor)
       if (!anchor || root.deleted) continue
@@ -251,6 +272,9 @@ export class ServerAnchorStore {
         changed = true
       }
       if (this.entries.has(root.id)) continue
+      // no sheets yet (a list that lands before the workbook is in Univer): not located yet, which
+      // is not lost; the id stays untracked and the next track locates it
+      if (sheets.length === 0 && root.anchor_state !== 'lost') continue
       this.entries.set(
         root.id,
         root.anchor_state === 'lost' ? null : locateXlsxAnchor(sheets, anchor),

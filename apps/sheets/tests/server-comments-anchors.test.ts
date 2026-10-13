@@ -249,7 +249,8 @@ describe('the kit anchor adapter', () => {
     const { adapter } = setup()
     expect(adapter.activeSheet?.()).toBe('Summary')
     expect(adapter.sheetName?.('sheet-2')).toBe('Data')
-    expect(adapter.sheetName?.('sheet-9')).toBeUndefined()
+    // V13-3: a stable id the workbook never had labels as the bare cell (the active sheet's name)
+    expect(adapter.sheetName?.('sheet-9')).toBe('Summary')
   })
 })
 

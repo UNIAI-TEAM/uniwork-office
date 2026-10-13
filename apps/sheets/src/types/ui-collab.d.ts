@@ -4,7 +4,8 @@
  * (exactOptionalPropertyTypes/noUncheckedIndexedAccess). tsconfig paths point type resolution here;
  * the runtime bundle and the tests still use the real kit. Only the part the server-comment panel
  * uses is declared; keep the signatures in sync with packages/ui/src/collab (types.ts,
- * use-collab-threads.ts, uniwork-source.ts, CollabPanel.tsx, CollabThread.tsx, strings.ts).
+ * use-collab-threads.ts, uniwork-source.ts, CollabPanel.tsx, CollabThread.tsx, strings.ts,
+ * live-region.ts); `type-checks/ui-collab-shim.ts` fails `npm run typecheck` when they drift.
  */
 import type { ReactElement, ReactNode } from 'react'
 import type { Lang } from '@genoffice/i18n'
@@ -37,11 +38,33 @@ export interface CollabComment {
   [k: string]: unknown
 }
 
+export interface CollabMention {
+  user_id: string
+  display_name?: string | undefined
+  avatar_url?: string | undefined
+  state: 'ok' | 'unavailable'
+}
+
 export interface CollabListResult {
   comments: CollabComment[]
-  mentions: unknown[]
+  mentions: CollabMention[]
   list_token: string
   unchanged: boolean
+}
+
+export interface CollabRevision {
+  id: string
+  revision: number
+  body: string
+  created_by_id: string | null
+  created_at: string
+}
+
+export interface CollabCandidate {
+  user_id: string
+  display_name: string
+  avatar_url?: string | undefined
+  email?: string | undefined
 }
 
 export interface CollabAnchorUpdate {
@@ -74,8 +97,8 @@ export interface CollabSource {
   remove(p: { comment_id: string }): Promise<{ outcome: 'tombstoned' | 'removed' }>
   resolve(p: { comment_id: string }): Promise<{ comment: CollabComment }>
   reopen(p: { comment_id: string }): Promise<{ comment: CollabComment }>
-  revisions(p: { comment_id: string }): Promise<{ revisions: unknown[] }>
-  searchMentions(p: { q: string; limit?: number }): Promise<{ candidates: unknown[] }>
+  revisions(p: { comment_id: string }): Promise<{ revisions: CollabRevision[] }>
+  searchMentions(p: { q: string; limit?: number }): Promise<{ candidates: CollabCandidate[] }>
   anchors?(p: { version_id: string; anchors: CollabAnchorUpdate[] }): Promise<CollabAnchorsResult>
 }
 
@@ -109,7 +132,7 @@ export interface UniworkCommentsLike {
     path: string
     kind?: CollabKind
     sinceToken?: string
-  }): Promise<CollabReply<unknown>>
+  }): Promise<CollabReply<CollabListResult>>
   create(input: {
     path: string
     kind: CollabKind
@@ -117,18 +140,38 @@ export interface UniworkCommentsLike {
     body: string
     anchor?: Record<string, unknown>
     baseVersionId?: string
-  }): Promise<CollabReply<unknown>>
-  update(input: { path: string; commentId: string; body: string }): Promise<CollabReply<unknown>>
-  remove(input: { path: string; commentId: string }): Promise<CollabReply<unknown>>
-  resolve(input: { path: string; commentId: string }): Promise<CollabReply<unknown>>
-  reopen(input: { path: string; commentId: string }): Promise<CollabReply<unknown>>
-  revisions(input: { path: string; commentId: string }): Promise<CollabReply<unknown>>
+  }): Promise<CollabReply<{ comment: CollabComment }>>
+  update(input: {
+    path: string
+    commentId: string
+    body: string
+  }): Promise<CollabReply<{ comment: CollabComment }>>
+  remove(input: {
+    path: string
+    commentId: string
+  }): Promise<CollabReply<{ outcome: 'tombstoned' | 'removed' }>>
+  resolve(input: {
+    path: string
+    commentId: string
+  }): Promise<CollabReply<{ comment: CollabComment }>>
+  reopen(input: {
+    path: string
+    commentId: string
+  }): Promise<CollabReply<{ comment: CollabComment }>>
+  revisions(input: {
+    path: string
+    commentId: string
+  }): Promise<CollabReply<{ revisions: CollabRevision[] }>>
   anchors(input: {
     path: string
     versionId: string
-    anchors: CollabAnchorUpdate[]
-  }): Promise<CollabReply<unknown>>
-  searchMentions(input: { path: string; q: string; limit?: number }): Promise<CollabReply<unknown>>
+    anchors: Array<{ commentId: string; anchor: Record<string, unknown>; state: 'exact' | 'lost' }>
+  }): Promise<CollabReply<CollabAnchorsResult>>
+  searchMentions(input: {
+    path: string
+    q: string
+    limit?: number
+  }): Promise<CollabReply<{ candidates: CollabCandidate[] }>>
 }
 
 export function createUniworkCommentsSource(
@@ -150,6 +193,8 @@ export function sendAnchorMap(
 export const COMMENTS_REVEAL_WAIT_MS: number
 /** the window's polite live region (the kit creates it on first use) */
 export const COLLAB_LIVE_REGION_ID: string
+/** say `text` in the window's polite live region */
+export function announcePolite(text: string, doc?: Document): void
 
 export type CollabStrings = Readonly<Record<string, string>>
 export type CollabAllStrings = Readonly<Record<string, string>>
@@ -206,10 +251,17 @@ export interface CollabComposerSlot {
   source: CollabSource
   mode: 'root' | 'reply' | 'discussion'
   draftKey: string
-  [k: string]: unknown
+  disabledReason?: 'status' | undefined
+  statusLineId?: string | undefined
+  onSubmit(body: string): Promise<void>
+  onCancel(): void
+  autoFocus?: boolean | undefined
 }
 
-export function CollabComposer(props: CollabComposerSlot & { strings: CollabStrings }): ReactElement
+/** `strings`: what `collabStrings(lang)` returns (it carries the composer's keys) */
+export function CollabComposer(
+  props: CollabComposerSlot & { strings: CollabAllStrings },
+): ReactElement
 
 export interface CollabPanelProps {
   controller: CollabController

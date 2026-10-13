@@ -8,9 +8,11 @@
  * kit's own options (`tsconfig.collab-shim.json`, run by `npm run typecheck`) and fails when they
  * drift:
  * - data shapes: the shim's members and the kit's same members are mutually assignable;
- * - functions and components: the kit's value is assignable to the shim's declaration (every call
- *   Sheets makes through the shim is a valid call of the kit, and what the kit returns satisfies
- *   what Sheets reads).
+ * - functions: the kit's value is assignable to the shim's declaration (every call Sheets makes
+ *   through the shim is a valid call of the kit, and what the kit returns satisfies what Sheets
+ *   reads);
+ * - components: the props Sheets passes are valid kit props (the controller and the composer slot
+ *   are always the kit's own objects, passed through).
  */
 import type * as Kit from '@genoffice/ui/collab'
 import * as KitValues from '@genoffice/ui/collab'
@@ -25,7 +27,7 @@ export type DataShapes = [
   Assert<Mutual<Shim.CollabLevel, Kit.CollabLevel>>,
   Assert<Mutual<Shim.CollabKind, Kit.CollabKind>>,
   Assert<Mutual<Shim.CollabAnchor, Kit.CollabAnchor>>,
-  Assert<SameOn<Shim.CollabComment, Kit.CollabComment>>,
+  Assert<Mutual<Shim.CollabComment, Kit.CollabComment>>,
   Assert<SameOn<Shim.CollabListResult, Kit.CollabListResult>>,
   Assert<Mutual<Shim.CollabAnchorUpdate, Kit.CollabAnchorUpdate>>,
   Assert<Mutual<Shim.CollabAnchorsResult, Kit.CollabAnchorsResult>>,
@@ -40,7 +42,18 @@ export type DataShapes = [
   Assert<Mutual<Shim.CollabNewThread, Kit.CollabNewThread>>,
   Assert<SameOn<Shim.CollabControllerOptions, Kit.CollabControllerOptions>>,
   Assert<SameOn<Shim.CollabInFileSlot, Kit.CollabInFileSlot>>,
+  // the panel props Sheets sets; `controller` is always the object `useCollabThreads` returned
+  Assert<SameOn<Omit<Shim.CollabPanelProps, 'controller'>, Kit.CollabPanelProps>>,
 ]
+
+// the composer slot the kit hands over is what Sheets spreads into the kit composer
+export const slot = (s: Kit.CollabComposerSlot): Shim.CollabComposerSlot => s
+export const composer = (
+  s: Kit.CollabComposerSlot,
+  lang: Parameters<typeof Shim.collabStrings>[0],
+) => KitValues.CollabComposer({ ...s, strings: KitValues.collabStrings(lang) })
+export const panel = (p: Omit<Shim.CollabPanelProps, 'controller'>, c: Kit.CollabController) =>
+  KitValues.CollabPanel({ ...p, controller: c })
 
 // what the kit's controller gives Sheets covers what the shim says Sheets reads
 export const controller = (c: Kit.CollabController): Shim.CollabController => c
@@ -50,8 +63,6 @@ export const values: {
   createUniworkCommentsSource: typeof Shim.createUniworkCommentsSource
   sendAnchorMap: typeof Shim.sendAnchorMap
   useCollabThreads: typeof Shim.useCollabThreads
-  CollabPanel: typeof Shim.CollabPanel
-  CollabComposer: typeof Shim.CollabComposer
   collabStrings: typeof Shim.collabStrings
   formatCollabTime: typeof Shim.formatCollabTime
   announcePolite: typeof Shim.announcePolite

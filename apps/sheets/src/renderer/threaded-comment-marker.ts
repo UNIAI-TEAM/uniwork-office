@@ -12,16 +12,9 @@ import { INTERCEPTOR_POINT, SheetInterceptorService } from '@univerjs/sheets'
 import { HoverManagerService } from '@univerjs/sheets-ui'
 
 import { serverAnchorStore } from './server-comments/anchor-store'
+import { threadMarkerPaint, type ThreadMarkerTheme } from './thread-marker-colors'
 import { threadStore, type CellThread } from './threaded-comments'
 import type { UniverRuntime } from './univer-state'
-
-/** Canvas chrome colors, kept out of document data and keyed by UI theme. */
-export const THREAD_MARKER_CANVAS_COLORS = {
-  light: { marker: '#7b3fe4', server: '#1a73e8' },
-  dark: { marker: '#a78bfa', server: '#8ab4f8' },
-} as const
-
-export type ThreadMarkerTheme = keyof typeof THREAD_MARKER_CANVAS_COLORS
 
 export interface ThreadHover {
   readonly sheetId: string
@@ -52,13 +45,14 @@ export function installThreadedCommentAffordances(
         const server =
           !thread && serverAnchorStore.hasMarker(position.subUnitId, position.row, position.col)
         if (!thread && !server) return next(cell)
-        const colors = THREAD_MARKER_CANVAS_COLORS[options.theme()]
+        // Univer's dark grid inverts canvas fills: the paint is the colour that ends up right
+        const tr = threadMarkerPaint(options.theme(), thread ? 'thread' : 'server')
         const base = !cell || cell === position.rawData ? { ...position.rawData } : cell
         return next({
           ...base,
           markers: {
             ...base?.markers,
-            tr: { color: thread ? colors.marker : colors.server, size: 6 },
+            tr,
           },
         })
       },

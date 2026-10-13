@@ -21,15 +21,24 @@ export interface ServerCommentsContext {
   versionId: string | null
   level?: 'view' | 'edit' | 'manage'
   myUserId?: string
+  /** web frame only (the frame comments API sets it): no desktop poll, the frame reloads on `comments.changed` */
+  frame?: true
 }
 
 type Reply<T> = { ok: true; value: T } | { ok: false; error: unknown }
 
 /** `window.uniworkComments` as the editor uses it (electron-utils `UniworkCommentsApi` / the frame port) */
 export interface ServerCommentsApi extends UniworkCommentsLike {
-  /** desktop: the return value is ignored; web: `true` only when this editor owns (and revealed) the id */
+  /**
+   * desktop: the return value is ignored; web: `true` only when this editor owns (and revealed) the id.
+   * `last` is set on the web only: `true` when no other owner is asked after this editor.
+   */
   onReveal(
-    handler: (payload: { path: string; commentId: string }) => void | boolean | Promise<boolean>,
+    handler: (payload: {
+      path: string
+      commentId: string
+      last?: boolean
+    }) => void | boolean | Promise<boolean>,
   ): () => void
   context(input: { path: string }): Promise<Reply<ServerCommentsContext>>
   /** a Save of `path` settled with a commit receipt */

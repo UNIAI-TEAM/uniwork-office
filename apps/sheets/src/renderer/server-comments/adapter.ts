@@ -8,6 +8,7 @@
 import {
   locateXlsxAnchor,
   resolveSheet,
+  stableSheetId,
   type LiveSheet,
   type Located,
   type ServerAnchorStore,
@@ -32,7 +33,7 @@ const SHEET_SPAN = 2 ** 34
 const UNPLACED = Number.MAX_SAFE_INTEGER
 
 export function createSheetsAnchorAdapter(
-  store: Pick<ServerAnchorStore, 'idOf' | 'locationOf'>,
+  store: Pick<ServerAnchorStore, 'idOf' | 'locationOf' | 'knownName'>,
   view: SheetsEditorView,
 ): CollabAnchorAdapter {
   const where = (anchor: CollabAnchor): Located | null => {
@@ -43,6 +44,10 @@ export function createSheetsAnchorAdapter(
       return view.sheets().some((s) => s.id === tracked.sheetId) ? tracked : null
     }
     return locateXlsxAnchor(view.sheets(), anchor)
+  }
+  const activeName = (): string | undefined => {
+    const id = view.activeSheetId()
+    return view.sheets().find((s) => s.id === id)?.name
   }
   return {
     order(anchor) {
@@ -56,10 +61,15 @@ export function createSheetsAnchorAdapter(
       const at = where(anchor)
       if (at) view.select(at.sheetId, at.range)
     },
-    activeSheet() {
-      const id = view.activeSheetId()
-      return view.sheets().find((s) => s.id === id)?.name
+    activeSheet: activeName,
+    sheetName(sheet) {
+      const live = resolveSheet(view.sheets(), sheet)?.name
+      if (live !== undefined) return live
+      // a session sheet is keyed by its name: that name is the label
+      if (!stableSheetId(sheet)) return sheet
+      // a stable id the workbook no longer has: its last known name, else the active sheet's
+      // name, which the kit labels as the bare cell (never the raw `sheet-9`)
+      return store.knownName(sheet) ?? activeName()
     },
-    sheetName: (sheet) => resolveSheet(view.sheets(), sheet)?.name,
   }
 }

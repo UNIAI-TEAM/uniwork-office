@@ -9,12 +9,13 @@
  * decision D4) and never rewritten: server comments live in the anchor store, never in the thread
  * store or the note snapshot (D3). Sheets has no comment AI tool, so nothing here is AI-reachable.
  */
-import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { Lang } from '@genoffice/i18n'
 import {
   COMMENTS_REVEAL_WAIT_MS,
   CollabComposer,
   CollabPanel,
+  announcePolite,
   collabStrings,
   formatCollabTime,
   useCollabThreads,
@@ -48,6 +49,10 @@ export interface SheetsServerCommentsHandle {
 /** the live handle; null while the workbook is in local mode */
 export const serverComments: { handle: SheetsServerCommentsHandle | null } = { handle: null }
 
+/** web frame: the editor and the Discussion panel share one side column (lane contract §3.5) */
+const FRAME_SIDE_PANEL_EVENT = 'uniwork:frame-side-panel'
+const SIDE_PANEL_OWNER = 'editor'
+
 /** one of the workbook's own threaded comments, for the read-only "in the file" list */
 export interface InFileThread {
   readonly sheetName: string
@@ -62,10 +67,12 @@ export interface SheetsServerCommentsProps {
   panelOpen: boolean
   onOpenPanel(): void
   onClosePanel(): void
-  /** one-line status for "save first" */
+  /** one-line status for "save first" / "select a cell first" */
   onStatus(text: string): void
   /** the translated "save first" line: no new root while the open version is unknown */
   saveFirstMessage: string
+  /** the translated "select a cell first" line: New Comment without a selection */
+  selectCellMessage: string
   inFile: readonly InFileThread[]
   /** the UI-language label of the neutral stored author "User" */
   neutralAuthor: string
@@ -180,15 +187,20 @@ export function SheetsServerComments(p: SheetsServerCommentsProps) {
   const ctlRef = useRef(ctl)
   ctlRef.current = ctl
 
-  // the latest server roots feed the store (new ids located once; known ids keep their live place)
+  // the latest server roots feed the store (new ids located once; known ids keep their live place);
+  // a reset (another open of the workbook) re-locates the listed roots at once
+  const epoch = useSyncExternalStore(store.subscribe, store.getEpoch)
   useEffect(() => {
     store.track(rootsOf(ctl), viewRef.current.sheets())
-  }, [store, ctl.threads, ctl.resolved]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [store, epoch, ctl.threads, ctl.resolved]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // base_version_id of a new root: the version open at load, then the last Save receipt
   const versionRef = useRef<string | null>(mode.versionId)
+  // mirrored in state so the "save first" line appears and goes away with it
+  const [knownVersion, setKnownVersion] = useState<string | null>(mode.versionId)
   useEffect(() => {
     versionRef.current = mode.versionId
+    setKnownVersion(mode.versionId)
   }, [mode.versionId])
 
   // after each Save receipt: one anchor map for every located (or lost) root
@@ -196,6 +208,7 @@ export function SheetsServerComments(p: SheetsServerCommentsProps) {
     return mode.api.onSaved((payload) => {
       if (payload.path && mode.path && payload.path !== mode.path) return
       versionRef.current = payload.versionId
+      setKnownVersion(payload.versionId)
       const updates = buildAnchorUpdates(store, rootsOf(ctlRef.current), viewRef.current.sheets())
       void syncAnchorsAfterSave(source, payload.versionId, updates, () => {
         void ctlRef.current.reload()
@@ -206,8 +219,11 @@ export function SheetsServerComments(p: SheetsServerCommentsProps) {
   }, [mode.api, mode.path, source, store])
 
   // desktop reload rule (addendum §4.7): focus + every 30 s while the panel is open and the tab visible
+  // (the web frame reloads on `comments.changed` itself: no poll there)
   const pollRef = useRef<ReturnType<typeof createCommentsPoll> | null>(null)
+  const inFrame = mode.frame === true
   useEffect(() => {
+    if (inFrame) return
     const poll = createCommentsPoll({
       fetch: async () => {
         await ctlRef.current.reload()
@@ -227,10 +243,10 @@ export function SheetsServerComments(p: SheetsServerCommentsProps) {
       poll.dispose()
       pollRef.current = null
     }
-  }, [])
+  }, [inFrame])
   useEffect(() => {
     pollRef.current?.setPanelOpen(panelOpen)
-  }, [panelOpen])
+  }, [panelOpen, inFrame])
 
   // reveal: wait for the first list, then answer only for ids this panel owns
   const waitersRef = useRef<Array<(ok: boolean) => void>>([])
@@ -259,10 +275,22 @@ export function SheetsServerComments(p: SheetsServerCommentsProps) {
   const openRef = useRef(p.onOpenPanel)
   openRef.current = p.onOpenPanel
   useEffect(() => {
-    return mode.api.onReveal(async ({ path, commentId }) => {
-      if (path && mode.path && path !== mode.path) return false
-      if (!(await loaded())) throw { code: 'not_ready', retryable: true }
-      if (!threadOf(ctlRef.current, commentId)) return false
+    return mode.api.onReveal(async ({ path, commentId, last }) => {
+      // `last` is set by the web frame router only (it ignores paths); desktop never sets it
+      const frame = last !== undefined
+      if (!frame && path && mode.path && path !== mode.path) return false
+      if (!(await loaded())) {
+        // the frame router maps the typed error; the desktop preload ignores our return value
+        if (frame) throw { code: 'not_ready', retryable: true }
+        return false
+      }
+      if (!threadOf(ctlRef.current, commentId)) {
+        // a miss is real only when no other owner is asked after this editor: show the S15 line
+        if (last !== true) return false
+        openRef.current()
+        await ctlRef.current.reveal(commentId)
+        return false
+      }
       openRef.current()
       // located: the kit selects the cell / range (adapter.goTo); lost: the thread only
       const r = await ctlRef.current.reveal(commentId)
@@ -270,23 +298,60 @@ export function SheetsServerComments(p: SheetsServerCommentsProps) {
     })
   }, [mode.api, mode.path, loaded])
 
+  // one side panel at a time: announce open / close, close when another owner opens (harmless on desktop)
+  const panelOpenRef = useRef(panelOpen)
+  panelOpenRef.current = panelOpen
+  const closeRef = useRef(p.onClosePanel)
+  closeRef.current = p.onClosePanel
+  const announcedRef = useRef<boolean | null>(null)
+  useEffect(() => {
+    if (announcedRef.current === null && !panelOpen) return
+    if (announcedRef.current === panelOpen) return
+    announcedRef.current = panelOpen
+    window.dispatchEvent(
+      new CustomEvent(FRAME_SIDE_PANEL_EVENT, {
+        detail: { owner: SIDE_PANEL_OWNER, open: panelOpen },
+      }),
+    )
+  }, [panelOpen])
+  useEffect(() => {
+    const onOther = (event: Event) => {
+      const detail = (event as CustomEvent<{ owner?: unknown; open?: unknown } | null>).detail
+      if (detail?.open === true && detail.owner !== SIDE_PANEL_OWNER && panelOpenRef.current) {
+        closeRef.current()
+      }
+    }
+    window.addEventListener(FRAME_SIDE_PANEL_EVENT, onOther)
+    return () => window.removeEventListener(FRAME_SIDE_PANEL_EVENT, onOther)
+  }, [])
+
   const statusRef = useRef(p.onStatus)
   statusRef.current = p.onStatus
   const saveFirstRef = useRef(p.saveFirstMessage)
   saveFirstRef.current = p.saveFirstMessage
+  const selectCellRef = useRef(p.selectCellMessage)
+  selectCellRef.current = p.selectCellMessage
 
   useEffect(() => {
+    /** a reason New Comment did nothing: status bar + polite announcement + the panel */
+    const explain = (text: string) => {
+      statusRef.current(text)
+      announcePolite(text)
+      openRef.current()
+    }
     const handle: SheetsServerCommentsHandle = {
       startThread: () => {
         // a root comment needs base_version_id (OQ-C2): unknown until the first Save receipt
         if (!versionRef.current) {
-          statusRef.current(saveFirstRef.current)
-          openRef.current()
+          explain(saveFirstRef.current)
           return
         }
         const at = viewRef.current.selection()
         const sheet = at && viewRef.current.sheets().find((s) => s.id === at.sheetId)
-        if (!at || !sheet) return
+        if (!at || !sheet) {
+          explain(selectCellRef.current)
+          return
+        }
         ctlRef.current.startThread({
           anchor: encodeXlsxAnchor(sheet, at.range),
           base_version_id: versionRef.current,
@@ -303,29 +368,37 @@ export function SheetsServerComments(p: SheetsServerCommentsProps) {
   if (!panelOpen) return null
 
   const activeSheet = adapter.activeSheet?.()
+  const needsSave = !knownVersion && mode.level !== 'view'
   return (
-    <CollabPanel
-      className="sheets-server-comments"
-      controller={ctl}
-      strings={strings}
-      onClose={p.onClosePanel}
-      renderComposer={(slot) => <CollabComposer {...slot} strings={strings} />}
-      inFile={
-        p.inFile.length > 0
-          ? {
-              count: p.inFile.length,
-              content: (
-                <InFileList
-                  threads={p.inFile}
-                  activeSheet={activeSheet}
-                  neutralAuthor={p.neutralAuthor}
-                  lang={lang}
-                  resolvedLabel={strings.collabResolved ?? ''}
-                />
-              ),
-            }
-          : undefined
-      }
-    />
+    <div className="sheets-server-comments">
+      <CollabPanel
+        className="sheets-server-panel"
+        controller={ctl}
+        strings={strings}
+        onClose={p.onClosePanel}
+        renderComposer={(slot) => <CollabComposer {...slot} strings={strings} />}
+        inFile={
+          p.inFile.length > 0
+            ? {
+                count: p.inFile.length,
+                content: (
+                  <InFileList
+                    threads={p.inFile}
+                    activeSheet={activeSheet}
+                    neutralAuthor={p.neutralAuthor}
+                    lang={lang}
+                    resolvedLabel={strings.collabResolved ?? ''}
+                  />
+                ),
+              }
+            : undefined
+        }
+      />
+      {needsSave && (
+        <p className="collab-pnote collab-pnote--warn sheets-server-save-first">
+          {p.saveFirstMessage}
+        </p>
+      )}
+    </div>
   )
 }

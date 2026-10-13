@@ -32,6 +32,7 @@ export function readContext(value: unknown): ServerCommentsContext | null {
     versionId: isId(v.versionId) ? v.versionId : null,
     ...(level ? { level } : {}),
     ...(isId(v.myUserId) ? { myUserId: v.myUserId } : {}),
+    ...(v.frame === true ? { frame: true as const } : {}),
   }
 }
 

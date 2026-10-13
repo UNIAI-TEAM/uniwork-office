@@ -11,6 +11,7 @@ import { useI18n } from '../i18n/locale'
 import { ThreadedCommentsPane } from '../ThreadedCommentsPane'
 import { threadPane, threadStore } from '../threaded-comments'
 import type { UniverRuntime } from '../univer-state'
+import { serverAnchorStore } from './anchor-store'
 import { useServerMode } from './mode'
 import type { ServerCommentsApi } from './seam'
 import { SheetsServerComments, type InFileThread } from './SheetsServerComments'
@@ -37,6 +38,11 @@ export function SheetsCommentsSurface(p: SheetsCommentsSurfaceProps) {
   const mode = useServerMode(commentsDocKey(p.file), p.file?.path ?? null, p.api)
   const pane = useSyncExternalStore(threadPane.subscribe, threadPane.getState)
   const threadsVersion = useSyncExternalStore(threadStore.subscribe, threadStore.getVersion)
+  // bumps on a sheet rename (and on server-anchor moves): the in-file labels name live sheets
+  const anchorsVersion = useSyncExternalStore(
+    serverAnchorStore.subscribe,
+    serverAnchorStore.getVersion,
+  )
   const fileRef = useRef(p.file)
   fileRef.current = p.file
   const { getRuntime } = p
@@ -51,8 +57,8 @@ export function SheetsCommentsSurface(p: SheetsCommentsSurfaceProps) {
       const name = sheets.find((s) => s.id === sheetId)?.name
       return name === undefined ? [] : threads.map((thread) => ({ sheetName: name, thread }))
     })
-    // the thread store's version is the dependency; `view` reads the live sheets
-  }, [mode, view, threadsVersion]) // eslint-disable-line react-hooks/exhaustive-deps
+    // the store versions are the dependencies; `view` reads the live sheets
+  }, [mode, view, threadsVersion, anchorsVersion]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!mode) return <ThreadedCommentsPane getRuntime={getRuntime} />
   return (
@@ -65,6 +71,7 @@ export function SheetsCommentsSurface(p: SheetsCommentsSurfaceProps) {
       onClosePanel={() => threadPane.close()}
       onStatus={p.onStatus}
       saveFirstMessage={t('appCommentSaveFirst')}
+      selectCellMessage={t('appSelectCellFirst')}
       inFile={inFile}
       neutralAuthor={t('appThreadNeutralAuthor')}
     />
