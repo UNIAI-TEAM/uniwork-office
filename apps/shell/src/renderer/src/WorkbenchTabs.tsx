@@ -14,6 +14,7 @@ import {
   type WorkbenchModuleId,
 } from '@uniwork/practice-core'
 import { WorkbenchIcon } from './WorkbenchIcons'
+import { useI18n } from './locale'
 import {
   pinModule,
   pinPillar,
@@ -84,7 +85,7 @@ export function WorkbenchTabs({
     return () => document.removeEventListener('mousedown', onDoc)
   }, [menuOpen])
 
-  const label = (a: string, b: string) => (vi ? a : b)
+  const { t } = useI18n()
   const pinnedPillarDefs = pillars.filter((p) => pillarPins.includes(p.id))
   const availablePillars = pillars.filter((p) => !pillarPins.includes(p.id))
   const availableModules = WORKBENCH_MODULES.filter((m) => !pins.includes(m.id))
@@ -165,7 +166,7 @@ export function WorkbenchTabs({
   }
 
   return (
-    <nav className="wb-tabs" aria-label={label('Khu vực làm việc', 'Workbench areas')}>
+    <nav className="wb-tabs" aria-label={t('wbTabsAreas')}>
       {pins.map((id) => {
         const mod = getWorkbenchModule(id)
         if (!mod) return null
@@ -190,9 +191,9 @@ export function WorkbenchTabs({
             onDragOver={(e) => onDragOver(id, e)}
             onDrop={(e) => onDrop(id, e)}
             onDragEnd={onDragEnd}
-            title={`${vi ? mod.hintVi : mod.hintEn} · ${label('Kéo để sắp xếp', 'Drag to reorder')}`}
+            title={`${vi ? mod.hintVi : mod.hintEn} · ${t('wbCommonDragToReorder')}`}
           >
-            <span className="wb-tab-grip" aria-hidden="true" title={label('Kéo', 'Drag')}>
+            <span className="wb-tab-grip" aria-hidden="true" title={t('wbTabsDrag')}>
               ⋮⋮
             </span>
             <span className="wb-tab-icon">
@@ -205,7 +206,7 @@ export function WorkbenchTabs({
                 role="button"
                 tabIndex={0}
                 draggable={false}
-                aria-label={label('Bỏ tab', 'Unpin tab')}
+                aria-label={t('wbCommonUnpin')}
                 onClick={(e) => removeModule(id, e)}
                 onMouseDown={(e) => e.stopPropagation()}
                 onKeyDown={(e) => {
@@ -239,7 +240,7 @@ export function WorkbenchTabs({
             role="button"
             tabIndex={0}
             draggable={false}
-            aria-label={label('Bỏ tab', 'Unpin tab')}
+            aria-label={t('wbCommonUnpin')}
             onClick={(e) => removePillar(p.id, e)}
             onMouseDown={(e) => e.stopPropagation()}
             onKeyDown={(e) => {
@@ -261,7 +262,7 @@ export function WorkbenchTabs({
           aria-haspopup="menu"
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((o) => !o)}
-          title={label('Thêm tab', 'Add tab')}
+          title={t('wbTabsAdd')}
         >
           <span className="wb-tab-icon">
             <WorkbenchIcon id="add" size={18} />
@@ -269,18 +270,14 @@ export function WorkbenchTabs({
         </button>
         {menuOpen && (
           <div className="wb-tab-menu" role="menu">
-            <p className="wb-tab-menu-title">
-              {label('Thêm vào bàn làm việc', 'Add to Workbench')}
-            </p>
+            <p className="wb-tab-menu-title">{t('wbTabsMenuTitle')}</p>
             {nothingToAdd ? (
-              <p className="wb-tab-menu-empty">
-                {label('Đã thêm đủ khu vực.', 'All areas are pinned.')}
-              </p>
+              <p className="wb-tab-menu-empty">{t('wbTabsAllPinned')}</p>
             ) : (
               <>
                 {availablePillars.length > 0 ? (
                   <>
-                    <p className="wb-tab-menu-section">{label('Khu vực chính', 'Core areas')}</p>
+                    <p className="wb-tab-menu-section">{t('wbTabsCore')}</p>
                     <div className="wb-tab-menu-grid">
                       {availablePillars.map((p) => (
                         <button
@@ -302,7 +299,7 @@ export function WorkbenchTabs({
                 ) : null}
                 {availableModules.length > 0 ? (
                   <>
-                    <p className="wb-tab-menu-section">{label('Module', 'Modules')}</p>
+                    <p className="wb-tab-menu-section">{t('wbTabsModules')}</p>
                     <div className="wb-tab-menu-grid">
                       {availableModules.map((m) => (
                         <button

@@ -5,6 +5,7 @@ import type { UniworkWorkspaceRef } from '../../shared/home-api'
 import type { UniworkWorkError } from '../../shared/uniwork-work-api'
 import { NotesPane } from './NotesPane'
 import { LocalTag } from './LocalTag'
+import { useI18n } from './locale'
 import { WorkProfilePane } from './WorkProfilePane'
 import { escapeHtml, profileForDraft, profileMergeHtml } from './form-merge'
 import { WorkCalendarPane } from './WorkCalendarPane'
@@ -45,12 +46,12 @@ export function WorkbenchModulePane({
   onReload,
 }: Props): ReactElement {
   const mod = getWorkbenchModule(moduleId)
-  const label = (a: string, b: string) => (vi ? a : b)
+  const { t } = useI18n()
   // what every server tab gets (Tasks, Calendar, Profile)
   const server: WorkPaneProps = { workspace, workspaceError, onReload }
 
   if (!mod) {
-    return <p className="wb-empty">{label('Module không tồn tại.', 'Unknown module.')}</p>
+    return <p className="wb-empty">{t('wbModuleUnknown')}</p>
   }
 
   return (
@@ -92,7 +93,7 @@ function FormsPane({
   /** the active org, for the cached UniWork profile the compose merge reads; null when signed out */
   orgId: string | null
 }): ReactElement {
-  const label = (a: string, b: string) => (vi ? a : b)
+  const { t } = useI18n()
   const [items, setItems] = useState<WbFormItem[]>(() => readForms(practiceId))
   const [editingId, setEditingId] = useState<string | null>(null)
   const [title, setTitle] = useState('')
@@ -144,9 +145,7 @@ function FormsPane({
     if (!result) return
     const accepted = result.accepted[0]
     if (!accepted) {
-      setUploadNotice(
-        result.rejected[0] || label('Không chọn được file hỗ trợ.', 'No supported file selected.'),
-      )
+      setUploadNotice(result.rejected[0] || t('wbFormsNoSupportedFile'))
       window.setTimeout(() => setUploadNotice(null), 4000)
       return
     }
@@ -224,31 +223,22 @@ function FormsPane({
 
   return (
     <>
-      <p className="wb-hint">
-        {label(
-          'Tải file mẫu (Word/PDF/Excel…) vào thư viện — My AI có thể điền theo mẫu thật. “Soạn” seed Docs vào gói đang chọn; “Mở file” mở mẫu gốc.',
-          'Upload a template file (Word/PDF/Excel…) — My AI can fill from the real form. “Draft” seeds Docs into the selected pack; “Open file” opens the source template.',
-        )}
-      </p>
-      {!packId ? (
-        <p className="wb-hint">
-          {label('Chọn gói ở Tri thức trước khi Soạn.', 'Select a Knowledge pack before drafting.')}
-        </p>
-      ) : null}
+      <p className="wb-hint">{t('wbFormsHint')}</p>
+      {!packId ? <p className="wb-hint">{t('wbFormsDraftNeedsPackHint')}</p> : null}
       <div className="wb-module-form">
         <label className="wb-form-wide">
-          <span>{label('Tên biểu mẫu', 'Form title')}</span>
+          <span>{t('wbFormsTitle')}</span>
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder={label('VD: Đơn xin nghỉ phép', 'e.g. Leave request')}
+            placeholder={t('wbFormsTitlePlaceholder')}
             onKeyDown={(e) => {
               if (e.key === 'Enter') save()
             }}
           />
         </label>
         <label className="wb-form-wide">
-          <span>{label('Ghi chú (tuỳ chọn)', 'Note (optional)')}</span>
+          <span>{t('wbFormsNote')}</span>
           <input value={note} onChange={(e) => setNote(e.target.value)} />
         </label>
         <div className="wb-chip-row">
@@ -257,38 +247,34 @@ function FormsPane({
             className="btn btn-secondary"
             onClick={() => void pickTemplateFile()}
           >
-            {draftFile
-              ? label('Đổi file mẫu…', 'Replace template file…')
-              : label('Tải file mẫu…', 'Upload template file…')}
+            {draftFile ? t('wbFormsReplaceFile') : t('wbFormsUploadFile')}
           </button>
           {draftFile ? (
             <button type="button" className="btn btn-secondary" onClick={() => setDraftFile(null)}>
-              {label('Bỏ file', 'Clear file')}
+              {t('wbFormsClearFile')}
             </button>
           ) : null}
         </div>
         {draftFile ? (
           <p className="wb-hint">
-            {label('File mẫu:', 'Template file:')} {draftFile.fileName}
+            {t('wbFormsTemplateFile')} {draftFile.fileName}
           </p>
         ) : null}
         {uploadNotice ? <p className="wb-hint">{uploadNotice}</p> : null}
         <div className="wb-chip-row">
           <button type="button" className="btn btn-primary" onClick={save}>
-            {editingId
-              ? label('Lưu biểu mẫu', 'Save form')
-              : label('Thêm vào thư viện', 'Add to library')}
+            {editingId ? t('wbFormsSave') : t('wbFormsAdd')}
           </button>
           {editingId ? (
             <button type="button" className="btn btn-secondary" onClick={clearForm}>
-              {label('Huỷ sửa', 'Cancel edit')}
+              {t('wbFormsCancelEdit')}
             </button>
           ) : null}
         </div>
       </div>
       <ul className="wb-module-list">
         {items.length === 0 ? (
-          <li className="wb-empty">{label('Chưa có biểu mẫu.', 'No forms yet.')}</li>
+          <li className="wb-empty">{t('wbFormsEmpty')}</li>
         ) : (
           items.map((it) => {
             const canOpen = Boolean(packId ?? it.linkedProjectId)
@@ -299,35 +285,29 @@ function FormsPane({
                   {it.note ? <span>{it.note}</span> : null}
                   {it.fileName ? (
                     <span className="wb-hint">
-                      {label('File:', 'File:')} {it.fileName}
+                      {t('wbFormsFile')} {it.fileName}
                     </span>
                   ) : null}
                   {it.linkedProjectId ? (
-                    <span className="wb-hint">
-                      {label('Đã gắn gói Tài liệu', 'Linked to Materials pack')}
-                    </span>
+                    <span className="wb-hint">{t('wbFormsLinked')}</span>
                   ) : null}
                 </div>
                 <WbRowActions>
-                  <WbEditBtn label={label('Sửa', 'Edit')} onClick={() => startEdit(it)} />
+                  <WbEditBtn label={t('wbFormsEdit')} onClick={() => startEdit(it)} />
                   {it.filePath ? (
                     <WbFileBtn
-                      label={label('Mở file', 'Open file')}
+                      label={t('wbFormsOpenFile')}
                       onClick={() => void openTemplateFile(it)}
                     />
                   ) : null}
                   <WbDraftBtn
-                    label={label('Soạn', 'Draft')}
+                    label={t('wbFormsDraft')}
                     disabled={!canOpen}
-                    title={
-                      canOpen
-                        ? label('Soạn', 'Draft')
-                        : label('Chọn gói ở Tri thức trước', 'Select a Knowledge pack first')
-                    }
+                    title={canOpen ? t('wbFormsDraft') : t('wbFormsDraftNeedsPack')}
                     onClick={() => void openForm(it)}
                   />
                   <WbDeleteBtn
-                    label={label('Xóa', 'Delete')}
+                    label={t('wbCommonDelete')}
                     onClick={() => {
                       if (editingId === it.id) clearForm()
                       persist(items.filter((x) => x.id !== it.id))
