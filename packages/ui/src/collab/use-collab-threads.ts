@@ -120,6 +120,7 @@ export interface CollabController {
 }
 
 export interface CollabControllerOptions {
+  /** pass a stable object (useMemo): a new one each render recomputes the thread views and re-renders unchanged lists */
   adapter?: CollabAnchorAdapter
   /** read for `collabUpdatedAnnounce` only */
   strings?: CollabStrings
@@ -429,16 +430,18 @@ export function useCollabThreads(
       againRef.current = true
       return inFlightRef.current
     }
-    const p = (async () => {
+    const loop = async (): Promise<void> => {
       try {
         do {
           againRef.current = false
           await runList()
         } while (againRef.current)
       } finally {
-        inFlightRef.current = null
+        // a document/kind change already replaced the slot: only the loop that owns it may clear it
+        if (inFlightRef.current === p) inFlightRef.current = null
       }
-    })()
+    }
+    const p = loop()
     inFlightRef.current = p
     return p
   }, [runList])
@@ -525,9 +528,11 @@ export function useCollabThreads(
       } catch (e) {
         const err = toCollabError(e)
         if (err.code === 'forbidden') setWriteForbidden(true)
-        else if (err.code === 'network' || err.code === 'internal' || err.code === 'unauthorized')
+        else if (err.code === 'network' || err.code === 'internal' || err.code === 'unauthorized') {
           setStatus(statusFor(err.code))
-        else if (err.code === 'conflict' && err.detailsCode === 'comment_deleted') {
+          // the connection may be back already: a good list clears the status and unlocks Send (the draft stays)
+          void reload()
+        } else if (err.code === 'conflict' && err.detailsCode === 'comment_deleted') {
           const id = target.commentId ?? target.threadId
           if (id) markDeleted(id)
           if (target.threadId && target.body !== undefined)

@@ -204,6 +204,48 @@ describe('writes', () => {
     expect(src.list).toHaveBeenCalledTimes(1)
   })
 
+  it.each([
+    ['network', 'offline'],
+    ['internal', 'serverError'],
+    ['unauthorized', 'signedOut'],
+  ])(
+    '%s on a write -> status %s, then a reload clears it once the connection is back',
+    async (code, status) => {
+      const src = fakeSource(list([cm({ id: 'a' })], 't1'))
+      await mount(src)
+      src.list.mockClear()
+      src.create.mockRejectedValueOnce(err(code))
+      let back!: (v: unknown) => void
+      src.list.mockReturnValueOnce(new Promise((r) => (back = r)))
+      await act(async () => {
+        await expect(ctl.actions.reply('a', 'draft')).rejects.toMatchObject({ code })
+        await flush()
+      })
+      // the failure itself triggers a reload; until it answers the status line stays
+      expect(src.list).toHaveBeenCalledTimes(1)
+      expect(ctl.status).toBe(status)
+      await act(async () => {
+        back(UNCHANGED)
+        await flush()
+      })
+      expect(ctl.status).toBeNull()
+    },
+  )
+
+  it('network on a write while still offline: the status stays after the reload', async () => {
+    const src = fakeSource(list([cm({ id: 'a' })], 't1'))
+    await mount(src)
+    src.list.mockClear()
+    src.create.mockRejectedValueOnce(err('network'))
+    src.list.mockRejectedValueOnce(err('network'))
+    await act(async () => {
+      await expect(ctl.actions.reply('a', 'draft')).rejects.toMatchObject({ code: 'network' })
+      await flush()
+    })
+    expect(src.list).toHaveBeenCalledTimes(1)
+    expect(ctl.status).toBe('offline')
+  })
+
   it('conflict + comment_deleted: thread marked deleted, body kept for copy, list reloaded', async () => {
     const src = fakeSource(list([cm({ id: 'a' })], 't1'))
     await mount(src)
@@ -221,6 +263,53 @@ describe('writes', () => {
     expect(ctl.conflict).toEqual({ threadId: 'a', body: 'my draft' })
     // the ghost stays (deleted) so the composer under it keeps its draft
     expect(ctl.threads.map((t) => [t.id, t.deleted])).toEqual([['a', true]])
+  })
+})
+
+describe('stale in-flight list (F1)', () => {
+  it('a document change while the old list is pending: the next reload joins the new list, no parallel list', async () => {
+    const announce = vi.fn()
+    const pending: Array<(v: unknown) => void> = []
+    const src = fakeSource()
+    src.list.mockImplementation(() => new Promise((r) => pending.push(r)))
+    await mount(src, host(), { announce })
+    expect(src.list).toHaveBeenCalledTimes(1)
+    // the document changes: the effect starts a new first load while the old list is still pending
+    await act(async () => {
+      root.render(
+        createElement(Harness, {
+          source: src,
+          host: host({ documentId: 'doc2' }),
+          opts: { strings: EN, announce },
+        }),
+      )
+      await flush()
+    })
+    expect(src.list).toHaveBeenCalledTimes(2)
+    // the old list settles (its result is dropped) ...
+    await act(async () => {
+      pending[0]!(list([cm({ id: 'old' })], 'tOld'))
+      await flush()
+    })
+    // ... and a poll / focus reload arrives while the new list is still pending
+    await act(async () => {
+      void ctl.reload()
+      await flush()
+    })
+    expect(src.list).toHaveBeenCalledTimes(2)
+    await act(async () => {
+      pending[1]!(list([cm({ id: 'new' })], 'tNew'))
+      await flush()
+    })
+    // the joined reload re-asks with the new token only
+    expect(src.list).toHaveBeenCalledTimes(3)
+    expect(src.list).toHaveBeenLastCalledWith({ kind: 'comment', since_token: 'tNew' })
+    await act(async () => {
+      pending[2]!(UNCHANGED)
+      await flush()
+    })
+    expect(ctl.threads.map((t) => t.id)).toEqual(['new'])
+    expect(announce).not.toHaveBeenCalled()
   })
 })
 
