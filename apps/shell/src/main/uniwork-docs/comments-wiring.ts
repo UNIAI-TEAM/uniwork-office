@@ -19,6 +19,7 @@ import type {
   MentionsSearchInput,
 } from '@genoffice/electron-utils/comments-ipc'
 import { DocsProtocolError, type ProtocolErrorShape } from '../../../../../web/docs/protocol/types'
+import type { PushOutcome } from './launch'
 import type { UniworkDocsService } from './service'
 import {
   createUniworkCommentsClient,
@@ -44,8 +45,14 @@ export interface CommentsWiringDeps {
   /** the same single-flight authorized request the documents client uses */
   authorized<T>(call: (token: string) => Promise<T>): Promise<T>
   isSignedIn(): boolean
-  /** push a reveal to the editor showing `path`; no-op when nothing shows it */
-  sendReveal(payload: CommentsRevealPayload): void
+  /**
+   * Push a reveal to the editor showing `path`. Returns 'delivered' when it was
+   * handed straight to a loaded editor, 'deferred' when it waits for
+   * did-finish-load (the renderer may not listen yet) and 'none' when nothing
+   * shows the path. `stillWanted` is consulted for a deferred push: the pull may
+   * have delivered the held reveal first (D1-4).
+   */
+  sendReveal(payload: CommentsRevealPayload, stillWanted: () => boolean): PushOutcome
   /**
    * R1-2: the path the invoking editor window shows; its held reveal is pulled
    * for exactly that path. undefined/null when nothing shows one.
@@ -180,12 +187,16 @@ export function createUniworkComments(
   // reaches a renderer that already subscribed; a renderer that subscribed
   // afterwards (cold start) would never see it, so the hold survives the push.
   const heldReveals = new Map<string, string>()
+  // D1-1: paths whose editor has pulled the held reveal; its listener is armed
+  // from then on (main cannot see the listener itself)
+  const subscribed = new Set<string>()
 
   ipcMain.handle(COMMENTS_CHANNELS.revealPending, (event) => {
     // scoped to the sender's own path: another editor's held reveal is neither
     // returned nor cleared
     const path = deps.shownPath?.(event.sender) ?? null
     if (!path) return null
+    subscribed.add(path)
     const commentId = heldReveals.get(path)
     if (commentId === undefined) return null
     heldReveals.delete(path)
@@ -195,8 +206,21 @@ export function createUniworkComments(
   return {
     reveal(path, commentId) {
       if (!resolveCommentBinding(deps.service, path)) return
-      heldReveals.set(path, commentId)
-      deps.sendReveal({ path, commentId })
+      const outcome = deps.sendReveal({ path, commentId }, () => {
+        // D1-4: the deferred push is dropped once a pull delivered the reveal
+        // D1-1: if the editor is subscribed by then, the push lands in its
+        // listener, which ends the hold
+        const held = heldReveals.get(path) === commentId
+        if (held && subscribed.has(path)) heldReveals.delete(path)
+        return held
+      })
+      // D1-1: a push handed straight to a subscribed editor lands in its
+      // listener, so the hold (this reveal, or a stale one for the path) is
+      // over - a later resubscribe must not replay it. Anything else (a deferred
+      // push, no editor, an editor that has not pulled yet) stays held for the
+      // first pull.
+      if (outcome === 'delivered' && subscribed.has(path)) heldReveals.delete(path)
+      else heldReveals.set(path, commentId)
     },
   }
 }

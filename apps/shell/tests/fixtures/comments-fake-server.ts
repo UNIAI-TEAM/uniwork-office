@@ -58,7 +58,6 @@ export interface FakeCommentServer {
   reset(): void
 }
 
-const ORIGIN = 'https://uniwork.example'
 /** the path prefix (a pathname has no origin) */
 const BASE = '/api/v1'
 const T0 = '2026-10-13T09:00:00Z'

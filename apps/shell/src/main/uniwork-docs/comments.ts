@@ -257,9 +257,7 @@ export function createUniworkCommentsClient(
         if (call.json !== undefined) headers['Content-Type'] = 'application/json'
         if (call.idempotencyKey) headers['Idempotency-Key'] = call.idempotencyKey
         const controller = new AbortController()
-        let timedOut = false
         const timer = setTimeout(() => {
-          timedOut = true
           controller.abort()
         }, timeoutMs)
         try {
@@ -297,6 +295,17 @@ export function createUniworkCommentsClient(
               (error as { name?: string }).name === 'DocsProtocolError'
             ) {
               throw error
+            }
+            // a deadline abort that lands while the body is read is a network
+            // interruption (§9), not a malformed payload: the headers arrived,
+            // the body never did
+            if (
+              controller.signal.aborted ||
+              (typeof error === 'object' &&
+                error !== null &&
+                (error as { name?: string }).name === 'AbortError')
+            ) {
+              throw commentsErrorFromHttp(0)
             }
             throw new DocsProtocolError({
               code: 'malformed',

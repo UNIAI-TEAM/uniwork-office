@@ -277,12 +277,14 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     profile: () => uniworkDeploymentProfile(),
     authorized: (call) => authorizedRequest(call),
     isSignedIn: () => uniworkSessionIdentity() !== null,
-    sendReveal: (payload) => {
+    sendReveal: (payload, stillWanted) => {
       // a cold start opens the editor after the reveal is decided: the push is
-      // held until the editor renderer finished loading (same rule as a launch)
-      createPushHolder<CommentsRevealPayload>(
+      // held until the editor renderer finished loading (same rule as a launch);
+      // a pull that delivered the reveal in the meantime ends it (D1-4)
+      return createPushHolder<CommentsRevealPayload>(
         () => wiring.commentsTarget?.(payload.path) ?? null,
         COMMENTS_CHANNELS.reveal,
+        stillWanted,
       )(payload)
     },
     // R1-2: the sender's own path scopes the pending-reveal pull

@@ -12,6 +12,7 @@
     "./comments-bridge": "./src/comments-bridge.ts",
     "./comments-ipc": "./src/comments-ipc.ts",
     "./comments-poll": "./src/comments-poll.ts",
+    "./comments-reply": "./src/comments-reply.ts",
     "./atomic-write": "./src/atomic-write.ts",
     "./drop-open": "./src/drop-open.ts",
     "./generated-images": "./src/generated-images.ts",

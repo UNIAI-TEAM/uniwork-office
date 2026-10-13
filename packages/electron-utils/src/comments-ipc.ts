@@ -95,23 +95,28 @@ export interface CommentsRevealPayload {
 /**
  * What every `uniwork:comments:*` handler answers (R1-1). Electron forwards
  * only an `Error`'s `message` across `ipcMain.handle` -> `ipcRenderer.invoke`,
- * so a thrown `DocsProtocolError` would lose `code`, `retryable` and
- * `details`. The handlers therefore return the protocol error's serializable
- * shape as data and the preload rehydrates a `DocsProtocolError` from it.
+ * so a thrown `DocsProtocolError` would lose `code`, `retryable` and `details`:
+ * the handler answers the protocol error's serializable shape as data, the
+ * preload forwards the envelope unchanged (an Error rehydrated there would lose
+ * those fields again on the contextBridge) and the renderer rehydrates it in its
+ * own realm (see ./comments-reply).
  */
 export type CommentsReply<T> = { ok: true; value: T } | { ok: false; error: ProtocolErrorShape }
 
-/** the API the six editor preloads expose as `window.uniworkComments` */
+/**
+ * the API the six editor preloads expose as `window.uniworkComments`: every call
+ * resolves to the `CommentsReply` envelope, never rejects with a protocol error
+ */
 export interface UniworkCommentsApi {
-  list(input: CommentsListInput): Promise<CommentsListResult>
-  create(input: CommentsCreateInput): Promise<CommentResult>
-  update(input: CommentsUpdateInput): Promise<CommentResult>
-  remove(input: CommentsIdInput): Promise<CommentsDeleteResult>
-  resolve(input: CommentsIdInput): Promise<CommentResult>
-  reopen(input: CommentsIdInput): Promise<CommentResult>
-  revisions(input: CommentsIdInput): Promise<CommentsRevisionsResult>
-  anchors(input: CommentsAnchorsInput): Promise<CommentsAnchorsResult>
-  searchMentions(input: MentionsSearchInput): Promise<MentionsSearchResult>
+  list(input: CommentsListInput): Promise<CommentsReply<CommentsListResult>>
+  create(input: CommentsCreateInput): Promise<CommentsReply<CommentResult>>
+  update(input: CommentsUpdateInput): Promise<CommentsReply<CommentResult>>
+  remove(input: CommentsIdInput): Promise<CommentsReply<CommentsDeleteResult>>
+  resolve(input: CommentsIdInput): Promise<CommentsReply<CommentResult>>
+  reopen(input: CommentsIdInput): Promise<CommentsReply<CommentResult>>
+  revisions(input: CommentsIdInput): Promise<CommentsReply<CommentsRevisionsResult>>
+  anchors(input: CommentsAnchorsInput): Promise<CommentsReply<CommentsAnchorsResult>>
+  searchMentions(input: MentionsSearchInput): Promise<CommentsReply<MentionsSearchResult>>
   /**
    * the shell asks the editor to reveal a thread; returns the unsubscribe.
    * The first subscribe also pulls the reveal main held for this window (R1-2),

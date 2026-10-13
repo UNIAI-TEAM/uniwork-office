@@ -9,6 +9,7 @@ import {
   LAUNCH_TICKET_TTL_MS,
   LaunchController,
   createLaunchPusher,
+  createPushHolder,
   parseOfficeDeepLink,
 } from '../src/main/uniwork-docs/launch'
 import { LAUNCH_REPLAY_MS, createLaunchReplay } from '../src/preload/launch-replay'
@@ -699,6 +700,61 @@ describe('cold-start launch events are not lost before the renderer listens', ()
     const seen: UniworkLaunchEvent[] = []
     replay.subscribe((e) => seen.push(e))
     expect(seen).toEqual([])
+  })
+})
+
+describe('the reveal push holder reports its outcome and can be dropped (D1-4)', () => {
+  function fakeContents(loading: boolean) {
+    const sent: unknown[] = []
+    let onLoad: (() => void) | null = null
+    const wc = {
+      loading,
+      isDestroyed: () => false,
+      isLoadingMainFrame: () => wc.loading,
+      send: (_channel: string, payload: unknown) => sent.push(payload),
+      once: (_event: 'did-finish-load', listener: () => void) => {
+        onLoad = listener
+      },
+      finishLoad: () => {
+        wc.loading = false
+        onLoad?.()
+      },
+    }
+    return { wc, sent }
+  }
+
+  it('reports delivered / deferred / none', () => {
+    const live = fakeContents(false)
+    expect(createPushHolder<{ id: string }>(() => live.wc, 'c')({ id: 'a' })).toBe('delivered')
+    expect(live.sent).toEqual([{ id: 'a' }])
+    const loading = fakeContents(true)
+    expect(createPushHolder<{ id: string }>(() => loading.wc, 'c')({ id: 'b' })).toBe('deferred')
+    expect(loading.sent).toEqual([])
+    expect(createPushHolder<{ id: string }>(() => null, 'c')({ id: 'c' })).toBe('none')
+  })
+
+  it('drops a deferred payload that is no longer wanted once the page finishes loading', () => {
+    const { wc, sent } = fakeContents(true)
+    const push = createPushHolder<{ id: string }>(
+      () => wc,
+      'c',
+      () => false,
+    )
+    push({ id: 'a' })
+    wc.finishLoad()
+    expect(sent).toEqual([])
+  })
+
+  it('still sends the deferred payload while it is wanted', () => {
+    const { wc, sent } = fakeContents(true)
+    const push = createPushHolder<{ id: string }>(
+      () => wc,
+      'c',
+      () => true,
+    )
+    push({ id: 'a' })
+    wc.finishLoad()
+    expect(sent).toEqual([{ id: 'a' }])
   })
 })
 
