@@ -60,6 +60,7 @@ export const zh = {
   paneCommentsDelete: '删除批注',
   paneCommentsPlaceholder: '新建批注…（⌘/Ctrl+Enter 发布）',
   paneCommentsPost: '发布',
+  paneCommentsNeutralAuthor: '用户',
 
   paneCsdTitle: '自定义放映',
   paneCsdDefaultName: '自定义放映 {n}',

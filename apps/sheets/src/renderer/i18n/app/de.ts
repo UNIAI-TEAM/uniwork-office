@@ -1503,6 +1503,7 @@ export const de = {
   appThreadReplyPlaceholder: 'Antworten…',
   appThreadNewPlaceholder: 'Unterhaltung beginnen',
   appThreadPost: 'Senden',
+  appThreadNeutralAuthor: 'Benutzer',
   appThreadResolve: 'Auflösen',
   appThreadReopen: 'Erneut öffnen',
   appThreadResolved: 'Aufgelöst',

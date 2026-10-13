@@ -62,6 +62,7 @@ export const en = {
   paneCommentsDelete: 'Delete comment',
   paneCommentsPlaceholder: 'New comment… (⌘/Ctrl+Enter to post)',
   paneCommentsPost: 'Post',
+  paneCommentsNeutralAuthor: 'User',
 
   paneCsdTitle: 'Custom Shows',
   paneCsdDefaultName: 'Custom Show {n}',

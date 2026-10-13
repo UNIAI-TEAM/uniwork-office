@@ -1410,6 +1410,7 @@ export const th = {
   appThreadReplyPlaceholder: 'ตอบกลับ…',
   appThreadNewPlaceholder: 'เริ่มการสนทนา',
   appThreadPost: 'โพสต์',
+  appThreadNeutralAuthor: 'ผู้ใช้',
   appThreadResolve: 'แก้ไขแล้ว',
   appThreadReopen: 'เปิดใหม่',
   appThreadResolved: 'แก้ไขแล้ว',

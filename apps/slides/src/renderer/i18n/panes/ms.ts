@@ -62,6 +62,7 @@ export const ms = {
   paneCommentsDelete: 'Padam komen',
   paneCommentsPlaceholder: 'Komen baharu… (⌘/Ctrl+Enter untuk menyiarkan)',
   paneCommentsPost: 'Siarkan',
+  paneCommentsNeutralAuthor: 'Pengguna',
 
   paneCsdTitle: 'Persembahan Tersuai',
   paneCsdDefaultName: 'Persembahan Tersuai {n}',

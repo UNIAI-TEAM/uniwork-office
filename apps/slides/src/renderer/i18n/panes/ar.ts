@@ -61,6 +61,7 @@ export const ar = {
   paneCommentsDelete: 'حذف التعليق',
   paneCommentsPlaceholder: 'تعليق جديد… (⌘/Ctrl+Enter للنشر)',
   paneCommentsPost: 'نشر',
+  paneCommentsNeutralAuthor: 'مستخدم',
 
   paneCsdTitle: 'عروض مخصصة',
   paneCsdDefaultName: 'عرض مخصص {n}',

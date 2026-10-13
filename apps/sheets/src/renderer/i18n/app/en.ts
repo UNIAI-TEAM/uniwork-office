@@ -1427,6 +1427,7 @@ export const en = {
   appThreadReplyPlaceholder: 'Reply…',
   appThreadNewPlaceholder: 'Start a conversation',
   appThreadPost: 'Post',
+  appThreadNeutralAuthor: 'User',
   appThreadResolve: 'Resolve',
   appThreadReopen: 'Reopen',
   appThreadResolved: 'Resolved',

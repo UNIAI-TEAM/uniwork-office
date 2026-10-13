@@ -1438,6 +1438,7 @@ export const vi = {
   appThreadReplyPlaceholder: 'Trả lời…',
   appThreadNewPlaceholder: 'Bắt đầu cuộc trò chuyện',
   appThreadPost: 'Đăng',
+  appThreadNeutralAuthor: 'Người dùng',
   appThreadResolve: 'Giải quyết',
   appThreadReopen: 'Mở lại',
   appThreadResolved: 'Đã giải quyết',

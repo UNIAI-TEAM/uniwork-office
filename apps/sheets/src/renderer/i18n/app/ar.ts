@@ -1410,6 +1410,7 @@ export const ar = {
   appThreadReplyPlaceholder: 'رد…',
   appThreadNewPlaceholder: 'بدء محادثة',
   appThreadPost: 'نشر',
+  appThreadNeutralAuthor: 'مستخدم',
   appThreadResolve: 'حل',
   appThreadReopen: 'إعادة فتح',
   appThreadResolved: 'تم الحل',

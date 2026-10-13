@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { formatAddress } from '@genoffice/xlsx-gateway/domain/cell-address'
 
+import { displayCommentAuthor } from './comment-author'
 import { useI18n } from './i18n/locale'
 import type { ThreadHover } from './threaded-comment-marker'
 import {
@@ -122,7 +123,9 @@ function Entry({
   return (
     <div className="tc-entry">
       <div className="tc-entry-head">
-        <span className="tc-author">{author}</span>
+        <span className="tc-author">
+          {displayCommentAuthor(author, t('appThreadNeutralAuthor'))}
+        </span>
         <span className="tc-time">{formatStamp(dT)}</span>
       </div>
       {editing ? (
@@ -314,7 +317,9 @@ export function ThreadHoverCard({
     <div className="thread-hover-card" style={{ left, top }} role="tooltip">
       <div className="tc-entry">
         <div className="tc-entry-head">
-          <span className="tc-author">{thread.author}</span>
+          <span className="tc-author">
+            {displayCommentAuthor(thread.author, t('appThreadNeutralAuthor'))}
+          </span>
           <span className="tc-time">{formatStamp(thread.dT)}</span>
           {thread.done && <span className="tc-badge">{t('appThreadResolved')}</span>}
         </div>

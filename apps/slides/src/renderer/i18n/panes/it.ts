@@ -62,6 +62,7 @@ export const it = {
   paneCommentsDelete: 'Elimina commento',
   paneCommentsPlaceholder: 'Nuovo commento… (⌘/Ctrl+Invio per pubblicare)',
   paneCommentsPost: 'Pubblica',
+  paneCommentsNeutralAuthor: 'Utente',
 
   paneCsdTitle: 'Presentazioni personalizzate',
   paneCsdDefaultName: 'Presentazione personalizzata {n}',

@@ -6,11 +6,14 @@
  */
 import { Editor } from '@tiptap/core'
 import { parseDocx, saveDocx, type CommentInfo } from '@genoffice/docx-engine'
+import { act, createElement } from 'react'
+import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { buildDocx } from '../../../packages/docx-engine/tests/helpers/build-docx'
 import { blocksToPmDoc, pmDocToSavePlan, type PmNode } from '../src/renderer/editor/convert'
 import { editorExtensions } from '../src/renderer/editor/extensions'
-import { setModuleLang } from '../src/renderer/i18n/locale'
+import { CommentsPanel } from '../src/renderer/components/CommentsPanel'
+import { LocaleProvider, setModuleLang } from '../src/renderer/i18n/locale'
 import {
   NEUTRAL_COMMENT_AUTHOR,
   commentAuthorName,
@@ -178,6 +181,49 @@ describe('comment author source', () => {
       'Nguyễn An',
       'User',
     ])
+    editor.destroy()
+  })
+})
+
+describe('the neutral author shows in the UI language (BE-6 / FE-1)', () => {
+  it('a vi pane shows "Người dùng" for the stored "User"; other names stay verbatim', () => {
+    const editor = new Editor({
+      element: document.createElement('div'),
+      extensions: editorExtensions,
+    })
+    const comments: CommentInfo[] = [
+      { id: '1', author: NEUTRAL_COMMENT_AUTHOR, date: '2026-01-01T00:00:00Z', text: 'root' },
+      { id: '2', author: 'Nguyễn An', date: '2026-01-02T00:00:00Z', text: 're', parentId: '1' },
+    ]
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    const noop = () => undefined
+    act(() =>
+      root.render(
+        createElement(LocaleProvider, {
+          initial: 'vi',
+          children: createElement(CommentsPanel, {
+            comments,
+            docNode: editor.state.doc,
+            composing: false,
+            onSubmitNew: noop,
+            onReply: noop,
+            onEdit: noop,
+            onResolve: noop,
+            onCancelNew: noop,
+            onDelete: noop,
+            onClose: noop,
+          }),
+        }),
+      ),
+    )
+    const names = [...container.querySelectorAll('.comment-author')].map((el) => el.textContent)
+    expect(names).toEqual(['Người dùng', 'Nguyễn An'])
+    // display only: the comment that will be saved still carries the constant
+    expect(comments[0]!.author).toBe('User')
+    act(() => root.unmount())
+    container.remove()
     editor.destroy()
   })
 })

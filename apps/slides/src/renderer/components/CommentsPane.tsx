@@ -6,6 +6,7 @@
  */
 import React, { useEffect, useRef, useState } from 'react'
 import type { SlideComment } from '../../shared/ipc'
+import { displayCommentAuthor } from '../comment-author'
 import { useI18n } from '../i18n/locale'
 import { IconComment, IconSidebarCollapse } from './icons'
 
@@ -40,6 +41,9 @@ export function CommentsPane({
   onCollapse,
 }: Props) {
   const { t, dateLocale } = useI18n()
+  // G8-02: the neutral author ("User" in the file) shows in the UI language
+  const authorLabel = (author: string) =>
+    displayCommentAuthor(author, t('paneCommentsNeutralAuthor'))
   const [draft, setDraft] = useState('')
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -81,9 +85,11 @@ export function CommentsPane({
         {comments.map((c) => (
           <div key={`${c.authorId}-${c.idx}`} className="comment-card">
             <div className="comment-head">
-              <span className="comment-avatar">{(c.initials || c.author).slice(0, 2)}</span>
+              <span className="comment-avatar">
+                {(c.initials || authorLabel(c.author)).slice(0, 2)}
+              </span>
               <span className="comment-meta">
-                <span className="comment-author">{c.author}</span>
+                <span className="comment-author">{authorLabel(c.author)}</span>
                 {c.dt && <span className="comment-time">{fmtDt(c.dt, dateLocale)}</span>}
               </span>
               <button

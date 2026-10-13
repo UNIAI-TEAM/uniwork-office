@@ -1485,6 +1485,7 @@ export const nl = {
   appThreadReplyPlaceholder: 'Beantwoorden…',
   appThreadNewPlaceholder: 'Een gesprek starten',
   appThreadPost: 'Plaatsen',
+  appThreadNeutralAuthor: 'Gebruiker',
   appThreadResolve: 'Oplossen',
   appThreadReopen: 'Heropenen',
   appThreadResolved: 'Opgelost',

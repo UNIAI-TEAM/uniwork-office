@@ -62,6 +62,7 @@ export const vi = {
   paneCommentsDelete: 'Xóa bình luận',
   paneCommentsPlaceholder: 'Bình luận mới… (⌘/Ctrl+Enter để gửi)',
   paneCommentsPost: 'Gửi',
+  paneCommentsNeutralAuthor: 'Người dùng',
 
   paneCsdTitle: 'Trình chiếu tùy chỉnh',
   paneCsdDefaultName: 'Trình chiếu tùy chỉnh {n}',

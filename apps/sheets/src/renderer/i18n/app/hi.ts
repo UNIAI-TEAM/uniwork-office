@@ -1447,6 +1447,7 @@ export const hi = {
   appThreadReplyPlaceholder: 'उत्तर दें…',
   appThreadNewPlaceholder: 'बातचीत शुरू करें',
   appThreadPost: 'पोस्ट करें',
+  appThreadNeutralAuthor: 'उपयोगकर्ता',
   appThreadResolve: 'हल करें',
   appThreadReopen: 'फिर से खोलें',
   appThreadResolved: 'हल किया गया',
