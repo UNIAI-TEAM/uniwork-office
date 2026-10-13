@@ -1182,18 +1182,23 @@ export class UniworkDocsService {
       if (typeof input.path !== 'string' || !input.path) throw new UniworkDocError('not_found')
       const filename = basename(input.path)
       if (!filename) throw new UniworkDocError('not_found')
-      let size: number
-      try {
-        const info = await stat(input.path)
-        if (!info.isFile()) throw new UniworkDocError('not_found')
-        size = info.size
-      } catch (error) {
-        throw error instanceof UniworkDocError ? error : new UniworkDocError('not_found')
-      }
-      if (size > MAX_UPLOAD_BYTES) throw new UniworkDocError('too_large')
+      // the controller is registered before the first await: a Cancel that lands
+      // while the file is still being stat'ed finds the upload and is never
+      // dropped (R2-1)
       const controller = new AbortController()
       this.uploads.set(uploadId, controller)
       try {
+        let size: number
+        try {
+          const info = await stat(input.path)
+          if (!info.isFile()) throw new UniworkDocError('not_found')
+          size = info.size
+        } catch (error) {
+          throw error instanceof UniworkDocError ? error : new UniworkDocError('not_found')
+        }
+        // a Cancel during the stat: answer it before the read and the POST
+        if (controller.signal.aborted) throw cancelledUpload()
+        if (size > MAX_UPLOAD_BYTES) throw new UniworkDocError('too_large')
         let bytes: Uint8Array
         try {
           bytes = new Uint8Array(await readFile(input.path, { signal: controller.signal }))
@@ -1201,6 +1206,8 @@ export class UniworkDocsService {
           if (controller.signal.aborted) throw cancelledUpload()
           throw new UniworkDocError('not_found')
         }
+        // the read can also resolve just as the abort lands: no POST then
+        if (controller.signal.aborted) throw cancelledUpload()
         const total = bytes.byteLength
         this.deps.pushUploadProgress?.({ uploadId, path: input.path, loaded: 0, total })
         const created = await this.api()

@@ -41,6 +41,47 @@ const json = (status: number, body: unknown) =>
 const envelope = (status: number, code: string) => json(status, { error: { code, message: 'x' } })
 const enc = (text: string) => new TextEncoder().encode(text)
 
+/**
+ * R2-1: an upload must be cancellable while its file is still being stat'ed, so
+ * the service registers the upload's AbortController before that await. The
+ * test below holds `stat` open to land the Cancel inside it; with the gate
+ * unset this mock is the real module.
+ */
+const statGate = vi.hoisted(() => ({
+  held: null as Promise<void> | null,
+  entered: null as (() => void) | null,
+}))
+
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>()
+  return {
+    ...actual,
+    stat: vi.fn(async (...args: Parameters<typeof actual.stat>) => {
+      statGate.entered?.()
+      if (statGate.held) await statGate.held
+      return actual.stat(...args)
+    }),
+  }
+})
+
+/** a one-shot latch: `reached` fires when the code hits it, `release` opens it */
+function latch() {
+  let release: () => void = () => undefined
+  let entered: () => void = () => undefined
+  const held = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  const reached = new Promise<void>((resolve) => {
+    entered = resolve
+  })
+  return { held, release, reached, entered }
+}
+
+afterEach(() => {
+  statGate.held = null
+  statGate.entered = null
+})
+
 interface Call {
   method: string
   path: string
@@ -571,6 +612,96 @@ describe('upload a file', () => {
     // the dialog's late Cancel names an upload main no longer holds (never a
     // hidden delete of the document D already created)
     ctx.service.cancelUpload('up-late')
+    expect(server.calls.some((c) => c.method === 'DELETE')).toBe(false)
+  })
+
+  // R2-1 (reviewer probe "cancel during initial stat prevents a later POST"):
+  // the controller is registered before the stat, so a Cancel that lands while
+  // main is still stat'ing the file is not dropped: nothing is read, no POST
+  // starts and the call answers upload_cancelled.
+  it('cancels an upload whose Cancel lands during the stat, before any read or POST', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const stat = latch()
+    statGate.held = stat.held
+    statGate.entered = stat.entered
+    const started = ctx.service.uploadDocument({
+      workspaceId: WS,
+      folderId: null,
+      path: ctx.uploadFile,
+      uploadId: 'up-stat-cancel',
+    })
+    await stat.reached
+    ctx.service.cancelUpload('up-stat-cancel')
+    stat.release()
+    await expect(started).resolves.toEqual({ ok: false, error: 'upload_cancelled' })
+    // nothing left main and no progress was reported for a refused upload
+    expect(server.calls).toHaveLength(0)
+    expect(ctx.progress).toHaveLength(0)
+    // the try/finally lifetime starts with the registration: the settled upload
+    // is no longer held
+    expect((ctx.service as unknown as { uploads: Map<string, AbortController> }).uploads.size).toBe(
+      0,
+    )
+  })
+
+  // R2-2 (reviewer probe "2xx headers before cancellation preserve the created
+  // document"): D accepted the upload before the Cancel landed, so the created
+  // document is returned as usual - the caller's abort is detached from the
+  // body read and no hidden delete follows.
+  it('returns the created document when the Cancel lands after the 201 was accepted', async () => {
+    const server = fakeServer()
+    const original = server.fetch
+    const atBody = latch()
+    const bodyHeld = latch()
+    server.fetch = (async (url: string, init: RequestInit) => {
+      const response = await original(url, init)
+      if (!String(url).endsWith('/documents/files')) return response
+      // the 201's headers are in, its body is held open: the Cancel lands
+      // between the accepted answer and the read of the created document
+      const raw = await response.text()
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          const onAbort = () =>
+            controller.error(new DOMException('The operation was aborted.', 'AbortError'))
+          init.signal?.addEventListener('abort', onAbort, { once: true })
+          bodyHeld.held.then(() => {
+            if (!init.signal?.aborted) {
+              controller.enqueue(new TextEncoder().encode(raw))
+              controller.close()
+            }
+            init.signal?.removeEventListener('abort', onAbort)
+          })
+        },
+      })
+      const accepted = new Response(stream, {
+        status: 201,
+        headers: { 'Content-Type': 'application/json' },
+      })
+      const readJson = accepted.json.bind(accepted)
+      accepted.json = () => {
+        atBody.entered()
+        return readJson()
+      }
+      return accepted
+    }) as typeof server.fetch
+
+    const ctx = setup(server)
+    const uploading = ctx.service.uploadDocument({
+      workspaceId: WS,
+      folderId: null,
+      path: ctx.uploadFile,
+      uploadId: 'up-201-cancel',
+    })
+    await atBody.reached
+    ctx.service.cancelUpload('up-201-cancel')
+    bodyHeld.release()
+    const result = await uploading
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.id).toBe('up_1')
+    // the document D created before the abort is real and was never deleted
+    expect(server.state.documents.has('up_1')).toBe(true)
     expect(server.calls.some((c) => c.method === 'DELETE')).toBe(false)
   })
 })

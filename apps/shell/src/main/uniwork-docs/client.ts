@@ -231,7 +231,9 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
           controller.abort()
         }, call.timeoutMs)
         // the caller's own abort rides the same controller as the deadline: one
-        // signal ends the request body included, whatever started it
+        // signal ends the request, whatever started it. Once D answers an
+        // accepted 2xx the bridge is detached (below), so a Cancel that lands
+        // after the write was accepted still lets the answer be read
         const abortFromCaller = () => controller.abort()
         if (call.signal) {
           if (call.signal.aborted) controller.abort()
@@ -254,6 +256,10 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
             // a redirect means another host or path answered: never followed
             throw new UniworkDocError(isRedirectRefusal(error) ? 'server_error' : 'network')
           }
+          // D accepted the request (2xx): the caller's abort ends its job here,
+          // so its created document is parsed and returned as usual (R2-2).
+          // The deadline above stays armed for a body that never arrives.
+          if (response.ok) call.signal?.removeEventListener('abort', abortFromCaller)
           if (
             response.redirected ||
             (response.status >= 300 && response.status < 400) ||
