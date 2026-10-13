@@ -320,7 +320,11 @@ export function CollabComposer(props: CollabComposerProps) {
             : {})}
           onChange={(e) => {
             setFocused(true)
-            const edit = applyMentionEdit(doc, e.currentTarget.value)
+            const edit = applyMentionEdit(
+              doc,
+              e.currentTarget.value,
+              e.currentTarget.selectionStart,
+            )
             const at = edit.mapCaret(e.currentTarget.selectionStart)
             if (edit.doc.text !== e.currentTarget.value) pendingCaret.current = at
             setCaret(at)
