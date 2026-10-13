@@ -51,6 +51,8 @@ export const pt = {
     'Sua sessão expirou, então a substituição não aconteceu. Suas alterações continuam neste navegador; entre novamente e tente de novo.',
   uwConflictTooLarge:
     'Sua versão ultrapassa o limite de tamanho do UniWork, então não foi possível substituir.',
+  uwConflictDownloadTooLarge:
+    'Sua versão ultrapassa o limite de tamanho do UniWork, então não é possível baixá-la aqui.',
   uwConflictDownloadFailed:
     'Não foi possível baixar sua versão, então o documento não foi recarregado. Tente novamente.',
   uwConflictOfflineWeb:
@@ -115,6 +117,8 @@ export const pt = {
     'Não foi possível carregar a versão {n}. Você ainda está vendo a versão anterior.',
   uwRemoteDeleted: 'Este documento foi excluído no UniWork. Os salvamentos na fila pararam.',
   uwAuthorFallback: 'um membro',
+  uwLockRegion: 'Estado do documento',
+  uwActRetry: 'Tentar novamente',
 
   // S6 new-version bar (web only)
   uwRemoteRevokedWeb:

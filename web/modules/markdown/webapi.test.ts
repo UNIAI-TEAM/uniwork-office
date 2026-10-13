@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 // GO-B4 M-1/M-2 (UNI-1014): window.markdownApi over a mocked frame port.
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { webLanguage } from '../../docs/bridge/browser'
+import { webText } from '../shared/i18n/strings-web'
 import { installModuleBridge } from '../../docs/bridge/module-bridge'
 import { createMockPort, type MockPort } from '../../docs/bridge/testing/mock-port'
 import type { Capabilities } from '../../docs/protocol/types'
@@ -40,6 +42,9 @@ function setup(
     bytes?: Uint8Array
     name?: string
     drafts?: TextWebApiOptions['drafts']
+    downloadMaxBytes?: number
+    revision?: string
+    reloadStore?: TextWebApiOptions['reloadStore']
   } = {},
 ) {
   const mock = createMockPort()
@@ -55,13 +60,26 @@ function setup(
       grants: textModuleGrants,
     },
     globals: {
-      markdownApi: (ctx) => createMarkdownWebApi(ctx, { print, reload, drafts: opts.drafts }),
+      markdownApi: (ctx) =>
+        createMarkdownWebApi(ctx, {
+          print,
+          reload,
+          drafts: opts.drafts,
+          ...(opts.reloadStore ? { reloadStore: opts.reloadStore } : {}),
+        }),
     },
     client: mock.port,
     target,
   })
   const api = target.markdownApi as Api
-  mock.init({ documentId: file.fileId, capabilities: opts.caps ?? FULL })
+  mock.init({
+    documentId: file.fileId,
+    capabilities: opts.caps ?? FULL,
+    ...(opts.revision !== undefined
+      ? { open: { ...mock.openPayload(file.fileId), file: { ...file, revision: opts.revision } } }
+      : {}),
+    ...(opts.downloadMaxBytes !== undefined ? { downloadMaxBytes: opts.downloadMaxBytes } : {}),
+  })
   return { mock, file, api, print, reload }
 }
 
@@ -148,21 +166,22 @@ describe('markdownApi: open and save', () => {
     // any other failure shows the shared sentence of its code, not the host's English message
     mock.override('api.save', () => ({
       ok: false,
-      error: { code: 'forbidden', message: 'You can only view this document.' },
-    }))
-    const denied = await api.save({ text, imageSources: [], mode: 'save' })
-    expect(denied).toEqual({
-      ok: false,
-      error: 'You do not have permission to save this document.',
-    })
-    mock.override('api.save', () => ({
-      ok: false,
       error: { code: 'internal', message: 'Internal Server Error', status: 500 },
     }))
     const server = await api.save({ text, imageSources: [], mode: 'save' })
     expect(server).toEqual({
       ok: false,
       error: 'UniWork had a problem saving. Try again in a moment.',
+    })
+    // a 403 is the revoke lock now, so it comes last: the shared sentence of its code, not the host's English message
+    mock.override('api.save', () => ({
+      ok: false,
+      error: { code: 'forbidden', message: 'You can only view this document.' },
+    }))
+    const denied = await api.save({ text, imageSources: [], mode: 'save' })
+    expect(denied).toEqual({
+      ok: false,
+      error: 'You do not have permission to save this document.',
     })
   })
 
@@ -251,8 +270,11 @@ describe('markdownApi: save conflicts', () => {
     expect(mock.dirty.at(-1)).toBe(false)
   })
 
-  async function hostConflict(caps?: Capabilities) {
-    const s = setup(caps ? { caps } : {})
+  async function hostConflict(caps?: Capabilities, downloadMaxBytes?: number) {
+    const s = setup({
+      ...(caps ? { caps } : {}),
+      ...(downloadMaxBytes !== undefined ? { downloadMaxBytes } : {}),
+    })
     const { text } = await open(s.api)
     s.api.onSaveRequest(() => void s.api.save({ text: `${text}x`, imageSources: [], mode: 'save' }))
     s.api.setDirty(true)
@@ -317,6 +339,42 @@ describe('markdownApi: save conflicts', () => {
     )
     await click('go')
     expect(await granted.res).toMatchObject({ ok: true })
+  })
+
+  it('my version over init.downloadMaxBytes: the download choice is aria-disabled up front', async () => {
+    const granted = await hostConflict({ ...FULL, download: true }, 4)
+    await click('reload')
+    await vi.waitFor(() =>
+      expect(document.querySelector('[data-choice="download"]')).not.toBeNull(),
+    )
+    const choice = document.querySelector('[data-choice="download"]')!
+    expect(choice.getAttribute('aria-disabled')).toBe('true')
+    ;(choice as HTMLElement).click()
+    expect(granted.mock.calls.some((c) => c.type === 'api.download')).toBe(false)
+    await click('back')
+    await click('cancel')
+    await granted.res
+  })
+
+  it('a cap equal to my version leaves the download choice enabled', async () => {
+    // measure the Save the dialog holds: overwrite it once and read what was sent
+    const probe = await hostConflict()
+    await click('overwrite')
+    await click('go')
+    await probe.res
+    const size = lastSave(probe.mock)!.data.byteLength
+    document.body.replaceChildren()
+    const granted = await hostConflict({ ...FULL, download: true }, size)
+    await click('reload')
+    await vi.waitFor(() =>
+      expect(document.querySelector('[data-choice="download"]')).not.toBeNull(),
+    )
+    expect(
+      document.querySelector('[data-choice="download"]')!.getAttribute('aria-disabled'),
+    ).toBeNull()
+    await click('back')
+    await click('cancel')
+    await granted.res
   })
 })
 
@@ -720,5 +778,162 @@ describe('markdownApi: draft recovery (C18)', () => {
     f.api.setDirty(true)
     await f.flush()
     expect(p.records().size).toBe(0)
+  })
+})
+
+// G5-03w: a newer version saved elsewhere (doc.remoteVersion)
+describe('markdownApi: new version on UniWork', () => {
+  const event = (fileId: string, revision: string) => ({
+    document_id: fileId,
+    revision,
+    version_id: `v${revision}`,
+    saved_at: new Date(Date.UTC(2026, 9, 12, 8)).toISOString(),
+    author_name: 'Trần An',
+  })
+  const barText = () => document.querySelector('.uw-remote-bar-text')?.textContent ?? null
+
+  it('clean: the frame reloads on the event version, and no bar is left behind', async () => {
+    const { api, mock, file, reload } = setup({ revision: '10' })
+    await open(api)
+    api.setDirty(false)
+    mock.sendRemoteVersion(event(file.fileId, '12'))
+    await vi.waitFor(() => expect(reload).toHaveBeenCalledOnce())
+    const opens = mock.calls.filter((c) => c.type === 'api.open')
+    expect(opens.at(-1)!.payload).toEqual({ fileId: file.fileId, versionId: 'v12' })
+  })
+
+  describe('the frame restarts for a clean version: the info bar and the reading position survive', () => {
+    const SAVED_AT = Date.UTC(2026, 9, 12, 8)
+    const head12 = (mock: MockPort, file: { fileId: string }) =>
+      mock.override('api.open', () => ({
+        ...mock.openPayload(file.fileId),
+        file: {
+          ...mock.openPayload(file.fileId).file,
+          revision: '12',
+          etag: '12',
+          versionId: 'v12',
+          modifiedAt: SAVED_AT,
+        },
+      }))
+    const stashKey = (fileId: string) => `uw-reload-notice:${fileId}`
+
+    it('stashes the notice and the scrolled elements before the reload, then shows the bar on the next boot', async () => {
+      sessionStorage.clear()
+      document.body.innerHTML = '<div id="root"><div id="scroller"></div></div>'
+      const scroller = document.getElementById('scroller')!
+      Object.defineProperty(scroller, 'scrollTop', { value: 240, writable: true })
+      const first = setup({ revision: '10' })
+      await open(first.api)
+      first.api.setDirty(false)
+      head12(first.mock, first.file)
+      first.mock.sendRemoteVersion(event(first.file.fileId, '12'))
+      await vi.waitFor(() => expect(first.reload).toHaveBeenCalledOnce())
+      // the page is about to go: no bar of this page, the notice waits in the session
+      const stash = JSON.parse(sessionStorage.getItem(stashKey(first.file.fileId))!)
+      expect(stash.notice).toEqual({ revision: '12', author: 'Trần An', savedAt: SAVED_AT })
+      expect(stash.scroll).toEqual([{ path: [0], top: 240 }])
+
+      // the next page: same document, boots on the head
+      document.body.innerHTML = '<div id="root"></div>'
+      const next = setup({ revision: '12' })
+      expect(next.file.fileId).toBe(first.file.fileId)
+      await open(next.api)
+      expect(barText()).toBe(
+        webText(webLanguage(), 'uwRemoteUpdated', {
+          n: '12',
+          author: 'Trần An',
+          time: new Intl.DateTimeFormat(webLanguage(), {
+            dateStyle: 'medium',
+            timeStyle: 'short',
+          }).format(SAVED_AT),
+        }),
+      )
+      expect(document.querySelector('.uw-remote-bar--info')).not.toBeNull()
+      // taken once: a plain reload of the page afterwards shows nothing
+      expect(sessionStorage.getItem(stashKey(first.file.fileId))).toBeNull()
+    })
+
+    it('a boot with nothing stashed shows no bar', async () => {
+      sessionStorage.clear()
+      const { api } = setup({ revision: '12' })
+      await open(api)
+      expect(document.querySelector('.uw-remote-bar')).toBeNull()
+    })
+
+    it('storage that throws only means no bar: the reload still happens', async () => {
+      const { api, mock, file, reload } = setup({
+        revision: '10',
+        reloadStore: {
+          getItem: () => {
+            throw new Error('blocked')
+          },
+          setItem: () => {
+            throw new Error('blocked')
+          },
+          removeItem: () => {},
+        },
+      })
+      await open(api)
+      api.setDirty(false)
+      head12(mock, file)
+      mock.sendRemoteVersion(event(file.fileId, '12'))
+      await vi.waitFor(() => expect(reload).toHaveBeenCalledOnce())
+    })
+  })
+
+  it('dirty: nothing is reloaded and the warn bar offers Reload', async () => {
+    const { api, mock, file, reload } = setup({ revision: '10' })
+    await open(api)
+    api.setDirty(true)
+    mock.sendRemoteVersion(event(file.fileId, '12'))
+    await vi.waitFor(() => expect(barText()).toContain('12'))
+    expect(reload).not.toHaveBeenCalled()
+    expect(document.querySelector('[data-action="reload"]')).not.toBeNull()
+  })
+
+  it('a revoked document locks saving with the status bar', async () => {
+    const { api, mock, file } = setup({ revision: '10' })
+    await open(api)
+    api.setDirty(false)
+    mock.override('api.open', () => {
+      throw Object.assign(new Error('revoked'), { code: 'forbidden', status: 403 })
+    })
+    mock.sendRemoteVersion(event(file.fileId, '12'))
+    await vi.waitFor(() => expect(document.querySelector('.uw-remote-bar--error')).not.toBeNull())
+    const res = await api.save({ text: 'x', imageSources: [], mode: 'save' })
+    expect(res.ok).toBe(false)
+    expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(0)
+  })
+
+  it('doc.blocked locks at once on a dirty document: the bar, saves refused, no reload', async () => {
+    const { api, mock, file, reload } = setup({ revision: '10' })
+    await open(api)
+    api.setDirty(true)
+    mock.sendBlocked({ document_id: file.fileId, reason: 'document_deleted' })
+    expect(document.querySelector('.uw-remote-bar--error')).not.toBeNull()
+    expect(barText()).not.toBeNull()
+    const res = await api.save({ text: 'mine', imageSources: [], mode: 'save' })
+    expect(res.ok).toBe(false)
+    const copy = await api.save({ text: 'mine', imageSources: [], mode: 'saveAs' })
+    expect(copy.ok).toBe(false)
+    expect(mock.calls.filter((c) => c.type === 'api.save' || c.type === 'api.saveAs')).toHaveLength(
+      0,
+    )
+    expect(reload).not.toHaveBeenCalled()
+  })
+
+  it('doc.blocked with an organisation reason: the bar only, the editor usable, Save still reaches the host', async () => {
+    const { api, mock, file } = setup({ revision: '10' })
+    await open(api)
+    api.setDirty(true)
+    mock.sendBlocked({ document_id: file.fileId, reason: 'organization_suspended' })
+    expect(document.querySelector('.uw-remote-bar--error')).not.toBeNull()
+    expect(barText()).toBe(
+      webText(webLanguage(), 'uwRemoteOrgBlockedWeb', {
+        reason: webText(webLanguage(), 'uwReasonSuspended'),
+      }),
+    )
+    expect((await api.save({ text: 'mine', imageSources: [], mode: 'save' })).ok).toBe(true)
+    expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(1)
   })
 })

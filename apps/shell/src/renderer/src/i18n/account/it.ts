@@ -78,6 +78,7 @@ export const it = {
   acctErrWrongDeployment: 'Questo account appartiene a un altro server UniWork.',
   acctErrNotConfigured: 'Questa app non è collegata a un server UniWork.',
   acctErrKeyringUnavailable: 'L’archivio sicuro di questo computer non è disponibile.',
+  acctErrKeystoreLocked: 'Il portachiavi di questo computer è bloccato. Sbloccalo e riprova.',
   acctErrServerError: 'UniWork ha riscontrato un problema. Riprova più tardi.',
   acctErrMalformedResponse: 'UniWork ha inviato una risposta imprevista. Riprova più tardi.',
   wbLoadFailedTitle: 'Impossibile caricare i tuoi dati salvati',

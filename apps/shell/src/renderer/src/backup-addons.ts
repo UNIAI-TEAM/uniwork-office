@@ -262,7 +262,7 @@ export function addonPricingUrl(sku?: AddonSkuId): string {
   const origin =
     (typeof window !== 'undefined' &&
       (window as unknown as { __UNIWOK_ORIGIN?: string }).__UNIWOK_ORIGIN) ||
-    'https://uniwork.app'
+    'https://uniworkos.com'
   const q = sku ? `?sku=${encodeURIComponent(sku)}` : ''
   return `${origin}${PRICING_PATH}${q}`
 }

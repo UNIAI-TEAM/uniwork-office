@@ -98,6 +98,7 @@ import {
   startUniworkCloud,
   stopUniworkAccount,
   onUniworkAccountStatus,
+  uniworkAccountDisplayName,
   uniworkSessionIdentity,
   authorizedRequest,
   uniworkAccount,
@@ -106,7 +107,12 @@ import {
 import { createUniworkDocs, type UniworkDocsHandle } from './uniwork-docs/wiring'
 import { registerUniworkWork } from './uniwork-work/wiring'
 import { refuseLockedOpenPath } from './uniwork-docs/service'
-import { installUniworkModuleSeams } from './uniwork-docs/modules'
+import {
+  COMMENT_AUTHOR_CHANGED_CHANNEL,
+  createCommentAuthorResolver,
+  installUniworkModuleSeams,
+  watchCommentAuthorChanges,
+} from './uniwork-docs/modules'
 import { createModuleSaveRequester } from './uniwork-docs/module-save'
 import { startEditorStatePoll } from './uniwork-docs/editor-state-poll'
 import { IPC_CHANNELS as SHEETS_IPC_CHANNELS } from '../../../sheets/src/shared/ipc-channels'
@@ -350,6 +356,7 @@ import {
   detachedRenameFile,
   detachedSetFileFor,
   detachedWebContentsFor,
+  detachedRetitleFile,
   detachedSetTitleFor,
   detachedWindowForWebContents,
   dockBandFor,
@@ -3144,6 +3151,15 @@ function afterFileMoved(oldPath: string, newPath: string): void {
   const affected = tabManager?.renameTabFile(oldPath, newPath) ?? []
   const detachedAffected = detachedRenameFile(oldPath, newPath)
   if (detachedAffected) affected.push(detachedAffected)
+  notifyEditorsOfMove(affected, oldPath, newPath)
+}
+
+/** every module's own rename IPC for the views whose path moved */
+function notifyEditorsOfMove(
+  affected: Array<{ kind: TabKind; webContents: WebContents }>,
+  oldPath: string,
+  newPath: string,
+): void {
   for (const t of affected) {
     if (t.kind === 'slides') slidesFileRenamed(t.webContents, oldPath, newPath)
     else if (t.kind === 'docs') docsFileRenamed(t.webContents, oldPath, newPath)
@@ -3152,6 +3168,20 @@ function afterFileMoved(oldPath: string, newPath: string): void {
     else if (t.kind === 'html') htmlFileRenamed(t.webContents, oldPath, newPath)
     else if (t.kind === 'pdf') pdfFileRenamed(t.webContents, oldPath, newPath)
   }
+}
+
+/**
+ * S18: a document renamed on the server kept its file name because an editor
+ * holds the working copy (a rename under an open handle is refused on Windows).
+ * The title still has to reach the tab and the editor: re-title the open
+ * tab/window by path and hand the view the module's own rename IPC with
+ * `newPath === path`, the desktop equivalent of the X-02 `file.renamed` event.
+ */
+function afterTitleChanged(path: string, title: string): void {
+  const affected = tabManager?.retitleTabFile(path, title) ?? []
+  const detached = detachedRetitleFile(path, title)
+  if (detached) affected.push(detached)
+  notifyEditorsOfMove(affected, path, path)
 }
 
 function trackedFilesUnder(dir: string): string[] {
@@ -3774,6 +3804,8 @@ const requestUniworkModuleSave = createModuleSaveRequester({
 })
 
 function uniworkDocsWiring() {
+  /** every path a tab or detached editor window shows */
+  const openPaths = (): string[] => [...(tabManager?.openFilePaths() ?? []), ...detachedFilePaths()]
   return {
     shellWindow: () => (shellWindow && !shellWindow.isDestroyed() ? shellWindow : null),
     shellContents: () =>
@@ -3791,9 +3823,39 @@ function uniworkDocsWiring() {
     },
     activePath: () => tabManager?.activeFilePath(),
     reveal: revealShellWindow,
+    // G8-08: the editor showing the path (its preload listens for the reveal)
+    commentsTarget: (path: string) => webContentsForPath(path)?.webContents,
+    // G8-08/R1-2: the path the invoking editor window shows, so its held
+    // reveal is pulled for exactly that path and no other editor's
+    commentsPathFor: (sender: { id: number }) => {
+      for (const path of openPaths()) {
+        const target = webContentsForPath(path)
+        if (target && !target.webContents.isDestroyed() && target.webContents.id === sender.id) {
+          return path
+        }
+      }
+      return undefined
+    },
+    // G8-11: the shell Discussion panel's bridge answers only the shell
+    // window's own webContents, and only for the paths open as its tabs
+    // (detached editor windows have no panel)
+    discussionTabPaths: (sender: { id: number }) =>
+      shellWindow && !shellWindow.isDestroyed() && shellWindow.webContents.id === sender.id
+        ? (tabManager?.openFilePaths() ?? [])
+        : null,
+    discussionTarget: (path: string) =>
+      shellWindow && !shellWindow.isDestroyed() && tabManager?.findTabByPath(path)
+        ? shellWindow.webContents
+        : null,
+    setDiscussionPanel: (sender: { id: number }, panel: { open: boolean; width: number }) => {
+      if (!shellWindow || shellWindow.isDestroyed() || shellWindow.webContents.id !== sender.id) {
+        return
+      }
+      tabManager?.setDiscussionPanel(panel)
+    },
     lang: () => currentLang(),
     defaultSaveDir: () => defaultSaveDir(),
-    openPaths: () => [...(tabManager?.openFilePaths() ?? []), ...detachedFilePaths()],
+    openPaths,
     closePath: async (path: string) => {
       const tabsClosed = tabManager ? await tabManager.closeTabsShowing(path) : true
       return (await closeDetachedByPath(path)) && tabsClosed
@@ -3807,6 +3869,14 @@ function uniworkDocsWiring() {
     },
     aiHistoryPaths: () => projectFilePaths(),
     forgetAiHistory: (paths: string[]) => projectForgetFiles(paths),
+    // S18: a document renamed on the server renamed its working copy on disk;
+    // the shell re-keys the tab, the recents/project entries and tells the
+    // editor - exactly the path a Home-list rename takes (the desktop host's
+    // equivalent of the X-02 `file.renamed` frame event)
+    notifyPathRenamed: (oldPath: string, newPath: string) => afterFileMoved(oldPath, newPath),
+    // the copy kept its name (an editor holds it): re-title the open tab/window
+    // by path and tell the editor, without moving any file
+    notifyTitleRenamed: (path: string, title: string) => afterTitleChanged(path, title),
   }
 }
 
@@ -4197,8 +4267,17 @@ function registerHomeIpc(): void {
     authorized: (call) => authorizedRequest(call),
     openExternal: (url) => shell.openExternal(url),
   })
-  installUniworkModuleSeams(uniworkDocs.service)
   const uniworkService = uniworkDocs.service
+  // G8-02: the single comment-author source. A bound document takes the
+  // signed-in account's display name; local files and signed-out sessions take
+  // the neutral constant — the OS account name is never an author.
+  installUniworkModuleSeams(
+    uniworkService,
+    createCommentAuthorResolver({
+      isBound: (path) => uniworkService.isBound(path),
+      displayName: uniworkAccountDisplayName,
+    }),
+  )
   // the chip reads "Unsaved changes" while an editor holds edits not saved yet
   startEditorStatePoll({
     editorDirtyStates: async (wanted) => (await tabManager?.editorDirtyStates(wanted)) ?? [],
@@ -6445,6 +6524,16 @@ app.whenReady().then(async () => {
   // My AI and workbench data follow the signed-in account (sign-out = signed-out bucket)
   syncWorkbenchOwner()
   onUniworkAccountStatus(() => syncWorkbenchOwner())
+  // G8-02: editors that cache the comment author re-ask when the signed-in
+  // display name changes (sign-in, sign-out, automatic session expiry)
+  watchCommentAuthorChanges({
+    onStatus: onUniworkAccountStatus,
+    displayName: uniworkAccountDisplayName,
+    broadcast: () => {
+      for (const wc of webContents.getAllWebContents())
+        if (!wc.isDestroyed()) wc.send(COMMENT_AUTHOR_CHANGED_CHANNEL)
+    },
+  })
   startUniworkCloud()
   authCallbacks.start(routeAuthCallback)
   // UniWork document launch links (held since startup) route from here on

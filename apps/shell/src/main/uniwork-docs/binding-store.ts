@@ -8,6 +8,7 @@ import type {
   UniworkSaveState,
 } from '../../shared/home-api'
 import { atomicWriteFile } from '../atomic-write'
+import { APP_STORE_LEVEL, readStoreGate } from '../uniwork-sync/store-level'
 import { formatForName, isDecimalString } from './formats'
 
 /**
@@ -20,7 +21,11 @@ import { formatForName, isDecimalString } from './formats'
  */
 
 export const BINDING_FILE = 'binding.json'
-/** the bytes of a pending save intent, kept so a replay sends the same payload */
+/**
+ * The bytes of a pending save intent as pre-store builds kept them, beside
+ * the binding. This build never writes one (the intent lives in the durable
+ * store); the schema 1 -> 2 migration reads and deletes the leftovers.
+ */
 export const INTENT_PAYLOAD_FILE = 'pending-upload.bin'
 /** at the root: who last had a live session (see readLastOwner) */
 export const LAST_OWNER_FILE = 'last-account.json'
@@ -30,19 +35,9 @@ export interface LastOwner {
   deploymentId: string
 }
 
-export interface PendingIntent {
-  intentId: string
-  idempotencyKey: string
-  documentId: string
-  /** decimal string */
-  baseRevision: string
-  /** sha256 hex of the payload bytes */
-  checksum: string
-  createdAt: string
-}
-
 export interface Binding {
-  schema: 1
+  /** the schema this build reads and writes; schema 1 is upgraded on the next write */
+  schema: 2
   documentId: string
   workspaceId: string
   orgId: string
@@ -56,7 +51,10 @@ export interface Binding {
   state: UniworkSaveState
   error?: UniworkDocErrorCode
   serverRevision?: string
-  pendingIntent?: PendingIntent
+  /** OQ-P4 (b): the store generation this copy needs (written as `min_store_level`) */
+  minStoreLevel: number
+  /** OQ-P4 (b): the build that wrote it, display only (written as `min_app_version`) */
+  minAppVersion: string
   lastSavedAt?: string
 }
 
@@ -67,27 +65,35 @@ export interface BoundDocument {
   dir: string
   deploymentId: string
   userId: string
+  /** the document key: the working-copy folder segment (a version copy has its own) */
+  key: string
   binding: Binding
 }
 
 /**
  * How this build reads a binding.json value, without parsing it: `current` is
- * schema 1 (the store this build writes), `newer` an integer schema >= 2 (a
- * store a newer app wrote: not read here, and never treated as a plain local
- * file), `unrecognized` anything else (no or garbage schema, non-JSON).
+ * a store this build reads (schema 1 - the legacy form - and schema 2 whose
+ * `min_store_level` is inside this build's window), `newer` a store it must
+ * not read (schema >= 3, or a schema-2 `min_store_level` missing, malformed or
+ * above this build: the G5-04g S11 lock), `unrecognized` anything else (no or
+ * garbage schema, non-JSON).
  */
 export type BindingKind = 'current' | 'newer' | 'unrecognized'
 
 /**
- * min_app_version is deliberately not looked at: G5-04g refuses every integer
- * schema >= 2 whatever that field says (OQ-P4).
+ * OQ-P4 (b): what this build does with the store the binding declares. Schema
+ * 1 is this app's own legacy form and opens; schema 2 needs a safe-integer
+ * `min_store_level` in 1..APP_STORE_LEVEL; schema >= 3 belongs to a newer app,
+ * as does a malformed schema-2 level (the G5-04g rule). `min_app_version` is
+ * never a gate: it is read for display only.
  */
 export function bindingKindOf(raw: unknown): BindingKind {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return 'unrecognized'
   const schema = (raw as Record<string, unknown>).schema
   if (typeof schema !== 'number' || !Number.isSafeInteger(schema)) return 'unrecognized'
   if (schema === 1) return 'current'
-  return schema >= 2 ? 'newer' : 'unrecognized'
+  if (schema >= 2) return readStoreGate(raw) === 'open' ? 'current' : 'newer'
+  return 'unrecognized'
 }
 
 /** how `BindingStore.classify` reads a path: one binding.json read, three outcomes */
@@ -110,6 +116,57 @@ export function bindingKindAt(dir: string): BindingKind | null {
     return bindingKindOf(JSON.parse(readFileSync(join(dir, BINDING_FILE), 'utf8')))
   } catch {
     return null
+  }
+}
+
+/** the document file name a folder's lock shows: the first in sorted order, so it is deterministic */
+export function documentNameIn(dir: string): string {
+  let name = basename(dir)
+  try {
+    name =
+      readdirSync(dir)
+        .sort()
+        .find((entry) => formatForName(entry) !== null) ?? name
+  } catch {
+    // unreadable folder: the folder's own name is all there is
+  }
+  return name
+}
+
+/**
+ * The working-copy folders of one account boundary:
+ * `<root>/<deploymentId>/<accountId>/<documentKey>/...`. The migration walks
+ * them; anything unreadable is skipped rather than failing the walk.
+ */
+export function scopeWorkingCopyDirs(
+  root: string,
+  scope: { deploymentId: string; accountId: string },
+): string[] {
+  const scopeDir = join(resolve(root), scope.deploymentId, scope.accountId)
+  try {
+    return readdirSync(scopeDir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => join(scopeDir, entry.name))
+  } catch {
+    return []
+  }
+}
+
+/**
+ * True while `dir` still holds a pre-store pending upload: a schema-1
+ * binding.json that carries a `pendingIntent` plus the `pending-upload.bin`
+ * bytes beside it. Only the schema 1 -> 2 migration (and the S11 lock while
+ * the store cannot open) cares about either file.
+ */
+export function hasLegacyIntentFiles(dir: string): boolean {
+  if (!existsSync(join(dir, INTENT_PAYLOAD_FILE))) return false
+  try {
+    const raw = JSON.parse(readFileSync(join(dir, BINDING_FILE), 'utf8')) as unknown
+    if (!raw || typeof raw !== 'object') return false
+    const r = raw as Record<string, unknown>
+    return r.schema === 1 && r.pendingIntent !== undefined
+  } catch {
+    return false
   }
 }
 
@@ -136,35 +193,16 @@ function isStr(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0
 }
 
-function parseIntent(raw: unknown): PendingIntent | undefined | null {
-  if (raw === undefined) return undefined
-  if (!raw || typeof raw !== 'object') return null
-  const r = raw as Record<string, unknown>
-  if (
-    !isStr(r.intentId) ||
-    !isStr(r.idempotencyKey) ||
-    !isStr(r.documentId) ||
-    !isDecimalString(r.baseRevision) ||
-    !isStr(r.checksum) ||
-    !isStr(r.createdAt)
-  ) {
-    return null
-  }
-  return {
-    intentId: r.intentId,
-    idempotencyKey: r.idempotencyKey,
-    documentId: r.documentId,
-    baseRevision: r.baseRevision,
-    checksum: r.checksum,
-    createdAt: r.createdAt,
-  }
-}
-
-/** a binding read back from disk; null for anything not exactly this schema */
+/**
+ * A binding read back from disk, normalized to what this build writes: a
+ * schema-1 value reads as its schema-2 form (the next write stamps it), and a
+ * schema-2 value is read only when the store gate opens (`newer` values never
+ * reach here). null for anything not exactly one of those schemas.
+ */
 export function parseBinding(raw: unknown): Binding | null {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  if (bindingKindOf(raw) !== 'current') return null
   const r = raw as Record<string, unknown>
-  if (r.schema !== 1) return null
+  const schema2 = r.schema === 2
   if (!isStr(r.documentId) || !isStr(r.workspaceId) || !isStr(r.title) || !isStr(r.filename))
     return null
   if (typeof r.orgId !== 'string') return null
@@ -173,11 +211,11 @@ export function parseBinding(raw: unknown): Binding | null {
   if (!isDecimalString(r.baseRevision) || typeof r.baseChecksum !== 'string') return null
   if (typeof r.baseVersion !== 'number' || !Number.isSafeInteger(r.baseVersion)) return null
   if (!isStr(r.state) || !STATES.has(r.state)) return null
-  const intent = parseIntent(r.pendingIntent)
-  if (intent === null) return null
   if (r.serverRevision !== undefined && !isDecimalString(r.serverRevision)) return null
+  const minStoreLevel = schema2 ? (r.min_store_level as number) : APP_STORE_LEVEL
+  const minAppVersion = typeof r.min_app_version === 'string' ? r.min_app_version : ''
   return {
-    schema: 1,
+    schema: 2,
     documentId: r.documentId,
     workspaceId: r.workspaceId,
     orgId: r.orgId,
@@ -188,20 +226,48 @@ export function parseBinding(raw: unknown): Binding | null {
     baseRevision: r.baseRevision,
     baseVersion: r.baseVersion,
     baseChecksum: r.baseChecksum,
-    // a save cannot still be running after a restart: it is retried from its intent
-    state: r.state === 'saving' ? (intent ? 'offline' : 'dirty') : (r.state as UniworkSaveState),
+    // a save cannot still be running after a restart: its intent is replayed
+    // from the durable store, so nothing is kept here
+    state: r.state === 'saving' ? 'dirty' : (r.state as UniworkSaveState),
     ...(typeof r.error === 'string' ? { error: r.error as UniworkDocErrorCode } : {}),
     ...(isDecimalString(r.serverRevision) ? { serverRevision: r.serverRevision } : {}),
-    ...(intent ? { pendingIntent: intent } : {}),
+    minStoreLevel,
+    minAppVersion,
     ...(typeof r.lastSavedAt === 'string' ? { lastSavedAt: r.lastSavedAt } : {}),
   }
 }
 
+/**
+ * The binding.json value of a binding: schema 2 with `min_store_level` and
+ * `min_app_version` (the OQ-P4 field names the reader gate looks at).
+ */
+export function bindingJson(binding: Binding): Record<string, unknown> {
+  const { minStoreLevel, minAppVersion, ...rest } = binding
+  return {
+    ...rest,
+    schema: 2,
+    min_store_level: minStoreLevel,
+    min_app_version: minAppVersion,
+  }
+}
+
+/**
+ * True while the binding.json of `dir` must not be rewritten: the schema 1 -> 2
+ * sweep still owns that working copy, and a rewrite would stamp schema 2 and
+ * drop `pendingIntent` - the only replayable record of the pre-store save while
+ * `pending-upload.bin` holds its bytes. Injected by the service (the one choke
+ * point every binding rewrite goes through); the sweep itself writes with
+ * atomicWriteFile, so its own guard never refuses it.
+ */
+export type BindingWriteHold = (dir: string) => boolean
+
 export class BindingStore {
   readonly root: string
+  private readonly holdWrite: BindingWriteHold
 
-  constructor(root: string) {
+  constructor(root: string, holdWrite: BindingWriteHold = () => false) {
     this.root = resolve(root)
+    this.holdWrite = holdWrite
   }
 
   /** the working-copy folder of one document (historical versions get their own key) */
@@ -229,7 +295,7 @@ export class BindingStore {
       return null
     }
     if (!binding || binding.filename !== filename) return null
-    return { path: full, dir, deploymentId, userId, binding }
+    return { path: full, dir, deploymentId, userId, key, binding }
   }
 
   /** the working-copy folder of `path` and its three segments, or null when the path is not one of ours */
@@ -267,10 +333,10 @@ export class BindingStore {
     }
     const binding = parseBinding(raw)
     if (!binding || binding.filename !== basename(full)) return { kind: 'plain' }
-    const [deploymentId, userId] = found.parts as [string, string, string, string]
+    const [deploymentId, userId, key] = found.parts as [string, string, string, string]
     return {
       kind: 'bound',
-      doc: { path: full, dir: found.dir, deploymentId, userId, binding },
+      doc: { path: full, dir: found.dir, deploymentId, userId, key, binding },
     }
   }
 
@@ -293,17 +359,20 @@ export class BindingStore {
    */
   newerStoreIn(dir: string): NewerStore | null {
     if (bindingKindAt(dir) !== 'newer') return null
-    let name = basename(dir)
-    try {
-      // sorted, so the lock's name does not depend on the readdir order
-      name =
-        readdirSync(dir)
-          .sort()
-          .find((entry) => formatForName(entry) !== null) ?? name
-    } catch {
-      // unreadable folder: the folder's own name is all there is
-    }
+    const name = documentNameIn(dir)
     return { path: join(dir, name), name }
+  }
+
+  /**
+   * True while the working copy at `path` still holds a pre-store pending
+   * upload (a schema-1 binding.json with a pendingIntent and its
+   * pending-upload.bin). The store-backed save never writes either file; until
+   * the schema 1 -> 2 migration moved the intent, opening such a copy needs the
+   * durable store, so a locked one is refused with the S11 `keystore_locked`.
+   */
+  legacyIntentAt(path: string): boolean {
+    const found = this.workingCopy(path)
+    return found !== null && hasLegacyIntentFiles(found.dir)
   }
 
   /** the binding of a document folder (any working-copy name), or null */
@@ -315,12 +384,21 @@ export class BindingStore {
     }
   }
 
-  async write(dir: string, binding: Binding): Promise<void> {
+  /**
+   * Writes the binding atomically. Resolves `false`, writing nothing, while
+   * `holdWrite` says the schema 1 -> 2 sweep still owns this folder: every
+   * binding rewrite - save, status refresh, open, conflict flow - goes through
+   * here, so no caller can drop a `pendingIntent` the sweep has not moved yet.
+   * `true` once the write landed (a resolve without a throw is still a write).
+   */
+  async write(dir: string, binding: Binding): Promise<boolean> {
+    if (this.holdWrite(dir)) return false
     await mkdir(dir, { recursive: true })
     await atomicWriteFile(
       join(dir, BINDING_FILE),
-      new TextEncoder().encode(`${JSON.stringify(binding, null, 2)}\n`),
+      new TextEncoder().encode(`${JSON.stringify(bindingJson(binding), null, 2)}\n`),
     )
+    return true
   }
 
   async writeWorkingCopy(dir: string, filename: string, bytes: Uint8Array): Promise<string> {
@@ -332,10 +410,6 @@ export class BindingStore {
 
   async removeWorkingCopy(dir: string, filename: string): Promise<void> {
     await unlink(join(dir, basename(filename))).catch(() => undefined)
-  }
-
-  async writeIntentPayload(dir: string, bytes: Uint8Array): Promise<void> {
-    await atomicWriteFile(join(dir, INTENT_PAYLOAD_FILE), bytes)
   }
 
   async readIntentPayload(dir: string): Promise<Uint8Array | null> {

@@ -866,6 +866,26 @@ describe('file path bookkeeping', () => {
     expect(onChanged).not.toHaveBeenCalled()
   })
 
+  // F1 (S18): a document renamed on the web keeps its file name under an open
+  // editor, so the tab is re-titled by path without re-keying it.
+  it('re-titles an open tab by path without moving its file', () => {
+    manager.openDocsTab('/tmp/Q4 plan.docx')
+    const view = lastCreatedView(createDocsView)
+    const affected = manager.retitleTabFile('/tmp/Q4 plan.docx', 'Q4 plan v2.docx')
+    expect(affected).toEqual([{ kind: 'docs', webContents: view.webContents }])
+    expect(manager.list()[1].title).toBe('Q4 plan v2.docx')
+    // the path is untouched: nothing moved on disk
+    expect(manager.findDocsTabByPath('/tmp/Q4 plan.docx')).toBe('t1')
+  })
+
+  it('re-titles the same path only once, and reports nothing when it matches none', () => {
+    manager.openDocsTab('/tmp/Q4 plan.docx')
+    expect(manager.retitleTabFile('/tmp/Q4 plan.docx', 'Q4 plan v2.docx')).toHaveLength(1)
+    // the title already carries the new value: no second change, no re-render
+    expect(manager.retitleTabFile('/tmp/Q4 plan.docx', 'Q4 plan v2.docx')).toEqual([])
+    expect(manager.retitleTabFile('/tmp/other.docx', 'Nope.docx')).toEqual([])
+  })
+
   /**
    * One case per TabKind a file can live in. The shell dispatches a rename to a
    * per-app hook on the kind renameTabFile reports, so a kind with no case here
@@ -1300,5 +1320,88 @@ describe('detach / attach (Open in New Window, tear-off, dock)', () => {
     expect(teardownDocsRenderer).toHaveBeenCalledWith(record.view.webContents)
     expect(record.view.webContents.close).not.toHaveBeenCalled()
     expect(manager.list()).toHaveLength(1)
+  })
+})
+
+describe('the Discussion panel narrows the active editor view (G8-11 D1)', () => {
+  const full = {
+    x: 0,
+    y: TAB_STRIP_HEIGHT,
+    width: WINDOW_WIDTH,
+    height: WINDOW_HEIGHT - TAB_STRIP_HEIGHT,
+  }
+
+  it('takes the clamped panel width off the right edge and restores it on close', () => {
+    manager.openDocsTab()
+    const view = lastCreatedView(createDocsView)
+    manager.setDiscussionPanel({ open: true, width: 320 })
+    expect(view.setBounds).toHaveBeenLastCalledWith({ ...full, width: WINDOW_WIDTH - 320 })
+    // wider than the window allows: the editor keeps its minimum (800 - 360)
+    manager.setDiscussionPanel({ open: true, width: 1000 })
+    expect(view.setBounds).toHaveBeenLastCalledWith({ ...full, width: 360 })
+    // narrower than the panel minimum: clamped up to 280
+    manager.setDiscussionPanel({ open: true, width: 10 })
+    expect(view.setBounds).toHaveBeenLastCalledWith({ ...full, width: WINDOW_WIDTH - 280 })
+    manager.setDiscussionPanel({ open: false, width: 320 })
+    expect(view.setBounds).toHaveBeenLastCalledWith(full)
+  })
+
+  it('re-applies on tab switch and on window resize', () => {
+    const docsId = manager.openDocsTab()
+    const docsView = lastCreatedView(createDocsView)
+    manager.openSheetsTab()
+    const sheetsView = lastCreatedView(createSheetsView)
+    manager.setDiscussionPanel({ open: true, width: 300 })
+    expect(sheetsView.setBounds).toHaveBeenLastCalledWith({ ...full, width: WINDOW_WIDTH - 300 })
+    manager.activateTab(docsId)
+    expect(docsView.setBounds).toHaveBeenLastCalledWith({ ...full, width: WINDOW_WIDTH - 300 })
+
+    shellWindow.getContentBounds = () => ({ x: 0, y: 0, width: 1200, height: WINDOW_HEIGHT })
+    manager.layout()
+    expect(docsView.setBounds).toHaveBeenLastCalledWith({ ...full, width: 1200 - 300 })
+    // a narrow window: the editor keeps its 360 minimum, the panel shrinks
+    shellWindow.getContentBounds = () => ({ x: 0, y: 0, width: 500, height: WINDOW_HEIGHT })
+    manager.layout()
+    expect(docsView.setBounds).toHaveBeenLastCalledWith({ ...full, width: 360 })
+  })
+
+  it('a full-bleed view (slideshow, HTML fullscreen) ignores the panel', () => {
+    manager.openSlidesTab()
+    const view = lastCreatedView(createSlidesView)
+    manager.setDiscussionPanel({ open: true, width: 320 })
+    view.webContents.listeners.get('enter-html-full-screen')!()
+    expect(view.setBounds).toHaveBeenLastCalledWith({
+      x: 0,
+      y: 0,
+      width: WINDOW_WIDTH,
+      height: WINDOW_HEIGHT,
+    })
+  })
+
+  it('bounds are computed for the tab being shown, not the one being left (W11A-3)', () => {
+    manager.openSlidesTab()
+    const slidesId = manager.list().find((t) => t.kind === 'slides')!.id
+    const slides = lastCreatedView(createSlidesView)
+    const docsId = manager.openDocsTab()
+    const docs = lastCreatedView(createDocsView)
+    manager.activateTab(slidesId)
+    manager.setDiscussionPanel({ open: true, width: 320 })
+    slides.webContents.listeners.get('enter-html-full-screen')!()
+    const bleed = { x: 0, y: 0, width: WINDOW_WIDTH, height: WINDOW_HEIGHT }
+    expect(slides.setBounds).toHaveBeenLastCalledWith(bleed)
+    // leaving the slideshow tab: the new view is narrowed by the open panel and
+    // sits under the tab strip, not full-window
+    manager.activateTab(docsId)
+    expect(docs.setBounds).toHaveBeenLastCalledWith({ ...full, width: WINDOW_WIDTH - 320 })
+    // coming back to the slideshow tab: full-bleed again, the panel is ignored
+    manager.activateTab(slidesId)
+    expect(slides.setBounds).toHaveBeenLastCalledWith(bleed)
+  })
+
+  it('a malformed width closes nothing open by accident and narrows nothing', () => {
+    manager.openDocsTab()
+    const view = lastCreatedView(createDocsView)
+    manager.setDiscussionPanel({ open: true, width: Number.NaN })
+    expect(view.setBounds).toHaveBeenLastCalledWith(full)
   })
 })

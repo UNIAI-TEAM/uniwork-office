@@ -470,11 +470,12 @@
   cursor: pointer;
 }
 
-.set-btn:hover {
+.set-btn:hover:not([aria-disabled='true']) {
   background: var(--bg-hover-strong);
 }
 
-.set-btn:disabled {
+.set-btn:disabled,
+.set-btn[aria-disabled='true'] {
   opacity: 0.55;
   cursor: default;
 }
@@ -485,7 +486,7 @@
   color: var(--color-btn-primary-text);
 }
 
-.set-btn.primary:hover {
+.set-btn.primary:hover:not([aria-disabled='true']) {
   background: var(--color-btn-primary-hover);
 }
 
@@ -1219,6 +1220,7 @@
 
 .acct-card {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   padding: 12px;
@@ -1245,7 +1247,8 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
-  flex: 1;
+  /* wraps under the avatar before the email has to break inside a word */
+  flex: 1 1 10rem;
 }
 
 .acct-card-name {
@@ -1258,7 +1261,8 @@
 .acct-card-email {
   font-size: 12px;
   color: var(--text-secondary);
-  overflow-wrap: anywhere;
+  /* only a single token wider than the whole card breaks inside a word */
+  overflow-wrap: break-word;
 }
 
 .acct-card-sync {
@@ -1342,6 +1346,211 @@
 .acct-org-dd .gs-dd-btn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
+}
+
+/* working-organization popup: grows leftwards from the trigger's right edge
+ * (the value sits at the row end), wide enough for a reason line, and never
+ * wider than the window */
+.acct-org-dd .gs-dd-pop {
+  left: auto;
+  right: anchor(right);
+  min-width: max(220px, anchor-size(width));
+  max-width: calc(100vw - 48px);
+}
+
+.acct-org-dd .gs-dd-item {
+  white-space: normal;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.acct-org-opt {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.acct-org-opt-name {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.acct-org-opt-reason {
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--danger-text);
+}
+
+/* organization step after sign-in (account in several organizations) */
+.uw-org-step {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--surface-subtle);
+}
+
+.uw-org-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.uw-org-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.uw-org-body,
+.uw-org-gone {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.uw-org-gone {
+  padding: 6px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--text-primary);
+}
+
+.uw-org-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.uw-org-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.uw-org-row:hover {
+  background: var(--hover);
+}
+
+.uw-org-row.checked {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.uw-org-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.uw-org-row.locked {
+  cursor: default;
+  background: var(--surface);
+}
+
+.uw-org-row.locked .uw-org-name {
+  color: var(--text-muted);
+}
+
+.uw-org-radio {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface);
+}
+
+.uw-org-row.checked .uw-org-radio {
+  border: 5px solid var(--accent);
+}
+
+.uw-org-row.locked .uw-org-radio {
+  border-style: dashed;
+}
+
+.uw-org-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.uw-org-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.uw-org-role,
+.uw-org-reason {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.uw-org-reason {
+  color: var(--danger-text);
+}
+
+.uw-org-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.uw-org-actions .set-btn {
+  gap: 6px;
+}
+
+.uw-org-actions .set-btn[aria-disabled='true'] {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.uw-org-actions .set-btn:focus-visible,
+.uw-org-blocked .set-btn:focus-visible,
+.uw-org-error .set-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.uw-org-blocked,
+.uw-org-error {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.uw-org-blocked .acct-notice-text,
+.uw-org-error .acct-notice-text {
+  flex: 1 1 12rem;
+}
+
+.uw-org-error .acct-notice-title {
+  font-weight: 400;
+}
+
+.uw-org-error .set-btn {
+  flex-shrink: 0;
+}
+
+@media (pointer: coarse) {
+  .uw-org-actions .set-btn,
+  .uw-org-blocked .set-btn,
+  .uw-org-error .set-btn {
+    height: 44px;
+  }
 }
 
 /* UniWork cloud AI (Settings → Account rows, AI media notice) */

@@ -77,6 +77,7 @@ export const id = {
   acctErrWrongDeployment: 'Akun ini milik server UniWork yang berbeda.',
   acctErrNotConfigured: 'Aplikasi ini belum terhubung ke server UniWork.',
   acctErrKeyringUnavailable: 'Penyimpanan aman di komputer ini tidak tersedia.',
+  acctErrKeystoreLocked: 'Keychain di komputer ini terkunci. Buka kuncinya, lalu coba lagi.',
   acctErrServerError: 'UniWork mengalami masalah. Silakan coba lagi nanti.',
   acctErrMalformedResponse: 'UniWork mengirim respons yang tidak terduga. Silakan coba lagi nanti.',
   wbLoadFailedTitle: 'Data tersimpan Anda tidak dapat dimuat',

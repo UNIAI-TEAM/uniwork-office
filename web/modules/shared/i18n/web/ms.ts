@@ -51,6 +51,8 @@ export const ms = {
   uwConflictSessionWeb:
     'Sesi anda telah tamat tempoh, jadi tulis ganti tidak berlaku. Perubahan anda kekal dalam pelayar ini; log masuk semula dan cuba lagi.',
   uwConflictTooLarge: 'Versi anda melebihi had saiz UniWork, jadi tidak dapat menulis ganti.',
+  uwConflictDownloadTooLarge:
+    'Versi anda melebihi had saiz UniWork, jadi tidak dapat dimuat turun di sini.',
   uwConflictDownloadFailed:
     'Tidak dapat memuat turun versi anda, jadi dokumen tidak dimuat semula. Cuba lagi.',
   uwConflictOfflineWeb:
@@ -113,6 +115,8 @@ export const ms = {
   uwRemoteReloadFailed: 'Tidak dapat memuatkan versi {n}. Anda masih melihat versi sebelumnya.',
   uwRemoteDeleted: 'Dokumen ini dipadam di UniWork. Simpanan dalam baris gilir dihentikan.',
   uwAuthorFallback: 'seorang ahli',
+  uwLockRegion: 'Status dokumen',
+  uwActRetry: 'Cuba lagi',
 
   // S6 new-version bar (web only)
   uwRemoteRevokedWeb:

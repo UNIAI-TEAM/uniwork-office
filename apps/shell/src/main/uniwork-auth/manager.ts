@@ -1,8 +1,16 @@
 import type { AccountEntitlements, AccountErrorCode, AccountStatus } from '../../shared/home-api'
 import { isAuthCallbackUrl, validateCallback } from './callback'
-import type { StoredCredential } from './credentials'
+import { CredentialStoreError, type StoredCredential } from './credentials'
 import { redirectUriForProfile, type DeploymentProfile } from './deployment'
-import { pickOrg, toAccountOrg, toEntitlements, toProfile } from './mapping'
+import {
+  classifyTransportFailure,
+  rememberedOrgFor,
+  resolveOrgChoice,
+  toAccountOrg,
+  toEntitlements,
+  toProfile,
+  type FailureOutcome,
+} from './mapping'
 import { LoginAttemptStore, type PendingLoginAttempt } from './pkce'
 import {
   ACCESS_TOKEN_SKEW_MS,
@@ -11,7 +19,13 @@ import {
   type AccountManagerDeps,
   type LiveSession,
 } from './session-core'
-import { TransportError, type DesktopSession, type UniworkTransport } from './transport'
+import {
+  TransportError,
+  type DesktopSession,
+  type OrgMembershipResponse,
+  type OrgResponse,
+  type UniworkTransport,
+} from './transport'
 
 export type { AccountManagerDeps } from './session-core'
 
@@ -79,8 +93,14 @@ export class AccountManager extends SessionCore {
     let credential: StoredCredential | null
     try {
       credential = this.deps.credentials.load()
-    } catch {
-      this.setState('keyring-unavailable', 'keyring_unavailable')
+    } catch (error) {
+      // a locked keystore is transient (retry once unlocked) and keeps the
+      // saved profile; a missing keyring is the permanent keyring-unavailable
+      if (error instanceof CredentialStoreError && error.code === 'keystore_locked') {
+        this.setState('keystore-locked', 'keystore_locked')
+      } else {
+        this.setState('keyring-unavailable', 'keyring_unavailable')
+      }
       return null
     }
     if (!credential) {
@@ -102,7 +122,8 @@ export class AccountManager extends SessionCore {
     // (or while it cannot be reached)
     const org = credential.org
     if (org && typeof org.id === 'string' && typeof org.name === 'string') {
-      this.org = { ...org, status: 'active' }
+      // display-only until the server answers: a cached org is shown as active
+      this.org = { id: org.id, name: org.name, slug: org.slug, role: org.role, status: 'active' }
       this.orgs = [this.org]
       if (credential.entitlements?.orgId === org.id)
         this.cachedEntitlements = credential.entitlements
@@ -166,6 +187,12 @@ export class AccountManager extends SessionCore {
     // be stored encrypted: otherwise the redeemed code would orphan a device
     if (this.state === 'keyring-unavailable' && !this.deps.credentials.canStore()) {
       this.emitLogin({ phase: 'error', error: 'keyring_unavailable' })
+      return false
+    }
+    // a locked keystore cannot be written: refuse before opening a browser, so
+    // the redeemed code never overwrites the saved credential
+    if (this.state === 'keystore-locked' && !this.deps.credentials.canStore()) {
+      this.emitLogin({ phase: 'error', error: 'keystore_locked' })
       return false
     }
     const profile = this.profile as DeploymentProfile
@@ -316,7 +343,7 @@ export class AccountManager extends SessionCore {
       refreshExpiresAt: this.now() + session.refreshExpiresIn * 1000,
     }
     if (!this.persist(credential)) {
-      this.failLogin('keyring_unavailable')
+      this.failLogin(this.state === 'keystore-locked' ? 'keystore_locked' : 'keyring_unavailable')
       return
     }
     this.resetSession()
@@ -330,7 +357,11 @@ export class AccountManager extends SessionCore {
   }
 
   async retry(): Promise<AccountStatus> {
-    if (this.state === 'not-configured' || this.state === 'keyring-unavailable')
+    if (
+      this.state === 'not-configured' ||
+      this.state === 'keyring-unavailable' ||
+      this.state === 'keystore-locked'
+    )
       return this.restore()
     if (this.state !== 'server-unreachable' && this.state !== 'signed-in') return this.status()
     if (!this.session) {
@@ -351,13 +382,44 @@ export class AccountManager extends SessionCore {
   async selectOrg(orgId: string): Promise<AccountStatus> {
     const org = this.orgs.find((candidate) => candidate.id === orgId)
     if (!org || !this.session) return this.status()
-    try {
-      this.deps.persistSelectedOrgId(org.id)
-    } catch {
-      // the choice still applies to this run
-    }
-    this.org = org
+    // a suspended organization is never selectable, and its row says so
+    if (org.status !== 'active') return this.status()
     const generation = this.generation
+    // the org list cannot carry a deactivated membership (D sends only the
+    // tenant status), so the caller's own membership is read here: this is
+    // the one org-scoped call a select makes, and only for the chosen org.
+    try {
+      const membership = await this.authorized((token) =>
+        (this.transport as UniworkTransport).orgMembership(org.slug, token),
+      )
+      if (generation !== this.generation) return this.status()
+      if (membership.deactivatedAt) {
+        this.deactivatedOrgIds.add(org.id)
+        this.setState(this.state, this.error)
+        return this.status()
+      }
+    } catch (error) {
+      if (generation !== this.generation) return this.status()
+      if (handled.has(error as object)) throw error
+      const outcome = this.failureOutcome(error)
+      // RBE1-02: a transient failure of the membership read (network / 5xx /
+      // gateway) while the org list has just loaded is not a verdict on the
+      // session, so it must not drop the signed-in UI to `server-unreachable`.
+      // Keep the previous selection and state untouched and reject the call:
+      // the renderer keeps the picker (its checked row intact) and shows its
+      // existing retryable error (`acctSwitchOrgFailed`). A failure that does
+      // end or change the session (a dead device, a moved deployment, a locked
+      // keystore) keeps its own handling below.
+      if (outcome.state === 'server-unreachable') throw this.markHandled(error)
+      this.applyFailure(error, 'session')
+      return this.status()
+    }
+    this.deactivatedOrgIds.delete(org.id)
+    this.rememberOrg(org.id)
+    this.org = org
+    this.needsOrgChoice = false
+    this.rememberedGone = false
+    this.orgsError = undefined
     try {
       await this.loadEntitlements(generation)
     } catch (error) {
@@ -421,19 +483,131 @@ export class AccountManager extends SessionCore {
 
   private async loadAccount(generation: number): Promise<void> {
     const me = await this.authorized((token) => (this.transport as UniworkTransport).me(token))
-    const orgs = await this.authorized((token) => (this.transport as UniworkTransport).orgs(token))
     if (generation !== this.generation) return
     // the tokens belong to the account the credential was issued for
     if (this.session && me.id !== this.session.credential.accountId) {
       throw new TransportError('unauthorized', undefined, true)
     }
     this.accountProfile = toProfile(me)
+    let orgs: OrgResponse[]
+    try {
+      orgs = await this.authorized((token) => (this.transport as UniworkTransport).orgs(token))
+    } catch (error) {
+      if (generation !== this.generation) return
+      // G8-16 S16 / F-5: the org list is the one read that can fail on its own
+      // while the session stays usable (an outage, a gateway). Show the picker's
+      // own error + Retry instead of the generic unreachable pane: the account
+      // is still signed in and a retry re-reads the list. Anything that ends or
+      // changes the session (a dead device, a moved deployment, a locked
+      // keystore) keeps its own state and error, exactly as before.
+      if (handled.has(error as object)) throw error
+      const outcome = this.failureOutcome(error)
+      if (outcome.state !== 'server-unreachable') throw error
+      this.orgs = []
+      this.org = undefined
+      // the S16 step is where the error belongs, so the shell opens it and
+      // shows uwOrgPickError + Retry; nothing org-scoped runs either way
+      this.needsOrgChoice = true
+      this.rememberedGone = false
+      this.orgsError = outcome.error
+      this.setState('signed-in')
+      return
+    }
+    if (generation !== this.generation) return
     this.orgs = orgs
-    this.org = pickOrg(orgs, this.deps.readSelectedOrgId())
+    this.orgsError = undefined
+    // G8-16 S16: a >1-org account with no remembered choice stops here, before
+    // any org-scoped read (billing included); one org is picked automatically.
+    const choice = resolveOrgChoice(orgs, this.deps.readSelectedOrgId(), me.id)
+    this.needsOrgChoice = choice.needsOrgChoice
+    this.rememberedGone = choice.rememberedGone
+    this.org = choice.org
+    if (choice.needsOrgChoice) {
+      // no org to load a plan for, and nothing org-scoped may run yet: the
+      // credential's display-only cached plan (if any) is left untouched
+      this.setState('signed-in')
+      return
+    }
+    // G8-16 S16 / F-2: the org list cannot carry a deactivated membership (D
+    // sends only the tenant status), so the chosen org's own membership is read
+    // here - it is the chosen org, so the read is allowed. A deactivated
+    // membership locks the row (and, when other orgs stay active, brings the
+    // picker back with that row locked) instead of failing on the first docs call.
+    if (this.org && !(await this.markDeactivated(this.org, generation))) return
+    if (generation !== this.generation) return
+    // the usable chosen org is remembered like a manual choice, so the next
+    // sign-in on this machine skips the question (a deactivated one is not)
+    if (this.org) this.rememberOrg(this.org.id)
     await this.loadEntitlements(generation)
     if (generation !== this.generation || !this.session) return
     this.cacheAccount()
     this.setState('signed-in')
+  }
+
+  /**
+   * G8-16 S16 / F-2: read the caller's membership of `org` (the chosen one) and
+   * mark it deactivated when the server says so. True when the org stays usable;
+   * false when it is deactivated (the state is already pushed) or the read moved
+   * on. A failure to read the membership is not a verdict: the org stays usable
+   * (its row is not a lie, it is unknown) and the caller's own failure handling
+   * applies.
+   */
+  private async markDeactivated(org: OrgResponse, generation: number): Promise<boolean> {
+    let membership: OrgMembershipResponse
+    try {
+      membership = await this.authorized((token) =>
+        (this.transport as UniworkTransport).orgMembership(org.slug, token),
+      )
+    } catch (error) {
+      if (generation !== this.generation) return false
+      if (handled.has(error as object)) throw error
+      return true
+    }
+    if (generation !== this.generation) return false
+    if (!membership.deactivatedAt) {
+      this.deactivatedOrgIds.delete(org.id)
+      return true
+    }
+    this.deactivatedOrgIds.add(org.id)
+    // the org cannot be worked in: with other active orgs the picker comes back
+    // (this row locked), with none the renderer shows the all-blocked panel
+    this.org = undefined
+    this.rememberedGone = false
+    const others = this.orgs.some(
+      (candidate) => candidate.id !== org.id && candidate.status === 'active',
+    )
+    this.needsOrgChoice = others
+    this.setEntitlements(null)
+    this.setState('signed-in')
+    return false
+  }
+
+  /**
+   * The state and code a failure would produce, without applying either: the
+   * same table `applyFailure` uses, so a caller can decide whether the failure
+   * belongs to it (a transient org-list outage) or must keep its own state.
+   */
+  private failureOutcome(error: unknown): FailureOutcome {
+    if (error instanceof CredentialStoreError) {
+      return error.code === 'keystore_locked'
+        ? { state: 'keystore-locked', error: 'keystore_locked', clearCredentials: false }
+        : { state: 'keyring-unavailable', error: 'keyring_unavailable', clearCredentials: false }
+    }
+    if (!(error instanceof TransportError))
+      return classifyTransportFailure('server_error', 'session')
+    return classifyTransportFailure(error.code, 'session', error.fromServer)
+  }
+
+  /** remember `orgId` for this account on this machine (best effort) */
+  private rememberOrg(orgId: string): void {
+    const accountId = this.session?.credential.accountId
+    if (!accountId) return
+    if (rememberedOrgFor(this.deps.readSelectedOrgId(), accountId) === orgId) return
+    try {
+      this.deps.persistSelectedOrgId(accountId, orgId)
+    } catch {
+      // the choice still applies to this run
+    }
   }
 
   private async loadEntitlements(generation: number): Promise<void> {

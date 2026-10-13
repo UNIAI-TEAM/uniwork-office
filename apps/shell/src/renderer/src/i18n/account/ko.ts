@@ -75,6 +75,7 @@ export const ko = {
   acctErrWrongDeployment: '이 계정은 다른 UniWork 서버에 속해 있습니다.',
   acctErrNotConfigured: '이 앱은 UniWork 서버에 연결되어 있지 않습니다.',
   acctErrKeyringUnavailable: '이 컴퓨터의 보안 저장소를 사용할 수 없습니다.',
+  acctErrKeystoreLocked: '이 컴퓨터의 키체인이 잠겨 있습니다. 잠금을 해제한 후 다시 시도하세요.',
   acctErrServerError: 'UniWork에 문제가 발생했습니다. 나중에 다시 시도해 주세요.',
   acctErrMalformedResponse: 'UniWork에서 예상치 못한 응답이 왔습니다. 나중에 다시 시도해 주세요.',
   wbLoadFailedTitle: '저장된 데이터를 불러오지 못했습니다',

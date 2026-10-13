@@ -7,7 +7,6 @@
  */
 import { clipboard, dialog, nativeImage } from 'electron'
 import { readFile } from 'node:fs/promises'
-import { userInfo } from 'node:os'
 import { savePptxToFile } from '@genoffice/pptx-engine'
 import { showOpenDialogWithMemory } from '@genoffice/electron-utils'
 import type {
@@ -23,6 +22,7 @@ import { AUDIO_EXTS, VIDEO_EXTS } from '../shared/media-kinds'
 import { ELEMENT_CLIPBOARD_FORMAT, elementClipboardMarkerMatches } from './element-clipboard'
 import { tm } from './i18n-main'
 import { dialogParent } from './session-state'
+import { uniworkCommentAuthor } from './uniwork-policy'
 
 const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'tif', 'tiff']
 
@@ -52,15 +52,6 @@ async function pickFile(options: {
     name: baseName(path),
     ext: path.split('.').pop()!.toLowerCase(),
     path,
-  }
-}
-
-/** Comment author name: system username, falling back to a generic "User" label. */
-function commentAuthorName(): string {
-  try {
-    return userInfo().username || 'User'
-  } catch {
-    return 'User'
   }
 }
 
@@ -144,7 +135,9 @@ export function createElectronHostIO(files: ElectronFileHooks): HostIO {
     },
 
     recent: () => files.recent(),
-    commentAuthor: commentAuthorName,
+    // G8-02: the shell's single author source — the signed-in account's display
+    // name for a bound deck, else the neutral constant. Never the OS account.
+    commentAuthor: (path) => uniworkCommentAuthor(path),
     saveTarget: {
       untitled: () => files.untitledTarget(),
       saveAs: (currentPath, defaultName) => files.saveAsTarget(currentPath, defaultName),

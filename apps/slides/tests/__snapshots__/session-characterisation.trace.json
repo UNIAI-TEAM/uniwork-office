@@ -1680,7 +1680,7 @@
   "wc": 1,
   "channel": "slides:add-comment",
   "result": "array(1)",
-  "digest": "97ade83b99efc471",
+  "digest": "d73e04555fdbe29b",
   "sent": [
    {
     "wc": 1,
@@ -1693,13 +1693,13 @@
   "wc": 1,
   "channel": "slides:get-comments",
   "result": "array(1)",
-  "digest": "97ade83b99efc471"
+  "digest": "d73e04555fdbe29b"
  },
  {
   "wc": 1,
   "channel": "slides:add-comment",
   "result": "array(2)",
-  "digest": "087978d3ee3922ba",
+  "digest": "5e97dac0380f082c",
   "sent": [
    {
     "wc": 1,
@@ -1712,7 +1712,7 @@
   "wc": 1,
   "channel": "slides:delete-comment",
   "result": "array(1)",
-  "digest": "e68d24d328555274",
+  "digest": "26617ea766ddb03b",
   "sent": [
    {
     "wc": 1,
@@ -2198,7 +2198,7 @@
  },
  {
   "saved": "business after save",
-  "bytes": "#bytes:61418:0485fbd50e4602300d6dccd223e1e71742457ef7f59bb9c3672b4555773d6f7b"
+  "bytes": "#bytes:61416:ca3bce0cb6fef6a57f19ab36a15317e3da599c923474dc5a8a765cc59af4952e"
  },
  {
   "wc": 1,
@@ -2284,7 +2284,7 @@
  },
  {
   "saved": "business save-as",
-  "bytes": "#bytes:62442:5bad756da8c757965276d0bd7732f984ee4dd065af1e1ac91447a787d46cfd5e"
+  "bytes": "#bytes:62440:589ef51638eec82e04c1a1e962c0ef1e96a843a069211d9acced6250b37d2948"
  },
  {
   "wc": 1,

@@ -1,6 +1,7 @@
 import {
   notifyUniworkUserSave,
   setUniworkUserSaveHook,
+  uniworkCommentAuthor,
   uniworkIsBound,
   uniworkIsReadOnly,
   uniworkMayRewriteInPlace,
@@ -18,7 +19,6 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { readFile, stat, writeFile } from 'node:fs/promises'
-import { userInfo } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { BrowserWindow, WebContentsView, app, dialog, ipcMain, shell } from 'electron'
 import type { WebContents } from 'electron'
@@ -1027,13 +1027,12 @@ function registerPdfIpc(): void {
     return preset
   })
 
-  ipcMain.handle(PDF_CHANNELS.getUsername, () => {
-    try {
-      return userInfo().username
-    } catch {
-      return ''
-    }
-  })
+  // G8-02: the author written into new note comments. The shell's single source
+  // answers with the signed-in account's display name for a bound document and
+  // the neutral constant otherwise — never the OS account name.
+  ipcMain.handle(PDF_CHANNELS.getUsername, (e) =>
+    uniworkCommentAuthor(openPathByWc.get(e.sender.id)),
+  )
 
   ipcMain.handle(PDF_CHANNELS.readFile, async (e, path: unknown) => {
     if (typeof path !== 'string' || !allowedByWc.get(e.sender.id)?.has(path)) {

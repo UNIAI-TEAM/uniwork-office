@@ -84,4 +84,19 @@ describe('the shell open router (G5-04g)', () => {
     expect(UNIWORK_DOC_CHANNELS.locks).toBe('uniwork-doc:locks')
     expect(UNIWORK_DOC_CHANNELS.dismissLock).toBe('uniwork-doc:dismiss-lock')
   })
+
+  it('the preload exposes the lock list push and keeps keystore locks (R1-fe-1 BE)', () => {
+    const source = read('src/preload/index.ts')
+    // the whole list when main clears a keystore lock (a Retry that worked)
+    expect(source).toMatch(/onUniworkLocksChanged\(cb\)/)
+    expect(source).toMatch(/ipcRenderer\.on\(UNIWORK_DOC_CHANNELS\.locksChanged,/)
+    // the validator must not drop a keystore_locked lock on the way to the shell
+    expect(source).toMatch(/r\.reason !== 'store_newer' && r\.reason !== 'keystore_locked'/)
+    expect(UNIWORK_DOC_CHANNELS.locksChanged).toBe('uniwork-doc:locks-changed')
+    // the wiring pushes the current list on that channel
+    const wiring = read('src/main/uniwork-docs/wiring.ts')
+    expect(wiring).toMatch(
+      /pushLocks: \(\) => push\(UNIWORK_DOC_CHANNELS\.locksChanged, service\.currentLocks\(\)\)/,
+    )
+  })
 })

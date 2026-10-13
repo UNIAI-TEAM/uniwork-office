@@ -67,6 +67,8 @@ import type { DraftHost, DraftRecovery } from '../../docs/bridge/draft-recovery'
 import { TIMEOUTS, errorCode } from '../../docs/bridge/frame-port'
 import type { ModuleBridgePort } from '../../docs/bridge/module-bridge'
 import { idFromPath, pathFor } from '../../docs/bridge/webapi'
+import { bridgeDownloadCap, downloadVia, revisionOf } from '../shared/conflict-dialog'
+import { createRemoteVersion, type RemoteVersion } from '../shared/remote-version'
 import { bridgeDraftRecovery } from '../shared/recovery-prompt'
 import { ask, hideFatal, showFatal, text, type WebKey } from './dialogs'
 import { createFullscreenControl } from './fullscreen-hint'
@@ -294,9 +296,12 @@ export function createWebSlidesApi(
 
   function pushDirty(): void {
     port.setDirty(isDirty())
+    remote?.dirtyChanged(isDirty())
   }
 
   let current: string | null = null
+  /** the "new version on UniWork" bar and its reload / lock rules (G5-03w); created below the open plumbing */
+  let remote: RemoteVersion | undefined = undefined
 
   // ------------------------------------------------------------ draft recovery (C18)
 
@@ -389,6 +394,7 @@ export function createWebSlidesApi(
       const result = await openPayload(open, sessions.get(WEB_CLIENT_ID)?.fitWidthPx ?? 1280)
       if (result) openedEvents.emit(result)
     },
+    remote: () => remote,
     onSaved: ({ file, previousPath, kind }) => {
       current = file.fileId
       if (kind === 'save' || kind === 'saveAs') void drafts.saved()
@@ -458,6 +464,8 @@ export function createWebSlidesApi(
     const draft = withDraft ? await offerDraft(open.file) : null
     if (draft) bytes = draft
     state.remember(open.file)
+    // another document: the pending version and the bar of the old one are gone
+    if (current !== null && current !== open.file.fileId) remote?.reset()
     current = open.file.fileId
     revokeMedia()
     await loadBundledFonts()
@@ -477,6 +485,7 @@ export function createWebSlidesApi(
     return fontsRelaid ? openResultFor(session, fitWidthPx) : result
   }
 
+  state.downloadCap = bridgeDownloadCap(port)
   let booted = false
   let pendingOpen: Promise<OpenPayload | null> | null = port
     .whenInitialized()
@@ -511,6 +520,29 @@ export function createWebSlidesApi(
     if (!result) throw new Error('the document cannot be opened in the browser')
     openedEvents.emit(result)
     return { opened: true, title: payload.file.name }
+  })
+
+  // ------------------------------------------------------------ new version on UniWork (G5-03w, S6)
+
+  remote = createRemoteVersion({
+    port,
+    current: () =>
+      current === null ? null : { fileId: current, revision: revisionOf(state.files.get(current)) },
+    isDirty,
+    canEdit: () => !viewOnly() && (current ? state.files.get(current)?.writable !== false : true),
+    // a clean reload replaces the open deck in place, like the conflict dialog's Reload latest
+    apply: async (reply) => {
+      const result = await openPayload(reply, sessions.get(WEB_CLIENT_ID)?.fitWidthPx ?? 1280)
+      if (!result) throw new Error('the new version cannot be opened in the browser')
+      openedEvents.emit(result)
+    },
+    download: () =>
+      downloadVia(port, state.effective, async () => {
+        const session = sessions.get(WEB_CLIENT_ID)
+        if (!session) throw new Error('no deck is open')
+        return savePptx(draftOpened(session.opened))
+      }),
+    frame: { markerAttr: 'data-slides-web' },
   })
 
   port.onFileRenamed((file: FileMeta) => {
@@ -562,8 +594,23 @@ export function createWebSlidesApi(
   }
   const saveWaiters = new Set<(ok: boolean) => void>()
 
+  /** the answer of a save the frame refuses because the document was revoked / deleted */
+  function lockedSave(): SaveResult | null {
+    const lock = remote?.locked()
+    if (!lock) return null
+    return {
+      ok: false,
+      error: {
+        code: lock === 'revoked' ? ('forbidden' as const) : ('not_found' as const),
+        message: remote!.lockText(),
+      },
+    }
+  }
+
   port.handleSave(async () => {
     if (state.fatal) return { ok: false, error: state.fatal }
+    const locked = lockedSave()
+    if (locked) return locked
     if (!current)
       return { ok: false, error: { code: 'not_ready' as const, message: 'no document is open' } }
     if (state.hostSaving)
@@ -595,6 +642,8 @@ export function createWebSlidesApi(
 
   port.handleSaveAs(async (payload) => {
     if (state.fatal) return { ok: false, error: state.fatal }
+    const locked = lockedSave()
+    if (locked) return locked
     if (hostSaveAs)
       return {
         ok: false,

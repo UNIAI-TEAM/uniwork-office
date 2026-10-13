@@ -81,9 +81,11 @@ import { ownHeadAfterUnknown } from '../../docs/bridge/head-match'
 import type { ModuleBridgePort } from '../../docs/bridge/module-bridge'
 import type { DraftHost, DraftRecovery } from '../../docs/bridge/draft-recovery'
 import { bridgeDraftRecovery, bridgeRecoveryGrant } from '../shared/recovery-prompt'
+import { createRemoteVersion, type RemoteVersion } from '../shared/remote-version'
 import { saveFailureText } from '../shared/save-failure'
 import {
   conflictSaveResult,
+  bridgeDownloadCap,
   downloadVia,
   headFromFile,
   overwriteHead,
@@ -221,9 +223,13 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
   let initDocumentId: string | null = null
   /** the effective capabilities from `init` (`download` for the conflict dialog) */
   let effective: Capabilities | undefined
+  /** `init.downloadMaxBytes`: the largest file the host's `api.download` accepts (X-02 r2b) */
+  const downloadCap = bridgeDownloadCap(port)
   /** stops the host save's renderer timer (the conflict dialog may stay open for long) */
   let holdRendererSave: (() => void) | null = null
   let saveRequestProvider: (() => SavePdfRequest | null) | null = null
+  /** the "new version on UniWork" bar and its reload / lock rules (G5-03w); created below the host requests */
+  let remote: RemoteVersion | undefined = undefined
 
   const currentPath = (): string | null => (doc ? pathFor(doc.file) : null)
   const owns = (path: unknown): boolean => typeof path === 'string' && path === currentPath()
@@ -287,6 +293,8 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
 
   async function openPayload(open: OpenPayload): Promise<string> {
     let bytes = await readSource(open.source)
+    // another document: the pending version and the bar of the old one are gone
+    if (doc && doc.file.fileId !== open.file.fileId) remote?.reset()
     // a new, still empty Documents file: start from the desktop's blank A4 page ("New PDF"),
     // which becomes the file's first version on the first save
     if (bytes.byteLength === 0) bytes = new Uint8Array(await (await deps.core()).blankPdfBuffer())
@@ -385,7 +393,8 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
       if (res?.ok === false) return res
       return failure('malformed', 'unexpected save result')
     } catch (err) {
-      return { ok: false, error: { code: errorCode(err), message: describe(err) } }
+      // the status and details (a 403's reason) go with it: the new-version bar reads them
+      return { ok: false, error: toProtocolError(err).toShape() }
     }
   }
 
@@ -425,14 +434,23 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
         return true
       },
       canEdit: () => can('edit'),
-      download: downloadVia(port, effective, () => bytes),
+      download: downloadVia(port, effective, () => bytes, {
+        size: bytes.byteLength,
+        maxBytes: downloadCap(),
+      }),
       markerAttr: 'data-pdf-web',
     })
     if (hostSave && doc) hostSave.answer = conflictSaveResult(outcome, { ...doc.file })
     if (outcome.kind === 'overwritten') return { ok: true }
     if (outcome.kind === 'reloaded') return fail(text('webReloaded'))
-    if (outcome.kind === 'failed')
+    if (outcome.kind === 'failed') {
+      // a 401 / 403 / 410 the Overwrite got: the bar of the document's new state stays behind
+      remote?.saveFailed({
+        code: outcome.code,
+        ...(outcome.apiCode ? { details: { apiCode: outcome.apiCode } } : {}),
+      })
       return fail(saveFailureText({ code: outcome.code, message: '' }, text))
+    }
     return fail(text('webConflictNotSaved'))
   }
 
@@ -467,6 +485,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
       return { ok: true }
     }
     if (hostSave) hostSave.error = res.error
+    remote?.saveFailed(res.error)
     if (res.error.code === 'conflict') {
       // the host's own `save` waits for the dialog's answer instead of an error event
       if (!hostSave) port.reportError(res.error, false)
@@ -484,6 +503,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
       if (hostSave) hostSave.error = fatal
       return fail(text('webFatalTitle'))
     }
+    if (remote?.locked()) return fail(remote.lockText())
     if (!can('edit')) return fail(text('webViewOnlyNoSave'))
     if (!doc || !owns(path)) return fail(NOT_GRANTED)
     return null
@@ -540,6 +560,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
     }
     // a cancelled host dialog wrote nothing: no error, like the desktop's cancelled dialog
     if (res.error.code === 'cancelled') return { ok: true }
+    remote?.saveFailed(res.error)
     return fail(saveFailureText(res.error, text))
   }
 
@@ -579,8 +600,17 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
 
   port.handleCloseCheck(() => ({ dirty: dirtyNow(), autoSave: false }))
 
+  /** the answer of a save the frame refuses because the document was revoked / deleted */
+  function lockedSave(): SaveResult | null {
+    const lock = remote?.locked()
+    if (!lock) return null
+    return failure(lock === 'revoked' ? 'forbidden' : 'not_found', remote!.lockText())
+  }
+
   port.handleSave(async () => {
     if (fatal) return { ok: false, error: fatal }
+    const locked = lockedSave()
+    if (locked) return locked
     if (!doc) return failure('not_ready', 'no document is open')
     if (!can('edit')) return failure('forbidden', 'the document is view-only')
     if (hostSave) return failure('busy', 'a save is already running')
@@ -606,6 +636,8 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
 
   port.handleSaveAs(async (payload) => {
     if (fatal) return { ok: false, error: fatal }
+    const locked = lockedSave()
+    if (locked) return locked
     if (!doc) return failure('not_ready', 'no document is open')
     if (hostSaveAs) return failure('busy', 'a save-as is already running')
     const target = saveAsTarget(payload?.name || doc.file.name)
@@ -645,6 +677,31 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
     if (printHandlers.size === 0) return { printed: false }
     for (const h of printHandlers) h()
     return { printed: true }
+  })
+
+  // ------------------------------------------------------------ new version on UniWork (G5-03w, S6)
+
+  remote = createRemoteVersion({
+    port,
+    current: () => (doc ? { fileId: doc.file.fileId, revision: revisionOf(doc.file) } : null),
+    isDirty: dirtyNow,
+    canEdit: () => can('edit'),
+    // a clean reload replaces the open copy in place, like a host `open` (no draft prompt)
+    apply: async (reply) => {
+      const path = await openPayload(reply)
+      if (pendingOpen) pendingOpen = Promise.resolve(path)
+      else emitReload(path)
+    },
+    download: () =>
+      downloadVia(port, effective, async () => {
+        if (!doc) throw new Error('no document is open')
+        const request = saveRequestProvider?.() ?? null
+        if (rendererDirty && request && owns(request.path)) {
+          return (await applyRequest(doc.bytes.slice(), request)).bytes
+        }
+        return doc.bytes
+      }),
+    frame: { markerAttr: 'data-pdf-web' },
   })
 
   // ------------------------------------------------------------ pdfApi
@@ -706,6 +763,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
     setDirty(dirty) {
       rendererDirty = dirty === true
       port.setDirty(dirtyNow())
+      remote?.dirtyChanged(dirtyNow())
     },
     onCloseSaveRequest(handler) {
       closeSaveHandlers.add(handler)
@@ -1003,6 +1061,8 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
 
     // ---- viewer identity, appearance
     getUsername: async () => author,
+    // the web host has no desktop account ping; the author comes from the frame's init only
+    onCommentAuthorChanged: () => () => {},
     getLanguage: browser.getLanguage as PdfWebApi['getLanguage'],
     onLanguageChanged: browser.onLanguageChanged as PdfWebApi['onLanguageChanged'],
     getTheme: browser.getTheme as PdfWebApi['getTheme'],

@@ -53,6 +53,8 @@ export const fr = {
     'Votre session a expiré, l’écrasement n’a donc pas eu lieu. Vos modifications restent dans ce navigateur ; reconnectez-vous et réessayez.',
   uwConflictTooLarge:
     'Votre version dépasse la taille maximale d’UniWork, l’écrasement est donc impossible.',
+  uwConflictDownloadTooLarge:
+    'Votre version dépasse la taille maximale d’UniWork, le téléchargement est donc impossible ici.',
   uwConflictDownloadFailed:
     'Impossible de télécharger votre version, le document n’a donc pas été rechargé. Réessayez.',
   uwConflictOfflineWeb:
@@ -118,6 +120,8 @@ export const fr = {
   uwRemoteDeleted:
     'Ce document a été supprimé sur UniWork. Les enregistrements en attente sont arrêtés.',
   uwAuthorFallback: 'un membre',
+  uwLockRegion: 'État du document',
+  uwActRetry: 'Réessayer',
 
   // S6 new-version bar (web only)
   uwRemoteRevokedWeb:

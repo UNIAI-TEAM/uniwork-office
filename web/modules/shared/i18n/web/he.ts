@@ -43,6 +43,8 @@ export const he = {
   uwConflictSessionWeb:
     'פג תוקף ההפעלה, ולכן הדריסה לא בוצעה. השינויים שלך נשארים בדפדפן הזה; התחבר מחדש ונסה שוב.',
   uwConflictTooLarge: 'הגרסה שלך חורגת ממגבלת הגודל של UniWork, ולכן לא ניתן היה לדרוס.',
+  uwConflictDownloadTooLarge:
+    'הגרסה שלך חורגת ממגבלת הגודל של UniWork, ולכן לא ניתן להוריד אותה כאן.',
   uwConflictDownloadFailed: 'לא ניתן היה להוריד את הגרסה שלך, ולכן המסמך לא נטען מחדש. נסה שוב.',
   uwConflictOfflineWeb:
     'אתה במצב לא מקוון. באינטרנט הפעולה הזו דורשת חיבור; השינויים שלך נשארים בדפדפן הזה.',
@@ -98,6 +100,8 @@ export const he = {
   uwRemoteReloadFailed: 'לא ניתן היה לטעון את גרסה {n}. אתה עדיין צופה בגרסה הקודמת.',
   uwRemoteDeleted: 'המסמך הזה נמחק ב-UniWork. השמירות שבתור נעצרו.',
   uwAuthorFallback: 'חבר צוות',
+  uwLockRegion: 'מצב המסמך',
+  uwActRetry: 'נסה שוב',
 
   // S6 new-version bar (web only)
   uwRemoteRevokedWeb:

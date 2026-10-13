@@ -45,7 +45,7 @@ describe('egress', () => {
     )
     const api = client(fetch)
     expect(await api.listWorkspaces('org_a')).toEqual([
-      { id: 'ws_1', name: 'Team', orgId: 'org_a', slug: 'team', orgSlug: 'acme' },
+      { id: 'ws_1', name: 'Team', orgId: 'org_a', slug: 'team', orgSlug: 'acme', myRole: null },
     ])
     await api.listDocuments({ workspaceId: 'ws_1' }).catch(() => undefined)
     await api
@@ -126,7 +126,7 @@ describe('workspace slugs', () => {
   it('reads as empty when the server sends none', async () => {
     const api = client(async () => json(200, { workspaces: [{ id: 'ws_1', name: 'Team' }] }))
     expect(await api.listWorkspaces('org_a')).toEqual([
-      { id: 'ws_1', name: 'Team', orgId: 'org_a', slug: '', orgSlug: '' },
+      { id: 'ws_1', name: 'Team', orgId: 'org_a', slug: '', orgSlug: '', myRole: null },
     ])
   })
 })
@@ -139,6 +139,9 @@ describe('error envelope mapping', () => {
     [envelope(404, 'not_found'), 'not_found'],
     [new Response('', { status: 404 }), 'server_error'],
     [envelope(410, 'document_deleted'), 'deleted'],
+    // the change feed's cursor verdicts are about the cursor, never a document
+    [envelope(410, 'change_cursor_expired'), 'server_error'],
+    [envelope(400, 'change_cursor_invalid'), 'server_error'],
     [envelope(413, 'file_too_large'), 'too_large'],
     [envelope(409, 'idempotency_payload_mismatch'), 'idempotency_mismatch'],
     [envelope(409, 'idempotency_key_reuse'), 'idempotency_mismatch'],
@@ -246,6 +249,7 @@ describe('401: one shared refresh, one retry (real account session)', () => {
       orgs: vi.fn(async () => [
         { id: 'org_a', name: 'Acme', slug: 'acme', role: 'owner', status: 'active' },
       ]),
+      orgMembership: vi.fn(async () => ({ role: 'owner' })),
       billing: vi.fn(async () => ({
         planCode: 'p',
         planName: 'P',

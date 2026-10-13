@@ -19,6 +19,8 @@ import {
   type DraftRecovery,
   type DraftStore,
 } from '../../docs/bridge/draft-recovery'
+import { webLanguage } from '../../docs/bridge/browser'
+import { webText } from '../shared/i18n/strings-web'
 import { createFakeIdb } from '../../docs/bridge/testing/fake-idb'
 import { createMockPort, protocolError, type MockPort } from '../../docs/bridge/testing/mock-port'
 import { setPendingTextEditProbe } from '../../../apps/slides/src/renderer/pending-text-edit'
@@ -62,6 +64,8 @@ async function setup(
     bytes?: Uint8Array
     /** the host marks the file view-only for the current token (FileMeta.writable) */
     writable?: boolean
+    /** the revision the handshake open reports (G5-03w: an event must be newer than it) */
+    revision?: string
   } = {},
 ): Promise<Setup> {
   const mock = createMockPort()
@@ -80,6 +84,9 @@ async function setup(
   )
   mock.init({
     documentId: file.fileId,
+    ...(opts.revision !== undefined
+      ? { open: { ...mock.openPayload(file.fileId), file: { ...file, revision: opts.revision } } }
+      : {}),
     ...(opts.user ? ({ user: { displayName: opts.user } } as object) : {}),
   })
   return { mock, fileId: file.fileId, api: web.slidesApi, web, downloads }
@@ -853,5 +860,94 @@ describe('hidden features answer with typed stubs', () => {
     expect(await api.consumeHeadlessExport()).toBeNull()
     expect(await api.getAutoSaveDefault()).toEqual({ on: false, updatedAt: 0 })
     expect(typeof api.onAiStream(() => {})).toBe('function')
+  })
+})
+
+// G5-03w: a newer version saved elsewhere (doc.remoteVersion)
+describe('new version on UniWork (doc.remoteVersion)', () => {
+  const event = (fileId: string, revision: string) => ({
+    document_id: fileId,
+    revision,
+    version_id: `v${revision}`,
+    saved_at: new Date(Date.UTC(2026, 9, 12, 8)).toISOString(),
+    author_name: 'Trần An',
+  })
+  const barText = () => document.querySelector('.uw-remote-bar-text')?.textContent ?? null
+
+  it('clean: the deck is re-read through api.open on the event version and onOpened fires', async () => {
+    const { mock, api, fileId } = await setup({ revision: '10' })
+    await api.consumePendingOpen(FIT)
+    const seen: string[] = []
+    api.onOpened((r) => seen.push(r.path))
+    mock.override('api.open', (payload) => {
+      const open = mock.openPayload((payload as { fileId: string }).fileId)
+      return { ...open, file: { ...open.file, revision: '12', versionId: 'v12' } }
+    })
+    mock.sendRemoteVersion(event(fileId, '12'))
+    await waitFor(() => (seen.length ? seen : null))
+    expect(seen).toEqual([`uniwork://files/${fileId}/deck.pptx`])
+    expect(mock.calls.filter((c) => c.type === 'api.open').at(-1)!.payload).toEqual({
+      fileId,
+      versionId: 'v12',
+    })
+    expect(barText()).toContain('12')
+  })
+
+  it('dirty: the deck is kept and the warn bar offers Reload', async () => {
+    const { mock, api, fileId } = await setup({ revision: '10' })
+    await api.consumePendingOpen(FIT)
+    const seen: string[] = []
+    api.onOpened((r) => seen.push(r.path))
+    await api.setNotes({ slideIndex: 0, text: 'mine' })
+    await flush()
+    mock.sendRemoteVersion(event(fileId, '12'))
+    await waitFor(() => barText())
+    expect(seen).toEqual([])
+    expect(barText()).toContain('12')
+    expect(document.querySelector('[data-action="reload"]')).not.toBeNull()
+  })
+
+  it('a revoked document locks saving with the status bar', async () => {
+    const { mock, api, fileId } = await setup({ revision: '10' })
+    await api.consumePendingOpen(FIT)
+    mock.override('api.open', () => {
+      throw protocolError('forbidden', 'revoked')
+    })
+    mock.sendRemoteVersion(event(fileId, '12'))
+    await waitFor(() => document.querySelector('.uw-remote-bar--error'))
+    await api.setNotes({ slideIndex: 0, text: 'mine' })
+    const r = await api.save()
+    expect(r.ok).toBe(false)
+    expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(0)
+  })
+
+  it('doc.blocked locks at once on an edited deck: the bar, Save refused, the deck kept', async () => {
+    const { mock, api, fileId } = await setup({ revision: '10' })
+    await api.consumePendingOpen(FIT)
+    const seen: string[] = []
+    api.onOpened((r) => seen.push(r.path))
+    await api.setNotes({ slideIndex: 0, text: 'mine' })
+    await flush()
+    mock.sendBlocked({ document_id: fileId, reason: 'permission_revoked' })
+    expect(document.querySelector('.uw-remote-bar--error')).not.toBeNull()
+    const r = await api.save()
+    expect(r.ok).toBe(false)
+    expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(0)
+    expect(seen).toEqual([])
+  })
+
+  it('doc.blocked with an organisation reason: the bar only, the deck usable, Save still reaches the host', async () => {
+    const { mock, api, fileId } = await setup({ revision: '10' })
+    await api.consumePendingOpen(FIT)
+    await api.setNotes({ slideIndex: 0, text: 'mine' })
+    await flush()
+    mock.sendBlocked({ document_id: fileId, reason: 'organization_suspended' })
+    expect(barText()).toBe(
+      webText(webLanguage(), 'uwRemoteOrgBlockedWeb', {
+        reason: webText(webLanguage(), 'uwReasonSuspended'),
+      }),
+    )
+    expect((await api.save()).ok).toBe(true)
+    expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(1)
   })
 })

@@ -1469,6 +1469,7 @@ export const ko = {
   appThreadReplyPlaceholder: '회신…',
   appThreadNewPlaceholder: '대화 시작',
   appThreadPost: '게시',
+  appThreadNeutralAuthor: '사용자',
   appThreadResolve: '해결',
   appThreadReopen: '다시 열기',
   appThreadResolved: '해결됨',

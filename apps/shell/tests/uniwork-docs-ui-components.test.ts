@@ -31,8 +31,8 @@ const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONM
 actEnvironment.IS_REACT_ACT_ENVIRONMENT = true
 
 const WORKSPACES = [
-  { id: 'w1', name: 'Team', orgId: 'o1' },
-  { id: 'w2', name: 'Sales', orgId: 'o1' },
+  { id: 'w1', name: 'Team', orgId: 'o1', myRole: null },
+  { id: 'w2', name: 'Sales', orgId: 'o1', myRole: null },
 ]
 
 function doc(id: string, title: string, format: UniworkDocSummary['format']): UniworkDocSummary {

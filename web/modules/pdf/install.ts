@@ -76,6 +76,8 @@ document.documentElement.dataset.webFrame = 'pdf'
 
 export const bridge = installModuleBridge({
   module: 'pdf',
+  // no frame comments yet: the page panel serves Comments + Discussion until the in-frame comments land
+  frameComments: false,
   // what this bundle supports; effective = this ∩ the host grant
   frameCapabilities: { save: true, saveAs: true, print: true, filePick: true },
   capabilities: { defaults: PDF_WEB_CAPABILITIES, grants: pdfGrants, on: ['pdfApi'] },

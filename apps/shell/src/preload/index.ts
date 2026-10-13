@@ -16,6 +16,7 @@ import type {
 } from '@genoffice/ai-provider/browser'
 import type { AiStreamChunk, AiStreamRequest } from '@genoffice/ai-provider'
 import { installDropOpenBridge } from '@genoffice/electron-utils/drop-open'
+import { installUniworkDiscussionBridge } from '@genoffice/electron-utils/discussion-bridge'
 import type { UpdateUiState } from '../shared/update-api'
 import { normalizeAiPanelPrefs } from '@genoffice/ui/ai-panel-prefs'
 import type {
@@ -42,12 +43,22 @@ import type {
   FileSearchPage,
   FileSearchRerank,
   FileSearchSettings,
+  UniworkCreateDocInput,
+  UniworkDocActionResult,
   UniworkDocErrorCode,
+  UniworkDocFolderRef,
   UniworkDocListPage,
   UniworkDocLock,
+  UniworkDocProperties,
+  UniworkDocRenamedEvent,
   UniworkDocStatus,
+  UniworkDocSummary,
   UniworkLaunchEvent,
   UniworkResult,
+  UniworkSharedPage,
+  UniworkSharedQuery,
+  UniworkUploadDocInput,
+  UniworkUploadProgress,
   UniworkWorkspaceRef,
 } from '../shared/home-api'
 import { HOME_CHANNELS, PROJECT_CHANNELS, UNIWORK_DOC_CHANNELS } from '../shared/home-api'
@@ -86,6 +97,31 @@ ipcRenderer.on(UNIWORK_DOC_CHANNELS.lock, (_event: IpcRendererEvent, raw: unknow
   const lock = asUniworkLock(raw)
   if (!lock) return
   for (const cb of [...uniworkLockSubscribers]) cb(lock)
+})
+// the whole list when it changes in main (a keystore lock cleared): the shell
+// replaces its list instead of waiting for the next unrelated push
+const uniworkLocksSubscribers = new Set<(locks: UniworkDocLock[]) => void>()
+ipcRenderer.on(UNIWORK_DOC_CHANNELS.locksChanged, (_event: IpcRendererEvent, raw: unknown) => {
+  // not a list: ignore it, an empty one would replace (and so clear) every panel
+  if (!Array.isArray(raw)) return
+  const locks = asUniworkLocks(raw)
+  for (const cb of [...uniworkLocksSubscribers]) cb(locks)
+})
+// S18: a document's title changed (renamed here or elsewhere); no replay is
+// needed - the library reads titles again on open, this only updates a row
+// already on screen and drives the polite announce
+const docRenamedSubscribers = new Set<(event: UniworkDocRenamedEvent) => void>()
+ipcRenderer.on(UNIWORK_DOC_CHANNELS.docRenamed, (_event: IpcRendererEvent, raw: unknown) => {
+  const event = asDocRenamed(raw)
+  if (!event) return
+  for (const cb of [...docRenamedSubscribers]) cb(event)
+})
+// S18: upload bytes sent of the total, while the dialog is open
+const uploadProgressSubscribers = new Set<(event: UniworkUploadProgress) => void>()
+ipcRenderer.on(UNIWORK_DOC_CHANNELS.uploadProgress, (_event: IpcRendererEvent, raw: unknown) => {
+  const event = asUploadProgress(raw)
+  if (!event) return
+  for (const cb of [...uploadProgressSubscribers]) cb(event)
 })
 
 const UI_LANGUAGES: readonly UiLanguage[] = [
@@ -172,18 +208,59 @@ function asUniworkResult<T>(result: unknown): UniworkResult<T> {
   return { ok: false, error: 'malformed_response' satisfies UniworkDocErrorCode }
 }
 
+/**
+ * An S18 action result from main: the same shape as UniworkResult, but its
+ * error union also carries the two field errors and a cancelled upload. Both
+ * branches are checked the way the other pushes are checked - an `ok:true` must
+ * carry an object `value` (the renderer dereferences `value.title`) and an
+ * `ok:false` a string `error` - so a shape main never meant to send is
+ * `malformed_response` here instead of a crash in the renderer.
+ */
+function asUniworkActionResult<T>(result: unknown): UniworkDocActionResult<T> {
+  if (result && typeof result === 'object') {
+    const r = result as { ok?: unknown; value?: unknown; error?: unknown }
+    if (r.ok === true && r.value && typeof r.value === 'object' && !Array.isArray(r.value)) {
+      return result as UniworkDocActionResult<T>
+    }
+    if (r.ok === false && typeof r.error === 'string' && r.error) {
+      return result as UniworkDocActionResult<T>
+    }
+  }
+  return { ok: false, error: 'malformed_response' }
+}
+
 /** a lock from main: path, reason and name only; anything else is dropped */
 function asUniworkLock(result: unknown): UniworkDocLock | null {
   if (!result || typeof result !== 'object') return null
   const r = result as Partial<UniworkDocLock>
   if (typeof r.path !== 'string' || !r.path) return null
-  if (r.reason !== 'store_newer') return null
+  if (r.reason !== 'store_newer' && r.reason !== 'keystore_locked') return null
   return { path: r.path, reason: r.reason, name: typeof r.name === 'string' ? r.name : '' }
 }
 
 function asUniworkLocks(result: unknown): UniworkDocLock[] {
   if (!Array.isArray(result)) return []
   return result.map(asUniworkLock).filter((lock): lock is UniworkDocLock => lock !== null)
+}
+
+/** a renamed push from main: a document id and its new title only */
+function asDocRenamed(raw: unknown): UniworkDocRenamedEvent | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Partial<UniworkDocRenamedEvent>
+  if (typeof r.documentId !== 'string' || !r.documentId) return null
+  if (typeof r.title !== 'string' || !r.title) return null
+  return { documentId: r.documentId, title: r.title }
+}
+
+/** an upload-progress push: the upload's own id, a local path and finite, non-negative byte counts */
+function asUploadProgress(raw: unknown): UniworkUploadProgress | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Partial<UniworkUploadProgress>
+  if (typeof r.uploadId !== 'string' || !r.uploadId) return null
+  if (typeof r.path !== 'string' || !r.path) return null
+  if (typeof r.loaded !== 'number' || !Number.isFinite(r.loaded) || r.loaded < 0) return null
+  if (typeof r.total !== 'number' || !Number.isFinite(r.total) || r.total < 0) return null
+  return { uploadId: r.uploadId, path: r.path, loaded: r.loaded, total: r.total }
 }
 
 function asUniworkStatus(result: unknown): UniworkDocStatus | null {
@@ -823,6 +900,70 @@ const homeApi: HomeApi = {
       await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.listDocuments, query),
     )
   },
+  async uniworkListSharedWithMe(query?: UniworkSharedQuery) {
+    return asUniworkResult<UniworkSharedPage>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.listSharedWithMe, query),
+    )
+  },
+  async uniworkDocumentProperties(documentId: string) {
+    return asUniworkResult<UniworkDocProperties>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.documentProperties, documentId),
+    )
+  },
+  async uniworkCreateDocument(input: UniworkCreateDocInput) {
+    return asUniworkActionResult<UniworkDocSummary>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.createDocument, input),
+    )
+  },
+  async uniworkPickUploadFile() {
+    const picked = (await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.pickUploadFile)) as unknown
+    if (!picked || typeof picked !== 'object') return null
+    const r = picked as { path?: unknown; name?: unknown }
+    return typeof r.path === 'string' && r.path && typeof r.name === 'string' && r.name
+      ? { path: r.path, name: r.name }
+      : null
+  },
+  async uniworkUploadDocument(input: UniworkUploadDocInput) {
+    return asUniworkActionResult<UniworkDocSummary>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.uploadDocument, input),
+    )
+  },
+  onUniworkUploadProgress(cb: (event: UniworkUploadProgress) => void) {
+    uploadProgressSubscribers.add(cb)
+    return () => {
+      uploadProgressSubscribers.delete(cb)
+    }
+  },
+  async uniworkCancelUploadDocument(uploadId: string) {
+    if (typeof uploadId !== 'string' || !uploadId) return
+    await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.cancelUpload, uploadId)
+  },
+  async uniworkRenameDocument(documentId: string, name: string) {
+    return asUniworkActionResult<UniworkDocSummary>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.renameDocument, documentId, name),
+    )
+  },
+  async uniworkArchiveDocument(documentId: string) {
+    return asUniworkActionResult<UniworkDocSummary>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.archiveDocument, documentId),
+    )
+  },
+  async uniworkRestoreDocument(documentId: string) {
+    return asUniworkActionResult<UniworkDocSummary>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.restoreDocument, documentId),
+    )
+  },
+  async uniworkListFolders(workspaceId: string) {
+    return asUniworkResult<UniworkDocFolderRef[]>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.listFolders, workspaceId),
+    )
+  },
+  onUniworkDocRenamed(cb: (event: UniworkDocRenamedEvent) => void) {
+    docRenamedSubscribers.add(cb)
+    return () => {
+      docRenamedSubscribers.delete(cb)
+    }
+  },
   async uniworkOpenDocument(documentId) {
     return asUniworkResult<{ path: string }>(
       await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.openDocument, documentId),
@@ -856,6 +997,12 @@ const homeApi: HomeApi = {
   },
   async uniworkLocks() {
     return asUniworkLocks(await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.locks))
+  },
+  onUniworkLocksChanged(cb) {
+    uniworkLocksSubscribers.add(cb)
+    return () => {
+      uniworkLocksSubscribers.delete(cb)
+    }
   },
   async dismissUniworkLock(path) {
     await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.dismissLock, path)
@@ -1077,3 +1224,8 @@ contextBridge.exposeInMainWorld('uniworkWork', workApi)
 
 // open documents dragged from the OS anywhere over Home or the tab strip
 installDropOpenBridge()
+
+// G8-11: the Discussion panel lives in the shell renderer and talks to the
+// UniWork comments client through its own bridge (main checks the sender is
+// this shell and the path an open, bound tab of its window)
+installUniworkDiscussionBridge()

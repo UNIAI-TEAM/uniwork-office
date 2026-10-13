@@ -58,7 +58,7 @@ export const cs = {
   aiNetworkError:
     'Problém se sítí: službu AI se nepodařilo kontaktovat. Zkontrolujte připojení a zkuste to znovu',
   aiCreditsExhausted:
-    'Vaše kredity UniWork jsou vyčerpány. Dobijte je na uniwork.app/pricing a zkuste to znovu',
+    'Vaše kredity UniWork jsou vyčerpány. Dobijte je na uniworkos.com/pricing a zkuste to znovu',
   aiToolWorkbookContext: 'Načtení informací o sešitu',
   aiToolReadRange: 'Načtení oblasti',
   aiToolReadRangeOf: 'Načtení oblasti {range}',

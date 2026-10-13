@@ -41,6 +41,7 @@ export const zh = {
   uwConflictSessionWeb:
     '登录会话已过期，因此没有完成覆盖。你的更改仍保留在此浏览器中；请重新登录后重试。',
   uwConflictTooLarge: '你的版本超过了 UniWork 的大小限制，因此无法覆盖。',
+  uwConflictDownloadTooLarge: '你的版本超过了 UniWork 的大小限制，因此无法在此下载。',
   uwConflictDownloadFailed: '无法下载你的版本，因此文档没有重新加载。请重试。',
   uwConflictOfflineWeb: '离线中。在网页上执行此操作需要网络连接；你的更改仍保留在浏览器中。',
 
@@ -95,6 +96,8 @@ export const zh = {
   uwRemoteReloadFailed: '无法加载版本 {n}。你仍在查看之前的版本。',
   uwRemoteDeleted: '此文档已在 UniWork 中删除。排队中的保存已停止。',
   uwAuthorFallback: '一位成员',
+  uwLockRegion: '文档状态',
+  uwActRetry: '重试',
 
   // S6 new-version bar (web only)
   uwRemoteRevokedWeb:

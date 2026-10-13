@@ -3322,6 +3322,7 @@ async function loadRange(
       const indexedRows = (result.indexedThroughRow ?? -1) + 1
       if (
         isActiveSheet(runtime, sheetId) &&
+        !state.flags.preloadComplete &&
         (result.indexedThroughRow === null || result.indexedThroughRow < mapped.fileEndRow)
       ) {
         setMessage(
@@ -3352,6 +3353,9 @@ async function loadRange(
       } else {
         const timer = setTimeout(() => {
           if (lazyWorkbookRef.current !== state) return
+          // The full preload already installed every row; only a sheet whose
+          // decorations are still pending has something left to wait for.
+          if (state.flags.preloadComplete && !state.decorationsPendingSheets.has(sheetId)) return
           state.loadingKeys.delete(sheetId)
           void loadRange(runtime, lazyWorkbookRef, worksheet, range, setMessage, true).then(() =>
             loadFrozenColumnStrip(lazyWorkbookRef, worksheet, sheet, range),
@@ -3359,7 +3363,9 @@ async function loadRange(
         }, 250)
         state.retryTimers.set(sheetId, timer)
       }
-    } else if (isActiveSheet(runtime, sheetId)) {
+    } else if (isActiveSheet(runtime, sheetId) && !state.flags.preloadComplete) {
+      // After the full preload the status already says "fully loaded"; a late
+      // tail (retry timer, decoration re-read) must not replace it.
       setMessage(
         t('appStreamingRows', {
           name: state.file.name,

@@ -43,6 +43,7 @@ export const zhTW = {
   uwConflictSessionWeb:
     '登入工作階段已過期，因此沒有完成覆寫。你的變更仍保留在此瀏覽器中；請重新登入後重試。',
   uwConflictTooLarge: '你的版本超過了 UniWork 的大小限制，因此無法覆寫。',
+  uwConflictDownloadTooLarge: '你的版本超過了 UniWork 的大小限制，因此無法在此下載。',
   uwConflictDownloadFailed: '無法下載你的版本，因此文件沒有重新載入。請重試。',
   uwConflictOfflineWeb: '離線中。在網頁上執行此操作需要網路連線；你的變更仍保留在瀏覽器中。',
 
@@ -97,6 +98,8 @@ export const zhTW = {
   uwRemoteReloadFailed: '無法載入版本 {n}。你仍在檢視之前的版本。',
   uwRemoteDeleted: '此文件已在 UniWork 中刪除。佇列中的儲存已停止。',
   uwAuthorFallback: '一位成員',
+  uwLockRegion: '文件狀態',
+  uwActRetry: '重試',
 
   // S6 new-version bar (web only)
   uwRemoteRevokedWeb:

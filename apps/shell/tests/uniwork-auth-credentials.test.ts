@@ -88,7 +88,7 @@ describe('uniwork credential store', () => {
     }
   })
 
-  it('keeps the file and reports keyring_unavailable when decryption fails (locked keyring)', () => {
+  it('keeps the file and reports keystore_locked when decryption fails (locked keyring)', () => {
     const writer = createCredentialStore({ userDataDir: dir, safeStorage: fakeSafeStorage() })
     writer.save(credential())
     const locked = createCredentialStore({
@@ -103,11 +103,81 @@ describe('uniwork credential store', () => {
       locked.load()
       expect.unreachable()
     } catch (error) {
-      expect((error as CredentialStoreError).code).toBe('keyring_unavailable')
+      expect((error as CredentialStoreError).code).toBe('keystore_locked')
     }
     // the refresh token survives: once the keyring opens again it is still there
     expect(readdirSync(join(dir, 'uniwork-auth'))).toEqual(['session.bin'])
     expect(writer.load()).toEqual(credential())
+  })
+
+  it('a locked keychain reports keystore_locked, never keyring_unavailable', () => {
+    const writer = createCredentialStore({ userDataDir: dir, safeStorage: fakeSafeStorage() })
+    writer.save(credential())
+    const locked = createCredentialStore({
+      userDataDir: dir,
+      safeStorage: fakeSafeStorage({
+        decryptString: () => {
+          throw new Error('keychain access denied')
+        },
+      }),
+    })
+    try {
+      locked.load()
+      expect.unreachable()
+    } catch (error) {
+      expect((error as CredentialStoreError).code).toBe('keystore_locked')
+    }
+    // a no-keyring host keeps the old code: the two cases stay distinct
+    const none = createCredentialStore({
+      userDataDir: dir,
+      safeStorage: fakeSafeStorage({ isEncryptionAvailable: () => false }),
+    })
+    try {
+      none.load()
+      expect.unreachable()
+    } catch (error) {
+      expect((error as CredentialStoreError).code).toBe('keyring_unavailable')
+    }
+  })
+
+  it('a keychain that locks at save time reports keystore_locked, never io', () => {
+    let locked = false
+    const base = fakeSafeStorage()
+    const store = createCredentialStore({
+      userDataDir: dir,
+      safeStorage: fakeSafeStorage({
+        encryptString: (text) => {
+          if (locked) throw new Error('keychain access denied')
+          return base.encryptString(text)
+        },
+      }),
+    })
+    store.save(credential('rt_secret_value_1'))
+    const before = readFileSync(sessionFile())
+    locked = true
+    try {
+      store.save(credential('rt_secret_value_2'))
+      expect.unreachable()
+    } catch (error) {
+      expect((error as CredentialStoreError).code).toBe('keystore_locked')
+    }
+    locked = false
+    // refused before any write: no replacement and no leftover temp file
+    expect(store.load()?.refreshToken).toBe('rt_secret_value_1')
+    expect(readFileSync(sessionFile())).toEqual(before)
+    expect(readdirSync(join(dir, 'uniwork-auth'))).toEqual(['session.bin'])
+  })
+
+  it('a filesystem failure at save time is still io', () => {
+    const store = createCredentialStore({ userDataDir: dir, safeStorage: fakeSafeStorage() })
+    // a file sits where the credential directory belongs: the write cannot land
+    writeFileSync(join(dir, 'uniwork-auth'), 'not a directory')
+    try {
+      store.save(credential())
+      expect.unreachable()
+    } catch (error) {
+      expect((error as CredentialStoreError).code).toBe('io')
+    }
   })
 
   it('a fresh save replaces a credential the keyring can no longer decrypt', () => {

@@ -238,6 +238,38 @@ describe('additive fields for the modules (GO-B4)', () => {
     expect(isInitRecovery({ key, scope: 'u1:d1' })).toBe(true)
   })
 
+  it('init.downloadMaxBytes is an optional positive safe integer (X-02 r2b)', () => {
+    const init = { ...baseInit(), protocolVersion: 1 }
+    expect(isInitPayload(init)).toBe(true)
+    expect(isInitPayload({ ...init, downloadMaxBytes: 52_428_800 })).toBe(true)
+    expect(isInitPayload({ ...init, downloadMaxBytes: 1 })).toBe(true)
+    expect(isInitPayload({ ...init, downloadMaxBytes: Number.MAX_SAFE_INTEGER })).toBe(true)
+    // present and not a positive safe integer: the whole init is malformed, like a bad user / recovery
+    expect(isInitPayload({ ...init, downloadMaxBytes: 0 })).toBe(false)
+    expect(isInitPayload({ ...init, downloadMaxBytes: -5 })).toBe(false)
+    expect(isInitPayload({ ...init, downloadMaxBytes: 1.5 })).toBe(false)
+    expect(isInitPayload({ ...init, downloadMaxBytes: Number.MAX_SAFE_INTEGER + 1 })).toBe(false)
+    expect(isInitPayload({ ...init, downloadMaxBytes: Infinity })).toBe(false)
+    expect(isInitPayload({ ...init, downloadMaxBytes: NaN })).toBe(false)
+    expect(isInitPayload({ ...init, downloadMaxBytes: '52428800' })).toBe(false)
+    expect(isInitPayload({ ...init, downloadMaxBytes: null })).toBe(false)
+  })
+
+  it('the frame session carries downloadMaxBytes from init', async () => {
+    const getInit = vi.fn(async () => baseInit({ downloadMaxBytes: 1024 }))
+    const { client } = setup({ getInit }, {})
+    const session = await client.whenInitialized()
+    expect(session.downloadMaxBytes).toBe(1024)
+  })
+
+  it('the frame session has no downloadMaxBytes when the host sent none', async () => {
+    const getInit = vi.fn(async () => baseInit())
+    const { client } = setup({ getInit }, {})
+    const session = await client.whenInitialized()
+    expect(session.downloadMaxBytes).toBeUndefined()
+    expect('downloadMaxBytes' in session).toBe(false)
+  })
+
   it('the frame session carries recovery through structured clone', async () => {
     const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, [
       'encrypt',

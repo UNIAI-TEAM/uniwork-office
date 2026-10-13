@@ -17,11 +17,18 @@ import type {
 } from '../shared/ipc'
 import type { ProjectApi } from '@genoffice/project-store'
 import { installAiRunBridge } from '@genoffice/electron-utils/ai-run-bridge'
+import { installUniworkCommentsBridge } from '@genoffice/electron-utils/comments-bridge'
 import { installDropOpenBridge } from '@genoffice/electron-utils/drop-open'
 
 const api: DesktopApi = {
   getLanguage: () => ipcRenderer.invoke('app:get-language'),
   getSystemLocale: () => ipcRenderer.invoke('docs:system-locale'),
+  getCommentAuthor: (path) => ipcRenderer.invoke('docs:comment-author', path),
+  onCommentAuthorChanged: (handler) => {
+    const listener = () => handler()
+    ipcRenderer.on('uniwork:comment-author-changed', listener)
+    return () => ipcRenderer.removeListener('uniwork:comment-author-changed', listener)
+  },
   onLanguageChanged: (handler) => {
     const listener = (
       _event: IpcRendererEvent,
@@ -273,4 +280,5 @@ contextBridge.exposeInMainWorld('projectApi', projectApi)
 installDropOpenBridge()
 
 // window.uniworkAiRun.reportAiRun: the shell learns when an AI turn runs here
+installUniworkCommentsBridge()
 installAiRunBridge()

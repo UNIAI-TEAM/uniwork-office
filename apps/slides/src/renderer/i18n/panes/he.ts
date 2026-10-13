@@ -61,6 +61,7 @@ export const he = {
   paneCommentsDelete: 'מחק הערה',
   paneCommentsPlaceholder: 'הערה חדשה… (⌘/Ctrl+Enter לפרסום)',
   paneCommentsPost: 'פרסם',
+  paneCommentsNeutralAuthor: 'משתמש',
 
   paneCsdTitle: 'הצגות מותאמות אישית',
   paneCsdDefaultName: 'הצגה מותאמת אישית {n}',

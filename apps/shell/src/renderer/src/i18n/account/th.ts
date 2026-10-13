@@ -77,6 +77,8 @@ export const th = {
   acctErrWrongDeployment: 'บัญชีนี้เป็นของเซิร์ฟเวอร์ UniWork อื่น',
   acctErrNotConfigured: 'แอปนี้ยังไม่ได้เชื่อมต่อกับเซิร์ฟเวอร์ UniWork',
   acctErrKeyringUnavailable: 'ที่เก็บข้อมูลที่ปลอดภัยบนคอมพิวเตอร์เครื่องนี้ไม่พร้อมใช้งาน',
+  acctErrKeystoreLocked:
+    'พวงกุญแจ (keychain) ของคอมพิวเตอร์เครื่องนี้ถูกล็อก โปรดปลดล็อกแล้วลองอีกครั้ง',
   acctErrServerError: 'UniWork พบปัญหา โปรดลองอีกครั้งในภายหลัง',
   acctErrMalformedResponse: 'UniWork ส่งการตอบกลับที่ไม่คาดคิด โปรดลองอีกครั้งในภายหลัง',
   wbLoadFailedTitle: 'ไม่สามารถโหลดข้อมูลที่บันทึกไว้ของคุณได้',

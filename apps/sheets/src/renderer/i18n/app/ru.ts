@@ -1466,6 +1466,7 @@ export const ru = {
   appThreadReplyPlaceholder: 'Ответить…',
   appThreadNewPlaceholder: 'Начать обсуждение',
   appThreadPost: 'Опубликовать',
+  appThreadNeutralAuthor: 'Пользователь',
   appThreadResolve: 'Решить',
   appThreadReopen: 'Открыть снова',
   appThreadResolved: 'Решено',

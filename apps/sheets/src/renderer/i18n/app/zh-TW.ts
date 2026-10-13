@@ -1355,6 +1355,7 @@ export const zhTW = {
   appThreadReplyPlaceholder: '回覆…',
   appThreadNewPlaceholder: '開始對話',
   appThreadPost: '發佈',
+  appThreadNeutralAuthor: '使用者',
   appThreadResolve: '解決',
   appThreadReopen: '重新開啟',
   appThreadResolved: '已解決',

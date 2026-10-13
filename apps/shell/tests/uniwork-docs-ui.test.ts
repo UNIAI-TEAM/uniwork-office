@@ -7,6 +7,8 @@ import type {
 } from '../src/shared/home-api'
 import {
   PICKER_SEARCH_DEBOUNCE_MS,
+  UNIWORK_ERROR_KEYS,
+  blockedReasonKey,
   chipCopy,
   chipModelOf,
   docExtension,
@@ -34,9 +36,14 @@ import { publishUniworkNotice } from '../src/renderer/src/uniwork-notice-bus'
 import { subscribeUniworkOpened } from '../src/renderer/src/uniwork-recents-refresh'
 import { uniworkDocumentStrings } from '../src/renderer/src/i18n/strings-uniwork-documents'
 import { accountStrings } from '../src/renderer/src/i18n/strings-account'
+import { syncStrings } from '../src/renderer/src/i18n/strings-sync'
 import type { StringKey, TFunc } from '../src/renderer/src/locale'
 
-const copy = { ...accountStrings.en, ...uniworkDocumentStrings.en } as Record<string, string>
+const copy = {
+  ...accountStrings.en,
+  ...syncStrings.en,
+  ...uniworkDocumentStrings.en,
+} as Record<string, string>
 /** English translator with the same {placeholder} rule as the real one */
 const t: TFunc = (key: StringKey, params) =>
   (copy[key] ?? key).replace(/\{(\w+)\}/g, (_, name: string) => String(params?.[name] ?? ''))
@@ -168,6 +175,52 @@ describe('chipModelOf: save state -> chip', () => {
   })
 })
 
+describe('keystore_locked reason', () => {
+  it('maps to the keychain-locked reason, not the generic one', () => {
+    expect(blockedReasonKey('keystore_locked')).toBe('uwReasonKeystore')
+    expect(t(blockedReasonKey('keystore_locked'))).toBe(syncStrings.en.uwReasonKeystore)
+    expect(blockedReasonKey('keystore_locked')).not.toBe(blockedReasonKey(undefined))
+  })
+
+  it('keeps the existing reasons unchanged', () => {
+    expect(blockedReasonKey('forbidden')).toBe('uwReasonForbidden')
+    expect(blockedReasonKey('quota_exceeded')).toBe('uwReasonQuota')
+    expect(blockedReasonKey(undefined)).toBe('uwReasonOther')
+  })
+})
+
+describe('store_full reason', () => {
+  it('maps to the store-full reason and the full-store sentence', () => {
+    expect(blockedReasonKey('store_full')).toBe('uwReasonStoreFull')
+    expect(UNIWORK_ERROR_KEYS.store_full).toBe('uwQueueFull')
+    expect(t(blockedReasonKey('store_full'))).toBe(syncStrings.en.uwReasonStoreFull)
+    expect(blockedReasonKey('store_full')).not.toBe(blockedReasonKey(undefined))
+  })
+
+  it('has a sentence for keystore_locked and store_full in every shipped table', () => {
+    expect(UNIWORK_ERROR_KEYS.keystore_locked).toBe('uwReasonKeystore')
+    for (const lang of ['vi', 'en'] as const) {
+      const table = { ...syncStrings[lang], ...uniworkDocumentStrings[lang] } as Record<
+        string,
+        string
+      >
+      expect(table[UNIWORK_ERROR_KEYS.keystore_locked]).toBeTruthy()
+      expect(table[UNIWORK_ERROR_KEYS.store_full]).toBeTruthy()
+    }
+  })
+
+  it('shows the blocked chip with the keychain / full-store reason', () => {
+    const labelOf = (error: 'keystore_locked' | 'store_full') =>
+      chipCopy(chipModelOf(status({ state: 'blocked', error })), t, 'en-US')
+    const keystore = labelOf('keystore_locked')
+    expect(keystore.label).toContain(syncStrings.en.uwReasonKeystore)
+    expect(keystore.title).toContain(syncStrings.en.uwReasonKeystore)
+    const full = labelOf('store_full')
+    expect(full.label).toContain(syncStrings.en.uwReasonStoreFull)
+    expect(full.title).toContain(syncStrings.en.uwQueueFull)
+  })
+})
+
 describe('errorActionOf', () => {
   it('sign in for an expired session, retry for transport trouble, nothing for a verdict', () => {
     expect(errorActionOf('session_expired')).toBe('sign-in')
@@ -234,6 +287,7 @@ describe('openCardOf: the card is always there, the call to action follows the a
     ['not-configured', 'settings', true],
     ['wrong-deployment', 'settings', true],
     ['keyring-unavailable', 'settings', true],
+    ['keystore-locked', 'settings', true],
   ] as const)('%s -> %s', (view, action, attention) => {
     const card = openCardOf(view)
     expect(card.action).toBe(action)
@@ -252,8 +306,8 @@ describe('picker reducer', () => {
   const run = (actions: PickerAction[], from: PickerState = initialPickerState()) =>
     actions.reduce(pickerReducer, from)
   const workspaces = [
-    { id: 'w1', name: 'Team', orgId: 'o1' },
-    { id: 'w2', name: 'Sales', orgId: 'o1' },
+    { id: 'w1', name: 'Team', orgId: 'o1', myRole: null },
+    { id: 'w2', name: 'Sales', orgId: 'o1', myRole: null },
   ]
   const loadedWorkspaces: PickerAction = {
     type: 'workspaces-loaded',

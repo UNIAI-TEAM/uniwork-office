@@ -76,6 +76,7 @@ export const ar = {
   acctErrWrongDeployment: 'ينتمي هذا الحساب إلى خادم UniWork مختلف.',
   acctErrNotConfigured: 'هذا التطبيق غير مرتبط بخادم UniWork.',
   acctErrKeyringUnavailable: 'التخزين الآمن على هذا الكمبيوتر غير متاح.',
+  acctErrKeystoreLocked: 'سلسلة المفاتيح في هذا الكمبيوتر مقفلة. افتحها ثم حاول مرة أخرى.',
   acctErrServerError: 'واجه UniWork مشكلة. يُرجى المحاولة لاحقًا.',
   acctErrMalformedResponse: 'أرسل UniWork استجابة غير متوقعة. يُرجى المحاولة لاحقًا.',
   wbLoadFailedTitle: 'تعذّر تحميل بياناتك المحفوظة',

@@ -37,15 +37,78 @@ export interface UniworkModuleSeam {
 }
 
 /**
- * Hands every editor module the UniWork policy (bound / read-only paths) and
- * its explicit-user-save hook. null restores genoffice behaviour everywhere.
+ * G8-02: the author written into a comment when no UniWork account resolves —
+ * a fixed, locale-independent constant. Never the OS account name.
  */
-export function installUniworkModuleSeams(seam: UniworkModuleSeam | null): void {
+export const NEUTRAL_COMMENT_AUTHOR = 'User'
+
+/** G8-02: author name for a new comment on `path`; null installs the neutral constant. */
+export type CommentAuthorResolver = (path: string) => string
+
+/**
+ * G8-02: the single comment-author rule. A document bound to the signed-in
+ * account takes its display name; every other document (local file, signed
+ * out, or a profile that carries no name) takes the neutral constant. The OS
+ * account name is never consulted.
+ */
+export function createCommentAuthorResolver(deps: {
+  isBound(path: string): boolean
+  displayName(): string | null
+}): CommentAuthorResolver {
+  return (path) => {
+    if (!deps.isBound(path)) return NEUTRAL_COMMENT_AUTHOR
+    const name = deps.displayName()?.trim()
+    return name ? name : NEUTRAL_COMMENT_AUTHOR
+  }
+}
+
+/**
+ * G8-02: pushed (no payload) to every renderer when the signed-in display name
+ * changes — sign-in, sign-out, automatic session expiry. The docs, pdf and
+ * sheets renderers cache the author per open document and re-ask on this ping;
+ * slides resolves the author at each add-comment and needs no ping.
+ */
+export const COMMENT_AUTHOR_CHANGED_CHANNEL = 'uniwork:comment-author-changed'
+
+/**
+ * G8-02: calls `broadcast` whenever an account status push changes the display
+ * name a bound document would take (null = signed out / no name). Token
+ * refreshes that keep the same name stay silent. Returns the unsubscribe.
+ */
+export function watchCommentAuthorChanges(deps: {
+  onStatus(listener: () => void): () => void
+  displayName(): string | null
+  broadcast(): void
+}): () => void {
+  let last = deps.displayName()
+  return deps.onStatus(() => {
+    const next = deps.displayName()
+    if (next === last) return
+    last = next
+    deps.broadcast()
+  })
+}
+
+/**
+ * Hands every editor module the UniWork policy (bound / read-only paths), its
+ * explicit-user-save hook and the single comment-author source. `commentAuthor`
+ * is asked once per new comment with the document path and returns the author
+ * to write into the file: the signed-in account's display name for a bound
+ * document, else the neutral constant. null restores genoffice behaviour
+ * everywhere (the modules then fall back to the same neutral constant, never
+ * to the OS account).
+ */
+export function installUniworkModuleSeams(
+  seam: UniworkModuleSeam | null,
+  commentAuthor: CommentAuthorResolver | null = null,
+): void {
+  const author = commentAuthor ?? (() => NEUTRAL_COMMENT_AUTHOR)
   const policy = seam
     ? {
         isBound: (path: string) => seam.isBound(path),
         isReadOnly: (path: string) => seam.isReadOnly(path),
         refuseOpen: (path: string) => seam.refuseLockedPath(path),
+        commentAuthor: (path: string) => author(path),
       }
     : null
   const hook = seam ? (path: string) => seam.onUserSave(path) : null

@@ -59,6 +59,7 @@ import {
   SAVE_EDITS_CHUNK_JSON_MAX,
 } from '../shared/ipc-channels'
 import { installAiRunBridge } from '@genoffice/electron-utils/ai-run-bridge'
+import { installUniworkCommentsBridge } from '@genoffice/electron-utils/comments-bridge'
 import { installDropOpenBridge } from '@genoffice/electron-utils/drop-open'
 
 const desktopApi: DesktopApi = {
@@ -492,9 +493,14 @@ const desktopApi: DesktopApi = {
   replyRecoveryPrompt(restore) {
     ipcRenderer.send(IPC_CHANNELS.recoveryPromptReply, restore === true)
   },
-  async getUserDisplayName() {
-    const result: unknown = await ipcRenderer.invoke(IPC_CHANNELS.userDisplayName)
+  async getUserDisplayName(sessionId) {
+    const result: unknown = await ipcRenderer.invoke(IPC_CHANNELS.userDisplayName, sessionId)
     return typeof result === 'string' ? result : ''
+  },
+  onCommentAuthorChanged(handler) {
+    const listener = () => handler()
+    ipcRenderer.on('uniwork:comment-author-changed', listener)
+    return () => ipcRenderer.removeListener('uniwork:comment-author-changed', listener)
   },
   async getAiSettings() {
     const result: unknown = await ipcRenderer.invoke(IPC_CHANNELS.aiGetSettings)
@@ -776,6 +782,7 @@ if (process.env.GENOFFICE_DEBUG_HOOKS === '1') {
 installDropOpenBridge()
 
 // window.uniworkAiRun.reportAiRun: the shell learns when an AI turn runs here
+installUniworkCommentsBridge()
 installAiRunBridge()
 
 function parseWorkbookFile(input: unknown): WorkbookFile {

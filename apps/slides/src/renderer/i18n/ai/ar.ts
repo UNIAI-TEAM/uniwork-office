@@ -116,7 +116,7 @@ export const ar = {
   aiErrNetwork:
     'مشكلة في الشبكة: تعذّر الوصول إلى خدمة الذكاء الاصطناعي. تحقق من الاتصال وحاول مجددًا',
   aiCreditsExhausted:
-    'نفدت أرصدة UniWork لديك. يرجى إعادة الشحن عبر uniwork.app/pricing ثم المحاولة مجددًا',
+    'نفدت أرصدة UniWork لديك. يرجى إعادة الشحن عبر uniworkos.com/pricing ثم المحاولة مجددًا',
   aiErrRequestFailed: 'فشل إرسال الطلب: {msg}',
   aiErrGenerateFailed: 'فشل الإنشاء',
   aiErrRegenFailed: 'فشلت إعادة إنشاء الصفحة',

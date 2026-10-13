@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { buildParseMap } from '../src/renderer/document/parse-map'
+import { usableAiSettings } from './helpers/ai-settings'
 import { Ribbon } from '../src/renderer/components/Ribbon'
 import { AiPanel, type HtmlAiDeps } from '../src/renderer/ai/AiPanel'
 import { createDocumentSkill } from '../src/renderer/ai/html-skill'
@@ -26,7 +27,9 @@ function stubHtmlApi(): void {
         if (!(prop in target)) {
           target[prop] = /^on[A-Z]/.test(prop)
             ? vi.fn(() => () => {})
-            : vi.fn(async () => undefined)
+            : prop === 'getAiSettings'
+              ? vi.fn(async () => usableAiSettings())
+              : vi.fn(async () => undefined)
         }
         return target[prop]
       },

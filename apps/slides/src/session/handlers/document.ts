@@ -174,7 +174,7 @@ export const documentHandlers = {
         {
           op: 'addComment',
           target: { slide: op.slideIndex },
-          author: ctx.host.commentAuthor(),
+          author: ctx.host.commentAuthor(session.path),
           text: op.text,
         },
       ],

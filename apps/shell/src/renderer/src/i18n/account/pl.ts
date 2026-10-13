@@ -79,6 +79,8 @@ export const pl = {
   acctErrWrongDeployment: 'To konto należy do innego serwera UniWork.',
   acctErrNotConfigured: 'Ta aplikacja nie jest połączona z serwerem UniWork.',
   acctErrKeyringUnavailable: 'Bezpieczny magazyn na tym komputerze jest niedostępny.',
+  acctErrKeystoreLocked:
+    'Pęk kluczy na tym komputerze jest zablokowany. Odblokuj go i spróbuj ponownie.',
   acctErrServerError: 'W UniWork wystąpił problem. Spróbuj ponownie później.',
   acctErrMalformedResponse: 'UniWork wysłał nieoczekiwaną odpowiedź. Spróbuj ponownie później.',
   wbLoadFailedTitle: 'Nie udało się wczytać zapisanych danych',

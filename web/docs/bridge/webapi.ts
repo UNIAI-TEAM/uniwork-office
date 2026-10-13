@@ -73,6 +73,7 @@ import { downloadBlob, printFrame } from './browser'
 import { ask, conflictFrame, hideFatal, onModalChange, showFatal, text } from './notice'
 import {
   conflictSaveResult,
+  bridgeDownloadCap,
   downloadVia,
   headFromFile,
   overwriteHead,
@@ -84,6 +85,7 @@ import { createSession, type SessionOptions } from './session'
 import type { DraftHost, DraftRecovery } from './draft-recovery'
 import { bridgeDraftRecovery } from '../../modules/shared/recovery-prompt'
 import { saveFailureText } from '../../modules/shared/save-failure'
+import { createRemoteVersion, type RemoteVersion } from '../../modules/shared/remote-version'
 import { projectApi } from './project-memory'
 import { mintDocHandoff, releaseDocHandoff } from './doc-handoff'
 
@@ -156,17 +158,14 @@ export function decodeDataUrl(url: string): { base64: string; mime: string } | n
   }
 }
 
-function describe(err: unknown): string {
-  return err instanceof Error ? err.message : String(err)
-}
-
 function failure(code: ProtocolErrorShape['code'], message: string): SaveResult {
   return { ok: false, error: { code, message } }
 }
 
 /** a rejected request or an ok:false SaveResult, as one shape */
 function saveError(err: unknown): ProtocolErrorShape {
-  return { code: errorCode(err), message: describe(err) }
+  // the status and details (a 403's reason) go with it: the new-version bar reads them
+  return toProtocolError(err).toShape()
 }
 
 const READ_ONLY = 'read-only document'
@@ -191,6 +190,8 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
   let current: string | null = null
   /** the host's effective grants from `init` (undefined until the handshake, and in unit-test sessions) */
   let grants: Capabilities | undefined
+  /** `init.downloadMaxBytes`: the largest file the host's `api.download` accepts (X-02 r2b) */
+  const downloadCap = bridgeDownloadCap(port)
 
   /**
    * View-only (protocol README "Read-only documents"): the host withheld the `save` grant, or the
@@ -200,7 +201,20 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
     if (grants !== undefined && grants.save !== true) return true
     return fileId ? files.get(fileId)?.writable === false : false
   }
-  const session = createSession(port, opts.session)
+  /** the "new version on UniWork" bar and its reload / lock rules (G5-03w); created below, once the open plumbing exists */
+  let remote: RemoteVersion | undefined = undefined
+  const session = createSession(
+    {
+      // the bar follows the editor's dirty state (dirty <-> "undone all changes")
+      setDirty: (dirty, o) => {
+        port.setDirty(dirty, o)
+        remote?.dirtyChanged(dirty)
+      },
+      setTitle: (title) => port.setTitle(title),
+      handleCloseCheck: (handler) => port.handleCloseCheck(handler),
+    },
+    opts.session,
+  )
   // the frame dialogs only dim the iframe: tell the host so it can dim its own chrome
   onModalChange((open) => port.setModal?.(open))
 
@@ -243,6 +257,8 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
 
   async function toOpenResult(open: OpenPayload): Promise<OpenFileResult> {
     const data = await readSource(open.source)
+    // another document: the pending version and the bar of the old one are gone
+    if (current !== null && current !== open.file.fileId) remote?.reset()
     remember(open.file)
     return {
       path: pathFor(open.file),
@@ -350,8 +366,17 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
     return { opened: true, title: result.name }
   })
 
+  /** the answer of a save the frame refuses because the document was revoked / deleted */
+  function lockedSave(): SaveResult | null {
+    const lock = remote?.locked()
+    if (!lock) return null
+    return failure(lock === 'revoked' ? 'forbidden' : 'not_found', remote!.lockText())
+  }
+
   port.handleSave(async () => {
     if (fatal) return { ok: false, error: fatal }
+    const locked = lockedSave()
+    if (locked) return locked
     if (!current) return failure('not_ready', 'no document is open')
     if (isViewOnly(current)) return failure('unsupported', READ_ONLY)
     if (hostSave) return failure('busy', 'a save is already running')
@@ -374,6 +399,8 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
 
   port.handleSaveAs(async (payload) => {
     if (fatal) return { ok: false, error: fatal }
+    const locked = lockedSave()
+    if (locked) return locked
     if (hostSaveAs) return failure('busy', 'a save-as is already running')
     return new Promise<SaveResult>((resolve) => {
       // bounded wait for the editor to reach saveDocxAs (it serializes the document first);
@@ -442,7 +469,10 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
         return true
       },
       canEdit: () => !isViewOnly(fileId),
-      download: downloadVia(port, grants, () => data),
+      download: downloadVia(port, grants, () => data, {
+        size: data.byteLength,
+        maxBytes: downloadCap(),
+      }),
       ...conflictFrame(),
     })
     const file = files.get(fileId)
@@ -451,6 +481,13 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
     // the document is being replaced by the latest version: no error banner
     if (outcome.kind === 'reloaded') return { ok: false, reason: 'external-modified' }
     if (outcome.kind === 'failed') {
+      // a 401 / 403 / 410 the Overwrite got: the bar of the document's new state stays behind, and
+      // it is the only surface: no failure toast of the editor on top of it
+      const shown = remote?.saveFailed({
+        code: outcome.code,
+        ...(outcome.apiCode ? { details: { apiCode: outcome.apiCode } } : {}),
+      })
+      if (shown) return { ok: false, reason: 'external-modified' }
       return {
         ok: false,
         error: saveFailureText({ code: outcome.code, message: '' }, () =>
@@ -566,6 +603,27 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
     return { printed: r.ok }
   })
 
+  // ------------------------------------------------------------ new version on UniWork (G5-03w, S6)
+
+  remote = createRemoteVersion({
+    port,
+    current: () =>
+      current === null ? null : { fileId: current, revision: revisionOf(files.get(current)) },
+    isDirty: () => session.isDirty(),
+    canEdit: () => !isViewOnly(current),
+    // a clean reload replaces the open document in place, like a host `open` (no draft prompt)
+    apply: async (reply) => {
+      deliver(await toOpenResult(reply))
+    },
+    download: () =>
+      downloadVia(port, grants, async () => {
+        const bytes = await liveDocBytes()
+        if (!bytes) throw new Error('the open document could not be serialized')
+        return bytes
+      }),
+    frame: conflictFrame(),
+  })
+
   // ------------------------------------------------------------ DesktopApi part
 
   const desktopPart = {
@@ -634,6 +692,11 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
         if (hostSave) hostSave.error = fatal
         return fatalSave()
       }
+      const lock = lockedSave()
+      if (lock && !lock.ok) {
+        if (hostSave) hostSave.error = lock.error
+        return { ok: false, error: lock.error.message }
+      }
       const fileId = idFromPath(path)
       if (!fileId) return { ok: false, error: `not a UniWork document: ${basename(String(path))}` }
       // the editor is read-only here (uniworkState); this refuses a save that still gets through
@@ -657,6 +720,7 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       }
       if (hostSave) hostSave.error = res.error
       const code = res.error.code
+      const shown = remote?.saveFailed(res.error) === true
       if (code === 'conflict') {
         // the host's own `save` waits for the dialog's answer instead of an error event
         if (!hostSave) port.reportError(res.error, false)
@@ -667,6 +731,9 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       if (code === 'timeout' || code === 'network') {
         await reconcileAfterUnknown(fileId, data)
       }
+      // the new-version bar says it (401 / 403 / 410): the editor shows neither a toast nor a status
+      // line of its own; the reason is the one that means "stay dirty, nothing more to say here"
+      if (shown) return { ok: false, reason: 'external-modified' }
       return {
         ok: false,
         // a raw browser error ("Failed to fetch") or status line is English whatever the UI language
@@ -680,6 +747,11 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       if (fatal) {
         pending?.settle({ ok: false, error: fatal })
         return fatalSave()
+      }
+      const lock = lockedSave()
+      if (lock && !lock.ok) {
+        pending?.settle(lock)
+        return { ok: false, error: lock.error.message }
       }
       // "save a copy" of a document the user cannot overwrite is its own grant (`saveAs`)
       if (isViewOnly(idFromPath(sourcePath)) && grants?.saveAs !== true) {
@@ -706,6 +778,8 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       pending?.settle(res)
       // cancelled dialog: {ok:false} without error, like the desktop
       if (res.error.code === 'cancelled') return { ok: false }
+      // the bar says it: a result without an error shows no toast (like a cancelled dialog)
+      if (remote?.saveFailed(res.error)) return { ok: false }
       return { ok: false, error: saveFailureText(res.error, () => text('appWebSaveOffline')) }
     },
 
@@ -715,6 +789,8 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
         if (hostSave) hostSave.error = fatal
         return fatalSave()
       }
+      const lock = lockedSave()
+      if (lock && !lock.ok) return { ok: false, error: lock.error.message }
       const payload = {
         name: withExt(defaultName || 'Untitled', '.docx'),
         data: copyBuffer(data),
@@ -728,6 +804,7 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       )
       if (!res.ok) {
         if (hostSave) hostSave.error = res.error
+        if (remote?.saveFailed(res.error)) return { ok: false }
         return { ok: false, error: saveFailureText(res.error, () => text('appWebSaveOffline')) }
       }
       return { ok: true, path: pathFor(landed(res)) }

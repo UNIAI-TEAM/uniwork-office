@@ -48,6 +48,7 @@ export const th = {
   uwConflictSessionWeb:
     'เซสชันหมดอายุ จึงไม่ได้เขียนทับ การเปลี่ยนแปลงยังอยู่ในเบราว์เซอร์นี้ ลงชื่อเข้าใช้อีกครั้งแล้วลองใหม่',
   uwConflictTooLarge: 'เวอร์ชันของคุณเกินขนาดสูงสุดของ UniWork จึงเขียนทับไม่ได้',
+  uwConflictDownloadTooLarge: 'เวอร์ชันของคุณเกินขนาดสูงสุดของ UniWork จึงดาวน์โหลดที่นี่ไม่ได้',
   uwConflictDownloadFailed: 'ดาวน์โหลดเวอร์ชันของคุณไม่ได้ เอกสารจึงไม่ถูกโหลดใหม่ โปรดลองอีกครั้ง',
   uwConflictOfflineWeb:
     'คุณออฟไลน์อยู่ บนเว็บต้องมีการเชื่อมต่อจึงทำได้ การเปลี่ยนแปลงยังอยู่ในเบราว์เซอร์นี้',
@@ -105,6 +106,8 @@ export const th = {
   uwRemoteReloadFailed: 'โหลดเวอร์ชัน {n} ไม่ได้ คุณยังดูเวอร์ชันก่อนหน้าอยู่',
   uwRemoteDeleted: 'เอกสารนี้ถูกลบบน UniWork การบันทึกในคิวหยุดลงแล้ว',
   uwAuthorFallback: 'สมาชิกคนหนึ่ง',
+  uwLockRegion: 'สถานะเอกสาร',
+  uwActRetry: 'ลองอีกครั้ง',
 
   // S6 new-version bar (web only)
   uwRemoteRevokedWeb:

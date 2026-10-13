@@ -52,6 +52,8 @@ export const ru = {
     'Сеанс истёк, поэтому перезапись не выполнена. Изменения остаются в этом браузере; войдите снова и повторите.',
   uwConflictTooLarge:
     'Ваша версия превышает ограничение размера UniWork, поэтому перезаписать не удалось.',
+  uwConflictDownloadTooLarge:
+    'Ваша версия превышает ограничение размера UniWork, поэтому скачать её здесь нельзя.',
   uwConflictDownloadFailed:
     'Не удалось скачать вашу версию, поэтому документ не перезагружен. Повторите попытку.',
   uwConflictOfflineWeb:
@@ -113,6 +115,8 @@ export const ru = {
   uwRemoteReloadFailed: 'Не удалось загрузить версию {n}. Вы по-прежнему видите предыдущую версию.',
   uwRemoteDeleted: 'Этот документ удалён в UniWork. Сохранения в очереди остановлены.',
   uwAuthorFallback: 'участник',
+  uwLockRegion: 'Состояние документа',
+  uwActRetry: 'Повторить',
 
   // S6 new-version bar (web only)
   uwRemoteRevokedWeb:

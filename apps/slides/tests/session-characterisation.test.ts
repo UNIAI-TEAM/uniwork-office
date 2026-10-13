@@ -10,8 +10,8 @@
  * Moving the session core out of Electron main must leave that trace unchanged.
  *
  * Non-determinism is pinned: Date (fake timers), crypto.randomUUID (counter), Math.random
- * (LCG), font metrics (heuristic provider instead of the machine's system fonts) and the OS
- * username used as the comment author.
+ * (LCG) and font metrics (heuristic provider instead of the machine's system fonts). The
+ * comment author is the neutral constant ("User", G8-02), so it needs no pin.
  */
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
@@ -43,12 +43,6 @@ const uuids = vi.hoisted(() => {
 vi.mock('node:crypto', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:crypto')>()
   return { ...actual, randomUUID: uuids }
-})
-// The comment author is the OS username (electron-host-io), which lands in the saved bytes and the
-// comment digests: pin it so the trace does not depend on who runs the test (CI runs as "runner")
-vi.mock('node:os', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:os')>()
-  return { ...actual, userInfo: () => ({ ...actual.userInfo(), username: 'ubuntu' }) }
 })
 vi.mock('../src/main/fonts', async () => {
   const { HeuristicMetrics } = await import('@genoffice/pptx-render')
@@ -109,9 +103,15 @@ interface Slide {
 let root = ''
 const trace: unknown[] = []
 
-/** Replace the temp root in any string so the trace does not depend on the machine. */
+/** Replace the temp root in any string so the trace does not depend on the machine;
+ * the remaining separators are normalized so the pin does not depend on the OS. */
+const SEP = process.platform === 'win32' ? '\\' : '/'
 function scrub(value: unknown): unknown {
-  if (typeof value === 'string') return root ? value.split(root).join('<tmp>') : value
+  if (typeof value === 'string') {
+    if (!root) return value
+    const scrubbed = value.split(root).join('<tmp>')
+    return SEP === '/' ? scrubbed : scrubbed.replace(/\\/g, '/')
+  }
   if (Array.isArray(value)) return value.map(scrub)
   if (value instanceof Uint8Array || value instanceof Map) return value
   if (value && typeof value === 'object') {

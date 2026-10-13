@@ -9,6 +9,7 @@ import {
   LAUNCH_TICKET_TTL_MS,
   LaunchController,
   createLaunchPusher,
+  createPushHolder,
   parseOfficeDeepLink,
 } from '../src/main/uniwork-docs/launch'
 import { LAUNCH_REPLAY_MS, createLaunchReplay } from '../src/preload/launch-replay'
@@ -306,6 +307,15 @@ describe('exchange receipt', () => {
       expect((error as UniworkDocError).code).toBe(expected_reason)
     }
   })
+  it('keeps a valid comment_id from the ticket and ignores a malformed one', () => {
+    const CMT = '01J8X4CMTN0N1P2Q3R4S5T6U7'
+    expect(parseExchange({ ...EXCHANGE.valid_response, comment_id: CMT }).commentId).toBe(CMT)
+    // the server drops a bad comment silently; the client never invents one
+    expect(parseExchange({ ...EXCHANGE.valid_response, comment_id: '' }).commentId).toBeUndefined()
+    expect(parseExchange({ ...EXCHANGE.valid_response, comment_id: 7 }).commentId).toBeUndefined()
+    expect(parseExchange(EXCHANGE.valid_response).commentId).toBeUndefined()
+  })
+
   it('a historical version must carry ?version=N', () => {
     const doc = { ...EXCHANGE.valid_response.document, version: 2, operation: 'view' }
     expect(() => parseExchange({ ...EXCHANGE.valid_response, document: doc })).toThrow()
@@ -400,6 +410,30 @@ describe('launch controller', () => {
       path: `/wc/${descriptor.id}/Q4 plan.docx`,
       title: 'Q4 plan',
     })
+  })
+
+  it('a ticket naming a comment reveals it after the editor is ready', async () => {
+    const CMT = '01J8X4CMTN0N1P2Q3R4S5T6U7'
+    const withComment = parseExchange({ ...EXCHANGE.valid_response, comment_id: CMT })
+    const ctx = setup({ exchange: async () => withComment })
+    const revealed = vi.fn()
+    // the shell holds the reveal until the editor renderer is ready; here the
+    // open already resolved, so the reveal fires once with the opened path
+    const controller = new LaunchController({
+      scheme: () => SCHEME,
+      applyProfile: async () => 'applied',
+      isSignedIn: () => true,
+      identity: () => ({ deviceSessionId: 'device-01', deploymentId: 'production-eu' }),
+      profile: () => ({ deploymentId: 'production-eu', clientId: 'uniwork-office' }),
+      exchange: async () => withComment,
+      open: async (d) => ({ path: `/wc/${d.id}/Q4 plan.docx`, title: d.title }),
+      emit: () => undefined,
+      reveal: () => undefined,
+      revealComment: revealed,
+    })
+    void ctx
+    await controller.handleUrl(link(TICKET))
+    expect(revealed).toHaveBeenCalledWith(`/wc/${withComment.id}/Q4 plan.docx`, CMT)
   })
 
   it('a malformed link fails without any exchange', async () => {
@@ -666,6 +700,61 @@ describe('cold-start launch events are not lost before the renderer listens', ()
     const seen: UniworkLaunchEvent[] = []
     replay.subscribe((e) => seen.push(e))
     expect(seen).toEqual([])
+  })
+})
+
+describe('the reveal push holder reports its outcome and can be dropped (D1-4)', () => {
+  function fakeContents(loading: boolean) {
+    const sent: unknown[] = []
+    let onLoad: (() => void) | null = null
+    const wc = {
+      loading,
+      isDestroyed: () => false,
+      isLoadingMainFrame: () => wc.loading,
+      send: (_channel: string, payload: unknown) => sent.push(payload),
+      once: (_event: 'did-finish-load', listener: () => void) => {
+        onLoad = listener
+      },
+      finishLoad: () => {
+        wc.loading = false
+        onLoad?.()
+      },
+    }
+    return { wc, sent }
+  }
+
+  it('reports delivered / deferred / none', () => {
+    const live = fakeContents(false)
+    expect(createPushHolder<{ id: string }>(() => live.wc, 'c')({ id: 'a' })).toBe('delivered')
+    expect(live.sent).toEqual([{ id: 'a' }])
+    const loading = fakeContents(true)
+    expect(createPushHolder<{ id: string }>(() => loading.wc, 'c')({ id: 'b' })).toBe('deferred')
+    expect(loading.sent).toEqual([])
+    expect(createPushHolder<{ id: string }>(() => null, 'c')({ id: 'c' })).toBe('none')
+  })
+
+  it('drops a deferred payload that is no longer wanted once the page finishes loading', () => {
+    const { wc, sent } = fakeContents(true)
+    const push = createPushHolder<{ id: string }>(
+      () => wc,
+      'c',
+      () => false,
+    )
+    push({ id: 'a' })
+    wc.finishLoad()
+    expect(sent).toEqual([])
+  })
+
+  it('still sends the deferred payload while it is wanted', () => {
+    const { wc, sent } = fakeContents(true)
+    const push = createPushHolder<{ id: string }>(
+      () => wc,
+      'c',
+      () => true,
+    )
+    push({ id: 'a' })
+    wc.finishLoad()
+    expect(sent).toEqual([{ id: 'a' }])
   })
 })
 

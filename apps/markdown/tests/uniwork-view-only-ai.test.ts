@@ -9,6 +9,7 @@ import { createMarkdownSkill, READ_ONLY_TOOLS } from '../src/renderer/ai/markdow
 import { AGENT_TOOLS } from '../src/renderer/ai/tools'
 import { LocaleProvider } from '../src/renderer/i18n/locale'
 import { strings } from '../src/renderer/i18n/strings'
+import { usableAiSettings } from './helpers/ai-settings'
 
 beforeEach(() => vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true))
 const cleanups: Array<() => void> = []
@@ -229,7 +230,9 @@ describe('AiPanel on a view-only copy', () => {
           if (!(prop in target)) {
             target[prop] = /^on[A-Z]/.test(prop)
               ? vi.fn(() => () => {})
-              : vi.fn(async () => undefined)
+              : prop === 'getAiSettings'
+                ? vi.fn(async () => usableAiSettings())
+                : vi.fn(async () => undefined)
           }
           return target[prop]
         },

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Collab panel harness</title>
+    <style>
+      /* the host app's accent (docs blue); these are custom-property definitions, as the apps write them */
+      :root {
+        --accent: #185abd;
+        --accent-dark: #124a9e;
+        --accent-soft: #e8f1fb;
+      }
+      [data-theme='dark'] {
+        --accent: #4a9eff;
+        --accent-dark: #3a8eef;
+        --accent-soft: #1e3a5f;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./main.tsx"></script>
+  </body>
+</html>

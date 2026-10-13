@@ -12,6 +12,7 @@ import {
   type AccountView,
 } from './account-model'
 import { SettingsModal, type SettingsSectionId, type SettingsTarget } from './SettingsModal'
+import { orgChoiceOf } from './uniwork-docs-model'
 
 /** sidebar sub-line for the states that need attention */
 const STATE_SUB: Partial<Record<AccountView, StringKey>> = {
@@ -21,6 +22,7 @@ const STATE_SUB: Partial<Record<AccountView, StringKey>> = {
   'wrong-deployment': 'acctWrongServerShort',
   'not-configured': 'acctNotConfiguredShort',
   'keyring-unavailable': 'acctKeyringShort',
+  'keystore-locked': 'uwBadgeKeystore',
 }
 
 const WARN_STATES: ReadonlySet<AccountView> = new Set([
@@ -29,6 +31,7 @@ const WARN_STATES: ReadonlySet<AccountView> = new Set([
   'server-unreachable',
   'wrong-deployment',
   'keyring-unavailable',
+  'keystore-locked',
 ])
 
 function Spinner() {
@@ -86,6 +89,15 @@ export function AccountEntry({
   }, [status, onStatusChange])
 
   const withProfile = showsProfile(view, status)
+  // signed in to several organizations and none chosen yet: the choice step
+  // lives in Settings › Account, so bring it up right after sign-in
+  const choiceNeeded = withProfile && orgChoiceOf(status).needed
+  useEffect(() => {
+    if (choiceNeeded && !settingsOpen) onOpenSettings('account')
+    // reacts to the step appearing only, not to Settings being closed again
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [choiceNeeded])
+
   const email = status?.profile?.email || status?.email || ''
   const name = withProfile || view === 'wrong-deployment' ? displayNameOf(status) : ''
   const signInFirst = needsSignIn(view)

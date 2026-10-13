@@ -1449,6 +1449,7 @@ export const ms = {
   appThreadReplyPlaceholder: 'Balas…',
   appThreadNewPlaceholder: 'Mulakan perbualan',
   appThreadPost: 'Hantar',
+  appThreadNeutralAuthor: 'Pengguna',
   appThreadResolve: 'Selesaikan',
   appThreadReopen: 'Buka semula',
   appThreadResolved: 'Selesai',

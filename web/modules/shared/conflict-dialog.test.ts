@@ -343,7 +343,12 @@ describe('Overwrite…', () => {
       format(t('uwRemoteOrgBlockedWeb'), { reason: t('uwReasonSuspended') }),
     )
     btn('close').click()
-    expect(await done).toEqual({ kind: 'failed', code: 'forbidden' })
+    // the outcome carries the server's reason, so the frame can show the organisation bar afterwards
+    expect(await done).toEqual({
+      kind: 'failed',
+      code: 'forbidden',
+      apiCode: 'organization_suspended',
+    })
   })
 
   it('410: the deleted variant; answers not_found', async () => {
@@ -366,6 +371,10 @@ describe('Overwrite…', () => {
     expect(choices()).toEqual(['reload', 'overwrite', 'cancel'])
     await pick('reload')
     expect(btn('download').getAttribute('aria-disabled')).toBe('true')
+    // the reason speaks of the download, not of the overwrite that just failed
+    const reason = card().querySelector<HTMLElement>('.ow-dlg-reasons')!.textContent
+    expect(reason).toContain(t('uwConflictDownloadTooLarge'))
+    expect(reason).not.toContain(t('uwConflictTooLarge'))
     btn('download').click()
     await flush()
     expect(send).not.toHaveBeenCalled()
@@ -481,6 +490,120 @@ describe('Reload latest (web)', () => {
     expect(alertLine().textContent).toBe(t('uwConflictDownloadFailed'))
     expect(choices()).toEqual(['download', 'discard', 'back'])
     expect(fake.reload).not.toHaveBeenCalled()
+  })
+
+  describe('opened from the new-version bar (start: reload)', () => {
+    it('opens the Reload confirm at once: no table, no Overwrite…; focus Back', async () => {
+      const fake = io({ start: 'reload' })
+      const done = runConflictDialog(fake)
+      await shown()
+      expect(card().querySelector('h2')!.textContent).toBe(t('uwConflictReloadTitle'))
+      expect(card().querySelector('table')).toBeNull()
+      expect(choices()).toEqual(['discard', 'back'])
+      expect(document.activeElement).toBe(btn('back'))
+      await pick('discard')
+      expect(await done).toEqual({ kind: 'reloaded' })
+      expect(fake.reload).toHaveBeenCalledTimes(1)
+      // no save conflict to read: the head table is never fetched
+      expect(fake.overwrite).not.toHaveBeenCalled()
+    })
+
+    it('Back (there is no step 1 to return to) ends it as cancelled', async () => {
+      const fake = io({ start: 'reload' })
+      const done = runConflictDialog(fake)
+      await shown()
+      btn('back').click()
+      expect(await done).toEqual({ kind: 'cancelled' })
+      expect(fake.reload).not.toHaveBeenCalled()
+    })
+
+    it('Escape ends it as cancelled', async () => {
+      const fake = io({ start: 'reload' })
+      const done = runConflictDialog(fake)
+      await shown()
+      keydown('Escape')
+      expect(await done).toEqual({ kind: 'cancelled' })
+      expect(fake.reload).not.toHaveBeenCalled()
+    })
+
+    it('a failed reload keeps the dialog with the line', async () => {
+      const fake = io({ start: 'reload', reload: vi.fn(async () => false) })
+      void runConflictDialog(fake)
+      await pick('discard')
+      expect(alertLine().textContent).toBe(t('uwConflictReloadFailed'))
+      expect(choices()).toEqual(['discard', 'back'])
+    })
+  })
+
+  describe('download cap (init.downloadMaxBytes, X-02 r2b)', () => {
+    const reasons = () => card().querySelector<HTMLElement>('.ow-dlg-reasons')!
+
+    async function openStep2(download: NonNullable<ConflictIo['download']>) {
+      const done = runConflictDialog(io({ download }))
+      await pick('reload')
+      return { done }
+    }
+
+    it('my version over the cap: the download choice is aria-disabled with the too-large reason at open', async () => {
+      const send = vi.fn(async () => {})
+      const bytes = vi.fn(async () => new ArrayBuffer(101))
+      await openStep2({ bytes, send, size: 101, maxBytes: 100 })
+      expect(choices()).toEqual(['download', 'discard', 'back'])
+      expect(btn('download').getAttribute('aria-disabled')).toBe('true')
+      expect(reasons().textContent).toContain(t('uwConflictDownloadTooLarge'))
+      expect(reasons().textContent).not.toContain(t('uwConflictTooLarge'))
+      btn('download').click()
+      await flush()
+      expect(send).not.toHaveBeenCalled()
+      expect(bytes).not.toHaveBeenCalled()
+      // the other two choices keep working
+      expect(btn('discard').getAttribute('aria-disabled')).toBeNull()
+    })
+
+    it('exactly the cap is allowed', async () => {
+      const send = vi.fn(async () => {})
+      await openStep2({ bytes: async () => new ArrayBuffer(100), send, size: 100, maxBytes: 100 })
+      expect(btn('download').getAttribute('aria-disabled')).toBeNull()
+      await pick('download')
+      expect(send).toHaveBeenCalledTimes(1)
+    })
+
+    it('under the cap is allowed', async () => {
+      const send = vi.fn(async () => {})
+      await openStep2({ bytes: async () => new ArrayBuffer(3), send, size: 3, maxBytes: 100 })
+      expect(btn('download').getAttribute('aria-disabled')).toBeNull()
+      await pick('download')
+      expect(send).toHaveBeenCalledTimes(1)
+    })
+
+    it('no cap from the host: as today, enabled until a 413 / too_large answer', async () => {
+      const send = vi.fn(async () => {})
+      await openStep2({ bytes: async () => new ArrayBuffer(1), send, size: 10 ** 9 })
+      expect(btn('download').getAttribute('aria-disabled')).toBeNull()
+      await pick('download')
+      expect(send).toHaveBeenCalledTimes(1)
+    })
+
+    it('a cap without a known size changes nothing', async () => {
+      await openStep2({ bytes: async () => new ArrayBuffer(1), send: vi.fn(), maxBytes: 100 })
+      expect(btn('download').getAttribute('aria-disabled')).toBeNull()
+    })
+
+    it('without the download capability there is still no download choice, cap or not', async () => {
+      void runConflictDialog(io())
+      await pick('reload')
+      expect(choices()).toEqual(['discard', 'back'])
+    })
+
+    it('an over-cap version still reaches Discard and reload', async () => {
+      const fake = io({
+        download: { bytes: async () => new ArrayBuffer(5), send: vi.fn(), size: 5, maxBytes: 4 },
+      })
+      const done = runConflictDialog(fake)
+      await pick('reload')
+      await pick('discard')
+      expect(await done).toEqual({ kind: 'reloaded' })
+    })
   })
 
   it('without edit access there is no download choice', async () => {

@@ -8,6 +8,7 @@ import {
   uniworkSaveAsDefault,
   uniworkSaveDecision,
 } from './uniwork-policy'
+import { sessionDocumentPath, workbookCommentAuthor } from './comment-author'
 import { workbookDisplayName } from './workbook-name'
 import { createHash, randomUUID } from 'node:crypto'
 import {
@@ -22,7 +23,6 @@ import {
 } from 'node:fs'
 import { copyFile, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
-import { userInfo } from 'node:os'
 import { basename, dirname, isAbsolute, join } from 'node:path'
 
 import {
@@ -2575,14 +2575,14 @@ export function registerSheetsIpc(): void {
   if (coreIpcRegistered) return
   coreIpcRegistered = true
 
-  ipcMain.handle(IPC_CHANNELS.userDisplayName, (event): string => {
-    sessionFor(event)
-    try {
-      return userInfo().username
-    } catch {
-      return ''
-    }
-  })
+  // G8-02: the author written into new threaded comments. The shell's single
+  // source answers with the signed-in account's display name for a bound
+  // workbook and the neutral constant otherwise — never the OS account name.
+  // The renderer names its open workbook session, so the answer follows that
+  // session's user-visible file through Save As / reopen / CSV import.
+  ipcMain.handle(IPC_CHANNELS.userDisplayName, (event, sessionId: unknown): string =>
+    workbookCommentAuthor(sessionFor(event).sessions, sessionId),
+  )
 
   // Registered here (not in registerSheetsAiIpc, skipped in shell mode):
   // slides' ai:generate-image only exists once a slides view opens, so sheets
@@ -3258,12 +3258,8 @@ export function registerSheetsIpc(): void {
     // on the temp copy and the serialized csvContent is written back to the
     // original .csv afterwards.
     const csvInPlace = request.mode === 'save' && session.csvSourcePath !== undefined
-    // UniWork seam: the file the user knows this workbook as (none yet for an
-    // unsaved new workbook or a converted import, whose first save is a Save As).
-    const documentPath =
-      session.suggestSaveAs !== undefined
-        ? null
-        : (session.csvSourcePath ?? session.restoreTarget ?? session.path)
+    // UniWork seam: the file the user knows this workbook as
+    const documentPath = sessionDocumentPath(session)
     const mcpSave = request.targetPath !== undefined
     const saveOrigin = uniworkRequestOrigin(request)
     // A plain Save of a read-only document, or AutoSave of a bound one, stops

@@ -52,6 +52,8 @@ export const nl = {
     'Je sessie is verlopen, dus er is niet overschreven. Je wijzigingen blijven in deze browser; meld je opnieuw aan en probeer het nog eens.',
   uwConflictTooLarge:
     'Je versie is groter dan de limiet van UniWork, dus overschrijven was niet mogelijk.',
+  uwConflictDownloadTooLarge:
+    'Je versie is groter dan de limiet van UniWork, dus downloaden is hier niet mogelijk.',
   uwConflictDownloadFailed:
     'Kan je versie niet downloaden, dus het document is niet opnieuw geladen. Probeer het opnieuw.',
   uwConflictOfflineWeb:
@@ -114,6 +116,8 @@ export const nl = {
   uwRemoteReloadFailed: 'Kan versie {n} niet laden. Je bekijkt nog de vorige versie.',
   uwRemoteDeleted: 'Dit document is verwijderd op UniWork. Opslagen in de wachtrij zijn gestopt.',
   uwAuthorFallback: 'een lid',
+  uwLockRegion: 'Documentstatus',
+  uwActRetry: 'Opnieuw proberen',
 
   // S6 new-version bar (web only)
   uwRemoteRevokedWeb:

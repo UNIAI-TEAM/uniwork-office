@@ -78,6 +78,8 @@ export const ru = {
   acctErrWrongDeployment: 'Этот аккаунт относится к другому серверу UniWork.',
   acctErrNotConfigured: 'Это приложение не связано с сервером UniWork.',
   acctErrKeyringUnavailable: 'Защищённое хранилище на этом компьютере недоступно.',
+  acctErrKeystoreLocked:
+    'Связка ключей на этом компьютере заблокирована. Разблокируйте её и повторите попытку.',
   acctErrServerError: 'В UniWork возникла проблема. Повторите попытку позже.',
   acctErrMalformedResponse: 'UniWork отправил непредвиденный ответ. Повторите попытку позже.',
   wbLoadFailedTitle: 'Не удалось загрузить сохранённые данные',

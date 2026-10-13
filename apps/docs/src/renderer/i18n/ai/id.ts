@@ -115,7 +115,7 @@ export const id = {
   aiNetworkError:
     'Masalah jaringan: tidak dapat terhubung ke layanan AI. Periksa koneksi Anda lalu coba lagi',
   aiCreditsExhausted:
-    'Kredit UniWork Anda telah habis. Isi ulang di uniwork.app/pricing lalu coba lagi',
+    'Kredit UniWork Anda telah habis. Isi ulang di uniworkos.com/pricing lalu coba lagi',
   aiSumReadAttachment: 'Baca lampiran',
   aiSumImageAttachment: 'Lampiran gambar {name}',
   aiSumRead: 'Baca {name}',

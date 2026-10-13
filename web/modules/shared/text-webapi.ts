@@ -46,13 +46,14 @@ import {
   type SaveResult,
 } from '../../docs/protocol/types'
 import { downloadBlob, pickFiles } from '../../docs/bridge/browser'
-import { TIMEOUTS, errorCode } from '../../docs/bridge/frame-port'
+import { TIMEOUTS } from '../../docs/bridge/frame-port'
 import { ownHeadAfterUnknown } from '../../docs/bridge/head-match'
 import type { ModuleBridgePort } from '../../docs/bridge/module-bridge'
 import type { DraftHost, DraftRecovery } from '../../docs/bridge/draft-recovery'
 import { createAssetStore } from './assets'
 import {
   conflictSaveResult,
+  bridgeDownloadCap,
   downloadVia,
   headFromFile,
   overwriteHead,
@@ -63,6 +64,14 @@ import {
 import { hideFatal, showFatal, text } from './notice'
 import { printHtmlDocument } from './print'
 import { bridgeDraftRecovery } from './recovery-prompt'
+import {
+  captureScroll,
+  restoreScroll,
+  stashReload,
+  takeReload,
+  type ScrollPosition,
+} from './reload-notice'
+import { createRemoteVersion, type RemoteVersion } from './remote-version'
 import { saveFailureText } from './save-failure'
 import { decodeText, encodeText } from './text-codec'
 
@@ -124,6 +133,8 @@ export interface TextWebApiOptions {
   saveTimeoutMs?: number
   /** "Reload latest" (default: location.reload()); injectable for tests */
   reload?: () => void
+  /** where the new-version notice and the reading position cross a reload (default: sessionStorage) */
+  reloadStore?: Parameters<typeof stashReload>[3]
   /**
    * the renderer's capability object (module-bridge): `save` is turned off when the opened
    * file cannot be saved back faithfully (not UTF-8), so the renderer goes view-only
@@ -134,10 +145,6 @@ export interface TextWebApiOptions {
 }
 
 type Waiter<T> = { settle: (r: T) => void; started: () => void } | null
-
-function describe(err: unknown): string {
-  return err instanceof Error ? err.message : String(err)
-}
 
 function failure(code: ProtocolErrorShape['code'], message: string): SaveResult {
   return { ok: false, error: { code, message } }
@@ -186,6 +193,10 @@ export function createTextWebApi(
   let inexact = false
   let fatal: ProtocolErrorShape | null = null
   let booted = false
+  /** the "new version on UniWork" bar and its reload / lock rules (G5-03w); created below the open plumbing */
+  let remote: RemoteVersion | undefined = undefined
+  /** the reading position the previous page left behind a clean reload; put back after the boot */
+  let scrollBack: ScrollPosition[] | null = null
 
   const assetListeners = new Set<() => void>()
   const assets = createAssetStore(port, {
@@ -209,6 +220,8 @@ export function createTextWebApi(
   let imagesGranted = false
   let desktopOpenGranted = false
   let downloadGranted = false
+  /** `init.downloadMaxBytes`: the largest file the host's `api.download` accepts (X-02 r2b) */
+  const downloadCap = bridgeDownloadCap(port)
 
   const viewOnly = (): boolean => !saveGranted || inexact
 
@@ -266,7 +279,22 @@ export function createTextWebApi(
 
   async function accept(open: OpenPayload): Promise<string> {
     const decoded = decodeText(await readSource(open.source))
+    // another document: the pending version and the bar of the old one are gone
+    if (current !== null && current !== open.file.fileId) remote?.reset()
     remember(open.file)
+    // the page restarted for a clean new version: the info bar and the reading position come back
+    const back = takeReload(
+      open.file.fileId,
+      {
+        revision: revisionOf(open.file),
+        ...(open.file.modifiedAt !== undefined ? { modifiedAt: open.file.modifiedAt } : {}),
+      },
+      opts.reloadStore,
+    )
+    if (back) {
+      remote?.reloaded(back.notice)
+      scrollBack = back.scroll
+    }
     assets.reset(open.assets)
     // a mapped picture the host refuses (revoked share, expired signature) is missing, not broken
     await assets.verify()
@@ -364,8 +392,17 @@ export function createTextWebApi(
     })
   }
 
+  /** the answer of a save the frame refuses because the document was revoked / deleted */
+  function lockedSave(): SaveResult | null {
+    const lock = remote?.locked()
+    if (!lock) return null
+    return failure(lock === 'revoked' ? 'forbidden' : 'not_found', remote!.lockText())
+  }
+
   port.handleSave(async (payload) => {
     if (fatal) return { ok: false, error: fatal }
+    const locked = lockedSave()
+    if (locked) return locked
     if (viewOnly()) return failure('forbidden', text('webViewOnlyNotSaved'))
     if (!current) return failure('not_ready', 'no document is open')
     if (!dirty) return okResult()
@@ -394,6 +431,8 @@ export function createTextWebApi(
 
   port.handleSaveAs(async (payload) => {
     if (fatal) return { ok: false, error: fatal }
+    const locked = lockedSave()
+    if (locked) return locked
     if (viewOnly()) return failure('forbidden', text('webViewOnlyNotSaved'))
     if (hostSave || hostSaveAs) return failure('busy', 'a save is already running')
     return runHostFlow<SaveResult>(
@@ -465,7 +504,8 @@ export function createTextWebApi(
       if (res?.ok === false) return res
       return failure('malformed', 'unexpected save result')
     } catch (err) {
-      return { ok: false, error: { code: errorCode(err), message: describe(err) } }
+      // the status and details (a 403's reason) go with it: the new-version bar reads them
+      return { ok: false, error: toProtocolError(err).toShape() }
     }
   }
 
@@ -518,6 +558,7 @@ export function createTextWebApi(
       await reconcileAfterUnknown(fileId, encodeText(data))
     }
     host?.settle(res)
+    remote?.saveFailed(res.error)
     return { ok: false, error: saveFailureText(res.error, text) }
   }
 
@@ -533,6 +574,8 @@ export function createTextWebApi(
     // the dialog may stay open for long: the host request must not time out meanwhile
     host?.started()
     let loaded = null as FileMeta | null
+    // encoded once: the Overwrite, the download and the cap check all use these bytes
+    const mine = encodeText(data)
     const outcome = await runConflictDialog({
       title: text('webConflictTitle'),
       body: text('webConflictBody'),
@@ -542,7 +585,7 @@ export function createTextWebApi(
       baseRevision: revisionOf(files.get(fileId)),
       readHead: async () => headFromFile(await readHeadFile(port, fileId)),
       overwrite: async () => {
-        const res = await overwriteHead(port, fileId, encodeText(data))
+        const res = await overwriteHead(port, fileId, mine)
         if (res.ok && res.file) {
           landed(
             { ok: true, file: res.file, ...(res.versionId ? { versionId: res.versionId } : {}) },
@@ -558,9 +601,10 @@ export function createTextWebApi(
         return true
       },
       canEdit: () => !viewOnly(),
-      download: downloadVia(port, downloadGranted ? { download: true } : undefined, () =>
-        encodeText(data),
-      ),
+      download: downloadVia(port, downloadGranted ? { download: true } : undefined, () => mine, {
+        size: mine.byteLength,
+        maxBytes: downloadCap(),
+      }),
     })
     const file = (outcome.kind === 'reloaded' ? loaded : null) ?? files.get(fileId)
     if (host && file) host.settle(conflictSaveResult(outcome, file))
@@ -573,6 +617,13 @@ export function createTextWebApi(
       // the dropped edits must not come back as a draft after the reload
       await drafts.saved()
       ;(opts.reload ?? (() => location.reload()))()
+    }
+    // a 401 / 403 / 410 the Overwrite got: the bar of the document's new state stays behind
+    if (outcome.kind === 'failed') {
+      remote?.saveFailed({
+        code: outcome.code,
+        ...(outcome.apiCode ? { details: { apiCode: outcome.apiCode } } : {}),
+      })
     }
     return {
       ok: false,
@@ -620,6 +671,7 @@ export function createTextWebApi(
     host?.settle(res)
     // a cancelled host dialog: nothing saved, no error (like the desktop's dialog cancel)
     if (res.error.code === 'cancelled') return { ok: true, canceled: true }
+    remote?.saveFailed(res.error)
     return { ok: false, error: saveFailureText(res.error, text) }
   }
 
@@ -651,6 +703,30 @@ export function createTextWebApi(
     return out
   }
 
+  // ------------------------------------------------------------ new version on UniWork (G5-03w, S6)
+
+  remote = createRemoteVersion({
+    port,
+    current: () =>
+      current === null ? null : { fileId: current, revision: revisionOf(files.get(current)) },
+    isDirty: () => dirty && !viewOnly(),
+    canEdit: () => !viewOnly(),
+    // the renderer reads its document once at boot, so a clean reload restarts the frame on the
+    // head (the host re-runs the handshake), like the conflict dialog's Reload latest. The page
+    // restarts, so the info bar and the reading position wait in sessionStorage for the next boot
+    apply: async (reply, notice) => {
+      stashReload(reply.file.fileId, notice, captureScroll(), opts.reloadStore)
+      await drafts.saved()
+      ;(opts.reload ?? (() => location.reload()))()
+    },
+    download: () =>
+      downloadVia(port, downloadGranted ? { download: true } : undefined, () => {
+        const live = textProvider?.()
+        if (typeof live !== 'string') throw new Error('the open document could not be read')
+        return encodeText(live)
+      }),
+  })
+
   // ------------------------------------------------------------ preload members
 
   return {
@@ -661,7 +737,13 @@ export function createTextWebApi(
       booted = true
       const pending = pendingOpen
       pendingOpen = null
-      return pending ? await pending : null
+      const path = pending ? await pending : null
+      // the renderer draws the document right after this answer: the position goes back then
+      if (scrollBack) {
+        restoreScroll(scrollBack)
+        scrollBack = null
+      }
+      return path
     },
 
     /**
@@ -707,6 +789,8 @@ export function createTextWebApi(
         return { ok: false, error: message }
       }
       if (fatal) return refuse(fatal, text('webFatalTitle'))
+      const locked = lockedSave()
+      if (locked && !locked.ok) return refuse(locked.error, locked.error.message)
       if (viewOnly()) {
         const message = text('webViewOnlyNotSaved')
         return refuse({ code: 'forbidden', message }, message)
@@ -728,6 +812,7 @@ export function createTextWebApi(
       const force = dirty && saveFailed
       if (dirty) saveFailed = false
       port.setDirty(dirty && !viewOnly(), force ? { force: true } : undefined)
+      remote?.dirtyChanged(dirty && !viewOnly())
     },
 
     onSaveRequest(handler: (mode: SaveMode) => void): () => void {

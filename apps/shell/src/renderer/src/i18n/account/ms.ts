@@ -79,6 +79,7 @@ export const ms = {
   acctErrWrongDeployment: 'Akaun ini milik pelayan UniWork yang lain.',
   acctErrNotConfigured: 'Apl ini tidak dipautkan kepada pelayan UniWork.',
   acctErrKeyringUnavailable: 'Storan selamat pada komputer ini tidak tersedia.',
+  acctErrKeystoreLocked: 'Rantai kunci komputer ini dikunci. Buka kuncinya, kemudian cuba lagi.',
   acctErrServerError: 'UniWork menghadapi masalah. Sila cuba lagi kemudian.',
   acctErrMalformedResponse:
     'UniWork menghantar respons yang tidak dijangka. Sila cuba lagi kemudian.',

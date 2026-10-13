@@ -1,6 +1,7 @@
 import {
   notifyUniworkUserSave,
   setUniworkUserSaveHook,
+  uniworkCommentAuthor,
   uniworkDocState,
   uniworkIsBound,
   uniworkRefusesOpen,
@@ -4428,6 +4429,12 @@ export function registerDocsIpc(): void {
     requestDocsClose(event.sender, dialogParent(event)),
   )
   ipcMain.handle('docs:system-locale', () => app.getSystemLocale())
+  // G8-02: the comment-author source. The renderer names the document it will
+  // write into; the shell's seam answers with the signed-in display name for a
+  // bound document and the neutral constant otherwise — never the OS account.
+  ipcMain.handle('docs:comment-author', (_event, path: unknown) =>
+    uniworkCommentAuthor(typeof path === 'string' ? path : null),
+  )
 
   configureMetricsCache(userDataPath('font-metrics'))
   ipcMain.handle('docs:font-metrics', (_event, family: string) =>

@@ -49,6 +49,8 @@ export const vi = {
   uwConflictSessionWeb:
     'Phiên đăng nhập đã hết hạn nên chưa ghi đè được. Thay đổi vẫn được giữ trong trình duyệt này; đăng nhập lại rồi thử lại.',
   uwConflictTooLarge: 'Bản của bạn vượt giới hạn kích thước của UniWork nên chưa ghi đè được.',
+  uwConflictDownloadTooLarge:
+    'Bản của bạn vượt giới hạn kích thước của UniWork nên không tải xuống được ở đây.',
   uwConflictDownloadFailed:
     'Chưa tải được bản của bạn về máy nên tài liệu chưa được tải lại. Hãy thử lại.',
   uwConflictOfflineWeb:
@@ -107,6 +109,8 @@ export const vi = {
   uwRemoteReloadFailed: 'Không tải được phiên bản {n}. Bạn vẫn đang xem bản trước.',
   uwRemoteDeleted: 'Tài liệu này đã bị xóa trên UniWork. Các lần lưu đang chờ đã dừng.',
   uwAuthorFallback: 'một thành viên',
+  uwLockRegion: 'Trạng thái tài liệu',
+  uwActRetry: 'Thử lại',
 
   // S6 new-version bar (web only)
   uwRemoteRevokedWeb:

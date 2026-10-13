@@ -49,6 +49,8 @@ export const en = {
   uwConflictSessionWeb:
     'Your session expired, so the overwrite didn’t happen. Your changes stay in this browser; sign in again and retry.',
   uwConflictTooLarge: 'Your version is over UniWork’s size limit, so it couldn’t overwrite.',
+  uwConflictDownloadTooLarge:
+    'Your version is over UniWork’s size limit, so it can’t be downloaded here.',
   uwConflictDownloadFailed:
     'Couldn’t download your version, so the document didn’t reload. Try again.',
   uwConflictOfflineWeb:
@@ -108,6 +110,8 @@ export const en = {
   uwRemoteReloadFailed: 'Couldn’t load version {n}. You’re still viewing the previous version.',
   uwRemoteDeleted: 'This document was deleted on UniWork. Queued saves stopped.',
   uwAuthorFallback: 'a member',
+  uwLockRegion: 'Document status',
+  uwActRetry: 'Retry',
 
   // S6 new-version bar (web only)
   uwRemoteRevokedWeb:

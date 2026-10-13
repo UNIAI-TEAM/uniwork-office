@@ -4,6 +4,9 @@ import type { OpenFileResult } from '../../../apps/docs/src/shared/ipc'
 import { createWebApi, idFromPath, pathFor, WEB_PRINT_PART, type WebApi } from './webapi'
 import { createMockPort, protocolError, timeoutAfter, type MockPort } from './testing/mock-port'
 import { text } from './notice'
+import { webText, type WebStringKey } from '../../modules/shared/i18n/strings-web'
+import { webLanguage } from './browser'
+import { frameAiRun } from '../../modules/shared/ai-run'
 // the renderer's own reader: resolves the bridge's in-page handoff without fetch()
 import { fetchDocBytes as bytesAt } from '../../../apps/docs/src/renderer/doc-bytes'
 import {
@@ -330,14 +333,6 @@ describe('saveDocx', () => {
 
   it('error: shows the localized sentence of the failure, never the host message', async () => {
     const doc = await bootWith()
-    mock.override('api.save', () => ({
-      ok: false,
-      error: { code: 'forbidden', message: 'read-only' },
-    }))
-    expect(await api.saveDocx(doc.path, buf([5]))).toEqual({
-      ok: false,
-      error: 'You do not have permission to save this document.',
-    })
     mock.override('api.save', () => Promise.reject(protocolError('internal', 'HTTP 500')))
     expect(await api.saveDocx(doc.path, buf([5]))).toEqual({
       ok: false,
@@ -345,6 +340,16 @@ describe('saveDocx', () => {
     })
     mock.override('api.save', () => ({ nonsense: true }))
     expect((await api.saveDocx(doc.path, buf([5]))).ok).toBe(false)
+    // last: a 403 means the access is gone, so the frame locks behind the bar afterwards
+    mock.override('api.save', () => ({
+      ok: false,
+      error: { code: 'forbidden', message: 'read-only' },
+    }))
+    // the bar says it: no error text, so the editor raises no toast of its own
+    expect(await api.saveDocx(doc.path, buf([5]))).toEqual({
+      ok: false,
+      reason: 'external-modified',
+    })
   })
 
   it('timeout: reports a timed-out save', async () => {
@@ -815,6 +820,60 @@ describe('host save / saveAs requests (editor flows)', () => {
     expect(await res).toMatchObject({ ok: true, file: { fileId: 'f1' } })
   })
 
+  it('save conflict with the download capability and my version over init.downloadMaxBytes: the download choice is aria-disabled up front', async () => {
+    const meta = mock.seed('Report.docx', DOCX)
+    mock.init({
+      documentId: meta.fileId,
+      capabilities: { save: true, download: true },
+      downloadMaxBytes: 1,
+    })
+    const doc = (await api.consumePendingOpenDocx()) as OpenFileResult
+    wireRenderer(
+      () => doc.path,
+      () => api.saveDocx(doc.path, buf([4, 4])),
+    )
+    mock.bumpRemote('f1')
+    const res = mock.host.save({ reason: 'user' })
+    await choose('conflict', 'reload')
+    await vi.waitFor(() =>
+      expect(document.querySelector('[data-choice="download"]')).not.toBeNull(),
+    )
+    const download = document.querySelector('[data-choice="download"]') as HTMLElement
+    expect(download.getAttribute('aria-disabled')).toBe('true')
+    download.click()
+    for (let i = 0; i < 5; i++) await flush()
+    expect(mock.calls.some((c) => c.type === 'api.download')).toBe(false)
+    await choose('conflict', 'back')
+    await choose('conflict', 'cancel')
+    await res
+  })
+
+  it('save conflict: a version exactly at init.downloadMaxBytes can still be downloaded', async () => {
+    const meta = mock.seed('Report.docx', DOCX)
+    mock.init({
+      documentId: meta.fileId,
+      capabilities: { save: true, download: true },
+      downloadMaxBytes: 2,
+    })
+    const doc = (await api.consumePendingOpenDocx()) as OpenFileResult
+    wireRenderer(
+      () => doc.path,
+      () => api.saveDocx(doc.path, buf([4, 4])),
+    )
+    mock.bumpRemote('f1')
+    const res = mock.host.save({ reason: 'user' })
+    await choose('conflict', 'reload')
+    await vi.waitFor(() =>
+      expect(document.querySelector('[data-choice="download"]')).not.toBeNull(),
+    )
+    expect(
+      document.querySelector('[data-choice="download"]')!.getAttribute('aria-disabled'),
+    ).toBeNull()
+    await choose('conflict', 'back')
+    await choose('conflict', 'cancel')
+    await res
+  })
+
   it('save conflict -> Overwrite gets 401: the session line, closing answers unauthorized', async () => {
     const doc = await bootWith()
     wireRenderer(() => doc.path)
@@ -1202,5 +1261,261 @@ describe('view-only (host withholds the save grant)', () => {
     const res = await api.saveDocxAs('Copy', buf([5]), doc.path)
     expect(res.ok).toBe(true)
     expect(mock.calls.some((c) => c.type === 'api.saveAs')).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------- new version on UniWork (G5-03w, S6)
+
+describe('new version on UniWork (doc.remoteVersion)', () => {
+  const wt = (key: WebStringKey, params?: Record<string, string>) =>
+    webText(webLanguage(), key, params)
+  const bar = () => document.querySelector<HTMLElement>('.uw-remote-bar')
+  const barText = () => bar()?.querySelector('.uw-remote-bar-text')?.textContent ?? null
+  const event = (revision: string, fileId = 'f1') => ({
+    document_id: fileId,
+    revision,
+    version_id: `v${revision}`,
+    saved_at: new Date(Date.UTC(2026, 9, 12, 8)).toISOString(),
+    author_name: 'Trần An',
+  })
+  /** the host answers api.open with the head: the new bytes and the head's own revision */
+  function serveHead(revision: string, bytes: Uint8Array): void {
+    mock.override('api.open', (payload) => {
+      const { fileId } = payload as { fileId: string }
+      const open = mock.openPayload(fileId)
+      return {
+        // the real host: the etag is the document revision of the same read
+        file: { ...open.file, etag: revision, revision, versionId: `v${revision}` },
+        source: { kind: 'bytes', data: bytes.slice().buffer },
+      }
+    })
+  }
+  async function bootRevision(revision: string): Promise<OpenFileResult> {
+    const meta = mock.seed('Report.docx', DOCX)
+    mock.init({
+      documentId: meta.fileId,
+      open: { ...mock.openPayload(meta.fileId), file: { ...meta, revision } },
+    })
+    return (await api.consumePendingOpenDocx()) as OpenFileResult
+  }
+
+  it('clean: reloads through api.open (the event version) and hands the head to the renderer', async () => {
+    const delivered: OpenFileResult[] = []
+    await bootRevision('10')
+    api.onOpenDocx((r) => {
+      if ('dataUrl' in r) delivered.push(r)
+    })
+    guardDirty(false)
+    const head = new Uint8Array([0x50, 0x4b, 9, 9])
+    serveHead('12', head)
+    mock.sendRemoteVersion(event('12'))
+    await vi.waitFor(() => expect(delivered).toHaveLength(1))
+    const open = mock.calls.filter((c) => c.type === 'api.open').at(-1)!
+    expect(open.payload).toEqual({ fileId: 'f1', versionId: 'v12' })
+    expect(await bytesAt(delivered[0]!.dataUrl)).toEqual(head)
+    expect(barText()).toContain('version 12')
+    expect(barText()).toContain('Trần An')
+  })
+
+  it('the Save after a head reload is based on the reply (etag = its revision), not the old copy', async () => {
+    const delivered: OpenFileResult[] = []
+    await bootRevision('10')
+    api.onOpenDocx((r) => {
+      if ('dataUrl' in r) delivered.push(r)
+    })
+    guardDirty(false)
+    serveHead('12', new Uint8Array([0x50, 0x4b, 7]))
+    mock.sendRemoteVersion(event('12'))
+    await vi.waitFor(() => expect(delivered).toHaveLength(1))
+    const bases: unknown[] = []
+    mock.override('api.save', (payload) => {
+      bases.push((payload as { etag?: string }).etag)
+      return { ok: true, file: { ...mock.openPayload('f1').file, etag: '13', revision: '13' } }
+    })
+    expect((await api.saveDocx(delivered[0]!.path, buf([6]), false)).ok).toBe(true)
+    expect(bases).toEqual(['12'])
+  })
+
+  it('dirty: the content is not replaced and the warn bar shows', async () => {
+    const delivered: OpenFileResult[] = []
+    await bootRevision('10')
+    api.onOpenDocx((r) => {
+      if ('dataUrl' in r) delivered.push(r)
+    })
+    guardDirty(true)
+    mock.sendRemoteVersion(event('12'))
+    await flush()
+    expect(mock.calls.filter((c) => c.type === 'api.open')).toHaveLength(0)
+    expect(delivered).toEqual([])
+    expect(barText()).toBe(wt('uwRemoteNewerDirty', { n: '12' }))
+    expect(bar()!.querySelector('[data-action="reload"]')).not.toBeNull()
+  })
+
+  it('an AI turn is running: no reload, the AI bar; the turn ends, the version loads', async () => {
+    const delivered: OpenFileResult[] = []
+    await bootRevision('10')
+    api.onOpenDocx((r) => {
+      if ('dataUrl' in r) delivered.push(r)
+    })
+    guardDirty(false)
+    serveHead('12', new Uint8Array([0x50, 0x4b, 1]))
+    frameAiRun.begin('turn-1')
+    mock.sendRemoteVersion(event('12'))
+    await flush()
+    expect(delivered).toEqual([])
+    expect(barText()).toBe(wt('uwRemoteNewerAi', { n: '12' }))
+    frameAiRun.end('turn-1')
+    await vi.waitFor(() => expect(delivered).toHaveLength(1), { timeout: 4000 })
+    frameAiRun.stop()
+  })
+
+  it('a save answered 403 (revoked) locks the frame: the bar, then every save is refused without a request', async () => {
+    const doc = await bootRevision('10')
+    mock.override('api.save', () => Promise.reject(protocolError('forbidden', 'HTTP 403')))
+    expect(await api.saveDocx(doc.path, buf([4]), false)).toMatchObject({ ok: false })
+    expect(barText()).toBe(wt('uwRemoteRevokedWeb'))
+    const calls = mock.calls.filter((c) => c.type === 'api.save').length
+    // Save is disabled with the spine sentence
+    expect(await api.saveDocx(doc.path, buf([5]), false)).toEqual({
+      ok: false,
+      error: wt('uwRemoteRevokedWeb'),
+    })
+    expect(await mock.host.save({ reason: 'user' })).toMatchObject({
+      ok: false,
+      error: { code: 'forbidden' },
+    })
+    expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(calls)
+    expect(document.getElementById('root')?.hasAttribute('inert') ?? true).toBe(true)
+  })
+
+  describe.each([
+    ['401', 'unauthorized', 'webSaveUnauthorized'],
+    ['403', 'forbidden', 'uwRemoteRevokedWeb'],
+    ['410', 'not_found', 'uwRemoteDeleted'],
+  ] as const)('a save answered %s', (status, code, key) => {
+    const fail = () => Promise.reject(protocolError(code, `HTTP ${status}`))
+
+    it('Save: the bar is the only surface, the reason that means "stay dirty, nothing more to say"', async () => {
+      const doc = await bootRevision('10')
+      mock.override('api.save', fail)
+      expect(await api.saveDocx(doc.path, buf([4]), false)).toEqual({
+        ok: false,
+        reason: 'external-modified',
+      })
+      expect(barText()).toBe(wt(key))
+    })
+
+    it('Save As and the first save: a result without an error shows no editor toast either', async () => {
+      const doc = await bootRevision('10')
+      mock.override('api.saveAs', fail)
+      expect(await api.saveDocxAs('Copy', buf([4]), doc.path)).toEqual({ ok: false })
+      expect(barText()).toBe(wt(key))
+    })
+
+    it('the first save of a new document', async () => {
+      await bootRevision('10')
+      mock.override('api.saveAs', fail)
+      expect(await api.saveDocxNew('Untitled', buf([4]))).toEqual({ ok: false })
+      expect(barText()).toBe(wt(key))
+    })
+  })
+
+  it('an error the bar does not own (a 500, the network) keeps the editor toast text', async () => {
+    const doc = await bootRevision('10')
+    mock.override('api.save', () => Promise.reject(protocolError('internal', 'HTTP 500')))
+    expect(await api.saveDocx(doc.path, buf([4]), false)).toEqual({
+      ok: false,
+      error: wt('webSaveFailedGeneric'),
+    })
+    expect(bar()).toBeNull()
+    mock.override('api.saveAs', () => Promise.reject(protocolError('internal', 'HTTP 500')))
+    expect(await api.saveDocxAs('Copy', buf([4]), doc.path)).toMatchObject({
+      ok: false,
+      error: wt('webSaveFailedGeneric'),
+    })
+  })
+
+  it('doc.blocked on a dirty frame: the bar and the lock at once, Save and Save As refused, edits kept', async () => {
+    const doc = await bootRevision('10')
+    guardDirty(true)
+    mock.sendBlocked({ document_id: 'f1', reason: 'permission_revoked' })
+    expect(barText()).toBe(wt('uwRemoteRevokedWeb'))
+    expect(document.getElementById('root')?.hasAttribute('inert') ?? true).toBe(true)
+    expect(await api.saveDocx(doc.path, buf([5]), false)).toEqual({
+      ok: false,
+      error: wt('uwRemoteRevokedWeb'),
+    })
+    expect((await api.saveDocxAs('Copy', buf([5]), doc.path)).ok).toBe(false)
+    expect(await mock.host.save({ reason: 'user' })).toMatchObject({
+      ok: false,
+      error: { code: 'forbidden' },
+    })
+    expect(mock.calls.filter((c) => c.type === 'api.save' || c.type === 'api.saveAs')).toEqual([])
+    // the frame never reverts the editor's edits: nothing was re-opened
+    expect(mock.calls.filter((c) => c.type === 'api.open')).toEqual([])
+  })
+
+  it('doc.blocked with an organisation reason: the bar only, the editor usable, Save still reaches the host', async () => {
+    const doc = await bootRevision('10')
+    guardDirty(true)
+    mock.sendBlocked({ document_id: 'f1', reason: 'organization_suspended' })
+    expect(barText()).toBe(wt('uwRemoteOrgBlockedWeb', { reason: wt('uwReasonSuspended') }))
+    expect(document.getElementById('root')?.hasAttribute('inert') ?? false).toBe(false)
+    expect((await api.saveDocx(doc.path, buf([5]), false)).ok).toBe(true)
+    expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(1)
+  })
+
+  it('doc.blocked deleted on a clean frame: the delete bar, a not_found answer to the host', async () => {
+    await bootRevision('10')
+    guardDirty(false)
+    mock.sendBlocked({ document_id: 'f1', reason: 'document_deleted' })
+    expect(barText()).toBe(wt('uwRemoteDeleted'))
+    expect(await mock.host.save({ reason: 'user' })).toMatchObject({
+      ok: false,
+      error: { code: 'not_found' },
+    })
+  })
+
+  it('a save answered 410 (deleted): the delete bar and a not_found answer to the host', async () => {
+    const doc = await bootRevision('10')
+    mock.override('api.save', () => {
+      throw Object.assign(protocolError('internal', 'HTTP 410'), { status: 410 })
+    })
+    await api.saveDocx(doc.path, buf([4]), false)
+    expect(barText()).toBe(wt('uwRemoteDeleted'))
+    expect(await mock.host.save({ reason: 'user' })).toMatchObject({
+      ok: false,
+      error: { code: 'not_found' },
+    })
+  })
+
+  it('a save answered 401: the sign-in-again bar, no lock', async () => {
+    const doc = await bootRevision('10')
+    mock.override('api.save', () => Promise.reject(protocolError('unauthorized', 'HTTP 401')))
+    await api.saveDocx(doc.path, buf([4]), false)
+    expect(barText()).toBe(wt('webSaveUnauthorized'))
+    mock.clearOverrides()
+    expect((await api.saveDocx(doc.path, buf([5]), false)).ok).toBe(true)
+  })
+
+  it('an Overwrite refused for an organisation reason leaves the organisation bar behind', async () => {
+    const doc = await bootRevision('10')
+    api.onCloseSaveRequest(() => {
+      void api.saveDocx(doc.path, buf([4])).then((r) => api.reportCloseSaveResult(r.ok))
+    })
+    mock.bumpRemote('f1')
+    const res = mock.host.save({ reason: 'user' })
+    await choose('conflict', 'overwrite')
+    mock.override('api.save', () =>
+      Promise.reject(
+        Object.assign(protocolError('forbidden', 'HTTP 403'), {
+          details: { apiCode: 'organization_suspended' },
+        }),
+      ),
+    )
+    await choose('conflict', 'go')
+    await choose('conflict', 'close')
+    expect(await res).toMatchObject({ ok: false, error: { code: 'forbidden' } })
+    expect(barText()).toBe(wt('uwRemoteOrgBlockedWeb', { reason: wt('uwReasonSuspended') }))
   })
 })

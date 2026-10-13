@@ -36,6 +36,8 @@ export const ACCOUNT_ERROR_KEYS: Record<AccountUiError, StringKey> = {
   wrong_deployment: 'acctErrWrongDeployment',
   not_configured: 'acctErrNotConfigured',
   keyring_unavailable: 'acctErrKeyringUnavailable',
+  // locked (transient), not missing: its own sentence (the notice title/body above already say the state)
+  keystore_locked: 'acctErrKeystoreLocked',
   server_error: 'acctErrServerError',
   malformed_response: 'acctErrMalformedResponse',
 }
@@ -155,6 +157,7 @@ export function useAccount(): AccountController {
   // set when main reported why the current sign-in failed (more specific than `launch`)
   const loginErrorSeen = useRef(false)
   const copiedTimer = useRef<number | null>(null)
+  const retrying = useRef(false)
 
   const apply = useCallback((next: AccountStatus) => {
     setStatus(next)
@@ -276,14 +279,20 @@ export function useAccount(): AccountController {
   }
 
   const retry = () => {
+    // one restore at a time: a second click before the busy state renders must not start another
+    if (retrying.current) return
+    retrying.current = true
     setBusy('retrying')
-    void window.aiOffice
-      .accountRetry?.()
+    // an absent accountRetry (older main) resolves at once, so the busy state never sticks
+    void Promise.resolve(window.aiOffice.accountRetry?.())
       .then((s) => {
         if (s) apply(s)
       })
       .catch(() => undefined)
-      .finally(() => setBusy(null))
+      .finally(() => {
+        retrying.current = false
+        setBusy(null)
+      })
   }
 
   const selectOrg = (orgId: string) => {

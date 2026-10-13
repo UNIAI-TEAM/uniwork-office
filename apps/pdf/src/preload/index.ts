@@ -3,6 +3,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { Lang } from '@genoffice/i18n'
 import type { AiStreamChunk } from '@genoffice/ai-provider'
 import { installAiRunBridge } from '@genoffice/electron-utils/ai-run-bridge'
+import { installUniworkCommentsBridge } from '@genoffice/electron-utils/comments-bridge'
 import { installDropOpenBridge } from '@genoffice/electron-utils/drop-open'
 import { AI_CHANNELS, PDF_CHANNELS } from '../shared/ipc'
 import type { PdfApi, UiTheme } from '../shared/ipc'
@@ -54,6 +55,11 @@ const api: PdfApi = {
   addSavedSignature: (data) => ipcRenderer.invoke(PDF_CHANNELS.addSignature, data),
   removeSavedSignature: (id) => ipcRenderer.invoke(PDF_CHANNELS.removeSignature, id),
   getUsername: () => ipcRenderer.invoke(PDF_CHANNELS.getUsername),
+  onCommentAuthorChanged: (handler) => {
+    const listener = () => handler()
+    ipcRenderer.on('uniwork:comment-author-changed', listener)
+    return () => ipcRenderer.removeListener('uniwork:comment-author-changed', listener)
+  },
   setDirty: (dirty) => ipcRenderer.send(PDF_CHANNELS.dirtyChanged, dirty),
   onCloseSaveRequest: (handler) => {
     const listener = (_e: Electron.IpcRendererEvent, request?: { origin?: unknown }) =>
@@ -144,4 +150,5 @@ contextBridge.exposeInMainWorld('projectApi', projectApi)
 installDropOpenBridge()
 
 // window.uniworkAiRun.reportAiRun: the shell learns when an AI turn runs here
+installUniworkCommentsBridge()
 installAiRunBridge()

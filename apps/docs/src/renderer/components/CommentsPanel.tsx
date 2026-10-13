@@ -3,6 +3,7 @@ import type { Node as PmNode } from '@tiptap/pm/model'
 import type { CommentInfo } from '@genoffice/docx-engine'
 import { isWebFrame } from '../capabilities'
 import { useI18n } from '../i18n/locale'
+import { displayCommentAuthor } from '../comment-author'
 import { IconComment, IconPencil, IconTrash } from './icons'
 
 function formatDate(iso?: string): string {
@@ -79,6 +80,10 @@ export const CommentsPanel = memo(function CommentsPanel({
   focus?: { id: string; nonce: number } | null
 }) {
   const { t } = useI18n()
+  // G8-02: the neutral author is written into the file as the fixed "User";
+  // the pane shows it in the UI language. Any other author shows verbatim.
+  const authorLabel = (author: string) =>
+    displayCommentAuthor(author, t('editorNeutralCommentAuthor'))
   const [activeId, setActiveId] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
   const draftRef = useRef<HTMLTextAreaElement>(null)
@@ -171,9 +176,11 @@ export const CommentsPanel = memo(function CommentsPanel({
     const replies = repliesOf(c.id)
     const head = (
       <div className="comment-card-head">
-        <span className="comment-avatar">{(c.initials || c.author || '?').slice(0, 2)}</span>
-        <span className="comment-author" title={c.author || undefined}>
-          {c.author || t('appUnknownAuthor')}
+        <span className="comment-avatar" aria-hidden="true">
+          {(c.initials || authorLabel(c.author) || '?').slice(0, 2)}
+        </span>
+        <span className="comment-author" title={authorLabel(c.author) || undefined}>
+          {authorLabel(c.author) || t('appUnknownAuthor')}
         </span>
         <span className="comment-date">{formatDate(c.date)}</span>
         {c.done && <span className="comment-resolved-badge">{t('appResolved')}</span>}
@@ -256,9 +263,11 @@ export const CommentsPanel = memo(function CommentsPanel({
         {replies.map((r) => (
           <div key={r.id} className="comment-reply">
             <div className="comment-card-head">
-              <span className="comment-avatar">{(r.initials || r.author || '?').slice(0, 2)}</span>
-              <span className="comment-author" title={r.author || undefined}>
-                {r.author || t('appUnknownAuthor')}
+              <span className="comment-avatar" aria-hidden="true">
+                {(r.initials || authorLabel(r.author) || '?').slice(0, 2)}
+              </span>
+              <span className="comment-author" title={authorLabel(r.author) || undefined}>
+                {authorLabel(r.author) || t('appUnknownAuthor')}
               </span>
               <span className="comment-date">{formatDate(r.date)}</span>
               <span

@@ -28,19 +28,21 @@ import type {
   SaveEvent,
 } from '../../../apps/slides/src/session/host-io'
 import { sessions } from '../../../apps/slides/src/session/state'
-import type {
-  Capabilities,
-  FileMeta,
-  ProtocolErrorShape,
-  SaveResult,
+import {
+  toProtocolError,
+  type Capabilities,
+  type FileMeta,
+  type ProtocolErrorShape,
+  type SaveResult,
 } from '../../docs/protocol/types'
 import { pickFiles } from '../../docs/bridge/browser'
-import { TIMEOUTS, errorCode, type FramePort } from '../../docs/bridge/frame-port'
+import { TIMEOUTS, type FramePort } from '../../docs/bridge/frame-port'
 import { ownHeadAfterUnknown } from '../../docs/bridge/head-match'
 import { idFromPath, pathFor } from '../../docs/bridge/webapi'
 import { tm } from '../../../apps/slides/src/main/i18n-main'
 import { choose, text } from './dialogs'
 import { saveFailureText } from '../shared/save-failure'
+import type { RemoteVersion } from '../shared/remote-version'
 import {
   conflictSaveResult,
   downloadVia,
@@ -78,6 +80,8 @@ export interface WebDocState {
   holdHostSave: (() => void) | null
   /** the effective capabilities from `init` (`download` for the conflict dialog) */
   effective: Capabilities | undefined
+  /** `init.downloadMaxBytes` (X-02 r2b): the largest file the host's `api.download` accepts */
+  downloadCap: () => number | undefined
   remember(file: FileMeta): void
 }
 
@@ -91,6 +95,7 @@ export function createDocState(): WebDocState {
     hostAnswer: null,
     holdHostSave: null,
     effective: undefined,
+    downloadCap: () => undefined,
     remember(file) {
       files.set(file.fileId, { ...files.get(file.fileId), ...file })
     },
@@ -122,6 +127,8 @@ export interface WebHostDeps {
   userName(): string | undefined
   /** a deck replaced by "Reload latest" after a conflict */
   reload(fileId: string): Promise<void>
+  /** the new-version bar (G5-03w): learns 401 / 403 / 410 save failures, locks saves (created after the host IO) */
+  remote?(): RemoteVersion | undefined
   /** after every landed save (dirty, title, rename listeners) */
   onSaved(event: { file: FileMeta; previousPath: string; kind: SaveEvent['kind'] }): void
   /** test seams */
@@ -207,6 +214,7 @@ export function createWebHostIO(deps: WebHostDeps): HostIO {
 
   function saveFailure(result: Extract<SaveResult, { ok: false }>): WebSaveError {
     deps.state.lastFailure = result.error
+    deps.remote?.()?.saveFailed(result.error)
     const code = result.error.code
     return new WebSaveError(
       // the protocol message is developer English: the user gets the localised text. A conflict
@@ -226,10 +234,8 @@ export function createWebHostIO(deps: WebHostDeps): HostIO {
       if (res?.ok === false) return res
       return { ok: false, error: { code: 'malformed', message: `${type}: unexpected result` } }
     } catch (err) {
-      return {
-        ok: false,
-        error: { code: errorCode(err), message: err instanceof Error ? err.message : String(err) },
-      }
+      // the status and details (a 403's reason) go with it: the new-version bar reads them
+      return { ok: false, error: toProtocolError(err).toShape() }
     }
   }
 
@@ -304,14 +310,24 @@ export function createWebHostIO(deps: WebHostDeps): HostIO {
       // the host's grant now AND the file's own flag for the current token (as the Docs bridge)
       canEdit: () =>
         deps.capabilities.save !== false && deps.state.files.get(fileId)?.writable !== false,
-      download: downloadVia(deps.port, deps.state.effective, () => bytes),
+      download: downloadVia(deps.port, deps.state.effective, () => bytes, {
+        size: bytes.byteLength,
+        maxBytes: deps.state.downloadCap(),
+      }),
       markerAttr: 'data-slides-web',
     })
     const file = deps.state.files.get(fileId)
     if (deps.state.hostSaving && file) deps.state.hostAnswer = conflictSaveResult(outcome, file)
     if (outcome.kind === 'overwritten') return
     if (outcome.kind === 'failed') {
-      throw saveFailure({ ok: false, error: { code: outcome.code, message: '' } })
+      throw saveFailure({
+        ok: false,
+        error: {
+          code: outcome.code,
+          message: '',
+          ...(outcome.apiCode ? { details: { apiCode: outcome.apiCode } } : {}),
+        },
+      })
     }
     deps.state.lastFailure = res.error
     throw new WebSaveError(text('webConflictNotSaved'), 'conflict')
@@ -339,6 +355,9 @@ export function createWebHostIO(deps: WebHostDeps): HostIO {
 
   function refuseWhenFatal(): void {
     if (deps.state.fatal) throw new WebSaveError(text('webFatalTitle'), 'fatal')
+    const remote = deps.remote?.()
+    // revoked / deleted (the new-version bar locked the frame): nothing is written
+    if (remote?.locked()) throw new WebSaveError(remote.lockText(), 'fatal')
   }
 
   return {

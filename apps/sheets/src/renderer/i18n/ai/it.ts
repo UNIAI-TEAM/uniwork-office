@@ -58,7 +58,7 @@ export const it = {
   aiNetworkError:
     'Problema di rete: impossibile raggiungere il servizio IA. Controlla la connessione e riprova',
   aiCreditsExhausted:
-    'I tuoi crediti UniWork sono esauriti. Ricarica su uniwork.app/pricing e riprova',
+    'I tuoi crediti UniWork sono esauriti. Ricarica su uniworkos.com/pricing e riprova',
   aiToolWorkbookContext: 'Lettura delle informazioni della cartella di lavoro',
   aiToolReadRange: "Lettura dell'intervallo",
   aiToolReadRangeOf: "Lettura dell'intervallo {range}",

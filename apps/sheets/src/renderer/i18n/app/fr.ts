@@ -1515,6 +1515,7 @@ export const fr = {
   appThreadReplyPlaceholder: 'Répondre…',
   appThreadNewPlaceholder: 'Démarrer une conversation',
   appThreadPost: 'Publier',
+  appThreadNeutralAuthor: 'Utilisateur',
   appThreadResolve: 'Résoudre',
   appThreadReopen: 'Rouvrir',
   appThreadResolved: 'Résolu',

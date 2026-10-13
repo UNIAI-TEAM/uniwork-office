@@ -51,6 +51,8 @@ export const ja = {
     'セッションの有効期限が切れたため、上書きされませんでした。変更はこのブラウザーに残っています。再ログインしてもう一度お試しください。',
   uwConflictTooLarge:
     'あなたのバージョンは UniWork のサイズ上限を超えているため、上書きできませんでした。',
+  uwConflictDownloadTooLarge:
+    'あなたのバージョンは UniWork のサイズ上限を超えているため、ここではダウンロードできません。',
   uwConflictDownloadFailed:
     'あなたのバージョンをダウンロードできなかったため、ドキュメントは再読み込みされませんでした。もう一度お試しください。',
   uwConflictOfflineWeb:
@@ -112,6 +114,8 @@ export const ja = {
   uwRemoteReloadFailed: 'バージョン {n} を読み込めませんでした。前のバージョンを表示したままです。',
   uwRemoteDeleted: 'このドキュメントは UniWork で削除されました。保存待ちは停止しました。',
   uwAuthorFallback: 'メンバー',
+  uwLockRegion: 'ドキュメントの状態',
+  uwActRetry: '再試行',
 
   // S6 new-version bar (web only)
   uwRemoteRevokedWeb:

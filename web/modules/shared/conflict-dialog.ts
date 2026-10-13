@@ -27,7 +27,7 @@ import {
   type SaveResult,
 } from '../../docs/protocol/types'
 import { webLanguage } from '../../docs/bridge/browser'
-import { TIMEOUTS, type FramePort } from '../../docs/bridge/frame-port'
+import { TIMEOUTS, type FramePort, type PortSession } from '../../docs/bridge/frame-port'
 import {
   FOCUS_TITLE,
   openFrameDialog,
@@ -74,7 +74,16 @@ export interface ConflictIo {
     bytes(): Promise<ArrayBuffer>
     /** `api.download {data}`: resolves when the host delivered the file, rejects otherwise */
     send(data: ArrayBuffer): Promise<void>
+    /** byte size of the user's version (the Save that got the 409), if known */
+    size?: number
+    /** the largest file the host's `api.download` accepts (`init.downloadMaxBytes`), if it said */
+    maxBytes?: number
   }
+  /**
+   * `reload` opens the Reload confirm directly (the S6 bar's "Reload latest…": there is no save
+   * conflict to compare); Back and the close X then end the dialog as `cancelled`
+   */
+  start?: 'reload'
   /** default: navigator.onLine */
   online?: () => boolean
   /** the dialog's marker attribute / backdrop class (module conventions) */
@@ -87,7 +96,12 @@ export type ConflictOutcome =
   | { kind: 'overwritten'; versionId?: string; file?: FileMeta }
   | { kind: 'reloaded' }
   | { kind: 'cancelled' }
-  | { kind: 'failed'; code: 'unauthorized' | 'forbidden' | 'not_found' | 'internal' }
+  | {
+      kind: 'failed'
+      code: 'unauthorized' | 'forbidden' | 'not_found' | 'internal'
+      /** the server's own reason of a 403 (`details.apiCode`), when the Overwrite got one */
+      apiCode?: string
+    }
 
 export const CONFLICT_MARKER = 'conflict'
 
@@ -176,16 +190,38 @@ export async function overwriteHead(
 }
 
 /**
+ * The host's `init.downloadMaxBytes` as the protocol session holds it (a later `init` after a
+ * frame reload updates the same session object): read when the dialog opens, undefined until
+ * `init` or when the host sent none.
+ */
+export function bridgeDownloadCap(
+  port: Pick<FramePort, 'whenInitialized'>,
+): () => number | undefined {
+  let session: PortSession | null = null
+  port.whenInitialized().then(
+    (s) => {
+      session = s
+    },
+    () => {},
+  )
+  return () => session?.downloadMaxBytes
+}
+
+/**
  * The download choice's IO, only when the effective capabilities include `download` (host
- * advertised it and the frame claimed it). `api.download` carries the bytes only.
+ * advertised it and the frame claimed it). `api.download` carries the bytes only. `limit` is the
+ * size of the user's version and the host's cap, so the dialog can disable the choice up front.
  */
 export function downloadVia(
   port: RequestPort,
   caps: Capabilities | undefined,
   bytes: () => Promise<ArrayBuffer | Uint8Array> | ArrayBuffer | Uint8Array,
+  limit?: { size: number; maxBytes?: number },
 ): ConflictIo['download'] {
   if (caps?.download !== true) return undefined
   return {
+    ...(limit ? { size: limit.size } : {}),
+    ...(limit?.maxBytes !== undefined ? { maxBytes: limit.maxBytes } : {}),
     bytes: async () => copyBuffer(await bytes()),
     async send(data) {
       const res = await port.request(
@@ -248,8 +284,14 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
     })
   /** the code the host hears when the user closes after a failed Overwrite */
   let failure: ConflictOutcome | null = null
-  /** an Overwrite answered 413: the same limit blocks the download */
-  let tooLarge = false
+  /**
+   * the download is known to be refused: an Overwrite answered 413, or my version is already over
+   * the cap the host announced in `init` (equal to the cap is allowed)
+   */
+  let tooLarge =
+    io.download?.size !== undefined &&
+    io.download.maxBytes !== undefined &&
+    io.download.size > io.download.maxBytes
   let alert = ''
   let focus: Id | typeof FOCUS_TITLE = 'cancel'
   /** step 1 is the one on screen: the only step whose Reload / Overwrite depend on the network */
@@ -385,7 +427,7 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
       choices.push({
         id: 'download',
         label: t('uwConflictDownloadThenReload'),
-        ...(tooLarge ? { disabled: true, reason: t('uwConflictTooLarge') } : {}),
+        ...(tooLarge ? { disabled: true, reason: t('uwConflictDownloadTooLarge') } : {}),
       })
     }
     choices.push(
@@ -419,7 +461,11 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
   }
 
   /** a closing variant (revoked, deleted, organisation blocked): one sentence and Close */
-  async function closing(body: string, code: 'forbidden' | 'not_found'): Promise<ConflictOutcome> {
+  async function closing(
+    body: string,
+    code: 'forbidden' | 'not_found',
+    apiCode?: string,
+  ): Promise<ConflictOutcome> {
     await dialog.step({
       title: io.title,
       body,
@@ -427,7 +473,7 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
       cancelId: 'close',
       focusId: FOCUS_TITLE,
     })
-    return { kind: 'failed', code }
+    return { kind: 'failed', code, ...(apiCode ? { apiCode } : {}) }
   }
 
   /** Reload: replace the document with the head, or stay with the failure line */
@@ -442,7 +488,7 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
 
   try {
     for (;;) {
-      const choice = await step1()
+      const choice = io.start === 'reload' ? 'reload' : await step1()
       focus = 'cancel'
       if (choice === 'cancel') return failure ?? { kind: 'cancelled' }
 
@@ -493,6 +539,7 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
               ? format(t('uwRemoteOrgBlockedWeb'), { reason: t(reason) })
               : t('uwRemoteRevokedWeb'),
             'forbidden',
+            typeof apiCode === 'string' ? apiCode : undefined,
           )
         }
         if (code === 'not_found') return await closing(t('uwRemoteDeleted'), 'not_found')
@@ -511,6 +558,8 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
         stepFocus = 'back'
         if (picked === 'cancel') return failure ?? { kind: 'cancelled' }
         if (picked === 'back') {
+          // opened from the new-version bar there is no step 1 to go back to
+          if (io.start === 'reload') return failure ?? { kind: 'cancelled' }
           focus = 'reload'
           break
         }

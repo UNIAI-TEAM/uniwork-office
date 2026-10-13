@@ -79,6 +79,8 @@ export const es = {
   acctErrWrongDeployment: 'Esta cuenta pertenece a otro servidor de UniWork.',
   acctErrNotConfigured: 'Esta aplicación no está vinculada a un servidor de UniWork.',
   acctErrKeyringUnavailable: 'El almacenamiento seguro de este equipo no está disponible.',
+  acctErrKeystoreLocked:
+    'El llavero de este equipo está bloqueado. Desbloquéalo y vuelve a intentarlo.',
   acctErrServerError: 'UniWork ha tenido un problema. Inténtalo de nuevo más tarde.',
   acctErrMalformedResponse: 'UniWork envió una respuesta inesperada. Inténtalo de nuevo más tarde.',
   wbLoadFailedTitle: 'No se pudieron cargar tus datos guardados',

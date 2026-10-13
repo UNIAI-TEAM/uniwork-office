@@ -1,5 +1,6 @@
 import { Dropdown } from '@genoffice/ui'
 import type { ReactNode } from 'react'
+import { OrgChoiceStep } from './OrgChoiceStep'
 import { ServerConnect } from './ServerConnect'
 import { useI18n } from './locale'
 import type { StringKey } from './locale'
@@ -11,6 +12,7 @@ import {
   type AccountController,
   type AccountView,
 } from './account-model'
+import { orgBlockKey, orgChoiceOf } from './uniwork-docs-model'
 
 /** banner copy for the states that need an explanation */
 const NOTICE: Partial<
@@ -29,6 +31,8 @@ const NOTICE: Partial<
   // no server chosen yet: the connect screen (the address field sits below)
   'not-configured': { title: 'acctConnectTitle', body: 'acctConnectBody', tone: 'info' },
   'keyring-unavailable': { title: 'acctKeyringTitle', body: 'acctKeyringBody', tone: 'warn' },
+  // the keychain exists but is locked: nothing was lost, unlock it and retry
+  'keystore-locked': { title: 'uwLockKeystoreTitle', body: 'uwLockKeystore', tone: 'warn' },
 }
 
 /** states whose notice body is the whole explanation (the error code would repeat it) */
@@ -37,6 +41,7 @@ const SELF_EXPLAINED: ReadonlySet<AccountView> = new Set([
   'session-revoked',
   'not-configured',
   'keyring-unavailable',
+  'keystore-locked',
   'wrong-deployment',
 ])
 
@@ -45,7 +50,9 @@ function showsErrorLine(account: AccountController): boolean {
   const { error, view } = account
   if (!error || error === 'cancelled') return false
   // a sign-in the user just tried from here failed: say so, even if the notice explains the state
-  if (view === 'keyring-unavailable') return account.loginError === error
+  if (view === 'keyring-unavailable' || view === 'keystore-locked') {
+    return account.loginError === error
+  }
   // the outage notice already says to check the connection
   if (view === 'server-unreachable' && error === 'network') return false
   return !SELF_EXPLAINED.has(view)
@@ -70,6 +77,7 @@ export function AccountPane({ account }: { account: AccountController }) {
   const email = profile?.email || status?.email || ''
   const name = displayNameOf(status)
   const orgs = status?.orgs ?? []
+  const orgChoice = orgChoiceOf(status)
   const server = status?.serverOrigin || t('acctThisServer')
   const notice = NOTICE[view]
   // the saved server did not answer: name it and offer the address field
@@ -101,7 +109,8 @@ export function AccountPane({ account }: { account: AccountController }) {
     <button
       type="button"
       className="set-btn"
-      disabled={busy === 'retrying'}
+      aria-disabled={busy === 'retrying' ? true : undefined}
+      aria-busy={busy === 'retrying' ? true : undefined}
       onClick={account.retry}
     >
       {busy === 'retrying' ? t('acctRetrying') : t('acctRetry')}
@@ -143,7 +152,8 @@ export function AccountPane({ account }: { account: AccountController }) {
           <button
             type="button"
             className="set-btn primary"
-            disabled={busy === 'retrying'}
+            aria-disabled={busy === 'retrying' ? true : undefined}
+            aria-busy={busy === 'retrying' ? true : undefined}
             onClick={account.retry}
           >
             {busy === 'retrying' ? t('acctRetrying') : t('acctRetry')}
@@ -168,6 +178,12 @@ export function AccountPane({ account }: { account: AccountController }) {
           {signInBtn('acctSignInAgain')}
         </>
       )
+      break
+    case 'keystore-locked':
+      // Retry re-reads the stored sign-in once the keychain is unlocked; signing in
+      // again is refused while locked (it would overwrite the saved sign-in), so
+      // there is no second button
+      actions = retryBtn
       break
     case 'signed-in':
     case 'refreshing':
@@ -218,17 +234,50 @@ export function AccountPane({ account }: { account: AccountController }) {
         </div>
       )}
 
-      {withProfile && (
+      {withProfile && orgChoice.loadError && (
+        <div className="acct-notice warn uw-org-error" role="alert">
+          <div className="acct-notice-text">
+            <div className="acct-notice-title">{t('uwOrgPickError')}</div>
+          </div>
+          {retryBtn}
+        </div>
+      )}
+      {withProfile && !orgChoice.loadError && orgChoice.needed && (
+        <OrgChoiceStep
+          orgs={orgChoice.rows}
+          rememberedGone={orgChoice.rememberedGone}
+          busy={busy === 'switching'}
+          failed={account.orgSwitchFailed}
+          onChoose={account.selectOrg}
+          onSignOut={account.signOut}
+        />
+      )}
+      {withProfile && !orgChoice.loadError && !orgChoice.needed && (
         <>
-          <Row label={t('acctOrg')}>
+          <Row label={t('uwOrgSettingsLabel')}>
             {orgs.length > 1 ? (
               <Dropdown
                 className="set-dd acct-org-dd"
                 value={status?.org?.id ?? orgs[0]!.id}
-                ariaLabel={t('acctSwitchOrg')}
+                ariaLabel={t('uwOrgSettingsLabel')}
                 tip={t('acctSwitchOrg')}
                 disabled={busy === 'switching' || view === 'server-unreachable'}
-                options={orgs.map((o) => ({ value: o.id, label: o.name }))}
+                options={orgChoice.rows.map((o) => {
+                  const reason = orgBlockKey(o)
+                  const label = reason ? `${o.name} · ${t(reason)}` : o.name
+                  return {
+                    value: o.id,
+                    // the accessible name keeps the reason; the popup shows it as a second line
+                    label,
+                    render: reason ? (
+                      <span className="acct-org-opt">
+                        <span className="acct-org-opt-name">{o.name}</span>
+                        <span className="acct-org-opt-reason">{t(reason)}</span>
+                      </span>
+                    ) : undefined,
+                    disabled: reason !== null,
+                  }
+                })}
                 onPick={(id) => {
                   if (id !== status?.org?.id) account.selectOrg(id)
                 }}
@@ -257,7 +306,10 @@ export function AccountPane({ account }: { account: AccountController }) {
           unreachableServer={unreachable ? server : null}
         />
       )}
-      {actions && <div className="set-pane-footer acct-actions">{actions}</div>}
+      {/* the organization step carries its own Sign out */}
+      {actions && !(withProfile && orgChoice.needed && !orgChoice.loadError) && (
+        <div className="set-pane-footer acct-actions">{actions}</div>
+      )}
     </section>
   )
 }

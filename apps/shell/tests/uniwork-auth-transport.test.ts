@@ -6,7 +6,11 @@ import {
   resolveDeploymentProfile,
   type DeploymentProfile,
 } from '../src/main/uniwork-auth/deployment'
-import { classifyTransportFailure, pickOrg } from '../src/main/uniwork-auth/mapping'
+import {
+  classifyTransportFailure,
+  rememberedOrgFor,
+  resolveOrgChoice,
+} from '../src/main/uniwork-auth/mapping'
 import {
   TransportError,
   createUniworkTransport,
@@ -349,15 +353,76 @@ describe('error mapping', () => {
     })
   })
 
-  it('picks the persisted org while a member, else the first active one', () => {
+  it('uses the remembered org, else picks a single active one, else asks (G8-16)', () => {
     const orgs = [
       { id: 'o1', name: 'A', slug: 'a', role: 'member', status: 'suspended' },
       { id: 'o2', name: 'B', slug: 'b', role: 'owner', status: 'active' },
+      { id: 'o3', name: 'C', slug: 'c', role: 'member', status: 'active' },
     ]
-    expect(pickOrg(orgs, 'o1')?.id).toBe('o1')
-    expect(pickOrg(orgs, 'gone')?.id).toBe('o2')
-    expect(pickOrg(orgs, undefined)?.id).toBe('o2')
-    expect(pickOrg([orgs[0]], undefined)).toBeUndefined()
+    const remembered = { accountId: 'acc_1', orgId: 'o2' }
+    // a remembered, usable org is used with no question
+    expect(resolveOrgChoice([orgs[1]!, orgs[2]!], remembered, 'acc_1')).toMatchObject({
+      org: { id: 'o2' },
+      needsOrgChoice: false,
+      rememberedGone: false,
+    })
+    // a single usable org is picked automatically
+    expect(resolveOrgChoice([orgs[0]!, orgs[1]!], undefined, 'acc_1')).toMatchObject({
+      org: { id: 'o2' },
+      needsOrgChoice: false,
+    })
+    // two usable orgs and no choice: the picker, no guess
+    expect(resolveOrgChoice([orgs[1]!, orgs[2]!], undefined, 'acc_1')).toMatchObject({
+      org: undefined,
+      needsOrgChoice: true,
+      rememberedGone: false,
+    })
+    // a remembered org that is gone returns the picker with the notice
+    expect(
+      resolveOrgChoice([orgs[1]!, orgs[2]!], { accountId: 'acc_1', orgId: 'gone' }, 'acc_1'),
+    ).toMatchObject({
+      org: undefined,
+      needsOrgChoice: true,
+      rememberedGone: true,
+    })
+    // a remembered org that is blocked (suspended) returns the picker, no notice
+    expect(
+      resolveOrgChoice([orgs[0]!, orgs[2]!], { accountId: 'acc_1', orgId: 'o1' }, 'acc_1'),
+    ).toMatchObject({
+      org: undefined,
+      needsOrgChoice: true,
+      rememberedGone: false,
+    })
+    // nothing usable: no picker (the all-blocked panel handles it)
+    expect(resolveOrgChoice([orgs[0]!], undefined, 'acc_1')).toMatchObject({
+      org: undefined,
+      needsOrgChoice: false,
+    })
+  })
+
+  it('the remembered org is per account + machine (F-3)', () => {
+    const orgs = [
+      { id: 'o2', name: 'B', slug: 'b', role: 'owner', status: 'active' },
+      { id: 'o3', name: 'C', slug: 'c', role: 'member', status: 'active' },
+    ]
+    const remembered = { accountId: 'acc_1', orgId: 'o2' }
+    // another account's memory is not this account's: the picker, no notice
+    expect(resolveOrgChoice(orgs, remembered, 'acc_2')).toMatchObject({
+      org: undefined,
+      needsOrgChoice: true,
+      rememberedGone: false,
+    })
+    // a legacy bare-string value has no account: ignored, no notice
+    expect(resolveOrgChoice(orgs, 'o2', 'acc_1')).toMatchObject({
+      org: undefined,
+      needsOrgChoice: true,
+      rememberedGone: false,
+    })
+    // rememberedOrgFor reads the record only for the matching account
+    expect(rememberedOrgFor(remembered, 'acc_1')).toBe('o2')
+    expect(rememberedOrgFor(remembered, 'acc_2')).toBeNull()
+    expect(rememberedOrgFor('o2', 'acc_1')).toBeNull()
+    expect(rememberedOrgFor(null, 'acc_1')).toBeNull()
   })
 })
 
@@ -420,12 +485,12 @@ describe('deployment profile', () => {
         userDataDir: '/ud',
         isPackaged: true,
         env: {},
-        settingsApiOrigin: 'https://uniwork.app',
+        settingsApiOrigin: 'https://uniworkos.com',
         readFile: files({}),
       }),
     ).toEqual({
       deploymentId: 'default',
-      apiOrigin: 'https://uniwork.app',
+      apiOrigin: 'https://uniworkos.com',
       clientId: 'uniwork-office',
       channel: 'stable',
     })

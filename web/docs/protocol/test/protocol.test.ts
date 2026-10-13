@@ -112,6 +112,7 @@ describe('handshake', () => {
         desktopOpen: false,
         download: false,
         uniworkAi: false,
+        comments: false,
       },
     })
     expect(session).toMatchObject({
@@ -1412,5 +1413,89 @@ describe('X-02 OQ-P3: api.open for a version that is no longer the head (fake ho
     await expect(
       client.request('api.open', { fileId: 'doc-1', versionId: 'other-doc-v1' }),
     ).rejects.toMatchObject({ code: 'not_found' })
+  })
+})
+
+// ---------------------------------------------------------------- doc.blocked (G5-03w, additive)
+
+describe('doc.blocked (G5-03w, additive)', () => {
+  const BLOCKED = { document_id: 'doc-1', reason: 'permission_revoked' } as const
+  const env = (payload: unknown) =>
+    parseEnvelope({
+      ns: PROTOCOL_NS,
+      v: PROTOCOL_VERSION,
+      id: 'b1',
+      kind: 'event',
+      type: 'doc.blocked',
+      payload,
+    })
+
+  it('is a host event under PROTOCOL_VERSION 1; any non-empty reason passes, so a newer reason still arrives', () => {
+    expect(PROTOCOL_VERSION).toBe(1)
+    expect(HOST_EVENT_TYPES).toContain('doc.blocked')
+    for (const reason of [
+      'permission_revoked',
+      'document_deleted',
+      'organization_suspended',
+      'member_deactivated',
+      'document_archived',
+      'a_reason_from_a_newer_host',
+    ]) {
+      expect(env({ document_id: 'doc-1', reason }).ok).toBe(true)
+    }
+    expect(env({ document_id: 'doc-1', reason: '' }).ok).toBe(false)
+    expect(env({ document_id: 'doc-1' }).ok).toBe(false)
+    expect(env({ document_id: '', reason: 'document_deleted' }).ok).toBe(false)
+    expect(env({ reason: 'document_deleted' }).ok).toBe(false)
+  })
+
+  it('an old frame: no listener, no reply, no reject; closeCheck still works', async () => {
+    const { host: hostWin, frame: frameWin } = wirePair()
+    const hostRejects: RejectInfo[] = []
+    const host = createDocsFrameHost({
+      self: hostWin,
+      frame: () => frameWin,
+      allowedOrigins: [ORIGIN],
+      getInit: async () => baseInit(),
+      refreshToken: async () => ({ token: 't', tokenExpiresAt: NOW + 60_000 }),
+      onReject: (r) => hostRejects.push(r),
+      timeoutMs: 1_000,
+    })
+    live.push(host)
+    const old = legacyFrame(frameWin, hostWin)
+    await host.whenReady()
+    const before = frameWin.sent.length
+    host.notifyBlocked(BLOCKED)
+    await flush()
+    expect(frameWin.sent.length).toBe(before)
+    expect(old.rejects).toEqual([])
+    expect(old.heard).toEqual([])
+    expect(hostRejects).toEqual([])
+    await expect(host.closeCheck()).resolves.toEqual({ dirty: false, autoSave: false })
+  })
+
+  it('a new frame hears it for this document only; a payload without a reason is malformed', async () => {
+    const { host, client, frameRejects } = setup()
+    await host.whenReady()
+    await client.whenInitialized()
+    const heard: unknown[] = []
+    client.onBlocked((p) => heard.push(p))
+    host.notifyBlocked({ document_id: 'doc-2', reason: 'document_deleted' })
+    host.notifyBlocked({ document_id: 'doc-1', reason: '' as never })
+    host.notifyBlocked({ document_id: 'doc-1', reason: 'document_deleted' })
+    await flush()
+    expect(heard).toEqual([{ document_id: 'doc-1', reason: 'document_deleted' }])
+    expect(frameRejects).toEqual([expect.objectContaining({ reason: 'malformed' })])
+  })
+
+  it('is not sent before the handshake', async () => {
+    const { host, client } = setup()
+    const heard: unknown[] = []
+    client.onBlocked((p) => heard.push(p))
+    host.notifyBlocked(BLOCKED)
+    await host.whenReady()
+    await client.whenInitialized()
+    await flush()
+    expect(heard).toEqual([])
   })
 })

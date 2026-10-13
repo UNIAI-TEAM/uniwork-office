@@ -51,6 +51,8 @@ export const hi = {
   uwConflictSessionWeb:
     'आपका सत्र समाप्त हो गया, इसलिए अधिलेखन नहीं हुआ। आपके बदलाव इस ब्राउज़र में रहेंगे; फिर से साइन इन करें और दोबारा कोशिश करें।',
   uwConflictTooLarge: 'आपका संस्करण UniWork की आकार सीमा से बड़ा है, इसलिए अधिलेखित नहीं हो सका।',
+  uwConflictDownloadTooLarge:
+    'आपका संस्करण UniWork की आकार सीमा से बड़ा है, इसलिए इसे यहाँ डाउनलोड नहीं किया जा सकता।',
   uwConflictDownloadFailed:
     'आपका संस्करण डाउनलोड नहीं हो सका, इसलिए दस्तावेज़ फिर से लोड नहीं हुआ। फिर से कोशिश करें।',
   uwConflictOfflineWeb:
@@ -110,6 +112,8 @@ export const hi = {
   uwRemoteReloadFailed: 'संस्करण {n} लोड नहीं हो सका। आप अभी भी पिछला संस्करण देख रहे हैं।',
   uwRemoteDeleted: 'यह दस्तावेज़ UniWork पर हटा दिया गया। कतार की सहेजें रुक गईं।',
   uwAuthorFallback: 'एक सदस्य',
+  uwLockRegion: 'दस्तावेज़ की स्थिति',
+  uwActRetry: 'फिर से कोशिश करें',
 
   // S6 new-version bar (web only)
   uwRemoteRevokedWeb:

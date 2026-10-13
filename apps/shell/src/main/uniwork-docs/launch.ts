@@ -136,32 +136,43 @@ export interface LaunchPushTarget {
   once(event: 'did-finish-load', listener: () => void): unknown
 }
 
+/** what a push did with its payload (D1-4: the comments reveal needs to know) */
+export type PushOutcome = 'delivered' | 'deferred' | 'none'
+
 /**
  * A payload pushed while the shell page is still loading is lost; the latest
  * one is therefore kept and sent once the page finished loading. Generic over
  * the payload: the launch event and the newer-store lock both push through
- * this, and `createLaunchPusher` is the launch-event instantiation.
+ * this, and `createLaunchPusher` is the launch-event instantiation. When given,
+ * `stillWanted` is consulted at did-finish-load: a deferred payload that was
+ * delivered by another path in the meantime (the comments reveal pull) is
+ * dropped. Returns what happened to the payload: 'delivered' to a loaded page,
+ * 'deferred' until it loads, 'none' when no target shows it.
  */
 export function createPushHolder<T>(
   target: () => LaunchPushTarget | null,
   channel: string,
-): (payload: T) => void {
+  stillWanted?: () => boolean,
+): (payload: T) => PushOutcome {
   let held: T | null = null
   return (payload) => {
     const wc = target()
-    if (!wc || wc.isDestroyed()) return
+    if (!wc || wc.isDestroyed()) return 'none'
     if (!wc.isLoadingMainFrame()) {
       wc.send(channel, payload)
-      return
+      return 'delivered'
     }
     const waiting = held !== null
     held = payload
-    if (waiting) return
+    if (waiting) return 'deferred'
     wc.once('did-finish-load', () => {
       const latest = held
       held = null
-      if (latest !== null && !wc.isDestroyed()) wc.send(channel, latest)
+      if (latest === null || wc.isDestroyed()) return
+      if (stillWanted && !stillWanted()) return
+      wc.send(channel, latest)
     })
+    return 'deferred'
   }
 }
 
@@ -193,6 +204,12 @@ export interface LaunchControllerDeps {
   }): Promise<LaunchDescriptor>
   /** the normal open flow with the descriptor's workspace and operation */
   open(descriptor: LaunchDescriptor): Promise<{ path: string; title: string }>
+  /**
+   * G8-08: the ticket named a comment (contract §2.9); after the editor shows
+   * the document, reveal that thread. The shell holds the push until the
+   * editor renderer is ready, so a cold start does not lose it.
+   */
+  revealComment?(path: string, commentId: string): void
   emit(event: UniworkLaunchEvent): void
   /** brings the shell window to the front */
   reveal(): void
@@ -341,6 +358,7 @@ export class LaunchController {
     try {
       const opened = await this.deps.open(descriptor)
       this.deps.emit({ phase: 'opened', path: opened.path, title: opened.title })
+      if (descriptor.commentId) this.deps.revealComment?.(opened.path, descriptor.commentId)
     } catch (error) {
       this.deps.emit({ phase: 'failed', error: codeOf(error) })
     }

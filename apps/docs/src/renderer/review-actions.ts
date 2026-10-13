@@ -8,6 +8,7 @@ import type { Editor } from '@tiptap/core'
 import { TextSelection } from '@tiptap/pm/state'
 import { nextNoteId, parseDocx, type CommentInfo, type NoteInfo } from '@genoffice/docx-engine'
 import type { Dispatch, SetStateAction } from 'react'
+import { NEUTRAL_COMMENT_AUTHOR } from './comment-author'
 import { fetchDocBytes } from './doc-bytes'
 import type { DocState } from './doc-state'
 import {
@@ -43,6 +44,46 @@ import { t } from './i18n/locale'
 export interface NotePrompt {
   kind: 'footnote' | 'endnote'
   id?: string
+}
+
+export { NEUTRAL_COMMENT_AUTHOR }
+
+/** G8-02: author written into new comments — refreshed from the host per open document. */
+let commentAuthor = NEUTRAL_COMMENT_AUTHOR
+
+/** G8-02: last author the host reported; anything unusable reads as the neutral constant. */
+export function commentAuthorName(): string {
+  return commentAuthor
+}
+
+/** G8-02: set the author; a blank/absent value keeps the neutral constant. */
+export function setCommentAuthor(name: unknown): void {
+  const trimmed = typeof name === 'string' ? name.trim() : ''
+  commentAuthor = trimmed.length > 0 ? trimmed : NEUTRAL_COMMENT_AUTHOR
+}
+
+/** G8-02: id of the latest author request; an older answer arriving late is dropped. */
+let authorRequest = 0
+
+/**
+ * G8-02: refresh the author for the document at `path` — the signed-in UniWork
+ * display name for a bound document, the neutral constant otherwise. Never the
+ * OS account name. Called when a document opens and when the signed-in account
+ * changes; only the answer to the latest request is kept, so a slow answer for
+ * the previous document never overwrites the current one. While the ask is in
+ * flight the author is the neutral constant, so a comment written in that
+ * window never carries the previous document's or account's name (BE-8).
+ */
+export async function refreshCommentAuthor(path: string | null): Promise<void> {
+  const request = ++authorRequest
+  setCommentAuthor(null)
+  let name: unknown
+  try {
+    name = await window.desktop.getCommentAuthor(path)
+  } catch {
+    name = null
+  }
+  if (request === authorRequest) setCommentAuthor(name)
 }
 
 /** The App state the review actions need; built fresh per call. */
@@ -170,7 +211,7 @@ export function submitNewComment(ctx: ReviewContext, text: string): void {
     return
   }
   const now = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z')
-  ctx.setComments((prev) => [...prev, { id, author: 'User', date: now, text }])
+  ctx.setComments((prev) => [...prev, { id, author: commentAuthor, date: now, text }])
   ctx.setCommentsDirty(true)
   ctx.setCommentComposing(false)
   ctx.dirtyRef.current = true
@@ -204,7 +245,7 @@ export function replyToComment(
   ctx: ReviewContext,
   parentId: string,
   text: string,
-  author = 'User',
+  author = commentAuthor,
 ): boolean {
   if (!ctx.editor) return false
   const id = nextCommentId(ctx.comments)

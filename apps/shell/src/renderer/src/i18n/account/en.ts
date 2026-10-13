@@ -76,6 +76,7 @@ export const en = {
   acctErrWrongDeployment: 'This account belongs to a different UniWork server.',
   acctErrNotConfigured: 'This app isn’t linked to a UniWork server.',
   acctErrKeyringUnavailable: 'Secure storage on this computer is unavailable.',
+  acctErrKeystoreLocked: 'This computer’s keychain is locked. Unlock it, then try again.',
   acctErrServerError: 'UniWork ran into a problem. Please try again later.',
   acctErrMalformedResponse: 'UniWork sent an unexpected response. Please try again later.',
   wbLoadFailedTitle: 'Your saved data could not be loaded',

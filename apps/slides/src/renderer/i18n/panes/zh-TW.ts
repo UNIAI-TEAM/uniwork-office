@@ -61,6 +61,7 @@ export const zhTW = {
   paneCommentsDelete: '刪除註解',
   paneCommentsPlaceholder: '新增註解…（⌘/Ctrl+Enter 發佈）',
   paneCommentsPost: '發佈',
+  paneCommentsNeutralAuthor: '使用者',
 
   paneCsdTitle: '自訂放映',
   paneCsdDefaultName: '自訂放映 {n}',

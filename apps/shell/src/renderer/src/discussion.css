@@ -1,0 +1,99 @@
+/* S13 Discussion: the toggle in the tab strip and the panel frame. Tokens only (CLAUDE.md theming rules);
+   the list itself is the shared collab kit (@genoffice/ui/collab.css). */
+
+.uw-discussion-toggle {
+  -webkit-app-region: no-drag;
+  position: relative;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+/* the pill stays inside the 40 px tab strip; the 44 px target is this invisible extension */
+.uw-discussion-toggle::after {
+  content: '';
+  position: absolute;
+  top: -8px;
+  right: -2px;
+  bottom: -8px;
+  left: -2px;
+}
+
+.uw-discussion-toggle:hover {
+  background: var(--hover);
+}
+
+.uw-discussion-toggle[aria-expanded='true'] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.uw-discussion-toggle:focus-visible,
+.uw-discussion-handle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* the shell draws the panel in the strip main frees by narrowing the active editor view */
+.uw-discussion {
+  position: fixed;
+  top: var(--tab-bar-height, 40px);
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  min-width: 0;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.uw-discussion-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+.uw-discussion-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -3px;
+  z-index: 1;
+  width: 6px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.uw-discussion-handle:hover {
+  background: var(--border-hover);
+}
+
+@media (pointer: coarse) {
+  .uw-discussion-toggle {
+    height: 36px;
+  }
+
+  .uw-discussion-toggle::after {
+    top: -4px;
+    bottom: -4px;
+  }
+
+  .uw-discussion-handle {
+    left: -11px;
+    width: 22px;
+  }
+}

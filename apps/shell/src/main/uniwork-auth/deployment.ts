@@ -10,7 +10,7 @@ export type DeploymentChannel = 'stable' | 'beta' | 'dev'
 
 export interface DeploymentProfile {
   deploymentId: string
-  /** normalized origin, no trailing slash (e.g. https://uniwork.app) */
+  /** normalized origin, no trailing slash (e.g. https://uniworkos.com) */
   apiOrigin: string
   clientId: string
   channel: DeploymentChannel

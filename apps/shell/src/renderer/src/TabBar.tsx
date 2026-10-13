@@ -5,6 +5,7 @@ import { TEAR_OFF_SLACK, insertionIndexForX, isBeyondBand } from '../../shared/t
 import { notifyFilesChanged } from './file-events'
 import { useI18n } from './locale'
 import {
+  DiscussionToggle,
   UniworkNotice,
   UniworkStatusChip,
   UniworkTabMarker,
@@ -165,6 +166,13 @@ export function TabBar() {
   // save state of the UniWork documents among the tabs (plain local files have none)
   const uniwork = useUniworkStatuses(tabs)
   const activeStatus = uniwork.statusOf(tabs.find((tab) => tab.active)?.filePath)
+  // the rename announcement speaks only for documents that are open in a tab
+  const openDocumentIds = new Set(
+    tabs.flatMap((tab) => {
+      const id = uniwork.statusOf(tab.filePath)?.documentId
+      return id ? [id] : []
+    }),
+  )
 
   // Double-click a file tab to rename the underlying file inline (Home's row
   // rename, one tab over): the input prefills the base name, Enter/blur commits
@@ -604,7 +612,8 @@ export function TabBar() {
         </button>
       </div>
       <div className="uw-chrome">
-        <UniworkNotice />
+        <UniworkNotice openDocumentIds={openDocumentIds} />
+        {activeStatus && <DiscussionToggle status={activeStatus} />}
         {activeStatus && (
           // one chip per document: a Resolve still running stays with its own tab
           <UniworkStatusChip

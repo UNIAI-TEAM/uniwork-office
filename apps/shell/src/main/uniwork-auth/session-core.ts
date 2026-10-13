@@ -28,8 +28,10 @@ export interface AccountManagerDeps {
   credentials: CredentialStore
   /** opens the validated authorization URL in the system browser */
   openBrowser(url: string, profile: DeploymentProfile): Promise<void>
+  /** the remembered organization of this machine: `{ accountId, orgId }` or a legacy value */
   readSelectedOrgId(): unknown
-  persistSelectedOrgId(orgId: string): void
+  /** remembers the account's choice on this machine (per account + machine) */
+  persistSelectedOrgId(accountId: string, orgId: string): void
   device?: { label?: string; platform?: string; build?: string }
   attempts?: LoginAttemptStore
   now?: () => number
@@ -72,6 +74,14 @@ export class SessionCore {
   protected accountProfile: AccountProfile | undefined
   protected orgs: OrgResponse[] = []
   protected org: OrgResponse | undefined
+  /** orgs whose membership this account is known to have deactivated (learned on a select) */
+  protected readonly deactivatedOrgIds = new Set<string>()
+  /** G8-16 S16: the renderer must show the picker; no org-scoped call may run yet */
+  protected needsOrgChoice = false
+  /** G8-16 S16: the stored choice is no longer a membership of this account */
+  protected rememberedGone = false
+  /** G8-16 S16: the org list could not be loaded (the picker shows uwOrgPickError) */
+  protected orgsError: AccountErrorCode | undefined
   protected entitlements: AccountEntitlements | null = null
   /** last known plan from the stored credential: shown, never published, until fresh data arrives */
   protected cachedEntitlements: AccountEntitlements | null = null
@@ -97,14 +107,29 @@ export class SessionCore {
     const showsAccount =
       this.state === 'signed-in' ||
       this.state === 'refreshing' ||
-      this.state === 'server-unreachable'
+      this.state === 'server-unreachable' ||
+      // a locked keystore shows the cached profile (no live session)
+      this.state === 'keystore-locked'
     const profile = showsAccount ? this.accountProfile : undefined
     return {
       loggedIn: this.state === 'signed-in' || this.state === 'refreshing',
       ...(profile ? { email: profile.email, profile: { ...profile } } : {}),
       state: this.state,
-      ...(showsAccount && this.org ? { org: toAccountOrg(this.org) } : {}),
-      ...(showsAccount && this.orgs.length ? { orgs: this.orgs.map(toAccountOrg) } : {}),
+      ...(showsAccount && this.org
+        ? { org: toAccountOrg(this.org, this.deactivatedOrgIds.has(this.org.id)) }
+        : {}),
+      ...(showsAccount && this.orgs.length
+        ? {
+            orgs: this.orgs.map((org) => toAccountOrg(org, this.deactivatedOrgIds.has(org.id))),
+          }
+        : {}),
+      ...(showsAccount
+        ? {
+            needsOrgChoice: this.needsOrgChoice,
+            rememberedGone: this.rememberedGone,
+            ...(this.orgsError ? { orgsError: this.orgsError } : {}),
+          }
+        : {}),
       ...(showsAccount ? { entitlements: this.entitlements ?? this.cachedEntitlements } : {}),
       ...(this.profile
         ? { serverOrigin: new URL(this.profile.apiOrigin).host, serverUrl: this.profile.apiOrigin }
@@ -129,7 +154,11 @@ export class SessionCore {
   }
 
   getEntitlements(): AccountEntitlements | null {
-    return this.state === 'signed-in' || this.state === 'refreshing' ? this.entitlements : null
+    return this.state === 'signed-in' ||
+      this.state === 'refreshing' ||
+      this.state === 'keystore-locked'
+      ? this.entitlements
+      : null
   }
 
   /**
@@ -372,6 +401,15 @@ export class SessionCore {
         this.setState('keyring-unavailable', 'keyring_unavailable')
         return false
       }
+      if (error instanceof CredentialStoreError && error.code === 'keystore_locked') {
+        // a locked keystore cannot be written: drop the in-memory session and
+        // show keystore-locked (no network session) - a failed persist is never
+        // continued as if saved. The stored credential is left untouched;
+        // Retry re-reads the store once it opens.
+        this.resetSession()
+        this.setState('keystore-locked', 'keystore_locked')
+        return false
+      }
       // a disk failure keeps the session for this run; restart signs in again
       return true
     }
@@ -381,6 +419,15 @@ export class SessionCore {
     if (handled.has(error as object)) return this.error ?? 'server_error'
     this.markHandled(error)
     if (error instanceof CredentialStoreError) {
+      // the keystore is locked (transient), not missing: a distinct state that
+      // keeps the cached profile and is retried by re-reading the store
+      if (error.code === 'keystore_locked') {
+        return this.applyOutcome({
+          state: 'keystore-locked',
+          error: 'keystore_locked',
+          clearCredentials: false,
+        })
+      }
       return this.applyOutcome({
         state: 'keyring-unavailable',
         error: 'keyring_unavailable',
@@ -400,7 +447,8 @@ export class SessionCore {
     } else if (
       outcome.state === 'wrong-deployment' ||
       outcome.state === 'signed-out' ||
-      outcome.state === 'keyring-unavailable'
+      outcome.state === 'keyring-unavailable' ||
+      outcome.state === 'keystore-locked'
     ) {
       // no usable session: a later sign-in must start fresh, not "recover" this one
       this.resetSession()
@@ -423,6 +471,10 @@ export class SessionCore {
     this.accountProfile = undefined
     this.orgs = []
     this.org = undefined
+    this.deactivatedOrgIds.clear()
+    this.needsOrgChoice = false
+    this.rememberedGone = false
+    this.orgsError = undefined
     this.setEntitlements(null)
   }
 

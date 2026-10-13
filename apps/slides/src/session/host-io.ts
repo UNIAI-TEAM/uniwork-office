@@ -61,8 +61,12 @@ export interface HostIO {
   confirm(box: HostMessageBox): Promise<number>
   clipboard: HostClipboard
   recent(): Promise<string[]>
-  /** Author name written into new comments */
-  commentAuthor(): string
+  /**
+   * G8-02: author name written into a new comment for the document at `path`
+   * (the host's single source: the signed-in UniWork display name for a bound
+   * document, else the neutral "User" constant — never the OS account name).
+   */
+  commentAuthor(path?: string | null): string
   saveTarget: {
     /** Target for the first save of an untitled deck (the desktop lands it in the drafts folder) */
     untitled(): string

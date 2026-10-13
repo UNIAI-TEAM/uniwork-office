@@ -52,6 +52,8 @@ export const es = {
     'Tu sesión caducó, así que no se sobrescribió. Tus cambios siguen en este navegador; vuelve a iniciar sesión e inténtalo de nuevo.',
   uwConflictTooLarge:
     'Tu versión supera el límite de tamaño de UniWork, así que no se pudo sobrescribir.',
+  uwConflictDownloadTooLarge:
+    'Tu versión supera el límite de tamaño de UniWork, así que no se puede descargar aquí.',
   uwConflictDownloadFailed:
     'No se pudo descargar tu versión, así que el documento no se recargó. Vuelve a intentarlo.',
   uwConflictOfflineWeb:
@@ -114,6 +116,8 @@ export const es = {
   uwRemoteReloadFailed: 'No se pudo cargar la versión {n}. Sigues viendo la versión anterior.',
   uwRemoteDeleted: 'Este documento se eliminó en UniWork. Los guardados en cola se detuvieron.',
   uwAuthorFallback: 'un miembro',
+  uwLockRegion: 'Estado del documento',
+  uwActRetry: 'Reintentar',
 
   // S6 new-version bar (web only)
   uwRemoteRevokedWeb:

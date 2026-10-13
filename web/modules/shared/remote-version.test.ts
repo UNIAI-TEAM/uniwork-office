@@ -1,0 +1,813 @@
+// "A new version is on UniWork" for the web frame (G5-03w, S6): when the open copy is replaced, when
+// the bar warns instead, what the bar says, and how revoke / delete / 401 / 403 / 410 lock or mark it.
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { format } from '@genoffice/i18n'
+import { webLanguage } from '../../docs/bridge/browser'
+import {
+  DocsProtocolError,
+  type DocBlockedPayload,
+  type OpenPayload,
+  type RemoteVersionPayload,
+} from '../../docs/protocol/types'
+import { createAiRunTracker } from './ai-run'
+import type { ConflictIo, ConflictOutcome } from './conflict-dialog'
+import { webText, type WebStringKey } from './i18n/strings-web'
+import { createRemoteBar } from './remote-bar'
+import { createRemoteVersion, type RemoteVersion, type RemoteVersionHost } from './remote-version'
+
+const t = (key: WebStringKey, params?: Record<string, string>) =>
+  webText(webLanguage(), key, params)
+const flush = async () => {
+  for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0))
+}
+
+const SAVED_AT = Date.UTC(2026, 9, 12, 8, 0)
+const time = (ms: number) =>
+  new Intl.DateTimeFormat(webLanguage(), { dateStyle: 'medium', timeStyle: 'short' }).format(ms)
+
+function head(revision: string | undefined, versionId = `v${revision}`): OpenPayload {
+  return {
+    file: {
+      fileId: 'd1',
+      name: 'a.docx',
+      etag: revision ? `"${revision}"` : '"?"',
+      versionId,
+      modifiedAt: SAVED_AT,
+      ...(revision ? { revision } : {}),
+    },
+    source: { kind: 'bytes', data: new ArrayBuffer(1) },
+  }
+}
+
+function event(revision: string, over: Partial<RemoteVersionPayload> = {}): RemoteVersionPayload {
+  return {
+    document_id: 'd1',
+    revision,
+    version_id: `v${revision}`,
+    saved_at: new Date(SAVED_AT).toISOString(),
+    author_name: 'Trần An',
+    ...over,
+  }
+}
+
+const bar = () => document.querySelector<HTMLElement>('.uw-remote-bar')
+const barText = () => bar()?.querySelector('.uw-remote-bar-text')?.textContent ?? null
+const actions = () =>
+  [...(bar()?.querySelectorAll<HTMLButtonElement>('[data-action]') ?? [])].map(
+    (b) => b.dataset.action,
+  )
+const click = (id: string) =>
+  document.querySelector<HTMLButtonElement>(`[data-action="${id}"]`)!.click()
+const tone = () => bar()?.className.match(/uw-remote-bar--(\w+)/)?.[1] ?? null
+
+interface Rig {
+  rv: RemoteVersion
+  emit(p: RemoteVersionPayload): void
+  block(p: DocBlockedPayload): void
+  request: ReturnType<typeof vi.fn>
+  apply: ReturnType<typeof vi.fn>
+  dialog: ReturnType<typeof vi.fn>
+  state: { revision: string | null; dirty: boolean; fileId: string }
+  ai: ReturnType<typeof createAiRunTracker>
+  onLock: ReturnType<typeof vi.fn>
+  confirmStop: ReturnType<typeof vi.fn>
+}
+
+function rig(
+  over: {
+    reply?: (payload: { fileId: string; versionId?: string }) => OpenPayload | Promise<OpenPayload>
+    host?: Partial<RemoteVersionHost>
+  } = {},
+): Rig {
+  const state = { revision: '10' as string | null, dirty: false, fileId: 'd1' }
+  let listener: (p: RemoteVersionPayload) => void = () => {}
+  let blockedListener: (p: DocBlockedPayload) => void = () => {}
+  const request = vi.fn(async (_type: string, payload: { fileId: string; versionId?: string }) =>
+    (over.reply ?? (() => head('12')))(payload),
+  )
+  const apply = vi.fn(async (reply: OpenPayload) => {
+    state.revision = reply.file.revision ?? null
+  })
+  const dialog = vi.fn(async (io: ConflictIo): Promise<ConflictOutcome> => {
+    await io.reload()
+    return { kind: 'reloaded' }
+  })
+  const ai = createAiRunTracker({ graceMs: 0 })
+  const onLock = vi.fn()
+  const confirmStop = vi.fn(async () => true)
+  const root = document.createElement('div')
+  root.id = 'root'
+  document.body.append(root)
+  const rv = createRemoteVersion({
+    port: {
+      onRemoteVersion: (l) => {
+        listener = l
+        return () => {}
+      },
+      onBlocked: (l) => {
+        blockedListener = l
+        return () => {}
+      },
+      request: request as never,
+    },
+    current: () => ({ fileId: state.fileId, revision: state.revision }),
+    isDirty: () => state.dirty,
+    canEdit: () => true,
+    apply,
+    onLock,
+    bar: createRemoteBar(),
+    aiRun: ai,
+    dialog: dialog as never,
+    confirmStop,
+    ...over.host,
+  })
+  return {
+    rv,
+    emit: (p) => listener(p),
+    block: (p) => blockedListener(p),
+    request,
+    apply,
+    dialog,
+    state,
+    ai,
+    onLock,
+    confirmStop,
+  }
+}
+
+beforeEach(() => {
+  vi.spyOn(console, 'warn').mockImplementation(() => {})
+})
+
+afterEach(() => {
+  vi.restoreAllMocks()
+  document.body.replaceChildren()
+  document.documentElement.classList.remove('uw-remote-bar-on', 'uw-locked')
+})
+
+describe('a clean frame with no AI turn', () => {
+  it('reloads through api.open asking for the event version, and shows the info bar', async () => {
+    const r = rig()
+    r.emit(event('12'))
+    await flush()
+    expect(r.request).toHaveBeenCalledWith(
+      'api.open',
+      { fileId: 'd1', versionId: 'v12' },
+      expect.anything(),
+    )
+    expect(r.apply).toHaveBeenCalledTimes(1)
+    expect(tone()).toBe('info')
+    expect(barText()).toBe(
+      t('uwRemoteUpdated', { n: '12', author: 'Trần An', time: time(SAVED_AT) }),
+    )
+    expect(actions()).toEqual(['close'])
+    expect(bar()!.getAttribute('role')).toBe('region')
+    expect(bar()!.getAttribute('aria-label')).toBe(t('uwRemoteRegion'))
+    // the visible copy is not a live region: the window's live node reads it once
+    expect(bar()!.querySelector('[aria-live],[role=status],[role=alert]')).toBeNull()
+    expect(document.querySelector('[role=status]')!.textContent).toBe(barText())
+  })
+
+  it('shows the revision of the reply, never the one the event named (a commit slipped in between)', async () => {
+    const r = rig({ reply: () => head('13', 'v13') })
+    r.emit(event('12'))
+    await flush()
+    expect(r.apply).toHaveBeenCalledTimes(1)
+    expect(barText()).toContain('13')
+    expect(barText()).not.toContain('version 12')
+    // another version than the event named: its author is not the event's
+    expect(barText()).toContain(t('uwAuthorFallback'))
+    expect(barText()).not.toContain('Trần An')
+  })
+
+  it('an old host (no revision on the reply): the sentence without a number', async () => {
+    const r = rig({ reply: () => head(undefined, 'v12') })
+    r.emit(event('12'))
+    await flush()
+    expect(r.apply).toHaveBeenCalledTimes(1)
+    expect(barText()).toBe(t('uwRemoteUpdatedNoRev'))
+  })
+
+  it('a reply that is not newer than the open copy replaces nothing and shows no bar', async () => {
+    const r = rig({ reply: () => head('9') })
+    r.emit(event('12'))
+    await flush()
+    expect(r.apply).not.toHaveBeenCalled()
+    expect(bar()).toBeNull()
+  })
+
+  it('compares revisions as numbers: 9 is older than 10, 11 newer than 10', async () => {
+    const r = rig()
+    r.emit(event('9'))
+    await flush()
+    expect(r.request).not.toHaveBeenCalled()
+    r.emit(event('11'))
+    await flush()
+    expect(r.request).toHaveBeenCalledTimes(1)
+  })
+
+  it('ignores another document, a revision at or below the open one, and a malformed revision', async () => {
+    const r = rig()
+    r.emit(event('12', { document_id: 'other' }))
+    r.emit(event('10'))
+    r.emit(event('1x'))
+    r.emit(event(''))
+    await flush()
+    expect(r.request).not.toHaveBeenCalled()
+    expect(bar()).toBeNull()
+  })
+
+  it('a version that is gone (not_found) is replaced by the head, asked without a version', async () => {
+    const r = rig({
+      reply: ({ versionId }) => {
+        if (versionId) throw new DocsProtocolError({ code: 'not_found', message: 'gone' })
+        return head('12')
+      },
+    })
+    r.emit(event('12'))
+    await flush()
+    expect(r.request.mock.calls.map((c) => c[1])).toEqual([
+      { fileId: 'd1', versionId: 'v12' },
+      { fileId: 'd1' },
+    ])
+    expect(r.apply).toHaveBeenCalledTimes(1)
+    expect(tone()).toBe('info')
+  })
+
+  it('a head that is not found either is a deleted document: the deleted lock, not the Retry bar', async () => {
+    const r = rig({
+      reply: () => {
+        throw new DocsProtocolError({ code: 'not_found', message: 'gone' })
+      },
+    })
+    r.emit(event('12'))
+    await flush()
+    expect(r.request).toHaveBeenCalledTimes(2)
+    expect(r.apply).not.toHaveBeenCalled()
+    expect(r.rv.locked()).toBe('deleted')
+    expect(barText()).toBe(t('uwRemoteDeleted'))
+    expect(actions()).toEqual([])
+    expect(r.onLock).toHaveBeenCalledWith('deleted')
+  })
+})
+
+describe('a dirty frame', () => {
+  it('never replaces the content: the warn bar with Reload latest… and Later', async () => {
+    const r = rig()
+    r.state.dirty = true
+    r.emit(event('12'))
+    await flush()
+    expect(r.request).not.toHaveBeenCalled()
+    expect(r.apply).not.toHaveBeenCalled()
+    expect(tone()).toBe('warn')
+    expect(barText()).toBe(t('uwRemoteNewerDirty', { n: '12' }))
+    expect(actions()).toEqual(['reload', 'later'])
+    expect(bar()!.getAttribute('aria-label')).toBe(t('uwRemoteRegion'))
+  })
+
+  it('a newer revision updates the number in the same bar (no stacking)', async () => {
+    const r = rig()
+    r.state.dirty = true
+    r.emit(event('12'))
+    r.emit(event('14'))
+    await flush()
+    expect(document.querySelectorAll('.uw-remote-bar')).toHaveLength(1)
+    expect(barText()).toBe(t('uwRemoteNewerDirty', { n: '14' }))
+  })
+
+  it('Later hides the bar until a newer revision arrives', async () => {
+    const r = rig()
+    r.state.dirty = true
+    r.emit(event('12'))
+    await flush()
+    click('later')
+    expect(bar()).toBeNull()
+    r.emit(event('12'))
+    await flush()
+    expect(bar()).toBeNull()
+    r.emit(event('13'))
+    await flush()
+    expect(barText()).toBe(t('uwRemoteNewerDirty', { n: '13' }))
+  })
+
+  it('undoing every change offers the reload but does not load by itself; typing again goes back to the warning', async () => {
+    const r = rig()
+    r.state.dirty = true
+    r.emit(event('12'))
+    await flush()
+    r.state.dirty = false
+    r.rv.dirtyChanged(false)
+    expect(tone()).toBe('info')
+    expect(barText()).toBe(t('uwRemoteNowClean', { n: '12' }))
+    expect(actions()).toEqual(['reload-now'])
+    expect(r.request).not.toHaveBeenCalled()
+    r.state.dirty = true
+    r.rv.dirtyChanged(true)
+    expect(barText()).toBe(t('uwRemoteNewerDirty', { n: '12' }))
+    r.state.dirty = false
+    r.rv.dirtyChanged(false)
+    click('reload-now')
+    await flush()
+    expect(r.apply).toHaveBeenCalledTimes(1)
+    expect(barText()).toContain(
+      t('uwRemoteUpdated', { n: '12', author: 'Trần An', time: time(SAVED_AT) }),
+    )
+  })
+
+  it('an edit that lands while the version is loading drops the result and keeps the content', async () => {
+    let release: (p: OpenPayload) => void = () => {}
+    const r = rig({ reply: () => new Promise<OpenPayload>((res) => (release = res)) })
+    r.emit(event('12'))
+    await flush()
+    r.state.dirty = true
+    release(head('12'))
+    await flush()
+    expect(r.apply).not.toHaveBeenCalled()
+    expect(barText()).toBe(t('uwRemoteNewerDirty', { n: '12' }))
+  })
+})
+
+describe('an AI turn is running', () => {
+  it('no reload, the AI bar; the next idle loads the version', async () => {
+    const r = rig()
+    r.ai.begin('s1')
+    r.emit(event('12'))
+    await flush()
+    expect(r.request).not.toHaveBeenCalled()
+    expect(tone()).toBe('warn')
+    expect(barText()).toBe(t('uwRemoteNewerAi', { n: '12' }))
+    expect(actions()).toEqual(['reload', 'later'])
+    r.ai.end('s1')
+    await flush()
+    expect(r.request).toHaveBeenCalledTimes(1)
+    expect(r.apply).toHaveBeenCalledTimes(1)
+    expect(tone()).toBe('info')
+  })
+
+  it('after the turn went idle the next event reloads without a warning', async () => {
+    const r = rig()
+    r.ai.begin('s1')
+    r.ai.end('s1')
+    r.emit(event('12'))
+    await flush()
+    expect(r.apply).toHaveBeenCalledTimes(1)
+    expect(tone()).toBe('info')
+  })
+
+  it('the frame unloads mid-turn: the reloaded clean frame loads the next version without a warning', async () => {
+    const before = rig()
+    before.ai.begin('s1')
+    before.emit(event('12'))
+    await flush()
+    expect(tone()).toBe('warn')
+    // unload: the page goes away without an idle; the reloaded frame starts with its own state
+    before.rv.dispose()
+    document.body.replaceChildren()
+    expect(bar()).toBeNull()
+    const after = rig()
+    after.emit(event('13'))
+    await flush()
+    expect(after.request).toHaveBeenCalledTimes(1)
+    expect(after.apply).toHaveBeenCalledTimes(1)
+    expect(tone()).toBe('info')
+    expect(actions()).toEqual(['close'])
+  })
+
+  it('idle on a document that became dirty shows the dirty bar instead of loading', async () => {
+    const r = rig()
+    r.ai.begin('s1')
+    r.emit(event('12'))
+    await flush()
+    r.state.dirty = true
+    r.rv.dirtyChanged(true)
+    expect(barText()).toBe(t('uwRemoteNewerDirty', { n: '12' }))
+    r.ai.end('s1')
+    await flush()
+    expect(r.apply).not.toHaveBeenCalled()
+    expect(barText()).toBe(t('uwRemoteNewerDirty', { n: '12' }))
+  })
+
+  it('a turn that starts while the version is loading drops the result: the AI bar, content kept', async () => {
+    let release: (p: OpenPayload) => void = () => {}
+    const r = rig({ reply: () => new Promise<OpenPayload>((res) => (release = res)) })
+    r.emit(event('12'))
+    await flush()
+    r.ai.begin('s1')
+    release(head('12'))
+    await flush()
+    expect(r.apply).not.toHaveBeenCalled()
+    expect(barText()).toBe(t('uwRemoteNewerAi', { n: '12' }))
+  })
+
+  it('Reload latest… with a turn running asks to stop it, stops it, then opens the Reload confirm', async () => {
+    const r = rig()
+    r.ai.begin('s1', () => queueMicrotask(() => r.ai.end('s1')))
+    const stop = vi.spyOn(r.ai, 'stop')
+    r.emit(event('12'))
+    await flush()
+    click('reload')
+    await flush()
+    expect(r.confirmStop).toHaveBeenCalledTimes(1)
+    expect(stop).toHaveBeenCalledTimes(1)
+    expect(r.dialog).toHaveBeenCalledTimes(1)
+    expect(r.dialog.mock.calls[0]![0].start).toBe('reload')
+    // the dialog's Reload ran the load: the open copy was replaced
+    expect(r.apply).toHaveBeenCalledTimes(1)
+  })
+
+  it('declining the stop leaves the turn and the bar alone', async () => {
+    const r = rig()
+    r.confirmStop.mockResolvedValue(false)
+    r.ai.begin('s1')
+    r.emit(event('12'))
+    await flush()
+    click('reload')
+    await flush()
+    expect(r.dialog).not.toHaveBeenCalled()
+    expect(r.ai.running()).toBe(true)
+    expect(barText()).toBe(t('uwRemoteNewerAi', { n: '12' }))
+  })
+})
+
+describe('Reload latest… on a dirty frame', () => {
+  it('opens the Reload confirm; the user choosing Reload replaces the content (the user asked)', async () => {
+    const r = rig()
+    r.state.dirty = true
+    r.emit(event('12'))
+    await flush()
+    click('reload')
+    await flush()
+    expect(r.dialog).toHaveBeenCalledTimes(1)
+    const io: ConflictIo = r.dialog.mock.calls[0]![0]
+    expect(io.start).toBe('reload')
+    expect(io.canEdit()).toBe(true)
+    expect(r.apply).toHaveBeenCalledTimes(1)
+    expect(tone()).toBe('info')
+  })
+
+  it('cancelling the dialog keeps the content and the warning', async () => {
+    const r = rig()
+    r.dialog.mockResolvedValue({ kind: 'cancelled' })
+    r.state.dirty = true
+    r.emit(event('12'))
+    await flush()
+    click('reload')
+    await flush()
+    expect(r.apply).not.toHaveBeenCalled()
+    expect(barText()).toBe(t('uwRemoteNewerDirty', { n: '12' }))
+  })
+
+  it('passes the module download choice to the dialog', async () => {
+    const download = { bytes: async () => new ArrayBuffer(1), send: async () => {} }
+    const r = rig({ host: { download: () => download } })
+    r.state.dirty = true
+    r.emit(event('12'))
+    await flush()
+    click('reload')
+    await flush()
+    expect(r.dialog.mock.calls[0]![0].download).toBe(download)
+  })
+})
+
+describe('a reload that fails', () => {
+  it('keeps the open content, shows the error bar with Retry; Retry loads', async () => {
+    let fail = true
+    const r = rig({
+      reply: () => {
+        if (fail) throw new DocsProtocolError({ code: 'network', message: 'offline' })
+        return head('12')
+      },
+    })
+    r.emit(event('12'))
+    await flush()
+    expect(r.apply).not.toHaveBeenCalled()
+    expect(tone()).toBe('error')
+    expect(barText()).toBe(t('uwRemoteReloadFailed', { n: '12' }))
+    expect(actions()).toEqual(['retry'])
+    expect(bar()!.getAttribute('aria-label')).toBe(t('uwLockRegion'))
+    expect(r.rv.locked()).toBeNull()
+    fail = false
+    click('retry')
+    await flush()
+    expect(r.apply).toHaveBeenCalledTimes(1)
+    expect(tone()).toBe('info')
+  })
+
+  it('a host that cannot apply it (the editor rejects) is the same error bar', async () => {
+    const r = rig()
+    r.apply.mockRejectedValue(new Error('cannot open'))
+    r.emit(event('12'))
+    await flush()
+    expect(barText()).toBe(t('uwRemoteReloadFailed', { n: '12' }))
+  })
+})
+
+describe('revoke and delete', () => {
+  it('api.open 403: the revoke bar, the frame is locked (inert editor, saves refused)', async () => {
+    const r = rig({
+      reply: () => {
+        throw new DocsProtocolError({ code: 'forbidden', message: 'no', status: 403 })
+      },
+    })
+    r.emit(event('12'))
+    await flush()
+    expect(tone()).toBe('error')
+    expect(barText()).toBe(t('uwRemoteRevokedWeb'))
+    expect(actions()).toEqual([])
+    expect(bar()!.getAttribute('aria-label')).toBe(t('uwLockRegion'))
+    expect(r.rv.locked()).toBe('revoked')
+    expect(r.rv.lockText()).toBe(t('uwRemoteRevokedWeb'))
+    expect(document.getElementById('root')!.hasAttribute('inert')).toBe(true)
+    expect(r.onLock).toHaveBeenCalledWith('revoked')
+    // nothing more happens for this document
+    r.emit(event('13'))
+    await flush()
+    expect(r.request).toHaveBeenCalledTimes(1)
+  })
+
+  it('api.open 410: the deleted bar and the lock', async () => {
+    const r = rig({
+      reply: () => {
+        throw new DocsProtocolError({ code: 'internal', message: 'gone', status: 410 })
+      },
+    })
+    r.emit(event('12'))
+    await flush()
+    expect(barText()).toBe(t('uwRemoteDeleted'))
+    expect(r.rv.locked()).toBe('deleted')
+    expect(document.getElementById('root')!.hasAttribute('inert')).toBe(true)
+  })
+
+  it('a save answered 403 (not an organisation reason) locks like a revoke; 410 and not_found like a delete', () => {
+    const a = rig()
+    a.rv.saveFailed({ code: 'forbidden', status: 403 })
+    expect(a.rv.locked()).toBe('revoked')
+    expect(barText()).toBe(t('uwRemoteRevokedWeb'))
+    a.rv.reset()
+    expect(a.rv.locked()).toBeNull()
+    a.rv.saveFailed({ code: 'internal', status: 410 })
+    expect(a.rv.locked()).toBe('deleted')
+    expect(barText()).toBe(t('uwRemoteDeleted'))
+    a.rv.reset()
+    a.rv.saveFailed({ code: 'not_found' })
+    expect(a.rv.locked()).toBe('deleted')
+  })
+
+  it('reset (another document opens) lifts the lock and clears the bar', () => {
+    const r = rig()
+    r.rv.saveFailed({ code: 'forbidden' })
+    expect(document.getElementById('root')!.hasAttribute('inert')).toBe(true)
+    r.rv.reset()
+    expect(r.rv.locked()).toBeNull()
+    expect(document.getElementById('root')!.hasAttribute('inert')).toBe(false)
+    expect(bar()).toBeNull()
+  })
+})
+
+describe('web save failures', () => {
+  it.each([
+    ['organization_suspended', 'uwReasonSuspended'],
+    ['member_deactivated', 'uwReasonDeactivated'],
+    ['document_archived', 'uwReasonArchived'],
+  ] as const)('403 %s: the organisation bar with its reason, no lock', (apiCode, reason) => {
+    const r = rig()
+    r.rv.saveFailed({ code: 'forbidden', status: 403, details: { apiCode } })
+    expect(tone()).toBe('error')
+    expect(barText()).toBe(format(t('uwRemoteOrgBlockedWeb'), { reason: t(reason) }))
+    expect(r.rv.locked()).toBeNull()
+    expect(document.getElementById('root')!.hasAttribute('inert')).toBe(false)
+  })
+
+  it('401: the sign-in-again sentence, no lock, dismissable', () => {
+    const r = rig()
+    r.rv.saveFailed({ code: 'unauthorized', status: 401 })
+    expect(tone()).toBe('error')
+    expect(barText()).toBe(t('webSaveUnauthorized'))
+    expect(actions()).toEqual(['close'])
+    expect(r.rv.locked()).toBeNull()
+    click('close')
+    expect(bar()).toBeNull()
+  })
+
+  it('a conflict, a timeout and a 5xx are not this bar (the conflict dialog / the save line own them)', () => {
+    const r = rig()
+    expect(r.rv.saveFailed({ code: 'conflict', status: 409 })).toBe(false)
+    expect(r.rv.saveFailed({ code: 'timeout' })).toBe(false)
+    expect(r.rv.saveFailed({ code: 'internal', status: 500 })).toBe(false)
+    expect(bar()).toBeNull()
+    expect(r.rv.locked()).toBeNull()
+  })
+
+  it('says whether the bar owns the failure, so the module raises no toast of its own on top', () => {
+    expect(rig().rv.saveFailed({ code: 'unauthorized', status: 401 })).toBe(true)
+    expect(rig().rv.saveFailed({ code: 'forbidden', status: 403 })).toBe(true)
+    expect(
+      rig().rv.saveFailed({
+        code: 'forbidden',
+        status: 403,
+        details: { apiCode: 'organization_suspended' },
+      }),
+    ).toBe(true)
+    expect(rig().rv.saveFailed({ code: 'not_found', status: 404 })).toBe(true)
+    expect(rig().rv.saveFailed({ code: 'internal', status: 410 })).toBe(true)
+  })
+})
+
+describe('a locked frame looks disabled, not only inert', () => {
+  const locked = () => document.documentElement.classList.contains('uw-locked')
+  const root = () => document.getElementById('root')!
+
+  it('revoke and delete: the dimmed-chrome class on the page and aria-disabled on the editor root', () => {
+    const r = rig()
+    expect(locked()).toBe(false)
+    r.rv.saveFailed({ code: 'forbidden' })
+    expect(locked()).toBe(true)
+    expect(root().getAttribute('aria-disabled')).toBe('true')
+    expect(root().hasAttribute('inert')).toBe(true)
+  })
+
+  it('doc.blocked locks the same way, and a delete after a revoke keeps it', () => {
+    const r = rig()
+    r.block({ document_id: 'd1', reason: 'permission_revoked' } as DocBlockedPayload)
+    expect(locked()).toBe(true)
+    r.block({ document_id: 'd1', reason: 'document_deleted' } as DocBlockedPayload)
+    expect(locked()).toBe(true)
+  })
+
+  it('a bar that leaves the editor usable (organisation, 401) does not dim anything', () => {
+    const r = rig()
+    r.rv.saveFailed({ code: 'unauthorized' })
+    r.rv.saveFailed({ code: 'forbidden', details: { apiCode: 'organization_suspended' } })
+    expect(locked()).toBe(false)
+    expect(root().hasAttribute('aria-disabled')).toBe(false)
+  })
+
+  it('reset and dispose bring the chrome back', () => {
+    const r = rig()
+    r.rv.saveFailed({ code: 'forbidden' })
+    r.rv.reset()
+    expect(locked()).toBe(false)
+    expect(root().hasAttribute('aria-disabled')).toBe(false)
+    r.rv.saveFailed({ code: 'forbidden' })
+    r.rv.dispose()
+    expect(locked()).toBe(false)
+    expect(root().hasAttribute('aria-disabled')).toBe(false)
+  })
+
+  it('an editor root that was inert before keeps its inert, but still lifts the dim', () => {
+    const r = rig()
+    root().setAttribute('inert', '')
+    r.rv.saveFailed({ code: 'forbidden' })
+    r.rv.reset()
+    expect(root().hasAttribute('inert')).toBe(true)
+    expect(locked()).toBe(false)
+  })
+})
+
+describe('a frame that restarts for the new version (reloaded)', () => {
+  it('apply gets the notice to carry across the restart: revision, author and time of the loaded head', async () => {
+    const r = rig()
+    r.emit(event('12'))
+    await flush()
+    expect(r.apply).toHaveBeenCalledWith(expect.anything(), {
+      revision: '12',
+      author: 'Trần An',
+      savedAt: SAVED_AT,
+    })
+  })
+
+  it('the next boot shows the same information bar from the notice', () => {
+    const r = rig()
+    r.rv.reloaded({ revision: '12', author: 'Trần An', savedAt: SAVED_AT })
+    expect(tone()).toBe('info')
+    expect(barText()).toBe(
+      t('uwRemoteUpdated', { n: '12', author: 'Trần An', time: time(SAVED_AT) }),
+    )
+    expect(actions()).toEqual(['close'])
+  })
+
+  it('without an author or a time it says the plain updated sentence', () => {
+    const r = rig()
+    r.rv.reloaded({ revision: null, author: null, savedAt: null })
+    expect(barText()).toBe(t('uwRemoteUpdatedNoRev'))
+  })
+
+  it('a locked frame keeps its lock bar', () => {
+    const r = rig()
+    r.rv.saveFailed({ code: 'forbidden' })
+    r.rv.reloaded({ revision: '12', author: null, savedAt: SAVED_AT })
+    expect(tone()).toBe('error')
+  })
+})
+
+describe('doc.blocked (the host pushes the block, no save needed)', () => {
+  const blocked = (reason: string, document_id = 'd1') =>
+    ({ document_id, reason }) as DocBlockedPayload
+  const inert = () => document.getElementById('root')!.hasAttribute('inert')
+
+  it('permission_revoked on a clean frame: the revoke bar, the editor inert, saves refused', () => {
+    const r = rig()
+    r.block(blocked('permission_revoked'))
+    expect(tone()).toBe('error')
+    expect(barText()).toBe(t('uwRemoteRevokedWeb'))
+    expect(inert()).toBe(true)
+    expect(r.rv.locked()).toBe('revoked')
+    expect(r.rv.lockText()).toBe(t('uwRemoteRevokedWeb'))
+    expect(r.onLock).toHaveBeenCalledWith('revoked')
+    expect(r.request).not.toHaveBeenCalled()
+  })
+
+  it('document_deleted on a dirty frame: the delete bar, the dirty content kept (nothing reloaded)', () => {
+    const r = rig()
+    r.state.dirty = true
+    r.block(blocked('document_deleted'))
+    expect(barText()).toBe(t('uwRemoteDeleted'))
+    expect(inert()).toBe(true)
+    expect(r.rv.locked()).toBe('deleted')
+    expect(r.apply).not.toHaveBeenCalled()
+    expect(r.request).not.toHaveBeenCalled()
+    expect(r.state).toMatchObject({ dirty: true, revision: '10' })
+  })
+
+  it.each([
+    ['organization_suspended', 'uwReasonSuspended'],
+    ['member_deactivated', 'uwReasonDeactivated'],
+    ['document_archived', 'uwReasonArchived'],
+  ] as const)(
+    'the organisation reason %s: the same bar and the same usable editor as the Save 403',
+    (reason, key) => {
+      const pushed = rig()
+      pushed.block(blocked(reason))
+      const sentence = t('uwRemoteOrgBlockedWeb', { reason: t(key) })
+      expect(tone()).toBe('error')
+      expect(barText()).toBe(sentence)
+      expect(inert()).toBe(false)
+      expect(pushed.rv.locked()).toBeNull()
+      expect(pushed.rv.lockText()).toBe('')
+      expect(pushed.onLock).not.toHaveBeenCalled()
+      const pushedBar = bar()!.outerHTML
+      pushed.rv.dispose()
+      document.body.replaceChildren()
+
+      const refused = rig()
+      refused.rv.saveFailed({ code: 'forbidden', status: 403, details: { apiCode: reason } })
+      expect(bar()!.outerHTML).toBe(pushedBar)
+      expect(refused.rv.locked()).toBeNull()
+      expect(inert()).toBe(false)
+    },
+  )
+
+  it('an organisation block is lifted by nothing but a later revoke / delete, which still lock', () => {
+    const r = rig()
+    r.block(blocked('organization_suspended'))
+    r.block(blocked('permission_revoked'))
+    expect(r.rv.locked()).toBe('revoked')
+    expect(barText()).toBe(t('uwRemoteRevokedWeb'))
+    expect(inert()).toBe(true)
+    r.block(blocked('document_deleted'))
+    expect(r.rv.locked()).toBe('deleted')
+    r.block(blocked('member_deactivated'))
+    expect(r.rv.locked()).toBe('deleted')
+    expect(barText()).toBe(t('uwRemoteDeleted'))
+  })
+
+  it('a reason this frame does not know reads as revoked', () => {
+    const r = rig()
+    r.block(blocked('a_reason_from_a_newer_host'))
+    expect(barText()).toBe(t('uwRemoteRevokedWeb'))
+    expect(r.rv.locked()).toBe('revoked')
+  })
+
+  it('another document changes nothing', () => {
+    const r = rig()
+    r.block(blocked('document_deleted', 'other'))
+    expect(bar()).toBeNull()
+    expect(r.rv.locked()).toBeNull()
+    expect(inert()).toBe(false)
+  })
+
+  it('once per reason; a delete after a revoke takes over, a revoke after a delete does not', () => {
+    const r = rig()
+    r.block(blocked('permission_revoked'))
+    r.block(blocked('permission_revoked'))
+    expect(r.onLock).toHaveBeenCalledTimes(1)
+    r.block(blocked('document_deleted'))
+    expect(r.rv.locked()).toBe('deleted')
+    expect(barText()).toBe(t('uwRemoteDeleted'))
+    r.block(blocked('permission_revoked'))
+    expect(r.rv.locked()).toBe('deleted')
+    expect(r.onLock).toHaveBeenCalledTimes(2)
+  })
+
+  it('a blocked frame ignores new versions; another document lifts the block', async () => {
+    const r = rig()
+    r.block(blocked('permission_revoked'))
+    r.emit(event('12'))
+    await flush()
+    expect(r.request).not.toHaveBeenCalled()
+    r.rv.reset()
+    expect(r.rv.locked()).toBeNull()
+    expect(inert()).toBe(false)
+    expect(bar()).toBeNull()
+  })
+})

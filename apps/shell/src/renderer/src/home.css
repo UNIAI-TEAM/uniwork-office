@@ -2270,19 +2270,20 @@ body.vib .home {
     color 160ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.btn:disabled {
+.btn:disabled,
+.btn[aria-disabled='true'] {
   opacity: 0.55;
   cursor: not-allowed;
   box-shadow: none;
 }
 
 /* design-system interaction states; hover fills live on each variant below */
-.btn:hover:not(:disabled) {
+.btn:hover:not(:disabled):not([aria-disabled='true']) {
   transform: translateY(-1px);
   box-shadow: var(--shadow-btn-lift);
 }
 
-.btn:active:not(:disabled) {
+.btn:active:not(:disabled):not([aria-disabled='true']) {
   transform: translateY(0) scale(0.98);
   box-shadow: var(--shadow-btn);
 }
@@ -2301,7 +2302,7 @@ body.vib .home {
   box-shadow: var(--shadow-btn-primary);
 }
 
-.btn-primary:hover:not(:disabled) {
+.btn-primary:hover:not(:disabled):not([aria-disabled='true']) {
   background: var(--accent-hover);
   border-color: var(--accent-hover);
   box-shadow: var(--shadow-btn-primary);
@@ -2313,7 +2314,7 @@ body.vib .home {
   color: var(--text);
 }
 
-.btn-secondary:hover:not(:disabled) {
+.btn-secondary:hover:not(:disabled):not([aria-disabled='true']) {
   background: var(--bg-hover);
   border-color: var(--border-hover);
 }
@@ -2325,7 +2326,7 @@ body.vib .home {
   box-shadow: var(--shadow-btn);
 }
 
-.btn-danger:hover:not(:disabled) {
+.btn-danger:hover:not(:disabled):not([aria-disabled='true']) {
   background: var(--color-error-hover);
 }
 
@@ -2997,11 +2998,12 @@ body.vib .home {
   color: var(--color-btn-primary-text);
 }
 
-.btn-primary:hover:not(:disabled) {
+.btn-primary:hover:not(:disabled):not([aria-disabled='true']) {
   background: var(--color-btn-primary-hover);
 }
 
-.btn:disabled {
+.btn:disabled,
+.btn[aria-disabled='true'] {
   opacity: 0.5;
   cursor: default;
 }
@@ -5325,7 +5327,8 @@ html[dir='rtl'] .quick-title-row {
 
 .uw-pick-body {
   flex: 1;
-  min-height: 220px;
+  /* tall enough that a row's "…" popup does not cover most of the rows */
+  min-height: min(300px, 45vh);
   overflow-y: auto;
   padding: 0 12px 12px;
   border-top: 1px solid var(--border-subtle);
@@ -5345,23 +5348,38 @@ html[dir='rtl'] .quick-title-row {
   list-style: none;
 }
 
+.uw-pick-item {
+  position: relative;
+}
+
 .uw-pick-row {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 8px;
+  /* the right padding keeps the row text clear of the Details button beside it */
+  padding: 8px 44px 8px 8px;
   border-radius: 8px;
   cursor: pointer;
 }
 
 .uw-pick-row.active {
   background: var(--hover);
+}
+
+/* the ring marks keyboard focus only: while the search field holds focus the highlighted row is shown by its fill */
+.uw-pick-item:focus-within > .uw-pick-row.active {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
 
 .uw-pick-row.disabled {
   cursor: default;
+}
+
+/* dim the icon and the text only: the row's controls (the "…" menu with Restore) stay legible */
+.uw-pick-row.disabled > img,
+.uw-pick-row.disabled > svg,
+.uw-pick-row.disabled > .uw-pick-row-text {
   opacity: 0.6;
 }
 
@@ -5465,6 +5483,156 @@ html[dir='rtl'] .quick-title-row {
 @keyframes uw-skel-pulse {
   50% {
     opacity: 0.45;
+  }
+}
+
+/* the list and the details panel side by side */
+.modal.uw-pick.with-info {
+  width: min(900px, 94vw);
+}
+
+.uw-pick-main {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.uw-pick-main > .uw-pick-body {
+  min-width: 0;
+  border-top: none;
+}
+
+.uw-pick-info-btn {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  transform: translateY(-50%);
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  /* visible on every row at rest: the muted text token keeps the icon >= 3:1 on the row surface */
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.uw-pick-info-btn:hover,
+.uw-pick-info-btn.on {
+  background: var(--bg-hover-strong);
+  color: var(--text);
+}
+
+.uw-pick-info-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.uw-info {
+  display: flex;
+  flex: 0 0 280px;
+  flex-direction: column;
+  min-width: 0;
+  overflow-y: auto;
+  border-left: 1px solid var(--border-subtle);
+  background: var(--surface-subtle);
+}
+
+.uw-info-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 12px 8px 16px;
+}
+
+.uw-info-title {
+  margin: 4px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.uw-info-title:focus {
+  outline: none;
+}
+
+.uw-info-title:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.uw-info-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 4px 16px 16px;
+}
+
+.uw-info-row dt {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.uw-info-row dd {
+  margin: 2px 0 0;
+  color: var(--text);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.uw-info-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 8px 16px;
+}
+
+.uw-info-skeleton .uw-skel-line {
+  width: 80%;
+}
+
+.uw-info-error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 16px;
+  color: var(--danger-text);
+  font-size: 13px;
+}
+
+.uw-info-error p {
+  margin: 0;
+}
+
+@media (max-width: 720px) {
+  .uw-pick-main {
+    flex-direction: column;
+  }
+
+  .uw-info {
+    flex-basis: auto;
+    border-top: 1px solid var(--border-subtle);
+    border-left: none;
+  }
+}
+
+@media (pointer: coarse) {
+  .uw-pick-row {
+    padding-right: 60px;
+  }
+
+  .uw-pick-info-btn {
+    width: 44px;
+    height: 44px;
   }
 }
 
@@ -5993,4 +6161,339 @@ html[dir='rtl'] .quick-title-row {
   font-size: 11px;
   font-weight: 700;
   line-height: 1;
+}
+
+/* ── UniWork library: create, upload, rename, archive (S18) ── */
+
+.uw-pick-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+  margin-right: 8px;
+}
+
+.uw-pick-actions .btn {
+  min-height: 28px;
+  padding: 4px 12px;
+  font-size: 13px;
+}
+
+/* stacked above the library dialog */
+.uw-act-overlay {
+  z-index: 110;
+}
+
+.modal.uw-act {
+  width: min(440px, 92vw);
+  max-width: none;
+}
+
+.uw-act-form {
+  display: contents;
+}
+
+.uw-act-field {
+  margin: 14px 0 0;
+  padding: 0;
+  border: none;
+  min-width: 0;
+}
+
+.uw-act-label {
+  display: block;
+  margin: 0 0 6px;
+  padding: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.uw-act-input,
+.uw-act-select {
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.uw-act-input:focus-visible,
+.uw-act-select:focus-visible,
+.uw-act-type:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.uw-act-input[aria-invalid='true'] {
+  border-color: var(--danger-text);
+}
+
+.uw-act-select:disabled {
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+.uw-act-error {
+  min-height: 0;
+  margin: 4px 0 0;
+  color: var(--danger-text);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.uw-act-error:empty {
+  display: none;
+}
+
+.uw-act-types {
+  display: flex;
+  gap: 8px;
+}
+
+.uw-act-type {
+  position: relative;
+  display: grid;
+  flex: 1;
+  place-items: center;
+  min-height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.uw-act-type:hover {
+  background: var(--bg-hover);
+}
+
+.uw-act-type.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.uw-act-type input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.uw-act-location-row {
+  display: flex;
+  gap: 8px;
+}
+
+.uw-act-file {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.uw-act-file-name {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.uw-act-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 16px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.uw-act-bar {
+  width: 100%;
+  height: 6px;
+  accent-color: var(--accent);
+}
+
+.modal.uw-act .btn[aria-disabled='true'] {
+  cursor: default;
+  opacity: 0.6;
+}
+
+/* row "…" menu */
+/* a sibling of the option inside the row item (like the Details button), parked left of that button */
+.uw-row-menu {
+  position: absolute;
+  top: 0;
+  right: 40px;
+  bottom: 0;
+  width: 28px;
+}
+
+.uw-row-menu-btn {
+  right: 0;
+}
+
+/* room for the menu button beside the Details button */
+.uw-pick-item:has(> .uw-row-menu) > .uw-pick-row {
+  padding-right: 80px;
+}
+
+.uw-pick-item:hover .uw-row-menu-btn,
+.uw-pick-item:focus-within .uw-row-menu-btn,
+.uw-pick-item:has(> .uw-pick-row.active) .uw-row-menu-btn {
+  opacity: 1;
+}
+
+/* portalled to the body and placed by the component (fixed top/left), so the scrolling list never clips it */
+.uw-row-menu-list {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 125;
+  display: flex;
+  flex-direction: column;
+  min-width: 160px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow-menu);
+}
+
+.uw-row-menu-item {
+  min-height: 30px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: start;
+  cursor: pointer;
+}
+
+.uw-row-menu-item:hover,
+.uw-row-menu-item:focus-visible {
+  background: var(--bg-hover-strong);
+  outline: none;
+}
+
+/* rename in place */
+.uw-rename {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.uw-rename-input {
+  height: 28px;
+}
+
+.uw-pick-row.archived .uw-pick-row-title {
+  color: var(--text-muted);
+}
+
+/* parked, not unsupported: the title and the "Archived" line keep full opacity so they stay at 4.5:1 or better (muted token on the surface, light and dark); only the icon is dimmed */
+.uw-pick-row.archived > .uw-pick-row-text {
+  opacity: 1;
+}
+
+/* Restore is the only action of an archived row: always visible, not on hover only */
+.uw-pick-item:has(> .uw-pick-row.archived) .uw-row-menu-btn {
+  opacity: 1;
+}
+
+/* above the library and its modals, so a failure inside a modal is seen too; near the foot, close to the actions */
+.uw-act-toast {
+  position: fixed;
+  bottom: 12vh;
+  left: 50%;
+  z-index: 120;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: min(420px, 90vw);
+  transform: translateX(-50%);
+  padding: 8px 8px 8px 12px;
+  box-shadow: var(--shadow-menu);
+  border: 1px solid var(--danger-border);
+  border-radius: 8px;
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.uw-act-toast-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.uw-act-toast-text {
+  min-width: 0;
+  flex: 1;
+  padding-top: 1px;
+  overflow-wrap: anywhere;
+}
+
+.uw-act-toast-close {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.uw-act-toast-close:hover {
+  background: var(--bg-hover-strong);
+}
+
+.uw-act-toast-close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.uw-act-heading {
+  overflow-wrap: anywhere;
+}
+
+@media (pointer: coarse) {
+  .uw-act-input,
+  .uw-act-select,
+  .uw-act-type,
+  .uw-row-menu-item,
+  .uw-pick-actions .btn,
+  .modal.uw-act .btn,
+  .uw-act-toast-close {
+    min-height: 44px;
+  }
+
+  .uw-act-toast-close {
+    min-width: 44px;
+  }
+
+  .uw-row-menu-btn {
+    opacity: 1;
+  }
+
+  .uw-row-menu {
+    right: 56px;
+    width: 44px;
+  }
+
+  .uw-pick-item:has(> .uw-row-menu) > .uw-pick-row {
+    padding-right: 108px;
+  }
 }

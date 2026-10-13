@@ -13,6 +13,7 @@
  */
 import {
   Endpoint,
+  armTimeout,
   err,
   type MessageSource,
   type PostTarget,
@@ -21,15 +22,21 @@ import {
 } from './endpoint'
 import {
   CAPABILITY_KEYS,
+  COMMENTS_REVEAL_WAIT_MS,
   DEFAULT_OFFICE_MODULE,
   DocsProtocolError,
   PROTOCOL_VERSION,
   moduleOf,
   errorFromHttpStatus,
+  isCommentsLevel,
+  isCommentsRequestType,
   toProtocolError,
   type AiRunPayload,
   type ApiMode,
   type Capabilities,
+  type CommentsChangedPayload,
+  type CommentsLevel,
+  type DocBlockedPayload,
   type FileMeta,
   type FrameRequestType,
   type FrameRequests,
@@ -95,6 +102,10 @@ export interface FrameSession {
   user?: InitUser
   /** draft-recovery grant (CONTRACT C18), if the host sent one; absent = recovery off */
   recovery?: InitRecovery
+  /** largest file `api.download` accepts (X-02 r2b), if the host sent it */
+  downloadMaxBytes?: number
+  /** the comment panel's level hint (G8-08), if the host sent it; see `commentsAccess` */
+  commentsLevel?: CommentsLevel
 }
 
 type HostRequestHandler<K extends keyof HostRequests> = (
@@ -134,6 +145,24 @@ export interface DocsFrameClient {
    * revision from its reply (`openReplyRevision`), not from the event.
    */
   onRemoteVersion(listener: (payload: RemoteVersionPayload) => void): () => void
+  /**
+   * the comments of THIS document changed elsewhere (additive, G8-08): reload `comments.list`.
+   * Events for another `document_id` (or before `init`) never reach the listener.
+   */
+  onCommentsChanged(listener: (payload: CommentsChangedPayload) => void): () => void
+  /**
+   * answer the host's `comments.reveal` (additive, G8-08). The handler runs only once a
+   * `comments.list` has succeeded: an earlier reveal is held until then (at most
+   * COMMENTS_REVEAL_WAIT_MS) and answered `not_ready` (retryable) when the list fails or the wait
+   * runs out.
+   */
+  handleCommentsReveal(handler: HostRequestHandler<'comments.reveal'>): () => void
+  /**
+   * THIS document is blocked for the viewer (additive, G5-03w): revoked, deleted, organisation
+   * suspended, member deactivated, archived. Events for another `document_id` (or before `init`)
+   * never reach the listener.
+   */
+  onBlocked(listener: (payload: DocBlockedPayload) => void): () => void
   onTheme(listener: (theme: Theme) => void): () => void
   onLanguage(listener: (locale: string) => void): () => void
   /** de-duplicated; `force` re-sends an unchanged flag (the host's header left "unsaved" after a failed save) */
@@ -171,6 +200,14 @@ export function createDocsFrameClient(options: DocsFrameClientOptions): DocsFram
   let session: FrameSession | null = null
   let lastDirty: boolean | null = null
   let lastModal = false
+
+  // comments.reveal waits for the first successful comments.list (contract-collab §10)
+  let commentsListed = false
+  let listsInFlight = 0
+  let lastListFailed = false
+  const listWaiters = new Set<{ resolve: () => void; reject: (e: DocsProtocolError) => void }>()
+  const listNotReady = (why: string): DocsProtocolError =>
+    err('not_ready', `comments.reveal before the comment list: ${why}`, { retryable: true })
 
   let resolveInit!: (s: FrameSession) => void
   let rejectInit!: (e: DocsProtocolError) => void
@@ -242,13 +279,22 @@ export function createDocsFrameClient(options: DocsFrameClientOptions): DocsFram
       capabilities,
     }
     if (p.open) next.open = p.open
-    if (p.user) next.user = { displayName: p.user.displayName }
+    if (p.user) {
+      next.user = { displayName: p.user.displayName }
+      // hint fields never fail the init: an empty / non-string id is absent
+      if (typeof p.user.id === 'string' && p.user.id !== '') next.user.id = p.user.id
+    }
     if (p.recovery) next.recovery = { key: p.recovery.key, scope: p.recovery.scope }
+    if (p.downloadMaxBytes !== undefined) next.downloadMaxBytes = p.downloadMaxBytes
+    // an unknown (future) or null level is treated as missing: the fallback rules apply
+    if (isCommentsLevel(p.commentsLevel)) next.commentsLevel = p.commentsLevel
     // a repeated init (host re-handshake) updates the object callers already hold
     if (session) {
       delete session.open
       delete session.user
       delete session.recovery
+      delete session.downloadMaxBytes
+      delete session.commentsLevel
       Object.assign(session, next)
     } else session = next
     resolveInit(session)
@@ -331,8 +377,62 @@ export function createDocsFrameClient(options: DocsFrameClientOptions): DocsFram
     payload: FrameRequests[K]['payload'],
     opts?: RequestOptions,
   ): Promise<FrameRequests[K]['result']> {
-    await initialized
-    return (await ep.request(type, payload, opts)) as FrameRequests[K]['result']
+    const s = await initialized
+    if (!isCommentsRequestType(type)) {
+      return (await ep.request(type, payload, opts)) as FrameRequests[K]['result']
+    }
+    // a host without `comments` gets no comment request at all (server mode stays hidden)
+    if (s.capabilities.comments !== true) {
+      throw err('unsupported', `${type} needs the comments capability`)
+    }
+    if (type !== 'comments.list') {
+      return (await ep.request(type, payload, opts)) as FrameRequests[K]['result']
+    }
+    listsInFlight += 1
+    try {
+      const result = (await ep.request(type, payload, opts)) as FrameRequests[K]['result']
+      commentsListed = true
+      lastListFailed = false
+      for (const w of [...listWaiters]) w.resolve()
+      return result
+    } catch (e) {
+      lastListFailed = true
+      for (const w of [...listWaiters]) w.reject(listNotReady('the list failed'))
+      throw e
+    } finally {
+      listsInFlight -= 1
+    }
+  }
+
+  function whenCommentsListed(signal: AbortSignal): Promise<void> {
+    if (commentsListed) return Promise.resolve()
+    // the last list failed and none is running: answer now, the host retries once
+    if (lastListFailed && listsInFlight === 0)
+      return Promise.reject(listNotReady('the list failed'))
+    return new Promise<void>((resolve, reject) => {
+      const w = {
+        resolve: () => {
+          done()
+          resolve()
+        },
+        reject: (e: DocsProtocolError) => {
+          done()
+          reject(e)
+        },
+      }
+      const clearTimer = armTimeout(COMMENTS_REVEAL_WAIT_MS, () =>
+        w.reject(listNotReady(`no list after ${COMMENTS_REVEAL_WAIT_MS} ms`)),
+      )
+      const onAbort = (): void => w.reject(err('cancelled', 'comments.reveal cancelled'))
+      const done = (): void => {
+        clearTimer()
+        signal.removeEventListener('abort', onAbort)
+        listWaiters.delete(w)
+      }
+      if (signal.aborted) return onAbort()
+      signal.addEventListener('abort', onAbort, { once: true })
+      listWaiters.add(w)
+    })
   }
 
   async function fetchApi(path: string, init: RequestInit = {}): Promise<Response> {
@@ -391,6 +491,21 @@ export function createDocsFrameClient(options: DocsFrameClientOptions): DocsFram
         const p = raw as HostEvents['doc.remoteVersion']
         if (session && p.document_id === session.documentId) l({ ...p })
       }),
+    onCommentsChanged: (l) =>
+      ep.on('comments.changed', (raw) => {
+        const p = raw as HostEvents['comments.changed']
+        if (session && p.document_id === session.documentId) l({ document_id: p.document_id })
+      }),
+    handleCommentsReveal: (h) =>
+      ep.handle('comments.reveal', async (p, ctx) => {
+        await whenCommentsListed(ctx.signal)
+        return h(p as HostRequests['comments.reveal']['payload'], ctx)
+      }),
+    onBlocked: (l) =>
+      ep.on('doc.blocked', (raw) => {
+        const p = raw as HostEvents['doc.blocked']
+        if (session && p.document_id === session.documentId) l({ ...p })
+      }),
     onTheme: (l) => ep.on('theme', (p) => l((p as HostEvents['theme']).theme)),
     onLanguage: (l) => ep.on('language', (p) => l((p as HostEvents['language']).locale)),
     setDirty(dirty, opts) {
@@ -416,6 +531,7 @@ export function createDocsFrameClient(options: DocsFrameClientOptions): DocsFram
     dispose() {
       stopReady()
       token = null
+      for (const w of [...listWaiters]) w.reject(err('cancelled', 'client disposed'))
       rejectInit(err('cancelled', 'client disposed'))
       ep.dispose()
     },

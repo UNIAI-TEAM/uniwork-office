@@ -15,7 +15,7 @@ describe('openrouter token hub', () => {
 
   it('adds attribution headers only for openrouter hosts', () => {
     expect(openRouterAttributionHeaders('https://openrouter.ai/api/v1')['HTTP-Referer']).toBe(
-      'https://uniwork.app',
+      'https://uniworkos.com',
     )
     expect(openRouterAttributionHeaders('https://api.openai.com/v1')).toEqual({})
   })

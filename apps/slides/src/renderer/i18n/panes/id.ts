@@ -62,6 +62,7 @@ export const id = {
   paneCommentsDelete: 'Hapus komentar',
   paneCommentsPlaceholder: 'Komentar baru… (⌘/Ctrl+Enter untuk memposting)',
   paneCommentsPost: 'Posting',
+  paneCommentsNeutralAuthor: 'Pengguna',
 
   paneCsdTitle: 'Peragaan Kustom',
   paneCsdDefaultName: 'Peragaan Kustom {n}',

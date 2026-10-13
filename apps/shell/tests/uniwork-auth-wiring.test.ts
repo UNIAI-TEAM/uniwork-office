@@ -1,4 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 const electron = vi.hoisted(() => ({
   app: {
@@ -18,6 +21,11 @@ const electron = vi.hoisted(() => ({
 vi.mock('electron', () => electron)
 
 import { deviceInfo, openAuthorizationUrl, registerAuthProtocols } from '../src/main/uniwork-auth'
+import {
+  CredentialStoreError,
+  createCredentialStore,
+  type StoredCredential,
+} from '../src/main/uniwork-auth/credentials'
 import { EventEmitter } from 'node:events'
 import { bindAuthCallbackEvents, createAuthCallbackRouter } from '../src/main/uniwork-auth/routing'
 import type { DeploymentProfile } from '../src/main/uniwork-auth/deployment'
@@ -176,5 +184,45 @@ describe('sign-in callback app events', () => {
     expect(fallback.secondInstance.mock.calls).toEqual([
       [['electron.exe', 'C:/doc.docx'], { x: 1 }],
     ])
+  })
+})
+
+describe('credential store wiring', () => {
+  const credential: StoredCredential = {
+    deploymentId: 'default',
+    apiOrigin: 'https://uniwork.example',
+    clientId: 'uniwork-office',
+    accountId: 'acc_1',
+    deviceSessionId: 'dev_1',
+    sessionId: 'sess_1',
+    refreshToken: 'rt_1',
+    refreshExpiresAt: 1_900_000_000_000,
+  }
+  let dir: string
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'uw-wiring-'))
+  })
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('a locked OS keychain surfaces as keystore_locked through the real store', () => {
+    const writer = createCredentialStore({ userDataDir: dir, safeStorage: electron.safeStorage })
+    writer.save(credential)
+    const original = electron.safeStorage.decryptString
+    electron.safeStorage.decryptString = () => {
+      throw new Error('keychain access denied')
+    }
+    try {
+      const store = createCredentialStore({ userDataDir: dir, safeStorage: electron.safeStorage })
+      try {
+        store.load()
+        expect.unreachable()
+      } catch (error) {
+        expect((error as CredentialStoreError).code).toBe('keystore_locked')
+      }
+    } finally {
+      electron.safeStorage.decryptString = original
+    }
   })
 })

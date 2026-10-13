@@ -44,6 +44,7 @@ export const ar = {
   uwConflictSessionWeb:
     'انتهت صلاحية جلستك، لذا لم يتم الاستبدال. تبقى تغييراتك في هذا المتصفح؛ سجّل الدخول مجددًا وأعد المحاولة.',
   uwConflictTooLarge: 'نسختك تتجاوز حد الحجم في UniWork، لذا تعذّر الاستبدال.',
+  uwConflictDownloadTooLarge: 'نسختك تتجاوز حد الحجم في UniWork، لذا لا يمكن تنزيلها هنا.',
   uwConflictDownloadFailed: 'تعذّر تنزيل نسختك، لذا لم تتم إعادة تحميل المستند. حاول مرة أخرى.',
   uwConflictOfflineWeb:
     'أنت غير متصل. على الويب يحتاج هذا إلى اتصال؛ وتبقى تغييراتك في هذا المتصفح.',
@@ -99,6 +100,8 @@ export const ar = {
   uwRemoteReloadFailed: 'تعذّر تحميل الإصدار {n}. ما زلت تعرض الإصدار السابق.',
   uwRemoteDeleted: 'حُذف هذا المستند على UniWork. توقفت عمليات الحفظ في قائمة الانتظار.',
   uwAuthorFallback: 'أحد الأعضاء',
+  uwLockRegion: 'حالة المستند',
+  uwActRetry: 'إعادة المحاولة',
 
   // S6 new-version bar (web only)
   uwRemoteRevokedWeb:

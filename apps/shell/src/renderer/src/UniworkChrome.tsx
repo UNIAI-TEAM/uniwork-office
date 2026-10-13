@@ -3,7 +3,18 @@ import type { TabSummary } from '../../shared/tabs-api'
 import type { UniworkDocStatus } from '../../shared/home-api'
 import { useI18n } from './locale'
 import { useAccount } from './account-model'
-import { onUniworkNotice } from './uniwork-notice-bus'
+import { onLocalRename, onUniworkNotice } from './uniwork-notice-bus'
+import { onDocRenamed } from './uniwork-library-api'
+import {
+  DISCUSSION_PANEL_ID,
+  DISCUSSION_TOGGLE_ID,
+  discussionBridge,
+  discussionTargetOf,
+  setDiscussionOpen,
+  useDiscussionOpen,
+} from './discussion-panel-model'
+import { collabStrings } from '@genoffice/ui/collab'
+import { showsProfile } from './account-model'
 import {
   chipCopy,
   chipModelOf,
@@ -40,6 +51,8 @@ function Spinner() {
 export interface UniworkStatuses {
   /** the UniWork status of the document behind this path; null for a plain local file */
   statusOf(path: string | undefined): UniworkDocStatus | null
+  /** the status of this path was read (null then means a plain local file, not "not read yet") */
+  isKnown(path: string | undefined): boolean
   /** take a status main just answered with (after Retry / Resolve) */
   apply(status: UniworkDocStatus): void
 }
@@ -108,7 +121,11 @@ export function useUniworkStatuses(tabs: TabSummary[]): UniworkStatuses {
     (path: string | undefined) => (path ? (byPath.get(pathKey(path)) ?? null) : null),
     [byPath],
   )
-  return { statusOf, apply }
+  const isKnown = useCallback(
+    (path: string | undefined) => (path ? byPath.has(pathKey(path)) : false),
+    [byPath],
+  )
+  return { statusOf, isKnown, apply }
 }
 
 /** small marker on the tab icon of a UniWork document */
@@ -226,7 +243,7 @@ function NoticePill({ notice, onDismiss }: { notice: LaunchNotice; onDismiss: ()
 }
 
 /** "Opening from UniWork…", the sign-in prompt and failures of an open (web launch or recent) */
-export function UniworkNotice() {
+export function UniworkNotice({ openDocumentIds }: { openDocumentIds: ReadonlySet<string> }) {
   const [notice, setNotice] = useState<LaunchNotice | null>(null)
 
   useEffect(() => {
@@ -245,5 +262,74 @@ export function UniworkNotice() {
     return () => window.clearTimeout(timer)
   }, [notice])
 
-  return notice ? <NoticePill notice={notice} onDismiss={() => setNotice(null)} /> : null
+  return (
+    <>
+      {notice && <NoticePill notice={notice} onDismiss={() => setNotice(null)} />}
+      <RenamedAnnouncer openDocumentIds={openDocumentIds} />
+    </>
+  )
+}
+
+/**
+ * Polite announcement of a document's new name: a rename the person just made
+ * in the library, or one from elsewhere for a document open in a tab (main
+ * refreshed its metadata; the tab title follows from main). A feed push for a
+ * document that is not open stays silent. The live region is always in the DOM
+ * so screen readers pick changes up.
+ */
+function RenamedAnnouncer({ openDocumentIds }: { openDocumentIds: ReadonlySet<string> }) {
+  const { t } = useI18n()
+  const [name, setName] = useState<{ title: string; n: number } | null>(null)
+  const openRef = useRef(openDocumentIds)
+  openRef.current = openDocumentIds
+  useEffect(() => {
+    const say = (title: string) => setName((prev) => ({ title, n: (prev?.n ?? 0) + 1 }))
+    const offFeed = onDocRenamed(({ documentId, title }) => {
+      if (openRef.current.has(documentId)) say(title)
+    })
+    const offLocal = onLocalRename(say)
+    return () => {
+      offFeed()
+      offLocal()
+    }
+  }, [])
+  return (
+    <span className="uw-sr-only" role="status" aria-live="polite">
+      {name ? <span key={name.n}>{t('uwDocRenamedAnnounce', { name: name.title })}</span> : null}
+    </span>
+  )
+}
+
+/**
+ * "Discussion" button of the tab strip: shown only for a UniWork document while signed in. A plain
+ * local file (and a signed-out desktop) has no Discussion, so no button.
+ */
+export function DiscussionToggle({ status }: { status: UniworkDocStatus }) {
+  const { lang } = useI18n()
+  const account = useAccount()
+  const open = useDiscussionOpen()
+  const bridge = discussionBridge()
+  if (!discussionTargetOf(status, showsProfile(account.view, account.status), bridge)) return null
+  const label = collabStrings(lang).collabDiscussion
+  return (
+    <button
+      type="button"
+      id={DISCUSSION_TOGGLE_ID}
+      className="uw-discussion-toggle"
+      aria-expanded={open}
+      aria-controls={open ? DISCUSSION_PANEL_ID : undefined}
+      data-open={open ? 'true' : undefined}
+      onClick={() => setDiscussionOpen(!open)}
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path
+          d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v9a1.5 1.5 0 0 1-1.5 1.5H10l-4.5 4v-4h0A1.5 1.5 0 0 1 4 14.5z"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+        />
+      </svg>
+      <span className="uw-discussion-toggle-label">{label}</span>
+    </button>
+  )
 }

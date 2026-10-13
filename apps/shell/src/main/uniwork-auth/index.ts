@@ -182,8 +182,11 @@ export function uniworkAccount(): AccountManager {
     createTransport: (profile) => createUniworkTransport(profile),
     credentials: createCredentialStore({ userDataDir: app.getPath('userData'), safeStorage }),
     openBrowser: openAuthorizationUrl,
+    // G8-16 S16: the remembered organization is per account + machine, so a
+    // choice made by one account is never read back for another on this install
     readSelectedOrgId: () => readAppSettings(settings()).uniworkOrgId,
-    persistSelectedOrgId: (orgId) => writeAppSetting(settings(), 'uniworkOrgId', orgId),
+    persistSelectedOrgId: (accountId, orgId) =>
+      writeAppSetting(settings(), 'uniworkOrgId', { accountId, orgId }),
     device: deviceInfo(process.platform, app.getVersion()),
   })
   created.onStatus((status) => push?.(HOME_CHANNELS.accountStatusEvent, status))
@@ -198,6 +201,19 @@ export function uniworkAccount(): AccountManager {
 /** Entitlements of the selected organization while signed in, else null (data only). */
 export function getAccountEntitlements(): AccountEntitlements | null {
   return manager?.getEntitlements() ?? null
+}
+
+/**
+ * G8-02: display name of the signed-in account, or null when signed out (or
+ * the profile carries no usable name). Read-only: never a token, never the OS
+ * account. This is the single author source for comment authorship.
+ */
+export function uniworkAccountDisplayName(): string | null {
+  if (!manager) return null
+  const status = manager.status()
+  if (!status.loggedIn) return null
+  const name = status.profile?.displayName.trim()
+  return name ? name : null
 }
 
 export function onAccountEntitlementsChanged(

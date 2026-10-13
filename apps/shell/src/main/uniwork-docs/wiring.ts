@@ -1,13 +1,18 @@
-import { app, BrowserWindow, dialog, type IpcMain, type WebContents } from 'electron'
-import { join } from 'node:path'
+import { app, BrowserWindow, dialog, safeStorage, type IpcMain, type WebContents } from 'electron'
+import { basename, join } from 'node:path'
+import { COMMENTS_CHANNELS } from '@genoffice/electron-utils/comments-ipc'
 import {
   UNIWORK_DOC_CHANNELS,
+  type AccountStatus,
   type UniworkConflictChoice,
+  type UniworkCreateDocInput,
   type UniworkDocFormat,
   type UniworkDocListQuery,
   type UniworkDocLock,
+  type UniworkUploadDocInput,
+  type UniworkSharedQuery,
 } from '../../shared/home-api'
-import { createLaunchPusher, createPushHolder } from './launch'
+import { createLaunchPusher, createPushHolder, type LaunchPushTarget } from './launch'
 import {
   applyUniworkProfile,
   authorizedRequest,
@@ -19,7 +24,27 @@ import {
   uniworkSessionIdentity,
 } from '../uniwork-auth'
 import { AccountBoundary } from './account-boundary'
+import {
+  createUniworkComments,
+  type DiscussionPushTarget,
+  type UniworkCommentsHandle,
+} from './comments-wiring'
+import type { CommentsRevealPayload } from '@genoffice/electron-utils/comments-ipc'
 import { setUniworkCloseGuard } from './close-guard'
+import { INTENT_STORE_REGISTRATION } from '../uniwork-sync/intent-store'
+import { createSafeStorageKeyProvider } from '../uniwork-sync/keys'
+import {
+  DOC_INDEX_REGISTRATION,
+  FEED_CURSORS_REGISTRATION,
+  SyncRuntime,
+  type SyncRuntimeTargets,
+} from '../uniwork-sync/runtime'
+import { createSyncStoreAccess, type SyncStoreAccess } from '../uniwork-sync/session-store'
+import { createStoreLayer, type StoreLayer } from '../uniwork-sync/store'
+import { createFeedClient, type FeedClient } from '../uniwork-sync/feed/client'
+import { createCapabilityFetch } from '../uniwork-sync/capability/client'
+import { CapabilityCache, NEVER_READ_CAPABILITIES } from '../uniwork-sync/capability/cache'
+import { createUniworkDocsClient, type FetchLike, type UniworkDocsClient } from './client'
 import {
   UniworkDocsService,
   type ConflictUi,
@@ -51,6 +76,25 @@ export interface UniworkDocsWiring {
   reloadPath(path: string): void
   activePath(): string | undefined
   reveal(): void
+  /**
+   * G8-08: the editor webContents showing `path` (tab or detached window), for
+   * the comments reveal push; undefined when nothing shows it.
+   */
+  commentsTarget?(path: string): LaunchPushTarget | undefined
+  /**
+   * G8-08/R1-2: the path an editor webContents shows, so its held reveal is
+   * pulled for exactly that path; undefined when nothing shows one.
+   */
+  commentsPathFor?(sender: { id: number }): string | undefined
+  /**
+   * G8-11: the file paths open as tabs of the window whose shell webContents
+   * is `sender`; null for any other sender (the discussion bridge is refused).
+   */
+  discussionTabPaths?(sender: { id: number }): readonly string[] | null
+  /** G8-11: the shell webContents that has `path` open as a tab, for the reveal push */
+  discussionTarget?(path: string): DiscussionPushTarget | null
+  /** G8-11: narrow / restore the active editor view of the sender's window */
+  setDiscussionPanel?(sender: { id: number }, panel: { open: boolean; width: number }): void
   lang(): string
   defaultSaveDir(): string
   /** every file path a tab or detached editor window shows */
@@ -65,6 +109,17 @@ export interface UniworkDocsWiring {
   aiHistoryPaths(): string[]
   /** deletes the AI chat history and project entries of these paths */
   forgetAiHistory(paths: string[]): void
+  /**
+   * S18: an open working copy got a new name; the shell re-keys its tab and the
+   * module follows (the desktop equivalent of the X-02 `file.renamed` event).
+   */
+  notifyPathRenamed(oldPath: string, newPath: string): void
+  /**
+   * S18: an open working copy keeps its file name (an editor holds it), so the
+   * shell re-titles the open tab/window by path and the module follows through
+   * its own rename IPC; no file moves. Absent in tests that do not open tabs.
+   */
+  notifyTitleRenamed?(path: string, title: string): void
 }
 
 const CHOICES: readonly UniworkConflictChoice[] = [
@@ -93,6 +148,33 @@ async function confirmConnect(wiring: UniworkDocsWiring, origin: string): Promis
     ? await dialog.showMessageBox(parent, options)
     : await dialog.showMessageBox(options)
   return response === 0
+}
+
+/**
+ * S18 upload: the native open dialog. The filters follow the formats UniWork
+ * Office can open (a file of any other type would be uploaded but never
+ * openable here); a cancelled dialog is null and no request is made.
+ */
+async function pickUploadFile(
+  wiring: UniworkDocsWiring,
+): Promise<{ path: string; name: string } | null> {
+  const parent = wiring.shellWindow()
+  const options: Electron.OpenDialogOptions = {
+    title: tUniworkDocs(wiring.lang(), 'uploadPickTitle'),
+    properties: ['openFile'],
+    filters: [
+      {
+        name: tUniworkDocs(wiring.lang(), 'uploadPickDocuments'),
+        extensions: ['docx', 'xlsx', 'pptx', 'pdf', 'md', 'html'],
+      },
+      { name: tUniworkDocs(wiring.lang(), 'uploadPickAll'), extensions: ['*'] },
+    ],
+  }
+  const picked = parent
+    ? await dialog.showOpenDialog(parent, options)
+    : await dialog.showOpenDialog(options)
+  const path = picked.canceled ? undefined : picked.filePaths[0]
+  return path ? { path, name: basename(path) } : null
 }
 
 function conflictUi(wiring: UniworkDocsWiring): ConflictUi {
@@ -204,11 +286,183 @@ function blockedReasonKey(reason: string | undefined): Parameters<typeof tUniwor
 export interface UniworkDocsHandle {
   service: UniworkDocsService
   boundary: AccountBoundary
+  /** G8-08: the comments IPC/reveal handle (registered with the documents handlers) */
+  comments: UniworkCommentsHandle
   /**
    * At app ready, after the account started: redeems a held launch ticket
    * once sign-in completes, and routes launch links from now on.
    */
   activate(startLaunch: (route: (url: string) => void) => void): void
+}
+
+/** encrypted bytes the account's sync store (intents, cursors, index) may keep */
+export const SYNC_STORE_BUDGET_BYTES = 256 * 1024 * 1024
+
+/**
+ * The durable sync store of the session. One key provider (keys wrapped by
+ * Electron safeStorage) and one layer under `userData/uniwork-sync/`, holding
+ * every store this build registers; the records are encrypted, budgeted and
+ * wiped at the account boundary. The wrapped keys sit beside the layer root,
+ * outside the wiped scope, so unlocking after a sign-out reads them again.
+ */
+function createSyncStoreLayer(root: string): StoreLayer {
+  const layer = createStoreLayer({
+    root: join(root, 'store'),
+    keys: createSafeStorageKeyProvider({ safeStorage, dir: join(root, 'keys') }),
+    budgetBytes: SYNC_STORE_BUDGET_BYTES,
+    clock: () => Date.now(),
+  })
+  layer.register(INTENT_STORE_REGISTRATION)
+  layer.register(FEED_CURSORS_REGISTRATION)
+  layer.register(DOC_INDEX_REGISTRATION)
+  return layer
+}
+
+/** the layer and the session's access to it: one pair per userData root */
+const syncStores = new Map<string, { layer: StoreLayer; access: SyncStoreAccess }>()
+
+function syncStoreFor(): { layer: StoreLayer; access: SyncStoreAccess } {
+  const root = join(app.getPath('userData'), 'uniwork-sync')
+  let found = syncStores.get(root)
+  if (!found) {
+    const layer = createSyncStoreLayer(root)
+    const access = createSyncStoreAccess({
+      layer,
+      scope: () => {
+        const identity = uniworkSessionIdentity()
+        return identity
+          ? { deploymentId: identity.deploymentId, accountId: identity.accountId }
+          : null
+      },
+    })
+    found = { layer, access }
+    syncStores.set(root, found)
+  }
+  return found
+}
+
+/**
+ * Test seams of the feed runtime: the HTTP round trip of the capability and
+ * feed clients, and the clock their caches read. Production leaves both out.
+ */
+export interface SyncRuntimeSeam {
+  fetch?: FetchLike
+  now?(): number
+}
+
+/**
+ * G8-16 S16: the one organization the change-feed may touch - the chosen org
+ * of the signed-in account, and only once the choice is made. Null while the
+ * picker is up (or no org is chosen), so no capability, workspace or feed call
+ * can run for a non-selected org or before the choice. Read on every pass, so
+ * a pass that outlives its choice makes no call either.
+ */
+export function feedOrgId(status: AccountStatus): string | null {
+  if (status.state !== 'signed-in' || status.needsOrgChoice) return null
+  return status.org?.id ?? null
+}
+
+/**
+ * The change-feed runtime of the shell: one FeedConsumer per (org, workspace)
+ * of the signed-in account, over the shared durable store, started on sign-in
+ * and re-run on a 60 s poll. There is no desktop realtime channel today, so
+ * this poll (plus a pass per sign-in) is the whole mechanism. Clients are
+ * rebuilt when the deployment origin changes; capabilities are cached per org
+ * FOR ONE ACCOUNT - a same-origin account switch clears the cache, so the
+ * outgoing account's org flags are never served to the incoming one.
+ * A capability or feed 401 asks the account to re-evaluate its session.
+ */
+export function createSyncRuntime(
+  service: UniworkDocsService,
+  seam: SyncRuntimeSeam = {},
+): SyncRuntime {
+  let origin: string | null = null
+  /** the account the capability cache belongs to: '', or `deployment/account` */
+  let account = ''
+  let docs: UniworkDocsClient | null = null
+  let feed: FeedClient | null = null
+  const clock = { now: () => seam.now?.() ?? Date.now() }
+  let capability: CapabilityCache = new CapabilityCache({
+    fetch: () => Promise.resolve({ status: 0, body: undefined }),
+    clock,
+  })
+  const clients = (): {
+    docs: UniworkDocsClient
+    feed: FeedClient
+    capability: CapabilityCache
+  } | null => {
+    const profile = uniworkDeploymentProfile()
+    if (!profile) return null
+    const identity = uniworkSessionIdentity()
+    const token = identity ? `${identity.deploymentId}/${identity.accountId}` : ''
+    if (origin !== profile.apiOrigin) {
+      origin = profile.apiOrigin
+      account = token
+      const options = {
+        apiOrigin: profile.apiOrigin,
+        authorized: <T>(call: (token: string) => Promise<T>) => authorizedRequest(call),
+        isSignedIn: () => uniworkSessionIdentity() !== null,
+        ...(seam.fetch ? { fetch: seam.fetch } : {}),
+      }
+      docs = createUniworkDocsClient(options)
+      feed = createFeedClient(options)
+      capability = new CapabilityCache({
+        fetch: createCapabilityFetch(options),
+        clock,
+      })
+    } else if (account !== token) {
+      // the boundary is the identity, not the origin: cached per-org flags of
+      // the outgoing account must never answer for the incoming one (R1-be-8)
+      account = token
+      capability.clear()
+    }
+    return docs && feed ? { docs, feed, capability } : null
+  }
+  const targets: SyncRuntimeTargets = {
+    // G8-16 S16: the chosen org of the live session only. The feed never
+    // touches another org of the account, a non-active one, or anything at
+    // all while the picker is up (this is read on every pass).
+    orgs: () => {
+      const orgId = feedOrgId(uniworkAccount().status())
+      return orgId ? [orgId] : []
+    },
+    workspaces: async (orgId) => {
+      const found = clients()
+      if (!found) return []
+      return (await found.docs.listWorkspaces(orgId)).map((workspace) => workspace.id)
+    },
+  }
+  return new SyncRuntime({
+    store: syncStoreFor().access,
+    // S18: a change the feed applies for a bound document re-reads its metadata,
+    // so a rename on the web reaches the open desktop copy
+    // the change's revision, so the echo of this service's own rename is
+    // recognised by it and a genuine later change is never swallowed (R1-6)
+    onFeedChange: (change) => service.noteFeedChange(change.documentId, change.revision),
+    targets,
+    capability: async (orgId) => {
+      const found = clients()
+      if (!found) {
+        return {
+          kind: 'ok' as const,
+          capabilities: { ...NEVER_READ_CAPABILITIES },
+          source: 'default' as const,
+        }
+      }
+      return found.capability.get(orgId)
+    },
+    client: () => clients()?.feed ?? null,
+    keepDraft: (documentId) => service.hasLocalDraft(documentId),
+    clock: { now: () => Date.now() },
+    onSessionExpired: () => {
+      // a capability or feed 401: the account re-reads the session and applies
+      // its own state (keystore-locked, signed-out, restoring, ...)
+      void uniworkAccount()
+        .retry()
+        .catch(() => undefined)
+    },
+    log: (message) => console.warn(message),
+  })
 }
 
 /** Registers the IPC handlers (safe before app ready: nothing touches the account yet). */
@@ -217,14 +471,27 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     const wc = wiring.shellContents()
     if (wc && !wc.isDestroyed()) wc.send(channel, payload)
   }
+  const syncStore = syncStoreFor().access
+  // the comments handle is built after the service (it resolves bindings through
+  // it) but the service needs it for the launch-ticket reveal: a holder breaks
+  // the cycle, and the reveal only runs once both exist
+  let comments: UniworkCommentsHandle | null = null
   const service = new UniworkDocsService({
     userDataDir: app.getPath('userData'),
+    syncStore,
+    appVersion: () => app.getVersion(),
     profile: () => uniworkDeploymentProfile(),
     channel: () => uniworkAppChannel(),
     applyProfile: (profile) =>
       applyUniworkProfile(profile, { confirm: (origin) => confirmConnect(wiring, origin) }),
     identity: () => uniworkSessionIdentity(),
-    selectedOrgId: () => uniworkAccount().status().org?.id ?? null,
+    // a locked keychain is the account's state, not the session's: a cold
+    // restore has no session and must still lock the saved account's copies
+    keystoreLocked: () => uniworkAccount().status().state === 'keystore-locked',
+    selectedOrg: () => {
+      const org = uniworkAccount().status().org
+      return org ? { id: org.id, slug: org.slug } : null
+    },
     authorized: (call) => authorizedRequest(call),
     openPath: (path) => {
       // G5-04g: a newer store is refused before any module sees the path
@@ -235,6 +502,12 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     requestModuleSave: (path, onNotWritten) => wiring.requestModuleSave(path, onNotWritten),
     reloadPath: (path) => wiring.reloadPath(path),
     activePath: () => wiring.activePath(),
+    // S18: main owns the native dialog (Electron); the service stays Electron-free
+    pickUploadFile: () => pickUploadFile(wiring),
+    pushUploadProgress: (event) => push(UNIWORK_DOC_CHANNELS.uploadProgress, event),
+    pushDocRenamed: (event) => push(UNIWORK_DOC_CHANNELS.docRenamed, event),
+    notifyPathRenamed: (oldPath, newPath) => wiring.notifyPathRenamed(oldPath, newPath),
+    notifyTitleRenamed: (path, title) => wiring.notifyTitleRenamed?.(path, title),
     ui: conflictUi(wiring),
     pushStatus: (status) => push(UNIWORK_DOC_CHANNELS.docStatusEvent, status),
     pushLaunch: createLaunchPusher(() => wiring.shellContents(), UNIWORK_DOC_CHANNELS.launchEvent),
@@ -247,12 +520,79 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
       () => wiring.shellContents(),
       UNIWORK_DOC_CHANNELS.lock,
     ),
+    // the whole list when locks clear (a Retry that unlocked the keychain): the
+    // shell replaces its list, so the S11 panel does not outlive the lock
+    pushLocks: () => push(UNIWORK_DOC_CHANNELS.locksChanged, service.currentLocks()),
     reveal: () => wiring.reveal(),
+    revealComment: (path, commentId) => comments?.reveal(path, commentId),
+  })
+
+  // G8-08: the UniWork comments IPC (one handler per frame request kind) and
+  // the reveal push for a launch ticket that named a comment
+  comments = createUniworkComments(ipcMain, {
+    service,
+    profile: () => uniworkDeploymentProfile(),
+    authorized: (call) => authorizedRequest(call),
+    isSignedIn: () => uniworkSessionIdentity() !== null,
+    sendReveal: (payload, stillWanted) => {
+      // a cold start opens the editor after the reveal is decided: the push is
+      // held until the editor renderer finished loading (same rule as a launch);
+      // a pull that delivered the reveal in the meantime ends it (D1-4)
+      return createPushHolder<CommentsRevealPayload>(
+        () => wiring.commentsTarget?.(payload.path) ?? null,
+        COMMENTS_CHANNELS.reveal,
+        stillWanted,
+      )(payload)
+    },
+    // R1-2: the sender's own path scopes the pending-reveal pull
+    shownPath: (sender) => wiring.commentsPathFor?.(sender) ?? null,
+    // G8-11: the shell Discussion panel's bridge, served only for the shell
+    // webContents and the open tabs of its window
+    ...(wiring.discussionTabPaths
+      ? {
+          shellTabPaths: (sender: { id: number }) => wiring.discussionTabPaths?.(sender) ?? null,
+          shellTarget: (path: string) => wiring.discussionTarget?.(path) ?? null,
+          setDiscussionPanel: (sender: { id: number }, panel: { open: boolean; width: number }) =>
+            wiring.setDiscussionPanel?.(sender, panel),
+        }
+      : {}),
   })
 
   ipcMain.handle(UNIWORK_DOC_CHANNELS.listWorkspaces, () => service.listWorkspaces())
   ipcMain.handle(UNIWORK_DOC_CHANNELS.listDocuments, (_event, query: unknown) =>
     service.listDocuments((query ?? {}) as UniworkDocListQuery),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.listSharedWithMe, (_event, query: unknown) =>
+    service.listSharedWithMe((query ?? {}) as UniworkSharedQuery),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.documentProperties, (_event, documentId: unknown) =>
+    service.documentProperties(documentId as string),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.createDocument, (_event, input: unknown) =>
+    service.createDocument((input ?? {}) as UniworkCreateDocInput),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.pickUploadFile, () => service.pickUploadFile())
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.uploadDocument, (_event, input: unknown) =>
+    service.uploadDocument((input ?? {}) as UniworkUploadDocInput),
+  )
+  // S18 cancel: a no-op for an id main does not hold, so a Cancel racing its own
+  // upload's settle (or a stale dialog's) is harmless
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.cancelUpload, (_event, uploadId: unknown) => {
+    if (typeof uploadId === 'string') service.cancelUpload(uploadId)
+  })
+  ipcMain.handle(
+    UNIWORK_DOC_CHANNELS.renameDocument,
+    (_event, documentId: unknown, name: unknown) =>
+      service.renameDocument(documentId as string, name as string),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.archiveDocument, (_event, documentId: unknown) =>
+    service.archiveDocument(documentId as string),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.restoreDocument, (_event, documentId: unknown) =>
+    service.restoreDocument(documentId as string),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.listFolders, (_event, workspaceId: unknown) =>
+    service.listFolders(workspaceId as string),
   )
   ipcMain.handle(UNIWORK_DOC_CHANNELS.openDocument, (_event, documentId: unknown) =>
     service.openDocument(documentId as string),
@@ -270,6 +610,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     if (typeof path === 'string') service.dismissLock(path)
   })
   setUniworkCloseGuard(service)
+  const runtime = createSyncRuntime(service)
   // Sign out and a sign-in as someone else close the previous account's
   // documents and delete their AI history (see account-boundary.ts)
   const boundary = new AccountBoundary({
@@ -284,6 +625,25 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     // not shown an S11 panel for a working copy it cannot explain
     forgetLocks: (match) => service.forgetLocksWhere(match),
     closeConflictPrompt: () => service.closeConflictPrompt(),
+    sessionOwner: () => {
+      const identity = uniworkSessionIdentity()
+      return identity
+        ? { accountId: identity.accountId, deploymentId: identity.deploymentId }
+        : null
+    },
+    // the outgoing account's durable store (intents, feed cursors, doc index)
+    // is locked and wiped with its documents; the feed stops first so no
+    // in-flight consumer writes into a wiped scope
+    wipeStore: async (owner) => {
+      runtime.stop()
+      if (!owner) return
+      const store = syncStoreFor()
+      store.access.forget()
+      await store.layer.lockAndWipe({
+        deploymentId: owner.deploymentId,
+        accountId: owner.accountId,
+      })
+    },
   })
   setUniworkSignOutHooks({
     before: () => boundary.beforeSignOut(),
@@ -293,16 +653,30 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   return {
     service,
     boundary,
+    comments,
     activate(startLaunch) {
       let signedIn = uniworkAccount().status().state === 'signed-in'
+      /** the org the feed currently runs for; null = no pass may run */
+      let feedOrg: string | null = null
       onUniworkAccountStatus((status) => {
         // the session's account may have changed: it becomes the last owner
         service.noteSessionIdentity()
+        // G8-16 S16: changing the organization reloads the library data
+        service.noteSelectedOrg(status.org?.id ?? null)
         const identity = uniworkSessionIdentity()
         if (identity) void boundary.enforce(identity).catch(() => undefined)
         const now = status.state === 'signed-in'
         if (now && !signedIn) void service.launch.onSignedIn()
         signedIn = now
+        // the feed runs only for the chosen org of a live session: while the
+        // picker is up nothing starts, and the choice's own status push starts
+        // it for that org (one pass plus the 60 s poll). Sign-out, a lock, an
+        // account switch or an org change stops the pass it replaces.
+        const target = identity ? feedOrgId(status) : null
+        if (target === feedOrg) return
+        runtime.stop()
+        feedOrg = target
+        if (target) runtime.start()
       })
       startLaunch((url) => void service.launch.handleUrl(url))
     },
