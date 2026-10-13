@@ -39,7 +39,6 @@
     "@modelcontextprotocol/sdk": "^1.32.1",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "@uniwork/edu-core": "*",
     "@uniwork/office-bridge": "*",
     "@uniwork/office-bridge-contracts": "*",
     "@uniwork/practice-core": "*",
