@@ -7,7 +7,11 @@ import { UniworkDocError, isTerminalRefusal } from './errors'
 import { sha256Hex } from './formats'
 import type { CommitReceipt, DocumentDetail } from './parse'
 import type { IntentBindFacts, IntentRecordV2, IntentStore } from '../uniwork-sync/intent-store'
-import { isTerminalQueueState } from '../uniwork-sync/queue/record'
+import {
+  isTerminalQueueState,
+  nextIntentGeneration,
+  parseStoredIntent,
+} from '../uniwork-sync/queue/record'
 import { transition, type QueueEvent } from '../uniwork-sync/queue/machine'
 import type {
   QueueCapabilityRead,
@@ -309,7 +313,16 @@ export class SaveCoordinator {
       // the Ctrl/Cmd+S decision table: the intent's first state (see the module doc)
       const verdict = await laneVerdict(this.deps.capability, binding.orgId)
       const pausedUser = (await this.deps.pause?.isPaused().catch(() => false)) === true
-      const minted = this.mintIntent(doc, facts, checksum)
+      // the fresh intent is one past the record the store still holds (the
+      // same aging QueueDispatcher.mint applies): a second inline save of one
+      // document, or an N+1 minted while N commits, is never erased by N's
+      // generation-correct cleanup (G5-06 fix-C item 3)
+      const minted = this.mintIntent(
+        doc,
+        facts,
+        checksum,
+        nextIntentGeneration(parseStoredIntent((await intents.get(doc.key))?.intent ?? null)),
+      )
       const state: IntentRecordV2['state'] =
         verdict === 'offline'
           ? 'paused_offline'
@@ -387,8 +400,18 @@ export class SaveCoordinator {
     return this.settle(saving, intent, receipt, intents)
   }
 
-  /** the v2 record of one Ctrl/Cmd+S, before its lane verdict sets the state */
-  private mintIntent(doc: BoundDocument, facts: IntentBindFacts, checksum: string): IntentRecordV2 {
+  /**
+   * The v2 record of one Ctrl/Cmd+S, before its lane verdict sets the state.
+   * `generation` is one past the record the store still holds under this
+   * document key (the same aging `QueueDispatcher.mint` applies), so an N+1
+   * minted while N commits is not erased by N's generation-correct cleanup.
+   */
+  private mintIntent(
+    doc: BoundDocument,
+    facts: IntentBindFacts,
+    checksum: string,
+    generation: number,
+  ): IntentRecordV2 {
     const id = this.uuid()
     const at = this.now().toISOString()
     return {
@@ -402,7 +425,7 @@ export class SaveCoordinator {
       baseVersion: facts.baseVersion,
       checksum,
       length: facts.length,
-      generation: 1,
+      generation,
       state: 'queued',
       attempt: 0,
       createdAt: at,
@@ -436,9 +459,32 @@ export class SaveCoordinator {
     this.pendingNext.delete(doc.path)
     const done = await this.commitState(doc, settled)
     // the same cleanup the dispatcher's committed transition performs: the
-    // record is removed, so a committed intent is never left dispatchable
-    await intents.delete(doc.key)
+    // record is removed, so a committed intent is never left dispatchable.
+    // Compare-then-delete: a newer intent (N+1) minted while this one settled
+    // is never erased by this generation's cleanup (G5-06 fix-C item 3).
+    await this.cleanupIntent(intents, doc, intent)
     return done
+  }
+
+  /**
+   * Delete the intent's stored record, but only when the store still holds
+   * exactly this intent (same intentId AND generation). A newer intent (N+1)
+   * minted while this one settled - a second inline save, or another window -
+   * must never be erased by this generation's cleanup (G5-06 fix-C item 3).
+   */
+  private async cleanupIntent(
+    intents: IntentStore,
+    doc: BoundDocument,
+    intent: IntentRecordV2,
+  ): Promise<void> {
+    const stored = await intents.read(doc.key, factsOf(doc, intent.length))
+    if (
+      stored &&
+      stored.intent.intentId === intent.intentId &&
+      stored.intent.generation === intent.generation
+    ) {
+      await intents.delete(doc.key)
+    }
   }
 
   /**
@@ -459,7 +505,7 @@ export class SaveCoordinator {
     if (!stored) return
     const result = transition(stored.intent, event, { now: this.now().getTime() })
     if (!result.record || result.effects.some((effect) => effect.kind === 'cleanup')) {
-      await intents.delete(doc.key)
+      await this.cleanupIntent(intents, doc, stored.intent)
       return
     }
     await intents.put(doc.key, result.record, stored.payload)
@@ -492,7 +538,7 @@ export class SaveCoordinator {
         intents,
       )
     }
-    await intents.delete(doc.key)
+    await this.cleanupIntent(intents, doc, intent)
     this.pendingNext.delete(doc.path)
     return this.commitState(doc, { ...doc.binding, ...otherwise })
   }
@@ -548,7 +594,7 @@ export class SaveCoordinator {
     const base = doc.binding
     const dropped = isTerminalRefusal(error)
     if (dropped) {
-      await intents.delete(doc.key)
+      await this.cleanupIntent(intents, doc, intent)
       this.pendingNext.delete(doc.path)
     }
     switch (error.code) {

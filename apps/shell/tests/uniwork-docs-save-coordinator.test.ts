@@ -202,6 +202,8 @@ interface Harness {
   coordinator: SaveCoordinator
   store: FakeBindingStore
   intents: IntentStore
+  drafts: ReturnType<typeof createDraftStore>
+  pause: ReturnType<typeof createPauseStore>
   layer: StoreLayer
   lockTable: FakeLockTable
   statuses: UniworkDocStatus[]
@@ -358,6 +360,8 @@ async function harness(): Promise<Harness> {
     coordinator,
     store,
     intents,
+    drafts,
+    pause,
     layer,
     lockTable,
     statuses,
@@ -841,6 +845,92 @@ describe('G5-06 W4a save queue (fakes)', () => {
     await pass
     // N committed with exactly one request, but N+1 survived: it was never this
     // generation's to clean up
+    expect(race.server.state.counts.commit).toBe(1)
+    const after = await stored(race.intents, old)
+    expect(after?.intent.intentId).toBe(next.intentId)
+    expect(after?.intent.generation).toBe(2)
+  })
+
+  it('two consecutive inline saves age the generation; the first cleanup leaves the second', async () => {
+    const h = await harness()
+    const doc = h.makeDoc()
+    // first inline save: someone saved on the web, so the base moved -> 409
+    // conflict. The intent is kept (the SAME record), generation 1 (empty store)
+    h.server.state.commitError = new UniworkDocError('conflict', {
+      serverCode: 'document_version_conflict',
+    })
+    await h.coordinator.save(doc.path)
+    const first = await stored(h.intents, doc)
+    expect(first?.intent.generation).toBe(1)
+    expect(first?.intent.state).toBe('conflict')
+    // Overwrite supersedes it (terminal, still stored) before the next save
+    await h.coordinator.supersede({
+      ...doc,
+      record: first!.intent,
+      payload: first!.payload,
+    })
+    expect((await stored(h.intents, doc))?.intent.state).toBe('cancelled')
+    // Overwrite would also clear the conflict chip; the next save runs on a
+    // dirty copy again
+    const bound = h.store.lookup(doc.path)!
+    await h.store.write(bound.dir, { ...bound.binding, state: 'dirty' })
+    // second inline save of the same document: a fresh intent is minted ONE
+    // PAST the stored record (not a hard-coded 1). Parked offline so it stays
+    h.server.state.commitError = null
+    h.capability.set('org_1', false)
+    h.capability.goStale('org_1')
+    await h.coordinator.save(doc.path)
+    const second = await stored(h.intents, doc)
+    expect(second?.intent.generation).toBe(2)
+    expect(second?.intent.state).toBe('paused_offline')
+
+    // a cleanup of the first (an older generation) leaves a newer stored intent
+    const race = await harness()
+    const old = race.makeDoc({ key: 'doc_gen' })
+    let entered!: () => void
+    const atCommit = new Promise<void>((resolve) => (entered = resolve))
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const gated: QueueClient = {
+      upload: race.server.client.upload,
+      commit: async (input) => {
+        entered()
+        await gate
+        return race.server.client.commit(input)
+      },
+      lookupCommit: race.server.client.lookupCommit,
+    }
+    const coordinator = new SaveCoordinator({
+      store: race.store as never,
+      client: {
+        upload: (input) => gated.upload(input),
+        commit: (input) => gated.commit(input),
+        getDocument: async () => {
+          throw new UniworkDocError('not_found')
+        },
+      },
+      isSignedIn: () => true,
+      ownsBinding: () => true,
+      intents: async () => ({ kind: 'ok', intents: race.intents }),
+      publish: (status) => race.statuses.push(status),
+      now: () => new Date(race.clock.now),
+      uuid: () => 'u1',
+      readBytes: async () => enc('v4'),
+      capability: race.capability,
+      pause: race.pause,
+      drafts: race.drafts,
+      dispatcher: race.dispatcher,
+    })
+    const saving = coordinator.save(old.path)
+    await atCommit
+    // a newer intent (N+1) is minted and stored while N commits
+    const next = await race.dispatcher.mint(mintedFor(old))
+    expect(next.generation).toBe(2)
+    await race.intents.put(old.key, next, old.payload)
+    release()
+    await saving
+    // N committed exactly once, but N+1 survived: the first cleanup never
+    // deleted the newer generation
     expect(race.server.state.counts.commit).toBe(1)
     const after = await stored(race.intents, old)
     expect(after?.intent.intentId).toBe(next.intentId)
