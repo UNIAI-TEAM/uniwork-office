@@ -5993,3 +5993,61 @@ html[dir='rtl'] .quick-title-row {
   color: var(--text-secondary);
   font-size: 12px;
 }
+
+.wb-agenda-day h3 {
+  margin: 8px 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: capitalize;
+}
+
+.wb-agenda-day ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wb-agenda-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: var(--radius-8);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: start;
+  cursor: pointer;
+}
+
+.wb-agenda-row:hover {
+  background: var(--hover);
+}
+
+.wb-agenda-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-6);
+}
+
+.wb-agenda-time {
+  flex: none;
+  width: 72px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.wb-agenda-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

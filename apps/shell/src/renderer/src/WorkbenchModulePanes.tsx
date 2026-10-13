@@ -3,8 +3,8 @@ import type { ReactElement } from 'react'
 import { getWorkbenchModule, type PracticeId, type WorkbenchModuleId } from '@uniwork/practice-core'
 import type { UniworkWorkspaceRef } from '../../shared/home-api'
 import type { UniworkWorkError } from '../../shared/uniwork-work-api'
-import { CalendarPane } from './CalendarPane'
 import { NotesPane } from './NotesPane'
+import { WorkCalendarPane } from './WorkCalendarPane'
 import { WorkTasksPane } from './WorkTasksPane'
 import { WbDeleteBtn, WbDraftBtn, WbEditBtn, WbFileBtn, WbRowActions } from './WbRowActions'
 import {
@@ -73,7 +73,7 @@ export function WorkbenchModulePane({
           </p>
         </>
       )}
-      {moduleId === 'calendar' && <CalendarPane practiceId={practiceId} vi={vi} />}
+      {moduleId === 'calendar' && <WorkCalendarPane {...server} />}
       {moduleId === 'tasks' && <WorkTasksPane {...server} />}
       {moduleId === 'notes' && <NotesPane practiceId={practiceId} vi={vi} />}
       {moduleId === 'forms' && (

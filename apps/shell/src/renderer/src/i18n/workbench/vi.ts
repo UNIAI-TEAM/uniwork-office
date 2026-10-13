@@ -90,4 +90,9 @@ export const vi = {
   wbTasksReopen: 'Mở lại: {title}',
   wbTasksSaveFailed: 'Không lưu được thay đổi.',
   wbTasksAddFailed: 'Không thêm được việc.',
+  wbCalAllDay: 'Cả ngày',
+  wbCalEmpty: 'Không có việc hay cuộc họp nào trong 14 ngày tới.',
+  wbCalKindTask: 'Việc',
+  wbCalKindMeeting: 'Cuộc họp',
+  wbCalKindExternal: 'Lịch bên ngoài',
 } satisfies Record<keyof typeof zh, string>

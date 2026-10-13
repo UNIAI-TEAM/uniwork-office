@@ -31,8 +31,8 @@ export const WORKBENCH_MODULES: readonly WorkbenchModuleDef[] = [
     id: 'calendar',
     labelVi: 'Lịch',
     labelEn: 'Calendar',
-    hintVi: 'Xem dạng Calendar hoặc danh sách · mốc hạn theo vai trò',
-    hintEn: 'Calendar or list view · role deadlines',
+    hintVi: 'Việc có hạn và cuộc họp trong 14 ngày tới',
+    hintEn: 'Due tasks and meetings in the next 14 days',
     available: true,
   },
   {

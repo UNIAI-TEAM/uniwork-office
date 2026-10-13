@@ -90,4 +90,9 @@ export const en = {
   wbTasksReopen: 'Reopen: {title}',
   wbTasksSaveFailed: 'Could not save the change.',
   wbTasksAddFailed: 'Could not add the task.',
+  wbCalAllDay: 'All day',
+  wbCalEmpty: 'No tasks or meetings in the next 14 days.',
+  wbCalKindTask: 'Task',
+  wbCalKindMeeting: 'Meeting',
+  wbCalKindExternal: 'External calendar',
 } satisfies Record<keyof typeof zh, string>

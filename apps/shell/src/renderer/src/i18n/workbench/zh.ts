@@ -95,4 +95,9 @@ export const zh = {
   wbTasksReopen: '重新打开：{title}',
   wbTasksSaveFailed: '无法保存更改。',
   wbTasksAddFailed: '无法添加任务。',
+  wbCalAllDay: '全天',
+  wbCalEmpty: '未来 14 天没有任务或会议。',
+  wbCalKindTask: '任务',
+  wbCalKindMeeting: '会议',
+  wbCalKindExternal: '外部日历',
 }
