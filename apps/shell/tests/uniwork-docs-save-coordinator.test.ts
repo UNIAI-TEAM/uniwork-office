@@ -937,13 +937,17 @@ describe('G5-06 W4a save queue (fakes)', () => {
     expect(after?.intent.generation).toBe(2)
   })
 
-  it('in-flight records at rest settle by lookup: committed / not_committed / unknown', async () => {
+  it('in-flight records at rest: validating/uploading requeue and re-send, committing settles by lookup (AC-4)', async () => {
     // a stop (lost lock, canCommit false, crash) left the record mid-flight.
-    // dispatchAll never picks validating/uploading/committing, so the next poll
-    // must resolve them with ONE lookup each and the SAME idempotency key.
+    // dispatchAll never picks validating/uploading/committing, so the next pass
+    // must resolve them. `committing` may have sent the commit POST, so it is
+    // settled by ONE lookup; `validating`/`uploading` provably never sent it, so
+    // a lookup would answer 410 commit_intent_unknown for a save the server
+    // never saw (AC-4) - instead the record goes back to queued with the SAME
+    // key and is re-sent in the same pass, never re-minted.
     const seedInFlight = async (
       h: Harness,
-      state: 'uploading' | 'committing',
+      state: 'validating' | 'uploading' | 'committing',
     ): Promise<QueueDoc> => {
       const doc = h.makeDoc()
       // the record at rest in the store AND the doc the poll builds from it
@@ -952,9 +956,31 @@ describe('G5-06 W4a save queue (fakes)', () => {
       return doc
     }
 
-    // committed -> settle with the receipt, one lookup, no upload/commit
+    // uploading at rest -> ZERO lookups: the record requeues and re-sends the
+    // SAME key in the same pass (one upload, one commit), never a lookup
+    const uploading = await harness()
+    const up = await seedInFlight(uploading, 'uploading')
+    const upKey = up.record.idempotencyKey
+    await uploading.dispatcher.dispatchAll([up])
+    expect(uploading.server.state.counts.lookup).toBe(0)
+    expect(uploading.server.state.keys.upload).toEqual([upKey])
+    expect(uploading.server.state.keys.commit).toEqual([upKey])
+    expect(up.record.state).toBe('committed')
+
+    // validating at rest -> the same: zero lookups, one re-send of the same key
+    const validating = await harness()
+    const va = await seedInFlight(validating, 'validating')
+    const vaKey = va.record.idempotencyKey
+    await validating.dispatcher.dispatchAll([va])
+    expect(validating.server.state.counts.lookup).toBe(0)
+    expect(validating.server.state.keys.upload).toEqual([vaKey])
+    expect(validating.server.state.keys.commit).toEqual([vaKey])
+    expect(va.record.state).toBe('committed')
+
+    // committing at rest, lookup committed -> settle with the receipt, one
+    // lookup, no upload/commit
     const committed = await harness()
-    const c = await seedInFlight(committed, 'uploading')
+    const c = await seedInFlight(committed, 'committing')
     committed.server.state.lookupOutcome = 'committed'
     const cResult = await committed.dispatcher.dispatchAll([c])
     expect(cResult.dispatched).toBe(1)
@@ -964,7 +990,8 @@ describe('G5-06 W4a save queue (fakes)', () => {
     expect(c.record.state).toBe('committed')
     expect(await stored(committed.intents, c)).toBeNull()
 
-    // not_committed -> back to queued with the SAME key (re-sent, not re-minted)
+    // committing at rest, lookup not_committed -> back to queued with the SAME
+    // key (re-sent, not re-minted)
     const notCommitted = await harness()
     const n = await seedInFlight(notCommitted, 'committing')
     const keyBefore = n.record.idempotencyKey
@@ -980,9 +1007,9 @@ describe('G5-06 W4a save queue (fakes)', () => {
     expect(notCommitted.server.state.keys.upload).toEqual([keyBefore])
     expect(notCommitted.server.state.keys.commit).toEqual([keyBefore])
 
-    // unknown -> reconciling-stuck, never a new attempt, no byte moved
+    // committing at rest, lookup unknown -> reconciling-stuck, never a new attempt
     const unknown = await harness()
-    const u = await seedInFlight(unknown, 'uploading')
+    const u = await seedInFlight(unknown, 'committing')
     unknown.server.state.lookupOutcome = 'unknown'
     await unknown.dispatcher.dispatchAll([u])
     expect(unknown.server.state.counts.lookup).toBe(1)
@@ -1037,9 +1064,10 @@ describe('G5-06 W4a save queue (fakes)', () => {
     expect(await stored(off.intents, torn)).toEqual(beforeTorn)
     expect(torn.record.state).toBe('committing')
 
-    // (c) the holder runs the same record: one lookup settles it, the record moves
+    // (c) the holder runs the same record: a `committing` record is settled by
+    // one lookup, and an `uploading` record re-sends the same key (AC-4)
     const holder = await harness()
-    const mine = await seedInFlight(holder, 'uploading')
+    const mine = await seedInFlight(holder, 'committing')
     holder.server.state.lookupOutcome = 'not_committed'
     await holder.dispatcher.dispatchAll([mine])
     expect(holder.server.state.counts.lookup).toBe(1)

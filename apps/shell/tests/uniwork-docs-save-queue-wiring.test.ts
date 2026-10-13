@@ -581,7 +581,7 @@ describe('G5-06 W4b save queue wiring', () => {
     expect((await storedIntent(ctx, path))?.intent.state).toBe('conflict')
   })
 
-  it('G5-06 fix-C item 4: a stored in-flight record is settled by lookup on the next poll', async () => {
+  it('G5-06 fix-C item 4 / AC-4: committing at rest is settled by lookup, uploading at rest re-sends', async () => {
     const seed = async (
       ctx: Ctx,
       state: 'uploading' | 'committing',
@@ -617,28 +617,25 @@ describe('G5-06 W4b save queue wiring', () => {
     const lookups = (server: ReturnType<typeof fakeServer>) =>
       server.calls.filter((c) => c.path.endsWith('/versions/commit') && c.method === 'GET')
 
-    // a stop left the record `uploading` at rest (lost lock / crash). Its lookup
-    // answers not_committed: the next poll resolves it to queued with the SAME
-    // key (one lookup, no upload/commit), and the poll after that re-sends it
+    // a stop left the record `uploading` at rest (lost lock / crash). The commit
+    // POST was never sent, so a lookup would answer 410 commit_intent_unknown
+    // for a save the server never saw (AC-4): the poll re-sends the SAME key
+    // instead - ZERO lookups, one upload, one commit, in that one poll
     const server = fakeServer({ bytes: enc('v3') })
     const ctx = setup(server)
     const path = await openDoc(ctx)
     await seed(ctx, 'uploading', path, 'key_stuck')
     await ctx.service.pollSaveQueue()
-    expect(lookups(server)).toHaveLength(1)
-    expect(uploads(server)).toHaveLength(0)
-    expect(commits(server)).toHaveLength(0)
-    expect((await storedIntent(ctx, path))?.intent).toMatchObject({
-      state: 'queued',
-      idempotencyKey: 'key_stuck',
-    })
-    await ctx.service.pollSaveQueue()
+    expect(lookups(server)).toHaveLength(0)
     expect(uploads(server)).toHaveLength(1)
     expect(commits(server)).toHaveLength(1)
+    expect(uploads(server)[0]!.headers['idempotency-key']).toBe('key_stuck')
     expect(commits(server)[0]!.headers['idempotency-key']).toBe('key_stuck')
+    expect(await storedIntent(ctx, path)).toBeNull()
 
-    // a record left `committing` whose lookup answers committed settles with the
-    // receipt: one lookup, no upload, no commit, and the record is cleared
+    // a record left `committing` (the commit POST may have been sent) whose
+    // lookup answers committed settles with the receipt: one lookup, no upload,
+    // no commit, and the record is cleared
     const second = fakeServer({ bytes: enc('v3') })
     const ctx2 = setup(second)
     const path2 = await openDoc(ctx2)
@@ -774,8 +771,9 @@ describe('G5-06 W4b save queue wiring', () => {
     const ctx = setup(server)
     const path = await openDoc(ctx)
     const key = basename(dirname(path))
-    // an in-flight record at rest (a lost lock / crash): the poll settles it
-    // through the G5-07 lookup with the SAME key
+    // a record at rest in `committing` (a lost lock / crash after the commit
+    // POST may have been sent): the poll settles it through the G5-07 lookup
+    // with the SAME key
     const opened = await ctx.layer.open({ deploymentId: 'default', accountId: 'acc_1' })
     if (opened.kind !== 'ok') throw new Error('store did not open')
     await createIntentStore(opened.store.records(INTENT_STORE_REGISTRATION.name)).put(
@@ -792,7 +790,7 @@ describe('G5-06 W4b save queue wiring', () => {
         checksum: hex(enc('v4')),
         length: enc('v4').byteLength,
         generation: 1,
-        state: 'uploading',
+        state: 'committing',
         attempt: 1,
         createdAt: '2026-10-13T00:00:00.000Z',
         updatedAt: '2026-10-13T00:00:00.000Z',
