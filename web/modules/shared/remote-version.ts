@@ -406,14 +406,26 @@ export function createRemoteVersion(host: RemoteVersionHost): RemoteVersion {
     evaluate()
   })
 
+  /** The organisation-blocked bar: shared by the pushed `doc.blocked` and the refused Save */
+  function showOrgBlocked(key: WebStringKey): void {
+    if (lock) return
+    shown = null
+    bar.show({
+      tone: 'error',
+      region: 'lock',
+      text: t('uwRemoteOrgBlockedWeb', { reason: t(key) }),
+    })
+  }
+
   /** `doc.blocked`: the host saw the revoke / delete itself; the reason picks the bar */
   function blocked(p: DocBlockedPayload): void {
     const cur = host.current()
     if (cur && cur.fileId !== p.document_id) return
     if (p.reason === 'document_deleted') return lockFrame('deleted')
     const org = ORG_BLOCKED[p.reason]
-    // the organisation reasons lock too: the host already knows the saves will be refused
-    if (org) return lockFrame('revoked', t('uwRemoteOrgBlockedWeb', { reason: t(org) }))
+    // the organisation reasons are transient (the organisation can be reopened): the bar only, the
+    // editor stays usable, exactly like the same reason arriving as a Save 403
+    if (org) return showOrgBlocked(org)
     lockFrame('revoked')
   }
 
@@ -446,12 +458,7 @@ export function createRemoteVersion(host: RemoteVersionHost): RemoteVersion {
         const apiCode = error.details?.apiCode
         const reason = typeof apiCode === 'string' ? ORG_BLOCKED[apiCode] : undefined
         if (!reason) return lockFrame('revoked')
-        shown = null
-        bar.show({
-          tone: 'error',
-          region: 'lock',
-          text: t('uwRemoteOrgBlockedWeb', { reason: t(reason) }),
-        })
+        showOrgBlocked(reason)
         return
       }
       if (error.code === 'not_found' || status === 410) lockFrame('deleted')

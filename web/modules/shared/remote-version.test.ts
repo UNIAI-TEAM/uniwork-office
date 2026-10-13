@@ -628,22 +628,46 @@ describe('doc.blocked (the host pushes the block, no save needed)', () => {
     expect(r.state).toMatchObject({ dirty: true, revision: '10' })
   })
 
-  it('the organisation reasons: their own sentence, locked like a revoke', () => {
-    for (const [reason, key] of [
-      ['organization_suspended', 'uwReasonSuspended'],
-      ['member_deactivated', 'uwReasonDeactivated'],
-      ['document_archived', 'uwReasonArchived'],
-    ] as const) {
-      const r = rig()
-      r.block(blocked(reason))
+  it.each([
+    ['organization_suspended', 'uwReasonSuspended'],
+    ['member_deactivated', 'uwReasonDeactivated'],
+    ['document_archived', 'uwReasonArchived'],
+  ] as const)(
+    'the organisation reason %s: the same bar and the same usable editor as the Save 403',
+    (reason, key) => {
+      const pushed = rig()
+      pushed.block(blocked(reason))
       const sentence = t('uwRemoteOrgBlockedWeb', { reason: t(key) })
+      expect(tone()).toBe('error')
       expect(barText()).toBe(sentence)
-      expect(r.rv.locked()).toBe('revoked')
-      expect(r.rv.lockText()).toBe(sentence)
-      expect(inert()).toBe(true)
-      r.rv.dispose()
+      expect(inert()).toBe(false)
+      expect(pushed.rv.locked()).toBeNull()
+      expect(pushed.rv.lockText()).toBe('')
+      expect(pushed.onLock).not.toHaveBeenCalled()
+      const pushedBar = bar()!.outerHTML
+      pushed.rv.dispose()
       document.body.replaceChildren()
-    }
+
+      const refused = rig()
+      refused.rv.saveFailed({ code: 'forbidden', status: 403, details: { apiCode: reason } })
+      expect(bar()!.outerHTML).toBe(pushedBar)
+      expect(refused.rv.locked()).toBeNull()
+      expect(inert()).toBe(false)
+    },
+  )
+
+  it('an organisation block is lifted by nothing but a later revoke / delete, which still lock', () => {
+    const r = rig()
+    r.block(blocked('organization_suspended'))
+    r.block(blocked('permission_revoked'))
+    expect(r.rv.locked()).toBe('revoked')
+    expect(barText()).toBe(t('uwRemoteRevokedWeb'))
+    expect(inert()).toBe(true)
+    r.block(blocked('document_deleted'))
+    expect(r.rv.locked()).toBe('deleted')
+    r.block(blocked('member_deactivated'))
+    expect(r.rv.locked()).toBe('deleted')
+    expect(barText()).toBe(t('uwRemoteDeleted'))
   })
 
   it('a reason this frame does not know reads as revoked', () => {

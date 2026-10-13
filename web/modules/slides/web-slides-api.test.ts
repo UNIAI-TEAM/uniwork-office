@@ -19,6 +19,8 @@ import {
   type DraftRecovery,
   type DraftStore,
 } from '../../docs/bridge/draft-recovery'
+import { webLanguage } from '../../docs/bridge/browser'
+import { webText } from '../shared/i18n/strings-web'
 import { createFakeIdb } from '../../docs/bridge/testing/fake-idb'
 import { createMockPort, protocolError, type MockPort } from '../../docs/bridge/testing/mock-port'
 import { setPendingTextEditProbe } from '../../../apps/slides/src/renderer/pending-text-edit'
@@ -926,11 +928,26 @@ describe('new version on UniWork (doc.remoteVersion)', () => {
     api.onOpened((r) => seen.push(r.path))
     await api.setNotes({ slideIndex: 0, text: 'mine' })
     await flush()
-    mock.sendBlocked({ document_id: fileId, reason: 'organization_suspended' })
+    mock.sendBlocked({ document_id: fileId, reason: 'permission_revoked' })
     expect(document.querySelector('.uw-remote-bar--error')).not.toBeNull()
     const r = await api.save()
     expect(r.ok).toBe(false)
     expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(0)
     expect(seen).toEqual([])
+  })
+
+  it('doc.blocked with an organisation reason: the bar only, the deck usable, Save still reaches the host', async () => {
+    const { mock, api, fileId } = await setup({ revision: '10' })
+    await api.consumePendingOpen(FIT)
+    await api.setNotes({ slideIndex: 0, text: 'mine' })
+    await flush()
+    mock.sendBlocked({ document_id: fileId, reason: 'organization_suspended' })
+    expect(barText()).toBe(
+      webText(webLanguage(), 'uwRemoteOrgBlockedWeb', {
+        reason: webText(webLanguage(), 'uwReasonSuspended'),
+      }),
+    )
+    expect((await api.save()).ok).toBe(true)
+    expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(1)
   })
 })
