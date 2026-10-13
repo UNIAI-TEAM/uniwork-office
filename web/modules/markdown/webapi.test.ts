@@ -44,6 +44,7 @@ function setup(
     drafts?: TextWebApiOptions['drafts']
     downloadMaxBytes?: number
     revision?: string
+    reloadStore?: TextWebApiOptions['reloadStore']
   } = {},
 ) {
   const mock = createMockPort()
@@ -59,7 +60,13 @@ function setup(
       grants: textModuleGrants,
     },
     globals: {
-      markdownApi: (ctx) => createMarkdownWebApi(ctx, { print, reload, drafts: opts.drafts }),
+      markdownApi: (ctx) =>
+        createMarkdownWebApi(ctx, {
+          print,
+          reload,
+          drafts: opts.drafts,
+          ...(opts.reloadStore ? { reloadStore: opts.reloadStore } : {}),
+        }),
     },
     client: mock.port,
     target,
@@ -793,6 +800,85 @@ describe('markdownApi: new version on UniWork', () => {
     await vi.waitFor(() => expect(reload).toHaveBeenCalledOnce())
     const opens = mock.calls.filter((c) => c.type === 'api.open')
     expect(opens.at(-1)!.payload).toEqual({ fileId: file.fileId, versionId: 'v12' })
+  })
+
+  describe('the frame restarts for a clean version: the info bar and the reading position survive', () => {
+    const SAVED_AT = Date.UTC(2026, 9, 12, 8)
+    const head12 = (mock: MockPort, file: { fileId: string }) =>
+      mock.override('api.open', () => ({
+        ...mock.openPayload(file.fileId),
+        file: {
+          ...mock.openPayload(file.fileId).file,
+          revision: '12',
+          etag: '12',
+          versionId: 'v12',
+          modifiedAt: SAVED_AT,
+        },
+      }))
+    const stashKey = (fileId: string) => `uw-reload-notice:${fileId}`
+
+    it('stashes the notice and the scrolled elements before the reload, then shows the bar on the next boot', async () => {
+      sessionStorage.clear()
+      document.body.innerHTML = '<div id="root"><div id="scroller"></div></div>'
+      const scroller = document.getElementById('scroller')!
+      Object.defineProperty(scroller, 'scrollTop', { value: 240, writable: true })
+      const first = setup({ revision: '10' })
+      await open(first.api)
+      first.api.setDirty(false)
+      head12(first.mock, first.file)
+      first.mock.sendRemoteVersion(event(first.file.fileId, '12'))
+      await vi.waitFor(() => expect(first.reload).toHaveBeenCalledOnce())
+      // the page is about to go: no bar of this page, the notice waits in the session
+      const stash = JSON.parse(sessionStorage.getItem(stashKey(first.file.fileId))!)
+      expect(stash.notice).toEqual({ revision: '12', author: 'Trần An', savedAt: SAVED_AT })
+      expect(stash.scroll).toEqual([{ path: [0, 0], top: 240 }])
+
+      // the next page: same document, boots on the head
+      document.body.innerHTML = '<div id="root"></div>'
+      const next = setup({ revision: '12' })
+      expect(next.file.fileId).toBe(first.file.fileId)
+      await open(next.api)
+      expect(barText()).toBe(
+        webText(webLanguage(), 'uwRemoteUpdated', {
+          n: '12',
+          author: 'Trần An',
+          time: new Intl.DateTimeFormat(webLanguage(), {
+            dateStyle: 'medium',
+            timeStyle: 'short',
+          }).format(SAVED_AT),
+        }),
+      )
+      expect(document.querySelector('.uw-remote-bar--info')).not.toBeNull()
+      // taken once: a plain reload of the page afterwards shows nothing
+      expect(sessionStorage.getItem(stashKey(first.file.fileId))).toBeNull()
+    })
+
+    it('a boot with nothing stashed shows no bar', async () => {
+      sessionStorage.clear()
+      const { api } = setup({ revision: '12' })
+      await open(api)
+      expect(document.querySelector('.uw-remote-bar')).toBeNull()
+    })
+
+    it('storage that throws only means no bar: the reload still happens', async () => {
+      const { api, mock, file, reload } = setup({
+        revision: '10',
+        reloadStore: {
+          getItem: () => {
+            throw new Error('blocked')
+          },
+          setItem: () => {
+            throw new Error('blocked')
+          },
+          removeItem: () => {},
+        },
+      })
+      await open(api)
+      api.setDirty(false)
+      head12(mock, file)
+      mock.sendRemoteVersion(event(file.fileId, '12'))
+      await vi.waitFor(() => expect(reload).toHaveBeenCalledOnce())
+    })
   })
 
   it('dirty: nothing is reloaded and the warn bar offers Reload', async () => {

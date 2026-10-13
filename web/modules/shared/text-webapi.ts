@@ -64,6 +64,13 @@ import {
 import { hideFatal, showFatal, text } from './notice'
 import { printHtmlDocument } from './print'
 import { bridgeDraftRecovery } from './recovery-prompt'
+import {
+  captureScroll,
+  restoreScroll,
+  stashReload,
+  takeReload,
+  type ScrollPosition,
+} from './reload-notice'
 import { createRemoteVersion, type RemoteVersion } from './remote-version'
 import { saveFailureText } from './save-failure'
 import { decodeText, encodeText } from './text-codec'
@@ -126,6 +133,8 @@ export interface TextWebApiOptions {
   saveTimeoutMs?: number
   /** "Reload latest" (default: location.reload()); injectable for tests */
   reload?: () => void
+  /** where the new-version notice and the reading position cross a reload (default: sessionStorage) */
+  reloadStore?: Parameters<typeof stashReload>[3]
   /**
    * the renderer's capability object (module-bridge): `save` is turned off when the opened
    * file cannot be saved back faithfully (not UTF-8), so the renderer goes view-only
@@ -186,6 +195,8 @@ export function createTextWebApi(
   let booted = false
   /** the "new version on UniWork" bar and its reload / lock rules (G5-03w); created below the open plumbing */
   let remote: RemoteVersion | undefined = undefined
+  /** the reading position the previous page left behind a clean reload; put back after the boot */
+  let scrollBack: ScrollPosition[] | null = null
 
   const assetListeners = new Set<() => void>()
   const assets = createAssetStore(port, {
@@ -271,6 +282,19 @@ export function createTextWebApi(
     // another document: the pending version and the bar of the old one are gone
     if (current !== null && current !== open.file.fileId) remote?.reset()
     remember(open.file)
+    // the page restarted for a clean new version: the info bar and the reading position come back
+    const back = takeReload(
+      open.file.fileId,
+      {
+        revision: revisionOf(open.file),
+        ...(open.file.modifiedAt !== undefined ? { modifiedAt: open.file.modifiedAt } : {}),
+      },
+      opts.reloadStore,
+    )
+    if (back) {
+      remote?.reloaded(back.notice)
+      scrollBack = back.scroll
+    }
     assets.reset(open.assets)
     // a mapped picture the host refuses (revoked share, expired signature) is missing, not broken
     await assets.verify()
@@ -688,8 +712,10 @@ export function createTextWebApi(
     isDirty: () => dirty && !viewOnly(),
     canEdit: () => !viewOnly(),
     // the renderer reads its document once at boot, so a clean reload restarts the frame on the
-    // head (the host re-runs the handshake), like the conflict dialog's Reload latest
-    apply: async () => {
+    // head (the host re-runs the handshake), like the conflict dialog's Reload latest. The page
+    // restarts, so the info bar and the reading position wait in sessionStorage for the next boot
+    apply: async (reply, notice) => {
+      stashReload(reply.file.fileId, notice, captureScroll(), opts.reloadStore)
       await drafts.saved()
       ;(opts.reload ?? (() => location.reload()))()
     },
@@ -711,7 +737,13 @@ export function createTextWebApi(
       booted = true
       const pending = pendingOpen
       pendingOpen = null
-      return pending ? await pending : null
+      const path = pending ? await pending : null
+      // the renderer draws the document right after this answer: the position goes back then
+      if (scrollBack) {
+        restoreScroll(scrollBack)
+        scrollBack = null
+      }
+      return path
     },
 
     /**
