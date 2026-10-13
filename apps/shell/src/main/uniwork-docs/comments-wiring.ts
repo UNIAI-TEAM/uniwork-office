@@ -416,7 +416,14 @@ export function createUniworkComments(
     ipcMain.on(DISCUSSION_CHANNELS.revealRelease, (event, payload: unknown) => {
       const request = parseDiscussionRevealRequest(payload)
       if (!request) return
-      armed.get(event.sender.id)?.delete(request.path)
+      // W11E-1: only a live shell that owns the path may let go of it - one of
+      // its open tabs, or a path it armed (so the cleanup after a tab close
+      // still works). An editor, an unknown sender or another shell window
+      // must not cancel the owner's held reveal.
+      const paths = deps.shellTabPaths?.(event.sender) ?? null
+      const own = armed.get(event.sender.id)
+      if (!paths || !(paths.includes(request.path) || own?.has(request.path))) return
+      own?.delete(request.path)
       // W11A-2: the panel let go of this path; its hold goes with it
       shellHeld.delete(request.path)
     })
