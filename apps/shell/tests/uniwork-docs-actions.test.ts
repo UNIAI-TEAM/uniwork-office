@@ -589,10 +589,7 @@ describe('folders', () => {
   // so a destination past the first page could not be chosen at all.
   it('follows the folder next_cursor across pages', async () => {
     const server = fakeServer({
-      folderPages: [
-        [{ id: 'fold_1', title: 'Contracts' }],
-        [{ id: 'fold_2', title: 'Archive' }],
-      ],
+      folderPages: [[{ id: 'fold_1', title: 'Contracts' }], [{ id: 'fold_2', title: 'Archive' }]],
     })
     const ctx = setup(server)
     const folders = await ctx.service.listFolders(WS)

@@ -97,7 +97,8 @@ describe('the S18 action result crossing the preload (R1-9)', () => {
 describe('the upload cancel and progress of the preload (FX10)', () => {
   it('invokes the cancel channel with the id, never without one', async () => {
     const { bridge, invoked } = await loadBridge(undefined)
-    const cancels = () => invoked.filter((call) => call.channel === UNIWORK_DOC_CHANNELS.cancelUpload)
+    const cancels = () =>
+      invoked.filter((call) => call.channel === UNIWORK_DOC_CHANNELS.cancelUpload)
     await bridge.uniworkCancelUploadDocument('up-1')
     expect(cancels()).toEqual([{ channel: UNIWORK_DOC_CHANNELS.cancelUpload, args: ['up-1'] }])
     // a missing or empty id names no upload: nothing is invoked
