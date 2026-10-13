@@ -3,6 +3,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { Lang } from '@genoffice/i18n'
 import type { AiStreamChunk } from '@genoffice/ai-provider'
 import { installAiRunBridge } from '@genoffice/electron-utils/ai-run-bridge'
+import { installUniworkCommentsBridge } from '@genoffice/electron-utils/comments-bridge'
 import { installDropOpenBridge } from '@genoffice/electron-utils/drop-open'
 import { AI_CHANNELS, PDF_CHANNELS } from '../shared/ipc'
 import type { PdfApi, UiTheme } from '../shared/ipc'
@@ -149,4 +150,5 @@ contextBridge.exposeInMainWorld('projectApi', projectApi)
 installDropOpenBridge()
 
 // window.uniworkAiRun.reportAiRun: the shell learns when an AI turn runs here
+installUniworkCommentsBridge()
 installAiRunBridge()

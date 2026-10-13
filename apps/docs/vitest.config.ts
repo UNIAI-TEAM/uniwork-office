@@ -26,6 +26,15 @@ export default defineConfig({
       '@genoffice/electron-utils/ai-run-bridge': local(
         '../../packages/electron-utils/src/ai-run-bridge.ts',
       ),
+      '@genoffice/electron-utils/comments-bridge': local(
+        '../../packages/electron-utils/src/comments-bridge.ts',
+      ),
+      '@genoffice/electron-utils/comments-ipc': local(
+        '../../packages/electron-utils/src/comments-ipc.ts',
+      ),
+      '@genoffice/electron-utils/comments-poll': local(
+        '../../packages/electron-utils/src/comments-poll.ts',
+      ),
       '@genoffice/electron-utils/ai-run': local('../../packages/electron-utils/src/ai-run.ts'),
       '@genoffice/electron-utils/drop-open': local(
         '../../packages/electron-utils/src/drop-open.ts',

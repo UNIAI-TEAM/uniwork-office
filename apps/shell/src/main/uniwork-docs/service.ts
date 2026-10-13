@@ -131,6 +131,12 @@ export interface UniworkDocsServiceDeps {
   /** a working copy refused by the newer-store guard (S11 lock panel) */
   pushLock?(lock: UniworkDocLock): void
   reveal(): void
+  /**
+   * G8-08: a launch ticket named a comment; after the editor shows the
+   * document, ask it to reveal that thread. Optional: a standalone app or a
+   * test installs none and the reveal is dropped.
+   */
+  revealComment?(path: string, commentId: string): void
   /** test seam: replaces the HTTP client */
   client?: UniworkDocsClient
   sleep?(ms: number): Promise<void>
@@ -240,6 +246,12 @@ export class UniworkDocsService {
       open: (descriptor) => this.openFromServer(descriptor.id, descriptor),
       emit: (event) => deps.pushLaunch(event),
       reveal: () => deps.reveal(),
+      ...(deps.revealComment
+        ? {
+            revealComment: (path: string, commentId: string) =>
+              deps.revealComment?.(path, commentId),
+          }
+        : {}),
       ...(deps.now ? { now: deps.now } : {}),
     })
   }

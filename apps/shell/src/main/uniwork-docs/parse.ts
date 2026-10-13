@@ -57,6 +57,11 @@ export interface LaunchDescriptor {
   version: number
   revision: string
   downloadPath: string
+  /**
+   * G8-08: the comment a launch ticket named (contract §2.9), when the server
+   * kept one. The shell sends `comments.reveal` for it once the editor is ready.
+   */
+  commentId?: string
 }
 
 const HEX64 = /^[0-9a-f]{64}$/
@@ -196,6 +201,14 @@ export function parseExchange(raw: unknown): LaunchDescriptor {
     version: nonNegInt(doc.version),
     revision: revision(doc.revision),
     downloadPath: str(doc.download_path, 512),
+  }
+  // the ticket may name a comment (contract §2.9); a malformed one is ignored
+  // (the server drops it silently), a well-formed one reaches the editor reveal
+  const commentId = body.comment_id
+  if (commentId !== undefined && commentId !== null) {
+    if (typeof commentId === 'string' && commentId.length > 0 && commentId.length <= 128) {
+      descriptor.commentId = commentId
+    }
   }
   const current = `/api/v1/documents/${encodeURIComponent(descriptor.id)}/download`
   const expected = descriptor.version > 0 ? `${current}?version=${descriptor.version}` : current

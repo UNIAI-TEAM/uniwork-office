@@ -3790,6 +3790,8 @@ function uniworkDocsWiring() {
     },
     activePath: () => tabManager?.activeFilePath(),
     reveal: revealShellWindow,
+    // G8-08: the editor showing the path (its preload listens for the reveal)
+    commentsTarget: (path: string) => webContentsForPath(path)?.webContents,
     lang: () => currentLang(),
     defaultSaveDir: () => defaultSaveDir(),
     openPaths: () => [...(tabManager?.openFilePaths() ?? []), ...detachedFilePaths()],

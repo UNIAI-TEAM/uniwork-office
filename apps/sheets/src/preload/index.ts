@@ -59,6 +59,7 @@ import {
   SAVE_EDITS_CHUNK_JSON_MAX,
 } from '../shared/ipc-channels'
 import { installAiRunBridge } from '@genoffice/electron-utils/ai-run-bridge'
+import { installUniworkCommentsBridge } from '@genoffice/electron-utils/comments-bridge'
 import { installDropOpenBridge } from '@genoffice/electron-utils/drop-open'
 
 const desktopApi: DesktopApi = {
@@ -781,6 +782,7 @@ if (process.env.GENOFFICE_DEBUG_HOOKS === '1') {
 installDropOpenBridge()
 
 // window.uniworkAiRun.reportAiRun: the shell learns when an AI turn runs here
+installUniworkCommentsBridge()
 installAiRunBridge()
 
 function parseWorkbookFile(input: unknown): WorkbookFile {
