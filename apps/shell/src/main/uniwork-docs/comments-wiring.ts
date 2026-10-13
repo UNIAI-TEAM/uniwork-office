@@ -17,7 +17,6 @@ import type {
   CommentsRevealPayload,
   MentionsSearchInput,
 } from '@genoffice/electron-utils/comments-ipc'
-import type { UniworkDocAccess } from '../../shared/home-api'
 import type { UniworkDocsService } from './service'
 import {
   createUniworkCommentsClient,
@@ -62,12 +61,7 @@ export function resolveCommentBinding(
 ): CommentBinding | null {
   const source = service.recentSource(path)
   if (!source || source === 'hidden') return null
-  return {
-    documentId: source.documentId,
-    workspaceId: source.workspaceId,
-    orgId: '',
-    access: source.access as UniworkDocAccess,
-  }
+  return { documentId: source.documentId }
 }
 
 /** the §9 `not_found` shape for an unbound document: no request is made */

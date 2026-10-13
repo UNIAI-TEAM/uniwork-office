@@ -1,4 +1,3 @@
-import type { UniworkDocAccess } from '../../shared/home-api'
 import type {
   CommentsAnchorsInput,
   CommentsCreateInput,
@@ -44,9 +43,6 @@ const ID = /^[A-Za-z0-9_-]{1,128}$/
 
 export interface CommentBinding {
   documentId: string
-  workspaceId: string
-  orgId: string
-  access: UniworkDocAccess
 }
 
 export interface UniworkCommentsClientOptions {
