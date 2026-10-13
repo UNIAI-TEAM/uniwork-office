@@ -63,6 +63,8 @@ export const ko = {
   paneCommentsPlaceholder: '새 메모… (⌘/Ctrl+Enter로 게시)',
   paneCommentsPost: '게시',
   paneCommentsNeutralAuthor: '사용자',
+  paneCommentsNewUnavailable:
+    '이 프레젠테이션에는 아직 새 댓글을 추가할 수 없습니다. 아래 댓글은 계속 읽고, 답글을 달고, 해결할 수 있습니다.',
 
   paneCsdTitle: '쇼 재구성',
   paneCsdDefaultName: '쇼 재구성 {n}',

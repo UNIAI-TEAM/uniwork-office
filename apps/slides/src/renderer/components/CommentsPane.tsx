@@ -1,13 +1,38 @@
 /**
- * Comments pane (right side) — current page's comment list + create/delete.
- * The source of truth lives in the main process (the pptx comments part); this only displays and
- * sends back intents. The list is owned by App (refreshed after page switch/add/delete), keeping
- * the ribbon badge in sync.
+ * Comments pane (right side).
+ *
+ * Local file (and a bound document without a signed-in UniWork session): the current page's comment
+ * list + create/delete. The source of truth lives in the main process (the pptx comments part); this
+ * only displays and sends back intents. The list is owned by App (refreshed after page switch/add/
+ * delete), keeping the ribbon badge in sync.
+ *
+ * Bound UniWork document (G8-14, spine S12): `ServerCommentsPane` — the shared collab panel over the
+ * server comments, anchored per slide; the file's own comments only show read-only in the
+ * "Comments in the file" section and are never rewritten.
  */
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { format } from '@genoffice/i18n'
+import type { UniworkCommentsApi } from '@genoffice/electron-utils/comments-ipc'
+import {
+  AnchorLabel,
+  CollabComposer,
+  CollabPanel,
+  collabStrings,
+  type AnchorLabelStrings,
+  type CollabAnchorSlot,
+} from '@genoffice/ui/collab'
 import type { SlideComment } from '../../shared/ipc'
 import { displayCommentAuthor } from '../comment-author'
 import { useI18n } from '../i18n/locale'
+import {
+  isPptxAnchor,
+  slidePositionOf,
+  type SlideIdentity,
+  type SlidesCommentsContext,
+  type SlidesCommentsContextApi,
+} from '../server-comments'
+import { useServerComments, type ServerComments } from '../use-server-comments'
 import { IconComment, IconSidebarCollapse } from './icons'
 
 interface Props {
@@ -125,5 +150,169 @@ export function CommentsPane({
         </button>
       </div>
     </aside>
+  )
+}
+
+/** one comment stored in the pptx itself, with the slide it sits on */
+export interface InFileComment {
+  slideIndex: number
+  comment: SlideComment
+}
+
+interface ServerProps {
+  server: ServerComments
+  /** the deck as shown: anchor labels follow a slide that moved */
+  slides: readonly SlideIdentity[]
+  inFile: readonly InFileComment[]
+  onCollapse: () => void
+}
+
+/** S12 for a bound presentation: threads per slide through the shared collab panel. */
+export function ServerCommentsPane({ server, slides, inFile, onCollapse }: ServerProps) {
+  const { lang, t, dateLocale } = useI18n()
+  const strings = useMemo(() => collabStrings(lang), [lang])
+  const ctl = server.controller
+
+  // the label names the slide where it is now (a reorder before Save keeps the server's old index)
+  const renderAnchor = (slot: CollabAnchorSlot) => {
+    const at = isPptxAnchor(slot.anchor) ? slidePositionOf(slides, slot.anchor) : -1
+    const anchor = at >= 0 ? { ...slot.anchor, slide_index: at } : slot.anchor
+    return (
+      <AnchorLabel
+        anchor={anchor}
+        state={slot.anchorState}
+        lang={lang}
+        strings={strings as unknown as AnchorLabelStrings}
+        labelId={slot.labelId}
+        stateId={slot.stateId}
+      />
+    )
+  }
+
+  const inFileContent = (
+    <ul role="list" className="collab-list comments-infile">
+      {inFile.map(({ slideIndex, comment: c }) => {
+        const author = displayCommentAuthor(c.author, t('paneCommentsNeutralAuthor'))
+        return (
+          <li key={`${slideIndex}-${c.authorId}-${c.idx}`} className="collab-thread">
+            <div className="collab-cm">
+              <div className="collab-cmh">
+                <span className="collab-av" aria-hidden="true">
+                  {(c.initials || author).slice(0, 2)}
+                </span>
+                <span className="collab-au">{author}</span>
+                {c.dt && <span className="collab-dt">{fmtDt(c.dt, dateLocale)}</span>}
+              </div>
+              <p className="collab-cap">
+                {format(strings.collabAnchorSlide ?? '', {
+                  slide: new Intl.NumberFormat(dateLocale).format(slideIndex + 1),
+                })}
+              </p>
+              <p className="collab-bd">{c.text}</p>
+            </div>
+          </li>
+        )
+      })}
+    </ul>
+  )
+
+  return (
+    <div className="comments-pane comments-pane--server">
+      <CollabPanel
+        controller={ctl}
+        strings={strings}
+        onClose={onCollapse}
+        renderAnchor={renderAnchor}
+        renderComposer={(slot) => <CollabComposer {...slot} strings={strings} />}
+        inFile={{ count: inFile.length, content: inFileContent }}
+      />
+      {!server.versionId && ctl.can.canWrite && ctl.state === 'ready' && (
+        <p className="comments-server-hint">{t('paneCommentsNewUnavailable')}</p>
+      )}
+    </div>
+  )
+}
+
+/** what App calls on the mounted server comments (the ribbon's "New Comment") */
+export interface ServerCommentsHandle {
+  /** false: no thread could start (no slide identity, or no document version yet) */
+  startThread(slideIndex: number, objectId?: string): boolean
+}
+
+interface HostProps {
+  bridge: UniworkCommentsApi
+  path: string
+  context: SlidesCommentsContext
+  contextApi?: SlidesCommentsContextApi
+  slides: readonly SlideIdentity[]
+  /** the pane slot App draws while the comments pane is shown; null: closed */
+  slot: HTMLElement | null
+  goTo(index: number, sourceId?: string): void
+  onOpen(): void
+  onCollapse(): void
+  /** the file's own comments, per slide (read-only listing) */
+  readFileComments(slideIndex: number): Promise<SlideComment[]>
+  /** bumps when the file's comments may have changed (undo / reopen) */
+  fileCommentsNonce: number
+  handleRef: React.MutableRefObject<ServerCommentsHandle | null>
+  /** open threads, for the ribbon badge */
+  onOpenCount(n: number): void
+}
+
+/**
+ * Stays mounted for the whole life of a bound document, so the post-save anchor round and a
+ * launch-ticket reveal work while the pane is closed; the pane renders into App's slot.
+ */
+export function ServerCommentsHost(p: HostProps) {
+  const { lang } = useI18n()
+  const server = useServerComments({
+    bridge: p.bridge,
+    path: p.path,
+    context: p.context,
+    contextApi: p.contextApi,
+    lang,
+    slides: p.slides,
+    open: p.slot !== null,
+    goTo: p.goTo,
+    onOpen: p.onOpen,
+  })
+  p.handleRef.current = { startThread: server.startThread }
+
+  const openCount = server.controller.threads.length
+  const onOpenCount = p.onOpenCount
+  useEffect(() => onOpenCount(openCount), [openCount, onOpenCount])
+
+  // the file's own comments of every slide, read while the pane is open (never written back)
+  const [inFile, setInFile] = useState<InFileComment[]>([])
+  const slideCount = p.slides.length
+  const readFileComments = p.readFileComments
+  const shown = p.slot !== null
+  useEffect(() => {
+    if (!shown) return
+    let live = true
+    void Promise.all(
+      Array.from({ length: slideCount }, (_, i) =>
+        readFileComments(i).then(
+          (list) => list.map((comment) => ({ slideIndex: i, comment })),
+          () => [] as InFileComment[],
+        ),
+      ),
+    ).then((rows) => {
+      if (live) setInFile(rows.flat())
+    })
+    return () => {
+      live = false
+    }
+  }, [shown, slideCount, readFileComments, p.fileCommentsNonce])
+
+  if (!p.slot) return null
+  return createPortal(
+    <ServerCommentsPane
+      server={server}
+      slides={p.slides}
+      inFile={inFile}
+      onCollapse={p.onCollapse}
+    />,
+    p.slot,
   )
 }

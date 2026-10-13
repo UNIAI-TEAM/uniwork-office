@@ -101,7 +101,18 @@ import {
 } from './ai/edit-queue'
 import { FormatBackgroundPane, type BgPaneOp } from './components/FormatBackgroundPane'
 import { FormatPane } from './components/FormatPane'
-import { CommentsPane } from './components/CommentsPane'
+import {
+  CommentsPane,
+  ServerCommentsHost,
+  type ServerCommentsHandle,
+} from './components/CommentsPane'
+import {
+  commentsBridge,
+  loadCommentsContext,
+  selectedObjectId,
+  type SlidesCommentsContext,
+  type SlidesCommentsContextApi,
+} from './server-comments'
 import { AnimationPane } from './components/AnimationPane'
 import { AnimPreviewOverlay } from './components/AnimatedSlide'
 import { EquationDialog, HeaderFooterDialog, LinkDialog } from './components/InsertDialogs'
@@ -510,6 +521,26 @@ export function App() {
       live = false
     }
   }, [path])
+  const [commentsContext, setCommentsContext] = useState<SlidesCommentsContext | null>(null)
+  const commentsBridgeApi = useMemo(() => commentsBridge(), [])
+  useEffect(() => {
+    if (!path || !uniwork.bound || !commentsBridgeApi) {
+      setCommentsContext(null)
+      return
+    }
+    let live = true
+    void loadCommentsContext(
+      window.slidesApi as unknown as SlidesCommentsContextApi,
+      path,
+      uniwork.readOnly,
+    ).then((ctx) => {
+      if (live) setCommentsContext(ctx)
+    })
+    return () => {
+      live = false
+    }
+  }, [path, uniwork.bound, uniwork.readOnly, commentsBridgeApi])
+  const serverComments = !!(commentsContext && commentsBridgeApi && path)
   // web frame: explicit saves only (CONTRACT C10), whatever a stored preference says
   const autoSave = cap('autoSave') && autoSavePref && !uniwork.bound
   useEffect(() => {
@@ -650,6 +681,11 @@ export function App() {
   const [commentsFocusNonce, setCommentsFocusNonce] = useState(0)
   /** Notes/comments must be re-fetched after undo/redo (they're not in RenderSlide) */
   const [annotationsNonce, setAnnotationsNonce] = useState(0)
+  // G8-14: a bound document with the shell's comments bridge uses server comments (spine S12);
+  // a local file, or a build without the bridge, keeps the pane above unchanged
+  const serverCommentsHandle = useRef<ServerCommentsHandle | null>(null)
+  const [serverCommentsSlot, setServerCommentsSlot] = useState<HTMLDivElement | null>(null)
+  const [serverOpenCount, setServerOpenCount] = useState(0)
   // ── Insert tab extensions: dialogs + screen recording ──────────────────────
   const [linkDialog, setLinkDialog] = useState<LinkDialogState | null>(null)
   const [hfDialog, setHfDialog] = useState<HfDialogState | null>(null)
@@ -2115,6 +2151,27 @@ export function App() {
     if (focus) setCommentsFocusNonce((n) => n + 1)
   }, [])
 
+  // "New Comment" on a bound document: a server thread on this slide (+ the one selected object)
+  const newComment = useCallback(() => {
+    openComments(!serverComments)
+    if (!serverComments) return
+    const ctx = ctxRef.current
+    serverCommentsHandle.current?.startThread(
+      ctx.current,
+      selectedObjectId(ctx.slides[ctx.current], ctx.selectedIds),
+    )
+  }, [openComments, serverComments])
+
+  // a comment reveal: that slide, and the anchored object when it still exists
+  const goToCommentAnchor = useCallback((index: number, sourceId?: string) => {
+    setCurrent(index)
+    setEditing(null)
+    setSelectedIds(sourceId ? [sourceId] : [])
+  }, [])
+  const openServerComments = useCallback(() => openComments(false), [openComments])
+  const closeComments = useCallback(() => setShowComments(false), [])
+  const readFileComments = useCallback((i: number) => window.slidesApi.getComments(i), [])
+
   // ── View modes ──────────────────────────────────────────────────────────
   const onViewMode = useCallback((mode: SlidesViewMode) => {
     // a view-only UniWork document stays in Reading view (no editing surface)
@@ -3245,7 +3302,7 @@ export function App() {
     onTransform,
     openBgFormat,
     openFormat,
-    newComment: () => openComments(true),
+    newComment,
     openChangeShape: (targetId, x, y) => setShapeGalleryAt({ targetId, x, y }),
   }
 
@@ -3314,6 +3371,24 @@ export function App() {
   return (
     <div className="app">
       <ToastHost />
+      {serverComments && commentsContext && commentsBridgeApi && path && (
+        <ServerCommentsHost
+          key={path}
+          bridge={commentsBridgeApi}
+          path={path}
+          context={commentsContext}
+          contextApi={window.slidesApi as unknown as SlidesCommentsContextApi}
+          slides={slides}
+          slot={showComments ? serverCommentsSlot : null}
+          goTo={goToCommentAnchor}
+          onOpen={openServerComments}
+          onCollapse={closeComments}
+          readFileComments={readFileComments}
+          fileCommentsNonce={annotationsNonce}
+          handleRef={serverCommentsHandle}
+          onOpenCount={setServerOpenCount}
+        />
+      )}
       <Ribbon
         hasDoc={!!slide}
         deckEmpty={deckEmpty}
@@ -3463,8 +3538,8 @@ export function App() {
         onToggleNotes={() => setShowNotes((v) => !v)}
         commentsOpen={showComments}
         onToggleComments={() => (showComments ? setShowComments(false) : openComments(false))}
-        onNewComment={() => openComments(true)}
-        commentCount={comments.length}
+        onNewComment={newComment}
+        commentCount={serverComments ? serverOpenCount : comments.length}
         onInsertIcon={(def, color) => void insertIcon(def, color)}
         onInsertChart={(kind) => void insertChart(kind)}
         onInsertSmartArt={(def) => void insertSmartArt(def)}
@@ -4497,6 +4572,8 @@ export function App() {
                     onPreview={() => setAnimPreview((n) => n + 1)}
                     onCollapse={() => setShowAnimPane(false)}
                   />
+                ) : showComments && serverComments ? (
+                  <div className="comments-slot" ref={setServerCommentsSlot} />
                 ) : showComments ? (
                   <CommentsPane
                     slideIndex={current}

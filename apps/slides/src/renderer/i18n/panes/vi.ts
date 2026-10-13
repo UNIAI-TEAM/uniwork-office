@@ -63,6 +63,8 @@ export const vi = {
   paneCommentsPlaceholder: 'Bình luận mới… (⌘/Ctrl+Enter để gửi)',
   paneCommentsPost: 'Gửi',
   paneCommentsNeutralAuthor: 'Người dùng',
+  paneCommentsNewUnavailable:
+    'Chưa thêm được bình luận mới cho bản trình chiếu này. Bạn vẫn đọc, trả lời và giải quyết được các bình luận bên dưới.',
 
   paneCsdTitle: 'Trình chiếu tùy chỉnh',
   paneCsdDefaultName: 'Trình chiếu tùy chỉnh {n}',

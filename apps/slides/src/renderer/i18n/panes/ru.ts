@@ -63,6 +63,8 @@ export const ru = {
   paneCommentsPlaceholder: 'Новое примечание… (⌘/Ctrl+Enter — опубликовать)',
   paneCommentsPost: 'Опубликовать',
   paneCommentsNeutralAuthor: 'Пользователь',
+  paneCommentsNewUnavailable:
+    'Добавить новый комментарий к этой презентации пока нельзя. Вы по-прежнему можете читать комментарии ниже, отвечать на них и отмечать их решёнными.',
 
   paneCsdTitle: 'Произвольные показы',
   paneCsdDefaultName: 'Произвольный показ {n}',

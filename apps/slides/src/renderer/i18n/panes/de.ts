@@ -63,6 +63,8 @@ export const de = {
   paneCommentsPlaceholder: 'Neuer Kommentar… (⌘/Strg+Eingabetaste zum Veröffentlichen)',
   paneCommentsPost: 'Veröffentlichen',
   paneCommentsNeutralAuthor: 'Benutzer',
+  paneCommentsNewUnavailable:
+    'Neue Kommentare sind für diese Präsentation noch nicht verfügbar. Sie können die Kommentare unten weiterhin lesen, beantworten und erledigen.',
 
   paneCsdTitle: 'Zielgruppenorientierte Präsentationen',
   paneCsdDefaultName: 'Zielgruppenorientierte Präsentation {n}',

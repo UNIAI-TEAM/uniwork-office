@@ -62,6 +62,8 @@ export const ar = {
   paneCommentsPlaceholder: 'تعليق جديد… (⌘/Ctrl+Enter للنشر)',
   paneCommentsPost: 'نشر',
   paneCommentsNeutralAuthor: 'مستخدم',
+  paneCommentsNewUnavailable:
+    'لا تتوفر إضافة تعليق جديد لهذا العرض التقديمي بعد. لا يزال بإمكانك قراءة التعليقات أدناه والرد عليها وحلّها.',
 
   paneCsdTitle: 'عروض مخصصة',
   paneCsdDefaultName: 'عرض مخصص {n}',

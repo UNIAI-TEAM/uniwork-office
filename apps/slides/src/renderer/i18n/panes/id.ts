@@ -63,6 +63,8 @@ export const id = {
   paneCommentsPlaceholder: 'Komentar baru… (⌘/Ctrl+Enter untuk memposting)',
   paneCommentsPost: 'Posting',
   paneCommentsNeutralAuthor: 'Pengguna',
+  paneCommentsNewUnavailable:
+    'Komentar baru belum dapat ditambahkan ke presentasi ini. Anda tetap dapat membaca, membalas, dan menyelesaikan komentar di bawah.',
 
   paneCsdTitle: 'Peragaan Kustom',
   paneCsdDefaultName: 'Peragaan Kustom {n}',

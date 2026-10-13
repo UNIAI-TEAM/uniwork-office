@@ -63,6 +63,8 @@ export const it = {
   paneCommentsPlaceholder: 'Nuovo commento… (⌘/Ctrl+Invio per pubblicare)',
   paneCommentsPost: 'Pubblica',
   paneCommentsNeutralAuthor: 'Utente',
+  paneCommentsNewUnavailable:
+    'Non è ancora possibile aggiungere un nuovo commento a questa presentazione. Puoi comunque leggere, rispondere e risolvere i commenti qui sotto.',
 
   paneCsdTitle: 'Presentazioni personalizzate',
   paneCsdDefaultName: 'Presentazione personalizzata {n}',

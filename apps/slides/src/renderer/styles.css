@@ -6449,6 +6449,36 @@ body.vib .slide-list {
   font-family: 'Segoe UI', var(--ui-cjk), sans-serif;
 }
 
+/* G8-14 server mode: App's slot is layout-transparent; the shared collab panel fills the pane */
+.comments-slot {
+  display: contents;
+}
+
+.comments-pane--server {
+  border-left: 0;
+}
+
+.comments-pane--server > .collab-panel {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+}
+
+.comments-server-hint {
+  flex: none;
+  margin: 0;
+  padding: 8px 12px 10px;
+  border-top: 1px solid var(--border);
+  border-left: 1px solid var(--border);
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.comments-infile .collab-thread {
+  background: var(--surface-subtle);
+}
+
 .comments-list {
   flex: 1;
   overflow-y: auto;

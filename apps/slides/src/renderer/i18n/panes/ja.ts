@@ -63,6 +63,8 @@ export const ja = {
   paneCommentsPlaceholder: '新しいコメント…（⌘/Ctrl+Enter で投稿）',
   paneCommentsPost: '投稿',
   paneCommentsNeutralAuthor: 'ユーザー',
+  paneCommentsNewUnavailable:
+    'このプレゼンテーションにはまだ新しいコメントを追加できません。下のコメントの閲覧、返信、解決は引き続きできます。',
 
   paneCsdTitle: '目的別スライドショー',
   paneCsdDefaultName: '目的別スライドショー {n}',

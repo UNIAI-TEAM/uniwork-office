@@ -62,6 +62,7 @@ export const zhTW = {
   paneCommentsPlaceholder: '新增註解…（⌘/Ctrl+Enter 發佈）',
   paneCommentsPost: '發佈',
   paneCommentsNeutralAuthor: '使用者',
+  paneCommentsNewUnavailable: '暫時無法為此簡報新增註解。你仍可以閱讀、回覆和解決下方的註解。',
 
   paneCsdTitle: '自訂放映',
   paneCsdDefaultName: '自訂放映 {n}',
