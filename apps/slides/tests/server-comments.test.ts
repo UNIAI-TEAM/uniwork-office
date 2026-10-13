@@ -562,6 +562,7 @@ async function mountHost(o: MountOpts) {
   const statuses: string[] = []
   const goTo = vi.fn()
   const onOpen = vi.fn()
+  const onCollapse = vi.fn()
   const handleRef =
     createRef<ServerCommentsHandle>() as MutableRefObject<ServerCommentsHandle | null>
   const readFileComments = vi.fn(async (i: number) => o.fileComments?.[i] ?? [])
@@ -579,7 +580,7 @@ async function mountHost(o: MountOpts) {
     slot: o.open === false ? null : slot,
     goTo,
     onOpen,
-    onCollapse: () => {},
+    onCollapse,
     readFileComments,
     fileCommentsNonce: 0,
     handleRef,
@@ -600,7 +601,7 @@ async function mountHost(o: MountOpts) {
       await flush()
       await flush()
     })
-  return { server, goTo, onOpen, handleRef, render, save, readFileComments, statuses }
+  return { server, goTo, onOpen, onCollapse, handleRef, render, save, readFileComments, statuses }
 }
 
 describe('ServerCommentsHost over the comments bridge', () => {
@@ -696,7 +697,8 @@ describe('ServerCommentsHost over the comments bridge', () => {
     )
     // RFE14-04: announced to assistive tech
     expect(slot.querySelector('.comments-server-hint')?.getAttribute('role')).toBe('status')
-    expect(h.statuses).toEqual([paneStrings.zh.paneCommentsSaveFirst])
+    // V14-10: the pane's own line carries it, the status bar does not repeat it
+    expect(h.statuses).toEqual([])
     expect(h.server.ops()).not.toContain('create')
     // the first Save receipt gives the open version: the hint goes, a thread can start
     await h.save('v1')
@@ -705,7 +707,7 @@ describe('ServerCommentsHost over the comments bridge', () => {
       expect(h.handleRef.current!.startThread(0)).toBe(true)
       await flush()
     })
-    expect(h.statuses).toHaveLength(1)
+    expect(h.statuses).toHaveLength(0)
   })
 
   it('a saved push for another document is ignored', async () => {
@@ -986,6 +988,204 @@ describe('G8-14 fix r1: host behaviour', () => {
       await flush()
     })
     expect(h.statuses).toEqual([paneStrings.zh.paneCommentsNewNoSlide])
+  })
+})
+
+describe('G8-14 fix r2: keyboard, focus and status of the pane (V14-01/02/04/10)', () => {
+  const key = (el: Element, k: string, init: KeyboardEventInit = {}) =>
+    act(async () => {
+      el.dispatchEvent(
+        new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true, ...init }),
+      )
+      await flush()
+    })
+  const type = (box: HTMLTextAreaElement, text: string) =>
+    act(async () => {
+      nativeValue.call(box, text)
+      box.dispatchEvent(new Event('input', { bubbles: true }))
+      await flush()
+    })
+  /** a stand-in for the ribbon button that opened the pane */
+  const openerButton = () => {
+    const b = document.createElement('button')
+    b.textContent = 'New Comment'
+    document.body.append(b)
+    b.focus()
+    return b
+  }
+
+  it('V14-01: Esc on an empty new-thread composer drops it and closes the pane', async () => {
+    const slides = deck('slide1', 'slide2')
+    const h = await mountHost({ slides, versionId: 'v1' })
+    await act(async () => {
+      h.handleRef.current!.startThread(0)
+      await flush()
+    })
+    const box = slot.querySelector<HTMLTextAreaElement>('.collab-thread--new textarea')!
+    expect(document.activeElement).toBe(box)
+    await key(box, 'Escape')
+    expect(h.onCollapse).toHaveBeenCalledTimes(1)
+    expect(slot.querySelector('.collab-thread--new')).toBeNull()
+  })
+
+  it('V14-01: Esc with a draft asks first: the composer stays, the pane stays open', async () => {
+    const slides = deck('slide1')
+    const h = await mountHost({ slides, versionId: 'v1' })
+    await act(async () => {
+      h.handleRef.current!.startThread(0)
+      await flush()
+    })
+    const box = slot.querySelector<HTMLTextAreaElement>('.collab-thread--new textarea')!
+    await type(box, 'half a thought')
+    await key(box, 'Escape')
+    expect(h.onCollapse).not.toHaveBeenCalled()
+    expect(document.querySelector('.collab-discard')).not.toBeNull()
+  })
+
+  it('V14-02: closing the pane (Esc, Close button) returns the focus to the button that opened it', async () => {
+    const slides = deck('slide1')
+    const opener = openerButton()
+    const h = await mountHost({ slides, versionId: 'v1', open: false })
+    // the ribbon click opens the pane, then starts the thread
+    await h.render({ slot })
+    await act(async () => {
+      h.handleRef.current!.startThread(0)
+      await flush()
+    })
+    const box = slot.querySelector<HTMLTextAreaElement>('.collab-thread--new textarea')!
+    expect(document.activeElement).toBe(box)
+    await key(box, 'Escape')
+    expect(h.onCollapse).toHaveBeenCalledTimes(1)
+    await h.render({ slot: null })
+    expect(document.activeElement).toBe(opener)
+
+    // the Close button of the panel header does the same
+    await h.render({ slot })
+    const close = slot.querySelector<HTMLButtonElement>('.collab-close')!
+    close.focus()
+    await act(async () => {
+      close.click()
+      await flush()
+    })
+    expect(h.onCollapse).toHaveBeenCalledTimes(2)
+    await h.render({ slot: null })
+    expect(document.activeElement).toBe(opener)
+    opener.remove()
+  })
+
+  it('V14-02: a focus the user already moved elsewhere is not pulled back', async () => {
+    const slides = deck('slide1')
+    const opener = openerButton()
+    const h = await mountHost({ slides, versionId: 'v1', open: false })
+    await h.render({ slot })
+    const other = document.createElement('button')
+    document.body.append(other)
+    other.focus()
+    await h.render({ slot: null })
+    expect(document.activeElement).toBe(other)
+    opener.remove()
+    other.remove()
+  })
+
+  it('V14-02: after Send of a new thread the focus goes to that thread, not to the page body', async () => {
+    const slides = deck('slide1')
+    const h = await mountHost({ slides, versionId: 'v1' })
+    await act(async () => {
+      h.handleRef.current!.startThread(0)
+      await flush()
+    })
+    const box = slot.querySelector<HTMLTextAreaElement>('.collab-thread--new textarea')!
+    await type(box, 'Một nhận xét mới')
+    await key(box, 'Enter', { ctrlKey: true })
+    await act(async () => {
+      await flush()
+      await flush()
+    })
+    const row = h.server.rows.find((r) => r.body === 'Một nhận xét mới')!
+    const heading = slot.querySelector<HTMLElement>(
+      `[data-thread-id="${row.id}"] [data-thread-heading]`,
+    )
+    expect(heading).not.toBeNull()
+    expect(document.activeElement).toBe(heading)
+  })
+
+  it('V14-04: New Comment while a composer is open focuses it and keeps the draft', async () => {
+    const slides = deck('slide1', 'slide2')
+    const h = await mountHost({ slides, versionId: 'v1' })
+    await act(async () => {
+      h.handleRef.current!.startThread(0)
+      await flush()
+    })
+    const box = slot.querySelector<HTMLTextAreaElement>('.collab-thread--new textarea')!
+    await type(box, 'draft stays')
+    const ribbon = openerButton()
+    expect(document.activeElement).toBe(ribbon)
+    await act(async () => {
+      expect(h.handleRef.current!.startThread(0)).toBe(true)
+      await flush()
+    })
+    const again = slot.querySelector<HTMLTextAreaElement>('.collab-thread--new textarea')!
+    expect(document.activeElement).toBe(again)
+    expect(again.value).toBe('draft stays')
+    ribbon.remove()
+  })
+
+  it('V14-10: save-first is carried by the pane line only (role=status), not repeated in the status bar', async () => {
+    const slides = deck('slide1')
+    const h = await mountHost({ slides })
+    expect(h.handleRef.current!.startThread(0)).toBe(false)
+    expect(slot.querySelector('.comments-server-hint')?.getAttribute('role')).toBe('status')
+    expect(h.statuses).toEqual([])
+  })
+})
+
+describe('G8-14 fix r2: tracker and lost set (RFE14b-02/03)', () => {
+  it('RFE14b-02: a reuse that lands while a round is in flight survives that round settling', async () => {
+    const slides = deck('slide1', 'slide2', 'slide3')
+    const h = await mountHost({
+      slides,
+      versionId: 'v1',
+      rows: [rootRow('x1', anchorOn(slides, 2)), rootRow('x22', anchorOn(slides, 1))],
+    })
+    // Save 1: slide3 is gone, x1 goes lost; its answer is still pending when slide2's id is reused
+    await h.render({ slides: [slides[0]!, slides[1]!] })
+    let release: () => void = () => {}
+    const gate = new Promise<void>((r) => (release = r))
+    const realAnchors = h.server.bridge.anchors
+    h.server.bridge.anchors = (input) => gate.then(() => realAnchors(input))
+    await h.save('v2')
+    await h.render({ slides: [slides[0]!] })
+    await h.render({ slides: [slides[0]!, replacementOf('slide2')] })
+    await act(async () => {
+      release()
+      await flush()
+      await flush()
+    })
+    // Save 2: x22 belonged to the slide that left; the reuse mark made during round 1 must still hold
+    h.server.bridge.anchors = realAnchors
+    await h.save('v3')
+    const last = h.server.calls.filter((c) => c.op === 'anchors').at(-1)!.input as {
+      anchors: Array<{ commentId: string; state: string }>
+    }
+    expect(last.anchors.filter((a) => a.commentId === 'x22').map((a) => a.state)).toEqual(['lost'])
+  })
+
+  it('RFE14b-02: tracker.settle(marks) clears only the marks it was given', () => {
+    let now = 1000
+    const t = createSlideTracker(() => now)
+    const slides = deck('slide1', 'slide2', 'slide3')
+    t.observe(slides)
+    t.observe([slides[0]!, slides[1]!])
+    t.observe([slides[0]!, slides[1]!, replacementOf('slide3')])
+    const marks = t.snapshot()
+    // while the round is in flight another slide id is reused
+    now = 2000
+    t.observe([slides[0]!, replacementOf('slide3')])
+    t.observe([slides[0]!, replacementOf('slide3'), { ...replacementOf('slide2'), sldId: '257' }])
+    expect(t.replacedAt('257')).toBe(2000)
+    t.settle(marks)
+    expect(t.replacedAt('258')).toBeUndefined()
+    expect(t.replacedAt('257')).toBe(2000)
   })
 })
 
