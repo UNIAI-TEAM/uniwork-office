@@ -186,7 +186,6 @@ describe('followCommentAuthor (renderer; FE-2 / FE-4)', () => {
 
   it('a note written while the ask is in flight is "User", not the previous name (BE-8)', async () => {
     const bound = pdfFile('bound.pdf')
-    const local = pdfFile('local.pdf')
     setUniworkDocumentPolicy({
       isBound: (p) => p === bound,
       isReadOnly: () => false,

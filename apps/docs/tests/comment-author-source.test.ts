@@ -277,7 +277,13 @@ describe('the page-margin comment surfaces use the same label (visual F1)', () =
   const comments: CommentInfo[] = [
     { id: '1', author: NEUTRAL_COMMENT_AUTHOR, date: '2026-01-01T00:00:00Z', text: 'root' },
     { id: '2', author: 'Nguyễn An', date: '2026-01-02T00:00:00Z', text: 're', parentId: '1' },
-    { id: '3', author: NEUTRAL_COMMENT_AUTHOR, date: '2026-01-03T00:00:00Z', text: 'r2', parentId: '1' },
+    {
+      id: '3',
+      author: NEUTRAL_COMMENT_AUTHOR,
+      date: '2026-01-03T00:00:00Z',
+      text: 'r2',
+      parentId: '1',
+    },
   ]
 
   afterEach(() => setModuleLang('en'))
