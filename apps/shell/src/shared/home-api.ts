@@ -147,6 +147,10 @@ export interface UniworkWorkspaceRef {
   id: string
   name: string
   orgId: string
+  /** server `slug` ('' when absent): web links need it */
+  slug: string
+  /** server `organization_slug` ('' when absent) */
+  orgSlug: string
 }
 
 export interface UniworkDocSummary {

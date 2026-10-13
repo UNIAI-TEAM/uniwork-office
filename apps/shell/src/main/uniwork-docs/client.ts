@@ -226,7 +226,13 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
         }
         const rowOrg =
           typeof r.organization_id === 'string' && r.organization_id ? r.organization_id : orgId
-        return { id: r.id, name: r.name, orgId: rowOrg }
+        return {
+          id: r.id,
+          name: r.name,
+          orgId: rowOrg,
+          slug: typeof r.slug === 'string' ? r.slug : '',
+          orgSlug: typeof r.organization_slug === 'string' ? r.organization_slug : '',
+        }
       })
     },
 
