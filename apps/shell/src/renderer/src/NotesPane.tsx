@@ -50,7 +50,7 @@ export function NotesPane({ practiceId }: { practiceId: PracticeId }): ReactElem
 
   return (
     <div className="wb-notes">
-      <form className="wb-work-quick" onSubmit={add}>
+      <form className="wb-notes-add" onSubmit={add}>
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}

@@ -88,6 +88,7 @@ export const vi = {
   wbTasksQuickAdd: 'Thêm việc nhanh',
   wbTasksAdd: 'Thêm',
   wbTasksEmpty: 'Không có việc nào đang mở.',
+  wbTasksOpenCount: 'Đang mở: {count}',
   wbTasksMarkDone: 'Đánh dấu hoàn thành: {title}',
   wbTasksReopen: 'Mở lại: {title}',
   wbTasksSaveFailed: 'Không lưu được thay đổi.',

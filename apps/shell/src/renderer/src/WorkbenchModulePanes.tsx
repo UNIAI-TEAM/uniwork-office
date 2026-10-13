@@ -10,6 +10,7 @@ import { WorkProfilePane } from './WorkProfilePane'
 import { escapeHtml, profileForDraft, profileMergeHtml } from './form-merge'
 import { WorkCalendarPane } from './WorkCalendarPane'
 import { WorkTasksPane } from './WorkTasksPane'
+import { WorkPaneHeader } from './WorkPaneHeader'
 import { WbDeleteBtn, WbDraftBtn, WbEditBtn, WbFileBtn, WbRowActions } from './WbRowActions'
 import { readForms, writeForms, type WbFormItem } from './workbench-pins'
 import type { WorkPaneProps } from './WorkErrorState'
@@ -54,16 +55,22 @@ export function WorkbenchModulePane({
     return <p className="wb-empty">{t('wbModuleUnknown')}</p>
   }
 
+  const title = vi ? mod.labelVi : mod.labelEn
+  const head = {
+    module: moduleId,
+    title,
+    meta: `${vi ? mod.hintVi : mod.hintEn}${contextTitle ? ` · ${contextTitle}` : ''}`,
+  }
+  const local = moduleId === 'forms' || moduleId === 'notes'
+
   return (
-    <section className="wb-panel wb-detail" aria-label={vi ? mod.labelVi : mod.labelEn}>
-      <h2>{vi ? mod.labelVi : mod.labelEn}</h2>
-      <p className="wb-hint">
-        {vi ? mod.hintVi : mod.hintEn}
-        {contextTitle ? ` · ${contextTitle}` : ''}
-      </p>
-      {(moduleId === 'forms' || moduleId === 'notes') && <LocalTag />}
+    <section className="wb-pane" aria-label={title}>
+      {/* Tasks draws its own header: the aside counts the list it loads */}
+      {moduleId !== 'tasks' && (
+        <WorkPaneHeader {...head} aside={local ? <LocalTag /> : undefined} />
+      )}
       {moduleId === 'calendar' && <WorkCalendarPane {...server} />}
-      {moduleId === 'tasks' && <WorkTasksPane {...server} />}
+      {moduleId === 'tasks' && <WorkTasksPane {...server} head={head} />}
       {moduleId === 'notes' && <NotesPane practiceId={practiceId} />}
       {moduleId === 'forms' && (
         <FormsPane

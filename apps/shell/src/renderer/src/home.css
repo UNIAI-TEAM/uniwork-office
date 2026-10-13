@@ -5614,78 +5614,79 @@ html[dir='rtl'] .quick-title-row {
   gap: 12px;
 }
 
-.wb-work-quick {
-  display: flex;
-  gap: 8px;
+.wb-work-quick:focus-within {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.wb-work-quick-plus {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: 1px dashed var(--border);
+  border-radius: 4px;
+  color: var(--text-secondary);
 }
 
 .wb-work-quick input {
   flex: 1;
   min-width: 0;
-  height: 32px;
-  padding: 0 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-8);
-  background: var(--surface);
+  height: 28px;
+  padding: 0;
+  border: none;
+  outline: none;
+  background: transparent;
   color: var(--text);
   font: inherit;
   font-size: 13px;
 }
 
-.wb-work-quick input:focus {
-  border-color: var(--accent);
-  outline: none;
+.wb-work-group {
+  border-top: 1px solid var(--border-subtle);
 }
 
-.wb-work-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
+.wb-work-group ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.wb-work-table th,
-.wb-work-table td {
-  padding: 6px 8px;
-  border-bottom: 1px solid var(--border-subtle);
-  text-align: start;
-  vertical-align: middle;
+.wb-work-row .wb-mono,
+.wb-work-row .wb-pill {
+  flex: none;
 }
 
-.wb-work-table thead th {
-  font-size: 11px;
-  font-weight: 600;
+.wb-pill.is-status {
+  background: var(--surface-subtle);
   color: var(--text-secondary);
-}
-
-.wb-work-group th {
-  padding-top: 14px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-}
-
-.wb-work-group.is-overdue th {
-  color: var(--danger-text);
-}
-
-.wb-work-check {
-  width: 28px;
 }
 
 .wb-work-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
   padding: 0;
   border: none;
   background: none;
   color: var(--text);
   font: inherit;
+  font-size: 13px;
   text-align: start;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   cursor: pointer;
 }
 
 .wb-work-title:hover {
   text-decoration: underline;
+}
+
+.wb-work-title:focus-visible {
+  border-radius: 2px;
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .wb-work-row.is-done .wb-work-title {
@@ -5795,6 +5796,33 @@ html[dir='rtl'] .quick-title-row {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.wb-notes-add {
+  display: flex;
+  gap: 8px;
+}
+
+.wb-notes-add input {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-8);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.wb-notes-add input:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.wb-notes-add .wb-btn {
+  height: 36px;
 }
 
 .wb-notes-list {

@@ -266,3 +266,66 @@ describe('Tasks tab', () => {
     expect(host.querySelector('.wb-work-state')).toBeNull()
   })
 })
+
+async function mountWithHead(
+  workspace: UniworkWorkspaceRef | null,
+  workspaceError: UniworkWorkError | null = null,
+): Promise<void> {
+  await act(async () => {
+    root.render(
+      createElement(
+        LocaleProvider,
+        { initial: 'en' },
+        createElement(WorkTasksPane, {
+          workspace,
+          workspaceError,
+          onReload,
+          head: { module: 'tasks', title: 'Tasks' },
+        }),
+      ),
+    )
+  })
+  await flush()
+}
+
+describe('Tasks tab layout (redesign spec 4.3)', () => {
+  it('quick add is the first row of the list block; rows are grouped, keyed in mono, no table', async () => {
+    await mount({ ...WS, id: 'w-layout' })
+    expect(host.querySelector('table')).toBeNull()
+    const block = host.querySelector('.wb-block')!
+    expect(block.firstElementChild?.classList.contains('wb-work-quick')).toBe(true)
+    expect(block.querySelector('.wb-work-quick-plus')).not.toBeNull()
+    expect(host.querySelector('.wb-work-quick button[type="submit"]')?.className).toBe(
+      'wb-btn wb-btn-primary wb-btn-sm',
+    )
+    expect(host.querySelector('.wb-group-head')?.textContent).toBe('Today 1')
+    expect(host.querySelector('.wb-work-row .wb-mono')?.textContent).toBe('OPS-7')
+    expect(host.querySelector('.wb-work-row .wb-pill.is-status')?.textContent).toBe('To do')
+    expect(checkbox().classList.contains('uw-sr-only')).toBe(true)
+    expect(checkbox().closest('label.wb-check')?.querySelector('.wb-check-box')).not.toBeNull()
+  })
+
+  it('with a head: the aside counts open tasks once the list has loaded', async () => {
+    await mountWithHead({ ...WS, id: 'w-head' })
+    expect(host.querySelectorAll('.wb-pane-head')).toHaveLength(1)
+    expect(host.querySelector('.wb-pane-title')?.textContent).toBe('Tasks')
+    expect(host.querySelector('.wb-pane-aside')?.textContent).toBe('Open: 1')
+  })
+
+  it('with a head: no count while loading, the header stays above the skeleton', async () => {
+    api.myTasks.mockImplementationOnce(
+      () => new Promise<UniworkWorkResult<WorkTask[]>>(() => undefined),
+    )
+    await mountWithHead({ ...WS, id: 'w-head-pending' })
+    expect(host.querySelectorAll('.wb-pane-head')).toHaveLength(1)
+    expect(host.querySelector('.wb-pane-aside')).toBeNull()
+    expect(host.querySelector('.wb-work-skeleton')).not.toBeNull()
+  })
+
+  it('with a head: signed out still shows the header above the sign-in panel', async () => {
+    await mountWithHead(null, 'signed-out')
+    expect(host.querySelector('.wb-pane-head + *')?.textContent).toContain(
+      'Sign in to see your work',
+    )
+  })
+})

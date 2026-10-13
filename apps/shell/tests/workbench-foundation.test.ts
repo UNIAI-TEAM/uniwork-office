@@ -159,3 +159,21 @@ describe('workbench states and pane title (home.css)', () => {
     expect(rule('.wb-pane-aside')).toMatch(/margin-left: auto;/)
   })
 })
+
+describe('long titles (review focus: very long workspace and task names)', () => {
+  it.each(['.wb-ov-row-title', '.wb-work-title', '.wb-crumb-name', '.wb-pane-meta'])(
+    '%s truncates to one line with an ellipsis instead of pushing its row apart',
+    (selector) => {
+      const body = rule(selector)
+      expect(body).toMatch(/overflow: hidden;/)
+      expect(body).toMatch(/text-overflow: ellipsis;/)
+      expect(body).toMatch(/white-space: nowrap;/)
+    },
+  )
+
+  it('the flexible title cells can shrink below their text width', () => {
+    for (const selector of ['.wb-ov-row-title', '.wb-work-title', '.wb-pane-text', '.wb-ov-meet']) {
+      expect(rule(selector), selector).toMatch(/min-width: 0;/)
+    }
+  })
+})

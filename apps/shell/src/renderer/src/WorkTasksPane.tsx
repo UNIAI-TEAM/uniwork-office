@@ -6,6 +6,7 @@ import { MODULE_TONES } from './module-tones'
 import { settleWork, useWorkLoad } from './work-cache'
 import { formatDay } from './work-home'
 import { closedStatusKeys, groupTasksByDue, localIsoDate, type TaskDueGroup } from './work-tasks'
+import { CHECK_GLYPH, WorkbenchIcon } from './WorkbenchIcons'
 import {
   WorkNoWorkspace,
   WorkStaleNote,
@@ -14,7 +15,7 @@ import {
   workLoadState,
   type WorkPaneProps,
 } from './WorkErrorState'
-import { WorkbenchIcon } from './WorkbenchIcons'
+import { WorkPaneHeader, type WorkPaneHeaderProps } from './WorkPaneHeader'
 
 const GROUP_LABEL: Record<TaskDueGroup, StringKey> = {
   overdue: 'wbTasksGroupOverdue',
@@ -32,15 +33,19 @@ interface WriteFailure {
 
 /**
  * Tasks tab: the signed-in user's UniWork tasks in the active workspace,
- * grouped by due date (device-local today). Ticking a row sets its status
- * (optimistic, put back on failure); quick add creates a task; a title opens
- * the task on the web.
+ * grouped by due date (device-local today) in one list block whose first row
+ * is quick add. Ticking a row sets its status (optimistic, put back on
+ * failure); a title opens the task on the web.
  */
 export function WorkTasksPane({
   workspace,
   workspaceError,
   onReload,
-}: WorkPaneProps): ReactElement {
+  head,
+}: WorkPaneProps & {
+  /** the tab header, drawn here so its aside can count the loaded list (WorkbenchModulePane passes it) */
+  head?: Omit<WorkPaneHeaderProps, 'aside'>
+}): ReactElement {
   const { t, dateLocale } = useI18n()
   const wsId = workspace?.id ?? null
   const wsRef = useRef(wsId)
@@ -110,9 +115,35 @@ export function WorkTasksPane({
     void create({ workspaceId: wsId, title, idempotencyKey: crypto.randomUUID() })
   }
 
-  if (!workspace) return <WorkNoWorkspace error={workspaceError} onRetry={onReload} />
+  const openCount = (list.value ?? []).filter((x) => !closed.has(x.status)).length
+  const header = head ? (
+    <WorkPaneHeader
+      {...head}
+      aside={
+        list.value ? (
+          <span className="wb-num">{t('wbTasksOpenCount', { count: openCount })}</span>
+        ) : undefined
+      }
+    />
+  ) : null
+
+  if (!workspace) {
+    return (
+      <>
+        {header}
+        <WorkNoWorkspace error={workspaceError} onRetry={onReload} />
+      </>
+    )
+  }
   const blocked = workLoadState(list)
-  if (blocked) return blocked
+  if (blocked) {
+    return (
+      <>
+        {header}
+        {blocked}
+      </>
+    )
+  }
 
   const today = localIsoDate(new Date())
   const groups = groupTasksByDue(
@@ -125,62 +156,64 @@ export function WorkTasksPane({
       .catch(() => false)
 
   return (
-    <div className="wb-work">
-      {list.stale && list.updatedAt !== null ? (
-        <WorkStaleNote at={list.updatedAt} onRetry={onReload} />
-      ) : null}
-      <form className="wb-work-quick" onSubmit={submit}>
-        <input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          placeholder={t('wbTasksQuickAdd')}
-          aria-label={t('wbTasksQuickAdd')}
-          disabled={adding}
-        />
-        <button type="submit" className="btn btn-primary" disabled={adding || !draft.trim()}>
-          {t('wbTasksAdd')}
-        </button>
-      </form>
-      {groups.length === 0 ? (
-        <WorkStatePanel
-          tone={MODULE_TONES.tasks}
-          icon={<WorkbenchIcon id="tasks" size={20} />}
-          title={t('wbTasksEmpty')}
-        />
-      ) : (
-        <table className="wb-work-table">
-          <thead>
-            <tr>
-              <th className="wb-work-check" />
-              <th>{t('wbTasksColTitle')}</th>
-              <th>{t('wbTasksColKey')}</th>
-              <th>{t('wbTasksColStatus')}</th>
-              <th>{t('wbTasksColDue')}</th>
-            </tr>
-          </thead>
+    <>
+      {header}
+      <div className="wb-work">
+        {list.stale && list.updatedAt !== null ? (
+          <WorkStaleNote at={list.updatedAt} onRetry={onReload} />
+        ) : null}
+        <div className="wb-block">
+          <form className="wb-row wb-work-quick" onSubmit={submit}>
+            <span className="wb-work-quick-plus" aria-hidden="true">
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <path
+                  d="M5 1.5v7M1.5 5h7"
+                  stroke="currentColor"
+                  strokeWidth="1.4"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </span>
+            <input
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              placeholder={t('wbTasksQuickAdd')}
+              aria-label={t('wbTasksQuickAdd')}
+              disabled={adding}
+            />
+            <button
+              type="submit"
+              className="wb-btn wb-btn-primary wb-btn-sm"
+              disabled={adding || !draft.trim()}
+            >
+              {t('wbTasksAdd')}
+            </button>
+          </form>
           {groups.map(({ group, tasks: rows }) => (
-            <tbody key={group}>
-              <tr className={`wb-work-group is-${group}`}>
-                <th colSpan={5} scope="colgroup">
-                  {t(GROUP_LABEL[group])}
-                </th>
-              </tr>
-              {rows.map((task) => {
-                const done = closed.has(task.status)
-                const day = task.due_date?.slice(0, 10)
-                return (
-                  <tr key={task.id} className={`wb-work-row${done ? ' is-done' : ''}`}>
-                    <td className="wb-work-check">
-                      <input
-                        type="checkbox"
-                        checked={done}
-                        aria-label={t(done ? 'wbTasksReopen' : 'wbTasksMarkDone', {
-                          title: task.title,
-                        })}
-                        onChange={(e) => void setDone(task, e.target.checked)}
-                      />
-                    </td>
-                    <td>
+            <section key={group} className="wb-work-group">
+              <h3 className={`wb-group-head${group === 'overdue' ? ' is-overdue' : ''}`}>
+                {t(GROUP_LABEL[group])} <span className="wb-num">{rows.length}</span>
+              </h3>
+              <ul>
+                {rows.map((task) => {
+                  const done = closed.has(task.status)
+                  const day = task.due_date?.slice(0, 10)
+                  return (
+                    <li key={task.id} className={`wb-row wb-work-row${done ? ' is-done' : ''}`}>
+                      <label className="wb-check">
+                        <input
+                          type="checkbox"
+                          className="uw-sr-only"
+                          checked={done}
+                          aria-label={t(done ? 'wbTasksReopen' : 'wbTasksMarkDone', {
+                            title: task.title,
+                          })}
+                          onChange={(e) => void setDone(task, e.target.checked)}
+                        />
+                        <span className="wb-check-box" aria-hidden="true">
+                          {CHECK_GLYPH}
+                        </span>
+                      </label>
                       <button
                         type="button"
                         className="wb-work-title"
@@ -189,36 +222,41 @@ export function WorkTasksPane({
                       >
                         {task.title}
                       </button>
-                    </td>
-                    <td className="wb-work-muted">{task.identifier}</td>
-                    <td>
-                      <span className="wb-pill">{statusName.get(task.status) ?? task.status}</span>
-                    </td>
-                    <td>
+                      <span className="wb-mono">{task.identifier}</span>
+                      <span className="wb-pill is-status">
+                        {statusName.get(task.status) ?? task.status}
+                      </span>
                       {day ? (
                         <span
-                          className={`wb-pill${day < today ? ' is-danger' : day === today ? ' is-warning' : ''}`}
+                          className={`wb-pill wb-num${day < today ? ' is-danger' : day === today ? ' is-warning' : ''}`}
                         >
                           {day === today
                             ? t('wbTasksGroupToday')
                             : formatDay(day, dateLocale, false)}
                         </span>
                       ) : null}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
+                    </li>
+                  )
+                })}
+              </ul>
+            </section>
           ))}
-        </table>
-      )}
-      {failure ? (
-        <WorkToast
-          message={failure.message}
-          onRetry={failure.retry}
-          onDismiss={() => setFailure(null)}
-        />
-      ) : null}
-    </div>
+        </div>
+        {groups.length === 0 ? (
+          <WorkStatePanel
+            tone={MODULE_TONES.tasks}
+            icon={<WorkbenchIcon id="tasks" size={20} />}
+            title={t('wbTasksEmpty')}
+          />
+        ) : null}
+        {failure ? (
+          <WorkToast
+            message={failure.message}
+            onRetry={failure.retry}
+            onDismiss={() => setFailure(null)}
+          />
+        ) : null}
+      </div>
+    </>
   )
 }

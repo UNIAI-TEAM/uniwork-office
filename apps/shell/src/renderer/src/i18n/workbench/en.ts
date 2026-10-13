@@ -88,6 +88,7 @@ export const en = {
   wbTasksQuickAdd: 'Quick add a task',
   wbTasksAdd: 'Add',
   wbTasksEmpty: 'No open tasks.',
+  wbTasksOpenCount: 'Open: {count}',
   wbTasksMarkDone: 'Mark done: {title}',
   wbTasksReopen: 'Reopen: {title}',
   wbTasksSaveFailed: 'Could not save the change.',

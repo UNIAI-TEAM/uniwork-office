@@ -93,6 +93,7 @@ export const zh = {
   wbTasksQuickAdd: '快速添加任务',
   wbTasksAdd: '添加',
   wbTasksEmpty: '没有未完成的任务。',
+  wbTasksOpenCount: '未完成：{count}',
   wbTasksMarkDone: '标记为完成：{title}',
   wbTasksReopen: '重新打开：{title}',
   wbTasksSaveFailed: '无法保存更改。',
