@@ -107,7 +107,7 @@ async function commentParts(path: string): Promise<Map<string, string>> {
   return out
 }
 
-type Slides = Array<{ partPath?: string }>
+type Slides = Array<{ partPath?: string; sldId?: string }>
 
 describe('Save of a bound deck with server comments', () => {
   it('reorder then Save: the file comments stay byte-identical and anchors follow slide_id', async () => {
@@ -143,6 +143,10 @@ describe('Save of a bound deck with server comments', () => {
     // after the reopen Save does, the identities still name the same slides
     const reopened = (await invoke(2, 'slides:get-render-slides')) as Slides
     expect(reopened[0]?.partPath).toBe(before[2]?.partPath)
+    // anchors name slides by p:sldId (numeric, from presentation.xml), which survives too
+    expect(threads.map((t) => t.anchor?.slide_id)).toEqual([before[1]?.sldId, before[2]?.sldId])
+    expect(before[1]?.sldId).toMatch(/^\d+$/)
+    expect(reopened[0]?.sldId).toBe(before[2]?.sldId)
     const round = anchorUpdatesAfterSave(threads, reopened)
     expect(round.map((u) => [u.commentId, u.state, u.anchor.slide_index])).toEqual([
       ['t1', 'exact', 2],

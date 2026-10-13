@@ -35,8 +35,11 @@ import type { SlideComment } from '../src/shared/ipc'
 
 /* ---------- a deck ---------- */
 
+/** slideN carries p:sldId 255 + N, as the render tree does ("slide2" -> "257") */
+const sldIdOf = (id: string) => String(255 + Number(id.replace(/\D/g, '')))
 const deck = (...ids: string[]): SlideIdentity[] =>
   ids.map((id) => ({
+    sldId: sldIdOf(id),
     partPath: `ppt/slides/${id}.xml`,
     nodes: [{ sourceId: `src-${id}`, durableId: `e_${id}` }],
   }))
@@ -199,7 +202,7 @@ describe('pptx anchors follow the slide, not its position', () => {
       { commentId: 'b', state: 'exact', anchor: { ...onB, slide_index: 2 } },
       { commentId: 'c', state: 'exact', anchor: { ...onC, slide_index: 0 } },
     ])
-    expect(onB.slide_id).toBe('ppt/slides/slide2.xml')
+    expect(onB.slide_id).toBe('257')
   })
 
   it('delete a slide then Save: its thread is lost, the old anchor kept, the others move up', () => {
@@ -216,17 +219,19 @@ describe('pptx anchors follow the slide, not its position', () => {
       { commentId: 'a', state: 'lost', anchor: anchorOn(before, 1) },
       { commentId: 'b', state: 'exact', anchor: { ...anchorOn(before, 2), slide_index: 1 } },
     ])
+    // the lost thread keeps naming the deleted slide by its p:sldId
+    expect(anchorOn(before, 1).slide_id).toBe('257')
   })
 
   it('a deleted object leaves the thread on its slide without object_id', () => {
     const before = deck('slide1')
     const a = anchorOn(before, 0, 'e_slide1')
-    const after: SlideIdentity[] = [{ partPath: 'ppt/slides/slide1.xml', nodes: [] }]
+    const after: SlideIdentity[] = [{ sldId: '256', partPath: 'ppt/slides/slide1.xml', nodes: [] }]
     const [u] = anchorUpdatesAfterSave([{ id: 'a', document_id: 'd', body: 'x', anchor: a }], after)
     expect(u).toEqual({
       commentId: 'a',
       state: 'exact',
-      anchor: { format: 'pptx', v: 1, slide_id: 'ppt/slides/slide1.xml', slide_index: 0 },
+      anchor: { format: 'pptx', v: 1, slide_id: '256', slide_index: 0 },
     })
   })
 
@@ -238,6 +243,10 @@ describe('pptx anchors follow the slide, not its position', () => {
       slide_id: '257',
       slide_index: 0,
     })
+    // a render tree without the id falls back to the part path
+    expect(pptxAnchorFor([{ partPath: 'ppt/slides/slide9.xml' }], 0)?.slide_id).toBe(
+      'ppt/slides/slide9.xml',
+    )
   })
 
   it('the adapter sorts by the current position, locates by slide_id and goes to slide + object', () => {
@@ -460,7 +469,7 @@ describe('ServerCommentsHost over the comments bridge', () => {
           anchor: {
             format: 'pptx',
             v: 1,
-            slide_id: 'ppt/slides/slide2.xml',
+            slide_id: '257',
             slide_index: 1,
             object_id: 'e_slide2',
           },
@@ -497,12 +506,12 @@ describe('ServerCommentsHost over the comments bridge', () => {
         {
           commentId: 'x22',
           state: 'exact',
-          anchor: { format: 'pptx', v: 1, slide_id: 'ppt/slides/slide3.xml', slide_index: 0 },
+          anchor: { format: 'pptx', v: 1, slide_id: '258', slide_index: 0 },
         },
         {
           commentId: 'x1',
           state: 'exact',
-          anchor: { format: 'pptx', v: 1, slide_id: 'ppt/slides/slide1.xml', slide_index: 2 },
+          anchor: { format: 'pptx', v: 1, slide_id: '256', slide_index: 2 },
         },
       ],
     })
@@ -542,9 +551,9 @@ describe('ServerCommentsHost over the comments bridge', () => {
     await h.render({ slides: [slides[0]!] })
     await h.save('v2')
     const round = h.server.calls.find((c) => c.op === 'anchors')!.input as {
-      anchors: Array<{ state: string }>
+      anchors: Array<{ state: string; anchor: { slide_id: string } }>
     }
-    expect(round.anchors.map((a) => a.state)).toEqual(['lost'])
+    expect(round.anchors.map((a) => [a.state, a.anchor.slide_id])).toEqual([['lost', '257']])
     expect(h.server.rows[0]!.anchor_state).toBe('lost')
     const zh = collabStrings('zh')
     expect(slot.textContent).toContain(zh.collabAnchorLost)

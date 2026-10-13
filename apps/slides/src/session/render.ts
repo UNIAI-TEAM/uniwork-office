@@ -9,6 +9,7 @@ import {
   parseTheme,
   patchBodyPrAutofit,
   resolveSchemeColor,
+  slideIdOfPath,
   type OpenedPptx,
   type Slide,
   type TextElement,
@@ -35,6 +36,8 @@ export function buildAllRenderSlides(opened: OpenedPptx, fitWidthPx: number): Re
       media: makeMediaResolver(opened, s.path),
       metrics: getFontMetrics(),
       slideNo: i + 1,
+      // the PPTX slide id: what server comments anchor a slide by
+      sldId: slideIdOfPath(opened, s.path),
     }),
   )
 }
@@ -132,6 +135,7 @@ export function rebuildSlide(session: Session, slideIndex: number): RenderSlide 
     media: makeMediaResolver(session.opened, slide.path),
     metrics: getFontMetrics(),
     slideNo: slideIndex + 1,
+    sldId: slideIdOfPath(session.opened, slide.path),
   })
 }
 
@@ -148,6 +152,7 @@ export function rebuildSlideWithReparse(session: Session, slideIndex: number): R
     media: makeMediaResolver(session.opened, fresh.path),
     metrics: getFontMetrics(),
     slideNo: slideIndex + 1,
+    sldId: slideIdOfPath(session.opened, fresh.path),
   })
 }
 
