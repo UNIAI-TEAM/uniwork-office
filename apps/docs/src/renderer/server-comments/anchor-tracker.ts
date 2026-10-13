@@ -132,6 +132,11 @@ export function createServerAnchors(
   /** canonical anchor JSON -> comment id, for the adapter calls that pass only an anchor */
   let byAnchor = new Map<string, string>()
   let signature = ''
+  /** comment id -> the anchor the server last sent, for recovering a range lost while editing */
+  let serverAnchors = new Map<string, DocxAnchor>()
+  /** ids whose located range collapsed in this session (not the ones the server already reported lost) */
+  const lostHere = new Set<string>()
+  let lastRanges: ReadonlyMap<string, PmRange | null> = new Map()
 
   const state = () => editor.state
   const dispatchMeta = (meta: TrackerMeta) => {
@@ -173,9 +178,43 @@ export function createServerAnchors(
     opts.onAdapterChange?.()
   }
 
+  /**
+   * Delete + undo: a range that collapsed comes back when its text does. Only where the stored prefix
+   * and suffix still surround it (never at another place with the same words), and only from the next
+   * document change after it was lost, so deleting a commented paragraph never re-attaches at once.
+   */
+  const recoverLost = () => {
+    const now = trackedRanges(state())
+    const justLost = new Set<string>()
+    for (const [id, r] of now) {
+      if (r === null && lastRanges.get(id)) {
+        lostHere.add(id)
+        justLost.add(id)
+      }
+    }
+    let recovered: Map<string, PmRange | null> | null = null
+    for (const id of [...lostHere]) {
+      if (now.get(id) !== null) {
+        lostHere.delete(id)
+        continue
+      }
+      const anchor = serverAnchors.get(id)
+      if (justLost.has(id) || !anchor) continue
+      const range = locateDocxAnchor(state().doc, anchor, { ...opts, requireContext: true })
+      if (!range) continue
+      lostHere.delete(id)
+      recovered ??= new Map(now)
+      recovered.set(id, range)
+    }
+    if (recovered) dispatchMeta({ ranges: recovered })
+    lastRanges = trackedRanges(state())
+  }
+
   // a lost / found flip while typing re-sorts the list on the next panel render
   const onTransaction = ({ transaction }: { transaction: { docChanged: boolean } }) => {
-    if (transaction.docChanged) refreshAdapter()
+    if (!transaction.docChanged) return
+    recoverLost()
+    refreshAdapter()
   }
   editor.on('transaction', onTransaction)
 
@@ -185,10 +224,12 @@ export function createServerAnchors(
       const ranges = new Map<string, PmRange | null>()
       const shown = new Set<string>()
       byAnchor = new Map()
+      serverAnchors = new Map()
       for (const root of roots) {
         const anchor = asDocxAnchor(root.anchor)
         if (!anchor || root.deleted) continue
         byAnchor.set(canonicalJson(root.anchor), root.id)
+        serverAnchors.set(root.id, anchor)
         const known = prev.get(root.id)
         const range =
           known !== undefined ? known : root.anchor_state === 'lost' ? null : locate(anchor)
@@ -196,6 +237,8 @@ export function createServerAnchors(
         if (!root.resolved) shown.add(root.id)
       }
       dispatchMeta({ ranges, shown })
+      for (const id of lostHere) if (!ranges.has(id)) lostHere.delete(id)
+      lastRanges = trackedRanges(state())
       refreshAdapter()
     },
     rangeOf: (id) => trackedRanges(state()).get(id),

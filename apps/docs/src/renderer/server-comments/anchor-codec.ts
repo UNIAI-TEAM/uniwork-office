@@ -43,6 +43,11 @@ export interface PmRange {
 export interface DocxCodecOptions {
   /** the w14:paraId of the source paragraph a textblock came from, when the editor knows it */
   paraIdOf?(node: PmNode): string | undefined
+  /**
+   * locate only where the stored prefix and suffix still surround the quote: a range that was lost
+   * while editing comes back where its text returns (undo), never at another place with the same words
+   */
+  requireContext?: boolean
 }
 
 /** JSON with object keys sorted by UTF-8 byte order and no whitespace (the server's canonical form) */
@@ -192,9 +197,20 @@ function textblocks(doc: PmNode): Block[] {
   return out
 }
 
-/** the matched span length: the full original span when the quote was capped, else the quote */
-function spanLength(a: DocxAnchor): number {
-  return Math.max(a.end - a.start, a.quote.length)
+/**
+ * Where the matched span ends. An anchor whose quote was capped covers more text than it quotes; the
+ * rest of the span cannot be compared, so the stored length is kept only while the text after it still
+ * reads as the stored suffix, otherwise the span shrinks to the matched quote.
+ */
+function spanEnd(text: string, start: number, a: DocxAnchor): number {
+  if (a.quote === '') return start
+  const quoteEnd = start + a.quote.length
+  const full = start + (a.end - a.start)
+  if (full <= quoteEnd) return quoteEnd
+  if (full > text.length) return quoteEnd
+  // no stored suffix to compare (paragraph end, or trimmed for the 4 KiB cap): keep the stored length
+  if (a.suffix === '' || text.startsWith(a.suffix, full)) return full
+  return quoteEnd
 }
 
 function quoteAt(text: string, start: number, a: DocxAnchor): boolean {
@@ -202,9 +218,16 @@ function quoteAt(text: string, start: number, a: DocxAnchor): boolean {
   return text.startsWith(a.quote, start)
 }
 
+/** the stored prefix and suffix surround the span at `start` */
+function contextAt(text: string, start: number, a: DocxAnchor): boolean {
+  return (
+    text.slice(0, start).endsWith(a.prefix) && text.startsWith(a.suffix, spanEnd(text, start, a))
+  )
+}
+
 function rangeIn(b: Block, start: number, a: DocxAnchor): PmRange {
   const len = b.node.content.size
-  const end = Math.min(start + (a.quote === '' ? 0 : spanLength(a)), len)
+  const end = Math.min(spanEnd(blockText(b.node), start, a), len)
   return { from: b.contentStart + start, to: b.contentStart + end }
 }
 
@@ -221,13 +244,14 @@ function commonPrefix(a: string, b: string): number {
 }
 
 /** best occurrence of the quote in `blocks`: most surrounding context, then nearest to the stored path/offset */
-function search(blocks: Block[], a: DocxAnchor): PmRange | null {
+function search(blocks: Block[], a: DocxAnchor, strict: boolean): PmRange | null {
   if (a.quote === '') return null
   let best: { score: number; dist: number; range: PmRange } | null = null
   for (const b of blocks) {
     const text = blockText(b.node)
     const samePath = b.path.length === a.path.length && b.path.every((x, i) => x === a.path[i])
     for (let at = text.indexOf(a.quote); at !== -1; at = text.indexOf(a.quote, at + 1)) {
+      if (strict && !contextAt(text, at, a)) continue
       const score =
         commonSuffix(text.slice(0, at), a.prefix) +
         commonPrefix(text.slice(at + a.quote.length), a.suffix)
@@ -248,17 +272,20 @@ export function locateDocxAnchor(
 ): PmRange | null {
   const a = asDocxAnchor(anchor)
   if (!a) return null
+  const strict = opts.requireContext === true
+  const fits = (text: string) =>
+    quoteAt(text, a.start, a) && (!strict || contextAt(text, a.start, a))
   const all = textblocks(doc)
   if (a.para_id) {
     const paraIdOf = opts.paraIdOf ?? defaultParaIdOf
     const hits = all.filter((b) => paraIdOf(b.node) === a.para_id)
     for (const b of hits) {
-      if (quoteAt(blockText(b.node), a.start, a)) return rangeIn(b, a.start, a)
+      if (fits(blockText(b.node))) return rangeIn(b, a.start, a)
     }
-    const inPara = search(hits, a)
+    const inPara = search(hits, a, strict)
     if (inPara) return inPara
   }
   const byPath = blockAtPath(doc, a.path)
-  if (byPath && quoteAt(blockText(byPath.node), a.start, a)) return rangeIn(byPath, a.start, a)
-  return search(all, a)
+  if (byPath && fits(blockText(byPath.node))) return rangeIn(byPath, a.start, a)
+  return search(all, a, strict)
 }

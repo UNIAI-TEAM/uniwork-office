@@ -60,6 +60,11 @@ describe('resolveServerMode', () => {
       versionId: 'v1',
       level: 'view',
     })
+    // the web frame marks its context; anything but `true` is ignored
+    expect(readContext({ documentId: 'd1', versionId: null, frame: true })?.frame).toBe(true)
+    expect(readContext({ documentId: 'd1', versionId: null, frame: 'yes' })).not.toHaveProperty(
+      'frame',
+    )
   })
 })
 

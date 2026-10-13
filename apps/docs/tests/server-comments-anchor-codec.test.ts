@@ -187,3 +187,49 @@ describe('locateDocxAnchor', () => {
     expect(locateDocxAnchor(editor.state.doc, { format: 'docx', v: 1 })).toBeNull()
   })
 })
+
+describe('a capped quote (FE12-5)', () => {
+  // 'a'..'z' blocks keep every offset readable; 700 chars, the comment spans the first 600
+  const body = Array.from({ length: 700 }, (_, i) => String.fromCharCode(97 + (i % 26))).join('')
+  const make = () => {
+    const editor = editorOf([para(body)])
+    const from = 1
+    const anchor = encodeDocxAnchor(editor.state.doc, { from, to: from + 600 })!
+    return { editor, anchor, from }
+  }
+
+  it('keeps the whole stored span while the text after it is unchanged', () => {
+    const { editor, anchor, from } = make()
+    expect(anchor.quote.length).toBe(QUOTE_MAX)
+    expect(locateDocxAnchor(editor.state.doc, anchor)).toEqual({ from, to: from + 600 })
+  })
+
+  it('shrinks to the matched quote when the text after the capped quote changed', () => {
+    const { editor, anchor, from } = make()
+    // an edit inside the span, past the 500th character
+    editor.commands.insertContentAt(from + 550, 'ZZZ')
+    expect(locateDocxAnchor(editor.state.doc, anchor)).toEqual({ from, to: from + QUOTE_MAX })
+  })
+})
+
+describe('locateDocxAnchor with requireContext (recovering a lost range)', () => {
+  const opts2 = { requireContext: true }
+  it('finds the range only where the stored prefix and suffix still surround it', () => {
+    const editor = editorOf([
+      para('Intro line.'),
+      para('We agree on the plan today.'),
+      para('We agree on the plan later, in the other place.'),
+    ])
+    const r = rangeOf(editor, 'the plan', 1)
+    const anchor = encodeDocxAnchor(editor.state.doc, r)!
+    expect(locateDocxAnchor(editor.state.doc, anchor, opts2)).toEqual(r)
+    // the first paragraph goes away: the second one has other words around 'the plan'
+    editor.commands.deleteRange({
+      from: editor.state.doc.child(0).nodeSize,
+      to: editor.state.doc.child(0).nodeSize + editor.state.doc.child(1).nodeSize,
+    })
+    expect(locateDocxAnchor(editor.state.doc, anchor, opts2)).toBeNull()
+    // the default search still falls back to the other occurrence
+    expect(locateDocxAnchor(editor.state.doc, anchor)).not.toBeNull()
+  })
+})

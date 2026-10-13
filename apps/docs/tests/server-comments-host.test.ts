@@ -9,7 +9,7 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Editor } from '@tiptap/core'
-import { COLLAB_LIVE_REGION_ID, collabStrings } from '@genoffice/ui/collab'
+import { COLLAB_LIVE_REGION_ID, COMMENTS_REVEAL_WAIT_MS, collabStrings } from '@genoffice/ui/collab'
 import { editorExtensions } from '../src/renderer/editor/extensions'
 import { encodeDocxAnchor } from '../src/renderer/server-comments/anchor-codec'
 import { SERVER_COMMENT_CLASS } from '../src/renderer/server-comments/anchor-tracker'
@@ -47,7 +47,8 @@ function fakeServer() {
   let seq = 0
   let token = 0
   const savedHandlers: Array<(p: { path: string; versionId: string }) => void> = []
-  const revealHandlers: Array<(p: { path: string; commentId: string }) => unknown> = []
+  const revealHandlers: Array<(p: { path: string; commentId: string; last?: boolean }) => unknown> =
+    []
   const ok = <T>(value: T) => Promise.resolve({ ok: true as const, value })
   const stamp = () => `2026-10-13T10:00:${String(++seq).padStart(2, '0')}Z`
   const find = (id: string) => rows.find((r) => r.id === id)!
@@ -143,7 +144,7 @@ function fakeServer() {
       savedHandlers.push(h)
       return () => savedHandlers.splice(savedHandlers.indexOf(h), 1)
     }),
-    onReveal: vi.fn((h: (p: { path: string; commentId: string }) => unknown) => {
+    onReveal: vi.fn((h: (p: { path: string; commentId: string; last?: boolean }) => unknown) => {
       revealHandlers.push(h)
       return () => revealHandlers.splice(revealHandlers.indexOf(h), 1)
     }),
@@ -154,7 +155,11 @@ function fakeServer() {
     rows,
     add,
     saved: (versionId: string) => savedHandlers.forEach((h) => h({ path: PATH, versionId })),
-    reveal: (commentId: string) => revealHandlers.map((h) => h({ path: PATH, commentId })),
+    /** `last`: the web frame router's flag (set on the frame, never on desktop) */
+    reveal: (commentId: string, last?: boolean) =>
+      revealHandlers.map((h) =>
+        h({ path: PATH, commentId, ...(last !== undefined ? { last } : {}) }),
+      ),
   }
 }
 
@@ -224,17 +229,22 @@ async function mount(
   server: ReturnType<typeof fakeServer>,
   panelOpen = true,
   versionId: string | null = 'v1',
+  over: Partial<ServerMode> = {},
 ) {
   const status = vi.fn()
+  const closes = vi.fn()
   const render = (open: boolean) =>
     root.render(
       createElement(ServerCommentsHost, {
-        mode: mode(server.api, versionId),
+        mode: { ...mode(server.api, versionId), ...over },
         editor,
         lang: 'en',
         panelOpen: open,
         onOpenPanel: () => render(true),
-        onClosePanel: () => render(false),
+        onClosePanel: () => {
+          closes()
+          render(false)
+        },
         onStatus: status,
         selectTextMessage: 'Select text first',
         saveFirstMessage: 'Save first',
@@ -245,7 +255,7 @@ async function mount(
     )
   await act(async () => render(panelOpen))
   await flush()
-  return { status }
+  return { status, closes }
 }
 
 const buttons = (text: string) =>
@@ -486,39 +496,71 @@ describe('server mode: reveal', () => {
     expect(el.textContent).not.toContain(EN.collabCommentDeleted!)
   })
 
-  it('web frame (no path): a miss opens the panel with the S15 line and answers false', async () => {
+  it('web frame: a miss shows the S15 line and opens the panel only when last is true', async () => {
     const server = fakeServer()
-    const status = vi.fn()
-    let open = false
-    const render = (o: boolean) => {
-      open = o
-      root.render(
-        createElement(ServerCommentsHost, {
-          mode: { ...mode(server.api), path: '' },
-          editor,
-          lang: 'en',
-          panelOpen: o,
-          onOpenPanel: () => render(true),
-          onClosePanel: () => render(false),
-          onStatus: status,
-          selectTextMessage: 's',
-          saveFirstMessage: 'v',
-          inFileComments: [],
-          neutralAuthor: 'User',
-          handleRef: handle,
-        }),
-      )
-    }
-    await act(async () => render(false))
+    // the real frame: the path is the bridge's file path, never empty
+    await mount(server, false)
+    let answer: unknown
+    await act(async () => {
+      answer = await server.reveal('gone', false)[0]
+    })
     await flush()
+    // another owner is still asked after this one: stay silent and closed
+    expect(answer).toBe(false)
+    expect(el.textContent).not.toContain(EN.collabCommentDeleted!)
+    expect(el.querySelector('.collab-panel')).toBeNull()
+    await act(async () => {
+      answer = await server.reveal('gone', true)[0]
+    })
+    await flush()
+    expect(answer).toBe(false)
+    expect(el.querySelector('.collab-panel')).not.toBeNull()
+    expect(el.textContent).toContain(EN.collabCommentDeleted!)
+  })
+
+  it('desktop (no last): a miss is silent even with an empty path; a late first list answers false', async () => {
+    const server = fakeServer()
+    await mount(server, false, 'v1', { path: '' })
     let answer: unknown
     await act(async () => {
       answer = await server.reveal('gone')[0]
     })
     await flush()
     expect(answer).toBe(false)
-    expect(open).toBe(true)
-    expect(el.textContent).toContain(EN.collabCommentDeleted!)
+    expect(el.textContent).not.toContain(EN.collabCommentDeleted!)
+
+    // a failed first list: no throw, no unhandled rejection
+    act(() => root.unmount())
+    root = createRoot(el)
+    const failing = fakeServer()
+    failing.calls.list.mockImplementation(
+      () => Promise.resolve({ ok: false, error: { code: 'internal' } }) as never,
+    )
+    await mount(failing, false)
+    await act(async () => {
+      answer = await failing.reveal('x')[0]
+    })
+    expect(answer).toBe(false)
+  })
+
+  it('frame (last set): a late first list is the typed not_ready the router maps', async () => {
+    const server = fakeServer()
+    server.calls.list.mockImplementation(() => new Promise(() => undefined) as never)
+    vi.useFakeTimers()
+    try {
+      await mount(server, false)
+      const result = server.reveal('x', true)[0] as Promise<unknown>
+      const caught = result.then(
+        () => null,
+        (e: unknown) => e,
+      )
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(COMMENTS_REVEAL_WAIT_MS + 50)
+      })
+      expect(await caught).toMatchObject({ code: 'not_ready', retryable: true })
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('a lost thread only opens: the selection does not move', async () => {
@@ -583,5 +625,163 @@ describe('server mode: AI tools fill drafts only (invariant 7)', () => {
       anchor: { quote: 'third quarter' },
       baseVersionId: 'v1',
     })
+  })
+})
+
+describe('server mode: one side panel at a time in the frame (V12-2)', () => {
+  const EVENT = 'uniwork:frame-side-panel'
+  const seen: Array<{ owner: string; open: boolean }> = []
+  const listener = (e: Event) => seen.push((e as CustomEvent).detail)
+  beforeEach(() => {
+    seen.length = 0
+    window.addEventListener(EVENT, listener)
+  })
+  afterEach(() => window.removeEventListener(EVENT, listener))
+
+  it('announces its own open and close as the editor owner', async () => {
+    const server = fakeServer()
+    await mount(server, false)
+    expect(seen).toEqual([])
+    editor.commands.setTextSelection(rangeOf('Closing'))
+    await act(async () => handle.current!.startThread())
+    await flush()
+    expect(seen).toContainEqual({ owner: 'editor', open: true })
+    await click(el.querySelector<HTMLButtonElement>('.collab-close') ?? undefined)
+    expect(seen.at(-1)).toEqual({ owner: 'editor', open: false })
+  })
+
+  it('closes itself when another owner opens, and ignores its own and close events', async () => {
+    const server = fakeServer()
+    const { closes } = await mount(server, true)
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent(EVENT, { detail: { owner: 'editor', open: true } }))
+      window.dispatchEvent(new CustomEvent(EVENT, { detail: { owner: 'discussion', open: false } }))
+    })
+    expect(closes).not.toHaveBeenCalled()
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent(EVENT, { detail: { owner: 'discussion', open: true } }))
+    })
+    expect(closes).toHaveBeenCalledTimes(1)
+    expect(el.querySelector('.collab-panel')).toBeNull()
+  })
+})
+
+describe("server mode: the desktop poll is not the frame's (FE12-3)", () => {
+  it('a window focus reloads the list on desktop and does not in the frame', async () => {
+    const desktop = fakeServer()
+    await mount(desktop, true)
+    const before = desktop.calls.list.mock.calls.length
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'))
+    })
+    await flush()
+    expect(desktop.calls.list.mock.calls.length).toBeGreaterThan(before)
+
+    act(() => root.unmount())
+    root = createRoot(el)
+    const frame = fakeServer()
+    await mount(frame, true, 'v1', { frame: true })
+    const framed = frame.calls.list.mock.calls.length
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'))
+    })
+    await flush()
+    expect(frame.calls.list.mock.calls.length).toBe(framed)
+  })
+})
+
+describe('server mode: a lost range comes back when its text does (FE12-4)', () => {
+  it('delete the paragraph, undo, Save: the comment goes out exact again', async () => {
+    const server = fakeServer()
+    const anchor = encodeDocxAnchor(editor.state.doc, rangeOf('third quarter'))!
+    const row = server.add({ body: 'note', anchor, anchor_state: 'exact' })
+    await mount(server, false)
+    const block = editor.state.doc.child(0).nodeSize
+    editor.commands.deleteRange({ from: block, to: block + editor.state.doc.child(1).nodeSize })
+    expect(editor.state.doc.textContent).not.toContain('third quarter')
+    editor.commands.undo()
+    expect(editor.state.doc.textContent).toContain('third quarter')
+    // one more edit elsewhere: recovery runs on a document change
+    editor.commands.insertContentAt(1, 'X')
+    await act(async () => server.saved('v2'))
+    await flush()
+    const sent = server.calls.anchors.mock.calls[0]![0].anchors
+    expect(sent).toHaveLength(1)
+    expect(sent[0]).toMatchObject({ commentId: row.id, state: 'exact' })
+    expect(sent[0].anchor).toMatchObject({ quote: 'third quarter' })
+    // the highlight is back too
+    expect(editor.view.dom.querySelector(`.${SERVER_COMMENT_CLASS}`)?.textContent).toBe(
+      'third quarter',
+    )
+  })
+
+  it('a deleted quote does not jump to another place with the same words', async () => {
+    const server = fakeServer()
+    const anchor = encodeDocxAnchor(editor.state.doc, rangeOf('Closing'))!
+    const row = server.add({ body: 'note', anchor, anchor_state: 'exact' })
+    editor.commands.insertContentAt(editor.state.doc.content.size, {
+      type: 'docParagraph',
+      attrs: { docxIndex: null },
+      content: [{ type: 'text', text: 'Closing the call.' }],
+    })
+    await mount(server, false)
+    const first = rangeOf('Closing')
+    editor.commands.deleteRange(first)
+    editor.commands.insertContentAt(1, 'Y')
+    await act(async () => server.saved('v2'))
+    await flush()
+    expect(server.calls.anchors.mock.calls[0]![0].anchors).toEqual([
+      { commentId: row.id, state: 'lost', anchor },
+    ])
+  })
+})
+
+describe('server mode: save the document first (V12-3)', () => {
+  it('shows a warn line in the panel while the version is unknown and announces it politely', async () => {
+    vi.useFakeTimers()
+    try {
+      const server = fakeServer()
+      await mount(server, true, null)
+      const line = el.querySelector('.docs-server-save-first')
+      expect(line?.textContent).toBe('Save first')
+      expect(line?.classList.contains('collab-pnote--warn')).toBe(true)
+      editor.commands.setTextSelection(rangeOf('third quarter'))
+      await act(async () => handle.current!.startThread())
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(100)
+      })
+      expect(document.getElementById(COLLAB_LIVE_REGION_ID)?.textContent).toBe('Save first')
+      await act(async () => server.saved('v2'))
+      await flush()
+      expect(el.querySelector('.docs-server-save-first')).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('no line for a known version', async () => {
+    await mount(fakeServer(), true, 'v1')
+    expect(el.querySelector('.docs-server-save-first')).toBeNull()
+  })
+})
+
+describe('server mode: the new-comment composer scrolls into view (V12-4)', () => {
+  it('scrolls the new thread item so Cancel and Send are visible', async () => {
+    const scroll = vi.fn()
+    Element.prototype.scrollIntoView = scroll
+    try {
+      const server = fakeServer()
+      await mount(server, true)
+      editor.commands.setTextSelection(rangeOf('Closing'))
+      await act(async () => handle.current!.startThread())
+      await flush()
+      const target = el.querySelector('.collab-thread--new')
+      expect(target).not.toBeNull()
+      const at = scroll.mock.contexts.findIndex((c) => c === target)
+      expect(at).toBeGreaterThanOrEqual(0)
+      expect(scroll.mock.calls[at]![0]).toMatchObject({ block: 'nearest' })
+    } finally {
+      delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView
+    }
   })
 })
