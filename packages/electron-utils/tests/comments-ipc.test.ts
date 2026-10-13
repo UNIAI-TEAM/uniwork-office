@@ -16,6 +16,14 @@ import {
   parseCommentsUpdateInput,
   parseMentionsSearchInput,
   readCommentsPath,
+  DISCUSSION_BRIDGE_KEY,
+  DISCUSSION_CHANNELS,
+  DISCUSSION_PANEL_LIMITS,
+  clampDiscussionPanelWidth,
+  parseDiscussionCreateInput,
+  parseDiscussionListInput,
+  parseDiscussionPanelInput,
+  parseDiscussionRevealRequest,
 } from '../src/comments-ipc'
 import { COMMENTS_POLL_INTERVAL_MS, createCommentsPoll } from '../src/comments-poll'
 
@@ -330,5 +338,60 @@ describe('the comments reload scheduler (contract §4.7)', () => {
     await Promise.resolve()
     await Promise.resolve()
     expect(fetch).toHaveBeenCalledWith({ sinceToken: 'lt1:1' })
+  })
+})
+
+describe('the discussion bridge contract (G8-11)', () => {
+  it('names its own channels and global, apart from the comments ones', () => {
+    expect(DISCUSSION_BRIDGE_KEY).toBe('uniworkDiscussion')
+    const names = Object.values(DISCUSSION_CHANNELS)
+    expect(names.every((n) => n.startsWith('uniwork:discussion:'))).toBe(true)
+    expect(new Set(names).size).toBe(names.length)
+  })
+
+  it('list forces kind discussion and refuses any other kind', () => {
+    expect(parseDiscussionListInput({ path: 'p' })).toEqual({ path: 'p', kind: 'discussion' })
+    expect(parseDiscussionListInput({ path: 'p', sinceToken: 't', kind: 'discussion' })).toEqual({
+      path: 'p',
+      kind: 'discussion',
+      sinceToken: 't',
+    })
+    expect(parseDiscussionListInput({ path: 'p', kind: 'comment' })).toBeNull()
+    expect(parseDiscussionListInput({ path: '' })).toBeNull()
+  })
+
+  it('create forces kind discussion and refuses an anchor or base version', () => {
+    expect(parseDiscussionCreateInput({ path: 'p', body: 'b', parentId: 'c1' })).toEqual({
+      path: 'p',
+      kind: 'discussion',
+      body: 'b',
+      parentId: 'c1',
+    })
+    expect(parseDiscussionCreateInput({ path: 'p', body: 'b', kind: 'comment' })).toBeNull()
+    expect(parseDiscussionCreateInput({ path: 'p', body: 'b', anchor: {} })).toBeNull()
+    expect(parseDiscussionCreateInput({ path: 'p', body: 'b', baseVersionId: 'v' })).toBeNull()
+    expect(parseDiscussionCreateInput({ path: 'p', body: '' })).toBeNull()
+  })
+
+  it('panel input needs a boolean open and a finite width', () => {
+    expect(parseDiscussionPanelInput({ open: true, width: 320 })).toEqual({
+      open: true,
+      width: 320,
+    })
+    expect(parseDiscussionPanelInput({ open: 1, width: 320 })).toBeNull()
+    expect(parseDiscussionPanelInput({ open: true, width: Infinity })).toBeNull()
+    expect(parseDiscussionRevealRequest({ path: 'p' })).toEqual({ path: 'p' })
+    expect(parseDiscussionRevealRequest({})).toBeNull()
+  })
+
+  it('clamps the panel width to [min, max] and leaves the editor its minimum', () => {
+    const { min, max, editorMin } = DISCUSSION_PANEL_LIMITS
+    expect(clampDiscussionPanelWidth(320, 1400)).toBe(320)
+    expect(clampDiscussionPanelWidth(10, 1400)).toBe(min)
+    expect(clampDiscussionPanelWidth(5000, 1400)).toBe(max)
+    expect(clampDiscussionPanelWidth(5000, 800)).toBe(800 - editorMin)
+    expect(clampDiscussionPanelWidth(320, 500)).toBe(500 - editorMin)
+    expect(clampDiscussionPanelWidth(320, 300)).toBe(0)
+    expect(clampDiscussionPanelWidth(Number.NaN, 1400)).toBe(0)
   })
 })

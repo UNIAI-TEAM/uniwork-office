@@ -15,6 +15,16 @@ import type { UniworkDocsService } from '../src/main/uniwork-docs/service'
 
 let dir: string
 let identity: { accountId: string; deviceSessionId: string; deploymentId: string } | null = null
+/** the account status the runtime's targets read (a two-org picker by default) */
+let accountStatus: AccountStatus = {
+  loggedIn: true,
+  state: 'signed-in',
+  needsOrgChoice: true,
+  orgs: [
+    { id: 'org_a', name: 'Org A', slug: 'org-a', role: 'owner', membership: 'active' },
+    { id: 'org_b', name: 'Org B', slug: 'org-b', role: 'member', membership: 'active' },
+  ],
+}
 /** what the fake server answers for `org_a`'s capability route */
 let capabilityAnswer: Record<string, unknown> = {}
 const fetched: string[] = []
@@ -35,11 +45,8 @@ vi.mock('../src/main/uniwork-auth', () => ({
   setUniworkSignOutHooks: vi.fn(),
   onUniworkAccountStatus: () => () => undefined,
   uniworkAccount: () => ({
-    status: (): AccountStatus => ({
-      loggedIn: identity !== null,
-      state: identity ? 'signed-in' : 'signed-out',
-      orgs: [{ id: 'org_a', name: 'Org A', slug: 'org-a', role: 'owner' }],
-    }),
+    status: (): AccountStatus =>
+      identity ? accountStatus : { loggedIn: false, state: 'signed-out' },
   }),
   uniworkDeploymentProfile: () => ({
     deploymentId: 'default',
@@ -73,6 +80,15 @@ beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'uw-sync-runtime-'))
   identity = { accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' }
   fetched.length = 0
+  accountStatus = {
+    loggedIn: true,
+    state: 'signed-in',
+    needsOrgChoice: true,
+    orgs: [
+      { id: 'org_a', name: 'Org A', slug: 'org-a', role: 'owner', membership: 'active' },
+      { id: 'org_b', name: 'Org B', slug: 'org-b', role: 'member', membership: 'active' },
+    ],
+  }
   capabilityAnswer = {
     sync_feed: true,
     sync_write: true,
@@ -93,6 +109,7 @@ async function runtimeWith() {
 
 describe('the feed runtime capability cache across an account boundary (R1-be-8)', () => {
   it('clears on a same-origin account switch instead of serving the old account’s flags', async () => {
+    chosen('org_a')
     const runtime = await runtimeWith()
 
     // account A: org_a says the feed is on, the pass lists its workspaces
@@ -122,10 +139,78 @@ describe('the feed runtime capability cache across an account boundary (R1-be-8)
   })
 
   it('keeps serving the cache inside the TTL for one account', async () => {
+    chosen('org_a')
     const runtime = await runtimeWith()
     await runtime.tick()
     await runtime.tick()
     await runtime.tick()
     expect(capabilityFetches()).toHaveLength(1)
+  })
+})
+
+/** the signed-in status of an account that picked `orgId` (the picker is done) */
+function chosen(orgId: string): void {
+  const org = accountStatus.orgs?.find((o) => o.id === orgId)
+  accountStatus = {
+    loggedIn: true,
+    state: 'signed-in',
+    needsOrgChoice: false,
+    org,
+    orgs: accountStatus.orgs,
+  }
+}
+
+describe('G8-16 S16: the feed makes no org-scoped call before the choice (F-1)', () => {
+  it('a two-org picker fetches nothing until the org is chosen', async () => {
+    const runtime = await runtimeWith()
+
+    // signed in with two usable orgs and nothing chosen: the picker is up, so
+    // no capability, workspace or feed request may run for any org
+    await runtime.tick()
+    expect(capabilityFetches()).toEqual([])
+    expect(workspaceFetches()).toEqual([])
+    expect(fetched).toEqual([])
+
+    // the choice's status push is what lets the feed run, and only for it
+    chosen('org_a')
+    await runtime.tick()
+    expect(capabilityFetches()).toEqual(['/api/v1/orgs/org_a/office/capabilities'])
+    expect(workspaceFetches()).toEqual(['/api/v1/orgs/org_a/workspaces'])
+    expect(fetched.some((path) => path.includes('org_b'))).toBe(false)
+  })
+
+  it('a chosen org is the only one ever touched', async () => {
+    chosen('org_b')
+    const runtime = await runtimeWith()
+    await runtime.tick()
+    expect(capabilityFetches()).toEqual(['/api/v1/orgs/org_b/office/capabilities'])
+    expect(fetched.some((path) => path.includes('org_a'))).toBe(false)
+  })
+
+  it('a pending choice blocks the pass even with an org already set', async () => {
+    // defensive: the gate is the choice, not the org field, so a status that
+    // still carries an org while the picker is up makes no call either
+    accountStatus = {
+      loggedIn: true,
+      state: 'signed-in',
+      needsOrgChoice: true,
+      org: { id: 'org_a', name: 'Org A', slug: 'org-a', role: 'owner', membership: 'active' },
+      orgs: accountStatus.orgs,
+    }
+    const runtime = await runtimeWith()
+    await runtime.tick()
+    expect(fetched).toEqual([])
+  })
+
+  it('no org chosen (every org blocked) still fetches nothing', async () => {
+    accountStatus = {
+      loggedIn: true,
+      state: 'signed-in',
+      needsOrgChoice: false,
+      orgs: [{ id: 'org_a', name: 'Org A', slug: 'org-a', role: 'owner', membership: 'active' }],
+    }
+    const runtime = await runtimeWith()
+    await runtime.tick()
+    expect(fetched).toEqual([])
   })
 })

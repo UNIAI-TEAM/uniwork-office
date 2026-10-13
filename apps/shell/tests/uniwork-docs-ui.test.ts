@@ -437,8 +437,8 @@ describe('picker reducer', () => {
   const run = (actions: PickerAction[], from: PickerState = initialPickerState()) =>
     actions.reduce(pickerReducer, from)
   const workspaces = [
-    { id: 'w1', name: 'Team', orgId: 'o1' },
-    { id: 'w2', name: 'Sales', orgId: 'o1' },
+    { id: 'w1', name: 'Team', orgId: 'o1', myRole: null },
+    { id: 'w2', name: 'Sales', orgId: 'o1', myRole: null },
   ]
   const loadedWorkspaces: PickerAction = {
     type: 'workspaces-loaded',

@@ -41,6 +41,7 @@ import {
   AiTimeoutError,
   createStreamWatchdog,
 } from '../../../../packages/ai-provider/src/watchdog'
+import type { AiRunTracker } from '../ai-run'
 import type { AiWebClient } from './client'
 import { AiWebError, findAiWebError, rawFailureAsTyped } from './errors'
 import { createProxyFetch } from './transport'
@@ -62,6 +63,8 @@ export interface StreamDeps {
    * so the bridge raises its in-frame state card for it.
    */
   onChatFailure?(error: AiWebError, provider: string): void
+  /** the frame's AI turn state: a chat stream is a running turn until it ends (X-02 `aiRun`, S6) */
+  aiRun?: AiRunTracker
 }
 
 /** the request config ai-provider sees: proxy base URL, no key */
@@ -172,6 +175,7 @@ export function createWebAiStreams(deps: StreamDeps): WebAiStreams {
     const maxTokens = request.maxTokens ?? maxOutputTokensOf(settings)
     const controller = new AbortController()
     active.set(requestId, controller)
+    deps.aiRun?.begin(requestId, () => controller.abort())
     let lastPing = 0
     const ping = (): void => {
       const now = Date.now()
@@ -218,6 +222,7 @@ export function createWebAiStreams(deps: StreamDeps): WebAiStreams {
       }
     } finally {
       active.delete(requestId)
+      deps.aiRun?.end(requestId)
     }
   }
 

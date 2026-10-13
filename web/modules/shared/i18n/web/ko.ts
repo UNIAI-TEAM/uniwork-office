@@ -111,6 +111,8 @@ export const ko = {
   uwRemoteReloadFailed: '버전 {n}을(를) 불러오지 못했습니다. 아직 이전 버전을 보고 있습니다.',
   uwRemoteDeleted: '이 문서가 UniWork에서 삭제되었습니다. 대기 중인 저장이 중지되었습니다.',
   uwAuthorFallback: '구성원',
+  uwLockRegion: '문서 상태',
+  uwActRetry: '다시 시도',
 
   // S6 new-version bar (web only)
   uwRemoteRevokedWeb:

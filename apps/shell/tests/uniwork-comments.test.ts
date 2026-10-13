@@ -300,6 +300,16 @@ function serviceFor(bound: boolean) {
   } as unknown as Parameters<typeof createUniworkComments>[1]['service']
 }
 
+/**
+ * The revealPending sender is the editor webContents: `shownPath` reads its id
+ * and the handler watches its realm events (D2-2); these tests pull from a
+ * realm that never reloads, so a no-op emitter is enough.
+ */
+function editorSender(id: number) {
+  const noop = () => undefined
+  return { id, on: noop, removeListener: noop }
+}
+
 type RevealOutcome = 'delivered' | 'deferred' | 'none'
 
 /** mount the wiring over a fake server; returns the handler map and the reveal spy */
@@ -516,7 +526,7 @@ describe('the shared body fixture round-trips over the desktop IPC (card T1)', (
 
 describe('the launch reveal is held until the editor subscribes (R1-2)', () => {
   const pull = (handlers: Map<string, Handler>, senderId: number) =>
-    handlers.get(COMMENTS_CHANNELS.revealPending)!({ sender: { id: senderId } }, undefined)
+    handlers.get(COMMENTS_CHANNELS.revealPending)!({ sender: editorSender(senderId) }, undefined)
 
   it('a reveal decided before the editor subscribes is pulled once, then cleared', async () => {
     const { handle, handlers } = mount({ shownPath: (sender) => (sender.id === 7 ? PATH : null) })
@@ -544,7 +554,7 @@ describe('the launch reveal is held until the editor subscribes (R1-2)', () => {
 
 describe('a delivered reveal is not replayed on the next subscribe (D1-1)', () => {
   const pull = (handlers: Map<string, Handler>, senderId: number) =>
-    handlers.get(COMMENTS_CHANNELS.revealPending)!({ sender: { id: senderId } }, undefined)
+    handlers.get(COMMENTS_CHANNELS.revealPending)!({ sender: editorSender(senderId) }, undefined)
 
   it('a push handed to a subscribed editor ends the hold', async () => {
     const { handle, handlers } = mount({ shownPath: (sender) => (sender.id === 7 ? PATH : null) })
@@ -594,7 +604,7 @@ describe('a pull that lands before the deferred push delivers once (D1-4)', () =
     handle.reveal(PATH, CMT)
     expect(stillWanted!()).toBe(true) // still held: the push owes the renderer the reveal
     expect(
-      await handlers.get(COMMENTS_CHANNELS.revealPending)!({ sender: { id: 7 } }, undefined),
+      await handlers.get(COMMENTS_CHANNELS.revealPending)!({ sender: editorSender(7) }, undefined),
     ).toEqual({ path: PATH, commentId: CMT })
     expect(stillWanted!()).toBe(false) // the pull delivered it: the push must not
   })

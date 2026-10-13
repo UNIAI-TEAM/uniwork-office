@@ -217,7 +217,7 @@ function setup() {
     identity: () => manager.sessionIdentity(),
     // the account's own state, as the wiring reports it
     keystoreLocked: () => manager.status().state === 'keystore-locked',
-    selectedOrgId: () => 'org_a',
+    selectedOrg: () => ({ id: 'org_a', slug: 'acme' }),
     authorized: <T>(call: (token: string) => Promise<T>) => call(TOKEN),
     openPath: vi.fn(() => true),
     isPathOpen: vi.fn(() => false),

@@ -1,0 +1,112 @@
+/* The new-version bar (S6) of every web frame: one slim bar above the editor, never over the
+ * document. Chrome only, theme tokens only (CLAUDE.md theming rules). While it is shown the page is a
+ * column (bar, then the app root), so the editor is pushed down instead of covered. */
+
+html.uw-remote-bar-on body {
+  display: flex;
+  flex-direction: column;
+}
+
+html.uw-remote-bar-on #root {
+  flex: 1 1 0;
+  min-height: 0;
+  height: auto;
+}
+
+.uw-remote-bar {
+  box-sizing: border-box;
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin: 8px 16px 0;
+  padding: 8px 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--accent-soft, var(--surface-subtle));
+  color: var(--text);
+  font-family: inherit;
+  font-size: var(--text-small);
+  line-height: 1.5;
+}
+
+.uw-remote-bar-text {
+  flex: 1 1 240px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.uw-remote-bar--warn {
+  border-color: var(--warning-border);
+  background: var(--warning-bg);
+  color: var(--warning-text);
+}
+
+.uw-remote-bar--error {
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+.uw-remote-bar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+
+/* a link action: the bar's own text colour (it sits on every tone), underlined */
+.uw-remote-link {
+  min-width: 24px;
+  min-height: 24px;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.uw-remote-link:hover {
+  background: var(--hover);
+}
+
+.uw-remote-link:focus-visible {
+  outline: 2px solid var(--color-dialog-primary);
+  outline-offset: 2px;
+}
+
+@media (pointer: coarse) {
+  .uw-remote-link {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+/* the window's live nodes: visually hidden, outside the bar */
+.uw-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* A locked frame (revoke / delete): #root is inert, so the ribbon / toolbar also look disabled
+ * instead of merely not answering. Opacity and a grey filter carry no colour: both themes dim the
+ * same way, the document itself is left as it is. */
+html.uw-locked
+  #root
+  :is(.ribbon, .ribbon-tabs, .ribbon-body, .toolbar, [role='toolbar']):not(
+    :is(.ribbon, .ribbon-tabs, .ribbon-body, .toolbar, [role='toolbar'])
+      :is(.ribbon, .ribbon-tabs, .ribbon-body, .toolbar, [role='toolbar'])
+  ) {
+  opacity: 0.5;
+  filter: grayscale(1);
+  cursor: not-allowed;
+}

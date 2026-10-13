@@ -28,6 +28,7 @@ import { rememberRemoteVersion } from '../../modules/shared/conflict-dialog'
 import { bindHostAppearance, createFrameClient, frameVersionFromDocument } from './frame-boot'
 import type { FramePort } from './frame-port'
 import { hostGrants } from './hide'
+import { frameAiRun } from '../../modules/shared/ai-run'
 import { projectApi } from './project-memory'
 import { mergeModules, safeApi, type BridgeObject } from './safe-api'
 import {
@@ -36,6 +37,8 @@ import {
   createWebAi,
   withWebAi,
 } from '../../modules/shared/ai/web-ai'
+import { FRAME_COMMENTS, frameCommentsClaim } from '../../modules/shared/discussion/claim'
+import { mountFrameDiscussion, type DiscussionPort } from '../../modules/shared/discussion/mount'
 
 /** what the installer hands each global's factory */
 export interface ModuleBridgeContext {
@@ -62,7 +65,9 @@ export type ModuleBridgePort = Pick<
   | 'setTitle'
   | 'setModal'
   | 'onRemoteVersion'
+  | 'onBlocked'
   | 'reportSaved'
+  | 'reportAiRun'
   | 'reportError'
   | 'getToken'
   | 'refreshToken'
@@ -72,6 +77,11 @@ export interface ModuleBridgeSpec {
   module: Exclude<OfficeModule, 'docs'>
   /** what this frame build supports (sent in `ready`; effective = frame ∩ host grant) */
   frameCapabilities: Capabilities
+  /**
+   * the frame Discussion panel (S13) + the `comments` claim in `ready` (lane G8-11 D4): on only when
+   * the frame covers every comments surface of the format (invariant 8). Default: FRAME_COMMENTS.
+   */
+  frameComments?: boolean
   /** window global name -> its members (merged over the appearance members) */
   globals: Record<string, (ctx: ModuleBridgeContext) => BridgeObject>
   /**
@@ -149,12 +159,20 @@ export function sharedMembers(): BridgeObject {
   }
 }
 
+/** what a module frame claims in `ready`: the base keys, its own, and `comments` when its switch is on */
+export function moduleFrameCapabilities(
+  spec: Pick<ModuleBridgeSpec, 'module' | 'frameCapabilities' | 'frameComments'>,
+): Capabilities {
+  const on = spec.frameComments ?? FRAME_COMMENTS[spec.module]
+  return { ...FRAME_BASE_CAPABILITIES, ...spec.frameCapabilities, ...frameCommentsClaim(on) }
+}
+
 export function installModuleBridge(spec: ModuleBridgeSpec): InstalledModuleBridge {
   const client: ModuleBridgePort =
     spec.client ??
     createFrameClient({
       module: spec.module,
-      capabilities: { ...FRAME_BASE_CAPABILITIES, ...spec.frameCapabilities },
+      capabilities: moduleFrameCapabilities(spec),
       frameVersion: frameVersionFromDocument(),
     })
   const grants = spec.capabilities?.grants ?? hostGrants
@@ -174,7 +192,9 @@ export function installModuleBridge(spec: ModuleBridgeSpec): InstalledModuleBrid
   // holds its save watchdog; the conflict table learns who saved a revision from doc.remoteVersion
   onFrameModal((open) => client.setModal?.(open))
   client.onRemoteVersion?.(rememberRemoteVersion)
-  const ai = createWebAi({ port: client, capabilities })
+  // the AI turns of this frame: the host hears `aiRun`, the new-version bar waits for idle
+  frameAiRun.bind((payload) => client.reportAiRun?.(payload))
+  const ai = createWebAi({ port: client, capabilities, aiRun: frameAiRun })
 
   const ctx: ModuleBridgeContext = { module: spec.module, client, capabilities }
   const target = spec.target ?? (window as unknown as Record<string, unknown>)
@@ -189,5 +209,9 @@ export function installModuleBridge(spec: ModuleBridgeSpec): InstalledModuleBrid
   }
   if (!('projectApi' in spec.globals)) target.projectApi = projectApi
   target.__officeWebModule = spec.module
+  // the Discussion panel: mounted once the session is known, only for a bound, signed-in document
+  if (spec.frameComments ?? FRAME_COMMENTS[spec.module]) {
+    void mountFrameDiscussion(client as ModuleBridgePort & DiscussionPort)
+  }
   return { client, capabilities, globals }
 }

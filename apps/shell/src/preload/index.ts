@@ -16,6 +16,7 @@ import type {
 } from '@genoffice/ai-provider/browser'
 import type { AiStreamChunk, AiStreamRequest } from '@genoffice/ai-provider'
 import { installDropOpenBridge } from '@genoffice/electron-utils/drop-open'
+import { installUniworkDiscussionBridge } from '@genoffice/electron-utils/discussion-bridge'
 import type { UpdateUiState } from '../shared/update-api'
 import { normalizeAiPanelPrefs } from '@genoffice/ui/ai-panel-prefs'
 import type {
@@ -45,9 +46,12 @@ import type {
   UniworkDocErrorCode,
   UniworkDocListPage,
   UniworkDocLock,
+  UniworkDocProperties,
   UniworkDocStatus,
   UniworkLaunchEvent,
   UniworkResult,
+  UniworkSharedPage,
+  UniworkSharedQuery,
   UniworkWorkspaceRef,
 } from '../shared/home-api'
 import { HOME_CHANNELS, PROJECT_CHANNELS, UNIWORK_DOC_CHANNELS } from '../shared/home-api'
@@ -838,6 +842,16 @@ const homeApi: HomeApi = {
       await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.listDocuments, query),
     )
   },
+  async uniworkListSharedWithMe(query?: UniworkSharedQuery) {
+    return asUniworkResult<UniworkSharedPage>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.listSharedWithMe, query),
+    )
+  },
+  async uniworkDocumentProperties(documentId: string) {
+    return asUniworkResult<UniworkDocProperties>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.documentProperties, documentId),
+    )
+  },
   async uniworkOpenDocument(documentId) {
     return asUniworkResult<{ path: string }>(
       await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.openDocument, documentId),
@@ -1060,3 +1074,8 @@ contextBridge.exposeInMainWorld('aiOfficeTabs', tabsApi)
 
 // open documents dragged from the OS anywhere over Home or the tab strip
 installDropOpenBridge()
+
+// G8-11: the Discussion panel lives in the shell renderer and talks to the
+// UniWork comments client through its own bridge (main checks the sender is
+// this shell and the path an open, bound tab of its window)
+installUniworkDiscussionBridge()

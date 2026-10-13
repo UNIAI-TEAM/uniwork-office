@@ -1,0 +1,117 @@
+/* The web frame's Discussion (S13): a slim document bar above the editor with the Discussion
+ * toggle, and the shared collab panel docked at the inline end. Chrome only, theme tokens only
+ * (CLAUDE.md theming rules); the panel itself is styled by @genoffice/ui/collab.css.
+ * While the bar is on, the page is a column (bar, new-version bar, app root) like remote-bar.css. */
+
+html.uw-disc-on {
+  --uw-disc-bar-h: 37px;
+  --uw-disc-w: 360px;
+}
+
+html.uw-disc-on body {
+  display: flex;
+  flex-direction: column;
+}
+
+html.uw-disc-on #root {
+  flex: 1 1 0;
+  min-height: 0;
+  height: auto;
+}
+
+/* the document bar stays first, above a new-version bar that prepends itself later */
+.uw-disc-root {
+  order: -1;
+  flex: none;
+}
+
+.uw-disc-bar {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  height: var(--uw-disc-bar-h);
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--chrome-bg, var(--surface));
+  color: var(--text);
+  font-family: var(--gs-font-sans, inherit);
+  font-size: var(--text-small);
+}
+
+.uw-disc-toggle {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 6px;
+  min-width: 24px;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font: inherit;
+  line-height: 1.4;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.uw-disc-toggle:hover {
+  background: var(--hover);
+}
+
+/* same open look as the shell toggle; --text on --accent-soft is >= 8.4:1 in every app and theme
+   (--accent on it is 4.18:1 in markdown dark) */
+.uw-disc-toggle[aria-expanded='true'] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.uw-disc-toggle:focus-visible {
+  outline: 2px solid var(--accent, var(--color-brand-secondary));
+  outline-offset: 2px;
+}
+
+@media (pointer: coarse) {
+  .uw-disc-toggle {
+    height: 44px;
+  }
+  html.uw-disc-on {
+    --uw-disc-bar-h: 52px;
+  }
+}
+
+.uw-disc {
+  position: fixed;
+  z-index: 1000;
+  top: var(--uw-disc-bar-h);
+  bottom: 0;
+  inset-inline-end: 0;
+  width: min(var(--uw-disc-w), 100vw);
+  box-sizing: border-box;
+}
+
+.uw-disc[hidden] {
+  display: none;
+}
+
+/* the editor narrows by the panel width; on a narrow viewport the panel covers it instead */
+@media (min-width: 640px) {
+  html.uw-disc-open #root {
+    margin-inline-end: var(--uw-disc-w);
+  }
+}
+
+/* the panel covers the editor: lift it above every editor toolbar or overlay by giving the editor
+   its own stacking context (its z-indexes stay inside it); mount.tsx also makes it inert */
+@media (max-width: 639.98px) {
+  html.uw-disc-open #root {
+    position: relative;
+    z-index: 0;
+    isolation: isolate;
+  }
+}

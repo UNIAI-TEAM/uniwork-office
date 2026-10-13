@@ -115,6 +115,8 @@ export const ms = {
   uwRemoteReloadFailed: 'Tidak dapat memuatkan versi {n}. Anda masih melihat versi sebelumnya.',
   uwRemoteDeleted: 'Dokumen ini dipadam di UniWork. Simpanan dalam baris gilir dihentikan.',
   uwAuthorFallback: 'seorang ahli',
+  uwLockRegion: 'Status dokumen',
+  uwActRetry: 'Cuba lagi',
 
   // S6 new-version bar (web only)
   uwRemoteRevokedWeb:

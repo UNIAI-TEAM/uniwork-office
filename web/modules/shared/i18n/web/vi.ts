@@ -109,6 +109,8 @@ export const vi = {
   uwRemoteReloadFailed: 'Không tải được phiên bản {n}. Bạn vẫn đang xem bản trước.',
   uwRemoteDeleted: 'Tài liệu này đã bị xóa trên UniWork. Các lần lưu đang chờ đã dừng.',
   uwAuthorFallback: 'một thành viên',
+  uwLockRegion: 'Trạng thái tài liệu',
+  uwActRetry: 'Thử lại',
 
   // S6 new-version bar (web only)
   uwRemoteRevokedWeb:

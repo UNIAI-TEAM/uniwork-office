@@ -24,6 +24,7 @@ import type { Lang } from '../src/renderer/src/locale'
 import type { SettingsSectionId } from '../src/renderer/src/SettingsModal'
 import { accountStrings } from '../src/renderer/src/i18n/strings-account'
 import { syncStrings } from '../src/renderer/src/i18n/strings-sync'
+import { uniworkDocumentStrings } from '../src/renderer/src/i18n/strings-uniwork-documents'
 
 const actEnvironment = globalThis as typeof globalThis & {
   IS_REACT_ACT_ENVIRONMENT?: boolean
@@ -877,5 +878,22 @@ describe('legacy license panes next to the UniWork account', () => {
     expect(host.textContent).not.toContain('No account number')
     await renderPane(createElement(BillingPaymentPane, { lang: 'en' }))
     expect(host.textContent).toContain('No account number')
+  })
+})
+
+describe('organization step after sign-in', () => {
+  it('opens Settings › Account with the step when the account must choose an organization', async () => {
+    const choosing = {
+      ...statusFor('signed-in', { org: undefined }),
+      needsOrgChoice: true,
+    } as AccountStatus
+    await render(choosing, { open: false })
+    expect(host.querySelector('[role="radiogroup"]')).not.toBeNull()
+    expect(pane()?.textContent).toContain(uniworkDocumentStrings.en.uwOrgPickTitle)
+  })
+
+  it('leaves Settings closed for an account with a chosen organization', async () => {
+    await render(statusFor('signed-in'), { open: false })
+    expect(pane()).toBeNull()
   })
 })

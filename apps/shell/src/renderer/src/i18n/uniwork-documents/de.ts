@@ -102,4 +102,39 @@ export const de = {
   uwLockNewerStoreTitle: 'Eine neuere App-Version ist erforderlich',
   uwLockNewerStore:
     'Diese Daten erfordern eine neuere App-Version. Aktualisieren Sie UniWork Office; es wurde nichts gelöscht und keine neue Speicherung erstellt.',
+  // S16 organization choice, S17 shared-with-me and document details
+  uwOrgPickTitle: 'Organisation auswählen',
+  uwOrgPickBody:
+    'Ihr Konto gehört zu mehreren Organisationen. Sie können das später unter Einstellungen › Konto ändern.',
+  uwOrgPickRole: 'Rolle: {role}',
+  uwOrgPickContinue: 'Weiter',
+  uwOrgPickRememberedGone:
+    'Die zuletzt gewählte Organisation ist nicht mehr verfügbar. Bitte wählen Sie erneut.',
+  uwOrgRowSuspended: 'Die Organisation ist gesperrt',
+  uwOrgRowDeactivated: 'Ihr Konto ist in dieser Organisation deaktiviert',
+  uwOrgAllBlocked:
+    'Sie können derzeit in keiner Organisation arbeiten. Wenden Sie sich an Ihren Administrator.',
+  uwOrgPickError: 'Ihre Organisationen konnten nicht geladen werden.',
+  uwOrgSettingsLabel: 'Aktive Organisation',
+  uwLibShared: 'Für mich freigegeben',
+  uwLibSharedEmpty: 'Bisher wurde nichts direkt für Sie freigegeben.',
+  uwLibSharedPartial:
+    'Es wurden nur die bisher geladenen Dokumente durchsucht. Laden Sie mehr, um weiterzusuchen.',
+  uwLibWsRole: '{workspace} · {role}',
+  uwDocInfo: 'Details',
+  uwDocInfoFor: 'Details zu „{name}“',
+  uwDocInfoClose: 'Details schließen',
+  uwDocInfoOwner: 'Eigentümer',
+  uwDocInfoCreated: 'Erstellt',
+  uwDocInfoUpdated: 'Aktualisiert',
+  uwDocInfoMyAccess: 'Mein Zugriff',
+  uwDocInfoVersion: 'Version',
+  uwDocInfoByAt: '{name}, {time}',
+  uwDocInfoVersionBy: '{version} · {name}',
+  uwAccessView: 'Ansehen',
+  uwAccessEdit: 'Bearbeiten',
+  uwAccessManage: 'Verwalten',
+  uwRoleOwner: 'Eigentümer',
+  uwRoleAdmin: 'Administrator',
+  uwRoleMember: 'Mitglied',
 } satisfies Record<keyof typeof zh, string>

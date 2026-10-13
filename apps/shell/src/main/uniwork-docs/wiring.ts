@@ -3,10 +3,12 @@ import { join } from 'node:path'
 import { COMMENTS_CHANNELS } from '@genoffice/electron-utils/comments-ipc'
 import {
   UNIWORK_DOC_CHANNELS,
+  type AccountStatus,
   type UniworkConflictChoice,
   type UniworkDocFormat,
   type UniworkDocListQuery,
   type UniworkDocLock,
+  type UniworkSharedQuery,
 } from '../../shared/home-api'
 import { createLaunchPusher, createPushHolder, type LaunchPushTarget } from './launch'
 import {
@@ -20,7 +22,11 @@ import {
   uniworkSessionIdentity,
 } from '../uniwork-auth'
 import { AccountBoundary } from './account-boundary'
-import { createUniworkComments, type UniworkCommentsHandle } from './comments-wiring'
+import {
+  createUniworkComments,
+  type DiscussionPushTarget,
+  type UniworkCommentsHandle,
+} from './comments-wiring'
 import type { CommentsRevealPayload } from '@genoffice/electron-utils/comments-ipc'
 import { setUniworkCloseGuard } from './close-guard'
 import { INTENT_STORE_REGISTRATION } from '../uniwork-sync/intent-store'
@@ -78,6 +84,15 @@ export interface UniworkDocsWiring {
    * pulled for exactly that path; undefined when nothing shows one.
    */
   commentsPathFor?(sender: { id: number }): string | undefined
+  /**
+   * G8-11: the file paths open as tabs of the window whose shell webContents
+   * is `sender`; null for any other sender (the discussion bridge is refused).
+   */
+  discussionTabPaths?(sender: { id: number }): readonly string[] | null
+  /** G8-11: the shell webContents that has `path` open as a tab, for the reveal push */
+  discussionTarget?(path: string): DiscussionPushTarget | null
+  /** G8-11: narrow / restore the active editor view of the sender's window */
+  setDiscussionPanel?(sender: { id: number }, panel: { open: boolean; width: number }): void
   lang(): string
   defaultSaveDir(): string
   /** every file path a tab or detached editor window shows */
@@ -296,6 +311,18 @@ export interface SyncRuntimeSeam {
 }
 
 /**
+ * G8-16 S16: the one organization the change-feed may touch - the chosen org
+ * of the signed-in account, and only once the choice is made. Null while the
+ * picker is up (or no org is chosen), so no capability, workspace or feed call
+ * can run for a non-selected org or before the choice. Read on every pass, so
+ * a pass that outlives its choice makes no call either.
+ */
+export function feedOrgId(status: AccountStatus): string | null {
+  if (status.state !== 'signed-in' || status.needsOrgChoice) return null
+  return status.org?.id ?? null
+}
+
+/**
  * The change-feed runtime of the shell: one FeedConsumer per (org, workspace)
  * of the signed-in account, over the shared durable store, started on sign-in
  * and re-run on a 60 s poll. There is no desktop realtime channel today, so
@@ -352,10 +379,13 @@ export function createSyncRuntime(
     return docs && feed ? { docs, feed, capability } : null
   }
   const targets: SyncRuntimeTargets = {
-    orgs: () =>
-      uniworkAccount()
-        .status()
-        .orgs?.map((org) => org.id) ?? [],
+    // G8-16 S16: the chosen org of the live session only. The feed never
+    // touches another org of the account, a non-active one, or anything at
+    // all while the picker is up (this is read on every pass).
+    orgs: () => {
+      const orgId = feedOrgId(uniworkAccount().status())
+      return orgId ? [orgId] : []
+    },
     workspaces: async (orgId) => {
       const found = clients()
       if (!found) return []
@@ -413,7 +443,10 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     // a locked keychain is the account's state, not the session's: a cold
     // restore has no session and must still lock the saved account's copies
     keystoreLocked: () => uniworkAccount().status().state === 'keystore-locked',
-    selectedOrgId: () => uniworkAccount().status().org?.id ?? null,
+    selectedOrg: () => {
+      const org = uniworkAccount().status().org
+      return org ? { id: org.id, slug: org.slug } : null
+    },
     authorized: (call) => authorizedRequest(call),
     openPath: (path) => {
       // G5-04g: a newer store is refused before any module sees the path
@@ -462,11 +495,27 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     },
     // R1-2: the sender's own path scopes the pending-reveal pull
     shownPath: (sender) => wiring.commentsPathFor?.(sender) ?? null,
+    // G8-11: the shell Discussion panel's bridge, served only for the shell
+    // webContents and the open tabs of its window
+    ...(wiring.discussionTabPaths
+      ? {
+          shellTabPaths: (sender: { id: number }) => wiring.discussionTabPaths?.(sender) ?? null,
+          shellTarget: (path: string) => wiring.discussionTarget?.(path) ?? null,
+          setDiscussionPanel: (sender: { id: number }, panel: { open: boolean; width: number }) =>
+            wiring.setDiscussionPanel?.(sender, panel),
+        }
+      : {}),
   })
 
   ipcMain.handle(UNIWORK_DOC_CHANNELS.listWorkspaces, () => service.listWorkspaces())
   ipcMain.handle(UNIWORK_DOC_CHANNELS.listDocuments, (_event, query: unknown) =>
     service.listDocuments((query ?? {}) as UniworkDocListQuery),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.listSharedWithMe, (_event, query: unknown) =>
+    service.listSharedWithMe((query ?? {}) as UniworkSharedQuery),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.documentProperties, (_event, documentId: unknown) =>
+    service.documentProperties(documentId as string),
   )
   ipcMain.handle(UNIWORK_DOC_CHANNELS.openDocument, (_event, documentId: unknown) =>
     service.openDocument(documentId as string),
@@ -530,18 +579,27 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     comments,
     activate(startLaunch) {
       let signedIn = uniworkAccount().status().state === 'signed-in'
+      /** the org the feed currently runs for; null = no pass may run */
+      let feedOrg: string | null = null
       onUniworkAccountStatus((status) => {
         // the session's account may have changed: it becomes the last owner
         service.noteSessionIdentity()
+        // G8-16 S16: changing the organization reloads the library data
+        service.noteSelectedOrg(status.org?.id ?? null)
         const identity = uniworkSessionIdentity()
         if (identity) void boundary.enforce(identity).catch(() => undefined)
         const now = status.state === 'signed-in'
         if (now && !signedIn) void service.launch.onSignedIn()
         signedIn = now
-        // the feed runs only for a live session: start on sign-in (one pass
-        // plus the 60 s poll), stop on sign-out, a lock or a switch
-        if (now && identity) runtime.start()
-        else runtime.stop()
+        // the feed runs only for the chosen org of a live session: while the
+        // picker is up nothing starts, and the choice's own status push starts
+        // it for that org (one pass plus the 60 s poll). Sign-out, a lock, an
+        // account switch or an org change stops the pass it replaces.
+        const target = identity ? feedOrgId(status) : null
+        if (target === feedOrg) return
+        runtime.stop()
+        feedOrg = target
+        if (target) runtime.start()
       })
       startLaunch((url) => void service.launch.handleUrl(url))
     },

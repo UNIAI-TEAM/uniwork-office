@@ -12,6 +12,8 @@ import { HTML_WEB_CAPABILITIES, createHtmlWebApi, htmlModuleGrants } from './web
 
 export const bridge = installModuleBridge({
   module: 'html',
+  // the frame Discussion panel + `comments` claim (S13; this format has no anchored comments)
+  frameComments: true,
   // what the bundle supports (effective = frame ∩ host grant); exportPdf = print dialog,
   // exportHtml = in-frame single-file download
   frameCapabilities: {

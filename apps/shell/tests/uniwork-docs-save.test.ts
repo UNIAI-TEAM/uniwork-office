@@ -267,7 +267,7 @@ function setup(
     profile: () => profile,
     identity: () =>
       account ? { accountId: account, deviceSessionId: 'dev_1', deploymentId: 'default' } : null,
-    selectedOrgId: () => 'org_a',
+    selectedOrg: () => ({ id: 'org_a', slug: 'acme' }),
     authorized: <T>(call: (token: string) => Promise<T>) => call(TOKEN),
     fetch: server.fetch,
     openPath: vi.fn(() => true),

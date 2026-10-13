@@ -1,0 +1,644 @@
+/* Shared collab panel (S12 comments / S13 Discussion). Tokens only (tokens.css + the app's --accent /
+ * --accent-soft, with shared fallbacks); light and dark come from the token blocks. Targets >= 24px,
+ * >= 44px under a coarse pointer. Layout mirrors the genoffice side panes (header bar, card threads). */
+@import './collab-body.css';
+@import './collab-composer.css';
+
+/* ---------- base ---------- */
+
+.collab-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.collab-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 100%;
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--gs-font-sans);
+  font-size: var(--text-small);
+  line-height: 1.5;
+  border-left: 1px solid var(--border);
+}
+
+.collab-panel :focus-visible {
+  outline: 2px solid var(--accent, var(--color-brand-secondary));
+  outline-offset: 2px;
+}
+
+.collab-btn,
+.collab-link,
+.collab-ico,
+.collab-group-toggle,
+.collab-menu-item {
+  font: inherit;
+  cursor: pointer;
+  min-height: 24px;
+  min-width: 24px;
+}
+
+.collab-btn {
+  font-size: var(--text-small);
+  font-weight: 500;
+  padding: 4px 12px;
+  min-height: 28px;
+  border-radius: var(--radius-6);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.collab-btn:hover {
+  background: var(--hover);
+}
+
+.collab-btn--primary {
+  background: var(--color-dialog-primary);
+  border-color: var(--color-dialog-primary);
+  color: var(--color-dialog-primary-text);
+}
+
+.collab-btn--primary:hover {
+  background: var(--color-dialog-primary-hover);
+}
+
+.collab-btn--danger {
+  background: var(--danger-bg);
+  border-color: var(--danger-border);
+  color: var(--danger-text);
+}
+
+.collab-btn[aria-disabled='true'] {
+  color: var(--text-secondary);
+  background: var(--surface-subtle);
+  border-color: var(--border-strong);
+  cursor: not-allowed;
+}
+
+.collab-link {
+  border: 0;
+  background: transparent;
+  color: var(--accent, var(--color-brand-secondary));
+  padding: 2px 6px;
+  border-radius: var(--radius-6);
+  font-size: var(--text-caption);
+}
+
+.collab-link:hover {
+  background: var(--hover);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.collab-ico {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-6);
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.collab-ico:hover,
+.collab-ico[aria-expanded='true'] {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.collab-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-30);
+  font-size: var(--text-caption);
+  line-height: 1.4;
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.collab-badge--ok {
+  background: var(--success-bg);
+  border-color: var(--success-border);
+  color: var(--success);
+}
+
+.collab-cap {
+  margin: 0;
+  font-size: var(--text-caption);
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.collab-cap--err,
+.collab-why--err {
+  color: var(--danger-text);
+}
+
+.collab-why {
+  margin: 4px 12px 8px;
+  font-size: var(--text-caption);
+}
+
+/* ---------- panel ---------- */
+
+.collab-ph {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px 6px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--chrome-bg);
+  flex: none;
+}
+
+.collab-title {
+  margin: 0;
+  font-size: var(--text-small);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.collab-close {
+  margin-left: auto;
+}
+
+.collab-pnote {
+  margin: 0;
+  padding: 8px 12px;
+  font-size: var(--text-caption);
+  line-height: 1.4;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+  flex: none;
+}
+
+.collab-pnote--warn {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  border-bottom-color: var(--warning-border);
+}
+
+.collab-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.collab-list {
+  list-style: none;
+  margin: 0;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.collab-list[hidden] {
+  display: none;
+}
+
+.collab-empty {
+  margin: 0;
+  padding: 20px 16px;
+  color: var(--text-secondary);
+}
+
+.collab-msg {
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.collab-msg p {
+  margin: 0;
+}
+
+.collab-msg-title {
+  font-weight: 600;
+}
+
+.collab-msg-body {
+  color: var(--text-secondary);
+}
+
+.collab-skelwrap {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.collab-skelc {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-8);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.collab-skel {
+  display: block;
+  height: 10px;
+  border-radius: 5px;
+  background: var(--border);
+}
+
+.collab-group {
+  margin: 0 8px 8px;
+}
+
+.collab-group-toggle {
+  width: 100%;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  text-align: left;
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-6);
+  background: var(--surface-subtle);
+  color: var(--text);
+}
+
+.collab-group-toggle:hover {
+  background: var(--bg-hover-subtle);
+}
+
+.collab-caret {
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 5px solid currentColor;
+  transition: transform var(--transition-fast, 0.12s);
+}
+
+.collab-group-toggle[aria-expanded='true'] .collab-caret {
+  transform: rotate(90deg);
+}
+
+.collab-group > .collab-list {
+  padding: 8px 0 0;
+}
+
+.collab-infile {
+  padding: 8px 4px 0;
+}
+
+.collab-comp-root {
+  flex: none;
+  border-top: 1px solid var(--border);
+  padding: 8px 12px 10px;
+  background: var(--surface);
+}
+
+/* ---------- thread ---------- */
+
+.collab-thread {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-8);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.collab-thread:focus-within {
+  border-color: var(--accent, var(--color-brand-secondary));
+}
+
+.collab-thread--resolved {
+  background: var(--surface-subtle);
+}
+
+.collab-th {
+  margin: 0;
+  padding: 8px 12px 4px;
+  font-size: var(--text-caption);
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  border-left: 3px solid var(--accent, var(--color-brand-secondary));
+}
+
+.collab-th--stale {
+  border-left-color: var(--warning-text);
+}
+
+.collab-th--lost {
+  border-left-color: var(--danger-text);
+  border-left-style: dashed;
+}
+
+.collab-th--plain {
+  border-left-color: transparent;
+}
+
+.collab-al {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text);
+}
+
+.collab-cm {
+  padding: 4px 12px 8px;
+}
+
+.collab-cm + .collab-cm {
+  border-top: 1px solid var(--border);
+}
+
+.collab-replies {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.collab-replies[hidden] {
+  display: none;
+}
+
+.collab-cm--reply {
+  margin-left: 14px;
+  padding-left: 10px;
+  border-left: 2px solid var(--border);
+}
+
+.collab-cmh {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 2px;
+  min-height: 24px;
+  font-size: var(--text-caption);
+  font-weight: 400;
+}
+
+h3.collab-cmh {
+  padding: 4px 0 0;
+  border-left: 0;
+  color: var(--text);
+}
+
+.collab-av {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 600;
+  background: var(--accent-soft, var(--bg-hover-subtle));
+  color: var(--accent, var(--color-brand-secondary));
+  border: 1px solid var(--border);
+}
+
+.collab-au {
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.collab-dt {
+  margin-left: auto;
+  color: var(--text-secondary);
+  flex: none;
+}
+
+.collab-bd {
+  overflow-wrap: anywhere;
+}
+
+.collab-acts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 2px;
+  margin-top: 2px;
+}
+
+.collab-replies-toggle {
+  margin: 0 12px 6px;
+}
+
+.collab-tomb {
+  scroll-margin: 8px 0;
+  margin: 2px 0;
+  padding: 6px 10px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-6);
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+}
+
+.collab-tdel {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin: 0 12px 8px;
+  padding: 6px 8px;
+  font-size: var(--text-caption);
+  color: var(--danger-text);
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+  border-radius: var(--radius-6);
+}
+
+.collab-comp-slot {
+  border-top: 1px solid var(--border);
+  padding: 8px 12px 10px;
+}
+
+/* actions menu */
+.collab-menu-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.collab-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 20;
+  min-width: 180px;
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-8);
+  box-shadow: var(--shadow-menu);
+}
+
+.collab-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 4px 10px;
+  min-height: 28px;
+  border: 0;
+  border-radius: var(--radius-6);
+  background: transparent;
+  color: var(--text);
+  font-size: var(--text-small);
+}
+
+.collab-menu-item:hover,
+.collab-menu-item:focus {
+  background: var(--hover);
+}
+
+/* edit */
+.collab-edit {
+  margin-top: 2px;
+}
+
+.collab-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 56px;
+  font: inherit;
+  font-size: var(--text-small);
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-6);
+  padding: 6px 8px;
+  resize: vertical;
+}
+
+.collab-edit-acts {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+/* history */
+.collab-hist {
+  margin: 6px 0 2px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-8);
+  background: var(--surface-subtle);
+}
+
+.collab-hist-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.collab-hist-head h4 {
+  margin: 0;
+  font-size: var(--text-small);
+  font-weight: 600;
+}
+
+.collab-hist-list {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+}
+
+.collab-hist-list li {
+  padding: 6px 0;
+  border-top: 1px solid var(--border);
+}
+
+.collab-hist-list li:first-child {
+  border-top: 0;
+}
+
+/* dialog (delete, discard) */
+.collab-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  background: var(--color-dialog-scrim);
+}
+
+.collab-dialog {
+  width: min(400px, calc(100vw - 32px));
+  padding: 20px;
+  background: var(--surface);
+  color: var(--text);
+  border-radius: var(--radius-12);
+  box-shadow: var(--shadow-modal-strong);
+}
+
+.collab-dialog-title {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.collab-dialog-body {
+  margin: 0 0 16px;
+  color: var(--text-secondary);
+}
+
+.collab-dialog-acts {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+@media (pointer: coarse) {
+  .collab-btn,
+  .collab-link,
+  .collab-ico,
+  .collab-group-toggle,
+  .collab-menu-item {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* the Edited link sits in the author row: keep the row's rhythm (24px) and reach 44px with a hit area that
+   extends over the row's own padding instead of making the row taller */
+@media (pointer: coarse) {
+  .collab-cmh .collab-link {
+    position: relative;
+    min-height: 24px;
+    min-width: 24px;
+  }
+
+  .collab-cmh .collab-link::after {
+    content: '';
+    position: absolute;
+    inset: -10px -4px;
+  }
+}

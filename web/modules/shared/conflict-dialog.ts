@@ -79,6 +79,11 @@ export interface ConflictIo {
     /** the largest file the host's `api.download` accepts (`init.downloadMaxBytes`), if it said */
     maxBytes?: number
   }
+  /**
+   * `reload` opens the Reload confirm directly (the S6 bar's "Reload latest…": there is no save
+   * conflict to compare); Back and the close X then end the dialog as `cancelled`
+   */
+  start?: 'reload'
   /** default: navigator.onLine */
   online?: () => boolean
   /** the dialog's marker attribute / backdrop class (module conventions) */
@@ -91,7 +96,12 @@ export type ConflictOutcome =
   | { kind: 'overwritten'; versionId?: string; file?: FileMeta }
   | { kind: 'reloaded' }
   | { kind: 'cancelled' }
-  | { kind: 'failed'; code: 'unauthorized' | 'forbidden' | 'not_found' | 'internal' }
+  | {
+      kind: 'failed'
+      code: 'unauthorized' | 'forbidden' | 'not_found' | 'internal'
+      /** the server's own reason of a 403 (`details.apiCode`), when the Overwrite got one */
+      apiCode?: string
+    }
 
 export const CONFLICT_MARKER = 'conflict'
 
@@ -451,7 +461,11 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
   }
 
   /** a closing variant (revoked, deleted, organisation blocked): one sentence and Close */
-  async function closing(body: string, code: 'forbidden' | 'not_found'): Promise<ConflictOutcome> {
+  async function closing(
+    body: string,
+    code: 'forbidden' | 'not_found',
+    apiCode?: string,
+  ): Promise<ConflictOutcome> {
     await dialog.step({
       title: io.title,
       body,
@@ -459,7 +473,7 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
       cancelId: 'close',
       focusId: FOCUS_TITLE,
     })
-    return { kind: 'failed', code }
+    return { kind: 'failed', code, ...(apiCode ? { apiCode } : {}) }
   }
 
   /** Reload: replace the document with the head, or stay with the failure line */
@@ -474,7 +488,7 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
 
   try {
     for (;;) {
-      const choice = await step1()
+      const choice = io.start === 'reload' ? 'reload' : await step1()
       focus = 'cancel'
       if (choice === 'cancel') return failure ?? { kind: 'cancelled' }
 
@@ -525,6 +539,7 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
               ? format(t('uwRemoteOrgBlockedWeb'), { reason: t(reason) })
               : t('uwRemoteRevokedWeb'),
             'forbidden',
+            typeof apiCode === 'string' ? apiCode : undefined,
           )
         }
         if (code === 'not_found') return await closing(t('uwRemoteDeleted'), 'not_found')
@@ -543,6 +558,8 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
         stepFocus = 'back'
         if (picked === 'cancel') return failure ?? { kind: 'cancelled' }
         if (picked === 'back') {
+          // opened from the new-version bar there is no step 1 to go back to
+          if (io.start === 'reload') return failure ?? { kind: 'cancelled' }
           focus = 'reload'
           break
         }

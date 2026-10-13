@@ -343,7 +343,12 @@ describe('Overwrite…', () => {
       format(t('uwRemoteOrgBlockedWeb'), { reason: t('uwReasonSuspended') }),
     )
     btn('close').click()
-    expect(await done).toEqual({ kind: 'failed', code: 'forbidden' })
+    // the outcome carries the server's reason, so the frame can show the organisation bar afterwards
+    expect(await done).toEqual({
+      kind: 'failed',
+      code: 'forbidden',
+      apiCode: 'organization_suspended',
+    })
   })
 
   it('410: the deleted variant; answers not_found', async () => {
@@ -485,6 +490,49 @@ describe('Reload latest (web)', () => {
     expect(alertLine().textContent).toBe(t('uwConflictDownloadFailed'))
     expect(choices()).toEqual(['download', 'discard', 'back'])
     expect(fake.reload).not.toHaveBeenCalled()
+  })
+
+  describe('opened from the new-version bar (start: reload)', () => {
+    it('opens the Reload confirm at once: no table, no Overwrite…; focus Back', async () => {
+      const fake = io({ start: 'reload' })
+      const done = runConflictDialog(fake)
+      await shown()
+      expect(card().querySelector('h2')!.textContent).toBe(t('uwConflictReloadTitle'))
+      expect(card().querySelector('table')).toBeNull()
+      expect(choices()).toEqual(['discard', 'back'])
+      expect(document.activeElement).toBe(btn('back'))
+      await pick('discard')
+      expect(await done).toEqual({ kind: 'reloaded' })
+      expect(fake.reload).toHaveBeenCalledTimes(1)
+      // no save conflict to read: the head table is never fetched
+      expect(fake.overwrite).not.toHaveBeenCalled()
+    })
+
+    it('Back (there is no step 1 to return to) ends it as cancelled', async () => {
+      const fake = io({ start: 'reload' })
+      const done = runConflictDialog(fake)
+      await shown()
+      btn('back').click()
+      expect(await done).toEqual({ kind: 'cancelled' })
+      expect(fake.reload).not.toHaveBeenCalled()
+    })
+
+    it('Escape ends it as cancelled', async () => {
+      const fake = io({ start: 'reload' })
+      const done = runConflictDialog(fake)
+      await shown()
+      keydown('Escape')
+      expect(await done).toEqual({ kind: 'cancelled' })
+      expect(fake.reload).not.toHaveBeenCalled()
+    })
+
+    it('a failed reload keeps the dialog with the line', async () => {
+      const fake = io({ start: 'reload', reload: vi.fn(async () => false) })
+      void runConflictDialog(fake)
+      await pick('discard')
+      expect(alertLine().textContent).toBe(t('uwConflictReloadFailed'))
+      expect(choices()).toEqual(['discard', 'back'])
+    })
   })
 
   describe('download cap (init.downloadMaxBytes, X-02 r2b)', () => {

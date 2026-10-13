@@ -100,6 +100,8 @@ export const ar = {
   uwRemoteReloadFailed: 'تعذّر تحميل الإصدار {n}. ما زلت تعرض الإصدار السابق.',
   uwRemoteDeleted: 'حُذف هذا المستند على UniWork. توقفت عمليات الحفظ في قائمة الانتظار.',
   uwAuthorFallback: 'أحد الأعضاء',
+  uwLockRegion: 'حالة المستند',
+  uwActRetry: 'إعادة المحاولة',
 
   // S6 new-version bar (web only)
   uwRemoteRevokedWeb:

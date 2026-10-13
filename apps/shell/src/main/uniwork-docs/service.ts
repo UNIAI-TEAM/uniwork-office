@@ -10,10 +10,14 @@ import type {
   UniworkDocListPage,
   UniworkDocListQuery,
   UniworkDocLock,
+  UniworkDocProperties,
+  UniworkDocSummary,
   UniworkDocStatus,
   UniworkLaunchEvent,
   UniworkLockReason,
   UniworkResult,
+  UniworkSharedPage,
+  UniworkSharedQuery,
   UniworkWorkspaceRef,
 } from '../../shared/home-api'
 import {
@@ -132,7 +136,8 @@ export interface UniworkDocsServiceDeps {
    * restore has none), so the S11 lock and the save refusal still happen.
    */
   keystoreLocked?(): boolean
-  selectedOrgId(): string | null
+  /** the selected organization: id for org-scoped routes, slug for the members read */
+  selectedOrg(): { id: string; slug: string } | null
   authorized<T>(call: (token: string) => Promise<T>): Promise<T>
   fetch?: FetchLike
   /** the shell's single document router; false = nothing opened */
@@ -200,6 +205,29 @@ const UNSENT_STATES: ReadonlySet<string> = new Set([
  */
 export const CLOSE_SAVE_WAIT_MS = 30_000
 
+/** shared-with-me aggregation bounds (one workspace page, total rows, total pages) */
+const SHARED_PAGE_SIZE = 50
+const SHARED_MAX_ROWS = 500
+const SHARED_MAX_PAGES = 10
+
+/**
+ * The org member list is paged by D (default 50, max 100 rows per page). The
+ * properties panel needs the whole directory to resolve any actor id, so the
+ * reads follow `next_cursor` until the end or this cap. 20 pages x 100 rows
+ * bounds one logical read at 2000 members, so a pathological tenant cannot
+ * make a panel open unbounded; a bigger org simply shows "—" for members past
+ * the cap (documented residual, no D change).
+ */
+const MEMBERS_PAGE_SIZE = 100
+const MEMBERS_MAX_PAGES = 20
+
+/** `shared:<n>` -> n; anything else is the first page */
+function parseOffsetCursor(cursor: string | undefined): number {
+  if (!cursor) return 0
+  const match = /^shared:(\d+)$/.exec(cursor)
+  return match ? Number(match[1]) : 0
+}
+
 async function result<T>(run: () => Promise<T>): Promise<UniworkResult<T>> {
   try {
     return { ok: true, value: await run() }
@@ -248,6 +276,13 @@ export class UniworkDocsService {
   private readonly hashMemo = new Map<string, { mtimeMs: number; size: number; checksum: string }>()
   /** working copies whose editor holds edits not written to the file yet */
   private readonly editorDirty = new Set<string>()
+  /** id -> display name of one org's members; dropped when the selected org changes */
+  private orgMemberNames = new Map<string, string>()
+  /** the org whose member names the map holds (null = nothing cached) */
+  private orgMemberNamesOrg: string | null = null
+  /** the one in-flight members read per org, shared by concurrent panel opens */
+  private orgMemberNamesInFlight: { orgId: string; promise: Promise<Map<string, string>> } | null =
+    null
   /** per path, the saveMark of its last user Save */
   private readonly lastUserSave = new Map<string, number>()
   private saveCounter = 0
@@ -613,6 +648,21 @@ export class UniworkDocsService {
     )
   }
 
+  /**
+   * G8-16 S16: the selected organization changed. The member-name map belongs
+   * to one org, so it is dropped (the library lists are re-read by the
+   * renderer on the same status push; nothing else here caches a library).
+   */
+  noteSelectedOrg(orgId: string | null): void {
+    if (this.orgMemberNamesOrg !== null && this.orgMemberNamesOrg !== orgId) {
+      this.orgMemberNames = new Map()
+      this.orgMemberNamesOrg = null
+    }
+    if (this.orgMemberNamesInFlight && this.orgMemberNamesInFlight.orgId !== orgId) {
+      this.orgMemberNamesInFlight = null
+    }
+  }
+
   /** the binding belongs to the signed-in account and the active deployment */
   owns(doc: BoundDocument): boolean {
     const identity = this.liveIdentity()
@@ -836,9 +886,198 @@ export class UniworkDocsService {
   listWorkspaces(): Promise<UniworkResult<UniworkWorkspaceRef[]>> {
     return result(async () => {
       if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
-      const orgId = this.deps.selectedOrgId()
-      return orgId ? this.api().listWorkspaces(orgId) : []
+      // the renderer reloads the library through this call: a member-name read
+      // that failed earlier is retried here
+      this.noteLibraryReload()
+      const org = this.deps.selectedOrg()
+      if (!org) return []
+      const workspaces = await this.api().listWorkspaces(org.id)
+      // S17: each row carries my role. One read per workspace, in parallel; a
+      // failed role read is null (the row still lists, the renderer shows "—").
+      const roles = await Promise.all(
+        workspaces.map((ws) =>
+          this.api()
+            .workspaceRole(ws.id)
+            .catch(() => null),
+        ),
+      )
+      return workspaces.map((ws, index) => ({ ...ws, myRole: roles[index] ?? null }))
     })
+  }
+
+  /**
+   * S17 "Shared with me": the selected org's direct shares, aggregated across
+   * its workspaces (the D route is per workspace), de-duplicated by document
+   * id, newest first, then paged locally. `cursor` is this method's own
+   * opaque offset cursor; a per-workspace page and total-row cap keeps one
+   * call bounded.
+   */
+  listSharedWithMe(query: UniworkSharedQuery = {}): Promise<UniworkResult<UniworkSharedPage>> {
+    return result(async () => {
+      if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+      this.noteLibraryReload()
+      const org = this.deps.selectedOrg()
+      if (!org) return { documents: [], nextCursor: null }
+      const api = this.api()
+      const workspaces = await api.listWorkspaces(org.id)
+      const nameOf = new Map(workspaces.map((ws) => [ws.id, ws.name]))
+      const merged = new Map<string, UniworkDocSummary>()
+      await Promise.all(
+        workspaces.map(async (ws) => {
+          let cursor: string | undefined
+          let pages = 0
+          do {
+            const page: Awaited<ReturnType<typeof api.listSharedWithMe>> =
+              await api.listSharedWithMe({ workspaceId: ws.id, cursor, limit: SHARED_PAGE_SIZE })
+            for (const doc of page.documents) {
+              if (!merged.has(doc.id)) {
+                merged.set(doc.id, {
+                  ...doc,
+                  workspaceName: nameOf.get(doc.workspaceId) ?? ws.name,
+                })
+              }
+            }
+            cursor = page.nextCursor ?? undefined
+            pages += 1
+          } while (cursor && pages < SHARED_MAX_PAGES && merged.size < SHARED_MAX_ROWS)
+        }),
+      )
+      const all = [...merged.values()].sort((a, b) =>
+        a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0,
+      )
+      const limit = Math.min(
+        SHARED_PAGE_SIZE,
+        Math.max(1, Math.floor(Number(query.limit) || SHARED_PAGE_SIZE)),
+      )
+      const offset = parseOffsetCursor(query.cursor)
+      const slice = all.slice(offset, offset + limit)
+      const next = offset + limit < all.length ? `shared:${offset + limit}` : null
+      return { documents: slice, nextCursor: next }
+    })
+  }
+
+  /**
+   * S17 properties panel. Reads GET /documents/{id} for the ids/times/level/
+   * version, then resolves display names best-effort through the org member
+   * list (readable by every member). Anything unresolved stays null ("—").
+   */
+  documentProperties(documentId: string): Promise<UniworkResult<UniworkDocProperties>> {
+    return result(async () => {
+      if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+      if (typeof documentId !== 'string') throw new UniworkDocError('not_found')
+      const properties = await this.api().documentProperties(documentId)
+      const names = await this.memberNames()
+      // a name resolves only for an id in the member list; a person who left
+      // stays null ("—")
+      const nameOf = (id: string | null): string | null => (id ? (names.get(id) ?? null) : null)
+      // an actor is a person only when the kind says so; a `work_product` owner
+      // or an agent/system creator/updater is never shown as a member even if
+      // its id happens to match one. A kind the server did not send stays
+      // lenient (an older server omits it) and is looked up.
+      const personName = (id: string | null, kind: string | null): string | null =>
+        kind === null || kind === 'human' ? nameOf(id) : null
+      return {
+        documentId: properties.id,
+        workspaceId: properties.workspaceId,
+        title: properties.title,
+        // the owner follows D's own rule: only owner_kind === 'human' is a person
+        ownerName: properties.ownerKind === 'human' ? nameOf(properties.ownerId) : null,
+        createdByName: personName(properties.createdById, properties.createdByKind),
+        createdAt: properties.createdAt,
+        updatedByName: personName(properties.updatedById, properties.updatedByKind),
+        updatedAt: properties.updatedAt,
+        myLevel: properties.myLevel,
+        version: properties.currentVersion,
+        // D's DocumentDTO carries no per-version updater: `updated_by` is also
+        // set by a rename/metadata patch, so it must not name the version's
+        // author. Always null until D sends one (see contract residual).
+        versionByName: null,
+        ownerId: properties.ownerId,
+        createdById: properties.createdById,
+        updatedById: properties.updatedById,
+      }
+    })
+  }
+
+  /**
+   * The org's member names (id -> display name), read across D's pages
+   * (`next_cursor`, up to `MEMBERS_MAX_PAGES`). Only a success or a 403/404
+   * (the org will not list members to a plain member) is cached, so the panel
+   * never issues one logical read per document; a network error or 5xx is NOT
+   * cached — the call returns an empty map ("—", no error banner) and the next
+   * panel open retries. At most one logical read per org is in flight:
+   * concurrent panel opens share the same promise. The cache is dropped on an
+   * org change / sign-out (`noteSelectedOrg`) and at the next library reload
+   * (`noteLibraryReload`).
+   */
+  private memberNames(): Promise<Map<string, string>> {
+    const org = this.deps.selectedOrg()
+    if (!org) return Promise.resolve(new Map())
+    if (this.orgMemberNamesOrg === org.id) return Promise.resolve(this.orgMemberNames)
+    if (this.orgMemberNamesInFlight?.orgId === org.id) return this.orgMemberNamesInFlight.promise
+    const promise = this.loadMemberNames(org)
+    this.orgMemberNamesInFlight = { orgId: org.id, promise }
+    return promise
+  }
+
+  private async loadMemberNames(org: { id: string; slug: string }): Promise<Map<string, string>> {
+    try {
+      const names = await this.readAllMemberNames(org.slug)
+      this.orgMemberNames = names
+      this.orgMemberNamesOrg = org.id
+      return names
+    } catch (error) {
+      // a 403/404 is a stable answer ("names unavailable for this org"); a
+      // transient failure is not cached and is retried on the next open
+      const stable =
+        error instanceof UniworkDocError &&
+        (error.code === 'forbidden' || error.code === 'not_found')
+      if (stable) {
+        const empty = new Map<string, string>()
+        this.orgMemberNames = empty
+        this.orgMemberNamesOrg = org.id
+        return empty
+      }
+      return new Map()
+    } finally {
+      if (this.orgMemberNamesInFlight?.orgId === org.id) this.orgMemberNamesInFlight = null
+    }
+  }
+
+  /**
+   * Every member of the org as id -> display name, following D's `next_cursor`
+   * across pages. One logical read per org (the caller caches the result and
+   * dedupes concurrent opens), so an org larger than one page still resolves
+   * names from later pages. `MEMBERS_MAX_PAGES` caps the walk.
+   */
+  private async readAllMemberNames(orgSlug: string): Promise<Map<string, string>> {
+    const api = this.api()
+    const names = new Map<string, string>()
+    let cursor: string | undefined
+    let pages = 0
+    do {
+      const page = await api.listOrgMembers({
+        orgSlug,
+        limit: MEMBERS_PAGE_SIZE,
+        ...(cursor ? { cursor } : {}),
+      })
+      for (const member of page.members) names.set(member.userId, member.displayName)
+      cursor = page.nextCursor ?? undefined
+      pages += 1
+    } while (cursor && pages < MEMBERS_MAX_PAGES)
+    return names
+  }
+
+  /**
+   * The renderer re-read the library (picker open, Retry, or the org-change
+   * status push): the org member-name cache is dropped so a read that failed
+   * earlier is retried at this point, not on every properties panel.
+   */
+  noteLibraryReload(): void {
+    // a read still in flight settles its own cache entry; only the settled
+    // map is dropped here, so the one-in-flight rule is not broken
+    this.orgMemberNames = new Map()
+    this.orgMemberNamesOrg = null
   }
 
   listDocuments(query: UniworkDocListQuery): Promise<UniworkResult<UniworkDocListPage>> {

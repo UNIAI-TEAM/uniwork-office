@@ -98,6 +98,8 @@ export const zhTW = {
   uwRemoteReloadFailed: '無法載入版本 {n}。你仍在檢視之前的版本。',
   uwRemoteDeleted: '此文件已在 UniWork 中刪除。佇列中的儲存已停止。',
   uwAuthorFallback: '一位成員',
+  uwLockRegion: '文件狀態',
+  uwActRetry: '重試',
 
   // S6 new-version bar (web only)
   uwRemoteRevokedWeb:

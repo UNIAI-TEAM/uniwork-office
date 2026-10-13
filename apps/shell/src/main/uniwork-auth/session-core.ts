@@ -28,8 +28,10 @@ export interface AccountManagerDeps {
   credentials: CredentialStore
   /** opens the validated authorization URL in the system browser */
   openBrowser(url: string, profile: DeploymentProfile): Promise<void>
+  /** the remembered organization of this machine: `{ accountId, orgId }` or a legacy value */
   readSelectedOrgId(): unknown
-  persistSelectedOrgId(orgId: string): void
+  /** remembers the account's choice on this machine (per account + machine) */
+  persistSelectedOrgId(accountId: string, orgId: string): void
   device?: { label?: string; platform?: string; build?: string }
   attempts?: LoginAttemptStore
   now?: () => number
@@ -72,6 +74,14 @@ export class SessionCore {
   protected accountProfile: AccountProfile | undefined
   protected orgs: OrgResponse[] = []
   protected org: OrgResponse | undefined
+  /** orgs whose membership this account is known to have deactivated (learned on a select) */
+  protected readonly deactivatedOrgIds = new Set<string>()
+  /** G8-16 S16: the renderer must show the picker; no org-scoped call may run yet */
+  protected needsOrgChoice = false
+  /** G8-16 S16: the stored choice is no longer a membership of this account */
+  protected rememberedGone = false
+  /** G8-16 S16: the org list could not be loaded (the picker shows uwOrgPickError) */
+  protected orgsError: AccountErrorCode | undefined
   protected entitlements: AccountEntitlements | null = null
   /** last known plan from the stored credential: shown, never published, until fresh data arrives */
   protected cachedEntitlements: AccountEntitlements | null = null
@@ -105,8 +115,21 @@ export class SessionCore {
       loggedIn: this.state === 'signed-in' || this.state === 'refreshing',
       ...(profile ? { email: profile.email, profile: { ...profile } } : {}),
       state: this.state,
-      ...(showsAccount && this.org ? { org: toAccountOrg(this.org) } : {}),
-      ...(showsAccount && this.orgs.length ? { orgs: this.orgs.map(toAccountOrg) } : {}),
+      ...(showsAccount && this.org
+        ? { org: toAccountOrg(this.org, this.deactivatedOrgIds.has(this.org.id)) }
+        : {}),
+      ...(showsAccount && this.orgs.length
+        ? {
+            orgs: this.orgs.map((org) => toAccountOrg(org, this.deactivatedOrgIds.has(org.id))),
+          }
+        : {}),
+      ...(showsAccount
+        ? {
+            needsOrgChoice: this.needsOrgChoice,
+            rememberedGone: this.rememberedGone,
+            ...(this.orgsError ? { orgsError: this.orgsError } : {}),
+          }
+        : {}),
       ...(showsAccount ? { entitlements: this.entitlements ?? this.cachedEntitlements } : {}),
       ...(this.profile
         ? { serverOrigin: new URL(this.profile.apiOrigin).host, serverUrl: this.profile.apiOrigin }
@@ -448,6 +471,10 @@ export class SessionCore {
     this.accountProfile = undefined
     this.orgs = []
     this.org = undefined
+    this.deactivatedOrgIds.clear()
+    this.needsOrgChoice = false
+    this.rememberedGone = false
+    this.orgsError = undefined
     this.setEntitlements(null)
   }
 

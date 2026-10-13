@@ -8281,11 +8281,16 @@ html[dir='rtl'] .quick-title-row {
   list-style: none;
 }
 
+.uw-pick-item {
+  position: relative;
+}
+
 .uw-pick-row {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 8px;
+  /* the right padding keeps the row text clear of the Details button beside it */
+  padding: 8px 44px 8px 8px;
   border-radius: 8px;
   cursor: pointer;
 }
@@ -8401,6 +8406,156 @@ html[dir='rtl'] .quick-title-row {
 @keyframes uw-skel-pulse {
   50% {
     opacity: 0.45;
+  }
+}
+
+/* the list and the details panel side by side */
+.modal.uw-pick.with-info {
+  width: min(900px, 94vw);
+}
+
+.uw-pick-main {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.uw-pick-main > .uw-pick-body {
+  min-width: 0;
+  border-top: none;
+}
+
+.uw-pick-info-btn {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  transform: translateY(-50%);
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  /* visible on every row at rest: the muted text token keeps the icon >= 3:1 on the row surface */
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.uw-pick-info-btn:hover,
+.uw-pick-info-btn.on {
+  background: var(--bg-hover-strong);
+  color: var(--text);
+}
+
+.uw-pick-info-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.uw-info {
+  display: flex;
+  flex: 0 0 280px;
+  flex-direction: column;
+  min-width: 0;
+  overflow-y: auto;
+  border-left: 1px solid var(--border-subtle);
+  background: var(--surface-subtle);
+}
+
+.uw-info-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 12px 8px 16px;
+}
+
+.uw-info-title {
+  margin: 4px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.uw-info-title:focus {
+  outline: none;
+}
+
+.uw-info-title:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.uw-info-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 4px 16px 16px;
+}
+
+.uw-info-row dt {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.uw-info-row dd {
+  margin: 2px 0 0;
+  color: var(--text);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.uw-info-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 8px 16px;
+}
+
+.uw-info-skeleton .uw-skel-line {
+  width: 80%;
+}
+
+.uw-info-error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 16px;
+  color: var(--danger-text);
+  font-size: 13px;
+}
+
+.uw-info-error p {
+  margin: 0;
+}
+
+@media (max-width: 720px) {
+  .uw-pick-main {
+    flex-direction: column;
+  }
+
+  .uw-info {
+    flex-basis: auto;
+    border-top: 1px solid var(--border-subtle);
+    border-left: none;
+  }
+}
+
+@media (pointer: coarse) {
+  .uw-pick-row {
+    padding-right: 60px;
+  }
+
+  .uw-pick-info-btn {
+    width: 44px;
+    height: 44px;
   }
 }
 
