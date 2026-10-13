@@ -107,6 +107,14 @@ describe('Workbench tab unpin', () => {
     expect(all[4]!.querySelector('.wb-tab-unpin[aria-label="Unpin tab"]')).not.toBeNull()
   })
 
+  it('marks only the active tab, module or pillar, with aria-current="page"', async () => {
+    store.set('uniwork.wb.pillarPins.sales', JSON.stringify(['knowledge']))
+    await mount({ active: 'tasks' })
+    expect(tabs().map((b) => b.getAttribute('aria-current'))).toEqual([null, 'page', null, null])
+    await mount({ active: 'knowledge' })
+    expect(tabs().map((b) => b.getAttribute('aria-current'))).toEqual([null, null, null, 'page'])
+  })
+
   it('CSS hides unpin and the grip until hover, focus or selection, and rounds the underline', () => {
     const css = readFileSync(join(__dirname, '../src/renderer/src/home.css'), 'utf8')
     expect(css).toMatch(/\n\.wb-tab-unpin \{[^}]*\n  opacity: 0;/)

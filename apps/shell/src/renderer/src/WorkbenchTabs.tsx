@@ -182,6 +182,7 @@ export function WorkbenchTabs({
             key={id}
             type="button"
             draggable
+            aria-current={active === id ? 'page' : undefined}
             className={`wb-tab wb-tab-module${active === id ? ' active' : ''}${
               dragging ? ' is-dragging' : ''
             }${over ? ' is-drag-over' : ''}`}
@@ -240,6 +241,7 @@ export function WorkbenchTabs({
         <button
           key={p.id}
           type="button"
+          aria-current={active === p.id ? 'page' : undefined}
           className={`wb-tab wb-tab-module${active === p.id ? ' active' : ''}`}
           onClick={() => onSelect(p.id)}
           title={vi ? p.hintVi : p.hintEn}

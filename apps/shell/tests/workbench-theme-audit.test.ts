@@ -64,6 +64,24 @@ describe('Workbench CSS sweep', () => {
   it('paints text in AA colours: no --text-tertiary, no bare --danger', () => {
     expect(selectorsWhere(/(?:^|[\s;])color:\s*var\(--text-tertiary\)/)).toEqual([])
     expect(selectorsWhere(/(?:^|[\s;])color:\s*var\(--danger\)/)).toEqual([])
+    // placeholder-only inputs: the UA default #757575 misses 4.5:1 on dark surfaces;
+    // --text-secondary on --surface / --wb-row-hover is checked in PAIRS below
+    const placeholder = rules.find(
+      (r) => r.selector === '.wb-home :is(input, textarea)::placeholder',
+    )
+    expect(placeholder?.body).toMatch(/(?:^|[\s;])color:\s*var\(--text-secondary\)/)
+  })
+
+  it('keeps the tick state and the active tab visible in forced-colors mode', () => {
+    // forced colors repaint `color`, so the unticked box hides its tick with visibility
+    expect(selectorsWhere(/(?:^|[\s;])color:\s*transparent/)).toEqual([])
+    const body = (selector: string) => rules.find((r) => r.selector === selector)?.body ?? ''
+    expect(body('.wb-check-box svg')).toMatch(/visibility:\s*hidden/)
+    expect(body('.wb-check input:checked + .wb-check-box svg')).toMatch(/visibility:\s*visible/)
+    const forced = /@media \(forced-colors: active\) \{([\s\S]*?)\n\}/.exec(region)?.[1] ?? ''
+    expect(forced).toMatch(
+      /\.wb-check input:checked \+ \.wb-check-box,\s*\.wb-tab\.active::after\s*\{[^}]*forced-color-adjust: none;[^}]*background: Highlight;/,
+    )
   })
 
   it('defines no class the renderer never uses', () => {

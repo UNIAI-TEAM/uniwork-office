@@ -3351,6 +3351,11 @@ body.vib .home {
   max-width: 1180px;
 }
 
+/* placeholder-only inputs: the UA default #757575 misses 4.5:1 on dark surfaces */
+.wb-home :is(input, textarea)::placeholder {
+  color: var(--text-secondary);
+}
+
 /* readable line length for prose (redesign spec 2.3) */
 :where(.wb-home) p {
   max-width: 64ch;
@@ -3505,16 +3510,34 @@ body.vib .home {
   border: 1.5px solid var(--wb-check-border);
   border-radius: 4px;
   background: var(--surface);
-  color: transparent;
   transition:
     background-color 150ms ease,
     border-color 150ms ease;
+}
+
+/* visibility, not color: transparent: forced-colors mode repaints color and would show the tick */
+.wb-check-box svg {
+  visibility: hidden;
 }
 
 .wb-check input:checked + .wb-check-box {
   border-color: var(--accent);
   background: var(--accent);
   color: var(--on-accent);
+}
+
+.wb-check input:checked + .wb-check-box svg {
+  visibility: visible;
+}
+
+/* Windows high contrast: keep the ticked fill and the active-tab underline as system colours */
+@media (forced-colors: active) {
+  .wb-check input:checked + .wb-check-box,
+  .wb-tab.active::after {
+    forced-color-adjust: none;
+    background: Highlight;
+    color: HighlightText;
+  }
 }
 
 .wb-check input:focus-visible + .wb-check-box {
