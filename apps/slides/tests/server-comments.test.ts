@@ -11,10 +11,12 @@ import { act, createElement, createRef, type MutableRefObject } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { LANGS, format } from '@genoffice/i18n'
 import { collabStrings } from '@genoffice/ui/collab'
+import type { CommentsRevealPayload } from '@genoffice/electron-utils/comments-ipc'
 import type {
-  CommentsRevealPayload,
-  UniworkCommentsApi,
-} from '@genoffice/electron-utils/comments-ipc'
+  CommentsContextResult,
+  CommentsSavedPayload,
+  UniworkCommentsSeamApi,
+} from '../src/renderer/comments-seam'
 import {
   anchorUpdatesAfterSave,
   createSlidesAnchorAdapter,
@@ -22,8 +24,8 @@ import {
   pptxAnchorFor,
   selectedObjectId,
   wantsServerComments,
+  sendAnchorsAfterSave,
   type SlideIdentity,
-  type SlidesCommentsContextApi,
 } from '../src/renderer/server-comments'
 import {
   CommentsPane,
@@ -69,8 +71,16 @@ interface Row {
   display_name: string
 }
 
-function fakeBridge(seed: Row[] = []) {
+interface FakeOpts {
+  /** what `context({path})` answers; default: a bound document, version unknown */
+  context?: () => Promise<unknown>
+  /** reject the next `anchors` calls with this protocol error code (400 anchor_version_invalid) */
+  anchorsFail?: { code: string; status?: number; detailsCode?: string }
+}
+
+function fakeBridge(seed: Row[] = [], opts: FakeOpts = {}) {
   const rows = [...seed]
+  const savedHandlers = new Set<(p: CommentsSavedPayload) => void>()
   const calls: Array<{ op: string; input: unknown }> = []
   let seq = 0
   let token = 0
@@ -79,7 +89,7 @@ function fakeBridge(seed: Row[] = []) {
   const ok = (value: unknown) => Promise.resolve({ ok: true, value }) as Promise<never>
   const at = () => `2026-10-13T10:00:${String(seq).padStart(2, '0')}Z`
   const find = (id: string) => rows.find((r) => r.id === id)!
-  const bridge: UniworkCommentsApi = {
+  const bridge: UniworkCommentsSeamApi = {
     list: (input) => {
       calls.push({ op: 'list', input })
       return ok({
@@ -139,6 +149,19 @@ function fakeBridge(seed: Row[] = []) {
     },
     anchors: (input) => {
       calls.push({ op: 'anchors', input })
+      const fail = opts.anchorsFail
+      if (fail) {
+        return Promise.resolve({
+          ok: false,
+          error: {
+            code: fail.code,
+            message: 'rejected',
+            status: fail.status ?? 400,
+            retryable: false,
+            ...(fail.detailsCode ? { details: { code: fail.detailsCode } } : {}),
+          },
+        }) as Promise<never>
+      }
       const updated: string[] = []
       for (const a of input.anchors) {
         const r = find(a.commentId)
@@ -156,9 +179,21 @@ function fakeBridge(seed: Row[] = []) {
       revealHandlers.add(handler)
       return () => revealHandlers.delete(handler)
     },
+    context: (input) => {
+      calls.push({ op: 'context', input })
+      return (
+        opts.context ? opts.context() : ok({ documentId: 'doc-1', versionId: null })
+      ) as Promise<never>
+    },
+    onSaved: (handler) => {
+      savedHandlers.add(handler)
+      return () => savedHandlers.delete(handler)
+    },
   }
   return {
     bridge,
+    emitSaved: (p: CommentsSavedPayload) => savedHandlers.forEach((h) => h(p)),
+    savedListeners: () => savedHandlers.size,
     rows,
     calls,
     ops: () => calls.map((c) => c.op),
@@ -280,31 +315,112 @@ describe('server mode only for a bound document with the bridge', () => {
     expect(wantsServerComments('/tmp/a.pptx', true, bridge)).toBe(true)
   })
 
-  it('the context falls back to view / edit from the read-only flag without the shell call', async () => {
-    expect(await loadCommentsContext(undefined, '/p.pptx', false)).toEqual({
-      documentId: '/p.pptx',
-      level: 'edit',
-    })
-    expect(await loadCommentsContext({}, '/p.pptx', true)).toEqual({
-      documentId: '/p.pptx',
-      level: 'view',
-    })
-    const api: SlidesCommentsContextApi = {
-      uniworkCommentsContext: async () => ({
-        documentId: 'doc-1',
-        versionId: 'v1',
-        userId: 'me',
-        level: 'manage',
-      }),
-    }
-    expect(await loadCommentsContext(api, '/p.pptx', false)).toEqual({
+  it('the context is read from window.uniworkComments.context({path}), field names as the seam', async () => {
+    const ok = (value: CommentsContextResult) => async () => ({ ok: true as const, value })
+    const ctxOf = (reply: () => Promise<unknown>) => ({ context: reply }) as never
+    const calls: unknown[] = []
+    const bridge = {
+      context: async (input: unknown) => {
+        calls.push(input)
+        return ok({ documentId: 'doc-1', versionId: 'v1', myUserId: 'me', level: 'manage' })()
+      },
+    } as never
+    expect(await loadCommentsContext(bridge, '/p.pptx', false)).toEqual({
       documentId: 'doc-1',
       versionId: 'v1',
-      userId: 'me',
+      myUserId: 'me',
       level: 'manage',
     })
-    // a read-only copy never writes
-    expect((await loadCommentsContext(api, '/p.pptx', true)).level).toBe('view')
+    expect(calls).toEqual([{ path: '/p.pptx' }])
+    // versionId may be null (unknown); level / myUserId may be absent (own-comments-only rule)
+    expect(
+      await loadCommentsContext(
+        ctxOf(ok({ documentId: 'doc-1', versionId: null })),
+        '/p.pptx',
+        false,
+      ),
+    ).toEqual({ documentId: 'doc-1', versionId: null })
+    // a read-only copy never writes, whatever the context says
+    expect((await loadCommentsContext(bridge, '/p.pptx', true))?.level).toBe('view')
+  })
+
+  it('an error envelope, a thrown call or a malformed answer is no server context', async () => {
+    const ctxOf = (reply: () => Promise<unknown>) => ({ context: reply }) as never
+    const notFound = async () => ({
+      ok: false as const,
+      error: { code: 'not_found', message: 'unbound' },
+    })
+    expect(await loadCommentsContext(ctxOf(notFound), '/p.pptx', false)).toBeNull()
+    expect(
+      await loadCommentsContext(
+        ctxOf(async () => {
+          throw new Error('ipc gone')
+        }),
+        '/p.pptx',
+        false,
+      ),
+    ).toBeNull()
+    for (const value of [
+      null,
+      { versionId: 'v1' },
+      { documentId: '', versionId: null },
+      { documentId: 'doc-1', versionId: 7 },
+    ]) {
+      expect(
+        await loadCommentsContext(
+          ctxOf(async () => ({ ok: true, value })),
+          '/p.pptx',
+          false,
+        ),
+      ).toBeNull()
+    }
+  })
+})
+
+describe('the anchor round behaves like the kit’s sendAnchorMap', () => {
+  const rowsOf = async (b: UniworkCommentsSeamApi) => {
+    const reply = await b.list({ path: '/p.pptx' })
+    return reply.ok ? reply.value.comments : []
+  }
+
+  it('501 anchors go in chunks of 500, one after the other, answers merged', async () => {
+    const slides = deck('slide1')
+    const { bridge, calls } = fakeBridge(
+      Array.from({ length: 501 }, (_, k) => rootRow(`m${k}`, anchorOn(slides, 0))),
+    )
+    const rows = await rowsOf(bridge)
+    const res = await sendAnchorsAfterSave(bridge, '/p.pptx', 'v2', rows, slides)
+    const rounds = calls.filter((c) => c.op === 'anchors')
+    expect(rounds.map((c) => (c.input as { anchors: unknown[] }).anchors.length)).toEqual([500, 1])
+    expect(res.outcome).toBe('synced')
+    if (res.outcome === 'synced') {
+      expect(res.updated).toHaveLength(501)
+      expect(res.list_token).toBe('t3')
+    }
+  })
+
+  it('anchor_version_invalid resolves to retry_next_save and stops the round; other errors reject', async () => {
+    const slides = deck('slide1')
+    const seed = [rootRow('x1', anchorOn(slides, 0))]
+    const stale = fakeBridge(seed, {
+      anchorsFail: { code: 'malformed', detailsCode: 'anchor_version_invalid' },
+    })
+    expect(
+      await sendAnchorsAfterSave(stale.bridge, '/p.pptx', 'v2', await rowsOf(stale.bridge), slides),
+    ).toEqual({ outcome: 'retry_next_save' })
+    const broken = fakeBridge(seed, { anchorsFail: { code: 'internal', status: 500 } })
+    await expect(
+      sendAnchorsAfterSave(broken.bridge, '/p.pptx', 'v2', await rowsOf(broken.bridge), slides),
+    ).rejects.toMatchObject({ code: 'internal' })
+  })
+
+  it('an empty round sends nothing', async () => {
+    const { bridge, calls } = fakeBridge()
+    expect(await sendAnchorsAfterSave(bridge, '/p.pptx', 'v2', [], deck('slide1'))).toMatchObject({
+      outcome: 'synced',
+      updated: [],
+    })
+    expect(calls).toEqual([])
   })
 })
 
@@ -342,17 +458,13 @@ interface MountOpts {
   versionId?: string
   open?: boolean
   fileComments?: SlideComment[][]
+  fake?: FakeOpts
 }
 
 async function mountHost(o: MountOpts) {
-  const server = fakeBridge(o.rows)
-  const saved = new Set<(r: { versionId: string }) => void>()
-  const contextApi: SlidesCommentsContextApi = {
-    onUniworkSaved: (h) => {
-      saved.add(h)
-      return () => saved.delete(h)
-    },
-  }
+  const server = fakeBridge(o.rows, o.fake)
+  const path = '/work/deck.pptx'
+  const statuses: string[] = []
   const goTo = vi.fn()
   const onOpen = vi.fn()
   const handleRef =
@@ -360,14 +472,14 @@ async function mountHost(o: MountOpts) {
   const readFileComments = vi.fn(async (i: number) => o.fileComments?.[i] ?? [])
   const props = {
     bridge: server.bridge,
-    path: '/work/deck.pptx',
+    path,
+    // what App builds from context({path}): this is the seam's shape, versionId null = unknown
     context: {
       documentId: 'doc-1',
       level: 'edit' as const,
-      userId: 'me',
-      ...(o.versionId ? { versionId: o.versionId } : {}),
+      myUserId: 'me',
+      versionId: o.versionId ?? null,
     },
-    contextApi,
     slides: o.slides,
     slot: o.open === false ? null : slot,
     goTo,
@@ -377,6 +489,7 @@ async function mountHost(o: MountOpts) {
     fileCommentsNonce: 0,
     handleRef,
     onOpenCount: () => {},
+    onStatus: (text: string) => statuses.push(text),
   }
   const render = async (patch: Partial<typeof props> = {}) => {
     Object.assign(props, patch)
@@ -386,13 +499,13 @@ async function mountHost(o: MountOpts) {
     })
   }
   await render()
-  const save = async (versionId: string) =>
+  const save = async (versionId: string, savedPath = path) =>
     act(async () => {
-      saved.forEach((h) => h({ versionId }))
+      server.emitSaved({ path: savedPath, versionId })
       await flush()
       await flush()
     })
-  return { server, goTo, onOpen, handleRef, render, save, readFileComments }
+  return { server, goTo, onOpen, handleRef, render, save, readFileComments, statuses }
 }
 
 describe('ServerCommentsHost over the comments bridge', () => {
@@ -479,11 +592,82 @@ describe('ServerCommentsHost over the comments bridge', () => {
     ])
   })
 
-  it('without a document version no thread starts and the pane says so', async () => {
-    const h = await mountHost({ slides: deck('slide1') })
+  it('versionId null: no new thread, the save-first line, replying still works; a Save receipt unlocks it', async () => {
+    const slides = deck('slide1')
+    const h = await mountHost({ slides, rows: [rootRow('x1', anchorOn(slides, 0))] })
     expect(h.handleRef.current!.startThread(0)).toBe(false)
-    expect(slot.querySelector('.comments-server-hint')).not.toBeNull()
+    expect(slot.querySelector('.comments-server-hint')?.textContent).toBe(
+      paneStrings.zh.paneCommentsSaveFirst,
+    )
+    expect(h.statuses).toEqual([paneStrings.zh.paneCommentsSaveFirst])
     expect(h.server.ops()).not.toContain('create')
+    // the first Save receipt gives the open version: the hint goes, a thread can start
+    await h.save('v1')
+    expect(slot.querySelector('.comments-server-hint')).toBeNull()
+    await act(async () => {
+      expect(h.handleRef.current!.startThread(0)).toBe(true)
+      await flush()
+    })
+    expect(h.statuses).toHaveLength(1)
+  })
+
+  it('a saved push for another document is ignored', async () => {
+    const slides = deck('slide1')
+    const h = await mountHost({
+      slides,
+      versionId: 'v1',
+      rows: [rootRow('x1', anchorOn(slides, 0))],
+    })
+    await h.save('v9', '/work/other.pptx')
+    expect(h.server.ops()).not.toContain('anchors')
+    await act(async () => {
+      h.handleRef.current!.startThread(0)
+      await flush()
+    })
+    const box = slot.querySelector('textarea')!
+    await act(async () => {
+      nativeValue.call(box, 'x')
+      box.dispatchEvent(new Event('input', { bubbles: true }))
+      box.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'Enter',
+          ctrlKey: true,
+          bubbles: true,
+          cancelable: true,
+        }),
+      )
+      await flush()
+    })
+    expect(h.server.calls.find((c) => c.op === 'create')?.input).toMatchObject({
+      baseVersionId: 'v1',
+    })
+  })
+
+  it('anchor_version_invalid: nothing thrown, no reload, the shown anchors stay, the next Save sends again', async () => {
+    const slides = deck('slide1', 'slide2')
+    const fake: FakeOpts = {
+      anchorsFail: { code: 'malformed', detailsCode: 'anchor_version_invalid' },
+    }
+    const h = await mountHost({
+      slides,
+      versionId: 'v1',
+      rows: [rootRow('x1', anchorOn(slides, 0))],
+      fake,
+    })
+    await h.render({ slides: [slides[1]!, slides[0]!] })
+    await h.save('v2')
+    expect(h.server.ops().filter((o) => o === 'anchors')).toHaveLength(1)
+    expect(h.server.ops().slice(-1)).toEqual(['anchors'])
+    expect(slot.textContent).toContain('Lê Thu Hà')
+    // the server accepts the next receipt: the map is rebuilt from the live deck and sent again
+    delete fake.anchorsFail
+    await h.save('v3')
+    const rounds = h.server.calls.filter((c) => c.op === 'anchors')
+    expect(rounds).toHaveLength(2)
+    expect(rounds[1]!.input).toMatchObject({
+      versionId: 'v3',
+      anchors: [{ commentId: 'x1', state: 'exact', anchor: { slide_id: '256', slide_index: 1 } }],
+    })
   })
 
   it('reorder then Save: comments.anchors goes after the receipt, with its version and slide_id', async () => {
@@ -630,9 +814,9 @@ describe('local pane', () => {
 describe('21-locale parity', () => {
   it('the new pane copy exists, non-empty and translated, in every locale', () => {
     expect(LANGS).toHaveLength(21)
-    const en = paneStrings.en.paneCommentsNewUnavailable
+    const en = paneStrings.en.paneCommentsSaveFirst
     for (const lang of LANGS) {
-      const text = paneStrings[lang].paneCommentsNewUnavailable
+      const text = paneStrings[lang].paneCommentsSaveFirst
       expect(text, lang).toBeTruthy()
       if (lang !== 'en') expect(text, lang).not.toBe(en)
       // product copy carries no internal codes
