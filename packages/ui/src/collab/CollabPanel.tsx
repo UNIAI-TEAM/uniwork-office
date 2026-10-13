@@ -70,6 +70,7 @@ export function CollabPanel(p: CollabPanelProps) {
   const base = useId()
   const titleId = `${base}t`
   const statusId = `${base}s`
+  const noticeId = `${base}n`
   const resolvedListId = `${base}rg`
   const inFileId = `${base}if`
   const [inFileOpen, setInFileOpen] = useState(false)
@@ -86,24 +87,29 @@ export function CollabPanel(p: CollabPanelProps) {
     : ctl.threads
   const visibleIds = visible.map((t) => t.id)
 
-  // the status line: S15 notice first, then the connection status, then view-only
-  const lineKey: string | null = ctl.notice
+  // two lines: the S15 notice, and the connection status (or view-only); Send describes only the latter
+  const noticeKey: string | null = ctl.notice
     ? ctl.notice === 'discussionDeleted'
       ? 'collabDiscussionDeleted'
       : 'collabCommentDeleted'
-    : ctl.status
-      ? ctl.status === 'offline'
-        ? 'collabOffline'
-        : ctl.status === 'signedOut'
-          ? 'collabSignedOut'
-          : 'collabServerError'
-      : ctl.viewOnly && ctl.state === 'ready'
-        ? 'collabViewOnly'
-        : null
+    : null
+  const lineKey: string | null = ctl.status
+    ? ctl.status === 'offline'
+      ? 'collabOffline'
+      : ctl.status === 'signedOut'
+        ? 'collabSignedOut'
+        : 'collabServerError'
+    : ctl.viewOnly && ctl.state === 'ready'
+      ? 'collabViewOnly'
+      : null
+  const noticeText = noticeKey ? (strings[noticeKey] ?? '') : ''
   const lineText = lineKey ? (strings[lineKey] ?? '') : ''
-  const lineTone = ctl.status && !ctl.notice ? 'warn' : 'plain'
+  const lineTone = ctl.status ? 'warn' : 'plain'
 
-  // the visible line is the on-screen copy; the sentence goes to the window's polite region once per change
+  // the visible lines are the on-screen copy; each sentence goes to the window's polite region once per change
+  useEffect(() => {
+    if (noticeText) announcePolite(noticeText)
+  }, [noticeText])
   useEffect(() => {
     if (lineText) announcePolite(lineText)
   }, [lineText])
@@ -377,13 +383,13 @@ export function CollabPanel(p: CollabPanelProps) {
           </button>
         )}
       </div>
+      {noticeKey && (
+        <p id={noticeId} ref={noticeRef} className="collab-pnote collab-pnote--plain" tabIndex={-1}>
+          {noticeText}
+        </p>
+      )}
       {lineKey && (
-        <p
-          id={statusId}
-          ref={noticeRef}
-          className={`collab-pnote collab-pnote--${lineTone}`}
-          tabIndex={ctl.notice ? -1 : undefined}
-        >
+        <p id={statusId} className={`collab-pnote collab-pnote--${lineTone}`}>
           {lineText}
         </p>
       )}

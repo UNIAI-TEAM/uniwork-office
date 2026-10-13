@@ -129,7 +129,11 @@ export interface CollabSource {
   searchMentions(p: { q: string; limit?: number }): Promise<{ candidates: CollabCandidate[] }>
 }
 
-/** what an editor plugs in for anchored comments; absent for Discussion */
+/**
+ * what an editor plugs in for anchored comments; absent for Discussion.
+ * Pass a stable object (e.g. `useMemo`): a new adapter on every render recomputes the thread views
+ * and re-renders lists that did not change.
+ */
 export interface CollabAnchorAdapter {
   /** sort key for the open list (doc order / sheet,row,col / slide_index / page,top) */
   order(anchor: CollabAnchor): number | string
