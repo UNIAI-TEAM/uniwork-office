@@ -175,6 +175,7 @@ export function CollabComposer(props: CollabComposerProps) {
   const base = initialBody ?? ''
   const body = mentionDocToBody(doc)
   const dirty = body.trim() !== '' && body !== base
+  const isRoot = mode === 'root' || mode === 'discussion'
 
   function update(next: MentionDoc) {
     setDoc(next)
@@ -264,6 +265,8 @@ export function CollabComposer(props: CollabComposerProps) {
         return
       }
     } else if (e.key === 'Escape') {
+      // an empty root composer has nothing to cancel: Esc falls through so the host closes its panel
+      if (isRoot && !dirty) return
       e.preventDefault()
       e.stopPropagation()
       requestCancel()
@@ -354,9 +357,11 @@ export function CollabComposer(props: CollabComposerProps) {
         <span className="collab-composer-hint" id={hintId}>
           {format(strings.collabSendHint, { shortcut })}
         </span>
-        <button type="button" className="collab-composer-btn" onClick={requestCancel}>
-          {strings.collabCancel}
-        </button>
+        {isRoot && body.trim() === '' ? null : (
+          <button type="button" className="collab-composer-btn" onClick={requestCancel}>
+            {strings.collabCancel}
+          </button>
+        )}
         <button
           type="button"
           className="collab-composer-btn collab-composer-send"

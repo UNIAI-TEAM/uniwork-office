@@ -134,7 +134,8 @@ export function CollabPanel(p: CollabPanelProps) {
     }
     if (!el) return
     el.focus()
-    el.scrollIntoView?.({ block: 'nearest' })
+    // center: a tall thread near the list edge shows its body, not just the header
+    el.scrollIntoView?.({ block: 'center' })
     // only the sequence number decides a new request
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusSeq])
