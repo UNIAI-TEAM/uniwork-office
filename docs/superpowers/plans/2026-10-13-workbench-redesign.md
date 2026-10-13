@@ -133,14 +133,14 @@ Checkbox tự vẽ (Task 1 định nghĩa, Task 5 và 6 dùng):
 
 ### Khóa i18n mới
 
-| Khóa                 | Task | zh                      | en                       | vi                            |
-| -------------------- | ---- | ----------------------- | ------------------------ | ----------------------------- |
-| `wbTabCountOverdue`  | 4    | 逾期任务：{count}       | Overdue tasks: {count}   | Việc quá hạn: {count}         |
-| `wbTabCountDueToday` | 4    | 今天到期的任务：{count} | Tasks due today: {count} | Việc đến hạn hôm nay: {count} |
-| `wbTabCountMeetings` | 4    | 今日会议：{count}       | Meetings today: {count}  | Cuộc họp hôm nay: {count}     |
-| `wbOvGroupUpcoming`  | 5    | 即将到期                | Upcoming                 | Sắp tới                       |
-| `wbOvMinutes`        | 5    | {count} 分钟            | {count} min              | {count} phút                  |
-| `wbTasksOpenCount`   | 6    | 未完成：{count}         | Open: {count}            | Đang mở: {count}              |
+| Khóa                 | Task | zh                            | en                       | vi                            |
+| -------------------- | ---- | ----------------------------- | ------------------------ | ----------------------------- |
+| `wbTabCountOverdue`  | 4    | (giá trị trong zh.ts)         | Overdue tasks: {count}   | Việc quá hạn: {count}         |
+| `wbTabCountDueToday` | 4    | (giá trị trong zh.ts)         | Tasks due today: {count} | Việc đến hạn hôm nay: {count} |
+| `wbTabCountMeetings` | 4    | (giá trị trong zh.ts)         | Meetings today: {count}  | Cuộc họp hôm nay: {count}     |
+| `wbOvGroupUpcoming`  | 5    | (giá trị trong zh.ts)         | Upcoming                 | Sắp tới                       |
+| `wbOvMinutes`        | 5    | {count} (giá trị trong zh.ts) | {count} min              | {count} phút                  |
+| `wbTasksOpenCount`   | 6    | (giá trị trong zh.ts)         | Open: {count}            | Đang mở: {count}              |
 
 Dùng lại: `wbTasksGroupOverdue`, `wbTasksGroupToday`, `wbCommonOpen` + " ↗", `wbKnSearch` (aria-label), `wbKnSearchPlaceholder`, các chuỗi `wb*Empty` và `wbOv*Title/Body`.
 
@@ -2599,7 +2599,7 @@ Expected: FAIL.
 
 Chèn ngay sau dòng `wbTabsModules: …,` trong mỗi shard.
 
-`apps/shell/src/renderer/src/i18n/workbench/zh.ts`, sau `  wbTabsModules: '模块',`:
+`apps/shell/src/renderer/src/i18n/workbench/zh.ts`, sau `  wbTabsModules: '(giá trị trong zh.ts)',`:
 
 ```ts
   wbTabCountOverdue: '逾期任务：{count}',
@@ -3818,7 +3818,7 @@ EOF
 
 Thêm dòng này ngay sau dòng `wbTasksEmpty:` của mỗi shard:
 
-- `zh.ts`: `  wbTasksOpenCount: '未完成：{count}',`
+- `zh.ts`: `  wbTasksOpenCount: '(giá trị trong zh.ts)',`
 - `en.ts`: `  wbTasksOpenCount: 'Open: {count}',`
 - `vi.ts`: `  wbTasksOpenCount: 'Đang mở: {count}',`
 
