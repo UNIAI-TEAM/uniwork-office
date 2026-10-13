@@ -10,10 +10,7 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { collabStrings, type CollabComment } from '@genoffice/ui/collab'
-import type {
-  CommentsRevealPayload,
-  UniworkCommentsApi,
-} from '@genoffice/electron-utils/comments-ipc'
+import type { CommentsRevealPayload } from '@genoffice/electron-utils/comments-ipc'
 import {
   PdfServerCommentsHost,
   type PdfServerComments,
