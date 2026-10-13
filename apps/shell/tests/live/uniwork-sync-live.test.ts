@@ -297,7 +297,7 @@ describe.skipIf(!LIVE)('G5-04 AC-5 live: real D server against the fork feed/cap
     ])
   }, 30_000)
 
-  it('4. replay: a second run from the saved cursor is idempotent and deletes nothing', async (context) => {
+  it('4. replay: the saved feed cursor falls back to exactly one snapshot, deleting nothing', async (context) => {
     const s = live()
     if (!s.capabilities.sync_feed) {
       skipStep(context, feedOffNote('4'))
@@ -305,40 +305,47 @@ describe.skipIf(!LIVE)('G5-04 AC-5 live: real D server against the fork feed/cap
     }
     const key = cursorKey(s.scope)
     const saved = s.cursors.memory.entries.get(key)
+    expect(saved, '4: step 2 must have saved a feed cursor').toBeTruthy()
     const effectsBefore = s.cache.state.effects
-    const first = await s.consumer.sync()
-    let note: string
-    if (first.kind === 'synced') {
-      expect(first.resynced, '4: a saved cursor must be followed incrementally').toBe(false)
-      note = `the server served the saved cursor incrementally (${first.pages} page(s)); the replay wrote nothing`
-    } else if (first.kind === 'failed' && first.error.serverCode === 'unsupported_operation') {
-      note =
-        'G5-01a answers 501 unsupported_operation for a feed cursor (the incremental feed is G5-01b); the fork reports it as failed, moves no cursor and deletes nothing'
+    const opensBefore = s.client.snapshotOpens()
+    const requestsBefore = s.client.requests.length
+
+    const result = await s.consumer.sync()
+    expect(result.kind, '4: a refused feed cursor must never surface as a failure').toBe('synced')
+    if (result.kind !== 'synced') return
+    const requests = s.client.requests.slice(requestsBefore)
+    expect(requests[0]?.cursor, '4: the pass must start from the saved feed cursor').toBe(saved)
+    if (result.resynced) {
+      // G5-01a: 501 unsupported_operation for the feed cursor -> the consumer
+      // clears it and rebuilds from a snapshot in this same pass
       expect(
-        s.cursors.memory.entries.get(key),
-        '4: a refused replay must not move the cursor',
-      ).toBe(saved)
+        requests[1]?.cursor,
+        '4: the fallback must open the snapshot without a cursor',
+      ).toBeUndefined()
+      expect(s.client.snapshotOpens() - opensBefore, '4: exactly one full resync').toBe(1)
+      expect(s.cache.state.events, '4: the refused cursor must be cleared').toContain(
+        'cursor:clear',
+      )
+      console.log(
+        `step 4: the saved feed cursor was refused (G5-01a errChangeFeedPending) and the consumer fell back to one full resync (${result.pages} page(s))`,
+      )
     } else {
-      throw new Error(`4: replay from the saved cursor answered ${JSON.stringify(first)}`)
+      expect(result.pages, '4: an incremental replay serves at most one page').toBeLessThanOrEqual(
+        1,
+      )
+      console.log(
+        'step 4: the server served the saved cursor incrementally; the replay wrote nothing',
+      )
     }
-    expect(s.cache.state.effects, '4: an idempotent replay writes no row').toBe(effectsBefore)
+    expect(s.cache.state.effects, '4: a replay writes no row').toBe(effectsBefore)
     expect([...s.cache.state.docs.keys()].sort(), '4: nothing may be deleted').toEqual(
       [...s.seed.documentIds].sort(),
     )
     expect(s.cache.state.evicted, '4: no cache entry may be evicted').toEqual([])
-
-    // the same guarantee over the path this server does support: a fresh
-    // cold snapshot reconciles to exactly the seeded ids
-    await s.cursors.store.clear(key)
-    const second = await s.consumer.sync()
-    expect(second, '4: the second cold snapshot must finish').toEqual({
-      kind: 'synced',
-      pages: 1,
-      resynced: true,
-    })
-    expect(s.cache.state.effects, '4: a replayed snapshot writes no row').toBe(effectsBefore)
-    expect(s.cache.state.evicted, '4: a replayed snapshot evicts nothing').toEqual([])
-    console.log(`step 4: ${note}`)
+    expect(
+      s.cursors.memory.entries.get(key),
+      '4: the pass must leave its own cursor for the next run',
+    ).toBeTruthy()
   }, 30_000)
 
   it('5. tampered cursor: 400 change_cursor_invalid, one full resync, nothing deleted', async (context) => {

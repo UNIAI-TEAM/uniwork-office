@@ -327,14 +327,17 @@ export function observeFeedClient(real: FeedClient): ObservedFeedClient {
     snapshotOpens: () => snapshotOpens,
     client: {
       async listChanges(workspaceId, cursor, limit) {
-        const page = await real.listChanges(workspaceId, cursor, limit)
-        pages.push(page)
+        // the attempt is recorded before the call: a request the server
+        // refuses (a 501 for a feed cursor, a 400 for a tamper) must still be
+        // visible to the step that asserts what the consumer did with it
         requests.push({
           workspaceId,
           ...(cursor === undefined ? {} : { cursor }),
           ...(limit === undefined ? {} : { limit }),
         })
         if (cursor === undefined) snapshotOpens += 1
+        const page = await real.listChanges(workspaceId, cursor, limit)
+        pages.push(page)
         return page
       },
     },
