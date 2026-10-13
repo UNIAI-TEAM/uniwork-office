@@ -430,7 +430,7 @@ export function useCollabThreads(
       againRef.current = true
       return inFlightRef.current
     }
-    const p: Promise<void> = (async () => {
+    const loop = async (): Promise<void> => {
       try {
         do {
           againRef.current = false
@@ -440,7 +440,8 @@ export function useCollabThreads(
         // a document/kind change already replaced the slot: only the loop that owns it may clear it
         if (inFlightRef.current === p) inFlightRef.current = null
       }
-    })()
+    }
+    const p = loop()
     inFlightRef.current = p
     return p
   }, [runList])
