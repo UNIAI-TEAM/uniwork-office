@@ -580,7 +580,7 @@ describe('Settings → Account pane', () => {
     expect(ACCOUNT_ERROR_KEYS.keystore_locked).toBe('acctErrKeystoreLocked')
   })
 
-  it('keystore locked: Retry is disabled and aria-busy while pending; a double click makes one accountRetry call', async () => {
+  it('keystore locked: Retry is aria-disabled (never disabled) and aria-busy while pending; a double click makes one accountRetry call', async () => {
     await render(statusFor('keystore-locked', { error: 'keystore_locked' }), { open: true })
     let finish!: (s: AccountStatus) => void
     api.accountRetry.mockImplementationOnce(
@@ -589,6 +589,7 @@ describe('Settings → Account pane', () => {
     const retry = button(en.acctRetry)!
     expect(retry.disabled).toBe(false)
     expect(retry.hasAttribute('aria-busy')).toBe(false)
+    retry.focus()
     await act(async () => {
       retry.click()
       retry.click()
@@ -596,14 +597,30 @@ describe('Settings → Account pane', () => {
     await flush()
     expect(api.accountRetry).toHaveBeenCalledTimes(1)
     const busyBtn = button(en.acctRetrying)!
-    expect(busyBtn.disabled).toBe(true)
+    // not `disabled`: that would drop the keyboard focus to <body>
+    expect(busyBtn.disabled).toBe(false)
+    expect(busyBtn.getAttribute('aria-disabled')).toBe('true')
     expect(busyBtn.getAttribute('aria-busy')).toBe('true')
+    expect(document.activeElement).toBe(busyBtn)
     await act(async () => busyBtn.click())
     expect(api.accountRetry).toHaveBeenCalledTimes(1)
     await act(async () => finish(statusFor('keystore-locked', { error: 'keystore_locked' })))
     await flush()
-    expect(button(en.acctRetry)!.disabled).toBe(false)
+    expect(button(en.acctRetry)!.hasAttribute('aria-disabled')).toBe(false)
     expect(button(en.acctRetry)!.hasAttribute('aria-busy')).toBe(false)
+    expect(document.activeElement).toBe(button(en.acctRetry))
+  })
+
+  it('keystore locked: focus stays on Retry after a rejected retry', async () => {
+    await render(statusFor('keystore-locked', { error: 'keystore_locked' }), { open: true })
+    api.accountRetry.mockRejectedValueOnce(new Error('ipc'))
+    const retry = button(en.acctRetry)!
+    retry.focus()
+    await act(async () => retry.click())
+    await flush()
+    expect(api.accountRetry).toHaveBeenCalledTimes(1)
+    expect(button(en.acctRetry)).toBeTruthy()
+    expect(document.activeElement).toBe(button(en.acctRetry))
   })
 
   it('keystore locked: Enter and Space are not swallowed on Retry and activate it', async () => {

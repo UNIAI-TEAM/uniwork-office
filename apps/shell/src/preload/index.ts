@@ -81,6 +81,8 @@ ipcRenderer.on(UNIWORK_DOC_CHANNELS.lock, (_event: IpcRendererEvent, raw: unknow
 // replaces its list instead of waiting for the next unrelated push
 const uniworkLocksSubscribers = new Set<(locks: UniworkDocLock[]) => void>()
 ipcRenderer.on(UNIWORK_DOC_CHANNELS.locksChanged, (_event: IpcRendererEvent, raw: unknown) => {
+  // not a list: ignore it, an empty one would replace (and so clear) every panel
+  if (!Array.isArray(raw)) return
   const locks = asUniworkLocks(raw)
   for (const cb of [...uniworkLocksSubscribers]) cb(locks)
 })

@@ -193,6 +193,58 @@ afterEach(() => {
   host.remove()
 })
 
+describe('preload locks-changed listener', () => {
+  it('fans a list out and ignores a payload that is not an array', async () => {
+    vi.resetModules()
+    const handlers = new Map<string, (event: unknown, raw: unknown) => void>()
+    const exposed: Record<string, Record<string, unknown>> = {}
+    const ipcRenderer = {
+      on: vi.fn((channel: string, cb: (event: unknown, raw: unknown) => void) => {
+        handlers.set(channel, cb)
+      }),
+      invoke: vi.fn(async () => undefined),
+      send: vi.fn(),
+      removeListener: vi.fn(),
+    }
+    vi.doMock('electron', () => ({
+      contextBridge: {
+        exposeInMainWorld: (key: string, value: Record<string, unknown>) => {
+          exposed[key] = value
+        },
+      },
+      ipcRenderer,
+      webUtils: { getPathForFile: vi.fn() },
+    }))
+    try {
+      await import('../src/preload/index')
+      const bridge = exposed.aiOffice as unknown as LockApiForTest
+      const seen: UniworkDocLock[][] = []
+      const off = bridge.onUniworkLocksChanged((locks) => seen.push(locks))
+      const push = handlers.get('uniwork-doc:locks-changed')!
+      push({}, [{ path: 'D:/A.docx', reason: 'store_newer' }])
+      expect(seen).toHaveLength(1)
+      expect(seen[0]).toHaveLength(1)
+      // a malformed payload would otherwise become [] and wipe every panel
+      for (const bad of [undefined, null, 'x', 7, { path: 'D:/A.docx' }]) push({}, bad)
+      expect(seen).toHaveLength(1)
+      // a real empty list still clears
+      push({}, [])
+      expect(seen).toHaveLength(2)
+      expect(seen[1]).toEqual([])
+      off()
+      push({}, [])
+      expect(seen).toHaveLength(2)
+    } finally {
+      vi.doUnmock('electron')
+      vi.resetModules()
+    }
+  })
+})
+
+type LockApiForTest = {
+  onUniworkLocksChanged: (cb: (locks: UniworkDocLock[]) => void) => () => void
+}
+
 describe('S11 lock panel (newer store)', () => {
   it('shows nothing until a lock arrives', async () => {
     await mount()
@@ -774,7 +826,42 @@ describe('S11 lock panel (keystore locked)', () => {
     expect(region()).toBeNull()
   })
 
-  it('Retry is disabled and aria-busy while pending; a double click makes one accountRetry call', async () => {
+  it('a push snapshot built before main processed a Close cannot bring the closed panel back', async () => {
+    await mount()
+    await act(async () => pushLock!(lock('A.docx')))
+    await flush()
+    // no read in flight: only the dismissed set can hold the path out
+    await clickClose()
+    expect(region()).toBeNull()
+    await act(async () => pushLocksChanged!([lock('A.docx')]))
+    await flush()
+    expect(region()).toBeNull()
+    // main caught up: a list without the path forgets it, so the same path locked again shows
+    await act(async () => pushLocksChanged!([]))
+    await act(async () => pushLocksChanged!([lock('A.docx')]))
+    await flush()
+    expect(region()).not.toBeNull()
+  })
+
+  it('a pushed lock for a closed path shows again, and a read without it clears the closed memory', async () => {
+    await mount()
+    await act(async () => pushLock!(lock('A.docx')))
+    await flush()
+    await clickClose()
+    await act(async () => pushLock!(lock('A.docx')))
+    await flush()
+    expect(region()).not.toBeNull()
+    await clickClose()
+    // a read (main processed the close) no longer has it, then it is locked again
+    initial = []
+    await act(async () => changeAccount!())
+    await flush()
+    await act(async () => pushLocksChanged!([lock('A.docx')]))
+    await flush()
+    expect(region()).not.toBeNull()
+  })
+
+  it('Retry is aria-disabled (never disabled) and aria-busy while pending; a double click makes one accountRetry call', async () => {
     initial = [keystoreLock()]
     let finish!: (s: unknown) => void
     accountRetry.mockImplementationOnce(() => new Promise((res) => (finish = res)))
@@ -782,22 +869,28 @@ describe('S11 lock panel (keystore locked)', () => {
     const button = actionButton()
     expect(button.disabled).toBe(false)
     expect(button.hasAttribute('aria-busy')).toBe(false)
+    expect(button.hasAttribute('aria-disabled')).toBe(false)
+    button.focus()
     await act(async () => {
       button.click()
       button.click()
     })
     await flush()
     expect(accountRetry).toHaveBeenCalledTimes(1)
-    expect(button.disabled).toBe(true)
+    // not `disabled`: a disabled button would drop the keyboard focus to <body>
+    expect(button.disabled).toBe(false)
+    expect(button.getAttribute('aria-disabled')).toBe('true')
     expect(button.getAttribute('aria-busy')).toBe('true')
+    expect(document.activeElement).toBe(button)
     await act(async () => {
       button.click()
     })
     expect(accountRetry).toHaveBeenCalledTimes(1)
     await act(async () => finish({ loggedIn: true, state: 'keystore-locked' }))
     await flush()
-    expect(actionButton().disabled).toBe(false)
+    expect(actionButton().hasAttribute('aria-disabled')).toBe(false)
     expect(actionButton().hasAttribute('aria-busy')).toBe(false)
+    expect(document.activeElement).toBe(actionButton())
     // idle again: the next click retries again
     await act(async () => actionButton().click())
     await flush()
@@ -836,6 +929,18 @@ describe('S11 lock panel (keystore locked)', () => {
     expect(accountRetry).toHaveBeenCalledTimes(1)
     expect(title()!.textContent).toBe(syncStrings.en.uwLockKeystoreTitle)
     expect(api.dismissUniworkLock).not.toHaveBeenCalled()
+  })
+
+  it('focus stays on Retry after a rejected retry while the lock is still shown', async () => {
+    initial = [keystoreLock()]
+    accountRetry.mockRejectedValueOnce(new Error('ipc'))
+    await mount()
+    actionButton().focus()
+    await act(async () => actionButton().click())
+    await flush()
+    expect(region()).not.toBeNull()
+    expect(actionButton().hasAttribute('aria-disabled')).toBe(false)
+    expect(document.activeElement).toBe(actionButton())
   })
 
   it('a failed Retry call still re-reads the locks', async () => {

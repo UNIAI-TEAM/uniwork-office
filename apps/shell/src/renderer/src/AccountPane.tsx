@@ -106,7 +106,7 @@ export function AccountPane({ account }: { account: AccountController }) {
     <button
       type="button"
       className="set-btn"
-      disabled={busy === 'retrying'}
+      aria-disabled={busy === 'retrying' ? true : undefined}
       aria-busy={busy === 'retrying' ? true : undefined}
       onClick={account.retry}
     >
@@ -149,7 +149,7 @@ export function AccountPane({ account }: { account: AccountController }) {
           <button
             type="button"
             className="set-btn primary"
-            disabled={busy === 'retrying'}
+            aria-disabled={busy === 'retrying' ? true : undefined}
             aria-busy={busy === 'retrying' ? true : undefined}
             onClick={account.retry}
           >
