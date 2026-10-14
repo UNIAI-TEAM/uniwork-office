@@ -3758,6 +3758,26 @@ const SETTINGS_PATH = () => userDataPath('ai-settings.json')
 
 const activeAiStreams = new Map<string, AbortController>()
 
+/**
+ * UniWork AI (the `uniwork` provider) runs in the shell main process only:
+ * the shell installs the host that resolves the sender's document, adds the
+ * UniWork session and runs the adapter (apps/shell uniwork-auth/ai-chat.ts).
+ * Without one (this module running on its own) a UniWork AI turn is refused.
+ */
+export interface UniworkAiHost {
+  stream(call: {
+    senderId: number
+    request: AiStreamRequest
+    send(chunk: AiStreamChunk): void
+    signal: AbortSignal
+  }): Promise<void>
+}
+
+let uniworkAiHost: UniworkAiHost | null = null
+export function setUniworkAiHost(host: UniworkAiHost | null): void {
+  uniworkAiHost = host
+}
+
 /** every renderer (tabs, home) re-reads ai-settings.json — the composer chip and
  *  the settings page edit the same file from different windows */
 function broadcastAiSettingsChanged(): void {
@@ -3845,6 +3865,29 @@ export function registerAiIpc(): void {
     const config = withUniAiOpenRouterAuth(settings, provider, settings.providers?.[provider])
     const send = (chunk: AiStreamChunk) => {
       if (!event.sender.isDestroyed()) event.sender.send('ai:stream-chunk', chunk)
+    }
+    if (provider === 'uniwork') {
+      // no key, no model: the UniWork session and the server's policy decide
+      const host = uniworkAiHost
+      if (!host) {
+        send({
+          requestId,
+          type: 'error',
+          error: 'UniWork AI is not available here.',
+          uniworkCode: 'ai_disabled',
+        })
+        return
+      }
+      const controller = new AbortController()
+      activeAiStreams.set(requestId, controller)
+      const unwatchSender = abortOnDestroyed(event.sender, controller)
+      try {
+        await host.stream({ senderId: event.sender.id, request, send, signal: controller.signal })
+      } finally {
+        unwatchSender()
+        activeAiStreams.delete(requestId)
+      }
+      return
     }
     if (!config || (provider !== 'codex' && !config.apiKey)) {
       send({

@@ -1,8 +1,14 @@
 import { app, safeStorage, shell, type IpcMain, type WebContents } from 'electron'
 import {
+  onUniworkCloudStatus,
+  setUniworkAiAvailable,
+  setUniworkChatTransport,
   setUniworkCloudRefresher,
   setUniworkCloudStatus,
   setUniworkCloudTransport,
+  uniworkChatTransport,
+  uniworkCloudEnabled,
+  uniworkConversations,
 } from '@genoffice/ai-provider'
 import { safeExternalUrl } from '@genoffice/electron-utils'
 import { getUiLang } from '@genoffice/i18n'
@@ -26,6 +32,15 @@ import {
   type ServerAddressError,
 } from './profile-store'
 import { createUniworkCloudClient, UniworkCloudController, type CloudAccountView } from './cloud'
+import {
+  createUniworkAiAvailability,
+  createUniworkAiChatTransport,
+  createUniworkAiStreams,
+  resolveUniworkAiScope,
+  type UniworkAiScopeDeps,
+  type UniworkAiStreams,
+} from './ai-chat'
+import type { CapabilityRead } from '../uniwork-sync/capability/cache'
 import { AccountManager } from './manager'
 import { TransportError, createUniworkTransport } from './transport'
 
@@ -52,6 +67,7 @@ const entitlementListeners = new Set<(entitlements: AccountEntitlements | null) 
 /** set by registerAccountIpc: delivers a push to the account renderers */
 let push: ((channel: string, payload: unknown) => void) | null = null
 let signOutHooks: UniworkSignOutHooks | null = null
+let aiStreams: UniworkAiStreams | null = null
 
 /**
  * What an explicit Sign out does around the account itself: `before` closes
@@ -72,6 +88,8 @@ export async function signOutUniwork(account: AccountManager): Promise<AccountSt
   const hooks = signOutHooks
   if (hooks && !(await hooks.before())) return account.status()
   const status = await account.logout()
+  // the session is gone: every UniWork AI turn still running ends now (aiErrSession)
+  endUniworkAiSession()
   try {
     hooks?.after()
   } catch (error) {
@@ -284,6 +302,95 @@ export function startUniworkCloud(): void {
 }
 
 /**
+ * UniWork AI (G6-05, desktop): installs the chat transport the adapter posts
+ * through (device bearer added per call, never sent over IPC) and returns
+ * the ai:stream runner of the `uniwork` provider. Every running turn ends
+ * when the session ends or the account changes. `describe` / `binding` /
+ * `capability` come from the tab manager and the UniWork documents handle.
+ */
+export function startUniworkAiChat(deps: {
+  describe: UniworkAiScopeDeps['describe']
+  binding: UniworkAiScopeDeps['binding']
+  capability(orgId: string): Promise<CapabilityRead>
+}): UniworkAiStreams {
+  if (aiStreams) return aiStreams
+  const account = uniworkAccount()
+  setUniworkChatTransport(
+    createUniworkAiChatTransport({
+      profile: () => account.deploymentProfile(),
+      authorized: (call) => authorizedRequest(call),
+    }),
+  )
+  const availability = createUniworkAiAvailability({
+    cloud: () => uniworkCloud().status(),
+    capability: deps.capability,
+  })
+  const streams = createUniworkAiStreams({
+    transport: () => (uniworkSessionIdentity() ? uniworkChatTransport() : null),
+    scope: (senderId) =>
+      resolveUniworkAiScope(senderId, {
+        describe: deps.describe,
+        binding: deps.binding,
+        orgId: () => {
+          // the chosen organization of a live session; none while the picker is up
+          const status = account.status()
+          return status.state === 'signed-in' && !status.needsOrgChoice
+            ? (status.org?.id ?? null)
+            : null
+        },
+      }),
+    available: (scope, orgId) => availability.available(orgId, scope.format),
+    // cloud tools go out with a turn only while the org has office.ai_cloud
+    toolPolicy: () => ({ cloudTools: uniworkCloudEnabled() }),
+  })
+  aiStreams = streams
+  // the provider entry (picker, Settings, selectedProvider) shows only while the
+  // selected org offers UniWork AI for some format; re-read on account and cloud
+  // changes and once per capability TTL
+  let generation = 0
+  const publishAvailability = () => {
+    const run = ++generation
+    const status = account.status()
+    const orgId =
+      status.state === 'signed-in' && !status.needsOrgChoice ? (status.org?.id ?? null) : null
+    void availability
+      .availableAny(orgId)
+      .catch(() => false)
+      .then((available) => {
+        if (run === generation) setUniworkAiAvailable(available)
+      })
+  }
+  // a session that ends (expiry, revoke) or a switch to another account ends the turns too
+  let owner = identityKey()
+  account.onStatus(() => {
+    const next = identityKey()
+    if (next !== owner) endUniworkAiSession()
+    owner = next
+    publishAvailability()
+  })
+  onUniworkCloudStatus(() => publishAvailability())
+  availabilityTimer = setInterval(publishAvailability, AVAILABILITY_REREAD_MS)
+  availabilityTimer.unref?.()
+  publishAvailability()
+  return streams
+}
+
+/** the capability TTL: the flag is re-read at least this often */
+const AVAILABILITY_REREAD_MS = 300_000
+let availabilityTimer: ReturnType<typeof setInterval> | null = null
+
+/** sign-out / account switch: running turns end and the server conversation ids are forgotten */
+function endUniworkAiSession(): void {
+  aiStreams?.cancelAll()
+  uniworkConversations.clear()
+}
+
+function identityKey(): string {
+  const identity = uniworkSessionIdentity()
+  return identity ? `${identity.deploymentId}/${identity.accountId}/${identity.deviceSessionId}` : ''
+}
+
+/**
  * Runs `call` with a bearer token: a 401 (signalled by throwing
  * TransportError('unauthorized')) refreshes once through the shared in-flight
  * refresh and retries once. Rejects with TransportError('unauthorized') when
@@ -339,6 +446,10 @@ export function startUniworkAccount(ready: Promise<unknown> = Promise.resolve())
 
 /** Stops the account timers (refresh, recovery, attempt) at quit. */
 export function stopUniworkAccount(): void {
+  endUniworkAiSession()
+  if (availabilityTimer) clearInterval(availabilityTimer)
+  availabilityTimer = null
+  setUniworkChatTransport(null)
   setUniworkCloudTransport(null)
   cloud?.dispose()
   manager?.dispose()
