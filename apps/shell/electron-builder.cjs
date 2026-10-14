@@ -811,8 +811,9 @@ if (releaseChannel) {
   config.publish = null
   // The dmgs are the only mac downloads; the zips exist for the update feed,
   // and Squirrel.Mac installs an update only into a signed app. The mac build
-  // therefore carries no feed: the app answers a manual check with the
-  // download page. Restore the zip and drop this once mac builds are signed.
+  // therefore carries no feed; with a github UNIWORK_UPDATE_URL it reads the
+  // repository's releases itself (uniworkReleaseFeed below) and offers the
+  // newer dmg. Restore the zip and drop this once mac builds are signed.
   config.mac.target = config.mac.target.filter((entry) => entry.target === 'dmg')
   config.mac.publish = null
   const macSigned = Boolean(process.env.CSC_LINK || process.env.CSC_NAME)
@@ -903,6 +904,17 @@ const extraMetadata = {
   homepage: legal.homepage,
 }
 if (fontCdnUrl) extraMetadata.genofficeFontCdn = { baseUrl: fontCdnUrl }
+// The unsigned mac release app's update notice (src/main/release-notifier.ts)
+// reads the releases of this repository and channel. Every platform's
+// package.json carries it; only the mac app, which has no app-update.yml, reads it.
+const releaseFeed = updateUrl && releaseChannel ? GITHUB_REPOSITORY_URL.exec(updateUrl) : null
+if (releaseFeed) {
+  extraMetadata.uniworkReleaseFeed = {
+    owner: releaseFeed[1],
+    repo: releaseFeed[2],
+    channel: releaseChannel,
+  }
+}
 config.extraMetadata = extraMetadata
 
 module.exports = config

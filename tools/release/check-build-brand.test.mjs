@@ -11,6 +11,7 @@ import {
   checkDebControl,
   checkDesktopEntry,
   checkInfoPlist,
+  checkReleaseFeed,
   impliedUnpackedDir,
   parseControl,
   parseDesktopEntry,
@@ -247,6 +248,7 @@ async function fakeMacOutput({
   helper = 'UniWork Office Helper.app',
   plist = plistXml(),
   updateFeed = false,
+  pkg = {},
 } = {}) {
   const root = newRoot()
   for (const arch of arches) {
@@ -261,7 +263,7 @@ async function fakeMacOutput({
     mkdirSync(join(contents, 'Frameworks', 'Electron Framework.framework'))
     writeFileSync(join(contents, 'Info.plist'), plist)
     if (updateFeed) writeFileSync(join(resources, 'app-update.yml'), 'provider: generic\n')
-    await writeAsar(root, resources, {})
+    await writeAsar(root, resources, pkg)
   }
   return root
 }
@@ -354,6 +356,31 @@ describe('checkBuildDir', () => {
       assert.ok(result.problems.some((p) => p.includes('auto-update must stay off')))
     })
 
+    const releaseFeed = { owner: 'UNIAI-TEAM', repo: 'uniwork-office', channel: 'dev' }
+
+    it('passes a mac app that names the repository for its update notice', async () => {
+      const root = await fakeMacOutput({ pkg: { uniworkReleaseFeed: releaseFeed } })
+      const result = checkBuildDir(root, { updateFeed: feed })
+      assert.deepEqual(result.problems, [])
+      assert.ok(result.checked.includes('UniWork Office.app uniworkReleaseFeed'))
+    })
+
+    it('flags a mac app without the release feed, or with another one', () => {
+      for (const pkg of [
+        {},
+        { uniworkReleaseFeed: { ...releaseFeed, repo: 'other' } },
+        { uniworkReleaseFeed: { ...releaseFeed, channel: 'latest' } },
+      ]) {
+        const problems = []
+        checkReleaseFeed('app', pkg, feed, {
+          problem: (p) => problems.push(p),
+          checked: () => {},
+        })
+        assert.equal(problems.length, 1, JSON.stringify(pkg))
+        assert.ok(problems[0].includes('expected github:UNIAI-TEAM/uniwork-office'))
+      }
+    })
+
     it('refuses anything but github:<owner>/<repo>', () => {
       assert.throws(() => parseUpdateFeed('https://github.com/UNIAI-TEAM/uniwork-office'))
       assert.throws(() => parseUpdateFeed('github:UNIAI-TEAM'))
@@ -404,6 +431,15 @@ describe('checkBuildDir', () => {
     assert.deepEqual(result.problems, [
       'mac: unpacked app directory missing (required by --expect)',
     ])
+  })
+
+  it('flags a release feed in a mac app built without --update-feed', async () => {
+    const root = await fakeMacOutput({
+      arches: ['arm64'],
+      pkg: { uniworkReleaseFeed: { owner: 'UNIAI-TEAM', repo: 'uniwork-office', channel: 'dev' } },
+    })
+    const result = checkBuildDir(root)
+    assert.ok(result.problems.some((p) => p.includes('carries uniworkReleaseFeed')))
   })
 
   it('passes a clean dual-arch mac output', async () => {

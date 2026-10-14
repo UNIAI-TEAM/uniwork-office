@@ -33,8 +33,10 @@
 //     resources and no channel file (latest*.yml, dev*.yml, ...) next to the
 //     installers. With --update-feed github:<owner>/<repo>: the Windows and
 //     Linux resources hold an app-update.yml for exactly that repository, the
-//     mac app holds none (unsigned apps cannot install updates), and every file
-//     a channel file lists sits next to it, so the uploaded names match
+//     mac app holds none (unsigned apps cannot install updates) but names the
+//     repository in package.json uniworkReleaseFeed (its update notice; none
+//     without --update-feed), and every file a channel file lists sits next to
+//     it, so the uploaded names match
 // The uninstall entry, shortcuts and file-association names come from the
 // packaging config, which apps/shell/tests/release-config.test.ts asserts.
 // Exit code 1 on any problem or when the directory holds nothing to check.
@@ -256,14 +258,42 @@ export function checkPackageJson(where, pkg, report) {
   }
 }
 
+/** Checks the app's packaged package.json and returns it (null without an app.asar). */
 function checkAsar(where, asarPath, report) {
   if (!existsSync(asarPath)) {
     report.problem(`${where}: no app.asar`)
-    return
+    return null
   }
   const pkg = JSON.parse(loadAsar().extractFile(asarPath, 'package.json').toString('utf8'))
   report.checked(`${where} package.json`)
   checkPackageJson(`${where} package.json`, pkg, report)
+  return pkg
+}
+
+/**
+ * The mac app's update notice source, package.json uniworkReleaseFeed. feed
+ * null: there must be none. Otherwise it must name exactly that repository and
+ * a dev / beta channel.
+ */
+export function checkReleaseFeed(where, pkg, feed, report) {
+  const baked = pkg.uniworkReleaseFeed
+  if (!feed) {
+    if (baked !== undefined) {
+      report.problem(`${where}: package.json carries uniworkReleaseFeed (no feed expected)`)
+    }
+    return
+  }
+  report.checked(`${where} uniworkReleaseFeed`)
+  if (
+    baked?.owner !== feed.owner ||
+    baked?.repo !== feed.repo ||
+    !['dev', 'beta'].includes(baked?.channel)
+  ) {
+    report.problem(
+      `${where}: package.json uniworkReleaseFeed is ${JSON.stringify(baked ?? null)}, ` +
+        `expected github:${feed.owner}/${feed.repo} on dev or beta`,
+    )
+  }
 }
 
 const CHANNEL_FILE = /^(?:latest|alpha|beta|dev)(?:-[a-z0-9]+)?\.yml$/i
@@ -381,7 +411,7 @@ export function checkInfoPlist(where, plist, report) {
   }
 }
 
-function checkMacApp(appDir, report) {
+function checkMacApp(appDir, report, feed) {
   const where = basename(appDir)
   report.problem(brandProblem('app bundle name', where))
   checkInfoPlist(where, readPlistFile(join(appDir, 'Contents', 'Info.plist')), report)
@@ -392,9 +422,11 @@ function checkMacApp(appDir, report) {
     }
   }
   const resources = join(appDir, 'Contents', 'Resources')
-  checkAsar(where, join(resources, 'app.asar'), report)
-  // never a feed: Squirrel.Mac installs updates only into a signed app
+  const pkg = checkAsar(where, join(resources, 'app.asar'), report)
+  // never a feed: Squirrel.Mac installs updates only into a signed app; the
+  // unsigned app reads the release repository from package.json instead
   checkUpdateFeed(where, resources, report, null)
+  if (pkg) checkReleaseFeed(where, pkg, feed, report)
 }
 
 function checkLinuxUnpacked(dir, report, feed) {
@@ -553,7 +585,7 @@ export function checkBuildDir(dir, { expect = [], updateFeed = null } = {}) {
       } else if (name.startsWith('mac')) {
         const apps = readdirSync(path).filter((entry) => entry.endsWith('.app'))
         if (apps.length === 0) report.problem(`${name}: no .app bundle`)
-        for (const app of apps) checkMacApp(join(path, app), report)
+        for (const app of apps) checkMacApp(join(path, app), report, updateFeed)
       } else {
         checkLinuxUnpacked(path, report, updateFeed)
       }

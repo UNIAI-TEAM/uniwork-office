@@ -26,7 +26,8 @@ name: Release installers
 # (pinned to the release channel), electron-builder writes <channel>.yml /
 # <channel>-linux.yml next to the installers and the release carries them, so an
 # installed dev build finds the next dev release. The unsigned mac app carries
-# no feed (Squirrel.Mac needs a signed app) and points at the download page.
+# no feed (Squirrel.Mac needs a signed app); it reads this repository's releases
+# itself (package.json uniworkReleaseFeed) and offers the newer dmg.
 # check-build-brand.mjs --update-feed checks all of it. A tag must point at a commit
 # on main. Only the publish job holds a write token, and it runs no repository
 # code: it downloads the built files and calls gh release. Everything else
@@ -442,7 +443,7 @@ jobs:
           done
 
       - name: Check the build output brand
-        run: node tools/release/check-build-brand.mjs --dir "$BUILD_DIR" --expect mac-arm64,mac
+        run: node tools/release/check-build-brand.mjs --dir "$BUILD_DIR" --expect mac-arm64,mac --update-feed "github:$GITHUB_REPOSITORY"
 
       - name: Collect the dmgs and their SHA-256 sums
         run: |
@@ -671,7 +672,7 @@ jobs:
           if ! gh release view "$TAG" >/dev/null 2>&1; then
             # the body is the install note people read before the first launch
             NOTES="$(cat <<'NOTES_END'
-          Unsigned CHANNEL_PLACEHOLDER build of UniWork Office for Windows x64, macOS (Apple Silicon and Intel) and Linux x64 (deb, AppImage). The Windows app and the Linux AppImage update themselves from these releases; on macOS and with the deb, install the next build from https://uniworkos.com/office. SHA-256 sums are attached.
+          Unsigned CHANNEL_PLACEHOLDER build of UniWork Office for Windows x64, macOS (Apple Silicon and Intel) and Linux x64 (deb, AppImage). The Windows app and the Linux AppImage update themselves from these releases; the macOS app tells you when a newer build is out and downloads its dmg to install by hand; with the deb, install the next build from https://uniworkos.com/office. SHA-256 sums are attached.
 
           Install and first launch
 

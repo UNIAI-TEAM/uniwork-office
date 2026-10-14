@@ -19,7 +19,10 @@ interface BuilderConfig {
   artifactName: string
   copyright: string
   publish?: unknown
-  extraMetadata?: { version?: string }
+  extraMetadata?: {
+    version?: string
+    uniworkReleaseFeed?: { owner: string; repo: string; channel: string }
+  }
   fileAssociations: { ext: string; name: string; description?: string; rank?: string }[]
   nsis: Record<string, unknown>
   mac: Record<string, unknown> & { target: { target: string; arch: string[] }[] }
@@ -236,6 +239,26 @@ describe('dev / beta release builds', () => {
     })
     expect(config.mac.publish).toBeNull()
     expect(config.mac.target.map((entry) => entry.target)).toEqual(['dmg'])
+  })
+
+  it('name the release repository and channel for the mac update notice', () => {
+    const config = loadConfig({
+      UNIWORK_RELEASE_CHANNEL: 'beta',
+      UNIWORK_UPDATE_URL: 'https://github.com/UNIAI-TEAM/uniwork-office/',
+    })
+    expect(config.extraMetadata?.uniworkReleaseFeed).toEqual({
+      owner: 'UNIAI-TEAM',
+      repo: 'uniwork-office',
+      channel: 'beta',
+    })
+    // no feed without a github URL or outside a release build
+    for (const env of [
+      { UNIWORK_RELEASE_CHANNEL: 'dev' },
+      { UNIWORK_RELEASE_CHANNEL: 'dev', UNIWORK_UPDATE_URL: 'https://updates.example/office' },
+      { UNIWORK_UPDATE_URL: 'https://github.com/UNIAI-TEAM/uniwork-office' },
+    ]) {
+      expect(loadConfig(env).extraMetadata?.uniworkReleaseFeed).toBeUndefined()
+    }
   })
 
   it('refuse an update URL that is not a plain HTTPS base URL', () => {

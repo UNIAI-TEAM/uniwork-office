@@ -4,6 +4,8 @@ import { app, dialog, shell } from 'electron'
 import type { BrowserWindow } from 'electron'
 import { autoUpdater, CancellationToken } from 'electron-updater'
 import { installResumeDownload } from './update-resume'
+import { channelVersion, latestMacRelease, parseReleaseFeed } from './release-notifier'
+import type { ReleaseFeed } from './release-notifier'
 import type { UpdateInfo } from 'electron-updater'
 import { createI18n, getUiLang, htmlLang } from '@genoffice/i18n'
 import type {
@@ -37,9 +39,12 @@ import {
  * dialog. Windows updates through the NSIS installer (latest.yml); macOS
  * through the zip target (latest-mac.yml); Linux through the AppImage
  * target (latest-linux.yml) — all published by the internal release
- * pipeline. On Linux only AppImage runs self-update (electron-updater
- * replaces the .AppImage file in place, no root needed); deb installs have
- * no updater — users upgrade via `apt install ./<new>.deb`.
+ * pipeline. The unsigned mac release app has no feed (Squirrel.Mac needs a
+ * signed app): it checks its channel's GitHub releases itself and offers the
+ * newer dmg to install by hand (release-notifier.ts). On Linux only
+ * AppImage runs self-update (electron-updater replaces the .AppImage file in
+ * place, no root needed); deb installs have no updater — users upgrade via
+ * `apt install ./<new>.deb`.
  *
  * Dev preview: GENOFFICE_FAKE_UPDATE=<version> in an unpacked run opens the
  * window with a simulated download so the UI can be exercised end to end.
@@ -61,6 +66,8 @@ const tUpd = createI18n({
     updCheckFailed: '无法检查更新，请检查网络后重试。',
     updOpenDownload: '前往下载页面',
     updNoFeed: '此版本的更新需从下载页面获取并安装。',
+    updNotify: '下载新版本后覆盖安装当前版本即可。',
+    updNotifyDownload: '下载安装包',
   },
   en: {
     updTitle: 'Software Update',
@@ -79,6 +86,8 @@ const tUpd = createI18n({
     updCheckFailed: "Couldn't check for updates. Check your network and try again.",
     updOpenDownload: 'Open Download Page',
     updNoFeed: 'Updates for this version are installed from the download page.',
+    updNotify: 'Download the new version and install it over the current one.',
+    updNotifyDownload: 'Download Installer',
   },
   vi: {
     updTitle: 'Cập nhật phần mềm',
@@ -97,6 +106,8 @@ const tUpd = createI18n({
     updCheckFailed: 'Không thể kiểm tra bản cập nhật. Kiểm tra mạng của bạn và thử lại.',
     updOpenDownload: 'Mở trang tải xuống',
     updNoFeed: 'Bản cập nhật cho phiên bản này được cài từ trang tải về.',
+    updNotify: 'Tải phiên bản mới về và cài đè lên bản hiện tại.',
+    updNotifyDownload: 'Tải bộ cài đặt',
   },
   ja: {
     updTitle: 'ソフトウェアアップデート',
@@ -115,6 +126,8 @@ const tUpd = createI18n({
     updCheckFailed: '更新を確認できませんでした。ネットワークを確認して再試行してください。',
     updOpenDownload: 'ダウンロードページを開く',
     updNoFeed: 'このバージョンの更新は、ダウンロードページから入手してインストールします。',
+    updNotify: '新しいバージョンをダウンロードし、現在のバージョンに上書きしてインストールしてください。',
+    updNotifyDownload: 'インストーラーをダウンロード',
   },
   ko: {
     updTitle: '소프트웨어 업데이트',
@@ -133,6 +146,8 @@ const tUpd = createI18n({
     updCheckFailed: '업데이트를 확인할 수 없습니다. 네트워크를 확인한 후 다시 시도하세요.',
     updOpenDownload: '다운로드 페이지 열기',
     updNoFeed: '이 버전의 업데이트는 다운로드 페이지에서 받아 설치합니다.',
+    updNotify: '새 버전을 다운로드하여 현재 버전 위에 설치하세요.',
+    updNotifyDownload: '설치 파일 다운로드',
   },
   fr: {
     updTitle: 'Mise à jour logicielle',
@@ -153,6 +168,8 @@ const tUpd = createI18n({
     updOpenDownload: 'Ouvrir la page de téléchargement',
     updNoFeed:
       'Les mises à jour de cette version sont installées depuis la page de téléchargement.',
+    updNotify: 'Téléchargez la nouvelle version et installez-la par-dessus la version actuelle.',
+    updNotifyDownload: "Télécharger l'installateur",
   },
   de: {
     updTitle: 'Softwareaktualisierung',
@@ -173,6 +190,8 @@ const tUpd = createI18n({
       'Updates konnten nicht geprüft werden. Prüfen Sie Ihre Netzwerkverbindung und versuchen Sie es erneut.',
     updOpenDownload: 'Download-Seite öffnen',
     updNoFeed: 'Updates für diese Version werden über die Download-Seite installiert.',
+    updNotify: 'Laden Sie die neue Version herunter und installieren Sie sie über die aktuelle.',
+    updNotifyDownload: 'Installer herunterladen',
   },
   es: {
     updTitle: 'Actualización de software',
@@ -191,6 +210,8 @@ const tUpd = createI18n({
     updCheckFailed: 'No se pudo buscar actualizaciones. Compruebe su red e inténtelo de nuevo.',
     updOpenDownload: 'Abrir página de descargas',
     updNoFeed: 'Las actualizaciones de esta versión se instalan desde la página de descargas.',
+    updNotify: 'Descargue la nueva versión e instálela sobre la actual.',
+    updNotifyDownload: 'Descargar instalador',
   },
   th: {
     updTitle: 'อัปเดตซอฟต์แวร์',
@@ -208,6 +229,8 @@ const tUpd = createI18n({
     updCheckFailed: 'ไม่สามารถตรวจหาการอัปเดตได้ โปรดตรวจสอบเครือข่ายแล้วลองอีกครั้ง',
     updOpenDownload: 'เปิดหน้าดาวน์โหลด',
     updNoFeed: 'การอัปเดตของเวอร์ชันนี้ติดตั้งจากหน้าดาวน์โหลด',
+    updNotify: 'ดาวน์โหลดเวอร์ชันใหม่แล้วติดตั้งทับเวอร์ชันปัจจุบัน',
+    updNotifyDownload: 'ดาวน์โหลดตัวติดตั้ง',
   },
   id: {
     updTitle: 'Pembaruan Perangkat Lunak',
@@ -226,6 +249,8 @@ const tUpd = createI18n({
     updCheckFailed: 'Tidak dapat memeriksa pembaruan. Periksa jaringan Anda dan coba lagi.',
     updOpenDownload: 'Buka Halaman Unduhan',
     updNoFeed: 'Pembaruan untuk versi ini dipasang dari halaman unduhan.',
+    updNotify: 'Unduh versi baru dan pasang di atas versi saat ini.',
+    updNotifyDownload: 'Unduh Penginstal',
   },
   ru: {
     updTitle: 'Обновление программы',
@@ -244,6 +269,8 @@ const tUpd = createI18n({
     updCheckFailed: 'Не удалось проверить обновления. Проверьте сеть и повторите попытку.',
     updOpenDownload: 'Открыть страницу загрузки',
     updNoFeed: 'Обновления для этой версии устанавливаются со страницы загрузки.',
+    updNotify: 'Скачайте новую версию и установите её поверх текущей.',
+    updNotifyDownload: 'Скачать установщик',
   },
   ar: {
     updTitle: 'تحديث البرنامج',
@@ -260,6 +287,8 @@ const tUpd = createI18n({
     updCheckFailed: 'تعذر التحقق من التحديثات. تحقق من الشبكة وحاول مرة أخرى.',
     updOpenDownload: 'فتح صفحة التنزيل',
     updNoFeed: 'تُثبَّت تحديثات هذا الإصدار من صفحة التنزيل.',
+    updNotify: 'نزّل الإصدار الجديد وثبّته فوق الإصدار الحالي.',
+    updNotifyDownload: 'تنزيل المثبّت',
   },
   pt: {
     updTitle: 'Atualização de Software',
@@ -278,6 +307,8 @@ const tUpd = createI18n({
     updCheckFailed: 'Não foi possível procurar atualizações. Verifique sua rede e tente novamente.',
     updOpenDownload: 'Abrir página de download',
     updNoFeed: 'As atualizações desta versão são instaladas a partir da página de download.',
+    updNotify: 'Baixe a nova versão e instale-a sobre a atual.',
+    updNotifyDownload: 'Baixar instalador',
   },
   it: {
     updTitle: 'Aggiornamento software',
@@ -296,6 +327,8 @@ const tUpd = createI18n({
     updCheckFailed: 'Impossibile controllare gli aggiornamenti. Verifica la rete e riprova.',
     updOpenDownload: 'Apri pagina di download',
     updNoFeed: 'Gli aggiornamenti di questa versione si installano dalla pagina di download.',
+    updNotify: 'Scarica la nuova versione e installala sopra quella attuale.',
+    updNotifyDownload: 'Scarica il programma di installazione',
   },
   pl: {
     updTitle: 'Aktualizacja oprogramowania',
@@ -314,6 +347,8 @@ const tUpd = createI18n({
     updCheckFailed: 'Nie udało się sprawdzić aktualizacji. Sprawdź sieć i spróbuj ponownie.',
     updOpenDownload: 'Otwórz stronę pobierania',
     updNoFeed: 'Aktualizacje tej wersji instaluje się ze strony pobierania.',
+    updNotify: 'Pobierz nową wersję i zainstaluj ją na obecnej.',
+    updNotifyDownload: 'Pobierz instalator',
   },
   cs: {
     updTitle: 'Aktualizace softwaru',
@@ -332,6 +367,8 @@ const tUpd = createI18n({
     updCheckFailed: 'Aktualizace se nepodařilo zkontrolovat. Zkontrolujte síť a zkuste to znovu.',
     updOpenDownload: 'Otevřít stránku pro stažení',
     updNoFeed: 'Aktualizace této verze se instalují ze stránky pro stažení.',
+    updNotify: 'Stáhněte novou verzi a nainstalujte ji přes současnou.',
+    updNotifyDownload: 'Stáhnout instalátor',
   },
   nl: {
     updTitle: 'Software-update',
@@ -351,6 +388,8 @@ const tUpd = createI18n({
       'Kan niet controleren op updates. Controleer uw netwerk en probeer het opnieuw.',
     updOpenDownload: 'Downloadpagina openen',
     updNoFeed: 'Updates voor deze versie installeert u via de downloadpagina.',
+    updNotify: 'Download de nieuwe versie en installeer deze over de huidige heen.',
+    updNotifyDownload: 'Installatieprogramma downloaden',
   },
   ms: {
     updTitle: 'Kemas Kini Perisian',
@@ -369,6 +408,8 @@ const tUpd = createI18n({
     updCheckFailed: 'Tidak dapat menyemak kemas kini. Semak rangkaian anda dan cuba lagi.',
     updOpenDownload: 'Buka Halaman Muat Turun',
     updNoFeed: 'Kemas kini untuk versi ini dipasang dari halaman muat turun.',
+    updNotify: 'Muat turun versi baharu dan pasang di atas versi semasa.',
+    updNotifyDownload: 'Muat Turun Pemasang',
   },
   he: {
     updTitle: 'עדכון תוכנה',
@@ -385,6 +426,8 @@ const tUpd = createI18n({
     updCheckFailed: 'לא ניתן לבדוק עדכונים. בדקו את הרשת ונסו שוב.',
     updOpenDownload: 'פתח את דף ההורדות',
     updNoFeed: 'עדכונים לגרסה זו מותקנים מדף ההורדות.',
+    updNotify: 'הורד את הגרסה החדשה והתקן אותה מעל הגרסה הנוכחית.',
+    updNotifyDownload: 'הורד את תוכנית ההתקנה',
   },
   hi: {
     updTitle: 'सॉफ़्टवेयर अपडेट',
@@ -403,6 +446,8 @@ const tUpd = createI18n({
     updCheckFailed: 'अपडेट जांच नहीं हो सकी। अपना नेटवर्क जांचें और फिर से प्रयास करें।',
     updOpenDownload: 'डाउनलोड पृष्ठ खोलें',
     updNoFeed: 'इस संस्करण के अपडेट डाउनलोड पृष्ठ से इंस्टॉल किए जाते हैं।',
+    updNotify: 'नया संस्करण डाउनलोड करें और उसे मौजूदा संस्करण के ऊपर इंस्टॉल करें।',
+    updNotifyDownload: 'इंस्टॉलर डाउनलोड करें',
   },
   'zh-TW': {
     updTitle: '軟體更新',
@@ -419,6 +464,8 @@ const tUpd = createI18n({
     updCheckFailed: '無法檢查更新，請檢查網路後重試。',
     updOpenDownload: '前往下載頁面',
     updNoFeed: '此版本的更新需從下載頁面取得並安裝。',
+    updNotify: '下載新版本後覆蓋安裝目前版本即可。',
+    updNotifyDownload: '下載安裝程式',
   },
 })
 
@@ -537,6 +584,9 @@ let pinnedChannel: string | null = null
 // unsigned mac release app, local packs): the manual check then explains where updates come
 // from instead of reporting a failed automatic update
 let noUpdateFeed = false
+// the unsigned mac release app's release check (see release-notifier.ts):
+// resolves true when it found a newer release and showed the window
+let macReleaseCheck: ((manual: boolean) => Promise<boolean>) | null = null
 
 function log(...args: unknown[]): void {
   console.log('[updater]', ...args)
@@ -556,6 +606,8 @@ function uiStrings(): UpdateUiStrings {
     retry: tUpd(lang, 'updRetry'),
     manualDesc: tUpd(lang, 'updManual'),
     openDownload: tUpd(lang, 'updOpenDownload'),
+    notifyDesc: tUpd(lang, 'updNotify'),
+    notifyDownload: tUpd(lang, 'updNotifyDownload'),
   }
 }
 
@@ -597,6 +649,19 @@ export async function checkForUpdatesNow(): Promise<void> {
       fakeShowAgain()
       return
     }
+    if (macReleaseCheck) {
+      dismissedVersion = null
+      let found
+      try {
+        found = await macReleaseCheck(true)
+      } catch (err) {
+        log('manual release check failed:', (err as Error)?.message ?? err)
+        await showCheckFailed(lang)
+        return
+      }
+      if (!found) await showUpToDate(lang)
+      return
+    }
     if (!updaterActive) {
       const { response } = await dialog.showMessageBox({
         type: 'info',
@@ -617,30 +682,87 @@ export async function checkForUpdatesNow(): Promise<void> {
       if (result === null) throw new Error('Update check was skipped')
     } catch (err) {
       log('manual check failed:', (err as Error)?.message ?? err)
-      await dialog.showMessageBox({
-        type: 'warning',
-        title: tUpd(lang, 'updTitle'),
-        message: tUpd(lang, 'updCheckFailed'),
-        buttons: ['OK'],
-        defaultId: 0,
-        cancelId: 0,
-      })
+      await showCheckFailed(lang)
       return
     }
     // an available update already opened the update window via the
     // 'update-available' handler; only "nothing new" needs a dialog here
     if (result.isUpdateAvailable) return
-    await dialog.showMessageBox({
-      type: 'info',
-      title: tUpd(lang, 'updTitle'),
-      message: tUpd(lang, 'updUpToDate', { version: app.getVersion() }),
-      buttons: ['OK'],
-      defaultId: 0,
-      cancelId: 0,
-    })
+    await showUpToDate(lang)
   } finally {
     manualCheckInFlight = false
   }
+}
+
+async function showCheckFailed(lang: ReturnType<typeof getUiLang>): Promise<void> {
+  await dialog.showMessageBox({
+    type: 'warning',
+    title: tUpd(lang, 'updTitle'),
+    message: tUpd(lang, 'updCheckFailed'),
+    buttons: ['OK'],
+    defaultId: 0,
+    cancelId: 0,
+  })
+}
+
+async function showUpToDate(lang: ReturnType<typeof getUiLang>): Promise<void> {
+  await dialog.showMessageBox({
+    type: 'info',
+    title: tUpd(lang, 'updTitle'),
+    message: tUpd(lang, 'updUpToDate', { version: app.getVersion() }),
+    buttons: ['OK'],
+    defaultId: 0,
+    cancelId: 0,
+  })
+}
+
+/// The release feed baked into an unsigned mac release app's package.json, or
+/// null. Only a build whose version belongs to the feed's channel qualifies.
+function bakedMacReleaseFeed(): ReleaseFeed | null {
+  try {
+    const pkg = JSON.parse(readFileSync(path.join(app.getAppPath(), 'package.json'), 'utf8'))
+    const feed = parseReleaseFeed(pkg?.uniworkReleaseFeed)
+    if (feed === null) return null
+    return channelVersion(app.getVersion(), feed.channel) === null ? null : feed
+  } catch {
+    return null
+  }
+}
+
+/// The unsigned mac app cannot install updates; it checks the GitHub releases
+/// of its channel and offers the newer dmg for its arch in the update window.
+function initMacReleaseNotifier(getWindow: () => BrowserWindow | null, feed: ReleaseFeed): void {
+  let shownVersion: string | null = null
+  let downloadUrl: string | null = null
+  const actions = {
+    onDownload: () => {},
+    onInstall: () => {},
+    onLater: () => {
+      dismissedVersion = shownVersion
+      closeUpdateWindow()
+    },
+    onOpenDownload: () => {
+      void shell.openExternal(downloadUrl ?? DOWNLOAD_PAGE_URL)
+    },
+  }
+  macReleaseCheck = async (manual) => {
+    const release = await latestMacRelease(feed, app.getVersion(), process.arch)
+    if (release === null) return false
+    // a background check stays quiet about a version the user put off
+    if (!manual && release.version === dismissedVersion) return true
+    // a recheck finding the version the open window shows leaves it alone
+    if (release.version === shownVersion && isUpdateWindowOpen()) return true
+    shownVersion = release.version
+    downloadUrl = release.downloadUrl
+    log('release available:', release.version)
+    showUpdateWindow(getWindow(), { ...initialState(release.version), phase: 'notify' }, actions)
+    return true
+  }
+  const check = (): void => {
+    macReleaseCheck?.(false).catch((err) => log('release check failed:', err?.message ?? err))
+  }
+  setTimeout(check, FIRST_CHECK_DELAY_MS)
+  setInterval(check, RECHECK_INTERVAL_MS)
 }
 
 export function initAutoUpdater(
@@ -672,6 +794,12 @@ export function initAutoUpdater(
   // manual check falls into the same download-page answer as other installs
   // without a self-update mechanism.
   if (!existsSync(path.join(process.resourcesPath, 'app-update.yml'))) {
+    const macFeed = process.platform === 'darwin' ? bakedMacReleaseFeed() : null
+    if (macFeed !== null) {
+      log('no app-update.yml; notifying of', macFeed.channel, 'releases')
+      initMacReleaseNotifier(getWindow, macFeed)
+      return
+    }
     log('no app-update.yml in this build; updater inactive')
     noUpdateFeed = true
     return
