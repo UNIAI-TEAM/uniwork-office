@@ -1,4 +1,4 @@
-import type { AgentMessage, AgentToolCall, AgentToolDef } from '@genoffice/agent-core'
+import type { AgentMessage, AgentStreamNotice, AgentToolCall, AgentToolDef } from '@genoffice/agent-core'
 
 export type AiProviderId =
   | 'genspark'
@@ -26,6 +26,8 @@ export type AiProviderId =
   | 'opencode-zen'
   | 'opencode-go'
   | 'custom'
+  /** UniWork AI: the organization's server-side model through the UniWork façade (no key, never BYOK pass-through) */
+  | 'uniwork'
 
 /** UniWork cloud account status (internal name kept): loggedIn = signed in to UniWork + plan includes cloud AI */
 export interface GenSparkAccountStatus {
@@ -217,13 +219,19 @@ export interface AiStreamChunk {
   requestId: string
   /** 'ping' = wire-level keepalive so the renderer can tell a live stream from a dead one;
    * 'reasoning' = model thinking delta (text carries it), stored for interleaved-thinking echo */
-  type: 'delta' | 'reasoning' | 'tool-call' | 'done' | 'error' | 'ping'
+  type: 'delta' | 'reasoning' | 'tool-call' | 'done' | 'error' | 'ping' | 'notice' | 'reset'
   text?: string
   /** complete parsed tool call (emitted once its arguments finish streaming) */
   toolCall?: AgentToolCall
+  /** 'notice' only: a non-fatal turn notice (UniWork AI); 'reset' = drop this turn's streamed output, the same turn is resent */
+  notice?: AgentStreamNotice
   error?: string
   /** machine-readable error cause ('timeout', exhausted 'credits', 'network' connectivity failure, 'overloaded' capacity/rate limit); lets the renderer localize the message */
   errorCode?: 'timeout' | 'credits' | 'network' | 'overloaded'
+  /** a UniWork AI failure: the server's `code` (UniworkWireCode) decides the message, never the text or errorCode */
+  uniworkCode?: string
+  /** with uniworkCode: seconds the server asked to wait (Retry-After), when it sent one */
+  retryAfterSec?: number
   /** normalized stop reason carried on 'done' ('max_tokens' = output cut off by the token limit) */
   stopReason?: string
 }

@@ -4,6 +4,7 @@ import type {
   AgentToolDef,
   AgentTransport,
   AgentMessage,
+  AgentStreamNotice,
 } from './types'
 
 /**
@@ -15,12 +16,18 @@ export interface IpcStreamChunk {
   requestId: string
   /** 'ping' = wire-level keepalive; re-arms the silence watchdog and carries no payload;
    * 'reasoning' = model thinking delta (text carries it) */
-  type: 'delta' | 'reasoning' | 'tool-call' | 'done' | 'error' | 'ping'
+  type: 'delta' | 'reasoning' | 'tool-call' | 'done' | 'error' | 'ping' | 'notice' | 'reset'
   text?: string
   toolCall?: AgentToolCall
+  /** 'notice' only: the non-fatal turn notice (UniWork AI) */
+  notice?: AgentStreamNotice
   error?: string
   /** machine-readable error cause; maps to the localized timeout/credits/network/overloaded message */
   errorCode?: 'timeout' | 'credits' | 'network' | 'overloaded'
+  /** a UniWork AI failure: the server's `code` decides the message, never the text or errorCode */
+  uniworkCode?: string
+  /** with uniworkCode: seconds the server asked to wait (Retry-After), when it sent one */
+  retryAfterSec?: number
   /** normalized stop reason on 'done' ('max_tokens' = cut off by the token limit) */
   stopReason?: string
 }

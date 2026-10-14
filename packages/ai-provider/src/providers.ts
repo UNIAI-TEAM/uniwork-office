@@ -363,6 +363,22 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
 ]
 
 /**
+ * UniWork AI (the `uniwork` provider). Kept out of AI_PROVIDERS on purpose:
+ * that list feeds every picker, the settings page and the web provider set,
+ * and the entry may only show where the server offers it (signed in, plan
+ * entitlement, `tools.chat`, the organization/format capability). The
+ * adapter work adds it there behind those conditions. No key, no model
+ * choice: the server's policy picks the model.
+ */
+export const UNIWORK_PROVIDER_META: AiProviderMeta = {
+  id: 'uniwork',
+  label: 'UniWork AI',
+  models: [],
+  defaultModel: '',
+  keyPlaceholder: '',
+}
+
+/**
  * Fresh settings with every provider's default model and an empty key,
  * except providers listed in `defaultApiKeys` (e.g. an app-specific
  * preconfigured Anthropic key). Callers own that policy; this package

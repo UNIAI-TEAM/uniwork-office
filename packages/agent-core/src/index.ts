@@ -1,8 +1,10 @@
 export type {
+  AgentDroppedToolCall,
   AgentImage,
   AgentMessage,
   AgentStreamCallbacks,
   AgentStreamHandle,
+  AgentStreamNotice,
   AgentStreamRequest,
   AgentToolCall,
   AgentToolDef,

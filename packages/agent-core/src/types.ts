@@ -108,9 +108,41 @@ export interface AgentStreamCallbacks {
   onPhase?(phase: AgentPhase): void
   /** normalized stop reason of the turn ('max_tokens' = cut off by the token limit); transports may omit this */
   onStopReason?(reason: string): void
+  /** a non-fatal turn notice (UniWork AI: dropped tool calls, a Retry-After wait, a new conversation); transports may omit this */
+  onNotice?(notice: AgentStreamNotice): void
+  /**
+   * the transport restarts the same turn (UniWork AI resends after a Retry-After wait): drop this
+   * turn's streamed text, reasoning and tool calls; history is untouched. Transports may omit this.
+   */
+  onTurnReset?(): void
   onDone(): void
   onError(error: string): void
 }
+
+/** a tool call the UniWork AI server refused to hand to the client (`x_uniwork.dropped_tool_calls[]`) */
+export interface AgentDroppedToolCall {
+  index: number
+  name: string
+  reason: 'view_only' | 'not_allowlisted'
+}
+
+/**
+ * Non-fatal information a transport reports during a turn. Only the UniWork AI adapter sends
+ * these today; a consumer ignores a kind it does not know.
+ * - `dropped-tool-calls`: calls the server filtered out of this answer, with their reason
+ * - `step`: tool rounds used by the run after this answer, and the cap
+ * - `rate-limit-wait`: the transport waits `seconds` before resending (attempt 1..3); no retry button
+ * - `conversation-restarted`: the server conversation expired; the question was not sent
+ * - `conversation-boundary`: this turn starts a new server conversation after a provider switch
+ * - `uniwork-off`: UniWork AI is off for this organization or format (hide it, no error chip)
+ */
+export type AgentStreamNotice =
+  | { kind: 'dropped-tool-calls'; calls: AgentDroppedToolCall[] }
+  | { kind: 'step'; step: number; limit: number }
+  | { kind: 'rate-limit-wait'; seconds: number; attempt: number }
+  | { kind: 'conversation-restarted' }
+  | { kind: 'conversation-boundary'; provider: string }
+  | { kind: 'uniwork-off' }
 
 export interface AgentStreamHandle {
   /** abort the in-flight turn; the transport must still emit onDone afterwards */
