@@ -17,7 +17,15 @@ import {
   imageGenerationAvailable,
   type AiSettings,
 } from '@genoffice/ai-provider/browser'
-import { AiComposer, AiScopeQuote, AiTypingIndicator, type AiScopeQuoteData } from '@genoffice/ui'
+import {
+  AiComposer,
+  AiQueueStrip,
+  AI_QUEUE_LABELS,
+  AiScopeQuote,
+  AiTypingIndicator,
+  useChatRunQueue,
+  type AiScopeQuoteData,
+} from '@genoffice/ui'
 import { cap, platform } from '../capabilities'
 import { aiLangDirective, t as tGlobal, useI18n } from '../i18n/locale'
 import { Markdown } from '@genoffice/ui'
@@ -136,6 +144,16 @@ export function AiPanel({
   /** the question of the running turn: a restarted conversation puts it back in the composer */
   const runQuestionRef = useRef('')
   const [busy, setBusy] = useState(false)
+  /** messages queued while a reply runs; the pump re-runs them through send on settle */
+  const msgQueue = useChatRunQueue<void>({
+    busy,
+    submit: (text) => {
+      const loop = loopRef.current
+      if (!loop || loop.busy) return false
+      send(text, null)
+      return true
+    },
+  })
   const [phase, setPhase] = useState<Phase>('thinking')
   /** the scope chip's expandable preview of the selected text */
   const [scopePreviewOpen, setScopePreviewOpen] = useState(false)
@@ -593,6 +611,14 @@ export function AiPanel({
 
   const stop = (): void => loopRef.current?.cancel()
 
+  /** Enter while a reply runs: the draft joins the queue above the composer */
+  const enqueueDraft = () => {
+    const text = prompt.trim()
+    if (!text) return
+    msgQueue.enqueue(text, undefined)
+    setPrompt('')
+  }
+
   // One-click AI actions from the ribbon / Ask popover; while a run is active the
   // preset lands in the composer instead of being dropped silently (markdown parity)
   useEffect(() => {
@@ -718,6 +744,7 @@ export function AiPanel({
                 loopRef.current?.reset()
                 clarify.dismiss()
                 clarify.clearReceipts()
+                msgQueue.clear()
                 setBusy(false)
                 setChat([])
               }}
@@ -883,6 +910,20 @@ export function AiPanel({
           </div>
         )}
         <AiComposer
+          queueStrip={
+            <AiQueueStrip
+              items={msgQueue.queued}
+              labels={AI_QUEUE_LABELS[lang]}
+              onUpdate={msgQueue.update}
+              onRemove={msgQueue.remove}
+              onClear={msgQueue.clear}
+              paused={msgQueue.paused}
+              onTogglePause={msgQueue.togglePaused}
+              onMove={msgQueue.move}
+            />
+          }
+          onQueue={enqueueDraft}
+          queuePlaceholder={AI_QUEUE_LABELS[lang].queuePlaceholder}
           value={prompt}
           busy={busy}
           header={
