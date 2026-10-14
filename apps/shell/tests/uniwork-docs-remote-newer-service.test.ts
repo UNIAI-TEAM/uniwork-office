@@ -4,7 +4,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { UniworkConflictChoice, UniworkDocStatus } from '../src/shared/home-api'
-import { BINDING_FILE, type Binding, type BindingStore } from '../src/main/uniwork-docs/binding-store'
+import {
+  BINDING_FILE,
+  type Binding,
+  type BindingStore,
+} from '../src/main/uniwork-docs/binding-store'
 import { UniworkDocError } from '../src/main/uniwork-docs/errors'
 import type { SaveCoordinator } from '../src/main/uniwork-docs/save-coordinator'
 import { UniworkDocsService, type ConflictUi } from '../src/main/uniwork-docs/service'
