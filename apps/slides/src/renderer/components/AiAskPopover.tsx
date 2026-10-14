@@ -104,12 +104,18 @@ export function AiAskTrigger({ getAnchorRect, onOpen }: TriggerProps): React.JSX
     const scroller = document.querySelector('.stage-wrap')
     scroller?.addEventListener('scroll', update, { passive: true })
     window.addEventListener('resize', update)
+    // the stage resizes without a window resize (the comments pane opens on a reveal, the AI dock
+    // collapses): the chip must follow the new stage edge instead of keeping its old position
+    const resizeObserver =
+      scroller && typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null
+    if (scroller) resizeObserver?.observe(scroller)
     document.addEventListener('pointerdown', onPointerDown, true)
     document.addEventListener('pointerup', onPointerUp, true)
     document.addEventListener('pointercancel', onPointerUp, true)
     return () => {
       scroller?.removeEventListener('scroll', update)
       window.removeEventListener('resize', update)
+      resizeObserver?.disconnect()
       document.removeEventListener('pointerdown', onPointerDown, true)
       document.removeEventListener('pointerup', onPointerUp, true)
       document.removeEventListener('pointercancel', onPointerUp, true)

@@ -142,6 +142,45 @@ describe('V14-12: the Ask AI chip stays inside the slide stage', () => {
     expect(parseFloat(chip.style.left)).toBeLessThanOrEqual(800 - chip.offsetWidth - 8)
   })
 
+  it('V14-12: the stage shrinking under a placed chip (a reveal opens the pane) moves the chip back inside it', () => {
+    // a recording ResizeObserver: the test fires the size change of the stage itself
+    const observers: Array<{ cb: () => void; targets: Element[] }> = []
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        entry = { cb: () => {}, targets: [] as Element[] }
+        constructor(cb: () => void) {
+          this.entry.cb = cb
+          observers.push(this.entry)
+        }
+        observe(el: Element) {
+          this.entry.targets.push(el)
+        }
+        disconnect() {
+          this.entry.targets.length = 0
+        }
+      },
+    )
+    const stage = document.createElement('div')
+    stage.className = 'stage-wrap'
+    document.body.appendChild(stage)
+    try {
+      // the stage ends at x = 1000 when the chip is placed; the pane then opens and it ends at 700
+      let viewRight = 1000
+      const getAnchorRect = () => ({ ...rectAt(690), viewRight })
+      const el = mount(createElement(AiAskTrigger, { getAnchorRect, onOpen: () => {} }))
+      const chip = () => el.querySelector<HTMLElement>('.ai-ask-trigger')!
+      expect(parseFloat(chip().style.left)).toBe(696)
+      viewRight = 700
+      act(() => {
+        for (const o of observers) if (o.targets.includes(stage)) o.cb()
+      })
+      expect(parseFloat(chip().style.left)).toBeLessThanOrEqual(700 - chip().offsetWidth - 8)
+    } finally {
+      stage.remove()
+    }
+  })
+
   it('an object well inside the stage keeps the chip beside it', () => {
     const el = mount(
       createElement(AiAskTrigger, { getAnchorRect: () => rectAt(300), onOpen: () => {} }),
