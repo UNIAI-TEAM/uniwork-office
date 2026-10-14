@@ -553,6 +553,8 @@ export const ru = {
   appPrintFailed: 'Не удалось напечатать.',
   appPrintNeedsFullLoad:
     'Для печати книга должна быть полностью загружена — дождитесь окончания загрузки.',
+  appPrintWorkbookTooLarge:
+    'Эта книга слишком велика, чтобы полностью загрузить её в память, поэтому её нельзя распечатать или экспортировать в PDF.',
   appCsvExportNeedsFullLoad:
     'Экспорт в CSV требует полностью загруженной книги — дождитесь завершения загрузки.',
   appCsvExportTooLarge: 'Лист слишком большой для экспорта в CSV.',
@@ -1096,6 +1098,9 @@ export const ru = {
   appHeadings: 'Заголовки',
   appHeadingsHidden: 'Заголовки скрыты.',
   appHeadingsShown: 'Заголовки показаны.',
+  appRightToLeft: 'Справа налево',
+  appRightToLeftOn: 'Направление сетки: справа налево.',
+  appRightToLeftOff: 'Направление сетки: слева направо.',
   appPrintHeadingsTitle: 'Печатать заголовки строк и столбцов',
   appGroupFunctionLibrary: 'Библиотека функций',
   appInsertFunction: 'Вставить функцию',

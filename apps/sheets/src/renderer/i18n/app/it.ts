@@ -572,6 +572,8 @@ export const it = {
   appPrintFailed: 'Impossibile stampare.',
   appPrintNeedsFullLoad:
     'La stampa richiede il caricamento completo della cartella di lavoro: attendere il termine del caricamento.',
+  appPrintWorkbookTooLarge:
+    'Questa cartella di lavoro è troppo grande per essere caricata interamente in memoria, quindi non può essere stampata né esportata in PDF.',
   appCsvExportNeedsFullLoad:
     "L'esportazione in CSV richiede la cartella di lavoro completamente caricata — attendi la fine del caricamento.",
   appCsvExportTooLarge: 'Il foglio è troppo grande per essere esportato come CSV.',
@@ -1115,6 +1117,9 @@ export const it = {
   appHeadings: 'Intestazioni',
   appHeadingsHidden: 'Intestazioni nascoste.',
   appHeadingsShown: 'Intestazioni mostrate.',
+  appRightToLeft: 'Da destra a sinistra',
+  appRightToLeftOn: 'Direzione della griglia: da destra a sinistra.',
+  appRightToLeftOff: 'Direzione della griglia: da sinistra a destra.',
   appPrintHeadingsTitle: 'Stampa le intestazioni di riga e colonna',
   appGroupFunctionLibrary: 'Libreria di funzioni',
   appInsertFunction: 'Inserisci funzione',

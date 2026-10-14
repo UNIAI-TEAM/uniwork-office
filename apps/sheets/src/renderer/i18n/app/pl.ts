@@ -561,6 +561,8 @@ export const pl = {
   appPrintFailed: 'Nie można wydrukować.',
   appPrintNeedsFullLoad:
     'Drukowanie wymaga pełnego wczytania skoroszytu — poczekaj na zakończenie wczytywania.',
+  appPrintWorkbookTooLarge:
+    'Ten skoroszyt jest zbyt duży, aby w pełni załadować go do pamięci, dlatego nie można go wydrukować ani wyeksportować do pliku PDF.',
   appCsvExportNeedsFullLoad:
     'Eksport do CSV wymaga w pełni załadowanego skoroszytu — poczekaj na zakończenie ładowania.',
   appCsvExportTooLarge: 'Arkusz jest za duży, aby wyeksportować go do CSV.',
@@ -1103,6 +1105,9 @@ export const pl = {
   appHeadings: 'Nagłówki',
   appHeadingsHidden: 'Nagłówki ukryte.',
   appHeadingsShown: 'Nagłówki widoczne.',
+  appRightToLeft: 'Od prawej do lewej',
+  appRightToLeftOn: 'Kierunek siatki: od prawej do lewej.',
+  appRightToLeftOff: 'Kierunek siatki: od lewej do prawej.',
   appPrintHeadingsTitle: 'Drukuj nagłówki wierszy i kolumn',
   appGroupFunctionLibrary: 'Biblioteka funkcji',
   appInsertFunction: 'Wstaw funkcję',

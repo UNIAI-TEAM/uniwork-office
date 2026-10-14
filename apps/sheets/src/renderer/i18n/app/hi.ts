@@ -539,6 +539,8 @@ export const hi = {
   appPrintFailed: 'प्रिंट नहीं किया जा सका।',
   appPrintNeedsFullLoad:
     'प्रिंट करने के लिए कार्यपुस्तिका पूरी लोड होनी चाहिए — लोडिंग पूरी होने तक प्रतीक्षा करें।',
+  appPrintWorkbookTooLarge:
+    'यह वर्कबुक इतनी बड़ी है कि इसे पूरी तरह मेमोरी में लोड नहीं किया जा सकता, इसलिए इसे प्रिंट या PDF में निर्यात नहीं किया जा सकता।',
   appCsvExportNeedsFullLoad:
     'CSV निर्यात के लिए पूरी तरह लोड की गई कार्यपुस्तिका चाहिए — लोडिंग पूरी होने तक प्रतीक्षा करें।',
   appCsvExportTooLarge: 'शीट बहुत बड़ी है, CSV के रूप में निर्यात नहीं की जा सकती।',
@@ -1076,6 +1078,9 @@ export const hi = {
   appHeadings: 'शीर्षक',
   appHeadingsHidden: 'शीर्षक छिपाए गए।',
   appHeadingsShown: 'शीर्षक दिखाए गए।',
+  appRightToLeft: 'दाएँ से बाएँ',
+  appRightToLeftOn: 'ग्रिड दिशा: दाएँ से बाएँ।',
+  appRightToLeftOff: 'ग्रिड दिशा: बाएँ से दाएँ।',
   appPrintHeadingsTitle: 'पंक्ति और स्तंभ शीर्षक मुद्रित करें',
   appGroupFunctionLibrary: 'फ़ंक्शन लाइब्रेरी',
   appInsertFunction: 'फ़ंक्शन सम्मिलित करें',

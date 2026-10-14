@@ -539,6 +539,8 @@ export const ms = {
   appPrintFailed: 'Tidak dapat mencetak.',
   appPrintNeedsFullLoad:
     'Cetakan memerlukan buku kerja dimuatkan sepenuhnya — tunggu sehingga pemuatan selesai.',
+  appPrintWorkbookTooLarge:
+    'Buku kerja ini terlalu besar untuk dimuatkan sepenuhnya ke dalam memori, jadi ia tidak boleh dicetak atau dieksport ke PDF.',
   appCsvExportNeedsFullLoad:
     'Eksport CSV memerlukan buku kerja dimuatkan sepenuhnya — tunggu pemuatan selesai.',
   appCsvExportTooLarge: 'Helaian terlalu besar untuk dieksport sebagai CSV.',
@@ -1077,6 +1079,9 @@ export const ms = {
   appHeadings: 'Tajuk',
   appHeadingsHidden: 'Tajuk disembunyikan.',
   appHeadingsShown: 'Tajuk ditunjukkan.',
+  appRightToLeft: 'Dari kanan ke kiri',
+  appRightToLeftOn: 'Arah grid: dari kanan ke kiri.',
+  appRightToLeftOff: 'Arah grid: dari kiri ke kanan.',
   appPrintHeadingsTitle: 'Cetak tajuk baris dan lajur',
   appGroupFunctionLibrary: 'Pustaka Fungsi',
   appInsertFunction: 'Selitkan Fungsi',

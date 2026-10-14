@@ -522,6 +522,8 @@ export const en = {
   appPrintFailed: 'Unable to print.',
   appPrintNeedsFullLoad:
     'Printing needs the whole workbook loaded — please wait for loading to finish.',
+  appPrintWorkbookTooLarge:
+    'This workbook is too large to load fully into memory, so it cannot be printed or exported to PDF.',
   appCsvExportNeedsFullLoad:
     'CSV export needs the fully loaded workbook — wait for loading to finish.',
   appCsvExportTooLarge: 'The sheet is too large to export as CSV.',
@@ -1056,6 +1058,9 @@ export const en = {
   appHeadings: 'Headings',
   appHeadingsHidden: 'Headings hidden.',
   appHeadingsShown: 'Headings shown.',
+  appRightToLeft: 'Right-to-Left',
+  appRightToLeftOn: 'Grid direction: right-to-left.',
+  appRightToLeftOff: 'Grid direction: left-to-right.',
   appPrintHeadingsTitle: 'Print row and column headings',
   appGroupFunctionLibrary: 'Function Library',
   appInsertFunction: 'Insert Function',
