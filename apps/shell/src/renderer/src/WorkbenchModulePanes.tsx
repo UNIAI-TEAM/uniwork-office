@@ -17,7 +17,7 @@ import { WbIconBtn, WbRowActions } from './WbRowActions'
 import { WbMenuButton } from './WbMenu'
 import { WbPackChip } from './DeskDrawer'
 import { FileBadge } from './FileBadge'
-import { readForms, writeForms, type WbFormItem } from './workbench-pins'
+import { readForms, WB_FORMS_CHANGED, writeForms, type WbFormItem } from './workbench-pins'
 import {
   WorkSkeleton,
   WorkStatePanel,
@@ -181,6 +181,13 @@ function FormsPane({
     setDraftFile(null)
   }, [practiceId])
 
+  // follow storage: an Undo from an earlier mount, the Desk drawer's pack link
+  useEffect(() => {
+    const sync = () => setItems(readForms(practiceId))
+    window.addEventListener(WB_FORMS_CHANGED, sync)
+    return () => window.removeEventListener(WB_FORMS_CHANGED, sync)
+  }, [practiceId])
+
   useEffect(() => {
     if (!refocus.current) return
     refocus.current = false
@@ -245,7 +252,9 @@ function FormsPane({
     const name = title.trim()
     if (!name || !card) return
     const editingId = card.editingId
-    const existing = editingId ? items.find((x) => x.id === editingId) : undefined
+    // the stored list, not this render's, so a stale pane cannot drop forms
+    const stored = readForms(practiceId)
+    const existing = editingId ? stored.find((x) => x.id === editingId) : undefined
     const row: WbFormItem = {
       id: editingId ?? newId(),
       title: name,
@@ -264,7 +273,7 @@ function FormsPane({
         : {}),
       ...(existing?.templateId ? { templateId: existing.templateId } : {}),
     }
-    persist(editingId ? items.map((x) => (x.id === editingId ? row : x)) : [row, ...items])
+    persist(editingId ? stored.map((x) => (x.id === editingId ? row : x)) : [row, ...stored])
     closeCard()
   }
 
@@ -283,10 +292,11 @@ function FormsPane({
 
   // removed at once, with Undo in the toast (spec 5.3); Undo puts it back where it was
   const remove = (item: WbFormItem) => {
-    const at = items.findIndex((x) => x.id === item.id)
+    const stored = readForms(practiceId)
+    const at = stored.findIndex((x) => x.id === item.id)
     if (card?.editingId === item.id) closeCard()
     refocus.current = true
-    persist(items.filter((x) => x.id !== item.id))
+    persist(stored.filter((x) => x.id !== item.id))
     toasts.show({
       id: `forms-delete:${item.id}`,
       message: { key: 'wbFormsDeleted', params: { title: item.title } },

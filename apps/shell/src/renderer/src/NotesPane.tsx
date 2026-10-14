@@ -13,6 +13,7 @@ import {
   createStickyNote,
   normalizeStickyNote,
   readStickyNotes,
+  WB_NOTES_CHANGED,
   writeStickyNotes,
   type WbStickyNote,
 } from './workbench-pins'
@@ -46,6 +47,20 @@ export function NotesPane({
     setDraft('')
   }, [practiceId])
 
+  // follow storage (an Undo from an earlier mount, an agent write); the note being typed in keeps its text
+  useEffect(() => {
+    const sync = () =>
+      setItems((cur) => {
+        const focused = document.activeElement
+          ?.closest('[data-note-id]')
+          ?.getAttribute('data-note-id')
+        const mine = cur.find((n) => n.id === focused)
+        return readStickyNotes(practiceId).map((n) => (n.id === mine?.id ? mine : n))
+      })
+    window.addEventListener(WB_NOTES_CHANGED, sync)
+    return () => window.removeEventListener(WB_NOTES_CHANGED, sync)
+  }, [practiceId])
+
   useEffect(() => {
     if (!refocus.current) return
     refocus.current = false
@@ -66,9 +81,10 @@ export function NotesPane({
     setDraft('')
   }
 
+  // every write starts from storage, never this render's list, so a stale pane cannot drop notes
   const edit = (id: string, body: string) =>
     persist(
-      items.map((n) =>
+      readStickyNotes(practiceId).map((n) =>
         n.id === id ? normalizeStickyNote({ ...n, body, updatedAt: new Date().toISOString() }) : n,
       ),
     )
@@ -82,9 +98,10 @@ export function NotesPane({
 
   // removed at once, with Undo in the toast (spec 5.3); Undo puts it back where it was
   const remove = (note: WbStickyNote) => {
-    const at = items.findIndex((n) => n.id === note.id)
+    const stored = readStickyNotes(practiceId)
+    const at = stored.findIndex((n) => n.id === note.id)
     refocus.current = true
-    persist(items.filter((n) => n.id !== note.id))
+    persist(stored.filter((n) => n.id !== note.id))
     toasts.show({
       id: `notes-delete:${note.id}`,
       message: { key: 'wbNotesDeleted' },
@@ -153,7 +170,7 @@ export function NotesPane({
           {items.map((note) => {
             const when = editedWhen(note.updatedAt, dateLocale)
             return (
-              <li key={note.id} className="wb-block wb-note">
+              <li key={note.id} className="wb-block wb-note" data-note-id={note.id}>
                 <textarea
                   value={note.body}
                   rows={1}

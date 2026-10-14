@@ -46,9 +46,12 @@ actEnvironment.IS_REACT_ACT_ENVIRONMENT = true
 let host: HTMLDivElement
 let root: Root
 let api: Record<string, ReturnType<typeof vi.fn>>
+// one toast store per test, kept across re-renders as PracticeHome keeps it across tab switches
+let toasts: ReturnType<typeof createWbToasts>
 
 beforeEach(() => {
   store.clear()
+  toasts = createWbToasts()
   host = document.createElement('div')
   document.body.append(host)
   root = createRoot(host)
@@ -88,7 +91,7 @@ async function mount(
         { initial: 'en' },
         createElement(
           WbToastHost,
-          { toasts: createWbToasts() },
+          { toasts },
           createElement(WorkbenchModulePane, {
             moduleId,
             practiceId: 'sales',
@@ -266,6 +269,27 @@ describe('Forms tab (redesign spec 4.4)', () => {
     expect(readForms('sales').map((f) => f.id)).toEqual(['a', 'b', 'c'])
     expect(host.querySelector('.wb-toast')).toBeNull()
   })
+
+  it('Undo after leaving the tab and coming back shows the form, and the next save keeps it', async () => {
+    writeForms('sales', [
+      { id: 'a', title: 'A' },
+      { id: 'b', title: 'B' },
+    ])
+    await mount('forms')
+    await openMenu('B')
+    await click(menuItem('Remove from library'))
+    await mount('notes')
+    await mount('forms')
+    expect(rowTitles()).toEqual(['A'])
+    const toast = host.querySelector('.wb-toast')!
+    await click(Array.from(toast.querySelectorAll('button')).find((b) => b.textContent === 'Undo'))
+    expect(rowTitles()).toEqual(['A', 'B'])
+    await openMenu('A')
+    await click(menuItem('Edit name and note'))
+    await type(host.querySelector<HTMLInputElement>('form input')!, 'A2')
+    await act(async () => host.querySelector('form')!.requestSubmit())
+    expect(readForms('sales').map((f) => f.title)).toEqual(['A2', 'B'])
+  })
 })
 
 describe('Notes tab (redesign spec 4.5)', () => {
@@ -343,6 +367,43 @@ describe('Notes tab (redesign spec 4.5)', () => {
     await click(Array.from(toast.querySelectorAll('button')).find((b) => b.textContent === 'Undo'))
     expect(bodies()).toEqual(order)
     expect(readStickyNotes('sales').map((n) => n.body)).toEqual(order)
+  })
+
+  const bodies = () =>
+    Array.from(host.querySelectorAll<HTMLTextAreaElement>('.wb-note textarea')).map((t) => t.value)
+
+  it('Undo after leaving the tab and coming back shows the note, and the next edit keeps it', async () => {
+    createStickyNote('sales', 'A')
+    createStickyNote('sales', 'B')
+    await mount('notes')
+    await click(host.querySelector<HTMLButtonElement>('.wb-note button[aria-label="Delete note"]'))
+    expect(bodies()).toEqual(['A'])
+    await mount('forms')
+    await mount('notes')
+    const toast = host.querySelector('.wb-toast')!
+    await click(Array.from(toast.querySelectorAll('button')).find((b) => b.textContent === 'Undo'))
+    expect(bodies()).toEqual(['B', 'A'])
+    await type(host.querySelectorAll<HTMLTextAreaElement>('.wb-note textarea')[1]!, 'A!')
+    expect(readStickyNotes('sales').map((n) => n.body)).toEqual(['B', 'A!'])
+  })
+
+  it('a note written elsewhere appears while Notes is open; the note being typed in keeps its text', async () => {
+    createStickyNote('sales', 'Mine')
+    await mount('notes')
+    const mine = host.querySelector<HTMLTextAreaElement>('.wb-note textarea')!
+    mine.focus()
+    await type(mine, 'Mine, typing')
+    const id = readStickyNotes('sales')[0]!.id
+    await act(async () => {
+      // an agent write that also carries an older copy of the note being typed in
+      createStickyNote('sales', 'From the agent')
+      writeStickyNotes(
+        'sales',
+        readStickyNotes('sales').map((n) => (n.id === id ? { ...n, body: 'Mine' } : n)),
+      )
+    })
+    expect(bodies()).toEqual(['From the agent', 'Mine, typing'])
+    expect(document.activeElement).toBe(mine)
   })
 })
 
