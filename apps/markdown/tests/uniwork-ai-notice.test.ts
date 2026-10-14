@@ -216,6 +216,8 @@ describe('UniWork AI notices (markdown panel)', () => {
     await notify({ kind: 'rate-limit-wait', seconds: 30, attempt: 1 })
     // the same node (not a new one mounted with its text) now holds the note, and nothing else in .ai-chat announces
     expect(container!.querySelector('.ai-sr-status')).toBe(live)
+    expect(container!.querySelectorAll('[aria-live]')).toHaveLength(1)
+    expect(container!.querySelectorAll('[role="status"]')).toHaveLength(0)
     expect(live!.textContent).toBe(ui('aiErrRateLimited', { seconds: 30 }))
     expect(container!.querySelectorAll('.ai-msg-notice [role="status"]')).toHaveLength(0)
     expect(container!.querySelectorAll('.ai-msg-notice')).toHaveLength(1)
@@ -309,7 +311,18 @@ describe('UniWork AI notices (markdown panel)', () => {
     const answerNode = chipEl?.parentElement
     expect(answerNode?.textContent?.startsWith(`${ui('aiResultAnswer')}:`)).toBe(true)
     const live = container!.querySelector('.ai-sr-status')
-    expect(live?.textContent).toContain(ui('aiResultAnswer'))
-    expect(live?.textContent).toContain('Rewritten paragraph.')
+    expect(live?.textContent).toBe(ui('aiResultAnswer'))
+    expect(live?.textContent).not.toContain('Rewritten paragraph.')
+  })
+
+  it('clicking Stop returns keyboard focus to the composer textarea (RF1-12, RF1-23b)', async () => {
+    await started()
+    const stopBtn = container!.querySelector<HTMLButtonElement>(
+      `button[aria-label="${t('aiStop')}"]`,
+    )
+    expect(stopBtn).not.toBeNull()
+    stopBtn!.focus()
+    await act(async () => stopBtn!.click())
+    expect(document.activeElement).toBe(container!.querySelector('textarea'))
   })
 })

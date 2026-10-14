@@ -190,6 +190,8 @@ describe('UniWork AI notices (docs panel)', () => {
     await emit({ type: 'notice', notice: { kind: 'rate-limit-wait', seconds: 30, attempt: 1 } })
     // the same node (not a new one mounted with its text) now holds the note, and nothing else in .ai-chat announces
     expect(container!.querySelector('.ai-sr-status')).toBe(live)
+    expect(container!.querySelectorAll('[aria-live]')).toHaveLength(1)
+    expect(container!.querySelectorAll('[role="status"]')).toHaveLength(0)
     expect(live!.textContent).toBe(ui('aiErrRateLimited', { seconds: 30 }))
     expect(container!.querySelectorAll('.ai-msg-notice [role="status"]')).toHaveLength(0)
     expect(container!.querySelectorAll('.ai-msg-notice')).toHaveLength(1)
@@ -335,7 +337,16 @@ describe('UniWork AI notices (docs panel)', () => {
     expect(answerNode?.textContent?.startsWith(`${ui('aiResultAnswer')}:`)).toBe(true)
     expect(answerNode?.textContent).toContain('Tóm tắt 3 ý chính.')
     const live = container!.querySelector('.ai-sr-status')
-    expect(live?.textContent).toContain(ui('aiResultAnswer'))
-    expect(live?.textContent).toContain('Tóm tắt 3 ý chính.')
+    expect(live?.textContent).toBe(ui('aiResultAnswer'))
+    expect(live?.textContent).not.toContain('Tóm tắt 3 ý chính.')
+  })
+
+  it('clicking Stop returns keyboard focus to the composer textarea (RF1-12, RF1-23b)', async () => {
+    const stop = stopButton()
+    expect(stop).not.toBeNull()
+    stop!.focus()
+    await act(async () => stop!.click())
+    expect(document.activeElement).toBe(container!.querySelector('textarea'))
+    await pastGrace()
   })
 })

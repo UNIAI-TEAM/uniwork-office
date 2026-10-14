@@ -250,6 +250,7 @@ describe('UniWork AI notices are announced through a separate status node (G05FE
       const user: AiChatMessage = { role: 'user', text: 'sum it', tools: [] }
       const streaming: AiChatMessage = { role: 'assistant', text: '', tools: [], streaming: true }
       render([user, streaming])
+      expect(container.querySelector('.ai-chat')?.getAttribute('aria-busy')).toBe('true')
       const live = container.querySelector('.ai-sr-status')
       expect(live, 'status node before any notice').not.toBeNull()
       expect(live!.getAttribute('aria-live')).toBe('polite')
@@ -429,7 +430,13 @@ describe('a refused UniWork AI question (too long, rejected): no Retry, the ques
       const editedEntry: AiChatMessage = {
         role: 'assistant',
         text: 'Đã cập nhật 12 ô tại Sheet1!B4:C9.',
-        tools: [{ name: 'propose_operations', summary: 'Wrote 12 cells in Sheet1!B4:C9 (4 overwritten)', isError: false }],
+        tools: [
+          {
+            name: 'propose_operations',
+            summary: 'Wrote 12 cells in Sheet1!B4:C9 (4 overwritten)',
+            isError: false,
+          },
+        ],
         streaming: false,
         autoApplied: { opCount: 12, undoSteps: 1 },
       }
@@ -485,8 +492,66 @@ describe('a refused UniWork AI question (too long, rejected): no Retry, the ques
       act(() => viewChangesBtn?.click())
       expect(onCitation).toHaveBeenCalled()
       const live = container.querySelector('.ai-sr-status')
-      expect(live?.textContent).toContain(tr('aiResultEdited'))
-      expect(live?.textContent).toContain('Đã cập nhật 12 ô tại Sheet1!B4:C9.')
+      expect(container.querySelectorAll('[aria-live]')).toHaveLength(1)
+      expect(live?.textContent).toBe(tr('aiResultEdited'))
+      expect(live?.textContent).not.toContain('Đã cập nhật 12 ô tại Sheet1!B4:C9.')
+    })
+
+    it('clicking Stop returns keyboard focus to the composer textarea (RF1-12, RF1-23b)', () => {
+      vi.stubGlobal(
+        'desktopApi',
+        new Proxy(
+          {},
+          {
+            get: (_t, prop: string) =>
+              /^on[A-Z]/.test(prop) ? () => () => {} : () => Promise.resolve(undefined),
+          },
+        ),
+      )
+      container = document.createElement('div')
+      document.body.appendChild(container)
+      root = createRoot(container)
+      const onStop = vi.fn()
+      act(() =>
+        root!.render(
+          createElement(
+            LocaleProvider,
+            { initial: 'vi', children: null },
+            createElement(AiChatPanel, {
+              isOpen: true,
+              hasContent: true,
+              chat: [user, streaming],
+              attachments: [],
+              attachNotice: null,
+              onPickAttachments: () => {},
+              onAddAttachmentPaths: () => {},
+              onAddPastedImage: () => {},
+              onRemoveAttachment: () => {},
+              prompt: '',
+              preview: null,
+              aiBusy: true,
+              onPromptChange: () => {},
+              onSend: () => {},
+              onStop,
+              onNewChat: () => {},
+              onUndo: () => {},
+              scopeRange: null,
+              scopeColumns: null,
+              scopeLocked: false,
+              onScopeDismiss: () => {},
+              onCitation: () => {},
+              onExpand: () => {},
+              onCollapse: () => {},
+            }),
+          ),
+        ),
+      )
+      const stopBtn = container.querySelector<HTMLButtonElement>('.ai-stop-btn')
+      expect(stopBtn).not.toBeNull()
+      stopBtn!.focus()
+      act(() => stopBtn!.click())
+      expect(onStop).toHaveBeenCalledTimes(1)
+      expect(document.activeElement).toBe(container.querySelector('textarea'))
     })
   })
 })

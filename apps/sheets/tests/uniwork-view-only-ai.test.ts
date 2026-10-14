@@ -2,8 +2,12 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { composeSkills, type AgentSkill } from '@genoffice/agent-core'
-import { describe, expect, it, vi } from 'vitest'
+import { aiUniworkText } from '@genoffice/ui'
+import { act, createElement } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
+import { AiChatPanel } from '../src/renderer/ai/AiChatPanel'
 import { createFilesSkill } from '../src/renderer/ai/files-skill'
 import { createSearchSkill } from '../src/renderer/ai/search-skill'
 import {
@@ -12,6 +16,7 @@ import {
   restrictToReading,
 } from '../src/renderer/ai/view-only-skill'
 import { createWorkbookSkill } from '../src/renderer/ai/workbook-skill'
+import { LocaleProvider } from '../src/renderer/i18n/locale'
 import { strings } from '../src/renderer/i18n/strings'
 import type { SheetsSkillDeps } from '../src/renderer/ai/tools'
 
@@ -111,7 +116,78 @@ describe('view-only workbook: the AI can read but not edit', () => {
 describe('view-only wiring', () => {
   const appSrc = read('src/renderer/App.tsx')
   const shellSrc = read('src/renderer/ExcelShell.tsx')
-  const panelSrc = read('src/renderer/ai/AiChatPanel.tsx')
+  let root: Root | null = null
+  let container: HTMLElement | null = null
+
+  beforeAll(() => {
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+    Element.prototype.scrollTo ??= () => {}
+  })
+
+  afterEach(() => {
+    if (root) act(() => root!.unmount())
+    container?.remove()
+    root = null
+    container = null
+    vi.unstubAllGlobals()
+  })
+
+  const renderPanel = async (provider: string, viewOnly: boolean) => {
+    vi.stubGlobal(
+      'desktopApi',
+      new Proxy(
+        {},
+        {
+          get: (_t, prop: string) =>
+            prop === 'getAiSettings'
+              ? () => Promise.resolve({ provider, providers: {} })
+              : /^on[A-Z]/.test(prop)
+                ? () => () => {}
+                : () => Promise.resolve(undefined),
+        },
+      ),
+    )
+    container = document.createElement('div')
+    document.body.appendChild(container)
+    root = createRoot(container)
+    await act(async () => {
+      root!.render(
+        createElement(
+          LocaleProvider,
+          { initial: 'vi', children: null },
+          createElement(AiChatPanel, {
+            isOpen: true,
+            hasContent: true,
+            viewOnly,
+            chat: [],
+            attachments: [],
+            attachNotice: null,
+            onPickAttachments: () => {},
+            onAddAttachmentPaths: () => {},
+            onAddPastedImage: () => {},
+            onRemoveAttachment: () => {},
+            prompt: '',
+            preview: null,
+            aiBusy: false,
+            onPromptChange: () => {},
+            onSend: () => {},
+            onStop: () => {},
+            onNewChat: () => {},
+            onUndo: () => {},
+            scopeRange: null,
+            scopeColumns: null,
+            scopeLocked: false,
+            onScopeDismiss: () => {},
+            onCitation: () => {},
+            onExpand: () => {},
+            onCollapse: () => {},
+          }),
+        ),
+      )
+      await Promise.resolve()
+    })
+    return container
+  }
 
   it('restricts every skill of the loop and refuses auto-applied plans', () => {
     expect(appSrc).toContain('restrictToReading(skill, () => aiViewOnlyRef.current)')
@@ -119,11 +195,25 @@ describe('view-only wiring', () => {
     expect(appSrc).toContain('aiViewOnly={aiViewOnly}')
   })
 
-  it('disables the editing ribbon AI action and shows the composer notice for BYOK and viewOnly sub-line for UniWork AI', () => {
+  it('disables the editing ribbon AI action and renders the composer notice for BYOK and viewOnly sub-line for UniWork AI (RF1-23b)', async () => {
     expect(shellSrc).toMatch(/aiViewOnly \?[\s\S]*?disabled[\s\S]*?t\('aiViewOnlyNotice'\)/)
     expect(shellSrc).toContain('viewOnly={aiViewOnly}')
-    expect(panelSrc).toMatch(/viewOnly && !isUniwork && \(\s*<div className="ai-readonly-notice"/)
-    expect(panelSrc).toContain('viewOnly={isUniwork && viewOnly ? true : undefined}')
+
+    const byokDom = await renderPanel('openai', true)
+    const readonlyNotice = byokDom.querySelector('.ai-readonly-notice')
+    expect(readonlyNotice).not.toBeNull()
+    expect(readonlyNotice?.hasAttribute('role')).toBe(false)
+    expect(byokDom.querySelector('.ai-uniwork-view-only')).toBeNull()
+    act(() => root!.unmount())
+    byokDom.remove()
+    root = null
+    container = null
+
+    const uniworkDom = await renderPanel('uniwork', true)
+    expect(uniworkDom.querySelector('.ai-readonly-notice')).toBeNull()
+    const uniworkViewOnly = uniworkDom.querySelector('.ai-uniwork-view-only')
+    expect(uniworkViewOnly).not.toBeNull()
+    expect(uniworkViewOnly?.textContent).toBe(aiUniworkText('vi', 'aiUniworkViewOnly'))
   })
 })
 
