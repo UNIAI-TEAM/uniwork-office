@@ -2716,6 +2716,8 @@ export function registerSheetsIpc(): void {
       path,
       event.sender,
       dialogParent(event),
+      // an export window must never ask about, or discard, crash recovery (it exports the saved file)
+      { skipRecoveryPrompt: headlessExportWaiters.has(event.sender.id) },
     )
     // G5-04g: a locked working copy was refused on the original path; no
     // session was derived and nothing opened

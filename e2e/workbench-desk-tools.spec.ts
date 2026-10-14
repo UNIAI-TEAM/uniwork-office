@@ -1,6 +1,7 @@
 import { test, expect, type ElectronApplication } from '@playwright/test'
 import { existsSync } from 'node:fs'
-import { mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, utimes, writeFile } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import JSZip from 'jszip'
@@ -171,6 +172,41 @@ test('Desk tools merge, split, convert and export PDFs', async () => {
         })
         // every OOXML file is a zip
         expect((await readFile(out)).subarray(0, 2).toString()).toBe('PK')
+      })
+    }
+
+    for (const [input, folder] of [
+      [docx, 'docs-autosave'],
+      [pptx, 'slides-autosave'],
+    ] as const) {
+      await test.step(`export PDF from ${input.split('.').pop()} leaves its crash copy alone`, async () => {
+        // a crash copy newer than the file: opening it normally asks Restore / Discard
+        const ext = input.split('.').pop()!
+        const name = createHash('sha1').update(input).digest('hex').slice(0, 16)
+        const copy = join(launched.userDataDir, folder, `${name}.${ext}`)
+        await mkdir(join(launched.userDataDir, folder), { recursive: true })
+        await writeFile(copy, await readFile(input))
+        const later = new Date(Date.now() + 60_000)
+        await utimes(copy, later, later)
+        const out = `${input}.with-copy.pdf`
+        await stubDialogs(app, out, dir)
+        // record every message box and answer "Discard", the answer that deletes the copy
+        await app.evaluate(({ dialog }) => {
+          const g = globalThis as { messageBoxes?: number }
+          g.messageBoxes = 0
+          dialog.showMessageBox = (async () => {
+            g.messageBoxes = (g.messageBoxes ?? 0) + 1
+            return { response: 1, checkboxChecked: false }
+          }) as typeof dialog.showMessageBox
+        })
+        expect(await run({ tool: 'export-pdf', inputs: [input] })).toEqual({
+          ok: true,
+          outputs: [out],
+        })
+        expect(
+          await app.evaluate(() => (globalThis as { messageBoxes?: number }).messageBoxes),
+        ).toBe(0)
+        expect(existsSync(copy)).toBe(true)
       })
     }
 

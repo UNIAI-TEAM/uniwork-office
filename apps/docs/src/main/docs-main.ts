@@ -3561,7 +3561,10 @@ async function loadDocx(
   // reopen with the user's password), so a bad save never loses the source file
   const hash = lazy?.hash ?? sha256Hex(original)
   await archiveOriginal(filePath, hash, size)
-  const recovery = await maybeRecoverDocBytes(filePath, plainBytes)
+  // an export window must never ask about, or discard, crash recovery (it exports the saved file)
+  const recovery = headlessExportWaiters.has(wcId)
+    ? { bytes: plainBytes, recovered: false }
+    : await maybeRecoverDocBytes(filePath, plainBytes)
   let bytes = recovery.bytes
   let recovered = recovery.recovered
   // recovery copies of a protected document are themselves encrypted (see

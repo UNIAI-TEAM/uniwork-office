@@ -719,10 +719,11 @@ async function openAndBuild(
   const raw = await readFile(path)
   // a 0-byte .pptx is an empty deck, not a corrupt one: open the blank template
   // under the file's own path so Save writes back to it
-  const { bytes, recovered } = await maybeRecoverBytes(
-    path,
-    raw.length === 0 ? await createBlankPptx() : new Uint8Array(raw),
-  )
+  const original = raw.length === 0 ? await createBlankPptx() : new Uint8Array(raw)
+  // an export window must never ask about, or discard, crash recovery (it exports the saved file)
+  const { bytes, recovered } = headlessExportWaiters.has(wc.id)
+    ? { bytes: original, recovered: false }
+    : await maybeRecoverBytes(path, original)
   await shapedMetricsReady() // Lay out only after complex-script shaped metrics are ready, avoiding an init race falling back to estimation
   const opened = await openPptx(bytes)
   adoptEmbeddedFonts(opened)
