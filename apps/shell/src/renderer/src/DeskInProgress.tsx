@@ -1,6 +1,6 @@
 import { useId } from 'react'
 import type { ReactElement } from 'react'
-import type { DeskDraft } from '../../shared/home-api'
+import type { DeskDraft, RecentEntry } from '../../shared/home-api'
 import type { DocumentTabKind } from '../../shared/tabs-api'
 import type { WorkRecentDocument } from '../../shared/uniwork-work-api'
 import { inProgressRows } from './desk-model'
@@ -25,13 +25,16 @@ const APP_EXT: Record<DocumentTabKind, string> = {
 export function DeskInProgress({
   drafts,
   recent,
+  local,
 }: {
   drafts: readonly DeskDraft[]
   recent: readonly WorkRecentDocument[]
+  /** this device's raw recents (working copies included) */
+  local: readonly RecentEntry[]
 }): ReactElement {
   const { t, dateLocale } = useI18n()
   const titleId = useId()
-  const rows = inProgressRows(drafts, recent)
+  const rows = inProgressRows(drafts, recent, local)
   const when = (ms: number) => formatWhen(new Date(ms).toISOString(), dateLocale)
 
   return (

@@ -128,6 +128,8 @@ describe('DeskToday', () => {
     expect(text).toContain('Weekly sync')
     // the document comment belongs to the tray; one other notification is left
     expect(text).toContain('Other notifications (1)')
+    // a note line, not a bare flex child that stretches and inherits the column's font
+    expect(button('Other notifications')!.parentElement!.className).toBe('wb-ov-note')
     await act(async () => button('Other notifications')!.click())
     expect(work.openWeb).toHaveBeenCalledWith({ kind: 'inbox', orgSlug: 'acme', wsSlug: 'team' })
   })

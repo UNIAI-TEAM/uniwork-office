@@ -203,9 +203,15 @@ export function DeskToday({
         : s.inbox.filter((x) => !x.read_at).length
     const n = Math.max(0, unread - docNotifications(s.inbox).length)
     return n > 0 && base ? (
-      <button type="button" className="wb-link" onClick={() => openWeb({ kind: 'inbox', ...base })}>
-        {t('wbDeskOtherNotifs', { count: n })} →
-      </button>
+      <p className="wb-ov-note">
+        <button
+          type="button"
+          className="wb-link"
+          onClick={() => openWeb({ kind: 'inbox', ...base })}
+        >
+          {t('wbDeskOtherNotifs', { count: n })} →
+        </button>
+      </p>
     ) : null
   }
 

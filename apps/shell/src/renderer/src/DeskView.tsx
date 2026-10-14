@@ -26,6 +26,8 @@ interface Props {
   /** each summary on screen (null before one exists): the page redraws the tab counts on it */
   onSummary?: (summary: WorkHomeSummary | null) => void
   onOpenTab: (id: 'tasks' | 'forms') => void
+  /** a Drawer draft linked a form to a pack: refresh the packs */
+  onPackLinked?: () => void
 }
 
 const IN_PROGRESS_ROWS = 10
@@ -42,6 +44,7 @@ export function DeskView({
   onReload,
   onSummary,
   onOpenTab,
+  onPackLinked,
 }: Props): ReactElement {
   const workspace = workspaces?.find((w) => w.id === workspaceId) ?? null
   const wsId = workspace?.id ?? null
@@ -150,14 +153,21 @@ export function DeskView({
           onDropHandled={() => setDropped(null)}
           unsavedPaths={unsavedPaths}
         />
-        <DeskInTray home={home} signedIn={workspace !== null} local={recents.local} />
-        <DeskInProgress drafts={drafts} recent={recents.docs} />
+        <DeskInTray
+          home={home}
+          signedIn={workspace !== null}
+          view={view}
+          local={recents.local}
+          onReload={onReload}
+        />
+        <DeskInProgress drafts={drafts} recent={recents.docs} local={recents.local} />
         <DeskDrawer
           practiceId={practiceId}
           packId={packId}
           orgId={workspace?.orgId ?? null}
           vi={vi}
           onManage={() => onOpenTab('forms')}
+          onPackLinked={onPackLinked}
         />
       </div>
       <DeskToday

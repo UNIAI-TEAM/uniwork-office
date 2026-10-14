@@ -640,6 +640,7 @@ export function PracticeHome({
           onReload={refresh}
           onSummary={setHomeSummary}
           onOpenTab={openDeskTab}
+          onPackLinked={onRefresh}
         />
       ) : isWorkbenchModuleId(tab) ? (
         <WorkbenchModulePane

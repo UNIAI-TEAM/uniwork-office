@@ -122,6 +122,7 @@ describe('inProgressRows', () => {
     const rows = inProgressRows(
       drafts,
       [local('/w/r.docx'), local('/w/x.xlsx'), local('/w/y.pptx')],
+      [],
       2,
     )
     expect(
@@ -129,5 +130,28 @@ describe('inProgressRows', () => {
         r.kind === 'draft' ? r.draft.title : r.doc.source === 'local' ? r.doc.entry.path : '',
       ),
     ).toEqual(['Report', '/w/x.xlsx'])
+  })
+
+  it('drops the cloud row of a UniWork document whose working copy is a draft', () => {
+    const drafts: DeskDraft[] = [
+      { kind: 'recovery', title: 'P', app: 'docs', filePath: '/c/p.docx', modifiedMs: 1 },
+    ]
+    const local = [
+      { path: '/c/p.docx', uniwork: { documentId: 'd9' } } as RecentEntry,
+      { path: '/c/q.docx', uniwork: { documentId: 'd7' } } as RecentEntry,
+    ]
+    const rows = inProgressRows(
+      drafts,
+      [
+        { source: 'uniwork', doc: doc({ id: 'd9' }) },
+        { source: 'uniwork', doc: doc({ id: 'd7' }) },
+      ],
+      local,
+    )
+    expect(
+      rows.map((r) =>
+        r.kind === 'draft' ? r.draft.title : r.doc.source === 'uniwork' ? r.doc.doc.id : '',
+      ),
+    ).toEqual(['P', 'd7'])
   })
 })

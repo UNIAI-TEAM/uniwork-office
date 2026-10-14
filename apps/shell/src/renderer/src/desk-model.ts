@@ -91,17 +91,24 @@ export function inTrayRows(i: {
 export type InProgressRow =
   { kind: 'draft'; draft: DeskDraft } | { kind: 'recent'; doc: WorkRecentDocument }
 
-/** "In progress": drafts first, then recent documents a draft does not already show */
+/**
+ * "In progress": drafts first, then recent documents a draft does not already show.
+ * `local` is this device's raw recents: it maps a draft's working copy to its UniWork document.
+ */
 export function inProgressRows(
   drafts: readonly DeskDraft[],
   recent: readonly WorkRecentDocument[],
+  local: readonly RecentEntry[],
   limit = 10,
 ): InProgressRow[] {
   const shown = new Set(drafts.flatMap((d) => (d.filePath ? [d.filePath] : [])))
+  const draftDocIds = new Set(
+    local.flatMap((e) => (e.uniwork && shown.has(e.path) ? [e.uniwork.documentId] : [])),
+  )
   return [
     ...drafts.map((draft) => ({ kind: 'draft' as const, draft })),
     ...recent
-      .filter((r) => r.source !== 'local' || !shown.has(r.entry.path))
+      .filter((r) => (r.source === 'local' ? !shown.has(r.entry.path) : !draftDocIds.has(r.doc.id)))
       .map((doc) => ({ kind: 'recent' as const, doc })),
   ].slice(0, limit)
 }

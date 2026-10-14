@@ -12,7 +12,7 @@ import { DeskInProgress } from '../src/renderer/src/DeskInProgress'
 import { DeskInTray } from '../src/renderer/src/DeskInTray'
 import { LocaleProvider } from '../src/renderer/src/locale'
 import type { WorkLoad } from '../src/renderer/src/work-cache'
-import { writeForms } from '../src/renderer/src/workbench-pins'
+import { readForms, writeForms } from '../src/renderer/src/workbench-pins'
 
 const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 actEnvironment.IS_REACT_ACT_ENVIRONMENT = true
@@ -108,7 +108,7 @@ const comment = {
 describe('DeskInTray', () => {
   it('opens a commented document, then marks the notification read and drops it', async () => {
     const h = home([comment])
-    await render(createElement(DeskInTray, { home: h, signedIn: true, local: [] }))
+    await render(createElement(DeskInTray, { home: h, signedIn: true, view: 'ready', local: [] }))
     expect(host.textContent).toContain('Contract-012')
     await act(async () => button('Contract-012')!.click())
     await act(async () => {
@@ -117,12 +117,19 @@ describe('DeskInTray', () => {
     expect(api.uniworkOpenDocument).toHaveBeenCalledWith('d1')
     expect(work.markNotificationsRead).toHaveBeenCalledWith(['n1'])
     expect(h.update).toHaveBeenCalledTimes(1)
+    // the read note leaves the unread total too, so "Other notifications" does not rise
+    const edit = vi.mocked(h.update).mock.calls[0]![0]
+    const before = { ...h.value!, counts: { ...h.value!.counts, unread: 5 } }
+    const after = edit(before)
+    expect(after.counts.unread).toBe(4)
+    expect(after.inbox).toEqual([])
+    expect(edit({ ...before, counts: { ...before.counts, unread: 0 } }).counts.unread).toBe(0)
   })
 
   it('keeps the row quietly when marking read fails', async () => {
     work.markNotificationsRead.mockResolvedValueOnce({ ok: false, error: 'offline' })
     const h = home([comment])
-    await render(createElement(DeskInTray, { home: h, signedIn: true, local: [] }))
+    await render(createElement(DeskInTray, { home: h, signedIn: true, view: 'ready', local: [] }))
     await act(async () => button('Contract-012')!.click())
     await act(async () => {
       for (let i = 0; i < 10; i++) await Promise.resolve()
@@ -135,7 +142,7 @@ describe('DeskInTray', () => {
   it('keeps the reminder when the document fails to open', async () => {
     api.uniworkOpenDocument.mockResolvedValueOnce({ ok: false, error: 'not_found' })
     const h = home([comment])
-    await render(createElement(DeskInTray, { home: h, signedIn: true, local: [] }))
+    await render(createElement(DeskInTray, { home: h, signedIn: true, view: 'ready', local: [] }))
     await act(async () => button('Contract-012')!.click())
     await act(async () => {
       for (let i = 0; i < 10; i++) await Promise.resolve()
@@ -151,7 +158,9 @@ describe('DeskInTray', () => {
       resource_id: `d${i}`,
       params: { actor: 'Lan', document: `Doc-${i}` },
     }))
-    await render(createElement(DeskInTray, { home: home(notes), signedIn: true, local: [] }))
+    await render(
+      createElement(DeskInTray, { home: home(notes), signedIn: true, view: 'ready', local: [] }),
+    )
     const titles = () => host.querySelectorAll<HTMLButtonElement>('.wb-desk-row-title')
     expect(titles()).toHaveLength(8)
     await act(async () => host.querySelector<HTMLButtonElement>('li .wb-link')!.click())
@@ -180,18 +189,70 @@ describe('DeskInTray', () => {
         uniwork: { documentId: 'd9' },
       } as RecentEntry,
     ]
-    await render(createElement(DeskInTray, { home: home([]), signedIn: true, local }))
+    await render(
+      createElement(DeskInTray, { home: home([]), signedIn: true, view: 'ready', local }),
+    )
     expect(host.textContent).toContain('Proposal')
     expect(host.textContent).toContain('Version conflict')
   })
 
   it('invites sign-in when signed out and the tray is empty', async () => {
     await render(
-      createElement(DeskInTray, { home: { ...home([]), value: null }, signedIn: false, local: [] }),
+      createElement(DeskInTray, {
+        home: { ...home([]), value: null },
+        signedIn: false,
+        view: 'signed-out',
+        local: [],
+      }),
     )
     expect(api.uniworkListSharedWithMe).not.toHaveBeenCalled()
     await act(async () => host.querySelector<HTMLButtonElement>('.wb-ov-note .wb-link')!.click())
     expect(api.accountLogin).toHaveBeenCalled()
+  })
+
+  it('offers Retry, not "nothing waiting", when the notifications failed to load', async () => {
+    const h = home([])
+    const onReload = vi.fn()
+    await render(
+      createElement(DeskInTray, {
+        home: { ...h, value: { ...h.value!, partial: ['notifications'] } },
+        signedIn: true,
+        view: 'ready',
+        local: [],
+        onReload,
+      }),
+    )
+    expect(host.textContent).not.toContain('Nothing is waiting on you')
+    expect(host.textContent).not.toContain('Sign in')
+    await act(async () => host.querySelector<HTMLButtonElement>('.wb-ov-partial .wb-link')!.click())
+    expect(onReload).toHaveBeenCalled()
+  })
+
+  it('shows neither a sign-in prompt nor the empty panel while loading', async () => {
+    await render(
+      createElement(DeskInTray, {
+        home: { ...home([]), value: null },
+        signedIn: false,
+        view: 'loading',
+        local: [],
+      }),
+    )
+    expect(host.textContent).not.toContain('Nothing is waiting on you')
+    expect(host.textContent).not.toContain('Sign in')
+    expect(host.querySelector('.wb-ov-partial')).toBeNull()
+  })
+
+  it('says there is no workspace instead of inviting sign-in', async () => {
+    await render(
+      createElement(DeskInTray, {
+        home: { ...home([]), value: null },
+        signedIn: false,
+        view: 'no-workspace',
+        local: [],
+      }),
+    )
+    expect(host.textContent).not.toContain('Sign in')
+    expect(host.querySelector('.wb-ov-note')).not.toBeNull()
   })
 })
 
@@ -210,6 +271,7 @@ describe('DeskInProgress', () => {
           },
         ],
         recent: [],
+        local: [],
       }),
     )
     expect(host.textContent).toContain('Unsaved')
@@ -221,7 +283,7 @@ describe('DeskInProgress', () => {
   })
 
   it('offers Open file when nothing is in progress', async () => {
-    await render(createElement(DeskInProgress, { drafts: [], recent: [] }))
+    await render(createElement(DeskInProgress, { drafts: [], recent: [], local: [] }))
     await act(async () => button('Open file')!.click())
     expect(api.browse).toHaveBeenCalled()
   })
@@ -247,6 +309,33 @@ describe('DeskDrawer', () => {
     expect(api.newDoc).toHaveBeenCalledWith(expect.objectContaining({ projectId: 'p1' }))
     await act(async () => button('Manage')!.click())
     expect(onManage).toHaveBeenCalled()
+  })
+
+  it('links the drafted form to the pack, like the Forms tab, and tells the page', async () => {
+    writeForms('legal', [
+      { id: 'f1', title: 'Quote' },
+      { id: 'f2', title: 'Memo' },
+    ])
+    const onPackLinked = vi.fn()
+    await render(
+      createElement(DeskDrawer, {
+        practiceId: 'legal',
+        packId: 'p1',
+        orgId: null,
+        vi: false,
+        onManage: vi.fn(),
+        onPackLinked,
+      }),
+    )
+    await act(async () => button('Quote')!.click())
+    await act(async () => {
+      for (let i = 0; i < 10; i++) await Promise.resolve()
+    })
+    expect(readForms('legal')).toEqual([
+      { id: 'f1', title: 'Quote', linkedProjectId: 'p1' },
+      { id: 'f2', title: 'Memo' },
+    ])
+    expect(onPackLinked).toHaveBeenCalledTimes(1)
   })
 
   it('locks a form chip when there is no pack to draft into', async () => {

@@ -14,7 +14,7 @@ import { useI18n } from './locale'
 import { docExtension, formatWhen } from './uniwork-docs-model'
 import { openUniworkDocument } from './uniwork-open'
 import { WorkbenchIcon } from './WorkbenchIcons'
-import { notificationKey } from './work-home'
+import { notificationKey, type OverviewView } from './work-home'
 import type { WorkLoad } from './work-cache'
 import { WorkStatePanel } from './WorkErrorState'
 
@@ -26,12 +26,16 @@ interface Props {
   home: WorkLoad<WorkHomeSummary>
   /** a workspace is selected: the server sources can load */
   signedIn: boolean
+  /** the page's server state: which note an empty tray shows */
+  view: OverviewView
   /** this device's recents as listed (working copies included) */
   local: readonly RecentEntry[]
+  /** reload the workspace list and every server section (the top bar's Refresh) */
+  onReload?: () => void
 }
 
 /** "Cần bạn xử lý" (office desk spec §3.1): sync problems, comments and mentions, new shares. */
-export function DeskInTray({ home, signedIn, local }: Props): ReactElement {
+export function DeskInTray({ home, signedIn, view, local, onReload }: Props): ReactElement {
   const { t, dateLocale } = useI18n()
   const titleId = useId()
   const [shared, setShared] = useState<UniworkDocSummary[]>([])
@@ -109,7 +113,15 @@ export function DeskInTray({ home, signedIn, local }: Props): ReactElement {
     if (!(await openUniworkDocument({ documentId, title }, window.aiOffice))) return
     const r = await window.uniworkWork.markNotificationsRead([id]).catch(() => null)
     // a refusal is quiet: the row comes back with the next summary
-    if (r?.ok) home.update((s) => ({ ...s, inbox: s.inbox.filter((n) => n.id !== id) }))
+    if (r?.ok)
+      home.update((s) => ({
+        ...s,
+        inbox: s.inbox.filter((n) => n.id !== id),
+        counts: {
+          ...s.counts,
+          unread: s.counts.unread === null ? null : Math.max(0, s.counts.unread - 1),
+        },
+      }))
   }
 
   const describe = (
@@ -157,6 +169,52 @@ export function DeskInTray({ home, signedIn, local }: Props): ReactElement {
     }
   }
 
+  // an empty tray only says "nothing waiting" when the notifications really loaded
+  const empty = (): ReactNode => {
+    if (view === 'signed-out')
+      return (
+        <p className="wb-ov-note">
+          {t('wbOvSignedOutTitle')} ·{' '}
+          <button
+            type="button"
+            className="wb-link"
+            onClick={() => void window.aiOffice.accountLogin().catch(() => false)}
+          >
+            {t('acctSignInUniwork')}
+          </button>
+        </p>
+      )
+    if (view === 'loading')
+      return (
+        <div className="wb-ov-skel" aria-hidden="true">
+          <span className="wb-skel wb-skel-row" />
+        </div>
+      )
+    if (view === 'no-workspace') return <p className="wb-ov-note">{t('wbOvNoWorkspaceTitle')}</p>
+    if (
+      view === 'forbidden' ||
+      view === 'unreachable' ||
+      home.error ||
+      home.value?.partial.includes('notifications')
+    )
+      return (
+        <p className="wb-ov-partial">
+          {t('wbOvLoadFailed')} ·{' '}
+          <button type="button" className="wb-link" onClick={onReload ?? home.reload}>
+            {t('acctRetry')}
+          </button>
+        </p>
+      )
+    return (
+      <WorkStatePanel
+        tone="gray"
+        icon={<WorkbenchIcon id="inbox" size={20} />}
+        title={t('wbDeskInTrayEmpty')}
+        role="status"
+      />
+    )
+  }
+
   return (
     <section className="wb-desk-section" aria-labelledby={titleId}>
       <div className="wb-desk-head">
@@ -164,25 +222,7 @@ export function DeskInTray({ home, signedIn, local }: Props): ReactElement {
         {rows.length > 0 ? <span className="wb-count wb-num">{rows.length}</span> : null}
       </div>
       {rows.length === 0 ? (
-        signedIn ? (
-          <WorkStatePanel
-            tone="gray"
-            icon={<WorkbenchIcon id="inbox" size={20} />}
-            title={t('wbDeskInTrayEmpty')}
-            role="status"
-          />
-        ) : (
-          <p className="wb-ov-note">
-            {t('wbOvSignedOutTitle')} ·{' '}
-            <button
-              type="button"
-              className="wb-link"
-              onClick={() => void window.aiOffice.accountLogin().catch(() => false)}
-            >
-              {t('acctSignInUniwork')}
-            </button>
-          </p>
-        )
+        empty()
       ) : (
         <ul ref={listRef} className="wb-ov-list wb-block">
           {visible.map((r) => {
