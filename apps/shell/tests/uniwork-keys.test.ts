@@ -16,7 +16,7 @@
  *   401 (`unauthorized` 1 refresh + retry), 403 (`entitlement_required`),
  *   424 (`provider_auth_failed`), 429 (`rate_limited` + `Retry-After`), 502 (`provider_unreachable`).
  */
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -88,7 +88,9 @@ import { registerAiIpc, setUniworkKeysHost } from '../../docs/src/main/docs-main
 import type { AccountStatus } from '../src/shared/home-api'
 import type { DeploymentProfile } from '../src/main/uniwork-auth/deployment'
 import { TransportError, type FetchLike } from '../src/main/uniwork-auth/transport'
+import { listProviderModels } from '@genoffice/ai-provider/provider-models'
 import {
+  CREDENTIALS_RETRY_MS,
   CREDENTIALS_TTL_MS,
   MODEL_LIST_TTL_MS,
   UniworkKeyError,
@@ -185,6 +187,15 @@ function createSender() {
 const getSettings = (): Promise<AiSettings> =>
   Promise.resolve(handlers.get('ai:get-settings')!({ sender: { id: 101 } })) as Promise<AiSettings>
 
+const setSettings = (settings: AiSettings): Promise<void> =>
+  Promise.resolve(
+    handlers.get('ai:set-settings')!({ sender: { id: 101 } }, settings),
+  ) as Promise<void>
+
+const readStoredSettings = (): {
+  providers: Record<string, { apiKey?: string; model?: string; baseUrl?: string }>
+} => JSON.parse(readFileSync(join(dirs.userData, 'ai-settings.json'), 'utf8'))
+
 const runStream = async (settings: AiSettings, requestId = 'req-1'): Promise<AiStreamChunk[]> => {
   const { event, chunks } = createSender()
   const req: AiStreamRequest = {
@@ -231,7 +242,7 @@ describe('UniworkKeysHost + docs-main BYOK proxy integration (G6-05k F2)', () =>
           label: 'OpenAI',
           base_url: '',
           key_hint: 'sk-...1234',
-          default_model: 'gpt-4o-mini',
+          model: 'gpt-4o-mini',
         },
       ],
     })
@@ -247,7 +258,7 @@ describe('UniworkKeysHost + docs-main BYOK proxy integration (G6-05k F2)', () =>
           label: 'OpenAI',
           base_url: '',
           key_hint: 'sk-...1234',
-          default_model: 'gpt-4o-mini',
+          model: 'gpt-4o-mini',
         },
       ],
     })
@@ -263,7 +274,7 @@ describe('UniworkKeysHost + docs-main BYOK proxy integration (G6-05k F2)', () =>
           label: 'Anthropic',
           base_url: '',
           key_hint: 'sk-ant-...9999',
-          default_model: 'claude-sonnet-4-6',
+          model: 'claude-sonnet-4-6',
           updated_at: '2026-10-14T10:00:00Z',
         },
         // custom without base_url is skipped
@@ -279,7 +290,7 @@ describe('UniworkKeysHost + docs-main BYOK proxy integration (G6-05k F2)', () =>
     expect(enabled.byok.enabled).toBe(true)
     expect(enabled.items).toHaveLength(1)
     expect(enabled.items[0]?.provider).toBe('anthropic')
-    expect(enabled.items[0]?.defaultModel).toBe('claude-sonnet-4-6')
+    expect(enabled.items[0]?.model).toBe('claude-sonnet-4-6')
     expect(enabled.items[0]?.keyHint).toBe('sk-ant-...9999')
   })
 
@@ -296,7 +307,7 @@ describe('UniworkKeysHost + docs-main BYOK proxy integration (G6-05k F2)', () =>
               label: 'Anthropic Org',
               base_url: '',
               key_hint: 'sk-ant-...abcd',
-              default_model: 'claude-sonnet-4-6',
+              model: 'claude-sonnet-4-6',
               updated_at: '2026-10-14T10:00:00Z',
             },
           ],
@@ -322,6 +333,7 @@ describe('UniworkKeysHost + docs-main BYOK proxy integration (G6-05k F2)', () =>
       },
     })
     setUniworkKeysHost(host)
+    await host.list()
 
     const settings = await getSettings()
     expect(settings.modelSources?.anthropic?.origin).toBe('org')
@@ -330,8 +342,8 @@ describe('UniworkKeysHost + docs-main BYOK proxy integration (G6-05k F2)', () =>
     expect(settings.providers.anthropic.apiKey).toBe('')
     expect(JSON.stringify(settings)).not.toContain('sk-ant-...abcd')
     expect(JSON.stringify(settings)).not.toContain(TOKEN_1)
-    // In-memory model reflects credential.default_model when no local model was saved
-    expect(settings.providers.anthropic.model).toBe('claude-sonnet-4-6')
+    // the org model is only `chosen`: providers.anthropic keeps what the file (defaults) holds
+    expect(settings.providers.anthropic.model).toBe('claude-sonnet-5')
     expect(isProviderUsable(settings, 'anthropic')).toBe(true)
     // Nothing was written to ai-settings.json on disk
     expect(existsSync(join(dirs.userData, 'ai-settings.json'))).toBe(false)
@@ -353,16 +365,12 @@ describe('UniworkKeysHost + docs-main BYOK proxy integration (G6-05k F2)', () =>
     ])
   })
 
-  it('local model pick in ai-settings.json overrides credential.default_model without needing a local apiKey', async () => {
-    writeFileSync(
-      join(dirs.userData, 'ai-settings.json'),
-      JSON.stringify({
-        provider: 'anthropic',
-        providers: {
-          anthropic: { apiKey: '', model: 'claude-haiku-4-5' },
-        },
-      }),
-    )
+  it('a model picked on this computer for an org-served provider wins over an older server model and streams through the proxy', async () => {
+    const stored = {
+      provider: 'anthropic',
+      providers: { anthropic: { apiKey: '', model: 'claude-sonnet-5' } },
+    }
+    writeFileSync(join(dirs.userData, 'ai-settings.json'), JSON.stringify(stored))
 
     const fetchMock: FetchLike = vi.fn(async (url, init = {}) => {
       const headers = recordHeaders(init.headers)
@@ -375,7 +383,8 @@ describe('UniworkKeysHost + docs-main BYOK proxy integration (G6-05k F2)', () =>
               label: 'Anthropic',
               base_url: '',
               key_hint: 'sk-ant-...9999',
-              default_model: 'claude-sonnet-4-6',
+              model: 'claude-sonnet-4-6',
+              model_updated_at: '2026-10-11T08:00:00Z',
               updated_at: '2026-10-14T10:00:00Z',
             },
           ],
@@ -403,11 +412,25 @@ describe('UniworkKeysHost + docs-main BYOK proxy integration (G6-05k F2)', () =>
       fetch: fetchMock,
     })
     setUniworkKeysHost(host)
+    await host.list()
 
+    const before = await getSettings()
+    // the stored slot model is no pick: the server's model is chosen
+    expect(before.modelSources?.anthropic?.chosen).toBe('claude-sonnet-4-6')
+
+    // the chip pick saves the settings with the new model (withAiModelSelection)
+    await setSettings({
+      ...before,
+      providers: {
+        ...before.providers,
+        anthropic: { ...before.providers.anthropic, model: 'claude-haiku-4-5' },
+      },
+    })
     const settings = await getSettings()
     expect(settings.modelSources?.anthropic?.origin).toBe('org')
     expect(settings.modelSources?.anthropic?.chosen).toBe('claude-haiku-4-5')
-    expect(settings.providers.anthropic.model).toBe('claude-haiku-4-5')
+    // the pick is kept with the account, the stored slot is untouched
+    expect(readStoredSettings().providers.anthropic).toEqual(stored.providers.anthropic)
 
     const chunks = await runStream(settings)
     expect(chunks.some((c) => c.type === 'delta' && c.text === 'Haiku reply')).toBe(true)
@@ -439,7 +462,7 @@ describe('UniworkKeysHost + docs-main BYOK proxy integration (G6-05k F2)', () =>
               label: 'Org OpenAI',
               base_url: '',
               key_hint: 'sk-org-...1111',
-              default_model: 'gpt-4o-mini',
+              model: 'gpt-4o-mini',
               updated_at: '2026-10-14T10:00:00Z',
             },
             {
@@ -447,7 +470,7 @@ describe('UniworkKeysHost + docs-main BYOK proxy integration (G6-05k F2)', () =>
               label: 'Org Anthropic',
               base_url: '',
               key_hint: 'sk-ant-...2222',
-              default_model: 'claude-sonnet-4-6',
+              model: 'claude-sonnet-4-6',
               updated_at: '2026-10-14T10:00:00Z',
             },
           ],
@@ -477,6 +500,7 @@ describe('UniworkKeysHost + docs-main BYOK proxy integration (G6-05k F2)', () =>
       fetch: fetchMock,
     })
     setUniworkKeysHost(host)
+    await host.list()
 
     const settings = await getSettings()
     // OpenAI has a local key -> local source wins (origin is not 'org')
@@ -528,7 +552,7 @@ describe('UniworkKeysHost + docs-main BYOK proxy integration (G6-05k F2)', () =>
               label: 'Org OpenAI',
               base_url: '',
               key_hint: 'sk-...1111',
-              default_model: 'gpt-5.4',
+              model: 'gpt-5.4',
             },
           ],
         })
@@ -548,6 +572,7 @@ describe('UniworkKeysHost + docs-main BYOK proxy integration (G6-05k F2)', () =>
       fetch: fetchMock,
     })
     setUniworkKeysHost(host)
+    await host.list()
 
     // 1. Signed in, byok.enabled = false
     const s1 = await getSettings()
@@ -582,7 +607,7 @@ describe('UniworkKeysHost + docs-main BYOK proxy integration (G6-05k F2)', () =>
               label: 'Org 1 OpenAI',
               base_url: '',
               key_hint: 'sk-...1111',
-              default_model: 'gpt-5.4',
+              model: 'gpt-5.4',
             },
           ],
         })
@@ -596,7 +621,7 @@ describe('UniworkKeysHost + docs-main BYOK proxy integration (G6-05k F2)', () =>
               label: 'Org 2 Gemini',
               base_url: '',
               key_hint: 'AIza...2222',
-              default_model: 'gemini-3.1-pro',
+              model: 'gemini-3.1-pro',
             },
           ],
         })
@@ -643,6 +668,7 @@ describe('UniworkKeysHost + docs-main BYOK proxy integration (G6-05k F2)', () =>
       fetch: fetchMock,
     })
     setUniworkKeysHost(host)
+    await host.list()
 
     const s1 = await getSettings()
     expect(s1.modelSources?.openai?.origin).toBe('org')
@@ -671,6 +697,7 @@ describe('UniworkKeysHost + docs-main BYOK proxy integration (G6-05k F2)', () =>
     expect(host.hasOrgSource('openai')).toBe(false)
 
     // Reading settings now loads ORG_2's credentials (gemini)
+    await host.list()
     const s2 = await getSettings()
     expect(s2.modelSources?.openai).toBeUndefined()
     expect(s2.modelSources?.gemini?.origin).toBe('org')
@@ -702,7 +729,7 @@ describe('UniworkKeysHost + docs-main BYOK proxy integration (G6-05k F2)', () =>
                   label: 'OpenAI',
                   base_url: '',
                   key_hint: 'sk-...1234',
-                  default_model: 'gpt-5.4',
+                  model: 'gpt-5.4',
                 },
               ]
             : [],
@@ -742,6 +769,7 @@ describe('UniworkKeysHost + docs-main BYOK proxy integration (G6-05k F2)', () =>
       fetch: fetchMock,
     })
     setUniworkKeysHost(host)
+    await host.list()
 
     const settings = await getSettings()
     expect(r1Reads).toBe(1)
@@ -758,7 +786,7 @@ describe('UniworkKeysHost + docs-main BYOK proxy integration (G6-05k F2)', () =>
     const missingChunks = await runStream({ ...settings, provider: 'openai' }, 'req-cred-missing')
     const errChunk = missingChunks.find((c) => c.type === 'error')
     expect(errChunk).toBeDefined()
-    expect(errChunk?.errorCode).toBe('invalid_key')
+    expect(errChunk?.errorCode).toBeUndefined()
     expect(errChunk?.error).toContain('No AI key yet')
     expect(errChunk?.uniworkCode).toBeUndefined()
     expect(host.hasOrgSource('openai')).toBe(false)
@@ -785,7 +813,7 @@ describe('UniworkKeysHost + docs-main BYOK proxy integration (G6-05k F2)', () =>
               label: 'OpenAI',
               base_url: '',
               key_hint: 'sk-...1234',
-              default_model: 'gpt-5.4',
+              model: 'gpt-5.4',
             },
           ],
         })
@@ -826,6 +854,7 @@ describe('UniworkKeysHost + docs-main BYOK proxy integration (G6-05k F2)', () =>
       },
     })
     setUniworkKeysHost(host)
+    await host.list()
 
     const settings = await getSettings()
     const streamReq = { ...settings, provider: 'openai' as const }
@@ -852,22 +881,22 @@ describe('UniworkKeysHost + docs-main BYOK proxy integration (G6-05k F2)', () =>
     const c424 = await runStream(streamReq, 'req-424')
     expect(c424.at(-1)).toMatchObject({
       type: 'error',
-      errorCode: 'invalid_key',
     })
     expect(c424.at(-1)?.error).toContain('The AI key was refused')
 
-    // 3. 429 rate_limited with Retry-After: 23 -> rate_limit + retryAfterSec: 23
+    // 3. 429 ai_rate_limited (the wire code) with Retry-After: 23 -> the wait in the line
     chatResponseFactory = () =>
-      jsonResponse({ error: { code: 'rate_limited', message: 'Rate limit exceeded' } }, 429, {
+      jsonResponse({ error: { code: 'ai_rate_limited', message: 'Rate limit exceeded' } }, 429, {
         'Retry-After': '23',
       })
     const c429 = await runStream(streamReq, 'req-429')
     expect(c429.at(-1)).toMatchObject({
       type: 'error',
-      errorCode: 'rate_limit',
-      retryAfterSec: 23,
     })
     expect(c429.at(-1)?.error).toContain('Wait 23 s and try again.')
+    // the renderer's generic per-code texts would replace the wait time: no errorCode is sent
+    expect(c429.at(-1)?.errorCode).toBeUndefined()
+    expect(c429.at(-1)?.retryAfterSec).toBeUndefined()
 
     // 4. 502 provider_unreachable -> unreachable
     chatResponseFactory = () =>
@@ -875,7 +904,6 @@ describe('UniworkKeysHost + docs-main BYOK proxy integration (G6-05k F2)', () =>
     const c502 = await runStream(streamReq, 'req-502')
     expect(c502.at(-1)).toMatchObject({
       type: 'error',
-      errorCode: 'unreachable',
     })
     expect(c502.at(-1)?.error).toContain('AI provider unreachable')
 
@@ -885,7 +913,6 @@ describe('UniworkKeysHost + docs-main BYOK proxy integration (G6-05k F2)', () =>
     const c400 = await runStream(streamReq, 'req-400')
     expect(c400.at(-1)).toMatchObject({
       type: 'error',
-      errorCode: 'bad_url',
     })
     expect(c400.at(-1)?.error).toContain('This base URL is not allowed')
 
@@ -895,7 +922,6 @@ describe('UniworkKeysHost + docs-main BYOK proxy integration (G6-05k F2)', () =>
     const c403 = await runStream(streamReq, 'req-403')
     expect(c403.at(-1)).toMatchObject({
       type: 'error',
-      errorCode: 'not_entitled',
     })
     expect(c403.at(-1)?.error).toContain('AI is not in your plan')
     expect(host.hasOrgSource('openai')).toBe(false)
@@ -903,7 +929,7 @@ describe('UniworkKeysHost + docs-main BYOK proxy integration (G6-05k F2)', () =>
     // Advance clock past CREDENTIALS_TTL_MS so next getSettings re-reads R1
     clock += CREDENTIALS_TTL_MS + 1_000
     await getSettings()
-    expect(host.hasOrgSource('openai')).toBe(true)
+    await vi.waitFor(() => expect(host.hasOrgSource('openai')).toBe(true))
 
     // 7. 401 device_revoked -> clears cache immediately without retry and triggers onDeviceRevoked
     chatAttempts = 0
@@ -915,7 +941,6 @@ describe('UniworkKeysHost + docs-main BYOK proxy integration (G6-05k F2)', () =>
     expect(host.hasOrgSource('openai')).toBe(false)
     expect(cRevoked.at(-1)).toMatchObject({
       type: 'error',
-      errorCode: 'invalid_key',
     })
     expect(cRevoked.at(-1)?.error).toContain('Session expired')
   })
@@ -935,7 +960,7 @@ describe('UniworkKeysHost + docs-main BYOK proxy integration (G6-05k F2)', () =>
               label: 'OpenAI',
               base_url: '',
               key_hint: keyHint,
-              default_model: 'gpt-5.4',
+              model: 'gpt-5.4',
               updated_at: '2026-10-14T10:00:00Z',
             },
           ],
@@ -958,22 +983,22 @@ describe('UniworkKeysHost + docs-main BYOK proxy integration (G6-05k F2)', () =>
     })
 
     await host.list()
-    host.sources(undefined)
+    host.sources()
     await vi.waitFor(() => {
-      expect(host.sources(undefined).openai?.listed).toEqual(['gpt-model-1'])
+      expect(host.sources().openai?.listed).toEqual(['gpt-model-1'])
     })
 
     // Within 10-min TTL: does not re-fetch R5
     clock += MODEL_LIST_TTL_MS - 1_000
-    expect(host.sources(undefined).openai?.listed).toEqual(['gpt-model-1'])
+    expect(host.sources().openai?.listed).toEqual(['gpt-model-1'])
     expect(r5Reads).toBe(1)
 
     // Rotating the key on UniWork changes key_hint -> invalidates R5 immediately
     keyHint = 'sk-...2222'
     await host.list({ force: true })
-    host.sources(undefined)
+    host.sources()
     await vi.waitFor(() => {
-      expect(host.sources(undefined).openai?.listed).toEqual(['gpt-model-2'])
+      expect(host.sources().openai?.listed).toEqual(['gpt-model-2'])
     })
   })
 
@@ -1014,5 +1039,557 @@ describe('UniworkKeysHost + docs-main BYOK proxy integration (G6-05k F2)', () =>
     expect(seenUrls).toEqual([
       `${ORIGIN}/api/v1/orgs/${ORG_1}/ai/byok/opencode-zen/chat/completions`,
     ])
+  })
+
+  // ---- review round 1 (desktop main) ----
+
+  const R1_URL = `${ORIGIN}/api/v1/orgs/${ORG_1}/ai/credentials`
+  const BYOK_URL = `${ORIGIN}/api/v1/orgs/${ORG_1}/ai/byok`
+
+  const orgItem = (provider: string, extra: Record<string, unknown> = {}) => ({
+    provider,
+    label: '',
+    base_url: '',
+    key_hint: `${provider}-...abcd`,
+    model:
+      provider === 'anthropic'
+        ? 'claude-sonnet-4-6'
+        : provider === 'deepseek'
+          ? 'deepseek-chat'
+          : 'gpt-5.4',
+    model_updated_at: '2026-10-11T08:00:00Z',
+    created_at: '2026-10-09T08:00:00Z',
+    updated_at: '2026-10-09T08:00:00Z',
+    ...extra,
+  })
+
+  const r1Body = (items: unknown[]) => ({ byok: { enabled: true, reason: '' }, items })
+
+  const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0))
+
+  it('ai:get-settings answers at once while R1 never answers (local keys only, no wait)', async () => {
+    writeFileSync(
+      join(dirs.userData, 'ai-settings.json'),
+      JSON.stringify({
+        provider: 'openai',
+        providers: { openai: { apiKey: 'sk-local-openai-secret', model: 'gpt-5.4' } },
+      }),
+    )
+    let r1Calls = 0
+    const fetchMock: FetchLike = vi.fn(async (url) => {
+      if (url === R1_URL) {
+        r1Calls++
+        return new Promise<Response>(() => {})
+      }
+      if (url === 'https://api.openai.com/v1/models') return jsonResponse({ data: [] })
+      throw new Error(`unexpected URL: ${url}`)
+    })
+    globalThis.fetch = fetchMock as typeof globalThis.fetch
+    setUniworkKeysHost(
+      createUniworkKeysHost({
+        profile: () => PROFILE,
+        orgId: () => ORG_1,
+        authorized: async (call) => call(TOKEN_1),
+        fetch: fetchMock,
+      }),
+    )
+
+    const started = Date.now()
+    const settings = await Promise.race([
+      getSettings(),
+      new Promise<'stalled'>((resolve) => setTimeout(() => resolve('stalled'), 1_000)),
+    ])
+    expect(settings).not.toBe('stalled')
+    expect(Date.now() - started).toBeLessThan(1_000)
+    const read = settings as AiSettings
+    expect(read.modelSources?.openai?.chosen).toBe('gpt-5.4')
+    expect(read.modelSources?.openai?.origin).toBeUndefined()
+    expect(read.modelSources?.anthropic).toBeUndefined()
+    expect(r1Calls).toBe(1)
+  })
+
+  it('a failing R1 costs one request per backoff window, and a landing R1 announces itself once', async () => {
+    let clock = 2_000_000
+    let r1Calls = 0
+    let mode: 'throw' | 'answer' = 'throw'
+    let release: (() => void) | null = null
+    const fetchMock: FetchLike = vi.fn(async (url) => {
+      if (url === R1_URL) {
+        r1Calls++
+        if (mode === 'throw') throw new TypeError('fetch failed: ECONNRESET')
+        await new Promise<void>((resolve) => {
+          release = resolve
+        })
+        return jsonResponse(r1Body([orgItem('anthropic')]))
+      }
+      if (url === `${BYOK_URL}/anthropic/models`) return jsonResponse({ data: [] })
+      throw new Error(`unexpected URL: ${url}`)
+    })
+    let changed = 0
+    const host = createUniworkKeysHost({
+      profile: () => PROFILE,
+      orgId: () => ORG_1,
+      authorized: async (call) => call(TOKEN_1),
+      fetch: fetchMock,
+      now: () => clock,
+      onChanged: () => {
+        changed++
+      },
+    })
+    setUniworkKeysHost(host)
+
+    for (let i = 0; i < 10; i++) {
+      await getSettings()
+      await flush()
+    }
+    expect(r1Calls).toBe(1)
+
+    // past the backoff the next read re-reads in the background; the read itself does not wait
+    clock += CREDENTIALS_RETRY_MS + 1
+    mode = 'answer'
+    const first = await getSettings()
+    expect(first.modelSources?.anthropic).toBeUndefined()
+    await vi.waitFor(() => expect(release).not.toBeNull())
+    release!()
+    await vi.waitFor(() => expect(changed).toBe(1))
+    expect(r1Calls).toBe(2)
+    const next = await getSettings()
+    expect(next.modelSources?.anthropic?.origin).toBe('org')
+  })
+
+  it('R1 429 / 5xx keep the last good list (no flap, Retry-After honoured); only 404 drops the source', async () => {
+    let clock = 3_000_000
+    let r1Calls = 0
+    let answer: () => Response = () => jsonResponse(r1Body([orgItem('anthropic')]))
+    const fetchMock: FetchLike = vi.fn(async (url) => {
+      if (url === R1_URL) {
+        r1Calls++
+        return answer()
+      }
+      if (url === `${BYOK_URL}/anthropic/models`) return jsonResponse({ data: [] })
+      if (url === `${BYOK_URL}/anthropic/messages`) return anthropicSseResponse('still proxied')
+      throw new Error(`unexpected URL: ${url}`)
+    })
+    globalThis.fetch = fetchMock as typeof globalThis.fetch
+    let changed = 0
+    const host = createUniworkKeysHost({
+      profile: () => PROFILE,
+      orgId: () => ORG_1,
+      authorized: async (call) => call(TOKEN_1),
+      fetch: fetchMock,
+      now: () => clock,
+      onChanged: () => {
+        changed++
+      },
+    })
+    setUniworkKeysHost(host)
+    await host.list()
+    expect(host.hasOrgSource('anthropic')).toBe(true)
+    const changedAfterLoad = changed
+
+    clock += CREDENTIALS_TTL_MS + 1
+    answer = () => jsonResponse({ error: { code: 'internal' } }, 500)
+    await host.list()
+    expect(host.hasOrgSource('anthropic')).toBe(true)
+
+    clock += CREDENTIALS_RETRY_MS + 1
+    answer = () => jsonResponse({ error: { code: 'rate_limited' } }, 429, { 'Retry-After': '120' })
+    await host.list()
+    expect(host.hasOrgSource('anthropic')).toBe(true)
+    expect(changed).toBe(changedAfterLoad)
+    const callsAt429 = r1Calls
+    clock += 60_000
+    await host.list()
+    expect(r1Calls).toBe(callsAt429)
+
+    const settings = await getSettings()
+    const chunks = await runStream({ ...settings, provider: 'anthropic' }, 'req-kept')
+    expect(chunks.some((c) => c.type === 'delta' && c.text === 'still proxied')).toBe(true)
+
+    clock += 61_000
+    answer = () => jsonResponse({ error: { code: 'not_found' } }, 404)
+    const beforeDrop = changed
+    await host.list()
+    expect(host.hasOrgSource('anthropic')).toBe(false)
+    expect(changed).toBe(beforeDrop + 1)
+  })
+
+  it('a vendor 402 / 503 / 400 passes through; only a UniWork-coded 503 is a proxy state', async () => {
+    let answer: () => Response = () => openAiSseResponse('ok')
+    const fetchMock: FetchLike = vi.fn(async (url) => {
+      if (url === R1_URL) return jsonResponse(r1Body([orgItem('openai')]))
+      if (url.endsWith('/models')) return jsonResponse({ data: [] })
+      if (url === `${BYOK_URL}/openai/chat/completions`) return answer()
+      throw new Error(`unexpected URL: ${url}`)
+    })
+    globalThis.fetch = fetchMock as typeof globalThis.fetch
+    const host = createUniworkKeysHost({
+      profile: () => PROFILE,
+      orgId: () => ORG_1,
+      authorized: async (call) => call(TOKEN_1),
+      fetch: fetchMock,
+    })
+    setUniworkKeysHost(host)
+    await host.list()
+    const proxied = host.fetchFor('openai')
+    const post = { method: 'POST', body: '{}' }
+
+    answer = () => jsonResponse({ error: { message: 'Insufficient Balance' } }, 402)
+    expect((await proxied(`${BYOK_URL}/openai/chat/completions`, post)).status).toBe(402)
+    const settings = await getSettings()
+    const c402 = await runStream({ ...settings, provider: 'openai' }, 'req-vendor-402')
+    expect(c402.at(-1)?.type).toBe('error')
+    expect(c402.at(-1)?.error).not.toContain('credits_exhausted')
+    expect(c402.at(-1)?.error).not.toContain('AI credits used up')
+
+    answer = () => jsonResponse({ error: { type: 'overloaded_error', message: 'busy' } }, 503)
+    expect((await proxied(`${BYOK_URL}/openai/chat/completions`, post)).status).toBe(503)
+
+    answer = () =>
+      jsonResponse(
+        { error: { message: 'max_tokens too large', type: 'invalid_request_error' } },
+        400,
+      )
+    expect((await proxied(`${BYOK_URL}/openai/chat/completions`, post)).status).toBe(400)
+
+    answer = () => jsonResponse({ error: { code: 'ai_credentials_unavailable' } }, 503)
+    const refused = await proxied(`${BYOK_URL}/openai/chat/completions`, post).catch((e) => e)
+    expect(refused).toBeInstanceOf(UniworkKeyError)
+    expect((refused as UniworkKeyError).code).toBe('keys_unavailable')
+    expect((refused as UniworkKeyError).describe('en')).toContain('Keys on UniWork unavailable')
+    expect((refused as UniworkKeyError).describe('vi')).toContain(
+      'Chưa dùng được khóa trên UniWork',
+    )
+  })
+
+  it('ai:chat and ai:settings-test use the org key through the proxy for an org-only provider', async () => {
+    const calls: RecordedCall[] = []
+    const fetchMock: FetchLike = vi.fn(async (url, init = {}) => {
+      calls.push({ url, init, headers: recordHeaders(init.headers) })
+      if (url === R1_URL) return jsonResponse(r1Body([orgItem('anthropic')]))
+      if (url.endsWith('/models')) return jsonResponse({ data: [] })
+      if (url === `${BYOK_URL}/anthropic/messages`) {
+        const body = JSON.parse(String(init.body ?? '{}')) as { stream?: boolean }
+        return body.stream
+          ? anthropicSseResponse('OK')
+          : jsonResponse({ content: [{ type: 'text', text: 'One-shot answer' }] })
+      }
+      throw new Error(`unexpected URL: ${url}`)
+    })
+    globalThis.fetch = fetchMock as typeof globalThis.fetch
+    const host = createUniworkKeysHost({
+      profile: () => PROFILE,
+      orgId: () => ORG_1,
+      authorized: async (call) => call(TOKEN_1),
+      fetch: fetchMock,
+    })
+    setUniworkKeysHost(host)
+    await host.list()
+    const settings = { ...(await getSettings()), provider: 'anthropic' as const }
+
+    const chat = (await handlers.get('ai:chat')!(
+      { sender: { id: 101 } },
+      { settings, system: 's', user: 'hello' },
+    )) as { ok: boolean; content?: string; error?: string }
+    expect(chat.ok).toBe(true)
+    expect(chat.content).toContain('One-shot answer')
+
+    const test = (await handlers.get('ai:settings-test')!(
+      { sender: { id: 101 } },
+      { settings, system: '', user: '' },
+    )) as { ok: boolean }
+    expect(test.ok).toBe(true)
+
+    const proxyCalls = calls.filter((c) => c.url === `${BYOK_URL}/anthropic/messages`)
+    expect(proxyCalls).toHaveLength(2)
+    for (const call of proxyCalls) {
+      expect(call.headers.authorization).toBe(`Bearer ${TOKEN_1}`)
+      expect(call.headers['x-api-key']).toBeUndefined()
+    }
+  })
+
+  it('Settings save round trip: no org model in ai-settings.json, server model newer-wins, a local key or slot is kept', async () => {
+    let serverModel = 'claude-sonnet-4-6'
+    let serverAt = '2026-10-11T08:00:00Z'
+    const fetchMock: FetchLike = vi.fn(async (url) => {
+      if (url === R1_URL) {
+        return jsonResponse(
+          r1Body([
+            orgItem('anthropic', { model: serverModel, model_updated_at: serverAt }),
+            orgItem('custom', { base_url: 'https://llm.example/v1' }),
+          ]),
+        )
+      }
+      if (url.endsWith('/models')) return jsonResponse({ data: [] })
+      throw new Error(`unexpected URL: ${url}`)
+    })
+    globalThis.fetch = fetchMock as typeof globalThis.fetch
+    // custom holds a key typed on this computer but no base URL yet: it stays local (incomplete)
+    const stored = {
+      provider: 'anthropic',
+      providers: { custom: { apiKey: 'sk-local-custom', model: 'my-model', baseUrl: '' } },
+    }
+    writeFileSync(join(dirs.userData, 'ai-settings.json'), JSON.stringify(stored))
+    const host = createUniworkKeysHost({
+      profile: () => PROFILE,
+      orgId: () => ORG_1,
+      authorized: async (call) => call(TOKEN_1),
+      fetch: fetchMock,
+    })
+    setUniworkKeysHost(host)
+    await host.list()
+
+    const first = await getSettings()
+    expect(first.modelSources?.anthropic).toMatchObject({
+      origin: 'org',
+      chosen: 'claude-sonnet-4-6',
+    })
+    expect(first.modelSources?.custom).toBeUndefined()
+    await setSettings(first)
+    const afterSave = readStoredSettings()
+    expect(afterSave.providers.anthropic?.model).not.toBe('claude-sonnet-4-6')
+    expect(afterSave.providers.custom?.apiKey).toBe('sk-local-custom')
+
+    // a model changed on the web (newer model_updated_at) is followed
+    serverModel = 'claude-opus-4-7'
+    serverAt = '2026-10-12T08:00:00Z'
+    await host.list({ force: true })
+    expect((await getSettings()).modelSources?.anthropic?.chosen).toBe('claude-opus-4-7')
+
+    // a pick on this computer (now) is newer than the server's
+    const current = await getSettings()
+    await setSettings({
+      ...current,
+      providers: {
+        ...current.providers,
+        anthropic: { ...current.providers.anthropic, model: 'claude-haiku-4-5' },
+      },
+    })
+    expect((await getSettings()).modelSources?.anthropic?.chosen).toBe('claude-haiku-4-5')
+    expect(readStoredSettings().providers.anthropic?.model).toBe(
+      afterSave.providers.anthropic?.model,
+    )
+
+    // a later change on the web wins again
+    serverModel = 'claude-sonnet-4-7'
+    serverAt = new Date(Date.now() + 60_000).toISOString()
+    await host.list({ force: true })
+    expect((await getSettings()).modelSources?.anthropic?.chosen).toBe('claude-sonnet-4-7')
+
+    // typing a key for the org-served provider saves it, and the local key wins from then on
+    const typed = await getSettings()
+    await setSettings({
+      ...typed,
+      providers: {
+        ...typed.providers,
+        anthropic: { apiKey: 'sk-ant-typed-locally', model: 'claude-sonnet-5' },
+      },
+    })
+    expect(readStoredSettings().providers.anthropic?.apiKey).toBe('sk-ant-typed-locally')
+    expect((await getSettings()).modelSources?.anthropic?.origin).toBeUndefined()
+  })
+
+  it('never replaces globalThis.fetch, works without a fetch dependency, and keeps concurrent streams apart', async () => {
+    writeFileSync(
+      join(dirs.userData, 'ai-settings.json'),
+      JSON.stringify({
+        provider: 'openai',
+        providers: { openai: { apiKey: 'sk-local-openai-secret', model: 'gpt-5.4' } },
+      }),
+    )
+    const calls: RecordedCall[] = []
+    let arrived = 0
+    let openGate: (() => void) | null = null
+    const gate = new Promise<void>((resolve) => {
+      openGate = resolve
+    })
+    let mode: 'barrier' | 'fail' = 'barrier'
+    const original = vi.fn(async (input: RequestInfo | URL, init: RequestInit = {}) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      calls.push({ url, init, headers: recordHeaders(init.headers) })
+      // the global is never swapped while a proxied call runs
+      expect(globalThis.fetch).toBe(original)
+      if (url === R1_URL) return jsonResponse(r1Body([orgItem('anthropic'), orgItem('deepseek')]))
+      if (url.endsWith('/models')) return jsonResponse({ data: [] })
+      if (mode === 'fail') return jsonResponse({ error: { code: 'provider_auth_failed' } }, 424)
+      if (url === 'https://api.openai.com/v1/chat/completions') return openAiSseResponse('local')
+      // both org turns stay open until the local turn has run in between them
+      arrived++
+      await gate
+      if (url === `${BYOK_URL}/anthropic/messages`) return anthropicSseResponse('org-anthropic')
+      if (url === `${BYOK_URL}/deepseek/chat/completions`) return openAiSseResponse('org-deepseek')
+      throw new Error(`unexpected URL: ${url}`)
+    })
+    globalThis.fetch = original as typeof globalThis.fetch
+    // no `fetch` dependency: the host uses globalThis.fetch like production
+    const host = createUniworkKeysHost({
+      profile: () => PROFILE,
+      orgId: () => ORG_1,
+      authorized: async (call) => call(TOKEN_1),
+    })
+    setUniworkKeysHost(host)
+    await host.list()
+    const settings = await getSettings()
+    expect(globalThis.fetch).toBe(original)
+
+    const orgTurns = Promise.all([
+      runStream({ ...settings, provider: 'anthropic' }, 'req-c-anthropic'),
+      runStream({ ...settings, provider: 'deepseek' }, 'req-c-deepseek'),
+    ])
+    await vi.waitFor(() => expect(arrived).toBe(2))
+    // a local turn started while two org turns are open must not see their scoped fetch
+    const local = await runStream({ ...settings, provider: 'openai' }, 'req-c-local')
+    openGate!()
+    const [anthropic, deepseek] = await orgTurns
+    expect(local.some((c) => c.type === 'delta' && c.text === 'local')).toBe(true)
+    expect(anthropic.some((c) => c.type === 'delta' && c.text === 'org-anthropic')).toBe(true)
+    expect(deepseek.some((c) => c.type === 'delta' && c.text === 'org-deepseek')).toBe(true)
+    expect(globalThis.fetch).toBe(original)
+
+    const direct = calls.filter((c) => c.url === 'https://api.openai.com/v1/chat/completions')
+    expect(direct).toHaveLength(1)
+    expect(direct[0]!.headers.authorization).toBe('Bearer sk-local-openai-secret')
+    for (const url of [`${BYOK_URL}/anthropic/messages`, `${BYOK_URL}/deepseek/chat/completions`]) {
+      const proxied = calls.filter((c) => c.url === url)
+      expect(proxied, url).toHaveLength(1)
+      expect(proxied[0]!.headers.authorization).toBe(`Bearer ${TOKEN_1}`)
+    }
+    expect(
+      calls
+        .filter((c) => c.headers.authorization === `Bearer ${TOKEN_1}`)
+        .every((c) => c.url.startsWith(`${ORIGIN}/`)),
+    ).toBe(true)
+
+    // a failed org turn leaves the global as it was too
+    mode = 'fail'
+    const failed = await runStream({ ...settings, provider: 'anthropic' }, 'req-c-fail')
+    expect(failed.at(-1)?.type).toBe('error')
+    expect(globalThis.fetch).toBe(original)
+  })
+
+  it('keeps the device bearer out of stream errors and logs, and refuses redirects on R1 and proxy calls', async () => {
+    const calls: RecordedCall[] = []
+    const fetchMock: FetchLike = vi.fn(async (url, init = {}) => {
+      calls.push({ url, init, headers: recordHeaders(init.headers) })
+      if (url === R1_URL) return jsonResponse(r1Body([orgItem('openai')]))
+      if (url.endsWith('/models')) return jsonResponse({ data: [] })
+      return jsonResponse({ error: { code: 'provider_auth_failed', message: 'Upstream 401' } }, 424)
+    })
+    globalThis.fetch = fetchMock as typeof globalThis.fetch
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    try {
+      const host = createUniworkKeysHost({
+        profile: () => PROFILE,
+        orgId: () => ORG_1,
+        authorized: async (call) => call(TOKEN_1),
+        fetch: fetchMock,
+      })
+      setUniworkKeysHost(host)
+      await host.list()
+      const settings = await getSettings()
+      const chunks = await runStream({ ...settings, provider: 'openai' }, 'req-no-leak')
+      expect(chunks.at(-1)?.error).toContain('The AI key was refused')
+      expect(JSON.stringify(chunks)).not.toContain(TOKEN_1)
+      expect(JSON.stringify(warn.mock.calls)).not.toContain(TOKEN_1)
+      expect(warn).toHaveBeenCalled()
+      const r1 = calls.find((c) => c.url === R1_URL)
+      const proxy = calls.find((c) => c.url === `${BYOK_URL}/openai/chat/completions`)
+      expect(r1?.init.redirect).toBe('error')
+      expect(proxy?.init.redirect).toBe('error')
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  it('reads R5 model ids like a direct listing (Gemini non-chat models dropped, list capped)', async () => {
+    const geminiBody = {
+      models: [
+        { name: 'models/gemini-3.8-flash', supportedGenerationMethods: ['generateContent'] },
+        { name: 'models/text-embedding-9', supportedGenerationMethods: ['embedContent'] },
+        { name: 'models/aqa', supportedGenerationMethods: ['generateAnswer'] },
+        ...Array.from({ length: 3000 }, (_, i) => ({ name: `models/g-${i}` })),
+      ],
+    }
+    const fetchMock: FetchLike = vi.fn(async (url) => {
+      if (url === R1_URL) return jsonResponse(r1Body([orgItem('gemini', { model: '' })]))
+      if (url === `${BYOK_URL}/gemini/models`) return jsonResponse(geminiBody)
+      throw new Error(`unexpected URL: ${url}`)
+    })
+    const host = createUniworkKeysHost({
+      profile: () => PROFILE,
+      orgId: () => ORG_1,
+      authorized: async (call) => call(TOKEN_1),
+      fetch: fetchMock,
+    })
+    await host.list()
+    const viaProxy = await host.listModels('gemini')
+
+    globalThis.fetch = vi.fn(async () => jsonResponse(geminiBody)) as typeof globalThis.fetch
+    const direct = await listProviderModels('gemini', { apiKey: 'k', model: '' })
+    expect(direct.ok).toBe(true)
+    expect(viaProxy).toEqual(direct.ids)
+    expect(viaProxy).not.toContain('text-embedding-9')
+    expect(viaProxy).not.toContain('aqa')
+    expect(viaProxy.length).toBeLessThanOrEqual(2000)
+  })
+
+  it('device_revoked tells the account once and backs R1 off; a 401 that is not from UniWork keeps the source', async () => {
+    let clock = 4_000_000
+    let r1Calls = 0
+    let r1Answer: () => Response = () => jsonResponse(r1Body([orgItem('openai')]))
+    let proxyAnswer: () => Response = () => openAiSseResponse('ok')
+    const fetchMock: FetchLike = vi.fn(async (url) => {
+      if (url === R1_URL) {
+        r1Calls++
+        return r1Answer()
+      }
+      if (url.endsWith('/models')) return jsonResponse({ data: [] })
+      if (url === `${BYOK_URL}/openai/chat/completions`) return proxyAnswer()
+      throw new Error(`unexpected URL: ${url}`)
+    })
+    globalThis.fetch = fetchMock as typeof globalThis.fetch
+    // the shell's authorized(): one refresh + retry on `unauthorized`, anything else rethrown
+    const authorized = async <T>(call: (token: string) => Promise<T>): Promise<T> => {
+      try {
+        return await call(TOKEN_1)
+      } catch (err) {
+        if (!(err instanceof TransportError) || err.code !== 'unauthorized') throw err
+      }
+      return call(TOKEN_2)
+    }
+    let revoked = 0
+    const host = createUniworkKeysHost({
+      profile: () => PROFILE,
+      orgId: () => ORG_1,
+      authorized,
+      fetch: fetchMock,
+      now: () => clock,
+      onDeviceRevoked: () => {
+        revoked++
+      },
+    })
+    setUniworkKeysHost(host)
+    await host.list()
+    const settings = await getSettings()
+
+    // a gateway / captive portal 401 (no UniWork body), twice: this call fails, the source stays
+    proxyAnswer = () => new Response('<html>login</html>', { status: 401 })
+    const gateway = await runStream({ ...settings, provider: 'openai' }, 'req-gw-401')
+    expect(gateway.at(-1)?.type).toBe('error')
+    expect(host.hasOrgSource('openai')).toBe(true)
+
+    // the server says the device is revoked on R1
+    clock += CREDENTIALS_TTL_MS + 1
+    r1Answer = () => jsonResponse({ error: { code: 'device_revoked' } }, 401)
+    await host.list()
+    expect(revoked).toBe(1)
+    expect(host.hasOrgSource('openai')).toBe(false)
+    const callsAfterRevoke = r1Calls
+    for (let i = 0; i < 10; i++) {
+      await getSettings()
+      await flush()
+    }
+    expect(r1Calls).toBe(callsAfterRevoke)
+    expect(revoked).toBe(1)
   })
 })

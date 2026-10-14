@@ -1,13 +1,14 @@
 import {
   AI_PROVIDERS,
   ProxyUrlError,
-  isProxy404,
   proxyAnswered,
   proxyErrorBodyFields,
   toProxyRequest,
   type AiModelSource,
   type AiProviderId,
 } from '@genoffice/ai-provider'
+import { modelIdsOfListBody } from '@genoffice/ai-provider/provider-models'
+import type { UniworkKeysHost as DocsUniworkKeysHost } from '../../../../docs/src/main/ai-org-route'
 import type { AccountStatus } from '../../shared/home-api'
 import { isAllowedOrigin, type DeploymentProfile } from './deployment'
 import { TransportError, type FetchLike } from './transport'
@@ -16,12 +17,17 @@ import {
   EMPTY_CREDENTIALS,
   ORG_KEY_PROVIDER_IDS,
   credentialSignature,
-  parseProxyModelIds,
+  parseCredentialsResponse,
   stampOf,
   type UniworkCredentialItem,
   type UniworkCredentialsResponse,
 } from './keys-credentials'
-import { UniworkKeyError, isProxy400, keyErrorFromResponse } from './keys-errors'
+import {
+  UniworkKeyError,
+  isProxy400,
+  keyErrorFromResponse,
+  parseRetryAfterHeader,
+} from './keys-errors'
 
 export * from './keys-errors'
 export * from './keys-credentials'
@@ -38,75 +44,52 @@ export const MODEL_LIST_TTL_MS = 10 * 60 * 1_000
 /** Pause before retrying a failed R5 `/models` listing (60 s). */
 export const MODEL_LIST_RETRY_MS = 60 * 1_000
 
-/** Header timeout for R1 / R5 requests (>= 20 s per §3, above the server's 15 s). */
+/** Header timeout for R5 listings (>= 20 s per §3, above the server's 15 s). */
 export const KEY_PROXY_HEADER_TIMEOUT_MS = 25_000
+
+/**
+ * R1 timeout. A settings read never waits for R1 (it answers the cached list), but a stream for a
+ * provider with no cached org source does, so a black-holed server must not hold it for long.
+ */
+export const CREDENTIALS_TIMEOUT_MS = 5_000
+
+/**
+ * Pause after a failed R1 (thrown, timed out, 5xx, 429 without a longer `Retry-After`, or a
+ * revoked device): reads answer the last good list meanwhile, so a dead server costs one request
+ * per window instead of one per settings read.
+ */
+export const CREDENTIALS_RETRY_MS = 30_000
 
 const ORG_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/
 
 export interface LocalModelChoice {
   readonly model: string
-  /** Epoch ms when the user picked the model locally; 0 or omitted if only from defaults. */
-  readonly updatedAt?: number | undefined
+  /** Epoch ms when the user picked the model on this computer. */
+  readonly updatedAt: number
 }
 
-export interface UniworkKeysHost {
+/**
+ * The desktop model pick per organization-served provider (contract §6.1: kept with the account,
+ * not in ai-settings.json). `scope` names the account and organization.
+ */
+export interface ModelPickStore {
+  read(scope: string): Partial<Record<string, LocalModelChoice>>
+  write(scope: string, provider: AiProviderId, choice: LocalModelChoice): void
+}
+
+/** The docs-main interface (ai-org-route.ts) plus the shell-only calls. */
+export interface UniworkKeysHost extends DocsUniworkKeysHost {
   /**
-   * Reads (or returns cached) R1 (`GET /api/v1/orgs/{orgId}/ai/credentials`) for the
-   * active signed-in organization. Never throws.
+   * Reads (or returns cached) R1 (`GET /api/v1/orgs/{orgId}/ai/credentials`) for the active
+   * signed-in organization. Never throws; while the list is fresh or a failure backoff runs it
+   * answers the cached list without a request.
    */
   list(options?: { force?: boolean }): Promise<UniworkCredentialsResponse>
-  /**
-   * Returns current `origin: 'org'` model sources for the active organization when `byok.enabled`
-   * is true. Starts background R5 (`/byok/{provider}/models`) listings and invokes `onChanged`
-   * when a listing settles or a 404 `credential_missing` invalidates R1.
-   */
-  sources(
-    localChoices?: Partial<Record<AiProviderId, string | LocalModelChoice>>,
-    onChanged?: () => void,
-    excludeProviders?: ReadonlySet<AiProviderId>,
-  ): Partial<Record<AiProviderId, AiModelSource>>
-  /**
-   * Returns the cached R1 credential item for `provider` when `byok.enabled` is true, or null.
-   */
+  /** The cached R1 credential item for `provider` when `byok.enabled` is true, or null. */
   credentialFor(provider: AiProviderId): UniworkCredentialItem | null
-  /**
-   * True when `provider` has a usable org credential in the active organization (`byok.enabled` is true).
-   */
-  hasOrgSource(provider: AiProviderId): boolean
-  /**
-   * Resolves the chosen model for an org-backed `provider` using the newer-wins rule against a
-   * local pick, falling back to the server row's `model`, the provider's default model, or the
-   * first listed model.
-   */
-  chosenModelFor(provider: AiProviderId, localChoice?: string | LocalModelChoice): string
-  /**
-   * Lists one provider's models via R5 (`GET /api/v1/orgs/{orgId}/ai/byok/{provider}/models`),
-   * updating the host's in-memory R5 cache.
-   */
+  /** Lists one provider's models via R5 (`/byok/{provider}/models`) into the in-memory cache. */
   listModels(provider: AiProviderId): Promise<readonly string[]>
-  /**
-   * The proxy base URL (`${apiOrigin}/api/v1/orgs/${orgId}/ai/byok/${provider}`) for `provider`,
-   * or `null` when not signed in / origin not allowed.
-   */
-  byokBaseUrl(provider: AiProviderId): string | null
-  /**
-   * Per-call fetch for `provider`: rewrites the URL with `toProxyRequest(aiBase, url, init)`,
-   * drops vendor key headers, adds the device bearer token through `authorized()`,
-   * refuses any origin outside `isAllowedOrigin`, tracks the stream so sign-out / org switch /
-   * `device_revoked` aborts it, and maps proxy contract statuses (§2.3).
-   */
-  fetchFor(
-    provider: AiProviderId,
-    options?: { onAbort?: () => void },
-  ): (url: string, init?: RequestInit) => Promise<Response>
-  /**
-   * Clears the R1/R5 caches and aborts every running proxied stream.
-   */
-  clear(reason?: 'sign-out' | 'org-switch' | 'device-revoked'): void
-  /**
-   * Synchronizes with an `AccountStatus` push: clears caches and aborts running streams when
-   * signed out or when the selected organization changed.
-   */
+  /** Clears caches and aborts running streams on sign-out or an organization change. */
   onAccountStatus(status: AccountStatus): void
   /** Number of currently active proxied streams. */
   activeStreamCount(): number
@@ -117,6 +100,10 @@ export interface UniworkKeysHostDeps {
   orgId: () => string | null
   /** Optional session identity (deploymentId/accountId/deviceSessionId) to scope cache per user. */
   sessionKey?: () => string | null
+  /** Optional account identity (deploymentId/accountId) that scopes the stored model picks. */
+  accountKey?: () => string | null
+  /** Optional persistent store of the desktop model picks (defaults to memory only). */
+  modelPicks?: ModelPickStore
   /** Runs an authenticated request with the device bearer token (1 refresh + retry on 401). */
   authorized?: <T>(call: (token: string) => Promise<T>) => Promise<T>
   /** Alias for `authorized` (matches `createUniworkCloudClient`). */
@@ -158,22 +145,22 @@ export function createUniworkKeysHost(deps: UniworkKeysHostDeps): UniworkKeysHos
   let r1LoadedAt = 0
   let r1EverLoaded = false
   let r1InFlight: Promise<UniworkCredentialsResponse> | null = null
+  /** no R1 request before this time (failure backoff); 0 = none */
+  let r1RetryAt = 0
   const r5Cache = new Map<string, R5Entry>()
   const activeStreams = new Map<AbortController, { onAbort?: () => void }>()
-  const extraChangeListeners = new Set<() => void>()
+  const memoryPicks = new Map<string, Partial<Record<string, LocalModelChoice>>>()
+  const pickStore: ModelPickStore = deps.modelPicks ?? {
+    read: (scope) => memoryPicks.get(scope) ?? {},
+    write: (scope, provider, choice) =>
+      memoryPicks.set(scope, { ...memoryPicks.get(scope), [provider]: choice }),
+  }
 
   function notifyChanged(): void {
     try {
       deps.onChanged?.()
     } catch {
       // ignore listener errors
-    }
-    for (const fn of [...extraChangeListeners]) {
-      try {
-        fn()
-      } catch {
-        // ignore listener errors
-      }
     }
   }
 
@@ -218,13 +205,15 @@ export function createUniworkKeysHost(deps: UniworkKeysHostDeps): UniworkKeysHos
     }
   }
 
-  function clear(_reason?: 'sign-out' | 'org-switch' | 'device-revoked'): void {
+  function clear(reason?: 'sign-out' | 'org-switch' | 'device-revoked'): void {
     generation++
     const hadSources = r1State.hasByok && r1State.byok.enabled && r1State.items.length > 0
     r1State = EMPTY_CREDENTIALS
     r1LoadedAt = 0
     r1EverLoaded = false
     r1InFlight = null
+    // a revoked device gets the same answer until the shell signs out: no R1 per settings read
+    r1RetryAt = reason === 'device-revoked' ? now() + CREDENTIALS_RETRY_MS : 0
     r5Cache.clear()
     abortAllStreams()
     if (hadSources) notifyChanged()
@@ -268,26 +257,52 @@ export function createUniworkKeysHost(deps: UniworkKeysHostDeps): UniworkKeysHos
     throw new TransportError('unauthorized', 401, code === 'unauthorized')
   }
 
+  /** a 401 from the UniWork server itself, a revoked device or a reused refresh ends the source */
+  function endsSession(err: TransportError): boolean {
+    return (
+      err.code === 'device_revoked' ||
+      err.code === 'refresh_reused' ||
+      (err.code === 'unauthorized' && err.fromServer)
+    )
+  }
+
+  function adoptCredentials(next: UniworkCredentialsResponse): UniworkCredentialsResponse {
+    const prevSig = credentialSignature(r1State)
+    r1State = next
+    r1LoadedAt = now()
+    r1EverLoaded = true
+    r1RetryAt = 0
+    if (prevSig !== credentialSignature(next)) notifyChanged()
+    return next
+  }
+
+  /** keep the last good list (no notify) and wait before the next R1 request */
+  function backOff(retryAfterSeconds?: number): UniworkCredentialsResponse {
+    const wait =
+      retryAfterSeconds !== undefined
+        ? Math.max(retryAfterSeconds * 1_000, CREDENTIALS_TTL_MS)
+        : CREDENTIALS_RETRY_MS
+    r1RetryAt = now() + wait
+    return r1State
+  }
+
   async function list(options?: { force?: boolean }): Promise<UniworkCredentialsResponse> {
     const target = syncOwner()
-    if (!target || !online()) {
-      if (!target) return EMPTY_CREDENTIALS
-      return r1State
-    }
+    if (!target) return EMPTY_CREDENTIALS
+    if (!online()) return r1State
     const force = options?.force === true
-    if (!force && r1EverLoaded && now() - r1LoadedAt < CREDENTIALS_TTL_MS) {
-      return r1State
-    }
-    if (!force && r1InFlight) {
-      return r1InFlight
+    if (!force) {
+      if (now() < r1RetryAt) return r1State
+      if (r1EverLoaded && now() - r1LoadedAt < CREDENTIALS_TTL_MS) return r1State
+      if (r1InFlight) return r1InFlight
     }
     const runGen = generation
     const runOwner = target.ownerKey
     const url = `${target.aiBase}/credentials`
+    const stale = () => runGen !== generation || runOwner !== lastOwnerKey
     const run = (async (): Promise<UniworkCredentialsResponse> => {
       try {
         const res = await runAuthorized(async (token) => {
-          const timeout = AbortSignal.timeout(KEY_PROXY_HEADER_TIMEOUT_MS)
           const response = await getFetch()(url, {
             method: 'GET',
             headers: {
@@ -295,48 +310,35 @@ export function createUniworkKeysHost(deps: UniworkKeysHostDeps): UniworkKeysHos
               Authorization: `Bearer ${token}`,
             },
             redirect: 'error',
-            signal: timeout,
+            signal: AbortSignal.timeout(CREDENTIALS_TIMEOUT_MS),
           })
           if (response.status === 401) {
             return inspect401AndThrow(response)
           }
           return response
         })
-        if (runGen !== generation || runOwner !== lastOwnerKey) return r1State
+        if (stale()) return r1State
+        // route-level 404: an older server or no longer a member, so no org source
+        if (res.status === 404) return adoptCredentials(EMPTY_CREDENTIALS)
+        // 429 / 5xx / anything else is not an answer about the keys: keep the last good list
         if (!res.ok) {
-          const prevSig = credentialSignature(r1State)
-          r1State = EMPTY_CREDENTIALS
-          r1LoadedAt = now()
-          r1EverLoaded = true
-          if (prevSig !== credentialSignature(r1State)) notifyChanged()
-          return r1State
+          return backOff(
+            res.status === 429 ? parseRetryAfterHeader(res.headers.get('retry-after')) : undefined,
+          )
         }
         const raw = await res.json()
-        if (runGen !== generation || runOwner !== lastOwnerKey) return r1State
-        const parsed = parseCredentialsResponse(raw)
-        const prevSig = credentialSignature(r1State)
-        r1State = parsed
-        r1LoadedAt = now()
-        r1EverLoaded = true
-        if (prevSig !== credentialSignature(parsed)) notifyChanged()
-        return parsed
+        if (stale()) return r1State
+        // a parsed `byok.enabled=false` (or no `byok` at all) drops the source
+        return adoptCredentials(parseCredentialsResponse(raw))
       } catch (err) {
-        if (runGen !== generation || runOwner !== lastOwnerKey) return r1State
-        if (
-          err instanceof TransportError &&
-          (err.code === 'unauthorized' ||
-            err.code === 'device_revoked' ||
-            err.code === 'refresh_reused')
-        ) {
+        if (stale()) return r1State
+        if (err instanceof TransportError && endsSession(err)) {
           clear(err.code === 'device_revoked' ? 'device-revoked' : 'sign-out')
           lastOwnerKey = ''
           return EMPTY_CREDENTIALS
         }
-        // Offline / transient failure: if never loaded, return empty; keep any previous state otherwise
-        if (!r1EverLoaded) {
-          r1State = EMPTY_CREDENTIALS
-        }
-        return r1State
+        // offline, timed out, a gateway's 401 or an unreadable body: transient
+        return backOff()
       }
     })()
     r1InFlight = run
@@ -412,16 +414,18 @@ export function createUniworkKeysHost(deps: UniworkKeysHostDeps): UniworkKeysHos
 
       const callController = new AbortController()
       const callerSignal = proxyReq.init.signal as AbortSignal | null | undefined
+      const forwardAbort = () => callController.abort()
       if (callerSignal?.aborted) {
         callController.abort()
       } else if (callerSignal) {
-        callerSignal.addEventListener('abort', () => callController.abort(), { once: true })
+        callerSignal.addEventListener('abort', forwardAbort, { once: true })
       }
 
       activeStreams.set(callController, { onAbort: options?.onAbort })
       let streamHandedOff = false
       const releaseStream = () => {
         activeStreams.delete(callController)
+        callerSignal?.removeEventListener('abort', forwardAbort)
       }
 
       try {
@@ -474,13 +478,12 @@ export function createUniworkKeysHost(deps: UniworkKeysHostDeps): UniworkKeysHos
         return res
       } catch (err) {
         if (err instanceof TransportError) {
-          if (
-            err.code === 'unauthorized' ||
-            err.code === 'device_revoked' ||
-            err.code === 'refresh_reused'
-          ) {
+          if (endsSession(err)) {
             clear(err.code === 'device_revoked' ? 'device-revoked' : 'sign-out')
             lastOwnerKey = ''
+          }
+          // a 401 that did not come from the UniWork server (gateway, captive portal) ends only this call
+          if (endsSession(err) || err.code === 'unauthorized') {
             throw new UniworkKeyError({
               code: err.code === 'device_revoked' ? 'device_revoked' : 'unauthorized',
               status: 401,
@@ -513,16 +516,14 @@ export function createUniworkKeysHost(deps: UniworkKeysHostDeps): UniworkKeysHos
 
     const run = (async (): Promise<readonly string[]> => {
       try {
+        // a proxy 404 credential_missing already threw inside fetchFor (and re-read R1)
         const res = await fetchFor(provider)(modelsUrl, {
           method: 'GET',
           headers: { Accept: 'application/json' },
+          signal: AbortSignal.timeout(KEY_PROXY_HEADER_TIMEOUT_MS),
         })
         if (runGen !== generation || runOwner !== lastOwnerKey) return []
         if (!res.ok) {
-          if (await isProxy404(res)) {
-            handleCredentialMissing(provider)
-            return []
-          }
           const prev = r5Cache.get(cacheKey)
           r5Cache.set(cacheKey, {
             stamp,
@@ -536,7 +537,7 @@ export function createUniworkKeysHost(deps: UniworkKeysHostDeps): UniworkKeysHos
         }
         const body = await res.json()
         if (runGen !== generation || runOwner !== lastOwnerKey) return []
-        const ids = parseProxyModelIds(body)
+        const ids = modelIdsOfListBody(body)
         r5Cache.set(cacheKey, {
           stamp,
           ids,
@@ -631,42 +632,54 @@ export function createUniworkKeysHost(deps: UniworkKeysHostDeps): UniworkKeysHos
     return credentialFor(provider) !== null
   }
 
-  function chosenModelFor(provider: AiProviderId, localChoice?: string | LocalModelChoice): string {
-    const item = credentialFor(provider)
-    const meta = AI_PROVIDERS.find((m) => m.id === provider)
-    const defaultModel = meta?.defaultModel ?? ''
-    const localModel =
-      typeof localChoice === 'string' ? localChoice.trim() : (localChoice?.model?.trim() ?? '')
-    const localAt =
-      typeof localChoice === 'object' && localChoice !== null ? (localChoice.updatedAt ?? 0) : 0
+  /** account + organization the desktop picks belong to, or null while not signed in */
+  function pickScope(): string | null {
+    const target = syncOwner()
+    if (!target) return null
+    const account = deps.accountKey?.() ?? deps.sessionKey?.() ?? ''
+    return `${target.profile.deploymentId}|${account}|${target.orgId}`
+  }
 
-    if (!item) {
-      return localModel || defaultModel
+  function localPickFor(provider: AiProviderId): LocalModelChoice | undefined {
+    const scope = pickScope()
+    if (!scope) return undefined
+    try {
+      const pick = pickStore.read(scope)[provider]
+      return pick && typeof pick.model === 'string' && pick.model.trim() ? pick : undefined
+    } catch {
+      return undefined
     }
+  }
+
+  function recordModelPick(provider: AiProviderId, model: string): void {
+    const scope = pickScope()
+    const picked = model.trim()
+    if (!scope || !picked) return
+    try {
+      pickStore.write(scope, provider, { model: picked, updatedAt: now() })
+    } catch {
+      // a store that cannot write keeps the previous pick
+    }
+  }
+
+  /**
+   * The model of an org-served provider: the newer of the desktop pick and the server row's
+   * `model` / `model_updated_at` (contract §6.1); then the provider default, then the first listed.
+   */
+  function chosenModelFor(provider: AiProviderId): string {
+    const item = credentialFor(provider)
+    const pick = localPickFor(provider)
+    const defaultModel = AI_PROVIDERS.find((m) => m.id === provider)?.defaultModel ?? ''
+    if (!item) return pick?.model.trim() || defaultModel
 
     const serverModel = item.model.trim()
     const parsedServerAt = item.modelUpdatedAt ? Date.parse(item.modelUpdatedAt) : Number.NaN
     const serverAt = Number.isFinite(parsedServerAt) ? parsedServerAt : 0
-
     let chosen: string
-    if (serverModel && localModel) {
-      if (typeof localChoice === 'string') {
-        chosen = localModel
-      } else if (localAt > 0 && serverAt > 0) {
-        chosen = localAt >= serverAt ? localModel : serverModel
-      } else if (localAt > 0) {
-        chosen = localModel
-      } else if (localModel !== defaultModel && !item.modelUpdatedAt) {
-        chosen = localModel
-      } else {
-        chosen = serverModel
-      }
-    } else if (serverModel) {
-      chosen = serverModel
-    } else if (localModel) {
-      chosen = localModel
+    if (serverModel && pick) {
+      chosen = (pick.updatedAt ?? 0) >= serverAt ? pick.model.trim() : serverModel
     } else {
-      chosen = defaultModel
+      chosen = serverModel || pick?.model.trim() || defaultModel
     }
 
     if (!chosen) {
@@ -682,20 +695,16 @@ export function createUniworkKeysHost(deps: UniworkKeysHostDeps): UniworkKeysHos
   }
 
   function sources(
-    localChoices?: Partial<Record<AiProviderId, string | LocalModelChoice>>,
-    onChanged?: () => void,
     excludeProviders?: ReadonlySet<AiProviderId>,
   ): Partial<Record<AiProviderId, AiModelSource>> {
-    if (onChanged) extraChangeListeners.add(onChanged)
     const target = syncOwner()
     if (!target || !r1State.hasByok || !r1State.byok.enabled) return {}
     const out: Partial<Record<AiProviderId, AiModelSource>> = {}
     for (const item of r1State.items) {
       if (excludeProviders?.has(item.provider)) continue
       const listInfo = readModelListState(target.ownerKey, item)
-      const chosen = chosenModelFor(item.provider, localChoices?.[item.provider])
       out[item.provider] = {
-        chosen,
+        chosen: chosenModelFor(item.provider),
         ...listInfo,
         origin: 'org',
       }
@@ -725,6 +734,7 @@ export function createUniworkKeysHost(deps: UniworkKeysHostDeps): UniworkKeysHos
     credentialFor,
     hasOrgSource,
     chosenModelFor,
+    recordModelPick,
     listModels,
     byokBaseUrl,
     fetchFor,

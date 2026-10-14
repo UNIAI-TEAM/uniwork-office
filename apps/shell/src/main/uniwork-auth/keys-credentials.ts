@@ -19,7 +19,7 @@ export interface UniworkCredentialItem {
   readonly label: string
   readonly baseUrl: string
   readonly keyHint: string
-  readonly defaultModel: string
+  /** the model chosen on UniWork for this key (wire `model`), '' when none */
   readonly model: string
   readonly modelUpdatedAt: string
   readonly createdAt: string
@@ -31,18 +31,6 @@ export interface UniworkCredentialsResponse {
   readonly byok: UniworkByokStatus
   /** True only when the server response carried the additive `byok` object (D1+). */
   readonly hasByok: boolean
-}
-
-/** Extracts model IDs from a vendor's `/models` JSON payload (`data[].id` or `models[].name`). */
-export function parseProxyModelIds(body: unknown): string[] {
-  const b = (body ?? {}) as { data?: unknown; models?: unknown }
-  const rows = Array.isArray(b.data) ? b.data : Array.isArray(b.models) ? b.models : []
-  const ids = rows.map((row) => {
-    const r = (row ?? {}) as { id?: unknown; name?: unknown }
-    const raw = typeof r.id === 'string' ? r.id : typeof r.name === 'string' ? r.name : ''
-    return raw.replace(/^models\//, '').trim()
-  })
-  return [...new Set(ids.filter(Boolean))]
 }
 
 export const EMPTY_CREDENTIALS: UniworkCredentialsResponse = Object.freeze({
@@ -87,19 +75,13 @@ export function parseCredentialsResponse(raw: unknown): UniworkCredentialsRespon
     if (!ORG_KEY_PROVIDER_IDS.has(provider) || seen.has(provider)) continue
     const baseUrl = typeof entry.base_url === 'string' ? entry.base_url.trim() : ''
     if (requiresBaseUrl.has(provider) && !baseUrl) continue
-    const serverModel =
-      typeof entry.default_model === 'string' && entry.default_model.trim()
-        ? entry.default_model.trim()
-        : typeof entry.model === 'string'
-          ? entry.model.trim()
-          : ''
+    const serverModel = typeof entry.model === 'string' ? entry.model.trim() : ''
     seen.add(provider)
     items.push({
       provider: provider as AiProviderId,
       label: typeof entry.label === 'string' ? entry.label : '',
       baseUrl,
       keyHint: typeof entry.key_hint === 'string' ? entry.key_hint : '',
-      defaultModel: serverModel,
       model: serverModel,
       modelUpdatedAt: typeof entry.model_updated_at === 'string' ? entry.model_updated_at : '',
       createdAt: typeof entry.created_at === 'string' ? entry.created_at : '',

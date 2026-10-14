@@ -1,7 +1,4 @@
-import {
-  proxyErrorBodyFields,
-  type AiTestFailureKind,
-} from '@genoffice/ai-provider'
+import { aiNoticeText, proxyErrorBodyFields, type AiTestFailureKind } from '@genoffice/ai-provider'
 
 /**
  * Error codes, status mapping and the en/vi state copy of the UniWork BYOK proxy (contract §2.3),
@@ -27,6 +24,7 @@ export type UniworkKeyErrorCode =
   | 'device_revoked'
   | 'forbidden'
   | 'cloud_unavailable'
+  | 'keys_unavailable'
   | 'credits_exhausted'
   | 'unknown'
 
@@ -43,13 +41,19 @@ const KNOWN_KEY_ERROR_CODES: ReadonlySet<string> = new Set<UniworkKeyErrorCode>(
   'device_revoked',
   'forbidden',
   'cloud_unavailable',
+  'keys_unavailable',
   'credits_exhausted',
   'unknown',
 ])
 
+/** the server's 503 codes for "saved keys cannot be used right now" (credential store, session check) */
+const KEYS_UNAVAILABLE_CODES: ReadonlySet<string> = new Set([
+  'ai_credentials_unavailable',
+  'unavailable',
+])
+
 interface StateCopy {
   readonly entitlementTitle: string
-  readonly entitlementBody: string
   readonly keyMissingTitle: string
   readonly keyMissingBody: string
   readonly keyRejectedTitle: string
@@ -61,6 +65,8 @@ interface StateCopy {
   readonly unreachableBody: string
   readonly cloudTitle: string
   readonly cloudBody: string
+  readonly keysUnavailableTitle: string
+  readonly keysUnavailableBody: string
   readonly sessionTitle: string
   readonly sessionBody: string
   readonly refusedTitle: string
@@ -68,15 +74,12 @@ interface StateCopy {
   readonly baseUrlBody: string
   readonly providerBody: string
   readonly creditsTitle: string
-  readonly creditsBody: string
   readonly unknownTitle: string
   readonly unknownBody: string
 }
 
 const STATE_COPY_EN: StateCopy = {
   entitlementTitle: 'AI is not in your plan',
-  entitlementBody:
-    "Your organization's UniWork plan does not include this AI feature. Ask your administrator.",
   keyMissingTitle: 'No AI key yet',
   keyMissingBody: 'Add an API key in AI settings to use the assistant.',
   keyRejectedTitle: 'The AI key was refused',
@@ -88,6 +91,9 @@ const STATE_COPY_EN: StateCopy = {
   unreachableBody: 'UniWork could not reach the AI provider. Try again in a moment.',
   cloudTitle: 'Cloud tool unavailable',
   cloudBody: 'This UniWork AI tool is not set up on the server yet.',
+  keysUnavailableTitle: 'Keys on UniWork unavailable',
+  keysUnavailableBody:
+    'The UniWork server cannot use your saved AI keys right now. Try again in a moment.',
   sessionTitle: 'Session expired',
   sessionBody: 'Sign in to UniWork again to continue.',
   refusedTitle: 'Request refused',
@@ -95,16 +101,12 @@ const STATE_COPY_EN: StateCopy = {
   baseUrlBody: 'This base URL is not allowed. Use a public https:// address.',
   providerBody: 'This provider is not supported.',
   creditsTitle: 'AI credits used up',
-  creditsBody:
-    'Your organization has used all UniWork AI credits for this period. Ask your administrator, or wait until they renew.',
   unknownTitle: 'AI request failed',
   unknownBody: 'Something went wrong. Try again.',
 }
 
 const STATE_COPY_VI: StateCopy = {
   entitlementTitle: 'Gói không bao gồm AI',
-  entitlementBody:
-    'Gói UniWork của tổ chức bạn không bao gồm tính năng AI này. Hãy liên hệ quản trị viên.',
   keyMissingTitle: 'Chưa có khóa AI',
   keyMissingBody: 'Thêm khóa API trong Cài đặt AI để dùng trợ lý.',
   keyRejectedTitle: 'Khóa AI bị từ chối',
@@ -116,6 +118,9 @@ const STATE_COPY_VI: StateCopy = {
   unreachableBody: 'UniWork không kết nối được tới nhà cung cấp AI. Hãy thử lại sau ít phút.',
   cloudTitle: 'Công cụ đám mây chưa sẵn sàng',
   cloudBody: 'Công cụ UniWork AI này chưa được cấu hình trên máy chủ.',
+  keysUnavailableTitle: 'Chưa dùng được khóa trên UniWork',
+  keysUnavailableBody:
+    'Máy chủ UniWork hiện chưa dùng được khóa AI bạn đã lưu. Hãy thử lại sau ít phút.',
   sessionTitle: 'Phiên đã hết hạn',
   sessionBody: 'Hãy đăng nhập lại UniWork để tiếp tục.',
   refusedTitle: 'Yêu cầu bị từ chối',
@@ -123,8 +128,6 @@ const STATE_COPY_VI: StateCopy = {
   baseUrlBody: 'Không cho phép Base URL này. Hãy dùng một địa chỉ https:// công khai.',
   providerBody: 'Nhà cung cấp này không được hỗ trợ.',
   creditsTitle: 'Đã hết tín dụng AI',
-  creditsBody:
-    'Tổ chức của bạn đã dùng hết tín dụng UniWork AI của kỳ này. Hãy liên hệ quản trị viên hoặc chờ kỳ mới.',
   unknownTitle: 'Yêu cầu AI thất bại',
   unknownBody: 'Đã xảy ra lỗi. Hãy thử lại.',
 }
@@ -146,6 +149,7 @@ export function errorKindForKeyCode(code: UniworkKeyErrorCode): UniworkKeyErrorK
       return 'rate_limit'
     case 'provider_unreachable':
     case 'cloud_unavailable':
+    case 'keys_unavailable':
       return 'unreachable'
     case 'base_url_refused':
       return 'bad_url'
@@ -163,7 +167,6 @@ export class UniworkKeyError extends Error {
   readonly status: number
   readonly serverCode?: string | undefined
   readonly retryAfterSeconds?: number | undefined
-  readonly retryAfterSec?: number | undefined
   readonly errorKind: UniworkKeyErrorKind
 
   constructor(opts: {
@@ -180,7 +183,6 @@ export class UniworkKeyError extends Error {
     if (opts.serverCode !== undefined) this.serverCode = opts.serverCode
     if (opts.retryAfterSeconds !== undefined) {
       this.retryAfterSeconds = opts.retryAfterSeconds
-      this.retryAfterSec = opts.retryAfterSeconds
     }
     this.errorKind = errorKindForKeyCode(opts.code)
   }
@@ -204,12 +206,13 @@ export function describeUniworkKeyError(
   providerLabel?: string,
 ): string {
   const copy = lang === 'vi' ? STATE_COPY_VI : STATE_COPY_EN
+  const noticeLang = lang === 'vi' ? 'vi' : 'en'
   let title: string
   let body: string
   switch (err.code) {
     case 'entitlement_required':
       title = copy.entitlementTitle
-      body = copy.entitlementBody
+      body = aiNoticeText('not_entitled', noticeLang)
       break
     case 'credential_missing':
       title = copy.keyMissingTitle
@@ -234,6 +237,10 @@ export function describeUniworkKeyError(
       title = copy.cloudTitle
       body = copy.cloudBody
       break
+    case 'keys_unavailable':
+      title = copy.keysUnavailableTitle
+      body = copy.keysUnavailableBody
+      break
     case 'unauthorized':
     case 'device_revoked':
       title = copy.sessionTitle
@@ -254,7 +261,7 @@ export function describeUniworkKeyError(
       break
     case 'credits_exhausted':
       title = copy.creditsTitle
-      body = copy.creditsBody
+      body = aiNoticeText('credits_exhausted', noticeLang)
       break
     default:
       title = copy.unknownTitle
@@ -264,7 +271,7 @@ export function describeUniworkKeyError(
   return providerLabel ? `${providerLabel} — ${title}: ${body}` : `${title}: ${body}`
 }
 
-function parseRetryAfterHeader(raw: string | null): number | undefined {
+export function parseRetryAfterHeader(raw: string | null): number | undefined {
   if (!raw) return undefined
   const trimmed = raw.trim()
   if (!trimmed) return undefined
@@ -279,6 +286,7 @@ function parseRetryAfterHeader(raw: string | null): number | undefined {
 }
 
 function keyErrorCodeForStatus(status: number, serverCode?: string): UniworkKeyErrorCode {
+  if (serverCode && KEYS_UNAVAILABLE_CODES.has(serverCode)) return 'keys_unavailable'
   if (serverCode && KNOWN_KEY_ERROR_CODES.has(serverCode)) {
     return serverCode as UniworkKeyErrorCode
   }

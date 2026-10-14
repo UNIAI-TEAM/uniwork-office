@@ -2,7 +2,11 @@
  * Wraps a streaming `Response` body so that aborting `signal` mid-stream
  * immediately rejects any pending `reader.read()` and cancels the underlying stream.
  */
-export function bindResponseToSignal(res: Response, signal: AbortSignal, onDone: () => void): Response {
+export function bindResponseToSignal(
+  res: Response,
+  signal: AbortSignal,
+  onDone: () => void,
+): Response {
   const body = res.body
   if (!body) {
     onDone()
