@@ -52,6 +52,7 @@ describe('Sheets ribbon status message under the interface scale', () => {
     // `.excel-header`, `.status-bar` and `.copilot` (checked against ExcelShell.tsx / App.tsx, R3-1)
     const outside = new Set([
       'body',
+      'html.uw-disc-on body, html.uw-remote-bar-on body',
       '.app-shell',
       '.format-cells-dialog',
       '.recovery-dialog',
@@ -62,6 +63,7 @@ describe('Sheets ribbon status message under the interface scale', () => {
       '.app-toast',
       '.find-replace-panel',
       '.threaded-comments-pane',
+      '.sheets-server-comments',
       '.thread-hover-card',
       '.format-cells-dialog.print-dialog',
       '.engine-unavailable',
@@ -70,7 +72,7 @@ describe('Sheets ribbon status message under the interface scale', () => {
     for (const m of css
       .replace(/\/\*[\s\S]*?\*\//g, '')
       .matchAll(/(^|\n)([^\n{}@/*][^{}]*?)\s*\{([^{}]*)\}/g)) {
-      const selector = (m[2] ?? '').trim()
+      const selector = (m[2] ?? '').replace(/\s+/g, ' ').trim()
       const body = m[3] ?? ''
       if (
         /\d(?:vh|vw|dvh|svh)\b/.test(body) &&
