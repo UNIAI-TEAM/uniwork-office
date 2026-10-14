@@ -121,6 +121,15 @@ describe('aiRun from the IPC transport: one idle per ending path', () => {
     expect(states()).toEqual(['running', 'idle'])
   })
 
+  it('the server run id a chunk carries names the run in every later payload', () => {
+    const { emit } = setup()
+    emit({ type: 'ping', runId: 'run-srv-1' })
+    emit({ type: 'delta', text: 'hi' })
+    emit({ type: 'done' })
+    expect(states()).toEqual(['running', 'running', 'idle'])
+    expect(sent.slice(1).map((p) => p.run_id)).toEqual(['run-srv-1', 'run-srv-1'])
+  })
+
   it('every chunk kind keeps the watchdog armed: a 250 s wait with pings does not time out', () => {
     const { emit, cb } = setup()
     for (let i = 0; i < 50; i++) {

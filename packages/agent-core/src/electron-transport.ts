@@ -32,6 +32,8 @@ export interface IpcStreamChunk {
   retryAfterSec?: number
   /** normalized stop reason on 'done' ('max_tokens' = cut off by the token limit) */
   stopReason?: string
+  /** the server's run id of this turn (UniWork AI `X-UniWork-AI-Run`), on the chunk after it is known */
+  runId?: string
 }
 
 /** The request forwarded to the main process to start one streaming turn. */
@@ -140,6 +142,8 @@ export function createIpcTransport<S>(options: IpcTransportOptions<S>): AgentTra
       }
       const unsubscribe = options.onStream((chunk) => {
         if (chunk.requestId !== requestId || settled) return
+        // the shell main process read the server's run id: aiRun reports it instead of the local one
+        if (chunk.runId) aiRun.setRunId(chunk.runId)
         if (chunk.type === 'ping') {
           armSilence()
         } else if (chunk.type === 'delta') {

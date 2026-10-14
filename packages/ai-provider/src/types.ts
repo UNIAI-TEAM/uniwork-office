@@ -242,4 +242,6 @@ export interface AiStreamChunk {
   retryAfterSec?: number
   /** normalized stop reason carried on 'done' ('max_tokens' = output cut off by the token limit) */
   stopReason?: string
+  /** the server's run id of this turn (UniWork AI `X-UniWork-AI-Run`), on the chunk after it is known */
+  runId?: string
 }

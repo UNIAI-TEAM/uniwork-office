@@ -1,6 +1,7 @@
 import { extname } from 'node:path'
 import { getUiLang } from '@genoffice/i18n'
 import {
+  UNIWORK_RUN_HEADER,
   UniworkError,
   aiStreamErrorFields,
   streamUniwork,
@@ -414,8 +415,21 @@ export function createUniworkAiStreams(deps: UniworkAiStreamDeps): UniworkAiStre
       }
       if (controller.signal.aborted) throw new Error('aborted')
       let stopReason: string | undefined
+      // the renderer's aiRun names the turn by the server's run id as soon as an answer carries it
+      let reportedRunId: string | undefined
+      const turnTransport: UniworkChatTransport = {
+        post: async (req) => {
+          const response = await transport.post(req)
+          const runId = response.headers.get(UNIWORK_RUN_HEADER)
+          if (runId && runId !== reportedRunId) {
+            reportedRunId = runId
+            send({ type: 'ping', runId })
+          }
+          return response
+        },
+      }
       await stream(
-        transport,
+        turnTransport,
         {
           scope: resolved.scope,
           messages: request.messages,

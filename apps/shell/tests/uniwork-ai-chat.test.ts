@@ -383,6 +383,30 @@ describe('ai:stream uniwork runner', () => {
     expect(chunks.every((c) => c.requestId === 'req-1')).toBe(true)
   })
 
+  it('tells the renderer the server run id once a response carries it (desktop aiRun)', async () => {
+    const withRun = (run: string) =>
+      new Response('data: [DONE]\n\n', {
+        status: 200,
+        headers: { 'Content-Type': 'text/event-stream', 'X-UniWork-AI-Run': run },
+      })
+    const answers = [withRun('run-1'), withRun('run-1'), withRun('run-2')]
+    const streams = runner(
+      async (transport, request, cb) => {
+        for (let i = 0; i < 3; i++) {
+          await transport.post({ scope: request.scope, headers: {}, body: '{}', signal: cb.signal })
+        }
+      },
+      { transport: () => ({ post: async () => answers.shift()! }) },
+    )
+    const { chunks, done } = run(streams)
+    await done
+    expect(chunks.filter((c) => c.runId).map((c) => [c.type, c.runId])).toEqual([
+      ['ping', 'run-1'],
+      ['ping', 'run-2'],
+    ])
+    expect(chunks.at(-1)).toMatchObject({ type: 'done' })
+  })
+
   it('forwards notices and a turn reset as their own chunks', async () => {
     const streams = runner(async (_t, _r, cb) => {
       cb.onNotice?.({ kind: 'step', step: 1, limit: 20 })
