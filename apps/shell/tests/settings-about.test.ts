@@ -33,7 +33,11 @@ afterEach(() => {
 
 const openLegalDoc = vi.fn(async (_doc: string) => true)
 
-async function openAbout(lang: Lang, aboutLabel: string): Promise<void> {
+async function openAbout(
+  lang: Lang,
+  aboutLabel: string,
+  pinned: string | null = null,
+): Promise<void> {
   openLegalDoc.mockClear()
   window.aiOffice = {
     openLegalDoc,
@@ -41,6 +45,7 @@ async function openAbout(lang: Lang, aboutLabel: string): Promise<void> {
     getDefaultSaveDir: async () => '',
     getAiPanelPrefs: async () => ({ fontSize: 'default', spellcheck: true }),
     getUpdateChannel: async () => 'beta',
+    getPinnedUpdateChannel: async () => pinned,
     getAppVersion: async () => '1.2.3',
     getUpdateState: async () => null,
   } as unknown as HomeApi
@@ -77,6 +82,33 @@ async function openAbout(lang: Lang, aboutLabel: string): Promise<void> {
 }
 
 describe('Settings > About', () => {
+  it('lets a build without a pinned channel pick Stable or Beta', async () => {
+    await openAbout('en', 'About')
+    const pane = host.querySelector('.set-pane')!
+    expect(pane.textContent).toContain('Update Channel')
+    expect(pane.textContent).toContain('Beta')
+    expect(pane.querySelector('.set-about-channel-pinned')).toBeNull()
+  })
+
+  it('shows a pinned channel read-only, with a note that it follows its own channel', async () => {
+    await openAbout('en', 'About', 'dev')
+    const pane = host.querySelector('.set-pane')!
+    expect(pane.querySelector('.set-about-channel-pinned')?.textContent).toBe('Dev')
+    expect(pane.textContent).toContain(
+      'This build always receives the newest build of its channel.',
+    )
+    expect(pane.textContent).not.toContain('Beta')
+    expect(pane.textContent).not.toContain('Stable')
+    expect(pane.querySelector('[role="combobox"], select, .set-dd')).toBeNull()
+  })
+
+  it('has the pinned-channel strings in every locale', () => {
+    for (const [lang, table] of Object.entries(strings)) {
+      expect(table.channelDev, `${lang}.channelDev`).toBeTruthy()
+      expect(table.updateChannelPinnedNote, `${lang}.note`).toBeTruthy()
+    }
+  })
+
   it('shows the product name, logo, version, channel and a copyright line, in English', async () => {
     await openAbout('en', 'About')
     const pane = host.querySelector('.set-pane')!

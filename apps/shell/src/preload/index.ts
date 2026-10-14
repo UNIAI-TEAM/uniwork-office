@@ -515,6 +515,10 @@ const homeApi: HomeApi = {
     const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.getUpdateChannel)
     return result === 'beta' ? 'beta' : 'stable'
   },
+  async getPinnedUpdateChannel() {
+    const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.getPinnedUpdateChannel)
+    return typeof result === 'string' && result !== '' ? result : null
+  },
   async setUpdateChannel(channel) {
     // validated inline: a runtime import from ../shared/update-api would be
     // shared with the update.ts preload entry and get split into a chunk,

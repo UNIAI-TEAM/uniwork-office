@@ -375,7 +375,12 @@ import {
   setDockHost,
   takeTornTab,
 } from './detached-windows'
-import { applyUpdateChannel, checkForUpdatesNow, initAutoUpdater } from './updater'
+import {
+  applyUpdateChannel,
+  checkForUpdatesNow,
+  getPinnedUpdateChannel,
+  initAutoUpdater,
+} from './updater'
 import { isUpdateChannel, type UpdateChannel } from '../shared/update-api'
 
 /**
@@ -4769,7 +4774,13 @@ function registerHomeIpc(): void {
 
   ipcMain.handle(HOME_CHANNELS.getUpdateChannel, (): UpdateChannel => currentUpdateChannel())
 
+  ipcMain.handle(HOME_CHANNELS.getPinnedUpdateChannel, (): string | null =>
+    getPinnedUpdateChannel(),
+  )
+
   ipcMain.handle(HOME_CHANNELS.setUpdateChannel, (_event, channel: unknown) => {
+    // a pinned build always follows its own channel; the choice is not stored
+    if (getPinnedUpdateChannel() !== null) return
     if (!isUpdateChannel(channel) || channel === currentUpdateChannel()) return
     cachedUpdateChannel = channel
     writeAppSetting(APP_SETTINGS_PATH(), 'updateChannel', channel)

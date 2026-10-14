@@ -139,13 +139,31 @@ meta job runs it first, so an invalid value fails before any build. electron-bui
 file: an upgrade replaces it, an uninstall removes it, and the user's own choice in the user
 data folder is untouched by both.
 
-## Auto-update is off
+## Auto-update from the GitHub releases
 
-Dev / beta builds are pre-releases without an update feed: the workflow never sets
-`GENOFFICE_UPDATE_URL` (the config refuses it together with a release channel), packages with
-`--publish never`, and `check-build-brand.mjs` fails when an `app-update.yml` or `latest*.yml`
-is in the output. Users install a newer build by downloading it again. Turning updates on
-needs signed builds (Squirrel.Mac requires them) and a feed host, which are backlog.
+Dev / beta builds update from the GitHub releases of this repository. The workflow sets
+`UNIWORK_UPDATE_URL=https://github.com/<repository>`, which `apps/shell/electron-builder.cjs`
+turns into the github publish provider on the release channel: the Windows and Linux apps get a
+`resources/app-update.yml` for this repository, and electron-builder writes `<channel>.yml`
+(Windows) and `<channel>-linux.yml` (AppImage) next to the installers. Packaging still runs
+with `--publish never`; the collect steps add those two files to the uploads and the publish job
+attaches them to the release with the installers.
+
+The app pins its feed to its own channel and accepts pre-releases
+(`apps/shell/src/main/updater.ts`): electron-updater reads the repository's release feed,
+takes the newest release whose tag has the same pre-release id (`v<version>-dev.<n>` for a dev
+build) and downloads the installer `<channel>.yml` names. A beta build never takes a dev release,
+and the Settings stable / beta switch does not apply to these builds.
+
+`check-build-brand.mjs --update-feed github:<repository>` fails when the Windows or Linux
+`app-update.yml` is missing or names another feed, when the mac app carries any feed, and when a
+channel file lists a file that is not in the output (the uploaded names must be the ones the
+feed points at).
+
+Not updated in place: the unsigned mac app (Squirrel.Mac installs updates only into a signed
+app, so the mac build has no feed and a manual check opens https://uniworkos.com/office) and the
+deb (upgrade with `apt install ./<new>.deb`). Any other HTTPS `UNIWORK_UPDATE_URL` is a
+generic feed prefix, meant for a stable CDN later.
 
 ## Signing hooks
 
