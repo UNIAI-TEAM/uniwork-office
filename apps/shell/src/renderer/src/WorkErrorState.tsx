@@ -235,8 +235,15 @@ export function WorkSkeleton({
   shape?: WorkSkeletonShape
   rows?: number
 }): ReactElement {
+  const { t } = useI18n()
+  // a status, so a screen reader hears that something is loading, not silence
   return (
-    <div className={`wb-work-skeleton wb-block is-${shape}`} aria-busy="true">
+    <div
+      className={`wb-work-skeleton wb-block is-${shape}`}
+      role="status"
+      aria-busy="true"
+      aria-label={t('wbLoading')}
+    >
       {shape === 'agenda' ? <span className="wb-skel wb-skel-head" /> : null}
       {shape === 'card' ? (
         <span className="wb-skel-line">

@@ -203,6 +203,10 @@ describe('DeskInTray', () => {
     expect(host.querySelector('.wb-pill.is-danger')!.textContent).toBe('Conflict')
     const resolve = button('Resolve')!
     expect(resolve.className).toContain('wb-btn-secondary')
+    // a screen reader hears which document Resolve is for
+    expect(document.getElementById(resolve.getAttribute('aria-describedby')!)?.textContent).toBe(
+      'Proposal',
+    )
     await act(async () => resolve.click())
     await act(async () => {
       for (let i = 0; i < 10; i++) await Promise.resolve()
@@ -326,6 +330,10 @@ describe('DeskInTray', () => {
     expect(host.textContent).not.toContain('Sign in')
     expect(host.querySelector('.wb-ov-partial')).toBeNull()
     expect(host.querySelector('.wb-work-skeleton')).not.toBeNull()
+    // loading is announced, not silent
+    const skel = host.querySelector('.wb-work-skeleton')!
+    expect(skel.getAttribute('role')).toBe('status')
+    expect(skel.getAttribute('aria-label')).toBe('Loading…')
   })
 
   it('says there is no workspace instead of inviting sign-in', async () => {

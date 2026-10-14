@@ -102,7 +102,7 @@ export const zh = {
   wbNotesPlaceholder: '快速记下要记住的事…',
   wbNotesAdd: '保存笔记',
   wbNotesEmpty: '还没有笔记',
-  wbNotesBodyLabel: '笔记内容',
+  wbNotesBodyLabel: '笔记 {n}',
   wbNotesDelete: '删除笔记',
   wbEditedAt: '编辑于 {time}',
   wbEditedYesterday: '昨天编辑',

@@ -97,7 +97,7 @@ export const vi = {
   wbNotesPlaceholder: 'Ghi nhanh điều cần nhớ…',
   wbNotesAdd: 'Lưu ghi chú',
   wbNotesEmpty: 'Chưa có ghi chú nào',
-  wbNotesBodyLabel: 'Nội dung ghi chú',
+  wbNotesBodyLabel: 'Ghi chú {n}',
   wbNotesDelete: 'Xóa ghi chú',
   wbEditedAt: 'Sửa lúc {time}',
   wbEditedYesterday: 'Sửa hôm qua',

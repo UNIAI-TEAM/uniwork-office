@@ -246,13 +246,19 @@ export function DeskInTray({
         empty()
       ) : (
         <ul ref={listRef} className="wb-ov-list">
-          {visible.map((r) => {
+          {visible.map((r, i) => {
             const d = describe(r)
+            const rowTitleId = `${titleId}-row${i}`
             return (
               <li key={d.key} className="wb-row wb-desk-row">
                 {d.icon}
                 <span className="wb-desk-row-main">
-                  <button type="button" className="wb-row-title wb-desk-row-title" onClick={d.open}>
+                  <button
+                    type="button"
+                    id={rowTitleId}
+                    className="wb-row-title wb-desk-row-title"
+                    onClick={d.open}
+                  >
                     {d.title}
                   </button>
                   {d.sub ? <span className="wb-desk-reason">{d.sub}</span> : null}
@@ -264,6 +270,7 @@ export function DeskInTray({
                   <button
                     type="button"
                     className="wb-btn wb-btn-secondary wb-btn-sm wb-desk-row-act"
+                    aria-describedby={rowTitleId}
                     onClick={d.open}
                   >
                     {t('wbDeskResolve')}

@@ -167,15 +167,17 @@ export function NotesPane({
           tabIndex={-1}
           aria-label={t('wbNotesCount', { count: items.length })}
         >
-          {items.map((note) => {
+          {items.map((note, i) => {
             const when = editedWhen(note.updatedAt, dateLocale)
             return (
               <li key={note.id} className="wb-block wb-note" data-note-id={note.id}>
                 <textarea
                   value={note.body}
                   rows={1}
-                  aria-label={t('wbNotesBodyLabel')}
+                  // each note its own name in a screen reader's list of fields
+                  aria-label={t('wbNotesBodyLabel', { n: i + 1 })}
                   onChange={(e) => edit(note.id, e.target.value)}
+                  onBlur={flush}
                 />
                 <div className="wb-note-foot">
                   <span className="wb-row-sub wb-num">{t(when.key, when.params)}</span>

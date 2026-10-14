@@ -97,7 +97,7 @@ export const en = {
   wbNotesPlaceholder: 'Jot down something to remember…',
   wbNotesAdd: 'Save note',
   wbNotesEmpty: 'No notes yet',
-  wbNotesBodyLabel: 'Note text',
+  wbNotesBodyLabel: 'Note {n}',
   wbNotesDelete: 'Delete note',
   wbEditedAt: 'Edited {time}',
   wbEditedYesterday: 'Edited yesterday',
