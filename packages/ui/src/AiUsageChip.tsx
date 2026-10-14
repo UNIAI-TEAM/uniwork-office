@@ -34,6 +34,21 @@ function usageText(usage: AgentTokenUsage): string {
   return parts.join(' ')
 }
 
+/** What a screen reader says for the chip: "Token usage for this reply: 1.2k input tokens, 300 output tokens". */
+export function usageAriaLabel(
+  usage: AgentTokenUsage,
+  lang: Lang,
+  session?: boolean | undefined,
+): string {
+  const labels = AI_USAGE_LABELS[lang]
+  const parts: string[] = []
+  if (usage.inputTokens !== undefined)
+    parts.push(`${formatTokenCount(usage.inputTokens)} ${labels.inputTokens}`)
+  if (usage.outputTokens !== undefined)
+    parts.push(`${formatTokenCount(usage.outputTokens)} ${labels.outputTokens}`)
+  return `${session ? labels.sessionTitle : labels.runTitle}: ${parts.join(', ')}`
+}
+
 /**
  * Small numeric chip showing tokens billed for a reply (or a session total).
  * Renders nothing when the provider reported nothing — usage is optional data,
@@ -53,7 +68,12 @@ export function AiUsageChip({
   if (!text) return null
   const title = session ? AI_USAGE_LABELS[lang].sessionTitle : AI_USAGE_LABELS[lang].runTitle
   return (
-    <span className="ai-usage-chip" title={title}>
+    <span
+      className="ai-usage-chip"
+      title={title}
+      role="img"
+      aria-label={usageAriaLabel(usage, lang, session)}
+    >
       {session ? 'Σ ' : ''}
       {text}
     </span>

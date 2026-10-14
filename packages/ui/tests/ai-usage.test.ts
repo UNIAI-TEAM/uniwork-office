@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addTokenUsage, formatTokenCount } from '../src/AiUsageChip'
+import { addTokenUsage, formatTokenCount, usageAriaLabel } from '../src/AiUsageChip'
 import { AI_USAGE_LABELS } from '../src/strings-ai-usage'
 
 describe('formatTokenCount', () => {
@@ -47,6 +47,22 @@ describe('AI_USAGE_LABELS', () => {
     for (const [lang, labels] of Object.entries(AI_USAGE_LABELS)) {
       expect(labels.runTitle.length, lang).toBeGreaterThan(0)
       expect(labels.sessionTitle.length, lang).toBeGreaterThan(0)
+      expect(labels.inputTokens.length, lang).toBeGreaterThan(0)
+      expect(labels.outputTokens.length, lang).toBeGreaterThan(0)
     }
+  })
+})
+
+describe('usageAriaLabel', () => {
+  it('spells out input and output tokens instead of the arrows', () => {
+    expect(usageAriaLabel({ inputTokens: 1234, outputTokens: 300 }, 'en')).toBe(
+      'Token usage for this reply: 1.2k input tokens, 300 output tokens',
+    )
+  })
+
+  it('names the session total and skips a side the provider never reported', () => {
+    expect(usageAriaLabel({ outputTokens: 7 }, 'en', true)).toBe(
+      'Session token usage: 7 output tokens',
+    )
   })
 })
