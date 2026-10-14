@@ -80,3 +80,18 @@ export {
 export { streamText } from './stream-text'
 export type { StreamTextOptions, StreamTextOutcome } from './stream-text'
 export type { IpcStreamChunk, IpcStreamStart, IpcTransportOptions } from './electron-transport'
+export {
+  getEntryResultChipView,
+  isTurnEnded,
+  panelLiveAnnouncement,
+  resolveEntryResultChip,
+  turnEnded,
+} from './uniwork-panel'
+export type {
+  EntryResultChipView,
+  PanelLiveAnnouncementInput,
+  ResultChip,
+  ResultChipStoppedKey,
+  UniworkPanelEntryLike,
+  UniworkTranslateFn,
+} from './uniwork-panel'

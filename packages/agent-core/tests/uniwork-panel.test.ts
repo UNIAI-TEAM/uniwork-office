@@ -4,9 +4,10 @@ import {
   isTurnEnded,
   panelLiveAnnouncement,
   resolveEntryResultChip,
+  resultChip,
+  type ResultChipOutput,
   type UniworkPanelEntryLike,
 } from '../src/index.js'
-import type { ResultChip } from '../src/result-chip.js'
 
 const mockTranslate = (key: string, vars?: Record<string, string | number>): string => {
   if (!vars || Object.keys(vars).length === 0) return `[${key}]`
@@ -48,11 +49,10 @@ describe('uniwork-panel shared helper (RF1-14, RF1-19)', () => {
   })
 
   describe('resolveEntryResultChip & getEntryResultChipView', () => {
-    const answerChip: ResultChip = {
-      kind: 'answer',
-      tone: 'neutral',
-      labelKey: 'aiResultAnswer',
-    }
+    const answerChip: ResultChipOutput = resultChip({
+      provider: 'uniwork',
+      text: 'A',
+    })
 
     it('returns null while entry is streaming or turn has not ended', () => {
       const streamingEntries: UniworkPanelEntryLike[] = [
@@ -70,26 +70,26 @@ describe('uniwork-panel shared helper (RF1-14, RF1-19)', () => {
     })
 
     it('resolves precomputed resultChip or computes from fallback input when turn ended', () => {
+      const editedChip = resultChip({
+        provider: 'uniwork',
+        mutated: true,
+        stopped: true,
+        text: 'A',
+      })
       const entries: UniworkPanelEntryLike[] = [
         { role: 'user', text: 'Q' },
         {
           role: 'assistant',
           text: 'A',
           streaming: false,
-          resultChip: {
-            kind: 'edited',
-            tone: 'success',
-            labelKey: 'aiResultEditedCellsCount',
-            labelMeta: { count: 4 },
-            stoppedKey: 'aiStoppedNoMoreChanges',
-          },
+          resultChip: editedChip,
         },
       ]
       const view = getEntryResultChipView(entries, 1, false, mockTranslate)
       expect(view).toEqual({
-        chip: entries[1].resultChip,
-        labelText: '[aiResultEditedCellsCount:count=4]',
-        stoppedText: '[aiStoppedNoMoreChanges]',
+        chip: editedChip,
+        labelText: '[aiResultEdited]',
+        stoppedText: '[aiRunStopped]',
       })
 
       const fallbackEntries: UniworkPanelEntryLike[] = [
@@ -98,41 +98,38 @@ describe('uniwork-panel shared helper (RF1-14, RF1-19)', () => {
       ]
       const fallbackView = getEntryResultChipView(fallbackEntries, 1, false, mockTranslate, {
         provider: 'uniwork',
-        module: 'pdf',
-        toolCalls: [],
-        assistantText: 'Computed answer',
       })
-      expect(fallbackView?.chip.kind).toBe('answer')
+      expect(fallbackView?.chip.chip).toBe('answer')
       expect(fallbackView?.labelText).toBe('[aiResultAnswer]')
       expect(fallbackView?.stoppedText).toBeNull()
     })
 
     it('narrows labelKey !== null when user stopped before any write (stopped-only chip)', () => {
+      const stoppedOnlyChip = resultChip({
+        provider: 'uniwork',
+        stopped: true,
+        text: '',
+      })
       const entries: UniworkPanelEntryLike[] = [
         { role: 'user', text: 'Q' },
         {
           role: 'assistant',
           text: '',
           streaming: false,
-          resultChip: {
-            kind: null,
-            tone: 'neutral',
-            labelKey: null,
-            stoppedKey: 'aiStoppedNoMoreChanges',
-          },
+          resultChip: stoppedOnlyChip,
         },
       ]
       const view = getEntryResultChipView(entries, 1, false, mockTranslate)
       expect(view).toEqual({
-        chip: entries[1].resultChip,
+        chip: stoppedOnlyChip,
         labelText: null,
-        stoppedText: '[aiStoppedNoMoreChanges]',
+        stoppedText: '[aiRunStopped]',
       })
     })
   })
 
   describe('panelLiveAnnouncement (RF1-19)', () => {
-    it('returns waitLine or status first while running', () => {
+    it('returns waitLine or status first while running, joining streaming notes when both exist', () => {
       expect(
         panelLiveAnnouncement({
           entries: [
@@ -150,6 +147,22 @@ describe('uniwork-panel shared helper (RF1-14, RF1-19)', () => {
           translate: mockTranslate,
         }),
       ).toBe('Đang ghi các ô…')
+
+      expect(
+        panelLiveAnnouncement({
+          entries: [
+            {
+              role: 'assistant',
+              text: '',
+              streaming: true,
+              waitLine: 'Thử lại sau 30 giây.',
+              notes: [{ text: 'Cuộc trò chuyện đã khởi động lại.' }],
+            },
+          ],
+          busy: true,
+          translate: mockTranslate,
+        }),
+      ).toBe('Thử lại sau 30 giây. Cuộc trò chuyện đã khởi động lại.')
     })
 
     it('returns latest streaming note when waitLine is empty', () => {
@@ -179,11 +192,10 @@ describe('uniwork-panel shared helper (RF1-14, RF1-19)', () => {
             role: 'assistant',
             text: longAnswer,
             streaming: false,
-            resultChip: {
-              kind: 'answer',
-              tone: 'neutral',
-              labelKey: 'aiResultAnswer',
-            },
+            resultChip: resultChip({
+              provider: 'uniwork',
+              text: longAnswer,
+            }),
           },
         ],
         busy: false,
@@ -198,10 +210,14 @@ describe('uniwork-panel shared helper (RF1-14, RF1-19)', () => {
       const announced = panelLiveAnnouncement({
         entries: [
           { role: 'user', text: 'Hi' },
-          { role: 'assistant', text: 'BYOK reply', streaming: false, resultChip: null },
+          { role: 'assistant', text: 'BYOK reply', streaming: false },
         ],
         busy: false,
         translate: mockTranslate,
+        lastEntryChipInput: {
+          provider: 'openai',
+          text: 'BYOK reply',
+        },
       })
       expect(announced).toBe('')
     })
