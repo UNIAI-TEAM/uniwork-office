@@ -3733,7 +3733,8 @@ export function registerSheetsAiIpc(): void {
     const stored = readJson<Partial<AiSettings> & LegacyAiSettings>(SETTINGS_PATH(), {})
     const settings = resolveAiSettings(stored, defaultAiSettings())
     // the stored provider stays selected even while its config is incomplete (the picker and
-    // Settings show what is missing); only an unknown id degrades to genspark
+    // Settings show what is missing); only an unknown id degrades to genspark. A saved `uniwork`
+    // stays `uniwork` (never UniAI): a send with it ends in the ai_disabled error below
     settings.provider = selectedProvider(settings)
     return settings
   })

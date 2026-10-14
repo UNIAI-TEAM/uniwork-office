@@ -111,7 +111,6 @@ import {
   refreshUniworkCloudStatus,
   resolveAiSettings,
   selectedProvider,
-  uniworkAiAvailable,
   maxOutputTokensOf,
   sanitizeAiSettings,
   sanitizeCliPath,
@@ -3883,7 +3882,8 @@ export function registerAiIpc(): void {
     // the stored provider stays selected even while its config is incomplete (the picker and
     // Settings show what is missing); only an unknown id degrades to genspark
     // the account's UniWork AI pick overlays the file's BYOK provider; while the entry is not
-    // offered, selectedProvider degrades it (the pick itself stays stored for when it returns)
+    // offered it stays `uniwork` (no silent switch to UniAI): the panel shows the unavailable
+    // state and Send is blocked until it returns
     if ((isUniworkAiEditor(event) || wantsUniworkPick(options)) && uniworkAiChoiceStore?.read())
       settings.provider = 'uniwork'
     settings.provider = selectedProvider(settings)
@@ -3919,21 +3919,10 @@ export function registerAiIpc(): void {
       return
     }
     if (sanitized.provider === 'uniwork') {
-      // saved per account, never in the file: the file keeps the BYOK provider it had
+      // saved per account, never in the file: the file keeps the BYOK provider it had; while the
+      // entry is hidden the renderer still holds `uniwork` and saves it back, which keeps the pick
       uniworkAiChoiceStore?.write(true)
       sanitized.provider = fileAiProvider()
-    } else if (!uniworkAiAvailable()) {
-      // while UniWork AI is hidden the renderer only had the degraded provider to save back: that
-      // is no choice against the account's pick, which stays stored for when the entry returns,
-      // and the BYOK provider underneath stays the file's (key and model edits still go through);
-      // any other provider is a real choice: it is written and the pick is cleared
-      if (uniworkAiChoiceStore?.read()) {
-        if (sanitized.provider === selectedProvider({ ...sanitized, provider: 'uniwork' })) {
-          sanitized.provider = fileAiProvider()
-        } else {
-          uniworkAiChoiceStore.write(false)
-        }
-      }
     } else if (
       // a window without the pick (home: My AI) clears it only by changing the provider; an editor
       // tab and the Settings window both saw the pick, so any provider they save is the choice
