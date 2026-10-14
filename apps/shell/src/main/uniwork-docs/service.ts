@@ -249,7 +249,28 @@ export interface UniworkDocsServiceDeps {
   client?: UniworkDocsClient
   sleep?(ms: number): Promise<void>
   now?(): number
+  /**
+   * ADVISOR D4 (a): this build's packaging flag (the wiring passes
+   * app.isPackaged), read only by the dev-only S6 display fixture. Absent reads
+   * as packaged, so a test that does not install the wiring stays inert.
+   */
+  isPackaged?: boolean
 }
+
+/**
+ * ADVISOR D4 (a): the bar kinds the dev-only S6 fixture may display. Anything
+ * else in the JSON file is dropped so a typo cannot inject an unknown bar.
+ * Never in product copy: no string, no i18n key, no UI mention.
+ */
+const DEV_FIXTURE_BAR_KINDS: ReadonlySet<string> = new Set([
+  'updated',
+  'newer-dirty',
+  'newer-ai',
+  'now-clean',
+  'reload-failed',
+  'revoked',
+  'deleted',
+])
 
 /** states whose working copy holds work UniWork does not have yet */
 const KEEP_LOCAL_STATES: ReadonlySet<string> = new Set([
@@ -587,6 +608,12 @@ export class UniworkDocsService {
   private readonly ownEcho = new Map<string, Set<string>>()
   /** documents locked by a server verdict (403/404 revoked, 410 deleted) */
   private readonly remoteLocked = new Map<string, 'revoked' | 'deleted'>()
+  /** ADVISOR D4 (a): the parsed dev-only fixture and the mtime it was read at */
+  private devFixture: {
+    file: string
+    mtimeMs: number
+    bars: Record<string, UniworkRemoteBar>
+  } | null = null
   /** per path, the last editor state the poll reported (the AI settle edge) */
   private readonly editorAi = new Map<string, { aiRunning: boolean; aiEpoch: number }>()
   /** one guarded reload per path at a time; a notice queued behind it runs after */
@@ -723,6 +750,10 @@ export class UniworkDocsService {
    * because the feed cursor never replays it.
    */
   private withRemote(status: UniworkDocStatus): UniworkDocStatus {
+    // ADVISOR D4 (a): the dev-only display fixture wins for a matching path; a
+    // packaged build never reads the env or the file (see devRemoteFixture)
+    const fixture = this.devRemoteFixture(status.path)
+    if (fixture) return { ...status, remote: fixture }
     const key = pathKey(status.path)
     if (this.remoteBars.has(key)) {
       const bar = this.remoteBars.get(key)
@@ -731,6 +762,43 @@ export class UniworkDocsService {
     const doc = this.store.lookup(status.path)
     const rebuilt = doc ? this.rebuiltRemote(doc.binding) : null
     return rebuilt ? { ...status, remote: rebuilt } : status
+  }
+
+  /**
+   * ADVISOR D4 (a): the dev-only S6 display fixture. When this build is
+   * unpackaged and UNIWORK_DEV_REMOTE_FIXTURE names a JSON file of
+   * `{ "<abs path>": UniworkRemoteBar }`, a matching path's status shows that
+   * bar, so the visual stage can reach every S6 state. Display only: it never
+   * writes a binding, never reloads, never sends a request; the file is parsed
+   * once and re-read when its mtime moves. A packaged build returns before the
+   * env is read, so the fixture is unreachable there. Code only - no product
+   * string, no i18n key, no UI copy.
+   */
+  private devRemoteFixture(path: string): UniworkRemoteBar | null {
+    if (this.deps.isPackaged !== false) return null
+    const file = process.env.UNIWORK_DEV_REMOTE_FIXTURE
+    if (!file) return null
+    try {
+      const mtimeMs = statSync(file).mtimeMs
+      if (
+        !this.devFixture ||
+        this.devFixture.file !== file ||
+        this.devFixture.mtimeMs !== mtimeMs
+      ) {
+        const parsed: unknown = JSON.parse(readFileSync(file, 'utf8'))
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
+        const bars: Record<string, UniworkRemoteBar> = {}
+        for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+          const bar = value as UniworkRemoteBar | null
+          if (bar && typeof bar === 'object' && DEV_FIXTURE_BAR_KINDS.has(bar.kind)) bars[key] = bar
+        }
+        this.devFixture = { file, mtimeMs, bars }
+      }
+      return this.devFixture.bars[path] ?? null
+    } catch {
+      // a missing or malformed fixture is not an error: show the real statuses
+      return null
+    }
   }
 
   /** the bar a binding alone can prove: a lock verdict, or a known newer head */

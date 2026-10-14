@@ -106,8 +106,16 @@ export interface UniworkDocsWiring {
   discussionTabPaths?(sender: { id: number }): readonly string[] | null
   /** G8-11: the shell webContents that has `path` open as a tab, for the reveal push */
   discussionTarget?(path: string): DiscussionPushTarget | null
-  /** G8-11: narrow / restore the active editor view of the sender's window */
+  /**
+   * G8-11: narrow / restore the active editor view of the sender's window
+   */
   setDiscussionPanel?(sender: { id: number }, panel: { open: boolean; width: number }): void
+  /**
+   * ADVISOR D4 (a): this build's packaging flag (index.ts passes
+   * app.isPackaged), read by the dev-only S6 display fixture. Optional and
+   * absent = packaged, so a wiring that does not set it keeps the fixture off.
+   */
+  isPackaged?: boolean
   lang(): string
   defaultSaveDir(): string
   /** every file path a tab or detached editor window shows */
@@ -544,6 +552,8 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     // placeholder is what index.ts installs today)
     editorStateOf: (path) => wiring.editorStateOf(path),
     activePath: () => wiring.activePath(),
+    // ADVISOR D4 (a): the dev-only fixture gate; index.ts passes app.isPackaged
+    isPackaged: wiring.isPackaged,
     // S18: main owns the native dialog (Electron); the service stays Electron-free
     pickUploadFile: () => pickUploadFile(wiring),
     pushUploadProgress: (event) => push(UNIWORK_DOC_CHANNELS.uploadProgress, event),

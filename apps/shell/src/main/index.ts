@@ -3875,6 +3875,8 @@ function uniworkDocsWiring() {
     },
     lang: () => currentLang(),
     defaultSaveDir: () => defaultSaveDir(),
+    // ADVISOR D4 (a): the gate of the dev-only S6 fixture (unreachable packaged)
+    isPackaged: app.isPackaged,
     openPaths,
     closePath: async (path: string) => {
       const tabsClosed = tabManager ? await tabManager.closeTabsShowing(path) : true
