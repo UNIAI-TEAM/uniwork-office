@@ -9,6 +9,7 @@ import {
   type UniworkCloudState,
   type UniworkCloudStatus,
   type UniworkCloudTool,
+  type UniworkCloudToolFlags,
   type UniworkCloudTransport,
 } from '@genoffice/ai-provider'
 import { isAllowedOrigin, type DeploymentProfile } from './deployment'
@@ -125,6 +126,11 @@ function optNum(value: unknown): number | null {
   if (value === undefined || value === null) return null
   if (typeof value !== 'number' || !Number.isFinite(value)) throw malformed()
   return value
+}
+
+/** `tools.chat` of a cloud answer or status: the server offers UniWork AI chat to this organization */
+export function cloudChatEnabled(status: { tools: UniworkCloudToolFlags }): boolean {
+  return status.tools.chat === true
 }
 
 export function parseCloudStatus(raw: unknown): CloudServerStatus {
@@ -405,6 +411,7 @@ export function statusFromServer(
   if (server.credits?.limit === 0) {
     return { ...UNIWORK_CLOUD_SIGNED_OUT, state: 'not-entitled', credits: null, ...display }
   }
+  // chat (in the list) alone is enough: UniWork AI is usable even with no cloud tool configured
   const anyTool = UNIWORK_CLOUD_TOOLS.some((tool) => server.tools[tool])
   const exhausted = server.credits?.remaining === 0
   return {

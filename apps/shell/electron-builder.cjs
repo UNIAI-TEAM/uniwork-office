@@ -3,11 +3,13 @@
  * auto-update feed URL can be injected at build time instead of living in
  * the repo).
  *
- * GENOFFICE_UPDATE_URL — public base URL of the update channel (the generic
- * provider prefix that serves latest.yml / latest-mac.yml). Required for
- * release builds; CI provides it as a repository secret. For local release
- * builds put it in apps/shell/electron-builder.env (gitignored) — the
- * electron-builder CLI loads that file automatically.
+ * UNIWORK_UPDATE_URL — where the packaged app looks for updates. A
+ * https://github.com/<owner>/<repo> URL selects electron-updater's github
+ * provider (the GitHub Releases of that repository, where the dev / beta
+ * installers are published); any other HTTPS base URL is a generic provider
+ * prefix that serves latest.yml / latest-mac.yml (a CDN). The release workflow
+ * sets it; for local builds put it in apps/shell/electron-builder.env
+ * (gitignored) — the electron-builder CLI loads that file automatically.
  *
  * When the variable is unset (forks, PR smoke builds, plain local packaging)
  * the publish config is omitted: electron-builder then bakes no
@@ -42,7 +44,7 @@ function normalizeHttpsBaseUrl(name, value) {
   }
 }
 
-const updateUrl = process.env.GENOFFICE_UPDATE_URL
+const updateUrl = normalizeHttpsBaseUrl('UNIWORK_UPDATE_URL', process.env.UNIWORK_UPDATE_URL)
 const fontCdnUrl = normalizeHttpsBaseUrl(
   'GENOFFICE_FONT_CDN_URL',
   process.env.GENOFFICE_FONT_CDN_URL,
@@ -795,11 +797,6 @@ if (releaseChannel) {
       `UNIWORK_RELEASE_CHANNEL must be one of ${RELEASE_CHANNELS.join(', ')}, got "${releaseChannel}"`,
     )
   }
-  // Dev / beta builds carry no update feed: no app-update.yml is baked in, so
-  // nothing polls an update server.
-  if (updateUrl) {
-    throw new Error('GENOFFICE_UPDATE_URL must stay unset for dev / beta release builds')
-  }
   // An exported but empty signing variable counts as unset. electron-builder
   // keeps CSC_LINK="" as a certificate path and the mac keychain import then
   // fails on the project directory, so empty values are dropped before it
@@ -807,11 +804,18 @@ if (releaseChannel) {
   for (const key of RELEASE_SIGNING_ENV) {
     if (process.env[key] === '') delete process.env[key]
   }
-  // No publish target at all, even when GH_TOKEN / GITHUB_TOKEN is in the
-  // shell (electron-builder would otherwise pick GitHub and bake a feed).
+  // No publish target unless UNIWORK_UPDATE_URL names one (set below), even
+  // when GH_TOKEN / GITHUB_TOKEN is in the shell (electron-builder would
+  // otherwise pick GitHub and bake a feed). Uploading stays with the workflow
+  // (--publish never); electron-builder only writes the feed files.
   config.publish = null
-  // The dmgs are the only mac downloads; the zips exist for the update feed.
+  // The dmgs are the only mac downloads; the zips exist for the update feed,
+  // and Squirrel.Mac installs an update only into a signed app. The mac build
+  // therefore carries no feed; with a github UNIWORK_UPDATE_URL it reads the
+  // repository's releases itself (uniworkReleaseFeed below) and offers the
+  // newer dmg. Restore the zip and drop this once mac builds are signed.
   config.mac.target = config.mac.target.filter((entry) => entry.target === 'dmg')
+  config.mac.publish = null
   const macSigned = Boolean(process.env.CSC_LINK || process.env.CSC_NAME)
   const winSigned = Boolean(winSignMode || process.env.WIN_CSC_LINK || process.env.CSC_LINK)
   const unsignedLabel = (signed) => (signed ? '' : '_unsigned')
@@ -871,14 +875,24 @@ function assertReleaseVersion() {
   }
 }
 
+const GITHUB_REPOSITORY_URL = /^https:\/\/github\.com\/([A-Za-z0-9-]+)\/([A-Za-z0-9._-]+)$/
+
+/**
+ * The publish entry UNIWORK_UPDATE_URL selects. The channel is the release
+ * channel (dev / beta builds) or latest (stable): electron-builder writes
+ * <channel>.yml / <channel>-linux.yml next to the installers and app-update.yml
+ * carries the channel, so a dev build only ever reads dev feeds. On GitHub the
+ * updater picks the newest release whose tag has the same pre-release id
+ * (v<version>-dev.<n>), so beta and stable never pick a dev build.
+ */
+function updatePublishConfig(url, channel) {
+  const github = GITHUB_REPOSITORY_URL.exec(url)
+  if (github) return { provider: 'github', owner: github[1], repo: github[2], channel }
+  return { provider: 'generic', url, channel }
+}
+
 if (updateUrl) {
-  config.publish = [
-    {
-      provider: 'generic',
-      url: updateUrl.replace(/\/+$/, ''),
-      channel: 'latest',
-    },
-  ]
+  config.publish = [updatePublishConfig(updateUrl, releaseChannel || 'latest')]
 }
 
 // CI's "-c.extraMetadata.version=..." CLI override deep-merges with this block,
@@ -890,6 +904,17 @@ const extraMetadata = {
   homepage: legal.homepage,
 }
 if (fontCdnUrl) extraMetadata.genofficeFontCdn = { baseUrl: fontCdnUrl }
+// The unsigned mac release app's update notice (src/main/release-notifier.ts)
+// reads the releases of this repository and channel. Every platform's
+// package.json carries it; only the mac app, which has no app-update.yml, reads it.
+const releaseFeed = updateUrl && releaseChannel ? GITHUB_REPOSITORY_URL.exec(updateUrl) : null
+if (releaseFeed) {
+  extraMetadata.uniworkReleaseFeed = {
+    owner: releaseFeed[1],
+    repo: releaseFeed[2],
+    channel: releaseChannel,
+  }
+}
 config.extraMetadata = extraMetadata
 
 module.exports = config

@@ -116,6 +116,8 @@ const opencodeLogo = (
 const LOGOS: Record<AiProviderId, ReactNode> = {
   // UniAI (internal id `genspark`): the shared UniAI mark
   genspark: <UniAiMark />,
+  // UniWork AI: the same UniWork mark until its provider row gets its own (panel UI work)
+  uniwork: <UniAiMark />,
   codex: (
     <svg
       viewBox="0 0 24 24"

@@ -17,8 +17,10 @@ export const UPDATE_CHANNELS = {
 
 /** 'manual' = automatic updating is not working for this version (repeated
  * failures, e.g. a signing-identity change the installed app refuses) — the
- * dialog guides the user to download the installer from the releases page */
-export type UpdatePhase = 'available' | 'downloading' | 'downloaded' | 'error' | 'manual'
+ * dialog guides the user to download the installer from the releases page.
+ * 'notify' = a build that cannot update itself (the unsigned mac app) learned
+ * of a newer release — the dialog offers its installer to install by hand */
+export type UpdatePhase = 'available' | 'downloading' | 'downloaded' | 'error' | 'manual' | 'notify'
 
 /** window copy is localized in the main process (owner of UI language) */
 export interface UpdateUiStrings {
@@ -33,6 +35,8 @@ export interface UpdateUiStrings {
   retry: string
   manualDesc: string
   openDownload: string
+  notifyDesc: string
+  notifyDownload: string
 }
 
 export interface UpdateUiState {

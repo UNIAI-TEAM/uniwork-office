@@ -61,4 +61,9 @@ export const hi = {
   aiErrUnsupported: 'UniWork AI अभी {module} में यह नहीं कर सकता।',
   aiErrViewOnlyEdit:
     'आपके पास इस दस्तावेज़ की केवल देखने की पहुँच है, इसलिए AI इसे संपादित नहीं कर सकता।',
+  // UniWork AI question limits (the façade takes text up to 8,000 characters)
+  aiErrQuestionTooLong:
+    'आपका अनुरोध UniWork AI के लिए बहुत लंबा है। इसे 8,000 वर्णों से कम करके फिर भेजें।',
+  aiErrQuestionRejected: 'UniWork AI यह अनुरोध स्वीकार नहीं कर सका। इसे बदलकर फिर भेजें।',
+  aiUniworkImagesNotSent: 'छवियाँ UniWork AI को नहीं भेजी जातीं; केवल आपका टेक्स्ट भेजा गया।',
 } satisfies Record<keyof typeof zh, string>

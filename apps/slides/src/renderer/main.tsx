@@ -18,8 +18,11 @@ import '@genoffice/ui/collab.css'
 import './styles.css'
 import { isWeb } from './capabilities'
 import { applyAiPanelPrefs, installScreenTips } from '@genoffice/ui'
+import { mirrorUniworkAiFlag } from '@genoffice/ai-provider/browser'
 
 installScreenTips()
+// this renderer's own provider list shows the UniWork AI entry only while the shell offers it
+mirrorUniworkAiFlag()
 
 // Canvas fillText never triggers @font-face downloads, so the bundled document fonts
 // (Carlito ↔ Calibri) must be loaded explicitly or Konva silently draws the fallback face.

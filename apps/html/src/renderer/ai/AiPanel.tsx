@@ -1,4 +1,6 @@
 import {
+  aiUniworkText,
+  isUniworkQuestionRefusal,
   aiPanelWidthAtPointer,
   AiPanelSideButton,
   AiModelPicker,
@@ -7,7 +9,13 @@ import {
 } from '@genoffice/ui'
 import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement, ReactNode } from 'react'
-import { AgentLoop, composeSkills } from '@genoffice/agent-core'
+import {
+  AgentLoop,
+  endsQuietly,
+  noticePatch,
+  type PanelNote,
+  composeSkills,
+} from '@genoffice/agent-core'
 import type { AgentImage } from '@genoffice/agent-core'
 import type { AiSettings } from '@genoffice/ai-provider'
 import { aiNoticeBody, aiNoticeKind } from '@genoffice/ai-provider/browser'
@@ -211,6 +219,10 @@ interface ChatEntry {
   text: string
   streaming?: boolean
   isError?: boolean
+  /** UniWork AI: the transport is waiting out a Retry-After; the run goes on, Stop is the only action */
+  waitLine?: string | undefined
+  /** UniWork AI: restarted conversation / provider boundary / dropped call, shown above the answer */
+  notes?: PanelNote[] | undefined
   /** the run failed and this user message was rolled back out of the model context */
   undelivered?: boolean
   /** instruction actually sent when it differs from the bubble text (sid-pinned Ask AI / queue batch); retries resend this */
@@ -716,7 +728,22 @@ export function AiPanel({
       captureSnapshot: () => depsRef.current.getSnapshot(),
       systemSuffix: () => aiLangDirective(langRef.current),
       events: {
-        onText: (text) => patchLast({ text }),
+        onText: (text) => patchLast({ text, waitLine: undefined }),
+        // transport notices (UniWork AI); langRef: the loop is created once, `lang` would go stale
+        onNotice: (notice) => {
+          // the question was not sent: it goes back into the composer for the user to send again
+          if (notice.kind === 'conversation-restarted')
+            setPrompt((current) => current || runDisplayRef.current)
+          patchLast(
+            (last) =>
+              noticePatch(
+                last,
+                notice,
+                (key, params) => aiUniworkText(langRef.current, key, params),
+                'HTML',
+              ) ?? {},
+          )
+        },
         onToolStart: (call) => {
           // Live "running" chip: replaced in place by onToolExecuted
           patchLast((last) => ({
@@ -753,7 +780,7 @@ export function AiPanel({
           })
         },
         onTurnEnd: () => {
-          patchLast({ streaming: false })
+          patchLast({ streaming: false, waitLine: undefined })
           setChat((prev) => [...prev, { role: 'assistant', text: '', streaming: true }])
         },
         onDone: ({ text, cancelled, turnLimit, truncated }) => {
@@ -768,7 +795,11 @@ export function AiPanel({
             : base
           patchLast((last) => ({
             streaming: false,
-            text: final || (last.tools?.length ? last.text : tGlobal('aiNoReply')),
+            waitLine: undefined,
+            // a restarted conversation or UniWork AI being off ends the turn on purpose: the note is the whole reply
+            text:
+              final ||
+              (last.tools?.length || endsQuietly(last.notes) ? last.text : tGlobal('aiNoReply')),
             // A stop mid-tool can leave a running placeholder behind — drop it
             tools: last.tools?.filter((tl) => !tl.running),
           }))
@@ -781,7 +812,11 @@ export function AiPanel({
         onError: (error) => {
           // once a tool ran the message was delivered; a later turn failing is not a send failure
           // a setup state (no key / no model) is not a send failure either: no "not sent" pill
-          const undelivered = runToolsRef.current.length === 0 && !aiNoticeKind(error)
+          // a refused question (too long, rejected) is no send failure to retry as is: it goes back
+          // into the composer to be shortened or fixed, as the message says
+          const refused = isUniworkQuestionRefusal(error)
+          if (refused) setPrompt((current) => current || runDisplayRef.current)
+          const undelivered = runToolsRef.current.length === 0 && !aiNoticeKind(error) && !refused
           setChat((prev) => {
             const next = [...prev]
             for (let i = undelivered ? next.length - 1 : -1; i >= 0; i--) {
@@ -796,6 +831,7 @@ export function AiPanel({
               next[next.length - 1] = {
                 ...last,
                 streaming: false,
+                waitLine: undefined,
                 text: error,
                 isError: true,
                 tools: last.tools?.filter((tl) => !tl.running),
@@ -1310,7 +1346,7 @@ export function AiPanel({
             )
           }
           const hasTools = (entry.tools?.length ?? 0) > 0
-          if (!entry.text && !entry.streaming && !hasTools) return null
+          if (!entry.text && !entry.streaming && !hasTools && !entry.notes?.length) return null
           const isLast = i === chat.length - 1
           // Action row appears once per completed reply: on the turn's final segment only
           // (mid-turn segments have a following assistant entry; the live turn ends when !busy)
@@ -1322,6 +1358,17 @@ export function AiPanel({
               key={i}
               className={`ai-msg ai-msg-assistant${entry.isError && !aiNoticeKind(entry.text) ? ' ai-msg-error' : ''}${entry.streaming ? ' ai-msg-streaming' : ''}`}
             >
+              {/* one persistent, empty-until-needed live region: a node that mounts with its text is often not announced */}
+              {
+                <div className="ai-msg-live" aria-live="polite">
+                  {entry.notes?.map((note, k) => (
+                    <div key={`un${k}`} className="ai-msg-notice">
+                      {note.text}
+                    </div>
+                  ))}
+                  {entry.waitLine && <div className="ai-msg-notice">{entry.waitLine}</div>}
+                </div>
+              }
               {!entry.text && entry.streaming ? (
                 <span className="ai-typing-row">
                   <AiTypingIndicator label={hasTools ? t('aiWorking') : t('aiThinking')} />

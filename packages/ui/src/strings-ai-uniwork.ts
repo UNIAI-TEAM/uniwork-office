@@ -54,3 +54,21 @@ const translate = createI18n(aiUniworkStrings)
 export function aiUniworkText(lang: Lang, key: AiUniworkStringKey, params?: Params): string {
   return translate(lang, key, params)
 }
+
+const refusalMessages = new Set(
+  Object.values(aiUniworkStrings).flatMap((table) => [
+    table.aiErrQuestionTooLong,
+    table.aiErrQuestionRejected,
+  ]),
+)
+
+/**
+ * Whether a chat error is the UniWork AI "this question cannot go out as written" message
+ * (`question_too_long`, `question_rejected`): sending the same text again cannot help, so a panel
+ * offers no Retry and puts the question back in the composer. The panels only get the error text,
+ * which the transport wrote in the UI language, so it is matched against every language's copy.
+ */
+export function isUniworkQuestionRefusal(message: string | null | undefined): boolean {
+  const text = message?.trim()
+  return !!text && refusalMessages.has(text)
+}

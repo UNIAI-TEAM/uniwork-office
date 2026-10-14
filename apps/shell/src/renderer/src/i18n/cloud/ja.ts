@@ -38,4 +38,5 @@ export const ja = {
   aiTestErrUnavailable: 'サービスが応答しません。後でもう一度お試しください',
   aiTestErrMisconfigured:
     '設定が不足しています。サービスのアドレスとアカウント欄を確認してください',
+  setAiUniworkNote: 'UniWork AI は組織のプランを使用します。キーやモデルの設定は不要です。',
 } satisfies Record<keyof typeof zh, string>

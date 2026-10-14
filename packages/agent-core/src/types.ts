@@ -35,7 +35,17 @@ export interface AgentImage {
 }
 
 export type AgentMessage =
-  | { role: 'user'; text: string; images?: AgentImage[] | undefined }
+  | {
+      role: 'user'
+      text: string
+      images?: AgentImage[] | undefined
+      /**
+       * the user's own words when `text` also carries the editor context the loop appended
+       * (text = instruction + context); a transport with a question cap (UniWork AI) keeps
+       * these whole and clips only the context
+       */
+      instruction?: string | undefined
+    }
   /** reasoning: opaque vendor thinking captured during the turn; interleaved-thinking
    * models (MiniMax M3, DeepSeek V4) degrade in tool loops unless it is echoed back */
   | {
@@ -92,10 +102,19 @@ export interface AgentPhase {
 
 // ---- LLM transport (how one model turn is streamed; app supplies the impl) ----
 
+/**
+ * What a request is for. Absent = an agent turn of the loop. `summary` (the
+ * loop's context compaction) and `one-shot` (streamText writers) are not the
+ * user's question: a transport whose server keeps the conversation (UniWork
+ * AI) refuses them instead of sending them as one.
+ */
+export type AgentRequestPurpose = 'summary' | 'one-shot'
+
 export interface AgentStreamRequest {
   system: string
   messages: AgentMessage[]
   tools: AgentToolDef[]
+  purpose?: AgentRequestPurpose | undefined
 }
 
 export interface AgentStreamCallbacks {
@@ -108,9 +127,43 @@ export interface AgentStreamCallbacks {
   onPhase?(phase: AgentPhase): void
   /** normalized stop reason of the turn ('max_tokens' = cut off by the token limit); transports may omit this */
   onStopReason?(reason: string): void
+  /** a non-fatal turn notice (UniWork AI: dropped tool calls, a Retry-After wait, a new conversation); transports may omit this */
+  onNotice?(notice: AgentStreamNotice): void
+  /**
+   * the transport restarts the same turn (UniWork AI resends after a Retry-After wait): drop this
+   * turn's streamed text, reasoning and tool calls; history is untouched. Transports may omit this.
+   */
+  onTurnReset?(): void
   onDone(): void
   onError(error: string): void
 }
+
+/** a tool call the UniWork AI server refused to hand to the client (`x_uniwork.dropped_tool_calls[]`) */
+export interface AgentDroppedToolCall {
+  index: number
+  name: string
+  reason: 'view_only' | 'not_allowlisted'
+}
+
+/**
+ * Non-fatal information a transport reports during a turn. Only the UniWork AI adapter sends
+ * these today; a consumer ignores a kind it does not know.
+ * - `dropped-tool-calls`: calls the server filtered out of this answer, with their reason
+ * - `step`: tool rounds used by the run after this answer, and the cap
+ * - `rate-limit-wait`: the transport waits `seconds` before resending (attempt 1..3); no retry button
+ * - `conversation-restarted`: the server conversation expired; the question was not sent
+ * - `conversation-boundary`: this turn starts a new server conversation after a provider switch
+ * - `uniwork-off`: UniWork AI is off for this organization or format (hide it, no error chip)
+ * - `images-not-sent`: the question's images were left out (UniWork AI takes text only)
+ */
+export type AgentStreamNotice =
+  | { kind: 'dropped-tool-calls'; calls: AgentDroppedToolCall[] }
+  | { kind: 'step'; step: number; limit: number }
+  | { kind: 'rate-limit-wait'; seconds: number; attempt: number }
+  | { kind: 'conversation-restarted' }
+  | { kind: 'conversation-boundary'; provider: string }
+  | { kind: 'uniwork-off' }
+  | { kind: 'images-not-sent' }
 
 export interface AgentStreamHandle {
   /** abort the in-flight turn; the transport must still emit onDone afterwards */

@@ -8,6 +8,7 @@ export type {
 } from './types'
 export {
   AI_PROVIDERS,
+  UNIWORK_PROVIDER_META,
   cloudToolsEnabled,
   DEFAULT_MAX_OUTPUT_TOKENS,
   MAX_MAX_OUTPUT_TOKENS,
@@ -46,6 +47,32 @@ export type {
   UniworkCloudStatus,
   UniworkCloudTool,
 } from './uniwork-cloud'
+export {
+  UNIWORK_CONVERSATION_HEADER,
+  UNIWORK_MAX_RATE_LIMIT_WAITS,
+  UNIWORK_PROVIDER_ID,
+  UNIWORK_RETRY_AFTER_CAP_SECONDS,
+  UNIWORK_RUN_HEADER,
+} from './uniwork/types'
+export type {
+  UniworkChatRequest,
+  UniworkChatTransport,
+  UniworkDroppedToolCall,
+  UniworkExtension,
+  UniworkFormat,
+  UniworkNotice,
+  UniworkScope,
+  UniworkTerminal,
+  UniworkToolPolicy,
+  UniworkTurnIds,
+  UniworkWireCode,
+} from './uniwork/types'
+export { streamUniwork } from './uniwork/protocol'
+export { UniworkError, isUniworkError, uniworkErrorKey } from './uniwork/errors'
+export { uniworkConversations } from './uniwork/conversation'
+export { setUniworkAiAvailable, uniworkAiAvailable } from './providers'
+export { mirrorUniworkAiFlag } from './uniwork/flag-mirror'
+export type { UniworkAiFlagBridge } from './uniwork/flag-mirror'
 export { aiNoticeBody, aiNoticeKind, aiNoticeKindForCloud, aiNoticeText } from './ai-notice'
 export type { AiNoticeKind } from './ai-notice'
 export { normalizeAiTestFailureKind } from './ai-test-failure'

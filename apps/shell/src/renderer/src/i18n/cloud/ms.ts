@@ -37,4 +37,6 @@ export const ms = {
   aiTestErrLimit: 'Had pembekal dicapai. Cuba lagi nanti',
   aiTestErrUnavailable: 'Perkhidmatan tidak memberi respons. Cuba lagi nanti',
   aiTestErrMisconfigured: 'Tetapan belum lengkap: semak alamat perkhidmatan dan medan akaun',
+  setAiUniworkNote:
+    'UniWork AI menggunakan pelan organisasi anda. Tidak perlu menetapkan kunci atau model.',
 } satisfies Record<keyof typeof zh, string>

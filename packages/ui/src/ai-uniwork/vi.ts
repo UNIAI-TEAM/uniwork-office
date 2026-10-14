@@ -62,4 +62,8 @@ export const vi = {
     'UniWork AI vừa được tắt cho tài liệu này nên lượt đã dừng sau bước hiện tại.',
   aiErrUnsupported: 'UniWork AI chưa làm được thao tác này trong {module}.',
   aiErrViewOnlyEdit: 'Bạn chỉ có quyền xem tài liệu này nên AI không sửa được.',
+  // UniWork AI question limits (the façade takes text up to 8,000 characters)
+  aiErrQuestionTooLong: 'Yêu cầu quá dài với UniWork AI. Hãy rút gọn dưới 8.000 ký tự rồi gửi lại.',
+  aiErrQuestionRejected: 'UniWork AI không nhận được yêu cầu này. Hãy sửa lại yêu cầu rồi gửi lại.',
+  aiUniworkImagesNotSent: 'UniWork AI không nhận ảnh; chỉ phần chữ đã được gửi.',
 } satisfies Record<keyof typeof zh, string>

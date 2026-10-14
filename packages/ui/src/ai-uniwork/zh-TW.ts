@@ -55,4 +55,8 @@ export const zhTW = {
   aiErrCapabilityOff: '此文件的 UniWork AI 剛被關閉，因此本次執行在目前步驟後停止。',
   aiErrUnsupported: 'UniWork AI 暫時還無法在{module}中執行此操作。',
   aiErrViewOnlyEdit: '你對此文件只有檢視權限，因此 AI 無法編輯。',
+  // UniWork AI question limits (the façade takes text up to 8,000 characters)
+  aiErrQuestionTooLong: '你的要求對 UniWork AI 來說太長了。請縮短到 8,000 個字元以內再傳送。',
+  aiErrQuestionRejected: 'UniWork AI 無法接受此要求。請修改後再傳送。',
+  aiUniworkImagesNotSent: '圖片不會傳送給 UniWork AI，只傳送了你的文字。',
 } satisfies Record<keyof typeof zh, string>
