@@ -53,6 +53,7 @@ import {
   deckTemplateLabel,
 } from './deck-templates'
 import { createElectronTransport } from './transport'
+import { oneShotStreamRequest } from './llm-request'
 import { renderSlidesToPngBase64 } from '../export-render'
 import {
   isQcEnabled,
@@ -904,13 +905,7 @@ export function AiPanel({
         signal?.addEventListener('abort', onAbort, { once: true })
         // If invoke itself rejects (IPC-layer failure), fail immediately instead of waiting out the timeout
         window.slidesApi
-          .aiStream({
-            requestId,
-            settings,
-            system,
-            messages: [{ role: 'user', text: user }],
-            ...(maxTokens ? { maxTokens } : {}),
-          })
+          .aiStream(oneShotStreamRequest({ requestId, settings, system, user, maxTokens }))
           .catch((e) =>
             finish({
               ok: false,
