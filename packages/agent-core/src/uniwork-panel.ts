@@ -10,12 +10,12 @@ export type ResultChipStoppedKey = NonNullable<ResultChipOutput['stoppedKey']>
 
 export interface UniworkPanelEntryLike {
   role: string
-  streaming?: boolean
-  text?: string
-  waitLine?: string
-  status?: string
-  notes?: ReadonlyArray<{ text: string }>
-  resultChip?: ResultChipOutput | null
+  streaming?: boolean | undefined
+  text?: string | undefined
+  waitLine?: string | undefined
+  status?: string | undefined
+  notes?: ReadonlyArray<{ text: string }> | undefined
+  resultChip?: ResultChipOutput | null | undefined
 }
 
 export type UniworkTranslateFn = (
@@ -33,7 +33,7 @@ export interface PanelLiveAnnouncementInput {
   entries: ReadonlyArray<UniworkPanelEntryLike>
   busy: boolean
   translate: UniworkTranslateFn
-  lastEntryChipInput?: ResultChipInput | null
+  lastEntryChipInput?: ResultChipInput | null | undefined
 }
 
 function isEmptyResultChip(chip: ResultChipOutput | null | undefined): boolean {

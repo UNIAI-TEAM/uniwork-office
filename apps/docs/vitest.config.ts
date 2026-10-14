@@ -56,6 +56,9 @@ export default defineConfig({
       ),
       '@genoffice/ai-provider': local('../../packages/ai-provider/src/index.ts'),
       '@genoffice/i18n': local('../../packages/i18n/src/index.ts'),
+      '@genoffice/ui/ai-uniwork-composer.css': local(
+        '../../packages/ui/src/ai-uniwork-composer/ai-uniwork-composer.css',
+      ),
       '@genoffice/ui/collab.css': local('../../packages/ui/src/collab/collab.css'),
       '@genoffice/ui/collab': local('../../packages/ui/src/collab/index.ts'),
       '@genoffice/ui': local('../../packages/ui/src/index.ts'),

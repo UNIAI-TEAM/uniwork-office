@@ -1,4 +1,5 @@
 import {
+  aiUniworkText,
   aiPanelWidthAtPointer,
   AiPanelSideButton,
   AiModelPicker,
@@ -7,6 +8,7 @@ import {
   composerNoteFor,
 } from '@genoffice/ui'
 import React, { useEffect, useRef, useState } from 'react'
+import '@genoffice/ui/ai-uniwork-composer.css'
 import {
   AiComposer,
   AiQueueStrip,
@@ -19,8 +21,10 @@ import {
   useChatRunQueue,
 } from '@genoffice/ui'
 import { aiNoticeBody, aiNoticeKind } from '@genoffice/ai-provider/browser'
-import { resultChip } from '@genoffice/agent-core'
-import { aiUniworkText } from '@genoffice/i18n/ai-uniwork'
+import {
+  getEntryResultChipView,
+  panelLiveAnnouncement as computePanelLiveAnnouncement,
+} from '@genoffice/agent-core'
 import type {
   UniworkCloudStatusBridge,
   UniworkCloudStatusSnapshot,
@@ -511,14 +515,15 @@ export function AiChatPanel({
   const [provider, setProvider] = useState<string | undefined>(undefined)
   useEffect(() => {
     let cancelled = false
-    void MODEL_BRIDGE.getSettings()
-      .then((s) => {
-        if (!cancelled) setProvider(s?.provider)
-      })
-      .catch(() => {})
-    const off = MODEL_BRIDGE.onSettingsChanged?.((s) => {
-      if (!cancelled) setProvider(s?.provider)
-    })
+    const sync = () => {
+      void MODEL_BRIDGE.getSettings()
+        .then((s) => {
+          if (!cancelled) setProvider(s?.provider)
+        })
+        .catch(() => {})
+    }
+    sync()
+    const off = MODEL_BRIDGE.onSettingsChanged?.(sync)
     return () => {
       cancelled = true
       off?.()
@@ -527,6 +532,7 @@ export function AiChatPanel({
   const isUniwork = provider === 'uniwork'
 
   const [cloudSnapshot, setCloudSnapshot] = useState<UniworkCloudStatusSnapshot | null>(null)
+  const [composerAnnouncement, setComposerAnnouncement] = useState('')
   useEffect(() => {
     const bridge = readUniworkCloudStatus()
     if (!bridge) return
@@ -537,15 +543,19 @@ export function AiChatPanel({
         if (!cancelled) setCloudSnapshot(snap)
       })
       .catch(() => {})
-    const off = bridge.onChange((snap) => {
+    const off = bridge.onChange?.((snap) => {
       if (!cancelled) setCloudSnapshot(snap)
     })
     return () => {
       cancelled = true
-      off()
+      off?.()
     }
   }, [])
-  const composerNoteState = composerNoteFor(cloudSnapshot, provider ?? null)
+  const composerNoteState = composerNoteFor({
+    provider: provider ?? undefined,
+    cloudState: cloudSnapshot?.state ?? null,
+    signedOut: cloudSnapshot ? !cloudSnapshot.signedIn : undefined,
+  })
 
   if (!isOpen) {
     // the sidebar setting is off: nothing to show until an explicit AI action opens the panel
@@ -613,32 +623,30 @@ export function AiChatPanel({
   }
 
   const lastEntry = chat.at(-1)
-  const lastAssistantCompleted =
-    lastEntry && lastEntry.role === 'assistant' && !lastEntry.streaming && !aiBusy
-      ? lastEntry
-      : null
-  const lastAssistantChip = lastAssistantCompleted
-    ? resultChip({
-        provider: provider ?? null,
-        mutated: Boolean(lastAssistantCompleted.autoApplied),
-        hasStreamedText: Boolean(lastAssistantCompleted.text?.trim()),
-        clarifyAsked: Boolean(lastAssistantCompleted.clarifyReceipts?.length),
-        toolExecutions: lastAssistantCompleted.tools,
-        isError: Boolean(lastAssistantCompleted.isError),
-        error: lastAssistantCompleted.isError ? lastAssistantCompleted.text : null,
-      })
-    : null
-  const panelLiveAnnouncement = (() => {
-    if (lastEntry?.role === 'assistant') {
-      if (lastEntry.status) return lastEntry.status
-      if (!lastEntry.streaming && !aiBusy && isUniwork && lastAssistantChip) {
-        const chipLabel = aiUniworkText(lang, lastAssistantChip.labelKey)
-        const body = aiNoticeBody(lastEntry.text)
-        return `${chipLabel}${body ? `: ${body}` : ''}`.trim()
-      }
-    }
-    return ''
-  })()
+  const panelLiveAnnouncement =
+    chat.length > 0 || aiBusy
+      ? computePanelLiveAnnouncement({
+          entries: chat,
+          busy: aiBusy,
+          translate: (key, vars) => aiUniworkText(lang, key, vars),
+          lastEntryChipInput:
+            lastEntry && lastEntry.role === 'assistant'
+              ? {
+                  provider: provider ?? null,
+                  mutated: Boolean(lastEntry.autoApplied),
+                  hasStreamedText: Boolean(lastEntry.text?.trim()),
+                  clarifyAsked: Boolean(lastEntry.clarifyReceipts?.length),
+                  toolExecutions: lastEntry.tools.map((tool) => ({
+                    name: tool.name ?? '',
+                    summary: tool.summary,
+                    isError: Boolean(tool.isError),
+                  })),
+                  isError: Boolean(lastEntry.isError),
+                  error: lastEntry.isError ? lastEntry.text : null,
+                }
+              : null,
+        })
+      : composerAnnouncement
 
   return (
     <aside
@@ -750,21 +758,27 @@ export function AiChatPanel({
           </div>
         )}
         {chat.map((entry, index) => {
-          const nextEntry = chat[index + 1]
-          const turnEnded = nextEntry ? nextEntry.role === 'user' : !aiBusy
-          const chip =
-            entry.role === 'assistant' && !entry.streaming && turnEnded
-              ? resultChip({
-                  provider: provider ?? null,
-                  mutated: Boolean(entry.autoApplied),
-                  hasStreamedText: Boolean(entry.text?.trim()),
-                  clarifyAsked: Boolean(entry.clarifyReceipts?.length),
-                  toolExecutions: entry.tools,
-                  isError: Boolean(entry.isError),
-                  error: entry.isError ? entry.text : null,
-                })
-              : null
-          const chipLabel = chip ? aiUniworkText(lang, chip.labelKey) : null
+          const chipView = getEntryResultChipView(
+            chat,
+            index,
+            aiBusy,
+            (key, vars) => aiUniworkText(lang, key, vars),
+            {
+              provider: provider ?? null,
+              mutated: Boolean(entry.autoApplied),
+              hasStreamedText: Boolean(entry.text?.trim()),
+              clarifyAsked: Boolean(entry.clarifyReceipts?.length),
+              toolExecutions: entry.tools.map((tool) => ({
+                name: tool.name ?? '',
+                summary: tool.summary,
+                isError: Boolean(tool.isError),
+              })),
+              isError: Boolean(entry.isError),
+              error: entry.isError ? entry.text : null,
+            },
+          )
+          const chip = chipView?.chip ?? null
+          const chipLabel = chipView?.labelText ?? null
           return (
             <div
               key={index}
@@ -946,9 +960,7 @@ export function AiChatPanel({
       <div className="ai-composer" style={clarify ? { display: 'none' } : undefined}>
         {attachNotice && <div className="ai-attach-notice">{attachNotice}</div>}
         {viewOnly && !isUniwork && (
-          <div className="ai-readonly-notice" role="status">
-            {t('aiViewOnlyNotice')}
-          </div>
+          <div className="ai-readonly-notice">{t('aiViewOnlyNotice')}</div>
         )}
         <AiComposer
           queueStrip={
@@ -1086,12 +1098,21 @@ export function AiChatPanel({
           uniwork={
             isUniwork
               ? {
-                  noteState: composerNoteState,
-                  onSignIn: () => void readUniworkCloudStatus()?.signIn(),
-                  onOpenAccountSettings: () => void readUniworkCloudStatus()?.openAccountSettings(),
-                  onRetry: () => onSend(),
-                  onOpenByokSettings: () => void window.desktopApi?.openAiSettings?.(),
-                  disclosure: { ackKey: cloudSnapshot?.accountId ?? null },
+                  provider: provider ?? 'uniwork',
+                  lang,
+                  note: composerNoteState,
+                  onSignIn: () => void readUniworkCloudStatus()?.signIn?.(),
+                  onChooseProvider: () => void window.desktopApi?.openAiSettings?.(),
+                  onAnnounce: setComposerAnnouncement,
+                  disclosure: {
+                    orgName: cloudSnapshot?.orgName ?? undefined,
+                    ackKey: {
+                      account: cloudSnapshot?.accountId ?? '',
+                      org: cloudSnapshot?.orgId ?? '',
+                      document: 'local',
+                    },
+                    variant: 'local',
+                  },
                 }
               : undefined
           }
@@ -1114,7 +1135,10 @@ export function AiChatPanel({
           textareaRef={inputRef}
           onChange={onPromptChange}
           onSend={send}
-          onStop={onStop}
+          onStop={() => {
+            onStop()
+            inputRef.current?.focus()
+          }}
           onPasteFiles={onPasteFiles}
         />
       </div>

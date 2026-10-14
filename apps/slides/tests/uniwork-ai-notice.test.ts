@@ -209,7 +209,7 @@ describe('UniWork AI notices (slides panel)', () => {
     // the same node (not a new one mounted with its text) now holds the note, and nothing else in .ai-chat announces
     expect(c.querySelector('.ai-sr-status')).toBe(live)
     expect(c.querySelectorAll('[aria-live]')).toHaveLength(1)
-    expect(c.querySelectorAll('[role="status"]')).toHaveLength(0)
+    expect(c.querySelectorAll('[role="status"]:not(.ai-typing)')).toHaveLength(0)
     expect(live!.textContent).toBe(ui('aiErrRateLimited', { seconds: 30 }))
     expect(c.querySelectorAll('.ai-msg-notice [role="status"]')).toHaveLength(0)
     expect(c.querySelectorAll('.ai-msg-notice')).toHaveLength(1)
@@ -225,6 +225,7 @@ describe('UniWork AI notices (slides panel)', () => {
       harness.events!.onDone?.({ text: '', cancelled: false, turnLimit: false }),
     )
     await flush()
+    expect(c.querySelectorAll('[role="status"]')).toHaveLength(0)
     expect(notices(c)).toEqual([ui('aiConversationRestarted')])
     expect(c.textContent).not.toContain(t('aiNoResponse'))
     // the turn ended quietly: no error line, no Retry, and the question is back in the composer

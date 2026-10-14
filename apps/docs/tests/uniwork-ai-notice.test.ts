@@ -115,7 +115,8 @@ describe('UniWork AI notices (docs panel)', () => {
   })
 
   const notices = () => [...container!.querySelectorAll('.ai-msg-notice')].map((n) => n.textContent)
-  const stopButton = () => container!.querySelector(`button[aria-label="${t('aiStop')}"]`)
+  const stopButton = () =>
+    container!.querySelector<HTMLButtonElement>(`button[aria-label="${t('aiStop')}"]`)
 
   it('waiting shows Stop only, no Retry', async () => {
     await emit({ type: 'notice', notice: { kind: 'rate-limit-wait', seconds: 120, attempt: 1 } })
@@ -191,7 +192,7 @@ describe('UniWork AI notices (docs panel)', () => {
     // the same node (not a new one mounted with its text) now holds the note, and nothing else in .ai-chat announces
     expect(container!.querySelector('.ai-sr-status')).toBe(live)
     expect(container!.querySelectorAll('[aria-live]')).toHaveLength(1)
-    expect(container!.querySelectorAll('[role="status"]')).toHaveLength(0)
+    expect(container!.querySelectorAll('[role="status"]:not(.ai-typing)')).toHaveLength(0)
     expect(live!.textContent).toBe(ui('aiErrRateLimited', { seconds: 30 }))
     expect(container!.querySelectorAll('.ai-msg-notice [role="status"]')).toHaveLength(0)
     expect(container!.querySelectorAll('.ai-msg-notice')).toHaveLength(1)
@@ -200,6 +201,7 @@ describe('UniWork AI notices (docs panel)', () => {
     expect(live!.textContent).toContain(ui('aiConversationRestarted'))
     await emit({ type: 'done' })
     expect(chatEl?.hasAttribute('aria-busy')).toBe(false)
+    expect(container!.querySelectorAll('[role="status"]')).toHaveLength(0)
   })
 
   it('a restarted conversation shows its note and not an empty-reply line', async () => {
