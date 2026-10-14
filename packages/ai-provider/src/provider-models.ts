@@ -143,6 +143,17 @@ interface CacheEntry {
   inflight: boolean
 }
 
+function snapshotOf(entry: CacheEntry): ProviderModelSnapshot {
+  if (entry.ids && entry.ids.length > 0) return { listed: [...entry.ids] }
+  if (!entry.settled) return { listState: 'loading' }
+  return entry.failed ? { listState: 'error' } : {}
+}
+
+/** two snapshots with the same key read the same on the chip (ids are never empty strings) */
+function snapshotKey(snapshot: ProviderModelSnapshot): string {
+  return `${snapshot.listState ?? ''}\0${snapshot.listed?.join('\0') ?? ''}`
+}
+
 export interface ProviderModelCacheOptions {
   ttlMs?: number
   failureTtlMs?: number
@@ -154,7 +165,8 @@ export interface ProviderModelCacheOptions {
  * Main-process cache of the live lists, one entry per provider keyed by
  * (baseUrl, key hash). `read` is synchronous: it answers from what is cached and
  * starts a background listing when the entry is missing or older than its TTL,
- * then calls `onSettled` once the answer lands so the caller can announce it.
+ * then calls `onSettled` once the answer lands, and only when it changed what `read`
+ * returns, so the caller can announce it.
  *
  * `listState` follows the chip's needs: `loading` only while no listing has
  * answered yet, `error` only when the last listing failed and no list is kept.
@@ -193,9 +205,7 @@ export class ProviderModelCache {
     if (!entry.inflight && (!entry.settled || this.now() - entry.at > ttl)) {
       this.start(provider, config, entry, onSettled)
     }
-    if (entry.ids && entry.ids.length > 0) return { listed: [...entry.ids] }
-    if (!entry.settled) return { listState: 'loading' }
-    return entry.failed ? { listState: 'error' } : {}
+    return snapshotOf(entry)
   }
 
   /** drop one provider's list so the next read lists again */
@@ -210,6 +220,7 @@ export class ProviderModelCache {
     onSettled: () => void,
   ): void {
     entry.inflight = true
+    const before = snapshotKey(snapshotOf(entry))
     void this.list(provider, config)
       .catch(() => FAILED)
       .then((result) => {
@@ -225,6 +236,8 @@ export class ProviderModelCache {
           // a failed refresh keeps the list it already has
           entry.failed = true
         }
+        // a refresh that leaves what the chip reads as it was has nothing to announce
+        if (snapshotKey(snapshotOf(entry)) === before) return
         try {
           onSettled()
         } catch {

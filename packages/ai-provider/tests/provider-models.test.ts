@@ -262,6 +262,65 @@ describe('ProviderModelCache', () => {
     expect(t.cache.read('openai', key('k'), t.settled)).toEqual({ listed: ['m1'] })
   })
 
+  it('does not announce a refresh that answers with the same ids', async () => {
+    const t = make([
+      { ok: true, ids: ['m1', 'm2'] },
+      { ok: true, ids: ['m1', 'm2'] },
+    ])
+    t.cache.read('openai', key('k'), t.settled)
+    await flush()
+    expect(t.settled).toHaveBeenCalledTimes(1)
+    t.advance(PROVIDER_MODELS_TTL_MS + 1)
+    t.cache.read('openai', key('k'), t.settled)
+    await flush()
+    expect(t.list).toHaveBeenCalledTimes(2)
+    expect(t.settled).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not announce a failure that repeats, nor a failed refresh over a kept list', async () => {
+    const failing = make([
+      { ok: false, ids: [] },
+      { ok: false, ids: [] },
+    ])
+    failing.cache.read('openai', key('k'), failing.settled)
+    await flush()
+    expect(failing.settled).toHaveBeenCalledTimes(1)
+    failing.advance(PROVIDER_MODELS_FAILURE_TTL_MS + 1)
+    failing.cache.read('openai', key('k'), failing.settled)
+    await flush()
+    expect(failing.list).toHaveBeenCalledTimes(2)
+    expect(failing.settled).toHaveBeenCalledTimes(1)
+
+    const kept = make([
+      { ok: true, ids: ['m1'] },
+      { ok: false, ids: [] },
+    ])
+    kept.cache.read('openai', key('k'), kept.settled)
+    await flush()
+    kept.advance(PROVIDER_MODELS_TTL_MS + 1)
+    kept.cache.read('openai', key('k'), kept.settled)
+    await flush()
+    expect(kept.list).toHaveBeenCalledTimes(2)
+    expect(kept.settled).toHaveBeenCalledTimes(1)
+  })
+
+  it('announces a change of state: failure then recovery, a list that grows', async () => {
+    const t = make([
+      { ok: false, ids: [] },
+      { ok: true, ids: ['m1'] },
+      { ok: true, ids: ['m1', 'm2'] },
+    ])
+    t.cache.read('openai', key('k'), t.settled)
+    await flush()
+    t.advance(PROVIDER_MODELS_FAILURE_TTL_MS + 1)
+    t.cache.read('openai', key('k'), t.settled)
+    await flush()
+    t.advance(PROVIDER_MODELS_TTL_MS + 1)
+    t.cache.read('openai', key('k'), t.settled)
+    await flush()
+    expect(t.settled).toHaveBeenCalledTimes(3)
+  })
+
   it('a failed refresh over a kept list leaves the list and sets no error', async () => {
     const t = make([
       { ok: true, ids: ['m1'] },
