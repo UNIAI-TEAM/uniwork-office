@@ -342,10 +342,20 @@ export interface AiComposerUniworkProps {
   readonly onAnnounce?: ((text: string) => void) | undefined
 }
 
+/** True when `el` is hidden from view or from assistive tech (own attributes or inline style). */
+function isHiddenElement(el: Element): boolean {
+  if (el.hasAttribute('hidden') || el.getAttribute('aria-hidden') === 'true') return true
+  const style = (el as HTMLElement).style
+  return style?.display === 'none' || style?.visibility === 'hidden'
+}
+
 /**
- * Checks whether a composer-owned popup/listbox/dialog/menu is open inside `root`, blocking
- * `Escape` from stopping a run without matching persistent ribbon/toolbar listboxes or inline
- * collapsible sections (`AiQueueStrip`).
+ * Checks whether a popup owned by the composer is open inside `root`, blocking `Escape` from
+ * stopping a run. Persistent ribbon/toolbar listboxes, inline collapsible sections
+ * (`AiQueueStrip`) and inline menus that are hidden or whose owner is collapsed never block it.
+ * A popup counts when it is a known composer popup (`.ai-model-pop`, `.gs-dd-pop`, rendered only
+ * while open), an expanded `aria-haspopup` trigger, a visible modal dialog, or a visible
+ * listbox/menu/dialog whose `aria-controls` owner is expanded.
  */
 export function isComposerPopupOpen(root?: Document | Element | null): boolean {
   const docOrEl = root ?? (typeof document !== 'undefined' ? document : null)
@@ -355,9 +365,26 @@ export function isComposerPopupOpen(root?: Document | Element | null): boolean {
       ? docOrEl
       : docOrEl.querySelector('.ai-input-box')
   if (!composerRoot) return false
-  return (
+  if (
     composerRoot.querySelector(
-      '[role="listbox"], [role="menu"], [role="dialog"], [aria-haspopup][aria-expanded="true"], .ai-model-pop, .gs-dd-pop',
+      '[aria-haspopup][aria-expanded="true"], .ai-model-pop, .gs-dd-pop',
     ) !== null
-  )
+  ) {
+    return true
+  }
+  for (const popup of composerRoot.querySelectorAll(
+    '[role="listbox"], [role="menu"], [role="dialog"]',
+  )) {
+    if (isHiddenElement(popup)) continue
+    if (popup.getAttribute('role') === 'dialog' && popup.getAttribute('aria-modal') === 'true') {
+      return true
+    }
+    const id = popup.id
+    if (!id) continue
+    const owner = [...composerRoot.querySelectorAll('[aria-controls]')].find((el) =>
+      (el.getAttribute('aria-controls') ?? '').split(/\s+/).includes(id),
+    )
+    if (owner?.getAttribute('aria-expanded') === 'true') return true
+  }
+  return false
 }

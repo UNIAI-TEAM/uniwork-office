@@ -5,7 +5,10 @@ export const UNIWORK_ACK_STORAGE_KEY = 'uniwork.office.ai.disclosure.ack.v1'
 /**
  * Identity key for the S8 AI disclosure acknowledgment (EXPERIENCE › AI disclosure S8, OQ-UX10).
  * Stored per account + organization + document (`'local'` for local unbound files).
- * Changing document or organization requires re-acknowledgment.
+ * Changing document or organization requires re-acknowledgment. An empty account (the cloud
+ * snapshot has not delivered it yet) has no scope to store under: the ack is required every
+ * time and never stored, so it cannot count for a later account on the same document. An empty
+ * org with an account is a personal account and keeps the `local-org` scope.
  */
 export interface UniworkAckKey {
   readonly account: string
@@ -15,7 +18,8 @@ export interface UniworkAckKey {
 
 export function serializeUniworkAckKey(key: UniworkAckKey | null | undefined): string | null {
   if (!key) return null
-  const account = key.account?.trim() || 'local-account'
+  const account = key.account?.trim()
+  if (!account) return null
   const org = key.org?.trim() || 'local-org'
   const document = key.document?.trim() || 'local'
   return `${account}|${org}|${document}`
