@@ -518,6 +518,9 @@ export interface DeskDraft {
 export type DeskToolId =
   'pdf-to-docx' | 'pdf-to-xlsx' | 'pdf-to-pptx' | 'export-pdf' | 'merge-pdf' | 'split-pdf'
 
+/** what Export PDF takes: the inputs headlessModuleFor (electron-utils) routes to an editor */
+export const DESK_EXPORTABLE = /\.(docx|xlsx|xlsm|xls|csv|tsv|pptx|md|markdown|html|htm)$/i
+
 export interface DeskToolRequest {
   tool: DeskToolId
   /** absolute paths (a drop); absent = main asks with a file picker */

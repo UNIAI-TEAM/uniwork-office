@@ -1,5 +1,5 @@
 import { basename, dirname, extname, isAbsolute, join, resolve } from 'node:path'
-import type { DeskToolId, DeskToolResult } from '../shared/home-api'
+import { DESK_EXPORTABLE, type DeskToolId, type DeskToolResult } from '../shared/home-api'
 
 export const DESK_TOOL_IDS: readonly DeskToolId[] = [
   'pdf-to-docx',
@@ -11,8 +11,6 @@ export const DESK_TOOL_IDS: readonly DeskToolId[] = [
 ]
 
 const PDF = /\.pdf$/i
-/** what Export PDF takes: the inputs headlessModuleFor (electron-utils) routes to an editor */
-export const EXPORTABLE = /\.(docx|xlsx|xlsm|xls|csv|tsv|pptx|md|markdown|html|htm)$/i
 const MAX_MERGE = 50
 
 /** Everything runDeskTool touches outside itself; index.ts wires the real ones, tests pass fakes. */
@@ -60,7 +58,7 @@ export function checkDeskInputs(
   const bad = { ok: false, error: 'bad-input' } as const
   if (!inputs.every((p) => typeof p === 'string' && isAbsolute(p))) return bad
   const paths = inputs as string[]
-  const want = tool === 'export-pdf' ? EXPORTABLE : PDF
+  const want = tool === 'export-pdf' ? DESK_EXPORTABLE : PDF
   if (!paths.every((p) => want.test(p))) return bad
   const countOk =
     tool === 'merge-pdf' ? paths.length >= 2 && paths.length <= MAX_MERGE : paths.length === 1

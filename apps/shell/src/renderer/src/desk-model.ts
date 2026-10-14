@@ -1,16 +1,15 @@
-import type {
-  DeskDraft,
-  DeskToolId,
-  RecentEntry,
-  UniworkDocStatus,
-  UniworkDocSummary,
-  UniworkSaveState,
+import {
+  DESK_EXPORTABLE,
+  type DeskDraft,
+  type DeskToolId,
+  type RecentEntry,
+  type UniworkDocStatus,
+  type UniworkDocSummary,
+  type UniworkSaveState,
 } from '../../shared/home-api'
 import type { WorkNotification, WorkRecentDocument } from '../../shared/uniwork-work-api'
 
 const PDF = /\.pdf$/i
-/** what Export PDF takes; mirrors desk-tools.ts EXPORTABLE (main checks again) */
-const EXPORTABLE = /\.(docx|xlsx|xlsm|xls|csv|tsv|pptx|md|markdown|html|htm)$/i
 
 /** the tools that fit a set of dropped files (office desk spec §4.2) */
 export function applicableTools(paths: readonly string[]): DeskToolId[] {
@@ -20,7 +19,7 @@ export function applicableTools(paths: readonly string[]): DeskToolId[] {
       ? ['pdf-to-docx', 'pdf-to-xlsx', 'pdf-to-pptx', 'split-pdf']
       : ['merge-pdf']
   }
-  return paths.length === 1 && EXPORTABLE.test(paths[0]!) ? ['export-pdf'] : []
+  return paths.length === 1 && DESK_EXPORTABLE.test(paths[0]!) ? ['export-pdf'] : []
 }
 
 const DOC_KINDS = new Set(['document_commented', 'document_mentioned'])
