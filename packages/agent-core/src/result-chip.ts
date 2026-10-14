@@ -27,6 +27,7 @@ export type ResultChipErrorKey =
   | 'aiErrQuestionRejected'
   | 'aiErrViewOnlyEdit'
   | 'aiErrUnsupported'
+  | 'aiErrGeneric'
 
 export type ResultChipErrorAction =
   'ask-again' | 'choose-provider' | 'sign-in' | 'retry' | 'open-in-app'
@@ -69,7 +70,8 @@ export interface ResultChipMeta {
     | {
         readonly written: number
         readonly range: string
-        readonly overwritten: number
+        /** `null` when the tool did not report an overwritten count (unknown is not zero) */
+        readonly overwritten: number | null
       }
     | undefined
   readonly warnings?: readonly string[] | undefined
@@ -99,8 +101,9 @@ export interface ResultChipInput {
   readonly mutated?: boolean | undefined
   readonly toolExecutions?: readonly ResultChipToolExecution[] | undefined
   readonly droppedToolCalls?: readonly ResultChipDroppedToolCall[] | undefined
+  /** @deprecated `resultChip` ignores it (RF1-13: only `droppedToolCalls` decides); removal is tracked in the G6-10 sweep */
   readonly panelNotes?: readonly PanelNote[] | undefined
-  /** Alias for `panelNotes` */
+  /** @deprecated Alias for `panelNotes`; ignored like it */
   readonly notes?: readonly PanelNote[] | undefined
   /** True when the allowlisted `ask_clarification` tool was called */
   readonly clarifyCalled?: boolean | undefined
@@ -319,12 +322,22 @@ export function classifyS9Error(
     }
   }
 
-  // Never fall through to key: null + raw server text (RF1-6)
+  // Never fall through to key: null + raw server text (RF1-6). A code we cannot name is not a
+  // "service unavailable" either, so it gets the generic line and no Retry (RF2-3).
   return {
-    key: 'aiErrUnavailable',
-    action: 'retry',
+    key: 'aiErrGeneric',
+    action: null,
     actionKey: null,
   }
+}
+
+/** True for an error that only reports the user's own cancel (AbortError, "aborted", "cancelled"). */
+export function isAbortTypeError(error: string | ResultChipErrorInput | null | undefined): boolean {
+  if (!error) return false
+  const parts = typeof error === 'string' ? [error] : [error.code ?? '', error.message ?? '']
+  return parts.some((part) =>
+    /\babort(?:ed|_err|error)?\b|aborterror|\bcancel+ed\b|err_canceled|user_cancel/i.test(part),
+  )
 }
 
 /** Valid A1 column index (A..XFD = 1..16384) and row index (1..1048576). */
@@ -345,7 +358,7 @@ function isValidA1Ref(colLetters: string, rowDigits: string): boolean {
  */
 function matchValidSheetRange(source: string): { sheet?: string; range: string } | null {
   const pattern =
-    /(?:(?:'([^']+)'|(?<![A-Za-z0-9_])([A-Za-z_][A-Za-z0-9_]*))!)?(\$?)([A-Z]{1,3})(\$?)([1-9]\d{0,6})(?::(\$?)([A-Z]{1,3})(\$?)([1-9]\d{0,6}))?(?![A-Za-z0-9_])/g
+    /(?<![A-Za-z0-9_$])(?:(?:'([^']+)'|(?<![A-Za-z0-9_])([A-Za-z_][A-Za-z0-9_]*))!)?(\$?)([A-Z]{1,3})(\$?)([1-9]\d{0,6})(?::(\$?)([A-Z]{1,3})(\$?)([1-9]\d{0,6}))?(?![A-Za-z0-9_])/g
   let m: RegExpExecArray | null
   while ((m = pattern.exec(source)) !== null) {
     const quotedSheet = m[1]
@@ -434,7 +447,7 @@ export function extractSheetsCellsMeta(
         ...(matchedRange.sheet ? { sheet: matchedRange.sheet } : {}),
         range: matchedRange.range,
         written: Number(writtenMatch[1]),
-        overwritten: overwrittenMatch ? Number(overwrittenMatch[1]) : 0,
+        ...(overwrittenMatch ? { overwritten: Number(overwrittenMatch[1]) } : {}),
       }
     }
   }
@@ -465,7 +478,7 @@ function buildMeta(input: ResultChipInput): ResultChipMeta | null {
           cellsMetaParams: {
             written: cells.written,
             range: cells.range,
-            overwritten: cells.overwritten ?? 0,
+            overwritten: cells.overwritten ?? null,
           },
         }
       : {}),
@@ -478,17 +491,19 @@ function deduplicateDroppedCalls(
 ): ResultChipDroppedToolCall[] {
   if (!calls || calls.length === 0) return []
   const seen = new Set<string>()
-  const result: ResultChipDroppedToolCall[] = []
+  const viewOnly: ResultChipDroppedToolCall[] = []
+  const notAllowlisted: ResultChipDroppedToolCall[] = []
   for (const call of calls) {
     const kind = classifyDroppedToolReason(call.reason)
     if (kind === 'other') continue
     const key = `${kind}:${call.module ?? ''}:${call.name}`
     if (!seen.has(key)) {
       seen.add(key)
-      result.push(call)
+      ;(kind === 'view_only' ? viewOnly : notAllowlisted).push(call)
     }
   }
-  return result
+  // view_only is the more specific reason for the user, so it leads whatever the arrival order
+  return [...viewOnly, ...notAllowlisted]
 }
 
 /**
@@ -523,7 +538,9 @@ export function resultChip(input: ResultChipInput): ResultChipOutput {
     Boolean(input.toolExecutions?.some((t) => t.mutated === true && !t.isError))
 
   const stopped = Boolean(input.stopped)
-  const effectiveError = input.error ?? (input.isError ? input.text || 'unavailable' : null)
+  const rawError = input.error ?? (input.isError ? input.text || 'unavailable' : null)
+  // An abort reported while the user pressed Stop is the Stop itself, not a failure (RF2-3)
+  const effectiveError = stopped && isAbortTypeError(rawError) ? null : rawError
   const errorLine = classifyS9Error(effectiveError, input.turnLimit)
   const meta = buildMeta(input)
 
