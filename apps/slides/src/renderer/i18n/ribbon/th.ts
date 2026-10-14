@@ -214,6 +214,8 @@ export const th = {
   ribbonGroupComments: 'ข้อคิดเห็น',
   ribbonComment: 'ข้อคิดเห็น',
   ribbonNewCommentTip: 'สร้างข้อคิดเห็นใหม่บนสไลด์ปัจจุบัน (บันทึกลง pptx มองเห็นได้ใน PowerPoint)',
+  ribbonNewCommentServerTip:
+    'สร้างข้อคิดเห็นใหม่บนสไลด์ปัจจุบัน (แชร์กับทุกคนที่เปิดงานนำเสนอนี้ และไม่ถูกบันทึกลงในไฟล์)',
   ribbonInsertTextBoxTip: 'แทรกกล่องข้อความ',
   ribbonWordArt: 'อักษรศิลป์',
   ribbonWordArtTip: 'แทรกอักษรศิลป์ (ข้อความขนาดใหญ่แบบเติมสี/เส้นขอบ)',

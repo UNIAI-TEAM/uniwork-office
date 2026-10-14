@@ -578,6 +578,8 @@ export interface RenderSlide {
   hidden?: boolean
   /** Slide part path (ppt/slides/slideN.xml): stable identity across insert/delete/reorder */
   partPath?: string
+  /** p:sldId/@id ("257"): the PPTX slide id, stable across reorder and Save (absent when the caller has none) */
+  sldId?: string
 }
 
 // Convenience type re-exports (for internal render logic)
