@@ -154,6 +154,7 @@ import {
   setDocsFileOpenedHook,
   setSessionPathResolver,
   setUniworkAiHost,
+  setUniworkAiChoiceStore,
   defaultSaveDir,
   uniquePathIn,
   authorizeMcpDocWrite,
@@ -343,6 +344,7 @@ import { runHeadlessExport, type HeadlessExporters } from './headless-export'
 import { isVersionRequest } from './version-flag'
 import { registerAiRunIpc } from './ai-run-registry'
 import { broadcastUniworkAiFlag, registerUniworkAiFlagIpc } from './uniwork-ai-flag'
+import { createUniworkAiChoiceStore } from './uniwork-ai-choice'
 import { TabManager } from './tab-manager'
 import { installShellCloseGuard } from './window-close-guard'
 import {
@@ -2943,6 +2945,9 @@ function syncWorkbenchOwner(): void {
   if (!workbenchAccounts().setOwner(owner)) return
   const wc = shellWindow && !shellWindow.isDestroyed() ? shellWindow.webContents : null
   if (wc && !wc.isDestroyed()) wc.send(HOME_CHANNELS.wbBucketChanged, workbenchAccounts().bucket())
+  // the UniWork AI pick is per account: every panel re-reads which provider is selected
+  for (const other of webContents.getAllWebContents())
+    if (!other.isDestroyed()) other.send('ai:settings-changed')
 }
 let tabManager: TabManager | null = null
 
@@ -6286,6 +6291,8 @@ registerDroppedFilesIpc()
 registerAiRunIpc(ipcMain)
 // the renderers' own provider lists learn whether UniWork AI is offered (pull + push)
 registerUniworkAiFlagIpc(ipcMain)
+// "UniWork AI" is picked per account (the account store), BYOK settings stay in ai-settings.json
+setUniworkAiChoiceStore(createUniworkAiChoiceStore(workbenchAccounts()))
 setUniworkAiFlagListener((available) =>
   broadcastUniworkAiFlag(available, webContents.getAllWebContents()),
 )

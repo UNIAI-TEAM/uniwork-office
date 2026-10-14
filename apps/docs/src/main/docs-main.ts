@@ -3778,6 +3778,21 @@ export function setUniworkAiHost(host: UniworkAiHost | null): void {
   uniworkAiHost = host
 }
 
+/**
+ * Whether the active UniWork account chose "UniWork AI" as its provider. The shell backs it with
+ * the per-account store (key `uniwork.ai.uniwork-choice`); ai-settings.json only ever holds the
+ * BYOK provider, so a pick of `uniwork` is routed here and the file keeps the previous BYOK one.
+ */
+export interface UniworkAiChoiceStore {
+  read(): boolean
+  write(on: boolean): void
+}
+
+let uniworkAiChoiceStore: UniworkAiChoiceStore | null = null
+export function setUniworkAiChoiceStore(store: UniworkAiChoiceStore | null): void {
+  uniworkAiChoiceStore = store
+}
+
 /** every renderer (tabs, home) re-reads ai-settings.json — the composer chip and
  *  the settings page edit the same file from different windows */
 function broadcastAiSettingsChanged(): void {
@@ -3797,6 +3812,9 @@ export function registerAiIpc(): void {
     const settings = resolveAiSettings(stored, defaultAiSettings())
     // the stored provider stays selected even while its config is incomplete (the picker and
     // Settings show what is missing); only an unknown id degrades to genspark
+    // the account's UniWork AI pick overlays the file's BYOK provider; while the entry is not
+    // offered, selectedProvider degrades it (the pick itself stays stored for when it returns)
+    if (uniworkAiChoiceStore?.read()) settings.provider = 'uniwork'
     settings.provider = selectedProvider(settings)
     return settings
   })
@@ -3828,6 +3846,17 @@ export function registerAiIpc(): void {
     if (!sanitized) {
       console.warn('[ai] rejected invalid ai:set-settings payload')
       return
+    }
+    if (sanitized.provider === 'uniwork') {
+      // saved per account, never in the file: the file keeps the BYOK provider it had
+      uniworkAiChoiceStore?.write(true)
+      const previous = resolveAiSettings(
+        readJson<Partial<AiSettings> & LegacyAiSettings>(SETTINGS_PATH(), {}),
+        defaultAiSettings(),
+      ).provider
+      sanitized.provider = previous === 'uniwork' ? defaultAiSettings().provider : previous
+    } else {
+      uniworkAiChoiceStore?.write(false)
     }
     writeJsonAtomic(SETTINGS_PATH(), sanitized)
     broadcastAiSettingsChanged()
