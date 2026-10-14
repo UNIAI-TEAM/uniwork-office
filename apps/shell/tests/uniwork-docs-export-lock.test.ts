@@ -329,6 +329,7 @@ describe('every export / Save As / print entry point refuses a locked source', (
     )
     for (const channel of [
       /'docs:save-as'/,
+      /'docs:save-new'/,
       /'docs:save-to'/,
       /'docs:export-pdf'/,
       /'docs:export-html'/,

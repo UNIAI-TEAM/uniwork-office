@@ -4937,6 +4937,9 @@ export function registerDocsIpc(): void {
       // a discarded draft in an orphaned renderer must not silently persist
       // itself to the default folder after the user chose Don't Save
       if (tornDownWcIds.has(event.sender.id)) return { ok: false }
+      // G5-03a: a locked working copy exports nothing, not even a first save
+      // into the default folder
+      if (uniworkRefusesExport(event.sender.id)) return { ok: false }
       const filePath = uniquePathIn(defaultSaveDir(), defaultName)
       const passwordState = snapshotDocPassword(event.sender.id, null)
       const { bytes: plain, hashes } = await materializeLazyDocx(Buffer.from(data))

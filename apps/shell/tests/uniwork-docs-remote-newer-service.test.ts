@@ -520,6 +520,103 @@ describe('G5-03a S6 service: the lock', () => {
     expect(h.service.isReadOnly(docPath())).toBe(true)
     expect((await h.service.docStatus(docPath()))?.remote).toEqual({ kind: 'revoked' })
   })
+
+  it('a re-granted copy is editable again after the reopen: lock, bar and binding agree', async () => {
+    seedCopy()
+    const h = setup()
+    h.client.error = new UniworkDocError('forbidden', { status: 403 })
+    notice(h)
+    await waitForBar(h, { kind: 'revoked' })
+    await vi.waitFor(() => {
+      expect(bindingOf()).toMatchObject({ state: 'blocked', error: 'permission_revoked' })
+    })
+    expect(h.service.isReadOnly(docPath())).toBe(true)
+    expect(h.service.isLocked(docPath())).toBe(true)
+
+    // the server grants edit again and the document is reopened from the picker
+    h.client.error = null
+    await h.service.openFromServer(DOC)
+
+    expect(h.service.isReadOnly(docPath())).toBe(false)
+    expect(h.service.isLocked(docPath())).toBe(false)
+    expect(bindingOf()).toMatchObject({ state: 'dirty' })
+    expect(bindingOf()).not.toHaveProperty('error')
+    expect(await barOf(h)).toBeUndefined()
+  })
+
+  it('the account boundary forgets the lock with its bar, so no verdict answers for the next session', async () => {
+    seedCopy()
+    const h = setup()
+    h.client.error = new UniworkDocError('not_found', { status: 404 })
+    await h.service.noteFeedGone(DOC)
+    expect(h.service.isLocked(docPath())).toBe(true)
+
+    h.service.forgetLocksWhere(() => true)
+
+    // the durable binding this account left still reads blocked - that copy IS
+    // still revoked for its owner, exactly like an S11 folder that keeps
+    // refusing after the panel is forgotten. The session's verdict is gone, so
+    // the next account's copy of the same document is not locked by it, and no
+    // bar survives with it either.
+    seedCopy({ state: 'dirty' })
+    expect(h.service.isLocked(docPath())).toBe(false)
+    expect(h.service.isReadOnly(docPath())).toBe(false)
+    expect(await barOf(h)).toBeUndefined()
+  })
+})
+
+describe('G5-03a S6 service: the bar through the real runtime (wiring onFeedChange)', () => {
+  /** the real SyncRuntime over the scripted feed, wired as wiring.ts wires it */
+  function runtimeOf(h: Harness, feed: FakeFeedClient): SyncRuntime {
+    return new SyncRuntime({
+      store: h.syncStore,
+      targets: { orgs: () => ['org_a'], workspaces: async () => ['ws_1'] },
+      capability: async () => ({
+        kind: 'ok' as const,
+        capabilities: { ...NEVER_READ_CAPABILITIES, sync_feed: true },
+        source: 'fresh' as const,
+      }),
+      client: () => feed,
+      keepDraft: async () => false,
+      clock: { now: () => 1_700_000_000_000 },
+      onFeedChange: (change) =>
+        h.service.noteFeedChange(change.documentId, change.revision, change),
+      isOpenBound: (documentId) => h.service.isOpenBound(documentId),
+      onFeedGone: (documentId) => {
+        void h.service.noteFeedGone(documentId)
+      },
+    })
+  }
+
+  /** a snapshot listing DOC at head revision 10, version 4 (the open base is 9/3) */
+  const newerSnapshot = () =>
+    new FakeFeedClient([
+      {
+        phase: 'snapshot',
+        rows: [{ document_id: DOC, revision: '10', current_version: 4, version_id: 'ver_4' }],
+        next_cursor: 'c1',
+      },
+    ])
+
+  it('a newer snapshot reaches the bar of a dirty copy through onFeedChange alone', async () => {
+    seedCopy({ state: 'dirty' })
+    const h = setup()
+    await runtimeOf(h, newerSnapshot()).tick()
+    await waitForBar(h, { kind: 'newer-dirty', version: 4 })
+    expect(hex(copyBytes())).toBe(hex(BASE_BYTES))
+    expect(bindingOf().baseRevision).toBe('9')
+    expect(h.client.calls.download).toBe(0)
+  })
+
+  it('a newer snapshot reloads a clean copy through onFeedChange alone: updated bar', async () => {
+    seedCopy()
+    const h = setup()
+    await runtimeOf(h, newerSnapshot()).tick()
+    await vi.waitFor(() => expect(h.reloaded).toEqual([docPath()]))
+    await waitForBar(h, { kind: 'updated', version: 4 })
+    expect(hex(copyBytes())).toBe(hex(HEAD_BYTES))
+    expect(bindingOf()).toMatchObject({ baseRevision: '10', baseVersion: 4, state: 'saved' })
+  })
 })
 
 describe('G5-03a S6 service: hold, later and the persisted rebuild', () => {
