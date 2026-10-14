@@ -156,6 +156,7 @@ export function AiModelPicker({
     currentUsable && current
       ? current.model || groupLabel(groups, current.provider)
       : strings.choose
+  const chipLabel = `${strings.title}: ${chipText}`
 
   return (
     <div
@@ -175,8 +176,9 @@ export function AiModelPicker({
         onClick={toggle}
         aria-haspopup="listbox"
         aria-expanded={open}
-        data-tip={strings.title}
-        aria-label={`${strings.title}: ${chipText}`}
+        title={chipLabel}
+        data-tip={chipLabel}
+        aria-label={chipLabel}
       >
         {currentUsable && current && <ProviderLogo id={current.provider} />}
         <span className="ai-model-chip-text">{chipText}</span>

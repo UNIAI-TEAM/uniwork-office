@@ -12,8 +12,17 @@
   font-variant-numeric: tabular-nums;
   user-select: none;
   white-space: nowrap;
-  /* the model picker label shrinks around the chip, never the other way round */
+  /* the model picker label shrinks around the chip while the footer has room */
   flex-shrink: 0;
+}
+
+/* once the model chip reaches its floor in a crowded composer footer, let the usage chip yield */
+.ai-input-footer .ai-usage-chip {
+  display: inline-block;
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* sits on its own quiet line under the reply text */
