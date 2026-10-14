@@ -245,6 +245,8 @@ describe('in-app confirmations and page toasts (redesign spec 2.3, 3)', () => {
     await act(async () => confirm.click())
     await flush()
     expect(deleteProject).toHaveBeenCalledWith('p1')
+    // the Delete button went busy (disabled): focus lands on the pack list, not <body>
+    expect(document.activeElement?.classList.contains('wb-pack-list')).toBe(true)
     // the notice is a toast in the one host, not a line pinned above every tab
     expect(host.querySelector('.wb-hint, .wb-error')).toBeNull()
     expect(host.querySelector('.wb-toast-host .wb-toast')?.textContent).toContain(

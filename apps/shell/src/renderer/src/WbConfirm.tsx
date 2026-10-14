@@ -5,7 +5,9 @@ import type { CSSProperties, ReactElement } from 'react'
  * A light in-app confirmation (redesign spec 2.3): a title, one line, Cancel
  * (ghost) and the confirm button (primary or danger). It opens next to the
  * control that was focused when it appeared (centred when there is none),
- * focuses Cancel, closes on Escape or a click outside, and gives focus back.
+ * focuses Cancel, closes on Escape or a click outside, and gives focus back:
+ * to the opener, or when the answer disabled or removed it, to `returnFocus`
+ * (else the nearest `tabindex="-1"` container of the opener).
  */
 export function WbConfirm({
   title,
@@ -15,6 +17,7 @@ export function WbConfirm({
   tone = 'primary',
   onConfirm,
   onCancel,
+  returnFocus,
 }: {
   title: string
   body?: string
@@ -23,6 +26,8 @@ export function WbConfirm({
   tone?: 'primary' | 'danger'
   onConfirm: () => void
   onCancel: () => void
+  /** where focus lands when the opener can no longer take it (a busy, disabled button; a deleted row) */
+  returnFocus?: () => HTMLElement | null
 }): ReactElement {
   const ref = useRef<HTMLDivElement>(null)
   const cancelRef = useRef<HTMLButtonElement>(null)
@@ -37,6 +42,8 @@ export function WbConfirm({
   const bodyId = useId()
   const onCancelRef = useRef(onCancel)
   onCancelRef.current = onCancel
+  const returnFocusRef = useRef(returnFocus)
+  returnFocusRef.current = returnFocus
 
   useLayoutEffect(() => {
     const box = ref.current
@@ -64,7 +71,12 @@ export function WbConfirm({
     document.addEventListener('mousedown', onDoc)
     return () => {
       document.removeEventListener('mousedown', onDoc)
-      if (opener?.isConnected) opener.focus()
+      // runs after the answer's re-render: a confirmed action may have disabled or removed the opener
+      const back =
+        opener?.isConnected && !opener.matches(':disabled')
+          ? opener
+          : (returnFocusRef.current?.() ?? opener?.closest<HTMLElement>('[tabindex="-1"]'))
+      back?.focus()
     }
   }, [opener])
 

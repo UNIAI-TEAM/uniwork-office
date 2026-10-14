@@ -128,6 +128,7 @@ export function PracticeHome({
   const setNotice = (m: Msg) => toasts.show({ message: toastText(m) })
   const setError = (m: Msg) => toasts.show({ message: toastText(m), tone: 'alert' })
   const [ask, setAsk] = useState<ConfirmAsk | null>(null)
+  const packListRef = useRef<HTMLUListElement>(null)
 
   // starts from this bucket's cached list (this pane remounts whenever the user returns
   // to the Workbench), then one load per mount plus Refresh
@@ -738,7 +739,7 @@ export function PracticeHome({
         ) : null}
 
         {tab === 'knowledge' && (
-          <section className="wb-pane" aria-labelledby={pillarTitleId}>
+          <section className="wb-pane" aria-labelledby={pillarTitleId} tabIndex={-1}>
             <label className="wb-kn-search">
               <WbGlyph id="search" size={14} />
               <input
@@ -759,7 +760,7 @@ export function PracticeHome({
                 {packs.length === 0 ? (
                   pillarState('knowledge', 'wbKnEmpty')
                 ) : (
-                  <ul className="wb-pack-list">
+                  <ul className="wb-pack-list" ref={packListRef} tabIndex={-1}>
                     {packs.map(({ entry, meta: m }) => (
                       <li key={entry.id}>
                         <button
@@ -848,7 +849,7 @@ export function PracticeHome({
         )}
 
         {tab === 'materials' && (
-          <section className="wb-pane" aria-labelledby={pillarTitleId}>
+          <section className="wb-pane" aria-labelledby={pillarTitleId} tabIndex={-1}>
             {!selected || !meta ? (
               pillarState('materials', 'wbMatSelectPackFirst')
             ) : (
@@ -974,7 +975,7 @@ export function PracticeHome({
         )}
 
         {tab === 'skills' && (
-          <section className="wb-pane" aria-labelledby={pillarTitleId}>
+          <section className="wb-pane" aria-labelledby={pillarTitleId} tabIndex={-1}>
             {!selected || !meta ? (
               pillarState('skills', 'wbSkNeedPack')
             ) : (
@@ -1121,6 +1122,8 @@ export function PracticeHome({
             cancelLabel={t('wbCommonCancel')}
             tone={ask.tone}
             onCancel={() => setAsk(null)}
+            // a deleted pack takes its Delete button with it: focus lands on the pack list
+            returnFocus={ask.action.kind === 'delete-pack' ? () => packListRef.current : undefined}
             onConfirm={() => {
               setAsk(null)
               runAsk(ask.action)

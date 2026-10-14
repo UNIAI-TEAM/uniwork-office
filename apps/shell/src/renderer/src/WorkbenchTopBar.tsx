@@ -138,7 +138,7 @@ export function WorkbenchTopBar({
             onClose={() => setMenuOpen(false)}
             anchorRef={newRef}
             label={t('wbTopNew')}
-            >
+          >
             <WbMenuItem
               icon={<WorkbenchIcon id="tasks" size={18} />}
               onSelect={() => run(onNewTask)}

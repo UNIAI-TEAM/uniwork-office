@@ -202,6 +202,38 @@ describe('WbConfirm', () => {
     expect(document.activeElement).toBe(opener)
     opener.remove()
   })
+
+  it('the answer disabled the opener: focus goes to returnFocus, else the tabindex=-1 container', () => {
+    const pane = document.createElement('section')
+    pane.tabIndex = -1
+    const opener = document.createElement('button')
+    pane.append(opener)
+    const list = document.createElement('ul')
+    list.tabIndex = -1
+    document.body.append(pane, list)
+    opener.focus()
+    render({ returnFocus: () => list })
+    opener.disabled = true
+    act(() => root.render(createElement('div')))
+    expect(document.activeElement).toBe(list)
+
+    opener.disabled = false
+    opener.focus()
+    render()
+    opener.remove()
+    act(() => root.render(createElement('div')))
+    // a removed opener has no container left to find: nothing to focus, and no throw
+    expect(document.activeElement).not.toBe(opener)
+
+    pane.append(opener)
+    opener.focus()
+    render()
+    opener.disabled = true
+    act(() => root.render(createElement('div')))
+    expect(document.activeElement).toBe(pane)
+    pane.remove()
+    list.remove()
+  })
 })
 
 describe('WbToastHost', () => {

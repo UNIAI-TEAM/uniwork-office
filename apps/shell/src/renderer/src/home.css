@@ -5053,6 +5053,12 @@ body.vib .home {
   min-width: 0;
 }
 
+/* focus landing spots after a confirm (WbConfirm returnFocus), not controls: no ring */
+.wb-pane:focus,
+.wb-pack-list:focus {
+  outline: none;
+}
+
 /* the bar every tab opens with (WorkToolbar): a one-line summary left, actions right */
 .wb-toolbar {
   display: flex;
