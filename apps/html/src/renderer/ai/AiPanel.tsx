@@ -1,5 +1,6 @@
 import {
   aiUniworkText,
+  isUniworkQuestionRefusal,
   aiPanelWidthAtPointer,
   AiPanelSideButton,
   AiModelPicker,
@@ -811,7 +812,11 @@ export function AiPanel({
         onError: (error) => {
           // once a tool ran the message was delivered; a later turn failing is not a send failure
           // a setup state (no key / no model) is not a send failure either: no "not sent" pill
-          const undelivered = runToolsRef.current.length === 0 && !aiNoticeKind(error)
+          // a refused question (too long, rejected) is no send failure to retry as is: it goes back
+          // into the composer to be shortened or fixed, as the message says
+          const refused = isUniworkQuestionRefusal(error)
+          if (refused) setPrompt((current) => current || runDisplayRef.current)
+          const undelivered = runToolsRef.current.length === 0 && !aiNoticeKind(error) && !refused
           setChat((prev) => {
             const next = [...prev]
             for (let i = undelivered ? next.length - 1 : -1; i >= 0; i--) {

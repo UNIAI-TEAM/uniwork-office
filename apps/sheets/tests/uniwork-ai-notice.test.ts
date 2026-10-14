@@ -14,6 +14,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { AiChatPanel, type AiChatMessage } from '../src/renderer/ai/AiChatPanel'
 import { createRunNotices, type RunCopy } from '../src/renderer/ai/run-notices'
+import { markRunFailed } from '../src/renderer/ai/run-error'
 import { LocaleProvider } from '../src/renderer/i18n/locale'
 
 const tr = (key: Parameters<typeof aiUniworkText>[1], params?: Record<string, string | number>) =>
@@ -286,6 +287,112 @@ describe('UniWork AI notices are announced through a separate status node (G05FE
         'utf8',
       )
       expect(shell).toMatch(/className="workbook-status"\s+role="status"/)
+    })
+  })
+})
+
+describe('a refused UniWork AI question (too long, rejected): no Retry, the question goes back to the composer', () => {
+  const user: AiChatMessage = { role: 'user', text: 'sum column B', tools: [] }
+  const streaming: AiChatMessage = { role: 'assistant', text: '', tools: [], streaming: true }
+
+  it.each([['aiErrQuestionTooLong'], ['aiErrQuestionRejected']] as const)(
+    '%s ends the run with the error and the user message is not marked undelivered',
+    (key) => {
+      const failed = markRunFailed([user, streaming], tr(key))
+      expect(failed[1]).toMatchObject({ isError: true, text: tr(key) })
+      expect(failed[0]!.undelivered).toBeUndefined()
+    },
+  )
+
+  it('another failure still marks the message undelivered (control)', () => {
+    expect(markRunFailed([user, streaming], 'server fell over')[0]!.undelivered).toBe(true)
+  })
+
+  it('App.tsx puts the refused question back in the composer', () => {
+    const source = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '../src/renderer/App.tsx'),
+      'utf8',
+    )
+    expect(source).toMatch(
+      /if \(isUniworkQuestionRefusal\(error\)\)\s+setPrompt\(\(current\) => current \|\| runQuestionRef\.current\)/,
+    )
+  })
+
+  describe('AiChatPanel', () => {
+    let root: Root | null = null
+    let container: HTMLElement | null = null
+    beforeAll(() => {
+      ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+      Element.prototype.scrollTo ??= () => {}
+    })
+    afterEach(() => {
+      if (root) act(() => root!.unmount())
+      container?.remove()
+      root = null
+      container = null
+      vi.unstubAllGlobals()
+    })
+    const mount = (chat: readonly AiChatMessage[]) => {
+      vi.stubGlobal(
+        'desktopApi',
+        new Proxy(
+          {},
+          {
+            get: (_t, prop: string) =>
+              /^on[A-Z]/.test(prop) ? () => () => {} : () => Promise.resolve(undefined),
+          },
+        ),
+      )
+      container = document.createElement('div')
+      document.body.appendChild(container)
+      root = createRoot(container)
+      act(() =>
+        root!.render(
+          createElement(
+            LocaleProvider,
+            { initial: 'vi', children: null },
+            createElement(AiChatPanel, {
+              isOpen: true,
+              hasContent: true,
+              chat,
+              attachments: [],
+              attachNotice: null,
+              onPickAttachments: () => {},
+              onAddAttachmentPaths: () => {},
+              onAddPastedImage: () => {},
+              onRemoveAttachment: () => {},
+              prompt: 'sum column B',
+              preview: null,
+              aiBusy: false,
+              onPromptChange: () => {},
+              onSend: () => {},
+              onStop: () => {},
+              onNewChat: () => {},
+              onUndo: () => {},
+              scopeRange: null,
+              scopeColumns: null,
+              scopeLocked: false,
+              onScopeDismiss: () => {},
+              onCitation: () => {},
+              onExpand: () => {},
+              onCollapse: () => {},
+            }),
+          ),
+        ),
+      )
+      return container
+    }
+
+    it('the refusal shows its error with no Retry; the composer holds the question', () => {
+      const c = mount(markRunFailed([user, streaming], tr('aiErrQuestionTooLong')))
+      expect(c.textContent).toContain(tr('aiErrQuestionTooLong'))
+      expect(c.querySelector('.ai-retry-btn')).toBeNull()
+      expect(c.querySelector('textarea')?.value).toBe('sum column B')
+    })
+
+    it('another failure shows Retry (control)', () => {
+      const c = mount(markRunFailed([user, streaming], 'server fell over'))
+      expect(c.querySelector('.ai-retry-btn')).not.toBeNull()
     })
   })
 })

@@ -226,6 +226,28 @@ describe('UniWork AI notices (slides panel)', () => {
     expect(c.querySelector('textarea')?.value).toBe('tighten it')
   })
 
+  it.each([['aiErrQuestionTooLong'], ['aiErrQuestionRejected']] as const)(
+    'a refused question (%s) shows its error, offers no Retry or regenerate, and puts the question back in the composer',
+    async (key) => {
+      const c = await startRun()
+      await act(async () => harness.events!.onError?.(ui(key)))
+      await flush()
+      expect(c.querySelector('.ai-msg-error')?.textContent).toContain(ui(key))
+      expect(c.querySelector('.ai-retry-btn')).toBeNull()
+      expect(c.querySelector(`button[aria-label="${t('aiRegenerate')}"]`)).toBeNull()
+      expect(c.querySelector('textarea')?.value).toBe('tighten it')
+    },
+  )
+
+  it('another failure still offers regenerate and leaves the composer alone (control)', async () => {
+    const c = await startRun()
+    await act(async () => harness.events!.onError?.('server fell over'))
+    await flush()
+    expect(c.querySelector('.ai-msg-error')).not.toBeNull()
+    expect(c.querySelector(`button[aria-label="${t('aiRegenerate')}"]`)).not.toBeNull()
+    expect(c.querySelector('textarea')?.value).toBe('')
+  })
+
   it('UniWork AI off: one note, no error line, no Retry or regenerate, no empty-reply line', async () => {
     const c = await startRun()
     await notify({ kind: 'uniwork-off' })

@@ -207,6 +207,31 @@ describe('UniWork AI notices (docs panel)', () => {
     expect(container!.querySelector('textarea')?.value).toBe('summarize it')
   })
 
+  it.each([
+    ['question_too_long', 'aiErrQuestionTooLong'],
+    ['question_rejected', 'aiErrQuestionRejected'],
+  ] as const)(
+    'a %s refusal shows its error, offers no Retry or regenerate, and puts the question back in the composer',
+    async (uniworkCode, key) => {
+      await emit({ type: 'error', uniworkCode, error: 'ignored' })
+      expect(container!.querySelector('.ai-msg-error')?.textContent).toContain(ui(key))
+      expect(container!.querySelector('.ai-retry-btn')).toBeNull()
+      expect(container!.querySelector(`button[aria-label="${t('aiRegenerateTitle')}"]`)).toBeNull()
+      expect(container!.querySelector('textarea')?.value).toBe('summarize it')
+      await pastGrace()
+      expect(reports.map((r) => r.state)).toEqual(['running', 'idle'])
+    },
+  )
+
+  it('another failure still offers regenerate and leaves the composer alone (control)', async () => {
+    await emit({ type: 'error', uniworkCode: 'unavailable', error: 'ignored' })
+    expect(container!.querySelector('.ai-msg-error')).not.toBeNull()
+    expect(
+      container!.querySelector(`button[aria-label="${t('aiRegenerateTitle')}"]`),
+    ).not.toBeNull()
+    expect(container!.querySelector('textarea')?.value).toBe('')
+  })
+
   it('UniWork AI off: one note, no error line, no Retry or regenerate, no empty-reply line', async () => {
     await emit({ type: 'notice', notice: { kind: 'uniwork-off' } })
     await emit({ type: 'done' })

@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { LANGS } from '@genoffice/i18n'
-import { aiUniworkStrings, aiUniworkText } from '../src/strings-ai-uniwork'
+import {
+  aiUniworkStrings,
+  aiUniworkText,
+  isUniworkQuestionRefusal,
+} from '../src/strings-ai-uniwork'
 
 /**
  * Shared UniWork AI shard (ai-uniwork/<lang>.ts, U-02 closed catalogue): zh defines the key set;
@@ -136,5 +140,19 @@ describe('ai-uniwork string shards', () => {
     expect(aiUniworkText('vi', 'aiErrRateLimited', { seconds: 30 })).toBe(
       'Bạn đang gửi quá nhanh. Thử lại sau 30 giây.',
     )
+  })
+})
+
+describe('isUniworkQuestionRefusal', () => {
+  it.each([...LANGS])('knows the two refusal messages of %s', (lang) => {
+    expect(isUniworkQuestionRefusal(aiUniworkText(lang, 'aiErrQuestionTooLong'))).toBe(true)
+    expect(isUniworkQuestionRefusal(aiUniworkText(lang, 'aiErrQuestionRejected'))).toBe(true)
+  })
+
+  it('is false for every other message and for nothing', () => {
+    expect(isUniworkQuestionRefusal(aiUniworkText('vi', 'aiErrUnavailable'))).toBe(false)
+    expect(isUniworkQuestionRefusal('Network error')).toBe(false)
+    expect(isUniworkQuestionRefusal('')).toBe(false)
+    expect(isUniworkQuestionRefusal(undefined)).toBe(false)
   })
 })

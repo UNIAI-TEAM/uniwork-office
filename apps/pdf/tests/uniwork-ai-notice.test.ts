@@ -205,6 +205,26 @@ describe('UniWork AI notices (pdf panel)', () => {
     expect(container!.querySelector('textarea')?.value).toBe('which pages?')
   })
 
+  it.each([['aiErrQuestionTooLong'], ['aiErrQuestionRejected']] as const)(
+    'a refused question (%s) shows its error, offers no Retry or regenerate, and puts the question back in the composer',
+    async (key) => {
+      await started()
+      await act(async () => harness.events.onError(ui(key)))
+      expect(container!.querySelector('.ai-msg-error')?.textContent).toContain(ui(key))
+      expect(retryButton()).toBeNull()
+      expect(container!.querySelector(`button[aria-label="${t('aiRegenerateTitle')}"]`)).toBeNull()
+      expect(container!.querySelector('.ai-msg-undelivered')).toBeNull()
+      expect(container!.querySelector('textarea')?.value).toBe('which pages?')
+    },
+  )
+
+  it('another failure still offers Retry and leaves the composer alone (control)', async () => {
+    await started()
+    await act(async () => harness.events.onError('server fell over'))
+    expect(retryButton()).not.toBeNull()
+    expect(container!.querySelector('textarea')?.value).toBe('')
+  })
+
   it('UniWork AI off: one note, no error line, no Retry or regenerate, no empty-reply line', async () => {
     await started()
     await notify({ kind: 'uniwork-off' })
