@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import type { MindMapTreeNode } from '@genoffice/agent-core'
@@ -93,5 +95,72 @@ describe('MindMapCard first frame', () => {
       w.mockRestore()
       h.mockRestore()
     }
+  })
+})
+
+describe('MindMapCard refit when first measured hidden (R3-4)', () => {
+  type Observer = { cb: () => void; disconnected: boolean }
+  const observers: Observer[] = []
+  class FakeResizeObserver {
+    private entry: Observer
+    constructor(cb: () => void) {
+      this.entry = { cb, disconnected: false }
+      observers.push(this.entry)
+    }
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {
+      this.entry.disconnected = true
+    }
+  }
+
+  afterEach(() => {
+    observers.length = 0
+    vi.unstubAllGlobals()
+  })
+
+  it('stays at 1:1 while hidden, then fits once the card gets a size and stops observing', () => {
+    vi.stubGlobal('ResizeObserver', FakeResizeObserver)
+    let width = 0
+    let height = 0
+    const w = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(() => width)
+    const h = vi
+      .spyOn(HTMLElement.prototype, 'clientHeight', 'get')
+      .mockImplementation(() => height)
+    try {
+      const { canvas } = renderCard()
+      expect(zoomOf(canvas)).toBe(1)
+      expect(observers).toHaveLength(1)
+
+      // the panel is revealed: one resize notification with a real size
+      width = 200
+      height = 300
+      act(() => observers[0]!.cb())
+
+      expect(zoomOf(canvas)).toBeLessThan(1)
+      expect(observers[0]!.disconnected).toBe(true)
+    } finally {
+      w.mockRestore()
+      h.mockRestore()
+    }
+  })
+
+  it('does not observe a card that was measured on first render', () => {
+    vi.stubGlobal('ResizeObserver', FakeResizeObserver)
+    const w = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(200)
+    const h = vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
+    try {
+      renderCard()
+      expect(observers.every((o) => o.disconnected)).toBe(true)
+    } finally {
+      w.mockRestore()
+      h.mockRestore()
+    }
+  })
+
+  it('runs the first fit before paint (layout effect, not a passive effect)', () => {
+    const source = readFileSync(resolve(__dirname, '../src/renderer/ai/MindMapCard.tsx'), 'utf8')
+    expect(source).toMatch(/useLayoutEffect\(/)
+    expect(source).not.toMatch(/lastTreeRef[\s\S]{0,120}\n {2}useEffect\(/)
   })
 })

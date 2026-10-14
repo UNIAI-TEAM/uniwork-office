@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { MindMapTreeNode } from '@genoffice/agent-core'
 import {
   countMindMapNodes,
@@ -58,13 +58,27 @@ export function MindMapCard({ tree, onAsk, onJumpBlock }: MindMapCardProps) {
     setPan({ x: view.x, y: view.y })
   }, [layout])
 
-  // fit once per new map (collapse toggles keep the user's view)
-  const lastTreeRef = useRef<MindMapTreeNode | null>(null)
-  useEffect(() => {
-    if (lastTreeRef.current === tree) return
-    lastTreeRef.current = tree
-    fitView()
-  }, [tree, fitView])
+  // fit once per new map (collapse toggles keep the user's view). A layout effect, so the first
+  // painted frame is already fitted instead of flashing at 1:1.
+  const fitViewRef = useRef(fitView)
+  useLayoutEffect(() => {
+    fitViewRef.current = fitView
+  })
+  useLayoutEffect(() => {
+    fitViewRef.current()
+    const vp = viewportRef.current
+    if (!vp || (vp.clientWidth > 0 && vp.clientHeight > 0)) return
+    if (typeof ResizeObserver === 'undefined') return
+    // first measured at size 0 (hidden / collapsed panel): the fit above was a no-op, so refit
+    // once when the card gets a real size, then stop watching
+    const observer = new ResizeObserver(() => {
+      if (vp.clientWidth <= 0 || vp.clientHeight <= 0) return
+      fitViewRef.current()
+      observer.disconnect()
+    })
+    observer.observe(vp)
+    return () => observer.disconnect()
+  }, [tree])
 
   // Ctrl/Cmd+wheel zooms around the cursor (Chromium reports a trackpad pinch
   // as ctrl+wheel) — the same gesture the editor canvas uses. A plain wheel is
