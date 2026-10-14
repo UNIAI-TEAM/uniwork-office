@@ -423,11 +423,13 @@ export function PracticeHome({
       )
       .sort((a, b) => (b.entry.lastActiveAt > a.entry.lastActiveAt ? 1 : -1))
   }, [projects, practice.id, practice.projectKind, qQuery])
-  // the Desk drawer's pack chip lists every pack of this role (the Knowledge search does not apply)
+  // the Desk drawer's pack chip lists every pack of this role (the Knowledge search does not apply),
+  // most recently active first, as Knowledge lists them
   const deskPacks = useMemo(
     () =>
       projects
         .filter((p) => p.kind === practice.projectKind && !!p.practice)
+        .sort((a, b) => (b.lastActiveAt > a.lastActiveAt ? 1 : -1))
         .flatMap((p) => {
           const m = toPracticeMeta(p, practice.id)
           return m ? [{ id: p.id, title: m.title }] : []
@@ -460,11 +462,14 @@ export function PracticeHome({
     setTab(id)
   }
 
+  // keyed on the stored values, not the array: a refresh hands over a new array with the same
+  // tags, and that must not throw away unsaved edits
+  const storedTags = (meta?.tags ?? []).join('\n')
   useEffect(() => {
     setNoteDraft(meta?.notes ?? '')
-    setTagList(meta?.tags ?? [])
+    setTagList(storedTags ? storedTags.split('\n') : [])
     setTagInput('')
-  }, [selected?.id, meta?.notes, meta?.tags])
+  }, [selected?.id, meta?.notes, storedTags])
 
   // a new pack shows its skeleton; a reload of the same pack keeps the list until it answers
   useEffect(() => setPackFiles(null), [selectedId])
@@ -527,6 +532,16 @@ export function PracticeHome({
       action: { kind: 'delete-pack', id: selected.id },
     })
   }
+
+  // deleting the last pack unmounts the list the confirm handed focus to: the pane takes it
+  const hadPacks = useRef(false)
+  useEffect(() => {
+    const active = document.activeElement
+    if (hadPacks.current && deskPacks.length === 0 && (!active || active === document.body)) {
+      paneRef.current?.focus()
+    }
+    hadPacks.current = deskPacks.length > 0
+  }, [deskPacks.length])
 
   const removePack = async (id: string) => {
     setBusy('delete-pack')
@@ -979,7 +994,10 @@ export function PracticeHome({
           }}
         />
 
-        <WorkspacePickerContext.Provider value={pickWorkspace}>
+        {/* "Choose another workspace" only when the chip is there and offers another one */}
+        <WorkspacePickerContext.Provider
+          value={workspace && workspaces?.some((w) => w.id !== workspace.id) ? pickWorkspace : null}
+        >
           {tab === 'desk' ? (
             <DeskView
               practiceId={practice.id}
@@ -1114,10 +1132,10 @@ export function PracticeHome({
                               {meta.title}
                             </h3>
                             <div className="wb-kn-facets">
-                              {Object.values(meta.facets)
-                                .filter(Boolean)
-                                .map((v) => (
-                                  <span key={v} className="wb-pill">
+                              {Object.entries(meta.facets)
+                                .filter(([, v]) => !!v)
+                                .map(([id, v]) => (
+                                  <span key={id} className="wb-pill">
                                     {v}
                                   </span>
                                 ))}

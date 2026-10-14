@@ -290,7 +290,7 @@ describe('Knowledge (redesign spec 4.7)', () => {
     ])
     expect(items[0]!.querySelector('.wb-row-sub')?.textContent).toBe('Acme · Đang làm')
     expect(items.map((b) => b.querySelector('.wb-pill')?.textContent)).toEqual([
-      '2 files',
+      'Files: 2',
       'No files yet',
     ])
     expect(items[0]!.getAttribute('aria-current')).toBe('true')
@@ -314,9 +314,9 @@ describe('Knowledge (redesign spec 4.7)', () => {
     const actions = detail.querySelector('.wb-kn-head-actions')!
     expect(
       Array.from(actions.querySelectorAll('.wb-btn-secondary')).map((b) => b.textContent),
-    ).toEqual(['Pack materials', 'Open folder'])
+    ).toEqual(['Pack materials', 'View files'])
     expect(host.querySelector('section.wb-pane .btn')).toBeNull()
-    await click(buttonByText('Open folder', actions))
+    await click(buttonByText('View files', actions))
     expect(props.onOpenPackFiles).toHaveBeenCalledWith('p1')
     await click(buttonByText('Pack materials', actions))
     expect(activeTab()).toContain('Materials')
@@ -469,6 +469,72 @@ describe('in-app confirmations and page toasts (redesign spec 2.3, 5.3)', () => 
   })
 })
 
+describe('Knowledge follows the projects Home hands down', () => {
+  /** PracticeHome under a parent that owns the projects, as Home does */
+  async function mountLive(initial: ProjectSummaryEntry[]) {
+    const live: { set?: (p: ProjectSummaryEntry[]) => void } = {}
+    const onRefresh = vi.fn()
+    function Harness() {
+      const [projects, setProjects] = useState(initial)
+      const [sel, setSel] = useState<string | null>(initial[0]?.id ?? null)
+      live.set = setProjects
+      return createElement(PracticeHome, {
+        practice: PRACTICE,
+        projects,
+        selectedId: sel,
+        onSelectPack: setSel,
+        onOpenPackFiles: vi.fn(),
+        onRefresh,
+        onSwitchPractice: vi.fn(),
+        newItems: [],
+      })
+    }
+    await act(async () => {
+      root.render(createElement(LocaleProvider, { initial: 'en' }, createElement(Harness)))
+    })
+    await flush()
+    await clickTab('knowledge')
+    return { setProjects: (p: ProjectSummaryEntry[]) => live.set!(p), onRefresh }
+  }
+
+  it('deleting the last pack: focus lands on the Knowledge pane, not <body>', async () => {
+    const { setProjects, onRefresh } = await mountLive([PACK])
+    onRefresh.mockImplementation(() => setProjects([]))
+    await chooseMenu(byLabel('More actions')!, 'Delete pack…')
+    await click(host.querySelector<HTMLButtonElement>('.wb-confirm .wb-btn-danger'))
+    expect(project.deleteProject).toHaveBeenCalledWith('p1')
+    expect(host.querySelector('.wb-pack-list')).toBeNull()
+    expect(document.activeElement).toBe(host.querySelector('section.wb-pane'))
+  })
+
+  it('a refresh that brings the same tags back keeps unsaved edits', async () => {
+    const { setProjects } = await mountLive([PACK])
+    await click(byLabel('Remove tag q4'))
+    const notes = host.querySelector<HTMLTextAreaElement>('.wb-kn-section textarea')!
+    await type(notes, 'Call Linh on Friday')
+    // a refresh: new objects and a new tags array, the same stored values
+    await act(async () =>
+      setProjects([
+        { ...PACK, practice: { ...PACK.practice!, tags: ['q4'] } } as ProjectSummaryEntry,
+      ]),
+    )
+    await flush()
+    expect(host.querySelectorAll('.wb-kn-tag')).toHaveLength(0)
+    expect(notes.value).toBe('Call Linh on Friday')
+    expect(host.querySelector('.wb-kn-foot')?.textContent).toContain('Unsaved changes')
+  })
+
+  it('the Materials pack chip lists packs in the Knowledge order, latest active first', async () => {
+    const older = { ...PACK2, lastActiveAt: '2026-10-01T00:00:00Z' } as ProjectSummaryEntry
+    const newer = { ...PACK, lastActiveAt: '2026-10-14T00:00:00Z' } as ProjectSummaryEntry
+    pinPillar(PRACTICE.id, 'materials')
+    await mountLive([older, newer])
+    await clickTab('materials')
+    const options = Array.from(host.querySelectorAll('.wb-toolbar .wb-crumb select option'))
+    expect(options.map((o) => o.textContent).slice(1)).toEqual(['Acme deal', 'Beta lease'])
+  })
+})
+
 describe('Materials (redesign spec 4.8)', () => {
   it('no pack: the panel sends you to Knowledge', async () => {
     await openPillar([PACK], null, 'materials')
@@ -483,7 +549,7 @@ describe('Materials (redesign spec 4.8)', () => {
     const bar = host.querySelector('.wb-toolbar')!
     expect(bar.querySelector('.wb-crumb .wb-crumb-name')?.textContent).toBe('Pack: Acme deal')
     expect(bar.querySelector<HTMLSelectElement>('.wb-crumb select')!.value).toBe('p1')
-    expect(bar.querySelector('.wb-toolbar-text')?.textContent).toBe('1 files')
+    expect(bar.querySelector('.wb-toolbar-text')?.textContent).toBe('Files: 1')
     const add = buttonByText('Add material', bar)!
     expect(add.className).toBe('wb-btn wb-btn-secondary')
     await chooseMenu(add, 'Report')
@@ -623,6 +689,23 @@ describe('Skills (redesign spec 4.9)', () => {
     expect(dialog.querySelector('.wb-btn-primary')?.textContent).toBe('Run')
     await key(dialog as HTMLElement, 'Escape')
     expect(host.querySelector('.wb-confirm')).toBeNull()
+  })
+
+  it('a confirmed Run opens the document with the skill set to run in the pack', async () => {
+    await openPillar([PACK], 'p1', 'skills')
+    await click(host.querySelector('.wb-sk-row button'))
+    await click(host.querySelector<HTMLButtonElement>('.wb-confirm .wb-btn-primary'))
+    const calls = [
+      ...(window.aiOffice.newDoc as ReturnType<typeof vi.fn>).mock.calls,
+      ...(window.aiOffice.newSlide as ReturnType<typeof vi.fn>).mock.calls,
+    ]
+    expect(calls).toHaveLength(1)
+    expect(calls[0]![0]).toEqual(
+      expect.objectContaining({
+        projectId: 'p1',
+        aiPreset: expect.objectContaining({ autoRun: true }),
+      }),
+    )
   })
 
   it('a run that fails names the skill in an alert toast; Retry asks again before spending', async () => {

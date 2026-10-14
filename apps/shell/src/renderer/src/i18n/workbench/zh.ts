@@ -140,7 +140,7 @@ export const zh = {
   wbKnSearchPlaceholder: '按名称、标签或备注搜索资料包',
   wbKnLibrary: '资料库',
   wbKnEmpty: '还没有资料包',
-  wbKnViewFiles: '打开文件夹',
+  wbKnViewFiles: '查看文件',
   wbKnDeletePack: '删除资料包',
   wbKnSelectPack: '请选择一个资料包',
   wbMatEmpty: '资料包中还没有文件',

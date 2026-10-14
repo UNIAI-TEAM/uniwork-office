@@ -136,7 +136,7 @@ export const vi = {
   wbKnSearchPlaceholder: 'Tìm gói theo tên, thẻ, ghi chú',
   wbKnLibrary: 'Thư viện',
   wbKnEmpty: 'Chưa có gói nào',
-  wbKnViewFiles: 'Mở thư mục',
+  wbKnViewFiles: 'Xem tệp',
   wbKnDeletePack: 'Xóa gói',
   wbKnSelectPack: 'Chọn một gói',
   wbMatEmpty: 'Chưa có tệp trong gói',

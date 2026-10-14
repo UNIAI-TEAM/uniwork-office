@@ -41,6 +41,7 @@ const WS: UniworkWorkspaceRef = {
   slug: 'ops',
   orgSlug: 'acme',
 }
+const WS2: UniworkWorkspaceRef = { ...WS, id: 'w-other', name: 'Sales', slug: 'sales' }
 let host: HTMLDivElement
 let root: Root
 
@@ -80,7 +81,7 @@ beforeEach(() => {
   document.body.append(host)
   root = createRoot(host)
   window.aiOffice = {
-    uniworkListWorkspaces: vi.fn(async () => ({ ok: true, value: [WS] })),
+    uniworkListWorkspaces: vi.fn(async () => ({ ok: true, value: [WS, WS2] })),
     accountStatus: vi.fn(async () => ({ loggedIn: true, state: 'signed-in' })),
     recents: vi.fn(async () => ({ entries: [], total: 0, totalAll: 0 })),
     uniworkListDocuments: vi.fn(forbidden),
@@ -132,6 +133,20 @@ describe('lost access offers "Choose another workspace" (spec 4.11)', () => {
       await act(async () => pick.click())
       expect(document.activeElement).toBe(workspaceSelect())
     }
+  })
+
+  it('with no other workspace to choose, the action is left out rather than opening the same one', async () => {
+    ;(window.aiOffice.uniworkListWorkspaces as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      value: [WS],
+    })
+    await renderHome()
+    expect(workspaceSelect()).not.toBeNull()
+    expect(buttonsByText('Choose another workspace')).toHaveLength(0)
+    await openTab('Tasks')
+    const panel = host.querySelector('.wb-state[role="alert"]')!
+    expect(panel.textContent).toContain('no longer have access')
+    expect(panel.querySelectorAll('button')).toHaveLength(0)
   })
 
   it.each(['Tasks', 'Calendar', 'Profile'])(
