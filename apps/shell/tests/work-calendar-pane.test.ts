@@ -18,8 +18,10 @@ const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONM
 actEnvironment.IS_REACT_ACT_ENVIRONMENT = true
 
 const WS: UniworkWorkspaceRef = { id: 'w1', name: 'Ops', orgId: 'o1', slug: 'ops', orgSlug: 'acme' }
-const TODAY = localIsoDate(new Date())
-const inOneHour = new Date(Date.now() + 3_600_000)
+// A fixed morning, so "in one hour" never crosses midnight on a CI clock.
+const NOW = new Date(2026, 9, 15, 10, 0)
+const TODAY = localIsoDate(NOW)
+const inOneHour = new Date(NOW.getTime() + 3_600_000)
 const EVENTS: WorkCalendarEvent[] = [
   {
     id: 'task:t1',
@@ -47,6 +49,8 @@ const api = {
 }
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(NOW)
   host = document.createElement('div')
   document.body.append(host)
   root = createRoot(host)
@@ -58,6 +62,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount())
   host.remove()
+  vi.useRealTimers()
 })
 
 async function mount(): Promise<void> {
