@@ -223,6 +223,20 @@ describe('UniWork AI notices (docs panel)', () => {
     },
   )
 
+  it('a refused question does not overwrite a newer draft typed while the turn ran', async () => {
+    const box = container!.querySelector('textarea') as HTMLTextAreaElement
+    const setValue = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+    await act(async () => {
+      setValue.call(box, 'a newer draft')
+      box.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    expect(box.value).toBe('a newer draft')
+    await emit({ type: 'error', uniworkCode: 'question_rejected', error: 'ignored' })
+    expect(container!.querySelector('.ai-msg-error')).not.toBeNull()
+    expect(container!.querySelector('textarea')?.value).toBe('a newer draft')
+    await pastGrace()
+  })
+
   it('another failure still offers regenerate and leaves the composer alone (control)', async () => {
     await emit({ type: 'error', uniworkCode: 'unavailable', error: 'ignored' })
     expect(container!.querySelector('.ai-msg-error')).not.toBeNull()
