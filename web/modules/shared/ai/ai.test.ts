@@ -2602,7 +2602,52 @@ describe('UniWork AI on the web (G6-05)', () => {
       expect(s.providers.uniwork.apiKey).not.toBe('')
       expect(s.credentialsUnavailable).toBeUndefined()
       expect(s.uniAiAvailable).toBe(false)
-      // no BYOK listing, no cloud read without a cloud grant: nothing was asked of the server
+      // no BYOK listing; the only read is the cloud status (it names the UniWork AI model)
+      expect(calls.length).toBeGreaterThan(0)
+      expect(new Set(calls.map((c) => c.url))).toEqual(new Set([`${BASE}/cloud`]))
+    })
+
+    it('uniworkAi alone with no cloud-tool grant still shows the model the server names, and leaves the tools off', async () => {
+      const { fetch } = recorder(() =>
+        jsonResponse(200, { ...CLOUD, uniwork_model: 'claude-opus-5' }),
+      )
+      const capabilities: Record<string, unknown> = { ai: true, uniworkAi: true }
+      const ai = createWebAi({
+        port: uniworkPort({ uniworkAi: true }),
+        capabilities,
+        fetch,
+        origin: ORIGIN,
+      })
+      const s = await ai.settings()
+      expect(s.provider).toBe('uniwork')
+      expect(s.uniworkModel).toBe('claude-opus-5')
+      // the cloud switches are only applied for a frame that was granted a tool
+      expect(capabilities).toEqual({ ai: true, uniworkAi: true })
+    })
+
+    it('uniworkAi alone, the status read fails: the plain name, nothing breaks', async () => {
+      const { fetch } = recorder(() => jsonResponse(503, { code: 'cloud_unavailable' }))
+      const ai = createWebAi({
+        port: uniworkPort({ uniworkAi: true }),
+        capabilities: { ai: true, uniworkAi: true },
+        fetch,
+        origin: ORIGIN,
+      })
+      const s = await ai.settings()
+      expect(s.provider).toBe('uniwork')
+      expect(s.uniworkModel).toBeUndefined()
+    })
+
+    it('neither grant: nothing is asked of the server', async () => {
+      const { calls, fetch } = recorder(() => jsonResponse(200, CLOUD))
+      const ai = createWebAi({
+        port: uniworkPort({}),
+        capabilities: {},
+        fetch,
+        origin: ORIGIN,
+      })
+      expect(await ai.active()).toBe(false)
+      await ai.settings()
       expect(calls).toEqual([])
     })
 

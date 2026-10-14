@@ -261,6 +261,8 @@ export function createWebAi(opts: {
   let byokGranted = false
   let uniworkGranted = false
   let cloudWanted = false
+  /** the cloud status is read: for the tool switches (`cloudWanted`) or for the UniWork AI model name */
+  let cloudRead = false
   /** UniWork AI turned off by the server after the grant was minted (capability / format off) */
   let uniworkOff = false
   let frameSession: { documentId: string; module?: OfficeModule } | null = null
@@ -314,13 +316,15 @@ export function createWebAi(opts: {
       const granted = session.capabilities
       // the availability flag adds the `uniwork` entry to AI_PROVIDERS (every list built from it)
       setUniworkAiAvailable(uniworkGranted)
-      // BYOK always reads the cloud switches (as before); a UniWork-only frame only when it was
-      // granted a cloud tool: nothing is asked of the server for a grant that is not there
+      // BYOK always reads the cloud switches (as before); a UniWork-only frame applies them only
+      // when it was granted a cloud tool. The status is also read for the UniWork AI grant (it names
+      // the model of that row); nothing is asked of the server when neither grant is there
       cloudWanted =
         byokGranted ||
         granted?.webSearch === true ||
         granted?.imageSearch === true ||
         granted?.imageGeneration === true
+      cloudRead = cloudWanted || uniworkGranted
       const sessionModule = (session as { module?: OfficeModule }).module
       const module = opts.module ?? sessionModule
       frameSession = { documentId: session.documentId, ...(module ? { module } : {}) }
@@ -342,20 +346,21 @@ export function createWebAi(opts: {
   async function load(refresh = false): Promise<WebAiState> {
     const client = clientRef
     if (!client) return EMPTY
-    // a UniWork-only frame with no cloud grant has neither a credential list nor cloud switches
-    if (!byokGranted && !cloudWanted) return state
+    // a UniWork-only frame has no credential list, and no cloud status unless a grant reads it
+    if (!byokGranted && !cloudRead) return state
     if (loading && !refresh && now() - loadedAt < CREDENTIALS_TTL_MS) return loading
     const run = (async () => {
       const [credentials, cloud] = await Promise.all([
         byokGranted ? client.listCredentials() : Promise.resolve(EMPTY.credentials),
-        cloudWanted ? client.cloudStatus().catch(() => null) : Promise.resolve(null),
+        cloudRead ? client.cloudStatus().catch(() => null) : Promise.resolve(null),
       ])
       const changed =
         everLoaded && credentialSignature(credentials) !== credentialSignature(state.credentials)
       state = { credentials, cloud }
       loadedAt = now()
       everLoaded = true
-      applyCloud(cloud)
+      // the tool switches and the process-wide status follow a granted tool only
+      if (cloudWanted) applyCloud(cloud)
       void refreshLists(true)
       if (changed) notifyChanged()
       return state
