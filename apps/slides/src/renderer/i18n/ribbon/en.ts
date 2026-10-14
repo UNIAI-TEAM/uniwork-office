@@ -213,6 +213,8 @@ export const en = {
   ribbonGroupComments: 'Comments',
   ribbonComment: 'Comment',
   ribbonNewCommentTip: 'New comment on the current slide (saved to pptx, visible in PowerPoint)',
+  ribbonNewCommentServerTip:
+    'New comment on the current slide (shared with everyone who opens this presentation, not saved in the file)',
   ribbonInsertTextBoxTip: 'Insert a text box',
   ribbonWordArt: 'WordArt',
   ribbonWordArtTip: 'Insert WordArt (large filled/outlined text)',

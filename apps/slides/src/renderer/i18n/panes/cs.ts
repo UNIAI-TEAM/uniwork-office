@@ -63,6 +63,10 @@ export const cs = {
   paneCommentsPlaceholder: 'Nový komentář… (⌘/Ctrl+Enter odešle)',
   paneCommentsPost: 'Odeslat',
   paneCommentsNeutralAuthor: 'Uživatel',
+  paneCommentsSaveFirst:
+    'Chcete-li přidat komentář, nejprve prezentaci uložte. Komentáře níže můžete dál číst, odpovídat na ně a řešit je.',
+  paneCommentsNewNoSlide:
+    'K tomuto snímku teď nelze přidat komentář. Vyberte jiný snímek a zkuste to znovu.',
 
   paneCsdTitle: 'Vlastní prezentace',
   paneCsdDefaultName: 'Vlastní prezentace {n}',
