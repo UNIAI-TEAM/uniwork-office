@@ -8,10 +8,12 @@
   gap: 2px;
   font-size: 11px;
   line-height: 16px;
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
   user-select: none;
   white-space: nowrap;
+  /* the model picker label shrinks around the chip, never the other way round */
+  flex-shrink: 0;
 }
 
 /* sits on its own quiet line under the reply text */
