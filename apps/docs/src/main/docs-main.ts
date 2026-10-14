@@ -9,6 +9,7 @@ import {
   uniworkSamePath,
   uniworkSaveDecision,
 } from './uniwork-policy'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { createHash, randomUUID } from 'node:crypto'
 import { handOffBytes } from './byte-handoff'
 import {
@@ -114,6 +115,7 @@ import {
   sanitizeAiSettings,
   sanitizeCliPath,
   aiNoticeBody,
+  aiNoticeTagged,
   aiTestFailure,
   testChatConnection,
   noModelMessage,
@@ -3816,6 +3818,103 @@ export function setUniworkAiHost(host: UniworkAiHost | null): void {
   uniworkAiHost = host
 }
 
+const UNIWORK_KEYS_HOST_SYMBOL = Symbol.for('genoffice.uniworkKeysHost')
+const BROADCAST_AI_SETTINGS_SYMBOL = Symbol.for('genoffice.broadcastAiSettingsChanged')
+
+export interface UniworkKeysLocalChoice {
+  readonly model: string
+  readonly updatedAt?: number | undefined
+}
+
+export interface UniworkKeysHost {
+  list(options?: { force?: boolean }): Promise<unknown>
+  sources(
+    localChoices?: Partial<Record<AiProviderId, string | UniworkKeysLocalChoice>>,
+    onChanged?: () => void,
+    excludeProviders?: ReadonlySet<AiProviderId>,
+  ): Partial<Record<AiProviderId, AiModelSource>>
+  hasOrgSource(provider: AiProviderId): boolean
+  chosenModelFor(provider: AiProviderId, localChoice?: string | UniworkKeysLocalChoice): string
+  byokBaseUrl(provider: AiProviderId): string | null
+  fetchFor(
+    provider: AiProviderId,
+    options?: { onAbort?: () => void },
+  ): (url: string, init?: RequestInit) => Promise<Response>
+  clear(reason?: 'sign-out' | 'org-switch' | 'device-revoked'): void
+}
+
+let uniworkKeysHost: UniworkKeysHost | null = null
+
+export function setUniworkKeysHost(host: UniworkKeysHost | null): void {
+  uniworkKeysHost = host
+  ;(globalThis as Record<symbol, unknown>)[UNIWORK_KEYS_HOST_SYMBOL] = host
+}
+
+export function getUniworkKeysHost(): UniworkKeysHost | null {
+  if (uniworkKeysHost) return uniworkKeysHost
+  const globalHost = (globalThis as Record<symbol, unknown>)[UNIWORK_KEYS_HOST_SYMBOL]
+  return (globalHost as UniworkKeysHost | null | undefined) ?? null
+}
+
+interface DuckUniworkKeyError extends Error {
+  readonly name: 'UniworkKeyError'
+  readonly code: string
+  readonly status: number
+  readonly errorKind:
+    AiTestFailureKind | 'not_entitled' | 'rate_limit' | 'unreachable' | 'bad_url' | 'quota'
+  readonly retryAfterSec?: number | undefined
+  describe(lang?: string, providerLabel?: string): string
+}
+
+function isDuckUniworkKeyError(err: unknown): err is DuckUniworkKeyError {
+  return (
+    err instanceof Error &&
+    err.name === 'UniworkKeyError' &&
+    typeof (err as Partial<DuckUniworkKeyError>).errorKind === 'string' &&
+    typeof (err as Partial<DuckUniworkKeyError>).describe === 'function'
+  )
+}
+
+type ScopedFetchFn = (url: string, init?: RequestInit) => Promise<Response>
+const orgStreamFetchContext = new AsyncLocalStorage<ScopedFetchFn | undefined>()
+let installedFetchWrapper: typeof globalThis.fetch | null = null
+let wrappedBaseFetch: typeof globalThis.fetch | null = null
+let activeOrgFetchCount = 0
+
+async function withScopedFetch<T>(scoped: ScopedFetchFn, run: () => Promise<T>): Promise<T> {
+  if (activeOrgFetchCount === 0 || globalThis.fetch !== installedFetchWrapper) {
+    const baseFetch = globalThis.fetch.bind(globalThis)
+    wrappedBaseFetch = globalThis.fetch
+    const wrapper = ((input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      const activeScoped = orgStreamFetchContext.getStore()
+      if (activeScoped) {
+        const url =
+          typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+        return orgStreamFetchContext.run(undefined, () => activeScoped(url, init))
+      }
+      return baseFetch(input, init)
+    }) as typeof globalThis.fetch
+    installedFetchWrapper = wrapper
+    globalThis.fetch = wrapper
+  }
+  activeOrgFetchCount++
+  try {
+    return await orgStreamFetchContext.run(scoped, run)
+  } finally {
+    activeOrgFetchCount--
+    if (
+      activeOrgFetchCount === 0 &&
+      installedFetchWrapper &&
+      globalThis.fetch === installedFetchWrapper &&
+      wrappedBaseFetch
+    ) {
+      globalThis.fetch = wrappedBaseFetch
+      installedFetchWrapper = null
+      wrappedBaseFetch = null
+    }
+  }
+}
+
 /**
  * Whether the active UniWork account chose "UniWork AI" as its provider. The shell backs it with
  * the per-account store (key `uniwork.ai.uniwork-choice`); ai-settings.json only ever holds the
@@ -3876,12 +3975,44 @@ function broadcastAiSettingsChanged(): void {
 /** live `/models` per provider for the model chip, listed in the background (10 min TTL) */
 const providerModelCache = new ProviderModelCache()
 
+function localModelChoicesOf(
+  stored: (Partial<AiSettings> & LegacyAiSettings) | undefined,
+): Partial<Record<AiProviderId, string>> {
+  const choices: Partial<Record<AiProviderId, string>> = {}
+  const storedProviders =
+    stored && typeof stored.providers === 'object' && stored.providers !== null
+      ? (stored.providers as Partial<Record<AiProviderId, Partial<AiProviderConfig> | undefined>>)
+      : undefined
+  if (!storedProviders) return choices
+  const storedCount = Object.keys(storedProviders).length
+  for (const meta of AI_PROVIDERS) {
+    const id = meta.id
+    const rawModel = storedProviders[id]?.model
+    const model = typeof rawModel === 'string' ? rawModel.trim() : ''
+    if (!model) continue
+    if (
+      storedCount > 5 &&
+      model === meta.defaultModel &&
+      !(storedProviders[id]?.apiKey ?? '').trim()
+    ) {
+      continue
+    }
+    choices[id] = model
+  }
+  return choices
+}
+
 /**
  * Per provider that can send: the model chosen in the Settings pane (this file) and the provider's
  * live list. The list never blocks the read: a first call answers `loading` and starts the
  * listing, which announces itself through `ai:settings-changed` when it lands.
+ * When signed into UniWork, organization credentials from `UniworkKeysHost` are merged with
+ * `origin: 'org'` for any provider that has no usable local key in `ai-settings.json`.
  */
-function modelSourcesOf(settings: AiSettings): Partial<Record<AiProviderId, AiModelSource>> {
+function modelSourcesOf(
+  settings: AiSettings,
+  stored?: Partial<AiSettings> & LegacyAiSettings,
+): Partial<Record<AiProviderId, AiModelSource>> {
   const sources: Partial<Record<AiProviderId, AiModelSource>> = {}
   for (const meta of AI_PROVIDERS) {
     const id = meta.id
@@ -3893,6 +4024,26 @@ function modelSourcesOf(settings: AiSettings): Partial<Record<AiProviderId, AiMo
       ...providerModelCache.read(id, config, broadcastAiSettingsChanged),
     }
   }
+  const keysHost = getUniworkKeysHost()
+  if (keysHost) {
+    const localChoices = localModelChoicesOf(stored)
+    const localSourceIds = new Set(Object.keys(sources) as AiProviderId[])
+    const orgSources = keysHost.sources(localChoices, broadcastAiSettingsChanged, localSourceIds)
+    for (const [rawId, orgSource] of Object.entries(orgSources)) {
+      const id = rawId as AiProviderId
+      // Local key for this provider wins over the org credential for the same provider (§1, §6.2)
+      if (sources[id] || !orgSource) continue
+      sources[id] = orgSource
+      // When the user has not explicitly picked a model locally, reflect the org source's chosen
+      // model in the in-memory settings (never persisted, and apiKey stays '').
+      if (!localChoices[id] && orgSource.chosen && settings.providers[id]) {
+        settings.providers[id] = {
+          ...settings.providers[id],
+          model: orgSource.chosen,
+        }
+      }
+    }
+  }
   return sources
 }
 
@@ -3902,10 +4053,18 @@ function modelSourcesOf(settings: AiSettings): Partial<Record<AiProviderId, AiMo
  * sheets' standalone AI handlers use the same channel names.
  */
 export function registerAiIpc(): void {
+  ;(globalThis as Record<symbol, unknown>)[BROADCAST_AI_SETTINGS_SYMBOL] =
+    broadcastAiSettingsChanged
   app.once('before-quit', shutdownCodexAppServers)
   ipcMain.handle('ai:get-settings', async (event, options?: unknown): Promise<AiSettings> => {
     const stored = readJson<Partial<AiSettings> & LegacyAiSettings>(SETTINGS_PATH(), {})
     const settings = resolveAiSettings(stored, defaultAiSettings())
+    const keysHost = getUniworkKeysHost()
+    if (keysHost) {
+      await keysHost.list().catch(() => undefined)
+    }
+    // derived, never saved: what the model chip shows besides the catalog (including org sources)
+    settings.modelSources = modelSourcesOf(settings, stored)
     // the stored provider stays selected even while its config is incomplete (the picker and
     // Settings show what is missing); only an unknown id degrades to genspark
     // the account's UniWork AI pick overlays the file's BYOK provider; while the entry is not
@@ -3913,8 +4072,6 @@ export function registerAiIpc(): void {
     if ((isUniworkAiEditor(event) || wantsUniworkPick(options)) && uniworkAiChoiceStore?.read())
       settings.provider = 'uniwork'
     settings.provider = selectedProvider(settings)
-    // derived, never saved: what the model chip shows besides the catalog
-    settings.modelSources = modelSourcesOf(settings)
     const uniworkModel = uniworkAiAvailable() ? uniworkAiHost?.uniworkModel().trim() : ''
     if (uniworkModel) settings.uniworkModel = uniworkModel
     return settings
@@ -4007,7 +4164,6 @@ export function registerAiIpc(): void {
     const tools = request.tools ?? []
     const maxTokens = request.maxTokens ?? maxOutputTokensOf(settings)
     const provider = settings.provider
-    const config = withUniAiOpenRouterAuth(settings, provider, settings.providers?.[provider])
     const send = (chunk: AiStreamChunk) => {
       if (!event.sender.isDestroyed()) event.sender.send('ai:stream-chunk', chunk)
     }
@@ -4034,7 +4190,60 @@ export function registerAiIpc(): void {
       }
       return
     }
-    if (!config || (provider !== 'codex' && !config.apiKey)) {
+
+    const diskStored = readJson<Partial<AiSettings> & LegacyAiSettings>(SETTINGS_PATH(), {})
+    const diskSettings = resolveAiSettings(diskStored, defaultAiSettings())
+    const reqConfig = withUniAiOpenRouterAuth(settings, provider, settings.providers?.[provider])
+    const diskConfig = withUniAiOpenRouterAuth(
+      diskSettings,
+      provider,
+      diskSettings.providers?.[provider],
+    )
+    const keysHost = getUniworkKeysHost()
+    const byokBaseForProvider = keysHost?.byokBaseUrl(provider) ?? null
+    const hasUsableLocalConfig = (cfg: AiProviderConfig | undefined): boolean => {
+      if (!cfg) return false
+      if (provider === 'codex') return true
+      if (provider === 'custom') {
+        const base = cfg.baseUrl?.trim() ?? ''
+        return Boolean(base && base !== byokBaseForProvider)
+      }
+      return Boolean(cfg.apiKey?.trim())
+    }
+
+    let activeConfig: AiProviderConfig | undefined
+    let useOrgProxy = false
+
+    if (hasUsableLocalConfig(reqConfig)) {
+      activeConfig = reqConfig
+    } else if (hasUsableLocalConfig(diskConfig)) {
+      activeConfig = {
+        ...diskConfig!,
+        ...(reqConfig?.model?.trim() ? { model: reqConfig.model.trim() } : {}),
+      }
+    } else if (keysHost) {
+      if (!keysHost.hasOrgSource(provider)) {
+        await keysHost.list().catch(() => undefined)
+      }
+      const byokBase = keysHost.hasOrgSource(provider) ? keysHost.byokBaseUrl(provider) : null
+      if (byokBase) {
+        const diskLocalChoices = localModelChoicesOf(diskStored)
+        const reqRawModel = (reqConfig?.model ?? '').trim()
+        const metaDefault = AI_PROVIDERS.find((m) => m.id === provider)?.defaultModel ?? ''
+        const explicitLocalModel =
+          diskLocalChoices[provider] ||
+          (reqRawModel && reqRawModel !== metaDefault ? reqRawModel : '')
+        const model = keysHost.chosenModelFor(provider, explicitLocalModel) || reqRawModel
+        activeConfig = {
+          apiKey: '',
+          model,
+          baseUrl: byokBase,
+        }
+        useOrgProxy = true
+      }
+    }
+
+    if (!activeConfig || (!useOrgProxy && provider !== 'codex' && !activeConfig.apiKey)) {
       send({
         requestId,
         type: 'error',
@@ -4042,10 +4251,11 @@ export function registerAiIpc(): void {
       })
       return
     }
-    if (provider !== 'codex' && !config.model) {
+    if (provider !== 'codex' && !activeConfig.model) {
       send({ requestId, type: 'error', error: tm('errNoModel') })
       return
     }
+    const streamConfig = activeConfig
     const controller = new AbortController()
     activeAiStreams.set(requestId, controller)
     const unwatchSender = abortOnDestroyed(event.sender, controller)
@@ -4059,26 +4269,55 @@ export function registerAiIpc(): void {
     }
     try {
       let stopReason: string | undefined
-      await streamForProvider(provider, config, system, messages, tools, maxTokens, {
-        ...(request.sessionId ? { sessionId: request.sessionId } : {}),
-        signal: controller.signal,
-        onDelta: (text) => send({ requestId, type: 'delta', text }),
-        onReasoningDelta: (text) => send({ requestId, type: 'reasoning', text }),
-        onToolCall: (toolCall) => send({ requestId, type: 'tool-call', toolCall }),
-        onActivity: ping,
-        onStopReason: (reason) => {
-          stopReason = reason
-        },
-        onUsage: (usage) => send({ requestId, type: 'usage', usage }),
-      })
+      const runStream = () =>
+        streamForProvider(provider, streamConfig, system, messages, tools, maxTokens, {
+          ...(request.sessionId ? { sessionId: request.sessionId } : {}),
+          signal: controller.signal,
+          onDelta: (text) => send({ requestId, type: 'delta', text }),
+          onReasoningDelta: (text) => send({ requestId, type: 'reasoning', text }),
+          onToolCall: (toolCall) => send({ requestId, type: 'tool-call', toolCall }),
+          onActivity: ping,
+          onStopReason: (reason) => {
+            stopReason = reason
+          },
+          onUsage: (usage) => send({ requestId, type: 'usage', usage }),
+        })
+      if (useOrgProxy && keysHost) {
+        const scopedFetch = keysHost.fetchFor(provider, {
+          onAbort: () => controller.abort(),
+        })
+        await withScopedFetch(scopedFetch, runStream)
+      } else {
+        await runStream()
+      }
       send({ requestId, type: 'done', stopReason })
     } catch (err) {
-      if (controller.signal.aborted) {
+      if (isDuckUniworkKeyError(err)) {
+        const providerLabel = AI_PROVIDERS.find((m) => m.id === provider)?.label ?? provider
+        const message = err.describe(getUiLang(), providerLabel)
+        console.warn(
+          `[ai-stream] ${requestId} (${provider}/${streamConfig.model}) org-key failed:`,
+          err.message,
+        )
+        const taggedMessage =
+          err.errorKind === 'not_entitled'
+            ? aiNoticeTagged('not_entitled', message)
+            : err.errorKind === 'quota'
+              ? aiNoticeTagged('credits_exhausted', message)
+              : message
+        send({
+          requestId,
+          type: 'error',
+          error: taggedMessage,
+          errorCode: err.errorKind as AiStreamChunk['errorCode'],
+          ...(err.retryAfterSec !== undefined ? { retryAfterSec: err.retryAfterSec } : {}),
+        })
+      } else if (controller.signal.aborted) {
         send({ requestId, type: 'done' })
       } else {
         const { raw, ...fields } = aiStreamErrorFields(err, getUiLang())
         // the panel gets the product message; the provider's own text stays in the log
-        console.warn(`[ai-stream] ${requestId} (${provider}/${config.model}) failed:`, raw)
+        console.warn(`[ai-stream] ${requestId} (${provider}/${streamConfig.model}) failed:`, raw)
         send({ requestId, type: 'error', ...fields })
       }
     } finally {
@@ -4611,7 +4850,13 @@ export function registerDocsIpc(): void {
   registerZoteroIpc()
   void app.whenReady().then(registerLazyMediaProtocol)
   // Node fetch (undici) direct connections get reset under VPN/tun setups; retry over Chromium's stack
-  setRescueFetch((url, init) => net.fetch(url, init))
+  // (except for org-proxied calls, which handle auth/status mapping themselves)
+  setRescueFetch((url, init) => {
+    if (orgStreamFetchContext.getStore()) {
+      return Promise.reject(new Error('rescueFetch disabled for org proxy requests'))
+    }
+    return net.fetch(url, init)
+  })
   setAiUserAgent(`UniWorkOffice/${app.getVersion()}`)
 
   // shared with the other editor modules — last (identical) registration wins

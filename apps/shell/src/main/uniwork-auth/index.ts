@@ -40,6 +40,7 @@ import {
   type UniworkAiScopeDeps,
   type UniworkAiStreams,
 } from './ai-chat'
+import { createUniworkKeysHost, type UniworkKeysHost } from './keys'
 import type { CapabilityRead } from '../uniwork-sync/capability/cache'
 import { AccountManager } from './manager'
 import { TransportError, createUniworkTransport } from './transport'
@@ -52,6 +53,22 @@ export {
 export type { AccountManager } from './manager'
 export { TransportError } from './transport'
 export type { DeploymentProfile } from './deployment'
+export {
+  createUniworkKeysHost,
+  UniworkKeyError,
+  isUniworkKeyError,
+  describeUniworkKeyError,
+  parseCredentialsResponse,
+  parseProxyModelIds,
+  type UniworkKeysHost,
+  type UniworkKeysHostDeps,
+  type UniworkCredentialItem,
+  type UniworkCredentialsResponse,
+  type UniworkKeyErrorCode,
+} from './keys'
+
+const UNIWORK_KEYS_HOST_SYMBOL = Symbol.for('genoffice.uniworkKeysHost')
+const BROADCAST_AI_SETTINGS_SYMBOL = Symbol.for('genoffice.broadcastAiSettingsChanged')
 
 /**
  * Electron wiring for the UniWork account: one AccountManager per process,
@@ -62,6 +79,7 @@ export type { DeploymentProfile } from './deployment'
 
 let manager: AccountManager | null = null
 let cloud: UniworkCloudController | null = null
+let keys: UniworkKeysHost | null = null
 let settingsPath: (() => string) | null = null
 const entitlementListeners = new Set<(entitlements: AccountEntitlements | null) => void>()
 /** set by registerAccountIpc: delivers a push to the account renderers */
@@ -207,7 +225,10 @@ export function uniworkAccount(): AccountManager {
       writeAppSetting(settings(), 'uniworkOrgId', { accountId, orgId }),
     device: deviceInfo(process.platform, app.getVersion()),
   })
-  created.onStatus((status) => push?.(HOME_CHANNELS.accountStatusEvent, status))
+  created.onStatus((status) => {
+    keys?.onAccountStatus(status)
+    push?.(HOME_CHANNELS.accountStatusEvent, status)
+  })
   created.onLoginEvent((event) => push?.(HOME_CHANNELS.accountLoginEvent, event))
   created.onEntitlementsChanged((current) => {
     for (const listener of entitlementListeners) listener(current)
@@ -288,12 +309,47 @@ export function uniworkCloud(): UniworkCloudController {
 }
 
 /**
+ * Organization AI keys (G6-05k, desktop BYOK proxy): R1/R5 client, per-org
+ * cache, per-call fetch via toProxyRequest + authorized(), and stream abort
+ * on sign-out / org switch / device_revoked.
+ */
+export function uniworkKeys(): UniworkKeysHost {
+  if (keys) return keys
+  const account = uniworkAccount()
+  keys = createUniworkKeysHost({
+    profile: () => account.deploymentProfile(),
+    orgId: () => {
+      const status = account.status()
+      return status.state === 'signed-in' && !status.needsOrgChoice
+        ? (status.org?.id ?? null)
+        : null
+    },
+    sessionKey: () => identityKey(),
+    authorized: (call) => authorizedRequest(call),
+    online: () => (typeof net?.isOnline === 'function' ? net.isOnline() : true),
+    onChanged: () => {
+      const broadcast = (globalThis as Record<symbol, unknown>)[BROADCAST_AI_SETTINGS_SYMBOL]
+      if (typeof broadcast === 'function') (broadcast as () => void)()
+    },
+  })
+  ;(globalThis as Record<symbol, unknown>)[UNIWORK_KEYS_HOST_SYMBOL] = keys
+  return keys
+}
+
+export function startUniworkKeys(): UniworkKeysHost {
+  const host = uniworkKeys()
+  void host.list().catch(() => undefined)
+  return host
+}
+
+/**
  * Installs the cloud transport and keeps the status current: re-read on
  * sign-in / sign-out / organization or plan change (entitlements), after
  * every tool call (credits), and once now.
  */
 export function startUniworkCloud(): void {
   const controller = uniworkCloud()
+  startUniworkKeys()
   setUniworkCloudTransport(controller.transport())
   // a cloud tool or an AI panel that finds the cloud off re-reads it first (the plan may have changed since)
   setUniworkCloudRefresher(() => controller.refresh())
@@ -315,6 +371,7 @@ export function startUniworkAiChat(deps: {
 }): UniworkAiStreams {
   if (aiStreams) return aiStreams
   const account = uniworkAccount()
+  startUniworkKeys()
   setUniworkChatTransport(
     createUniworkAiChatTransport({
       profile: () => account.deploymentProfile(),
@@ -397,6 +454,7 @@ let availabilityTimer: ReturnType<typeof setInterval> | null = null
 /** sign-out / account switch: running turns end and the server conversation ids are forgotten */
 function endUniworkAiSession(): void {
   aiStreams?.cancelAll()
+  keys?.clear()
   uniworkConversations.clear()
 }
 
@@ -468,6 +526,9 @@ export function stopUniworkAccount(): void {
   availabilityTimer = null
   setUniworkChatTransport(null)
   setUniworkCloudTransport(null)
+  keys?.clear()
+  keys = null
+  ;(globalThis as Record<symbol, unknown>)[UNIWORK_KEYS_HOST_SYMBOL] = null
   cloud?.dispose()
   manager?.dispose()
 }
