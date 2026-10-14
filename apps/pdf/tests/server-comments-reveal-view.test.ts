@@ -1,8 +1,9 @@
 /** G8-15 fix r1 (V15-06, V15-11): the reveal scroll and the minimum frame size, as pure geometry. */
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   MIN_COMMENT_FRAME_PX,
   commentFrameBox,
+  rerunOnResize,
   scrollLeftToReveal,
 } from '../src/renderer/server-comments/reveal-view'
 
@@ -39,5 +40,49 @@ describe('commentFrameBox', () => {
   it('leaves a frame that is big enough as it is', () => {
     const big = { left: 1, top: 2, width: 200, height: 40 }
     expect(commentFrameBox(big)).toEqual(big)
+  })
+})
+
+describe('rerunOnResize (V15b-01: the reveal that opens the panel)', () => {
+  class FakeResizeObserver {
+    static live: FakeResizeObserver[] = []
+    disconnected = false
+    constructor(private cb: () => void) {
+      FakeResizeObserver.live.push(this)
+    }
+    observe() {}
+    disconnect() {
+      this.disconnected = true
+    }
+    fire() {
+      if (!this.disconnected) this.cb()
+    }
+  }
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+    FakeResizeObserver.live = []
+  })
+
+  it('runs again when the viewer is resized (panel narrows it), and stops after the window', () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('ResizeObserver', FakeResizeObserver)
+    const run = vi.fn()
+    rerunOnResize(document.createElement('div'), run, 800)
+    FakeResizeObserver.live[0]!.fire()
+    expect(run).toHaveBeenCalledTimes(1)
+    vi.advanceTimersByTime(800)
+    FakeResizeObserver.live[0]!.fire()
+    expect(run).toHaveBeenCalledTimes(1)
+    expect(FakeResizeObserver.live[0]!.disconnected).toBe(true)
+  })
+
+  it('the stop function ends it early, and it is a no-op without ResizeObserver', () => {
+    vi.stubGlobal('ResizeObserver', FakeResizeObserver)
+    const stop = rerunOnResize(document.createElement('div'), vi.fn())
+    stop()
+    expect(FakeResizeObserver.live[0]!.disconnected).toBe(true)
+    vi.stubGlobal('ResizeObserver', undefined)
+    expect(() => rerunOnResize(document.createElement('div'), vi.fn())()).not.toThrow()
   })
 })
