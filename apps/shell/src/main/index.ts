@@ -5719,7 +5719,7 @@ function buildHtmlMenu(): void {
  * Non-destructive: the original file is never written, and a cancelled dialog changes
  * nothing on disk (dialog first, no flush into the source).
  */
-/** In-flight guard (same pattern as exportPdfAsDocxLocal): a re-trigger while the dialog
+/** In-flight guard (same pattern as convertPdfToOffice): a re-trigger while the dialog
     or write is active must not start a second flow that overwrites the first one's
     waiter/target grant or clears its autosave pause early */
 let savingPdfAs = false
@@ -5759,118 +5759,177 @@ async function savePdfAs(): Promise<void> {
 
 /**
  * In-flight guard: covers the whole flow (dialogs included) so re-triggering
- * from the menu can never start a second conversion
+ * from the menu or the Desk can never start a second conversion
  */
 let exportingPdfDocx = false
 
+type PdfOfficeKind = 'docx' | 'pptx' | 'xlsx'
+type MainKey = Parameters<typeof tm>[0]
+
+/** per-format copy for the shared PDF → Office flow */
+const PDF_OFFICE_COPY: Record<PdfOfficeKind, { filter: MainKey; busy: MainKey; failed: MainKey }> =
+  {
+    docx: { filter: 'filterWord', busy: 'pdfDocxBusyMsg', failed: 'pdfDocxFailedMsg' },
+    pptx: { filter: 'filterPpt', busy: 'pdfPptxBusyMsg', failed: 'pdfPptxFailedMsg' },
+    xlsx: { filter: 'filterExcel', busy: 'pdfXlsxBusyMsg', failed: 'pdfXlsxFailedMsg' },
+  }
+
+/** the editor tab already showing `path` in the format a conversion writes */
+function officeTabByPath(kind: PdfOfficeKind, path: string): string | undefined {
+  if (kind === 'docx') return tabManager?.findDocsTabByPath(path)
+  if (kind === 'pptx') return tabManager?.findSlidesTabByPath(path)
+  return tabManager?.findSheetsTabByPath(path)
+}
+
 /**
- * Export as Word for pdf tabs, fully local (pdf2docx P4): flush pending
- * edits, pick the destination, convert in-process via PDFium wasm, write the
- * file and open it in a Docs tab. No login, no credits.
+ * Local PDF → Word / PowerPoint / Excel (pdf2docx P4, pdf2pptx P25, pdf2xlsx
+ * P26), shared by the PDF tab's File menu and the Desk tools: pick the
+ * destination, close a stale tab on it, convert in-process via PDFium wasm
+ * (password prompt included), write, and explain degraded pages. Resolves
+ * the written path, or null when the user cancelled or the failure was
+ * already shown. `returnTo` re-activates that tab after a stale-tab close.
+ * No login, no credits; pdfium never runs two conversions at once.
  */
-async function exportPdfAsDocxLocal(): Promise<void> {
-  const tab = activePdfTarget()
-  const host = pdfHostWindow(tab)
-  if (!tab?.filePath || !host) return
+async function convertPdfToOffice(
+  kind: PdfOfficeKind,
+  pdfPath: string,
+  host: BrowserWindow,
+  returnTo?: string,
+): Promise<string | null> {
+  const copy = PDF_OFFICE_COPY[kind]
   if (exportingPdfDocx) {
-    void dialog.showMessageBox(host, {
-      type: 'info',
-      message: tm('pdfDocxBusyMsg'),
-    })
-    return
+    void dialog.showMessageBox(host, { type: 'info', message: tm(copy.busy) })
+    return null
   }
   exportingPdfDocx = true
   try {
-    if (!(await flushPdfForExport(flushPdfSave, tab.webContents))) return
     const picked = await showSaveDialogWithMemory(dialog, host, {
-      defaultPath: tab.filePath.replace(/\.pdf$/i, '.docx'),
-      filters: [{ name: tm('filterWord'), extensions: ['docx'] }],
+      defaultPath: pdfPath.replace(/\.pdf$/i, `.${kind}`),
+      filters: [{ name: tm(copy.filter), extensions: [kind] }],
     })
-    if (picked.canceled || !picked.filePath) return
-    // If the destination is already open in a docs tab, close it first (its
+    if (picked.canceled || !picked.filePath) return null
+    const target = picked.filePath
+    // If the destination is already open in an editor tab, close it first (its
     // normal unsaved-changes guard applies) so the converted file opens fresh
     // instead of leaving a stale tab whose next save would clobber the result.
-    const staleTabId = tabManager?.findDocsTabByPath(picked.filePath)
+    const staleTabId = officeTabByPath(kind, target)
     if (staleTabId) {
       await tabManager?.closeTab(staleTabId)
-      tabManager?.activateTab(tab.id)
-      if (tabManager?.findDocsTabByPath(picked.filePath)) return
+      if (returnTo) tabManager?.activateTab(returnTo)
+      if (officeTabByPath(kind, target)) return null
     }
     host.setProgressBar(2)
     // encrypted PDFs prompt for the password (P23), looping on wrong entries;
     // null result = user cancelled the prompt → abort silently
-    const pdfPath = tab.filePath
-    const result = await convertPdfFileToDocxLocalWithPrompt(
-      pdfPath,
-      (retry) =>
-        promptPdfPassword(host, {
-          fileName: basename(pdfPath),
-          retry,
-          busy: false,
-          lang: currentLang(),
-          strings: {
-            title: tm('pdfPwdTitle'),
-            prompt: tm('pdfPwdPrompt'),
-            retryPrompt: tm('pdfPwdRetryPrompt'),
-            ok: tm('pdfPwdOk'),
-            cancel: tm('btnCancel'),
-            verifying: tm('pdfPwdVerifying'),
-            label: tm('pdfPwdLabel'),
-            placeholder: tm('pdfPwdPlaceholder'),
-            show: tm('pdfPwdShow'),
-            hide: tm('pdfPwdHide'),
-          },
-        }),
-      (page, total) => {
-        if (host && !host.isDestroyed() && total > 0) {
-          host.setProgressBar(page / total)
-        }
-      },
-    )
-    if (result === null) return
-    await atomicWriteFile(picked.filePath, result.docx)
-
-    // degrade transparency (plan §7.6 dual-track split): whole scan → say so
-    // once; individual image-fallback pages → name them;
-    // OCR-recovered scans ('ocr') are SUCCESSES — announce the recovery (the
-    // user should proofread machine-read text), never the image-export notice
-    const ocrPages = result.pageResults.filter((r) => r.status === 'ocr').map((r) => r.page)
-    const imagePages = result.pageResults
-      .filter((r) => r.status !== 'ok' && r.status !== 'ocr')
-      .map((r) => r.page)
-    if (result.scannedDocument) {
-      await dialog.showMessageBox(host, {
-        type: 'info',
-        message: tm('pdfDocxLocalScannedMsg'),
-        detail: tm('pdfDocxLocalScannedDetail'),
+    const promptPassword = (retry: boolean) =>
+      promptPdfPassword(host, {
+        fileName: basename(pdfPath),
+        retry,
+        busy: false,
+        lang: currentLang(),
+        strings: {
+          title: tm('pdfPwdTitle'),
+          prompt: tm('pdfPwdPrompt'),
+          retryPrompt: tm('pdfPwdRetryPrompt'),
+          ok: tm('pdfPwdOk'),
+          cancel: tm('btnCancel'),
+          verifying: tm('pdfPwdVerifying'),
+          label: tm('pdfPwdLabel'),
+          placeholder: tm('pdfPwdPlaceholder'),
+          show: tm('pdfPwdShow'),
+          hide: tm('pdfPwdHide'),
+        },
       })
-    } else if (imagePages.length > 0 && ocrPages.length > 0) {
-      // mixed documents surface BOTH facts in one dialog: which pages shipped
-      // as images and which carry machine-read text the user should proofread
-      await dialog.showMessageBox(host, {
-        type: 'info',
-        message: tm('pdfDocxLocalDegradedMsg'),
-        detail:
-          tm('pdfDocxLocalDegradedDetail', { pages: imagePages.join(', ') }) +
-          '\n\n' +
-          tm('pdfDocxLocalOcrDetail', { pages: ocrPages.join(', ') }),
-      })
-    } else if (imagePages.length > 0) {
-      await dialog.showMessageBox(host, {
-        type: 'info',
-        message: tm('pdfDocxLocalDegradedMsg'),
-        detail: tm('pdfDocxLocalDegradedDetail', { pages: imagePages.join(', ') }),
-      })
-    } else if (ocrPages.length > 0) {
-      await dialog.showMessageBox(host, {
-        type: 'info',
-        message: tm('pdfDocxLocalOcrMsg'),
-        detail: tm('pdfDocxLocalOcrDetail', { pages: ocrPages.join(', ') }),
-      })
+    const onProgress = (page: number, total: number) => {
+      if (!host.isDestroyed() && total > 0) host.setProgressBar(page / total)
     }
-    openDocumentPath(picked.filePath)
+
+    if (kind === 'docx') {
+      const result = await convertPdfFileToDocxLocalWithPrompt(pdfPath, promptPassword, onProgress)
+      if (result === null) return null
+      await atomicWriteFile(target, result.docx)
+      // degrade transparency (plan §7.6 dual-track split): whole scan → say so
+      // once; individual image-fallback pages → name them;
+      // OCR-recovered scans ('ocr') are SUCCESSES — announce the recovery (the
+      // user should proofread machine-read text), never the image-export notice
+      const ocrPages = result.pageResults.filter((r) => r.status === 'ocr').map((r) => r.page)
+      const imagePages = result.pageResults
+        .filter((r) => r.status !== 'ok' && r.status !== 'ocr')
+        .map((r) => r.page)
+      if (result.scannedDocument) {
+        await dialog.showMessageBox(host, {
+          type: 'info',
+          message: tm('pdfDocxLocalScannedMsg'),
+          detail: tm('pdfDocxLocalScannedDetail'),
+        })
+      } else if (imagePages.length > 0 && ocrPages.length > 0) {
+        // mixed documents surface BOTH facts in one dialog: which pages shipped
+        // as images and which carry machine-read text the user should proofread
+        await dialog.showMessageBox(host, {
+          type: 'info',
+          message: tm('pdfDocxLocalDegradedMsg'),
+          detail:
+            tm('pdfDocxLocalDegradedDetail', { pages: imagePages.join(', ') }) +
+            '\n\n' +
+            tm('pdfDocxLocalOcrDetail', { pages: ocrPages.join(', ') }),
+        })
+      } else if (imagePages.length > 0) {
+        await dialog.showMessageBox(host, {
+          type: 'info',
+          message: tm('pdfDocxLocalDegradedMsg'),
+          detail: tm('pdfDocxLocalDegradedDetail', { pages: imagePages.join(', ') }),
+        })
+      } else if (ocrPages.length > 0) {
+        await dialog.showMessageBox(host, {
+          type: 'info',
+          message: tm('pdfDocxLocalOcrMsg'),
+          detail: tm('pdfDocxLocalOcrDetail', { pages: ocrPages.join(', ') }),
+        })
+      }
+    } else if (kind === 'pptx') {
+      const result = await convertPdfFileToPptxLocalWithPrompt(pdfPath, promptPassword, onProgress)
+      if (result === null) return null
+      await atomicWriteFile(target, result.pptx)
+      // degrade transparency (same split as the Word export): whole scan vs
+      // individual image-fallback pages
+      const imagePages = result.pageResults.filter((r) => r.status !== 'ok').map((r) => r.page)
+      if (result.scannedDocument) {
+        await dialog.showMessageBox(host, {
+          type: 'info',
+          message: tm('pdfDocxLocalScannedMsg'),
+          detail: tm('pdfPptxLocalScannedDetail'),
+        })
+      } else if (imagePages.length > 0) {
+        await dialog.showMessageBox(host, {
+          type: 'info',
+          message: tm('pdfDocxLocalDegradedMsg'),
+          detail: tm('pdfDocxLocalDegradedDetail', { pages: imagePages.join(', ') }),
+        })
+      }
+    } else {
+      const result = await convertPdfFileToXlsxLocalWithPrompt(pdfPath, promptPassword, onProgress)
+      if (result === null) return null
+      await atomicWriteFile(target, result.xlsx)
+      // degrade transparency: pages that could not become cells got a notice
+      // row on their worksheet instead of an image (a spreadsheet has none)
+      const noticePages = result.pageResults.filter((r) => r.status !== 'ok').map((r) => r.page)
+      if (result.scannedDocument) {
+        await dialog.showMessageBox(host, {
+          type: 'info',
+          message: tm('pdfDocxLocalScannedMsg'),
+          detail: tm('pdfXlsxLocalScannedDetail'),
+        })
+      } else if (noticePages.length > 0) {
+        await dialog.showMessageBox(host, {
+          type: 'info',
+          message: tm('pdfXlsxLocalSkippedMsg'),
+          detail: tm('pdfXlsxLocalSkippedDetail', { pages: noticePages.join(', ') }),
+        })
+      }
+    }
+    return target
   } catch (err) {
-    if (host && !host.isDestroyed()) {
+    if (!host.isDestroyed()) {
       // structured load failures (P22): password-protected / damaged PDFs get
       // a human-readable explanation instead of the raw PDFium error string
       const detail =
@@ -5886,241 +5945,45 @@ async function exportPdfAsDocxLocal(): Promise<void> {
           : err instanceof Error
             ? err.message
             : String(err)
-      void dialog.showMessageBox(host, {
-        type: 'error',
-        message: tm('pdfDocxFailedMsg'),
-        detail,
-      })
+      void dialog.showMessageBox(host, { type: 'error', message: tm(copy.failed), detail })
     }
+    return null
   } finally {
     // the prompt window may still be open when the loop exits through cancel
     // or a non-password error thrown mid-retry
     closePdfPasswordDialog()
     exportingPdfDocx = false
-    if (host && !host.isDestroyed()) host.setProgressBar(-1)
+    if (!host.isDestroyed()) host.setProgressBar(-1)
   }
 }
 
 /**
- * Export as PowerPoint for pdf tabs, fully local (pdf2pptx P25): flush
- * pending edits, pick the destination, convert in-process via PDFium wasm,
- * write the file and open it in a Slides tab. No login, no credits. Shares
- * the in-flight guard with the Word exports so pdfium never runs two
- * conversions at once.
+ * Export as Word / PowerPoint / Excel for pdf tabs: flush pending edits, run
+ * the shared local conversion, then open the result in its editor tab.
  */
-async function exportPdfAsPptxLocal(): Promise<void> {
+async function exportActivePdfAsOffice(kind: PdfOfficeKind): Promise<void> {
   const tab = activePdfTarget()
   const host = pdfHostWindow(tab)
   if (!tab?.filePath || !host) return
   if (exportingPdfDocx) {
-    void dialog.showMessageBox(host, {
-      type: 'info',
-      message: tm('pdfPptxBusyMsg'),
-    })
+    void dialog.showMessageBox(host, { type: 'info', message: tm(PDF_OFFICE_COPY[kind].busy) })
     return
   }
-  exportingPdfDocx = true
-  try {
-    if (!(await flushPdfForExport(flushPdfSave, tab.webContents))) return
-    const picked = await showSaveDialogWithMemory(dialog, host, {
-      defaultPath: tab.filePath.replace(/\.pdf$/i, '.pptx'),
-      filters: [{ name: tm('filterPpt'), extensions: ['pptx'] }],
-    })
-    if (picked.canceled || !picked.filePath) return
-    // same stale-tab handling as the Word export (see exportPdfAsDocxLocal),
-    // against the slides tab that may already show the destination file
-    const staleTabId = tabManager?.findSlidesTabByPath(picked.filePath)
-    if (staleTabId) {
-      await tabManager?.closeTab(staleTabId)
-      tabManager?.activateTab(tab.id)
-      if (tabManager?.findSlidesTabByPath(picked.filePath)) return
-    }
-    host.setProgressBar(2)
-    // encrypted PDFs prompt for the password (P23), looping on wrong entries;
-    // null result = user cancelled the prompt → abort silently
-    const pdfPath = tab.filePath
-    const result = await convertPdfFileToPptxLocalWithPrompt(
-      pdfPath,
-      (retry) =>
-        promptPdfPassword(host, {
-          fileName: basename(pdfPath),
-          retry,
-          busy: false,
-          lang: currentLang(),
-          strings: {
-            title: tm('pdfPwdTitle'),
-            prompt: tm('pdfPwdPrompt'),
-            retryPrompt: tm('pdfPwdRetryPrompt'),
-            ok: tm('pdfPwdOk'),
-            cancel: tm('btnCancel'),
-            verifying: tm('pdfPwdVerifying'),
-            label: tm('pdfPwdLabel'),
-            placeholder: tm('pdfPwdPlaceholder'),
-            show: tm('pdfPwdShow'),
-            hide: tm('pdfPwdHide'),
-          },
-        }),
-      (page, total) => {
-        if (host && !host.isDestroyed() && total > 0) {
-          host.setProgressBar(page / total)
-        }
-      },
-    )
-    if (result === null) return
-    await atomicWriteFile(picked.filePath, result.pptx)
-
-    // degrade transparency (same split as the Word export): whole scan vs
-    // individual image-fallback pages
-    const imagePages = result.pageResults.filter((r) => r.status !== 'ok').map((r) => r.page)
-    if (result.scannedDocument) {
-      await dialog.showMessageBox(host, {
-        type: 'info',
-        message: tm('pdfDocxLocalScannedMsg'),
-        detail: tm('pdfPptxLocalScannedDetail'),
-      })
-    } else if (imagePages.length > 0) {
-      await dialog.showMessageBox(host, {
-        type: 'info',
-        message: tm('pdfDocxLocalDegradedMsg'),
-        detail: tm('pdfDocxLocalDegradedDetail', { pages: imagePages.join(', ') }),
-      })
-    }
-    openDocumentPath(picked.filePath)
-  } catch (err) {
-    if (host && !host.isDestroyed()) {
-      // structured load failures (P22): same explanations as the Word export
-      const detail =
-        err instanceof PdfLoadError
-          ? err.code === 'password-required'
-            ? tm('pdfDocxLocalEncryptedDetail')
-            : err.code === 'unsupported'
-              ? tm('pdfDocxLocalUnsupportedEncDetail')
-              : tm('pdfDocxLocalCorruptDetail')
-          : err instanceof Error
-            ? err.message
-            : String(err)
-      void dialog.showMessageBox(host, {
-        type: 'error',
-        message: tm('pdfPptxFailedMsg'),
-        detail,
-      })
-    }
-  } finally {
-    closePdfPasswordDialog()
-    exportingPdfDocx = false
-    if (host && !host.isDestroyed()) host.setProgressBar(-1)
-  }
+  if (!(await flushPdfForExport(flushPdfSave, tab.webContents))) return
+  const out = await convertPdfToOffice(kind, tab.filePath, host, tab.id)
+  if (out) openDocumentPath(out)
 }
 
-/**
- * Export as Excel for pdf tabs, fully local (pdf2xlsx P26): flush pending
- * edits, pick the destination, convert in-process via PDFium wasm, write the
- * file and open it in a Sheets tab. No login, no credits. Shares the
- * in-flight guard with the Word/PowerPoint exports so pdfium never runs two
- * conversions at once.
- */
-async function exportPdfAsXlsxLocal(): Promise<void> {
-  const tab = activePdfTarget()
-  const host = pdfHostWindow(tab)
-  if (!tab?.filePath || !host) return
-  if (exportingPdfDocx) {
-    void dialog.showMessageBox(host, {
-      type: 'info',
-      message: tm('pdfXlsxBusyMsg'),
-    })
-    return
-  }
-  exportingPdfDocx = true
-  try {
-    if (!(await flushPdfForExport(flushPdfSave, tab.webContents))) return
-    const picked = await showSaveDialogWithMemory(dialog, host, {
-      defaultPath: tab.filePath.replace(/\.pdf$/i, '.xlsx'),
-      filters: [{ name: tm('filterExcel'), extensions: ['xlsx'] }],
-    })
-    if (picked.canceled || !picked.filePath) return
-    // same stale-tab handling as the Word export (see exportPdfAsDocxLocal),
-    // against the sheets tab that may already show the destination file
-    const staleTabId = tabManager?.findSheetsTabByPath(picked.filePath)
-    if (staleTabId) {
-      await tabManager?.closeTab(staleTabId)
-      tabManager?.activateTab(tab.id)
-      if (tabManager?.findSheetsTabByPath(picked.filePath)) return
-    }
-    host.setProgressBar(2)
-    // encrypted PDFs prompt for the password (P23), looping on wrong entries;
-    // null result = user cancelled the prompt → abort silently
-    const pdfPath = tab.filePath
-    const result = await convertPdfFileToXlsxLocalWithPrompt(
-      pdfPath,
-      (retry) =>
-        promptPdfPassword(host, {
-          fileName: basename(pdfPath),
-          retry,
-          busy: false,
-          lang: currentLang(),
-          strings: {
-            title: tm('pdfPwdTitle'),
-            prompt: tm('pdfPwdPrompt'),
-            retryPrompt: tm('pdfPwdRetryPrompt'),
-            ok: tm('pdfPwdOk'),
-            cancel: tm('btnCancel'),
-            verifying: tm('pdfPwdVerifying'),
-            label: tm('pdfPwdLabel'),
-            placeholder: tm('pdfPwdPlaceholder'),
-            show: tm('pdfPwdShow'),
-            hide: tm('pdfPwdHide'),
-          },
-        }),
-      (page, total) => {
-        if (host && !host.isDestroyed() && total > 0) {
-          host.setProgressBar(page / total)
-        }
-      },
-    )
-    if (result === null) return
-    await atomicWriteFile(picked.filePath, result.xlsx)
+function exportPdfAsDocxLocal(): Promise<void> {
+  return exportActivePdfAsOffice('docx')
+}
 
-    // degrade transparency: pages that could not become cells got a notice
-    // row on their worksheet instead of an image (a spreadsheet has none)
-    const noticePages = result.pageResults.filter((r) => r.status !== 'ok').map((r) => r.page)
-    if (result.scannedDocument) {
-      await dialog.showMessageBox(host, {
-        type: 'info',
-        message: tm('pdfDocxLocalScannedMsg'),
-        detail: tm('pdfXlsxLocalScannedDetail'),
-      })
-    } else if (noticePages.length > 0) {
-      await dialog.showMessageBox(host, {
-        type: 'info',
-        message: tm('pdfXlsxLocalSkippedMsg'),
-        detail: tm('pdfXlsxLocalSkippedDetail', { pages: noticePages.join(', ') }),
-      })
-    }
-    openDocumentPath(picked.filePath)
-  } catch (err) {
-    if (host && !host.isDestroyed()) {
-      // structured load failures (P22): same explanations as the Word export
-      const detail =
-        err instanceof PdfLoadError
-          ? err.code === 'password-required'
-            ? tm('pdfDocxLocalEncryptedDetail')
-            : err.code === 'unsupported'
-              ? tm('pdfDocxLocalUnsupportedEncDetail')
-              : tm('pdfDocxLocalCorruptDetail')
-          : err instanceof Error
-            ? err.message
-            : String(err)
-      void dialog.showMessageBox(host, {
-        type: 'error',
-        message: tm('pdfXlsxFailedMsg'),
-        detail,
-      })
-    }
-  } finally {
-    closePdfPasswordDialog()
-    exportingPdfDocx = false
-    if (host && !host.isDestroyed()) host.setProgressBar(-1)
-  }
+function exportPdfAsPptxLocal(): Promise<void> {
+  return exportActivePdfAsOffice('pptx')
+}
+
+function exportPdfAsXlsxLocal(): Promise<void> {
+  return exportActivePdfAsOffice('xlsx')
 }
 
 // The pdf renderer's converter dropdown funnels into the same local conversion
