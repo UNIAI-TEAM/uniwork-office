@@ -48,8 +48,11 @@
   outline-offset: 2px;
 }
 
-/* the shell draws the panel in the strip main frees by narrowing the active editor view */
+/* the shell draws the panel in the strip main frees by narrowing the active editor view.
+ * --uw-discussion-width is that strip in window pixels (clamped once, in one unit); the panel sits
+ * inside the zoomed .app-frame, so the box divides by --ui-scale to paint exactly that width. */
 .uw-discussion {
+  width: calc(var(--uw-discussion-width) / var(--ui-scale, 1));
   position: fixed;
   top: var(--tab-bar-height, 40px);
   right: 0;
