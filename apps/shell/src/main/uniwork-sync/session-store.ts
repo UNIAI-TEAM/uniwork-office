@@ -1,14 +1,18 @@
+import { INTENT_STORE_REGISTRATION } from './intent-store'
 import type { StoreScope } from './keys'
-import type { StoreLayer, StoreRecords } from './store'
+import { DRAFTS_STORE_REGISTRATION } from './queue/drafts'
+import { PARKED_STORE_REGISTRATION } from './queue/parked'
+import { PAUSE_STORE_REGISTRATION } from './queue/pause'
+import { DOC_INDEX_REGISTRATION, FEED_CURSORS_REGISTRATION } from './runtime'
+import type { StoreLayer, StoreRecords, StoreRegistration } from './store'
 
 /**
  * The signed-in session's view of the durable store. One scope per account
  * boundary ({deploymentId, accountId} of the live session): `open` names it,
  * opens it once and hands back its registered stores by name. A scope that
  * cannot open right now (a locked keychain, no usable keyring, no session) is
- * reported as it is, and a later call retries - only `forget` (the account
- * boundary wiped the scope) drops a handle, because after the wipe every
- * handle of that scope is dead.
+ * reported as it is, and a later call retries - only `forget` (or `lock`)
+ * drops a handle, because after the boundary every handle of that scope is dead.
  *
  * A cached handle is revalidated on every call: the OS keychain may have
  * relocked since it was opened, and a handle whose key can no longer be
@@ -17,6 +21,20 @@ import type { StoreLayer, StoreRecords } from './store'
  * open still in flight when the session moves is discarded, never returned to
  * the other account and never written back into the cache.
  */
+
+/**
+ * Every store registered on the account's sync store layer. Kept here as one
+ * list so `createSyncStoreLayer` and the store compliance test agree on the
+ * exact set of registered stores.
+ */
+export const SYNC_STORE_REGISTRATIONS: readonly StoreRegistration[] = [
+  INTENT_STORE_REGISTRATION,
+  DRAFTS_STORE_REGISTRATION,
+  PAUSE_STORE_REGISTRATION,
+  PARKED_STORE_REGISTRATION,
+  FEED_CURSORS_REGISTRATION,
+  DOC_INDEX_REGISTRATION,
+]
 
 export type SyncStoreOpen =
   | { kind: 'ok'; records(name: string): StoreRecords }
@@ -30,7 +48,11 @@ export interface SyncStoreAccess {
   open(): Promise<SyncStoreOpen>
   /** the opened handle is dead (the account boundary wiped the scope) */
   forget(): void
+  /** forget the cached handle and lock the scope being left (ciphertext stays) */
+  lock(scope?: StoreScope): Promise<void>
 }
+
+export type SessionStore = SyncStoreAccess
 
 export function createSyncStoreAccess(options: {
   layer: StoreLayer
@@ -105,6 +127,9 @@ export function createSyncStoreAccess(options: {
       generation += 1
       opened = null
       pending = null
+    },
+    async lock(_scope) {
+      throw new Error('not implemented')
     },
   }
 }

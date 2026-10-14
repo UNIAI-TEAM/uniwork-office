@@ -48,6 +48,8 @@ export interface StoreRecords {
   write(key: string, value: Uint8Array): Promise<StoreWriteResult>
   read(key: string): Promise<StoreReadResult>
   delete(key: string): Promise<StoreDeleteResult>
+  /** decrypted payloads of every readable record in the store namespace */
+  values?(): Promise<Uint8Array[]>
 }
 
 /** one scope, opened: the registered stores are reachable by their name */
@@ -96,6 +98,13 @@ export interface StoreLayer {
    * cached handle never outlives the key it was built from.
    */
   verifyKey(scope: StoreScope): Promise<StoreKeyStatus>
+  /**
+   * Sign-out / switch: bump the epoch (every handle + in-flight write of scope
+   * dead -> `interrupted`), wait for in-flight writes, drop RAM key material;
+   * FILES STAY (ciphertext only). A later open() re-fetches the key and reads
+   * everything.
+   */
+  lock(scope: StoreScope): Promise<void>
   /** close every handle of `scope` and wipe everything it kept on disk */
   lockAndWipe(scope: StoreScope): Promise<void>
   usage(scope: StoreScope): Promise<StoreUsage>
@@ -449,6 +458,10 @@ export function createStoreLayer(options: StoreLayerOptions): StoreLayer {
     async verifyKey(scope) {
       const fetched = await fetchKey(scope)
       return 'kind' in fetched ? fetched.kind : 'ok'
+    },
+
+    async lock(_scope) {
+      throw new Error('not implemented')
     },
 
     async lockAndWipe(scope) {
