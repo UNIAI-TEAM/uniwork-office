@@ -1,6 +1,9 @@
 // UniWork AI notices in the pdf panel (G6-05 slice D): a Retry-After wait is a status line with
 // Stop only (no Retry while the run waits); a restarted conversation, a provider boundary and a
 // dropped call are plain notes. The loop is replaced by a harness that hands over its events.
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { act, createElement } from 'react'
 import { aiUniworkText } from '@genoffice/ui'
@@ -160,6 +163,17 @@ describe('UniWork AI notices (pdf panel)', () => {
       'Stop stays',
     ).not.toBeNull()
     expect(retryButton()).toBeNull()
+  })
+
+  it('the notice line has its own style rule (set apart from the reply, no raw colours)', () => {
+    const css = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '../src/renderer/styles.css'),
+      'utf8',
+    )
+    const rule = /\n\.ai-msg-notice \{([^}]*)\}/.exec(css)
+    expect(rule, '.ai-msg-notice rule').not.toBeNull()
+    expect(rule![1]).toMatch(/margin-top:/)
+    expect(rule![1]).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(/i)
   })
 
   it('a restarted conversation keeps its note and no empty-reply line', async () => {
