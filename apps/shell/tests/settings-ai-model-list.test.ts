@@ -81,26 +81,12 @@ async function openAiPane(): Promise<void> {
       createElement(
         LocaleProvider,
         { initial: 'en' },
-        createElement(SettingsModal, {
-          status: null,
-          loggingOut: false,
-          loginWaiting: false,
-          loginUrl: null,
-          urlCopied: false,
-          onOpenLoginUrl: vi.fn(),
-          onCopyLoginUrl: vi.fn(),
-          onClose: vi.fn(),
-          onLogin: vi.fn(),
-          onLogout: vi.fn(),
-        }),
+        createElement(SettingsModal, { onClose: vi.fn(), initialSection: 'aiModel' }),
       ),
     )
     await Promise.resolve()
+    await Promise.resolve()
   })
-  const nav = Array.from(host.querySelectorAll<HTMLButtonElement>('.set-nav-item')).find((button) =>
-    button.textContent?.includes('AI Model'),
-  )
-  await click(nav!)
 }
 
 /** the model ids the Model dropdown offers, in order */
