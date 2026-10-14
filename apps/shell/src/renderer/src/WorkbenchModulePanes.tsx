@@ -9,7 +9,7 @@ import { MODULE_TONES } from './module-tones'
 import { WorkbenchIcon } from './WorkbenchIcons'
 import { useI18n, type StringKey } from './locale'
 import { WorkProfilePane } from './WorkProfilePane'
-import { escapeHtml, profileForDraft, profileMergeHtml } from './form-merge'
+import { draftFromForm } from './form-draft'
 import { WorkCalendarPane } from './WorkCalendarPane'
 import { WorkTasksPane } from './WorkTasksPane'
 import { WorkPaneHeader } from './WorkPaneHeader'
@@ -223,23 +223,7 @@ function FormsPane({
   const openForm = async (item: WbFormItem) => {
     const targetPack = packId ?? item.linkedProjectId
     if (!targetPack) return
-    // merge fields from the UniWork profile: cached first, never blocking compose (form-merge.ts)
-    const metaLines = profileMergeHtml(await profileForDraft(orgId))
-    const fileHint = item.fileName
-      ? `<p><em>${vi ? 'Mẫu gốc' : 'Source template'}: ${escapeHtml(item.fileName)}</em></p>`
-      : ''
-    const html = `
-      <h1>${escapeHtml(item.title)}</h1>
-      ${item.note ? `<p><em>${escapeHtml(item.note)}</em></p>` : ''}
-      ${fileHint}
-      ${metaLines}
-      <h2>${vi ? 'Nội dung' : 'Content'}</h2>
-      <p></p>
-    `.trim()
-    await window.aiOffice.newDoc({
-      projectId: targetPack,
-      aiContent: { title: item.title, html },
-    })
+    await draftFromForm(item, targetPack, orgId, vi)
     if (!item.linkedProjectId || item.linkedProjectId !== targetPack) {
       persist(items.map((x) => (x.id === item.id ? { ...x, linkedProjectId: targetPack } : x)))
     }
