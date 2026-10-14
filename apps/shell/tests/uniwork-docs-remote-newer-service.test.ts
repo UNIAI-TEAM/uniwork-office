@@ -64,6 +64,7 @@ const detailOf = (revision: string, version: number, bytes: Uint8Array): Documen
     filename: 'Plan.docx',
     mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     version,
+    versionId: `ver_${version}`,
     checksumSha256: hex(bytes),
     sizeBytes: bytes.byteLength,
   },
@@ -276,7 +277,7 @@ describe('G5-03a S6 service: the guarded clean reload', () => {
   })
 
   it('a clean copy reloads to the noticed head: bytes sha256 = detail checksum, base revision/version = head, reloadPath once, bar updated', async () => {
-    seedCopy()
+    seedCopy({ baseVersionId: 'ver_3' })
     const h = setup()
     notice(h)
     await vi.waitFor(() => expect(h.reloaded).toEqual([docPath()]))
@@ -287,9 +288,23 @@ describe('G5-03a S6 service: the guarded clean reload', () => {
       baseChecksum: hex(HEAD_BYTES),
       state: 'saved',
     })
+    // the base moved to the fetched head: the anchor base moves with it, so a
+    // comment created before the next Save anchors against the version on screen
+    expect(bindingOf().baseVersionId).toBe('ver_4')
+    expect(h.service.commentContext(docPath())?.versionId).toBe('ver_4')
     expect(bindingOf()).not.toHaveProperty('serverRevision')
     expect(bindingOf()).not.toHaveProperty('serverVersion')
     await waitForBar(h, { kind: 'updated', version: 4 })
+  })
+
+  it('a clean reload whose read reports a lower level moves the comments level with the head', async () => {
+    seedCopy({ baseVersionId: 'ver_3', level: 'manage' })
+    const h = setup()
+    h.client.detail = { ...detailOf('10', 4, HEAD_BYTES), myLevel: 'view' }
+    notice(h)
+    await vi.waitFor(() => expect(h.reloaded).toEqual([docPath()]))
+    expect(bindingOf()).toMatchObject({ baseRevision: '10', baseVersion: 4, level: 'view' })
+    expect(h.service.commentContext(docPath())?.level).toBe('view')
   })
 
   it('no download while aiRunning (bar newer-ai, the copy stays)', async () => {
