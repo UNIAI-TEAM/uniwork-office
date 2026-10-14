@@ -206,7 +206,7 @@ describe('workbench primitives (home.css)', () => {
   it('row actions hide until the row is hovered or holds focus (always shown on touch)', () => {
     expect(rule('.wb-row-actions')).toMatch(/opacity: 0;/)
     expect(css).toContain(
-      '\n.wb-row:hover .wb-row-actions,\n.wb-row:focus-within .wb-row-actions,\n',
+      '\n.wb-row:hover .wb-row-actions,\n.wb-row:focus-within .wb-row-actions {\n',
     )
     expect(css).toContain('@media (hover: none) {\n  .wb-row-actions {\n    opacity: 1;\n  }\n}')
   })

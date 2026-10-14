@@ -6,6 +6,8 @@
   --accent-hover: #0843bd;
   /* selected-option tint for the shared dropdown (gs-dd) */
   --accent-soft: #eaf0fd;
+  /* accent-coloured text on --accent-soft (a selected pack's title): AA in every theme */
+  --accent-text: #0a47c7;
   --modal-width-sm: 480px;
   /* the centered content column every Home view shares (files, workbench) */
   --content-max: 1360px;
@@ -35,6 +37,7 @@
   --accent: #5a96ff;
   --accent-hover: #7aabff;
   --accent-soft: #24354d;
+  --accent-text: #93bbff;
   --avatar-bg: #333;
   --account-avatar-bg: #3f99ff;
   --badge-bg: #2a3a4a;
@@ -55,6 +58,7 @@
     --accent: #5a96ff;
     --accent-hover: #7aabff;
     --accent-soft: #24354d;
+    --accent-text: #93bbff;
     --avatar-bg: #333;
     --account-avatar-bg: #3f99ff;
     --badge-bg: #2a3a4a;
@@ -4059,103 +4063,56 @@ body.vib .home {
   margin-top: 12px;
 }
 
-/* ── Skill domain mini-tabs (under Skills pillar) ───────── */
-.skill-domain-tabs {
+/* ── Skill domains (spec 4.9): one segmented control, its ⋯ menu and a ghost Add ── */
+.skill-domain-bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
   align-items: center;
-  margin: 4px 0 14px;
+  gap: 8px;
+}
+
+.skill-domain-tabs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-8);
+  background: var(--surface-subtle);
 }
 
 .skill-domain-tab {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-8);
-  background: var(--bg-content);
+  height: 28px;
+  padding: 0 10px 0 6px;
+  border: none;
+  border-radius: var(--radius-6);
+  background: transparent;
   color: var(--text-secondary);
-  padding: 7px 12px;
+  font: inherit;
   font-size: 12px;
-  font-weight: 600;
-  cursor: grab;
+  font-weight: 500;
+  cursor: pointer;
   transition:
-    background var(--transition-fast),
-    color var(--transition-fast),
-    border-color var(--transition-fast);
+    background-color var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .skill-domain-tab:hover {
-  background: var(--hover);
   color: var(--text);
 }
 
 .skill-domain-tab.active {
-  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
-  color: var(--text);
-  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
-}
-
-.skill-domain-tab.is-dragging {
-  opacity: 0.45;
-}
-
-.skill-domain-tab.is-drag-over {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-}
-
-.skill-domain-tab-grip {
-  display: inline-flex;
-  color: var(--text-secondary);
-  opacity: 0.6;
-}
-
-.skill-domain-tab-icon {
-  display: inline-flex;
-  line-height: 0;
-}
-
-.skill-domain-tab-unpin {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  margin-right: -6px;
-  border-radius: var(--radius-6);
-  color: var(--text-secondary);
-}
-
-.skill-domain-tab-unpin:hover {
   background: var(--surface);
   color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--border);
 }
 
-.skill-domain-add {
-  cursor: pointer;
-  min-width: 36px;
-  justify-content: center;
-}
-
-.skill-domain-tab:focus-visible,
-.skill-domain-tab-unpin:focus-visible {
+.skill-domain-tab:focus-visible {
   outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-.skill-domain-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding-top: 4px;
-}
-
-.skill-domain-panel h3 {
-  margin: 0;
-  font-size: 15px;
-  color: var(--text);
+  outline-offset: -2px;
 }
 
 .wb-tabs {
@@ -4439,11 +4396,7 @@ body.vib .home {
 }
 
 .wb-row:hover .wb-row-actions,
-.wb-row:focus-within .wb-row-actions,
-.wb-material-row:hover .wb-row-actions,
-.wb-material-row:focus-within .wb-row-actions,
-.wb-skill-row:hover .wb-row-actions,
-.wb-skill-row:focus-within .wb-row-actions {
+.wb-row:focus-within .wb-row-actions {
   opacity: 1;
 }
 
@@ -5213,171 +5166,85 @@ textarea.wb-input {
   }
 }
 
-.wb-material-list,
-.wb-skill-list {
+/* ── Pillars (spec 4.7–4.10) ── */
+/* a 13/600 section head over a card, sentence case */
+.wb-sec-title {
   margin: 0;
-  padding: 0;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-12);
-  background: var(--surface);
-  box-shadow: var(--wb-shadow);
-  list-style: none;
-}
-
-.wb-material-row,
-.wb-skill-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  min-height: 36px;
-  padding: 7px 12px;
-}
-
-.wb-material-row + .wb-material-row,
-.wb-skill-row + .wb-skill-row {
-  border-top: 1px solid var(--border-subtle);
-}
-
-.wb-material-row:hover,
-.wb-skill-row:hover {
-  background: var(--wb-row-hover);
-}
-
-.wb-material-row > .wb-row-actions,
-.wb-skill-row > .wb-row-actions {
-  margin-left: auto;
-}
-
-/* the text column only: a bare `div` would also stack the row's .wb-row-actions */
-.wb-material-row > div:first-child,
-.wb-skill-row > div:first-child {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-
-.wb-material-row strong,
-.wb-skill-row strong {
-  color: var(--text);
-  font-size: 13px;
-}
-
-.wb-material-row span,
-.wb-skill-row span,
-.wb-skill-row em {
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-style: normal;
-}
-
-.wb-add-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 12px;
-}
-
-.wb-add-row label {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--text-secondary);
-  min-width: 220px;
-}
-
-.wb-form-spaced {
-  margin-top: 14px;
-}
-
-.wb-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
-  gap: 16px;
-}
-
-@media (max-width: 960px) {
-  .wb-layout {
-    grid-template-columns: 1fr;
-  }
-}
-
-.wb-packs,
-.wb-detail {
-  padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-12);
-  background: var(--surface);
-  box-shadow: var(--wb-shadow);
-}
-
-.wb-packs h3,
-.wb-detail h3 {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  margin: 0 0 10px;
   color: var(--text);
   font-size: 13px;
   font-weight: 600;
+  line-height: 20px;
 }
 
-.wb-count {
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.wb-form {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-bottom: 14px;
-}
-
-.wb-form label {
+.wb-pillar-section {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  font-size: 12px;
+  gap: 8px;
+}
+
+.wb-pillar-section > .wb-sec-title {
+  margin-bottom: 4px;
+}
+
+/* Knowledge: the pack list | the pack detail */
+.wb-kn {
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .wb-kn {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.wb-kn-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 320px;
+  max-width: 100%;
   color: var(--text-secondary);
 }
 
-.wb-form-wide {
-  grid-column: 1 / -1;
+.wb-kn-search svg {
+  position: absolute;
+  left: 10px;
+  pointer-events: none;
 }
 
-.wb-empty {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: 13px;
+.wb-kn-search .wb-input {
+  width: 100%;
+  padding-left: 32px;
 }
 
 .wb-pack-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  max-height: 420px;
+  max-height: 560px;
+  margin: 0;
+  padding: 0;
   overflow: auto;
+  list-style: none;
+}
+
+.wb-pack-list > li + li {
+  border-top: 1px solid var(--border-subtle);
 }
 
 .wb-pack-item {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: flex-start;
+  gap: 12px;
   width: 100%;
-  padding: 8px 10px;
+  padding: 12px 16px;
   border: none;
-  border-radius: var(--radius-8);
   background: transparent;
   color: var(--text);
-  text-align: left;
+  font: inherit;
+  text-align: start;
   cursor: pointer;
   transition: background-color var(--transition-fast);
 }
@@ -5388,7 +5255,6 @@ textarea.wb-input {
 
 .wb-pack-item.active {
   background: var(--accent-soft);
-  box-shadow: inset 2px 0 0 var(--accent);
 }
 
 .wb-pack-item:focus-visible {
@@ -5396,16 +5262,432 @@ textarea.wb-input {
   outline-offset: -2px;
 }
 
-.wb-pack-item strong {
-  font-size: 13px;
-  font-weight: 600;
+.wb-pack-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
-.wb-pack-item span,
-.wb-pack-item em {
-  font-size: 12px;
+.wb-pack-title {
+  overflow: hidden;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wb-pack-item.active .wb-pack-title {
+  color: var(--accent-text);
+}
+
+.wb-kn-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 20px 16px;
+}
+
+.wb-kn-head-text {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.wb-kn-title {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 28px;
+}
+
+.wb-kn-facets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.wb-kn-facets:empty {
+  display: none;
+}
+
+.wb-kn-head-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+}
+
+/* the detail's own sections: files, tags, notes */
+.wb-kn-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--border);
+}
+
+.wb-kn-label {
+  margin: 0;
   color: var(--text-secondary);
-  font-style: normal;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+}
+
+.wb-kn-section > .wb-link {
+  align-self: flex-start;
+  font-size: 12px;
+}
+
+.wb-kn-files {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wb-kn-file {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 36px;
+  padding: 0 8px;
+  border-radius: var(--radius-8);
+}
+
+.wb-kn-file:hover {
+  background: var(--wb-row-hover);
+}
+
+.wb-kn-file .wb-row-title {
+  font-weight: 400;
+}
+
+/* tag chips and the input that adds one, drawn as one field */
+.wb-kn-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 4px 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-8);
+  background: var(--surface);
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.wb-kn-tags:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--wb-focus-ring);
+}
+
+.wb-kn-tags input {
+  flex: 1;
+  min-width: 120px;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+}
+
+.wb-kn-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 2px 0 8px;
+  border-radius: var(--radius-6);
+  background: var(--surface-subtle);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.wb-kn-tag-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-6);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.wb-kn-tag-x:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.wb-kn-tag-x:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.wb-kn-section textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+.wb-kn-foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+}
+
+.wb-kn-foot-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* a skeleton or an error inside a card or a card section: the card is the frame */
+.wb-kn-section .wb-work-skeleton,
+.wb-mat-files .wb-work-skeleton {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* Materials: the pack's files, then quick create */
+.wb-mat-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wb-mat-row {
+  min-height: 52px;
+}
+
+.wb-mat-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* the ⋯ sits next to Open, not pushed away from it */
+.wb-mat-row > .wb-row-actions {
+  margin-left: 0;
+}
+
+/* overflow visible: a row's menu opens past the card */
+.wb-mat-files {
+  overflow: visible;
+}
+
+.wb-mat-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 900px) {
+  .wb-mat-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.wb-mat-tile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-12);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-weight: 500;
+  text-align: start;
+  cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.wb-mat-tile:hover {
+  border-color: var(--border-strong);
+  background: var(--wb-row-hover);
+}
+
+.wb-mat-tile:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.wb-mat-tile:disabled {
+  background: var(--surface-subtle);
+  color: var(--text-tertiary);
+  cursor: default;
+}
+
+.wb-pillar-section > .wb-chip-row {
+  align-items: center;
+  margin-top: 4px;
+}
+
+/* Skills: tile | name and description | category | Run */
+.wb-sk-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wb-sk-row {
+  min-height: 52px;
+  padding-block: 10px;
+}
+
+.wb-sk-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.wb-sk-name {
+  font-weight: 500;
+}
+
+.wb-sk-desc,
+.wb-sk-hint {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+/* Compose: the form card | "What's in a pack?" */
+.wb-cmp {
+  display: grid;
+  grid-template-columns: minmax(0, 720px) 300px;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 1000px) {
+  .wb-cmp {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.wb-cmp-form {
+  overflow: visible;
+}
+
+.wb-cmp-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 20px;
+}
+
+.wb-cmp-section + .wb-cmp-section {
+  border-top: 1px solid var(--border);
+}
+
+.wb-cmp-section.wb-field {
+  gap: 8px;
+}
+
+.wb-cmp-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+
+.wb-cmp-fields.is-two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 640px) {
+  .wb-cmp-fields.is-two {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.wb-cmp-section textarea {
+  min-height: 72px;
+  resize: vertical;
+}
+
+.wb-field-error {
+  color: var(--danger-text);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.wb-input[aria-invalid='true'] {
+  border-color: var(--danger-text);
+}
+
+.wb-cmp-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+}
+
+.wb-cmp-foot-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.wb-cmp-aside {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-12);
+  background: var(--surface-subtle);
+}
+
+.wb-cmp-aside ul {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wb-cmp-aside li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: var(--text-secondary);
+}
+
+.wb-empty {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
 }
 
 .wb-chip-row {
@@ -6664,36 +6946,6 @@ html[dir='rtl'] .quick-title-row {
   color: var(--text-secondary);
   font-size: 12px;
   white-space: nowrap;
-}
-
-.wb-kn-search {
-  position: relative;
-  display: flex;
-  align-items: center;
-  max-width: 360px;
-  color: var(--text-secondary);
-}
-
-.wb-kn-search svg {
-  position: absolute;
-  left: 10px;
-  pointer-events: none;
-}
-
-.wb-kn-search .wb-input {
-  width: 100%;
-  padding-left: 32px;
-}
-
-.wb-cmp {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  padding: 20px;
-}
-
-.wb-cmp > .wb-btn {
-  align-self: flex-start;
 }
 
 /* Notes (spec 4.5): a composer card, then the notes as cards in columns */

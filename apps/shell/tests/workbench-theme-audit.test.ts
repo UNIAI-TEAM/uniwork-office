@@ -210,6 +210,8 @@ const PAIRS: readonly (readonly [fg: string, bg: string, min: number])[] = [
   ['--on-accent', '--accent', TEXT],
   ['--on-accent', '--accent-hover', TEXT],
   ...['--surface', '--bg-content', '--wb-row-hover'].map((bg) => ['--accent', bg, TEXT] as const),
+  // Knowledge: the selected pack's title
+  ['--accent-text', '--accent-soft', TEXT],
   ['--wb-check-border', '--surface', UI],
   ['--wb-check-border', '--wb-row-hover', UI],
   ...['gray', 'green', 'yellow', 'violet', 'blue', 'teal', 'pink'].map(

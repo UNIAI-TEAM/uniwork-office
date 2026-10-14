@@ -301,7 +301,7 @@ describe('Calendar tab', () => {
     api.calendarEvents.mockResolvedValueOnce({ ok: true as const, value: [] })
     await mount()
     expect(host.querySelector('.wb-state')?.textContent).toContain(
-      'No tasks or meetings in the next 14 days.',
+      'No tasks or meetings in the next 14 days',
     )
     expect(host.querySelector('.wb-work-state')).toBeNull()
   })

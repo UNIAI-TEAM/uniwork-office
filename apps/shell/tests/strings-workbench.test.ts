@@ -126,4 +126,31 @@ describe('Workbench nav label', () => {
     expect(dict.navTeacher).toBeUndefined()
     expect(dict.navWorkbench).toBe(NAV[lang])
   })
+
+  // spec 4.12: one AI name, and state titles carry no closing full stop
+  it.each(['zh', 'en', 'vi'] as const)('%s names the AI UniAI only', (lang) => {
+    expect(
+      Object.values(table(lang)).filter((v) =>
+        /Hub AI|AI Hub|Trợ lý của bạn|Your assistant/i.test(v),
+      ),
+    ).toEqual([])
+  })
+
+  it.each(['zh', 'en', 'vi'] as const)('%s state titles end without a full stop', (lang) => {
+    const titles = [
+      'wbTasksEmpty',
+      'wbCalEmpty',
+      'wbNotesEmpty',
+      'wbFormsEmpty',
+      'wbKnEmpty',
+      'wbKnSelectPack',
+      'wbKnNoMatch',
+      'wbMatEmpty',
+      'wbMatPackNone',
+      'wbSkNeedPack',
+      'wbDeskInTrayEmpty',
+      'wbDeskInProgressEmpty',
+    ]
+    expect(titles.filter((k) => /[.。]$/.test(table(lang)[k]!))).toEqual([])
+  })
 })

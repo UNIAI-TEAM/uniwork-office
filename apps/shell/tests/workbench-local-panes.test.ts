@@ -138,7 +138,7 @@ describe('Forms tab (redesign spec 4.4)', () => {
     expect(add.textContent).toBe('Add a form')
     expect(add.getAttribute('aria-expanded')).toBe('false')
     expect(host.querySelector('form')).toBeNull()
-    expect(host.querySelector('.wb-state')?.textContent).toContain('No forms yet.')
+    expect(host.querySelector('.wb-state')?.textContent).toContain('No forms yet')
   })
 
   it('Add a form opens the New form card: a real form, three fields, Add locked without a name', async () => {
@@ -286,7 +286,7 @@ describe('Notes tab (redesign spec 4.5)', () => {
     expect(host.querySelector('.wb-notes-composer-foot')?.textContent).toMatch(/↵ to save/)
     expect(save().className).toBe('wb-btn wb-btn-primary wb-btn-sm')
     expect(save().disabled).toBe(true)
-    expect(host.querySelector('.wb-state')?.textContent).toContain('No notes yet.')
+    expect(host.querySelector('.wb-state')?.textContent).toContain('No notes yet')
   })
 
   it('Ctrl/Cmd+Enter saves; Enter alone does not (it is a new line)', async () => {

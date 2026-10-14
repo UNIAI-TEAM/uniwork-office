@@ -277,7 +277,7 @@ describe('Tasks tab', () => {
     expect(panel.classList.contains('is-compact')).toBe(true)
     expect(panel.previousElementSibling?.classList.contains('wb-work-quick')).toBe(true)
     expect(panel.parentElement?.classList.contains('wb-block')).toBe(true)
-    expect(panel.querySelector('.wb-state-title')?.textContent).toBe('No open tasks.')
+    expect(panel.querySelector('.wb-state-title')?.textContent).toBe('No open tasks')
     expect(panel.querySelector<HTMLElement>('.wb-state-icon')!.style.background).toBe(
       'var(--tint-green)',
     )
