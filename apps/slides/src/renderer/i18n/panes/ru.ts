@@ -63,6 +63,10 @@ export const ru = {
   paneCommentsPlaceholder: 'Новое примечание… (⌘/Ctrl+Enter — опубликовать)',
   paneCommentsPost: 'Опубликовать',
   paneCommentsNeutralAuthor: 'Пользователь',
+  paneCommentsSaveFirst:
+    'Сначала сохраните презентацию, чтобы добавить комментарий. Комментарии ниже по-прежнему можно читать, отвечать на них и закрывать.',
+  paneCommentsNewNoSlide:
+    'Сейчас к этому слайду нельзя добавить примечание. Выберите другой слайд и повторите попытку.',
 
   paneCsdTitle: 'Произвольные показы',
   paneCsdDefaultName: 'Произвольный показ {n}',

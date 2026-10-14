@@ -63,6 +63,10 @@ export const en = {
   paneCommentsPlaceholder: 'New comment… (⌘/Ctrl+Enter to post)',
   paneCommentsPost: 'Post',
   paneCommentsNeutralAuthor: 'User',
+  paneCommentsSaveFirst:
+    'Save the presentation first to add a comment. You can still read, reply to and resolve the comments below.',
+  paneCommentsNewNoSlide:
+    'A comment can’t be added to this slide right now. Select another slide and try again.',
 
   paneCsdTitle: 'Custom Shows',
   paneCsdDefaultName: 'Custom Show {n}',

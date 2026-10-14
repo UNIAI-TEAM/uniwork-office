@@ -220,6 +220,8 @@ export const ru = {
   ribbonComment: 'Примечание',
   ribbonNewCommentTip:
     'Новое примечание на текущем слайде (сохраняется в pptx, видно в PowerPoint)',
+  ribbonNewCommentServerTip:
+    'Новое примечание на текущем слайде (доступно всем, кто открывает эту презентацию, в файл не сохраняется)',
   ribbonInsertTextBoxTip: 'Вставить надпись',
   ribbonWordArt: 'WordArt',
   ribbonWordArtTip: 'Вставить объект WordArt (крупный текст с заливкой/контуром)',

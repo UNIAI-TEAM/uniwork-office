@@ -477,6 +477,8 @@ export interface Props {
   onNewComment: () => void
   /** Current page's comment count (button badge) */
   commentCount: number
+  /** Bound UniWork document: comments are server threads, not written to the pptx (tooltip copy) */
+  serverComments?: boolean
   // ── Insert tab extensions ────────────────────────────────────────────────
   /** Insert an icon (rasterized to a PNG image) */
   onInsertIcon: (def: IconDef, color: string) => void
@@ -634,6 +636,7 @@ export interface RibbonTabCtx extends Pick<
   | 'onOpenZoom'
   | 'hasSections'
   | 'onNewComment'
+  | 'serverComments'
   | 'onOpenEquation'
   | 'onOpenHeaderFooter'
   | 'onOpenLink'

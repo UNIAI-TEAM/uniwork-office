@@ -57,6 +57,14 @@ export interface PdfAiDeps {
   /** Original page number of the currently visible page (1-based) */
   currentPage(): number
   readOnly(): boolean
+  /**
+   * G8-15: the document is bound to UniWork and keeps its comments on the server. Its notes in the
+   * file are read-only, and invariant 7 holds: a suggested comment only pre-fills the panel's
+   * composer, nothing is sent until the user presses Send. Absent = a local file (today's notes).
+   */
+  serverComments?(): boolean
+  /** G8-15: put `text` as an AI draft into a new comment composer at `at`; false when it cannot start */
+  draftServerComment?(origIdx: number, at: [number, number], text: string): boolean
   /** OCR-recovered text of a scanned page; null when the page was not OCR'd */
   ocrText(origIdx: number): string | null
   /** Text selection cached at mouseup (native DOM selections collapse when focus moves
@@ -1212,6 +1220,10 @@ const BOUND_OUTPUT =
 const READONLY_OUTPUT =
   'The document is encrypted and read-only; it cannot be modified. Inform the user.'
 
+/** G8-15: the file's own notes of a UniWork document are read-only; comments live in the panel */
+const SERVER_NOTES_READONLY_OUTPUT =
+  'This document is shared in UniWork: its comments live in the Comments panel and the notes saved in the file are read-only, so they cannot be replied to, edited or deleted. Suggest the comment text to the user instead.'
+
 /** mirror of the docs tool-echo guard: reject tool-protocol output pasted as document content */
 function contentEchoError(content: string): string | null {
   if (/<\/?tool_response>/i.test(content)) {
@@ -1468,6 +1480,19 @@ async function addNoteTool(
     return err('Position the note with anchor_text or x/y', summary)
   }
   if (signal?.aborted) return err('stopped by the user; nothing was changed', summary)
+  if (deps.serverComments?.()) {
+    // invariant 7: a draft in the composer, never a comment sent on the user's behalf
+    if (!deps.draftServerComment?.(r.origIdx, at, text))
+      return err(
+        'The Comments panel cannot take a new comment right now; nothing was changed',
+        summary,
+      )
+    deps.gotoPage(r.origIdx + 1)
+    return {
+      output: `Drafted a comment on page ${r.origIdx + 1} in the Comments panel. It is not posted: the user reviews it and presses Send.`,
+      summary,
+    }
+  }
   const added = deps.addNote(r.origIdx, at, text, color)
   if ('error' in added) return err(added.error, summary)
   deps.gotoPage(r.origIdx + 1)
@@ -1485,6 +1510,7 @@ async function replyNoteTool(
 ): Promise<ToolExecution> {
   const summary = t('aiToolReplyNote', { page: Number(input.page) })
   if (deps.readOnly()) return err(READONLY_OUTPUT, summary)
+  if (deps.serverComments?.()) return err(SERVER_NOTES_READONLY_OUTPUT, summary)
   const r = resolvePage(deps, input.page)
   if ('bad' in r) return err(r.bad, summary)
   const text = String(input.text ?? '').trim()
@@ -1515,6 +1541,7 @@ async function editNoteTool(
 ): Promise<ToolExecution> {
   const summary = t('aiToolEditNote', { page: Number(input.page) })
   if (deps.readOnly()) return err(READONLY_OUTPUT, summary)
+  if (deps.serverComments?.()) return err(SERVER_NOTES_READONLY_OUTPUT, summary)
   const r = resolvePage(deps, input.page)
   if ('bad' in r) return err(r.bad, summary)
   const page = r.origIdx + 1
@@ -1715,6 +1742,7 @@ async function deleteNoteTool(
 ): Promise<ToolExecution> {
   const summary = t('aiToolDeleteNote', { page: Number(input.page) })
   if (deps.readOnly()) return err(READONLY_OUTPUT, summary)
+  if (deps.serverComments?.()) return err(SERVER_NOTES_READONLY_OUTPUT, summary)
   const r = resolvePage(deps, input.page)
   if ('bad' in r) return err(r.bad, summary)
   const noteId = String(input.note_id ?? '').trim()

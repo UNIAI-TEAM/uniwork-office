@@ -418,6 +418,11 @@ export function AiPanel({
       pageCount: () => apiRef.current.pageCount(),
       currentPage: () => apiRef.current.currentPage(),
       readOnly: () => apiRef.current.readOnly(),
+      // G8-15: a bound document keeps its comments on the server; the AI only drafts (invariant 7)
+      serverComments: () => apiRef.current.serverComments?.() ?? false,
+      draftServerComment: (idx, at, text) =>
+        apiRef.current.draftServerComment?.(idx, at, text) ?? false,
+      uniworkBound: () => apiRef.current.uniworkBound?.() ?? false,
       ocrText: (idx) => apiRef.current.ocrText(idx),
       selection: () => apiRef.current.selection(),
       pendingSummary: () => apiRef.current.pendingSummary(),
