@@ -1,5 +1,5 @@
 /** @vitest-environment jsdom */
-import { act, createElement, useState, type ReactNode } from 'react'
+import { act, createElement, useLayoutEffect, useState, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CollabComposer } from '../src/collab/CollabComposer'
@@ -481,6 +481,68 @@ describe('focus', () => {
     expect(document.activeElement).toBe($('[data-thread-id="n2"] [data-thread-heading]'))
   })
 
+  it('new-thread Send when created thread is hidden does not steal focus from outside the panel on a later reload (FEK-3)', async () => {
+    const src = fakeSource(list([cm({ id: 'a', anchor: docx(1) })], 't1'))
+    const nativeSet = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+    const outsideEditor = document.createElement('button')
+    outsideEditor.textContent = 'Editor Canvas'
+    document.body.append(outsideEditor)
+    try {
+      await mount(
+        src,
+        host(),
+        { adapter: ad() },
+        {
+          renderComposer: (slot) =>
+            createElement(CollabComposer, { ...slot, strings: { ...EN, ...COMPOSER_STRINGS } }),
+        },
+      )
+
+      // Post-send reload hides the created thread (resolved while resolvedOpen is false)
+      src.list.mockResolvedValueOnce(
+        list(
+          [
+            cm({ id: 'a', anchor: docx(1) }),
+            cm({ id: 'n-hidden', anchor: docx(5), resolved_at: '2026-10-12T10:00:00Z' }),
+          ],
+          't2',
+        ),
+      )
+      await act(async () => ctl.startThread({ anchor: docx(5), base_version_id: 'v1' }))
+      const ta = $<HTMLTextAreaElement>('.collab-thread--new textarea')!
+      act(() => {
+        nativeSet.call(ta, 'Resolved right away')
+        ta.dispatchEvent(new Event('input', { bubbles: true }))
+      })
+      const sendBtn = $<HTMLButtonElement>('.collab-thread--new .collab-composer-send')!
+      await act(async () => {
+        sendBtn.click()
+        await flush()
+      })
+      expect($('.collab-thread--new')).toBeNull()
+
+      // User moves focus outside the panel (into the editor)
+      outsideEditor.focus()
+      expect(document.activeElement).toBe(outsideEditor)
+
+      // Another user's thread arrives on a later reload -> focus must NOT move from outsideEditor
+      await reloadWith(
+        src,
+        list(
+          [
+            cm({ id: 'a', anchor: docx(1) }),
+            cm({ id: 'n-hidden', anchor: docx(5), resolved_at: '2026-10-12T10:00:00Z' }),
+            cm({ id: 'other-user', anchor: docx(9) }),
+          ],
+          't3',
+        ),
+      )
+      expect(document.activeElement).toBe(outsideEditor)
+    } finally {
+      outsideEditor.remove()
+    }
+  })
+
   it('new-thread Cancel and Discard restore focus to the opener button (or adjacent thread heading when no opener button)', async () => {
     const src = fakeSource(list([cm({ id: 'a', anchor: docx(1) })], 't1'))
     const nativeSet = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
@@ -543,6 +605,54 @@ describe('focus', () => {
       act(() => cancelBtn2.click())
       expect($('.collab-thread--new')).toBeNull()
       expect(document.activeElement).toBe($('[data-thread-id="a"] [data-thread-heading]'))
+    } finally {
+      opener.remove()
+    }
+  })
+
+  it('captures newThreadOpenerRef in useLayoutEffect on [ctl.newThread] rather than during render (FEK-4)', async () => {
+    const src = fakeSource(list([cm({ id: 'a', anchor: docx(1) })], 't1'))
+    const opener = document.createElement('button')
+    opener.textContent = 'Toolbar Comment'
+    document.body.append(opener)
+    try {
+      await act(async () => {
+        function SiblingFocusOnStart(p: { active: boolean }) {
+          useLayoutEffect(() => {
+            if (p.active) opener.focus()
+          }, [p.active])
+          return null
+        }
+        function HostWithSibling() {
+          ctl = useCollabThreads(src, host(), { strings: EN, adapter: ad() })
+          return createElement(
+            'div',
+            null,
+            createElement(SiblingFocusOnStart, { active: ctl.newThread !== null }),
+            createElement(CollabPanel, {
+              controller: ctl,
+              strings: EN,
+              onClose: () => {},
+              renderComposer: (slot) =>
+                createElement(CollabComposer, { ...slot, strings: { ...EN, ...COMPOSER_STRINGS } }),
+            }),
+          )
+        }
+        root.render(createElement(HostWithSibling))
+        await flush()
+      })
+
+      act(() => (document.activeElement as HTMLElement | null)?.blur())
+      await act(async () => ctl.startThread({ anchor: docx(5), base_version_id: 'v1' }))
+      const ta = $<HTMLTextAreaElement>('.collab-thread--new textarea')!
+      expect(document.activeElement).toBe(ta)
+      act(() => {
+        ta.dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+        )
+      })
+      expect($('.collab-thread--new')).toBeNull()
+      expect(document.activeElement).toBe(opener)
     } finally {
       opener.remove()
     }

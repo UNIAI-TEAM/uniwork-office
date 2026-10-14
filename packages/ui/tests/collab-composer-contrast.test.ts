@@ -98,7 +98,9 @@ const propValue = (body: string, prop: string): string => {
   return m[1]!.trim()
 }
 const tokenOf = (body: string, prop: string): string => {
-  const m = new RegExp(`(?:^|[\\s;])${prop}:\\s*var\\((--[\\w-]+)`).exec(body)
+  const m = new RegExp(
+    `(?:^|[\\s;])${prop}:\\s*(?:color-mix\\(\\s*in srgb\\s*,\\s*)?var\\((--[\\w-]+)`,
+  ).exec(body)
   if (!m) throw new Error(`no ${prop} token`)
   return m[1]!
 }
@@ -213,6 +215,7 @@ describe('unified primary button look (V14-06)', () => {
     expect(propValue(sendBody, 'color')).toBe(propValue(primaryBody, 'color'))
     expect(tokenOf(sendHoverBody, 'background')).toBe('--accent-dark')
     expect(tokenOf(primaryHoverBody, 'background')).toBe('--accent-dark')
+    expect(propValue(sendHoverBody, 'background')).toBe(propValue(primaryHoverBody, 'background'))
     expect(tokenOf(linkBody, 'color')).toBe('--accent')
   })
 
@@ -224,4 +227,59 @@ describe('unified primary button look (V14-06)', () => {
     expect(tokenOf(compBtn, 'color')).toBe('--text')
     expect(tokenOf(panelBtn, 'color')).toBe('--text')
   })
+
+  const PRIMARY_APP_STYLES: Record<string, string> = {
+    docs: '../../../apps/docs/src/renderer/styles.css',
+    sheets: '../../../apps/sheets/src/renderer/styles.css',
+    slides: '../../../apps/slides/src/renderer/styles.css',
+    pdf: '../../../apps/pdf/src/renderer/styles.css',
+    shell: '../../../apps/shell/src/renderer/src/home.css',
+    html: '../../../apps/html/src/renderer/styles.css',
+  }
+
+  const fgExpr = propValue(sendBody, 'color')
+  const restBgExpr = propValue(sendBody, 'background')
+  const hoverBgExpr = propValue(sendHoverBody, 'background')
+  const saveRestBgExpr = propValue(primaryBody, 'background')
+  const saveHoverBgExpr = propValue(primaryHoverBody, 'background')
+
+  for (const [app, stylePath] of [
+    ...Object.entries(PRIMARY_APP_STYLES),
+    ['kit-fallback', ''] as const,
+  ]) {
+    const appCss = stylePath ? read(stylePath) : ''
+    const appLight = appCss ? blockFrom(appCss, ':root {') : {}
+    const sysDarkHeader = appCss.includes(
+      ":root:not([data-theme='light']):not([data-theme='dark']) {",
+    )
+      ? ":root:not([data-theme='light']):not([data-theme='dark']) {"
+      : ":root:not([data-theme='light']) {"
+    const appThemes: Record<string, Tokens> = {
+      light: { ...themes.light!, ...appLight },
+      dark: {
+        ...themes.dark!,
+        ...appLight,
+        ...(appCss ? blockFrom(appCss, "[data-theme='dark'] {") : {}),
+      },
+      'system-dark': {
+        ...themes['system-dark']!,
+        ...appLight,
+        ...(appCss ? blockFrom(appCss, sysDarkHeader) : {}),
+      },
+    }
+
+    for (const [theme, tokens] of Object.entries(appThemes)) {
+      it(`${app} (${theme}): Send/Save primary rest contrast is >= 4.5:1`, () => {
+        const fg = resolveColor(fgExpr, tokens)
+        expect(contrast(fg, resolveColor(restBgExpr, tokens))).toBeGreaterThanOrEqual(4.5)
+        expect(contrast(fg, resolveColor(saveRestBgExpr, tokens))).toBeGreaterThanOrEqual(4.5)
+      })
+
+      it(`${app} (${theme}): Send/Save primary hover contrast is >= 4.5:1 (FEK-1)`, () => {
+        const fg = resolveColor(fgExpr, tokens)
+        expect(contrast(fg, resolveColor(hoverBgExpr, tokens))).toBeGreaterThanOrEqual(4.5)
+        expect(contrast(fg, resolveColor(saveHoverBgExpr, tokens))).toBeGreaterThanOrEqual(4.5)
+      })
+    }
+  }
 })

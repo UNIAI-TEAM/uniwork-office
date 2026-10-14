@@ -138,14 +138,22 @@
 }
 
 .collab-composer-send {
-  border-color: var(--accent, var(--color-brand-secondary));
-  background: var(--accent, var(--color-brand-secondary));
+  border-color: var(--accent, var(--color-btn-primary));
+  background: var(--accent, var(--color-btn-primary));
   color: var(--color-btn-primary-text);
 }
 
 .collab-composer-send:hover {
-  border-color: var(--accent-dark, var(--color-dialog-primary-hover));
-  background: var(--accent-dark, var(--color-dialog-primary-hover));
+  border-color: color-mix(
+    in srgb,
+    var(--accent-dark, var(--color-dialog-primary-hover)) 75%,
+    var(--text)
+  );
+  background: color-mix(
+    in srgb,
+    var(--accent-dark, var(--color-dialog-primary-hover)) 75%,
+    var(--text)
+  );
 }
 
 /* not available now: still focusable, says why through its name / description */
