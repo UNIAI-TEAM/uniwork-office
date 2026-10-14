@@ -113,8 +113,8 @@ export function CollabPanel(p: CollabPanelProps) {
     | null
   >(null)
 
-  if (ctl.newThread !== prevNewThreadRef.current) {
-    if (ctl.newThread && !prevNewThreadRef.current && typeof document !== 'undefined') {
+  useLayoutEffect(() => {
+    if (ctl.newThread && !prevNewThreadRef.current) {
       const active = document.activeElement
       newThreadOpenerRef.current =
         active instanceof HTMLElement &&
@@ -124,7 +124,7 @@ export function CollabPanel(p: CollabPanelProps) {
           : null
     }
     prevNewThreadRef.current = ctl.newThread
-  }
+  }, [ctl.newThread])
 
   useLayoutEffect(() => {
     const active = document.activeElement
