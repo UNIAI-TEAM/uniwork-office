@@ -41,6 +41,7 @@
    - Rỗng và lỗi nằm gọn trong vùng của nó, dùng biến thể compact.
    - Mỗi màn có tối đa một banner đăng nhập hoặc offline.
    - Toast xếp chồng ở góc dưới phải cột nội dung (một host duy nhất), tự tắt sau 6 giây khi không có hành động.
+     - _Sửa đổi (audit Impeccable P1-1):_ toast có hành động (Hoàn tác / Thử lại / Mở) tự tắt sau 10 giây; đồng hồ dừng khi chuột hoặc focus bàn phím ở trong chồng toast, nên không bao giờ tắt khi focus đang ở đó. Tối đa 3 toast, cái cũ nhất nhường chỗ. Chồng toast chiếm chỗ thật ở cuối trang, nên cuộn xuống luôn thấy phần bị che.
    - Xóa có "Hoàn tác" thay cho hộp confirm. Xóa gói vẫn cần xác nhận, nhưng dùng popover trong app.
 7. **Chuyển động** 150ms vào / 120ms ra, chỉ để giải thích thay đổi; dùng `--transition-fast`. Tôn trọng `prefers-reduced-motion`.
 

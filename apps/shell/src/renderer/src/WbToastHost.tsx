@@ -1,4 +1,4 @@
-import { createContext, useContext, useSyncExternalStore } from 'react'
+import { createContext, useContext, useEffect, useRef, useSyncExternalStore } from 'react'
 import type { ReactElement, ReactNode } from 'react'
 import { useI18n, type StringKey, type TFunc } from './locale'
 import { WbGlyph } from './WorkbenchIcons'
@@ -12,7 +12,7 @@ export interface WbToastInput {
   message: WbToastText
   /** `alert` for failures; `status` (default) for results and notices */
   tone?: 'status' | 'alert'
-  /** Open / Undo / Retry; a toast without actions closes itself after AUTO_DISMISS_MS */
+  /** Open / Undo / Retry; such a toast lives ACTION_DISMISS_MS, one without actions AUTO_DISMISS_MS */
   actions?: readonly { label: StringKey; onClick: () => void }[]
 }
 
@@ -21,10 +21,17 @@ interface Shown extends WbToastInput {
 }
 
 export const AUTO_DISMISS_MS = 6000
+/** long enough to reach Undo / Retry by keyboard; the clock stops while the stack is hovered or focused */
+export const ACTION_DISMISS_MS = 10_000
+/** the newest toasts kept on screen; an older one gives way (spec 1.6: they never pile over the page) */
+export const MAX_TOASTS = 3
 
 export interface WbToasts {
   show: (toast: WbToastInput) => void
   dismiss: (id: string) => void
+  /** hover or focus in the stack: every toast's clock stops until `resume` */
+  pause: () => void
+  resume: () => void
   subscribe: (fn: () => void) => () => void
   list: () => readonly Shown[]
 }
@@ -33,12 +40,26 @@ export interface WbToasts {
 export function createWbToasts(): WbToasts {
   let shown: readonly Shown[] = []
   let seq = 0
-  const timers = new Map<string, ReturnType<typeof setTimeout>>()
+  let paused = false
+  // per toast: the time it has left, and since when that clock runs
+  const clocks = new Map<
+    string,
+    { left: number; since: number; timer?: ReturnType<typeof setTimeout> }
+  >()
   const fns = new Set<() => void>()
   const emit = () => fns.forEach((fn) => fn())
+  const stop = (id: string) => {
+    clearTimeout(clocks.get(id)?.timer)
+    clocks.delete(id)
+  }
+  const run = (id: string) => {
+    const c = clocks.get(id)
+    if (!c) return
+    c.since = Date.now()
+    c.timer = setTimeout(() => dismiss(id), c.left)
+  }
   const dismiss = (id: string) => {
-    clearTimeout(timers.get(id))
-    timers.delete(id)
+    stop(id)
     if (!shown.some((x) => x.id === id)) return
     shown = shown.filter((x) => x.id !== id)
     emit()
@@ -46,17 +67,31 @@ export function createWbToasts(): WbToasts {
   return {
     show: (toast) => {
       const id = toast.id ?? `t${++seq}`
-      clearTimeout(timers.get(id))
-      timers.delete(id)
+      stop(id)
       shown = [...shown.filter((x) => x.id !== id), { ...toast, id }]
-      if (!toast.actions?.length)
-        timers.set(
-          id,
-          setTimeout(() => dismiss(id), AUTO_DISMISS_MS),
-        )
+      for (const old of shown.slice(0, -MAX_TOASTS)) stop(old.id)
+      shown = shown.slice(-MAX_TOASTS)
+      clocks.set(id, {
+        left: toast.actions?.length ? ACTION_DISMISS_MS : AUTO_DISMISS_MS,
+        since: 0,
+      })
+      if (!paused) run(id)
       emit()
     },
     dismiss,
+    pause: () => {
+      if (paused) return
+      paused = true
+      for (const c of clocks.values()) {
+        clearTimeout(c.timer)
+        c.left = Math.max(0, c.left - (Date.now() - c.since))
+      }
+    },
+    resume: () => {
+      if (!paused) return
+      paused = false
+      for (const id of clocks.keys()) run(id)
+    },
     subscribe: (fn) => {
       fns.add(fn)
       return () => fns.delete(fn)
@@ -75,7 +110,8 @@ export function useWbToast(): WbToasts {
 
 /**
  * The single Workbench toast host (redesign spec 2.3): provides `toasts` to the
- * panes below, and stacks them at the bottom right of the content column.
+ * panes below, and stacks them at the bottom right of the content column. The stack
+ * takes real room at the end of the page, so scrolling down always uncovers what it hid.
  */
 export function WbToastHost({
   toasts,
@@ -87,13 +123,42 @@ export function WbToastHost({
   const { t } = useI18n()
   const shown = useSyncExternalStore(toasts.subscribe, toasts.list)
   const text = (m: WbToastText) => ('key' in m ? t(m.key, m.params) : m.text)
+  const stackRef = useRef<HTMLDivElement>(null)
+  const hovered = useRef(false)
+  // the clocks run again once neither the pointer nor the focus is in the stack
+  const settle = () => {
+    const focused = stackRef.current?.contains(document.activeElement) ?? false
+    if (hovered.current || focused) toasts.pause()
+    else toasts.resume()
+  }
+  // a closed toast can take the focus with it, and no blur says so
+  useEffect(() => {
+    // the last toast closed under a still pointer: no mouseleave follows
+    if (!shown.length) hovered.current = false
+    if (!hovered.current && !stackRef.current?.contains(document.activeElement)) toasts.resume()
+  }, [shown, toasts])
   return (
     <Ctx.Provider value={toasts}>
       {children}
       <div className="wb-toast-host">
         {/* the live region is always there: a region inserted with its text is often not announced;
             a failure is its own role=alert node, which is announced on insertion */}
-        <div className="wb-toast-stack" aria-live="polite">
+        <div
+          ref={stackRef}
+          className="wb-toast-stack"
+          aria-live="polite"
+          onMouseEnter={() => {
+            hovered.current = true
+            settle()
+          }}
+          onMouseLeave={() => {
+            hovered.current = false
+            settle()
+          }}
+          onFocus={settle}
+          // focus is still on the old element during blur: decide once it has moved
+          onBlur={() => setTimeout(settle)}
+        >
           {shown.map((toast) => (
             <div
               key={toast.id}

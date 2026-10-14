@@ -1,6 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { act, createElement, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
@@ -9,7 +11,9 @@ import { LocaleProvider } from '../src/renderer/src/locale'
 import { WbConfirm } from '../src/renderer/src/WbConfirm'
 import { WbMenu, WbMenuItem, WbMenuLabel } from '../src/renderer/src/WbMenu'
 import {
+  ACTION_DISMISS_MS,
   AUTO_DISMISS_MS,
+  MAX_TOASTS,
   WbToastHost,
   createWbToasts,
   type WbToasts,
@@ -291,7 +295,7 @@ describe('WbToastHost', () => {
     expect(shown()).toHaveLength(0)
   })
 
-  it('closes itself after 6 seconds unless it carries an action; the × always closes', () => {
+  it('a notice closes after 6 seconds, one with an action after 10; the × always closes', () => {
     mount()
     act(() => {
       toasts.show({ message: { text: 'Saved' } })
@@ -304,10 +308,86 @@ describe('WbToastHost', () => {
     expect(shown()).toHaveLength(2)
     act(() => vi.advanceTimersByTime(1))
     expect(shown().map((t) => t.querySelector('.wb-toast-text')?.textContent)).toEqual(['Failed'])
-    act(() => vi.advanceTimersByTime(60_000))
+    // an action toast does not live forever: it would sit over the page on every tab
+    act(() => vi.advanceTimersByTime(ACTION_DISMISS_MS - AUTO_DISMISS_MS - 1))
     expect(shown()).toHaveLength(1)
+    act(() => vi.advanceTimersByTime(1))
+    expect(shown()).toHaveLength(0)
+    act(() => toasts.show({ message: { text: 'Again' } }))
     const close = shown()[0]!.querySelector<HTMLButtonElement>('button[aria-label="Dismiss"]')!
     act(() => close.click())
     expect(shown()).toHaveLength(0)
+  })
+
+  it('the clock stops while the pointer is over the stack and resumes with the time it had left', () => {
+    mount()
+    act(() =>
+      toasts.show({
+        message: { text: 'Deleted' },
+        actions: [{ label: 'wbCommonUndo', onClick: vi.fn() }],
+      }),
+    )
+    act(() => vi.advanceTimersByTime(ACTION_DISMISS_MS - 1000))
+    const stack = host.querySelector<HTMLElement>('.wb-toast-stack')!
+    // React listens for mouseover/out to synthesize enter/leave
+    act(() => {
+      shown()[0]!.dispatchEvent(
+        new MouseEvent('mouseover', { bubbles: true, relatedTarget: document.body }),
+      )
+    })
+    act(() => vi.advanceTimersByTime(60_000))
+    expect(shown()).toHaveLength(1)
+    act(() => {
+      stack.dispatchEvent(
+        new MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body }),
+      )
+    })
+    act(() => vi.advanceTimersByTime(999))
+    expect(shown()).toHaveLength(1)
+    act(() => vi.advanceTimersByTime(1))
+    expect(shown()).toHaveLength(0)
+  })
+
+  it('never closes while keyboard focus is in it: Undo stays reachable', () => {
+    mount()
+    act(() =>
+      toasts.show({
+        message: { text: 'Deleted' },
+        actions: [{ label: 'wbCommonUndo', onClick: vi.fn() }],
+      }),
+    )
+    const undo = Array.from(shown()[0]!.querySelectorAll('button')).find(
+      (b) => b.textContent === 'Undo',
+    )!
+    act(() => undo.focus())
+    act(() => vi.advanceTimersByTime(ACTION_DISMISS_MS * 5))
+    expect(shown()).toHaveLength(1)
+    // focus leaves: the clock runs out what it had left
+    act(() => undo.blur())
+    act(() => vi.advanceTimersByTime(0))
+    act(() => vi.advanceTimersByTime(ACTION_DISMISS_MS))
+    expect(shown()).toHaveLength(0)
+  })
+
+  it(`keeps at most ${MAX_TOASTS}: the oldest gives way`, () => {
+    mount()
+    act(() => {
+      for (let i = 1; i <= MAX_TOASTS + 2; i++) toasts.show({ message: { text: `T${i}` } })
+    })
+    expect(shown().map((t) => t.querySelector('.wb-toast-text')?.textContent)).toEqual(
+      Array.from({ length: MAX_TOASTS }, (_, i) => `T${i + 3}`),
+    )
+  })
+
+  it('the host takes room at the end of the page and lets clicks through around the toasts', () => {
+    const css = readFileSync(join(__dirname, '../src/renderer/src/home.css'), 'utf8')
+    const host = css.slice(
+      css.indexOf('\n.wb-toast-host {'),
+      css.indexOf('\n}', css.indexOf('\n.wb-toast-host {')),
+    )
+    expect(host).not.toMatch(/height: 0/)
+    expect(host).toMatch(/pointer-events: none;/)
+    expect(css).toMatch(/\n\.wb-toast \{[^}]*pointer-events: auto;/)
+    expect(css).not.toMatch(/\n\.wb-toast-stack \{[^}]*position: absolute;/)
   })
 })

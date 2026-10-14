@@ -253,7 +253,9 @@ describe('workbench states and the tab toolbar (home.css)', () => {
 
   it('the toast host ends the column even on a short tab, and sticks 24px above the bottom', () => {
     const body = rule('.wb-toast-host')
-    expect(body).toMatch(/position: sticky;\n {2}bottom: 24px;/)
+    // sticky insets count from inside .wb-home's 56px bottom padding: -32px is 24px above the
+    // edge, the same place the stack ends at the bottom of the page, so scrolling down uncovers
+    expect(body).toMatch(/position: sticky;\n {2}bottom: -32px;/)
     // a short tab: pushed to the column end; 56px padding - 32px = 24px from the edge
     expect(body).toMatch(/margin-top: auto;\n {2}margin-bottom: -32px;/)
   })

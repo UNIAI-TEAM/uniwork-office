@@ -5134,33 +5134,33 @@ body.vib .home {
   padding: 8px 0;
 }
 
-/* the single toast host (WbToastHost): takes no room in the page; toasts stack upwards at its
- * right edge. A short tab: margin-top auto drops it to the column's end, and the negative bottom
- * margin (24px from the edge minus .wb-home's 56px bottom padding) lands it 24px above the edge.
- * A long tab: sticky lifts it to 24px above the visible bottom. */
+/* the single toast host (WbToastHost): toasts stack at the right edge of the column's end and
+ * take real room there, so scrolling to the end always uncovers what they hid. Sticky insets
+ * count from inside .wb-home's 56px bottom padding: bottom and margin-bottom -32px both land the
+ * stack 24px above the window edge, so its stuck place and its place at the end are the same
+ * (a short tab: margin-top auto drops it to the column's end). Only the toasts take the pointer. */
 .wb-toast-host {
   position: sticky;
-  bottom: 24px;
+  bottom: -32px;
   z-index: 60;
-  height: 0;
   margin-top: auto;
   margin-bottom: -32px;
+  pointer-events: none;
 }
 
 .wb-toast-stack {
-  position: absolute;
-  right: 0;
-  bottom: 0;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   gap: 8px;
   max-width: min(480px, 100%);
+  margin-left: auto;
 }
 
 .wb-toast {
   display: flex;
   align-items: center;
+  pointer-events: auto;
   gap: 12px;
   padding: 8px 8px 8px 14px;
   border: 1px solid var(--border);
