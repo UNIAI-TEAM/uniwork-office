@@ -3,8 +3,9 @@
 
 .ai-model-picker {
   display: inline-flex;
-  /* the chip's own floor: the wrapper may shrink to it but not below, so the label cannot spill */
-  min-width: 56px;
+  /* shrinks ahead of the usage chip while the footer has room, then holds ~8-10 chars of the label */
+  flex-shrink: 1000;
+  min-width: 88px;
 }
 
 .ai-model-chip {
@@ -12,11 +13,11 @@
   align-items: center;
   gap: 5px;
   height: 24px;
-  max-width: 200px;
+  max-width: min(200px, 100%);
   padding: 0 7px 0 6px;
   /* yields to its footer neighbours (usage chip, attach, track changes, send): the label
-     ellipsizes instead of painting over them, but never collapses to nothing */
-  min-width: 56px;
+     ellipsizes instead of painting over them, keeping ~8-10 characters readable */
+  min-width: 88px;
   border: 1px solid transparent;
   border-radius: var(--radius-30);
   background: none;
@@ -70,7 +71,7 @@
   display: flex;
   flex-direction: column;
   width: 260px;
-  max-height: min(420px, 70vh);
+  max-height: min(420px, calc(var(--ui-vh, 1vh) * 70));
   padding: 4px;
   background: var(--surface);
   border: 1px solid var(--border-strong);
