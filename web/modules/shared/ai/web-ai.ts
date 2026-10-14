@@ -123,7 +123,7 @@ function readChoice(): AiChoice {
     if (raw && typeof raw === 'object') {
       return {
         // only a provider the web can run: the value comes from localStorage and ends up in a URL
-        // (`uniwork` has a fixed route; settings() still drops it while the grant is off)
+        // (`uniwork` has a fixed route; settings() keeps it selected while the grant is off, and Send is blocked)
         ...(typeof raw.provider === 'string' &&
         (WEB_PROVIDER_IDS.has(raw.provider) || raw.provider === UNIWORK_PROVIDER_ID)
           ? { provider: raw.provider }
@@ -507,8 +507,11 @@ export function createWebAi(opts: {
     const picked = choice.provider === UNIWORK_PROVIDER_ID ? undefined : choice.provider
     const keyed =
       picked && usable.includes(picked) ? picked : (serverDefault ?? usable[0] ?? undefined)
+    // a picked UniWork AI stays selected while it is unavailable (grant off, or the server turned
+    // it off): the picker shows the unavailable state, Send is blocked and a send answers as off,
+    // never a request to the viewer's BYOK provider they did not pick
     const provider = (
-      choice.provider === UNIWORK_PROVIDER_ID && uniworkOn
+      choice.provider === UNIWORK_PROVIDER_ID
         ? UNIWORK_PROVIDER_ID
         : (keyed ?? (uniworkOn ? UNIWORK_PROVIDER_ID : (picked ?? fallback ?? 'openai')))
     ) as AiProviderId
