@@ -166,4 +166,35 @@ describe('setRunId', () => {
     t.begin('s2')
     expect(sent.at(-1)).toEqual({ state: 'running', run_id: 'r1' })
   })
+
+  it('an id that arrives after a Stop does not name the next run (a late header of the aborted turn)', async () => {
+    const t = tracker(1000)
+    let cancelled = false
+    t.begin('s1', () => {
+      cancelled = true
+      t.end('s1')
+    })
+    t.setRunId('run-1')
+    await t.stop()
+    expect(cancelled).toBe(true)
+    // the aborted turn's response header shows up after the run is already idle
+    t.setRunId('late-from-run-1')
+    t.begin('s2')
+    expect(sent.at(-1)).toEqual({ state: 'running', run_id: 'r2' })
+    t.end('s2')
+    // a normal run that ends by itself keeps the early-id behaviour pinned above
+    vi.advanceTimersByTime(1000)
+    t.setRunId('early-again')
+    t.begin('s3')
+    expect(sent.at(-1)).toEqual({ state: 'running', run_id: 'early-again' })
+  })
+
+  it('a pending next id never survives the end of a run (idle clears it)', () => {
+    const t = tracker(0)
+    t.setRunId('early')
+    t.begin('s1')
+    t.end('s1')
+    t.begin('s2')
+    expect(sent.at(-1)).toEqual({ state: 'running', run_id: 'r1' })
+  })
 })

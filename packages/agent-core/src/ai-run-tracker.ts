@@ -60,10 +60,14 @@ export function createAiRunTracker(opts: AiRunTrackerOptions = {}): AiRunTracker
   let timer: ReturnType<typeof setTimeout> | null = null
   /** stop() cancelled the streams: their end is the end of the run, no grace */
   let stopping = false
+  /** the run just ended by a Stop: an id that shows up now is a late header of the aborted turn */
+  let stoppedIdle = false
 
   function flip(next: boolean): void {
     if (next === isRunning) return
     isRunning = next
+    // a pending id names a run that has not started; it never outlives the run that just ended
+    if (!next) nextRunId = ''
     try {
       report?.(next ? { state: 'running', run_id: runId } : { state: 'idle', run_id: runId })
     } catch (err) {
@@ -80,6 +84,7 @@ export function createAiRunTracker(opts: AiRunTrackerOptions = {}): AiRunTracker
 
   function settle(): void {
     timer = null
+    if (stopping) stoppedIdle = true
     stopping = false
     if (active.size === 0) flip(false)
   }
@@ -91,6 +96,7 @@ export function createAiRunTracker(opts: AiRunTrackerOptions = {}): AiRunTracker
         timer = null
       }
       active.set(streamId, cancel)
+      stoppedIdle = false
       if (!isRunning) {
         runId = nextRunId || `r${++seq}`
         nextRunId = ''
@@ -129,7 +135,8 @@ export function createAiRunTracker(opts: AiRunTrackerOptions = {}): AiRunTracker
     setRunId(id) {
       if (!id) return
       if (!isRunning) {
-        nextRunId = id
+        // after a Stop the id belongs to the turn that was cancelled, not to the next one
+        if (!stoppedIdle) nextRunId = id
         return
       }
       if (id === runId) return
