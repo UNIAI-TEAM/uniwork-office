@@ -395,9 +395,9 @@
 
 .collab-cmh {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   margin: 0 0 2px;
   min-height: 24px;
   font-size: var(--text-caption);
@@ -425,18 +425,29 @@ h3.collab-cmh {
 }
 
 .collab-au {
+  flex: 0 1 auto;
   font-weight: 600;
   color: var(--text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 4ch;
+}
+
+.collab-cmh .collab-link {
+  flex: 0 2 auto;
   min-width: 0;
+  padding: 2px 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .collab-dt {
   margin-left: auto;
   color: var(--text-secondary);
   flex: none;
+  white-space: nowrap;
 }
 
 .collab-bd {
