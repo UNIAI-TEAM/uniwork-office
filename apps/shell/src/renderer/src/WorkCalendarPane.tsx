@@ -164,9 +164,12 @@ export function WorkCalendarPane({
                   {rows.map((e) => {
                     const kind = kindOf(e)
                     const end = e.end ? Date.parse(e.end) : NaN
+                    // the server's status decides, as on Desk Today; the clock only stands in when it sent none
                     const live =
                       kind === 'meeting' &&
-                      (e.status === 'IN_PROGRESS' || (Date.parse(e.start) <= now && now < end))
+                      (e.status == null
+                        ? Date.parse(e.start) <= now && now < end
+                        : e.status === 'IN_PROGRESS')
                     const past = !live && kind !== 'task' && !e.all_day && end <= now
                     const dur = duration(e, t)
                     return (

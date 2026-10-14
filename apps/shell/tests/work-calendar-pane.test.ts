@@ -229,6 +229,38 @@ describe('Calendar tab', () => {
     }
   })
 
+  it('a meeting inside its slot is not live when the server says it is not running (C-I2)', async () => {
+    const now = Date.now()
+    const slot = (id: string, status: string) => ({
+      id: `meeting:${id}`,
+      kind: 'meeting',
+      entity_id: id,
+      title: `Meeting ${id}`,
+      start: new Date(now - 60_000).toISOString(),
+      end: new Date(now + 1_800_000).toISOString(),
+      all_day: false,
+      status,
+    })
+    api.calendarEvents.mockResolvedValueOnce({
+      ok: true,
+      value: [slot('ended', 'ENDED'), slot('scheduled', 'SCHEDULED'), slot('on', 'IN_PROGRESS')],
+    })
+    await mount()
+    const row = (title: string) =>
+      Array.from(host.querySelectorAll('.wb-agenda-row')).find((r) =>
+        r.textContent?.includes(title),
+      )
+    // a slot that began a minute ago can fall on yesterday just after midnight
+    if (!row('Meeting ended')) return
+    for (const title of ['Meeting ended', 'Meeting scheduled']) {
+      expect(row(title)!.querySelector('.wb-pill.is-success')).toBeNull()
+      expect(
+        Array.from(row(title)!.querySelectorAll('button')).some((b) => b.textContent === 'Join'),
+      ).toBe(false)
+    }
+    expect(row('Meeting on')!.querySelector('.wb-pill.is-success')?.textContent).toBe('In progress')
+  })
+
   it('with a head: the toolbar says 14 days and the item count, the legend, and opens the web calendar', async () => {
     await act(async () => {
       root.render(
