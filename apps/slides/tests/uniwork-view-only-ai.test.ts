@@ -276,8 +276,20 @@ describe('AI panel of a view-only deck', () => {
     root = createRoot(container)
     act(() => root!.render(createElement(AiPanel as never, props({ readOnly: true }) as never)))
     expect(container.querySelector('.ai-readonly-notice')?.textContent).toBeTruthy()
+    expect(container.querySelector('.ai-uniwork-view-only')).toBeNull()
     expect(container.querySelectorAll('.ai-starter').length).toBe(0)
     expect(container.querySelector('.ai-tpl-gallery')).toBeNull()
+
+    act(() =>
+      root!.render(
+        createElement(
+          AiPanel as never,
+          props({ readOnly: true, settings: { ...settings, provider: 'uniwork' } }) as never,
+        ),
+      ),
+    )
+    expect(container.querySelector('.ai-readonly-notice')).toBeNull()
+    expect(container.querySelector('.ai-uniwork-view-only')?.textContent).toBeTruthy()
 
     act(() => root!.render(createElement(AiPanel as never, props({}) as never)))
     expect(container.querySelector('.ai-readonly-notice')).toBeNull()

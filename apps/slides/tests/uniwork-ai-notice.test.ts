@@ -80,7 +80,7 @@ const flush = () =>
 const ui = (key: Parameters<typeof aiUniworkText>[1], params?: Record<string, string | number>) =>
   aiUniworkText(getLang(), key, params)
 
-async function startRun(): Promise<HTMLElement> {
+async function startRun(provider: AiSettings['provider'] = 'anthropic'): Promise<HTMLElement> {
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
@@ -96,7 +96,7 @@ async function startRun(): Promise<HTMLElement> {
           applySlide: () => {},
           applyDeck: () => {},
           fitWidthPx: 960,
-          settings,
+          settings: { ...settings, provider },
           open: true,
           onExpand: () => {},
           onCollapse: () => {},
@@ -195,17 +195,22 @@ describe('UniWork AI notices (slides panel)', () => {
 
   it('one persistent aria-live region is mounted before the notice, and the note lands inside it', async () => {
     const c = await startRun()
-    const live = c.querySelector('.ai-msg-assistant [aria-live="polite"]')
+    const chatEl = c.querySelector('.ai-chat')
+    expect(chatEl?.hasAttribute('aria-live')).toBe(false)
+    expect(chatEl?.getAttribute('aria-busy')).toBe('true')
+    expect(c.querySelector('.ai-msg-assistant [aria-live]')).toBeNull()
+    const live = c.querySelector('.ai-sr-status')
     expect(live, 'live region before any notice').not.toBeNull()
+    expect(live!.getAttribute('aria-live')).toBe('polite')
     expect(live!.textContent).toBe('')
     // a plain aria-live container: role=status would collide with the app's own status nodes
     expect(live!.hasAttribute('role')).toBe(false)
     await notify({ kind: 'rate-limit-wait', seconds: 30, attempt: 1 })
-    // the same node (not a new one mounted with its text) now holds the note, and nothing else announces
-    expect(c.querySelector('.ai-msg-assistant [aria-live="polite"]')).toBe(live)
+    // the same node (not a new one mounted with its text) now holds the note, and nothing else in .ai-chat announces
+    expect(c.querySelector('.ai-sr-status')).toBe(live)
     expect(live!.textContent).toBe(ui('aiErrRateLimited', { seconds: 30 }))
     expect(c.querySelectorAll('.ai-msg-notice [role="status"]')).toHaveLength(0)
-    expect(live!.querySelectorAll('.ai-msg-notice')).toHaveLength(1)
+    expect(c.querySelectorAll('.ai-msg-notice')).toHaveLength(1)
     // a restart note joins the wait line in the same region
     await notify({ kind: 'conversation-restarted' })
     expect(live!.textContent).toContain(ui('aiConversationRestarted'))
@@ -277,5 +282,30 @@ describe('UniWork AI notices (slides panel)', () => {
       ui('aiErrViewOnlyEdit'),
       ui('aiErrUnsupported', { module: 'Slides' }),
     ])
+  })
+
+  it('when UniWork AI is selected, renders result chip as first words of answer node and announces once in panel live node', async () => {
+    const c = await startRun('uniwork')
+    const chatEl = c.querySelector('.ai-chat')
+    expect(chatEl?.hasAttribute('aria-live')).toBe(false)
+    expect(chatEl?.getAttribute('aria-busy')).toBe('true')
+    await act(async () => harness.events!.onText?.('Bố cục trang 1 đã gọn hơn.'))
+    await act(async () =>
+      harness.events!.onDone?.({
+        text: 'Bố cục trang 1 đã gọn hơn.',
+        cancelled: false,
+        turnLimit: false,
+      }),
+    )
+    await flush()
+    expect(chatEl?.hasAttribute('aria-busy')).toBe(false)
+    const chipEl = c.querySelector('.ai-result-chip')
+    expect(chipEl).not.toBeNull()
+    expect(chipEl?.textContent).toBe(ui('aiResultAnswer'))
+    const answerNode = chipEl?.parentElement
+    expect(answerNode?.textContent?.startsWith(`${ui('aiResultAnswer')}:`)).toBe(true)
+    const live = c.querySelector('.ai-sr-status')
+    expect(live?.textContent).toContain(ui('aiResultAnswer'))
+    expect(live?.textContent).toContain('Bố cục trang 1 đã gọn hơn.')
   })
 })

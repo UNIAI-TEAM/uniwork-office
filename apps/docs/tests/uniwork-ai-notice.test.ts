@@ -177,21 +177,27 @@ describe('UniWork AI notices (docs panel)', () => {
   })
 
   it('one persistent aria-live region is mounted before the notice, and the note lands inside it', async () => {
-    const live = container!.querySelector('.ai-msg-assistant [aria-live="polite"]')
+    const chatEl = container!.querySelector('.ai-chat')
+    expect(chatEl?.hasAttribute('aria-live')).toBe(false)
+    expect(chatEl?.getAttribute('aria-busy')).toBe('true')
+    expect(container!.querySelector('.ai-msg-assistant [aria-live]')).toBeNull()
+    const live = container!.querySelector('.ai-sr-status')
     expect(live, 'live region before any notice').not.toBeNull()
+    expect(live!.getAttribute('aria-live')).toBe('polite')
     expect(live!.textContent).toBe('')
     // a plain aria-live container: role=status would collide with the app's own status nodes
     expect(live!.hasAttribute('role')).toBe(false)
     await emit({ type: 'notice', notice: { kind: 'rate-limit-wait', seconds: 30, attempt: 1 } })
-    // the same node (not a new one mounted with its text) now holds the note, and nothing else announces
-    expect(container!.querySelector('.ai-msg-assistant [aria-live="polite"]')).toBe(live)
+    // the same node (not a new one mounted with its text) now holds the note, and nothing else in .ai-chat announces
+    expect(container!.querySelector('.ai-sr-status')).toBe(live)
     expect(live!.textContent).toBe(ui('aiErrRateLimited', { seconds: 30 }))
     expect(container!.querySelectorAll('.ai-msg-notice [role="status"]')).toHaveLength(0)
-    expect(live!.querySelectorAll('.ai-msg-notice')).toHaveLength(1)
+    expect(container!.querySelectorAll('.ai-msg-notice')).toHaveLength(1)
     // a restart note joins the wait line in the same region
     await emit({ type: 'notice', notice: { kind: 'conversation-restarted' } })
     expect(live!.textContent).toContain(ui('aiConversationRestarted'))
     await emit({ type: 'done' })
+    expect(chatEl?.hasAttribute('aria-busy')).toBe(false)
   })
 
   it('a restarted conversation shows its note and not an empty-reply line', async () => {
@@ -294,5 +300,42 @@ describe('UniWork AI notices (docs panel)', () => {
       ui('aiErrUnsupported', { module: 'Docs' }),
     ])
     expect(container!.textContent).toContain('partial')
+  })
+
+  it('when UniWork AI is selected, renders result chip as first words of answer node and announces once in panel live region', async () => {
+    const uniworkSettings: AiSettings = {
+      ...settings,
+      provider: 'uniwork',
+    }
+    act(() =>
+      root!.render(
+        createElement(LocaleProvider, {
+          initial: 'vi',
+          children: createElement(AiPanel, {
+            editor: editor!,
+            blocks: [],
+            settings: uniworkSettings,
+            open: true,
+            filePath: '/docs/a.docx',
+            preset: { text: 'summarize it', nonce: 1, autoRun: true },
+          }),
+        }),
+      ),
+    )
+    const chatEl = container!.querySelector('.ai-chat')
+    expect(chatEl?.hasAttribute('aria-live')).toBe(false)
+    expect(chatEl?.getAttribute('aria-busy')).toBe('true')
+    await emit({ type: 'delta', text: 'Tóm tắt 3 ý chính.' })
+    await emit({ type: 'done' })
+    expect(chatEl?.hasAttribute('aria-busy')).toBe(false)
+    const chipEl = container!.querySelector('.ai-result-chip')
+    expect(chipEl).not.toBeNull()
+    expect(chipEl?.textContent).toBe(ui('aiResultAnswer'))
+    const answerNode = chipEl?.parentElement
+    expect(answerNode?.textContent?.startsWith(`${ui('aiResultAnswer')}:`)).toBe(true)
+    expect(answerNode?.textContent).toContain('Tóm tắt 3 ý chính.')
+    const live = container!.querySelector('.ai-sr-status')
+    expect(live?.textContent).toContain(ui('aiResultAnswer'))
+    expect(live?.textContent).toContain('Tóm tắt 3 ý chính.')
   })
 })

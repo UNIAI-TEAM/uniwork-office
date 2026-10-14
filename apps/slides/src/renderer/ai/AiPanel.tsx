@@ -7,6 +7,13 @@ import {
   useCloudSignedIn,
   type AiModelPickerBridge,
   UniAiMark,
+  UniworkComposerNote,
+  UniworkDisclosure,
+  UniworkDisclosureShort,
+  composerNoteFor,
+  isComposerPopupOpen,
+  readUniworkDisclosureAcked,
+  writeUniworkDisclosureAcked,
 } from '@genoffice/ui'
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import {
@@ -15,10 +22,19 @@ import {
   IPC_STREAM_SILENCE_TIMEOUT_MS,
   endsQuietly,
   noticePatch,
+  resultChip,
   type AgentImage,
   type PanelNote,
   type ToolDisplay,
 } from '@genoffice/agent-core'
+import type {
+  UniworkCloudStatusBridge,
+  UniworkCloudStatusSnapshot,
+} from '@genoffice/electron-utils/uniwork-ai-flag'
+
+function readUniworkCloudStatus(): UniworkCloudStatusBridge | undefined {
+  return (window as Window & { uniworkCloudStatus?: UniworkCloudStatusBridge }).uniworkCloudStatus
+}
 import type { RenderSlide } from '@genoffice/pptx-render'
 import {
   aiNoticeBody,
@@ -264,6 +280,7 @@ interface ChatEntry {
   waitLine?: string | undefined
   /** UniWork AI: restarted conversation / provider boundary / dropped call, shown above the answer */
   notes?: PanelNote[] | undefined
+  stopped?: boolean | undefined
 }
 
 /** Empty deck → generation starters; deck with content → polish starters */
@@ -1502,6 +1519,7 @@ export function AiPanel({
             next[next.length - 1] = {
               ...last,
               streaming: false,
+              stopped: cancelled,
               waitLine: undefined,
               // a restarted conversation or UniWork AI being off ends the turn on purpose: the note is the whole reply
               text:
@@ -2109,6 +2127,35 @@ export function AiPanel({
     resizer.setPointerCapture(e.pointerId)
   }
 
+  const isUniwork = settings.provider === 'uniwork'
+  const [cloudSnapshot, setCloudSnapshot] = useState<UniworkCloudStatusSnapshot | null>(null)
+  useEffect(() => {
+    const bridge = readUniworkCloudStatus()
+    if (!bridge) return
+    let cancelled = false
+    void bridge
+      .get()
+      .then((snap) => {
+        if (!cancelled) setCloudSnapshot(snap)
+      })
+      .catch(() => {})
+    const off = bridge.onChange((snap) => {
+      if (!cancelled) setCloudSnapshot(snap)
+    })
+    return () => {
+      cancelled = true
+      off()
+    }
+  }, [])
+  const composerNoteState = composerNoteFor(cloudSnapshot, settings.provider)
+  const ackKey = cloudSnapshot?.accountId ?? null
+  const [disclosureAcked, setDisclosureAcked] = useState<boolean>(() =>
+    readUniworkDisclosureAcked(ackKey),
+  )
+  useEffect(() => {
+    setDisclosureAcked(readUniworkDisclosureAcked(ackKey))
+  }, [ackKey])
+
   // collapsed: rail only — after all hooks, so the instance and its state survive
   if (!open) {
     return (
@@ -2122,6 +2169,37 @@ export function AiPanel({
       </button>
     )
   }
+
+  const lastEntry = chat[chat.length - 1]
+  const lastAssistantCompleted =
+    lastEntry && lastEntry.role === 'assistant' && !lastEntry.streaming && !busy ? lastEntry : null
+  const lastAssistantChip = lastAssistantCompleted
+    ? resultChip({
+        provider: settings.provider,
+        mutated: lastAssistantCompleted.snapshotId != null,
+        stopped: Boolean(lastAssistantCompleted.stopped),
+        hasStreamedText: Boolean(lastAssistantCompleted.text?.trim()),
+        clarifyAsked: clarifyAnswers.some((c) => c.afterIdx === chat.length - 1),
+        notes: lastAssistantCompleted.notes,
+        toolExecutions: lastAssistantCompleted.tools,
+        error: lastAssistantCompleted.error ?? null,
+      })
+    : null
+  const panelLiveAnnouncement = (() => {
+    if (lastEntry?.role === 'assistant') {
+      if (lastEntry.waitLine) return lastEntry.waitLine
+      if (lastEntry.notes?.length && lastEntry.streaming) {
+        return lastEntry.notes[lastEntry.notes.length - 1].text
+      }
+      if (!lastEntry.streaming && !busy) {
+        const chipPrefix = lastAssistantChip
+          ? `${aiUniworkText(lang, lastAssistantChip.labelKey)}${lastEntry.text ? ': ' : ''}`
+          : ''
+        return `${chipPrefix}${lastEntry.text || ''}`.trim()
+      }
+    }
+    return ''
+  })()
 
   return (
     <aside
@@ -2181,7 +2259,17 @@ export function AiPanel({
         </div>
       </div>
 
-      <div ref={logRef} className="ai-chat" onScroll={onLogScroll}>
+      {/* Single panel-level polite live region: announces transport notices while running and the finished answer once when it ends */}
+      <div className="ai-sr-status" aria-live="polite" aria-atomic="true">
+        {panelLiveAnnouncement}
+      </div>
+
+      <div
+        ref={logRef}
+        className="ai-chat"
+        aria-busy={busy ? 'true' : undefined}
+        onScroll={onLogScroll}
+      >
         {/* Past conversation (read-only transcript, not fed to the model), displayed continuously with the current turn */}
         {historicChat.length > 0 && (
           <>
@@ -2272,7 +2360,9 @@ export function AiPanel({
             !entry.streaming &&
             !entry.error &&
             !entry.notes?.length &&
-            !entry.tools?.length
+            !entry.tools?.length &&
+            !entry.stopped &&
+            entry.snapshotId == null
           ) {
             return null
           }
@@ -2287,6 +2377,20 @@ export function AiPanel({
             turnEnded &&
             // edits-only turns have no text but still carry the rollback point
             (!!(entry.text || entry.error) || entry.snapshotId != null)
+          const chip =
+            entry.role === 'assistant' && !entry.streaming && turnEnded
+              ? resultChip({
+                  provider: settings.provider,
+                  mutated: entry.snapshotId != null,
+                  stopped: Boolean(entry.stopped),
+                  hasStreamedText: Boolean(entry.text?.trim()),
+                  clarifyAsked: clarifyAnswers.some((c) => c.afterIdx === i),
+                  notes: entry.notes,
+                  toolExecutions: entry.tools,
+                  error: entry.error ?? null,
+                })
+              : null
+          const chipLabel = chip ? aiUniworkText(lang, chip.labelKey) : null
           return (
             <div
               key={i}
@@ -2296,17 +2400,17 @@ export function AiPanel({
               {entry.role === 'user' && entry.attachments && entry.attachments.length > 0 && (
                 <SentAttachments atts={entry.attachments} previews={attachmentPreviews} />
               )}
-              {/* one persistent, empty-until-needed live region: a node that mounts with its text is often not announced */}
-              {entry.role === 'assistant' && (
-                <div className="ai-msg-live" aria-live="polite">
-                  {entry.notes?.map((note, k) => (
-                    <div key={`un${k}`} className="ai-msg-notice">
-                      {note.text}
-                    </div>
-                  ))}
-                  {entry.waitLine && <div className="ai-msg-notice">{entry.waitLine}</div>}
-                </div>
-              )}
+              {entry.role === 'assistant' &&
+                Boolean(entry.notes?.length || entry.waitLine) && (
+                  <div className="ai-msg-live">
+                    {entry.notes?.map((note, k) => (
+                      <div key={`un${k}`} className="ai-msg-notice">
+                        {note.text}
+                      </div>
+                    ))}
+                    {entry.waitLine && <div className="ai-msg-notice">{entry.waitLine}</div>}
+                  </div>
+                )}
               {entry.role === 'assistant' && !entry.text && entry.streaming ? (
                 <span className="ai-typing-row">
                   <AiTypingIndicator
@@ -2314,11 +2418,37 @@ export function AiPanel({
                   />
                 </span>
               ) : entry.role === 'assistant' ? (
-                <div dir="auto">
-                  <Markdown text={entry.text} />
+                <div className="ai-msg-answer" dir="auto">
+                  {chip && chipLabel && (
+                    <>
+                      <span
+                        className="ai-result-chip"
+                        data-chip={chip.chip}
+                        data-tone={chip.tone}
+                      >
+                        {chipLabel}
+                      </span>
+                      {entry.text ? <span className="ai-result-chip-sep">: </span> : null}
+                    </>
+                  )}
+                  {entry.text && <Markdown text={entry.text} />}
                 </div>
               ) : (
                 <span dir="auto">{entry.text}</span>
+              )}
+              {chip?.chip === 'edited' && (
+                <div className="ai-result-actions">
+                  <button
+                    type="button"
+                    className="ai-result-view-changes"
+                    onClick={() => applyDeckRef.current(slidesRef.current, currentRef.current)}
+                  >
+                    {aiUniworkText(lang, 'aiResultViewChanges')}
+                  </button>
+                  <span className="ai-result-edited-hint">
+                    {aiUniworkText(lang, 'aiResultEditedHint')}
+                  </span>
+                </div>
               )}
               {entry.tools && entry.tools.length > 0 && <ToolChipList tools={entry.tools} />}
               {entry.error &&
@@ -2453,7 +2583,7 @@ export function AiPanel({
         </div>
       ) : (
         <div className="ai-composer">
-          {readOnly && (
+          {readOnly && !isUniwork && (
             <div className="ai-readonly-notice" role="note">
               {t('aiViewOnlyNotice')}
             </div>
@@ -2472,6 +2602,27 @@ export function AiPanel({
           )}
           {attachNotice && <div className="ai-attach-notice">{attachNotice}</div>}
           <div className="ai-input-box">
+            {isUniwork && (
+              <UniworkComposerNote
+                state={composerNoteState}
+                lang={lang}
+                onSignIn={() => void readUniworkCloudStatus()?.signIn()}
+                onOpenAccountSettings={() => void readUniworkCloudStatus()?.openAccountSettings()}
+                onRetry={retry}
+                onOpenByokSettings={() => void window.desktop?.openAiSettings?.()}
+              />
+            )}
+            {isUniwork && ackKey !== null && !disclosureAcked && (
+              <UniworkDisclosure
+                ackKey={ackKey}
+                acked={disclosureAcked}
+                onAck={() => {
+                  writeUniworkDisclosureAcked(ackKey, true)
+                  setDisclosureAcked(true)
+                }}
+                lang={lang}
+              />
+            )}
             {attachments.length > 0 && (
               <div className="ai-attachments" onScroll={onAttachmentsScroll}>
                 {attachments.map((a) =>
@@ -2553,7 +2704,7 @@ export function AiPanel({
                 if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
                   e.preventDefault()
                   run()
-                } else if (e.key === 'Escape' && busy) {
+                } else if (e.key === 'Escape' && busy && !isComposerPopupOpen(e.currentTarget)) {
                   e.preventDefault()
                   cancel()
                 }
@@ -2600,19 +2751,38 @@ export function AiPanel({
               ) : (
                 <button
                   className="ai-send-btn"
-                  onClick={run}
-                  disabled={!input.trim() || needModelHint !== null}
+                  onClick={() => {
+                    if (isUniwork && composerNoteState !== 'ready') return
+                    run()
+                  }}
+                  disabled={
+                    !(isUniwork && composerNoteState !== 'ready') &&
+                    (!input.trim() || needModelHint !== null)
+                  }
+                  aria-disabled={isUniwork && composerNoteState !== 'ready' ? 'true' : undefined}
                   data-tip={needModelHint ?? t('aiSend')}
                   aria-label={t('aiSend')}
                 >
                   <img
-                    src={input.trim() && needModelHint === null ? sendEnterOn : sendEnterOff}
+                    src={
+                      input.trim() &&
+                      needModelHint === null &&
+                      (!isUniwork || composerNoteState === 'ready')
+                        ? sendEnterOn
+                        : sendEnterOff
+                    }
                     alt=""
                     aria-hidden
                   />
                 </button>
               )}
             </div>
+            {isUniwork && (ackKey === null || disclosureAcked) && (
+              <UniworkDisclosureShort lang={lang} />
+            )}
+            {isUniwork && readOnly && (
+              <div className="ai-uniwork-view-only">{aiUniworkText(lang, 'aiUniworkViewOnly')}</div>
+            )}
           </div>
         </div>
       )}

@@ -1,5 +1,6 @@
 import {
   aiUniworkText,
+  composerNoteFor,
   isUniworkQuestionRefusal,
   aiPanelWidthAtPointer,
   AiPanelSideButton,
@@ -14,6 +15,7 @@ import {
   AgentLoop,
   endsQuietly,
   noticePatch,
+  resultChip,
   type PanelNote,
   composeSkills,
   streamText,
@@ -24,6 +26,10 @@ import {
   imageGenerationAvailable,
   type AiSettings,
 } from '@genoffice/ai-provider/browser'
+import type {
+  UniworkCloudStatusBridge,
+  UniworkCloudStatusSnapshot,
+} from '@genoffice/electron-utils/uniwork-ai-flag'
 import {
   AiComposer,
   AiScopeQuote,
@@ -74,9 +80,13 @@ import {
 } from './edit-queue'
 import { DOC_NAV_SCHEME, navigateToBlock, parseDocNavHref } from './doc-nav'
 
+function readUniworkCloudStatus(): UniworkCloudStatusBridge | undefined {
+  return (window as Window & { uniworkCloudStatus?: UniworkCloudStatusBridge }).uniworkCloudStatus
+}
+
 // Word-parity count (docs word-count.ts): Asian chars one by one + non-Asian words
 const ASIAN_RE =
-  /[ᄀ-ᇿ⺀-⿟、-〿぀-ヿ㄀-ㄯ㄰-㆏㇀-ㇿ㐀-䶿一-鿿가-힯豈-﫿！-｠￠-￦]|[\uD840-\uD87F][\uDC00-\uDFFF]/g
+  /[ᄀ-ᇿ⺀-⿟、-\u303f぀-ヿ㄀-ㄯ㄰-㆏㇀-ㇿ㐀-䶿一-鿿가-힯豈-﫿！-｠￠-￦]|[\uD840-\uD87F][\uDC00-\uDFFF]/g
 const NON_ASIAN_WORD_RE = /[A-Za-z0-9À-ɏ]+(?:['-][A-Za-z0-9À-ɏ]+)*/g
 
 function countWords(text: string): number {
@@ -121,6 +131,10 @@ interface ChatEntry {
   text: string
   streaming?: boolean
   isError?: boolean
+  /** the user stopped the turn before it finished */
+  stopped?: boolean | undefined
+  /** at least one tool mutated the document in this turn */
+  mutated?: boolean | undefined
   /** UniWork AI: the transport is waiting out a Retry-After; the run goes on, Stop is the only action */
   waitLine?: string | undefined
   /** UniWork AI: restarted conversation / provider boundary / dropped call, shown above the answer */
@@ -533,6 +547,8 @@ export function AiPanel({
             : base
           patchLast((last) => ({
             streaming: false,
+            stopped: cancelled,
+            mutated: runMutatedRef.current,
             waitLine: undefined,
             // a restarted conversation or UniWork AI being off ends the turn on purpose: the note is the whole reply
             text:
@@ -734,7 +750,9 @@ export function AiPanel({
     persistMessage('user', displayText ?? instruction, undefined, scope)
     void (async () => {
       try {
-        settingsRef.current = await window.markdownApi.getAiSettings()
+        const s = await window.markdownApi.getAiSettings()
+        settingsRef.current = s
+        setProvider(s?.provider)
         if (!mountedRef.current) return
         await loop.run(instruction)
       } catch (err) {
@@ -883,6 +901,72 @@ export function AiPanel({
   const resizeCleanupRef = useRef<(() => void) | null>(null)
   useEffect(() => () => resizeCleanupRef.current?.(), [])
 
+  const [provider, setProvider] = useState<string | undefined>(undefined)
+  useEffect(() => {
+    let alive = true
+    const sync = () => {
+      void window.markdownApi
+        .getAiSettings()
+        .then((s) => {
+          if (!alive) return
+          settingsRef.current = s
+          setProvider(s?.provider)
+        })
+        .catch(() => {})
+    }
+    sync()
+    const off = window.markdownApi.onAiSettingsChanged?.((s) => {
+      if (!alive) return
+      settingsRef.current = s
+      setProvider(s?.provider)
+    })
+    return () => {
+      alive = false
+      off?.()
+    }
+  }, [open])
+
+  const isUniwork = provider === 'uniwork'
+
+  const [cloudSnapshot, setCloudSnapshot] = useState<UniworkCloudStatusSnapshot>(() => {
+    const bridge = readUniworkCloudStatus()
+    return bridge ? bridge.get() : { status: 'ready' }
+  })
+  useEffect(() => {
+    const bridge = readUniworkCloudStatus()
+    if (!bridge) return
+    setCloudSnapshot(bridge.get())
+    return bridge.subscribe((next) => setCloudSnapshot(next))
+  }, [open])
+
+  const lastAssistant = [...chat].reverse().find((c) => c.role === 'assistant')
+  const panelLiveAnnouncement = (() => {
+    if (!lastAssistant) return ''
+    const parts: string[] = []
+    if (lastAssistant.notes?.length) {
+      parts.push(...lastAssistant.notes.map((n) => n.text))
+    }
+    if (lastAssistant.waitLine) {
+      parts.push(lastAssistant.waitLine)
+    }
+    if (!lastAssistant.streaming && !busy) {
+      const chip = isUniwork
+        ? resultChip({
+            stopped: lastAssistant.stopped,
+            mutated: lastAssistant.mutated,
+            isError: lastAssistant.isError,
+            text: lastAssistant.text,
+            notes: lastAssistant.notes,
+          })
+        : null
+      const chipText = chip ? aiUniworkText(lang, chip.labelKey) : ''
+      const bodyText = lastAssistant.text ? aiNoticeBody(lastAssistant.text) : ''
+      if (chipText && bodyText) parts.push(`${chipText}: ${bodyText}`)
+      else if (bodyText) parts.push(bodyText)
+    }
+    return parts.join(' ')
+  })()
+
   /** Drag the inner panel edge to resize from the selected window side. */
   const startResize = (e: ReactPointerEvent<HTMLDivElement>): void => {
     e.preventDefault()
@@ -978,7 +1062,15 @@ export function AiPanel({
         </div>
       </header>
 
-      <div className="ai-chat" ref={chatRef} onScroll={onChatScroll}>
+      <div className="ai-sr-status" aria-live="polite" aria-atomic="true">
+        {panelLiveAnnouncement}
+      </div>
+      <div
+        className="ai-chat"
+        ref={chatRef}
+        aria-busy={busy ? 'true' : undefined}
+        onScroll={onChatScroll}
+      >
         {chat.length === 0 && (
           <div className="ai-chat-empty">
             <div className="ai-chat-empty-title">{t('aiEmptyTitle')}</div>
@@ -1045,30 +1137,67 @@ export function AiPanel({
           const nextEntry = chat[i + 1]
           const turnEnded = nextEntry ? nextEntry.role === 'user' : !busy
           const showToolbar = !entry.streaming && turnEnded && !!entry.text && !entry.isError
+          const chip =
+            isUniwork && !entry.streaming && turnEnded
+              ? resultChip({
+                  stopped: entry.stopped,
+                  mutated: entry.mutated,
+                  isError: entry.isError,
+                  text: entry.text,
+                  notes: entry.notes,
+                })
+              : null
+          const chipLabel = chip ? aiUniworkText(lang, chip.labelKey) : null
           return (
             <div
               key={i}
               className={`ai-msg ai-msg-assistant${entry.isError && !aiNoticeKind(entry.text) ? ' ai-msg-error' : ''}${entry.streaming ? ' ai-msg-streaming' : ''}`}
             >
-              {/* one persistent, empty-until-needed live region: a node that mounts with its text is often not announced */}
-              {
-                <div className="ai-msg-live" aria-live="polite">
-                  {entry.notes?.map((note, k) => (
-                    <div key={`un${k}`} className="ai-msg-notice">
-                      {note.text}
-                    </div>
-                  ))}
-                  {entry.waitLine && <div className="ai-msg-notice">{entry.waitLine}</div>}
-                </div>
-              }
+              <div className="ai-msg-live">
+                {entry.notes?.map((note, k) => (
+                  <div key={`un${k}`} className="ai-msg-notice">
+                    {note.text}
+                  </div>
+                ))}
+                {entry.waitLine && <div className="ai-msg-notice">{entry.waitLine}</div>}
+              </div>
               {!entry.text && entry.streaming ? (
                 <span className="ai-typing-row">
                   <AiTypingIndicator label={hasTools ? t('aiWorking') : t('aiThinking')} />
                 </span>
               ) : (
                 entry.text && (
-                  <div dir="auto">
+                  <div className="ai-msg-answer" dir="auto">
+                    {chip && chipLabel && (
+                      <>
+                        <span
+                          className="ai-result-chip"
+                          data-chip={chip.chip}
+                          data-tone={chip.tone}
+                        >
+                          {chipLabel}
+                        </span>
+                        <span className="ai-result-chip-sep">: </span>
+                      </>
+                    )}
                     <Markdown text={aiNoticeBody(entry.text)} nav={docNav} />
+                    {chip?.chip === 'edited' && (
+                      <div className="ai-result-actions">
+                        <button
+                          type="button"
+                          className="ai-result-view-changes"
+                          onClick={() => {
+                            const ed = depsRef.current.getEditor()
+                            if (ed) navigateToBlock(ed, 0)
+                          }}
+                        >
+                          {aiUniworkText(lang, 'aiResultViewChanges')}
+                        </button>
+                        <span className="ai-result-edited-hint">
+                          {aiUniworkText(lang, 'aiResultEditedHint')}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )
               )}
@@ -1168,7 +1297,7 @@ export function AiPanel({
         </div>
       )}
       <div className="ai-composer" style={activeClarify ? { display: 'none' } : undefined}>
-        {readOnly && (
+        {readOnly && !isUniwork && (
           <div className="ai-readonly-notice" role="note">
             {t('aiViewOnlyNotice')}
           </div>
@@ -1210,6 +1339,17 @@ export function AiPanel({
         <AiComposer
           value={prompt}
           busy={busy}
+          lang={lang}
+          viewOnly={isUniwork && readOnly ? true : undefined}
+          uniwork={
+            isUniwork
+              ? {
+                  note: composerNoteFor(cloudSnapshot),
+                  onSignIn: () => readUniworkCloudStatus()?.signIn?.(),
+                  onRetry: () => readUniworkCloudStatus()?.retry?.(),
+                }
+              : undefined
+          }
           header={
             hasScopeSelection && (
               <div className="ai-scope-row">

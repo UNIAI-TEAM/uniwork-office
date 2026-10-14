@@ -16,14 +16,40 @@ export type {
 } from './types'
 export { AI_RUN_IDLE_GRACE_MS, createAiRunTracker } from './ai-run-tracker'
 export type { AiRunPayload, AiRunState, AiRunTracker, AiRunTrackerOptions } from './ai-run-tracker'
-export { createTextNoticeSurface, endsQuietly, noticePatch } from './notice-surface'
+export {
+  classifyDroppedToolReason,
+  createTextNoticeSurface,
+  endsQuietly,
+  noticePatch,
+  noticeToPanelNote,
+} from './notice-surface'
 export type {
+  DroppedToolReason,
+  LegacyDroppedNoticeNote,
   NoticeKey,
   NoticeSurface,
   NoticeTranslate,
   PanelNote,
   TextNoticeSurface,
 } from './notice-surface'
+export { classifyS9Error, extractSheetsCellsMeta, resultChip } from './result-chip'
+export type {
+  ResultChipCellsMetaInput,
+  ResultChipDroppedToolCall,
+  ResultChipErrorAction,
+  ResultChipErrorActionKey,
+  ResultChipErrorInput,
+  ResultChipErrorKey,
+  ResultChipErrorLine,
+  ResultChipInput,
+  ResultChipKind,
+  ResultChipLabelKey,
+  ResultChipMeta,
+  ResultChipOutput,
+  ResultChipReasonKey,
+  ResultChipTone,
+  ResultChipToolExecution,
+} from './result-chip'
 export { composeSkills } from './skill'
 export type { AgentSkill, ExecutedToolCall } from './skill'
 export {

@@ -4,10 +4,17 @@ import {
   AiModelPicker,
   type AiModelPickerBridge,
   UniAiMark,
+  composerNoteFor,
 } from '@genoffice/ui'
 import React, { useEffect, useRef, useState } from 'react'
 import { AiComposer, AiScopeQuote, AiTypingIndicator, type AiScopeQuoteData } from '@genoffice/ui'
 import { aiNoticeBody, aiNoticeKind } from '@genoffice/ai-provider/browser'
+import { resultChip } from '@genoffice/agent-core'
+import { aiUniworkText } from '@genoffice/i18n/ai-uniwork'
+import type {
+  UniworkCloudStatusBridge,
+  UniworkCloudStatusSnapshot,
+} from '@genoffice/electron-utils/uniwork-ai-flag'
 import { cap, platform } from '../capabilities'
 import type { ChangePlan } from '@genoffice/xlsx-gateway/domain/workbook.types'
 import { ATTACHMENT_IMAGE_EXTS, type AttachmentMeta } from '../../shared/desktop-api'
@@ -17,6 +24,10 @@ import { SHEET_NAV_SCHEME } from './sheet-nav'
 import type { ClarifyQuestion } from './tools'
 import { ClarifyCard } from './ClarifyCard'
 import type { ClarifyQa } from './clarify-receipts'
+
+function readUniworkCloudStatus(): UniworkCloudStatusBridge | undefined {
+  return (window as Window & { uniworkCloudStatus?: UniworkCloudStatusBridge }).uniworkCloudStatus
+}
 import sendEnterOn from '../assets/send-enter-on.png'
 import sendEnterOff from '../assets/send-enter-off.png'
 import sendStop from '../assets/send-stop.png'
@@ -471,6 +482,45 @@ export function AiChatPanel({
     stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48
   }
 
+  const [provider, setProvider] = useState<string | undefined>(undefined)
+  useEffect(() => {
+    let cancelled = false
+    void MODEL_BRIDGE.getSettings()
+      .then((s) => {
+        if (!cancelled) setProvider(s?.provider)
+      })
+      .catch(() => {})
+    const off = MODEL_BRIDGE.onSettingsChanged?.((s) => {
+      if (!cancelled) setProvider(s?.provider)
+    })
+    return () => {
+      cancelled = true
+      off?.()
+    }
+  }, [])
+  const isUniwork = provider === 'uniwork'
+
+  const [cloudSnapshot, setCloudSnapshot] = useState<UniworkCloudStatusSnapshot | null>(null)
+  useEffect(() => {
+    const bridge = readUniworkCloudStatus()
+    if (!bridge) return
+    let cancelled = false
+    void bridge
+      .get()
+      .then((snap) => {
+        if (!cancelled) setCloudSnapshot(snap)
+      })
+      .catch(() => {})
+    const off = bridge.onChange((snap) => {
+      if (!cancelled) setCloudSnapshot(snap)
+    })
+    return () => {
+      cancelled = true
+      off()
+    }
+  }, [])
+  const composerNoteState = composerNoteFor(cloudSnapshot, provider ?? null)
+
   if (!isOpen) {
     return (
       <aside className="copilot collapsed">
@@ -522,6 +572,34 @@ export function AiChatPanel({
     }
     if (paths.length > 0) onAddAttachmentPaths(paths)
   }
+
+  const lastEntry = chat.at(-1)
+  const lastAssistantCompleted =
+    lastEntry && lastEntry.role === 'assistant' && !lastEntry.streaming && !aiBusy
+      ? lastEntry
+      : null
+  const lastAssistantChip = lastAssistantCompleted
+    ? resultChip({
+        provider: provider ?? null,
+        mutated: Boolean(lastAssistantCompleted.autoApplied),
+        hasStreamedText: Boolean(lastAssistantCompleted.text?.trim()),
+        clarifyAsked: Boolean(lastAssistantCompleted.clarifyReceipts?.length),
+        toolExecutions: lastAssistantCompleted.tools,
+        isError: Boolean(lastAssistantCompleted.isError),
+        error: lastAssistantCompleted.isError ? lastAssistantCompleted.text : null,
+      })
+    : null
+  const panelLiveAnnouncement = (() => {
+    if (lastEntry?.role === 'assistant') {
+      if (lastEntry.status) return lastEntry.status
+      if (!lastEntry.streaming && !aiBusy && isUniwork && lastAssistantChip) {
+        const chipLabel = aiUniworkText(lang, lastAssistantChip.labelKey)
+        const body = aiNoticeBody(lastEntry.text)
+        return `${chipLabel}${body ? `: ${body}` : ''}`.trim()
+      }
+    }
+    return ''
+  })()
 
   return (
     <aside
@@ -591,9 +669,14 @@ export function AiChatPanel({
       {/* one persistent live node: a notice folded into a message mounts with its text and is often not announced.
           No role=status: the workbook's own status node is the one role=status of the window */}
       <div className="ai-sr-status" aria-live="polite" aria-atomic="true">
-        {chat.at(-1)?.role === 'assistant' ? (chat.at(-1)?.status ?? '') : ''}
+        {panelLiveAnnouncement}
       </div>
-      <div className="ai-chat" ref={chatRef} onScroll={onChatScroll}>
+      <div
+        className="ai-chat"
+        ref={chatRef}
+        aria-busy={aiBusy ? 'true' : undefined}
+        onScroll={onChatScroll}
+      >
         {/* Past conversation (read-only transcript), shown continuously with the current turn */}
         {historicChat.length > 0 && (
           <>
@@ -624,81 +707,137 @@ export function AiChatPanel({
             </div>
           </div>
         )}
-        {chat.map((entry, index) => (
-          <div
-            key={index}
-            className={`ai-msg ai-msg-${entry.role}${entry.isError && !aiNoticeKind(entry.text) ? ' ai-msg-error' : ''}${entry.role === 'assistant' && entry.streaming ? ' ai-msg-streaming' : ''}`}
-          >
-            {entry.role === 'user' ? (
-              <>
-                {entry.scope && <AiScopeQuote scope={entry.scope} />}
-                {entry.attachments && entry.attachments.length > 0 && (
-                  <SentAttachments atts={entry.attachments} previews={attachmentPreviews} />
-                )}
-                <span dir="auto">{entry.text}</span>
-                {entry.clarifyReceipts?.map((qa, k) => (
-                  <div key={`ca${k}`} className="ai-clarify-answered">
-                    {qa.map((pair, m) => (
-                      <div key={m} className="ai-clarify-answered-row">
-                        <div className="ai-clarify-answered-q">{pair.q}</div>
-                        <div className="ai-clarify-answered-a">{pair.a}</div>
+        {chat.map((entry, index) => {
+          const nextEntry = chat[index + 1]
+          const turnEnded = nextEntry ? nextEntry.role === 'user' : !aiBusy
+          const chip =
+            entry.role === 'assistant' && !entry.streaming && turnEnded
+              ? resultChip({
+                  provider: provider ?? null,
+                  mutated: Boolean(entry.autoApplied),
+                  hasStreamedText: Boolean(entry.text?.trim()),
+                  clarifyAsked: Boolean(entry.clarifyReceipts?.length),
+                  toolExecutions: entry.tools,
+                  isError: Boolean(entry.isError),
+                  error: entry.isError ? entry.text : null,
+                })
+              : null
+          const chipLabel = chip ? aiUniworkText(lang, chip.labelKey) : null
+          return (
+            <div
+              key={index}
+              className={`ai-msg ai-msg-${entry.role}${entry.isError && !aiNoticeKind(entry.text) ? ' ai-msg-error' : ''}${entry.role === 'assistant' && entry.streaming ? ' ai-msg-streaming' : ''}`}
+            >
+              {entry.role === 'user' ? (
+                <>
+                  {entry.scope && <AiScopeQuote scope={entry.scope} />}
+                  {entry.attachments && entry.attachments.length > 0 && (
+                    <SentAttachments atts={entry.attachments} previews={attachmentPreviews} />
+                  )}
+                  <span dir="auto">{entry.text}</span>
+                  {entry.clarifyReceipts?.map((qa, k) => (
+                    <div key={`ca${k}`} className="ai-clarify-answered">
+                      {qa.map((pair, m) => (
+                        <div key={m} className="ai-clarify-answered-row">
+                          <div className="ai-clarify-answered-q">{pair.q}</div>
+                          <div className="ai-clarify-answered-a">{pair.a}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                  {entry.undelivered && (
+                    <div className="ai-msg-undelivered">
+                      {t('aiUndelivered')}
+                      {!aiBusy && (
+                        <button
+                          className="ai-retry-btn"
+                          onClick={() => onSend(entry.text, entry.attachments ?? [], index)}
+                        >
+                          {t('aiRetry')}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  {entry.tools.length > 0 && <ToolChipList tools={entry.tools} />}
+                  {entry.text || chip ? (
+                    <div className="ai-msg-answer" dir="auto">
+                      {chip && chipLabel && (
+                        <>
+                          <span
+                            className="ai-result-chip"
+                            data-chip={chip.chip}
+                            data-tone={chip.tone}
+                          >
+                            {chipLabel}
+                          </span>
+                          {entry.text ? <span className="ai-result-chip-sep">: </span> : null}
+                        </>
+                      )}
+                      {entry.text && (
+                        <Markdown text={aiNoticeBody(entry.text)} nav={citationNav} />
+                      )}
+                    </div>
+                  ) : (
+                    entry.streaming && (
+                      <span className="ai-typing-row">
+                        <AiTypingIndicator
+                          label={entry.tools.length > 0 ? t('aiWorking') : t('aiThinking')}
+                        />
+                      </span>
+                    )
+                  )}
+                  {chip?.chip === 'edited' && (
+                    <>
+                      {chip.meta?.cellsMetaParams && (
+                        <div className="ai-result-meta">
+                          {aiUniworkText(lang, 'aiResultCellsMeta', chip.meta.cellsMetaParams)}
+                        </div>
+                      )}
+                      <div className="ai-result-actions">
+                        <button
+                          type="button"
+                          className="ai-result-view-changes"
+                          onClick={() =>
+                            onCitation(
+                              `${SHEET_NAV_SCHEME}${encodeURIComponent(chip.meta?.range ?? 'A1')}`,
+                            )
+                          }
+                        >
+                          {aiUniworkText(lang, 'aiResultViewChanges')}
+                        </button>
+                        <span className="ai-result-edited-hint">
+                          {aiUniworkText(lang, 'aiResultEditedHint')}
+                        </span>
                       </div>
-                    ))}
-                  </div>
-                ))}
-                {entry.undelivered && (
-                  <div className="ai-msg-undelivered">
-                    {t('aiUndelivered')}
-                    {!aiBusy && (
-                      <button
-                        className="ai-retry-btn"
-                        onClick={() => onSend(entry.text, entry.attachments ?? [], index)}
-                      >
-                        {t('aiRetry')}
-                      </button>
-                    )}
-                  </div>
-                )}
-              </>
-            ) : (
-              <>
-                {entry.tools.length > 0 && <ToolChipList tools={entry.tools} />}
-                {entry.text ? (
-                  <div dir="auto">
-                    <Markdown text={aiNoticeBody(entry.text)} nav={citationNav} />
-                  </div>
-                ) : (
-                  entry.streaming && (
-                    <span className="ai-typing-row">
-                      <AiTypingIndicator
-                        label={entry.tools.length > 0 ? t('aiWorking') : t('aiThinking')}
-                      />
-                    </span>
-                  )
-                )}
-                {entry.autoApplied && (
-                  <div className="ai-auto-applied">
-                    <span className="ai-auto-applied-text">
-                      {t('aiAutoApplied', { count: entry.autoApplied.opCount })}
-                    </span>
-                    {/* undoSteps 0 = the batch exceeded the undo budget and
-                        kept no stack entry; a forced 1-step undo would revert
-                        the user's own previous action instead. */}
-                    {(entry.autoApplied.undoSteps ?? 1) > 0 && (
-                      <button
-                        className="ai-undo-btn"
-                        onClick={() => onUndo(Math.max(1, entry.autoApplied?.undoSteps ?? 1))}
-                        data-tip={t('aiUndoTitle')}
-                      >
-                        {t('aiUndo')}
-                      </button>
-                    )}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        ))}
+                    </>
+                  )}
+                  {entry.autoApplied && (
+                    <div className="ai-auto-applied">
+                      <span className="ai-auto-applied-text">
+                        {t('aiAutoApplied', { count: entry.autoApplied.opCount })}
+                      </span>
+                      {/* undoSteps 0 = the batch exceeded the undo budget and
+                          kept no stack entry; a forced 1-step undo would revert
+                          the user's own previous action instead. */}
+                      {(entry.autoApplied.undoSteps ?? 1) > 0 && (
+                        <button
+                          className="ai-undo-btn"
+                          onClick={() => onUndo(Math.max(1, entry.autoApplied?.undoSteps ?? 1))}
+                          data-tip={t('aiUndoTitle')}
+                        >
+                          {t('aiUndo')}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )
+        })}
 
         {preview && (
           <section className="preview ai-preview-card" aria-label={t('aiPreviewAria')}>
@@ -761,7 +900,7 @@ export function AiChatPanel({
       {/* the composer stays mounted (draft, attachments) while the card holds the run */}
       <div className="ai-composer" style={clarify ? { display: 'none' } : undefined}>
         {attachNotice && <div className="ai-attach-notice">{attachNotice}</div>}
-        {viewOnly && (
+        {viewOnly && !isUniwork && (
           <div className="ai-readonly-notice" role="status">
             {t('aiViewOnlyNotice')}
           </div>
@@ -883,6 +1022,20 @@ export function AiChatPanel({
           sendIconEnabled={<img src={sendEnterOn} alt="" aria-hidden />}
           sendIconDisabled={<img src={sendEnterOff} alt="" aria-hidden />}
           stopIcon={<img src={sendStop} alt="" aria-hidden />}
+          lang={lang}
+          viewOnly={isUniwork && viewOnly ? true : undefined}
+          uniwork={
+            isUniwork
+              ? {
+                  noteState: composerNoteState,
+                  onSignIn: () => void readUniworkCloudStatus()?.signIn(),
+                  onOpenAccountSettings: () => void readUniworkCloudStatus()?.openAccountSettings(),
+                  onRetry: () => onSend(),
+                  onOpenByokSettings: () => void window.desktopApi?.openAiSettings?.(),
+                  disclosure: { ackKey: cloudSnapshot?.accountId ?? null },
+                }
+              : undefined
+          }
           footerStart={
             <>
               <AiModelPicker bridge={MODEL_BRIDGE} lang={lang} />
