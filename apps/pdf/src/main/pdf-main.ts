@@ -35,6 +35,7 @@ import {
   registerRendererScheme,
   rendererUrl,
 } from '@genoffice/electron-utils'
+import { answerUniworkAiFlagOff } from '@genoffice/electron-utils/uniwork-ai-flag'
 import { createI18n, getUiLang } from '@genoffice/i18n'
 import { generateImageTool, documentMediaRoots } from '@genoffice/ai-search'
 import { PDF_CHANNELS } from '../shared/ipc'
@@ -1791,6 +1792,8 @@ export function createPdfView(openPath?: string | null): WebContentsView {
 
 /** Standalone window mode: `npm run dev -w @genoffice/pdf`, pdf path passed via argv */
 export function startPdfStandalone(): void {
+  // no shell here: answer the renderer's UniWork AI flag pull with "off" instead of an unregistered channel
+  answerUniworkAiFlagOff(ipcMain)
   registerRendererScheme()
   installNavigationGuard(app)
   installContextMenu(app, () => contextMenuLabels(getUiLang()))

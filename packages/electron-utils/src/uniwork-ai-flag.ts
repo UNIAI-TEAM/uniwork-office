@@ -13,6 +13,17 @@ export const UNIWORK_AI_FLAG_GET = 'uniwork:ai-flag'
 /** main -> renderer: the flag changed (payload: boolean) */
 export const UNIWORK_AI_FLAG_CHANGED = 'uniwork:ai-flag-changed'
 
+/**
+ * A standalone editor has no UniWork session and no shell: its main answers the renderer's pull
+ * with "off" so the preload never meets an unregistered channel (the shell registers the real
+ * answer through its own handler and must not call this).
+ */
+export function answerUniworkAiFlagOff(ipc: {
+  handle(channel: string, listener: () => unknown): void
+}): void {
+  ipc.handle(UNIWORK_AI_FLAG_GET, () => false)
+}
+
 /** the global each preload exposes the flag under */
 export const UNIWORK_AI_FLAG_BRIDGE_KEY = 'uniworkAiFlag'
 
