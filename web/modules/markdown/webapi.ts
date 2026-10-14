@@ -148,6 +148,14 @@ export function createMarkdownWebApi(ctx: ModuleBridgeContext, opts: TextWebApiO
     // desktop-only setting (mdTheme capability off): hidden, never called on the web
     | 'getMarkdownTheme'
     | 'setMarkdownTheme'
+    // wiki links resolve against the file tree and open a note through the shell; a frame
+    // holds one document and has neither. The renderer already tolerates the absence: the
+    // resolver call is caught (links simply stay undecorated) and the fragment take is
+    // typeof-guarded, so nothing throws.
+    | 'resolveWikiLinks'
+    | 'rememberWikiFragment'
+    | 'takeWikiFragment'
+    | 'openSourcePath'
   >
   return Object.assign(api, {
     // web-only (renderer: editor/localImage.ts): relative pictures through OpenPayload.assets
