@@ -44,7 +44,7 @@ export function aiModelPickerGroups(
           : isProviderUsable(settings, meta.id)
     if (!usable) continue
     const models = stored && !meta.models.includes(stored) ? [stored, ...meta.models] : meta.models
-    if (models.length === 0 && !meta.needsCliPath) continue
+    if (models.length === 0 && !meta.needsCliPath && meta.id !== 'uniwork') continue
     groups.push({ id: meta.id, label: meta.label, models })
   }
   return groups

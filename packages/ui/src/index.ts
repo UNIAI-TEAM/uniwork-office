@@ -184,4 +184,9 @@ export {
   type ComposerNoteKey,
   type ComposerNoteKind,
 } from '@genoffice/ai-provider/browser'
+export type {
+  AiModelPickerCloudCredits,
+  AiModelPickerCloudState,
+  AiModelPickerCloudStatus,
+} from './AiModelPicker'
 

@@ -1,12 +1,17 @@
-import { describe, expect, it } from 'vitest'
-import { AI_PROVIDERS, defaultAiSettings } from '@genoffice/ai-provider'
+import { afterEach, describe, expect, it } from 'vitest'
+import { AI_PROVIDERS, defaultAiSettings, setUniworkAiAvailable } from '@genoffice/ai-provider'
 import {
   aiModelPickerGroups,
+  aiModelPickerNeed,
   aiModelPickerSelection,
   withAiModelSelection,
 } from '../src/ai-model-picker-options'
 
 const anthropicModels = AI_PROVIDERS.find((m) => m.id === 'anthropic')!.models
+
+afterEach(() => {
+  setUniworkAiAvailable(false)
+})
 
 describe('aiModelPickerGroups', () => {
   it('lists nothing while signed out with no keys', () => {
@@ -109,5 +114,21 @@ describe('CLI vendors', () => {
     expect(aiModelPickerGroups(settings, false)).toEqual([
       { id: 'codex', label: 'Codex CLI', models: [] },
     ])
+  })
+})
+
+describe('UniWork AI provider (uniwork)', () => {
+  it('lists UniWork AI when the availability flag is on and hides it when off', () => {
+    const settings = defaultAiSettings()
+    setUniworkAiAvailable(false)
+    expect(aiModelPickerGroups(settings, false).map((g) => g.id)).not.toContain('uniwork')
+
+    setUniworkAiAvailable(true)
+    const groups = aiModelPickerGroups(settings, false)
+    expect(groups).toContainEqual({ id: 'uniwork', label: 'UniWork AI', models: [] })
+
+    settings.provider = 'uniwork'
+    expect(aiModelPickerSelection(settings)).toEqual({ provider: 'uniwork', model: '' })
+    expect(aiModelPickerNeed(settings)).toBeNull()
   })
 })
