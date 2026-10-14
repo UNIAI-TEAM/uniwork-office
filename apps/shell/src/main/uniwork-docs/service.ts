@@ -1720,10 +1720,24 @@ export class UniworkDocsService {
    * account boundary uses it when the account those locks belong to goes away,
    * so the next session is not handed an S11 panel for another account's
    * working copy.
+   *
+   * G5-03a: the S6 state of those paths goes with the locks. A revoked/deleted
+   * verdict is keyed by document id and would otherwise answer for the next
+   * account's copy of the same document, and a bar of the account that went
+   * away must not survive the boundary either.
    */
   forgetLocksWhere(match: (path: string) => boolean): void {
     for (const [key, lock] of [...this.locks]) {
       if (match(lock.path)) this.locks.delete(key)
+    }
+    for (const key of [...this.remoteBars.keys()]) {
+      const doc = this.store.lookup(key)
+      if (!match(doc?.path ?? key)) continue
+      this.remoteBars.delete(key)
+      this.remoteNotices.delete(key)
+      if (!doc) continue
+      this.remoteLocked.delete(doc.binding.documentId)
+      this.remoteHeld.delete(doc.binding.documentId)
     }
   }
 
@@ -2809,6 +2823,24 @@ export class UniworkDocsService {
   }
 
   /**
+   * The server lets this copy be edited again (the path that re-grants the
+   * binding): the session's verdict is spent, so the lock map and the bar it
+   * put up go with it, and `lockedFor` answers from the binding again - the
+   * two sources of truth never disagree. A no-op for a document this session
+   * never locked (a newer-version bar is left alone), and only the verdict's
+   * own bar is dropped.
+   */
+  private clearRemoteLock(documentId: string, path: string): void {
+    const verdict = this.remoteLocked.get(documentId)
+    if (!verdict) return
+    this.remoteLocked.delete(documentId)
+    const key = pathKey(path)
+    if (this.remoteBars.get(key)?.kind !== verdict) return
+    this.remoteBars.delete(key)
+    this.remoteNotices.delete(key)
+  }
+
+  /**
    * One guarded reload per path at a time: a second notice queues behind the
    * one in flight, so two fetches never race the same working copy.
    */
@@ -3428,6 +3460,8 @@ export class UniworkDocsService {
           ) {
             binding.state = 'dirty'
             delete binding.error
+            // the re-grant spends the session's lock verdict (G5-03a)
+            this.clearRemoteLock(documentId, local)
           }
           // a reopen has a live session (the identity check above): a "sign in
           // again" left by an earlier session is stale, so the copy reads as what
@@ -3446,6 +3480,8 @@ export class UniworkDocsService {
           ) {
             binding.state = localChecksum === existing.baseChecksum ? 'ready' : 'dirty'
             delete binding.error
+            // the document answers again: the deleted verdict it earned is spent
+            this.clearRemoteLock(documentId, local)
           }
           // the sweep still owns this copy's pre-store intent: the rewrite is
           // refused by the store's own hold and the copy opens with its old
