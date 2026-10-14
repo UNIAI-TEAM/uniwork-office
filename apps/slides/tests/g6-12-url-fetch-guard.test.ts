@@ -7,13 +7,23 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 // insert_web_image, replace_image, the generate_deck / regenerate_slide page pipeline
 // and analyze_media — goes through the SSRF guard (no loopback / private / link-local
 // target, every redirect hop revalidated) and a byte cap. These tests drive the real
-// main-process handlers with a stubbed global fetch: a blocked target never reaches
+// main-process handlers with the gate's transport stubbed (undici's fetch): a blocked target never reaches
 // the network, and an oversized body never lands in the deck. No policy change.
 
 const env = vi.hoisted(() => {
   vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
   return { dir: '', handlers: new Map<string, (...args: never[]) => unknown>() }
 })
+
+// safe-remote-url.ts imports `fetch` from the undici package (the same module whose
+// Agent pins the connection), so stubbing the global fetch leaves the gate dialing for
+// real. Keep the rest of undici actual so a hostname hop still builds its pinned dispatcher.
+const { fetchMock } = vi.hoisted(() => ({ fetchMock: vi.fn() }))
+
+vi.mock('undici', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  fetch: fetchMock,
+}))
 
 vi.mock('electron', () => ({
   app: {
@@ -89,8 +99,6 @@ const BLOCKED = [
   'ftp://93.184.216.34/a.png',
 ]
 
-const fetchMock = vi.fn<typeof fetch>()
-
 function call(channel: string, ...args: unknown[]): Promise<unknown> {
   const fn = env.handlers.get(channel)
   if (!fn) throw new Error(`handler not registered: ${channel}`)
@@ -121,7 +129,6 @@ afterAll(() => {
 
 beforeEach(async () => {
   fetchMock.mockReset()
-  vi.stubGlobal('fetch', fetchMock)
   sessions.clear()
   const opened = await openPptx(await createBlankPptx())
   const slide = opened.deck.slides[0]!
@@ -141,7 +148,7 @@ beforeEach(async () => {
   sessions.set(WC, session)
 })
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => fetchMock.mockReset())
 
 const insertOp = (url: string) => ({
   slideIndex: 0,

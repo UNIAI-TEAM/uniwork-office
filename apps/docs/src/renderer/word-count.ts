@@ -6,7 +6,9 @@
  * reports the two addends separately — Chinese users care about the
  * Asian-character figure.
  */
-import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
+
+import type { Node as PmNode } from '@tiptap/pm/model'
+import type { Selection } from '@tiptap/pm/state'
 
 // Han (incl. radicals/compat/ext-B+), kana, hangul, bopomofo, CJK symbols
 // and punctuation (U+3001 up: the ideographic space stays whitespace),
@@ -39,7 +41,21 @@ export function countWords(text: string): number {
   return asianCharCount(text) + nonAsianWordCount(text)
 }
 
-export function documentTextForWordCount(doc: ProseMirrorNode): string {
+/**
+ * Words inside the current selection, for the status bar's "selected/total"
+ * figure. Word shows that pair while a selection exists and the plain total
+ * once the caret collapses; this feeds the selected half.
+ *
+ * Every no-selection case falls out of the counting rule itself: a collapsed
+ * caret and a NodeSelection (an image or a table is selected as a node, not
+ * a text range) both yield no text, and `countWords('')` is 0 — no separate
+ * guard needed.
+ */
+export function selectedWordCount(doc: PmNode, selection: Selection): number {
+  return countWords(doc.textBetween(selection.from, selection.to, ' ', ' '))
+}
+
+export function documentTextForWordCount(doc: PmNode): string {
   // ProseMirror textContent skips Tiptap renderText serializers on atomic leaves.
   return doc.textBetween(0, doc.content.size, ' ', (leaf) => {
     if (leaf.type.name === 'docInlineMath') return String(leaf.attrs.text ?? '')

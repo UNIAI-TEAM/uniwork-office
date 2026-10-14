@@ -199,4 +199,17 @@ export const fr = {
   aiClarifySubmit: 'Continuer',
   aiSumClarify: 'Précisions apportées',
   aiSumClarifySkipped: 'Précisions ignorées',
+  aiStarterMindMap: 'Générer une carte mentale de ce document',
+  aiMindMapBtn: 'Carte mentale IA',
+  aiMindMapPrompt:
+    'Génère une carte mentale de ce document en organisant les thèmes principaux et les concepts clés selon sa structure de sections',
+  aiSumMindMap: 'Générer la carte mentale',
+  aiMindMapTitle: 'Carte mentale',
+  aiMindMapNodes: '{count} nœuds',
+  aiMindMapAskPrompt: 'Parle-moi de « {label} » dans ce document',
+  aiMindMapJump: 'Aller au passage cité',
+  aiMindMapExport: 'Exporter en PNG',
+  aiMindMapReset: 'Réinitialiser la vue',
+  aiMindMapExpand: 'Déplier la branche',
+  aiMindMapCollapse: 'Replier la branche',
 } satisfies Record<keyof typeof zh, string>

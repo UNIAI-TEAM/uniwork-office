@@ -541,6 +541,8 @@ export const cs = {
   appPrintCanceled: 'Tisk zrušen.',
   appPrintFailed: 'Nelze tisknout.',
   appPrintNeedsFullLoad: 'Tisk vyžaduje úplné načtení sešitu – počkejte na dokončení načítání.',
+  appPrintWorkbookTooLarge:
+    'Tento sešit je příliš velký na to, aby se dal celý načíst do paměti, proto jej nelze vytisknout ani exportovat do PDF.',
   appCsvExportNeedsFullLoad:
     'Export do CSV vyžaduje plně načtený sešit — počkejte na dokončení načítání.',
   appCsvExportTooLarge: 'List je příliš velký na export do CSV.',
@@ -1078,6 +1080,9 @@ export const cs = {
   appHeadings: 'Záhlaví',
   appHeadingsHidden: 'Záhlaví skryta.',
   appHeadingsShown: 'Záhlaví zobrazena.',
+  appRightToLeft: 'Zprava doleva',
+  appRightToLeftOn: 'Směr mřížky: zprava doleva.',
+  appRightToLeftOff: 'Směr mřížky: zleva doprava.',
   appPrintHeadingsTitle: 'Tisknout záhlaví řádků a sloupců',
   appGroupFunctionLibrary: 'Knihovna funkcí',
   appInsertFunction: 'Vložit funkci',

@@ -397,6 +397,9 @@ export interface RecentEntry {
   sizeBytes: number
   /** whether the user starred this file */
   starred: boolean
+  /** the starred group this file belongs to (absent when ungrouped); only
+      populated by the starred() query — the other list queries omit it */
+  group?: string
   /** the path failed to stat (disconnected drive, moved, deleted) — kept
       listed like Word's recents instead of silently dropped (r158) */
   missing?: boolean
@@ -412,6 +415,8 @@ export interface RecentQuery {
   limit?: number
   /** restrict to one extension ('docx' | 'xlsx' | 'pptx'); omit for all */
   ext?: string
+  /** starred() only: restrict to one starred group; omit for all */
+  group?: string
 }
 
 export interface RecentPage {
@@ -533,6 +538,10 @@ export interface HomeApi {
   testFileSearchRerank(settings: FileSearchSettings): Promise<AiConnectionTestResult>
   /** starred files (independent of the recent list), newest first (paged) */
   starred(query?: RecentQuery): Promise<RecentPage>
+  /** starred group names that currently have at least one file, in creation order */
+  starredGroups(): Promise<string[]>
+  /** put each starred path into `group` (null = remove from its group) */
+  setStarredGroup(paths: string[], group: string | null): Promise<void>
   /** stat a specific set of paths (project view); unstat-able files come back flagged `missing` */
   statPaths(paths: string[]): Promise<RecentEntry[]>
   /** star / unstar a file */
@@ -577,6 +586,8 @@ export interface HomeApi {
   newHtml(opts?: NewFileOpts & { projectId?: string }): Promise<void>
   /** drop entries from the recent list (does not touch the files) */
   removeRecent(paths: string[]): Promise<void>
+  /** unstar files in bulk (Starred view selection bar); the recents list and the files are untouched */
+  unstarPaths(paths: string[]): Promise<void>
   /** reveal the file in Finder / Explorer */
   revealPath(path: string): Promise<void>
   /** rename the file on disk (same directory) and update the recent list */
@@ -804,7 +815,7 @@ export interface HomeApi {
    * or the two reloads); resolves to the status after the action.
    */
   uniworkRemoteAction(path: string, action: UniworkRemoteAction): Promise<UniworkDocStatus | null>
-  /** S6: the bar's height; main moves the active editor view down by it */
+  /** S6: the bar's unscaled CSS-px height; main scales it by `--ui-scale` and moves the active editor view down by it */
   uniworkSetBarInset(heightPx: number): Promise<void>
   onUniworkLaunch(cb: (event: UniworkLaunchEvent) => void): () => void
   /** newer-store locks pushed from main; returns an unsubscribe */
@@ -1227,6 +1238,9 @@ export const HOME_CHANNELS = {
   starred: 'home:starred',
   statPaths: 'home:stat-paths',
   toggleStar: 'home:toggle-star',
+  unstarPaths: 'home:unstar-paths',
+  starredGroups: 'home:starred-groups',
+  setStarredGroup: 'home:set-starred-group',
   openPath: 'home:open-path',
   browse: 'home:browse',
   newDoc: 'home:new-doc',

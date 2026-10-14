@@ -21,6 +21,8 @@ import { createCapabilityReader } from '@genoffice/ui/capabilities'
  * | pdfAnnotDelete   | deleting annotations already saved in the file (pdfium)                 |
  * | insertPages      | import / replace pages from another PDF (host file picker)              |
  * | savedSignatures  | the reusable signature library                                          |
+ * | certSign         | certificate (digital) signing and the signatures panel: reads the file  |
+ * |                  | on disk and writes a signed copy next to it (node:crypto, pdf-lib)      |
  * | redaction        | the Redact tool (applies into a working copy of the file)               |
  * | saveStatus       | the ribbon-row Saving / Unsaved / Saved / Save failed text (the web     |
  * |                  | host header owns the save state)                                        |
@@ -41,6 +43,7 @@ export type PdfCapability =
   | 'pdfAnnotDelete'
   | 'insertPages'
   | 'savedSignatures'
+  | 'certSign'
   | 'redaction'
   | 'saveStatus'
   | 'viewOnlyChip'

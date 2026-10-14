@@ -1090,6 +1090,14 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
     openAiModelSettings: async () => {},
     setAiPanelPrefs: async () => ({ ...DEFAULT_AI_PANEL_PREFS }),
     requestRedactionCopy: async () => false,
+    // certificate signing reads the file on disk and writes a signed copy next to it (desktop only;
+    // the `certSign` capability hides the entries) - safe typed answers here
+    listDigitalSignatures: async () => [],
+    pickCertificate: async () => null,
+    listSystemCertificates: async () => ({ certs: [], issues: [] }),
+    releaseCertificate: () => {},
+    inspectCertificate: async () => ({ ok: false, error: 'cert-invalid' }),
+    signWithCertificate: async () => ({ ok: false, error: 'sign-failed', message: NOT_AVAILABLE }),
     // the host's file.renamed only renames: the web document id (its "path") never changes
     onFileRenamed: () => () => {},
     aiStream: ai.aiStream,

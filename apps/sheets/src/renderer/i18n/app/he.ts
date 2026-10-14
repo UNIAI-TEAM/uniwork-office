@@ -496,6 +496,8 @@ export const he = {
   appPrintCanceled: 'ההדפסה בוטלה.',
   appPrintFailed: 'לא ניתן להדפיס.',
   appPrintNeedsFullLoad: 'ההדפסה דורשת שחוברת העבודה תיטען במלואה — יש להמתין לסיום הטעינה.',
+  appPrintWorkbookTooLarge:
+    'חוברת העבודה גדולה מכדי להיטען במלואה לזיכרון, ולכן לא ניתן להדפיס אותה או לייצא אותה ל-PDF.',
   appCsvExportNeedsFullLoad: 'ייצוא CSV דורש חוברת עבודה טעונה במלואה — המתן לסיום הטעינה.',
   appCsvExportTooLarge: 'הגיליון גדול מדי לייצוא כ-CSV.',
   appCsvExportCanceled: 'ייצוא ה-CSV בוטל.',
@@ -1022,6 +1024,9 @@ export const he = {
   appHeadings: 'כותרות',
   appHeadingsHidden: 'הכותרות הוסתרו.',
   appHeadingsShown: 'הכותרות מוצגות.',
+  appRightToLeft: 'מימין לשמאל',
+  appRightToLeftOn: 'כיוון הרשת: מימין לשמאל.',
+  appRightToLeftOff: 'כיוון הרשת: משמאל לימין.',
   appPrintHeadingsTitle: 'הדפס כותרות שורות ועמודות',
   appGroupFunctionLibrary: 'ספריית פונקציות',
   appInsertFunction: 'הוסף פונקציה',
