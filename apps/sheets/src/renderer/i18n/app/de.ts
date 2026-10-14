@@ -583,6 +583,8 @@ export const de = {
   appPrintFailed: 'Drucken nicht möglich.',
   appPrintNeedsFullLoad:
     'Zum Drucken muss die Arbeitsmappe vollständig geladen sein – bitte warten Sie, bis der Ladevorgang abgeschlossen ist.',
+  appPrintWorkbookTooLarge:
+    'Diese Arbeitsmappe ist zu groß, um vollständig in den Speicher geladen zu werden; sie kann daher weder gedruckt noch als PDF exportiert werden.',
   appCsvExportNeedsFullLoad:
     'Der CSV-Export erfordert die vollständig geladene Arbeitsmappe — warten Sie, bis das Laden abgeschlossen ist.',
   appCsvExportTooLarge: 'Das Blatt ist zu groß für den CSV-Export.',
@@ -1129,6 +1131,9 @@ export const de = {
   appHeadings: 'Überschriften',
   appHeadingsHidden: 'Überschriften ausgeblendet.',
   appHeadingsShown: 'Überschriften eingeblendet.',
+  appRightToLeft: 'Von rechts nach links',
+  appRightToLeftOn: 'Gitterausrichtung: von rechts nach links.',
+  appRightToLeftOff: 'Gitterausrichtung: von links nach rechts.',
   appPrintHeadingsTitle: 'Zeilen- und Spaltenüberschriften drucken',
   appGroupFunctionLibrary: 'Funktionsbibliothek',
   appInsertFunction: 'Funktion einfügen',

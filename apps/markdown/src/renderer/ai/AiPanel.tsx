@@ -14,6 +14,7 @@ import {
   AgentLoop,
   endsQuietly,
   noticePatch,
+  type MindMapTreeNode,
   type PanelNote,
   composeSkills,
   streamText,
@@ -57,6 +58,7 @@ import {
   type FenceRange,
 } from './edit-fence'
 import { createMarkdownSkill, MARKDOWN_RULES } from './markdown-skill'
+import { MindMapCard } from './MindMapCard'
 import {
   buildDocWriterRequest,
   countMarkdownBlocks,
@@ -134,6 +136,9 @@ interface ChatEntry {
   /** the run failed and this user message was rolled back out of the model context */
   undelivered?: boolean
   tools?: ToolActivity[]
+  /** interactive mind map from generate_mindmap's side-channel display (session-only;
+   * the persisted transcript keeps the tool call, so a reopened file can regenerate) */
+  mindmap?: MindMapTreeNode
   /** the selection this user message targeted, frozen at send */
   scope?: AiScopeQuoteData
   /** the edit fence of this user turn (selection scope or queue submission): a retry reuses it, never runs the turn unfenced */
@@ -527,6 +532,9 @@ export function AiPanel({
               [...prev, { label, time, doc: snapshotBefore }].slice(-MAX_SNAPSHOTS),
             )
           }
+          // mind maps ride the UI-only display side channel onto the message
+          const display = execution.display
+          const mindmap = display?.kind === 'mindmap' ? display.tree : undefined
           const activity: ToolActivity = {
             name: call.name,
             summary: execution.summary,
@@ -538,7 +546,7 @@ export function AiPanel({
             // Swap out the running placeholder pushed by onToolStart (parse-fail calls have none)
             const tools = [...(last.tools ?? [])]
             if (tools.at(-1)?.running) tools.pop()
-            return { tools: [...tools, activity] }
+            return { tools: [...tools, activity], ...(mindmap ? { mindmap } : {}) }
           })
         },
         onTurnEnd: () => {
@@ -1041,6 +1049,15 @@ export function AiPanel({
               >
                 {t('aiQuickPolish')}
               </button>
+              <button
+                className="ai-starter"
+                onClick={() => {
+                  setPrompt(t('aiQuickMindMapPrompt'))
+                  inputRef.current?.focus()
+                }}
+              >
+                {t('aiQuickMindMap')}
+              </button>
             </div>
           </div>
         )}
@@ -1116,6 +1133,19 @@ export function AiPanel({
                 <div className="ai-message-usage">
                   <AiUsageChip usage={entry.usage} lang={lang} />
                 </div>
+              )}
+              {entry.mindmap && (
+                <MindMapCard
+                  tree={entry.mindmap}
+                  onAsk={(label) => {
+                    setPrompt(t('aiMindMapAskPrompt', { label }))
+                    inputRef.current?.focus()
+                  }}
+                  onJumpBlock={(index) => {
+                    const current = depsRef.current.getEditor()
+                    if (current) navigateToBlock(current, index)
+                  }}
+                />
               )}
               {showToolbar && (
                 <div className="ai-msg-toolbar">

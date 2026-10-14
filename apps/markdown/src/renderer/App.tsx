@@ -24,7 +24,7 @@ import type { Editor } from '@tiptap/core'
 import { TextSelection } from '@tiptap/pm/state'
 import { exportImages } from './export/imageExport'
 import type { StringKey } from './i18n/locale'
-import { useI18n } from './i18n/locale'
+import { t as translate, useI18n } from './i18n/locale'
 import {
   buildFrontmatterRaw,
   frontmatterInner,
@@ -45,9 +45,12 @@ import { collectOutline, type OutlineItem } from './editor/outline'
 import { rewriteRawHtmlImages } from './editor/rawHtml'
 import { buildSlashItems } from './editor/slashCommand'
 import type { SlashController, SlashMenuState } from './editor/slashCommand'
+import { wikiFragmentPosition } from './editor/wikilink'
 import { dirOf, refreshWebPictures, setImageBaseDir, VIEW_IMAGE_EVENT } from './editor/localImage'
 import { Ribbon } from './components/Ribbon'
+import type { MarkdownTheme } from '../shared/markdown-theme'
 import { ImageHostDialog } from './components/ImageHostDialog'
+import { RedactMenu } from './components/RedactMenu'
 import { OutlinePane } from './components/OutlinePane'
 import { SourcePane } from './components/SourcePane'
 import { SlashMenu, type SlashMenuHandle } from './components/SlashMenu'
@@ -153,6 +156,7 @@ export default function App() {
   const sourceMode = isSourceMode(textMode)
   // bumped on every CodeMirror doc change so the ribbon's undo/redo state re-renders
   const [sourceRev, setSourceRev] = useState(0)
+
   const [dirty, setDirty] = useState(false)
   const [saveState, setSaveState] = useState<SaveState>('idle')
   const exportingImagesRef = useRef(false)
@@ -191,6 +195,26 @@ export default function App() {
   const syncSourceFromEditorRef = useRef<() => void>(() => {})
   const [spellcheck, setSpellcheck] = useState(
     () => localStorage.getItem('mdapp.spellcheck') !== '0',
+  )
+  // paper theme (markdown-themes.css scopes the palette on data-markdown-theme)
+  const [mdTheme, setMdTheme] = useState<MarkdownTheme>('default')
+  useEffect(() => {
+    window.markdownApi
+      .getMarkdownTheme?.()
+      .then(setMdTheme)
+      .catch(() => {})
+  }, [])
+  const pickMarkdownTheme = (theme: MarkdownTheme): void => {
+    setMdTheme(theme)
+    // the boot path sets this once; live picks re-scope it here
+    if (theme === 'default') document.documentElement.removeAttribute('data-markdown-theme')
+    else document.documentElement.setAttribute('data-markdown-theme', theme)
+    window.markdownApi.setMarkdownTheme(theme).catch(() => {})
+  }
+  // off by default: it takes over the editor's right-click menu, and a reader
+  // should opt into that rather than discover it
+  const [redactEnabled, setRedactEnabled] = useState(
+    () => localStorage.getItem('mdapp.redact') === '1',
   )
   const [viewImage, setViewImage] = useState<string | null>(null)
   useEffect(() => {
@@ -272,6 +296,28 @@ export default function App() {
     })()
   }, [])
 
+  /**
+   * Land on the heading a wiki link pointed at. The fragment waited in main
+   * for this path — the shell activates an open tab without waking anything —
+   * so it is taken here, once the note is actually on screen.
+   */
+  const jumpToWikiFragment = useCallback((path: string): void => {
+    const current = editorRef.current
+    if (!current) return
+    // The browser test harness stubs markdownApi without the Electron-only
+    // wiki channels; a missing API here means nothing to jump to, not a
+    // failed load.
+    if (typeof window.markdownApi.takeWikiFragment !== 'function') return
+    void window.markdownApi.takeWikiFragment(path).then((fragment) => {
+      if (!fragment || filePathRef.current !== path) return
+      const pos = wikiFragmentPosition(current.state.doc, fragment)
+      if (pos === null) return
+      const selection = TextSelection.near(current.state.doc.resolve(pos))
+      current.view.dispatch(current.state.tr.setSelection(selection).scrollIntoView())
+      current.view.focus()
+    })
+  }, [])
+
   const extensions = useMemo(() => {
     const controller: SlashController = {
       onOpen: setSlashState,
@@ -283,8 +329,20 @@ export default function App() {
       slashController: controller,
       slashItems: () =>
         buildSlashItems({ insertImage: filePathRef.current ? insertImage : undefined }),
+      wikiLink: {
+        getDocumentPath: () => filePathRef.current ?? '',
+        onOpen: (path, fragment) => {
+          void window.markdownApi.rememberWikiFragment(path, fragment)
+          void window.markdownApi.openSourcePath(path)
+          // a link into the note already on screen opens no tab; jump here
+          if (filePathRef.current === path) jumpToWikiFragment(path)
+        },
+        // the module-level `t`, not the hook's: this memo holds the closure for
+        // the life of the editor, and the hook's `t` is a new function each render
+        onUnresolved: (target) => showToast(translate('wikiLinkUnresolved', { target }), 'error'),
+      },
     })
-  }, [insertImage])
+  }, [insertImage, jumpToWikiFragment])
 
   const editor = useEditor({
     extensions,
@@ -410,6 +468,7 @@ export default function App() {
           const raw = await window.markdownApi.readFile(path)
           if (cancelled) return
           loadFromPath(path, raw)
+          jumpToWikiFragment(path)
         } else {
           envelopeRef.current = { ...EMPTY_ENVELOPE }
         }
@@ -428,7 +487,7 @@ export default function App() {
     return () => {
       cancelled = true
     }
-  }, [editor, roundTripEnabled, loadFromPath, markDirty])
+  }, [editor, roundTripEnabled, loadFromPath, markDirty, jumpToWikiFragment])
 
   const onFrontmatterChange = useCallback(
     (inner: string) => {
@@ -1190,6 +1249,8 @@ export default function App() {
         uniworkBound={uniwork.bound}
         readOnly={uniwork.readOnly}
         imageEnabled={Boolean(filePath)}
+        mdTheme={mdTheme}
+        onMarkdownTheme={pickMarkdownTheme}
         onInsertImage={insertImage}
         onImageHost={cap('imageHost') ? () => setImageHostOpen(true) : undefined}
         frontmatterOpen={fmOpen}
@@ -1210,6 +1271,11 @@ export default function App() {
         onAiPreset={(text) => {
           setAiOpen(true)
           setAiPreset((prev) => ({ text, nonce: (prev?.nonce ?? 0) + 1 }))
+        }}
+        redactEnabled={redactEnabled}
+        onToggleRedact={(on) => {
+          setRedactEnabled(on)
+          localStorage.setItem('mdapp.redact', on ? '1' : '0')
         }}
       />
       {status === 'loading' && <div className="center-note">{t('loading')}</div>}
@@ -1368,6 +1434,8 @@ export default function App() {
       {!sourceMode && (
         <SlashMenu ref={slashMenuRef} state={slashState} onDismiss={() => setSlashState(null)} />
       )}
+      {/* the model lives behind `ai`: with the key off (web frame) a stored toggle has nothing to hide from */}
+      <RedactMenu editor={editor} enabled={aiEnabled && redactEnabled} />
       <ToastHost />
       {imageHostOpen && (
         <ImageHostDialog onClose={() => setImageHostOpen(false)} onSaved={() => {}} />

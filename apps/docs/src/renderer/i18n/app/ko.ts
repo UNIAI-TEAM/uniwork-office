@@ -245,6 +245,7 @@ export const ko = {
   appPageOf: '{current}/{total} 페이지',
   appWordCountTitle: '단어 개수',
   appWordCountN: '단어 {n}개',
+  appWordCountSelection: '선택됨 {selected} / {total}자',
   appTrackChangesOn: '변경 내용 추적: 켜짐',
   appTrackChangesOff: '변경 내용 추적: 꺼짐',
   appAcTitle: '자동 고침 옵션',
@@ -467,6 +468,7 @@ export const ko = {
   appParaSpecialFirstLine: '첫 줄',
   appParaSpecialHanging: '내어쓰기',
   appParaBy: '값',
+  appParaUnitChars: '문자',
   // Equations
   appInsertEquation: '수식 삽입',
   appLatexPlaceholder: '예: x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}',

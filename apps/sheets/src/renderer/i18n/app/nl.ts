@@ -570,6 +570,8 @@ export const nl = {
   appPrintFailed: 'Kan niet afdrukken.',
   appPrintNeedsFullLoad:
     'Afdrukken vereist dat de werkmap volledig is geladen. Wacht tot het laden is voltooid.',
+  appPrintWorkbookTooLarge:
+    'Deze werkmap is te groot om volledig in het geheugen te laden, dus hij kan niet worden afgedrukt of als pdf worden geëxporteerd.',
   appCsvExportNeedsFullLoad:
     'CSV-export vereist een volledig geladen werkmap — wacht tot het laden is voltooid.',
   appCsvExportTooLarge: 'Het blad is te groot om als CSV te exporteren.',
@@ -1112,6 +1114,9 @@ export const nl = {
   appHeadings: 'Koppen',
   appHeadingsHidden: 'Kopteksten verborgen.',
   appHeadingsShown: 'Kopteksten weergegeven.',
+  appRightToLeft: 'Van rechts naar links',
+  appRightToLeftOn: 'Raster Richting: van rechts naar links.',
+  appRightToLeftOff: 'Raster Richting: van links naar rechts.',
   appPrintHeadingsTitle: 'Rij- en kolomkoppen afdrukken',
   appGroupFunctionLibrary: 'Functiebibliotheek',
   appInsertFunction: 'Functie invoegen',
