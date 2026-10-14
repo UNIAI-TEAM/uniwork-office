@@ -51,11 +51,33 @@ export interface Binding {
   state: UniworkSaveState
   error?: UniworkDocErrorCode
   serverRevision?: string
+  /**
+   * G5-03a: the server's head version when it differs from this copy's base
+   * (a caught notice); the S6 bar of kind newer-* is rebuilt from this and
+   * `serverRevision` after a restart, because the feed cursor does not replay
+   * the notice. Absent = no known newer version.
+   */
+  serverVersion?: number
   /** OQ-P4 (b): the store generation this copy needs (written as `min_store_level`) */
   minStoreLevel: number
   /** OQ-P4 (b): the build that wrote it, display only (written as `min_app_version`) */
   minAppVersion: string
   lastSavedAt?: string
+  /**
+   * G8-12: the server version id of the base bytes (the comments anchor base),
+   * from the document read at open or the last commit receipt; absent while
+   * unknown. Moves with `baseVersion`, never on its own.
+   */
+  baseVersionId?: string
+  /** G8-12: the caller's effective level (`my_level`) last read from the server */
+  level?: UniworkDocLevel
+}
+
+export type UniworkDocLevel = 'view' | 'edit' | 'manage'
+
+/** a server `my_level` this build knows, else undefined */
+export function docLevelOf(value: unknown): UniworkDocLevel | undefined {
+  return value === 'view' || value === 'edit' || value === 'manage' ? value : undefined
 }
 
 export interface BoundDocument {
@@ -222,6 +244,14 @@ export function parseBinding(raw: unknown): Binding | null {
   if (typeof r.baseVersion !== 'number' || !Number.isSafeInteger(r.baseVersion)) return null
   if (!isStr(r.state) || !STATES.has(r.state)) return null
   if (r.serverRevision !== undefined && !isDecimalString(r.serverRevision)) return null
+  if (
+    r.serverVersion !== undefined &&
+    (typeof r.serverVersion !== 'number' ||
+      !Number.isSafeInteger(r.serverVersion) ||
+      r.serverVersion < 0)
+  ) {
+    return null
+  }
   const minStoreLevel = schema2 ? (r.min_store_level as number) : APP_STORE_LEVEL
   const minAppVersion = typeof r.min_app_version === 'string' ? r.min_app_version : ''
   return {
@@ -241,9 +271,16 @@ export function parseBinding(raw: unknown): Binding | null {
     state: r.state === 'saving' ? 'dirty' : (r.state as UniworkSaveState),
     ...(typeof r.error === 'string' ? { error: r.error as UniworkDocErrorCode } : {}),
     ...(isDecimalString(r.serverRevision) ? { serverRevision: r.serverRevision } : {}),
+    ...(typeof r.serverVersion === 'number' ? { serverVersion: r.serverVersion } : {}),
     minStoreLevel,
     minAppVersion,
     ...(typeof r.lastSavedAt === 'string' ? { lastSavedAt: r.lastSavedAt } : {}),
+    ...(typeof r.baseVersionId === 'string' &&
+    r.baseVersionId.length > 0 &&
+    r.baseVersionId.length <= 128
+      ? { baseVersionId: r.baseVersionId }
+      : {}),
+    ...(docLevelOf(r.level) ? { level: docLevelOf(r.level) } : {}),
   }
 }
 

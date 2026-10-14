@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from 'react'
+import type {
+  CSSProperties,
+  KeyboardEvent as ReactKeyboardEvent,
+  PointerEvent as ReactPointerEvent,
+} from 'react'
 import type { Lang } from '@genoffice/i18n'
 import {
   CollabComposer,
@@ -276,7 +280,7 @@ export function DiscussionPanel() {
     <div
       id={DISCUSSION_PANEL_ID}
       className="uw-discussion"
-      style={{ width }}
+      style={{ '--uw-discussion-width': `${width}px` } as CSSProperties}
       onKeyDown={onKeyDown}
       aria-busy={target ? undefined : true}
     >

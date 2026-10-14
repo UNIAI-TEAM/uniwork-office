@@ -119,6 +119,7 @@ export const ja = {
     '用紙サイズが混在する文書:ページ プレビューを開き、ページごとに結合してエクスポートしています…',
   // Comments
   appSelectTextToComment: 'コメントを付けるテキストを先に選択してください',
+  appCommentSaveFirst: 'コメントを追加するには、先に文書を保存してください',
   appCommentSelectionLost:
     '選択範囲が無効になりました。コメントを付けるテキストをもう一度選択してください',
   appCommentAdded: 'コメントを追加しました。保存時に文書へ書き込まれます',
@@ -245,6 +246,7 @@ export const ja = {
   appPageOf: '{current} / {total} ページ',
   appWordCountTitle: '文字カウント',
   appWordCountN: '{n} 文字',
+  appWordCountSelection: '選択中 {selected} / {total} 文字',
   appTrackChangesOn: '変更履歴の記録: オン',
   appTrackChangesOff: '変更履歴の記録: オフ',
   appAcTitle: 'オートコレクトのオプション',
@@ -467,6 +469,7 @@ export const ja = {
   appParaSpecialFirstLine: '字下げ',
   appParaSpecialHanging: 'ぶら下げ',
   appParaBy: '幅',
+  appParaUnitChars: '文字',
   // Equations
   appInsertEquation: '数式の挿入',
   appLatexPlaceholder: '例: x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}',

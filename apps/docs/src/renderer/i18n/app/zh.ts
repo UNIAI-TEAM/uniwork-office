@@ -113,6 +113,7 @@ export const zh = {
   appMixedExportOpening: '混合纸张文档:正在打开分页预览并按页合并导出…',
   // Comments
   appSelectTextToComment: '先选中要批注的文字',
+  appCommentSaveFirst: '请先保存文档，再添加批注',
   appCommentSelectionLost: '选区已失效,请重新选中要批注的文字',
   appCommentAdded: '已添加批注,保存后写入文档',
   appCommentEdited: '批注已更新,保存后写入文档',
@@ -233,6 +234,7 @@ export const zh = {
   appPageOf: '第 {current} 页,共 {total} 页',
   appWordCountTitle: '字数统计',
   appWordCountN: '{n} 个字',
+  appWordCountSelection: '已选 {selected} / {total} 个字',
   appTrackChangesOn: '修订:开',
   appTrackChangesOff: '修订:关',
   appAcTitle: '自动更正选项',
@@ -455,6 +457,7 @@ export const zh = {
   appParaSpecialFirstLine: '首行缩进',
   appParaSpecialHanging: '悬挂缩进',
   appParaBy: '缩进值',
+  appParaUnitChars: '字符',
   // Equations
   appInsertEquation: '插入公式',
   appLatexPlaceholder: '例如 x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}',

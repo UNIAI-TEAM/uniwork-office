@@ -52,8 +52,7 @@ export interface AiModelPickerBridge {
   readonly signIn?: (() => Promise<void> | void) | undefined
   /** desktop: read current UniWork cloud status (falls back to window.uniworkCloudStatus.get) */
   readonly getCloudStatus?:
-    | (() => Promise<AiModelPickerCloudStatus | null> | AiModelPickerCloudStatus | null)
-    | undefined
+    (() => Promise<AiModelPickerCloudStatus | null> | AiModelPickerCloudStatus | null) | undefined
   /** alias for getCloudStatus */
   readonly cloudStatus?:
     | (() => Promise<AiModelPickerCloudStatus | null> | AiModelPickerCloudStatus | null)
@@ -62,8 +61,7 @@ export interface AiModelPickerBridge {
     | undefined
   /** desktop: subscribe to UniWork cloud status updates (falls back to window.uniworkCloudStatus.onChanged) */
   readonly onCloudStatusChanged?:
-    | ((handler: (status: AiModelPickerCloudStatus | null) => void) => () => void)
-    | undefined
+    ((handler: (status: AiModelPickerCloudStatus | null) => void) => () => void) | undefined
   /**
    * web frames: while the chip reads "Choose model" (no key, or a key without a known model) the
    * composer's send stays off with a hint saying which; other hosts leave it undefined
@@ -280,8 +278,16 @@ export function AiModelPicker({
     if (!open && settings?.credentialsUnavailable) refresh()
     if (!open) {
       const rect = chipRef.current?.getBoundingClientRect()
-      // the composer sits at the panel bottom: open upwards, pinned to the chip
-      if (rect) setPopStyle({ left: rect.left, bottom: window.innerHeight - rect.top + 6 })
+      const zoom = effectiveZoom(chipRef.current)
+      // the composer sits at the panel bottom: open upwards, pinned to the chip;
+      // divide window-px offsets and the 70vh cap by any ancestor CSS zoom (.copilot, .app-frame)
+      if (rect) {
+        setPopStyle({
+          left: rect.left / zoom,
+          bottom: (window.innerHeight - rect.top + 6) / zoom,
+          maxHeight: Math.min(420, (window.innerHeight * 0.7) / zoom),
+        })
+      }
       setFocusKey(null)
     }
     setOpen((v) => !v)
@@ -414,6 +420,7 @@ export function AiModelPicker({
     currentUsable && current
       ? current.model || groupLabel(groups, current.provider)
       : strings.choose
+  const chipLabel = `${strings.title}: ${chipText}`
 
   return (
     <div
@@ -436,8 +443,9 @@ export function AiModelPicker({
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={open ? listId : undefined}
-        data-tip={strings.title}
-        aria-label={`${strings.title}: ${chipText}`}
+        title={chipLabel}
+        data-tip={chipLabel}
+        aria-label={chipLabel}
       >
         {currentUsable && current && <ProviderLogo id={current.provider} />}
         <span className="ai-model-chip-text">{chipText}</span>
@@ -471,12 +479,7 @@ export function AiModelPicker({
             {groups.map((g) => {
               const headId = groupHeadId(g.id)
               return (
-                <div
-                  key={g.id}
-                  className="ai-model-group"
-                  role="group"
-                  aria-labelledby={headId}
-                >
+                <div key={g.id} className="ai-model-group" role="group" aria-labelledby={headId}>
                   <div id={headId} className="ai-model-group-head">
                     <ProviderLogo id={g.id} />
                     <span>{g.label}</span>
@@ -485,9 +488,7 @@ export function AiModelPicker({
                     const optionKey = `${g.id}:${m}`
                     const selected = current?.provider === g.id && current.model === m
                     const isUniworkWithCredits =
-                      g.id === 'uniwork' &&
-                      creditsVisibleText !== null &&
-                      creditsAriaText !== null
+                      g.id === 'uniwork' && creditsVisibleText !== null && creditsAriaText !== null
                     return (
                       <React.Fragment key={optionKey}>
                         <button
@@ -555,11 +556,7 @@ export function AiModelPicker({
           {footerInfo && (
             <div className="ai-model-footer">
               <span className="ai-model-footer-text">{footerInfo.text}</span>
-              <button
-                type="button"
-                className="ai-model-footer-action"
-                onClick={onFooterAction}
-              >
+              <button type="button" className="ai-model-footer-action" onClick={onFooterAction}>
                 {footerInfo.actionLabel}
               </button>
             </div>
@@ -568,6 +565,24 @@ export function AiModelPicker({
       )}
     </div>
   )
+}
+
+function effectiveZoom(el: HTMLElement | null): number {
+  if (!el) return 1
+  let zoom = 1
+  for (let cur: HTMLElement | null = el; cur; cur = cur.parentElement) {
+    const raw = window.getComputedStyle?.(cur)?.zoom
+    if (raw) {
+      const n = raw.endsWith('%') ? parseFloat(raw) / 100 : parseFloat(raw)
+      if (Number.isFinite(n) && n > 0) zoom *= n
+    }
+  }
+  if (zoom !== 1) return zoom
+  const cssZoom = (el as HTMLElement & { currentCSSZoom?: unknown }).currentCSSZoom
+  if (typeof cssZoom === 'number' && Number.isFinite(cssZoom) && cssZoom > 0) {
+    return cssZoom
+  }
+  return 1
 }
 
 function groupLabel(groups: ReadonlyArray<{ id: string; label: string }>, id: string): string {

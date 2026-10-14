@@ -137,6 +137,36 @@ describe('AI agent on a view-only document', () => {
     editor.destroy()
   })
 
+  it('keeps generate_mindmap: it only returns a display payload', async () => {
+    const editor = createEditor()
+    const skill = createDocsSkill(
+      () => editor,
+      () => NUM_IDS,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      () => true,
+    )
+    expect(skill.tools.map((tool) => tool.name)).toContain('generate_mindmap')
+    const before = JSON.stringify(editor.getJSON())
+    const exec = await skill.executeTool({
+      id: 't1',
+      name: 'generate_mindmap',
+      input: { root: { label: 'Quarterly report', children: [{ label: 'Revenue', block: 0 }] } },
+    })
+    expect(exec.isError).toBeFalsy()
+    expect(exec.mutated).toBe(false)
+    expect(exec.display).toMatchObject({ kind: 'mindmap' })
+    expect(JSON.stringify(editor.getJSON())).toBe(before)
+    editor.destroy()
+  })
+
   it('keeps the full tool set on an editable document', () => {
     const editor = createEditor()
     const skill = createDocsSkill(

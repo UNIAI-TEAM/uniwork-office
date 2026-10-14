@@ -112,6 +112,7 @@ export const cs = {
   appMixedExportOpening:
     'Různé velikosti papíru: otevírá se náhled stránkování pro sloučený export stránek…',
   appSelectTextToComment: 'Nejprve vyberte text, ke kterému chcete přidat komentář',
+  appCommentSaveFirst: 'Před přidáním komentáře nejprve uložte dokument',
   appCommentSelectionLost: 'Výběr již není platný; znovu vyberte text ke komentování',
   appCommentAdded: 'Komentář přidán; do dokumentu se zapíše při uložení',
   appCommentEdited: 'Komentář upraven; do dokumentu se zapíše při uložení',
@@ -230,6 +231,7 @@ export const cs = {
   appPageOf: 'Stránka {current} z {total}',
   appWordCountTitle: 'Počet slov',
   appWordCountN: 'Slov: {n}',
+  appWordCountSelection: 'Vybráno {selected} z {total} slov',
   appTrackChangesOn: 'Sledování změn: zapnuto',
   appTrackChangesOff: 'Sledování změn: vypnuto',
   appAcTitle: 'Možnosti automatických oprav',
@@ -446,6 +448,7 @@ export const cs = {
   appParaSpecialFirstLine: 'První řádek',
   appParaSpecialHanging: 'Předsazení',
   appParaBy: 'O kolik',
+  appParaUnitChars: 'znaky',
   appInsertEquation: 'Vložit rovnici',
   appLatexPlaceholder: 'např. x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}',
   appLatexPreviewHint: 'Zadejte LaTeX a zobrazí se náhled',

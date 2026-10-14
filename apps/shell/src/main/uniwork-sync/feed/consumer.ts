@@ -88,7 +88,7 @@ export type FeedSyncResult =
 
 export const FEED_BACKOFF_BASE_MS = 30_000
 export const FEED_BACKOFF_MAX_MS = 30 * 60_000
-const KNOWN_PHASES = new Set(['snapshot', 'changes'])
+const KNOWN_PHASES = new Set(['snapshot', 'feed', 'changes'])
 
 /** a commit that did not land: the page stays unapplied and the cache's own verdict is carried */
 function commitFailed(commit: DocCacheCommit & { kind: 'failed' }): FeedSyncResult {

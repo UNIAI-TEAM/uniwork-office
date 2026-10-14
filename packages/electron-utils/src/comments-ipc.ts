@@ -39,6 +39,13 @@ export const COMMENTS_CHANNELS = {
    * answer is the held `CommentsRevealPayload` or null, and the hold is cleared
    */
   revealPending: 'uniwork:comments:reveal:pending',
+  /**
+   * G8-12 (UNI-1407): editor -> main (invoke `{ path }`): the server context of
+   * the bound document the sender shows (`CommentsContextResult`)
+   */
+  context: 'uniwork:comments:context',
+  /** G8-12: main -> editor renderer: a Save of `path` settled with a commit receipt */
+  saved: 'uniwork:comments:saved',
 } as const
 
 export type CommentKind = 'comment' | 'discussion'
@@ -90,6 +97,40 @@ export interface MentionsSearchInput extends CommentsDocRef {
 export interface CommentsRevealPayload {
   path: string
   commentId: string
+  /**
+   * Web frame only (set by the frame comments API, never by a desktop push or `parseCommentsReveal`):
+   * true when no other reveal owner is asked after this editor, so it shows its S15 line on a miss.
+   */
+  last?: boolean
+}
+
+/** the caller's effective level on the document (contract-collab §10) */
+export type CommentsLevel = 'view' | 'edit' | 'manage'
+
+/**
+ * G8-12 (UNI-1407): what `context` answers for a bound document. Main resolves
+ * every field from the binding and the session; the renderer never supplies a
+ * document or version id.
+ */
+export interface CommentsContextResult {
+  documentId: string
+  /** the server version the editor has open or last saved; null only while truly unknown */
+  versionId: string | null
+  /** the caller's effective level when main knows it; undefined = own-comments-only rule (contract-collab §10) */
+  level?: CommentsLevel
+  /** the signed-in UniWork user id ("mine" only, never a permission) */
+  myUserId?: string
+  /**
+   * Web frame only (set by the frame comments API, never by desktop main): editors skip the
+   * desktop poll there, since the frame reloads on `comments.changed` (addendum §4.7).
+   */
+  frame?: true
+}
+
+/** main pushes this after a Save of `path` settled with a commit receipt */
+export interface CommentsSavedPayload {
+  path: string
+  versionId: string
 }
 
 /**
@@ -123,6 +164,10 @@ export interface UniworkCommentsApi {
    * so a cold-start reveal decided before the editor mounted is not lost.
    */
   onReveal(handler: (payload: CommentsRevealPayload) => void): () => void
+  /** G8-12: the server context (document id, open version, level, my id) of the bound document */
+  context(input: CommentsDocRef): Promise<CommentsReply<CommentsContextResult>>
+  /** main pushes after a Save of `path` settled with a commit receipt; returns the unsubscribe */
+  onSaved(handler: (payload: CommentsSavedPayload) => void): () => void
 }
 
 /** the global the six editor preloads expose the API under */
@@ -172,6 +217,24 @@ export function readCommentsPath(payload: unknown): string | null {
   const { path } = payload
   if (typeof path !== 'string' || path.length === 0 || path.length > 4096) return null
   return path
+}
+
+/**
+ * `context`: only the path is read; a document or version id the renderer adds
+ * is dropped (main resolves both from the binding)
+ */
+export function parseCommentsContextInput(payload: unknown): CommentsDocRef | null {
+  const path = readCommentsPath(payload)
+  return path ? { path } : null
+}
+
+/** A validated saved push, or null when the payload is malformed. */
+export function parseCommentsSaved(payload: unknown): CommentsSavedPayload | null {
+  const path = readCommentsPath(payload)
+  if (!path) return null
+  const { versionId } = payload as Record<string, unknown>
+  if (!isId(versionId)) return null
+  return { path, versionId }
 }
 
 /** `comments.list`: kind is optional, sinceToken a bounded opaque token */

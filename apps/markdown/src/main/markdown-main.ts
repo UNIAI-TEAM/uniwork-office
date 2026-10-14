@@ -2,6 +2,7 @@ import {
   notifyUniworkUserSave,
   setUniworkUserSaveHook,
   uniworkIsBound,
+  uniworkIsLocked,
   uniworkIsReadOnly,
   uniworkSaveAsDefault,
   uniworkSaveDecision,
@@ -59,8 +60,11 @@ import {
   writeImageIntoOwnedAssets,
 } from './asset-lifecycle'
 import { createMarkdownConversionSession, writeMarkdownConversion } from './conversion-lifecycle'
+import { normalizeMarkdownTheme, type MarkdownTheme } from '../shared/markdown-theme'
 import { MARKDOWN_CHANNELS, MAX_PASTED_IMAGE_BYTES } from '../shared/ipc'
-import type { ImageHostConfig } from '../shared/ipc'
+import type { ImageHostConfig, WikiLinkResolveRequest, WikiLinkResolved } from '../shared/ipc'
+import { resolveWikiLinks } from './wiki-resolve'
+import { rememberWikiFragment, takeWikiFragment } from './wiki-fragment'
 import { isImageHostUsable, normalizeImageHostConfig, uploadImageToHost } from './image-host'
 import {
   EXPORT_IMAGE_EXTS,
@@ -441,12 +445,16 @@ function markdownConversionSession(): Promise<string> {
 
 /** Shell menu export entry: ask the renderer to serialize and run the export flow */
 export function sendMarkdownExportRequest(contents: WebContents, format: ExportFormat): void {
-  if (!contents.isDestroyed()) contents.send(MARKDOWN_CHANNELS.exportRequest, format)
+  // G5-03a: a locked working copy exports nothing
+  if (contents.isDestroyed() || uniworkIsLocked(savePathByWc.get(contents.id))) return
+  contents.send(MARKDOWN_CHANNELS.exportRequest, format)
 }
 
 /** Shell menu Print: ask the renderer to build the print HTML and open the system dialog */
 export function sendMarkdownPrintRequest(contents: WebContents): void {
-  if (!contents.isDestroyed()) contents.send(MARKDOWN_CHANNELS.printRequest)
+  // G5-03a: a locked working copy prints nothing
+  if (contents.isDestroyed() || uniworkIsLocked(savePathByWc.get(contents.id))) return
+  contents.send(MARKDOWN_CHANNELS.printRequest)
 }
 
 export function markdownIsDirty(webContentsId: number): boolean {
@@ -785,6 +793,32 @@ function registerMarkdownIpc(): void {
   })
 
   ipcMain.handle(
+    MARKDOWN_CHANNELS.resolveWikiLinks,
+    (_e, request: WikiLinkResolveRequest): Record<string, WikiLinkResolved> => {
+      const fromPath = typeof request?.fromPath === 'string' ? request.fromPath : ''
+      const targets = Array.isArray(request?.targets)
+        ? request.targets.filter((t): t is string => typeof t === 'string')
+        : []
+      const resolved = resolveWikiLinks(targets, {
+        fromPath,
+        root: configuredDefaultSaveDir(app),
+      })
+      // a Map is structured-cloneable but arrives as an empty object; ship the
+      // shape the renderer asked for
+      return Object.fromEntries(resolved)
+    },
+  )
+
+  ipcMain.handle(MARKDOWN_CHANNELS.rememberWikiFragment, (_e, path: unknown, fragment: unknown) => {
+    if (typeof path !== 'string' || typeof fragment !== 'string') return
+    rememberWikiFragment(path, fragment)
+  })
+
+  ipcMain.handle(MARKDOWN_CHANNELS.takeWikiFragment, (_e, path: unknown): string =>
+    typeof path === 'string' ? takeWikiFragment(path) : '',
+  )
+
+  ipcMain.handle(
     MARKDOWN_CHANNELS.save,
     async (e, request: SaveMarkdownRequest): Promise<SaveMarkdownResult> => {
       const waiter = saveWaiters.get(e.sender.id)
@@ -806,6 +840,10 @@ function registerMarkdownIpc(): void {
       }
       const mode: SaveMode = request.mode === 'saveAs' ? 'saveAs' : 'save'
       const pathAtRequest = savePathByWc.get(e.sender.id)
+      // G5-03a: a locked working copy leaves as nothing, not even a Save As copy
+      if (mode === 'saveAs' && uniworkIsLocked(pathAtRequest)) {
+        return done({ ok: false, error: 'markdown: this document is view only' })
+      }
       const pendingAtRequest = pathAtRequest
         ? await pendingOwnedAssetsForDocument(pathAtRequest)
         : []
@@ -981,6 +1019,32 @@ function registerMarkdownIpc(): void {
     },
   )
 
+  // ---- document paper theme (rendered via data-markdown-theme) ----
+  ipcMain.handle(MARKDOWN_CHANNELS.getMarkdownTheme, async (): Promise<MarkdownTheme> => {
+    try {
+      const raw = JSON.parse(await readFile(imageHostConfigPath(), 'utf8'))
+      return normalizeMarkdownTheme(raw?.markdownTheme)
+    } catch {
+      return 'default'
+    }
+  })
+
+  ipcMain.handle(
+    MARKDOWN_CHANNELS.setMarkdownTheme,
+    async (_e, theme: unknown): Promise<MarkdownTheme> => {
+      const normalized = normalizeMarkdownTheme(theme)
+      let file: Record<string, unknown>
+      try {
+        file = JSON.parse(await readFile(imageHostConfigPath(), 'utf8'))
+      } catch {
+        file = {}
+      }
+      file.markdownTheme = normalized
+      await atomicWriteFile(imageHostConfigPath(), Buffer.from(JSON.stringify(file, null, 2)))
+      return normalized
+    },
+  )
+
   ipcMain.handle(
     MARKDOWN_CHANNELS.uploadImage,
     async (
@@ -1004,6 +1068,10 @@ function registerMarkdownIpc(): void {
 
   ipcMain.handle(MARKDOWN_CHANNELS.saveImageAs, async (e, src: unknown) => {
     if (typeof src !== 'string') return { ok: false }
+    // G5-03a: an image out of a locked working copy is an export it may not have
+    if (uniworkIsLocked(savePathByWc.get(e.sender.id))) {
+      return { ok: false, error: 'markdown: this document is view only' }
+    }
     const win = BrowserWindow.fromWebContents(e.sender)
     return saveImageFromUrl(win, src, {
       title: tm('dlgSaveImage'),
@@ -1035,6 +1103,10 @@ function registerMarkdownIpc(): void {
     async (e, request: ExportDocxRequest): Promise<ExportResult> => {
       if (typeof request?.base64 !== 'string' || !request.base64) {
         return { ok: false, error: 'markdown: bad export request' }
+      }
+      // G5-03a: a locked working copy exports nothing
+      if (uniworkIsLocked(savePathByWc.get(e.sender.id))) {
+        return { ok: false, error: 'markdown: this document is view only' }
       }
       const safeName =
         String(request.suggestedName || tm('untitledFile'))
@@ -1081,6 +1153,10 @@ function registerMarkdownIpc(): void {
       if (typeof request?.html !== 'string' || !request.html) {
         return { ok: false, error: 'markdown: bad export request' }
       }
+      // G5-03a: a locked working copy exports nothing
+      if (uniworkIsLocked(savePathByWc.get(e.sender.id))) {
+        return { ok: false, error: 'markdown: this document is view only' }
+      }
       const safeName =
         String(request.suggestedName || tm('untitledFile'))
           .replace(/[/\\:*?"<>|]/g, '_')
@@ -1118,6 +1194,10 @@ function registerMarkdownIpc(): void {
     async (e, request: ExportPdfRequest): Promise<ImageExportPreparation> => {
       if (typeof request?.html !== 'string' || !request.html)
         return { ok: false, error: 'Empty document' }
+      // G5-03a: a locked working copy exports nothing
+      if (uniworkIsLocked(savePathByWc.get(e.sender.id))) {
+        return { ok: false, error: 'markdown: this document is view only' }
+      }
       let id: string | undefined
       try {
         const win = BrowserWindow.fromWebContents(e.sender) ?? undefined

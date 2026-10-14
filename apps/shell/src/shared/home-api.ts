@@ -320,6 +320,23 @@ export interface UniworkDocRenamedEvent {
   title: string
 }
 
+/**
+ * S6: the "new version available" bar of one document (G5-03a). Absent = no
+ * bar. `version` is the server's head version when the notice carried one
+ * (null only for an old host that sent none -> `uwRemoteUpdatedNoRev`).
+ */
+export type UniworkRemoteBar =
+  | { kind: 'updated'; version: number | null }
+  | { kind: 'newer-dirty'; version: number; wait?: 'commit' | 'stuck' }
+  | { kind: 'newer-ai'; version: number }
+  | { kind: 'now-clean'; version: number }
+  | { kind: 'reload-failed'; version: number }
+  | { kind: 'revoked' }
+  | { kind: 'deleted' }
+
+/** the S6 bar's actions: hide, hide until a newer revision, retry a clean reload, or the conflict flow */
+export type UniworkRemoteAction = 'later' | 'close' | 'retry' | 'reload' | 'reload-now'
+
 export interface UniworkDocStatus {
   path: string
   documentId: string
@@ -332,6 +349,8 @@ export interface UniworkDocStatus {
   /** an unsent N+1 exists behind the pending intent (G5-06) */
   pendingNext?: boolean
   lastSavedAt?: string
+  /** S6 (G5-03a): the new-version bar of this document; absent = none */
+  remote?: UniworkRemoteBar
 }
 
 export type UniworkConflictChoice = 'overwrite' | 'save-local-copy' | 'open-latest' | 'later'
@@ -378,6 +397,9 @@ export interface RecentEntry {
   sizeBytes: number
   /** whether the user starred this file */
   starred: boolean
+  /** the starred group this file belongs to (absent when ungrouped); only
+      populated by the starred() query — the other list queries omit it */
+  group?: string
   /** the path failed to stat (disconnected drive, moved, deleted) — kept
       listed like Word's recents instead of silently dropped (r158) */
   missing?: boolean
@@ -393,6 +415,8 @@ export interface RecentQuery {
   limit?: number
   /** restrict to one extension ('docx' | 'xlsx' | 'pptx'); omit for all */
   ext?: string
+  /** starred() only: restrict to one starred group; omit for all */
+  group?: string
 }
 
 export interface RecentPage {
@@ -514,6 +538,10 @@ export interface HomeApi {
   testFileSearchRerank(settings: FileSearchSettings): Promise<AiConnectionTestResult>
   /** starred files (independent of the recent list), newest first (paged) */
   starred(query?: RecentQuery): Promise<RecentPage>
+  /** starred group names that currently have at least one file, in creation order */
+  starredGroups(): Promise<string[]>
+  /** put each starred path into `group` (null = remove from its group) */
+  setStarredGroup(paths: string[], group: string | null): Promise<void>
   /** stat a specific set of paths (project view); unstat-able files come back flagged `missing` */
   statPaths(paths: string[]): Promise<RecentEntry[]>
   /** star / unstar a file */
@@ -558,6 +586,8 @@ export interface HomeApi {
   newHtml(opts?: NewFileOpts & { projectId?: string }): Promise<void>
   /** drop entries from the recent list (does not touch the files) */
   removeRecent(paths: string[]): Promise<void>
+  /** unstar files in bulk (Starred view selection bar); the recents list and the files are untouched */
+  unstarPaths(paths: string[]): Promise<void>
   /** reveal the file in Finder / Explorer */
   revealPath(path: string): Promise<void>
   /** rename the file on disk (same directory) and update the recent list */
@@ -780,6 +810,13 @@ export interface HomeApi {
   onUniworkDocStatus(cb: (status: UniworkDocStatus) => void): () => void
   uniworkSave(path: string): Promise<UniworkDocStatus | null>
   uniworkResolveConflict(path: string): Promise<UniworkDocStatus | null>
+  /**
+   * S6 (G5-03a): one action of the new-version bar (`later`, `close`, `retry`
+   * or the two reloads); resolves to the status after the action.
+   */
+  uniworkRemoteAction(path: string, action: UniworkRemoteAction): Promise<UniworkDocStatus | null>
+  /** S6: the bar's unscaled CSS-px height; main scales it by `--ui-scale` and moves the active editor view down by it */
+  uniworkSetBarInset(heightPx: number): Promise<void>
   onUniworkLaunch(cb: (event: UniworkLaunchEvent) => void): () => void
   /** newer-store locks pushed from main; returns an unsubscribe */
   onUniworkLock(cb: (lock: UniworkDocLock) => void): () => void
@@ -1201,6 +1238,9 @@ export const HOME_CHANNELS = {
   starred: 'home:starred',
   statPaths: 'home:stat-paths',
   toggleStar: 'home:toggle-star',
+  unstarPaths: 'home:unstar-paths',
+  starredGroups: 'home:starred-groups',
+  setStarredGroup: 'home:set-starred-group',
   openPath: 'home:open-path',
   browse: 'home:browse',
   newDoc: 'home:new-doc',
@@ -1324,6 +1364,10 @@ export const UNIWORK_DOC_CHANNELS = {
   docStatusEvent: 'uniwork-doc:status-event',
   save: 'uniwork-doc:save',
   resolveConflict: 'uniwork-doc:resolve-conflict',
+  /** invoke(path, action) -> the S6 bar action (later/close/retry/reload/reload-now) */
+  remoteAction: 'uniwork-doc:remote-action',
+  /** invoke(heightPx) -> the S6 bar's height under the tab strip (active view inset) */
+  barInset: 'uniwork-doc:bar-inset',
   launchEvent: 'uniwork-doc:launch-event',
   /** main -> shell renderer: a working copy refused by the newer-store guard */
   lock: 'uniwork-doc:lock',

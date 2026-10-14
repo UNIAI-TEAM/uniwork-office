@@ -370,7 +370,9 @@ describe('Settings › Account › Working organization', () => {
     expect(css).toMatch(
       /\.acct-org-dd \.gs-dd-item \{[^}]*white-space: normal;[^}]*overflow-wrap: normal;/,
     )
-    expect(css).toMatch(/\.acct-org-dd \.gs-dd-pop \{[^}]*max-width: calc\(100vw/)
+    expect(css).toMatch(
+      /\.acct-org-dd \.gs-dd-pop \{[^}]*max-width: calc\(var\(--ui-vw\) \* 100 - 48px\)/,
+    )
     await click(open)
     expect(account.selectOrg).toHaveBeenCalledWith('org-2')
   })

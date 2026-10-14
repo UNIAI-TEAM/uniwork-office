@@ -4,6 +4,7 @@ import {
   uniworkCommentAuthor,
   uniworkDocState,
   uniworkIsBound,
+  uniworkIsLocked,
   uniworkRefusesOpen,
   uniworkSamePath,
   uniworkSaveDecision,
@@ -16,6 +17,7 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  renameSync,
   statSync,
   unlinkSync,
   writeFileSync,
@@ -195,6 +197,16 @@ import {
 import { isExternallyModified, type DiskFileState } from './external-change'
 import { copyImageDisplaySize, validCopyImageDataUrl } from './copy-image-guard'
 import { hasNoPrinter, pdfExportPath, printScaleOption, validPrintGeometry } from './print-args'
+import {
+  assignStarredGroup,
+  dropStarredItems,
+  readStarredItems,
+  renameStarredItem,
+  starredGroupMap,
+  starredGroupNames,
+  toggleStarredItem,
+  writeStarredItems,
+} from './starred-files'
 import { initDocsAutoUpdater } from './updater'
 import { registerZoteroIpc, teardownZoteroIpc } from './zotero-ipc'
 
@@ -3207,17 +3219,14 @@ export function replaceRecentFile(oldPath: string, newPath: string): void {
     RECENT_PATH(),
     recent.map((p) => (p === oldPath ? newPath : p)),
   )
-  const starred = readJson<string[]>(STARRED_PATH(), [])
-  if (starred.includes(oldPath)) {
-    writeJsonAtomic(
-      STARRED_PATH(),
-      starred.map((p) => (p === oldPath ? newPath : p)),
-    )
-  }
+  const renamed = renameStarredItem(readStarredItems(STARRED_PATH()), oldPath, newPath)
+  if (renamed) writeStarredItems(STARRED_PATH(), renamed)
   buildDocsMenu()
 }
 
 // ---- starred files (home screen favorites) ----
+// the store lives in starred-files.ts (pure, unit-tested); legacy flat
+// string[] files migrate to the versioned shape on the first write
 
 const STARRED_PATH = () => userDataPath('starred.json')
 
@@ -3225,25 +3234,37 @@ const STARRED_PATH = () => userDataPath('starred.json')
  *  unavailable starred file must keep its star and its Starred-view row —
  *  filtering here also desynced the star state shown on recents rows (r158) */
 export function readStarredFiles(): string[] {
-  return readJson<string[]>(STARRED_PATH(), [])
+  return readStarredItems(STARRED_PATH()).map((item) => item.path)
 }
 
 export function toggleStarredFile(filePath: string): void {
-  const starred = readJson<string[]>(STARRED_PATH(), [])
-  const next = starred.includes(filePath)
-    ? starred.filter((p) => p !== filePath)
-    : [...starred, filePath]
-  writeJsonAtomic(STARRED_PATH(), next)
+  writeStarredItems(STARRED_PATH(), toggleStarredItem(readStarredItems(STARRED_PATH()), filePath))
 }
 
-/** Bulk unstar (in-app delete, or removing an unavailable entry from the
- *  recents list): the star must not outlive the row it pointed at (r158) */
+/** Bulk unstar (in-app delete, bulk unfollow from the Starred view, or
+ *  removing an unavailable entry from the recents list): the star must not
+ *  outlive the row it pointed at (r158) */
 export function removeStarredFiles(filePaths: string[]): void {
-  const drop = new Set(filePaths)
-  if (drop.size === 0) return
-  const starred = readJson<string[]>(STARRED_PATH(), [])
-  const next = starred.filter((p) => !drop.has(p))
-  if (next.length !== starred.length) writeJsonAtomic(STARRED_PATH(), next)
+  const next = dropStarredItems(readStarredItems(STARRED_PATH()), filePaths)
+  if (next) writeStarredItems(STARRED_PATH(), next)
+}
+
+/** put each starred path into `group` (null = back to ungrouped). Groups have
+ *  no separate list: a group exists while an entry carries its name, so
+ *  creating one is assigning its first file and emptying one is implicit. */
+export function setStarredGroup(filePaths: string[], group: string | null): void {
+  const next = assignStarredGroup(readStarredItems(STARRED_PATH()), filePaths, group)
+  if (next) writeStarredItems(STARRED_PATH(), next)
+}
+
+/** group names that currently have at least one starred file, first-seen order */
+export function readStarredGroups(): string[] {
+  return starredGroupNames(readStarredItems(STARRED_PATH()))
+}
+
+/** starred path → its group (ungrouped paths absent); feeds the home IPC entries */
+export function readStarredGroupMap(): Map<string, string> {
+  return starredGroupMap(readStarredItems(STARRED_PATH()))
 }
 
 // ---- original archive (pass-through base: original file archived by content hash) ----
@@ -3304,6 +3325,15 @@ const openDocByWc = new Map<number, string>()
 
 function rememberOpenDoc(wcId: number, filePath: string): void {
   openDocByWc.set(wcId, filePath)
+}
+
+/**
+ * G5-03a: a locked working copy (the server revoked or deleted it while it is
+ * open) leaves the app as nothing - no export, no Save As copy, no print. The
+ * tab's open document is the source unless the caller names one (Save As).
+ */
+function uniworkRefusesExport(wcId: number, sourcePath?: string | null): boolean {
+  return uniworkIsLocked(sourcePath ?? openDocByWc.get(wcId) ?? null)
 }
 
 function docsMediaRoots(wcId: number): string[] {
@@ -4005,6 +4035,7 @@ export function registerAiIpc(): void {
         onStopReason: (reason) => {
           stopReason = reason
         },
+        onUsage: (usage) => send({ requestId, type: 'usage', usage }),
       })
       send({ requestId, type: 'done', stopReason })
     } catch (err) {
@@ -4985,6 +5016,8 @@ export function registerDocsIpc(): void {
     async (event, defaultName: string, data: ArrayBuffer, sourcePath?: string | null) => {
       // an orphaned (closed-tab) renderer must not open dialogs or land new files
       if (tornDownWcIds.has(event.sender.id)) return { ok: false }
+      // G5-03a: a locked working copy exports nothing, not even a Save As copy
+      if (uniworkRefusesExport(event.sender.id, sourcePath)) return { ok: false }
       const result = await saveDialog(event, {
         title: tm('dlgSaveAs'),
         // a UniWork working copy's Save As starts outside its hidden folder
@@ -5052,6 +5085,9 @@ export function registerDocsIpc(): void {
       // a discarded draft in an orphaned renderer must not silently persist
       // itself to the default folder after the user chose Don't Save
       if (tornDownWcIds.has(event.sender.id)) return { ok: false }
+      // G5-03a: a locked working copy exports nothing, not even a first save
+      // into the default folder
+      if (uniworkRefusesExport(event.sender.id)) return { ok: false }
       const filePath = uniquePathIn(defaultSaveDir(), defaultName)
       const passwordState = snapshotDocPassword(event.sender.id, null)
       const { bytes: plain, hashes } = await materializeLazyDocx(Buffer.from(data))
@@ -5105,6 +5141,8 @@ export function registerDocsIpc(): void {
     async (event, filePath: string, data: ArrayBuffer, overwrite: boolean) => {
       try {
         if (tornDownWcIds.has(event.sender.id)) return { ok: false }
+        // G5-03a: an agent copy-out of a locked working copy is refused too
+        if (uniworkRefusesExport(event.sender.id)) return { ok: false }
         if (typeof filePath !== 'string' || !isAbsolute(filePath)) {
           return { ok: false, error: 'path must be absolute' }
         }
@@ -5320,6 +5358,8 @@ export function registerDocsIpc(): void {
       : {}
 
   ipcMain.handle('docs:print', async (event, scale?: number) => {
+    // G5-03a: a locked working copy prints nothing
+    if (uniworkRefusesExport(event.sender.id)) return { ok: false }
     // print the calling tab's own content; zero margins — the docx page padding provides them.
     // Resolves when the system dialog is dismissed; the print dialog stays open on cancel
     // (ok=false without error) and surfaces real failures. With no printer installed
@@ -5349,6 +5389,8 @@ export function registerDocsIpc(): void {
       outPath?: string,
       scale?: number,
     ) => {
+      // G5-03a: a locked working copy exports nothing
+      if (uniworkRefusesExport(event.sender.id)) return { ok: false }
       // Renderer-supplied page geometry reaches Chromium printToPDF verbatim:
       // reject non-finite/out-of-range sizes (0.1in..50in) and scales (0.1..5),
       // same guard as docs:print-pdf-buffer (a malformed w:pgSz in a doc would
@@ -5396,6 +5438,8 @@ export function registerDocsIpc(): void {
 
   ipcMain.handle('docs:save-image-as', async (event, src: unknown) => {
     if (tornDownWcIds.has(event.sender.id) || typeof src !== 'string') return { ok: false }
+    // G5-03a: an image out of a locked working copy is an export it may not have
+    if (uniworkRefusesExport(event.sender.id)) return { ok: false }
     return saveImageFromUrl(dialogParent(event), src, {
       title: tm('dlgSaveAs'),
       fallbackDir: defaultSaveDir(),
@@ -5403,6 +5447,8 @@ export function registerDocsIpc(): void {
   })
 
   ipcMain.handle('docs:pick-export-images-target', async (event) => {
+    // G5-03a: a locked working copy exports nothing (null is "cancelled")
+    if (uniworkRefusesExport(event.sender.id)) return null
     let dir = testExportDir
     if (!dir) {
       const r = await openDialog(event, {
@@ -5439,6 +5485,8 @@ export function registerDocsIpc(): void {
   ipcMain.handle(
     'docs:write-export-image',
     async (event, dir: string, fileName: string, pngBase64: string) => {
+      // G5-03a: a locked working copy exports nothing
+      if (uniworkRefusesExport(event.sender.id)) return { ok: false }
       if (typeof dir !== 'string' || !imageExportDirs.get(event.sender.id)?.has(dir)) {
         return { ok: false, error: 'export target is not an authorized folder' }
       }
@@ -5463,6 +5511,8 @@ export function registerDocsIpc(): void {
     'docs:export-html',
     async (event, defaultName: string, html: string, outPath?: string) => {
       if (typeof html !== 'string' || !html) return { ok: false, error: 'empty document' }
+      // G5-03a: a locked working copy exports nothing
+      if (uniworkRefusesExport(event.sender.id)) return { ok: false }
       let filePath = outPath ?? null
       if (filePath && !canPdfWrite(event.sender.id, filePath)) {
         return { ok: false, error: 'export target is not an authorized path' }
@@ -5495,6 +5545,8 @@ export function registerDocsIpc(): void {
   ipcMain.handle(
     'docs:print-pdf-buffer',
     async (event, pageWidthTwips: number, pageHeightTwips: number, scale?: number) => {
+      // G5-03a: a locked working copy exports nothing
+      if (uniworkRefusesExport(event.sender.id)) return { ok: false }
       // Renderer-supplied page geometry reaches Chromium printToPDF verbatim:
       // reject non-finite/out-of-range sizes (0.5in..50in) and scales (0.1..5).
       if (!validPrintGeometry(pageWidthTwips, pageHeightTwips, scale)) {
@@ -5521,6 +5573,8 @@ export function registerDocsIpc(): void {
   ipcMain.handle(
     'docs:save-merged-pdf',
     async (event, defaultName: string, base64Parts: string[], outPath?: string) => {
+      // G5-03a: a locked working copy exports nothing
+      if (uniworkRefusesExport(event.sender.id)) return { ok: false }
       let filePath = outPath ?? null
       if (filePath && !canPdfWrite(event.sender.id, filePath)) {
         return { ok: false, error: 'export target is not an authorized path' }
@@ -6422,7 +6476,22 @@ export function startDocsStandalone(): void {
   // AI_OFFICE_USER_DATA: E2E/screenshot runs isolate userData (and the
   // single-instance lock) so parallel automation sessions don't evict each other
   if (process.env.AI_OFFICE_USER_DATA) app.setPath('userData', process.env.AI_OFFICE_USER_DATA)
-  else if (isDev) app.setPath('userData', join(app.getPath('appData'), 'UniWork Docs Dev'))
+  else if (isDev) {
+    // "UniWork Docs Dev" carried a space, against the XDG one-token
+    // convention (#1817); move the old profile once, as the shell does.
+    const appData = app.getPath('appData')
+    const devDir = join(appData, 'UniWork-Docs-Dev')
+    const oldDevDir = join(appData, 'UniWork Docs Dev')
+    if (existsSync(oldDevDir) && !existsSync(devDir)) {
+      try {
+        renameSync(oldDevDir, devDir)
+      } catch {
+        // another dev instance is mid-migration or holds the directory:
+        // continuing with a fresh profile beats failing the launch
+      }
+    }
+    app.setPath('userData', devDir)
+  }
 
   const hasSingleInstanceLock = app.requestSingleInstanceLock()
   if (!hasSingleInstanceLock) {

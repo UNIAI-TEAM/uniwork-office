@@ -113,6 +113,28 @@ describe('view-only skill (UniWork copy the user may only read)', () => {
     expect(result.isError).toBeFalsy()
   })
 
+  it('keeps generate_mindmap: it only returns a display payload', async () => {
+    const editor = createEditor()
+    const skill = createMarkdownSkill(
+      () => editor,
+      undefined,
+      undefined,
+      undefined,
+      () => true,
+    )
+    expect(skill.tools.map((t) => t.name)).toContain('generate_mindmap')
+    const before = editor.getHTML()
+    const result = await skill.executeTool(
+      call('generate_mindmap', {
+        root: { label: 'Saved document', children: [{ label: 'Intro', block: 0 }] },
+      }),
+    )
+    expect(result.isError).toBeFalsy()
+    expect(result.mutated).toBe(false)
+    expect(result.display).toMatchObject({ kind: 'mindmap' })
+    expect(editor.getHTML()).toBe(before)
+  })
+
   it('reads the predicate live: lifting view-only restores editing', () => {
     let readOnly = true
     const skill = createMarkdownSkill(

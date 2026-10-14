@@ -28,6 +28,8 @@ export interface AiComposerProps {
   readonly ariaLabel?: string | undefined
   /** content inside the box above the textarea (attachment chips, …) — Genspark composer style */
   readonly header?: React.ReactNode
+  /** queued-messages strip, rendered above the header while replies run */
+  readonly queueStrip?: React.ReactNode
   /** extra controls at the left of the footer (attach button, toggles, …) */
   readonly footerStart?: React.ReactNode
   /** compact variant: no hint text, icon-only enter/stop button (Genspark composer style) */
@@ -41,6 +43,10 @@ export interface AiComposerProps {
   readonly textareaRef?: React.RefObject<HTMLTextAreaElement | null> | undefined
   readonly onChange: (next: string) => void
   readonly onSend: () => void
+  /** while busy, Enter queues the draft instead of sending (MiniMax-style queue) */
+  readonly onQueue?: (() => void) | undefined
+  /** placeholder shown while busy and queueing is available, naming the Enter/Esc swap */
+  readonly queuePlaceholder?: string | undefined
   readonly onStop: () => void
   /** clipboard files pasted into the textarea (screenshots, copied files); text paste stays native */
   readonly onPasteFiles?: ((files: File[]) => void) | undefined
@@ -61,6 +67,7 @@ export interface AiComposerProps {
  * (Enter sends, Shift+Enter newline, Esc stops) plus a footer with optional
  * app-specific controls, a shortcut hint, and the send/stop button.
  * Renders the `.ai-input-box` class family; each app themes it in its own CSS.
+ * While busy, Enter queues the draft instead (see useChatRunQueue).
  */
 export function AiComposer({
   value,
@@ -73,6 +80,7 @@ export function AiComposer({
   stopLabel,
   ariaLabel,
   header,
+  queueStrip,
   footerStart,
   iconOnly = false,
   sendIconEnabled,
@@ -81,6 +89,8 @@ export function AiComposer({
   textareaRef,
   onChange,
   onSend,
+  onQueue,
+  queuePlaceholder,
   onStop,
   onPasteFiles,
   onPasteText,
@@ -104,7 +114,8 @@ export function AiComposer({
 
   const hasUniworkFeatures = uniwork !== undefined || viewOnly !== undefined
   const uniworkActive = Boolean(
-    uniwork && (uniwork.active ?? (uniwork.provider === undefined || uniwork.provider === 'uniwork')),
+    uniwork &&
+    (uniwork.active ?? (uniwork.provider === undefined || uniwork.provider === 'uniwork')),
   )
   const resolvedLang: Lang = uniwork?.lang ?? lang ?? 'vi'
   const resolvedViewOnly = Boolean(viewOnly ?? uniwork?.viewOnly)
@@ -169,12 +180,13 @@ export function AiComposer({
 
   const inputBox = (
     <div ref={boxRef} className="ai-input-box">
+      {queueStrip}
       {header}
       <textarea
         ref={ref}
         className="ai-input"
         value={value}
-        placeholder={placeholder}
+        placeholder={busy && onQueue && queuePlaceholder ? queuePlaceholder : placeholder}
         aria-label={ariaLabel}
         rows={1}
         dir="auto"
@@ -188,8 +200,10 @@ export function AiComposer({
               return
             }
             if (canSend) onSend()
+            else if (busy && onQueue) onQueue()
           } else if (e.key === 'Escape' && busy) {
-            const doc = boxRef.current?.ownerDocument ?? (typeof document !== 'undefined' ? document : null)
+            const doc =
+              boxRef.current?.ownerDocument ?? (typeof document !== 'undefined' ? document : null)
             if (resolvedPopupOpen || isComposerPopupOpen(doc)) return
             e.preventDefault()
             onStop()
@@ -309,7 +323,9 @@ export function AiComposer({
         />
       )}
       {resolvedViewOnly && (
-        <div className="ai-uniwork-view-only">{aiUniworkText(resolvedLang, 'aiUniworkViewOnly')}</div>
+        <div className="ai-uniwork-view-only">
+          {aiUniworkText(resolvedLang, 'aiUniworkViewOnly')}
+        </div>
       )}
     </>
   )

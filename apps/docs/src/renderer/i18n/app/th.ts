@@ -110,6 +110,7 @@ export const th = {
   appMixedExportOpening:
     'เอกสารมีขนาดกระดาษผสม: กำลังเปิดตัวอย่างการแบ่งหน้าเพื่อส่งออกแบบรวมทีละหน้า…',
   appSelectTextToComment: 'เลือกข้อความที่ต้องการใส่ข้อคิดเห็นก่อน',
+  appCommentSaveFirst: 'บันทึกเอกสารก่อนเพื่อเพิ่มความคิดเห็น',
   appCommentSelectionLost:
     'ส่วนที่เลือกไม่ถูกต้องแล้ว โปรดเลือกข้อความที่ต้องการใส่ข้อคิดเห็นอีกครั้ง',
   appCommentAdded: 'เพิ่มข้อคิดเห็นแล้ว จะเขียนลงในเอกสารเมื่อบันทึก',
@@ -228,6 +229,7 @@ export const th = {
   appPageOf: 'หน้า {current} จาก {total}',
   appWordCountTitle: 'นับจำนวนคำ',
   appWordCountN: '{n} คำ',
+  appWordCountSelection: 'เลือกแล้ว {selected} / {total} คำ',
   appTrackChangesOn: 'ติดตามการเปลี่ยนแปลง: เปิด',
   appTrackChangesOff: 'ติดตามการเปลี่ยนแปลง: ปิด',
   appAcTitle: 'ตัวเลือกการแก้ไขอัตโนมัติ',
@@ -444,6 +446,7 @@ export const th = {
   appParaSpecialFirstLine: 'บรรทัดแรก',
   appParaSpecialHanging: 'ลอย',
   appParaBy: 'ระยะ',
+  appParaUnitChars: 'ตัวอักษร',
   appInsertEquation: 'แทรกสมการ',
   appLatexPlaceholder: 'เช่น x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}',
   appLatexPreviewHint: 'พิมพ์ LaTeX เพื่อดูตัวอย่าง',

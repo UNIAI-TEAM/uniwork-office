@@ -147,6 +147,9 @@
   --docs-paper-comment-bg: rgb(179 247 95 / 25%);
   --docs-paper-comment-flash: rgb(130 171 81 / 45%);
   --docs-paper-comment-line: #82ab51;
+  /* UniWork (server) comment highlight: screen-only, apart from the green in-file comment tint */
+  --docs-paper-server-comment-bg: rgb(112 92 214 / 16%);
+  --docs-paper-server-comment-line: #6f5bd2;
   /* printed markup is document output, not chrome: fixed values, identical in both themes;
      the balloon fill is the anchor tint composited over white (balloons sit on the gray strip) */
   --docs-print-markup-band: #f2f2f2;
@@ -755,21 +758,34 @@ html.genoffice-popover-open .ribbon-tabs {
  * window packs more of them in before the row overflows.
  */
 .ribbon-compact .ribbon-body {
-  /* same fixed-height contract as the full band, only shorter: switching tabs
-     (including the auto-jump to Table Layout) must still never resize the row */
-  height: 38px;
+  /* Same fixed-height contract as the full band, only shorter: switching tabs
+     (including the auto-jump to Table Layout) must still never resize the row.
+     38px was measured holding 51px of content — the font and size pickers
+     stacked, style cards at 62px, split carets under their buttons — and
+     `overflow-y: hidden` sliced the difference off instead of scrolling it,
+     which is how the font picker ended up cut through the middle. Every tab
+     has been measured since; 45px is the smallest that holds all eight with
+     nothing clipped. */
+  height: 45px;
   padding-top: 5px;
   padding-bottom: 1px;
 }
 
 .ribbon-compact .rb-big {
-  /* the label is the only thing taller than the icon; dropping the column gap
-     and the vertical padding brings the button to the band's content box */
-  padding: 3px 5px;
+  /* The label is taken out of flow entirely (below), so the only things still
+     adding height are the icon, the column gap and the vertical padding. The
+     gap was never dropped here even though the comment claimed it was: the
+     button came out 40px tall inside a 38px band, and `overflow-y: hidden` on
+     `.ribbon-body` sliced the bottom off it — the font and size pickers were
+     cut in half and every icon row lost its lower edge. */
+  gap: 0;
+  padding: 2px 5px;
 }
 
 .ribbon-compact .rb-big-icon {
-  min-height: 28px;
+  /* 28px of icon, plus this block's own 3px top and bottom padding, was 34px
+     before the group's borders were counted. */
+  min-height: 22px;
   flex: none;
 }
 
@@ -792,8 +808,11 @@ html.genoffice-popover-open .ribbon-tabs {
 /* the icon row is the whole button now, so let the hover/open paint cover it */
 .ribbon-compact .rb-big .rb-big-icon {
   align-self: stretch;
-  padding: 3px 4px;
-  margin: 0 -3px;
+  /* This padding, not the icon, is what put every button at 38px inside a
+     33px band: the glyph is ~26px and 3px of padding on each side took it to
+     32, which plus the button's own padding is a slice off every icon row. */
+  padding: 1px 3px;
+  margin: 0 -2px;
 }
 
 /* Groups and separators centre on the shorter band. */
@@ -804,6 +823,79 @@ html.genoffice-popover-open .ribbon-tabs {
 /* The table ribbon groups its tools in .table-tool-group (min-width 66px), not
  * .ribbon-group — without this they keep the full-band inset and the band ends
  * up wider than the content it holds. */
+/* These three were never compact-styled, and they are what overflowed: the
+ * style gallery's cards are a fixed 62px tall with a 62px box to match, and the
+ * font group is a column that grows to whatever its two pickers need. Measured
+ * in the compact band they came out at 62-64px starting at top:-13 — taller
+ * than the 38px band, so `overflow-y: hidden` sliced the font and size pickers
+ * in half and cut the top off every style card. The band was never too short;
+ * these were never made shorter. */
+.ribbon-compact .style-card {
+  width: 46px;
+  height: 30px;
+}
+
+/* Every control the compact band has to hold was measured, not guessed: with
+ * 38px of button and a 33px content box, *every* tab clipped by at least 5px.
+ * These are the ones that needed more than the icon padding above. */
+.ribbon-compact .style-gallery-more {
+  /* 62px, matching the full-height cards it sits beside — but the cards are
+     30px in compact mode now, and this one was left behind. */
+  height: 30px;
+}
+
+/* Split buttons (Paste Special, font colour, ...) stack a caret under the
+ * button: `.rb-big-split` is a column, so 32 + 17 = 49px and the caret alone
+ * accounts for 17px of the 51px group that was overflowing Home. Compact puts
+ * the caret beside the button, where it was always meant to be. */
+.ribbon-compact .rb-big-split {
+  flex-direction: row;
+  align-items: stretch;
+}
+
+.ribbon-compact .rb-big-split-caret {
+  margin: 0 0 0 2px;
+  padding: 1px 2px;
+}
+
+/* `.rb-col` is the same shape as `.rb-font-group`: a column of controls that
+ * fits a 38px band only by going side by side. Home and Insert both carry one. */
+.ribbon-compact .rb-col {
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Ink: swatches (16px) stacked over widths (22px) with a 4px gap is 42px. */
+.ribbon-compact .ink-settings {
+  flex-direction: row;
+  gap: 8px;
+}
+
+/* Page Layout: two columns each stacking two controls, 28 + 5 + 28 = 61px. */
+.ribbon-compact .layout-para {
+  gap: 6px;
+}
+
+.ribbon-compact .layout-col {
+  flex-direction: row;
+  gap: 4px;
+}
+
+/* The font and size pickers are two 28px controls stacked in a column, so the
+ * group is 28 + 4 + 28 = 60px before padding — taller than the 38px band on
+ * its own, and the reason the font picker was cut through the middle. Side by
+ * side they are 28px, which is what every compact ribbon does anyway. */
+.ribbon-compact .rb-font-group {
+  flex-direction: row;
+  align-items: center;
+  gap: 3px;
+}
+
+.ribbon-compact .style-gallery {
+  height: 30px;
+}
+
 .ribbon-compact .table-tool-group {
   min-width: 0;
   padding: 2px 4px;
@@ -2585,6 +2677,26 @@ th.cell-rev-del {
   display: block;
 }
 
+/* While an IME composition is live — the ScriptFonts plugin's compositionstart
+   handler sets this class on the editor root, which is also the .doc-page
+   element that defines --doc-latin-chain; prosemirror-view itself does not —
+   the span under the caret inherits its pre-edit string, a
+   pinyin sequence that must resolve Latin glyphs through the document's
+   Latin chain (Word's per-script behavior), not the EA face's half-width
+   Latin. The EA slot stays last so Han typed in the same span still renders
+   in the EA face. Scoped to compositions on purpose: the span's rendered
+   declaration stays EA-primary (its inline style from script-fonts.ts), so
+   the inline box and the strut share one half-leading geometry and no line
+   moves while nobody is typing — only the line under the caret may reflow,
+   and the decoration rebuild settles it when the composition ends. */
+.ProseMirror-composing .doc-east-asian-font {
+  /* !important is what lets a stylesheet rule out-shout the decoration's
+     inline font-family while typing; the moment the class drops, the inline
+     EA-primary declaration is the whole story again */
+  font-family:
+    var(--doc-latin-chain, 'Latin Sans GO'), var(--doc-east-asian-font, inherit) !important;
+}
+
 /* ---- Word basics: marks / columns / page border / header-footer / nav / ruler ---- */
 
 /* ¶ editing marks (front-end only) */
@@ -3791,6 +3903,43 @@ th.cell-rev-del {
   cursor: pointer;
 }
 
+/* a UniWork (server) comment: a screen-only decoration, never part of the document */
+.doc-server-comment {
+  background: var(--docs-paper-server-comment-bg);
+  border-bottom: 2px solid var(--docs-paper-server-comment-line);
+}
+
+/* the server comment panel (kit S12) takes the local pane's column and narrow-screen overlay */
+.comments-pane.docs-server-comments {
+  width: min(300px, 100%);
+}
+
+/* the kit panel fills the pane; the pane owns the column border and the optional save-first line */
+.docs-server-comments .docs-server-panel {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+  border-left: 0;
+}
+
+.docs-server-comments .docs-server-save-first {
+  border-top: 1px solid var(--warning-border);
+  border-bottom: 0;
+}
+
+/* 300 px column: hint, Cancel and Send stay on one row (the hint wraps inside its own box) */
+.docs-server-comments .collab-composer-actions {
+  flex-wrap: nowrap;
+}
+
+.docs-server-comments .collab-composer-hint {
+  min-width: 0;
+}
+
+.docs-server-comments .collab-composer-btn {
+  flex: none;
+}
+
 /* range picked for a comment that is still being composed */
 .comment-pending {
   background: var(--docs-paper-comment-bg);
@@ -4286,6 +4435,8 @@ th.cell-rev-del {
     --docs-paper-comment-bg: rgb(106 166 32 / 25%);
     --docs-paper-comment-flash: rgb(145 181 102 / 45%);
     --docs-paper-comment-line: #91b566;
+    --docs-paper-server-comment-bg: rgb(108 90 198 / 16%);
+    --docs-paper-server-comment-line: #6e5dc6;
     --docs-paper-ai-anchor-bg: rgb(74 116 197 / 14%);
     --docs-paper-ai-anchor-line: #4a74c5;
     --docs-paper-xe-ink: #c5ab7f;
@@ -5725,6 +5876,26 @@ body.docs-crop-active .doc-protected[data-doc-protected='image'] .doc-img-wrap {
   grid-template-rows: repeat(3, minmax(24px, 1fr));
   gap: 2px;
   flex: 1;
+}
+
+/* Three stacked rows have to fit the 64px the fixed 80px band leaves after its
+   padding and the scrollbar lane: 3 × 20px + 2 × 2px. At the default 25-26px
+   the bottom row (Table Properties, Insert Cells…) was clipped. */
+.table-tool-stack-three {
+  grid-template-rows: repeat(3, 20px);
+  align-content: center;
+}
+
+.table-tool-col-three > .table-tool-grid {
+  flex: none;
+  gap: 2px 3px;
+}
+
+.table-tool-group .table-tool-stack-three .table-command-row,
+.table-tool-group .table-tool-col-three button {
+  min-height: 20px;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 /* Word's split button: the left half repeats the last gallery pick, the caret opens it */
@@ -7916,6 +8087,171 @@ body.docs-crop-active
   flex-direction: column;
   gap: 8px;
   margin-top: 8px;
+}
+
+/* ---- interactive mind map card (generate_mindmap) ---- */
+.ai-mindmap {
+  margin-top: 12px;
+  border: 1px solid var(--color-border-default);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--color-bg-subtle);
+}
+
+.ai-msg-assistant .ai-mindmap:first-child,
+.ai-mindmap:only-child {
+  margin-top: 0;
+}
+
+.ai-mindmap-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--color-border-default);
+  background: var(--surface);
+}
+
+.ai-mindmap-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.ai-mindmap-count {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+}
+
+.ai-mindmap-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 4px;
+}
+
+.ai-mindmap-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  transition:
+    color 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+    background 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ai-mindmap-btn:hover {
+  color: var(--color-text-primary);
+  background: var(--hover);
+}
+
+.ai-mindmap-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--docs-focus-ring);
+}
+
+.ai-mindmap-viewport {
+  position: relative;
+  height: 300px;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+}
+
+.ai-mindmap-viewport:active {
+  cursor: grabbing;
+}
+
+.ai-mindmap-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  user-select: none;
+}
+
+.ai-mindmap-edges path {
+  fill: none;
+  stroke: var(--color-border-strong);
+  stroke-width: 1.5;
+}
+
+.ai-mindmap-node {
+  cursor: pointer;
+}
+
+.ai-mindmap-node rect {
+  fill: var(--surface);
+  stroke: var(--color-border-strong);
+  stroke-width: 1;
+}
+
+.ai-mindmap-node.root rect {
+  fill: var(--color-ai-action);
+  stroke: var(--color-ai-action);
+}
+
+.ai-mindmap-node .ai-mindmap-label {
+  fill: var(--color-text-primary);
+  font-size: 12.5px;
+}
+
+.ai-mindmap-node.root .ai-mindmap-label {
+  fill: var(--color-ai-action-text);
+}
+
+.ai-mindmap-node:hover rect {
+  stroke: var(--color-ai-action);
+}
+
+.ai-mindmap-node:focus-visible {
+  outline: none;
+}
+
+.ai-mindmap-node:focus-visible rect {
+  stroke: var(--color-ai-action);
+  stroke-width: 2;
+}
+
+.ai-mindmap-badge {
+  cursor: pointer;
+}
+
+.ai-mindmap-badge rect {
+  fill: var(--color-brand-secondary);
+  stroke: none;
+}
+
+.ai-mindmap-badge text {
+  fill: var(--color-ai-action-text);
+  font-size: 10px;
+}
+
+.ai-mindmap-toggle {
+  cursor: pointer;
+}
+
+.ai-mindmap-toggle rect,
+.ai-mindmap-toggle circle {
+  fill: var(--hover);
+  stroke: var(--color-border-strong);
+  stroke-width: 1;
+}
+
+.ai-mindmap-toggle text {
+  fill: var(--color-text-secondary);
+  font-size: 10px;
+}
+
+.ai-mindmap-toggle:hover rect,
+.ai-mindmap-toggle:hover circle {
+  stroke: var(--color-ai-action);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -12758,6 +13094,11 @@ tr > .page-gap-cut {
 
 .ai-dock.collapsed {
   width: 34px;
+}
+
+/* "show the AI sidebar" off and panel closed: no rail, no sliver */
+.ai-dock.collapsed.ai-dock-off {
+  width: 0;
 }
 
 /* while dragging the resizer, follow the pointer without easing */

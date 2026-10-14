@@ -197,4 +197,17 @@ export const ja = {
   aiClarifySubmit: '続ける',
   aiSumClarify: '確認の質問に回答済み',
   aiSumClarifySkipped: '確認の質問をスキップ',
+  aiStarterMindMap: 'このドキュメントのマインドマップを生成',
+  aiMindMapBtn: 'AI マインドマップ',
+  aiMindMapPrompt:
+    'このドキュメントのマインドマップを生成し、章構成に沿って主要トピックとキーワードを整理してください',
+  aiSumMindMap: 'マインドマップを生成',
+  aiMindMapTitle: 'マインドマップ',
+  aiMindMapNodes: '{count} ノード',
+  aiMindMapAskPrompt: 'このドキュメントの「{label}」について教えて',
+  aiMindMapJump: '該当段落へジャンプ',
+  aiMindMapExport: 'PNG で書き出す',
+  aiMindMapReset: '表示をリセット',
+  aiMindMapExpand: 'ブランチを展開',
+  aiMindMapCollapse: 'ブランチを折りたたむ',
 } satisfies Record<keyof typeof zh, string>

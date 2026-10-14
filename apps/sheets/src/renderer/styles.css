@@ -365,6 +365,20 @@ textarea:disabled {
   background: var(--surface);
 }
 
+/* web frame: a bar above the app (the Discussion document bar, the new-version bar) makes the page a
+   column and #root the remaining height (web/modules/shared/discussion.css, remote-bar.css). The
+   body gets a definite height so that remaining height is definite, and the shell fills it instead
+   of a full viewport (which pushed the status bar and the sheet tabs below the fold). */
+html.uw-disc-on body,
+html.uw-remote-bar-on body {
+  height: 100vh;
+}
+
+html.uw-disc-on .app-shell,
+html.uw-remote-bar-on .app-shell {
+  height: 100%;
+}
+
 /* Go To arrow injected beside Univer's formula-bar Name Box (the
    defined-name selector) — see the ensure() effect in ExcelShell. */
 .goto-in-bar {
@@ -648,7 +662,12 @@ html.genoffice-popover-open .ribbon-tabs {
 }
 
 .workbook-status {
-  max-width: min(360px, 30vw);
+  /* 30% of the visible window, in zoomed units (the header is `zoom`ed: see --ui-vw) */
+  max-width: min(360px, calc(var(--ui-vw) * 30));
+  /* the message yields first when the row is short (interface scale 125%+): far above the tab
+     scroller's shrink of 1, down to a floor; the tabs only scroll beyond that, never sit under it */
+  flex: 0 1000 auto;
+  min-width: 6em;
   overflow: hidden;
   color: var(--text-muted);
   font-size: 12px;
@@ -1621,11 +1640,37 @@ button.check-item:hover {
   opacity: 0.45;
 }
 
+/* Interface scale (issue #1913).
+ *
+ * Each chrome surface opts in on its own, and the workbook canvas
+ * (`.workbook-area` / `#univer-container`) is deliberately NOT on this list.
+ * That is the mechanism: the document zoom is the app's own per-app state, and
+ * the interface scale is applied to its *siblings*. They cannot compound,
+ * because nothing contains both.
+ *
+ * `zoom` rather than a window zoom for the same reason — see
+ * apps/shell/src/main/ui-scale.ts for why `webContents.setZoomFactor()` would
+ * drag the canvas along with the chrome. */
+.excel-header,
+.status-bar,
+.copilot {
+  zoom: var(--ui-scale);
+  /* Chromium resolves vh/vw inside a zoomed box to the real viewport and zooms the result again;
+     size viewport shares in these units (`calc(var(--ui-vh) * 62)` = 62vh of the visible window) */
+  --ui-vh: calc(1vh / var(--ui-scale, 1));
+  --ui-vw: calc(1vw / var(--ui-scale, 1));
+}
+
 /* AI panel on the left, spanning from the ribbon to the status bar (unified with docs);
  * its column is drag-resizable: driven by --copilot-width (updated by the AiChatPanel resizer) */
 .sheet-body {
   display: grid;
-  grid-template-columns: var(--copilot-width, 360px) minmax(0, 1fr);
+  /* The AI panel's slot has to grow with the scale as well. Its column is
+   * `--copilot-width`, and `.copilot` is `zoom`ed, so a 2x panel inside an
+   * unscaled 360px slot paints 720px of content into 360px of grid — the
+   * heading clips, the composer overlaps the model name, and both overflow
+   * into the document. */
+  grid-template-columns: calc(var(--copilot-width, 360px) * var(--ui-scale)) minmax(0, 1fr);
   min-height: 0;
   transition: grid-template-columns 180ms cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -1635,8 +1680,12 @@ button.check-item:hover {
   display: grid;
   /* workbook / status bar */
   grid-template-rows: minmax(0, 1fr) auto;
-  /* one shrinkable column: an implicit `auto` track would grow to the content's min-width (the
-   * status bar / formula bar rows) and push the grid past the frame on a narrow web viewport */
+  /* The implicit column defaults to `min-width: auto`, i.e. its content's
+   * min-content width — and the Univer canvas is far wider than the window.
+   * So the column grew past the window, and the status bar, sharing it, ran off
+   * the right edge with the zoom controls past the frame. Invisible at 100%
+   * because nothing else pushes that column; a large interface scale makes the
+   * sheet's own chrome demand the width it no longer has. */
   grid-template-columns: minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
@@ -1645,6 +1694,9 @@ button.check-item:hover {
 .workbook-area {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
+  /* Same reason as `.sheet-main`: the canvas's intrinsic width must not become
+   * this grid's minimum. */
+  min-width: 0;
   min-height: 0;
   position: relative;
 }
@@ -1802,21 +1854,33 @@ button.check-item:hover {
   display: flex;
   align-items: center;
   gap: 10px;
+  /* The message is the part that gives way at a large interface scale: it is
+   * prose with a natural end, so an ellipsis reads as "more of this" rather
+   * than as a control that vanished. `min-width: 0` is what lets a flex item
+   * shrink past its content at all. */
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .status-msg {
+  display: block;
+  min-width: 0;
   opacity: 0.85;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .status-right {
   display: flex;
   align-items: center;
   gap: 6px;
+  /* The zoom slider and the sheet counters stay whole. With both sides pinned
+   * the bar ran past the window edge at 200% with the zoom percentage half
+   * off-screen, which is why `.status-left` above is allowed to shrink. */
   flex-shrink: 0;
 }
 
@@ -6298,7 +6362,7 @@ body > div:has([data-u-comp='find-replace-dialog']) {
   left: 0;
   z-index: 30;
   width: 520px;
-  max-height: 60vh;
+  max-height: calc(var(--ui-vh) * 60);
   overflow: auto;
   padding: 8px 10px 10px;
   border: 1px solid var(--border);
@@ -6612,6 +6676,38 @@ body > div:has([data-u-comp='find-replace-dialog']) {
   display: grid;
   gap: 10px;
   align-content: start;
+}
+
+/* G8-13: the server comment panel (shared collab kit) floats where the threaded-comments pane does.
+   In the web frame it is the only side panel open (the Discussion panel closes when it opens). */
+.sheets-server-comments {
+  position: fixed;
+  top: calc(96px + var(--uw-disc-bar-h, 0px));
+  right: 24px;
+  bottom: 48px;
+  z-index: 120;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: min(340px, calc(100vw - 32px));
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow-modal);
+  overflow: hidden;
+}
+
+/* the kit panel fills the box; the box owns the border and the optional save-first line */
+.sheets-server-comments .sheets-server-panel {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+  border-left: 0;
+}
+
+.sheets-server-comments .sheets-server-save-first {
+  border-top: 1px solid var(--warning-border);
+  border-bottom: 0;
 }
 
 .tc-empty {
@@ -7249,7 +7345,7 @@ body > div:has([data-u-comp='find-replace-dialog']) {
   flex-direction: column;
   box-sizing: border-box;
   width: 100%;
-  max-height: min(560px, 62vh);
+  max-height: min(560px, calc(var(--ui-vh) * 62));
   padding: 12px 16px;
   font-size: 16px;
   color: var(--color-text-primary);

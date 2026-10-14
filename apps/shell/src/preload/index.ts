@@ -58,6 +58,8 @@ import type {
   UniworkDocStatus,
   UniworkDocSummary,
   UniworkLaunchEvent,
+  UniworkRemoteBar,
+  UniworkRemoteAction,
   UniworkResult,
   UniworkSharedPage,
   UniworkSharedQuery,
@@ -267,12 +269,57 @@ function asUploadProgress(raw: unknown): UniworkUploadProgress | null {
   return { uploadId: r.uploadId, path: r.path, loaded: r.loaded, total: r.total }
 }
 
+/**
+ * The S6 bar of a status from main: a known kind, and an integer version where
+ * the kind carries one. Anything else is dropped (the renderer then shows no
+ * bar) rather than dereferenced.
+ */
+function asUniworkRemoteBar(raw: unknown): UniworkRemoteBar | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as { kind?: unknown; version?: unknown; wait?: unknown }
+  const version = (): number | null =>
+    Number.isSafeInteger(r.version) ? (r.version as number) : null
+  switch (r.kind) {
+    case 'updated': {
+      if (r.version === null || r.version === undefined) return { kind: 'updated', version: null }
+      const v = version()
+      return v === null ? null : { kind: 'updated', version: v }
+    }
+    case 'newer-dirty': {
+      const v = version()
+      if (v === null) return null
+      if (r.wait === 'commit' || r.wait === 'stuck') {
+        return { kind: 'newer-dirty', version: v, wait: r.wait }
+      }
+      return r.wait === undefined ? { kind: 'newer-dirty', version: v } : null
+    }
+    case 'newer-ai':
+    case 'now-clean':
+    case 'reload-failed': {
+      const v = version()
+      return v === null ? null : { kind: r.kind, version: v }
+    }
+    case 'revoked':
+    case 'deleted':
+      return { kind: r.kind }
+    default:
+      return null
+  }
+}
+
 function asUniworkStatus(result: unknown): UniworkDocStatus | null {
-  return result &&
+  if (
+    result &&
     typeof result === 'object' &&
     typeof (result as UniworkDocStatus).path === 'string'
-    ? (result as UniworkDocStatus)
-    : null
+  ) {
+    const status = result as UniworkDocStatus
+    const { remote, ...rest } = status
+    if (remote === undefined) return status
+    const bar = asUniworkRemoteBar(remote)
+    return bar ? { ...rest, remote: bar } : rest
+  }
+  return null
 }
 
 /** a connection test answer for the renderer: the failure kind only, never the provider's raw text (that stays in the main process log) */
@@ -310,6 +357,13 @@ const homeApi: HomeApi = {
   },
   async starred(query) {
     return asRecentPage(await ipcRenderer.invoke(HOME_CHANNELS.starred, query))
+  },
+  async starredGroups() {
+    const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.starredGroups)
+    return Array.isArray(result) ? result.filter((g): g is string => typeof g === 'string') : []
+  },
+  async setStarredGroup(paths, group) {
+    await ipcRenderer.invoke(HOME_CHANNELS.setStarredGroup, paths, group)
   },
   async statPaths(paths) {
     const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.statPaths, paths)
@@ -398,6 +452,9 @@ const homeApi: HomeApi = {
   },
   async removeRecent(paths) {
     await ipcRenderer.invoke(HOME_CHANNELS.removeRecent, paths)
+  },
+  async unstarPaths(paths) {
+    await ipcRenderer.invoke(HOME_CHANNELS.unstarPaths, paths)
   },
   async revealPath(path) {
     if (typeof path !== 'string' || !path) throw new Error('Invalid path.')
@@ -1000,6 +1057,15 @@ const homeApi: HomeApi = {
   },
   async uniworkResolveConflict(path) {
     return asUniworkStatus(await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.resolveConflict, path))
+  },
+  async uniworkRemoteAction(path, action: UniworkRemoteAction) {
+    return asUniworkStatus(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.remoteAction, path, action),
+    )
+  },
+  async uniworkSetBarInset(heightPx) {
+    if (typeof heightPx !== 'number' || !Number.isFinite(heightPx)) return
+    await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.barInset, Math.max(0, Math.round(heightPx)))
   },
   onUniworkLaunch(cb) {
     return uniworkLaunches.subscribe(cb)

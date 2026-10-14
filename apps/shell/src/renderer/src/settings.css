@@ -10,7 +10,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 5vh 24px;
+  padding: calc(var(--ui-vh) * 5) 24px;
   background: var(--color-bg-overlay);
   backdrop-filter: blur(6px);
 }
@@ -19,7 +19,7 @@
   display: flex;
   flex-direction: column;
   width: min(960px, 100%);
-  height: min(720px, 90vh);
+  height: min(720px, calc(var(--ui-vh) * 90));
   border-radius: 14px;
   background: var(--surface);
   color: var(--text-primary);
@@ -1356,7 +1356,7 @@
   left: auto;
   right: anchor(right);
   min-width: max(220px, anchor-size(width));
-  max-width: calc(100vw - 48px);
+  max-width: calc(var(--ui-vw) * 100 - 48px);
 }
 
 .acct-org-dd .gs-dd-item {
