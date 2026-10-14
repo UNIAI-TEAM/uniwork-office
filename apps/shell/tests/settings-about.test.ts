@@ -85,7 +85,7 @@ describe('Settings > About', () => {
       /app-icon/,
     )
     expect(pane.textContent).toContain('1.2.3')
-    expect(pane.textContent).toContain('Update Channel')
+    expect(pane.textContent).toContain('Update channel')
     expect(pane.querySelector('.set-about-copyright')?.textContent).toBe(
       `© ${legal.copyrightYear} ${legal.company}`,
     )

@@ -228,7 +228,9 @@ export function IntegrationsPane({
 
       <section className="set-intg-part">
         <h4 className="set-pane-subtitle set-intg-step">
-          <span className="set-intg-step-no">1</span>
+          <span className="set-intg-step-no" aria-hidden="true">
+            1
+          </span>
           {t('intgCliPartTitle')}
           <span className="set-intg-version">{t('intgSkillVersion', { v: bundled })}</span>
         </h4>
@@ -317,7 +319,6 @@ export function IntegrationsPane({
           <div className="set-field-desc set-intg-lead">{t('intgOtherDesc')}</div>
 
           <div className="set-intg-option">
-            <span className="set-intg-option-letter">A</span>
             <div className="set-field-stack">
               <div className="set-field-label">{t('intgOtherFolderTitle')}</div>
               <div className="set-field-desc">{t('intgOtherFolderDesc')}</div>
@@ -328,7 +329,6 @@ export function IntegrationsPane({
           </div>
 
           <div className="set-intg-option">
-            <span className="set-intg-option-letter">B</span>
             <div className="set-field-stack">
               <div className="set-field-label">{t('intgOtherZipTitle')}</div>
               <div className="set-field-desc">{t('intgOtherZipDesc')}</div>
@@ -339,7 +339,6 @@ export function IntegrationsPane({
           </div>
 
           <div className="set-intg-option">
-            <span className="set-intg-option-letter">C</span>
             <div className="set-field-stack">
               <div className="set-field-label">{t('intgOtherNpxTitle')}</div>
               <div className="set-field-desc">{t('intgOtherNpxDesc')}</div>
@@ -408,16 +407,15 @@ export function IntegrationsPane({
 
       <section className="set-intg-part">
         <h4 className="set-pane-subtitle set-intg-step">
-          <span className="set-intg-step-no">2</span>
+          <span className="set-intg-step-no" aria-hidden="true">
+            2
+          </span>
           {t('intgMcpPartTitle')}
         </h4>
         <div className="set-field-desc set-intg-lead">{t('intgMcpPartDesc')}</div>
 
         <div className="set-intg-mcp">
-          <h5 className="set-intg-sub">
-            <span className="set-intg-option-letter">A</span>
-            {t('intgMcpStdioTitle')}
-          </h5>
+          <h5 className="set-intg-sub">{t('intgMcpStdioTitle')}</h5>
           <div className="set-field-desc set-intg-lead">
             {t('intgMcpStdioDesc', { cmd: status.cli.command })}
           </div>
@@ -461,10 +459,7 @@ export function IntegrationsPane({
         </div>
 
         <div className="set-intg-mcp-http">
-          <h5 className="set-intg-sub">
-            <span className="set-intg-option-letter">B</span>
-            {t('intgMcpHttpTitle')}
-          </h5>
+          <h5 className="set-intg-sub">{t('intgMcpHttpTitle')}</h5>
           <div className="set-field-desc set-intg-lead">{t('intgMcpHttpDesc')}</div>
           <McpServerSection t={t} />
         </div>

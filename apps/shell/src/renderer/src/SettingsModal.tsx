@@ -333,6 +333,21 @@ function Field({
   )
 }
 
+/** the pane's shape while its settings load, so the form does not pop in from a blank pane */
+function PaneSkeleton({ title }: { title: string }) {
+  return (
+    <div aria-busy="true">
+      <h3 className="set-pane-title">{title}</h3>
+      {[0, 1, 2, 3].map((i) => (
+        <div key={i} className="set-field set-skel-row" aria-hidden="true">
+          <span className="set-skel" />
+          <span className="set-skel set-skel-control" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 /**
  * Long enough that typing an address does not fire a request per keystroke,
  * short enough that the picker is populated by the time the eye reaches it.
@@ -499,7 +514,7 @@ function AiModelPane({
     }
   }, [endpointProvider, endpointBaseUrl, endpointApiKey])
 
-  if (!settings) return null
+  if (!settings) return <PaneSkeleton title={t('setSecAiModel')} />
   const provider = settings.provider
   const meta = catalog.find((c) => c.id === provider)
   const config = settings.providers[provider] ?? {
@@ -912,7 +927,7 @@ function AiMediaPane({
     null,
   )
   const focused = useRef(false)
-  const scrollToFocused = (el: HTMLDivElement | null) => {
+  const scrollToFocused = (el: HTMLElement | null) => {
     if (!el || focused.current) return
     focused.current = true
     el.scrollIntoView({ block: 'start' })
@@ -952,7 +967,7 @@ function AiMediaPane({
     }
   }, [])
 
-  if (!settings?.media || !settings.search) return null
+  if (!settings?.media || !settings.search) return <PaneSkeleton title={t('setSecAiMedia')} />
   const media: AiMediaSettings = settings.media
   const search: AiSearchSettings = settings.search
 
@@ -1270,34 +1285,48 @@ function AiMediaPane({
     const modelField = cap === 'image' ? 'imageModel' : 'analysisModel'
     return (
       <section key={cap}>
-        {subhead(cap, title)}
-        {providerRow(
-          title,
-          id,
-          options.map((m) => ({ id: m.id, label: mediaLabel(m) })),
-          pick,
-        )}
-        <div className="set-field-desc set-ai-note">
-          {id === 'genspark' ? t('cloudMediaDesc') : meta.description}
-        </div>
-        {/* the UniWork cloud entry has no model, key or endpoint of its own */}
-        {id !== 'genspark' && (
-          <>
-            {modelRow(
-              `set-ai-${cap}-model`,
-              cap === 'image' ? meta.imageModels : meta.analysisModels,
-              cap === 'image' ? meta.defaultImageModel : meta.defaultAnalysisModel,
-              config[modelField],
-              (m) => updateMediaConfig(cap, id, { [modelField]: m }),
-            )}
-            {keyRow(`set-ai-${cap}-key`, config.apiKey, meta.keyPlaceholder, (v) =>
-              updateMediaConfig(cap, id, { apiKey: v }),
-            )}
-            {baseUrlRow(`set-ai-${cap}-base-url`, meta, config.baseUrl ?? '', (v) =>
-              updateMediaConfig(cap, id, { baseUrl: v }),
-            )}
-          </>
-        )}
+        {/* a media block reads as one line (what serves it, how it tested) until
+            it is opened; a block someone points at or that failed opens itself */}
+        <details
+          className="set-ai-block"
+          open={cap === focusBlock || blockStatus(cap)?.kind === 'err' || undefined}
+        >
+          <summary
+            className="set-pane-subhead set-ai-block-head"
+            ref={cap === focusBlock ? scrollToFocused : undefined}
+          >
+            <h4 className="set-pane-subtitle">{title}</h4>
+            <span className="set-ai-block-provider">{mediaLabel(meta)}</span>
+            <AiStatusPill status={blockStatus(cap)} />
+          </summary>
+          {providerRow(
+            title,
+            id,
+            options.map((m) => ({ id: m.id, label: mediaLabel(m) })),
+            pick,
+          )}
+          <div className="set-field-desc set-ai-note">
+            {id === 'genspark' ? t('cloudMediaDesc') : meta.description}
+          </div>
+          {/* the UniWork cloud entry has no model, key or endpoint of its own */}
+          {id !== 'genspark' && (
+            <>
+              {modelRow(
+                `set-ai-${cap}-model`,
+                cap === 'image' ? meta.imageModels : meta.analysisModels,
+                cap === 'image' ? meta.defaultImageModel : meta.defaultAnalysisModel,
+                config[modelField],
+                (m) => updateMediaConfig(cap, id, { [modelField]: m }),
+              )}
+              {keyRow(`set-ai-${cap}-key`, config.apiKey, meta.keyPlaceholder, (v) =>
+                updateMediaConfig(cap, id, { apiKey: v }),
+              )}
+              {baseUrlRow(`set-ai-${cap}-base-url`, meta, config.baseUrl ?? '', (v) =>
+                updateMediaConfig(cap, id, { baseUrl: v }),
+              )}
+            </>
+          )}
+        </details>
       </section>
     )
   }
@@ -2086,21 +2115,21 @@ export function SettingsModal({
                   <div className="set-about-legal-links">
                     <button
                       type="button"
-                      className="set-about-legal-btn"
+                      className="set-btn set-about-legal-btn"
                       onClick={() => openLegal('license')}
                     >
                       {t('setAboutLicense')}
                     </button>
                     <button
                       type="button"
-                      className="set-about-legal-btn"
+                      className="set-btn set-about-legal-btn"
                       onClick={() => openLegal('notice')}
                     >
                       {t('setAboutLegalNotices')}
                     </button>
                     <button
                       type="button"
-                      className="set-about-legal-btn"
+                      className="set-btn set-about-legal-btn"
                       onClick={() => openLegal('thirdParty')}
                     >
                       {t('setAboutThirdPartyLicenses')}

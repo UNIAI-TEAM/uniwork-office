@@ -189,7 +189,7 @@ export function AccountEntry({
           {warn && <span className="account-state-dot" />}
         </span>
         <span className="account-text">
-          <span className={`account-name${withProfile ? '' : ' wrap'}`}>{label}</span>
+          <span className="account-name">{label}</span>
           {sub && (
             <span
               className={`account-sub${withProfile && !stateSub ? '' : ' wrap'}${warn ? ' warn' : ''}${view === 'refreshing' ? ' refreshing' : ''}`}

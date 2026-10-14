@@ -323,7 +323,12 @@ body.vib .home {
   height: 100%;
   border-radius: inherit;
   background: var(--accent);
-  transition: width 0.3s ease;
+  transform-origin: left center;
+  transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+[dir='rtl'] .credit-wallet-meter > span {
+  transform-origin: right center;
 }
 
 .credit-wallet-meter.is-low > span {
@@ -455,6 +460,12 @@ body.vib .home {
   display: flex;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-dock * {
+    transition: none !important;
+  }
+}
+
 .account-avatar {
   position: relative;
   display: flex;
@@ -543,7 +554,6 @@ body.vib .home {
   white-space: nowrap;
 }
 
-.account-name.wrap,
 .account-sub.wrap {
   /* state copy (vi runs long) wraps instead of being cut at the sidebar width */
   white-space: normal;

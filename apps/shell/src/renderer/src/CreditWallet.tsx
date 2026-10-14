@@ -29,6 +29,8 @@ function hubKeyFromSettings(settings: {
   )
 }
 
+const FOCUS_REFRESH_MS = 60_000
+
 function formatTime(iso: string, locale: string): string {
   try {
     return new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(
@@ -86,7 +88,14 @@ export function CreditWallet({ onOpenAiSettings }: Props): ReactElement {
 
   useEffect(() => {
     void refresh()
-    const onFocus = () => void refresh()
+    // coming back to the window re-reads the balance at most once a minute: every
+    // alt-tab would otherwise be a request to the key provider
+    let lastFocusRefresh = Date.now()
+    const onFocus = () => {
+      if (Date.now() - lastFocusRefresh < FOCUS_REFRESH_MS) return
+      lastFocusRefresh = Date.now()
+      void refresh()
+    }
     const onCustom = () => void refresh()
     window.addEventListener('focus', onFocus)
     window.addEventListener('uniwork:credit-refresh', onCustom)
@@ -149,6 +158,7 @@ export function CreditWallet({ onOpenAiSettings }: Props): ReactElement {
           type="button"
           className={`credit-wallet-toggle${openLog ? ' is-open' : ''}`}
           aria-expanded={openLog}
+          aria-controls="credit-wallet-log"
           aria-label={t('cwHistory')}
           data-tip={t('cwHistory')}
           onClick={() => {
@@ -175,15 +185,21 @@ export function CreditWallet({ onOpenAiSettings }: Props): ReactElement {
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={Math.round(share * 100)}
+          aria-valuetext={value}
         >
-          <span style={{ width: `${Math.max(2, Math.round(share * 100))}%` }} />
+          <span style={{ transform: `scaleX(${Math.max(0.02, share)})` }} />
         </div>
       )}
       {todayCredits > 0 && (
         <div className="credit-wallet-today">{t('cwToday', { n: fmtEst(todayCredits) })}</div>
       )}
       {openLog ? (
-        <div className="credit-wallet-log" role="region" aria-label={t('cwHistory')}>
+        <div
+          id="credit-wallet-log"
+          className="credit-wallet-log"
+          role="region"
+          aria-label={t('cwHistory')}
+        >
           <p className="credit-wallet-log-note">{t('cwLogNote')}</p>
           {recent.length === 0 ? (
             <p className="credit-wallet-log-empty">{t('cwLogEmpty')}</p>

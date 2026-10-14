@@ -265,7 +265,7 @@ export function BackupStoragePane({
         </div>
         <button
           type="button"
-          className="set-btn primary"
+          className={`set-btn${hasCloudBackup(ent) ? ' primary' : ''}`}
           disabled={!hasCloudBackup(ent)}
           onClick={cloudBackup}
         >
@@ -275,7 +275,7 @@ export function BackupStoragePane({
       {feedback}
 
       <h4 className="set-pane-subtitle">{t('bkPlansHeading')}</h4>
-      <div className="set-backup-grid">
+      <div className="set-backup-skus">
         {BACKUP_PLANS.map((sku) => (
           <SkuCard
             key={sku.id}
@@ -297,7 +297,7 @@ export function BackupStoragePane({
       </div>
 
       <h4 className="set-pane-subtitle">{t('bkPacksHeading')}</h4>
-      <div className="set-backup-grid">
+      <div className="set-backup-skus">
         {STORAGE_PACKS.map((sku) => (
           <SkuCard
             key={sku.id}
@@ -353,38 +353,37 @@ function SkuCard({
   onSimulate?: () => void
 }): ReactElement {
   const vi = lang === 'vi'
+  const facts = [
+    `${sku.quotaGb} GB`,
+    sku.kind === 'backup'
+      ? `${vi ? sku.cadenceVi : sku.cadenceEn} · ${t('bkRetentionDays', { n: sku.retentionDays })}`
+      : '',
+  ]
+    .filter(Boolean)
+    .join(' · ')
   return (
-    <article className={`set-backup-card${active ? ' is-active' : ''}`}>
-      <header>
-        <h5>{vi ? sku.labelVi : sku.labelEn}</h5>
-        {active ? <span className="set-backup-badge">{t('bkActive')}</span> : null}
-      </header>
-      <p>{vi ? sku.descVi : sku.descEn}</p>
-      <dl className="set-backup-facts">
-        <dt>{t('bkPrice')}</dt>
-        <dd>{vi ? sku.priceVi : sku.priceEn}</dd>
-        <dt>{t('bkQuota')}</dt>
-        <dd>{sku.quotaGb} GB</dd>
-        {sku.kind === 'backup' ? (
-          <>
-            <dt>{t('bkCadence')}</dt>
-            <dd>
-              {vi ? sku.cadenceVi : sku.cadenceEn} ·{' '}
-              {t('bkRetentionDays', { n: sku.retentionDays })}
-            </dd>
-          </>
-        ) : null}
-      </dl>
-      <div className="set-backup-card-actions">
-        <button type="button" className={`set-btn${active ? '' : ' primary'}`} onClick={onBuy}>
-          {active ? t('bkManage') : t('bkBuy')}
-        </button>
+    <div className={`set-field set-backup-sku${active ? ' is-active' : ''}`}>
+      <div className="set-field-text">
+        <div className="set-field-stack">
+          <div className="set-field-label">
+            {vi ? sku.labelVi : sku.labelEn}
+            {active ? <span className="set-backup-badge">{t('bkActive')}</span> : null}
+          </div>
+          <div className="set-field-desc">{vi ? sku.descVi : sku.descEn}</div>
+          <div className="set-field-desc">{facts}</div>
+        </div>
+        <span className="set-backup-price">{vi ? sku.priceVi : sku.priceEn}</span>
+      </div>
+      <div className="set-btn-row">
         {onSimulate ? (
           <button type="button" className="set-btn" onClick={onSimulate}>
             {t('bkSimulate')}
           </button>
         ) : null}
+        <button type="button" className="set-btn" onClick={onBuy}>
+          {active ? t('bkManage') : t('bkBuy')}
+        </button>
       </div>
-    </article>
+    </div>
   )
 }
