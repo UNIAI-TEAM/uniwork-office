@@ -648,7 +648,16 @@ describe('save pipeline', () => {
     expect(status).toMatchObject({ state: 'conflict', error: 'conflict' })
     expect(readFileSync(path, 'utf8')).toBe('mine')
     expect(binding(path)).toMatchObject({ baseRevision: '41', serverRevision: '45' })
-    expect(await intentOf(ctx, path)).toBeNull()
+    // the contract keeps the intent on a base conflict: the same record and
+    // key survive (with the queue wired the record reads 'conflict'; the front
+    // keeps THIS one, never a second intent)
+    const conflicted = await intentOf(ctx, path)
+    expect(conflicted?.intent).toMatchObject({
+      documentId: DOC,
+      baseRevision: '41',
+      checksum: hex(enc('mine')),
+    })
+    expect(conflicted?.intent.idempotencyKey).toBe(commits(server)[0]?.headers['idempotency-key'])
     const calls = server.calls.length
     await ctx.service.save(path)
     await ctx.service.coordinator.save(path)
@@ -742,7 +751,7 @@ describe('save pipeline', () => {
     server.faults.push({ route: 'commit', kind: 403, code: 'forbidden' })
     expect(await ctx.service.save(path)).toMatchObject({
       state: 'blocked',
-      error: 'forbidden',
+      error: 'permission_revoked',
       access: 'view',
     })
     expect(readFileSync(path, 'utf8')).toBe('v4')
@@ -761,8 +770,14 @@ describe('save pipeline', () => {
     expect(readFileSync(path, 'utf8')).toBe('v4')
     server.state.myLevel = 'edit'
     await openDoc(ctx)
+    // W4b: the reopen-unblock branch now clears the contract's permission_revoked
+    // copy when the server grants edit again, so the local work can be saved
     expect(binding(path)).toMatchObject({ access: 'edit', state: 'dirty' })
+    expect(binding(path).error).toBeUndefined()
+    const refused = server.calls.length
     expect(await ctx.service.save(path)).toMatchObject({ state: 'saved' })
+    expect(server.calls.length).toBeGreaterThan(refused)
+    expect(binding(path)).toMatchObject({ baseRevision: '42' })
   })
 
   it('a view-only document never reaches the network', async () => {
@@ -899,10 +914,17 @@ describe('review r1 save fixes', () => {
     const ctx = setup(server)
     const path = await openDoc(ctx)
     writeFileSync(path, 'v4')
+    // the contract's document_deleted is terminal for replay: the coordinator
+    // stops there and does NOT ask the document (the old flow confirmed with a
+    // getDocument), so only the commit fault is needed
     server.faults.push({ route: 'commit', kind: 410, code: 'document_deleted' })
-    server.faults.push({ route: 'detail', kind: 410, code: 'document_deleted' })
-    expect(await ctx.service.save(path)).toMatchObject({ state: 'blocked', error: 'deleted' })
-    // restored from the trash: the reopen answers again
+    expect(await ctx.service.save(path)).toMatchObject({
+      state: 'blocked',
+      error: 'document_deleted',
+    })
+    // restored from the trash: the reopen answers again. W4b: the reopen-unblock
+    // branch now clears the contract's document_deleted copy when the document
+    // answers, so the local work can be saved once more
     await openDoc(ctx)
     expect(binding(path)).toMatchObject({ state: 'dirty' })
     expect(binding(path).error).toBeUndefined()
@@ -1172,10 +1194,14 @@ describe('review r2 follow-ups', () => {
     server.faults.push({ route: 'commit', kind: 410, code: 'document_deleted' })
     server.faults.push({ route: 'detail', kind: 410, code: 'document_deleted' })
     await ctx.service.save(path)
-    expect(binding(path)).toMatchObject({ state: 'blocked', error: 'deleted' })
+    expect(binding(path)).toMatchObject({ state: 'blocked', error: 'document_deleted' })
     vi.mocked(ctx.deps.requestModuleSave).mockClear()
     expect(await ctx.service.confirmClose(path)).toBe(false)
-    expect(ctx.ui.chooseUnsavedClose).toHaveBeenCalledWith('Q4 plan.docx', 'blocked', 'deleted')
+    expect(ctx.ui.chooseUnsavedClose).toHaveBeenCalledWith(
+      'Q4 plan.docx',
+      'blocked',
+      'document_deleted',
+    )
     expect(ctx.deps.requestModuleSave).not.toHaveBeenCalled()
     vi.mocked(ctx.ui.chooseUnsavedClose).mockResolvedValueOnce('close')
     expect(await ctx.service.confirmClose(path)).toBe(true)

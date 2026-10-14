@@ -6,11 +6,12 @@ import type {
   UniworkWorkspaceRef,
 } from '../../shared/home-api'
 import { TransportError } from '../uniwork-auth/transport'
-import { UniworkDocError, errorFromResponse } from './errors'
+import { UniworkDocError, errorFromResponse, parseRetryAfter } from './errors'
 import { formatForName, isDecimalString, mimeForFormat } from './formats'
 import {
   documentRevisionOf,
   parseCommit,
+  parseCommitLookup,
   parseDetail,
   parseDocumentList,
   parseDocumentSummary,
@@ -23,6 +24,7 @@ import {
   parseUpload,
 } from './parse'
 import type {
+  CommitLookup,
   CommitReceipt,
   DocumentDetail,
   DocumentListResult,
@@ -154,6 +156,12 @@ export interface UniworkDocsClient {
     baseRevision: string
     idempotencyKey: string
   }): Promise<CommitReceipt>
+  /**
+   * What became of a commit intent (G5-07). A 410 `commit_intent_unknown` is
+   * the `unknown` verdict, not a failure: the caller keeps reconciling and
+   * never mints a new key on it.
+   */
+  lookupCommit(input: { documentId: string; idempotencyKey: string }): Promise<CommitLookup>
   exchange(input: {
     launchTicket: string
     deploymentId: string
@@ -275,7 +283,13 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
             const body: unknown = await response.json().catch(() => undefined)
             throw timedOut
               ? new UniworkDocError('timeout')
-              : errorFromResponse(response.status, body)
+              : errorFromResponse(
+                  response.status,
+                  body,
+                  // a Retry-After on a throttle / the in-flight idempotency
+                  // verdict rides on the error (see errorFromResponse)
+                  parseRetryAfter(response.headers.get('Retry-After')),
+                )
           }
           try {
             return await call.read(response)
@@ -559,6 +573,27 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
         read: json,
       })
       return parseCommit(raw)
+    },
+
+    async lookupCommit(input) {
+      try {
+        const raw = await send({
+          method: 'GET',
+          route: `/documents/${id(input.documentId)}/versions/commit`,
+          idempotencyKey: input.idempotencyKey,
+          timeoutMs: metadataTimeout,
+          read: json,
+        })
+        return parseCommitLookup(raw)
+      } catch (error) {
+        // the server holds no intent for this key any more: `unknown` is a
+        // verdict, not a failure; the caller keeps reconciling and never
+        // mints a new key on it
+        if (error instanceof UniworkDocError && error.code === 'intent_unknown') {
+          return { outcome: 'unknown' }
+        }
+        throw error
+      }
     },
 
     async exchange(input) {

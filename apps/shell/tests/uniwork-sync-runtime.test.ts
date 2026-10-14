@@ -751,6 +751,58 @@ runStoreCompliance('uniwork-sync doc index', async (env: ComplianceEnv) => {
   return subject
 })
 
+describe('G506-be-3: only a failed feed round trip reports the queue offline', () => {
+  function pollRuntime(orgs: string[], listChanges: FeedClient['listChanges']) {
+    const h = harness()
+    const polls: boolean[] = []
+    const runtime = new SyncRuntime({
+      store: {
+        scope: () => h.scope(),
+        open: async () => {
+          const open = await h.layer.open(SCOPE)
+          return open.kind === 'ok'
+            ? { kind: 'ok', records: (name: string) => open.store.records(name) }
+            : open
+        },
+        forget: () => undefined,
+      },
+      targets: { orgs: () => orgs, workspaces: async () => ['ws_1'] },
+      capability: async () => ({
+        kind: 'ok',
+        capabilities: { ...NEVER_READ_CAPABILITIES, sync_feed: true },
+        source: 'fresh',
+      }),
+      client: () => ({ listChanges }),
+      keepDraft: async () => false,
+      clock: { now: () => 1_700_000_000_000 },
+      onPoll: async (online: boolean) => {
+        polls.push(online)
+      },
+    })
+    return { runtime, polls }
+  }
+
+  it('a pass with no org to feed (nothing attempted) reports no verdict', async () => {
+    const { runtime, polls } = pollRuntime([], async () => ({
+      ...PAGE,
+      changes: [],
+      nextCursor: 'c1',
+    }))
+    await runtime.tick()
+    // neither online nor offline: nothing was attempted
+    expect(polls).toHaveLength(1)
+    expect(polls[0]).toBeUndefined()
+  })
+
+  it('a failed feed round trip parks the queue offline', async () => {
+    const { runtime, polls } = pollRuntime(['org_a'], async () => {
+      throw new FeedError({ kind: 'other', error: new UniworkDocError('network') })
+    })
+    await runtime.tick()
+    expect(polls).toEqual([false])
+  })
+})
+
 describe('the S18 change notice (G8-17)', () => {
   it('announces every document of a page the doc cache committed, exactly once', async () => {
     const seen: string[] = []

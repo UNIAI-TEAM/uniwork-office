@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type {
   RecentEntry,
+  UniworkDocErrorCode,
   UniworkDocStatus,
   UniworkDocSummary,
   UniworkSaveState,
@@ -218,6 +219,136 @@ describe('store_full reason', () => {
     const full = labelOf('store_full')
     expect(full.label).toContain(syncStrings.en.uwReasonStoreFull)
     expect(full.title).toContain(syncStrings.en.uwQueueFull)
+  })
+})
+
+describe('G5-06 save queue: states -> chip', () => {
+  const chipOf = (s: Partial<UniworkDocStatus>, queuedAt?: string) => {
+    const model = chipModelOf(status(s), { needsSignIn: false, queuedAt })
+    return { ...model, ...chipCopy(model, t, 'en-US') }
+  }
+  // uwReasonQuota / TooLarge / Other / Forbidden / Deleted live in the uniwork-documents shard
+  const en = { ...syncStrings.en, ...uniworkDocumentStrings.en }
+
+  it.each<[UniworkSaveState, StringKey, StringKey, string]>([
+    ['queued', 'uwChipQueued', 'uwTipQueued', 'neutral'],
+    ['paused_offline', 'uwChipQueued', 'uwTipQueued', 'neutral'],
+    ['paused_user', 'uwChipQueued', 'uwTipPausedUser', 'neutral'],
+    ['paused_admin', 'uwChipPausedAdmin', 'uwTipPausedAdmin', 'neutral'],
+    ['reconciling', 'uwChipReconciling', 'uwTipReconciling', 'warn'],
+    ['reconciling-stuck', 'uwChipReconcileStuck', 'uwTipReconciling', 'warn'],
+  ])('%s -> %s / %s (%s)', (state, labelKey, tipKey, tone) => {
+    const model = chipModelOf(status({ state }))
+    expect(model.labelKey).toBe(labelKey)
+    expect(model.tipKey).toBe(tipKey)
+    expect(model.tone).toBe(tone)
+    expect(model.action).toBeUndefined()
+    expect(chipOf({ state }).label).toBe(en[labelKey])
+  })
+
+  it('failed reads as the error chip with the reused quota / too-large / other fragment', () => {
+    const chip = chipOf({ state: 'failed', error: 'too_large' })
+    expect(chip.tone).toBe('error')
+    expect(chip.labelKey).toBe('uwChipError')
+    expect(chip.tipKey).toBe('uwTipFailed')
+    expect(chip.tip).toBe(en.uwTipFailed.replace('{reason}', en.uwReasonTooLarge))
+    expect(chipOf({ state: 'failed', error: 'quota_exceeded' }).tip).toContain(en.uwReasonQuota)
+    expect(chipOf({ state: 'failed' }).tip).toContain(en.uwReasonOther)
+    expect(chipOf({ state: 'failed', error: 'server_error' }).tip).not.toMatch(/\{|\}/)
+  })
+
+  it('queued with an unsent N+1 switches to the "queued newer" chip', () => {
+    for (const state of ['queued', 'paused_offline', 'paused_user'] as const) {
+      expect(chipModelOf(status({ state, pendingNext: true })).labelKey).toBe('uwChipQueuedNewer')
+    }
+    const chip = chipOf({ state: 'queued', pendingNext: true })
+    expect(chip.label).toBe(en.uwChipQueuedNewer)
+    expect(chip.tipKey).toBe('uwTipQueuedNewer')
+    expect(chipOf({ state: 'queued', pendingNext: false }).labelKey).toBe('uwChipQueued')
+    // paused_admin and the reconcile states have no newer variant
+    expect(chipModelOf(status({ state: 'paused_admin', pendingNext: true })).labelKey).toBe(
+      'uwChipPausedAdmin',
+    )
+    expect(chipModelOf(status({ state: 'reconciling', pendingNext: true })).labelKey).toBe(
+      'uwChipReconciling',
+    )
+  })
+
+  it('fills the queued tooltip with the time of the waiting save', () => {
+    const chip = chipOf({ state: 'queued' }, '2026-05-01T10:00:00Z')
+    expect(chip.tip).toMatch(/^Your save from .+ is kept safely/)
+    expect(chip.tip).not.toMatch(/\{|\}/)
+  })
+
+  it('a queue state wins over View only (the intent was created before access dropped)', () => {
+    expect(chipOf({ access: 'view', state: 'queued' }).labelKey).toBe('uwChipQueued')
+    expect(chipOf({ access: 'view', state: 'reconciling' }).labelKey).toBe('uwChipReconciling')
+  })
+
+  it('never shows an internal code or a placeholder', () => {
+    for (const state of [
+      'queued',
+      'paused_offline',
+      'paused_user',
+      'paused_admin',
+      'reconciling',
+      'reconciling-stuck',
+    ] as const) {
+      const chip = chipOf({ state }, '2026-05-01T10:00:00Z')
+      expect(chip.label).not.toMatch(/_|\{|\}/)
+      expect(chip.tip).not.toMatch(/\{|\}/)
+    }
+  })
+})
+
+describe('G5-06 error codes -> sentence and reason', () => {
+  const en = { ...syncStrings.en, ...uniworkDocumentStrings.en }
+  const doc = en
+
+  it.each<[UniworkDocErrorCode, StringKey, StringKey]>([
+    ['capability_off', 'uwTipPausedAdmin', 'uwReasonOther'],
+    ['intent_unknown', 'uwChipReconcileStuck', 'uwReasonOther'],
+    ['document_deleted', 'uwErrDeleted', 'uwReasonDeleted'],
+    ['permission_revoked', 'uwErrForbidden', 'uwReasonForbidden'],
+    ['member_deactivated', 'uwLockDeactivated', 'uwReasonDeactivated'],
+    ['organization_suspended', 'uwLockSuspended', 'uwReasonSuspended'],
+    ['drafts_full', 'uwConflictDraftCapReached', 'uwReasonOther'],
+    ['other_window', 'uwLockOtherWindow', 'uwReasonOther'],
+  ])('%s -> sentence %s, blocked reason %s', (code, sentence, reason) => {
+    expect(UNIWORK_ERROR_KEYS[code]).toBe(sentence)
+    expect(blockedReasonKey(code)).toBe(reason)
+    for (const lang of ['vi', 'en'] as const) {
+      const table = { ...syncStrings[lang], ...uniworkDocumentStrings[lang] } as Record<
+        string,
+        string
+      >
+      expect(table[UNIWORK_ERROR_KEYS[code]]).toBeTruthy()
+      expect(table[blockedReasonKey(code)]).toBeTruthy()
+    }
+  })
+
+  it('reuses the existing deleted / forbidden / suspended / deactivated reasons in the blocked chip', () => {
+    const labelOf = (error: UniworkDocErrorCode) =>
+      chipCopy(chipModelOf(status({ state: 'blocked', error })), t, 'en-US')
+    expect(labelOf('permission_revoked').label).toContain(en.uwReasonForbidden)
+    expect(labelOf('permission_revoked').tip).toContain(doc.uwErrForbidden)
+    expect(labelOf('document_deleted').label).toContain(en.uwReasonDeleted)
+    expect(labelOf('document_deleted').tip).toContain(doc.uwErrDeleted)
+    expect(labelOf('organization_suspended').label).toContain(en.uwReasonSuspended)
+    expect(labelOf('organization_suspended').tip).toContain(en.uwLockSuspended)
+    expect(labelOf('member_deactivated').label).toContain(en.uwReasonDeactivated)
+    expect(labelOf('member_deactivated').tip).toContain(en.uwLockDeactivated)
+  })
+
+  it('gives the account-side blocks no retry action (a re-check is the Queue row’s)', () => {
+    for (const code of [
+      'permission_revoked',
+      'document_deleted',
+      'member_deactivated',
+      'organization_suspended',
+    ] as const) {
+      expect(errorActionOf(code)).toBe('none')
+    }
   })
 })
 
