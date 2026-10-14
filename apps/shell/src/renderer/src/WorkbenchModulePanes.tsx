@@ -14,7 +14,7 @@ import { WorkTasksPane } from './WorkTasksPane'
 import { WorkToolbar, type WorkToolbarProps } from './WorkToolbar'
 import { useWbToast } from './WbToastHost'
 import { WbIconBtn, WbRowActions } from './WbRowActions'
-import { WbMenu, WbMenuItem } from './WbMenu'
+import { WbMenuButton } from './WbMenu'
 import { WbPackChip } from './DeskDrawer'
 import { FileBadge } from './FileBadge'
 import { readForms, writeForms, type WbFormItem } from './workbench-pins'
@@ -478,39 +478,28 @@ function FormMenu({
   onRemove: () => void
 }): ReactElement {
   const { t } = useI18n()
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLButtonElement>(null)
-  const run = (fn: () => void) => () => {
-    setOpen(false)
-    fn()
-  }
   return (
-    <div className="wb-menu-wrap">
-      <button
-        ref={ref}
-        type="button"
-        className="wb-icon-btn"
-        aria-label={t('wbFormsMore', { title: item.title })}
-        title={t('wbFormsMore', { title: item.title })}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
-      >
-        <WbGlyph id="more" />
-      </button>
-      <WbMenu open={open} onClose={() => setOpen(false)} anchorRef={ref} label={item.title}>
-        {item.filePath ? (
-          <WbMenuItem icon={<WbGlyph id="external" />} onSelect={run(onOpenFile)}>
-            {t('wbFormsOpenTemplate')}
-          </WbMenuItem>
-        ) : null}
-        <WbMenuItem icon={<WbGlyph id="pencil" />} onSelect={run(onEdit)}>
-          {t('wbFormsEditMenu')}
-        </WbMenuItem>
-        <WbMenuItem icon={<WbGlyph id="trash" />} danger onSelect={run(onRemove)}>
-          {t('wbFormsRemove')}
-        </WbMenuItem>
-      </WbMenu>
-    </div>
+    <WbMenuButton
+      label={t('wbFormsMore', { title: item.title })}
+      menuLabel={item.title}
+      items={[
+        ...(item.filePath
+          ? [
+              {
+                label: t('wbFormsOpenTemplate'),
+                icon: <WbGlyph id="external" />,
+                onSelect: onOpenFile,
+              },
+            ]
+          : []),
+        { label: t('wbFormsEditMenu'), icon: <WbGlyph id="pencil" />, onSelect: onEdit },
+        {
+          label: t('wbFormsRemove'),
+          icon: <WbGlyph id="trash" />,
+          danger: true,
+          onSelect: onRemove,
+        },
+      ]}
+    />
   )
 }

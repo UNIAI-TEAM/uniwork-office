@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { KeyboardEvent, ReactElement, ReactNode, RefObject } from 'react'
+import { WbGlyph } from './WorkbenchIcons'
 
 const ITEMS = '[role="menuitem"]:not(:disabled)'
 
@@ -142,6 +143,80 @@ export function WbMenuLabel({ children }: { children: ReactNode }): ReactElement
   return (
     <div role="presentation" className="wb-menu-label-row">
       {children}
+    </div>
+  )
+}
+
+export interface WbMenuEntry {
+  label: string
+  icon?: ReactNode
+  hint?: string
+  danger?: boolean
+  disabled?: boolean
+  onSelect: () => void
+}
+
+/**
+ * A trigger plus its WbMenu: the ⋯ of a row or a card by default, or any button (`className`,
+ * `children`). Choosing an entry puts focus back on the trigger first, so a WbConfirm the entry
+ * opens anchors to the trigger and returns focus there.
+ */
+export function WbMenuButton({
+  label,
+  menuLabel,
+  items,
+  empty,
+  className = 'wb-icon-btn',
+  disabled,
+  children,
+}: {
+  /** the trigger's accessible name (and tooltip when it shows only a glyph) */
+  label: string
+  menuLabel?: string
+  items: readonly WbMenuEntry[]
+  /** shown, as a caption, when there is nothing to choose */
+  empty?: string
+  className?: string
+  disabled?: boolean
+  /** the trigger's content; ⋯ when omitted */
+  children?: ReactNode
+}): ReactElement {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLButtonElement>(null)
+  return (
+    <div className="wb-menu-wrap">
+      <button
+        ref={ref}
+        type="button"
+        className={className}
+        aria-label={children ? undefined : label}
+        title={children ? undefined : label}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        disabled={disabled}
+        onClick={() => setOpen((o) => !o)}
+      >
+        {children ?? <WbGlyph id="more" />}
+      </button>
+      <WbMenu open={open} onClose={() => setOpen(false)} anchorRef={ref} label={menuLabel ?? label}>
+        {items.length === 0 && empty ? <WbMenuLabel>{empty}</WbMenuLabel> : null}
+        {items.map((it) => (
+          <WbMenuItem
+            key={it.label}
+            icon={it.icon}
+            hint={it.hint}
+            danger={it.danger}
+            disabled={it.disabled}
+            onSelect={() => {
+              ref.current?.focus()
+              setOpen(false)
+              it.onSelect()
+            }}
+          >
+            {it.label}
+          </WbMenuItem>
+        ))}
+      </WbMenu>
     </div>
   )
 }

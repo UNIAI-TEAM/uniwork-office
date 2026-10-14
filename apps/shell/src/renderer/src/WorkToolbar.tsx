@@ -6,6 +6,8 @@ export interface WorkToolbarProps {
   title: string
   /** id of that heading, for the pane section's aria-labelledby */
   titleId?: string
+  /** a control that leads the summary: a search box, a pack chip */
+  lead?: ReactNode
   /** one line about the tab's real state ("6 open · 1 overdue"), else the tab hint */
   summary?: ReactNode
   /** local-only data: adds the "On this device" tag */
@@ -18,6 +20,7 @@ export interface WorkToolbarProps {
 export function WorkToolbar({
   title,
   titleId,
+  lead,
   summary,
   local = false,
   actions,
@@ -28,6 +31,7 @@ export function WorkToolbar({
         {title}
       </h2>
       <div className="wb-toolbar-summary">
+        {lead}
         {summary ? <p className="wb-toolbar-text">{summary}</p> : null}
         {local ? <LocalTag /> : null}
       </div>

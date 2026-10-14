@@ -107,23 +107,34 @@ export function DeskDrawer({
 }
 
 /**
- * The chip that picks where drafts from forms go (spec 4.1, 4.4): a transparent select over the
- * chip, like the workspace chip. "Default project" stands for no selection.
+ * The chip that picks a pack (spec 4.1, 4.4, 4.8, 4.9): a transparent select over the chip, like
+ * the workspace chip. The empty choice stands for no selection: "Default project" where drafts
+ * from forms go, else `noneLabel`. `format` wraps the shown name ("Pack: …", "Context: …").
  */
 export function WbPackChip({
   packs,
   selectedPackId,
   onSelectPack,
+  noneLabel,
+  format,
+  ariaLabel,
+  className = 'wb-desk-pack',
 }: {
   packs: readonly { id: string; title: string }[]
   selectedPackId: string | null
   onSelectPack?: (id: string | null) => void
+  noneLabel?: string
+  format?: (name: string) => string
+  ariaLabel?: string
+  /** the 24px card-head size by default; a toolbar passes its own class for the 28px chip */
+  className?: string
 }): ReactElement {
   const { t } = useI18n()
-  const packLabel =
-    (selectedPackId && packs.find((p) => p.id === selectedPackId)?.title) || t('wbDeskDefaultPack')
+  const none = noneLabel ?? t('wbDeskDefaultPack')
+  const name = (selectedPackId && packs.find((p) => p.id === selectedPackId)?.title) || none
+  const packLabel = format ? format(name) : name
   return (
-    <span className="wb-crumb wb-desk-pack">
+    <span className={className ? `wb-crumb ${className}` : 'wb-crumb'}>
       <span className="wb-crumb-name" aria-hidden="true">
         {packLabel}
       </span>
@@ -131,11 +142,11 @@ export function WbPackChip({
         <WbGlyph id="chevronDown" size={12} />
       </span>
       <select
-        aria-label={t('wbDeskDrawerPack')}
+        aria-label={ariaLabel ?? t('wbDeskDrawerPack')}
         value={selectedPackId ?? ''}
         onChange={(e) => onSelectPack?.(e.target.value || null)}
       >
-        <option value="">{t('wbDeskDefaultPack')}</option>
+        <option value="">{none}</option>
         {packs.map((p) => (
           <option key={p.id} value={p.id}>
             {p.title}
