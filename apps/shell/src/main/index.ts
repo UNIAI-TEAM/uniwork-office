@@ -30,13 +30,8 @@ import type { MenuItemConstructorOptions, NativeImage, WebContents } from 'elect
 import { atomicCopyFile, atomicWriteFile } from './atomic-write'
 import { tabStripOverlay } from './title-bar-overlay'
 import { legalDocPath, openLegalDoc, type LegalDocEnv } from './legal-docs'
-import {
-  applyUiScaleTo,
-  applyUiScaleToAll,
-  changeUiScale,
-  onUiScaleChanged,
-  readUiScale,
-} from './ui-scale'
+import { applyUiScaleTo, applyUiScaleToAll, onUiScaleChanged, readUiScale } from './ui-scale'
+import { uiScaleMenuItems, withViewMenu } from './ui-scale-menu'
 import menuDocxIcon1x from './assets/menu-docx.png?asset'
 import menuDocxIcon2x from './assets/menu-docx@2x.png?asset'
 import menuXlsxIcon1x from './assets/menu-xlsx.png?asset'
@@ -3428,69 +3423,12 @@ function applyMenuFor(kind: TabKind): void {
     default:
       buildHomeMenu()
   }
-  withViewMenu()
+  withViewMenu(kind, tm, APP_SETTINGS_PATH)
 }
 
-/**
- * The View › interface-scale items, shared by the home menu and every editor
- * tab. CmdOrCtrl+Alt (not Shift): Shift+= is Sheets insert-cells and Docs
- * superscript, and the View menu now exists on editor tabs too, where those
- * accelerators are taken.
- */
-function uiScaleMenuItems(): MenuItemConstructorOptions[] {
-  return [
-    {
-      label: tm('menuUiZoomIn'),
-      accelerator: 'CmdOrCtrl+Alt+=',
-      click: () => changeUiScale(APP_SETTINGS_PATH(), 1),
-    },
-    {
-      label: tm('menuUiZoomOut'),
-      accelerator: 'CmdOrCtrl+Alt+-',
-      click: () => changeUiScale(APP_SETTINGS_PATH(), -1),
-    },
-    { type: 'separator' },
-    {
-      label: tm('menuUiZoomReset'),
-      accelerator: 'CmdOrCtrl+Alt+0',
-      click: () => changeUiScale(APP_SETTINGS_PATH(), 0),
-    },
-  ]
-}
-
+/** The Home menu's View menu: the interface-scale items (Home follows the scale). */
 function viewMenuTemplate(): MenuItemConstructorOptions {
-  return { label: tm('menuView'), submenu: uiScaleMenuItems() }
-}
-
-/**
- * Interface-scale items in the View menu of every tab kind. Editor menus are
- * built in the editor apps (docs/sheets/slides) or by the three shell-owned
- * builders, so rather than teaching seven menu builders about the scale, the
- * current menu is post-processed here. An existing View menu (docs, slides:
- * document zoom) gains the items after a separator; the rest get a fresh View
- * menu inserted before the Help menu every builder already carries.
- */
-function withViewMenu(): void {
-  const menu = Menu.getApplicationMenu()
-  if (!menu) return
-  const hasScale = menu.items.some((item) =>
-    item.submenu?.items.some((i) => i.accelerator === 'CmdOrCtrl+Alt+='),
-  )
-  if (hasScale) return
-  const view = menu.items.find((item) => item.label === tm('menuView'))
-  if (view?.submenu) {
-    // build the separator together with the items: Electron drops a separator
-    // that sits alone in a template
-    for (const item of Menu.buildFromTemplate([{ type: 'separator' }, ...uiScaleMenuItems()])
-      .items) {
-      view.submenu.append(item)
-    }
-    return
-  }
-  const viewItem = Menu.buildFromTemplate([viewMenuTemplate()]).items[0]!
-  const helpIdx = menu.items.findIndex((item) => item.role === 'help')
-  if (helpIdx === -1) menu.append(viewItem)
-  else menu.insert(helpIdx, viewItem)
+  return { label: tm('menuView'), submenu: uiScaleMenuItems(tm, APP_SETTINGS_PATH) }
 }
 
 /// Interface scale (genoffice#1913). Read once at boot, then replaced by the View menu.
