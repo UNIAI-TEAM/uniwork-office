@@ -346,7 +346,7 @@ import { FileIndexStore } from './file-index/store'
 import { normalizeFileSearchSettings, probeDecision, SearchReranker } from './file-index/rerank'
 import { runHeadlessExport, type HeadlessExporters } from './headless-export'
 import { isVersionRequest } from './version-flag'
-import { registerAiRunIpc } from './ai-run-registry'
+import { clearAiRun, isAiRunning, registerAiRunIpc } from './ai-run-registry'
 import { broadcastUniworkAiFlag, registerUniworkAiFlagIpc } from './uniwork-ai-flag'
 import { createUniworkAiChoiceStore } from './uniwork-ai-choice'
 import { TabManager } from './tab-manager'
@@ -3892,6 +3892,15 @@ function uniworkDocsWiring() {
     // the copy kept its name (an editor holds it): re-title the open tab/window
     // by path and tell the editor, without moving any file
     notifyTitleRenamed: (path: string, title: string) => afterTitleChanged(path, title),
+    isAiRunning: (path: string) => {
+      const target = webContentsForPath(path)
+      return !!target && !target.webContents.isDestroyed() && isAiRunning(target.webContents.id)
+    },
+    stopAiRun: (path: string) => {
+      const target = webContentsForPath(path)
+      if (!target || target.webContents.isDestroyed()) return
+      clearAiRun(target.webContents.id)
+    },
   }
 }
 
