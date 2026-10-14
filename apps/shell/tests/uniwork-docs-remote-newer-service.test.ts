@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { UniworkDocStatus } from '../src/shared/home-api'
+import type { UniworkConflictChoice, UniworkDocStatus } from '../src/shared/home-api'
 import { BINDING_FILE } from '../src/main/uniwork-docs/binding-store'
 import { UniworkDocError } from '../src/main/uniwork-docs/errors'
 import { UniworkDocsService, type ConflictUi } from '../src/main/uniwork-docs/service'
@@ -126,6 +126,8 @@ interface Harness {
   syncStore: SyncStoreAccess
   intents(): Promise<IntentStore>
   capability: { syncFeed: boolean }
+  /** what the conflict dialog (the bar's `reload` action) answers */
+  ui: { conflict: UniworkConflictChoice; discard: boolean }
 }
 
 function setup(): Harness {
@@ -165,9 +167,10 @@ function setup(): Harness {
       return { bytes: HEAD_BYTES }
     },
   }
+  const uiState = { conflict: 'later' as UniworkConflictChoice, discard: false }
   const ui: ConflictUi = {
-    chooseConflict: vi.fn(async () => 'later'),
-    confirmDiscard: vi.fn(async () => false),
+    chooseConflict: vi.fn(async () => uiState.conflict),
+    confirmDiscard: vi.fn(async () => uiState.discard),
     pickCopyPath: vi.fn(async () => null),
     showOpenLatestFailed: vi.fn(),
     showCopyFailed: vi.fn(),
@@ -225,6 +228,7 @@ function setup(): Harness {
       return createIntentStore(open.records(INTENT_STORE_REGISTRATION.name))
     },
     capability,
+    ui: uiState,
   }
 }
 
@@ -595,5 +599,64 @@ describe('G5-03a S6 service: hold, later and the persisted rebuild', () => {
     await drain()
     expect(bindingOf()).toMatchObject({ baseRevision: '9' })
     expect(await barOf(h)).toBeUndefined()
+  })
+})
+
+describe('G5-03a S6 service: the poll edges and the reload action', () => {
+  it('newer-ai: the poll sees the turn end, the rule runs again and a clean copy reloads', async () => {
+    seedCopy()
+    const h = setup()
+    h.editorStates.splice(0, 1, AI_TURN)
+    h.service.noteEditorState(docPath(), AI_TURN, 0)
+    notice(h)
+    await waitForBar(h, { kind: 'newer-ai', version: 4 })
+
+    // the turn is over: the fresh read now answers a clean, idle editor
+    h.editorStates.splice(0, 1, CLEAN)
+    h.service.noteEditorState(docPath(), CLEAN, 0)
+    await vi.waitFor(() => expect(h.reloaded).toEqual([docPath()]))
+    await waitForBar(h, { kind: 'updated', version: 4 })
+    expect(hex(copyBytes())).toBe(hex(HEAD_BYTES))
+  })
+
+  it('newer-dirty: the copy is clean again → now-clean (no auto reload)', async () => {
+    seedCopy()
+    const h = setup()
+    h.service.noteEditorState(docPath(), { dirty: true, aiRunning: false, aiEpoch: 1 }, 0)
+    notice(h)
+    await waitForBar(h, { kind: 'newer-dirty', version: 4 })
+
+    h.service.noteEditorState(docPath(), { dirty: false, aiRunning: false, aiEpoch: 1 }, 0)
+    await waitForBar(h, { kind: 'now-clean', version: 4 })
+    expect(h.reloaded).toEqual([])
+    expect(hex(copyBytes())).toBe(hex(BASE_BYTES))
+  })
+
+  it('reload opens the conflict dialog and “open the latest” replaces the copy', async () => {
+    seedCopy({ state: 'dirty' })
+    const h = setup()
+    notice(h)
+    await waitForBar(h, { kind: 'newer-dirty', version: 4 })
+
+    h.ui.conflict = 'open-latest'
+    h.ui.discard = true
+    const status = await h.service.remoteAction(docPath(), 'reload')
+    expect(status?.remote).toEqual({ kind: 'updated', version: 4 })
+    expect(hex(copyBytes())).toBe(hex(HEAD_BYTES))
+    expect(bindingOf()).toMatchObject({ baseRevision: '10', baseVersion: 4, state: 'saved' })
+    expect(h.reloaded).toEqual([docPath()])
+  })
+
+  it('reload cancel (decide later) keeps the bar and the copy', async () => {
+    seedCopy({ state: 'dirty' })
+    const h = setup()
+    notice(h)
+    await waitForBar(h, { kind: 'newer-dirty', version: 4 })
+
+    h.ui.conflict = 'later'
+    const status = await h.service.remoteAction(docPath(), 'reload')
+    expect(status?.remote).toEqual({ kind: 'newer-dirty', version: 4 })
+    expect(hex(copyBytes())).toBe(hex(BASE_BYTES))
+    expect(h.reloaded).toEqual([])
   })
 })
