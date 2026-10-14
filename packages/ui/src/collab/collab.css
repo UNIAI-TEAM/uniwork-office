@@ -69,13 +69,14 @@
 }
 
 .collab-btn--primary {
-  background: var(--color-dialog-primary);
-  border-color: var(--color-dialog-primary);
-  color: var(--color-dialog-primary-text);
+  background: var(--accent, var(--color-brand-secondary));
+  border-color: var(--accent, var(--color-brand-secondary));
+  color: var(--color-btn-primary-text);
 }
 
 .collab-btn--primary:hover {
-  background: var(--color-dialog-primary-hover);
+  background: var(--accent-dark, var(--color-dialog-primary-hover));
+  border-color: var(--accent-dark, var(--color-dialog-primary-hover));
 }
 
 .collab-btn--danger {
