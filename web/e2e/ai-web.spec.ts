@@ -74,6 +74,8 @@ const panel = (frame: Frame) => frame.locator('.ai-panel-header')
 async function ask(frame: Frame, text: string) {
   const box = frame.locator('.ai-input-box textarea').first()
   await expect(box).toBeVisible({ timeout: 30_000 })
+  await expect(box).toBeEnabled()
+  await expect(frame.locator('.ai-msg-streaming')).toHaveCount(0, { timeout: 30_000 })
   await box.fill(text)
   await box.press('Enter')
 }
