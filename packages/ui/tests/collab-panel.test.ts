@@ -288,7 +288,7 @@ describe('states', () => {
     })
   })
 
-  it('new root thread (real composer): empty Cancel button and first Esc close composer; second Esc falls through to host', async () => {
+  it('new root thread (real composer): empty Cancel button and first Esc close composer (Esc still reaches the host); second Esc falls through to host', async () => {
     const src = fakeSource(list([cm({ id: 'a', anchor: docx(1) })]))
     await mount(
       src,
@@ -325,8 +325,8 @@ describe('states', () => {
     act(() => {
       ta.dispatchEvent(firstEsc)
     })
-    expect(firstEsc.defaultPrevented).toBe(true)
-    expect(hostEsc).not.toHaveBeenCalled()
+    expect(firstEsc.defaultPrevented).toBe(false)
+    expect(hostEsc).toHaveBeenCalledTimes(1)
     expect($('.collab-thread--new')).toBeNull()
 
     const secondEsc = new KeyboardEvent('keydown', {
@@ -338,7 +338,7 @@ describe('states', () => {
       $('aside')!.dispatchEvent(secondEsc)
     })
     expect(secondEsc.defaultPrevented).toBe(false)
-    expect(hostEsc).toHaveBeenCalledTimes(1)
+    expect(hostEsc).toHaveBeenCalledTimes(2)
   })
 })
 

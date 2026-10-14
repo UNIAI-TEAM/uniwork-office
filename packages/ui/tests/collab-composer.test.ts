@@ -289,17 +289,31 @@ describe('root vs discussion composer: Esc and Cancel when empty (V14-01 / V15-0
     expect(dialog()).toBeNull()
   })
 
-  it('root: Esc in an empty new-thread composer is consumed and cancels at once without a Discard dialog', () => {
+  it('root: Esc in an empty new-thread composer cancels at once and still reaches the host unconsumed', () => {
     const m = render({ mode: 'root' })
     const hostEsc = vi.fn()
     host.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && !e.defaultPrevented) hostEsc()
     })
     const ev = key('Escape')
-    expect(ev.defaultPrevented).toBe(true)
-    expect(hostEsc).not.toHaveBeenCalled()
+    expect(ev.defaultPrevented).toBe(false)
+    expect(hostEsc).toHaveBeenCalledTimes(1)
     expect(m.onCancel).toHaveBeenCalledTimes(1)
     expect(dialog()).toBeNull()
+  })
+
+  it('root: Esc with text asks to discard and the host does not act on it (consumed)', () => {
+    const m = render({ mode: 'root' })
+    const hostEsc = vi.fn()
+    host.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !e.defaultPrevented) hostEsc()
+    })
+    type('draft')
+    const ev = key('Escape')
+    expect(ev.defaultPrevented).toBe(true)
+    expect(hostEsc).not.toHaveBeenCalled()
+    expect(dialog()).not.toBeNull()
+    expect(m.onCancel).not.toHaveBeenCalled()
   })
 
   it.each(['root', 'discussion'] as const)(
