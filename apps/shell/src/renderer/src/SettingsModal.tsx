@@ -175,7 +175,8 @@ const SECTIONS: readonly { id: SectionId; labelKey: StringKey }[] = [
   { id: 'account', labelKey: 'setSecAccount' },
   { id: 'aiModel', labelKey: 'setSecAiModel' },
   { id: 'aiMedia', labelKey: 'setSecAiMedia' },
-  { id: 'uniai', labelKey: 'setSecUniAi' },
+  // shortcut: UniAI pane hidden for now (pane code kept); re-add this entry to show it again
+  // { id: 'uniai', labelKey: 'setSecUniAi' },
   { id: 'general', labelKey: 'setSecGeneral' },
   { id: 'backup', labelKey: 'setSecBackup' },
   { id: 'integrations', labelKey: 'setSecIntegrations' },
