@@ -41,6 +41,8 @@ export interface AgentLoopEvents<TSnapshot> {
   onTurnEnd?(): void
   /** a transport notice (UniWork AI: dropped calls, a Retry-After wait, a new conversation); never fatal */
   onNotice?(notice: AgentStreamNotice): void
+  /** the transport restarts this turn (a Retry-After wait ended): drop what the UI drew for it; fires on every reset, onText('') only follows when text had streamed */
+  onTurnReset?(): void
   onDone?(result: AgentRunResult): void
   onError?(error: string): void
 }
@@ -975,6 +977,11 @@ export class AgentLoop<TSnapshot = unknown> {
             this.turnReasoning = ''
             this.toolCalls = []
             this.turnStopReason = null
+            try {
+              this.options.events?.onTurnReset?.()
+            } catch (err) {
+              console.warn('[agent-loop] onTurnReset listener threw', err)
+            }
             if (!hadText) return
             try {
               this.options.events?.onText?.('')

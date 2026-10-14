@@ -80,6 +80,32 @@ describe('onTurnReset', () => {
   })
 })
 
+describe('events.onTurnReset', () => {
+  it('fires on every reset, even when no text had streamed yet', async () => {
+    const resets: string[] = []
+    const done: unknown[] = []
+    const transport = transportOf((cb) => {
+      cb.onTurnReset?.()
+      cb.onDelta('a')
+      cb.onTurnReset?.()
+      cb.onDelta('b')
+      cb.onDone()
+    })
+    const loop = new AgentLoop({
+      transport,
+      skill,
+      events: {
+        onText: (t) => resets.push(`text:${t}`),
+        onTurnReset: () => resets.push('reset'),
+        onDone: (r) => done.push(r),
+      },
+    })
+    loop.run('hi')
+    await finished(loop, { done })
+    expect(resets).toEqual(['reset', 'text:a', 'reset', 'text:', 'text:b'])
+  })
+})
+
 describe('onNotice', () => {
   it('forwards a transport notice to the loop events, in order, mid-turn', async () => {
     const notices: AgentStreamNotice[] = []

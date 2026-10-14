@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { noticePatch, type NoticeKey } from '../src'
+import { createTextNoticeSurface, noticePatch, type NoticeKey } from '../src'
 
 // the panels translate with aiUniworkText; a keyed echo is enough to pin the mapping
 const tr = (key: NoticeKey, params?: Record<string, string | number>) =>
@@ -66,5 +66,38 @@ describe('noticePatch', () => {
     ])
     expect(noticePatch({}, { kind: 'step', step: 1, limit: 5 }, tr, 'Docs')).toBeNull()
     expect(noticePatch({}, { kind: 'from-the-future' } as never, tr, 'Docs')).toBeNull()
+  })
+})
+
+describe('createTextNoticeSurface (single-text chat messages)', () => {
+  it('a wait shows as the text, a reset or new text ends it, notes stay above the answer', () => {
+    const surface = createTextNoticeSurface()
+    expect(surface.notice({ kind: 'rate-limit-wait', seconds: 30, attempt: 1 }, tr, 'Sheets')).toBe(
+      'aiErrRateLimited:{"seconds":30}',
+    )
+    expect(surface.reset()).toBe('')
+    expect(
+      surface.notice({ kind: 'conversation-boundary', provider: 'uniwork' }, tr, 'Sheets'),
+    ).toBe('aiConversationBoundary:{"provider":"aiUniworkProvider"}')
+    expect(surface.text('answer')).toBe(
+      'aiConversationBoundary:{"provider":"aiUniworkProvider"}\n\nanswer',
+    )
+    // a wait inside a streaming turn: the line sits between the notes and the answer so far
+    surface.notice({ kind: 'rate-limit-wait', seconds: 5, attempt: 2 }, tr, 'Sheets')
+    expect(surface.text('again')).toContain('again')
+    expect(surface.text('again')).not.toContain('aiErrRateLimited')
+    expect(surface.notice({ kind: 'step', step: 1, limit: 3 }, tr, 'Sheets')).toBeNull()
+  })
+
+  it('a restart is remembered, compose() puts the notes above the final answer, clear() starts over', () => {
+    const surface = createTextNoticeSurface()
+    expect(surface.restarted()).toBe(false)
+    surface.notice({ kind: 'conversation-restarted' }, tr, 'Sheets')
+    expect(surface.restarted()).toBe(true)
+    expect(surface.compose('')).toBe('aiConversationRestarted')
+    expect(surface.compose('done')).toBe('aiConversationRestarted\n\ndone')
+    surface.clear()
+    expect(surface.restarted()).toBe(false)
+    expect(surface.compose('done')).toBe('done')
   })
 })

@@ -75,3 +75,63 @@ export function noticePatch(
       return null
   }
 }
+
+/**
+ * For a panel whose chat message is a single text (sheets): the notices are folded into that text.
+ * Order: notes, then the wait line, then the answer. The wait line goes away when the turn resets
+ * or text arrives; notes stay for the run. `compose(raw)` is the display text for a raw answer.
+ */
+export interface TextNoticeSurface {
+  /** a transport notice; returns the display text for the current raw answer, or null when nothing changed */
+  notice(notice: AgentStreamNotice, tr: NoticeTranslate, moduleName: string): string | null
+  /** streamed (cumulative) answer text: ends a wait */
+  text(raw: string): string
+  /** the transport restarted the turn */
+  reset(): string
+  /** display text for a final answer (notes above it); the wait is over */
+  compose(raw: string): string
+  /** the conversation was restarted and the question not sent: an empty answer is on purpose */
+  restarted(): boolean
+  /** a new run starts */
+  clear(): void
+}
+
+export function createTextNoticeSurface(): TextNoticeSurface {
+  let notes: PanelNote[] = []
+  let waitLine: string | undefined
+  let raw = ''
+  const display = (): string =>
+    [...notes.map((n) => n.text), waitLine, raw]
+      .filter((part): part is string => !!part)
+      .join('\n\n')
+  return {
+    notice(notice, tr, moduleName) {
+      const patch = noticePatch({ waitLine, notes }, notice, tr, moduleName)
+      if (!patch) return null
+      if (patch.notes) notes = [...patch.notes]
+      if ('waitLine' in patch) waitLine = patch.waitLine
+      return display()
+    },
+    text(next) {
+      raw = next
+      waitLine = undefined
+      return display()
+    },
+    reset() {
+      raw = ''
+      waitLine = undefined
+      return display()
+    },
+    compose(final) {
+      raw = final
+      waitLine = undefined
+      return display()
+    },
+    restarted: () => notes.some((n) => n.kind === 'restarted'),
+    clear() {
+      notes = []
+      waitLine = undefined
+      raw = ''
+    },
+  }
+}
