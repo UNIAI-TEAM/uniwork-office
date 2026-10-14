@@ -34,6 +34,13 @@ export interface AgentImage {
   mime: string
 }
 
+/** Token usage one model turn was billed (best-effort: providers that do not
+ * report usage simply never fire the callback — absent is "unknown", not zero). */
+export interface AgentTokenUsage {
+  inputTokens?: number
+  outputTokens?: number
+}
+
 export type AgentMessage =
   | {
       role: 'user'
@@ -134,6 +141,8 @@ export interface AgentStreamCallbacks {
    * turn's streamed text, reasoning and tool calls; history is untouched. Transports may omit this.
    */
   onTurnReset?(): void
+  /** tokens the provider billed for this turn; transports whose provider does not report usage omit this */
+  onUsage?(usage: AgentTokenUsage): void
   onDone(): void
   onError(error: string): void
 }

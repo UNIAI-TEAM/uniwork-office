@@ -6,6 +6,7 @@ export type {
   AgentStreamHandle,
   AgentStreamNotice,
   AgentStreamRequest,
+  AgentTokenUsage,
   AgentRequestPurpose,
   AgentToolCall,
   AgentToolDef,
