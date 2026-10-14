@@ -32,10 +32,12 @@ import type {
   AiMediaProviderMeta,
   AiMediaSettings,
   AiModelSource,
+  AiProviderId,
   AiSearchProviderMeta,
   AiSearchSettings,
   AiSettings,
 } from '@genoffice/ai-provider'
+import { AI_MODEL_PICKER_STRINGS } from '../../../../../packages/ui/src/strings-ai-model-picker'
 import { useI18n } from './locale'
 import type { StringKey, TFunc } from './locale'
 import type { AiCatalogEntry, DocTheme, UiTheme } from '../../shared/home-api'
@@ -387,13 +389,16 @@ function paneModelIds(
 function AiModelPane({
   t,
   cloud,
+  serverUrl,
   onDirtyChange,
 }: {
   t: TFunc
   cloud: UniworkCloudStatus | null
+  serverUrl?: string
   onDirtyChange?: (dirty: boolean) => void
 }) {
-  const { dateLocale } = useI18n()
+  const { lang, dateLocale } = useI18n()
+  const pickerStrings = AI_MODEL_PICKER_STRINGS[lang] ?? AI_MODEL_PICKER_STRINGS.en
   const [catalog, setCatalog] = useState<AiCatalogEntry[]>(
     () => window.aiOffice.getAiProviders?.() ?? [],
   )
@@ -449,6 +454,7 @@ function AiModelPane({
           s.providers.genspark?.apiKey?.trim() || s.providers.openrouter?.apiKey?.trim() || ''
         if (
           (s.provider === 'openrouter' || s.provider === 'genspark') &&
+          s.modelSources?.[s.provider]?.origin !== 'org' &&
           hubKey &&
           window.aiOffice.probeOpenRouterKey
         ) {
@@ -483,7 +489,10 @@ function AiModelPane({
   // stays a no-op while any other provider is selected — a local server saved
   // months ago is never contacted while Genspark is in use.
   const endpointProvider = catalog.find(
-    (entry) => entry.id === settings?.provider && entry.needsBaseUrl,
+    (entry) =>
+      entry.id === settings?.provider &&
+      entry.needsBaseUrl &&
+      settings?.modelSources?.[entry.id]?.origin !== 'org',
   )?.id
   const endpointConfig = settings ? settings.providers[settings.provider] : undefined
   const endpointBaseUrl = (endpointConfig?.baseUrl ?? '').trim()
@@ -538,6 +547,8 @@ function AiModelPane({
   if (!settings) return <PaneSkeleton title={t('setSecAiModel')} />
   const provider = settings.provider
   const meta = catalog.find((c) => c.id === provider)
+  const source = settings.modelSources?.[provider]
+  const isOrgKey = source?.origin === 'org'
   const config = settings.providers[provider] ?? {
     apiKey: '',
     model: meta?.defaultModel ?? '',
@@ -550,13 +561,16 @@ function AiModelPane({
   // UniWork AI runs on the organization's plan: no key, model or endpoint to set or test
   const isUniwork = provider === 'uniwork'
   const isTokenHub = isGenspark || isOpenRouter
+  const effectiveModel =
+    config.model || (isOrgKey ? source?.chosen : '') || meta?.defaultModel || ''
   const modelIds = paneModelIds(
     meta?.models ?? [],
-    settings.modelSources?.[provider],
-    isCodex || !!meta?.needsBaseUrl,
+    source,
+    (isCodex || !!meta?.needsBaseUrl) && !isOrgKey,
     // the effective model, as the field shows it: never off-list when the live list lacks the default
-    config.model || meta?.defaultModel || '',
+    effectiveModel,
   )
+  const orgKeyManageUrl = `${(serverUrl || 'https://uniworkos.com').replace(/\/+$/, '')}/settings/ai`
 
   const touch = () => {
     setDirty(true)
@@ -566,10 +580,18 @@ function AiModelPane({
     setHubStatus(null)
   }
   const updateConfig = (patch: Partial<typeof config>) => {
-    const nextSlot = { ...config, ...patch }
+    if (isOrgKey && ('apiKey' in patch || 'baseUrl' in patch)) return
+    const nextSlot = isOrgKey
+      ? {
+          ...config,
+          model: patch.model ?? config.model,
+          apiKey: '',
+          baseUrl: undefined,
+        }
+      : { ...config, ...patch }
     const providers = { ...settings.providers, [provider]: nextSlot }
     // UniAI and OpenRouter share one Token Hub key — mirror apiKey only.
-    if (isTokenHub && patch.apiKey !== undefined) {
+    if (!isOrgKey && isTokenHub && patch.apiKey !== undefined) {
       const other = provider === 'genspark' ? 'openrouter' : 'genspark'
       providers[other] = { ...settings.providers[other], apiKey: nextSlot.apiKey }
     }
@@ -591,13 +613,27 @@ function AiModelPane({
   }
   const save = () => {
     setSaveError(null)
+    const nextProviders = { ...settings.providers }
+    if (settings.modelSources) {
+      for (const [id, src] of Object.entries(settings.modelSources)) {
+        const pid = id as AiProviderId
+        if (src?.origin === 'org' && nextProviders[pid]) {
+          nextProviders[pid] = {
+            ...nextProviders[pid],
+            apiKey: '',
+            baseUrl: undefined,
+          }
+        }
+      }
+    }
+    const payload: AiSettings = { ...settings, providers: nextProviders }
     window.aiOffice
-      .setAiSettings?.(settings, SETTINGS_PICK)
+      .setAiSettings?.(payload, SETTINGS_PICK)
       .then(() => {
         setDirty(false)
         setSaved(true)
         window.dispatchEvent(new Event('uniwork:credit-refresh'))
-        if (isTokenHub && config.apiKey) void checkOpenRouterHub(config.apiKey)
+        if (!isOrgKey && isTokenHub && config.apiKey) void checkOpenRouterHub(config.apiKey)
       })
       .catch((error) => {
         setSaved(false)
@@ -618,7 +654,7 @@ function AiModelPane({
         if (r?.ok && isCodex) {
           void refreshCodexModels(config.cliPath ?? '', config.model).catch(() => undefined)
         }
-        if (r?.ok && isTokenHub && config.apiKey) {
+        if (r?.ok && !isOrgKey && isTokenHub && config.apiKey) {
           void checkOpenRouterHub(config.apiKey)
         }
       })
@@ -730,7 +766,7 @@ function AiModelPane({
             {meta && modelIds.length > 0 ? (
               <Dropdown
                 className="set-dd"
-                value={config.model || meta.defaultModel}
+                value={effectiveModel}
                 ariaLabel={t('setAiModelId')}
                 options={modelIds.map((m) => ({ value: m, label: m }))}
                 onPick={(m) => updateConfig({ model: m })}
@@ -740,7 +776,7 @@ function AiModelPane({
                 id="set-ai-model"
                 className="set-input"
                 type="text"
-                value={config.model}
+                value={effectiveModel}
                 placeholder="model-id"
                 spellCheck={false}
                 onChange={(e) => updateConfig({ model: e.target.value })}
@@ -771,6 +807,33 @@ function AiModelPane({
                   void refreshCodexModels(cliPath, config.model).catch(() => undefined)
                 }}
               />
+            </div>
+          ) : isOrgKey ? (
+            <div className="set-field" data-org-key-row={provider}>
+              <div className="set-field-text">
+                <div className="set-field-stack">
+                  <div className="set-field-label">{t('setAiApiKey')}</div>
+                  <div className="set-field-desc" data-org-key-note="">
+                    {pickerStrings.orgKeyNote}
+                  </div>
+                </div>
+                <span
+                  className="set-field-value"
+                  data-org-key-tag=""
+                  title={pickerStrings.orgKeyNote}
+                  data-tip={pickerStrings.orgKeyNote}
+                >
+                  {pickerStrings.orgKeyTag}
+                </span>
+              </div>
+              <button
+                type="button"
+                className="set-btn"
+                data-org-key-manage=""
+                onClick={() => void window.open(orgKeyManageUrl, '_blank', 'noopener,noreferrer')}
+              >
+                {pickerStrings.orgKeyManage}
+              </button>
             </div>
           ) : (
             <>
@@ -867,7 +930,7 @@ function AiModelPane({
           />
         </div>
       )}
-      {isTokenHub ? (
+      {isTokenHub && !isOrgKey ? (
         <div className="set-field">
           <div className="set-field-text">
             <div className="set-field-stack">
@@ -1872,7 +1935,12 @@ export function SettingsModal({
               </>
             )}
             {section === 'aiModel' && (
-              <AiModelPane t={t} cloud={cloud} onDirtyChange={onPaneDirty} />
+              <AiModelPane
+                t={t}
+                cloud={cloud}
+                serverUrl={account?.status?.serverUrl}
+                onDirtyChange={onPaneDirty}
+              />
             )}
             {section === 'aiMedia' && (
               <AiMediaPane
