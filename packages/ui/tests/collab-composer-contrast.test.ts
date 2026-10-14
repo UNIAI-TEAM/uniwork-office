@@ -243,9 +243,12 @@ describe('unified primary button look (V14-06)', () => {
   const saveRestBgExpr = propValue(primaryBody, 'background')
   const saveHoverBgExpr = propValue(primaryHoverBody, 'background')
 
-  for (const [app, stylePath] of Object.entries(PRIMARY_APP_STYLES)) {
-    const appCss = read(stylePath)
-    const appLight = blockFrom(appCss, ':root {')
+  for (const [app, stylePath] of [
+    ...Object.entries(PRIMARY_APP_STYLES),
+    ['kit-fallback', ''] as const,
+  ]) {
+    const appCss = stylePath ? read(stylePath) : ''
+    const appLight = appCss ? blockFrom(appCss, ':root {') : {}
     const sysDarkHeader = appCss.includes(
       ":root:not([data-theme='light']):not([data-theme='dark']) {",
     )
@@ -253,11 +256,15 @@ describe('unified primary button look (V14-06)', () => {
       : ":root:not([data-theme='light']) {"
     const appThemes: Record<string, Tokens> = {
       light: { ...themes.light!, ...appLight },
-      dark: { ...themes.dark!, ...appLight, ...blockFrom(appCss, "[data-theme='dark'] {") },
+      dark: {
+        ...themes.dark!,
+        ...appLight,
+        ...(appCss ? blockFrom(appCss, "[data-theme='dark'] {") : {}),
+      },
       'system-dark': {
         ...themes['system-dark']!,
         ...appLight,
-        ...blockFrom(appCss, sysDarkHeader),
+        ...(appCss ? blockFrom(appCss, sysDarkHeader) : {}),
       },
     }
 
