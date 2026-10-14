@@ -1587,51 +1587,138 @@ git commit -m "feat(shell): Desk model for the tray, work in progress and tool c
 
 - Produces: các khóa `StringKey` liệt kê dưới đây. Task 8 đến 11 dùng đúng các tên này.
 
-- [ ] **Step 1: Add the keys to `zh.ts`, `en.ts`, `vi.ts`** (ngay trước dấu `}` cuối object), theo đúng bảng sau:
+- [ ] **Step 1: Add the keys to `zh.ts`, `en.ts`, `vi.ts`** (ngay trước dấu `}` cuối object), đúng các dòng sau:
 
-| key                     | zh                                  | en                                                      | vi                                     |
-| ----------------------- | ----------------------------------- | ------------------------------------------------------- | -------------------------------------- |
-| `wbDeskTools`           | 工具                                | Tools                                                   | Dụng cụ                                |
-| `wbDeskDropHint`        | 将文件拖到这里，或选择一个工具      | Drop files here or pick a tool                          | Thả tệp vào đây hoặc chọn một dụng cụ  |
-| `wbDeskToolPdfToDocx`   | PDF → Word                          | PDF → Word                                              | PDF → Word                             |
-| `wbDeskToolPdfToXlsx`   | PDF → Excel                         | PDF → Excel                                             | PDF → Excel                            |
-| `wbDeskToolPdfToPptx`   | PDF → PowerPoint                    | PDF → PowerPoint                                        | PDF → PowerPoint                       |
-| `wbDeskToolExportPdf`   | 导出 PDF                            | Export PDF                                              | Xuất PDF                               |
-| `wbDeskToolMergePdf`    | 合并 PDF                            | Merge PDFs                                              | Ghép PDF                               |
-| `wbDeskToolSplitPdf`    | 拆分 PDF                            | Split PDF                                               | Tách PDF                               |
-| `wbDeskSplitEvery`      | 每份页数                            | Pages per part                                          | Số trang mỗi phần                      |
-| `wbDeskSplitRun`        | 拆分                                | Split                                                   | Tách                                   |
-| `wbDeskDropNone`        | 没有适用于此类文件的工具。          | No tool takes this kind of file.                        | Không có dụng cụ cho loại tệp này.     |
-| `wbDeskFromSaved`       | 将导出已保存的版本                  | Exports the saved version                               | Xuất từ bản đã lưu                     |
-| `wbDeskToolDone`        | 已创建 {name}                       | Created {name}                                          | Đã tạo {name}                          |
-| `wbDeskToolDoneMany`    | 已在 {folder} 中创建 {count} 个文件 | Created {count} files in {folder}                       | Đã tạo {count} tệp trong {folder}      |
-| `wbDeskShowInFolder`    | 在文件夹中显示                      | Show in folder                                          | Hiện trong thư mục                     |
-| `wbDeskToolBusy`        | 另一个工具仍在运行。                | Another tool is still running.                          | Một dụng cụ khác đang chạy.            |
-| `wbDeskToolFailed`      | 操作未完成，请重试。                | That did not work. Try again.                           | Không thực hiện được. Hãy thử lại.     |
-| `wbDeskToolSamePath`    | 请选择与源文件不同的文件名。        | Pick a file name different from the source.             | Hãy chọn tên tệp khác tệp nguồn.       |
-| `wbDeskToolTargetOpen`  | 该文件已打开，请关闭后重试。        | That file is open. Close it and try again.              | Tệp đó đang mở. Đóng nó rồi thử lại.   |
-| `wbDeskToolNotFound`    | 找不到该文件。                      | The file is no longer there.                            | Không còn tìm thấy tệp.                |
-| `wbDeskToolBadInput`    | 此工具不支持该文件。                | This tool does not take that file.                      | Dụng cụ này không nhận tệp đó.         |
-| `wbDeskInTray`          | 待你处理                            | Needs you                                               | Cần bạn xử lý                          |
-| `wbDeskInTrayEmpty`     | 没有待你处理的事项                  | Nothing is waiting on you                               | Không có gì đang chờ bạn               |
-| `wbDeskReasonShared`    | 已与你共享                          | Shared with you                                         | Được chia sẻ với bạn                   |
-| `wbDeskReasonConflict`  | 版本冲突                            | Version conflict                                        | Có xung đột phiên bản                  |
-| `wbDeskReasonSync`      | 未能同步                            | Not synced                                              | Chưa đồng bộ được                      |
-| `wbDeskMore`            | 再显示 {count} 项                   | Show {count} more                                       | Xem thêm {count}                       |
-| `wbDeskInProgress`      | 进行中                              | In progress                                             | Đang làm dở                            |
-| `wbDeskInProgressEmpty` | 暂无进行中的文档                    | No documents in progress                                | Chưa có tài liệu đang làm              |
-| `wbDeskUnsaved`         | 未保存                              | Unsaved                                                 | Chưa lưu                               |
-| `wbDeskRecovery`        | 有恢复版本                          | Recovered copy                                          | Có bản khôi phục                       |
-| `wbDeskSwitchTo`        | 切换到                              | Switch to                                               | Chuyển tới                             |
-| `wbDeskOpenFile`        | 打开文件…                           | Open file…                                              | Mở tệp…                                |
-| `wbDeskDrawer`          | 常用表单                            | Forms drawer                                            | Ngăn kéo · biểu mẫu                    |
-| `wbDeskDrawerManage`    | 管理                                | Manage                                                  | Quản lý                                |
-| `wbDeskDrawerEmpty`     | 保存常用表单，一键起草              | Save the forms you use often to draft them in one click | Lưu mẫu giấy tờ hay dùng để soạn nhanh |
-| `wbDeskDrawerAdd`       | 添加表单                            | Add a form                                              | Thêm biểu mẫu                          |
-| `wbDeskToday`           | 今天                                | Today                                                   | Hôm nay                                |
-| `wbDeskTodayNoTasks`    | 今天没有到期的任务。                | Nothing due today.                                      | Không có việc đến hạn hôm nay.         |
-| `wbDeskAllTasks`        | 全部任务                            | All tasks                                               | Tất cả việc                            |
-| `wbDeskOtherNotifs`     | 其他通知（{count}）                 | Other notifications ({count})                           | Thông báo khác ({count})               |
+```ts
+// zh.ts
+  wbDeskTools: '工具',
+  wbDeskDropHint: '将文件拖到这里，或选择一个工具',
+  wbDeskToolPdfToDocx: 'PDF → Word',
+  wbDeskToolPdfToXlsx: 'PDF → Excel',
+  wbDeskToolPdfToPptx: 'PDF → PowerPoint',
+  wbDeskToolExportPdf: '导出 PDF',
+  wbDeskToolMergePdf: '合并 PDF',
+  wbDeskToolSplitPdf: '拆分 PDF',
+  wbDeskSplitEvery: '每份页数',
+  wbDeskSplitRun: '拆分',
+  wbDeskDropNone: '没有适用于此类文件的工具。',
+  wbDeskFromSaved: '将导出已保存的版本',
+  wbDeskToolDone: '已创建 {name}',
+  wbDeskToolDoneMany: '已在 {folder} 中创建 {count} 个文件',
+  wbDeskShowInFolder: '在文件夹中显示',
+  wbDeskToolBusy: '另一个工具仍在运行。',
+  wbDeskToolFailed: '操作未完成，请重试。',
+  wbDeskToolSamePath: '请选择与源文件不同的文件名。',
+  wbDeskToolTargetOpen: '该文件已打开，请关闭后重试。',
+  wbDeskToolNotFound: '找不到该文件。',
+  wbDeskToolBadInput: '此工具不支持该文件。',
+  wbDeskInTray: '待你处理',
+  wbDeskInTrayEmpty: '没有待你处理的事项',
+  wbDeskReasonShared: '已与你共享',
+  wbDeskReasonConflict: '版本冲突',
+  wbDeskReasonSync: '未能同步',
+  wbDeskMore: '再显示 {count} 项',
+  wbDeskInProgress: '进行中',
+  wbDeskInProgressEmpty: '暂无进行中的文档',
+  wbDeskUnsaved: '未保存',
+  wbDeskRecovery: '有恢复版本',
+  wbDeskSwitchTo: '切换到',
+  wbDeskOpenFile: '打开文件…',
+  wbDeskDrawer: '常用表单',
+  wbDeskDrawerManage: '管理',
+  wbDeskDrawerEmpty: '保存常用表单，一键起草',
+  wbDeskDrawerAdd: '添加表单',
+  wbDeskToday: '今天',
+  wbDeskTodayNoTasks: '今天没有到期的任务。',
+  wbDeskAllTasks: '全部任务',
+  wbDeskOtherNotifs: '其他通知（{count}）',
+
+// en.ts
+  wbDeskTools: 'Tools',
+  wbDeskDropHint: 'Drop files here or pick a tool',
+  wbDeskToolPdfToDocx: 'PDF → Word',
+  wbDeskToolPdfToXlsx: 'PDF → Excel',
+  wbDeskToolPdfToPptx: 'PDF → PowerPoint',
+  wbDeskToolExportPdf: 'Export PDF',
+  wbDeskToolMergePdf: 'Merge PDFs',
+  wbDeskToolSplitPdf: 'Split PDF',
+  wbDeskSplitEvery: 'Pages per part',
+  wbDeskSplitRun: 'Split',
+  wbDeskDropNone: 'No tool takes this kind of file.',
+  wbDeskFromSaved: 'Exports the saved version',
+  wbDeskToolDone: 'Created {name}',
+  wbDeskToolDoneMany: 'Created {count} files in {folder}',
+  wbDeskShowInFolder: 'Show in folder',
+  wbDeskToolBusy: 'Another tool is still running.',
+  wbDeskToolFailed: 'That did not work. Try again.',
+  wbDeskToolSamePath: 'Pick a file name different from the source.',
+  wbDeskToolTargetOpen: 'That file is open. Close it and try again.',
+  wbDeskToolNotFound: 'The file is no longer there.',
+  wbDeskToolBadInput: 'This tool does not take that file.',
+  wbDeskInTray: 'Needs you',
+  wbDeskInTrayEmpty: 'Nothing is waiting on you',
+  wbDeskReasonShared: 'Shared with you',
+  wbDeskReasonConflict: 'Version conflict',
+  wbDeskReasonSync: 'Not synced',
+  wbDeskMore: 'Show {count} more',
+  wbDeskInProgress: 'In progress',
+  wbDeskInProgressEmpty: 'No documents in progress',
+  wbDeskUnsaved: 'Unsaved',
+  wbDeskRecovery: 'Recovered copy',
+  wbDeskSwitchTo: 'Switch to',
+  wbDeskOpenFile: 'Open file…',
+  wbDeskDrawer: 'Forms drawer',
+  wbDeskDrawerManage: 'Manage',
+  wbDeskDrawerEmpty: 'Save the forms you use often to draft them in one click',
+  wbDeskDrawerAdd: 'Add a form',
+  wbDeskToday: 'Today',
+  wbDeskTodayNoTasks: 'Nothing due today.',
+  wbDeskAllTasks: 'All tasks',
+  wbDeskOtherNotifs: 'Other notifications ({count})',
+
+// vi.ts
+  wbDeskTools: 'Dụng cụ',
+  wbDeskDropHint: 'Thả tệp vào đây hoặc chọn một dụng cụ',
+  wbDeskToolPdfToDocx: 'PDF → Word',
+  wbDeskToolPdfToXlsx: 'PDF → Excel',
+  wbDeskToolPdfToPptx: 'PDF → PowerPoint',
+  wbDeskToolExportPdf: 'Xuất PDF',
+  wbDeskToolMergePdf: 'Ghép PDF',
+  wbDeskToolSplitPdf: 'Tách PDF',
+  wbDeskSplitEvery: 'Số trang mỗi phần',
+  wbDeskSplitRun: 'Tách',
+  wbDeskDropNone: 'Không có dụng cụ cho loại tệp này.',
+  wbDeskFromSaved: 'Xuất từ bản đã lưu',
+  wbDeskToolDone: 'Đã tạo {name}',
+  wbDeskToolDoneMany: 'Đã tạo {count} tệp trong {folder}',
+  wbDeskShowInFolder: 'Hiện trong thư mục',
+  wbDeskToolBusy: 'Một dụng cụ khác đang chạy.',
+  wbDeskToolFailed: 'Không thực hiện được. Hãy thử lại.',
+  wbDeskToolSamePath: 'Hãy chọn tên tệp khác tệp nguồn.',
+  wbDeskToolTargetOpen: 'Tệp đó đang mở. Đóng nó rồi thử lại.',
+  wbDeskToolNotFound: 'Không còn tìm thấy tệp.',
+  wbDeskToolBadInput: 'Dụng cụ này không nhận tệp đó.',
+  wbDeskInTray: 'Cần bạn xử lý',
+  wbDeskInTrayEmpty: 'Không có gì đang chờ bạn',
+  wbDeskReasonShared: 'Được chia sẻ với bạn',
+  wbDeskReasonConflict: 'Có xung đột phiên bản',
+  wbDeskReasonSync: 'Chưa đồng bộ được',
+  wbDeskMore: 'Xem thêm {count}',
+  wbDeskInProgress: 'Đang làm dở',
+  wbDeskInProgressEmpty: 'Chưa có tài liệu đang làm',
+  wbDeskUnsaved: 'Chưa lưu',
+  wbDeskRecovery: 'Có bản khôi phục',
+  wbDeskSwitchTo: 'Chuyển tới',
+  wbDeskOpenFile: 'Mở tệp…',
+  wbDeskDrawer: 'Ngăn kéo · biểu mẫu',
+  wbDeskDrawerManage: 'Quản lý',
+  wbDeskDrawerEmpty: 'Lưu mẫu giấy tờ hay dùng để soạn nhanh',
+  wbDeskDrawerAdd: 'Thêm biểu mẫu',
+  wbDeskToday: 'Hôm nay',
+  wbDeskTodayNoTasks: 'Không có việc đến hạn hôm nay.',
+  wbDeskAllTasks: 'Tất cả việc',
+  wbDeskOtherNotifs: 'Thông báo khác ({count})',
+```
 
 - [ ] **Step 2: Add the same 41 keys to the other 18 shards.** Các shard là: `ar, cs, de, es, fr, he, hi, id, it, ja, ko, ms, nl, pl, pt, ru, th, zh-TW`.
   - Dịch từ cột **en** sang đúng ngôn ngữ của file, giữ giọng văn giống các khóa `wbTasks*` / `wbFormsDraft*` ngay trong file đó.
