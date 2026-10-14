@@ -301,6 +301,76 @@ describe('G5-06 save queue: states -> chip', () => {
   })
 })
 
+describe('S6 remote-newer chip priority', () => {
+  const newerDirty = { kind: 'newer-dirty', version: 4 } as const
+  const chip = (s: Partial<UniworkDocStatus>) => chipModelOf(status(s), { needsSignIn: false })
+
+  it('reads "newer version on UniWork" (warn, Resolve -> reload) for a newer-dirty / newer-ai bar', () => {
+    const model = chip({ state: 'dirty', remote: newerDirty })
+    expect(model).toMatchObject({
+      tone: 'warn',
+      labelKey: 'uwChipRemoteNewer',
+      tipKey: 'uwTipRemoteNewer',
+      action: { kind: 'reload', labelKey: 'uwActResolve' },
+    })
+    expect(chipCopy(model, t, 'en-US').label).toBe(copy.uwChipRemoteNewer)
+    // the AI bar: Reload is not available yet, so the pill has no button either
+    expect(chip({ state: 'dirty', remote: { kind: 'newer-ai', version: 4 } })).toMatchObject({
+      labelKey: 'uwChipRemoteNewer',
+      action: undefined,
+    })
+    // a save in flight or a stuck one: same
+    for (const wait of ['commit', 'stuck'] as const) {
+      expect(chip({ state: 'dirty', remote: { ...newerDirty, wait } }).action).toBeUndefined()
+    }
+  })
+
+  it.each<UniworkSaveState>([
+    'paused_admin',
+    'queued',
+    'paused_offline',
+    'paused_user',
+    'dirty',
+    'saving',
+    'offline',
+    'saved',
+    'ready',
+  ])('beats %s', (state) => {
+    expect(chip({ state, remote: newerDirty }).labelKey).toBe('uwChipRemoteNewer')
+  })
+
+  it('beats View only', () => {
+    expect(chip({ access: 'view', state: 'saved', remote: newerDirty }).labelKey).toBe(
+      'uwChipRemoteNewer',
+    )
+  })
+
+  it.each<[UniworkSaveState, StringKey]>([
+    ['reconciling', 'uwChipReconciling'],
+    ['reconciling-stuck', 'uwChipReconcileStuck'],
+    ['conflict', 'uwChipConflict'],
+    ['blocked', 'uwChipBlocked'],
+    ['error', 'uwChipError'],
+    ['failed', 'uwChipError'],
+    ['signed-out', 'uwChipSignedOut'],
+  ])('loses to %s', (state, labelKey) => {
+    expect(chip({ state, remote: newerDirty }).labelKey).toBe(labelKey)
+  })
+
+  it('only a newer-* bar changes the chip', () => {
+    for (const remote of [
+      { kind: 'updated', version: 2 },
+      { kind: 'now-clean', version: 2 },
+      { kind: 'reload-failed', version: 2 },
+      { kind: 'revoked' },
+      { kind: 'deleted' },
+    ] as const) {
+      expect(chip({ state: 'dirty', remote }).labelKey).toBe('uwChipDirty')
+    }
+    expect(chip({ state: 'dirty' }).labelKey).toBe('uwChipDirty')
+  })
+})
+
 describe('G5-06 error codes -> sentence and reason', () => {
   const en = { ...syncStrings.en, ...uniworkDocumentStrings.en }
   const doc = en
