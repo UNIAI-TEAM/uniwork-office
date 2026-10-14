@@ -162,6 +162,7 @@ import {
   defaultSaveDir,
   uniquePathIn,
   authorizeMcpDocWrite,
+  recoveryCopyMtime as docsRecoveryCopyMtime,
 } from '../../../docs/src/main/docs-main'
 import { blankXlsxBuffer } from '@genoffice/xlsx-gateway/gateway/csv-import'
 import { blankPdfBuffer } from '../../../pdf/src/main/blank-pdf'
@@ -205,6 +206,7 @@ import {
   setSheetsWorkbookOpenedHook,
   startSheetsCaptureServer,
   stopSheetsSidecar,
+  recoveryCopyMtime as sheetsRecoveryCopyMtime,
 } from '../../../sheets/src/main/sheets-main'
 import {
   configureSlidesRuntime,
@@ -220,6 +222,7 @@ import {
   setSlidesShellWindow,
   setSlidesShowBleed,
   slidesFileRenamed,
+  recoveryCopyMtime as slidesRecoveryCopyMtime,
 } from '../../../slides/src/main/slides-main'
 import {
   configurePdfRuntime,
@@ -350,6 +353,7 @@ import { registerAiRunIpc } from './ai-run-registry'
 import { broadcastUniworkAiFlag, registerUniworkAiFlagIpc } from './uniwork-ai-flag'
 import { createUniworkAiChoiceStore } from './uniwork-ai-choice'
 import { TabManager } from './tab-manager'
+import { listDeskDrafts } from './desk-drafts'
 import { installShellCloseGuard } from './window-close-guard'
 import {
   activateDetached,
@@ -4643,6 +4647,21 @@ function registerHomeIpc(): void {
     if (typeof path === 'string' && existsSync(path)) shell.showItemInFolder(path)
   })
 
+  ipcMain.handle(HOME_CHANNELS.listDrafts, () =>
+    listDeskDrafts({
+      openTabs: async () => [
+        ...(tabManager ? await tabManager.openDocuments() : []),
+        ...(await detachedOpenDocuments()),
+      ],
+      recents: readRecentFiles,
+      probes: [
+        { app: 'docs', ext: /\.docx$/i, mtime: docsRecoveryCopyMtime },
+        { app: 'sheets', ext: /\.(xlsx|xlsm|xls|csv)$/i, mtime: sheetsRecoveryCopyMtime },
+        { app: 'slides', ext: /\.pptx$/i, mtime: slidesRecoveryCopyMtime },
+      ],
+    }),
+  )
+
   ipcMain.handle(
     HOME_CHANNELS.renameFile,
     (_event, path: unknown, newName: unknown): RenameResult => {
@@ -5225,7 +5244,7 @@ function registerTabsIpc(): void {
   ipcMain.handle(TABS_CHANNELS.list, () => tabManager?.list() ?? [])
   ipcMain.handle(TABS_CHANNELS.activate, (_event, id: unknown) => {
     if (typeof id !== 'string' || !id) return
-    tabManager?.activateTab(id)
+    if (!activateDetached(id)) tabManager?.activateTab(id)
   })
   ipcMain.handle(TABS_CHANNELS.close, (_event, id: unknown) => {
     if (typeof id !== 'string' || !id) return

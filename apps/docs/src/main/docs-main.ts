@@ -3447,6 +3447,18 @@ const recoveryDir = () => userDataPath('docs-autosave')
 const recoveryPathFor = (filePath: string) =>
   join(recoveryDir(), `${createHash('sha1').update(filePath).digest('hex').slice(0, 16)}.docx`)
 
+/** mtime of a crash copy newer than `filePath`, or null; read-only (the shell's Desk lists it, opening offers the restore) */
+export function recoveryCopyMtime(filePath: string): number | null {
+  try {
+    const copy = recoveryPathFor(filePath)
+    if (!existsSync(copy)) return null
+    const at = statSync(copy).mtimeMs
+    return at > statSync(filePath).mtimeMs ? at : null
+  } catch {
+    return null
+  }
+}
+
 /** Bumped by every clear: an in-flight docs:write-recovery that started before
  * the bump must not recreate the file it is about to land (stale-recovery race). */
 const recoveryClearEpochs = new Map<string, number>()

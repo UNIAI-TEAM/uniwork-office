@@ -1908,6 +1908,18 @@ const recoveryDir = () => userDataPath('sheets-autosave')
 const recoveryPathFor = (filePath: string) =>
   join(recoveryDir(), `${createHash('sha1').update(filePath).digest('hex').slice(0, 16)}.xlsx`)
 
+/** mtime of a crash copy newer than `filePath`, or null; read-only (the shell's Desk lists it, opening offers the restore) */
+export function recoveryCopyMtime(filePath: string): number | null {
+  try {
+    const copy = recoveryPathFor(filePath)
+    if (!existsSync(copy)) return null
+    const at = statSync(copy).mtimeMs
+    return at > statSync(filePath).mtimeMs ? at : null
+  } catch {
+    return null
+  }
+}
+
 function clearWorkbookRecovery(filePath: string): void {
   try {
     unlinkSync(recoveryPathFor(filePath))

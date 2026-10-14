@@ -57,6 +57,7 @@ export interface AttachmentImageResult {
 }
 import type { AiPanelPrefs } from '@genoffice/ui/ai-panel-prefs'
 import type { FileExcerpt } from './file-excerpt'
+import type { DocumentTabKind } from './tabs-api'
 
 /** UI language; kept self-contained here (mirrors Lang in @genoffice/i18n) */
 
@@ -501,6 +502,19 @@ export interface AiConnectionTestResult {
   errorKind?: AiTestFailureKind
 }
 
+/** Desk "In progress": an open tab with unsaved changes, or a crash copy newer than its recent file */
+export interface DeskDraft {
+  kind: 'unsaved' | 'recovery'
+  title: string
+  app: DocumentTabKind
+  /** absent for an untitled unsaved tab */
+  filePath?: string
+  /** the tab to switch to ('unsaved' only; 'detached:<n>' for a detached window) */
+  tabId?: string
+  /** when the crash copy was written ('recovery' only) */
+  modifiedMs?: number
+}
+
 export interface HomeApi {
   /** unified recents across document types, newest first (paged) */
   recents(query?: RecentQuery): Promise<RecentPage>
@@ -560,6 +574,8 @@ export interface HomeApi {
   removeRecent(paths: string[]): Promise<void>
   /** reveal the file in Finder / Explorer */
   revealPath(path: string): Promise<void>
+  /** Desk: open tabs with unsaved changes, then crash copies newer than a recent file that is not open */
+  listDrafts(): Promise<DeskDraft[]>
   /** rename the file on disk (same directory) and update the recent list */
   renameFile(path: string, newName: string): Promise<RenameResult>
   /** copy the file next to itself (localized "copy" suffix before .ext) and record it as recent */
@@ -1211,6 +1227,7 @@ export const HOME_CHANNELS = {
   newPdf: 'home:new-pdf',
   removeRecent: 'home:remove-recent',
   revealPath: 'home:reveal-path',
+  listDrafts: 'home:list-drafts',
   renameFile: 'home:rename-file',
   duplicateFile: 'home:duplicate-file',
   deleteFiles: 'home:delete-files',

@@ -30,7 +30,7 @@ import type { WebContents } from 'electron'
 import { execFile } from 'node:child_process'
 import { readFile, writeFile, rm, stat, mkdir, open } from 'node:fs/promises'
 import { createHash, randomUUID } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, statSync } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
 import { cleanupExpiredGeneratedPages } from './generated-page-temp'
 import { exportSlidesPdf } from './pdf-export'
@@ -385,6 +385,18 @@ export function slidesFileRenamed(wc: WebContents, oldPath: string, newPath: str
 const autosaveDir = () => join(app.getPath('userData'), 'slides-autosave')
 const autosavePathFor = (filePath: string) =>
   join(autosaveDir(), `${createHash('sha1').update(filePath).digest('hex').slice(0, 16)}.pptx`)
+
+/** mtime of a crash copy newer than `filePath`, or null; read-only (the shell's Desk lists it, opening offers the restore) */
+export function recoveryCopyMtime(filePath: string): number | null {
+  try {
+    const copy = autosavePathFor(filePath)
+    if (!existsSync(copy)) return null
+    const at = statSync(copy).mtimeMs
+    return at > statSync(filePath).mtimeMs ? at : null
+  } catch {
+    return null
+  }
+}
 
 /**
  * Ticks to skip after a failed recovery copy, per deck. Retrying every 30s just

@@ -22,6 +22,7 @@ import type { UpdateUiState } from '../shared/update-api'
 import { normalizeAiPanelPrefs } from '@genoffice/ui/ai-panel-prefs'
 import type {
   AccountLoginEvent,
+  DeskDraft,
   AiConnectionTestResult,
   AccountSetServerResult,
   AccountStatus,
@@ -399,6 +400,9 @@ const homeApi: HomeApi = {
   async revealPath(path) {
     if (typeof path !== 'string' || !path) throw new Error('Invalid path.')
     await ipcRenderer.invoke(HOME_CHANNELS.revealPath, path)
+  },
+  async listDrafts() {
+    return (await ipcRenderer.invoke(HOME_CHANNELS.listDrafts)) as DeskDraft[]
   },
   async renameFile(path, newName) {
     if (typeof path !== 'string' || !path) throw new Error('Invalid path.')
