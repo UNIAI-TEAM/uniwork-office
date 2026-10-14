@@ -82,6 +82,12 @@ export interface ModuleBridgeSpec {
    * the frame covers every comments surface of the format (invariant 8). Default: FRAME_COMMENTS.
    */
   frameComments?: boolean
+  /**
+   * G8-13: what the frame Discussion panel does with a reveal it does not own. A module whose editor
+   * serves anchored comments (S12) passes 'silent': the editor shows its own S15 line on a miss.
+   * Default 'notice'.
+   */
+  discussionRevealMissing?: 'notice' | 'silent'
   /** window global name -> its members (merged over the appearance members) */
   globals: Record<string, (ctx: ModuleBridgeContext) => BridgeObject>
   /**
@@ -131,7 +137,7 @@ export const MODULE_WEB_CAPABILITIES: Readonly<Record<string, unknown>> = Object
 /**
  * What every frame (Docs and the five modules) claims in `ready` on top of its own keys; each is
  * effective only with the host grant:
- *   - the web AI keys (CONTRACT C16; `uniworkAi` stays false until the G6-05 adapter),
+ *   - the web AI keys (CONTRACT C16; `uniworkAi` is the UniWork AI adapter's, effective with the host grant),
  *   - `desktopOpen`: the host's "Open in desktop app" flow for `app.open` (A7),
  *   - `download`: the host downloads the open bytes for `api.download` (X-02).
  */
@@ -194,7 +200,7 @@ export function installModuleBridge(spec: ModuleBridgeSpec): InstalledModuleBrid
   client.onRemoteVersion?.(rememberRemoteVersion)
   // the AI turns of this frame: the host hears `aiRun`, the new-version bar waits for idle
   frameAiRun.bind((payload) => client.reportAiRun?.(payload))
-  const ai = createWebAi({ port: client, capabilities, aiRun: frameAiRun })
+  const ai = createWebAi({ port: client, capabilities, aiRun: frameAiRun, module: spec.module })
 
   const ctx: ModuleBridgeContext = { module: spec.module, client, capabilities }
   const target = spec.target ?? (window as unknown as Record<string, unknown>)
@@ -211,7 +217,10 @@ export function installModuleBridge(spec: ModuleBridgeSpec): InstalledModuleBrid
   target.__officeWebModule = spec.module
   // the Discussion panel: mounted once the session is known, only for a bound, signed-in document
   if (spec.frameComments ?? FRAME_COMMENTS[spec.module]) {
-    void mountFrameDiscussion(client as ModuleBridgePort & DiscussionPort)
+    void mountFrameDiscussion(
+      client as ModuleBridgePort & DiscussionPort,
+      spec.discussionRevealMissing ? { revealMissing: spec.discussionRevealMissing } : {},
+    )
   }
   return { client, capabilities, globals }
 }

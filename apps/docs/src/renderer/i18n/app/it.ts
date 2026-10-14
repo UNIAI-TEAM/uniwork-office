@@ -113,6 +113,7 @@ export const it = {
   appMixedExportOpening:
     "Formati carta misti: apertura dell'anteprima di impaginazione per esportare unendo per pagina…",
   appSelectTextToComment: 'Seleziona prima il testo da commentare',
+  appCommentSaveFirst: 'Salva prima il documento per aggiungere un commento',
   appCommentSelectionLost: 'La selezione non è più valida; riseleziona il testo da commentare',
   appCommentAdded: 'Commento aggiunto; scritto nel documento al salvataggio',
   appCommentEdited: 'Commento aggiornato; scritto nel documento al salvataggio',

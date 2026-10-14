@@ -61,13 +61,15 @@ export function sheetsHostGrants(
 ): Pick<
   SheetsCapabilities,
   'open' | 'recents' | 'save' | 'saveAs' | 'ai' | 'webSearch' | 'imageSearch' | 'imageGeneration'
-> & { aiCredentials: boolean } {
+> & { aiCredentials: boolean; uniworkAi: boolean } {
   const ai = aiHostGrants(granted)
   return {
-    // `ai` family (with the AI settings entry): the shared web AI bridge's mapping; each cloud
-    // tool needs `ai` too
+    // `ai` family (with the AI settings entry): the shared web AI bridge's mapping (the Grant
+    // formula: `ai` opens for BYOK or UniWork AI, `aiCredentials` is BYOK only); each cloud tool
+    // needs one of the two AI grants too
     ai: ai.ai!,
     aiCredentials: ai.aiCredentials!,
+    uniworkAi: ai.uniworkAi!,
     webSearch: ai.webSearch!,
     imageSearch: ai.imageSearch!,
     imageGeneration: ai.imageGeneration!,

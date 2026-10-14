@@ -59,4 +59,9 @@ export const th = {
   aiErrCapabilityOff: 'UniWork AI เพิ่งถูกปิดสำหรับเอกสารนี้ การทำงานจึงหยุดหลังขั้นตอนปัจจุบัน',
   aiErrUnsupported: 'UniWork AI ยังทำสิ่งนี้ใน {module} ไม่ได้',
   aiErrViewOnlyEdit: 'คุณมีสิทธิ์ดูเอกสารนี้เท่านั้น AI จึงแก้ไขไม่ได้',
+  // UniWork AI question limits (the façade takes text up to 8,000 characters)
+  aiErrQuestionTooLong:
+    'คำขอยาวเกินไปสำหรับ UniWork AI โปรดย่อให้ต่ำกว่า 8,000 อักขระแล้วส่งอีกครั้ง',
+  aiErrQuestionRejected: 'UniWork AI รับคำขอนี้ไม่ได้ โปรดแก้ไขคำขอแล้วส่งอีกครั้ง',
+  aiUniworkImagesNotSent: 'ระบบไม่ส่งรูปภาพไปยัง UniWork AI ส่งเฉพาะข้อความของคุณเท่านั้น',
 } satisfies Record<keyof typeof zh, string>

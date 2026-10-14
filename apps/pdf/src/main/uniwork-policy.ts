@@ -12,6 +12,12 @@ export interface UniworkDocumentPolicy {
   isBound(path: string): boolean
   isReadOnly(path: string): boolean
   /**
+   * G5-03a: the server revoked or deleted this open working copy, so it may not
+   * be saved, exported or printed. Optional: no shell, or an older shell, never
+   * locks.
+   */
+  isLocked?(path: string): boolean
+  /**
    * G8-02: author name for a new comment on `path` — the shell's single source
    * (the signed-in account's display name for a bound document, else the
    * neutral constant). Absent = neutral constant; never the OS account name.
@@ -44,6 +50,21 @@ export function uniworkIsReadOnly(path: string | null | undefined): boolean {
   if (!path || !policy) return false
   try {
     return policy.isReadOnly(path)
+  } catch {
+    return false
+  }
+}
+
+/**
+ * G5-03a: true when the shell locked this working copy — the server revoked or
+ * deleted a document that is still open. The lock gates export, Save As and
+ * print in this module. A policy without isLocked, or one that throws, reads as
+ * not locked, so a standalone app and a plain local file are unaffected.
+ */
+export function uniworkIsLocked(path: string | null | undefined): boolean {
+  if (!path || !policy?.isLocked) return false
+  try {
+    return policy.isLocked(path)
   } catch {
     return false
   }

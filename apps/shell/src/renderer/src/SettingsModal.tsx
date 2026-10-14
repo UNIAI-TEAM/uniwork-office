@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
+import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react'
 import {
   AI_CUSTOM_FONT_MAX_PX,
   AI_CUSTOM_FONT_MIN_PX,
@@ -46,12 +46,7 @@ import type { BlockCheck, TestedBlock, TestResult } from './ai-connection-test'
 import { AccountPane } from './AccountPane'
 import type { AccountController } from './account-model'
 import { BackupStoragePane } from './BackupStoragePane'
-import {
-  CREDIT_RATE_NOTE_EN,
-  CREDIT_RATE_NOTE_VI,
-  creditWalletFromOpenRouter,
-  formatCreditCount,
-} from './credit-wallet'
+import { creditWalletFromOpenRouter, formatCreditCount } from './credit-wallet'
 import { UniAiPwaPane } from './UniAiPwaPane'
 import {
   UniworkCloudAccountRows,
@@ -68,6 +63,9 @@ import './settings.css'
 
 // sorted by ISO 639 language code — native-script labels have no natural
 // shared alphabet, so the code is the ordering key
+/** the Settings window reads and saves the account's UniWork AI pick with the BYOK settings */
+const SETTINGS_PICK = { includeUniworkPick: true } as const
+
 const LANG_OPTIONS = [
   { value: 'ar', label: 'العربية' },
   { value: 'cs', label: 'Čeština' },
@@ -180,7 +178,8 @@ const SECTIONS: readonly { id: SectionId; labelKey: StringKey }[] = [
   { id: 'account', labelKey: 'setSecAccount' },
   { id: 'aiModel', labelKey: 'setSecAiModel' },
   { id: 'aiMedia', labelKey: 'setSecAiMedia' },
-  { id: 'uniai', labelKey: 'setSecUniAi' },
+  // shortcut: UniAI pane hidden for now (pane code kept); re-add this entry to show it again
+  // { id: 'uniai', labelKey: 'setSecUniAi' },
   { id: 'general', labelKey: 'setSecGeneral' },
   { id: 'backup', labelKey: 'setSecBackup' },
   { id: 'integrations', labelKey: 'setSecIntegrations' },
@@ -337,6 +336,21 @@ function Field({
   )
 }
 
+/** the pane's shape while its settings load, so the form does not pop in from a blank pane */
+function PaneSkeleton({ title }: { title: string }) {
+  return (
+    <div aria-busy="true">
+      <h3 className="set-pane-title">{title}</h3>
+      {[0, 1, 2, 3].map((i) => (
+        <div key={i} className="set-field set-skel-row" aria-hidden="true">
+          <span className="set-skel" />
+          <span className="set-skel set-skel-control" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 /**
  * Long enough that typing an address does not fire a request per keystroke,
  * short enough that the picker is populated by the time the eye reaches it.
@@ -352,14 +366,23 @@ function foldModels(providerId: string, models: string[]) {
 }
 
 /** AI model pane: provider / model / key / base URL, saved to userData/ai-settings.json */
-function AiModelPane({ t, cloud }: { t: TFunc; cloud: UniworkCloudStatus | null }) {
-  const { lang } = useI18n()
+function AiModelPane({
+  t,
+  cloud,
+  onDirtyChange,
+}: {
+  t: TFunc
+  cloud: UniworkCloudStatus | null
+  onDirtyChange?: (dirty: boolean) => void
+}) {
+  const { dateLocale } = useI18n()
   const [catalog, setCatalog] = useState<AiCatalogEntry[]>(
     () => window.aiOffice.getAiProviders?.() ?? [],
   )
   const [settings, setSettings] = useState<AiSettings | null>(null)
   const [dirty, setDirty] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ ok: boolean; error?: string } | null>(null)
   const [hubStatus, setHubStatus] = useState<string | null>(null)
@@ -386,12 +409,14 @@ function AiModelPane({ t, cloud }: { t: TFunc; cloud: UniworkCloudStatus | null 
   // unsaved edits; a dirty form keeps the user's draft and saves it as is.
   const dirtyRef = useRef(dirty)
   dirtyRef.current = dirty
+  useEffect(() => onDirtyChange?.(dirty), [dirty, onDirtyChange])
+  useEffect(() => () => onDirtyChange?.(false), [onDirtyChange])
   /** bumped on every outside reload so a connection test that was still running reports nothing */
   const testSeqRef = useRef(0)
   useEffect(() => {
     let alive = true
     const load = () => {
-      void window.aiOffice.getAiSettings?.().then((s) => {
+      void window.aiOffice.getAiSettings?.(SETTINGS_PICK).then((s) => {
         if (!alive || !s) return
         testSeqRef.current += 1
         setTesting(false)
@@ -492,7 +517,7 @@ function AiModelPane({ t, cloud }: { t: TFunc; cloud: UniworkCloudStatus | null 
     }
   }, [endpointProvider, endpointBaseUrl, endpointApiKey])
 
-  if (!settings) return null
+  if (!settings) return <PaneSkeleton title={t('setSecAiModel')} />
   const provider = settings.provider
   const meta = catalog.find((c) => c.id === provider)
   const config = settings.providers[provider] ?? {
@@ -504,11 +529,14 @@ function AiModelPane({ t, cloud }: { t: TFunc; cloud: UniworkCloudStatus | null 
   const isGenspark = provider === 'genspark'
   const isCodex = provider === 'codex'
   const isOpenRouter = provider === 'openrouter'
+  // UniWork AI runs on the organization's plan: no key, model or endpoint to set or test
+  const isUniwork = provider === 'uniwork'
   const isTokenHub = isGenspark || isOpenRouter
 
   const touch = () => {
     setDirty(true)
     setSaved(false)
+    setSaveError(null)
     setTestResult(null)
     setHubStatus(null)
   }
@@ -537,8 +565,9 @@ function AiModelPane({ t, cloud }: { t: TFunc; cloud: UniworkCloudStatus | null 
     touch()
   }
   const save = () => {
+    setSaveError(null)
     window.aiOffice
-      .setAiSettings?.(settings)
+      .setAiSettings?.(settings, SETTINGS_PICK)
       .then(() => {
         setDirty(false)
         setSaved(true)
@@ -546,7 +575,10 @@ function AiModelPane({ t, cloud }: { t: TFunc; cloud: UniworkCloudStatus | null 
         if (isTokenHub && config.apiKey) void checkOpenRouterHub(config.apiKey)
       })
       .catch((error) => {
-        window.alert(error instanceof Error ? error.message : String(error))
+        setSaved(false)
+        setSaveError(
+          t('setAiSaveFailed', { error: error instanceof Error ? error.message : String(error) }),
+        )
       })
   }
   const test = () => {
@@ -582,21 +614,15 @@ function AiModelPane({ t, cloud }: { t: TFunc; cloud: UniworkCloudStatus | null 
       .then((r) => {
         if (r.ok) {
           const wallet = creditWalletFromOpenRouter(r, true)
-          const rate = lang === 'vi' ? CREDIT_RATE_NOTE_VI : CREDIT_RATE_NOTE_EN
-          const used = formatCreditCount(wallet.used, lang === 'vi' ? 'vi-VN' : 'en-US')
-          const remain =
-            wallet.remaining != null
-              ? formatCreditCount(wallet.remaining, lang === 'vi' ? 'vi-VN' : 'en-US')
-              : null
+          const used = formatCreditCount(wallet.used, dateLocale)
           const creditLine =
-            remain != null
-              ? lang === 'vi'
-                ? `Credit: còn ${remain} · đã dùng ${used}`
-                : `Credits: ${remain} left · used ${used}`
-              : lang === 'vi'
-                ? `Credit đã dùng ${used} (không giới hạn khóa)`
-                : `Credits used ${used} (no key limit)`
-          setHubStatus([r.summary, creditLine, rate].filter(Boolean).join(' · '))
+            wallet.remaining != null
+              ? t('setAiCreditLeft', {
+                  remain: formatCreditCount(wallet.remaining, dateLocale),
+                  used,
+                })
+              : t('setAiCreditUsedNoLimit', { used })
+          setHubStatus([r.summary, creditLine, t('setAiCreditRate')].filter(Boolean).join(' · '))
           window.dispatchEvent(new Event('uniwork:credit-refresh'))
         } else {
           setHubStatus(r.error || t('setAiOpenRouterHubFail'))
@@ -617,18 +643,22 @@ function AiModelPane({ t, cloud }: { t: TFunc; cloud: UniworkCloudStatus | null 
             status={
               testing
                 ? { kind: 'testing', text: t('setAiTesting') }
-                : testResult
-                  ? testResult.ok
-                    ? { kind: 'ok', text: t('setAiTestOk') }
-                    : { kind: 'err', text: testResult.error || t('setAiTestFail') }
-                  : saved
-                    ? { kind: 'ok', text: t('setAiSaved') }
-                    : null
+                : saveError
+                  ? { kind: 'err', text: saveError }
+                  : testResult
+                    ? testResult.ok
+                      ? { kind: 'ok', text: t('setAiTestOk') }
+                      : { kind: 'err', text: testResult.error || t('setAiTestFail') }
+                    : saved
+                      ? { kind: 'ok', text: t('setAiSaved') }
+                      : null
             }
           />
-          <button className="set-btn" disabled={testing} onClick={test}>
-            {t('setAiTest')}
-          </button>
+          {!isUniwork && (
+            <button className="set-btn" disabled={testing} onClick={test}>
+              {t('setAiTest')}
+            </button>
+          )}
           <button className="set-btn primary" disabled={!dirty} onClick={save}>
             {t('setAiSave')}
           </button>
@@ -636,7 +666,7 @@ function AiModelPane({ t, cloud }: { t: TFunc; cloud: UniworkCloudStatus | null 
       </div>
       <div className="set-field">
         <div className="set-field-text">
-          <label className="set-field-label">{t('setAiProvider')}</label>
+          <div className="set-field-label">{t('setAiProvider')}</div>
         </div>
         <Dropdown
           className="set-dd"
@@ -656,127 +686,141 @@ function AiModelPane({ t, cloud }: { t: TFunc; cloud: UniworkCloudStatus | null 
         />
       </div>
       <div className="set-field-desc set-ai-note">
-        {isGenspark ? t('setAiGensparkHint') : isCodex ? t('setAiCodexHint') : t('setAiByokNote')}
+        {isUniwork
+          ? t('setAiUniworkNote')
+          : isGenspark
+            ? t('setAiGensparkHint')
+            : isCodex
+              ? t('setAiCodexHint')
+              : t('setAiByokNote')}
       </div>
-      <div className="set-field">
-        <div className="set-field-text">
-          <label className="set-field-label">{t('setAiModelId')}</label>
-        </div>
-        {meta && meta.models.length > 0 ? (
-          <Dropdown
-            className="set-dd"
-            value={config.model || meta.defaultModel}
-            ariaLabel={t('setAiModelId')}
-            options={meta.models.map((m) => ({ value: m, label: m }))}
-            onPick={(m) => updateConfig({ model: m })}
-          />
-        ) : (
-          <input
-            id="set-ai-model"
-            className="set-input"
-            type="text"
-            value={config.model}
-            placeholder="model-id"
-            spellCheck={false}
-            onChange={(e) => updateConfig({ model: e.target.value })}
-          />
-        )}
-      </div>
-      {isCodex ? (
-        <div className="set-field">
-          <div className="set-field-text">
-            <div className="set-field-stack">
-              <label className="set-field-label" htmlFor="set-ai-cli-path">
-                {t('setAiCodexPath')}
-              </label>
-              <div className="set-field-desc">{t('setAiCodexPathHint')}</div>
-            </div>
-          </div>
-          <input
-            id="set-ai-cli-path"
-            className="set-input"
-            type="text"
-            value={config.cliPath ?? ''}
-            placeholder={t('setAiCodexAutoPlaceholder')}
-            spellCheck={false}
-            autoComplete="off"
-            onChange={(e) => updateConfig({ cliPath: e.target.value.trim() })}
-            onBlur={(e) => {
-              const cliPath = e.target.value.trim()
-              void refreshCodexModels(cliPath, config.model).catch(() => undefined)
-            }}
-          />
-        </div>
-      ) : (
+      {!isUniwork && (
         <>
           <div className="set-field">
             <div className="set-field-text">
-              <div className="set-field-stack">
-                <label className="set-field-label" htmlFor="set-ai-key">
-                  {t('setAiApiKey')}
-                </label>
-                <div className="set-field-desc">
-                  {isTokenHub ? t('setAiOpenRouterHubHint') : t('setAiKeyHint')}
-                </div>
-              </div>
+              <label className="set-field-label" htmlFor="set-ai-model">
+                {t('setAiModelId')}
+              </label>
             </div>
-            <input
-              id="set-ai-key"
-              className="set-input"
-              type="password"
-              value={config.apiKey}
-              placeholder={meta?.keyPlaceholder ?? 'API Key'}
-              spellCheck={false}
-              autoComplete="off"
-              onChange={(e) => updateConfig({ apiKey: e.target.value.trim() })}
-            />
+            {meta && meta.models.length > 0 ? (
+              <Dropdown
+                className="set-dd"
+                value={config.model || meta.defaultModel}
+                ariaLabel={t('setAiModelId')}
+                options={meta.models.map((m) => ({ value: m, label: m }))}
+                onPick={(m) => updateConfig({ model: m })}
+              />
+            ) : (
+              <input
+                id="set-ai-model"
+                className="set-input"
+                type="text"
+                value={config.model}
+                placeholder="model-id"
+                spellCheck={false}
+                onChange={(e) => updateConfig({ model: e.target.value })}
+              />
+            )}
           </div>
-          {!isGenspark && (
+          {isCodex ? (
             <div className="set-field">
               <div className="set-field-text">
                 <div className="set-field-stack">
-                  <label className="set-field-label" htmlFor="set-ai-base-url">
-                    {t('setAiBaseUrl')}
+                  <label className="set-field-label" htmlFor="set-ai-cli-path">
+                    {t('setAiCodexPath')}
                   </label>
-                  {!meta?.needsBaseUrl && (
-                    <div className="set-field-desc">{t('setAiBaseUrlHint')}</div>
-                  )}
+                  <div className="set-field-desc">{t('setAiCodexPathHint')}</div>
                 </div>
               </div>
               <input
-                id="set-ai-base-url"
+                id="set-ai-cli-path"
                 className="set-input"
                 type="text"
-                value={config.baseUrl ?? ''}
-                placeholder={meta?.needsBaseUrl ? 'https://…/v1' : meta?.defaultBaseUrl}
+                value={config.cliPath ?? ''}
+                placeholder={t('setAiCodexAutoPlaceholder')}
                 spellCheck={false}
-                onChange={(e) => updateConfig({ baseUrl: e.target.value.trim() })}
+                autoComplete="off"
+                onChange={(e) => updateConfig({ cliPath: e.target.value.trim() })}
+                onBlur={(e) => {
+                  const cliPath = e.target.value.trim()
+                  void refreshCodexModels(cliPath, config.model).catch(() => undefined)
+                }}
               />
             </div>
+          ) : (
+            <>
+              <div className="set-field">
+                <div className="set-field-text">
+                  <div className="set-field-stack">
+                    <label className="set-field-label" htmlFor="set-ai-key">
+                      {t('setAiApiKey')}
+                    </label>
+                    <div className="set-field-desc">
+                      {isTokenHub ? t('setAiOpenRouterHubHint') : t('setAiKeyHint')}
+                    </div>
+                  </div>
+                </div>
+                <input
+                  id="set-ai-key"
+                  className="set-input"
+                  type="password"
+                  value={config.apiKey}
+                  placeholder={meta?.keyPlaceholder ?? 'API Key'}
+                  spellCheck={false}
+                  autoComplete="off"
+                  onChange={(e) => updateConfig({ apiKey: e.target.value.trim() })}
+                />
+              </div>
+              {!isGenspark && (
+                <div className="set-field">
+                  <div className="set-field-text">
+                    <div className="set-field-stack">
+                      <label className="set-field-label" htmlFor="set-ai-base-url">
+                        {t('setAiBaseUrl')}
+                      </label>
+                      {!meta?.needsBaseUrl && (
+                        <div className="set-field-desc">{t('setAiBaseUrlHint')}</div>
+                      )}
+                    </div>
+                  </div>
+                  <input
+                    id="set-ai-base-url"
+                    className="set-input"
+                    type="text"
+                    value={config.baseUrl ?? ''}
+                    placeholder={meta?.needsBaseUrl ? 'https://…/v1' : meta?.defaultBaseUrl}
+                    spellCheck={false}
+                    onChange={(e) => updateConfig({ baseUrl: e.target.value.trim() })}
+                  />
+                </div>
+              )}
+            </>
           )}
+          <div className="set-field">
+            <div className="set-field-text">
+              <div className="set-field-stack">
+                <label className="set-field-label" htmlFor="set-ai-max-tokens">
+                  {t('setAiMaxTokens')}
+                </label>
+                <div className="set-field-desc">{t('setAiMaxTokensDesc')}</div>
+              </div>
+            </div>
+            <input
+              id="set-ai-max-tokens"
+              className="set-input"
+              type="number"
+              min={MIN_MAX_OUTPUT_TOKENS}
+              max={MAX_MAX_OUTPUT_TOKENS}
+              step={1024}
+              value={
+                maxTokensDraft ?? String(settings.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS)
+              }
+              onChange={(e) => setMaxTokensDraft(e.target.value)}
+              onBlur={commitMaxTokens}
+            />
+          </div>
         </>
       )}
-      <div className="set-field">
-        <div className="set-field-text">
-          <div className="set-field-stack">
-            <label className="set-field-label" htmlFor="set-ai-max-tokens">
-              {t('setAiMaxTokens')}
-            </label>
-            <div className="set-field-desc">{t('setAiMaxTokensDesc')}</div>
-          </div>
-        </div>
-        <input
-          id="set-ai-max-tokens"
-          className="set-input"
-          type="number"
-          min={MIN_MAX_OUTPUT_TOKENS}
-          max={MAX_MAX_OUTPUT_TOKENS}
-          step={1024}
-          value={maxTokensDraft ?? String(settings.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS)}
-          onChange={(e) => setMaxTokensDraft(e.target.value)}
-          onBlur={commitMaxTokens}
-        />
-      </div>
       {/* offered only while signed in to UniWork and the plan includes cloud AI */}
       {cloud?.enabled && (
         <div className="set-field">
@@ -867,12 +911,14 @@ function AiMediaPane({
   focusBlock,
   onSignIn,
   cloud,
+  onDirtyChange,
 }: {
   t: TFunc
   onFileSearchChange?: () => void
   focusBlock?: TestedBlock
   onSignIn?: () => void
   cloud: UniworkCloudStatus | null
+  onDirtyChange?: (dirty: boolean) => void
 }) {
   // re-listed when the cloud turns on or off: the UniWork cloud entry is offered only while it is on
   const cloudOn = cloud?.enabled === true
@@ -894,12 +940,13 @@ function AiMediaPane({
   const [fileSearch, setFileSearchState] = useState<FileSearchSettings | null>(null)
   const [dirty, setDirty] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [testing, setTesting] = useState(false)
   const [testResults, setTestResults] = useState<Partial<Record<TestedBlock, TestResult>> | null>(
     null,
   )
   const focused = useRef(false)
-  const scrollToFocused = (el: HTMLDivElement | null) => {
+  const scrollToFocused = (el: HTMLElement | null) => {
     if (!el || focused.current) return
     focused.current = true
     el.scrollIntoView({ block: 'start' })
@@ -907,11 +954,13 @@ function AiMediaPane({
 
   const dirtyRef = useRef(dirty)
   dirtyRef.current = dirty
+  useEffect(() => onDirtyChange?.(dirty), [dirty, onDirtyChange])
+  useEffect(() => () => onDirtyChange?.(false), [onDirtyChange])
   const testSeqRef = useRef(0)
   useEffect(() => {
     let alive = true
     const load = () => {
-      void window.aiOffice.getAiSettings?.().then((s) => {
+      void window.aiOffice.getAiSettings?.(SETTINGS_PICK).then((s) => {
         if (!alive || !s) return
         testSeqRef.current += 1
         setTesting(false)
@@ -937,13 +986,14 @@ function AiMediaPane({
     }
   }, [])
 
-  if (!settings?.media || !settings.search) return null
+  if (!settings?.media || !settings.search) return <PaneSkeleton title={t('setSecAiMedia')} />
   const media: AiMediaSettings = settings.media
   const search: AiSearchSettings = settings.search
 
   const touch = () => {
     setDirty(true)
     setSaved(false)
+    setSaveError(null)
     setTestResults(null)
   }
   const setMedia = (next: AiMediaSettings) => {
@@ -984,8 +1034,9 @@ function AiMediaPane({
   ) => setMedia(updateMediaProviderConfig(media, cap, id, patch))
 
   const save = () => {
+    setSaveError(null)
     Promise.all([
-      window.aiOffice.setAiSettings?.(settings),
+      window.aiOffice.setAiSettings?.(settings, SETTINGS_PICK),
       fileSearch ? window.aiOffice.setFileSearchSettings?.(fileSearch) : undefined,
     ])
       .then(() => {
@@ -994,7 +1045,10 @@ function AiMediaPane({
         onFileSearchChange?.()
       })
       .catch((error) => {
-        window.alert(error instanceof Error ? error.message : String(error))
+        setSaved(false)
+        setSaveError(
+          t('setAiSaveFailed', { error: error instanceof Error ? error.message : String(error) }),
+        )
       })
   }
   // every block reports its own verdict; blocks sharing a vendor share that vendor's one check
@@ -1070,16 +1124,18 @@ function AiMediaPane({
     : []
   const headStatus: AiStatus | null = testing
     ? { kind: 'testing', text: t('setAiTesting') }
-    : testResults
-      ? failed.length === 0
-        ? { kind: 'ok', text: t('setAiTestOk') }
-        : {
-            kind: 'err',
-            text: `${blockLabel(failed[0]!)} · ${blockProvider(failed[0]!)}: ${testResults[failed[0]!]?.error || t('setAiTestFail')}`,
-          }
-      : saved
-        ? { kind: 'ok', text: t('setAiSaved') }
-        : null
+    : saveError
+      ? { kind: 'err', text: saveError }
+      : testResults
+        ? failed.length === 0
+          ? { kind: 'ok', text: t('setAiTestOk') }
+          : {
+              kind: 'err',
+              text: `${blockLabel(failed[0]!)} · ${blockProvider(failed[0]!)}: ${testResults[failed[0]!]?.error || t('setAiTestFail')}`,
+            }
+        : saved
+          ? { kind: 'ok', text: t('setAiSaved') }
+          : null
 
   const providerRow = (
     label: string,
@@ -1089,7 +1145,7 @@ function AiMediaPane({
   ) => (
     <div className="set-field">
       <div className="set-field-text">
-        <label className="set-field-label">{t('setAiProvider')}</label>
+        <div className="set-field-label">{t('setAiProvider')}</div>
       </div>
       <Dropdown
         className="set-dd"
@@ -1248,34 +1304,48 @@ function AiMediaPane({
     const modelField = cap === 'image' ? 'imageModel' : 'analysisModel'
     return (
       <section key={cap}>
-        {subhead(cap, title)}
-        {providerRow(
-          title,
-          id,
-          options.map((m) => ({ id: m.id, label: mediaLabel(m) })),
-          pick,
-        )}
-        <div className="set-field-desc set-ai-note">
-          {id === 'genspark' ? t('cloudMediaDesc') : meta.description}
-        </div>
-        {/* the UniWork cloud entry has no model, key or endpoint of its own */}
-        {id !== 'genspark' && (
-          <>
-            {modelRow(
-              `set-ai-${cap}-model`,
-              cap === 'image' ? meta.imageModels : meta.analysisModels,
-              cap === 'image' ? meta.defaultImageModel : meta.defaultAnalysisModel,
-              config[modelField],
-              (m) => updateMediaConfig(cap, id, { [modelField]: m }),
-            )}
-            {keyRow(`set-ai-${cap}-key`, config.apiKey, meta.keyPlaceholder, (v) =>
-              updateMediaConfig(cap, id, { apiKey: v }),
-            )}
-            {baseUrlRow(`set-ai-${cap}-base-url`, meta, config.baseUrl ?? '', (v) =>
-              updateMediaConfig(cap, id, { baseUrl: v }),
-            )}
-          </>
-        )}
+        {/* a media block reads as one line (what serves it, how it tested) until
+            it is opened; a block someone points at or that failed opens itself */}
+        <details
+          className="set-ai-block"
+          open={cap === focusBlock || blockStatus(cap)?.kind === 'err' || undefined}
+        >
+          <summary
+            className="set-pane-subhead set-ai-block-head"
+            ref={cap === focusBlock ? scrollToFocused : undefined}
+          >
+            <h4 className="set-pane-subtitle">{title}</h4>
+            <span className="set-ai-block-provider">{mediaLabel(meta)}</span>
+            <AiStatusPill status={blockStatus(cap)} />
+          </summary>
+          {providerRow(
+            title,
+            id,
+            options.map((m) => ({ id: m.id, label: mediaLabel(m) })),
+            pick,
+          )}
+          <div className="set-field-desc set-ai-note">
+            {id === 'genspark' ? t('cloudMediaDesc') : meta.description}
+          </div>
+          {/* the UniWork cloud entry has no model, key or endpoint of its own */}
+          {id !== 'genspark' && (
+            <>
+              {modelRow(
+                `set-ai-${cap}-model`,
+                cap === 'image' ? meta.imageModels : meta.analysisModels,
+                cap === 'image' ? meta.defaultImageModel : meta.defaultAnalysisModel,
+                config[modelField],
+                (m) => updateMediaConfig(cap, id, { [modelField]: m }),
+              )}
+              {keyRow(`set-ai-${cap}-key`, config.apiKey, meta.keyPlaceholder, (v) =>
+                updateMediaConfig(cap, id, { apiKey: v }),
+              )}
+              {baseUrlRow(`set-ai-${cap}-base-url`, meta, config.baseUrl ?? '', (v) =>
+                updateMediaConfig(cap, id, { baseUrl: v }),
+              )}
+            </>
+          )}
+        </details>
       </section>
     )
   }
@@ -1355,7 +1425,7 @@ function AiMediaPane({
             <>
               <div className="set-field">
                 <div className="set-field-text">
-                  <label className="set-field-label">{t('setSearchRerankEndpoint')}</label>
+                  <div className="set-field-label">{t('setSearchRerankEndpoint')}</div>
                 </div>
                 <Dropdown
                   className="set-dd"
@@ -1475,6 +1545,9 @@ function AiStatusPill({ status }: { status: AiStatus | null }) {
   )
 }
 
+const FOCUSABLE =
+  'button:not(:disabled), input:not(:disabled):not([hidden]), textarea, a[href], summary, [tabindex]:not([tabindex="-1"])'
+
 export interface SettingsModalProps {
   /** the UniWork account (owned by the sidebar AccountEntry); absent in isolated renders */
   account?: AccountController
@@ -1504,6 +1577,20 @@ export function SettingsModal({
   useEffect(() => {
     if (target) setSection(target.section)
   }, [target])
+  // the AI panes report unsaved edits; leaving them (close, other section) asks first
+  const paneDirtyRef = useRef(false)
+  const onPaneDirty = useCallback((dirty: boolean) => {
+    paneDirtyRef.current = dirty
+  }, [])
+  const [leaveAction, setLeaveAction] = useState<(() => void) | null>(null)
+  const guardLeave = (action: () => void) => {
+    if (paneDirtyRef.current) setLeaveAction(() => action)
+    else action()
+  }
+  const requestClose = () => guardLeave(onClose)
+  const goToSection = (id: SectionId) => {
+    if (id !== section) guardLeave(() => setSection(id))
+  }
   const [theme, setTheme] = useState<UiTheme>('system')
   const [docTheme, setDocTheme] = useState<DocTheme>('follow')
   const [saveDir, setSaveDir] = useState('')
@@ -1515,6 +1602,7 @@ export function SettingsModal({
   const [cliLinkBusy, setCliLinkBusy] = useState(false)
   const [aiPrefs, setAiPrefs] = useState<AiPanelPrefs>(DEFAULT_AI_PANEL_PREFS)
   const [channel, setChannel] = useState<'stable' | 'beta'>('stable')
+  const [pinnedChannel, setPinnedChannel] = useState<string | null>(null)
   const [appVersion, setAppVersion] = useState('')
   const [updateState, setUpdateState] = useState<UpdateUiState | null>(null)
   const [legalOpenFailed, setLegalOpenFailed] = useState(false)
@@ -1561,6 +1649,9 @@ export function SettingsModal({
     void window.aiOffice.getUpdateChannel?.().then((ch) => {
       if (alive) setChannel(ch)
     })
+    void window.aiOffice.getPinnedUpdateChannel?.().then((ch) => {
+      if (alive) setPinnedChannel(ch)
+    })
     void window.aiOffice.getAppVersion?.().then((v) => {
       if (alive && v) setAppVersion(v)
     })
@@ -1584,13 +1675,43 @@ export function SettingsModal({
     return () => off?.()
   }, [])
 
+  // modal focus: start on the current section, Tab cycles inside, closing hands focus back
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    dialogRef.current?.querySelector<HTMLElement>('.set-nav-item.active')?.focus()
+    return () => opener?.focus()
+  }, [])
+  const trapTab = (e: ReactKeyboardEvent) => {
+    if (e.key !== 'Tab' || !dialogRef.current) return
+    const items = [...dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
+      (el) => el.getClientRects().length > 0,
+    )
+    const first = items[0]
+    const last = items[items.length - 1]
+    if (!first || !last) return
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault()
+      last.focus()
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault()
+      first.focus()
+    }
+  }
+
+  // read through a ref so the listener is registered once, not per render
+  const escapeRef = useRef<() => void>(() => undefined)
+  escapeRef.current = () => {
+    if (leaveAction) setLeaveAction(null)
+    else requestClose()
+  }
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') escapeRef.current()
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [onClose])
+  }, [])
 
   const applyTheme = (next: UiTheme) => {
     setTheme(next)
@@ -1606,7 +1727,10 @@ export function SettingsModal({
 
   const updateAiPrefs = (patch: Partial<AiPanelPrefs>) => {
     setAiPrefs((prev) => ({ ...prev, ...patch }))
-    void window.aiOffice.setAiPanelPrefs(patch).then(setAiPrefs)
+    // a refused write re-reads what is actually stored
+    void window.aiOffice
+      .setAiPanelPrefs(patch)
+      .then(setAiPrefs, () => window.aiOffice.getAiPanelPrefs?.().then(setAiPrefs))
   }
 
   const changeSaveDir = () => {
@@ -1673,13 +1797,20 @@ export function SettingsModal({
     <div
       className="set-overlay"
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose()
+        if (e.target === e.currentTarget) requestClose()
       }}
     >
-      <div className="set-dialog" role="dialog" aria-modal="true" aria-label={t('settings')}>
+      <div
+        ref={dialogRef}
+        className="set-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label={t('settings')}
+        onKeyDown={trapTab}
+      >
         <div className="set-header">
           <h2 className="set-title">{t('settings')}</h2>
-          <button className="set-close" onClick={onClose} aria-label={t('cancel')}>
+          <button className="set-close" onClick={requestClose} aria-label={t('setClose')}>
             <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
               <path
                 d="M2 2l10 10M12 2L2 12"
@@ -1697,7 +1828,7 @@ export function SettingsModal({
                 key={s.id}
                 className={`set-nav-item${section === s.id ? ' active' : ''}`}
                 aria-current={section === s.id}
-                onClick={() => setSection(s.id)}
+                onClick={() => goToSection(s.id)}
               >
                 <SectionIcon id={s.id} />
                 {t(s.labelKey)}
@@ -1711,23 +1842,13 @@ export function SettingsModal({
             {section === 'account' && (
               <>
                 <h3 className="set-pane-title">{t('setSecAccount')}</h3>
-                <div className="set-field">
-                  <div className="set-field-text">
-                    <label className="set-field-label">{t('language')}</label>
-                  </div>
-                  <Dropdown
-                    className="set-dd"
-                    value={lang}
-                    ariaLabel={t('language')}
-                    options={LANG_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
-                    onPick={(v) => setLang(v as typeof lang)}
-                  />
-                </div>
                 {account && <AccountPane account={account} />}
                 {loggedIn && <UniworkCloudAccountRows status={cloud} />}
               </>
             )}
-            {section === 'aiModel' && <AiModelPane t={t} cloud={cloud} />}
+            {section === 'aiModel' && (
+              <AiModelPane t={t} cloud={cloud} onDirtyChange={onPaneDirty} />
+            )}
             {section === 'aiMedia' && (
               <AiMediaPane
                 cloud={cloud}
@@ -1735,18 +1856,18 @@ export function SettingsModal({
                 onFileSearchChange={onFileSearchChange}
                 focusBlock={target?.block}
                 onSignIn={signIn}
+                onDirtyChange={onPaneDirty}
               />
             )}
-            {section === 'backup' && (
-              <BackupStoragePane lang={lang} loggedIn={loggedIn} onLogin={signIn} />
-            )}
-            {section === 'uniai' && <UniAiPwaPane lang={lang} />}
+            {section === 'backup' && <BackupStoragePane loggedIn={loggedIn} onLogin={signIn} />}
+            {section === 'uniai' && <UniAiPwaPane />}
             {section === 'general' && (
               <>
                 <h3 className="set-pane-title">{t('setSecGeneral')}</h3>
+                <h4 className="set-pane-subtitle">{t('setGrpAppearance')}</h4>
                 <div className="set-field">
                   <div className="set-field-text">
-                    <label className="set-field-label">{t('language')}</label>
+                    <div className="set-field-label">{t('language')}</div>
                   </div>
                   <Dropdown
                     className="set-dd"
@@ -1758,7 +1879,7 @@ export function SettingsModal({
                 </div>
                 <div className="set-field">
                   <div className="set-field-text">
-                    <label className="set-field-label">{t('theme')}</label>
+                    <div className="set-field-label">{t('theme')}</div>
                   </div>
                   <Dropdown
                     className="set-dd"
@@ -1773,7 +1894,7 @@ export function SettingsModal({
                 </div>
                 <div className="set-field">
                   <div className="set-field-text">
-                    <label className="set-field-label">{t('documentTheme')}</label>
+                    <div className="set-field-label">{t('documentTheme')}</div>
                   </div>
                   <Dropdown
                     className="set-dd"
@@ -1786,9 +1907,10 @@ export function SettingsModal({
                     onPick={(v) => applyDocumentTheme(v as DocTheme)}
                   />
                 </div>
+                <h4 className="set-pane-subtitle">{t('setGrpAiPanel')}</h4>
                 <div className="set-field">
                   <div className="set-field-text">
-                    <label className="set-field-label">{t('setAiPanelSide')}</label>
+                    <div className="set-field-label">{t('setAiPanelSide')}</div>
                   </div>
                   <Dropdown
                     className="set-dd"
@@ -1803,7 +1925,7 @@ export function SettingsModal({
                 </div>
                 <div className="set-field">
                   <div className="set-field-text">
-                    <label className="set-field-label">{t('setAiFontSize')}</label>
+                    <div className="set-field-label">{t('setAiFontSize')}</div>
                   </div>
                   {aiPrefs.fontSize === 'custom' && (
                     <CustomFontSizeInput
@@ -1861,6 +1983,44 @@ export function SettingsModal({
                     onClick={() => updateAiPrefs({ openInNewDocs: !aiPrefs.openInNewDocs })}
                   />
                 </div>
+                <h4 className="set-pane-subtitle">{t('setGrpFiles')}</h4>
+                <Field
+                  label={t('saveLocation')}
+                  value={saveDir || '—'}
+                  valueTitle={saveDir}
+                  action={
+                    <button className="set-btn" onClick={changeSaveDir}>
+                      {t('setChange')}
+                    </button>
+                  }
+                />
+                <div className="set-field">
+                  <div className="set-field-text">
+                    <div className="set-field-stack">
+                      <div className="set-field-label">{t('setAutoSave')}</div>
+                      <div className="set-field-desc">{t('setAutoSaveDesc')}</div>
+                      <div className="set-field-desc">{t('setAutoSaveUniworkNote')}</div>
+                    </div>
+                  </div>
+                  <button
+                    className="set-switch"
+                    role="switch"
+                    aria-checked={autoSaveOn}
+                    aria-label={t('setAutoSave')}
+                    onClick={() => {
+                      const next = !autoSaveOn
+                      setAutoSaveOn(next)
+                      // a refused write puts the switch back instead of showing a state that was not saved
+                      void window.aiOffice
+                        .setAutoSaveDefault?.(next)
+                        .catch(() => setAutoSaveOn(!next))
+                    }}
+                  />
+                </div>
+                {((defaultApp && defaultApp.state !== 'unsupported') ||
+                  (cliLink && cliLink.state !== 'unsupported')) && (
+                  <h4 className="set-pane-subtitle">{t('setGrpSystem')}</h4>
+                )}
                 {defaultApp && defaultApp.state !== 'unsupported' && (
                   <div className="set-field">
                     <div className="set-field-text">
@@ -1900,36 +2060,6 @@ export function SettingsModal({
                     </button>
                   </div>
                 )}
-                <Field
-                  label={t('saveLocation')}
-                  value={saveDir || '—'}
-                  valueTitle={saveDir}
-                  action={
-                    <button className="set-btn" onClick={changeSaveDir}>
-                      {t('setChange')}
-                    </button>
-                  }
-                />
-                <div className="set-field">
-                  <div className="set-field-text">
-                    <div className="set-field-stack">
-                      <div className="set-field-label">{t('setAutoSave')}</div>
-                      <div className="set-field-desc">{t('setAutoSaveDesc')}</div>
-                      <div className="set-field-desc">{t('setAutoSaveUniworkNote')}</div>
-                    </div>
-                  </div>
-                  <button
-                    className="set-switch"
-                    role="switch"
-                    aria-checked={autoSaveOn}
-                    aria-label={t('setAutoSave')}
-                    onClick={() => {
-                      const next = !autoSaveOn
-                      setAutoSaveOn(next)
-                      void window.aiOffice.setAutoSaveDefault?.(next).catch(() => {})
-                    }}
-                  />
-                </div>
               </>
             )}
             {section === 'integrations' && (
@@ -1941,7 +2071,7 @@ export function SettingsModal({
                 <div className="set-about-hero">
                   <img className="set-about-logo" src={appIcon} alt="" />
                   <div className="set-about-id">
-                    <div className="set-about-name">UniWork Office</div>
+                    <div className="set-about-name">{legal.product}</div>
                     <div className="set-about-tagline">{t('onbSubtitle1')}</div>
                   </div>
                 </div>
@@ -1949,11 +2079,11 @@ export function SettingsModal({
                 {updateState && (
                   <div className="set-field">
                     <div className="set-field-text">
-                      <label className="set-field-label">{t('setUpdateAvailableLabel')}</label>
+                      <div className="set-field-label">{t('setUpdateAvailableLabel')}</div>
                     </div>
                     <button
                       type="button"
-                      className="set-update-btn"
+                      className="set-btn primary"
                       onClick={() => void window.aiOffice.openUpdateDialog?.()}
                     >
                       {updateState.phase === 'downloading'
@@ -1968,23 +2098,41 @@ export function SettingsModal({
                 )}
                 <div className="set-field">
                   <div className="set-field-text">
-                    <label className="set-field-label">{t('updateChannel')}</label>
+                    <div className="set-field-stack">
+                      <div className="set-field-label">{t('updateChannel')}</div>
+                      {(pinnedChannel ?? channel) === 'beta' && (
+                        <div className="set-field-desc">{t('setChannelBetaDesc')}</div>
+                      )}
+                    </div>
                   </div>
-                  <Dropdown
-                    className="set-dd"
-                    value={channel}
-                    ariaLabel={t('updateChannel')}
-                    options={CHANNEL_OPTIONS.map((opt) => ({
-                      value: opt.value,
-                      label: t(opt.labelKey),
-                    }))}
-                    onPick={(v) => {
-                      const next = v === 'beta' ? 'beta' : 'stable'
-                      setChannel(next)
-                      void window.aiOffice.setUpdateChannel(next)
-                    }}
-                  />
+                  {pinnedChannel !== null ? (
+                    <span className="set-about-channel-pinned">
+                      {pinnedChannel === 'dev'
+                        ? t('channelDev')
+                        : pinnedChannel === 'beta'
+                          ? t('channelBeta')
+                          : pinnedChannel}
+                    </span>
+                  ) : (
+                    <Dropdown
+                      className="set-dd"
+                      value={channel}
+                      ariaLabel={t('updateChannel')}
+                      options={CHANNEL_OPTIONS.map((opt) => ({
+                        value: opt.value,
+                        label: t(opt.labelKey),
+                      }))}
+                      onPick={(v) => {
+                        const next = v === 'beta' ? 'beta' : 'stable'
+                        setChannel(next)
+                        void window.aiOffice.setUpdateChannel(next)
+                      }}
+                    />
+                  )}
                 </div>
+                {pinnedChannel !== null && (
+                  <p className="set-field-desc">{t('updateChannelPinnedNote')}</p>
+                )}
                 <div className="set-about-legal">
                   <p className="set-about-copyright">
                     {t('setAboutCopyright', {
@@ -2003,21 +2151,21 @@ export function SettingsModal({
                   <div className="set-about-legal-links">
                     <button
                       type="button"
-                      className="set-about-legal-btn"
+                      className="set-btn set-about-legal-btn"
                       onClick={() => openLegal('license')}
                     >
                       {t('setAboutLicense')}
                     </button>
                     <button
                       type="button"
-                      className="set-about-legal-btn"
+                      className="set-btn set-about-legal-btn"
                       onClick={() => openLegal('notice')}
                     >
                       {t('setAboutLegalNotices')}
                     </button>
                     <button
                       type="button"
-                      className="set-about-legal-btn"
+                      className="set-btn set-about-legal-btn"
                       onClick={() => openLegal('thirdParty')}
                     >
                       {t('setAboutThirdPartyLicenses')}
@@ -2033,6 +2181,45 @@ export function SettingsModal({
             )}
           </div>
         </div>
+        {leaveAction && (
+          <div
+            className="set-leave"
+            role="alertdialog"
+            aria-labelledby="set-leave-title"
+            aria-describedby="set-leave-body"
+          >
+            <div className="set-field-stack">
+              <div className="set-field-label" id="set-leave-title">
+                {t('setUnsavedTitle')}
+              </div>
+              <div className="set-field-desc" id="set-leave-body">
+                {t('setUnsavedBody')}
+              </div>
+            </div>
+            <div className="set-btn-row">
+              <button
+                type="button"
+                className="set-btn"
+                onClick={() => {
+                  const action = leaveAction
+                  setLeaveAction(null)
+                  paneDirtyRef.current = false
+                  action()
+                }}
+              >
+                {t('setUnsavedDiscard')}
+              </button>
+              <button
+                type="button"
+                className="set-btn primary"
+                autoFocus
+                onClick={() => setLeaveAction(null)}
+              >
+                {t('setUnsavedKeep')}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

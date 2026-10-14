@@ -8,6 +8,7 @@ import {
   notifyUniworkUserSave,
   setUniworkUserSaveHook,
   uniworkIsBound,
+  uniworkIsLocked,
   uniworkIsReadOnly,
   uniworkRefusesOpen,
   uniworkSaveDecision,
@@ -56,6 +57,7 @@ import {
   MAX_REMOTE_IMAGE_BYTES,
   readBodyCapped,
 } from '@genoffice/electron-utils'
+import { answerUniworkAiFlagOff } from '@genoffice/electron-utils/uniwork-ai-flag'
 import { buildPagePptx, parsePageSpec } from '@genoffice/pipelines/slides'
 import { sniffImageMime } from './media-mime'
 import { canWriteElementClipboardImage, writeElementClipboardImage } from './element-clipboard'
@@ -1435,7 +1437,9 @@ export function registerSlidesIpc(): void {
 
   ipcMain.handle(
     'slides:export-images',
-    async (_e, op: ExportImagesOp): Promise<ExportImagesResult> => {
+    async (e, op: ExportImagesOp): Promise<ExportImagesResult> => {
+      // G5-03a: a locked working copy exports nothing
+      if (uniworkIsLocked(sessions.get(e.sender.id)?.path ?? null)) return { ok: false }
       try {
         // Zero-padding width follows the total page count (3 digits for ≥100 pages)
         const pad = op.pngsBase64.length >= 100 ? 3 : 2
@@ -1465,7 +1469,9 @@ export function registerSlidesIpc(): void {
 
   ipcMain.handle(
     'slides:save-picture',
-    async (_e, op: SavePictureOp): Promise<SavePictureResult> => {
+    async (e, op: SavePictureOp): Promise<SavePictureResult> => {
+      // G5-03a: an image out of a locked working copy is an export it may not have
+      if (uniworkIsLocked(sessions.get(e.sender.id)?.path ?? null)) return { ok: false }
       const options = {
         title: tm('dlgSavePicture'),
         defaultPath: `${op.defaultName}.png`,
@@ -1482,7 +1488,9 @@ export function registerSlidesIpc(): void {
     },
   )
 
-  ipcMain.handle('slides:export-pdf', async (_e, op: ExportPdfOp): Promise<ExportPdfResult> => {
+  ipcMain.handle('slides:export-pdf', async (e, op: ExportPdfOp): Promise<ExportPdfResult> => {
+    // G5-03a: a locked working copy exports nothing
+    if (uniworkIsLocked(sessions.get(e.sender.id)?.path ?? null)) return { ok: false }
     return exportSlidesPdf({
       ...op,
       // hidden window: without this, throttled timers/rAF stall the
@@ -1499,6 +1507,8 @@ export function registerSlidesIpc(): void {
   ipcMain.handle(
     'slides:print',
     async (e, op: PrintSlidesOp): Promise<{ ok: boolean; error?: string }> => {
+      // G5-03a: a locked working copy prints nothing
+      if (uniworkIsLocked(sessions.get(e.sender.id)?.path ?? null)) return { ok: false }
       // Page assembly is shared with the renderer's print-preview pane (print-html.ts)
       const html = buildPrintDocumentHtml({
         srcs: op.pngsBase64.map((b64) => `data:image/png;base64,${b64}`),
@@ -1995,6 +2005,8 @@ async function applyMainProcessProxy(): Promise<void> {
 }
 
 export function startSlidesStandalone(): void {
+  // no shell here: answer the renderer's UniWork AI flag pull with "off" instead of an unregistered channel
+  answerUniworkAiFlagOff(ipcMain)
   registerRendererScheme()
   installNavigationGuard(app)
   installContextMenu(app, () => contextMenuLabels(getUiLang()))

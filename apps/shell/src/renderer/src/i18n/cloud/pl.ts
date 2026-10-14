@@ -37,4 +37,6 @@ export const pl = {
   aiTestErrLimit: 'Osiągnięto limit dostawcy. Spróbuj później',
   aiTestErrUnavailable: 'Usługa nie odpowiada. Spróbuj później',
   aiTestErrMisconfigured: 'Ustawienia niekompletne: sprawdź adres usługi i pola konta',
+  setAiUniworkNote:
+    'UniWork AI korzysta z planu Twojej organizacji. Nie trzeba podawać klucza ani wybierać modelu.',
 } satisfies Record<keyof typeof zh, string>

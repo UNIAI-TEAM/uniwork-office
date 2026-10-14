@@ -9,6 +9,7 @@ import {
   type UniworkDocFormat,
   type UniworkDocListQuery,
   type UniworkDocLock,
+  type UniworkRemoteAction,
   type UniworkUploadDocInput,
   type UniworkSharedQuery,
 } from '../../shared/home-api'
@@ -45,7 +46,11 @@ import { createSyncStoreAccess, type SyncStoreAccess } from '../uniwork-sync/ses
 import { createStoreLayer, type StoreLayer } from '../uniwork-sync/store'
 import { createFeedClient, type FeedClient } from '../uniwork-sync/feed/client'
 import { createCapabilityFetch } from '../uniwork-sync/capability/client'
-import { CapabilityCache, NEVER_READ_CAPABILITIES } from '../uniwork-sync/capability/cache'
+import {
+  CapabilityCache,
+  NEVER_READ_CAPABILITIES,
+  type CapabilityRead,
+} from '../uniwork-sync/capability/cache'
 import { createUniworkDocsClient, type FetchLike, type UniworkDocsClient } from './client'
 import {
   UniworkDocsService,
@@ -76,6 +81,16 @@ export interface UniworkDocsWiring {
   isPathOpen(path: string): boolean
   requestModuleSave(path: string, onNotWritten?: () => void): boolean
   reloadPath(path: string): void
+  /**
+   * G5-03a: the FRESH editor state of one path, summed over every view that
+   * shows it (tab, detached window, present view of its owner tab): unsaved
+   * edits (null = no view answered), any running AI turn, and the sum of the
+   * views' AI epochs (never decreases). The guarded clean reload reads this
+   * before and after its fetch; it is never served from the 1 s poll cache.
+   */
+  editorStateOf(
+    path: string,
+  ): Promise<{ dirty: boolean | null; aiRunning: boolean; aiEpoch: number }>
   activePath(): string | undefined
   reveal(): void
   /**
@@ -95,8 +110,16 @@ export interface UniworkDocsWiring {
   discussionTabPaths?(sender: { id: number }): readonly string[] | null
   /** G8-11: the shell webContents that has `path` open as a tab, for the reveal push */
   discussionTarget?(path: string): DiscussionPushTarget | null
-  /** G8-11: narrow / restore the active editor view of the sender's window */
+  /**
+   * G8-11: narrow / restore the active editor view of the sender's window
+   */
   setDiscussionPanel?(sender: { id: number }, panel: { open: boolean; width: number }): void
+  /**
+   * ADVISOR D4 (a): this build's packaging flag (index.ts passes
+   * app.isPackaged), read by the dev-only S6 display fixture. Optional and
+   * absent = packaged, so a wiring that does not set it keeps the fixture off.
+   */
+  isPackaged?: boolean
   lang(): string
   defaultSaveDir(): string
   /** every file path a tab or detached editor window shows */
@@ -295,6 +318,24 @@ export interface UniworkDocsHandle {
    * once sign-in completes, and routes launch links from now on.
    */
   activate(startLaunch: (route: (url: string) => void) => void): void
+  /**
+   * G6-05: the UniWork binding a UniWork AI turn runs against (document +
+   * its org), 'hidden' for another account's copy, null for a local file.
+   */
+  aiBinding(path: string): { documentId: string; orgId: string } | 'hidden' | null
+  /** G6-05: the per-org capability read (shared cache, TTL rule) UniWork AI availability uses */
+  capabilityRead(orgId: string): Promise<CapabilityRead>
+}
+
+/** the binding of a path as UniWork AI sees it (see UniworkDocsHandle.aiBinding) */
+export function uniworkAiBinding(
+  service: Pick<UniworkDocsService, 'store' | 'owns'>,
+  path: string,
+): { documentId: string; orgId: string } | 'hidden' | null {
+  const doc = service.store.lookup(path)
+  if (!doc) return service.store.isInside(path) ? 'hidden' : null
+  if (!service.owns(doc)) return 'hidden'
+  return { documentId: doc.binding.documentId, orgId: doc.binding.orgId }
 }
 
 /** encrypted bytes the account's sync store (intents, cursors, index) may keep */
@@ -442,7 +483,16 @@ export function createSyncRuntime(
     // so a rename on the web reaches the open desktop copy
     // the change's revision, so the echo of this service's own rename is
     // recognised by it and a genuine later change is never swallowed (R1-6)
-    onFeedChange: (change) => service.noteFeedChange(change.documentId, change.revision),
+    // G5-03a: the same change IS the S6 newer-version notice (head version +
+    // version id), so one feed tick drives both
+    onFeedChange: (change) => service.noteFeedChange(change.documentId, change.revision, change),
+    // G5-03a: a full resync that no longer lists an open, bound document asks
+    // the service to classify it (403/404 -> revoked, 410 -> deleted); the
+    // runtime learns ids only, never paths
+    isOpenBound: (documentId) => service.isOpenBound(documentId),
+    onFeedGone: (documentId) => {
+      void service.noteFeedGone(documentId).catch(() => undefined)
+    },
     targets,
     capability: async (orgId) => {
       const found = clients()
@@ -520,7 +570,12 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     isPathOpen: (path) => wiring.isPathOpen(path),
     requestModuleSave: (path, onNotWritten) => wiring.requestModuleSave(path, onNotWritten),
     reloadPath: (path) => wiring.reloadPath(path),
+    // G5-03a: the fresh editor state of one path (W2's live read; the wiring
+    // placeholder is what index.ts installs today)
+    editorStateOf: (path) => wiring.editorStateOf(path),
     activePath: () => wiring.activePath(),
+    // ADVISOR D4 (a): the dev-only fixture gate; index.ts passes app.isPackaged
+    isPackaged: wiring.isPackaged,
     // S18: main owns the native dialog (Electron); the service stays Electron-free
     pickUploadFile: () => pickUploadFile(wiring),
     pushUploadProgress: (event) => push(UNIWORK_DOC_CHANNELS.uploadProgress, event),
@@ -553,6 +608,8 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     pushLocks: () => push(UNIWORK_DOC_CHANNELS.locksChanged, service.currentLocks()),
     reveal: () => wiring.reveal(),
     revealComment: (path, commentId) => comments?.reveal(path, commentId),
+    // G8-12: a settled Save tells the editor's comment panel its new version
+    notifySaved: (path, versionId) => comments?.saved(path, versionId),
   })
 
   // G8-08: the UniWork comments IPC (one handler per frame request kind) and
@@ -574,6 +631,13 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     },
     // R1-2: the sender's own path scopes the pending-reveal pull
     shownPath: (sender) => wiring.commentsPathFor?.(sender) ?? null,
+    // G8-12: the saved push goes to the loaded editor showing the path only; a
+    // page still loading reads the version through context() once it mounts
+    sendSaved: (payload) => {
+      const target = wiring.commentsTarget?.(payload.path)
+      if (!target || target.isDestroyed() || target.isLoadingMainFrame()) return
+      target.send(COMMENTS_CHANNELS.saved, payload)
+    },
     // G8-11: the shell Discussion panel's bridge, served only for the shell
     // webContents and the open tabs of its window
     ...(wiring.discussionTabPaths
@@ -633,6 +697,11 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   ipcMain.handle(UNIWORK_DOC_CHANNELS.resolveConflict, (_event, path: unknown) =>
     service.resolveConflict(path as string),
   )
+  // G5-03a: the S6 bar's actions. The barInset handler is NOT registered here:
+  // it belongs to the window chrome (index.ts, W2).
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.remoteAction, (_event, path: unknown, action: unknown) =>
+    service.remoteAction(path as string, action as UniworkRemoteAction),
+  )
   ipcMain.handle(UNIWORK_DOC_CHANNELS.locks, () => service.currentLocks())
   ipcMain.handle(UNIWORK_DOC_CHANNELS.dismissLock, (_event, path: unknown) => {
     if (typeof path === 'string') service.dismissLock(path)
@@ -687,6 +756,8 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     service,
     boundary,
     comments,
+    aiBinding: (path) => uniworkAiBinding(service, path),
+    capabilityRead: (orgId) => runtime.capabilityRead(orgId),
     activate(startLaunch) {
       let signedIn = uniworkAccount().status().state === 'signed-in'
       /** the org the feed currently runs for; null = no pass may run */

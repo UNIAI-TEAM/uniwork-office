@@ -66,7 +66,13 @@ import { isNumericIdentifierText } from './cell-warning'
 import { consumePendingUndoCarry, undoStackDepth } from './undo-carry'
 import { createSaveGate, recoveryCopyBacksSession, shouldRunSaveTick } from './save-scheduler'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { useAutoSavePref, useCloudSignedIn, type AiScopeQuoteData } from '@genoffice/ui'
+import {
+  aiUniworkText,
+  isUniworkQuestionRefusal,
+  useAutoSavePref,
+  useCloudSignedIn,
+  type AiScopeQuoteData,
+} from '@genoffice/ui'
 
 import {
   CellValueType,
@@ -128,12 +134,8 @@ import {
   type TableDesignContext,
 } from './table-design-actions'
 
-import {
-  AgentLoop,
-  COMPLETED_VIA_TOOLS_TEXT,
-  composeSkills,
-  type AgentImage,
-} from '@genoffice/agent-core'
+import { AgentLoop, composeSkills, type AgentImage } from '@genoffice/agent-core'
+import { createRunNotices } from './ai/run-notices'
 import { imageGenerationAvailable, type AiSettings } from '@genoffice/ai-provider/browser'
 import { type WorkbookOperation } from '@genoffice/xlsx-gateway/domain/workbook-dsl'
 import {
@@ -391,7 +393,11 @@ import { installInvalidDataMarkerSuppression } from './data-validation-marker'
 import { installThreadedCommentAffordances, type ThreadHover } from './threaded-comment-marker'
 import { followCommentAuthor } from './comment-author'
 import { threadPane, threadStore } from './threaded-comments'
-import { ThreadHoverCard, ThreadedCommentsPane } from './ThreadedCommentsPane'
+import { ThreadHoverCard } from './ThreadedCommentsPane'
+import { serverAnchorStore } from './server-comments/anchor-store'
+import { SheetsCommentsSurface } from './server-comments/CommentsSurface'
+import { serverComments } from './server-comments/SheetsServerComments'
+import { liveSheetNames } from './server-comments/univer-view'
 import { installFormulaNullResultFix } from './formula-null-result'
 import { installNumberFormatFix } from './numfmt-fix'
 import { installIfsEmptySetFix } from './ifs-empty-set'
@@ -1447,11 +1453,14 @@ export function App({
   /** AI plans apply asynchronously after propose_operations returns. Run
    * completion waits for these before doing the run's single auto-save. */
   const aiApplyPromisesRef = useRef<Promise<boolean>[]>([])
-  /** Last non-empty streamed text of the run: a final empty turn falls back to
-   * it instead of wiping the model's own summary from the tool-call turn. */
-  const runLastTextRef = useRef('')
   /** true once any tool of the run mutated the workbook */
   const runMutatedRef = useRef(false)
+  /** UniWork AI notices of the run (a Retry-After wait, a restart, a boundary, dropped calls, off) folded into
+   * the one text of the assistant message (the chat message here has no note fields), plus the run's
+   * last streamed text for the fallback reply */
+  const runNoticesRef = useRef(createRunNotices())
+  /** the question of the running turn: a restarted conversation puts it back in the composer */
+  const runQuestionRef = useRef('')
 
   const agentLoopRef = useRef<AgentLoop | null>(null)
   if (!agentLoopRef.current) {
@@ -1488,14 +1497,44 @@ export function App({
       ),
       events: {
         onText: (text) => {
-          if (text) runLastTextRef.current = text
           // Status bar (and the ribbon-row status span) show a short state only;
           // the full streamed prose lives in the chat panel (web: not echoed at all).
           if (cap('statusEcho')) setMessage(t('appAiThinking'))
           // When the model retries successfully and keeps streaming after a
           // mid-run failure (e.g. one apply error), clear the error flag —
           // otherwise the whole successful message stays rendered in red.
-          patchLastAssistant((entry) => ({ ...entry, text, isError: false }))
+          patchLastAssistant((entry) => ({
+            ...entry,
+            text: runNoticesRef.current.text(text),
+            status: runNoticesRef.current.announcement(),
+            isError: false,
+          }))
+        },
+        // module-level getLang: the loop is created once, a render closure would go stale
+        onNotice: (notice) => {
+          // the question was not sent: it goes back into the composer for the user to send again
+          if (notice.kind === 'conversation-restarted')
+            setPrompt((current) => current || runQuestionRef.current)
+          const shown = runNoticesRef.current.notice(
+            notice,
+            (key, params) => aiUniworkText(getLang(), key, params),
+            'Sheets',
+          )
+          if (shown !== null)
+            patchLastAssistant((entry) => ({
+              ...entry,
+              text: shown,
+              isError: false,
+              status: runNoticesRef.current.announcement(),
+            }))
+        },
+        onTurnReset: () => {
+          const shown = runNoticesRef.current.reset()
+          patchLastAssistant((entry) => ({
+            ...entry,
+            text: shown,
+            status: runNoticesRef.current.announcement(),
+          }))
         },
         onToolStart: (call) => {
           // Live "running" chip: replaced in place by onToolExecuted
@@ -1558,31 +1597,27 @@ export function App({
             }
             return lines.join('\n')
           })()
-          // A cancelled run must keep the "stopped" notice: earlier narration or
-          // tool summaries would make an aborted run read as completed.
-          const prose =
-            text && text !== COMPLETED_VIA_TOOLS_TEXT
-              ? text
-              : cancelled
-                ? ''
-                : runLastTextRef.current || toolSummaries || text
-          // A final empty turn must not claim completion: reuse the model's last
-          // streamed text; with none, only a mutating run gets the "done" phrasing.
-          const fallback = cancelled
-            ? t('appAiStopped')
-            : runLastTextRef.current ||
-              toolSummaries ||
-              (runMutatedRef.current ? t('appAiNoSummary') : t('appAiNoAction'))
-          const baseText = turnLimit
-            ? [prose, t('appAiTurnLimit')].filter(Boolean).join('\n\n')
-            : prose || fallback
-          const finalText = truncated
-            ? [baseText, t('appAiTruncatedNote')].filter(Boolean).join('\n\n')
-            : baseText
+          const { display, persisted: finalText } = runNoticesRef.current.finish({
+            text,
+            cancelled,
+            turnLimit: !!turnLimit,
+            truncated: !!truncated,
+            toolSummaries,
+            mutated: runMutatedRef.current,
+            copy: {
+              stopped: t('appAiStopped'),
+              noSummary: t('appAiNoSummary'),
+              noAction: t('appAiNoAction'),
+              turnLimit: t('appAiTurnLimit'),
+              truncated: t('appAiTruncatedNote'),
+            },
+          })
           if (cap('statusEcho')) setMessage(cancelled ? t('appAiStopped') : t('appAiDone'))
           patchLastAssistant((entry) => ({
             ...entry,
-            text: finalText,
+            // notes above the answer; what is persisted below stays the bare answer
+            text: display,
+            status: '',
             streaming: false,
             isError: false,
             // A stop mid-tool can leave a running placeholder behind — drop it
@@ -1597,6 +1632,10 @@ export function App({
           void autoSaveCompletedAiRun().finally(() => setAiBusy(false))
         },
         onError: (error) => {
+          // a refused question (too long, rejected) goes back into the composer to be shortened or
+          // fixed, as the message says
+          if (isUniworkQuestionRefusal(error))
+            setPrompt((current) => current || runQuestionRef.current)
           // the chat bubble is the only place the failure is shown; the status line only drops
           // the "AI is working" state (the same text also sat in the ribbon row and the status bar)
           setMessage('')
@@ -1655,7 +1694,8 @@ export function App({
     // Released in onDone/onError, which own the rest of the run teardown.
     setAiRunScope(aiScopeDismissed ? null : aiScope)
     aiApplyPromisesRef.current = []
-    runLastTextRef.current = ''
+    runNoticesRef.current.clear()
+    runQuestionRef.current = instruction
     runMutatedRef.current = false
     setAiBusy(true)
     if (cap('statusEcho')) setMessage(t('appAiThinking'))
@@ -2442,6 +2482,7 @@ export function App({
             if (typeof params.subUnitId === 'string') {
               recordSheetRemove(state.editJournal, params.subUnitId)
               threadStore.removeSheet(params.subUnitId)
+              serverAnchorStore.removeSheet(params.subUnitId)
             }
           } else if (event.id === 'sheet.mutation.set-worksheet-order') {
             recordSheetOrderChange(state.editJournal)
@@ -2480,6 +2521,8 @@ export function App({
             recordSheetRename(state.editJournal, params.subUnitId, params.name, originalName)
             if (previousName !== undefined && previousName !== params.name) {
               renameChartRefsForSheet(state, previousName, params.name)
+              // server comment / in-file labels name the live sheet
+              serverAnchorStore.sheetRenamed(params.subUnitId)
             }
           }
           setPendingEdits(journalSize(state.editJournal))
@@ -2503,6 +2546,7 @@ export function App({
           if (toSheet && toRange) journalRangeSnapshot(runtime, state, toSheet, toRange)
           if (fromSheet && fromRange && toSheet && toRange) {
             threadStore.moveRange(fromSheet, fromRange, toSheet, toRange)
+            serverAnchorStore.moveRange(fromSheet, fromRange, toSheet, toRange)
           }
           // Moved cells feed charts too, same as value mutations.
           if (fromSheet && fromRange) queueChartDataSync(fromSheet, fromRange)
@@ -2764,6 +2808,7 @@ export function App({
             outline.version += 1
           }
           threadStore.applyStructuralOp(structuralSheetId, structuralOp)
+          serverAnchorStore.applyStructuralOp(structuralSheetId, structuralOp)
           // File visuals shift on-screen too (the save shifts the file's own
           // anchors and c:f refs independently); keeping the in-memory copy in
           // the new space keeps the preview and the live data sync honest.
@@ -4315,6 +4360,8 @@ export function App({
       ),
     }
     const cellCounts = workbookCellCounts(selected.sheets)
+    // G8-13: a Save reopens the same document; server comment anchors follow the sheets by name
+    const previousSheetNames = opts?.continueChat ? liveSheetNames(univerRef.current) : null
     setWorkbookFile(selected)
     // Calculation mode is workbook state: the next file starts automatic,
     // in the engine and in the menu alike.
@@ -4475,7 +4522,10 @@ export function App({
     loadWorkbookSkeleton(univerRef.current, selected)
     applyWorkbookNotes(univerRef.current, selected)
     threadStore.load(selected)
-    threadPane.close()
+    if (previousSheetNames) serverAnchorStore.rebase(previousSheetNames, selected.sheets)
+    else serverAnchorStore.reset()
+    // the server comment panel stays open through the reopen a Save does
+    if (!(previousSheetNames && serverComments.handle)) threadPane.close()
     applyDefinedNames(univerRef.current, selected, state)
     const runtime = univerRef.current
     if (runtime) {
@@ -5292,7 +5342,7 @@ export function App({
         ) : (
           <WorkbookOpeningScreen />
         ))}
-      <ThreadedCommentsPane getRuntime={getRuntime} />
+      <SheetsCommentsSurface getRuntime={getRuntime} file={workbookFile} onStatus={setMessage} />
       <ThreadHoverCard hover={threadHover} />
       {findReplaceService && (
         <FindReplacePanel

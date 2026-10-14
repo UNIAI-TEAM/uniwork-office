@@ -8,7 +8,7 @@ import {
 } from '../src/registry'
 import { endpointUrl } from '../src/protocols/shared'
 import { OPENROUTER_API_BASE } from '../src/openrouter'
-import { AI_PROVIDERS } from '../src/providers'
+import { AI_PROVIDERS, UNIWORK_PROVIDER_META } from '../src/providers'
 import type { AiProviderConfig, AiProviderId } from '../src/types'
 
 function config(model: string, baseUrl?: string): AiProviderConfig {
@@ -20,7 +20,17 @@ describe('provider registry', () => {
     for (const meta of AI_PROVIDERS) {
       expect(AI_PROVIDER_ADAPTERS[meta.id].meta).toBe(meta)
     }
-    expect(Object.keys(AI_PROVIDER_ADAPTERS).sort()).toEqual(AI_PROVIDERS.map((m) => m.id).sort())
+    // UniWork AI is registered but stays out of AI_PROVIDERS (shown only where the server offers it)
+    expect(Object.keys(AI_PROVIDER_ADAPTERS).sort()).toEqual(
+      [...AI_PROVIDERS.map((m) => m.id), 'uniwork'].sort(),
+    )
+    expect(AI_PROVIDER_ADAPTERS.uniwork.meta).toBe(UNIWORK_PROVIDER_META)
+  })
+
+  it('UniWork AI has no BYOK endpoint (the adapter streams it)', () => {
+    expect(() => AI_PROVIDER_ADAPTERS.uniwork.resolveEndpoint(config(''))).toThrow(
+      /UniWork adapter/,
+    )
   })
 
   it('routes UniAI (genspark) chat through OpenRouter', () => {
@@ -313,9 +323,11 @@ describe('provider registry', () => {
     ).toBe('https://mirror/v1')
   })
 
-  it('only Codex uses CLI auth; UniAI and the rest use api-key', () => {
+  it('only Codex uses CLI auth and UniWork AI the UniWork session; UniAI and the rest use api-key', () => {
+    const expected = (id: string) =>
+      id === 'codex' ? 'codex-chatgpt' : id === 'uniwork' ? 'uniwork-session' : 'api-key'
     for (const [id, adapter] of Object.entries(AI_PROVIDER_ADAPTERS)) {
-      expect(adapter.capabilities.auth).toBe(id === 'codex' ? 'codex-chatgpt' : 'api-key')
+      expect(adapter.capabilities.auth).toBe(expected(id))
     }
   })
 

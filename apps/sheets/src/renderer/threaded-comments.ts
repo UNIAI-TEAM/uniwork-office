@@ -125,6 +125,13 @@ export class ThreadStore {
     this.bump(null)
   }
 
+  /// G8-13: every sheet's threads (the read-only "in the file" list of server mode).
+  allThreads(): { sheetId: string; threads: CellThread[] }[] {
+    return [...this.threads.keys()]
+      .map((sheetId) => ({ sheetId, threads: this.sheetThreads(sheetId) }))
+      .filter((entry) => entry.threads.length > 0)
+  }
+
   sheetThreads(sheetId: string | null): CellThread[] {
     if (sheetId === null) return []
     return [...(this.threads.get(sheetId)?.values() ?? [])].sort(byPosition)
@@ -443,6 +450,11 @@ class ThreadPaneController {
 
   close(): void {
     this.set({ open: false, draft: null, focus: null })
+  }
+
+  /// G8-13: shows the pane as it is (server mode: the comment panel).
+  show(): void {
+    if (!this.state.open) this.set({ open: true, draft: null, focus: null })
   }
 
   /// Opens the pane on a cell: a composer when it has no thread yet,

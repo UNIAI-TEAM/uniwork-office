@@ -63,11 +63,13 @@ describe('workbench tokens', () => {
 })
 
 describe('workbench primitives (home.css)', () => {
-  it('the Workbench column: 24px side gutters, 18px between sections, capped at 1180px', () => {
+  it('the Workbench column: 24px side gutters, 18px between sections, capped and centered like Home', () => {
     expect(rule('.wb-home')).toMatch(/gap: 18px;/)
     expect(rule('.wb-home')).toMatch(/padding-inline: 24px;/)
     // the fixed skill-confirm overlay must keep the full window
-    expect(rule('.wb-home > :not(.modal-overlay)')).toMatch(/max-width: 1180px;/)
+    expect(rule('.wb-home > :not(.modal-overlay)')).toMatch(
+      /max-width: var\(--content-max\);\n {2}margin-inline: auto;/,
+    )
     expect(rule(':where(.wb-home) p')).toMatch(/max-width: 64ch;\n {2}text-wrap: pretty;/)
   })
 

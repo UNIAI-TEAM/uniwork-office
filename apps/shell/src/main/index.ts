@@ -94,7 +94,9 @@ import {
   createAuthCallbackRouter,
   registerAccountIpc,
   routeAuthCallbackUrl,
+  setUniworkAiFlagListener,
   startUniworkAccount,
+  startUniworkAiChat,
   startUniworkCloud,
   stopUniworkAccount,
   onUniworkAccountStatus,
@@ -114,7 +116,7 @@ import {
   watchCommentAuthorChanges,
 } from './uniwork-docs/modules'
 import { createModuleSaveRequester } from './uniwork-docs/module-save'
-import { startEditorStatePoll } from './uniwork-docs/editor-state-poll'
+import { mergeEditorStates, startEditorStatePoll } from './uniwork-docs/editor-state-poll'
 import { IPC_CHANNELS as SHEETS_IPC_CHANNELS } from '../../../sheets/src/shared/ipc-channels'
 import { isAgentIntentUrl, parseAgentIntentUrl } from './agent-intent-host'
 import { extractLaunchUrlFromArgv, isOfficeAppUrl, parseOfficeAppUrl } from '@uniwork/office-bridge'
@@ -154,6 +156,9 @@ import {
   setDocsFileSavedHook,
   setDocsFileOpenedHook,
   setSessionPathResolver,
+  setUniworkAiHost,
+  setUniworkAiChoiceStore,
+  setUniworkAiEditorSender,
   defaultSaveDir,
   uniquePathIn,
   authorizeMcpDocWrite,
@@ -281,6 +286,7 @@ import type {
   FileSearchSettings,
 } from '../shared/home-api'
 import { HOME_CHANNELS } from '../shared/home-api'
+import { UNIWORK_DOC_CHANNELS } from '../shared/home-api'
 import { extractAllowedFileExcerpts } from './file-excerpts'
 import { isAllowedWbKey, type WbKvMap } from './workbench-db'
 import { WorkbenchAccounts, loadWorkbenchSnapshot } from './workbench-accounts'
@@ -342,7 +348,9 @@ import { normalizeFileSearchSettings, probeDecision, SearchReranker } from './fi
 import { runHeadlessExport, type HeadlessExporters } from './headless-export'
 import { isVersionRequest } from './version-flag'
 import { registerAiRunIpc } from './ai-run-registry'
-import { TabManager } from './tab-manager'
+import { broadcastUniworkAiFlag, registerUniworkAiFlagIpc } from './uniwork-ai-flag'
+import { createUniworkAiChoiceStore } from './uniwork-ai-choice'
+import { canonicalPath, TabManager } from './tab-manager'
 import { installShellCloseGuard } from './window-close-guard'
 import {
   activateDetached,
@@ -353,6 +361,7 @@ import {
   createDetachedEditorWindow,
   detachedFilePaths,
   detachedOpenDocuments,
+  detachedEditorStates,
   detachedRenameFile,
   detachedSetFileFor,
   detachedWebContentsFor,
@@ -373,7 +382,12 @@ import {
   setDockHost,
   takeTornTab,
 } from './detached-windows'
-import { applyUpdateChannel, checkForUpdatesNow, initAutoUpdater } from './updater'
+import {
+  applyUpdateChannel,
+  checkForUpdatesNow,
+  getPinnedUpdateChannel,
+  initAutoUpdater,
+} from './updater'
 import { isUpdateChannel, type UpdateChannel } from '../shared/update-api'
 
 /**
@@ -2946,6 +2960,9 @@ function syncWorkbenchOwner(): void {
   if (!workbenchAccounts().setOwner(owner)) return
   const wc = shellWindow && !shellWindow.isDestroyed() ? shellWindow.webContents : null
   if (wc && !wc.isDestroyed()) wc.send(HOME_CHANNELS.wbBucketChanged, workbenchAccounts().bucket())
+  // the UniWork AI pick is per account: every panel re-reads which provider is selected
+  for (const other of webContents.getAllWebContents())
+    if (!other.isDestroyed()) other.send('ai:settings-changed')
 }
 let tabManager: TabManager | null = null
 
@@ -3794,6 +3811,27 @@ function webContentsForPath(
   return detached ? { kind: detached.kind, webContents: detached.webContents } : undefined
 }
 
+/**
+ * G5-03a: the editor state of one path, read fresh from the live views — the
+ * owner tab (with its present views folded in) and every detached window of the
+ * path. The guarded clean reload compares it across its fetch, so this is never
+ * served from the 1 s poll cache. `dirty` is null only when no view answered.
+ */
+async function editorStateOfPath(
+  path: string,
+): Promise<{ dirty: boolean | null; aiRunning: boolean; aiEpoch: number }> {
+  const wanted = canonicalPath(path)
+  const wantedPath = (p: string) => canonicalPath(p) === wanted
+  const states = mergeEditorStates([
+    ...((await tabManager?.editorDirtyStates(wantedPath)) ?? []),
+    ...(await detachedEditorStates(wantedPath)),
+  ])
+  const merged = states[0]
+  return merged
+    ? { dirty: merged.dirty, aiRunning: merged.aiRunning, aiEpoch: merged.aiEpoch }
+    : { dirty: null, aiRunning: false, aiEpoch: 0 }
+}
+
 /** each module's explicit Save, exactly what its File > Save runs */
 const requestUniworkModuleSave = createModuleSaveRequester({
   targetForPath: webContentsForPath,
@@ -3821,6 +3859,10 @@ function uniworkDocsWiring() {
       if (target?.tabId && tabManager) tabManager.reloadTab(target.tabId)
       else if (target && !target.webContents.isDestroyed()) target.webContents.reload()
     },
+    // G5-03a: the FRESH editor state of one path (never the 1 s poll cache),
+    // summed over its tab (present views of it folded in) and detached windows.
+    // The guarded clean reload reads it before and after its fetch.
+    editorStateOf: (path: string) => editorStateOfPath(path),
     activePath: () => tabManager?.activeFilePath(),
     reveal: revealShellWindow,
     // G8-08: the editor showing the path (its preload listens for the reveal)
@@ -3855,6 +3897,8 @@ function uniworkDocsWiring() {
     },
     lang: () => currentLang(),
     defaultSaveDir: () => defaultSaveDir(),
+    // ADVISOR D4 (a): the gate of the dev-only S6 fixture (unreachable packaged)
+    isPackaged: app.isPackaged,
     openPaths,
     closePath: async (path: string) => {
       const tabsClosed = tabManager ? await tabManager.closeTabsShowing(path) : true
@@ -4280,10 +4324,24 @@ function registerHomeIpc(): void {
   )
   // the chip reads "Unsaved changes" while an editor holds edits not saved yet
   startEditorStatePoll({
-    editorDirtyStates: async (wanted) => (await tabManager?.editorDirtyStates(wanted)) ?? [],
+    // tabs AND detached windows; a path open in both appears twice and the poll
+    // merges it (dirty any, aiRunning any, aiEpoch sum)
+    editorDirtyStates: async (wanted) => [
+      ...((await tabManager?.editorDirtyStates(wanted)) ?? []),
+      ...(await detachedEditorStates(wanted)),
+    ],
     isBound: (path) => uniworkService.isBound(path),
     saveMark: () => uniworkService.saveMark(),
-    noteEditorDirty: (path, dirty, mark) => uniworkService.noteEditorDirty(path, dirty, mark),
+    noteEditorState: (path, state, mark) => uniworkService.noteEditorState(path, state, mark),
+  })
+
+  // G5-03a: the S6 bar's height under the tab strip; the shell renderer reports
+  // it for the active tab only and resends on every tab switch (0 hides it)
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.barInset, (event, heightPx: unknown) => {
+    if (typeof heightPx !== 'number' || !Number.isFinite(heightPx)) return
+    if (!shellWindow || shellWindow.isDestroyed()) return
+    if (shellWindow.webContents.id !== event.sender.id) return
+    tabManager?.setTopInset(heightPx)
   })
 
   // Reserved for the Hub result channel; the ack is not reported anywhere today.
@@ -4726,7 +4784,13 @@ function registerHomeIpc(): void {
 
   ipcMain.handle(HOME_CHANNELS.getUpdateChannel, (): UpdateChannel => currentUpdateChannel())
 
+  ipcMain.handle(HOME_CHANNELS.getPinnedUpdateChannel, (): string | null =>
+    getPinnedUpdateChannel(),
+  )
+
   ipcMain.handle(HOME_CHANNELS.setUpdateChannel, (_event, channel: unknown) => {
+    // a pinned build always follows its own channel; the choice is not stored
+    if (getPinnedUpdateChannel() !== null) return
     if (!isUpdateChannel(channel) || channel === currentUpdateChannel()) return
     cachedUpdateChannel = channel
     writeAppSetting(APP_SETTINGS_PATH(), 'updateChannel', channel)
@@ -6276,6 +6340,13 @@ registerTabsIpc()
 registerDroppedFilesIpc()
 // editors report a running AI turn per webContents (TabManager.editorDirtyStates reads it)
 registerAiRunIpc(ipcMain)
+// the renderers' own provider lists learn whether UniWork AI is offered (pull + push)
+registerUniworkAiFlagIpc(ipcMain)
+// "UniWork AI" is picked per account (the account store), BYOK settings stay in ai-settings.json
+setUniworkAiChoiceStore(createUniworkAiChoiceStore(workbenchAccounts()))
+setUniworkAiFlagListener((available) =>
+  broadcastUniworkAiFlag(available, webContents.getAllWebContents()),
+)
 
 // sheets' project:resolveChat goes through the handler registered by docs-main; the sessionId reverse lookup hooks in here
 setSessionPathResolver(resolveSheetsSessionPath)
@@ -6535,6 +6606,32 @@ app.whenReady().then(async () => {
     },
   })
   startUniworkCloud()
+  // G6-05: UniWork AI turns (the `uniwork` provider) run here, scoped to the
+  // sender's tab: a bound document goes to its document route, a local file
+  // to the selected organization
+  const uniworkDocsHandle = uniworkDocs
+  const describeAiSender = (senderId: number) => {
+    const tab = tabManager?.describeWebContents(senderId)
+    if (tab) return tab.filePath ? { kind: tab.kind, filePath: tab.filePath } : { kind: tab.kind }
+    for (const path of detachedFilePaths()) {
+      const found = findDetachedTabByPath(path)
+      if (found && found.webContents.id === senderId) return { kind: found.kind, filePath: path }
+    }
+    return null
+  }
+  // the account's UniWork AI pick reaches editor tabs only (My AI, email, Settings keep BYOK)
+  setUniworkAiEditorSender((senderId) => {
+    const kind = describeAiSender(senderId)?.kind
+    return kind !== undefined && kind !== 'home'
+  })
+  if (uniworkDocsHandle) {
+    const uniworkAi = startUniworkAiChat({
+      describe: describeAiSender,
+      binding: (path) => uniworkDocsHandle.aiBinding(path),
+      capability: (orgId) => uniworkDocsHandle.capabilityRead(orgId),
+    })
+    setUniworkAiHost({ stream: (call) => uniworkAi.run(call) })
+  }
   authCallbacks.start(routeAuthCallback)
   // UniWork document launch links (held since startup) route from here on
   uniworkDocs?.activate((route) => authCallbacks.startLaunch(route))

@@ -16,6 +16,7 @@ import type {
 } from '@genoffice/ai-provider/browser'
 import type { AiStreamChunk, AiStreamRequest } from '@genoffice/ai-provider'
 import { installDropOpenBridge } from '@genoffice/electron-utils/drop-open'
+import { installUniworkAiFlagBridge } from '@genoffice/electron-utils/uniwork-ai-flag-bridge'
 import { installUniworkDiscussionBridge } from '@genoffice/electron-utils/discussion-bridge'
 import type { UpdateUiState } from '../shared/update-api'
 import { normalizeAiPanelPrefs } from '@genoffice/ui/ai-panel-prefs'
@@ -54,6 +55,8 @@ import type {
   UniworkDocStatus,
   UniworkDocSummary,
   UniworkLaunchEvent,
+  UniworkRemoteBar,
+  UniworkRemoteAction,
   UniworkResult,
   UniworkSharedPage,
   UniworkSharedQuery,
@@ -263,12 +266,57 @@ function asUploadProgress(raw: unknown): UniworkUploadProgress | null {
   return { uploadId: r.uploadId, path: r.path, loaded: r.loaded, total: r.total }
 }
 
+/**
+ * The S6 bar of a status from main: a known kind, and an integer version where
+ * the kind carries one. Anything else is dropped (the renderer then shows no
+ * bar) rather than dereferenced.
+ */
+function asUniworkRemoteBar(raw: unknown): UniworkRemoteBar | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as { kind?: unknown; version?: unknown; wait?: unknown }
+  const version = (): number | null =>
+    Number.isSafeInteger(r.version) ? (r.version as number) : null
+  switch (r.kind) {
+    case 'updated': {
+      if (r.version === null || r.version === undefined) return { kind: 'updated', version: null }
+      const v = version()
+      return v === null ? null : { kind: 'updated', version: v }
+    }
+    case 'newer-dirty': {
+      const v = version()
+      if (v === null) return null
+      if (r.wait === 'commit' || r.wait === 'stuck') {
+        return { kind: 'newer-dirty', version: v, wait: r.wait }
+      }
+      return r.wait === undefined ? { kind: 'newer-dirty', version: v } : null
+    }
+    case 'newer-ai':
+    case 'now-clean':
+    case 'reload-failed': {
+      const v = version()
+      return v === null ? null : { kind: r.kind, version: v }
+    }
+    case 'revoked':
+    case 'deleted':
+      return { kind: r.kind }
+    default:
+      return null
+  }
+}
+
 function asUniworkStatus(result: unknown): UniworkDocStatus | null {
-  return result &&
+  if (
+    result &&
     typeof result === 'object' &&
     typeof (result as UniworkDocStatus).path === 'string'
-    ? (result as UniworkDocStatus)
-    : null
+  ) {
+    const status = result as UniworkDocStatus
+    const { remote, ...rest } = status
+    if (remote === undefined) return status
+    const bar = asUniworkRemoteBar(remote)
+    return bar ? { ...rest, remote: bar } : rest
+  }
+  return null
 }
 
 /** a connection test answer for the renderer: the failure kind only, never the provider's raw text (that stays in the main process log) */
@@ -467,6 +515,10 @@ const homeApi: HomeApi = {
   async getUpdateChannel() {
     const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.getUpdateChannel)
     return result === 'beta' ? 'beta' : 'stable'
+  },
+  async getPinnedUpdateChannel() {
+    const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.getPinnedUpdateChannel)
+    return typeof result === 'string' && result !== '' ? result : null
   },
   async setUpdateChannel(channel) {
     // validated inline: a runtime import from ../shared/update-api would be
@@ -718,11 +770,18 @@ const homeApi: HomeApi = {
     ipcRenderer.on('ai:settings-changed', listener)
     return () => ipcRenderer.removeListener('ai:settings-changed', listener)
   },
-  async getAiSettings() {
-    return (await ipcRenderer.invoke('ai:get-settings')) as AiSettings
+  async getAiSettings(options) {
+    return (await ipcRenderer.invoke(
+      'ai:get-settings',
+      options?.includeUniworkPick ? { includeUniworkPick: true } : undefined,
+    )) as AiSettings
   },
-  async setAiSettings(settings) {
-    await ipcRenderer.invoke('ai:set-settings', settings)
+  async setAiSettings(settings, options) {
+    await ipcRenderer.invoke(
+      'ai:set-settings',
+      settings,
+      options?.includeUniworkPick ? { includeUniworkPick: true } : undefined,
+    )
   },
   getAiProviders() {
     return AI_PROVIDERS.map((meta) => {
@@ -986,6 +1045,15 @@ const homeApi: HomeApi = {
   async uniworkResolveConflict(path) {
     return asUniworkStatus(await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.resolveConflict, path))
   },
+  async uniworkRemoteAction(path, action: UniworkRemoteAction) {
+    return asUniworkStatus(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.remoteAction, path, action),
+    )
+  },
+  async uniworkSetBarInset(heightPx) {
+    if (typeof heightPx !== 'number' || !Number.isFinite(heightPx)) return
+    await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.barInset, Math.max(0, Math.round(heightPx)))
+  },
   onUniworkLaunch(cb) {
     return uniworkLaunches.subscribe(cb)
   },
@@ -1022,6 +1090,8 @@ void ipcRenderer
   .catch(() => undefined)
 
 contextBridge.exposeInMainWorld('aiOffice', homeApi)
+// window.uniworkAiFlag: the home renderer's provider list mirrors the shell's UniWork AI flag
+installUniworkAiFlagBridge()
 
 const projectApi: ProjectHomeApi = {
   async listProjects() {

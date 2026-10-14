@@ -17,6 +17,11 @@ import type {
 import type { UpdateChannel, UpdateUiState } from './update-api'
 
 /** Legal files shipped beside the app and opened from Settings > About. */
+/** The Settings window shows and saves the account's UniWork AI pick; My AI, email and one-click never pass this. */
+export interface AiSettingsPickOptions {
+  includeUniworkPick?: boolean
+}
+
 export type LegalDoc = 'license' | 'notice' | 'modifications' | 'thirdParty'
 
 /** Image attachment extensions — multimodal base64 on send (mirrors docs). */
@@ -315,6 +320,23 @@ export interface UniworkDocRenamedEvent {
   title: string
 }
 
+/**
+ * S6: the "new version available" bar of one document (G5-03a). Absent = no
+ * bar. `version` is the server's head version when the notice carried one
+ * (null only for an old host that sent none -> `uwRemoteUpdatedNoRev`).
+ */
+export type UniworkRemoteBar =
+  | { kind: 'updated'; version: number | null }
+  | { kind: 'newer-dirty'; version: number; wait?: 'commit' | 'stuck' }
+  | { kind: 'newer-ai'; version: number }
+  | { kind: 'now-clean'; version: number }
+  | { kind: 'reload-failed'; version: number }
+  | { kind: 'revoked' }
+  | { kind: 'deleted' }
+
+/** the S6 bar's actions: hide, hide until a newer revision, retry a clean reload, or the conflict flow */
+export type UniworkRemoteAction = 'later' | 'close' | 'retry' | 'reload' | 'reload-now'
+
 export interface UniworkDocStatus {
   path: string
   documentId: string
@@ -327,6 +349,8 @@ export interface UniworkDocStatus {
   /** an unsent N+1 exists behind the pending intent (G5-06) */
   pendingNext?: boolean
   lastSavedAt?: string
+  /** S6 (G5-03a): the new-version bar of this document; absent = none */
+  remote?: UniworkRemoteBar
 }
 
 export type UniworkConflictChoice = 'overwrite' | 'save-local-copy' | 'open-latest' | 'later'
@@ -591,6 +615,8 @@ export interface HomeApi {
   setLanguage(lang: UiLanguage): Promise<void>
   /** current update channel (persisted in userData/app-settings.json; default 'stable') */
   getUpdateChannel(): Promise<UpdateChannel>
+  /** the release channel a dev / beta build is pinned to (setUpdateChannel is ignored), else null */
+  getPinnedUpdateChannel(): Promise<string | null>
   /** switch + persist the update channel; triggers an immediate update check */
   setUpdateChannel(channel: UpdateChannel): Promise<void>
   /** UniWork account status (desktop session sync TBD; Sign-in opens the UniWork web link) */
@@ -686,9 +712,9 @@ export interface HomeApi {
   /** open the Token Hub (OpenRouter) credits page in the default browser */
   openCreditUsage(): Promise<void>
   /** AI settings (userData/ai-settings.json, shared by every editor) */
-  getAiSettings(): Promise<AiSettings>
+  getAiSettings(options?: AiSettingsPickOptions): Promise<AiSettings>
   /** persist AI settings; every renderer gets ai:settings-changed and re-reads */
-  setAiSettings(settings: AiSettings): Promise<void>
+  setAiSettings(settings: AiSettings, options?: AiSettingsPickOptions): Promise<void>
   /** ai-settings.json was rewritten by any renderer (composer model chip, another window) */
   onAiSettingsChanged(handler: () => void): () => void
   /** provider catalog with each fixed endpoint's default base URL (empty for UniAI/custom) */
@@ -773,6 +799,13 @@ export interface HomeApi {
   onUniworkDocStatus(cb: (status: UniworkDocStatus) => void): () => void
   uniworkSave(path: string): Promise<UniworkDocStatus | null>
   uniworkResolveConflict(path: string): Promise<UniworkDocStatus | null>
+  /**
+   * S6 (G5-03a): one action of the new-version bar (`later`, `close`, `retry`
+   * or the two reloads); resolves to the status after the action.
+   */
+  uniworkRemoteAction(path: string, action: UniworkRemoteAction): Promise<UniworkDocStatus | null>
+  /** S6: the bar's height; main moves the active editor view down by it */
+  uniworkSetBarInset(heightPx: number): Promise<void>
   onUniworkLaunch(cb: (event: UniworkLaunchEvent) => void): () => void
   /** newer-store locks pushed from main; returns an unsubscribe */
   onUniworkLock(cb: (lock: UniworkDocLock) => void): () => void
@@ -1221,6 +1254,7 @@ export const HOME_CHANNELS = {
   getLanguage: 'home:get-language',
   setLanguage: 'home:set-language',
   getUpdateChannel: 'home:get-update-channel',
+  getPinnedUpdateChannel: 'home:get-pinned-update-channel',
   setUpdateChannel: 'home:set-update-channel',
   accountStatus: 'home:account-status',
   accountLogin: 'home:account-login',
@@ -1316,6 +1350,10 @@ export const UNIWORK_DOC_CHANNELS = {
   docStatusEvent: 'uniwork-doc:status-event',
   save: 'uniwork-doc:save',
   resolveConflict: 'uniwork-doc:resolve-conflict',
+  /** invoke(path, action) -> the S6 bar action (later/close/retry/reload/reload-now) */
+  remoteAction: 'uniwork-doc:remote-action',
+  /** invoke(heightPx) -> the S6 bar's height under the tab strip (active view inset) */
+  barInset: 'uniwork-doc:bar-inset',
   launchEvent: 'uniwork-doc:launch-event',
   /** main -> shell renderer: a working copy refused by the newer-store guard */
   lock: 'uniwork-doc:lock',

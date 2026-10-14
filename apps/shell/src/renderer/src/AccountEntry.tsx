@@ -176,12 +176,20 @@ export function AccountEntry({
           ) : withProfile ? (
             initialsOf(status?.profile, email)
           ) : (
-            '?'
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="5.4" r="2.7" stroke="currentColor" strokeWidth="1.4" />
+              <path
+                d="M2.9 13.6a5.2 5.2 0 0 1 10.2 0"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+              />
+            </svg>
           )}
           {warn && <span className="account-state-dot" />}
         </span>
         <span className="account-text">
-          <span className={`account-name${withProfile ? '' : ' wrap'}`}>{label}</span>
+          <span className="account-name">{label}</span>
           {sub && (
             <span
               className={`account-sub${withProfile && !stateSub ? '' : ' wrap'}${warn ? ' warn' : ''}${view === 'refreshing' ? ' refreshing' : ''}`}

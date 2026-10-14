@@ -37,4 +37,6 @@ export const de = {
   aiTestErrLimit: 'Limit des Anbieters erreicht. Später erneut versuchen',
   aiTestErrUnavailable: 'Dienst antwortet nicht. Später erneut versuchen',
   aiTestErrMisconfigured: 'Einstellungen unvollständig: Dienstadresse und Kontofelder prüfen',
+  setAiUniworkNote:
+    'UniWork AI nutzt den Tarif deiner Organisation. Kein Schlüssel und kein Modell einzustellen.',
 } satisfies Record<keyof typeof zh, string>

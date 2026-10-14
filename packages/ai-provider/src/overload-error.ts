@@ -5,6 +5,8 @@
  * 'overloaded') instead of the raw HTTP body dump.
  */
 
+import { isUniworkError } from './uniwork/errors'
+
 // Status markers embedded by the protocol layers ("HTTP 429: …", "Claude HTTP 529: …")
 // plus the notice texts the gateways/providers put in error bodies.
 const OVERLOADED_PATTERN = new RegExp(
@@ -42,11 +44,13 @@ function matches(text: string): boolean {
  * True when the error (an Error, its `cause` chain, or a plain error string)
  * looks like a transient capacity/rate-limit failure that a later retry can
  * resolve. Works on message text so it covers both thrown HTTP errors and
- * error notices delivered inside a 200 SSE stream.
+ * error notices delivered inside a 200 SSE stream. A UniWork AI failure is
+ * never one: it carries the server's code (its own message and wait rule).
  */
 export function isAiOverloadedError(err: unknown): boolean {
   let current: unknown = err
   for (let depth = 0; current && depth < 5; depth++) {
+    if (isUniworkError(current)) return false
     if (typeof current === 'string') return matches(current)
     const e = current as { message?: unknown; cause?: unknown }
     if (typeof e.message === 'string' && matches(e.message)) return true

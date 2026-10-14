@@ -765,9 +765,11 @@ function ProjectPanel({ projects, selectedId, onSelect, onRefresh }: ProjectPane
   }, [confirmDeleteId])
 
   return (
-    <div className="proj-panel">
+    <section className="proj-panel" aria-labelledby="sidebar-projects-title">
       <div className="proj-panel-head">
-        <span className="proj-panel-title">{t('projects')}</span>
+        <h2 className="proj-panel-title" id="sidebar-projects-title">
+          {t('projects')}
+        </h2>
         <button
           className="proj-add-btn"
           data-tip={t('newProject')}
@@ -818,9 +820,13 @@ function ProjectPanel({ projects, selectedId, onSelect, onRefresh }: ProjectPane
                 className="proj-item-main"
                 role="button"
                 tabIndex={0}
+                aria-current={isActive ? 'page' : undefined}
                 onClick={() => onSelect(isActive ? null : proj.id)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') onSelect(isActive ? null : proj.id)
+                  if (e.key !== 'Enter' && e.key !== ' ') return
+                  // Space must not scroll the sidebar
+                  e.preventDefault()
+                  onSelect(isActive ? null : proj.id)
                 }}
               >
                 <span className="proj-item-icon" aria-hidden="true">
@@ -855,7 +861,7 @@ function ProjectPanel({ projects, selectedId, onSelect, onRefresh }: ProjectPane
                   </span>
                 )}
                 <span className="proj-item-meta">
-                  <span className="proj-item-count">{proj.fileCount}</span>
+                  {proj.fileCount > 0 && <span className="proj-item-count">{proj.fileCount}</span>}
                 </span>
               </div>
 
@@ -955,13 +961,13 @@ function ProjectPanel({ projects, selectedId, onSelect, onRefresh }: ProjectPane
             </div>
           )
         })()}
-    </div>
+    </section>
   )
 }
 
-// ── Sidebar footer: Settings + Sign-in (bottom-left) ─────
-// Settings is its own control. The UniWork account entry (AccountEntry.tsx)
-// starts the browser sign-in or opens Settings → Account.
+// ── Sidebar footer: one dock — AI credits, then account + Settings ─────
+// The UniWork account entry (AccountEntry.tsx) starts the browser sign-in or
+// opens Settings → Account; the gear beside it opens Settings → General.
 
 function SidebarFooter({
   onStatusChange,
@@ -1020,43 +1026,50 @@ function SidebarFooter({
 
   return (
     <div className="sidebar-footer">
-      <CreditWallet onOpenAiSettings={() => openSettings('aiModel')} />
-      <button
-        type="button"
-        className="settings-btn"
-        onClick={() => openSettings('general')}
-        aria-haspopup="dialog"
-        aria-expanded={settingsOpen}
-        data-tip={t('settings')}
-        aria-label={t('settings')}
-      >
-        <span className="settings-icon" aria-hidden="true">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path
-              d="M6.6 2.4h2.8l.35 1.45a4.6 4.6 0 0 1 1.15.65l1.4-.55 1.4 1.4-.55 1.4c.26.36.48.75.65 1.15L15.6 8v2.8l-1.45.35a4.6 4.6 0 0 1-.65 1.15l.55 1.4-1.4 1.4-1.4-.55a4.6 4.6 0 0 1-1.15.65L9.4 15.6H6.6l-.35-1.45a4.6 4.6 0 0 1-1.15-.65l-1.4.55-1.4-1.4.55-1.4a4.6 4.6 0 0 1-.65-1.15L.4 10.8V8l1.45-.35c.17-.4.39-.79.65-1.15l-.55-1.4 1.4-1.4 1.4.55c.36-.26.75-.48 1.15-.65L6.6 2.4z"
-              stroke="currentColor"
-              strokeWidth="1.2"
-              strokeLinejoin="round"
-            />
-            <circle cx="8" cy="9.2" r="2.1" stroke="currentColor" strokeWidth="1.2" />
-          </svg>
-          {skillUpdate && (
-            <span className="account-badge" role="img" aria-label={t('intgUpdateDue')} />
-          )}
-        </span>
-        <span className="settings-label">{t('settings')}</span>
-      </button>
-      <AccountEntry
-        onStatusChange={onStatusChange}
-        settingsOpen={settingsOpen}
-        settingsSection={settingsSection}
-        onOpenSettings={openSettings}
-        onCloseSettings={() => setSettingsOpen(false)}
-        skillUpdate={skillUpdate}
-        onSkillUpdateDue={setSkillUpdate}
-        onFileSearchSettingsChange={onFileSearchSettingsChange}
-        target={target}
-      />
+      <div className="sidebar-dock">
+        <CreditWallet onOpenAiSettings={() => openSettings('aiModel')} />
+        <div className="sidebar-dock-me">
+          <AccountEntry
+            onStatusChange={onStatusChange}
+            settingsOpen={settingsOpen}
+            settingsSection={settingsSection}
+            onOpenSettings={openSettings}
+            onCloseSettings={() => setSettingsOpen(false)}
+            skillUpdate={skillUpdate}
+            onSkillUpdateDue={setSkillUpdate}
+            onFileSearchSettingsChange={onFileSearchSettingsChange}
+            target={target}
+          />
+          <button
+            type="button"
+            className="settings-btn"
+            onClick={() => openSettings('general')}
+            aria-haspopup="dialog"
+            aria-expanded={settingsOpen}
+            data-tip={t('settings')}
+            aria-label={t('settings')}
+          >
+            <span className="settings-icon" aria-hidden="true">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+              {skillUpdate && (
+                <span className="account-badge" role="img" aria-label={t('intgUpdateDue')} />
+              )}
+            </span>
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
@@ -1209,6 +1222,8 @@ export function Home() {
   const [accountName, setAccountName] = useState('')
   // whose UniWork documents recents may list ('' = nobody): a change re-reads them
   const [recentsAccount, setRecentsAccount] = useState('')
+  // the signed-in organization, shown under the wordmark ('' = the edition label)
+  const [orgName, setOrgName] = useState('')
   // single source of account state: AccountEntry reports every change (initial
   // load, login, logout), keeping the greeting name in sync
   const handleAccountStatus = useCallback((s: AccountStatus | null) => {
@@ -1216,8 +1231,10 @@ export function Home() {
     // the cached profile still names the user while UniWork is unreachable
     if (!s?.loggedIn && !(s?.state === 'server-unreachable' && s.profile)) {
       setAccountName('')
+      setOrgName('')
       return
     }
+    setOrgName(s.org?.name?.trim() ?? '')
     const display = s.profile?.displayName?.trim()
     if (display) {
       setAccountName(display)
@@ -2360,9 +2377,15 @@ export function Home() {
     const createIn = selectedFolder ?? root?.path
     const canCreate = createIn !== undefined && rootOf(createIn, roots)?.usable === true
     return (
-      <div className={`folder-panel${panelDrop ? ' drop-target' : ''}`} {...panelDropProps}>
+      <section
+        className={`folder-panel${panelDrop ? ' drop-target' : ''}`}
+        aria-labelledby="sidebar-folders-title"
+        {...panelDropProps}
+      >
         <div className="folder-panel-head">
-          <span className="folder-panel-title">{t('folders')}</span>
+          <h2 className="folder-panel-title" id="sidebar-folders-title">
+            {t('folders')}
+          </h2>
           <div className="folder-panel-actions">
             {roots.length > 0 && (
               <button
@@ -2427,7 +2450,7 @@ export function Home() {
               renderTreeNode({ path: r.path, name: r.name, hasSubfolders: r.readable }, 0),
             )}
         </ul>
-      </div>
+      </section>
     )
   }
 
@@ -3349,11 +3372,18 @@ export function Home() {
       <aside className="sidebar">
         <div className="sidebar-logo">
           <img className="logo-mark" src={appIcon} alt="" />
-          <span className="logo-word">UniWork Office</span>
+          <span className="logo-text">
+            <span className="logo-word">UniWork Office</span>
+            {/* edition name, like "GitHub Enterprise": a product name, not translated */}
+            <span className="logo-org" title={orgName || undefined}>
+              {orgName || 'Enterprise'}
+            </span>
+          </span>
         </div>
         <nav className="sidebar-nav">
           <button
             className={`nav-item${chatMode && !selectedProjectId && !eduMode ? ' active' : ''}`}
+            aria-current={chatMode && !selectedProjectId && !eduMode ? 'page' : undefined}
             data-nav="chat"
             onClick={goNewChat}
           >
@@ -3381,6 +3411,11 @@ export function Home() {
           </button>
           <button
             className={`nav-item${view === 'recent' && !selectedFolder && !selectedProjectId && !eduMode && !chatMode ? ' active' : ''}`}
+            aria-current={
+              view === 'recent' && !selectedFolder && !selectedProjectId && !eduMode && !chatMode
+                ? 'page'
+                : undefined
+            }
             data-nav="recent"
             onClick={() => goHomeList('recent')}
           >
@@ -3394,10 +3429,15 @@ export function Home() {
               />
             </svg>
             <span className="nav-label">{t('navRecent')}</span>
-            <span className="nav-count">{navCounts.recent}</span>
+            {navCounts.recent > 0 && <span className="nav-count">{navCounts.recent}</span>}
           </button>
           <button
             className={`nav-item${view === 'starred' && !selectedFolder && !selectedProjectId && !eduMode && !chatMode ? ' active' : ''}`}
+            aria-current={
+              view === 'starred' && !selectedFolder && !selectedProjectId && !eduMode && !chatMode
+                ? 'page'
+                : undefined
+            }
             onClick={() => goHomeList('starred')}
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -3409,11 +3449,12 @@ export function Home() {
               />
             </svg>
             <span className="nav-label">{t('navStarred')}</span>
-            <span className="nav-count">{navCounts.starred}</span>
+            {navCounts.starred > 0 && <span className="nav-count">{navCounts.starred}</span>}
           </button>
           {projectMode && (
             <button
               className={`nav-item${eduMode && !selectedProjectId ? ' active' : ''}`}
+              aria-current={eduMode && !selectedProjectId ? 'page' : undefined}
               onClick={() => {
                 setEduMode(true)
                 setChatMode(false)
@@ -3435,28 +3476,24 @@ export function Home() {
             </button>
           )}
         </nav>
-        <div className="sidebar-divider" />
         {renderFolderPanel()}
         {/* project sidebar */}
         {projectMode && (
-          <>
-            <div className="sidebar-divider" />
-            <ProjectPanel
-              projects={projects}
-              selectedId={selectedProjectId}
-              onSelect={(id) => {
-                setSelectedProjectId(id)
-                setSelectedFolder(null)
-                setEduMode(false)
-                setChatMode(false)
-                // reset list-selection state on any project switch (paths are
-                // shared between the plain view and project views)
-                setSelected(new Set())
-                setRowMenu(null)
-              }}
-              onRefresh={refresh}
-            />
-          </>
+          <ProjectPanel
+            projects={projects}
+            selectedId={selectedProjectId}
+            onSelect={(id) => {
+              setSelectedProjectId(id)
+              setSelectedFolder(null)
+              setEduMode(false)
+              setChatMode(false)
+              // reset list-selection state on any project switch (paths are
+              // shared between the plain view and project views)
+              setSelected(new Set())
+              setRowMenu(null)
+            }}
+            onRefresh={refresh}
+          />
         )}
 
         <SidebarFooter

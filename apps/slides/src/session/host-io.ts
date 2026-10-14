@@ -67,6 +67,13 @@ export interface HostIO {
    * document, else the neutral "User" constant — never the OS account name).
    */
   commentAuthor(path?: string | null): string
+  /**
+   * G5-03a: the shell locked this open working copy (the server revoked or
+   * deleted the document), so Save As refuses it before a picker opens. Absent =
+   * never locked: the web host leaves it undefined and a plain local file is
+   * never locked.
+   */
+  isLocked?(path: string): boolean
   saveTarget: {
     /** Target for the first save of an untitled deck (the desktop lands it in the drafts folder) */
     untitled(): string

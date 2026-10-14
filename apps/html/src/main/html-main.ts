@@ -2,6 +2,7 @@ import {
   notifyUniworkUserSave,
   setUniworkUserSaveHook,
   uniworkIsBound,
+  uniworkIsLocked,
   uniworkIsReadOnly,
   uniworkSaveDecision,
 } from './uniwork-policy'
@@ -49,6 +50,7 @@ import {
   printHtmlDocument,
   type PrintDialogOutcome,
 } from '@genoffice/electron-utils'
+import { answerUniworkAiFlagOff } from '@genoffice/electron-utils/uniwork-ai-flag'
 import { createI18n, getUiLang } from '@genoffice/i18n'
 import { generateImageTool, documentMediaRoots } from '@genoffice/ai-search'
 import { parseFileToText } from '@genoffice/file-parse'
@@ -969,13 +971,17 @@ async function renderPrintPdf(
 
 /** Shell menu export entry: ask the renderer to serialize and run the export flow */
 export function sendHtmlExportRequest(contents: WebContents, format: ExportFormat): void {
+  // G5-03a: a locked working copy exports nothing
   if (contents.isDestroyed() || presentOwnerByWc.has(contents.id)) return
+  if (uniworkIsLocked(savePathByWc.get(contents.id))) return
   contents.send(HTML_CHANNELS.exportRequest, format)
 }
 
 /** Shell menu Print: ask the renderer to build the print HTML and open the system dialog */
 export function sendHtmlPrintRequest(contents: WebContents): void {
+  // G5-03a: a locked working copy prints nothing
   if (contents.isDestroyed() || presentOwnerByWc.has(contents.id)) return
+  if (uniworkIsLocked(savePathByWc.get(contents.id))) return
   contents.send(HTML_CHANNELS.printRequest)
 }
 
@@ -1415,6 +1421,10 @@ function registerHtmlIpc(): void {
       }
       const mode: SaveMode = request.mode === 'saveAs' ? 'saveAs' : 'save'
       const pathAtRequest = savePathByWc.get(e.sender.id)
+      // G5-03a: a locked working copy leaves as nothing, not even a Save As copy
+      if (mode === 'saveAs' && uniworkIsLocked(pathAtRequest)) {
+        return done({ ok: false, error: 'html: this document is view only' })
+      }
       const pendingAtRequest = pathAtRequest
         ? await pendingOwnedAssetsForDocument(pathAtRequest)
         : []
@@ -1672,6 +1682,10 @@ function registerHtmlIpc(): void {
       if (typeof request?.html !== 'string') {
         return { ok: false, error: 'html: bad export request' }
       }
+      // G5-03a: a locked working copy exports nothing
+      if (uniworkIsLocked(savePathByWc.get(e.sender.id))) {
+        return { ok: false, error: 'html: this document is view only' }
+      }
       const win =
         BrowserWindow.fromWebContents(e.sender) ?? BrowserWindow.getFocusedWindow() ?? undefined
       // Headless export has no dialog to authorize a path; the CLI already chose one.
@@ -1737,6 +1751,10 @@ function registerHtmlIpc(): void {
       if (typeof request?.html !== 'string') {
         return { ok: false, error: 'html: bad export request' }
       }
+      // G5-03a: a locked working copy exports nothing
+      if (uniworkIsLocked(savePathByWc.get(e.sender.id))) {
+        return { ok: false, error: 'html: this document is view only' }
+      }
       const win =
         BrowserWindow.fromWebContents(e.sender) ?? BrowserWindow.getFocusedWindow() ?? undefined
       // Headless export has no dialog to authorize a path; the CLI already chose one.
@@ -1773,6 +1791,10 @@ function registerHtmlIpc(): void {
       if (typeof request?.html !== 'string') {
         return { ok: false, error: 'html: bad print request' }
       }
+      // G5-03a: a locked working copy prints nothing
+      if (uniworkIsLocked(savePathByWc.get(e.sender.id))) {
+        return { ok: false, error: 'html: this document is view only' }
+      }
       // printHtml already reports why it failed and separates a dialog the
       // user closed from a real failure, so the outcome maps straight onto
       // PrintResult: the renderer can stay silent on cancel and must surface
@@ -1786,6 +1808,10 @@ function registerHtmlIpc(): void {
     async (e, request: ExportHtmlRequest): Promise<ExportResult> => {
       if (typeof request?.html !== 'string') {
         return { ok: false, error: 'html: bad export request' }
+      }
+      // G5-03a: a locked working copy exports nothing
+      if (uniworkIsLocked(savePathByWc.get(e.sender.id))) {
+        return { ok: false, error: 'html: this document is view only' }
       }
       const win =
         BrowserWindow.fromWebContents(e.sender) ?? BrowserWindow.getFocusedWindow() ?? undefined
@@ -1993,6 +2019,8 @@ export function createHtmlView(openPath?: string | null): WebContentsView {
 
 /** Standalone window mode: `npm run dev -w @genoffice/html`, md path passed via argv */
 export function startHtmlStandalone(): void {
+  // no shell here: answer the renderer's UniWork AI flag pull with "off" instead of an unregistered channel
+  answerUniworkAiFlagOff(ipcMain)
   registerPrivilegedSchemes()
   installNavigationGuard(app)
   installContextMenu(app, () => contextMenuLabels(getUiLang()))

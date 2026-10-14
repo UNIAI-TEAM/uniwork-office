@@ -5,7 +5,7 @@
  * The controller runs while the panel is closed too: the frame client answers `comments.reveal`
  * only after a `comments.list` succeeded (contract-collab §10), so the list is loaded up front.
  * Refresh = `comments.changed` and window focus. Closing (button or Esc) gives focus back to the
- * toggle (Accessibility Floor G8).
+ * toggle (Accessibility Floor G8); another panel opening closes it without touching focus.
  */
 import {
   CollabComposer,
@@ -33,7 +33,8 @@ import {
 export interface FrameDiscussionHandle {
   /** open the panel (focus stays where the reveal puts it) */
   open(): void
-  close(): void
+  /** the user's own close returns focus to the toggle; `{ focus: false }` (another panel took over) never moves it */
+  close(opts?: { focus?: boolean }): void
   controller(): CollabController
 }
 
@@ -70,9 +71,13 @@ export function FrameDiscussion(p: FrameDiscussionProps) {
   const toggleRef = useRef<HTMLButtonElement>(null)
   const panelId = `${useId()}disc`
 
-  const close = useCallback(() => {
+  const openRef = useRef(open)
+  openRef.current = open
+  const close = useCallback((opts?: { focus?: boolean }) => {
+    // already closed: nothing to close, and the focus is wherever the user (or another panel) put it
+    if (!openRef.current) return
     setOpen(false)
-    toggleRef.current?.focus()
+    if (opts?.focus !== false) toggleRef.current?.focus()
   }, [])
   useImperativeHandle(
     p.handle,
@@ -122,7 +127,7 @@ export function FrameDiscussion(p: FrameDiscussionProps) {
           <CollabPanel
             controller={controller}
             strings={strings}
-            onClose={close}
+            onClose={() => close()}
             renderComposer={(slot) => <CollabComposer {...slot} strings={strings} />}
           />
         )}

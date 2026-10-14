@@ -1,4 +1,4 @@
-import type { AgentToolCall } from '@genoffice/agent-core'
+import type { AgentStreamNotice, AgentToolCall } from '@genoffice/agent-core'
 
 // ---- endpoint URL composition ----
 
@@ -261,6 +261,10 @@ export interface StreamCallbacks {
   onActivity?: () => void
   /** Stable renderer transport id for providers with native sessions. */
   sessionId?: string
+  /** a non-fatal turn notice (UniWork AI adapter only: x_uniwork, Retry-After wait, conversation changes) */
+  onNotice?: (notice: AgentStreamNotice) => void
+  /** the same turn is about to be resent (UniWork AI, after a Retry-After wait): drop its streamed output */
+  onTurnReset?: () => void
   signal: AbortSignal
 }
 

@@ -7,6 +7,10 @@
   /* selected-option tint for the shared dropdown (gs-dd) */
   --accent-soft: #eaf0fd;
   --modal-width-sm: 480px;
+  /* the centered content column every Home view shares (files, workbench) */
+  --content-max: 1360px;
+  /* selected sidebar row: one clear step past --bg-hover-subtle (hover) */
+  --nav-selected: #dfe3e9;
   --avatar-bg: #e8ebef;
   /* signed-in avatar behind var(--surface) initials: AA (4.5:1) in both themes */
   --account-avatar-bg: #0a66d8;
@@ -27,6 +31,7 @@
 
 /* Explicit dark: [data-theme="dark"] on <html> */
 [data-theme='dark'] {
+  --nav-selected: #444;
   --accent: #5a96ff;
   --accent-hover: #7aabff;
   --accent-soft: #24354d;
@@ -46,6 +51,7 @@
 /* System dark: no data-theme or data-theme="system" — follow OS preference */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']):not([data-theme='dark']) {
+    --nav-selected: #444;
     --accent: #5a96ff;
     --accent-hover: #7aabff;
     --accent-soft: #24354d;
@@ -114,18 +120,23 @@ body.vib .home {
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
-  width: 232px;
-  padding: 18px 12px 16px;
+  width: 240px;
+  padding: 14px 10px 8px;
   border-right: 1px solid var(--border);
   overflow-y: auto;
 }
 
+/* Every sidebar row (nav, folder tree, projects, dock) shares one metric:
+ * 30px tall, 8px inset, 16px icon column centered at x=16, 13.5px label.
+ * Hover/selected are two steps of the same cool gray; selection also tints
+ * the icon with the brand accent so state never relies on weight alone. */
 .sidebar-logo {
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 0 8px;
-  margin-bottom: 20px;
+  gap: 10px;
+  height: 38px;
+  padding: 0 2px;
+  margin-bottom: 8px;
 }
 
 .logo-mark {
@@ -136,185 +147,269 @@ body.vib .home {
   border-radius: 7px;
 }
 
-.logo-word {
+.logo-text {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
+  line-height: 1.2;
+}
+
+.logo-word,
+.logo-org {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 15px;
+}
+
+.logo-word {
+  font-size: 14px;
   font-weight: 650;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
   color: var(--text);
+}
+
+/* the organization (or edition) under the wordmark: quiet, never competes */
+.logo-org {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-muted);
 }
 
 .sidebar-nav {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 
 .nav-item {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 10px;
   width: 100%;
-  padding: 8px 10px;
+  height: 30px;
+  padding: 0 8px;
   border: none;
-  border-radius: 8px;
+  border-radius: 7px;
   background: none;
   font: inherit;
-  font-size: 14px;
+  font-size: 13.5px;
+  font-weight: 500;
   color: var(--text);
   cursor: pointer;
   text-align: left;
+  transition: background-color 0.12s ease;
 }
 
 .nav-item:hover {
-  background: var(--bg-hover);
+  background: var(--bg-hover-subtle);
+}
+
+.nav-item:active,
+.nav-item.active {
+  background: var(--nav-selected);
 }
 
 .nav-item.active {
-  background: var(--bg-hover);
   font-weight: 600;
+}
+
+.nav-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 .nav-item svg {
   flex-shrink: 0;
-  color: var(--text-primary);
+  color: var(--text-secondary);
+  transition: color 0.12s ease;
+}
+
+.nav-item:hover svg {
+  color: var(--text);
+}
+
+.nav-item.active svg {
+  color: var(--accent);
 }
 
 .nav-label {
-  flex-shrink: 0;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .nav-count {
-  margin-left: auto;
-  min-width: 22px;
-  text-align: center;
-  font-size: 12px;
+  flex-shrink: 0;
+  font-size: 11.5px;
+  font-weight: 400;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
 
-/* ---- bottom-left footer: Settings + Sign-in / account ---- */
+/* muted gray misses 4.5:1 on the selected fill (dark theme) */
+:is(.nav-item.active .nav-count, .proj-item.active .proj-item-count) {
+  color: var(--text);
+}
+
+/* ---- bottom-left dock: AI credits on top, then account + Settings ----
+ * flush with the rows above (no card), set off by one hairline */
 .sidebar-footer {
-  margin-top: auto;
-  padding-top: 12px;
+  flex-shrink: 0;
+  margin: auto -10px 0;
+  padding: 6px 10px 0;
   border-top: 1px solid var(--border-subtle);
+}
+
+.sidebar-dock {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
+}
+
+.sidebar-dock :is(.credit-wallet, .credit-wallet-toggle, .account-btn, .settings-btn) {
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.sidebar-dock
+  :is(.credit-wallet, .credit-wallet-toggle, .account-btn, .settings-btn):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 .credit-wallet-wrap {
-  margin-bottom: 4px;
+  padding: 0 0 2px;
 }
 
 .credit-wallet-row {
   display: flex;
-  align-items: stretch;
-  gap: 4px;
+  align-items: center;
+  gap: 2px;
 }
 
+/* label left, the one number that matters right */
 .credit-wallet {
-  display: flex;
-  align-items: center;
-  gap: 9px;
   flex: 1;
   min-width: 0;
-  padding: 8px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 10px;
-  background: var(--surface-subtle);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  padding: 7px 8px;
+  border: none;
+  border-radius: 7px;
+  background: none;
   font: inherit;
+  color: var(--text);
   cursor: pointer;
   text-align: left;
-  color: var(--text);
 }
 
-.credit-wallet:hover {
-  background: var(--hover);
+.credit-wallet:hover,
+.credit-wallet-toggle:hover {
+  background: var(--bg-hover-subtle);
 }
 
-.credit-wallet.is-empty {
-  border-style: dashed;
+.credit-wallet-title {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
 }
 
-.credit-wallet.is-warn {
-  border-color: var(--border-subtle);
+.credit-wallet-value {
+  /* long labels (de, ar) drop to their own line instead of being cut */
+  margin-inline-start: auto;
+  min-width: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.credit-wallet-value.is-cta {
+  color: var(--accent);
+}
+
+.credit-wallet-value.is-warn {
+  color: var(--danger-text);
 }
 
 .credit-wallet-toggle {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
   flex-shrink: 0;
-  border: 1px solid var(--border-subtle);
-  border-radius: 10px;
-  background: var(--surface-subtle);
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 7px;
+  background: none;
   color: var(--text-muted);
   cursor: pointer;
 }
 
 .credit-wallet-toggle:hover {
-  background: var(--hover);
   color: var(--text);
+}
+
+.credit-wallet-toggle svg {
+  transition: transform 0.2s ease;
 }
 
 .credit-wallet-toggle.is-open svg {
   transform: rotate(180deg);
 }
 
-.credit-wallet-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--avatar-bg);
-  color: var(--text-muted);
-}
-
-.credit-wallet-text {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-
-.credit-wallet-title {
-  font-size: 12.5px;
-  font-weight: 600;
-  line-height: 1.25;
-  white-space: nowrap;
+/* remaining share of the key's limit; turns to danger under 10% */
+.credit-wallet-meter {
+  height: 4px;
+  margin: 2px 8px 0;
+  border-radius: 2px;
+  background: var(--border-subtle);
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-.credit-wallet-sub {
+.credit-wallet-meter > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transform-origin: left center;
+  transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+[dir='rtl'] .credit-wallet-meter > span {
+  transform-origin: right center;
+}
+
+.credit-wallet-meter.is-low > span {
+  background: var(--danger);
+}
+
+.credit-wallet-today {
+  margin: 5px 8px 0;
   font-size: 11px;
   color: var(--text-muted);
-  line-height: 1.25;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
 }
 
 .credit-wallet-log {
-  margin-top: 6px;
+  margin: 8px 0 0;
   padding: 8px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 10px;
-  background: var(--surface);
+  border-radius: 8px;
+  background: var(--surface-subtle);
 }
 
 .credit-wallet-log-note,
 .credit-wallet-log-empty {
   margin: 0;
-  font-size: 10.5px;
+  font-size: 11px;
   color: var(--text-muted);
   line-height: 1.35;
 }
@@ -364,19 +459,27 @@ body.vib .home {
   white-space: nowrap;
 }
 
-.account-entry {
-  position: relative;
+/* account row: who you are, with Settings one click away on the right */
+.sidebar-dock-me {
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
 
-.settings-btn,
+.account-entry {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
 .account-btn {
   display: flex;
   align-items: center;
   gap: 9px;
   width: 100%;
-  padding: 7px 8px;
+  padding: 6px 5px;
   border: none;
-  border-radius: 10px;
+  border-radius: 7px;
   background: none;
   font: inherit;
   cursor: pointer;
@@ -384,51 +487,40 @@ body.vib .home {
   color: var(--text);
 }
 
-.settings-btn:hover,
-.account-btn:hover {
-  background: var(--surface-subtle);
+.settings-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  align-self: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 7px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.account-btn:hover,
+.settings-btn:hover {
+  background: var(--bg-hover-subtle);
+}
+
+.settings-btn:hover {
+  color: var(--text);
 }
 
 .settings-icon {
   position: relative;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--avatar-bg);
-  color: var(--text-muted);
 }
 
-.settings-label {
-  flex: 1;
-  min-width: 0;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.account-btn {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  width: 100%;
-  padding: 7px 8px;
-  border: none;
-  border-radius: 10px;
-  background: none;
-  font: inherit;
-  cursor: pointer;
-  text-align: left;
-}
-
-.account-btn:hover {
-  background: var(--surface-subtle);
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-dock * {
+    transition: none !important;
+  }
 }
 
 .account-avatar {
@@ -437,8 +529,8 @@ body.vib .home {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   background: var(--avatar-bg);
   color: var(--text-secondary);
@@ -452,11 +544,6 @@ body.vib .home {
   font-size: 12px;
 }
 
-.account-btn:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
-}
-
 /* attention states (expired, revoked, unreachable, …): small dot on the avatar */
 .account-state-dot {
   position: absolute;
@@ -465,7 +552,7 @@ body.vib .home {
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  border: 2px solid var(--chrome-bg);
+  border: 2px solid var(--surface);
   background: var(--danger);
 }
 
@@ -480,7 +567,7 @@ body.vib .home {
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  border: 2px solid var(--chrome-bg);
+  border: 2px solid var(--surface);
   background: var(--danger);
 }
 
@@ -509,7 +596,7 @@ body.vib .home {
 }
 
 .account-name {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -517,14 +604,13 @@ body.vib .home {
 }
 
 .account-sub {
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.account-name.wrap,
 .account-sub.wrap {
   /* state copy (vi runs long) wraps instead of being cut at the sidebar width */
   white-space: normal;
@@ -682,6 +768,14 @@ body.vib .home {
   padding: 28px 36px 40px;
   overflow-y: auto;
   background: var(--bg-content);
+}
+
+/* one centered column: quick cards, toolbar and list share the same edges on
+   any window width (cards no longer stop short of a full-width table) */
+.content > :is(.quick-start, .recents) {
+  width: 100%;
+  max-width: var(--content-max);
+  margin-inline: auto;
 }
 
 .section-head {
@@ -1662,7 +1756,7 @@ body.vib .home {
    full (one row of eight cut "Open from UniWork" to "Open fro…") */
 .quick-cards {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 280px));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   align-items: stretch;
   gap: 10px;
 }
@@ -1761,7 +1855,10 @@ body.vib .home {
   letter-spacing: 0.03em;
 }
 
-@media (max-width: 1100px) {
+/* 4 columns down to ~210px a card, then 2 (8 cards never split 5 + 3). The
+   window width counts the 240px sidebar; a container query is out because the
+   UniWork picker renders its fixed overlay inside this grid. */
+@media (max-width: 1200px) {
   .quick-cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2391,28 +2488,30 @@ body.vib .home {
 
 /* ── Folders sidebar ─────────────────────────────────── */
 
-.sidebar-divider {
-  height: 1px;
-  margin: 12px 0;
-  background: var(--border-subtle);
-}
-
 .proj-panel {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  flex: 1;
+  /* sections stack by content (no half-empty slabs); each scrolls once the
+     sidebar runs out of room */
+  flex: 0 1 auto;
+  margin-top: 18px;
 }
 
-.proj-panel-head {
+.proj-panel-head,
+.folder-panel-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 10px 6px;
+  height: 26px;
+  padding: 0 3px 0 8px;
+  margin-bottom: 2px;
 }
 
-.proj-panel-title {
-  font-size: 12px;
+.proj-panel-title,
+.folder-panel-title {
+  margin: 0;
+  font-size: 11.5px;
   font-weight: 600;
   letter-spacing: 0.02em;
   color: var(--text-muted);
@@ -2422,8 +2521,8 @@ body.vib .home {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border: none;
   border-radius: 6px;
   background: none;
@@ -2435,8 +2534,13 @@ body.vib .home {
 }
 
 .proj-add-btn:hover {
-  background: var(--surface-subtle);
+  background: var(--bg-hover-strong);
   color: var(--text);
+}
+
+:is(.proj-add-btn, .folder-add-btn, .proj-more-btn, .folder-more-btn):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 .proj-new-row {
@@ -2449,7 +2553,7 @@ body.vib .home {
   border: 1.5px solid var(--accent);
   border-radius: 6px;
   font: inherit;
-  font-size: 14px;
+  font-size: 13.5px;
   outline: none;
   background: var(--surface);
 }
@@ -2471,24 +2575,26 @@ body.vib .home {
   position: relative;
   display: flex;
   align-items: center;
-  border-radius: 8px;
-  margin: 0 2px 1px;
+  border-radius: 7px;
+  margin-bottom: 1px;
 }
 
 .proj-item.active {
-  background: var(--bg-hover);
+  background: var(--nav-selected);
 }
 
 .proj-item-main {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 10px;
   flex: 1;
   min-width: 0;
-  padding: 8px 10px;
+  height: 30px;
+  padding: 0 8px;
   cursor: pointer;
-  border-radius: 8px;
+  border-radius: 7px;
   user-select: none;
+  transition: background-color 0.12s ease;
 }
 
 .proj-item-main:focus-visible {
@@ -2497,7 +2603,7 @@ body.vib .home {
 }
 
 .proj-item:hover .proj-item-main {
-  background: var(--bg-hover);
+  background: var(--bg-hover-subtle);
 }
 
 .proj-item.active .proj-item-main {
@@ -2506,15 +2612,19 @@ body.vib .home {
 
 .proj-item-icon {
   flex-shrink: 0;
-  color: var(--text-primary);
+  color: var(--text-secondary);
   display: flex;
   align-items: center;
+}
+
+.proj-item.active .proj-item-icon {
+  color: var(--accent);
 }
 
 .proj-item-name {
   flex: 1;
   min-width: 0;
-  font-size: 14px;
+  font-size: 13.5px;
   color: var(--text);
   white-space: nowrap;
   overflow: hidden;
@@ -2522,7 +2632,7 @@ body.vib .home {
 }
 
 .proj-item.active .proj-item-name {
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .proj-item-meta {
@@ -2535,7 +2645,7 @@ body.vib .home {
 .proj-item-count {
   min-width: 22px;
   text-align: center;
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
@@ -2566,8 +2676,8 @@ body.vib .home {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border: none;
   border-radius: 6px;
   background: none;
@@ -2628,21 +2738,8 @@ body.vib .home {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  flex: 1;
-}
-
-.folder-panel-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 10px 6px;
-}
-
-.folder-panel-title {
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--text-muted);
+  flex: 0 1 auto;
+  margin-top: 18px;
 }
 
 .folder-add-btn,
@@ -2650,8 +2747,8 @@ body.vib .home {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border: none;
   border-radius: 6px;
   background: none;
@@ -2663,7 +2760,7 @@ body.vib .home {
 }
 
 .folder-add-btn:hover {
-  background: var(--surface-subtle);
+  background: var(--bg-hover-strong);
   color: var(--text);
 }
 
@@ -2686,7 +2783,7 @@ body.vib .home {
   margin-left: auto;
   padding-right: 4px;
   font-size: 11px;
-  color: var(--text-tertiary);
+  color: var(--text-muted);
   white-space: nowrap;
 }
 
@@ -2709,7 +2806,7 @@ body.vib .home {
   border: 1.5px solid var(--accent);
   border-radius: 6px;
   font: inherit;
-  font-size: 14px;
+  font-size: 13.5px;
   outline: none;
   background: var(--surface);
   color: var(--text);
@@ -2730,7 +2827,6 @@ body.vib .home {
 
 .tree {
   overflow-y: auto;
-  padding: 0 2px;
 }
 
 .tree-item {
@@ -2742,9 +2838,9 @@ body.vib .home {
   display: flex;
   align-items: center;
   gap: 6px;
-  min-height: 32px;
-  padding: 4px 8px 4px 8px;
-  border-radius: 8px;
+  min-height: 30px;
+  padding: 0 8px;
+  border-radius: 7px;
   margin-bottom: 1px;
   cursor: pointer;
   user-select: none;
@@ -2752,15 +2848,19 @@ body.vib .home {
 }
 
 .tree-row:hover {
-  background: var(--bg-hover);
+  background: var(--bg-hover-subtle);
 }
 
 .tree-row.active {
-  background: var(--bg-hover);
+  background: var(--nav-selected);
 }
 
 .tree-row.active .tree-name {
-  font-weight: 600;
+  font-weight: 500;
+}
+
+.tree-row.active .tree-icon {
+  color: var(--accent);
 }
 
 .tree-row:focus-visible {
@@ -2799,13 +2899,13 @@ body.vib .home {
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  color: var(--text-primary);
+  color: var(--text-secondary);
 }
 
 .tree-name {
   flex: 1;
   min-width: 0;
-  font-size: 14px;
+  font-size: 13.5px;
   color: var(--text);
   white-space: nowrap;
   overflow: hidden;
@@ -3348,9 +3448,11 @@ body.vib .home {
   padding-bottom: 32px;
 }
 
-/* the content column (redesign spec 2.4): left-aligned and capped; the fixed modal overlay is not */
+/* the content column: capped and centered like the file views; the fixed modal overlay is not */
 .wb-home > :not(.modal-overlay) {
-  max-width: 1180px;
+  width: 100%;
+  max-width: var(--content-max);
+  margin-inline: auto;
 }
 
 /* placeholder-only inputs: the UA default #757575 misses 4.5:1 on dark surfaces */

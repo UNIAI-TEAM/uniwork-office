@@ -112,6 +112,7 @@ export const cs = {
   appMixedExportOpening:
     'Různé velikosti papíru: otevírá se náhled stránkování pro sloučený export stránek…',
   appSelectTextToComment: 'Nejprve vyberte text, ke kterému chcete přidat komentář',
+  appCommentSaveFirst: 'Před přidáním komentáře nejprve uložte dokument',
   appCommentSelectionLost: 'Výběr již není platný; znovu vyberte text ke komentování',
   appCommentAdded: 'Komentář přidán; do dokumentu se zapíše při uložení',
   appCommentEdited: 'Komentář upraven; do dokumentu se zapíše při uložení',

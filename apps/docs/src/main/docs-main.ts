@@ -4,6 +4,7 @@ import {
   uniworkCommentAuthor,
   uniworkDocState,
   uniworkIsBound,
+  uniworkIsLocked,
   uniworkRefusesOpen,
   uniworkSamePath,
   uniworkSaveDecision,
@@ -78,6 +79,7 @@ import {
   readBodyCapped,
   writeJsonAtomic,
 } from '@genoffice/electron-utils'
+import { answerUniworkAiFlagOff } from '@genoffice/electron-utils/uniwork-ai-flag'
 import { configureMetricsCache, familyVerticalMetrics } from '@genoffice/font-metrics'
 import { createI18n, getUiLang, normalizeLang, setUiLang } from '@genoffice/i18n'
 import { ProjectStore, type PracticeId } from '@genoffice/project-store'
@@ -105,6 +107,7 @@ import {
   refreshUniworkCloudStatus,
   resolveAiSettings,
   selectedProvider,
+  uniworkAiAvailable,
   maxOutputTokensOf,
   sanitizeAiSettings,
   sanitizeCliPath,
@@ -3304,6 +3307,15 @@ function rememberOpenDoc(wcId: number, filePath: string): void {
   openDocByWc.set(wcId, filePath)
 }
 
+/**
+ * G5-03a: a locked working copy (the server revoked or deleted it while it is
+ * open) leaves the app as nothing - no export, no Save As copy, no print. The
+ * tab's open document is the source unless the caller names one (Save As).
+ */
+function uniworkRefusesExport(wcId: number, sourcePath?: string | null): boolean {
+  return uniworkIsLocked(sourcePath ?? openDocByWc.get(wcId) ?? null)
+}
+
 function docsMediaRoots(wcId: number): string[] {
   return documentMediaRoots(openDocByWc.get(wcId), join(app.getPath('temp'), 'genoffice-pasted'))
 }
@@ -3758,6 +3770,76 @@ const SETTINGS_PATH = () => userDataPath('ai-settings.json')
 
 const activeAiStreams = new Map<string, AbortController>()
 
+/**
+ * UniWork AI (the `uniwork` provider) runs in the shell main process only:
+ * the shell installs the host that resolves the sender's document, adds the
+ * UniWork session and runs the adapter (apps/shell uniwork-auth/ai-chat.ts).
+ * Without one (this module running on its own) a UniWork AI turn is refused.
+ */
+export interface UniworkAiHost {
+  stream(call: {
+    senderId: number
+    request: AiStreamRequest
+    send(chunk: AiStreamChunk): void
+    signal: AbortSignal
+  }): Promise<void>
+}
+
+let uniworkAiHost: UniworkAiHost | null = null
+export function setUniworkAiHost(host: UniworkAiHost | null): void {
+  uniworkAiHost = host
+}
+
+/**
+ * Whether the active UniWork account chose "UniWork AI" as its provider. The shell backs it with
+ * the per-account store (key `uniwork.ai.uniwork-choice`); ai-settings.json only ever holds the
+ * BYOK provider, so a pick of `uniwork` is routed here and the file keeps the previous BYOK one.
+ */
+export interface UniworkAiChoiceStore {
+  read(): boolean
+  write(on: boolean): void
+}
+
+let uniworkAiChoiceStore: UniworkAiChoiceStore | null = null
+export function setUniworkAiChoiceStore(store: UniworkAiChoiceStore | null): void {
+  uniworkAiChoiceStore = store
+}
+
+/**
+ * Whether a webContents is an editor tab (the same tab lookup the UniWork AI scope resolver uses).
+ * Only editor panels run UniWork AI; My AI, email, one-click actions and the settings test read
+ * the file's BYOK/UniAI provider. Unset (this module on its own): no sender gets the pick.
+ */
+let uniworkAiEditorSender: ((senderId: number) => boolean) | null = null
+export function setUniworkAiEditorSender(isEditor: ((senderId: number) => boolean) | null): void {
+  uniworkAiEditorSender = isEditor
+}
+
+function isUniworkAiEditor(event: unknown): boolean {
+  const id = (event as { sender?: { id?: unknown } } | null)?.sender?.id
+  return typeof id === 'number' && uniworkAiEditorSender?.(id) === true
+}
+
+/**
+ * The home Settings window reads (and saves) the account pick too, so its AI pane shows what an
+ * editor tab uses. Everything else on the home window (My AI, email, one-click) keeps the file
+ * provider: it never passes this option.
+ */
+function wantsUniworkPick(options: unknown): boolean {
+  return (
+    (options as { includeUniworkPick?: unknown } | null | undefined)?.includeUniworkPick === true
+  )
+}
+
+/** the provider ai-settings.json holds (never `uniwork`: the pick lives in the account store) */
+function fileAiProvider(): AiProviderId {
+  const provider = resolveAiSettings(
+    readJson<Partial<AiSettings> & LegacyAiSettings>(SETTINGS_PATH(), {}),
+    defaultAiSettings(),
+  ).provider
+  return provider === 'uniwork' ? defaultAiSettings().provider : provider
+}
+
 /** every renderer (tabs, home) re-reads ai-settings.json — the composer chip and
  *  the settings page edit the same file from different windows */
 function broadcastAiSettingsChanged(): void {
@@ -3772,11 +3854,15 @@ function broadcastAiSettingsChanged(): void {
  */
 export function registerAiIpc(): void {
   app.once('before-quit', shutdownCodexAppServers)
-  ipcMain.handle('ai:get-settings', async (): Promise<AiSettings> => {
+  ipcMain.handle('ai:get-settings', async (event, options?: unknown): Promise<AiSettings> => {
     const stored = readJson<Partial<AiSettings> & LegacyAiSettings>(SETTINGS_PATH(), {})
     const settings = resolveAiSettings(stored, defaultAiSettings())
     // the stored provider stays selected even while its config is incomplete (the picker and
     // Settings show what is missing); only an unknown id degrades to genspark
+    // the account's UniWork AI pick overlays the file's BYOK provider; while the entry is not
+    // offered, selectedProvider degrades it (the pick itself stays stored for when it returns)
+    if ((isUniworkAiEditor(event) || wantsUniworkPick(options)) && uniworkAiChoiceStore?.read())
+      settings.provider = 'uniwork'
     settings.provider = selectedProvider(settings)
     return settings
   })
@@ -3800,7 +3886,7 @@ export function registerAiIpc(): void {
     shellHooks?.openSettings?.('aiModel')
   })
 
-  ipcMain.handle('ai:set-settings', (_event, settings: AiSettings) => {
+  ipcMain.handle('ai:set-settings', (event, settings: AiSettings, options?: unknown) => {
     // SECURITY.md: payloads are schema-checked in the main process. The settings
     // file feeds cliPath into spawn() and baseUrl receives a bearer token,
     // so the renderer's copy is sanitized before it touches disk.
@@ -3808,6 +3894,31 @@ export function registerAiIpc(): void {
     if (!sanitized) {
       console.warn('[ai] rejected invalid ai:set-settings payload')
       return
+    }
+    if (sanitized.provider === 'uniwork') {
+      // saved per account, never in the file: the file keeps the BYOK provider it had
+      uniworkAiChoiceStore?.write(true)
+      sanitized.provider = fileAiProvider()
+    } else if (!uniworkAiAvailable()) {
+      // while UniWork AI is hidden the renderer only had the degraded provider to save back: that
+      // is no choice against the account's pick, which stays stored for when the entry returns,
+      // and the BYOK provider underneath stays the file's (key and model edits still go through);
+      // any other provider is a real choice: it is written and the pick is cleared
+      if (uniworkAiChoiceStore?.read()) {
+        if (sanitized.provider === selectedProvider({ ...sanitized, provider: 'uniwork' })) {
+          sanitized.provider = fileAiProvider()
+        } else {
+          uniworkAiChoiceStore.write(false)
+        }
+      }
+    } else if (
+      // a window without the pick (home: My AI) clears it only by changing the provider; an editor
+      // tab and the Settings window both saw the pick, so any provider they save is the choice
+      isUniworkAiEditor(event) ||
+      wantsUniworkPick(options) ||
+      sanitized.provider !== fileAiProvider()
+    ) {
+      uniworkAiChoiceStore?.write(false)
     }
     writeJsonAtomic(SETTINGS_PATH(), sanitized)
     broadcastAiSettingsChanged()
@@ -3845,6 +3956,29 @@ export function registerAiIpc(): void {
     const config = withUniAiOpenRouterAuth(settings, provider, settings.providers?.[provider])
     const send = (chunk: AiStreamChunk) => {
       if (!event.sender.isDestroyed()) event.sender.send('ai:stream-chunk', chunk)
+    }
+    if (provider === 'uniwork') {
+      // no key, no model: the UniWork session and the server's policy decide
+      const host = uniworkAiHost
+      if (!host) {
+        send({
+          requestId,
+          type: 'error',
+          error: 'UniWork AI is not available here.',
+          uniworkCode: 'ai_disabled',
+        })
+        return
+      }
+      const controller = new AbortController()
+      activeAiStreams.set(requestId, controller)
+      const unwatchSender = abortOnDestroyed(event.sender, controller)
+      try {
+        await host.stream({ senderId: event.sender.id, request, send, signal: controller.signal })
+      } finally {
+        unwatchSender()
+        activeAiStreams.delete(requestId)
+      }
+      return
     }
     if (!config || (provider !== 'codex' && !config.apiKey)) {
       send({
@@ -4045,6 +4179,9 @@ export function registerAiIpc(): void {
     // the renderer's settings copy verbatim
     const settings = sanitizeAiSettings(request.settings)
     if (!settings) return { ok: false, error: 'invalid AI settings payload', errorKind: 'failed' }
+    // UniWork AI runs only as an editor panel's agent turn: a one-shot caller holding an editor's
+    // settings copy gets the file's BYOK/UniAI provider instead of a key request for `uniwork`
+    if (settings.provider === 'uniwork') settings.provider = fileAiProvider()
     const provider = settings.provider
     const config = withUniAiOpenRouterAuth(settings, provider, settings.providers?.[provider])
     if (!config || (provider !== 'codex' && !config.apiKey)) {
@@ -4858,6 +4995,8 @@ export function registerDocsIpc(): void {
     async (event, defaultName: string, data: ArrayBuffer, sourcePath?: string | null) => {
       // an orphaned (closed-tab) renderer must not open dialogs or land new files
       if (tornDownWcIds.has(event.sender.id)) return { ok: false }
+      // G5-03a: a locked working copy exports nothing, not even a Save As copy
+      if (uniworkRefusesExport(event.sender.id, sourcePath)) return { ok: false }
       const result = await saveDialog(event, {
         title: tm('dlgSaveAs'),
         // a UniWork working copy's Save As starts outside its hidden folder
@@ -4925,6 +5064,9 @@ export function registerDocsIpc(): void {
       // a discarded draft in an orphaned renderer must not silently persist
       // itself to the default folder after the user chose Don't Save
       if (tornDownWcIds.has(event.sender.id)) return { ok: false }
+      // G5-03a: a locked working copy exports nothing, not even a first save
+      // into the default folder
+      if (uniworkRefusesExport(event.sender.id)) return { ok: false }
       const filePath = uniquePathIn(defaultSaveDir(), defaultName)
       const passwordState = snapshotDocPassword(event.sender.id, null)
       const { bytes: plain, hashes } = await materializeLazyDocx(Buffer.from(data))
@@ -4978,6 +5120,8 @@ export function registerDocsIpc(): void {
     async (event, filePath: string, data: ArrayBuffer, overwrite: boolean) => {
       try {
         if (tornDownWcIds.has(event.sender.id)) return { ok: false }
+        // G5-03a: an agent copy-out of a locked working copy is refused too
+        if (uniworkRefusesExport(event.sender.id)) return { ok: false }
         if (typeof filePath !== 'string' || !isAbsolute(filePath)) {
           return { ok: false, error: 'path must be absolute' }
         }
@@ -5193,6 +5337,8 @@ export function registerDocsIpc(): void {
       : {}
 
   ipcMain.handle('docs:print', async (event, scale?: number) => {
+    // G5-03a: a locked working copy prints nothing
+    if (uniworkRefusesExport(event.sender.id)) return { ok: false }
     // print the calling tab's own content; zero margins — the docx page padding provides them.
     // Resolves when the system dialog is dismissed; the print dialog stays open on cancel
     // (ok=false without error) and surfaces real failures. With no printer installed
@@ -5222,6 +5368,8 @@ export function registerDocsIpc(): void {
       outPath?: string,
       scale?: number,
     ) => {
+      // G5-03a: a locked working copy exports nothing
+      if (uniworkRefusesExport(event.sender.id)) return { ok: false }
       // Renderer-supplied page geometry reaches Chromium printToPDF verbatim:
       // reject non-finite/out-of-range sizes (0.1in..50in) and scales (0.1..5),
       // same guard as docs:print-pdf-buffer (a malformed w:pgSz in a doc would
@@ -5269,6 +5417,8 @@ export function registerDocsIpc(): void {
 
   ipcMain.handle('docs:save-image-as', async (event, src: unknown) => {
     if (tornDownWcIds.has(event.sender.id) || typeof src !== 'string') return { ok: false }
+    // G5-03a: an image out of a locked working copy is an export it may not have
+    if (uniworkRefusesExport(event.sender.id)) return { ok: false }
     return saveImageFromUrl(dialogParent(event), src, {
       title: tm('dlgSaveAs'),
       fallbackDir: defaultSaveDir(),
@@ -5276,6 +5426,8 @@ export function registerDocsIpc(): void {
   })
 
   ipcMain.handle('docs:pick-export-images-target', async (event) => {
+    // G5-03a: a locked working copy exports nothing (null is "cancelled")
+    if (uniworkRefusesExport(event.sender.id)) return null
     let dir = testExportDir
     if (!dir) {
       const r = await openDialog(event, {
@@ -5312,6 +5464,8 @@ export function registerDocsIpc(): void {
   ipcMain.handle(
     'docs:write-export-image',
     async (event, dir: string, fileName: string, pngBase64: string) => {
+      // G5-03a: a locked working copy exports nothing
+      if (uniworkRefusesExport(event.sender.id)) return { ok: false }
       if (typeof dir !== 'string' || !imageExportDirs.get(event.sender.id)?.has(dir)) {
         return { ok: false, error: 'export target is not an authorized folder' }
       }
@@ -5336,6 +5490,8 @@ export function registerDocsIpc(): void {
     'docs:export-html',
     async (event, defaultName: string, html: string, outPath?: string) => {
       if (typeof html !== 'string' || !html) return { ok: false, error: 'empty document' }
+      // G5-03a: a locked working copy exports nothing
+      if (uniworkRefusesExport(event.sender.id)) return { ok: false }
       let filePath = outPath ?? null
       if (filePath && !canPdfWrite(event.sender.id, filePath)) {
         return { ok: false, error: 'export target is not an authorized path' }
@@ -5368,6 +5524,8 @@ export function registerDocsIpc(): void {
   ipcMain.handle(
     'docs:print-pdf-buffer',
     async (event, pageWidthTwips: number, pageHeightTwips: number, scale?: number) => {
+      // G5-03a: a locked working copy exports nothing
+      if (uniworkRefusesExport(event.sender.id)) return { ok: false }
       // Renderer-supplied page geometry reaches Chromium printToPDF verbatim:
       // reject non-finite/out-of-range sizes (0.5in..50in) and scales (0.1..5).
       if (!validPrintGeometry(pageWidthTwips, pageHeightTwips, scale)) {
@@ -5394,6 +5552,8 @@ export function registerDocsIpc(): void {
   ipcMain.handle(
     'docs:save-merged-pdf',
     async (event, defaultName: string, base64Parts: string[], outPath?: string) => {
+      // G5-03a: a locked working copy exports nothing
+      if (uniworkRefusesExport(event.sender.id)) return { ok: false }
       let filePath = outPath ?? null
       if (filePath && !canPdfWrite(event.sender.id, filePath)) {
         return { ok: false, error: 'export target is not an authorized path' }
@@ -6284,6 +6444,8 @@ export function hasDocsWindow(): boolean {
 // ---- standalone lifecycle (apps/docs running on its own) ----
 
 export function startDocsStandalone(): void {
+  // no shell here: answer the renderer's UniWork AI flag pull with "off" instead of an unregistered channel
+  answerUniworkAiFlagOff(ipcMain)
   registerRendererScheme()
   installNavigationGuard(app)
   installContextMenu(app, () => contextMenuLabels(getUiLang()))

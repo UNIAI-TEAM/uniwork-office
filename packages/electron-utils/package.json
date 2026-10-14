@@ -25,7 +25,9 @@
     "./renderer-protocol": "./src/renderer-protocol.ts",
     "./renderer-scheme": "./src/renderer-scheme.ts",
     "./safe-external-url": "./src/safe-external-url.ts",
-    "./safe-remote-url": "./src/safe-remote-url.ts"
+    "./safe-remote-url": "./src/safe-remote-url.ts",
+    "./uniwork-ai-flag": "./src/uniwork-ai-flag.ts",
+    "./uniwork-ai-flag-bridge": "./src/uniwork-ai-flag-bridge.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
