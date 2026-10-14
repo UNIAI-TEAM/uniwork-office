@@ -360,6 +360,16 @@ const FONTS = [
     '© The Noto Project Authors, original Reserved Font Name "Noto". Modified advance widths;\nrenamed per OFL 1.1.',
   ],
   [
+    'Inter 4.x (UniWork Sans, Workbench UI)',
+    'SIL OFL 1.1',
+    '© 2016 The Inter Project Authors (https://github.com/rsms/inter).\nLatin and Latin Extended woff2 subsets; unmodified otherwise.',
+  ],
+  [
+    'Be Vietnam Pro (UniWork Sans, Workbench UI)',
+    'SIL OFL 1.1',
+    '© 2021 The Be Vietnam Pro Project Authors (https://github.com/bettergui/BeVietnamPro).\nVietnamese woff2 subset; unmodified otherwise.',
+  ],
+  [
     'KaTeX webfonts',
     'SIL OFL 1.1',
     'Copyright (c) 2009-2010, Design Science, Inc. (<www.mathjax.org>)\n' +
