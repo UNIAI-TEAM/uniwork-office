@@ -350,7 +350,8 @@ export function Ribbon({
   // editor-shaped commands stand down while the pane hides the selection;
   // Save As never does, and Find only while the source view hides its target
   const off = disabled || sourceMode || sourceViewOpen || !editor || !state
-  // read-only AI (summarize) stays available on a view-only copy; the editing presets do not
+  // read-only AI (summarize, mind map) stays available on a view-only copy; the editing presets do not
+  const readOnlyAi = (kind: string) => kind === 'summarize' || kind === 'mindmap'
   const offUnlessReadOnly = notReady || sourceMode || sourceViewOpen || !editor || !state
   // a view-only copy can still be read: Find, the outline, spellcheck and the
   // (read-only) properties stay on; everything that edits or saves goes off
@@ -504,8 +505,8 @@ export function Ribbon({
                     key={kind}
                     type="button"
                     className="rb-big ai-entry"
-                    data-tip={readOnly && kind !== 'summarize' ? t('aiViewOnlyNotice') : t(btn)}
-                    disabled={(kind === 'summarize' ? offUnlessReadOnly : off) || state?.empty}
+                    data-tip={readOnly && !readOnlyAi(kind) ? t('aiViewOnlyNotice') : t(btn)}
+                    disabled={(readOnlyAi(kind) ? offUnlessReadOnly : off) || state?.empty}
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => onAiPreset(prompt())}
                   >
