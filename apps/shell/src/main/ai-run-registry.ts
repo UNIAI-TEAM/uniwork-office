@@ -18,15 +18,33 @@ export interface EditorState {
   /** null: the editor did not answer, the caller keeps what it last knew */
   dirty: boolean | null
   aiRunning: boolean
+  /**
+   * G5-03a: how many AI turns this view has started since the shell first
+   * saw it (never decreases). The guarded clean reload reads the SUM over a
+   * document's views before and after its download: a change means a turn
+   * started meanwhile, so the fetched bytes must not be written.
+   */
+  aiEpoch: number
 }
 
 /** webContents.id -> id of the running turn ('' when the editor sent none) */
 const runningByWc = new Map<number, string>()
+/**
+ * webContents.id -> number of `running` reports accepted so far. Kept apart
+ * from runningByWc: the flag is cleared by an idle / reload / crash, while the
+ * count only ever grows (the reload race compares it across a fetch).
+ */
+const epochByWc = new Map<number, number>()
 /** views whose destroy/reload/crash already clears the flag */
 const watched = new Set<number>()
 
 export function isAiRunning(webContentsId: number): boolean {
   return runningByWc.has(webContentsId)
+}
+
+/** How many AI turns this view has started (0 when the shell never saw one). */
+export function aiEpochOf(webContentsId: number): number {
+  return epochByWc.get(webContentsId) ?? 0
 }
 
 /** Apply one report from `sender`; false when the payload is malformed (ignored). */
@@ -38,6 +56,7 @@ export function noteAiRun(sender: WebContents, payload: unknown): boolean {
     if (sender.isDestroyed()) return true
     watch(sender)
     runningByWc.set(wcId, report.runId ?? '')
+    epochByWc.set(wcId, aiEpochOf(wcId) + 1)
     return true
   }
   // an 'idle' naming an older turn does not end the current one
@@ -58,6 +77,8 @@ function watch(wc: WebContents): void {
   watched.add(wcId)
   wc.once('destroyed', () => {
     runningByWc.delete(wcId)
+    // the view is gone for good: its epoch goes with it
+    epochByWc.delete(wcId)
     watched.delete(wcId)
   })
   // reload() remounts the renderer without destroying webContents: the turn is gone
@@ -75,5 +96,6 @@ export function registerAiRunIpc(ipc: Pick<IpcMain, 'on'>): void {
 /** Test seam: drop every flag. */
 export function resetAiRunRegistry(): void {
   runningByWc.clear()
+  epochByWc.clear()
   watched.clear()
 }

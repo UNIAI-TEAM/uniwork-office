@@ -109,4 +109,13 @@ describe('Ribbon on a UniWork copy', () => {
     // the editable source pane stays off
     expect(body('源码').disabled).toBe(true)
   })
+
+  // V11: the chat starter chip already runs generate_mindmap on a view-only copy (read tool),
+  // so its ribbon twin must not be the one entry that stays off
+  it('a view-only copy keeps the read-only AI entries (summarize, mind map) on and edits off', () => {
+    const { container } = renderRibbon({ uniworkBound: true, readOnly: true })
+    // AI toggle, summarize, polish, tidy, mind map
+    const entries = Array.from(container.querySelectorAll<HTMLButtonElement>('button.ai-entry'))
+    expect(entries.map((b) => b.disabled)).toEqual([false, false, true, true, false])
+  })
 })

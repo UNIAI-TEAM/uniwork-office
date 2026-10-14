@@ -312,10 +312,22 @@ describe('width', () => {
       await click(toggle())
       // 600 - 360 (editor minimum) = 240, below the panel's own minimum: the window decides
       expect(bridge.setPanel).toHaveBeenLastCalledWith({ open: true, width: 240 })
-      expect(frame()!.style.width).toBe('240px')
+      expect(frame()!.style.getPropertyValue('--uw-discussion-width')).toBe('240px')
     } finally {
       Object.defineProperty(window, 'innerWidth', { configurable: true, value: wide })
     }
+  })
+
+  // R1-3: `.app-frame` is `zoom: var(--ui-scale)`, so a fixed panel paints `width x scale` CSS px.
+  // The width the panel reports to main is in window pixels (what main frees for the editor
+  // view); the box divides by the scale so what it paints is exactly what main freed.
+  it('paints the reported window-pixel width at any interface scale', () => {
+    const css = readFileSync(resolve(__dirname, '../src/renderer/src/discussion.css'), 'utf8')
+    const at = css.indexOf('.uw-discussion {')
+    const rule = css.slice(at, css.indexOf('}', at))
+    expect(rule).toMatch(
+      /width:\s*calc\(var\(--uw-discussion-width\)\s*\/\s*var\(--ui-scale,\s*1\)\)/,
+    )
   })
 })
 

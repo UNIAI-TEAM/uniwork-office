@@ -113,6 +113,7 @@ export const pt = {
   appMixedExportOpening:
     'Tamanhos de papel mistos: abrindo a visualização de paginação para exportar mesclando por página…',
   appSelectTextToComment: 'Selecione primeiro o texto a comentar',
+  appCommentSaveFirst: 'Salve o documento primeiro para adicionar um comentário',
   appCommentSelectionLost: 'A seleção não é mais válida; selecione novamente o texto a comentar',
   appCommentAdded: 'Comentário adicionado; gravado no documento ao salvar',
   appCommentEdited: 'Comentário atualizado; gravado no documento ao salvar',
@@ -231,6 +232,7 @@ export const pt = {
   appPageOf: 'Página {current} de {total}',
   appWordCountTitle: 'Contagem de palavras',
   appWordCountN: '{n} palavras',
+  appWordCountSelection: '{selected} de {total} palavras selecionadas',
   appTrackChangesOn: 'Controlar Alterações: Ativado',
   appTrackChangesOff: 'Controlar Alterações: Desativado',
   appAcTitle: 'Opções de Correção Automática',
@@ -447,6 +449,7 @@ export const pt = {
   appParaSpecialFirstLine: 'Primeira linha',
   appParaSpecialHanging: 'Deslocamento',
   appParaBy: 'Por',
+  appParaUnitChars: 'Caracteres',
   appInsertEquation: 'Inserir equação',
   appLatexPlaceholder: 'ex.: x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}',
   appLatexPreviewHint: 'Digite LaTeX para ver uma prévia',

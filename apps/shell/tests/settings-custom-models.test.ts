@@ -129,7 +129,7 @@ async function openAiPane(): Promise<void> {
     await Promise.resolve()
   })
   const nav = Array.from(host.querySelectorAll<HTMLButtonElement>('.set-nav-item')).find((button) =>
-    button.textContent?.includes('AI Model'),
+    button.textContent?.includes('AI model'),
   )
   await click(nav!)
 }

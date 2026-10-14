@@ -3,9 +3,11 @@
  * generate_image results): every AI-supplied URL goes through the shell-wide
  * `ai:fetch-image` handler, which keeps the SSRF guard (http(s) only, no
  * private / loopback / link-local target, every redirect hop re-checked) and
- * the 50 MB size cap. The real handler runs here with electron mocked and
- * `fetch` stubbed, so no request leaves the machine. The URL policy itself is
- * unchanged (Product question); this only pins the guard.
+ * the 50 MB size cap. The real handler runs here with electron mocked and the
+ * gate's transport stubbed, so no request leaves the machine: the guard dials
+ * undici's `fetch` (it pins every hop through a per-hop undici Agent), not the
+ * global `fetch`. The URL policy itself is unchanged (Product question); this
+ * only pins the guard.
  */
 import { tmpdir } from 'node:os'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -13,6 +15,17 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 type IpcHandler = (event: unknown, ...args: unknown[]) => unknown
 const { handlers } = vi.hoisted(() => ({
   handlers: new Map<string, (event: unknown, ...args: unknown[]) => unknown>(),
+}))
+
+// safe-remote-url.ts imports `fetch` from the undici package (the same module
+// whose Agent pins the connection), so stubbing the global fetch would leave
+// the guard resolving and dialing for real. Keep the rest of undici actual,
+// so a hostname hop still builds its pinned dispatcher.
+const { undiciFetch } = vi.hoisted(() => ({ undiciFetch: vi.fn() }))
+
+vi.mock('undici', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  fetch: undiciFetch,
 }))
 
 vi.mock('@genoffice/ai-search', () => ({}))
@@ -71,12 +84,11 @@ const fetchImage = (url: string): Promise<Fetched> =>
   Promise.resolve(handlers.get('ai:fetch-image')!({ sender: {} }, url)) as Promise<Fetched>
 
 beforeAll(() => registerAiIpc())
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => undiciFetch.mockReset())
 
 function stubFetch(respond: (url: string) => Response) {
-  const fetchMock = vi.fn(async (input: unknown) => respond(String(input)))
-  vi.stubGlobal('fetch', fetchMock)
-  return fetchMock
+  undiciFetch.mockImplementation(async (input: unknown) => respond(String(input)))
+  return undiciFetch
 }
 
 describe('docs ai:fetch-image keeps the SSRF guard', () => {

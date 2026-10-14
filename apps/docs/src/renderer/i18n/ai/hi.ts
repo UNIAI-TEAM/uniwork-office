@@ -195,4 +195,17 @@ export const hi = {
   aiClarifySubmit: 'जारी रखें',
   aiSumClarify: 'स्पष्टीकरण का जवाब दिया गया',
   aiSumClarifySkipped: 'स्पष्टीकरण छोड़ा गया',
+  aiStarterMindMap: 'इस दस्तावेज़ का माइंड मैप बनाएँ',
+  aiMindMapBtn: 'AI माइंड मैप',
+  aiMindMapPrompt:
+    'इस दस्तावेज़ का माइंड मैप बनाएँ और मुख्य विषयों तथा प्रमुख अवधारणाओं को अनुभाग संरचना के अनुसार व्यवस्थित करें',
+  aiSumMindMap: 'माइंड मैप बनाएँ',
+  aiMindMapTitle: 'माइंड मैप',
+  aiMindMapNodes: '{count} नोड',
+  aiMindMapAskPrompt: 'इस दस्तावेज़ में «{label}» के बारे में बताएँ',
+  aiMindMapJump: 'उद्धृत अनुच्छेद पर जाएँ',
+  aiMindMapExport: 'PNG निर्यात करें',
+  aiMindMapReset: 'दृश्य रीसेट करें',
+  aiMindMapExpand: 'शाखा खोलें',
+  aiMindMapCollapse: 'शाखा समेटें',
 } satisfies Record<keyof typeof zh, string>

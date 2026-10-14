@@ -115,6 +115,7 @@ export const de = {
   appMixedExportOpening:
     'Gemischte Papierformate: Seitenvorschau wird geöffnet, um die Seiten zusammengeführt zu exportieren…',
   appSelectTextToComment: 'Wählen Sie zuerst den zu kommentierenden Text aus',
+  appCommentSaveFirst: 'Speichern Sie zuerst das Dokument, um einen Kommentar hinzuzufügen',
   appCommentSelectionLost:
     'Die Auswahl ist nicht mehr gültig; wählen Sie den zu kommentierenden Text erneut aus',
   appCommentAdded: 'Kommentar hinzugefügt; wird beim Speichern in das Dokument geschrieben',
@@ -242,6 +243,7 @@ export const de = {
   appPageOf: 'Seite {current} von {total}',
   appWordCountTitle: 'Wörter zählen',
   appWordCountN: '{n} Wörter',
+  appWordCountSelection: '{selected} von {total} Wörtern ausgewählt',
   appTrackChangesOn: 'Änderungen nachverfolgen: Ein',
   appTrackChangesOff: 'Änderungen nachverfolgen: Aus',
   appAcTitle: 'AutoKorrektur-Optionen',
@@ -458,6 +460,7 @@ export const de = {
   appParaSpecialFirstLine: 'Erste Zeile',
   appParaSpecialHanging: 'Hängend',
   appParaBy: 'Um',
+  appParaUnitChars: 'Zeichen',
   appInsertEquation: 'Formel einfügen',
   appLatexPlaceholder: 'z. B. x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}',
   appLatexPreviewHint: 'LaTeX eingeben, um eine Vorschau anzuzeigen',

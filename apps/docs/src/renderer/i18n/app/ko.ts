@@ -120,6 +120,7 @@ export const ko = {
     '용지 크기가 혼합된 문서: 페이지 미리 보기를 열어 페이지별로 병합하여 내보내는 중…',
   // Comments
   appSelectTextToComment: '메모를 추가할 텍스트를 먼저 선택하세요',
+  appCommentSaveFirst: '댓글을 추가하려면 먼저 문서를 저장하세요',
   appCommentSelectionLost:
     '선택 영역이 더 이상 유효하지 않습니다. 메모를 추가할 텍스트를 다시 선택하세요',
   appCommentAdded: '메모를 추가했습니다. 저장 시 문서에 기록됩니다',
@@ -245,6 +246,7 @@ export const ko = {
   appPageOf: '{current}/{total} 페이지',
   appWordCountTitle: '단어 개수',
   appWordCountN: '단어 {n}개',
+  appWordCountSelection: '선택됨 {selected} / {total}자',
   appTrackChangesOn: '변경 내용 추적: 켜짐',
   appTrackChangesOff: '변경 내용 추적: 꺼짐',
   appAcTitle: '자동 고침 옵션',
@@ -467,6 +469,7 @@ export const ko = {
   appParaSpecialFirstLine: '첫 줄',
   appParaSpecialHanging: '내어쓰기',
   appParaBy: '값',
+  appParaUnitChars: '문자',
   // Equations
   appInsertEquation: '수식 삽입',
   appLatexPlaceholder: '예: x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}',

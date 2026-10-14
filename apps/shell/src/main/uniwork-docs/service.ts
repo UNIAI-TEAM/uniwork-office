@@ -21,6 +21,8 @@ import type {
   UniworkDocStatus,
   UniworkLaunchEvent,
   UniworkLockReason,
+  UniworkRemoteAction,
+  UniworkRemoteBar,
   UniworkResult,
   UniworkSharedPage,
   UniworkSharedQuery,
@@ -46,6 +48,7 @@ import {
   type Binding,
   BindingStore,
   type BoundDocument,
+  docLevelOf,
   documentNameIn,
   hasLegacyIntentFiles,
   type LastOwner,
@@ -64,6 +67,7 @@ import {
 } from './formats'
 import { pathKey } from '../../shared/path-key'
 import { LaunchController } from './launch'
+import type { CommentsContextResult } from '@genoffice/electron-utils/comments-ipc'
 import { actionFlags, type DocumentDetail, type LaunchDescriptor } from './parse'
 import {
   QUEUE_LIMITS,
@@ -98,6 +102,9 @@ import {
   type QueueDoc,
 } from '../uniwork-sync/queue/dispatcher'
 import { isTerminalQueueState, type IntentRecordV2 } from '../uniwork-sync/queue/record'
+import { compareRevision } from '../uniwork-sync/feed/revision'
+import type { FeedChange } from '../uniwork-sync/feed/client'
+import { decideRemote, type RemoteLocal, type RemoteNotice } from './remote-newer'
 import type { StoreRecords } from '../uniwork-sync/store'
 
 /**
@@ -201,6 +208,15 @@ export interface UniworkDocsServiceDeps {
   reloadPath(path: string): void
   activePath(): string | undefined
   /**
+   * G5-03a: the FRESH editor state of one path (tab, detached window, present
+   * view of the owner tab), never the 1 s poll cache - the guarded reload reads
+   * it before and after its fetch, so an AI turn that starts in between drops
+   * the result. Absent = a clean, idle editor (tests that never poll).
+   */
+  editorStateOf?(
+    path: string,
+  ): Promise<{ dirty: boolean | null; aiRunning: boolean; aiEpoch: number }>
+  /**
    * S18: the native open dialog for an upload (Electron-free seam). Null when
    * the person cancelled or the file is not usable.
    */
@@ -255,11 +271,38 @@ export interface UniworkDocsServiceDeps {
    * test installs none and the reveal is dropped.
    */
   revealComment?(path: string, commentId: string): void
+  /**
+   * G8-12: a Save of `path` settled with a commit; `versionId` is the server
+   * version the editor's comment anchors now refer to. Optional (read at push
+   * time): a standalone app or a test installs none.
+   */
+  notifySaved?(path: string, versionId: string): void
   /** test seam: replaces the HTTP client */
   client?: UniworkDocsClient
   sleep?(ms: number): Promise<void>
   now?(): number
+  /**
+   * ADVISOR D4 (a): this build's packaging flag (the wiring passes
+   * app.isPackaged), read only by the dev-only S6 display fixture. Absent reads
+   * as packaged, so a test that does not install the wiring stays inert.
+   */
+  isPackaged?: boolean
 }
+
+/**
+ * ADVISOR D4 (a): the bar kinds the dev-only S6 fixture may display. Anything
+ * else in the JSON file is dropped so a typo cannot inject an unknown bar.
+ * Never in product copy: no string, no i18n key, no UI mention.
+ */
+const DEV_FIXTURE_BAR_KINDS: ReadonlySet<string> = new Set([
+  'updated',
+  'newer-dirty',
+  'newer-ai',
+  'now-clean',
+  'reload-failed',
+  'revoked',
+  'deleted',
+])
 
 /** states whose working copy holds work UniWork does not have yet */
 const KEEP_LOCAL_STATES: ReadonlySet<string> = new Set([
@@ -408,8 +451,56 @@ function samePath(a: string, b: string): boolean {
   return process.platform === 'win32' ? ra.toLowerCase() === rb.toLowerCase() : ra === rb
 }
 
+/**
+ * G5-03a: the S6 lock verdict of a failed documents call, read from the CODES
+ * the client's own mapping produced - a coded 403/404 is `forbidden` /
+ * `permission_revoked` / `not_found`, a coded 410 is `deleted`, and the
+ * tombstone code `document_deleted`. A bare 403/404 (no UniWork envelope: a
+ * gateway, a captive portal) stays `server_error` on purpose, so it is
+ * transient here too - the bar says `reload-failed`, never a lock.
+ */
+function lockVerdict(error: unknown): 'revoked' | 'deleted' | null {
+  if (!(error instanceof UniworkDocError)) return null
+  if (error.code === 'document_deleted' || error.code === 'deleted') return 'deleted'
+  if (
+    error.code === 'permission_revoked' ||
+    error.code === 'forbidden' ||
+    error.code === 'not_found'
+  ) {
+    return 'revoked'
+  }
+  return null
+}
+
+/** the refusal code a queue record's blocked state carries, as an S6 lock verdict */
+function refusalVerdict(code: UniworkDocErrorCode | undefined): 'revoked' | 'deleted' | null {
+  if (code === 'permission_revoked') return 'revoked'
+  if (code === 'document_deleted') return 'deleted'
+  return null
+}
+
+/** no revision of this app's own has been seen for a document yet */
+const NO_ECHO: ReadonlySet<string> = new Set()
+
 function accessFor(level: string | null): UniworkDocAccess {
   return level === 'edit' || level === 'manage' ? 'edit' : 'view'
+}
+
+/**
+ * G8-12: what a document read tells a binding for the comments seam: the
+ * caller's level, and the server version id of the base bytes when the base is
+ * the version that read describes (a binding on another version keeps its own).
+ */
+function withServerContext(binding: Binding, detail: DocumentDetail, readOnly = false): Binding {
+  const next = { ...binding }
+  const level = docLevelOf(detail.myLevel)
+  // a read-only copy (a view ticket, or a launch that asked to view) never shows a level above view
+  if (level) next.level = readOnly ? 'view' : level
+  else delete next.level
+  if (detail.file.versionId && next.baseVersion === detail.file.version) {
+    next.baseVersionId = detail.file.versionId
+  }
+  return next
 }
 
 /**
@@ -463,6 +554,10 @@ function queueBindingPatch(record: IntentRecordV2): Partial<Binding> | null {
   else if (state === 'blocked') patched.error = error ?? 'server_error'
   else if (state === 'reconciling-stuck') patched.error = error ?? 'intent_unknown'
   else if (state === 'failed') patched.error = error ?? 'server_error'
+  // G8-12: a refused permission is a fact about the caller's level, as on the inline path
+  if (patched.error === 'permission_revoked' || patched.error === 'forbidden') {
+    patched.level = 'view'
+  }
   return patched
 }
 
@@ -474,6 +569,7 @@ interface ConflictSession {
   controller: AbortController
   fromClose: boolean
   onNotWritten?: () => void
+  remoteNotice?: RemoteNotice
   knownServerRevision: string | null
   knownServerVersion: number | null
   knownServerSavedAt: string | null
@@ -562,6 +658,36 @@ export class UniworkDocsService {
    */
   private readonly selfRenamed = new Map<string, string>()
   /**
+   * G5-03a (S6): the bar of each path as this session knows it, keyed by path.
+   * An entry (even `null`, an explicitly hidden bar) is authoritative over the
+   * rebuild from the binding - so `later`/`close` stay hidden and a fresh
+   * notice is what brings the bar back.
+   */
+  private readonly remoteBars = new Map<string, UniworkRemoteBar | null>()
+  /** the notice behind a path's bar (or the last one handled): re-decisions and actions */
+  private readonly remoteNotices = new Map<string, RemoteNotice>()
+  /** notices held while an intent is validating/uploading/committing */
+  private readonly remoteHeld = new Map<string, RemoteNotice>()
+  /**
+   * Revisions this app itself produced, per document: a settled receipt or the
+   * rename revision of `selfRenamed`. A notice carrying one is this app's own
+   * write echoing back through the feed, never a reason for a bar (the receipt
+   * may settle after the notice arrived, so the equality must outlive it).
+   */
+  private readonly ownEcho = new Map<string, Set<string>>()
+  /** documents locked by a server verdict (403/404 revoked, 410 deleted) */
+  private readonly remoteLocked = new Map<string, 'revoked' | 'deleted'>()
+  /** ADVISOR D4 (a): the parsed dev-only fixture and the mtime it was read at */
+  private devFixture: {
+    file: string
+    mtimeMs: number
+    bars: Record<string, UniworkRemoteBar>
+  } | null = null
+  /** per path, the last editor state the poll reported (the AI settle edge) */
+  private readonly editorAi = new Map<string, { aiRunning: boolean; aiEpoch: number }>()
+  /** one guarded reload per path at a time; a notice queued behind it runs after */
+  private readonly remoteReloads = new Map<string, Promise<void>>()
+  /**
    * S18: the in-flight uploads by the renderer's own `uploadId`, so the dialog's
    * Cancel can abort the one it started (the read, or the POST already running).
    * An entry lives exactly as long as its upload call.
@@ -587,6 +713,7 @@ export class UniworkDocsService {
       ownsBinding: (doc) => this.owns(doc),
       intents: () => this.intentAccess(),
       publish: (status) => this.publish(status),
+      onSaved: (doc, versionId) => this.deps.notifySaved?.(doc.path, versionId),
       capability: {
         get: (orgId) =>
           deps.capability
@@ -681,17 +808,18 @@ export class UniworkDocsService {
 
   /** every status push: the shell window, then in-process waiters (close prompt) */
   private publish(status: UniworkDocStatus): void {
-    this.deps.pushStatus(this.present(status))
-    for (const listener of [...this.statusListeners]) listener(status)
+    const full = this.withRemote(this.present(status))
+    this.deps.pushStatus(full)
+    for (const listener of [...this.statusListeners]) listener(full)
     const open = this.conflictPrompt
-    if (open && !open.controller.signal.aborted && samePath(open.path, status.path)) {
-      if (status.state === 'blocked') {
+    if (open && !open.controller.signal.aborted && samePath(open.path, full.path)) {
+      if (full.state === 'blocked') {
         const locked: 'revoked' | 'deleted' | undefined =
-          status.error === 'permission_revoked' || status.error === 'forbidden'
+          full.error === 'permission_revoked' || full.error === 'forbidden'
             ? 'revoked'
-            : status.error === 'document_deleted' ||
-                status.error === 'deleted' ||
-                status.error === 'not_found'
+            : full.error === 'document_deleted' ||
+                full.error === 'deleted' ||
+                full.error === 'not_found'
               ? 'deleted'
               : undefined
         if (locked && open.locked !== locked) {
@@ -707,6 +835,80 @@ export class UniworkDocsService {
         }
       }
     }
+  }
+
+  /**
+   * G5-03a: the status plus its S6 bar. The session's own bar for the path wins
+   * (including an explicit `null`, a hidden one); otherwise the bar is rebuilt
+   * from the binding - a newer-* notice or a revoke/delete survives a restart
+   * because the feed cursor never replays it.
+   */
+  private withRemote(status: UniworkDocStatus): UniworkDocStatus {
+    // ADVISOR D4 (a): the dev-only display fixture wins for a matching path; a
+    // packaged build never reads the env or the file (see devRemoteFixture)
+    const fixture = this.devRemoteFixture(status.path)
+    if (fixture) return { ...status, remote: fixture }
+    const key = pathKey(status.path)
+    if (this.remoteBars.has(key)) {
+      const bar = this.remoteBars.get(key)
+      return bar ? { ...status, remote: bar } : status
+    }
+    const doc = this.store.lookup(status.path)
+    const rebuilt = doc ? this.rebuiltRemote(doc.binding) : null
+    return rebuilt ? { ...status, remote: rebuilt } : status
+  }
+
+  /**
+   * ADVISOR D4 (a): the dev-only S6 display fixture. When this build is
+   * unpackaged and UNIWORK_DEV_REMOTE_FIXTURE names a JSON file of
+   * `{ "<abs path>": UniworkRemoteBar }`, a matching path's status shows that
+   * bar, so the visual stage can reach every S6 state. Display only: it never
+   * writes a binding, never reloads, never sends a request; the file is parsed
+   * once and re-read when its mtime moves. A packaged build returns before the
+   * env is read, so the fixture is unreachable there. Code only - no product
+   * string, no i18n key, no UI copy.
+   */
+  private devRemoteFixture(path: string): UniworkRemoteBar | null {
+    if (this.deps.isPackaged !== false) return null
+    const file = process.env.UNIWORK_DEV_REMOTE_FIXTURE
+    if (!file) return null
+    try {
+      const mtimeMs = statSync(file).mtimeMs
+      if (
+        !this.devFixture ||
+        this.devFixture.file !== file ||
+        this.devFixture.mtimeMs !== mtimeMs
+      ) {
+        const parsed: unknown = JSON.parse(readFileSync(file, 'utf8'))
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
+        const bars: Record<string, UniworkRemoteBar> = {}
+        for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+          const bar = value as UniworkRemoteBar | null
+          if (bar && typeof bar === 'object' && DEV_FIXTURE_BAR_KINDS.has(bar.kind)) bars[key] = bar
+        }
+        this.devFixture = { file, mtimeMs, bars }
+      }
+      return this.devFixture.bars[path] ?? null
+    } catch {
+      // a missing or malformed fixture is not an error: show the real statuses
+      return null
+    }
+  }
+
+  /** the bar a binding alone can prove: a lock verdict, or a known newer head */
+  private rebuiltRemote(binding: Binding): UniworkRemoteBar | null {
+    if (binding.state === 'blocked') {
+      if (binding.error === 'permission_revoked') return { kind: 'revoked' }
+      if (binding.error === 'document_deleted') return { kind: 'deleted' }
+    }
+    if (
+      binding.serverRevision !== undefined &&
+      binding.serverVersion !== undefined &&
+      compareRevision(binding.serverRevision, binding.baseRevision) > 0
+    ) {
+      return { kind: 'newer-dirty', version: binding.serverVersion }
+    }
+    return null
   }
 
   /**
@@ -726,7 +928,7 @@ export class UniworkDocsService {
   }
 
   private statusOf(doc: BoundDocument): UniworkDocStatus {
-    return this.present(toStatus(doc))
+    return this.withRemote(this.present(toStatus(doc)))
   }
 
   /**
@@ -745,6 +947,42 @@ export class UniworkDocsService {
     else this.editorDirty.delete(doc.path)
     const status = this.statusOf(doc)
     if (status.state !== before) this.deps.pushStatus(status)
+  }
+
+  /**
+   * G5-03a: one editor poll pass's answer for `path` (W2's poll). `dirty` keeps
+   * noteEditorDirty's behaviour (the chip); `aiRunning`/`aiEpoch` are remembered
+   * for the reload race guard and the bar's own settle edges: a `newer-ai` bar
+   * whose turn ended is re-decided (a copy that is clean again reloads), and a
+   * `newer-dirty` bar on a copy that is clean again becomes `now-clean`
+   * (EXPERIENCE :333, :338 - no auto reload of an undone edit).
+   */
+  noteEditorState(
+    path: string,
+    state: { dirty: boolean | null; aiRunning: boolean; aiEpoch: number },
+    mark?: number,
+  ): void {
+    const doc = typeof path === 'string' ? this.store.lookup(path) : null
+    if (!doc || !this.ownsLocally(doc) || doc.binding.access !== 'edit') return
+    if (state.dirty !== null) this.noteEditorDirty(doc.path, state.dirty, mark)
+    const before = this.editorAi.get(doc.path)
+    this.editorAi.set(doc.path, { aiRunning: state.aiRunning, aiEpoch: state.aiEpoch })
+    const key = pathKey(doc.path)
+    const bar = this.remoteBars.get(key)
+    if (!bar) return
+    const notice = this.remoteNotices.get(key)
+    if (!notice) return
+    if (bar.kind === 'newer-ai' && before?.aiRunning === true && !state.aiRunning) {
+      void this.rerunRemoteDecision(doc.path, notice).catch(() => undefined)
+      return
+    }
+    if (bar.kind === 'newer-dirty' && state.dirty === false) {
+      const clean = doc.binding.state === 'ready' || doc.binding.state === 'saved'
+      if (!clean || this.editorDirty.has(doc.path)) return
+      void this.showRemoteBar(doc, notice, { kind: 'now-clean', version: notice.version }).catch(
+        () => undefined,
+      )
+    }
   }
 
   /** the live session's identity; remembered (on disk) as the last owner */
@@ -1084,6 +1322,16 @@ export class UniworkDocsService {
 
   /** a queue record change: move the chip, or settle the base on a commit */
   private async applyRecord(record: IntentRecordV2): Promise<void> {
+    try {
+      await this.applyRecordToChip(record)
+    } finally {
+      // G5-03a: a notice the intent held up is re-decided now that the record moved
+      await this.redecideHeld(record.documentId, record).catch(() => undefined)
+    }
+  }
+
+  /** the chip side of one record change */
+  private async applyRecordToChip(record: IntentRecordV2): Promise<void> {
     const doc = await this.boundDocFor(record.documentId)
     if (!doc) return
     if (record.state === 'blocked' && record.lastError === 'other_window') {
@@ -1097,6 +1345,14 @@ export class UniworkDocsService {
       }
       this.otherWindowStatus.set(doc.path, local)
       this.publish(local)
+      return
+    }
+    // G5-03a: a queue refusal that lost the document for good IS the S6 lock
+    // (revoked/deleted), from the same server verdicts the reload path reads
+    const refusal = record.state === 'blocked' ? refusalVerdict(record.lastError) : null
+    if (refusal) {
+      this.otherWindowStatus.delete(doc.path)
+      await this.lockFromServer(record.documentId, refusal)
       return
     }
     // a real record change ends the window-local read-only status
@@ -1117,6 +1373,10 @@ export class UniworkDocsService {
    */
   private async settleFromRecord(doc: BoundDocument, record: IntentRecordV2): Promise<void> {
     if (!record.receipt) return
+    // G5-03a: this app's own commit, by its exact revision - a feed notice for
+    // it is an echo, never a newer version (its own base moves below; a notice
+    // that arrived earlier is still held and matched by this receipt)
+    this.rememberOwnEcho(record.documentId, record.receipt.revision)
     let current: string | null
     try {
       current = sha256Hex(new Uint8Array(await readFile(doc.path)))
@@ -1130,10 +1390,20 @@ export class UniworkDocsService {
       baseChecksum: record.checksum,
       state: current === record.checksum ? 'saved' : 'dirty',
       lastSavedAt: new Date().toISOString(),
+      // G8-12: the comments anchor base moves with the base version (the
+      // queue's receipt always names the produced version)
+      baseVersionId: record.receipt.versionId,
     }
     delete next.error
     delete next.serverRevision
-    await this.coordinator.commitState(doc, next)
+    delete next.serverVersion
+    const done = await this.coordinator.commitState(doc, next)
+    // G8-12: a queue-settled Save (dispatched, or found committed by a lookup
+    // at rest) tells the editor's comment panel its new version, exactly as
+    // the inline settle does; a refused binding write pushes nothing
+    if (done.binding.baseVersionId === record.receipt.versionId) {
+      this.deps.notifySaved?.(done.path, record.receipt.versionId)
+    }
   }
 
   /**
@@ -1554,10 +1824,24 @@ export class UniworkDocsService {
    * account boundary uses it when the account those locks belong to goes away,
    * so the next session is not handed an S11 panel for another account's
    * working copy.
+   *
+   * G5-03a: the S6 state of those paths goes with the locks. A revoked/deleted
+   * verdict is keyed by document id and would otherwise answer for the next
+   * account's copy of the same document, and a bar of the account that went
+   * away must not survive the boundary either.
    */
   forgetLocksWhere(match: (path: string) => boolean): void {
     for (const [key, lock] of [...this.locks]) {
       if (match(lock.path)) this.locks.delete(key)
+    }
+    for (const key of [...this.remoteBars.keys()]) {
+      const doc = this.store.lookup(key)
+      if (!match(doc?.path ?? key)) continue
+      this.remoteBars.delete(key)
+      this.remoteNotices.delete(key)
+      if (!doc) continue
+      this.remoteLocked.delete(doc.binding.documentId)
+      this.remoteHeld.delete(doc.binding.documentId)
     }
   }
 
@@ -1611,11 +1895,15 @@ export class UniworkDocsService {
     )
   }
 
-  /** view access, another account's copy, or a newer store this build cannot read (one read) */
+  /** view access, another account's copy, a newer store this build cannot read, or an S6 lock (one read) */
   isReadOnly(path: string): boolean {
     const found: PathBinding = this.store.classify(path)
     if (found.kind === 'newer') return true
     if (found.kind !== 'bound') return false
+    // G5-03a: a document the server has revoked or deleted while it is open is
+    // read-only for good (its module refuses the save, and W4's export gate
+    // reads the same answer)
+    if (this.lockedFor(found.doc.binding)) return true
     // G5-06: another window holds this document's lock: this one is read-only
     // (EXPERIENCE - Second-window bar, :129). The queue never writes for it, and
     // the module is told so too. No extra binding read: `classify` already gave
@@ -1625,6 +1913,16 @@ export class UniworkDocsService {
       !this.ownsLocally(found.doc) ||
       this.coordinator.isOtherWindow(found.doc.key)
     )
+  }
+
+  /**
+   * G5-03a: the server revoked or deleted this open working copy. The module
+   * seam reads this to refuse export / Save As / print-to-PDF; `isReadOnly`
+   * already covers the save side.
+   */
+  isLocked(path: string): boolean {
+    const found: PathBinding = this.store.classify(path)
+    return found.kind === 'bound' && this.lockedFor(found.doc.binding) !== null
   }
 
   /** moves on every user Save; see noteEditorDirty */
@@ -2124,15 +2422,32 @@ export class UniworkDocsService {
    * arrived - is someone else's rename and is followed (R1-6). Without a
    * revision the notice is taken as this service's own echo, so the one-shot
    * suppression the callers without a feed still rely on is unchanged.
+   *
+   * G5-03a: the same change is the S6 notice (`change` carries the head version
+   * and version id), so one feed tick drives both the rename follow and the
+   * newer-version decision.
    */
-  noteFeedChange(documentId: string, revision?: string): void {
+  noteFeedChange(documentId: string, revision?: string, change?: FeedChange): void {
     if (typeof documentId !== 'string' || !documentId) return
+    const rev = typeof revision === 'string' ? revision : change?.revision
     const own = this.selfRenamed.get(documentId)
     if (own !== undefined) {
       this.selfRenamed.delete(documentId)
-      if (revision === undefined || revision === own) return
+      if (rev === undefined || rev === own) {
+        // its own revision, now settled: never a newer-version notice either
+        if (rev !== undefined) this.rememberOwnEcho(documentId, rev)
+        return
+      }
     }
     void this.refreshMetadataFor(documentId).catch(() => undefined)
+    if (change && rev !== undefined) {
+      void this.noteRemoteChange({
+        documentId,
+        revision: rev,
+        version: change.currentVersion,
+        versionId: change.versionId,
+      }).catch(() => undefined)
+    }
     const open = this.conflictPrompt
     if (open && !open.controller.signal.aborted && open.doc.binding.documentId === documentId) {
       void this.buildConflictView(open, { fetchServer: true })
@@ -2166,7 +2481,12 @@ export class UniworkDocsService {
     let detail: DocumentDetail
     try {
       detail = await this.api().getDocument(documentId)
-    } catch {
+    } catch (error) {
+      // G5-03a: the server's own verdicts are no longer swallowed - a 403/404
+      // revokes the copy and a 410 deletes it (the S6 lock); the rest is
+      // transient and stays invisible here
+      const verdict = lockVerdict(error)
+      if (verdict) await this.lockFromServer(documentId, verdict)
       return
     }
     // the metadata read is async: a save may have started or settled, and an
@@ -2267,7 +2587,15 @@ export class UniworkDocsService {
     }
     const next: Binding = { ...fresh.binding, state: 'dirty' }
     delete next.error
-    return this.coordinator.commitState(fresh, next)
+    // G5-03a FF: guarded by the base just read. A guarded reload/restore can put
+    // a different base in place between that read and the queued write (W4: its
+    // `9/saved` lands after this `10/saved` read); the coordinator compares the
+    // guard inside its chain, so the superseded base is never resurrected as
+    // `dirty` - and a copy the restore made match its base again stays `saved`.
+    return this.coordinator.commitState(fresh, next, {
+      baseRevision: fresh.binding.baseRevision,
+      baseChecksum: fresh.binding.baseChecksum,
+    })
   }
 
   /**
@@ -2309,6 +2637,455 @@ export class UniworkDocsService {
     // never writes (EXPERIENCE - Second-window bar, :129)
     if (this.coordinator.isOtherWindow(doc.key)) return false
     return !(b.state === 'blocked' && b.error !== 'quota_exceeded')
+  }
+
+  // ---- S6: a newer version on the server (G5-03a) ---------------------------
+
+  /**
+   * One feed notice for an open, bound document of this session: the pure rule
+   * order decides (remote-newer.ts) and this class only acts - hold it, show
+   * its bar, or run the guarded clean reload. A notice for a closed or unknown
+   * document does nothing: there is no surface to move.
+   */
+  private async noteRemoteChange(notice: RemoteNotice): Promise<void> {
+    const doc = await this.boundDocFor(notice.documentId)
+    if (!doc || !this.deps.isPathOpen(doc.path)) return
+    const decision = decideRemote(notice, await this.remoteLocalFor(doc))
+    await this.applyRemoteDecision(doc, notice, decision)
+  }
+
+  private async applyRemoteDecision(
+    doc: BoundDocument,
+    notice: RemoteNotice,
+    decision: ReturnType<typeof decideRemote>,
+  ): Promise<void> {
+    switch (decision.kind) {
+      case 'ignore':
+        if (decision.reason === 'malformed') {
+          console.warn(`uniwork docs: ignoring a malformed feed revision for ${notice.documentId}`)
+        }
+        return
+      case 'hold':
+        // the intent's own receipt decides: settleFromRecord/applyRecord re-decide it
+        this.remoteHeld.set(notice.documentId, notice)
+        return
+      case 'bar':
+        await this.showRemoteBar(doc, notice, decision.bar)
+        return
+      case 'reload':
+        await this.runGuardedReload(doc.path, notice)
+    }
+  }
+
+  /** everything decideRemote needs about the local copy; nulls where the store cannot answer */
+  private async remoteLocalFor(doc: BoundDocument): Promise<RemoteLocal> {
+    const editor = await this.editorState(doc.path)
+    const record = await this.queueRecordFor(doc)
+    return {
+      documentId: doc.binding.documentId,
+      baseRevision: doc.binding.baseRevision,
+      feedOn: await this.feedOnFor(doc.binding.orgId),
+      dirty:
+        doc.binding.state === 'dirty' || this.editorDirty.has(doc.path) || editor.dirty === true,
+      aiRunning: editor.aiRunning,
+      queue: record && !isTerminalQueueState(record.state) ? record.state : null,
+      ...(record?.receipt ? { receiptRevision: record.receipt.revision } : {}),
+      ownEcho: this.echoSet(doc.binding.documentId),
+      locked: this.lockedFor(doc.binding),
+    }
+  }
+
+  /** the document's live intent record, or null (none, terminal, store unreachable) */
+  private async queueRecordFor(doc: BoundDocument): Promise<IntentRecordV2 | null> {
+    const access = await this.intentAccess()
+    if (access.kind !== 'ok') return null
+    const stored = await access.intents.read(doc.key, {
+      orgId: doc.binding.orgId,
+      workspaceId: doc.binding.workspaceId,
+      baseVersion: doc.binding.baseVersion,
+      length: 0,
+    })
+    return stored ? stored.intent : null
+  }
+
+  /**
+   * `sync_feed` of the document's org through the SAME capability cache the save
+   * queue reads. A store that cannot answer (session expired, a network throw)
+   * counts as on: the notice was already produced by the feed, so a transient
+   * capability failure must not hide the bar.
+   */
+  private async feedOnFor(orgId: string): Promise<boolean> {
+    if (!this.deps.capability || !orgId) return true
+    try {
+      const read = await this.deps.capability.get(orgId)
+      const capabilities = read.capabilities as { sync_feed?: boolean }
+      if (read.source === 'default' || capabilities.sync_feed === undefined) return true
+      return capabilities.sync_feed === true
+    } catch {
+      return true
+    }
+  }
+
+  /** the fresh editor state; a missing seam or a view that cannot answer reads clean and idle */
+  private async editorState(
+    path: string,
+  ): Promise<{ dirty: boolean | null; aiRunning: boolean; aiEpoch: number }> {
+    if (!this.deps.editorStateOf) return { dirty: null, aiRunning: false, aiEpoch: 0 }
+    try {
+      return await this.deps.editorStateOf(path)
+    } catch {
+      return { dirty: null, aiRunning: false, aiEpoch: 0 }
+    }
+  }
+
+  private rememberOwnEcho(documentId: string, revision: string): void {
+    let set = this.ownEcho.get(documentId)
+    if (!set) {
+      set = new Set()
+      this.ownEcho.set(documentId, set)
+    }
+    set.add(revision)
+    // the check only ever looks at the notice's own revision: a bounded window
+    // of the newest ones is enough, and a long session cannot grow it forever
+    while (set.size > 16) {
+      const oldest = set.values().next().value
+      if (oldest === undefined) break
+      set.delete(oldest)
+    }
+  }
+
+  private echoSet(documentId: string): ReadonlySet<string> {
+    return this.ownEcho.get(documentId) ?? NO_ECHO
+  }
+
+  /** the lock of a document: this session's verdict, or the one the binding carries */
+  private lockedFor(binding: Binding): 'revoked' | 'deleted' | null {
+    const known = this.remoteLocked.get(binding.documentId)
+    if (known) return known
+    if (binding.state !== 'blocked') return null
+    if (binding.error === 'permission_revoked') return 'revoked'
+    if (binding.error === 'document_deleted') return 'deleted'
+    return null
+  }
+
+  /**
+   * Show one bar: remembered for the path (the authoritative in-memory state),
+   * and carried onto the binding for the newer-* kinds so a restart still shows
+   * it - the feed never replays the notice.
+   */
+  private async showRemoteBar(
+    doc: BoundDocument,
+    notice: RemoteNotice,
+    bar: UniworkRemoteBar,
+  ): Promise<void> {
+    const key = pathKey(doc.path)
+    this.remoteBars.set(key, bar)
+    this.remoteNotices.set(key, notice)
+    const fresh = this.store.lookup(doc.path)
+    if (!fresh) return
+    if (bar.kind === 'updated') {
+      this.publish(toStatus(fresh))
+      return
+    }
+    const next: Binding = {
+      ...fresh.binding,
+      serverRevision: notice.revision,
+      serverVersion: notice.version,
+    }
+    await this.coordinator.commitState(fresh, next)
+  }
+
+  /**
+   * The S6 bar's actions. `later` keeps the bar in the status - the renderer is
+   * what hides it (per path + bar signature), so the chip's `remote-newer` pill
+   * stays; `close` is the action that clears it in this session. `reload` opens
+   * the existing conflict dialog flow (S5 proper is G5-09), and
+   * `retry`/`reload-now` are the guarded clean reload again.
+   */
+  async remoteAction(path: string, action: UniworkRemoteAction): Promise<UniworkDocStatus | null> {
+    const doc = typeof path === 'string' ? this.store.lookup(path) : null
+    if (!doc || !this.ownsLocally(doc)) return null
+    const key = pathKey(doc.path)
+    const notice = this.remoteNotices.get(key)
+    switch (action) {
+      case 'later':
+        // EXPERIENCE S6: Later only hides the BAR, in the window that pressed it
+        // (the renderer keeps that per path + bar signature); main keeps the bar
+        // in the status, so the chip's `remote-newer` pill stays. A newer
+        // revision replaces the version as usual.
+        return this.statusOf(doc)
+      case 'close':
+        // Close hides the info bar for this session (one bar, no stacking)
+        this.remoteBars.set(key, null)
+        return this.statusOf(doc)
+      case 'retry':
+      case 'reload-now': {
+        if (!notice) return this.statusOf(doc)
+        await this.runGuardedReload(doc.path, notice)
+        return this.currentStatus(doc)
+      }
+      case 'reload':
+        return this.remoteReloadFlow(doc)
+      default:
+        return this.statusOf(doc)
+    }
+  }
+
+  /**
+   * "Tải lại bản mới nhất…": the S5 conflict dialog, opened from the S6 bar.
+   * One dialog at a time, exactly as the chip's conflict flow: a dialog for
+   * another document closes as "Decide later" first. While the AI turn is still
+   * running the action is inert (D3: no stop channel yet, the renderer shows it
+   * aria-disabled).
+   */
+  private async remoteReloadFlow(doc: BoundDocument): Promise<UniworkDocStatus | null> {
+    const notice = this.remoteNotices.get(pathKey(doc.path))
+    if (!notice) return this.statusOf(doc)
+    if (this.remoteBars.get(pathKey(doc.path))?.kind === 'newer-ai') {
+      const editor = await this.editorState(doc.path)
+      if (editor.aiRunning) return this.statusOf(doc)
+    }
+    return this.openConflictSession(doc, { remoteNotice: notice })
+  }
+
+  /**
+   * A successful resync no longer lists this open, bound document: classify it
+   * with ONE metadata read. 403/404 -> revoked, 410 -> deleted, an answer ->
+   * nothing (the snapshot may simply have moved on).
+   */
+  async noteFeedGone(documentId: string): Promise<void> {
+    if (typeof documentId !== 'string' || !documentId) return
+    const doc = await this.boundDocFor(documentId)
+    if (!doc) return
+    try {
+      await this.api().getDocument(documentId)
+    } catch (error) {
+      const verdict = lockVerdict(error)
+      if (verdict) await this.lockFromServer(documentId, verdict)
+    }
+  }
+
+  /** the runtime's drop filter: the id belongs to an open, bound copy of this session */
+  async isOpenBound(documentId: string): Promise<boolean> {
+    if (typeof documentId !== 'string' || !documentId) return false
+    const doc = await this.boundDocFor(documentId)
+    return doc !== null && this.deps.isPathOpen(doc.path)
+  }
+
+  /**
+   * Lock a copy the server no longer lets this session use: the binding reads
+   * `blocked` with the verdict's reason, the S6 bar says revoked/deleted, and
+   * isReadOnly(path) is true from now on (module saves refused). The editor
+   * content is never touched: no reload, no delete.
+   */
+  private async lockFromServer(documentId: string, verdict: 'revoked' | 'deleted'): Promise<void> {
+    this.remoteLocked.set(documentId, verdict)
+    const doc = await this.boundDocFor(documentId)
+    if (!doc) return
+    this.remoteBars.set(pathKey(doc.path), { kind: verdict })
+    const next: Binding = {
+      ...doc.binding,
+      state: 'blocked',
+      error: verdict === 'revoked' ? 'permission_revoked' : 'document_deleted',
+      // G8-12: a locked copy can never be edited again, so its comments level
+      // caps at view here exactly as on the inline 403 path - a queue refusal
+      // (and the metadata/feed reads) settles through this writer, so the cap
+      // in queueBindingPatch never sees it
+      level: 'view',
+    }
+    await this.coordinator.commitState(doc, next)
+  }
+
+  /**
+   * The server lets this copy be edited again (the path that re-grants the
+   * binding): the session's verdict is spent, so the lock map and the bar it
+   * put up go with it, and `lockedFor` answers from the binding again - the
+   * two sources of truth never disagree. A no-op for a document this session
+   * never locked (a newer-version bar is left alone), and only the verdict's
+   * own bar is dropped.
+   */
+  private clearRemoteLock(documentId: string, path: string): void {
+    const verdict = this.remoteLocked.get(documentId)
+    if (!verdict) return
+    this.remoteLocked.delete(documentId)
+    const key = pathKey(path)
+    if (this.remoteBars.get(key)?.kind !== verdict) return
+    this.remoteBars.delete(key)
+    this.remoteNotices.delete(key)
+  }
+
+  /**
+   * One guarded reload per path at a time: a second notice queues behind the
+   * one in flight, so two fetches never race the same working copy.
+   */
+  private runGuardedReload(path: string, notice: RemoteNotice): Promise<void> {
+    const key = pathKey(path)
+    const previous = this.remoteReloads.get(key) ?? Promise.resolve()
+    const run = previous.then(
+      () => this.guardedReload(path, notice),
+      () => this.guardedReload(path, notice),
+    )
+    this.remoteReloads.set(
+      key,
+      run.then(
+        () => undefined,
+        () => undefined,
+      ),
+    )
+    return run
+  }
+
+  /**
+   * The reload race rule: only a clean, idle copy is replaced with the fetched
+   * head, and the editor state is read again AFTER the fetch and AFTER the
+   * write - an AI turn that starts in between (a moved aiEpoch), or an edit,
+   * drops the result (no file write, no reloadPath; a late write is undone).
+   * The path never supersedes or drops an intent: it only runs with none.
+   */
+  private async guardedReload(path: string, notice: RemoteNotice): Promise<void> {
+    const doc = this.store.lookup(path)
+    if (!doc || !this.ownsLocally(doc) || doc.binding.documentId !== notice.documentId) return
+    // the notice was decided on an older read: re-run the rule order before any
+    // download, so a copy that turned dirty/AI-busy in between gets its bar
+    const before = await this.editorState(doc.path)
+    const decision = decideRemote(notice, await this.remoteLocalFor(doc))
+    if (decision.kind !== 'reload') {
+      await this.applyRemoteDecision(doc, notice, decision)
+      return
+    }
+    let fetched: { detail: DocumentDetail; bytes: Uint8Array }
+    try {
+      fetched = await this.fetchLatest(notice.documentId)
+    } catch (error) {
+      const verdict = lockVerdict(error)
+      if (verdict) {
+        await this.lockFromServer(notice.documentId, verdict)
+        return
+      }
+      await this.showRemoteBar(doc, notice, { kind: 'reload-failed', version: notice.version })
+      return
+    }
+    const after = await this.editorState(doc.path)
+    const moved = after.aiEpoch !== before.aiEpoch
+    if (after.dirty === true || after.aiRunning || moved) {
+      await this.showRemoteBar(doc, notice, {
+        kind: after.aiRunning || moved ? 'newer-ai' : 'newer-dirty',
+        version: notice.version,
+      })
+      return
+    }
+    const fresh = this.store.lookup(doc.path)
+    if (!fresh) return
+    // a save or the schema 1 -> 2 sweep took the copy while it was fetching:
+    // the fetched bytes may not be written over it
+    if (this.coordinator.isSaving(fresh.path) || this.heldByMigration(fresh.dir)) {
+      await this.showRemoteBar(fresh, notice, { kind: 'newer-dirty', version: notice.version })
+      return
+    }
+    if (compareRevision(fetched.detail.revision, fresh.binding.baseRevision) <= 0) {
+      // EXPERIENCE :341: the head is not newer than the open base after all
+      console.warn(
+        `uniwork docs: a fetched version of ${notice.documentId} is not newer than the open base; dropped`,
+      )
+      return
+    }
+    const previousBytes = await readFile(fresh.path)
+      .then((bytes) => new Uint8Array(bytes))
+      .catch(() => null)
+    const previousBinding = fresh.binding
+    await this.store.writeWorkingCopy(fresh.dir, fresh.binding.filename, fetched.bytes)
+    const reloaded: Binding = {
+      ...previousBinding,
+      title: fetched.detail.title,
+      access: accessFor(fetched.detail.myLevel),
+      baseRevision: fetched.detail.revision,
+      baseVersion: fetched.detail.file.version,
+      baseChecksum: sha256Hex(fetched.bytes),
+      state: 'saved',
+    }
+    // the base moved to the fetched head: the anchor base and the comments
+    // level come from the read, so an id or level it does not name is dropped
+    delete reloaded.baseVersionId
+    const next = withServerContext(reloaded, fetched.detail)
+    delete next.error
+    delete next.serverRevision
+    delete next.serverVersion
+    const done = await this.coordinator.commitState(fresh, next)
+    const final = await this.editorState(done.path)
+    const lateMove = final.aiEpoch !== before.aiEpoch
+    if (final.dirty === true || final.aiRunning || lateMove) {
+      // a turn (or an edit) started after the write: the previous copy goes back
+      // byte for byte, binding included, and the bar says why
+      await this.restoreWorkingCopy(done, previousBinding, previousBytes)
+      const restored = this.store.lookup(path)
+      if (restored) {
+        await this.showRemoteBar(restored, notice, {
+          kind: final.aiRunning || lateMove ? 'newer-ai' : 'newer-dirty',
+          version: notice.version,
+        })
+      }
+      return
+    }
+    this.remoteBars.set(pathKey(done.path), { kind: 'updated', version: notice.version })
+    this.remoteNotices.set(pathKey(done.path), notice)
+    this.deps.reloadPath(done.path)
+    const shown = this.store.lookup(path)
+    if (shown) this.publish(toStatus(shown))
+  }
+
+  /** undo the write of a reload the last read refused */
+  private async restoreWorkingCopy(
+    doc: BoundDocument,
+    binding: Binding,
+    bytes: Uint8Array | null,
+  ): Promise<void> {
+    if (bytes) {
+      await this.store.writeWorkingCopy(doc.dir, binding.filename, bytes).catch(() => undefined)
+    }
+    // the coordinator's chain, so the restore cannot interleave with a save's
+    // own binding write for the same document
+    await this.coordinator.commitState(doc, binding)
+  }
+
+  /** the rule order again for a notice whose bar needs a fresh verdict (an AI turn ended) */
+  private async rerunRemoteDecision(path: string, notice: RemoteNotice): Promise<void> {
+    const doc = this.store.lookup(path)
+    if (!doc || !this.ownsLocally(doc) || doc.binding.documentId !== notice.documentId) return
+    const decision = decideRemote(notice, await this.remoteLocalFor(doc))
+    await this.applyRemoteDecision(doc, notice, decision)
+  }
+
+  /**
+   * A record moved: a notice held for its document is re-decided on the new
+   * record. A receipt that already covers the notice is this app's own commit
+   * (dropped, never shown); anything else runs the rule order again, where a
+   * still-holding intent holds the notice further.
+   */
+  private async redecideHeld(documentId: string, record?: IntentRecordV2): Promise<void> {
+    const notice = this.remoteHeld.get(documentId)
+    if (!notice) return
+    if (record?.receipt && compareRevision(record.receipt.revision, notice.revision) >= 0) {
+      this.rememberOwnEcho(documentId, record.receipt.revision)
+      this.remoteHeld.delete(documentId)
+      return
+    }
+    const doc = await this.boundDocFor(documentId)
+    if (!doc || !this.deps.isPathOpen(doc.path)) {
+      this.remoteHeld.delete(documentId)
+      return
+    }
+    const decision = decideRemote(notice, await this.remoteLocalFor(doc))
+    if (decision.kind === 'hold') return
+    this.remoteHeld.delete(documentId)
+    await this.applyRemoteDecision(doc, notice, decision)
+  }
+
+  /** the binding at `doc.path` now, if it is still that document and still ours */
+  private sameLiveDoc(doc: BoundDocument): BoundDocument | null {
+    const now = this.store.lookup(doc.path)
+    return now && now.binding.documentId === doc.binding.documentId && this.ownsLocally(now)
+      ? now
+      : null
   }
 
   // ---- close guard (A1.4) ----------------------------------------------------
@@ -2493,6 +3270,20 @@ export class UniworkDocsService {
     const doc = typeof path === 'string' ? this.store.lookup(path) : null
     if (!doc || !this.ownsLocally(doc)) return null
     if (doc.binding.state !== 'conflict') return this.statusOf(doc)
+    return this.openConflictSession(doc, {
+      fromClose: opts.fromClose,
+      onNotWritten,
+    })
+  }
+
+  private async openConflictSession(
+    doc: BoundDocument,
+    opts: {
+      fromClose?: boolean
+      onNotWritten?: () => void
+      remoteNotice?: RemoteNotice
+    } = {},
+  ): Promise<UniworkDocStatus | null> {
     const open = this.conflictPrompt
     if (open && samePath(open.path, doc.path)) return this.statusOf(doc)
     if (open) {
@@ -2512,9 +3303,10 @@ export class UniworkDocsService {
       doc,
       controller,
       fromClose: !!opts.fromClose,
-      onNotWritten,
-      knownServerRevision: doc.binding.serverRevision ?? null,
-      knownServerVersion: null,
+      onNotWritten: opts.onNotWritten,
+      remoteNotice: opts.remoteNotice,
+      knownServerRevision: opts.remoteNotice?.revision ?? doc.binding.serverRevision ?? null,
+      knownServerVersion: opts.remoteNotice?.version ?? doc.binding.serverVersion ?? null,
       knownServerSavedAt: null,
       knownServerBy: null,
       knownCanEdit: doc.binding.access === 'edit' ? true : false,
@@ -2576,7 +3368,9 @@ export class UniworkDocsService {
     if (open.locked) {
       return { kind: 'view', view: await this.buildConflictView(open, { fetchServer: false }) }
     }
-    const chosen = this.stillInConflict(open.doc)
+    const chosen = open.remoteNotice
+      ? this.sameLiveDoc(open.doc)
+      : this.stillInConflict(open.doc)
     if (!chosen) {
       open.controller.abort()
       open.finish()
@@ -2815,7 +3609,15 @@ export class UniworkDocsService {
     }
     if (action.stopAi) this.deps.stopAiRun?.(chosen.path)
     try {
-      await this.replaceWithLatest(chosen)
+      const done = await this.replaceWithLatest(chosen)
+      if (open.remoteNotice) {
+        this.remoteBars.set(pathKey(done.path), {
+          kind: 'updated',
+          version: open.remoteNotice.version,
+        })
+        this.remoteNotices.set(pathKey(done.path), open.remoteNotice)
+        this.publish(toStatus(done))
+      }
     } catch (error) {
       if (error instanceof UniworkDocError) {
         if (error.code === 'permission_revoked' || error.code === 'forbidden') {
@@ -2896,12 +3698,15 @@ export class UniworkDocsService {
     const next: Binding = {
       ...chosen.binding,
       baseRevision: serverRevision,
-      // the server's bytes are unknown here: the next Save always uploads
+      // the server's bytes are unknown here: the next Save always uploads.
+      // baseVersionId stays: it names the version these bytes were based on (baseVersion is
+      // unchanged too), so comments anchored against it remain valid until a Save moves the base
       baseChecksum: '',
       state: 'dirty',
     }
     delete next.error
     delete next.serverRevision
+    delete next.serverVersion
     // "Ghi đè": the old intent is superseded BEFORE a new one is minted, so the
     // user's snapshot is spent (superseded), never replayed against the new base
     await this.supersedePending(chosen)
@@ -2986,6 +3791,23 @@ export class UniworkDocsService {
     }
   }
 
+  /**
+   * G8-12: the comments context of the bound copy at `path` - everything comes
+   * from the binding and the session, nothing from the renderer. null when the
+   * path is not a copy of the signed-in account (no request is made for it).
+   */
+  commentContext(path: string): CommentsContextResult | null {
+    const doc = this.store.lookup(path)
+    if (!doc || !this.owns(doc)) return null
+    const b = doc.binding
+    return {
+      documentId: b.documentId,
+      versionId: b.baseVersionId ?? null,
+      ...(b.level ? { level: b.level } : {}),
+      myUserId: doc.userId,
+    }
+  }
+
   // ---- flows -----------------------------------------------------------------
 
   /** "Discard my changes and open the latest": download, replace, reload the tab */
@@ -2997,7 +3819,7 @@ export class UniworkDocsService {
     await this.store.writeWorkingCopy(doc.dir, doc.binding.filename, bytes)
     // the local work (and its intent) is discarded: nothing is left to replay
     await this.dropIntent(doc)
-    const next: Binding = {
+    const fresh: Binding = {
       ...doc.binding,
       title: detail.title,
       access: accessFor(detail.myLevel),
@@ -3007,9 +3829,16 @@ export class UniworkDocsService {
       // the old intent is superseded below; the copy reads saved
       state: 'saved',
     }
+    // the base moved: the old version id must not survive an unknown new one
+    delete fresh.baseVersionId
+    const next = withServerContext(fresh, detail)
     delete next.error
     delete next.serverRevision
+    delete next.serverVersion
     const done = await this.coordinator.commitState(doc, next)
+    // the bar belonged to the replaced base: the copy is at the head now
+    this.remoteBars.delete(pathKey(doc.path))
+    this.remoteNotices.delete(pathKey(doc.path))
     this.deps.reloadPath(doc.path)
     return done
   }
@@ -3093,7 +3922,11 @@ export class UniworkDocsService {
           // permissions come from the server: a save refused with 403 left the
           // copy view-only; once the server grants edit again, its local work
           // can be saved (dirty), otherwise it stays view-only
-          const binding: Binding = { ...existing, title: detail.title, access }
+          const binding: Binding = withServerContext(
+            { ...existing, title: detail.title, access },
+            detail,
+            viewTicket || viewRequested,
+          )
           // G5-06 W4b: the queue's refusal code is `permission_revoked` (the old
           // `forbidden`); a re-granted edit level clears the copy for saving
           if (
@@ -3103,6 +3936,8 @@ export class UniworkDocsService {
           ) {
             binding.state = 'dirty'
             delete binding.error
+            // the re-grant spends the session's lock verdict (G5-03a)
+            this.clearRemoteLock(documentId, local)
           }
           // a reopen has a live session (the identity check above): a "sign in
           // again" left by an earlier session is stale, so the copy reads as what
@@ -3121,6 +3956,8 @@ export class UniworkDocsService {
           ) {
             binding.state = localChecksum === existing.baseChecksum ? 'ready' : 'dirty'
             delete binding.error
+            // the document answers again: the deleted verdict it earned is spent
+            this.clearRemoteLock(documentId, local)
           }
           // the sweep still owns this copy's pre-store intent: the rewrite is
           // refused by the store's own hold and the copy opens with its old
@@ -3165,23 +4002,27 @@ export class UniworkDocsService {
       (stale ? null : existing?.filename) ?? workingCopyName(base.title, base.file.filename, format)
     const path = await this.store.writeWorkingCopy(dir, filename, bytes)
     if (stale && stale !== filename) await this.store.removeWorkingCopy(dir, stale)
-    const binding: Binding = {
-      schema: 2,
-      documentId,
-      workspaceId,
-      orgId,
-      title: base.title,
-      filename,
-      format,
-      access,
-      baseRevision: viewTicket ? launch.revision : base.revision,
-      baseVersion: viewTicket ? launch.version : base.file.version,
-      baseChecksum: sha256Hex(bytes),
-      state: 'ready',
-      minStoreLevel: APP_STORE_LEVEL,
-      minAppVersion: this.buildVersion(),
-      ...(existing?.lastSavedAt ? { lastSavedAt: existing.lastSavedAt } : {}),
-    }
+    const binding: Binding = withServerContext(
+      {
+        schema: 2,
+        documentId,
+        workspaceId,
+        orgId,
+        title: base.title,
+        filename,
+        format,
+        access,
+        baseRevision: viewTicket ? launch.revision : base.revision,
+        baseVersion: viewTicket ? launch.version : base.file.version,
+        baseChecksum: sha256Hex(bytes),
+        state: 'ready',
+        minStoreLevel: APP_STORE_LEVEL,
+        minAppVersion: this.buildVersion(),
+        ...(existing?.lastSavedAt ? { lastSavedAt: existing.lastSavedAt } : {}),
+      },
+      base,
+      viewTicket || viewRequested,
+    )
     // a refused write is never ignored, exactly as in the branch above: the
     // copy then reads as the binding that persisted, not the refused one
     const written = await this.store.write(dir, binding)

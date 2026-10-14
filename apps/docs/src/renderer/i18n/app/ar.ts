@@ -109,6 +109,7 @@ export const ar = {
   appMixedExportOpening:
     'أحجام ورق مختلطة: جارٍ فتح معاينة ترقيم الصفحات للتصدير مع الدمج حسب الصفحات…',
   appSelectTextToComment: 'حدد النص المراد التعليق عليه أولاً',
+  appCommentSaveFirst: 'احفظ المستند أولاً لإضافة تعليق',
   appCommentSelectionLost: 'لم يعد التحديد صالحًا؛ أعد تحديد النص المراد التعليق عليه',
   appCommentAdded: 'تمت إضافة التعليق؛ سيُكتب في المستند عند الحفظ',
   appCommentEdited: 'تم تحديث التعليق؛ سيُكتب في المستند عند الحفظ',
@@ -224,6 +225,7 @@ export const ar = {
   appPageOf: 'الصفحة {current} من {total}',
   appWordCountTitle: 'عدد الكلمات',
   appWordCountN: '{n} كلمة',
+  appWordCountSelection: 'المحدد {selected} / {total} كلمة',
   appTrackChangesOn: 'تعقب التغييرات: تشغيل',
   appTrackChangesOff: 'تعقب التغييرات: إيقاف',
   appAcTitle: 'خيارات التصحيح التلقائي',
@@ -440,6 +442,7 @@ export const ar = {
   appParaSpecialFirstLine: 'السطر الأول',
   appParaSpecialHanging: 'معلق',
   appParaBy: 'بمقدار',
+  appParaUnitChars: 'أحرف',
   appInsertEquation: 'إدراج معادلة',
   appLatexPlaceholder: 'مثال: x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}',
   appLatexPreviewHint: 'اكتب LaTeX لعرض المعاينة',

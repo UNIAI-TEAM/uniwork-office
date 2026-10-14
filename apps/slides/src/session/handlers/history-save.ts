@@ -115,6 +115,8 @@ export const historySaveHandlers = {
   'slides:save-as': async (ctx: HandlerContext, defaultName: string) => {
     const session = sessions.get(ctx.clientId)
     if (!session) return { ok: false, error: 'no file open' }
+    // G5-03a: a locked working copy leaves as nothing, not even a Save As copy
+    if (session.path && ctx.host.isLocked?.(session.path)) return { ok: false }
     const target = await ctx.host.saveTarget.saveAs(session.path, defaultName)
     if (!target) return { ok: false }
     // A view-only UniWork path is refused (cancel shape); picking the deck's own

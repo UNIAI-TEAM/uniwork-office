@@ -201,4 +201,17 @@ export const de = {
   aiClarifySubmit: 'Weiter',
   aiSumClarify: 'Rückfragen beantwortet',
   aiSumClarifySkipped: 'Rückfragen übersprungen',
+  aiStarterMindMap: 'Mindmap zu diesem Dokument erstellen',
+  aiMindMapBtn: 'KI-Mindmap',
+  aiMindMapPrompt:
+    'Erstelle eine Mindmap zu diesem Dokument und ordne die Hauptthemen und Schlüsselkonzepte nach seiner Abschnittsstruktur',
+  aiSumMindMap: 'Mindmap erstellen',
+  aiMindMapTitle: 'Mindmap',
+  aiMindMapNodes: '{count} Knoten',
+  aiMindMapAskPrompt: 'Erzähl mir über „{label}“ in diesem Dokument',
+  aiMindMapJump: 'Zur zitierten Stelle springen',
+  aiMindMapExport: 'PNG exportieren',
+  aiMindMapReset: 'Ansicht zurücksetzen',
+  aiMindMapExpand: 'Zweig ausklappen',
+  aiMindMapCollapse: 'Zweig einklappen',
 } satisfies Record<keyof typeof zh, string>

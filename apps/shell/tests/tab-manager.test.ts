@@ -151,9 +151,10 @@ vi.mock('../../html/src/main/html-main', () => ({
   requestHtmlClose: (...args: unknown[]) => requestHtmlClose(...(args as [])),
 }))
 
-import { noteAiRun, resetAiRunRegistry } from '../src/main/ai-run-registry'
+import { isAiRunning, noteAiRun, resetAiRunRegistry } from '../src/main/ai-run-registry'
 import { TabManager } from '../src/main/tab-manager'
 import type { TabKind } from '../src/shared/tabs-api'
+import { tabStripHeight } from '../src/shared/tab-drag-geometry'
 
 const TAB_STRIP_HEIGHT = 40
 const WINDOW_WIDTH = 800
@@ -1118,8 +1119,8 @@ describe('dirty-tab queries (shell close guard)', () => {
     markdownIsDirty.mockImplementation(() => true)
     const states = await manager.editorDirtyStates((path) => path.startsWith('/uw/'))
     expect(states).toEqual([
-      { path: '/uw/a.docx', dirty: null, aiRunning: false },
-      { path: '/uw/b.md', dirty: true, aiRunning: false },
+      { path: '/uw/a.docx', dirty: null, aiRunning: false, aiEpoch: 0 },
+      { path: '/uw/b.md', dirty: true, aiRunning: false, aiEpoch: 0 },
     ])
     expect(pdfIsDirty).not.toHaveBeenCalled()
     markdownIsDirty.mockImplementation(() => false)
@@ -1154,8 +1155,9 @@ describe('dirty-tab queries (shell close guard)', () => {
     noteAiRun(view.webContents as never, { state: 'running', runId: 'turn-1' })
     expect((await manager.editorDirtyStates(() => true))[0].aiRunning).toBe(true)
     view.webContents.listeners.get('render-process-gone')!()
+    // the flag goes with the crashed renderer; the epoch is not rolled back
     expect(await manager.editorDirtyStates(() => true)).toEqual([
-      { path: '/uw/a.docx', dirty: false, aiRunning: false },
+      { path: '/uw/a.docx', dirty: false, aiRunning: false, aiEpoch: 1 },
     ])
   })
 
@@ -1168,9 +1170,25 @@ describe('dirty-tab queries (shell close guard)', () => {
     const pending = manager.editorDirtyStates(() => true)
     manager.closeTabWithoutPrompt(id)
     answer(false)
-    expect(await pending).toEqual([{ path: '/uw/a.docx', dirty: false, aiRunning: false }])
+    expect(await pending).toEqual([
+      { path: '/uw/a.docx', dirty: false, aiRunning: false, aiEpoch: 0 },
+    ])
     expect(await manager.editorDirtyStates(() => true)).toEqual([])
     docsQueryEditorDirty.mockImplementation(() => Promise.resolve(false))
+  })
+
+  it('a closed docs tab (blanked, not destroyed) reads aiRunning false', async () => {
+    const id = manager.openDocsTab('/uw/a.docx')
+    const view = lastCreatedView(createDocsView)
+    noteAiRun(view.webContents as never, { state: 'running', runId: 'turn-1' })
+    expect((await manager.editorDirtyStates(() => true))[0].aiRunning).toBe(true)
+    expect(manager.closeTabWithoutPrompt(id)).toBe(true)
+    // the docs teardown path blanks the page and keeps the webContents alive,
+    // so the shell must drop the turn itself
+    expect(teardownDocsRenderer).toHaveBeenCalledWith(view.webContents)
+    expect(view.webContents.close).not.toHaveBeenCalled()
+    expect(isAiRunning(view.webContents.id)).toBe(false)
+    expect(await manager.editorDirtyStates(() => true)).toEqual([])
   })
 
   it('a Present tab adds no entry; its owner tab reports the run', async () => {
@@ -1179,7 +1197,31 @@ describe('dirty-tab queries (shell close guard)', () => {
     manager.openHtmlPresentTab(owner.webContents as never, 'Preview')
     noteAiRun(owner.webContents as never, { state: 'running' })
     expect(await manager.editorDirtyStates(() => true)).toEqual([
-      { path: '/uw/f.html', dirty: false, aiRunning: true },
+      { path: '/uw/f.html', dirty: false, aiRunning: true, aiEpoch: 1 },
+    ])
+  })
+
+  it("a present view's AI turn is attributed to its owner's document", async () => {
+    manager.openHtmlTab('/uw/f.html')
+    const owner = viewOfPath('/uw/f.html')
+    manager.openHtmlPresentTab(owner.webContents as never, 'Preview')
+    const present = lastCreatedView(createHtmlPresentView)
+    // the present view alone runs: the document is busy
+    noteAiRun(present.webContents as never, { state: 'running', runId: 'present-1' })
+    expect(await manager.editorDirtyStates(() => true)).toEqual([
+      { path: '/uw/f.html', dirty: false, aiRunning: true, aiEpoch: 1 },
+    ])
+    // both views run: the epochs add up, so a turn on either is visible
+    noteAiRun(owner.webContents as never, { state: 'running', runId: 'owner-1' })
+    expect(await manager.editorDirtyStates(() => true)).toEqual([
+      { path: '/uw/f.html', dirty: false, aiRunning: true, aiEpoch: 2 },
+    ])
+    // closing the present tab mid-turn clears its flag
+    const presentId = manager.tabIdForWebContents(present.webContents.id)!
+    await manager.closeTab(presentId)
+    expect(isAiRunning(present.webContents.id)).toBe(false)
+    expect(await manager.editorDirtyStates(() => true)).toEqual([
+      { path: '/uw/f.html', dirty: false, aiRunning: true, aiEpoch: 1 },
     ])
   })
 
@@ -1346,6 +1388,28 @@ describe('the Discussion panel narrows the active editor view (G8-11 D1)', () =>
     expect(view.setBounds).toHaveBeenLastCalledWith(full)
   })
 
+  // R1-3: the panel reports window pixels and the renderer divides its box by --ui-scale, so main
+  // frees the same width at any interface scale (only the tab strip height follows the scale).
+  it('frees the reported window-pixel width at interface scale 1.5', () => {
+    manager = new TabManager(
+      shellWindow as never,
+      () => onChanged(),
+      (kind) => applyMenuFor(kind),
+      undefined,
+      () => 1.5,
+    )
+    manager.openDocsTab()
+    const view = lastCreatedView(createDocsView)
+    manager.setDiscussionPanel({ open: true, width: 320 })
+    const strip = tabStripHeight(1.5)
+    expect(view.setBounds).toHaveBeenLastCalledWith({
+      x: 0,
+      y: strip,
+      width: WINDOW_WIDTH - 320,
+      height: WINDOW_HEIGHT - strip,
+    })
+  })
+
   it('re-applies on tab switch and on window resize', () => {
     const docsId = manager.openDocsTab()
     const docsView = lastCreatedView(createDocsView)
@@ -1403,5 +1467,106 @@ describe('the Discussion panel narrows the active editor view (G8-11 D1)', () =>
     const view = lastCreatedView(createDocsView)
     manager.setDiscussionPanel({ open: true, width: Number.NaN })
     expect(view.setBounds).toHaveBeenLastCalledWith(full)
+  })
+})
+
+describe('the S6 bar inset moves the active editor view down (G5-03a)', () => {
+  const withInset = (inset: number) => ({
+    x: 0,
+    y: TAB_STRIP_HEIGHT + inset,
+    width: WINDOW_WIDTH,
+    height: WINDOW_HEIGHT - TAB_STRIP_HEIGHT - inset,
+  })
+
+  it('insets the active view under the tab strip and restores it at 0', () => {
+    manager.openDocsTab()
+    const view = lastCreatedView(createDocsView)
+    manager.setTopInset(36)
+    expect(view.setBounds).toHaveBeenLastCalledWith(withInset(36))
+    // a bar that hides reports 0: the view takes the tab strip height again
+    manager.setTopInset(0)
+    expect(view.setBounds).toHaveBeenLastCalledWith(withInset(0))
+  })
+
+  it('clamps the inset to 0..200 and rounds to an integer', () => {
+    manager.openDocsTab()
+    const view = lastCreatedView(createDocsView)
+    manager.setTopInset(-20)
+    expect(view.setBounds).toHaveBeenLastCalledWith(withInset(0))
+    manager.setTopInset(9999)
+    expect(view.setBounds).toHaveBeenLastCalledWith(withInset(200))
+    manager.setTopInset(42.6)
+    expect(view.setBounds).toHaveBeenLastCalledWith(withInset(43))
+    // a non-finite height moves nothing
+    manager.setTopInset(Number.NaN)
+    expect(view.setBounds).toHaveBeenLastCalledWith(withInset(43))
+  })
+
+  it('re-applies on tab switch and on window resize', () => {
+    const docsId = manager.openDocsTab()
+    const docs = lastCreatedView(createDocsView)
+    manager.openSheetsTab()
+    const sheets = lastCreatedView(createSheetsView)
+    manager.setTopInset(40)
+    expect(sheets.setBounds).toHaveBeenLastCalledWith(withInset(40))
+    manager.activateTab(docsId)
+    expect(docs.setBounds).toHaveBeenLastCalledWith(withInset(40))
+    shellWindow.getContentBounds = () => ({ x: 0, y: 0, width: WINDOW_WIDTH, height: 1080 })
+    manager.layout()
+    expect(docs.setBounds).toHaveBeenLastCalledWith({
+      x: 0,
+      y: TAB_STRIP_HEIGHT + 40,
+      width: WINDOW_WIDTH,
+      height: 1080 - TAB_STRIP_HEIGHT - 40,
+    })
+  })
+
+  it('combines with the Discussion panel and is ignored by a full-bleed view', () => {
+    manager.openDocsTab()
+    const docs = lastCreatedView(createDocsView)
+    manager.setTopInset(40)
+    manager.setDiscussionPanel({ open: true, width: 320 })
+    expect(docs.setBounds).toHaveBeenLastCalledWith({
+      ...withInset(40),
+      width: WINDOW_WIDTH - 320,
+    })
+    manager.openSlidesTab()
+    const slides = lastCreatedView(createSlidesView)
+    slides.webContents.listeners.get('enter-html-full-screen')!()
+    expect(slides.setBounds).toHaveBeenLastCalledWith({
+      x: 0,
+      y: 0,
+      width: WINDOW_WIDTH,
+      height: WINDOW_HEIGHT,
+    })
+  })
+
+  it('scales the CSS-px inset at interface scale 1.5 and re-layouts on a scale change without a new report (R4-2, R4-5)', () => {
+    let scale = 1.5
+    manager = new TabManager(
+      shellWindow as never,
+      () => onChanged(),
+      (kind) => applyMenuFor(kind),
+      undefined,
+      () => scale,
+    )
+    manager.openDocsTab()
+    const view = lastCreatedView(createDocsView)
+    manager.setTopInset(40)
+    expect(view.setBounds).toHaveBeenLastCalledWith({
+      x: 0,
+      y: 60 + 60,
+      width: WINDOW_WIDTH,
+      height: WINDOW_HEIGHT - 120,
+    })
+    // a scale change triggers layout() only, without a new bar report
+    scale = 1
+    manager.layout()
+    expect(view.setBounds).toHaveBeenLastCalledWith({
+      x: 0,
+      y: TAB_STRIP_HEIGHT + 40,
+      width: WINDOW_WIDTH,
+      height: WINDOW_HEIGHT - TAB_STRIP_HEIGHT - 40,
+    })
   })
 })

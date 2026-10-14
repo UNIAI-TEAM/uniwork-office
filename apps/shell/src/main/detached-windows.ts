@@ -23,12 +23,12 @@ import { pdfIsDirty, requestPdfClose } from '../../../pdf/src/main/pdf-main'
 import { markdownIsDirty, requestMarkdownClose } from '../../../markdown/src/main/markdown-main'
 import { htmlIsDirty, requestHtmlClose } from '../../../html/src/main/html-main'
 import { blankRetiredPage } from './retire-page'
-import { isAiRunning, type EditorState } from './ai-run-registry'
+import { aiEpochOf, clearAiRun, isAiRunning, type EditorState } from './ai-run-registry'
 import { canonicalPath } from './tab-manager'
 import { confirmUniworkClose } from './uniwork-docs/close-guard'
 import type { DetachedTab } from './tab-manager'
 import type { OpenDocumentTab, TabKind } from '../shared/tabs-api'
-import { DOCK_DWELL_MS, dockBand, pointInRect } from '../shared/tab-drag-geometry'
+import { DOCK_BAND_SLACK, DOCK_DWELL_MS, dockBand, pointInRect } from '../shared/tab-drag-geometry'
 
 /**
  * Detached editor windows: a tab's live WebContentsView reparented into its
@@ -339,7 +339,12 @@ export async function detachedEditorStates(
     if (rec.window.isDestroyed() || !rec.filePath || !wanted(rec.filePath)) continue
     const dirty = await detachedIsDirty(rec)
     if (rec.window.isDestroyed() || rec.view.webContents.isDestroyed()) continue
-    out.push({ path: rec.filePath, dirty, aiRunning: isAiRunning(wcId) })
+    out.push({
+      path: rec.filePath,
+      dirty,
+      aiRunning: isAiRunning(wcId),
+      aiEpoch: aiEpochOf(wcId),
+    })
   }
   return out
 }
@@ -469,11 +474,14 @@ function trackDockHover(rec: DetachedRecord): void {
   }, DOCK_DWELL_MS)
 }
 
-/** screen rect of the shell's dock band for a given shell window (null when hidden) */
-export function dockBandFor(shellWindow: BrowserWindow | null): Rectangle | null {
+/** screen rect of the shell's dock band for a given shell window (null when hidden).
+ *  `scale` is the live interface scale: the band has to cover the strip as it is
+ *  actually rendered, or a scaled-up strip outgrows the band and re-docking
+ *  misses. */
+export function dockBandFor(shellWindow: BrowserWindow | null, scale = 1): Rectangle | null {
   if (!shellWindow || shellWindow.isDestroyed() || !shellWindow.isVisible()) return null
   if (shellWindow.isMinimized()) return null
-  return dockBand(shellWindow.getContentBounds())
+  return dockBand(shellWindow.getContentBounds(), DOCK_BAND_SLACK, scale)
 }
 
 /** frame origin that puts the pointer (at) inside the new window's title bar,
@@ -524,6 +532,9 @@ export function createDetachedEditorWindow(options: {
     if (torn?.rec === rec) torn = null
     win.contentView.removeChildView(view)
     detached.delete(wcId)
+    // G5-03a: the window is closed mid AI turn — the document must not stay
+    // "busy" (a docs view is blanked, not destroyed, so nothing else clears it)
+    clearAiRun(wcId)
     if (kind === 'docs') {
       teardownDocsRenderer(view.webContents)
       blankRetiredPage(view.webContents)

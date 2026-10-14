@@ -241,6 +241,14 @@ const OPENING: Array<[string, unknown]> = [
     'schema 2, min_store_level 2, min_app_version 0.11.0-dev.3',
     { ...schema1, schema: 2, min_store_level: 2, min_app_version: '0.11.0-dev.3' },
   ],
+  [
+    'schema 2, min_store_level 2, min_app_version 0.11.0 (0.11.0-beta.1 store in 1.0.0)',
+    { ...schema1, schema: 2, min_store_level: 2, min_app_version: '0.11.0' },
+  ],
+  [
+    'schema 2, min_store_level 2, min_app_version 1.0.0 (1.0.0 store in an older build)',
+    { ...schema1, schema: 2, min_store_level: 2, min_app_version: '1.0.0' },
+  ],
   ['schema 2, min_store_level 1', { ...schema1, schema: 2, min_store_level: 1 }],
 ]
 

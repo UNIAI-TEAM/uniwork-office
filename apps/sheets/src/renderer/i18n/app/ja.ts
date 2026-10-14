@@ -571,6 +571,8 @@ export const ja = {
   appPrintFailed: '印刷できません。',
   appPrintNeedsFullLoad:
     '印刷にはワークブックの完全な読み込みが必要です。読み込み完了までお待ちください。',
+  appPrintWorkbookTooLarge:
+    'このブックは大きすぎて完全に読み込めないため、印刷や PDF への書き出しはできません。',
   appCsvExportNeedsFullLoad:
     'CSV エクスポートにはブックの完全読み込みが必要です — 読み込みの完了をお待ちください。',
   appCsvExportTooLarge: 'シートが大きすぎるため、CSV をエクスポートできません。',
@@ -1122,6 +1124,9 @@ export const ja = {
   appHeadings: '見出し',
   appHeadingsHidden: '見出しを非表示にしました。',
   appHeadingsShown: '見出しを表示しました。',
+  appRightToLeft: '右から左',
+  appRightToLeftOn: 'グリッドの方向: 右から左。',
+  appRightToLeftOff: 'グリッドの方向: 左から右。',
   appPrintHeadingsTitle: '行列番号を印刷',
   // Formulas tab
   appGroupFunctionLibrary: '関数ライブラリ',
@@ -1519,6 +1524,7 @@ export const ja = {
   appCtxResolveComment: 'コメントを解決',
   appThreadConverted: '{count} 件のコメントをメモに変換しました。',
   appThreadNoneAtSelection: '選択したセルにスレッド コメントはありません。',
+  appCommentSaveFirst: 'コメントを追加するには、まずブックを保存してください',
   appThreadCellHasNote: '選択したセルには既にメモがあるため、コメントを追加できません。',
   appThreadHoverHint: 'コメント ウィンドウで返信',
   appNoteCellHasThread: '選択したセルには既にスレッド コメントがあるため、メモを追加できません。',

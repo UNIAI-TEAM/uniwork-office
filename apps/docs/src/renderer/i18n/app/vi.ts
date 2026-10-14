@@ -110,6 +110,7 @@ export const vi = {
   appMixedExportOpening:
     'Nhiều khổ giấy: đang mở bản xem trước phân trang để xuất các trang đã gộp…',
   appSelectTextToComment: 'Chọn đoạn văn bản cần bình luận trước',
+  appCommentSaveFirst: 'Hãy lưu tài liệu trước khi thêm bình luận',
   appCommentSelectionLost: 'Vùng chọn không còn hiệu lực; hãy chọn lại đoạn văn bản cần bình luận',
   appCommentAdded: 'Đã thêm bình luận; sẽ được ghi vào tài liệu khi lưu',
   appCommentEdited: 'Đã cập nhật bình luận; sẽ được ghi vào tài liệu khi lưu',
@@ -228,6 +229,7 @@ export const vi = {
   appPageOf: 'Trang {current} / {total}',
   appWordCountTitle: 'Thống kê từ',
   appWordCountN: '{n} từ',
+  appWordCountSelection: 'Đã chọn {selected} / {total} từ',
   appTrackChangesOn: 'Theo dõi thay đổi: Bật',
   appTrackChangesOff: 'Theo dõi thay đổi: Tắt',
   appAcTitle: 'Tùy chọn tự sửa lỗi',
@@ -444,6 +446,7 @@ export const vi = {
   appParaSpecialFirstLine: 'Dòng đầu',
   appParaSpecialHanging: 'Treo',
   appParaBy: 'Theo',
+  appParaUnitChars: 'ký tự',
   appInsertEquation: 'Chèn công thức',
   appLatexPlaceholder: 'ví dụ: x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}',
   appLatexPreviewHint: 'Nhập mã LaTeX để xem trước',

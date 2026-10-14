@@ -196,4 +196,17 @@ export const vi = {
   aiClarifySubmit: 'Tiếp tục',
   aiSumClarify: 'Đã trả lời câu hỏi làm rõ',
   aiSumClarifySkipped: 'Đã bỏ qua câu hỏi làm rõ',
+  aiStarterMindMap: 'Tạo bản đồ tư duy cho tài liệu này',
+  aiMindMapBtn: 'Bản đồ tư duy AI',
+  aiMindMapPrompt:
+    'Tạo bản đồ tư duy cho tài liệu này, sắp xếp các chủ đề chính và khái niệm then chốt theo cấu trúc các phần',
+  aiSumMindMap: 'Tạo bản đồ tư duy',
+  aiMindMapTitle: 'Bản đồ tư duy',
+  aiMindMapNodes: '{count} nút',
+  aiMindMapAskPrompt: 'Hãy giới thiệu về "{label}" trong tài liệu này',
+  aiMindMapJump: 'Đến đoạn được trích dẫn',
+  aiMindMapExport: 'Xuất PNG',
+  aiMindMapReset: 'Đặt lại khung nhìn',
+  aiMindMapExpand: 'Mở rộng nhánh',
+  aiMindMapCollapse: 'Thu gọn nhánh',
 } satisfies Record<keyof typeof zh, string>

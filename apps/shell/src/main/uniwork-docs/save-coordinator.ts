@@ -118,6 +118,12 @@ export interface SaveCoordinatorDeps {
   intents(): Promise<IntentAccess>
   /** status push for every state change */
   publish(status: UniworkDocStatus): void
+  /**
+   * G8-12: a Save of `doc` settled with a commit and the binding now names the
+   * server version `versionId` (the comments anchor base). Never called for a
+   * failed, conflicted or no-op Save.
+   */
+  onSaved?(doc: BoundDocument, versionId: string): void
   now?(): Date
   uuid?(): string
   sleep?(ms: number): Promise<void>
@@ -137,6 +143,19 @@ export interface SaveCoordinatorDeps {
    * key the queue is already running (G506-be-1).
    */
   dispatcherBusy?(docKey: string): boolean
+}
+
+/**
+ * G5-03a FF: the base (`baseRevision` + `baseChecksum`) a binding rewrite was
+ * decided from. `commitState` compares it inside the per-key chain, against
+ * the binding as it is at write time, and writes nothing when the document no
+ * longer carries it: a guarded reload/restore (or any other base-moving write)
+ * that committed after the decision can never be overwritten by state derived
+ * from the superseded read.
+ */
+export interface CommitBaseGuard {
+  baseRevision: string
+  baseChecksum: string
 }
 
 export function toStatus(doc: BoundDocument, pendingNext = false): UniworkDocStatus {
@@ -447,7 +466,7 @@ export class SaveCoordinator {
   private async settle(
     doc: BoundDocument,
     intent: IntentRecordV2,
-    landed: { revision: string; version: number },
+    landed: { revision: string; version: number; versionId?: string },
     intents: IntentStore,
   ): Promise<BoundDocument> {
     let current: string | null
@@ -466,6 +485,10 @@ export class SaveCoordinator {
       lastSavedAt: this.now().toISOString(),
     })
     delete settled.serverRevision
+    // the comments anchor base moves with the base version; an unknown id is
+    // dropped rather than left naming the previous version
+    if (landed.versionId) settled.baseVersionId = landed.versionId
+    else delete settled.baseVersionId
     this.pendingNext.delete(doc.path)
     const done = await this.commitState(doc, settled)
     // the same cleanup the dispatcher's committed transition performs: the
@@ -473,6 +496,9 @@ export class SaveCoordinator {
     // Compare-then-delete: a newer intent (N+1) minted while this one settled
     // is never erased by this generation's cleanup (G5-06 fix-C item 3).
     await this.cleanupIntent(intents, doc, intent)
+    if (landed.versionId && done.binding.baseVersionId === landed.versionId) {
+      this.deps.onSaved?.(done, landed.versionId)
+    }
     return done
   }
 
@@ -544,7 +570,11 @@ export class SaveCoordinator {
       return this.settle(
         doc,
         intent,
-        { revision: detail.revision, version: detail.file.version },
+        {
+          revision: detail.revision,
+          version: detail.file.version,
+          ...(detail.file.versionId ? { versionId: detail.file.versionId } : {}),
+        },
         intents,
       )
     }
@@ -629,6 +659,8 @@ export class SaveCoordinator {
           state: 'blocked',
           error: 'permission_revoked',
           access: 'view',
+          // a fact about the server's answer, also for a binding written before levels existed
+          level: 'view' as const,
         })
       case 'member_deactivated':
       case 'organization_suspended':
@@ -757,11 +789,32 @@ export class SaveCoordinator {
    * is not a failure: nothing was written, so the document keeps its binding
    * (and the copy keeps its plaintext intent) and the old status is what the
    * chip shows.
+   *
+   * `guard`: write only while the document still carries the base (see
+   * CommitBaseGuard), compared inside the per-key chain - a reload/restore that
+   * committed after the decision is never overwritten by the superseded read.
    */
-  async commitState(doc: BoundDocument, binding: Binding): Promise<BoundDocument> {
+  async commitState(
+    doc: BoundDocument,
+    binding: Binding,
+    guard?: CommitBaseGuard,
+  ): Promise<BoundDocument> {
     // one writer per document key: the inline pipeline and the dispatcher's
     // `publish` both rewrite binding.json, so chain them (G506-be-7)
-    return this.serializeBinding(doc.key, () => this.writeBinding(doc, binding))
+    return this.serializeBinding(doc.key, () => {
+      if (!guard) return this.writeBinding(doc, binding)
+      const latest = this.deps.store.lookup(doc.path)
+      if (
+        !latest ||
+        latest.binding.baseRevision !== guard.baseRevision ||
+        latest.binding.baseChecksum !== guard.baseChecksum
+      ) {
+        // the base moved since the decision (a reload/restore, a save): the
+        // binding as it is now wins, and this write never lands
+        return Promise.resolve(latest ?? doc)
+      }
+      return this.writeBinding(latest, binding)
+    })
   }
 
   /** the binding write itself, always run inside the per-key chain */

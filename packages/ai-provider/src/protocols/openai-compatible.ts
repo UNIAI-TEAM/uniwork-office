@@ -18,8 +18,10 @@ import {
   throwIfCreditsNotice,
   throwIfToolCountOverBudget,
   throwIfToolJsonOverBudget,
+  usageCount,
   type StreamCallbacks,
 } from './shared'
+import type { AiTokenUsage } from '../types'
 
 function openAiMessages(
   system: string,
@@ -92,6 +94,7 @@ function emitOpenAiJsonMessage(
       }
       finish_reason?: string | null
     }>
+    usage?: { prompt_tokens?: unknown; completion_tokens?: unknown }
     error?: { message?: string } | string
   }
   try {
@@ -137,6 +140,16 @@ function emitOpenAiJsonMessage(
   for (const call of toolCalls) cb.onToolCall(call)
   if (!emitted) throw new Error(`The model returned no content: ${httpBodyDetail(bodyText)}`)
   if (choice?.finish_reason === 'length') cb.onStopReason?.('max_tokens')
+  const jsonUsage = msg.usage as
+    { prompt_tokens?: unknown; completion_tokens?: unknown } | undefined
+  if (jsonUsage) {
+    const usage: AiTokenUsage = {}
+    const input = usageCount(jsonUsage.prompt_tokens)
+    const output = usageCount(jsonUsage.completion_tokens)
+    if (input !== undefined) usage.inputTokens = input
+    if (output !== undefined) usage.outputTokens = output
+    if (usage.inputTokens !== undefined || usage.outputTokens !== undefined) cb.onUsage?.(usage)
+  }
 }
 
 /** Per-endpoint request shaping resolved from the provider registry. */
@@ -160,7 +173,19 @@ export async function streamOpenAiCompatible(
 ): Promise<void> {
   const wd = createStreamWatchdog(cb.signal)
   return wd.guard(() =>
-    openAiCompatibleTurn(baseUrl, config, system, messages, tools, maxTokens, cb, wd, options),
+    openAiCompatibleTurn(baseUrl, config, system, messages, tools, maxTokens, cb, wd, {
+      ...options,
+      requestUsage: true,
+    }).catch((e) => {
+      // Some gateways reject the (spec) stream_options field outright; a 400 that
+      // names it is retried once without it — those providers simply never report usage.
+      if (!/HTTP 4\d\d:[\s\S]*stream_options/i.test(e instanceof Error ? e.message : String(e)))
+        throw e
+      return openAiCompatibleTurn(baseUrl, config, system, messages, tools, maxTokens, cb, wd, {
+        ...options,
+        requestUsage: false,
+      })
+    }),
   )
 }
 
@@ -173,7 +198,7 @@ async function openAiCompatibleTurn(
   maxTokens: number,
   cb: StreamCallbacks,
   wd: StreamWatchdog,
-  options: OpenAiRequestOptions,
+  options: OpenAiRequestOptions & { requestUsage?: boolean | undefined },
 ): Promise<void> {
   const onBytes = () => {
     wd.touch()
@@ -205,6 +230,10 @@ async function openAiCompatibleTurn(
       ...(options.omitTemperature ? {} : { temperature: 0.3 }),
       ...options.bodyExtras,
       stream: true,
+      // OpenAI-class providers only report usage in a stream when asked (a final
+      // chunk with empty choices carries it); strict gateways that reject the
+      // field are retried once without it by streamOpenAiCompatible.
+      ...(options.requestUsage ? { stream_options: { include_usage: true } } : {}),
     }),
   })
   // headers arrived: ping the renderer watchdog too, or a slow first chunk could trip it
@@ -255,6 +284,7 @@ export async function consumeOpenAiCompatibleResponse(
   let sawFinish = false
   let sawDone = false
   let emitted = false
+  let turnUsage: AiTokenUsage | undefined
   const flushTools = () => {
     const entries = [...pendingTools.entries()].sort(([a], [b]) => a - b)
     const lastIndex = entries.at(-1)?.[0]
@@ -299,11 +329,25 @@ export async function consumeOpenAiCompatibleResponse(
         }
         finish_reason?: string | null
       }>
+      /** usage chunk (requested via stream_options): empty choices + the counts */
+      usage?: { prompt_tokens?: unknown; completion_tokens?: unknown }
       error?: { message?: string } | string
     }
     if (event.error) throw new Error(sseErrorText(event.error, 'Model stream error'))
     // before the choices: an end-of-stream frame must stop the turn before anything else is emitted
     if (event.x_uniwork !== undefined) options.onExtension?.(event.x_uniwork)
+    // The usage chunk arrives with empty choices right before [DONE]; some
+    // providers (DeepSeek et al) attach usage to the last content chunk instead.
+    if (event.usage) {
+      const usage: AiTokenUsage = {}
+      const input = usageCount(event.usage.prompt_tokens)
+      const output = usageCount(event.usage.completion_tokens)
+      if (input !== undefined) usage.inputTokens = input
+      if (output !== undefined) usage.outputTokens = output
+      if (usage.inputTokens !== undefined || usage.outputTokens !== undefined) {
+        turnUsage = usage
+      }
+    }
     const choice = event.choices?.[0]
     if (!choice) continue
     const reasoning = choice.delta?.reasoning_content ?? choice.delta?.reasoning
@@ -379,6 +423,7 @@ export async function consumeOpenAiCompatibleResponse(
     throw new Error('The model returned no content (empty stream)')
   }
   if (stopReason) cb.onStopReason?.(stopReason)
+  if (turnUsage) cb.onUsage?.(turnUsage)
 }
 
 export async function chatOpenAiCompatible(

@@ -6,6 +6,19 @@
  * palettes) never live here and never reference these tokens. */
 
 :root {
+  /* Interface scale (issue #1913).
+   *
+   * `zoom` on a *chrome* container, never on the document container. That is
+   * the whole point: a window-level `webContents.setZoomFactor()` would also
+   * scale the canvas, so a document already at 150% would land at 150% x 150%
+   * and the user would watch the interface follow the document zoom — the very
+   * complaint #1913 is about. Scaling the chrome container and leaving the
+   * canvas as a sibling means the two never meet.
+   *
+   * The main process overwrites this value on every renderer from
+   * `app-settings.json` (`uiScale`); 1 is "no scaling". */
+  --ui-scale: 1;
+
   /* chrome */
   --surface: #ffffff;
   --surface-subtle: #f6f7f9;
@@ -14,6 +27,8 @@
   --border: #e3e6ea;
   --border-subtle: #efefef;
   --border-strong: #d9d9d9;
+  /* boundary of a form control (input, switch track): ≥3:1 on surfaces, WCAG 1.4.11 */
+  --border-control: #878c93;
   --border-hover: #d3d7dd;
   --text: #242424;
   --text-primary: #232425;
@@ -126,6 +141,7 @@
   --border: #3a3a3a;
   --border-subtle: #3a3a3a;
   --border-strong: #555;
+  --border-control: #707070;
   --border-hover: #555;
   --text: #e4e4e4;
   --text-primary: #e4e4e4;
@@ -220,6 +236,7 @@
     --border: #3a3a3a;
     --border-subtle: #3a3a3a;
     --border-strong: #555;
+    --border-control: #707070;
     --border-hover: #555;
     --text: #e4e4e4;
     --text-primary: #e4e4e4;

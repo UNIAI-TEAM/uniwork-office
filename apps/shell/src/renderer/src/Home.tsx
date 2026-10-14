@@ -80,6 +80,16 @@ const DRAG_EXPAND_DELAY_MS = 600
 /** expanded folders survive a home reload; the selection is per session */
 const TREE_STATE_KEY = 'home.folderTree'
 
+/**
+ * Width of the viewport that `position: fixed` elements anchor to. The layout
+ * engine owns this coordinate system, so documentElement's client rect is the
+ * value to compute menu offsets from; window.innerWidth can disagree on scaled
+ * Linux desktops, which pushed row menus past the window's left edge (#1946).
+ */
+function fixedViewportWidth(): number {
+  return document.documentElement.clientWidth
+}
+
 function FolderIcon({ size = 16, open = false }: { size?: number; open?: boolean }) {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -665,6 +675,102 @@ function hasProjectApi(): boolean {
   return typeof window.aiOfficeProject !== 'undefined'
 }
 
+// ── Starred-group picker ─────────────────────────────────
+
+interface GroupPickerProps {
+  /** existing group names (a group exists while it has at least one file) */
+  groups: readonly string[]
+  count: number
+  onCancel: () => void
+  /** put the files into an existing group */
+  onPick: (group: string) => void
+  /** create a group named `name` and put the files into it */
+  onCreate: (name: string) => void
+  /** take the files out of their group (back to the unfiltered list) */
+  onRemove: () => void
+}
+
+/** Modal moving starred files into a named group. Deliberately minimal: no
+ *  group rename/delete — a group is just a label its entries carry, and it
+ *  vanishes when its last member leaves (via this dialog's remove action,
+ *  an unstar, or a deleted file). */
+function GroupPicker({ groups, count, onCancel, onPick, onCreate, onRemove }: GroupPickerProps) {
+  const { t } = useI18n()
+  const [name, setName] = useState('')
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCancel()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [onCancel])
+
+  const create = () => {
+    const trimmed = name.trim()
+    if (!trimmed) return
+    setName('')
+    onCreate(trimmed)
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onCancel}>
+      <div
+        className="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label={t('moveToGroupTitle')}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3>{t('moveToGroupTitle')}</h3>
+        <p>{t('selectedCount', { n: count })}</p>
+        {groups.length > 0 && (
+          <ul className="group-picker-list">
+            {groups.map((group) => (
+              <li key={group}>
+                <button
+                  className="group-picker-row"
+                  onClick={() => {
+                    setName('')
+                    onPick(group)
+                  }}
+                >
+                  <FolderIcon size={16} />
+                  <span className="group-picker-name">{group}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="group-picker-new">
+          <input
+            className="folder-rename-input"
+            placeholder={t('groupNamePlaceholder')}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => {
+              e.stopPropagation()
+              if (e.nativeEvent.isComposing) return
+              if (e.key === 'Enter') create()
+            }}
+          />
+          <button className="btn btn-secondary" disabled={!name.trim()} onClick={create}>
+            {t('newGroup')}
+          </button>
+        </div>
+        <div className="modal-buttons">
+          <button className="btn btn-secondary" onClick={onRemove}>
+            {t('removeFromGroup')}
+          </button>
+          <button className="btn btn-secondary" autoFocus onClick={onCancel}>
+            {t('cancel')}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Project sidebar component ────────────────────────────
 
 interface ProjectPanelProps {
@@ -765,9 +871,11 @@ function ProjectPanel({ projects, selectedId, onSelect, onRefresh }: ProjectPane
   }, [confirmDeleteId])
 
   return (
-    <div className="proj-panel">
+    <section className="proj-panel" aria-labelledby="sidebar-projects-title">
       <div className="proj-panel-head">
-        <span className="proj-panel-title">{t('projects')}</span>
+        <h2 className="proj-panel-title" id="sidebar-projects-title">
+          {t('projects')}
+        </h2>
         <button
           className="proj-add-btn"
           data-tip={t('newProject')}
@@ -818,9 +926,13 @@ function ProjectPanel({ projects, selectedId, onSelect, onRefresh }: ProjectPane
                 className="proj-item-main"
                 role="button"
                 tabIndex={0}
+                aria-current={isActive ? 'page' : undefined}
                 onClick={() => onSelect(isActive ? null : proj.id)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') onSelect(isActive ? null : proj.id)
+                  if (e.key !== 'Enter' && e.key !== ' ') return
+                  // Space must not scroll the sidebar
+                  e.preventDefault()
+                  onSelect(isActive ? null : proj.id)
                 }}
               >
                 <span className="proj-item-icon" aria-hidden="true">
@@ -855,7 +967,7 @@ function ProjectPanel({ projects, selectedId, onSelect, onRefresh }: ProjectPane
                   </span>
                 )}
                 <span className="proj-item-meta">
-                  <span className="proj-item-count">{proj.fileCount}</span>
+                  {proj.fileCount > 0 && <span className="proj-item-count">{proj.fileCount}</span>}
                 </span>
               </div>
 
@@ -955,13 +1067,13 @@ function ProjectPanel({ projects, selectedId, onSelect, onRefresh }: ProjectPane
             </div>
           )
         })()}
-    </div>
+    </section>
   )
 }
 
-// ── Sidebar footer: Settings + Sign-in (bottom-left) ─────
-// Settings is its own control. The UniWork account entry (AccountEntry.tsx)
-// starts the browser sign-in or opens Settings → Account.
+// ── Sidebar footer: one dock — AI credits, then account + Settings ─────
+// The UniWork account entry (AccountEntry.tsx) starts the browser sign-in or
+// opens Settings → Account; the gear beside it opens Settings → General.
 
 function SidebarFooter({
   onStatusChange,
@@ -1020,43 +1132,50 @@ function SidebarFooter({
 
   return (
     <div className="sidebar-footer">
-      <CreditWallet onOpenAiSettings={() => openSettings('aiModel')} />
-      <button
-        type="button"
-        className="settings-btn"
-        onClick={() => openSettings('general')}
-        aria-haspopup="dialog"
-        aria-expanded={settingsOpen}
-        data-tip={t('settings')}
-        aria-label={t('settings')}
-      >
-        <span className="settings-icon" aria-hidden="true">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path
-              d="M6.6 2.4h2.8l.35 1.45a4.6 4.6 0 0 1 1.15.65l1.4-.55 1.4 1.4-.55 1.4c.26.36.48.75.65 1.15L15.6 8v2.8l-1.45.35a4.6 4.6 0 0 1-.65 1.15l.55 1.4-1.4 1.4-1.4-.55a4.6 4.6 0 0 1-1.15.65L9.4 15.6H6.6l-.35-1.45a4.6 4.6 0 0 1-1.15-.65l-1.4.55-1.4-1.4.55-1.4a4.6 4.6 0 0 1-.65-1.15L.4 10.8V8l1.45-.35c.17-.4.39-.79.65-1.15l-.55-1.4 1.4-1.4 1.4.55c.36-.26.75-.48 1.15-.65L6.6 2.4z"
-              stroke="currentColor"
-              strokeWidth="1.2"
-              strokeLinejoin="round"
-            />
-            <circle cx="8" cy="9.2" r="2.1" stroke="currentColor" strokeWidth="1.2" />
-          </svg>
-          {skillUpdate && (
-            <span className="account-badge" role="img" aria-label={t('intgUpdateDue')} />
-          )}
-        </span>
-        <span className="settings-label">{t('settings')}</span>
-      </button>
-      <AccountEntry
-        onStatusChange={onStatusChange}
-        settingsOpen={settingsOpen}
-        settingsSection={settingsSection}
-        onOpenSettings={openSettings}
-        onCloseSettings={() => setSettingsOpen(false)}
-        skillUpdate={skillUpdate}
-        onSkillUpdateDue={setSkillUpdate}
-        onFileSearchSettingsChange={onFileSearchSettingsChange}
-        target={target}
-      />
+      <div className="sidebar-dock">
+        <CreditWallet onOpenAiSettings={() => openSettings('aiModel')} />
+        <div className="sidebar-dock-me">
+          <AccountEntry
+            onStatusChange={onStatusChange}
+            settingsOpen={settingsOpen}
+            settingsSection={settingsSection}
+            onOpenSettings={openSettings}
+            onCloseSettings={() => setSettingsOpen(false)}
+            skillUpdate={skillUpdate}
+            onSkillUpdateDue={setSkillUpdate}
+            onFileSearchSettingsChange={onFileSearchSettingsChange}
+            target={target}
+          />
+          <button
+            type="button"
+            className="settings-btn"
+            onClick={() => openSettings('general')}
+            aria-haspopup="dialog"
+            aria-expanded={settingsOpen}
+            data-tip={t('settings')}
+            aria-label={t('settings')}
+          >
+            <span className="settings-icon" aria-hidden="true">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+              {skillUpdate && (
+                <span className="account-badge" role="img" aria-label={t('intgUpdateDue')} />
+              )}
+            </span>
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
@@ -1174,6 +1293,13 @@ export function Home() {
   // refresh signal for project-view data (re-pull file stats after file changes)
   const [projectTick, setProjectTick] = useState(0)
   const [filter, setFilter] = useState('all')
+  // ── Starred groups (named buckets the Starred view can filter on) ──
+  // groups that currently have at least one starred file (drives the pills)
+  const [starredGroups, setStarredGroups] = useState<string[]>([])
+  // the group pill filtering the Starred list; null shows every group
+  const [groupFilter, setGroupFilter] = useState<string | null>(null)
+  // starred rows being moved to a group (GroupPicker modal)
+  const [groupPicker, setGroupPicker] = useState<string[] | null>(null)
   // ── File search (names + indexed content); active while the box has text ──
   const [searchQuery, setSearchQuery] = useState('')
   const [searchPage, setSearchPage] = useState<FileSearchPage | null>(null)
@@ -1209,6 +1335,8 @@ export function Home() {
   const [accountName, setAccountName] = useState('')
   // whose UniWork documents recents may list ('' = nobody): a change re-reads them
   const [recentsAccount, setRecentsAccount] = useState('')
+  // the signed-in organization, shown under the wordmark ('' = the edition label)
+  const [orgName, setOrgName] = useState('')
   // single source of account state: AccountEntry reports every change (initial
   // load, login, logout), keeping the greeting name in sync
   const handleAccountStatus = useCallback((s: AccountStatus | null) => {
@@ -1216,8 +1344,10 @@ export function Home() {
     // the cached profile still names the user while UniWork is unreachable
     if (!s?.loggedIn && !(s?.state === 'server-unreachable' && s.profile)) {
       setAccountName('')
+      setOrgName('')
       return
     }
+    setOrgName(s.org?.name?.trim() ?? '')
     const display = s.profile?.displayName?.trim()
     if (display) {
       setAccountName(display)
@@ -1387,10 +1517,13 @@ export function Home() {
   const reload = (keepCount: boolean) => {
     const seq = ++requestSeq.current
     const ext = filter === 'all' ? undefined : filter
+    // the group pills only scope the Starred view's own list; the sidebar
+    // counters and the other view stay group-agnostic
+    const group = view === 'starred' && groupFilter ? groupFilter : undefined
     const limit = keepCount ? Math.max(entriesLen.current, PAGE_SIZE) : PAGE_SIZE
     const primary = view === 'recent' ? window.aiOffice.recents : window.aiOffice.starred
     const secondary = view === 'recent' ? window.aiOffice.starred : window.aiOffice.recents
-    void primary({ offset: 0, limit, ext }).then((page) => {
+    void primary({ offset: 0, limit, ext, group }).then((page) => {
       if (seq !== requestSeq.current) return
       setEntries(page.entries)
       setListTotal(page.total)
@@ -1412,6 +1545,14 @@ export function Home() {
     if (projectMode) {
       void window.aiOfficeProject!.listProjects().then(setProjects)
     }
+    // the group pills live on the renderer, so their list rides along with
+    // every reload; a vanished group (last file unstarred/ungrouped) clears
+    // the filter instead of showing a silently empty list
+    void window.aiOffice.starredGroups().then((groups) => {
+      if (seq !== requestSeq.current) return
+      setStarredGroups(groups)
+      setGroupFilter((cur) => (cur && !groups.includes(cur) ? null : cur))
+    })
   }
   const reloadRef = useRef(reload)
   reloadRef.current = reload
@@ -1428,7 +1569,7 @@ export function Home() {
 
   useEffect(() => {
     reloadRef.current(false)
-  }, [view, filter])
+  }, [view, filter, groupFilter])
 
   const q = searchQuery.trim()
   useEffect(() => {
@@ -1767,10 +1908,17 @@ export function Home() {
     setChatMode(false)
     setSelected(new Set())
     setRowMenu(null)
+    setGroupFilter(null)
   }
 
   const changeFilter = (key: string) => {
     setFilter(key)
+    setSelected(new Set())
+    setRowMenu(null)
+  }
+
+  const changeGroupFilter = (group: string | null) => {
+    setGroupFilter(group)
     setSelected(new Set())
     setRowMenu(null)
   }
@@ -1829,6 +1977,21 @@ export function Home() {
     setRowMenu(null)
     setSelected(new Set())
     void window.aiOffice.removeRecent(paths).then(refresh)
+  }
+
+  /** the Starred view's bulk action: drop the stars, keep the recents entries */
+  const unstarSelected = (paths: string[]) => {
+    setRowMenu(null)
+    setSelected(new Set())
+    void window.aiOffice.unstarPaths(paths).then(refresh)
+  }
+
+  /** put rows into a group (null = out of their group); the pills list and
+   *  the filtered list come back with the refresh */
+  const assignGroup = (paths: string[], group: string | null) => {
+    setGroupPicker(null)
+    setRowMenu(null)
+    void window.aiOffice.setStarredGroup(paths, group).then(refresh)
   }
 
   const deleteFiles = (paths: string[]) => {
@@ -2170,7 +2333,7 @@ export function Home() {
             path: entry.path,
             where: 'tree',
             top: rect.bottom + 4,
-            right: window.innerWidth - rect.right,
+            right: fixedViewportWidth() - rect.right,
           })
         }}
       >
@@ -2300,7 +2463,7 @@ export function Home() {
               path: entry.path,
               where: 'tree',
               top: e.clientY + 2,
-              right: window.innerWidth - e.clientX,
+              right: fixedViewportWidth() - e.clientX,
             })
           }}
           draggable={!isRoot && !isRenaming}
@@ -2360,9 +2523,15 @@ export function Home() {
     const createIn = selectedFolder ?? root?.path
     const canCreate = createIn !== undefined && rootOf(createIn, roots)?.usable === true
     return (
-      <div className={`folder-panel${panelDrop ? ' drop-target' : ''}`} {...panelDropProps}>
+      <section
+        className={`folder-panel${panelDrop ? ' drop-target' : ''}`}
+        aria-labelledby="sidebar-folders-title"
+        {...panelDropProps}
+      >
         <div className="folder-panel-head">
-          <span className="folder-panel-title">{t('folders')}</span>
+          <h2 className="folder-panel-title" id="sidebar-folders-title">
+            {t('folders')}
+          </h2>
           <div className="folder-panel-actions">
             {roots.length > 0 && (
               <button
@@ -2427,7 +2596,7 @@ export function Home() {
               renderTreeNode({ path: r.path, name: r.name, hasSubfolders: r.readable }, 0),
             )}
         </ul>
-      </div>
+      </section>
     )
   }
 
@@ -2646,14 +2815,35 @@ export function Home() {
                     </button>
                   </>
                 )}
+                {entry.starred && (
+                  <>
+                    <div className="row-menu-divider" />
+                    <button
+                      role="menuitem"
+                      onClick={() => {
+                        setRowMenu(null)
+                        setGroupPicker([entry.path])
+                      }}
+                    >
+                      {t('moveToGroup')}
+                    </button>
+                  </>
+                )}
                 {canDelete && (context === 'global' || editable) && (
                   <>
                     <div className="row-menu-divider" />
-                    {context === 'global' && (
-                      <button role="menuitem" onClick={() => removeRecent([entry.path])}>
-                        {t('removeFromList')}
-                      </button>
-                    )}
+                    {context === 'global' &&
+                      // same root cause as the selection bar: in the Starred
+                      // view "remove from list" must unstar, not drop recents
+                      (view === 'starred' ? (
+                        <button role="menuitem" onClick={() => unstarSelected([entry.path])}>
+                          {t('unstar')}
+                        </button>
+                      ) : (
+                        <button role="menuitem" onClick={() => removeRecent([entry.path])}>
+                          {t('removeFromList')}
+                        </button>
+                      ))}
                     {editable && (
                       <button
                         role="menuitem"
@@ -2703,7 +2893,7 @@ export function Home() {
               path: entry.path,
               where: 'table',
               top: e.clientY + 2,
-              right: window.innerWidth - e.clientX,
+              right: fixedViewportWidth() - e.clientX,
             })
           }}
         >
@@ -2755,7 +2945,7 @@ export function Home() {
                   path: entry.path,
                   where: 'table',
                   top: rect.bottom + 4,
-                  right: window.innerWidth - rect.right,
+                  right: fixedViewportWidth() - rect.right,
                 })
               }}
             >
@@ -3148,9 +3338,21 @@ export function Home() {
                     {t('moveToFolder')}
                   </button>
                 )}
-                <button className="selection-action" onClick={() => removeRecent(selectedPaths)}>
-                  {t('removeFromList')}
-                </button>
+                {view === 'starred' ? (
+                  // every Starred-view row is a favorite, so the selection
+                  // action unstars; removeRecent there kept the stars and the
+                  // rows came straight back on refresh
+                  <button
+                    className="selection-action"
+                    onClick={() => unstarSelected(selectedPaths)}
+                  >
+                    {t('unstar')}
+                  </button>
+                ) : (
+                  <button className="selection-action" onClick={() => removeRecent(selectedPaths)}>
+                    {t('removeFromList')}
+                  </button>
+                )}
                 <button
                   className="selection-action danger"
                   onClick={() => deleteFiles(selectedPaths)}
@@ -3162,16 +3364,39 @@ export function Home() {
                 </button>
               </div>
             ) : (
-              <div className="filter-pills" role="tablist" aria-label={t('filterAria')}>
-                {FILTERS.map((f) => (
-                  <button
-                    key={f.key}
-                    className={`filter-pill${filter === f.key ? ' active' : ''}`}
-                    onClick={() => changeFilter(f.key)}
-                  >
-                    {t(f.label)}
-                  </button>
-                ))}
+              <div className="toolbar-filters">
+                <div className="filter-pills" role="tablist" aria-label={t('filterAria')}>
+                  {FILTERS.map((f) => (
+                    <button
+                      key={f.key}
+                      className={`filter-pill${filter === f.key ? ' active' : ''}`}
+                      onClick={() => changeFilter(f.key)}
+                    >
+                      {t(f.label)}
+                    </button>
+                  ))}
+                </div>
+                {view === 'starred' && starredGroups.length > 0 && (
+                  // the group pills refine the Starred view further; the type
+                  // pills above them keep working on the group-scoped list
+                  <div className="filter-pills" role="tablist" aria-label={t('groupFilterAria')}>
+                    <button
+                      className={`filter-pill${groupFilter === null ? ' active' : ''}`}
+                      onClick={() => changeGroupFilter(null)}
+                    >
+                      {t('filterAll')}
+                    </button>
+                    {starredGroups.map((g) => (
+                      <button
+                        key={g}
+                        className={`filter-pill${groupFilter === g ? ' active' : ''}`}
+                        onClick={() => changeGroupFilter(g)}
+                      >
+                        {g}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
             <div className="file-search-group">
@@ -3349,11 +3574,18 @@ export function Home() {
       <aside className="sidebar">
         <div className="sidebar-logo">
           <img className="logo-mark" src={appIcon} alt="" />
-          <span className="logo-word">UniWork Office</span>
+          <span className="logo-text">
+            <span className="logo-word">UniWork Office</span>
+            {/* edition name, like "GitHub Enterprise": a product name, not translated */}
+            <span className="logo-org" title={orgName || undefined}>
+              {orgName || 'Enterprise'}
+            </span>
+          </span>
         </div>
         <nav className="sidebar-nav">
           <button
             className={`nav-item${chatMode && !selectedProjectId && !eduMode ? ' active' : ''}`}
+            aria-current={chatMode && !selectedProjectId && !eduMode ? 'page' : undefined}
             data-nav="chat"
             onClick={goNewChat}
           >
@@ -3381,6 +3613,11 @@ export function Home() {
           </button>
           <button
             className={`nav-item${view === 'recent' && !selectedFolder && !selectedProjectId && !eduMode && !chatMode ? ' active' : ''}`}
+            aria-current={
+              view === 'recent' && !selectedFolder && !selectedProjectId && !eduMode && !chatMode
+                ? 'page'
+                : undefined
+            }
             data-nav="recent"
             onClick={() => goHomeList('recent')}
           >
@@ -3394,10 +3631,15 @@ export function Home() {
               />
             </svg>
             <span className="nav-label">{t('navRecent')}</span>
-            <span className="nav-count">{navCounts.recent}</span>
+            {navCounts.recent > 0 && <span className="nav-count">{navCounts.recent}</span>}
           </button>
           <button
             className={`nav-item${view === 'starred' && !selectedFolder && !selectedProjectId && !eduMode && !chatMode ? ' active' : ''}`}
+            aria-current={
+              view === 'starred' && !selectedFolder && !selectedProjectId && !eduMode && !chatMode
+                ? 'page'
+                : undefined
+            }
             onClick={() => goHomeList('starred')}
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -3409,11 +3651,12 @@ export function Home() {
               />
             </svg>
             <span className="nav-label">{t('navStarred')}</span>
-            <span className="nav-count">{navCounts.starred}</span>
+            {navCounts.starred > 0 && <span className="nav-count">{navCounts.starred}</span>}
           </button>
           {projectMode && (
             <button
               className={`nav-item${eduMode && !selectedProjectId ? ' active' : ''}`}
+              aria-current={eduMode && !selectedProjectId ? 'page' : undefined}
               onClick={() => {
                 setEduMode(true)
                 setChatMode(false)
@@ -3435,28 +3678,24 @@ export function Home() {
             </button>
           )}
         </nav>
-        <div className="sidebar-divider" />
         {renderFolderPanel()}
         {/* project sidebar */}
         {projectMode && (
-          <>
-            <div className="sidebar-divider" />
-            <ProjectPanel
-              projects={projects}
-              selectedId={selectedProjectId}
-              onSelect={(id) => {
-                setSelectedProjectId(id)
-                setSelectedFolder(null)
-                setEduMode(false)
-                setChatMode(false)
-                // reset list-selection state on any project switch (paths are
-                // shared between the plain view and project views)
-                setSelected(new Set())
-                setRowMenu(null)
-              }}
-              onRefresh={refresh}
-            />
-          </>
+          <ProjectPanel
+            projects={projects}
+            selectedId={selectedProjectId}
+            onSelect={(id) => {
+              setSelectedProjectId(id)
+              setSelectedFolder(null)
+              setEduMode(false)
+              setChatMode(false)
+              // reset list-selection state on any project switch (paths are
+              // shared between the plain view and project views)
+              setSelected(new Set())
+              setRowMenu(null)
+            }}
+            onRefresh={refresh}
+          />
         )}
 
         <SidebarFooter
@@ -3624,6 +3863,17 @@ export function Home() {
           count={movePicker.length}
           onCancel={() => setMovePicker(null)}
           onPick={(dir) => void doMove(movePicker, dir, 'ask')}
+        />
+      )}
+
+      {groupPicker && (
+        <GroupPicker
+          groups={starredGroups}
+          count={groupPicker.length}
+          onCancel={() => setGroupPicker(null)}
+          onPick={(group) => assignGroup(groupPicker, group)}
+          onCreate={(name) => assignGroup(groupPicker, name)}
+          onRemove={() => assignGroup(groupPicker, null)}
         />
       )}
 

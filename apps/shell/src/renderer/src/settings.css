@@ -10,7 +10,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 5vh 24px;
+  padding: calc(var(--ui-vh) * 5) 24px;
   background: var(--color-bg-overlay);
   backdrop-filter: blur(6px);
 }
@@ -19,12 +19,38 @@
   display: flex;
   flex-direction: column;
   width: min(960px, 100%);
-  height: min(720px, 90vh);
+  height: min(720px, calc(var(--ui-vh) * 90));
   border-radius: 14px;
   background: var(--surface);
   color: var(--text-primary);
   box-shadow: var(--shadow-modal-strong);
   overflow: hidden;
+}
+
+/* one visible focus ring for keyboard users across all panes */
+.set-dialog :is(button, a[href], summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.set-dialog :is(.set-btn, .set-nav-item, .set-close, .set-about-legal-btn) {
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.1s ease;
+}
+
+.set-dialog
+  :is(.set-btn, .set-close, .set-about-legal-btn):active:not(:disabled):not(
+    [aria-disabled='true']
+  ) {
+  transform: translateY(1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .set-dialog * {
+    transition: none !important;
+  }
 }
 
 .set-header {
@@ -51,7 +77,7 @@
   border: none;
   border-radius: 8px;
   background: none;
-  color: var(--text-tertiary);
+  color: var(--text-muted);
   cursor: pointer;
 }
 
@@ -69,7 +95,7 @@
 .set-nav {
   flex-shrink: 0;
   width: 232px;
-  padding: 8px 14px 16px;
+  padding: 8px 12px 16px;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -80,7 +106,7 @@
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 8px 12px;
+  padding: 8px 10px;
   border: none;
   border-radius: 8px;
   background: none;
@@ -98,11 +124,11 @@
 }
 
 .set-nav-item:hover:not(.active) {
-  background: var(--bg-content);
+  background: var(--bg-hover);
 }
 
 .set-nav-item.active {
-  background: var(--bg-hover);
+  background: var(--bg-hover-strong);
   font-weight: 600;
 }
 
@@ -128,6 +154,40 @@
   overflow-y: auto;
   /* height of the sticky title row, so focus/scroll-into-view lands below it */
   scroll-padding-top: 49px;
+  container: set-pane / inline-size;
+}
+
+/* a narrow pane (minimum window size) stacks a text field under its label
+   instead of squeezing the description into a column beside a 200px input */
+@container set-pane (max-width: 520px) {
+  .set-field:has(> .set-input:not(.set-num-input)) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .set-field > .set-input {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+}
+
+/* minimum window: the nav gives the pane room */
+@media (max-width: 900px) {
+  .set-nav {
+    width: 188px;
+    padding-inline: 10px;
+  }
+
+  .set-pane {
+    padding-inline: 22px;
+  }
+
+  .set-pane-head {
+    margin-inline: -22px;
+    padding-inline: 22px;
+  }
 }
 
 /* the pane scrolls, so rows must keep their natural height: .set-field's
@@ -187,7 +247,8 @@
   border-bottom: 1px solid var(--border-subtle);
 }
 
-.set-field:last-child {
+.set-field:last-child,
+.set-field:has(+ .set-pane-subtitle) {
   border-bottom: none;
 }
 
@@ -212,7 +273,7 @@
   color: var(--text-secondary);
   text-align: right;
   user-select: text;
-  word-break: break-all;
+  overflow-wrap: anywhere;
 }
 
 /* stacked label + secondary description (analytics toggle row) */
@@ -311,19 +372,20 @@
 }
 
 .set-log-empty {
-  color: var(--text-tertiary);
+  color: var(--text-muted);
 }
 
 /* on/off switch (analytics toggle) */
 .set-switch {
   position: relative;
   flex-shrink: 0;
-  width: 40px;
-  height: 22px;
+  width: 42px;
+  height: 24px;
   padding: 0;
   border: none;
-  border-radius: 11px;
+  border-radius: 12px;
   background: var(--bg-hover-strong);
+  box-shadow: inset 0 0 0 1px var(--border-control);
   cursor: pointer;
   transition: background 0.15s ease;
 }
@@ -333,20 +395,30 @@
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background: var(--surface);
   box-shadow: var(--shadow-modal-strong);
-  transition: left 0.15s ease;
+  transition: transform 0.15s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+[dir='rtl'] .set-switch::after {
+  left: auto;
+  right: 2px;
 }
 
 .set-switch[aria-checked='true'] {
   background: var(--color-btn-primary);
+  box-shadow: none;
 }
 
 .set-switch[aria-checked='true']::after {
-  left: 20px;
+  transform: translateX(18px);
+}
+
+[dir='rtl'] .set-switch[aria-checked='true']::after {
+  transform: translateX(-18px);
 }
 
 .set-switch:disabled {
@@ -354,61 +426,7 @@
   cursor: default;
 }
 
-/* GenMail-style select pill: the visible layer is just the current value +
-   chevron (width hugs the content); the real <select> sits on top invisibly
-   and only supplies the click target and the native popup. */
-.set-select-wrap {
-  position: relative;
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.set-select-wrap:hover,
-.set-select-wrap:focus-within {
-  background: var(--bg-hover);
-}
-
-.set-select-text {
-  font-size: 14px;
-  color: var(--text-primary);
-  white-space: nowrap;
-}
-
-.set-select-wrap::after {
-  content: '';
-  flex-shrink: 0;
-  width: 7px;
-  height: 7px;
-  margin-top: -4px;
-  border-right: 1.5px solid var(--text-primary);
-  border-bottom: 1.5px solid var(--text-primary);
-  transform: rotate(45deg);
-}
-
-.set-select {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  font: inherit;
-  cursor: pointer;
-  /* the element is invisible, but the OS popup that opens on click reads its
-     computed color/background to render the option list */
-  color: var(--text-primary);
-  background: var(--surface);
-}
-
-.set-select option {
-  color: var(--text-primary);
-  background: var(--surface);
-}
-
-/* Shared dropdown (@genoffice/ui gs-dd) in settings rows: borderless text
- * trigger matching the old .set-select-wrap look */
+/* Shared dropdown (@genoffice/ui gs-dd) in settings rows: borderless text trigger */
 .set-dd {
   flex-shrink: 0;
 }
@@ -470,7 +488,7 @@
   cursor: pointer;
 }
 
-.set-btn:hover:not([aria-disabled='true']) {
+.set-btn:hover:not(:disabled):not([aria-disabled='true']) {
   background: var(--bg-hover-strong);
 }
 
@@ -486,7 +504,14 @@
   color: var(--color-btn-primary-text);
 }
 
-.set-btn.primary:hover:not([aria-disabled='true']) {
+.set-btn.primary:disabled,
+.set-btn.primary[aria-disabled='true'] {
+  background: var(--bg-hover);
+  color: var(--text-muted);
+  opacity: 1;
+}
+
+.set-btn.primary:hover:not(:disabled):not([aria-disabled='true']) {
   background: var(--color-btn-primary-hover);
 }
 
@@ -517,7 +542,7 @@
   width: 46%;
   min-width: 200px;
   padding: 6px 10px;
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--border-control);
   border-radius: 6px;
   font: inherit;
   font-size: 13px;
@@ -543,10 +568,11 @@
 .set-input:focus {
   outline: none;
   border-color: var(--accent, var(--text-primary));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
 .set-input::placeholder {
-  color: var(--text-tertiary, var(--text-secondary));
+  color: var(--text-muted);
 }
 
 .set-ai-note {
@@ -621,6 +647,53 @@
   margin: 28px 0 4px;
 }
 
+/* collapsible media block: the head is the toggle, the chevron says so */
+.set-ai-block-head {
+  cursor: pointer;
+  list-style: none;
+  border-radius: 8px;
+}
+
+.set-ai-block-head::-webkit-details-marker {
+  display: none;
+}
+
+.set-ai-block-head::before {
+  content: '';
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  margin-inline: 2px 0;
+  border-right: 1.5px solid var(--text-muted);
+  border-bottom: 1.5px solid var(--text-muted);
+  transform: rotate(-45deg);
+  transition: transform 0.15s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+[dir='rtl'] .set-ai-block-head::before {
+  transform: rotate(135deg);
+}
+
+.set-ai-block[open] > .set-ai-block-head::before {
+  transform: rotate(45deg);
+}
+
+.set-ai-block-provider {
+  margin-inline-start: auto;
+  font-size: 13px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.set-ai-block-head .set-ai-status {
+  margin-inline: 0;
+}
+
+.set-ai-block:not([open]) > .set-ai-block-head {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
 .set-pane-subhead .set-pane-subtitle {
   margin: 0;
 }
@@ -637,7 +710,8 @@
   margin: 8px 0 4px;
   padding: 14px 16px;
   border-radius: 12px;
-  background: var(--surface-subtle);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-content);
 }
 
 .set-intg-hero-title {
@@ -696,7 +770,7 @@
   margin-left: auto;
   font-size: 12px;
   font-weight: 400;
-  color: var(--text-tertiary);
+  color: var(--text-muted);
 }
 
 .set-intg-lead {
@@ -732,6 +806,7 @@
 }
 
 .set-intg-details > summary {
+  padding-block: 4px;
   font-size: 13px;
   font-weight: 500;
   color: var(--text-primary);
@@ -801,14 +876,6 @@
   flex: 1;
 }
 
-.set-intg-option-letter {
-  flex-shrink: 0;
-  width: 20px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-tertiary);
-}
-
 .set-intg-code {
   display: flex;
   align-items: center;
@@ -859,12 +926,13 @@
   gap: 16px;
   margin: 0 0 10px;
   padding: 10px 12px;
-  border-radius: 8px;
-  background: var(--bg-hover);
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-content);
 }
 
 .set-intg-confirm .set-field-desc {
-  word-break: break-all;
+  overflow-wrap: anywhere;
 }
 
 .set-intg-notice {
@@ -895,7 +963,7 @@
   gap: 10px;
   padding: 12px;
   border-radius: 12px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-subtle);
   background: var(--bg-content);
 }
 
@@ -909,6 +977,7 @@
 .set-backup-status strong {
   font-size: 13px;
   color: var(--text);
+  font-variant-numeric: tabular-nums;
 }
 
 .set-backup-sim {
@@ -926,8 +995,8 @@
   gap: 10px;
   padding: 12px;
   border-radius: 12px;
-  border: 1px dashed color-mix(in srgb, var(--accent) 40%, var(--border));
-  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-content);
 }
 
 .set-backup-login p {
@@ -938,84 +1007,38 @@
   color: var(--text);
 }
 
-.set-backup-h {
-  margin: 6px 0 0;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text);
-}
-
 .set-backup-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-.set-backup-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 10px;
-}
-
-.set-backup-card {
+.set-backup-skus {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 14px;
-  border-radius: 14px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  box-shadow: var(--shadow-btn);
 }
 
-.set-backup-card.is-active {
-  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
-  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
-}
-
-.set-backup-card header {
-  display: flex;
+.set-backup-sku .set-field-label {
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
 }
 
-.set-backup-card h5 {
-  margin: 0;
-  font-size: 14px;
-  color: var(--text);
-}
-
-.set-backup-card p {
-  margin: 0;
-  font-size: 12px;
-  color: var(--text-secondary);
-  line-height: 1.4;
-}
-
-.set-backup-card ul {
-  margin: 0;
-  padding: 0 0 0 16px;
-  font-size: 12px;
-  color: var(--text);
+.set-backup-price {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .set-backup-badge {
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  padding: 2px 7px;
-  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
   color: var(--accent);
   background: color-mix(in srgb, var(--accent) 16%, transparent);
-}
-
-.set-backup-card-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: auto;
 }
 
 .set-backup-msg {
@@ -1044,9 +1067,9 @@
   justify-content: space-between;
   gap: 12px;
   padding: 14px;
-  border-radius: 14px;
-  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
-  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-content);
 }
 
 .set-uniai-qr-block {
@@ -1061,7 +1084,7 @@
 .set-uniai-qr {
   width: 160px;
   height: 160px;
-  border-radius: 12px;
+  border-radius: 8px;
   border: 1px solid var(--border);
   background: var(--surface);
   flex-shrink: 0;
@@ -1105,22 +1128,6 @@
 .set-uniai-steps li + li,
 .set-uniai-bullets li + li {
   margin-top: 8px;
-}
-
-/* Settings → About: the one-click update entry next to the version row */
-.set-update-btn {
-  height: 26px;
-  padding: 0 12px;
-  border: 1px solid var(--border-strong);
-  border-radius: 3px;
-  background: none;
-  color: var(--text);
-  font: inherit;
-  cursor: pointer;
-}
-
-.set-update-btn:hover {
-  background: var(--hover);
 }
 
 /* Settings → About: product identity above the version rows */
@@ -1174,32 +1181,11 @@
   margin-top: 10px;
 }
 
-.set-about-legal-btn {
-  height: 26px;
-  padding: 0 12px;
-  border: 1px solid var(--border-strong);
-  border-radius: 3px;
-  background: none;
-  color: var(--text);
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.set-about-legal-btn:hover {
-  background: var(--hover);
-}
-
 .set-about-legal-error {
   margin: 8px 0 0;
   font-size: 12px;
   line-height: 1.45;
   color: var(--danger);
-}
-
-.set-about-legal-btn:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
 }
 
 /* ── Settings → Account: UniWork account ── */
@@ -1212,10 +1198,13 @@
 }
 
 .acct-heading {
-  margin: 0 0 6px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-secondary);
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .acct-card {
@@ -1240,7 +1229,7 @@
   background: var(--account-avatar-bg);
   color: var(--surface);
   font-size: 15px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .acct-card-text {
@@ -1278,9 +1267,9 @@
   align-items: flex-start;
   gap: 10px;
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: 12px;
   border: 1px solid var(--border-subtle);
-  background: var(--accent-soft);
+  background: var(--bg-content);
   color: var(--text-primary);
 }
 
@@ -1337,6 +1326,18 @@
   }
 }
 
+/* server address form: label over a full-width field, actions under it */
+.acct-server-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.acct-server-form .set-input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
 .acct-actions {
   flex-wrap: wrap;
   padding-top: 12px;
@@ -1355,7 +1356,7 @@
   left: auto;
   right: anchor(right);
   min-width: max(220px, anchor-size(width));
-  max-width: calc(100vw - 48px);
+  max-width: calc(var(--ui-vw) * 100 - 48px);
 }
 
 .acct-org-dd .gs-dd-item {
@@ -1390,7 +1391,7 @@
   padding: 14px;
   border: 1px solid var(--border-subtle);
   border-radius: 12px;
-  background: var(--surface-subtle);
+  background: var(--bg-content);
 }
 
 .uw-org-head {
@@ -1435,7 +1436,7 @@
   min-height: 44px;
   padding: 6px 10px;
   border: 1px solid var(--border-subtle);
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--surface);
   cursor: pointer;
 }
@@ -1581,4 +1582,58 @@
 .cloud-renews {
   margin-left: 8px;
   font-size: 12px;
+}
+
+/* unsaved-changes prompt pinned to the bottom of the dialog */
+.set-leave {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 22px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-content);
+}
+
+/* a pane that could not load: the reason and a retry, inline */
+.set-inline-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--danger-border);
+  background: var(--danger-bg);
+  font-size: 13px;
+  color: var(--danger-text);
+}
+
+/* loading placeholder rows for panes that read their settings first */
+.set-skel {
+  display: block;
+  width: 34%;
+  height: 12px;
+  border-radius: 6px;
+  background: var(--bg-hover);
+  animation: set-skel-pulse 1.4s ease-in-out infinite;
+}
+
+.set-skel-control {
+  width: 28%;
+  height: 26px;
+  margin-inline-start: auto;
+}
+
+@keyframes set-skel-pulse {
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .set-skel {
+    animation: none;
+  }
 }

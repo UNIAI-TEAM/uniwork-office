@@ -115,6 +115,7 @@ export const fr = {
   appMixedExportOpening:
     "Formats de papier mixtes : ouverture de l'aperçu de pagination pour exporter les pages fusionnées…",
   appSelectTextToComment: "Sélectionnez d'abord le texte à commenter",
+  appCommentSaveFirst: 'Enregistrez d’abord le document pour ajouter un commentaire',
   appCommentSelectionLost:
     "La sélection n'est plus valide ; sélectionnez à nouveau le texte à commenter",
   appCommentAdded: "Commentaire ajouté ; écrit dans le document à l'enregistrement",
@@ -240,6 +241,7 @@ export const fr = {
   appPageOf: 'Page {current} sur {total}',
   appWordCountTitle: 'Statistiques',
   appWordCountN: '{n} mots',
+  appWordCountSelection: '{selected} mots sur {total} sélectionnés',
   appTrackChangesOn: 'Suivi des modifications : activé',
   appTrackChangesOff: 'Suivi des modifications : désactivé',
   appAcTitle: 'Options de correction automatique',
@@ -456,6 +458,7 @@ export const fr = {
   appParaSpecialFirstLine: 'Positif',
   appParaSpecialHanging: 'Négatif',
   appParaBy: 'De',
+  appParaUnitChars: 'Caractères',
   appInsertEquation: 'Insérer une équation',
   appLatexPlaceholder: 'p. ex. x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}',
   appLatexPreviewHint: 'Saisissez du LaTeX pour afficher un aperçu',
