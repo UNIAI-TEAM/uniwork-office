@@ -6348,7 +6348,7 @@ body > div:has([data-u-comp='find-replace-dialog']) {
   left: 0;
   z-index: 30;
   width: 520px;
-  max-height: 60vh;
+  max-height: calc(var(--ui-vh) * 60);
   overflow: auto;
   padding: 8px 10px 10px;
   border: 1px solid var(--border);
