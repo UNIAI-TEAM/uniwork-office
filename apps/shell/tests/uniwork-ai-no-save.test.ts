@@ -4,13 +4,7 @@ import { rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import {
-  defaultAiSettings,
-  type AiStreamChunk,
-  type StreamCallbacks,
-  type UniworkChatTransport,
-  type UniworkTurnRequest,
-} from '@genoffice/ai-provider'
+import { defaultAiSettings, streamUniwork, type AiStreamChunk } from '@genoffice/ai-provider'
 import type { DeploymentProfile } from '../src/main/uniwork-auth/deployment'
 import {
   createUniworkAiChatTransport,
@@ -32,8 +26,9 @@ import { createLockableSafeStorage } from '../src/main/uniwork-sync/test-kit/com
  * document makes no save, upload or commit request and records no save
  * intent; the tab stays dirty until the user presses Save. Real documents
  * service + durable store over a fake UniWork server that counts every
- * request; the chat route is the only one the turn may touch. The adapter is
- * a fake that posts through the real shell transport.
+ * request; the chat route is the only one the turn may touch. The real
+ * adapter (streamUniwork) posts through the real shell transport, so an extra
+ * request the adapter ever makes (a retry elsewhere, a second URL) fails here.
  */
 
 const TOKEN = 'secret-access-token-0123456789'
@@ -86,17 +81,37 @@ function fakeServer(bytes: Uint8Array) {
       return new Response(bytes as BodyInit, { status: 200 })
     }
     if (u.pathname === CHAT && method === 'POST') {
-      return new Response(
-        'data: {"choices":[{"delta":{"content":"Made it bold."}}],"x_uniwork":{"step":1,"limit":20}}\n\ndata: [DONE]\n\n',
-        {
-          status: 200,
-          headers: {
-            'Content-Type': 'text/event-stream',
-            'X-UniWork-AI-Conversation': 'conv_1',
-            'X-UniWork-AI-Run': 'run_1',
+      // the server's answer: text plus the edit tool call the renderer applies
+      const chunk = {
+        object: 'chat.completion.chunk',
+        choices: [
+          {
+            index: 0,
+            delta: {
+              role: 'assistant',
+              content: 'Made it bold.',
+              tool_calls: [
+                {
+                  index: 0,
+                  id: 'call_1',
+                  type: 'function',
+                  function: { name: 'format_text', arguments: '{"bold":true}' },
+                },
+              ],
+            },
+            finish_reason: 'tool_calls',
           },
+        ],
+        x_uniwork: { step: 0, limit: 20 },
+      }
+      return new Response(`data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`, {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'X-UniWork-AI-Conversation': 'conv_1',
+          'X-UniWork-AI-Run': 'run_1',
         },
-      )
+      })
     }
     return json(404, { error: { code: 'not_found', message: 'x' } })
   })
@@ -195,24 +210,6 @@ describe('G6-A03 desktop: AI never saves', () => {
     expect(before).toMatchObject({ documentId: DOC })
     const callsBefore = server.calls.length
 
-    // the adapter double: one request through the shell transport, then an
-    // edit tool call the renderer applies to the open document
-    const stream = async (
-      transport: UniworkChatTransport,
-      request: UniworkTurnRequest,
-      cb: StreamCallbacks,
-    ) => {
-      const response = await transport.post({
-        scope: request.scope,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: [{ role: 'user', content: 'bold' }], stream: true }),
-        signal: cb.signal,
-      })
-      expect(response.status).toBe(200)
-      await response.text()
-      cb.onDelta('Made it bold.')
-      cb.onToolCall({ id: 'call_1', name: 'format_text', input: { bold: true } })
-    }
     const streams = createUniworkAiStreams({
       transport: () => ctx.transport,
       scope: (senderId) =>
@@ -223,7 +220,7 @@ describe('G6-A03 desktop: AI never saves', () => {
         }),
       available: async () => true,
       toolPolicy: () => ({ cloudTools: false }),
-      stream,
+      stream: streamUniwork,
     })
     const chunks: AiStreamChunk[] = []
     await streams.run({
@@ -233,7 +230,8 @@ describe('G6-A03 desktop: AI never saves', () => {
         sessionId: 'sess-1',
         settings: { ...defaultAiSettings(), provider: 'uniwork' },
         system: '',
-        messages: [{ role: 'user', content: 'bold' }],
+        messages: [{ role: 'user', text: 'make the title bold' }],
+        tools: [{ name: 'format_text', description: 'd', inputSchema: { type: 'object' } }],
       },
       send: (chunk) => {
         chunks.push(chunk)
@@ -242,11 +240,19 @@ describe('G6-A03 desktop: AI never saves', () => {
       },
       signal: new AbortController().signal,
     })
-    expect(chunks.map((c) => c.type)).toEqual(['delta', 'tool-call', 'done'])
+    // keepalive pings and notices aside, the panel gets the answer, the edit and the end
+    expect(
+      chunks.filter((c) => c.type !== 'notice' && c.type !== 'ping').map((c) => c.type),
+    ).toEqual(['delta', 'tool-call', 'done'])
+    expect(chunks.find((c) => c.type === 'tool-call')?.toolCall).toMatchObject({
+      id: 'call_1',
+      name: 'format_text',
+      input: { bold: true },
+    })
 
-    // only the chat route was touched by the turn
-    const during = server.calls.slice(callsBefore)
-    expect(during).toEqual([{ method: 'POST', path: CHAT }])
+    // exactly one request, the chat POST: none before, none after the turn (GETs included)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(server.calls.slice(callsBefore)).toEqual([{ method: 'POST', path: CHAT }])
     expect(server.calls.filter((c) => c.path !== CHAT && c.method !== 'GET')).toEqual([])
     expect(server.calls.filter((c) => /\/uploads$|\/versions\/commit$/.test(c.path))).toEqual([])
     // no module save was requested and no save intent was recorded
