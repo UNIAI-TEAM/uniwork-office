@@ -1,24 +1,16 @@
 import type {
   UniworkConflictAction,
-  UniworkConflictView
+  UniworkConflictNotice,
+  UniworkConflictView,
 } from '../../shared/uniwork-conflict'
 
-export type ConflictStep1ActionId =
-  | 'view-diff'
-  | 'reload'
-  | 'save-copy'
-  | 'overwrite'
-  | 'cancel'
+export type ConflictStep1ActionId = 'view-diff' | 'reload' | 'save-copy' | 'overwrite' | 'cancel'
 
 export type ConflictStep2Kind = 'reload' | 'save-copy' | 'overwrite'
 
 export type ConflictStep = 'step1' | 'stop-ai' | ConflictStep2Kind | 'locked'
 
-export type ConflictFocusTarget =
-  | ConflictStep1ActionId
-  | 'back'
-  | 'title'
-  | null
+export type ConflictFocusTarget = ConflictStep1ActionId | 'back' | 'title' | null
 
 export interface ConflictStep1ActionItem {
   id: ConflictStep1ActionId
@@ -63,6 +55,7 @@ export interface ConflictReloadStepModel {
   showOpenCenter: boolean
   selectedKeep: 'draft' | 'discard' | null
   canSubmit: boolean
+  submitReasonKey: 'uwConflictKeepUnavailable' | 'uwConflictDraftCapReached' | null
 }
 
 export interface ConflictResolvedNotice {
@@ -75,7 +68,14 @@ export interface ConflictResolvedNotice {
   args: Record<string, string>
 }
 
-export function getStep1Model(view: UniworkConflictView): ConflictStep1Model {
+export interface ConflictStep1Options {
+  canViewDiff?: boolean
+}
+
+export function getStep1Model(
+  view: UniworkConflictView,
+  options?: ConflictStep1Options,
+): ConflictStep1Model {
   const intentBusy = view.intent === 'committing' || view.intent === 'reconciling'
   const intentStuck = view.intent === 'reconciling-stuck'
 
@@ -96,14 +96,14 @@ export function getStep1Model(view: UniworkConflictView): ConflictStep1Model {
   const intentBlock = resolveIntentBlock()
   const actions: ConflictStep1ActionItem[] = []
 
-  if (view.module === 'docs') {
+  if (view.module === 'docs' && options?.canViewDiff) {
     actions.push({
       id: 'view-diff',
       labelKey: 'uwConflictViewDiff',
       style: 'ghost',
       disabled: false,
       reasonKey: null,
-      showOpenCenter: false
+      showOpenCenter: false,
     })
   }
 
@@ -113,7 +113,7 @@ export function getStep1Model(view: UniworkConflictView): ConflictStep1Model {
       id: 'reload',
       labelKey: 'uwConflictReload',
       style: 'primary',
-      ...intentBlock
+      ...intentBlock,
     })
   } else if (!view.online && !view.headOffline) {
     actions.push({
@@ -122,7 +122,7 @@ export function getStep1Model(view: UniworkConflictView): ConflictStep1Model {
       style: 'primary',
       disabled: true,
       reasonKey: 'uwConflictOfflineDesktop',
-      showOpenCenter: false
+      showOpenCenter: false,
     })
   } else {
     actions.push({
@@ -131,7 +131,7 @@ export function getStep1Model(view: UniworkConflictView): ConflictStep1Model {
       style: 'primary',
       disabled: false,
       reasonKey: null,
-      showOpenCenter: false
+      showOpenCenter: false,
     })
   }
 
@@ -142,7 +142,7 @@ export function getStep1Model(view: UniworkConflictView): ConflictStep1Model {
         id: 'save-copy',
         labelKey: 'uwConflictSaveCopy',
         style: 'ghost',
-        ...intentBlock
+        ...intentBlock,
       })
     } else if (!view.online) {
       actions.push({
@@ -151,7 +151,7 @@ export function getStep1Model(view: UniworkConflictView): ConflictStep1Model {
         style: 'ghost',
         disabled: true,
         reasonKey: 'uwConflictSaveCopyOffline',
-        showOpenCenter: false
+        showOpenCenter: false,
       })
     } else {
       actions.push({
@@ -160,7 +160,7 @@ export function getStep1Model(view: UniworkConflictView): ConflictStep1Model {
         style: 'ghost',
         disabled: false,
         reasonKey: null,
-        showOpenCenter: false
+        showOpenCenter: false,
       })
     }
   }
@@ -172,7 +172,7 @@ export function getStep1Model(view: UniworkConflictView): ConflictStep1Model {
         id: 'overwrite',
         labelKey: 'uwConflictOverwrite',
         style: 'danger',
-        ...intentBlock
+        ...intentBlock,
       })
     } else {
       actions.push({
@@ -181,7 +181,7 @@ export function getStep1Model(view: UniworkConflictView): ConflictStep1Model {
         style: 'danger',
         disabled: false,
         reasonKey: null,
-        showOpenCenter: false
+        showOpenCenter: false,
       })
     }
   }
@@ -193,13 +193,13 @@ export function getStep1Model(view: UniworkConflictView): ConflictStep1Model {
     style: 'ghost',
     disabled: false,
     reasonKey: null,
-    showOpenCenter: false
+    showOpenCenter: false,
   })
 
   return {
     actions,
     defaultFocus: 'cancel',
-    noEditKey: view.canEdit ? null : 'uwConflictNoEdit'
+    noEditKey: view.canEdit ? null : 'uwConflictNoEdit',
   }
 }
 
@@ -213,14 +213,14 @@ export function createInitialConflictState(view: UniworkConflictView): ConflictD
     stopAi: false,
     selectedKeep: view.keepDraft === 'ok' ? 'draft' : null,
     focusTarget: isLocked ? 'title' : 'cancel',
-    focusTick: 1
+    focusTick: 1,
   }
 }
 
 export function applyConflictStep1Click(
   state: ConflictDialogState,
   view: UniworkConflictView,
-  actionId: ConflictStep2Kind
+  actionId: ConflictStep2Kind,
 ): ConflictDialogState {
   const step1 = getStep1Model(view)
   const item = step1.actions.find((a) => a.id === actionId)
@@ -235,7 +235,7 @@ export function applyConflictStep1Click(
       opener: actionId,
       pendingStep: actionId,
       focusTarget: 'back',
-      focusTick: state.focusTick + 1
+      focusTick: state.focusTick + 1,
     }
   }
 
@@ -245,15 +245,16 @@ export function applyConflictStep1Click(
     opener: actionId,
     pendingStep: null,
     stopAi: false,
-    selectedKeep: actionId === 'reload' ? (view.keepDraft === 'ok' ? 'draft' : null) : state.selectedKeep,
+    selectedKeep:
+      actionId === 'reload' ? (view.keepDraft === 'ok' ? 'draft' : null) : state.selectedKeep,
     focusTarget: 'back',
-    focusTick: state.focusTick + 1
+    focusTick: state.focusTick + 1,
   }
 }
 
 export function applyConflictStopAiConfirm(
   state: ConflictDialogState,
-  view: UniworkConflictView
+  view: UniworkConflictView,
 ): ConflictDialogState {
   if (state.step !== 'stop-ai' || !state.pendingStep) {
     return state
@@ -264,9 +265,10 @@ export function applyConflictStopAiConfirm(
     step: targetStep,
     pendingStep: null,
     stopAi: true,
-    selectedKeep: targetStep === 'reload' ? (view.keepDraft === 'ok' ? 'draft' : null) : state.selectedKeep,
+    selectedKeep:
+      targetStep === 'reload' ? (view.keepDraft === 'ok' ? 'draft' : null) : state.selectedKeep,
     focusTarget: 'back',
-    focusTick: state.focusTick + 1
+    focusTick: state.focusTick + 1,
   }
 }
 
@@ -280,27 +282,27 @@ export function applyConflictBack(state: ConflictDialogState): ConflictDialogSta
     pendingStep: null,
     stopAi: false,
     focusTarget: state.opener ?? 'cancel',
-    focusTick: state.focusTick + 1
+    focusTick: state.focusTick + 1,
   }
 }
 
 export function applyConflictSelectKeep(
   state: ConflictDialogState,
   view: UniworkConflictView,
-  choice: 'draft' | 'discard'
+  choice: 'draft' | 'discard',
 ): ConflictDialogState {
   if (choice === 'draft' && view.keepDraft !== 'ok') {
     return state
   }
   return {
     ...state,
-    selectedKeep: choice
+    selectedKeep: choice,
   }
 }
 
 export function getReloadStepModel(
   state: ConflictDialogState,
-  view: UniworkConflictView
+  view: UniworkConflictView,
 ): ConflictReloadStepModel {
   const keepOk = view.keepDraft === 'ok'
   let keepReasonKey: ConflictReloadStepModel['keepReasonKey'] = null
@@ -315,10 +317,8 @@ export function getReloadStepModel(
     keepReasonKey = 'uwConflictKeepUnavailable'
   }
 
-  const selectedKeep =
-    !keepOk && state.selectedKeep === 'draft' ? null : state.selectedKeep
-  const canSubmit =
-    selectedKeep === 'discard' || (selectedKeep === 'draft' && keepOk)
+  const selectedKeep = !keepOk && state.selectedKeep === 'draft' ? null : state.selectedKeep
+  const canSubmit = selectedKeep === 'discard' || (selectedKeep === 'draft' && keepOk)
 
   return {
     keepDisabled: !keepOk,
@@ -326,20 +326,18 @@ export function getReloadStepModel(
     keepReasonArgs,
     showOpenCenter,
     selectedKeep,
-    canSubmit
+    canSubmit,
+    submitReasonKey: !canSubmit ? keepReasonKey : null,
   }
 }
 
-export function canSubmitReload(
-  state: ConflictDialogState,
-  view: UniworkConflictView
-): boolean {
+export function canSubmitReload(state: ConflictDialogState, view: UniworkConflictView): boolean {
   return getReloadStepModel(state, view).canSubmit
 }
 
 export function buildConfirmPayload(
   state: ConflictDialogState,
-  view: UniworkConflictView
+  view: UniworkConflictView,
 ): UniworkConflictAction | null {
   if (state.step === 'reload') {
     const model = getReloadStepModel(state, view)
@@ -349,27 +347,42 @@ export function buildConfirmPayload(
     return {
       kind: 'reload',
       keep: model.selectedKeep,
-      stopAi: state.stopAi
+      stopAi: state.stopAi,
     }
   }
   if (state.step === 'overwrite') {
     return {
       kind: 'overwrite',
-      stopAi: state.stopAi
+      stopAi: state.stopAi,
     }
   }
   if (state.step === 'save-copy') {
     return {
       kind: 'save-copy',
-      stopAi: state.stopAi
+      stopAi: state.stopAi,
     }
   }
   return null
 }
 
+export function getActionFailureNotice(
+  action: UniworkConflictAction,
+): UniworkConflictNotice | null {
+  switch (action.kind) {
+    case 'reload':
+      return 'reload_failed'
+    case 'overwrite':
+      return 'overwrite_failed'
+    case 'save-copy':
+      return 'save_copy_failed'
+    case 'cancel':
+      return null
+  }
+}
+
 export function applyConflictViewUpdate(
   state: ConflictDialogState,
-  nextView: UniworkConflictView
+  nextView: UniworkConflictView,
 ): ConflictDialogState {
   if (nextView.sessionId !== state.sessionId) {
     return createInitialConflictState(nextView)
@@ -381,7 +394,7 @@ export function applyConflictViewUpdate(
       step: 'locked',
       pendingStep: null,
       focusTarget: 'title',
-      focusTick: state.focusTick + 1
+      focusTick: state.focusTick + 1,
     }
   }
 
@@ -393,33 +406,27 @@ export function applyConflictViewUpdate(
       stopAi: false,
       selectedKeep: nextView.keepDraft === 'ok' ? 'draft' : null,
       focusTarget: 'cancel',
-      focusTick: state.focusTick + 1
+      focusTick: state.focusTick + 1,
     }
   }
 
   const adjustedSelectedKeep =
-    nextView.keepDraft !== 'ok' && state.selectedKeep === 'draft'
-      ? null
-      : state.selectedKeep
+    nextView.keepDraft !== 'ok' && state.selectedKeep === 'draft' ? null : state.selectedKeep
 
   return {
     ...state,
-    selectedKeep: adjustedSelectedKeep
+    selectedKeep: adjustedSelectedKeep,
   }
 }
 
-export function resolveConflictNotice(
-  view: UniworkConflictView
-): ConflictResolvedNotice | null {
+export function resolveConflictNotice(view: UniworkConflictView): ConflictResolvedNotice | null {
   switch (view.notice) {
     case 'head_moved':
       return {
         key: 'uwConflictHeadMoved',
         args: {
-          n:
-            view.noticeArg ??
-            (view.server.version !== null ? String(view.server.version) : '—')
-        }
+          n: view.noticeArg ?? (view.server.version !== null ? String(view.server.version) : '—'),
+        },
       }
     case 'reload_failed':
       return { key: 'uwConflictReloadFailed', args: {} }
@@ -428,7 +435,7 @@ export function resolveConflictNotice(
     case 'save_copy_done':
       return {
         key: 'uwConflictSaveCopyDone',
-        args: { title: view.noticeArg ?? view.title }
+        args: { title: view.noticeArg ?? view.title },
       }
     case 'save_copy_failed':
       return { key: 'uwConflictSaveCopyFailed', args: {} }

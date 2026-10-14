@@ -4,7 +4,7 @@ import { useI18n } from './locale'
 import type {
   UniworkConflictAction,
   UniworkConflictReply,
-  UniworkConflictView
+  UniworkConflictView,
 } from '../../shared/uniwork-conflict'
 import {
   applyConflictBack,
@@ -14,19 +14,21 @@ import {
   applyConflictViewUpdate,
   buildConfirmPayload,
   createInitialConflictState,
+  getActionFailureNotice,
   getReloadStepModel,
   getStep1Model,
   resolveConflictNotice,
   type ConflictDialogState,
-  type ConflictStep1ActionId
+  type ConflictStep1ActionId,
 } from './uniwork-conflict-model'
 import './uniwork-conflict-dialog.css'
 
 export interface UniworkConflictBridge {
   onUniworkConflict?: (cb: (view: UniworkConflictView) => void) => () => void
+  onUniworkConflictClosed?: (cb: (sessionId: string) => void) => () => void
   uniworkConflictAct?: (
     sessionId: string,
-    action: UniworkConflictAction
+    action: UniworkConflictAction,
   ) => Promise<UniworkConflictReply>
   uniworkSyncQueueOpen?: () => Promise<unknown>
 }
@@ -58,12 +60,37 @@ function formatSavedAt(savedAt: string | null): string {
   }
 }
 
+function getDialogTabbables(dialog: HTMLElement, active: HTMLElement | null): HTMLElement[] {
+  const raw = Array.from(
+    dialog.querySelectorAll<HTMLElement>(
+      'button:not(:disabled), input[type="radio"]:not(:disabled), [href], [tabindex]:not([tabindex="-1"])',
+    ),
+  )
+  const radiosByName = new Map<string, HTMLInputElement[]>()
+  for (const el of raw) {
+    if (el instanceof HTMLInputElement && el.type === 'radio' && el.name) {
+      const group = radiosByName.get(el.name) ?? []
+      group.push(el)
+      radiosByName.set(el.name, group)
+    }
+  }
+  const winnerByName = new Map<string, HTMLInputElement>()
+  for (const [name, group] of radiosByName.entries()) {
+    const activeRadio = group.find((r) => r === active)
+    const checkedRadio = group.find((r) => r.checked)
+    winnerByName.set(name, activeRadio ?? checkedRadio ?? group[0])
+  }
+  return raw.filter((el) => {
+    if (el instanceof HTMLInputElement && el.type === 'radio' && el.name) {
+      return winnerByName.get(el.name) === el
+    }
+    return true
+  })
+}
+
 export interface UniworkConflictDialogProps {
   view: UniworkConflictView
-  onAct: (
-    sessionId: string,
-    action: UniworkConflictAction
-  ) => Promise<UniworkConflictReply>
+  onAct: (sessionId: string, action: UniworkConflictAction) => Promise<UniworkConflictReply>
   onOpenSyncCenter?: () => void | Promise<unknown>
   onClosed: () => void
   onViewChange: (nextView: UniworkConflictView) => void
@@ -76,7 +103,7 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
   onOpenSyncCenter,
   onClosed,
   onViewChange,
-  onViewDiff
+  onViewDiff,
 }) => {
   const { t } = useI18n()
   const uid = useId()
@@ -84,17 +111,32 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
   const dialogRef = useRef<HTMLDivElement | null>(null)
   const titleRef = useRef<HTMLHeadingElement | null>(null)
   const prevViewRef = useRef<UniworkConflictView>(view)
-  const [state, setState] = useState<ConflictDialogState>(() =>
-    createInitialConflictState(view)
-  )
+  const [state, setState] = useState<ConflictDialogState>(() => createInitialConflictState(view))
   const [busy, setBusy] = useState(false)
+  const [alertClearing, setAlertClearing] = useState(false)
 
   useEffect(() => {
     if (prevViewRef.current !== view) {
+      const prevResolved = resolveConflictNotice(prevViewRef.current)
+      const nextResolved = resolveConflictNotice(view)
+      const isSameNotice =
+        prevResolved !== null &&
+        nextResolved !== null &&
+        prevResolved.key === nextResolved.key &&
+        JSON.stringify(prevResolved.args) === JSON.stringify(nextResolved.args)
       prevViewRef.current = view
       setState((prev) => applyConflictViewUpdate(prev, view))
+      setAlertClearing(isSameNotice)
     }
   }, [view])
+
+  useEffect(() => {
+    if (!alertClearing) return
+    const raf = requestAnimationFrame(() => {
+      setAlertClearing(false)
+    })
+    return () => cancelAnimationFrame(raf)
+  }, [alertClearing])
 
   // Apply `inert` to sibling children of document.body while the modal is mounted
   useEffect(() => {
@@ -124,7 +166,7 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
       return
     }
     const target = dialog.querySelector<HTMLElement>(
-      `[data-conflict-action="${state.focusTarget}"]`
+      `[data-conflict-action="${state.focusTarget}"]`,
     )
     target?.focus()
   }, [state.focusTarget, state.focusTick, state.step])
@@ -140,11 +182,22 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
         } else if (reply.kind === 'view') {
           onViewChange(reply.view)
         }
+      } catch {
+        const failureNotice = getActionFailureNotice(action)
+        if (!failureNotice) {
+          onClosed()
+        } else {
+          onViewChange({
+            ...view,
+            notice: failureNotice,
+            noticeArg: null,
+          })
+        }
       } finally {
         setBusy(false)
       }
     },
-    [busy, onAct, onClosed, onViewChange, view.sessionId]
+    [busy, onAct, onClosed, onViewChange, view],
   )
 
   const handleOpenSyncCenter = useCallback(async () => {
@@ -168,16 +221,52 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
         void sendAction({ kind: 'cancel' })
         return
       }
+      if (
+        e.key === 'ArrowDown' ||
+        e.key === 'ArrowRight' ||
+        e.key === 'ArrowUp' ||
+        e.key === 'ArrowLeft'
+      ) {
+        const dialog = dialogRef.current
+        const active = document.activeElement
+        if (
+          dialog &&
+          active instanceof HTMLInputElement &&
+          active.type === 'radio' &&
+          active.name
+        ) {
+          const group = Array.from(
+            dialog.querySelectorAll<HTMLInputElement>('input[type="radio"]:not(:disabled)'),
+          ).filter((r) => r.name === active.name)
+          if (group.length > 1) {
+            e.preventDefault()
+            const idx = group.indexOf(active)
+            const forward = e.key === 'ArrowDown' || e.key === 'ArrowRight'
+            const nextIdx = forward
+              ? (idx + 1) % group.length
+              : (idx - 1 + group.length) % group.length
+            const nextRadio = group[nextIdx]
+            if (nextRadio) {
+              nextRadio.focus()
+              if (
+                nextRadio.getAttribute('aria-disabled') !== 'true' &&
+                (nextRadio.value === 'draft' || nextRadio.value === 'discard')
+              ) {
+                setState((s) =>
+                  applyConflictSelectKeep(s, view, nextRadio.value as 'draft' | 'discard'),
+                )
+              }
+            }
+            return
+          }
+        }
+      }
       if (e.key === 'Tab') {
         const dialog = dialogRef.current
         if (!dialog) return
-        const focusables = Array.from(
-          dialog.querySelectorAll<HTMLElement>(
-            'button:not(:disabled), input[type="radio"]:not(:disabled), [href], [tabindex]:not([tabindex="-1"])'
-          )
-        )
-        if (focusables.length === 0) return
         const active = document.activeElement as HTMLElement | null
+        const focusables = getDialogTabbables(dialog, active)
+        if (focusables.length === 0) return
         const idx = active ? focusables.indexOf(active) : -1
         e.preventDefault()
         if (e.shiftKey) {
@@ -189,7 +278,7 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
         }
       }
     },
-    [sendAction]
+    [sendAction, view],
   )
 
   const handleStep1ActionClick = (actionId: ConflictStep1ActionId, disabled: boolean) => {
@@ -216,28 +305,21 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
   const bodyId = `${uid}-body`
   const alertId = `${uid}-alert`
   const serverAuthor =
-    view.server.by && view.server.by.trim().length > 0
-      ? view.server.by
-      : t('uwAuthorFallback')
-  const serverVerStr =
-    view.server.version !== null ? String(view.server.version) : '—'
-  const nextVerStr =
-    view.server.version !== null ? String(view.server.version + 1) : '—'
+    view.server.by && view.server.by.trim().length > 0 ? view.server.by : t('uwAuthorFallback')
+  const serverVerStr = view.server.version !== null ? String(view.server.version) : '—'
+  const nextVerStr = view.server.version !== null ? String(view.server.version + 1) : '—'
 
   const resolvedNotice = resolveConflictNotice(view)
-  const noticeText = resolvedNotice
-    ? fmt(t(resolvedNotice.key), resolvedNotice.args)
-    : ''
+  const noticeText = resolvedNotice ? fmt(t(resolvedNotice.key), resolvedNotice.args) : ''
 
-  const step1Model = getStep1Model(view)
+  const step1Model = getStep1Model(view, { canViewDiff: Boolean(onViewDiff) })
   const reloadModel = getReloadStepModel(state, view)
 
   let headingText = t('uwConflictTitle')
   let bodyText = t('uwConflictBody')
   if (state.step === 'locked') {
     headingText = t('uwConflictTitle')
-    bodyText =
-      view.locked === 'deleted' ? t('uwRemoteDeleted') : t('uwRemoteRevoked')
+    bodyText = view.locked === 'deleted' ? t('uwRemoteDeleted') : t('uwRemoteRevoked')
   } else if (state.step === 'stop-ai') {
     headingText = t('uwConflictTitle')
     bodyText = t('uwRemoteStopAiConfirm')
@@ -249,13 +331,13 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
     bodyText = fmt(t('uwConflictOverwriteConfirm'), {
       next: nextVerStr,
       server: serverVerStr,
-      author: serverAuthor
+      author: serverAuthor,
     })
   } else if (state.step === 'save-copy') {
     headingText = t('uwConflictSaveCopyTitle')
     bodyText = fmt(t('uwConflictSaveCopyConfirm'), {
       server: serverVerStr,
-      author: serverAuthor
+      author: serverAuthor,
     })
   }
 
@@ -274,7 +356,7 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
         step1Reasons.push({
           reasonId: rId,
           reasonKey: actItem.reasonKey,
-          showOpenCenter: actItem.showOpenCenter
+          showOpenCenter: actItem.showOpenCenter,
         })
       }
     }
@@ -285,19 +367,14 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
       <div
         ref={dialogRef}
         className="uw-conflict-dialog"
-        role="dialog"
+        role="alertdialog"
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={bodyId}
         onKeyDown={handleKeyDown}
       >
         <div className="uw-conflict-head">
-          <h2
-            ref={titleRef}
-            id={titleId}
-            className="uw-conflict-title"
-            tabIndex={-1}
-          >
+          <h2 ref={titleRef} id={titleId} className="uw-conflict-title" tabIndex={-1}>
             {headingText}
           </h2>
           <p id={bodyId} className="uw-conflict-body">
@@ -320,7 +397,7 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
                     <td className="uw-conflict-version-num">
                       {view.mine.baseVersion !== null
                         ? fmt(t('uwConflictBasedOn'), {
-                            n: String(view.mine.baseVersion)
+                            n: String(view.mine.baseVersion),
                           })
                         : '—'}
                     </td>
@@ -348,9 +425,7 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
           {state.step === 'reload' && (
             <>
               <fieldset className="uw-conflict-fieldset">
-                <legend className="uw-conflict-sr-only">
-                  {t('uwConflictColMine')}
-                </legend>
+                <legend className="uw-conflict-sr-only">{t('uwConflictColMine')}</legend>
                 <label
                   className="uw-conflict-radio"
                   aria-disabled={reloadModel.keepDisabled ? 'true' : undefined}
@@ -368,9 +443,7 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
                     }
                     onChange={() => {
                       if (!reloadModel.keepDisabled) {
-                        setState((s) =>
-                          applyConflictSelectKeep(s, view, 'draft')
-                        )
+                        setState((s) => applyConflictSelectKeep(s, view, 'draft'))
                       }
                     }}
                     onClick={(e) => {
@@ -383,12 +456,7 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
                 </label>
                 {reloadModel.keepDisabled && reloadModel.keepReasonKey && (
                   <p id={`${uid}-keep-reason`} className="uw-conflict-reason">
-                    <span>
-                      {fmt(
-                        t(reloadModel.keepReasonKey),
-                        reloadModel.keepReasonArgs
-                      )}
-                    </span>
+                    <span>{fmt(t(reloadModel.keepReasonKey), reloadModel.keepReasonArgs)}</span>
                     {reloadModel.showOpenCenter && (
                       <button
                         type="button"
@@ -407,11 +475,7 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
                     name={`${uid}-keep`}
                     value="discard"
                     checked={reloadModel.selectedKeep === 'discard'}
-                    onChange={() =>
-                      setState((s) =>
-                        applyConflictSelectKeep(s, view, 'discard')
-                      )
-                    }
+                    onChange={() => setState((s) => applyConflictSelectKeep(s, view, 'discard'))}
                   />
                   <span>{t('uwConflictDiscard')}</span>
                 </label>
@@ -429,7 +493,7 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
               view.notice === 'save_copy_done' ? ' uw-conflict-alert--ok' : ''
             }`}
           >
-            {noticeText}
+            {alertClearing ? '' : noticeText}
           </p>
         </div>
 
@@ -437,9 +501,7 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
           <>
             <div className="uw-conflict-actions">
               {step1Model.actions.map((item) => {
-                const reasonId = item.reasonKey
-                  ? reasonIdByKey.get(item.reasonKey)
-                  : undefined
+                const reasonId = item.reasonKey ? reasonIdByKey.get(item.reasonKey) : undefined
                 const styleClass =
                   item.style === 'primary'
                     ? ' uw-conflict-btn--primary'
@@ -485,9 +547,7 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
               type="button"
               className="uw-conflict-btn uw-conflict-btn--primary"
               data-conflict-action="stop-ai-go"
-              onClick={() =>
-                setState((s) => applyConflictStopAiConfirm(s, view))
-              }
+              onClick={() => setState((s) => applyConflictStopAiConfirm(s, view))}
             >
               {t('uwActStopAi')}
             </button>
@@ -509,6 +569,11 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
               className="uw-conflict-btn uw-conflict-btn--primary"
               data-conflict-action="reload-go"
               aria-disabled={!reloadModel.canSubmit || busy ? 'true' : undefined}
+              aria-describedby={
+                !reloadModel.canSubmit && reloadModel.submitReasonKey
+                  ? `${uid}-keep-reason`
+                  : undefined
+              }
               onClick={handleConfirmStep2}
             >
               {t('uwConflictReloadGo')}
@@ -581,25 +646,27 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
           </div>
         )}
 
-        <button
-          type="button"
-          className="uw-conflict-close"
-          data-conflict-action="close-x"
-          aria-label={t('uwConflictClose')}
-          onClick={() => void sendAction({ kind: 'cancel' })}
-        >
-          <svg
-            viewBox="0 0 14 14"
-            width="14"
-            height="14"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            aria-hidden="true"
+        {state.step !== 'locked' && (
+          <button
+            type="button"
+            className="uw-conflict-close"
+            data-conflict-action="close-x"
+            aria-label={t('uwConflictClose')}
+            onClick={() => void sendAction({ kind: 'cancel' })}
           >
-            <path d="M3 3l8 8M11 3l-8 8" />
-          </svg>
-        </button>
+            <svg
+              viewBox="0 0 14 14"
+              width="14"
+              height="14"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              aria-hidden="true"
+            >
+              <path d="M3 3l8 8M11 3l-8 8" />
+            </svg>
+          </button>
+        )}
       </div>
     </div>
   )
@@ -610,9 +677,34 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
   return createPortal(dialogNode, document.body)
 }
 
-export const UniworkConflictHost: React.FC = () => {
+export interface UniworkConflictHostProps {
+  onViewDiff?: (view: UniworkConflictView) => void
+}
+
+export const UniworkConflictHost: React.FC<UniworkConflictHostProps> = ({ onViewDiff }) => {
   const [view, setView] = useState<UniworkConflictView | null>(null)
+  const viewRef = useRef<UniworkConflictView | null>(null)
+  viewRef.current = view
   const openerRef = useRef<HTMLElement | null>(null)
+
+  const restoreOpenerFocus = useCallback(() => {
+    const opener = openerRef.current
+    openerRef.current = null
+    if (opener && typeof opener.focus === 'function' && opener.isConnected) {
+      opener.focus()
+    } else if (typeof document !== 'undefined') {
+      const fallback =
+        document.querySelector<HTMLElement>('.tab.active, [role="tab"][aria-selected="true"]') ??
+        document.body
+      fallback?.focus?.()
+    }
+  }, [])
+
+  const handleClosed = useCallback(() => {
+    viewRef.current = null
+    setView(null)
+    restoreOpenerFocus()
+  }, [restoreOpenerFocus])
 
   useEffect(() => {
     const bridges = getConflictBridges()
@@ -624,11 +716,22 @@ export const UniworkConflictHost: React.FC = () => {
             if (!prev && typeof document !== 'undefined') {
               openerRef.current = document.activeElement as HTMLElement | null
             }
+            viewRef.current = incoming
             return incoming
           })
         })
         if (typeof unsub === 'function') {
           unsubs.push(unsub)
+        }
+      }
+      if (typeof bridge.onUniworkConflictClosed === 'function') {
+        const unsubClosed = bridge.onUniworkConflictClosed((sessionId) => {
+          if (viewRef.current && viewRef.current.sessionId === sessionId) {
+            handleClosed()
+          }
+        })
+        if (typeof unsubClosed === 'function') {
+          unsubs.push(unsubClosed)
         }
       }
     }
@@ -637,13 +740,10 @@ export const UniworkConflictHost: React.FC = () => {
         unsub()
       }
     }
-  }, [])
+  }, [handleClosed])
 
   const handleAct = useCallback(
-    async (
-      sessionId: string,
-      action: UniworkConflictAction
-    ): Promise<UniworkConflictReply> => {
+    async (sessionId: string, action: UniworkConflictAction): Promise<UniworkConflictReply> => {
       for (const bridge of getConflictBridges()) {
         if (typeof bridge.uniworkConflictAct === 'function') {
           return await bridge.uniworkConflictAct(sessionId, action)
@@ -651,17 +751,8 @@ export const UniworkConflictHost: React.FC = () => {
       }
       return { kind: 'closed' }
     },
-    []
+    [],
   )
-
-  const handleClosed = useCallback(() => {
-    setView(null)
-    const opener = openerRef.current
-    openerRef.current = null
-    if (opener && typeof opener.focus === 'function' && opener.isConnected) {
-      opener.focus()
-    }
-  }, [])
 
   if (!view) return null
 
@@ -671,6 +762,7 @@ export const UniworkConflictHost: React.FC = () => {
       onAct={handleAct}
       onClosed={handleClosed}
       onViewChange={setView}
+      onViewDiff={onViewDiff}
     />
   )
 }

@@ -9,9 +9,10 @@ import {
   buildConfirmPayload,
   canSubmitReload,
   createInitialConflictState,
+  getActionFailureNotice,
   getReloadStepModel,
   getStep1Model,
-  resolveConflictNotice
+  resolveConflictNotice,
 } from '../src/renderer/src/uniwork-conflict-model'
 
 function makeView(overrides: Partial<UniworkConflictView> = {}): UniworkConflictView {
@@ -33,36 +34,54 @@ function makeView(overrides: Partial<UniworkConflictView> = {}): UniworkConflict
     locked: 'none',
     notice: null,
     noticeArg: null,
-    ...overrides
+    ...overrides,
   }
 }
 
 describe('uniwork-conflict-model (G5-09 S5 desktop)', () => {
-  it('AC2: returns step 1 actions in exact DOM/visual/Tab order with Cancel as default focus (docs vs non-docs)', () => {
-    const docsModel = getStep1Model(makeView({ module: 'docs', canEdit: true }))
-    expect(docsModel.actions.map((a) => a.id)).toEqual([
+  it('AC2 / FE-06: returns step 1 actions in exact DOM/visual/Tab order with Cancel as default focus, rendering View differences only for docs when canViewDiff is true', () => {
+    const docsWithoutHandler = getStep1Model(makeView({ module: 'docs', canEdit: true }))
+    expect(docsWithoutHandler.actions.map((a) => a.id)).toEqual([
+      'reload',
+      'save-copy',
+      'overwrite',
+      'cancel',
+    ])
+    expect(docsWithoutHandler.defaultFocus).toBe('cancel')
+    expect(docsWithoutHandler.noEditKey).toBeNull()
+
+    const docsWithHandler = getStep1Model(makeView({ module: 'docs', canEdit: true }), {
+      canViewDiff: true,
+    })
+    expect(docsWithHandler.actions.map((a) => a.id)).toEqual([
       'view-diff',
       'reload',
       'save-copy',
       'overwrite',
-      'cancel'
+      'cancel',
     ])
-    expect(docsModel.defaultFocus).toBe('cancel')
-    expect(docsModel.noEditKey).toBeNull()
 
-    const sheetsModel = getStep1Model(makeView({ module: 'sheets', canEdit: true }))
-    expect(sheetsModel.actions.map((a) => a.id)).toEqual([
+    const sheetsWithHandler = getStep1Model(makeView({ module: 'sheets', canEdit: true }), {
+      canViewDiff: true,
+    })
+    expect(sheetsWithHandler.actions.map((a) => a.id)).toEqual([
       'reload',
       'save-copy',
       'overwrite',
-      'cancel'
+      'cancel',
     ])
   })
 
-  it('AC5: hides Overwrite and Save-copy when !canEdit and exposes uwConflictNoEdit', () => {
-    const model = getStep1Model(makeView({ canEdit: false, module: 'docs' }))
-    expect(model.actions.map((a) => a.id)).toEqual(['view-diff', 'reload', 'cancel'])
-    expect(model.noEditKey).toBe('uwConflictNoEdit')
+  it('AC5 / FE-06: hides Overwrite and Save-copy when !canEdit and exposes uwConflictNoEdit (with and without canViewDiff)', () => {
+    const modelNoDiff = getStep1Model(makeView({ canEdit: false, module: 'docs' }))
+    expect(modelNoDiff.actions.map((a) => a.id)).toEqual(['reload', 'cancel'])
+    expect(modelNoDiff.noEditKey).toBe('uwConflictNoEdit')
+
+    const modelWithDiff = getStep1Model(makeView({ canEdit: false, module: 'docs' }), {
+      canViewDiff: true,
+    })
+    expect(modelWithDiff.actions.map((a) => a.id)).toEqual(['view-diff', 'reload', 'cancel'])
+    expect(modelWithDiff.noEditKey).toBe('uwConflictNoEdit')
   })
 
   it('AC7: offline disables Reload (unless headOffline) and Save-copy, but keeps Overwrite enabled', () => {
@@ -104,7 +123,7 @@ describe('uniwork-conflict-model (G5-09 S5 desktop)', () => {
     }
   })
 
-  it('AC6: Reload step 2 preselects Keep draft when ok, and disables Keep without preselecting Discard when store_full / keystore_locked / drafts_full', () => {
+  it('AC6 / FE-05: Reload step 2 preselects Keep draft when ok, and disables Keep without preselecting Discard when store_full / keystore_locked / drafts_full while exposing submitReasonKey', () => {
     const okView = makeView({ keepDraft: 'ok' })
     let state = createInitialConflictState(okView)
     state = applyConflictStep1Click(state, okView, 'reload')
@@ -112,11 +131,12 @@ describe('uniwork-conflict-model (G5-09 S5 desktop)', () => {
     const okReload = getReloadStepModel(state, okView)
     expect(okReload.keepDisabled).toBe(false)
     expect(okReload.selectedKeep).toBe('draft')
+    expect(okReload.submitReasonKey).toBeNull()
     expect(canSubmitReload(state, okView)).toBe(true)
     expect(buildConfirmPayload(state, okView)).toEqual({
       kind: 'reload',
       keep: 'draft',
-      stopAi: false
+      stopAi: false,
     })
 
     for (const keepDraft of ['store_full', 'keystore_locked'] as const) {
@@ -126,6 +146,7 @@ describe('uniwork-conflict-model (G5-09 S5 desktop)', () => {
       const reloadModel = getReloadStepModel(blockedState, blockedView)
       expect(reloadModel.keepDisabled).toBe(true)
       expect(reloadModel.keepReasonKey).toBe('uwConflictKeepUnavailable')
+      expect(reloadModel.submitReasonKey).toBe('uwConflictKeepUnavailable')
       expect(reloadModel.showOpenCenter).toBe(false)
       expect(reloadModel.selectedKeep).toBeNull()
       expect(canSubmitReload(blockedState, blockedView)).toBe(false)
@@ -135,11 +156,13 @@ describe('uniwork-conflict-model (G5-09 S5 desktop)', () => {
       expect(canSubmitReload(blockedState, blockedView)).toBe(false)
 
       blockedState = applyConflictSelectKeep(blockedState, blockedView, 'discard')
+      const afterDiscardModel = getReloadStepModel(blockedState, blockedView)
+      expect(afterDiscardModel.submitReasonKey).toBeNull()
       expect(canSubmitReload(blockedState, blockedView)).toBe(true)
       expect(buildConfirmPayload(blockedState, blockedView)).toEqual({
         kind: 'reload',
         keep: 'discard',
-        stopAi: false
+        stopAi: false,
       })
     }
 
@@ -149,6 +172,7 @@ describe('uniwork-conflict-model (G5-09 S5 desktop)', () => {
     const capModel = getReloadStepModel(capState, capView)
     expect(capModel.keepDisabled).toBe(true)
     expect(capModel.keepReasonKey).toBe('uwConflictDraftCapReached')
+    expect(capModel.submitReasonKey).toBe('uwConflictDraftCapReached')
     expect(capModel.keepReasonArgs).toEqual({ cap: '3' })
     expect(capModel.showOpenCenter).toBe(true)
     expect(capModel.selectedKeep).toBeNull()
@@ -172,7 +196,7 @@ describe('uniwork-conflict-model (G5-09 S5 desktop)', () => {
     expect(state.focusTarget).toBe('back')
     expect(buildConfirmPayload(state, view)).toEqual({
       kind: 'overwrite',
-      stopAi: true
+      stopAi: true,
     })
   })
 
@@ -185,14 +209,14 @@ describe('uniwork-conflict-model (G5-09 S5 desktop)', () => {
     const headMovedView = makeView({
       server: { version: 13, savedAt: '2026-10-14T08:05:00Z', by: 'Minh' },
       notice: 'head_moved',
-      noticeArg: '13'
+      noticeArg: '13',
     })
     state = applyConflictViewUpdate(state, headMovedView)
     expect(state.step).toBe('step1')
     expect(state.focusTarget).toBe('cancel')
     expect(resolveConflictNotice(headMovedView)).toEqual({
       key: 'uwConflictHeadMoved',
-      args: { n: '13' }
+      args: { n: '13' },
     })
 
     state = applyConflictStep1Click(state, headMovedView, 'save-copy')
@@ -203,24 +227,33 @@ describe('uniwork-conflict-model (G5-09 S5 desktop)', () => {
     expect(state.step).toBe('save-copy')
     expect(resolveConflictNotice(copyFailedView)).toEqual({
       key: 'uwConflictSaveCopyFailed',
-      args: {}
+      args: {},
     })
 
     const copyDoneView = makeView({
       notice: 'save_copy_done',
-      noticeArg: 'Contract (copy).docx'
+      noticeArg: 'Contract (copy).docx',
     })
     state = applyConflictViewUpdate(state, copyDoneView)
     expect(state.step).toBe('step1')
     expect(state.focusTarget).toBe('cancel')
     expect(resolveConflictNotice(copyDoneView)).toEqual({
       key: 'uwConflictSaveCopyDone',
-      args: { title: 'Contract (copy).docx' }
+      args: { title: 'Contract (copy).docx' },
     })
 
     const revokedView = makeView({ locked: 'revoked' })
     state = applyConflictViewUpdate(state, revokedView)
     expect(state.step).toBe('locked')
     expect(state.focusTarget).toBe('title')
+  })
+
+  it('FE-03: maps rejected conflict actions to their failure notice (or null for cancel)', () => {
+    expect(getActionFailureNotice({ kind: 'reload', keep: 'draft', stopAi: false })).toBe(
+      'reload_failed',
+    )
+    expect(getActionFailureNotice({ kind: 'overwrite', stopAi: false })).toBe('overwrite_failed')
+    expect(getActionFailureNotice({ kind: 'save-copy', stopAi: false })).toBe('save_copy_failed')
+    expect(getActionFailureNotice({ kind: 'cancel' })).toBeNull()
   })
 })
