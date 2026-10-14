@@ -69,8 +69,8 @@
 }
 
 .collab-btn--primary {
-  background: var(--accent, var(--color-brand-secondary));
-  border-color: var(--accent, var(--color-brand-secondary));
+  background: var(--accent, var(--color-btn-primary));
+  border-color: var(--accent, var(--color-btn-primary));
   color: var(--color-btn-primary-text);
 }
 
