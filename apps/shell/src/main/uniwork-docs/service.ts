@@ -2459,7 +2459,15 @@ export class UniworkDocsService {
     }
     const next: Binding = { ...fresh.binding, state: 'dirty' }
     delete next.error
-    return this.coordinator.commitState(fresh, next)
+    // G5-03a FF: guarded by the base just read. A guarded reload/restore can put
+    // a different base in place between that read and the queued write (W4: its
+    // `9/saved` lands after this `10/saved` read); the coordinator compares the
+    // guard inside its chain, so the superseded base is never resurrected as
+    // `dirty` - and a copy the restore made match its base again stays `saved`.
+    return this.coordinator.commitState(fresh, next, {
+      baseRevision: fresh.binding.baseRevision,
+      baseChecksum: fresh.binding.baseChecksum,
+    })
   }
 
   /**
