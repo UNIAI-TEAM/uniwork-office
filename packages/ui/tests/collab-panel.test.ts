@@ -1,7 +1,8 @@
 /** @vitest-environment jsdom */
-import { act, createElement, type ReactNode } from 'react'
+import { act, createElement, useLayoutEffect, useState, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { CollabComposer } from '../src/collab/CollabComposer'
 import { CollabPanel, type CollabPanelProps } from '../src/collab/CollabPanel'
 import type { CollabComposerSlot } from '../src/collab/CollabThread'
 import {
@@ -11,6 +12,7 @@ import {
 } from '../src/collab/use-collab-threads'
 import type { CollabAnchorAdapter, CollabHostState, CollabSource } from '../src/collab/types'
 import { COLLAB_LIVE_REGION_ID } from '../src/collab/live-region'
+import { COMPOSER_STRINGS } from './collab-composer-fixtures'
 import {
   EN,
   UNCHANGED,
@@ -285,9 +287,101 @@ describe('states', () => {
       base_version_id: 'v1',
     })
   })
+
+  it('new root thread (real composer): empty Cancel button and first Esc close composer (Esc still reaches the host); second Esc falls through to host', async () => {
+    const src = fakeSource(list([cm({ id: 'a', anchor: docx(1) })]))
+    await mount(
+      src,
+      host(),
+      { adapter: ad() },
+      {
+        renderComposer: (slot) =>
+          createElement(CollabComposer, { ...slot, strings: { ...EN, ...COMPOSER_STRINGS } }),
+      },
+    )
+
+    await act(async () => ctl.startThread({ anchor: docx(5), base_version_id: 'v1' }))
+    const newCard = $('.collab-thread--new')!
+    expect(newCard).not.toBeNull()
+    const cancelBtn = [...newCard.querySelectorAll<HTMLButtonElement>('button')].find(
+      (b) => b.textContent === EN.collabCancel,
+    )!
+    expect(cancelBtn).toBeTruthy()
+    await act(async () => cancelBtn.click())
+    expect($('.collab-thread--new')).toBeNull()
+
+    await act(async () => ctl.startThread({ anchor: docx(5), base_version_id: 'v1' }))
+    const ta = $<HTMLTextAreaElement>('.collab-thread--new textarea')!
+    expect(ta).not.toBeNull()
+    const hostEsc = vi.fn()
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !e.defaultPrevented) hostEsc()
+    })
+    const firstEsc = new KeyboardEvent('keydown', {
+      key: 'Escape',
+      bubbles: true,
+      cancelable: true,
+    })
+    act(() => {
+      ta.dispatchEvent(firstEsc)
+    })
+    expect(firstEsc.defaultPrevented).toBe(false)
+    expect(hostEsc).toHaveBeenCalledTimes(1)
+    expect($('.collab-thread--new')).toBeNull()
+
+    const secondEsc = new KeyboardEvent('keydown', {
+      key: 'Escape',
+      bubbles: true,
+      cancelable: true,
+    })
+    act(() => {
+      $('aside')!.dispatchEvent(secondEsc)
+    })
+    expect(secondEsc.defaultPrevented).toBe(false)
+    expect(hostEsc).toHaveBeenCalledTimes(2)
+  })
 })
 
 describe('focus', () => {
+  it('a host that closes the pane on the same unconsumed Esc leaves no error and no focus on a detached node', async () => {
+    const src = fakeSource(list([cm({ id: 'a', anchor: docx(1) })], 't1'))
+    const opener = document.createElement('button')
+    document.body.append(opener)
+    const errors: unknown[] = []
+    const onErr = (ev: ErrorEvent) => errors.push(ev.error)
+    window.addEventListener('error', onErr)
+    try {
+      await mount(
+        src,
+        host(),
+        { adapter: ad() },
+        {
+          renderComposer: (slot) =>
+            createElement(CollabComposer, { ...slot, strings: { ...EN, ...COMPOSER_STRINGS } }),
+        },
+      )
+      opener.focus()
+      await act(async () => ctl.startThread({ anchor: docx(5), base_version_id: 'v1' }))
+      const ta = $<HTMLTextAreaElement>('.collab-thread--new textarea')!
+      // the host closes (unmounts) its pane on an Esc nobody consumed
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !e.defaultPrevented) root.render(null)
+      })
+      await act(async () => {
+        ta.dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+        )
+        await flush()
+      })
+      expect($('aside')).toBeNull()
+      expect(errors).toEqual([])
+      expect(document.activeElement?.isConnected).toBe(true)
+    } finally {
+      window.removeEventListener('error', onErr)
+      opener.remove()
+    }
+  })
+
   it('a reload never moves focus', async () => {
     const src = fakeSource(list([cm({ id: 'a' }), cm({ id: 'b' })], 't1'))
     await mount(src)
@@ -367,6 +461,329 @@ describe('focus', () => {
     expect(document.getElementById(COLLAB_LIVE_REGION_ID)!.textContent).toBe(
       EN.collabUpdatedAnnounce,
     )
+  })
+
+  it('new-thread Send (button and Ctrl+Enter) moves focus to the created thread heading instead of BODY', async () => {
+    const src = fakeSource(list([cm({ id: 'a', anchor: docx(1) })], 't1'))
+    const nativeSet = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+    await mount(
+      src,
+      host(),
+      { adapter: ad() },
+      {
+        renderComposer: (slot) =>
+          createElement(CollabComposer, { ...slot, strings: { ...EN, ...COMPOSER_STRINGS } }),
+      },
+    )
+
+    // 1. Send via Ctrl+Enter -> focuses created thread heading 'n1'
+    src.list.mockResolvedValueOnce(
+      list([cm({ id: 'a', anchor: docx(1) }), cm({ id: 'n1', anchor: docx(5) })], 't2'),
+    )
+    await act(async () => ctl.startThread({ anchor: docx(5), base_version_id: 'v1' }))
+    let ta = $<HTMLTextAreaElement>('.collab-thread--new textarea')!
+    expect(document.activeElement).toBe(ta)
+    act(() => {
+      nativeSet.call(ta, 'Created by keyboard')
+      ta.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await act(async () => {
+      ta.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true }))
+      await flush()
+    })
+    expect($('.collab-thread--new')).toBeNull()
+    expect(document.activeElement).toBe($('[data-thread-id="n1"] [data-thread-heading]'))
+
+    // 2. Send via Send button -> focuses created thread heading 'n2'
+    src.list.mockResolvedValueOnce(
+      list(
+        [
+          cm({ id: 'a', anchor: docx(1) }),
+          cm({ id: 'n1', anchor: docx(5) }),
+          cm({ id: 'n2', anchor: docx(9) }),
+        ],
+        't3',
+      ),
+    )
+    await act(async () => ctl.startThread({ anchor: docx(9), base_version_id: 'v1' }))
+    ta = $<HTMLTextAreaElement>('.collab-thread--new textarea')!
+    act(() => {
+      nativeSet.call(ta, 'Created by button')
+      ta.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    const sendBtn = $<HTMLButtonElement>('.collab-thread--new .collab-composer-send')!
+    await act(async () => {
+      sendBtn.click()
+      await flush()
+    })
+    expect($('.collab-thread--new')).toBeNull()
+    expect(document.activeElement).toBe($('[data-thread-id="n2"] [data-thread-heading]'))
+  })
+
+  it('new-thread Send when created thread is hidden does not steal focus from outside the panel on a later reload (FEK-3)', async () => {
+    const src = fakeSource(list([cm({ id: 'a', anchor: docx(1) })], 't1'))
+    const nativeSet = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+    const outsideEditor = document.createElement('button')
+    outsideEditor.textContent = 'Editor Canvas'
+    document.body.append(outsideEditor)
+    try {
+      await mount(
+        src,
+        host(),
+        { adapter: ad() },
+        {
+          renderComposer: (slot) =>
+            createElement(CollabComposer, { ...slot, strings: { ...EN, ...COMPOSER_STRINGS } }),
+        },
+      )
+
+      // Post-send reload hides the created thread (resolved while resolvedOpen is false)
+      src.list.mockResolvedValueOnce(
+        list(
+          [
+            cm({ id: 'a', anchor: docx(1) }),
+            cm({ id: 'n-hidden', anchor: docx(5), resolved_at: '2026-10-12T10:00:00Z' }),
+          ],
+          't2',
+        ),
+      )
+      await act(async () => ctl.startThread({ anchor: docx(5), base_version_id: 'v1' }))
+      const ta = $<HTMLTextAreaElement>('.collab-thread--new textarea')!
+      act(() => {
+        nativeSet.call(ta, 'Resolved right away')
+        ta.dispatchEvent(new Event('input', { bubbles: true }))
+      })
+      const sendBtn = $<HTMLButtonElement>('.collab-thread--new .collab-composer-send')!
+      await act(async () => {
+        sendBtn.click()
+        await flush()
+      })
+      expect($('.collab-thread--new')).toBeNull()
+
+      // User moves focus outside the panel (into the editor)
+      outsideEditor.focus()
+      expect(document.activeElement).toBe(outsideEditor)
+
+      // Another user's thread arrives on a later reload -> focus must NOT move from outsideEditor
+      await reloadWith(
+        src,
+        list(
+          [
+            cm({ id: 'a', anchor: docx(1) }),
+            cm({ id: 'n-hidden', anchor: docx(5), resolved_at: '2026-10-12T10:00:00Z' }),
+            cm({ id: 'other-user', anchor: docx(9) }),
+          ],
+          't3',
+        ),
+      )
+      expect(document.activeElement).toBe(outsideEditor)
+    } finally {
+      outsideEditor.remove()
+    }
+  })
+
+  it('new-thread Cancel and Discard restore focus to the opener button (or adjacent thread heading when no opener button)', async () => {
+    const src = fakeSource(list([cm({ id: 'a', anchor: docx(1) })], 't1'))
+    const nativeSet = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+    const opener = document.createElement('button')
+    opener.textContent = 'New Comment'
+    document.body.append(opener)
+    const onCancelThread = vi.fn()
+    try {
+      await mount(
+        src,
+        host(),
+        { adapter: ad() },
+        {
+          onCancelThread,
+          renderComposer: (slot) =>
+            createElement(CollabComposer, { ...slot, strings: { ...EN, ...COMPOSER_STRINGS } }),
+        },
+      )
+
+      // 1. Opened from focused opener button -> Escape on empty restores focus to opener
+      opener.focus()
+      await act(async () => ctl.startThread({ anchor: docx(5), base_version_id: 'v1' }))
+      let ta = $<HTMLTextAreaElement>('.collab-thread--new textarea')!
+      expect(document.activeElement).toBe(ta)
+      act(() => {
+        ta.dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+        )
+      })
+      expect($('.collab-thread--new')).toBeNull()
+      expect(onCancelThread).toHaveBeenCalledTimes(1)
+      expect(document.activeElement).toBe(opener)
+
+      // 2. Opened from focused opener button -> Cancel with draft -> Discard restores focus to opener
+      opener.focus()
+      await act(async () => ctl.startThread({ anchor: docx(5), base_version_id: 'v1' }))
+      ta = $<HTMLTextAreaElement>('.collab-thread--new textarea')!
+      act(() => {
+        nativeSet.call(ta, 'will discard')
+        ta.dispatchEvent(new Event('input', { bubbles: true }))
+      })
+      const cancelBtn = [...$$('.collab-thread--new button')].find(
+        (b) => b.textContent === EN.collabCancel,
+      )!
+      act(() => cancelBtn.click())
+      const discardBtn = [
+        ...document.querySelectorAll<HTMLButtonElement>('[role=dialog] button'),
+      ].find((b) => b.textContent === EN.collabDiscard)!
+      act(() => discardBtn.click())
+      expect($('.collab-thread--new')).toBeNull()
+      expect(onCancelThread).toHaveBeenCalledTimes(2)
+      expect(document.activeElement).toBe(opener)
+
+      // 3. Opened without a focused opener button (e.g. document.body) -> Cancel moves focus to adjacent thread heading
+      act(() => (document.activeElement as HTMLElement | null)?.blur())
+      await act(async () => ctl.startThread({ anchor: docx(5), base_version_id: 'v1' }))
+      const cancelBtn2 = [...$$('.collab-thread--new button')].find(
+        (b) => b.textContent === EN.collabCancel,
+      )!
+      act(() => cancelBtn2.click())
+      expect($('.collab-thread--new')).toBeNull()
+      expect(document.activeElement).toBe($('[data-thread-id="a"] [data-thread-heading]'))
+    } finally {
+      opener.remove()
+    }
+  })
+
+  it('captures newThreadOpenerRef in useLayoutEffect on [ctl.newThread] rather than during render (FEK-4)', async () => {
+    const src = fakeSource(list([cm({ id: 'a', anchor: docx(1) })], 't1'))
+    const opener = document.createElement('button')
+    opener.textContent = 'Toolbar Comment'
+    document.body.append(opener)
+    try {
+      await act(async () => {
+        function SiblingFocusOnStart(p: { active: boolean }) {
+          useLayoutEffect(() => {
+            if (p.active) opener.focus()
+          }, [p.active])
+          return null
+        }
+        function HostWithSibling() {
+          ctl = useCollabThreads(src, host(), { strings: EN, adapter: ad() })
+          return createElement(
+            'div',
+            null,
+            createElement(SiblingFocusOnStart, { active: ctl.newThread !== null }),
+            createElement(CollabPanel, {
+              controller: ctl,
+              strings: EN,
+              onClose: () => {},
+              renderComposer: (slot) =>
+                createElement(CollabComposer, { ...slot, strings: { ...EN, ...COMPOSER_STRINGS } }),
+            }),
+          )
+        }
+        root.render(createElement(HostWithSibling))
+        await flush()
+      })
+
+      act(() => (document.activeElement as HTMLElement | null)?.blur())
+      await act(async () => ctl.startThread({ anchor: docx(5), base_version_id: 'v1' }))
+      const ta = $<HTMLTextAreaElement>('.collab-thread--new textarea')!
+      expect(document.activeElement).toBe(ta)
+      act(() => {
+        ta.dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+        )
+      })
+      expect($('.collab-thread--new')).toBeNull()
+      expect(document.activeElement).toBe(opener)
+    } finally {
+      opener.remove()
+    }
+  })
+
+  it('calling startThread while a new-thread composer is already open moves focus back into the composer (V14-04)', async () => {
+    const src = fakeSource(list([cm({ id: 'a', anchor: docx(1) })], 't1'))
+    const nativeSet = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+    await mount(
+      src,
+      host(),
+      { adapter: ad() },
+      {
+        renderComposer: (slot) =>
+          createElement(CollabComposer, { ...slot, strings: { ...EN, ...COMPOSER_STRINGS } }),
+      },
+    )
+    await act(async () => ctl.startThread({ anchor: docx(5), base_version_id: 'v1' }))
+    const ta = $<HTMLTextAreaElement>('.collab-thread--new textarea')!
+    act(() => {
+      nativeSet.call(ta, 'keep my draft')
+      ta.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    const goBtn = $<HTMLButtonElement>('[data-thread-id="a"] .collab-link')!
+    act(() => goBtn.focus())
+    expect(document.activeElement).toBe(goBtn)
+    await act(async () => ctl.startThread({ anchor: docx(5), base_version_id: 'v1' }))
+    expect(document.activeElement).toBe($('.collab-thread--new textarea'))
+    expect($<HTMLTextAreaElement>('.collab-thread--new textarea')!.value).toBe('keep my draft')
+  })
+
+  it('Close button restores focus to the host opener button (via mount capture or openerRef / onRestoreFocus)', async () => {
+    const src = fakeSource(list([cm({ id: 'a' })]))
+    const opener = document.createElement('button')
+    opener.textContent = 'Comments Pane'
+    document.body.append(opener)
+    try {
+      // 1. Automatic capture of activeElement when CollabPanel mounts, plus unmount on onClose
+      opener.focus()
+      await act(async () => {
+        function HostWithOpen() {
+          const [open, setOpen] = useState(true)
+          ctl = useCollabThreads(src, host(), { strings: EN })
+          if (!open) return null
+          return createElement(CollabPanel, {
+            controller: ctl,
+            strings: EN,
+            onClose: () => setOpen(false),
+            renderComposer,
+          })
+        }
+        root.render(createElement(HostWithOpen))
+        await flush()
+      })
+      const closeBtn = $<HTMLButtonElement>('button.collab-close')!
+      act(() => closeBtn.focus())
+      await act(async () => {
+        closeBtn.click()
+        await flush()
+      })
+      expect($('aside')).toBeNull()
+      expect(document.activeElement).toBe(opener)
+
+      // 2. Explicit openerRef and onRestoreFocus prop on CollabPanelProps
+      const explicitOpener = document.createElement('button')
+      document.body.append(explicitOpener)
+      const onRestoreFocus = vi.fn()
+      try {
+        act(() => (document.activeElement as HTMLElement | null)?.blur())
+        await mount(
+          src,
+          host(),
+          {},
+          {
+            openerRef: { current: explicitOpener },
+            onRestoreFocus,
+          },
+        )
+        const closeBtn2 = $<HTMLButtonElement>('button.collab-close')!
+        act(() => closeBtn2.focus())
+        await act(async () => {
+          closeBtn2.click()
+          await flush()
+        })
+        expect(onRestoreFocus).toHaveBeenCalledTimes(1)
+        expect(document.activeElement).toBe(explicitOpener)
+      } finally {
+        explicitOpener.remove()
+      }
+    } finally {
+      opener.remove()
+    }
   })
 })
 
