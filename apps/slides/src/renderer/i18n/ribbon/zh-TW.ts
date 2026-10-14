@@ -208,6 +208,7 @@ export const zhTW = {
   ribbonGroupComments: '註解',
   ribbonComment: '註解',
   ribbonNewCommentTip: '在目前頁新增註解（寫入 pptx，PowerPoint 中可見）',
+  ribbonNewCommentServerTip: '在目前頁新增註解（與開啟此簡報的所有人共用，不寫入檔案）',
   ribbonInsertTextBoxTip: '插入文字方塊',
   ribbonWordArt: '文字藝術師',
   ribbonWordArtTip: '插入文字藝術師（大型填滿/外框樣式文字）',

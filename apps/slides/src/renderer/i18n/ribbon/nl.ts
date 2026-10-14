@@ -219,6 +219,8 @@ export const nl = {
   ribbonComment: 'Opmerking',
   ribbonNewCommentTip:
     'Nieuwe opmerking op de huidige dia (opgeslagen in pptx, zichtbaar in PowerPoint)',
+  ribbonNewCommentServerTip:
+    'Nieuwe opmerking op de huidige dia (gedeeld met iedereen die deze presentatie opent, niet in het bestand opgeslagen)',
   ribbonInsertTextBoxTip: 'Een tekstvak invoegen',
   ribbonWordArt: 'WordArt',
   ribbonWordArtTip: 'WordArt invoegen (grote tekst met opvulling/contour)',
