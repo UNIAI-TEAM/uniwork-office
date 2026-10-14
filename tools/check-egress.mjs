@@ -35,7 +35,14 @@ export const PATTERNS = [
  * Reasoned exemptions: { path (repo-relative, forward slashes), pattern id, reason }.
  * Keep it short; every entry needs a reason a reviewer can check.
  */
-export const ALLOWLIST = []
+export const ALLOWLIST = [
+  {
+    path: 'packages/agent-core/src/redact-range.ts',
+    pattern: 'genspark.ai',
+    reason:
+      "XML namespace of the stored 'hidden from the model' marker (a go:redact element in a docx run's rPr and inside a pptx <a:ext>). It is part of the document format: renaming it makes Word and PowerPoint treat the file as corrupt and repair drops the run carrying the mark. A document identifier, never rendered and never contacted.",
+  },
+]
 
 const SCOPE = [
   /^apps\/[^/]+\/(src|scripts|native|build)\//,
