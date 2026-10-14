@@ -650,10 +650,8 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   ipcMain.handle(UNIWORK_DOC_CHANNELS.resolveConflict, (_event, path: unknown) =>
     service.resolveConflict(path as string),
   )
-  ipcMain.handle(
-    UNIWORK_DOC_CHANNELS.conflictAct,
-    (_event, sessionId: unknown, action: unknown) =>
-      service.conflictAct(sessionId as string, action as UniworkConflictAction),
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.conflictAct, (_event, sessionId: unknown, action: unknown) =>
+    service.conflictAct(sessionId as string, action as UniworkConflictAction),
   )
   // G5-03a: the S6 bar's actions. The barInset handler is NOT registered here:
   // it belongs to the window chrome (index.ts, W2).

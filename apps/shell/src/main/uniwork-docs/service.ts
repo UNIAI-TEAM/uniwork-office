@@ -3384,9 +3384,7 @@ export class UniworkDocsService {
     if (open.locked) {
       return { kind: 'view', view: await this.buildConflictView(open, { fetchServer: false }) }
     }
-    const chosen = open.remoteNotice
-      ? this.sameLiveDoc(open.doc)
-      : this.stillInConflict(open.doc)
+    const chosen = open.remoteNotice ? this.sameLiveDoc(open.doc) : this.stillInConflict(open.doc)
     if (!chosen) {
       open.controller.abort()
       open.finish()
@@ -3432,10 +3430,7 @@ export class UniworkDocsService {
     if (fresh) session.doc = fresh
     const b = session.doc.binding
     if (b.serverRevision) session.knownServerRevision = b.serverRevision
-    if (
-      b.state === 'blocked' &&
-      (b.error === 'permission_revoked' || b.error === 'forbidden')
-    ) {
+    if (b.state === 'blocked' && (b.error === 'permission_revoked' || b.error === 'forbidden')) {
       session.locked = 'revoked'
       session.knownCanEdit = false
     } else if (
@@ -3521,9 +3516,7 @@ export class UniworkDocsService {
           : b.format === 'pptx'
             ? 'slides'
             : 'other'
-    const canEdit = session.locked
-      ? false
-      : (session.knownCanEdit ?? (b.access === 'edit'))
+    const canEdit = session.locked ? false : (session.knownCanEdit ?? b.access === 'edit')
 
     return {
       sessionId: session.sessionId,
@@ -3571,7 +3564,8 @@ export class UniworkDocsService {
         } catch {
           fileBytes = 0
         }
-        const overhead = (existing.length === 0 ? 220 : 120) + Buffer.byteLength(doc.binding.title, 'utf8')
+        const overhead =
+          (existing.length === 0 ? 220 : 120) + Buffer.byteLength(doc.binding.title, 'utf8')
         if (usage.bytes + fileBytes + overhead > usage.budgetBytes) {
           return 'store_full'
         }
@@ -3759,8 +3753,7 @@ export class UniworkDocsService {
         view: {
           ...refreshed,
           notice: 'head_moved',
-          noticeArg:
-            open.knownServerVersion !== null ? String(open.knownServerVersion) : null,
+          noticeArg: open.knownServerVersion !== null ? String(open.knownServerVersion) : null,
         },
       }
     }

@@ -11,11 +11,7 @@ export type UniworkConflictKeepDraft = 'ok' | 'drafts_full' | 'store_full' | 'ke
 
 /** one line in the dialog's alert region (`role=alert`), null = none */
 export type UniworkConflictNotice =
-  | 'head_moved'
-  | 'reload_failed'
-  | 'overwrite_failed'
-  | 'save_copy_done'
-  | 'save_copy_failed'
+  'head_moved' | 'reload_failed' | 'overwrite_failed' | 'save_copy_done' | 'save_copy_failed'
 
 export interface UniworkConflictView {
   /** a fresh id per opened dialog; every answer echoes it */
@@ -54,6 +50,4 @@ export type UniworkConflictAction =
  * 'view' = stay open and re-render with the new view (head moved, failure,
  * save-copy done/failed, lock while open).
  */
-export type UniworkConflictReply =
-  | { kind: 'closed' }
-  | { kind: 'view'; view: UniworkConflictView }
+export type UniworkConflictReply = { kind: 'closed' } | { kind: 'view'; view: UniworkConflictView }

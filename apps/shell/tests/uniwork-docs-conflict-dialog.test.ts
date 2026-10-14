@@ -55,7 +55,9 @@ type Fault = {
   fields?: Record<string, unknown>
 }
 
-function fakeServer(initial: { bytes: Uint8Array; myLevel?: string; title?: string } = { bytes: enc('v3') }) {
+function fakeServer(
+  initial: { bytes: Uint8Array; myLevel?: string; title?: string } = { bytes: enc('v3') },
+) {
   const state = {
     revision: 41,
     version: 3,
@@ -295,7 +297,10 @@ function binding(path: string): Binding {
   return JSON.parse(readFileSync(join(dirname(path), BINDING_FILE), 'utf8')) as Binding
 }
 
-async function openAndConflict(ctx: ReturnType<typeof setup>, server: ReturnType<typeof fakeServer>) {
+async function openAndConflict(
+  ctx: ReturnType<typeof setup>,
+  server: ReturnType<typeof fakeServer>,
+) {
   const opened = await ctx.service.openDocument(DOC)
   if (!opened.ok) throw new Error(`open failed: ${opened.error}`)
   const path = opened.value.path
@@ -377,8 +382,12 @@ describe('G5-09 desktop conflict dialog S5 session (main)', () => {
     expect(reply).toEqual({ kind: 'closed' })
     expect(await resolvePromise).toMatchObject({ state: 'saved' })
     expect(binding(path)).toMatchObject({ state: 'saved', baseRevision: '46', baseVersion: 5 })
-    const commitCalls = server.calls.filter((c) => c.path.endsWith('/versions/commit') && c.method === 'POST')
-    expect(commitCalls.at(-1)?.headers['idempotency-key']).not.toBe(oldIntent?.intent.idempotencyKey)
+    const commitCalls = server.calls.filter(
+      (c) => c.path.endsWith('/versions/commit') && c.method === 'POST',
+    )
+    expect(commitCalls.at(-1)?.headers['idempotency-key']).not.toBe(
+      oldIntent?.intent.idempotencyKey,
+    )
     expect(commitCalls.at(-1)?.body).toMatchObject({ base_revision: '45' })
   })
 
@@ -721,9 +730,9 @@ describe('G5-09 desktop conflict dialog S5 session (main)', () => {
     ctx.service.noteActivePath(undefined)
     expect(ctx.closedSessions).toEqual([sessionId1])
     expect(await p1).toMatchObject({ state: 'conflict' })
-    expect(
-      await ctx.service.conflictAct(sessionId1, { kind: 'overwrite', stopAi: false }),
-    ).toEqual({ kind: 'closed' })
+    expect(await ctx.service.conflictAct(sessionId1, { kind: 'overwrite', stopAi: false })).toEqual(
+      { kind: 'closed' },
+    )
 
     // Language switch (closeConflictPrompt) also pushes close once with the session id
     const p2 = ctx.service.resolveConflict(path)
