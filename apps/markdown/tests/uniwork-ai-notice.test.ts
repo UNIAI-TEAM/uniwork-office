@@ -203,17 +203,22 @@ describe('UniWork AI notices (markdown panel)', () => {
 
   it('one persistent aria-live region is mounted before the notice, and the note lands inside it', async () => {
     await started()
-    const live = container!.querySelector('.ai-msg-assistant [aria-live="polite"]')
+    const chatEl = container!.querySelector('.ai-chat')
+    expect(chatEl?.hasAttribute('aria-live')).toBe(false)
+    expect(chatEl?.getAttribute('aria-busy')).toBe('true')
+    expect(container!.querySelector('.ai-msg-assistant [aria-live]')).toBeNull()
+    const live = container!.querySelector('.ai-sr-status')
     expect(live, 'live region before any notice').not.toBeNull()
+    expect(live!.getAttribute('aria-live')).toBe('polite')
     expect(live!.textContent).toBe('')
     // a plain aria-live container: role=status would collide with the app's own status nodes
     expect(live!.hasAttribute('role')).toBe(false)
     await notify({ kind: 'rate-limit-wait', seconds: 30, attempt: 1 })
-    // the same node (not a new one mounted with its text) now holds the note, and nothing else announces
-    expect(container!.querySelector('.ai-msg-assistant [aria-live="polite"]')).toBe(live)
+    // the same node (not a new one mounted with its text) now holds the note, and nothing else in .ai-chat announces
+    expect(container!.querySelector('.ai-sr-status')).toBe(live)
     expect(live!.textContent).toBe(ui('aiErrRateLimited', { seconds: 30 }))
     expect(container!.querySelectorAll('.ai-msg-notice [role="status"]')).toHaveLength(0)
-    expect(live!.querySelectorAll('.ai-msg-notice')).toHaveLength(1)
+    expect(container!.querySelectorAll('.ai-msg-notice')).toHaveLength(1)
     // a restart note joins the wait line in the same region
     await notify({ kind: 'conversation-restarted' })
     expect(live!.textContent).toContain(ui('aiConversationRestarted'))
@@ -277,5 +282,34 @@ describe('UniWork AI notices (markdown panel)', () => {
       ui('aiErrViewOnlyEdit'),
       ui('aiErrUnsupported', { module: 'Markdown' }),
     ])
+  })
+
+  it('when UniWork AI is selected, renders result chip as first words of answer node and announces once in panel live node', async () => {
+    await started()
+    ;(window as any).markdownApi.getAiSettings = vi.fn(async () => ({
+      ...usableAiSettings(),
+      provider: 'uniwork',
+    }))
+    // re-trigger settings sync via focus
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'))
+    })
+    await flush()
+    const chatEl = container!.querySelector('.ai-chat')
+    expect(chatEl?.hasAttribute('aria-live')).toBe(false)
+    expect(chatEl?.getAttribute('aria-busy')).toBe('true')
+    await act(async () => harness.events.onText('Rewritten paragraph.'))
+    await act(async () =>
+      harness.events.onDone({ text: 'Rewritten paragraph.', cancelled: false, turnLimit: false }),
+    )
+    expect(chatEl?.hasAttribute('aria-busy')).toBe(false)
+    const chipEl = container!.querySelector('.ai-result-chip')
+    expect(chipEl).not.toBeNull()
+    expect(chipEl?.textContent).toBe(ui('aiResultAnswer'))
+    const answerNode = chipEl?.parentElement
+    expect(answerNode?.textContent?.startsWith(`${ui('aiResultAnswer')}:`)).toBe(true)
+    const live = container!.querySelector('.ai-sr-status')
+    expect(live?.textContent).toContain(ui('aiResultAnswer'))
+    expect(live?.textContent).toContain('Rewritten paragraph.')
   })
 })

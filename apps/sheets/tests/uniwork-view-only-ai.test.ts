@@ -119,10 +119,11 @@ describe('view-only wiring', () => {
     expect(appSrc).toContain('aiViewOnly={aiViewOnly}')
   })
 
-  it('disables the editing ribbon AI action and shows the composer notice', () => {
+  it('disables the editing ribbon AI action and shows the composer notice for BYOK and viewOnly sub-line for UniWork AI', () => {
     expect(shellSrc).toMatch(/aiViewOnly \?[\s\S]*?disabled[\s\S]*?t\('aiViewOnlyNotice'\)/)
     expect(shellSrc).toContain('viewOnly={aiViewOnly}')
-    expect(panelSrc).toMatch(/viewOnly && \(\s*<div className="ai-readonly-notice"/)
+    expect(panelSrc).toMatch(/viewOnly && !isUniwork && \(\s*<div className="ai-readonly-notice"/)
+    expect(panelSrc).toContain('viewOnly={isUniwork && viewOnly ? true : undefined}')
   })
 })
 

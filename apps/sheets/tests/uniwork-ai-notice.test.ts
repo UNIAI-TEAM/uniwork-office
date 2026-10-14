@@ -406,5 +406,87 @@ describe('a refused UniWork AI question (too long, rejected): no Retry, the ques
       const c = mount(markRunFailed([user, streaming], 'server fell over'))
       expect(c.querySelector('.ai-retry-btn')).not.toBeNull()
     })
+
+    it('renders result chip as first words of answer node, cellsMeta, Xem thay đổi, and announces finished answer once for UniWork AI', async () => {
+      vi.stubGlobal(
+        'desktopApi',
+        new Proxy(
+          {},
+          {
+            get: (_t, prop: string) =>
+              prop === 'getAiSettings'
+                ? () => Promise.resolve({ provider: 'uniwork', providers: {} })
+                : /^on[A-Z]/.test(prop)
+                  ? () => () => {}
+                  : () => Promise.resolve(undefined),
+          },
+        ),
+      )
+      container = document.createElement('div')
+      document.body.appendChild(container)
+      root = createRoot(container)
+      const onCitation = vi.fn()
+      const editedEntry: AiChatMessage = {
+        role: 'assistant',
+        text: 'Đã cập nhật 12 ô tại Sheet1!B4:C9.',
+        tools: [{ name: 'propose_operations', summary: 'Wrote 12 cells in Sheet1!B4:C9 (4 overwritten)', isError: false }],
+        streaming: false,
+        autoApplied: { opCount: 12, undoSteps: 1 },
+      }
+      await act(async () => {
+        root!.render(
+          createElement(
+            LocaleProvider,
+            { initial: 'vi', children: null },
+            createElement(AiChatPanel, {
+              isOpen: true,
+              hasContent: true,
+              chat: [user, editedEntry],
+              attachments: [],
+              attachNotice: null,
+              onPickAttachments: () => {},
+              onAddAttachmentPaths: () => {},
+              onAddPastedImage: () => {},
+              onRemoveAttachment: () => {},
+              prompt: '',
+              preview: null,
+              aiBusy: false,
+              onPromptChange: () => {},
+              onSend: () => {},
+              onStop: () => {},
+              onNewChat: () => {},
+              onUndo: () => {},
+              scopeRange: null,
+              scopeColumns: null,
+              scopeLocked: false,
+              onScopeDismiss: () => {},
+              onCitation,
+              onExpand: () => {},
+              onCollapse: () => {},
+            }),
+          ),
+        )
+        await Promise.resolve()
+      })
+      const chatEl = container.querySelector('.ai-chat')
+      expect(chatEl?.hasAttribute('aria-live')).toBe(false)
+      expect(chatEl?.hasAttribute('aria-busy')).toBe(false)
+      const chipEl = container.querySelector('.ai-result-chip')
+      expect(chipEl).not.toBeNull()
+      expect(chipEl?.textContent).toBe(tr('aiResultEdited'))
+      const answerNode = chipEl?.parentElement
+      expect(answerNode?.textContent?.startsWith(`${tr('aiResultEdited')}:`)).toBe(true)
+      expect(container.textContent).toContain(
+        tr('aiResultCellsMeta', { written: 12, range: 'Sheet1!B4:C9', overwritten: 4 }),
+      )
+      expect(container.textContent).toContain(tr('aiResultEditedHint'))
+      const viewChangesBtn = container.querySelector<HTMLButtonElement>('.ai-result-view-changes')
+      expect(viewChangesBtn?.textContent).toBe(tr('aiResultViewChanges'))
+      act(() => viewChangesBtn?.click())
+      expect(onCitation).toHaveBeenCalled()
+      const live = container.querySelector('.ai-sr-status')
+      expect(live?.textContent).toContain(tr('aiResultEdited'))
+      expect(live?.textContent).toContain('Đã cập nhật 12 ô tại Sheet1!B4:C9.')
+    })
   })
 })
