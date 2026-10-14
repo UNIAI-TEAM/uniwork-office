@@ -196,6 +196,20 @@ const bar = () => host.querySelector<HTMLElement>('.uw-remote-bar')
 const button = (action: string) =>
   host.querySelector<HTMLButtonElement>(`.uw-remote-action[data-action="${action}"]`)
 
+/** counts the sentences the live nodes were given (each announcement mounts a fresh child) */
+function watchAnnouncements(): { count: () => number; stop: () => void } {
+  let added = 0
+  const observer = new MutationObserver((records) => {
+    for (const record of records) {
+      if (!(record.target instanceof HTMLElement)) continue
+      if (!record.target.classList.contains('uw-sr-only')) continue
+      added += Array.from(record.addedNodes).filter((n) => n instanceof HTMLElement).length
+    }
+  })
+  observer.observe(host, { childList: true, subtree: true })
+  return { count: () => added, stop: () => observer.disconnect() }
+}
+
 async function click(el: HTMLElement | null): Promise<void> {
   expect(el, 'element to click').toBeTruthy()
   await act(async () => {
@@ -416,6 +430,30 @@ describe('UniworkRemoteBar: actions', () => {
     await mount(status({ kind: 'newer-dirty', version: 5 }))
     expect(bars()).toHaveLength(1)
     expect(bar()!.querySelector('.uw-remote-message')!.textContent).toContain('version 5')
+  })
+
+  it('Later holds for the notice, not for its wait: a settled commit keeps the bar hidden, a newer version brings it back', async () => {
+    await mount(status({ kind: 'newer-dirty', version: 4, wait: 'commit' }))
+    expect(button('later')!.hasAttribute('aria-disabled')).toBe(false)
+    await click(button('later'))
+    expect(bar()).toBeNull()
+    const watch = watchAnnouncements()
+    // the commit settled: main drops `wait`, same version, same notice
+    await mount(status({ kind: 'newer-dirty', version: 4 }))
+    expect(bar()).toBeNull()
+    // the same version as an AI notice is still the put-off notice
+    await mount(status({ kind: 'newer-ai', version: 4 }))
+    expect(bar()).toBeNull()
+    expect(watch.count()).toBe(0)
+    // a newer revision shows it again, once, announced
+    await mount(status({ kind: 'newer-dirty', version: 5 }))
+    expect(bars()).toHaveLength(1)
+    expect(bar()!.querySelector('.uw-remote-message')!.textContent).toContain('version 5')
+    expect(watch.count()).toBe(1)
+    expect(host.querySelector('[role="status"]')!.textContent).toBe(
+      text('en', 'uwRemoteNewerDirty', { n: 5 }),
+    )
+    watch.stop()
   })
 
   it('Close (updated, revoked) calls the bridge and hides the bar', async () => {

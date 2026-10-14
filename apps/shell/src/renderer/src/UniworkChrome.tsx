@@ -345,6 +345,18 @@ function remoteSignature(status: UniworkDocStatus | null): string | null {
   return status?.remote ? JSON.stringify(status.remote) : null
 }
 
+/**
+ * The identity of the notice a user closed or put off. A newer revision is the same notice
+ * whatever it waits for (a commit in flight, a stuck one) and whether it is dirty or AI: only a
+ * higher version is a new one. Every other kind is its whole state.
+ */
+function remoteNoticeKey(status: UniworkDocStatus | null): string | null {
+  const remote = status?.remote
+  if (!remote) return null
+  if (remote.kind === 'newer-dirty' || remote.kind === 'newer-ai') return `newer\n${remote.version}`
+  return JSON.stringify(remote)
+}
+
 interface RemoteSay {
   key: StringKey
   params: Record<string, string | number>
@@ -357,7 +369,7 @@ interface RemoteSay {
  * notice replaces its version). The sentence on screen is not live: it is read once through
  * the window-level live nodes below, polite for a newer version, alert for the error kinds.
  * `Later` / `Close` hide the bar here at once and tell main; a bar that main later replaces
- * with another one (a newer version, another kind) shows again.
+ * with another notice (a newer version, another kind) shows again.
  */
 export function UniworkRemoteBar({
   status,
@@ -371,9 +383,10 @@ export function UniworkRemoteBar({
   const model = status ? remoteBarModelOf(status) : null
   const path = status ? pathKey(status.path) : null
   const signature = remoteSignature(status)
-  // paths whose current bar was closed / put off, with the bar's signature
+  const noticeKey = remoteNoticeKey(status)
+  // paths whose current notice was closed / put off, with the notice's identity
   const [hidden, setHidden] = useState<ReadonlyMap<string, string>>(new Map())
-  const hiddenHere = path !== null && signature !== null && hidden.get(path) === signature
+  const hiddenHere = path !== null && noticeKey !== null && hidden.get(path) === noticeKey
   const visible = Boolean(model) && !hiddenHere
   const [hovered, setHovered] = useState(false)
   const [focused, setFocused] = useState(false)
@@ -383,9 +396,9 @@ export function UniworkRemoteBar({
   const heightRef = useRef(0)
 
   const hide = useCallback(() => {
-    if (path === null || signature === null) return
-    setHidden((prev) => new Map(prev).set(path, signature))
-  }, [path, signature])
+    if (path === null || noticeKey === null) return
+    setHidden((prev) => new Map(prev).set(path, noticeKey))
+  }, [path, noticeKey])
 
   const act = useCallback(
     (kind: RemoteBarAction['kind']) => {
@@ -403,15 +416,15 @@ export function UniworkRemoteBar({
     [status, hide, onStatus],
   )
 
-  // a closed bar is forgotten once the document has no bar, or another one
+  // a closed bar is forgotten once the document has no bar, or another notice
   useEffect(() => {
-    if (path === null || hidden.get(path) === undefined || hidden.get(path) === signature) return
+    if (path === null || hidden.get(path) === undefined || hidden.get(path) === noticeKey) return
     setHidden((prev) => {
       const next = new Map(prev)
       next.delete(path)
       return next
     })
-  }, [path, signature, hidden])
+  }, [path, noticeKey, hidden])
 
   // announced once per bar that appears
   const shownKey = visible && model && path ? `${path}\n${signature}` : null
