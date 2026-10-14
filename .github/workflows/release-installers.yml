@@ -21,8 +21,13 @@ name: Release installers
 # fails the meta job before anything is built.
 #
 # <version> must equal apps/shell/package.json. Stable is refused while builds
-# are unsigned. Auto-update stays off: no GENOFFICE_UPDATE_URL, --publish never,
-# and the output is checked for app-update.yml. A tag must point at a commit
+# are unsigned. Auto-update reads the GitHub releases of this repository:
+# UNIWORK_UPDATE_URL bakes the github feed into the Windows and Linux apps
+# (pinned to the release channel), electron-builder writes <channel>.yml /
+# <channel>-linux.yml next to the installers and the release carries them, so an
+# installed dev build finds the next dev release. The unsigned mac app carries
+# no feed (Squirrel.Mac needs a signed app) and points at the download page.
+# check-build-brand.mjs --update-feed checks all of it. A tag must point at a commit
 # on main. Only the publish job holds a write token, and it runs no repository
 # code: it downloads the built files and calls gh release. Everything else
 # (build jobs, the URL map) runs with contents: read.
@@ -169,6 +174,8 @@ jobs:
       UNIWORK_DEFAULT_DEPLOYMENT_ID: ${{ inputs.default_deployment_id || vars.UNIWORK_DEFAULT_DEPLOYMENT_ID }}
       RELEASE_VERSION: ${{ needs.meta.outputs.version }}
       BUILD_DIR: ${{ github.workspace }}/release-out
+      # the update feed: this repository's GitHub releases (Windows, Linux AppImage)
+      UNIWORK_UPDATE_URL: https://github.com/${{ github.repository }}
       # Built natively on the Windows runner with MSVC; the crate's
       # .cargo/config.toml links the CRT statically for this target.
       GENOFFICE_WIN_SIDECAR_TARGET: x86_64-pc-windows-msvc
@@ -268,9 +275,9 @@ jobs:
         run: npx electron-builder --win --x64 --publish never "-c.extraMetadata.version=$RELEASE_VERSION"
 
       - name: Check the build output brand
-        run: node tools/release/check-build-brand.mjs --dir "$BUILD_DIR" --expect win-unpacked
+        run: node tools/release/check-build-brand.mjs --dir "$BUILD_DIR" --expect win-unpacked --update-feed "github:$GITHUB_REPOSITORY"
 
-      - name: Collect the installer and its SHA-256 sum
+      - name: Collect the installer, its update feed file and their SHA-256 sums
         run: |
           set -euo pipefail
           mkdir -p upload
@@ -281,7 +288,12 @@ jobs:
             ls -la "$BUILD_DIR"
             exit 1
           fi
-          cp "${files[@]}" upload/
+          feed="$BUILD_DIR/$UNIWORK_RELEASE_CHANNEL.yml"
+          if [ ! -f "$feed" ]; then
+            echo "::error::no update feed file $UNIWORK_RELEASE_CHANNEL.yml in the output"
+            exit 1
+          fi
+          cp "${files[@]}" "$feed" upload/
           cd upload
           sha256sum -- * > SHA256SUMS-win32-x64.txt
           cat SHA256SUMS-win32-x64.txt
@@ -313,6 +325,8 @@ jobs:
       UNIWORK_DEFAULT_DEPLOYMENT_ID: ${{ inputs.default_deployment_id || vars.UNIWORK_DEFAULT_DEPLOYMENT_ID }}
       RELEASE_VERSION: ${{ needs.meta.outputs.version }}
       BUILD_DIR: ${{ github.workspace }}/release-out
+      # the update feed: this repository's GitHub releases (Windows, Linux AppImage)
+      UNIWORK_UPDATE_URL: https://github.com/${{ github.repository }}
       # both arches: arm64 + x64 dmg from one fat sidecar / OCR helper
       GENOFFICE_MAC_X64: '1'
       SIGNING_ENABLED: ${{ vars.UNIWORK_SIGNING_ENABLED == 'true' }}
@@ -473,6 +487,8 @@ jobs:
       UNIWORK_DEFAULT_DEPLOYMENT_ID: ${{ inputs.default_deployment_id || vars.UNIWORK_DEFAULT_DEPLOYMENT_ID }}
       RELEASE_VERSION: ${{ needs.meta.outputs.version }}
       BUILD_DIR: ${{ github.workspace }}/release-out
+      # the update feed: this repository's GitHub releases (Windows, Linux AppImage)
+      UNIWORK_UPDATE_URL: https://github.com/${{ github.repository }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -524,7 +540,7 @@ jobs:
 
       # dpkg-deb reads the deb's control fields and desktop entry
       - name: Check the build output brand
-        run: node tools/release/check-build-brand.mjs --dir "$BUILD_DIR" --expect linux-unpacked
+        run: node tools/release/check-build-brand.mjs --dir "$BUILD_DIR" --expect linux-unpacked --update-feed "github:$GITHUB_REPOSITORY"
 
       # The post-install script replaces electron-builder's default one, so a
       # real install proves the launcher link, the URL handler registration,
@@ -532,7 +548,7 @@ jobs:
       - name: Install check (deb)
         run: bash tools/release/linux-install-check.sh "$BUILD_DIR/UniWork-Office_${RELEASE_VERSION}_unsigned_linux_x64.deb"
 
-      - name: Collect the packages and their SHA-256 sums
+      - name: Collect the packages, the AppImage update feed file and their SHA-256 sums
         run: |
           set -euo pipefail
           mkdir -p upload
@@ -543,7 +559,12 @@ jobs:
             ls -la "$BUILD_DIR"
             exit 1
           fi
-          cp "${files[@]}" upload/
+          feed="$BUILD_DIR/$UNIWORK_RELEASE_CHANNEL-linux.yml"
+          if [ ! -f "$feed" ]; then
+            echo "::error::no update feed file $UNIWORK_RELEASE_CHANNEL-linux.yml in the output"
+            exit 1
+          fi
+          cp "${files[@]}" "$feed" upload/
           cd upload
           sha256sum -- * > SHA256SUMS-linux-x64.txt
           cat SHA256SUMS-linux-x64.txt
@@ -650,7 +671,7 @@ jobs:
           if ! gh release view "$TAG" >/dev/null 2>&1; then
             # the body is the install note people read before the first launch
             NOTES="$(cat <<'NOTES_END'
-          Unsigned CHANNEL_PLACEHOLDER build of UniWork Office for Windows x64, macOS (Apple Silicon and Intel) and Linux x64 (deb, AppImage). No auto-update. SHA-256 sums are attached.
+          Unsigned CHANNEL_PLACEHOLDER build of UniWork Office for Windows x64, macOS (Apple Silicon and Intel) and Linux x64 (deb, AppImage). The Windows app and the Linux AppImage update themselves from these releases; on macOS and with the deb, install the next build from https://uniworkos.com/office. SHA-256 sums are attached.
 
           Install and first launch
 

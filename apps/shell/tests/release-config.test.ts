@@ -114,6 +114,13 @@ describe('installer identity', () => {
     expect(config.dmg.sign).toBe(true)
     expect(config.publish).toBeUndefined()
   })
+
+  it('takes any other HTTPS update URL as a generic feed on the latest channel', () => {
+    const config = loadConfig({ UNIWORK_UPDATE_URL: 'https://updates.example/office/' })
+    expect(config.publish).toEqual([
+      { provider: 'generic', url: 'https://updates.example/office', channel: 'latest' },
+    ])
+  })
 })
 
 describe('dev / beta release builds', () => {
@@ -203,13 +210,42 @@ describe('dev / beta release builds', () => {
     expect(() => loadConfig({ UNIWORK_RELEASE_CHANNEL: 'nightly' })).toThrow(/dev, beta/)
   })
 
-  it('refuse an update feed', () => {
-    expect(() =>
-      loadConfig({
-        UNIWORK_RELEASE_CHANNEL: 'dev',
-        GENOFFICE_UPDATE_URL: 'https://updates.example/office',
-      }),
-    ).toThrow(/GENOFFICE_UPDATE_URL/)
+  it('read their update feed from the GitHub releases of the repository UNIWORK_UPDATE_URL names', () => {
+    const config = loadConfig({
+      UNIWORK_RELEASE_CHANNEL: 'dev',
+      UNIWORK_UPDATE_URL: 'https://github.com/UNIAI-TEAM/uniwork-office/',
+    })
+    expect(config.publish).toEqual([
+      { provider: 'github', owner: 'UNIAI-TEAM', repo: 'uniwork-office', channel: 'dev' },
+    ])
+    const beta = loadConfig({
+      UNIWORK_RELEASE_CHANNEL: 'beta',
+      UNIWORK_UPDATE_URL: 'https://github.com/UNIAI-TEAM/uniwork-office',
+    })
+    expect(beta.publish).toEqual([
+      { provider: 'github', owner: 'UNIAI-TEAM', repo: 'uniwork-office', channel: 'beta' },
+    ])
+  })
+
+  it('bake no feed into the unsigned mac app (Squirrel.Mac needs a signed one)', () => {
+    const config = loadConfig({
+      UNIWORK_RELEASE_CHANNEL: 'dev',
+      UNIWORK_UPDATE_URL: 'https://github.com/UNIAI-TEAM/uniwork-office',
+    })
+    expect(config.mac.publish).toBeNull()
+    expect(config.mac.target.map((entry) => entry.target)).toEqual(['dmg'])
+  })
+
+  it('refuse an update URL that is not a plain HTTPS base URL', () => {
+    for (const url of [
+      'http://github.com/UNIAI-TEAM/uniwork-office',
+      'https://user:pass@github.com/UNIAI-TEAM/uniwork-office',
+      'https://github.com/UNIAI-TEAM/uniwork-office?x=1',
+    ]) {
+      expect(() => loadConfig({ UNIWORK_RELEASE_CHANNEL: 'dev', UNIWORK_UPDATE_URL: url })).toThrow(
+        /UNIWORK_UPDATE_URL/,
+      )
+    }
   })
 
   it('require the <shell version>-<channel>.<n> version at packaging time', async () => {

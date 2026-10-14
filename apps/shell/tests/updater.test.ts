@@ -8,7 +8,7 @@ import type { UpdateUiState } from '../src/shared/update-api'
  * Install / Later actions come back through update-window.ts callbacks.
  */
 
-const appState = { isPackaged: true }
+const appState = { isPackaged: true, version: '0.1.0' }
 
 const openExternal = vi.hoisted(() => vi.fn())
 const showMessageBox = vi.hoisted(() =>
@@ -22,7 +22,7 @@ vi.mock('electron', () => ({
     get isPackaged() {
       return appState.isPackaged
     },
-    getVersion: () => '0.1.0',
+    getVersion: () => appState.version,
   },
   shell: {
     openExternal: (url: string) => openExternal(url),
@@ -46,6 +46,7 @@ const updaterState = {
   disableDifferentialDownload: false,
   channel: null as string | null,
   allowDowngrade: false,
+  allowPrerelease: false,
 }
 const checkForUpdates = vi.fn(() => Promise.resolve(null))
 const downloadUpdate = vi.fn<(token?: FakeCancellationToken) => Promise<unknown>>(() =>
@@ -91,6 +92,9 @@ vi.mock('electron-updater', () => ({
     },
     get allowDowngrade() {
       return updaterState.allowDowngrade
+    },
+    set allowPrerelease(v: boolean) {
+      updaterState.allowPrerelease = v
     },
   },
 }))
@@ -150,6 +154,7 @@ beforeEach(() => {
   vi.resetModules()
   vi.useFakeTimers()
   appState.isPackaged = true
+  appState.version = '0.1.0'
   delete process.env.GENOFFICE_FAKE_UPDATE
   updaterState.listeners.clear()
   updaterState.autoDownload = true
@@ -157,6 +162,7 @@ beforeEach(() => {
   updaterState.disableDifferentialDownload = false
   updaterState.channel = null
   updaterState.allowDowngrade = false
+  updaterState.allowPrerelease = false
   checkForUpdates.mockClear()
   downloadUpdate.mockReset()
   downloadUpdate.mockImplementation(() => Promise.resolve([]))
@@ -219,6 +225,44 @@ describe('initAutoUpdater', () => {
     applyUpdateChannel('stable')
     expect(updaterState.channel).toBeNull()
     expect(checkForUpdates).not.toHaveBeenCalled()
+  })
+
+  it('pins a dev build with a GitHub feed to its own channel and accepts pre-releases', async () => {
+    platformSpy?.restore()
+    setPlatform('win32')
+    appState.version = '0.11.0-dev.12'
+    readFileSyncMock.mockReturnValue(
+      'owner: UNIAI-TEAM\nrepo: uniwork-office\nprovider: github\nchannel: dev\n',
+    )
+    const { initAutoUpdater, applyUpdateChannel } = await loadUpdater()
+    initAutoUpdater(() => null, 'beta')
+    expect(updaterState.channel).toBe('dev')
+    expect(updaterState.allowPrerelease).toBe(true)
+    expect(updaterState.allowDowngrade).toBe(false)
+    vi.advanceTimersByTime(FIRST_CHECK_DELAY_MS)
+    expect(checkForUpdates).toHaveBeenCalledTimes(1)
+    // the Settings stable / beta switch does not move a pinned build
+    applyUpdateChannel('stable')
+    expect(updaterState.channel).toBe('dev')
+    expect(checkForUpdates).toHaveBeenCalledTimes(1)
+  })
+
+  it('pins a beta build with a GitHub feed to beta', async () => {
+    appState.version = '0.11.0-beta.3'
+    readFileSyncMock.mockReturnValue('provider: github\nowner: UNIAI-TEAM\nrepo: uniwork-office\n')
+    const { initAutoUpdater } = await loadUpdater()
+    initAutoUpdater(() => null)
+    expect(updaterState.channel).toBe('beta')
+    expect(updaterState.allowPrerelease).toBe(true)
+  })
+
+  it('keeps the Settings channel for a generic feed even on a pre-release version', async () => {
+    appState.version = '0.11.0-dev.12'
+    readFileSyncMock.mockReturnValue('provider: generic\nurl: https://cdn.example.com/office\n')
+    const { initAutoUpdater } = await loadUpdater()
+    initAutoUpdater(() => null, 'beta')
+    expect(updaterState.channel).toBe('beta')
+    expect(updaterState.allowPrerelease).toBe(false)
   })
 
   it('configures manual full-package download and checks after the initial delay', async () => {
@@ -581,10 +625,8 @@ describe('manual download fallback', () => {
     expect(openExternal).toHaveBeenCalledWith((await loadUpdater()).DOWNLOAD_PAGE_URL)
   })
 
-  it('uses the release list as the generic download page (pre-releases have no /latest)', async () => {
-    expect((await loadUpdater()).DOWNLOAD_PAGE_URL).toBe(
-      'https://github.com/UNIAI-TEAM/uniwork-office/releases',
-    )
+  it('uses the UniWork Office download page as the generic download page', async () => {
+    expect((await loadUpdater()).DOWNLOAD_PAGE_URL).toBe('https://uniworkos.com/office')
   })
 
   it('falls back to the generic download page when the feed base cannot be read', async () => {

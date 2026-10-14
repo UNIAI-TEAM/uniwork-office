@@ -15,6 +15,7 @@ import {
   parseControl,
   parseDesktopEntry,
   parsePlist,
+  parseUpdateFeed,
   parseVersionInfo,
   visibleDebMembers,
 } from './check-build-brand.mjs'
@@ -231,7 +232,10 @@ async function fakeWindowsOutput({
   const resources = join(root, 'win-unpacked', 'resources')
   mkdirSync(resources, { recursive: true })
   writeFileSync(join(root, 'win-unpacked', 'UniWork Office.exe'), fakeExe(exeStrings))
-  if (updateFeed) writeFileSync(join(resources, 'app-update.yml'), 'provider: generic\n')
+  if (updateFeed) {
+    const yml = typeof updateFeed === 'string' ? updateFeed : 'provider: generic\n'
+    writeFileSync(join(resources, 'app-update.yml'), yml)
+  }
   await writeAsar(root, resources, pkg)
   return root
 }
@@ -297,6 +301,64 @@ describe('checkBuildDir', () => {
   it('flags a baked update feed', async () => {
     const result = checkBuildDir(await fakeWindowsOutput({ updateFeed: true }))
     assert.ok(result.problems.some((p) => p.includes('app-update.yml')))
+  })
+
+  describe('with --update-feed github:UNIAI-TEAM/uniwork-office', () => {
+    const feed = parseUpdateFeed('github:UNIAI-TEAM/uniwork-office')
+    const githubYml =
+      'owner: UNIAI-TEAM\nrepo: uniwork-office\nprovider: github\nchannel: dev\n' +
+      'updaterCacheDirName: uniwork-office-updater\n'
+    const installer = 'UniWork-Office_0.11.0-dev.0_unsigned_win32_x64-setup.exe'
+    const channelYml = (name) =>
+      `version: 0.11.0-dev.0\nfiles:\n  - url: ${name}\n    sha512: x\n    size: 1\npath: ${name}\n`
+
+    it('passes the github feed and a channel file that lists the installer', async () => {
+      const root = await fakeWindowsOutput({ updateFeed: githubYml })
+      writeFileSync(join(root, 'dev.yml'), channelYml(installer))
+      const result = checkBuildDir(root, { updateFeed: feed })
+      assert.deepEqual(result.problems, [])
+      assert.ok(result.checked.includes('win-unpacked app-update.yml'))
+    })
+
+    it('flags a missing feed, another repository and a generic feed', async () => {
+      for (const [updateFeed, expected] of [
+        [false, 'holds no app-update.yml'],
+        [githubYml.replace('uniwork-office\n', 'other\n'), 'expected github:UNIAI-TEAM/uniwork-office'],
+        ['provider: generic\nurl: https://cdn.example\n', 'expected github:UNIAI-TEAM/uniwork-office'],
+      ]) {
+        const result = checkBuildDir(await fakeWindowsOutput({ updateFeed }), { updateFeed: feed })
+        assert.ok(
+          result.problems.some((p) => p.includes(expected)),
+          `${expected}: ${result.problems}`,
+        )
+      }
+    })
+
+    it('flags a channel file listing a name that is not in the output', async () => {
+      const root = await fakeWindowsOutput({ updateFeed: githubYml })
+      writeFileSync(join(root, 'dev.yml'), channelYml('UniWork-Office-0.11.0-dev.0-setup.exe'))
+      const result = checkBuildDir(root, { updateFeed: feed })
+      assert.ok(result.problems.some((p) => p.includes('which is not in the output')))
+    })
+
+    it('still flags any feed in the mac app', async () => {
+      const result = checkBuildDir(await fakeMacOutput({ arches: ['arm64'], updateFeed: true }), {
+        updateFeed: feed,
+      })
+      assert.ok(result.problems.some((p) => p.includes('auto-update must stay off')))
+    })
+
+    it('refuses anything but github:<owner>/<repo>', () => {
+      assert.throws(() => parseUpdateFeed('https://github.com/UNIAI-TEAM/uniwork-office'))
+      assert.throws(() => parseUpdateFeed('github:UNIAI-TEAM'))
+    })
+  })
+
+  it('flags a dev channel file when no feed is expected', async () => {
+    const root = await fakeWindowsOutput()
+    writeFileSync(join(root, 'dev.yml'), 'version: 0.11.0-dev.0\n')
+    const result = checkBuildDir(root)
+    assert.ok(result.problems.some((p) => p.startsWith('dev.yml: update feed metadata')))
   })
 
   it('flags an upstream-branded installer exe', async () => {

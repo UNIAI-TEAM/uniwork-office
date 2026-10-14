@@ -22,14 +22,16 @@ import {
 } from './update-window'
 
 /**
- * Full-package auto-update over the generic provider (Azure CDN).
- *
- * The release pipeline publishes `latest.yml` + the versioned installer to
- * the update channel prefix (production builds only). The packaged app reads
- * that URL from resources/app-update.yml, which electron-builder bakes in
- * from the `publish` config in apps/shell/electron-builder.cjs — the URL
- * itself is injected at build time via the GENOFFICE_UPDATE_URL env var and
- * is intentionally not committed to the repo.
+ * Full-package auto-update. The packaged app reads its feed from
+ * resources/app-update.yml, which electron-builder bakes in from the
+ * `publish` config in apps/shell/electron-builder.cjs, chosen at build time
+ * by the UNIWORK_UPDATE_URL env var:
+ *   - dev / beta release builds: the github provider on the GitHub Releases
+ *     of UNIAI-TEAM/uniwork-office. The feed channel is pinned to the build's
+ *     own release channel (see pinnedReleaseChannel), so a dev build only
+ *     installs newer dev builds and beta never picks a dev one.
+ *   - stable builds (none yet): a generic provider prefix (CDN) serving
+ *     latest.yml / beta.yml, switchable in Settings.
  *
  * UX is the strong-guidance modal card (update-window.ts), not a native
  * dialog. Windows updates through the NSIS installer (latest.yml); macOS
@@ -429,12 +431,30 @@ const RECHECK_INTERVAL_MS = 4 * 60 * 60 * 1000
 // code-signing identity (Apple Team ID) change, which Squirrel.Mac rejects
 // on every retry while the error looks like a download failure to the user.
 const MANUAL_FALLBACK_AFTER = 2
-// Last-resort manual link only: the release list mixes channels and signing
-// tracks, so a user could land on the wrong build. Preferred is the CDN
-// installer derived from the user's own update feed (see manualDownloadUrlFor),
-// which matches channel, track, and arch. The list, not /releases/latest: dev
-// and beta builds are pre-releases, which /latest never resolves to (404).
-export const DOWNLOAD_PAGE_URL = 'https://github.com/UNIAI-TEAM/uniwork-office/releases'
+// Manual install link: the UniWork Office download page, which offers the
+// installer of the server's own channel for each platform. Preferred, when a
+// generic feed is baked in, is the installer derived from the user's own update
+// feed (see manualDownloadUrlFor), which matches channel, track, and arch.
+export const DOWNLOAD_PAGE_URL = 'https://uniworkos.com/office'
+
+const RELEASE_CHANNELS = ['dev', 'beta']
+
+/// The release channel a dev / beta build is pinned to, or null. Only builds
+/// whose baked feed is the github provider qualify: their releases are tagged
+/// v<version>-<channel>.<n> and published as <channel>.yml, and electron-updater
+/// matches the tag's pre-release id against autoUpdater.channel. The Settings
+/// stable / beta choice maps to latest.yml / beta.yml feeds that such a
+/// repository does not carry, so it does not apply to these builds.
+function pinnedReleaseChannel(): string | null {
+  try {
+    const yml = readFileSync(path.join(process.resourcesPath, 'app-update.yml'), 'utf8')
+    if (!/^provider:\s*['"]?github['"]?\s*$/m.test(yml)) return null
+  } catch {
+    return null
+  }
+  const channel = /^\d+\.\d+\.\d+-([a-z]+)\.\d+$/.exec(app.getVersion())?.[1]
+  return channel && RELEASE_CHANNELS.includes(channel) ? channel : null
+}
 
 /// Trusted HTTPS base URL baked into resources/app-update.yml. Manual download
 /// links are always rebuilt from this base rather than trusting URLs supplied
@@ -510,8 +530,11 @@ const CHANNEL_FEED: Record<UpdateChannel, string> = { stable: 'latest', beta: 'b
 // true once the packaged-run updater is configured; channel switches before
 // that (or in dev runs) must not touch electron-updater
 let updaterActive = false
+// the dev / beta release channel the feed is pinned to (github feeds), which
+// the Settings stable / beta switch must not override
+let pinnedChannel: string | null = null
 // true for a packaged build shipped without resources/app-update.yml (the
-// dev/beta installers): the manual check then explains where updates come
+// unsigned mac release app, local packs): the manual check then explains where updates come
 // from instead of reporting a failed automatic update
 let noUpdateFeed = false
 
@@ -548,7 +571,7 @@ function initialState(version: string): UpdateUiState {
 }
 
 export function applyUpdateChannel(channel: UpdateChannel): void {
-  if (!updaterActive) return
+  if (!updaterActive || pinnedChannel !== null) return
   resetDownloadFlow?.()
   autoUpdater.channel = CHANNEL_FEED[channel]
   // the channel setter unconditionally flips allowDowngrade to true; force it
@@ -643,7 +666,7 @@ export function initAutoUpdater(
   if (!app.isPackaged) return
   const isLinuxAppImage = process.platform === 'linux' && Boolean(process.env.APPIMAGE)
   if (process.platform !== 'win32' && process.platform !== 'darwin' && !isLinuxAppImage) return
-  // Builds shipped without an update feed (the unsigned dev/beta installers)
+  // Builds shipped without an update feed (the unsigned mac release app, local packs)
   // have no resources/app-update.yml; electron-updater would reject every check
   // with ENOENT. Stay inactive: no autoUpdater calls, no network, and the
   // manual check falls into the same download-page answer as other installs
@@ -655,10 +678,14 @@ export function initAutoUpdater(
   }
 
   updaterActive = true
-  autoUpdater.channel = CHANNEL_FEED[initialChannel]
+  pinnedChannel = pinnedReleaseChannel()
+  autoUpdater.channel = pinnedChannel ?? CHANNEL_FEED[initialChannel]
   // the channel setter unconditionally flips allowDowngrade to true; force it
   // back off since a beta user switching to stable must not downgrade
   autoUpdater.allowDowngrade = false
+  // every dev / beta release is a GitHub pre-release; without this the github
+  // provider asks /releases/latest, which never resolves to one
+  if (pinnedChannel !== null) autoUpdater.allowPrerelease = true
   autoUpdater.autoDownload = false
   // if the user picked "later" after download, install on normal quit
   autoUpdater.autoInstallOnAppQuit = true

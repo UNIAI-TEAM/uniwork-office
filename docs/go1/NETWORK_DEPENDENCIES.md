@@ -8,7 +8,7 @@ Renderer CSP keeps `connect-src` at `'self'` plus local Vite websockets. Outboun
 | `www.genspark.ai` | LLM proxy, device-code login, tool_cli, credits, projects | Genspark AI / sign-in / search / cloud projects | | OPTIONAL | do not sign in; no `GSK_API_KEY`; BYOK |
 | `sspark.genspark.ai` | generated-image CDN | inserting Genspark images | | OPTIONAL | do not use Genspark image gen |
 | `github.com` / `api.github.com` | About stars, updater fallback, README | About pane / failed update | | OPTIONAL | ignore About; no updater URL |
-| Update CDN | electron-updater | only if `GENOFFICE_UPDATE_URL` baked | | OPTIONAL | omit env (GO-1 default) |
+| Update feed (GitHub releases / CDN) | electron-updater | only if `UNIWORK_UPDATE_URL` baked (dev / beta release builds: github.com releases) | | OPTIONAL | omit env (local packs) |
 | Font CDN | optional OFL catalog | only if `GENOFFICE_FONT_CDN_URL` baked | | OPTIONAL | omit env |
 | `api.anthropic.com` | Claude BYOK | user key | | OPTIONAL | no key |
 | `generativelanguage.googleapis.com` | Gemini BYOK | user key | | OPTIONAL | no key |
