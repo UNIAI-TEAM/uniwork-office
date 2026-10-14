@@ -356,7 +356,40 @@ export interface UniworkDocStatus {
 export type UniworkConflictChoice = 'overwrite' | 'save-local-copy' | 'open-latest' | 'later'
 
 /** why a working copy was refused before anything opened (S11 lock panel) */
-export type UniworkLockReason = 'store_newer' | 'keystore_locked'
+export type UniworkLockReason = 'store_newer' | 'keystore_locked' | 'signed_out'
+
+/**
+ * G5-11: what the sign-out / account-switch / deployment-switch prompt needs;
+ * computed WITHOUT changing anything.
+ */
+export interface SignOutPlan {
+  /** docs with a pending intent or N+1 changes (dirty file or dirty editor) */
+  count: number
+  /** intents in validating|uploading|committing|reconciling */
+  waiting: number
+  /** storeLocked(): the capture cannot be written */
+  keystoreLocked: boolean
+  /** keystoreLocked && docs whose N+1 is not already ciphertext (or a module that could not capture) */
+  ramOnly: number
+}
+
+export interface SignOutProgress {
+  phase: 'waiting' | 'done'
+}
+
+/**
+ * D5: main-initiated sign-out confirmation (account switch / deployment switch)
+ * pushed to the shell renderer; answered through `signOutPromptAnswer`.
+ */
+export interface SignOutPromptRequest {
+  requestId: string
+  plan: SignOutPlan
+}
+
+export interface SignOutPromptAnswer {
+  requestId: string
+  confirmed: boolean
+}
 
 /**
  * G5-04g: the folder of this working copy holds a binding.json with an integer
@@ -640,8 +673,8 @@ export interface HomeApi {
   onOpenSettings(handler: (target: { section: string }) => void): () => void
   /** re-open the pending UniWork Sign-in URL in the default browser (rescue when auto-open failed) */
   openLoginUrl(): Promise<void>
-  /** log out (clears any leftover local auth material) */
-  accountLogout(): Promise<void>
+  /** log out (clears any leftover local auth material); { confirmed: true } after the sign-out prompt */
+  accountLogout(options?: { confirmed?: boolean }): Promise<void>
   /** account status pushes (every state change); returns an unsubscribe */
   onAccountStatus(handler: (status: AccountStatus) => void): () => void
   /** abandon the pending sign-in attempt (state -> signed-out) */
@@ -830,6 +863,14 @@ export interface HomeApi {
   onUniworkLocksChanged(cb: (locks: UniworkDocLock[]) => void): () => void
   /** close the lock panel for a path (nothing is deleted) */
   dismissUniworkLock(path: string): Promise<void>
+  /** G5-11: compute the sign-out plan for the active account without changing anything */
+  signOutPlan(): Promise<SignOutPlan>
+  /** G5-11: progress pushes while a sign-out waits for an in-flight save (`waiting` | `done`) */
+  onSignOutProgress(cb: (event: SignOutProgress) => void): () => void
+  /** G5-11 D5: main-initiated sign-out prompt (account switch / deployment switch) */
+  onSignOutPrompt?(cb: (request: SignOutPromptRequest) => void): () => void
+  /** G5-11 D5: answer a main-initiated sign-out prompt */
+  answerSignOutPrompt?(requestId: string, confirmed: boolean): Promise<void>
 }
 
 /** IndexedDB media blobs embedded in Workbench ZIP backup (optional). */
@@ -1377,6 +1418,14 @@ export const UNIWORK_DOC_CHANNELS = {
   dismissLock: 'uniwork-doc:dismiss-lock',
   /** main -> shell renderer: the whole lock list changed (a keystore lock cleared after unlock/Retry) */
   locksChanged: 'uniwork-doc:locks-changed',
+  /** invoke() -> SignOutPlan (G5-11) */
+  signOutPlan: 'uniwork-doc:sign-out-plan',
+  /** push -> { phase: 'waiting' | 'done' } (G5-11) */
+  signOutProgress: 'uniwork-doc:sign-out-progress',
+  /** main -> shell renderer: ask the sign-out prompt for an account or deployment switch (G5-11 D5) */
+  signOutPrompt: 'uniwork-doc:sign-out-prompt',
+  /** invoke({ requestId, confirmed }) -> answer the main-initiated sign-out prompt (G5-11 D5) */
+  signOutPromptAnswer: 'uniwork-doc:sign-out-prompt-answer',
 } as const
 
 export const PROJECT_CHANNELS = {
