@@ -1,5 +1,5 @@
 import type { IFunctionInfo } from '@univerjs/engine-formula'
-import { useEffect, useMemo, useRef, useState, type ComponentProps } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from 'react'
 import { platformShortcuts } from '@genoffice/i18n'
 import {
   Dropdown,
@@ -583,10 +583,11 @@ export function ExcelShell({
   // a waiting ask_clarification keeps the dock open: its card lives there
   const askingRef = useRef(aiClarify !== null)
   askingRef.current = aiClarify !== null
-  const setIsCopilotOpen: typeof setIsCopilotOpenState = (next) => {
+  // stable identity: useAiSidebarEnabled and the effects below must not see a new setter per render
+  const setIsCopilotOpen: typeof setIsCopilotOpenState = useCallback((next) => {
     if (cap('ai'))
       setIsCopilotOpenState((prev) => resolveCopilotOpen(prev, next, askingRef.current))
-  }
+  }, [])
   // the sidebar switch is a soft hide; it closes the panel when it turns off
   const aiSidebarEnabled = useAiSidebarEnabled(setIsCopilotOpen)
   useEffect(() => {

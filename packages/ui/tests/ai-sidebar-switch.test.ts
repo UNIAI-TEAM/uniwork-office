@@ -15,6 +15,22 @@ import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { applyAiPanelPrefs, useAiSidebarEnabled } from '../src/ai-panel-prefs-store'
 
+/**
+ * Sheets passes a setter that is re-created on every render (it wraps a
+ * capability check around the `useState` setter), so the hook must not treat the
+ * setter's identity as a reason to close the panel again.
+ */
+function UnstableSetterDock() {
+  const [showAi, setShowAiState] = useState(true)
+  const setShowAi = (next: boolean) => setShowAiState(next)
+  const enabled = useAiSidebarEnabled(setShowAi)
+  return createElement(
+    'div',
+    { 'data-open': String(showAi), 'data-enabled': String(enabled) },
+    createElement('button', { className: 'ask-ai', onClick: () => setShowAi(true) }),
+  )
+}
+
 /** Stands in for an editor's dock: `showAi` is the panel's open state. */
 function Dock() {
   const [showAi, setShowAi] = useState(true)
@@ -97,6 +113,15 @@ describe('useAiSidebarEnabled', () => {
     expect(open()).toBe(false)
     act(() => applyAiPanelPrefs({ showAiSidebar: true }))
     expect(open()).toBe(false)
+    click('.ask-ai')
+    expect(open()).toBe(true)
+  })
+
+  it('keeps an explicit open while the switch is off when the setter changes identity every render', () => {
+    act(() => root.render(createElement(UnstableSetterDock)))
+    act(() => applyAiPanelPrefs({ showAiSidebar: false }))
+    expect(open()).toBe(false)
+
     click('.ask-ai')
     expect(open()).toBe(true)
   })
