@@ -216,6 +216,8 @@ export const hi = {
   ribbonComment: 'टिप्पणी',
   ribbonNewCommentTip:
     'वर्तमान स्लाइड पर नई टिप्पणी (pptx में सहेजी गई, PowerPoint में दिखाई देती है)',
+  ribbonNewCommentServerTip:
+    'वर्तमान स्लाइड पर नई टिप्पणी (इस प्रस्तुति को खोलने वाले सभी के साथ साझा, फ़ाइल में सहेजी नहीं जाती)',
   ribbonInsertTextBoxTip: 'पाठ बॉक्स सम्मिलित करें',
   ribbonWordArt: 'WordArt',
   ribbonWordArtTip: 'WordArt सम्मिलित करें (भरण/रूपरेखा शैली वाला बड़ा पाठ)',

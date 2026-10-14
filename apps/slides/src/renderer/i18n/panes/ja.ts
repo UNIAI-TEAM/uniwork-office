@@ -63,6 +63,10 @@ export const ja = {
   paneCommentsPlaceholder: '新しいコメント…（⌘/Ctrl+Enter で投稿）',
   paneCommentsPost: '投稿',
   paneCommentsNeutralAuthor: 'ユーザー',
+  paneCommentsSaveFirst:
+    'コメントを追加するには、先にプレゼンテーションを保存してください。下のコメントの閲覧、返信、解決は引き続きできます。',
+  paneCommentsNewNoSlide:
+    '現在、このスライドにはコメントを追加できません。別のスライドを選んでもう一度お試しください。',
 
   paneCsdTitle: '目的別スライドショー',
   paneCsdDefaultName: '目的別スライドショー {n}',

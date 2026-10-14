@@ -63,6 +63,10 @@ export const es = {
   paneCommentsPlaceholder: 'Nuevo comentario… (⌘/Ctrl+Entrar para publicar)',
   paneCommentsPost: 'Publicar',
   paneCommentsNeutralAuthor: 'Usuario',
+  paneCommentsSaveFirst:
+    'Guarda primero la presentación para añadir un comentario. Aún puedes leer, responder y resolver los comentarios de abajo.',
+  paneCommentsNewNoSlide:
+    'No se puede añadir un comentario a esta diapositiva ahora. Selecciona otra diapositiva e inténtalo de nuevo.',
 
   paneCsdTitle: 'Presentaciones personalizadas',
   paneCsdDefaultName: 'Presentación personalizada {n}',

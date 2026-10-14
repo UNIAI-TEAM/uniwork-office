@@ -219,6 +219,8 @@ export const pt = {
   ribbonGroupComments: 'Comentários',
   ribbonComment: 'Comentário',
   ribbonNewCommentTip: 'Novo comentário no slide atual (salvo no pptx, visível no PowerPoint)',
+  ribbonNewCommentServerTip:
+    'Novo comentário no slide atual (compartilhado com todos que abrirem esta apresentação, não salvo no arquivo)',
   ribbonInsertTextBoxTip: 'Inserir uma caixa de texto',
   ribbonWordArt: 'WordArt',
   ribbonWordArtTip: 'Inserir WordArt (texto grande com preenchimento/contorno)',

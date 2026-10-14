@@ -62,6 +62,9 @@ export const ar = {
   paneCommentsPlaceholder: 'تعليق جديد… (⌘/Ctrl+Enter للنشر)',
   paneCommentsPost: 'نشر',
   paneCommentsNeutralAuthor: 'مستخدم',
+  paneCommentsSaveFirst:
+    'احفظ العرض التقديمي أولاً لإضافة تعليق. لا يزال بإمكانك قراءة التعليقات أدناه والرد عليها وحلّها.',
+  paneCommentsNewNoSlide: 'لا يمكن إضافة تعليق إلى هذه الشريحة الآن. حدّد شريحة أخرى وحاول مجددًا.',
 
   paneCsdTitle: 'عروض مخصصة',
   paneCsdDefaultName: 'عرض مخصص {n}',
