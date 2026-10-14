@@ -4,8 +4,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { UniworkConflictChoice, UniworkDocStatus } from '../src/shared/home-api'
-import { BINDING_FILE } from '../src/main/uniwork-docs/binding-store'
+import { BINDING_FILE, type Binding, type BindingStore } from '../src/main/uniwork-docs/binding-store'
 import { UniworkDocError } from '../src/main/uniwork-docs/errors'
+import type { SaveCoordinator } from '../src/main/uniwork-docs/save-coordinator'
 import { UniworkDocsService, type ConflictUi } from '../src/main/uniwork-docs/service'
 import type { DocumentDetail } from '../src/main/uniwork-docs/parse'
 import type { DownloadResult, UniworkDocsClient } from '../src/main/uniwork-docs/client'
@@ -317,7 +318,55 @@ describe('G5-03a S6 service: the guarded clean reload', () => {
     // four clean reads (decision x2, before the fetch, after the fetch), then
     // the turn that started while the write landed
     h.editorStates.splice(0, 1, CLEAN, CLEAN, CLEAN, CLEAN, AI_TURN)
+
+    // The W4 race, made deterministic without a timing sleep: the restore's own
+    // binding write is held open, so a status refresh started in that window
+    // reads the reloaded head (`10/saved`) plus the just-restored BASE bytes
+    // and queues `{base:10, state:'dirty'}` behind the gated restore.
+    const store = (h.service as unknown as { store: BindingStore }).store
+    const realWrite = store.write.bind(store)
+    const written: Binding[] = []
+    let gated = false
+    let restoreEntered!: () => void
+    const restoreEnteredP = new Promise<void>((resolve) => (restoreEntered = resolve))
+    let releaseRestore!: () => void
+    const restoreGate = new Promise<void>((resolve) => (releaseRestore = resolve))
+    store.write = async (dir, binding) => {
+      written.push(binding)
+      if (
+        !gated &&
+        binding.baseRevision === '9' &&
+        binding.state === 'saved' &&
+        binding.serverRevision === undefined
+      ) {
+        gated = true
+        restoreEntered()
+        await restoreGate
+      }
+      return realWrite(dir, binding)
+    }
+    const coordinator = (h.service as unknown as { coordinator: SaveCoordinator }).coordinator
+    const realCommitState = coordinator.commitState.bind(coordinator)
+    let refreshQueued!: () => void
+    const refreshQueuedP = new Promise<void>((resolve) => (refreshQueued = resolve))
+    coordinator.commitState = (doc, binding, guard) => {
+      const result = realCommitState(doc, binding, guard)
+      if (binding.state === 'dirty') refreshQueued()
+      return result
+    }
+
     notice(h)
+    await restoreEnteredP
+    const refreshing = h.service.docStatus(docPath())
+    await refreshQueuedP
+    releaseRestore()
+    await refreshing
+
+    // the refresh's queued write must not resurrect the reloaded head as the
+    // copy's base: the restore's `9/saved` is what the binding still carries
+    expect(bindingOf()).toMatchObject({ baseRevision: '9', baseVersion: 3, state: 'saved' })
+    expect(written.filter((binding) => binding.state === 'dirty')).toEqual([])
+
     await waitForBar(h, { kind: 'newer-ai', version: 4 })
     expect(hex(copyBytes())).toBe(hex(BASE_BYTES))
     expect(bindingOf()).toMatchObject({ baseRevision: '9', baseVersion: 3, state: 'saved' })
