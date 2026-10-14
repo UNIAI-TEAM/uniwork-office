@@ -2,6 +2,8 @@
 // G6-05m slice A: the chip shows the data its host hands over (Settings pick, live list, the served
 // UniWork AI model), re-reads on every open, and keeps today's catalog chip when a host sends none.
 // (A .ts file: this package's vitest include only matches tests/**/*.test.ts.)
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -178,10 +180,8 @@ describe('list state note', () => {
   it('uses only classes the picker stylesheet already defines', async () => {
     const m = await mount(anthropic({ anthropic: { chosen: 'claude-chosen', listState: 'error' } }))
     await m.open()
-    const css = (await import('node:fs')).readFileSync(
-      new URL('../src/ai-model-picker.css', import.meta.url),
-      'utf8',
-    )
+    // vitest runs with the package as cwd
+    const css = readFileSync(join(process.cwd(), 'src/ai-model-picker.css'), 'utf8')
     for (const el of host.querySelectorAll('.ai-model-pop *')) {
       for (const cls of el.classList)
         if (cls.startsWith('ai-model')) expect(css).toContain(`.${cls}`)
