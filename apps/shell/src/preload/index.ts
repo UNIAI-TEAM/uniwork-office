@@ -16,6 +16,7 @@ import type {
 } from '@genoffice/ai-provider/browser'
 import type { AiStreamChunk, AiStreamRequest } from '@genoffice/ai-provider'
 import { installDropOpenBridge } from '@genoffice/electron-utils/drop-open'
+import { installUniworkAiFlagBridge } from '@genoffice/electron-utils/uniwork-ai-flag-bridge'
 import { installUniworkDiscussionBridge } from '@genoffice/electron-utils/discussion-bridge'
 import type { UpdateUiState } from '../shared/update-api'
 import { normalizeAiPanelPrefs } from '@genoffice/ui/ai-panel-prefs'
@@ -769,11 +770,18 @@ const homeApi: HomeApi = {
     ipcRenderer.on('ai:settings-changed', listener)
     return () => ipcRenderer.removeListener('ai:settings-changed', listener)
   },
-  async getAiSettings() {
-    return (await ipcRenderer.invoke('ai:get-settings')) as AiSettings
+  async getAiSettings(options) {
+    return (await ipcRenderer.invoke(
+      'ai:get-settings',
+      options?.includeUniworkPick ? { includeUniworkPick: true } : undefined,
+    )) as AiSettings
   },
-  async setAiSettings(settings) {
-    await ipcRenderer.invoke('ai:set-settings', settings)
+  async setAiSettings(settings, options) {
+    await ipcRenderer.invoke(
+      'ai:set-settings',
+      settings,
+      options?.includeUniworkPick ? { includeUniworkPick: true } : undefined,
+    )
   },
   getAiProviders() {
     return AI_PROVIDERS.map((meta) => {
@@ -1082,6 +1090,8 @@ void ipcRenderer
   .catch(() => undefined)
 
 contextBridge.exposeInMainWorld('aiOffice', homeApi)
+// window.uniworkAiFlag: the home renderer's provider list mirrors the shell's UniWork AI flag
+installUniworkAiFlagBridge()
 
 const projectApi: ProjectHomeApi = {
   async listProjects() {

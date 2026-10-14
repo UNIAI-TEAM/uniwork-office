@@ -59,4 +59,8 @@ export const zh = {
   aiErrCapabilityOff: '此文档的 UniWork AI 刚被关闭，因此本次运行在当前步骤后停止。',
   aiErrUnsupported: 'UniWork AI 暂时还无法在{module}中执行此操作。',
   aiErrViewOnlyEdit: '你对此文档只有查看权限，因此 AI 无法编辑。',
+  // UniWork AI question limits (the façade takes text up to 8,000 characters)
+  aiErrQuestionTooLong: '你的请求对 UniWork AI 来说太长了。请缩短到 8,000 个字符以内后再发送。',
+  aiErrQuestionRejected: 'UniWork AI 无法接受此请求。请修改后再发送。',
+  aiUniworkImagesNotSent: '图片不会发送给 UniWork AI，只发送了你的文字。',
 }

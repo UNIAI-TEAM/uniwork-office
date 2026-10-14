@@ -37,4 +37,5 @@ export const th = {
   aiTestErrLimit: 'ถึงขีดจำกัดของผู้ให้บริการแล้ว โปรดลองใหม่ภายหลัง',
   aiTestErrUnavailable: 'บริการไม่ตอบสนอง โปรดลองใหม่ภายหลัง',
   aiTestErrMisconfigured: 'การตั้งค่าไม่ครบ: ตรวจสอบที่อยู่บริการและช่องบัญชี',
+  setAiUniworkNote: 'UniWork AI ใช้แพ็กเกจขององค์กรของคุณ ไม่ต้องกรอกคีย์หรือเลือกโมเดล',
 } satisfies Record<keyof typeof zh, string>

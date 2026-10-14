@@ -66,4 +66,10 @@ export const id = {
   aiErrUnsupported: 'UniWork AI belum dapat melakukan ini di {module}.',
   aiErrViewOnlyEdit:
     'Anda hanya memiliki akses lihat ke dokumen ini, jadi AI tidak dapat mengeditnya.',
+  // UniWork AI question limits (the façade takes text up to 8,000 characters)
+  aiErrQuestionTooLong:
+    'Permintaan Anda terlalu panjang untuk UniWork AI. Persingkat menjadi kurang dari 8.000 karakter, lalu kirim lagi.',
+  aiErrQuestionRejected:
+    'UniWork AI tidak dapat menerima permintaan ini. Ubah permintaannya, lalu kirim lagi.',
+  aiUniworkImagesNotSent: 'Gambar tidak dikirim ke UniWork AI; hanya teks Anda yang dikirim.',
 } satisfies Record<keyof typeof zh, string>

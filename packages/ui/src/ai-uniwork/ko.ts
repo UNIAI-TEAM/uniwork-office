@@ -60,4 +60,9 @@ export const ko = {
   aiErrCapabilityOff: '이 문서에서 UniWork AI가 방금 꺼져 현재 단계 이후 실행이 중지되었습니다.',
   aiErrUnsupported: 'UniWork AI는 아직 {module}에서 이 작업을 할 수 없습니다.',
   aiErrViewOnlyEdit: '이 문서에 대한 보기 권한만 있어 AI가 편집할 수 없습니다.',
+  // UniWork AI question limits (the façade takes text up to 8,000 characters)
+  aiErrQuestionTooLong:
+    'UniWork AI에 보내기에는 요청이 너무 깁니다. 8,000자 미만으로 줄인 뒤 다시 보내세요.',
+  aiErrQuestionRejected: 'UniWork AI가 이 요청을 받을 수 없습니다. 요청을 수정한 뒤 다시 보내세요.',
+  aiUniworkImagesNotSent: '이미지는 UniWork AI로 전송되지 않으며 텍스트만 전송되었습니다.',
 } satisfies Record<keyof typeof zh, string>

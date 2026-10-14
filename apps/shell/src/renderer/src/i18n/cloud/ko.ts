@@ -37,4 +37,5 @@ export const ko = {
   aiTestErrLimit: '제공업체 한도에 도달했습니다. 나중에 다시 시도하세요',
   aiTestErrUnavailable: '서비스가 응답하지 않습니다. 나중에 다시 시도하세요',
   aiTestErrMisconfigured: '설정이 완전하지 않습니다. 서비스 주소와 계정 항목을 확인하세요',
+  setAiUniworkNote: 'UniWork AI는 조직의 요금제를 사용합니다. 키나 모델을 설정할 필요가 없습니다.',
 } satisfies Record<keyof typeof zh, string>

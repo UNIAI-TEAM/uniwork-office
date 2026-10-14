@@ -57,6 +57,7 @@ import {
   MAX_REMOTE_IMAGE_BYTES,
   readBodyCapped,
 } from '@genoffice/electron-utils'
+import { answerUniworkAiFlagOff } from '@genoffice/electron-utils/uniwork-ai-flag'
 import { buildPagePptx, parsePageSpec } from '@genoffice/pipelines/slides'
 import { sniffImageMime } from './media-mime'
 import { canWriteElementClipboardImage, writeElementClipboardImage } from './element-clipboard'
@@ -2004,6 +2005,8 @@ async function applyMainProcessProxy(): Promise<void> {
 }
 
 export function startSlidesStandalone(): void {
+  // no shell here: answer the renderer's UniWork AI flag pull with "off" instead of an unregistered channel
+  answerUniworkAiFlagOff(ipcMain)
   registerRendererScheme()
   installNavigationGuard(app)
   installContextMenu(app, () => contextMenuLabels(getUiLang()))

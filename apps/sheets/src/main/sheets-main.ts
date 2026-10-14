@@ -70,6 +70,7 @@ import {
   rendererUrl,
   writeJsonAtomic,
 } from '@genoffice/electron-utils'
+import { answerUniworkAiFlagOff } from '@genoffice/electron-utils/uniwork-ai-flag'
 import { createI18n, getUiLang, type Lang, normalizeLang, setUiLang } from '@genoffice/i18n'
 import { ProjectStore } from '@genoffice/project-store'
 
@@ -3807,6 +3808,16 @@ export function registerSheetsAiIpc(): void {
     const send = (chunk: AiStreamChunk) => {
       if (!event.sender.isDestroyed()) event.sender.send(IPC_CHANNELS.aiStreamChunk, chunk)
     }
+    if (provider === 'uniwork') {
+      // UniWork AI needs the UniWork session of the shell; this standalone module has none
+      send({
+        requestId,
+        type: 'error',
+        error: 'UniWork AI is not available here.',
+        uniworkCode: 'ai_disabled',
+      })
+      return
+    }
     if (!config || (provider !== 'codex' && !config.apiKey)) {
       send({
         requestId,
@@ -4759,6 +4770,8 @@ async function applyMainProcessProxy(): Promise<void> {
 }
 
 export function startSheetsStandalone(): void {
+  // no shell here: answer the renderer's UniWork AI flag pull with "off" instead of an unregistered channel
+  answerUniworkAiFlagOff(ipcMain)
   registerRendererScheme()
   installNavigationGuard(app)
   installContextMenu(app, () => contextMenuLabels(getUiLang()))

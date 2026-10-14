@@ -39,6 +39,7 @@ import {
   registerRendererScheme,
   rendererUrl,
 } from '@genoffice/electron-utils'
+import { answerUniworkAiFlagOff } from '@genoffice/electron-utils/uniwork-ai-flag'
 import { createI18n, getUiLang } from '@genoffice/i18n'
 import { generateImageTool, documentMediaRoots } from '@genoffice/ai-search'
 import { ImageExportSessions } from './image-export'
@@ -1331,6 +1332,8 @@ export function createMarkdownView(openPath?: string | null): WebContentsView {
 
 /** Standalone window mode: `npm run dev -w @genoffice/markdown`, md path passed via argv */
 export function startMarkdownStandalone(): void {
+  // no shell here: answer the renderer's UniWork AI flag pull with "off" instead of an unregistered channel
+  answerUniworkAiFlagOff(ipcMain)
   registerRendererScheme()
   installNavigationGuard(app)
   installContextMenu(app, () => contextMenuLabels(getUiLang()))

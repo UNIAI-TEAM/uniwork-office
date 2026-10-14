@@ -77,8 +77,13 @@ function openAiMessages(
 }
 
 /** Emits a complete (non-streamed) chat completion delivered as a plain JSON body. */
-function emitOpenAiJsonMessage(bodyText: string, cb: StreamCallbacks): void {
+function emitOpenAiJsonMessage(
+  bodyText: string,
+  cb: StreamCallbacks,
+  onExtension?: (extension: unknown) => void,
+): void {
   let msg: {
+    x_uniwork?: unknown
     choices?: Array<{
       message?: {
         content?: unknown
@@ -95,6 +100,7 @@ function emitOpenAiJsonMessage(bodyText: string, cb: StreamCallbacks): void {
     throw new Error(`The model returned an unparseable JSON body: ${httpBodyDetail(bodyText)}`)
   }
   if (msg.error) throw new Error(sseErrorText(msg.error, 'Model error'))
+  if (msg.x_uniwork !== undefined) onExtension?.(msg.x_uniwork)
   const choice = msg.choices?.[0]
   let emitted = false
   if (choice?.message?.reasoning_content) {
@@ -208,10 +214,39 @@ async function openAiCompatibleTurn(
     if (response.status === 402) throw new AiCreditsError(detail)
     throw new Error(`HTTP ${response.status}: ${detail}`)
   }
+  return consumeOpenAiCompatibleResponse(response, cb, onBytes)
+}
+
+/** How a successful chat-completions answer is read. */
+export interface ConsumeOpenAiResponseOptions {
+  /**
+   * The UniWork AI `x_uniwork` object, from the JSON body or any SSE chunk
+   * that carries it (before that chunk's choices). Throwing ends the read.
+   */
+  onExtension?: ((extension: unknown) => void) | undefined
+  /**
+   * Scan a JSON body for a gateway credits-exhausted notice (default true).
+   * UniWork AI reports credits by status and code only, so its answer text
+   * (which may quote such a sentence) is never scanned.
+   */
+  creditsNotice?: boolean | undefined
+}
+
+/**
+ * Reads an OK chat-completions response, a JSON body or an SSE stream (one
+ * complete chunk or many deltas alike), into the stream callbacks. Shared by
+ * the BYOK openai-compatible path and the UniWork AI adapter.
+ */
+export async function consumeOpenAiCompatibleResponse(
+  response: Response,
+  cb: StreamCallbacks,
+  onBytes: () => void,
+  options: ConsumeOpenAiResponseOptions = {},
+): Promise<void> {
   const jsonBody = await jsonBodyInsteadOfSse(response, onBytes)
   if (jsonBody !== null) {
-    throwIfCreditsNotice(jsonBody)
-    return emitOpenAiJsonMessage(jsonBody, cb)
+    if (options.creditsNotice !== false) throwIfCreditsNotice(jsonBody)
+    return emitOpenAiJsonMessage(jsonBody, cb, options.onExtension)
   }
   // tool call arguments stream in fragments keyed by index
   const pendingTools = new Map<number, { id: string; name: string; json: string }>()
@@ -239,6 +274,7 @@ async function openAiCompatibleTurn(
     }
     pendingTools.clear()
   }
+  if (!response.body) throw new Error('The model returned no content (empty stream)')
   for await (const sse of sseDataEvents(response.body, onBytes)) {
     if (sse.raw === '[DONE]') {
       sawDone = true
@@ -248,6 +284,7 @@ async function openAiCompatibleTurn(
     // rather than killing the turn.
     if (sse.json === undefined) continue
     const event = sse.json as {
+      x_uniwork?: unknown
       choices?: Array<{
         delta?: {
           content?: unknown
@@ -265,6 +302,8 @@ async function openAiCompatibleTurn(
       error?: { message?: string } | string
     }
     if (event.error) throw new Error(sseErrorText(event.error, 'Model stream error'))
+    // before the choices: an end-of-stream frame must stop the turn before anything else is emitted
+    if (event.x_uniwork !== undefined) options.onExtension?.(event.x_uniwork)
     const choice = event.choices?.[0]
     if (!choice) continue
     const reasoning = choice.delta?.reasoning_content ?? choice.delta?.reasoning

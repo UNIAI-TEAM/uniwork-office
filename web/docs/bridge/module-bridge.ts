@@ -131,7 +131,7 @@ export const MODULE_WEB_CAPABILITIES: Readonly<Record<string, unknown>> = Object
 /**
  * What every frame (Docs and the five modules) claims in `ready` on top of its own keys; each is
  * effective only with the host grant:
- *   - the web AI keys (CONTRACT C16; `uniworkAi` stays false until the G6-05 adapter),
+ *   - the web AI keys (CONTRACT C16; `uniworkAi` is the UniWork AI adapter's, effective with the host grant),
  *   - `desktopOpen`: the host's "Open in desktop app" flow for `app.open` (A7),
  *   - `download`: the host downloads the open bytes for `api.download` (X-02).
  */
@@ -194,7 +194,7 @@ export function installModuleBridge(spec: ModuleBridgeSpec): InstalledModuleBrid
   client.onRemoteVersion?.(rememberRemoteVersion)
   // the AI turns of this frame: the host hears `aiRun`, the new-version bar waits for idle
   frameAiRun.bind((payload) => client.reportAiRun?.(payload))
-  const ai = createWebAi({ port: client, capabilities, aiRun: frameAiRun })
+  const ai = createWebAi({ port: client, capabilities, aiRun: frameAiRun, module: spec.module })
 
   const ctx: ModuleBridgeContext = { module: spec.module, client, capabilities }
   const target = spec.target ?? (window as unknown as Record<string, unknown>)

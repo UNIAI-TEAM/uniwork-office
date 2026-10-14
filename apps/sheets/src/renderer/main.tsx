@@ -1,6 +1,7 @@
 import ReactDOM from 'react-dom/client'
 import { htmlDir, htmlLang, type Lang } from '@genoffice/i18n'
 import { applyAiPanelPrefs, installScreenTips } from '@genoffice/ui'
+import { mirrorUniworkAiFlag } from '@genoffice/ai-provider/browser'
 
 import '@genoffice/ui/tokens.css'
 import '@genoffice/ui/screentip.css'
@@ -33,6 +34,8 @@ const root = document.getElementById('root')
 if (!root) throw new Error('Missing application root.')
 
 installScreenTips()
+// this renderer's own provider list shows the UniWork AI entry only while the shell offers it
+mirrorUniworkAiFlag()
 installCanvasFontFallback()
 
 function applyTheme(theme: UiTheme): void {

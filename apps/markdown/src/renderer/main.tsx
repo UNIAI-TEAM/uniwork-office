@@ -16,8 +16,11 @@ import '@genoffice/ui/image-viewer.css'
 import 'katex/dist/katex.min.css'
 import './styles.css'
 import { applyAiPanelPrefs, installScreenTips } from '@genoffice/ui'
+import { mirrorUniworkAiFlag } from '@genoffice/ai-provider/browser'
 
 installScreenTips()
+// this renderer's own provider list shows the UniWork AI entry only while the shell offers it
+mirrorUniworkAiFlag()
 
 function applyTheme(theme: UiTheme): void {
   if (theme === 'system') document.documentElement.removeAttribute('data-theme')

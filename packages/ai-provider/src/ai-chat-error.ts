@@ -8,6 +8,7 @@ import { isAiNetworkError } from './network-error'
 import { isAiOverloadedError } from './overload-error'
 import { AiCreditsError } from './protocols/shared'
 import type { AiChatResponse } from './types'
+import { isUniworkError } from './uniwork/errors'
 import { AiTimeoutError } from './watchdog'
 
 /** an HTTP status marker or a JSON body: the text is a provider dump, not a message for people */
@@ -22,6 +23,10 @@ export interface AiStreamErrorFields {
   errorCode?: AiStreamErrorCode
   /** the raw provider text, for the main process log */
   raw: string
+  /** a UniWork AI failure: the server's code picks the message (uniworkErrorKey), errorCode stays unset */
+  uniworkCode?: string
+  /** with uniworkCode: the Retry-After seconds the server sent */
+  retryAfterSec?: number
 }
 
 function rawText(err: unknown): string {
@@ -37,6 +42,15 @@ function rawText(err: unknown): string {
  */
 export function aiStreamErrorFields(err: unknown, lang: string): AiStreamErrorFields {
   const raw = rawText(err)
+  // before every text classifier: a UniWork AI code is never read as overloaded/credits/network text
+  if (isUniworkError(err)) {
+    return {
+      error: raw,
+      raw,
+      uniworkCode: err.code,
+      ...(err.retryAfterSec !== undefined ? { retryAfterSec: err.retryAfterSec } : {}),
+    }
+  }
   if (err instanceof AiTimeoutError) return { error: raw, errorCode: 'timeout', raw }
   if (err instanceof AiCreditsError) return { error: raw, errorCode: 'credits', raw }
   if (isAiNetworkError(err)) return { error: raw, errorCode: 'network', raw }

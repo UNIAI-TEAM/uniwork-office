@@ -63,4 +63,9 @@ export const cs = {
   aiErrUnsupported: 'UniWork AI to zatím v {module} neumí.',
   aiErrViewOnlyEdit:
     'K tomuto dokumentu máte jen přístup pro zobrazení, takže ho AI nemůže upravit.',
+  // UniWork AI question limits (the façade takes text up to 8,000 characters)
+  aiErrQuestionTooLong:
+    'Požadavek je pro UniWork AI příliš dlouhý. Zkraťte ho pod 8 000 znaků a odešlete znovu.',
+  aiErrQuestionRejected: 'UniWork AI tento požadavek nemůže přijmout. Upravte ho a odešlete znovu.',
+  aiUniworkImagesNotSent: 'Obrázky se do UniWork AI neodesílají; odeslal se jen text.',
 } satisfies Record<keyof typeof zh, string>

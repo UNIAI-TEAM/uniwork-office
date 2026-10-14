@@ -70,4 +70,11 @@ export const fr = {
   aiErrUnsupported: 'UniWork AI ne peut pas encore faire cela dans {module}.',
   aiErrViewOnlyEdit:
     'Vous n’avez qu’un accès en lecture à ce document : l’IA ne peut pas le modifier.',
+  // UniWork AI question limits (the façade takes text up to 8,000 characters)
+  aiErrQuestionTooLong:
+    'Votre demande est trop longue pour UniWork AI. Raccourcissez-la à moins de 8 000 caractères, puis renvoyez-la.',
+  aiErrQuestionRejected:
+    'UniWork AI n’a pas pu accepter cette demande. Modifiez-la, puis renvoyez-la.',
+  aiUniworkImagesNotSent:
+    'Les images ne sont pas envoyées à UniWork AI ; seul votre texte a été envoyé.',
 } satisfies Record<keyof typeof zh, string>

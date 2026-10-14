@@ -79,6 +79,7 @@ import {
   readBodyCapped,
   writeJsonAtomic,
 } from '@genoffice/electron-utils'
+import { answerUniworkAiFlagOff } from '@genoffice/electron-utils/uniwork-ai-flag'
 import { configureMetricsCache, familyVerticalMetrics } from '@genoffice/font-metrics'
 import { createI18n, getUiLang, normalizeLang, setUiLang } from '@genoffice/i18n'
 import { ProjectStore, type PracticeId } from '@genoffice/project-store'
@@ -106,6 +107,7 @@ import {
   refreshUniworkCloudStatus,
   resolveAiSettings,
   selectedProvider,
+  uniworkAiAvailable,
   maxOutputTokensOf,
   sanitizeAiSettings,
   sanitizeCliPath,
@@ -3768,6 +3770,76 @@ const SETTINGS_PATH = () => userDataPath('ai-settings.json')
 
 const activeAiStreams = new Map<string, AbortController>()
 
+/**
+ * UniWork AI (the `uniwork` provider) runs in the shell main process only:
+ * the shell installs the host that resolves the sender's document, adds the
+ * UniWork session and runs the adapter (apps/shell uniwork-auth/ai-chat.ts).
+ * Without one (this module running on its own) a UniWork AI turn is refused.
+ */
+export interface UniworkAiHost {
+  stream(call: {
+    senderId: number
+    request: AiStreamRequest
+    send(chunk: AiStreamChunk): void
+    signal: AbortSignal
+  }): Promise<void>
+}
+
+let uniworkAiHost: UniworkAiHost | null = null
+export function setUniworkAiHost(host: UniworkAiHost | null): void {
+  uniworkAiHost = host
+}
+
+/**
+ * Whether the active UniWork account chose "UniWork AI" as its provider. The shell backs it with
+ * the per-account store (key `uniwork.ai.uniwork-choice`); ai-settings.json only ever holds the
+ * BYOK provider, so a pick of `uniwork` is routed here and the file keeps the previous BYOK one.
+ */
+export interface UniworkAiChoiceStore {
+  read(): boolean
+  write(on: boolean): void
+}
+
+let uniworkAiChoiceStore: UniworkAiChoiceStore | null = null
+export function setUniworkAiChoiceStore(store: UniworkAiChoiceStore | null): void {
+  uniworkAiChoiceStore = store
+}
+
+/**
+ * Whether a webContents is an editor tab (the same tab lookup the UniWork AI scope resolver uses).
+ * Only editor panels run UniWork AI; My AI, email, one-click actions and the settings test read
+ * the file's BYOK/UniAI provider. Unset (this module on its own): no sender gets the pick.
+ */
+let uniworkAiEditorSender: ((senderId: number) => boolean) | null = null
+export function setUniworkAiEditorSender(isEditor: ((senderId: number) => boolean) | null): void {
+  uniworkAiEditorSender = isEditor
+}
+
+function isUniworkAiEditor(event: unknown): boolean {
+  const id = (event as { sender?: { id?: unknown } } | null)?.sender?.id
+  return typeof id === 'number' && uniworkAiEditorSender?.(id) === true
+}
+
+/**
+ * The home Settings window reads (and saves) the account pick too, so its AI pane shows what an
+ * editor tab uses. Everything else on the home window (My AI, email, one-click) keeps the file
+ * provider: it never passes this option.
+ */
+function wantsUniworkPick(options: unknown): boolean {
+  return (
+    (options as { includeUniworkPick?: unknown } | null | undefined)?.includeUniworkPick === true
+  )
+}
+
+/** the provider ai-settings.json holds (never `uniwork`: the pick lives in the account store) */
+function fileAiProvider(): AiProviderId {
+  const provider = resolveAiSettings(
+    readJson<Partial<AiSettings> & LegacyAiSettings>(SETTINGS_PATH(), {}),
+    defaultAiSettings(),
+  ).provider
+  return provider === 'uniwork' ? defaultAiSettings().provider : provider
+}
+
 /** every renderer (tabs, home) re-reads ai-settings.json — the composer chip and
  *  the settings page edit the same file from different windows */
 function broadcastAiSettingsChanged(): void {
@@ -3782,11 +3854,15 @@ function broadcastAiSettingsChanged(): void {
  */
 export function registerAiIpc(): void {
   app.once('before-quit', shutdownCodexAppServers)
-  ipcMain.handle('ai:get-settings', async (): Promise<AiSettings> => {
+  ipcMain.handle('ai:get-settings', async (event, options?: unknown): Promise<AiSettings> => {
     const stored = readJson<Partial<AiSettings> & LegacyAiSettings>(SETTINGS_PATH(), {})
     const settings = resolveAiSettings(stored, defaultAiSettings())
     // the stored provider stays selected even while its config is incomplete (the picker and
     // Settings show what is missing); only an unknown id degrades to genspark
+    // the account's UniWork AI pick overlays the file's BYOK provider; while the entry is not
+    // offered, selectedProvider degrades it (the pick itself stays stored for when it returns)
+    if ((isUniworkAiEditor(event) || wantsUniworkPick(options)) && uniworkAiChoiceStore?.read())
+      settings.provider = 'uniwork'
     settings.provider = selectedProvider(settings)
     return settings
   })
@@ -3810,7 +3886,7 @@ export function registerAiIpc(): void {
     shellHooks?.openSettings?.('aiModel')
   })
 
-  ipcMain.handle('ai:set-settings', (_event, settings: AiSettings) => {
+  ipcMain.handle('ai:set-settings', (event, settings: AiSettings, options?: unknown) => {
     // SECURITY.md: payloads are schema-checked in the main process. The settings
     // file feeds cliPath into spawn() and baseUrl receives a bearer token,
     // so the renderer's copy is sanitized before it touches disk.
@@ -3818,6 +3894,31 @@ export function registerAiIpc(): void {
     if (!sanitized) {
       console.warn('[ai] rejected invalid ai:set-settings payload')
       return
+    }
+    if (sanitized.provider === 'uniwork') {
+      // saved per account, never in the file: the file keeps the BYOK provider it had
+      uniworkAiChoiceStore?.write(true)
+      sanitized.provider = fileAiProvider()
+    } else if (!uniworkAiAvailable()) {
+      // while UniWork AI is hidden the renderer only had the degraded provider to save back: that
+      // is no choice against the account's pick, which stays stored for when the entry returns,
+      // and the BYOK provider underneath stays the file's (key and model edits still go through);
+      // any other provider is a real choice: it is written and the pick is cleared
+      if (uniworkAiChoiceStore?.read()) {
+        if (sanitized.provider === selectedProvider({ ...sanitized, provider: 'uniwork' })) {
+          sanitized.provider = fileAiProvider()
+        } else {
+          uniworkAiChoiceStore.write(false)
+        }
+      }
+    } else if (
+      // a window without the pick (home: My AI) clears it only by changing the provider; an editor
+      // tab and the Settings window both saw the pick, so any provider they save is the choice
+      isUniworkAiEditor(event) ||
+      wantsUniworkPick(options) ||
+      sanitized.provider !== fileAiProvider()
+    ) {
+      uniworkAiChoiceStore?.write(false)
     }
     writeJsonAtomic(SETTINGS_PATH(), sanitized)
     broadcastAiSettingsChanged()
@@ -3855,6 +3956,29 @@ export function registerAiIpc(): void {
     const config = withUniAiOpenRouterAuth(settings, provider, settings.providers?.[provider])
     const send = (chunk: AiStreamChunk) => {
       if (!event.sender.isDestroyed()) event.sender.send('ai:stream-chunk', chunk)
+    }
+    if (provider === 'uniwork') {
+      // no key, no model: the UniWork session and the server's policy decide
+      const host = uniworkAiHost
+      if (!host) {
+        send({
+          requestId,
+          type: 'error',
+          error: 'UniWork AI is not available here.',
+          uniworkCode: 'ai_disabled',
+        })
+        return
+      }
+      const controller = new AbortController()
+      activeAiStreams.set(requestId, controller)
+      const unwatchSender = abortOnDestroyed(event.sender, controller)
+      try {
+        await host.stream({ senderId: event.sender.id, request, send, signal: controller.signal })
+      } finally {
+        unwatchSender()
+        activeAiStreams.delete(requestId)
+      }
+      return
     }
     if (!config || (provider !== 'codex' && !config.apiKey)) {
       send({
@@ -4055,6 +4179,9 @@ export function registerAiIpc(): void {
     // the renderer's settings copy verbatim
     const settings = sanitizeAiSettings(request.settings)
     if (!settings) return { ok: false, error: 'invalid AI settings payload', errorKind: 'failed' }
+    // UniWork AI runs only as an editor panel's agent turn: a one-shot caller holding an editor's
+    // settings copy gets the file's BYOK/UniAI provider instead of a key request for `uniwork`
+    if (settings.provider === 'uniwork') settings.provider = fileAiProvider()
     const provider = settings.provider
     const config = withUniAiOpenRouterAuth(settings, provider, settings.providers?.[provider])
     if (!config || (provider !== 'codex' && !config.apiKey)) {
@@ -6317,6 +6444,8 @@ export function hasDocsWindow(): boolean {
 // ---- standalone lifecycle (apps/docs running on its own) ----
 
 export function startDocsStandalone(): void {
+  // no shell here: answer the renderer's UniWork AI flag pull with "off" instead of an unregistered channel
+  answerUniworkAiFlagOff(ipcMain)
   registerRendererScheme()
   installNavigationGuard(app)
   installContextMenu(app, () => contextMenuLabels(getUiLang()))

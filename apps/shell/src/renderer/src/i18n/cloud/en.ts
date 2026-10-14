@@ -37,4 +37,5 @@ export const en = {
   aiTestErrLimit: 'Provider limit reached. Try again later',
   aiTestErrUnavailable: 'Service not answering. Try again later',
   aiTestErrMisconfigured: 'Settings incomplete: check the service address and account fields',
+  setAiUniworkNote: "UniWork AI uses your organization's plan. No key or model to set.",
 } satisfies Record<keyof typeof zh, string>
