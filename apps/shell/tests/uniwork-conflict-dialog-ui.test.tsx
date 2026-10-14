@@ -816,4 +816,33 @@ describe('UniworkConflictDialog UI (G5-09 S5 desktop)', () => {
     })
     expect(alertEl.textContent).toBe(en.uwConflictOverwriteFailed)
   })
+
+  it('FE-204: busy ref guard ensures two synchronous clicks in the same frame send only one uniworkConflictAct call', async () => {
+    await act(async () => {
+      pushConflict?.(makeView())
+    })
+
+    const dialog = document.querySelector('[role="alertdialog"]') as HTMLElement
+    const overwriteBtn = dialog.querySelector(
+      '[data-conflict-action="overwrite"]',
+    ) as HTMLButtonElement
+    await act(async () => {
+      overwriteBtn.click()
+    })
+
+    const overwriteGo = dialog.querySelector(
+      '[data-conflict-action="overwrite-go"]',
+    ) as HTMLButtonElement
+
+    await act(async () => {
+      overwriteGo.click()
+      overwriteGo.click()
+    })
+
+    expect(actCalls).toHaveLength(1)
+    expect(actCalls[0]).toEqual({
+      sessionId: 'sess-ui-1',
+      action: { kind: 'overwrite', stopAi: false },
+    })
+  })
 })

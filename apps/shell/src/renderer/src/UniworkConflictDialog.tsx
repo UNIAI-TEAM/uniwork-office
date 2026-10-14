@@ -112,6 +112,7 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
   const titleRef = useRef<HTMLHeadingElement | null>(null)
   const prevViewRef = useRef<UniworkConflictView>(view)
   const replyViewRef = useRef<UniworkConflictView | null>(null)
+  const busyRef = useRef(false)
   const [state, setState] = useState<ConflictDialogState>(() => createInitialConflictState(view))
   const [busy, setBusy] = useState(false)
   const [alertClearing, setAlertClearing] = useState(false)
@@ -177,7 +178,8 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
 
   const sendAction = useCallback(
     async (action: UniworkConflictAction) => {
-      if (busy) return
+      if (busyRef.current) return
+      busyRef.current = true
       setBusy(true)
       try {
         const reply = await onAct(view.sessionId, action)
@@ -201,10 +203,11 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
           onViewChange(fallbackView)
         }
       } finally {
+        busyRef.current = false
         setBusy(false)
       }
     },
-    [busy, onAct, onClosed, onViewChange, view],
+    [onAct, onClosed, onViewChange, view],
   )
 
   const handleOpenSyncCenter = useCallback(async () => {
@@ -300,7 +303,7 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
   )
 
   const handleStep1ActionClick = (actionId: ConflictStep1ActionId, disabled: boolean) => {
-    if (disabled || busy) return
+    if (disabled || busyRef.current) return
     if (actionId === 'cancel') {
       void sendAction({ kind: 'cancel' })
       return
@@ -313,7 +316,7 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
   }
 
   const handleConfirmStep2 = () => {
-    if (busy) return
+    if (busyRef.current) return
     const payload = buildConfirmPayload(state, view)
     if (!payload) return
     void sendAction(payload)
