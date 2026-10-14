@@ -186,6 +186,7 @@ export const vi = {
   wbDeskShowInFolder: 'Hiện trong thư mục',
   wbDeskToolBusy: 'Một dụng cụ khác đang chạy.',
   wbDeskToolFailed: 'Không thực hiện được. Hãy thử lại.',
+  wbDeskToolEncrypted: 'PDF này có mật khẩu. Hãy mở bằng ứng dụng PDF và gỡ mật khẩu trước.',
   wbDeskToolSamePath: 'Hãy chọn tên tệp khác tệp nguồn.',
   wbDeskToolTargetOpen: 'Tệp đó đang mở. Đóng nó rồi thử lại.',
   wbDeskToolNotFound: 'Không còn tìm thấy tệp.',

@@ -531,7 +531,8 @@ export type DeskToolResult =
   | { ok: false; canceled: true }
   | {
       ok: false
-      error: 'busy' | 'bad-input' | 'not-found' | 'same-path' | 'target-open' | 'failed'
+      error:
+        'busy' | 'bad-input' | 'not-found' | 'same-path' | 'target-open' | 'encrypted' | 'failed'
     }
 
 export interface HomeApi {

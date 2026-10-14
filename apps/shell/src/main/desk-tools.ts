@@ -154,6 +154,12 @@ export async function runDeskTool(raw: unknown, deps: DeskToolDeps): Promise<Des
     return { ok: true, outputs: [out] }
   } catch (err) {
     console.error('[shell] desk tool failed:', err)
+    // pdf-lib's EncryptedPDFError is an ES5 subclass: at runtime its name reads 'Error', so match the text too
+    if (
+      err instanceof Error &&
+      (err.name === 'EncryptedPDFError' || /PDFDocument\.load` is encrypted/.test(err.message))
+    )
+      return { ok: false, error: 'encrypted' }
     return { ok: false, error: 'failed' }
   } finally {
     deps.progress(false)

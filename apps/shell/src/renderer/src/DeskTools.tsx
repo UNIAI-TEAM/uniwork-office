@@ -21,6 +21,7 @@ const ERROR_KEY: Record<ToolError, StringKey> = {
   'not-found': 'wbDeskToolNotFound',
   'same-path': 'wbDeskToolSamePath',
   'target-open': 'wbDeskToolTargetOpen',
+  encrypted: 'wbDeskToolEncrypted',
   failed: 'wbDeskToolFailed',
 }
 

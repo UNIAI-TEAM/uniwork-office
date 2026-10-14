@@ -186,6 +186,8 @@ export const en = {
   wbDeskShowInFolder: 'Show in folder',
   wbDeskToolBusy: 'Another tool is still running.',
   wbDeskToolFailed: 'That did not work. Try again.',
+  wbDeskToolEncrypted:
+    'This PDF is password-protected. Open it in the PDF app and remove the password first.',
   wbDeskToolSamePath: 'Pick a file name different from the source.',
   wbDeskToolTargetOpen: 'That file is open. Close it and try again.',
   wbDeskToolNotFound: 'The file is no longer there.',

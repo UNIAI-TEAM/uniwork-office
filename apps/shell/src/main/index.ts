@@ -5892,6 +5892,8 @@ async function convertPdfToOffice(
       if (returnTo) tabManager?.activateTab(returnTo)
       if (officeTabByPath(kind, target)) return null
     }
+    // a detached window on the target is just as stale: close it through its own guard, or stop
+    if (findDetachedTabByPath(target) && !(await closeDetachedByPath(target))) return null
     host.setProgressBar(2)
     // encrypted PDFs prompt for the password (P23), looping on wrong entries;
     // null result = user cancelled the prompt → abort silently

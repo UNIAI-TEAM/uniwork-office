@@ -190,6 +190,7 @@ export const zh = {
   wbDeskShowInFolder: '在文件夹中显示',
   wbDeskToolBusy: '另一个工具仍在运行。',
   wbDeskToolFailed: '操作未完成，请重试。',
+  wbDeskToolEncrypted: '该 PDF 受密码保护。请先在 PDF 应用中打开并移除密码。',
   wbDeskToolSamePath: '请选择与源文件不同的文件名。',
   wbDeskToolTargetOpen: '该文件已打开，请关闭后重试。',
   wbDeskToolNotFound: '找不到该文件。',

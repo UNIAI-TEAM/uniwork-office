@@ -1,3 +1,4 @@
+import { EncryptedPDFError } from 'pdf-lib'
 import { describe, expect, it, vi } from 'vitest'
 import { checkDeskInputs, runDeskTool, type DeskToolDeps } from '../src/main/desk-tools'
 
@@ -177,5 +178,21 @@ describe('desk tools: runs', () => {
       error: 'failed',
     })
     expect(d.busy()).toBe(false)
+  })
+
+  it('a password-protected PDF comes back as encrypted and frees the tool', async () => {
+    // pdf-lib's real error (ES5 subclass: its name reads 'Error'), and one that names itself
+    const named = Object.assign(new Error('locked'), { name: 'EncryptedPDFError' })
+    for (const err of [new EncryptedPDFError(), named]) {
+      const { d } = deps({
+        mergePdf: async () => {
+          throw err
+        },
+      })
+      expect(await runDeskTool({ tool: 'merge-pdf', inputs: ['/w/a.pdf', '/w/b.pdf'] }, d)).toEqual(
+        { ok: false, error: 'encrypted' },
+      )
+      expect(d.busy()).toBe(false)
+    }
   })
 })
