@@ -3,7 +3,8 @@
 // UniWork AI model), re-reads on every open, and keeps today's catalog chip when a host sends none.
 // (A .ts file: this package's vitest include only matches tests/**/*.test.ts.)
 import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -212,8 +213,11 @@ describe('list state note', () => {
   it('uses only classes the picker stylesheet already defines', async () => {
     const m = await mount(anthropic({ anthropic: { chosen: 'claude-chosen', listState: 'error' } }))
     await m.open()
-    // vitest runs with the package as cwd
-    const css = readFileSync(join(process.cwd(), 'src/ai-model-picker.css'), 'utf8')
+    // resolved from this file, so it works from the repo root (--root packages/ui) and the package
+    const css = readFileSync(
+      resolve(dirname(fileURLToPath(import.meta.url)), '../src/ai-model-picker.css'),
+      'utf8',
+    )
     for (const el of host.querySelectorAll('.ai-model-pop *')) {
       for (const cls of el.classList)
         if (cls.startsWith('ai-model')) expect(css).toContain(`.${cls}`)
