@@ -44,7 +44,6 @@ import type {
   FileSearchPage,
   FileSearchRerank,
   FileSearchSettings,
-  UniworkConflictAction,
   UniworkConflictReply,
   UniworkConflictView,
   UniworkCreateDocInput,

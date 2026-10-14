@@ -3565,7 +3565,7 @@ export class UniworkDocsService {
     if (this.deps.storeUsage) {
       const usage = await this.deps.storeUsage().catch(() => null)
       if (usage) {
-        let fileBytes = 0
+        let fileBytes: number
         try {
           fileBytes = statSync(doc.path).size
         } catch {

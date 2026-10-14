@@ -200,7 +200,7 @@ function setup(
   const statuses: UniworkDocStatus[] = []
   const views: UniworkConflictView[] = []
   const closedSessions: string[] = []
-  let account: string | null = 'acc_1'
+  const account: string | null = 'acc_1'
   let capabilityOffline = false
   let keystoreLocked = opts.keystoreLocked ?? false
   let aiRunning = opts.aiRunning ?? false
