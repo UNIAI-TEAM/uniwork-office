@@ -133,13 +133,8 @@ import {
   type TableDesignContext,
 } from './table-design-actions'
 
-import {
-  AgentLoop,
-  COMPLETED_VIA_TOOLS_TEXT,
-  composeSkills,
-  createTextNoticeSurface,
-  type AgentImage,
-} from '@genoffice/agent-core'
+import { AgentLoop, composeSkills, type AgentImage } from '@genoffice/agent-core'
+import { createRunNotices } from './ai/run-notices'
 import { imageGenerationAvailable, type AiSettings } from '@genoffice/ai-provider/browser'
 import { type WorkbookOperation } from '@genoffice/xlsx-gateway/domain/workbook-dsl'
 import {
@@ -1453,14 +1448,14 @@ export function App({
   /** AI plans apply asynchronously after propose_operations returns. Run
    * completion waits for these before doing the run's single auto-save. */
   const aiApplyPromisesRef = useRef<Promise<boolean>[]>([])
-  /** Last non-empty streamed text of the run: a final empty turn falls back to
-   * it instead of wiping the model's own summary from the tool-call turn. */
-  const runLastTextRef = useRef('')
   /** true once any tool of the run mutated the workbook */
   const runMutatedRef = useRef(false)
-  /** UniWork AI notices of the run (a Retry-After wait, a restart, a boundary, dropped calls) folded into
-   * the one text of the assistant message: the chat message here has no note fields */
-  const noticeSurfaceRef = useRef(createTextNoticeSurface())
+  /** UniWork AI notices of the run (a Retry-After wait, a restart, a boundary, dropped calls, off) folded into
+   * the one text of the assistant message (the chat message here has no note fields), plus the run's
+   * last streamed text for the fallback reply */
+  const runNoticesRef = useRef(createRunNotices())
+  /** the question of the running turn: a restarted conversation puts it back in the composer */
+  const runQuestionRef = useRef('')
 
   const agentLoopRef = useRef<AgentLoop | null>(null)
   if (!agentLoopRef.current) {
@@ -1497,7 +1492,6 @@ export function App({
       ),
       events: {
         onText: (text) => {
-          if (text) runLastTextRef.current = text
           // Status bar (and the ribbon-row status span) show a short state only;
           // the full streamed prose lives in the chat panel (web: not echoed at all).
           if (cap('statusEcho')) setMessage(t('appAiThinking'))
@@ -1506,13 +1500,16 @@ export function App({
           // otherwise the whole successful message stays rendered in red.
           patchLastAssistant((entry) => ({
             ...entry,
-            text: noticeSurfaceRef.current.text(text),
+            text: runNoticesRef.current.text(text),
             isError: false,
           }))
         },
         // module-level getLang: the loop is created once, a render closure would go stale
         onNotice: (notice) => {
-          const shown = noticeSurfaceRef.current.notice(
+          // the question was not sent: it goes back into the composer for the user to send again
+          if (notice.kind === 'conversation-restarted')
+            setPrompt((current) => current || runQuestionRef.current)
+          const shown = runNoticesRef.current.notice(
             notice,
             (key, params) => aiUniworkText(getLang(), key, params),
             'Sheets',
@@ -1521,7 +1518,7 @@ export function App({
             patchLastAssistant((entry) => ({ ...entry, text: shown, isError: false }))
         },
         onTurnReset: () => {
-          const shown = noticeSurfaceRef.current.reset()
+          const shown = runNoticesRef.current.reset()
           patchLastAssistant((entry) => ({ ...entry, text: shown }))
         },
         onToolStart: (call) => {
@@ -1585,33 +1582,26 @@ export function App({
             }
             return lines.join('\n')
           })()
-          // A cancelled run must keep the "stopped" notice: earlier narration or
-          // tool summaries would make an aborted run read as completed.
-          const prose =
-            text && text !== COMPLETED_VIA_TOOLS_TEXT
-              ? text
-              : cancelled
-                ? ''
-                : runLastTextRef.current || toolSummaries || text
-          // A final empty turn must not claim completion: reuse the model's last
-          // streamed text; with none, only a mutating run gets the "done" phrasing.
-          const fallback = cancelled
-            ? t('appAiStopped')
-            : runLastTextRef.current ||
-              toolSummaries ||
-              (runMutatedRef.current ? t('appAiNoSummary') : t('appAiNoAction'))
-          // a restarted conversation or UniWork AI being off ends the turn on purpose: the note is the whole reply
-          const baseText = turnLimit
-            ? [prose, t('appAiTurnLimit')].filter(Boolean).join('\n\n')
-            : prose || (noticeSurfaceRef.current.quiet() ? '' : fallback)
-          const finalText = truncated
-            ? [baseText, t('appAiTruncatedNote')].filter(Boolean).join('\n\n')
-            : baseText
+          const { display, persisted: finalText } = runNoticesRef.current.finish({
+            text,
+            cancelled,
+            turnLimit: !!turnLimit,
+            truncated: !!truncated,
+            toolSummaries,
+            mutated: runMutatedRef.current,
+            copy: {
+              stopped: t('appAiStopped'),
+              noSummary: t('appAiNoSummary'),
+              noAction: t('appAiNoAction'),
+              turnLimit: t('appAiTurnLimit'),
+              truncated: t('appAiTruncatedNote'),
+            },
+          })
           if (cap('statusEcho')) setMessage(cancelled ? t('appAiStopped') : t('appAiDone'))
           patchLastAssistant((entry) => ({
             ...entry,
             // notes above the answer; what is persisted below stays the bare answer
-            text: noticeSurfaceRef.current.compose(finalText),
+            text: display,
             streaming: false,
             isError: false,
             // A stop mid-tool can leave a running placeholder behind — drop it
@@ -1684,8 +1674,8 @@ export function App({
     // Released in onDone/onError, which own the rest of the run teardown.
     setAiRunScope(aiScopeDismissed ? null : aiScope)
     aiApplyPromisesRef.current = []
-    runLastTextRef.current = ''
-    noticeSurfaceRef.current.clear()
+    runNoticesRef.current.clear()
+    runQuestionRef.current = instruction
     runMutatedRef.current = false
     setAiBusy(true)
     if (cap('statusEcho')) setMessage(t('appAiThinking'))
