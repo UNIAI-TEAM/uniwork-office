@@ -10,6 +10,7 @@ import { AiPanel } from './ai/AiPanel'
 import { AiAskPopover, type AskAnchorRect } from './AiAskPopover'
 import { AppOnlyNote } from './AppOnlyNote'
 import { narrowPane, widthFitScale } from './fit-scale'
+import { useAiDockLayout } from './ai-dock-layout'
 import { appMayDrawText } from './font-notice'
 import { appOpenAvailable, cap, platform } from './capabilities'
 import {
@@ -394,6 +395,12 @@ export default function App() {
   useEffect(() => {
     rememberAiPanelOpen('genoffice-pdf-show-ai', !aiCollapsed)
   }, [aiCollapsed])
+  /** G8-15: bound documents' comments panel; declared here so the AI dock can fold away for it */
+  const [serverPanelOpen, setServerPanelOpen] = useState(false)
+  /** what the dock shows: the stored choice above, folded while the comments panel is open in a narrow window */
+  const aiDock = useAiDockLayout(aiCollapsed, setAiCollapsed, serverPanelOpen)
+  const aiDockRef = useRef(aiDock)
+  aiDockRef.current = aiDock
   /** One-shot prompt pushed by the ribbon AI buttons; the panel auto-runs it (docs preset pattern) */
   const [aiPreset, setAiPreset] = useState<{ text: string; nonce: number } | null>(null)
   const [ribbonTab, setRibbonTab] = useState<RibbonTab>('home')
@@ -851,8 +858,8 @@ export default function App() {
   // the first AI turn should already know whether the file carries review
   // feedback, so an open panel starts the scan before the user sends anything
   useEffect(() => {
-    if (!aiCollapsed) startAiAnnotCountScan()
-  }, [aiCollapsed, startAiAnnotCountScan])
+    if (!aiDock.collapsed) startAiAnnotCountScan()
+  }, [aiDock.collapsed, startAiAnnotCountScan])
   const [selected, setSelected] = useState<AnnotSelection | null>(null)
   /** Transparency presets fold-out inside the image selection popup */
   const [opacityMenu, setOpacityMenu] = useState(false)
@@ -1405,7 +1412,7 @@ export default function App() {
   useEffect(() => {
     return window.pdfApi.onAiPreset?.((preset) => {
       if (!preset?.text) return
-      setAiCollapsed(false)
+      aiDockRef.current.open()
       setAiPreset({ text: preset.text, nonce: Date.now() })
     })
   }, [])
@@ -1433,7 +1440,6 @@ export default function App() {
   /** G8-15: a bound document with the comments bridge keeps its comments on UniWork (server mode) */
   const commentsBridge = useMemo(() => pdfCommentsBridge(), [])
   const serverComments = uniwork.bound && commentsBridge !== null && !!filePath
-  const [serverPanelOpen, setServerPanelOpen] = useState(false)
 
   /** pdf-lib cannot write encrypted files, including owner-protected files that open without a password. */
   const encryptedReadOnly =
@@ -6329,7 +6335,7 @@ export default function App() {
 
   /** Ribbon AI buttons: expand the dock and auto-run the prompt in the assistant */
   const runAiPreset = (text: string): void => {
-    setAiCollapsed(false)
+    aiDock.open()
     setAiPreset({ text, nonce: Date.now() })
   }
 
@@ -6718,9 +6724,9 @@ export default function App() {
                 <div className="ribbon-group">
                   <div className="ribbon-group-items">
                     <button
-                      className={`rb-big ai-entry${aiCollapsed ? '' : ' active'}`}
+                      className={`rb-big ai-entry${aiDock.collapsed ? '' : ' active'}`}
                       data-tip={t('aiOpenAssistant')}
-                      onClick={() => setAiCollapsed((v) => !v)}
+                      onClick={() => (aiDock.collapsed ? aiDock.open() : aiDock.collapse())}
                     >
                       <span className="rb-big-icon">
                         <UniAiMark size={26} />
@@ -7454,13 +7460,13 @@ export default function App() {
         {/* dock wrapper animates the width between panel and rail (docs-style 180ms ease);
             the panel stays mounted while collapsed so the chat history survives */}
         {cap('ai') && (
-          <div className={`ai-dock${aiCollapsed ? ' collapsed' : ''}`}>
-            {aiCollapsed && (
+          <div className={`ai-dock${aiDock.collapsed ? ' collapsed' : ''}`}>
+            {aiDock.collapsed && (
               <button
                 className="ai-rail"
                 data-tip={t('aiOpenAssistant')}
                 aria-label={t('aiOpenAssistant')}
-                onClick={() => setAiCollapsed(false)}
+                onClick={aiDock.open}
               >
                 <UniAiMark size={22} />
               </button>
@@ -7469,8 +7475,8 @@ export default function App() {
               api={aiApi}
               filePath={filePath}
               preset={aiPreset}
-              open={!aiCollapsed}
-              onCollapse={() => setAiCollapsed(true)}
+              open={!aiDock.collapsed}
+              onCollapse={aiDock.collapse}
               readOnly={readOnly}
               onRunDone={() => void autoSaveAfterAiRun()}
               onClearSelection={() => setAiSelection(null)}
