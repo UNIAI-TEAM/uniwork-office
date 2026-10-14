@@ -56,7 +56,11 @@ import type {
   UniworkRemoteBar,
 } from '../../src/shared/home-api'
 import { BINDING_FILE } from '../../src/main/uniwork-docs/binding-store'
-import { createUniworkDocsClient, type UniworkDocsClient } from '../../src/main/uniwork-docs/client'
+import {
+  createUniworkDocsClient,
+  type FetchLike,
+  type UniworkDocsClient,
+} from '../../src/main/uniwork-docs/client'
 import { sha256Hex } from '../../src/main/uniwork-docs/formats'
 import type { CommitReceipt } from '../../src/main/uniwork-docs/parse'
 import { UniworkDocsService, type ConflictUi } from '../../src/main/uniwork-docs/service'
@@ -139,6 +143,41 @@ interface LiveState {
 }
 
 let liveState: LiveState | null = null
+
+/** one feed page as the server sent it, before the client under test parsed it */
+interface RawFeedPage {
+  phase: string
+  changes: number
+  feed: number
+}
+
+/** this run's raw feed pages; the client shares the fetch, so a dropped row is still visible here */
+let rawFeedPages: RawFeedPage[] = []
+
+/**
+ * The fetch the feed client runs on: each feed page's raw row counts are
+ * recorded beside the parsed page, so a timeout can tell "the server carried no
+ * row" from "the server carried rows and this run saw none" - the two cannot be
+ * told apart from the parsed pages alone. The round trip itself is untouched.
+ */
+const observingFetch: FetchLike = async (input, init) => {
+  const response = await fetch(input, init)
+  if (new URL(input).pathname.endsWith('/documents/changes')) {
+    void response
+      .clone()
+      .text()
+      .then((text) => {
+        const body = JSON.parse(text) as Record<string, unknown>
+        rawFeedPages.push({
+          phase: typeof body.phase === 'string' ? body.phase : '',
+          changes: Array.isArray(body.changes) ? body.changes.length : -1,
+          feed: Array.isArray(body.feed) ? body.feed.length : -1,
+        })
+      })
+      .catch(() => undefined)
+  }
+  return response
+}
 
 function live(): LiveState {
   if (!liveState) throw new Error('the live suite has no seeded context')
@@ -288,11 +327,16 @@ function feedRow(s: LiveState, documentId: string, revision: string): FeedChange
  * feed announced is handled asynchronously (noteFeedChange is fire-and-forget),
  * and the server may take a moment to list a just-committed version, so every
  * window is retried with another tick until the step's budget runs out.
+ *
+ * The timeout carries the step's diagnostics (see syncDiagnostic), so the next
+ * run can tell "the feed never carried the head" from "the feed carried it and
+ * this app dropped it".
  */
 async function syncUntil(
   s: LiveState,
   step: string,
   done: () => Promise<boolean> | boolean,
+  diag?: SyncDiag,
 ): Promise<void> {
   const deadline = Date.now() + STEP_SYNC_BUDGET_MS
   let ticks = 0
@@ -310,9 +354,100 @@ async function syncUntil(
         `${step}: the live feed did not deliver the expected state within ` +
           `${Math.round(STEP_SYNC_BUDGET_MS / 1000)}s (${ticks} runtime tick(s), ` +
           `${s.feed.pages.length} feed page(s) seen; ` +
-          `office_sync_feed=${s.syncFeed === null ? 'unreadable' : s.syncFeed})`,
+          `office_sync_feed=${s.syncFeed === null ? 'unreadable' : s.syncFeed})\n  ` +
+          (await syncDiagnostic(s, diag)),
       )
     }
+  }
+}
+
+/** what the timeout reports about the step (ids, never an origin or a token) */
+interface SyncDiag {
+  documentId: string
+  path: string
+  /** the revision the step's own web commit receipt named */
+  receiptRevision: string
+}
+
+/** the last 6 characters of an id: enough to match a log line, never the whole id */
+function shortId(id: string): string {
+  return id.length <= 6 ? id : `...${id.slice(-6)}`
+}
+
+/** the feed pages seen so far, by phase */
+function phaseCounts(s: LiveState): string {
+  const counts = new Map<string, number>()
+  for (const page of s.feed.pages) counts.set(page.phase, (counts.get(page.phase) ?? 0) + 1)
+  if (counts.size === 0) return 'none'
+  return [...counts].map(([phase, count]) => `${phase}=${count}`).join(' ')
+}
+
+/** what the raw bodies of the feed-phase pages carried, rows the parse may not have kept */
+function rawCounts(): string {
+  let pages = 0
+  let feed = 0
+  let changes = 0
+  for (const page of rawFeedPages) {
+    if (page.phase !== 'feed') continue
+    pages += 1
+    feed += Math.max(0, page.feed)
+    changes += Math.max(0, page.changes)
+  }
+  return `raw: ${pages} feed page(s) carried ${feed} feed row(s), ${changes} changes row(s)`
+}
+
+/** the distinct feed rows the pages actually carried for one document */
+function feedRowsSeen(s: LiveState, documentId: string): string {
+  const rows = new Set<string>()
+  for (const page of s.feed.pages) {
+    for (const change of page.changes) {
+      if (change.documentId !== documentId) continue
+      rows.add(`rev=${change.revision} ver=${change.currentVersion} kind=${change.kind}`)
+    }
+  }
+  const seen = [...rows]
+  if (seen.length === 0) return 'no row for this document'
+  const shown = seen.slice(-8)
+  const older = seen.length - shown.length
+  return `${shown.join(' | ')}${older > 0 ? ` | (+${older} earlier)` : ''}`
+}
+
+/**
+ * The second half of a step timeout: what the feed carried for the step's
+ * document, the binding the copy holds now, the service's status/bar and the
+ * commit receipt's revision. Nothing here names a token, an origin or a full
+ * document id, and a diagnostic failure never replaces the timeout's cause.
+ */
+async function syncDiagnostic(s: LiveState, diag?: SyncDiag): Promise<string> {
+  try {
+    const parts = [`feed pages: ${phaseCounts(s)} (${rawCounts()})`]
+    if (!diag) return parts.join('; ')
+    parts.push(`feed rows for ${shortId(diag.documentId)}: ${feedRowsSeen(s, diag.documentId)}`)
+    parts.push(`receipt revision: ${diag.receiptRevision}`)
+    let binding = 'unreadable'
+    try {
+      const raw = bindingOf(diag.path)
+      const caught =
+        raw.serverRevision === undefined
+          ? ''
+          : ` caughtRevision=${String(raw.serverRevision)} caughtVersion=${String(raw.serverVersion)}`
+      binding = `state=${String(raw.state)} baseRevision=${String(raw.baseRevision)} baseVersion=${String(raw.baseVersion)}${caught}`
+    } catch {
+      // a copy whose binding is gone is itself the finding
+    }
+    parts.push(`binding: ${binding}`)
+    const status = await s.service.docStatus(diag.path).catch(() => null)
+    const bar = status?.remote
+    const barText = !bar
+      ? 'none'
+      : bar.kind === 'revoked' || bar.kind === 'deleted'
+        ? bar.kind
+        : `${bar.kind} version=${bar.version ?? 'none'}`
+    parts.push(status ? `status: state=${status.state} bar=${barText}` : 'status: none (not bound)')
+    return parts.join('; ')
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : 'unreadable'
+    return `diagnostics unavailable (${reason})`
   }
 }
 
@@ -487,7 +622,12 @@ describe.skipIf(!LIVE)('G5-A03 live: a web save on the real D server reaches the
 
     // the real runtime, wired exactly as wiring.ts wires it against the live feed
     const feed = observeFeedClient(
-      createFeedClient({ apiOrigin: origin, authorized, isSignedIn: () => true }),
+      createFeedClient({
+        apiOrigin: origin,
+        authorized,
+        isSignedIn: () => true,
+        fetch: observingFetch,
+      }),
     )
     const runtime = new SyncRuntime({
       store: syncStore,
@@ -543,6 +683,7 @@ describe.skipIf(!LIVE)('G5-A03 live: a web save on the real D server reaches the
   afterAll(() => {
     if (liveState) rmSync(liveState.root, { recursive: true, force: true })
     liveState = null
+    rawFeedPages = []
   })
 
   it('I0. cold start: the real feed lists every seeded head through the runtime', async () => {
@@ -613,7 +754,11 @@ describe.skipIf(!LIVE)('G5-A03 live: a web save on the real D server reaches the
     ).toBe(0)
     const downloadsBefore = s.serviceClient.download
 
-    await syncUntil(s, 'I1', async () => (await remoteOf(s, path))?.kind === 'updated')
+    await syncUntil(s, 'I1', async () => (await remoteOf(s, path))?.kind === 'updated', {
+      documentId: doc.documentId,
+      path,
+      receiptRevision: receipt.revision,
+    })
 
     const status = await s.service.docStatus(path)
     expect(status?.remote, 'I1: the bar must say the copy was updated to the new head').toEqual({
@@ -693,7 +838,11 @@ describe.skipIf(!LIVE)('G5-A03 live: a web save on the real D server reaches the
       withZipComment(s.fixtures.docx, `g5-03a I2 web save ${RUN_TAG}`),
     )
 
-    await syncUntil(s, 'I2', async () => (await remoteOf(s, path))?.kind === 'newer-dirty')
+    await syncUntil(s, 'I2', async () => (await remoteOf(s, path))?.kind === 'newer-dirty', {
+      documentId: doc.documentId,
+      path,
+      receiptRevision: receipt.revision,
+    })
 
     const status = await s.service.docStatus(path)
     expect(status?.remote, 'I2: a dirty copy gets the newer-dirty bar at the web save').toEqual({
@@ -771,7 +920,11 @@ describe.skipIf(!LIVE)('G5-A03 live: a web save on the real D server reaches the
     ).toBe(0)
     const downloadsBefore = s.serviceClient.download
 
-    await syncUntil(s, 'I3', async () => (await remoteOf(s, path))?.kind === 'updated')
+    await syncUntil(s, 'I3', async () => (await remoteOf(s, path))?.kind === 'updated', {
+      documentId: doc.documentId,
+      path,
+      receiptRevision: receipt.revision,
+    })
 
     const status = await s.service.docStatus(path)
     expect(status?.remote, 'I3: the bar must say the copy was updated to the new head').toEqual({
@@ -838,7 +991,11 @@ describe.skipIf(!LIVE)('G5-A03 live: a web save on the real D server reaches the
       withZipComment(s.fixtures.xlsx, `g5-03a I4 web save ${RUN_TAG}`),
     )
 
-    await syncUntil(s, 'I4', async () => (await remoteOf(s, path))?.kind === 'newer-dirty')
+    await syncUntil(s, 'I4', async () => (await remoteOf(s, path))?.kind === 'newer-dirty', {
+      documentId: doc.documentId,
+      path,
+      receiptRevision: receipt.revision,
+    })
 
     const status = await s.service.docStatus(path)
     expect(status?.remote, 'I4: a dirty copy gets the newer-dirty bar at the web save').toEqual({
@@ -908,7 +1065,11 @@ describe.skipIf(!LIVE)('G5-A03 live: a web save on the real D server reaches the
 
     // the feed must really deliver this app's own revision, and the service must
     // ignore it: no bar, no reload, no byte moves
-    await syncUntil(s, 'I5', () => feedRow(s, doc.documentId, appRevision) !== undefined)
+    await syncUntil(s, 'I5', () => feedRow(s, doc.documentId, appRevision) !== undefined, {
+      documentId: doc.documentId,
+      path,
+      receiptRevision: appRevision,
+    })
     expect(
       delta(s.webClient.commit, webBefore.commit),
       'I5: no web client commit is involved in the self-echo check',
