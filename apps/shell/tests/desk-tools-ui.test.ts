@@ -44,6 +44,18 @@ const click = async (label: string) => {
     for (let i = 0; i < 10; i++) await Promise.resolve()
   })
 }
+const typeInto = async (input: HTMLInputElement, value: string) => {
+  await act(async () => {
+    const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+    set.call(input, value)
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+}
+const escape = async (el: Element) => {
+  await act(async () => {
+    el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  })
+}
 const noDrop = { dropped: null, onDropHandled: vi.fn(), unsavedPaths: new Set<string>() }
 
 describe('DeskTools', () => {
@@ -111,6 +123,53 @@ describe('DeskTools', () => {
     expect(host.textContent).toContain('Another tool is still running.')
     api.runDeskTool.mockResolvedValueOnce({ ok: false, canceled: true })
     await click('Export PDF')
+    expect(host.querySelector('.wb-toast')).toBeNull()
+  })
+
+  it('keeps the typed page count and clamps it only when splitting', async () => {
+    await render(noDrop)
+    for (const [typed, sent] of [
+      ['3', 3],
+      ['0', 1],
+      ['1000', 999],
+    ] as const) {
+      await click('Split PDF')
+      const input = host.querySelector<HTMLInputElement>('input[type="number"]')!
+      await typeInto(input, '')
+      expect(input.value).toBe('')
+      await typeInto(input, typed)
+      await click('Split')
+      expect(api.runDeskTool).toHaveBeenLastCalledWith({ tool: 'split-pdf', splitEvery: sent })
+    }
+  })
+
+  it('focuses the page count, and Escape closes the split prompt back to Split PDF', async () => {
+    await render(noDrop)
+    await click('Split PDF')
+    const input = host.querySelector<HTMLInputElement>('input[type="number"]')!
+    expect(document.activeElement).toBe(input)
+    await escape(input)
+    expect(host.querySelector('input[type="number"]')).toBeNull()
+    expect(document.activeElement).toBe(button('Split PDF'))
+  })
+
+  it('returns focus to the tool that ran', async () => {
+    await render(noDrop)
+    await click('Merge PDFs')
+    expect(document.activeElement).toBe(button('Merge PDFs'))
+  })
+
+  it('Escape on the drop panel cancels it', async () => {
+    const onDropHandled = vi.fn()
+    await render({ dropped: ['/w/a.pdf'], onDropHandled, unsavedPaths: new Set() })
+    await escape(host.querySelector('.wb-desk-panel')!)
+    expect(onDropHandled).toHaveBeenCalled()
+  })
+
+  it('shows no toast when a tool creates no files', async () => {
+    api.runDeskTool.mockResolvedValueOnce({ ok: true, outputs: [] })
+    await render(noDrop)
+    await click('Merge PDFs')
     expect(host.querySelector('.wb-toast')).toBeNull()
   })
 })

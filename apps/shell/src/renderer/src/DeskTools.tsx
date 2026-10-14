@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import type { ReactElement } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { KeyboardEvent, ReactElement } from 'react'
 import type { DeskToolId, DeskToolResult } from '../../shared/home-api'
 import { applicableTools } from './desk-model'
 import { FileBadge } from './FileBadge'
@@ -43,13 +43,42 @@ export function DeskTools({
   const { t } = useI18n()
   const [running, setRunning] = useState<DeskToolId | null>(null)
   const [splitFor, setSplitFor] = useState<{ inputs?: string[] } | null>(null)
-  const [every, setEvery] = useState(1)
+  // raw text so a cleared field can be retyped; clamped when the split runs
+  const [every, setEvery] = useState('1')
   // keys and paths only; translated at render
   const [toast, setToast] = useState<{ outputs: string[] } | { error: StringKey } | null>(null)
+
+  // strip buttons by tool id; focus goes back here when a panel closes or a run ends
+  const stripRefs = useRef(new Map<DeskToolId, HTMLButtonElement>())
+  const focusAfterRender = useRef<DeskToolId | null>(null)
+  const focusStrip = (tool: DeskToolId = TOOLS[0]!.id) => {
+    focusAfterRender.current = tool
+  }
+  useEffect(() => {
+    const tool = focusAfterRender.current
+    const el = tool && stripRefs.current.get(tool)
+    if (el && !el.disabled) {
+      el.focus()
+      focusAfterRender.current = null
+    }
+  })
+
+  const closeSplit = () => {
+    setSplitFor(null)
+    focusStrip('split-pdf')
+  }
+  const closeDrop = () => {
+    onDropHandled()
+    focusStrip()
+  }
+  const onEscape = (close: () => void) => (e: KeyboardEvent<HTMLElement>) => {
+    if (e.key === 'Escape') close()
+  }
 
   const run = async (tool: DeskToolId, inputs?: string[], askedSplit = false) => {
     onDropHandled()
     if (tool === 'split-pdf' && !askedSplit) {
+      focusAfterRender.current = null // the page-count input takes focus
       setSplitFor(inputs ? { inputs } : {})
       return
     }
@@ -60,12 +89,14 @@ export function DeskTools({
       .runDeskTool({
         tool,
         ...(inputs ? { inputs } : {}),
-        ...(tool === 'split-pdf' ? { splitEvery: every } : {}),
+        ...(tool === 'split-pdf' ? { splitEvery: clampEvery(every) } : {}),
       })
       .catch((): DeskToolResult => ({ ok: false, error: 'failed' }))
     setRunning(null)
-    if (result.ok) setToast({ outputs: result.outputs })
-    else if (!('canceled' in result)) setToast({ error: ERROR_KEY[result.error] })
+    focusStrip(tool)
+    if (result.ok) {
+      if (result.outputs.length > 0) setToast({ outputs: result.outputs })
+    } else if (!('canceled' in result)) setToast({ error: ERROR_KEY[result.error] })
   }
 
   const busy = running !== null
@@ -81,6 +112,10 @@ export function DeskTools({
             className="wb-btn wb-btn-secondary wb-btn-sm wb-desk-tool"
             disabled={busy}
             aria-busy={running === tool.id}
+            ref={(el) => {
+              if (el) stripRefs.current.set(tool.id, el)
+              else stripRefs.current.delete(tool.id)
+            }}
             onClick={() => void run(tool.id)}
           >
             <FileBadge ext={tool.ext} size={16} />
@@ -91,15 +126,16 @@ export function DeskTools({
       </div>
 
       {splitFor ? (
-        <div className="wb-desk-panel wb-block wb-desk-split">
+        <div className="wb-desk-panel wb-block wb-desk-split" onKeyDown={onEscape(closeSplit)}>
           <label>
             {t('wbDeskSplitEvery')}{' '}
             <input
               type="number"
               min={1}
               max={999}
+              autoFocus
               value={every}
-              onChange={(e) => setEvery(clampEvery(e.target.value))}
+              onChange={(e) => setEvery(e.target.value)}
             />
           </label>
           <button
@@ -109,18 +145,19 @@ export function DeskTools({
           >
             {t('wbDeskSplitRun')}
           </button>
-          <button
-            type="button"
-            className="wb-btn wb-btn-ghost wb-btn-sm"
-            onClick={() => setSplitFor(null)}
-          >
+          <button type="button" className="wb-btn wb-btn-ghost wb-btn-sm" onClick={closeSplit}>
             {t('wbCommonCancel')}
           </button>
         </div>
       ) : null}
 
       {dropped ? (
-        <div className="wb-desk-panel wb-block" role="group" aria-label={t('wbDeskDropHint')}>
+        <div
+          className="wb-desk-panel wb-block"
+          role="group"
+          aria-label={t('wbDeskDropHint')}
+          onKeyDown={onEscape(closeDrop)}
+        >
           <p>{dropped.map(fileName).join(', ')}</p>
           {fitting.length === 0 ? <p>{t('wbDeskDropNone')}</p> : null}
           {fitting.map((id) => (
@@ -129,7 +166,10 @@ export function DeskTools({
               type="button"
               className="wb-btn wb-btn-primary wb-btn-sm"
               disabled={busy}
-              onClick={() => void run(id, [...dropped])}
+              onClick={() => {
+                focusStrip()
+                void run(id, [...dropped])
+              }}
             >
               {t(TOOLS.find((x) => x.id === id)!.label)}
             </button>
@@ -139,12 +179,12 @@ export function DeskTools({
             className="wb-btn wb-btn-secondary wb-btn-sm"
             onClick={() => {
               for (const p of dropped) void window.aiOffice.openPath(p)
-              onDropHandled()
+              closeDrop()
             }}
           >
             {t('wbCommonOpen')}
           </button>
-          <button type="button" className="wb-btn wb-btn-ghost wb-btn-sm" onClick={onDropHandled}>
+          <button type="button" className="wb-btn wb-btn-ghost wb-btn-sm" onClick={closeDrop}>
             {t('wbCommonCancel')}
           </button>
           {fitting.includes('export-pdf') && dropped.some((p) => unsavedPaths.has(p)) ? (
