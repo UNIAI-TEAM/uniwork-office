@@ -42,6 +42,7 @@ export const vi = {
   wbOvSignedOutBody: 'Việc, lịch họp và thông báo được lấy từ tài khoản UniWork của bạn.',
   wbOvForbiddenTitle: 'Bạn không còn quyền truy cập không gian làm việc này',
   wbOvForbiddenBody: 'Hãy chọn không gian làm việc khác ở thanh phía trên.',
+  wbOvPickWorkspace: 'Chọn không gian khác',
   wbOvOfflineTitle: 'Không kết nối được UniWork',
   wbOvOfflineBody: 'Hãy kiểm tra kết nối mạng rồi thử lại.',
   wbOvNoWorkspaceTitle: 'Bạn chưa tham gia không gian làm việc nào',

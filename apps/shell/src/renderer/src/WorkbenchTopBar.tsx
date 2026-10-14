@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import type { ReactElement } from 'react'
+import type { ReactElement, RefObject } from 'react'
 import {
   listPracticeGroups,
   type PracticeDefinition,
@@ -25,6 +25,8 @@ interface Props {
   workspaces: readonly UniworkWorkspaceRef[]
   workspaceId: string | null
   onSelectWorkspace: (id: string) => void
+  /** the workspace select, so a lost-access panel can open it (spec 4.11) */
+  workspaceRef?: RefObject<HTMLSelectElement | null>
   newItems: readonly WorkbenchNewItem[]
   onNewTask: () => void
   onRefresh: () => void
@@ -41,6 +43,7 @@ export function WorkbenchTopBar({
   workspaces,
   workspaceId,
   onSelectWorkspace,
+  workspaceRef,
   newItems,
   onNewTask,
   onRefresh,
@@ -75,6 +78,7 @@ export function WorkbenchTopBar({
             <WbGlyph id="chevronDown" size={14} />
           </span>
           <select
+            ref={workspaceRef}
             aria-label={t('wbTopWorkspace')}
             value={workspaceId ?? ''}
             onChange={(e) => onSelectWorkspace(e.target.value)}

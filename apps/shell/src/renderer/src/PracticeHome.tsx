@@ -47,7 +47,7 @@ import {
   workCacheSlot,
 } from './work-cache'
 import { tabCounts } from './work-home'
-import { WorkStatePanel } from './WorkErrorState'
+import { WorkStatePanel, WorkspacePickerContext } from './WorkErrorState'
 import { DeskView } from './DeskView'
 
 interface PracticeHomeProps {
@@ -163,6 +163,18 @@ export function PracticeHome({
   }, [workspaceId])
 
   const selectWorkspace = (id: string) => setWsState((s) => ({ ...s, workspaceId: id }))
+  // a lost-access panel's "Choose another workspace": focus the chip's select and open its list
+  const workspaceRef = useRef<HTMLSelectElement>(null)
+  const pickWorkspace = () => {
+    const select = workspaceRef.current
+    if (!select) return
+    select.focus()
+    try {
+      select.showPicker?.()
+    } catch {
+      // no user activation or no picker support: the focused chip is enough
+    }
+  }
 
   // a write in the Tasks tab moves the tab counts: reload the summary they read from the cache
   const homeSeq = useRef(0)
@@ -671,6 +683,7 @@ export function PracticeHome({
           workspaces={workspaces ?? []}
           workspaceId={workspaceId}
           onSelectWorkspace={selectWorkspace}
+          workspaceRef={workspaceRef}
           newItems={newItems}
           onNewTask={() => setTab('tasks')}
           onRefresh={refresh}
@@ -691,39 +704,41 @@ export function PracticeHome({
           }}
         />
 
-        {tab === 'desk' ? (
-          <DeskView
-            practiceId={practice.id}
-            vi={vi}
-            workspaces={workspaces}
-            workspaceId={workspaceId}
-            workspaceError={workspaceError}
-            refreshTick={refreshTick}
-            packId={selectedId ?? projects.find((p) => p.isDefault)?.id ?? null}
-            onReload={refresh}
-            onSummary={setHomeSummary}
-            onOpenTab={openDeskTab}
-            onPackLinked={onRefresh}
-            userName={accountName}
-            packs={deskPacks}
-            selectedPackId={selectedId}
-            onSelectPack={onSelectPack}
-          />
-        ) : isWorkbenchModuleId(tab) ? (
-          <WorkbenchModulePane
-            moduleId={tab}
-            practiceId={practice.id}
-            vi={vi}
-            contextTitle={meta?.title}
-            packId={selectedId}
-            onPackLinked={onRefresh}
-            workspace={workspace}
-            workspaceError={workspaceError}
-            onReload={refresh}
-            onTasksWritten={reloadHomeSummary}
-            loading={workspaces === null}
-          />
-        ) : null}
+        <WorkspacePickerContext.Provider value={pickWorkspace}>
+          {tab === 'desk' ? (
+            <DeskView
+              practiceId={practice.id}
+              vi={vi}
+              workspaces={workspaces}
+              workspaceId={workspaceId}
+              workspaceError={workspaceError}
+              refreshTick={refreshTick}
+              packId={selectedId ?? projects.find((p) => p.isDefault)?.id ?? null}
+              onReload={refresh}
+              onSummary={setHomeSummary}
+              onOpenTab={openDeskTab}
+              onPackLinked={onRefresh}
+              userName={accountName}
+              packs={deskPacks}
+              selectedPackId={selectedId}
+              onSelectPack={onSelectPack}
+            />
+          ) : isWorkbenchModuleId(tab) ? (
+            <WorkbenchModulePane
+              moduleId={tab}
+              practiceId={practice.id}
+              vi={vi}
+              contextTitle={meta?.title}
+              packId={selectedId}
+              onPackLinked={onRefresh}
+              workspace={workspace}
+              workspaceError={workspaceError}
+              onReload={refresh}
+              onTasksWritten={reloadHomeSummary}
+              loading={workspaces === null}
+            />
+          ) : null}
+        </WorkspacePickerContext.Provider>
 
         {pillar ? (
           <WorkToolbar

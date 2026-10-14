@@ -47,6 +47,7 @@ export const zh = {
   wbOvSignedOutBody: '任务、会议和通知来自你的 UniWork 账户。',
   wbOvForbiddenTitle: '你已无法访问此工作区',
   wbOvForbiddenBody: '请在上方栏中选择其他工作区。',
+  wbOvPickWorkspace: '选择其他工作区',
   wbOvOfflineTitle: '无法连接 UniWork',
   wbOvOfflineBody: '请检查网络连接后重试。',
   wbOvNoWorkspaceTitle: '你还没有加入任何工作区',

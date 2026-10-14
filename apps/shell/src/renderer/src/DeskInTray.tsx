@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useContext, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { ReactElement, ReactNode } from 'react'
 import type { RecentEntry, UniworkDocStatus, UniworkDocSummary } from '../../shared/home-api'
 import type { WorkHomeSummary } from '../../shared/uniwork-work-api'
@@ -17,7 +17,7 @@ import { openUniworkDocument } from './uniwork-open'
 import { WorkbenchIcon } from './WorkbenchIcons'
 import { notificationKey, type OverviewView } from './work-home'
 import type { WorkLoad } from './work-cache'
-import { WorkSkeleton, WorkStatePanel } from './WorkErrorState'
+import { WorkSkeleton, WorkStatePanel, WorkspacePickerContext } from './WorkErrorState'
 
 const TRAY_ROWS = 8
 /** working copies whose sync state is asked for (one stat each in main) */
@@ -47,6 +47,7 @@ export function DeskInTray({
   refreshTick,
 }: Props): ReactElement {
   const { t, dateLocale } = useI18n()
+  const pickWorkspace = useContext(WorkspacePickerContext)
   const titleId = useId()
   const [shared, setShared] = useState<UniworkDocSummary[]>([])
   const [statuses, setStatuses] = useState<Record<string, UniworkDocStatus>>({})
@@ -203,6 +204,15 @@ export function DeskInTray({
   // signed out, offline or locked out, the Desk banner (or Today) already says why
   const empty = (): ReactNode => {
     if (view === 'loading') return <WorkSkeleton rows={2} />
+    if (view === 'forbidden' && pickWorkspace)
+      return (
+        <p className="wb-ov-note">
+          {t('wbDeskNoServerData')} ·{' '}
+          <button type="button" className="wb-link" onClick={pickWorkspace}>
+            {t('wbOvPickWorkspace')}
+          </button>
+        </p>
+      )
     if (view === 'signed-out' || view === 'unreachable' || view === 'forbidden')
       return <p className="wb-ov-note">{t('wbDeskNoServerData')}</p>
     if (view === 'no-workspace') return <p className="wb-ov-note">{t('wbOvNoWorkspaceTitle')}</p>

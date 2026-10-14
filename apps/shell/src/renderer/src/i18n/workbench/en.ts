@@ -42,6 +42,7 @@ export const en = {
   wbOvSignedOutBody: 'Tasks, meetings and notifications come from your UniWork account.',
   wbOvForbiddenTitle: 'You no longer have access to this workspace',
   wbOvForbiddenBody: 'Choose another workspace in the bar above.',
+  wbOvPickWorkspace: 'Choose another workspace',
   wbOvOfflineTitle: 'Couldn’t reach UniWork',
   wbOvOfflineBody: 'Check your connection, then try again.',
   wbOvNoWorkspaceTitle: 'You are not in a workspace yet',

@@ -1,3 +1,4 @@
+import { createContext, useContext } from 'react'
 import type { ReactElement, ReactNode } from 'react'
 import type { UniworkWorkspaceRef } from '../../shared/home-api'
 import type { UniworkWorkError } from '../../shared/uniwork-work-api'
@@ -142,6 +143,12 @@ const COPY: Record<
   server: { title: 'wbOvLoadFailed', action: 'acctRetry', tone: 'danger', glyph: 'alert' },
 }
 
+/**
+ * Opens the top bar's workspace chip (spec 4.11, "Chọn không gian khác"); PracticeHome provides it.
+ * Outside a Workbench page it is null and the lost-access panel has no action.
+ */
+export const WorkspacePickerContext = createContext<(() => void) | null>(null)
+
 /** A server tab with nothing to show (spec §7): sign in, lost access, or an error with Retry. */
 export function WorkErrorState({
   state,
@@ -153,16 +160,21 @@ export function WorkErrorState({
   compact?: boolean
 }): ReactElement {
   const { t } = useI18n()
+  const pickWorkspace = useContext(WorkspacePickerContext)
   const copy = COPY[state]
   const run =
     state === 'signed-out' ? () => void window.aiOffice.accountLogin().catch(() => false) : onRetry
+  const action =
+    state === 'forbidden'
+      ? pickWorkspace && { label: t('wbOvPickWorkspace'), onClick: pickWorkspace }
+      : copy.action && { label: t(copy.action), onClick: run }
   return (
     <WorkStatePanel
       tone={copy.tone}
       icon={<StateGlyph id={copy.glyph} />}
       title={t(copy.title)}
       body={copy.body ? t(copy.body) : undefined}
-      action={copy.action ? { label: t(copy.action), onClick: run } : undefined}
+      action={action || undefined}
       role={state === 'signed-out' ? 'status' : 'alert'}
       compact={compact}
     />
