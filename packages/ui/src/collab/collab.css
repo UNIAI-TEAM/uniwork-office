@@ -555,6 +555,9 @@ h3.collab-cmh {
   width: 100%;
   box-sizing: border-box;
   min-height: 56px;
+  max-height: 200px;
+  overflow-y: auto;
+  field-sizing: content;
   font: inherit;
   font-size: var(--text-small);
   line-height: 1.5;

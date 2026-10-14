@@ -318,6 +318,13 @@ function EditBox({
     el.setSelectionRange(el.value.length, el.value.length)
   }, [])
 
+  useEffect(() => {
+    const el = areaRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    if (el.scrollHeight > 0) el.style.height = `${Math.min(el.scrollHeight, 200)}px`
+  }, [text])
+
   const cancel = () => {
     if (text !== initial) setAsking(true)
     else onClose()
