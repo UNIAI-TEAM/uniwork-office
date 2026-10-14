@@ -719,11 +719,18 @@ const homeApi: HomeApi = {
     ipcRenderer.on('ai:settings-changed', listener)
     return () => ipcRenderer.removeListener('ai:settings-changed', listener)
   },
-  async getAiSettings() {
-    return (await ipcRenderer.invoke('ai:get-settings')) as AiSettings
+  async getAiSettings(options) {
+    return (await ipcRenderer.invoke(
+      'ai:get-settings',
+      options?.includeUniworkPick ? { includeUniworkPick: true } : undefined,
+    )) as AiSettings
   },
-  async setAiSettings(settings) {
-    await ipcRenderer.invoke('ai:set-settings', settings)
+  async setAiSettings(settings, options) {
+    await ipcRenderer.invoke(
+      'ai:set-settings',
+      settings,
+      options?.includeUniworkPick ? { includeUniworkPick: true } : undefined,
+    )
   },
   getAiProviders() {
     return AI_PROVIDERS.map((meta) => {

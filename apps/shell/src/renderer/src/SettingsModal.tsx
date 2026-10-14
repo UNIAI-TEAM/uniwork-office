@@ -68,6 +68,9 @@ import './settings.css'
 
 // sorted by ISO 639 language code — native-script labels have no natural
 // shared alphabet, so the code is the ordering key
+/** the Settings window reads and saves the account's UniWork AI pick with the BYOK settings */
+const SETTINGS_PICK = { includeUniworkPick: true } as const
+
 const LANG_OPTIONS = [
   { value: 'ar', label: 'العربية' },
   { value: 'cs', label: 'Čeština' },
@@ -391,7 +394,7 @@ function AiModelPane({ t, cloud }: { t: TFunc; cloud: UniworkCloudStatus | null 
   useEffect(() => {
     let alive = true
     const load = () => {
-      void window.aiOffice.getAiSettings?.().then((s) => {
+      void window.aiOffice.getAiSettings?.(SETTINGS_PICK).then((s) => {
         if (!alive || !s) return
         testSeqRef.current += 1
         setTesting(false)
@@ -538,7 +541,7 @@ function AiModelPane({ t, cloud }: { t: TFunc; cloud: UniworkCloudStatus | null 
   }
   const save = () => {
     window.aiOffice
-      .setAiSettings?.(settings)
+      .setAiSettings?.(settings, SETTINGS_PICK)
       .then(() => {
         setDirty(false)
         setSaved(true)
@@ -911,7 +914,7 @@ function AiMediaPane({
   useEffect(() => {
     let alive = true
     const load = () => {
-      void window.aiOffice.getAiSettings?.().then((s) => {
+      void window.aiOffice.getAiSettings?.(SETTINGS_PICK).then((s) => {
         if (!alive || !s) return
         testSeqRef.current += 1
         setTesting(false)
@@ -985,7 +988,7 @@ function AiMediaPane({
 
   const save = () => {
     Promise.all([
-      window.aiOffice.setAiSettings?.(settings),
+      window.aiOffice.setAiSettings?.(settings, SETTINGS_PICK),
       fileSearch ? window.aiOffice.setFileSearchSettings?.(fileSearch) : undefined,
     ])
       .then(() => {

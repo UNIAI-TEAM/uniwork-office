@@ -3810,6 +3810,17 @@ function isUniworkAiEditor(event: unknown): boolean {
   return typeof id === 'number' && uniworkAiEditorSender?.(id) === true
 }
 
+/**
+ * The home Settings window reads (and saves) the account pick too, so its AI pane shows what an
+ * editor tab uses. Everything else on the home window (My AI, email, one-click) keeps the file
+ * provider: it never passes this option.
+ */
+function wantsUniworkPick(options: unknown): boolean {
+  return (
+    (options as { includeUniworkPick?: unknown } | null | undefined)?.includeUniworkPick === true
+  )
+}
+
 /** the provider ai-settings.json holds (never `uniwork`: the pick lives in the account store) */
 function fileAiProvider(): AiProviderId {
   const provider = resolveAiSettings(
@@ -3833,14 +3844,15 @@ function broadcastAiSettingsChanged(): void {
  */
 export function registerAiIpc(): void {
   app.once('before-quit', shutdownCodexAppServers)
-  ipcMain.handle('ai:get-settings', async (event): Promise<AiSettings> => {
+  ipcMain.handle('ai:get-settings', async (event, options?: unknown): Promise<AiSettings> => {
     const stored = readJson<Partial<AiSettings> & LegacyAiSettings>(SETTINGS_PATH(), {})
     const settings = resolveAiSettings(stored, defaultAiSettings())
     // the stored provider stays selected even while its config is incomplete (the picker and
     // Settings show what is missing); only an unknown id degrades to genspark
     // the account's UniWork AI pick overlays the file's BYOK provider; while the entry is not
     // offered, selectedProvider degrades it (the pick itself stays stored for when it returns)
-    if (isUniworkAiEditor(event) && uniworkAiChoiceStore?.read()) settings.provider = 'uniwork'
+    if ((isUniworkAiEditor(event) || wantsUniworkPick(options)) && uniworkAiChoiceStore?.read())
+      settings.provider = 'uniwork'
     settings.provider = selectedProvider(settings)
     return settings
   })
@@ -3864,7 +3876,7 @@ export function registerAiIpc(): void {
     shellHooks?.openSettings?.('aiModel')
   })
 
-  ipcMain.handle('ai:set-settings', (event, settings: AiSettings) => {
+  ipcMain.handle('ai:set-settings', (event, settings: AiSettings, options?: unknown) => {
     // SECURITY.md: payloads are schema-checked in the main process. The settings
     // file feeds cliPath into spawn() and baseUrl receives a bearer token,
     // so the renderer's copy is sanitized before it touches disk.
@@ -3879,8 +3891,11 @@ export function registerAiIpc(): void {
       sanitized.provider = fileAiProvider()
     } else if (
       uniworkAiAvailable() &&
-      // a window without the pick (home: Settings, My AI) clears it only by changing the provider
-      (isUniworkAiEditor(event) || sanitized.provider !== fileAiProvider())
+      // a window without the pick (home: My AI) clears it only by changing the provider; an editor
+      // tab and the Settings window both saw the pick, so any provider they save is the choice
+      (isUniworkAiEditor(event) ||
+        wantsUniworkPick(options) ||
+        sanitized.provider !== fileAiProvider())
     ) {
       // while UniWork AI is hidden the renderer only had the degraded provider to save back: that
       // is no choice against the account's pick, which stays stored for when the entry returns

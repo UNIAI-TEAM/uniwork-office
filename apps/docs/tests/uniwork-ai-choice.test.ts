@@ -83,10 +83,14 @@ const EDITOR = 11
 const HOME = 22
 const from = (id: number) => ({ sender: { id } })
 
-const getSettings = (sender = EDITOR) =>
-  Promise.resolve(handlers.get('ai:get-settings')!(from(sender))) as Promise<AiSettings>
-const setSettings = (s: AiSettings, sender = EDITOR) =>
-  handlers.get('ai:set-settings')!(from(sender), s)
+/** `settingsWindow`: the home Settings window's own read/save, which carries the account pick */
+const SETTINGS_WINDOW = { includeUniworkPick: true }
+const getSettings = (sender = EDITOR, settingsWindow = false) =>
+  Promise.resolve(
+    handlers.get('ai:get-settings')!(from(sender), settingsWindow ? SETTINGS_WINDOW : undefined),
+  ) as Promise<AiSettings>
+const setSettings = (s: AiSettings, sender = EDITOR, settingsWindow = false) =>
+  handlers.get('ai:set-settings')!(from(sender), s, settingsWindow ? SETTINGS_WINDOW : undefined)
 const file = (): AiSettings =>
   JSON.parse(readFileSync(join(dirs.userData, 'ai-settings.json'), 'utf8')) as AiSettings
 
@@ -249,5 +253,46 @@ describe('UniWork AI choice per account (desktop)', () => {
     await setSettings(picked('openai'), HOME)
     expect(accounts.writes.at(-1)).toEqual(['a-1', false])
     expect((await getSettings(EDITOR)).provider).toBe('openai')
+  })
+
+  it('the home Settings window reads the pick (pick on: uniwork; pick off: the file provider) while My AI still gets the file provider', async () => {
+    fakeAccounts()
+    await setSettings(picked('anthropic'))
+    expect((await getSettings(HOME, true)).provider).toBe('anthropic')
+    await setSettings(picked('uniwork'))
+    expect((await getSettings(HOME, true)).provider).toBe('uniwork')
+    expect((await getSettings(HOME)).provider).toBe('anthropic') // My AI, email, one-click
+    expect((await getSettings(EDITOR)).provider).toBe('uniwork')
+  })
+
+  it('the Settings read follows the availability flag: hidden entry, degraded provider; the pick stays', async () => {
+    fakeAccounts()
+    await setSettings(picked('anthropic'))
+    await setSettings(picked('uniwork'))
+    setUniworkAiAvailable(false)
+    expect((await getSettings(HOME, true)).provider).toBe('genspark')
+    setUniworkAiAvailable(true)
+    expect((await getSettings(HOME, true)).provider).toBe('uniwork')
+  })
+
+  it('a Settings save that goes back to the file provider clears the pick it showed', async () => {
+    const accounts = fakeAccounts()
+    await setSettings(picked('anthropic'))
+    await setSettings(picked('uniwork'))
+    // the pane showed UniWork AI; choosing the BYOK provider the file already holds is a real change
+    await setSettings(picked('anthropic'), HOME, true)
+    expect(accounts.writes.at(-1)).toEqual(['a-1', false])
+    expect((await getSettings(HOME, true)).provider).toBe('anthropic')
+    expect((await getSettings(EDITOR)).provider).toBe('anthropic')
+  })
+
+  it('a Settings save that keeps UniWork AI keeps the pick and the BYOK provider underneath', async () => {
+    const accounts = fakeAccounts()
+    await setSettings(picked('anthropic'))
+    await setSettings(picked('uniwork'))
+    await setSettings(picked('uniwork'), HOME, true)
+    expect(accounts.writes.at(-1)).toEqual(['a-1', true])
+    expect(file().provider).toBe('anthropic')
+    expect((await getSettings(HOME, true)).provider).toBe('uniwork')
   })
 })
