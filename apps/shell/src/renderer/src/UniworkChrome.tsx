@@ -23,6 +23,7 @@ import {
   type ChipActionKind,
   type LaunchNotice,
 } from './uniwork-docs-model'
+import { UniworkConflictHost } from './UniworkConflictDialog'
 
 /**
  * UniWork pieces of the tab strip. The strip is shell DOM that stays visible
@@ -266,6 +267,7 @@ export function UniworkNotice({ openDocumentIds }: { openDocumentIds: ReadonlySe
     <>
       {notice && <NoticePill notice={notice} onDismiss={() => setNotice(null)} />}
       <RenamedAnnouncer openDocumentIds={openDocumentIds} />
+      <UniworkConflictHost />
     </>
   )
 }
