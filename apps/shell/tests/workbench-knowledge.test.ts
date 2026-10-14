@@ -535,6 +535,115 @@ describe('Knowledge follows the projects Home hands down', () => {
   })
 })
 
+describe('unsaved Knowledge edits ask before the pack changes (E-M15)', () => {
+  const notes = () => host.querySelector<HTMLTextAreaElement>('.wb-kn-section textarea')!
+  const packItem = (title: string) =>
+    Array.from(host.querySelectorAll<HTMLElement>('.wb-pack-item')).find((b) =>
+      b.textContent?.includes(title),
+    )
+  const dialog = () => host.querySelector<HTMLElement>('.wb-confirm[role="alertdialog"]')
+
+  it('another pack asks Save / Don’t save; Escape stays on the pack with the text kept', async () => {
+    const props = await openPillar([PACK, PACK2], 'p1')
+    await type(notes(), 'Call Linh on Friday')
+    await click(packItem('Beta lease'))
+    expect(dialog()?.querySelector('.wb-confirm-title')?.textContent).toBe(
+      'Save changes to the pack “Acme deal”?',
+    )
+    expect(Array.from(dialog()!.querySelectorAll('button')).map((b) => b.textContent)).toEqual([
+      'Cancel',
+      'Don’t save',
+      'Save',
+    ])
+    expect(props.onSelectPack).not.toHaveBeenCalled()
+    await key(dialog()!, 'Escape')
+    expect(dialog()).toBeNull()
+    expect(props.onSelectPack).not.toHaveBeenCalled()
+    expect(notes().value).toBe('Call Linh on Friday')
+    expect(project.patchPracticeMeta).not.toHaveBeenCalled()
+  })
+
+  it('Don’t save moves on and drops the edits; Save stores them first, then moves on', async () => {
+    const props = await openPillar([PACK, PACK2], 'p1')
+    await type(notes(), 'scratch')
+    await click(packItem('Beta lease'))
+    await click(buttonByText('Don’t save', dialog()!))
+    expect(props.onSelectPack).toHaveBeenLastCalledWith('p2')
+    expect(project.patchPracticeMeta).not.toHaveBeenCalled()
+
+    await click(packItem('Acme deal'))
+    expect(props.onSelectPack).toHaveBeenLastCalledWith('p1')
+    await type(notes(), 'Call Linh on Friday')
+    await click(packItem('Beta lease'))
+    await click(buttonByText('Save', dialog()!))
+    expect(project.patchPracticeMeta).toHaveBeenCalledWith({
+      projectId: 'p1',
+      patch: { notes: 'Call Linh on Friday', tags: ['q4'] },
+    })
+    expect(props.onSelectPack).toHaveBeenLastCalledWith('p2')
+  })
+
+  it('a Save that fails stays on the pack, with its edits', async () => {
+    project.patchPracticeMeta.mockRejectedValueOnce(new Error('disk full'))
+    const props = await openPillar([PACK, PACK2], 'p1')
+    await type(notes(), 'Call Linh on Friday')
+    await click(packItem('Beta lease'))
+    await click(buttonByText('Save', dialog()!))
+    expect(props.onSelectPack).not.toHaveBeenCalled()
+    expect(notes().value).toBe('Call Linh on Friday')
+    expect(host.querySelector('.wb-toast[role="alert"]')?.textContent).toContain('disk full')
+  })
+
+  it('the toolbar pack chip asks too; nothing unsaved switches at once', async () => {
+    pinPillar(PRACTICE.id, 'materials')
+    const props = await openPillar([PACK, PACK2], 'p1')
+    await type(notes(), 'Call Linh on Friday')
+    await clickTab('materials')
+    const chip = () => host.querySelector<HTMLSelectElement>('.wb-toolbar .wb-crumb select')!
+    const pick = async (value: string) => {
+      const select = chip()
+      select.focus()
+      await act(async () => {
+        Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')!.set!.call(
+          select,
+          value,
+        )
+        select.dispatchEvent(new Event('change', { bubbles: true }))
+      })
+      await flush()
+    }
+    await pick('p2')
+    expect(dialog()).not.toBeNull()
+    expect(props.onSelectPack).not.toHaveBeenCalled()
+    await click(buttonByText('Cancel', dialog()!))
+    // the controlled chip still shows the pack it stayed on
+    expect(chip().value).toBe('p1')
+    await clickTab('knowledge')
+    await click(buttonByText('Discard changes'))
+    await clickTab('materials')
+    await pick('p2')
+    expect(dialog()).toBeNull()
+    expect(props.onSelectPack).toHaveBeenLastCalledWith('p2')
+  })
+
+  it('an agent skill run never replaces an open confirm (Enter on Delete must not become Run)', async () => {
+    await openPillar([PACK], 'p1')
+    await chooseMenu(byLabel('More actions')!, 'Delete pack…')
+    const skill = PRACTICE.skills[0]!
+    await act(async () => {
+      window.dispatchEvent(
+        new CustomEvent('uniwork:agent-run-skill', { detail: { skillHint: skill.labelEn } }),
+      )
+    })
+    await flush()
+    expect(dialog()?.querySelector('.wb-confirm-title')?.textContent).toBe(
+      'Delete pack “Acme deal”?',
+    )
+    expect(host.querySelector('.wb-confirm .wb-btn-danger')?.textContent).toBe('Delete pack')
+    expect(toastText()).toContain('Opened Skills')
+  })
+})
+
 describe('Materials (redesign spec 4.8)', () => {
   it('no pack: the panel sends you to Knowledge', async () => {
     await openPillar([PACK], null, 'materials')
@@ -626,6 +735,32 @@ describe('Materials (redesign spec 4.8)', () => {
     expect(host.querySelector('.wb-toast[role="alert"]')).toBeNull()
   })
 
+  it('a create that worked offers no Retry when only its bookkeeping fails: no second document', async () => {
+    project.getPracticeMeta.mockRejectedValue(new Error('meta locked'))
+    await openPillar([PACK], 'p1', 'materials')
+    await click(host.querySelector<HTMLButtonElement>('.wb-pillar-section .wb-chip-row button'))
+    expect(window.aiOffice.newDoc).toHaveBeenCalledTimes(1)
+    expect(host.querySelector('.wb-toast[role="alert"]')).toBeNull()
+    expect(buttonByText('Retry')).toBeUndefined()
+  })
+
+  it('Retry does nothing while another create is running', async () => {
+    ;(window.aiOffice.newSheet as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error('no space left'),
+    )
+    await openPillar([PACK], 'p1', 'materials')
+    const tiles = () => Array.from(host.querySelectorAll<HTMLButtonElement>('.wb-mat-tile'))
+    await click(tiles()[1])
+    const toast = host.querySelector('.wb-toast[role="alert"]')!
+    // a second create that has not answered yet keeps the page busy
+    ;(window.aiOffice.newDoc as ReturnType<typeof vi.fn>).mockReturnValueOnce(
+      new Promise(() => undefined),
+    )
+    await click(host.querySelector<HTMLButtonElement>('.wb-pillar-section .wb-chip-row button'))
+    await click(buttonByText('Retry', toast))
+    expect(window.aiOffice.newSheet).toHaveBeenCalledTimes(1)
+  })
+
   it('a role template that fails is reported too, not swallowed', async () => {
     ;(window.aiOffice.newDoc as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('boom'))
     await openPillar([PACK], 'p1', 'materials')
@@ -706,6 +841,32 @@ describe('Skills (redesign spec 4.9)', () => {
         aiPreset: expect.objectContaining({ autoRun: true }),
       }),
     )
+  })
+
+  it('a run that started says so even when its bookkeeping fails, and offers no Retry', async () => {
+    project.getPracticeMeta.mockRejectedValue(new Error('meta locked'))
+    await openPillar([PACK], 'p1', 'skills')
+    await click(host.querySelector('.wb-sk-row button'))
+    await click(host.querySelector<HTMLButtonElement>('.wb-confirm .wb-btn-primary'))
+    const calls = [
+      ...(window.aiOffice.newDoc as ReturnType<typeof vi.fn>).mock.calls,
+      ...(window.aiOffice.newSlide as ReturnType<typeof vi.fn>).mock.calls,
+    ]
+    expect(calls).toHaveLength(1)
+    expect(host.querySelector('.wb-toast[role="alert"]')).toBeNull()
+    expect(toastText()).toMatch(/^Ran /)
+  })
+
+  it('a failure shows the cause, not Electron’s "Error invoking remote method" wrapper', async () => {
+    ;(window.aiOffice.newSheet as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error("Error invoking remote method 'home:new-sheet': Error: no space left"),
+    )
+    await openPillar([PACK], 'p1', 'materials')
+    await click(host.querySelectorAll<HTMLButtonElement>('.wb-mat-tile')[1])
+    expect(host.querySelector('.wb-toast[role="alert"]')?.textContent).toContain(
+      'Couldn’t create the document. no space left',
+    )
+    expect(host.textContent).not.toContain('invoking remote method')
   })
 
   it('a run that fails names the skill in an alert toast; Retry asks again before spending', async () => {

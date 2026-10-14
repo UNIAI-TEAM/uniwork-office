@@ -3,7 +3,8 @@ import type { CSSProperties, ReactElement } from 'react'
 
 /**
  * A light in-app confirmation (redesign spec 2.3): a title, one line, Cancel
- * (ghost) and the confirm button (primary or danger). It opens next to the
+ * (ghost), an optional second answer (secondary, e.g. "Don't save") and the confirm
+ * button (primary or danger). It opens next to the
  * control that was focused when it appeared (centred when there is none),
  * focuses Cancel and keeps Tab inside itself (a modal alertdialog: nothing behind it
  * can change while it waits), closes on Escape or a click outside, and gives focus back:
@@ -18,6 +19,7 @@ export function WbConfirm({
   tone = 'primary',
   onConfirm,
   onCancel,
+  alt,
   returnFocus,
 }: {
   title: string
@@ -27,6 +29,8 @@ export function WbConfirm({
   tone?: 'primary' | 'danger'
   onConfirm: () => void
   onCancel: () => void
+  /** the other answer of a three-way question (Save / Don't save / Cancel) */
+  alt?: { label: string; onClick: () => void }
   /** where focus lands when the opener can no longer take it (a busy, disabled button; a deleted row) */
   returnFocus?: () => HTMLElement | null
 }): ReactElement {
@@ -123,6 +127,11 @@ export function WbConfirm({
         <button ref={cancelRef} type="button" className="wb-btn wb-btn-ghost" onClick={onCancel}>
           {cancelLabel}
         </button>
+        {alt ? (
+          <button type="button" className="wb-btn wb-btn-secondary" onClick={alt.onClick}>
+            {alt.label}
+          </button>
+        ) : null}
         <button type="button" className={`wb-btn wb-btn-${tone}`} onClick={onConfirm}>
           {confirmLabel}
         </button>

@@ -37,7 +37,7 @@ import { WbConfirm } from './WbConfirm'
 import { WbMenuButton } from './WbMenu'
 import { WbPackChip } from './DeskDrawer'
 import { FileBadge } from './FileBadge'
-import { WbToastHost, createWbToasts, type WbToastText } from './WbToastHost'
+import { WbToastHost, createWbToasts, toastError, type WbToastText } from './WbToastHost'
 import { WorkbenchTabs } from './WorkbenchTabs'
 import { WorkbenchTopBar, type WorkbenchNewItem } from './WorkbenchTopBar'
 import { pinModule, pinPillar } from './workbench-pins'
@@ -97,6 +97,8 @@ type ConfirmAction =
   | { kind: 'delete-pack'; id: string }
   | { kind: 'delete-file'; path: string }
   | { kind: 'run-skill'; skill: 'domain' | 'practice'; id: string }
+  /** leaving a pack with unsaved notes or tags: save (or not), then `go` */
+  | { kind: 'leave-pack'; go: () => void }
 
 /** an in-app confirmation waiting for an answer (WbConfirm); keys, translated at render */
 interface ConfirmAsk {
@@ -215,17 +217,21 @@ export function PracticeHome({
     retry?: () => void,
   ) =>
     toasts.show({
-      message: {
-        key,
-        params: { ...params, error: err instanceof Error ? err.message : String(err) },
-      },
+      message: { key, params: { ...params, error: toastError(err) } },
       tone: 'alert',
-      ...(retry ? { actions: [{ label: 'acctRetry' as const, onClick: retry }] } : {}),
+      ...(retry
+        ? {
+            // another create is running: a retry now would race it (and re-enable its tiles)
+            actions: [{ label: 'acctRetry' as const, onClick: () => !busyRef.current && retry() }],
+          }
+        : {}),
     })
   // the selection now, for a delete that finishes after the user picked another pack
   const selectedIdRef = useRef(selectedId)
   selectedIdRef.current = selectedId
   const [ask, setAsk] = useState<ConfirmAsk | null>(null)
+  const askRef = useRef(ask)
+  askRef.current = ask
   const packListRef = useRef<HTMLUListElement>(null)
   const paneRef = useRef<HTMLElement>(null)
 
@@ -313,6 +319,8 @@ export function PracticeHome({
   useEffect(() => {
     if (tab !== 'desk') setDeskDropped(null)
   }, [tab, setDeskDropped])
+  const busyRef = useRef(busy)
+  busyRef.current = busy
   const [skillDomain, setSkillDomain] = useState<SkillDomainId>(() =>
     readActiveSkillDomain(readPinnedSkillDomains()),
   )
@@ -387,6 +395,12 @@ export function PracticeHome({
             hint.includes(s.labelEn.toLowerCase()),
         )
       if (!hit) {
+        toasts.show({ message: { key: 'wbSkOpenedPick' } })
+        return
+      }
+      // an open confirm keeps its question: swapping it under the focused answer would run
+      // something the user never chose (Enter on "Delete pack" becoming "Run")
+      if (askRef.current) {
         toasts.show({ message: { key: 'wbSkOpenedPick' } })
         return
       }
@@ -514,12 +528,35 @@ export function PracticeHome({
     setTagList(meta?.tags ?? [])
     setTagInput('')
   }
+  /** anything that moves off the pack (another pack, another role) asks before unsaved notes or
+   *  tags go: Save, Don't save, or stay (E-M15); an open confirm keeps its question */
+  const leavePack = (go: () => void) => {
+    if (!metaDirty) return go()
+    setAsk(
+      (cur) =>
+        cur ?? {
+          title: { key: 'wbKnLeaveTitle', params: { title: meta.title } },
+          confirm: 'wbCommonSave',
+          tone: 'primary',
+          action: { kind: 'leave-pack', go },
+        },
+    )
+  }
+  const selectPack = (id: string | null) =>
+    id === selectedId ? onSelectPack(id) : leavePack(() => onSelectPack(id))
+  const switchPractice = (id: PracticeId) => leavePack(() => onSwitchPractice(id))
 
+  /** bookkeeping after a create: the document exists by now, so a failure here is never a
+   *  "couldn't create" with Retry (a retry would make a second document) */
   const rememberRole = async (projectId: string, role: string) => {
-    const current = await window.aiOfficeProject!.getPracticeMeta(projectId)
-    const materials = { ...(current?.materials ?? {}), [`role:${role}`]: role }
-    await window.aiOfficeProject!.patchPracticeMeta({ projectId, patch: { materials } })
-    onRefresh()
+    try {
+      const current = await window.aiOfficeProject!.getPracticeMeta(projectId)
+      const materials = { ...(current?.materials ?? {}), [`role:${role}`]: role }
+      await window.aiOfficeProject!.patchPracticeMeta({ projectId, patch: { materials } })
+      onRefresh()
+    } catch {
+      // the pack keeps its old role marks; the document itself is fine
+    }
   }
 
   // the confirm string is "question\nconsequence": the title and the line of an in-app confirm
@@ -558,7 +595,7 @@ export function PracticeHome({
       onRefresh()
       setNotice({ key: 'wbKnPackDeleted' })
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setError(toastError(err))
     } finally {
       setBusy(null)
     }
@@ -593,7 +630,7 @@ export function PracticeHome({
       setPackFiles(next)
       onRefresh()
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setError(toastError(err))
     } finally {
       setBusy(null)
     }
@@ -638,10 +675,11 @@ export function PracticeHome({
         )
         await openDocs(created.id, `${roleDef?.labelVi ?? seedRole} — ${createdMeta.title}`, html)
       }
-      await rememberRole(created.id, seedRole)
     } catch (err) {
       failed('wbMatCreateFailed', {}, err, () => void draftFirstDoc(created))
+      return
     }
+    await rememberRole(created.id, seedRole)
   }
 
   const submitCreate = async () => {
@@ -668,7 +706,7 @@ export function PracticeHome({
       })
       onRefresh()
       // no blank document opens by itself (spec 5.2): the new pack is selected in Knowledge
-      onSelectPack(created.id)
+      selectPack(created.id)
       setQQuery('')
       resetCompose()
       openPillar('knowledge')
@@ -678,14 +716,15 @@ export function PracticeHome({
         actions: [{ label: 'wbCmpFirstDoc', onClick: () => void draftFirstDoc(created) }],
       })
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setError(toastError(err))
     } finally {
       setBusy(null)
     }
   }
 
-  const saveMeta = async () => {
-    if (!selected || !meta) return
+  /** true once the notes and tags are stored */
+  const saveMeta = async (): Promise<boolean> => {
+    if (!selected || !meta) return false
     setBusy('meta')
     try {
       const tags = tagsNow
@@ -697,8 +736,10 @@ export function PracticeHome({
       setTagInput('')
       onRefresh()
       setNotice({ key: 'wbKnSaved' })
+      return true
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setError(toastError(err))
+      return false
     } finally {
       setBusy(null)
     }
@@ -716,13 +757,14 @@ export function PracticeHome({
         const html = practiceMaterialSeedHtml(addRole, vi ? roleDef.labelVi : roleDef.labelEn, meta)
         await openDocs(selected.id, `${roleDef.labelVi} — ${meta.title}`, html)
       }
-      await rememberRole(selected.id, addRole)
-      setNotice({ key: 'wbMatRoleAdded', params: { role: vi ? roleDef.labelVi : roleDef.labelEn } })
     } catch (err) {
       failed('wbMatCreateFailed', {}, err, () => void addMaterial(addRole))
+      return
     } finally {
       setBusy(null)
     }
+    setNotice({ key: 'wbMatRoleAdded', params: { role: vi ? roleDef.labelVi : roleDef.labelEn } })
+    await rememberRole(selected.id, addRole)
   }
 
   const openTemplate = async (templateId: string) => {
@@ -742,12 +784,13 @@ export function PracticeHome({
         )
         await openDocs(selected.id, `${tpl.labelVi} — ${meta.title}`, html)
       }
-      await rememberRole(selected.id, tpl.materialRole)
     } catch (err) {
       failed('wbMatCreateFailed', {}, err, () => void openTemplate(templateId))
+      return
     } finally {
       setBusy(null)
     }
+    await rememberRole(selected.id, tpl.materialRole)
   }
 
   const runDomainSkill = async (skillId: string) => {
@@ -755,6 +798,7 @@ export function PracticeHome({
     const skill = getDomainSkill(skillId)
     if (!skill) return
     const domain = getSkillDomain(skill.domainId)
+    const role = practice.materialRoles[0]?.id ?? 'khac'
     setBusy(`skill:${skillId}`)
     try {
       const ctx = [
@@ -776,7 +820,6 @@ export function PracticeHome({
       if (skill.app === 'slides') {
         await window.aiOffice.newSlide({ projectId: selected.id, aiPreset: preset })
       } else {
-        const role = practice.materialRoles[0]?.id ?? 'khac'
         const roleDef = practice.materialRoles.find((r) => r.id === role)
         const html = practiceMaterialSeedHtml(
           role,
@@ -784,23 +827,26 @@ export function PracticeHome({
           meta,
         )
         await openDocs(selected.id, `${skill.labelVi} — ${meta.title}`, html, preset)
-        await rememberRole(selected.id, role)
       }
-      setNotice({ key: 'wbSkRan', params: { skill: vi ? skill.labelVi : skill.labelEn } })
     } catch (err) {
       // Retry asks again: a run spends AI credit
       failed('wbSkRunFailed', { skill: vi ? skill.labelVi : skill.labelEn }, err, () =>
         setAsk(skillAsk('domain', skillId)),
       )
+      return
     } finally {
       setBusy(null)
     }
+    // the run has started: say so now, whatever the bookkeeping does
+    setNotice({ key: 'wbSkRan', params: { skill: vi ? skill.labelVi : skill.labelEn } })
+    if (skill.app !== 'slides') await rememberRole(selected.id, role)
   }
 
   const runPracticeSkill = async (skillId: string) => {
     if (!selected || !meta) return
     const skill = roleSkills.find((s) => s.id === skillId)
     if (!skill) return
+    const role = skill.seedRole ?? practice.materialRoles[0]?.id ?? 'khac'
     setBusy(`pskill:${skillId}`)
     try {
       const prompt = practiceSkillPrompt(
@@ -816,7 +862,6 @@ export function PracticeHome({
       if (skill.app === 'slides') {
         await window.aiOffice.newSlide({ projectId: selected.id, aiPreset: preset })
       } else {
-        const role = skill.seedRole ?? practice.materialRoles[0]?.id ?? 'khac'
         const roleDef = practice.materialRoles.find((r) => r.id === role)
         const html = practiceMaterialSeedHtml(
           role,
@@ -824,16 +869,17 @@ export function PracticeHome({
           meta,
         )
         await openDocs(selected.id, `${skill.labelVi} — ${meta.title}`, html, preset)
-        await rememberRole(selected.id, role)
       }
-      setNotice({ key: 'wbSkRanRole', params: { skill: vi ? skill.labelVi : skill.labelEn } })
     } catch (err) {
       failed('wbSkRunFailed', { skill: vi ? skill.labelVi : skill.labelEn }, err, () =>
         setAsk(skillAsk('practice', skillId)),
       )
+      return
     } finally {
       setBusy(null)
     }
+    setNotice({ key: 'wbSkRanRole', params: { skill: vi ? skill.labelVi : skill.labelEn } })
+    if (skill.app !== 'slides') await rememberRole(selected.id, role)
   }
 
   const openBlank = (b: (typeof BLANKS)[number], projectId: string): Promise<void> =>
@@ -846,6 +892,7 @@ export function PracticeHome({
   const runAsk = (a: ConfirmAction) => {
     if (a.kind === 'delete-pack') void removePack(a.id)
     else if (a.kind === 'delete-file') void removeMaterialFile(a.path)
+    else if (a.kind === 'leave-pack') void saveMeta().then((saved) => saved && a.go())
     else void (a.skill === 'practice' ? runPracticeSkill(a.id) : runDomainSkill(a.id))
   }
 
@@ -976,7 +1023,7 @@ export function PracticeHome({
       <WbToastHost toasts={toasts}>
         <WorkbenchTopBar
           practice={practice}
-          onSwitchPractice={onSwitchPractice}
+          onSwitchPractice={switchPractice}
           workspaces={workspaces ?? []}
           workspaceId={workspaceId}
           onSelectWorkspace={selectWorkspace}
@@ -1021,7 +1068,7 @@ export function PracticeHome({
               userName={accountName}
               packs={deskPacks}
               selectedPackId={selectedId}
-              onSelectPack={onSelectPack}
+              onSelectPack={selectPack}
               drop={deskDrop}
             />
           ) : isWorkbenchModuleId(tab) ? (
@@ -1033,7 +1080,7 @@ export function PracticeHome({
               packId={draftPackId}
               packs={deskPacks}
               selectedPackId={selectedId}
-              onSelectPack={onSelectPack}
+              onSelectPack={selectPack}
               onPackLinked={onRefresh}
               workspace={workspace}
               workspaceError={workspaceError}
@@ -1109,7 +1156,7 @@ export function PracticeHome({
                               className={`wb-pack-item${entry.id === selectedId ? ' active' : ''}`}
                               aria-current={entry.id === selectedId ? 'true' : undefined}
                               // a second click keeps the pack: no hidden "click again to clear" (spec 5.4)
-                              onClick={() => onSelectPack(entry.id)}
+                              onClick={() => selectPack(entry.id)}
                             >
                               <span className="wb-pack-text">
                                 <span className="wb-pack-title">{m.title}</span>
@@ -1305,7 +1352,7 @@ export function PracticeHome({
                 <WbPackChip
                   packs={deskPacks}
                   selectedPackId={selectedId}
-                  onSelectPack={onSelectPack}
+                  onSelectPack={selectPack}
                   noneLabel={t('wbMatPackNone')}
                   format={(name) => t('wbMatPackChip', { title: name })}
                   ariaLabel={t('wbMatPackPick')}
@@ -1466,7 +1513,7 @@ export function PracticeHome({
                 <WbPackChip
                   packs={deskPacks}
                   selectedPackId={selectedId}
-                  onSelectPack={onSelectPack}
+                  onSelectPack={selectPack}
                   noneLabel={t('wbMatPackNone')}
                   format={(name) => t('wbSkContextChip', { title: name })}
                   ariaLabel={t('wbMatPackPick')}
@@ -1627,6 +1674,17 @@ export function PracticeHome({
             cancelLabel={t('wbCommonCancel')}
             tone={ask.tone}
             onCancel={() => setAsk(null)}
+            alt={
+              ask.action.kind === 'leave-pack'
+                ? {
+                    label: t('wbCommonDontSave'),
+                    onClick: () => {
+                      setAsk(null)
+                      if (ask.action.kind === 'leave-pack') ask.action.go()
+                    },
+                  }
+                : undefined
+            }
             // a delete takes its row or pack with it: focus lands on the pack list, else the pane
             returnFocus={
               ask.action.kind === 'run-skill'

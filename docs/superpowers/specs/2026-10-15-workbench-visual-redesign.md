@@ -41,7 +41,9 @@
    - Rỗng và lỗi nằm gọn trong vùng của nó, dùng biến thể compact.
    - Mỗi màn có tối đa một banner đăng nhập hoặc offline.
    - Toast xếp chồng ở góc dưới phải cột nội dung (một host duy nhất), tự tắt sau 6 giây khi không có hành động.
-     - _Sửa đổi (audit Impeccable P1-1):_ toast có hành động (Hoàn tác / Thử lại / Mở) tự tắt sau 10 giây; đồng hồ dừng khi chuột hoặc focus bàn phím ở trong chồng toast, nên không bao giờ tắt khi focus đang ở đó. Tối đa 3 toast, cái cũ nhất nhường chỗ. Chồng toast chiếm chỗ thật ở cuối trang, nên cuộn xuống luôn thấy phần bị che.
+     - _Sửa đổi (audit Impeccable P1-1):_ toast có hành động (Thử lại / Mở) tự tắt sau 10 giây; đồng hồ dừng khi chuột hoặc focus bàn phím ở trong chồng toast, nên không bao giờ tắt khi focus đang ở đó. Tối đa 3 toast. Chồng toast chiếm chỗ thật ở cuối trang, nên cuộn xuống luôn thấy phần bị che.
+     - _Sửa đổi (review I1, WCAG 2.2.1):_ toast có "Hoàn tác" **không** tự tắt theo giờ; nó chỉ đóng khi bấm ×, Hoàn tác, khi một toast cùng id thay nó, hoặc khi vượt giới hạn. Vượt giới hạn 3 toast thì toast không có hành động nhường chỗ trước, rồi mới đến toast có hành động cũ nhất. Trong tab Ghi chú và Biểu mẫu, ⌘/Ctrl+Z (khi focus không ở ô nhập chữ hay contenteditable, nơi hoàn tác chữ của trình duyệt vẫn được ưu tiên) chạy Hoàn tác mới nhất còn hiện. Toast đang giữ focus mà bị đẩy ra thì focus trở về chỗ cũ, không rơi về `<body>`.
+     - _Sửa đổi (review I2, m6):_ "Thử lại" chỉ có khi bước tạo tài liệu thất bại; việc ghi sổ sau khi tạo xong (đánh dấu vai trò của gói) thất bại thì không báo lỗi tạo và không có Thử lại, vì tài liệu đã có. Kỹ năng báo "Đã chạy" ngay khi lượt chạy bắt đầu. Thử lại không làm gì khi trang đang bận tạo tài liệu khác. Lỗi trong toast hiện nguyên nhân, bỏ phần bọc "Error invoking remote method …" của Electron.
    - Xóa có "Hoàn tác" thay cho hộp confirm. Xóa gói vẫn cần xác nhận, nhưng dùng popover trong app.
 7. **Chuyển động** 150ms vào / 120ms ra, chỉ để giải thích thay đổi; dùng `--transition-fast`. Tôn trọng `prefers-reduced-motion`.
 
@@ -90,6 +92,7 @@ Dùng lại và chuẩn hóa những gì đã có, không thêm thư viện.
 - `WbConfirm` (mới, popover xác nhận nhẹ):
   - Thay `window.confirm` (xóa gói, xóa tệp tài liệu) và modal "Dùng lượt AI?".
   - Gồm tiêu đề, một dòng mô tả, nút Hủy (ghost) và nút xác nhận (chính hoặc nguy hiểm). Esc đóng; focus vào nút Hủy.
+  - _Sửa đổi (E-M15):_ có thể thêm một câu trả lời thứ hai (nút phụ, ví dụ "Không lưu") giữa Hủy và nút xác nhận.
 - `WbToastHost` (mới): một host cho mọi toast của Bàn làm việc (Desk tools, Today, Tasks, Forms, Notes…). Toast xếp chồng, có hành động (Mở / Hoàn tác / Thử lại) và nút đóng; không chồng lên nhau.
 - `WorkStatePanel`: thêm biến thể `compact` (ô icon 28px, padding 12px, căn trái) dùng trong vùng nhỏ. Bản đầy đủ căn giữa vùng.
 - Skeleton: `WorkSkeleton` nhận `shape` (`rows` | `agenda` | `card`). Dòng skeleton có ô icon tròn, hai vạch chữ và một pill.
@@ -287,6 +290,9 @@ Dùng lại và chuẩn hóa những gì đã có, không thêm thư viện.
 3. Xóa biểu mẫu, ghi chú → toast Hoàn tác (khôi phục bản đã xóa). Xóa gói và gỡ tệp → `WbConfirm` trong app, thay `window.confirm`.
 4. Bấm lại gói đang chọn không còn bỏ chọn.
 5. Thông báo cấp tab → toast; lỗi nhập → tại trường.
+6. _Sửa đổi (E-M15):_ rời gói đang có ghi chú hoặc thẻ chưa lưu ở Tri thức (chọn gói khác trong danh sách hoặc ở chip gói trên thanh công cụ, tạo gói mới ở Soạn mới, đổi vai trò) mở `WbConfirm` "Lưu thay đổi của gói “A”?" với Hủy / Không lưu (phụ) / Lưu (chính). Lưu thất bại hoặc Esc / Hủy thì ở lại gói A, giữ nguyên chữ đã gõ. Xóa chính gói A thì không hỏi.
+7. _Sửa đổi (review m2):_ khi một `WbConfirm` đang mở, lệnh "chạy kỹ năng" của trợ lý không thay câu hỏi đó; trợ lý chỉ mở tab Kỹ năng và báo bằng toast.
+8. _Sửa đổi (review m3):_ khi đang ở Mặt bàn, cả trang Bàn làm việc nhận tệp thả vào (kể cả khe giữa các thẻ, lề và vùng toast), không chỉ thanh công cụ, banner và lưới.
 
 ## 6. Kiểm thử
 
