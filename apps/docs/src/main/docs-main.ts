@@ -3889,16 +3889,18 @@ export function registerAiIpc(): void {
       // saved per account, never in the file: the file keeps the BYOK provider it had
       uniworkAiChoiceStore?.write(true)
       sanitized.provider = fileAiProvider()
+    } else if (!uniworkAiAvailable()) {
+      // while UniWork AI is hidden the renderer only had the degraded provider to save back: that
+      // is no choice against the account's pick, which stays stored for when the entry returns,
+      // and the BYOK provider underneath stays the file's (key and model edits still go through)
+      if (uniworkAiChoiceStore?.read()) sanitized.provider = fileAiProvider()
     } else if (
-      uniworkAiAvailable() &&
       // a window without the pick (home: My AI) clears it only by changing the provider; an editor
       // tab and the Settings window both saw the pick, so any provider they save is the choice
-      (isUniworkAiEditor(event) ||
-        wantsUniworkPick(options) ||
-        sanitized.provider !== fileAiProvider())
+      isUniworkAiEditor(event) ||
+      wantsUniworkPick(options) ||
+      sanitized.provider !== fileAiProvider()
     ) {
-      // while UniWork AI is hidden the renderer only had the degraded provider to save back: that
-      // is no choice against the account's pick, which stays stored for when the entry returns
       uniworkAiChoiceStore?.write(false)
     }
     writeJsonAtomic(SETTINGS_PATH(), sanitized)

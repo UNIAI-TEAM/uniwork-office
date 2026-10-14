@@ -185,6 +185,26 @@ describe('UniWork AI choice per account (desktop)', () => {
     expect((await getSettings()).provider).toBe('uniwork')
     expect(accounts.choice.get('a-1')).toBe(true)
     expect(accounts.writes.slice(before)).toEqual([])
+    // the file keeps the BYOK provider underneath, not the degraded fallback the renderer held
+    expect(file().provider).toBe('anthropic')
+  })
+
+  it('a save while hidden still takes the key edits, and without a pick the renderer provider is saved as is', async () => {
+    fakeAccounts()
+    await setSettings(picked('anthropic'))
+    await setSettings(picked('uniwork'))
+    setUniworkAiAvailable(false)
+    await setSettings({
+      ...picked('genspark'),
+      providers: { anthropic: { apiKey: 'sk-hidden', model: 'claude-test' } },
+    } as unknown as AiSettings)
+    expect(file().provider).toBe('anthropic')
+    expect(file().providers.anthropic?.apiKey).toBe('sk-hidden')
+    setUniworkAiAvailable(true)
+    await setSettings(picked('anthropic')) // the pick is cleared by a real choice
+    setUniworkAiAvailable(false)
+    await setSettings(picked('openai'))
+    expect(file().provider).toBe('openai')
   })
 
   it('BYOK edits made while UniWork AI is chosen still reach ai-settings.json', async () => {
