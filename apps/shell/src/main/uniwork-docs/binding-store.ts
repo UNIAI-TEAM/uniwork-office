@@ -63,6 +63,21 @@ export interface Binding {
   /** OQ-P4 (b): the build that wrote it, display only (written as `min_app_version`) */
   minAppVersion: string
   lastSavedAt?: string
+  /**
+   * G8-12: the server version id of the base bytes (the comments anchor base),
+   * from the document read at open or the last commit receipt; absent while
+   * unknown. Moves with `baseVersion`, never on its own.
+   */
+  baseVersionId?: string
+  /** G8-12: the caller's effective level (`my_level`) last read from the server */
+  level?: UniworkDocLevel
+}
+
+export type UniworkDocLevel = 'view' | 'edit' | 'manage'
+
+/** a server `my_level` this build knows, else undefined */
+export function docLevelOf(value: unknown): UniworkDocLevel | undefined {
+  return value === 'view' || value === 'edit' || value === 'manage' ? value : undefined
 }
 
 export interface BoundDocument {
@@ -260,6 +275,12 @@ export function parseBinding(raw: unknown): Binding | null {
     minStoreLevel,
     minAppVersion,
     ...(typeof r.lastSavedAt === 'string' ? { lastSavedAt: r.lastSavedAt } : {}),
+    ...(typeof r.baseVersionId === 'string' &&
+    r.baseVersionId.length > 0 &&
+    r.baseVersionId.length <= 128
+      ? { baseVersionId: r.baseVersionId }
+      : {}),
+    ...(docLevelOf(r.level) ? { level: docLevelOf(r.level) } : {}),
   }
 }
 

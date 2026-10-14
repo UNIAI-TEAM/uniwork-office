@@ -118,6 +118,12 @@ export interface SaveCoordinatorDeps {
   intents(): Promise<IntentAccess>
   /** status push for every state change */
   publish(status: UniworkDocStatus): void
+  /**
+   * G8-12: a Save of `doc` settled with a commit and the binding now names the
+   * server version `versionId` (the comments anchor base). Never called for a
+   * failed, conflicted or no-op Save.
+   */
+  onSaved?(doc: BoundDocument, versionId: string): void
   now?(): Date
   uuid?(): string
   sleep?(ms: number): Promise<void>
@@ -450,7 +456,7 @@ export class SaveCoordinator {
   private async settle(
     doc: BoundDocument,
     intent: IntentRecordV2,
-    landed: { revision: string; version: number },
+    landed: { revision: string; version: number; versionId?: string },
     intents: IntentStore,
   ): Promise<BoundDocument> {
     let current: string | null
@@ -469,6 +475,10 @@ export class SaveCoordinator {
       lastSavedAt: this.now().toISOString(),
     })
     delete settled.serverRevision
+    // the comments anchor base moves with the base version; an unknown id is
+    // dropped rather than left naming the previous version
+    if (landed.versionId) settled.baseVersionId = landed.versionId
+    else delete settled.baseVersionId
     this.pendingNext.delete(doc.path)
     const done = await this.commitState(doc, settled)
     // the same cleanup the dispatcher's committed transition performs: the
@@ -476,6 +486,9 @@ export class SaveCoordinator {
     // Compare-then-delete: a newer intent (N+1) minted while this one settled
     // is never erased by this generation's cleanup (G5-06 fix-C item 3).
     await this.cleanupIntent(intents, doc, intent)
+    if (landed.versionId && done.binding.baseVersionId === landed.versionId) {
+      this.deps.onSaved?.(done, landed.versionId)
+    }
     return done
   }
 
@@ -547,7 +560,11 @@ export class SaveCoordinator {
       return this.settle(
         doc,
         intent,
-        { revision: detail.revision, version: detail.file.version },
+        {
+          revision: detail.revision,
+          version: detail.file.version,
+          ...(detail.file.versionId ? { versionId: detail.file.versionId } : {}),
+        },
         intents,
       )
     }
@@ -632,6 +649,8 @@ export class SaveCoordinator {
           state: 'blocked',
           error: 'permission_revoked',
           access: 'view',
+          // a fact about the server's answer, also for a binding written before levels existed
+          level: 'view' as const,
         })
       case 'member_deactivated':
       case 'organization_suspended':

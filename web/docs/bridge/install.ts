@@ -51,13 +51,15 @@ import { aiHostGrants, createWebAi, withWebAi } from '../../modules/shared/ai/we
 import { FRAME_BASE_CAPABILITIES } from './module-bridge'
 import { frameCommentsClaim } from '../../modules/shared/discussion/claim'
 import { mountFrameDiscussion } from '../../modules/shared/discussion/mount'
+import { installFrameComments } from '../../modules/shared/comments'
 import type { DesktopCapabilities } from '../../../apps/docs/src/shared/ipc'
 
 /**
- * The frame Discussion panel (S13) + the `comments` claim (lane G8-11 D4, invariant 8): off until
- * the Docs frame also serves its anchored comments (S12); the page panel serves both until then.
+ * The frame Discussion panel (S13) + the `comments` claim (lane G8-11 D4, invariant 8). On since
+ * G8-12: the editor serves the anchored comments (S12) through `window.uniworkComments`, so the
+ * frame panels are the page's only comments surfaces.
  */
-const frameComments = false
+const frameComments = true
 
 const headlessEntry = parseHeadlessEntry(location.href, isTopLevel(window))
 const headless = headlessEntry ? createHeadless(headlessEntry) : null
@@ -126,7 +128,14 @@ export function installBridge(): void {
   win.__docsWebBridge = true
   // the host leave dialog hands the focus back to the frame window: put it in the editor again
   if (!headless) installFocusReturn()
-  if (!headless && frameComments) void mountFrameDiscussion(client)
+  if (!headless && frameComments) {
+    // the editor's S12 panel reads window.uniworkComments once init says `comments` is effective;
+    // it awaits this promise first, since the install itself waits for init
+    ;(window as unknown as { uniworkCommentsReady?: Promise<unknown> }).uniworkCommentsReady =
+      installFrameComments(client)
+    // the editor panel owns anchored ids and shows its own S15 line on a miss
+    void mountFrameDiscussion(client, { revealMissing: 'silent' })
+  }
 }
 
 installBridge()

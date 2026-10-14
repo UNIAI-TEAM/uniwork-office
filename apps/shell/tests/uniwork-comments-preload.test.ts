@@ -68,6 +68,8 @@ const METHODS = [
   'anchors',
   'searchMentions',
   'onReveal',
+  'context',
+  'onSaved',
 ] as const
 
 const ORIGIN = 'https://uniwork.example'
@@ -166,7 +168,7 @@ beforeEach(() => {
 })
 
 describe('every editor preload exposes window.uniworkComments', () => {
-  it('the same ten-method surface per app', async () => {
+  it('the same twelve-method surface per app', async () => {
     for (const app of APPS) {
       bridge.exposed.clear()
       vi.resetModules()
@@ -379,5 +381,40 @@ describe('the held reveal pull races with a push (D1-2/D1-3, VG-2)', () => {
     release({ path: '/w/Plan.docx', commentId: 'c1' })
     await flush()
     expect(heard).toEqual([])
+  })
+})
+
+describe('context + onSaved (G8-12 §3.1)', () => {
+  interface SeamApi {
+    context(input: unknown): Promise<unknown>
+    onSaved(handler: (payload: unknown) => void): () => void
+  }
+  const seam = async () => (await preloadApi()) as unknown as SeamApi
+
+  it('context forwards { path } to its channel and resolves the envelope unchanged', async () => {
+    bridge.reply = { ok: true, value: { documentId: DOC, versionId: 'v3' } }
+    const api = await seam()
+    expect(await api.context({ path: PATH })).toEqual({
+      ok: true,
+      value: { documentId: DOC, versionId: 'v3' },
+    })
+    expect(bridge.invoked).toEqual([{ channel: COMMENTS_CHANNELS.context, args: [{ path: PATH }] }])
+  })
+
+  it('onSaved hands well-formed pushes to the handler and drops malformed ones', async () => {
+    const api = await seam()
+    const heard: unknown[] = []
+    const off = api.onSaved((p) => heard.push(p))
+    const push = bridge.listeners.get(COMMENTS_CHANNELS.saved)!
+    push({}, { path: PATH, versionId: 'ver_4' })
+    push({}, { path: PATH })
+    push({}, { path: PATH, versionId: 7 })
+    push({}, 'ver_5')
+    push({}, null)
+    expect(heard).toEqual([{ path: PATH, versionId: 'ver_4' }])
+    // subscribing pulls nothing: the saved push is not held
+    expect(bridge.invoked).toEqual([])
+    off()
+    expect(bridge.listeners.has(COMMENTS_CHANNELS.saved)).toBe(false)
   })
 })

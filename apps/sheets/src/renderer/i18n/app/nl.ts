@@ -1507,6 +1507,7 @@ export const nl = {
   appCtxResolveComment: 'Opmerking oplossen',
   appThreadConverted: '{count} opmerkingen geconverteerd naar notities.',
   appThreadNoneAtSelection: 'Geen opmerkingenthread in de geselecteerde cel.',
+  appCommentSaveFirst: 'Sla eerst de werkmap op om een opmerking toe te voegen',
   appThreadCellHasNote:
     'De geselecteerde cel heeft al een notitie; er kan geen opmerking worden toegevoegd.',
   appThreadHoverHint: 'Beantwoorden in het deelvenster Opmerkingen',

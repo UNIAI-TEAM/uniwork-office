@@ -11,8 +11,19 @@
 /// surface.
 import { contextBridge, ipcRenderer } from 'electron'
 import type { IpcRendererEvent } from 'electron'
-import { COMMENTS_BRIDGE_KEY, COMMENTS_CHANNELS, parseCommentsReveal } from './comments-ipc'
-import type { CommentsRevealPayload, CommentsReply, UniworkCommentsApi } from './comments-ipc'
+import {
+  COMMENTS_BRIDGE_KEY,
+  COMMENTS_CHANNELS,
+  parseCommentsReveal,
+  parseCommentsSaved,
+} from './comments-ipc'
+import type {
+  CommentsContextResult,
+  CommentsRevealPayload,
+  CommentsReply,
+  CommentsSavedPayload,
+  UniworkCommentsApi,
+} from './comments-ipc'
 
 async function call<T>(channel: string, input: unknown): Promise<CommentsReply<T>> {
   return (await ipcRenderer.invoke(channel, input)) as CommentsReply<T>
@@ -61,6 +72,19 @@ export function createUniworkCommentsApi(): UniworkCommentsApi {
         ipcRenderer.removeListener(COMMENTS_CHANNELS.reveal, listener)
       }
     },
+    context: (input) => call<CommentsContextResult>(COMMENTS_CHANNELS.context, input),
+    onSaved: (handler) => {
+      // G8-12: nothing is held for a late subscriber - the editor reads the
+      // current version through context() when it mounts
+      const listener = (_event: IpcRendererEvent, payload: unknown) => {
+        const saved = parseCommentsSaved(payload)
+        if (saved) handler(saved)
+      }
+      ipcRenderer.on(COMMENTS_CHANNELS.saved, listener)
+      return () => {
+        ipcRenderer.removeListener(COMMENTS_CHANNELS.saved, listener)
+      }
+    },
   }
 }
 
@@ -68,4 +92,4 @@ export function installUniworkCommentsBridge(): void {
   contextBridge.exposeInMainWorld(COMMENTS_BRIDGE_KEY, createUniworkCommentsApi())
 }
 
-export type { CommentsRevealPayload, UniworkCommentsApi }
+export type { CommentsRevealPayload, CommentsSavedPayload, UniworkCommentsApi }

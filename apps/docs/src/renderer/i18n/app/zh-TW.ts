@@ -106,6 +106,7 @@ export const zhTW = {
   appExportImagesFailed: '匯出圖片失敗：{error}',
   appMixedExportOpening: '混合紙張文件:正在開啟分頁預覽並按頁合併匯出…',
   appSelectTextToComment: '請先選取要加註解的文字',
+  appCommentSaveFirst: '請先儲存文件，再新增註解',
   appCommentSelectionLost: '選取範圍已失效,請重新選取要加註解的文字',
   appCommentAdded: '已新增註解,儲存後寫入文件',
   appCommentEdited: '已更新註解,儲存後寫入文件',

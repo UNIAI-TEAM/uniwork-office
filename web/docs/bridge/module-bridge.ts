@@ -82,6 +82,12 @@ export interface ModuleBridgeSpec {
    * the frame covers every comments surface of the format (invariant 8). Default: FRAME_COMMENTS.
    */
   frameComments?: boolean
+  /**
+   * G8-13: what the frame Discussion panel does with a reveal it does not own. A module whose editor
+   * serves anchored comments (S12) passes 'silent': the editor shows its own S15 line on a miss.
+   * Default 'notice'.
+   */
+  discussionRevealMissing?: 'notice' | 'silent'
   /** window global name -> its members (merged over the appearance members) */
   globals: Record<string, (ctx: ModuleBridgeContext) => BridgeObject>
   /**
@@ -211,7 +217,10 @@ export function installModuleBridge(spec: ModuleBridgeSpec): InstalledModuleBrid
   target.__officeWebModule = spec.module
   // the Discussion panel: mounted once the session is known, only for a bound, signed-in document
   if (spec.frameComments ?? FRAME_COMMENTS[spec.module]) {
-    void mountFrameDiscussion(client as ModuleBridgePort & DiscussionPort)
+    void mountFrameDiscussion(
+      client as ModuleBridgePort & DiscussionPort,
+      spec.discussionRevealMissing ? { revealMissing: spec.discussionRevealMissing } : {},
+    )
   }
   return { client, capabilities, globals }
 }
