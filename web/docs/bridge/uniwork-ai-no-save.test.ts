@@ -3,9 +3,12 @@
 // upload request from the frame. The host fake counts every frame protocol request, the fetch fake
 // every HTTP request: the only thing a UniWork AI turn sends is the chat completion on its own route.
 // The adapter is slice A: its `streamUniwork` is replaced by one that posts through the transport the
-// frame hands it, then reports an editing tool call the way the real adapter does.
+// frame hands it, then reports an editing tool call the way the real adapter does. The tool call is
+// applied to the module's document (the real Markdown web API, so an edit marks the document dirty
+// exactly as the app does), and EVERY frame message is then counted: an exact set, no allowlist.
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { installModuleBridge } from './module-bridge'
+import { createMarkdownWebApi } from '../../modules/markdown/webapi'
 import { createMockPort } from './testing/mock-port'
 
 vi.mock('../../../packages/ai-provider/src/uniwork/protocol', () => ({
@@ -31,7 +34,7 @@ afterEach(() => {
 })
 
 describe('a UniWork AI turn never saves (G6-A03, web)', () => {
-  it('sends no api.save / api.saveAs and no upload request', async () => {
+  it('sends no request but the chat completion, and the edit only marks the document dirty', async () => {
     const urls: Array<{ url: string; method: string }> = []
     vi.stubGlobal(
       'fetch',
@@ -41,7 +44,10 @@ describe('a UniWork AI turn never saves (G6-A03, web)', () => {
       }),
     )
     const mock = createMockPort({ documentId: 'doc-1' })
+    const file = mock.seed('Notes.md', new TextEncoder().encode('a typo: a\n'))
     const target: Record<string, unknown> = {}
+    // the AI run state events the frame reports to the host (the one event family a turn may send)
+    const aiRun: Array<{ state: string }> = []
     installModuleBridge({
       module: 'markdown',
       frameCapabilities: { save: true, saveAs: true },
@@ -49,19 +55,45 @@ describe('a UniWork AI turn never saves (G6-A03, web)', () => {
         ...mock.port,
         getToken: vi.fn(async () => 'tok-1'),
         refreshToken: vi.fn(async () => 'tok-2'),
+        reportAiRun: (payload: { state: string }) => void aiRun.push(payload),
       },
       target,
-      // the module's own (off) stubs: the web AI bridge replaces them while the grant is on
-      globals: { markdownApi: () => ({ aiStream: async () => {}, onAiStream: () => () => {} }) },
+      // the module's own members (its real web API: save, setDirty, ...); the web AI bridge adds the
+      // AI members over them while the grant is on
+      globals: { markdownApi: (ctx) => createMarkdownWebApi(ctx) },
     })
-    mock.init({ apiBase: '/api/v1', capabilities: { uniworkAi: true, save: true, saveAs: true } })
+    mock.init({
+      apiBase: '/api/v1',
+      capabilities: { uniworkAi: true, save: true, saveAs: true },
+      open: mock.openPayload(file.fileId),
+    })
     await flush()
     const api = target.markdownApi as {
       aiStream(request: unknown): Promise<void>
-      onAiStream(handler: (chunk: { type: string }) => void): () => void
+      onAiStream(handler: (chunk: { type: string; toolCall?: unknown }) => void): () => void
+      setDirty(dirty: boolean): void
+    }
+    // the module's document: the tool call is applied to it, and an edit reports the document dirty
+    let documentText = 'a typo: a'
+    // the host handed the document over in `init`: nothing has been requested yet
+    expect(mock.calls.map((c) => c.type)).toEqual([])
+    // what the frame had reported by then (the title of the opened document): the turn adds to none of it
+    const before = {
+      titles: [...mock.titles],
+      modals: [...mock.modals],
+      saved: [...mock.saved],
+      errors: [...mock.errors],
+      dirty: [...mock.dirty],
     }
     const chunks: Array<{ type: string }> = []
-    api.onAiStream((c) => chunks.push(c))
+    api.onAiStream((c) => {
+      chunks.push(c)
+      if (c.type === 'tool-call') {
+        const { args } = c.toolCall as { args: { from: string; to: string } }
+        documentText = documentText.replace(args.from, args.to)
+        api.setDirty(true)
+      }
+    })
     await api.aiStream({
       requestId: 'a1',
       settings: { provider: 'uniwork', providers: {} },
@@ -69,8 +101,21 @@ describe('a UniWork AI turn never saves (G6-A03, web)', () => {
       messages: [{ role: 'user', content: 'fix the typo' }],
     })
     expect(chunks.map((c) => c.type)).toEqual(['tool-call', 'delta', 'done'])
-    const saved = mock.calls.filter((c) => /^api\.(save|saveAs|upload|create)/.test(c.type))
-    expect(saved).toEqual([])
+    expect(documentText).toBe('b typo: a')
+    // every frame message of the turn, counted: no request of any kind (save, save-as, upload,
+    // commit, draft, intent, ...), no saved / title / modal / error report, and the only dirty
+    // report is the edit itself
+    expect(mock.calls.map((c) => c.type)).toEqual([])
+    expect(mock.saved).toEqual(before.saved)
+    expect(mock.titles).toEqual(before.titles)
+    expect(mock.modals).toEqual(before.modals)
+    expect(mock.errors).toEqual(before.errors)
+    expect(mock.saved).toEqual([])
+    expect(mock.errors).toEqual([])
+    expect(mock.dirty).toEqual([...before.dirty, true])
+    // the run state report is the one event family a turn may add (the idle waits out its grace)
+    expect(aiRun.length).toBeGreaterThan(0)
+    expect(aiRun.every((r) => r.state === 'running' || r.state === 'idle')).toBe(true)
     // the frame's only HTTP request is the chat completion on the UniWork AI route
     expect(urls).toHaveLength(1)
     expect(urls[0]!.method).toBe('POST')
