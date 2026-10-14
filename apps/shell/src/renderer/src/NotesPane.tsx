@@ -20,9 +20,13 @@ import {
 
 const IS_MAC = navigator.platform.toLowerCase().includes('mac')
 
+/** typing in a note writes the whole list over IPC: once per pause, not per keystroke */
+export const NOTE_WRITE_DELAY_MS = 300
+
 /**
  * Notes (spec 4.5): a composer card, then the notes as cards in columns, stored on this device.
- * A note is edited in place and saved as you type. The stored paper color and board position
+ * A note is edited in place and saved as you type (one write per pause in typing, and at once on
+ * blur, unmount or window close). The stored paper color and board position
  * (from the old pinboard) are kept in the data, unused.
  */
 export function NotesPane({
@@ -41,6 +45,35 @@ export function NotesPane({
   const composerRef = useRef<HTMLTextAreaElement>(null)
   // a deleted card took the focus with it: land on the wall (or the composer) after the render
   const refocus = useRef(false)
+  // the typed text not yet written, and the timer that writes it
+  const pending = useRef<{ id: string; body: string; at: string } | null>(null)
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+
+  // every write starts from storage, never this render's list, so a stale pane cannot drop notes
+  const flush = () => {
+    clearTimeout(timer.current)
+    const p = pending.current
+    if (!p) return
+    pending.current = null
+    writeStickyNotes(
+      practiceId,
+      readStickyNotes(practiceId).map((n) =>
+        n.id === p.id ? normalizeStickyNote({ ...n, body: p.body, updatedAt: p.at }) : n,
+      ),
+    )
+  }
+  const flushRef = useRef(flush)
+  flushRef.current = flush
+
+  // nothing typed is lost: leaving the tab, switching practice or closing the window writes it
+  useEffect(() => {
+    const onUnload = () => flushRef.current()
+    window.addEventListener('beforeunload', onUnload)
+    return () => {
+      window.removeEventListener('beforeunload', onUnload)
+      flushRef.current()
+    }
+  }, [practiceId])
 
   useEffect(() => {
     setItems(readStickyNotes(practiceId))
@@ -68,6 +101,7 @@ export function NotesPane({
   }, [items])
 
   const persist = (next: WbStickyNote[]) => {
+    flush()
     setItems(next)
     writeStickyNotes(practiceId, next)
   }
@@ -76,18 +110,21 @@ export function NotesPane({
     e?.preventDefault()
     const body = draft.trim()
     if (!body) return
+    flush()
     createStickyNote(practiceId, body)
     setItems(readStickyNotes(practiceId))
     setDraft('')
   }
 
-  // every write starts from storage, never this render's list, so a stale pane cannot drop notes
-  const edit = (id: string, body: string) =>
-    persist(
-      readStickyNotes(practiceId).map((n) =>
-        n.id === id ? normalizeStickyNote({ ...n, body, updatedAt: new Date().toISOString() }) : n,
-      ),
-    )
+  // shown at once, written after a pause (another note's pending text is written first)
+  const edit = (id: string, body: string) => {
+    if (pending.current && pending.current.id !== id) flush()
+    const at = new Date().toISOString()
+    pending.current = { id, body, at }
+    setItems((cur) => cur.map((n) => (n.id === id ? { ...n, body, updatedAt: at } : n)))
+    clearTimeout(timer.current)
+    timer.current = setTimeout(flush, NOTE_WRITE_DELAY_MS)
+  }
 
   const copy = (note: WbStickyNote) =>
     void navigator.clipboard.writeText(note.body).then(
@@ -98,6 +135,7 @@ export function NotesPane({
 
   // removed at once, with Undo in the toast (spec 5.3); Undo puts it back where it was
   const remove = (note: WbStickyNote) => {
+    flush()
     const stored = readStickyNotes(practiceId)
     const at = stored.findIndex((n) => n.id === note.id)
     refocus.current = true

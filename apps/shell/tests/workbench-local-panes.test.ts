@@ -8,10 +8,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkbenchModuleId } from '@uniwork/practice-core'
 
 const store = vi.hoisted(() => new Map<string, string>())
+const setRaw = vi.hoisted(() => vi.fn())
 vi.mock('../src/renderer/src/workbench-store-client', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../src/renderer/src/workbench-store-client')>()),
   wbStoreGetRaw: (key: string) => store.get(key) ?? null,
   wbStoreSetRaw: (key: string, value: string) => {
+    setRaw(key, value)
     store.set(key, value)
   },
   wbStoreRemove: (key: string) => {
@@ -22,6 +24,7 @@ vi.mock('../src/renderer/src/workbench-store-client', async (importOriginal) => 
     return raw === undefined ? fallback : (JSON.parse(raw) as T)
   },
   wbStoreWrite: (key: string, value: unknown) => {
+    setRaw(key, value)
     store.set(key, JSON.stringify(value))
   },
 }))
@@ -31,6 +34,7 @@ import type { UniworkWorkApi } from '../src/shared/uniwork-work-api'
 import { LocaleProvider } from '../src/renderer/src/locale'
 import { WbToastHost, createWbToasts } from '../src/renderer/src/WbToastHost'
 import { WorkbenchModulePane } from '../src/renderer/src/WorkbenchModulePanes'
+import { NOTE_WRITE_DELAY_MS } from '../src/renderer/src/NotesPane'
 import { editedWhen } from '../src/renderer/src/work-home'
 import {
   createStickyNote,
@@ -364,8 +368,44 @@ describe('Notes tab (redesign spec 4.5)', () => {
         b.getAttribute('aria-label'),
       ),
     ).toEqual(['Copy', 'Delete note'])
+    // each note its own name for a screen reader's field list
+    expect(body.getAttribute('aria-label')).toBe('Note 1')
     await type(body, 'Call the notary at 4')
+    await act(async () => body.dispatchEvent(new FocusEvent('focusout', { bubbles: true })))
     expect(readStickyNotes('sales')[0]!.body).toBe('Call the notary at 4')
+  })
+
+  it('typing writes the store once per pause, and at once on blur and on leaving the tab', async () => {
+    vi.useFakeTimers()
+    try {
+      createStickyNote('sales', 'Draft')
+      await mount('notes')
+      const notesWrites = () => setRaw.mock.calls.filter(([k]) => /stick/i.test(String(k))).length
+      const body = () => host.querySelector<HTMLTextAreaElement>('.wb-note textarea')!
+      setRaw.mockClear()
+      await type(body(), 'Draft 1')
+      await type(body(), 'Draft 12')
+      await type(body(), 'Draft 123')
+      // shown at once, nothing written yet
+      expect(body().value).toBe('Draft 123')
+      expect(notesWrites()).toBe(0)
+      await act(async () => vi.advanceTimersByTime(NOTE_WRITE_DELAY_MS))
+      expect(notesWrites()).toBe(1)
+      expect(readStickyNotes('sales')[0]!.body).toBe('Draft 123')
+
+      await type(body(), 'Draft 1234')
+      await act(async () => body().dispatchEvent(new FocusEvent('focusout', { bubbles: true })))
+      expect(notesWrites()).toBe(2)
+      expect(readStickyNotes('sales')[0]!.body).toBe('Draft 1234')
+
+      // leaving the tab before the pause ends still keeps the text
+      await type(body(), 'Draft 12345')
+      await mount('forms')
+      expect(readStickyNotes('sales')[0]!.body).toBe('Draft 12345')
+      expect(notesWrites()).toBe(3)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('Delete: gone at once, Undo in the toast puts it back where it was', async () => {
@@ -406,7 +446,9 @@ describe('Notes tab (redesign spec 4.5)', () => {
     const toast = host.querySelector('.wb-toast')!
     await click(Array.from(toast.querySelectorAll('button')).find((b) => b.textContent === 'Undo'))
     expect(bodies()).toEqual(['B', 'A'])
-    await type(host.querySelectorAll<HTMLTextAreaElement>('.wb-note textarea')[1]!, 'A!')
+    const second = host.querySelectorAll<HTMLTextAreaElement>('.wb-note textarea')[1]!
+    await type(second, 'A!')
+    await act(async () => second.dispatchEvent(new FocusEvent('focusout', { bubbles: true })))
     expect(readStickyNotes('sales').map((n) => n.body)).toEqual(['B', 'A!'])
   })
 
