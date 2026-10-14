@@ -127,11 +127,20 @@ function optNum(value: unknown): number | null {
   return value
 }
 
+const CHAT_FLAG = 'chat'
+
+/** `tools.chat` of a cloud answer or status: the server offers UniWork AI chat to this organization */
+export function cloudChatEnabled(status: { tools: Record<UniworkCloudTool, boolean> }): boolean {
+  return (status.tools as Record<string, boolean>)[CHAT_FLAG] === true
+}
+
 export function parseCloudStatus(raw: unknown): CloudServerStatus {
   if (!isRecord(raw) || typeof raw.enabled !== 'boolean') throw malformed()
   const toolsRaw = isRecord(raw.tools) ? raw.tools : {}
   const tools = {} as Record<UniworkCloudTool, boolean>
   for (const tool of UNIWORK_CLOUD_TOOLS) tools[tool] = toolsRaw[tool] === true
+  // `chat` (UniWork AI) is a flag of the same answer, not a model tool; kept only when sent
+  if (CHAT_FLAG in toolsRaw) (tools as Record<string, boolean>)[CHAT_FLAG] = toolsRaw[CHAT_FLAG] === true
   let credits: UniworkCloudCredits | null = null
   if (isRecord(raw.credits)) {
     const c = raw.credits
@@ -405,7 +414,8 @@ export function statusFromServer(
   if (server.credits?.limit === 0) {
     return { ...UNIWORK_CLOUD_SIGNED_OUT, state: 'not-entitled', credits: null, ...display }
   }
-  const anyTool = UNIWORK_CLOUD_TOOLS.some((tool) => server.tools[tool])
+  // chat alone is enough: UniWork AI is usable even with no cloud tool configured
+  const anyTool = UNIWORK_CLOUD_TOOLS.some((tool) => server.tools[tool]) || cloudChatEnabled(server)
   const exhausted = server.credits?.remaining === 0
   return {
     state: exhausted ? 'credits-exhausted' : anyTool ? 'ready' : 'unavailable',
