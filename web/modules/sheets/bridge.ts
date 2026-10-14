@@ -88,6 +88,7 @@ import type {
   WorkbookSaveResult,
 } from '../../../apps/sheets/src/shared/desktop-api'
 import { ask as domAsk, notifySavedReopenFailed, text, type AskFn } from './notice'
+import { frameDocVersion } from '../shared/comments/doc-version'
 import { isEngineUnavailable, type SheetsEngineTransport } from './engine/transport'
 
 export { pathFor, idFromPath }
@@ -269,6 +270,9 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
   function remember(file: FileMeta): void {
     files.set(file.fileId, { ...files.get(file.fileId), ...file })
     current = file.fileId
+    // G8-12: the comments anchor base follows the open file (open, reload, adopted head, save)
+    const meta = files.get(file.fileId)!
+    frameDocVersion.noteOpened({ path: pathFor(meta), versionId: meta.versionId ?? null })
   }
 
   // ------------------------------------------------------------ engine availability
@@ -818,6 +822,8 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
       if ('canceled' in landed) return { canceled: true }
       const meta = landed.file
       remember(meta)
+      const saved = files.get(meta.fileId)!
+      frameDocVersion.noteSaved({ path: pathFor(saved), versionId: saved.versionId ?? null })
       port.reportSaved({
         file: files.get(meta.fileId)!,
         ...(meta.versionId ? { versionId: meta.versionId } : {}),

@@ -113,6 +113,12 @@ export interface StoreDocCacheOptions {
   scope: FeedScope
   /** true while the document has local work (a stored intent or a dirty copy) */
   keepDraft?(documentId: string): Promise<boolean>
+  /**
+   * G5-03a: a full resync dropped this document from the index (it was not in
+   * the snapshot and held no local work). Reported only after the reconcile
+   * committed, so a refused one (which is replayed) never reports.
+   */
+  onDropped?(documentId: string): void
 }
 
 /**
@@ -179,6 +185,7 @@ export function createStoreDocCache(options: StoreDocCacheOptions): DocCache {
       const state = await load()
       if (!state) return UNAVAILABLE
       const kept: string[] = []
+      const dropped: string[] = []
       for (const documentId of state.index) {
         if (ids.has(documentId)) {
           kept.push(documentId)
@@ -189,13 +196,19 @@ export function createStoreDocCache(options: StoreDocCacheOptions): DocCache {
           kept.push(documentId)
           continue
         }
+        dropped.push(documentId)
       }
       const keep = new Set(kept)
       for (const documentId of Object.keys(state.docs)) {
         if (!keep.has(documentId)) delete state.docs[documentId]
       }
       state.index = kept
-      return commit(state)
+      const outcome = await commit(state)
+      // only a committed reconcile drops for good: a refused one is replayed
+      if (outcome.kind === 'ok') {
+        for (const documentId of dropped) options.onDropped?.(documentId)
+      }
+      return outcome
     },
   }
 }
@@ -237,6 +250,18 @@ export interface SyncRuntimeOptions {
    * committed (a refused page is replayed, and would announce twice).
    */
   onFeedChange?(change: FeedChange): void
+  /**
+   * G5-03a: whether the id belongs to an open, bound working copy of the live
+   * session. This is the only filter on the drop report - the runtime never
+   * learns a local path or a binding.
+   */
+  isOpenBound?(documentId: string): boolean | Promise<boolean>
+  /**
+   * G5-03a: a successful resync no longer lists this open, bound document (its
+   * permission may be gone or it was deleted). The owner classifies it with
+   * one metadata read; nothing is evicted by the feed for a kept draft.
+   */
+  onFeedGone?(documentId: string): void
   intervalMs?: number
   /** test seam: schedule `run` on the interval, return the cancel */
   schedule?(run: () => void): () => void
@@ -358,7 +383,7 @@ export class SyncRuntime {
         const feedScope: FeedScope = { ...scope, orgId, workspaceId }
         const key = cursorKey(feedScope)
         wanted.add(key)
-        const consumer = this.consumerFor(key, feedScope, open.records, client)
+        const consumer = this.consumerFor(key, feedScope, open.records, client, current)
         const result = await consumer.sync()
         if (!current()) return
         if (result.kind === 'session_expired') sessionExpired = true
@@ -382,6 +407,7 @@ export class SyncRuntime {
     scope: FeedScope,
     records: (name: string) => StoreRecords,
     client: FeedClient,
+    live: () => boolean,
   ): FeedConsumer {
     const existing = this.running.get(key)
     if (existing) return existing
@@ -394,6 +420,11 @@ export class SyncRuntime {
           records: records(DOC_INDEX_REGISTRATION.name),
           scope,
           keepDraft: (documentId) => this.options.keepDraft(documentId),
+          // a resync dropped an id: report it only while this pass is current
+          // and the caller still calls it open (G5-03a)
+          onDropped: (documentId) => {
+            if (live()) void this.reportGone(documentId, live)
+          },
         }),
       ),
       clock: this.options.clock,
@@ -403,6 +434,23 @@ export class SyncRuntime {
     })
     this.running.set(key, consumer)
     return consumer
+  }
+
+  /**
+   * A successful resync dropped this id: report it when the owner answers that
+   * it belongs to an open, bound working copy. The id is the only thing the
+   * runtime learns - no path, no binding - and the report is dropped once the
+   * pass it belonged to is no longer current.
+   */
+  private async reportGone(documentId: string, live: () => boolean): Promise<void> {
+    const gone = this.options.onFeedGone
+    if (!gone) return
+    try {
+      if (!(await this.options.isOpenBound?.(documentId))) return
+    } catch {
+      return
+    }
+    if (live()) gone(documentId)
   }
 
   /**

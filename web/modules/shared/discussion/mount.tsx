@@ -7,9 +7,11 @@
  * Without it nothing is added to the page and no comment request is sent.
  *
  * `comments.changed` -> reload; `comments.reveal` -> the kit's reveal, then the panel opens on the
- * post. An id that is not a discussion post answers `revealed: false`; with `revealMissing:
- * 'notice'` (default: Markdown / HTML, where this panel is the page's only one) the panel opens on
- * the S15 line, with 'silent' it stays closed (a frame whose own comments panel owns other ids).
+ * post. The reveal comes through the frame's one reveal router (../comments/reveal-router, G8-12),
+ * which asks this panel first and an editor's own comments panel next. An id that is not a
+ * discussion post answers `revealed: false`; when no editor panel follows and `revealMissing` is
+ * 'notice' (default: Markdown / HTML, where this panel is the page's only one) the panel opens on
+ * the S15 line, otherwise it stays closed (the editor panel owns the other ids and the S15 line).
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -29,6 +31,8 @@ import {
 import { FrameDiscussion, type FrameDiscussionHandle } from './FrameDiscussion'
 import { createEditorShield, type EditorShield } from './overlay'
 import { createFrameDiscussionSource } from './source'
+import { frameRevealRouter } from '../comments/reveal-router'
+import { announceFrameSidePanel, onFrameSidePanel } from '../comments/side-panel'
 
 /** what the mount needs from the frame client; the two comment hooks are absent on old ports and mocks */
 export type DiscussionPort = Pick<FramePort, 'whenInitialized' | 'request'> & {
@@ -95,20 +99,28 @@ function DiscussionRoot({ port, session, revealMissing, doc }: RootProps) {
     const offChanged = port.onCommentsChanged?.(() => void handle.current?.controller().reload())
     const onFocus = () => void handle.current?.controller().reload()
     doc.defaultView?.addEventListener('focus', onFocus)
-    const offReveal = port.handleCommentsReveal?.(async ({ comment_id }) => {
+    const offReveal = frameRevealRouter(port).setDiscussion(async (commentId, { last }) => {
       const h = handle.current
-      if (!h) return { revealed: false }
-      const result = await h.controller().reveal(comment_id)
-      if (result.revealed || revealMissing === 'notice') h.open()
+      if (!h) return false
+      const result = await h.controller().reveal(commentId)
+      if (result.revealed || (last && revealMissing === 'notice')) h.open()
       else h.controller().dismissNotice()
-      return result
+      return result.revealed
     })
+    // one side panel at a time: the editor's panel opening closes this one
+    const offSide = onFrameSidePanel(
+      'discussion',
+      () => handle.current?.close({ focus: false }),
+      doc.defaultView ?? undefined,
+    )
     return () => {
       offChanged?.()
-      offReveal?.()
+      offReveal()
+      offSide()
       doc.defaultView?.removeEventListener('focus', onFocus)
     }
   }, [port, doc, revealMissing])
+  const announced = useRef(false)
 
   return (
     <FrameDiscussion
@@ -122,6 +134,10 @@ function DiscussionRoot({ port, session, revealMissing, doc }: RootProps) {
       onOpenChange={(open) => {
         doc.documentElement.classList.toggle(OPEN_CLASS, open)
         shield.current?.setOpen(open)
+        if (open !== announced.current) {
+          announced.current = open
+          announceFrameSidePanel('discussion', open, doc.defaultView ?? undefined)
+        }
       }}
     />
   )

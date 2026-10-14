@@ -109,6 +109,11 @@ export interface ReviewContext {
   setInkAnnotations: Dispatch<SetStateAction<InkAnnotation[]>>
   setInksDirty: (dirty: boolean) => void
   setCompareResult: (value: { otherName: string; entries: CompareEntry[] } | null) => void
+  /**
+   * G8-12: set while the document is in server-comment mode. New Comment opens the server composer
+   * and the comments stored in the file are read-only (lane decision D4): no local comment write.
+   */
+  server?: { startThread(): void } | null
 }
 
 // ---- References: footnotes / endnotes ----
@@ -186,6 +191,10 @@ export function cancelNewComment(ctx: ReviewContext): void {
 export function startNewComment(ctx: ReviewContext): void {
   const editor = ctx.editor
   if (!editor) return
+  if (ctx.server) {
+    ctx.server.startThread()
+    return
+  }
   if (editor.state.selection.empty) {
     // Word anchors on the word under a collapsed caret rather than refusing
     const word = wordRangeAtCaret(editor)
@@ -202,7 +211,7 @@ export function startNewComment(ctx: ReviewContext): void {
 }
 
 export function submitNewComment(ctx: ReviewContext, text: string): void {
-  if (!ctx.editor) return
+  if (!ctx.editor || ctx.server) return
   setPendingCommentRange(ctx, null)
   const id = nextCommentId(ctx.comments)
   if (!addCommentToSelection(ctx.editor, id)) {
@@ -226,7 +235,7 @@ export function addCommentAt(
   author: string,
   initials?: string,
 ): string | null {
-  if (!ctx.editor) return null
+  if (!ctx.editor || ctx.server) return null
   const id = nextCommentId(ctx.comments)
   if (!addCommentToRange(ctx.editor, range.from, range.to, id)) return null
   const now = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z')
@@ -247,7 +256,7 @@ export function replyToComment(
   text: string,
   author = commentAuthor,
 ): boolean {
-  if (!ctx.editor) return false
+  if (!ctx.editor || ctx.server) return false
   const id = nextCommentId(ctx.comments)
   if (!addReplyToCommentRange(ctx.editor, parentId, id)) {
     ctx.setStatus(t('appCommentAnchorGone'))
@@ -263,6 +272,7 @@ export function replyToComment(
 
 /** Word: comment text edits in place; the author, date and anchor stay */
 export function editComment(ctx: ReviewContext, id: string, text: string): void {
+  if (ctx.server) return
   ctx.setComments((prev) => prev.map((c) => (c.id === id ? { ...c, text } : c)))
   ctx.setCommentsDirty(true)
   ctx.dirtyRef.current = true
@@ -271,6 +281,7 @@ export function editComment(ctx: ReviewContext, id: string, text: string): void 
 
 /** Resolve/reopen: the whole thread (parent + replies) gets done set together */
 export function resolveComment(ctx: ReviewContext, id: string, done: boolean): void {
+  if (ctx.server) return
   ctx.setComments((prev) =>
     prev.map((c) => (c.id === id || c.parentId === id ? { ...c, done } : c)),
   )
@@ -280,7 +291,7 @@ export function resolveComment(ctx: ReviewContext, id: string, done: boolean): v
 }
 
 export function deleteComment(ctx: ReviewContext, id: string): void {
-  if (!ctx.editor) return
+  if (!ctx.editor || ctx.server) return
   // cascade: deleting a parent comment also deletes its replies (including their anchor marks)
   const victims = [id, ...ctx.comments.filter((c) => c.parentId === id).map((c) => c.id)]
   for (const v of victims) removeCommentFromDoc(ctx.editor, v)
@@ -307,7 +318,7 @@ export function deleteCommentAtCaret(ctx: ReviewContext): void {
 
 /** Delete All Comments in Document / Delete All Resolved Comments */
 export function deleteAllComments(ctx: ReviewContext, resolvedOnly: boolean): void {
-  if (!ctx.editor) return
+  if (!ctx.editor || ctx.server) return
   // replies never carry done themselves: a resolved thread goes with all of its replies
   const doneThreads = new Set(ctx.comments.filter((c) => c.done && !c.parentId).map((c) => c.id))
   const victims = ctx.comments

@@ -107,6 +107,7 @@ export const he = {
   appMixedExportOpening:
     'גודלי נייר מעורבים: נפתחת תצוגה מקדימה של עימוד לייצוא עם איחוד לפי עמודים…',
   appSelectTextToComment: 'תחילה סמנו את הטקסט שעליו תרצו להעיר',
+  appCommentSaveFirst: 'שמרו קודם את המסמך כדי להוסיף הערה',
   appCommentSelectionLost: 'הסימון אינו תקף עוד; סמנו שוב את הטקסט להערה',
   appCommentAdded: 'ההערה נוספה; תיכתב למסמך בעת השמירה',
   appCommentEdited: 'ההערה עודכנה; תיכתב למסמך בעת השמירה',

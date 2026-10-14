@@ -1432,6 +1432,7 @@ export const th = {
   appCtxResolveComment: 'แก้ไขข้อคิดเห็นแล้ว',
   appThreadConverted: 'แปลงข้อคิดเห็น {count} รายการเป็นบันทึกย่อแล้ว',
   appThreadNoneAtSelection: 'ไม่มีข้อคิดเห็นแบบเธรดในเซลล์ที่เลือก',
+  appCommentSaveFirst: 'บันทึกเวิร์กบุ๊กก่อนเพื่อเพิ่มข้อคิดเห็น',
   appThreadCellHasNote: 'เซลล์ที่เลือกมีบันทึกย่ออยู่แล้ว ไม่สามารถเพิ่มข้อคิดเห็นได้',
   appThreadHoverHint: 'ตอบกลับในบานหน้าต่างข้อคิดเห็น',
   appNoteCellHasThread: 'เซลล์ที่เลือกมีข้อคิดเห็นแบบเธรดอยู่แล้ว ไม่สามารถเพิ่มบันทึกย่อได้',

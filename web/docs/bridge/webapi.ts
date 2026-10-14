@@ -88,6 +88,7 @@ import { saveFailureText } from '../../modules/shared/save-failure'
 import { createRemoteVersion, type RemoteVersion } from '../../modules/shared/remote-version'
 import { projectApi } from './project-memory'
 import { mintDocHandoff, releaseDocHandoff } from './doc-handoff'
+import { frameDocVersion } from '../../modules/shared/comments/doc-version'
 
 // ---------------------------------------------------------------- paths
 
@@ -253,6 +254,9 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
   function remember(file: FileMeta): void {
     files.set(file.fileId, { ...files.get(file.fileId), ...file })
     current = file.fileId
+    // G8-12: the comments anchor base follows the open file (open, reload, adopted head, save)
+    const meta = files.get(file.fileId)!
+    frameDocVersion.noteOpened({ path: pathFor(meta), versionId: meta.versionId ?? null })
   }
 
   async function toOpenResult(open: OpenPayload): Promise<OpenFileResult> {
@@ -310,6 +314,8 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
     const file = { ...result.file }
     if (result.versionId && !file.versionId) file.versionId = result.versionId
     remember(file)
+    const meta = files.get(file.fileId)!
+    frameDocVersion.noteSaved({ path: pathFor(meta), versionId: meta.versionId ?? null })
     void drafts.saved()
     port.reportSaved({
       file: files.get(file.fileId)!,

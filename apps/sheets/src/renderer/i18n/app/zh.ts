@@ -1405,6 +1405,7 @@ export const zh = {
   appCtxResolveComment: '解决批注',
   appThreadConverted: '已将 {count} 条批注转换为注释。',
   appThreadNoneAtSelection: '所选单元格没有批注会话。',
+  appCommentSaveFirst: '请先保存工作簿再添加批注',
   appThreadCellHasNote: '所选单元格已有注释，无法再添加批注。',
   appThreadHoverHint: '在“批注”窗格中回复',
   appNoteCellHasThread: '所选单元格已有批注会话，无法再添加注释。',

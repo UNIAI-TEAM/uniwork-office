@@ -1519,6 +1519,7 @@ export const ja = {
   appCtxResolveComment: 'コメントを解決',
   appThreadConverted: '{count} 件のコメントをメモに変換しました。',
   appThreadNoneAtSelection: '選択したセルにスレッド コメントはありません。',
+  appCommentSaveFirst: 'コメントを追加するには、まずブックを保存してください',
   appThreadCellHasNote: '選択したセルには既にメモがあるため、コメントを追加できません。',
   appThreadHoverHint: 'コメント ウィンドウで返信',
   appNoteCellHasThread: '選択したセルには既にスレッド コメントがあるため、メモを追加できません。',

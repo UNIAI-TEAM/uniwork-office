@@ -127,6 +127,32 @@ export interface CollabSource {
   reopen(p: { comment_id: string }): Promise<{ comment: CollabComment }>
   revisions(p: { comment_id: string }): Promise<{ revisions: CollabRevision[] }>
   searchMentions(p: { q: string; limit?: number }): Promise<{ candidates: CollabCandidate[] }>
+  /**
+   * G8-12: re-anchor root comments to `version_id` after a Save receipt (protocol `comments.anchors`).
+   * Optional: a Discussion source never has it. Send through `sendAnchorMap`, which chunks and maps
+   * `anchor_version_invalid`.
+   */
+  anchors?(p: { version_id: string; anchors: CollabAnchorUpdate[] }): Promise<CollabAnchorsResult>
+}
+
+/** one re-anchored root comment; the editor reports found (`exact`) or not found (`lost`), never `stale` */
+export interface CollabAnchorUpdate {
+  comment_id: string
+  anchor: CollabAnchor
+  state: 'exact' | 'lost'
+}
+
+/** a comment the server did not re-anchor, and why */
+export interface CollabAnchorSkip {
+  comment_id: string
+  reason: 'older_version' | 'not_applicable'
+}
+
+/** protocol `CommentsAnchorsResult`: `list_token` is never a since_token - reload when `updated` is not empty */
+export interface CollabAnchorsResult {
+  updated: string[]
+  skipped: CollabAnchorSkip[]
+  list_token: string
 }
 
 /**

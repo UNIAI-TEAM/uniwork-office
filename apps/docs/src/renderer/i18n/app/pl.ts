@@ -113,6 +113,7 @@ export const pl = {
   appMixedExportOpening:
     'Mieszane rozmiary papieru: otwieranie podglądu podziału na strony w celu eksportu ze scaleniem według stron…',
   appSelectTextToComment: 'Najpierw zaznacz tekst do skomentowania',
+  appCommentSaveFirst: 'Najpierw zapisz dokument, aby dodać komentarz',
   appCommentSelectionLost:
     'Zaznaczenie jest już nieaktualne; zaznacz ponownie tekst do skomentowania',
   appCommentAdded: 'Dodano komentarz; zostanie zapisany w dokumencie przy zapisie',
