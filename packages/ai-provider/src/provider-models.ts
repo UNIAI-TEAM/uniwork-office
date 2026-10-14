@@ -171,7 +171,7 @@ export class ProviderModelCache {
     this.ttlMs = options.ttlMs ?? PROVIDER_MODELS_TTL_MS
     this.failureTtlMs = options.failureTtlMs ?? PROVIDER_MODELS_FAILURE_TTL_MS
     this.list = options.list ?? listProviderModels
-    this.now = options.now ?? Date.now
+    this.now = options.now ?? (() => Date.now())
   }
 
   read(
