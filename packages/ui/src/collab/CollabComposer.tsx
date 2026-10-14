@@ -214,7 +214,10 @@ export function CollabComposer(props: CollabComposerProps) {
       await onSubmit(sent)
       clearDraft(storeKey)
       setAiActive(false)
-      if (mode !== 'edit') setDoc({ text: '', ranges: [] })
+      if (mode !== 'edit') {
+        setDoc({ text: '', ranges: [] })
+        if (taRef.current?.isConnected) taRef.current.focus()
+      }
     } catch (e) {
       const err = toCollabError(e)
       // a deleted target is reported by the host next to the thread, not as a send failure
@@ -235,8 +238,12 @@ export function CollabComposer(props: CollabComposerProps) {
 
   function discard() {
     clearDraft(storeKey)
+    setDoc(mentionDocFromBody(base))
+    setAiActive(false)
+    setSendError(false)
     setConfirmOpen(false)
     onCancel()
+    if (isDiscussion && taRef.current?.isConnected) taRef.current.focus()
   }
 
   function onKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
@@ -390,7 +397,10 @@ export function CollabComposer(props: CollabComposerProps) {
         ? createPortal(
             <DiscardDialog
               strings={strings}
-              onKeep={() => setConfirmOpen(false)}
+              onKeep={() => {
+                setConfirmOpen(false)
+                taRef.current?.focus()
+              }}
               onDiscard={discard}
             />,
             document.body,
@@ -425,8 +435,7 @@ function DiscardDialog({
 }): ReactNode {
   const id = useId()
   const keepRef = useRef<HTMLButtonElement>(null)
-  // declared before the focus effect: it must remember the control that had focus
-  const modal = useModalKeys(onKeep, { restoreFocus: true })
+  const modal = useModalKeys(onKeep)
   useEffect(() => keepRef.current?.focus(), [])
   return (
     <div

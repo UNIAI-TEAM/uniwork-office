@@ -8,6 +8,7 @@ import {
   memo,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -546,6 +547,8 @@ function CollabThreadImpl(p: CollabThreadProps) {
   const itemRef = useRef<HTMLLIElement>(null)
   /** the control that opened history / edit / delete, for focus return */
   const openerRef = useRef<HTMLElement | null>(null)
+  const restoreCommentRef = useRef<string | null>(null)
+  const restoreReplyRef = useRef(false)
 
   const comment = host.kind === 'comment'
   const { root } = thread
@@ -557,11 +560,38 @@ function CollabThreadImpl(p: CollabThreadProps) {
     return m?.display_name || (id === null ? nameOf(c) : strings.collabFormerMember || '')
   }
 
-  const restore = () => {
+  const restore = (commentId?: string) => {
     const el = openerRef.current
     openerRef.current = null
-    if (el && el.isConnected) el.focus()
+    if (el && el.isConnected) {
+      el.focus()
+      return
+    }
+    if (commentId) restoreCommentRef.current = commentId
   }
+
+  useLayoutEffect(() => {
+    const commentId = restoreCommentRef.current
+    if (!commentId || editing === commentId) return
+    restoreCommentRef.current = null
+    const scope = [
+      ...(itemRef.current?.querySelectorAll<HTMLElement>('[data-comment-id]') ?? []),
+    ].find((n) => n.dataset.commentId === commentId)
+    const target =
+      scope?.querySelector<HTMLElement>('button[aria-haspopup="menu"]') ??
+      scope?.querySelector<HTMLElement>('button') ??
+      itemRef.current?.querySelector<HTMLElement>('[data-thread-heading]')
+    target?.focus()
+  }, [editing, historyFor, deleting])
+
+  useLayoutEffect(() => {
+    if (replyOpen || !restoreReplyRef.current) return
+    restoreReplyRef.current = false
+    const target =
+      (replyBtnRef.current?.isConnected ? replyBtnRef.current : null) ??
+      itemRef.current?.querySelector<HTMLElement>('[data-thread-heading]')
+    target?.focus()
+  }, [replyOpen])
 
   const run = async (fn: () => Promise<unknown>) => {
     setFailed(false)
@@ -706,14 +736,14 @@ function CollabThreadImpl(p: CollabThreadProps) {
                 try {
                   await actions.edit(c.id, body)
                   setEditing(null)
-                  restore()
+                  restore(c.id)
                 } catch {
                   setFailed(true)
                 }
               }}
               onClose={() => {
                 setEditing(null)
-                restore()
+                restore(c.id)
               }}
             />
           ) : (
@@ -774,7 +804,7 @@ function CollabThreadImpl(p: CollabThreadProps) {
             formatTime={fmt}
             onClose={() => {
               setHistoryFor(null)
-              restore()
+              restore(c.id)
             }}
             onDeleted={() => setHistoryFor(null)}
           />
@@ -788,12 +818,12 @@ function CollabThreadImpl(p: CollabThreadProps) {
             defaultFocus="cancel"
             onConfirm={() => {
               setDeleting(null)
-              restore()
+              restore(c.id)
               void run(() => actions.remove(c.id))
             }}
             onCancel={() => {
               setDeleting(null)
-              restore()
+              restore(c.id)
             }}
           />
         )}
@@ -884,9 +914,11 @@ function CollabThreadImpl(p: CollabThreadProps) {
             autoFocus: true,
             onSubmit: async (body) => {
               await actions.reply(thread.id, body)
+              restoreReplyRef.current = true
               setReplyOpen(false)
             },
             onCancel: () => {
+              restoreReplyRef.current = true
               setReplyOpen(false)
               replyBtnRef.current?.focus()
             },
