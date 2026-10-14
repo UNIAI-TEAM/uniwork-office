@@ -14,25 +14,26 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Lang } from '@genoffice/i18n'
 import {
   collabStrings,
+  createUniworkCommentsSource,
+  sendAnchorMap,
   useCollabThreads,
   type CollabController,
   type CollabHostState,
 } from '@genoffice/ui/collab'
 import { createCommentsPoll } from '@genoffice/electron-utils/comments-poll'
-import type { UniworkCommentsSeamApi } from './comments-seam'
+import type { UniworkCommentsApi } from '@genoffice/electron-utils/comments-ipc'
 import {
   createSlideTracker,
   createSlidesAnchorAdapter,
-  createSlidesCommentSource,
+  anchorUpdatesAfterSave,
   pptxAnchorFor,
-  sendAnchorsAfterSave,
   slideIdOf,
   type SlideIdentity,
   type SlidesCommentsContext,
 } from './server-comments'
 
 export interface ServerCommentsOptions {
-  bridge: UniworkCommentsSeamApi
+  bridge: UniworkCommentsApi
   /** the working-copy path every bridge call names */
   path: string
   context: SlidesCommentsContext
@@ -65,7 +66,7 @@ export function useServerComments(o: ServerCommentsOptions): ServerComments {
   const versionRef = useRef(versionId)
   versionRef.current = versionId
 
-  const source = useMemo(() => createSlidesCommentSource(bridge, path), [bridge, path])
+  const source = useMemo(() => createUniworkCommentsSource(bridge, path, 'comment'), [bridge, path])
   const platform = useMemo<CollabHostState['platform']>(
     () => (/mac/i.test(navigator.platform) ? 'mac' : 'other'),
     [],
@@ -157,9 +158,10 @@ export function useServerComments(o: ServerCommentsOptions): ServerComments {
       const roots = [...ctl.threads, ...ctl.resolved].filter((t) => !t.deleted).map((t) => t.root)
       // what this round covers: a slide replaced while it is in flight is for the next round
       const marks = tracker.snapshot()
-      void sendAnchorsAfterSave(bridge, path, round, roots, slidesRef.current, (id) =>
+      const updates = anchorUpdatesAfterSave(roots, slidesRef.current, (id) =>
         tracker.replacedAt(id),
-      ).then(
+      )
+      void sendAnchorMap(source, round, updates).then(
         (res) => {
           if (res.outcome !== 'synced') return
           // the server holds the lost threads now: a reused id can no longer pull them onto its slide
@@ -171,7 +173,7 @@ export function useServerComments(o: ServerCommentsOptions): ServerComments {
         () => undefined,
       )
     },
-    [bridge, path, tracker],
+    [source, tracker],
   )
   useEffect(
     () =>

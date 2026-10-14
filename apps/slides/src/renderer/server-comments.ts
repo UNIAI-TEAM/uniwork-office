@@ -16,17 +16,14 @@
 import type {
   CollabAnchor,
   CollabAnchorAdapter,
+  CollabAnchorUpdate,
   CollabComment,
-  CollabLevel,
-  CollabSource,
 } from '@genoffice/ui/collab'
-import { unwrapCommentsReply } from '@genoffice/electron-utils/comments-reply'
 import {
   COMMENTS_BRIDGE_KEY,
-  type CommentsReply,
+  type CommentsContextResult,
   type UniworkCommentsApi,
 } from '@genoffice/electron-utils/comments-ipc'
-import type { UniworkCommentsSeamApi } from './comments-seam'
 
 /** the slide fields the adapter reads (a `RenderSlide` carries them) */
 export interface SlideIdentity {
@@ -203,12 +200,6 @@ export function createSlidesAnchorAdapter(nav: SlidesAnchorNav): CollabAnchorAda
   }
 }
 
-export interface AnchorUpdate {
-  commentId: string
-  anchor: PptxAnchor
-  state: 'exact' | 'lost'
-}
-
 /**
  * The `comments.anchors` round after a save: every live root comment with a pptx anchor gets its
  * slide's new position (`exact`), or keeps its old anchor as `lost` when the slide is gone (or its
@@ -221,8 +212,8 @@ export function anchorUpdatesAfterSave(
   comments: readonly CollabComment[],
   slides: readonly SlideIdentity[],
   replacedAt?: (slideId: string) => number | undefined,
-): AnchorUpdate[] {
-  const out: AnchorUpdate[] = []
+): CollabAnchorUpdate[] {
+  const out: CollabAnchorUpdate[] = []
   for (const c of comments) {
     if (c.parent_id || c.deleted_at || (c.kind !== undefined && c.kind !== 'comment')) continue
     const anchor = c.anchor
@@ -234,7 +225,7 @@ export function anchorUpdatesAfterSave(
     const reused = since !== undefined && !(created >= since)
     const at = reused ? -1 : slidePositionOf(slides, anchor)
     if (at < 0) {
-      out.push({ commentId: c.id, anchor, state: 'lost' })
+      out.push({ comment_id: c.id, anchor, state: 'lost' })
       continue
     }
     const next: PptxAnchor = { ...anchor, slide_index: at }
@@ -242,7 +233,7 @@ export function anchorUpdatesAfterSave(
     if (next.object_id && !slides[at]?.nodes?.some((n) => n.durableId === next.object_id)) {
       delete next.object_id
     }
-    out.push({ commentId: c.id, anchor: next, state: 'exact' })
+    out.push({ comment_id: c.id, anchor: next, state: 'exact' })
   }
   return out
 }
@@ -253,11 +244,11 @@ export function anchorUpdatesAfterSave(
  * The typed accessor: null when this build's preload has no bridge, or a shell that does not serve
  * the G8-12 context / saved calls (local file behaviour then).
  */
-export function commentsBridge(): UniworkCommentsSeamApi | null {
-  const w = window as unknown as Record<string, Partial<UniworkCommentsSeamApi> | undefined>
+export function commentsBridge(): UniworkCommentsApi | null {
+  const w = window as unknown as Record<string, Partial<UniworkCommentsApi> | undefined>
   const api = w[COMMENTS_BRIDGE_KEY]
   if (!api || typeof api.context !== 'function' || typeof api.onSaved !== 'function') return null
-  return api as UniworkCommentsSeamApi
+  return api as UniworkCommentsApi
 }
 
 /**
@@ -273,17 +264,12 @@ export function wantsServerComments(
 }
 
 /**
- * What the editor knows about a bound document (field names as the seam's `CommentsContextResult`).
- * `versionId` is the version the editor has open (or just saved); null = unknown, so no new
- * anchored thread can start (`base_version_id`). `myUserId` lets the panel recognise "mine";
- * `level` undefined = the own-comments-only rule.
+ * What the editor knows about a bound document: the seam's `CommentsContextResult`. `versionId` is
+ * the version the editor has open (or just saved); null = unknown, so no new anchored thread can
+ * start (`base_version_id`). `myUserId` lets the panel recognise "mine"; `level` undefined = the
+ * own-comments-only rule.
  */
-export interface SlidesCommentsContext {
-  documentId: string
-  versionId: string | null
-  level?: CollabLevel
-  myUserId?: string
-}
+export type SlidesCommentsContext = CommentsContextResult
 
 function isId(v: unknown): v is string {
   return typeof v === 'string' && v.length > 0 && v.length <= 128
@@ -295,13 +281,14 @@ function isId(v: unknown): v is string {
  * A read-only copy never writes, whatever the context says.
  */
 export async function loadCommentsContext(
-  bridge: Pick<UniworkCommentsSeamApi, 'context'>,
+  bridge: Pick<UniworkCommentsApi, 'context'>,
   path: string,
   readOnly: boolean,
 ): Promise<SlidesCommentsContext | null> {
   let value: unknown
   try {
-    value = unwrapCommentsReply(await bridge.context({ path }))
+    const reply = await bridge.context({ path })
+    value = reply && reply.ok ? reply.value : null
   } catch {
     return null
   }
@@ -317,108 +304,4 @@ export async function loadCommentsContext(
     ...(readOnly ? { level: 'view' as const } : level ? { level } : {}),
     ...(isId(v.myUserId) ? { myUserId: v.myUserId } : {}),
   }
-}
-
-/**
- * The kit's `CollabSource` over the bridge for the comment kind (snake_case kit <-> camelCase IPC).
- * Each call unwraps the envelope in this realm, so a failure rejects with the protocol error
- * (`code`, `details.code`, `retryable`) the kit maps to panel states.
- */
-export function createSlidesCommentSource(bridge: UniworkCommentsApi, path: string): CollabSource {
-  const value = <T>(reply: Promise<CommentsReply<T>>): Promise<T> =>
-    reply.then((r) => unwrapCommentsReply(r))
-  return {
-    list: (p) =>
-      value(
-        bridge.list({
-          path,
-          kind: p.kind ?? 'comment',
-          ...(p.since_token ? { sinceToken: p.since_token } : {}),
-        }),
-      ),
-    create: (p) =>
-      value(
-        bridge.create({
-          path,
-          kind: p.kind,
-          body: p.body,
-          ...(p.parent_id ? { parentId: p.parent_id } : {}),
-          ...(p.anchor ? { anchor: p.anchor } : {}),
-          ...(p.base_version_id ? { baseVersionId: p.base_version_id } : {}),
-        }),
-      ),
-    update: (p) => value(bridge.update({ path, commentId: p.comment_id, body: p.body })),
-    remove: (p) => value(bridge.remove({ path, commentId: p.comment_id })),
-    resolve: (p) => value(bridge.resolve({ path, commentId: p.comment_id })),
-    reopen: (p) => value(bridge.reopen({ path, commentId: p.comment_id })),
-    revisions: (p) => value(bridge.revisions({ path, commentId: p.comment_id })),
-    searchMentions: (p) =>
-      value(
-        bridge.searchMentions({
-          path,
-          q: p.q,
-          ...(p.limit !== undefined ? { limit: p.limit } : {}),
-        }),
-      ),
-  }
-}
-
-/** protocol `COMMENTS_MAX_ANCHORS`: the most anchors one `comments.anchors` call may carry */
-const MAX_ANCHORS = 500
-
-/** what one post-Save anchor round did (the kit's `AnchorSyncOutcome` shape) */
-export type AnchorSyncOutcome =
-  | {
-      outcome: 'synced'
-      updated: string[]
-      skipped: Array<{ comment_id: string; reason: 'older_version' | 'not_applicable' }>
-      list_token: string
-    }
-  /** the server does not know the version (400 `anchor_version_invalid`): the anchors stay shown as stale; send again after the next Save */
-  | { outcome: 'retry_next_save' }
-
-function isVersionInvalid(error: unknown): boolean {
-  if (!error || typeof error !== 'object') return false
-  const e = error as { code?: unknown; details?: { code?: unknown } | null }
-  return e.code === 'anchor_version_invalid' || e.details?.code === 'anchor_version_invalid'
-}
-
-/**
- * Sends the post-save anchor round (contract §2.6, same behaviour as the kit's `sendAnchorMap`):
- * only after the save receipt, with the receipt's version, in chunks of 500 sent one after the
- * other, answers merged (`list_token` = the last one). `anchor_version_invalid` resolves to
- * `retry_next_save` and never throws; any other failure rejects. The caller reloads the full list
- * when the round `synced` with `updated.length > 0`. An empty round sends nothing.
- */
-export async function sendAnchorsAfterSave(
-  bridge: UniworkCommentsApi,
-  path: string,
-  versionId: string,
-  comments: readonly CollabComment[],
-  slides: readonly SlideIdentity[],
-  replacedAt?: (slideId: string) => number | undefined,
-): Promise<AnchorSyncOutcome> {
-  const synced: AnchorSyncOutcome = { outcome: 'synced', updated: [], skipped: [], list_token: '' }
-  const anchors = anchorUpdatesAfterSave(comments, slides, replacedAt)
-  for (let i = 0; i < anchors.length; i += MAX_ANCHORS) {
-    let res
-    try {
-      res = unwrapCommentsReply(
-        await bridge.anchors({
-          path,
-          versionId,
-          anchors: anchors
-            .slice(i, i + MAX_ANCHORS)
-            .map((a) => ({ ...a, anchor: { ...a.anchor } })),
-        }),
-      )
-    } catch (error) {
-      if (isVersionInvalid(error)) return { outcome: 'retry_next_save' }
-      throw error
-    }
-    synced.updated.push(...res.updated)
-    synced.skipped.push(...res.skipped)
-    synced.list_token = res.list_token
-  }
-  return synced
 }

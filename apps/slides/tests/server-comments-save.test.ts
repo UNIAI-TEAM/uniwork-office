@@ -148,7 +148,7 @@ describe('Save of a bound deck with server comments', () => {
     expect(before[1]?.sldId).toMatch(/^\d+$/)
     expect(reopened[0]?.sldId).toBe(before[2]?.sldId)
     const round = anchorUpdatesAfterSave(threads, reopened)
-    expect(round.map((u) => [u.commentId, u.state, u.anchor.slide_index])).toEqual([
+    expect(round.map((u) => [u.comment_id, u.state, u.anchor.slide_index])).toEqual([
       ['t1', 'exact', 2],
       ['t2', 'exact', 0],
     ])

@@ -10,22 +10,27 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, createElement, createRef, type MutableRefObject } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { LANGS, format } from '@genoffice/i18n'
-import { collabStrings } from '@genoffice/ui/collab'
-import type { CommentsRevealPayload } from '@genoffice/electron-utils/comments-ipc'
+import {
+  collabStrings,
+  createUniworkCommentsSource,
+  sendAnchorMap,
+  type CollabComment,
+} from '@genoffice/ui/collab'
 import type {
   CommentsContextResult,
+  CommentsRevealPayload,
   CommentsSavedPayload,
-  UniworkCommentsSeamApi,
-} from '../src/renderer/comments-seam'
+  UniworkCommentsApi,
+} from '@genoffice/electron-utils/comments-ipc'
 import {
   anchorUpdatesAfterSave,
   createSlideTracker,
   createSlidesAnchorAdapter,
+  commentsBridge,
   loadCommentsContext,
   pptxAnchorFor,
   selectedObjectId,
   wantsServerComments,
-  sendAnchorsAfterSave,
   type SlideIdentity,
 } from '../src/renderer/server-comments'
 import {
@@ -92,7 +97,7 @@ function fakeBridge(seed: Row[] = [], opts: FakeOpts = {}) {
   const ok = (value: unknown) => Promise.resolve({ ok: true, value }) as Promise<never>
   const at = () => `2026-10-13T10:00:${String(seq).padStart(2, '0')}Z`
   const find = (id: string) => rows.find((r) => r.id === id)!
-  const bridge: UniworkCommentsSeamApi = {
+  const bridge: UniworkCommentsApi = {
     list: (input) => {
       calls.push({ op: 'list', input })
       const answer = () =>
@@ -239,8 +244,8 @@ describe('pptx anchors follow the slide, not its position', () => {
     // the user drags slide 3 to the front: C, A, B
     const after = [before[2]!, before[0]!, before[1]!]
     expect(anchorUpdatesAfterSave(comments, after)).toEqual([
-      { commentId: 'b', state: 'exact', anchor: { ...onB, slide_index: 2 } },
-      { commentId: 'c', state: 'exact', anchor: { ...onC, slide_index: 0 } },
+      { comment_id: 'b', state: 'exact', anchor: { ...onB, slide_index: 2 } },
+      { comment_id: 'c', state: 'exact', anchor: { ...onC, slide_index: 0 } },
     ])
     expect(onB.slide_id).toBe('257')
   })
@@ -256,8 +261,8 @@ describe('pptx anchors follow the slide, not its position', () => {
     ]
     const after = [before[0]!, before[2]!]
     expect(anchorUpdatesAfterSave(comments, after)).toEqual([
-      { commentId: 'a', state: 'lost', anchor: anchorOn(before, 1) },
-      { commentId: 'b', state: 'exact', anchor: { ...anchorOn(before, 2), slide_index: 1 } },
+      { comment_id: 'a', state: 'lost', anchor: anchorOn(before, 1) },
+      { comment_id: 'b', state: 'exact', anchor: { ...anchorOn(before, 2), slide_index: 1 } },
     ])
     // the lost thread keeps naming the deleted slide by its p:sldId
     expect(anchorOn(before, 1).slide_id).toBe('257')
@@ -269,7 +274,7 @@ describe('pptx anchors follow the slide, not its position', () => {
     const after: SlideIdentity[] = [{ sldId: '256', partPath: 'ppt/slides/slide1.xml', nodes: [] }]
     const [u] = anchorUpdatesAfterSave([{ id: 'a', document_id: 'd', body: 'x', anchor: a }], after)
     expect(u).toEqual({
-      commentId: 'a',
+      comment_id: 'a',
       state: 'exact',
       anchor: { format: 'pptx', v: 1, slide_id: '256', slide_index: 0 },
     })
@@ -334,7 +339,7 @@ describe('RFE14-01: a lost thread never re-binds to a slide that reuses its p:sl
     // a live thread on a surviving slide still moves as before
     const live = { id: 'b', document_id: 'd', body: 'y', anchor: anchorOn(before, 0) }
     expect(anchorUpdatesAfterSave([lostRoot, live], after)).toEqual([
-      { commentId: 'b', state: 'exact', anchor: { ...anchorOn(before, 0), slide_index: 0 } },
+      { comment_id: 'b', state: 'exact', anchor: { ...anchorOn(before, 0), slide_index: 0 } },
     ])
   })
 
@@ -395,8 +400,8 @@ describe('RFE14-01: a lost thread never re-binds to a slide that reuses its p:sl
       created_at: '2026-10-13T10:00:05Z',
     }
     expect(anchorUpdatesAfterSave([old, fresh], after, (id) => t.replacedAt(id))).toEqual([
-      { commentId: 'old', state: 'lost', anchor: anchorOn(base, 2) },
-      { commentId: 'new', state: 'exact', anchor: { ...anchorOn(after, 2), slide_index: 2 } },
+      { comment_id: 'old', state: 'lost', anchor: anchorOn(base, 2) },
+      { comment_id: 'new', state: 'exact', anchor: { ...anchorOn(after, 2), slide_index: 2 } },
     ])
   })
 })
@@ -472,20 +477,109 @@ describe('server mode only for a bound document with the bridge', () => {
   })
 })
 
-describe('the anchor round behaves like the kit’s sendAnchorMap', () => {
-  const rowsOf = async (b: UniworkCommentsSeamApi) => {
-    const reply = await b.list({ path: '/p.pptx' })
-    return reply.ok ? reply.value.comments : []
+/**
+ * G8-A01 / G8-A02 on the real seam: `window.uniworkComments` is the object the preload exposes (only
+ * that object is stubbed); the source and the anchor sender are the kit's own functions, fed by the
+ * slides adapter. Nothing of the kit is replaced.
+ */
+describe('G8-A01 / G8-A02 through the kit over window.uniworkComments', () => {
+  const PATH = '/p.pptx'
+  const install = (server: ReturnType<typeof fakeBridge>) => {
+    vi.stubGlobal('uniworkComments', server.bridge)
+    const api = commentsBridge()
+    if (!api) throw new Error('the seam is not exposed')
+    return createUniworkCommentsSource(api, PATH, 'comment')
   }
+  const rowsOf = async (source: ReturnType<typeof install>): Promise<CollabComment[]> =>
+    (await source.list({})).comments
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('G8-A01: bound + versionId known -> one create: kind comment, the pptx anchor, baseVersionId, no author', async () => {
+    const server = fakeBridge([], {
+      context: async () => ({
+        ok: true,
+        value: { documentId: 'doc-1', versionId: 'v7', myUserId: 'me', level: 'edit' },
+      }),
+    })
+    const source = install(server)
+    expect(wantsServerComments(PATH, true, commentsBridge())).toBe(true)
+    const ctx = await loadCommentsContext(commentsBridge()!, PATH, false)
+    expect(ctx?.versionId).toBe('v7')
+    const slides = deck('slide1', 'slide2')
+    const anchor = anchorOn(slides, 1, 'e_slide2')
+    await source.create({
+      kind: 'comment',
+      body: 'hello',
+      anchor,
+      base_version_id: ctx!.versionId!,
+    })
+    expect(server.calls.filter((c) => c.op === 'create')).toEqual([
+      {
+        op: 'create',
+        input: { path: PATH, kind: 'comment', body: 'hello', anchor, baseVersionId: 'v7' },
+      },
+    ])
+    // the author is the server's: nothing of the OS account travels with the create
+    expect(JSON.stringify(server.calls.find((c) => c.op === 'create')?.input)).not.toMatch(
+      /author|created_by/,
+    )
+  })
+
+  it('G8-A01: a document without a server version starts no anchored thread, an unbound one no server mode', async () => {
+    const server = fakeBridge([], {
+      context: async () => ({ ok: true, value: { documentId: 'doc-1', versionId: null } }),
+    })
+    install(server)
+    const ctx = await loadCommentsContext(commentsBridge()!, PATH, false)
+    expect(ctx).toEqual({ documentId: 'doc-1', versionId: null })
+    expect(pptxAnchorFor(deck('slide1'), 0)).not.toBeNull()
+    expect(wantsServerComments(PATH, false, commentsBridge())).toBe(false)
+  })
+
+  it('G8-A02: after the Save receipt the anchor map goes with the receipt version, exact | lost only', async () => {
+    const before = deck('slide1', 'slide2', 'slide3')
+    const server = fakeBridge([
+      rootRow('a', anchorOn(before, 0)),
+      rootRow('b', anchorOn(before, 1)),
+      rootRow('c', anchorOn(before, 2)),
+    ])
+    const source = install(server)
+    // slide2 is deleted, then Save: the receipt names v2
+    const after = deck('slide1', 'slide3')
+    const res = await sendAnchorMap(
+      source,
+      'v2',
+      anchorUpdatesAfterSave(await rowsOf(source), after),
+    )
+    expect(res).toMatchObject({ outcome: 'synced', updated: ['a', 'b', 'c'] })
+    const sent = server.calls.filter((c) => c.op === 'anchors')
+    expect(sent).toHaveLength(1)
+    const input = sent[0]!.input as {
+      path: string
+      versionId: string
+      anchors: Array<{ commentId: string; state: string; anchor: { slide_index: number } }>
+    }
+    expect(input.versionId).toBe('v2')
+    expect(input.anchors.map((x) => [x.commentId, x.state, x.anchor.slide_index])).toEqual([
+      ['a', 'exact', 0],
+      ['b', 'lost', 1],
+      ['c', 'exact', 1],
+    ])
+    expect(input.anchors.every((x) => x.state === 'exact' || x.state === 'lost')).toBe(true)
+  })
 
   it('501 anchors go in chunks of 500, one after the other, answers merged', async () => {
     const slides = deck('slide1')
-    const { bridge, calls } = fakeBridge(
+    const server = fakeBridge(
       Array.from({ length: 501 }, (_, k) => rootRow(`m${k}`, anchorOn(slides, 0))),
     )
-    const rows = await rowsOf(bridge)
-    const res = await sendAnchorsAfterSave(bridge, '/p.pptx', 'v2', rows, slides)
-    const rounds = calls.filter((c) => c.op === 'anchors')
+    const source = install(server)
+    const res = await sendAnchorMap(
+      source,
+      'v2',
+      anchorUpdatesAfterSave(await rowsOf(source), slides),
+    )
+    const rounds = server.calls.filter((c) => c.op === 'anchors')
     expect(rounds.map((c) => (c.input as { anchors: unknown[] }).anchors.length)).toEqual([500, 1])
     expect(res.outcome).toBe('synced')
     if (res.outcome === 'synced') {
@@ -494,28 +588,37 @@ describe('the anchor round behaves like the kit’s sendAnchorMap', () => {
     }
   })
 
-  it('anchor_version_invalid resolves to retry_next_save and stops the round; other errors reject', async () => {
+  it('G8-A02: anchor_version_invalid resolves to retry_next_save and stops the round; other errors reject', async () => {
     const slides = deck('slide1')
     const seed = [rootRow('x1', anchorOn(slides, 0))]
     const stale = fakeBridge(seed, {
       anchorsFail: { code: 'malformed', detailsCode: 'anchor_version_invalid' },
     })
+    const staleSource = install(stale)
     expect(
-      await sendAnchorsAfterSave(stale.bridge, '/p.pptx', 'v2', await rowsOf(stale.bridge), slides),
+      await sendAnchorMap(
+        staleSource,
+        'v2',
+        anchorUpdatesAfterSave(await rowsOf(staleSource), slides),
+      ),
     ).toEqual({ outcome: 'retry_next_save' })
     const broken = fakeBridge(seed, { anchorsFail: { code: 'internal', status: 500 } })
+    const brokenSource = install(broken)
     await expect(
-      sendAnchorsAfterSave(broken.bridge, '/p.pptx', 'v2', await rowsOf(broken.bridge), slides),
+      sendAnchorMap(brokenSource, 'v2', anchorUpdatesAfterSave(await rowsOf(brokenSource), slides)),
     ).rejects.toMatchObject({ code: 'internal' })
   })
 
   it('an empty round sends nothing', async () => {
-    const { bridge, calls } = fakeBridge()
-    expect(await sendAnchorsAfterSave(bridge, '/p.pptx', 'v2', [], deck('slide1'))).toMatchObject({
+    const server = fakeBridge()
+    const source = install(server)
+    expect(
+      await sendAnchorMap(source, 'v2', anchorUpdatesAfterSave([], deck('slide1'))),
+    ).toMatchObject({
       outcome: 'synced',
       updated: [],
     })
-    expect(calls).toEqual([])
+    expect(server.calls).toEqual([])
   })
 })
 
@@ -558,6 +661,8 @@ interface MountOpts {
 
 async function mountHost(o: MountOpts) {
   const server = fakeBridge(o.rows, o.fake)
+  // the host gets the object the app reads from window.uniworkComments (the preload's shape)
+  vi.stubGlobal('uniworkComments', server.bridge)
   const path = '/work/deck.pptx'
   const statuses: string[] = []
   const goTo = vi.fn()
@@ -567,7 +672,7 @@ async function mountHost(o: MountOpts) {
     createRef<ServerCommentsHandle>() as MutableRefObject<ServerCommentsHandle | null>
   const readFileComments = vi.fn(async (i: number) => o.fileComments?.[i] ?? [])
   const props = {
-    bridge: server.bridge,
+    bridge: commentsBridge()!,
     path,
     // what App builds from context({path}): this is the seam's shape, versionId null = unknown
     context: {

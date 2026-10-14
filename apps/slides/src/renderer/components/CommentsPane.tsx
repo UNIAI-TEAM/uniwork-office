@@ -13,7 +13,7 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { format } from '@genoffice/i18n'
-import type { UniworkCommentsSeamApi } from '../comments-seam'
+import type { UniworkCommentsApi } from '@genoffice/electron-utils/comments-ipc'
 import {
   AnchorLabel,
   CollabComposer,
@@ -302,7 +302,7 @@ export interface ServerCommentsHandle {
 }
 
 interface HostProps {
-  bridge: UniworkCommentsSeamApi
+  bridge: UniworkCommentsApi
   path: string
   context: SlidesCommentsContext
   slides: readonly SlideIdentity[]
