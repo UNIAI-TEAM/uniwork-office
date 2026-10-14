@@ -19,6 +19,7 @@ import {
   streamText,
   type AgentImage,
   type PanelNote,
+  type MindMapTreeNode,
 } from '@genoffice/agent-core'
 import {
   aiNoticeBody,
@@ -47,6 +48,7 @@ import {
 import type { AiPageSetupAccess } from './page-setup'
 import type { AiNotesAccess } from './note-ops'
 import { createDocsSkill } from './docs-skill'
+import { MindMapCard } from './MindMapCard'
 import {
   buildDocWriterRequest,
   countFragmentBlocks,
@@ -129,6 +131,9 @@ interface ChatEntry {
   turnLimit?: boolean
   /** tool executions performed during this assistant turn */
   tools?: ToolActivity[]
+  /** interactive mind map from generate_mindmap's side-channel display (session-only;
+   * the persisted transcript keeps the tool call, so a reopened file can regenerate) */
+  mindmap?: MindMapTreeNode
   /** document state before this turn's first edit — rendered as an inline roll-back action */
   snapshot?: AiRunSnapshot
   /** attachments consumed from the composer by this user message (read-only echo chips) */
@@ -158,6 +163,7 @@ const EDIT_STARTER_PROMPTS: StringKey[] = [
   'aiStarterPolishAll',
   'aiStarterContinue',
   'aiStarterFillTemplate',
+  'aiStarterMindMap',
 ]
 
 /** a view-only document keeps only the starter that does not edit it */
@@ -889,6 +895,9 @@ export function AiPanel({
             // tracking on: revisions stay pending, handled in the Review tab
             if (!trackChangesRef.current) clearAiHighlights(true)
           }
+          // mind maps ride the UI-only display side channel onto the message
+          const display = execution.display
+          const mindmap = display?.kind === 'mindmap' ? display.tree : undefined
           runToolsRef.current.push({
             name: call.name,
             summary: execution.summary,
@@ -914,6 +923,7 @@ export function AiPanel({
                     : undefined,
                 },
               ],
+              ...(mindmap ? { mindmap } : {}),
             }
           })
         },
@@ -1548,6 +1558,16 @@ export function AiPanel({
                 </div>
               ))}
               {entry.tools && entry.tools.length > 0 && <ToolChipList tools={entry.tools} />}
+              {entry.mindmap && (
+                <MindMapCard
+                  tree={entry.mindmap}
+                  onAsk={(label) => {
+                    setInput(t('aiMindMapAskPrompt', { label }))
+                    inputRef.current?.focus()
+                  }}
+                  onJumpBlock={(index) => navigateToBlock(editorRef.current, index)}
+                />
+              )}
               {entry.error &&
                 (aiNoticeKind(entry.error) ? (
                   // "nothing to chat with" is a setup / plan state: a plain notice, not a red error

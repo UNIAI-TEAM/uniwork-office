@@ -79,6 +79,12 @@
       "pattern": "GitHub Copilot",
       "kind": "permanent",
       "reason": "Name of a third-party AI coding agent (GitHub Copilot) in the list of agents the skill installer can target; a product name, not a repository link."
+    },
+    {
+      "path": "packages/agent-core/src/redact-range.ts",
+      "pattern": "genspark\\.ai/genoffice/redaction",
+      "kind": "permanent",
+      "reason": "XML namespace of the stored 'hidden from the model' marker (a go:redact element in a docx run's rPr and inside a pptx <a:ext>). It is part of the document format, like the docx/xlsx/pptx namespaces beside it: renaming it makes Word and PowerPoint treat the file as corrupt and repair drops the run carrying the mark, so the span silently becomes readable again. Never rendered in the UI."
     }
   ]
 }
