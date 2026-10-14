@@ -788,4 +788,32 @@ describe('G5-09 desktop conflict dialog S5 session (main)', () => {
       kind: 'closed',
     })
   })
+
+  it('BE-04: does not push conflictClosed when the session is ended before conflictOpen is delivered', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const path = await openAndConflict(ctx, server)
+
+    let releaseDetail: () => void = () => undefined
+    const detailGate = new Promise<void>((resolve) => {
+      releaseDetail = resolve
+    })
+    const origFetch = server.fetch.getMockImplementation()!
+    server.fetch.mockImplementation(async (url: string, init: RequestInit) => {
+      const u = new URL(url)
+      if (u.pathname === `/api/v1/documents/${DOC}` && (init.method ?? 'GET') === 'GET') {
+        await detailGate
+      }
+      return origFetch(url, init)
+    })
+
+    const resolvePromise = ctx.service.resolveConflict(path)
+    // Active path changes while the initial buildConflictView is awaiting getDocument
+    ctx.service.noteActivePath(undefined)
+    releaseDetail()
+
+    expect(await resolvePromise).toMatchObject({ state: 'conflict' })
+    expect(ctx.views).toEqual([])
+    expect(ctx.closedSessions).toEqual([])
+  })
 })

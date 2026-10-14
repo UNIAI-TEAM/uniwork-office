@@ -580,6 +580,7 @@ interface ConflictSession {
   serverOnline: boolean
   locked?: 'revoked' | 'deleted'
   draftBlock?: UniworkConflictKeepDraft
+  opened: boolean
   done: Promise<UniworkDocStatus | null>
   finish: () => void
 }
@@ -3320,6 +3321,7 @@ export class UniworkDocsService {
       knownServerBy: null,
       knownCanEdit: doc.binding.access === 'edit' ? true : false,
       serverOnline: true,
+      opened: false,
       done,
       finish,
     }
@@ -3327,6 +3329,7 @@ export class UniworkDocsService {
     try {
       const view = await this.buildConflictView(prompt, { fetchServer: true })
       if (this.conflictPrompt === prompt && !controller.signal.aborted) {
+        prompt.opened = true
         this.deps.pushConflict?.(view)
       }
       return await done
@@ -3341,7 +3344,9 @@ export class UniworkDocsService {
     if (open.controller.signal.aborted) return
     open.controller.abort()
     open.finish()
-    this.deps.pushConflictClosed?.(open.sessionId)
+    if (open.opened) {
+      this.deps.pushConflictClosed?.(open.sessionId)
+    }
   }
 
   /**
