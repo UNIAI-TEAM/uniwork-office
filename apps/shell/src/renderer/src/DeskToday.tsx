@@ -196,7 +196,12 @@ export function DeskToday({
 
   const others = (s: WorkHomeSummary) => {
     // document comments and mentions sit in the tray; the rest live on the web inbox
-    const n = s.inbox.filter((x) => !x.read_at).length - docNotifications(s.inbox).length
+    // the inbox is a capped preview; counts.unread is the true total when it loaded
+    const unread =
+      !s.partial.includes('notifications') && s.counts.unread !== null
+        ? s.counts.unread
+        : s.inbox.filter((x) => !x.read_at).length
+    const n = Math.max(0, unread - docNotifications(s.inbox).length)
     return n > 0 && base ? (
       <button type="button" className="wb-link" onClick={() => openWeb({ kind: 'inbox', ...base })}>
         {t('wbDeskOtherNotifs', { count: n })} →

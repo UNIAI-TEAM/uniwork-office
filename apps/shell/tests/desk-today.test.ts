@@ -132,6 +132,12 @@ describe('DeskToday', () => {
     expect(work.openWeb).toHaveBeenCalledWith({ kind: 'inbox', orgSlug: 'acme', wsSlug: 'team' })
   })
 
+  it('counts other notifications from the unread total, not the capped inbox preview', async () => {
+    const s = summary()
+    await render(base(load({ ...s, counts: { ...s.counts, unread: 30 } })))
+    expect(host.textContent).toContain('Other notifications (29)')
+  })
+
   it('ticks a task through the server and reloads; a refusal puts it back and offers Retry', async () => {
     const home = load(summary())
     await render(base(home))
