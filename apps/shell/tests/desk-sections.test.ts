@@ -376,6 +376,24 @@ describe('DeskInProgress', () => {
     expect(api.browse).toHaveBeenCalled()
   })
 
+  it('a failed UniWork list says so with Retry instead of posing as nothing in progress', async () => {
+    const onRetry = vi.fn()
+    await render(
+      createElement(DeskInProgress, {
+        drafts: [],
+        recent: [],
+        local: [],
+        cloudFailed: true,
+        onRetry,
+      }),
+    )
+    expect(host.textContent).not.toContain('No documents in progress')
+    const line = host.querySelector('.wb-desk-card > .wb-ov-partial')!
+    expect(line.textContent).toContain('Couldn’t load your UniWork documents')
+    await act(async () => line.querySelector('button')!.click())
+    expect(onRetry).toHaveBeenCalled()
+  })
+
   it('shows a skeleton, not the empty line, while drafts or recents load', async () => {
     await render(
       createElement(DeskInProgress, { drafts: [], recent: [], local: [], loading: true }),

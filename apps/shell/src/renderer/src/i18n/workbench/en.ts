@@ -256,6 +256,7 @@ export const en = {
   wbDeskDrawerPack: 'Pack to draft into',
   wbDeskDefaultPack: 'Default project',
   wbDeskDueTasks: 'Due tasks',
+  wbDeskCloudFailed: 'Couldn’t load your UniWork documents',
   wbDeskMeetings: 'Meetings',
   wbKnNewPack: 'New pack',
   wbKnCreateFirst: 'Create your first pack',

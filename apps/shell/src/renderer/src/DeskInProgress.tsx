@@ -30,6 +30,8 @@ export function DeskInProgress({
   recent,
   local,
   loading = false,
+  cloudFailed = false,
+  onRetry,
 }: {
   drafts: readonly DeskDraft[]
   recent: readonly WorkRecentDocument[]
@@ -37,6 +39,9 @@ export function DeskInProgress({
   local: readonly RecentEntry[]
   /** drafts or recents have not answered yet: a skeleton, not the empty line */
   loading?: boolean
+  /** the UniWork list did not load: only this device's files show, so say so (spec 4.11) */
+  cloudFailed?: boolean
+  onRetry?: () => void
 }): ReactElement {
   const { t, dateLocale } = useI18n()
   const titleId = useId()
@@ -45,6 +50,7 @@ export function DeskInProgress({
 
   const body = () => {
     if (loading) return <WorkSkeleton rows={3} />
+    if (rows.length === 0 && cloudFailed) return null
     if (rows.length === 0)
       return (
         <WorkStatePanel
@@ -165,6 +171,14 @@ export function DeskInProgress({
         </button>
       </div>
       {body()}
+      {!loading && cloudFailed ? (
+        <p className="wb-ov-partial">
+          {t('wbDeskCloudFailed')} ·{' '}
+          <button type="button" className="wb-link" onClick={onRetry}>
+            {t('acctRetry')}
+          </button>
+        </p>
+      ) : null}
     </section>
   )
 }

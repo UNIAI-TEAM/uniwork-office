@@ -255,6 +255,7 @@ export const vi = {
   wbDeskDrawerPack: 'Gói nhận bản soạn',
   wbDeskDefaultPack: 'Dự án mặc định',
   wbDeskDueTasks: 'Việc đến hạn',
+  wbDeskCloudFailed: 'Không tải được tài liệu trên UniWork',
   wbDeskMeetings: 'Lịch họp',
   wbKnNewPack: 'Gói mới',
   wbKnCreateFirst: 'Tạo gói đầu tiên',

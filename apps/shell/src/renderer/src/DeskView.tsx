@@ -241,6 +241,9 @@ export function DeskView({
             recent={recents.docs}
             local={recents.local}
             loading={drafts === null || !recents.loaded}
+            // signed out or offline already has the page banner: no second notice here
+            cloudFailed={recents.cloudFailed && view === 'ready'}
+            onRetry={recents.reload}
           />
           <DeskDrawer
             practiceId={practiceId}

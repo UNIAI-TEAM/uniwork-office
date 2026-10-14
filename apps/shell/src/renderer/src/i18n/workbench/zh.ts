@@ -257,6 +257,7 @@ export const zh = {
   wbDeskDrawerPack: '起草目标资料包',
   wbDeskDefaultPack: '默认项目',
   wbDeskDueTasks: '到期任务',
+  wbDeskCloudFailed: '无法加载 UniWork 上的文档',
   wbDeskMeetings: '会议',
   wbKnNewPack: '新建资料包',
   wbKnCreateFirst: '创建第一个资料包',
