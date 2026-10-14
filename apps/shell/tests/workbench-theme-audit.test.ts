@@ -49,7 +49,11 @@ const WORKBENCH_TSX = [
   'NotesPane.tsx',
   'PracticeHome.tsx',
   'WorkErrorState.tsx',
-  'WorkPaneHeader.tsx',
+  'WorkToolbar.tsx',
+  'WbMenu.tsx',
+  'WbConfirm.tsx',
+  'WbToastHost.tsx',
+  'FileBadge.tsx',
   'WorkbenchIcons.tsx',
   'WbRowActions.tsx',
   'SkillDomainTabs.tsx',
@@ -66,8 +70,13 @@ describe('Workbench CSS sweep', () => {
     for (const name of WORKBENCH_TSX) expect(tsx(name), name).not.toMatch(RAW_COLOR)
   })
 
-  it('paints text in AA colours: no --text-tertiary, no bare --danger', () => {
-    expect(selectorsWhere(/(?:^|[\s;])color:\s*var\(--text-tertiary\)/)).toEqual([])
+  it('paints text in AA colours: no --text-tertiary (except locked controls), no bare --danger', () => {
+    // a disabled control is exempt from WCAG contrast; locked reads as neutral grey (spec 1.4)
+    expect(
+      selectorsWhere(/(?:^|[\s;])color:\s*var\(--text-tertiary\)/).filter(
+        (s) => !s.split(',').every((part) => part.includes(':disabled')),
+      ),
+    ).toEqual([])
     expect(selectorsWhere(/(?:^|[\s;])color:\s*var\(--danger\)/)).toEqual([])
     // placeholder-only inputs: the UA default #757575 misses 4.5:1 on dark surfaces;
     // --text-secondary on --surface / --wb-row-hover is checked in PAIRS below
@@ -127,14 +136,15 @@ describe('Workbench CSS sweep', () => {
     expect(motion).toMatch(/\.wb-skel[^{]*\{[^}]*animation: none/)
   })
 
-  it('Workbench components use .wb-btn; the shared .btn stays only in the skill-confirm modal', () => {
-    for (const name of WORKBENCH_TSX.filter((n) => n !== 'PracticeHome.tsx')) {
+  it('Workbench components use .wb-btn only; the skill confirm is a WbConfirm, not a .modal', () => {
+    for (const name of WORKBENCH_TSX) {
       expect(tsx(name), name).not.toMatch(/\bbtn btn-/)
+      expect(tsx(name), name).not.toContain('className="modal')
     }
-    const practice = tsx('PracticeHome.tsx')
-    const modal = practice.indexOf('className="modal"')
-    expect(modal).toBeGreaterThan(0)
-    expect(practice.slice(0, modal)).not.toMatch(/\bbtn btn-/)
+  })
+
+  it('no window.confirm: deletes ask through the in-app WbConfirm', () => {
+    for (const name of WORKBENCH_TSX) expect(tsx(name), name).not.toMatch(/window\.confirm/)
   })
 })
 
@@ -221,10 +231,16 @@ describe('Workbench colour pairs', () => {
 
 /** rules that paint their own text on their own fill (review focus: dark contrast of the new pills) */
 const PAINTED = [
-  '.wb-pill.is-status',
+  '.wb-pill',
   '.wb-pill.is-danger',
   '.wb-pill.is-warning',
-  '.wb-crumb-role',
+  '.wb-pill.is-success',
+  '.wb-pill.is-info',
+  '.wb-tab-count',
+  '.wb-tab-count.is-danger',
+  '.wb-crumb',
+  '.wb-crumb-mark',
+  '.wb-btn-danger',
   '.wb-check input:checked + .wb-check-box',
 ]
 

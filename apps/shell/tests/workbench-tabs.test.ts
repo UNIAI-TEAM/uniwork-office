@@ -81,6 +81,7 @@ describe('Workbench tab counts', () => {
     expect(desk!.querySelector('.wb-tab-count')).toBeNull()
     const badge = tasks!.querySelector('.wb-tab-count')!
     expect(badge.textContent).toBe('3')
+    // a pill: danger when tasks are overdue, neutral otherwise
     expect(badge.className).toBe('wb-tab-count wb-num is-danger')
     expect(badge.getAttribute('aria-hidden')).toBe('true')
     expect(tasks!.querySelector('.uw-sr-only')?.textContent).toBe('Overdue tasks: 3')
@@ -102,9 +103,68 @@ describe('Workbench tab unpin', () => {
     await mount()
     const all = tabs()
     expect(all).toHaveLength(5)
-    expect(all.slice(0, 3).map((b) => b.querySelector('.wb-tab-unpin'))).toEqual([null, null, null])
-    expect(all[3]!.querySelector('.wb-tab-unpin[aria-label="Unpin tab"]')).not.toBeNull()
-    expect(all[4]!.querySelector('.wb-tab-unpin[aria-label="Unpin tab"]')).not.toBeNull()
+    const unpinOf = (tab: HTMLButtonElement) =>
+      tab.parentElement!.querySelector<HTMLButtonElement>(':scope > .wb-tab-unpin')
+    expect(all.slice(0, 3).map(unpinOf)).toEqual([null, null, null])
+    expect(unpinOf(all[3]!)?.getAttribute('aria-label')).toBe('Unpin tab: Profile')
+    expect(unpinOf(all[4]!)?.getAttribute('aria-label')).toBe('Unpin tab: Knowledge')
+  })
+
+  it('unpin is its own button beside the tab, never nested inside the tab button', async () => {
+    store.set('uniwork.wb.pins.sales', JSON.stringify(['desk', 'tasks', 'calendar', 'personal']))
+    store.set('uniwork.wb.pillarPins.sales', JSON.stringify(['knowledge']))
+    const onSelect = vi.fn()
+    await mount({ onSelect, active: 'personal' })
+    // no interactive content inside a tab button
+    for (const tab of tabs()) {
+      expect(tab.querySelector('button, [role="button"], [tabindex]')).toBeNull()
+    }
+    const unpins = Array.from(host.querySelectorAll<HTMLButtonElement>('.wb-tab-unpin'))
+    expect(unpins).toHaveLength(2)
+    for (const u of unpins) {
+      expect(u.tagName).toBe('BUTTON')
+      expect(u.type).toBe('button')
+      expect(u.closest('.wb-tab')).toBeNull()
+      expect(u.previousElementSibling?.classList.contains('wb-tab')).toBe(true)
+    }
+    // unpinning the open tab goes back to the Desk, and the tab is gone
+    await act(async () => unpins[0]!.click())
+    expect(onSelect).toHaveBeenCalledWith('desk')
+    expect(tabs().map((b) => b.textContent)).not.toContain('Profile')
+  })
+
+  it('Alt+arrow moves a focused non-core tab; core tabs stay put', async () => {
+    store.set(
+      'uniwork.wb.pins.sales',
+      JSON.stringify(['desk', 'tasks', 'calendar', 'personal', 'notes']),
+    )
+    await mount()
+    const ids = () => tabs().map((b) => b.dataset.tabId)
+    const press = (el: HTMLElement, key: string) =>
+      act(() => {
+        el.dispatchEvent(new KeyboardEvent('keydown', { key, altKey: true, bubbles: true }))
+      })
+    const notes = tabs()[4]!
+    notes.focus()
+    press(notes, 'ArrowLeft')
+    expect(ids()).toEqual(['desk', 'tasks', 'calendar', 'notes', 'personal'])
+    expect(JSON.parse(store.get('uniwork.wb.pins.sales')!)).toEqual([
+      'desk',
+      'tasks',
+      'calendar',
+      'notes',
+      'personal',
+    ])
+    // focus stays on the moved tab
+    expect(document.activeElement).toBe(tabs()[3])
+    press(tabs()[3]!, 'ArrowRight')
+    expect(ids()).toEqual(['desk', 'tasks', 'calendar', 'personal', 'notes'])
+    // a core tab does not move
+    press(tabs()[1]!, 'ArrowRight')
+    expect(ids()).toEqual(['desk', 'tasks', 'calendar', 'personal', 'notes'])
+    // the last tab has no right neighbour
+    press(tabs()[4]!, 'ArrowRight')
+    expect(ids()).toEqual(['desk', 'tasks', 'calendar', 'personal', 'notes'])
   })
 
   it('marks only the active tab, module or pillar, with aria-current="page"', async () => {
@@ -119,10 +179,10 @@ describe('Workbench tab unpin', () => {
     const css = readFileSync(join(__dirname, '../src/renderer/src/home.css'), 'utf8')
     expect(css).toMatch(/\n\.wb-tab-unpin \{[^}]*\n {2}opacity: 0;/)
     expect(css).toContain(
-      '\n.wb-tab:hover .wb-tab-unpin,\n.wb-tab:focus-within .wb-tab-unpin,\n.wb-tab.active .wb-tab-unpin {\n  opacity: 1;\n}',
+      '\n.wb-tab-item:hover .wb-tab-unpin,\n.wb-tab-item:focus-within .wb-tab-unpin,\n.wb-tab-item .wb-tab.active + .wb-tab-unpin {\n  opacity: 1;\n}',
     )
     expect(css).toContain(
-      '\n.wb-tab-module:hover .wb-tab-grip,\n.wb-tab-module:focus-within .wb-tab-grip,\n.wb-tab-module.active .wb-tab-grip {\n  opacity: 1;\n}',
+      '\n.wb-tab-module:hover .wb-tab-grip,\n.wb-tab-module:focus-visible .wb-tab-grip,\n.wb-tab-module.active .wb-tab-grip {\n  opacity: 1;\n}',
     )
     expect(css).toMatch(
       /\n\.wb-tab\.active::after \{[^}]*border-radius: 2px;[^}]*background: var\(--accent\);/,
@@ -146,7 +206,8 @@ describe('Workbench tab row (one row, scrolls sideways)', () => {
     const scroller = nav.querySelector(':scope > .wb-tabs-scroll')!
     expect(scroller.querySelectorAll('.wb-tab-module')).toHaveLength(tabs().length)
     expect(scroller.querySelector('.wb-tab-add')).toBeNull()
-    expect(nav.lastElementChild?.className).toBe('wb-tab-add-wrap')
+    expect(nav.lastElementChild?.className).toBe('wb-menu-wrap')
+    expect(nav.lastElementChild?.querySelector('.wb-tab-add')).not.toBeNull()
   })
 
   it('scrolls the selected tab into view when the selection changes', async () => {
@@ -220,20 +281,40 @@ describe('Workbench tab row (one row, scrolls sideways)', () => {
     expect(scroller).toMatch(/overflow-x: auto;/)
     expect(scroller).toMatch(/scrollbar-width: none;/)
     expect(scroller).toMatch(/margin-bottom: -1px;/)
-    expect(rule('.wb-tab-add-wrap')).toMatch(/flex: none;/)
+    expect(rule('.wb-menu-wrap')).toMatch(/flex: none;/)
   })
 
-  it('CSS: a tab is as wide as its label; the grip and × overlay the side padding', () => {
+  it('CSS: a 40px tab as wide as its label; the grip and the 24px unpin overlay the side padding', () => {
     const tab = rule('.wb-tab')
     expect(tab).toMatch(/flex: none;/)
-    expect(tab).toMatch(/padding: 8px 16px 10px;/)
+    expect(tab).toMatch(/height: 40px;/)
     expect(tab).toMatch(/white-space: nowrap;/)
     expect(tab).not.toMatch(/min-width/)
     expect(rule('.wb-tab-grip')).toMatch(/position: absolute;/)
     const unpin = rule('.wb-tab-unpin')
     expect(unpin).toMatch(/position: absolute;/)
-    // the × fits inside the 16px right padding
-    expect(unpin).toMatch(/right: 1px;/)
-    expect(unpin).toMatch(/width: 14px;/)
+    // a 24px target (WCAG 2.5.8) inside the tab's 30px right padding
+    expect(unpin).toMatch(/width: 24px;\n {2}height: 24px;/)
+    expect(rule('.wb-tab-item.has-unpin > .wb-tab')).toMatch(/padding-right: 30px;/)
+  })
+
+  it('an overflowing row fades its clipped edges and offers step buttons', async () => {
+    await mount()
+    const scroller = host.querySelector<HTMLDivElement>('.wb-tabs-scroll')!
+    expect(scroller.className).toBe('wb-tabs-scroll')
+    expect(host.querySelector('.wb-tabs-step')).toBeNull()
+    Object.defineProperty(scroller, 'scrollWidth', { value: 900, configurable: true })
+    Object.defineProperty(scroller, 'clientWidth', { value: 400, configurable: true })
+    await act(async () => scroller.dispatchEvent(new Event('scroll')))
+    expect(scroller.className).toBe('wb-tabs-scroll is-fade-end')
+    const steps = host.querySelectorAll<HTMLButtonElement>('.wb-tabs-step')
+    expect(steps).toHaveLength(1)
+    // a mouse affordance: keyboard users reach every tab by Tab, which scrolls it into view
+    expect(steps[0]!.tabIndex).toBe(-1)
+    scroller.scrollLeft = 200
+    await act(async () => scroller.dispatchEvent(new Event('scroll')))
+    expect(scroller.className).toBe('wb-tabs-scroll is-fade-start is-fade-end')
+    expect(host.querySelectorAll('.wb-tabs-step')).toHaveLength(2)
+    expect(rule('.wb-tabs-scroll.is-fade-end')).toMatch(/mask-image: linear-gradient/)
   })
 })

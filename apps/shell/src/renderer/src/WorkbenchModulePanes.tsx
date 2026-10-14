@@ -4,18 +4,23 @@ import { getWorkbenchModule, type PracticeId, type WorkbenchModuleId } from '@un
 import type { UniworkWorkspaceRef } from '../../shared/home-api'
 import type { UniworkWorkError } from '../../shared/uniwork-work-api'
 import { NotesPane } from './NotesPane'
-import { LocalTag } from './LocalTag'
 import { MODULE_TONES } from './module-tones'
 import { WorkbenchIcon } from './WorkbenchIcons'
-import { useI18n, type StringKey } from './locale'
+import { useI18n } from './locale'
 import { WorkProfilePane } from './WorkProfilePane'
 import { draftFromForm } from './form-draft'
 import { WorkCalendarPane } from './WorkCalendarPane'
 import { WorkTasksPane } from './WorkTasksPane'
-import { WorkPaneHeader } from './WorkPaneHeader'
+import { WorkToolbar, type WorkToolbarProps } from './WorkToolbar'
+import { useWbToast } from './WbToastHost'
 import { WbDeleteBtn, WbDraftBtn, WbEditBtn, WbFileBtn, WbRowActions } from './WbRowActions'
 import { readForms, writeForms, type WbFormItem } from './workbench-pins'
-import { WorkSkeleton, WorkStatePanel, type WorkPaneProps } from './WorkErrorState'
+import {
+  WorkSkeleton,
+  WorkStatePanel,
+  type WorkPaneProps,
+  type WorkSkeletonShape,
+} from './WorkErrorState'
 
 interface Props {
   moduleId: WorkbenchModuleId
@@ -64,10 +69,10 @@ export function WorkbenchModulePane({
   }
 
   const title = vi ? mod.labelVi : mod.labelEn
-  const head = {
-    module: moduleId,
+  // the tab hint (and the open pack) until the tab's data can say more
+  const head: WorkToolbarProps = {
     title,
-    meta: `${vi ? mod.hintVi : mod.hintEn}${contextTitle ? ` · ${contextTitle}` : ''}`,
+    summary: `${vi ? mod.hintVi : mod.hintEn}${contextTitle ? ` · ${contextTitle}` : ''}`,
   }
   const local = moduleId === 'forms' || moduleId === 'notes'
 
@@ -75,21 +80,19 @@ export function WorkbenchModulePane({
   if (loading && !local) {
     return (
       <section className="wb-pane" aria-label={title}>
-        <WorkPaneHeader {...head} />
-        <WorkSkeleton />
+        <WorkToolbar {...head} />
+        <WorkSkeleton shape={SKELETON[moduleId]} />
       </section>
     )
   }
 
   return (
     <section className="wb-pane" aria-label={title}>
-      {/* Tasks draws its own header: the aside counts the list it loads */}
-      {moduleId !== 'tasks' && (
-        <WorkPaneHeader {...head} aside={local ? <LocalTag /> : undefined} />
-      )}
+      {/* Tasks, Notes and Forms draw their own toolbar: its summary counts what they load */}
+      {moduleId === 'calendar' || moduleId === 'personal' ? <WorkToolbar {...head} /> : null}
       {moduleId === 'calendar' && <WorkCalendarPane {...server} />}
       {moduleId === 'tasks' && <WorkTasksPane {...server} head={head} onWritten={onTasksWritten} />}
-      {moduleId === 'notes' && <NotesPane practiceId={practiceId} />}
+      {moduleId === 'notes' && <NotesPane practiceId={practiceId} head={head} />}
       {moduleId === 'forms' && (
         <FormsPane
           practiceId={practiceId}
@@ -97,11 +100,17 @@ export function WorkbenchModulePane({
           packId={packId}
           onPackLinked={onPackLinked}
           orgId={workspace?.orgId ?? null}
+          head={head}
         />
       )}
       {moduleId === 'personal' && <WorkProfilePane {...server} />}
     </section>
   )
+}
+
+const SKELETON: Partial<Record<WorkbenchModuleId, WorkSkeletonShape>> = {
+  calendar: 'agenda',
+  personal: 'card',
 }
 
 function FormsPane({
@@ -110,6 +119,7 @@ function FormsPane({
   packId,
   onPackLinked,
   orgId,
+  head,
 }: {
   practiceId: PracticeId
   vi: boolean
@@ -117,8 +127,10 @@ function FormsPane({
   onPackLinked?: () => void
   /** the active org, for the cached UniWork profile the compose merge reads; null when signed out */
   orgId: string | null
+  head: WorkToolbarProps
 }): ReactElement {
   const { t } = useI18n()
+  const toasts = useWbToast()
   const [items, setItems] = useState<WbFormItem[]>(() => readForms(practiceId))
   const [editingId, setEditingId] = useState<string | null>(null)
   const [title, setTitle] = useState('')
@@ -128,10 +140,6 @@ function FormsPane({
     fileName: string
     fileExt: string
   } | null>(null)
-  // a key (translated at render, so a language switch applies) or the main process's own text
-  const [uploadNotice, setUploadNotice] = useState<{ key: StringKey } | { text: string } | null>(
-    null,
-  )
 
   useEffect(() => {
     setItems(readForms(practiceId))
@@ -173,10 +181,13 @@ function FormsPane({
     if (!result) return
     const accepted = result.accepted[0]
     if (!accepted) {
-      setUploadNotice(
-        result.rejected[0] ? { text: result.rejected[0] } : { key: 'wbFormsNoSupportedFile' },
-      )
-      window.setTimeout(() => setUploadNotice(null), 4000)
+      // a key is translated by the host at render, so a language switch applies
+      toasts.show({
+        id: 'forms-upload',
+        message: result.rejected[0]
+          ? { text: result.rejected[0] }
+          : { key: 'wbFormsNoSupportedFile' },
+      })
       return
     }
     setDraftFile({
@@ -187,7 +198,7 @@ function FormsPane({
     if (!title.trim()) {
       setTitle(accepted.name.replace(/\.[^.]+$/, ''))
     }
-    setUploadNotice(null)
+    toasts.dismiss('forms-upload')
   }
 
   const save = () => {
@@ -237,12 +248,13 @@ function FormsPane({
 
   return (
     <>
+      <WorkToolbar {...head} summary={t('wbFormsCount', { count: items.length })} local />
       <p className="wb-forms-hint" title={t('wbFormsHint')}>
         {t('wbFormsHint')}
       </p>
       <div className="wb-forms-add">
         <input
-          className="wb-forms-title"
+          className="wb-input wb-forms-title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           aria-label={t('wbFormsTitle')}
@@ -252,7 +264,7 @@ function FormsPane({
           }}
         />
         <input
-          className="wb-forms-note"
+          className="wb-input wb-forms-note"
           value={note}
           onChange={(e) => setNote(e.target.value)}
           aria-label={t('wbFormsNote')}
@@ -283,9 +295,6 @@ function FormsPane({
         <p className="wb-hint">
           {t('wbFormsTemplateFile')} {draftFile.fileName}
         </p>
-      ) : null}
-      {uploadNotice ? (
-        <p className="wb-hint">{'key' in uploadNotice ? t(uploadNotice.key) : uploadNotice.text}</p>
       ) : null}
       {items.length === 0 ? (
         <WorkStatePanel

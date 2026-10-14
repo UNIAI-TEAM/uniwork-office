@@ -13,6 +13,7 @@ import type {
   WorkTaskStatus,
 } from '../src/shared/uniwork-work-api'
 import { LocaleProvider } from '../src/renderer/src/locale'
+import { WbToastHost, createWbToasts } from '../src/renderer/src/WbToastHost'
 import { WorkTasksPane } from '../src/renderer/src/WorkTasksPane'
 import { WB_REFRESH_EVENT } from '../src/renderer/src/work-cache'
 import { localIsoDate } from '../src/renderer/src/work-tasks'
@@ -80,7 +81,11 @@ async function render(
       createElement(
         LocaleProvider,
         { initial: 'en' },
-        createElement(WorkTasksPane, { workspace, workspaceError, onReload }),
+        createElement(
+          WbToastHost,
+          { toasts: createWbToasts() },
+          createElement(WorkTasksPane, { workspace, workspaceError, onReload }),
+        ),
       ),
     )
   })
@@ -280,7 +285,7 @@ async function mountWithHead(
           workspace,
           workspaceError,
           onReload,
-          head: { module: 'tasks', title: 'Tasks' },
+          head: { title: 'Tasks', summary: 'Your UniWork tasks' },
         }),
       ),
     )
@@ -300,32 +305,35 @@ describe('Tasks tab layout (redesign spec 4.3)', () => {
     )
     expect(host.querySelector('.wb-group-head')?.textContent).toBe('Today 1')
     expect(host.querySelector('.wb-work-row .wb-mono')?.textContent).toBe('OPS-7')
-    expect(host.querySelector('.wb-work-row .wb-pill.is-status')?.textContent).toBe('To do')
+    // the status is a neutral pill with a dot
+    const status = host.querySelector('.wb-work-row .wb-pill:not(.wb-num)')!
+    expect(status.className).toBe('wb-pill')
+    expect(status.textContent).toBe('To do')
+    expect(status.querySelector('.wb-pill-dot')).not.toBeNull()
     expect(checkbox().classList.contains('uw-sr-only')).toBe(true)
     expect(checkbox().closest('label.wb-check')?.querySelector('.wb-check-box')).not.toBeNull()
   })
 
-  it('with a head: the aside counts open tasks once the list has loaded', async () => {
+  it('with a head: the toolbar summary counts open, overdue and due-today tasks once loaded', async () => {
     await mountWithHead({ ...WS, id: 'w-head' })
-    expect(host.querySelectorAll('.wb-pane-head')).toHaveLength(1)
-    expect(host.querySelector('.wb-pane-title')?.textContent).toBe('Tasks')
-    expect(host.querySelector('.wb-pane-aside')?.textContent).toBe('Open: 1')
+    expect(host.querySelectorAll('.wb-toolbar')).toHaveLength(1)
+    // the tab name is a heading for screen readers only: the tab row shows it
+    expect(host.querySelector('.wb-toolbar h2.uw-sr-only')?.textContent).toBe('Tasks')
+    expect(host.querySelector('.wb-toolbar-text')?.textContent).toBe('Open: 1 · Due today: 1')
   })
 
-  it('with a head: no count while loading, the header stays above the skeleton', async () => {
+  it('with a head: the hint while loading, the toolbar stays above the skeleton', async () => {
     api.myTasks.mockImplementationOnce(
       () => new Promise<UniworkWorkResult<WorkTask[]>>(() => undefined),
     )
     await mountWithHead({ ...WS, id: 'w-head-pending' })
-    expect(host.querySelectorAll('.wb-pane-head')).toHaveLength(1)
-    expect(host.querySelector('.wb-pane-aside')).toBeNull()
+    expect(host.querySelectorAll('.wb-toolbar')).toHaveLength(1)
+    expect(host.querySelector('.wb-toolbar-text')?.textContent).toBe('Your UniWork tasks')
     expect(host.querySelector('.wb-work-skeleton')).not.toBeNull()
   })
 
-  it('with a head: signed out still shows the header above the sign-in panel', async () => {
+  it('with a head: signed out still shows the toolbar above the sign-in panel', async () => {
     await mountWithHead(null, 'signed-out')
-    expect(host.querySelector('.wb-pane-head + *')?.textContent).toContain(
-      'Sign in to see your work',
-    )
+    expect(host.querySelector('.wb-toolbar + *')?.textContent).toContain('Sign in to see your work')
   })
 })

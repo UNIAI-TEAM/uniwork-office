@@ -68,54 +68,62 @@ async function mount(moduleId: WorkbenchModuleId, contextTitle?: string, loading
   })
 }
 
-describe('Workbench module pane frame (redesign spec 4.2)', () => {
-  it('a local tab: one header with the module name, its hint as meta and the device tag', async () => {
+describe('Workbench module pane frame (redesign spec 3: the tab toolbar)', () => {
+  it('a local tab: one toolbar counting its items, the device tag, the name for screen readers', async () => {
     await mount('notes', 'Acme deal')
     expect(host.querySelector('section.wb-pane')?.getAttribute('aria-label')).toBe('Notes')
     expect(host.querySelector('.wb-panel, .wb-detail')).toBeNull()
-    expect(Array.from(host.querySelectorAll('h2')).map((h) => h.textContent)).toEqual(['Notes'])
-    expect(host.querySelector('.wb-pane-meta')?.textContent).toBe(
-      'Quick notes, stored on this device · Acme deal',
+    expect(host.querySelectorAll('.wb-toolbar')).toHaveLength(1)
+    // no visible tab title repeated under the tab row; the heading stays for screen readers
+    expect(
+      Array.from(host.querySelectorAll('h2')).map((h) => [h.textContent, h.className]),
+    ).toEqual([['Notes', 'uw-sr-only']])
+    expect(host.querySelector('.wb-toolbar-text')?.textContent).toBe('Notes: 0')
+    expect(host.querySelector('.wb-toolbar-summary .wb-local-tag')?.textContent).toBe(
+      'On this device',
     )
-    expect(host.querySelector('.wb-pane-aside .wb-local-tag')?.textContent).toBe('On this device')
   })
 
-  it('a server tab gets the header without the device tag', async () => {
+  it('a server tab gets the toolbar with its hint and no device tag', async () => {
     await mount('calendar')
-    expect(host.querySelectorAll('.wb-pane-head')).toHaveLength(1)
-    expect(host.querySelector('.wb-pane-meta')?.textContent).toBe(
+    expect(host.querySelectorAll('.wb-toolbar')).toHaveLength(1)
+    expect(host.querySelector('.wb-toolbar-text')?.textContent).toBe(
       'Due tasks and meetings in the next 14 days',
     )
     expect(host.querySelector('.wb-local-tag')).toBeNull()
   })
 
-  it('Tasks gets exactly one header, drawn by the Tasks pane (no count before a list)', async () => {
+  it('Tasks gets exactly one toolbar, drawn by the Tasks pane (the hint before a list)', async () => {
     await mount('tasks')
-    expect(host.querySelectorAll('.wb-pane-head')).toHaveLength(1)
-    expect(host.querySelector('.wb-pane-title')?.textContent).toBe('Tasks')
-    expect(host.querySelector('.wb-pane-aside')).toBeNull()
+    expect(host.querySelectorAll('.wb-toolbar')).toHaveLength(1)
+    expect(host.querySelector('.wb-toolbar h2')?.textContent).toBe('Tasks')
+    expect(host.querySelector('.wb-toolbar-text')?.textContent).not.toMatch(/Open:/)
   })
 
   // the workspace list is still loading (PracticeHome passes workspaces === null)
   it.each([
-    ['tasks', 'Tasks'],
-    ['calendar', 'Calendar'],
-    ['personal', 'Profile'],
-  ] as const)('%s keeps its header above the skeleton while workspaces load', async (id, title) => {
-    await mount(id, undefined, true)
-    expect(host.querySelector('section.wb-pane')?.getAttribute('aria-label')).toBe(title)
-    expect(host.querySelectorAll('.wb-pane-head')).toHaveLength(1)
-    expect(host.querySelector('.wb-pane-title')?.textContent).toBe(title)
-    const skeleton = host.querySelector('.wb-work-skeleton')!
-    expect(skeleton.getAttribute('aria-busy')).toBe('true')
-    expect(host.querySelector('.wb-pane-head')!.compareDocumentPosition(skeleton)).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING,
-    )
-  })
+    ['tasks', 'Tasks', 'rows'],
+    ['calendar', 'Calendar', 'agenda'],
+    ['personal', 'Profile', 'card'],
+  ] as const)(
+    '%s keeps its toolbar above a skeleton shaped like its content while workspaces load',
+    async (id, title, shape) => {
+      await mount(id, undefined, true)
+      expect(host.querySelector('section.wb-pane')?.getAttribute('aria-label')).toBe(title)
+      expect(host.querySelectorAll('.wb-toolbar')).toHaveLength(1)
+      expect(host.querySelector('.wb-toolbar h2')?.textContent).toBe(title)
+      const skeleton = host.querySelector('.wb-work-skeleton')!
+      expect(skeleton.getAttribute('aria-busy')).toBe('true')
+      expect(skeleton.classList.contains(`is-${shape}`)).toBe(true)
+      expect(host.querySelector('.wb-toolbar')!.compareDocumentPosition(skeleton)).toBe(
+        Node.DOCUMENT_POSITION_FOLLOWING,
+      )
+    },
+  )
 
   it('a local tab ignores the workspace load', async () => {
     await mount('notes', undefined, true)
     expect(host.querySelector('.wb-work-skeleton')).toBeNull()
-    expect(host.querySelector('.wb-pane-aside .wb-local-tag')).not.toBeNull()
+    expect(host.querySelector('.wb-toolbar .wb-local-tag')).not.toBeNull()
   })
 })

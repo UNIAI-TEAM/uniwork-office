@@ -66,7 +66,7 @@ export function DeskInProgress({
               return (
                 <li key={`d:${d.tabId ?? d.filePath}`} className="wb-row">
                   <FileBadge ext={APP_EXT[d.app]} size={20} />
-                  <button type="button" className="wb-desk-row-title" onClick={go}>
+                  <button type="button" className="wb-row-title wb-desk-row-title" onClick={go}>
                     {d.title}
                   </button>
                   <span className="wb-pill is-warning">
@@ -97,7 +97,7 @@ export function DeskInProgress({
                   <FileBadge ext={docExtension(doc.doc)} size={20} />
                   <button
                     type="button"
-                    className="wb-desk-row-title"
+                    className="wb-row-title wb-desk-row-title"
                     onClick={() =>
                       void openUniworkDocument(
                         { documentId: doc.doc.id, title: doc.doc.title },
@@ -119,7 +119,7 @@ export function DeskInProgress({
                 <FileBadge ext={e.ext} size={20} />
                 <button
                   type="button"
-                  className="wb-desk-row-title"
+                  className="wb-row-title wb-desk-row-title"
                   onClick={() => void openRecentEntry(e, window.aiOffice)}
                 >
                   {e.name}

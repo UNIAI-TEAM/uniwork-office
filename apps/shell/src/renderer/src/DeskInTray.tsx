@@ -240,7 +240,7 @@ export function DeskInTray({
               <li key={d.key} className="wb-row">
                 {d.icon}
                 <span className="wb-desk-row-main">
-                  <button type="button" className="wb-desk-row-title" onClick={d.open}>
+                  <button type="button" className="wb-row-title wb-desk-row-title" onClick={d.open}>
                     {d.title}
                   </button>
                   <span className="wb-desk-reason">{d.reason}</span>

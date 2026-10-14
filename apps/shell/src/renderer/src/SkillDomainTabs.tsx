@@ -15,6 +15,8 @@ import {
 } from './skill-domain-pins'
 import { MODULE_TONES, tintStyle } from './module-tones'
 import { useI18n } from './locale'
+import { WbMenu, WbMenuItem, WbMenuLabel } from './WbMenu'
+import { WbGlyph } from './WorkbenchIcons'
 
 interface Props {
   vi: boolean
@@ -43,7 +45,7 @@ export function SkillDomainTabs({ vi, active, onSelect, onPinsChange }: Props): 
   const [dragId, setDragId] = useState<SkillDomainId | null>(null)
   const [overId, setOverId] = useState<SkillDomainId | null>(null)
   const dragMoved = useRef(false)
-  const wrapRef = useRef<HTMLDivElement>(null)
+  const addRef = useRef<HTMLButtonElement>(null)
   const { t } = useI18n()
 
   useEffect(() => {
@@ -55,15 +57,6 @@ export function SkillDomainTabs({ vi, active, onSelect, onPinsChange }: Props): 
     // Sync pins from storage once on mount; parent owns active thereafter.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  useEffect(() => {
-    if (!menuOpen) return
-    const onDoc = (e: MouseEvent) => {
-      if (!wrapRef.current?.contains(e.target as Node)) setMenuOpen(false)
-    }
-    document.addEventListener('mousedown', onDoc)
-    return () => document.removeEventListener('mousedown', onDoc)
-  }, [menuOpen])
 
   const availableToAdd = SKILL_DOMAINS.filter((d) => !pins.includes(d.id))
 
@@ -155,7 +148,7 @@ export function SkillDomainTabs({ vi, active, onSelect, onPinsChange }: Props): 
             title={`${vi ? mod.hintVi : mod.hintEn} · ${t('wbCommonDragToReorder')}`}
           >
             <span className="skill-domain-tab-grip" aria-hidden>
-              ⋮⋮
+              <WbGlyph id="grip" size={12} />
             </span>
             <span className="skill-domain-tab-icon">
               <DomainBadge id={id} size={18} />
@@ -177,53 +170,49 @@ export function SkillDomainTabs({ vi, active, onSelect, onPinsChange }: Props): 
                   }
                 }}
               >
-                ×
+                <WbGlyph id="close" size={14} />
               </span>
             ) : null}
           </button>
         )
       })}
 
-      <div className="skill-domain-add-wrap" ref={wrapRef}>
+      <div className="wb-menu-wrap">
         <button
+          ref={addRef}
           type="button"
           className={`skill-domain-tab skill-domain-add${menuOpen ? ' active' : ''}`}
           aria-haspopup="menu"
           aria-expanded={menuOpen}
+          aria-label={t('wbSkTabsAdd')}
           onClick={() => setMenuOpen((o) => !o)}
           title={t('wbSkTabsAdd')}
         >
           <span className="skill-domain-tab-icon" aria-hidden>
-            +
+            <WbGlyph id="plus" />
           </span>
         </button>
-        {menuOpen && (
-          <div className="skill-domain-menu" role="menu">
-            <p className="skill-domain-menu-title">{t('wbSkTabsMenuTitle')}</p>
-            {availableToAdd.length === 0 ? (
-              <p className="skill-domain-menu-empty">{t('wbSkTabsAllPinned')}</p>
-            ) : (
-              <div className="skill-domain-menu-grid">
-                {availableToAdd.map((m) => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    role="menuitem"
-                    className="skill-domain-menu-item"
-                    onClick={() => add(m.id)}
-                    title={vi ? m.hintVi : m.hintEn}
-                  >
-                    <span className="skill-domain-menu-icon">
-                      <DomainBadge id={m.id} size={22} />
-                    </span>
-                    <strong>{vi ? m.labelVi : m.labelEn}</strong>
-                    <span>{vi ? m.hintVi : m.hintEn}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+        <WbMenu
+          open={menuOpen}
+          onClose={() => setMenuOpen(false)}
+          anchorRef={addRef}
+          label={t('wbSkTabsMenuTitle')}
+        >
+          {availableToAdd.length === 0 ? (
+            <WbMenuLabel>{t('wbSkTabsAllPinned')}</WbMenuLabel>
+          ) : (
+            availableToAdd.map((m) => (
+              <WbMenuItem
+                key={m.id}
+                icon={<DomainBadge id={m.id} size={22} />}
+                hint={vi ? m.hintVi : m.hintEn}
+                onSelect={() => add(m.id)}
+              >
+                {vi ? m.labelVi : m.labelEn}
+              </WbMenuItem>
+            ))
+          )}
+        </WbMenu>
       </div>
     </nav>
   )

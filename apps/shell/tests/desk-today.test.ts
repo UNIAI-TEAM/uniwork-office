@@ -8,6 +8,7 @@ import type { UniworkWorkspaceRef } from '../src/shared/home-api'
 import type { UniworkWorkApi, WorkHomeSummary, WorkTask } from '../src/shared/uniwork-work-api'
 import { DeskToday } from '../src/renderer/src/DeskToday'
 import { LocaleProvider } from '../src/renderer/src/locale'
+import { WbToastHost, createWbToasts } from '../src/renderer/src/WbToastHost'
 import type { WorkLoad } from '../src/renderer/src/work-cache'
 
 const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -104,7 +105,13 @@ afterEach(() => {
 
 async function render(props: Parameters<typeof DeskToday>[0]) {
   await act(async () => {
-    root.render(createElement(LocaleProvider, { initial: 'en' }, createElement(DeskToday, props)))
+    root.render(
+      createElement(
+        LocaleProvider,
+        { initial: 'en' },
+        createElement(WbToastHost, { toasts: createWbToasts() }, createElement(DeskToday, props)),
+      ),
+    )
   })
 }
 const base = (home: WorkLoad<WorkHomeSummary>) => ({

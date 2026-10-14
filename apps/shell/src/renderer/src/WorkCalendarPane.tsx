@@ -97,7 +97,7 @@ export function WorkCalendarPane({
   )
 
   if (!workspace) return <WorkNoWorkspace error={workspaceError} onRetry={onReload} />
-  const blocked = workLoadState(load)
+  const blocked = workLoadState(load, 'agenda')
   if (blocked) return blocked
 
   const today = localIsoDate(new Date())

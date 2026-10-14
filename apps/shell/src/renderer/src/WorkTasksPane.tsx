@@ -11,11 +11,11 @@ import {
   WorkNoWorkspace,
   WorkStaleNote,
   WorkStatePanel,
-  WorkToast,
   workLoadState,
   type WorkPaneProps,
 } from './WorkErrorState'
-import { WorkPaneHeader, type WorkPaneHeaderProps } from './WorkPaneHeader'
+import { WorkToolbar, type WorkToolbarProps } from './WorkToolbar'
+import { useWbToast } from './WbToastHost'
 
 const GROUP_LABEL: Record<TaskDueGroup, StringKey> = {
   overdue: 'wbTasksGroupOverdue',
@@ -25,11 +25,8 @@ const GROUP_LABEL: Record<TaskDueGroup, StringKey> = {
   none: 'wbTasksGroupNone',
 }
 
-/** A write the server refused: a toast whose Retry repeats the same request (spec §7). */
-interface WriteFailure {
-  message: StringKey
-  retry: () => void
-}
+/** the one toast slot of this tab: a refused write, whose Retry repeats the same request */
+const WRITE_TOAST = 'tasks-write'
 
 /**
  * Tasks tab: the signed-in user's UniWork tasks in the active workspace,
@@ -44,8 +41,8 @@ export function WorkTasksPane({
   head,
   onWritten,
 }: WorkPaneProps & {
-  /** the tab header, drawn here so its aside can count the loaded list (WorkbenchModulePane passes it) */
-  head?: Omit<WorkPaneHeaderProps, 'aside'>
+  /** the tab toolbar, drawn here so its summary can count the loaded list (WorkbenchModulePane passes it) */
+  head?: WorkToolbarProps
   /** a write landed: the tab counts (Overview summary) are stale */
   onWritten?: () => void
 }): ReactElement {
@@ -62,7 +59,7 @@ export function WorkTasksPane({
   )
   // ticked this session: stays listed (dimmed) until the next load, like the web
   const [touched, setTouched] = useState<ReadonlySet<string>>(() => new Set())
-  const [failure, setFailure] = useState<WriteFailure | null>(null)
+  const toasts = useWbToast()
   const [draft, setDraft] = useState('')
   const [adding, setAdding] = useState(false)
 
@@ -70,8 +67,8 @@ export function WorkTasksPane({
     setTouched(new Set())
   }, [list.updatedAt])
   useEffect(() => {
-    setFailure(null)
-  }, [wsId])
+    toasts.dismiss(WRITE_TOAST)
+  }, [wsId, toasts])
 
   const closed = useMemo(() => closedStatusKeys(catalogue.value ?? []), [catalogue.value])
   const statusName = useMemo(
@@ -84,7 +81,7 @@ export function WorkTasksPane({
 
   const setDone = async (task: WorkTask, done: boolean): Promise<void> => {
     const next = done ? 'done' : 'todo'
-    setFailure(null)
+    toasts.dismiss(WRITE_TOAST)
     setTouched((cur) => new Set(cur).add(task.id))
     setRowStatus(task.id, next)
     const r = await settleWork(window.uniworkWork.setTaskStatus(task.id, next))
@@ -94,11 +91,19 @@ export function WorkTasksPane({
       return
     }
     setRowStatus(task.id, task.status)
-    setFailure({ message: 'wbTasksSaveFailed', retry: () => void setDone(task, done) })
+    failed('wbTasksSaveFailed', () => void setDone(task, done))
   }
 
+  const failed = (message: StringKey, retry: () => void) =>
+    toasts.show({
+      id: WRITE_TOAST,
+      message: { key: message },
+      tone: 'alert',
+      actions: [{ label: 'acctRetry', onClick: retry }],
+    })
+
   const create = async (input: WorkCreateTaskInput): Promise<void> => {
-    setFailure(null)
+    toasts.dismiss(WRITE_TOAST)
     setAdding(true)
     const r = await settleWork(window.uniworkWork.createTask(input))
     setAdding(false)
@@ -110,7 +115,7 @@ export function WorkTasksPane({
       return
     }
     // Retry sends the same Idempotency-Key: a lost answer never creates a second task
-    setFailure({ message: 'wbTasksAddFailed', retry: () => void create(input) })
+    failed('wbTasksAddFailed', () => void create(input))
   }
 
   const submit = (e: FormEvent) => {
@@ -120,17 +125,22 @@ export function WorkTasksPane({
     void create({ workspaceId: wsId, title, idempotencyKey: crypto.randomUUID() })
   }
 
-  const openCount = (list.value ?? []).filter((x) => !closed.has(x.status)).length
-  const header = head ? (
-    <WorkPaneHeader
-      {...head}
-      aside={
-        list.value ? (
-          <span className="wb-num">{t('wbTasksOpenCount', { count: openCount })}</span>
-        ) : undefined
-      }
-    />
-  ) : null
+  const today = localIsoDate(new Date())
+  const open = (list.value ?? []).filter((x) => !closed.has(x.status))
+  const due = (x: WorkTask) => x.due_date?.slice(0, 10)
+  const overdue = open.filter((x) => (due(x) ?? today) < today).length
+  const dueToday = open.filter((x) => due(x) === today).length
+  // a real count once the list loaded (spec 3: "6 open · 1 overdue · 2 due today"), else the hint
+  const summary = list.value
+    ? [
+        t('wbTasksOpenCount', { count: open.length }),
+        overdue > 0 ? t('wbTasksOverdueCount', { count: overdue }) : '',
+        dueToday > 0 ? t('wbTasksDueTodayCount', { count: dueToday }) : '',
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : head?.summary
+  const header = head ? <WorkToolbar {...head} summary={summary} /> : null
 
   if (!workspace) {
     return (
@@ -150,7 +160,6 @@ export function WorkTasksPane({
     )
   }
 
-  const today = localIsoDate(new Date())
   const groups = groupTasksByDue(
     (list.value ?? []).filter((x) => !closed.has(x.status) || touched.has(x.id)),
     today,
@@ -221,14 +230,15 @@ export function WorkTasksPane({
                       </label>
                       <button
                         type="button"
-                        className="wb-work-title"
+                        className="wb-row-title"
                         title={t('wbWorkOpenOnWeb')}
                         onClick={() => openOnWeb(task)}
                       >
                         {task.title}
                       </button>
                       <span className="wb-mono">{task.identifier}</span>
-                      <span className="wb-pill is-status">
+                      <span className="wb-pill">
+                        <span className="wb-pill-dot" aria-hidden="true" />
                         {statusName.get(task.status) ?? task.status}
                       </span>
                       {day ? (
@@ -252,13 +262,6 @@ export function WorkTasksPane({
             tone={MODULE_TONES.tasks}
             icon={<WorkbenchIcon id="tasks" size={20} />}
             title={t('wbTasksEmpty')}
-          />
-        ) : null}
-        {failure ? (
-          <WorkToast
-            message={failure.message}
-            onRetry={failure.retry}
-            onDismiss={() => setFailure(null)}
           />
         ) : null}
       </div>

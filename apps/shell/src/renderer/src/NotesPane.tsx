@@ -6,6 +6,7 @@ import { MODULE_TONES } from './module-tones'
 import { WbDeleteBtn, WbRowActions } from './WbRowActions'
 import { WorkbenchIcon } from './WorkbenchIcons'
 import { WorkStatePanel } from './WorkErrorState'
+import { WorkToolbar, type WorkToolbarProps } from './WorkToolbar'
 import {
   createStickyNote,
   normalizeStickyNote,
@@ -18,7 +19,14 @@ import {
  * Notes: one row per note in a list block, stored on this device. The stored paper
  * color and board position (from the old pinboard) are kept in the data, unused.
  */
-export function NotesPane({ practiceId }: { practiceId: PracticeId }): ReactElement {
+export function NotesPane({
+  practiceId,
+  head,
+}: {
+  practiceId: PracticeId
+  /** the tab toolbar; its summary counts the notes */
+  head: WorkToolbarProps
+}): ReactElement {
   const { t, dateLocale } = useI18n()
   const [items, setItems] = useState<WbStickyNote[]>(() => readStickyNotes(practiceId))
   const [draft, setDraft] = useState('')
@@ -51,8 +59,10 @@ export function NotesPane({ practiceId }: { practiceId: PracticeId }): ReactElem
 
   return (
     <div className="wb-notes">
+      <WorkToolbar {...head} summary={t('wbNotesCount', { count: items.length })} local />
       <form className="wb-notes-add" onSubmit={add}>
         <input
+          className="wb-input"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           placeholder={t('wbNotesPlaceholder')}

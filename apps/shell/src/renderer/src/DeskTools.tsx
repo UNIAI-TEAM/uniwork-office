@@ -4,6 +4,7 @@ import type { DeskToolId, DeskToolResult } from '../../shared/home-api'
 import { applicableTools } from './desk-model'
 import { FileBadge } from './FileBadge'
 import { useI18n, type StringKey } from './locale'
+import { useWbToast } from './WbToastHost'
 
 const TOOLS: readonly { id: DeskToolId; label: StringKey; ext: string }[] = [
   { id: 'pdf-to-docx', label: 'wbDeskToolPdfToDocx', ext: 'docx' },
@@ -27,6 +28,7 @@ const ERROR_KEY: Record<ToolError, StringKey> = {
 
 const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path
 const folderOf = (path: string) => path.replace(/[\\/][^\\/]*$/, '')
+const TOOL_TOAST = 'desk-tool'
 const clampEvery = (raw: string) => Math.min(999, Math.max(1, Math.floor(Number(raw)) || 1))
 
 /** the Desk's tool strip, drop chooser, split popover and result toast (office desk spec §4) */
@@ -46,8 +48,7 @@ export function DeskTools({
   const [splitFor, setSplitFor] = useState<{ inputs?: string[] } | null>(null)
   // raw text so a cleared field can be retyped; clamped when the split runs
   const [every, setEvery] = useState('1')
-  // keys and paths only; translated at render
-  const [toast, setToast] = useState<{ outputs: string[] } | { error: StringKey } | null>(null)
+  const toasts = useWbToast()
 
   // strip buttons by tool id; focus goes back here when a panel closes or a run ends
   const stripRefs = useRef(new Map<DeskToolId, HTMLButtonElement>())
@@ -84,7 +85,7 @@ export function DeskTools({
       return
     }
     setSplitFor(null)
-    setToast(null)
+    toasts.dismiss(TOOL_TOAST)
     setRunning(tool)
     const result = await window.aiOffice
       .runDeskTool({
@@ -96,8 +97,36 @@ export function DeskTools({
     setRunning(null)
     focusStrip(tool)
     if (result.ok) {
-      if (result.outputs.length > 0) setToast({ outputs: result.outputs })
-    } else if (!('canceled' in result)) setToast({ error: ERROR_KEY[result.error] })
+      if (result.outputs.length > 0) showDone(result.outputs)
+    } else if (!('canceled' in result)) {
+      toasts.show({ id: TOOL_TOAST, message: { key: ERROR_KEY[result.error] }, tone: 'alert' })
+    }
+  }
+
+  // keys and paths only: the host translates at render
+  const showDone = (outputs: string[]) => {
+    const first = outputs[0]!
+    toasts.show({
+      id: TOOL_TOAST,
+      message:
+        outputs.length === 1
+          ? { key: 'wbDeskToolDone', params: { name: fileName(first) } }
+          : {
+              key: 'wbDeskToolDoneMany',
+              params: { count: outputs.length, folder: fileName(folderOf(first)) },
+            },
+      actions: [
+        ...(outputs.length === 1
+          ? [
+              {
+                label: 'wbCommonOpen' as const,
+                onClick: () => void window.aiOffice.openPath(first),
+              },
+            ]
+          : []),
+        { label: 'wbDeskShowInFolder', onClick: () => void window.aiOffice.revealPath(first) },
+      ],
+    })
   }
 
   const busy = running !== null
@@ -131,6 +160,7 @@ export function DeskTools({
           <label>
             {t('wbDeskSplitEvery')}{' '}
             <input
+              className="wb-input"
               type="number"
               min={1}
               max={999}
@@ -191,44 +221,6 @@ export function DeskTools({
           {fitting.includes('export-pdf') && dropped.some((p) => unsavedPaths.has(p)) ? (
             <p>{t('wbDeskFromSaved')}</p>
           ) : null}
-        </div>
-      ) : null}
-
-      {toast ? (
-        <div className="wb-toast" role={'error' in toast ? 'alert' : 'status'}>
-          {'error' in toast ? (
-            <span>{t(toast.error)}</span>
-          ) : (
-            <>
-              <span>
-                {toast.outputs.length === 1
-                  ? t('wbDeskToolDone', { name: fileName(toast.outputs[0]!) })
-                  : t('wbDeskToolDoneMany', {
-                      count: toast.outputs.length,
-                      folder: fileName(folderOf(toast.outputs[0]!)),
-                    })}
-              </span>
-              {toast.outputs.length === 1 ? (
-                <button
-                  type="button"
-                  className="wb-link"
-                  onClick={() => void window.aiOffice.openPath(toast.outputs[0]!)}
-                >
-                  {t('wbCommonOpen')}
-                </button>
-              ) : null}
-              <button
-                type="button"
-                className="wb-link"
-                onClick={() => void window.aiOffice.revealPath(toast.outputs[0]!)}
-              >
-                {t('wbDeskShowInFolder')}
-              </button>
-            </>
-          )}
-          <button type="button" className="wb-link" onClick={() => setToast(null)}>
-            {t('wbOvDismiss')}
-          </button>
         </div>
       ) : null}
     </section>

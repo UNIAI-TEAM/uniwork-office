@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { HomeApi } from '../src/shared/home-api'
 import { DeskTools } from '../src/renderer/src/DeskTools'
 import { LocaleProvider } from '../src/renderer/src/locale'
+import { WbToastHost, createWbToasts } from '../src/renderer/src/WbToastHost'
 
 const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 actEnvironment.IS_REACT_ACT_ENVIRONMENT = true
@@ -33,7 +34,13 @@ afterEach(() => {
 
 async function render(props: Parameters<typeof DeskTools>[0]) {
   await act(async () => {
-    root.render(createElement(LocaleProvider, { initial: 'en' }, createElement(DeskTools, props)))
+    root.render(
+      createElement(
+        LocaleProvider,
+        { initial: 'en' },
+        createElement(WbToastHost, { toasts: createWbToasts() }, createElement(DeskTools, props)),
+      ),
+    )
   })
 }
 const button = (label: string) =>

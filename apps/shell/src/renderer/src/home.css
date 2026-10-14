@@ -3443,15 +3443,23 @@ body.vib .home {
 .wb-home {
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding-inline: 24px;
-  padding-bottom: 32px;
+  gap: 16px;
+  /* one 32px gutter (spec 1.3): this replaces .content's padding, it does not add to it */
+  padding: 24px 32px 56px;
+  font-family: 'UniWork Sans', var(--ui-cjk), system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 20px;
 }
 
-/* the content column: capped and centered like the file views; the fixed modal overlay is not */
-.wb-home > :not(.modal-overlay) {
+/* form controls do not inherit the family by default */
+.wb-home :is(button, input, select, textarea) {
+  font-family: inherit;
+}
+
+/* the 1200px content column, centred; the fixed confirm popover places itself */
+.wb-home > :not(.wb-confirm) {
   width: 100%;
-  max-width: var(--content-max);
+  max-width: 1200px;
   margin-inline: auto;
 }
 
@@ -3486,9 +3494,9 @@ body.vib .home {
   white-space: nowrap;
   cursor: pointer;
   transition:
-    background-color 150ms ease,
-    border-color 150ms ease,
-    color 150ms ease;
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .wb-btn:active:not(:disabled) {
@@ -3500,8 +3508,11 @@ body.vib .home {
   outline-offset: 2px;
 }
 
+/* locked is neutral grey on every variant, never a pale accent (spec 1.4) */
 .wb-btn:disabled {
-  opacity: 0.5;
+  border-color: var(--border);
+  background: var(--surface-subtle);
+  color: var(--text-tertiary);
   cursor: not-allowed;
 }
 
@@ -3515,7 +3526,7 @@ body.vib .home {
 }
 
 .wb-btn-secondary {
-  border-color: var(--border);
+  border-color: var(--border-strong);
   background: var(--surface);
   color: var(--text);
 }
@@ -3533,6 +3544,15 @@ body.vib .home {
   color: var(--text);
 }
 
+.wb-btn-danger {
+  background: var(--danger-text);
+  color: var(--surface);
+}
+
+.wb-btn-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger-text) 85%, var(--text));
+}
+
 .wb-btn-icon {
   width: 32px;
   padding: 0;
@@ -3541,7 +3561,17 @@ body.vib .home {
 .wb-btn-sm {
   height: 28px;
   padding: 0 10px;
-  font-size: 12.5px;
+  font-size: 12px;
+}
+
+.wb-btn-sm.wb-btn-icon {
+  width: 28px;
+}
+
+/* the chevron after a menu button's label */
+.wb-btn .wb-glyph:last-child:not(:first-child) {
+  margin-right: -4px;
+  opacity: 0.8;
 }
 
 .wb-num {
@@ -3551,7 +3581,7 @@ body.vib .home {
 /* the app has no mono token: same stack as settings.css */
 .wb-mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--text-secondary);
 }
 
@@ -3566,12 +3596,49 @@ body.vib .home {
 .wb-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-height: 36px;
-  padding: 7px 12px;
+  gap: 12px;
+  min-height: 44px;
+  padding: 8px 16px;
   font-size: 13px;
   color: var(--text);
-  transition: background-color 150ms ease;
+  transition: background-color var(--transition-fast);
+}
+
+/* the one row title (spec 2.3): 500, one line, a button that opens the row's item */
+.wb-row-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-weight: 500;
+  text-align: start;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.wb-row-title:hover {
+  text-decoration: underline;
+}
+
+.wb-row.is-done .wb-row-title {
+  color: var(--text-secondary);
+  font-weight: 400;
+  text-decoration: line-through;
+}
+
+/* the caption line under a row title */
+.wb-row-sub {
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .wb-row:hover {
@@ -3587,8 +3654,8 @@ body.vib .home {
   align-items: center;
   gap: 6px;
   margin: 0;
-  padding: 10px 12px 4px;
-  font-size: 13px;
+  padding: 12px 16px 4px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-secondary);
 }
@@ -3602,6 +3669,9 @@ body.vib .home {
   position: relative;
   display: inline-flex;
   flex-shrink: 0;
+  /* a 24px target around the 16px box (WCAG 2.5.8) */
+  margin: -4px;
+  padding: 4px;
   cursor: pointer;
 }
 
@@ -3615,8 +3685,8 @@ body.vib .home {
   border-radius: 4px;
   background: var(--surface);
   transition:
-    background-color 150ms ease,
-    border-color 150ms ease;
+    background-color var(--transition-fast),
+    border-color var(--transition-fast);
 }
 
 /* visibility, not color: transparent: forced-colors mode repaints color and would show the tick */
@@ -3671,6 +3741,62 @@ body.vib .home {
   height: 36px;
 }
 
+/* a skeleton list row (WorkSkeleton): round icon, two bars, a pill */
+.wb-skel-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 8px 16px;
+}
+
+.wb-skel-line + .wb-skel-line {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.wb-skel-lines {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.wb-skel-dot {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+}
+
+.wb-skel-avatar {
+  flex: none;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+}
+
+.wb-skel-bar {
+  width: 60%;
+  height: 10px;
+}
+
+.wb-skel-bar.is-short {
+  width: 35%;
+}
+
+.wb-skel-pill {
+  flex: none;
+  width: 56px;
+  height: 20px;
+}
+
+.wb-skel-head {
+  height: 16px;
+  margin: 12px 16px 4px;
+  width: 140px;
+}
+
 @keyframes wb-skel-shimmer {
   from {
     background-position: 100% 0;
@@ -3700,35 +3826,40 @@ body.vib .home {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  min-height: 40px;
+  min-height: 32px;
 }
 
 .wb-topbar-title {
-  margin: 0;
-  font-size: 15px;
+  margin: 0 8px 0 0;
+  font-size: 20px;
+  line-height: 28px;
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
   color: var(--text);
 }
 
+/* workspace and role: one chip style, 28px, a transparent native select laid over it */
 .wb-crumb {
   position: relative;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 30px;
-  padding: 0 8px;
+  height: 28px;
+  padding: 0 8px 0 6px;
+  border: 1px solid var(--border);
   border-radius: var(--radius-8);
-  color: var(--text);
-  font-size: 13px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 12px;
   font-weight: 500;
   transition:
-    background-color 150ms ease,
-    color 150ms ease;
+    border-color var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .wb-crumb:hover {
-  background: var(--hover);
+  border-color: var(--border-strong);
+  color: var(--text);
 }
 
 .wb-crumb > select {
@@ -3745,22 +3876,23 @@ body.vib .home {
   outline-offset: 2px;
 }
 
-.wb-crumb-ws {
-  padding-left: 4px;
+.wb-crumb-role {
+  padding-left: 8px;
 }
 
+/* identity is a tint, never the solid accent (spec 3) */
 .wb-crumb-mark {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 16px;
-  height: 16px;
-  border-radius: 4px;
-  background: var(--accent);
-  color: var(--on-accent);
-  font-size: 10px;
-  font-weight: 700;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  background: var(--tint-blue);
+  color: var(--tint-blue-fg);
+  font-size: 11px;
+  font-weight: 600;
   line-height: 1;
 }
 
@@ -3771,33 +3903,13 @@ body.vib .home {
   white-space: nowrap;
 }
 
-.wb-crumb-role {
-  height: 24px;
-  border: 1px solid var(--border);
-  background: var(--surface-subtle);
-  color: var(--text-secondary);
-  font-size: 12px;
-}
-
-.wb-crumb-role:hover {
-  background: var(--hover);
-  color: var(--text);
-}
-
 .wb-crumb-caret {
-  color: var(--text-secondary);
-  font-size: 10px;
-  line-height: 1;
+  display: inline-flex;
+  flex: none;
 }
 
 .wb-crumb-caret.is-muted {
   opacity: 0.4;
-}
-
-/* decorative: aria-hidden, the selects carry the structure */
-.wb-crumb-sep {
-  color: var(--text-secondary);
-  font-size: 14px;
 }
 
 .wb-topbar-actions {
@@ -3807,50 +3919,148 @@ body.vib .home {
   margin-left: auto;
 }
 
-.wb-new-wrap {
+/* the anchor of a WbMenu */
+.wb-menu-wrap {
   position: relative;
+  flex: none;
 }
 
-.wb-new-menu {
+/* the one Workbench menu (WbMenu): Esc, arrows, flips up when there is no room below */
+.wb-menu {
   position: absolute;
   top: calc(100% + 4px);
-  right: 0;
   z-index: 40;
   display: flex;
   flex-direction: column;
+  gap: 2px;
   min-width: 220px;
-  padding: 4px;
+  max-width: min(360px, 92vw);
+  max-height: min(60vh, 420px);
+  overflow-y: auto;
+  padding: 6px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-12);
   background: var(--surface);
   box-shadow: var(--shadow-menu);
 }
 
-.wb-new-item {
+.wb-menu.is-start {
+  left: 0;
+}
+
+.wb-menu.is-end {
+  right: 0;
+}
+
+.wb-menu.is-up {
+  top: auto;
+  bottom: calc(100% + 4px);
+}
+
+.wb-menu-item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  width: 100%;
   min-height: 32px;
-  padding: 0 8px;
+  padding: 6px 8px;
   border: none;
   border-radius: var(--radius-6);
   background: transparent;
   color: var(--text);
   font: inherit;
   font-size: 13px;
-  text-align: left;
+  text-align: start;
   cursor: pointer;
-  transition: background 150ms ease;
+  transition: background-color var(--transition-fast);
 }
 
-.wb-new-item:hover,
-.wb-new-item:focus-visible {
+.wb-menu-item:hover:not(:disabled),
+.wb-menu-item:focus-visible {
   background: var(--wb-row-hover);
 }
 
-.wb-new-item:focus-visible {
+.wb-menu-item:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
+}
+
+.wb-menu-item.is-danger {
+  color: var(--danger-text);
+}
+
+.wb-menu-item:disabled {
+  color: var(--text-tertiary);
+  cursor: not-allowed;
+}
+
+.wb-menu-icon {
+  display: inline-flex;
+  flex: none;
+  line-height: 0;
+}
+
+.wb-menu-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.wb-menu-label {
+  overflow: hidden;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wb-menu-hint {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-secondary);
+}
+
+.wb-menu-label-row {
+  padding: 8px 8px 2px;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.wb-menu-label-row:first-child {
+  padding-top: 2px;
+}
+
+/* a light in-app confirmation (WbConfirm), placed by its own script */
+.wb-confirm {
+  position: fixed;
+  z-index: 50;
+  width: min(320px, calc(100vw - 16px));
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-12);
+  background: var(--surface);
+  box-shadow: var(--shadow-menu);
+}
+
+.wb-confirm-title {
+  margin: 0;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.wb-confirm-body {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-secondary);
+}
+
+.wb-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
 }
 
 /* ── Skill domain mini-tabs (under Skills pillar) ───────── */
@@ -3875,9 +4085,9 @@ body.vib .home {
   font-weight: 600;
   cursor: grab;
   transition:
-    background 160ms ease,
-    color 160ms ease,
-    border-color 160ms ease;
+    background var(--transition-fast),
+    color var(--transition-fast),
+    border-color var(--transition-fast);
 }
 
 .skill-domain-tab:hover {
@@ -3901,12 +4111,9 @@ body.vib .home {
 }
 
 .skill-domain-tab-grip {
-  width: 10px;
+  display: inline-flex;
   color: var(--text-secondary);
-  font-size: 10px;
-  letter-spacing: -2px;
-  opacity: 0.5;
-  user-select: none;
+  opacity: 0.6;
 }
 
 .skill-domain-tab-icon {
@@ -3918,10 +4125,10 @@ body.vib .home {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  font-size: 13px;
+  width: 20px;
+  height: 20px;
+  margin-right: -6px;
+  border-radius: var(--radius-6);
   color: var(--text-secondary);
 }
 
@@ -3934,84 +4141,12 @@ body.vib .home {
   cursor: pointer;
   min-width: 36px;
   justify-content: center;
-  font-size: 16px;
-  font-weight: 700;
 }
 
-.skill-domain-add-wrap {
-  position: relative;
-}
-
-.skill-domain-menu {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  z-index: 40;
-  width: min(360px, 92vw);
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface);
-  box-shadow: var(--shadow-menu);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.skill-domain-menu-title {
-  margin: 0;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text-secondary);
-}
-
-.skill-domain-menu-empty {
-  margin: 0;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.skill-domain-menu-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 6px;
-  max-height: min(50vh, 360px);
-  overflow: auto;
-}
-
-.skill-domain-menu-item {
-  display: grid;
-  grid-template-columns: 28px 1fr;
-  grid-template-rows: auto auto;
-  column-gap: 10px;
-  row-gap: 2px;
-  align-items: center;
-  text-align: left;
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--bg-content);
-  color: var(--text);
-  cursor: pointer;
-}
-
-.skill-domain-menu-item:hover {
-  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
-  background: color-mix(in srgb, var(--accent) 8%, var(--bg-content));
-}
-
-.skill-domain-menu-icon {
-  grid-row: 1 / span 2;
-  display: inline-flex;
-}
-
-.skill-domain-menu-item strong {
-  font-size: 13px;
-}
-
-.skill-domain-menu-item span:last-child {
-  font-size: 11px;
-  color: var(--text-secondary);
+.skill-domain-tab:focus-visible,
+.skill-domain-tab-unpin:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .skill-domain-panel {
@@ -4028,13 +4163,14 @@ body.vib .home {
 }
 
 .wb-tabs {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 2px;
   border-bottom: 1px solid var(--border);
 }
 
-/* one row: many pinned tabs scroll sideways (wheel, trackpad, focus) instead of wrapping */
+/* one row: many pinned tabs scroll sideways (wheel, trackpad, focus, the edge buttons) */
 .wb-tabs-scroll {
   display: flex;
   gap: 2px;
@@ -4045,26 +4181,82 @@ body.vib .home {
   scrollbar-width: none;
 }
 
-/* the grip and the unpin × sit in the side padding, so a tab is as wide as its label */
+/* overflow: the clipped edge fades out (mask colours are alpha only, not paint) */
+.wb-tabs-scroll.is-fade-start {
+  mask-image: linear-gradient(to right, transparent, black 32px);
+}
+
+.wb-tabs-scroll.is-fade-end {
+  mask-image: linear-gradient(to left, transparent, black 32px);
+}
+
+.wb-tabs-scroll.is-fade-start.is-fade-end {
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    black 32px,
+    black calc(100% - 32px),
+    transparent
+  );
+}
+
+.wb-tabs-step {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-6);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.wb-tabs-step:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+/* a tab and its unpin button sit side by side: the unpin is never inside the tab button */
+.wb-tab-item {
+  position: relative;
+  display: flex;
+  flex: none;
+}
+
 .wb-tab {
   position: relative;
   display: inline-flex;
   flex: none;
   align-items: center;
   gap: 6px;
+  height: 40px;
   border: none;
   border-radius: var(--radius-6) var(--radius-6) 0 0;
   background: transparent;
   color: var(--text-secondary);
-  padding: 8px 16px 10px;
+  padding: 0 12px;
   white-space: nowrap;
   font: inherit;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   transition:
-    color 150ms ease,
-    background 150ms ease;
+    color var(--transition-fast),
+    background var(--transition-fast);
+}
+
+/* room for the grip on the left and the unpin button on the right */
+.wb-tab-module.is-movable {
+  padding-left: 18px;
+  cursor: grab;
+}
+
+.wb-tab-item.has-unpin > .wb-tab {
+  padding-right: 30px;
 }
 
 .wb-tab:hover {
@@ -4095,20 +4287,22 @@ body.vib .home {
   }
 }
 
+/* the count pill: 11/600, the only text at that size (spec 1.2) */
 .wb-tab-count {
-  min-width: 14px;
-  font-size: 11.5px;
+  min-width: 18px;
+  padding: 0 6px;
+  border-radius: var(--radius-8);
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+  font-size: 11px;
   font-weight: 600;
-  line-height: 1;
+  line-height: 16px;
   text-align: center;
 }
 
 .wb-tab-count.is-danger {
+  background: var(--danger-bg);
   color: var(--danger-text);
-}
-
-.wb-tab-count.is-muted {
-  color: var(--text-secondary);
 }
 
 .wb-tab:focus-visible {
@@ -4116,14 +4310,14 @@ body.vib .home {
   outline-offset: -2px;
 }
 
-.wb-tab-icon,
-.wb-tab-menu-icon {
+.wb-tab-icon {
   display: inline-flex;
   flex-shrink: 0;
   line-height: 0;
 }
 
-.wb-icon-tile {
+.wb-icon-tile,
+.wb-icon-glyph {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -4132,11 +4326,7 @@ body.vib .home {
   line-height: 0;
 }
 
-.wb-tab-module {
-  cursor: grab;
-}
-
-.wb-tab-module:active {
+.wb-tab-module.is-movable:active {
   cursor: grabbing;
 }
 
@@ -4152,46 +4342,44 @@ body.vib .home {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: 3px;
+  left: 2px;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 10px;
   color: var(--text-secondary);
-  font-size: 11px;
-  letter-spacing: -2px;
-  line-height: 1;
   opacity: 0;
-  user-select: none;
-  transition: opacity 150ms ease;
+  pointer-events: none;
+  transition: opacity var(--transition-fast);
 }
 
 .wb-tab-module:hover .wb-tab-grip,
-.wb-tab-module:focus-within .wb-tab-grip,
+.wb-tab-module:focus-visible .wb-tab-grip,
 .wb-tab-module.active .wb-tab-grip {
   opacity: 1;
 }
 
+/* a 24px target over the tab's right padding; shown on hover or keyboard focus */
 .wb-tab-unpin {
   position: absolute;
   top: 0;
-  right: 1px;
+  right: 4px;
   bottom: 0;
   margin: auto 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 14px;
-  height: 14px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
   border-radius: var(--radius-6);
+  background: transparent;
   color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 1;
+  cursor: pointer;
   opacity: 0;
   transition:
-    opacity 150ms ease,
-    background 150ms ease,
-    color 150ms ease;
+    opacity var(--transition-fast),
+    background var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .wb-tab-unpin:hover {
@@ -4199,9 +4387,14 @@ body.vib .home {
   color: var(--text);
 }
 
-.wb-tab:hover .wb-tab-unpin,
-.wb-tab:focus-within .wb-tab-unpin,
-.wb-tab.active .wb-tab-unpin {
+.wb-tab-unpin:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.wb-tab-item:hover .wb-tab-unpin,
+.wb-tab-item:focus-within .wb-tab-unpin,
+.wb-tab-item .wb-tab.active + .wb-tab-unpin {
   opacity: 1;
 }
 
@@ -4214,7 +4407,12 @@ body.vib .home {
 }
 
 .wb-tab-add {
-  padding: 8px;
+  width: 32px;
+  height: 32px;
+  justify-content: center;
+  padding: 0;
+  border-radius: var(--radius-6);
+  margin-left: 4px;
 }
 
 .wb-tab-add[aria-expanded='true'] {
@@ -4222,92 +4420,14 @@ body.vib .home {
   color: var(--text);
 }
 
-.wb-tab-add-wrap {
-  position: relative;
-  flex: none;
-}
-
 .wb-tab-menu {
-  position: absolute;
-  top: calc(100% + 4px);
-  right: 0;
-  z-index: 40;
-  width: min(320px, 92vw);
-  padding: 8px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface);
-  box-shadow: var(--shadow-menu);
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.wb-tab-menu-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 2px;
+  width: min(360px, 92vw);
 }
 
-.wb-tab-menu-title {
-  margin: 0 4px 2px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
-.wb-tab-menu-section {
-  margin: 8px 4px 2px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-}
-
-.wb-tab-menu-section:first-of-type {
-  margin-top: 2px;
-}
-
-.wb-tab-menu-empty {
-  margin: 0;
-  padding: 8px;
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-
-.wb-tab-menu-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  min-height: 32px;
-  padding: 6px 8px;
-  border: none;
-  border-radius: var(--radius-6);
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  font-size: 13px;
-  text-align: left;
-  cursor: pointer;
-  transition: background 150ms ease;
-}
-
-.wb-tab-menu-item:hover,
-.wb-tab-menu-item:focus-visible {
-  background: var(--hover);
-}
-
-.wb-tab-menu-item:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
-}
-
-.wb-tab-menu-item strong {
-  min-width: 0;
-  font-size: 13px;
-  font-weight: 500;
+.wb-tab-menu > .wb-menu-label-row {
+  grid-column: 1 / -1;
 }
 
 /* Compact icon cluster — never wraps into 2–3 text-button rows */
@@ -4319,7 +4439,7 @@ body.vib .home {
   flex: 0 0 auto;
   margin-left: auto;
   opacity: 0;
-  transition: opacity 140ms ease;
+  transition: opacity var(--transition-fast);
 }
 
 .wb-row:hover .wb-row-actions,
@@ -4341,19 +4461,28 @@ body.vib .home {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   padding: 0;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-6);
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
   flex-shrink: 0;
   transition:
-    background 140ms ease,
-    color 140ms ease,
-    transform 140ms ease;
+    background var(--transition-fast),
+    color var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+/* every Workbench control shows a 2px accent ring on keyboard focus (spec 2.3) */
+.wb-icon-btn:focus-visible,
+.wb-link:focus-visible,
+.wb-row-title:focus-visible {
+  border-radius: var(--radius-6);
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .wb-icon-btn:hover:not(:disabled) {
@@ -4372,7 +4501,7 @@ body.vib .home {
 }
 
 .wb-icon-btn:disabled {
-  opacity: 0.35;
+  color: var(--text-tertiary);
   cursor: not-allowed;
 }
 
@@ -4485,15 +4614,8 @@ body.vib .home {
   color: var(--text);
 }
 
-.wb-desk-split input {
+.wb-desk-split .wb-input {
   width: 72px;
-  height: 28px;
-  padding: 0 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-6);
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
 }
 
 .wb-desk-row-main {
@@ -4501,24 +4623,6 @@ body.vib .home {
   flex: 1;
   flex-direction: column;
   min-width: 0;
-}
-
-.wb-desk-row-title {
-  overflow: hidden;
-  padding: 0;
-  border: none;
-  background: none;
-  color: var(--text);
-  font: inherit;
-  font-weight: 500;
-  text-align: left;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.wb-desk-row-title:hover {
-  text-decoration: underline;
 }
 
 .wb-desk-reason {
@@ -4585,11 +4689,15 @@ body.vib .home {
 }
 
 .wb-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   border: none;
   background: none;
   padding: 0;
   color: var(--accent);
   font: inherit;
+  font-weight: 500;
   cursor: pointer;
 }
 
@@ -4616,37 +4724,12 @@ body.vib .home {
   list-style: none;
 }
 
-.wb-ov-row-title {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  padding: 0;
-  border: none;
-  background: none;
-  color: var(--text);
-  font: inherit;
-  font-size: 13px;
-  text-align: left;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.wb-ov-row-title:hover {
-  text-decoration: underline;
-}
-
 .wb-ov-card .wb-group-head {
   margin: 0;
 }
 
 .wb-ov-list + .wb-group-head {
   border-top: 1px solid var(--border-subtle);
-}
-
-.wb-row.is-done .wb-ov-row-title {
-  color: var(--text-secondary);
-  text-decoration: line-through;
 }
 
 .wb-ov-time {
@@ -4663,21 +4746,22 @@ body.vib .home {
   min-width: 0;
 }
 
-.wb-ov-meet-sub {
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
+/* a status label (spec 1.5): neutral unless a signal class says otherwise */
 .wb-pill {
   display: inline-flex;
   flex-shrink: 0;
   align-items: center;
-  padding: 1px 6px;
+  gap: 5px;
+  height: 20px;
+  padding: 0 8px;
   border-radius: var(--radius-6);
-  background: var(--tint-gray);
-  color: var(--tint-gray-fg);
-  font-size: 11px;
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+  font-size: 12px;
   font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .wb-pill.is-danger {
@@ -4690,28 +4774,57 @@ body.vib .home {
   color: var(--warning-text);
 }
 
-/* empty / error / sign-in states (WorkStatePanel): no box around them, the tile carries the tone */
+.wb-pill.is-success {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.wb-pill.is-info {
+  background: var(--info-bg);
+  color: var(--info);
+}
+
+.wb-pill-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* empty / error / sign-in states (WorkStatePanel): no box around them, the tile carries the tone;
+ * the full panel centres in its area, the compact one sits left in a narrow column */
 .wb-state {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
+  align-items: center;
+  gap: 12px;
   margin: 0;
-  padding: 24px;
+  padding: 32px 24px;
+  text-align: center;
 }
 
 .wb-state-icon {
   display: inline-flex;
+  flex: none;
   align-items: center;
   justify-content: center;
   width: 36px;
   height: 36px;
-  border-radius: 10px;
+  border-radius: var(--radius-8);
+}
+
+.wb-state-text {
+  display: flex;
+  flex-direction: column;
+  align-items: inherit;
+  gap: 4px;
+  min-width: 0;
 }
 
 .wb-state-title {
   margin: 0;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text);
 }
@@ -4725,57 +4838,83 @@ body.vib .home {
 }
 
 .wb-state .wb-btn {
+  margin-top: 8px;
+}
+
+.wb-state.is-compact {
+  flex-direction: row;
+  align-items: flex-start;
+  padding: 12px;
+  text-align: start;
+}
+
+.wb-state.is-compact .wb-state-icon {
+  width: 28px;
+  height: 28px;
+}
+
+.wb-state.is-compact .wb-state-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.wb-state.is-compact .wb-state-text {
+  align-items: flex-start;
+}
+
+.wb-state.is-compact .wb-state-body {
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.wb-state.is-compact .wb-btn {
   margin-top: 4px;
 }
 
-/* the shared tab title (WorkPaneHeader) */
+/* a tab's body under its toolbar */
 .wb-pane {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 16px;
   min-width: 0;
 }
 
-.wb-pane-head {
+/* the bar every tab opens with (WorkToolbar): a one-line summary left, actions right */
+.wb-toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
-  min-width: 0;
+  justify-content: space-between;
+  gap: 8px 12px;
+  min-height: 32px;
+  margin-top: 4px;
 }
 
-.wb-pane-text {
-  min-width: 0;
-}
-
-.wb-pane-title {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  color: var(--text);
-}
-
-.wb-pane-meta {
-  margin: 2px 0 0;
-  font-size: 12px;
-  color: var(--text-secondary);
-  display: -webkit-box;
-  max-width: none;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  text-wrap: pretty;
-}
-
-.wb-pane-aside {
+.wb-toolbar-summary {
   display: flex;
-  flex-shrink: 0;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  margin-left: auto;
-  font-size: 12px;
+  min-width: 0;
   color: var(--text-secondary);
+}
+
+.wb-toolbar-text {
+  max-width: none;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.wb-toolbar-text strong {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.wb-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 
 .wb-work-stale {
@@ -4787,7 +4926,10 @@ body.vib .home {
 .wb-work-skeleton {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+}
+
+.wb-work-skeleton.is-card {
+  padding: 8px 0;
 }
 
 .wb-ov-skel {
@@ -4797,32 +4939,100 @@ body.vib .home {
   padding: 8px 0;
 }
 
-.wb-toast {
-  position: fixed;
-  bottom: 16px;
-  left: 50%;
+/* the single toast host (WbToastHost): sticks to the bottom of the scrolled content column
+ * and takes no room in the page; toasts stack upwards at its right edge */
+.wb-toast-host {
+  position: sticky;
+  bottom: 24px;
   z-index: 60;
+  height: 0;
+  margin-top: -16px;
+}
+
+.wb-toast-stack {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  max-width: min(480px, 100%);
+}
+
+.wb-toast {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 8px 12px;
+  padding: 8px 8px 8px 14px;
   border: 1px solid var(--border);
   border-radius: var(--radius-8);
   background: var(--surface);
   box-shadow: var(--shadow-menu);
   color: var(--text);
   font-size: 13px;
-  transform: translateX(-50%);
+  animation: wb-toast-in 150ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.wb-form select,
-.wb-add-row select {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg-content);
+.wb-toast-text {
+  min-width: 0;
+}
+
+.wb-toast-close {
+  margin-left: -4px;
+}
+
+@keyframes wb-toast-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wb-toast {
+    animation: none;
+  }
+}
+
+/* one input style for the Workbench (spec 2.3): 32px, surface fill, accent border + 3px ring on focus */
+.wb-input {
+  min-width: 0;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-8);
+  background: var(--surface);
   color: var(--text);
-  padding: 8px 10px;
   font: inherit;
+  font-size: 13px;
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+textarea.wb-input {
+  height: auto;
+  min-height: 64px;
+  padding: 6px 10px;
+  resize: vertical;
+}
+
+.wb-input:hover {
+  border-color: var(--border-control);
+}
+
+.wb-input:focus,
+.wb-input:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--wb-focus-ring);
+}
+
+/* Windows high contrast drops box-shadow: keep a real outline there */
+@media (forced-colors: active) {
+  .wb-input:focus-visible {
+    outline: 2px solid Highlight;
+  }
 }
 
 .wb-material-list,
@@ -4962,28 +5172,6 @@ body.vib .home {
   grid-column: 1 / -1;
 }
 
-.wb-form input,
-.wb-form textarea {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg-content);
-  color: var(--text);
-  padding: 8px 10px;
-  font: inherit;
-}
-
-.wb-form input:focus,
-.wb-form textarea:focus {
-  outline: none;
-  border-color: var(--accent, var(--text-secondary));
-}
-
-.wb-error {
-  color: var(--danger-text);
-  margin: 0 0 10px;
-  font-size: 13px;
-}
-
 .wb-empty {
   margin: 0;
   color: var(--text-secondary);
@@ -5013,7 +5201,7 @@ body.vib .home {
   color: var(--text);
   text-align: left;
   cursor: pointer;
-  transition: background-color 150ms;
+  transition: background-color var(--transition-fast);
 }
 
 .wb-pack-item:hover {
@@ -5823,42 +6011,6 @@ html[dir='rtl'] .quick-title-row {
   flex: none;
 }
 
-.wb-pill.is-status {
-  background: var(--surface-subtle);
-  color: var(--text-secondary);
-}
-
-.wb-work-title {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  padding: 0;
-  border: none;
-  background: none;
-  color: var(--text);
-  font: inherit;
-  font-size: 13px;
-  text-align: start;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.wb-work-title:hover {
-  text-decoration: underline;
-}
-
-.wb-work-title:focus-visible {
-  border-radius: 2px;
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-.wb-work-row.is-done .wb-work-title {
-  color: var(--text-secondary);
-  text-decoration: line-through;
-}
-
 .wb-work-muted {
   color: var(--text-secondary);
   font-size: 12px;
@@ -5866,8 +6018,8 @@ html[dir='rtl'] .quick-title-row {
 
 .wb-agenda-head {
   position: sticky;
-  /* offsets .content's 28px padding-top so the head hugs the visible top edge */
-  top: -28px;
+  /* offsets .wb-home's 24px padding-top so the head hugs the visible top edge */
+  top: -24px;
   z-index: 1;
   display: flex;
   align-items: center;
@@ -6043,22 +6195,6 @@ html[dir='rtl'] .quick-title-row {
   gap: 8px;
 }
 
-.wb-forms-add input {
-  height: 32px;
-  padding: 0 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-8);
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
-  font-size: 13px;
-}
-
-.wb-forms-add input:focus {
-  border-color: var(--accent);
-  outline: none;
-}
-
 .wb-forms-title {
   flex: 1 1 200px;
   min-width: 0;
@@ -6122,21 +6258,9 @@ html[dir='rtl'] .quick-title-row {
   pointer-events: none;
 }
 
-.wb-kn-search input {
+.wb-kn-search .wb-input {
   width: 100%;
-  height: 32px;
-  padding: 0 10px 0 32px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-8);
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
-  font-size: 13px;
-}
-
-.wb-kn-search input:focus {
-  border-color: var(--accent);
-  outline: none;
+  padding-left: 32px;
 }
 
 .wb-cmp {
@@ -6161,26 +6285,8 @@ html[dir='rtl'] .quick-title-row {
   gap: 8px;
 }
 
-.wb-notes-add input {
+.wb-notes-add .wb-input {
   flex: 1;
-  min-width: 0;
-  height: 36px;
-  padding: 0 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-8);
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
-  font-size: 13px;
-}
-
-.wb-notes-add input:focus {
-  border-color: var(--accent);
-  outline: none;
-}
-
-.wb-notes-add .wb-btn {
-  height: 36px;
 }
 
 .wb-notes-list {

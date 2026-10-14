@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react'
+import { Fragment } from 'react'
 import type { ReactElement } from 'react'
 import type { UniworkWorkspaceRef } from '../../shared/home-api'
 import type {
@@ -9,7 +9,7 @@ import type {
 } from '../../shared/uniwork-work-api'
 import { docNotifications } from './desk-model'
 import { useI18n, type StringKey } from './locale'
-import { CHECK_GLYPH } from './WorkbenchIcons'
+import { CHECK_GLYPH, WbGlyph } from './WorkbenchIcons'
 import {
   clock,
   dueState,
@@ -21,7 +21,8 @@ import {
   type OverviewView,
 } from './work-home'
 import { settleWork, type WorkLoad } from './work-cache'
-import { WorkErrorState, WorkNoWorkspace, WorkStaleNote, WorkToast } from './WorkErrorState'
+import { WorkErrorState, WorkNoWorkspace, WorkStaleNote } from './WorkErrorState'
+import { useWbToast } from './WbToastHost'
 
 interface Props {
   home: WorkLoad<WorkHomeSummary>
@@ -49,7 +50,7 @@ export function DeskToday({
   onOpenTasks,
 }: Props): ReactElement {
   const { t, dateLocale } = useI18n()
-  const [failedWrite, setFailedWrite] = useState<{ task: WorkTask; status: string } | null>(null)
+  const toasts = useWbToast()
   const shown = view === 'ready' || view === 'stale' ? home.value : null
   const base = workspace ? { orgSlug: workspace.orgSlug, wsSlug: workspace.slug } : null
   const today =
@@ -61,7 +62,7 @@ export function DeskToday({
   }
 
   const setStatus = async (task: WorkTask, status: string) => {
-    setFailedWrite(null)
+    toasts.dismiss('desk-today-write')
     home.update((s) => withTaskStatus(s, task.id, status))
     const result = await settleWork(window.uniworkWork.setTaskStatus(task.id, status))
     if (result.ok) {
@@ -69,7 +70,12 @@ export function DeskToday({
       return
     }
     home.update((s) => withTaskStatus(s, task.id, task.status))
-    setFailedWrite({ task, status })
+    toasts.show({
+      id: 'desk-today-write',
+      message: { key: 'wbOvTaskUpdateFailed' },
+      tone: 'alert',
+      actions: [{ label: 'acctRetry', onClick: () => void setStatus(task, status) }],
+    })
   }
 
   const retryLine = (
@@ -120,7 +126,7 @@ export function DeskToday({
                     </label>
                     <button
                       type="button"
-                      className="wb-ov-row-title"
+                      className="wb-row-title"
                       onClick={() => base && openWeb({ kind: 'task', ...base, id: task.id })}
                     >
                       {task.title}
@@ -170,12 +176,12 @@ export function DeskToday({
                 <div className="wb-ov-meet">
                   <button
                     type="button"
-                    className="wb-ov-row-title"
+                    className="wb-row-title"
                     onClick={() => base && openWeb({ kind: 'meeting', ...base, id: m.id })}
                   >
                     {m.title}
                   </button>
-                  {sub ? <span className="wb-ov-meet-sub wb-num">{sub}</span> : null}
+                  {sub ? <span className="wb-row-sub wb-num">{sub}</span> : null}
                 </div>
                 {live ? (
                   <button
@@ -209,7 +215,8 @@ export function DeskToday({
           className="wb-link"
           onClick={() => openWeb({ kind: 'inbox', ...base })}
         >
-          {t('wbDeskOtherNotifs', { count: n })} →
+          {t('wbDeskOtherNotifs', { count: n })}
+          <WbGlyph id="arrowRight" size={14} />
         </button>
       </p>
     ) : null
@@ -223,7 +230,8 @@ export function DeskToday({
           <h3>{t('wbDeskToday')}</h3>
           {shown ? (
             <button type="button" className="wb-link" onClick={onOpenTasks}>
-              {t('wbDeskAllTasks')} →
+              {t('wbDeskAllTasks')}
+              <WbGlyph id="arrowRight" size={14} />
             </button>
           ) : null}
         </div>
@@ -238,22 +246,19 @@ export function DeskToday({
         </div>
       ) : null}
       {view === 'signed-out' || view === 'forbidden' || view === 'unreachable' ? (
-        <WorkErrorState state={workspaceError ?? home.error ?? 'offline'} onRetry={onReload} />
+        <WorkErrorState
+          state={workspaceError ?? home.error ?? 'offline'}
+          onRetry={onReload}
+          compact
+        />
       ) : null}
-      {view === 'no-workspace' ? <WorkNoWorkspace error={null} onRetry={onReload} /> : null}
+      {view === 'no-workspace' ? <WorkNoWorkspace error={null} onRetry={onReload} compact /> : null}
       {shown ? (
         <>
           {tasks(shown)}
           {meetings(shown)}
           {others(shown)}
         </>
-      ) : null}
-      {failedWrite ? (
-        <WorkToast
-          message="wbOvTaskUpdateFailed"
-          onRetry={() => void setStatus(failedWrite.task, failedWrite.status)}
-          onDismiss={() => setFailedWrite(null)}
-        />
       ) : null}
     </aside>
   )

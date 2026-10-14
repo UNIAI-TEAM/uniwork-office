@@ -41,7 +41,7 @@ describe('Workbench tab bar', () => {
   })
 
   // WCAG 2.4.7: the hover background alone is near-invisible on the light surface
-  it.each(['.wb-new-item', '.wb-tab-menu-item'])(
+  it.each(['.wb-menu-item', '.wb-tab', '.wb-tab-unpin', '.skill-domain-tab-unpin'])(
     '%s shows an accent outline on keyboard focus',
     (sel) => {
       const css = readFileSync(join(__dirname, '../src/renderer/src/home.css'), 'utf8')

@@ -29,10 +29,11 @@ import { useI18n, type StringKey, type TFunc } from './locale'
 import { SkillDomainTabs } from './SkillDomainTabs'
 import { readActiveSkillDomain, readPinnedSkillDomains } from './skill-domain-pins'
 import { WorkbenchModulePane } from './WorkbenchModulePanes'
-import { LocalTag } from './LocalTag'
 import { MODULE_TONES } from './module-tones'
-import { WorkbenchIcon } from './WorkbenchIcons'
-import { WorkPaneHeader } from './WorkPaneHeader'
+import { WbGlyph, WorkbenchIcon } from './WorkbenchIcons'
+import { WorkToolbar } from './WorkToolbar'
+import { WbConfirm } from './WbConfirm'
+import { WbToastHost, createWbToasts, type WbToastText } from './WbToastHost'
 import { WorkbenchTabs } from './WorkbenchTabs'
 import { WorkbenchTopBar, type WorkbenchNewItem } from './WorkbenchTopBar'
 import { pinModule, pinPillar } from './workbench-pins'
@@ -80,6 +81,30 @@ function toPracticeMeta(entry: ProjectSummaryEntry, practiceId: PracticeId): Pra
 
 type Msg = string | { key: StringKey; params?: Parameters<TFunc>[1] }
 
+/** what a WbConfirm runs on yes; resolved at that render, so it acts on the pack shown then */
+type ConfirmAction =
+  | { kind: 'delete-pack' }
+  | { kind: 'delete-file'; path: string }
+  | { kind: 'run-skill'; skill: 'domain' | 'practice'; id: string }
+
+/** an in-app confirmation waiting for an answer (WbConfirm); keys, translated at render */
+interface ConfirmAsk {
+  title: Msg
+  body?: Msg
+  confirm: StringKey
+  tone: 'primary' | 'danger'
+  action: ConfirmAction
+}
+
+/** every skill run spends AI quota: an in-app confirm first (spec 2.3) */
+const skillAsk = (skill: 'domain' | 'practice', id: string): ConfirmAsk => ({
+  title: { key: 'wbSkConfirmTitle' },
+  body: { key: 'wbSkConfirmBody' },
+  confirm: 'wbSkConfirmRun',
+  tone: 'primary',
+  action: { kind: 'run-skill', skill, id },
+})
+
 export function PracticeHome({
   practice,
   projects,
@@ -94,6 +119,12 @@ export function PracticeHome({
   // State keeps keys (or raw server text), translated at render so a language switch applies.
   const showMsg = (m: Msg): string => (typeof m === 'string' ? m : t(m.key, m.params))
   const vi = lang === 'vi'
+  // notices and errors of the whole page go to its one toast host (spec 3), not a line on top
+  const [toasts] = useState(createWbToasts)
+  const toastText = (m: Msg): WbToastText => (typeof m === 'string' ? { text: m } : m)
+  const setNotice = (m: Msg) => toasts.show({ message: toastText(m) })
+  const setError = (m: Msg) => toasts.show({ message: toastText(m), tone: 'alert' })
+  const [ask, setAsk] = useState<ConfirmAsk | null>(null)
 
   // starts from this bucket's cached list (this pane remounts whenever the user returns
   // to the Workbench), then one load per mount plus Refresh
@@ -160,12 +191,6 @@ export function PracticeHome({
   const [tab, setTab] = useState<string>('desk')
   const [qQuery, setQQuery] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
-  const [error, setError] = useState<Msg | null>(null)
-  const [notice, setNotice] = useState<Msg | null>(null)
-  const [confirmSkill, setConfirmSkill] = useState<{
-    kind: 'domain' | 'practice'
-    id: string
-  } | null>(null)
   const [skillDomain, setSkillDomain] = useState<SkillDomainId>(() =>
     readActiveSkillDomain(readPinnedSkillDomains()),
   )
@@ -210,7 +235,7 @@ export function PracticeHome({
         .toLowerCase()
         .trim()
       if (!hint || !hasSelectedPack) {
-        setNotice({ key: 'wbSkOpenedNeedPack' })
+        toasts.show({ message: { key: 'wbSkOpenedNeedPack' } })
         return
       }
       const hit =
@@ -227,11 +252,11 @@ export function PracticeHome({
             hint.includes(s.labelEn.toLowerCase()),
         )
       if (!hit) {
-        setNotice({ key: 'wbSkOpenedPick' })
+        toasts.show({ message: { key: 'wbSkOpenedPick' } })
         return
       }
       const isPractice = roleSkills.some((s) => s.id === hit.id)
-      setConfirmSkill({ kind: isPractice ? 'practice' : 'domain', id: hit.id })
+      setAsk(skillAsk(isPractice ? 'practice' : 'domain', hit.id))
     }
     window.addEventListener('uniwork:wb-open-module', openMod)
     window.addEventListener('uniwork:agent-run-skill', onRunSkill)
@@ -239,7 +264,7 @@ export function PracticeHome({
       window.removeEventListener('uniwork:wb-open-module', openMod)
       window.removeEventListener('uniwork:agent-run-skill', onRunSkill)
     }
-  }, [roleSkills, domainSkills, hasSelectedPack, lang, practice.id])
+  }, [roleSkills, domainSkills, hasSelectedPack, lang, practice.id, toasts])
 
   useEffect(() => {
     return onAgentIntentNavigate((tabId, intent) => {
@@ -247,9 +272,9 @@ export function PracticeHome({
       if (intent.target.kind === 'skill-domain') {
         setSkillDomain(intent.target.id)
       }
-      setNotice({ key: 'wbAgentApplied' })
+      toasts.show({ message: { key: 'wbAgentApplied' } })
     })
-  }, [lang])
+  }, [lang, toasts])
 
   const packs = useMemo(() => {
     return projects
@@ -309,12 +334,27 @@ export function PracticeHome({
     onRefresh()
   }
 
-  const deletePack = async () => {
+  // the confirm string is "question\nconsequence": the title and the line of an in-app confirm
+  const confirmFrom = (key: StringKey, params: Parameters<TFunc>[1]) => {
+    const [title, ...rest] = t(key, params).split('\n')
+    return { title: title ?? '', body: rest.join(' ') || undefined }
+  }
+
+  const deletePack = () => {
     if (!selected) return
-    const ok = window.confirm(t('wbKnDeletePackConfirm', { title: meta?.title ?? selected.name }))
-    if (!ok) return
+    const text = confirmFrom('wbKnDeletePackConfirm', { title: meta?.title ?? selected.name })
+    setAsk({
+      title: text.title,
+      body: text.body,
+      confirm: 'wbKnDeletePack',
+      tone: 'danger',
+      action: { kind: 'delete-pack' },
+    })
+  }
+
+  const removePack = async () => {
+    if (!selected) return
     setBusy('delete-pack')
-    setError(null)
     try {
       await window.aiOfficeProject!.deleteProject(selected.id)
       onSelectPack(null)
@@ -327,13 +367,20 @@ export function PracticeHome({
     }
   }
 
-  const deleteMaterialFile = async (filePath: string) => {
+  const deleteMaterialFile = (filePath: string) => {
     if (!selected) return
     const base = filePath.split(/[/\\]/).pop() || filePath
-    const ok = window.confirm(t('wbMatDeleteFileConfirm', { name: base }))
-    if (!ok) return
+    setAsk({
+      title: { key: 'wbMatDeleteFileConfirm', params: { name: base } },
+      confirm: 'wbCommonDelete',
+      tone: 'danger',
+      action: { kind: 'delete-file', path: filePath },
+    })
+  }
+
+  const removeMaterialFile = async (filePath: string) => {
+    if (!selected) return
     setBusy(`del-file:${filePath}`)
-    setError(null)
     try {
       await window.aiOffice.deleteFiles([filePath])
       const current = await window.aiOfficeProject!.getPracticeMeta(selected.id)
@@ -369,7 +416,6 @@ export function PracticeHome({
   }
 
   const submitCreate = async () => {
-    setError(null)
     const title = titleDraft.trim()
     if (!title) {
       setError({ key: 'wbCmpTitleRequired' })
@@ -495,7 +541,6 @@ export function PracticeHome({
     const skill = getDomainSkill(skillId)
     if (!skill) return
     const domain = getSkillDomain(skill.domainId)
-    setConfirmSkill(null)
     setBusy(`skill:${skillId}`)
     try {
       const ctx = [
@@ -537,7 +582,6 @@ export function PracticeHome({
     if (!selected || !meta) return
     const skill = roleSkills.find((s) => s.id === skillId)
     if (!skill) return
-    setConfirmSkill(null)
     setBusy(`pskill:${skillId}`)
     try {
       const prompt = practiceSkillPrompt(
@@ -567,6 +611,12 @@ export function PracticeHome({
     } finally {
       setBusy(null)
     }
+  }
+
+  const runAsk = (a: ConfirmAction) => {
+    if (a.kind === 'delete-pack') void removePack()
+    else if (a.kind === 'delete-file') void removeMaterialFile(a.path)
+    else void (a.skill === 'practice' ? runPracticeSkill(a.id) : runDomainSkill(a.id))
   }
 
   const openFreeChain = async () => {
@@ -599,325 +649,366 @@ export function PracticeHome({
 
   return (
     <main className="content wb-home">
-      <WorkbenchTopBar
-        practice={practice}
-        onSwitchPractice={onSwitchPractice}
-        workspaces={workspaces ?? []}
-        workspaceId={workspaceId}
-        onSelectWorkspace={selectWorkspace}
-        newItems={newItems}
-        onNewTask={() => setTab('tasks')}
-        onRefresh={refresh}
-      />
-
-      <WorkbenchTabs
-        practiceId={practice.id}
-        pillars={practice.pillars}
-        active={tab}
-        onSelect={setTab}
-        vi={vi}
-        counts={tabCounts(
-          workspace ? (cachedWork<WorkHomeSummary>(`home:${workspace.id}`)?.value ?? null) : null,
-        )}
-        onPinsChange={(pins, pillarPins) => {
-          if (isWorkbenchModuleId(tab) && !pins.includes(tab)) setTab('desk')
-          if (isPracticePillarId(tab) && !pillarPins.includes(tab)) setTab('desk')
-        }}
-      />
-
-      {error && <p className="wb-error">{showMsg(error)}</p>}
-      {notice && <p className="wb-hint">{showMsg(notice)}</p>}
-
-      {tab === 'desk' ? (
-        <DeskView
-          practiceId={practice.id}
-          vi={vi}
-          workspaces={workspaces}
+      <WbToastHost toasts={toasts}>
+        <WorkbenchTopBar
+          practice={practice}
+          onSwitchPractice={onSwitchPractice}
+          workspaces={workspaces ?? []}
           workspaceId={workspaceId}
-          workspaceError={workspaceError}
-          refreshTick={refreshTick}
-          packId={selectedId ?? projects.find((p) => p.isDefault)?.id ?? null}
-          onReload={refresh}
-          onSummary={setHomeSummary}
-          onOpenTab={openDeskTab}
-          onPackLinked={onRefresh}
+          onSelectWorkspace={selectWorkspace}
+          newItems={newItems}
+          onNewTask={() => setTab('tasks')}
+          onRefresh={refresh}
         />
-      ) : isWorkbenchModuleId(tab) ? (
-        <WorkbenchModulePane
-          moduleId={tab}
+
+        <WorkbenchTabs
           practiceId={practice.id}
+          pillars={practice.pillars}
+          active={tab}
+          onSelect={setTab}
           vi={vi}
-          contextTitle={meta?.title}
-          packId={selectedId}
-          onPackLinked={onRefresh}
-          workspace={workspace}
-          workspaceError={workspaceError}
-          onReload={refresh}
-          onTasksWritten={reloadHomeSummary}
-          loading={workspaces === null}
+          counts={tabCounts(
+            workspace ? (cachedWork<WorkHomeSummary>(`home:${workspace.id}`)?.value ?? null) : null,
+          )}
+          onPinsChange={(pins, pillarPins) => {
+            if (isWorkbenchModuleId(tab) && !pins.includes(tab)) setTab('desk')
+            if (isPracticePillarId(tab) && !pillarPins.includes(tab)) setTab('desk')
+          }}
         />
-      ) : null}
 
-      {pillar ? (
-        <WorkPaneHeader
-          module={pillar.id}
-          title={vi ? pillar.labelVi : pillar.labelEn}
-          meta={`${vi ? pillar.hintVi : pillar.hintEn}${meta?.title ? ` · ${meta.title}` : ''}`}
-          aside={<LocalTag />}
-          titleId={pillarTitleId}
-        />
-      ) : null}
+        {tab === 'desk' ? (
+          <DeskView
+            practiceId={practice.id}
+            vi={vi}
+            workspaces={workspaces}
+            workspaceId={workspaceId}
+            workspaceError={workspaceError}
+            refreshTick={refreshTick}
+            packId={selectedId ?? projects.find((p) => p.isDefault)?.id ?? null}
+            onReload={refresh}
+            onSummary={setHomeSummary}
+            onOpenTab={openDeskTab}
+            onPackLinked={onRefresh}
+          />
+        ) : isWorkbenchModuleId(tab) ? (
+          <WorkbenchModulePane
+            moduleId={tab}
+            practiceId={practice.id}
+            vi={vi}
+            contextTitle={meta?.title}
+            packId={selectedId}
+            onPackLinked={onRefresh}
+            workspace={workspace}
+            workspaceError={workspaceError}
+            onReload={refresh}
+            onTasksWritten={reloadHomeSummary}
+            loading={workspaces === null}
+          />
+        ) : null}
 
-      {tab === 'knowledge' && (
-        <section className="wb-pane" aria-labelledby={pillarTitleId}>
-          <label className="wb-kn-search">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
-              <path
-                d="M20 20l-3.5-3.5"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
+        {pillar ? (
+          <WorkToolbar
+            title={vi ? pillar.labelVi : pillar.labelEn}
+            titleId={pillarTitleId}
+            summary={
+              pillar.id === 'knowledge'
+                ? t('wbKnCount', { count: packs.length })
+                : `${vi ? pillar.hintVi : pillar.hintEn}${meta?.title ? ` · ${meta.title}` : ''}`
+            }
+            local
+          />
+        ) : null}
+
+        {tab === 'knowledge' && (
+          <section className="wb-pane" aria-labelledby={pillarTitleId}>
+            <label className="wb-kn-search">
+              <WbGlyph id="search" size={14} />
+              <input
+                className="wb-input"
+                type="search"
+                value={qQuery}
+                onChange={(e) => setQQuery(e.target.value)}
+                aria-label={t('wbKnSearch')}
+                placeholder={t('wbKnSearchPlaceholder')}
               />
-            </svg>
-            <input
-              type="search"
-              value={qQuery}
-              onChange={(e) => setQQuery(e.target.value)}
-              aria-label={t('wbKnSearch')}
-              placeholder={t('wbKnSearchPlaceholder')}
-            />
-          </label>
-          <div className="wb-layout">
-            <section className="wb-packs">
-              <h3>
-                {t('wbKnLibrary')}
-                <span className="wb-count wb-num">{packs.length}</span>
-              </h3>
-              {packs.length === 0 ? (
-                pillarState('knowledge', 'wbKnEmpty')
-              ) : (
-                <ul className="wb-pack-list">
-                  {packs.map(({ entry, meta: m }) => (
-                    <li key={entry.id}>
+            </label>
+            <div className="wb-layout">
+              <section className="wb-packs">
+                <h3>
+                  {t('wbKnLibrary')}
+                  <span className="wb-count wb-num">{packs.length}</span>
+                </h3>
+                {packs.length === 0 ? (
+                  pillarState('knowledge', 'wbKnEmpty')
+                ) : (
+                  <ul className="wb-pack-list">
+                    {packs.map(({ entry, meta: m }) => (
+                      <li key={entry.id}>
+                        <button
+                          type="button"
+                          className={`wb-pack-item${entry.id === selectedId ? ' active' : ''}`}
+                          onClick={() => onSelectPack(entry.id === selectedId ? null : entry.id)}
+                        >
+                          <strong>{m.title}</strong>
+                          <span>{Object.values(m.facets).filter(Boolean).join(' · ')}</span>
+                          <em className="wb-num">
+                            {entry.fileCount} {t('wbKnFiles')}
+                          </em>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+              <aside className="wb-detail">
+                {selected && meta ? (
+                  <>
+                    <h3>{meta.title}</h3>
+                    <p>{Object.values(meta.facets).filter(Boolean).join(' · ')}</p>
+                    <div className="wb-chip-row">
                       <button
                         type="button"
-                        className={`wb-pack-item${entry.id === selectedId ? ' active' : ''}`}
-                        onClick={() => onSelectPack(entry.id === selectedId ? null : entry.id)}
+                        className="wb-btn wb-btn-secondary"
+                        onClick={() => {
+                          pinPillar(practice.id, 'materials')
+                          window.dispatchEvent(new Event('uniwork:wb-pins-changed'))
+                          setTab('materials')
+                        }}
                       >
-                        <strong>{m.title}</strong>
-                        <span>{Object.values(m.facets).filter(Boolean).join(' · ')}</span>
-                        <em className="wb-num">
-                          {entry.fileCount} {t('wbKnFiles')}
-                        </em>
+                        {t('wbCommonMaterials')}
                       </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-            <aside className="wb-detail">
-              {selected && meta ? (
-                <>
-                  <h3>{meta.title}</h3>
-                  <p>{Object.values(meta.facets).filter(Boolean).join(' · ')}</p>
-                  <div className="wb-chip-row">
+                      <button
+                        type="button"
+                        className="wb-btn wb-btn-secondary"
+                        onClick={() => onOpenPackFiles(selected.id)}
+                      >
+                        {t('wbKnViewFiles')}
+                      </button>
+                      <button
+                        type="button"
+                        className="wb-btn wb-btn-secondary"
+                        disabled={busy === 'delete-pack'}
+                        onClick={deletePack}
+                      >
+                        {t('wbKnDeletePack')}
+                      </button>
+                    </div>
+                    <div className="wb-form wb-form-spaced">
+                      <label className="wb-form-wide">
+                        <span>{t('wbCommonTags')}</span>
+                        <input
+                          className="wb-input"
+                          value={tagDraft}
+                          onChange={(e) => setTagDraft(e.target.value)}
+                        />
+                      </label>
+                      <label className="wb-form-wide">
+                        <span>{t('wbCommonNotes')}</span>
+                        <textarea
+                          className="wb-input"
+                          rows={3}
+                          value={noteDraft}
+                          onChange={(e) => setNoteDraft(e.target.value)}
+                        />
+                      </label>
+                    </div>
                     <button
                       type="button"
-                      className="wb-btn wb-btn-secondary"
-                      onClick={() => {
-                        pinPillar(practice.id, 'materials')
-                        window.dispatchEvent(new Event('uniwork:wb-pins-changed'))
-                        setTab('materials')
-                      }}
+                      className="wb-btn wb-btn-primary"
+                      disabled={!!busy}
+                      onClick={() => void saveMeta()}
                     >
-                      {t('wbCommonMaterials')}
+                      {t('wbCommonSave')}
                     </button>
-                    <button
-                      type="button"
-                      className="wb-btn wb-btn-secondary"
-                      onClick={() => onOpenPackFiles(selected.id)}
+                  </>
+                ) : (
+                  pillarState('knowledge', 'wbKnSelectPack')
+                )}
+              </aside>
+            </div>
+          </section>
+        )}
+
+        {tab === 'materials' && (
+          <section className="wb-pane" aria-labelledby={pillarTitleId}>
+            {!selected || !meta ? (
+              pillarState('materials', 'wbMatSelectPackFirst')
+            ) : (
+              <>
+                {packFiles.length === 0 ? (
+                  pillarState('materials', 'wbMatEmpty')
+                ) : (
+                  <ul className="wb-material-list">
+                    {packFiles.map((fp) => {
+                      const base = fp.split(/[/\\]/).pop() || fp
+                      return (
+                        <li key={fp} className="wb-material-row">
+                          <div>
+                            <strong>{base}</strong>
+                            <span>
+                              {meta.materials?.[fp] ?? meta.materials?.[`role:${base}`] ?? '—'}
+                            </span>
+                          </div>
+                          <WbRowActions>
+                            <WbOpenBtn
+                              label={t('wbCommonOpen')}
+                              onClick={() => void window.aiOffice.openPath(fp)}
+                            />
+                            <WbDeleteBtn
+                              label={t('wbCommonDelete')}
+                              disabled={busy === `del-file:${fp}`}
+                              onClick={() => deleteMaterialFile(fp)}
+                            />
+                          </WbRowActions>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+                <div className="wb-add-row">
+                  <label>
+                    <span>{t('wbMatAdd')}</span>
+                    <select
+                      className="wb-input"
+                      value={addRole}
+                      onChange={(e) => setAddRole(e.target.value)}
                     >
-                      {t('wbKnViewFiles')}
-                    </button>
-                    <button
-                      type="button"
-                      className="wb-btn wb-btn-secondary"
-                      disabled={busy === 'delete-pack'}
-                      onClick={() => void deletePack()}
-                    >
-                      {t('wbKnDeletePack')}
-                    </button>
-                  </div>
-                  <div className="wb-form wb-form-spaced">
-                    <label className="wb-form-wide">
-                      <span>{t('wbCommonTags')}</span>
-                      <input value={tagDraft} onChange={(e) => setTagDraft(e.target.value)} />
-                    </label>
-                    <label className="wb-form-wide">
-                      <span>{t('wbCommonNotes')}</span>
-                      <textarea
-                        rows={3}
-                        value={noteDraft}
-                        onChange={(e) => setNoteDraft(e.target.value)}
-                      />
-                    </label>
-                  </div>
+                      {practice.materialRoles.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {vi ? r.labelVi : r.labelEn}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                   <button
                     type="button"
                     className="wb-btn wb-btn-primary"
                     disabled={!!busy}
-                    onClick={() => void saveMeta()}
+                    onClick={() => void addMaterial()}
                   >
-                    {t('wbCommonSave')}
+                    {t('wbMatAddOpen')}
                   </button>
-                </>
-              ) : (
-                pillarState('knowledge', 'wbKnSelectPack')
-              )}
-            </aside>
-          </div>
-        </section>
-      )}
-
-      {tab === 'materials' && (
-        <section className="wb-pane" aria-labelledby={pillarTitleId}>
-          {!selected || !meta ? (
-            pillarState('materials', 'wbMatSelectPackFirst')
-          ) : (
-            <>
-              {packFiles.length === 0 ? (
-                pillarState('materials', 'wbMatEmpty')
-              ) : (
-                <ul className="wb-material-list">
-                  {packFiles.map((fp) => {
-                    const base = fp.split(/[/\\]/).pop() || fp
-                    return (
-                      <li key={fp} className="wb-material-row">
-                        <div>
-                          <strong>{base}</strong>
-                          <span>
-                            {meta.materials?.[fp] ?? meta.materials?.[`role:${base}`] ?? '—'}
-                          </span>
-                        </div>
-                        <WbRowActions>
-                          <WbOpenBtn
-                            label={t('wbCommonOpen')}
-                            onClick={() => void window.aiOffice.openPath(fp)}
-                          />
-                          <WbDeleteBtn
-                            label={t('wbCommonDelete')}
-                            disabled={busy === `del-file:${fp}`}
-                            onClick={() => void deleteMaterialFile(fp)}
-                          />
-                        </WbRowActions>
-                      </li>
-                    )
-                  })}
-                </ul>
-              )}
-              <div className="wb-add-row">
-                <label>
-                  <span>{t('wbMatAdd')}</span>
-                  <select value={addRole} onChange={(e) => setAddRole(e.target.value)}>
-                    {practice.materialRoles.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {vi ? r.labelVi : r.labelEn}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <button
-                  type="button"
-                  className="wb-btn wb-btn-primary"
-                  disabled={!!busy}
-                  onClick={() => void addMaterial()}
-                >
-                  {t('wbMatAddOpen')}
-                </button>
-              </div>
-              <p className="wb-hint">{t('wbMatQuickCreateHint')}</p>
-              <div className="wb-chip-row">
-                <button
-                  type="button"
-                  className="wb-btn wb-btn-secondary wb-btn-sm"
-                  disabled={!!busy}
-                  onClick={() => void window.aiOffice.newDoc({ projectId: selected.id })}
-                >
-                  Docs
-                </button>
-                <button
-                  type="button"
-                  className="wb-btn wb-btn-secondary wb-btn-sm"
-                  disabled={!!busy}
-                  onClick={() => void window.aiOffice.newSheet({ projectId: selected.id })}
-                >
-                  Sheets
-                </button>
-                <button
-                  type="button"
-                  className="wb-btn wb-btn-secondary wb-btn-sm"
-                  disabled={!!busy}
-                  onClick={() => void window.aiOffice.newSlide({ projectId: selected.id })}
-                >
-                  Slides
-                </button>
-                <button
-                  type="button"
-                  className="wb-btn wb-btn-secondary wb-btn-sm"
-                  disabled={!!busy}
-                  onClick={() => void window.aiOffice.newPdf({ projectId: selected.id })}
-                >
-                  PDF
-                </button>
-              </div>
-              <h3>{t('wbMatQuickTemplates')}</h3>
-              <div className="wb-chip-row">
-                {practice.templates.map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    className="wb-btn wb-btn-secondary wb-btn-sm"
-                    disabled={!!busy}
-                    onClick={() => void openTemplate(t.id)}
-                  >
-                    {vi ? t.labelVi : t.labelEn}
-                  </button>
-                ))}
-              </div>
-              {practice.freeChainTemplateIds && practice.freeChainTemplateIds.length > 0 ? (
+                </div>
+                <p className="wb-hint">{t('wbMatQuickCreateHint')}</p>
                 <div className="wb-chip-row">
                   <button
                     type="button"
-                    className="wb-btn wb-btn-secondary"
+                    className="wb-btn wb-btn-secondary wb-btn-sm"
                     disabled={!!busy}
-                    onClick={() => void openFreeChain()}
+                    onClick={() => void window.aiOffice.newDoc({ projectId: selected.id })}
                   >
-                    {t('wbMatOpenChain')}
+                    Docs
+                  </button>
+                  <button
+                    type="button"
+                    className="wb-btn wb-btn-secondary wb-btn-sm"
+                    disabled={!!busy}
+                    onClick={() => void window.aiOffice.newSheet({ projectId: selected.id })}
+                  >
+                    Sheets
+                  </button>
+                  <button
+                    type="button"
+                    className="wb-btn wb-btn-secondary wb-btn-sm"
+                    disabled={!!busy}
+                    onClick={() => void window.aiOffice.newSlide({ projectId: selected.id })}
+                  >
+                    Slides
+                  </button>
+                  <button
+                    type="button"
+                    className="wb-btn wb-btn-secondary wb-btn-sm"
+                    disabled={!!busy}
+                    onClick={() => void window.aiOffice.newPdf({ projectId: selected.id })}
+                  >
+                    PDF
                   </button>
                 </div>
-              ) : null}
-            </>
-          )}
-        </section>
-      )}
+                <h3>{t('wbMatQuickTemplates')}</h3>
+                <div className="wb-chip-row">
+                  {practice.templates.map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      className="wb-btn wb-btn-secondary wb-btn-sm"
+                      disabled={!!busy}
+                      onClick={() => void openTemplate(t.id)}
+                    >
+                      {vi ? t.labelVi : t.labelEn}
+                    </button>
+                  ))}
+                </div>
+                {practice.freeChainTemplateIds && practice.freeChainTemplateIds.length > 0 ? (
+                  <div className="wb-chip-row">
+                    <button
+                      type="button"
+                      className="wb-btn wb-btn-secondary"
+                      disabled={!!busy}
+                      onClick={() => void openFreeChain()}
+                    >
+                      {t('wbMatOpenChain')}
+                    </button>
+                  </div>
+                ) : null}
+              </>
+            )}
+          </section>
+        )}
 
-      {tab === 'skills' && (
-        <section className="wb-pane" aria-labelledby={pillarTitleId}>
-          {!selected || !meta ? (
-            pillarState('skills', 'wbSkNeedPack')
-          ) : (
-            <p>
-              {t('wbSkContext')} <strong>{meta.title}</strong>
-            </p>
-          )}
+        {tab === 'skills' && (
+          <section className="wb-pane" aria-labelledby={pillarTitleId}>
+            {!selected || !meta ? (
+              pillarState('skills', 'wbSkNeedPack')
+            ) : (
+              <p>
+                {t('wbSkContext')} <strong>{meta.title}</strong>
+              </p>
+            )}
 
-          {roleSkills.length > 0 ? (
-            <>
-              <h3>{t('wbSkRoleSkills')}</h3>
-              <p className="wb-hint">{t('wbSkRoleHint')}</p>
+            {roleSkills.length > 0 ? (
+              <>
+                <h3>{t('wbSkRoleSkills')}</h3>
+                <p className="wb-hint">{t('wbSkRoleHint')}</p>
+                <ul className="wb-skill-list">
+                  {roleSkills.map((s) => (
+                    <li key={s.id} className="wb-skill-row">
+                      <div>
+                        <strong>{vi ? s.labelVi : s.labelEn}</strong>
+                        <span>{vi ? s.descVi : s.descEn}</span>
+                        <em>
+                          {s.category} · {t('wbCommonUsesTokens')}
+                        </em>
+                      </div>
+                      <button
+                        type="button"
+                        className="wb-btn wb-btn-primary wb-btn-sm"
+                        disabled={!!busy || !selected}
+                        onClick={() => setAsk(skillAsk('practice', s.id))}
+                      >
+                        {t('wbCommonRun')}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : null}
+
+            <h3>{t('wbSkDomainSkills')}</h3>
+            <p className="wb-hint">{t('wbSkDomainHint')}</p>
+            <SkillDomainTabs vi={vi} active={skillDomain} onSelect={setSkillDomain} />
+            <div className="skill-domain-panel">
+              <h3>
+                {skillDomainDef
+                  ? vi
+                    ? skillDomainDef.labelVi
+                    : skillDomainDef.labelEn
+                  : t('wbCommonSkills')}
+              </h3>
+              <p className="wb-hint">
+                {skillDomainDef ? (vi ? skillDomainDef.hintVi : skillDomainDef.hintEn) : ''}
+              </p>
               <ul className="wb-skill-list">
-                {roleSkills.map((s) => (
+                {domainSkills.map((s) => (
                   <li key={s.id} className="wb-skill-row">
                     <div>
                       <strong>{vi ? s.labelVi : s.labelEn}</strong>
@@ -930,143 +1021,95 @@ export function PracticeHome({
                       type="button"
                       className="wb-btn wb-btn-primary wb-btn-sm"
                       disabled={!!busy || !selected}
-                      onClick={() => setConfirmSkill({ kind: 'practice', id: s.id })}
+                      onClick={() => setAsk(skillAsk('domain', s.id))}
                     >
                       {t('wbCommonRun')}
                     </button>
                   </li>
                 ))}
               </ul>
-            </>
-          ) : null}
+            </div>
+          </section>
+        )}
 
-          <h3>{t('wbSkDomainSkills')}</h3>
-          <p className="wb-hint">{t('wbSkDomainHint')}</p>
-          <SkillDomainTabs vi={vi} active={skillDomain} onSelect={setSkillDomain} />
-          <div className="skill-domain-panel">
-            <h3>
-              {skillDomainDef
-                ? vi
-                  ? skillDomainDef.labelVi
-                  : skillDomainDef.labelEn
-                : t('wbCommonSkills')}
-            </h3>
-            <p className="wb-hint">
-              {skillDomainDef ? (vi ? skillDomainDef.hintVi : skillDomainDef.hintEn) : ''}
-            </p>
-            <ul className="wb-skill-list">
-              {domainSkills.map((s) => (
-                <li key={s.id} className="wb-skill-row">
-                  <div>
-                    <strong>{vi ? s.labelVi : s.labelEn}</strong>
-                    <span>{vi ? s.descVi : s.descEn}</span>
-                    <em>
-                      {s.category} · {t('wbCommonUsesTokens')}
-                    </em>
-                  </div>
-                  <button
-                    type="button"
-                    className="wb-btn wb-btn-primary wb-btn-sm"
-                    disabled={!!busy || !selected}
-                    onClick={() => setConfirmSkill({ kind: 'domain', id: s.id })}
-                  >
-                    {t('wbCommonRun')}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </section>
-      )}
-
-      {tab === 'compose' && (
-        <section className="wb-block wb-cmp" aria-labelledby={pillarTitleId}>
-          <div className="wb-form">
-            {practice.facets.map((f) => {
-              if (f.id === practice.titleFacetId) {
+        {tab === 'compose' && (
+          <section className="wb-block wb-cmp" aria-labelledby={pillarTitleId}>
+            <div className="wb-form">
+              {practice.facets.map((f) => {
+                if (f.id === practice.titleFacetId) {
+                  return (
+                    <label key={f.id} className="wb-form-wide">
+                      <span>{vi ? f.labelVi : f.labelEn}</span>
+                      <input
+                        className="wb-input"
+                        value={titleDraft}
+                        onChange={(e) => setTitleDraft(e.target.value)}
+                        placeholder={vi ? f.placeholderVi : f.placeholderEn}
+                      />
+                    </label>
+                  )
+                }
                 return (
-                  <label key={f.id} className="wb-form-wide">
+                  <label key={f.id}>
                     <span>{vi ? f.labelVi : f.labelEn}</span>
-                    <input
-                      value={titleDraft}
-                      onChange={(e) => setTitleDraft(e.target.value)}
-                      placeholder={vi ? f.placeholderVi : f.placeholderEn}
-                    />
+                    {f.options ? (
+                      <select
+                        className="wb-input"
+                        value={facetDraft[f.id] ?? ''}
+                        onChange={(e) => setFacetDraft((d) => ({ ...d, [f.id]: e.target.value }))}
+                      >
+                        {f.options.map((o) => (
+                          <option key={o} value={o}>
+                            {o}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        className="wb-input"
+                        value={facetDraft[f.id] ?? ''}
+                        onChange={(e) => setFacetDraft((d) => ({ ...d, [f.id]: e.target.value }))}
+                        placeholder={vi ? f.placeholderVi : f.placeholderEn}
+                      />
+                    )}
                   </label>
                 )
-              }
-              return (
-                <label key={f.id}>
-                  <span>{vi ? f.labelVi : f.labelEn}</span>
-                  {f.options ? (
-                    <select
-                      value={facetDraft[f.id] ?? ''}
-                      onChange={(e) => setFacetDraft((d) => ({ ...d, [f.id]: e.target.value }))}
-                    >
-                      {f.options.map((o) => (
-                        <option key={o} value={o}>
-                          {o}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      value={facetDraft[f.id] ?? ''}
-                      onChange={(e) => setFacetDraft((d) => ({ ...d, [f.id]: e.target.value }))}
-                      placeholder={vi ? f.placeholderVi : f.placeholderEn}
-                    />
-                  )}
-                </label>
-              )
-            })}
-            <label className="wb-form-wide">
-              <span>{t('wbCommonTags')}</span>
-              <input value={tagsText} onChange={(e) => setTagsText(e.target.value)} />
-            </label>
-          </div>
-          <button
-            type="button"
-            className="wb-btn wb-btn-primary"
-            disabled={busy === 'create'}
-            onClick={() => void submitCreate()}
-          >
-            {busy === 'create' ? t('wbCmpCreating') : t('wbCmpCreate')}
-          </button>
-        </section>
-      )}
-
-      {confirmSkill && (
-        <div className="modal-overlay" onClick={() => setConfirmSkill(null)}>
-          <div
-            className="modal"
-            role="dialog"
-            aria-modal="true"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3>{t('wbSkConfirmTitle')}</h3>
-            <p>{t('wbSkConfirmBody')}</p>
-            <div className="modal-buttons">
-              <button
-                className="btn btn-secondary"
-                type="button"
-                onClick={() => setConfirmSkill(null)}
-              >
-                {t('wbCommonCancel')}
-              </button>
-              <button
-                className="btn btn-primary"
-                type="button"
-                onClick={() => {
-                  if (confirmSkill.kind === 'practice') void runPracticeSkill(confirmSkill.id)
-                  else void runDomainSkill(confirmSkill.id)
-                }}
-              >
-                {t('wbSkConfirmRun')}
-              </button>
+              })}
+              <label className="wb-form-wide">
+                <span>{t('wbCommonTags')}</span>
+                <input
+                  className="wb-input"
+                  value={tagsText}
+                  onChange={(e) => setTagsText(e.target.value)}
+                />
+              </label>
             </div>
-          </div>
-        </div>
-      )}
+            <button
+              type="button"
+              className="wb-btn wb-btn-primary"
+              disabled={busy === 'create'}
+              onClick={() => void submitCreate()}
+            >
+              {busy === 'create' ? t('wbCmpCreating') : t('wbCmpCreate')}
+            </button>
+          </section>
+        )}
+
+        {ask ? (
+          <WbConfirm
+            title={showMsg(ask.title)}
+            body={ask.body ? showMsg(ask.body) : undefined}
+            confirmLabel={t(ask.confirm)}
+            cancelLabel={t('wbCommonCancel')}
+            tone={ask.tone}
+            onCancel={() => setAsk(null)}
+            onConfirm={() => {
+              setAsk(null)
+              runAsk(ask.action)
+            }}
+          />
+        ) : null}
+      </WbToastHost>
     </main>
   )
 }

@@ -141,13 +141,14 @@ async function openKnowledge(
 }
 
 describe('Knowledge pillar (redesign spec 4.8)', () => {
-  it('a pane header, a search box with a leading icon and an empty library panel', async () => {
+  it('a toolbar, a search box with a leading icon and an empty library panel', async () => {
     await openKnowledge([], null)
-    expect(host.querySelector('.wb-pane-title')?.textContent).toBe(KNOWLEDGE.labelEn)
-    expect(host.querySelector('.wb-pane-aside .wb-local-tag')).not.toBeNull()
+    expect(host.querySelector('.wb-toolbar h2.uw-sr-only')?.textContent).toBe(KNOWLEDGE.labelEn)
+    expect(host.querySelector('.wb-toolbar-text')?.textContent).toBe('Packs: 0')
+    expect(host.querySelector('.wb-toolbar .wb-local-tag')).not.toBeNull()
     const labelledBy = host.querySelector('section.wb-pane')?.getAttribute('aria-labelledby')
     expect(labelledBy && document.getElementById(labelledBy)?.textContent).toBe(KNOWLEDGE.labelEn)
-    const search = host.querySelector<HTMLInputElement>('.wb-kn-search input')!
+    const search = host.querySelector<HTMLInputElement>('.wb-kn-search input.wb-input')!
     expect(search.getAttribute('aria-label')).toBe('Search')
     expect(search.placeholder).toBe('Title, tags, notes…')
     expect(host.querySelector('.wb-kn-search svg')).not.toBeNull()
@@ -208,5 +209,61 @@ describe('pillar empty sentences use the shared state panel (redesign spec 5)', 
       '\n.wb-material-row > div:first-child,\n.wb-skill-row > div:first-child {',
     )
     expect(css).toMatch(/\n\.wb-row-actions \{[^}]*display: inline-flex;[^}]*flex-wrap: nowrap;/)
+  })
+})
+
+describe('in-app confirmations and page toasts (redesign spec 2.3, 3)', () => {
+  const buttonByText = (text: string) =>
+    Array.from(host.querySelectorAll<HTMLButtonElement>('button')).find(
+      (b) => b.textContent?.trim() === text,
+    )
+
+  it('Delete pack asks in a WbConfirm (no window.confirm); Cancel keeps it, Delete removes it', async () => {
+    const deleteProject = vi.fn(async () => undefined)
+    window.aiOfficeProject = {
+      deleteProject,
+      listFiles: vi.fn(async () => []),
+    } as unknown as typeof window.aiOfficeProject
+    const native = vi.spyOn(window, 'confirm')
+    await openKnowledge([PACK], 'p1')
+    const del = buttonByText('Delete pack')!
+    del.focus()
+    await act(async () => del.click())
+    const dialog = host.querySelector<HTMLElement>('.wb-confirm[role="alertdialog"]')!
+    expect(dialog.textContent).toContain('Delete pack “Acme deal”?')
+    expect(native).not.toHaveBeenCalled()
+    // focus starts on Cancel; Cancel closes with no delete and gives focus back
+    expect(document.activeElement?.textContent).toBe('Cancel')
+    await act(async () => (document.activeElement as HTMLButtonElement).click())
+    expect(host.querySelector('.wb-confirm')).toBeNull()
+    expect(deleteProject).not.toHaveBeenCalled()
+    expect(document.activeElement).toBe(del)
+
+    await act(async () => del.click())
+    const confirm = host.querySelector<HTMLButtonElement>('.wb-confirm .wb-btn-danger')!
+    expect(confirm.textContent).toBe('Delete pack')
+    await act(async () => confirm.click())
+    await flush()
+    expect(deleteProject).toHaveBeenCalledWith('p1')
+    // the notice is a toast in the one host, not a line pinned above every tab
+    expect(host.querySelector('.wb-hint, .wb-error')).toBeNull()
+    expect(host.querySelector('.wb-toast-host .wb-toast')?.textContent).toContain(
+      'Pack removed from Knowledge.',
+    )
+    native.mockRestore()
+  })
+
+  it('running a skill asks in a WbConfirm instead of the old .modal', async () => {
+    await openKnowledge([PACK], 'p1', 'skills')
+    const run = host.querySelector<HTMLButtonElement>('.wb-skill-row .wb-btn')!
+    await act(async () => run.click())
+    expect(host.querySelector('.modal, .modal-overlay')).toBeNull()
+    const dialog = host.querySelector('.wb-confirm')!
+    expect(dialog.querySelector('.wb-confirm-title')?.textContent).toBe('Use AI Tokens?')
+    expect(dialog.querySelector('.wb-btn-primary')?.textContent).toBe('Run AI')
+    await act(async () => {
+      dialog.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    })
+    expect(host.querySelector('.wb-confirm')).toBeNull()
   })
 })

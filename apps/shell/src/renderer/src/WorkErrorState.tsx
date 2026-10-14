@@ -47,7 +47,7 @@ function StateGlyph({ id }: { id: keyof typeof GLYPH }): ReactElement {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.6"
+      strokeWidth="1.5"
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
@@ -60,7 +60,11 @@ function StateGlyph({ id }: { id: keyof typeof GLYPH }): ReactElement {
 const isSignal = (tone: Tint | SignalTone): tone is SignalTone =>
   tone === 'danger' || tone === 'warning' || tone === 'info'
 
-/** Every Workbench empty / error / sign-in state (redesign spec 5): tile, title, one line, one action. */
+/**
+ * Every Workbench empty / error / sign-in state (redesign spec 2.3): tile, title, one line,
+ * one action. The full panel centres in its area; `compact` (28px tile, 12px padding,
+ * left-aligned) fits a narrow column or a card section.
+ */
 export function WorkStatePanel({
   tone,
   icon,
@@ -68,6 +72,7 @@ export function WorkStatePanel({
   body,
   action,
   role,
+  compact = false,
 }: {
   /** a module tint for empty states, a signal for errors */
   tone: Tint | SignalTone
@@ -76,9 +81,10 @@ export function WorkStatePanel({
   body?: string
   action?: { label: string; onClick: () => void; variant?: 'primary' | 'secondary' }
   role?: 'status' | 'alert'
+  compact?: boolean
 }): ReactElement {
   return (
-    <div className="wb-state" role={role}>
+    <div className={`wb-state${compact ? ' is-compact' : ''}`} role={role}>
       <span
         className="wb-state-icon"
         style={isSignal(tone) ? signalStyle(tone) : tintStyle(tone)}
@@ -86,17 +92,19 @@ export function WorkStatePanel({
       >
         {icon}
       </span>
-      <h3 className="wb-state-title">{title}</h3>
-      {body ? <p className="wb-state-body">{body}</p> : null}
-      {action ? (
-        <button
-          type="button"
-          className={`wb-btn wb-btn-${action.variant ?? 'primary'}`}
-          onClick={action.onClick}
-        >
-          {action.label}
-        </button>
-      ) : null}
+      <div className="wb-state-text">
+        <h3 className="wb-state-title">{title}</h3>
+        {body ? <p className="wb-state-body">{body}</p> : null}
+        {action ? (
+          <button
+            type="button"
+            className={`wb-btn wb-btn-${action.variant ?? 'primary'}${compact ? ' wb-btn-sm' : ''}`}
+            onClick={action.onClick}
+          >
+            {action.label}
+          </button>
+        ) : null}
+      </div>
     </div>
   )
 }
@@ -138,9 +146,11 @@ const COPY: Record<
 export function WorkErrorState({
   state,
   onRetry,
+  compact,
 }: {
   state: UniworkWorkError
   onRetry: () => void
+  compact?: boolean
 }): ReactElement {
   const { t } = useI18n()
   const copy = COPY[state]
@@ -154,6 +164,7 @@ export function WorkErrorState({
       body={copy.body ? t(copy.body) : undefined}
       action={copy.action ? { label: t(copy.action), onClick: run } : undefined}
       role={state === 'signed-out' ? 'status' : 'alert'}
+      compact={compact}
     />
   )
 }
@@ -162,12 +173,14 @@ export function WorkErrorState({
 export function WorkNoWorkspace({
   error,
   onRetry,
+  compact,
 }: {
   error: UniworkWorkError | null
   onRetry: () => void
+  compact?: boolean
 }): ReactElement {
   const { t } = useI18n()
-  if (error) return <WorkErrorState state={error} onRetry={onRetry} />
+  if (error) return <WorkErrorState state={error} onRetry={onRetry} compact={compact} />
   return (
     <WorkStatePanel
       tone="info"
@@ -178,17 +191,53 @@ export function WorkNoWorkspace({
         onClick: () => void window.uniworkWork.openWeb({ kind: 'onboarding' }).catch(() => false),
       }}
       role="status"
+      compact={compact}
     />
   )
 }
 
-/** The loading placeholder of a server tab: three shimmer rows (reduced motion stops them). */
-export function WorkSkeleton(): ReactElement {
+export type WorkSkeletonShape = 'rows' | 'agenda' | 'card'
+
+/** one placeholder list row: a round icon, two text bars and a pill */
+function SkelRow(): ReactElement {
   return (
-    <div className="wb-work-skeleton" aria-busy="true">
-      <span className="wb-skel wb-skel-row" />
-      <span className="wb-skel wb-skel-row" />
-      <span className="wb-skel wb-skel-row" />
+    <span className="wb-skel-line">
+      <span className="wb-skel wb-skel-dot" />
+      <span className="wb-skel-lines">
+        <span className="wb-skel wb-skel-bar" />
+        <span className="wb-skel wb-skel-bar is-short" />
+      </span>
+      <span className="wb-skel wb-skel-pill" />
+    </span>
+  )
+}
+
+/**
+ * The loading placeholder of a server tab, shaped like what loads (spec 2.3): list rows,
+ * an agenda (a day head over rows) or a profile card. Reduced motion stops the shimmer.
+ */
+export function WorkSkeleton({
+  shape = 'rows',
+  rows = 3,
+}: {
+  shape?: WorkSkeletonShape
+  rows?: number
+}): ReactElement {
+  return (
+    <div className={`wb-work-skeleton wb-block is-${shape}`} aria-busy="true">
+      {shape === 'agenda' ? <span className="wb-skel wb-skel-head" /> : null}
+      {shape === 'card' ? (
+        <span className="wb-skel-line">
+          <span className="wb-skel wb-skel-avatar" />
+          <span className="wb-skel-lines">
+            <span className="wb-skel wb-skel-bar" />
+            <span className="wb-skel wb-skel-bar is-short" />
+          </span>
+        </span>
+      ) : null}
+      {Array.from({ length: rows }, (_, i) => (
+        <SkelRow key={i} />
+      ))}
     </div>
   )
 }
@@ -206,30 +255,6 @@ export function WorkStaleNote({ at, onRetry }: { at: number; onRetry: () => void
   )
 }
 
-/** A write the server refused: the change was undone; Retry repeats the same request. */
-export function WorkToast({
-  message,
-  onRetry,
-  onDismiss,
-}: {
-  message: StringKey
-  onRetry: () => void
-  onDismiss: () => void
-}): ReactElement {
-  const { t } = useI18n()
-  return (
-    <div className="wb-toast" role="alert">
-      <span>{t(message)}</span>
-      <button type="button" className="wb-link" onClick={onRetry}>
-        {t('acctRetry')}
-      </button>
-      <button type="button" className="wb-link" onClick={onDismiss}>
-        {t('wbOvDismiss')}
-      </button>
-    </div>
-  )
-}
-
 /** What PracticeHome hands every server tab (Tasks, Calendar, Profile). */
 export interface WorkPaneProps {
   /** the active workspace; null = signed out, in none, or the first list failed (workspaceError says why) */
@@ -241,15 +266,18 @@ export interface WorkPaneProps {
 }
 
 /** What a server tab shows instead of its data (lost access, sign in, an error, the skeleton); null when it has data. */
-export function workLoadState(load: {
-  value: unknown
-  error: UniworkWorkError | null
-  reload: () => void
-}): ReactElement | null {
+export function workLoadState(
+  load: {
+    value: unknown
+    error: UniworkWorkError | null
+    reload: () => void
+  },
+  shape?: WorkSkeletonShape,
+): ReactElement | null {
   if (load.error === 'signed-out' || load.error === 'forbidden') {
     return <WorkErrorState state={load.error} onRetry={load.reload} />
   }
   if (load.value !== null) return null
   if (load.error) return <WorkErrorState state={load.error} onRetry={load.reload} />
-  return <WorkSkeleton />
+  return <WorkSkeleton shape={shape} />
 }

@@ -22,7 +22,7 @@ export function WorkProfilePane({
 
   if (!workspace) return <WorkNoWorkspace error={workspaceError} onRetry={onReload} />
   const person = load.value
-  const blocked = workLoadState(load)
+  const blocked = workLoadState(load, 'card')
   // workLoadState answers whenever there is no person yet
   if (blocked || !person) return blocked ?? <></>
 

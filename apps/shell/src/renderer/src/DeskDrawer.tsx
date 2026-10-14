@@ -5,7 +5,7 @@ import { FileBadge } from './FileBadge'
 import { draftFromForm } from './form-draft'
 import { useI18n } from './locale'
 import { readForms, writeForms, type WbFormItem } from './workbench-pins'
-import { WorkbenchIcon } from './WorkbenchIcons'
+import { WbGlyph, WorkbenchIcon } from './WorkbenchIcons'
 
 const DRAWER_FORMS = 8
 
@@ -48,7 +48,8 @@ export function DeskDrawer({
       <div className="wb-desk-head">
         <h3 id={titleId}>{t('wbDeskDrawer')}</h3>
         <button type="button" className="wb-link" onClick={onManage}>
-          {t('wbDeskDrawerManage')} →
+          {t('wbDeskDrawerManage')}
+          <WbGlyph id="arrowRight" size={14} />
         </button>
       </div>
       {forms.length === 0 ? (
