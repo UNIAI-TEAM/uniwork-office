@@ -38,4 +38,5 @@ export const vi = {
   aiTestErrUnavailable: 'Dịch vụ chưa phản hồi, thử lại sau',
   aiTestErrMisconfigured:
     'Cài đặt chưa đầy đủ: hãy kiểm tra địa chỉ dịch vụ và các trường tài khoản',
+  setAiUniworkNote: 'UniWork AI dùng gói của tổ chức bạn. Không cần nhập key hay chọn mô hình.',
 } satisfies Record<keyof typeof zh, string>

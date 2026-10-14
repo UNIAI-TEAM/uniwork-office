@@ -35,6 +35,13 @@ export default defineConfig({
       '@genoffice/electron-utils/comments-poll': local(
         '../../packages/electron-utils/src/comments-poll.ts',
       ),
+      // longer name first: a string alias is a prefix replacement
+      '@genoffice/electron-utils/uniwork-ai-flag-bridge': local(
+        '../../packages/electron-utils/src/uniwork-ai-flag-bridge.ts',
+      ),
+      '@genoffice/electron-utils/uniwork-ai-flag': local(
+        '../../packages/electron-utils/src/uniwork-ai-flag.ts',
+      ),
       '@genoffice/electron-utils/ai-run': local('../../packages/electron-utils/src/ai-run.ts'),
       '@genoffice/electron-utils/drop-open': local(
         '../../packages/electron-utils/src/drop-open.ts',

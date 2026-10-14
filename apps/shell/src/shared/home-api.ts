@@ -17,6 +17,11 @@ import type {
 import type { UpdateChannel, UpdateUiState } from './update-api'
 
 /** Legal files shipped beside the app and opened from Settings > About. */
+/** The Settings window shows and saves the account's UniWork AI pick; My AI, email and one-click never pass this. */
+export interface AiSettingsPickOptions {
+  includeUniworkPick?: boolean
+}
+
 export type LegalDoc = 'license' | 'notice' | 'modifications' | 'thirdParty'
 
 /** Image attachment extensions — multimodal base64 on send (mirrors docs). */
@@ -591,6 +596,8 @@ export interface HomeApi {
   setLanguage(lang: UiLanguage): Promise<void>
   /** current update channel (persisted in userData/app-settings.json; default 'stable') */
   getUpdateChannel(): Promise<UpdateChannel>
+  /** the release channel a dev / beta build is pinned to (setUpdateChannel is ignored), else null */
+  getPinnedUpdateChannel(): Promise<string | null>
   /** switch + persist the update channel; triggers an immediate update check */
   setUpdateChannel(channel: UpdateChannel): Promise<void>
   /** UniWork account status (desktop session sync TBD; Sign-in opens the UniWork web link) */
@@ -686,9 +693,9 @@ export interface HomeApi {
   /** open the Token Hub (OpenRouter) credits page in the default browser */
   openCreditUsage(): Promise<void>
   /** AI settings (userData/ai-settings.json, shared by every editor) */
-  getAiSettings(): Promise<AiSettings>
+  getAiSettings(options?: AiSettingsPickOptions): Promise<AiSettings>
   /** persist AI settings; every renderer gets ai:settings-changed and re-reads */
-  setAiSettings(settings: AiSettings): Promise<void>
+  setAiSettings(settings: AiSettings, options?: AiSettingsPickOptions): Promise<void>
   /** ai-settings.json was rewritten by any renderer (composer model chip, another window) */
   onAiSettingsChanged(handler: () => void): () => void
   /** provider catalog with each fixed endpoint's default base URL (empty for UniAI/custom) */
@@ -1221,6 +1228,7 @@ export const HOME_CHANNELS = {
   getLanguage: 'home:get-language',
   setLanguage: 'home:set-language',
   getUpdateChannel: 'home:get-update-channel',
+  getPinnedUpdateChannel: 'home:get-pinned-update-channel',
   setUpdateChannel: 'home:set-update-channel',
   accountStatus: 'home:account-status',
   accountLogin: 'home:account-login',

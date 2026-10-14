@@ -38,4 +38,6 @@ export const cs = {
   aiTestErrLimit: 'Dosažen limit poskytovatele. Zkuste to později',
   aiTestErrUnavailable: 'Služba neodpovídá. Zkuste to později',
   aiTestErrMisconfigured: 'Nastavení je neúplné: zkontrolujte adresu služby a pole účtu',
+  setAiUniworkNote:
+    'UniWork AI používá tarif vaší organizace. Není třeba zadávat klíč ani vybírat model.',
 } satisfies Record<keyof typeof zh, string>

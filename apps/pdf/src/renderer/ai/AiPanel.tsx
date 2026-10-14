@@ -1,4 +1,6 @@
 import {
+  aiUniworkText,
+  isUniworkQuestionRefusal,
   aiPanelWidthAtPointer,
   AiPanelSideButton,
   AiModelPicker,
@@ -8,7 +10,7 @@ import {
 } from '@genoffice/ui'
 import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react'
-import { AgentLoop } from '@genoffice/agent-core'
+import { AgentLoop, endsQuietly, noticePatch, type PanelNote } from '@genoffice/agent-core'
 import {
   aiNoticeBody,
   aiNoticeKind,
@@ -70,6 +72,10 @@ interface ChatEntry {
   text: string
   streaming?: boolean
   isError?: boolean
+  /** UniWork AI: the transport is waiting out a Retry-After; the run goes on, Stop is the only action */
+  waitLine?: string | undefined
+  /** UniWork AI: restarted conversation / provider boundary / dropped call, shown above the answer */
+  notes?: PanelNote[] | undefined
   /** the run failed and this user message was rolled back out of the model context */
   undelivered?: boolean
   tools?: ToolActivity[]
@@ -127,6 +133,8 @@ export function AiPanel({
   const { lang, t } = useI18n()
   const [chat, setChat] = useState<ChatEntry[]>([])
   const [prompt, setPrompt] = useState('')
+  /** the question of the running turn: a restarted conversation puts it back in the composer */
+  const runQuestionRef = useRef('')
   const [busy, setBusy] = useState(false)
   const [phase, setPhase] = useState<Phase>('thinking')
   /** the scope chip's expandable preview of the selected text */
@@ -424,7 +432,22 @@ export function AiPanel({
         onText: (text) => {
           setPhase('replying')
           segTextRef.current = text
-          patchLast({ text })
+          patchLast({ text, waitLine: undefined })
+        },
+        // transport notices (UniWork AI); langRef: the loop is created once, `lang` would go stale
+        onNotice: (notice) => {
+          // the question was not sent: it goes back into the composer for the user to send again
+          if (notice.kind === 'conversation-restarted')
+            setPrompt((current) => current || runQuestionRef.current)
+          patchLast(
+            (last) =>
+              noticePatch(
+                last,
+                notice,
+                (key, params) => aiUniworkText(langRef.current, key, params),
+                'PDF',
+              ) ?? {},
+          )
         },
         onToolExecuted: ({ call, execution }) => {
           setPhase('working')
@@ -451,7 +474,7 @@ export function AiPanel({
           setPhase('thinking')
           runTextsRef.current.push(segTextRef.current)
           segTextRef.current = ''
-          patchLast({ streaming: false })
+          patchLast({ streaming: false, waitLine: undefined })
           setChat((prev) => [...prev, { role: 'assistant', text: '', streaming: true }])
         },
         onDone: ({ text, cancelled, turnLimit, truncated }) => {
@@ -474,7 +497,11 @@ export function AiPanel({
           }
           patchLast((last) => ({
             streaming: false,
-            text: final || (last.tools?.length ? last.text : tGlobal('aiNoReply')),
+            waitLine: undefined,
+            // a restarted conversation or UniWork AI being off ends the turn on purpose: the note is the whole reply
+            text:
+              final ||
+              (last.tools?.length || endsQuietly(last.notes) ? last.text : tGlobal('aiNoReply')),
           }))
           setBusy(false)
           if (runMutatedRef.current) {
@@ -483,6 +510,10 @@ export function AiPanel({
           }
         },
         onError: (error) => {
+          // a refused question (too long, rejected) is no send failure to retry as is: it goes back
+          // into the composer to be shortened or fixed, as the message says
+          const refused = isUniworkQuestionRefusal(error)
+          if (refused) setPrompt((current) => current || runQuestionRef.current)
           setChat((prev) => {
             const next = [...prev]
             // the loop rolled this run's user message out of the model context — surface that
@@ -490,13 +521,19 @@ export function AiPanel({
               const entry = next[i]!
               if (entry.role === 'user') {
                 // a setup state (no key / no model) is not a send failure: no "not sent" pill
-                next[i] = aiNoticeKind(error) ? entry : { ...entry, undelivered: true }
+                next[i] = aiNoticeKind(error) || refused ? entry : { ...entry, undelivered: true }
                 break
               }
             }
             const last = next.at(-1)
             if (last?.role === 'assistant') {
-              next[next.length - 1] = { ...last, streaming: false, text: error, isError: true }
+              next[next.length - 1] = {
+                ...last,
+                streaming: false,
+                waitLine: undefined,
+                text: error,
+                isError: true,
+              }
             }
             return next
           })
@@ -524,6 +561,7 @@ export function AiPanel({
     const loop = loopRef.current
     if (!instruction || !loop || loop.busy) return
     stickToBottomRef.current = true
+    runQuestionRef.current = instruction
     const scope = retryScope !== undefined ? (retryScope ?? undefined) : selectionScopeQuote()
     persistMessage('user', instruction, undefined, scope)
     segTextRef.current = ''
@@ -762,12 +800,32 @@ export function AiPanel({
             )
           }
           const hasTools = (entry.tools?.length ?? 0) > 0
-          if (!entry.text && !hasTools) return null
+          // a streaming bubble stays mounted while empty: its live region must exist before a
+          // notice arrives, or a screen reader may not announce the note
+          if (
+            !entry.text &&
+            !hasTools &&
+            !entry.notes?.length &&
+            !entry.waitLine &&
+            !entry.streaming
+          )
+            return null
           return (
             <div
               key={i}
               className={`ai-msg ai-msg-assistant${entry.isError && !aiNoticeKind(entry.text) ? ' ai-msg-error' : ''}`}
             >
+              {/* one persistent, empty-until-needed live region: a node that mounts with its text is often not announced */}
+              {
+                <div className="ai-msg-live" aria-live="polite">
+                  {entry.notes?.map((note, k) => (
+                    <div key={`un${k}`} className="ai-msg-notice">
+                      {note.text}
+                    </div>
+                  ))}
+                  {entry.waitLine && <div className="ai-msg-notice">{entry.waitLine}</div>}
+                </div>
+              }
               {hasTools && <ToolChipList tools={entry.tools!} />}
               {entry.text && (
                 <div dir="auto">

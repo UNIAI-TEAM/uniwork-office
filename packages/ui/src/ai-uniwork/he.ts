@@ -57,4 +57,8 @@ export const he = {
   aiErrCapabilityOff: 'UniWork AI כובה עכשיו עבור המסמך הזה ולכן ההרצה נעצרה אחרי השלב הנוכחי.',
   aiErrUnsupported: 'UniWork AI עדיין לא יכול לעשות את זה ב-{module}.',
   aiErrViewOnlyEdit: 'יש לך רק גישת צפייה למסמך הזה ולכן ה-AI לא יכול לערוך אותו.',
+  // UniWork AI question limits (the façade takes text up to 8,000 characters)
+  aiErrQuestionTooLong: 'הבקשה ארוכה מדי עבור UniWork AI. קצר אותה לפחות מ-8,000 תווים ושלח שוב.',
+  aiErrQuestionRejected: 'UniWork AI לא יכול לקבל את הבקשה הזו. שנה אותה ושלח שוב.',
+  aiUniworkImagesNotSent: 'תמונות לא נשלחות ל-UniWork AI; נשלח רק הטקסט שלך.',
 } satisfies Record<keyof typeof zh, string>
