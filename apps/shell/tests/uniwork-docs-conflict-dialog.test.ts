@@ -199,6 +199,7 @@ function setup(
 ) {
   const statuses: UniworkDocStatus[] = []
   const views: UniworkConflictView[] = []
+  const closedSessions: string[] = []
   let account: string | null = 'acc_1'
   let capabilityOffline = false
   let keystoreLocked = opts.keystoreLocked ?? false
@@ -246,6 +247,7 @@ function setup(
     ui,
     pushStatus: (s: UniworkDocStatus) => statuses.push(s),
     pushConflict: (v: UniworkConflictView) => views.push(v),
+    pushConflictClosed: (sessionId: string) => closedSessions.push(sessionId),
     isAiRunning: () => aiRunning,
     stopAiRun,
     pushLaunch: vi.fn(),
@@ -271,6 +273,7 @@ function setup(
     ui,
     statuses,
     views,
+    closedSessions,
     layer,
     safeStorage,
     stopAiRun,
@@ -698,5 +701,40 @@ describe('G5-09 desktop conflict dialog S5 session (main)', () => {
     const cancelReply = await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
     expect(cancelReply).toEqual({ kind: 'closed' })
     await p
+  })
+
+  it('FE-02: tab switch while open pushes conflictClosed once with the session id; an action answered after that returns {kind: "closed"}', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const path = await openAndConflict(ctx, server)
+
+    const p1 = ctx.service.resolveConflict(path)
+    await vi.waitFor(() => expect(ctx.views).toHaveLength(1))
+    const sessionId1 = ctx.views[0]!.sessionId
+
+    // Same path keeps the session open
+    ctx.service.noteActivePath(path)
+    expect(ctx.closedSessions).toEqual([])
+
+    // Tab switch (or home tab / document closed -> different active path) ends the session and pushes close once
+    ctx.service.noteActivePath(undefined)
+    ctx.service.noteActivePath(undefined)
+    expect(ctx.closedSessions).toEqual([sessionId1])
+    expect(await p1).toMatchObject({ state: 'conflict' })
+    expect(
+      await ctx.service.conflictAct(sessionId1, { kind: 'overwrite', stopAi: false }),
+    ).toEqual({ kind: 'closed' })
+
+    // Language switch (closeConflictPrompt) also pushes close once with the session id
+    const p2 = ctx.service.resolveConflict(path)
+    await vi.waitFor(() => expect(ctx.views).toHaveLength(2))
+    const sessionId2 = ctx.views[1]!.sessionId
+    ctx.service.closeConflictPrompt()
+    ctx.service.closeConflictPrompt()
+    expect(ctx.closedSessions).toEqual([sessionId1, sessionId2])
+    expect(await p2).toMatchObject({ state: 'conflict' })
+    expect(
+      await ctx.service.conflictAct(sessionId2, { kind: 'reload', keep: 'discard', stopAi: false }),
+    ).toEqual({ kind: 'closed' })
   })
 })

@@ -534,6 +534,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     ui: conflictUi(wiring),
     pushStatus: (status) => push(UNIWORK_DOC_CHANNELS.docStatusEvent, status),
     pushConflict: (view) => push(UNIWORK_DOC_CHANNELS.conflictOpen, view),
+    pushConflictClosed: (sessionId) => push(UNIWORK_DOC_CHANNELS.conflictClosed, { sessionId }),
     isAiRunning: (path) => wiring.isAiRunning?.(path) === true,
     stopAiRun: (path) => wiring.stopAiRun?.(path),
     // the save queue's lane verdicts read the same per-org capability cache the

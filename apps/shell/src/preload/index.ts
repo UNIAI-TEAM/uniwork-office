@@ -1087,6 +1087,16 @@ const homeApi: HomeApi = {
     ipcRenderer.on(UNIWORK_DOC_CHANNELS.conflictOpen, listener)
     return () => ipcRenderer.removeListener(UNIWORK_DOC_CHANNELS.conflictOpen, listener)
   },
+  onUniworkConflictClosed(cb) {
+    const listener = (_event: IpcRendererEvent, raw: unknown) => {
+      if (raw && typeof raw === 'object') {
+        const sessionId = (raw as { sessionId?: unknown }).sessionId
+        if (typeof sessionId === 'string' && sessionId) cb(sessionId)
+      }
+    }
+    ipcRenderer.on(UNIWORK_DOC_CHANNELS.conflictClosed, listener)
+    return () => ipcRenderer.removeListener(UNIWORK_DOC_CHANNELS.conflictClosed, listener)
+  },
   async uniworkConflictAct(sessionId, action) {
     return asUniworkConflictReply(
       await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.conflictAct, sessionId, action),

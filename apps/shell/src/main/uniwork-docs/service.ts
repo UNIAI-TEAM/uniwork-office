@@ -244,6 +244,8 @@ export interface UniworkDocsServiceDeps {
   pushLaunch(event: UniworkLaunchEvent): void
   /** G5-09 S5: pushes the current conflict dialog view to the shell renderer */
   pushConflict?(view: UniworkConflictView): void
+  /** G5-09 S5: main ended the open conflict dialog session itself */
+  pushConflictClosed?(sessionId: string): void
   /** G5-09 S5: whether an AI turn is running in the editor showing `path` */
   isAiRunning?(path: string): boolean
   /** G5-09 S5: stops the AI turn running in the editor showing `path` */
@@ -1516,6 +1518,9 @@ export class UniworkDocsService {
 
   /** "Hủy lần lưu" of one document; `closed` = its tab is closed -> kept draft */
   async cancelSave(path: string, closed = false): Promise<void> {
+    if (closed && this.conflictPrompt && samePath(this.conflictPrompt.path, path)) {
+      this.endConflictByMain(this.conflictPrompt)
+    }
     const doc = typeof path === 'string' ? this.store.lookup(path) : null
     if (!doc || !this.ownsLocally(doc)) return
     const queueDoc = await this.queueDocFromStore(doc)
@@ -3152,7 +3157,12 @@ export class UniworkDocsService {
             ? 'blocked'
             : 'unsent'
       const choice = await this.deps.ui.chooseUnsavedClose(b.title, kind, b.error)
-      if (choice === 'close') return true
+      if (choice === 'close') {
+        if (this.conflictPrompt && samePath(this.conflictPrompt.path, path)) {
+          this.endConflictByMain(this.conflictPrompt)
+        }
+        return true
+      }
       if (kind === 'unsent' && choice === 'save') return this.saveForClose(path)
       if (kind === 'conflict' && choice === 'resolve') {
         const outcome = await this.resolveForClose(path)
@@ -3287,8 +3297,7 @@ export class UniworkDocsService {
     const open = this.conflictPrompt
     if (open && samePath(open.path, doc.path)) return this.statusOf(doc)
     if (open) {
-      open.controller.abort()
-      open.finish()
+      this.endConflictByMain(open)
       await open.done
     }
     const controller = new AbortController()
@@ -3326,6 +3335,15 @@ export class UniworkDocsService {
     }
   }
 
+  /** G5-09 S5: main ended the open conflict session itself -> abort and push close */
+  private endConflictByMain(open: ConflictSession): void {
+    if (this.conflictPrompt === open) this.conflictPrompt = null
+    if (open.controller.signal.aborted) return
+    open.controller.abort()
+    open.finish()
+    this.deps.pushConflictClosed?.(open.sessionId)
+  }
+
   /**
    * The active document changed (tab switch, the home tab, a language
    * switch): a conflict dialog opened for another document from its chip
@@ -3334,8 +3352,7 @@ export class UniworkDocsService {
   noteActivePath(path: string | undefined): void {
     const open = this.conflictPrompt
     if (open && !open.fromClose && !(path && samePath(open.path, path))) {
-      open.controller.abort()
-      open.finish()
+      this.endConflictByMain(open)
     }
   }
 
@@ -3343,8 +3360,7 @@ export class UniworkDocsService {
   closeConflictPrompt(): void {
     const open = this.conflictPrompt
     if (open) {
-      open.controller.abort()
-      open.finish()
+      this.endConflictByMain(open)
     }
   }
 
