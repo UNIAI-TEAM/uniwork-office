@@ -183,7 +183,8 @@ describe('list state note', () => {
       'utf8',
     )
     for (const el of host.querySelectorAll('.ai-model-pop *')) {
-      for (const cls of el.classList) if (cls.startsWith('ai-model')) expect(css).toContain(`.${cls}`)
+      for (const cls of el.classList)
+        if (cls.startsWith('ai-model')) expect(css).toContain(`.${cls}`)
     }
   })
 })
@@ -201,12 +202,15 @@ describe('UniWork AI row', () => {
     expect(host.querySelector('.ai-model-item.selected')).not.toBeNull()
   })
 
-  it.each([undefined, ''])('reads "UniWork AI" when the model is %j (older server)', async (model) => {
-    setUniworkAiAvailable(true)
-    const m = await mount(uniwork(model))
-    await m.open()
-    expect(rows()).toEqual(['UniWork AI'])
-  })
+  it.each([undefined, ''])(
+    'reads "UniWork AI" when the model is %j (older server)',
+    async (model) => {
+      setUniworkAiAvailable(true)
+      const m = await mount(uniwork(model))
+      await m.open()
+      expect(rows()).toEqual(['UniWork AI'])
+    },
+  )
 
   it('follows a model that arrives with a later read', async () => {
     setUniworkAiAvailable(true)
