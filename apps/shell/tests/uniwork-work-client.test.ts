@@ -305,7 +305,8 @@ describe('uniwork work client: parsing', () => {
 describe('uniwork work client: errors', () => {
   it('maps each failure to the work error the renderer shows', async () => {
     const cases: Array<[FetchLike, UniworkDocErrorCode, UniworkWorkError]> = [
-      [async () => envelope(403, 'forbidden'), 'forbidden', 'forbidden'],
+      // a coded 403 is the server revoking access (G5-06 code)
+      [async () => envelope(403, 'forbidden'), 'permission_revoked', 'forbidden'],
       [async () => envelope(404, 'not_found'), 'not_found', 'forbidden'],
       // a bare 403 from a proxy is not the server's verdict
       [async () => new Response('denied', { status: 403 }), 'server_error', 'server'],
@@ -419,6 +420,16 @@ describe('workErrorOfDocCode', () => {
       ticket_expired: 'server',
       server_error: 'server',
       malformed_response: 'server',
+      keystore_locked: 'server',
+      store_full: 'server',
+      capability_off: 'server',
+      intent_unknown: 'server',
+      document_deleted: 'forbidden',
+      permission_revoked: 'forbidden',
+      member_deactivated: 'forbidden',
+      organization_suspended: 'forbidden',
+      drafts_full: 'server',
+      other_window: 'server',
     }
     for (const [code, work] of Object.entries(table)) {
       expect(workErrorOfDocCode(code as UniworkDocErrorCode)).toBe(work)

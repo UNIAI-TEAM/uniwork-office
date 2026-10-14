@@ -19,9 +19,14 @@ export function workErrorOfDocCode(code: UniworkDocErrorCode): UniworkWorkError 
     case 'session_expired':
     case 'wrong_deployment':
       return 'signed-out'
+    // access lost, including the G5-06 split of the server refusals
     case 'forbidden':
     case 'not_found':
     case 'deleted':
+    case 'permission_revoked':
+    case 'member_deactivated':
+    case 'organization_suspended':
+    case 'document_deleted':
       return 'forbidden'
     case 'network':
     case 'timeout':
