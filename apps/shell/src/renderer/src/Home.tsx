@@ -80,6 +80,16 @@ const DRAG_EXPAND_DELAY_MS = 600
 /** expanded folders survive a home reload; the selection is per session */
 const TREE_STATE_KEY = 'home.folderTree'
 
+/**
+ * Width of the viewport that `position: fixed` elements anchor to. The layout
+ * engine owns this coordinate system, so documentElement's client rect is the
+ * value to compute menu offsets from; window.innerWidth can disagree on scaled
+ * Linux desktops, which pushed row menus past the window's left edge (#1946).
+ */
+function fixedViewportWidth(): number {
+  return document.documentElement.clientWidth
+}
+
 function FolderIcon({ size = 16, open = false }: { size?: number; open?: boolean }) {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -2311,7 +2321,7 @@ export function Home() {
             path: entry.path,
             where: 'tree',
             top: rect.bottom + 4,
-            right: window.innerWidth - rect.right,
+            right: fixedViewportWidth() - rect.right,
           })
         }}
       >
@@ -2441,7 +2451,7 @@ export function Home() {
               path: entry.path,
               where: 'tree',
               top: e.clientY + 2,
-              right: window.innerWidth - e.clientX,
+              right: fixedViewportWidth() - e.clientX,
             })
           }}
           draggable={!isRoot && !isRenaming}
@@ -2865,7 +2875,7 @@ export function Home() {
               path: entry.path,
               where: 'table',
               top: e.clientY + 2,
-              right: window.innerWidth - e.clientX,
+              right: fixedViewportWidth() - e.clientX,
             })
           }}
         >
@@ -2917,7 +2927,7 @@ export function Home() {
                   path: entry.path,
                   where: 'table',
                   top: rect.bottom + 4,
-                  right: window.innerWidth - rect.right,
+                  right: fixedViewportWidth() - rect.right,
                 })
               }}
             >
