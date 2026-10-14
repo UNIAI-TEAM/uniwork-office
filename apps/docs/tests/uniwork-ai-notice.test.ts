@@ -158,6 +158,18 @@ describe('UniWork AI notices (docs panel)', () => {
     expect(reports.map((r) => r.state)).toEqual(['running', 'idle'])
   })
 
+  it('UniWork AI off: one note, no error line, no Retry or regenerate, no empty-reply line', async () => {
+    await emit({ type: 'notice', notice: { kind: 'uniwork-off' } })
+    await emit({ type: 'done' })
+    expect(notices()).toEqual([ui('aiUniworkOff')])
+    expect(container!.querySelector('.ai-msg-error')).toBeNull()
+    expect(container!.querySelector('.ai-retry-btn')).toBeNull()
+    expect(container!.querySelector(`button[aria-label="${t('aiRegenerateTitle')}"]`)).toBeNull()
+    expect(container!.textContent).not.toContain(t('aiNoReply'))
+    await pastGrace()
+    expect(reports.map((r) => r.state)).toEqual(['running', 'idle'])
+  })
+
   it('a provider boundary and dropped calls become notes above the answer', async () => {
     await emit({
       type: 'notice',

@@ -130,14 +130,10 @@ export function createUniworkAiChatTransport(
 
 /** a refusal before any request, in the façade's own codes (the renderer maps them like a server answer) */
 export type UniworkAiRefusal =
-  | 'access_revoked'
-  | 'office_capability_off'
-  | 'session_expired'
-  | 'ai_disabled'
+  'access_revoked' | 'office_capability_off' | 'session_expired' | 'ai_disabled'
 
 export type UniworkAiScopeResult =
-  | { ok: true; scope: UniworkScope; orgId: string }
-  | { ok: false; code: UniworkAiRefusal }
+  { ok: true; scope: UniworkScope; orgId: string } | { ok: false; code: UniworkAiRefusal }
 
 export interface UniworkAiScopeDeps {
   /** the editor tab or detached window rendered by this webContents id (null: not an editor) */
@@ -169,7 +165,10 @@ const FORMAT_OF_EXTENSION: Record<string, UniworkFormat> = {
 }
 
 /** the format token of a tab: its file's extension (one of six), or its module's when untitled */
-export function uniworkFormatOfTab(tab: { kind: TabKind; filePath?: string }): UniworkFormat | null {
+export function uniworkFormatOfTab(tab: {
+  kind: TabKind
+  filePath?: string
+}): UniworkFormat | null {
   if (tab.filePath) {
     return FORMAT_OF_EXTENSION[extname(tab.filePath).slice(1).toLowerCase()] ?? null
   }
@@ -211,7 +210,14 @@ export function uniworkAiOffered(
   return capabilities.ai_uniwork_formats.includes(format)
 }
 
-const UNIWORK_FORMATS: readonly UniworkFormat[] = ['docx', 'xlsx', 'pptx', 'pdf', 'markdown', 'html']
+const UNIWORK_FORMATS: readonly UniworkFormat[] = [
+  'docx',
+  'xlsx',
+  'pptx',
+  'pdf',
+  'markdown',
+  'html',
+]
 
 /** the cloud-only pre-check: every format on, so only the cloud status decides */
 const ALL_FORMATS_ON: OfficeCapabilities = {
@@ -234,7 +240,6 @@ export interface UniworkAiAvailability {
   /** offered for at least one format of this org (the process-wide provider entry) */
   availableAny(orgId: string | null): Promise<boolean>
 }
-
 
 export function createUniworkAiAvailability(
   deps: UniworkAiAvailabilityDeps,
@@ -358,7 +363,12 @@ export function createUniworkAiStreams(deps: UniworkAiStreamDeps): UniworkAiStre
 
     const resolved = deps.scope(call.senderId)
     if (!resolved.ok) {
-      if (resolved.code === 'office_capability_off') send({ type: 'notice', notice: { kind: 'uniwork-off' } })
+      if (resolved.code === 'office_capability_off') {
+        // hidden, not an error: the note is the whole answer
+        send({ type: 'notice', notice: { kind: 'uniwork-off' } })
+        send({ type: 'done' })
+        return
+      }
       fail({ code: resolved.code })
       return
     }
@@ -380,6 +390,8 @@ export function createUniworkAiStreams(deps: UniworkAiStreamDeps): UniworkAiStre
       if (waitTimer) clearInterval(waitTimer)
       waitTimer = null
     }
+    // the adapter sent `uniwork-off` (a 403 before any run id): the note is the whole answer
+    let offNoticed = false
     let lastPing = 0
     const ping = () => {
       const now = Date.now()
@@ -391,7 +403,7 @@ export function createUniworkAiStreams(deps: UniworkAiStreamDeps): UniworkAiStre
       if (!(await deps.available(resolved.scope, resolved.orgId))) {
         // hidden, not an error chip: the panel shows aiUniworkOff
         send({ type: 'notice', notice: { kind: 'uniwork-off' } })
-        fail({ code: 'office_capability_off' })
+        send({ type: 'done' })
         return
       }
       if (controller.signal.aborted) throw new Error('aborted')
@@ -424,6 +436,7 @@ export function createUniworkAiStreams(deps: UniworkAiStreamDeps): UniworkAiStre
             stopReason = reason
           },
           onNotice: (notice) => {
+            if (notice.kind === 'uniwork-off') offNoticed = true
             send({ type: 'notice', notice })
             if (notice.kind === 'rate-limit-wait') {
               // the turn stays running through the wait: keep the 240 s watchdog fed
@@ -448,6 +461,8 @@ export function createUniworkAiStreams(deps: UniworkAiStreamDeps): UniworkAiStre
       stopWait()
       if (state.signedOut) fail({ code: 'session_expired' })
       else if (controller.signal.aborted) send({ type: 'done' })
+      else if (offNoticed && failureOf(error).code === 'office_capability_off')
+        send({ type: 'done' })
       else {
         console.warn(`[ai-stream] ${requestId} (uniwork) failed:`, failureOf(error).code)
         fail(failureOf(error))

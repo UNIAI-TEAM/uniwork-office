@@ -203,16 +203,11 @@ export function createWebAiStreams(deps: StreamDeps): WebAiStreams {
     const chat = deps.client.uniworkChat
     const scope = uniwork?.scope() ?? null
     if (!uniwork || !chat || !scope) {
-      // not available in this frame (grant off, format off): hidden, never an error chip
-      const failure: UniworkFailure = { code: 'office_capability_off' }
+      // not available in this frame (grant off, format off): hidden, never an error chip. The turn
+      // ends quietly after the note (EXPERIENCE: no error bubble, no Retry for a provider that is gone)
       uniwork?.onOff()
       emit({ requestId, type: 'notice', notice: { kind: 'uniwork-off' } })
-      emit({
-        requestId,
-        type: 'error',
-        error: uniwork ? uniwork.describeFailure(failure) : 'UniWork AI is not available',
-        uniworkCode: failure.code,
-      })
+      emit({ requestId, type: 'done' })
       return
     }
     const controller = new AbortController()
@@ -236,6 +231,8 @@ export function createWebAiStreams(deps: StreamDeps): WebAiStreams {
     }
     let stopReason: string | undefined
     let off = false
+    // the adapter sent `uniwork-off` (a 403 before any run id): the note is the whole answer
+    let offNoticed = false
     const cb: StreamCallbacks = {
       ...(request.sessionId ? { sessionId: request.sessionId } : {}),
       signal: controller.signal,
@@ -247,9 +244,12 @@ export function createWebAiStreams(deps: StreamDeps): WebAiStreams {
         stopReason = reason
       },
       onNotice: (notice) => {
-        if (notice.kind === 'uniwork-off' && !off) {
-          off = true
-          uniwork.onOff()
+        if (notice.kind === 'uniwork-off') {
+          offNoticed = true
+          if (!off) {
+            off = true
+            uniwork.onOff()
+          }
         }
         emit({ requestId, type: 'notice', notice })
       },
@@ -291,6 +291,11 @@ export function createWebAiStreams(deps: StreamDeps): WebAiStreams {
       if (failure?.code === 'office_capability_off' && !off) {
         off = true
         uniwork.onOff()
+      }
+      if (failure?.code === 'office_capability_off' && offNoticed) {
+        // off before a run id: the note was shown, the turn just ends (no error chunk, no Retry)
+        emit({ requestId, type: 'done' })
+        return
       }
       emit({
         requestId,

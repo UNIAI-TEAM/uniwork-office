@@ -13,6 +13,7 @@ import type { Block } from '@genoffice/docx-engine'
 import {
   AgentLoop,
   composeSkills,
+  endsQuietly,
   noticePatch,
   streamText,
   type AgentImage,
@@ -929,12 +930,10 @@ export function AiPanel({
             streaming: false,
             waitLine: undefined,
             turnLimit,
-            // a restarted conversation ends the turn on purpose: its note is the whole reply
+            // a restarted conversation or UniWork AI being off ends the turn on purpose: the note is the whole reply
             text:
               finalText ||
-              (last.tools?.length || last.notes?.some((n) => n.kind === 'restarted')
-                ? last.text
-                : tModule('aiNoReply')),
+              (last.tools?.length || endsQuietly(last.notes) ? last.text : tModule('aiNoReply')),
             // A stop mid-tool can leave a running placeholder behind — drop it
             tools: last.tools?.filter((tl) => !tl.running),
             snapshot: runSnapshotRef.current ?? undefined,

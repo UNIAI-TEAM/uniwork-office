@@ -43,7 +43,10 @@ const ORG = '01J8X4ORG0N1P2Q3R4S5T6U7'
 const docScope: UniworkScope = { kind: 'document', documentId: DOC, format: 'docx' }
 const orgScope: UniworkScope = { kind: 'org', orgId: ORG, format: 'xlsx' }
 
-function chatRequest(scope: UniworkScope, headers: Record<string, string> = {}): UniworkChatRequest {
+function chatRequest(
+  scope: UniworkScope,
+  headers: Record<string, string> = {},
+): UniworkChatRequest {
   return {
     scope,
     headers: { 'Content-Type': 'application/json', ...headers },
@@ -252,10 +255,16 @@ describe('webContents -> UniWork AI scope (OQ-P2)', () => {
 
   it('a local file goes to the selected organization with the module format', () => {
     expect(
-      resolveUniworkAiScope(7, deps({ describe: () => ({ kind: 'slides', filePath: '/x/p.pptx' }) })),
+      resolveUniworkAiScope(
+        7,
+        deps({ describe: () => ({ kind: 'slides', filePath: '/x/p.pptx' }) }),
+      ),
     ).toEqual({ ok: true, scope: { kind: 'org', orgId: ORG, format: 'pptx' }, orgId: ORG })
     expect(
-      resolveUniworkAiScope(7, deps({ describe: () => ({ kind: 'markdown', filePath: '/x/n.md' }) })),
+      resolveUniworkAiScope(
+        7,
+        deps({ describe: () => ({ kind: 'markdown', filePath: '/x/n.md' }) }),
+      ),
     ).toMatchObject({ ok: true, scope: { format: 'markdown' } })
   })
 
@@ -531,7 +540,7 @@ describe('ai:stream uniwork runner', () => {
     expect(chunks[0]).toMatchObject({ type: 'error', uniworkCode: 'access_revoked' })
   })
 
-  it('UniWork AI off for the org or format: a uniwork-off notice, then capability off', async () => {
+  it('UniWork AI off for the org or format: a uniwork-off notice, then a quiet done (no error chunk)', async () => {
     const stream = vi.fn<FakeStream>(async () => undefined)
     const available = vi.fn(async () => false)
     const streams = runner(stream, { available })
@@ -539,9 +548,39 @@ describe('ai:stream uniwork runner', () => {
     await done
     expect(available).toHaveBeenCalledWith(docScope, ORG)
     expect(stream).not.toHaveBeenCalled()
-    expect(chunks.map((c) => c.type)).toEqual(['notice', 'error'])
+    expect(chunks.map((c) => c.type)).toEqual(['notice', 'done'])
     expect(chunks[0]!.notice).toEqual({ kind: 'uniwork-off' })
-    expect(chunks[1]).toMatchObject({ uniworkCode: 'office_capability_off' })
+  })
+
+  it('a format outside the six (scope refusal off): the same quiet notice + done', async () => {
+    const stream = vi.fn<FakeStream>(async () => undefined)
+    const streams = runner(stream, { scope: () => ({ ok: false, code: 'office_capability_off' }) })
+    const { chunks, done } = run(streams)
+    await done
+    expect(stream).not.toHaveBeenCalled()
+    expect(chunks.map((c) => c.type)).toEqual(['notice', 'done'])
+    expect(chunks[0]!.notice).toEqual({ kind: 'uniwork-off' })
+  })
+
+  it('the server 403 office_capability_off before a run id (notice already sent): ends with done, no error', async () => {
+    const streams = runner(async (_t, _r, cb) => {
+      cb.onNotice?.({ kind: 'uniwork-off' })
+      throw new UniworkError('office_capability_off', { status: 403 })
+    })
+    const { chunks, done } = run(streams)
+    await done
+    expect(chunks.map((c) => c.type)).toEqual(['notice', 'done'])
+  })
+
+  it('office_capability_off in the middle of a run (no off notice) stays a visible error', async () => {
+    const streams = runner(async () => {
+      throw new UniworkError('office_capability_off', { status: 403 })
+    })
+    const { chunks, done } = run(streams)
+    await done
+    expect(terminal(chunks)).toMatchObject([
+      { type: 'error', uniworkCode: 'office_capability_off' },
+    ])
   })
 
   it('no transport installed (signed out): a session error', async () => {

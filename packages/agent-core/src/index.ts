@@ -15,7 +15,7 @@ export type {
 } from './types'
 export { AI_RUN_IDLE_GRACE_MS, createAiRunTracker } from './ai-run-tracker'
 export type { AiRunPayload, AiRunState, AiRunTracker, AiRunTrackerOptions } from './ai-run-tracker'
-export { createTextNoticeSurface, noticePatch } from './notice-surface'
+export { createTextNoticeSurface, endsQuietly, noticePatch } from './notice-surface'
 export type {
   NoticeKey,
   NoticeSurface,

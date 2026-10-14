@@ -175,6 +175,20 @@ describe('UniWork AI notices (slides panel)', () => {
     expect(c.textContent).not.toContain(t('aiNoResponse'))
   })
 
+  it('UniWork AI off: one note, no error line, no Retry or regenerate, no empty-reply line', async () => {
+    const c = await startRun()
+    await notify({ kind: 'uniwork-off' })
+    await act(async () =>
+      harness.events!.onDone?.({ text: '', cancelled: false, turnLimit: false }),
+    )
+    await flush()
+    expect(notices(c)).toEqual([ui('aiUniworkOff')])
+    expect(c.querySelector('.ai-msg-error')).toBeNull()
+    expect(c.querySelector('.ai-retry-btn')).toBeNull()
+    expect(c.querySelector(`button[aria-label="${t('aiRegenerate')}"]`)).toBeNull()
+    expect(c.textContent).not.toContain(t('aiNoResponse'))
+  })
+
   it('a provider boundary and dropped calls become notes', async () => {
     const c = await startRun()
     await notify({ kind: 'conversation-boundary', provider: 'UniWork AI' })

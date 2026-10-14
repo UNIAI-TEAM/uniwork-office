@@ -1938,7 +1938,9 @@ describe('UniWork AI on the web (G6-05)', () => {
       expect(r.chunks.find((c) => c.type === 'notice')).toMatchObject({
         notice: { kind: 'uniwork-off' },
       })
-      expect(r.chunks.at(-1)).toMatchObject({ type: 'error', uniworkCode: 'office_capability_off' })
+      // the turn ends quietly: the note is the whole message, never an error chunk
+      expect(r.chunks.map((c) => c.type)).toEqual(['notice', 'done'])
+      expect(r.chunks.at(-1)!.type).toBe('done')
       expect(document.querySelector('.ow-ai-state')).toBeNull()
     })
 
@@ -1948,7 +1950,8 @@ describe('UniWork AI on the web (G6-05)', () => {
       expect(r.stream).not.toHaveBeenCalled()
       expect(r.calls).toEqual([])
       expect(r.onOff).toHaveBeenCalledTimes(1)
-      expect(r.chunks.at(-1)).toMatchObject({ type: 'error', uniworkCode: 'office_capability_off' })
+      expect(r.chunks.map((c) => c.type)).toEqual(['notice', 'done'])
+      expect(r.chunks.some((c) => c.type === 'error')).toBe(false)
     })
 
     it('uniwork 503 then a BYOK turn completes (G6-A08)', async () => {
@@ -2241,7 +2244,8 @@ describe('UniWork AI on the web (G6-05)', () => {
       const s = await ai.settings()
       expect(s.providers.uniwork?.apiKey ?? '').toBe('')
       expect(s.provider).toBe('openai')
-      expect(chunks.at(-1)).toMatchObject({ type: 'error', uniworkCode: 'office_capability_off' })
+      expect(chunks.at(-1)!.type).toBe('done')
+      expect(chunks.some((c) => c.type === 'error')).toBe(false)
     })
   })
 })

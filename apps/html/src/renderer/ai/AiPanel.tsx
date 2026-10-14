@@ -8,7 +8,13 @@ import {
 } from '@genoffice/ui'
 import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement, ReactNode } from 'react'
-import { AgentLoop, noticePatch, type PanelNote, composeSkills } from '@genoffice/agent-core'
+import {
+  AgentLoop,
+  endsQuietly,
+  noticePatch,
+  type PanelNote,
+  composeSkills,
+} from '@genoffice/agent-core'
 import type { AgentImage } from '@genoffice/agent-core'
 import type { AiSettings } from '@genoffice/ai-provider'
 import { aiNoticeBody, aiNoticeKind } from '@genoffice/ai-provider/browser'
@@ -785,12 +791,10 @@ export function AiPanel({
           patchLast((last) => ({
             streaming: false,
             waitLine: undefined,
-            // a restarted conversation ends the turn on purpose: its note is the whole reply
+            // a restarted conversation or UniWork AI being off ends the turn on purpose: the note is the whole reply
             text:
               final ||
-              (last.tools?.length || last.notes?.some((n) => n.kind === 'restarted')
-                ? last.text
-                : tGlobal('aiNoReply')),
+              (last.tools?.length || endsQuietly(last.notes) ? last.text : tGlobal('aiNoReply')),
             // A stop mid-tool can leave a running placeholder behind — drop it
             tools: last.tools?.filter((tl) => !tl.running),
           }))

@@ -12,6 +12,7 @@ import {
   AgentLoop,
   composeSkills,
   IPC_STREAM_SILENCE_TIMEOUT_MS,
+  endsQuietly,
   noticePatch,
   type AgentImage,
   type PanelNote,
@@ -1502,10 +1503,10 @@ export function AiPanel({
               ...last,
               streaming: false,
               waitLine: undefined,
-              // a restarted conversation ends the turn on purpose: its note is the whole reply
+              // a restarted conversation or UniWork AI being off ends the turn on purpose: the note is the whole reply
               text:
                 finalText ||
-                (last.tools?.length || last.notes?.some((n) => n.kind === 'restarted')
+                (last.tools?.length || endsQuietly(last.notes)
                   ? last.text
                   : tGlobal('aiNoResponse')),
               // A stop mid-tool can leave a running placeholder behind — drop it

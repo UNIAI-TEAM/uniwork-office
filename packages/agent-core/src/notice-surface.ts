@@ -24,6 +24,14 @@ export interface PanelNote {
   text: string
 }
 
+/**
+ * A turn whose notes are the whole answer: a restarted conversation (the question was not sent) and
+ * UniWork AI being off. Neither is a failure, so the panel shows no error, no empty-reply line and no Retry.
+ */
+export function endsQuietly(notes: readonly PanelNote[] | undefined): boolean {
+  return !!notes?.some((n) => n.kind === 'restarted' || n.kind === 'off')
+}
+
 /** the two chat-entry fields a notice writes */
 export interface NoticeSurface {
   /** set while the transport waits to resend; cleared by the panel when text, an error or the end arrives */
@@ -92,6 +100,8 @@ export interface TextNoticeSurface {
   compose(raw: string): string
   /** the conversation was restarted and the question not sent: an empty answer is on purpose */
   restarted(): boolean
+  /** the notes are the whole answer (restarted, or UniWork AI off): an empty answer is on purpose */
+  quiet(): boolean
   /** a new run starts */
   clear(): void
 }
@@ -128,6 +138,7 @@ export function createTextNoticeSurface(): TextNoticeSurface {
       return display()
     },
     restarted: () => notes.some((n) => n.kind === 'restarted'),
+    quiet: () => endsQuietly(notes),
     clear() {
       notes = []
       waitLine = undefined

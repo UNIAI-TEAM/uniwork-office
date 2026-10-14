@@ -1600,10 +1600,10 @@ export function App({
             : runLastTextRef.current ||
               toolSummaries ||
               (runMutatedRef.current ? t('appAiNoSummary') : t('appAiNoAction'))
-          // a restarted conversation ends the turn on purpose: its note is the whole reply
+          // a restarted conversation or UniWork AI being off ends the turn on purpose: the note is the whole reply
           const baseText = turnLimit
             ? [prose, t('appAiTurnLimit')].filter(Boolean).join('\n\n')
-            : prose || (noticeSurfaceRef.current.restarted() ? '' : fallback)
+            : prose || (noticeSurfaceRef.current.quiet() ? '' : fallback)
           const finalText = truncated
             ? [baseText, t('appAiTruncatedNote')].filter(Boolean).join('\n\n')
             : baseText
