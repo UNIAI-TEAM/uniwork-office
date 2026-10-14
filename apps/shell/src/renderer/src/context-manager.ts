@@ -10,15 +10,8 @@ import {
   type PracticeId,
   type WorkbenchModuleId,
 } from '@uniwork/practice-core'
-import {
-  healthDeskCounts,
-  readCalendar,
-  readEvents,
-  readFinance,
-  readEmails,
-  readNotes,
-  readTasks,
-} from './workbench-pins'
+import { readNotes } from './workbench-pins'
+import { cachedAgendaItems, cachedOpenTasks } from './work-cache'
 
 const MAX_PACK_CHARS = 6_000
 const MAX_LIST = 8
@@ -63,22 +56,28 @@ function packChunks(chunks: ContextChunk[]): ContextChunk[] {
 function moduleContext(practiceId: PracticeId, moduleId: WorkbenchModuleId): ContextChunk[] {
   const chunks: ContextChunk[] = []
   if (moduleId === 'tasks') {
-    const open = readTasks(practiceId).filter((t) => !t.done).slice(0, MAX_LIST)
+    const open = cachedOpenTasks()?.slice(0, MAX_LIST) ?? null
     chunks.push({
       id: 'tasks-open',
-      source: 'local:tasks',
-      text: open.length
-        ? `Open tasks (${open.length}): ${open.map((t) => t.title).join('; ')}`
-        : 'No open tasks.',
+      source: 'uniwork:tasks',
+      text:
+        open === null
+          ? 'Open tasks: not loaded from UniWork yet.'
+          : open.length
+            ? `Open tasks (${open.length}): ${open.map((t) => t.title).join('; ')}`
+            : 'No open tasks.',
     })
   } else if (moduleId === 'calendar') {
-    const items = readCalendar(practiceId).slice(0, MAX_LIST)
+    const items = cachedAgendaItems()?.slice(0, MAX_LIST) ?? null
     chunks.push({
       id: 'calendar',
-      source: 'local:calendar',
-      text: items.length
-        ? `Calendar: ${items.map((i) => `${i.date} ${i.title}`).join('; ')}`
-        : 'Calendar empty.',
+      source: 'uniwork:calendar',
+      text:
+        items === null
+          ? 'Calendar: not loaded from UniWork yet.'
+          : items.length
+            ? `Calendar: ${items.map((i) => `${i.date} ${i.title}`).join('; ')}`
+            : 'Calendar empty.',
     })
   } else if (moduleId === 'notes') {
     const text = readNotes(practiceId)
@@ -87,53 +86,15 @@ function moduleContext(practiceId: PracticeId, moduleId: WorkbenchModuleId): Con
       source: 'local:notes',
       text: clip(text ? `Sticky notes:\n${text}` : 'Notes board empty.', 1_500),
     })
-  } else if (moduleId === 'email') {
-    const mails = readEmails(practiceId).slice(0, MAX_LIST)
-    chunks.push({
-      id: 'email',
-      source: 'local:email',
-      text: mails.length
-        ? `Email (${mails.length}): ${mails
-            .map((m) => `[${m.folder}] ${m.subject || '(no subject)'} → ${m.to || m.from}`)
-            .join('; ')}`
-        : 'Email mailbox empty.',
-    })
-  } else if (moduleId === 'events') {
-    const items = readEvents(practiceId).slice(0, MAX_LIST)
-    chunks.push({
-      id: 'events',
-      source: 'local:events',
-      text: items.length
-        ? `Events: ${items.map((i) => `${i.date ?? ''} ${i.title}`).join('; ')}`
-        : 'No events.',
-    })
-  } else if (moduleId === 'personal-finance') {
-    const items = readFinance().slice(-MAX_LIST)
-    const sum = items.reduce(
-      (a, x) => a + (x.kind === 'income' ? x.amount : -x.amount),
-      0,
-    )
-    chunks.push({
-      id: 'finance',
-      source: 'local:finance',
-      text: `Recent finance (${items.length} rows), net≈${Math.round(sum)}: ${items
-        .map((i) => `${i.kind} ${i.amount} ${i.label}`)
-        .join('; ')}`,
-    })
-  } else if (moduleId === 'health') {
-    const c = healthDeskCounts()
-    chunks.push({
-      id: 'health',
-      source: 'local:health',
-      text: `Health desk counts: exercise=${c.exercise} sleep=${c.sleep} checkup=${c.checkup} other=${c.other}`,
-    })
   } else if (moduleId === 'desk') {
-    const tasks = readTasks(practiceId).filter((t) => !t.done).length
-    const events = readEvents(practiceId).length
+    const open = cachedOpenTasks()
     chunks.push({
       id: 'desk',
-      source: 'local:desk',
-      text: `My Space pulse: openTasks=${tasks}, events=${events}`,
+      source: 'uniwork:desk',
+      text:
+        open === null
+          ? 'Overview pulse: open tasks not loaded from UniWork yet.'
+          : `Overview pulse: openTasks=${open.length}`,
     })
   } else {
     chunks.push({
@@ -171,17 +132,22 @@ export function buildMyAiContextPack(
   const vi = opts?.vi !== false
   const chunks: ContextChunk[] = []
 
-  const openTasks = readTasks(practiceId).filter((t) => !t.done).slice(0, MAX_LIST)
+  const openTasks = cachedOpenTasks()?.slice(0, MAX_LIST) ?? null
   chunks.push({
     id: 'tasks-open',
-    source: 'local:tasks',
-    text: openTasks.length
-      ? vi
-        ? `Việc đang mở (${openTasks.length}): ${openTasks.map((t) => t.title).join('; ')}`
-        : `Open tasks (${openTasks.length}): ${openTasks.map((t) => t.title).join('; ')}`
-      : vi
-        ? 'Không có việc đang mở.'
-        : 'No open tasks.',
+    source: 'uniwork:tasks',
+    text:
+      openTasks === null
+        ? vi
+          ? 'Danh sách việc chưa được tải từ UniWork.'
+          : 'Open tasks are not loaded from UniWork yet.'
+        : openTasks.length
+          ? vi
+            ? `Việc đang mở (${openTasks.length}): ${openTasks.map((t) => t.title).join('; ')}`
+            : `Open tasks (${openTasks.length}): ${openTasks.map((t) => t.title).join('; ')}`
+          : vi
+            ? 'Không có việc đang mở.'
+            : 'No open tasks.',
   })
 
   const notes = readNotes(practiceId)
@@ -200,34 +166,22 @@ export function buildMyAiContextPack(
     ),
   })
 
-  const mails = readEmails(practiceId).slice(0, MAX_LIST)
-  chunks.push({
-    id: 'email',
-    source: 'local:email',
-    text: mails.length
-      ? vi
-        ? `Email (${mails.length}): ${mails
-            .map((m) => `[${m.folder}] ${m.subject || '(không tiêu đề)'} → ${m.to || m.from}`)
-            .join('; ')}`
-        : `Email (${mails.length}): ${mails
-            .map((m) => `[${m.folder}] ${m.subject || '(no subject)'} → ${m.to || m.from}`)
-            .join('; ')}`
-      : vi
-        ? 'Hộp thư trống.'
-        : 'Email mailbox empty.',
-  })
-
-  const cal = readCalendar(practiceId).slice(0, MAX_LIST)
+  const cal = cachedAgendaItems()?.slice(0, MAX_LIST) ?? null
   chunks.push({
     id: 'calendar',
-    source: 'local:calendar',
-    text: cal.length
-      ? vi
-        ? `Lịch: ${cal.map((i) => `${i.date} ${i.title}`).join('; ')}`
-        : `Calendar: ${cal.map((i) => `${i.date} ${i.title}`).join('; ')}`
-      : vi
-        ? 'Lịch trống.'
-        : 'Calendar empty.',
+    source: 'uniwork:calendar',
+    text:
+      cal === null
+        ? vi
+          ? 'Lịch chưa được tải từ UniWork.'
+          : 'The calendar is not loaded from UniWork yet.'
+        : cal.length
+          ? vi
+            ? `Lịch: ${cal.map((i) => `${i.date} ${i.title}`).join('; ')}`
+            : `Calendar: ${cal.map((i) => `${i.date} ${i.title}`).join('; ')}`
+          : vi
+            ? 'Lịch trống.'
+            : 'Calendar empty.',
   })
 
   const recents = opts?.recents?.slice(0, MAX_LIST) ?? []

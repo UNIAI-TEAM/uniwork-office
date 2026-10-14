@@ -5,7 +5,6 @@ const empty: LocalAnswerSnapshot = {
   tasks: [],
   calendar: [],
   notes: '',
-  emails: [],
   recents: [],
 }
 
@@ -65,7 +64,12 @@ describe('answerMyAiLocally', () => {
   })
 
   it('fallback offers AI for longer unclear questions', () => {
-    const r = answerMyAiLocally('Giúp mình sắp xếp công việc tuần này theo ưu tiên', empty, true, now)
+    const r = answerMyAiLocally(
+      'Giúp mình sắp xếp công việc tuần này theo ưu tiên',
+      empty,
+      true,
+      now,
+    )
     expect(r.topic).toBe('fallback')
     expect(r.offerAi).toBe(true)
   })
@@ -78,5 +82,22 @@ describe('answerMyAiLocally', () => {
     const r = answerMyAiLocally("What's on my calendar today?", snap, false, now)
     expect(r.topic).toBe('calendar')
     expect(r.text).toMatch(/Standup/)
+  })
+
+  it('says open tasks are not loaded yet, not that there are none, when UniWork was never read', () => {
+    const r = answerMyAiLocally('Việc đang mở là gì?', { ...empty, tasks: null }, true, now)
+    expect(r.topic).toBe('tasks')
+    expect(r.text).toMatch(/Chưa tải danh sách việc/)
+    expect(r.text).toContain('mở mục Công việc')
+    expect(r.text).not.toMatch(/\btab\b/)
+    expect(r.text).not.toMatch(/Không có việc đang mở/)
+  })
+  it('says the calendar is not loaded yet, not empty, when UniWork was never read', () => {
+    const r = answerMyAiLocally('Lịch hôm nay có gì?', { ...empty, calendar: null }, true, now)
+    expect(r.topic).toBe('calendar')
+    expect(r.text).toMatch(/Chưa tải lịch/)
+    expect(r.text).toContain('mở mục Lịch')
+    expect(r.text).not.toMatch(/\btab\b/)
+    expect(r.text).not.toMatch(/Chưa có sự kiện/)
   })
 })

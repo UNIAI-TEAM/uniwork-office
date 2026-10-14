@@ -33,7 +33,6 @@ vi.mock('../src/renderer/src/workbench-pins', () => ({
       note: 'no file',
     },
   ],
-  readClients: () => [{ id: 'c1', name: 'Công ty ABC', email: 'an@abc.vn' }],
 }))
 
 describe('my-ai forms library', () => {
@@ -64,17 +63,16 @@ describe('my-ai forms library', () => {
     expect(f?.id).toBe('f2')
   })
 
-  it('builds brief with excerpt + client', () => {
+  it('builds brief with excerpt + request', () => {
     const form = matchFormByQuery('sales', 'nghỉ phép')!
     const brief = buildFormFillBrief({
       form,
       vi: true,
       userHint: 'Điền biểu mẫu nghỉ phép cho khách ABC từ 10–12/10',
       excerpt: 'Họ tên: ____\nTừ ngày: ____',
-      clientRow: { id: 'c1', name: 'Công ty ABC', email: 'an@abc.vn' },
     })
     expect(brief).toMatch(/Đơn xin nghỉ phép/)
-    expect(brief).toMatch(/Công ty ABC/)
+    expect(brief).toMatch(/khách ABC/)
     expect(brief).toMatch(/Họ tên/)
     expect(brief).toMatch(/không bịa/i)
   })

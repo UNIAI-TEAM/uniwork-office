@@ -1,10 +1,8 @@
 /** Canonical practice ids (profession workbenches on UniOffice). */
 export const PRACTICE_IDS = [
-  'teacher',
   'legal',
   'construction',
   'procurement',
-  'principal',
   'sales',
   'customer-care',
   'entrepreneur',
@@ -24,11 +22,8 @@ export function isPracticeId(value: unknown): value is PracticeId {
   return typeof value === 'string' && (PRACTICE_IDS as readonly string[]).includes(value)
 }
 
-/**
- * ProjectStore `kind` for a practice pack.
- * Teacher keeps legacy `education` for backward compatibility.
- */
-export type PracticeProjectKind = 'education' | Exclude<PracticeId, 'teacher'>
+/** ProjectStore `kind` for a practice pack: the practice id itself. */
+export type PracticeProjectKind = PracticeId
 
 export type PracticePillarId = 'knowledge' | 'materials' | 'skills' | 'compose'
 
