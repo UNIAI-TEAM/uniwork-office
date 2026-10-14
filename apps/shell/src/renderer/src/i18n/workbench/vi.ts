@@ -238,6 +238,7 @@ export const vi = {
   wbDeskGreeting: '{greeting}, {name}.',
   wbDeskSummaryTasks: '{count} việc đang chờ bạn',
   wbDeskSummaryUnsaved: '{count} tài liệu chưa lưu',
+  wbDeskSummaryJoin: ', ',
   wbDeskSignInBanner:
     'Đăng nhập UniWork để thấy việc, lịch, thông báo; dụng cụ và tài liệu trên máy vẫn dùng được.',
   wbDeskSignIn: 'Đăng nhập',

@@ -241,6 +241,7 @@ export const zh = {
   wbDeskGreeting: '{greeting}，{name}。',
   wbDeskSummaryTasks: '待处理任务：{count}',
   wbDeskSummaryUnsaved: '未保存的文档：{count}',
+  wbDeskSummaryJoin: '，',
   wbDeskSignInBanner: '登录 UniWork 即可查看任务、日程和通知；工具和本机文档无需登录也能使用。',
   wbDeskSignIn: '登录',
   wbDeskOfflineBanner: '无法连接 UniWork。工具和本机文档仍可使用。',

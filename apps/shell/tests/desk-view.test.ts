@@ -161,6 +161,64 @@ describe('DeskView', () => {
     expect(text).toMatch(/^Good (morning|afternoon|evening), Quang\. Unsaved documents: 1$/)
   })
 
+  it('counts overdue plus due-today tasks into one fact, joined to the next; none when tasks are partial', async () => {
+    api.listDrafts = vi.fn(async () => [
+      { kind: 'unsaved', title: 'A.docx', app: 'docs', tabId: 'a' },
+    ])
+    const summary = (partial: string[]) => ({
+      ok: true,
+      value: {
+        today: '2026-10-15',
+        timezone: '',
+        counts: { open: 5, overdue: 1, due_today: 2, meetings_today: 0, unread: 0 },
+        my_work: [],
+        upcoming_meetings: [],
+        inbox: [],
+        partial,
+        generated_at: '2026-10-15T08:00:00Z',
+      },
+    })
+    const ws = (id: string) => ({ id, name: 'Ops', orgId: 'o1', slug: 'ops', orgSlug: 'acme' })
+    window.uniworkWork.homeSummary = vi.fn(async () => summary([])) as never
+    await mount({ workspaces: [ws('w-facts')], workspaceId: 'w-facts', workspaceError: null })
+    expect(host.querySelector('.wb-toolbar-text')!.textContent).toBe(
+      'Tasks due: 3 · Unsaved documents: 1',
+    )
+    window.uniworkWork.homeSummary = vi.fn(async () => summary(['tasks'])) as never
+    await mount({ workspaces: [ws('w-partial')], workspaceId: 'w-partial', workspaceError: null })
+    expect(host.querySelector('.wb-toolbar-text')!.textContent).toBe('Unsaved documents: 1')
+  })
+
+  it('In progress Retry reads "Loading…" until the UniWork list answers again', async () => {
+    window.uniworkWork.homeSummary = vi.fn(async () => ({
+      ok: true,
+      value: {
+        today: '2026-10-15',
+        timezone: '',
+        counts: { open: 0, overdue: 0, due_today: 0, meetings_today: 0, unread: 0 },
+        my_work: [],
+        upcoming_meetings: [],
+        inbox: [],
+        partial: [],
+        generated_at: '2026-10-15T08:00:00Z',
+      },
+    })) as never
+    api.uniworkListDocuments = vi.fn(async () => ({ ok: false, error: 'offline' }))
+    const ws = { id: 'w-retry', name: 'Ops', orgId: 'o1', slug: 'ops', orgSlug: 'acme' }
+    await mount({ workspaces: [ws], workspaceId: 'w-retry', workspaceError: null })
+    const retry = () => host.querySelector<HTMLButtonElement>('.wb-ov-partial button')!
+    expect(retry().textContent).toBe('Retry')
+    let answer: (v: unknown) => void = () => undefined
+    api.uniworkListDocuments = vi.fn(() => new Promise((r) => (answer = r)))
+    await act(async () => retry().click())
+    expect(retry().textContent).toBe('Loading…')
+    await act(async () => answer({ ok: false, error: 'offline' }))
+    await act(async () => {
+      for (let i = 0; i < 5; i++) await Promise.resolve()
+    })
+    expect(retry().textContent).toBe('Retry')
+  })
+
   it('drops the greeting when no name is known', async () => {
     await mount()
     expect(host.querySelector('.wb-toolbar-text')).toBeNull()
@@ -179,6 +237,21 @@ describe('DeskView', () => {
     })
     expect(drop.defaultPrevented).toBe(true)
     expect(host.querySelector('.wb-desk-panel')?.textContent).toContain('PDF → Word')
+  })
+
+  it("a file dropped on the toolbar or the banner is the Desk's too: it offers the tools", async () => {
+    await mount()
+    for (const target of ['.wb-toolbar', '.wb-banner']) {
+      const drop = new Event('drop', { bubbles: true, cancelable: true }) as Event & {
+        dataTransfer: unknown
+      }
+      drop.dataTransfer = { types: ['Files'], files: [new File(['x'], 'a.pdf')] }
+      await act(async () => {
+        host.querySelector(target)!.dispatchEvent(drop)
+      })
+      expect(drop.defaultPrevented, target).toBe(true)
+      expect(host.querySelector('.wb-desk-panel')?.textContent).toContain('PDF → Word')
+    }
   })
 
   it("keeps a file drag's enter inside the Desk, so Home's Drop to open overlay stays hidden", async () => {

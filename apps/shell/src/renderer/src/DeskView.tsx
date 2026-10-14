@@ -185,7 +185,7 @@ export function DeskView({
       <>
         {name ? <strong>{t('wbDeskGreeting', { greeting: t(greeting), name })}</strong> : null}
         {name && facts.length > 0 ? ' ' : null}
-        {facts.join(' · ')}
+        {facts.join(t('wbDeskSummaryJoin'))}
       </>
     ) : null
 
@@ -211,17 +211,19 @@ export function DeskView({
       </div>
     ) : null
 
+  // the toolbar and banner take a file drop too ("anywhere on the Desk"): the drop target is a
+  // box-less wrapper, so the three stay rows of the page column
   return (
-    <>
+    <div
+      className="wb-desk-drop"
+      onDragEnter={onDragEnter}
+      onDragLeave={onDragLeave}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+    >
       <WorkToolbar title={vi ? DESK.labelVi : DESK.labelEn} summary={summary} />
       {banner}
-      <div
-        className={`wb-desk${dragging ? ' is-dragging' : ''}`}
-        onDragEnter={onDragEnter}
-        onDragLeave={onDragLeave}
-        onDragOver={onDragOver}
-        onDrop={onDrop}
-      >
+      <div className={`wb-desk${dragging ? ' is-dragging' : ''}`}>
         <div className="wb-desk-main">
           <DeskTools
             dropped={dropped}
@@ -243,6 +245,7 @@ export function DeskView({
             loading={drafts === null || !recents.loaded}
             // signed out or offline already has the page banner: no second notice here
             cloudFailed={recents.cloudFailed && view === 'ready'}
+            retrying={recents.checking}
             onRetry={recents.reload}
           />
           <DeskDrawer
@@ -265,6 +268,6 @@ export function DeskView({
           onOpenTasks={() => onOpenTab('tasks')}
         />
       </div>
-    </>
+    </div>
   )
 }

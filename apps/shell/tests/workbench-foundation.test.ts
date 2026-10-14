@@ -25,6 +25,8 @@ const contrast = (a: string, b: string) => {
   return (hi! + 0.05) / (lo! + 0.05)
 }
 /** the body of the rule whose selector line is exactly `selector` */
+/** the column rows: the page's, and the Desk's inside its box-less drop wrapper */
+const COLUMN_ROWS = '.wb-home > :not(.wb-confirm, .wb-desk-drop),\n.wb-desk-drop > *'
 const rule = (selector: string) => {
   const start = css.indexOf(`\n${selector} {\n`)
   expect(start, selector).toBeGreaterThanOrEqual(0)
@@ -81,9 +83,7 @@ describe('workbench primitives (home.css)', () => {
     expect(home).toMatch(/font-family: 'UniWork Sans', var\(--ui-cjk\), system-ui, sans-serif;/)
     expect(home).toMatch(/font-size: 13px;/)
     // the fixed confirm popover places itself
-    expect(rule('.wb-home > :not(.wb-confirm)')).toMatch(
-      /max-width: 1200px;\n {2}margin-inline: auto;/,
-    )
+    expect(rule(COLUMN_ROWS)).toMatch(/max-width: 1200px;\n {2}margin-inline: auto;/)
     expect(rule(':where(.wb-home) p')).toMatch(/max-width: 64ch;\n {2}text-wrap: pretty;/)
   })
 
@@ -284,7 +284,8 @@ describe('long titles (review focus: very long workspace and task names)', () =>
 describe('the Workbench lays out by its own width (impeccable audit P1-2, P2-1, P2-3..6, P3-2, P3-3)', () => {
   it('rows never shrink; breakpoints are container queries on .wb-home, not the window', () => {
     expect(rule('.wb-home')).toMatch(/container: wb-home \/ inline-size;/)
-    expect(rule('.wb-home > :not(.wb-confirm)')).toMatch(/flex-shrink: 0;/)
+    expect(rule('.wb-desk-drop')).toMatch(/display: contents;/)
+    expect(rule(COLUMN_ROWS)).toMatch(/flex-shrink: 0;/)
     // a viewport query misses the sidebar and the interface scale (zoom)
     expect(css).not.toMatch(/@media \(max-width: \d+px\) \{\n {2}\.wb-/)
     expect(css).toMatch(

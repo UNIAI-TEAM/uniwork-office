@@ -403,6 +403,25 @@ describe('DeskInProgress', () => {
     expect(onRetry).toHaveBeenCalled()
   })
 
+  it('Retry says it is trying while the list is asked again, so the click never looks dead', async () => {
+    const onRetry = vi.fn()
+    await render(
+      createElement(DeskInProgress, {
+        drafts: [],
+        recent: [],
+        local: [],
+        cloudFailed: true,
+        retrying: true,
+        onRetry,
+      }),
+    )
+    const retry = host.querySelector<HTMLButtonElement>('.wb-ov-partial button')!
+    expect(retry.textContent).toBe('Loading…')
+    expect(retry.getAttribute('aria-disabled')).toBe('true')
+    await act(async () => retry.click())
+    expect(onRetry).not.toHaveBeenCalled()
+  })
+
   it('shows a skeleton, not the empty line, while drafts or recents load', async () => {
     await render(
       createElement(DeskInProgress, { drafts: [], recent: [], local: [], loading: true }),
@@ -428,6 +447,13 @@ describe('DeskInProgress', () => {
     expect(api.openPath).toHaveBeenCalledWith('/w/old.xlsx')
     const switchTo = button('Switch to')!
     expect(switchTo.className).toContain('wb-btn-secondary')
+    // each row's action is described by its title, so a list of buttons tells them apart
+    expect(document.getElementById(switchTo.getAttribute('aria-describedby')!)?.textContent).toBe(
+      'Report',
+    )
+    expect(
+      document.getElementById(button('Restore')!.getAttribute('aria-describedby')!)?.textContent,
+    ).toBe('old.xlsx')
     expect(switchTo.getAttribute('aria-hidden')).toBeNull()
     await act(async () => switchTo.click())
     expect(window.aiOfficeTabs.activate).toHaveBeenCalledWith('t1')

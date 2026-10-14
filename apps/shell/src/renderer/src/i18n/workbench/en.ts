@@ -239,6 +239,7 @@ export const en = {
   wbDeskGreeting: '{greeting}, {name}.',
   wbDeskSummaryTasks: 'Tasks due: {count}',
   wbDeskSummaryUnsaved: 'Unsaved documents: {count}',
+  wbDeskSummaryJoin: ' · ',
   wbDeskSignInBanner:
     'Sign in to UniWork to see your tasks, calendar and notifications. Tools and files on this device work without it.',
   wbDeskSignIn: 'Sign in',

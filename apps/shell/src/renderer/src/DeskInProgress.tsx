@@ -31,6 +31,7 @@ export function DeskInProgress({
   local,
   loading = false,
   cloudFailed = false,
+  retrying = false,
   onRetry,
 }: {
   drafts: readonly DeskDraft[]
@@ -41,6 +42,8 @@ export function DeskInProgress({
   loading?: boolean
   /** the UniWork list did not load: only this device's files show, so say so (spec 4.11) */
   cloudFailed?: boolean
+  /** the list is being asked again: Retry says so instead of looking dead */
+  retrying?: boolean
   onRetry?: () => void
 }): ReactElement {
   const { t, dateLocale } = useI18n()
@@ -63,7 +66,9 @@ export function DeskInProgress({
       )
     return (
       <ul className="wb-ov-list">
-        {rows.map((r) => {
+        {rows.map((r, i) => {
+          // a row's actions are described by its title: "Switch to" alone does not say which document
+          const rowTitleId = `${titleId}-row${i}`
           if (r.kind === 'draft') {
             const d = r.draft
             const unsaved = d.kind === 'unsaved'
@@ -75,7 +80,12 @@ export function DeskInProgress({
               <li key={`d:${d.tabId ?? d.filePath}`} className="wb-row wb-desk-row">
                 <FileBadge ext={APP_EXT[d.app]} size={24} />
                 <span className="wb-desk-row-main">
-                  <button type="button" className="wb-row-title wb-desk-row-title" onClick={go}>
+                  <button
+                    type="button"
+                    id={rowTitleId}
+                    className="wb-row-title wb-desk-row-title"
+                    onClick={go}
+                  >
                     {d.title}
                   </button>
                   <span className="wb-desk-reason">
@@ -88,6 +98,7 @@ export function DeskInProgress({
                 <button
                   type="button"
                   className="wb-btn wb-btn-secondary wb-btn-sm wb-desk-row-act"
+                  aria-describedby={rowTitleId}
                   onClick={go}
                 >
                   {t(unsaved ? 'wbDeskSwitchTo' : 'wbDeskRestore')}
@@ -130,6 +141,7 @@ export function DeskInProgress({
               <span className="wb-desk-row-main">
                 <button
                   type="button"
+                  id={rowTitleId}
                   className="wb-row-title wb-desk-row-title"
                   onClick={() => void openRecentEntry(e, window.aiOffice)}
                 >
@@ -143,6 +155,7 @@ export function DeskInProgress({
               <WbRowActions>
                 <WbIconBtn
                   label={t('wbDeskShowInFolder')}
+                  aria-describedby={rowTitleId}
                   onClick={() => void window.aiOffice.revealPath(e.path)}
                 >
                   <WbGlyph id="folder" />
@@ -174,8 +187,13 @@ export function DeskInProgress({
       {!loading && cloudFailed ? (
         <p className="wb-ov-partial">
           {t('wbDeskCloudFailed')} ·{' '}
-          <button type="button" className="wb-link" onClick={onRetry}>
-            {t('acctRetry')}
+          <button
+            type="button"
+            className="wb-link"
+            aria-disabled={retrying || undefined}
+            onClick={retrying ? undefined : onRetry}
+          >
+            {t(retrying ? 'wbLoading' : 'acctRetry')}
           </button>
         </p>
       ) : null}

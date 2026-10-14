@@ -3533,11 +3533,17 @@ body.vib .home {
 /* the 1200px content column, centred; the fixed confirm popover places itself. A long tab
  * scrolls the page: no row of it may shrink below its content (a squeezed top bar painted its
  * wrapped buttons over the tabs at 150%) */
-.wb-home > :not(.wb-confirm) {
+.wb-home > :not(.wb-confirm, .wb-desk-drop),
+.wb-desk-drop > * {
   flex-shrink: 0;
   width: 100%;
   max-width: 1200px;
   margin-inline: auto;
+}
+
+/* the Desk's file-drop target spans its toolbar, banner and grid without a box of its own */
+.wb-desk-drop {
+  display: contents;
 }
 
 /* placeholder-only inputs: the UA default #757575 misses 4.5:1 on dark surfaces */

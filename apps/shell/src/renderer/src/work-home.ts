@@ -253,6 +253,8 @@ export function useRecentDocuments(
   cloudFailed: boolean
   /** false until the first answer: an empty list before it is not "nothing recent" */
   loaded: boolean
+  /** a load is on its way (the first one, Refresh, Retry): a Retry can say it is trying */
+  checking: boolean
   reload: () => void
 } {
   const [state, setState] = useState({
@@ -260,6 +262,7 @@ export function useRecentDocuments(
     local: [] as RecentEntry[],
     cloudFailed: false,
     loaded: false,
+    checking: true,
   })
   const [tick, setTick] = useState(0)
   const reload = useCallback(() => setTick((n) => n + 1), [])
@@ -275,6 +278,7 @@ export function useRecentDocuments(
   }, [reload])
   useEffect(() => {
     let live = true
+    setState((s) => (s.checking ? s : { ...s, checking: true }))
     const local = window.aiOffice.recents({ limit: 20 }).then(
       (page) => page.entries,
       () => [] as RecentEntry[],
@@ -292,6 +296,7 @@ export function useRecentDocuments(
           local: l,
           cloudFailed: c === null,
           loaded: true,
+          checking: false,
         })
       }
     })
