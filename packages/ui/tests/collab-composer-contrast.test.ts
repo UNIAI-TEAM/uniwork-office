@@ -196,3 +196,32 @@ describe('mention chip contrast across app accents (V14-09)', () => {
     }
   }
 })
+
+describe('unified primary button look (V14-06)', () => {
+  const sendBody = ruleBodyFrom(css, '.collab-composer-send')
+  const sendHoverBody = ruleBodyFrom(css, '.collab-composer-send:hover')
+  const primaryBody = ruleBodyFrom(panelCss, '.collab-btn--primary')
+  const primaryHoverBody = ruleBodyFrom(panelCss, '.collab-btn--primary:hover')
+  const linkBody = ruleBodyFrom(panelCss, '.collab-link')
+
+  it('unifies Send (.collab-composer-send) and edit Save (.collab-btn--primary) on kit primary (--accent)', () => {
+    expect(tokenOf(sendBody, 'background')).toBe('--accent')
+    expect(tokenOf(sendBody, 'border-color')).toBe('--accent')
+    expect(tokenOf(primaryBody, 'background')).toBe('--accent')
+    expect(tokenOf(primaryBody, 'border-color')).toBe('--accent')
+    expect(propValue(sendBody, 'background')).toBe(propValue(primaryBody, 'background'))
+    expect(propValue(sendBody, 'color')).toBe(propValue(primaryBody, 'color'))
+    expect(tokenOf(sendHoverBody, 'background')).toBe('--accent-dark')
+    expect(tokenOf(primaryHoverBody, 'background')).toBe('--accent-dark')
+    expect(tokenOf(linkBody, 'color')).toBe('--accent')
+  })
+
+  it('keeps secondary actions (.collab-composer-btn and .collab-btn) on the secondary surface look', () => {
+    const compBtn = ruleBodyFrom(css, '.collab-composer-btn')
+    const panelBtn = ruleBodyFrom(panelCss, '.collab-btn')
+    expect(tokenOf(compBtn, 'background')).toBe('--surface')
+    expect(tokenOf(panelBtn, 'background')).toBe('--surface')
+    expect(tokenOf(compBtn, 'color')).toBe('--text')
+    expect(tokenOf(panelBtn, 'color')).toBe('--text')
+  })
+})
