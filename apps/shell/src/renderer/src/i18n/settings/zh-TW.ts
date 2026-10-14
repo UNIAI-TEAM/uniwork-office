@@ -20,6 +20,19 @@ export const zhTW = {
   intgActionFailed: '無法完成。請確認該資料夾可寫入，然後再試一次。',
   intgLoadFailed: '無法讀取整合狀態。',
 
+  cwTitle: 'AI 額度',
+  cwAddKey: '新增金鑰',
+  cwNoKey: '尚未設定 AI 金鑰',
+  cwUpdating: '更新中…',
+  cwLoadFailed: '無法載入',
+  cwLeft: '剩餘 {n}',
+  cwUsed: '已用 {n}',
+  cwToday: '今日 ≈ {n}',
+  cwHistory: 'AI 使用記錄',
+  cwLogNote: '此裝置上的估算值，並非帳單。',
+  cwLogEmpty: '尚無 AI 呼叫記錄。',
+  cwOpenHint: '點擊開啟 AI 設定 · 右鍵開啟用量頁面',
+
   bkLead:
     '付費附加元件可將工作台備份至 UniWork Cloud 並增加儲存空間。在這部裝置上匯出及還原一律免費。',
   bkPlanLabel: '備份方案',

@@ -21,6 +21,19 @@ export const nl = {
     'Kan dit niet voltooien. Controleer of er naar de map kan worden geschreven en probeer het opnieuw.',
   intgLoadFailed: 'Kan de integratiestatus niet lezen.',
 
+  cwTitle: 'AI-tegoed',
+  cwAddKey: 'Sleutel toevoegen',
+  cwNoKey: 'Nog geen AI-sleutel',
+  cwUpdating: 'Bijwerken…',
+  cwLoadFailed: 'Laden mislukt',
+  cwLeft: 'Nog {n}',
+  cwUsed: '{n} gebruikt',
+  cwToday: 'Vandaag ≈ {n}',
+  cwHistory: 'AI-gebruiksgeschiedenis',
+  cwLogNote: 'Geschat op dit apparaat; niet je factuur.',
+  cwLogEmpty: 'Nog geen AI-aanroepen vastgelegd.',
+  cwOpenHint: 'Klik voor AI-instellingen · rechtsklik voor de gebruikspagina',
+
   bkLead:
     'Betaalde add-ons maken een back-up van je Werkbank in UniWork Cloud en voegen opslagruimte toe. Exporteren en herstellen op dit apparaat is altijd gratis.',
   bkPlanLabel: 'Back-upabonnement',

@@ -21,7 +21,7 @@ import { hi } from './settings/hi'
 import { zhTW } from './settings/zh-TW'
 import { vi } from './settings/vi'
 
-/** Settings modal: shared chrome, Backup & storage, UniAI (sharded per locale; zh defines the key set) */
+/** Settings modal and the sidebar dock's AI credits (sharded per locale; zh defines the key set) */
 export const settingsStrings = defineStrings({
   zh,
   en,

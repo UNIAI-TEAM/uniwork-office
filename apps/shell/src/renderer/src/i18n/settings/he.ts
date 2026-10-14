@@ -20,6 +20,19 @@ export const he = {
   intgActionFailed: 'הפעולה לא הושלמה. יש לוודא שאפשר לכתוב לתיקייה ולנסות שוב.',
   intgLoadFailed: 'לא ניתן לקרוא את מצב השילוב.',
 
+  cwTitle: 'קרדיטי AI',
+  cwAddKey: 'הוספת מפתח',
+  cwNoKey: 'עדיין אין מפתח AI',
+  cwUpdating: 'מתעדכן…',
+  cwLoadFailed: 'הטעינה נכשלה',
+  cwLeft: 'נותרו {n}',
+  cwUsed: 'נוצלו {n}',
+  cwToday: 'היום ≈ {n}',
+  cwHistory: 'היסטוריית שימוש ב-AI',
+  cwLogNote: 'הערכה במכשיר הזה, לא החשבון שלך.',
+  cwLogEmpty: 'עדיין לא נרשמו קריאות AI.',
+  cwOpenHint: 'לחיצה להגדרות AI · לחיצה ימנית לדף השימוש',
+
   bkLead:
     'תוספות בתשלום מגבות את עמדת העבודה שלך ל-UniWork Cloud ומוסיפות שטח אחסון. ייצוא ושחזור במכשיר הזה תמיד בחינם.',
   bkPlanLabel: 'תוכנית גיבוי',

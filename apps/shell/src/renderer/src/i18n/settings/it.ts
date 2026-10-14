@@ -21,6 +21,19 @@ export const it = {
   intgActionFailed: 'Impossibile completare. Verifica che la cartella sia scrivibile, poi riprova.',
   intgLoadFailed: 'Impossibile leggere lo stato dell’integrazione.',
 
+  cwTitle: 'Crediti IA',
+  cwAddKey: 'Aggiungi chiave',
+  cwNoKey: 'Nessuna chiave IA',
+  cwUpdating: 'Aggiornamento…',
+  cwLoadFailed: 'Caricamento non riuscito',
+  cwLeft: '{n} rimanenti',
+  cwUsed: '{n} usati',
+  cwToday: 'Oggi ≈ {n}',
+  cwHistory: 'Cronologia utilizzo IA',
+  cwLogNote: 'Stima su questo dispositivo, non è la tua fattura.',
+  cwLogEmpty: 'Nessuna chiamata IA registrata finora.',
+  cwOpenHint: 'Clic per le impostazioni IA · clic destro per la pagina di utilizzo',
+
   bkLead:
     'I componenti aggiuntivi a pagamento eseguono il backup del Banco di lavoro su UniWork Cloud e aggiungono spazio di archiviazione. L’esportazione e il ripristino su questo dispositivo sono sempre gratuiti.',
   bkPlanLabel: 'Piano di backup',

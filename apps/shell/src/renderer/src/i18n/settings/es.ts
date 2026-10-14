@@ -22,6 +22,19 @@ export const es = {
     'No se pudo completar. Comprueba que se pueda escribir en la carpeta y vuelve a intentarlo.',
   intgLoadFailed: 'No se pudo leer el estado de la integración.',
 
+  cwTitle: 'Créditos de IA',
+  cwAddKey: 'Añadir clave',
+  cwNoKey: 'Aún no hay clave de IA',
+  cwUpdating: 'Actualizando…',
+  cwLoadFailed: 'Error al cargar',
+  cwLeft: 'Quedan {n}',
+  cwUsed: '{n} usados',
+  cwToday: 'Hoy ≈ {n}',
+  cwHistory: 'Historial de uso de IA',
+  cwLogNote: 'Estimado en este dispositivo; no es tu factura.',
+  cwLogEmpty: 'Aún no hay llamadas de IA registradas.',
+  cwOpenHint: 'Clic para la configuración de IA · clic derecho para la página de uso',
+
   bkLead:
     'Los complementos de pago hacen copias de seguridad de tu Mesa de trabajo en UniWork Cloud y añaden espacio de almacenamiento. Exportar y restaurar en este dispositivo siempre es gratis.',
   bkPlanLabel: 'Plan de copia de seguridad',

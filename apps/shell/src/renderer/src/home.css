@@ -196,125 +196,158 @@ body.vib .home {
   font-variant-numeric: tabular-nums;
 }
 
-/* ---- bottom-left footer: Settings + Sign-in / account ---- */
+/* ---- bottom-left dock: AI credits on top, then account + Settings ---- */
 .sidebar-footer {
   margin-top: auto;
   padding-top: 12px;
-  border-top: 1px solid var(--border-subtle);
+}
+
+.sidebar-dock {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.sidebar-dock :is(.credit-wallet, .credit-wallet-toggle, .account-btn, .settings-btn) {
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.sidebar-dock
+  :is(.credit-wallet, .credit-wallet-toggle, .account-btn, .settings-btn):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 .credit-wallet-wrap {
-  margin-bottom: 4px;
+  padding: 6px 6px 8px;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .credit-wallet-row {
   display: flex;
-  align-items: stretch;
-  gap: 4px;
+  align-items: center;
+  gap: 2px;
 }
 
+/* label left, the one number that matters right */
 .credit-wallet {
-  display: flex;
-  align-items: center;
-  gap: 9px;
   flex: 1;
   min-width: 0;
-  padding: 8px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 10px;
-  background: var(--surface-subtle);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  padding: 5px 6px;
+  border: none;
+  border-radius: 7px;
+  background: none;
   font: inherit;
+  color: var(--text);
   cursor: pointer;
   text-align: left;
-  color: var(--text);
 }
 
-.credit-wallet:hover {
+.credit-wallet:hover,
+.credit-wallet-toggle:hover {
   background: var(--hover);
 }
 
-.credit-wallet.is-empty {
-  border-style: dashed;
+.credit-wallet-title {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
 }
 
-.credit-wallet.is-warn {
-  border-color: var(--border-subtle);
+.credit-wallet-value {
+  /* long labels (de, ar) drop to their own line instead of being cut */
+  margin-inline-start: auto;
+  min-width: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.credit-wallet-value.is-cta {
+  color: var(--accent);
+}
+
+.credit-wallet-value.is-warn {
+  color: var(--danger-text);
 }
 
 .credit-wallet-toggle {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
   flex-shrink: 0;
-  border: 1px solid var(--border-subtle);
-  border-radius: 10px;
-  background: var(--surface-subtle);
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 7px;
+  background: none;
   color: var(--text-muted);
   cursor: pointer;
 }
 
 .credit-wallet-toggle:hover {
-  background: var(--hover);
   color: var(--text);
+}
+
+.credit-wallet-toggle svg {
+  transition: transform 0.2s ease;
 }
 
 .credit-wallet-toggle.is-open svg {
   transform: rotate(180deg);
 }
 
-.credit-wallet-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--avatar-bg);
-  color: var(--text-muted);
-}
-
-.credit-wallet-text {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-
-.credit-wallet-title {
-  font-size: 12.5px;
-  font-weight: 600;
-  line-height: 1.25;
-  white-space: nowrap;
+/* remaining share of the key's limit; turns to danger under 10% */
+.credit-wallet-meter {
+  height: 4px;
+  margin: 4px 6px 0;
+  border-radius: 2px;
+  background: var(--border-subtle);
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-.credit-wallet-sub {
+.credit-wallet-meter > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+
+.credit-wallet-meter.is-low > span {
+  background: var(--danger);
+}
+
+.credit-wallet-today {
+  margin: 5px 6px 0;
   font-size: 11px;
   color: var(--text-muted);
-  line-height: 1.25;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
 }
 
 .credit-wallet-log {
-  margin-top: 6px;
+  margin: 8px 0 0;
   padding: 8px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 10px;
-  background: var(--surface);
+  border-radius: 8px;
+  background: var(--surface-subtle);
 }
 
 .credit-wallet-log-note,
 .credit-wallet-log-empty {
   margin: 0;
-  font-size: 10.5px;
+  font-size: 11px;
   color: var(--text-muted);
   line-height: 1.35;
 }
@@ -364,19 +397,27 @@ body.vib .home {
   white-space: nowrap;
 }
 
-.account-entry {
-  position: relative;
+/* account row: who you are, with Settings one click away on the right */
+.sidebar-dock-me {
+  display: flex;
+  align-items: center;
+  padding: 4px;
 }
 
-.settings-btn,
+.account-entry {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
 .account-btn {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
   width: 100%;
-  padding: 7px 8px;
+  padding: 5px;
   border: none;
-  border-radius: 10px;
+  border-radius: 8px;
   background: none;
   font: inherit;
   cursor: pointer;
@@ -384,51 +425,34 @@ body.vib .home {
   color: var(--text);
 }
 
-.settings-btn:hover,
-.account-btn:hover {
-  background: var(--surface-subtle);
+.settings-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  align-self: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.account-btn:hover,
+.settings-btn:hover {
+  background: var(--hover);
+}
+
+.settings-btn:hover {
+  color: var(--text);
 }
 
 .settings-icon {
   position: relative;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--avatar-bg);
-  color: var(--text-muted);
-}
-
-.settings-label {
-  flex: 1;
-  min-width: 0;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.account-btn {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  width: 100%;
-  padding: 7px 8px;
-  border: none;
-  border-radius: 10px;
-  background: none;
-  font: inherit;
-  cursor: pointer;
-  text-align: left;
-}
-
-.account-btn:hover {
-  background: var(--surface-subtle);
 }
 
 .account-avatar {
@@ -437,8 +461,8 @@ body.vib .home {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   background: var(--avatar-bg);
   color: var(--text-secondary);
@@ -452,11 +476,6 @@ body.vib .home {
   font-size: 12px;
 }
 
-.account-btn:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
-}
-
 /* attention states (expired, revoked, unreachable, …): small dot on the avatar */
 .account-state-dot {
   position: absolute;
@@ -465,7 +484,7 @@ body.vib .home {
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  border: 2px solid var(--chrome-bg);
+  border: 2px solid var(--surface);
   background: var(--danger);
 }
 
@@ -480,7 +499,7 @@ body.vib .home {
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  border: 2px solid var(--chrome-bg);
+  border: 2px solid var(--surface);
   background: var(--danger);
 }
 
@@ -509,7 +528,7 @@ body.vib .home {
 }
 
 .account-name {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -517,7 +536,7 @@ body.vib .home {
 }
 
 .account-sub {
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;

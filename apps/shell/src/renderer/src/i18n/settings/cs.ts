@@ -21,6 +21,19 @@ export const cs = {
     'Akci se nepodařilo dokončit. Zkontrolujte, zda lze do složky zapisovat, a zkuste to znovu.',
   intgLoadFailed: 'Stav integrace se nepodařilo načíst.',
 
+  cwTitle: 'Kredity AI',
+  cwAddKey: 'Přidat klíč',
+  cwNoKey: 'Zatím žádný klíč AI',
+  cwUpdating: 'Aktualizace…',
+  cwLoadFailed: 'Nelze načíst',
+  cwLeft: 'Zbývá {n}',
+  cwUsed: 'Využito {n}',
+  cwToday: 'Dnes ≈ {n}',
+  cwHistory: 'Historie využití AI',
+  cwLogNote: 'Odhad na tomto zařízení, nejde o vyúčtování.',
+  cwLogEmpty: 'Zatím nejsou zaznamenána žádná volání AI.',
+  cwOpenHint: 'Kliknutím otevřete nastavení AI · pravým tlačítkem stránku využití',
+
   bkLead:
     'Placené doplňky zálohují váš Pracovní stůl do UniWork Cloud a přidávají úložný prostor. Export a obnovení na tomto zařízení jsou vždy zdarma.',
   bkPlanLabel: 'Plán zálohování',

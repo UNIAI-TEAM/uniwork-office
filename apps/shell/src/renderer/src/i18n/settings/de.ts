@@ -22,6 +22,19 @@ export const de = {
     'Vorgang konnte nicht abgeschlossen werden. Prüfe, ob in den Ordner geschrieben werden kann, und versuche es erneut.',
   intgLoadFailed: 'Der Integrationsstatus konnte nicht gelesen werden.',
 
+  cwTitle: 'KI-Credits',
+  cwAddKey: 'Schlüssel hinzufügen',
+  cwNoKey: 'Noch kein KI-Schlüssel',
+  cwUpdating: 'Wird aktualisiert…',
+  cwLoadFailed: 'Laden fehlgeschlagen',
+  cwLeft: '{n} übrig',
+  cwUsed: '{n} verbraucht',
+  cwToday: 'Heute ≈ {n}',
+  cwHistory: 'KI-Nutzungsverlauf',
+  cwLogNote: 'Auf diesem Gerät geschätzt, keine Rechnung.',
+  cwLogEmpty: 'Noch keine KI-Aufrufe protokolliert.',
+  cwOpenHint: 'Klicken für KI-Einstellungen · Rechtsklick für die Nutzungsseite',
+
   bkLead:
     'Kostenpflichtige Add-ons sichern Ihren Arbeitsplatz in der UniWork Cloud und erweitern den Speicherplatz. Exportieren und Wiederherstellen auf diesem Gerät ist immer kostenlos.',
   bkPlanLabel: 'Sicherungstarif',

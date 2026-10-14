@@ -1,4 +1,4 @@
-/** Settings modal strings (zh defines the key set for every sibling shard) */
+/** Settings modal + sidebar dock (AI credits) strings; zh defines the key set for every sibling shard */
 export const zh = {
   setClose: '关闭',
   setRetry: '重试',
@@ -18,6 +18,19 @@ export const zh = {
   setMcpApplyFailed: '无法应用 MCP 服务设置。',
   intgActionFailed: '未能完成。请确认该文件夹可写入，然后重试。',
   intgLoadFailed: '无法读取集成状态。',
+
+  cwTitle: 'AI 额度',
+  cwAddKey: '添加密钥',
+  cwNoKey: '尚未设置 AI 密钥',
+  cwUpdating: '正在更新…',
+  cwLoadFailed: '无法加载',
+  cwLeft: '剩余 {n}',
+  cwUsed: '已用 {n}',
+  cwToday: '今天 ≈ {n}',
+  cwHistory: 'AI 用量记录',
+  cwLogNote: '本机估算，并非账单。',
+  cwLogEmpty: '尚无 AI 调用记录。',
+  cwOpenHint: '点击打开 AI 设置 · 右键查看用量页面',
 
   bkLead: '付费附加服务可将工作台备份到 UniWork Cloud 并增加存储空间。在本机导出和恢复始终免费。',
   bkPlanLabel: '备份方案',

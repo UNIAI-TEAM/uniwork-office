@@ -21,6 +21,19 @@ export const id = {
   intgActionFailed: 'Tidak dapat menyelesaikan. Pastikan folder dapat ditulisi, lalu coba lagi.',
   intgLoadFailed: 'Tidak dapat membaca status integrasi.',
 
+  cwTitle: 'Kredit AI',
+  cwAddKey: 'Tambah kunci',
+  cwNoKey: 'Belum ada kunci AI',
+  cwUpdating: 'Memperbarui…',
+  cwLoadFailed: 'Gagal memuat',
+  cwLeft: 'Sisa {n}',
+  cwUsed: '{n} terpakai',
+  cwToday: 'Hari ini ≈ {n}',
+  cwHistory: 'Riwayat penggunaan AI',
+  cwLogNote: 'Perkiraan di perangkat ini, bukan tagihan Anda.',
+  cwLogEmpty: 'Belum ada panggilan AI yang tercatat.',
+  cwOpenHint: 'Klik untuk pengaturan AI · klik kanan untuk halaman penggunaan',
+
   bkLead:
     'Add-on berbayar mencadangkan Meja kerja Anda ke UniWork Cloud dan menambah ruang penyimpanan. Ekspor dan pemulihan di perangkat ini selalu gratis.',
   bkPlanLabel: 'Paket cadangan',

@@ -22,6 +22,19 @@ export const pl = {
     'Nie udało się dokończyć. Sprawdź, czy folder umożliwia zapis, i spróbuj ponownie.',
   intgLoadFailed: 'Nie udało się odczytać stanu integracji.',
 
+  cwTitle: 'Kredyty AI',
+  cwAddKey: 'Dodaj klucz',
+  cwNoKey: 'Brak klucza AI',
+  cwUpdating: 'Aktualizowanie…',
+  cwLoadFailed: 'Błąd wczytywania',
+  cwLeft: 'Zostało {n}',
+  cwUsed: 'Zużyto {n}',
+  cwToday: 'Dziś ≈ {n}',
+  cwHistory: 'Historia użycia AI',
+  cwLogNote: 'Szacunek na tym urządzeniu, a nie rachunek.',
+  cwLogEmpty: 'Brak zarejestrowanych wywołań AI.',
+  cwOpenHint: 'Kliknij, aby otworzyć ustawienia AI · prawy przycisk – strona użycia',
+
   bkLead:
     'Płatne dodatki tworzą kopię zapasową Stanowiska pracy w UniWork Cloud i zwiększają miejsce na dane. Eksport i przywracanie na tym urządzeniu są zawsze bezpłatne.',
   bkPlanLabel: 'Plan kopii zapasowych',

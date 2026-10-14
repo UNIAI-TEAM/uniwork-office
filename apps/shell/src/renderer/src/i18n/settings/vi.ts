@@ -20,6 +20,19 @@ export const vi = {
   intgActionFailed: 'Chưa hoàn tất được. Hãy kiểm tra thư mục có quyền ghi rồi thử lại.',
   intgLoadFailed: 'Không đọc được trạng thái tích hợp.',
 
+  cwTitle: 'Tín dụng AI',
+  cwAddKey: 'Thêm khóa',
+  cwNoKey: 'Chưa có khóa AI',
+  cwUpdating: 'Đang cập nhật…',
+  cwLoadFailed: 'Không tải được',
+  cwLeft: 'Còn {n}',
+  cwUsed: 'Đã dùng {n}',
+  cwToday: 'Hôm nay ≈ {n}',
+  cwHistory: 'Lịch sử dùng AI',
+  cwLogNote: 'Ước tính trên máy này, không phải hóa đơn.',
+  cwLogEmpty: 'Chưa có lần gọi AI nào được ghi.',
+  cwOpenHint: 'Bấm để mở cài đặt AI · chuột phải để xem trang mức dùng',
+
   bkLead:
     'Gói bổ sung trả phí giúp sao lưu Bàn làm việc lên UniWork Cloud và thêm dung lượng. Xuất và khôi phục trên máy này luôn miễn phí.',
   bkPlanLabel: 'Gói sao lưu',
