@@ -131,4 +131,12 @@ describe('UniWork AI provider (uniwork)', () => {
     expect(aiModelPickerSelection(settings)).toEqual({ provider: 'uniwork', model: '' })
     expect(aiModelPickerNeed(settings)).toBeNull()
   })
+
+  it('keeps a saved uniwork choice selected and reports need "model" when the availability flag is off instead of falling back to UniAI', () => {
+    setUniworkAiAvailable(false)
+    const settings = defaultAiSettings()
+    settings.provider = 'uniwork'
+    expect(aiModelPickerSelection(settings)).toEqual({ provider: 'uniwork', model: '' })
+    expect(aiModelPickerNeed(settings)).toBe('model')
+  })
 })

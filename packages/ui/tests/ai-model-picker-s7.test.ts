@@ -122,7 +122,7 @@ describe('AiModelPicker S7 — row UniWork AI & credits sub-line', () => {
       hasCompletedRead: true,
       credits: { remaining: 8200, limit: 10000, periodEndsAt: '2026-11-01T00:00:00Z' },
     }))
-    const { getChip, getOptions } = await mountPicker({ getCloudStatus }, 'vi')
+    const { getChip, getListbox, getOptions } = await mountPicker({ getCloudStatus }, 'vi')
     expect(getChip().textContent).toBe('UniWork AI')
     expect(getCloudStatus).toHaveBeenCalledTimes(1)
 
@@ -140,17 +140,49 @@ describe('AiModelPicker S7 — row UniWork AI & credits sub-line', () => {
     expect(subLine!.getAttribute('aria-hidden')).toBe('true')
     expect(subLine!.textContent).toBe('Còn 8200 / 10000')
 
-    // Screen-reader description via aria-describedby uses aiUniworkCreditsAria, not live region
+    // Screen-reader description via aria-describedby uses aiUniworkCreditsAria, not live region,
+    // and is rendered outside role="listbox" (RF1-21)
     const descId = uniworkOpt.getAttribute('aria-describedby')
     expect(descId).toBeTruthy()
     const descEl = document.getElementById(descId!)
     expect(descEl).not.toBeNull()
+    expect(getListbox()!.contains(descEl)).toBe(false)
     expect(descEl!.textContent).toBe(
       aiUniworkText('vi', 'aiUniworkCreditsAria', { remaining: 8200, limit: 10000 }),
     )
     expect(descEl!.getAttribute('aria-live')).toBeNull()
     expect(descEl!.getAttribute('role')).toBeNull()
   })
+
+  it.each([
+    'signed-out',
+    'not-entitled',
+    'subscription-inactive',
+    'credits-exhausted',
+    'unavailable',
+  ] as const)(
+    'desktop: hides the UniWork AI row and shows Choose model on the chip when cloud state is %s even if the flag is still true (RF1-20)',
+    async (state) => {
+      setUniworkAiAvailable(true)
+      const { getChip, getGroups, getOptions } = await mountPicker(
+        {
+          getCloudStatus: async () => ({
+            state,
+            signedIn: state !== 'signed-out',
+            hasCompletedRead: true,
+          }),
+        },
+        'vi',
+        buildSettings({ provider: 'uniwork' }),
+      )
+      expect(getChip().textContent).toBe(AI_MODEL_PICKER_STRINGS.vi.choose)
+      await openPopup(getChip())
+      expect(
+        getGroups().map((g) => g.querySelector('.ai-model-group-head')?.textContent),
+      ).not.toContain('UniWork AI')
+      expect(getOptions().map((o) => o.textContent)).not.toContain('UniWork AI')
+    },
+  )
 
   it('desktop: shows cloudCreditsUnlimited when credits.limit is null', async () => {
     setUniworkAiAvailable(true)
@@ -425,30 +457,46 @@ describe('AiModelPicker S7 — Accessibility Floor ARIA & keyboard', () => {
 
   it('implements roving tabindex (single Tab stop on selected option) and ArrowUp/ArrowDown/Home/End navigation across groups', async () => {
     setUniworkAiAvailable(true)
-    // Select anthropic (second group's option) initially
-    const initial = buildSettings({ provider: 'anthropic' })
+    // Configure two 1-model BYOK providers (kimi + spark) and select kimi (second group's option) initially
+    const initial: AiSettings = {
+      ...defaultAiSettings(),
+      uniAiAvailable: false,
+      provider: 'kimi',
+    }
+    initial.providers = {
+      ...initial.providers,
+      kimi: { ...initial.providers.kimi, apiKey: 'sk-kimi', model: 'kimi-k3' },
+      spark: { ...initial.providers.spark, apiKey: 'ak-spark', model: 'spark-x2.5' },
+    }
+    let pushStatus: ((next: CloudStatusMock | null) => void) | undefined
     const { getChip, getOptions, getManageBtn, getFooterBtn } = await mountPicker(
       {
         getCloudStatus: async () => ({
-          state: 'not-entitled',
+          state: 'ready',
           signedIn: true,
           hasCompletedRead: true,
         }),
+        onCloudStatusChanged: (cb) => {
+          pushStatus = cb
+          return () => {
+            pushStatus = undefined
+          }
+        },
       },
       'vi',
       initial,
     )
     await openPopup(getChip())
     const options = getOptions()
-    expect(options).toHaveLength(3) // UniWork AI, claude-sonnet-4-6, gpt-5.4
+    expect(options).toHaveLength(3) // UniWork AI, kimi-k3, spark-x2.5
 
-    // Roving tabindex enters on the selected option (index 1: claude-sonnet-4-6)
+    // Roving tabindex enters on the selected option (index 1: kimi-k3)
     expect(options.map((o) => o.tabIndex)).toEqual([-1, 0, -1])
 
     act(() => options[1]!.focus())
     expect(document.activeElement).toBe(options[1])
 
-    // ArrowDown moves to index 2 (gpt-5.4)
+    // ArrowDown moves to index 2 (spark-x2.5)
     pressKey(options[1]!, 'ArrowDown')
     expect(document.activeElement).toBe(options[2])
     expect(options.map((o) => o.tabIndex)).toEqual([-1, -1, 0])
@@ -468,11 +516,22 @@ describe('AiModelPicker S7 — Accessibility Floor ARIA & keyboard', () => {
     expect(document.activeElement).toBe(options[2])
     expect(options.map((o) => o.tabIndex)).toEqual([-1, -1, 0])
 
+    // When cloud state transitions to not-entitled, UniWork AI row hides and footer action button joins Tab order
+    await act(async () => {
+      pushStatus?.({
+        state: 'not-entitled',
+        signedIn: true,
+        hasCompletedRead: true,
+      })
+    })
+    const remainingOptions = getOptions()
+    expect(remainingOptions).toHaveLength(2) // kimi-k3, spark-x2.5
+
     // Tab order stops inside picker: chip -> active option in list -> Manage -> footer action button
     const tabStops = [...host.querySelectorAll<HTMLElement>('button')].filter(
       (b) => b.tabIndex === 0,
     )
-    expect(tabStops).toEqual([getChip(), options[2]!, getManageBtn()!, getFooterBtn()!])
+    expect(tabStops).toEqual([getChip(), remainingOptions[1]!, getManageBtn()!, getFooterBtn()!])
   })
 
   it('closes and returns focus to chip on Escape, option pick, Manage click, and footer action (unless focus moved to another surface); outside click leaves focus where clicked', async () => {

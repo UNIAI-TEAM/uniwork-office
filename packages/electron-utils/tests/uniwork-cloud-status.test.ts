@@ -67,8 +67,26 @@ describe('uniwork-cloud-status bridge', () => {
       accountId: 'acc_1',
       orgId: 'org_1',
       orgName: 'Công ty mẫu',
-      email: 'user@example.com',
-      planName: 'Pro',
+    })
+    expect(ready).not.toHaveProperty('email')
+    expect(ready).not.toHaveProperty('planName')
+
+    const missingUsed = parseUniworkCloudStatusSnapshot({
+      state: 'ready',
+      signedIn: true,
+      enabled: true,
+      credits: {
+        limit: 500,
+        remaining: 320,
+        periodEndsAt: '2026-12-01T00:00:00Z',
+      },
+    })
+    expect(missingUsed?.credits).toEqual({
+      unit: 'ai.tokens',
+      used: null,
+      limit: 500,
+      remaining: 320,
+      periodEnd: '2026-12-01T00:00:00Z',
     })
 
     const serverUnavailable = parseUniworkCloudStatusSnapshot({
@@ -95,15 +113,19 @@ describe('uniwork-cloud-status bridge', () => {
     expect(networkUnavailable?.reason).toBe('network')
   })
 
-  it('wires get, onChange, openAccountSettings and signIn through the preload bridge', async () => {
+  it('wires get, onChange, openAccountSettings and signIn through the preload bridge and warns on get IPC error', async () => {
     let current: UniworkCloudStatusSnapshot | null = null
+    let failGet = false
     const invoked: string[] = []
     const listeners = new Set<(event: unknown, payload: unknown) => void>()
 
     const bridge = createUniworkCloudStatusBridge({
       invoke: async (channel) => {
         invoked.push(channel)
-        if (channel === UNIWORK_CLOUD_STATUS_GET) return current
+        if (channel === UNIWORK_CLOUD_STATUS_GET) {
+          if (failGet) throw new Error('ipc channel failed')
+          return current
+        }
         return undefined
       },
       on: (channel, listener) => {
@@ -115,6 +137,13 @@ describe('uniwork-cloud-status bridge', () => {
     })
 
     expect(await bridge.get()).toBeNull()
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    failGet = true
+    expect(await bridge.get()).toBeNull()
+    expect(warnSpy).toHaveBeenCalledTimes(1)
+    warnSpy.mockRestore()
+    failGet = false
 
     const seen: Array<UniworkCloudStatusSnapshot | null> = []
     const off = bridge.onChange((next) => seen.push(next))
@@ -132,13 +161,13 @@ describe('uniwork-cloud-status bridge', () => {
     await bridge.signIn()
     expect(invoked).toEqual([
       UNIWORK_CLOUD_STATUS_GET,
+      UNIWORK_CLOUD_STATUS_GET,
       UNIWORK_CLOUD_STATUS_OPEN_ACCOUNT,
       UNIWORK_CLOUD_STATUS_SIGN_IN,
     ])
 
     off()
     expect(listeners.size).toBe(0)
-    void vi
   })
 
   it('every editor preload and the shell preload install the cloud status bridge', () => {
@@ -146,6 +175,19 @@ describe('uniwork-cloud-status bridge', () => {
     for (const app of ['docs', 'sheets', 'slides', 'pdf', 'markdown', 'html', 'shell']) {
       const src = readFileSync(join(apps, app, 'src/preload/index.ts'), 'utf8')
       expect(src, `${app} preload`).toContain('installUniworkCloudStatusBridge()')
+    }
+  })
+
+  it('every standalone editor main answers the cloud-status pull; the shell registers the real handler instead (RB1-5)', () => {
+    const apps = join(__dirname, '../../../apps')
+    for (const app of ['docs', 'sheets', 'slides', 'pdf', 'html', 'markdown']) {
+      const src = readFileSync(join(apps, app, 'src/main', `${app}-main.ts`), 'utf8')
+      const start = src.indexOf(`export function start`)
+      expect(start, `${app} standalone start`).toBeGreaterThan(-1)
+      expect(src.slice(start), `${app} standalone start answers the cloud-status pull`).toContain(
+        'answerUniworkCloudStatusOff(ipcMain)',
+      )
+      expect(src.slice(0, start)).not.toContain('answerUniworkCloudStatusOff(')
     }
   })
 })

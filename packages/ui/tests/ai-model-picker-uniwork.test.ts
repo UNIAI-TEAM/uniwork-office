@@ -27,11 +27,16 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-async function mountPickerAndComposer(settings: AiSettings, requireModel: boolean) {
+async function mountPickerAndComposer(
+  settings: AiSettings,
+  requireModel: boolean,
+  bridgeOverrides: Partial<AiModelPickerBridge> = {},
+) {
   const bridge: AiModelPickerBridge = {
     getSettings: async () => settings,
     setSettings: async () => {},
     requireModel,
+    ...bridgeOverrides,
   }
   await act(async () => {
     root.render(
@@ -87,14 +92,31 @@ describe('AiModelPicker with UniWork AI selected', () => {
     expect(hint).toBe('Enter to send')
   })
 
-  it('shows "Choose model" when the UniWork AI flag is off', async () => {
+  it('shows "Choose model" and disables Send with needModel hint when the UniWork AI flag is off', async () => {
     setUniworkAiAvailable(false)
     const settings: AiSettings = {
       ...defaultAiSettings(),
       uniAiAvailable: false,
       provider: 'uniwork',
     }
-    const { chip } = await mountPickerAndComposer(settings, false)
+    const { chip, send, hint } = await mountPickerAndComposer(settings, false)
     expect(chip).toBe(AI_MODEL_PICKER_STRINGS.en.choose)
+    expect(send.disabled).toBe(true)
+    expect(hint).toBe(AI_MODEL_PICKER_STRINGS.en.needModel)
+  })
+
+  it('never silently falls back from a saved uniwork choice to UniAI when UniWork AI is unavailable even while UniAI is signed in', async () => {
+    setUniworkAiAvailable(false)
+    const settings: AiSettings = {
+      ...defaultAiSettings(),
+      uniAiAvailable: true,
+      provider: 'uniwork',
+    }
+    const { chip, send, hint } = await mountPickerAndComposer(settings, false, {
+      getAccountStatus: async () => ({ loggedIn: true }),
+    })
+    expect(chip).toBe(AI_MODEL_PICKER_STRINGS.en.choose)
+    expect(send.disabled).toBe(true)
+    expect(hint).toBe(AI_MODEL_PICKER_STRINGS.en.needModel)
   })
 })
