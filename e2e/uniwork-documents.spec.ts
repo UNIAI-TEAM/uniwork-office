@@ -597,15 +597,27 @@ test.describe.serial('UniWork documents', () => {
       ).toBeVisible()
       // FE-304: actions are addressed by role + accessible name
       await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused()
-      // the head's ✕ is a sixth button in the alertdialog; scope the order check
-      // to the action row: the five Step-1 actions in spec order
+      // the head's ✕ sits outside the action row and has no text, only the
+      // accessible name "Close"; scope the order check to the action row:
+      // the four Step-1 actions in spec order
       await expect(dialog.locator('.uw-conflict-actions').getByRole('button')).toHaveText([
         'Reload latest',
         'Save as a copy…',
         'Overwrite…',
         'Cancel',
-        'Close',
       ])
+      // the ✕ in turn is addressed by role + name: it must be visible and come
+      // after Cancel in DOM (Tab) order - it is rendered last in the alertdialog
+      const closeX = dialog.getByRole('button', { name: 'Close', exact: true })
+      await expect(closeX).toBeVisible()
+      const buttonOrder = await dialog
+        .getByRole('button')
+        .evaluateAll((buttons) =>
+          buttons.map(
+            (button) => button.getAttribute('aria-label') ?? button.textContent?.trim() ?? '',
+          ),
+        )
+      expect(buttonOrder.indexOf('Close')).toBeGreaterThan(buttonOrder.indexOf('Cancel'))
       expect(await seenMessageBoxes(launched)).toHaveLength(0)
       await shell.screenshot({ path: screenshotPath('uniwork-docs-conflict-dialog-step1') })
 
