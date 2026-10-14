@@ -103,7 +103,13 @@ export function CollabPanel(p: CollabPanelProps) {
   const newThreadOpenerRef = useRef<HTMLElement | null>(null)
   const afterNewThreadRef = useRef<
     | { kind: 'cancel'; insertAt: number; opener: HTMLElement | null }
-    | { kind: 'send'; prevIds: Set<string>; insertAt: number; opener: HTMLElement | null }
+    | {
+        kind: 'send'
+        createdId?: string
+        prevIds: Set<string>
+        insertAt: number
+        opener: HTMLElement | null
+      }
     | null
   >(null)
 
@@ -212,6 +218,7 @@ export function CollabPanel(p: CollabPanelProps) {
   useLayoutEffect(() => {
     const afterNt = afterNewThreadRef.current
     if (!ctl.newThread && afterNt) {
+      afterNewThreadRef.current = null
       const fallbackHeading = (insertAt: number) => {
         const headings = asideRef.current?.querySelectorAll<HTMLElement>(
           'ul.collab-list > li[data-thread-id] [data-thread-heading]',
@@ -220,9 +227,8 @@ export function CollabPanel(p: CollabPanelProps) {
           ? (headings[Math.min(insertAt, headings.length - 1)] ?? headings[0] ?? null)
           : null
       }
+      const active = document.activeElement
       if (afterNt.kind === 'cancel') {
-        afterNewThreadRef.current = null
-        const active = document.activeElement
         if (!active || active === document.body || !active.isConnected) {
           const target =
             (afterNt.opener?.isConnected ? afterNt.opener : null) ??
@@ -231,27 +237,27 @@ export function CollabPanel(p: CollabPanelProps) {
             titleRef.current
           target?.focus()
         }
-      } else {
-        const created = ctl.threads.find((t) => !afterNt.prevIds.has(t.id))
-        const createdHeading = created
-          ? asideRef.current?.querySelector<HTMLElement>(
-              `[data-thread-id="${cssEscape(created.id)}"] [data-thread-heading]`,
-            )
-          : null
-        if (createdHeading) {
-          afterNewThreadRef.current = null
-          createdHeading.focus()
-        } else {
-          const active = document.activeElement
-          if (!active || active === document.body || !active.isConnected) {
-            const target =
-              fallbackHeading(afterNt.insertAt) ??
-              (afterNt.opener?.isConnected ? afterNt.opener : null) ??
-              closeBtnRef.current ??
-              titleRef.current
-            target?.focus()
-          }
-        }
+      } else if (
+        !active ||
+        active === document.body ||
+        !active.isConnected ||
+        asideRef.current?.contains(active)
+      ) {
+        const byId = (id: string | undefined) =>
+          id
+            ? (asideRef.current?.querySelector<HTMLElement>(
+                `[data-thread-id="${cssEscape(id)}"] [data-thread-heading]`,
+              ) ?? null)
+            : null
+        const createdHeading =
+          byId(afterNt.createdId) ?? byId(ctl.threads.find((t) => !afterNt.prevIds.has(t.id))?.id)
+        const target =
+          createdHeading ??
+          fallbackHeading(afterNt.insertAt) ??
+          (afterNt.opener?.isConnected ? afterNt.opener : null) ??
+          closeBtnRef.current ??
+          titleRef.current
+        target?.focus()
       }
     }
     const keep = keepFocusRef.current
@@ -355,9 +361,23 @@ export function CollabPanel(p: CollabPanelProps) {
             onSubmit: async (body) => {
               const prevIds = new Set(ctl.threads.map((t) => t.id))
               const opener = p.newThreadOpenerRef?.current ?? newThreadOpenerRef.current
-              afterNewThreadRef.current = { kind: 'send', prevIds, insertAt, opener }
+              const pendingSend = {
+                kind: 'send' as const,
+                createdId: undefined as string | undefined,
+                prevIds,
+                insertAt,
+                opener,
+              }
+              afterNewThreadRef.current = pendingSend
               try {
-                await ctl.actions.create(body, nt)
+                const res: unknown = await ctl.actions.create(body, nt)
+                if (typeof res === 'string') pendingSend.createdId = res
+                else if (res && typeof res === 'object') {
+                  const direct = (res as { id?: unknown }).id
+                  const nested = (res as { comment?: { id?: unknown } }).comment?.id
+                  if (typeof direct === 'string') pendingSend.createdId = direct
+                  else if (typeof nested === 'string') pendingSend.createdId = nested
+                }
                 newThreadOpenerRef.current = null
               } catch (err) {
                 afterNewThreadRef.current = null
