@@ -46,7 +46,7 @@ const OFF_STATES: readonly UniworkCloudStateName[] = [
 
 export interface UniworkCloudCreditsSnapshot {
   unit: string
-  used: number
+  used: number | null
   limit: number | null
   remaining: number | null
   periodEnd: string | null
@@ -75,8 +75,6 @@ export interface UniworkCloudStatusSnapshot {
   orgId?: string | null
   /** Selected organization display name (interpolated into `aiUniworkDisclosure` `{org}`). */
   orgName?: string | null
-  email?: string
-  planName?: string
 }
 
 /** what a preload exposes to its renderer as window.uniworkCloudStatus */
@@ -125,10 +123,10 @@ export function parseUniworkCloudStatusSnapshot(
     const c = r.credits as Record<string, unknown>
     credits = {
       unit: nonEmptyStr(c.unit) ?? 'ai.tokens',
-      used: finiteNum(c.used) ?? 0,
+      used: finiteNum(c.used),
       limit: finiteNum(c.limit),
       remaining: finiteNum(c.remaining),
-      periodEnd: nonEmptyStr(c.periodEnd),
+      periodEnd: nonEmptyStr(c.periodEnd) ?? nonEmptyStr(c.periodEndsAt),
     }
   }
 
@@ -141,8 +139,6 @@ export function parseUniworkCloudStatusSnapshot(
   const accountId = nonEmptyStr(r.accountId)
   const orgId = nonEmptyStr(r.orgId)
   const orgName = nonEmptyStr(r.orgName)
-  const email = nonEmptyStr(r.email)
-  const planName = nonEmptyStr(r.planName)
 
   return {
     state,
@@ -154,7 +150,5 @@ export function parseUniworkCloudStatusSnapshot(
     accountId,
     orgId,
     orgName,
-    ...(email ? { email } : {}),
-    ...(planName ? { planName } : {}),
   }
 }

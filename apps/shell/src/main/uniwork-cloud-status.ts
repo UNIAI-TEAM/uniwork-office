@@ -20,15 +20,30 @@ export interface UniworkCloudStatusIpcDeps {
   signIn?(): void | Promise<void>
 }
 
+function isMainFrameSender(event: unknown): boolean {
+  if (!event || typeof event !== 'object') return false
+  const e = event as {
+    sender?: { isDestroyed?: () => boolean; mainFrame?: unknown }
+    senderFrame?: unknown
+  }
+  if (!e.sender || e.sender.isDestroyed?.()) return false
+  return Boolean(e.senderFrame && e.senderFrame === e.sender.mainFrame)
+}
+
 export function registerUniworkCloudStatusIpc(
   ipc: Pick<IpcMain, 'handle'>,
   deps: UniworkCloudStatusIpcDeps,
 ): void {
-  ipc.handle(UNIWORK_CLOUD_STATUS_GET, () => deps.get())
-  ipc.handle(UNIWORK_CLOUD_STATUS_OPEN_ACCOUNT, async () => {
+  ipc.handle(UNIWORK_CLOUD_STATUS_GET, (event) => {
+    if (!isMainFrameSender(event)) return null
+    return deps.get()
+  })
+  ipc.handle(UNIWORK_CLOUD_STATUS_OPEN_ACCOUNT, async (event) => {
+    if (!isMainFrameSender(event)) return
     await deps.openAccountSettings?.()
   })
-  ipc.handle(UNIWORK_CLOUD_STATUS_SIGN_IN, async () => {
+  ipc.handle(UNIWORK_CLOUD_STATUS_SIGN_IN, async (event) => {
+    if (!isMainFrameSender(event)) return
     await deps.signIn?.()
   })
 }

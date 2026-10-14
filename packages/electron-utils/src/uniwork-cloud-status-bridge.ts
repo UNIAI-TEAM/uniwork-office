@@ -25,7 +25,8 @@ export function createUniworkCloudStatusBridge(
     get: async () => {
       try {
         return parseUniworkCloudStatusSnapshot(await ipc.invoke(UNIWORK_CLOUD_STATUS_GET))
-      } catch {
+      } catch (error) {
+        console.warn('[uniwork-cloud-status] get failed:', error)
         return null
       }
     },

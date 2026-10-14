@@ -390,7 +390,10 @@ export function uniworkAiAvailable(): boolean {
  * `tools.chat`, the `ai_uniwork` capability and the module format; web: the
  * `uniworkAi` grant). It adds or removes the entry in AI_PROVIDERS in place,
  * right after UniAI, so every list built from it shows or hides the entry;
- * while hidden, selectedProvider() falls back from a saved `uniwork` choice.
+ * in the composer picker (`aiModelPickerSelection`), a saved `uniwork` choice
+ * stays on `uniwork` and shows the S7 unavailable state instead of falling back
+ * to UniAI, while `selectedProvider()` returns the underlying stored vendor for
+ * the main-process `uniworkAiChoiceStore` overlay.
  */
 export function setUniworkAiAvailable(available: boolean): void {
   uniworkAvailable = available

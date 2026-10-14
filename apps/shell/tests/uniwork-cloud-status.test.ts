@@ -209,6 +209,7 @@ describe('shell account + cloud status integration (RB1-1, RB1-4, RB1-8, RB1-9)'
     ])
 
     // 2. "Đăng nhập" (UNIWORK_CLOUD_STATUS_SIGN_IN) when account state is not-configured also switches to Home first
+    await uniworkAccount().restore()
     callOrder.length = 0
     expect(uniworkAccount().status().state).toBe('not-configured')
     await handlers.get(UNIWORK_CLOUD_STATUS_SIGN_IN)!(mainFrameEvent())

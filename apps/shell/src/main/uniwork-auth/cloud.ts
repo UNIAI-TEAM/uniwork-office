@@ -530,7 +530,7 @@ export class UniworkCloudController {
   private async read(account: CloudAccountView, generation: number): Promise<UniworkCloudStatus> {
     let next: UniworkCloudStatus
     let answered = false
-    let reason: string | null = null
+    let reason: string | null
     try {
       const server = await this.deps.client.status()
       next = statusFromServer(server, account)

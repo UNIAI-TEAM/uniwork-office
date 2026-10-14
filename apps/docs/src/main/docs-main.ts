@@ -80,7 +80,10 @@ import {
   readBodyCapped,
   writeJsonAtomic,
 } from '@genoffice/electron-utils'
-import { answerUniworkAiFlagOff } from '@genoffice/electron-utils/uniwork-ai-flag'
+import {
+  answerUniworkAiFlagOff,
+  answerUniworkCloudStatusOff,
+} from '@genoffice/electron-utils/uniwork-ai-flag'
 import { configureMetricsCache, familyVerticalMetrics } from '@genoffice/font-metrics'
 import { createI18n, getUiLang, normalizeLang, setUiLang } from '@genoffice/i18n'
 import { ProjectStore, type PracticeId } from '@genoffice/project-store'
@@ -6467,6 +6470,7 @@ export function hasDocsWindow(): boolean {
 export function startDocsStandalone(): void {
   // no shell here: answer the renderer's UniWork AI flag pull with "off" instead of an unregistered channel
   answerUniworkAiFlagOff(ipcMain)
+  answerUniworkCloudStatusOff(ipcMain)
   registerRendererScheme()
   installNavigationGuard(app)
   installContextMenu(app, () => contextMenuLabels(getUiLang()))

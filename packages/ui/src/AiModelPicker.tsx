@@ -23,14 +23,16 @@ export type AiModelPickerCloudState =
   | 'signed-out'
 
 export interface AiModelPickerCloudCredits {
-  readonly remaining: number
+  readonly remaining: number | null
   readonly limit: number | null
+  readonly periodEnd?: string | null | undefined
   readonly periodEndsAt?: string | null | undefined
 }
 
 export interface AiModelPickerCloudStatus {
   readonly state: AiModelPickerCloudState
   readonly signedIn?: boolean | undefined
+  readonly enabled?: boolean | undefined
   readonly hasCompletedRead?: boolean | undefined
   readonly cloudUnavailable?: boolean | undefined
   readonly reason?: string | null | undefined
@@ -59,7 +61,7 @@ export interface AiModelPickerBridge {
     | AiModelPickerCloudStatus
     | null
     | undefined
-  /** desktop: subscribe to UniWork cloud status updates (falls back to window.uniworkCloudStatus.onChanged) */
+  /** desktop: subscribe to UniWork cloud status updates (falls back to window.uniworkCloudStatus.onChange) */
   readonly onCloudStatusChanged?:
     ((handler: (status: AiModelPickerCloudStatus | null) => void) => () => void) | undefined
   /**
@@ -71,7 +73,10 @@ export interface AiModelPickerBridge {
 
 interface WindowCloudStatusBridge {
   readonly get?: () => Promise<AiModelPickerCloudStatus | null> | AiModelPickerCloudStatus | null
+  readonly onChange?: (cb: (status: AiModelPickerCloudStatus | null) => void) => () => void
   readonly onChanged?: (cb: (status: AiModelPickerCloudStatus | null) => void) => () => void
+  readonly openAccountSettings?: () => Promise<void> | void
+  readonly signIn?: () => Promise<void> | void
 }
 
 function getWindowCloudStatusBridge(): WindowCloudStatusBridge | undefined {
@@ -192,7 +197,8 @@ export function AiModelPicker({
     }
     let offCloud: (() => void) | undefined
     if (b.requireModel !== true) {
-      const sub = b.onCloudStatusChanged ?? getWindowCloudStatusBridge()?.onChanged
+      const winCloud = getWindowCloudStatusBridge()
+      const sub = b.onCloudStatusChanged ?? winCloud?.onChange ?? winCloud?.onChanged
       try {
         offCloud = sub?.((next) => setCloudStatus(next ?? null))
       } catch {
@@ -214,10 +220,16 @@ export function AiModelPicker({
     inside: () => [chipRef.current, popRef.current],
   })
 
-  const groups = useMemo(
-    () => (settings ? aiModelPickerGroups(settings, loggedIn) : []),
-    [settings, loggedIn],
-  )
+  const hideUniworkByCloudStatus =
+    bridge.requireModel !== true &&
+    cloudStatus !== null &&
+    cloudStatus.hasCompletedRead !== false &&
+    (cloudStatus.state !== 'ready' || cloudStatus.enabled === false)
+
+  const groups = useMemo(() => {
+    const raw = settings ? aiModelPickerGroups(settings, loggedIn) : []
+    return hideUniworkByCloudStatus ? raw.filter((g) => g.id !== 'uniwork') : raw
+  }, [settings, loggedIn, hideUniworkByCloudStatus])
   const flatOptions = useMemo(
     () =>
       groups.flatMap((g) =>
@@ -249,13 +261,17 @@ export function AiModelPicker({
   // on every host: a chosen vendor is never swapped for UniAI, so the chip and the request agree.
   // Web frames apply it to UniAI too (nothing usable at all). A key list that failed to load says
   // nothing about keys: no hint, send stays on, the server decides
-  const need = settings ? aiModelPickerNeed(settings) : null
+  const need = settings
+    ? current?.provider === 'uniwork' && !currentUsable
+      ? 'model'
+      : aiModelPickerNeed(settings)
+    : null
   const needHint =
     settings !== null && !currentUsable && settings.credentialsUnavailable !== true
       ? need === 'base-url'
         ? strings.needBaseUrl
         : bridge.requireModel === true
-          ? hasKey
+          ? hasKey || current?.provider === 'uniwork'
             ? strings.needModel
             : strings.needKey
           : need === 'model'
@@ -319,7 +335,7 @@ export function AiModelPicker({
       0,
       flatOptions.findIndex((o) => o.key === activeKey),
     )
-    let nextIdx = currentIdx
+    let nextIdx: number
     if (e.key === 'ArrowDown') {
       nextIdx = Math.min(flatOptions.length - 1, currentIdx + 1)
     } else if (e.key === 'ArrowUp') {
@@ -345,19 +361,27 @@ export function AiModelPicker({
   const creditsVisibleText = desktopCredits
     ? desktopCredits.limit === null
       ? pickerCloudText(lang, strings, 'cloudCreditsUnlimited')
-      : pickerCloudText(lang, strings, 'cloudCreditsLeft', {
-          remaining: desktopCredits.remaining,
-          limit: desktopCredits.limit,
-        })
+      : desktopCredits.remaining !== null
+        ? pickerCloudText(lang, strings, 'cloudCreditsLeft', {
+            remaining: desktopCredits.remaining,
+            limit: desktopCredits.limit,
+          })
+        : null
     : null
   const creditsAriaText = desktopCredits
     ? desktopCredits.limit === null
       ? pickerCloudText(lang, strings, 'cloudCreditsUnlimited')
-      : aiUniworkText(lang, 'aiUniworkCreditsAria', {
-          remaining: desktopCredits.remaining,
-          limit: desktopCredits.limit,
-        })
+      : desktopCredits.remaining !== null
+        ? aiUniworkText(lang, 'aiUniworkCreditsAria', {
+            remaining: desktopCredits.remaining,
+            limit: desktopCredits.limit,
+          })
+        : null
     : null
+  const hasUniworkWithCredits =
+    groups.some((g) => g.id === 'uniwork') &&
+    creditsVisibleText !== null &&
+    creditsAriaText !== null
 
   const footerInfo = useMemo(() => {
     if (bridge.requireModel === true || !cloudStatus || cloudStatus.hasCompletedRead === false) {
@@ -407,10 +431,21 @@ export function AiModelPicker({
     const pop = popRef.current
     setOpen(false)
     setFocusKey(null)
+    const winCloud = getWindowCloudStatusBridge()
     if (footerInfo?.kind === 'sign-in') {
-      void (bridge.signIn ?? bridge.openAccountSettings ?? bridge.openModelSettings)?.()
+      void (
+        bridge.signIn ??
+        winCloud?.signIn ??
+        bridge.openAccountSettings ??
+        winCloud?.openAccountSettings ??
+        bridge.openModelSettings
+      )?.()
     } else {
-      void (bridge.openAccountSettings ?? bridge.openModelSettings)?.()
+      void (
+        bridge.openAccountSettings ??
+        winCloud?.openAccountSettings ??
+        bridge.openModelSettings
+      )?.()
     }
     restoreChipFocusUnlessMoved(chipRef.current, pop)
   }
@@ -487,53 +522,51 @@ export function AiModelPicker({
                   {(g.models.length > 0 ? g.models : ['']).map((m) => {
                     const optionKey = `${g.id}:${m}`
                     const selected = current?.provider === g.id && current.model === m
-                    const isUniworkWithCredits =
-                      g.id === 'uniwork' && creditsVisibleText !== null && creditsAriaText !== null
+                    const isUniworkWithCredits = g.id === 'uniwork' && hasUniworkWithCredits
                     return (
-                      <React.Fragment key={optionKey}>
-                        <button
-                          type="button"
-                          role="option"
-                          tabIndex={optionKey === activeKey ? 0 : -1}
-                          aria-selected={selected}
-                          aria-describedby={isUniworkWithCredits ? creditsDescId : undefined}
-                          className={`ai-model-item${selected ? ' selected' : ''}${isUniworkWithCredits ? ' ai-model-item-with-sub' : ''}`}
-                          onFocus={() => setFocusKey(optionKey)}
-                          onClick={() => pick({ provider: g.id, model: m })}
-                        >
-                          <span className="ai-model-item-body">
-                            <span className="ai-model-item-text">{m || g.label}</span>
-                            {isUniworkWithCredits && (
-                              <span className="ai-model-item-sub" aria-hidden="true">
-                                {creditsVisibleText}
-                              </span>
-                            )}
-                          </span>
-                          {selected && (
-                            <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden>
-                              <path
-                                d="M2.5 6.5 5 9l4.5-6"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="1.6"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              />
-                            </svg>
+                      <button
+                        key={optionKey}
+                        type="button"
+                        role="option"
+                        tabIndex={optionKey === activeKey ? 0 : -1}
+                        aria-selected={selected}
+                        aria-describedby={isUniworkWithCredits ? creditsDescId : undefined}
+                        className={`ai-model-item${selected ? ' selected' : ''}${isUniworkWithCredits ? ' ai-model-item-with-sub' : ''}`}
+                        onFocus={() => setFocusKey(optionKey)}
+                        onClick={() => pick({ provider: g.id, model: m })}
+                      >
+                        <span className="ai-model-item-body">
+                          <span className="ai-model-item-text">{m || g.label}</span>
+                          {isUniworkWithCredits && (
+                            <span className="ai-model-item-sub" aria-hidden="true">
+                              {creditsVisibleText}
+                            </span>
                           )}
-                        </button>
-                        {isUniworkWithCredits && (
-                          <span id={creditsDescId} className="ai-model-sr-only">
-                            {creditsAriaText}
-                          </span>
+                        </span>
+                        {selected && (
+                          <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden>
+                            <path
+                              d="M2.5 6.5 5 9l4.5-6"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.6"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
                         )}
-                      </React.Fragment>
+                      </button>
                     )
                   })}
                 </div>
               )
             })}
           </div>
+          {hasUniworkWithCredits && (
+            <span id={creditsDescId} className="ai-model-sr-only">
+              {creditsAriaText}
+            </span>
+          )}
           {bridge.openModelSettings && (
             <button type="button" className="ai-model-item ai-model-manage" onClick={manage}>
               <svg
@@ -548,7 +581,7 @@ export function AiModelPicker({
                 aria-hidden
               >
                 <circle cx="12" cy="12" r="3" />
-                <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
+                <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0-4h-.1a1.7 1.7 0 0 0-1.5 1z" />
               </svg>
               <span className="ai-model-item-text">{strings.manage}</span>
             </button>

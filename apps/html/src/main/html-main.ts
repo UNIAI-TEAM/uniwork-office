@@ -50,7 +50,10 @@ import {
   printHtmlDocument,
   type PrintDialogOutcome,
 } from '@genoffice/electron-utils'
-import { answerUniworkAiFlagOff } from '@genoffice/electron-utils/uniwork-ai-flag'
+import {
+  answerUniworkAiFlagOff,
+  answerUniworkCloudStatusOff,
+} from '@genoffice/electron-utils/uniwork-ai-flag'
 import { createI18n, getUiLang } from '@genoffice/i18n'
 import { generateImageTool, documentMediaRoots } from '@genoffice/ai-search'
 import { parseFileToText } from '@genoffice/file-parse'
@@ -2021,6 +2024,7 @@ export function createHtmlView(openPath?: string | null): WebContentsView {
 export function startHtmlStandalone(): void {
   // no shell here: answer the renderer's UniWork AI flag pull with "off" instead of an unregistered channel
   answerUniworkAiFlagOff(ipcMain)
+  answerUniworkCloudStatusOff(ipcMain)
   registerPrivilegedSchemes()
   installNavigationGuard(app)
   installContextMenu(app, () => contextMenuLabels(getUiLang()))

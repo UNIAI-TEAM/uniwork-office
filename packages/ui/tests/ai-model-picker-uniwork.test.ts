@@ -113,7 +113,7 @@ describe('AiModelPicker with UniWork AI selected', () => {
       provider: 'uniwork',
     }
     const { chip, send, hint } = await mountPickerAndComposer(settings, false, {
-      getAccountStatus: async () => ({ loggedIn: true }),
+      gskLoggedIn: async () => true,
     })
     expect(chip).toBe(AI_MODEL_PICKER_STRINGS.en.choose)
     expect(send.disabled).toBe(true)
