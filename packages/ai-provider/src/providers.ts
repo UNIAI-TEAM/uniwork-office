@@ -396,8 +396,8 @@ export function setUniworkAiAvailable(available: boolean): void {
   uniworkAvailable = available
   const at = AI_PROVIDERS.findIndex((m) => m.id === 'uniwork')
   if (available && at < 0) {
-    const genspark = AI_PROVIDERS.findIndex((m) => m.id === 'genspark')
-    AI_PROVIDERS.splice(genspark + 1, 0, UNIWORK_PROVIDER_META)
+    // UniAI leads the list (index 0): UniWork AI goes right after it
+    AI_PROVIDERS.splice(1, 0, UNIWORK_PROVIDER_META)
   } else if (!available && at >= 0) {
     AI_PROVIDERS.splice(at, 1)
   }
