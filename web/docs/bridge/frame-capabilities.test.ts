@@ -6,6 +6,7 @@ import { createDocsFrameHost } from '../protocol/host'
 import { OFFICE_MODULES, type Capabilities, type OfficeModule } from '../protocol/types'
 import { ORIGIN, wirePair } from '../protocol/test/fake-windows'
 import { FRAME_BASE_CAPABILITIES } from './module-bridge'
+import { aiHostGrants } from '../../modules/shared/ai/web-ai'
 
 const NOW = 1_000_000
 const live: Array<{ dispose(): void }> = []
@@ -49,9 +50,13 @@ async function effective(module: OfficeModule, granted: Capabilities): Promise<C
 }
 
 describe('frame base capabilities (X-02)', () => {
-  it('every frame claims download and does not claim uniworkAi yet (G6-05 flips it)', () => {
-    expect(FRAME_BASE_CAPABILITIES).toMatchObject({ download: true, desktopOpen: true, ai: true })
-    expect(FRAME_BASE_CAPABILITIES.uniworkAi).toBe(false)
+  it('every frame claims download and uniworkAi (the UniWork AI adapter is in the frame)', () => {
+    expect(FRAME_BASE_CAPABILITIES).toMatchObject({
+      download: true,
+      desktopOpen: true,
+      ai: true,
+      uniworkAi: true,
+    })
   })
 
   it.each(OFFICE_MODULES)(
@@ -65,7 +70,28 @@ describe('frame base capabilities (X-02)', () => {
     expect((await effective(m, { save: true })).download).toBe(false)
   })
 
-  it.each(OFFICE_MODULES)('%s: a host advertising uniworkAi gets no effective grant', async (m) => {
-    expect((await effective(m, { ai: true, uniworkAi: true })).uniworkAi).toBe(false)
+  it.each(OFFICE_MODULES)('%s: a host advertising uniworkAi gets the effective grant', async (m) => {
+    expect((await effective(m, { ai: true, uniworkAi: true })).uniworkAi).toBe(true)
   })
+
+  it.each(OFFICE_MODULES)('%s: no uniworkAi without the host grant', async (m) => {
+    expect((await effective(m, { ai: true })).uniworkAi).toBe(false)
+  })
+
+  it.each(OFFICE_MODULES)(
+    '%s: uniworkAi alone is effective and opens AI without credentials',
+    async (m) => {
+      const caps = await effective(m, { uniworkAi: true })
+      expect(caps.uniworkAi).toBe(true)
+      // what the module's capability object is built from (aiHostGrants over the effective set)
+      expect(aiHostGrants(caps)).toMatchObject({
+        ai: true,
+        aiCredentials: false,
+        uniworkAi: true,
+        webSearch: false,
+        imageSearch: false,
+        imageGeneration: false,
+      })
+    },
+  )
 })

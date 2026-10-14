@@ -691,6 +691,7 @@ describe('members (off = as today, on = UniWork routes)', () => {
     expect(aiHostGrants(undefined)).toEqual({
       ai: false,
       aiCredentials: false,
+      uniworkAi: false,
       webSearch: false,
       imageSearch: false,
       imageGeneration: false,
@@ -702,6 +703,7 @@ describe('members (off = as today, on = UniWork routes)', () => {
     expect(aiHostGrants({ ai: true, webSearch: true })).toEqual({
       ai: true,
       aiCredentials: true,
+      uniworkAi: false,
       webSearch: true,
       imageSearch: false,
       imageGeneration: false,
@@ -1658,5 +1660,533 @@ describe('the model of a provider with a key (UNI-1232 FX2: N3-01 / G-N1)', () =
     expect(modelIdsOf({ data: [{ id: 'gpt-x' }, { id: 'gpt-x' }, {}] })).toEqual(['gpt-x'])
     expect(modelIdsOf({ models: [{ name: 'models/gemini-x' }] })).toEqual(['gemini-x'])
     expect(modelIdsOf(null)).toEqual([])
+  })
+})
+
+// ------------------------------------------------------------------ UniWork AI (G6-05 slice C)
+// The frame side of the `uniwork` provider: the frame route client, the host transport handed to
+// the adapter, the aiStream branch (never the BYOK proxy), the Grant formula, the unlocked settings
+// entry, capability off -> hidden with no error, the server run id on aiRun. The adapter itself
+// (slicing, conversation ids, Retry-After) is slice A: these tests drive a fake `streamUniwork`.
+describe('UniWork AI on the web (G6-05)', () => {
+  const ROUTE = `${BASE}/uniwork/chat/completions`
+  const stored = (provider: string) => ({
+    provider,
+    label: '',
+    base_url: '',
+    key_hint: '…abcd',
+    created_at: '2026-10-09T00:00:00Z',
+    updated_at: '2026-10-09T00:00:00Z',
+    model: 'm-1',
+    model_updated_at: '2026-10-09T00:00:00Z',
+  })
+
+  type FakeStream = NonNullable<
+    NonNullable<Parameters<typeof createWebAiStreams>[0]['uniwork']>['stream']
+  >
+
+  const wire = (extra: Record<string, string> = {}) => ({
+    headers: { 'Content-Type': 'application/json', ...extra },
+    body: JSON.stringify({ messages: [{ role: 'user', content: 'hi' }], stream: true }),
+  })
+
+  interface Rig {
+    s: ReturnType<typeof createWebAiStreams>
+    calls: Call[]
+    chunks: Array<Record<string, unknown>>
+    onOff: ReturnType<typeof vi.fn>
+    stream: ReturnType<typeof vi.fn>
+    runIds: string[]
+  }
+
+  function rig(
+    script: FakeStream,
+    opts: {
+      answer?: (c: Call) => Response
+      aiRun?: AiRunTracker
+      cloudTools?: boolean
+      scope?: object | null
+    } = {},
+  ): Rig {
+    const { calls, fetch } = recorder((c) =>
+      (opts.answer ?? (() => jsonResponse(200, {}, { 'X-UniWork-AI-Run': 'run-srv-1' })))(c),
+    )
+    const client = createAiWebClient({
+      documentId: 'doc-1',
+      apiBase: 'https://app.test/api/v1',
+      tokens: tokens(),
+      origin: ORIGIN,
+      fetch,
+    })
+    const onOff = vi.fn()
+    const stream = vi.fn(script)
+    const runIds: string[] = []
+    const aiRun = opts.aiRun
+      ? Object.assign(opts.aiRun, { setRunId: (id: string) => runIds.push(id) })
+      : undefined
+    const s = createWebAiStreams({
+      client,
+      protocolOf: (id) => (id === 'openai' ? 'openai-compatible' : null),
+      describe: (err) => `typed:${err.code}`,
+      ...(aiRun ? { aiRun } : {}),
+      uniwork: {
+        scope: () =>
+          opts.scope === undefined
+            ? { kind: 'frame', documentId: 'doc-1', format: 'docx' }
+            : (opts.scope as never),
+        cloudTools: () => opts.cloudTools ?? false,
+        describeFailure: (f) => `uniwork:${f.code}`,
+        onOff,
+        stream: stream as unknown as FakeStream,
+      },
+    })
+    const chunks: Array<Record<string, unknown>> = []
+    s.onAiStream((c) => chunks.push(c as never))
+    return { s, calls, chunks, onOff, stream, runIds }
+  }
+
+  const uniworkTurn = (s: Rig['s'], id = 'u1', extra: object = {}) =>
+    s.aiStream({
+      requestId: id,
+      sessionId: 'sess-1',
+      settings: { provider: 'uniwork', providers: { uniwork: { apiKey: '…', model: '' } } },
+      system: 'sys',
+      messages: [{ role: 'user', content: 'hi' }],
+      tools: [{ name: 'edit_doc', description: 'd', parameters: { type: 'object' } }],
+      ...extra,
+    } as never)
+
+  const failure = (code: string, status: number, more: object = {}) =>
+    Object.assign(new Error(`uniwork ${code}`), { name: 'UniworkError', code, status, ...more })
+
+  describe('Grant formula', () => {
+    it('aiHostGrants: uniworkAi alone opens the panel, no credentials, no cloud tools', () => {
+      expect(aiHostGrants({ uniworkAi: true })).toEqual({
+        ai: true,
+        aiCredentials: false,
+        uniworkAi: true,
+        webSearch: false,
+        imageSearch: false,
+        imageGeneration: false,
+      })
+      // a cloud tool follows its own grant under either of the two
+      expect(aiHostGrants({ uniworkAi: true, webSearch: true })).toMatchObject({
+        ai: true,
+        aiCredentials: false,
+        webSearch: true,
+      })
+      expect(aiHostGrants({ ai: true, uniworkAi: true, imageSearch: true })).toMatchObject({
+        aiCredentials: true,
+        uniworkAi: true,
+        imageSearch: true,
+      })
+      // the tool grants alone still open nothing
+      expect(aiHostGrants({ webSearch: true })).toMatchObject({ ai: false, webSearch: false })
+    })
+
+    it('the frame claims uniworkAi', async () => {
+      const { AI_FRAME_CAPABILITIES } = await import('./web-ai')
+      expect(AI_FRAME_CAPABILITIES.uniworkAi).toBe(true)
+    })
+  })
+
+  describe('client.uniworkChat', () => {
+    it('posts to the frame route with the frame token and returns the raw Response', async () => {
+      const { calls, fetch } = recorder(() =>
+        jsonResponse(409, { code: 'conversation_expired' }, { 'X-UniWork-AI-Run': 'r1' }),
+      )
+      const client = createAiWebClient({
+        documentId: 'doc-1',
+        apiBase: '/api/v1',
+        tokens: tokens(),
+        origin: ORIGIN,
+        fetch,
+      })
+      const res = await client.uniworkChat({ ...wire({ 'X-UniWork-AI-Conversation': 'c1' }) })
+      // a non-2xx answer is NOT thrown here: the adapter branches on status and code itself
+      expect(res.status).toBe(409)
+      expect(res.headers.get('X-UniWork-AI-Run')).toBe('r1')
+      expect(calls[0]!.url).toBe(ROUTE)
+      expect(calls[0]!.url).not.toContain('/byok/')
+      expect(calls[0]!.init.method).toBe('POST')
+      expect(header(calls[0]!, 'authorization')).toBe('Bearer tok-1')
+      expect(header(calls[0]!, 'x-uniwork-ai-conversation')).toBe('c1')
+      expect(calls[0]!.init.credentials).toBe('omit')
+    })
+
+    it('refreshes the token once after a 401 and retries the same turn', async () => {
+      const t = tokens('old', 'new')
+      const { calls, fetch } = recorder((_c, n) =>
+        n === 1 ? jsonResponse(401, { code: 'unauthorized' }) : jsonResponse(200, {}),
+      )
+      const client = createAiWebClient({
+        documentId: 'doc-1',
+        apiBase: '/api/v1',
+        tokens: t,
+        origin: ORIGIN,
+        fetch,
+      })
+      const res = await client.uniworkChat(wire())
+      expect(res.status).toBe(200)
+      expect(calls.map((c) => header(c, 'authorization'))).toEqual(['Bearer old', 'Bearer new'])
+    })
+  })
+
+  describe('aiStream uniwork branch', () => {
+    it('goes through the frame route, never the BYOK proxy, and reports the server run id', async () => {
+      const sent: Array<{ state: string }> = []
+      const aiRun = createAiRunTracker({ report: (p) => sent.push(p), graceMs: 0 })
+      const r = rig(
+        async (transport, request, cb) => {
+          const res = await transport.post({
+            scope: request.scope,
+            ...wire(),
+            signal: cb.signal,
+          })
+          expect(res.status).toBe(200)
+          cb.onDelta('hello')
+        },
+        { aiRun },
+      )
+      await uniworkTurn(r.s)
+      expect(r.calls.map((c) => c.url)).toEqual([ROUTE])
+      expect(r.runIds).toEqual(['run-srv-1'])
+      expect(r.chunks.filter((c) => c.type === 'delta')).toEqual([
+        { requestId: 'u1', type: 'delta', text: 'hello' },
+      ])
+      expect(r.chunks.at(-1)).toEqual({ requestId: 'u1', type: 'done' })
+      expect(sent.map((p) => p.state)).toEqual(['running', 'idle'])
+    })
+
+    it('hands the adapter the frame scope, the loop history, the module tools and the cloud policy', async () => {
+      const r = rig(async () => {}, { cloudTools: true })
+      await uniworkTurn(r.s)
+      const [, request, cb] = r.stream.mock.calls[0]!
+      expect(request).toMatchObject({
+        scope: { kind: 'frame', documentId: 'doc-1', format: 'docx' },
+        messages: [{ role: 'user', content: 'hi' }],
+        tools: [{ name: 'edit_doc' }],
+        toolPolicy: { cloudTools: true },
+      })
+      expect(cb.sessionId).toBe('sess-1')
+    })
+
+    it('passes the adapter notices and a turn reset on to the panel, in order', async () => {
+      const r = rig(async (_t, _req, cb) => {
+        cb.onDelta('partial')
+        cb.onNotice?.({ kind: 'rate-limit-wait', seconds: 120, attempt: 1 })
+        cb.onTurnReset?.()
+        cb.onDelta('whole')
+        cb.onNotice?.({ kind: 'step', step: 1, limit: 12 })
+      })
+      await uniworkTurn(r.s)
+      expect(r.chunks.map((c) => c.type)).toEqual([
+        'delta',
+        'notice',
+        'reset',
+        'delta',
+        'notice',
+        'done',
+      ])
+      expect(r.chunks[1]).toMatchObject({
+        notice: { kind: 'rate-limit-wait', seconds: 120, attempt: 1 },
+      })
+      // a wait is a notice, never an error
+      expect(r.chunks.some((c) => c.type === 'error')).toBe(false)
+    })
+
+    it.each([
+      ['run_limit_reached', 409, undefined],
+      ['credits_exhausted', 402, undefined],
+      ['entitlement_required', 403, undefined],
+      ['ai_provider_error', 502, undefined],
+      ['rate_limited', 429, 301],
+    ])('a %s failure (%i) is one error chunk with the code, in the failure text', async (code, status, retry) => {
+      const r = rig(async () => {
+        throw failure(code, status, retry ? { retryAfterSec: retry } : {})
+      })
+      await uniworkTurn(r.s)
+      const err = r.chunks.at(-1)!
+      expect(err).toMatchObject({ type: 'error', error: `uniwork:${code}`, uniworkCode: code })
+      if (retry) expect(err.retryAfterSec).toBe(retry)
+      // never the BYOK classifier's `overloaded`, and no floating card
+      expect(err.errorCode).toBeUndefined()
+      expect(document.querySelector('.ow-ai-state')).toBeNull()
+    })
+
+    it('UniWork AI off before any run: hides the entry, asks the panel for no error chip', async () => {
+      const r = rig(async (_t, _req, cb) => {
+        cb.onNotice?.({ kind: 'uniwork-off' })
+        throw failure('office_capability_off', 403)
+      })
+      await uniworkTurn(r.s)
+      expect(r.onOff).toHaveBeenCalledTimes(1)
+      expect(r.chunks.find((c) => c.type === 'notice')).toMatchObject({
+        notice: { kind: 'uniwork-off' },
+      })
+      expect(r.chunks.at(-1)).toMatchObject({ type: 'error', uniworkCode: 'office_capability_off' })
+      expect(document.querySelector('.ow-ai-state')).toBeNull()
+    })
+
+    it('a frame without the UniWork scope answers as off, sends nothing', async () => {
+      const r = rig(async () => {}, { scope: null })
+      await uniworkTurn(r.s)
+      expect(r.stream).not.toHaveBeenCalled()
+      expect(r.calls).toEqual([])
+      expect(r.onOff).toHaveBeenCalledTimes(1)
+      expect(r.chunks.at(-1)).toMatchObject({ type: 'error', uniworkCode: 'office_capability_off' })
+    })
+
+    it('uniwork 503 then a BYOK turn completes (G6-A08)', async () => {
+      const r = rig(
+        async () => {
+          throw failure('cloud_unavailable', 503)
+        },
+        {
+          answer: (c) =>
+            c.url.includes('/byok/')
+              ? sseResponse([
+                  `data: ${JSON.stringify({ choices: [{ delta: { content: 'ok' }, finish_reason: 'stop' }] })}\n\n`,
+                  'data: [DONE]\n\n',
+                ])
+              : jsonResponse(200, {}),
+        },
+      )
+      await uniworkTurn(r.s, 'u-503')
+      expect(r.chunks.at(-1)).toMatchObject({ type: 'error', uniworkCode: 'cloud_unavailable' })
+      await r.s.aiStream({
+        requestId: 'b1',
+        sessionId: 'sess-1',
+        settings: { provider: 'openai', providers: { openai: { apiKey: 'x', model: 'm-1' } } },
+        system: 's',
+        messages: [{ role: 'user', content: 'hi' }],
+      } as never)
+      expect(r.chunks.filter((c) => c.requestId === 'b1').at(-1)).toEqual({
+        requestId: 'b1',
+        type: 'done',
+      })
+      expect(r.calls.at(-1)!.url).toBe(`${BASE}/byok/openai/chat/completions`)
+    })
+
+    describe('uniwork turn: one idle per ending path', () => {
+      const paths: Array<[string, FakeStream]> = [
+        ['done', async () => {}],
+        [
+          'error',
+          async () => {
+            throw failure('ai_provider_error', 502)
+          },
+        ],
+        [
+          '401',
+          async () => {
+            throw failure('unauthorized', 401)
+          },
+        ],
+        [
+          'disconnect',
+          async () => {
+            throw new TypeError('Failed to fetch')
+          },
+        ],
+        [
+          '429 give-up',
+          async () => {
+            throw failure('ai_rate_limited', 429)
+          },
+        ],
+      ]
+      it.each(paths)('%s', async (_name, script) => {
+        const sent: string[] = []
+        const aiRun = createAiRunTracker({ report: (p) => sent.push(p.state), graceMs: 0 })
+        const r = rig(script, { aiRun })
+        await uniworkTurn(r.s)
+        expect(sent).toEqual(['running', 'idle'])
+        expect(aiRun.running()).toBe(false)
+        expect(r.chunks.filter((c) => c.type === 'done' || c.type === 'error')).toHaveLength(1)
+      })
+
+      it('Stop ends the run with one idle and a done', async () => {
+        const sent: string[] = []
+        const aiRun = createAiRunTracker({ report: (p) => sent.push(p.state), graceMs: 0 })
+        const r = rig(
+          (_t, _req, cb) =>
+            new Promise<void>((_resolve, reject) =>
+              cb.signal.addEventListener('abort', () =>
+                reject(Object.assign(new Error('aborted'), { name: 'AbortError' })),
+              ),
+            ),
+          { aiRun },
+        )
+        const turn = uniworkTurn(r.s)
+        expect(aiRun.running()).toBe(true)
+        await r.s.aiStreamCancel('u1')
+        await turn
+        expect(sent).toEqual(['running', 'idle'])
+        expect(r.chunks.at(-1)).toEqual({ requestId: 'u1', type: 'done' })
+      })
+
+      it('a Retry-After wait inside the adapter keeps the run running, one idle at the end', async () => {
+        vi.useFakeTimers()
+        try {
+          const sent: string[] = []
+          const aiRun = createAiRunTracker({ report: (p) => sent.push(p.state), graceMs: 0 })
+          const r = rig(
+            async (_t, _req, cb) => {
+              cb.onNotice?.({ kind: 'rate-limit-wait', seconds: 120, attempt: 1 })
+              await new Promise((resolve) => setTimeout(resolve, 120_000))
+              cb.onDelta('after the wait')
+            },
+            { aiRun },
+          )
+          const turn = uniworkTurn(r.s)
+          await vi.advanceTimersByTimeAsync(119_000)
+          expect(sent).toEqual(['running'])
+          await vi.advanceTimersByTimeAsync(2_000)
+          await turn
+          expect(sent).toEqual(['running', 'idle'])
+        } finally {
+          vi.useRealTimers()
+        }
+      })
+    })
+  })
+
+  describe('createWebAi with uniworkAi', () => {
+    function uniworkPort(caps: Record<string, boolean>, module?: string) {
+      return {
+        whenInitialized: async () => ({
+          documentId: 'doc-1',
+          apiBase: 'https://app.test/api/v1',
+          capabilities: caps,
+          ...(module ? { module } : {}),
+        }),
+        ...tokens(),
+      }
+    }
+
+    it('uniworkAi alone: active, no credential list read, an unlocked UniWork AI entry chosen by default', async () => {
+      const { calls, fetch } = recorder(() => jsonResponse(404, { code: 'not_found' }))
+      const capabilities: Record<string, unknown> = { ai: true, uniworkAi: true }
+      const ai = createWebAi({
+        port: uniworkPort({ uniworkAi: true }),
+        capabilities,
+        fetch,
+        origin: ORIGIN,
+      })
+      expect(await ai.active()).toBe(true)
+      const s = await ai.settings()
+      expect(s.provider).toBe('uniwork')
+      // not locked: the picker sees a non-empty key slot; no credential-list failure either
+      expect(s.providers.uniwork.apiKey).not.toBe('')
+      expect(s.credentialsUnavailable).toBeUndefined()
+      expect(s.uniAiAvailable).toBe(false)
+      // no BYOK listing, no cloud read without a cloud grant: nothing was asked of the server
+      expect(calls).toEqual([])
+    })
+
+    it('with ai and uniworkAi both: BYOK stays the default, UniWork AI is chosen on request', async () => {
+      const { fetch } = recorder((c) =>
+        c.url.endsWith('/credentials')
+          ? jsonResponse(200, { items: [stored('openai')], providers: CREDENTIALS.providers })
+          : jsonResponse(200, CLOUD),
+      )
+      const ai = createWebAi({
+        port: uniworkPort({ ai: true, uniworkAi: true }),
+        capabilities: { ai: true, uniworkAi: true },
+        fetch,
+        origin: ORIGIN,
+        now: () => 0,
+      })
+      expect((await ai.settings()).provider).toBe('openai')
+      ai.choose('uniwork')
+      const s = await ai.settings()
+      expect(s.provider).toBe('uniwork')
+      expect(s.providers.uniwork.apiKey).not.toBe('')
+      expect(s.providers.openai.apiKey).toBe('…abcd')
+    })
+
+    it('without the uniworkAi grant there is no UniWork AI entry, and a stored choice of it is ignored', async () => {
+      localStorage.setItem(
+        'uniwork.office.web.ai.choice',
+        JSON.stringify({ provider: 'uniwork', models: {} }),
+      )
+      const { fetch } = recorder((c) =>
+        c.url.endsWith('/credentials')
+          ? jsonResponse(200, { items: [stored('openai')], providers: CREDENTIALS.providers })
+          : jsonResponse(200, CLOUD),
+      )
+      const ai = createWebAi({
+        port: uniworkPort({ ai: true }),
+        capabilities: { ai: true },
+        fetch,
+        origin: ORIGIN,
+        now: () => 0,
+      })
+      const s = await ai.settings()
+      expect(s.provider).toBe('openai')
+      expect(s.providers.uniwork?.apiKey ?? '').toBe('')
+    })
+
+    it('the scope carries the document and the module of the session as the format token', async () => {
+      const seen: unknown[] = []
+      const { fetch } = recorder(() => jsonResponse(200, {}))
+      const ai = createWebAi({
+        port: uniworkPort({ uniworkAi: true }, 'sheets'),
+        capabilities: { ai: true, uniworkAi: true },
+        fetch,
+        origin: ORIGIN,
+        uniworkStream: async (_t, request) => {
+          seen.push(request.scope)
+        },
+      })
+      const api = withWebAi({ aiStream: async () => {}, onAiStream: () => () => {} }, ai)
+      await (api.aiStream as (r: unknown) => Promise<void>)({
+        requestId: 'x1',
+        settings: { provider: 'uniwork', providers: {} },
+        system: '',
+        messages: [{ role: 'user', content: 'hi' }],
+      })
+      expect(seen).toEqual([{ kind: 'frame', documentId: 'doc-1', format: 'xlsx' }])
+    })
+
+    it('office_capability_off before any run: the entry hides, the key goes off, no error chip, BYOK untouched', async () => {
+      const { fetch } = recorder((c) =>
+        c.url.endsWith('/credentials')
+          ? jsonResponse(200, { items: [stored('openai')], providers: CREDENTIALS.providers })
+          : jsonResponse(200, CLOUD),
+      )
+      const capabilities: Record<string, unknown> = { ai: true, uniworkAi: true }
+      const ai = createWebAi({
+        port: uniworkPort({ ai: true, uniworkAi: true }),
+        capabilities,
+        fetch,
+        origin: ORIGIN,
+        now: () => 0,
+        uniworkStream: async (_t, _r, cb) => {
+          cb.onNotice?.({ kind: 'uniwork-off' })
+          throw failure('office_capability_off', 403)
+        },
+      })
+      ai.choose('uniwork')
+      expect((await ai.settings()).provider).toBe('uniwork')
+      const changed = vi.fn()
+      ai.onChanged(changed)
+      const chunks: Array<Record<string, unknown>> = []
+      ai.streams.onAiStream((c) => chunks.push(c as never))
+      await ai.streams.aiStream({
+        requestId: 'off1',
+        settings: await ai.settings(),
+        system: '',
+        messages: [{ role: 'user', content: 'hi' }],
+      } as never)
+      expect(capabilities.uniworkAi).toBe(false)
+      expect(changed).toHaveBeenCalled()
+      expect(document.querySelector('.ow-ai-state')).toBeNull()
+      const s = await ai.settings()
+      expect(s.providers.uniwork?.apiKey ?? '').toBe('')
+      expect(s.provider).toBe('openai')
+      expect(chunks.at(-1)).toMatchObject({ type: 'error', uniworkCode: 'office_capability_off' })
+    })
   })
 })
