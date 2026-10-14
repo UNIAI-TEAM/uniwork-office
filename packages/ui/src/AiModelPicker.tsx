@@ -46,6 +46,7 @@ export function AiModelPicker({
   const [settings, setSettings] = useState<AiSettings | null>(null)
   const [loggedIn, setLoggedIn] = useState(false)
   const [open, setOpen] = useState(false)
+  const [orgNoteSeen, setOrgNoteSeen] = useState(false)
   const [popStyle, setPopStyle] = useState<React.CSSProperties>({})
   const chipRef = useRef<HTMLButtonElement | null>(null)
   const popRef = useRef<HTMLDivElement | null>(null)
@@ -84,14 +85,26 @@ export function AiModelPicker({
     () => (settings ? aiModelPickerGroups(settings, loggedIn) : []),
     [settings, loggedIn],
   )
+  const hasOrgGroup = groups.some((g) => settings?.modelSources?.[g.id]?.origin === 'org')
   // what the listbox's quiet notes say, read out once through a live region beside the listbox
-  const listNote = [...new Set(groups.map((g) => g.listState))]
-    .map((state) =>
+  const listNote = [
+    ...[...new Set(groups.map((g) => g.listState))].map((state) =>
       state === 'loading' ? strings.modelsLoading : state ? strings.modelsUnavailable : '',
-    )
+    ),
+    hasOrgGroup && !orgNoteSeen ? strings.orgKeyNote : '',
+  ]
     .filter(Boolean)
     .join('. ')
-  const current = settings ? aiModelPickerSelection(settings) : null
+  const rawCurrent = settings ? aiModelPickerSelection(settings) : null
+  const current = useMemo<AiModelPickerSelection | null>(() => {
+    if (!settings || !rawCurrent) return rawCurrent
+    const src = settings.modelSources?.[rawCurrent.provider]
+    const storedModel = settings.providers?.[rawCurrent.provider]?.model?.trim() ?? ''
+    if (src?.origin === 'org' && !storedModel && src.chosen.trim()) {
+      return { provider: rawCurrent.provider, model: src.chosen.trim() }
+    }
+    return rawCurrent
+  }, [settings, rawCurrent])
   const currentUsable = groups.some((g) => g.id === current?.provider)
   // the wanted provider is read raw (a key list that failed to load masks nothing here)
   const wanted = settings?.provider
@@ -149,6 +162,9 @@ export function AiModelPicker({
   const pick = (sel: AiModelPickerSelection) => {
     setOpen(false)
     if (!settings) return
+    if (settings.modelSources?.[sel.provider]?.origin === 'org') {
+      setOrgNoteSeen(true)
+    }
     const next = withAiModelSelection(settings, sel)
     setSettings(next)
     void bridge.setSettings(next).catch(() => {})
@@ -210,48 +226,74 @@ export function AiModelPicker({
           style={popStyle}
         >
           <div className="ai-model-pop-list">
-            {groups.map((g) => (
-              <div key={g.id} className="ai-model-group">
-                <div className="ai-model-group-head">
-                  <ProviderLogo id={g.id} />
-                  <span>{g.label}</span>
-                </div>
-                {g.listState && (
-                  // plain text for sighted users; screen readers get it from the live region
-                  // outside the listbox, since a listbox may only own options and groups
-                  <div className="ai-model-group-head" role="presentation" aria-hidden>
-                    {g.listState === 'loading' ? strings.modelsLoading : strings.modelsUnavailable}
+            {groups.map((g) => {
+              const isOrg = settings.modelSources?.[g.id]?.origin === 'org'
+              return (
+                <div key={g.id} className="ai-model-group" data-origin={isOrg ? 'org' : undefined}>
+                  <div className="ai-model-group-head">
+                    <ProviderLogo id={g.id} />
+                    <span>{g.label}</span>
+                    {isOrg && (
+                      <span
+                        data-org-key-tag=""
+                        title={strings.orgKeyNote}
+                        data-tip={strings.orgKeyNote}
+                        style={ORG_KEY_TAG_STYLE}
+                      >
+                        {strings.orgKeyTag}
+                      </span>
+                    )}
                   </div>
-                )}
-                {(g.models.length > 0 ? g.models : ['']).map((m) => {
-                  const selected = current?.provider === g.id && current.model === m
-                  return (
-                    <button
-                      key={`${g.id}:${m}`}
-                      type="button"
-                      role="option"
-                      aria-selected={selected}
-                      className={`ai-model-item${selected ? ' selected' : ''}`}
-                      onClick={() => pick({ provider: g.id, model: m })}
+                  {isOrg && !orgNoteSeen && (
+                    <div
+                      className="ai-model-group-head"
+                      role="presentation"
+                      aria-hidden
+                      data-org-key-note=""
+                      style={ORG_KEY_NOTE_STYLE}
                     >
-                      <span className="ai-model-item-text">{m || g.rowLabel}</span>
-                      {selected && (
-                        <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden>
-                          <path
-                            d="M2.5 6.5 5 9l4.5-6"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="1.6"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                      )}
-                    </button>
-                  )
-                })}
-              </div>
-            ))}
+                      {strings.orgKeyNote}
+                    </div>
+                  )}
+                  {g.listState && (
+                    // plain text for sighted users; screen readers get it from the live region
+                    // outside the listbox, since a listbox may only own options and groups
+                    <div className="ai-model-group-head" role="presentation" aria-hidden>
+                      {g.listState === 'loading'
+                        ? strings.modelsLoading
+                        : strings.modelsUnavailable}
+                    </div>
+                  )}
+                  {(g.models.length > 0 ? g.models : ['']).map((m) => {
+                    const selected = current?.provider === g.id && current.model === m
+                    return (
+                      <button
+                        key={`${g.id}:${m}`}
+                        type="button"
+                        role="option"
+                        aria-selected={selected}
+                        className={`ai-model-item${selected ? ' selected' : ''}`}
+                        onClick={() => pick({ provider: g.id, model: m })}
+                      >
+                        <span className="ai-model-item-text">{m || g.rowLabel}</span>
+                        {selected && (
+                          <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden>
+                            <path
+                              d="M2.5 6.5 5 9l4.5-6"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.6"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+              )
+            })}
           </div>
           {bridge.openModelSettings && (
             <button type="button" className="ai-model-item ai-model-manage" onClick={manage}>
@@ -279,6 +321,28 @@ export function AiModelPicker({
       </div>
     </div>
   )
+}
+
+const ORG_KEY_TAG_STYLE: React.CSSProperties = {
+  marginLeft: 'auto',
+  padding: '1px 6px',
+  borderRadius: 'var(--radius-6)',
+  background: 'var(--surface-subtle)',
+  border: '1px solid var(--border-subtle)',
+  color: 'var(--text-secondary)',
+  fontSize: 10,
+  fontWeight: 500,
+  lineHeight: 1.4,
+  whiteSpace: 'nowrap',
+}
+
+const ORG_KEY_NOTE_STYLE: React.CSSProperties = {
+  paddingTop: 2,
+  paddingBottom: 4,
+  color: 'var(--text-secondary)',
+  fontSize: 11,
+  fontWeight: 400,
+  lineHeight: 1.4,
 }
 
 /** screen-reader-only: the box stays in the layout flow but takes no space and shows nothing */
