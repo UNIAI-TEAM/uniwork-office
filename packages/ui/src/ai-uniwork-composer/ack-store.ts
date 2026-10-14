@@ -22,30 +22,93 @@ export function serializeUniworkAckKey(key: UniworkAckKey | null | undefined): s
   return `${account}|${org}|${document}`
 }
 
+const memoryAcks = new Set<string>()
+const listeners = new Set<() => void>()
+
+function readStorageAcks(): string[] {
+  if (typeof localStorage === 'undefined') return []
+  try {
+    const raw = localStorage.getItem(UNIWORK_ACK_STORAGE_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as unknown
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter((x): x is string => typeof x === 'string' && x.length > 0)
+  } catch {
+    return []
+  }
+}
+
+function writeStorageAcks(entries: Iterable<string>): void {
+  if (typeof localStorage === 'undefined') return
+  try {
+    localStorage.setItem(UNIWORK_ACK_STORAGE_KEY, JSON.stringify([...new Set(entries)]))
+  } catch {
+    // storage blocked or quota exceeded: memoryAcks still holds for this session
+  }
+}
+
+function notifyListeners(): void {
+  for (const listener of [...listeners]) {
+    try {
+      listener()
+    } catch {
+      // ignore listener errors
+    }
+  }
+}
+
 /** Whether the user has acknowledged the S8 disclosure for this account + org + document */
-export function isAcked(_key: UniworkAckKey | null | undefined): boolean {
+export function isAcked(key: UniworkAckKey | null | undefined): boolean {
+  const serialized = serializeUniworkAckKey(key)
+  if (!serialized) return false
+  if (memoryAcks.has(serialized)) return true
+  const stored = readStorageAcks()
+  if (stored.includes(serialized)) {
+    memoryAcks.add(serialized)
+    return true
+  }
   return false
 }
 
 /** Records the user's S8 disclosure acknowledgment for this account + org + document */
-export function ack(_key: UniworkAckKey | null | undefined): void {
-  // implemented in behaviour commit
+export function ack(key: UniworkAckKey | null | undefined): void {
+  const serialized = serializeUniworkAckKey(key)
+  if (!serialized) return
+  const stored = readStorageAcks()
+  for (const item of stored) memoryAcks.add(item)
+  const had = memoryAcks.has(serialized)
+  memoryAcks.add(serialized)
+  writeStorageAcks(memoryAcks)
+  if (!had) notifyListeners()
 }
 
 /** Clears all stored disclosure acknowledgments (used by tests and sign-out cleanup) */
 export function clearUniworkAcks(): void {
-  // implemented in behaviour commit
+  const hadAny = memoryAcks.size > 0 || readStorageAcks().length > 0
+  memoryAcks.clear()
+  if (typeof localStorage !== 'undefined') {
+    try {
+      localStorage.removeItem(UNIWORK_ACK_STORAGE_KEY)
+    } catch {
+      // ignore
+    }
+  }
+  if (hadAny) notifyListeners()
 }
 
 /** Subscribes to disclosure acknowledgment changes */
-export function subscribeUniworkAck(_listener: () => void): () => void {
-  return () => {}
+export function subscribeUniworkAck(listener: () => void): () => void {
+  listeners.add(listener)
+  return () => {
+    listeners.delete(listener)
+  }
 }
 
 /** React hook binding an ack key to `isAcked` / `ack` state */
 export function useUniworkDisclosureAck(key: UniworkAckKey | null | undefined): {
   readonly acked: boolean
   readonly needsAck: boolean
+  readonly ackNow: () => void
   readonly acknowledge: () => void
 } {
   const [, setTick] = useState(0)
@@ -55,5 +118,5 @@ export function useUniworkDisclosureAck(key: UniworkAckKey | null | undefined): 
     ack(key)
     setTick((n) => n + 1)
   }, [key])
-  return { acked, needsAck: !acked, acknowledge }
+  return { acked, needsAck: !acked, ackNow: acknowledge, acknowledge }
 }

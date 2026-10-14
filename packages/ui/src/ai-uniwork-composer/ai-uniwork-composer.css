@@ -1,0 +1,171 @@
+/* UniWork AI composer surfaces (G6-05u S7–S11): composer note, first-use disclosure,
+ * post-ack short line, view-only sub-line, polite live region, and 44x44px coarse pointer targets.
+ * Uses only semantic tokens from packages/ui/src/tokens.css. */
+
+.ai-uniwork-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.ai-uniwork-composer-note {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-subtle);
+  color: var(--text-primary);
+  font-family: var(--gs-font-sans);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.ai-uniwork-composer-note-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--text-primary);
+}
+
+.ai-uniwork-composer-note-action {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-primary);
+  font-family: var(--gs-font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.ai-uniwork-composer-note-action:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-hover);
+}
+
+.ai-uniwork-composer-note-action:focus-visible {
+  outline: 2px solid var(--color-border-brand);
+  outline-offset: 1px;
+}
+
+.ai-uniwork-disclosure {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  margin-bottom: 6px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-subtle);
+  color: var(--text-primary);
+  font-family: var(--gs-font-sans);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.ai-uniwork-disclosure:focus-visible,
+.ai-uniwork-disclosure:focus {
+  outline: 2px solid var(--color-border-brand);
+  outline-offset: 1px;
+}
+
+.ai-uniwork-disclosure-body {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.ai-uniwork-disclosure-restart {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-secondary);
+}
+
+.ai-uniwork-disclosure-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ai-uniwork-disclosure-ack {
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: var(--color-btn-primary);
+  color: var(--color-btn-primary-text);
+  font-family: var(--gs-font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.ai-uniwork-disclosure-ack:hover {
+  background: var(--color-btn-primary-hover);
+}
+
+.ai-uniwork-disclosure-ack:focus-visible {
+  outline: 2px solid var(--color-border-brand);
+  outline-offset: 1px;
+}
+
+.ai-uniwork-disclosure-learn {
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--gs-font-sans);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.ai-uniwork-disclosure-learn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.ai-uniwork-disclosure-learn:focus-visible {
+  outline: 2px solid var(--color-border-brand);
+  outline-offset: 1px;
+}
+
+.ai-uniwork-disclosure-short,
+.ai-uniwork-view-only {
+  margin-top: 4px;
+  padding: 2px 4px;
+  color: var(--text-secondary);
+  font-family: var(--gs-font-sans);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.ai-send-btn[aria-disabled='true'] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.ai-send-btn[aria-disabled='true'] img {
+  filter: var(--ai-send-off-filter);
+}
+
+@media (pointer: coarse) {
+  .ai-send-btn,
+  .ai-stop-btn,
+  .ai-uniwork-composer-note-action,
+  .ai-uniwork-disclosure-ack,
+  .ai-uniwork-disclosure-learn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}

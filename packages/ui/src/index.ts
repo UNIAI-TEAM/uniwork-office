@@ -164,6 +164,7 @@ export {
   clearUniworkAcks,
   isAcked,
   isComposerPopupOpen,
+  resolveComposerNoteText,
   serializeUniworkAckKey,
   subscribeUniworkAck,
   useUniworkDisclosureAck,

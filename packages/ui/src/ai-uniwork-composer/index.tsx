@@ -1,8 +1,12 @@
-import type React from 'react'
+import React, { useCallback, useEffect, useId, useRef, useState } from 'react'
 import type { Lang } from '@genoffice/i18n'
-import type { ComposerNote, ComposerNoteAction } from '@genoffice/ai-provider/browser'
-import type { AiUniworkStringKey } from '../strings-ai-uniwork'
-import type { UniworkAckKey } from './ack-store'
+import {
+  aiNoticeText,
+  type ComposerNote,
+  type ComposerNoteAction,
+} from '@genoffice/ai-provider/browser'
+import { aiUniworkText, type AiUniworkStringKey } from '../strings-ai-uniwork'
+import { useUniworkDisclosureAck, type UniworkAckKey } from './ack-store'
 
 export {
   UNIWORK_ACK_STORAGE_KEY,
@@ -17,6 +21,15 @@ export {
 
 export type UniworkDisclosureVariant = 'document' | 'local'
 
+/** Resolves the localized body text for a `ComposerNote` */
+export function resolveComposerNoteText(note: ComposerNote, lang: Lang = 'vi'): string {
+  if (note.text) return note.text
+  if (note.key === 'not_entitled' || note.key === 'credits_exhausted') {
+    return aiNoticeText(note.key, lang === 'vi' ? 'vi' : 'en')
+  }
+  return aiUniworkText(lang, note.key)
+}
+
 export interface UniworkComposerNoteProps {
   /** Resolved composer note from `composerNoteFor`; renders nothing when `null` */
   readonly note: ComposerNote | null | undefined
@@ -27,6 +40,8 @@ export interface UniworkComposerNoteProps {
   /** Invoked when the user clicks the note's action button (also clears the note) */
   readonly onAction?: ((action: ComposerNoteAction, note: ComposerNote) => void) | undefined
   /** Invoked when the user clicks "Chọn nhà cung cấp khác" (`aiRunChooseOther`) */
+  readonly onChooseProvider?: (() => void) | undefined
+  /** Alias for `onChooseProvider` */
   readonly onChooseOtherProvider?: (() => void) | undefined
   /** Invoked when the user clicks "Đăng nhập" (`acctSignIn`) on a `signed-out` note */
   readonly onSignIn?: (() => void) | undefined
@@ -38,8 +53,90 @@ export interface UniworkComposerNoteProps {
  * S7–S9 Composer note above the composer (one at a time, no auto-hide, clears on action or
  * provider change, announced once through a persistent polite live region).
  */
-export function UniworkComposerNote(_props: UniworkComposerNoteProps): React.JSX.Element | null {
-  return null
+export function UniworkComposerNote({
+  note,
+  lang = 'vi',
+  provider = 'uniwork',
+  onAction,
+  onChooseProvider,
+  onChooseOtherProvider,
+  onSignIn,
+  onAnnounce,
+}: UniworkComposerNoteProps): React.JSX.Element | null {
+  const [dismissed, setDismissed] = useState<{ provider: string; kind: string } | null>(null)
+  const [localLiveText, setLocalLiveText] = useState('')
+  const prevProviderRef = useRef(provider)
+
+  useEffect(() => {
+    if (prevProviderRef.current !== provider) {
+      prevProviderRef.current = provider
+      setDismissed(null)
+    }
+  }, [provider])
+
+  const isDismissed =
+    dismissed !== null &&
+    dismissed.provider === provider &&
+    note !== null &&
+    note !== undefined &&
+    dismissed.kind === note.kind
+
+  const visibleNote =
+    note && (provider === undefined || provider === 'uniwork') && !isDismissed ? note : null
+  const bodyText = visibleNote ? resolveComposerNoteText(visibleNote, lang) : ''
+
+  useEffect(() => {
+    if (!bodyText) return
+    if (onAnnounce) {
+      onAnnounce(bodyText)
+    } else {
+      setLocalLiveText(bodyText)
+    }
+  }, [bodyText, onAnnounce])
+
+  if (!visibleNote) {
+    return onAnnounce ? null : (
+      <div className="ai-uniwork-sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {localLiveText}
+      </div>
+    )
+  }
+
+  const actionLabel =
+    visibleNote.action === 'sign-in'
+      ? aiUniworkText(lang, 'acctSignIn')
+      : aiUniworkText(lang, 'aiRunChooseOther')
+
+  const handleActionClick = () => {
+    setDismissed({ provider, kind: visibleNote.kind })
+    onAction?.(visibleNote.action, visibleNote)
+    if (visibleNote.action === 'sign-in') {
+      onSignIn?.()
+    } else {
+      onChooseProvider?.()
+      onChooseOtherProvider?.()
+    }
+  }
+
+  return (
+    <>
+      {!onAnnounce && (
+        <div className="ai-uniwork-sr-only" role="status" aria-live="polite" aria-atomic="true">
+          {localLiveText}
+        </div>
+      )}
+      <div className="ai-uniwork-composer-note" data-note-kind={visibleNote.kind}>
+        <span className="ai-uniwork-composer-note-text">{bodyText}</span>
+        <button
+          type="button"
+          className="ai-uniwork-composer-note-action"
+          onClick={handleActionClick}
+        >
+          {actionLabel}
+        </button>
+      </div>
+    </>
+  )
 }
 
 export interface UniworkDisclosureProps {
@@ -71,8 +168,101 @@ export interface UniworkDisclosureProps {
  * S8/S10 AI disclosure region above the composer (`role="region"`, `aria-label=aiUniworkDisclosureLabel`,
  * `tabIndex=-1`, never steals focus on appear, read polite).
  */
-export function UniworkDisclosure(_props: UniworkDisclosureProps): React.JSX.Element | null {
-  return null
+export function UniworkDisclosure({
+  ackKey,
+  needsAck,
+  orgName,
+  variant = 'document',
+  lang = 'vi',
+  sentenceId,
+  regionRef,
+  onAck,
+  onLearnMore,
+  showShortWhenAcked = false,
+  onAnnounce,
+}: UniworkDisclosureProps): React.JSX.Element | null {
+  const autoId = useId()
+  const resolvedSentenceId = sentenceId ?? `ai-uniwork-disclosure-sentence-${autoId}`
+  const { acked, acknowledge } = useUniworkDisclosureAck(ackKey)
+  const shouldShow = needsAck ?? (ackKey ? !acked : true)
+  const [localLiveText, setLocalLiveText] = useState('')
+
+  const org = orgName?.trim() || 'UniWork'
+  const primaryText =
+    variant === 'local'
+      ? aiUniworkText(lang, 'aiUniworkLocalFile', { org })
+      : aiUniworkText(lang, 'aiUniworkDisclosure', { org })
+  const restartText = variant === 'local' ? aiUniworkText(lang, 'aiUniworkLocalFileRestart') : ''
+  const fullText = restartText ? `${primaryText} ${restartText}` : primaryText
+
+  useEffect(() => {
+    if (!shouldShow) return
+    if (onAnnounce) {
+      onAnnounce(fullText)
+    } else {
+      setLocalLiveText(fullText)
+    }
+  }, [shouldShow, fullText, onAnnounce])
+
+  const setRegionNode = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (regionRef && 'current' in regionRef) {
+        ;(regionRef as React.MutableRefObject<HTMLElement | null>).current = node
+      }
+    },
+    [regionRef],
+  )
+
+  if (!shouldShow) {
+    if (showShortWhenAcked) {
+      return <UniworkDisclosureShort orgName={org} variant={variant} lang={lang} />
+    }
+    return null
+  }
+
+  return (
+    <>
+      {!onAnnounce && (
+        <div className="ai-uniwork-sr-only" role="status" aria-live="polite" aria-atomic="true">
+          {localLiveText}
+        </div>
+      )}
+      <div
+        ref={setRegionNode}
+        className="ai-uniwork-disclosure"
+        role="region"
+        aria-label={aiUniworkText(lang, 'aiUniworkDisclosureLabel')}
+        tabIndex={-1}
+      >
+        <p id={resolvedSentenceId} className="ai-uniwork-disclosure-body">
+          {primaryText}
+          {restartText ? (
+            <span className="ai-uniwork-disclosure-restart"> {restartText}</span>
+          ) : null}
+        </p>
+        <div className="ai-uniwork-disclosure-actions">
+          <button
+            type="button"
+            className="ai-uniwork-disclosure-ack"
+            aria-describedby={resolvedSentenceId}
+            onClick={() => {
+              acknowledge()
+              onAck?.()
+            }}
+          >
+            {aiUniworkText(lang, 'aiUniworkAck')}
+          </button>
+          <button
+            type="button"
+            className="ai-uniwork-disclosure-learn"
+            onClick={() => onLearnMore?.()}
+          >
+            {aiUniworkText(lang, 'aiUniworkLearnMore')}
+          </button>
+        </div>
+      </div>
+    </>
+  )
 }
 
 export interface UniworkDisclosureShortProps {
@@ -87,10 +277,20 @@ export interface UniworkDisclosureShortProps {
 /**
  * Permanent post-acknowledgment sub-line under the composer (`aiUniworkDisclosureShort`).
  */
-export function UniworkDisclosureShort(
-  _props: UniworkDisclosureShortProps,
-): React.JSX.Element | null {
-  return null
+export function UniworkDisclosureShort({
+  orgName,
+  variant = 'document',
+  lang = 'vi',
+}: UniworkDisclosureShortProps): React.JSX.Element {
+  const org = orgName?.trim() || 'UniWork'
+  const shortText = aiUniworkText(lang, 'aiUniworkDisclosureShort', { org })
+  const restartText = variant === 'local' ? aiUniworkText(lang, 'aiUniworkLocalFileRestart') : ''
+  return (
+    <div className="ai-uniwork-disclosure-short">
+      {shortText}
+      {restartText ? ` ${restartText}` : ''}
+    </div>
+  )
 }
 
 export interface AiComposerUniworkDisclosureConfig {
@@ -113,9 +313,8 @@ export interface AiComposerUniworkDisclosureConfig {
   /** Called when the user clicks "Tìm hiểu thêm" (`aiUniworkLearnMore`) */
   readonly onLearnMore?: (() => void) | undefined
   /**
-   * When true (default true unless `external` is set), `AiComposer` renders `<UniworkDisclosure>`
-   * above the input box and `<UniworkDisclosureShort>` below it. Set `false` if the panel mounts
-   * `<UniworkDisclosure>` and `<UniworkDisclosureShort>` itself.
+   * When true (default true), `AiComposer` renders `<UniworkDisclosure>` above the input box
+   * and `<UniworkDisclosureShort>` below it. Set `false` if the panel mounts them itself.
    */
   readonly renderInline?: boolean | undefined
 }
@@ -132,6 +331,8 @@ export interface AiComposerUniworkProps {
   /** Invoked when the user clicks the composer note's action button */
   readonly onNoteAction?: ((action: ComposerNoteAction, note: ComposerNote) => void) | undefined
   /** Invoked when the user clicks "Chọn nhà cung cấp khác" on a composer note */
+  readonly onChooseProvider?: (() => void) | undefined
+  /** Alias for `onChooseProvider` */
   readonly onChooseOtherProvider?: (() => void) | undefined
   /** Invoked when the user clicks "Đăng nhập" on a `signed-out` composer note */
   readonly onSignIn?: (() => void) | undefined
@@ -149,6 +350,12 @@ export interface AiComposerUniworkProps {
 }
 
 /** Checks whether any popup/listbox/dialog/menu is open in `root`, blocking `Escape` from stopping a run */
-export function isComposerPopupOpen(_root?: Document | Element | null): boolean {
-  return false
+export function isComposerPopupOpen(root?: Document | Element | null): boolean {
+  const scope = root ?? (typeof document !== 'undefined' ? document : null)
+  if (!scope) return false
+  return (
+    scope.querySelector(
+      '[role="listbox"], [role="menu"], [role="dialog"], [aria-expanded="true"]',
+    ) !== null
+  )
 }

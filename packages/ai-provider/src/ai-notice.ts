@@ -161,15 +161,45 @@ export interface ComposerNoteInput {
 export interface ComposerNote {
   readonly kind: ComposerNoteKind
   readonly key: ComposerNoteKey
-  readonly text: string
   readonly action: ComposerNoteAction
+  readonly text?: string | undefined
 }
 
 /**
  * Resolves the single composer note shown above the composer when UniWork AI is selected.
  * Returns `null` when UniWork AI is not selected or is ready with capability and format enabled.
  */
-export function composerNoteFor(_input: ComposerNoteInput): ComposerNote | null {
+export function composerNoteFor(input: ComposerNoteInput): ComposerNote | null {
+  const selected = input.uniworkSelected ?? input.provider === 'uniwork'
+  if (!selected) return null
+  if (input.signedIn === false || input.cloudState === 'signed-out') {
+    return { kind: 'signed-out', key: 'aiUniworkSignedOut', action: 'sign-in' }
+  }
+  if (
+    input.off === true ||
+    input.capabilityOn === false ||
+    input.formatOn === false ||
+    input.toolsChat === false
+  ) {
+    return { kind: 'off', key: 'aiUniworkOff', action: 'choose-provider' }
+  }
+  if (input.notEntitled === true || input.cloudState === 'not-entitled') {
+    return { kind: 'not-entitled', key: 'not_entitled', action: 'choose-provider' }
+  }
+  if (input.subscriptionInactive === true || input.cloudState === 'subscription-inactive') {
+    return {
+      kind: 'subscription-inactive',
+      key: 'cloudInactiveBody',
+      action: 'choose-provider',
+    }
+  }
+  if (input.creditsExhausted === true || input.cloudState === 'credits-exhausted') {
+    return { kind: 'credits-exhausted', key: 'credits_exhausted', action: 'choose-provider' }
+  }
+  if (input.unavailable === true || input.cloudState === 'unavailable') {
+    return { kind: 'unavailable', key: 'aiErrUnavailable', action: 'choose-provider' }
+  }
   return null
 }
+
 

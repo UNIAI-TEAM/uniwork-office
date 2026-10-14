@@ -1,9 +1,17 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useCallback, useEffect, useId, useRef, useState } from 'react'
 import type { Lang } from '@genoffice/i18n'
 import { IconEnter, IconSend, IconStop } from './icons'
 import { useAiPanelPrefs } from './ai-panel-prefs-store'
 import { useAiModelNeedAction, useAiModelNeedHint } from './ai-model-need'
-import type { AiComposerUniworkProps } from './ai-uniwork-composer'
+import {
+  UniworkComposerNote,
+  UniworkDisclosure,
+  UniworkDisclosureShort,
+  isComposerPopupOpen,
+  useUniworkDisclosureAck,
+  type AiComposerUniworkProps,
+} from './ai-uniwork-composer'
+import { aiUniworkText } from './strings-ai-uniwork'
 
 // Keep in sync with the CSS `max-height` on `.ai-input-box textarea` (7 lines à 24px)
 const MAX_TEXTAREA_HEIGHT = 168
@@ -12,8 +20,8 @@ export interface AiComposerProps {
   readonly value: string
   readonly busy: boolean
   readonly placeholder: string
-  readonly hintIdle: string
-  readonly hintBusy: string
+  readonly hintIdle?: string | undefined
+  readonly hintBusy?: string | undefined
   readonly hintIdleTitle?: string | undefined
   readonly sendLabel: string
   readonly stopLabel: string
@@ -58,8 +66,8 @@ export function AiComposer({
   value,
   busy,
   placeholder,
-  hintIdle,
-  hintBusy,
+  hintIdle = '',
+  hintBusy = '',
   hintIdleTitle,
   sendLabel,
   stopLabel,
@@ -76,14 +84,61 @@ export function AiComposer({
   onStop,
   onPasteFiles,
   onPasteText,
+  uniwork,
+  viewOnly,
+  popupOpen,
+  lang,
 }: AiComposerProps): React.JSX.Element {
   const innerRef = useRef<HTMLTextAreaElement | null>(null)
+  const boxRef = useRef<HTMLDivElement | null>(null)
+  const internalDisclosureRegionRef = useRef<HTMLElement | null>(null)
   const ref = textareaRef ?? innerRef
+  const autoId = useId()
+  const autoSentenceId = `ai-uniwork-disclosure-sentence-${autoId}`
+  const autoNeedsAckId = `ai-uniwork-send-needs-ack-${autoId}`
+
   // no key or no known model (web): send stays off and the hint says why
   const needModelHint = useAiModelNeedHint()
   const needModelAction = useAiModelNeedAction()
-  const canSend = value.trim().length > 0 && !busy && needModelHint === null
   const { spellcheck } = useAiPanelPrefs()
+
+  const hasUniworkFeatures = uniwork !== undefined || viewOnly !== undefined
+  const uniworkActive = Boolean(
+    uniwork && (uniwork.active ?? (uniwork.provider === undefined || uniwork.provider === 'uniwork')),
+  )
+  const resolvedLang: Lang = uniwork?.lang ?? lang ?? 'vi'
+  const resolvedViewOnly = Boolean(viewOnly ?? uniwork?.viewOnly)
+  const resolvedPopupOpen = Boolean(popupOpen ?? uniwork?.popupOpen)
+
+  const disclosureCfg = uniworkActive ? uniwork?.disclosure : undefined
+  const { acked } = useUniworkDisclosureAck(disclosureCfg?.ackKey)
+  const unacked = Boolean(
+    disclosureCfg && (disclosureCfg.needsAck ?? (disclosureCfg.ackKey ? !acked : false)),
+  )
+  const renderInlineDisclosure = Boolean(disclosureCfg && (disclosureCfg.renderInline ?? true))
+  const sentenceId = disclosureCfg?.sentenceId ?? autoSentenceId
+
+  const canSend = value.trim().length > 0 && !busy && needModelHint === null && !unacked
+
+  const [liveText, setLiveText] = useState('')
+  const onAnnounceProp = uniwork?.onAnnounce
+  const announce = useCallback(
+    (text: string) => {
+      setLiveText(text)
+      onAnnounceProp?.(text)
+    },
+    [onAnnounceProp],
+  )
+
+  const prevBusyRef = useRef(busy)
+  useEffect(() => {
+    if (prevBusyRef.current !== busy) {
+      prevBusyRef.current = busy
+      if (uniworkActive) {
+        announce(aiUniworkText(resolvedLang, busy ? 'aiRunRunning' : 'aiRunStopped'))
+      }
+    }
+  }, [busy, uniworkActive, resolvedLang, announce])
 
   // auto-grow up to ~6 lines; empty clears the inline height outright so the
   // CSS min-height governs (a hidden-at-measure pass can leave a stale value).
@@ -98,11 +153,26 @@ export function AiComposer({
     ta.style.height = `${Math.min(ta.scrollHeight, MAX_TEXTAREA_HEIGHT)}px`
   }, [value, ref])
 
-  return (
-    <div className="ai-input-box">
+  const handleBlockedByAck = useCallback(() => {
+    announce(aiUniworkText(resolvedLang, 'aiUniworkSendNeedsAck'))
+    const regionNode = disclosureCfg?.regionRef?.current ?? internalDisclosureRegionRef.current
+    regionNode?.focus()
+    disclosureCfg?.onRequestFocus?.()
+  }, [announce, resolvedLang, disclosureCfg])
+
+  const effectiveSendLabel = uniworkActive
+    ? aiUniworkText(resolvedLang, uniwork?.sendLabelKey ?? 'aiRunSend')
+    : sendLabel
+  const effectiveStopLabel = uniworkActive
+    ? aiUniworkText(resolvedLang, uniwork?.stopLabelKey ?? 'aiRunStop')
+    : stopLabel
+
+  const inputBox = (
+    <div ref={boxRef} className="ai-input-box">
       {header}
       <textarea
         ref={ref}
+        className="ai-input"
         value={value}
         placeholder={placeholder}
         aria-label={ariaLabel}
@@ -113,8 +183,14 @@ export function AiComposer({
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
             e.preventDefault()
+            if (unacked) {
+              handleBlockedByAck()
+              return
+            }
             if (canSend) onSend()
           } else if (e.key === 'Escape' && busy) {
+            const doc = boxRef.current?.ownerDocument ?? (typeof document !== 'undefined' ? document : null)
+            if (resolvedPopupOpen || isComposerPopupOpen(doc)) return
             e.preventDefault()
             onStop()
           }
@@ -154,19 +230,21 @@ export function AiComposer({
           <button
             className="ai-send-btn ai-stop-btn"
             onClick={onStop}
-            title={stopLabel}
-            aria-label={stopLabel}
+            title={effectiveStopLabel}
+            aria-label={effectiveStopLabel}
           >
             {iconOnly ? (stopIcon ?? <IconStop size={16} />) : <IconStop size={16} />}
-            {!iconOnly && stopLabel}
+            {!iconOnly && effectiveStopLabel}
           </button>
         ) : (
           <button
             className="ai-send-btn"
-            onClick={onSend}
-            disabled={!canSend}
-            title={needModelHint ?? sendLabel}
-            aria-label={sendLabel}
+            onClick={unacked ? handleBlockedByAck : onSend}
+            disabled={!unacked && !canSend}
+            aria-disabled={unacked ? 'true' : undefined}
+            aria-describedby={unacked ? `${autoNeedsAckId} ${sentenceId}` : undefined}
+            title={needModelHint ?? effectiveSendLabel}
+            aria-label={effectiveSendLabel}
           >
             {iconOnly ? (
               ((canSend ? sendIconEnabled : (sendIconDisabled ?? sendIconEnabled)) ?? (
@@ -175,10 +253,64 @@ export function AiComposer({
             ) : (
               <IconSend size={16} />
             )}
-            {!iconOnly && sendLabel}
+            {!iconOnly && effectiveSendLabel}
           </button>
         )}
       </div>
     </div>
+  )
+
+  if (!hasUniworkFeatures) {
+    return inputBox
+  }
+
+  return (
+    <>
+      <div className="ai-uniwork-sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {liveText}
+      </div>
+      {unacked && (
+        <span id={autoNeedsAckId} className="ai-uniwork-sr-only">
+          {aiUniworkText(resolvedLang, 'aiUniworkSendNeedsAck')}
+        </span>
+      )}
+      {uniwork && (
+        <UniworkComposerNote
+          note={uniwork.note}
+          lang={resolvedLang}
+          provider={uniwork.provider ?? (uniworkActive ? 'uniwork' : 'other')}
+          onAction={uniwork.onNoteAction}
+          onChooseProvider={uniwork.onChooseProvider}
+          onChooseOtherProvider={uniwork.onChooseOtherProvider}
+          onSignIn={uniwork.onSignIn}
+          onAnnounce={announce}
+        />
+      )}
+      {renderInlineDisclosure && unacked && disclosureCfg && (
+        <UniworkDisclosure
+          ackKey={disclosureCfg.ackKey}
+          needsAck={disclosureCfg.needsAck}
+          orgName={disclosureCfg.orgName}
+          variant={disclosureCfg.variant}
+          lang={resolvedLang}
+          sentenceId={sentenceId}
+          regionRef={disclosureCfg.regionRef ?? internalDisclosureRegionRef}
+          onAck={disclosureCfg.onAck}
+          onLearnMore={disclosureCfg.onLearnMore}
+          onAnnounce={announce}
+        />
+      )}
+      {inputBox}
+      {renderInlineDisclosure && !unacked && disclosureCfg && (
+        <UniworkDisclosureShort
+          orgName={disclosureCfg.orgName}
+          variant={disclosureCfg.variant}
+          lang={resolvedLang}
+        />
+      )}
+      {resolvedViewOnly && (
+        <div className="ai-uniwork-view-only">{aiUniworkText(resolvedLang, 'aiUniworkViewOnly')}</div>
+      )}
+    </>
   )
 }

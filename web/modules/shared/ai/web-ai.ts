@@ -244,7 +244,13 @@ export function createWebAi(opts: {
   let cloudWanted = false
   /** UniWork AI turned off by the server after the grant was minted (capability / format off) */
   let uniworkOff = false
-  let frameSession: { documentId: string; module?: OfficeModule } | null = null
+  let frameSession: {
+    documentId: string
+    module?: OfficeModule
+    workspaceId?: string
+    account?: string
+    orgName?: string
+  } | null = null
   /** provider -> model ids its own `/models` route listed (only asked for a provider with no default model) */
   const listed = new Map<string, string[]>()
   const listing = new Map<string, string>()
@@ -286,8 +292,20 @@ export function createWebAi(opts: {
         granted?.imageSearch === true ||
         granted?.imageGeneration === true
       const sessionModule = (session as { module?: OfficeModule }).module
+      const workspaceId = (session as { workspaceId?: string }).workspaceId
+      const orgName = (session as { orgName?: string }).orgName
+      const account =
+        session.user?.id?.trim() ||
+        session.recovery?.scope?.split(':')[0]?.trim() ||
+        session.user?.displayName?.trim()
       const module = opts.module ?? sessionModule
-      frameSession = { documentId: session.documentId, ...(module ? { module } : {}) }
+      frameSession = {
+        documentId: session.documentId,
+        ...(module ? { module } : {}),
+        ...(workspaceId ? { workspaceId } : {}),
+        ...(account ? { account } : {}),
+        ...(orgName ? { orgName } : {}),
+      }
       clientRef = createAiWebClient({
         documentId: session.documentId,
         apiBase: session.apiBase,
@@ -684,7 +702,18 @@ export function createWebAi(opts: {
     streams,
     openSettings,
     fail,
-    uniworkIdentity: () => null,
+    uniworkIdentity: () => {
+      if (!frameSession) return null
+      const org = state.cloud?.org_id || frameSession.workspaceId || frameSession.documentId
+      const orgName = state.cloud?.org_name || frameSession.orgName || org || 'UniWork'
+      const account = frameSession.account || 'web'
+      return {
+        account,
+        org,
+        orgName,
+        document: frameSession.documentId,
+      }
+    },
   }
 }
 
