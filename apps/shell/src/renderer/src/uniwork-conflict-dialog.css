@@ -26,12 +26,12 @@
 }
 
 .uw-conflict-head {
-  padding-right: 28px;
   overflow-y: auto;
 }
 
 .uw-conflict-title {
   margin: 0 0 6px;
+  padding-right: 28px;
   font-size: 16px;
   line-height: 24px;
   font-weight: 600;
@@ -239,7 +239,7 @@
 }
 
 .uw-conflict-btn--danger:hover:not([aria-disabled='true']) {
-  opacity: 0.92;
+  background: color-mix(in srgb, var(--danger) 88%, black);
 }
 
 .uw-conflict-btn[aria-disabled='true'] {
@@ -251,6 +251,11 @@
 .uw-conflict-close:focus-visible,
 .uw-conflict-link:focus-visible,
 .uw-conflict-radio input[type='radio']:focus-visible {
+  outline: 2px solid var(--color-border-brand);
+  outline-offset: 2px;
+}
+
+.uw-conflict-btn[data-conflict-initial-focus] {
   outline: 2px solid var(--color-border-brand);
   outline-offset: 2px;
 }

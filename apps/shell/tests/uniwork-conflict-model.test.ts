@@ -123,6 +123,17 @@ describe('uniwork-conflict-model (G5-09 S5 desktop)', () => {
     }
   })
 
+  it('V-04: the kept-draft helper (showKeepHint) is only offered when Keep is available', () => {
+    for (const keepDraft of ['store_full', 'keystore_locked', 'drafts_full'] as const) {
+      const view = makeView({ keepDraft })
+      const state = applyConflictStep1Click(createInitialConflictState(view), view, 'reload')
+      expect(getReloadStepModel(state, view).showKeepHint).toBe(false)
+    }
+    const okView = makeView({ keepDraft: 'ok' })
+    const okState = applyConflictStep1Click(createInitialConflictState(okView), okView, 'reload')
+    expect(getReloadStepModel(okState, okView).showKeepHint).toBe(true)
+  })
+
   it('AC6 / FE-05: Reload step 2 preselects Keep draft when ok, and disables Keep without preselecting Discard when store_full / keystore_locked / drafts_full while exposing submitReasonKey', () => {
     const okView = makeView({ keepDraft: 'ok' })
     let state = createInitialConflictState(okView)

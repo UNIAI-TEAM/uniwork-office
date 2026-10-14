@@ -1,4 +1,7 @@
 // @vitest-environment jsdom
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -844,5 +847,170 @@ describe('UniworkConflictDialog UI (G5-09 S5 desktop)', () => {
       sessionId: 'sess-ui-1',
       action: { kind: 'overwrite', stopAi: false },
     })
+  })
+
+  it('V-01: the initially focused control carries a data-conflict-initial-focus marker (cleared on blur and pointer interaction)', async () => {
+    await act(async () => {
+      pushConflict?.(makeView({ sessionId: 'sess-v01' }))
+    })
+    const dialog = document.querySelector('[role="alertdialog"]') as HTMLElement
+    const cancelBtn = dialog.querySelector('[data-conflict-action="cancel"]') as HTMLButtonElement
+    expect(document.activeElement).toBe(cancelBtn)
+    expect(cancelBtn.hasAttribute('data-conflict-initial-focus')).toBe(true)
+
+    // Blur (focus moves on) clears the marker so a later focus-visible ring is the only ring.
+    const closeX = dialog.querySelector('[data-conflict-action="close-x"]') as HTMLButtonElement
+    await act(async () => {
+      closeX.focus()
+    })
+    expect(cancelBtn.hasAttribute('data-conflict-initial-focus')).toBe(false)
+
+    // A pointer press on the marked control also clears it (mouse users get the native :focus-visible behaviour).
+    await act(async () => {
+      cancelBtn.focus()
+    })
+    // focus() outside the effect is not "initial": the marker is only set by the dialog's own focus management
+    expect(cancelBtn.hasAttribute('data-conflict-initial-focus')).toBe(false)
+
+    const reloadBtn = dialog.querySelector('[data-conflict-action="reload"]') as HTMLButtonElement
+    await act(async () => {
+      reloadBtn.click()
+    })
+    const backBtn = dialog.querySelector('[data-conflict-action="back"]') as HTMLButtonElement
+    expect(document.activeElement).toBe(backBtn)
+    expect(backBtn.hasAttribute('data-conflict-initial-focus')).toBe(true)
+    await act(async () => {
+      backBtn.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+    })
+    expect(backBtn.hasAttribute('data-conflict-initial-focus')).toBe(false)
+  })
+
+  it('V-04: Reload step 2 hides the kept-draft helper when Keep is unavailable (store_full / keystore_locked / drafts_full) and keeps it when Keep is available', async () => {
+    for (const keepDraft of ['store_full', 'keystore_locked', 'drafts_full'] as const) {
+      await act(async () => {
+        pushConflict?.(makeView({ sessionId: `sess-v04-${keepDraft}`, keepDraft }))
+      })
+      const dialog = document.querySelector('[role="alertdialog"]') as HTMLElement
+      await act(async () => {
+        ;(dialog.querySelector('[data-conflict-action="reload"]') as HTMLButtonElement).click()
+      })
+      expect(dialog.textContent).not.toContain(en.uwConflictKeepDraftHint)
+      const keepRadio = dialog.querySelector('input[value="draft"]') as HTMLInputElement
+      for (const id of (keepRadio.getAttribute('aria-describedby') ?? '').split(' ')) {
+        expect(document.getElementById(id)).not.toBeNull()
+      }
+      await act(async () => {
+        pushConflictClosed?.(`sess-v04-${keepDraft}`)
+      })
+    }
+
+    await act(async () => {
+      pushConflict?.(makeView({ sessionId: 'sess-v04-ok', keepDraft: 'ok' }))
+    })
+    const dialog = document.querySelector('[role="alertdialog"]') as HTMLElement
+    await act(async () => {
+      ;(dialog.querySelector('[data-conflict-action="reload"]') as HTMLButtonElement).click()
+    })
+    expect(dialog.textContent).toContain(en.uwConflictKeepDraftHint)
+    const keepRadio = dialog.querySelector('input[value="draft"]') as HTMLInputElement
+    const hintId = keepRadio.getAttribute('aria-describedby') ?? ''
+    expect(document.getElementById(hintId)?.textContent).toBe(en.uwConflictKeepDraftHint)
+  })
+
+  it('FE-303: the detached-opener fallback does not leave a persistent tabindex on TabBar markup (removed on blur)', async () => {
+    const activeTab = document.createElement('div')
+    activeTab.className = 'tab-item active'
+    appSiblingEl.appendChild(activeTab)
+
+    const openerEl = document.getElementById('opener-trigger')!
+    openerEl.focus()
+    await act(async () => {
+      pushConflict?.(makeView({ sessionId: 'sess-fe-303' }))
+    })
+    openerEl.remove()
+    const dialog = document.querySelector('[role="alertdialog"]') as HTMLElement
+    await act(async () => {
+      dialog.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    })
+    expect(document.activeElement).toBe(activeTab)
+
+    const other = document.createElement('button')
+    appSiblingEl.appendChild(other)
+    other.focus()
+    expect(activeTab.hasAttribute('tabindex')).toBe(false)
+  })
+
+  it('FE-303: an already focusable active tab is focused without any attribute mutation', async () => {
+    const activeTab = document.createElement('button')
+    activeTab.className = 'tab-item active'
+    appSiblingEl.appendChild(activeTab)
+
+    const openerEl = document.getElementById('opener-trigger')!
+    openerEl.focus()
+    await act(async () => {
+      pushConflict?.(makeView({ sessionId: 'sess-fe-303b' }))
+    })
+    openerEl.remove()
+    const dialog = document.querySelector('[role="alertdialog"]') as HTMLElement
+    await act(async () => {
+      dialog.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    })
+    expect(document.activeElement).toBe(activeTab)
+    expect(activeTab.hasAttribute('tabindex')).toBe(false)
+  })
+})
+
+describe('UniworkConflictDialog CSS (G5-09 S5 visual-1 fixes)', () => {
+  const dir = path.dirname(fileURLToPath(import.meta.url))
+  const css = readFileSync(
+    path.resolve(dir, '../src/renderer/src/uniwork-conflict-dialog.css'),
+    'utf8',
+  )
+  const tokens = readFileSync(path.resolve(dir, '../../../packages/ui/src/tokens.css'), 'utf8')
+
+  function rule(selector: string): string {
+    const esc = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const m = new RegExp(`(?:^|\\n)${esc}\\s*\\{([^}]*)\\}`).exec(css)
+    return m?.[1] ?? ''
+  }
+
+  it('V-01: marked initial-focus controls get the same ring as :focus-visible, from tokens', () => {
+    const body = rule('.uw-conflict-btn[data-conflict-initial-focus]')
+    expect(body).toContain('outline: 2px solid var(--color-border-brand)')
+    expect(body).not.toMatch(/#[0-9a-f]{3,8}\b|rgb\(/i)
+  })
+
+  it('V-02: the head no longer reserves the close-button gutter for the whole column (only the title does)', () => {
+    expect(rule('.uw-conflict-head')).not.toContain('padding-right')
+    expect(rule('.uw-conflict-title')).toContain('padding-right')
+  })
+
+  it('V-06: Overwrite (danger) hover keeps white-on-red at >= 4.5:1 in light and dark (no opacity fade)', () => {
+    const hover = rule(".uw-conflict-btn--danger:hover:not([aria-disabled='true'])")
+    expect(hover).not.toContain('opacity')
+    expect(hover).toContain('color-mix(')
+    const lum = (hex: string) => {
+      const c = [1, 3, 5]
+        .map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+        .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
+      return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+    }
+    const danger = /--danger:\s*(#[0-9a-f]{6})/i.exec(tokens)![1]
+    const onDanger = /--on-danger:\s*(#[0-9a-f]{6})/i.exec(tokens)![1]
+    const pct = Number(/color-mix\(in srgb, var\(--danger\) (\d+)%/.exec(hover)![1]) / 100
+    const mix = (h: string) =>
+      '#' +
+      [1, 3, 5]
+        .map((i) =>
+          Math.round(parseInt(h.slice(i, i + 2), 16) * pct)
+            .toString(16)
+            .padStart(2, '0'),
+        )
+        .join('')
+    for (const bg of [danger, mix(danger)]) {
+      const hi = Math.max(lum(bg), lum(onDanger))
+      const lo = Math.min(lum(bg), lum(onDanger))
+      expect((hi + 0.05) / (lo + 0.05)).toBeGreaterThanOrEqual(4.5)
+    }
   })
 })

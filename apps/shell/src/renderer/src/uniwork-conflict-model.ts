@@ -50,6 +50,7 @@ export interface ConflictDialogState {
 
 export interface ConflictReloadStepModel {
   keepDisabled: boolean
+  showKeepHint: boolean
   keepReasonKey: 'uwConflictKeepUnavailable' | 'uwConflictDraftCapReached' | null
   keepReasonArgs: Record<string, string>
   showOpenCenter: boolean
@@ -322,6 +323,7 @@ export function getReloadStepModel(
 
   return {
     keepDisabled: !keepOk,
+    showKeepHint: keepOk,
     keepReasonKey,
     keepReasonArgs,
     showOpenCenter,

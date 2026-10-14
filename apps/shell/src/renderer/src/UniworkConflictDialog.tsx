@@ -166,15 +166,26 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
   useEffect(() => {
     const dialog = dialogRef.current
     if (!dialog || !state.focusTarget) return
-    if (state.focusTarget === 'title') {
-      titleRef.current?.focus()
-      return
+    // Programmatic focus after a mouse click is not :focus-visible, so mark the control the
+    // dialog focused itself; the CSS gives it the same ring (cleared on blur / pointer press).
+    const target =
+      state.focusTarget === 'title'
+        ? titleRef.current
+        : dialog.querySelector<HTMLElement>(`[data-conflict-action="${state.focusTarget}"]`)
+    for (const marked of dialog.querySelectorAll('[data-conflict-initial-focus]')) {
+      marked.removeAttribute('data-conflict-initial-focus')
     }
-    const target = dialog.querySelector<HTMLElement>(
-      `[data-conflict-action="${state.focusTarget}"]`,
-    )
-    target?.focus()
+    if (!target) return
+    target.focus()
+    if (document.activeElement === target) target.setAttribute('data-conflict-initial-focus', '')
   }, [state.focusTarget, state.focusTick, state.step])
+
+  const clearInitialFocusMark = useCallback(() => {
+    for (const marked of dialogRef.current?.querySelectorAll('[data-conflict-initial-focus]') ??
+      []) {
+      marked.removeAttribute('data-conflict-initial-focus')
+    }
+  }, [])
 
   const sendAction = useCallback(
     async (action: UniworkConflictAction) => {
@@ -393,6 +404,8 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
         aria-labelledby={titleId}
         aria-describedby={bodyId}
         onKeyDown={handleKeyDown}
+        onBlur={clearInitialFocusMark}
+        onPointerDown={clearInitialFocusMark}
       >
         <div className="uw-conflict-head">
           <h2 ref={titleRef} id={titleId} className="uw-conflict-title" tabIndex={-1}>
@@ -459,7 +472,7 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
                     aria-disabled={reloadModel.keepDisabled ? 'true' : undefined}
                     aria-describedby={
                       reloadModel.keepDisabled && reloadModel.keepReasonKey
-                        ? `${uid}-keep-reason ${uid}-keep-hint`
+                        ? `${uid}-keep-reason`
                         : `${uid}-keep-hint`
                     }
                     onChange={() => {
@@ -501,9 +514,11 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
                   <span>{t('uwConflictDiscard')}</span>
                 </label>
               </fieldset>
-              <p id={`${uid}-keep-hint`} className="uw-conflict-caption">
-                {t('uwConflictKeepDraftHint')}
-              </p>
+              {reloadModel.showKeepHint && (
+                <p id={`${uid}-keep-hint`} className="uw-conflict-caption">
+                  {t('uwConflictKeepDraftHint')}
+                </p>
+              )}
             </>
           )}
 
@@ -718,7 +733,11 @@ export const UniworkConflictHost: React.FC<UniworkConflictHostProps> = ({ onView
         '.tab-item.active, [role="tab"][aria-selected="true"]',
       )
       if (activeTab && !activeTab.hasAttribute('tabindex') && activeTab.tabIndex < 0) {
+        // TabBar owns this node: make it focusable only until focus leaves it again.
         activeTab.setAttribute('tabindex', '-1')
+        activeTab.addEventListener('blur', () => activeTab.removeAttribute('tabindex'), {
+          once: true,
+        })
       }
       const fallback = activeTab ?? document.body
       fallback?.focus?.()
