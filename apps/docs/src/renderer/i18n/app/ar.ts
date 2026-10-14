@@ -109,6 +109,7 @@ export const ar = {
   appMixedExportOpening:
     'أحجام ورق مختلطة: جارٍ فتح معاينة ترقيم الصفحات للتصدير مع الدمج حسب الصفحات…',
   appSelectTextToComment: 'حدد النص المراد التعليق عليه أولاً',
+  appCommentSaveFirst: 'احفظ المستند أولاً لإضافة تعليق',
   appCommentSelectionLost: 'لم يعد التحديد صالحًا؛ أعد تحديد النص المراد التعليق عليه',
   appCommentAdded: 'تمت إضافة التعليق؛ سيُكتب في المستند عند الحفظ',
   appCommentEdited: 'تم تحديث التعليق؛ سيُكتب في المستند عند الحفظ',

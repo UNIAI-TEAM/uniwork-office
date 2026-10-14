@@ -7,6 +7,7 @@ import {
   parseDiscussionPanelInput,
   parseDiscussionRevealRequest,
   parseCommentsAnchorsInput,
+  parseCommentsContextInput,
   parseCommentsCreateInput,
   parseCommentsIdInput,
   parseCommentsListInput,
@@ -15,12 +16,15 @@ import {
 } from '@genoffice/electron-utils/comments-ipc'
 import type {
   CommentsAnchorsInput,
+  CommentsContextResult,
   CommentsCreateInput,
+  CommentsDocRef,
   CommentsIdInput,
   CommentsListInput,
   CommentsReply,
   CommentsUpdateInput,
   CommentsRevealPayload,
+  CommentsSavedPayload,
   DiscussionPanelInput,
   MentionsSearchInput,
 } from '@genoffice/electron-utils/comments-ipc'
@@ -65,6 +69,11 @@ export interface CommentsWiringDeps {
    */
   shownPath?(sender: { id: number }): string | null
   /**
+   * G8-12: push a settled Save to the editor that shows `payload.path`. Not
+   * held: an editor that mounts later reads the version through `context`.
+   */
+  sendSaved?(payload: CommentsSavedPayload): void
+  /**
    * G8-11 (D2): the file paths open as tabs of the window whose SHELL
    * webContents is `sender`; null when `sender` is not a live shell
    * webContents. Every discussion channel is refused without it.
@@ -95,6 +104,8 @@ type RealmSender = Pick<WebContents, 'id' | 'on'>
 export interface UniworkCommentsHandle {
   /** reveal a comment in the editor showing `path` (the launch-ticket deep link) */
   reveal(path: string, commentId: string): void
+  /** G8-12: a Save of `path` settled on server version `versionId` */
+  saved(path: string, versionId: string): void
 }
 
 /** the binding a comments request may run against, or null when the path is not ours */
@@ -210,6 +221,35 @@ export function createUniworkComments(
     COMMENTS_CHANNELS.searchMentions,
     parseMentionsSearchInput,
     (input) => api().searchMentions(binding(input.path), input),
+  )
+
+  // G8-12: the server context of the document the SENDER shows. Only the
+  // editor showing `path` may read it (another window's editor, the shell or
+  // an unknown sender is refused), an unbound path answers not_found, and
+  // nothing goes to the network: every field comes from the binding.
+  ipcMain.handle(
+    COMMENTS_CHANNELS.context,
+    async (event, payload: unknown): Promise<CommentsReply<CommentsContextResult>> => {
+      const input: CommentsDocRef | null = parseCommentsContextInput(payload)
+      if (!input) {
+        return {
+          ok: false,
+          error: { code: 'malformed', message: 'comments: invalid request', retryable: false },
+        }
+      }
+      try {
+        if (!deps.shownPath || deps.shownPath(event.sender) !== input.path) {
+          throw new DocsProtocolError({
+            code: 'forbidden',
+            message: 'comments: the sender does not show this document',
+            retryable: false,
+          })
+        }
+        return { ok: true, value: deps.service.commentContext(input.path) ?? unbound() }
+      } catch (error) {
+        return { ok: false, error: errorShape(error) }
+      }
+    },
   )
 
   // R1-2: the latest reveal per path, held until that editor pulls it. A push
@@ -473,6 +513,10 @@ export function createUniworkComments(
       // first pull.
       if (outcome === 'delivered' && subscribed.has(path)) heldReveals.delete(path)
       else heldReveals.set(path, commentId)
+    },
+    saved(path, versionId) {
+      if (!resolveCommentBinding(deps.service, path)) return
+      deps.sendSaved?.({ path, versionId })
     },
   }
 }

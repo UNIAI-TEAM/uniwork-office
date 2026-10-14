@@ -113,6 +113,7 @@ export const pt = {
   appMixedExportOpening:
     'Tamanhos de papel mistos: abrindo a visualização de paginação para exportar mesclando por página…',
   appSelectTextToComment: 'Selecione primeiro o texto a comentar',
+  appCommentSaveFirst: 'Salve o documento primeiro para adicionar um comentário',
   appCommentSelectionLost: 'A seleção não é mais válida; selecione novamente o texto a comentar',
   appCommentAdded: 'Comentário adicionado; gravado no documento ao salvar',
   appCommentEdited: 'Comentário atualizado; gravado no documento ao salvar',

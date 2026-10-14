@@ -4,6 +4,7 @@ import {
   uniworkCommentAuthor,
   uniworkDocState,
   uniworkIsBound,
+  uniworkIsLocked,
   uniworkRefusesOpen,
   uniworkSamePath,
   uniworkSaveDecision,
@@ -3326,6 +3327,15 @@ function rememberOpenDoc(wcId: number, filePath: string): void {
   openDocByWc.set(wcId, filePath)
 }
 
+/**
+ * G5-03a: a locked working copy (the server revoked or deleted it while it is
+ * open) leaves the app as nothing - no export, no Save As copy, no print. The
+ * tab's open document is the source unless the caller names one (Save As).
+ */
+function uniworkRefusesExport(wcId: number, sourcePath?: string | null): boolean {
+  return uniworkIsLocked(sourcePath ?? openDocByWc.get(wcId) ?? null)
+}
+
 function docsMediaRoots(wcId: number): string[] {
   return documentMediaRoots(openDocByWc.get(wcId), join(app.getPath('temp'), 'genoffice-pasted'))
 }
@@ -5006,6 +5016,8 @@ export function registerDocsIpc(): void {
     async (event, defaultName: string, data: ArrayBuffer, sourcePath?: string | null) => {
       // an orphaned (closed-tab) renderer must not open dialogs or land new files
       if (tornDownWcIds.has(event.sender.id)) return { ok: false }
+      // G5-03a: a locked working copy exports nothing, not even a Save As copy
+      if (uniworkRefusesExport(event.sender.id, sourcePath)) return { ok: false }
       const result = await saveDialog(event, {
         title: tm('dlgSaveAs'),
         // a UniWork working copy's Save As starts outside its hidden folder
@@ -5073,6 +5085,9 @@ export function registerDocsIpc(): void {
       // a discarded draft in an orphaned renderer must not silently persist
       // itself to the default folder after the user chose Don't Save
       if (tornDownWcIds.has(event.sender.id)) return { ok: false }
+      // G5-03a: a locked working copy exports nothing, not even a first save
+      // into the default folder
+      if (uniworkRefusesExport(event.sender.id)) return { ok: false }
       const filePath = uniquePathIn(defaultSaveDir(), defaultName)
       const passwordState = snapshotDocPassword(event.sender.id, null)
       const { bytes: plain, hashes } = await materializeLazyDocx(Buffer.from(data))
@@ -5126,6 +5141,8 @@ export function registerDocsIpc(): void {
     async (event, filePath: string, data: ArrayBuffer, overwrite: boolean) => {
       try {
         if (tornDownWcIds.has(event.sender.id)) return { ok: false }
+        // G5-03a: an agent copy-out of a locked working copy is refused too
+        if (uniworkRefusesExport(event.sender.id)) return { ok: false }
         if (typeof filePath !== 'string' || !isAbsolute(filePath)) {
           return { ok: false, error: 'path must be absolute' }
         }
@@ -5341,6 +5358,8 @@ export function registerDocsIpc(): void {
       : {}
 
   ipcMain.handle('docs:print', async (event, scale?: number) => {
+    // G5-03a: a locked working copy prints nothing
+    if (uniworkRefusesExport(event.sender.id)) return { ok: false }
     // print the calling tab's own content; zero margins — the docx page padding provides them.
     // Resolves when the system dialog is dismissed; the print dialog stays open on cancel
     // (ok=false without error) and surfaces real failures. With no printer installed
@@ -5370,6 +5389,8 @@ export function registerDocsIpc(): void {
       outPath?: string,
       scale?: number,
     ) => {
+      // G5-03a: a locked working copy exports nothing
+      if (uniworkRefusesExport(event.sender.id)) return { ok: false }
       // Renderer-supplied page geometry reaches Chromium printToPDF verbatim:
       // reject non-finite/out-of-range sizes (0.1in..50in) and scales (0.1..5),
       // same guard as docs:print-pdf-buffer (a malformed w:pgSz in a doc would
@@ -5417,6 +5438,8 @@ export function registerDocsIpc(): void {
 
   ipcMain.handle('docs:save-image-as', async (event, src: unknown) => {
     if (tornDownWcIds.has(event.sender.id) || typeof src !== 'string') return { ok: false }
+    // G5-03a: an image out of a locked working copy is an export it may not have
+    if (uniworkRefusesExport(event.sender.id)) return { ok: false }
     return saveImageFromUrl(dialogParent(event), src, {
       title: tm('dlgSaveAs'),
       fallbackDir: defaultSaveDir(),
@@ -5424,6 +5447,8 @@ export function registerDocsIpc(): void {
   })
 
   ipcMain.handle('docs:pick-export-images-target', async (event) => {
+    // G5-03a: a locked working copy exports nothing (null is "cancelled")
+    if (uniworkRefusesExport(event.sender.id)) return null
     let dir = testExportDir
     if (!dir) {
       const r = await openDialog(event, {
@@ -5460,6 +5485,8 @@ export function registerDocsIpc(): void {
   ipcMain.handle(
     'docs:write-export-image',
     async (event, dir: string, fileName: string, pngBase64: string) => {
+      // G5-03a: a locked working copy exports nothing
+      if (uniworkRefusesExport(event.sender.id)) return { ok: false }
       if (typeof dir !== 'string' || !imageExportDirs.get(event.sender.id)?.has(dir)) {
         return { ok: false, error: 'export target is not an authorized folder' }
       }
@@ -5484,6 +5511,8 @@ export function registerDocsIpc(): void {
     'docs:export-html',
     async (event, defaultName: string, html: string, outPath?: string) => {
       if (typeof html !== 'string' || !html) return { ok: false, error: 'empty document' }
+      // G5-03a: a locked working copy exports nothing
+      if (uniworkRefusesExport(event.sender.id)) return { ok: false }
       let filePath = outPath ?? null
       if (filePath && !canPdfWrite(event.sender.id, filePath)) {
         return { ok: false, error: 'export target is not an authorized path' }
@@ -5516,6 +5545,8 @@ export function registerDocsIpc(): void {
   ipcMain.handle(
     'docs:print-pdf-buffer',
     async (event, pageWidthTwips: number, pageHeightTwips: number, scale?: number) => {
+      // G5-03a: a locked working copy exports nothing
+      if (uniworkRefusesExport(event.sender.id)) return { ok: false }
       // Renderer-supplied page geometry reaches Chromium printToPDF verbatim:
       // reject non-finite/out-of-range sizes (0.5in..50in) and scales (0.1..5).
       if (!validPrintGeometry(pageWidthTwips, pageHeightTwips, scale)) {
@@ -5542,6 +5573,8 @@ export function registerDocsIpc(): void {
   ipcMain.handle(
     'docs:save-merged-pdf',
     async (event, defaultName: string, base64Parts: string[], outPath?: string) => {
+      // G5-03a: a locked working copy exports nothing
+      if (uniworkRefusesExport(event.sender.id)) return { ok: false }
       let filePath = outPath ?? null
       if (filePath && !canPdfWrite(event.sender.id, filePath)) {
         return { ok: false, error: 'export target is not an authorized path' }

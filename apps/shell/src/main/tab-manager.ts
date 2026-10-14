@@ -61,7 +61,7 @@ import {
 import type { DocumentTabKind, OpenDocumentTab, TabKind, TabSummary } from '../shared/tabs-api'
 import { tabStripHeight } from '../shared/tab-drag-geometry'
 import { clampDiscussionPanelWidth } from '@genoffice/electron-utils/comments-ipc'
-import { isAiRunning, type EditorState } from './ai-run-registry'
+import { aiEpochOf, clearAiRun, isAiRunning, type EditorState } from './ai-run-registry'
 import { isCloseTabChord } from './close-tab-chord'
 import { blankRetiredPage } from './retire-page'
 
@@ -83,6 +83,12 @@ interface TabRecord {
   filePath?: string
   /** chrome-free Present tab: no file, no editor menu or save/export targets */
   present?: boolean
+  /**
+   * Present tab only: the editing view whose live preview it shows. Its AI
+   * turns and unsaved edits belong to that owner's document, so the poll
+   * attributes them there (a present tab carries no file of its own).
+   */
+  ownerWcId?: number
 }
 
 const HOME_ID = 'home'
@@ -103,6 +109,8 @@ export class TabManager {
   private nextId = 1
   /** G8-11: the width the shell renderer draws the Discussion panel at (0 = closed) */
   private discussionPanelWidth = 0
+  /** G5-03a: the S6 bar's height under the tab strip (0 = no bar); per shell window */
+  private topInset = 0
   /** tab whose page entered HTML fullscreen (e.g. slides slideshow) — its view covers the tab strip */
   private htmlFullScreenId: string | null = null
   /** webContents ids whose view must cover the tab strip without HTML fullscreen
@@ -217,13 +225,31 @@ export class TabManager {
     const panel = this.discussionPanelWidth
       ? clampDiscussionPanelWidth(this.discussionPanelWidth, width)
       : 0
+    // the strip follows the interface scale; the S6 bar is drawn under it (its
+    // height is reported in window px), so the active view starts below both
     const strip = tabStripHeight(this.uiScale())
+    const inset = this.topInset
     return {
       x: 0,
-      y: strip,
+      y: strip + inset,
       width: Math.max(0, width - panel),
-      height: Math.max(0, height - strip),
+      height: Math.max(0, height - strip - inset),
     }
+  }
+
+  /**
+   * G5-03a: the height of the S6 "new version available" bar the shell
+   * renderer draws under the tab strip. The bar shows for the active tab only,
+   * so the renderer resends it on every tab switch; 0 hides it and restores the
+   * view. Clamped to 0..200 and rounded, so a stray report cannot blank the
+   * editor. Full-bleed / fullscreen views ignore it (contentBounds).
+   */
+  setTopInset(px: number): void {
+    if (!Number.isFinite(px)) return
+    const next = Math.min(200, Math.max(0, Math.round(px)))
+    if (next === this.topInset) return
+    this.topInset = next
+    this.layout()
   }
 
   /**
@@ -485,8 +511,10 @@ export class TabManager {
    * (the UniWork chip's dirty state). null: the editor did not answer (docs
    * busy saving), so the caller keeps what it last knew. aiRunning: the
    * editor reported an AI turn in progress (ai-run-registry); read after the
-   * dirty answer, so a tab closed meanwhile reads false. Present tabs carry
-   * no file: their owner tab answers for the document.
+   * dirty answer, so a tab closed meanwhile reads false. aiEpoch: how many AI
+   * turns the view has started (never decreases). Present tabs carry no file:
+   * their owner tab answers for the document, with the present view's own AI
+   * turn and epoch folded in.
    */
   async editorDirtyStates(wanted: (path: string) => boolean): Promise<EditorState[]> {
     const tabs = this.tabs.filter((t) => t.view && t.filePath && !t.present && wanted(t.filePath))
@@ -498,9 +526,33 @@ export class TabManager {
             : await this.tabIsDirty(tab)
         const wc = tab.view?.webContents
         const open = this.tabs.includes(tab) && !!wc && !wc.isDestroyed()
-        return { path: tab.filePath!, dirty, aiRunning: open && isAiRunning(wc.id) }
+        // the owner tab's own view plus every present view of it: a turn in
+        // either belongs to this document
+        const views = [...(open && wc ? [wc.id] : []), ...this.presentViewIdsOf(tab)]
+        return {
+          path: tab.filePath!,
+          dirty,
+          aiRunning: views.some((id) => isAiRunning(id)),
+          aiEpoch: views.reduce((sum, id) => sum + aiEpochOf(id), 0),
+        }
       }),
     )
+  }
+
+  /**
+   * The live present views showing `owner`'s preview. A present view whose
+   * webContents was destroyed (or that has left the strip) is skipped: it is no
+   * longer a view of the document.
+   */
+  private presentViewIdsOf(owner: TabRecord): number[] {
+    const ownerWc = owner.view?.webContents
+    if (!ownerWc) return []
+    return this.tabs
+      .filter(
+        (t) =>
+          t.present && t.ownerWcId === ownerWc.id && t.view && !t.view.webContents.isDestroyed(),
+      )
+      .map((t) => t.view!.webContents.id)
   }
 
   openHomeTab(): void {
@@ -659,6 +711,7 @@ export class TabManager {
       view,
       title: title || this.untitled('html', 'AI HTML'),
       present: true,
+      ownerWcId: owner.id,
     })
     this.activateTab(id)
     return id
@@ -982,6 +1035,9 @@ export class TabManager {
     if (removed.view) {
       removed.view.setVisible(false)
       this.shellWindow.contentView.removeChildView(removed.view)
+      // G5-03a: a tab closed mid AI turn must not keep the document "busy";
+      // a docs view is blanked (not destroyed), so its flag is cleared here
+      clearAiRun(removed.view.webContents.id)
       if (removed.kind === 'docs') {
         // webContents.close()/.destroy() on a closed docs tab wedges Electron's whole
         // UI thread in a native modal run loop (reproduced consistently; survives

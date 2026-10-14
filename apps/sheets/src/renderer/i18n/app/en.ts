@@ -1454,6 +1454,7 @@ export const en = {
   appCtxResolveComment: 'Resolve Comment',
   appThreadConverted: 'Converted {count} comments to notes.',
   appThreadNoneAtSelection: 'No threaded comment at the selected cell.',
+  appCommentSaveFirst: 'Save the workbook first to add a comment',
   appThreadCellHasNote: 'The selected cell already has a note; a comment cannot be added.',
   appThreadHoverHint: 'Reply in the Comments pane',
   appNoteCellHasThread: 'The selected cell already has a threaded comment; a note cannot be added.',

@@ -717,7 +717,27 @@ export interface AiCommentsAccess {
   add?(range: { from: number; to: number }, text: string, meta: CommentAuthorMeta): string | null
   /** the comment and its replies, anchors included; false when the id does not exist */
   remove?(id: string): boolean
+  /**
+   * G8-12 (invariant 7): set on a document bound to UniWork. Comments then live on the server and the
+   * AI only fills composer drafts the user reviews and sends; comments stored in the file are read-only.
+   */
+  server?: AiServerComments
 }
+
+/** draft-only access to the server comment panel (never a `comments.*` write) */
+export interface AiServerComments {
+  /** a server comment id (thread root or reply) */
+  owns(id: string): boolean
+  /** a reply draft under thread `rootId`; false when the thread is gone */
+  draftReply(rootId: string, text: string): boolean
+  /** a new-thread draft anchored at the range; false when the range holds no text */
+  draftNew(range: { from: number; to: number }, text: string): boolean
+}
+
+const IN_FILE_READ_ONLY =
+  'this comment is stored in the file and is read-only on a UniWork document; start a new comment instead'
+const SERVER_DRAFT_NOTE =
+  'The draft waits in the comments panel for the user to review and send; nothing was posted.'
 
 export interface CommentAuthorMeta {
   author?: string
@@ -1810,6 +1830,17 @@ function executeSyncTool(
         )
       }
       const rootId = target.parentId ?? target.id // replies always attach to the thread root
+      if (comments.server) {
+        if (!comments.server.owns(rootId)) return fail(t('aiSumReplyComment'), IN_FILE_READ_ONLY)
+        if (!comments.server.draftReply(rootId, text)) {
+          return fail(t('aiSumReplyComment'), `comment ${rootId} no longer exists`)
+        }
+        return {
+          output: `Drafted a reply to comment ${rootId}. ${SERVER_DRAFT_NOTE}`,
+          mutated: false,
+          summary: t('aiSumReplyComment'),
+        }
+      }
       if (!comments.reply(rootId, text)) {
         return fail(
           t('aiSumReplyComment'),
@@ -1834,6 +1865,14 @@ function executeSyncTool(
         )
       }
       const rootId = target.parentId ?? target.id
+      if (comments.server) {
+        return fail(
+          t('aiSumResolveComment'),
+          comments.server.owns(rootId)
+            ? 'only the user can resolve a UniWork comment thread; ask them to resolve it in the comments panel'
+            : IN_FILE_READ_ONLY,
+        )
+      }
       if (!comments.resolve(rootId)) {
         return fail(t('aiSumResolveComment'), `comment ${rootId} could not be resolved`)
       }
@@ -1945,7 +1984,9 @@ function executeSyncTool(
     }
 
     case 'add_comment': {
-      if (!comments?.add) return fail(t('aiSumAddComment'), 'comments are not available here')
+      if (!comments?.add && !comments?.server) {
+        return fail(t('aiSumAddComment'), 'comments are not available here')
+      }
       const body = typeof call.input.comment === 'string' ? call.input.comment.trim() : ''
       if (!body) return fail(t('aiSumAddComment'), 'comment must not be empty')
       const anchor = resolveCommentAnchor(editor, {
@@ -1961,6 +2002,20 @@ function executeSyncTool(
       if (typeof call.input.initials === 'string' && call.input.initials.trim()) {
         meta.initials = call.input.initials.trim()
       }
+      if (comments.server) {
+        if (!comments.server.draftNew({ from: anchor.from, to: anchor.to }, body)) {
+          return fail(
+            t('aiSumAddComment'),
+            'a new comment cannot be drafted here: the range holds no text, or the document must be saved once first',
+          )
+        }
+        return {
+          output: `Drafted a comment on block ${call.input.blockIndex}, anchored to "${clipExcerpt(anchor.excerpt)}". ${SERVER_DRAFT_NOTE}`,
+          mutated: false,
+          summary: t('aiSumAddComment'),
+        }
+      }
+      if (!comments.add) return fail(t('aiSumAddComment'), 'comments are not available here')
       const id = comments.add({ from: anchor.from, to: anchor.to }, body, meta)
       if (!id) return fail(t('aiSumAddComment'), 'the range holds no text to anchor a comment to')
       return {
@@ -1971,7 +2026,9 @@ function executeSyncTool(
     }
 
     case 'delete_comment': {
-      if (!comments?.remove) return fail(t('aiSumDeleteComment'), 'comments are not available here')
+      if (!comments?.remove && !comments?.server) {
+        return fail(t('aiSumDeleteComment'), 'comments are not available here')
+      }
       const id = String(call.input.id ?? '').trim()
       const list = comments.list()
       const target = list.find((c) => c.id === id)
@@ -1981,6 +2038,14 @@ function executeSyncTool(
           `no comment with id ${id}; call read_comments for the current ids`,
         )
       }
+      if (comments.server) {
+        return fail(
+          t('aiSumDeleteComment'),
+          comments.server.owns(id)
+            ? 'only the user can delete a UniWork comment; ask them to delete it in the comments panel'
+            : IN_FILE_READ_ONLY,
+        )
+      }
       const replies = repliesOf(list, id)
       if (replies.length > 0 && call.input.withReplies !== true) {
         return fail(
@@ -1988,6 +2053,7 @@ function executeSyncTool(
           `comment ${id} has ${replies.length} repl${replies.length === 1 ? 'y' : 'ies'} (${replies.map((r) => r.id).join(', ')}); set withReplies: true to delete the whole thread`,
         )
       }
+      if (!comments.remove) return fail(t('aiSumDeleteComment'), 'comments are not available here')
       if (!comments.remove(id))
         return fail(t('aiSumDeleteComment'), `comment ${id} could not be deleted`)
       const gone = [id, ...replies.map((r) => r.id)]

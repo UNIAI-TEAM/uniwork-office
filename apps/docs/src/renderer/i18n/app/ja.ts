@@ -119,6 +119,7 @@ export const ja = {
     '用紙サイズが混在する文書:ページ プレビューを開き、ページごとに結合してエクスポートしています…',
   // Comments
   appSelectTextToComment: 'コメントを付けるテキストを先に選択してください',
+  appCommentSaveFirst: 'コメントを追加するには、先に文書を保存してください',
   appCommentSelectionLost:
     '選択範囲が無効になりました。コメントを付けるテキストをもう一度選択してください',
   appCommentAdded: 'コメントを追加しました。保存時に文書へ書き込まれます',

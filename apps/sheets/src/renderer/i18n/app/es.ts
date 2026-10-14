@@ -1519,6 +1519,7 @@ export const es = {
   appCtxResolveComment: 'Resolver comentario',
   appThreadConverted: 'Se convirtieron {count} comentarios en notas.',
   appThreadNoneAtSelection: 'No hay comentario en hilo en la celda seleccionada.',
+  appCommentSaveFirst: 'Guarde primero el libro para agregar un comentario',
   appThreadCellHasNote:
     'La celda seleccionada ya tiene una nota; no se puede añadir un comentario.',
   appThreadHoverHint: 'Responder en el panel Comentarios',

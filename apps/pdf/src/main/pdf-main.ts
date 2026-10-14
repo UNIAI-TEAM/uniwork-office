@@ -3,10 +3,12 @@ import {
   setUniworkUserSaveHook,
   uniworkCommentAuthor,
   uniworkIsBound,
+  uniworkIsLocked,
   uniworkIsReadOnly,
   uniworkMayRewriteInPlace,
   uniworkSaveDecision,
 } from './uniwork-policy'
+import { PDF_UNIWORK_VIEW_ONLY } from '../shared/uniwork-refusal'
 import {
   constants,
   copyFileSync,
@@ -1097,7 +1099,9 @@ export function flushPdfSave(
 
 /** Menu Print: ask the renderer to run its print flow (save, rasterize, system dialog) */
 export function sendPdfPrintRequest(contents: WebContents): void {
-  if (!contents.isDestroyed()) contents.send(PDF_CHANNELS.printRequest)
+  // G5-03a: a locked working copy prints nothing
+  if (contents.isDestroyed() || uniworkIsLocked(openPathByWc.get(contents.id) ?? null)) return
+  contents.send(PDF_CHANNELS.printRequest)
 }
 
 /**
@@ -1116,6 +1120,8 @@ export function setPdfSaveAsInFlight(contents: WebContents, inFlight: boolean): 
  */
 export function requestPdfSaveAs(contents: WebContents, targetPath: string): Promise<boolean> {
   if (contents.isDestroyed()) return Promise.resolve(false)
+  // G5-03a: a locked working copy leaves as nothing, not even a Save As copy
+  if (uniworkIsLocked(openPathByWc.get(contents.id) ?? null)) return Promise.resolve(false)
   const wcId = contents.id
   saveAsTargetByWc.set(wcId, targetPath)
   return new Promise<boolean>((resolve) => {
@@ -1265,6 +1271,10 @@ function registerPdfIpc(): void {
       saveAs: request.targetPath !== undefined || saveAsTargetByWc.get(e.sender.id) === target,
     })
     if (!uniwork.write) return { ok: false, error: uniwork.reason ?? 'pdf: save refused' }
+    // G5-03a: a locked working copy is never copied out through Save As either
+    if (target !== path && uniworkIsLocked(path)) {
+      return { ok: false, error: PDF_UNIWORK_VIEW_ONLY }
+    }
     if (request.redactions !== undefined) {
       let regions
       try {
@@ -1343,6 +1353,8 @@ function registerPdfIpc(): void {
 
   ipcMain.handle(PDF_CHANNELS.requestRedactionCopy, async (e, path: unknown): Promise<boolean> => {
     if (typeof path !== 'string' || !allowedByWc.get(e.sender.id)?.has(path)) return false
+    // G5-03a: a redaction copy is a Save As the lock refuses before any dialog
+    if (uniworkIsLocked(path)) return false
     if (redactionFlows.has(e.sender.id) || saveAsWaiters.has(e.sender.id)) return false
     redactionFlows.add(e.sender.id)
     const base = basename(path).replace(/\.pdf$/i, '')
@@ -1838,6 +1850,9 @@ function registerPdfIpc(): void {
   ipcMain.handle(
     PDF_CHANNELS.exportImages,
     async (e, request: ExportImagesRequest): Promise<ExportImagesResult> => {
+      // G5-03a: a locked working copy exports nothing (cancel shape = no UI)
+      if (uniworkIsLocked(openPathByWc.get(e.sender.id) ?? null))
+        return { ok: true, canceled: true }
       const { images, pageNumbers, baseName } = request ?? {}
       if (!Array.isArray(images) || images.length === 0)
         return { ok: false, error: 'pdf: no images' }

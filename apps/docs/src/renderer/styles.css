@@ -147,6 +147,9 @@
   --docs-paper-comment-bg: rgb(179 247 95 / 25%);
   --docs-paper-comment-flash: rgb(130 171 81 / 45%);
   --docs-paper-comment-line: #82ab51;
+  /* UniWork (server) comment highlight: screen-only, apart from the green in-file comment tint */
+  --docs-paper-server-comment-bg: rgb(112 92 214 / 16%);
+  --docs-paper-server-comment-line: #6f5bd2;
   /* printed markup is document output, not chrome: fixed values, identical in both themes;
      the balloon fill is the anchor tint composited over white (balloons sit on the gray strip) */
   --docs-print-markup-band: #f2f2f2;
@@ -3900,6 +3903,43 @@ th.cell-rev-del {
   cursor: pointer;
 }
 
+/* a UniWork (server) comment: a screen-only decoration, never part of the document */
+.doc-server-comment {
+  background: var(--docs-paper-server-comment-bg);
+  border-bottom: 2px solid var(--docs-paper-server-comment-line);
+}
+
+/* the server comment panel (kit S12) takes the local pane's column and narrow-screen overlay */
+.comments-pane.docs-server-comments {
+  width: min(300px, 100%);
+}
+
+/* the kit panel fills the pane; the pane owns the column border and the optional save-first line */
+.docs-server-comments .docs-server-panel {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+  border-left: 0;
+}
+
+.docs-server-comments .docs-server-save-first {
+  border-top: 1px solid var(--warning-border);
+  border-bottom: 0;
+}
+
+/* 300 px column: hint, Cancel and Send stay on one row (the hint wraps inside its own box) */
+.docs-server-comments .collab-composer-actions {
+  flex-wrap: nowrap;
+}
+
+.docs-server-comments .collab-composer-hint {
+  min-width: 0;
+}
+
+.docs-server-comments .collab-composer-btn {
+  flex: none;
+}
+
 /* range picked for a comment that is still being composed */
 .comment-pending {
   background: var(--docs-paper-comment-bg);
@@ -4395,6 +4435,8 @@ th.cell-rev-del {
     --docs-paper-comment-bg: rgb(106 166 32 / 25%);
     --docs-paper-comment-flash: rgb(145 181 102 / 45%);
     --docs-paper-comment-line: #91b566;
+    --docs-paper-server-comment-bg: rgb(108 90 198 / 16%);
+    --docs-paper-server-comment-line: #6e5dc6;
     --docs-paper-ai-anchor-bg: rgb(74 116 197 / 14%);
     --docs-paper-ai-anchor-line: #4a74c5;
     --docs-paper-xe-ink: #c5ab7f;

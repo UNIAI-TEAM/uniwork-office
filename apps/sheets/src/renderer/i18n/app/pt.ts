@@ -1516,6 +1516,7 @@ export const pt = {
   appCtxResolveComment: 'Resolver comentário',
   appThreadConverted: '{count} comentários convertidos em anotações.',
   appThreadNoneAtSelection: 'Nenhum comentário encadeado na célula selecionada.',
+  appCommentSaveFirst: 'Salve a pasta de trabalho primeiro para adicionar um comentário',
   appThreadCellHasNote:
     'A célula selecionada já tem uma anotação; não é possível adicionar um comentário.',
   appThreadHoverHint: 'Responder no painel Comentários',

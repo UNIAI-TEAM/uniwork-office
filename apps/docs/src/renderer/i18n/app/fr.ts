@@ -115,6 +115,7 @@ export const fr = {
   appMixedExportOpening:
     "Formats de papier mixtes : ouverture de l'aperçu de pagination pour exporter les pages fusionnées…",
   appSelectTextToComment: "Sélectionnez d'abord le texte à commenter",
+  appCommentSaveFirst: 'Enregistrez d’abord le document pour ajouter un commentaire',
   appCommentSelectionLost:
     "La sélection n'est plus valide ; sélectionnez à nouveau le texte à commenter",
   appCommentAdded: "Commentaire ajouté ; écrit dans le document à l'enregistrement",

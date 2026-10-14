@@ -115,6 +115,7 @@ export const ms = {
   appMixedExportOpening:
     'Saiz kertas bercampur: membuka pratonton penomboran halaman untuk eksport dengan gabungan mengikut halaman…',
   appSelectTextToComment: 'Pilih dahulu teks yang hendak dikomen',
+  appCommentSaveFirst: 'Simpan dokumen dahulu untuk menambah ulasan',
   appCommentSelectionLost: 'Pilihan tidak lagi sah; pilih semula teks yang hendak dikomen',
   appCommentAdded: 'Komen ditambah; ditulis ke dokumen semasa disimpan',
   appCommentEdited: 'Komen dikemas kini; ditulis ke dokumen semasa disimpan',

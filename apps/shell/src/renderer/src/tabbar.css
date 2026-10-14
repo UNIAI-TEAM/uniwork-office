@@ -685,3 +685,116 @@ body.overlay-title-bar .tab-bar-drag-spacer {
     min-height: 44px;
   }
 }
+
+/* ── S6 new-version bar: hangs under the tab strip; main moves the active editor view down by its height ── */
+
+.uw-remote-bar {
+  --uw-remote-bg: var(--surface-subtle);
+  --uw-remote-border: var(--border);
+  --uw-remote-text: var(--text-primary);
+  --uw-remote-accent: var(--color-border-brand);
+  box-sizing: border-box;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--uw-remote-border);
+  background: var(--uw-remote-bg);
+  color: var(--uw-remote-text);
+  font-size: 12px;
+  line-height: 1.5;
+  /* the strip is a drag region; the bar must take presses */
+  -webkit-app-region: no-drag;
+}
+
+.uw-remote-bar[data-tone='warn'] {
+  --uw-remote-bg: var(--warning-bg);
+  --uw-remote-border: var(--warning-border);
+  --uw-remote-text: var(--warning-text);
+  --uw-remote-accent: var(--warning-text);
+}
+
+.uw-remote-bar[data-tone='error'] {
+  --uw-remote-bg: var(--danger-bg);
+  --uw-remote-border: var(--danger-border);
+  --uw-remote-text: var(--danger-text);
+  --uw-remote-accent: var(--danger);
+}
+
+.uw-remote-dot {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  /* centred on the first text line (12px * 1.5 = 18px tall) */
+  margin-top: 5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--uw-remote-accent);
+}
+
+.uw-remote-text {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.uw-remote-message,
+.uw-remote-reason {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.uw-remote-reason {
+  margin-top: 2px;
+  opacity: 0.85;
+}
+
+.uw-remote-actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-inline-start: auto;
+}
+
+.uw-remote-action {
+  box-sizing: border-box;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 2px 10px;
+  border: 1px solid var(--uw-remote-border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--uw-remote-text);
+  font: inherit;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.uw-remote-action:hover:not([aria-disabled='true']) {
+  background: var(--hover);
+}
+
+.uw-remote-action[aria-disabled='true'] {
+  /* busy or not available yet, not disabled: it keeps focus, so the ring stays */
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.uw-remote-action:focus-visible {
+  outline: 2px solid var(--color-border-brand);
+  outline-offset: 1px;
+}
+
+@media (pointer: coarse) {
+  .uw-remote-action {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}

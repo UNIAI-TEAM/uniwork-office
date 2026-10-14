@@ -1476,6 +1476,7 @@ export const cs = {
   appCtxResolveComment: 'Vyřešit komentář',
   appThreadConverted: 'Počet komentářů převedených na poznámky: {count}.',
   appThreadNoneAtSelection: 'Ve vybrané buňce není žádný komentář ve vlákně.',
+  appCommentSaveFirst: 'Před přidáním komentáře nejprve uložte sešit',
   appThreadCellHasNote: 'Vybraná buňka už má poznámku; komentář nelze přidat.',
   appThreadHoverHint: 'Odpovědět v podokně Komentáře',
   appNoteCellHasThread: 'Vybraná buňka už má komentář ve vlákně; poznámku nelze přidat.',

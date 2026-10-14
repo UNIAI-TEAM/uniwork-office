@@ -1437,6 +1437,7 @@ export const ar = {
   appCtxResolveComment: 'حل التعليق',
   appThreadConverted: 'تم تحويل {count} تعليقات إلى ملاحظات.',
   appThreadNoneAtSelection: 'لا يوجد تعليق مترابط في الخلية المحددة.',
+  appCommentSaveFirst: 'احفظ المصنف أولاً لإضافة تعليق',
   appThreadCellHasNote: 'تحتوي الخلية المحددة على ملاحظة بالفعل؛ لا يمكن إضافة تعليق.',
   appThreadHoverHint: 'الرد في جزء التعليقات',
   appNoteCellHasThread: 'تحتوي الخلية المحددة على تعليق مترابط بالفعل؛ لا يمكن إضافة ملاحظة.',

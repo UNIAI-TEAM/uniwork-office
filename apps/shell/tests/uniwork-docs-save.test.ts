@@ -1923,3 +1923,131 @@ describe('min_app_version is the core semver (R1-be-12)', () => {
     expect(coreSemver('dev')).toBe('dev')
   })
 })
+
+describe('the comments context of a bound copy (G8-12 §3.1)', () => {
+  /** the service reads `notifySaved` from its deps at push time */
+  function withSavedSpy(ctx: ReturnType<typeof setup>) {
+    const notifySaved = vi.fn()
+    ;(ctx.deps as Record<string, unknown>).notifySaved = notifySaved
+    return notifySaved
+  }
+
+  it('a fresh open records the open version id, the level and the signed-in id', async () => {
+    const server = fakeServer({ bytes: enc('v3'), myLevel: 'manage' })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    expect(ctx.service.commentContext(path)).toEqual({
+      documentId: DOC,
+      versionId: 'v3',
+      level: 'manage',
+      myUserId: 'acc_1',
+    })
+    expect(binding(path)).toMatchObject({ baseVersionId: 'v3' })
+  })
+
+  it('an unbound path, or another account copy, has no context', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    expect(ctx.service.commentContext(join(dir, 'elsewhere.docx'))).toBeNull()
+    ctx.signInAs('acc_2')
+    expect(ctx.service.commentContext(path)).toBeNull()
+  })
+
+  it('a settled Save moves the version id to the receipt and pushes it once', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    const notifySaved = withSavedSpy(ctx)
+    writeFileSync(path, 'v4 from desktop')
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'saved' })
+    expect(ctx.service.commentContext(path)).toMatchObject({ versionId: 'ver_4' })
+    expect(notifySaved.mock.calls).toEqual([[path, 'ver_4']])
+  })
+
+  it('a receipt settled through the document read takes the document version id', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    const notifySaved = withSavedSpy(ctx)
+    writeFileSync(path, 'v4')
+    // the receipt omits its checksum: the document itself proves the commit
+    server.faults.push({ route: 'commit', kind: 'no-checksum' })
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'saved' })
+    expect(notifySaved.mock.calls).toEqual([[path, 'v4']])
+    expect(ctx.service.commentContext(path)).toMatchObject({ versionId: 'v4' })
+  })
+
+  it('a 403 save downgrades the level to view, also for a binding written before levels existed', async () => {
+    const server = fakeServer({ bytes: enc('v3'), myLevel: 'manage' })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    // an old binding: no `level` field
+    const file = join(path, '..', BINDING_FILE)
+    const raw = JSON.parse(readFileSync(file, 'utf8'))
+    delete raw.level
+    writeFileSync(file, JSON.stringify(raw))
+    expect(binding(path).level).toBeUndefined()
+    writeFileSync(path, 'v4')
+    server.faults.push({ route: 'commit', kind: 403, code: 'forbidden' })
+    await ctx.service.save(path)
+    expect(binding(path)).toMatchObject({ access: 'view', level: 'view' })
+    expect(ctx.service.commentContext(path)).toMatchObject({ level: 'view' })
+  })
+
+  it('a view-ticket copy caps the comments level at view', async () => {
+    const server = fakeServer({ bytes: enc('v3'), myLevel: 'manage' })
+    const ctx = setup(server)
+    const opened = await ctx.service.openFromServer(DOC, {
+      organizationId: 'org_launch',
+      workspaceId: 'ws_launch',
+      title: 'Q4 plan',
+      operation: 'view' as const,
+      version: 3,
+      revision: '41',
+      downloadPath: `/api/v1/documents/${DOC}/download?version=3`,
+    } as never)
+    expect(binding(opened.path)).toMatchObject({ access: 'view', level: 'view' })
+    expect(ctx.service.commentContext(opened.path)).toMatchObject({ level: 'view' })
+  })
+
+  it('a view launch without a version caps the comments level at view', async () => {
+    const server = fakeServer({ bytes: enc('v3'), myLevel: 'manage' })
+    const ctx = setup(server)
+    const opened = await ctx.service.openFromServer(DOC, {
+      organizationId: 'org_launch',
+      workspaceId: 'ws_launch',
+      title: 'Q4 plan',
+      operation: 'view' as const,
+      version: 0,
+      revision: '41',
+      downloadPath: `/api/v1/documents/${DOC}/download`,
+    } as never)
+    expect(binding(opened.path)).toMatchObject({ access: 'view', level: 'view' })
+    expect(ctx.service.commentContext(opened.path)).toMatchObject({ level: 'view' })
+  })
+
+  it('a conflicted or failed Save pushes nothing and keeps the open version', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    const notifySaved = withSavedSpy(ctx)
+    writeFileSync(path, 'v4')
+    server.faults.push({ route: 'upload', kind: 'network' })
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'offline' })
+    // someone else saved meanwhile: the replay hits a conflict
+    server.state.revision += 1
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'conflict' })
+    expect(notifySaved).not.toHaveBeenCalled()
+    expect(ctx.service.commentContext(path)).toMatchObject({ versionId: 'v3' })
+  })
+
+  it('a Save that needs no upload (bytes equal the base) pushes nothing', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    const notifySaved = withSavedSpy(ctx)
+    await ctx.service.save(path)
+    expect(notifySaved).not.toHaveBeenCalled()
+  })
+})

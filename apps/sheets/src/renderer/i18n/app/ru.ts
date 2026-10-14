@@ -1493,6 +1493,7 @@ export const ru = {
   appCtxResolveComment: 'Решить примечание',
   appThreadConverted: 'Преобразовано примечаний в заметки: {count}.',
   appThreadNoneAtSelection: 'В выделенной ячейке нет цепочки примечаний.',
+  appCommentSaveFirst: 'Сначала сохраните книгу, чтобы добавить комментарий',
   appThreadCellHasNote: 'В выделенной ячейке уже есть заметка; примечание добавить нельзя.',
   appThreadHoverHint: 'Ответить в области «Примечания»',
   appNoteCellHasThread: 'В выделенной ячейке уже есть цепочка примечаний; заметку добавить нельзя.',

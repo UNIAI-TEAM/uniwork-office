@@ -1414,6 +1414,7 @@ export const he = {
   appCtxResolveComment: 'פתור הערה',
   appThreadConverted: '{count} הערות הומרו לפתקים.',
   appThreadNoneAtSelection: 'אין הערה משורשרת בתא שנבחר.',
+  appCommentSaveFirst: 'שמרו קודם את חוברת העבודה כדי להוסיף הערה',
   appThreadCellHasNote: 'לתא שנבחר כבר יש פתק; לא ניתן להוסיף הערה.',
   appThreadHoverHint: 'השב בחלונית ההערות',
   appNoteCellHasThread: 'לתא שנבחר כבר יש הערה משורשרת; לא ניתן להוסיף פתק.',

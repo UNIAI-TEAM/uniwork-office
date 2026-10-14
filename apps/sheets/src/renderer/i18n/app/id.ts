@@ -1476,6 +1476,7 @@ export const id = {
   appCtxResolveComment: 'Selesaikan komentar',
   appThreadConverted: '{count} komentar diubah menjadi catatan.',
   appThreadNoneAtSelection: 'Tidak ada komentar berutas di sel yang dipilih.',
+  appCommentSaveFirst: 'Simpan buku kerja terlebih dahulu untuk menambahkan komentar',
   appThreadCellHasNote:
     'Sel yang dipilih sudah memiliki catatan; komentar tidak dapat ditambahkan.',
   appThreadHoverHint: 'Balas di panel Komentar',

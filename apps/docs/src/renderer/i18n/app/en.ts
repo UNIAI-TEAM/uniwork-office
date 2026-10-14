@@ -109,6 +109,7 @@ export const en = {
   appExportImagesFailed: 'Image export failed: {error}',
   appMixedExportOpening: 'Mixed paper sizes: opening pagination preview to export pages merged…',
   appSelectTextToComment: 'Select the text to comment on first',
+  appCommentSaveFirst: 'Save the document first to add a comment',
   appCommentSelectionLost: 'The selection is no longer valid; reselect the text to comment on',
   appCommentAdded: 'Comment added; written to the document on save',
   appCommentEdited: 'Comment updated; written to the document on save',

@@ -120,6 +120,7 @@ export const ko = {
     '용지 크기가 혼합된 문서: 페이지 미리 보기를 열어 페이지별로 병합하여 내보내는 중…',
   // Comments
   appSelectTextToComment: '메모를 추가할 텍스트를 먼저 선택하세요',
+  appCommentSaveFirst: '댓글을 추가하려면 먼저 문서를 저장하세요',
   appCommentSelectionLost:
     '선택 영역이 더 이상 유효하지 않습니다. 메모를 추가할 텍스트를 다시 선택하세요',
   appCommentAdded: '메모를 추가했습니다. 저장 시 문서에 기록됩니다',

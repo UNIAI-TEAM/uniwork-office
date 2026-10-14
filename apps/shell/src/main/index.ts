@@ -118,7 +118,7 @@ import {
   watchCommentAuthorChanges,
 } from './uniwork-docs/modules'
 import { createModuleSaveRequester } from './uniwork-docs/module-save'
-import { startEditorStatePoll } from './uniwork-docs/editor-state-poll'
+import { mergeEditorStates, startEditorStatePoll } from './uniwork-docs/editor-state-poll'
 import { IPC_CHANNELS as SHEETS_IPC_CHANNELS } from '../../../sheets/src/shared/ipc-channels'
 import { isAgentIntentUrl, parseAgentIntentUrl } from './agent-intent-host'
 import { extractLaunchUrlFromArgv, isOfficeAppUrl, parseOfficeAppUrl } from '@uniwork/office-bridge'
@@ -291,6 +291,7 @@ import type {
   FileSearchSettings,
 } from '../shared/home-api'
 import { HOME_CHANNELS } from '../shared/home-api'
+import { UNIWORK_DOC_CHANNELS } from '../shared/home-api'
 import { extractAllowedFileExcerpts } from './file-excerpts'
 import { isAllowedWbKey, type WbKvMap } from './workbench-db'
 import { WorkbenchAccounts, loadWorkbenchSnapshot } from './workbench-accounts'
@@ -354,7 +355,7 @@ import { isVersionRequest } from './version-flag'
 import { registerAiRunIpc } from './ai-run-registry'
 import { broadcastUniworkAiFlag, registerUniworkAiFlagIpc } from './uniwork-ai-flag'
 import { createUniworkAiChoiceStore } from './uniwork-ai-choice'
-import { TabManager } from './tab-manager'
+import { canonicalPath, TabManager } from './tab-manager'
 import { installShellCloseGuard } from './window-close-guard'
 import {
   activateDetached,
@@ -365,6 +366,7 @@ import {
   createDetachedEditorWindow,
   detachedFilePaths,
   detachedOpenDocuments,
+  detachedEditorStates,
   detachedRenameFile,
   detachedSetFileFor,
   detachedWebContentsFor,
@@ -3953,6 +3955,27 @@ function webContentsForPath(
   return detached ? { kind: detached.kind, webContents: detached.webContents } : undefined
 }
 
+/**
+ * G5-03a: the editor state of one path, read fresh from the live views — the
+ * owner tab (with its present views folded in) and every detached window of the
+ * path. The guarded clean reload compares it across its fetch, so this is never
+ * served from the 1 s poll cache. `dirty` is null only when no view answered.
+ */
+async function editorStateOfPath(
+  path: string,
+): Promise<{ dirty: boolean | null; aiRunning: boolean; aiEpoch: number }> {
+  const wanted = canonicalPath(path)
+  const wantedPath = (p: string) => canonicalPath(p) === wanted
+  const states = mergeEditorStates([
+    ...((await tabManager?.editorDirtyStates(wantedPath)) ?? []),
+    ...(await detachedEditorStates(wantedPath)),
+  ])
+  const merged = states[0]
+  return merged
+    ? { dirty: merged.dirty, aiRunning: merged.aiRunning, aiEpoch: merged.aiEpoch }
+    : { dirty: null, aiRunning: false, aiEpoch: 0 }
+}
+
 /** each module's explicit Save, exactly what its File > Save runs */
 const requestUniworkModuleSave = createModuleSaveRequester({
   targetForPath: webContentsForPath,
@@ -3980,6 +4003,10 @@ function uniworkDocsWiring() {
       if (target?.tabId && tabManager) tabManager.reloadTab(target.tabId)
       else if (target && !target.webContents.isDestroyed()) target.webContents.reload()
     },
+    // G5-03a: the FRESH editor state of one path (never the 1 s poll cache),
+    // summed over its tab (present views of it folded in) and detached windows.
+    // The guarded clean reload reads it before and after its fetch.
+    editorStateOf: (path: string) => editorStateOfPath(path),
     activePath: () => tabManager?.activeFilePath(),
     reveal: revealShellWindow,
     // G8-08: the editor showing the path (its preload listens for the reveal)
@@ -4014,6 +4041,8 @@ function uniworkDocsWiring() {
     },
     lang: () => currentLang(),
     defaultSaveDir: () => defaultSaveDir(),
+    // ADVISOR D4 (a): the gate of the dev-only S6 fixture (unreachable packaged)
+    isPackaged: app.isPackaged,
     openPaths,
     closePath: async (path: string) => {
       const tabsClosed = tabManager ? await tabManager.closeTabsShowing(path) : true
@@ -4439,10 +4468,24 @@ function registerHomeIpc(): void {
   )
   // the chip reads "Unsaved changes" while an editor holds edits not saved yet
   startEditorStatePoll({
-    editorDirtyStates: async (wanted) => (await tabManager?.editorDirtyStates(wanted)) ?? [],
+    // tabs AND detached windows; a path open in both appears twice and the poll
+    // merges it (dirty any, aiRunning any, aiEpoch sum)
+    editorDirtyStates: async (wanted) => [
+      ...((await tabManager?.editorDirtyStates(wanted)) ?? []),
+      ...(await detachedEditorStates(wanted)),
+    ],
     isBound: (path) => uniworkService.isBound(path),
     saveMark: () => uniworkService.saveMark(),
-    noteEditorDirty: (path, dirty, mark) => uniworkService.noteEditorDirty(path, dirty, mark),
+    noteEditorState: (path, state, mark) => uniworkService.noteEditorState(path, state, mark),
+  })
+
+  // G5-03a: the S6 bar's height under the tab strip; the shell renderer reports
+  // it for the active tab only and resends on every tab switch (0 hides it)
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.barInset, (event, heightPx: unknown) => {
+    if (typeof heightPx !== 'number' || !Number.isFinite(heightPx)) return
+    if (!shellWindow || shellWindow.isDestroyed()) return
+    if (shellWindow.webContents.id !== event.sender.id) return
+    tabManager?.setTopInset(heightPx)
   })
 
   // Reserved for the Hub result channel; the ack is not reported anywhere today.

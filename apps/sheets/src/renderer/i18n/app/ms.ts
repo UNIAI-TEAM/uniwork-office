@@ -1476,6 +1476,7 @@ export const ms = {
   appCtxResolveComment: 'Selesaikan komen',
   appThreadConverted: '{count} komen ditukar kepada nota.',
   appThreadNoneAtSelection: 'Tiada komen berbebenang pada sel yang dipilih.',
+  appCommentSaveFirst: 'Simpan buku kerja dahulu untuk menambah komen',
   appThreadCellHasNote: 'Sel yang dipilih sudah mempunyai nota; komen tidak boleh ditambah.',
   appThreadHoverHint: 'Balas dalam anak tetingkap Komen',
   appNoteCellHasThread:

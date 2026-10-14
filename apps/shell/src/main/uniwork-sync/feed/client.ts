@@ -5,9 +5,18 @@ import { REVISION } from './revision'
 
 /**
  * Client for `GET /api/v1/workspaces/{workspaceID}/documents/changes`
- * (G5-01a `DocumentChangeListSDO`). The cursor is opaque and travels in the
- * query only. Every failure rejects with a FeedError, classified by
- * parseFeedError so a cursor verdict is never a deleted document.
+ * (G5-01a `DocumentChangeListSDO`, G5-01b `DocumentChangeFeedSDO`). The cursor
+ * is opaque and travels in the query only. Every failure rejects with a
+ * FeedError, classified by parseFeedError so a cursor verdict is never a
+ * deleted document.
+ *
+ * Two page shapes, one row stream: a snapshot page fills `changes`, an
+ * incremental feed page (`phase` feed) fills `feed` and leaves `changes` empty
+ * (the D handler's own contract). Both are read into `changes`, so the
+ * consumer applies one stream. A feed removal (`change_kind` removal) carries
+ * no version pointer and is not a document state; the fork has no removal path
+ * yet, so only its upserts enter the stream - never a removal read as a newer
+ * version.
  */
 
 export interface FeedChange {
@@ -21,8 +30,9 @@ export interface FeedChange {
 }
 
 export interface FeedPage {
-  /** `snapshot` today; G5-01b adds an incremental phase, any other value is read as changes */
+  /** `snapshot` | `feed` today; any other value is read as changes (G5-01a) */
   phase: string
+  /** the page's rows: a snapshot page's `changes`, or a feed page's upserts */
   changes: FeedChange[]
   hasMore: boolean
   nextCursor: string
@@ -54,6 +64,11 @@ function malformed(): never {
   throw new FeedError({ kind: 'other', error: new UniworkDocError('malformed_response') })
 }
 
+/** the incremental feed page's phase (G5-01b); its rows travel in `feed` */
+const FEED_PHASE = 'feed'
+/** the feed row kind that carries a document state; the other kind is a removal */
+const FEED_CHANGE_UPSERT = 'upsert'
+
 function parseChange(raw: unknown): FeedChange {
   if (!raw || typeof raw !== 'object') malformed()
   const row = raw as Record<string, unknown>
@@ -71,6 +86,19 @@ function parseChange(raw: unknown): FeedChange {
   return { documentId, kind, revision, currentVersion, versionId }
 }
 
+/**
+ * One `feed` row (G5-01b): an upsert is the same row a snapshot page carries
+ * (ids, kind, revision, version pointer) and is read by the same parser; a
+ * removal is ids-only with no document state, so it is not part of the row
+ * stream this consumer applies - dropping it is deliberate, never a removal
+ * mistaken for a newer version.
+ */
+function parseFeedChange(raw: unknown): FeedChange | null {
+  if (!raw || typeof raw !== 'object') malformed()
+  if ((raw as Record<string, unknown>).change_kind !== FEED_CHANGE_UPSERT) return null
+  return parseChange(raw)
+}
+
 export function parseFeedPage(text: string): FeedPage {
   let raw: unknown
   try {
@@ -80,7 +108,7 @@ export function parseFeedPage(text: string): FeedPage {
   }
   if (!raw || typeof raw !== 'object') malformed()
   const page = raw as Record<string, unknown>
-  const { phase, changes, has_more: hasMore, next_cursor: nextCursor } = page
+  const { phase, changes, feed, has_more: hasMore, next_cursor: nextCursor } = page
   const expiresAt = page.expires_at ?? ''
   if (typeof phase !== 'string' || !phase) malformed()
   if (!Array.isArray(changes)) malformed()
@@ -89,7 +117,17 @@ export function parseFeedPage(text: string): FeedPage {
     malformed()
   }
   if (typeof expiresAt !== 'string') malformed()
-  return { phase, changes: changes.map(parseChange), hasMore, nextCursor, expiresAt }
+  // a feed page (G5-01b) carries its rows in `feed` and leaves `changes` empty:
+  // reading only `changes` would silently drop every committed change the
+  // snapshot did not see (G5-03a live I1-I5)
+  let rows: FeedChange[]
+  if (phase === FEED_PHASE) {
+    if (!Array.isArray(feed)) malformed()
+    rows = feed.map(parseFeedChange).filter((change): change is FeedChange => change !== null)
+  } else {
+    rows = changes.map(parseChange)
+  }
+  return { phase, changes: rows, hasMore, nextCursor, expiresAt }
 }
 
 export function createFeedClient(options: AuthorizedGetOptions): FeedClient {

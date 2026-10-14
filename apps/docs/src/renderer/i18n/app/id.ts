@@ -114,6 +114,7 @@ export const id = {
   appMixedExportOpening:
     'Ukuran kertas campuran: membuka pratinjau paginasi untuk mengekspor halaman yang digabungkan…',
   appSelectTextToComment: 'Pilih teks yang ingin dikomentari terlebih dahulu',
+  appCommentSaveFirst: 'Simpan dokumen terlebih dahulu untuk menambahkan komentar',
   appCommentSelectionLost: 'Pilihan tidak lagi valid; pilih kembali teks yang ingin dikomentari',
   appCommentAdded: 'Komentar ditambahkan; ditulis ke dokumen saat disimpan',
   appCommentEdited: 'Komentar diperbarui; ditulis ke dokumen saat disimpan',

@@ -1465,6 +1465,7 @@ export const vi = {
   appCtxResolveComment: 'Giải quyết chú thích',
   appThreadConverted: 'Đã chuyển {count} chú thích thành ghi chú.',
   appThreadNoneAtSelection: 'Không có chú thích theo chuỗi trong ô đã chọn.',
+  appCommentSaveFirst: 'Hãy lưu sổ làm việc trước khi thêm bình luận',
   appThreadCellHasNote: 'Ô đã chọn đã có ghi chú; không thể thêm chú thích.',
   appThreadHoverHint: 'Trả lời trong ngăn Chú thích',
   appNoteCellHasThread: 'Ô đã chọn đã có chú thích theo chuỗi; không thể thêm ghi chú.',

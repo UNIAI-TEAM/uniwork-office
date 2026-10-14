@@ -1516,6 +1516,7 @@ export const it = {
   appCtxResolveComment: 'Risolvi commento',
   appThreadConverted: '{count} commenti convertiti in note.',
   appThreadNoneAtSelection: 'Nessun commento in thread nella cella selezionata.',
+  appCommentSaveFirst: 'Salva prima la cartella di lavoro per aggiungere un commento',
   appThreadCellHasNote: 'La cella selezionata ha già una nota; impossibile aggiungere un commento.',
   appThreadHoverHint: 'Rispondi nel riquadro Commenti',
   appNoteCellHasThread:

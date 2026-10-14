@@ -320,6 +320,23 @@ export interface UniworkDocRenamedEvent {
   title: string
 }
 
+/**
+ * S6: the "new version available" bar of one document (G5-03a). Absent = no
+ * bar. `version` is the server's head version when the notice carried one
+ * (null only for an old host that sent none -> `uwRemoteUpdatedNoRev`).
+ */
+export type UniworkRemoteBar =
+  | { kind: 'updated'; version: number | null }
+  | { kind: 'newer-dirty'; version: number; wait?: 'commit' | 'stuck' }
+  | { kind: 'newer-ai'; version: number }
+  | { kind: 'now-clean'; version: number }
+  | { kind: 'reload-failed'; version: number }
+  | { kind: 'revoked' }
+  | { kind: 'deleted' }
+
+/** the S6 bar's actions: hide, hide until a newer revision, retry a clean reload, or the conflict flow */
+export type UniworkRemoteAction = 'later' | 'close' | 'retry' | 'reload' | 'reload-now'
+
 export interface UniworkDocStatus {
   path: string
   documentId: string
@@ -332,6 +349,8 @@ export interface UniworkDocStatus {
   /** an unsent N+1 exists behind the pending intent (G5-06) */
   pendingNext?: boolean
   lastSavedAt?: string
+  /** S6 (G5-03a): the new-version bar of this document; absent = none */
+  remote?: UniworkRemoteBar
 }
 
 export type UniworkConflictChoice = 'overwrite' | 'save-local-copy' | 'open-latest' | 'later'
@@ -791,6 +810,13 @@ export interface HomeApi {
   onUniworkDocStatus(cb: (status: UniworkDocStatus) => void): () => void
   uniworkSave(path: string): Promise<UniworkDocStatus | null>
   uniworkResolveConflict(path: string): Promise<UniworkDocStatus | null>
+  /**
+   * S6 (G5-03a): one action of the new-version bar (`later`, `close`, `retry`
+   * or the two reloads); resolves to the status after the action.
+   */
+  uniworkRemoteAction(path: string, action: UniworkRemoteAction): Promise<UniworkDocStatus | null>
+  /** S6: the bar's height; main moves the active editor view down by it */
+  uniworkSetBarInset(heightPx: number): Promise<void>
   onUniworkLaunch(cb: (event: UniworkLaunchEvent) => void): () => void
   /** newer-store locks pushed from main; returns an unsubscribe */
   onUniworkLock(cb: (lock: UniworkDocLock) => void): () => void
@@ -1338,6 +1364,10 @@ export const UNIWORK_DOC_CHANNELS = {
   docStatusEvent: 'uniwork-doc:status-event',
   save: 'uniwork-doc:save',
   resolveConflict: 'uniwork-doc:resolve-conflict',
+  /** invoke(path, action) -> the S6 bar action (later/close/retry/reload/reload-now) */
+  remoteAction: 'uniwork-doc:remote-action',
+  /** invoke(heightPx) -> the S6 bar's height under the tab strip (active view inset) */
+  barInset: 'uniwork-doc:bar-inset',
   launchEvent: 'uniwork-doc:launch-event',
   /** main -> shell renderer: a working copy refused by the newer-store guard */
   lock: 'uniwork-doc:lock',

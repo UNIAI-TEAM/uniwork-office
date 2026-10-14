@@ -1502,6 +1502,7 @@ export const pl = {
   appCtxResolveComment: 'Rozwiąż komentarz',
   appThreadConverted: 'Przekonwertowano {count} komentarzy na notatki.',
   appThreadNoneAtSelection: 'Brak komentarza wątkowego w zaznaczonej komórce.',
+  appCommentSaveFirst: 'Najpierw zapisz skoroszyt, aby dodać komentarz',
   appThreadCellHasNote: 'Zaznaczona komórka ma już notatkę; nie można dodać komentarza.',
   appThreadHoverHint: 'Odpowiedz w okienku Komentarze',
   appNoteCellHasThread: 'Zaznaczona komórka ma już komentarz wątkowy; nie można dodać notatki.',

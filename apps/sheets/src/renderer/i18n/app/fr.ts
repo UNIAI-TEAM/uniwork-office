@@ -1542,6 +1542,7 @@ export const fr = {
   appCtxResolveComment: 'Résoudre le commentaire',
   appThreadConverted: '{count} commentaires convertis en notes.',
   appThreadNoneAtSelection: 'Aucun commentaire en fil dans la cellule sélectionnée.',
+  appCommentSaveFirst: 'Enregistrez d’abord le classeur pour ajouter un commentaire',
   appThreadCellHasNote:
     'La cellule sélectionnée a déjà une note ; impossible d’ajouter un commentaire.',
   appThreadHoverHint: 'Répondre dans le volet Commentaires',

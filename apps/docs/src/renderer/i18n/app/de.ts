@@ -115,6 +115,7 @@ export const de = {
   appMixedExportOpening:
     'Gemischte Papierformate: Seitenvorschau wird geöffnet, um die Seiten zusammengeführt zu exportieren…',
   appSelectTextToComment: 'Wählen Sie zuerst den zu kommentierenden Text aus',
+  appCommentSaveFirst: 'Speichern Sie zuerst das Dokument, um einen Kommentar hinzuzufügen',
   appCommentSelectionLost:
     'Die Auswahl ist nicht mehr gültig; wählen Sie den zu kommentierenden Text erneut aus',
   appCommentAdded: 'Kommentar hinzugefügt; wird beim Speichern in das Dokument geschrieben',

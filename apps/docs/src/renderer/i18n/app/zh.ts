@@ -113,6 +113,7 @@ export const zh = {
   appMixedExportOpening: '混合纸张文档:正在打开分页预览并按页合并导出…',
   // Comments
   appSelectTextToComment: '先选中要批注的文字',
+  appCommentSaveFirst: '请先保存文档，再添加批注',
   appCommentSelectionLost: '选区已失效,请重新选中要批注的文字',
   appCommentAdded: '已添加批注,保存后写入文档',
   appCommentEdited: '批注已更新,保存后写入文档',
