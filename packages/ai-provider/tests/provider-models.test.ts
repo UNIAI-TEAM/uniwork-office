@@ -128,7 +128,9 @@ describe('listProviderModels request and shapes', () => {
   })
 
   it('drops blank, repeated and non-string ids and keeps server order', async () => {
-    stubFetch(json({ data: [{ id: ' b ' }, { id: 'a' }, { id: 'b' }, { id: '' }, { id: 7 }, null] }))
+    stubFetch(
+      json({ data: [{ id: ' b ' }, { id: 'a' }, { id: 'b' }, { id: '' }, { id: 7 }, null] }),
+    )
     expect((await listProviderModels('openai', key('k'))).ids).toEqual(['b', 'a'])
   })
 })
@@ -170,15 +172,23 @@ describe('listProviderModels never throws', () => {
 
   it('a hang is cut at 5 s', async () => {
     vi.useFakeTimers()
-    stubFetch(
-      () =>
-        new Promise<Response>(() => {
-          /* never answers */
-        }),
+    let aborted = false
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        (_url: string, init: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            init.signal?.addEventListener('abort', () => {
+              aborted = true
+              reject(new DOMException('The operation was aborted.', 'AbortError'))
+            })
+          }),
+      ),
     )
     const pending = listProviderModels('openai', key('k'))
-    await vi.advanceTimersByTimeAsync(5_100)
+    await vi.advanceTimersByTimeAsync(5_000)
     expect(await pending).toEqual(failed)
+    expect(aborted).toBe(true)
   })
 
   it('an unusable base URL', async () => {
@@ -276,9 +286,9 @@ describe('ProviderModelCache', () => {
     expect(t.cache.read('openai', key('k2'), t.settled)).toEqual({ listState: 'loading' })
     await flush()
     expect(t.cache.read('openai', key('k2'), t.settled)).toEqual({ listed: ['new'] })
-    expect(t.cache.read('openai', key('k2', { baseUrl: 'https://m.example/v1' }), t.settled)).toEqual(
-      { listState: 'loading' },
-    )
+    expect(
+      t.cache.read('openai', key('k2', { baseUrl: 'https://m.example/v1' }), t.settled),
+    ).toEqual({ listState: 'loading' })
     expect(t.list).toHaveBeenCalledTimes(3)
   })
 
