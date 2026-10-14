@@ -48,19 +48,23 @@ export function WbConfirm({
   useLayoutEffect(() => {
     const box = ref.current
     if (!box) return
-    const w = box.offsetWidth
-    const h = box.offsetHeight
+    // .app-frame is `zoom: var(--ui-scale)`: rects and the window are in window px,
+    // while this fixed box's own size and left/top are multiplied by the zoom
+    const rawScale = Number.parseFloat(getComputedStyle(box).getPropertyValue('--ui-scale'))
+    const z = Number.isFinite(rawScale) && rawScale > 0 ? rawScale : 1
+    const w = box.offsetWidth * z
+    const h = box.offsetHeight * z
     const vw = window.innerWidth
     const vh = window.innerHeight
     const a = opener?.isConnected ? opener.getBoundingClientRect() : null
     if (!a || (a.width === 0 && a.height === 0)) {
-      setPos({ left: Math.max(8, (vw - w) / 2), top: Math.max(8, vh / 3 - h / 2) })
+      setPos({ left: Math.max(8, (vw - w) / 2) / z, top: Math.max(8, vh / 3 - h / 2) / z })
       return
     }
     const left = Math.min(Math.max(8, a.right - w), vw - w - 8)
     const below = a.bottom + 6
     const top = below + h <= vh - 8 ? below : Math.max(8, a.top - h - 6)
-    setPos({ left, top })
+    setPos({ left: left / z, top: top / z })
   }, [opener])
 
   useEffect(() => {

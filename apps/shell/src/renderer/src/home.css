@@ -4001,8 +4001,8 @@ body.vib .home {
   flex-direction: column;
   gap: 2px;
   min-width: 220px;
-  max-width: min(360px, 92vw);
-  max-height: min(60vh, 420px);
+  max-width: min(360px, calc(var(--ui-vw) * 92));
+  max-height: min(calc(var(--ui-vh) * 60), 420px);
   overflow-y: auto;
   padding: 6px;
   border: 1px solid var(--border);
@@ -4102,7 +4102,7 @@ body.vib .home {
 .wb-confirm {
   position: fixed;
   z-index: 50;
-  width: min(320px, calc(100vw - 16px));
+  width: min(320px, calc(var(--ui-vw) * 100 - 16px));
   padding: 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-12);
@@ -4443,7 +4443,7 @@ body.vib .home {
 .wb-tab-menu {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  width: min(360px, 92vw);
+  width: min(360px, calc(var(--ui-vw) * 92));
 }
 
 .wb-tab-menu > .wb-menu-label-row {
