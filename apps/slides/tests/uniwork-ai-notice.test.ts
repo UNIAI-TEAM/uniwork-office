@@ -1,0 +1,185 @@
+// UniWork AI notices in the slides panel (G6-05 slice D): a Retry-After wait is a status line
+// with Stop only (no Retry while the run waits); a restarted conversation, a provider boundary
+// and a dropped call are plain notes. The loop is replaced by a harness that hands over its events.
+import { act, createElement } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { AgentStreamNotice } from '@genoffice/agent-core'
+import { aiUniworkText } from '@genoffice/ui'
+
+const harness = vi.hoisted(() => ({
+  events: null as null | {
+    onText?: (text: string) => void
+    onNotice?: (notice: unknown) => void
+    onDone?: (result: { text: string; cancelled: boolean; turnLimit: boolean }) => void
+    onError?: (error: string) => void
+  },
+  run: vi.fn(),
+}))
+
+vi.mock('@genoffice/agent-core', async () => {
+  const actual =
+    await vi.importActual<typeof import('@genoffice/agent-core')>('@genoffice/agent-core')
+  return {
+    ...actual,
+    AgentLoop: class MockAgentLoop {
+      busy = false
+      constructor(options: { events?: typeof harness.events }) {
+        harness.events = options.events ?? null
+      }
+      run(...args: unknown[]) {
+        harness.run(...args)
+      }
+      cancel() {}
+      reset() {}
+      restore() {}
+    },
+  }
+})
+
+// react-konva's node entry requires the native 'canvas' package; these tests do not draw.
+vi.mock('react-konva', () => {
+  const stub = () => null
+  return Object.fromEntries(
+    [
+      'Stage',
+      'Layer',
+      'Rect',
+      'Group',
+      'Transformer',
+      'Line',
+      'Arrow',
+      'Text',
+      'Ellipse',
+      'Image',
+      'Path',
+      'Circle',
+      'Arc',
+    ].map((k) => [k, stub]),
+  )
+})
+
+import { AiPanel } from '../src/renderer/ai/AiPanel'
+import { getLang, t } from '../src/renderer/i18n/locale'
+import { AI_PROVIDERS, type AiSettings } from '../src/shared/ipc'
+
+const settings: AiSettings = {
+  provider: 'anthropic',
+  providers: Object.fromEntries(
+    AI_PROVIDERS.map((p) => [p.id, { apiKey: 'k', model: p.defaultModel }]),
+  ) as AiSettings['providers'],
+}
+
+const mounted: Array<{ root: Root; container: HTMLElement }> = []
+const flush = () =>
+  act(async () => {
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+  })
+const ui = (key: Parameters<typeof aiUniworkText>[1], params?: Record<string, string | number>) =>
+  aiUniworkText(getLang(), key, params)
+
+async function startRun(): Promise<HTMLElement> {
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  act(() =>
+    root.render(
+      createElement(AiPanel, {
+        slides: [],
+        current: 0,
+        selectedIds: [],
+        images: new Map(),
+        applySlide: () => {},
+        applyDeck: () => {},
+        fitWidthPx: 960,
+        settings,
+        open: true,
+        onExpand: () => {},
+        onCollapse: () => {},
+        preset: { text: 'tighten it', nonce: 1, autoRun: true },
+      }),
+    ),
+  )
+  mounted.push({ root, container })
+  await flush()
+  expect(harness.run).toHaveBeenCalled()
+  return container
+}
+
+const notify = (notice: AgentStreamNotice) => act(() => harness.events!.onNotice?.(notice))
+const notices = (c: HTMLElement) =>
+  [...c.querySelectorAll('.ai-msg-notice')].map((n) => n.textContent)
+
+beforeAll(() => {
+  Element.prototype.scrollTo ??= () => {}
+})
+
+beforeEach(() => {
+  harness.events = null
+  harness.run.mockReset()
+  Object.defineProperty(window, 'slidesApi', {
+    configurable: true,
+    value: {
+      aiGskStatus: vi.fn(async () => ({ loggedIn: true })),
+      beginHistoryBatch: vi.fn(async () => false),
+      endHistoryBatch: vi.fn(async () => null),
+      aiLogRunFailure: vi.fn(async () => undefined),
+    },
+  })
+  Object.defineProperty(window, 'projectApi', { configurable: true, value: undefined })
+  Object.defineProperty(window, 'desktop', {
+    configurable: true,
+    value: { readAttachmentImage: vi.fn(async () => ({ ok: false })) },
+  })
+})
+
+afterEach(() => {
+  for (const { root, container } of mounted.splice(0)) {
+    act(() => root.unmount())
+    container.remove()
+  }
+})
+
+describe('UniWork AI notices (slides panel)', () => {
+  it('waiting shows Stop only, no Retry', async () => {
+    const c = await startRun()
+    await notify({ kind: 'rate-limit-wait', seconds: 90, attempt: 1 })
+    expect(notices(c)).toEqual([ui('aiErrRateLimited', { seconds: 90 })])
+    expect(c.querySelector(`button[aria-label="${t('aiStop')}"]`), 'Stop stays').not.toBeNull()
+    expect(c.querySelector(`button[aria-label="${t('aiRegenerate')}"]`)).toBeNull()
+    expect(c.querySelector('.ai-msg-error')).toBeNull()
+    // the resend streams text: the line goes
+    await act(async () => harness.events!.onText?.('done it'))
+    expect(notices(c)).toEqual([])
+  })
+
+  it('a restarted conversation keeps its note and no empty-reply line', async () => {
+    const c = await startRun()
+    await notify({ kind: 'conversation-restarted' })
+    await act(async () =>
+      harness.events!.onDone?.({ text: '', cancelled: false, turnLimit: false }),
+    )
+    await flush()
+    expect(notices(c)).toEqual([ui('aiConversationRestarted')])
+    expect(c.textContent).not.toContain(t('aiNoResponse'))
+  })
+
+  it('a provider boundary and dropped calls become notes', async () => {
+    const c = await startRun()
+    await notify({ kind: 'conversation-boundary', provider: 'UniWork AI' })
+    await notify({
+      kind: 'dropped-tool-calls',
+      calls: [
+        { index: 0, name: 'edit', reason: 'view_only' },
+        { index: 1, name: 'x', reason: 'not_allowlisted' },
+      ],
+    })
+    expect(notices(c)).toEqual([
+      ui('aiConversationBoundary', { provider: 'UniWork AI' }),
+      ui('aiErrViewOnlyEdit'),
+      ui('aiErrUnsupported', { module: 'Slides' }),
+    ])
+  })
+})
