@@ -1,5 +1,5 @@
 /** @vitest-environment jsdom */
-import { act, createElement, useState, type ReactNode } from 'react'
+import { act, createElement, useLayoutEffect, useState, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CollabComposer } from '../src/collab/CollabComposer'
@@ -605,6 +605,54 @@ describe('focus', () => {
       act(() => cancelBtn2.click())
       expect($('.collab-thread--new')).toBeNull()
       expect(document.activeElement).toBe($('[data-thread-id="a"] [data-thread-heading]'))
+    } finally {
+      opener.remove()
+    }
+  })
+
+  it('captures newThreadOpenerRef in useLayoutEffect on [ctl.newThread] rather than during render (FEK-4)', async () => {
+    const src = fakeSource(list([cm({ id: 'a', anchor: docx(1) })], 't1'))
+    const opener = document.createElement('button')
+    opener.textContent = 'Toolbar Comment'
+    document.body.append(opener)
+    try {
+      await act(async () => {
+        function SiblingFocusOnStart(p: { active: boolean }) {
+          useLayoutEffect(() => {
+            if (p.active) opener.focus()
+          }, [p.active])
+          return null
+        }
+        function HostWithSibling() {
+          ctl = useCollabThreads(src, host(), { strings: EN, adapter: ad() })
+          return createElement(
+            'div',
+            null,
+            createElement(SiblingFocusOnStart, { active: ctl.newThread !== null }),
+            createElement(CollabPanel, {
+              controller: ctl,
+              strings: EN,
+              onClose: () => {},
+              renderComposer: (slot) =>
+                createElement(CollabComposer, { ...slot, strings: { ...EN, ...COMPOSER_STRINGS } }),
+            }),
+          )
+        }
+        root.render(createElement(HostWithSibling))
+        await flush()
+      })
+
+      act(() => (document.activeElement as HTMLElement | null)?.blur())
+      await act(async () => ctl.startThread({ anchor: docx(5), base_version_id: 'v1' }))
+      const ta = $<HTMLTextAreaElement>('.collab-thread--new textarea')!
+      expect(document.activeElement).toBe(ta)
+      act(() => {
+        ta.dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+        )
+      })
+      expect($('.collab-thread--new')).toBeNull()
+      expect(document.activeElement).toBe(opener)
     } finally {
       opener.remove()
     }
