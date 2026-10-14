@@ -184,7 +184,13 @@ export async function streamUniwork(
   try {
     slice = sliceUniworkTurn(request.messages)
   } catch (cause) {
-    if (cause instanceof UniworkError) throw cause
+    if (cause instanceof UniworkError) {
+      // a question refused before sending (too long, blank after the image strip): the user still
+      // learns that the images were left out
+      const last = request.messages.at(-1)
+      if (last?.role === 'user' && last.images?.length) cb.onNotice?.({ kind: 'images-not-sent' })
+      throw cause
+    }
     throw new UniworkError('protocol_error', { cause })
   }
   const tools = uniworkAllowedTools(request.tools, request.toolPolicy)

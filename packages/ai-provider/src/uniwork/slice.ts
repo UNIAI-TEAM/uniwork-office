@@ -81,6 +81,9 @@ export function sliceUniworkTurn(history: AgentMessage[]): UniworkTurnSlice {
   }
   if (last.role === 'user') {
     const { text, clipped } = capQuestion(last)
+    // images never go out, so an image-only message (no text, no editor context) would be a blank
+    // question: the façade answers it with a 400, so refuse it here instead of sending it
+    if (text.trim() === '') throw new UniworkError('question_rejected')
     return {
       kind: 'question',
       messages: [{ role: 'user', content: text }],

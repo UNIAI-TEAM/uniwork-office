@@ -114,6 +114,46 @@ describe('UniWork AI question cap (façade 8000 runes, string content)', () => {
     expect(rec.state.notices).toContainEqual({ kind: 'images-not-sent' })
   })
 
+  it('an image-only question (no text, no context) is refused before any request, with the images note', async () => {
+    const fake = createUniworkFake()
+    const rec = recorder()
+    const conversations = new UniworkConversations()
+    for (const text of ['', '  \n\t ']) {
+      const err = await streamUniwork(
+        fake,
+        turn([{ role: 'user', text, images: [{ mime: 'image/png', base64: 'AAAA' }] }]),
+        rec.cb,
+        { conversations },
+      ).catch((e: unknown) => e)
+      expect((err as UniworkError).code).toBe('question_rejected')
+    }
+    expect(fake.requests).toHaveLength(0)
+    expect(rec.state.notices).toContainEqual({ kind: 'images-not-sent' })
+    // nothing was started: the next real question opens normally
+    fake.enqueue(oneChunk('ok'))
+    await streamUniwork(fake, turn([{ role: 'user', text: 'hi' }]), recorder().cb, {
+      conversations,
+    })
+    expect(fake.requests).toHaveLength(1)
+  })
+
+  it('a blank question with no images is refused the same way; editor context alone is a question', async () => {
+    const fake = createUniworkFake()
+    const err = await streamUniwork(fake, turn([{ role: 'user', text: ' ' }]), recorder().cb, {
+      conversations: new UniworkConversations(),
+    }).catch((e: unknown) => e)
+    expect((err as UniworkError).code).toBe('question_rejected')
+    expect(fake.requests).toHaveLength(0)
+    fake.enqueue(oneChunk('ok'))
+    await streamUniwork(
+      fake,
+      turn([{ role: 'user', text: '\n\nthe document text', instruction: '' }]),
+      recorder().cb,
+      { conversations: new UniworkConversations() },
+    )
+    expect(fake.requests).toHaveLength(1)
+  })
+
   it('a 400 invalid_request on a question has its own message, not "unavailable"', async () => {
     const fake = createUniworkFake()
     fake.enqueue(error(400, 'invalid_request'))
@@ -145,5 +185,15 @@ describe('UniWork AI question cap (façade 8000 runes, string content)', () => {
       signal: new AbortController().signal,
     })
     expect(arrayContent.status).toBe(400)
+    // a blank user question (TrimSpace empty) is a 400 too
+    for (const content of ['', ' \n\t']) {
+      const blank = await fake.post({
+        scope,
+        headers: {},
+        body: JSON.stringify({ messages: [{ role: 'user', content }] }),
+        signal: new AbortController().signal,
+      })
+      expect(blank.status).toBe(400)
+    }
   })
 })

@@ -227,6 +227,10 @@ function facadeRefusal(request: RecordedUniworkRequest): Response | null {
     if (m.role === 'user' && [...m.content].length > FACADE_QUESTION_MAX_RUNES) {
       return error(400, 'invalid_request', { ids: false })
     }
+    // a blank question (TrimSpace empty) is refused too (openai_facade.go)
+    if (m.role === 'user' && m.content.trim() === '') {
+      return error(400, 'invalid_request', { ids: false })
+    }
   }
   return null
 }
