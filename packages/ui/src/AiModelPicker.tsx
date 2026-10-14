@@ -120,9 +120,10 @@ export function AiModelPicker({
   }, [needHint, openSettings, openSettingsOnce])
 
   const toggle = () => {
-    // a key list that failed to load is tried again when the chip is opened (and on focus)
-    if (!open && settings?.credentialsUnavailable) refresh()
+    // every open re-reads the settings (host data: Settings pick, live lists, served model); a host
+    // answers from its cache and announces a newer listing through onSettingsChanged
     if (!open) {
+      refresh()
       const rect = chipRef.current?.getBoundingClientRect()
       // the composer sits at the panel bottom: open upwards, pinned to the chip
       if (rect) setPopStyle({ left: rect.left, bottom: window.innerHeight - rect.top + 6 })
@@ -198,6 +199,11 @@ export function AiModelPicker({
                   <ProviderLogo id={g.id} />
                   <span>{g.label}</span>
                 </div>
+                {g.listState && (
+                  <div className="ai-model-group-head" role="status">
+                    {g.listState === 'loading' ? strings.modelsLoading : strings.modelsUnavailable}
+                  </div>
+                )}
                 {(g.models.length > 0 ? g.models : ['']).map((m) => {
                   const selected = current?.provider === g.id && current.model === m
                   return (
@@ -209,7 +215,7 @@ export function AiModelPicker({
                       className={`ai-model-item${selected ? ' selected' : ''}`}
                       onClick={() => pick({ provider: g.id, model: m })}
                     >
-                      <span className="ai-model-item-text">{m || g.label}</span>
+                      <span className="ai-model-item-text">{m || g.rowLabel}</span>
                       {selected && (
                         <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden>
                           <path
