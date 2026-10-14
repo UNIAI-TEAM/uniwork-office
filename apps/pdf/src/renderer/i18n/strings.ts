@@ -1,4 +1,5 @@
 import { webStrings } from './strings-web'
+import { serverCommentsStrings } from './strings-server-comments'
 import { certSignStrings } from './cert-sign-strings'
 
 const fillFormStrings = {
@@ -208,6 +209,7 @@ export const strings = {
   zh: {
     ...fillFormStringsFor('zh'),
     ...webStrings.zh,
+    ...serverCommentsStrings.zh,
     aiViewOnlyNotice: '仅查看文档:AI 可以阅读并回答问题,但无法编辑。',
     ...certSignStrings['zh'],
     ribbonTabHome: '开始',
@@ -555,6 +557,7 @@ export const strings = {
   en: {
     ...fillFormStringsFor('en'),
     ...webStrings.en,
+    ...serverCommentsStrings.en,
     aiViewOnlyNotice:
       'View-only document: AI can read it and answer questions, but editing is turned off.',
     ...certSignStrings['en'],
@@ -912,6 +915,7 @@ export const strings = {
   vi: {
     ...fillFormStringsFor('vi'),
     ...webStrings.vi,
+    ...serverCommentsStrings.vi,
     aiViewOnlyNotice:
       'Tài liệu chỉ xem: AI có thể đọc và trả lời câu hỏi, nhưng không thể chỉnh sửa.',
     ...certSignStrings['vi'],
@@ -1272,6 +1276,7 @@ export const strings = {
   ja: {
     ...fillFormStringsFor('ja'),
     ...webStrings.ja,
+    ...serverCommentsStrings.ja,
     aiViewOnlyNotice:
       '閲覧専用のドキュメント: AI は内容の読み取りと質問への回答はできますが、編集はできません。',
     ...certSignStrings['ja'],
@@ -1628,6 +1633,7 @@ export const strings = {
   ko: {
     ...fillFormStringsFor('ko'),
     ...webStrings.ko,
+    ...serverCommentsStrings.ko,
     aiViewOnlyNotice:
       '보기 전용 문서: AI는 내용을 읽고 질문에 답할 수 있지만 편집할 수는 없습니다.',
     ...certSignStrings['ko'],
@@ -1983,6 +1989,7 @@ export const strings = {
   fr: {
     ...fillFormStringsFor('fr'),
     ...webStrings.fr,
+    ...serverCommentsStrings.fr,
     aiViewOnlyNotice:
       'Document en lecture seule : l’IA peut le lire et répondre à des questions, mais ne peut pas le modifier.',
     ...certSignStrings['fr'],
@@ -2348,6 +2355,7 @@ export const strings = {
   de: {
     ...fillFormStringsFor('de'),
     ...webStrings.de,
+    ...serverCommentsStrings.de,
     aiViewOnlyNotice:
       'Schreibgeschütztes Dokument: Die KI kann es lesen und Fragen beantworten, aber nicht bearbeiten.',
     ...certSignStrings['de'],
@@ -2711,6 +2719,7 @@ export const strings = {
   es: {
     ...fillFormStringsFor('es'),
     ...webStrings.es,
+    ...serverCommentsStrings.es,
     aiViewOnlyNotice:
       'Documento de solo lectura: la IA puede leerlo y responder preguntas, pero no puede editarlo.',
     ...certSignStrings['es'],
@@ -3074,6 +3083,7 @@ export const strings = {
   th: {
     ...fillFormStringsFor('th'),
     ...webStrings.th,
+    ...serverCommentsStrings.th,
     aiViewOnlyNotice: 'เอกสารแบบดูอย่างเดียว: AI อ่านและตอบคำถามได้ แต่แก้ไขไม่ได้',
     ...certSignStrings['th'],
     ribbonTabHome: 'หน้าแรก',
@@ -3428,6 +3438,7 @@ export const strings = {
   id: {
     ...fillFormStringsFor('id'),
     ...webStrings.id,
+    ...serverCommentsStrings.id,
     aiViewOnlyNotice:
       'Dokumen hanya-lihat: AI dapat membaca dan menjawab pertanyaan, tetapi tidak dapat mengedit.',
     ...certSignStrings['id'],
@@ -3788,6 +3799,7 @@ export const strings = {
   ru: {
     ...fillFormStringsFor('ru'),
     ...webStrings.ru,
+    ...serverCommentsStrings.ru,
     aiViewOnlyNotice:
       'Документ только для просмотра: ИИ может читать его и отвечать на вопросы, но не может редактировать.',
     ...certSignStrings['ru'],
@@ -4149,6 +4161,7 @@ export const strings = {
   ar: {
     ...fillFormStringsFor('ar'),
     ...webStrings.ar,
+    ...serverCommentsStrings.ar,
     aiViewOnlyNotice:
       'مستند للعرض فقط: يمكن للذكاء الاصطناعي قراءته والإجابة عن الأسئلة، لكنه لا يستطيع تعديله.',
     ...certSignStrings['ar'],
@@ -4503,6 +4516,7 @@ export const strings = {
   pt: {
     ...fillFormStringsFor('pt'),
     ...webStrings.pt,
+    ...serverCommentsStrings.pt,
     aiViewOnlyNotice:
       'Documento somente leitura: a IA pode lê-lo e responder a perguntas, mas não pode editá-lo.',
     ...certSignStrings['pt'],
@@ -4865,6 +4879,7 @@ export const strings = {
   it: {
     ...fillFormStringsFor('it'),
     ...webStrings.it,
+    ...serverCommentsStrings.it,
     aiViewOnlyNotice:
       'Documento di sola lettura: l’IA può leggerlo e rispondere a domande, ma non può modificarlo.',
     ...certSignStrings['it'],
@@ -5230,6 +5245,7 @@ export const strings = {
   pl: {
     ...fillFormStringsFor('pl'),
     ...webStrings.pl,
+    ...serverCommentsStrings.pl,
     aiViewOnlyNotice:
       'Dokument tylko do odczytu: AI może go czytać i odpowiadać na pytania, ale nie może go edytować.',
     ...certSignStrings['pl'],
@@ -5590,6 +5606,7 @@ export const strings = {
   cs: {
     ...fillFormStringsFor('cs'),
     ...webStrings.cs,
+    ...serverCommentsStrings.cs,
     aiViewOnlyNotice:
       'Dokument jen pro čtení: AI jej může číst a odpovídat na otázky, ale nemůže jej upravovat.',
     ...certSignStrings['cs'],
@@ -5948,6 +5965,7 @@ export const strings = {
   nl: {
     ...fillFormStringsFor('nl'),
     ...webStrings.nl,
+    ...serverCommentsStrings.nl,
     aiViewOnlyNotice:
       'Alleen-lezen document: AI kan het lezen en vragen beantwoorden, maar niet bewerken.',
     ...certSignStrings['nl'],
@@ -6308,6 +6326,7 @@ export const strings = {
   ms: {
     ...fillFormStringsFor('ms'),
     ...webStrings.ms,
+    ...serverCommentsStrings.ms,
     aiViewOnlyNotice:
       'Dokumen lihat sahaja: AI boleh membaca dan menjawab soalan, tetapi tidak boleh mengedit.',
     ...certSignStrings['ms'],
@@ -6667,6 +6686,7 @@ export const strings = {
   he: {
     ...fillFormStringsFor('he'),
     ...webStrings.he,
+    ...serverCommentsStrings.he,
     aiViewOnlyNotice: 'מסמך לצפייה בלבד: ה-AI יכול לקרוא אותו ולענות על שאלות, אך לא לערוך אותו.',
     ...certSignStrings['he'],
     ribbonTabHome: 'בית',
@@ -7016,6 +7036,7 @@ export const strings = {
   hi: {
     ...fillFormStringsFor('hi'),
     ...webStrings.hi,
+    ...serverCommentsStrings.hi,
     aiViewOnlyNotice:
       'केवल-देखने योग्य दस्तावेज़: AI इसे पढ़ सकता है और प्रश्नों के उत्तर दे सकता है, लेकिन संपादित नहीं कर सकता।',
     ...certSignStrings['hi'],
@@ -7372,6 +7393,7 @@ export const strings = {
   'zh-TW': {
     ...fillFormStringsFor('zh-TW'),
     ...webStrings['zh-TW'],
+    ...serverCommentsStrings['zh-TW'],
     aiViewOnlyNotice: '唯讀文件:AI 可以閱讀並回答問題,但無法編輯。',
     ...certSignStrings['zh-TW'],
     ribbonTabHome: '常用',
