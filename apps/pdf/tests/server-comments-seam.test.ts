@@ -79,7 +79,8 @@ function installBridge(
   context: ContextValue | 'unbound',
   anchorsReply?: () => Promise<unknown>,
 ) {
-  let savedHandler: ((p: { path: string; versionId: string }) => void) | null = null
+  // every live `onSaved` subscription: an unsubscribe removes it, so a leak stays observable
+  const savedHandlers = new Set<(p: { path: string; versionId: string }) => void>()
   const bridge = {
     list: vi.fn(() => ok({ comments, mentions: [], list_token: 't', unchanged: false })),
     create: vi.fn((input: { anchor?: unknown; body: string }) =>
@@ -103,18 +104,25 @@ function installBridge(
         : ok(context),
     ),
     onSaved: vi.fn((handler: (p: { path: string; versionId: string }) => void) => {
-      savedHandler = handler
+      savedHandlers.add(handler)
       return () => {
-        savedHandler = null
+        savedHandlers.delete(handler)
       }
     }),
-    receipt: (versionId: string) => savedHandler?.({ path: PATH, versionId }),
+    savedHandlers,
+    receipt: (versionId: string, path = PATH) => {
+      for (const h of [...savedHandlers]) h({ path, versionId })
+    },
   }
   ;(window as unknown as Record<string, unknown>).uniworkComments = bridge
   return bridge
 }
 
-async function mount(): Promise<{ api: { current: PdfServerComments | null } }> {
+async function mount(): Promise<{
+  api: { current: PdfServerComments | null }
+  /** render the same host for another document (the tab switched files) */
+  switchPath(path: string): Promise<void>
+}> {
   // the editor takes the bridge from the window, exactly as App does
   const bridge = pdfCommentsBridge() as UniworkCommentsApi
   const api: { current: PdfServerComments | null } = { current: null }
@@ -124,11 +132,11 @@ async function mount(): Promise<{ api: { current: PdfServerComments | null } }> 
     viewTop: (_i, rect) => 842 - rect[3],
     goTo: vi.fn(),
   })
-  await act(async () => {
+  const render = (path: string) =>
     root.render(
       createElement(PdfServerCommentsHost, {
         bridge,
-        path: PATH,
+        path,
         lang: 'en',
         readOnly: false,
         adapter,
@@ -140,9 +148,17 @@ async function mount(): Promise<{ api: { current: PdfServerComments | null } }> 
         saveFirstText: 'Save the document first to add a comment',
       }),
     )
+  await act(async () => {
+    render(PATH)
     await flush()
   })
-  return { api }
+  const switchPath = async (path: string) => {
+    await act(async () => {
+      render(path)
+      await flush()
+    })
+  }
+  return { api, switchPath }
 }
 
 const nativeValue = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
@@ -265,5 +281,52 @@ describe('G8-A02 (pdf): the anchor map after the Save receipt on the real seam',
     })
     expect(bridge.anchors).toHaveBeenCalledTimes(1)
     expect(bridge.list.mock.calls.length).toBe(lists)
+  })
+})
+
+describe('G8-A02 (pdf): the save receipt follows this document only', () => {
+  const ctx = { documentId: 'doc-1', versionId: 'ver-1', myUserId: 'u-1' }
+  const OTHER = '/work/uniwork/doc-2/other.pdf'
+
+  it('a receipt for another path sends no anchors and keeps the open version', async () => {
+    const bridge = installBridge([comment('c1', 1)], ctx)
+    const { api } = await mount()
+    await act(async () => {
+      api.current!.saved(new Map([[1, 0]])) // a Save of this document is waiting for its receipt
+      bridge.receipt('ver-other', OTHER)
+      await flush()
+    })
+    expect(bridge.anchors).not.toHaveBeenCalled()
+    expect(api.current?.context.versionId).toBe('ver-1')
+    // the waiting Save still pairs with its own receipt
+    await act(async () => {
+      bridge.receipt('ver-2')
+      await flush()
+    })
+    expect(bridge.anchors).toHaveBeenCalledTimes(1)
+    expect(api.current?.context.versionId).toBe('ver-2')
+  })
+
+  it('unmounting the editor unsubscribes the receipt handler', async () => {
+    const bridge = installBridge([comment('c1', 1)], ctx)
+    await mount()
+    expect(bridge.savedHandlers.size).toBe(1)
+    act(() => root.render(createElement('div')))
+    expect(bridge.savedHandlers.size).toBe(0)
+  })
+
+  it('switching to another document unsubscribes the old handler: its receipts reach nobody', async () => {
+    const bridge = installBridge([comment('c1', 1)], ctx)
+    const { api, switchPath } = await mount()
+    await switchPath(OTHER)
+    // one live subscription (the new path's), not two
+    expect(bridge.savedHandlers.size).toBe(1)
+    await act(async () => {
+      api.current!.saved(new Map([[1, 0]]))
+      bridge.receipt('ver-old') // the old document's receipt
+      await flush()
+    })
+    expect(bridge.anchors).not.toHaveBeenCalled()
+    expect(api.current?.context.versionId).not.toBe('ver-old')
   })
 })
