@@ -225,10 +225,11 @@ export class TabManager {
     const panel = this.discussionPanelWidth
       ? clampDiscussionPanelWidth(this.discussionPanelWidth, width)
       : 0
-    // the strip follows the interface scale; the S6 bar is drawn under it (its
-    // height is reported in window px), so the active view starts below both
-    const strip = tabStripHeight(this.uiScale())
-    const inset = this.topInset
+    // the strip and the S6 bar under it both follow the interface scale (the
+    // bar reports its unscaled CSS-px height), so the active view starts below both
+    const scale = this.uiScale()
+    const strip = tabStripHeight(scale)
+    const inset = Math.round(this.topInset * scale)
     return {
       x: 0,
       y: strip + inset,
@@ -238,11 +239,13 @@ export class TabManager {
   }
 
   /**
-   * G5-03a: the height of the S6 "new version available" bar the shell
-   * renderer draws under the tab strip. The bar shows for the active tab only,
-   * so the renderer resends it on every tab switch; 0 hides it and restores the
-   * view. Clamped to 0..200 and rounded, so a stray report cannot blank the
-   * editor. Full-bleed / fullscreen views ignore it (contentBounds).
+   * G5-03a: the unscaled CSS-px height of the S6 "new version available" bar
+   * the shell renderer draws under the tab strip (`contentBounds` multiplies by
+   * `uiScale()` so a scale change re-layouts without a new report). The bar
+   * shows for the active tab only, so the renderer resends it on every tab
+   * switch; 0 hides it and restores the view. Clamped to 0..200 CSS px and
+   * rounded, so a stray report cannot blank the editor. Full-bleed / fullscreen
+   * views ignore it (contentBounds).
    */
   setTopInset(px: number): void {
     if (!Number.isFinite(px)) return

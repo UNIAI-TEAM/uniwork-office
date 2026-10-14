@@ -4479,8 +4479,9 @@ function registerHomeIpc(): void {
     noteEditorState: (path, state, mark) => uniworkService.noteEditorState(path, state, mark),
   })
 
-  // G5-03a: the S6 bar's height under the tab strip; the shell renderer reports
-  // it for the active tab only and resends on every tab switch (0 hides it)
+  // G5-03a: the S6 bar's unscaled CSS-px height under the tab strip (TabManager
+  // scales it by the interface scale); the shell renderer reports it for the
+  // active tab only and resends on every tab switch (0 hides it)
   ipcMain.handle(UNIWORK_DOC_CHANNELS.barInset, (event, heightPx: unknown) => {
     if (typeof heightPx !== 'number' || !Number.isFinite(heightPx)) return
     if (!shellWindow || shellWindow.isDestroyed()) return

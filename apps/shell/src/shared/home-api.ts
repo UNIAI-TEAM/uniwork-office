@@ -815,7 +815,7 @@ export interface HomeApi {
    * or the two reloads); resolves to the status after the action.
    */
   uniworkRemoteAction(path: string, action: UniworkRemoteAction): Promise<UniworkDocStatus | null>
-  /** S6: the bar's height; main moves the active editor view down by it */
+  /** S6: the bar's unscaled CSS-px height; main scales it by `--ui-scale` and moves the active editor view down by it */
   uniworkSetBarInset(heightPx: number): Promise<void>
   onUniworkLaunch(cb: (event: UniworkLaunchEvent) => void): () => void
   /** newer-store locks pushed from main; returns an unsubscribe */

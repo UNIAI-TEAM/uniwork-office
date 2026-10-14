@@ -1540,4 +1540,33 @@ describe('the S6 bar inset moves the active editor view down (G5-03a)', () => {
       height: WINDOW_HEIGHT,
     })
   })
+
+  it('scales the CSS-px inset at interface scale 1.5 and re-layouts on a scale change without a new report (R4-2, R4-5)', () => {
+    let scale = 1.5
+    manager = new TabManager(
+      shellWindow as never,
+      () => onChanged(),
+      (kind) => applyMenuFor(kind),
+      undefined,
+      () => scale,
+    )
+    manager.openDocsTab()
+    const view = lastCreatedView(createDocsView)
+    manager.setTopInset(40)
+    expect(view.setBounds).toHaveBeenLastCalledWith({
+      x: 0,
+      y: 60 + 60,
+      width: WINDOW_WIDTH,
+      height: WINDOW_HEIGHT - 120,
+    })
+    // a scale change triggers layout() only, without a new bar report
+    scale = 1
+    manager.layout()
+    expect(view.setBounds).toHaveBeenLastCalledWith({
+      x: 0,
+      y: TAB_STRIP_HEIGHT + 40,
+      width: WINDOW_WIDTH,
+      height: WINDOW_HEIGHT - TAB_STRIP_HEIGHT - 40,
+    })
+  })
 })
