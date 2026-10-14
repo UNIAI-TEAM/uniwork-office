@@ -447,7 +447,9 @@ export function createWebAi(opts: {
           lists.set(id, { ids, stamp, at: Math.max(now(), 1), failedAt: 0, failedStamp: '' })
         } catch (err) {
           missing = isAiWebError(err) && err.code === 'credential_missing'
-          const kept = lists.get(id)
+          // the old list belongs to the old key: only a failed refresh of the same key keeps it
+          const prior = lists.get(id)
+          const kept = prior?.stamp === stamp ? prior : undefined
           lists.set(id, {
             ids: kept?.ids ?? [],
             stamp: kept?.stamp ?? '',

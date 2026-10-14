@@ -2052,6 +2052,29 @@ describe('the model chip data on the web (G6-05m)', () => {
       expect(after.modelSources?.openai?.listState).toBeUndefined()
     })
 
+    it("a replaced key whose listing fails shows the error, not the old key's list", async () => {
+      const { ai, live, listCalls } = world({
+        items: [row('openai')],
+        models: {
+          openai: (n) =>
+            n === 1
+              ? jsonResponse(200, { data: [{ id: 'old-key-model' }] })
+              : jsonResponse(403, {}),
+        },
+      })
+      await ai.settings()
+      await vi.waitFor(async () => expect(await listedOf(ai, 'openai')).toEqual(['old-key-model']))
+      // the key is replaced in UniWork settings (new stamp) and the new key cannot list
+      live.items = [row('openai', '', '', '2026-10-14T08:05:00Z')]
+      await ai.state(true)
+      await ai.settings()
+      await vi.waitFor(() => expect(listCalls('openai')).toBe(2))
+      await vi.waitFor(async () =>
+        expect((await ai.settings()).modelSources?.openai?.listState).toBe('error'),
+      )
+      expect(await listedOf(ai, 'openai')).toBeUndefined()
+    })
+
     it('a failed listing is not retried on every chip open, only after a pause', async () => {
       const { ai, clock, listCalls } = world({
         items: [row('openai')],
