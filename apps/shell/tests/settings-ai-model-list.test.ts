@@ -117,6 +117,15 @@ describe('Settings › AI model: the Model dropdown', () => {
     expect(await modelOptions()).toEqual(['claude-typed', 'claude-future-9'])
   })
 
+  it('puts the effective default first when no model is saved and the live list lacks it', async () => {
+    installApi(stored('', { chosen: '', listed: ['claude-future-9', 'claude-future-8'] }))
+    await openAiPane()
+    // the field must not read empty while the chip shows the default
+    const trigger = host.querySelector<HTMLButtonElement>('.gs-dd-btn[aria-label="Model"]')!
+    expect(trigger.textContent).toContain('claude-sonnet-5')
+    expect(await modelOptions()).toEqual(['claude-sonnet-5', 'claude-future-9', 'claude-future-8'])
+  })
+
   it.each([
     ['no source (an older host)', undefined],
     ['an empty list', { chosen: 'claude-sonnet-5', listed: [] }],

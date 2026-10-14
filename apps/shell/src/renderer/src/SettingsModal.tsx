@@ -554,7 +554,8 @@ function AiModelPane({
     meta?.models ?? [],
     settings.modelSources?.[provider],
     isCodex || !!meta?.needsBaseUrl,
-    config.model,
+    // the effective model, as the field shows it: never off-list when the live list lacks the default
+    config.model || meta?.defaultModel || '',
   )
 
   const touch = () => {
