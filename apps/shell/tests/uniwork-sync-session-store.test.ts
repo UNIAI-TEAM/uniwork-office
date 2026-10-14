@@ -230,4 +230,81 @@ describe('createSyncStoreAccess', () => {
     expect(next.kind).toBe('ok')
     expect(opens).toBe(2)
   })
+
+  it("B's session never opens A's scope", async () => {
+    const { layer } = make()
+    let account = 'acc_a'
+    const openedScopes: string[] = []
+    const tracking: StoreLayer = {
+      ...layer,
+      open: async (scope) => {
+        openedScopes.push(`${scope.deploymentId}/${scope.accountId}`)
+        return layer.open(scope)
+      },
+    }
+    const access = createSyncStoreAccess({
+      layer: tracking,
+      scope: () => ({ deploymentId: 'dep_1', accountId: account }),
+    })
+
+    const aOpen = await access.open()
+    if (aOpen.kind !== 'ok') throw new Error(aOpen.kind)
+    const aRecords = aOpen.records(INTENT_STORE_REGISTRATION.name)
+    expect(await aRecords.write('doc_a', Buffer.from('only-for-a'))).toEqual({ kind: 'ok' })
+
+    await access.lock()
+    account = 'acc_b'
+    openedScopes.length = 0
+
+    const bOpen = await access.open()
+    if (bOpen.kind !== 'ok') throw new Error(bOpen.kind)
+    expect(access.scope()).toEqual({ deploymentId: 'dep_1', accountId: 'acc_b' })
+    expect(openedScopes).toEqual(['dep_1/acc_b'])
+    const bRecords = bOpen.records(INTENT_STORE_REGISTRATION.name)
+    expect(await bRecords.read('doc_a')).toEqual({ kind: 'missing' })
+    // A's old handle is locked and dead
+    expect(await aRecords.read('doc_a')).toEqual({ kind: 'interrupted' })
+  })
+
+  it('lock() drops the cached handle and locks the left scope', async () => {
+    const { layer } = make()
+    let account: string | null = 'acc_1'
+    let opens = 0
+    const counting: StoreLayer = {
+      ...layer,
+      open: async (scope) => {
+        opens += 1
+        return layer.open(scope)
+      },
+    }
+    const access = createSyncStoreAccess({
+      layer: counting,
+      scope: () => (account ? { deploymentId: 'dep_1', accountId: account } : null),
+    })
+
+    const first = await access.open()
+    if (first.kind !== 'ok') throw new Error(first.kind)
+    const firstRecords = first.records(INTENT_STORE_REGISTRATION.name)
+    expect(await firstRecords.write('doc_1', Buffer.from('kept-ciphertext'))).toEqual({
+      kind: 'ok',
+    })
+    expect(opens).toBe(1)
+
+    // even if the live identity already moved to another account before lock() is called,
+    // lock() locks the scope of the cached handle being left (acc_1), never acc_2
+    account = 'acc_2'
+    await access.lock()
+    expect(await firstRecords.read('doc_1')).toEqual({ kind: 'interrupted' })
+    expect(await firstRecords.write('doc_2', Buffer.from('nope'))).toEqual({
+      kind: 'interrupted',
+    })
+
+    // switching back to acc_1 reopens from disk and reads the preserved ciphertext
+    account = 'acc_1'
+    const reopened = await access.open()
+    if (reopened.kind !== 'ok') throw new Error(reopened.kind)
+    expect(opens).toBe(2)
+    const read = await reopened.records(INTENT_STORE_REGISTRATION.name).read('doc_1')
+    expect(read).toEqual({ kind: 'ok', value: new Uint8Array(Buffer.from('kept-ciphertext')) })
+  })
 })

@@ -59,9 +59,11 @@ export function createSyncStoreAccess(options: {
   scope(): StoreScope | null
 }): SyncStoreAccess {
   const tokenOf = (scope: StoreScope) => `${scope.deploymentId}/${scope.accountId}`
-  let opened: { token: string; records(name: string): StoreRecords } | null = null
-  let pending: { token: string; promise: Promise<SyncStoreOpen> } | null = null
-  /** bumped by forget: an open that started before it never lands */
+  let opened: { scope: StoreScope; token: string; records(name: string): StoreRecords } | null =
+    null
+  let pending: { scope: StoreScope; token: string; promise: Promise<SyncStoreOpen> } | null = null
+  let lastScope: StoreScope | null = null
+  /** bumped by forget / lock: an open that started before it never lands */
   let generation = 0
 
   const currentToken = (): string | null => {
@@ -76,12 +78,17 @@ export function createSyncStoreAccess(options: {
   ): Promise<SyncStoreOpen> => {
     const result = await options.layer.open(scope)
     if (result.kind !== 'ok') return result
-    // the session may have moved, or the boundary wiped the scope, while the
-    // key was fetched: that handle belongs to nobody now
+    // the session may have moved, or the boundary locked/wiped the scope, while
+    // the key was fetched: that handle belongs to nobody now
     if (started !== generation || currentToken() !== token) return { kind: 'no_session' }
     const store = result.store
-    const handle = { token, records: (name: string) => store.records(name) }
+    const handle = {
+      scope: { deploymentId: scope.deploymentId, accountId: scope.accountId },
+      token,
+      records: (name: string) => store.records(name),
+    }
     opened = handle
+    lastScope = handle.scope
     return { kind: 'ok', records: handle.records }
   }
 
@@ -101,8 +108,10 @@ export function createSyncStoreAccess(options: {
     const joined = pending
     // only this scope's own open is shared; another account never joins it
     if (joined && joined.token === token) return joined.promise
-    const promise = openScope(scope, token, started)
-    const entry = { token, promise }
+    const scopeCopy: StoreScope = { deploymentId: scope.deploymentId, accountId: scope.accountId }
+    lastScope = scopeCopy
+    const promise = openScope(scopeCopy, token, started)
+    const entry = { scope: scopeCopy, token, promise }
     pending = entry
     const settled = promise.then(
       () => undefined,
@@ -112,6 +121,13 @@ export function createSyncStoreAccess(options: {
       if (pending === entry) pending = null
     })
     return promise
+  }
+
+  const dropHandle = (): void => {
+    generation += 1
+    opened = null
+    pending = null
+    lastScope = null
   }
 
   return {
@@ -124,12 +140,12 @@ export function createSyncStoreAccess(options: {
       return openToken(scope, tokenOf(scope))
     },
     forget() {
-      generation += 1
-      opened = null
-      pending = null
+      dropHandle()
     },
-    async lock(_scope) {
-      throw new Error('not implemented')
+    async lock(explicitScope) {
+      const left = explicitScope ?? opened?.scope ?? pending?.scope ?? lastScope ?? options.scope()
+      dropHandle()
+      if (left) await options.layer.lock(left)
     },
   }
 }

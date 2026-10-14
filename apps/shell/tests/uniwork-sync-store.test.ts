@@ -459,4 +459,50 @@ describe('uniwork sync store layer', () => {
     expect(await pending).toEqual({ kind: 'interrupted' })
     expect(filesContaining(dir, marker)).toEqual([])
   })
+
+  it('createSyncStoreLayer registers exactly the stores the compliance runs cover', async () => {
+    const { SYNC_STORE_REGISTRATIONS } = await import('../src/main/uniwork-sync/session-store')
+    const bySymbol = new Map<string, string>([
+      ['INTENT_STORE_REGISTRATION', 'intents'],
+      ['DRAFTS_STORE_REGISTRATION', 'drafts'],
+      ['PAUSE_STORE_REGISTRATION', 'pause'],
+      ['PARKED_STORE_REGISTRATION', 'parked'],
+      ['FEED_CURSORS_REGISTRATION', 'feed-cursors'],
+      ['DOC_INDEX_REGISTRATION', 'doc-index'],
+    ])
+    const testFiles = readdirSync(__dirname).filter(
+      (name) => name.startsWith('uniwork-sync-') && name.endsWith('.test.ts'),
+    )
+    const covered = new Set<string>()
+    for (const file of testFiles) {
+      const source = readFileSync(join(__dirname, file), 'utf8')
+      const matches = source.matchAll(/runStoreCompliance\([\s\S]*?registration:\s*([A-Z0-9_]+)/g)
+      for (const match of matches) {
+        const symbol = match[1]
+        if (symbol) covered.add(bySymbol.get(symbol) ?? symbol)
+      }
+    }
+    const registered = SYNC_STORE_REGISTRATIONS.map((r) => r.name).sort()
+    expect([...covered].sort()).toEqual(registered)
+
+    // every registered store opens and locks cleanly through the layer contract
+    const layer = createStoreLayer({
+      root: dir,
+      keys: keyProvider(),
+      budgetBytes: 1 << 20,
+      clock: () => 1_700_000_000_000,
+    })
+    for (const reg of SYNC_STORE_REGISTRATIONS) layer.register(reg)
+    const opened = await layer.open(SCOPE)
+    if (opened.kind !== 'ok') throw new Error(`store did not open: ${opened.kind}`)
+    for (const reg of SYNC_STORE_REGISTRATIONS) {
+      expect(await opened.store.records(reg.name).write('k', Buffer.from(reg.name))).toEqual({
+        kind: 'ok',
+      })
+    }
+    await layer.lock(SCOPE)
+    for (const reg of SYNC_STORE_REGISTRATIONS) {
+      expect(await opened.store.records(reg.name).read('k')).toEqual({ kind: 'interrupted' })
+    }
+  })
 })

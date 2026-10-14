@@ -116,6 +116,8 @@ export interface StoreLayerOptions {
   /** encrypted bytes the whole account may keep */
   budgetBytes: number
   clock: () => number
+  /** the store level this layer reads and writes (defaults to APP_STORE_LEVEL) */
+  storeLevel?: number
   fs?: Partial<StoreFs>
 }
 
@@ -182,16 +184,25 @@ export function createStoreLayer(options: StoreLayerOptions): StoreLayer {
   const keys = options.keys
   const budgetBytes = options.budgetBytes
   const clock = options.clock
+  const storeLevel = options.storeLevel ?? APP_STORE_LEVEL
   const registrations = new Map<string, StoreRegistration>()
-  /** per scope: bumped by lockAndWipe; a handle holding an older value is dead */
+  /** per scope: bumped by lock / lockAndWipe; a handle holding an older value is dead */
   const epochs = new Map<string, number>()
-  /** per scope: started writes that have not settled (lockAndWipe waits for them) */
+  /** per scope: record keys held in RAM by open handles, zeroed and dropped on lock */
+  const activeKeys = new Map<string, Set<Buffer>>()
+  /** per scope: started writes that have not settled (lock / lockAndWipe waits for them) */
   const inFlight = new Map<string, Set<Promise<unknown>>>()
   /** per scope: the write queue, so the budget is accounted one write at a time */
   const queues = new Map<string, Promise<unknown>>()
 
   const tokenOf = (scope: StoreScope) => `${scope.deploymentId}/${scope.accountId}`
   const epochOf = (token: string) => epochs.get(token) ?? 0
+  const dropKeys = (token: string) => {
+    const held = activeKeys.get(token)
+    if (!held) return
+    for (const key of held) key.fill(0)
+    activeKeys.delete(token)
+  }
 
   const walk = async (dir: string): Promise<WalkEntry[]> => {
     const found: WalkEntry[] = []
@@ -321,14 +332,14 @@ export function createStoreLayer(options: StoreLayerOptions): StoreLayer {
     /** OQ-P4 (b) in both directions: only records inside this build's window are served */
     const withinWindow = (header: RecordHeader): boolean =>
       header.min_store_level >= registration.minStoreLevel &&
-      header.min_store_level <= APP_STORE_LEVEL &&
+      header.min_store_level <= storeLevel &&
       header.schema <= registration.schema
 
     return {
       async write(key, value) {
         if (!live()) return { kind: 'interrupted' }
         // a store that needs a level this build does not have never writes
-        if (registration.minStoreLevel > APP_STORE_LEVEL) return { kind: 'refused' }
+        if (registration.minStoreLevel > storeLevel) return { kind: 'refused' }
         return enqueue(token, async (): Promise<StoreWriteResult> => {
           if (!live()) return { kind: 'interrupted' }
           const dest = join(storePath, recordFileName(key))
@@ -414,6 +425,42 @@ export function createStoreLayer(options: StoreLayerOptions): StoreLayer {
           return { kind: 'ok' }
         })
       },
+
+      async values() {
+        if (!live()) return []
+        let entries: Array<{ name: string; directory: boolean }>
+        try {
+          entries = await fs.list(storePath)
+        } catch (error) {
+          if (!live()) return []
+          if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []
+          throw error
+        }
+        if (!live()) return []
+        const files = entries
+          .filter((entry) => !entry.directory && entry.name.endsWith('.rec'))
+          .map((entry) => entry.name)
+          .sort()
+        const out: Uint8Array[] = []
+        for (const file of files) {
+          if (!live()) return []
+          let bytes: Uint8Array
+          try {
+            bytes = await fs.readFile(join(storePath, file))
+          } catch (error) {
+            if (!live()) return []
+            if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue
+            throw error
+          }
+          if (!live()) return []
+          const frame = readRecordFrame(bytes)
+          const header = frame ? recordHeaderOf(frame.header) : null
+          if (!frame || !header || !withinWindow(header)) continue
+          const value = openRecord(recordKey, frame)
+          if (value) out.push(value)
+        }
+        return out
+      },
     }
   }
 
@@ -437,12 +484,19 @@ export function createStoreLayer(options: StoreLayerOptions): StoreLayer {
     async open(scope) {
       const scopePath = scopeDir(root, scope)
       const token = tokenOf(scope)
-      // captured before the key is fetched: a wipe during open() leaves the
-      // handle dead instead of live inside a wiped scope
+      // captured before the key is fetched: a lock or wipe during open() leaves
+      // the handle dead instead of live inside a locked scope
       const epoch = epochOf(token)
       const fetched = await fetchKey(scope)
       if ('kind' in fetched) return fetched
-      const recordKey = fetched.key
+      const recordKey = Buffer.from(fetched.key)
+      if (epochOf(token) !== epoch) {
+        recordKey.fill(0)
+      } else {
+        const held = activeKeys.get(token) ?? new Set<Buffer>()
+        held.add(recordKey)
+        activeKeys.set(token, held)
+      }
       await fs.mkdir(scopePath, 0o700)
       await scrubTemps(scopePath)
       const opened: StoreScope = { deploymentId: scope.deploymentId, accountId: scope.accountId }
@@ -460,8 +514,16 @@ export function createStoreLayer(options: StoreLayerOptions): StoreLayer {
       return 'kind' in fetched ? fetched.kind : 'ok'
     },
 
-    async lock(_scope) {
-      throw new Error('not implemented')
+    async lock(scope) {
+      const scopePath = scopeDir(root, scope)
+      const token = tokenOf(scope)
+      // bump first, synchronously: every handle and in-flight write of this
+      // scope is dead from this instant, and RAM key material is zeroed
+      epochs.set(token, epochOf(token) + 1)
+      dropKeys(token)
+      const started = [...(inFlight.get(token) ?? [])]
+      if (started.length > 0) await Promise.allSettled(started)
+      await scrubTemps(scopePath)
     },
 
     async lockAndWipe(scope) {
@@ -470,6 +532,7 @@ export function createStoreLayer(options: StoreLayerOptions): StoreLayer {
       // bump first, synchronously: no handle or in-flight write can publish
       // anything after this point
       epochs.set(token, epochOf(token) + 1)
+      dropKeys(token)
       await fs.rm(scopePath)
       const started = [...(inFlight.get(token) ?? [])]
       // writes already past their entry check settle now (interrupted), and
