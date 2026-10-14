@@ -363,12 +363,12 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
 ]
 
 /**
- * UniWork AI (the `uniwork` provider). Kept out of AI_PROVIDERS on purpose:
- * that list feeds every picker, the settings page and the web provider set,
- * and the entry may only show where the server offers it (signed in, plan
- * entitlement, `tools.chat`, the organization/format capability). The
- * adapter work adds it there behind those conditions. No key, no model
- * choice: the server's policy picks the model.
+ * UniWork AI (the `uniwork` provider). No key, no model choice: the server's
+ * policy picks the model. It is in AI_PROVIDERS only while UniWork AI is
+ * available here (setUniworkAiAvailable), because that list feeds every
+ * picker, the settings page and the web provider set, and the entry may only
+ * show where the server offers it (signed in, plan entitlement,
+ * `tools.chat`, the organization/format capability).
  */
 export const UNIWORK_PROVIDER_META: AiProviderMeta = {
   id: 'uniwork',
@@ -376,6 +376,31 @@ export const UNIWORK_PROVIDER_META: AiProviderMeta = {
   models: [],
   defaultModel: '',
   keyPlaceholder: '',
+}
+
+let uniworkAvailable = false
+
+/** UniWork AI is offered in this process (the host evaluates the S7 conditions) */
+export function uniworkAiAvailable(): boolean {
+  return uniworkAvailable
+}
+
+/**
+ * The host's availability flag for UniWork AI (desktop: cloud ready with
+ * `tools.chat`, the `ai_uniwork` capability and the module format; web: the
+ * `uniworkAi` grant). It adds or removes the entry in AI_PROVIDERS in place,
+ * right after UniAI, so every list built from it shows or hides the entry;
+ * while hidden, selectedProvider() falls back from a saved `uniwork` choice.
+ */
+export function setUniworkAiAvailable(available: boolean): void {
+  uniworkAvailable = available
+  const at = AI_PROVIDERS.findIndex((m) => m.id === 'uniwork')
+  if (available && at < 0) {
+    const genspark = AI_PROVIDERS.findIndex((m) => m.id === 'genspark')
+    AI_PROVIDERS.splice(genspark + 1, 0, UNIWORK_PROVIDER_META)
+  } else if (!available && at >= 0) {
+    AI_PROVIDERS.splice(at, 1)
+  }
 }
 
 /**
@@ -420,12 +445,13 @@ export type ProviderNeed = 'key' | 'model' | 'base-url'
  * What a provider's stored config still lacks before it can send a request
  * (api-key providers need a model id and a key; custom needs a model and a base
  * URL, its key stays optional). Codex auto-discovers its executable, and UniAI
- * authenticates through the cloud account, so neither reports a need here.
+ * and UniWork AI authenticate through the cloud account, so none reports a need here.
  * Trim-aware: in-memory settings bypass the trimConfigs applied to persisted
  * files, and a whitespace-only key/URL/model is a 401, not a config.
  */
 export function providerNeed(settings: AiSettings, id: AiProviderId): ProviderNeed | null {
-  if (id === 'genspark') return null
+  // UniAI and UniWork AI authenticate through the UniWork account
+  if (id === 'genspark' || id === 'uniwork') return null
   const meta = AI_PROVIDERS.find((m) => m.id === id)
   if (!meta) return 'key'
   if (meta.needsCliPath) return null
