@@ -143,6 +143,7 @@ import { collabStrings } from '@genoffice/ui/collab'
 import { PdfServerCommentsHost, type PdfServerComments } from './server-comments/PdfServerComments'
 import { commentFrameBox, rerunOnResize, scrollLeftToReveal } from './server-comments/reveal-view'
 import { createPdfAnchorAdapter } from './server-comments/pdf-adapter'
+import { startFailureNotice } from './server-comments/start-notice'
 import { withoutFileNoteWrites } from './server-comments/bound-save'
 import { pdfCommentsBridge } from './server-comments/pdf-comments-context'
 import { FileNotesList, type FileNoteThread } from './server-comments/FileNotesList'
@@ -1782,8 +1783,10 @@ export default function App() {
     setServerPanelOpen(true)
     const server = serverRef.current
     if (!server?.startAt(origIdx + 1, at, aiText)) {
-      // an unknown open version asks to save first (like the Docs editor); anything else is the generic line
-      showNotice(t(server?.needsSave ? 'serverCommentSaveFirst' : 'serverCommentStartUnavailable'))
+      // an unknown open version asks to save first through the panel footer (opened just above);
+      // anything else is the generic line
+      const key = startFailureNotice(server?.needsSave === true)
+      if (key) showNotice(t(key))
       return false
     }
     return true
