@@ -88,7 +88,7 @@ describe('workbench primitives (home.css)', () => {
     expect(rule(':where(.wb-home) p')).toMatch(/max-width: 64ch;\n {2}text-wrap: pretty;/)
   })
 
-  it('UniWork Sans is self-hosted: Inter, then Be Vietnam Pro last so it wins Vietnamese, 400–700', () => {
+  it('UniWork Sans is self-hosted Inter for every subset, Vietnamese included, 400–700', () => {
     const fonts = readFileSync(join(__dirname, '../src/renderer/src/workbench-fonts.css'), 'utf8')
     const faces = [...fonts.matchAll(/@font-face \{([^}]*)\}/g)].map((m) => m[1]!)
     expect(faces).toHaveLength(12)
@@ -99,10 +99,11 @@ describe('workbench primitives (home.css)', () => {
       expect(url).toMatch(/^\.\/assets\/fonts\/[a-z-]+-\d00\.woff2$/)
       expect(existsSync(join(__dirname, '../src/renderer/src', url))).toBe(true)
     }
-    // overlapping unicode-ranges: the last declared face wins, so every Be Vietnam Pro face follows every Inter face
-    const kinds = faces.map((f) => (/be-vietnam-pro/.test(f) ? 'vi' : 'inter'))
-    expect(kinds.lastIndexOf('inter')).toBeLessThan(kinds.indexOf('vi'))
-    expect(faces.at(-1)).toMatch(/be-vietnam-pro-vietnamese-700/)
+    // one typeface: a Vietnamese word takes its base letters from inter-latin and its accented
+    // letters from inter-vietnamese, so no second family may draw any glyph
+    for (const face of faces) expect(face).toMatch(/url\('\.\/assets\/fonts\/inter-/)
+    expect(faces.filter((f) => /inter-vietnamese-/.test(f))).toHaveLength(4)
+    expect(fonts).not.toMatch(/vietnam-pro/i)
     expect(faces.map((f) => /font-weight: (\d+);/.exec(f)![1]).sort()).toEqual([
       '400',
       '400',

@@ -362,12 +362,7 @@ const FONTS = [
   [
     'Inter 4.x (UniWork Sans, Workbench UI)',
     'SIL OFL 1.1',
-    '© 2016 The Inter Project Authors (https://github.com/rsms/inter).\nLatin and Latin Extended woff2 subsets; unmodified otherwise.',
-  ],
-  [
-    'Be Vietnam Pro (UniWork Sans, Workbench UI)',
-    'SIL OFL 1.1',
-    '© 2021 The Be Vietnam Pro Project Authors (https://github.com/bettergui/BeVietnamPro).\nVietnamese woff2 subset; unmodified otherwise.',
+    '© 2016 The Inter Project Authors (https://github.com/rsms/inter).\nLatin, Latin Extended and Vietnamese woff2 subsets; unmodified otherwise.',
   ],
   [
     'KaTeX webfonts',

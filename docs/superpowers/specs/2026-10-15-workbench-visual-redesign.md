@@ -55,9 +55,9 @@ Không áp dụng từ skill redesign:
 
 ### 2.1 Phông
 
-- Dùng lại bộ woff2 tự host của `apps/uniai-pwa/fonts`, OFL:
-  - Inter latin + latin-ext, 400/500/600/700;
-  - Be Vietnam Pro vietnamese, 400/500/600/700, khai báo trước để dấu tiếng Việt ưu tiên Be Vietnam Pro, giống `apps/uniai-pwa/fonts.css`.
+- Một họ phông cho mọi chữ: Inter, woff2 tự host, OFL:
+  - Inter latin + latin-ext, 400/500/600/700, dùng lại từ `apps/uniai-pwa/fonts`;
+  - Inter vietnamese, 400/500/600/700 (subset `vietnamese` của `@fontsource/inter`). Không dùng Be Vietnam Pro cho dấu: subset đó chỉ có chữ có dấu, chữ gốc vẫn lấy từ Inter, nên một từ tiếng Việt sẽ bị vẽ bằng hai họ phông.
 - Chép vào asset của shell renderer. Khai báo `@font-face` family `'UniWork Sans'` (cùng unicode-range).
 - Áp cho `.wb-home`: `font-family: 'UniWork Sans', var(--ui-cjk), system-ui, sans-serif`.
 - Phông phải chạy offline, không gọi CDN.

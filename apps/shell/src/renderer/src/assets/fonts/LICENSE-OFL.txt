@@ -1,8 +1,7 @@
 Inter: Copyright (c) 2016 The Inter Project Authors (https://github.com/rsms/inter)
-Be Vietnam Pro: Copyright (c) 2021 The Be Vietnam Pro Project Authors (https://github.com/bettergui/BeVietnamPro)
 
-The woff2 files in this folder are subsets of these fonts (inter-latin*, inter-latin-ext*,
-be-vietnam-pro-vietnamese*), unmodified otherwise.
+The woff2 files in this folder are subsets of this font (inter-latin*, inter-latin-ext*,
+inter-vietnamese*), unmodified otherwise.
 
 This Font Software is licensed under the SIL Open Font License,
 Version 1.1.
