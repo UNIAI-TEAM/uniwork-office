@@ -59,7 +59,7 @@ import {
   slidesIsDirty,
 } from '../../../slides/src/main/slides-main'
 import type { DocumentTabKind, OpenDocumentTab, TabKind, TabSummary } from '../shared/tabs-api'
-import { TAB_STRIP_HEIGHT } from '../shared/tab-drag-geometry'
+import { tabStripHeight } from '../shared/tab-drag-geometry'
 import { clampDiscussionPanelWidth } from '@genoffice/electron-utils/comments-ipc'
 import { isAiRunning, type EditorState } from './ai-run-registry'
 import { isCloseTabChord } from './close-tab-chord'
@@ -127,6 +127,11 @@ export class TabManager {
     private readonly applyMenuFor: (kind: TabKind) => void,
     /** localized placeholder title for a tab that has no file yet */
     private readonly untitledTitleFor?: (kind: TabKind) => string,
+    /**
+     * The live interface scale (genoffice#1913). A getter rather than a value so a change
+     * made from the View menu reaches the next layout without rebuilding this.
+     */
+    private readonly uiScale: () => number = () => 1,
   ) {
     // Layout once synchronously for macOS/Windows (bounds are already correct),
     // then once more on the next tick. On Linux/X11, `resize` fires before the
@@ -205,15 +210,19 @@ export class TabManager {
       return { x: 0, y: 0, width, height }
     }
     // the Discussion panel is drawn by the shell renderer at the right edge,
-    // under no view: the active editor view gives up the clamped panel width
+    // under no view: the active editor view gives up the clamped panel width.
+    // The strip is `zoom`ed by the interface scale, so its rendered height
+    // grows with it — positioning the view at the unscaled constant would
+    // paint the document underneath a taller tab strip.
     const panel = this.discussionPanelWidth
       ? clampDiscussionPanelWidth(this.discussionPanelWidth, width)
       : 0
+    const strip = tabStripHeight(this.uiScale())
     return {
       x: 0,
-      y: TAB_STRIP_HEIGHT,
+      y: strip,
       width: Math.max(0, width - panel),
-      height: Math.max(0, height - TAB_STRIP_HEIGHT),
+      height: Math.max(0, height - strip),
     }
   }
 
