@@ -45,28 +45,34 @@ export function DeskDrawer({
           </button>
         </p>
       ) : (
-        <ul className="wb-desk-chips">
-          {forms.map((f) => (
-            <li key={f.id}>
-              <button
-                type="button"
-                className="wb-btn wb-btn-secondary wb-btn-sm wb-desk-chip"
-                disabled={!packId}
-                title={packId ? (f.note ?? f.title) : t('wbFormsDraftNeedsPack')}
-                onClick={() => {
-                  if (packId) void draftFromForm(f, packId, orgId, vi)
-                }}
-              >
-                {f.fileExt ? (
-                  <FileBadge ext={f.fileExt.replace(/^\./, '')} size={16} />
-                ) : (
-                  <WorkbenchIcon id="forms" size={16} />
-                )}
-                {f.title}
-              </button>
-            </li>
-          ))}
-        </ul>
+        <>
+          {/* visible, not only a tooltip: a disabled chip's title never reaches keyboard users */}
+          {packId ? null : (
+            <span className="wb-forms-locked">{t('wbFormsDraftNeedsPackHint')}</span>
+          )}
+          <ul className="wb-desk-chips">
+            {forms.map((f) => (
+              <li key={f.id}>
+                <button
+                  type="button"
+                  className="wb-btn wb-btn-secondary wb-btn-sm wb-desk-chip"
+                  disabled={!packId}
+                  title={packId ? (f.note ?? f.title) : t('wbFormsDraftNeedsPack')}
+                  onClick={() => {
+                    if (packId) void draftFromForm(f, packId, orgId, vi)
+                  }}
+                >
+                  {f.fileExt ? (
+                    <FileBadge ext={f.fileExt.replace(/^\./, '')} size={16} />
+                  ) : (
+                    <WorkbenchIcon id="forms" size={16} />
+                  )}
+                  {f.title}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
     </section>
   )

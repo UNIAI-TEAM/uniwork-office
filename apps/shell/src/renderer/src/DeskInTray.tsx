@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { ReactElement, ReactNode } from 'react'
 import type { RecentEntry, UniworkDocStatus, UniworkDocSummary } from '../../shared/home-api'
 import type { WorkHomeSummary } from '../../shared/uniwork-work-api'
@@ -37,6 +37,7 @@ export function DeskInTray({ home, signedIn, local }: Props): ReactElement {
   const [shared, setShared] = useState<UniworkDocSummary[]>([])
   const [statuses, setStatuses] = useState<Record<string, UniworkDocStatus>>({})
   const [expanded, setExpanded] = useState(false)
+  const listRef = useRef<HTMLUListElement>(null)
 
   useEffect(() => {
     if (!signedIn) {
@@ -65,21 +66,36 @@ export function DeskInTray({ home, signedIn, local }: Props): ReactElement {
   )
   const boundKey = bound.join('\n')
   useEffect(() => {
+    const paths = boundKey ? boundKey.split('\n') : []
     let live = true
-    void Promise.all(bound.map((p) => window.aiOffice.uniworkDocStatus(p).catch(() => null))).then(
+    // paths an event updated while the probes ran: the event is newer than the probe
+    const touched = new Set<string>()
+    void Promise.all(paths.map((p) => window.aiOffice.uniworkDocStatus(p).catch(() => null))).then(
       (list) => {
-        if (live) setStatuses(Object.fromEntries(list.flatMap((s) => (s ? [[s.path, s]] : []))))
+        if (!live) return
+        const fresh = Object.fromEntries(list.flatMap((s) => (s ? [[s.path, s]] : [])))
+        setStatuses((m) => ({
+          ...fresh,
+          ...Object.fromEntries(Object.entries(m).filter(([p]) => touched.has(p))),
+        }))
       },
     )
     const off = window.aiOffice.onUniworkDocStatus((s) => {
-      if (bound.includes(s.path)) setStatuses((m) => ({ ...m, [s.path]: s }))
+      if (!paths.includes(s.path)) return
+      touched.add(s.path)
+      setStatuses((m) => ({ ...m, [s.path]: s }))
     })
     return () => {
       live = false
       off()
     }
-    // boundKey stands for `bound`: same paths, same subscription
   }, [boundKey])
+
+  // "Show more" removes itself: focus goes on to the first row it revealed
+  useEffect(() => {
+    if (expanded)
+      listRef.current?.querySelectorAll<HTMLButtonElement>('.wb-desk-row-title')[TRAY_ROWS]?.focus()
+  }, [expanded])
 
   const rows = inTrayRows({
     notes: home.value ? docNotifications(home.value.inbox) : [],
@@ -89,7 +105,8 @@ export function DeskInTray({ home, signedIn, local }: Props): ReactElement {
   const visible = expanded ? rows : rows.slice(0, TRAY_ROWS)
 
   const openNote = async (id: string, documentId: string, title: string) => {
-    await openUniworkDocument({ documentId, title }, window.aiOffice)
+    // a failed open keeps the reminder
+    if (!(await openUniworkDocument({ documentId, title }, window.aiOffice))) return
     const r = await window.uniworkWork.markNotificationsRead([id]).catch(() => null)
     // a refusal is quiet: the row comes back with the next summary
     if (r?.ok) home.update((s) => ({ ...s, inbox: s.inbox.filter((n) => n.id !== id) }))
@@ -167,7 +184,7 @@ export function DeskInTray({ home, signedIn, local }: Props): ReactElement {
           </p>
         )
       ) : (
-        <ul className="wb-ov-list wb-block">
+        <ul ref={listRef} className="wb-ov-list wb-block">
           {visible.map((r) => {
             const d = describe(r)
             return (

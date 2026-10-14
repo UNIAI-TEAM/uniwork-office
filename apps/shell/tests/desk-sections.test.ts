@@ -132,6 +132,33 @@ describe('DeskInTray', () => {
     expect(host.querySelector('[role="alert"]')).toBeNull()
   })
 
+  it('keeps the reminder when the document fails to open', async () => {
+    api.uniworkOpenDocument.mockResolvedValueOnce({ ok: false, error: 'not_found' })
+    const h = home([comment])
+    await render(createElement(DeskInTray, { home: h, signedIn: true, local: [] }))
+    await act(async () => button('Contract-012')!.click())
+    await act(async () => {
+      for (let i = 0; i < 10; i++) await Promise.resolve()
+    })
+    expect(work.markNotificationsRead).not.toHaveBeenCalled()
+    expect(h.update).not.toHaveBeenCalled()
+  })
+
+  it('moves focus to the first newly shown row after Show more', async () => {
+    const notes = Array.from({ length: 9 }, (_, i) => ({
+      ...comment,
+      id: `n${i}`,
+      resource_id: `d${i}`,
+      params: { actor: 'Lan', document: `Doc-${i}` },
+    }))
+    await render(createElement(DeskInTray, { home: home(notes), signedIn: true, local: [] }))
+    const titles = () => host.querySelectorAll<HTMLButtonElement>('.wb-desk-row-title')
+    expect(titles()).toHaveLength(8)
+    await act(async () => host.querySelector<HTMLButtonElement>('li .wb-link')!.click())
+    expect(titles()).toHaveLength(9)
+    expect(document.activeElement).toBe(titles()[8])
+  })
+
   it('shows a sync problem from a working copy', async () => {
     api.uniworkDocStatus.mockResolvedValue({
       path: '/c/p.docx',
@@ -234,5 +261,6 @@ describe('DeskDrawer', () => {
       }),
     )
     expect(button('Quote')!.disabled).toBe(true)
+    expect(host.querySelector('.wb-forms-locked')?.textContent).toBeTruthy()
   })
 })
