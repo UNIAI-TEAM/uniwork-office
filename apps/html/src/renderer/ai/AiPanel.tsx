@@ -1,4 +1,5 @@
 import {
+  aiUniworkText,
   aiPanelWidthAtPointer,
   AiPanelSideButton,
   AiModelPicker,
@@ -7,7 +8,7 @@ import {
 } from '@genoffice/ui'
 import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement, ReactNode } from 'react'
-import { AgentLoop, composeSkills } from '@genoffice/agent-core'
+import { AgentLoop, noticePatch, type PanelNote, composeSkills } from '@genoffice/agent-core'
 import type { AgentImage } from '@genoffice/agent-core'
 import type { AiSettings } from '@genoffice/ai-provider'
 import { aiNoticeBody, aiNoticeKind } from '@genoffice/ai-provider/browser'
@@ -211,6 +212,10 @@ interface ChatEntry {
   text: string
   streaming?: boolean
   isError?: boolean
+  /** UniWork AI: the transport is waiting out a Retry-After; the run goes on, Stop is the only action */
+  waitLine?: string | undefined
+  /** UniWork AI: restarted conversation / provider boundary / dropped call, shown above the answer */
+  notes?: PanelNote[] | undefined
   /** the run failed and this user message was rolled back out of the model context */
   undelivered?: boolean
   /** instruction actually sent when it differs from the bubble text (sid-pinned Ask AI / queue batch); retries resend this */
@@ -716,7 +721,18 @@ export function AiPanel({
       captureSnapshot: () => depsRef.current.getSnapshot(),
       systemSuffix: () => aiLangDirective(langRef.current),
       events: {
-        onText: (text) => patchLast({ text }),
+        onText: (text) => patchLast({ text, waitLine: undefined }),
+        // transport notices (UniWork AI); langRef: the loop is created once, `lang` would go stale
+        onNotice: (notice) =>
+          patchLast(
+            (last) =>
+              noticePatch(
+                last,
+                notice,
+                (key, params) => aiUniworkText(langRef.current, key, params),
+                'HTML',
+              ) ?? {},
+          ),
         onToolStart: (call) => {
           // Live "running" chip: replaced in place by onToolExecuted
           patchLast((last) => ({
@@ -753,7 +769,7 @@ export function AiPanel({
           })
         },
         onTurnEnd: () => {
-          patchLast({ streaming: false })
+          patchLast({ streaming: false, waitLine: undefined })
           setChat((prev) => [...prev, { role: 'assistant', text: '', streaming: true }])
         },
         onDone: ({ text, cancelled, turnLimit, truncated }) => {
@@ -768,7 +784,13 @@ export function AiPanel({
             : base
           patchLast((last) => ({
             streaming: false,
-            text: final || (last.tools?.length ? last.text : tGlobal('aiNoReply')),
+            waitLine: undefined,
+            // a restarted conversation ends the turn on purpose: its note is the whole reply
+            text:
+              final ||
+              (last.tools?.length || last.notes?.some((n) => n.kind === 'restarted')
+                ? last.text
+                : tGlobal('aiNoReply')),
             // A stop mid-tool can leave a running placeholder behind — drop it
             tools: last.tools?.filter((tl) => !tl.running),
           }))
@@ -796,6 +818,7 @@ export function AiPanel({
               next[next.length - 1] = {
                 ...last,
                 streaming: false,
+                waitLine: undefined,
                 text: error,
                 isError: true,
                 tools: last.tools?.filter((tl) => !tl.running),
@@ -1310,7 +1333,7 @@ export function AiPanel({
             )
           }
           const hasTools = (entry.tools?.length ?? 0) > 0
-          if (!entry.text && !entry.streaming && !hasTools) return null
+          if (!entry.text && !entry.streaming && !hasTools && !entry.notes?.length) return null
           const isLast = i === chat.length - 1
           // Action row appears once per completed reply: on the turn's final segment only
           // (mid-turn segments have a following assistant entry; the live turn ends when !busy)
@@ -1322,6 +1345,11 @@ export function AiPanel({
               key={i}
               className={`ai-msg ai-msg-assistant${entry.isError && !aiNoticeKind(entry.text) ? ' ai-msg-error' : ''}${entry.streaming ? ' ai-msg-streaming' : ''}`}
             >
+              {entry.notes?.map((note, k) => (
+                <div key={`un${k}`} className="ai-msg-notice" role="status">
+                  {note.text}
+                </div>
+              ))}
               {!entry.text && entry.streaming ? (
                 <span className="ai-typing-row">
                   <AiTypingIndicator label={hasTools ? t('aiWorking') : t('aiThinking')} />
@@ -1332,6 +1360,11 @@ export function AiPanel({
                     <Markdown text={aiNoticeBody(entry.text)} nav={docNav} />
                   </div>
                 )
+              )}
+              {entry.waitLine && (
+                <div className="ai-msg-notice" role="status">
+                  {entry.waitLine}
+                </div>
               )}
               {hasTools && <ToolChipList tools={entry.tools!} />}
               {showToolbar && (

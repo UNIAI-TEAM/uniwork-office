@@ -1,4 +1,5 @@
 import {
+  aiUniworkText,
   aiPanelWidthAtPointer,
   AiPanelSideButton,
   AiModelPicker,
@@ -9,7 +10,14 @@ import {
 import { useEffect, useRef, useState } from 'react'
 import type { Editor } from '@tiptap/core'
 import type { Block } from '@genoffice/docx-engine'
-import { AgentLoop, composeSkills, streamText, type AgentImage } from '@genoffice/agent-core'
+import {
+  AgentLoop,
+  composeSkills,
+  noticePatch,
+  streamText,
+  type AgentImage,
+  type PanelNote,
+} from '@genoffice/agent-core'
 import {
   aiNoticeBody,
   aiNoticeKind,
@@ -63,7 +71,7 @@ import { currentDocGeneration } from '../file-actions'
 import { createFilesSkill } from './files-skill'
 import { boundChatHistory } from './chat-retention'
 import { createElectronTransport } from './transport'
-import { useI18n, t as tModule, aiLangDirective, type StringKey } from '../i18n/locale'
+import { useI18n, t as tModule, aiLangDirective, getLang, type StringKey } from '../i18n/locale'
 import { Markdown } from '@genoffice/ui'
 import { AiComposer, AiScopeQuote, AiTypingIndicator, type AiScopeQuoteData } from '@genoffice/ui'
 import sendEnterOn from '../assets/send-enter-on.png'
@@ -127,6 +135,10 @@ interface ChatEntry {
   scope?: AiScopeQuoteData
   /** answered ask_clarification cards of this message's run (view-only receipts) */
   clarifyReceipts?: ClarifyQa[][]
+  /** UniWork AI: the transport is waiting out a Retry-After; the run goes on, Stop is the only action */
+  waitLine?: string | undefined
+  /** UniWork AI: restarted conversation / provider boundary / dropped call, shown above the answer */
+  notes?: PanelNote[] | undefined
 }
 
 /** longest selection excerpt echoed on a user bubble */
@@ -842,7 +854,18 @@ export function AiPanel({
       ]),
       captureSnapshot: () => captureRunSnapshot(editorRef.current, sideStateRef.current),
       events: {
-        onText: (text) => patchLastAssistant({ text }),
+        onText: (text) => patchLastAssistant({ text, waitLine: undefined }),
+        // module-level getLang: the loop is created once, the component's lang would go stale
+        onNotice: (notice) =>
+          patchLastAssistant(
+            (last) =>
+              noticePatch(
+                last,
+                notice,
+                (key, params) => aiUniworkText(getLang(), key, params),
+                'Docs',
+              ) ?? {},
+          ),
         onToolStart: (call) => {
           // Live "running" chip: replaced in place by onToolExecuted
           patchLastAssistant((last) => ({
@@ -889,7 +912,7 @@ export function AiPanel({
           })
         },
         onTurnEnd: () => {
-          patchLastAssistant({ streaming: false })
+          patchLastAssistant({ streaming: false, waitLine: undefined })
           setChat((prev) =>
             boundChatHistory([...prev, { role: 'assistant', text: '', streaming: true }]),
           )
@@ -904,8 +927,14 @@ export function AiPanel({
             : baseText
           patchLastAssistant((last) => ({
             streaming: false,
+            waitLine: undefined,
             turnLimit,
-            text: finalText || (last.tools?.length ? last.text : tModule('aiNoReply')),
+            // a restarted conversation ends the turn on purpose: its note is the whole reply
+            text:
+              finalText ||
+              (last.tools?.length || last.notes?.some((n) => n.kind === 'restarted')
+                ? last.text
+                : tModule('aiNoReply')),
             // A stop mid-tool can leave a running placeholder behind — drop it
             tools: last.tools?.filter((tl) => !tl.running),
             snapshot: runSnapshotRef.current ?? undefined,
@@ -928,6 +957,7 @@ export function AiPanel({
               next[next.length - 1] = {
                 ...last,
                 streaming: false,
+                waitLine: undefined,
                 error,
                 tools: last.tools?.filter((tl) => !tl.running),
                 snapshot: runSnapshotRef.current ?? undefined,
@@ -1450,6 +1480,7 @@ export function AiPanel({
             !entry.text &&
             !entry.streaming &&
             !entry.error &&
+            !entry.notes?.length &&
             !entry.tools?.length
           ) {
             return null
@@ -1474,6 +1505,11 @@ export function AiPanel({
               {entry.role === 'user' && entry.attachments && entry.attachments.length > 0 && (
                 <SentAttachments atts={entry.attachments} previews={attachmentPreviews} />
               )}
+              {entry.notes?.map((note, k) => (
+                <div key={`un${k}`} className="ai-msg-notice" role="status">
+                  {note.text}
+                </div>
+              ))}
               {entry.role === 'assistant' && !entry.text && entry.streaming ? (
                 <span className="ai-typing-row">
                   <AiTypingIndicator
@@ -1486,6 +1522,11 @@ export function AiPanel({
                 </div>
               ) : (
                 <span dir="auto">{entry.text}</span>
+              )}
+              {entry.waitLine && (
+                <div className="ai-msg-notice" role="status">
+                  {entry.waitLine}
+                </div>
               )}
               {entry.clarifyReceipts?.map((qa, k) => (
                 <div key={`ca${k}`} className="ai-clarify-answered">

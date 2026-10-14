@@ -66,7 +66,12 @@ import { isNumericIdentifierText } from './cell-warning'
 import { consumePendingUndoCarry, undoStackDepth } from './undo-carry'
 import { createSaveGate, recoveryCopyBacksSession, shouldRunSaveTick } from './save-scheduler'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { useAutoSavePref, useCloudSignedIn, type AiScopeQuoteData } from '@genoffice/ui'
+import {
+  aiUniworkText,
+  useAutoSavePref,
+  useCloudSignedIn,
+  type AiScopeQuoteData,
+} from '@genoffice/ui'
 
 import {
   CellValueType,
@@ -132,6 +137,7 @@ import {
   AgentLoop,
   COMPLETED_VIA_TOOLS_TEXT,
   composeSkills,
+  createTextNoticeSurface,
   type AgentImage,
 } from '@genoffice/agent-core'
 import { imageGenerationAvailable, type AiSettings } from '@genoffice/ai-provider/browser'
@@ -1452,6 +1458,9 @@ export function App({
   const runLastTextRef = useRef('')
   /** true once any tool of the run mutated the workbook */
   const runMutatedRef = useRef(false)
+  /** UniWork AI notices of the run (a Retry-After wait, a restart, a boundary, dropped calls) folded into
+   * the one text of the assistant message: the chat message here has no note fields */
+  const noticeSurfaceRef = useRef(createTextNoticeSurface())
 
   const agentLoopRef = useRef<AgentLoop | null>(null)
   if (!agentLoopRef.current) {
@@ -1495,7 +1504,25 @@ export function App({
           // When the model retries successfully and keeps streaming after a
           // mid-run failure (e.g. one apply error), clear the error flag —
           // otherwise the whole successful message stays rendered in red.
-          patchLastAssistant((entry) => ({ ...entry, text, isError: false }))
+          patchLastAssistant((entry) => ({
+            ...entry,
+            text: noticeSurfaceRef.current.text(text),
+            isError: false,
+          }))
+        },
+        // module-level getLang: the loop is created once, a render closure would go stale
+        onNotice: (notice) => {
+          const shown = noticeSurfaceRef.current.notice(
+            notice,
+            (key, params) => aiUniworkText(getLang(), key, params),
+            'Sheets',
+          )
+          if (shown !== null)
+            patchLastAssistant((entry) => ({ ...entry, text: shown, isError: false }))
+        },
+        onTurnReset: () => {
+          const shown = noticeSurfaceRef.current.reset()
+          patchLastAssistant((entry) => ({ ...entry, text: shown }))
         },
         onToolStart: (call) => {
           // Live "running" chip: replaced in place by onToolExecuted
@@ -1573,16 +1600,18 @@ export function App({
             : runLastTextRef.current ||
               toolSummaries ||
               (runMutatedRef.current ? t('appAiNoSummary') : t('appAiNoAction'))
+          // a restarted conversation ends the turn on purpose: its note is the whole reply
           const baseText = turnLimit
             ? [prose, t('appAiTurnLimit')].filter(Boolean).join('\n\n')
-            : prose || fallback
+            : prose || (noticeSurfaceRef.current.restarted() ? '' : fallback)
           const finalText = truncated
             ? [baseText, t('appAiTruncatedNote')].filter(Boolean).join('\n\n')
             : baseText
           if (cap('statusEcho')) setMessage(cancelled ? t('appAiStopped') : t('appAiDone'))
           patchLastAssistant((entry) => ({
             ...entry,
-            text: finalText,
+            // notes above the answer; what is persisted below stays the bare answer
+            text: noticeSurfaceRef.current.compose(finalText),
             streaming: false,
             isError: false,
             // A stop mid-tool can leave a running placeholder behind — drop it
@@ -1656,6 +1685,7 @@ export function App({
     setAiRunScope(aiScopeDismissed ? null : aiScope)
     aiApplyPromisesRef.current = []
     runLastTextRef.current = ''
+    noticeSurfaceRef.current.clear()
     runMutatedRef.current = false
     setAiBusy(true)
     if (cap('statusEcho')) setMessage(t('appAiThinking'))

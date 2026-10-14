@@ -6,6 +6,7 @@ import type {
   AgentMessage,
   AgentStreamNotice,
 } from './types'
+import { createAiRunTracker, type AiRunTracker } from './ai-run-tracker'
 
 /**
  * One streamed chunk pushed back over an Electron IPC bridge. Structurally
@@ -70,7 +71,36 @@ export interface IpcTransportOptions<S> {
   networkErrorText?(): string
   /** localized message for capacity/rate-limit failures (errorCode 'overloaded') */
   overloadedErrorText?(): string
+  /**
+   * localized message for a UniWork AI failure, chosen by the server's `code` (never by the error
+   * text); undefined falls back to the chunk's own text. `retryAfterSec` is the Retry-After the
+   * server sent, when it did.
+   */
+  uniworkErrorText?(code: string, retryAfterSec?: number): string | undefined
+  /** the AI turn tracker the stream reports to; default: the window's shared one (see desktopAiRun) */
+  aiRun?: AiRunTracker
 }
+
+/** the narrow slice of the preload's window.uniworkAiRun bridge used here (agent-core imports no Electron types) */
+interface AiRunWindowBridge {
+  reportAiRun?(report: { state: 'running' | 'idle'; runId?: string }): void
+}
+
+/**
+ * The renderer's one tracker for window.uniworkAiRun.reportAiRun: every AI turn of every provider
+ * reports through it, so the shell sees `running` at the first stream and exactly one `idle` after
+ * the last. Without the bridge (web frame, tests, an older preload) it reports nothing.
+ */
+export const desktopAiRun: AiRunTracker = createAiRunTracker({
+  report: (payload) => {
+    const bridge = (globalThis as { window?: { uniworkAiRun?: AiRunWindowBridge } }).window
+      ?.uniworkAiRun
+    bridge?.reportAiRun?.({
+      state: payload.state,
+      ...(payload.run_id !== undefined ? { runId: payload.run_id } : {}),
+    })
+  },
+})
 
 /**
  * AgentTransport over an Electron IPC bridge: the main process talks to the
@@ -80,6 +110,7 @@ export interface IpcTransportOptions<S> {
 export function createIpcTransport<S>(options: IpcTransportOptions<S>): AgentTransport {
   const timeoutText = () => options.timeoutErrorText?.() ?? options.unknownErrorText()
   const sessionId = crypto.randomUUID()
+  const aiRun = options.aiRun ?? desktopAiRun
   return {
     stream(request: AgentStreamRequest, cb) {
       const requestId = crypto.randomUUID()
@@ -89,6 +120,8 @@ export function createIpcTransport<S>(options: IpcTransportOptions<S>): AgentTra
         settled = true
         clearTimeout(silenceTimer)
         unsubscribe()
+        // every ending path (done, error, stop, watchdog, rejected start) lands here: one idle
+        aiRun.end(requestId)
       }
       const fail = (error: string) => {
         if (settled) return
@@ -115,6 +148,13 @@ export function createIpcTransport<S>(options: IpcTransportOptions<S>): AgentTra
         } else if (chunk.type === 'tool-call') {
           armSilence()
           if (chunk.toolCall) cb.onToolCall(chunk.toolCall)
+        } else if (chunk.type === 'notice') {
+          // a wait or a restart is traffic too: the watchdog stays armed through a Retry-After wait
+          armSilence()
+          if (chunk.notice) cb.onNotice?.(chunk.notice)
+        } else if (chunk.type === 'reset') {
+          armSilence()
+          cb.onTurnReset?.()
         } else if (chunk.type === 'done') {
           settle()
           if (chunk.stopReason) cb.onStopReason?.(chunk.stopReason)
@@ -122,15 +162,21 @@ export function createIpcTransport<S>(options: IpcTransportOptions<S>): AgentTra
         } else if (chunk.type === 'error') {
           settle()
           cb.onError(
-            chunk.errorCode === 'timeout'
-              ? timeoutText()
-              : chunk.errorCode === 'credits'
-                ? (options.creditsErrorText?.() ?? chunk.error ?? options.unknownErrorText())
-                : chunk.errorCode === 'network'
-                  ? (options.networkErrorText?.() ?? chunk.error ?? options.unknownErrorText())
-                  : chunk.errorCode === 'overloaded'
-                    ? (options.overloadedErrorText?.() ?? chunk.error ?? options.unknownErrorText())
-                    : (chunk.error ?? options.unknownErrorText()),
+            chunk.uniworkCode !== undefined
+              ? (options.uniworkErrorText?.(chunk.uniworkCode, chunk.retryAfterSec) ??
+                  chunk.error ??
+                  options.unknownErrorText())
+              : chunk.errorCode === 'timeout'
+                ? timeoutText()
+                : chunk.errorCode === 'credits'
+                  ? (options.creditsErrorText?.() ?? chunk.error ?? options.unknownErrorText())
+                  : chunk.errorCode === 'network'
+                    ? (options.networkErrorText?.() ?? chunk.error ?? options.unknownErrorText())
+                    : chunk.errorCode === 'overloaded'
+                      ? (options.overloadedErrorText?.() ??
+                        chunk.error ??
+                        options.unknownErrorText())
+                      : (chunk.error ?? options.unknownErrorText()),
           )
         } else {
           // A chunk kind this build predates must not kill the run; traffic proves it is alive.
@@ -138,6 +184,7 @@ export function createIpcTransport<S>(options: IpcTransportOptions<S>): AgentTra
         }
       })
       armSilence()
+      aiRun.begin(requestId, () => options.cancel(requestId))
       try {
         // a rejected/thrown start would otherwise leave the run pending until the watchdog
         Promise.resolve(
