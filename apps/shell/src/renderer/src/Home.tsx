@@ -771,11 +771,6 @@ function GroupPicker({ groups, count, onCancel, onPick, onCreate, onRemove }: Gr
   )
 }
 
-// ── Account entry (bottom-left) ──────────────────────────
-// Currently the Genspark (gsk) login entry; to be upgraded to a signup/account system later.
-// Clicking it opens the settings modal directly (SettingsModal.tsx), which hosts
-// login/logout plus preferences (language, theme, save location, update channel).
-
 // ── Project sidebar component ────────────────────────────
 
 interface ProjectPanelProps {
