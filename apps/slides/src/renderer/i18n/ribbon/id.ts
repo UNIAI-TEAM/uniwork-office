@@ -219,6 +219,8 @@ export const id = {
   ribbonGroupComments: 'Komentar',
   ribbonComment: 'Komentar',
   ribbonNewCommentTip: 'Komentar baru di slide saat ini (disimpan ke pptx, terlihat di PowerPoint)',
+  ribbonNewCommentServerTip:
+    'Komentar baru di slide saat ini (dibagikan kepada semua orang yang membuka presentasi ini, tidak disimpan di file)',
   ribbonInsertTextBoxTip: 'Sisipkan kotak teks',
   ribbonWordArt: 'WordArt',
   ribbonWordArtTip: 'Sisipkan WordArt (teks besar dengan gaya isian/kontur)',

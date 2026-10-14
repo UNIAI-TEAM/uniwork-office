@@ -1222,6 +1222,7 @@ export function Ribbon({
   onToggleComments,
   onNewComment,
   commentCount,
+  serverComments,
   onInsertIcon,
   onInsertChart,
   onInsertSmartArt,
@@ -1679,6 +1680,7 @@ export function Ribbon({
     onOpenZoom,
     hasSections,
     onNewComment,
+    serverComments,
     onOpenEquation,
     onOpenHeaderFooter,
     onOpenLink,
@@ -2614,7 +2616,7 @@ export function Ribbon({
                 className="rb-big"
                 disabled={!hasDoc}
                 onClick={onNewComment}
-                data-tip={t('ribbonNewCommentTip')}
+                data-tip={t(serverComments ? 'ribbonNewCommentServerTip' : 'ribbonNewCommentTip')}
               >
                 <span className="rb-big-icon">
                   <IconComment size={BIG} />

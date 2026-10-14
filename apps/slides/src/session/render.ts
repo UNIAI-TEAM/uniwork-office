@@ -9,6 +9,8 @@ import {
   parseTheme,
   patchBodyPrAutofit,
   resolveSchemeColor,
+  slideIdOfPath,
+  slideIdsByPath,
   type OpenedPptx,
   type Slide,
   type TextElement,
@@ -29,12 +31,17 @@ import { getFontMetrics, sessionPlatform } from './platform'
 import type { Session } from './state'
 
 export function buildAllRenderSlides(opened: OpenedPptx, fitWidthPx: number): RenderSlide[] {
+  // Read presentation.xml + its rels ONCE for the whole deck: a per-slide slideIdOfPath
+  // would re-parse them for every slide, making a full-deck rebuild O(N^2).
+  const sldIds = slideIdsByPath(opened)
   return opened.deck.slides.map((s, i) =>
     buildRenderSlide(s, opened.deck.size, {
       fitWidthPx,
       media: makeMediaResolver(opened, s.path),
       metrics: getFontMetrics(),
       slideNo: i + 1,
+      // the PPTX slide id: what server comments anchor a slide by
+      sldId: sldIds.get(s.path),
     }),
   )
 }
@@ -132,6 +139,7 @@ export function rebuildSlide(session: Session, slideIndex: number): RenderSlide 
     media: makeMediaResolver(session.opened, slide.path),
     metrics: getFontMetrics(),
     slideNo: slideIndex + 1,
+    sldId: slideIdOfPath(session.opened, slide.path),
   })
 }
 
@@ -148,6 +156,7 @@ export function rebuildSlideWithReparse(session: Session, slideIndex: number): R
     media: makeMediaResolver(session.opened, fresh.path),
     metrics: getFontMetrics(),
     slideNo: slideIndex + 1,
+    sldId: slideIdOfPath(session.opened, fresh.path),
   })
 }
 

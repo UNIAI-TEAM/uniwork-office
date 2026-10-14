@@ -63,6 +63,10 @@ export const vi = {
   paneCommentsPlaceholder: 'Bình luận mới… (⌘/Ctrl+Enter để gửi)',
   paneCommentsPost: 'Gửi',
   paneCommentsNeutralAuthor: 'Người dùng',
+  paneCommentsSaveFirst:
+    'Hãy lưu bản trình chiếu trước để thêm bình luận. Bạn vẫn đọc, trả lời và giải quyết được các bình luận bên dưới.',
+  paneCommentsNewNoSlide:
+    'Hiện chưa thể thêm bình luận vào trang chiếu này. Hãy chọn trang chiếu khác rồi thử lại.',
 
   paneCsdTitle: 'Trình chiếu tùy chỉnh',
   paneCsdDefaultName: 'Trình chiếu tùy chỉnh {n}',
