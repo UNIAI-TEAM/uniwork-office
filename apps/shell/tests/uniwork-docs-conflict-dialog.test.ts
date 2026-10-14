@@ -678,7 +678,7 @@ describe('G5-09 desktop conflict dialog S5 session (main)', () => {
     expect(view.locked).toBe('none')
 
     // Feed change triggers metadata refresh where server returns 403 permission_revoked
-    server.faults.push({ route: 'detail', kind: 'status', status: 403, code: 'permission_revoked' })
+    server.faults.push({ route: 'detail', kind: 403, code: 'permission_revoked' })
     ctx.service.noteFeedChange(DOC, '46')
     await vi.waitFor(() => expect(ctx.views).toHaveLength(2))
     expect(ctx.views[1]).toMatchObject({ locked: 'revoked', canEdit: false })

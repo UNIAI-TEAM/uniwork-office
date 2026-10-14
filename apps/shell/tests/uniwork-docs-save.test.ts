@@ -16,6 +16,7 @@ import { basename, dirname, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   UniworkConflictChoice,
+  UniworkConflictView,
   UniworkDocStatus,
   UniworkLaunchEvent,
 } from '../src/shared/home-api'
@@ -236,6 +237,7 @@ function setup(
 ) {
   const statuses: UniworkDocStatus[] = []
   const launches: UniworkLaunchEvent[] = []
+  const views: UniworkConflictView[] = []
   let account: string | null = (opts.signedIn ?? true) ? (opts.account ?? 'acc_1') : null
   const safeStorage: LockableSafeStorage = createLockableSafeStorage()
   const layer: StoreLayer = createStoreLayer({
@@ -250,13 +252,6 @@ function setup(
     scope: () => (account ? { deploymentId: 'default', accountId: account } : null),
   })
   const ui: ConflictUi = {
-    chooseConflict: vi.fn(async () => opts.choice ?? 'later'),
-    confirmDiscard: vi.fn(async () => true),
-    pickCopyPath: vi.fn(async (stem: string, format: string) =>
-      join(dir, `${stem} (my copy).${format}`),
-    ),
-    showOpenLatestFailed: vi.fn(),
-    showCopyFailed: vi.fn(),
     chooseUnsavedClose: vi.fn(async () => opts.closeChoice ?? 'cancel'),
   }
   const deps = {
@@ -277,6 +272,26 @@ function setup(
     activePath: () => undefined,
     ui,
     pushStatus: (s: UniworkDocStatus) => statuses.push(s),
+    pushConflict: (v: UniworkConflictView) => {
+      views.push(v)
+      if (opts.choice) {
+        queueMicrotask(() => {
+          if (opts.choice === 'overwrite') {
+            void service.conflictAct(v.sessionId, { kind: 'overwrite', stopAi: false })
+          } else if (opts.choice === 'open-latest') {
+            void service.conflictAct(v.sessionId, {
+              kind: 'reload',
+              keep: 'discard',
+              stopAi: false,
+            })
+          } else if (opts.choice === 'save-local-copy') {
+            void service.conflictAct(v.sessionId, { kind: 'save-copy', stopAi: false })
+          } else if (opts.choice === 'later') {
+            void service.conflictAct(v.sessionId, { kind: 'cancel' })
+          }
+        })
+      }
+    },
     pushLaunch: (e: UniworkLaunchEvent) => launches.push(e),
     reveal: vi.fn(),
     sleep: async () => undefined,
@@ -288,6 +303,7 @@ function setup(
     ui,
     statuses,
     launches,
+    views,
     layer,
     safeStorage,
     currentAccount: () => account,
@@ -695,23 +711,33 @@ describe('save pipeline', () => {
     writeFileSync(path, 'mine')
     await ctx.service.save(path)
     const status = await ctx.service.resolveConflict(path)
-    expect(ctx.ui.confirmDiscard).toHaveBeenCalled()
+    expect(ctx.views).toHaveLength(1)
     expect(status).toMatchObject({ state: 'saved' })
     expect(readFileSync(path, 'utf8')).toBe('theirs')
     expect(binding(path)).toMatchObject({ baseRevision: '45' })
     expect(ctx.deps.reloadPath).toHaveBeenCalledWith(path)
   })
 
-  it('save-local-copy writes a plain copy and the document stays in conflict', async () => {
+  it('save-local-copy reports save_copy_failed until G5-10 and the document stays in conflict', async () => {
     const server = fakeServer({ bytes: enc('v3') })
-    const ctx = setup(server, { choice: 'save-local-copy' })
+    const ctx = setup(server)
     const path = await openDoc(ctx)
     server.state.revision = 45
     writeFileSync(path, 'mine')
     await ctx.service.save(path)
-    expect(await ctx.service.resolveConflict(path)).toMatchObject({ state: 'conflict' })
-    expect(ctx.ui.pickCopyPath).toHaveBeenCalledWith('Q4 plan', 'docx')
-    expect(readFileSync(join(dir, 'Q4 plan (my copy).docx'), 'utf8')).toBe('mine')
+    const flow = ctx.service.resolveConflict(path)
+    await vi.waitFor(() => expect(ctx.views).toHaveLength(1))
+    const reply = await ctx.service.conflictAct(ctx.views[0]!.sessionId, {
+      kind: 'save-copy',
+      stopAi: false,
+    })
+    expect(reply).toEqual({
+      kind: 'view',
+      view: expect.objectContaining({ notice: 'save_copy_failed' }),
+    })
+    await ctx.service.conflictAct(ctx.views[0]!.sessionId, { kind: 'cancel' })
+    expect(await flow).toMatchObject({ state: 'conflict' })
+    expect(readFileSync(path, 'utf8')).toBe('mine')
   })
 
   it('a payload mismatch drops the intent; the next save mints a new key', async () => {
@@ -1005,18 +1031,24 @@ describe('review r1 save fixes', () => {
 
   it('save-local-copy reports a copy that could not be written (BE-6)', async () => {
     const server = fakeServer({ bytes: enc('v3') })
-    const ctx = setup(server, { choice: 'save-local-copy' })
+    const ctx = setup(server)
     const path = await openDoc(ctx)
     server.state.revision = 45
     writeFileSync(path, 'mine')
     await ctx.service.save(path)
-    vi.mocked(ctx.ui.pickCopyPath).mockResolvedValueOnce(join(dir, 'missing-dir', 'copy.docx'))
-    await ctx.service.resolveConflict(path)
-    expect(ctx.ui.showCopyFailed).toHaveBeenCalledTimes(1)
-    // the working copy itself is never a "copy on this computer"
-    vi.mocked(ctx.ui.pickCopyPath).mockResolvedValueOnce(path)
-    await ctx.service.resolveConflict(path)
-    expect(ctx.ui.showCopyFailed).toHaveBeenCalledTimes(2)
+    const flow = ctx.service.resolveConflict(path)
+    await vi.waitFor(() => expect(ctx.views).toHaveLength(1))
+    const reply = await ctx.service.conflictAct(ctx.views[0]!.sessionId, {
+      kind: 'reload',
+      keep: 'draft',
+      stopAi: false,
+    })
+    expect(reply).toEqual({
+      kind: 'view',
+      view: expect.objectContaining({ notice: 'reload_failed' }),
+    })
+    await ctx.service.conflictAct(ctx.views[0]!.sessionId, { kind: 'cancel' })
+    await flow
     expect(readFileSync(path, 'utf8')).toBe('mine')
     expect(binding(path)).toMatchObject({ state: 'conflict' })
   })
@@ -1155,7 +1187,7 @@ describe('review r2 follow-ups', () => {
     vi.mocked(ctx.ui.chooseUnsavedClose).mockResolvedValue('resolve')
     expect(await ctx.service.confirmClose(path)).toBe(true)
     expect(ctx.ui.chooseUnsavedClose).toHaveBeenCalledWith('Q4 plan.docx', 'conflict', 'conflict')
-    expect(ctx.ui.chooseConflict).toHaveBeenCalledTimes(1)
+    expect(ctx.views).toHaveLength(1)
     expect(binding(path)).toMatchObject({ state: 'saved' })
     expect(new TextDecoder().decode(server.state.bytes)).toBe('mine')
   })
@@ -1775,92 +1807,77 @@ describe('the conflict dialog belongs to the document that hit the conflict (GOA
     return { server, ctx, docx, xlsx }
   }
 
-  /** a native dialog that stays open until it is answered or closed by its signal */
-  function heldDialog(ctx: ReturnType<typeof setup>, onAbort: UniworkConflictChoice = 'later') {
-    let answer: (choice: UniworkConflictChoice) => void = () => undefined
-    let seen: AbortSignal | undefined
-    vi.mocked(ctx.ui.chooseConflict).mockImplementationOnce(
-      (_title, signal) =>
-        new Promise((resolveChoice) => {
-          seen = signal
-          answer = resolveChoice
-          signal?.addEventListener('abort', () => resolveChoice(onAbort))
-        }),
-    )
-    return { answer: (choice: UniworkConflictChoice) => answer(choice), signal: () => seen }
-  }
-
-  it('a conflict on the non-focused xlsx names the xlsx and copies the xlsx', async () => {
-    const { ctx, xlsx } = await twoConflicts({ choice: 'save-local-copy' })
-    expect(await ctx.service.resolveConflict(xlsx)).toMatchObject({
+  it('a conflict on the non-focused xlsx names the xlsx and targets the xlsx', async () => {
+    const { ctx, xlsx } = await twoConflicts()
+    const flow = ctx.service.resolveConflict(xlsx)
+    await vi.waitFor(() => expect(ctx.views).toHaveLength(1))
+    expect(ctx.views[0]).toMatchObject({
+      path: xlsx,
+      documentId: SHEET,
+      title: 'Budget.xlsx',
+      module: 'sheets',
+    })
+    await ctx.service.conflictAct(ctx.views[0]!.sessionId, { kind: 'cancel' })
+    expect(await flow).toMatchObject({
       path: xlsx,
       state: 'conflict',
     })
-    expect(ctx.ui.chooseConflict).toHaveBeenCalledWith('Budget.xlsx', expect.any(AbortSignal))
-    expect(ctx.ui.pickCopyPath).toHaveBeenCalledWith('Budget', 'xlsx')
-    expect(readFileSync(join(dir, 'Budget (my copy).xlsx'), 'utf8')).toBe('my xlsx')
   })
 
   it('a docx dialog still open closes as "Decide later" before the xlsx dialog opens', async () => {
     const { ctx, docx, xlsx } = await twoConflicts()
-    // the docx dialog answers "Save a copy" only after it was closed: too late to count
-    const held = heldDialog(ctx, 'save-local-copy')
     const docxFlow = ctx.service.resolveConflict(docx)
-    await vi.waitFor(() => expect(held.signal()).toBeDefined())
-    vi.mocked(ctx.ui.chooseConflict).mockResolvedValueOnce('save-local-copy')
-    const xlsxStatus = await ctx.service.resolveConflict(xlsx)
-    expect(held.signal()?.aborted).toBe(true)
+    await vi.waitFor(() => expect(ctx.views).toHaveLength(1))
+    const docxSessionId = ctx.views[0]!.sessionId
+    const xlsxFlow = ctx.service.resolveConflict(xlsx)
+    await vi.waitFor(() => expect(ctx.views).toHaveLength(2))
     expect(await docxFlow).toMatchObject({ path: docx, state: 'conflict' })
-    expect(xlsxStatus).toMatchObject({ path: xlsx, state: 'conflict' })
-    expect(vi.mocked(ctx.ui.chooseConflict).mock.calls.map(([title]) => title)).toEqual([
-      'Q4 plan.docx',
-      'Budget.xlsx',
-    ])
-    // exactly one copy, of the xlsx, typed xlsx
-    expect(vi.mocked(ctx.ui.pickCopyPath).mock.calls).toEqual([['Budget', 'xlsx']])
-    expect(readdirSync(dir).filter((name) => name.includes('(my copy)'))).toEqual([
-      'Budget (my copy).xlsx',
-    ])
+    // the docx dialog answers after it was closed: too late to count
+    expect(
+      await ctx.service.conflictAct(docxSessionId, { kind: 'overwrite', stopAi: false }),
+    ).toEqual({ kind: 'closed' })
+    await ctx.service.conflictAct(ctx.views[1]!.sessionId, { kind: 'cancel' })
+    expect(await xlsxFlow).toMatchObject({ path: xlsx, state: 'conflict' })
+    expect(ctx.views.map((v) => v.title)).toEqual(['Q4 plan.docx', 'Budget.xlsx'])
+    expect(binding(docx)).toMatchObject({ state: 'conflict' })
   })
 
   it('leaving the tab closes its chip dialog; the close prompt dialog stays', async () => {
-    const { ctx, docx } = await twoConflicts({ choice: 'overwrite' })
-    const held = heldDialog(ctx)
+    const { ctx, docx } = await twoConflicts()
     const flow = ctx.service.resolveConflict(docx)
-    await vi.waitFor(() => expect(held.signal()).toBeDefined())
+    await vi.waitFor(() => expect(ctx.views).toHaveLength(1))
+    const chipSessionId = ctx.views[0]!.sessionId
     ctx.service.noteActivePath(docx.toUpperCase())
-    if (process.platform === 'win32') expect(held.signal()?.aborted).toBe(false)
     ctx.service.noteActivePath(undefined)
-    expect(held.signal()?.aborted).toBe(true)
     expect(await flow).toMatchObject({ state: 'conflict' })
+    expect(await ctx.service.conflictAct(chipSessionId, { kind: 'cancel' })).toEqual({
+      kind: 'closed',
+    })
     expect(binding(docx)).toMatchObject({ state: 'conflict' })
 
-    const fromClose = heldDialog(ctx)
     vi.mocked(ctx.ui.chooseUnsavedClose).mockResolvedValueOnce('resolve').mockResolvedValue('close')
     const closing = ctx.service.confirmClose(docx)
-    await vi.waitFor(() => expect(fromClose.signal()).toBeDefined())
+    await vi.waitFor(() => expect(ctx.views).toHaveLength(2))
+    const closeSessionId = ctx.views[1]!.sessionId
     ctx.service.noteActivePath(undefined)
-    expect(fromClose.signal()?.aborted).toBe(false)
-    fromClose.answer('later')
+    await ctx.service.conflictAct(closeSessionId, { kind: 'cancel' })
     expect(await closing).toBe(true)
   })
 
   it('a second Resolve of the same document does not open a second dialog', async () => {
     const { ctx, xlsx } = await twoConflicts()
-    const held = heldDialog(ctx)
     const first = ctx.service.resolveConflict(xlsx)
-    await vi.waitFor(() => expect(held.signal()).toBeDefined())
+    await vi.waitFor(() => expect(ctx.views).toHaveLength(1))
     expect(await ctx.service.resolveConflict(xlsx)).toMatchObject({ state: 'conflict' })
-    expect(ctx.ui.chooseConflict).toHaveBeenCalledTimes(1)
-    held.answer('later')
+    expect(ctx.views).toHaveLength(1)
+    await ctx.service.conflictAct(ctx.views[0]!.sessionId, { kind: 'cancel' })
     await first
   })
 
   it('a choice made after the document left conflict is not applied', async () => {
     const { server, ctx, docx } = await twoConflicts()
-    const held = heldDialog(ctx)
     const flow = ctx.service.resolveConflict(docx)
-    await vi.waitFor(() => expect(held.signal()).toBeDefined())
+    await vi.waitFor(() => expect(ctx.views).toHaveLength(1))
     // resolved elsewhere meanwhile (e.g. the close prompt's discard)
     writeFileSync(
       join(docx, '..', BINDING_FILE),
@@ -1868,25 +1885,17 @@ describe('the conflict dialog belongs to the document that hit the conflict (GOA
     )
     const before = commits(server).length
     const moduleSaves = ctx.deps.requestModuleSave.mock.calls.length
-    held.answer('overwrite')
+    await ctx.service.conflictAct(ctx.views[0]!.sessionId, { kind: 'overwrite', stopAi: false })
     expect(await flow).toMatchObject({ state: 'saved' })
     expect(commits(server).length).toBe(before)
     expect(ctx.deps.requestModuleSave).toHaveBeenCalledTimes(moduleSaves)
   })
 
-  it('the discard confirmation is closed with its conflict dialog', async () => {
-    const { ctx, xlsx } = await twoConflicts({ choice: 'open-latest' })
-    let discardSignal: AbortSignal | undefined
-    vi.mocked(ctx.ui.confirmDiscard).mockImplementationOnce(
-      (_title, signal) =>
-        new Promise((resolveConfirm) => {
-          discardSignal = signal
-          signal?.addEventListener('abort', () => resolveConfirm(false))
-        }),
-    )
+  it('closing the conflict prompt aborts the open session without modifying the working copy', async () => {
+    const { ctx, xlsx } = await twoConflicts()
     const flow = ctx.service.resolveConflict(xlsx)
-    await vi.waitFor(() => expect(discardSignal).toBeDefined())
-    expect(ctx.ui.confirmDiscard).toHaveBeenCalledWith('Budget.xlsx', expect.any(AbortSignal))
+    await vi.waitFor(() => expect(ctx.views).toHaveLength(1))
+    expect(ctx.views[0]).toMatchObject({ title: 'Budget.xlsx', path: xlsx })
     ctx.service.closeConflictPrompt()
     expect(await flow).toMatchObject({ path: xlsx, state: 'conflict' })
     expect(readFileSync(xlsx, 'utf8')).toBe('my xlsx')

@@ -2746,7 +2746,7 @@ export class UniworkDocsService {
     doc: BoundDocument,
   ): Promise<UniworkConflictKeepDraft> {
     if (this.storeLocked()) return 'keystore_locked'
-    const access = await this.queueEngine()
+    const access = await this.queueEngine().catch(() => ({ kind: 'unavailable' as const }))
     if (access.kind === 'keystore_locked') return 'keystore_locked'
     if (access.kind !== 'ok') return session.draftBlock ?? 'ok'
     const existing = await access.drafts.list(doc.key)
@@ -2792,7 +2792,7 @@ export class UniworkDocsService {
           view: await this.buildConflictView(open, { fetchServer: false, notice: 'reload_failed' }),
         }
       }
-      const access = await this.queueEngine()
+      const access = await this.queueEngine().catch(() => ({ kind: 'unavailable' as const }))
       if (access.kind === 'keystore_locked') {
         open.draftBlock = 'keystore_locked'
         return { kind: 'view', view: await this.buildConflictView(open, { fetchServer: false }) }
