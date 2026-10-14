@@ -68,6 +68,9 @@ import './settings.css'
 
 // sorted by ISO 639 language code — native-script labels have no natural
 // shared alphabet, so the code is the ordering key
+/** the Settings window reads and saves the account's UniWork AI pick with the BYOK settings */
+const SETTINGS_PICK = { includeUniworkPick: true } as const
+
 const LANG_OPTIONS = [
   { value: 'ar', label: 'العربية' },
   { value: 'cs', label: 'Čeština' },
@@ -391,7 +394,7 @@ function AiModelPane({ t, cloud }: { t: TFunc; cloud: UniworkCloudStatus | null 
   useEffect(() => {
     let alive = true
     const load = () => {
-      void window.aiOffice.getAiSettings?.().then((s) => {
+      void window.aiOffice.getAiSettings?.(SETTINGS_PICK).then((s) => {
         if (!alive || !s) return
         testSeqRef.current += 1
         setTesting(false)
@@ -504,6 +507,8 @@ function AiModelPane({ t, cloud }: { t: TFunc; cloud: UniworkCloudStatus | null 
   const isGenspark = provider === 'genspark'
   const isCodex = provider === 'codex'
   const isOpenRouter = provider === 'openrouter'
+  // UniWork AI runs on the organization's plan: no key, model or endpoint to set or test
+  const isUniwork = provider === 'uniwork'
   const isTokenHub = isGenspark || isOpenRouter
 
   const touch = () => {
@@ -538,7 +543,7 @@ function AiModelPane({ t, cloud }: { t: TFunc; cloud: UniworkCloudStatus | null 
   }
   const save = () => {
     window.aiOffice
-      .setAiSettings?.(settings)
+      .setAiSettings?.(settings, SETTINGS_PICK)
       .then(() => {
         setDirty(false)
         setSaved(true)
@@ -626,9 +631,11 @@ function AiModelPane({ t, cloud }: { t: TFunc; cloud: UniworkCloudStatus | null 
                     : null
             }
           />
-          <button className="set-btn" disabled={testing} onClick={test}>
-            {t('setAiTest')}
-          </button>
+          {!isUniwork && (
+            <button className="set-btn" disabled={testing} onClick={test}>
+              {t('setAiTest')}
+            </button>
+          )}
           <button className="set-btn primary" disabled={!dirty} onClick={save}>
             {t('setAiSave')}
           </button>
@@ -656,127 +663,139 @@ function AiModelPane({ t, cloud }: { t: TFunc; cloud: UniworkCloudStatus | null 
         />
       </div>
       <div className="set-field-desc set-ai-note">
-        {isGenspark ? t('setAiGensparkHint') : isCodex ? t('setAiCodexHint') : t('setAiByokNote')}
+        {isUniwork
+          ? t('setAiUniworkNote')
+          : isGenspark
+            ? t('setAiGensparkHint')
+            : isCodex
+              ? t('setAiCodexHint')
+              : t('setAiByokNote')}
       </div>
-      <div className="set-field">
-        <div className="set-field-text">
-          <label className="set-field-label">{t('setAiModelId')}</label>
-        </div>
-        {meta && meta.models.length > 0 ? (
-          <Dropdown
-            className="set-dd"
-            value={config.model || meta.defaultModel}
-            ariaLabel={t('setAiModelId')}
-            options={meta.models.map((m) => ({ value: m, label: m }))}
-            onPick={(m) => updateConfig({ model: m })}
-          />
-        ) : (
-          <input
-            id="set-ai-model"
-            className="set-input"
-            type="text"
-            value={config.model}
-            placeholder="model-id"
-            spellCheck={false}
-            onChange={(e) => updateConfig({ model: e.target.value })}
-          />
-        )}
-      </div>
-      {isCodex ? (
-        <div className="set-field">
-          <div className="set-field-text">
-            <div className="set-field-stack">
-              <label className="set-field-label" htmlFor="set-ai-cli-path">
-                {t('setAiCodexPath')}
-              </label>
-              <div className="set-field-desc">{t('setAiCodexPathHint')}</div>
-            </div>
-          </div>
-          <input
-            id="set-ai-cli-path"
-            className="set-input"
-            type="text"
-            value={config.cliPath ?? ''}
-            placeholder={t('setAiCodexAutoPlaceholder')}
-            spellCheck={false}
-            autoComplete="off"
-            onChange={(e) => updateConfig({ cliPath: e.target.value.trim() })}
-            onBlur={(e) => {
-              const cliPath = e.target.value.trim()
-              void refreshCodexModels(cliPath, config.model).catch(() => undefined)
-            }}
-          />
-        </div>
-      ) : (
+      {!isUniwork && (
         <>
           <div className="set-field">
             <div className="set-field-text">
-              <div className="set-field-stack">
-                <label className="set-field-label" htmlFor="set-ai-key">
-                  {t('setAiApiKey')}
-                </label>
-                <div className="set-field-desc">
-                  {isTokenHub ? t('setAiOpenRouterHubHint') : t('setAiKeyHint')}
-                </div>
-              </div>
+              <label className="set-field-label">{t('setAiModelId')}</label>
             </div>
-            <input
-              id="set-ai-key"
-              className="set-input"
-              type="password"
-              value={config.apiKey}
-              placeholder={meta?.keyPlaceholder ?? 'API Key'}
-              spellCheck={false}
-              autoComplete="off"
-              onChange={(e) => updateConfig({ apiKey: e.target.value.trim() })}
-            />
+            {meta && meta.models.length > 0 ? (
+              <Dropdown
+                className="set-dd"
+                value={config.model || meta.defaultModel}
+                ariaLabel={t('setAiModelId')}
+                options={meta.models.map((m) => ({ value: m, label: m }))}
+                onPick={(m) => updateConfig({ model: m })}
+              />
+            ) : (
+              <input
+                id="set-ai-model"
+                className="set-input"
+                type="text"
+                value={config.model}
+                placeholder="model-id"
+                spellCheck={false}
+                onChange={(e) => updateConfig({ model: e.target.value })}
+              />
+            )}
           </div>
-          {!isGenspark && (
+          {isCodex ? (
             <div className="set-field">
               <div className="set-field-text">
                 <div className="set-field-stack">
-                  <label className="set-field-label" htmlFor="set-ai-base-url">
-                    {t('setAiBaseUrl')}
+                  <label className="set-field-label" htmlFor="set-ai-cli-path">
+                    {t('setAiCodexPath')}
                   </label>
-                  {!meta?.needsBaseUrl && (
-                    <div className="set-field-desc">{t('setAiBaseUrlHint')}</div>
-                  )}
+                  <div className="set-field-desc">{t('setAiCodexPathHint')}</div>
                 </div>
               </div>
               <input
-                id="set-ai-base-url"
+                id="set-ai-cli-path"
                 className="set-input"
                 type="text"
-                value={config.baseUrl ?? ''}
-                placeholder={meta?.needsBaseUrl ? 'https://…/v1' : meta?.defaultBaseUrl}
+                value={config.cliPath ?? ''}
+                placeholder={t('setAiCodexAutoPlaceholder')}
                 spellCheck={false}
-                onChange={(e) => updateConfig({ baseUrl: e.target.value.trim() })}
+                autoComplete="off"
+                onChange={(e) => updateConfig({ cliPath: e.target.value.trim() })}
+                onBlur={(e) => {
+                  const cliPath = e.target.value.trim()
+                  void refreshCodexModels(cliPath, config.model).catch(() => undefined)
+                }}
               />
             </div>
+          ) : (
+            <>
+              <div className="set-field">
+                <div className="set-field-text">
+                  <div className="set-field-stack">
+                    <label className="set-field-label" htmlFor="set-ai-key">
+                      {t('setAiApiKey')}
+                    </label>
+                    <div className="set-field-desc">
+                      {isTokenHub ? t('setAiOpenRouterHubHint') : t('setAiKeyHint')}
+                    </div>
+                  </div>
+                </div>
+                <input
+                  id="set-ai-key"
+                  className="set-input"
+                  type="password"
+                  value={config.apiKey}
+                  placeholder={meta?.keyPlaceholder ?? 'API Key'}
+                  spellCheck={false}
+                  autoComplete="off"
+                  onChange={(e) => updateConfig({ apiKey: e.target.value.trim() })}
+                />
+              </div>
+              {!isGenspark && (
+                <div className="set-field">
+                  <div className="set-field-text">
+                    <div className="set-field-stack">
+                      <label className="set-field-label" htmlFor="set-ai-base-url">
+                        {t('setAiBaseUrl')}
+                      </label>
+                      {!meta?.needsBaseUrl && (
+                        <div className="set-field-desc">{t('setAiBaseUrlHint')}</div>
+                      )}
+                    </div>
+                  </div>
+                  <input
+                    id="set-ai-base-url"
+                    className="set-input"
+                    type="text"
+                    value={config.baseUrl ?? ''}
+                    placeholder={meta?.needsBaseUrl ? 'https://…/v1' : meta?.defaultBaseUrl}
+                    spellCheck={false}
+                    onChange={(e) => updateConfig({ baseUrl: e.target.value.trim() })}
+                  />
+                </div>
+              )}
+            </>
           )}
+          <div className="set-field">
+            <div className="set-field-text">
+              <div className="set-field-stack">
+                <label className="set-field-label" htmlFor="set-ai-max-tokens">
+                  {t('setAiMaxTokens')}
+                </label>
+                <div className="set-field-desc">{t('setAiMaxTokensDesc')}</div>
+              </div>
+            </div>
+            <input
+              id="set-ai-max-tokens"
+              className="set-input"
+              type="number"
+              min={MIN_MAX_OUTPUT_TOKENS}
+              max={MAX_MAX_OUTPUT_TOKENS}
+              step={1024}
+              value={
+                maxTokensDraft ?? String(settings.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS)
+              }
+              onChange={(e) => setMaxTokensDraft(e.target.value)}
+              onBlur={commitMaxTokens}
+            />
+          </div>
         </>
       )}
-      <div className="set-field">
-        <div className="set-field-text">
-          <div className="set-field-stack">
-            <label className="set-field-label" htmlFor="set-ai-max-tokens">
-              {t('setAiMaxTokens')}
-            </label>
-            <div className="set-field-desc">{t('setAiMaxTokensDesc')}</div>
-          </div>
-        </div>
-        <input
-          id="set-ai-max-tokens"
-          className="set-input"
-          type="number"
-          min={MIN_MAX_OUTPUT_TOKENS}
-          max={MAX_MAX_OUTPUT_TOKENS}
-          step={1024}
-          value={maxTokensDraft ?? String(settings.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS)}
-          onChange={(e) => setMaxTokensDraft(e.target.value)}
-          onBlur={commitMaxTokens}
-        />
-      </div>
       {/* offered only while signed in to UniWork and the plan includes cloud AI */}
       {cloud?.enabled && (
         <div className="set-field">
@@ -911,7 +930,7 @@ function AiMediaPane({
   useEffect(() => {
     let alive = true
     const load = () => {
-      void window.aiOffice.getAiSettings?.().then((s) => {
+      void window.aiOffice.getAiSettings?.(SETTINGS_PICK).then((s) => {
         if (!alive || !s) return
         testSeqRef.current += 1
         setTesting(false)
@@ -985,7 +1004,7 @@ function AiMediaPane({
 
   const save = () => {
     Promise.all([
-      window.aiOffice.setAiSettings?.(settings),
+      window.aiOffice.setAiSettings?.(settings, SETTINGS_PICK),
       fileSearch ? window.aiOffice.setFileSearchSettings?.(fileSearch) : undefined,
     ])
       .then(() => {
@@ -1515,6 +1534,7 @@ export function SettingsModal({
   const [cliLinkBusy, setCliLinkBusy] = useState(false)
   const [aiPrefs, setAiPrefs] = useState<AiPanelPrefs>(DEFAULT_AI_PANEL_PREFS)
   const [channel, setChannel] = useState<'stable' | 'beta'>('stable')
+  const [pinnedChannel, setPinnedChannel] = useState<string | null>(null)
   const [appVersion, setAppVersion] = useState('')
   const [updateState, setUpdateState] = useState<UpdateUiState | null>(null)
   const [legalOpenFailed, setLegalOpenFailed] = useState(false)
@@ -1560,6 +1580,9 @@ export function SettingsModal({
     })
     void window.aiOffice.getUpdateChannel?.().then((ch) => {
       if (alive) setChannel(ch)
+    })
+    void window.aiOffice.getPinnedUpdateChannel?.().then((ch) => {
+      if (alive) setPinnedChannel(ch)
     })
     void window.aiOffice.getAppVersion?.().then((v) => {
       if (alive && v) setAppVersion(v)
@@ -1970,21 +1993,34 @@ export function SettingsModal({
                   <div className="set-field-text">
                     <label className="set-field-label">{t('updateChannel')}</label>
                   </div>
-                  <Dropdown
-                    className="set-dd"
-                    value={channel}
-                    ariaLabel={t('updateChannel')}
-                    options={CHANNEL_OPTIONS.map((opt) => ({
-                      value: opt.value,
-                      label: t(opt.labelKey),
-                    }))}
-                    onPick={(v) => {
-                      const next = v === 'beta' ? 'beta' : 'stable'
-                      setChannel(next)
-                      void window.aiOffice.setUpdateChannel(next)
-                    }}
-                  />
+                  {pinnedChannel !== null ? (
+                    <span className="set-about-channel-pinned">
+                      {pinnedChannel === 'dev'
+                        ? t('channelDev')
+                        : pinnedChannel === 'beta'
+                          ? t('channelBeta')
+                          : pinnedChannel}
+                    </span>
+                  ) : (
+                    <Dropdown
+                      className="set-dd"
+                      value={channel}
+                      ariaLabel={t('updateChannel')}
+                      options={CHANNEL_OPTIONS.map((opt) => ({
+                        value: opt.value,
+                        label: t(opt.labelKey),
+                      }))}
+                      onPick={(v) => {
+                        const next = v === 'beta' ? 'beta' : 'stable'
+                        setChannel(next)
+                        void window.aiOffice.setUpdateChannel(next)
+                      }}
+                    />
+                  )}
                 </div>
+                {pinnedChannel !== null && (
+                  <p className="set-field-desc">{t('updateChannelPinnedNote')}</p>
+                )}
                 <div className="set-about-legal">
                   <p className="set-about-copyright">
                     {t('setAboutCopyright', {

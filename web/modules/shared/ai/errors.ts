@@ -22,6 +22,12 @@
  * The status decides; the body's `code` only refines a 400 (and is kept in `serverCode`).
  */
 
+import { UniworkError, uniworkErrorKey } from '../../../../packages/ai-provider/src/uniwork/errors'
+import {
+  aiUniworkStrings,
+  type AiUniworkStringKey,
+} from '../../../../packages/ui/src/strings-ai-uniwork'
+
 export type AiWebErrorCode =
   | 'credits_exhausted'
   | 'entitlement_required'
@@ -188,4 +194,39 @@ export function rawFailureAsTyped(err: unknown): AiWebError | undefined {
  */
 export function isContractFailure(status: number): boolean {
   return status in BY_STATUS
+}
+
+// ------------------------------------------------------------------ UniWork AI (G6-05)
+
+/**
+ * What the panel text of a failed UniWork AI turn is picked from: the adapter's `UniworkError`
+ * (the façade's `code`, `Retry-After` seconds, the run id when one was open). The text comes from
+ * the code, never from the message; these are not AiWebErrors (no card, no BYOK state).
+ */
+export interface UniworkFailure {
+  code: string
+  retryAfterSec?: number
+  /** a run was open when it failed (the capability went off mid-run, not before the first one) */
+  runId?: string
+}
+
+/** the adapter's error as a UniworkFailure; undefined for anything else */
+export function asUniworkFailure(err: unknown): UniworkFailure | undefined {
+  if (!(err instanceof UniworkError)) return undefined
+  return {
+    code: err.code,
+    ...(err.retryAfterSec !== undefined ? { retryAfterSec: err.retryAfterSec } : {}),
+    ...(err.runId ? { runId: err.runId } : {}),
+  }
+}
+
+/**
+ * The S9/S10 string of a failed UniWork AI turn: the adapter's `uniworkErrorKey` (web host), except
+ * that "off" before any run is the entry's own note (`aiUniworkOff`), and a key U-02 has no string
+ * for yet (the web 413 `aiErrWorkbookTooLarge`) reads as `aiErrUnavailable`.
+ */
+export function uniworkFailureKey(failure: UniworkFailure): AiUniworkStringKey {
+  if (failure.code === 'office_capability_off' && !failure.runId) return 'aiUniworkOff'
+  const key = uniworkErrorKey(failure.code, 'web')
+  return key in aiUniworkStrings.zh ? (key as AiUniworkStringKey) : 'aiErrUnavailable'
 }

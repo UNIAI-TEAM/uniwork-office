@@ -38,4 +38,6 @@ export const nl = {
   aiTestErrUnavailable: 'Service reageert niet. Probeer het later opnieuw',
   aiTestErrMisconfigured:
     'Instellingen onvolledig: controleer het serviceadres en de accountvelden',
+  setAiUniworkNote:
+    'UniWork AI gebruikt het abonnement van je organisatie. Je hoeft geen sleutel of model in te stellen.',
 } satisfies Record<keyof typeof zh, string>

@@ -62,4 +62,10 @@ export const ja = {
     'このドキュメントで UniWork AI がオフにされたため、実行は現在のステップの後で停止しました。',
   aiErrUnsupported: 'UniWork AI は {module} ではまだこの操作を行えません。',
   aiErrViewOnlyEdit: 'このドキュメントには表示権限しかないため、AI は編集できません。',
+  // UniWork AI question limits (the façade takes text up to 8,000 characters)
+  aiErrQuestionTooLong:
+    'UniWork AI へのリクエストが長すぎます。8,000 文字未満に短くしてから送信してください。',
+  aiErrQuestionRejected:
+    'UniWork AI はこのリクエストを受け付けられませんでした。内容を変更してから送信してください。',
+  aiUniworkImagesNotSent: '画像は UniWork AI に送信されません。テキストのみ送信しました。',
 } satisfies Record<keyof typeof zh, string>

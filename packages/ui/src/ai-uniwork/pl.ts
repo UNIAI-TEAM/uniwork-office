@@ -63,4 +63,9 @@ export const pl = {
     'UniWork AI właśnie wyłączono dla tego dokumentu, więc uruchomienie zatrzymano po bieżącym kroku.',
   aiErrUnsupported: 'UniWork AI nie potrafi jeszcze tego zrobić w {module}.',
   aiErrViewOnlyEdit: 'Masz tylko dostęp do odczytu tego dokumentu, więc AI nie może go edytować.',
+  // UniWork AI question limits (the façade takes text up to 8,000 characters)
+  aiErrQuestionTooLong:
+    'Prośba jest za długa dla UniWork AI. Skróć ją do mniej niż 8000 znaków i wyślij ponownie.',
+  aiErrQuestionRejected: 'UniWork AI nie może przyjąć tej prośby. Zmień ją i wyślij ponownie.',
+  aiUniworkImagesNotSent: 'Obrazy nie są wysyłane do UniWork AI; wysłano tylko tekst.',
 } satisfies Record<keyof typeof zh, string>

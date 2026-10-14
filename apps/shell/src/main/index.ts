@@ -94,7 +94,9 @@ import {
   createAuthCallbackRouter,
   registerAccountIpc,
   routeAuthCallbackUrl,
+  setUniworkAiFlagListener,
   startUniworkAccount,
+  startUniworkAiChat,
   startUniworkCloud,
   stopUniworkAccount,
   onUniworkAccountStatus,
@@ -154,6 +156,9 @@ import {
   setDocsFileSavedHook,
   setDocsFileOpenedHook,
   setSessionPathResolver,
+  setUniworkAiHost,
+  setUniworkAiChoiceStore,
+  setUniworkAiEditorSender,
   defaultSaveDir,
   uniquePathIn,
   authorizeMcpDocWrite,
@@ -342,6 +347,8 @@ import { normalizeFileSearchSettings, probeDecision, SearchReranker } from './fi
 import { runHeadlessExport, type HeadlessExporters } from './headless-export'
 import { isVersionRequest } from './version-flag'
 import { registerAiRunIpc } from './ai-run-registry'
+import { broadcastUniworkAiFlag, registerUniworkAiFlagIpc } from './uniwork-ai-flag'
+import { createUniworkAiChoiceStore } from './uniwork-ai-choice'
 import { TabManager } from './tab-manager'
 import { installShellCloseGuard } from './window-close-guard'
 import {
@@ -373,7 +380,12 @@ import {
   setDockHost,
   takeTornTab,
 } from './detached-windows'
-import { applyUpdateChannel, checkForUpdatesNow, initAutoUpdater } from './updater'
+import {
+  applyUpdateChannel,
+  checkForUpdatesNow,
+  getPinnedUpdateChannel,
+  initAutoUpdater,
+} from './updater'
 import { isUpdateChannel, type UpdateChannel } from '../shared/update-api'
 
 /**
@@ -2946,6 +2958,9 @@ function syncWorkbenchOwner(): void {
   if (!workbenchAccounts().setOwner(owner)) return
   const wc = shellWindow && !shellWindow.isDestroyed() ? shellWindow.webContents : null
   if (wc && !wc.isDestroyed()) wc.send(HOME_CHANNELS.wbBucketChanged, workbenchAccounts().bucket())
+  // the UniWork AI pick is per account: every panel re-reads which provider is selected
+  for (const other of webContents.getAllWebContents())
+    if (!other.isDestroyed()) other.send('ai:settings-changed')
 }
 let tabManager: TabManager | null = null
 
@@ -4726,7 +4741,13 @@ function registerHomeIpc(): void {
 
   ipcMain.handle(HOME_CHANNELS.getUpdateChannel, (): UpdateChannel => currentUpdateChannel())
 
+  ipcMain.handle(HOME_CHANNELS.getPinnedUpdateChannel, (): string | null =>
+    getPinnedUpdateChannel(),
+  )
+
   ipcMain.handle(HOME_CHANNELS.setUpdateChannel, (_event, channel: unknown) => {
+    // a pinned build always follows its own channel; the choice is not stored
+    if (getPinnedUpdateChannel() !== null) return
     if (!isUpdateChannel(channel) || channel === currentUpdateChannel()) return
     cachedUpdateChannel = channel
     writeAppSetting(APP_SETTINGS_PATH(), 'updateChannel', channel)
@@ -6276,6 +6297,13 @@ registerTabsIpc()
 registerDroppedFilesIpc()
 // editors report a running AI turn per webContents (TabManager.editorDirtyStates reads it)
 registerAiRunIpc(ipcMain)
+// the renderers' own provider lists learn whether UniWork AI is offered (pull + push)
+registerUniworkAiFlagIpc(ipcMain)
+// "UniWork AI" is picked per account (the account store), BYOK settings stay in ai-settings.json
+setUniworkAiChoiceStore(createUniworkAiChoiceStore(workbenchAccounts()))
+setUniworkAiFlagListener((available) =>
+  broadcastUniworkAiFlag(available, webContents.getAllWebContents()),
+)
 
 // sheets' project:resolveChat goes through the handler registered by docs-main; the sessionId reverse lookup hooks in here
 setSessionPathResolver(resolveSheetsSessionPath)
@@ -6535,6 +6563,32 @@ app.whenReady().then(async () => {
     },
   })
   startUniworkCloud()
+  // G6-05: UniWork AI turns (the `uniwork` provider) run here, scoped to the
+  // sender's tab: a bound document goes to its document route, a local file
+  // to the selected organization
+  const uniworkDocsHandle = uniworkDocs
+  const describeAiSender = (senderId: number) => {
+    const tab = tabManager?.describeWebContents(senderId)
+    if (tab) return tab.filePath ? { kind: tab.kind, filePath: tab.filePath } : { kind: tab.kind }
+    for (const path of detachedFilePaths()) {
+      const found = findDetachedTabByPath(path)
+      if (found && found.webContents.id === senderId) return { kind: found.kind, filePath: path }
+    }
+    return null
+  }
+  // the account's UniWork AI pick reaches editor tabs only (My AI, email, Settings keep BYOK)
+  setUniworkAiEditorSender((senderId) => {
+    const kind = describeAiSender(senderId)?.kind
+    return kind !== undefined && kind !== 'home'
+  })
+  if (uniworkDocsHandle) {
+    const uniworkAi = startUniworkAiChat({
+      describe: describeAiSender,
+      binding: (path) => uniworkDocsHandle.aiBinding(path),
+      capability: (orgId) => uniworkDocsHandle.capabilityRead(orgId),
+    })
+    setUniworkAiHost({ stream: (call) => uniworkAi.run(call) })
+  }
   authCallbacks.start(routeAuthCallback)
   // UniWork document launch links (held since startup) route from here on
   uniworkDocs?.activate((route) => authCallbacks.startLaunch(route))

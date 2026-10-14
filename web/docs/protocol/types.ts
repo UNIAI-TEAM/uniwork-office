@@ -375,7 +375,7 @@ export interface InitPayload extends TokenPayload {
   protocolVersion: number
   documentId: string
   workspaceId: string
-  /** absolute API origin + prefix, e.g. "https://app.uniwork.vn/api" */
+  /** absolute API origin + prefix, e.g. "https://uniworkos.com/api" */
   apiBase: string
   apiMode: ApiMode
   /** BCP-47, e.g. "vi", "en" */

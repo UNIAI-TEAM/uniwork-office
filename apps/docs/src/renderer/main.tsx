@@ -16,9 +16,12 @@ import '@genoffice/ui/image-viewer.css'
 import './styles.css'
 import './fonts/fonts.css'
 import { applyAiPanelPrefs, installScreenTips } from '@genoffice/ui'
+import { mirrorUniworkAiFlag } from '@genoffice/ai-provider/browser'
 import { setAltChunkHtmlConverter } from '@genoffice/docx-engine'
 
 installScreenTips()
+// this renderer's own provider list shows the UniWork AI entry only while the shell offers it
+mirrorUniworkAiFlag()
 if (window.desktop?.convertAltChunkHtml) {
   setAltChunkHtmlConverter((html) => window.desktop.convertAltChunkHtml(html))
 }

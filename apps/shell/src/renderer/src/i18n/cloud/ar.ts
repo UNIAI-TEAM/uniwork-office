@@ -36,4 +36,5 @@ export const ar = {
   aiTestErrLimit: 'تم بلوغ حد المزوّد. حاول لاحقًا',
   aiTestErrUnavailable: 'الخدمة لا تستجيب. حاول لاحقًا',
   aiTestErrMisconfigured: 'الإعدادات غير مكتملة. تحقق من عنوان الخدمة وحقول الحساب',
+  setAiUniworkNote: 'يستخدم UniWork AI باقة مؤسستك. لا حاجة إلى إدخال مفتاح أو اختيار نموذج.',
 } satisfies Record<keyof typeof zh, string>

@@ -73,7 +73,7 @@ npm run dist:win      # Windows NSIS (from Windows or with a Windows sidecar)
 npm run dist:linux    # AppImage / deb / rpm
 ```
 
-Do not set `GENOFFICE_UPDATE_URL` until a UniWork update feed exists; without it in-app auto-update stays disabled. The app has no usage-statistics component (see [PRIVACY.md](PRIVACY.md)).
+In-app auto-update reads the feed `UNIWORK_UPDATE_URL` names at packaging time: the release workflow points dev / beta builds at this repository's GitHub releases (Windows and the Linux AppImage; the unsigned mac app uses the download page at https://uniworkos.com/office). Without it auto-update stays disabled. The app has no usage-statistics component (see [PRIVACY.md](PRIVACY.md)).
 
 ## Scope notes
 

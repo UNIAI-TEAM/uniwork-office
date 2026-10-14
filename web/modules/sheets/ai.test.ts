@@ -127,6 +127,21 @@ describe('sheetsHostGrants (AI family)', () => {
     expect(sheetsHostGrants(undefined).ai).toBe(false)
   })
 
+  it('sheetsHostGrants uniworkAi alone: the panel opens, no credentials entry, no cloud tools', () => {
+    expect(sheetsHostGrants({ uniworkAi: true })).toEqual(
+      expect.objectContaining({
+        ai: true,
+        aiCredentials: false,
+        uniworkAi: true,
+        webSearch: false,
+        imageSearch: false,
+        imageGeneration: false,
+      }),
+    )
+    expect(sheetsHostGrants({ uniworkAi: true, webSearch: true }).webSearch).toBe(true)
+    expect(sheetsHostGrants({ ai: true }).uniworkAi).toBe(false)
+  })
+
   it('still maps the file grants', () => {
     expect(sheetsHostGrants({ filePick: true, recents: true, save: true, saveAs: true })).toEqual(
       expect.objectContaining({ open: true, recents: true, save: true, saveAs: true }),

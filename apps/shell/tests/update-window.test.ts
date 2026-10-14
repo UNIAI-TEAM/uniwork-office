@@ -73,6 +73,8 @@ const state = (phase: UpdateUiState['phase']): UpdateUiState =>
       retry: 'r',
       manualDesc: 'm',
       openDownload: 'o',
+      notifyDesc: 'n',
+      notifyDownload: 'd',
     },
   }) as UpdateUiState
 

@@ -1,4 +1,5 @@
 import { aiNoticeKind } from '@genoffice/ai-provider/browser'
+import { isUniworkQuestionRefusal } from '@genoffice/ui'
 import type { AiChatMessage } from './AiChatPanel'
 
 /**
@@ -15,8 +16,12 @@ export function markRunFailed(
   for (let i = next.length - 1; i >= 0; i--) {
     const entry = next[i]!
     if (entry.role === 'user') {
-      // a setup state (no key / no model) is not a send failure: no "not sent" pill, no retry
-      next[i] = aiNoticeKind(error) ? entry : { ...entry, undelivered: true }
+      // a setup state (no key / no model) is not a send failure: no "not sent" pill, no retry; nor
+      // is a refused question (too long, rejected): sending the same text again cannot help
+      next[i] =
+        aiNoticeKind(error) || isUniworkQuestionRefusal(error)
+          ? entry
+          : { ...entry, undelivered: true }
       break
     }
   }
@@ -24,6 +29,8 @@ export function markRunFailed(
   if (last?.role === 'assistant') {
     next[next.length - 1] = {
       ...last,
+      // a stale wait announcement must not outlive the failed run
+      status: '',
       text: error,
       isError: true,
       streaming: false,

@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 // Brand gate on packaged output: what a user sees after installing a release
 // build must say UniWork, never the upstream product or company name, and the
-// build must carry no update feed. Runs on an electron-builder output directory
-// (BUILD_DIR) after packaging:
+// build must carry no update feed but the one it was given. Runs on an
+// electron-builder output directory (BUILD_DIR) after packaging:
 //
 //   node tools/release/check-build-brand.mjs --dir apps/shell/release
-//     [--expect win-unpacked | --expect mac-arm64,mac | --expect linux-unpacked] [--json]
+//     [--expect win-unpacked | --expect mac-arm64,mac | --expect linux-unpacked]
+//     [--update-feed github:<owner>/<repo>] [--json]
 //
 // The unpacked app directories are required, never optional: the ones named
 // with --expect, and the ones the installers imply (a Windows setup .exe needs
@@ -28,8 +29,14 @@
 //     uniwork-office and uniwork-office-dev URL schemes (the sign-in callback)
 //   - the packaged package.json inside app.asar (productName, author,
 //     homepage, description)
-//   - no app-update.yml in the app resources and no latest*.yml next to the
-//     installers (auto-update stays off)
+//   - the update feed. Without --update-feed: no app-update.yml in the app
+//     resources and no channel file (latest*.yml, dev*.yml, ...) next to the
+//     installers. With --update-feed github:<owner>/<repo>: the Windows and
+//     Linux resources hold an app-update.yml for exactly that repository, the
+//     mac app holds none (unsigned apps cannot install updates) but names the
+//     repository in package.json uniworkReleaseFeed (its update notice; none
+//     without --update-feed), and every file a channel file lists sits next to
+//     it, so the uploaded names match
 // The uninstall entry, shortcuts and file-association names come from the
 // packaging config, which apps/shell/tests/release-config.test.ts asserts.
 // Exit code 1 on any problem or when the directory holds nothing to check.
@@ -251,19 +258,99 @@ export function checkPackageJson(where, pkg, report) {
   }
 }
 
+/** Checks the app's packaged package.json and returns it (null without an app.asar). */
 function checkAsar(where, asarPath, report) {
   if (!existsSync(asarPath)) {
     report.problem(`${where}: no app.asar`)
-    return
+    return null
   }
   const pkg = JSON.parse(loadAsar().extractFile(asarPath, 'package.json').toString('utf8'))
   report.checked(`${where} package.json`)
   checkPackageJson(`${where} package.json`, pkg, report)
+  return pkg
 }
 
-function checkNoUpdateFeed(where, resourcesDir, report) {
-  if (existsSync(join(resourcesDir, 'app-update.yml'))) {
-    report.problem(`${where}: resources hold app-update.yml (auto-update must stay off)`)
+/**
+ * The mac app's update notice source, package.json uniworkReleaseFeed. feed
+ * null: there must be none. Otherwise it must name exactly that repository and
+ * a dev / beta channel.
+ */
+export function checkReleaseFeed(where, pkg, feed, report) {
+  const baked = pkg.uniworkReleaseFeed
+  if (!feed) {
+    if (baked !== undefined) {
+      report.problem(`${where}: package.json carries uniworkReleaseFeed (no feed expected)`)
+    }
+    return
+  }
+  report.checked(`${where} uniworkReleaseFeed`)
+  if (
+    baked?.owner !== feed.owner ||
+    baked?.repo !== feed.repo ||
+    !['dev', 'beta'].includes(baked?.channel)
+  ) {
+    report.problem(
+      `${where}: package.json uniworkReleaseFeed is ${JSON.stringify(baked ?? null)}, ` +
+        `expected github:${feed.owner}/${feed.repo} on dev or beta`,
+    )
+  }
+}
+
+const CHANNEL_FILE = /^(?:latest|alpha|beta|dev)(?:-[a-z0-9]+)?\.yml$/i
+
+/** github:<owner>/<repo> -> { owner, repo }; throws on anything else. */
+export function parseUpdateFeed(value) {
+  const match = /^github:([A-Za-z0-9-]+)\/([A-Za-z0-9._-]+)$/.exec(value ?? '')
+  if (!match) throw new Error(`--update-feed ${value}: expected github:<owner>/<repo>`)
+  return { owner: match[1], repo: match[2] }
+}
+
+/** Top-level `key: value` pairs of a flat yml file (app-update.yml). */
+function ymlFields(text) {
+  const fields = {}
+  for (const line of text.split(/\r?\n/)) {
+    const match = /^([A-Za-z]+):\s*['"]?([^'"]*?)['"]?\s*$/.exec(line)
+    if (match) fields[match[1]] = match[2]
+  }
+  return fields
+}
+
+/**
+ * The app's resources/app-update.yml. feed null: there must be none. Otherwise
+ * it must name the github provider on exactly that repository.
+ */
+function checkUpdateFeed(where, resourcesDir, report, feed) {
+  const path = join(resourcesDir, 'app-update.yml')
+  if (!feed) {
+    if (existsSync(path)) {
+      report.problem(`${where}: resources hold app-update.yml (auto-update must stay off)`)
+    }
+    return
+  }
+  if (!existsSync(path)) {
+    report.problem(`${where}: resources hold no app-update.yml (expected the github feed)`)
+    return
+  }
+  report.checked(`${where} app-update.yml`)
+  const fields = ymlFields(readFileSync(path, 'utf8'))
+  if (fields.provider !== 'github' || fields.owner !== feed.owner || fields.repo !== feed.repo) {
+    report.problem(
+      `${where}: app-update.yml names ${fields.provider}:${fields.owner}/${fields.repo}, ` +
+        `expected github:${feed.owner}/${feed.repo}`,
+    )
+  }
+}
+
+/** Every file a channel file lists (url: / path:) must sit in the same directory. */
+function checkChannelFile(name, text, present, report) {
+  const listed = new Set()
+  for (const line of text.split(/\r?\n/)) {
+    const match = /^\s*(?:-\s*)?(?:url|path):\s*['"]?([^'"\s]+)/.exec(line)
+    if (match) listed.add(match[1])
+  }
+  if (listed.size === 0) report.problem(`${name}: lists no files`)
+  for (const file of listed) {
+    if (!present.has(file)) report.problem(`${name}: lists ${file}, which is not in the output`)
   }
 }
 
@@ -283,7 +370,7 @@ export function checkVersionInfo(where, strings, report, { requireKeys = false }
   }
 }
 
-function checkWindowsUnpacked(dir, report) {
+function checkWindowsUnpacked(dir, report, feed) {
   const where = basename(dir)
   for (const name of readdirSync(dir)) report.problem(brandProblem(`${where} file name`, name))
   const appExe = join(dir, `${EXPECTED_PRODUCT_NAME}.exe`)
@@ -300,7 +387,7 @@ function checkWindowsUnpacked(dir, report) {
     )
   }
   checkAsar(where, join(dir, 'resources', 'app.asar'), report)
-  checkNoUpdateFeed(where, join(dir, 'resources'), report)
+  checkUpdateFeed(where, join(dir, 'resources'), report, feed)
 }
 
 /** Brand / identity problems in a parsed mac Info.plist. */
@@ -324,7 +411,7 @@ export function checkInfoPlist(where, plist, report) {
   }
 }
 
-function checkMacApp(appDir, report) {
+function checkMacApp(appDir, report, feed) {
   const where = basename(appDir)
   report.problem(brandProblem('app bundle name', where))
   checkInfoPlist(where, readPlistFile(join(appDir, 'Contents', 'Info.plist')), report)
@@ -335,18 +422,21 @@ function checkMacApp(appDir, report) {
     }
   }
   const resources = join(appDir, 'Contents', 'Resources')
-  checkAsar(where, join(resources, 'app.asar'), report)
-  checkNoUpdateFeed(where, resources, report)
+  const pkg = checkAsar(where, join(resources, 'app.asar'), report)
+  // never a feed: Squirrel.Mac installs updates only into a signed app; the
+  // unsigned app reads the release repository from package.json instead
+  checkUpdateFeed(where, resources, report, null)
+  if (pkg) checkReleaseFeed(where, pkg, feed, report)
 }
 
-function checkLinuxUnpacked(dir, report) {
+function checkLinuxUnpacked(dir, report, feed) {
   const where = basename(dir)
   for (const name of readdirSync(dir)) report.problem(brandProblem(`${where} file name`, name))
   if (!existsSync(join(dir, EXPECTED_LINUX_NAME))) {
     report.problem(`${where}: no "${EXPECTED_LINUX_NAME}" executable`)
   }
   checkAsar(where, join(dir, 'resources', 'app.asar'), report)
-  checkNoUpdateFeed(where, join(dir, 'resources'), report)
+  checkUpdateFeed(where, join(dir, 'resources'), report, feed)
 }
 
 /** Parses `dpkg-deb -f` output (RFC 822 style, continuation lines folded in). */
@@ -473,7 +563,7 @@ export function impliedUnpackedDir(name) {
 }
 
 /** Runs every check on an electron-builder output directory. */
-export function checkBuildDir(dir, { expect = [] } = {}) {
+export function checkBuildDir(dir, { expect = [], updateFeed = null } = {}) {
   const problems = []
   const checked = []
   const report = {
@@ -483,26 +573,32 @@ export function checkBuildDir(dir, { expect = [] } = {}) {
   const inspected = new Set()
   const required = new Map(expect.map((name) => [name, '--expect']))
   const requiredPlatforms = new Map()
-  for (const name of readdirSync(dir)) {
+  const entries = readdirSync(dir)
+  const present = new Set(entries)
+  for (const name of entries) {
     const path = join(dir, name)
     if (statSync(path).isDirectory()) {
       if (!UNPACKED_DIR.test(name)) continue
       inspected.add(name)
       if (name.startsWith('win')) {
-        checkWindowsUnpacked(path, report)
+        checkWindowsUnpacked(path, report, updateFeed)
       } else if (name.startsWith('mac')) {
         const apps = readdirSync(path).filter((entry) => entry.endsWith('.app'))
         if (apps.length === 0) report.problem(`${name}: no .app bundle`)
-        for (const app of apps) checkMacApp(join(path, app), report)
+        for (const app of apps) checkMacApp(join(path, app), report, updateFeed)
       } else {
-        checkLinuxUnpacked(path, report)
+        checkLinuxUnpacked(path, report, updateFeed)
       }
       continue
     }
     checked.push(`file name ${name}`)
     report.problem(brandProblem('artifact name', name))
-    if (/^latest(?:-[a-z0-9]+)?\.yml$/i.test(name)) {
-      report.problem(`${name}: update feed metadata in the output (auto-update must stay off)`)
+    if (CHANNEL_FILE.test(name)) {
+      if (!updateFeed) {
+        report.problem(`${name}: update feed metadata in the output (auto-update must stay off)`)
+      } else {
+        checkChannelFile(name, readFileSync(path, 'utf8'), present, report)
+      }
     }
     if (/\.exe$/i.test(name)) {
       checkVersionInfo(name, parseVersionInfo(readFileSync(path)), report, { requireKeys: true })
@@ -529,23 +625,27 @@ export function checkBuildDir(dir, { expect = [] } = {}) {
 function main(argv) {
   let dir
   let json = false
+  let updateFeed = null
   const expect = []
   for (let index = 0; index < argv.length; index += 1) {
     if (argv[index] === '--dir') dir = argv[++index]
     else if (argv[index] === '--expect') {
       expect.push(...(argv[++index] ?? '').split(',').filter(Boolean))
+    } else if (argv[index] === '--update-feed') {
+      updateFeed = parseUpdateFeed(argv[++index])
     } else if (argv[index] === '--json') json = true
     else throw new Error(`unknown argument: ${argv[index]}`)
   }
   if (!dir) {
     throw new Error(
-      'usage: check-build-brand.mjs --dir <electron-builder output> [--expect <dir>[,<dir>]] [--json]',
+      'usage: check-build-brand.mjs --dir <electron-builder output> [--expect <dir>[,<dir>]] ' +
+        '[--update-feed github:<owner>/<repo>] [--json]',
     )
   }
   for (const name of expect) {
     if (!UNPACKED_DIR.test(name)) throw new Error(`--expect ${name}: not an unpacked app directory`)
   }
-  const result = checkBuildDir(resolve(dir), { expect })
+  const result = checkBuildDir(resolve(dir), { expect, updateFeed })
   if (json) {
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`)
   } else {
