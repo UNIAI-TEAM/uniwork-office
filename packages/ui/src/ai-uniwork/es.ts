@@ -72,4 +72,23 @@ export const es = {
     'Tu solicitud es demasiado larga para UniWork AI. Acórtala a menos de 8.000 caracteres y envíala de nuevo.',
   aiErrQuestionRejected: 'UniWork AI no pudo aceptar esta solicitud. Cámbiala y vuelve a enviarla.',
   aiUniworkImagesNotSent: 'Las imágenes no se envían a UniWork AI; solo se envió tu texto.',
+  // Cloud state, credits and account actions (shared with picker footer and composer note)
+  cloudStateReady: 'Disponible',
+  cloudStateNotEntitled: 'No incluido en tu plan',
+  cloudStateExhausted: 'Sin créditos de IA',
+  cloudStateUnavailable: 'No disponible',
+  cloudStateSignedOut: 'Sin iniciar sesión',
+  cloudStateInactive: 'Suscripción inactiva',
+  cloudCredits: 'Créditos de IA',
+  cloudCreditsLeft: 'Quedan {remaining} / {limit}',
+  cloudCreditsUnlimited: 'Ilimitado',
+  cloudCreditsRenews: 'Se renueva el {date}',
+  cloudInactiveBody: 'La suscripción de UniWork de su organización no está activa, por lo que la IA en la nube está en pausa. Pida a un administrador que la renueve; sus propios proveedores de abajo siguen funcionando.',
+  acctSignIn: 'Iniciar sesión',
+  acctSignInAgain: 'Volver a iniciar sesión',
+  // S8/S10 local-file conversation restart notice (G05BE-6)
+  aiUniworkLocalFileRestart: 'Los archivos locales inician una conversación nueva en tu organización y no conservan los turnos de otros archivos.',
+  // S9 cells summary and S10 web workbook size limit
+  aiResultCellsMeta: 'Celdas escritas: {written} ({range}) · Celdas existentes sobrescritas: {overwritten}',
+  aiErrWorkbookTooLarge: 'Este libro es demasiado grande para la IA en la web. Ábrelo en la aplicación UniWork Office.',
 } satisfies Record<keyof typeof zh, string>

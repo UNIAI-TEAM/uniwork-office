@@ -154,3 +154,33 @@ export {
   type AiModelPickerSelection,
 } from './ai-model-picker-options'
 export { ProviderLogo } from './provider-logos'
+export { type AiComposerProps } from './AiComposer'
+export {
+  UNIWORK_ACK_STORAGE_KEY,
+  UniworkComposerNote,
+  UniworkDisclosure,
+  UniworkDisclosureShort,
+  ack,
+  clearUniworkAcks,
+  isAcked,
+  isComposerPopupOpen,
+  serializeUniworkAckKey,
+  subscribeUniworkAck,
+  useUniworkDisclosureAck,
+  type AiComposerUniworkDisclosureConfig,
+  type AiComposerUniworkProps,
+  type UniworkAckKey,
+  type UniworkComposerNoteProps,
+  type UniworkDisclosureProps,
+  type UniworkDisclosureShortProps,
+  type UniworkDisclosureVariant,
+} from './ai-uniwork-composer'
+export {
+  composerNoteFor,
+  type ComposerNote,
+  type ComposerNoteAction,
+  type ComposerNoteInput,
+  type ComposerNoteKey,
+  type ComposerNoteKind,
+} from '@genoffice/ai-provider/browser'
+

@@ -70,6 +70,10 @@ export interface AiCloudTools {
 export interface AiCloudStatus {
   enabled: boolean
   reason?: string
+  /** optional organization id from GET cloud (used for UniWork AI disclosure ack identity) */
+  org_id?: string
+  /** optional organization display name from GET cloud (used for {org} in UniWork AI disclosure) */
+  org_name?: string
   tools: AiCloudTools
   credits: {
     unit: string

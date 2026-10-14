@@ -61,4 +61,23 @@ export const he = {
   aiErrQuestionTooLong: 'הבקשה ארוכה מדי עבור UniWork AI. קצר אותה לפחות מ-8,000 תווים ושלח שוב.',
   aiErrQuestionRejected: 'UniWork AI לא יכול לקבל את הבקשה הזו. שנה אותה ושלח שוב.',
   aiUniworkImagesNotSent: 'תמונות לא נשלחות ל-UniWork AI; נשלח רק הטקסט שלך.',
+  // Cloud state, credits and account actions (shared with picker footer and composer note)
+  cloudStateReady: 'זמין',
+  cloudStateNotEntitled: 'לא כלול בתוכנית שלך',
+  cloudStateExhausted: 'נגמרו קרדיטי ה-AI',
+  cloudStateUnavailable: 'לא זמין',
+  cloudStateSignedOut: 'לא מחובר',
+  cloudStateInactive: 'המנוי אינו פעיל',
+  cloudCredits: 'קרדיטי AI',
+  cloudCreditsLeft: 'נותרו {remaining} / {limit}',
+  cloudCreditsUnlimited: 'ללא הגבלה',
+  cloudCreditsRenews: 'יתחדש ב-{date}',
+  cloudInactiveBody: 'מנוי UniWork של הארגון שלך אינו פעיל, ולכן ה-AI בענן מושהה. בקש ממנהל לחדש אותו; הספקים שלך למטה ממשיכים לעבוד.',
+  acctSignIn: 'כניסה',
+  acctSignInAgain: 'כניסה מחדש',
+  // S8/S10 local-file conversation restart notice (G05BE-6)
+  aiUniworkLocalFileRestart: 'קבצים מקומיים מתחילים שיחה חדשה תחת הארגון שלך ואינם שומרים סבבים מקבצים אחרים.',
+  // S9 cells summary and S10 web workbook size limit
+  aiResultCellsMeta: 'תאים שנכתבו: {written} ({range}) · תאים קיימים שנדרסו: {overwritten}',
+  aiErrWorkbookTooLarge: 'חוברת העבודה הזו גדולה מדי ל-AI באינטרנט. פתח אותה באפליקציית UniWork Office.',
 } satisfies Record<keyof typeof zh, string>

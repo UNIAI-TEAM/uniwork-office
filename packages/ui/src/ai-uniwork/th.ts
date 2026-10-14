@@ -64,4 +64,23 @@ export const th = {
     'คำขอยาวเกินไปสำหรับ UniWork AI โปรดย่อให้ต่ำกว่า 8,000 อักขระแล้วส่งอีกครั้ง',
   aiErrQuestionRejected: 'UniWork AI รับคำขอนี้ไม่ได้ โปรดแก้ไขคำขอแล้วส่งอีกครั้ง',
   aiUniworkImagesNotSent: 'ระบบไม่ส่งรูปภาพไปยัง UniWork AI ส่งเฉพาะข้อความของคุณเท่านั้น',
+  // Cloud state, credits and account actions (shared with picker footer and composer note)
+  cloudStateReady: 'พร้อมใช้งาน',
+  cloudStateNotEntitled: 'ไม่รวมในแพ็กเกจของคุณ',
+  cloudStateExhausted: 'เครดิต AI หมดแล้ว',
+  cloudStateUnavailable: 'ใช้งานไม่ได้ในขณะนี้',
+  cloudStateSignedOut: 'ยังไม่ได้ลงชื่อเข้าใช้',
+  cloudStateInactive: 'การสมัครสมาชิกไม่ใช้งาน',
+  cloudCredits: 'เครดิต AI',
+  cloudCreditsLeft: 'เหลือ {remaining} / {limit}',
+  cloudCreditsUnlimited: 'ไม่จำกัด',
+  cloudCreditsRenews: 'รีเซ็ตวันที่ {date}',
+  cloudInactiveBody: 'การสมัครสมาชิก UniWork ขององค์กรไม่ได้ใช้งานอยู่ AI บนคลาวด์จึงหยุดชั่วคราว โปรดให้ผู้ดูแลต่ออายุ ผู้ให้บริการของคุณเองด้านล่างยังใช้งานได้ตามปกติ',
+  acctSignIn: 'เข้าสู่ระบบ',
+  acctSignInAgain: 'เข้าสู่ระบบอีกครั้ง',
+  // S8/S10 local-file conversation restart notice (G05BE-6)
+  aiUniworkLocalFileRestart: 'ไฟล์ในเครื่องจะเริ่มการสนทนาใหม่ภายใต้องค์กรของคุณ และไม่เก็บรอบการสนทนาจากไฟล์อื่น',
+  // S9 cells summary and S10 web workbook size limit
+  aiResultCellsMeta: 'เซลล์ที่เขียน: {written} ({range}) · เซลล์เดิมที่ถูกเขียนทับ: {overwritten}',
+  aiErrWorkbookTooLarge: 'เวิร์กบุ๊กนี้ใหญ่เกินไปสำหรับ AI บนเว็บ เปิดในแอป UniWork Office',
 } satisfies Record<keyof typeof zh, string>

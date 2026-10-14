@@ -79,4 +79,23 @@ export const de = {
     'UniWork AI konnte diese Anfrage nicht annehmen. Ändern Sie sie und senden Sie sie erneut.',
   aiUniworkImagesNotSent:
     'Bilder werden nicht an UniWork AI gesendet; nur Ihr Text wurde gesendet.',
+  // Cloud state, credits and account actions (shared with picker footer and composer note)
+  cloudStateReady: 'Verfügbar',
+  cloudStateNotEntitled: 'Nicht in Ihrem Tarif',
+  cloudStateExhausted: 'KI-Guthaben aufgebraucht',
+  cloudStateUnavailable: 'Nicht verfügbar',
+  cloudStateSignedOut: 'Nicht angemeldet',
+  cloudStateInactive: 'Abonnement inaktiv',
+  cloudCredits: 'KI-Guthaben',
+  cloudCreditsLeft: '{remaining} / {limit} übrig',
+  cloudCreditsUnlimited: 'Unbegrenzt',
+  cloudCreditsRenews: 'Erneuert am {date}',
+  cloudInactiveBody: 'Das UniWork-Abonnement Ihrer Organisation ist nicht aktiv, daher ist die Cloud-KI pausiert. Bitten Sie einen Administrator um die Verlängerung; Ihre eigenen Anbieter unten funktionieren weiter.',
+  acctSignIn: 'Anmelden',
+  acctSignInAgain: 'Erneut anmelden',
+  // S8/S10 local-file conversation restart notice (G05BE-6)
+  aiUniworkLocalFileRestart: 'Lokale Dateien starten eine neue Unterhaltung in Ihrer Organisation und übernehmen keine Runden aus anderen Dateien.',
+  // S9 cells summary and S10 web workbook size limit
+  aiResultCellsMeta: 'Geschriebene Zellen: {written} ({range}) · Überschriebene vorhandene Zellen: {overwritten}',
+  aiErrWorkbookTooLarge: 'Diese Arbeitsmappe ist für die KI im Web zu groß. Öffnen Sie sie in der UniWork Office-App.',
 } satisfies Record<keyof typeof zh, string>

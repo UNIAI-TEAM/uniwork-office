@@ -65,4 +65,23 @@ export const ko = {
     'UniWork AI에 보내기에는 요청이 너무 깁니다. 8,000자 미만으로 줄인 뒤 다시 보내세요.',
   aiErrQuestionRejected: 'UniWork AI가 이 요청을 받을 수 없습니다. 요청을 수정한 뒤 다시 보내세요.',
   aiUniworkImagesNotSent: '이미지는 UniWork AI로 전송되지 않으며 텍스트만 전송되었습니다.',
+  // Cloud state, credits and account actions (shared with picker footer and composer note)
+  cloudStateReady: '사용 가능',
+  cloudStateNotEntitled: '플랜에 포함되지 않음',
+  cloudStateExhausted: 'AI 크레딧 소진',
+  cloudStateUnavailable: '현재 사용할 수 없음',
+  cloudStateSignedOut: '로그인하지 않음',
+  cloudStateInactive: '구독이 활성 상태가 아님',
+  cloudCredits: 'AI 크레딧',
+  cloudCreditsLeft: '{remaining} / {limit} 남음',
+  cloudCreditsUnlimited: '무제한',
+  cloudCreditsRenews: '{date}에 갱신',
+  cloudInactiveBody: '조직의 UniWork 구독이 활성 상태가 아니어서 클라우드 AI가 일시 중지되었습니다. 관리자에게 갱신을 요청하세요. 아래의 자체 공급자는 계속 작동합니다.',
+  acctSignIn: '로그인',
+  acctSignInAgain: '다시 로그인',
+  // S8/S10 local-file conversation restart notice (G05BE-6)
+  aiUniworkLocalFileRestart: '로컬 파일은 조직에서 새 대화를 시작하며 다른 파일의 대화 기록을 유지하지 않습니다.',
+  // S9 cells summary and S10 web workbook size limit
+  aiResultCellsMeta: '기록한 셀: {written}({range}) · 덮어쓴 기존 셀: {overwritten}',
+  aiErrWorkbookTooLarge: '이 통합 문서는 너무 커서 웹에서 AI를 사용할 수 없습니다. UniWork Office 앱에서 여세요.',
 } satisfies Record<keyof typeof zh, string>

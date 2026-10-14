@@ -104,3 +104,72 @@ export function noModelMessageFor(
 export function noModelMessage(lang: string, fallback: string): string {
   return noModelMessageFor(lang, getUniworkCloudStatus().state, fallback)
 }
+
+/**
+ * Priority-ordered composer note kinds when UniWork AI is selected (EXPERIENCE › Composer note):
+ * signed-out > capability/format off > not-entitled > subscription-inactive > credits-exhausted > unavailable.
+ */
+export type ComposerNoteKind =
+  | 'signed-out'
+  | 'off'
+  | 'not-entitled'
+  | 'subscription-inactive'
+  | 'credits-exhausted'
+  | 'unavailable'
+
+export type ComposerNoteKey =
+  | 'aiUniworkSignedOut'
+  | 'aiUniworkOff'
+  | 'not_entitled'
+  | 'cloudInactiveBody'
+  | 'credits_exhausted'
+  | 'aiErrUnavailable'
+
+export type ComposerNoteAction = 'sign-in' | 'choose-provider'
+
+export interface ComposerNoteInput {
+  /** Whether UniWork AI (`uniwork`) is the currently selected provider */
+  readonly uniworkSelected?: boolean | undefined
+  /** Optional provider id; treated as selected when `'uniwork'` and `uniworkSelected` is omitted */
+  readonly provider?: string | undefined
+  /** Current UniWork cloud state */
+  readonly cloudState?: UniworkCloudState | null | undefined
+  /** Explicit signed-out override (for tie resolution tests or pre-cloud-read session state) */
+  readonly signedOut?: boolean | undefined
+  /** Organization capability `ai_uniwork` enabled (default true) */
+  readonly capabilityOn?: boolean | undefined
+  /** Open document format in `ai_uniwork_formats` (default true) */
+  readonly formatOn?: boolean | undefined
+  /** `tools.chat` flag from `GET /orgs/{orgID}/ai/cloud` (default true) */
+  readonly toolsChat?: boolean | undefined
+  /** Explicit capability/format off override */
+  readonly off?: boolean | undefined
+  /** Explicit not-entitled override (for priority tie resolution) */
+  readonly notEntitled?: boolean | undefined
+  /** Explicit subscription-inactive override (for priority tie resolution) */
+  readonly subscriptionInactive?: boolean | undefined
+  /** Explicit credits-exhausted override (for priority tie resolution) */
+  readonly creditsExhausted?: boolean | undefined
+  /** Explicit unavailable override (for priority tie resolution) */
+  readonly unavailable?: boolean | undefined
+  /** View-only document mode (renders a separate sub-line under the composer; never suppresses the note) */
+  readonly viewOnly?: boolean | undefined
+  /** UI locale (`'vi'`, `'en'`, …) */
+  readonly locale?: string | undefined
+}
+
+export interface ComposerNote {
+  readonly kind: ComposerNoteKind
+  readonly key: ComposerNoteKey
+  readonly text: string
+  readonly action: ComposerNoteAction
+}
+
+/**
+ * Resolves the single composer note shown above the composer when UniWork AI is selected.
+ * Returns `null` when UniWork AI is not selected or is ready with capability and format enabled.
+ */
+export function composerNoteFor(_input: ComposerNoteInput): ComposerNote | null {
+  return null
+}
+

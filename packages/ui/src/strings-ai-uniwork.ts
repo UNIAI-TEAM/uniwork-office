@@ -50,7 +50,7 @@ export type AiUniworkStringKey = keyof (typeof aiUniworkStrings)['zh']
 
 const translate = createI18n(aiUniworkStrings)
 
-// params fill the {org}, {remaining}, {limit}, {seconds}, {module} and {provider} slots
+// params fill the {org}, {remaining}, {limit}, {date}, {written}, {range}, {overwritten}, {seconds}, {module} and {provider} slots
 export function aiUniworkText(lang: Lang, key: AiUniworkStringKey, params?: Params): string {
   return translate(lang, key, params)
 }

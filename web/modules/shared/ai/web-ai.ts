@@ -162,6 +162,17 @@ export interface WebAiState {
   cloud: AiCloudStatus | null
 }
 
+/**
+ * Identity tuple for the web frame's UniWork AI disclosure acknowledgement store
+ * (`{ account, org, document }`) and the `{org}` display name.
+ */
+export interface WebUniworkAiIdentity {
+  account: string
+  org: string
+  orgName: string
+  document: string
+}
+
 /** one frame's AI session; null-safe: `active()` is false whenever AI is off */
 export interface WebAi {
   active(): Promise<boolean>
@@ -175,6 +186,8 @@ export interface WebAi {
   openSettings(): Promise<void>
   /** the typed failure -> its card + its text */
   fail(err: unknown, provider?: string): string
+  /** UniWork AI disclosure identity and org display name for this frame session; null before init */
+  uniworkIdentity(): WebUniworkAiIdentity | null
 }
 
 const EMPTY: WebAiState = { credentials: { items: [], providers: [] }, cloud: null }
@@ -671,6 +684,7 @@ export function createWebAi(opts: {
     streams,
     openSettings,
     fail,
+    uniworkIdentity: () => null,
   }
 }
 

@@ -68,4 +68,23 @@ export const ja = {
   aiErrQuestionRejected:
     'UniWork AI はこのリクエストを受け付けられませんでした。内容を変更してから送信してください。',
   aiUniworkImagesNotSent: '画像は UniWork AI に送信されません。テキストのみ送信しました。',
+  // Cloud state, credits and account actions (shared with picker footer and composer note)
+  cloudStateReady: '利用可能',
+  cloudStateNotEntitled: 'プランに含まれていません',
+  cloudStateExhausted: 'AI クレジットを使い切りました',
+  cloudStateUnavailable: '現在利用できません',
+  cloudStateSignedOut: 'サインインしていません',
+  cloudStateInactive: 'サブスクリプション無効',
+  cloudCredits: 'AI クレジット',
+  cloudCreditsLeft: '残り {remaining} / {limit}',
+  cloudCreditsUnlimited: '無制限',
+  cloudCreditsRenews: '{date} にリセット',
+  cloudInactiveBody: '組織の UniWork サブスクリプションが有効でないため、クラウド AI は停止中です。管理者に更新を依頼してください。下の独自プロバイダーは引き続き使えます。',
+  acctSignIn: 'サインイン',
+  acctSignInAgain: '再度サインイン',
+  // S8/S10 local-file conversation restart notice (G05BE-6)
+  aiUniworkLocalFileRestart: 'ローカルファイルは組織の下で新しい会話を開始し、他のファイルのやり取りは引き継ぎません。',
+  // S9 cells summary and S10 web workbook size limit
+  aiResultCellsMeta: '書き込んだセル: {written}（{range}）· 上書きした既存セル: {overwritten}',
+  aiErrWorkbookTooLarge: 'このブックは大きすぎるため、Web 版では AI を使えません。UniWork Office アプリで開いてください。',
 } satisfies Record<keyof typeof zh, string>

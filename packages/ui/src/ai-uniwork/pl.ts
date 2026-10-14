@@ -68,4 +68,23 @@ export const pl = {
     'Prośba jest za długa dla UniWork AI. Skróć ją do mniej niż 8000 znaków i wyślij ponownie.',
   aiErrQuestionRejected: 'UniWork AI nie może przyjąć tej prośby. Zmień ją i wyślij ponownie.',
   aiUniworkImagesNotSent: 'Obrazy nie są wysyłane do UniWork AI; wysłano tylko tekst.',
+  // Cloud state, credits and account actions (shared with picker footer and composer note)
+  cloudStateReady: 'Dostępna',
+  cloudStateNotEntitled: 'Nie ma w Twoim planie',
+  cloudStateExhausted: 'Brak kredytów AI',
+  cloudStateUnavailable: 'Niedostępna',
+  cloudStateSignedOut: 'Niezalogowano',
+  cloudStateInactive: 'Subskrypcja nieaktywna',
+  cloudCredits: 'Kredyty AI',
+  cloudCreditsLeft: 'Pozostało {remaining} / {limit}',
+  cloudCreditsUnlimited: 'Bez limitu',
+  cloudCreditsRenews: 'Odnowienie {date}',
+  cloudInactiveBody: 'Subskrypcja UniWork Twojej organizacji jest nieaktywna, więc chmurowa AI jest wstrzymana. Poproś administratora o jej odnowienie; Twoi własni dostawcy poniżej nadal działają.',
+  acctSignIn: 'Zaloguj się',
+  acctSignInAgain: 'Zaloguj się ponownie',
+  // S8/S10 local-file conversation restart notice (G05BE-6)
+  aiUniworkLocalFileRestart: 'Pliki lokalne rozpoczynają nową rozmowę w ramach Twojej organizacji i nie zachowują tur z innych plików.',
+  // S9 cells summary and S10 web workbook size limit
+  aiResultCellsMeta: 'Zapisane komórki: {written} ({range}) · Nadpisane istniejące komórki: {overwritten}',
+  aiErrWorkbookTooLarge: 'Ten skoroszyt jest za duży dla AI w przeglądarce. Otwórz go w aplikacji UniWork Office.',
 } satisfies Record<keyof typeof zh, string>

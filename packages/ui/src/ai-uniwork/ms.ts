@@ -75,4 +75,23 @@ export const ms = {
   aiErrQuestionRejected:
     'UniWork AI tidak dapat menerima permintaan ini. Ubah permintaan itu, kemudian hantar semula.',
   aiUniworkImagesNotSent: 'Imej tidak dihantar kepada UniWork AI; hanya teks anda dihantar.',
+  // Cloud state, credits and account actions (shared with picker footer and composer note)
+  cloudStateReady: 'Tersedia',
+  cloudStateNotEntitled: 'Tiada dalam pelan anda',
+  cloudStateExhausted: 'Kredit AI habis',
+  cloudStateUnavailable: 'Tidak tersedia',
+  cloudStateSignedOut: 'Belum log masuk',
+  cloudStateInactive: 'Langganan tidak aktif',
+  cloudCredits: 'Kredit AI',
+  cloudCreditsLeft: 'Baki {remaining} / {limit}',
+  cloudCreditsUnlimited: 'Tanpa had',
+  cloudCreditsRenews: 'Diperbaharui {date}',
+  cloudInactiveBody: 'Langganan UniWork organisasi anda tidak aktif, jadi AI awan dijeda. Minta pentadbir memperbaharuinya; pembekal anda sendiri di bawah terus berfungsi.',
+  acctSignIn: 'Log masuk',
+  acctSignInAgain: 'Log masuk semula',
+  // S8/S10 local-file conversation restart notice (G05BE-6)
+  aiUniworkLocalFileRestart: 'Fail setempat memulakan perbualan baharu di bawah organisasi anda dan tidak menyimpan giliran daripada fail lain.',
+  // S9 cells summary and S10 web workbook size limit
+  aiResultCellsMeta: 'Sel ditulis: {written} ({range}) · Sel sedia ada ditulis ganti: {overwritten}',
+  aiErrWorkbookTooLarge: 'Buku kerja ini terlalu besar untuk AI di web. Buka dalam apl UniWork Office.',
 } satisfies Record<keyof typeof zh, string>

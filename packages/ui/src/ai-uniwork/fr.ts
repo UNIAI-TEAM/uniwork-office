@@ -77,4 +77,23 @@ export const fr = {
     'UniWork AI n’a pas pu accepter cette demande. Modifiez-la, puis renvoyez-la.',
   aiUniworkImagesNotSent:
     'Les images ne sont pas envoyées à UniWork AI ; seul votre texte a été envoyé.',
+  // Cloud state, credits and account actions (shared with picker footer and composer note)
+  cloudStateReady: 'Disponible',
+  cloudStateNotEntitled: 'Non inclus dans votre offre',
+  cloudStateExhausted: 'Crédits IA épuisés',
+  cloudStateUnavailable: 'Indisponible',
+  cloudStateSignedOut: 'Non connecté',
+  cloudStateInactive: 'Abonnement inactif',
+  cloudCredits: 'Crédits IA',
+  cloudCreditsLeft: '{remaining} / {limit} restants',
+  cloudCreditsUnlimited: 'Illimité',
+  cloudCreditsRenews: 'Renouvellement le {date}',
+  cloudInactiveBody: 'L’abonnement UniWork de votre organisation n’est pas actif : l’IA cloud est suspendue. Demandez à un administrateur de le renouveler ; vos propres fournisseurs ci-dessous continuent de fonctionner.',
+  acctSignIn: 'Se connecter',
+  acctSignInAgain: 'Se reconnecter',
+  // S8/S10 local-file conversation restart notice (G05BE-6)
+  aiUniworkLocalFileRestart: 'Les fichiers locaux démarrent une nouvelle conversation au sein de votre organisation et ne conservent pas les échanges des autres fichiers.',
+  // S9 cells summary and S10 web workbook size limit
+  aiResultCellsMeta: 'Cellules écrites : {written} ({range}) · Cellules existantes remplacées : {overwritten}',
+  aiErrWorkbookTooLarge: 'Ce classeur est trop volumineux pour l’IA sur le web. Ouvrez-le dans l’application UniWork Office.',
 } satisfies Record<keyof typeof zh, string>

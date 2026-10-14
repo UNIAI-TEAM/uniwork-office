@@ -69,4 +69,23 @@ export const ru = {
     'Запрос слишком длинный для UniWork AI. Сократите его до 8 000 символов и отправьте снова.',
   aiErrQuestionRejected: 'UniWork AI не может принять этот запрос. Измените его и отправьте снова.',
   aiUniworkImagesNotSent: 'Изображения не отправляются в UniWork AI; отправлен только ваш текст.',
+  // Cloud state, credits and account actions (shared with picker footer and composer note)
+  cloudStateReady: 'Доступен',
+  cloudStateNotEntitled: 'Не входит в ваш тариф',
+  cloudStateExhausted: 'Кредиты ИИ закончились',
+  cloudStateUnavailable: 'Недоступен',
+  cloudStateSignedOut: 'Вход не выполнен',
+  cloudStateInactive: 'Подписка неактивна',
+  cloudCredits: 'Кредиты ИИ',
+  cloudCreditsLeft: 'Осталось {remaining} / {limit}',
+  cloudCreditsUnlimited: 'Без ограничений',
+  cloudCreditsRenews: 'Обновится {date}',
+  cloudInactiveBody: 'Подписка UniWork вашей организации неактивна, поэтому облачный ИИ приостановлен. Попросите администратора продлить её; ваши собственные провайдеры ниже продолжают работать.',
+  acctSignIn: 'Войти',
+  acctSignInAgain: 'Войти снова',
+  // S8/S10 local-file conversation restart notice (G05BE-6)
+  aiUniworkLocalFileRestart: 'Локальные файлы начинают новый диалог в вашей организации и не сохраняют реплики из других файлов.',
+  // S9 cells summary and S10 web workbook size limit
+  aiResultCellsMeta: 'Записано ячеек: {written} ({range}) · Перезаписано существующих ячеек: {overwritten}',
+  aiErrWorkbookTooLarge: 'Эта книга слишком велика для ИИ в веб-версии. Откройте её в приложении UniWork Office.',
 } satisfies Record<keyof typeof zh, string>

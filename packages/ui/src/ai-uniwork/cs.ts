@@ -68,4 +68,23 @@ export const cs = {
     'Požadavek je pro UniWork AI příliš dlouhý. Zkraťte ho pod 8 000 znaků a odešlete znovu.',
   aiErrQuestionRejected: 'UniWork AI tento požadavek nemůže přijmout. Upravte ho a odešlete znovu.',
   aiUniworkImagesNotSent: 'Obrázky se do UniWork AI neodesílají; odeslal se jen text.',
+  // Cloud state, credits and account actions (shared with picker footer and composer note)
+  cloudStateReady: 'K dispozici',
+  cloudStateNotEntitled: 'Není ve vašem tarifu',
+  cloudStateExhausted: 'Kredity AI vyčerpány',
+  cloudStateUnavailable: 'Nedostupné',
+  cloudStateSignedOut: 'Nepřihlášeno',
+  cloudStateInactive: 'Předplatné není aktivní',
+  cloudCredits: 'Kredity AI',
+  cloudCreditsLeft: 'Zbývá {remaining} / {limit}',
+  cloudCreditsUnlimited: 'Neomezeně',
+  cloudCreditsRenews: 'Obnoví se {date}',
+  cloudInactiveBody: 'Předplatné UniWork vaší organizace není aktivní, proto je cloudová AI pozastavena. Požádejte správce o obnovení; vaši vlastní poskytovatelé níže fungují dál.',
+  acctSignIn: 'Přihlásit se',
+  acctSignInAgain: 'Přihlásit se znovu',
+  // S8/S10 local-file conversation restart notice (G05BE-6)
+  aiUniworkLocalFileRestart: 'Místní soubory zahajují novou konverzaci v rámci vaší organizace a neuchovávají kola z jiných souborů.',
+  // S9 cells summary and S10 web workbook size limit
+  aiResultCellsMeta: 'Zapsané buňky: {written} ({range}) · Přepsané existující buňky: {overwritten}',
+  aiErrWorkbookTooLarge: 'Tento sešit je pro AI na webu příliš velký. Otevřete ho v aplikaci UniWork Office.',
 } satisfies Record<keyof typeof zh, string>

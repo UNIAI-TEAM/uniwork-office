@@ -64,4 +64,23 @@ export const en = {
     'Your request is too long for UniWork AI. Shorten it to under 8,000 characters and send again.',
   aiErrQuestionRejected: 'UniWork AI couldn’t accept this request. Change it, then send it again.',
   aiUniworkImagesNotSent: 'Images aren’t sent to UniWork AI; only your text was sent.',
+  // Cloud state, credits and account actions (shared with picker footer and composer note)
+  cloudStateReady: 'Available',
+  cloudStateNotEntitled: 'Not in your plan',
+  cloudStateExhausted: 'Out of AI credits',
+  cloudStateUnavailable: 'Unavailable',
+  cloudStateSignedOut: 'Not signed in',
+  cloudStateInactive: 'Subscription inactive',
+  cloudCredits: 'AI credits',
+  cloudCreditsLeft: '{remaining} / {limit} left',
+  cloudCreditsUnlimited: 'Unlimited',
+  cloudCreditsRenews: 'Renews {date}',
+  cloudInactiveBody: 'Your organization’s UniWork subscription is not active, so cloud AI is paused. Ask an admin to renew it; your own providers below keep working.',
+  acctSignIn: 'Sign in',
+  acctSignInAgain: 'Sign in again',
+  // S8/S10 local-file conversation restart notice (G05BE-6)
+  aiUniworkLocalFileRestart: 'Local files start a new conversation under your organization and don’t keep turns from other files.',
+  // S9 cells summary and S10 web workbook size limit
+  aiResultCellsMeta: 'Cells written: {written} ({range}) · Existing cells overwritten: {overwritten}',
+  aiErrWorkbookTooLarge: 'This workbook is too large for AI on the web. Open it in the UniWork Office app.',
 } satisfies Record<keyof typeof zh, string>

@@ -75,4 +75,23 @@ export const nl = {
     'UniWork AI kon dit verzoek niet accepteren. Pas het aan en verstuur het opnieuw.',
   aiUniworkImagesNotSent:
     'Afbeeldingen worden niet naar UniWork AI gestuurd; alleen je tekst is verstuurd.',
+  // Cloud state, credits and account actions (shared with picker footer and composer note)
+  cloudStateReady: 'Beschikbaar',
+  cloudStateNotEntitled: 'Niet in je abonnement',
+  cloudStateExhausted: 'AI-tegoed op',
+  cloudStateUnavailable: 'Niet beschikbaar',
+  cloudStateSignedOut: 'Niet aangemeld',
+  cloudStateInactive: 'Abonnement inactief',
+  cloudCredits: 'AI-tegoed',
+  cloudCreditsLeft: '{remaining} / {limit} over',
+  cloudCreditsUnlimited: 'Onbeperkt',
+  cloudCreditsRenews: 'Vernieuwt op {date}',
+  cloudInactiveBody: 'Het UniWork-abonnement van je organisatie is niet actief, dus cloud-AI is gepauzeerd. Vraag een beheerder het te verlengen; je eigen providers hieronder blijven werken.',
+  acctSignIn: 'Inloggen',
+  acctSignInAgain: 'Opnieuw inloggen',
+  // S8/S10 local-file conversation restart notice (G05BE-6)
+  aiUniworkLocalFileRestart: 'Lokale bestanden starten een nieuw gesprek binnen je organisatie en bewaren geen beurten uit andere bestanden.',
+  // S9 cells summary and S10 web workbook size limit
+  aiResultCellsMeta: 'Geschreven cellen: {written} ({range}) · Overschreven bestaande cellen: {overwritten}',
+  aiErrWorkbookTooLarge: 'Deze werkmap is te groot voor AI op het web. Open hem in de UniWork Office-app.',
 } satisfies Record<keyof typeof zh, string>

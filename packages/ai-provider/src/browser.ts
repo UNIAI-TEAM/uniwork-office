@@ -73,8 +73,22 @@ export { uniworkConversations } from './uniwork/conversation'
 export { setUniworkAiAvailable, uniworkAiAvailable } from './providers'
 export { mirrorUniworkAiFlag } from './uniwork/flag-mirror'
 export type { UniworkAiFlagBridge } from './uniwork/flag-mirror'
-export { aiNoticeBody, aiNoticeKind, aiNoticeKindForCloud, aiNoticeText } from './ai-notice'
-export type { AiNoticeKind } from './ai-notice'
+export {
+  aiNoticeBody,
+  aiNoticeKind,
+  aiNoticeKindForCloud,
+  aiNoticeText,
+  composerNoteFor,
+} from './ai-notice'
+export type {
+  AiNoticeKind,
+  AiNoticeLang,
+  ComposerNote,
+  ComposerNoteAction,
+  ComposerNoteInput,
+  ComposerNoteKey,
+  ComposerNoteKind,
+} from './ai-notice'
 export { normalizeAiTestFailureKind } from './ai-test-failure'
 export type { AiTestFailureKind } from './ai-test-failure'
 export { AI_SEARCH_PROVIDERS } from './search-settings'

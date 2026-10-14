@@ -1,40 +1,14 @@
 import React, { useEffect, useRef } from 'react'
+import type { Lang } from '@genoffice/i18n'
 import { IconEnter, IconSend, IconStop } from './icons'
 import { useAiPanelPrefs } from './ai-panel-prefs-store'
 import { useAiModelNeedAction, useAiModelNeedHint } from './ai-model-need'
+import type { AiComposerUniworkProps } from './ai-uniwork-composer'
 
 // Keep in sync with the CSS `max-height` on `.ai-input-box textarea` (7 lines à 24px)
 const MAX_TEXTAREA_HEIGHT = 168
 
-/**
- * The AI panel input box shared by docs and sheets: auto-growing textarea
- * (Enter sends, Shift+Enter newline, Esc stops) plus a footer with optional
- * app-specific controls, a shortcut hint, and the send/stop button.
- * Renders the `.ai-input-box` class family; each app themes it in its own CSS.
- */
-export function AiComposer({
-  value,
-  busy,
-  placeholder,
-  hintIdle,
-  hintBusy,
-  hintIdleTitle,
-  sendLabel,
-  stopLabel,
-  ariaLabel,
-  header,
-  footerStart,
-  iconOnly = false,
-  sendIconEnabled,
-  sendIconDisabled,
-  stopIcon,
-  textareaRef,
-  onChange,
-  onSend,
-  onStop,
-  onPasteFiles,
-  onPasteText,
-}: {
+export interface AiComposerProps {
   readonly value: string
   readonly busy: boolean
   readonly placeholder: string
@@ -64,7 +38,45 @@ export function AiComposer({
   readonly onPasteFiles?: ((files: File[]) => void) | undefined
   /** first look at pasted text; return true to consume it (e.g. a base64 image turned into an attachment) */
   readonly onPasteText?: ((text: string) => boolean) | undefined
-}): React.JSX.Element {
+  /** S7–S10 UniWork AI composer configuration (note, disclosure, view-only, Send/Stop labels) */
+  readonly uniwork?: AiComposerUniworkProps | undefined
+  /** Top-level shorthand for `uniwork.viewOnly`: renders `aiUniworkViewOnly` sub-line under the composer */
+  readonly viewOnly?: boolean | undefined
+  /** Top-level shorthand for `uniwork.popupOpen`: guards `Escape` from stopping while a popup is open */
+  readonly popupOpen?: boolean | undefined
+  /** UI language for `ai-uniwork` copy (default `'vi'`) */
+  readonly lang?: Lang | undefined
+}
+
+/**
+ * The AI panel input box shared by docs and sheets: auto-growing textarea
+ * (Enter sends, Shift+Enter newline, Esc stops) plus a footer with optional
+ * app-specific controls, a shortcut hint, and the send/stop button.
+ * Renders the `.ai-input-box` class family; each app themes it in its own CSS.
+ */
+export function AiComposer({
+  value,
+  busy,
+  placeholder,
+  hintIdle,
+  hintBusy,
+  hintIdleTitle,
+  sendLabel,
+  stopLabel,
+  ariaLabel,
+  header,
+  footerStart,
+  iconOnly = false,
+  sendIconEnabled,
+  sendIconDisabled,
+  stopIcon,
+  textareaRef,
+  onChange,
+  onSend,
+  onStop,
+  onPasteFiles,
+  onPasteText,
+}: AiComposerProps): React.JSX.Element {
   const innerRef = useRef<HTMLTextAreaElement | null>(null)
   const ref = textareaRef ?? innerRef
   // no key or no known model (web): send stays off and the hint says why

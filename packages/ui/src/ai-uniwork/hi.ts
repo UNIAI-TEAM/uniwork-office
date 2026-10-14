@@ -66,4 +66,23 @@ export const hi = {
     'आपका अनुरोध UniWork AI के लिए बहुत लंबा है। इसे 8,000 वर्णों से कम करके फिर भेजें।',
   aiErrQuestionRejected: 'UniWork AI यह अनुरोध स्वीकार नहीं कर सका। इसे बदलकर फिर भेजें।',
   aiUniworkImagesNotSent: 'छवियाँ UniWork AI को नहीं भेजी जातीं; केवल आपका टेक्स्ट भेजा गया।',
+  // Cloud state, credits and account actions (shared with picker footer and composer note)
+  cloudStateReady: 'उपलब्ध',
+  cloudStateNotEntitled: 'आपके प्लान में शामिल नहीं',
+  cloudStateExhausted: 'AI क्रेडिट खत्म',
+  cloudStateUnavailable: 'अभी उपलब्ध नहीं',
+  cloudStateSignedOut: 'साइन इन नहीं है',
+  cloudStateInactive: 'सदस्यता सक्रिय नहीं है',
+  cloudCredits: 'AI क्रेडिट',
+  cloudCreditsLeft: '{remaining} / {limit} शेष',
+  cloudCreditsUnlimited: 'असीमित',
+  cloudCreditsRenews: '{date} को रीन्यू',
+  cloudInactiveBody: 'आपके संगठन की UniWork सदस्यता सक्रिय नहीं है, इसलिए क्लाउड AI रुका हुआ है। किसी एडमिन से इसे नवीनीकृत करवाएँ; नीचे आपके अपने प्रदाता काम करते रहेंगे।',
+  acctSignIn: 'साइन इन करें',
+  acctSignInAgain: 'फिर से साइन इन करें',
+  // S8/S10 local-file conversation restart notice (G05BE-6)
+  aiUniworkLocalFileRestart: 'स्थानीय फ़ाइलें आपके संगठन के अंतर्गत एक नई बातचीत शुरू करती हैं और अन्य फ़ाइलों के संवाद नहीं रखतीं।',
+  // S9 cells summary and S10 web workbook size limit
+  aiResultCellsMeta: 'लिखी गई सेल: {written} ({range}) · ओवरराइट हुई मौजूदा सेल: {overwritten}',
+  aiErrWorkbookTooLarge: 'यह वर्कबुक वेब पर AI के लिए बहुत बड़ी है। इसे UniWork Office ऐप में खोलें।',
 } satisfies Record<keyof typeof zh, string>

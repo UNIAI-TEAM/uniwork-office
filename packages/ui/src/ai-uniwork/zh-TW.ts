@@ -59,4 +59,23 @@ export const zhTW = {
   aiErrQuestionTooLong: '你的要求對 UniWork AI 來說太長了。請縮短到 8,000 個字元以內再傳送。',
   aiErrQuestionRejected: 'UniWork AI 無法接受此要求。請修改後再傳送。',
   aiUniworkImagesNotSent: '圖片不會傳送給 UniWork AI，只傳送了你的文字。',
+  // Cloud state, credits and account actions (shared with picker footer and composer note)
+  cloudStateReady: '可用',
+  cloudStateNotEntitled: '方案未包含此功能',
+  cloudStateExhausted: 'AI 額度已用完',
+  cloudStateUnavailable: '暫時無法使用',
+  cloudStateSignedOut: '尚未登入',
+  cloudStateInactive: '訂閱未生效',
+  cloudCredits: 'AI 額度',
+  cloudCreditsLeft: '剩餘 {remaining} / {limit}',
+  cloudCreditsUnlimited: '不限量',
+  cloudCreditsRenews: '{date} 重置',
+  cloudInactiveBody: '你所在組織的 UniWork 訂閱未生效，雲端 AI 已暫停。請聯絡管理員續訂；下方自己的服務商不受影響。',
+  acctSignIn: '登入',
+  acctSignInAgain: '重新登入',
+  // S8/S10 local-file conversation restart notice (G05BE-6)
+  aiUniworkLocalFileRestart: '本機檔案會在你的組織下開始新對話，不會保留其他檔案的對話輪次。',
+  // S9 cells summary and S10 web workbook size limit
+  aiResultCellsMeta: '已寫入 {written} 個儲存格（{range}）· 覆寫既有儲存格 {overwritten} 個',
+  aiErrWorkbookTooLarge: '此活頁簿太大，無法在網頁上使用 AI。請在 UniWork Office 應用程式中開啟。',
 } satisfies Record<keyof typeof zh, string>

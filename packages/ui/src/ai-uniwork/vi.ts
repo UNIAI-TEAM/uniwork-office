@@ -66,4 +66,23 @@ export const vi = {
   aiErrQuestionTooLong: 'Yêu cầu quá dài với UniWork AI. Hãy rút gọn dưới 8.000 ký tự rồi gửi lại.',
   aiErrQuestionRejected: 'UniWork AI không nhận được yêu cầu này. Hãy sửa lại yêu cầu rồi gửi lại.',
   aiUniworkImagesNotSent: 'UniWork AI không nhận ảnh; chỉ phần chữ đã được gửi.',
+  // Cloud state, credits and account actions (shared with picker footer and composer note)
+  cloudStateReady: 'Sẵn sàng',
+  cloudStateNotEntitled: 'Gói hiện tại chưa bao gồm',
+  cloudStateExhausted: 'Đã hết tín dụng AI',
+  cloudStateUnavailable: 'Tạm thời không dùng được',
+  cloudStateSignedOut: 'Chưa đăng nhập',
+  cloudStateInactive: 'Gói đăng ký không hoạt động',
+  cloudCredits: 'Tín dụng AI',
+  cloudCreditsLeft: 'Còn {remaining} / {limit}',
+  cloudCreditsUnlimited: 'Không giới hạn',
+  cloudCreditsRenews: 'Làm mới vào {date}',
+  cloudInactiveBody: 'Gói đăng ký UniWork của tổ chức bạn không hoạt động nên AI đám mây đang tạm dừng. Hãy nhờ quản trị viên gia hạn; nhà cung cấp riêng bên dưới vẫn hoạt động.',
+  acctSignIn: 'Đăng nhập',
+  acctSignInAgain: 'Đăng nhập lại',
+  // S8/S10 local-file conversation restart notice (G05BE-6)
+  aiUniworkLocalFileRestart: 'Tệp trên máy bắt đầu cuộc trò chuyện mới theo tổ chức của bạn và không giữ các lượt từ tệp khác.',
+  // S9 cells summary and S10 web workbook size limit
+  aiResultCellsMeta: 'Đã ghi {written} ô ({range}) · {overwritten} ô có sẵn bị ghi đè',
+  aiErrWorkbookTooLarge: 'Bảng tính này quá lớn để AI xử lý trên web. Mở bằng ứng dụng UniWork Office.',
 } satisfies Record<keyof typeof zh, string>
