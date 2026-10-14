@@ -2,6 +2,7 @@
 import { act, createElement, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { CollabComposer } from '../src/collab/CollabComposer'
 import { CollabPanel, type CollabPanelProps } from '../src/collab/CollabPanel'
 import type { CollabComposerSlot } from '../src/collab/CollabThread'
 import {
@@ -11,6 +12,7 @@ import {
 } from '../src/collab/use-collab-threads'
 import type { CollabAnchorAdapter, CollabHostState, CollabSource } from '../src/collab/types'
 import { COLLAB_LIVE_REGION_ID } from '../src/collab/live-region'
+import { COMPOSER_STRINGS } from './collab-composer-fixtures'
 import {
   EN,
   UNCHANGED,
@@ -284,6 +286,59 @@ describe('states', () => {
       anchor: docx(5),
       base_version_id: 'v1',
     })
+  })
+
+  it('new root thread (real composer): empty Cancel button and first Esc close composer; second Esc falls through to host', async () => {
+    const src = fakeSource(list([cm({ id: 'a', anchor: docx(1) })]))
+    await mount(
+      src,
+      host(),
+      { adapter: ad() },
+      {
+        renderComposer: (slot) =>
+          createElement(CollabComposer, { ...slot, strings: { ...EN, ...COMPOSER_STRINGS } }),
+      },
+    )
+
+    await act(async () => ctl.startThread({ anchor: docx(5), base_version_id: 'v1' }))
+    const newCard = $('.collab-thread--new')!
+    expect(newCard).not.toBeNull()
+    const cancelBtn = [...newCard.querySelectorAll<HTMLButtonElement>('button')].find(
+      (b) => b.textContent === EN.collabCancel,
+    )!
+    expect(cancelBtn).toBeTruthy()
+    await act(async () => cancelBtn.click())
+    expect($('.collab-thread--new')).toBeNull()
+
+    await act(async () => ctl.startThread({ anchor: docx(5), base_version_id: 'v1' }))
+    const ta = $<HTMLTextAreaElement>('.collab-thread--new textarea')!
+    expect(ta).not.toBeNull()
+    const hostEsc = vi.fn()
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !e.defaultPrevented) hostEsc()
+    })
+    const firstEsc = new KeyboardEvent('keydown', {
+      key: 'Escape',
+      bubbles: true,
+      cancelable: true,
+    })
+    act(() => {
+      ta.dispatchEvent(firstEsc)
+    })
+    expect(firstEsc.defaultPrevented).toBe(true)
+    expect(hostEsc).not.toHaveBeenCalled()
+    expect($('.collab-thread--new')).toBeNull()
+
+    const secondEsc = new KeyboardEvent('keydown', {
+      key: 'Escape',
+      bubbles: true,
+      cancelable: true,
+    })
+    act(() => {
+      $('aside')!.dispatchEvent(secondEsc)
+    })
+    expect(secondEsc.defaultPrevented).toBe(false)
+    expect(hostEsc).toHaveBeenCalledTimes(1)
   })
 })
 
