@@ -196,6 +196,14 @@ describe('DeskInTray', () => {
     expect(host.textContent).toContain('Version conflict')
   })
 
+  it('reloads "Shared with you" on the top bar Refresh', async () => {
+    const props = { home: home([]), signedIn: true, view: 'ready' as const, local: [] }
+    await render(createElement(DeskInTray, { ...props, refreshTick: 0 }))
+    expect(api.uniworkListSharedWithMe).toHaveBeenCalledTimes(1)
+    await render(createElement(DeskInTray, { ...props, refreshTick: 1 }))
+    expect(api.uniworkListSharedWithMe).toHaveBeenCalledTimes(2)
+  })
+
   it('invites sign-in when signed out and the tray is empty', async () => {
     await render(
       createElement(DeskInTray, {

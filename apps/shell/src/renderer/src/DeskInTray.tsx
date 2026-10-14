@@ -32,10 +32,19 @@ interface Props {
   local: readonly RecentEntry[]
   /** reload the workspace list and every server section (the top bar's Refresh) */
   onReload?: () => void
+  /** bumped by the top bar's Refresh: "Shared with you" reloads too */
+  refreshTick?: number
 }
 
 /** "Cần bạn xử lý" (office desk spec §3.1): sync problems, comments and mentions, new shares. */
-export function DeskInTray({ home, signedIn, view, local, onReload }: Props): ReactElement {
+export function DeskInTray({
+  home,
+  signedIn,
+  view,
+  local,
+  onReload,
+  refreshTick,
+}: Props): ReactElement {
   const { t, dateLocale } = useI18n()
   const titleId = useId()
   const [shared, setShared] = useState<UniworkDocSummary[]>([])
@@ -58,7 +67,7 @@ export function DeskInTray({ home, signedIn, view, local, onReload }: Props): Re
     return () => {
       live = false
     }
-  }, [signedIn])
+  }, [signedIn, refreshTick])
 
   const bound = useMemo(
     () =>

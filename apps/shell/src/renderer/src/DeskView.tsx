@@ -159,6 +159,7 @@ export function DeskView({
           view={view}
           local={recents.local}
           onReload={onReload}
+          refreshTick={refreshTick}
         />
         <DeskInProgress drafts={drafts} recent={recents.docs} local={recents.local} />
         <DeskDrawer
