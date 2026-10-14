@@ -211,6 +211,29 @@ describe('edit', () => {
     expect(src.update).toHaveBeenCalledWith({ comment_id: 'a', body: 'new' })
     expect($('.collab-edit')).toBeNull()
   })
+
+  it('auto-grows the edit textarea to fit multi-line content up to max-height with scroll (V14-11)', async () => {
+    Object.defineProperty(HTMLTextAreaElement.prototype, 'scrollHeight', {
+      configurable: true,
+      get(this: HTMLTextAreaElement) {
+        return Math.max(56, this.value.split('\n').length * 22 + 12)
+      },
+    })
+    const src = fakeSource(
+      list([cm({ id: 'a', author_id: 'me', body: 'line 1\nline 2\nline 3\nline 4\nline 5' })]),
+    )
+    await mount(src)
+    await click(btn(EN.collabEdit, await openMenu('a')))
+    const area = $<HTMLTextAreaElement>('.collab-edit textarea')!
+    expect(Number.parseInt(area.style.height, 10)).toBeGreaterThanOrEqual(120)
+    await type(area, Array.from({ length: 15 }, (_, i) => `line ${i + 1}`).join('\n'))
+    expect(area.style.height).toBe('200px')
+    const css = readFileSync(`${__dirname}/../src/collab/collab.css`, 'utf8')
+    const taAt = css.indexOf('.collab-textarea {')
+    const ta = css.slice(taAt, css.indexOf('}', taAt))
+    expect(ta).toMatch(/max-height:\s*200px/)
+    expect(ta).toMatch(/overflow-y:\s*auto/)
+  })
 })
 
 describe('history', () => {
