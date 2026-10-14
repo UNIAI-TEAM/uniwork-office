@@ -183,6 +183,7 @@ export const UNIWORK_WORK_CHANNELS = {
   createTask: 'uniwork-work:create-task',
   calendarEvents: 'uniwork-work:calendar-events',
   myProfile: 'uniwork-work:my-profile',
+  markNotificationsRead: 'uniwork-work:mark-notifications-read',
   openWeb: 'uniwork-work:open-web',
 } as const
 
@@ -205,6 +206,8 @@ export interface UniworkWorkApi {
   }): Promise<UniworkWorkResult<WorkCalendarEvent[]>>
   /** the signed-in user in the selected org (main resolves the org slug and account id) */
   myProfile(): Promise<UniworkWorkResult<WorkPerson>>
+  /** POST /me/notifications/read: the caller's own ids (1-100); someone else's id is a 404 */
+  markNotificationsRead(ids: string[]): Promise<UniworkWorkResult<null>>
   /** false when the target fails validation or no deployment profile is set */
   openWeb(target: WorkWebTarget): Promise<boolean>
 }

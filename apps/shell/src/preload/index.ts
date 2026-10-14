@@ -1229,6 +1229,11 @@ const workApi: UniworkWorkApi = {
   async myProfile() {
     return asWorkResult<WorkPerson>(await ipcRenderer.invoke(UNIWORK_WORK_CHANNELS.myProfile))
   },
+  async markNotificationsRead(ids) {
+    return asWorkResult<null>(
+      await ipcRenderer.invoke(UNIWORK_WORK_CHANNELS.markNotificationsRead, ids),
+    )
+  },
   async openWeb(target) {
     return (await ipcRenderer.invoke(UNIWORK_WORK_CHANNELS.openWeb, target)) === true
   },

@@ -44,6 +44,8 @@ export interface UniworkWorkClient {
     to: string
   }): Promise<WorkCalendarEvent[]>
   person(orgSlug: string, userId: string): Promise<WorkPerson>
+  /** POST /me/notifications/read: the caller's own ids (1-100); someone else's id is a 404 */
+  markNotificationsRead(ids: string[]): Promise<null>
 }
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/
@@ -116,6 +118,20 @@ export function createUniworkWorkClient(options: UniworkDocsClientOptions): Uniw
 
     async person(orgSlug, userId) {
       return parsePerson(await get(`/orgs/${uniworkId(orgSlug)}/people/${uniworkId(userId)}`))
+    },
+
+    async markNotificationsRead(ids) {
+      if (!Array.isArray(ids) || ids.length === 0 || ids.length > 100) refuse()
+      // uniworkId checks each id; the JSON body carries them as they are
+      for (const id of ids) uniworkId(id)
+      await send({
+        method: 'POST',
+        route: '/me/notifications/read',
+        json: { ids },
+        timeoutMs,
+        read,
+      })
+      return null
     },
   }
 }

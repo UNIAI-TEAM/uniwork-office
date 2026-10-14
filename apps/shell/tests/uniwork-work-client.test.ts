@@ -436,3 +436,21 @@ describe('workErrorOfDocCode', () => {
     }
   })
 })
+
+describe('uniwork work client: notifications', () => {
+  it('POST /me/notifications/read sends only the ids', async () => {
+    const fetch = server({ '/me/notifications/read': () => json(200, { status: 'ok', ids: [] }) })
+    expect(await client(fetch).markNotificationsRead(['n_1', 'n_2'])).toBeNull()
+    const [url, init] = fetch.mock.calls[0]!
+    expect(`${init.method} ${url}`).toBe(`POST ${ORIGIN}/api/v1/me/notifications/read`)
+    expect(JSON.parse(init.body as string)).toEqual({ ids: ['n_1', 'n_2'] })
+  })
+
+  it('refuses an empty or oversized id list without calling the server', async () => {
+    const fetch = server()
+    expect(await codeOf(client(fetch).markNotificationsRead([]))).toBe('server_error')
+    const many = Array.from({ length: 101 }, (_, i) => `n_${i}`)
+    expect(await codeOf(client(fetch).markNotificationsRead(many))).toBe('server_error')
+    expect(fetch).not.toHaveBeenCalled()
+  })
+})
