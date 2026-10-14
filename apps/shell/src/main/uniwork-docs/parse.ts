@@ -261,6 +261,45 @@ export function parseCommit(raw: unknown): CommitReceipt {
   }
 }
 
+/** the receipt of a looked-up commit that already committed (G5-07) */
+export interface CommitLookupReceipt {
+  versionId: string
+  version: number
+  /** decimal string, never a JS number */
+  revision: string
+}
+
+/** what became of a commit intent (G5-07); `unknown` never carries a receipt */
+export type CommitLookup =
+  | { outcome: 'committed'; receipt: CommitLookupReceipt }
+  | { outcome: 'in_flight' }
+  | { outcome: 'not_committed' }
+  | { outcome: 'unknown' }
+
+/**
+ * The commit-intent lookup body (GET .../versions/commit). `committed` needs
+ * the produced version id, version number and the document revision as a
+ * decimal string (bigint-safe); `unknown` is only ever carried by the 410
+ * envelope, never a 200 body, so on a 200 it is malformed. Anything else is
+ * `malformed_response`.
+ */
+export function parseCommitLookup(raw: unknown): CommitLookup {
+  const body = record(raw)
+  const outcome = body.outcome
+  if (outcome === 'committed') {
+    return {
+      outcome,
+      receipt: {
+        versionId: str(body.version_id, 128),
+        version: nonNegInt(body.version),
+        revision: revision(body.revision),
+      },
+    }
+  }
+  if (outcome === 'in_flight' || outcome === 'not_committed') return { outcome }
+  bad()
+}
+
 function isTimestamp(value: unknown): value is string {
   return (
     typeof value === 'string' &&

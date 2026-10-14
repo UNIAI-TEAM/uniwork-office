@@ -3,7 +3,7 @@ import type { DeploymentProfile } from '../src/main/uniwork-auth/deployment'
 import { AccountManager } from '../src/main/uniwork-auth/manager'
 import type { DesktopSession, UniworkTransport } from '../src/main/uniwork-auth/transport'
 import { createUniworkDocsClient, type FetchLike } from '../src/main/uniwork-docs/client'
-import { UniworkDocError } from '../src/main/uniwork-docs/errors'
+import { UniworkDocError, isTerminalRefusal } from '../src/main/uniwork-docs/errors'
 import { createMemoryCredentialStore } from './uniwork-auth-fakes'
 
 const ORIGIN = 'https://uniwork.example'
@@ -114,12 +114,12 @@ describe('egress', () => {
 
 describe('error envelope mapping', () => {
   const cases: Array<[Response, string]> = [
-    [envelope(403, 'forbidden'), 'forbidden'],
+    [envelope(403, 'forbidden'), 'permission_revoked'],
     [envelope(403, 'quota_exceeded'), 'quota_exceeded'],
     [new Response('denied', { status: 403 }), 'server_error'],
     [envelope(404, 'not_found'), 'not_found'],
     [new Response('', { status: 404 }), 'server_error'],
-    [envelope(410, 'document_deleted'), 'deleted'],
+    [envelope(410, 'document_deleted'), 'document_deleted'],
     // the change feed's cursor verdicts are about the cursor, never a document
     [envelope(410, 'change_cursor_expired'), 'server_error'],
     [envelope(400, 'change_cursor_invalid'), 'server_error'],
@@ -193,6 +193,55 @@ describe('error envelope mapping', () => {
     const [, init] = fetch.mock.calls[0]!
     expect(JSON.parse(String(init.body))).toEqual({ upload_id: 'up_1', base_revision: '41' })
     expect((init.headers as Record<string, string>)['Idempotency-Key']).toBe('office-key-1')
+  })
+})
+
+describe('Retry-After (G5-06 be-9)', () => {
+  beforeEach(() => vi.useFakeTimers({ now: new Date('2026-10-13T12:00:00Z'), toFake: ['Date'] }))
+  afterEach(() => vi.useRealTimers())
+
+  const dated = (status: number, body: unknown, retryAfter: string) =>
+    new Response(typeof body === 'string' ? body : JSON.stringify(body), {
+      status,
+      headers: { 'Content-Type': 'application/json', 'Retry-After': retryAfter },
+    })
+  const failureOf = async (response: () => Promise<Response>): Promise<UniworkDocError> => {
+    try {
+      await client(response).commit({
+        documentId: DOC,
+        uploadId: 'up_1',
+        baseRevision: '41',
+        idempotencyKey: 'office-key-1',
+      })
+    } catch (error) {
+      if (error instanceof UniworkDocError) return error
+      throw error
+    }
+    throw new Error('expected a failure')
+  }
+
+  it('429 / 503 / 409 idempotency_in_flight carry it, delta-seconds or an HTTP date', async () => {
+    // a throttle is retryable, never a terminal refusal, and keeps the delay
+    const throttled = await failureOf(async () => dated(429, 'busy', '900'))
+    expect(throttled.code).toBe('server_error')
+    expect(isTerminalRefusal(throttled)).toBe(false)
+    expect(throttled.retryAfterMs).toBe(900_000)
+    // an HTTP date is the delay from now
+    const date = new Date(Date.now() + 42_000).toUTCString()
+    const unavailable = await failureOf(async () => dated(503, '', date))
+    expect(unavailable.code).toBe('server_error')
+    expect(unavailable.retryAfterMs).toBe(42_000)
+    // the in-flight idempotency answer is retried with a bounded backoff
+    const inFlight = await failureOf(async () =>
+      dated(409, { error: { code: 'idempotency_in_flight' } }, '120'),
+    )
+    expect(inFlight.code).toBe('network')
+    expect(inFlight.retryAfterMs).toBe(120_000)
+    // a malformed header, or one on a status that does not carry it, is ignored
+    expect((await failureOf(async () => dated(429, 'busy', 'later'))).retryAfterMs).toBeUndefined()
+    const denied = await failureOf(async () => dated(403, { error: { code: 'forbidden' } }, '900'))
+    expect(denied.code).toBe('permission_revoked')
+    expect(denied.retryAfterMs).toBeUndefined()
   })
 })
 

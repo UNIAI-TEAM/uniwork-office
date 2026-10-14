@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -64,7 +65,16 @@ beforeEach(() => {
   accountState = 'signed-out'
   safe.locked = false
 })
-afterEach(() => rmSync(dir, { recursive: true, force: true }))
+/**
+ * The store layer and the save queue may still be settling a write when a test
+ * ends (an in-flight rename, a heartbeat). Await a beat, then remove the tree
+ * with retries: a bare synchronous rmdir races a late write and flakes with
+ * ENOTEMPTY on the cloud runner.
+ */
+afterEach(async () => {
+  await new Promise((resolve) => setTimeout(resolve, 25))
+  await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })
+})
 
 const docDir = () => join(dir, 'uniwork-documents', 'default', 'acc_1', 'doc_1')
 const docPath = () => join(docDir(), 'Plan.docx')

@@ -32,6 +32,8 @@ import {
 import type { CommentsRevealPayload } from '@genoffice/electron-utils/comments-ipc'
 import { setUniworkCloseGuard } from './close-guard'
 import { INTENT_STORE_REGISTRATION } from '../uniwork-sync/intent-store'
+import { DRAFTS_STORE_REGISTRATION } from '../uniwork-sync/queue/drafts'
+import { PAUSE_STORE_REGISTRATION } from '../uniwork-sync/queue/pause'
 import { createSafeStorageKeyProvider } from '../uniwork-sync/keys'
 import {
   DOC_INDEX_REGISTRATION,
@@ -313,6 +315,8 @@ function createSyncStoreLayer(root: string): StoreLayer {
     clock: () => Date.now(),
   })
   layer.register(INTENT_STORE_REGISTRATION)
+  layer.register(DRAFTS_STORE_REGISTRATION)
+  layer.register(PAUSE_STORE_REGISTRATION)
   layer.register(FEED_CURSORS_REGISTRATION)
   layer.register(DOC_INDEX_REGISTRATION)
   return layer
@@ -454,6 +458,17 @@ export function createSyncRuntime(
     client: () => clients()?.feed ?? null,
     keepDraft: (documentId) => service.hasLocalDraft(documentId),
     clock: { now: () => Date.now() },
+    // the same poll drives the durable save queue: dispatch the pending intents
+    // and advance their reconciling clocks on every pass (sign-in + interval),
+    // and mirror the pass's connectivity onto the queue's waiting intents (a
+    // failed round trip parks them, a working one wakes them)
+    onPoll: async (online) => {
+      // `undefined` = the pass had nothing to do (no chosen org, no scope): no
+      // verdict to apply, so the queue's intents are left where they are
+      // (G506-be-3). A real failed round trip parks them, a reached one wakes them
+      if (online !== undefined) await service.setQueueOnline?.(online)
+      await service.pollSaveQueue?.()
+    },
     onSessionExpired: () => {
       // a capability or feed 401: the account re-reads the session and applies
       // its own state (keystore-locked, signed-out, restoring, ...)
@@ -472,6 +487,10 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     if (wc && !wc.isDestroyed()) wc.send(channel, payload)
   }
   const syncStore = syncStoreFor().access
+  // the service is built before the runtime, but its save queue reads the
+  // runtime's capability cache: this holder breaks the cycle (the read happens
+  // only after `createSyncRuntime` assigned it, below)
+  const seamRef: { runtime: SyncRuntime | null } = { runtime: null }
   // the comments handle is built after the service (it resolves bindings through
   // it) but the service needs it for the launch-ticket reveal: a holder breaks
   // the cycle, and the reveal only runs once both exist
@@ -510,6 +529,15 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     notifyTitleRenamed: (path, title) => wiring.notifyTitleRenamed?.(path, title),
     ui: conflictUi(wiring),
     pushStatus: (status) => push(UNIWORK_DOC_CHANNELS.docStatusEvent, status),
+    // the save queue's lane verdicts read the same per-org capability cache the
+    // feed runtime does (see the SyncRuntimeSeam note), so `sync_write` is read
+    // once per account and cleared on an account switch for both
+    capability: {
+      get: (orgId) =>
+        seamRef.runtime
+          ? seamRef.runtime.capabilityRead(orgId)
+          : Promise.resolve({ kind: 'ok', capabilities: { sync_write: true }, source: 'default' }),
+    },
     pushLaunch: createLaunchPusher(() => wiring.shellContents(), UNIWORK_DOC_CHANNELS.launchEvent),
     // A lock can be pushed before the shell page has loaded (a cold-start open):
     // main holds the latest one and sends it when the page finishes loading.
@@ -620,6 +648,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   })
   setUniworkCloseGuard(service)
   const runtime = createSyncRuntime(service)
+  seamRef.runtime = runtime
   // Sign out and a sign-in as someone else close the previous account's
   // documents and delete their AI history (see account-boundary.ts)
   const boundary = new AccountBoundary({
@@ -641,10 +670,14 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
         : null
     },
     // the outgoing account's durable store (intents, feed cursors, doc index)
-    // is locked and wiped with its documents; the feed stops first so no
-    // in-flight consumer writes into a wiped scope
+    // is locked and wiped with its documents; the feed and the save queue stop
+    // first so no in-flight consumer or dispatch writes into a wiped scope
     wipeStore: async (owner) => {
       runtime.stop()
+      // await the queue teardown BEFORE the wipe: the in-flight poll/dispatch
+      // must unwind (and release its locks) before the scope is wiped, so no
+      // lookup or record write runs into a wiped scope (G506-be-d1-1)
+      await service.teardownSaveQueue?.()
       if (!owner) return
       const store = syncStoreFor()
       store.access.forget()
