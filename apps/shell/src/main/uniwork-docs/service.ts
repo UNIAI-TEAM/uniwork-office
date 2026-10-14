@@ -83,7 +83,7 @@ import {
   PAUSE_STORE_REGISTRATION,
   type PauseStore,
 } from '../uniwork-sync/queue/pause'
-import { createParkedStore, PARKED_STORE_REGISTRATION } from '../uniwork-sync/queue/parked'
+import { createParkedStore, PARKED_STORE_REGISTRATION, type ParkedStore } from '../uniwork-sync/queue/parked'
 import { SIGN_OUT_RECEIPT_WAIT_MS } from '../uniwork-sync/queue/limits'
 import {
   QueueDispatcher,
@@ -154,6 +154,19 @@ export type UnsavedCloseKind = 'unsent' | 'conflict' | 'blocked'
 
 /** 'save' (unsent) and 'resolve' (conflict) are each kind's default button */
 export type UnsavedCloseChoice = 'save' | 'resolve' | 'close' | 'cancel'
+
+/**
+ * G5-11 be-1: what a session lock settled to. `ok` is false when a dirty working
+ * copy could not be parked (the plan promised it would be kept encrypted).
+ * `captureFailed` lists the document keys whose capture never landed on disk:
+ * their working-copy folder was NOT deleted (nothing may be deleted that was not
+ * captured), so the copy stays as the owner's own locked folder until the owner
+ * signs in again.
+ */
+export interface SignOutLockResult {
+  ok: boolean
+  captureFailed: string[]
+}
 
 export interface UniworkDocsServiceDeps {
   userDataDir: string
@@ -1560,6 +1573,12 @@ export class UniworkDocsService {
   private readonly deadQueueSessions = new Set<string>()
   /** scopes explicitly locked by sign-out / account switch until the account signs in again */
   private readonly lockedScopes = new Set<string>()
+  /**
+   * G5-11 be-7: parked records a restore refused (`scope/key`) because the
+   * binding or its folder declares a newer store. Kept so the 60 s poll does
+   * not re-read a record that cannot be restored in this build.
+   */
+  private readonly refusedParkedKeys = new Set<string>()
   /** paths armed for a one-shot capture save (G5-11 D3) */
   private readonly armedCaptures = new Map<string, () => void>()
 
@@ -1741,14 +1760,19 @@ export class UniworkDocsService {
    *    (skipped when `keystoreLocked`).
    * 3. Close every open view of `owner`'s working copies with no prompt, forget AI
    *    history and locks.
-   * 4. Delete plaintext working copies and docs/sheets recovery copies of `owner`
-   *    (only for docs where step 2 succeeded, or after keystore confirmation).
+   * 4. Delete the plaintext working copies and docs/sheets recovery copies of
+   *    `owner`, and its archived docs originals, only for docs whose step 2
+   *    capture/park succeeded (or after the keystore confirmation); a doc whose
+   *    capture never landed keeps its folder and is reported in `captureFailed`.
    * 5. Clear all in-memory caches on the service.
    * 6. Lock the encrypted store (`syncStore.lock(owner)`).
    */
-  async lockSession(owner?: LastOwner | null, onWaiting?: () => void): Promise<{ ok: boolean }> {
+  async lockSession(
+    owner?: LastOwner | null,
+    onWaiting?: () => void,
+  ): Promise<SignOutLockResult> {
     const target = owner ?? this.liveIdentity() ?? this.lastOwner
-    if (!target) return { ok: true }
+    if (!target) return { ok: true, captureFailed: [] }
     const scopeToken = `${target.deploymentId}/${target.accountId}`
     const keystoreLocked = this.storeLocked()
 
@@ -1845,8 +1869,16 @@ export class UniworkDocsService {
 
     // Step 2: capture N+1 from open editors and park dirty / queued working copies
     const parkFailedDirs = new Set<string>()
+    /**
+     * G5-11 be-1: dirs whose editor bytes never reached the disk. Nothing was
+     * captured, so nothing is parked - and step 4 must not delete a folder
+     * whose copy only lives in a closed editor's RAM: it stays as the owner's
+     * own folder (locked by the S11 signed_out reason) and reopens for them.
+     */
+    const captureFailedDirs = new Set<string>()
+    let parked: ParkedStore | null = null
     if (!keystoreLocked && open.kind === 'ok' && intents) {
-      const parked = createParkedStore(open.records(PARKED_STORE_REGISTRATION.name))
+      parked = createParkedStore(open.records(PARKED_STORE_REGISTRATION.name))
       for (const dir of dirs) {
         if (this.store.newerStoreIn(dir)) continue
         const binding = await this.store.readDir(dir)
@@ -1859,7 +1891,8 @@ export class UniworkDocsService {
           const st = await this.editorState(path)
           if (st.dirty === true) edDirty = true
         }
-        if (isOpen && edDirty) {
+        const captureNeeded = isOpen && edDirty
+        if (captureNeeded) {
           const beforeHash = this.store.exists(path)
             ? sha256Hex(new Uint8Array(readFileSync(path)))
             : null
@@ -1895,7 +1928,12 @@ export class UniworkDocsService {
             void this.sleepMs(5_000).then(finish)
           })
         }
-        if (!this.store.exists(path)) continue
+        if (!this.store.exists(path)) {
+          // the module never wrote (or the file is gone): the editor's bytes are
+          // only in its RAM, so the folder is kept rather than deleted
+          if (captureNeeded) captureFailedDirs.add(dir)
+          continue
+        }
         const bytes = new Uint8Array(readFileSync(path))
         const diskHash = sha256Hex(bytes)
         const stored = await intents.read(key, {
@@ -1924,18 +1962,17 @@ export class UniworkDocsService {
           if (parkRes !== 'ok') {
             parkFailedDirs.add(dir)
           }
+        } else if (captureNeeded) {
+          // the disk still holds the base bytes: the capture did not land, and
+          // there is nothing to park. The folder stays (be-1).
+          captureFailedDirs.add(dir)
         }
       }
     }
 
     // Step 3: close every view of the owner's copies with NO prompt, forget AI history + locks
     this.closeConflictPrompt()
-    const ownedPath = (p: string): boolean => {
-      const rel = relative(resolve(this.store.root), resolve(p))
-      if (!rel || rel.startsWith('..') || isAbsolute(rel)) return false
-      const [dep, acc] = rel.split(sep)
-      return dep === target.deploymentId && acc === target.accountId
-    }
+    const ownedPath = (p: string): boolean => this.pathBelongsTo(target, p)
     this.forgetLocksWhere(ownedPath)
     if (this.deps.closePathNow && parkFailedDirs.size === 0) {
       const openPaths = this.deps.openPaths ? this.deps.openPaths() : []
@@ -1948,28 +1985,53 @@ export class UniworkDocsService {
       if (toForget.length > 0) this.deps.forgetAiHistory(toForget)
     }
 
-    // Step 4: delete plaintext working copies and docs/sheets recovery copies
-    // (only for docs where step 2 succeeded, or after keystore confirmation)
-    let keptDir = false
+    // Step 4: delete the plaintext working copies whose bytes were captured or
+    // parked, and every docs/sheets recovery copy of the owner's paths. A doc
+    // whose capture or park failed keeps its folder (be-1): its bytes were
+    // never captured, so nothing may be deleted for it.
+    const keptDirs = new Set<string>()
+    const deletedPaths = new Set<string>()
     for (const dir of scopeWorkingCopyDirs(this.store.root, target)) {
-      if (this.store.newerStoreIn(dir) || parkFailedDirs.has(dir)) {
-        keptDir = true
+      if (
+        this.store.newerStoreIn(dir) ||
+        parkFailedDirs.has(dir) ||
+        captureFailedDirs.has(dir)
+      ) {
+        keptDirs.add(dir)
         continue
       }
       const binding = await this.store.readDir(dir)
       const filename = binding?.filename ?? documentNameIn(dir)
-      const path = join(dir, filename)
-      this.deleteRecoveryCopies(path)
+      deletedPaths.add(join(dir, filename))
+    }
+    // be-8: recovery copies of a path whose folder is already gone have no
+    // folder left to walk; the parked records and the owner's still-open paths
+    // are the only names that can still find them
+    for (const path of await this.sweepRecoveryPaths(target, parked)) deletedPaths.add(path)
+    for (const path of deletedPaths) this.deleteRecoveryCopies(path)
+    // be-2: the docs originals archive is keyed by the sha256 of the archived
+    // bytes, so it is cleared while the working copies still exist
+    try {
+      this.clearOriginalsFn?.([...deletedPaths])
+    } catch {
+      // the archive is module state; a failure never blocks the lock
+    }
+    for (const dir of scopeWorkingCopyDirs(this.store.root, target)) {
+      if (keptDirs.has(dir)) continue
       rmSync(dir, { recursive: true, force: true })
     }
-    if (!keptDir) {
+    if (keptDirs.size === 0) {
       const accountDir = join(this.store.root, target.deploymentId, target.accountId)
       rmSync(accountDir, { recursive: true, force: true })
     }
 
     // Step 5: clear all 15 in-memory caches on the service
     this.lockedScopes.add(scopeToken)
-    this.locks.clear()
+    // be-10: only the owner's own locks go (`forgetLocksWhere` already matched
+    // this account): another account's S11 panel is not this sign-out's to drop
+    for (const [key, lock] of [...this.locks]) {
+      if (ownedPath(lock.path)) this.locks.delete(key)
+    }
     this.hashMemo.clear()
     this.editorDirty.clear()
     this.lastUserSave.clear()
@@ -1998,7 +2060,10 @@ export class UniworkDocsService {
       this.deps.pushSignOutProgress?.({ phase: 'done' })
     }
 
-    return { ok: parkFailedDirs.size === 0 }
+    return {
+      ok: parkFailedDirs.size === 0,
+      captureFailed: [...captureFailedDirs].map((dir) => basename(dir)),
+    }
   }
 
   private clearRecoveryFn: ((path: string) => void) | null = null
@@ -2007,24 +2072,85 @@ export class UniworkDocsService {
     this.clearRecoveryFn = clear
   }
 
+  private clearOriginalsFn: ((paths: string[]) => void) | null = null
+
+  /**
+   * G5-11 be-2: the docs originals archive (`userData/originals/<sha256>.docx`)
+   * is kept for plain local files only; sign-out clears the copies archived for
+   * the owner's working copies, by the hash of the bytes that are about to be
+   * deleted (the module seam owns the archive).
+   */
+  setClearOriginals(clear: (paths: string[]) => void): void {
+    this.clearOriginalsFn = clear
+  }
+
+  /** true when `path` is a working copy under `owner`'s account folder */
+  private pathBelongsTo(owner: LastOwner, path: string): boolean {
+    const rel = relative(resolve(this.store.root), resolve(path))
+    if (!rel || rel.startsWith('..') || isAbsolute(rel)) return false
+    const [dep, acc] = rel.split(sep)
+    return dep === owner.deploymentId && acc === owner.accountId
+  }
+
+  /**
+   * G5-11 be-8: the working-copy paths of `owner` that a folder walk cannot
+   * reach any more - a parked record whose folder was removed at an earlier
+   * lock, and a path still open in a view whose folder was deleted or renamed
+   * underneath it. Both only exist as the path the module hashed, so these
+   * names are the only way to clear the recovery copies they left behind.
+   */
+  private async sweepRecoveryPaths(
+    owner: LastOwner,
+    parked: ParkedStore | null,
+  ): Promise<string[]> {
+    const paths: string[] = []
+    for (const path of this.deps.openPaths?.() ?? []) {
+      if (this.pathBelongsTo(owner, path)) paths.push(path)
+    }
+    if (parked) {
+      try {
+        for (const key of await parked.list()) {
+          const dir = this.store.dirFor(owner.deploymentId, owner.accountId, key)
+          // a folder still on disk is walked by step 4 itself
+          if (existsSync(dir)) continue
+          const copy = await parked.take(key)
+          if (copy) paths.push(join(dir, copy.binding.filename))
+        }
+      } catch {
+        // the parked store is module state; a failure never blocks the lock
+      }
+    }
+    return paths
+  }
+
+  /**
+   * G5-11 be-6: the crash-recovery copies of one working copy. The modules name
+   * them `sha1(<the path they were given>).slice(0, 16)` with their own
+   * extension (`docs-autosave/*.docx`, `sheets-autosave/*.xlsx`), so only those
+   * two spellings exist. The path is hashed as given, as resolved, and through
+   * the shared `pathKey` normalizer, so a separator or drive-letter spelling
+   * difference does not leave a copy behind. The registered module clearer is
+   * the load-bearing path (it also bumps the stale-recovery epoch).
+   */
   private deleteRecoveryCopies(filePath: string): void {
     try {
       this.clearRecoveryFn?.(filePath)
     } catch {
       // ignore when Electron app path is not initialized in unit tests
     }
-    for (const candidate of [filePath, resolve(filePath)]) {
-      const hash = createHash('sha1').update(candidate).digest('hex')
-      const shortHash = hash.slice(0, 16)
-      const docsDir = join(this.deps.userDataDir, 'docs-autosave')
-      const sheetsDir = join(this.deps.userDataDir, 'sheets-autosave')
+    const docsDir = join(this.deps.userDataDir, 'docs-autosave')
+    const sheetsDir = join(this.deps.userDataDir, 'sheets-autosave')
+    const spellings = new Set([
+      filePath,
+      resolve(filePath),
+      pathKey(filePath),
+      pathKey(resolve(filePath)),
+    ])
+    for (const spelling of spellings) {
+      const shortHash = createHash('sha1').update(spelling).digest('hex').slice(0, 16)
       for (const target of [
         join(docsDir, `${shortHash}.docx`),
-        join(docsDir, `${hash}.docx`),
-        join(docsDir, `${hash}.json`),
         join(sheetsDir, `${shortHash}.xlsx`),
-        join(sheetsDir, `${hash}.xlsx`),
-        join(sheetsDir, `${hash}.recovery.json`),
       ]) {
         try {
           if (existsSync(target)) unlinkSync(target)
@@ -2040,7 +2166,14 @@ export class UniworkDocsService {
    * encrypted `parked` store back to `uniwork-documents/<dep>/<acc>/<doc>/`,
    * verifies the written file's sha256 against the parked bytes, and removes
    * the parked record only after verification succeeds. Refuses to restore
-   * records whose binding declares a newer `minStoreLevel`.
+   * records whose binding declares a newer `minStoreLevel` (or whose folder
+   * declares a newer store), and remembers the refusal so a poll does not
+   * re-read them every 60 s.
+   *
+   * The binding is written BEFORE the working copy: a refused binding write (or
+   * a crash between the two writes) must never leave plaintext on disk that no
+   * binding explains, and the working copy is only written once the binding
+   * landed.
    */
   async restoreParked(owner?: LastOwner | null): Promise<void> {
     const target = owner ?? this.liveIdentity()
@@ -2060,12 +2193,19 @@ export class UniworkDocsService {
     const parked = createParkedStore(open.records(PARKED_STORE_REGISTRATION.name))
     const keys = await parked.list()
     for (const key of keys) {
+      const refusal = `${target.deploymentId}/${target.accountId}/${key}`
+      if (this.refusedParkedKeys.has(refusal)) continue
       const copy = await parked.take(key)
       if (!copy) continue
-      if ((copy.binding.minStoreLevel ?? APP_STORE_LEVEL) > APP_STORE_LEVEL) continue
+      if ((copy.binding.minStoreLevel ?? APP_STORE_LEVEL) > APP_STORE_LEVEL) {
+        this.refusedParkedKeys.add(refusal)
+        continue
+      }
       const dir = this.store.dirFor(target.deploymentId, target.accountId, copy.documentKey)
-      if (this.store.newerStoreIn(dir)) continue
-      const filePath = await this.store.writeWorkingCopy(dir, copy.binding.filename, copy.bytes)
+      if (this.store.newerStoreIn(dir)) {
+        this.refusedParkedKeys.add(refusal)
+        continue
+      }
       const written = await this.store.write(dir, {
         ...copy.binding,
         state: 'dirty',
@@ -2073,9 +2213,11 @@ export class UniworkDocsService {
         minAppVersion: this.buildVersion(),
       })
       if (!written) continue
+      const filePath = await this.store.writeWorkingCopy(dir, copy.binding.filename, copy.bytes)
       const readBack = new Uint8Array(await readFile(filePath))
       if (sha256Hex(readBack) === sha256Hex(copy.bytes)) {
         await parked.remove(key)
+        this.refusedParkedKeys.delete(refusal)
       }
     }
   }

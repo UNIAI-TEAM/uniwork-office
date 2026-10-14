@@ -107,6 +107,20 @@ function seedWorkingCopy(
   return file
 }
 
+/** every file under `root` whose bytes contain `marker`, sorted (row 8 sweep) */
+function filesContaining(root: string, marker: string): string[] {
+  const hits: string[] = []
+  const walk = (current: string): void => {
+    for (const entry of readdirSync(current, { withFileTypes: true })) {
+      const full = join(current, entry.name)
+      if (entry.isDirectory()) walk(full)
+      else if (readFileSync(full).includes(marker)) hits.push(full)
+    }
+  }
+  walk(root)
+  return hits.sort()
+}
+
 function setup(
   opts: {
     account?: string | null
@@ -213,6 +227,8 @@ function setup(
     )
   })
 
+  const fetchFn = opts.fetch ?? defaultFetch
+
   const service = new UniworkDocsService({
     userDataDir: dir,
     syncStore,
@@ -222,12 +238,13 @@ function setup(
     keystoreLocked: () => keystoreLocked,
     selectedOrg: () => ({ id: 'org_a', slug: 'acme' }),
     authorized: <T>(call: (token: string) => Promise<T>) => call(TOKEN),
-    fetch: (opts.fetch ?? defaultFetch) as never,
+    fetch: fetchFn as never,
     openPath: vi.fn((p: string) => {
       openSet.add(p)
       return true
     }),
     isPathOpen: vi.fn((p: string) => openSet.has(p)),
+    openPaths: () => [...openSet],
     requestModuleSave,
     reloadPath: vi.fn(),
     activePath: () => undefined,
@@ -254,6 +271,8 @@ function setup(
     slept,
     openSet,
     requestModuleSave,
+    ui,
+    fetch: fetchFn,
     setAccount: (next: string | null) => {
       account = next
     },
@@ -281,7 +300,7 @@ describe('G5-11 sign-out lock-and-keep, N+1 park, and restoreParked', () => {
     })
 
     const res = await ctx.service.lockSession(ownerA)
-    expect(res).toEqual({ ok: true })
+    expect(res).toEqual({ ok: true, captureFailed: [] })
     expect(existsSync(docDir())).toBe(false)
     // Open handle from before lockSession now reads 'interrupted'
     expect(await recordsBefore.read(DOC)).toEqual({ kind: 'interrupted' })
@@ -331,7 +350,7 @@ describe('G5-11 sign-out lock-and-keep, N+1 park, and restoreParked', () => {
     })
 
     const res = await ctx.service.lockSession(ownerA)
-    expect(res).toEqual({ ok: true })
+    expect(res).toEqual({ ok: true, captureFailed: [] })
     expect(existsSync(docDir())).toBe(false)
 
     // Intent .rec file stays byte-identical in intents store; N+1 bytes land in parked
@@ -354,19 +373,18 @@ describe('G5-11 sign-out lock-and-keep, N+1 park, and restoreParked', () => {
       state: 'saved',
     })
 
-    // Seed docs-autosave and sheets-autosave recovery copies for those paths
+    // Seed docs-autosave and sheets-autosave recovery copies under the module's
+    // real naming (`sha1(path).slice(0,16)` + the module's extension)
     const docsRecoveryDir = join(dir, 'docs-autosave')
     const sheetsRecoveryDir = join(dir, 'sheets-autosave')
     mkdirSync(docsRecoveryDir, { recursive: true })
     mkdirSync(sheetsRecoveryDir, { recursive: true })
-    const docHash = createHash('sha1').update(path).digest('hex')
-    const sheetHash = createHash('sha1').update(sheetPath).digest('hex')
+    const docHash = createHash('sha1').update(path).digest('hex').slice(0, 16)
+    const sheetHash = createHash('sha1').update(sheetPath).digest('hex').slice(0, 16)
     const docRecoveryFile = join(docsRecoveryDir, `${docHash}.docx`)
-    const docRecoveryMeta = join(docsRecoveryDir, `${docHash}.json`)
-    const sheetRecoveryFile = join(sheetsRecoveryDir, `${sheetHash}.recovery.json`)
+    const sheetRecoveryFile = join(sheetsRecoveryDir, `${sheetHash}.xlsx`)
     writeFileSync(docRecoveryFile, 'recovery docx')
-    writeFileSync(docRecoveryMeta, JSON.stringify({ originalFilePath: path }))
-    writeFileSync(sheetRecoveryFile, JSON.stringify({ filePath: sheetPath }))
+    writeFileSync(sheetRecoveryFile, 'recovery xlsx')
 
     let onUserSaveCount = 0
     const ctx = setup({
@@ -399,14 +417,13 @@ describe('G5-11 sign-out lock-and-keep, N+1 park, and restoreParked', () => {
     })
 
     const res = await ctx.service.lockSession(ownerA)
-    expect(res).toEqual({ ok: true })
+    expect(res).toEqual({ ok: true, captureFailed: [] })
     expect(onUserSaveCount).toBe(0)
     expect(ctx.requestModuleSave).toHaveBeenCalledWith(path, expect.any(Function), 'capture')
 
     // Plaintext working copies and recovery copies are gone
     expect(existsSync(path)).toBe(false)
     expect(existsSync(docRecoveryFile)).toBe(false)
-    expect(existsSync(docRecoveryMeta)).toBe(false)
     expect(existsSync(sheetRecoveryFile)).toBe(false)
 
     // Parked record contains the captured N+1 bytes
@@ -429,7 +446,7 @@ describe('G5-11 sign-out lock-and-keep, N+1 park, and restoreParked', () => {
     const ctx = setup({ openPaths: [path], budgetBytes: 256 })
 
     const res = await ctx.service.lockSession(ownerA)
-    expect(res).toEqual({ ok: false })
+    expect(res).toEqual({ ok: false, captureFailed: [] })
     // Step 4 did NOT run: plaintext working copy is still intact on disk
     expect(existsSync(path)).toBe(true)
     expect(readFileSync(path, 'utf8')).toBe('x'.repeat(2048))
@@ -499,7 +516,7 @@ describe('G5-11 sign-out lock-and-keep, N+1 park, and restoreParked', () => {
     const res = await ctx.service.lockSession(ownerA, () => {
       waitingCalled += 1
     })
-    expect(res).toEqual({ ok: true })
+    expect(res).toEqual({ ok: true, captureFailed: [] })
     expect(waitingCalled).toBe(1)
     expect(ctx.progress).toEqual([{ phase: 'waiting' }, { phase: 'done' }])
     expect(ctx.slept).toContain(SIGN_OUT_RECEIPT_WAIT_MS)
@@ -596,7 +613,7 @@ describe('G5-11 sign-out lock-and-keep, N+1 park, and restoreParked', () => {
 
     const res = await ctx.service.lockSession(ownerA)
     await pollPromise
-    expect(res).toEqual({ ok: true })
+    expect(res).toEqual({ ok: true, captureFailed: [] })
 
     // Because commit settled within the 30s bound, finishCleanup deleted the committed intent, status settled to 'saved', and nothing needed to be parked
     expect(ctx.statuses.some((s) => s.state === 'saved')).toBe(true)
@@ -608,9 +625,38 @@ describe('G5-11 sign-out lock-and-keep, N+1 park, and restoreParked', () => {
     expect(await parkedAfter.list()).toEqual([])
   })
 
-  it('6. keystore-locked sign-out: plan reports keystoreLocked=true and ramOnly=1, skips capture, deletes working copies', async () => {
+  it('6. keystore-locked sign-out: plan reports keystoreLocked=true and ramOnly=1, skips capture, deletes working copies, writes no parked record and keeps the ciphertext byte-identical', async () => {
     const path = seedWorkingCopy({ bytes: 'v3 base', baseBytes: 'v3 base', state: 'saved' })
     const ctx = setup({ openPaths: [path], keystoreLocked: false })
+    // a stored intent whose ciphertext must survive the locked sign-out untouched
+    const opened = await ctx.layer.open(ownerA)
+    if (opened.kind !== 'ok') throw new Error(opened.kind)
+    const payload = enc('v4 queued')
+    await createIntentStore(opened.store.records(INTENT_STORE_REGISTRATION.name)).put(
+      DOC,
+      {
+        v: 2,
+        intentId: 'int_locked',
+        idempotencyKey: 'idem_locked',
+        documentId: DOC,
+        orgId: 'org_a',
+        workspaceId: 'ws_1',
+        baseRevision: '41',
+        baseVersion: 3,
+        checksum: hex(payload),
+        length: payload.byteLength,
+        generation: 1,
+        state: 'queued',
+        attempt: 0,
+        createdAt: '2026-04-17T00:00:00.000Z',
+        updatedAt: '2026-04-17T00:00:00.000Z',
+      },
+      payload,
+    )
+    const intentDir = join(dir, 'uniwork-sync', 'store', 'default', 'acc_1', 'intents')
+    const recFile = readdirSync(intentDir).find((f) => f.endsWith('.rec'))!
+    const ciphertextBefore = readFileSync(join(intentDir, recFile))
+
     ctx.service.noteEditorDirty(path, true)
     ctx.safeStorage.lock()
     ctx.setKeystoreLocked(true)
@@ -624,9 +670,20 @@ describe('G5-11 sign-out lock-and-keep, N+1 park, and restoreParked', () => {
     })
 
     const res = await ctx.service.lockSession(ownerA)
-    expect(res).toEqual({ ok: true })
+    expect(res).toEqual({ ok: true, captureFailed: [] })
     expect(ctx.requestModuleSave).not.toHaveBeenCalled()
     expect(existsSync(docDir())).toBe(false)
+    // no record was written while the keychain was locked: the stored ciphertext
+    // of the account is unchanged byte-for-byte
+    expect(readFileSync(join(intentDir, recFile)).equals(ciphertextBefore)).toBe(true)
+
+    // the keychain comes back and the scope reopens: no parked record was left
+    ctx.safeStorage.unlock()
+    ctx.setKeystoreLocked(false)
+    const reopen = await ctx.layer.open(ownerA)
+    if (reopen.kind !== 'ok') throw new Error(reopen.kind)
+    const parked = createParkedStore(reopen.store.records(PARKED_STORE_REGISTRATION.name))
+    expect(await parked.list()).toEqual([])
   })
 
   it('7. cancel on sign-out prompt (or unconfirmed logout when count > 0): closes no tab, locks no store, deletes no working copy', async () => {
@@ -696,7 +753,7 @@ describe('G5-11 sign-out lock-and-keep, N+1 park, and restoreParked', () => {
     )
 
     // Sign out A: parks working copy and deletes plaintext folder
-    expect(await ctx.service.lockSession(ownerA)).toEqual({ ok: true })
+    expect(await ctx.service.lockSession(ownerA)).toEqual({ ok: true, captureFailed: [] })
     expect(existsSync(path)).toBe(false)
 
     // Sign in as B: restores nothing of A and A's folder stays absent
@@ -763,7 +820,9 @@ describe('G5-11 sign-out lock-and-keep, N+1 park, and restoreParked', () => {
     svc.orgMemberNamesOrg = 'org_a'
     ;(svc.migratedScopes as Set<string>).add('default/acc_1')
 
-    expect(await ctx.service.lockSession(ownerA)).toEqual({ ok: true })
+    // the editor is marked dirty (one of the 15 caches) and the harness module
+    // never writes a capture: be-1 keeps the folder and lists the doc
+    expect(await ctx.service.lockSession(ownerA)).toEqual({ ok: true, captureFailed: [DOC] })
 
     expect((svc.locks as Map<string, unknown>).size).toBe(0)
     expect((svc.hashMemo as Map<string, unknown>).size).toBe(0)
@@ -793,5 +852,203 @@ describe('G5-11 sign-out lock-and-keep, N+1 park, and restoreParked', () => {
     })
     expect(ctx.service.isReadOnly(residual)).toBe(true)
     expect(ctx.service.isLocked(residual)).toBe(true)
+  })
+
+  it('10. be-1: a capture that never writes keeps the working copy, lists the doc, and leaves no other plaintext', async () => {
+    const path = seedWorkingCopy({ bytes: 'v3 base', baseBytes: 'v3 base', state: 'saved' })
+    const ctx = setup({
+      openPaths: [path],
+      // a busy / hung renderer: the capture is accepted and never writes a byte
+      requestModuleSave: vi.fn(() => true),
+    })
+    ctx.service.noteEditorDirty(path, true)
+
+    const plan = await ctx.service.signOutPlan()
+    expect(plan.count).toBe(1)
+
+    const res = await ctx.service.lockSession(ownerA)
+    expect(res).toEqual({ ok: true, captureFailed: [DOC] })
+    // nothing may be deleted after a capture that never landed
+    expect(existsSync(path)).toBe(true)
+    expect(readFileSync(path, 'utf8')).toBe('v3 base')
+    expect(existsSync(join(docDir(), BINDING_FILE))).toBe(true)
+    // nothing was parked; the doc's bytes exist nowhere else under userData
+    const reopen = await ctx.layer.open(ownerA)
+    if (reopen.kind !== 'ok') throw new Error(reopen.kind)
+    const parked = createParkedStore(reopen.store.records(PARKED_STORE_REGISTRATION.name))
+    expect(await parked.list()).toEqual([])
+    expect(filesContaining(dir, 'v3 base')).toEqual([path])
+  })
+
+  it('11. be-6/be-8: recovery copies go under the module naming, including a path whose folder is already gone', async () => {
+    const path = seedWorkingCopy({ bytes: 'v3 base', baseBytes: 'v3 base', state: 'saved' })
+    const docsRecoveryDir = join(dir, 'docs-autosave')
+    const sheetsRecoveryDir = join(dir, 'sheets-autosave')
+    mkdirSync(docsRecoveryDir, { recursive: true })
+    mkdirSync(sheetsRecoveryDir, { recursive: true })
+    const recoveryFor = (p: string) =>
+      join(docsRecoveryDir, `${createHash('sha1').update(p).digest('hex').slice(0, 16)}.docx`)
+    const sheetRecoveryFor = (p: string) =>
+      join(sheetsRecoveryDir, `${createHash('sha1').update(p).digest('hex').slice(0, 16)}.xlsx`)
+    writeFileSync(recoveryFor(path), 'recovery docx')
+    writeFileSync(sheetRecoveryFor(path), 'recovery xlsx')
+    // a path whose folder was removed while a view still had it open
+    const gonePath = join(dir, 'uniwork-documents', 'default', 'acc_1', 'doc_gone', 'Gone.docx')
+    writeFileSync(recoveryFor(gonePath), 'recovery docx gone')
+    // naming no writer ever produced: it must not be swept (dead candidates)
+    const fullHash = createHash('sha1').update(path).digest('hex')
+    const deadDocs = join(docsRecoveryDir, `${fullHash}.docx`)
+    const deadMeta = join(docsRecoveryDir, `${fullHash}.json`)
+    const deadSheet = join(sheetsRecoveryDir, `${fullHash}.recovery.json`)
+    writeFileSync(deadDocs, 'not a module file')
+    writeFileSync(deadMeta, '{}')
+    writeFileSync(deadSheet, '{}')
+
+    const ctx = setup({ openPaths: [path, gonePath] })
+    expect(await ctx.service.lockSession(ownerA)).toEqual({ ok: true, captureFailed: [] })
+
+    expect(existsSync(recoveryFor(path))).toBe(false)
+    expect(existsSync(sheetRecoveryFor(path))).toBe(false)
+    expect(existsSync(recoveryFor(gonePath))).toBe(false)
+    expect(existsSync(deadDocs)).toBe(true)
+    expect(existsSync(deadMeta)).toBe(true)
+    expect(existsSync(deadSheet)).toBe(true)
+  })
+
+  it('12. be-7: a refused binding write leaves no orphan plaintext; the next poll restores', async () => {
+    const path = seedWorkingCopy({ bytes: 'v5 n+1', baseBytes: 'v3 base', state: 'dirty' })
+    const ctx = setup({ openPaths: [path] })
+    expect(await ctx.service.lockSession(ownerA)).toEqual({ ok: true, captureFailed: [] })
+    expect(existsSync(path)).toBe(false)
+    const parkedNow = async () => {
+      const opened = await ctx.syncStore.open()
+      if (opened.kind !== 'ok') throw new Error(opened.kind)
+      return createParkedStore(opened.records(PARKED_STORE_REGISTRATION.name))
+    }
+    expect(await (await parkedNow()).list()).toEqual([DOC])
+
+    // the restore's binding write is refused once
+    const write = vi.spyOn(ctx.service.store, 'write').mockResolvedValueOnce(false)
+    await ctx.service.restoreParked(ownerA)
+    expect(write).toHaveBeenCalledTimes(1)
+    // binding first: a refused binding write leaves no plaintext behind it
+    expect(existsSync(path)).toBe(false)
+    expect(existsSync(docDir())).toBe(false)
+    expect(await (await parkedNow()).list()).toEqual([DOC])
+    write.mockRestore()
+
+    // the next poll restores it for good
+    await ctx.service.restoreParked(ownerA)
+    expect(readFileSync(path, 'utf8')).toBe('v5 n+1')
+    expect(await (await parkedNow()).list()).toEqual([])
+  })
+
+  it("13. be-10: another account's S11 lock survives the sign-out", async () => {
+    const path = seedWorkingCopy({ bytes: 'v3 base', baseBytes: 'v3 base', state: 'saved' })
+    const ctx = setup({ openPaths: [path] })
+    const otherDir = join(dir, 'uniwork-documents', 'default', 'acc_9', 'doc_9')
+    const otherPath = join(otherDir, 'Other.docx')
+    mkdirSync(otherDir, { recursive: true })
+    writeFileSync(otherPath, 'other bytes')
+    writeFileSync(join(otherDir, BINDING_FILE), JSON.stringify({ schema: 2 }))
+    expect(ctx.service.refuseLockedPath(otherPath)).toBe(true)
+    expect(ctx.service.currentLocks()).toHaveLength(1)
+
+    expect(await ctx.service.lockSession(ownerA)).toEqual({ ok: true, captureFailed: [] })
+    expect(ctx.service.currentLocks()).toEqual([
+      { path: otherPath, reason: 'store_newer', name: 'Other.docx' },
+    ])
+  })
+
+  it('14. rows 7/9/10: the sign-out shows no prompt, sends no request and mints no intent', async () => {
+    const path = seedWorkingCopy({ bytes: 'v4 dirty', baseBytes: 'v3 base', state: 'dirty' })
+    const ctx = setup({ openPaths: [path] })
+    const opened = await ctx.layer.open(ownerA)
+    if (opened.kind !== 'ok') throw new Error(opened.kind)
+    const payload = enc('v4 dirty')
+    await createIntentStore(opened.store.records(INTENT_STORE_REGISTRATION.name)).put(
+      DOC,
+      {
+        v: 2,
+        intentId: 'int_prompt',
+        idempotencyKey: 'idem_prompt',
+        documentId: DOC,
+        orgId: 'org_a',
+        workspaceId: 'ws_1',
+        baseRevision: '41',
+        baseVersion: 3,
+        checksum: hex(payload),
+        length: payload.byteLength,
+        generation: 1,
+        state: 'queued',
+        attempt: 0,
+        createdAt: '2026-04-17T00:00:00.000Z',
+        updatedAt: '2026-04-17T00:00:00.000Z',
+      },
+      payload,
+    )
+    const intentDir = join(dir, 'uniwork-sync', 'store', 'default', 'acc_1', 'intents')
+    const recFiles = readdirSync(intentDir)
+      .filter((f) => f.endsWith('.rec'))
+      .sort()
+    expect(recFiles).toHaveLength(1)
+    const ciphertextBefore = readFileSync(join(intentDir, recFiles[0]!))
+
+    expect(await ctx.service.lockSession(ownerA)).toEqual({ ok: true, captureFailed: [] })
+
+    // row 7: neither the module's unsaved-close prompt nor the UniWork discard
+    // prompt ran for the dirty doc that had a queued intent
+    expect(ctx.ui.chooseUnsavedClose).not.toHaveBeenCalled()
+    expect(ctx.ui.confirmDiscard).not.toHaveBeenCalled()
+
+    // row 9: the dispatcher sends nothing after the boundary, even on a poll
+    const fetchMock = ctx.fetch as unknown as ReturnType<typeof vi.fn>
+    const callsAtSignOut = fetchMock.mock.calls.length
+    await ctx.service.pollSaveQueue()
+    await ctx.service.setQueueOnline(true)
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(fetchMock.mock.calls.length).toBe(callsAtSignOut)
+
+    // row 10: no intent was minted during or after the sign-out
+    expect(
+      readdirSync(intentDir)
+        .filter((f) => f.endsWith('.rec'))
+        .sort(),
+    ).toEqual(recFiles)
+    expect(readFileSync(join(intentDir, recFiles[0]!)).equals(ciphertextBefore)).toBe(true)
+  })
+
+  it('15. row 8: a marker from the N+1 bytes is found in no file under userData after sign-out', async () => {
+    const marker = 'MARKER-N1-7f31'
+    const path = seedWorkingCopy({ bytes: `v5 ${marker}`, baseBytes: 'v3 base', state: 'dirty' })
+    // the crash-recovery copy of that path holds the same bytes
+    const docsRecoveryDir = join(dir, 'docs-autosave')
+    mkdirSync(docsRecoveryDir, { recursive: true })
+    const recovery = join(
+      docsRecoveryDir,
+      `${createHash('sha1').update(path).digest('hex').slice(0, 16)}.docx`,
+    )
+    writeFileSync(recovery, `v5 ${marker}`)
+
+    const ctx = setup({ openPaths: [path] })
+    expect(await ctx.service.lockSession(ownerA)).toEqual({ ok: true, captureFailed: [] })
+
+    // the N+1 bytes live only inside the encrypted parked record now
+    expect(existsSync(path)).toBe(false)
+    expect(existsSync(recovery)).toBe(false)
+    expect(filesContaining(dir, marker)).toEqual([])
+  })
+
+  it('16. be-2: sign-out hands the deleted working copies to the module originals clearer', async () => {
+    const path = seedWorkingCopy({ bytes: 'v3 base', baseBytes: 'v3 base', state: 'saved' })
+    const ctx = setup({ openPaths: [path] })
+    const clearOriginals = vi.fn()
+    ctx.service.setClearOriginals(clearOriginals)
+
+    expect(await ctx.service.lockSession(ownerA)).toEqual({ ok: true, captureFailed: [] })
+    // the module hashes the bytes just before they are deleted: the path is
+    // handed over while the working copy still exists
+    expect(clearOriginals).toHaveBeenCalledWith([path])
+    expect(existsSync(path)).toBe(false)
   })
 })
