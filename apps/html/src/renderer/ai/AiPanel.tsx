@@ -9,12 +9,15 @@ import {
   composerNoteFor,
 } from '@genoffice/ui'
 import { useEffect, useRef, useState } from 'react'
+import '@genoffice/ui/ai-uniwork-composer.css'
 import type { PointerEvent as ReactPointerEvent, ReactElement, ReactNode } from 'react'
 import {
   AgentLoop,
   endsQuietly,
+  getEntryResultChipView,
+  isTurnEnded,
   noticePatch,
-  resultChip,
+  panelLiveAnnouncement as computePanelLiveAnnouncement,
   type PanelNote,
   composeSkills,
 } from '@genoffice/agent-core'
@@ -1142,6 +1145,7 @@ export function AiPanel({
     const loop = loopRef.current
     if (loop?.busy) loop.cancel()
     else cancelPendingSend()
+    inputRef.current?.focus()
   }
 
   const retry = (): void => {
@@ -1243,19 +1247,18 @@ export function AiPanel({
   const [provider, setProvider] = useState<string | undefined>(() => settingsRef.current?.provider)
   useEffect(() => {
     let cancelled = false
-    void window.htmlApi
-      ?.getAiSettings?.()
-      .then((s) => {
-        if (cancelled) return
-        settingsRef.current = s
-        setProvider(s?.provider)
-      })
-      .catch(() => {})
-    const off = window.htmlApi?.onAiSettingsChanged?.((s) => {
-      if (cancelled) return
-      settingsRef.current = s
-      setProvider(s?.provider)
-    })
+    const sync = () => {
+      void window.htmlApi
+        ?.getAiSettings?.()
+        .then((s) => {
+          if (cancelled) return
+          settingsRef.current = s
+          setProvider(s?.provider)
+        })
+        .catch(() => {})
+    }
+    sync()
+    const off = window.htmlApi?.onAiSettingsChanged?.(sync)
     return () => {
       cancelled = true
       off?.()
@@ -1264,6 +1267,7 @@ export function AiPanel({
   const isUniwork = provider === 'uniwork'
 
   const [cloudSnapshot, setCloudSnapshot] = useState<UniworkCloudStatusSnapshot | null>(null)
+  const [composerAnnouncement, setComposerAnnouncement] = useState('')
   useEffect(() => {
     const bridge = readUniworkCloudStatus()
     if (!bridge) return
@@ -1274,50 +1278,45 @@ export function AiPanel({
         if (!cancelled) setCloudSnapshot(snap)
       })
       .catch(() => {})
-    const off = bridge.onChange((snap) => {
+    const off = bridge.onChange?.((snap) => {
       if (!cancelled) setCloudSnapshot(snap)
     })
     return () => {
       cancelled = true
-      off()
+      off?.()
     }
   }, [])
-  const composerNoteState = composerNoteFor(cloudSnapshot, provider ?? null)
+  const composerNoteState = composerNoteFor({
+    provider: provider ?? settingsRef.current?.provider ?? undefined,
+    cloudState: cloudSnapshot?.state ?? null,
+    signedOut: cloudSnapshot ? !cloudSnapshot.signedIn : undefined,
+  })
 
   const docEmpty = chat.length === 0 && isDocEmpty(deps.access.getText())
 
   const lastEntry = chat.at(-1)
-  const lastAssistantCompleted =
-    lastEntry && lastEntry.role === 'assistant' && !lastEntry.streaming && !busy ? lastEntry : null
-  const lastAssistantChip = lastAssistantCompleted
-    ? resultChip({
-        provider: provider ?? settingsRef.current?.provider ?? null,
-        mutated: Boolean(lastAssistantCompleted.mutated),
-        stopped: Boolean(lastAssistantCompleted.stopped),
-        hasStreamedText: Boolean(lastAssistantCompleted.text?.trim()),
-        clarifyAsked: receipts.some((r) => Boolean(r.qa)),
-        notes: lastAssistantCompleted.notes,
-        toolExecutions: lastAssistantCompleted.tools,
-        isError: Boolean(lastAssistantCompleted.isError),
-        error: lastAssistantCompleted.isError ? lastAssistantCompleted.text : null,
-      })
-    : null
-  const panelLiveAnnouncement = (() => {
-    if (lastEntry?.role === 'assistant') {
-      if (lastEntry.waitLine) return lastEntry.waitLine
-      if (lastEntry.notes?.length && lastEntry.streaming) {
-        return lastEntry.notes[lastEntry.notes.length - 1].text
-      }
-      if (!lastEntry.streaming && !busy) {
-        const body = aiNoticeBody(lastEntry.text)
-        const chipPrefix = lastAssistantChip
-          ? `${aiUniworkText(lang, lastAssistantChip.labelKey)}${body ? ': ' : ''}`
-          : ''
-        return `${chipPrefix}${body || ''}`.trim()
-      }
-    }
-    return ''
-  })()
+  const panelLiveAnnouncement =
+    chat.length > 0 || busy
+      ? computePanelLiveAnnouncement({
+          entries: chat,
+          busy,
+          translate: (key, vars) => aiUniworkText(lang, key, vars),
+          lastEntryChipInput:
+            lastEntry && lastEntry.role === 'assistant'
+              ? {
+                  provider: provider ?? settingsRef.current?.provider ?? null,
+                  mutated: Boolean(lastEntry.mutated),
+                  stopped: Boolean(lastEntry.stopped),
+                  hasStreamedText: Boolean(lastEntry.text?.trim()),
+                  clarifyAsked: receipts.some((r) => Boolean(r.qa)),
+                  notes: lastEntry.notes,
+                  toolExecutions: lastEntry.tools,
+                  isError: Boolean(lastEntry.isError),
+                  error: lastEntry.isError ? lastEntry.text : null,
+                }
+              : null,
+        })
+      : composerAnnouncement
 
   return (
     <aside
@@ -1503,24 +1502,27 @@ export function AiPanel({
           const isLast = i === chat.length - 1
           // Action row appears once per completed reply: on the turn's final segment only
           // (mid-turn segments have a following assistant entry; the live turn ends when !busy)
-          const nextEntry = chat[i + 1]
-          const turnEnded = nextEntry ? nextEntry.role === 'user' : !busy
+          const turnEnded = isTurnEnded(chat, i, busy)
           const showToolbar = !entry.streaming && turnEnded && !!entry.text && !entry.isError
-          const chip =
-            !entry.streaming && turnEnded
-              ? resultChip({
-                  provider: provider ?? settingsRef.current?.provider ?? null,
-                  mutated: Boolean(entry.mutated),
-                  stopped: Boolean(entry.stopped),
-                  hasStreamedText: Boolean(entry.text?.trim()),
-                  clarifyAsked: receipts.some((r) => Boolean(r.qa)),
-                  notes: entry.notes,
-                  toolExecutions: entry.tools,
-                  isError: Boolean(entry.isError),
-                  error: entry.isError ? entry.text : null,
-                })
-              : null
-          const chipLabel = chip ? aiUniworkText(lang, chip.labelKey) : null
+          const chipView = getEntryResultChipView(
+            chat,
+            i,
+            busy,
+            (key, vars) => aiUniworkText(lang, key, vars),
+            {
+              provider: provider ?? settingsRef.current?.provider ?? null,
+              mutated: Boolean(entry.mutated),
+              stopped: Boolean(entry.stopped),
+              hasStreamedText: Boolean(entry.text?.trim()),
+              clarifyAsked: receipts.some((r) => Boolean(r.qa)),
+              notes: entry.notes,
+              toolExecutions: entry.tools,
+              isError: Boolean(entry.isError),
+              error: entry.isError ? entry.text : null,
+            },
+          )
+          const chip = chipView?.chip ?? null
+          const chipLabel = chipView?.labelText ?? null
           return (
             <div
               key={i}
@@ -1565,7 +1567,7 @@ export function AiPanel({
                     type="button"
                     className="ai-result-view-changes"
                     onClick={() => {
-                      const firstSid = depsRef.current.access.getMap()[0]?.sid ?? 1
+                      const firstSid = depsRef.current.access.getMap().elements[0]?.sid ?? 1
                       depsRef.current.navigateTo(firstSid)
                     }}
                   >
@@ -1838,12 +1840,21 @@ export function AiPanel({
           uniwork={
             isUniwork
               ? {
-                  noteState: composerNoteState,
-                  onSignIn: () => void readUniworkCloudStatus()?.signIn(),
-                  onOpenAccountSettings: () => void readUniworkCloudStatus()?.openAccountSettings(),
-                  onRetry: retry,
-                  onOpenByokSettings: () => void window.htmlApi?.openAiModelSettings?.(),
-                  disclosure: { ackKey: cloudSnapshot?.accountId ?? null },
+                  provider: provider ?? 'uniwork',
+                  lang,
+                  note: composerNoteState,
+                  onSignIn: () => void readUniworkCloudStatus()?.signIn?.(),
+                  onChooseProvider: () => void window.htmlApi?.openAiModelSettings?.(),
+                  onAnnounce: setComposerAnnouncement,
+                  disclosure: {
+                    orgName: cloudSnapshot?.orgName ?? undefined,
+                    ackKey: {
+                      account: cloudSnapshot?.accountId ?? '',
+                      org: cloudSnapshot?.orgId ?? '',
+                      document: filePath ?? 'local',
+                    },
+                    variant: filePath ? 'document' : 'local',
+                  },
                 }
               : undefined
           }

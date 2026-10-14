@@ -1,3 +1,4 @@
+import '@genoffice/ui/ai-uniwork-composer.css'
 import {
   aiUniworkText,
   composerNoteFor,
@@ -14,8 +15,9 @@ import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react'
 import {
   AgentLoop,
   endsQuietly,
+  getEntryResultChipView,
   noticePatch,
-  resultChip,
+  panelLiveAnnouncement as computePanelLiveAnnouncement,
   type PanelNote,
 } from '@genoffice/agent-core'
 import {
@@ -126,11 +128,14 @@ interface PendingConfirm {
 }
 
 const MODEL_BRIDGE: AiModelPickerBridge = {
-  getSettings: () => window.pdfApi.getAiSettings(),
-  setSettings: (settings) => window.pdfApi.setAiSettings(settings),
-  onSettingsChanged: (handler) => window.pdfApi.onAiSettingsChanged(handler),
-  gskLoggedIn: () => window.pdfApi.gskStatus().then((s) => !!s?.loggedIn),
-  openModelSettings: () => window.pdfApi.openAiModelSettings().catch(() => {}),
+  getSettings: () => window.pdfApi?.getAiSettings?.() ?? Promise.resolve({} as AiSettings),
+  setSettings: (settings) =>
+    window.pdfApi?.setAiSettings?.(settings) ?? Promise.resolve({} as AiSettings),
+  onSettingsChanged: (handler) => window.pdfApi?.onAiSettingsChanged?.(handler) ?? (() => {}),
+  gskLoggedIn: () =>
+    (window.pdfApi?.gskStatus?.() ?? Promise.resolve(null)).then((s) => !!s?.loggedIn),
+  openModelSettings: () =>
+    (window.pdfApi?.openAiModelSettings?.() ?? Promise.resolve()).catch(() => {}),
   // web frames: no key or no model keeps send off with a hint (see AiModelPicker)
   get requireModel() {
     return platform() === 'web'
@@ -182,6 +187,7 @@ export function AiPanel({
   /** the scope chip's expandable preview of the selected text */
   const [scopePreviewOpen, setScopePreviewOpen] = useState(false)
   const chatRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   const stickToBottomRef = useRef(true)
 
   // ── Chat-history persistence (r142): same shared store Docs/Sheets use ──
@@ -633,9 +639,9 @@ export function AiPanel({
     runMutatedRef.current = false
     void (async () => {
       try {
-        const s = await window.pdfApi.getAiSettings()
-        settingsRef.current = s
-        setProvider(s?.provider)
+        const s = await window.pdfApi?.getAiSettings?.()
+        if (s) settingsRef.current = s
+        setProvider(s?.provider ?? settingsRef.current?.provider)
         await loop.run(instruction)
       } catch (err) {
         patchLast({
@@ -648,7 +654,10 @@ export function AiPanel({
     })()
   }
 
-  const stop = (): void => loopRef.current?.cancel()
+  const stop = (): void => {
+    loopRef.current?.cancel()
+    inputRef.current?.focus()
+  }
 
   /** Enter while a reply runs: the draft joins the queue above the composer */
   const enqueueDraft = () => {
@@ -683,8 +692,8 @@ export function AiPanel({
     let alive = true
     const sync = () => {
       void window.pdfApi
-        .getAiSettings()
-        .then((s) => {
+        ?.getAiSettings?.()
+        ?.then((s) => {
           if (!alive) return
           settingsRef.current = s
           setProvider(s?.provider)
@@ -692,11 +701,7 @@ export function AiPanel({
         .catch(() => {})
     }
     sync()
-    const off = window.pdfApi.onAiSettingsChanged?.((s) => {
-      if (!alive) return
-      settingsRef.current = s
-      setProvider(s?.provider)
-    })
+    const off = window.pdfApi?.onAiSettingsChanged?.(sync)
     window.addEventListener('focus', sync)
     return () => {
       alive = false
@@ -707,44 +712,56 @@ export function AiPanel({
 
   const isUniwork = provider === 'uniwork'
 
-  const [cloudSnapshot, setCloudSnapshot] = useState<UniworkCloudStatusSnapshot>(() => {
-    const bridge = readUniworkCloudStatus()
-    return bridge ? bridge.get() : { status: 'ready' }
-  })
+  const [cloudSnapshot, setCloudSnapshot] = useState<UniworkCloudStatusSnapshot | null>(null)
+  const [composerAnnouncement, setComposerAnnouncement] = useState('')
   useEffect(() => {
     const bridge = readUniworkCloudStatus()
     if (!bridge) return
-    setCloudSnapshot(bridge.get())
-    return bridge.subscribe((next) => setCloudSnapshot(next))
+    let cancelled = false
+    void bridge
+      .get()
+      .then((snap) => {
+        if (!cancelled) setCloudSnapshot(snap)
+      })
+      .catch(() => {})
+    const off = bridge.onChange?.((snap) => {
+      if (!cancelled) setCloudSnapshot(snap)
+    })
+    return () => {
+      cancelled = true
+      off?.()
+    }
   }, [open])
 
-  const lastAssistant = [...chat].reverse().find((c) => c.role === 'assistant')
-  const panelLiveAnnouncement = (() => {
-    if (!lastAssistant) return ''
-    const parts: string[] = []
-    if (lastAssistant.notes?.length) {
-      parts.push(...lastAssistant.notes.map((n) => n.text))
-    }
-    if (lastAssistant.waitLine) {
-      parts.push(lastAssistant.waitLine)
-    }
-    if (!lastAssistant.streaming && !busy) {
-      const chip = isUniwork
-        ? resultChip({
-            stopped: lastAssistant.stopped,
-            mutated: lastAssistant.mutated,
-            isError: lastAssistant.isError,
-            text: lastAssistant.text,
-            notes: lastAssistant.notes,
-          })
-        : null
-      const chipText = chip ? aiUniworkText(lang, chip.labelKey) : ''
-      const bodyText = lastAssistant.text ? aiNoticeBody(lastAssistant.text) : ''
-      if (chipText && bodyText) parts.push(`${chipText}: ${bodyText}`)
-      else if (bodyText) parts.push(bodyText)
-    }
-    return parts.join(' ')
-  })()
+  const composerNoteState = composerNoteFor({
+    provider: provider ?? settingsRef.current?.provider ?? undefined,
+    cloudState: cloudSnapshot?.state ?? null,
+    signedOut: cloudSnapshot ? !cloudSnapshot.signedIn : undefined,
+  })
+
+  const lastEntry = chat.at(-1)
+  const panelLiveAnnouncement =
+    chat.length > 0 || busy
+      ? computePanelLiveAnnouncement({
+          entries: chat,
+          busy,
+          translate: (key, vars) => aiUniworkText(lang, key, vars),
+          lastEntryChipInput:
+            lastEntry && lastEntry.role === 'assistant'
+              ? {
+                  provider: provider ?? settingsRef.current?.provider ?? null,
+                  mutated: Boolean(lastEntry.mutated),
+                  stopped: Boolean(lastEntry.stopped),
+                  hasStreamedText: Boolean(lastEntry.text?.trim()),
+                  clarifyAsked: clarify.receipts.length > 0,
+                  notes: lastEntry.notes,
+                  toolExecutions: lastEntry.tools,
+                  isError: Boolean(lastEntry.isError),
+                  error: lastEntry.isError ? lastEntry.text : null,
+                }
+              : null,
+        })
+      : composerAnnouncement
 
   /** Drag the inner panel edge to resize from the selected window side. */
   const startResize = (e: ReactPointerEvent<HTMLDivElement>): void => {
@@ -841,7 +858,7 @@ export function AiPanel({
         <div className="ai-panel-header-actions">
           <AiPanelSideButton
             lang={lang}
-            onMove={(side) => window.pdfApi.setAiPanelPrefs({ side })}
+            onMove={(side) => window.pdfApi?.setAiPanelPrefs?.({ side })}
           />
           {chat.length > 0 && (
             <button
@@ -949,22 +966,30 @@ export function AiPanel({
             !hasTools &&
             !entry.notes?.length &&
             !entry.waitLine &&
-            !entry.streaming
+            !entry.streaming &&
+            !entry.stopped &&
+            !entry.mutated
           )
             return null
-          const nextEntry = chat[i + 1]
-          const turnEnded = nextEntry ? nextEntry.role === 'user' : !busy
-          const chip =
-            isUniwork && !entry.streaming && turnEnded
-              ? resultChip({
-                  stopped: entry.stopped,
-                  mutated: entry.mutated,
-                  isError: entry.isError,
-                  text: entry.text,
-                  notes: entry.notes,
-                })
-              : null
-          const chipLabel = chip ? aiUniworkText(lang, chip.labelKey) : null
+          const chipView = getEntryResultChipView(
+            chat,
+            i,
+            busy,
+            (key, vars) => aiUniworkText(lang, key, vars),
+            {
+              provider: provider ?? settingsRef.current?.provider ?? null,
+              mutated: Boolean(entry.mutated),
+              stopped: Boolean(entry.stopped),
+              hasStreamedText: Boolean(entry.text?.trim()),
+              clarifyAsked: clarify.receipts.length > 0,
+              notes: entry.notes,
+              toolExecutions: entry.tools,
+              isError: Boolean(entry.isError),
+              error: entry.isError ? entry.text : null,
+            },
+          )
+          const chip = chipView?.chip ?? null
+          const chipLabel = chipView?.labelText ?? null
           return (
             <div
               key={i}
@@ -984,17 +1009,17 @@ export function AiPanel({
                   <AiUsageChip usage={entry.usage} lang={lang} />
                 </div>
               )}
-              {entry.text && (
+              {(entry.text || chip) && (
                 <div className="ai-msg-answer" dir="auto">
                   {chip && chipLabel && (
                     <>
                       <span className="ai-result-chip" data-chip={chip.chip} data-tone={chip.tone}>
                         {chipLabel}
                       </span>
-                      <span className="ai-result-chip-sep">: </span>
+                      {entry.text ? <span className="ai-result-chip-sep">: </span> : null}
                     </>
                   )}
-                  <Markdown text={aiNoticeBody(entry.text)} nav={pdfNav} />
+                  {entry.text && <Markdown text={aiNoticeBody(entry.text)} nav={pdfNav} />}
                   {chip?.chip === 'edited' && (
                     <div className="ai-result-actions">
                       <button
@@ -1062,6 +1087,7 @@ export function AiPanel({
           </div>
         )}
         <AiComposer
+          textareaRef={inputRef}
           queueStrip={
             <AiQueueStrip
               items={msgQueue.queued}
@@ -1083,9 +1109,21 @@ export function AiPanel({
           uniwork={
             isUniwork
               ? {
-                  note: composerNoteFor(cloudSnapshot),
-                  onSignIn: () => readUniworkCloudStatus()?.signIn?.(),
-                  onRetry: () => readUniworkCloudStatus()?.retry?.(),
+                  provider: provider ?? 'uniwork',
+                  lang,
+                  note: composerNoteState,
+                  onSignIn: () => void readUniworkCloudStatus()?.signIn?.(),
+                  onChooseProvider: () => void window.pdfApi?.openAiModelSettings?.(),
+                  onAnnounce: setComposerAnnouncement,
+                  disclosure: {
+                    orgName: cloudSnapshot?.orgName ?? undefined,
+                    ackKey: {
+                      account: cloudSnapshot?.accountId ?? '',
+                      org: cloudSnapshot?.orgId ?? '',
+                      document: filePath ?? 'local',
+                    },
+                    variant: filePath ? 'document' : 'local',
+                  },
                 }
               : undefined
           }
