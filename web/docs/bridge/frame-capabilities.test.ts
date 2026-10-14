@@ -70,9 +70,12 @@ describe('frame base capabilities (X-02)', () => {
     expect((await effective(m, { save: true })).download).toBe(false)
   })
 
-  it.each(OFFICE_MODULES)('%s: a host advertising uniworkAi gets the effective grant', async (m) => {
-    expect((await effective(m, { ai: true, uniworkAi: true })).uniworkAi).toBe(true)
-  })
+  it.each(OFFICE_MODULES)(
+    '%s: a host advertising uniworkAi gets the effective grant',
+    async (m) => {
+      expect((await effective(m, { ai: true, uniworkAi: true })).uniworkAi).toBe(true)
+    },
+  )
 
   it.each(OFFICE_MODULES)('%s: no uniworkAi without the host grant', async (m) => {
     expect((await effective(m, { ai: true })).uniworkAi).toBe(false)

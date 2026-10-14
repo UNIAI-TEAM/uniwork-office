@@ -1901,18 +1901,21 @@ describe('UniWork AI on the web (G6-05)', () => {
       ['entitlement_required', 403, undefined],
       ['ai_provider_error', 502, undefined],
       ['rate_limited', 429, 301],
-    ])('a %s failure (%i) is one error chunk with the code, in the failure text', async (code, status, retry) => {
-      const r = rig(async () => {
-        throw failure(code, status, retry ? { retryAfterSec: retry } : {})
-      })
-      await uniworkTurn(r.s)
-      const err = r.chunks.at(-1)!
-      expect(err).toMatchObject({ type: 'error', error: `uniwork:${code}`, uniworkCode: code })
-      if (retry) expect(err.retryAfterSec).toBe(retry)
-      // never the BYOK classifier's `overloaded`, and no floating card
-      expect(err.errorCode).toBeUndefined()
-      expect(document.querySelector('.ow-ai-state')).toBeNull()
-    })
+    ])(
+      'a %s failure (%i) is one error chunk with the code, in the failure text',
+      async (code, status, retry) => {
+        const r = rig(async () => {
+          throw failure(code, status, retry ? { retryAfterSec: retry } : {})
+        })
+        await uniworkTurn(r.s)
+        const err = r.chunks.at(-1)!
+        expect(err).toMatchObject({ type: 'error', error: `uniwork:${code}`, uniworkCode: code })
+        if (retry) expect(err.retryAfterSec).toBe(retry)
+        // never the BYOK classifier's `overloaded`, and no floating card
+        expect(err.errorCode).toBeUndefined()
+        expect(document.querySelector('.ow-ai-state')).toBeNull()
+      },
+    )
 
     it('UniWork AI off before any run: hides the entry, asks the panel for no error chip', async () => {
       const r = rig(async (_t, _req, cb) => {

@@ -30,9 +30,16 @@ import type {
   AiStreamChunk,
 } from '../../../../packages/ai-provider/src/types'
 import { setUniworkCloudStatus } from '../../../../packages/ai-provider/src/uniwork-cloud'
-import type { Capabilities } from '../../../docs/protocol/types'
+import type { streamUniwork } from '../../../../packages/ai-provider/src/uniwork/protocol'
+import {
+  UNIWORK_PROVIDER_ID,
+  type UniworkFormat,
+} from '../../../../packages/ai-provider/src/uniwork/types'
+import { aiUniworkText } from '../../../../packages/ui/src/strings-ai-uniwork'
+import type { Capabilities, OfficeModule } from '../../../docs/protocol/types'
 import type { BridgeObject } from '../../../docs/bridge/safe-api'
 import type { FramePort } from '../../../docs/bridge/frame-port'
+import { webLanguage } from '../../../docs/bridge/browser'
 import {
   createAiWebClient,
   type AiCloudStatus,
@@ -41,7 +48,7 @@ import {
   type AiWebClient,
 } from './client'
 import type { AiRunTracker } from '../ai-run'
-import { AiWebError, isAiWebError } from './errors'
+import { AiWebError, isAiWebError, uniworkFailureKey, type UniworkFailure } from './errors'
 import { createWebAiStreams, type WireProtocol, type WebAiStreams } from './stream'
 import { describeAiError, openAiSettingsDialog, showAiState } from './ui'
 
@@ -51,23 +58,41 @@ export const AI_FRAME_CAPABILITIES: Capabilities = Object.freeze({
   webSearch: true,
   imageSearch: true,
   imageGeneration: true,
-  // UniWork AI (X-02 key): not claimed until the frame has the adapter (G6-05 flips it to true)
-  uniworkAi: false,
+  // UniWork AI (X-02 key): the frame runs the `uniwork` adapter over its frame-token route
+  uniworkAi: true,
 })
 
 /**
- * Host grants -> renderer capability keys. Each cloud tool needs `ai` too; `aiCredentials` (web
- * only) shows the AI settings entry. Without the `ai` grant everything stays false.
+ * Host grants -> renderer capability keys (the Grant formula of the UniWork AI design, one source
+ * for every module):
+ *   - `ai` (the panel opens) = the BYOK grant OR the UniWork AI grant,
+ *   - `aiCredentials` (the BYOK key settings entry, the lock) = the BYOK grant only,
+ *   - `uniworkAi` = the UniWork AI grant,
+ *   - each cloud tool needs one of the two AI grants plus its own.
+ * Without either AI grant everything stays false.
  */
 export function aiHostGrants(granted: Capabilities | undefined): Record<string, boolean> {
-  const ai = granted?.ai === true
+  const byok = granted?.ai === true
+  const uniworkAi = granted?.uniworkAi === true
+  const ai = byok || uniworkAi
   return {
     ai,
-    aiCredentials: ai,
+    aiCredentials: byok,
+    uniworkAi,
     webSearch: ai && granted?.webSearch === true,
     imageSearch: ai && granted?.imageSearch === true,
     imageGeneration: ai && granted?.imageGeneration === true,
   }
+}
+
+/** the module of the frame session -> the format token the UniWork AI server knows it by */
+const FORMAT_OF_MODULE: Record<OfficeModule, UniworkFormat> = {
+  docs: 'docx',
+  sheets: 'xlsx',
+  slides: 'pptx',
+  pdf: 'pdf',
+  markdown: 'markdown',
+  html: 'html',
 }
 
 /** genoffice providers the web can run: the server's table ∩ genoffice ids, no CLI / UniAI pool */
@@ -97,7 +122,9 @@ function readChoice(): AiChoice {
     if (raw && typeof raw === 'object') {
       return {
         // only a provider the web can run: the value comes from localStorage and ends up in a URL
-        ...(typeof raw.provider === 'string' && WEB_PROVIDER_IDS.has(raw.provider)
+        // (`uniwork` has a fixed route; settings() still drops it while the grant is off)
+        ...(typeof raw.provider === 'string' &&
+        (WEB_PROVIDER_IDS.has(raw.provider) || raw.provider === UNIWORK_PROVIDER_ID)
           ? { provider: raw.provider }
           : {}),
         models: raw.models && typeof raw.models === 'object' ? raw.models : {},
@@ -179,6 +206,13 @@ export function createWebAi(opts: {
   aiRun?: AiRunTracker
   /** test seams */
   fetch?: typeof fetch
+  /**
+   * the module this frame runs (its format token goes to UniWork AI); unset = what the session says,
+   * else Docs (the module-less frame is the Docs one)
+   */
+  module?: OfficeModule
+  /** the UniWork AI adapter (default: ai-provider `streamUniwork`) */
+  uniworkStream?: typeof streamUniwork
   origin?: string
   now?: () => number
   /** the window whose focus / visibility refresh the credentials (default: the frame's) */
@@ -190,6 +224,13 @@ export function createWebAi(opts: {
   let loadedAt = 0
   let everLoaded = false
   let choice = readChoice()
+  // what the host granted this frame (set at activation): BYOK, UniWork AI, and which cloud tools
+  let byokGranted = false
+  let uniworkGranted = false
+  let cloudWanted = false
+  /** UniWork AI turned off by the server after the grant was minted (capability / format off) */
+  let uniworkOff = false
+  let frameSession: { documentId: string; module?: OfficeModule } | null = null
   /** provider -> model ids its own `/models` route listed (only asked for a provider with no default model) */
   const listed = new Map<string, string[]>()
   const listing = new Map<string, string>()
@@ -210,14 +251,27 @@ export function createWebAi(opts: {
     .whenInitialized()
     .then((session) => {
       const tokens = opts.port
+      byokGranted = session.capabilities?.ai === true
+      uniworkGranted = session.capabilities?.uniworkAi === true
       if (
-        session.capabilities?.ai !== true ||
+        !(byokGranted || uniworkGranted) ||
         !session.apiBase ||
         !tokens.getToken ||
         !tokens.refreshToken
       ) {
         return false
       }
+      const granted = session.capabilities
+      // BYOK always reads the cloud switches (as before); a UniWork-only frame only when it was
+      // granted a cloud tool: nothing is asked of the server for a grant that is not there
+      cloudWanted =
+        byokGranted ||
+        granted?.webSearch === true ||
+        granted?.imageSearch === true ||
+        granted?.imageGeneration === true
+      const sessionModule = (session as { module?: OfficeModule }).module
+      const module = opts.module ?? sessionModule
+      frameSession = { documentId: session.documentId, ...(module ? { module } : {}) }
       clientRef = createAiWebClient({
         documentId: session.documentId,
         apiBase: session.apiBase,
@@ -227,7 +281,8 @@ export function createWebAi(opts: {
       })
       // early: the cloud tool switches land before the first AI run; a failure is retried on use
       void load(true).catch(() => {})
-      watchForeground()
+      // keys may change in another tab: only a BYOK frame has a credential list to refresh
+      if (byokGranted) watchForeground()
       return true
     })
     .catch(() => false)
@@ -235,11 +290,13 @@ export function createWebAi(opts: {
   async function load(refresh = false): Promise<WebAiState> {
     const client = clientRef
     if (!client) return EMPTY
+    // a UniWork-only frame with no cloud grant has neither a credential list nor cloud switches
+    if (!byokGranted && !cloudWanted) return state
     if (loading && !refresh && now() - loadedAt < CREDENTIALS_TTL_MS) return loading
     const run = (async () => {
       const [credentials, cloud] = await Promise.all([
-        client.listCredentials(),
-        client.cloudStatus().catch(() => null),
+        byokGranted ? client.listCredentials() : Promise.resolve(EMPTY.credentials),
+        cloudWanted ? client.cloudStatus().catch(() => null) : Promise.resolve(null),
       ])
       const changed =
         everLoaded && credentialSignature(credentials) !== credentialSignature(state.credentials)
@@ -361,6 +418,35 @@ export function createWebAi(opts: {
       .filter((id) => WEB_PROVIDER_IDS.has(id) && protocolOf(id))
   }
 
+  /** the grant is there and the server has not turned UniWork AI off since */
+  function uniworkEffective(): boolean {
+    return uniworkGranted && !uniworkOff && opts.capabilities.uniworkAi !== false
+  }
+
+  /** the frame route scope of this document and module; null while UniWork AI is not available */
+  function uniworkScope(): { kind: 'frame'; documentId: string; format: UniworkFormat } | null {
+    if (!uniworkEffective() || !frameSession) return null
+    return {
+      kind: 'frame',
+      documentId: frameSession.documentId,
+      format: FORMAT_OF_MODULE[frameSession.module ?? 'docs'],
+    }
+  }
+
+  /**
+   * The server says UniWork AI is off for this organization or format (a 403 before any run): the
+   * entry hides at once, with no error. A frame that has no BYOK grant has nothing left to chat
+   * with, so its panel hides too.
+   */
+  function turnUniworkOff(): void {
+    if (uniworkOff) return
+    uniworkOff = true
+    const caps = opts.capabilities
+    caps.uniworkAi = false
+    if (!byokGranted) caps.ai = false
+    notifyChanged()
+  }
+
   async function settings(): Promise<AiSettings> {
     const base = defaultAiSettings()
     if (!(await activation)) return base
@@ -372,13 +458,18 @@ export function createWebAi(opts: {
     )
     const usable = usableProviders()
     const fallback = state.credentials.providers.find((p) => WEB_PROVIDER_IDS.has(p.id))?.id
+    const uniworkOn = uniworkEffective()
     // this browser's pick when its provider still has a key, else the server's default (the provider
-    // whose model was set last), else the first usable one
+    // whose model was set last), else the first usable one; UniWork AI when the viewer picked it, or
+    // when it is all there is (no key of their own)
     const serverDefault = serverDefaultProvider(usable)
+    const picked = choice.provider === UNIWORK_PROVIDER_ID ? undefined : choice.provider
+    const keyed =
+      picked && usable.includes(picked) ? picked : (serverDefault ?? usable[0] ?? undefined)
     const provider = (
-      choice.provider && usable.includes(choice.provider)
-        ? choice.provider
-        : (serverDefault ?? usable[0] ?? choice.provider ?? fallback ?? 'openai')
+      choice.provider === UNIWORK_PROVIDER_ID && uniworkOn
+        ? UNIWORK_PROVIDER_ID
+        : (keyed ?? (uniworkOn ? UNIWORK_PROVIDER_ID : (picked ?? fallback ?? 'openai')))
     ) as AiProviderId
     const providers = { ...base.providers }
     for (const id of Object.keys(providers) as AiProviderId[]) {
@@ -401,6 +492,9 @@ export function createWebAi(opts: {
         ...(model ? { model } : {}),
       }
     }
+    // UniWork AI: no key, never locked (a non-empty slot reads as configured); the server's policy
+    // picks the model, so none is named here
+    if (uniworkOn) providers[UNIWORK_PROVIDER_ID] = { apiKey: '…', model: '' }
     const cloudOn = opts.capabilities.imageGeneration === true
     // UniAI is the desktop's pool of cloud models: the web runs only the viewer's own providers
     return {
@@ -528,6 +622,10 @@ export function createWebAi(opts: {
         if (!clientRef) return Promise.reject(new AiWebError({ code: 'unknown', status: 0 }))
         return clientRef.fetch(path, init)
       },
+      uniworkChat: (request) => {
+        if (!clientRef) return Promise.reject(new AiWebError({ code: 'unknown', status: 0 }))
+        return clientRef.uniworkChat(request)
+      },
     },
     protocolOf,
     // a failed chat turn is announced once, by the panel's inline error (the typed text below);
@@ -541,6 +639,17 @@ export function createWebAi(opts: {
     },
     onChatFailure: (err, provider) => showAiState(err, providerLabel(provider), { openSettings }),
     ...(opts.aiRun ? { aiRun: opts.aiRun } : {}),
+    uniwork: {
+      scope: uniworkScope,
+      cloudTools: () =>
+        opts.capabilities.webSearch === true ||
+        opts.capabilities.imageSearch === true ||
+        opts.capabilities.imageGeneration === true,
+      describeFailure: (failure: UniworkFailure) =>
+        aiUniworkText(webLanguage(), uniworkFailureKey(failure)),
+      onOff: turnUniworkOff,
+      ...(opts.uniworkStream ? { stream: opts.uniworkStream } : {}),
+    },
   })
 
   return {

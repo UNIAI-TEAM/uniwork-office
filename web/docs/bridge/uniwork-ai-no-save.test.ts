@@ -51,7 +51,8 @@ describe('a UniWork AI turn never saves (G6-A03, web)', () => {
         refreshToken: vi.fn(async () => 'tok-2'),
       },
       target,
-      globals: { markdownApi: () => ({}) },
+      // the module's own (off) stubs: the web AI bridge replaces them while the grant is on
+      globals: { markdownApi: () => ({ aiStream: async () => {}, onAiStream: () => () => {} }) },
     })
     mock.init({ apiBase: '/api/v1', capabilities: { uniworkAi: true, save: true, saveAs: true } })
     await flush()
@@ -73,6 +74,8 @@ describe('a UniWork AI turn never saves (G6-A03, web)', () => {
     // the frame's only HTTP request is the chat completion on the UniWork AI route
     expect(urls).toHaveLength(1)
     expect(urls[0]!.method).toBe('POST')
-    expect(urls[0]!.url).toMatch(/\/office-frame\/documents\/doc-1\/ai\/uniwork\/chat\/completions$/)
+    expect(urls[0]!.url).toMatch(
+      /\/office-frame\/documents\/doc-1\/ai\/uniwork\/chat\/completions$/,
+    )
   })
 })
