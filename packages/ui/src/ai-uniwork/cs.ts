@@ -3,7 +3,7 @@ import type { zh } from './zh'
 export const cs = {
   // S7 provider row, picker footer and composer notes
   aiUniworkProvider: 'UniWork AI',
-  aiUniworkCreditsAria: 'Zbývající kredity: {remaining} z {limit}',
+  aiUniworkCreditsAria: 'Zbývá {remaining} / {limit}',
   aiUniworkFooterSignIn: 'Pro UniWork AI se přihlaste do UniWork',
   aiUniworkSignedOut:
     'Jste odhlášeni z UniWork. Vyberte jiného poskytovatele nebo se znovu přihlaste.',
@@ -50,6 +50,8 @@ export const cs = {
   aiErrRateLimited: 'Odesíláte příliš rychle. Zkuste to znovu za {seconds} s.',
   aiErrRateLimitedNoWait: 'Odesíláte příliš rychle. Zkuste to znovu za několik minut.',
   aiErrUnavailable: 'UniWork AI teď neodpovídá. Dokument i Uložit dál fungují.',
+  aiErrGeneric:
+    'UniWork AI narazil na neočekávaný problém, a proto byl tento běh zastaven. Dokument i Uložit dál fungují.',
   aiErrDisconnected:
     'Připojení se přerušilo, takže se tento běh zastavil. Již použité změny zůstávají v dokumentu a lze je vrátit zpět.',
   aiErrOffline: 'Jste offline. UniWork AI offline nefunguje a požadavky se neřadí do fronty.',

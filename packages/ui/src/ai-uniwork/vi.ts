@@ -3,7 +3,7 @@ import type { zh } from './zh'
 export const vi = {
   // S7 provider row, picker footer and composer notes
   aiUniworkProvider: 'UniWork AI',
-  aiUniworkCreditsAria: 'Còn {remaining} trên {limit} tín dụng',
+  aiUniworkCreditsAria: 'Còn {remaining} / {limit}',
   aiUniworkFooterSignIn: 'Đăng nhập UniWork để dùng UniWork AI',
   aiUniworkSignedOut: 'Phiên UniWork đã đăng xuất. Chọn nhà cung cấp khác hoặc đăng nhập lại.',
   aiUniworkOff: 'UniWork AI đang tắt cho tài liệu này. Chọn nhà cung cấp khác.',
@@ -50,6 +50,8 @@ export const vi = {
   aiErrRateLimited: 'Bạn đang gửi quá nhanh. Thử lại sau {seconds} giây.',
   aiErrRateLimitedNoWait: 'Bạn đang gửi quá nhanh. Hãy thử lại sau ít phút.',
   aiErrUnavailable: 'UniWork AI tạm thời không phản hồi. Tài liệu và nút Lưu vẫn dùng bình thường.',
+  aiErrGeneric:
+    'UniWork AI gặp sự cố ngoài dự kiến nên lượt này đã dừng. Tài liệu và nút Lưu vẫn dùng bình thường.',
   aiErrDisconnected:
     'Mất kết nối giữa chừng nên lượt này đã dừng. Thay đổi đã áp dụng (nếu có) vẫn trong tài liệu và hoàn tác được.',
   aiErrOffline: 'Không có mạng. UniWork AI không chạy khi offline và yêu cầu không được xếp hàng.',

@@ -3,7 +3,7 @@ import type { zh } from './zh'
 export const ko = {
   // S7 provider row, picker footer and composer notes
   aiUniworkProvider: 'UniWork AI',
-  aiUniworkCreditsAria: '크레딧 {limit} 중 {remaining} 남음',
+  aiUniworkCreditsAria: '{remaining} / {limit} 남음',
   aiUniworkFooterSignIn: 'UniWork AI를 사용하려면 UniWork에 로그인하세요',
   aiUniworkSignedOut: 'UniWork에서 로그아웃되었습니다. 다른 제공자를 선택하거나 다시 로그인하세요.',
   aiUniworkOff: '이 문서에서는 UniWork AI가 꺼져 있습니다. 다른 제공자를 선택하세요.',
@@ -50,6 +50,8 @@ export const ko = {
   aiErrRateLimitedNoWait: '너무 빠르게 보내고 있습니다. 몇 분 후에 다시 시도하세요.',
   aiErrUnavailable:
     'UniWork AI가 지금 응답하지 않습니다. 문서와 저장 기능은 계속 사용할 수 있습니다.',
+  aiErrGeneric:
+    'UniWork AI에 예기치 않은 문제가 발생하여 이번 실행이 중지되었습니다. 문서와 저장 기능은 계속 사용할 수 있습니다.',
   aiErrDisconnected:
     '연결이 끊어져 이번 실행이 중지되었습니다. 이미 적용된 변경 사항(있는 경우)은 문서에 남아 있으며 실행 취소할 수 있습니다.',
   aiErrOffline:

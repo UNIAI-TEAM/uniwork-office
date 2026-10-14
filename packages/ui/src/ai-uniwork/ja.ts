@@ -3,7 +3,7 @@ import type { zh } from './zh'
 export const ja = {
   // S7 provider row, picker footer and composer notes
   aiUniworkProvider: 'UniWork AI',
-  aiUniworkCreditsAria: 'クレジット残り {remaining} / {limit}',
+  aiUniworkCreditsAria: '残り {remaining} / {limit}',
   aiUniworkFooterSignIn: 'UniWork AI を使うには UniWork にログインしてください',
   aiUniworkSignedOut:
     'UniWork からログアウトしています。別のプロバイダーを選ぶか、再ログインしてください。',
@@ -50,6 +50,8 @@ export const ja = {
   aiErrRateLimited: '送信が速すぎます。{seconds} 秒後にもう一度お試しください。',
   aiErrRateLimitedNoWait: '送信が速すぎます。数分後にもう一度お試しください。',
   aiErrUnavailable: 'UniWork AI は現在応答していません。ドキュメントと「保存」は引き続き使えます。',
+  aiErrGeneric:
+    'UniWork AI で予期しない問題が発生したため、この実行を停止しました。ドキュメントと「保存」は引き続き使えます。',
   aiErrDisconnected:
     '接続が切れたため、この実行は停止しました。すでに適用された変更（ある場合）はドキュメントに残り、元に戻せます。',
   aiErrOffline:

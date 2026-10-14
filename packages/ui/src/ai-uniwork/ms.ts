@@ -3,7 +3,7 @@ import type { zh } from './zh'
 export const ms = {
   // S7 provider row, picker footer and composer notes
   aiUniworkProvider: 'UniWork AI',
-  aiUniworkCreditsAria: 'Baki kredit: {remaining} daripada {limit}',
+  aiUniworkCreditsAria: 'Baki {remaining} / {limit}',
   aiUniworkFooterSignIn: 'Log masuk ke UniWork untuk menggunakan UniWork AI',
   aiUniworkSignedOut:
     'Anda telah log keluar daripada UniWork. Pilih penyedia lain atau log masuk semula.',
@@ -55,6 +55,8 @@ export const ms = {
   aiErrRateLimitedNoWait: 'Anda menghantar terlalu pantas. Cuba lagi dalam beberapa minit.',
   aiErrUnavailable:
     'UniWork AI tidak bertindak balas sekarang. Dokumen anda dan Simpan masih berfungsi.',
+  aiErrGeneric:
+    'UniWork AI menghadapi masalah yang tidak dijangka, jadi larian ini dihentikan. Dokumen anda dan Simpan masih berfungsi.',
   aiErrDisconnected:
     'Sambungan terputus, jadi larian ini dihentikan. Sebarang perubahan yang telah digunakan kekal dalam dokumen dan boleh dibuat asal.',
   aiErrOffline:

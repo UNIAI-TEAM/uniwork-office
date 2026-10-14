@@ -3,7 +3,7 @@ import type { zh } from './zh'
 export const en = {
   // S7 provider row, picker footer and composer notes
   aiUniworkProvider: 'UniWork AI',
-  aiUniworkCreditsAria: '{remaining} of {limit} credits left',
+  aiUniworkCreditsAria: '{remaining} / {limit} left',
   aiUniworkFooterSignIn: 'Sign in to UniWork to use UniWork AI',
   aiUniworkSignedOut: 'You’re signed out of UniWork. Choose another provider or sign in again.',
   aiUniworkOff: 'UniWork AI is off for this document. Choose another provider.',
@@ -48,6 +48,8 @@ export const en = {
   aiErrRateLimited: 'You’re sending too fast. Try again in {seconds} s.',
   aiErrRateLimitedNoWait: 'You’re sending too fast. Try again in a few minutes.',
   aiErrUnavailable: 'UniWork AI isn’t responding right now. Your document and Save still work.',
+  aiErrGeneric:
+    'UniWork AI ran into an unexpected problem, so this run stopped. Your document and Save still work.',
   aiErrDisconnected:
     'The connection dropped, so this run stopped. Any changes already applied stay in the document and can be undone.',
   aiErrOffline: 'You’re offline. UniWork AI doesn’t run offline and requests aren’t queued.',

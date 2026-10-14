@@ -3,7 +3,7 @@ import type { zh } from './zh'
 export const he = {
   // S7 provider row, picker footer and composer notes
   aiUniworkProvider: 'UniWork AI',
-  aiUniworkCreditsAria: 'קרדיטים שנותרו: {remaining} מתוך {limit}',
+  aiUniworkCreditsAria: 'נותרו {remaining} / {limit}',
   aiUniworkFooterSignIn: 'התחבר ל-UniWork כדי להשתמש ב-UniWork AI',
   aiUniworkSignedOut: 'התנתקת מ-UniWork. בחר ספק אחר או התחבר מחדש.',
   aiUniworkOff: 'UniWork AI כבוי עבור המסמך הזה. בחר ספק אחר.',
@@ -48,6 +48,8 @@ export const he = {
   aiErrRateLimited: 'אתה שולח מהר מדי. נסה שוב בעוד {seconds} שנ׳.',
   aiErrRateLimitedNoWait: 'אתה שולח מהר מדי. נסה שוב בעוד כמה דקות.',
   aiErrUnavailable: 'UniWork AI לא מגיב כרגע. המסמך שלך והשמירה עדיין עובדים.',
+  aiErrGeneric:
+    'UniWork AI נתקל בבעיה בלתי צפויה, ולכן ההרצה הזו נעצרה. המסמך שלך והשמירה עדיין עובדים.',
   aiErrDisconnected:
     'החיבור נותק ולכן ההרצה נעצרה. שינויים שכבר הוחלו נשארים במסמך וניתן לבטל אותם.',
   aiErrOffline: 'אתה במצב לא מקוון. UniWork AI לא פועל במצב לא מקוון ובקשות לא נכנסות לתור.',

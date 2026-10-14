@@ -3,7 +3,7 @@ import type { zh } from './zh'
 export const zhTW = {
   // S7 provider row, picker footer and composer notes
   aiUniworkProvider: 'UniWork AI',
-  aiUniworkCreditsAria: '剩餘 {remaining} / {limit} 額度',
+  aiUniworkCreditsAria: '剩餘 {remaining} / {limit}',
   aiUniworkFooterSignIn: '登入 UniWork 以使用 UniWork AI',
   aiUniworkSignedOut: '你已登出 UniWork。請選擇其他服務商或重新登入。',
   aiUniworkOff: '此文件已關閉 UniWork AI。請選擇其他服務商。',
@@ -47,6 +47,7 @@ export const zhTW = {
   aiErrRateLimited: '你傳送得太快了。請在 {seconds} 秒後重試。',
   aiErrRateLimitedNoWait: '你傳送得太快了。請幾分鐘後重試。',
   aiErrUnavailable: 'UniWork AI 暫時沒有回應。你的文件和「儲存」仍可正常使用。',
+  aiErrGeneric: 'UniWork AI 遇到意外問題，本次執行已停止。你的文件和「儲存」仍可正常使用。',
   aiErrDisconnected: '連線中斷，本次執行已停止。已套用的變更（如有）仍在文件中，可以復原。',
   aiErrOffline: '你已離線。UniWork AI 無法離線執行，請求也不會排隊。',
   aiErrSession: '你的 UniWork 登入已過期，本次執行已停止。請重新登入以繼續。',

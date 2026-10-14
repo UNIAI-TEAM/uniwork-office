@@ -3,7 +3,7 @@ import type { zh } from './zh'
 export const nl = {
   // S7 provider row, picker footer and composer notes
   aiUniworkProvider: 'UniWork AI',
-  aiUniworkCreditsAria: 'Resterende credits: {remaining} van {limit}',
+  aiUniworkCreditsAria: '{remaining} / {limit} over',
   aiUniworkFooterSignIn: 'Meld je aan bij UniWork om UniWork AI te gebruiken',
   aiUniworkSignedOut:
     'Je bent afgemeld bij UniWork. Kies een andere provider of meld je opnieuw aan.',
@@ -54,6 +54,8 @@ export const nl = {
   aiErrRateLimited: 'Je verzendt te snel. Probeer het over {seconds} s opnieuw.',
   aiErrRateLimitedNoWait: 'Je verzendt te snel. Probeer het over een paar minuten opnieuw.',
   aiErrUnavailable: 'UniWork AI reageert nu niet. Je document en Opslaan werken nog steeds.',
+  aiErrGeneric:
+    'UniWork AI kreeg een onverwacht probleem, dus deze run is gestopt. Je document en Opslaan werken nog steeds.',
   aiErrDisconnected:
     'De verbinding is weggevallen, dus deze run is gestopt. Al toegepaste wijzigingen blijven in het document en kunnen ongedaan worden gemaakt.',
   aiErrOffline:

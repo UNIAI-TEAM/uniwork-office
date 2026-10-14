@@ -3,7 +3,7 @@ import type { zh } from './zh'
 export const id = {
   // S7 provider row, picker footer and composer notes
   aiUniworkProvider: 'UniWork AI',
-  aiUniworkCreditsAria: 'Sisa kredit: {remaining} dari {limit}',
+  aiUniworkCreditsAria: 'Sisa {remaining} / {limit}',
   aiUniworkFooterSignIn: 'Masuk ke UniWork untuk memakai UniWork AI',
   aiUniworkSignedOut: 'Anda sudah keluar dari UniWork. Pilih penyedia lain atau masuk lagi.',
   aiUniworkOff: 'UniWork AI dinonaktifkan untuk dokumen ini. Pilih penyedia lain.',
@@ -52,6 +52,8 @@ export const id = {
   aiErrRateLimited: 'Anda mengirim terlalu cepat. Coba lagi dalam {seconds} dtk.',
   aiErrRateLimitedNoWait: 'Anda mengirim terlalu cepat. Coba lagi dalam beberapa menit.',
   aiErrUnavailable: 'UniWork AI sedang tidak merespons. Dokumen Anda dan Simpan tetap berfungsi.',
+  aiErrGeneric:
+    'UniWork AI mengalami masalah tak terduga, jadi proses ini dihentikan. Dokumen Anda dan Simpan tetap berfungsi.',
   aiErrDisconnected:
     'Koneksi terputus, jadi proses ini dihentikan. Perubahan yang sudah diterapkan tetap ada di dokumen dan dapat diurungkan.',
   aiErrOffline:

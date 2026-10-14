@@ -3,7 +3,7 @@ import type { zh } from './zh'
 export const ar = {
   // S7 provider row, picker footer and composer notes
   aiUniworkProvider: 'UniWork AI',
-  aiUniworkCreditsAria: 'الأرصدة المتبقية: {remaining} من {limit}',
+  aiUniworkCreditsAria: 'متبقٍ {remaining} / {limit}',
   aiUniworkFooterSignIn: 'سجّل الدخول إلى UniWork لاستخدام UniWork AI',
   aiUniworkSignedOut: 'لقد سجّلت الخروج من UniWork. اختر مزودًا آخر أو سجّل الدخول مجددًا.',
   aiUniworkOff: 'UniWork AI متوقف لهذا المستند. اختر مزودًا آخر.',
@@ -48,6 +48,8 @@ export const ar = {
   aiErrRateLimited: 'أنت ترسل بسرعة كبيرة. أعد المحاولة بعد {seconds} ث.',
   aiErrRateLimitedNoWait: 'أنت ترسل بسرعة كبيرة. أعد المحاولة بعد بضع دقائق.',
   aiErrUnavailable: 'لا يستجيب UniWork AI حاليًا. لا يزال مستندك وزر الحفظ يعملان.',
+  aiErrGeneric:
+    'واجه UniWork AI مشكلة غير متوقعة، لذلك توقف هذا التشغيل. لا يزال مستندك وزر الحفظ يعملان.',
   aiErrDisconnected:
     'انقطع الاتصال، لذا توقف هذا التشغيل. تبقى أي تغييرات مطبّقة بالفعل في المستند ويمكن التراجع عنها.',
   aiErrOffline: 'أنت غير متصل. لا يعمل UniWork AI دون اتصال ولا توضع الطلبات في قائمة الانتظار.',

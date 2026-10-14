@@ -7,7 +7,7 @@
 export const zh = {
   // S7 provider row, picker footer and composer notes
   aiUniworkProvider: 'UniWork AI',
-  aiUniworkCreditsAria: '剩余 {remaining} / {limit} 额度',
+  aiUniworkCreditsAria: '剩余 {remaining} / {limit}',
   aiUniworkFooterSignIn: '登录 UniWork 以使用 UniWork AI',
   aiUniworkSignedOut: '你已退出 UniWork。请选择其他服务商或重新登录。',
   aiUniworkOff: '此文档已关闭 UniWork AI。请选择其他服务商。',
@@ -51,6 +51,7 @@ export const zh = {
   aiErrRateLimited: '你发送得太快了。请在 {seconds} 秒后重试。',
   aiErrRateLimitedNoWait: '你发送得太快了。请几分钟后重试。',
   aiErrUnavailable: 'UniWork AI 暂时没有响应。你的文档和“保存”仍可正常使用。',
+  aiErrGeneric: 'UniWork AI 遇到意外问题，本次运行已停止。你的文档和“保存”仍可正常使用。',
   aiErrDisconnected: '连接中断，本次运行已停止。已应用的更改（如有）仍在文档中，可以撤销。',
   aiErrOffline: '你已离线。UniWork AI 无法离线运行，请求也不会排队。',
   aiErrSession: '你的 UniWork 登录已过期，本次运行已停止。请重新登录以继续。',

@@ -3,7 +3,7 @@ import type { zh } from './zh'
 export const th = {
   // S7 provider row, picker footer and composer notes
   aiUniworkProvider: 'UniWork AI',
-  aiUniworkCreditsAria: 'เครดิตคงเหลือ {remaining} จาก {limit}',
+  aiUniworkCreditsAria: 'เหลือ {remaining} / {limit}',
   aiUniworkFooterSignIn: 'ลงชื่อเข้าใช้ UniWork เพื่อใช้ UniWork AI',
   aiUniworkSignedOut: 'คุณออกจากระบบ UniWork แล้ว เลือกผู้ให้บริการอื่นหรือลงชื่อเข้าใช้อีกครั้ง',
   aiUniworkOff: 'UniWork AI ปิดอยู่สำหรับเอกสารนี้ เลือกผู้ให้บริการอื่น',
@@ -49,6 +49,8 @@ export const th = {
   aiErrRateLimited: 'คุณส่งเร็วเกินไป ลองอีกครั้งใน {seconds} วินาที',
   aiErrRateLimitedNoWait: 'คุณส่งเร็วเกินไป ลองอีกครั้งในอีกไม่กี่นาที',
   aiErrUnavailable: 'UniWork AI ไม่ตอบสนองในขณะนี้ เอกสารและการบันทึกยังใช้งานได้ตามปกติ',
+  aiErrGeneric:
+    'UniWork AI พบปัญหาที่ไม่คาดคิด การทำงานครั้งนี้จึงหยุดลง เอกสารและการบันทึกยังใช้งานได้ตามปกติ',
   aiErrDisconnected:
     'การเชื่อมต่อขาดหาย การทำงานครั้งนี้จึงหยุด การเปลี่ยนแปลงที่นำไปใช้แล้ว (ถ้ามี) ยังอยู่ในเอกสารและเลิกทำได้',
   aiErrOffline: 'คุณออฟไลน์อยู่ UniWork AI ไม่ทำงานแบบออฟไลน์และคำขอจะไม่ถูกเข้าคิว',

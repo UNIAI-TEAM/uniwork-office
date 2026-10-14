@@ -3,7 +3,7 @@ import type { zh } from './zh'
 export const hi = {
   // S7 provider row, picker footer and composer notes
   aiUniworkProvider: 'UniWork AI',
-  aiUniworkCreditsAria: 'बचे क्रेडिट: {limit} में से {remaining}',
+  aiUniworkCreditsAria: '{remaining} / {limit} शेष',
   aiUniworkFooterSignIn: 'UniWork AI इस्तेमाल करने के लिए UniWork में साइन इन करें',
   aiUniworkSignedOut: 'आप UniWork से साइन आउट हैं। कोई दूसरा प्रदाता चुनें या फिर से साइन इन करें।',
   aiUniworkOff: 'इस दस्तावेज़ के लिए UniWork AI बंद है। कोई दूसरा प्रदाता चुनें।',
@@ -48,6 +48,8 @@ export const hi = {
   aiErrRateLimited: 'आप बहुत तेज़ी से भेज रहे हैं। {seconds} सेकंड बाद फिर से कोशिश करें।',
   aiErrRateLimitedNoWait: 'आप बहुत तेज़ी से भेज रहे हैं। कुछ मिनट बाद फिर से कोशिश करें।',
   aiErrUnavailable: 'UniWork AI अभी जवाब नहीं दे रहा। आपका दस्तावेज़ और सहेजें अब भी काम करते हैं।',
+  aiErrGeneric:
+    'UniWork AI में अप्रत्याशित समस्या आई, इसलिए यह रन रुक गया। आपका दस्तावेज़ और सहेजें अब भी काम करते हैं।',
   aiErrDisconnected:
     'कनेक्शन टूट गया, इसलिए यह रन रुक गया। पहले से लागू बदलाव दस्तावेज़ में रहेंगे और पूर्ववत किए जा सकते हैं।',
   aiErrOffline: 'आप ऑफ़लाइन हैं। UniWork AI ऑफ़लाइन नहीं चलता और अनुरोध कतार में नहीं रखे जाते।',

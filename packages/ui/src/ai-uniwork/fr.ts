@@ -3,7 +3,7 @@ import type { zh } from './zh'
 export const fr = {
   // S7 provider row, picker footer and composer notes
   aiUniworkProvider: 'UniWork AI',
-  aiUniworkCreditsAria: 'Crédits restants : {remaining} sur {limit}',
+  aiUniworkCreditsAria: '{remaining} / {limit} restants',
   aiUniworkFooterSignIn: 'Connectez-vous à UniWork pour utiliser UniWork AI',
   aiUniworkSignedOut:
     'Vous êtes déconnecté d’UniWork. Choisissez un autre fournisseur ou reconnectez-vous.',
@@ -56,6 +56,8 @@ export const fr = {
   aiErrRateLimitedNoWait: 'Vous envoyez trop vite. Réessayez dans quelques minutes.',
   aiErrUnavailable:
     'UniWork AI ne répond pas pour le moment. Votre document et Enregistrer fonctionnent toujours.',
+  aiErrGeneric:
+    'UniWork AI a rencontré un problème inattendu, cette exécution s’est donc arrêtée. Votre document et Enregistrer fonctionnent toujours.',
   aiErrDisconnected:
     'La connexion a été interrompue, cette exécution s’est donc arrêtée. Les modifications déjà appliquées restent dans le document et peuvent être annulées.',
   aiErrOffline:

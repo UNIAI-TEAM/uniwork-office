@@ -3,7 +3,7 @@ import type { zh } from './zh'
 export const es = {
   // S7 provider row, picker footer and composer notes
   aiUniworkProvider: 'UniWork AI',
-  aiUniworkCreditsAria: 'Créditos restantes: {remaining} de {limit}',
+  aiUniworkCreditsAria: 'Quedan {remaining} / {limit}',
   aiUniworkFooterSignIn: 'Inicia sesión en UniWork para usar UniWork AI',
   aiUniworkSignedOut:
     'Has cerrado sesión en UniWork. Elige otro proveedor o vuelve a iniciar sesión.',
@@ -53,6 +53,8 @@ export const es = {
   aiErrRateLimitedNoWait: 'Estás enviando demasiado rápido. Inténtalo de nuevo en unos minutos.',
   aiErrUnavailable:
     'UniWork AI no responde en este momento. Tu documento y Guardar siguen funcionando.',
+  aiErrGeneric:
+    'UniWork AI tuvo un problema inesperado, así que esta ejecución se detuvo. Tu documento y Guardar siguen funcionando.',
   aiErrDisconnected:
     'Se perdió la conexión, así que esta ejecución se detuvo. Los cambios ya aplicados siguen en el documento y se pueden deshacer.',
   aiErrOffline:
