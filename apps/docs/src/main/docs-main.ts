@@ -3481,7 +3481,7 @@ const recoveryPathFor = (filePath: string) =>
  * the bump must not recreate the file it is about to land (stale-recovery race). */
 const recoveryClearEpochs = new Map<string, number>()
 
-function clearRecoveryCopy(filePath: string): void {
+export function clearRecoveryCopy(filePath: string): void {
   recoveryClearEpochs.set(filePath, (recoveryClearEpochs.get(filePath) ?? 0) + 1)
   try {
     unlinkSync(recoveryPathFor(filePath))
@@ -3489,6 +3489,8 @@ function clearRecoveryCopy(filePath: string): void {
     /* nothing to clean */
   }
 }
+
+export { clearRecoveryCopy as clearDocsRecoveryCopy }
 
 interface MaybeRecoveredDocBytes {
   bytes: Buffer

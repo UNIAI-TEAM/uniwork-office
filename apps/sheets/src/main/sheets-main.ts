@@ -1922,7 +1922,7 @@ const recoveryDir = () => userDataPath('sheets-autosave')
 const recoveryPathFor = (filePath: string) =>
   join(recoveryDir(), `${createHash('sha1').update(filePath).digest('hex').slice(0, 16)}.xlsx`)
 
-function clearWorkbookRecovery(filePath: string): void {
+export function clearWorkbookRecovery(filePath: string): void {
   try {
     unlinkSync(recoveryPathFor(filePath))
   } catch {

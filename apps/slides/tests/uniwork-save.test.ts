@@ -176,10 +176,31 @@ describe('uniworkSaveDecision (pure gate)', () => {
     expect(at('/d/plain.pptx', 'auto')).toEqual({ write: true, fireHook: false })
   })
 
-  it('reads a missing or unknown origin as an explicit save', () => {
+  it('reads a missing or unknown origin as an explicit save, and preserves capture', () => {
     expect(parseUniworkSaveOrigin(undefined)).toBe('user')
     expect(parseUniworkSaveOrigin('weird')).toBe('user')
     expect(parseUniworkSaveOrigin('auto')).toBe('auto')
+    expect(parseUniworkSaveOrigin('capture')).toBe('capture')
+  })
+
+  it('capture origin writes a bound editable deck without firing the hook and refuses read-only', () => {
+    bindPolicy({ bound: ['/d/b.pptx'], readOnly: ['/d/r.pptx'] })
+    expect(
+      uniworkSaveDecision({
+        kind: 'save',
+        origin: 'capture',
+        currentPath: '/d/b.pptx',
+        targetPath: '/d/b.pptx',
+      }),
+    ).toEqual({ write: true, fireHook: false })
+    expect(
+      uniworkSaveDecision({
+        kind: 'save',
+        origin: 'capture',
+        currentPath: '/d/r.pptx',
+        targetPath: '/d/r.pptx',
+      }),
+    ).toEqual({ write: false, fireHook: false })
   })
 })
 
