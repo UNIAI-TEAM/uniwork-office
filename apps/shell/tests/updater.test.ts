@@ -993,7 +993,7 @@ describe('unsigned mac release app (release notice)', () => {
     expect(showMessageBox).not.toHaveBeenCalled()
   })
 
-  it("answers a manual check with up-to-date when nothing newer is out", async () => {
+  it('answers a manual check with up-to-date when nothing newer is out', async () => {
     answer([release('0.11.0-dev.1'), release('0.10.0-dev.9')])
     const { initAutoUpdater, checkForUpdatesNow } = await loadUpdater()
     initAutoUpdater(() => null)
