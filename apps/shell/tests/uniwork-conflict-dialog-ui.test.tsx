@@ -470,15 +470,36 @@ describe('UniworkConflictDialog UI (G5-09 S5 desktop)', () => {
 
   it('FE-04: same notice twice in a row empties the role=alert node and re-fills it on the next frame', async () => {
     await act(async () => {
-      pushConflict?.(makeView({ notice: 'overwrite_failed' }))
+      pushConflict?.(makeView())
     })
 
     const dialog = document.querySelector('[role="alertdialog"]') as HTMLElement
     const alertEl = dialog.querySelector('[role="alert"]') as HTMLElement
+    const overwriteBtn = dialog.querySelector(
+      '[data-conflict-action="overwrite"]',
+    ) as HTMLButtonElement
+    await act(async () => {
+      overwriteBtn.click()
+    })
+
+    const overwriteGo = dialog.querySelector(
+      '[data-conflict-action="overwrite-go"]',
+    ) as HTMLButtonElement
+    nextReply = {
+      kind: 'view',
+      view: makeView({ notice: 'overwrite_failed' }),
+    }
+    await act(async () => {
+      overwriteGo.click()
+    })
     expect(alertEl.textContent).toBe(en.uwConflictOverwriteFailed)
 
+    nextReply = {
+      kind: 'view',
+      view: makeView({ notice: 'overwrite_failed' }),
+    }
     await act(async () => {
-      pushConflict?.(makeView({ notice: 'overwrite_failed' }))
+      overwriteGo.click()
     })
     expect(alertEl.textContent).toBe('')
 
@@ -743,5 +764,56 @@ describe('UniworkConflictDialog UI (G5-09 S5 desktop)', () => {
     })
     expect(document.activeElement).toBe(keepRadio)
     expect(keepRadio.checked).toBe(true)
+  })
+
+  it('FE-203: re-announces a notice only when it comes from this reply (repeated failure), not on a pushed view that still carries the same notice', async () => {
+    await act(async () => {
+      pushConflict?.(makeView())
+    })
+
+    const dialog = document.querySelector('[role="alertdialog"]') as HTMLElement
+    const alertEl = dialog.querySelector('[role="alert"]') as HTMLElement
+
+    const overwriteBtn = dialog.querySelector(
+      '[data-conflict-action="overwrite"]',
+    ) as HTMLButtonElement
+    await act(async () => {
+      overwriteBtn.click()
+    })
+
+    const overwriteGo = dialog.querySelector(
+      '[data-conflict-action="overwrite-go"]',
+    ) as HTMLButtonElement
+
+    // First failure reply sets notice='overwrite_failed'
+    nextReply = {
+      kind: 'view',
+      view: makeView({ notice: 'overwrite_failed' }),
+    }
+    await act(async () => {
+      overwriteGo.click()
+    })
+    expect(alertEl.textContent).toBe(en.uwConflictOverwriteFailed)
+
+    // Pushed view update (e.g. intent change) still carrying the same notice does NOT clear/re-announce
+    await act(async () => {
+      pushConflict?.(makeView({ notice: 'overwrite_failed', intent: 'committing' }))
+    })
+    expect(alertEl.textContent).toBe(en.uwConflictOverwriteFailed)
+
+    // Repeated failure from THIS reply DOES clear and re-fill on the next frame
+    nextReply = {
+      kind: 'view',
+      view: makeView({ notice: 'overwrite_failed', intent: 'committing' }),
+    }
+    await act(async () => {
+      overwriteGo.click()
+    })
+    expect(alertEl.textContent).toBe('')
+
+    await act(async () => {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+    })
+    expect(alertEl.textContent).toBe(en.uwConflictOverwriteFailed)
   })
 })

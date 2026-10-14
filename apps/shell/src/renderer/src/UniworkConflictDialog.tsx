@@ -111,15 +111,19 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
   const dialogRef = useRef<HTMLDivElement | null>(null)
   const titleRef = useRef<HTMLHeadingElement | null>(null)
   const prevViewRef = useRef<UniworkConflictView>(view)
+  const replyViewRef = useRef<UniworkConflictView | null>(null)
   const [state, setState] = useState<ConflictDialogState>(() => createInitialConflictState(view))
   const [busy, setBusy] = useState(false)
   const [alertClearing, setAlertClearing] = useState(false)
 
   useEffect(() => {
     if (prevViewRef.current !== view) {
+      const isFromReply = replyViewRef.current === view
+      replyViewRef.current = null
       const prevResolved = resolveConflictNotice(prevViewRef.current)
       const nextResolved = resolveConflictNotice(view)
       const isSameNotice =
+        isFromReply &&
         prevResolved !== null &&
         nextResolved !== null &&
         prevResolved.key === nextResolved.key &&
@@ -180,6 +184,7 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
         if (!reply || reply.kind === 'closed') {
           onClosed()
         } else if (reply.kind === 'view') {
+          replyViewRef.current = reply.view
           onViewChange(reply.view)
         }
       } catch {
@@ -187,11 +192,13 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
         if (!failureNotice) {
           onClosed()
         } else {
-          onViewChange({
+          const fallbackView: UniworkConflictView = {
             ...view,
             notice: failureNotice,
             noticeArg: null,
-          })
+          }
+          replyViewRef.current = fallbackView
+          onViewChange(fallbackView)
         }
       } finally {
         setBusy(false)
