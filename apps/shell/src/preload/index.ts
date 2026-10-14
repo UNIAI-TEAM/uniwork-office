@@ -23,6 +23,7 @@ import { normalizeAiPanelPrefs } from '@genoffice/ui/ai-panel-prefs'
 import type {
   AccountLoginEvent,
   DeskDraft,
+  DeskToolResult,
   AiConnectionTestResult,
   AccountSetServerResult,
   AccountStatus,
@@ -403,6 +404,9 @@ const homeApi: HomeApi = {
   },
   async listDrafts() {
     return (await ipcRenderer.invoke(HOME_CHANNELS.listDrafts)) as DeskDraft[]
+  },
+  async runDeskTool(req) {
+    return (await ipcRenderer.invoke(HOME_CHANNELS.runDeskTool, req)) as DeskToolResult
   },
   async renameFile(path, newName) {
     if (typeof path !== 'string' || !path) throw new Error('Invalid path.')

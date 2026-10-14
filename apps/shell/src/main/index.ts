@@ -166,6 +166,7 @@ import {
 } from '../../../docs/src/main/docs-main'
 import { blankXlsxBuffer } from '@genoffice/xlsx-gateway/gateway/csv-import'
 import { blankPdfBuffer } from '../../../pdf/src/main/blank-pdf'
+import { mergePdfBytes, splitPdfBytes } from '../../../pdf/src/main/save-pdf'
 import {
   applyMcpSettings,
   clearMcpLogs,
@@ -354,6 +355,7 @@ import { broadcastUniworkAiFlag, registerUniworkAiFlagIpc } from './uniwork-ai-f
 import { createUniworkAiChoiceStore } from './uniwork-ai-choice'
 import { TabManager } from './tab-manager'
 import { listDeskDrafts } from './desk-drafts'
+import { runDeskTool } from './desk-tools'
 import { installShellCloseGuard } from './window-close-guard'
 import {
   activateDetached,
@@ -4662,6 +4664,73 @@ function registerHomeIpc(): void {
     }),
   )
 
+  ipcMain.handle(HOME_CHANNELS.runDeskTool, async (event, req: unknown) => {
+    const host = BrowserWindow.fromWebContents(event.sender) ?? shellWindow
+    if (!host) return { ok: false, error: 'failed' }
+    return runDeskTool(req, {
+      busy: () => deskToolRunning || exportingPdfDocx,
+      setBusy: (on) => {
+        deskToolRunning = on
+        if (!host.isDestroyed()) host.setProgressBar(on ? 2 : -1)
+      },
+      pickFiles: async ({ exportable, multi }) => {
+        const office = [
+          'docx',
+          'xlsx',
+          'xlsm',
+          'xls',
+          'csv',
+          'tsv',
+          'pptx',
+          'md',
+          'markdown',
+          'html',
+          'htm',
+        ]
+        const picked = await showOpenDialogWithMemory(dialog, host, {
+          filters: exportable
+            ? [{ name: tm('filterSupported'), extensions: office }]
+            : [{ name: tm('filterPdf'), extensions: ['pdf'] }],
+          properties: multi ? ['openFile', 'multiSelections'] : ['openFile'],
+        })
+        return picked.canceled ? [] : picked.filePaths
+      },
+      pickSavePath: async (defaultPath) => {
+        const picked = await showSaveDialogWithMemory(dialog, host, {
+          defaultPath,
+          filters: [{ name: tm('filterPdf'), extensions: ['pdf'] }],
+        })
+        return picked.canceled || !picked.filePath ? null : picked.filePath
+      },
+      pickFolder: async (defaultPath) => {
+        const picked = await showOpenDialogWithMemory(dialog, host, {
+          defaultPath,
+          properties: ['openDirectory', 'createDirectory'],
+        })
+        return picked.canceled ? null : (picked.filePaths[0] ?? null)
+      },
+      convertPdf: (kind, pdfPath) => convertPdfToOffice(kind, pdfPath, host),
+      exportPdf: async (input, outPath) => {
+        const outcome = await runHeadlessExport(
+          { input, outPath, targetFormat: 'pdf', json: false },
+          headlessExporters,
+        )
+        if (!outcome.ok) throw new Error(outcome.message)
+      },
+      mergePdf: mergePdfBytes,
+      splitPdf: splitPdfBytes,
+      isOpenInTab: (path) => !!tabManager?.findPdfTabByPath(path),
+      isFile: (path) => existsSync(path) && statSync(path).isFile(),
+      exists: existsSync,
+      readFile: async (path) => new Uint8Array(readFileSync(path)),
+      writeFile: (path, bytes) => atomicWriteFile(path, bytes),
+      mkdir: async (path) => {
+        mkdirSync(path, { recursive: true })
+      },
+      recordRecent: recordRecentFile,
+    })
+  })
+
   ipcMain.handle(
     HOME_CHANNELS.renameFile,
     (_event, path: unknown, newName: unknown): RenameResult => {
@@ -5762,6 +5831,9 @@ async function savePdfAs(): Promise<void> {
  * from the menu or the Desk can never start a second conversion
  */
 let exportingPdfDocx = false
+
+/** a Desk tool (export / merge / split) is running; PDF → Office runs under exportingPdfDocx */
+let deskToolRunning = false
 
 type PdfOfficeKind = 'docx' | 'pptx' | 'xlsx'
 type MainKey = Parameters<typeof tm>[0]
