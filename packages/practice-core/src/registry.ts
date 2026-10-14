@@ -1,17 +1,13 @@
 import { BUSINESS_PRACTICES } from './practices/business.js'
 import { constructionPractice } from './practices/construction.js'
 import { legalPractice } from './practices/legal.js'
-import { principalPractice } from './practices/principal.js'
 import { procurementPractice } from './practices/procurement.js'
-import { teacherPractice } from './practices/teacher.js'
 import type { PracticeDefinition, PracticeId } from './types.js'
 
 export const PRACTICE_REGISTRY: readonly PracticeDefinition[] = [
-  teacherPractice,
   legalPractice,
   constructionPractice,
   procurementPractice,
-  principalPractice,
   ...BUSINESS_PRACTICES,
 ] as const
 
@@ -22,12 +18,6 @@ export const PRACTICE_GROUPS: readonly {
   labelEn: string
   ids: readonly PracticeId[]
 }[] = [
-  {
-    id: 'education',
-    labelVi: 'Giáo dục',
-    labelEn: 'Education',
-    ids: ['teacher', 'principal'],
-  },
   {
     id: 'professional',
     labelVi: 'Chuyên môn',

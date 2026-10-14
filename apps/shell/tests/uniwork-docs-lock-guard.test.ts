@@ -11,7 +11,11 @@ import {
   refuseLockedOpenPath,
   type ConflictUi,
 } from '../src/main/uniwork-docs/service'
-import { BINDING_FILE, INTENT_PAYLOAD_FILE } from '../src/main/uniwork-docs/binding-store'
+import {
+  BINDING_FILE,
+  INTENT_PAYLOAD_FILE,
+  LAST_OWNER_FILE,
+} from '../src/main/uniwork-docs/binding-store'
 import { INTENT_STORE_REGISTRATION, createIntentStore } from '../src/main/uniwork-sync/intent-store'
 import { createSafeStorageKeyProvider } from '../src/main/uniwork-sync/keys'
 import { createSyncStoreAccess } from '../src/main/uniwork-sync/session-store'
@@ -90,6 +94,15 @@ let dir: string
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'uw-lock-guard-'))
   calls.length = 0
+  // the service remembers a newly seen live account with a fire-and-forget
+  // atomic write of last-account.json (`liveIdentity`); seeding acc_1 as
+  // already remembered removes that write, which otherwise outlived the
+  // refused opens and raced the rmSync below (ENOTEMPTY), as in R1-13
+  mkdirSync(join(dir, 'uniwork-documents'), { recursive: true })
+  writeFileSync(
+    join(dir, 'uniwork-documents', LAST_OWNER_FILE),
+    JSON.stringify({ accountId: 'acc_1', deploymentId: 'default' }),
+  )
 })
 afterEach(() => rmSync(dir, { recursive: true, force: true }))
 

@@ -44,7 +44,7 @@ const actEnvironment = globalThis as typeof globalThis & {
 }
 actEnvironment.IS_REACT_ACT_ENVIRONMENT = true
 
-const CHAT = 'uniwork.my-ai.chat.v1:teacher'
+const CHAT = 'uniwork.my-ai.chat.v1:entrepreneur'
 
 /**
  * The main process as the renderer sees it: one key/value map per bucket, the
@@ -165,9 +165,9 @@ function installMemoryLocalStorage(): Map<string, string> {
   return map
 }
 
-/** stands in for Home: shows the stored My AI chat of the teacher practice */
+/** stands in for Home: shows the stored My AI chat of the entrepreneur practice */
 function ChatView() {
-  const messages = loadMyAiHistory('teacher')
+  const messages = loadMyAiHistory('entrepreneur')
   return createElement(
     'ul',
     { className: 'chat' },
@@ -221,7 +221,7 @@ describe('My AI per UniWork account in the Home renderer', () => {
     main.signIn('owner')
     await renderGate()
     act(() => {
-      saveMyAiHistory('teacher', [{ id: '1', role: 'user', text: 'owner secret' }])
+      saveMyAiHistory('entrepreneur', [{ id: '1', role: 'user', text: 'owner secret' }])
     })
     await flush()
     // the write went to the owner's bucket in main, not to localStorage
@@ -279,7 +279,7 @@ describe('My AI per UniWork account in the Home renderer', () => {
   it('signed-out use keeps its own bucket', async () => {
     await renderGate()
     act(() => {
-      saveMyAiHistory('teacher', [{ id: '1', role: 'user', text: 'signed-out note' }])
+      saveMyAiHistory('entrepreneur', [{ id: '1', role: 'user', text: 'signed-out note' }])
     })
     expect(main.buckets.get('local')!.get(CHAT)).toContain('signed-out note')
 
@@ -293,7 +293,7 @@ describe('My AI per UniWork account in the Home renderer', () => {
 
   it('pre-upgrade localStorage copies move to the first account once, then leave localStorage', async () => {
     ls.set(CHAT, '[{"id":"1","role":"user","text":"before upgrade"}]')
-    ls.set('uniwork.wb.tasks.teacher', '[]')
+    ls.set('uniwork.wb.tasks.entrepreneur', '[]')
     ls.set('unrelated.key', 'stays')
 
     // signed-out first: not shown, not moved
@@ -307,7 +307,7 @@ describe('My AI per UniWork account in the Home renderer', () => {
     expect(main.buckets.get('a-owner')!.get(CHAT)).toContain('before upgrade')
     expect(main.legacyDone).toBe(true)
     expect(ls.has(CHAT)).toBe(false)
-    expect(ls.has('uniwork.wb.tasks.teacher')).toBe(false)
+    expect(ls.has('uniwork.wb.tasks.entrepreneur')).toBe(false)
     expect(ls.get('unrelated.key')).toBe('stays')
 
     // the second account gets none of it
@@ -400,10 +400,10 @@ describe('Settings > Backup and add-ons through the per-account store', () => {
     main.signIn('owner')
     await hydrateWorkbenchStore()
     wbStoreWrite(CHAT, [{ id: '1', role: 'user', text: 'in the backup' }])
-    wbStoreSetRaw('uniwork.wb.tasks.teacher', '[]')
+    wbStoreSetRaw('uniwork.wb.tasks.entrepreneur', '[]')
     wbStoreSetRaw('not.allowlisted', 'no')
     const snap = exportLocalBackup()
-    expect(Object.keys(snap.keys).sort()).toEqual([CHAT, 'uniwork.wb.tasks.teacher'].sort())
+    expect(Object.keys(snap.keys).sort()).toEqual([CHAT, 'uniwork.wb.tasks.entrepreneur'].sort())
     expect(snap.keys[CHAT]).toContain('in the backup')
     // the export reads the account store, never localStorage (shared by every account)
     expect(ls.size).toBe(0)

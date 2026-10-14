@@ -1,5 +1,6 @@
 import {
   defaultPinnedSkillDomains,
+  isPracticeId,
   isSkillDomainId,
   type SkillDomainId,
 } from '@uniwork/practice-core'
@@ -7,17 +8,25 @@ import { wbStoreGetRaw, wbStoreSetRaw } from './workbench-store-client'
 
 const KEY = 'uniwork.skill.domain.pins'
 const ACTIVE_KEY = 'uniwork.skill.domain.active'
+/** written by Home.tsx switchPractice */
+const ACTIVE_PRACTICE_KEY = 'uniwork.activePracticeId'
+
+/** Skill tabs of a user who never pinned any: they follow the active role. */
+function roleDefaults(): SkillDomainId[] {
+  const practice = wbStoreGetRaw(ACTIVE_PRACTICE_KEY)
+  return defaultPinnedSkillDomains(isPracticeId(practice) ? practice : 'entrepreneur')
+}
 
 export function readPinnedSkillDomains(): SkillDomainId[] {
   try {
     const raw = wbStoreGetRaw(KEY)
-    if (raw === null) return defaultPinnedSkillDomains()
+    if (raw === null) return roleDefaults()
     const parsed: unknown = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return defaultPinnedSkillDomains()
+    if (!Array.isArray(parsed)) return roleDefaults()
     const ids = parsed.filter(isSkillDomainId)
-    return ids.length > 0 ? ids : defaultPinnedSkillDomains()
+    return ids.length > 0 ? ids : roleDefaults()
   } catch {
-    return defaultPinnedSkillDomains()
+    return roleDefaults()
   }
 }
 
@@ -35,7 +44,7 @@ export function pinSkillDomain(id: SkillDomainId): SkillDomainId[] {
 
 export function unpinSkillDomain(id: SkillDomainId): SkillDomainId[] {
   const next = readPinnedSkillDomains().filter((x) => x !== id)
-  const safe = next.length > 0 ? next : defaultPinnedSkillDomains()
+  const safe = next.length > 0 ? next : roleDefaults()
   writePinnedSkillDomains(safe)
   return safe
 }
@@ -59,7 +68,7 @@ export function reorderPinnedSkillDomains(
 export function readActiveSkillDomain(pins: SkillDomainId[]): SkillDomainId {
   const raw = wbStoreGetRaw(ACTIVE_KEY)
   if (raw && isSkillDomainId(raw) && pins.includes(raw)) return raw
-  return pins[0] ?? 'education'
+  return pins[0] ?? roleDefaults()[0]
 }
 
 export function writeActiveSkillDomain(id: SkillDomainId): void {

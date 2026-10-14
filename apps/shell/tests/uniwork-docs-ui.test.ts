@@ -32,7 +32,7 @@ import {
   type PickerAction,
   type PickerState,
 } from '../src/renderer/src/uniwork-docs-model'
-import { openRecentEntry } from '../src/renderer/src/uniwork-open'
+import { openRecentEntry, openUniworkDocument } from '../src/renderer/src/uniwork-open'
 import { publishUniworkNotice } from '../src/renderer/src/uniwork-notice-bus'
 import { subscribeUniworkOpened } from '../src/renderer/src/uniwork-recents-refresh'
 import { uniworkDocumentStrings } from '../src/renderer/src/i18n/strings-uniwork-documents'
@@ -710,6 +710,24 @@ describe('openRecentEntry', () => {
     const notify2 = vi.fn()
     await openRecentEntry(bound, broken as never, notify2)
     expect(notify2).toHaveBeenLastCalledWith({ phase: 'failed', error: 'network' })
+  })
+})
+
+describe('openUniworkDocument', () => {
+  it('opens a cloud document by id and reports progress in the notice', async () => {
+    const api = {
+      uniworkOpenDocument: vi.fn(async () => ({
+        ok: true as const,
+        value: { path: '/w/Plan.docx' },
+      })),
+    }
+    const notify = vi.fn()
+    await openUniworkDocument({ documentId: 'd1', title: 'Plan' }, api as never, notify)
+    expect(api.uniworkOpenDocument).toHaveBeenCalledWith('d1')
+    expect(notify.mock.calls.map((c) => c[0])).toEqual([
+      { phase: 'opening', title: 'Plan' },
+      { phase: 'opened', path: '/w/Plan.docx', title: 'Plan' },
+    ])
   })
 })
 

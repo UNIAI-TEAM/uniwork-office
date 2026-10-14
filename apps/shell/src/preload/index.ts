@@ -70,6 +70,16 @@ import type {
 } from '../shared/integrations-api'
 import type { TabsApi, TabSummary } from '../shared/tabs-api'
 import { TABS_CHANNELS } from '../shared/tabs-api'
+import { UNIWORK_WORK_CHANNELS } from '../shared/uniwork-work-api'
+import type {
+  UniworkWorkApi,
+  UniworkWorkResult,
+  WorkCalendarEvent,
+  WorkHomeSummary,
+  WorkPerson,
+  WorkTask,
+  WorkTaskStatus,
+} from '../shared/uniwork-work-api'
 import { createLaunchReplay } from './launch-replay'
 
 // subscribed at preload time: a cold-start launch event can arrive before the
@@ -345,14 +355,6 @@ const homeApi: HomeApi = {
   async browse() {
     await ipcRenderer.invoke(HOME_CHANNELS.browse)
   },
-  async probeAiHub(opts) {
-    return (await ipcRenderer.invoke(HOME_CHANNELS.probeAiHub, opts)) as {
-      ok: boolean
-      message: string
-      balanceText?: string
-      modelCount?: number
-    }
-  },
   onAgentIntent(handler) {
     const listener = (
       _event: IpcRendererEvent,
@@ -371,14 +373,6 @@ const homeApi: HomeApi = {
   async submitAgentIntent(intent) {
     const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.submitAgentIntent, intent)
     return result === true
-  },
-  async exportLessonPack(projectId) {
-    return (await ipcRenderer.invoke(HOME_CHANNELS.exportLessonPack, projectId)) as {
-      ok: boolean
-      path?: string
-      error?: string
-      canceled?: boolean
-    }
   },
   async newDoc(opts) {
     await ipcRenderer.invoke(HOME_CHANNELS.newDoc, opts)
@@ -1044,19 +1038,6 @@ const projectApi: ProjectHomeApi = {
     const result: unknown = await ipcRenderer.invoke(PROJECT_CHANNELS.create, { name })
     return result as ProjectSummaryEntry
   },
-  async createEducationProject(args) {
-    const result: unknown = await ipcRenderer.invoke(PROJECT_CHANNELS.createEducation, args)
-    return result as ProjectSummaryEntry
-  },
-  async getEduMeta(projectId) {
-    const result: unknown = await ipcRenderer.invoke(PROJECT_CHANNELS.getEduMeta, { projectId })
-    if (!result || typeof result !== 'object') return null
-    return result as NonNullable<ProjectSummaryEntry['edu']>
-  },
-  async patchEduMeta(args) {
-    const result: unknown = await ipcRenderer.invoke(PROJECT_CHANNELS.patchEduMeta, args)
-    return result as NonNullable<ProjectSummaryEntry['edu']>
-  },
   async createPracticeProject(args) {
     const result: unknown = await ipcRenderer.invoke(PROJECT_CHANNELS.createPractice, args)
     return result as ProjectSummaryEntry
@@ -1189,6 +1170,57 @@ const tabsApi: TabsApi = {
 }
 
 contextBridge.exposeInMainWorld('aiOfficeTabs', tabsApi)
+
+/** main answers every work call with a result; anything else is a broken reply */
+function asWorkResult<T>(result: unknown): UniworkWorkResult<T> {
+  if (
+    result &&
+    typeof result === 'object' &&
+    typeof (result as { ok?: unknown }).ok === 'boolean'
+  ) {
+    return result as UniworkWorkResult<T>
+  }
+  return { ok: false, error: 'server' }
+}
+
+const workApi: UniworkWorkApi = {
+  async homeSummary(workspaceId) {
+    return asWorkResult<WorkHomeSummary>(
+      await ipcRenderer.invoke(UNIWORK_WORK_CHANNELS.homeSummary, workspaceId),
+    )
+  },
+  async myTasks(workspaceId) {
+    return asWorkResult<WorkTask[]>(
+      await ipcRenderer.invoke(UNIWORK_WORK_CHANNELS.myTasks, workspaceId),
+    )
+  },
+  async taskStatuses(workspaceId) {
+    return asWorkResult<WorkTaskStatus[]>(
+      await ipcRenderer.invoke(UNIWORK_WORK_CHANNELS.taskStatuses, workspaceId),
+    )
+  },
+  async setTaskStatus(taskId, status) {
+    return asWorkResult<WorkTask>(
+      await ipcRenderer.invoke(UNIWORK_WORK_CHANNELS.setTaskStatus, taskId, status),
+    )
+  },
+  async createTask(input) {
+    return asWorkResult<WorkTask>(await ipcRenderer.invoke(UNIWORK_WORK_CHANNELS.createTask, input))
+  },
+  async calendarEvents(input) {
+    return asWorkResult<WorkCalendarEvent[]>(
+      await ipcRenderer.invoke(UNIWORK_WORK_CHANNELS.calendarEvents, input),
+    )
+  },
+  async myProfile() {
+    return asWorkResult<WorkPerson>(await ipcRenderer.invoke(UNIWORK_WORK_CHANNELS.myProfile))
+  },
+  async openWeb(target) {
+    return (await ipcRenderer.invoke(UNIWORK_WORK_CHANNELS.openWeb, target)) === true
+  },
+}
+
+contextBridge.exposeInMainWorld('uniworkWork', workApi)
 
 // open documents dragged from the OS anywhere over Home or the tab strip
 installDropOpenBridge()
