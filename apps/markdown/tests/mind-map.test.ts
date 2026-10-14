@@ -5,6 +5,7 @@ import { executeTool } from '../src/renderer/ai/tools'
 import { createMarkdownSkill } from '../src/renderer/ai/markdown-skill'
 import {
   countMindMapNodes,
+  fitMindMapView,
   labelUnits,
   layoutMindMap,
   MIND_MAP_LIMITS,
@@ -410,5 +411,73 @@ describe('generate_mindmap tool', () => {
     const exec = await executeTool(editor, call('generate_mindmap', { root: { label: 'Lonely' } }))
     expect(exec.isError).toBe(true)
     expect(exec.display).toBeUndefined()
+  })
+})
+
+// V10: the first frame showed the middle of the map (root outside the card, branches clipped);
+// the card now fits the whole map, and keeps the root in view when it cannot all fit.
+describe('fitMindMapView', () => {
+  const wide: MindMapTreeNode = {
+    label: 'Root',
+    children: Array.from({ length: 9 }, (_, i) => ({
+      label: `Branch ${i}`,
+      children: [{ label: `Leaf ${i}` }],
+    })),
+  }
+  const vp = { width: 320, height: 300 }
+
+  it('fits a map that is larger than the card entirely inside it', () => {
+    const layout = layoutMindMap({
+      label: 'Root',
+      children: [{ label: 'A' }, { label: 'B' }, { label: 'C' }],
+    })
+    const view = fitMindMapView(
+      layout,
+      layout.nodes.find((n) => n.id === '0')!,
+      vp,
+    )
+    expect(view.zoom).toBeLessThan(1)
+    expect(view.x).toBeGreaterThanOrEqual(0)
+    expect(view.y).toBeGreaterThanOrEqual(0)
+    expect(view.x + layout.width * view.zoom).toBeLessThanOrEqual(vp.width)
+    expect(view.y + layout.height * view.zoom).toBeLessThanOrEqual(vp.height)
+  })
+
+  it('keeps a small map at 1:1 and centres it', () => {
+    const layout = layoutMindMap({ label: 'Root', children: [{ label: 'A' }] })
+    const view = fitMindMapView(
+      layout,
+      layout.nodes.find((n) => n.id === '0')!,
+      {
+        width: 800,
+        height: 600,
+      },
+    )
+    expect(view.zoom).toBe(1)
+    expect(view.x).toBeCloseTo((800 - layout.width) / 2, 5)
+    expect(view.y).toBeCloseTo((600 - layout.height) / 2, 5)
+  })
+
+  it('never drops the root out of the card when the map cannot fit at the minimum zoom', () => {
+    const layout = layoutMindMap(wide)
+    const root = layout.nodes.find((n) => n.id === '0')!
+    const view = fitMindMapView(layout, root, vp)
+    const left = view.x + root.x * view.zoom
+    const right = left + MIND_MAP_METRICS.nodeWidth * view.zoom
+    const top = view.y + root.y * view.zoom
+    const bottom = top + MIND_MAP_METRICS.nodeHeight * view.zoom
+    expect(left).toBeGreaterThanOrEqual(0)
+    expect(right).toBeLessThanOrEqual(vp.width)
+    expect(top).toBeGreaterThanOrEqual(0)
+    expect(bottom).toBeLessThanOrEqual(vp.height)
+  })
+
+  it('falls back to 1:1 at the origin margin while the card has no measured size', () => {
+    const layout = layoutMindMap(wide)
+    expect(fitMindMapView(layout, layout.nodes[0], { width: 0, height: 0 })).toEqual({
+      zoom: 1,
+      x: 8,
+      y: 8,
+    })
   })
 })

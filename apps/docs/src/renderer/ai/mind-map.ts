@@ -392,3 +392,39 @@ function labelBudget(hasBadge: boolean, hasToggle: boolean): number {
   const right = hasToggle ? 32 : 10
   return Math.max(6, Math.floor((MIND_MAP_METRICS.nodeWidth - left - right) / 6.5))
 }
+
+/** Margin kept around the map inside the card (px, before zoom). */
+const FIT_MARGIN = 8
+
+/**
+ * First-frame / "Reset view" framing for a card of the given size: the whole map
+ * when it fits (shrunk down to `minZoom`, centred), and when it still does not fit at
+ * `minZoom` the root stays in view on each axis that overflows, so the user lands on the
+ * map's entry point instead of its middle. An unmeasured card (0 x 0) keeps 1:1 at the
+ * origin margin. Pure.
+ */
+export function fitMindMapView(
+  layout: { width: number; height: number },
+  root: { x: number; y: number },
+  viewport: { width: number; height: number },
+  minZoom = 0.3,
+): { zoom: number; x: number; y: number } {
+  const availW = viewport.width - FIT_MARGIN * 2
+  const availH = viewport.height - FIT_MARGIN * 2
+  if (availW <= 0 || availH <= 0) return { zoom: 1, x: FIT_MARGIN, y: FIT_MARGIN }
+  const zoom = Math.min(
+    1,
+    Math.max(minZoom, Math.min(availW / layout.width, availH / layout.height)),
+  )
+  const place = (avail: number, content: number, rootStart: number, rootSize: number): number => {
+    if (content <= avail) return FIT_MARGIN + (avail - content) / 2
+    // overflowing axis: centre the root box, but never leave a gap before the map's edges
+    const centred = FIT_MARGIN + avail / 2 - (rootStart + rootSize / 2) * zoom
+    return Math.min(FIT_MARGIN, Math.max(FIT_MARGIN + avail - content, centred))
+  }
+  return {
+    zoom,
+    x: place(availW, layout.width * zoom, root.x * zoom, MIND_MAP_METRICS.nodeWidth * zoom),
+    y: place(availH, layout.height * zoom, root.y * zoom, MIND_MAP_METRICS.nodeHeight * zoom),
+  }
+}

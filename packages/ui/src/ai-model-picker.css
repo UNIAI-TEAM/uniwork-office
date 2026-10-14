@@ -3,7 +3,8 @@
 
 .ai-model-picker {
   display: inline-flex;
-  min-width: 0;
+  /* the chip's own floor: the wrapper may shrink to it but not below, so the label cannot spill */
+  min-width: 56px;
 }
 
 .ai-model-chip {
@@ -13,7 +14,9 @@
   height: 24px;
   max-width: 200px;
   padding: 0 7px 0 6px;
-  flex-shrink: 0;
+  /* yields to its footer neighbours (usage chip, attach, track changes, send): the label
+     ellipsizes instead of painting over them, but never collapses to nothing */
+  min-width: 56px;
   border: 1px solid transparent;
   border-radius: var(--radius-30);
   background: none;

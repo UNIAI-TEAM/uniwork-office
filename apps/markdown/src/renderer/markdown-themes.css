@@ -3,6 +3,10 @@
  * the paper variables that `html[data-doc-theme='light'] .doc-page` owns, so
  * a picked theme wins over the light/dark document theme for the paper.
  *
+ * Each block also declares `color: var(--text)`: `.doc-page` only sets its ink under
+ * data-doc-theme='light', so without it a theme of the other mode than the UI inherited
+ * the UI text colour onto its own paper (V1).
+ *
  * Provenance of each palette lives in shared/markdown-theme.ts. Structural
  * rules beyond the variable blocks are kept minimal: font stacks, the couple
  * of signature details each design is known by, and nothing else — the
@@ -42,6 +46,7 @@ html[data-markdown-theme='notion-light'] .doc-page {
   --md-selection: rgb(192 229 244 / 60%);
   --md-text-selection: #c0e5f4;
   color-scheme: light;
+  color: var(--text);
 }
 
 html[data-markdown-theme='notion-light'] .editor-scroll {
@@ -102,6 +107,7 @@ html[data-markdown-theme='notion-dark'] .doc-page {
   --md-selection: rgb(46 87 103 / 70%);
   --md-text-selection: #2e5767;
   color-scheme: dark;
+  color: var(--text);
 }
 
 html[data-markdown-theme='notion-dark'] .editor-scroll {
@@ -169,6 +175,7 @@ html[data-markdown-theme='drake-dark'] .doc-page {
   --md-text-selection: rgb(52 115 176 / 41%);
   --md-page-shadow: 0 1px 4px rgb(0 0 0 / 40%);
   color-scheme: dark;
+  color: var(--text);
 }
 
 html[data-markdown-theme='drake-dark'] .editor-scroll {
@@ -232,6 +239,7 @@ html[data-markdown-theme='blubook'] .doc-page {
   --md-selection: rgb(56 132 254 / 18%);
   --md-text-selection: rgb(56 132 254 / 22%);
   color-scheme: light;
+  color: var(--text);
 }
 
 html[data-markdown-theme='blubook'] .doc-editor blockquote {
@@ -298,6 +306,7 @@ html[data-markdown-theme='nord'] .doc-page {
   --md-text-selection: rgb(150 156 170 / 35%);
   --md-page-shadow: 0 1px 4px rgb(0 0 0 / 40%);
   color-scheme: dark;
+  color: var(--text);
 }
 
 html[data-markdown-theme='nord'] .editor-scroll {
@@ -339,6 +348,7 @@ html[data-markdown-theme='newsprint'] .doc-page {
   --md-selection: rgb(32 43 51 / 30%);
   --md-text-selection: rgb(32 43 51 / 30%);
   color-scheme: light;
+  color: var(--text);
 }
 
 html[data-markdown-theme='newsprint'] .editor-scroll {

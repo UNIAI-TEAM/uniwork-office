@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import type { MindMapTreeNode } from '@genoffice/agent-core'
@@ -74,5 +74,24 @@ describe('MindMapCard wheel gestures', () => {
 
     wheel(viewport, { deltaY: -240, metaKey: true })
     expect(zoomOf(canvas)).toBeCloseTo(1, 5)
+  })
+})
+
+describe('MindMapCard first frame', () => {
+  it('fits the map into a measured card on first render (V10)', () => {
+    const size = (name: 'clientWidth' | 'clientHeight', value: number) =>
+      vi.spyOn(HTMLElement.prototype, name, 'get').mockReturnValue(value)
+    const w = size('clientWidth', 200)
+    const h = size('clientHeight', 300)
+    try {
+      const { canvas } = renderCard()
+      // the 3-leaf tree is ~560 px wide: it shrinks to fit 200 px instead of opening at 1:1
+      expect(zoomOf(canvas)).toBeLessThan(1)
+      const x = /translate\(([-\d.]+)px/.exec(canvas.style.transform)
+      expect(Number(x?.[1])).toBeGreaterThanOrEqual(0)
+    } finally {
+      w.mockRestore()
+      h.mockRestore()
+    }
   })
 })

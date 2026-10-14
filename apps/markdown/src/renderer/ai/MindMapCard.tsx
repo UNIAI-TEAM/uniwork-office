@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { MindMapTreeNode } from '@genoffice/agent-core'
 import {
   countMindMapNodes,
+  fitMindMapView,
   layoutMindMap,
   MIND_MAP_EXPORT_COLORS,
   MIND_MAP_METRICS,
@@ -45,10 +46,17 @@ export function MindMapCard({ tree, onAsk, onJumpBlock }: MindMapCardProps) {
 
   const fitView = useCallback(() => {
     const vp = viewportRef.current
-    zoomRef.current = 1
-    setZoom(1)
-    setPan({ x: 8, y: vp ? Math.max(8, (vp.clientHeight - layout.height) / 2) : 8 })
-  }, [layout.height])
+    const root = layout.nodes.find((n) => n.depth === 0) ?? { x: 0, y: 0 }
+    const view = fitMindMapView(
+      layout,
+      root,
+      { width: vp?.clientWidth ?? 0, height: vp?.clientHeight ?? 0 },
+      ZOOM_MIN,
+    )
+    zoomRef.current = view.zoom
+    setZoom(view.zoom)
+    setPan({ x: view.x, y: view.y })
+  }, [layout])
 
   // fit once per new map (collapse toggles keep the user's view)
   const lastTreeRef = useRef<MindMapTreeNode | null>(null)
