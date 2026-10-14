@@ -123,6 +123,18 @@ export type UniworkSaveState =
   | 'offline'
   | 'signed-out'
   | 'error'
+  // G5-06 durable save queue: an intent is stored and waiting (queued /
+  // paused_offline), the user or the admin paused dispatch (paused_user /
+  // paused_admin), the commit outcome is being looked up (reconciling, or
+  // reconciling-stuck past the 1 h limit), or the intent will not retry on its
+  // own (failed). 'saving' stays the umbrella for validating/uploading/committing.
+  | 'queued'
+  | 'paused_offline'
+  | 'paused_user'
+  | 'paused_admin'
+  | 'reconciling'
+  | 'reconciling-stuck'
+  | 'failed'
 export type UniworkDocErrorCode =
   | 'not_signed_in'
   | 'session_expired'
@@ -146,6 +158,18 @@ export type UniworkDocErrorCode =
   // refused the pending intent (budget full)
   | 'keystore_locked'
   | 'store_full'
+  // G5-06 save queue: refused because sync_write is off / the server no longer
+  // knows the intent / the document was deleted or access was lost / the
+  // account or organization was suspended / the kept-draft or document cap was
+  // reached / another window holds the document lock
+  | 'capability_off'
+  | 'intent_unknown'
+  | 'document_deleted'
+  | 'permission_revoked'
+  | 'member_deactivated'
+  | 'organization_suspended'
+  | 'drafts_full'
+  | 'other_window'
 
 export interface UniworkWorkspaceRef {
   id: string
@@ -300,6 +324,8 @@ export interface UniworkDocStatus {
   access: UniworkDocAccess
   state: UniworkSaveState
   error?: UniworkDocErrorCode
+  /** an unsent N+1 exists behind the pending intent (G5-06) */
+  pendingNext?: boolean
   lastSavedAt?: string
 }
 

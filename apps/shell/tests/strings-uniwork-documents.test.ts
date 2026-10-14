@@ -73,9 +73,18 @@ describe('uniwork documents string shards', () => {
         'malformed_response',
         'keystore_locked',
         'store_full',
+        // G5-06 save queue
+        'capability_off',
+        'intent_unknown',
+        'document_deleted',
+        'permission_revoked',
+        'member_deactivated',
+        'organization_suspended',
+        'drafts_full',
+        'other_window',
       ].sort(),
     )
-    // the G5-04 refusals reuse the sync shard's sentences
+    // the G5-04 / G5-06 refusals reuse the sync shard's sentences
     const sentenceKeys = [...referenceKeys, ...Object.keys(syncStrings.zh)]
     for (const key of Object.values(UNIWORK_ERROR_KEYS)) expect(sentenceKeys).toContain(key)
   })
@@ -92,9 +101,19 @@ describe('uniwork documents string shards', () => {
         'offline',
         'signed-out',
         'error',
+        // G5-06 save queue
+        'queued',
+        'paused_offline',
+        'paused_user',
+        'paused_admin',
+        'reconciling',
+        'reconciling-stuck',
+        'failed',
       ].sort(),
     )
-    for (const key of Object.values(UNIWORK_STATE_KEYS)) expect(referenceKeys).toContain(key)
+    // the queue chips live in the sync shard
+    const chipKeys = [...referenceKeys, ...Object.keys(syncStrings.zh)]
+    for (const key of Object.values(UNIWORK_STATE_KEYS)) expect(chipKeys).toContain(key)
   })
 
   it('says the same thing in vi and en as the product copy rules ask for', () => {

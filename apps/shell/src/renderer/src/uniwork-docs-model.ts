@@ -47,6 +47,16 @@ export const UNIWORK_ERROR_KEYS: Record<UniworkDocErrorCode, StringKey> = {
   // refusals before anything is queued: the keychain is locked, or the account's store is full
   keystore_locked: 'uwReasonKeystore',
   store_full: 'uwQueueFull',
+  // G5-06 save queue (EXPERIENCE l.144-171 blocked reasons, l.223 / l.230 / l.129 / l.304-321).
+  // The sentence for a refusal or a lock; a {cap} / {time} in it is filled by the caller.
+  capability_off: 'uwTipPausedAdmin',
+  intent_unknown: 'uwChipReconcileStuck',
+  document_deleted: 'uwErrDeleted',
+  permission_revoked: 'uwErrForbidden',
+  member_deactivated: 'uwLockDeactivated',
+  organization_suspended: 'uwLockSuspended',
+  drafts_full: 'uwConflictDraftCapReached',
+  other_window: 'uwLockOtherWindow',
 }
 
 /** chip label for every save state (ready and saved read the same: nothing is waiting to upload) */
@@ -60,6 +70,15 @@ export const UNIWORK_STATE_KEYS: Record<UniworkSaveState, StringKey> = {
   conflict: 'uwChipConflict',
   blocked: 'uwChipBlocked',
   error: 'uwChipError',
+  // G5-06 durable save queue: queued / paused_offline / paused_user read as "queued" (EXPERIENCE
+  // l.185-187; pendingNext picks uwChipQueuedNewer in chipModelOf), the rest have their own label
+  queued: 'uwChipQueued',
+  paused_offline: 'uwChipQueued',
+  paused_user: 'uwChipQueued',
+  paused_admin: 'uwChipPausedAdmin',
+  reconciling: 'uwChipReconciling',
+  'reconciling-stuck': 'uwChipReconcileStuck',
+  failed: 'uwChipError',
 }
 
 /**
@@ -81,11 +100,17 @@ export function blockedReasonKey(
     case 'store_full':
       return 'uwReasonStoreFull'
     case 'forbidden':
+    case 'permission_revoked':
       return 'uwReasonForbidden'
     case 'not_found':
       return 'uwReasonNotFound'
     case 'deleted':
+    case 'document_deleted':
       return 'uwReasonDeleted'
+    case 'organization_suspended':
+      return 'uwReasonSuspended'
+    case 'member_deactivated':
+      return 'uwReasonDeactivated'
     case 'quota_exceeded':
       return 'uwReasonQuota'
     case 'too_large':
@@ -133,7 +158,7 @@ export interface ChipModel {
   errorKey?: StringKey
   /** a click on the chip's button */
   action?: { kind: ChipActionKind; labelKey: StringKey }
-  /** last save time, filled into the tooltip */
+  /** time filled into the tooltip: the last save, or for the queued states the save waiting to be sent */
   savedAt?: string
 }
 
@@ -147,11 +172,15 @@ const QUIET_STATES: ReadonlySet<UniworkSaveState> = new Set(['ready', 'saved', '
 /**
  * The chip for a bound document. `needsSignIn` is the account state: when the
  * save state is signed-out and the account is signed in again, the way forward
- * is Retry, not another browser sign-in.
+ * is Retry, not another browser sign-in. `queuedAt` is when the waiting save was
+ * made (the intent's creation time), filled into the queued tooltips.
+ *
+ * The queue states carry no action here: "View queue" (EXPERIENCE l.185-190, 195)
+ * opens the Queue popover, which belongs to the Save pill component (G5-06u).
  */
 export function chipModelOf(
   status: UniworkDocStatus,
-  ctx: { needsSignIn: boolean } = { needsSignIn: true },
+  ctx: { needsSignIn: boolean; queuedAt?: string } = { needsSignIn: true },
 ): ChipModel {
   const { state, access, error } = status
   if (access === 'view' && QUIET_STATES.has(state)) {
@@ -213,6 +242,37 @@ export function chipModelOf(
         errorKey: error ? UNIWORK_ERROR_KEYS[error] : undefined,
         action: { kind: 'retry', labelKey: 'uwActRetry' },
       }
+    case 'queued':
+    case 'paused_offline':
+      return {
+        tone: 'neutral',
+        labelKey: status.pendingNext ? 'uwChipQueuedNewer' : UNIWORK_STATE_KEYS[state],
+        tipKey: status.pendingNext ? 'uwTipQueuedNewer' : 'uwTipQueued',
+        savedAt: ctx.queuedAt,
+      }
+    case 'paused_user':
+      // same label as queued; the tooltip says why it is not going out (EXPERIENCE l.187)
+      return {
+        tone: 'neutral',
+        labelKey: status.pendingNext ? 'uwChipQueuedNewer' : UNIWORK_STATE_KEYS[state],
+        tipKey: 'uwTipPausedUser',
+        savedAt: ctx.queuedAt,
+      }
+    case 'paused_admin':
+      return { tone: 'neutral', labelKey: 'uwChipPausedAdmin', tipKey: 'uwTipPausedAdmin' }
+    case 'reconciling':
+      return { tone: 'warn', labelKey: 'uwChipReconciling', tipKey: 'uwTipReconciling' }
+    case 'reconciling-stuck':
+      // the tooltip stays the reconciling one (EXPERIENCE l.190)
+      return { tone: 'warn', labelKey: 'uwChipReconcileStuck', tipKey: 'uwTipReconciling' }
+    case 'failed':
+      // no automatic retry; {reason} of the tooltip reuses the quota / too-large / other fragments (l.233)
+      return {
+        tone: 'error',
+        labelKey: 'uwChipError',
+        reasonKey: blockedReasonKey(error),
+        tipKey: 'uwTipFailed',
+      }
   }
 }
 
@@ -230,9 +290,10 @@ export function chipCopy(
   const label = model.reasonKey
     ? t(model.labelKey, { reason: t(model.reasonKey) })
     : t(model.labelKey)
-  const tip = model.savedAt
-    ? t(model.tipKey, { time: formatWhen(model.savedAt, dateLocale, now) })
-    : t(model.tipKey)
+  const tipParams: Record<string, string> = {}
+  if (model.savedAt) tipParams.time = formatWhen(model.savedAt, dateLocale, now)
+  if (model.reasonKey) tipParams.reason = t(model.reasonKey)
+  const tip = t(model.tipKey, tipParams)
   const fullTip = model.errorKey ? `${t(model.errorKey)} ${tip}` : tip
   return { label, tip: fullTip, title: `${label}\n${fullTip}` }
 }
