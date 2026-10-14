@@ -322,8 +322,19 @@ export const HOME_REFRESH_MS = 60_000
 export function useRecentDocuments(
   workspaceId: string | null,
   refreshTick: number,
-): { docs: WorkRecentDocument[]; cloudFailed: boolean; reload: () => void } {
-  const [state, setState] = useState({ docs: [] as WorkRecentDocument[], cloudFailed: false })
+  limit = 6,
+): {
+  docs: WorkRecentDocument[]
+  /** this device's recents as listed (working copies included), for the Desk's tray */
+  local: RecentEntry[]
+  cloudFailed: boolean
+  reload: () => void
+} {
+  const [state, setState] = useState({
+    docs: [] as WorkRecentDocument[],
+    local: [] as RecentEntry[],
+    cloudFailed: false,
+  })
   const [tick, setTick] = useState(0)
   const reload = useCallback(() => setTick((n) => n + 1), [])
   useEffect(() => {
@@ -338,7 +349,7 @@ export function useRecentDocuments(
   }, [reload])
   useEffect(() => {
     let live = true
-    const local = window.aiOffice.recents({ limit: 12 }).then(
+    const local = window.aiOffice.recents({ limit: 20 }).then(
       (page) => page.entries,
       () => [] as RecentEntry[],
     )
@@ -349,11 +360,17 @@ export function useRecentDocuments(
         )
       : Promise.resolve([])
     void Promise.all([cloud, local]).then(([c, l]) => {
-      if (live) setState({ docs: mergeRecentDocuments(c ?? [], l), cloudFailed: c === null })
+      if (live) {
+        setState({
+          docs: mergeRecentDocuments(c ?? [], l, limit),
+          local: l,
+          cloudFailed: c === null,
+        })
+      }
     })
     return () => {
       live = false
     }
-  }, [workspaceId, refreshTick, tick])
+  }, [workspaceId, refreshTick, tick, limit])
   return { ...state, reload }
 }
