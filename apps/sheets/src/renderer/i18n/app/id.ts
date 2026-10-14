@@ -538,6 +538,8 @@ export const id = {
   appPrintFailed: 'Tidak dapat mencetak.',
   appPrintNeedsFullLoad:
     'Pencetakan memerlukan buku kerja termuat sepenuhnya — tunggu hingga pemuatan selesai.',
+  appPrintWorkbookTooLarge:
+    'Buku kerja ini terlalu besar untuk dimuat sepenuhnya ke memori, sehingga tidak dapat dicetak atau diekspor ke PDF.',
   appCsvExportNeedsFullLoad:
     'Ekspor CSV memerlukan buku kerja termuat penuh — tunggu pemuatan selesai.',
   appCsvExportTooLarge: 'Lembar terlalu besar untuk diekspor sebagai CSV.',
@@ -1077,6 +1079,9 @@ export const id = {
   appHeadings: 'Judul',
   appHeadingsHidden: 'Judul disembunyikan.',
   appHeadingsShown: 'Judul ditampilkan.',
+  appRightToLeft: 'Dari kanan ke kiri',
+  appRightToLeftOn: 'Arah kisi: dari kanan ke kiri.',
+  appRightToLeftOff: 'Arah kisi: dari kiri ke kanan.',
   appPrintHeadingsTitle: 'Cetak judul baris dan kolom',
   appGroupFunctionLibrary: 'Pustaka Fungsi',
   appInsertFunction: 'Sisipkan Fungsi',
@@ -1471,6 +1476,7 @@ export const id = {
   appCtxResolveComment: 'Selesaikan komentar',
   appThreadConverted: '{count} komentar diubah menjadi catatan.',
   appThreadNoneAtSelection: 'Tidak ada komentar berutas di sel yang dipilih.',
+  appCommentSaveFirst: 'Simpan buku kerja terlebih dahulu untuk menambahkan komentar',
   appThreadCellHasNote:
     'Sel yang dipilih sudah memiliki catatan; komentar tidak dapat ditambahkan.',
   appThreadHoverHint: 'Balas di panel Komentar',

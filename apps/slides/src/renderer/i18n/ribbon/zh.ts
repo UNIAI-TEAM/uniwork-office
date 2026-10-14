@@ -55,7 +55,7 @@ export const zh = {
   // Home: slides
   ribbonGroupSlides: '幻灯片',
   ribbonNewSlide: '新建幻灯片',
-  ribbonNewSlideTip: '新建空白幻灯片（沿用当前页版式背景；⌘M）',
+  ribbonNewSlideTip: '新建空白幻灯片（沿用当前页版式背景）',
   ribbonChooseLayout: '选择版式',
   ribbonChooseLayoutNew: '选择版式新建幻灯片',
   ribbonChooseLayoutChange: '更改当前页版式',
@@ -214,6 +214,7 @@ export const zh = {
   ribbonGroupComments: '批注',
   ribbonComment: '批注',
   ribbonNewCommentTip: '在当前页新建批注（写入 pptx，PowerPoint 中可见）',
+  ribbonNewCommentServerTip: '在当前页新建批注（与打开此演示文稿的所有人共享，不写入文件）',
   ribbonInsertTextBoxTip: '插入文本框',
   ribbonWordArt: '艺术字',
   ribbonWordArtTip: '插入艺术字（大号填充/描边样式文本）',

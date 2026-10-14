@@ -1,0 +1,12 @@
+{
+  // FE13-1: checks the kit type shim (src/types/ui-collab.d.ts) against the real kit. The kit is TS
+  // source written for the default compiler options, so this project uses them (no `paths`: the
+  // import resolves to packages/ui/src/collab) instead of this package's stricter ones.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": []
+  },
+  "include": ["type-checks/ui-collab-shim.ts"]
+}

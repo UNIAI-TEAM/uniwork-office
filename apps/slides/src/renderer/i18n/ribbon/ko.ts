@@ -59,7 +59,7 @@ export const ko = {
   // Home: slides
   ribbonGroupSlides: '슬라이드',
   ribbonNewSlide: '새 슬라이드',
-  ribbonNewSlideTip: '새 빈 슬라이드(현재 슬라이드의 레이아웃 배경 유지; ⌘M)',
+  ribbonNewSlideTip: '새 빈 슬라이드(현재 슬라이드의 레이아웃 배경 유지)',
   ribbonChooseLayout: '레이아웃 선택',
   ribbonChooseLayoutNew: '레이아웃 선택 후 새 슬라이드',
   ribbonChooseLayoutChange: '현재 슬라이드 레이아웃 변경',
@@ -219,6 +219,8 @@ export const ko = {
   ribbonGroupComments: '메모',
   ribbonComment: '메모',
   ribbonNewCommentTip: '현재 슬라이드에 새 메모 추가(pptx에 저장, PowerPoint에서 표시 가능)',
+  ribbonNewCommentServerTip:
+    '현재 슬라이드에 새 메모 추가(이 프레젠테이션을 여는 모든 사람과 공유되며 파일에는 저장되지 않음)',
   ribbonInsertTextBoxTip: '텍스트 상자 삽입',
   ribbonWordArt: 'WordArt',
   ribbonWordArtTip: 'WordArt 삽입(큰 채우기/윤곽선 스타일 텍스트)',

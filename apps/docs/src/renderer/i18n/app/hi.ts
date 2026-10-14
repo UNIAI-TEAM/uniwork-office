@@ -112,6 +112,7 @@ export const hi = {
   appMixedExportOpening:
     'मिश्रित कागज़ आकार: पृष्ठ अनुसार मर्ज करके निर्यात के लिए पृष्ठांकन पूर्वावलोकन खोला जा रहा है…',
   appSelectTextToComment: 'पहले वह टेक्स्ट चुनें जिस पर टिप्पणी करनी है',
+  appCommentSaveFirst: 'टिप्पणी जोड़ने के लिए पहले दस्तावेज़ सहेजें',
   appCommentSelectionLost: 'चयन अब मान्य नहीं है; टिप्पणी के लिए टेक्स्ट फिर से चुनें',
   appCommentAdded: 'टिप्पणी जोड़ी गई; सहेजने पर दस्तावेज़ में लिखी जाएगी',
   appCommentEdited: 'टिप्पणी अपडेट की गई; सहेजने पर दस्तावेज़ में लिखी जाएगी',
@@ -230,6 +231,7 @@ export const hi = {
   appPageOf: 'पृष्ठ {current}, कुल {total}',
   appWordCountTitle: 'शब्द गणना',
   appWordCountN: '{n} शब्द',
+  appWordCountSelection: '{total} में से {selected} शब्द चयनित',
   appTrackChangesOn: 'परिवर्तन ट्रैक करें: चालू',
   appTrackChangesOff: 'परिवर्तन ट्रैक करें: बंद',
   appAcTitle: 'स्वतः सुधार विकल्प',
@@ -446,6 +448,7 @@ export const hi = {
   appParaSpecialFirstLine: 'पहली पंक्ति',
   appParaSpecialHanging: 'हैंगिंग',
   appParaBy: 'द्वारा',
+  appParaUnitChars: 'वर्ण',
   appInsertEquation: 'समीकरण सम्मिलित करें',
   appLatexPlaceholder: 'जैसे x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}',
   appLatexPreviewHint: 'पूर्वावलोकन देखने के लिए LaTeX लिखें',

@@ -6,6 +6,7 @@
  */
 import { t } from './i18n/locale'
 import type { RibbonCommandContext } from './ribbon-actions'
+import { serverComments } from './server-comments/SheetsServerComments'
 import { neighbourThread, threadPane, threadStore, type CellThread } from './threaded-comments'
 import { revealCellBelowFreeze } from './univer-sync'
 
@@ -31,6 +32,27 @@ export function handleThreadedCommentCommand(
   const notes = sheet.getNotes() as readonly { row: number; col: number; show?: boolean }[]
   const noteAt = (position: Position) =>
     notes.find((note) => note.row === position.row && note.col === position.column)
+
+  // G8-13 server mode: new comments go to UniWork; the file's own threads are read-only (D4)
+  const server = serverComments.handle
+  if (server) {
+    switch (command) {
+      case 'comment-new':
+        server.startThread()
+        return
+      case 'comment-delete':
+        if (!thread && noteAt({ row, column })) fallback('note-delete')
+        else threadPane.show()
+        return
+      case 'comment-reply':
+      case 'comment-resolve':
+      case 'notes-convert':
+        threadPane.show()
+        return
+      default:
+        break
+    }
+  }
 
   switch (command) {
     case 'comment-new':

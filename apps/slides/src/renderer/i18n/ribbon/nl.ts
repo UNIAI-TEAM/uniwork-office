@@ -58,7 +58,7 @@ export const nl = {
     'Opmaak kopiëren/plakken (klik om opmaak te kopiëren en toe te passen; ⌘⇧C kopieert opmaak / ⌘⇧V plakt opmaak)',
   ribbonGroupSlides: "Dia's",
   ribbonNewSlide: 'Nieuwe dia',
-  ribbonNewSlideTip: 'Nieuwe lege dia (behoudt de indelingsachtergrond van de huidige dia; ⌘M)',
+  ribbonNewSlideTip: 'Nieuwe lege dia (behoudt de indelingsachtergrond van de huidige dia)',
   ribbonChooseLayout: 'Indeling kiezen',
   ribbonChooseLayoutNew: 'Nieuwe dia met indeling',
   ribbonChooseLayoutChange: 'Indeling van huidige dia wijzigen',
@@ -219,6 +219,8 @@ export const nl = {
   ribbonComment: 'Opmerking',
   ribbonNewCommentTip:
     'Nieuwe opmerking op de huidige dia (opgeslagen in pptx, zichtbaar in PowerPoint)',
+  ribbonNewCommentServerTip:
+    'Nieuwe opmerking op de huidige dia (gedeeld met iedereen die deze presentatie opent, niet in het bestand opgeslagen)',
   ribbonInsertTextBoxTip: 'Een tekstvak invoegen',
   ribbonWordArt: 'WordArt',
   ribbonWordArtTip: 'WordArt invoegen (grote tekst met opvulling/contour)',

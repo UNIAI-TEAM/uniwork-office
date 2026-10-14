@@ -56,7 +56,7 @@ export const vi = {
     'Chổi sao chép định dạng (nhấp để sao chép và áp dụng định dạng; ⌘⇧C sao chép định dạng / ⌘⇧V dán định dạng)',
   ribbonGroupSlides: 'Trang chiếu',
   ribbonNewSlide: 'Trang chiếu mới',
-  ribbonNewSlideTip: 'Tạo trang chiếu trống mới (giữ lại nền bố cục của trang hiện tại; ⌘M)',
+  ribbonNewSlideTip: 'Tạo trang chiếu trống mới (giữ lại nền bố cục của trang hiện tại)',
   ribbonChooseLayout: 'Chọn bố cục',
   ribbonChooseLayoutNew: 'Trang chiếu mới có bố cục',
   ribbonChooseLayoutChange: 'Đổi bố cục trang chiếu hiện tại',
@@ -217,6 +217,8 @@ export const vi = {
   ribbonComment: 'Nhận xét',
   ribbonNewCommentTip:
     'Nhận xét mới trên trang chiếu hiện tại (lưu vào pptx, hiển thị trong PowerPoint)',
+  ribbonNewCommentServerTip:
+    'Nhận xét mới trên trang chiếu hiện tại (chia sẻ với mọi người mở bản trình bày này, không lưu vào tệp)',
   ribbonInsertTextBoxTip: 'Chèn hộp văn bản',
   ribbonWordArt: 'Chữ nghệ thuật WordArt',
   ribbonWordArtTip: 'Chèn WordArt (văn bản cỡ lớn có màu tô/đường viền)',

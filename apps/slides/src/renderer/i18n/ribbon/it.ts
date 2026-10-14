@@ -58,7 +58,7 @@ export const it = {
   ribbonGroupSlides: 'Diapositive',
   ribbonNewSlide: 'Nuova Diapositiva',
   ribbonNewSlideTip:
-    'Nuova diapositiva vuota (mantiene lo sfondo del layout della diapositiva corrente; ⌘M)',
+    'Nuova diapositiva vuota (mantiene lo sfondo del layout della diapositiva corrente)',
   ribbonChooseLayout: 'Scegli Layout',
   ribbonChooseLayoutNew: 'Nuova diapositiva con layout',
   ribbonChooseLayoutChange: 'Cambia layout della diapositiva corrente',
@@ -224,6 +224,8 @@ export const it = {
   ribbonComment: 'Commento',
   ribbonNewCommentTip:
     'Nuovo commento sulla diapositiva corrente (salvato nel pptx, visibile in PowerPoint)',
+  ribbonNewCommentServerTip:
+    'Nuovo commento sulla diapositiva corrente (condiviso con chiunque apra questa presentazione, non salvato nel file)',
   ribbonInsertTextBoxTip: 'Inserisci una casella di testo',
   ribbonWordArt: 'WordArt',
   ribbonWordArtTip: 'Inserisci WordArt (testo grande con riempimento/contorno)',

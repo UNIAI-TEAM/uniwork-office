@@ -107,6 +107,7 @@ export const he = {
   appMixedExportOpening:
     'גודלי נייר מעורבים: נפתחת תצוגה מקדימה של עימוד לייצוא עם איחוד לפי עמודים…',
   appSelectTextToComment: 'תחילה סמנו את הטקסט שעליו תרצו להעיר',
+  appCommentSaveFirst: 'שמרו קודם את המסמך כדי להוסיף הערה',
   appCommentSelectionLost: 'הסימון אינו תקף עוד; סמנו שוב את הטקסט להערה',
   appCommentAdded: 'ההערה נוספה; תיכתב למסמך בעת השמירה',
   appCommentEdited: 'ההערה עודכנה; תיכתב למסמך בעת השמירה',
@@ -221,6 +222,7 @@ export const he = {
   appPageOf: 'עמוד {current} מתוך {total}',
   appWordCountTitle: 'ספירת מילים',
   appWordCountN: '{n} מילים',
+  appWordCountSelection: 'נבחרו {selected} מתוך {total} מילים',
   appTrackChangesOn: 'עקוב אחר שינויים: פועל',
   appTrackChangesOff: 'עקוב אחר שינויים: כבוי',
   appAcTitle: 'אפשרויות תיקון אוטומטי',
@@ -437,6 +439,7 @@ export const he = {
   appParaSpecialFirstLine: 'שורה ראשונה',
   appParaSpecialHanging: 'תלויה',
   appParaBy: 'ב-',
+  appParaUnitChars: 'תווים',
   appInsertEquation: 'הוספת משוואה',
   appLatexPlaceholder: 'לדוגמה x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}',
   appLatexPreviewHint: 'הקלידו LaTeX לתצוגה מקדימה',

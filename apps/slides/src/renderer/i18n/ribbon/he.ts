@@ -54,7 +54,7 @@ export const he = {
     'מברשת עיצוב (לחץ כדי להעתיק ולהחיל עיצוב; ⌘⇧C מעתיק עיצוב / ⌘⇧V מדביק עיצוב)',
   ribbonGroupSlides: 'שקופיות',
   ribbonNewSlide: 'שקופית חדשה',
-  ribbonNewSlideTip: 'שקופית ריקה חדשה (שומרת על רקע הפריסה של השקופית הנוכחית; ⌘M)',
+  ribbonNewSlideTip: 'שקופית ריקה חדשה (שומרת על רקע הפריסה של השקופית הנוכחית)',
   ribbonChooseLayout: 'בחירת פריסה',
   ribbonChooseLayoutNew: 'שקופית חדשה עם פריסה',
   ribbonChooseLayoutChange: 'שינוי פריסת השקופית הנוכחית',
@@ -211,6 +211,8 @@ export const he = {
   ribbonGroupComments: 'תגובות',
   ribbonComment: 'תגובה',
   ribbonNewCommentTip: 'תגובה חדשה בשקופית הנוכחית (נשמרת ב-pptx, גלויה ב-PowerPoint)',
+  ribbonNewCommentServerTip:
+    'תגובה חדשה בשקופית הנוכחית (משותפת לכל מי שפותח מצגת זו, לא נשמרת בקובץ)',
   ribbonInsertTextBoxTip: 'הוספת תיבת טקסט',
   ribbonWordArt: 'WordArt',
   ribbonWordArtTip: 'הוספת WordArt (טקסט גדול עם מילוי/קו מתאר)',

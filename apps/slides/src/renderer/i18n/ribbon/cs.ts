@@ -56,7 +56,7 @@ export const cs = {
     'Kopírovat formát (kliknutím zkopírujete a použijete formátování; ⌘⇧C kopírovat formát / ⌘⇧V vložit formát)',
   ribbonGroupSlides: 'Snímky',
   ribbonNewSlide: 'Nový snímek',
-  ribbonNewSlideTip: 'Nový prázdný snímek (zachová pozadí rozložení aktuálního snímku; ⌘M)',
+  ribbonNewSlideTip: 'Nový prázdný snímek (zachová pozadí rozložení aktuálního snímku)',
   ribbonChooseLayout: 'Zvolit rozložení',
   ribbonChooseLayoutNew: 'Nový snímek s rozložením',
   ribbonChooseLayoutChange: 'Změnit rozložení aktuálního snímku',
@@ -214,6 +214,8 @@ export const cs = {
   ribbonComment: 'Komentář',
   ribbonNewCommentTip:
     'Nový komentář k aktuálnímu snímku (uložen do pptx, viditelný v PowerPointu)',
+  ribbonNewCommentServerTip:
+    'Nový komentář k aktuálnímu snímku (sdílený s každým, kdo tuto prezentaci otevře, neukládá se do souboru)',
   ribbonInsertTextBoxTip: 'Vložit textové pole',
   ribbonWordArt: 'WordArt',
   ribbonWordArtTip: 'Vložit WordArt (velký text s výplní/obrysem)',

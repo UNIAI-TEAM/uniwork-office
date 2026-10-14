@@ -63,6 +63,10 @@ export const id = {
   paneCommentsPlaceholder: 'Komentar baru… (⌘/Ctrl+Enter untuk memposting)',
   paneCommentsPost: 'Posting',
   paneCommentsNeutralAuthor: 'Pengguna',
+  paneCommentsSaveFirst:
+    'Simpan presentasi terlebih dahulu untuk menambahkan komentar. Anda tetap bisa membaca, membalas, dan menyelesaikan komentar di bawah.',
+  paneCommentsNewNoSlide:
+    'Komentar tidak dapat ditambahkan ke slide ini saat ini. Pilih slide lain lalu coba lagi.',
 
   paneCsdTitle: 'Peragaan Kustom',
   paneCsdDefaultName: 'Peragaan Kustom {n}',

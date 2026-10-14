@@ -101,11 +101,23 @@ import {
 } from './ai/edit-queue'
 import { FormatBackgroundPane, type BgPaneOp } from './components/FormatBackgroundPane'
 import { FormatPane } from './components/FormatPane'
-import { CommentsPane } from './components/CommentsPane'
+import {
+  CommentsPane,
+  ServerCommentsHost,
+  type ServerCommentsHandle,
+} from './components/CommentsPane'
+import {
+  commentsBridge,
+  loadCommentsContext,
+  selectedObjectId,
+  wantsServerComments,
+  type SlidesCommentsContext,
+} from './server-comments'
 import { AnimationPane } from './components/AnimationPane'
 import { AnimPreviewOverlay } from './components/AnimatedSlide'
 import { EquationDialog, HeaderFooterDialog, LinkDialog } from './components/InsertDialogs'
 import { UseAppDialog } from './components/UseAppDialog'
+import { RedactDialog } from './components/RedactDialog'
 import { ZoomDialog } from './components/ZoomDialog'
 import { CutoutDialog } from './components/CutoutDialog'
 import {
@@ -118,6 +130,7 @@ import {
   aiPanelInitiallyOpen,
   rememberAiPanelOpen,
   UniAiMark,
+  useAiSidebarEnabled,
 } from '@genoffice/ui'
 import type { ChartPresetDef, IconDef, SmartArtDef } from './insert-presets'
 import { IconAiBeautify, IconAiFactCheck, IconAiImage } from './components/icons'
@@ -138,6 +151,7 @@ import type {
   EditingState,
   HfDialogState,
   LinkDialogState,
+  RedactDialogState,
   SlideShowState,
   EditPointsState,
   UngroupedSet,
@@ -145,6 +159,7 @@ import type {
 import type { PathCmd } from './edit-points'
 import { createPreviewTracker, type EditPointsCommit } from './edit-points-actions'
 import { FIT_WIDTH, NARROW_FRAME_PX } from './app-constants'
+import { aiDockShouldYield, useWindowWidth } from './narrow-dock'
 import { StageRuler } from './components/StageRuler'
 import { formatRulerValue, type RulerUnit } from './ruler-ticks'
 import * as fileActions from './file-actions'
@@ -158,6 +173,7 @@ import * as slideActions from './slide-actions'
 import * as zoomActions from './zoom-actions'
 import { groupSections } from './section-groups'
 import * as pictureEditActions from './picture-edit-actions'
+import * as redactActions from './redact-actions'
 import * as arrangeActions from './arrange-actions'
 import * as tableActions from './table-actions'
 import * as styleActions from './style-actions'
@@ -510,6 +526,27 @@ export function App() {
       live = false
     }
   }, [path])
+  const [commentsContext, setCommentsContext] = useState<SlidesCommentsContext | null>(null)
+  const commentsBridgeApi = useMemo(() => commentsBridge(), [])
+  useEffect(() => {
+    // a context never applies to another document: drop it first, then ask the shell again
+    setCommentsContext(null)
+    if (
+      !path ||
+      !commentsBridgeApi ||
+      !wantsServerComments(path, uniwork.bound, commentsBridgeApi)
+    ) {
+      return
+    }
+    let live = true
+    void loadCommentsContext(commentsBridgeApi, path, uniwork.readOnly).then((ctx) => {
+      if (live) setCommentsContext(ctx)
+    })
+    return () => {
+      live = false
+    }
+  }, [path, uniwork.bound, uniwork.readOnly, commentsBridgeApi])
+  const serverComments = !!(commentsContext && commentsBridgeApi && path)
   // web frame: explicit saves only (CONTRACT C10), whatever a stored preference says
   const autoSave = cap('autoSave') && autoSavePref && !uniwork.bound
   useEffect(() => {
@@ -518,6 +555,11 @@ export function App() {
   const aiEnabled = cap('ai')
   const [showAiPref, setShowAi] = useState(() => aiPanelInitiallyOpen('ai-slides-show-ai'))
   const showAi = aiEnabled && showAiPref
+  // Settings › "show the AI sidebar" off hides the panel and its rail (Word's
+  // Copilot-pane model): an explicit Ask-AI action still opens the panel for
+  // this deck, and closing it returns to hidden. The dock stays mounted; the
+  // hook closes it when the switch itself goes off.
+  const aiSidebarEnabled = useAiSidebarEnabled(setShowAi)
   const [showFormat, setShowFormat] = useState(false)
   const [showBgFormat, setShowBgFormat] = useState(false)
   const [aiSettings, setAiSettings] = useState<AiSettings | null>(null)
@@ -647,11 +689,34 @@ export function App() {
   // ── Review tab: comments ────────────────────────────────────────────────
   const [comments, setComments] = useState<SlideComment[]>([])
   const [showComments, setShowComments] = useState(false)
+  // V14b-01: a narrow window with the comments pane open: the AI dock shows its rail so the stage
+  // keeps a usable width. Display only (the stored preference is untouched); the user can still
+  // expand the dock for as long as the pane stays open
+  const windowWidth = useWindowWidth()
+  const dockYields =
+    aiEnabled &&
+    aiDockShouldYield({
+      paneOpen: showComments,
+      windowWidth,
+      thumbsWidth: showThumbs ? thumbsW : 0,
+    })
+  const [dockExpandedByUser, setDockExpandedByUser] = useState(false)
+  useEffect(() => setDockExpandedByUser(false), [dockYields])
+  const dockYieldsRef = useRef({ yields: false, preferred: false })
+  dockYieldsRef.current = { yields: dockYields, preferred: showAi }
+  /** the dock the layout shows: the stored preference, unless it yields to the stage */
+  const aiDockOpen = showAi && !(dockYields && !dockExpandedByUser)
   const [commentsFocusNonce, setCommentsFocusNonce] = useState(0)
   /** Notes/comments must be re-fetched after undo/redo (they're not in RenderSlide) */
   const [annotationsNonce, setAnnotationsNonce] = useState(0)
+  // G8-14: a bound document with the shell's comments bridge uses server comments (spine S12);
+  // a local file, or a build without the bridge, keeps the pane above unchanged
+  const serverCommentsHandle = useRef<ServerCommentsHandle | null>(null)
+  const [serverCommentsSlot, setServerCommentsSlot] = useState<HTMLDivElement | null>(null)
+  const [serverOpenCount, setServerOpenCount] = useState(0)
   // ── Insert tab extensions: dialogs + screen recording ──────────────────────
   const [linkDialog, setLinkDialog] = useState<LinkDialogState | null>(null)
+  const [redactDialog, setRedactDialog] = useState<RedactDialogState | null>(null)
   const [hfDialog, setHfDialog] = useState<HfDialogState | null>(null)
   const [eqDialogOpen, setEqDialogOpen] = useState(false)
   const [zoomDialog, setZoomDialog] = useState<zoomActions.ZoomMode | null>(null)
@@ -735,7 +800,7 @@ export function App() {
       const viewportW =
         el?.clientWidth ||
         stageViewportSize.w ||
-        window.innerWidth - (showThumbs ? thumbsW : 0) - (showAi ? 360 : aiEnabled ? 34 : 0)
+        window.innerWidth - (showThumbs ? thumbsW : 0) - (aiDockOpen ? 360 : aiEnabled ? 34 : 0)
       const viewportH = el?.clientHeight || stageViewportSize.h || window.innerHeight - 150
       // 56 = the stage's 2 x 32 padding minus slack; a phone-width WINDOW pads 12 px a side (the
       // styles.css media query keys off the window, not the stage, so this must too: a narrow stage
@@ -745,7 +810,7 @@ export function App() {
       const availH = viewportH - 72
       return Math.min(availW / s.widthPx, availH / s.heightPx)
     },
-    [showThumbs, showAi, aiEnabled, stageViewportSize.h, stageViewportSize.w, thumbsW],
+    [showThumbs, aiDockOpen, aiEnabled, stageViewportSize.h, stageViewportSize.w, thumbsW],
   )
   /** Fit zoom for display: rawFit clamped to the 0.1–1.5 auto-fit range */
   const fitZoom = useCallback(
@@ -1367,6 +1432,12 @@ export function App() {
   }, [slides.length])
 
   const toggleAi = useCallback(() => {
+    // while the dock yields to the stage the click only expands / re-collapses it for this pane
+    // session; the stored preference stays
+    if (dockYieldsRef.current.yields && dockYieldsRef.current.preferred) {
+      setDockExpandedByUser((v) => !v)
+      return
+    }
     setShowAi((v) => {
       rememberAiPanelOpen('ai-slides-show-ai', !v)
       return !v
@@ -1386,6 +1457,7 @@ export function App() {
         rememberAiPanelOpen('ai-slides-show-ai', true)
         return true
       })
+      if (dockYieldsRef.current.yields) setDockExpandedByUser(true)
       setAiPreset({
         text,
         nonce: Date.now(),
@@ -1471,6 +1543,8 @@ export function App() {
         bottom: Math.min(r.top + maxY * scale, view?.bottom ?? Infinity),
         viewTop: view?.top ?? 0,
         viewBottom: view?.bottom ?? window.innerHeight,
+        viewLeft: view?.left ?? 0,
+        viewRight: view?.right ?? window.innerWidth,
       }
       return rect.right <= rect.left || rect.bottom <= rect.top ? null : rect
     },
@@ -1526,6 +1600,7 @@ export function App() {
         rememberAiPanelOpen('ai-slides-show-ai', true)
         return true
       })
+      if (dockYieldsRef.current.yields) setDockExpandedByUser(true)
     },
     [askState, askTargets, current],
   )
@@ -1758,6 +1833,10 @@ export function App() {
   const openLinkDialog = useCallback(() => insertActions.openLinkDialog(ctxRef.current), [])
   const applyLink = useCallback(
     (target: LinkTargetOp | null) => insertActions.applyLink(ctxRef.current, target),
+    [],
+  )
+  const applyRedaction = useCallback(
+    (label: string | null) => redactActions.applyRedaction(ctxRef.current, label),
     [],
   )
   const insertZooms = useCallback((mode: zoomActions.ZoomMode, keys: number[]) => {
@@ -2114,6 +2193,27 @@ export function App() {
     setShowAnimPane(false)
     if (focus) setCommentsFocusNonce((n) => n + 1)
   }, [])
+
+  // "New Comment" on a bound document: a server thread on this slide (+ the one selected object)
+  const newComment = useCallback(() => {
+    openComments(!serverComments)
+    if (!serverComments) return
+    const ctx = ctxRef.current
+    serverCommentsHandle.current?.startThread(
+      ctx.current,
+      selectedObjectId(ctx.slides[ctx.current], ctx.selectedIds),
+    )
+  }, [openComments, serverComments])
+
+  // a comment reveal: that slide, and the anchored object when it still exists
+  const goToCommentAnchor = useCallback((index: number, sourceId?: string) => {
+    setCurrent(index)
+    setEditing(null)
+    setSelectedIds(sourceId ? [sourceId] : [])
+  }, [])
+  const openServerComments = useCallback(() => openComments(false), [openComments])
+  const closeComments = useCallback(() => setShowComments(false), [])
+  const readFileComments = useCallback((i: number) => window.slidesApi.getComments(i), [])
 
   // ── View modes ──────────────────────────────────────────────────────────
   const onViewMode = useCallback((mode: SlidesViewMode) => {
@@ -3215,6 +3315,8 @@ export function App() {
     commitEditPoints,
     linkDialog,
     setLinkDialog,
+    redactDialog,
+    setRedactDialog,
     setHfDialog,
     setEqDialogOpen,
     setChartDataDialogInit,
@@ -3236,6 +3338,7 @@ export function App() {
     setRecording,
     editingActiveRef,
     applySlide,
+    applyDeck,
     flushNotes,
     findNodeCtx,
     groupIdOf,
@@ -3245,7 +3348,7 @@ export function App() {
     onTransform,
     openBgFormat,
     openFormat,
-    newComment: () => openComments(true),
+    newComment,
     openChangeShape: (targetId, x, y) => setShapeGalleryAt({ targetId, x, y }),
   }
 
@@ -3314,6 +3417,24 @@ export function App() {
   return (
     <div className="app">
       <ToastHost />
+      {serverComments && commentsContext && commentsBridgeApi && path && (
+        <ServerCommentsHost
+          key={path}
+          bridge={commentsBridgeApi}
+          path={path}
+          context={commentsContext}
+          slides={slides}
+          slot={showComments ? serverCommentsSlot : null}
+          goTo={goToCommentAnchor}
+          onOpen={openServerComments}
+          onCollapse={closeComments}
+          readFileComments={readFileComments}
+          fileCommentsNonce={annotationsNonce}
+          handleRef={serverCommentsHandle}
+          onOpenCount={setServerOpenCount}
+          onStatus={setStatus}
+        />
+      )}
       <Ribbon
         hasDoc={!!slide}
         deckEmpty={deckEmpty}
@@ -3340,7 +3461,7 @@ export function App() {
         onZoom={previewZoom}
         showThumbs={showThumbs}
         onToggleThumbs={() => setShowThumbs((v) => !v)}
-        aiOpen={showAi}
+        aiOpen={aiDockOpen}
         onToggleAi={toggleAi}
         onAiPreset={(text, opts) => pushAiPreset(text, true, undefined, undefined, opts?.slideShot)}
         onPickShape={pickShape}
@@ -3463,8 +3584,9 @@ export function App() {
         onToggleNotes={() => setShowNotes((v) => !v)}
         commentsOpen={showComments}
         onToggleComments={() => (showComments ? setShowComments(false) : openComments(false))}
-        onNewComment={() => openComments(true)}
-        commentCount={comments.length}
+        onNewComment={newComment}
+        commentCount={serverComments ? serverOpenCount : comments.length}
+        serverComments={serverComments}
         onInsertIcon={(def, color) => void insertIcon(def, color)}
         onInsertChart={(kind) => void insertChart(kind)}
         onInsertSmartArt={(def) => void insertSmartArt(def)}
@@ -3645,7 +3767,11 @@ export function App() {
 
       <div className="app-main">
         {aiEnabled && slide && viewMode !== 'reading' && viewMode !== 'sorter' && (
-          <div className={`ai-dock${showAi && aiSettings ? '' : ' collapsed'}`}>
+          <div
+            className={`ai-dock${aiDockOpen && aiSettings ? '' : ' collapsed'}${
+              !aiSidebarEnabled && !showAi ? ' ai-dock-off' : ''
+            }`}
+          >
             {/* always mounted once settings load: collapse must not drop state or in-flight runs */}
             {aiSettings ? (
               <Suspense fallback={null}>
@@ -3661,7 +3787,7 @@ export function App() {
                   fitWidthPx={FIT_WIDTH}
                   settings={aiSettings}
                   preset={aiPreset}
-                  open={showAi}
+                  open={aiDockOpen}
                   onExpand={toggleAi}
                   onCollapse={toggleAi}
                   onUndo={() => void undo()}
@@ -3689,7 +3815,7 @@ export function App() {
                   }
                 />
               </Suspense>
-            ) : (
+            ) : aiSidebarEnabled ? (
               <button
                 className="ai-rail"
                 onClick={toggleAi}
@@ -3698,7 +3824,7 @@ export function App() {
               >
                 <UniAiMark size={22} />
               </button>
-            )}
+            ) : null}
           </div>
         )}
         <div className="app-content">
@@ -4038,7 +4164,7 @@ export function App() {
                           <div className="stage-ai-bar">
                             <div className="stage-ai-group">
                               <button
-                                className={`stage-ai-btn${showAi ? ' active' : ''}`}
+                                className={`stage-ai-btn${aiDockOpen ? ' active' : ''}`}
                                 data-tip={t('aiOpenAssistant')}
                                 onClick={toggleAi}
                               >
@@ -4497,6 +4623,8 @@ export function App() {
                     onPreview={() => setAnimPreview((n) => n + 1)}
                     onCollapse={() => setShowAnimPane(false)}
                   />
+                ) : showComments && serverComments ? (
+                  <div className="comments-slot" ref={setServerCommentsSlot} />
                 ) : showComments ? (
                   <CommentsPane
                     slideIndex={current}
@@ -4597,6 +4725,13 @@ export function App() {
           currentSlide={current}
           onApply={(target) => void applyLink(target)}
           onClose={() => setLinkDialog(null)}
+        />
+      )}
+      {redactDialog && (
+        <RedactDialog
+          seed={redactDialog.seed}
+          onSubmit={(label) => void applyRedaction(label)}
+          onCancel={() => setRedactDialog(null)}
         />
       )}
       {hfDialog && (

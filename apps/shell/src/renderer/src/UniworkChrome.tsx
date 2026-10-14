@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import type { TabSummary } from '../../shared/tabs-api'
 import type { UniworkDocStatus } from '../../shared/home-api'
-import { useI18n } from './locale'
+import { useI18n, type StringKey } from './locale'
 import { useAccount } from './account-model'
 import { onLocalRename, onUniworkNotice } from './uniwork-notice-bus'
 import { onDocRenamed } from './uniwork-library-api'
@@ -20,8 +20,10 @@ import {
   chipModelOf,
   launchNoticeOf,
   pathKey,
+  remoteBarModelOf,
   type ChipActionKind,
   type LaunchNotice,
+  type RemoteBarAction,
 } from './uniwork-docs-model'
 
 /**
@@ -167,7 +169,9 @@ export function UniworkStatusChip({
     const call =
       kind === 'retry'
         ? window.aiOffice.uniworkSave(status.path)
-        : window.aiOffice.uniworkResolveConflict(status.path)
+        : kind === 'reload'
+          ? window.aiOffice.uniworkRemoteAction(status.path, 'reload')
+          : window.aiOffice.uniworkResolveConflict(status.path)
     void call
       .then((next) => {
         if (next) onStatus(next)
@@ -331,5 +335,249 @@ export function DiscussionToggle({ status }: { status: UniworkDocStatus }) {
       </svg>
       <span className="uw-discussion-toggle-label">{label}</span>
     </button>
+  )
+}
+
+// ── S6 new-version bar ──────────────────────────────────
+
+/** one signature per bar state: a newer revision (another version) is a different bar */
+function remoteSignature(status: UniworkDocStatus | null): string | null {
+  return status?.remote ? JSON.stringify(status.remote) : null
+}
+
+/**
+ * The identity of the notice a user closed or put off. A newer revision is the same notice
+ * whatever it waits for (a commit in flight, a stuck one) and whether it is dirty or AI: only a
+ * higher version is a new one. Every other kind is its whole state.
+ */
+function remoteNoticeKey(status: UniworkDocStatus | null): string | null {
+  const remote = status?.remote
+  if (!remote) return null
+  if (remote.kind === 'newer-dirty' || remote.kind === 'newer-ai') return `newer\n${remote.version}`
+  return JSON.stringify(remote)
+}
+
+interface RemoteSay {
+  key: StringKey
+  params: Record<string, string | number>
+  assertive: boolean
+  n: number
+}
+
+/**
+ * The bar under the tab strip for the ACTIVE tab's document (one bar, never stacked; a second
+ * notice replaces its version). The sentence on screen is not live: it is read once through
+ * the window-level live nodes below, polite for a newer version, alert for the error kinds.
+ * `Later` / `Close` hide the bar here at once and tell main; a bar that main later replaces
+ * with another notice (a newer version, another kind) shows again.
+ */
+export function UniworkRemoteBar({
+  status,
+  onStatus,
+}: {
+  status: UniworkDocStatus | null
+  onStatus: (status: UniworkDocStatus) => void
+}) {
+  const { t } = useI18n()
+  const id = useId()
+  const model = status ? remoteBarModelOf(status) : null
+  const path = status ? pathKey(status.path) : null
+  const signature = remoteSignature(status)
+  const noticeKey = remoteNoticeKey(status)
+  // paths whose current notice was closed / put off, with the notice's identity
+  const [hidden, setHidden] = useState<ReadonlyMap<string, string>>(new Map())
+  const hiddenHere = path !== null && noticeKey !== null && hidden.get(path) === noticeKey
+  const visible = Boolean(model) && !hiddenHere
+  const [hovered, setHovered] = useState(false)
+  const [focused, setFocused] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [say, setSay] = useState<RemoteSay | null>(null)
+  const barRef = useRef<HTMLDivElement>(null)
+  const heightRef = useRef(0)
+
+  const hide = useCallback(() => {
+    if (path === null || noticeKey === null) return
+    setHidden((prev) => new Map(prev).set(path, noticeKey))
+  }, [path, noticeKey])
+
+  const act = useCallback(
+    (kind: RemoteBarAction['kind']) => {
+      if (!status) return
+      if (kind === 'later' || kind === 'close') hide()
+      setBusy(true)
+      void window.aiOffice
+        .uniworkRemoteAction(status.path, kind)
+        .then((next) => {
+          if (next) onStatus(next)
+        })
+        .catch(() => undefined)
+        .finally(() => setBusy(false))
+    },
+    [status, hide, onStatus],
+  )
+
+  // a closed bar is forgotten once the document has no bar, or another notice
+  useEffect(() => {
+    if (path === null || hidden.get(path) === undefined || hidden.get(path) === noticeKey) return
+    setHidden((prev) => {
+      const next = new Map(prev)
+      next.delete(path)
+      return next
+    })
+  }, [path, noticeKey, hidden])
+
+  // announced once per notice of a document: coming back to a tab does not say it again, a bar
+  // that went away (no remote) and returns does, and a hidden bar leaves no stale sentence behind
+  const announced = useRef(new Map<string, string>())
+  const shownKey = visible && model && path ? `${path}\n${signature}` : null
+  const announceKey = visible && model && path && noticeKey ? `${path}\n${noticeKey}` : null
+  const modelRef = useRef(model)
+  modelRef.current = model
+  useEffect(() => {
+    if (path !== null && model === null) announced.current.delete(path)
+  }, [path, model])
+  useEffect(() => {
+    const current = modelRef.current
+    if (!announceKey || !current || path === null || noticeKey === null) {
+      setSay(null)
+      return
+    }
+    if (announced.current.get(path) === noticeKey) return
+    announced.current.set(path, noticeKey)
+    setSay((prev) => ({
+      key: current.messageKey,
+      params: current.params,
+      assertive: current.tone === 'error',
+      n: (prev?.n ?? 0) + 1,
+    }))
+  }, [announceKey, path, noticeKey])
+
+  // an information bar hides itself unless the pointer or the focus is in it; leaving restarts the 8 s
+  const autoHideMs = visible ? model?.autoHideMs : undefined
+  const actRef = useRef(act)
+  actRef.current = act
+  useEffect(() => {
+    if (!autoHideMs || hovered || focused || busy) return
+    const timer = window.setTimeout(() => actRef.current('close'), autoHideMs)
+    return () => window.clearTimeout(timer)
+  }, [autoHideMs, hovered, focused, busy, shownKey])
+  useEffect(() => {
+    if (!visible) {
+      setHovered(false)
+      setFocused(false)
+    }
+  }, [visible])
+
+  // main moves the active editor view down by the bar's unscaled CSS-px height (main multiplies by
+  // the interface scale): 0 when there is no bar or no document tab
+  const report = useCallback((px: number) => {
+    try {
+      void Promise.resolve(window.aiOffice.uniworkSetBarInset(px)).catch(() => undefined)
+    } catch {
+      // a host without the channel has no inset to move
+    }
+  }, [])
+  useEffect(() => {
+    const bar = barRef.current
+    if (!visible || !bar) {
+      heightRef.current = 0
+      report(0)
+      return
+    }
+    const cssHeight = () => {
+      const rawScale = Number.parseFloat(
+        getComputedStyle(bar).getPropertyValue('--ui-scale') ||
+          document.documentElement.style.getPropertyValue('--ui-scale'),
+      )
+      const scale = Number.isFinite(rawScale) && rawScale > 0 ? rawScale : 1
+      return Math.ceil(bar.getBoundingClientRect().height / scale)
+    }
+    const measure = () => {
+      const px = cssHeight()
+      if (px === heightRef.current) return
+      heightRef.current = px
+      report(px)
+    }
+    heightRef.current = cssHeight()
+    report(heightRef.current)
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(measure)
+    observer.observe(bar)
+    return () => observer.disconnect()
+    // a tab switch sends the height again (the view that becomes active needs it)
+  }, [visible, path, shownKey, report])
+  useEffect(() => () => report(0), [report])
+
+  const messageId = `${id}-msg`
+  const reasonId = `${id}-reason`
+  const reasonKey = model?.actions.find((a) => a.disabledReasonKey)?.disabledReasonKey
+  const showReason = Boolean(reasonKey) && reasonKey !== model?.messageKey
+
+  return (
+    <>
+      {visible && model && (
+        <div
+          ref={barRef}
+          className="uw-remote-bar"
+          role="region"
+          aria-label={t(model.regionKey)}
+          aria-busy={busy ? 'true' : undefined}
+          data-tone={model.tone}
+          data-kind={status?.remote?.kind}
+          onMouseEnter={() => setHovered(true)}
+          onMouseLeave={() => setHovered(false)}
+          onFocus={() => setFocused(true)}
+          onBlur={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocused(false)
+          }}
+        >
+          <span className="uw-remote-dot" aria-hidden="true" />
+          <div className="uw-remote-text">
+            <p id={messageId} className="uw-remote-message">
+              {t(model.messageKey, model.params)}
+            </p>
+            {showReason && reasonKey && (
+              <p id={reasonId} className="uw-remote-reason">
+                {t(reasonKey)}
+              </p>
+            )}
+          </div>
+          <div className="uw-remote-actions">
+            {model.actions.map((action) => {
+              const blocked = Boolean(action.disabledReasonKey)
+              return (
+                <button
+                  key={action.kind}
+                  type="button"
+                  className="uw-remote-action"
+                  data-action={action.kind}
+                  aria-disabled={blocked || busy ? 'true' : undefined}
+                  aria-describedby={
+                    action.disabledReasonKey
+                      ? action.disabledReasonKey === model.messageKey
+                        ? messageId
+                        : reasonId
+                      : undefined
+                  }
+                  onClick={() => {
+                    if (blocked || busy) return
+                    act(action.kind)
+                  }}
+                >
+                  {t(action.labelKey)}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+      {/* window-level live nodes: always in the DOM so a screen reader picks the change up */}
+      <span className="uw-sr-only" role="status" aria-live="polite">
+        {say && !say.assertive ? <span key={say.n}>{t(say.key, say.params)}</span> : null}
+      </span>
+      <span className="uw-sr-only" role="alert">
+        {say?.assertive ? <span key={say.n}>{t(say.key, say.params)}</span> : null}
+      </span>
+    </>
   )
 }

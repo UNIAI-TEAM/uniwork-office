@@ -1,5 +1,6 @@
 /** Insert tab of the slides ribbon. Extracted from Ribbon.tsx. */
 import type { InsertKind } from '../../shared/ipc'
+import { platformShortcuts } from '@genoffice/i18n'
 import { WORDART_PRESETS, wordArtStrokePx } from '@genoffice/ui'
 import {
   CHART_GALLERY,
@@ -45,6 +46,9 @@ import {
   type RibbonTabCtx,
 } from './ribbon-shared'
 
+/** The New Slide screentip shows the platform's real chord: ⇧⌘N on mac, Ctrl+M elsewhere. */
+const IS_MAC = navigator.platform.toLowerCase().includes('mac')
+
 const ZOOM_LABEL = {
   summary: 'ribbonZoomSummary',
   section: 'ribbonZoomSection',
@@ -74,6 +78,7 @@ export function RibbonInsertTab({ rb }: { rb: RibbonTabCtx }) {
     onOpenZoom,
     hasSections,
     onNewComment,
+    serverComments,
     onOpenEquation,
     onOpenHeaderFooter,
     onOpenLink,
@@ -101,7 +106,8 @@ export function RibbonInsertTab({ rb }: { rb: RibbonTabCtx }) {
             className="rb-big rb-split"
             disabled={!hasDoc}
             onClick={onAddSlide}
-            data-tip={t('ribbonNewSlideTip')}
+            data-tip={platformShortcuts(t('ribbonNewSlideTip'))}
+            data-tip-kbd={IS_MAC ? '⇧⌘N' : 'Ctrl+M'}
           >
             <span className="rb-big-icon">
               <span className="rb-split-main">
@@ -399,7 +405,7 @@ export function RibbonInsertTab({ rb }: { rb: RibbonTabCtx }) {
           className="rb-big"
           disabled={!hasDoc}
           onClick={onNewComment}
-          data-tip={t('ribbonNewCommentTip')}
+          data-tip={t(serverComments ? 'ribbonNewCommentServerTip' : 'ribbonNewCommentTip')}
         >
           <span className="rb-big-icon">
             <IconComment size={BIG} />

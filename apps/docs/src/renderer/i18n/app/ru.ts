@@ -114,6 +114,7 @@ export const ru = {
   appMixedExportOpening:
     'Смешанные форматы бумаги: открывается предварительный просмотр страниц для постраничного объединения при экспорте…',
   appSelectTextToComment: 'Сначала выделите текст для примечания',
+  appCommentSaveFirst: 'Сначала сохраните документ, чтобы добавить комментарий',
   appCommentSelectionLost: 'Выделение больше недействительно; выделите текст для примечания заново',
   appCommentAdded: 'Примечание добавлено; будет записано в документ при сохранении',
   appCommentEdited: 'Примечание изменено; будет записано в документ при сохранении',
@@ -234,6 +235,7 @@ export const ru = {
   appPageOf: 'Страница {current} из {total}',
   appWordCountTitle: 'Статистика',
   appWordCountN: 'Слов: {n}',
+  appWordCountSelection: 'Выбрано {selected} из {total} слов',
   appTrackChangesOn: 'Исправления: вкл.',
   appTrackChangesOff: 'Исправления: выкл.',
   appAcTitle: 'Параметры автозамены',
@@ -450,6 +452,7 @@ export const ru = {
   appParaSpecialFirstLine: 'Отступ',
   appParaSpecialHanging: 'Выступ',
   appParaBy: 'На',
+  appParaUnitChars: 'символов',
   appInsertEquation: 'Вставить уравнение',
   appLatexPlaceholder: 'например, x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}',
   appLatexPreviewHint: 'Введите LaTeX, чтобы увидеть предварительный просмотр',

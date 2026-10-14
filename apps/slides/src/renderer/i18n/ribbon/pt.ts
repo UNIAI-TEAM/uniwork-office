@@ -57,7 +57,7 @@ export const pt = {
     'Pincel de Formatação (clique para copiar e aplicar a formatação; ⌘⇧C copia o formato / ⌘⇧V cola o formato)',
   ribbonGroupSlides: 'Slides',
   ribbonNewSlide: 'Novo Slide',
-  ribbonNewSlideTip: 'Novo slide em branco (mantém o plano de fundo do layout do slide atual; ⌘M)',
+  ribbonNewSlideTip: 'Novo slide em branco (mantém o plano de fundo do layout do slide atual)',
   ribbonChooseLayout: 'Escolher Layout',
   ribbonChooseLayoutNew: 'Novo Slide com Layout',
   ribbonChooseLayoutChange: 'Alterar Layout do Slide Atual',
@@ -219,6 +219,8 @@ export const pt = {
   ribbonGroupComments: 'Comentários',
   ribbonComment: 'Comentário',
   ribbonNewCommentTip: 'Novo comentário no slide atual (salvo no pptx, visível no PowerPoint)',
+  ribbonNewCommentServerTip:
+    'Novo comentário no slide atual (compartilhado com todos que abrirem esta apresentação, não salvo no arquivo)',
   ribbonInsertTextBoxTip: 'Inserir uma caixa de texto',
   ribbonWordArt: 'WordArt',
   ribbonWordArtTip: 'Inserir WordArt (texto grande com preenchimento/contorno)',

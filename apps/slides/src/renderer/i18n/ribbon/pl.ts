@@ -57,7 +57,7 @@ export const pl = {
     'Malarz formatów (kliknij, aby skopiować i zastosować formatowanie; ⌘⇧C kopiuje format / ⌘⇧V wkleja format)',
   ribbonGroupSlides: 'Slajdy',
   ribbonNewSlide: 'Nowy slajd',
-  ribbonNewSlideTip: 'Nowy pusty slajd (zachowuje tło układu bieżącego slajdu; ⌘M)',
+  ribbonNewSlideTip: 'Nowy pusty slajd (zachowuje tło układu bieżącego slajdu)',
   ribbonChooseLayout: 'Wybierz układ',
   ribbonChooseLayoutNew: 'Nowy slajd z układem',
   ribbonChooseLayoutChange: 'Zmień układ bieżącego slajdu',
@@ -219,6 +219,8 @@ export const pl = {
   ribbonComment: 'Komentarz',
   ribbonNewCommentTip:
     'Nowy komentarz na bieżącym slajdzie (zapisany w pptx, widoczny w programie PowerPoint)',
+  ribbonNewCommentServerTip:
+    'Nowy komentarz na bieżącym slajdzie (udostępniony wszystkim, którzy otwierają tę prezentację, nie jest zapisywany w pliku)',
   ribbonInsertTextBoxTip: 'Wstaw pole tekstowe',
   ribbonWordArt: 'WordArt',
   ribbonWordArtTip: 'Wstaw obiekt WordArt (duży tekst z wypełnieniem/konturem)',

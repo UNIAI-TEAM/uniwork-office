@@ -27,6 +27,9 @@
   --shadow-btn-lift: 0 4px 16px rgb(0 0 0 / 12%);
   --shadow-btn-primary: 0 2px 6px rgb(10 82 230 / 28%), 0 6px 18px rgb(10 82 230 / 18%);
   --on-accent: #ffffff;
+  /* unscaled viewport unit defaults (overridden on .app-frame in tabbar.css when zoomed) */
+  --ui-vh: 1vh;
+  --ui-vw: 1vw;
 }
 
 /* ── Dark mode overrides ─────────────────────────────────── */
@@ -117,7 +120,7 @@ body.vib .home {
 
 .home {
   display: flex;
-  height: calc(100vh - 40px);
+  height: calc(var(--ui-vh) * 100 - var(--tab-bar-height, 40px));
 }
 
 .sidebar {
@@ -637,7 +640,7 @@ body.vib .home {
   bottom: 20px;
   transform: translateX(-50%);
   z-index: 80;
-  width: min(560px, calc(100vw - 32px));
+  width: min(560px, calc(var(--ui-vw) * 100 - 32px));
   pointer-events: none;
 }
 
@@ -870,7 +873,7 @@ body.vib .home {
 .new-chat.is-empty .new-chat-body {
   display: flex;
   flex-direction: column;
-  padding-top: clamp(40px, 16vh, 168px);
+  padding-top: clamp(40px, calc(var(--ui-vh) * 16), 168px);
   padding-bottom: 20px;
 }
 
@@ -1949,6 +1952,70 @@ body.vib .home {
   box-shadow: var(--shadow-pill);
 }
 
+/* the type pills and the Starred view's group pills stack in one column so
+   both segmented controls read as separate tracks */
+.toolbar-filters {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+/* group list inside the move-to-group modal (visual language of .picker-tree) */
+.group-picker-list {
+  margin: 14px 0 0;
+  padding: 4px;
+  list-style: none;
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+}
+
+.group-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 30px;
+  padding: 3px 8px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.group-picker-row:hover {
+  background: var(--bg-hover);
+}
+
+.group-picker-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* new-group name input + confirm button */
+.group-picker-new {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.group-picker-new .folder-rename-input {
+  flex: 1;
+  min-width: 0;
+  border-color: var(--border);
+}
+
+.group-picker-new .folder-rename-input:focus {
+  border-color: var(--accent);
+}
+
 .empty {
   color: var(--text-muted);
   font-size: 14px;
@@ -2233,7 +2300,7 @@ body.vib .home {
   z-index: 20;
   box-sizing: border-box;
   min-width: 160px;
-  max-height: calc(100dvh - 16px);
+  max-height: calc(var(--ui-vh) * 100 - 16px);
   overflow-y: auto;
   padding: 6px;
   background: var(--surface);
@@ -2444,7 +2511,7 @@ body.vib .home {
 
 /* ConfirmDialog per the design system: 8px container, 6px buttons */
 .modal {
-  min-width: min(var(--modal-width-sm), 90vw);
+  min-width: min(var(--modal-width-sm), calc(var(--ui-vw) * 90));
   max-width: 500px;
   padding: 24px;
   background: var(--surface);
@@ -2995,7 +3062,7 @@ body.vib .home {
 
 .picker-modal {
   width: 440px;
-  max-width: calc(100vw - 48px);
+  max-width: calc(var(--ui-vw) * 100 - 48px);
   display: flex;
   flex-direction: column;
 }
@@ -5975,9 +6042,9 @@ html[dir='rtl'] .quick-title-row {
 }
 
 .modal.uw-pick {
-  width: min(640px, 92vw);
+  width: min(640px, calc(var(--ui-vw) * 92));
   max-width: none;
-  max-height: min(640px, 86vh);
+  max-height: min(640px, calc(var(--ui-vh) * 86));
   display: flex;
   flex-direction: column;
   padding: 0;
@@ -6053,7 +6120,7 @@ html[dir='rtl'] .quick-title-row {
 .uw-pick-body {
   flex: 1;
   /* tall enough that a row's "…" popup does not cover most of the rows */
-  min-height: min(300px, 45vh);
+  min-height: min(300px, calc(var(--ui-vh) * 45));
   overflow-y: auto;
   padding: 0 12px 12px;
   border-top: 1px solid var(--border-subtle);
@@ -6213,7 +6280,7 @@ html[dir='rtl'] .quick-title-row {
 
 /* the list and the details panel side by side */
 .modal.uw-pick.with-info {
-  width: min(900px, 94vw);
+  width: min(900px, calc(var(--ui-vw) * 94));
 }
 
 .uw-pick-main {
@@ -6398,7 +6465,7 @@ html[dir='rtl'] .quick-title-row {
 .wb-gate-failed {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 40px);
+  height: calc(var(--ui-vh) * 100 - var(--tab-bar-height, 40px));
 }
 
 .wb-gate-failed > .home {
@@ -7085,7 +7152,7 @@ html[dir='rtl'] .quick-title-row {
 }
 
 .modal.uw-act {
-  width: min(440px, 92vw);
+  width: min(440px, calc(var(--ui-vw) * 92));
   max-width: none;
 }
 
@@ -7314,13 +7381,13 @@ html[dir='rtl'] .quick-title-row {
 /* above the library and its modals, so a failure inside a modal is seen too; near the foot, close to the actions */
 .uw-act-toast {
   position: fixed;
-  bottom: 12vh;
+  bottom: calc(var(--ui-vh) * 12);
   left: 50%;
   z-index: 120;
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  max-width: min(420px, 90vw);
+  max-width: min(420px, calc(var(--ui-vw) * 90));
   transform: translateX(-50%);
   padding: 8px 8px 8px 12px;
   box-shadow: var(--shadow-menu);

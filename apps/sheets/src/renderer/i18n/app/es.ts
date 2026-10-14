@@ -577,6 +577,8 @@ export const es = {
   appPrintFailed: 'No se puede imprimir.',
   appPrintNeedsFullLoad:
     'Para imprimir, el libro debe estar completamente cargado; espere a que termine la carga.',
+  appPrintWorkbookTooLarge:
+    'Este libro es demasiado grande para cargarse por completo en la memoria, por lo que no se puede imprimir ni exportar a PDF.',
   appCsvExportNeedsFullLoad:
     'La exportación a CSV requiere el libro completamente cargado — espere a que termine la carga.',
   appCsvExportTooLarge: 'La hoja es demasiado grande para exportarla como CSV.',
@@ -1119,6 +1121,9 @@ export const es = {
   appHeadings: 'Encabezados',
   appHeadingsHidden: 'Encabezados ocultos.',
   appHeadingsShown: 'Encabezados mostrados.',
+  appRightToLeft: 'De derecha a izquierda',
+  appRightToLeftOn: 'Dirección de la cuadrícula: de derecha a izquierda.',
+  appRightToLeftOff: 'Dirección de la cuadrícula: de izquierda a derecha.',
   appPrintHeadingsTitle: 'Imprimir encabezados de fila y columna',
   appGroupFunctionLibrary: 'Biblioteca de funciones',
   appInsertFunction: 'Insertar función',
@@ -1514,6 +1519,7 @@ export const es = {
   appCtxResolveComment: 'Resolver comentario',
   appThreadConverted: 'Se convirtieron {count} comentarios en notas.',
   appThreadNoneAtSelection: 'No hay comentario en hilo en la celda seleccionada.',
+  appCommentSaveFirst: 'Guarde primero el libro para agregar un comentario',
   appThreadCellHasNote:
     'La celda seleccionada ya tiene una nota; no se puede añadir un comentario.',
   appThreadHoverHint: 'Responder en el panel Comentarios',

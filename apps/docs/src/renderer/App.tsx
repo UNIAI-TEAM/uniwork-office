@@ -25,6 +25,7 @@ import {
   createZoomWheelClassifier,
   useAutoSavePref,
   useImageGenerationOffered,
+  useAiSidebarEnabled,
 } from '@genoffice/ui'
 import { wordRangeAtCaret } from './editor/comments'
 import {
@@ -128,8 +129,12 @@ import {
   countWords,
   documentTextForWordCount,
   nonAsianWordCount,
+  selectedWordCount,
 } from './word-count'
 import { CommentsPanel } from './components/CommentsPanel'
+import { ServerCommentsHost, type ServerCommentsHandle } from './server-comments/ServerCommentsHost'
+import { useServerMode } from './server-comments/mode'
+import { paraIdResolver } from './server-comments/para-id'
 import { EquationModal } from './components/EquationModal'
 import { HeaderFooterArea } from './components/HeaderFooterArea'
 import { PageFootnotes, PageEndnotes } from './components/PageNoteAreas'
@@ -394,6 +399,7 @@ import {
 import {
   applyAiDocContent as applyAiDocContentImpl,
   buildDocBytes as buildDocBytesImpl,
+  currentDocGeneration,
   exportPdf as exportPdfImpl,
   exportHtml as exportHtmlImpl,
   exportImages as exportImagesImpl,
@@ -812,6 +818,12 @@ export function App() {
     () => aiPanelInitiallyOpen('aidocs.showAi') && !isNarrowViewport(),
   )
   const showAi = aiEnabled && showAiPref
+  // Settings › "show the AI sidebar" off hides the panel and its rail the way Word
+  // treats the Copilot pane: an explicit Ask-AI action (ribbon, context menu,
+  // shortcut, preset) still opens the panel for this document, and closing it
+  // returns to hidden. The dock stays mounted either way, so panel state and
+  // in-flight runs survive; the hook closes it when the switch itself goes off.
+  const aiSidebarEnabled = useAiSidebarEnabled(setShowAi)
   const [spellcheck, setSpellcheck] = useState(spellcheckEnabled)
   const [largeDocSpellOff, setLargeDocSpellOff] = useState(false)
   const spellcheckActive = spellcheck && !largeDocSpellOff
@@ -1087,6 +1099,18 @@ export function App() {
   uniworkRef.current = uniworkState
   /** autosave as it actually runs: the pref, forced off for a UniWork document */
   const autoSaveActive = autoSave && !uniwork.bound
+  // G8-12: server comments (S12) when the host answers a comments context for this document; a
+  // Save replaces `doc` but not the document generation, so server mode survives it
+  const serverMode = useServerMode(doc ? currentDocGeneration() + 1 : 0, doc?.filePath)
+  const serverCommentsRef = useRef<ServerCommentsHandle | null>(null)
+  const serverActiveRef = useRef(false)
+  serverActiveRef.current = serverMode !== null
+  const parsedBlocksRef = useRef<DocState['parsed']['blocks']>([])
+  parsedBlocksRef.current = doc?.parsed.blocks ?? []
+  const serverCodec = useMemo(
+    () => ({ paraIdOf: paraIdResolver(() => parsedBlocksRef.current) }),
+    [],
+  )
   // tab closed but this renderer kept alive (shell freeze workaround): go inert
   const [tornDown, setTornDown] = useState(false)
   const [aiPreset, setAiPreset] = useState<{
@@ -2941,6 +2965,9 @@ export function App() {
     setInkAnnotations,
     setInksDirty,
     setCompareResult,
+    server: serverActiveRef.current
+      ? { startThread: () => serverCommentsRef.current?.startThread() }
+      : null,
   }
 
   // G8-02: comments written from here carry the author the host resolves for the
@@ -5236,8 +5263,22 @@ export function App() {
   // (Word refreshes its count on idle too). A trailing throttle, not a
   // debounce: the streamed tail of a phased open would keep resetting one
   const [wordCount, setWordCount] = useState(0)
+  // Word's "selected/total" pair; 0 means no selection, so the bar falls back
+  // to the plain total. Cheap enough (a text range, not a document walk) to
+  // follow the selection directly rather than ride the throttle above.
+  const [selectionWordCount, setSelectionWordCount] = useState(0)
   // the ribbon's revision badge walks every block too: same pacing
   const [revisionCount, setRevisionCount] = useState(0)
+  useEffect(() => {
+    if (!editor) return
+    const refreshSelection = () =>
+      setSelectionWordCount(selectedWordCount(editor.state.doc, editor.state.selection))
+    refreshSelection()
+    editor.on('selectionUpdate', refreshSelection)
+    return () => {
+      editor.off('selectionUpdate', refreshSelection)
+    }
+  }, [editor])
   useEffect(() => {
     if (!editor) return
     let timer = 0
@@ -5245,6 +5286,7 @@ export function App() {
       timer = 0
       setWordCount(wordCountOfDoc(editor.state.doc))
       setRevisionCount(doc ? revisionCountOfDoc(editor.state.doc) : 0)
+      setSelectionWordCount(selectedWordCount(editor.state.doc, editor.state.selection))
     }
     const onUpdate = () => {
       if (!timer) timer = window.setTimeout(refresh, WORD_COUNT_THROTTLE_MS)
@@ -6292,7 +6334,22 @@ export function App() {
   // AI comment tools run the same review-actions code paths as the comments pane
   const aiCommentsAccess = useMemo<AiCommentsAccess>(
     () => ({
-      list: () => reviewCtxRef.current.comments,
+      list: () => [
+        ...reviewCtxRef.current.comments,
+        ...(serverActiveRef.current ? (serverCommentsRef.current?.ai.list() ?? []) : []),
+      ],
+      // G8-12: on a bound document the tools only fill server composer drafts (invariant 7)
+      get server() {
+        const handle = serverActiveRef.current ? serverCommentsRef.current : null
+        return handle
+          ? {
+              owns: (id: string) => handle.ai.owns(id),
+              draftReply: (id: string, text: string) => handle.ai.draftReply(id, text),
+              draftNew: (range: { from: number; to: number }, text: string) =>
+                handle.ai.draftNew(range, text),
+            }
+          : undefined
+      },
       reply: (parentId, text) =>
         replyToCommentImpl(reviewCtxRef.current, parentId, text, AI_REVISION_AUTHOR),
       resolve: (id) => {
@@ -7207,7 +7264,11 @@ export function App() {
 
       <div className="app-main">
         {doc && aiEnabled && (
-          <div className={`ai-dock${showAi ? '' : ' collapsed'}`}>
+          <div
+            className={`ai-dock${showAi ? '' : ' collapsed'}${
+              !aiSidebarEnabled && !showAi ? ' ai-dock-off' : ''
+            }`}
+          >
             {/* always mounted: collapse must not drop state or in-flight runs */}
             <AiPanel
               key={aiPanelKey}
@@ -7220,6 +7281,7 @@ export function App() {
               }
               preset={aiPreset}
               open={showAi}
+              hideRail={!aiSidebarEnabled}
               onExpand={() => setShowAi(true)}
               onCollapse={() => setShowAi(false)}
               filePath={doc?.filePath ?? null}
@@ -7516,7 +7578,25 @@ export function App() {
                 {t('appExitReadMode')}
               </button>
             )}
-            {doc && showComments && (
+            {doc && serverMode && editor && (
+              <ServerCommentsHost
+                key={`${serverMode.documentId}\u0000${serverMode.path}`}
+                mode={serverMode}
+                editor={editor}
+                lang={lang}
+                panelOpen={showComments && !readMode}
+                onOpenPanel={() => setShowComments(true)}
+                onClosePanel={closeCommentsPanel}
+                onStatus={setStatus}
+                selectTextMessage={t('appSelectTextToComment')}
+                saveFirstMessage={t('appCommentSaveFirst')}
+                inFileComments={comments}
+                neutralAuthor={t('editorNeutralCommentAuthor')}
+                handleRef={serverCommentsRef}
+                codec={serverCodec}
+              />
+            )}
+            {doc && !serverMode && showComments && (
               <CommentsPanel
                 comments={comments}
                 docNode={editor.state.doc}
@@ -7572,7 +7652,12 @@ export function App() {
                     data-tip={t('appWordCountTitle')}
                     onClick={openStats}
                   >
-                    {t('appWordCountN', { n: wordCount })}
+                    {selectionWordCount > 0
+                      ? t('appWordCountSelection', {
+                          selected: selectionWordCount,
+                          total: wordCount,
+                        })
+                      : t('appWordCountN', { n: wordCount })}
                   </button>
                   <button
                     className={`status-item status-btn status-track${trackChanges ? ' on' : ''}`}

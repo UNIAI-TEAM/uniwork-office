@@ -113,6 +113,7 @@ export const pl = {
   appMixedExportOpening:
     'Mieszane rozmiary papieru: otwieranie podglądu podziału na strony w celu eksportu ze scaleniem według stron…',
   appSelectTextToComment: 'Najpierw zaznacz tekst do skomentowania',
+  appCommentSaveFirst: 'Najpierw zapisz dokument, aby dodać komentarz',
   appCommentSelectionLost:
     'Zaznaczenie jest już nieaktualne; zaznacz ponownie tekst do skomentowania',
   appCommentAdded: 'Dodano komentarz; zostanie zapisany w dokumencie przy zapisie',
@@ -235,6 +236,7 @@ export const pl = {
   appPageOf: 'Strona {current} z {total}',
   appWordCountTitle: 'Statystyka wyrazów',
   appWordCountN: 'Wyrazów: {n}',
+  appWordCountSelection: 'Zaznaczono {selected} z {total} wyrazów',
   appTrackChangesOn: 'Śledź zmiany: wł.',
   appTrackChangesOff: 'Śledź zmiany: wył.',
   appAcTitle: 'Opcje Autokorekty',
@@ -451,6 +453,7 @@ export const pl = {
   appParaSpecialFirstLine: 'Pierwszy wiersz',
   appParaSpecialHanging: 'Wysunięcie',
   appParaBy: 'Co',
+  appParaUnitChars: 'znaki',
   appInsertEquation: 'Wstaw równanie',
   appLatexPlaceholder: 'np. x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}',
   appLatexPreviewHint: 'Wpisz LaTeX, aby zobaczyć podgląd',

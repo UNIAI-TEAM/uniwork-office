@@ -114,6 +114,7 @@ export const id = {
   appMixedExportOpening:
     'Ukuran kertas campuran: membuka pratinjau paginasi untuk mengekspor halaman yang digabungkan…',
   appSelectTextToComment: 'Pilih teks yang ingin dikomentari terlebih dahulu',
+  appCommentSaveFirst: 'Simpan dokumen terlebih dahulu untuk menambahkan komentar',
   appCommentSelectionLost: 'Pilihan tidak lagi valid; pilih kembali teks yang ingin dikomentari',
   appCommentAdded: 'Komentar ditambahkan; ditulis ke dokumen saat disimpan',
   appCommentEdited: 'Komentar diperbarui; ditulis ke dokumen saat disimpan',
@@ -232,6 +233,7 @@ export const id = {
   appPageOf: 'Halaman {current} dari {total}',
   appWordCountTitle: 'Jumlah Kata',
   appWordCountN: '{n} kata',
+  appWordCountSelection: 'Dipilih {selected} / {total} kata',
   appTrackChangesOn: 'Lacak Perubahan: Aktif',
   appTrackChangesOff: 'Lacak Perubahan: Nonaktif',
   appAcTitle: 'Opsi Koreksi Otomatis',
@@ -448,6 +450,7 @@ export const id = {
   appParaSpecialFirstLine: 'Baris pertama',
   appParaSpecialHanging: 'Menggantung',
   appParaBy: 'Sebesar',
+  appParaUnitChars: 'karakter',
   appInsertEquation: 'Sisipkan Persamaan',
   appLatexPlaceholder: 'mis. x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}',
   appLatexPreviewHint: 'Ketik LaTeX untuk melihat pratinjau',

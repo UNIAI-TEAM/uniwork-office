@@ -57,7 +57,7 @@ export const th = {
     'ตัวคัดวางรูปแบบ (คลิกเพื่อคัดลอกและนำรูปแบบไปใช้; ⌘⇧C คัดลอกรูปแบบ / ⌘⇧V วางรูปแบบ)',
   ribbonGroupSlides: 'สไลด์',
   ribbonNewSlide: 'สไลด์ใหม่',
-  ribbonNewSlideTip: 'สไลด์เปล่าใหม่ (ใช้พื้นหลังเค้าโครงของสไลด์ปัจจุบันต่อ; ⌘M)',
+  ribbonNewSlideTip: 'สไลด์เปล่าใหม่ (ใช้พื้นหลังเค้าโครงของสไลด์ปัจจุบันต่อ)',
   ribbonChooseLayout: 'เลือกเค้าโครง',
   ribbonChooseLayoutNew: 'สร้างภาพนิ่งใหม่ด้วยเค้าโครง',
   ribbonChooseLayoutChange: 'เปลี่ยนเค้าโครงภาพนิ่งปัจจุบัน',
@@ -214,6 +214,8 @@ export const th = {
   ribbonGroupComments: 'ข้อคิดเห็น',
   ribbonComment: 'ข้อคิดเห็น',
   ribbonNewCommentTip: 'สร้างข้อคิดเห็นใหม่บนสไลด์ปัจจุบัน (บันทึกลง pptx มองเห็นได้ใน PowerPoint)',
+  ribbonNewCommentServerTip:
+    'สร้างข้อคิดเห็นใหม่บนสไลด์ปัจจุบัน (แชร์กับทุกคนที่เปิดงานนำเสนอนี้ และไม่ถูกบันทึกลงในไฟล์)',
   ribbonInsertTextBoxTip: 'แทรกกล่องข้อความ',
   ribbonWordArt: 'อักษรศิลป์',
   ribbonWordArtTip: 'แทรกอักษรศิลป์ (ข้อความขนาดใหญ่แบบเติมสี/เส้นขอบ)',

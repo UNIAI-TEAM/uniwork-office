@@ -60,7 +60,7 @@ export const es = {
   ribbonGroupSlides: 'Diapositivas',
   ribbonNewSlide: 'Nueva diapositiva',
   ribbonNewSlideTip:
-    'Nueva diapositiva en blanco (conserva el fondo del diseño de la diapositiva actual; ⌘M)',
+    'Nueva diapositiva en blanco (conserva el fondo del diseño de la diapositiva actual)',
   ribbonChooseLayout: 'Elegir diseño',
   ribbonChooseLayoutNew: 'Nueva diapositiva con diseño',
   ribbonChooseLayoutChange: 'Cambiar diseño de la diapositiva actual',
@@ -224,6 +224,8 @@ export const es = {
   ribbonComment: 'Comentario',
   ribbonNewCommentTip:
     'Nuevo comentario en la diapositiva actual (guardado en pptx, visible en PowerPoint)',
+  ribbonNewCommentServerTip:
+    'Nuevo comentario en la diapositiva actual (compartido con todos los que abran esta presentación, no se guarda en el archivo)',
   ribbonInsertTextBoxTip: 'Insertar un cuadro de texto',
   ribbonWordArt: 'WordArt',
   ribbonWordArtTip: 'Insertar WordArt (texto grande con relleno/contorno)',

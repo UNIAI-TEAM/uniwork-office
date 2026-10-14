@@ -532,6 +532,8 @@ export const vi = {
   appPrintFailed: 'Không thể in.',
   appPrintNeedsFullLoad:
     'In ấn cần toàn bộ sổ làm việc được tải — vui lòng đợi quá trình tải hoàn tất.',
+  appPrintWorkbookTooLarge:
+    'Sổ làm việc này quá lớn để tải đầy đủ vào bộ nhớ, nên không thể in hoặc xuất ra PDF.',
   appCsvExportNeedsFullLoad: 'Xuất CSV cần sổ làm việc được tải đầy đủ — vui lòng đợi tải xong.',
   appCsvExportTooLarge: 'Trang tính quá lớn để xuất dưới dạng CSV.',
   appCsvExportCanceled: 'Đã hủy xuất CSV.',
@@ -1068,6 +1070,9 @@ export const vi = {
   appHeadings: 'Tiêu đề',
   appHeadingsHidden: 'Đã ẩn tiêu đề.',
   appHeadingsShown: 'Đã hiển thị tiêu đề.',
+  appRightToLeft: 'Từ phải sang trái',
+  appRightToLeftOn: 'Hướng lưới: từ phải sang trái.',
+  appRightToLeftOff: 'Hướng lưới: từ trái sang phải.',
   appPrintHeadingsTitle: 'In tiêu đề hàng và cột',
   appGroupFunctionLibrary: 'Thư viện hàm',
   appInsertFunction: 'Chèn hàm',
@@ -1460,6 +1465,7 @@ export const vi = {
   appCtxResolveComment: 'Giải quyết chú thích',
   appThreadConverted: 'Đã chuyển {count} chú thích thành ghi chú.',
   appThreadNoneAtSelection: 'Không có chú thích theo chuỗi trong ô đã chọn.',
+  appCommentSaveFirst: 'Hãy lưu sổ làm việc trước khi thêm bình luận',
   appThreadCellHasNote: 'Ô đã chọn đã có ghi chú; không thể thêm chú thích.',
   appThreadHoverHint: 'Trả lời trong ngăn Chú thích',
   appNoteCellHasThread: 'Ô đã chọn đã có chú thích theo chuỗi; không thể thêm ghi chú.',

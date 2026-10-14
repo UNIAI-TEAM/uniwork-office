@@ -60,7 +60,7 @@ export const fr = {
   ribbonGroupSlides: 'Diapositives',
   ribbonNewSlide: 'Nouvelle diapositive',
   ribbonNewSlideTip:
-    "Nouvelle diapositive vide (conserve l'arrière-plan de disposition de la diapositive actuelle; ⌘M)",
+    "Nouvelle diapositive vide (conserve l'arrière-plan de disposition de la diapositive actuelle)",
   ribbonChooseLayout: 'Choisir une disposition',
   ribbonChooseLayoutNew: 'Nouvelle diapositive avec disposition',
   ribbonChooseLayoutChange: 'Modifier la disposition de la diapositive',
@@ -224,6 +224,8 @@ export const fr = {
   ribbonComment: 'Commentaire',
   ribbonNewCommentTip:
     'Nouveau commentaire sur la diapositive actuelle (enregistré dans le pptx, visible dans PowerPoint)',
+  ribbonNewCommentServerTip:
+    'Nouveau commentaire sur la diapositive actuelle (partagé avec toute personne qui ouvre cette présentation, non enregistré dans le fichier)',
   ribbonInsertTextBoxTip: 'Insérer une zone de texte',
   ribbonWordArt: 'WordArt',
   ribbonWordArtTip: 'Insérer un objet WordArt (grand texte avec remplissage/contour)',

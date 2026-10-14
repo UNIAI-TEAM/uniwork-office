@@ -1,5 +1,6 @@
 import type {
   AgentStreamRequest,
+  AgentTokenUsage,
   AgentToolCall,
   AgentToolDef,
   AgentTransport,
@@ -18,7 +19,8 @@ export interface IpcStreamChunk {
   requestId: string
   /** 'ping' = wire-level keepalive; re-arms the silence watchdog and carries no payload;
    * 'reasoning' = model thinking delta (text carries it) */
-  type: 'delta' | 'reasoning' | 'tool-call' | 'done' | 'error' | 'ping' | 'notice' | 'reset'
+  type:
+    'delta' | 'reasoning' | 'tool-call' | 'usage' | 'done' | 'error' | 'ping' | 'notice' | 'reset'
   text?: string
   toolCall?: AgentToolCall
   /** 'notice' only: the non-fatal turn notice (UniWork AI) */
@@ -34,6 +36,8 @@ export interface IpcStreamChunk {
   stopReason?: string
   /** the server's run id of this turn (UniWork AI `X-UniWork-AI-Run`), on the chunk after it is known */
   runId?: string
+  /** tokens the provider billed for this turn, carried on 'usage' (always sent before 'done') */
+  usage?: AgentTokenUsage
 }
 
 /** The request forwarded to the main process to start one streaming turn. */
@@ -162,6 +166,9 @@ export function createIpcTransport<S>(options: IpcTransportOptions<S>): AgentTra
         } else if (chunk.type === 'reset') {
           armSilence()
           cb.onTurnReset?.()
+        } else if (chunk.type === 'usage') {
+          armSilence()
+          if (chunk.usage) cb.onUsage?.(chunk.usage)
         } else if (chunk.type === 'done') {
           settle()
           if (chunk.stopReason) cb.onStopReason?.(chunk.stopReason)

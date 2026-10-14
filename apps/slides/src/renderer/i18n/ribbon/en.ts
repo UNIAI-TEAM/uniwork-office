@@ -56,7 +56,7 @@ export const en = {
     'Format Painter (click to copy and apply formatting; ⌘⇧C copy format / ⌘⇧V paste format)',
   ribbonGroupSlides: 'Slides',
   ribbonNewSlide: 'New Slide',
-  ribbonNewSlideTip: "New blank slide (keeps the current slide's layout background; ⌘M)",
+  ribbonNewSlideTip: "New blank slide (keeps the current slide's layout background)",
   ribbonChooseLayout: 'Choose Layout',
   ribbonChooseLayoutNew: 'New Slide with Layout',
   ribbonChooseLayoutChange: 'Change Current Slide Layout',
@@ -213,6 +213,8 @@ export const en = {
   ribbonGroupComments: 'Comments',
   ribbonComment: 'Comment',
   ribbonNewCommentTip: 'New comment on the current slide (saved to pptx, visible in PowerPoint)',
+  ribbonNewCommentServerTip:
+    'New comment on the current slide (shared with everyone who opens this presentation, not saved in the file)',
   ribbonInsertTextBoxTip: 'Insert a text box',
   ribbonWordArt: 'WordArt',
   ribbonWordArtTip: 'Insert WordArt (large filled/outlined text)',

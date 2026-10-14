@@ -58,7 +58,7 @@ export const de = {
     'Format übertragen (klicken, um das Format zu kopieren und anzuwenden; ⌘⇧C Format kopieren / ⌘⇧V Format einfügen)',
   ribbonGroupSlides: 'Folien',
   ribbonNewSlide: 'Neue Folie',
-  ribbonNewSlideTip: 'Neue leere Folie (übernimmt den Layouthintergrund der aktuellen Folie; ⌘M)',
+  ribbonNewSlideTip: 'Neue leere Folie (übernimmt den Layouthintergrund der aktuellen Folie)',
   ribbonChooseLayout: 'Layout auswählen',
   ribbonChooseLayoutNew: 'Neue Folie mit Layout',
   ribbonChooseLayoutChange: 'Layout der aktuellen Folie ändern',
@@ -222,6 +222,8 @@ export const de = {
   ribbonComment: 'Kommentar',
   ribbonNewCommentTip:
     'Neuer Kommentar auf der aktuellen Folie (in pptx gespeichert, in PowerPoint sichtbar)',
+  ribbonNewCommentServerTip:
+    'Neuer Kommentar auf der aktuellen Folie (für alle sichtbar, die diese Präsentation öffnen, nicht in der Datei gespeichert)',
   ribbonInsertTextBoxTip: 'Textfeld einfügen',
   ribbonWordArt: 'WordArt',
   ribbonWordArtTip: 'WordArt einfügen (großer Text mit Füllung/Kontur)',

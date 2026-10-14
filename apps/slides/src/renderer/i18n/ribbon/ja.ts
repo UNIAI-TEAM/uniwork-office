@@ -59,7 +59,7 @@ export const ja = {
   // Home: slides
   ribbonGroupSlides: 'スライド',
   ribbonNewSlide: '新しいスライド',
-  ribbonNewSlideTip: '新しい空白スライド（現在のスライドのレイアウト背景を引き継ぎ；⌘M）',
+  ribbonNewSlideTip: '新しい空白スライド（現在のスライドのレイアウト背景を引き継ぎ）',
   ribbonChooseLayout: 'レイアウトの選択',
   ribbonChooseLayoutNew: 'レイアウトを選んで新規スライド',
   ribbonChooseLayoutChange: '現在のスライドのレイアウトを変更',
@@ -222,6 +222,8 @@ export const ja = {
   ribbonGroupComments: 'コメント',
   ribbonComment: 'コメント',
   ribbonNewCommentTip: '現在のスライドに新しいコメントを追加（pptx に保存、PowerPoint で表示可能）',
+  ribbonNewCommentServerTip:
+    '現在のスライドに新しいコメントを追加（このプレゼンテーションを開く全員と共有され、ファイルには保存されません）',
   ribbonInsertTextBoxTip: 'テキストボックスの挿入',
   ribbonWordArt: 'ワードアート',
   ribbonWordArtTip: 'ワードアートの挿入（大きな塗りつぶし/輪郭スタイルのテキスト）',

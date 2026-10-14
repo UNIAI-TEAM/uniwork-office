@@ -55,7 +55,7 @@ export const hi = {
     'स्वरूप पेंटर (स्वरूप की प्रतिलिपि बनाकर लागू करने के लिए क्लिक करें; ⌘⇧C स्वरूप की प्रतिलिपि / ⌘⇧V स्वरूप चिपकाएँ)',
   ribbonGroupSlides: 'स्लाइड्स',
   ribbonNewSlide: 'नई स्लाइड',
-  ribbonNewSlideTip: 'नई रिक्त स्लाइड (वर्तमान स्लाइड के लेआउट की पृष्ठभूमि बनाए रखती है; ⌘M)',
+  ribbonNewSlideTip: 'नई रिक्त स्लाइड (वर्तमान स्लाइड के लेआउट की पृष्ठभूमि बनाए रखती है)',
   ribbonChooseLayout: 'लेआउट चुनें',
   ribbonChooseLayoutNew: 'लेआउट के साथ नई स्लाइड',
   ribbonChooseLayoutChange: 'वर्तमान स्लाइड का लेआउट बदलें',
@@ -216,6 +216,8 @@ export const hi = {
   ribbonComment: 'टिप्पणी',
   ribbonNewCommentTip:
     'वर्तमान स्लाइड पर नई टिप्पणी (pptx में सहेजी गई, PowerPoint में दिखाई देती है)',
+  ribbonNewCommentServerTip:
+    'वर्तमान स्लाइड पर नई टिप्पणी (इस प्रस्तुति को खोलने वाले सभी के साथ साझा, फ़ाइल में सहेजी नहीं जाती)',
   ribbonInsertTextBoxTip: 'पाठ बॉक्स सम्मिलित करें',
   ribbonWordArt: 'WordArt',
   ribbonWordArtTip: 'WordArt सम्मिलित करें (भरण/रूपरेखा शैली वाला बड़ा पाठ)',

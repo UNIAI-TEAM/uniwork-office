@@ -58,8 +58,7 @@ export const id = {
     'Penyalin Format (klik untuk menyalin dan menerapkan format; ⌘⇧C salin format / ⌘⇧V tempel format)',
   ribbonGroupSlides: 'Slide',
   ribbonNewSlide: 'Slide Baru',
-  ribbonNewSlideTip:
-    'Slide kosong baru (mempertahankan latar belakang tata letak slide saat ini; ⌘M)',
+  ribbonNewSlideTip: 'Slide kosong baru (mempertahankan latar belakang tata letak slide saat ini)',
   ribbonChooseLayout: 'Pilih Tata Letak',
   ribbonChooseLayoutNew: 'Slide Baru dengan Tata Letak',
   ribbonChooseLayoutChange: 'Ubah Tata Letak Slide Saat Ini',
@@ -220,6 +219,8 @@ export const id = {
   ribbonGroupComments: 'Komentar',
   ribbonComment: 'Komentar',
   ribbonNewCommentTip: 'Komentar baru di slide saat ini (disimpan ke pptx, terlihat di PowerPoint)',
+  ribbonNewCommentServerTip:
+    'Komentar baru di slide saat ini (dibagikan kepada semua orang yang membuka presentasi ini, tidak disimpan di file)',
   ribbonInsertTextBoxTip: 'Sisipkan kotak teks',
   ribbonWordArt: 'WordArt',
   ribbonWordArtTip: 'Sisipkan WordArt (teks besar dengan gaya isian/kontur)',

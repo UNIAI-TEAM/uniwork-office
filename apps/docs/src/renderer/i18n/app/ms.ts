@@ -115,6 +115,7 @@ export const ms = {
   appMixedExportOpening:
     'Saiz kertas bercampur: membuka pratonton penomboran halaman untuk eksport dengan gabungan mengikut halaman…',
   appSelectTextToComment: 'Pilih dahulu teks yang hendak dikomen',
+  appCommentSaveFirst: 'Simpan dokumen dahulu untuk menambah ulasan',
   appCommentSelectionLost: 'Pilihan tidak lagi sah; pilih semula teks yang hendak dikomen',
   appCommentAdded: 'Komen ditambah; ditulis ke dokumen semasa disimpan',
   appCommentEdited: 'Komen dikemas kini; ditulis ke dokumen semasa disimpan',
@@ -234,6 +235,7 @@ export const ms = {
   appPageOf: 'Halaman {current} daripada {total}',
   appWordCountTitle: 'Kiraan Perkataan',
   appWordCountN: '{n} perkataan',
+  appWordCountSelection: 'Dipilih {selected} / {total} perkataan',
   appTrackChangesOn: 'Jejak Perubahan: Hidup',
   appTrackChangesOff: 'Jejak Perubahan: Mati',
   appAcTitle: 'Pilihan AutoBetul',
@@ -450,6 +452,7 @@ export const ms = {
   appParaSpecialFirstLine: 'Baris pertama',
   appParaSpecialHanging: 'Gantung',
   appParaBy: 'Sebanyak',
+  appParaUnitChars: 'aksara',
   appInsertEquation: 'Sisipkan Persamaan',
   appLatexPlaceholder: 'cth. x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}',
   appLatexPreviewHint: 'Taip LaTeX untuk melihat pratonton',

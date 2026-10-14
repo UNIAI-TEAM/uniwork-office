@@ -56,7 +56,7 @@ export const ar = {
     'نسخ التنسيق (انقر لنسخ التنسيق وتطبيقه؛ ⌘⇧C نسخ التنسيق / ⌘⇧V لصق التنسيق)',
   ribbonGroupSlides: 'شرائح',
   ribbonNewSlide: 'شريحة جديدة',
-  ribbonNewSlideTip: 'شريحة فارغة جديدة (تحتفظ بخلفية تخطيط الشريحة الحالية; ⌘M)',
+  ribbonNewSlideTip: 'شريحة فارغة جديدة (تحتفظ بخلفية تخطيط الشريحة الحالية)',
   ribbonChooseLayout: 'اختيار التخطيط',
   ribbonChooseLayoutNew: 'شريحة جديدة بتخطيط',
   ribbonChooseLayoutChange: 'تغيير تخطيط الشريحة الحالية',
@@ -213,6 +213,8 @@ export const ar = {
   ribbonGroupComments: 'تعليقات',
   ribbonComment: 'تعليق',
   ribbonNewCommentTip: 'تعليق جديد على الشريحة الحالية (يُحفظ في pptx ويظهر في PowerPoint)',
+  ribbonNewCommentServerTip:
+    'تعليق جديد على الشريحة الحالية (يُشارك مع كل من يفتح هذا العرض التقديمي ولا يُحفظ في الملف)',
   ribbonInsertTextBoxTip: 'إدراج مربع نص',
   ribbonWordArt: 'WordArt',
   ribbonWordArtTip: 'إدراج WordArt (نص كبير بنمط تعبئة/حدود)',

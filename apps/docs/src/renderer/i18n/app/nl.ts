@@ -115,6 +115,7 @@ export const nl = {
   appMixedExportOpening:
     'Gemengde papierformaten: pagineringsvoorbeeld wordt geopend om per pagina samengevoegd te exporteren…',
   appSelectTextToComment: 'Selecteer eerst de tekst waarop je een opmerking wilt plaatsen',
+  appCommentSaveFirst: 'Sla het document eerst op om een opmerking toe te voegen',
   appCommentSelectionLost:
     'De selectie is niet meer geldig; selecteer de tekst voor de opmerking opnieuw',
   appCommentAdded: 'Opmerking toegevoegd; wordt bij het opslaan naar het document geschreven',
@@ -240,6 +241,7 @@ export const nl = {
   appPageOf: 'Pagina {current} van {total}',
   appWordCountTitle: 'Aantal woorden',
   appWordCountN: '{n} woorden',
+  appWordCountSelection: '{selected} van {total} woorden geselecteerd',
   appTrackChangesOn: 'Wijzigingen bijhouden: aan',
   appTrackChangesOff: 'Wijzigingen bijhouden: uit',
   appAcTitle: 'AutoCorrectie-opties',
@@ -456,6 +458,7 @@ export const nl = {
   appParaSpecialFirstLine: 'Eerste regel',
   appParaSpecialHanging: 'Verkeerd-om',
   appParaBy: 'Met',
+  appParaUnitChars: 'tekens',
   appInsertEquation: 'Vergelijking invoegen',
   appLatexPlaceholder: 'bijv. x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}',
   appLatexPreviewHint: 'Typ LaTeX om een voorbeeld te zien',

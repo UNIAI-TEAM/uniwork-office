@@ -541,6 +541,8 @@ export const cs = {
   appPrintCanceled: 'Tisk zrušen.',
   appPrintFailed: 'Nelze tisknout.',
   appPrintNeedsFullLoad: 'Tisk vyžaduje úplné načtení sešitu – počkejte na dokončení načítání.',
+  appPrintWorkbookTooLarge:
+    'Tento sešit je příliš velký na to, aby se dal celý načíst do paměti, proto jej nelze vytisknout ani exportovat do PDF.',
   appCsvExportNeedsFullLoad:
     'Export do CSV vyžaduje plně načtený sešit — počkejte na dokončení načítání.',
   appCsvExportTooLarge: 'List je příliš velký na export do CSV.',
@@ -1078,6 +1080,9 @@ export const cs = {
   appHeadings: 'Záhlaví',
   appHeadingsHidden: 'Záhlaví skryta.',
   appHeadingsShown: 'Záhlaví zobrazena.',
+  appRightToLeft: 'Zprava doleva',
+  appRightToLeftOn: 'Směr mřížky: zprava doleva.',
+  appRightToLeftOff: 'Směr mřížky: zleva doprava.',
   appPrintHeadingsTitle: 'Tisknout záhlaví řádků a sloupců',
   appGroupFunctionLibrary: 'Knihovna funkcí',
   appInsertFunction: 'Vložit funkci',
@@ -1471,6 +1476,7 @@ export const cs = {
   appCtxResolveComment: 'Vyřešit komentář',
   appThreadConverted: 'Počet komentářů převedených na poznámky: {count}.',
   appThreadNoneAtSelection: 'Ve vybrané buňce není žádný komentář ve vlákně.',
+  appCommentSaveFirst: 'Před přidáním komentáře nejprve uložte sešit',
   appThreadCellHasNote: 'Vybraná buňka už má poznámku; komentář nelze přidat.',
   appThreadHoverHint: 'Odpovědět v podokně Komentáře',
   appNoteCellHasThread: 'Vybraná buňka už má komentář ve vlákně; poznámku nelze přidat.',
