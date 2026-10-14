@@ -3,6 +3,7 @@ import type {
   AgentImage,
   AgentMessage,
   AgentStreamHandle,
+  AgentStreamNotice,
   AgentToolCall,
   AgentToolDef,
   AgentToolResult,
@@ -38,6 +39,8 @@ export interface AgentLoopEvents<TSnapshot> {
   onToolExecuted?(event: ToolExecutedEvent<TSnapshot>): void
   /** a turn requested tools and they ran; the loop is going back to the model */
   onTurnEnd?(): void
+  /** a transport notice (UniWork AI: dropped calls, a Retry-After wait, a new conversation); never fatal */
+  onNotice?(notice: AgentStreamNotice): void
   onDone?(result: AgentRunResult): void
   onError?(error: string): void
 }
@@ -953,6 +956,32 @@ export class AgentLoop<TSnapshot = unknown> {
           onStopReason: (reason) => {
             if (generation !== this.generation || settled) return
             this.turnStopReason = reason
+          },
+          onNotice: (notice) => {
+            if (generation !== this.generation || settled) return
+            try {
+              this.options.events?.onNotice?.(notice)
+            } catch (err) {
+              // a notice is information: a panel that throws on it must not end the turn
+              console.warn('[agent-loop] onNotice listener threw', err)
+            }
+          },
+          onTurnReset: () => {
+            if (generation !== this.generation || settled) return
+            // the transport resends this same turn (a Retry-After wait): what streamed so far is
+            // dropped, history is untouched; the UI redraws from empty only if it saw text
+            const hadText = this.turnText.length > 0
+            this.turnText = ''
+            this.turnReasoning = ''
+            this.toolCalls = []
+            this.turnStopReason = null
+            if (!hadText) return
+            try {
+              this.options.events?.onText?.('')
+            } catch (err) {
+              settled = true
+              this.failRun(err instanceof Error ? err.message : String(err))
+            }
           },
           onDone: () => {
             if (generation !== this.generation || settled) return

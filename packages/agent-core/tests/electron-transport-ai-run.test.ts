@@ -177,12 +177,15 @@ describe('aiRun from the IPC transport: one idle per ending path', () => {
         getSettings: () => ({}),
         unknownErrorText: () => 'x',
       })
-      transport.stream({ system: '', messages: [], tools: [] }, {
-        onDelta() {},
-        onToolCall() {},
-        onDone() {},
-        onError() {},
-      })
+      transport.stream(
+        { system: '', messages: [], tools: [] },
+        {
+          onDelta() {},
+          onToolCall() {},
+          onDone() {},
+          onError() {},
+        },
+      )
       expect(reportAiRun).toHaveBeenCalledTimes(1)
       expect(reportAiRun.mock.calls[0]![0]).toMatchObject({ state: 'running' })
       listener?.({ requestId: id, type: 'done' })

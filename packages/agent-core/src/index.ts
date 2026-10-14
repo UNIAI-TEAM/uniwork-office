@@ -13,6 +13,8 @@ export type {
   ToolDisplay,
   ToolExecution,
 } from './types'
+export { AI_RUN_IDLE_GRACE_MS, createAiRunTracker } from './ai-run-tracker'
+export type { AiRunPayload, AiRunState, AiRunTracker, AiRunTrackerOptions } from './ai-run-tracker'
 export { composeSkills } from './skill'
 export type { AgentSkill, ExecutedToolCall } from './skill'
 export {
@@ -33,7 +35,11 @@ export type {
   CompactionOptions,
   ToolExecutedEvent,
 } from './loop'
-export { createIpcTransport, IPC_STREAM_SILENCE_TIMEOUT_MS } from './electron-transport'
+export {
+  createIpcTransport,
+  desktopAiRun,
+  IPC_STREAM_SILENCE_TIMEOUT_MS,
+} from './electron-transport'
 export { streamText } from './stream-text'
 export type { StreamTextOptions, StreamTextOutcome } from './stream-text'
 export type { IpcStreamChunk, IpcStreamStart, IpcTransportOptions } from './electron-transport'
