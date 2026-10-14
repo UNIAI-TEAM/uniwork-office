@@ -57,6 +57,7 @@ export default defineConfig({
       '@genoffice/ai-provider/provider-models': local(
         '../../packages/ai-provider/src/provider-models.ts',
       ),
+      '@genoffice/ai-provider/proxy-url': local('../../packages/ai-provider/src/proxy-url.ts'),
       '@genoffice/ai-provider': local('../../packages/ai-provider/src/index.ts'),
       '@genoffice/i18n': local('../../packages/i18n/src/index.ts'),
       '@genoffice/ui/collab.css': local('../../packages/ui/src/collab/collab.css'),

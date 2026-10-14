@@ -456,7 +456,12 @@ export function providerNeed(settings: AiSettings, id: AiProviderId): ProviderNe
   if (!meta) return 'key'
   if (meta.needsCliPath) return null
   const config = settings.providers?.[id]
-  if (!config?.model?.trim()) return 'model'
+  const source = settings.modelSources?.[id]
+  const model = config?.model?.trim() || (source?.origin === 'org' ? source.chosen?.trim() : '')
+  if (!model) return 'model'
+  // A key saved on UniWork (`origin: 'org'`) authenticates and resolves its base URL through the
+  // UniWork proxy, without storing a key or placeholder in ai-settings.json.
+  if (source?.origin === 'org') return null
   if (meta.needsBaseUrl) {
     // Custom OpenAI-compatible endpoints (Ollama, LM Studio, vLLM) accept
     // anonymous requests: base URL + model suffice, the key stays optional.

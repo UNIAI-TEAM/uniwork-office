@@ -10,7 +10,8 @@
     "./browser": "./src/browser.ts",
     "./codex-app-server": "./src/codex-app-server.ts",
     "./custom-models": "./src/custom-models.ts",
-    "./provider-models": "./src/provider-models.ts"
+    "./provider-models": "./src/provider-models.ts",
+    "./proxy-url": "./src/proxy-url.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

@@ -19,6 +19,7 @@ export {
   providerNeed,
   selectedProvider,
   uniAiOpenRouterKey,
+  type ProviderNeed,
 } from './providers'
 export { getProviderAdapter, modelLacksVision } from './registry'
 export {
