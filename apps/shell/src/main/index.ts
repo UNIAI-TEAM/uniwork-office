@@ -155,6 +155,7 @@ import {
   setSessionPathResolver,
   setUniworkAiHost,
   setUniworkAiChoiceStore,
+  setUniworkAiEditorSender,
   defaultSaveDir,
   uniquePathIn,
   authorizeMcpDocWrite,
@@ -6559,19 +6560,23 @@ app.whenReady().then(async () => {
   // sender's tab: a bound document goes to its document route, a local file
   // to the selected organization
   const uniworkDocsHandle = uniworkDocs
+  const describeAiSender = (senderId: number) => {
+    const tab = tabManager?.describeWebContents(senderId)
+    if (tab) return tab.filePath ? { kind: tab.kind, filePath: tab.filePath } : { kind: tab.kind }
+    for (const path of detachedFilePaths()) {
+      const found = findDetachedTabByPath(path)
+      if (found && found.webContents.id === senderId) return { kind: found.kind, filePath: path }
+    }
+    return null
+  }
+  // the account's UniWork AI pick reaches editor tabs only (My AI, email, Settings keep BYOK)
+  setUniworkAiEditorSender((senderId) => {
+    const kind = describeAiSender(senderId)?.kind
+    return kind !== undefined && kind !== 'home'
+  })
   if (uniworkDocsHandle) {
     const uniworkAi = startUniworkAiChat({
-      describe: (senderId) => {
-        const tab = tabManager?.describeWebContents(senderId)
-        if (tab)
-          return tab.filePath ? { kind: tab.kind, filePath: tab.filePath } : { kind: tab.kind }
-        for (const path of detachedFilePaths()) {
-          const found = findDetachedTabByPath(path)
-          if (found && found.webContents.id === senderId)
-            return { kind: found.kind, filePath: path }
-        }
-        return null
-      },
+      describe: describeAiSender,
       binding: (path) => uniworkDocsHandle.aiBinding(path),
       capability: (orgId) => uniworkDocsHandle.capabilityRead(orgId),
     })

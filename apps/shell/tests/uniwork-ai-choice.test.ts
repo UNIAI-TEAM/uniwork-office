@@ -77,4 +77,12 @@ describeSqlite('UniWork AI choice in the account store', () => {
     )
     expect(src).toContain("other.send('ai:settings-changed')")
   })
+
+  it('index.ts gives the pick to editor tabs only, through the scope resolver’s tab lookup', () => {
+    const src = readFileSync(join(__dirname, '../src/main/index.ts'), 'utf8')
+    expect(src).toMatch(
+      /setUniworkAiEditorSender\(\(senderId\) => \{\s+const kind = describeAiSender\(senderId\)\?\.kind\s+return kind !== undefined && kind !== 'home'/,
+    )
+    expect(src).toContain('describe: describeAiSender,')
+  })
 })

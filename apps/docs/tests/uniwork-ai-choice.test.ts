@@ -17,6 +17,17 @@ const { handlers, dirs } = vi.hoisted(() => ({
 
 vi.mock('@genoffice/ai-search', () => ({}))
 
+// the one-shot chat and the settings test never reach a network: the provider they pick is the point
+const { chatForProvider, testChatConnection } = vi.hoisted(() => ({
+  chatForProvider: vi.fn(async () => ({ ok: true as const, text: 'hi' })),
+  testChatConnection: vi.fn(async () => ({ ok: true as const })),
+}))
+vi.mock('@genoffice/ai-provider', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@genoffice/ai-provider')>()),
+  chatForProvider,
+  testChatConnection,
+}))
+
 vi.mock('electron', () => ({
   app: {
     getPath: vi.fn(() => dirs.userData),
@@ -60,12 +71,22 @@ vi.mock('electron', () => ({
 }))
 
 import { setUniworkAiAvailable } from '@genoffice/ai-provider'
-import { registerAiIpc, setUniworkAiChoiceStore } from '../src/main/docs-main'
+import {
+  registerAiIpc,
+  setUniworkAiChoiceStore,
+  setUniworkAiEditorSender,
+} from '../src/main/docs-main'
 import type { AiSettings } from '../src/shared/ipc'
 
-const getSettings = () =>
-  Promise.resolve(handlers.get('ai:get-settings')!({})) as Promise<AiSettings>
-const setSettings = (s: AiSettings) => handlers.get('ai:set-settings')!({}, s)
+/** webContents ids: an editor tab, and the home window (My AI, email, Settings) */
+const EDITOR = 11
+const HOME = 22
+const from = (id: number) => ({ sender: { id } })
+
+const getSettings = (sender = EDITOR) =>
+  Promise.resolve(handlers.get('ai:get-settings')!(from(sender))) as Promise<AiSettings>
+const setSettings = (s: AiSettings, sender = EDITOR) =>
+  handlers.get('ai:set-settings')!(from(sender), s)
 const file = (): AiSettings =>
   JSON.parse(readFileSync(join(dirs.userData, 'ai-settings.json'), 'utf8')) as AiSettings
 
@@ -96,10 +117,15 @@ describe('UniWork AI choice per account (desktop)', () => {
   beforeEach(() => {
     dirs.userData = mkdtempSync(join(tmpdir(), 'uniwork-choice-'))
     setUniworkAiAvailable(true)
+    // the shell's tab lookup: only an editor tab runs UniWork AI
+    setUniworkAiEditorSender((id) => id === EDITOR)
   })
   afterEach(() => {
     setUniworkAiAvailable(false)
     setUniworkAiChoiceStore(null)
+    setUniworkAiEditorSender(null)
+    chatForProvider.mockClear()
+    testChatConnection.mockClear()
   })
   afterAll(() => rmSync(dirs.userData, { recursive: true, force: true }))
 
@@ -174,5 +200,54 @@ describe('UniWork AI choice per account (desktop)', () => {
     await setSettings(picked('uniwork'))
     expect(file().provider).toBe('anthropic')
     expect((await getSettings()).provider).toBe('anthropic')
+  })
+
+  it('the pick reaches editor tabs only: My AI, email and Settings read the file provider', async () => {
+    fakeAccounts()
+    await setSettings(picked('anthropic'))
+    await setSettings(picked('uniwork'))
+    expect((await getSettings(EDITOR)).provider).toBe('uniwork')
+    expect((await getSettings(HOME)).provider).toBe('anthropic')
+  })
+
+  it('ai:chat and the settings test with provider uniwork run the file provider, never ask a key for uniwork', async () => {
+    fakeAccounts()
+    await setSettings(picked('anthropic'))
+    await setSettings(picked('uniwork'))
+    // an editor's settings copy carries the overlay; a one-click action sends it as is
+    const request = { settings: picked('uniwork'), system: 's', user: 'u' }
+    const chat = (await handlers.get('ai:chat')!(from(EDITOR), request)) as { ok: boolean }
+    expect(chat.ok).toBe(true)
+    expect(chatForProvider).toHaveBeenCalledTimes(1)
+    expect((chatForProvider.mock.calls[0] as unknown[])[0]).toBe('anthropic')
+    const test = (await handlers.get('ai:settings-test')!(from(HOME), request)) as { ok: boolean }
+    expect(test.ok).toBe(true)
+    expect((testChatConnection.mock.calls[0] as unknown[])[0]).toBe('anthropic')
+  })
+
+  it('a Settings save from the home window (same BYOK provider) keeps the pick', async () => {
+    const accounts = fakeAccounts()
+    await setSettings(picked('anthropic'))
+    await setSettings(picked('uniwork'))
+    const before = accounts.writes.length
+    await setSettings(
+      {
+        ...picked('anthropic'),
+        providers: { anthropic: { apiKey: 'sk-newer', model: 'claude-test' } },
+      } as unknown as AiSettings,
+      HOME,
+    )
+    expect(accounts.writes.slice(before)).toEqual([])
+    expect(file().providers.anthropic?.apiKey).toBe('sk-newer')
+    expect((await getSettings(EDITOR)).provider).toBe('uniwork')
+  })
+
+  it('a provider change from the home window is a choice: the pick is cleared', async () => {
+    const accounts = fakeAccounts()
+    await setSettings(picked('anthropic'))
+    await setSettings(picked('uniwork'))
+    await setSettings(picked('openai'), HOME)
+    expect(accounts.writes.at(-1)).toEqual(['a-1', false])
+    expect((await getSettings(EDITOR)).provider).toBe('openai')
   })
 })
