@@ -198,6 +198,8 @@ describe('UniWork AI notices (slides panel)', () => {
     const live = c.querySelector('.ai-msg-assistant [aria-live="polite"]')
     expect(live, 'live region before any notice').not.toBeNull()
     expect(live!.textContent).toBe('')
+    // a plain aria-live container: role=status would collide with the app's own status nodes
+    expect(live!.hasAttribute('role')).toBe(false)
     await notify({ kind: 'rate-limit-wait', seconds: 30, attempt: 1 })
     // the same node (not a new one mounted with its text) now holds the note, and nothing else announces
     expect(c.querySelector('.ai-msg-assistant [aria-live="polite"]')).toBe(live)

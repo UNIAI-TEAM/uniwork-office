@@ -240,6 +240,9 @@ describe('UniWork AI notices are announced through a separate status node (G05FE
       const live = container.querySelector('.ai-sr-status')
       expect(live, 'status node before any notice').not.toBeNull()
       expect(live!.getAttribute('aria-live')).toBe('polite')
+      expect(live!.getAttribute('aria-atomic')).toBe('true')
+      // the role would collide with the workbook status (e2e getByRole('status') must stay unique)
+      expect(live!.hasAttribute('role')).toBe(false)
       expect(live!.textContent).toBe('')
       render([user, { ...streaming, text: 'wait text', status: 'Try again in 30 s.' }])
       expect(container.querySelector('.ai-sr-status')).toBe(live)
@@ -248,6 +251,41 @@ describe('UniWork AI notices are announced through a separate status node (G05FE
       expect(container.querySelectorAll('[aria-live]')).toHaveLength(1)
       render([user, { ...streaming, text: 'the answer', streaming: false }])
       expect(live!.textContent).toBe('')
+    })
+
+    it('the AI panel adds no role=status node: a workbook with it mounted keeps exactly one, the workbook status', () => {
+      vi.stubGlobal(
+        'desktopApi',
+        new Proxy(
+          {},
+          {
+            get: (_t, prop: string) =>
+              /^on[A-Z]/.test(prop) ? () => () => {} : () => Promise.resolve(undefined),
+          },
+        ),
+      )
+      container = document.createElement('div')
+      document.body.appendChild(container)
+      root = createRoot(container)
+      const user: AiChatMessage = { role: 'user', text: 'sum it', tools: [] }
+      render([
+        user,
+        {
+          role: 'assistant',
+          text: 'wait',
+          tools: [],
+          streaming: true,
+          status: 'Try again in 30 s.',
+        },
+      ])
+      expect(container.querySelector('.ai-sr-status')!.textContent).toBe('Try again in 30 s.')
+      expect(container.querySelectorAll('[role="status"]')).toHaveLength(0)
+      // ExcelShell (which mounts this panel under cap('ai')) owns the one status node of the workbook
+      const shell = readFileSync(
+        join(dirname(fileURLToPath(import.meta.url)), '../src/renderer/ExcelShell.tsx'),
+        'utf8',
+      )
+      expect(shell).toMatch(/className="workbook-status"\s+role="status"/)
     })
   })
 })

@@ -588,8 +588,9 @@ export function AiChatPanel({
         </div>
       </header>
 
-      {/* one persistent live node: a notice folded into a message mounts with its text and is often not announced */}
-      <div className="ai-sr-status" role="status" aria-live="polite">
+      {/* one persistent live node: a notice folded into a message mounts with its text and is often not announced.
+          No role=status: the workbook's own status node is the one role=status of the window */}
+      <div className="ai-sr-status" aria-live="polite" aria-atomic="true">
         {chat.at(-1)?.role === 'assistant' ? (chat.at(-1)?.status ?? '') : ''}
       </div>
       <div className="ai-chat" ref={chatRef} onScroll={onChatScroll}>
