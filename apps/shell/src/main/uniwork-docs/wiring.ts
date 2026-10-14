@@ -56,6 +56,7 @@ import { createUniworkDocsClient, type FetchLike, type UniworkDocsClient } from 
 import {
   UniworkDocsService,
   type ConflictUi,
+  type SessionIdentity,
   type UnsavedCloseChoice,
   type UnsavedCloseKind,
 } from './service'
@@ -566,6 +567,14 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   // runtime's capability cache: this holder breaks the cycle (the read happens
   // only after `createSyncRuntime` assigned it, below)
   const seamRef: { runtime: SyncRuntime | null } = { runtime: null }
+  /**
+   * G5-11 be-3: true while the feed runtime is started. lockSession's step 1
+   * stops it through `stopRuntime` on every path (including the account switch
+   * that never reaches `lockStore`), and a same-org switch then re-runs the
+   * status handler with `target === feedOrg`: the flag is what tells the
+   * handler that the pass it should be running is gone and must start again.
+   */
+  let feedRunning = false
   // the comments handle is built after the service (it resolves bindings through
   // it) but the service needs it for the launch-ticket reveal: a holder breaks
   // the cycle, and the reveal only runs once both exist
@@ -600,6 +609,15 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     // placeholder is what index.ts installs today)
     editorStateOf: (path) => wiring.editorStateOf(path),
     activePath: () => wiring.activePath(),
+    // G5-11 be-3: lockSession's own step 1/3 hooks, wired to the real runtime and
+    // the real tab/window/AI-history surfaces, so the account switch (which runs
+    // `lockSession`, not `lockStore`) stops the feed pass and closes the outgoing
+    // account's views without a prompt too
+    stopRuntime: () => stopFeed(),
+    openPaths: () => wiring.openPaths(),
+    closePathNow: (path) => wiring.closePathNow(path),
+    aiHistoryPaths: () => wiring.aiHistoryPaths(),
+    forgetAiHistory: (paths) => wiring.forgetAiHistory(paths),
     // ADVISOR D4 (a): the dev-only fixture gate; index.ts passes app.isPackaged
     isPackaged: wiring.isPackaged,
     // S18: main owns the native dialog (Electron); the service stays Electron-free
@@ -751,6 +769,11 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   setUniworkCloseGuard(service)
   const runtime = createSyncRuntime(service)
   seamRef.runtime = runtime
+  /** stops the feed pass and remembers it, so the next status push restarts it */
+  const stopFeed = (): void => {
+    runtime.stop()
+    feedRunning = false
+  }
   // Sign out and a sign-in as someone else close the previous account's
   // documents and delete their AI history (see account-boundary.ts)
   const boundary = new AccountBoundary({
@@ -790,7 +813,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     // waiting for any in-flight save, capturing N+1 editor/disk working copies
     // into `parked`, and deleting plaintext working + recovery copies.
     lockStore: async (owner) => {
-      runtime.stop()
+      stopFeed()
       const res = await service.lockSession(owner, () =>
         push(UNIWORK_DOC_CHANNELS.signOutProgress, { phase: 'waiting' }),
       )
@@ -813,6 +836,23 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
       let signedIn = uniworkAccount().status().state === 'signed-in'
       /** the org the feed currently runs for; null = no pass may run */
       let feedOrg: string | null = null
+      /**
+       * The feed runs only for the chosen org of a live session: while the
+       * picker is up nothing starts, and the choice's own status push starts it
+       * for that org (one pass plus the 60 s poll). Sign-out, a lock, an account
+       * switch or an org change stops the pass it replaces; a stop the boundary
+       * forced (`feedRunning` false with the same org) starts it again.
+       */
+      const syncFeed = (status: AccountStatus, identity: SessionIdentity | null): void => {
+        const target = identity ? feedOrgId(status) : null
+        if (target === feedOrg && (target === null || feedRunning)) return
+        stopFeed()
+        feedOrg = target
+        if (target) {
+          runtime.start()
+          feedRunning = true
+        }
+      }
       onUniworkAccountStatus((status) => {
         // the session's account may have changed: it becomes the last owner
         service.noteSessionIdentity()
@@ -823,20 +863,16 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
           void boundary
             .enforce(identity)
             .then(() => service.restoreParked(identity))
+            // the boundary's lockSession stops the feed pass (be-3): when the
+            // session's org is unchanged the synchronous call below has already
+            // returned, so the feed is re-evaluated once the boundary settled
+            .then(() => syncFeed(status, uniworkSessionIdentity()))
             .catch(() => undefined)
         }
         const now = status.state === 'signed-in'
         if (now && !signedIn) void service.launch.onSignedIn()
         signedIn = now
-        // the feed runs only for the chosen org of a live session: while the
-        // picker is up nothing starts, and the choice's own status push starts
-        // it for that org (one pass plus the 60 s poll). Sign-out, a lock, an
-        // account switch or an org change stops the pass it replaces.
-        const target = identity ? feedOrgId(status) : null
-        if (target === feedOrg) return
-        runtime.stop()
-        feedOrg = target
-        if (target) runtime.start()
+        syncFeed(status, identity)
       })
       startLaunch((url) => void service.launch.handleUrl(url))
     },
