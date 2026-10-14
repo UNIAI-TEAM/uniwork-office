@@ -1,4 +1,5 @@
 import {
+  aiUniworkText,
   aiPanelWidthAtPointer,
   AiPanelSideButton,
   AiModelPicker,
@@ -8,7 +9,7 @@ import {
 } from '@genoffice/ui'
 import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react'
-import { AgentLoop } from '@genoffice/agent-core'
+import { AgentLoop, noticePatch, type PanelNote } from '@genoffice/agent-core'
 import {
   aiNoticeBody,
   aiNoticeKind,
@@ -70,6 +71,10 @@ interface ChatEntry {
   text: string
   streaming?: boolean
   isError?: boolean
+  /** UniWork AI: the transport is waiting out a Retry-After; the run goes on, Stop is the only action */
+  waitLine?: string | undefined
+  /** UniWork AI: restarted conversation / provider boundary / dropped call, shown above the answer */
+  notes?: PanelNote[] | undefined
   /** the run failed and this user message was rolled back out of the model context */
   undelivered?: boolean
   tools?: ToolActivity[]
@@ -424,8 +429,19 @@ export function AiPanel({
         onText: (text) => {
           setPhase('replying')
           segTextRef.current = text
-          patchLast({ text })
+          patchLast({ text, waitLine: undefined })
         },
+        // transport notices (UniWork AI); langRef: the loop is created once, `lang` would go stale
+        onNotice: (notice) =>
+          patchLast(
+            (last) =>
+              noticePatch(
+                last,
+                notice,
+                (key, params) => aiUniworkText(langRef.current, key, params),
+                'PDF',
+              ) ?? {},
+          ),
         onToolExecuted: ({ call, execution }) => {
           setPhase('working')
           if (execution.mutated) runMutatedRef.current = true
@@ -451,7 +467,7 @@ export function AiPanel({
           setPhase('thinking')
           runTextsRef.current.push(segTextRef.current)
           segTextRef.current = ''
-          patchLast({ streaming: false })
+          patchLast({ streaming: false, waitLine: undefined })
           setChat((prev) => [...prev, { role: 'assistant', text: '', streaming: true }])
         },
         onDone: ({ text, cancelled, turnLimit, truncated }) => {
@@ -474,7 +490,13 @@ export function AiPanel({
           }
           patchLast((last) => ({
             streaming: false,
-            text: final || (last.tools?.length ? last.text : tGlobal('aiNoReply')),
+            waitLine: undefined,
+            // a restarted conversation ends the turn on purpose: its note is the whole reply
+            text:
+              final ||
+              (last.tools?.length || last.notes?.some((n) => n.kind === 'restarted')
+                ? last.text
+                : tGlobal('aiNoReply')),
           }))
           setBusy(false)
           if (runMutatedRef.current) {
@@ -496,7 +518,13 @@ export function AiPanel({
             }
             const last = next.at(-1)
             if (last?.role === 'assistant') {
-              next[next.length - 1] = { ...last, streaming: false, text: error, isError: true }
+              next[next.length - 1] = {
+                ...last,
+                streaming: false,
+                waitLine: undefined,
+                text: error,
+                isError: true,
+              }
             }
             return next
           })
@@ -762,13 +790,23 @@ export function AiPanel({
             )
           }
           const hasTools = (entry.tools?.length ?? 0) > 0
-          if (!entry.text && !hasTools) return null
+          if (!entry.text && !hasTools && !entry.notes?.length && !entry.waitLine) return null
           return (
             <div
               key={i}
               className={`ai-msg ai-msg-assistant${entry.isError && !aiNoticeKind(entry.text) ? ' ai-msg-error' : ''}`}
             >
+              {entry.notes?.map((note, k) => (
+                <div key={`un${k}`} className="ai-msg-notice" role="status">
+                  {note.text}
+                </div>
+              ))}
               {hasTools && <ToolChipList tools={entry.tools!} />}
+              {entry.waitLine && (
+                <div className="ai-msg-notice" role="status">
+                  {entry.waitLine}
+                </div>
+              )}
               {entry.text && (
                 <div dir="auto">
                   <Markdown text={aiNoticeBody(entry.text)} nav={pdfNav} />
