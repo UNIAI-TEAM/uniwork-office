@@ -77,12 +77,20 @@ export const hi = {
   cloudCreditsLeft: '{remaining} / {limit} शेष',
   cloudCreditsUnlimited: 'असीमित',
   cloudCreditsRenews: '{date} को रीन्यू',
-  cloudInactiveBody: 'आपके संगठन की UniWork सदस्यता सक्रिय नहीं है, इसलिए क्लाउड AI रुका हुआ है। किसी एडमिन से इसे नवीनीकृत करवाएँ; नीचे आपके अपने प्रदाता काम करते रहेंगे।',
+  cloudInactiveBody:
+    'आपके संगठन की UniWork सदस्यता सक्रिय नहीं है, इसलिए क्लाउड AI रुका हुआ है। किसी एडमिन से इसे नवीनीकृत करवाएँ; नीचे आपके अपने प्रदाता काम करते रहेंगे।',
   acctSignIn: 'साइन इन करें',
   acctSignInAgain: 'फिर से साइन इन करें',
   // S8/S10 local-file conversation restart notice (G05BE-6)
-  aiUniworkLocalFileRestart: 'स्थानीय फ़ाइलें आपके संगठन के अंतर्गत एक नई बातचीत शुरू करती हैं और अन्य फ़ाइलों के संवाद नहीं रखतीं।',
+  aiUniworkLocalFileRestart:
+    'स्थानीय फ़ाइलें आपके संगठन के अंतर्गत एक नई बातचीत शुरू करती हैं और अन्य फ़ाइलों के संवाद नहीं रखतीं।',
   // S9 cells summary and S10 web workbook size limit
   aiResultCellsMeta: 'लिखी गई सेल: {written} ({range}) · ओवरराइट हुई मौजूदा सेल: {overwritten}',
-  aiErrWorkbookTooLarge: 'यह वर्कबुक वेब पर AI के लिए बहुत बड़ी है। इसे UniWork Office ऐप में खोलें।',
+  aiErrWorkbookTooLarge:
+    'यह वर्कबुक वेब पर AI के लिए बहुत बड़ी है। इसे UniWork Office ऐप में खोलें।',
+  // S7 composer notice keys (not_entitled, credits_exhausted)
+  not_entitled:
+    'आपके संगठन के प्लान में UniWork AI शामिल नहीं है। प्लान के बारे में संगठन व्यवस्थापक से पूछें, या सेटिंग्स > AI मॉडल में अपनी खुद की AI कुंजी जोड़ें।',
+  credits_exhausted:
+    'आपके संगठन ने इस अवधि के सभी AI क्रेडिट उपयोग कर लिए हैं। संगठन व्यवस्थापक से क्रेडिट जोड़ने के लिए कहें, या सेटिंग्स > AI मॉडल में अपनी खुद की AI कुंजी जोड़ें।',
 } satisfies Record<keyof typeof zh, string>

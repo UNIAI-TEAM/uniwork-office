@@ -77,12 +77,20 @@ export const vi = {
   cloudCreditsLeft: 'Còn {remaining} / {limit}',
   cloudCreditsUnlimited: 'Không giới hạn',
   cloudCreditsRenews: 'Làm mới vào {date}',
-  cloudInactiveBody: 'Gói đăng ký UniWork của tổ chức bạn không hoạt động nên AI đám mây đang tạm dừng. Hãy nhờ quản trị viên gia hạn; nhà cung cấp riêng bên dưới vẫn hoạt động.',
+  cloudInactiveBody:
+    'Gói đăng ký UniWork của tổ chức bạn không hoạt động nên AI đám mây đang tạm dừng. Hãy nhờ quản trị viên gia hạn; nhà cung cấp riêng bên dưới vẫn hoạt động.',
   acctSignIn: 'Đăng nhập',
   acctSignInAgain: 'Đăng nhập lại',
   // S8/S10 local-file conversation restart notice (G05BE-6)
-  aiUniworkLocalFileRestart: 'Tệp trên máy bắt đầu cuộc trò chuyện mới theo tổ chức của bạn và không giữ các lượt từ tệp khác.',
+  aiUniworkLocalFileRestart:
+    'Tệp trên máy bắt đầu cuộc trò chuyện mới theo tổ chức của bạn và không giữ các lượt từ tệp khác.',
   // S9 cells summary and S10 web workbook size limit
   aiResultCellsMeta: 'Đã ghi {written} ô ({range}) · {overwritten} ô có sẵn bị ghi đè',
-  aiErrWorkbookTooLarge: 'Bảng tính này quá lớn để AI xử lý trên web. Mở bằng ứng dụng UniWork Office.',
+  aiErrWorkbookTooLarge:
+    'Bảng tính này quá lớn để AI xử lý trên web. Mở bằng ứng dụng UniWork Office.',
+  // S7 composer notice keys (not_entitled, credits_exhausted)
+  not_entitled:
+    'Gói của tổ chức bạn chưa bao gồm UniWork AI. Hãy liên hệ quản trị viên tổ chức về gói, hoặc thêm khóa AI của riêng bạn trong Cài đặt > Mô hình AI.',
+  credits_exhausted:
+    'Tổ chức của bạn đã dùng hết tín dụng AI trong kỳ này. Hãy nhờ quản trị viên tổ chức bổ sung, hoặc thêm khóa AI của riêng bạn trong Cài đặt > Mô hình AI.',
 } satisfies Record<keyof typeof zh, string>

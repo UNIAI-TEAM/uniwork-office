@@ -83,12 +83,21 @@ export const es = {
   cloudCreditsLeft: 'Quedan {remaining} / {limit}',
   cloudCreditsUnlimited: 'Ilimitado',
   cloudCreditsRenews: 'Se renueva el {date}',
-  cloudInactiveBody: 'La suscripción de UniWork de su organización no está activa, por lo que la IA en la nube está en pausa. Pida a un administrador que la renueve; sus propios proveedores de abajo siguen funcionando.',
+  cloudInactiveBody:
+    'La suscripción de UniWork de su organización no está activa, por lo que la IA en la nube está en pausa. Pida a un administrador que la renueve; sus propios proveedores de abajo siguen funcionando.',
   acctSignIn: 'Iniciar sesión',
   acctSignInAgain: 'Volver a iniciar sesión',
   // S8/S10 local-file conversation restart notice (G05BE-6)
-  aiUniworkLocalFileRestart: 'Los archivos locales inician una conversación nueva en tu organización y no conservan los turnos de otros archivos.',
+  aiUniworkLocalFileRestart:
+    'Los archivos locales inician una conversación nueva en tu organización y no conservan los turnos de otros archivos.',
   // S9 cells summary and S10 web workbook size limit
-  aiResultCellsMeta: 'Celdas escritas: {written} ({range}) · Celdas existentes sobrescritas: {overwritten}',
-  aiErrWorkbookTooLarge: 'Este libro es demasiado grande para la IA en la web. Ábrelo en la aplicación UniWork Office.',
+  aiResultCellsMeta:
+    'Celdas escritas: {written} ({range}) · Celdas existentes sobrescritas: {overwritten}',
+  aiErrWorkbookTooLarge:
+    'Este libro es demasiado grande para la IA en la web. Ábrelo en la aplicación UniWork Office.',
+  // S7 composer notice keys (not_entitled, credits_exhausted)
+  not_entitled:
+    'El plan de tu organización no incluye UniWork AI. Consulta el plan con un administrador de la organización o añade tu propia clave de IA en Configuración > Modelo de IA.',
+  credits_exhausted:
+    'Tu organización ha agotado todos sus créditos de IA para este período. Pide a un administrador de la organización que añada créditos o añade tu propia clave de IA en Configuración > Modelo de IA.',
 } satisfies Record<keyof typeof zh, string>

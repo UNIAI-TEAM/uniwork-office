@@ -1,10 +1,7 @@
+import './ai-uniwork-composer.css'
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react'
 import type { Lang } from '@genoffice/i18n'
-import {
-  aiNoticeText,
-  type ComposerNote,
-  type ComposerNoteAction,
-} from '@genoffice/ai-provider/browser'
+import type { ComposerNote, ComposerNoteAction } from '@genoffice/ai-provider/browser'
 import { aiUniworkText, type AiUniworkStringKey } from '../strings-ai-uniwork'
 import { useUniworkDisclosureAck, type UniworkAckKey } from './ack-store'
 
@@ -24,9 +21,6 @@ export type UniworkDisclosureVariant = 'document' | 'local'
 /** Resolves the localized body text for a `ComposerNote` */
 export function resolveComposerNoteText(note: ComposerNote, lang: Lang = 'vi'): string {
   if (note.text) return note.text
-  if (note.key === 'not_entitled' || note.key === 'credits_exhausted') {
-    return aiNoticeText(note.key, lang === 'vi' ? 'vi' : 'en')
-  }
   return aiUniworkText(lang, note.key)
 }
 
@@ -81,8 +75,7 @@ export function UniworkComposerNote({
     note !== undefined &&
     dismissed.kind === note.kind
 
-  const visibleNote =
-    note && (provider === undefined || provider === 'uniwork') && !isDismissed ? note : null
+  const visibleNote = note && provider === 'uniwork' && !isDismissed ? note : null
   const bodyText = visibleNote ? resolveComposerNoteText(visibleNote, lang) : ''
 
   useEffect(() => {
@@ -349,13 +342,22 @@ export interface AiComposerUniworkProps {
   readonly onAnnounce?: ((text: string) => void) | undefined
 }
 
-/** Checks whether any popup/listbox/dialog/menu is open in `root`, blocking `Escape` from stopping a run */
+/**
+ * Checks whether a composer-owned popup/listbox/dialog/menu is open inside `root`, blocking
+ * `Escape` from stopping a run without matching persistent ribbon/toolbar listboxes or inline
+ * collapsible sections (`AiQueueStrip`).
+ */
 export function isComposerPopupOpen(root?: Document | Element | null): boolean {
-  const scope = root ?? (typeof document !== 'undefined' ? document : null)
-  if (!scope) return false
+  const docOrEl = root ?? (typeof document !== 'undefined' ? document : null)
+  if (!docOrEl) return false
+  const composerRoot =
+    typeof Element !== 'undefined' && docOrEl instanceof Element
+      ? docOrEl
+      : docOrEl.querySelector('.ai-input-box')
+  if (!composerRoot) return false
   return (
-    scope.querySelector(
-      '[role="listbox"], [role="menu"], [role="dialog"], [aria-expanded="true"]',
+    composerRoot.querySelector(
+      '[role="listbox"], [role="menu"], [role="dialog"], [aria-haspopup][aria-expanded="true"], .ai-model-pop, .gs-dd-pop',
     ) !== null
   )
 }

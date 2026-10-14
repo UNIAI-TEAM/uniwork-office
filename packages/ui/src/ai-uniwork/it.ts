@@ -85,12 +85,21 @@ export const it = {
   cloudCreditsLeft: '{remaining} / {limit} rimasti',
   cloudCreditsUnlimited: 'Illimitato',
   cloudCreditsRenews: 'Si rinnova il {date}',
-  cloudInactiveBody: 'L’abbonamento UniWork della tua organizzazione non è attivo, quindi l’IA cloud è in pausa. Chiedi a un amministratore di rinnovarlo; i tuoi provider qui sotto continuano a funzionare.',
+  cloudInactiveBody:
+    'L’abbonamento UniWork della tua organizzazione non è attivo, quindi l’IA cloud è in pausa. Chiedi a un amministratore di rinnovarlo; i tuoi provider qui sotto continuano a funzionare.',
   acctSignIn: 'Accedi',
   acctSignInAgain: 'Accedi di nuovo',
   // S8/S10 local-file conversation restart notice (G05BE-6)
-  aiUniworkLocalFileRestart: 'I file locali avviano una nuova conversazione nella tua organizzazione e non conservano i turni di altri file.',
+  aiUniworkLocalFileRestart:
+    'I file locali avviano una nuova conversazione nella tua organizzazione e non conservano i turni di altri file.',
   // S9 cells summary and S10 web workbook size limit
-  aiResultCellsMeta: 'Celle scritte: {written} ({range}) · Celle esistenti sovrascritte: {overwritten}',
-  aiErrWorkbookTooLarge: 'Questa cartella di lavoro è troppo grande per l’IA sul web. Aprila nell’app UniWork Office.',
+  aiResultCellsMeta:
+    'Celle scritte: {written} ({range}) · Celle esistenti sovrascritte: {overwritten}',
+  aiErrWorkbookTooLarge:
+    'Questa cartella di lavoro è troppo grande per l’IA sul web. Aprila nell’app UniWork Office.',
+  // S7 composer notice keys (not_entitled, credits_exhausted)
+  not_entitled:
+    'Il piano della tua organizzazione non include UniWork AI. Chiedi informazioni sul piano a un amministratore dell’organizzazione o aggiungi la tua chiave IA in Impostazioni > Modello IA.',
+  credits_exhausted:
+    'La tua organizzazione ha esaurito tutti i crediti IA per questo periodo. Chiedi a un amministratore dell’organizzazione di aggiungere crediti o aggiungi la tua chiave IA in Impostazioni > Modello IA.',
 } satisfies Record<keyof typeof zh, string>

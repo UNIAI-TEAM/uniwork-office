@@ -79,12 +79,21 @@ export const pl = {
   cloudCreditsLeft: 'Pozostało {remaining} / {limit}',
   cloudCreditsUnlimited: 'Bez limitu',
   cloudCreditsRenews: 'Odnowienie {date}',
-  cloudInactiveBody: 'Subskrypcja UniWork Twojej organizacji jest nieaktywna, więc chmurowa AI jest wstrzymana. Poproś administratora o jej odnowienie; Twoi własni dostawcy poniżej nadal działają.',
+  cloudInactiveBody:
+    'Subskrypcja UniWork Twojej organizacji jest nieaktywna, więc chmurowa AI jest wstrzymana. Poproś administratora o jej odnowienie; Twoi własni dostawcy poniżej nadal działają.',
   acctSignIn: 'Zaloguj się',
   acctSignInAgain: 'Zaloguj się ponownie',
   // S8/S10 local-file conversation restart notice (G05BE-6)
-  aiUniworkLocalFileRestart: 'Pliki lokalne rozpoczynają nową rozmowę w ramach Twojej organizacji i nie zachowują tur z innych plików.',
+  aiUniworkLocalFileRestart:
+    'Pliki lokalne rozpoczynają nową rozmowę w ramach Twojej organizacji i nie zachowują tur z innych plików.',
   // S9 cells summary and S10 web workbook size limit
-  aiResultCellsMeta: 'Zapisane komórki: {written} ({range}) · Nadpisane istniejące komórki: {overwritten}',
-  aiErrWorkbookTooLarge: 'Ten skoroszyt jest za duży dla AI w przeglądarce. Otwórz go w aplikacji UniWork Office.',
+  aiResultCellsMeta:
+    'Zapisane komórki: {written} ({range}) · Nadpisane istniejące komórki: {overwritten}',
+  aiErrWorkbookTooLarge:
+    'Ten skoroszyt jest za duży dla AI w przeglądarce. Otwórz go w aplikacji UniWork Office.',
+  // S7 composer notice keys (not_entitled, credits_exhausted)
+  not_entitled:
+    'Plan Twojej organizacji nie obejmuje UniWork AI. Zapytaj administratora organizacji o plan lub dodaj własny klucz AI w Ustawienia > Model AI.',
+  credits_exhausted:
+    'Twoja organizacja wykorzystała wszystkie kredyty AI w tym okresie. Poproś administratora organizacji o doładowanie kredytów lub dodaj własny klucz AI w Ustawienia > Model AI.',
 } satisfies Record<keyof typeof zh, string>

@@ -15,15 +15,16 @@ export interface UniworkAckKey {
 
 export function serializeUniworkAckKey(key: UniworkAckKey | null | undefined): string | null {
   if (!key) return null
-  const account = key.account?.trim()
-  const org = key.org?.trim()
-  const document = key.document?.trim()
-  if (!account || !org || !document) return null
+  const account = key.account?.trim() || 'local-account'
+  const org = key.org?.trim() || 'local-org'
+  const document = key.document?.trim() || 'local'
   return `${account}|${org}|${document}`
 }
 
 const memoryAcks = new Set<string>()
 const listeners = new Set<() => void>()
+let hydrated = false
+let storageListenerAttached = false
 
 function readStorageAcks(): string[] {
   if (typeof localStorage === 'undefined') return []
@@ -57,25 +58,39 @@ function notifyListeners(): void {
   }
 }
 
+function ensureStorageListener(): void {
+  if (storageListenerAttached) return
+  if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return
+  storageListenerAttached = true
+  window.addEventListener('storage', (event: StorageEvent) => {
+    if (event.key !== null && event.key !== UNIWORK_ACK_STORAGE_KEY) return
+    memoryAcks.clear()
+    for (const item of readStorageAcks()) memoryAcks.add(item)
+    hydrated = true
+    notifyListeners()
+  })
+}
+
+function ensureHydrated(): void {
+  ensureStorageListener()
+  if (hydrated) return
+  hydrated = true
+  for (const item of readStorageAcks()) memoryAcks.add(item)
+}
+
 /** Whether the user has acknowledged the S8 disclosure for this account + org + document */
 export function isAcked(key: UniworkAckKey | null | undefined): boolean {
   const serialized = serializeUniworkAckKey(key)
   if (!serialized) return false
-  if (memoryAcks.has(serialized)) return true
-  const stored = readStorageAcks()
-  if (stored.includes(serialized)) {
-    memoryAcks.add(serialized)
-    return true
-  }
-  return false
+  ensureHydrated()
+  return memoryAcks.has(serialized)
 }
 
 /** Records the user's S8 disclosure acknowledgment for this account + org + document */
 export function ack(key: UniworkAckKey | null | undefined): void {
   const serialized = serializeUniworkAckKey(key)
   if (!serialized) return
-  const stored = readStorageAcks()
-  for (const item of stored) memoryAcks.add(item)
+  ensureHydrated()
   const had = memoryAcks.has(serialized)
   memoryAcks.add(serialized)
   writeStorageAcks(memoryAcks)
@@ -84,8 +99,9 @@ export function ack(key: UniworkAckKey | null | undefined): void {
 
 /** Clears all stored disclosure acknowledgments (used by tests and sign-out cleanup) */
 export function clearUniworkAcks(): void {
-  const hadAny = memoryAcks.size > 0 || readStorageAcks().length > 0
+  const hadAny = memoryAcks.size > 0
   memoryAcks.clear()
+  hydrated = false
   if (typeof localStorage !== 'undefined') {
     try {
       localStorage.removeItem(UNIWORK_ACK_STORAGE_KEY)

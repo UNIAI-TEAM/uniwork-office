@@ -74,7 +74,8 @@ export const zh = {
   cloudCreditsLeft: '剩余 {remaining} / {limit}',
   cloudCreditsUnlimited: '不限量',
   cloudCreditsRenews: '{date} 重置',
-  cloudInactiveBody: '你所在组织的 UniWork 订阅未生效，云端 AI 已暂停。请联系管理员续订；下方自己的服务商不受影响。',
+  cloudInactiveBody:
+    '你所在组织的 UniWork 订阅未生效，云端 AI 已暂停。请联系管理员续订；下方自己的服务商不受影响。',
   acctSignIn: '登录',
   acctSignInAgain: '重新登录',
   // S8/S10 local-file conversation restart notice (G05BE-6)
@@ -82,4 +83,9 @@ export const zh = {
   // S9 cells summary and S10 web workbook size limit
   aiResultCellsMeta: '已写入 {written} 个单元格（{range}）· 覆盖已有单元格 {overwritten} 个',
   aiErrWorkbookTooLarge: '此工作簿太大，无法在网页上使用 AI。请在 UniWork Office 应用中打开。',
+  // S7 composer notice keys (not_entitled, credits_exhausted)
+  not_entitled:
+    '你所在组织的套餐不包含 UniWork AI。请联系组织管理员了解套餐，或在“设置 > AI 模型”中添加你自己的 AI 密钥。',
+  credits_exhausted:
+    '你所在组织本周期的 AI 额度已用完。请联系组织管理员补充额度，或在“设置 > AI 模型”中添加你自己的 AI 密钥。',
 }

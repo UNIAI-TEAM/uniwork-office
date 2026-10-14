@@ -74,12 +74,21 @@ export const ar = {
   cloudCreditsLeft: 'متبقٍ {remaining} / {limit}',
   cloudCreditsUnlimited: 'غير محدود',
   cloudCreditsRenews: 'يتجدد في {date}',
-  cloudInactiveBody: 'اشتراك UniWork الخاص بمؤسستك غير نشط، لذا تم إيقاف الذكاء الاصطناعي السحابي مؤقتًا. اطلب من المسؤول تجديده؛ ستستمر مزوّداتك الخاصة أدناه في العمل.',
+  cloudInactiveBody:
+    'اشتراك UniWork الخاص بمؤسستك غير نشط، لذا تم إيقاف الذكاء الاصطناعي السحابي مؤقتًا. اطلب من المسؤول تجديده؛ ستستمر مزوّداتك الخاصة أدناه في العمل.',
   acctSignIn: 'تسجيل الدخول',
   acctSignInAgain: 'تسجيل الدخول مرة أخرى',
   // S8/S10 local-file conversation restart notice (G05BE-6)
-  aiUniworkLocalFileRestart: 'تبدأ الملفات المحلية محادثة جديدة ضمن مؤسستك ولا تحتفظ بالأدوار السابقة من الملفات الأخرى.',
+  aiUniworkLocalFileRestart:
+    'تبدأ الملفات المحلية محادثة جديدة ضمن مؤسستك ولا تحتفظ بالأدوار السابقة من الملفات الأخرى.',
   // S9 cells summary and S10 web workbook size limit
-  aiResultCellsMeta: 'الخلايا المكتوبة: {written} ({range}) · الخلايا الموجودة التي تمت الكتابة فوقها: {overwritten}',
-  aiErrWorkbookTooLarge: 'هذا المصنف كبير جدًا على الذكاء الاصطناعي على الويب. افتحه في تطبيق UniWork Office.',
+  aiResultCellsMeta:
+    'الخلايا المكتوبة: {written} ({range}) · الخلايا الموجودة التي تمت الكتابة فوقها: {overwritten}',
+  aiErrWorkbookTooLarge:
+    'هذا المصنف كبير جدًا على الذكاء الاصطناعي على الويب. افتحه في تطبيق UniWork Office.',
+  // S7 composer notice keys (not_entitled, credits_exhausted)
+  not_entitled:
+    'خطة مؤسستك لا تتضمن UniWork AI. اسأل مسؤول المؤسسة عن الخطة، أو أضف مفتاح الذكاء الاصطناعي الخاص بك في الإعدادات > نموذج الذكاء الاصطناعي.',
+  credits_exhausted:
+    'استنفدت مؤسستك جميع أرصدة الذكاء الاصطناعي لهذه الفترة. اطلب من مسؤول المؤسسة إضافة أرصدة، أو أضف مفتاح الذكاء الاصطناعي الخاص بك في الإعدادات > نموذج الذكاء الاصطناعي.',
 } satisfies Record<keyof typeof zh, string>

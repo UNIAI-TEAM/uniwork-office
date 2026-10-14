@@ -86,12 +86,21 @@ export const ms = {
   cloudCreditsLeft: 'Baki {remaining} / {limit}',
   cloudCreditsUnlimited: 'Tanpa had',
   cloudCreditsRenews: 'Diperbaharui {date}',
-  cloudInactiveBody: 'Langganan UniWork organisasi anda tidak aktif, jadi AI awan dijeda. Minta pentadbir memperbaharuinya; pembekal anda sendiri di bawah terus berfungsi.',
+  cloudInactiveBody:
+    'Langganan UniWork organisasi anda tidak aktif, jadi AI awan dijeda. Minta pentadbir memperbaharuinya; pembekal anda sendiri di bawah terus berfungsi.',
   acctSignIn: 'Log masuk',
   acctSignInAgain: 'Log masuk semula',
   // S8/S10 local-file conversation restart notice (G05BE-6)
-  aiUniworkLocalFileRestart: 'Fail setempat memulakan perbualan baharu di bawah organisasi anda dan tidak menyimpan giliran daripada fail lain.',
+  aiUniworkLocalFileRestart:
+    'Fail setempat memulakan perbualan baharu di bawah organisasi anda dan tidak menyimpan giliran daripada fail lain.',
   // S9 cells summary and S10 web workbook size limit
-  aiResultCellsMeta: 'Sel ditulis: {written} ({range}) · Sel sedia ada ditulis ganti: {overwritten}',
-  aiErrWorkbookTooLarge: 'Buku kerja ini terlalu besar untuk AI di web. Buka dalam apl UniWork Office.',
+  aiResultCellsMeta:
+    'Sel ditulis: {written} ({range}) · Sel sedia ada ditulis ganti: {overwritten}',
+  aiErrWorkbookTooLarge:
+    'Buku kerja ini terlalu besar untuk AI di web. Buka dalam apl UniWork Office.',
+  // S7 composer notice keys (not_entitled, credits_exhausted)
+  not_entitled:
+    'Pelan organisasi anda tidak termasuk UniWork AI. Tanya pentadbir organisasi tentang pelan tersebut, atau tambah kunci AI anda sendiri dalam Tetapan > Model AI.',
+  credits_exhausted:
+    'Organisasi anda telah menggunakan semua kredit AI untuk tempoh ini. Minta pentadbir organisasi menambah kredit, atau tambah kunci AI anda sendiri dalam Tetapan > Model AI.',
 } satisfies Record<keyof typeof zh, string>

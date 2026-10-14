@@ -72,12 +72,20 @@ export const he = {
   cloudCreditsLeft: 'נותרו {remaining} / {limit}',
   cloudCreditsUnlimited: 'ללא הגבלה',
   cloudCreditsRenews: 'יתחדש ב-{date}',
-  cloudInactiveBody: 'מנוי UniWork של הארגון שלך אינו פעיל, ולכן ה-AI בענן מושהה. בקש ממנהל לחדש אותו; הספקים שלך למטה ממשיכים לעבוד.',
+  cloudInactiveBody:
+    'מנוי UniWork של הארגון שלך אינו פעיל, ולכן ה-AI בענן מושהה. בקש ממנהל לחדש אותו; הספקים שלך למטה ממשיכים לעבוד.',
   acctSignIn: 'כניסה',
   acctSignInAgain: 'כניסה מחדש',
   // S8/S10 local-file conversation restart notice (G05BE-6)
-  aiUniworkLocalFileRestart: 'קבצים מקומיים מתחילים שיחה חדשה תחת הארגון שלך ואינם שומרים סבבים מקבצים אחרים.',
+  aiUniworkLocalFileRestart:
+    'קבצים מקומיים מתחילים שיחה חדשה תחת הארגון שלך ואינם שומרים סבבים מקבצים אחרים.',
   // S9 cells summary and S10 web workbook size limit
   aiResultCellsMeta: 'תאים שנכתבו: {written} ({range}) · תאים קיימים שנדרסו: {overwritten}',
-  aiErrWorkbookTooLarge: 'חוברת העבודה הזו גדולה מדי ל-AI באינטרנט. פתח אותה באפליקציית UniWork Office.',
+  aiErrWorkbookTooLarge:
+    'חוברת העבודה הזו גדולה מדי ל-AI באינטרנט. פתח אותה באפליקציית UniWork Office.',
+  // S7 composer notice keys (not_entitled, credits_exhausted)
+  not_entitled:
+    'התוכנית של הארגון שלך אינה כוללת את UniWork AI. פנה למנהל הארגון לגבי התוכנית, או הוסף מפתח AI משלך בהגדרות > מודל AI.',
+  credits_exhausted:
+    'הארגון שלך ניצל את כל קרדיטי ה-AI לתקופה זו. בקש ממנהל הארגון להוסיף קרדיטים, או הוסף מפתח AI משלך בהגדרות > מודל AI.',
 } satisfies Record<keyof typeof zh, string>

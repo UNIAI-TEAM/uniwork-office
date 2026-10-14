@@ -79,12 +79,20 @@ export const ja = {
   cloudCreditsLeft: '残り {remaining} / {limit}',
   cloudCreditsUnlimited: '無制限',
   cloudCreditsRenews: '{date} にリセット',
-  cloudInactiveBody: '組織の UniWork サブスクリプションが有効でないため、クラウド AI は停止中です。管理者に更新を依頼してください。下の独自プロバイダーは引き続き使えます。',
+  cloudInactiveBody:
+    '組織の UniWork サブスクリプションが有効でないため、クラウド AI は停止中です。管理者に更新を依頼してください。下の独自プロバイダーは引き続き使えます。',
   acctSignIn: 'サインイン',
   acctSignInAgain: '再度サインイン',
   // S8/S10 local-file conversation restart notice (G05BE-6)
-  aiUniworkLocalFileRestart: 'ローカルファイルは組織の下で新しい会話を開始し、他のファイルのやり取りは引き継ぎません。',
+  aiUniworkLocalFileRestart:
+    'ローカルファイルは組織の下で新しい会話を開始し、他のファイルのやり取りは引き継ぎません。',
   // S9 cells summary and S10 web workbook size limit
   aiResultCellsMeta: '書き込んだセル: {written}（{range}）· 上書きした既存セル: {overwritten}',
-  aiErrWorkbookTooLarge: 'このブックは大きすぎるため、Web 版では AI を使えません。UniWork Office アプリで開いてください。',
+  aiErrWorkbookTooLarge:
+    'このブックは大きすぎるため、Web 版では AI を使えません。UniWork Office アプリで開いてください。',
+  // S7 composer notice keys (not_entitled, credits_exhausted)
+  not_entitled:
+    '組織のプランに UniWork AI が含まれていません。プランについて組織の管理者に確認するか、「設定 > AI モデル」でご自身の AI キーを追加してください。',
+  credits_exhausted:
+    '組織の今期の AI クレジットをすべて使い切りました。組織の管理者にクレジットの追加を依頼するか、「設定 > AI モデル」でご自身の AI キーを追加してください。',
 } satisfies Record<keyof typeof zh, string>

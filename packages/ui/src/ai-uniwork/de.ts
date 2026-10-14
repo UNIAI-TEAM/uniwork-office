@@ -90,12 +90,21 @@ export const de = {
   cloudCreditsLeft: '{remaining} / {limit} übrig',
   cloudCreditsUnlimited: 'Unbegrenzt',
   cloudCreditsRenews: 'Erneuert am {date}',
-  cloudInactiveBody: 'Das UniWork-Abonnement Ihrer Organisation ist nicht aktiv, daher ist die Cloud-KI pausiert. Bitten Sie einen Administrator um die Verlängerung; Ihre eigenen Anbieter unten funktionieren weiter.',
+  cloudInactiveBody:
+    'Das UniWork-Abonnement Ihrer Organisation ist nicht aktiv, daher ist die Cloud-KI pausiert. Bitten Sie einen Administrator um die Verlängerung; Ihre eigenen Anbieter unten funktionieren weiter.',
   acctSignIn: 'Anmelden',
   acctSignInAgain: 'Erneut anmelden',
   // S8/S10 local-file conversation restart notice (G05BE-6)
-  aiUniworkLocalFileRestart: 'Lokale Dateien starten eine neue Unterhaltung in Ihrer Organisation und übernehmen keine Runden aus anderen Dateien.',
+  aiUniworkLocalFileRestart:
+    'Lokale Dateien starten eine neue Unterhaltung in Ihrer Organisation und übernehmen keine Runden aus anderen Dateien.',
   // S9 cells summary and S10 web workbook size limit
-  aiResultCellsMeta: 'Geschriebene Zellen: {written} ({range}) · Überschriebene vorhandene Zellen: {overwritten}',
-  aiErrWorkbookTooLarge: 'Diese Arbeitsmappe ist für die KI im Web zu groß. Öffnen Sie sie in der UniWork Office-App.',
+  aiResultCellsMeta:
+    'Geschriebene Zellen: {written} ({range}) · Überschriebene vorhandene Zellen: {overwritten}',
+  aiErrWorkbookTooLarge:
+    'Diese Arbeitsmappe ist für die KI im Web zu groß. Öffnen Sie sie in der UniWork Office-App.',
+  // S7 composer notice keys (not_entitled, credits_exhausted)
+  not_entitled:
+    'Der Tarif Ihrer Organisation umfasst UniWork AI nicht. Wenden Sie sich wegen des Tarifs an einen Organisationsadministrator oder fügen Sie unter Einstellungen > KI-Modell Ihren eigenen KI-Schlüssel hinzu.',
+  credits_exhausted:
+    'Ihre Organisation hat ihr gesamtes KI-Guthaben für diesen Zeitraum verbraucht. Bitten Sie einen Organisationsadministrator, Guthaben nachzuladen, oder fügen Sie unter Einstellungen > KI-Modell Ihren eigenen KI-Schlüssel hinzu.',
 } satisfies Record<keyof typeof zh, string>

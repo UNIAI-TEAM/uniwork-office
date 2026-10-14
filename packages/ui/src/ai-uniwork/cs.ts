@@ -79,12 +79,21 @@ export const cs = {
   cloudCreditsLeft: 'Zbývá {remaining} / {limit}',
   cloudCreditsUnlimited: 'Neomezeně',
   cloudCreditsRenews: 'Obnoví se {date}',
-  cloudInactiveBody: 'Předplatné UniWork vaší organizace není aktivní, proto je cloudová AI pozastavena. Požádejte správce o obnovení; vaši vlastní poskytovatelé níže fungují dál.',
+  cloudInactiveBody:
+    'Předplatné UniWork vaší organizace není aktivní, proto je cloudová AI pozastavena. Požádejte správce o obnovení; vaši vlastní poskytovatelé níže fungují dál.',
   acctSignIn: 'Přihlásit se',
   acctSignInAgain: 'Přihlásit se znovu',
   // S8/S10 local-file conversation restart notice (G05BE-6)
-  aiUniworkLocalFileRestart: 'Místní soubory zahajují novou konverzaci v rámci vaší organizace a neuchovávají kola z jiných souborů.',
+  aiUniworkLocalFileRestart:
+    'Místní soubory zahajují novou konverzaci v rámci vaší organizace a neuchovávají kola z jiných souborů.',
   // S9 cells summary and S10 web workbook size limit
-  aiResultCellsMeta: 'Zapsané buňky: {written} ({range}) · Přepsané existující buňky: {overwritten}',
-  aiErrWorkbookTooLarge: 'Tento sešit je pro AI na webu příliš velký. Otevřete ho v aplikaci UniWork Office.',
+  aiResultCellsMeta:
+    'Zapsané buňky: {written} ({range}) · Přepsané existující buňky: {overwritten}',
+  aiErrWorkbookTooLarge:
+    'Tento sešit je pro AI na webu příliš velký. Otevřete ho v aplikaci UniWork Office.',
+  // S7 composer notice keys (not_entitled, credits_exhausted)
+  not_entitled:
+    'Tarif vaší organizace nezahrnuje UniWork AI. Informujte se u správce organizace ohledně tarifu, nebo přidejte vlastní klíč AI v Nastavení > Model AI.',
+  credits_exhausted:
+    'Vaše organizace vyčerpala všechny své kredity AI pro toto období. Požádejte správce organizace o doplnění kreditů, nebo přidejte vlastní klíč AI v Nastavení > Model AI.',
 } satisfies Record<keyof typeof zh, string>

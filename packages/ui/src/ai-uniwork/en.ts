@@ -75,12 +75,21 @@ export const en = {
   cloudCreditsLeft: '{remaining} / {limit} left',
   cloudCreditsUnlimited: 'Unlimited',
   cloudCreditsRenews: 'Renews {date}',
-  cloudInactiveBody: 'Your organization’s UniWork subscription is not active, so cloud AI is paused. Ask an admin to renew it; your own providers below keep working.',
+  cloudInactiveBody:
+    'Your organization’s UniWork subscription is not active, so cloud AI is paused. Ask an admin to renew it; your own providers below keep working.',
   acctSignIn: 'Sign in',
   acctSignInAgain: 'Sign in again',
   // S8/S10 local-file conversation restart notice (G05BE-6)
-  aiUniworkLocalFileRestart: 'Local files start a new conversation under your organization and don’t keep turns from other files.',
+  aiUniworkLocalFileRestart:
+    'Local files start a new conversation under your organization and don’t keep turns from other files.',
   // S9 cells summary and S10 web workbook size limit
-  aiResultCellsMeta: 'Cells written: {written} ({range}) · Existing cells overwritten: {overwritten}',
-  aiErrWorkbookTooLarge: 'This workbook is too large for AI on the web. Open it in the UniWork Office app.',
+  aiResultCellsMeta:
+    'Cells written: {written} ({range}) · Existing cells overwritten: {overwritten}',
+  aiErrWorkbookTooLarge:
+    'This workbook is too large for AI on the web. Open it in the UniWork Office app.',
+  // S7 composer notice keys (not_entitled, credits_exhausted)
+  not_entitled:
+    "Your organization's plan does not include UniWork AI. Ask an organization admin about the plan, or add your own AI key in Settings > AI Model.",
+  credits_exhausted:
+    'Your organization has used all its AI credits for this period. Ask an organization admin to add credits, or add your own AI key in Settings > AI Model.',
 } satisfies Record<keyof typeof zh, string>

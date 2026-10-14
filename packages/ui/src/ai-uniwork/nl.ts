@@ -86,12 +86,21 @@ export const nl = {
   cloudCreditsLeft: '{remaining} / {limit} over',
   cloudCreditsUnlimited: 'Onbeperkt',
   cloudCreditsRenews: 'Vernieuwt op {date}',
-  cloudInactiveBody: 'Het UniWork-abonnement van je organisatie is niet actief, dus cloud-AI is gepauzeerd. Vraag een beheerder het te verlengen; je eigen providers hieronder blijven werken.',
+  cloudInactiveBody:
+    'Het UniWork-abonnement van je organisatie is niet actief, dus cloud-AI is gepauzeerd. Vraag een beheerder het te verlengen; je eigen providers hieronder blijven werken.',
   acctSignIn: 'Inloggen',
   acctSignInAgain: 'Opnieuw inloggen',
   // S8/S10 local-file conversation restart notice (G05BE-6)
-  aiUniworkLocalFileRestart: 'Lokale bestanden starten een nieuw gesprek binnen je organisatie en bewaren geen beurten uit andere bestanden.',
+  aiUniworkLocalFileRestart:
+    'Lokale bestanden starten een nieuw gesprek binnen je organisatie en bewaren geen beurten uit andere bestanden.',
   // S9 cells summary and S10 web workbook size limit
-  aiResultCellsMeta: 'Geschreven cellen: {written} ({range}) · Overschreven bestaande cellen: {overwritten}',
-  aiErrWorkbookTooLarge: 'Deze werkmap is te groot voor AI op het web. Open hem in de UniWork Office-app.',
+  aiResultCellsMeta:
+    'Geschreven cellen: {written} ({range}) · Overschreven bestaande cellen: {overwritten}',
+  aiErrWorkbookTooLarge:
+    'Deze werkmap is te groot voor AI op het web. Open hem in de UniWork Office-app.',
+  // S7 composer notice keys (not_entitled, credits_exhausted)
+  not_entitled:
+    'Het abonnement van je organisatie bevat geen UniWork AI. Vraag een organisatiebeheerder naar het abonnement of voeg je eigen AI-sleutel toe via Instellingen > AI-model.',
+  credits_exhausted:
+    'Je organisatie heeft alle AI-credits voor deze periode verbruikt. Vraag een organisatiebeheerder om credits toe te voegen of voeg je eigen AI-sleutel toe via Instellingen > AI-model.',
 } satisfies Record<keyof typeof zh, string>

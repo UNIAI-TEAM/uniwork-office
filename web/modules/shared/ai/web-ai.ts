@@ -248,6 +248,7 @@ export function createWebAi(opts: {
     documentId: string
     module?: OfficeModule
     workspaceId?: string
+    orgId?: string
     account?: string
     orgName?: string
   } | null = null
@@ -292,8 +293,9 @@ export function createWebAi(opts: {
         granted?.imageSearch === true ||
         granted?.imageGeneration === true
       const sessionModule = (session as { module?: OfficeModule }).module
-      const workspaceId = (session as { workspaceId?: string }).workspaceId
-      const orgName = (session as { orgName?: string }).orgName
+      const workspaceId = (session as { workspaceId?: string }).workspaceId?.trim()
+      const orgId = (session as { orgId?: string }).orgId?.trim()
+      const orgName = (session as { orgName?: string }).orgName?.trim()
       const account =
         session.user?.id?.trim() ||
         session.recovery?.scope?.split(':')[0]?.trim() ||
@@ -303,6 +305,7 @@ export function createWebAi(opts: {
         documentId: session.documentId,
         ...(module ? { module } : {}),
         ...(workspaceId ? { workspaceId } : {}),
+        ...(orgId ? { orgId } : {}),
         ...(account ? { account } : {}),
         ...(orgName ? { orgName } : {}),
       }
@@ -333,7 +336,10 @@ export function createWebAi(opts: {
         cloudWanted ? client.cloudStatus().catch(() => null) : Promise.resolve(null),
       ])
       const changed =
-        everLoaded && credentialSignature(credentials) !== credentialSignature(state.credentials)
+        (everLoaded &&
+          credentialSignature(credentials) !== credentialSignature(state.credentials)) ||
+        (cloud?.org_id ?? '') !== (state.cloud?.org_id ?? '') ||
+        (cloud?.org_name ?? '') !== (state.cloud?.org_name ?? '')
       state = { credentials, cloud }
       loadedAt = now()
       everLoaded = true
@@ -704,8 +710,16 @@ export function createWebAi(opts: {
     fail,
     uniworkIdentity: () => {
       if (!frameSession) return null
-      const org = state.cloud?.org_id || frameSession.workspaceId || frameSession.documentId
-      const orgName = state.cloud?.org_name || frameSession.orgName || org || 'UniWork'
+      // InitPayload (web/docs/protocol/types.ts, frozen X-02) does not define dedicated orgId /
+      // orgName fields, so org_id / org_name come from GET .../ai/cloud when cloudWanted is true or
+      // from optional host session extensions; when neither is available, org scopes to the document
+      // and orgName falls back to 'UniWork' (never a raw document UUID).
+      const org =
+        state.cloud?.org_id?.trim() ||
+        frameSession.orgId ||
+        frameSession.workspaceId ||
+        frameSession.documentId
+      const orgName = state.cloud?.org_name?.trim() || frameSession.orgName || 'UniWork'
       const account = frameSession.account || 'web'
       return {
         account,

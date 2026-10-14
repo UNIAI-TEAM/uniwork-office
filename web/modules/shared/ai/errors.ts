@@ -23,7 +23,10 @@
  */
 
 import { UniworkError, uniworkErrorKey } from '../../../../packages/ai-provider/src/uniwork/errors'
-import type { AiUniworkStringKey } from '../../../../packages/ui/src/strings-ai-uniwork'
+import {
+  aiUniworkStrings,
+  type AiUniworkStringKey,
+} from '../../../../packages/ui/src/strings-ai-uniwork'
 
 export type AiWebErrorCode =
   | 'credits_exhausted'
@@ -219,9 +222,14 @@ export function asUniworkFailure(err: unknown): UniworkFailure | undefined {
 
 /**
  * The S9/S10 string of a failed UniWork AI turn: the adapter's `uniworkErrorKey` (web host), except
- * that "off" before any run is the entry's own note (`aiUniworkOff`).
+ * that "off" before any run is the entry's own note (`aiUniworkOff`), falling back to
+ * `aiErrUnavailable` if the key is not in `aiUniworkStrings`.
  */
-export function uniworkFailureKey(failure: UniworkFailure): AiUniworkStringKey {
+export function uniworkFailureKey(
+  failure: UniworkFailure,
+  resolveErrorKey: (code: string, host: 'desktop' | 'web') => string = uniworkErrorKey,
+): AiUniworkStringKey {
   if (failure.code === 'office_capability_off' && !failure.runId) return 'aiUniworkOff'
-  return uniworkErrorKey(failure.code, 'web')
+  const key = resolveErrorKey(failure.code, 'web')
+  return key in aiUniworkStrings.zh ? (key as AiUniworkStringKey) : 'aiErrUnavailable'
 }

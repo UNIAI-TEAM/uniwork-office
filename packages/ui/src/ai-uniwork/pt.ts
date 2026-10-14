@@ -82,12 +82,21 @@ export const pt = {
   cloudCreditsLeft: 'Restam {remaining} / {limit}',
   cloudCreditsUnlimited: 'Ilimitado',
   cloudCreditsRenews: 'Renova em {date}',
-  cloudInactiveBody: 'A assinatura UniWork da sua organização não está ativa, por isso a IA na nuvem está pausada. Peça a um administrador para renová-la; seus próprios provedores abaixo continuam funcionando.',
+  cloudInactiveBody:
+    'A assinatura UniWork da sua organização não está ativa, por isso a IA na nuvem está pausada. Peça a um administrador para renová-la; seus próprios provedores abaixo continuam funcionando.',
   acctSignIn: 'Entrar',
   acctSignInAgain: 'Entrar novamente',
   // S8/S10 local-file conversation restart notice (G05BE-6)
-  aiUniworkLocalFileRestart: 'Arquivos locais iniciam uma nova conversa na sua organização e não mantêm os turnos de outros arquivos.',
+  aiUniworkLocalFileRestart:
+    'Arquivos locais iniciam uma nova conversa na sua organização e não mantêm os turnos de outros arquivos.',
   // S9 cells summary and S10 web workbook size limit
-  aiResultCellsMeta: 'Células gravadas: {written} ({range}) · Células existentes substituídas: {overwritten}',
-  aiErrWorkbookTooLarge: 'Esta pasta de trabalho é grande demais para a IA na web. Abra-a no app UniWork Office.',
+  aiResultCellsMeta:
+    'Células gravadas: {written} ({range}) · Células existentes substituídas: {overwritten}',
+  aiErrWorkbookTooLarge:
+    'Esta pasta de trabalho é grande demais para a IA na web. Abra-a no app UniWork Office.',
+  // S7 composer notice keys (not_entitled, credits_exhausted)
+  not_entitled:
+    'O plano da sua organização não inclui o UniWork AI. Fale com um administrador da organização sobre o plano ou adicione sua própria chave de IA em Configurações > Modelo de IA.',
+  credits_exhausted:
+    'Sua organização usou todos os créditos de IA deste período. Peça a um administrador da organização para adicionar créditos ou adicione sua própria chave de IA em Configurações > Modelo de IA.',
 } satisfies Record<keyof typeof zh, string>

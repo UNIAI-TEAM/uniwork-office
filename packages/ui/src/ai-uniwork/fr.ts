@@ -88,12 +88,21 @@ export const fr = {
   cloudCreditsLeft: '{remaining} / {limit} restants',
   cloudCreditsUnlimited: 'Illimité',
   cloudCreditsRenews: 'Renouvellement le {date}',
-  cloudInactiveBody: 'L’abonnement UniWork de votre organisation n’est pas actif : l’IA cloud est suspendue. Demandez à un administrateur de le renouveler ; vos propres fournisseurs ci-dessous continuent de fonctionner.',
+  cloudInactiveBody:
+    'L’abonnement UniWork de votre organisation n’est pas actif : l’IA cloud est suspendue. Demandez à un administrateur de le renouveler ; vos propres fournisseurs ci-dessous continuent de fonctionner.',
   acctSignIn: 'Se connecter',
   acctSignInAgain: 'Se reconnecter',
   // S8/S10 local-file conversation restart notice (G05BE-6)
-  aiUniworkLocalFileRestart: 'Les fichiers locaux démarrent une nouvelle conversation au sein de votre organisation et ne conservent pas les échanges des autres fichiers.',
+  aiUniworkLocalFileRestart:
+    'Les fichiers locaux démarrent une nouvelle conversation au sein de votre organisation et ne conservent pas les échanges des autres fichiers.',
   // S9 cells summary and S10 web workbook size limit
-  aiResultCellsMeta: 'Cellules écrites : {written} ({range}) · Cellules existantes remplacées : {overwritten}',
-  aiErrWorkbookTooLarge: 'Ce classeur est trop volumineux pour l’IA sur le web. Ouvrez-le dans l’application UniWork Office.',
+  aiResultCellsMeta:
+    'Cellules écrites : {written} ({range}) · Cellules existantes remplacées : {overwritten}',
+  aiErrWorkbookTooLarge:
+    'Ce classeur est trop volumineux pour l’IA sur le web. Ouvrez-le dans l’application UniWork Office.',
+  // S7 composer notice keys (not_entitled, credits_exhausted)
+  not_entitled:
+    'L’offre de votre organisation n’inclut pas UniWork AI. Renseignez-vous auprès d’un administrateur de l’organisation ou ajoutez votre propre clé IA dans Paramètres > Modèle IA.',
+  credits_exhausted:
+    'Votre organisation a utilisé tous ses crédits IA pour cette période. Demandez à un administrateur de l’organisation d’ajouter des crédits ou ajoutez votre propre clé IA dans Paramètres > Modèle IA.',
 } satisfies Record<keyof typeof zh, string>

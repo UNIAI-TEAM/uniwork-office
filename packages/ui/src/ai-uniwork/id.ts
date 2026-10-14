@@ -83,12 +83,20 @@ export const id = {
   cloudCreditsLeft: 'Sisa {remaining} / {limit}',
   cloudCreditsUnlimited: 'Tanpa batas',
   cloudCreditsRenews: 'Diperbarui {date}',
-  cloudInactiveBody: 'Langganan UniWork organisasi Anda tidak aktif, sehingga AI cloud dijeda. Minta admin untuk memperpanjangnya; penyedia Anda sendiri di bawah tetap berfungsi.',
+  cloudInactiveBody:
+    'Langganan UniWork organisasi Anda tidak aktif, sehingga AI cloud dijeda. Minta admin untuk memperpanjangnya; penyedia Anda sendiri di bawah tetap berfungsi.',
   acctSignIn: 'Masuk',
   acctSignInAgain: 'Masuk lagi',
   // S8/S10 local-file conversation restart notice (G05BE-6)
-  aiUniworkLocalFileRestart: 'File lokal memulai percakapan baru di bawah organisasi Anda dan tidak menyimpan giliran dari file lain.',
+  aiUniworkLocalFileRestart:
+    'File lokal memulai percakapan baru di bawah organisasi Anda dan tidak menyimpan giliran dari file lain.',
   // S9 cells summary and S10 web workbook size limit
   aiResultCellsMeta: 'Sel ditulis: {written} ({range}) · Sel yang ada ditimpa: {overwritten}',
-  aiErrWorkbookTooLarge: 'Buku kerja ini terlalu besar untuk AI di web. Buka di aplikasi UniWork Office.',
+  aiErrWorkbookTooLarge:
+    'Buku kerja ini terlalu besar untuk AI di web. Buka di aplikasi UniWork Office.',
+  // S7 composer notice keys (not_entitled, credits_exhausted)
+  not_entitled:
+    'Paket organisasi Anda tidak mencakup UniWork AI. Tanyakan kepada admin organisasi tentang paket tersebut, atau tambahkan kunci AI Anda sendiri di Pengaturan > Model AI.',
+  credits_exhausted:
+    'Organisasi Anda telah menggunakan semua kredit AI untuk periode ini. Minta admin organisasi untuk menambahkan kredit, atau tambahkan kunci AI Anda sendiri di Pengaturan > Model AI.',
 } satisfies Record<keyof typeof zh, string>

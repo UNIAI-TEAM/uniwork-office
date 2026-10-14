@@ -75,12 +75,19 @@ export const th = {
   cloudCreditsLeft: 'เหลือ {remaining} / {limit}',
   cloudCreditsUnlimited: 'ไม่จำกัด',
   cloudCreditsRenews: 'รีเซ็ตวันที่ {date}',
-  cloudInactiveBody: 'การสมัครสมาชิก UniWork ขององค์กรไม่ได้ใช้งานอยู่ AI บนคลาวด์จึงหยุดชั่วคราว โปรดให้ผู้ดูแลต่ออายุ ผู้ให้บริการของคุณเองด้านล่างยังใช้งานได้ตามปกติ',
+  cloudInactiveBody:
+    'การสมัครสมาชิก UniWork ขององค์กรไม่ได้ใช้งานอยู่ AI บนคลาวด์จึงหยุดชั่วคราว โปรดให้ผู้ดูแลต่ออายุ ผู้ให้บริการของคุณเองด้านล่างยังใช้งานได้ตามปกติ',
   acctSignIn: 'เข้าสู่ระบบ',
   acctSignInAgain: 'เข้าสู่ระบบอีกครั้ง',
   // S8/S10 local-file conversation restart notice (G05BE-6)
-  aiUniworkLocalFileRestart: 'ไฟล์ในเครื่องจะเริ่มการสนทนาใหม่ภายใต้องค์กรของคุณ และไม่เก็บรอบการสนทนาจากไฟล์อื่น',
+  aiUniworkLocalFileRestart:
+    'ไฟล์ในเครื่องจะเริ่มการสนทนาใหม่ภายใต้องค์กรของคุณ และไม่เก็บรอบการสนทนาจากไฟล์อื่น',
   // S9 cells summary and S10 web workbook size limit
   aiResultCellsMeta: 'เซลล์ที่เขียน: {written} ({range}) · เซลล์เดิมที่ถูกเขียนทับ: {overwritten}',
   aiErrWorkbookTooLarge: 'เวิร์กบุ๊กนี้ใหญ่เกินไปสำหรับ AI บนเว็บ เปิดในแอป UniWork Office',
+  // S7 composer notice keys (not_entitled, credits_exhausted)
+  not_entitled:
+    'แผนขององค์กรคุณไม่รวม UniWork AI โปรดสอบถามผู้ดูแลองค์กรเกี่ยวกับแผน หรือเพิ่มคีย์ AI ของคุณเองใน การตั้งค่า > โมเดล AI',
+  credits_exhausted:
+    'องค์กรของคุณใช้เครดิต AI ของรอบนี้หมดแล้ว โปรดให้ผู้ดูแลองค์กรเติมเครดิต หรือเพิ่มคีย์ AI ของคุณเองใน การตั้งค่า > โมเดล AI',
 } satisfies Record<keyof typeof zh, string>

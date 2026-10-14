@@ -145,11 +145,18 @@ export function AiComposer({
   useEffect(() => {
     if (prevBusyRef.current !== busy) {
       prevBusyRef.current = busy
-      if (uniworkActive) {
-        announce(aiUniworkText(resolvedLang, busy ? 'aiRunRunning' : 'aiRunStopped'))
+      if (uniworkActive && busy) {
+        announce(aiUniworkText(resolvedLang, 'aiRunRunning'))
       }
     }
   }, [busy, uniworkActive, resolvedLang, announce])
+
+  const handleStop = useCallback(() => {
+    if (uniworkActive) {
+      announce(aiUniworkText(resolvedLang, 'aiRunStopped'))
+    }
+    onStop()
+  }, [uniworkActive, announce, resolvedLang, onStop])
 
   // auto-grow up to ~6 lines; empty clears the inline height outright so the
   // CSS min-height governs (a hidden-at-measure pass can leave a stale value).
@@ -202,11 +209,9 @@ export function AiComposer({
             if (canSend) onSend()
             else if (busy && onQueue) onQueue()
           } else if (e.key === 'Escape' && busy) {
-            const doc =
-              boxRef.current?.ownerDocument ?? (typeof document !== 'undefined' ? document : null)
-            if (resolvedPopupOpen || isComposerPopupOpen(doc)) return
+            if (resolvedPopupOpen || isComposerPopupOpen(boxRef.current)) return
             e.preventDefault()
-            onStop()
+            handleStop()
           }
         }}
         onPaste={(e) => {
@@ -243,7 +248,7 @@ export function AiComposer({
         {busy ? (
           <button
             className="ai-send-btn ai-stop-btn"
-            onClick={onStop}
+            onClick={handleStop}
             title={effectiveStopLabel}
             aria-label={effectiveStopLabel}
           >

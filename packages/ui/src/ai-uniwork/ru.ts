@@ -80,12 +80,21 @@ export const ru = {
   cloudCreditsLeft: 'Осталось {remaining} / {limit}',
   cloudCreditsUnlimited: 'Без ограничений',
   cloudCreditsRenews: 'Обновится {date}',
-  cloudInactiveBody: 'Подписка UniWork вашей организации неактивна, поэтому облачный ИИ приостановлен. Попросите администратора продлить её; ваши собственные провайдеры ниже продолжают работать.',
+  cloudInactiveBody:
+    'Подписка UniWork вашей организации неактивна, поэтому облачный ИИ приостановлен. Попросите администратора продлить её; ваши собственные провайдеры ниже продолжают работать.',
   acctSignIn: 'Войти',
   acctSignInAgain: 'Войти снова',
   // S8/S10 local-file conversation restart notice (G05BE-6)
-  aiUniworkLocalFileRestart: 'Локальные файлы начинают новый диалог в вашей организации и не сохраняют реплики из других файлов.',
+  aiUniworkLocalFileRestart:
+    'Локальные файлы начинают новый диалог в вашей организации и не сохраняют реплики из других файлов.',
   // S9 cells summary and S10 web workbook size limit
-  aiResultCellsMeta: 'Записано ячеек: {written} ({range}) · Перезаписано существующих ячеек: {overwritten}',
-  aiErrWorkbookTooLarge: 'Эта книга слишком велика для ИИ в веб-версии. Откройте её в приложении UniWork Office.',
+  aiResultCellsMeta:
+    'Записано ячеек: {written} ({range}) · Перезаписано существующих ячеек: {overwritten}',
+  aiErrWorkbookTooLarge:
+    'Эта книга слишком велика для ИИ в веб-версии. Откройте её в приложении UniWork Office.',
+  // S7 composer notice keys (not_entitled, credits_exhausted)
+  not_entitled:
+    'Тариф вашей организации не включает UniWork AI. Обратитесь к администратору организации по поводу тарифа или добавьте собственный ключ ИИ в меню Настройки > Модель ИИ.',
+  credits_exhausted:
+    'Ваша организация израсходовала все кредиты ИИ за этот период. Попросите администратора организации пополнить кредиты или добавьте собственный ключ ИИ в меню Настройки > Модель ИИ.',
 } satisfies Record<keyof typeof zh, string>
