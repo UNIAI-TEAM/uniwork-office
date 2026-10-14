@@ -66,6 +66,12 @@ async function userDataText(dir: string): Promise<string> {
   return parts.join('\n')
 }
 
+/** Settings > Account, opened from the sidebar Settings button. */
+async function openAccountPane(page: Page): Promise<void> {
+  await page.locator('.settings-btn').click()
+  await page.locator('.set-nav-item').first().click()
+}
+
 test.describe('UniWork account sign-in', () => {
   test('signs in through the callback handoff, shows the profile, signs out', async () => {
     test.setTimeout(90_000)
@@ -110,6 +116,7 @@ test.describe('UniWork account sign-in', () => {
       // sign out: one device-scope logout, then back to signed-out
       await pane.getByRole('button', { name: 'Sign out' }).click()
       await expect(accountButton(page)).toHaveAttribute('data-state', 'signed-out')
+      await openAccountPane(page) // the account change remounts Home, which closes Settings
       await expect(pane).toHaveAttribute('data-state', 'signed-out')
       // local first: the stored credential is gone
       expect(existsSync(sessionFile(launched.userDataDir))).toBe(false)
@@ -199,6 +206,7 @@ test.describe('UniWork account sign-in', () => {
       await expect(accountButton(page)).toHaveAttribute('data-state', 'signed-in', {
         timeout: 30_000,
       })
+      await openAccountPane(page) // the account change remounts Home, which closes Settings
       await expect(pane).toContainText(STUB_PLAN.name)
     } finally {
       await closeAndSaveVideo(launched, 'uniwork-signin-keyring')

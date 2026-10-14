@@ -4,7 +4,7 @@
   "license": "Apache-2.0",
   "private": true,
   "type": "module",
-  "description": "Multi-profession practice packs for UniWork Office (education, legal, business, and more)",
+  "description": "Business practice packs for UniWork Office (legal, sales, HR, and more)",
   "exports": {
     ".": "./src/index.ts"
   },
@@ -12,9 +12,6 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
-  },
-  "dependencies": {
-    "@uniwork/edu-core": "*"
   },
   "devDependencies": {
     "typescript": "^5.9.3",

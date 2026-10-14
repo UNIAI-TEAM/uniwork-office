@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -24,10 +25,24 @@ function sqliteAvailable(): boolean {
 
 const describeSqlite = sqliteAvailable() ? describe : describe.skip
 
-const OWNER: WorkbenchOwner = { deploymentId: 'default', accountId: 'acc-owner' }
-const MEMBER: WorkbenchOwner = { deploymentId: 'default', accountId: 'acc-member' }
-const CHAT = 'uniwork.my-ai.chat.v1:teacher'
-const TASKS = 'uniwork.wb.tasks.teacher'
+describe('bucket key', () => {
+  it('is one bucket per (deployment, account, org); signed out stays local', () => {
+    const owner: WorkbenchOwner = { deploymentId: 'default', accountId: 'acc', orgId: 'org_a' }
+    expect(workbenchBucketOf(null)).toBe(LOCAL_BUCKET)
+    expect(workbenchBucketOf(owner)).toBe(
+      `a-${createHash('sha256').update('default\nacc\norg_a').digest('hex').slice(0, 32)}`,
+    )
+    expect(workbenchBucketOf({ ...owner, orgId: 'org_b' })).not.toBe(workbenchBucketOf(owner))
+    // signed in before an org is selected: its own bucket until the org loads
+    expect(workbenchBucketOf({ ...owner, orgId: '' })).not.toBe(workbenchBucketOf(owner))
+    expect(workbenchBucketOf(owner)).not.toContain('org_a')
+  })
+})
+
+const OWNER: WorkbenchOwner = { deploymentId: 'default', accountId: 'acc-owner', orgId: 'org_a' }
+const MEMBER: WorkbenchOwner = { deploymentId: 'default', accountId: 'acc-member', orgId: 'org_a' }
+const CHAT = 'uniwork.my-ai.chat.v1:entrepreneur'
+const TASKS = 'uniwork.wb.tasks.entrepreneur'
 
 describeSqlite('workbench data per UniWork account', () => {
   const dirs: string[] = []
@@ -69,6 +84,20 @@ describeSqlite('workbench data per UniWork account', () => {
     )
     // no account id in the bucket (it names a folder)
     expect(workbenchBucketOf(OWNER)).not.toContain('acc-owner')
+  })
+
+  it('does not move pre-upgrade data into the temporary no-org bucket', () => {
+    const dir = userData()
+    seedLegacy(dir, { [CHAT]: '[{"id":"1"}]' })
+    const store = open(dir)
+    store.setOwner({ ...OWNER, orgId: '' })
+    expect(store.activeDb()!.loadAll()).toEqual({})
+    expect(store.legacyPending()).toBe(false)
+    expect(existsSync(join(dir, 'workbench', 'legacy-migration.json'))).toBe(false)
+    // the org arrives: the data lands in the org bucket
+    store.setOwner(OWNER)
+    expect(store.activeDb()!.get(CHAT)).toContain('"id":"1"')
+    expect(store.legacyPending()).toBe(true)
   })
 
   it('account switch, sign-out, sign-in again: each account sees only its own data', () => {
@@ -170,7 +199,7 @@ describeSqlite('workbench data per UniWork account', () => {
     seedLegacy(dir, { [CHAT]: '[{"id":"1","role":"user","text":"private words"}]' })
     const log: string[] = []
     const store = open(dir, log)
-    store.setOwner({ deploymentId: 'default', accountId: 'acc-42' })
+    store.setOwner({ deploymentId: 'default', accountId: 'acc-42', orgId: 'org_a' })
     store.activeDb()
     expect(log).toHaveLength(1)
     expect(log[0]).toMatch(/acc-42$/)

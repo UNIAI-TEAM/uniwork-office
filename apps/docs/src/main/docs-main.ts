@@ -80,7 +80,7 @@ import {
 } from '@genoffice/electron-utils'
 import { configureMetricsCache, familyVerticalMetrics } from '@genoffice/font-metrics'
 import { createI18n, getUiLang, normalizeLang, setUiLang } from '@genoffice/i18n'
-import { ProjectStore } from '@genoffice/project-store'
+import { ProjectStore, type PracticeId } from '@genoffice/project-store'
 import type {
   IpcMainInvokeEvent,
   MenuItemConstructorOptions,
@@ -4315,80 +4315,13 @@ export function registerProjectIpc(): void {
     return store.listProjectsSummary().find((s) => s.id === data.id) ?? data
   })
 
-  /** Create a teacher lesson pack */
-  ipcMain.handle(
-    'project:createEducation',
-    (
-      _event,
-      args: {
-        subject: string
-        grade: string
-        week?: string
-        lessonTitle: string
-        durationMinutes?: number
-        objectives?: string[]
-        tags?: string[]
-        notes?: string
-      },
-    ) => {
-      const store = getProjectStore()
-      const now = new Date().toISOString()
-      const subject = (args.subject ?? '').trim()
-      const grade = (args.grade ?? '').trim()
-      const lessonTitle = (args.lessonTitle ?? '').trim()
-      if (!subject || !grade || !lessonTitle) {
-        throw new Error('subject, grade, and lessonTitle are required')
-      }
-      const name = [subject, grade, lessonTitle].join(' · ')
-      const tags = (args.tags ?? []).map((t) => t.trim()).filter(Boolean)
-      const data = store.createEducationProject(name, {
-        version: 2,
-        kind: 'education',
-        subject,
-        grade,
-        ...(args.week?.trim() ? { week: args.week.trim() } : {}),
-        lessonTitle,
-        ...(typeof args.durationMinutes === 'number'
-          ? { durationMinutes: args.durationMinutes }
-          : {}),
-        objectives: (args.objectives ?? []).map((o) => o.trim()).filter(Boolean),
-        ...(tags.length > 0 ? { tags } : {}),
-        ...(args.notes?.trim() ? { notes: args.notes.trim() } : {}),
-        materials: {},
-        createdAt: now,
-        updatedAt: now,
-      })
-      return store.listProjectsSummary().find((s) => s.id === data.id) ?? data
-    },
-  )
-
-  ipcMain.handle('project:getEduMeta', (_event, args: { projectId: string }) => {
-    return getProjectStore().getEduMeta(args.projectId)
-  })
-
-  ipcMain.handle(
-    'project:patchEduMeta',
-    (
-      _event,
-      args: {
-        projectId: string
-        patch: Record<string, unknown>
-      },
-    ) => {
-      if (!args?.projectId || !args.patch || typeof args.patch !== 'object') {
-        throw new Error('projectId and patch are required')
-      }
-      return getProjectStore().patchEduMeta(args.projectId, args.patch)
-    },
-  )
-
-  /** Create a non-teacher practice pack */
+  /** Create a practice pack */
   ipcMain.handle(
     'project:createPractice',
     (
       _event,
       args: {
-        practiceId: 'legal' | 'construction' | 'procurement' | 'principal'
+        practiceId: PracticeId
         title: string
         facets?: Record<string, string>
         tags?: string[]
@@ -4399,7 +4332,7 @@ export function registerProjectIpc(): void {
       const now = new Date().toISOString()
       const title = (args.title ?? '').trim()
       const practiceId = args.practiceId
-      if (!title || !practiceId || practiceId === ('teacher' as string)) {
+      if (!title || !practiceId) {
         throw new Error('practiceId and title are required')
       }
       const facets: Record<string, string> = {}

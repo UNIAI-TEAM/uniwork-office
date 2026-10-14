@@ -1143,10 +1143,10 @@ function mkdirSyncHelper(p: string): void {
 }
 
 // ────────────────────────────────────────────────────────────
-// Education lesson packs
+// Legacy education packs (removed): edu/meta.json is no longer read
 // ────────────────────────────────────────────────────────────
 
-describe('createEducationProject', () => {
+describe('legacy edu/meta.json', () => {
   let tmpDir: string
   let store: ProjectStore
 
@@ -1159,47 +1159,27 @@ describe('createEducationProject', () => {
     rmSync(tmpDir, { recursive: true, force: true })
   })
 
-  it('writes edu/meta.json and surfaces kind+edu on summary', () => {
-    const meta = {
-      version: 1 as const,
-      kind: 'education' as const,
-      subject: 'Toán',
-      grade: 'Lớp 6',
-      week: 'Tuần 12',
-      lessonTitle: 'Phân số',
-      objectives: ['Nhận biết phân số'],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }
-    const data = store.createEducationProject('Toán · Lớp 6 · Phân số', meta)
-    expect(data.kind).toBe('education')
-    expect(store.getEduMeta(data.id)?.lessonTitle).toBe('Phân số')
+  it('is not read into the project summary', () => {
+    const data = store.createProject('Toán · Lớp 6 · Phân số')
+    const eduDir = join(tmpDir, 'projects', data.id, 'edu')
+    mkdirSyncHelper(eduDir)
+    writeFileSync(
+      join(eduDir, 'meta.json'),
+      JSON.stringify({
+        version: 2,
+        kind: 'education',
+        subject: 'Toán',
+        grade: 'Lớp 6',
+        lessonTitle: 'Phân số',
+        objectives: [],
+        createdAt: data.createdAt,
+        updatedAt: data.updatedAt,
+      }),
+    )
     const summary = store.listProjectsSummary().find((p) => p.id === data.id)
-    expect(summary?.kind).toBe('education')
-    expect(summary?.edu?.subject).toBe('Toán')
-  })
-
-  it('patches tags, notes, and material roles', () => {
-    const data = store.createEducationProject('Toán · Lớp 6 · Phân số', {
-      version: 2,
-      kind: 'education',
-      subject: 'Toán',
-      grade: 'Lớp 6',
-      lessonTitle: 'Phân số',
-      objectives: [],
-      materials: {},
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    })
-    const next = store.patchEduMeta(data.id, {
-      tags: ['đại-số'],
-      notes: 'ôn tập',
-      materials: { 'role:giao-an': 'giao-an' },
-    })
-    expect(next.version).toBe(2)
-    expect(next.tags).toEqual(['đại-số'])
-    expect(next.notes).toBe('ôn tập')
-    expect(next.materials?.['role:giao-an']).toBe('giao-an')
+    expect(summary).toBeDefined()
+    expect(summary).not.toHaveProperty('edu')
+    expect(summary?.kind).toBeUndefined()
   })
 })
 

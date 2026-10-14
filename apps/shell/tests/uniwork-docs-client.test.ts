@@ -31,11 +31,21 @@ async function codeOf(promise: Promise<unknown>): Promise<string> {
 describe('egress', () => {
   it('builds only apiOrigin/api/v1 URLs, never follows redirects, never caches', async () => {
     const fetch = vi.fn<FetchLike>(async () =>
-      json(200, { workspaces: [{ id: 'ws_1', name: 'Team', organization_id: 'org_a' }] }),
+      json(200, {
+        workspaces: [
+          {
+            id: 'ws_1',
+            name: 'Team',
+            slug: 'team',
+            organization_id: 'org_a',
+            organization_slug: 'acme',
+          },
+        ],
+      }),
     )
     const api = client(fetch)
     expect(await api.listWorkspaces('org_a')).toEqual([
-      { id: 'ws_1', name: 'Team', orgId: 'org_a', myRole: null },
+      { id: 'ws_1', name: 'Team', orgId: 'org_a', slug: 'team', orgSlug: 'acme', myRole: null },
     ])
     await api.listDocuments({ workspaceId: 'ws_1' }).catch(() => undefined)
     await api
@@ -109,6 +119,15 @@ describe('egress', () => {
     })
     expect(await codeOf(api.listWorkspaces('org_a'))).toBe('not_signed_in')
     expect(fetch).not.toHaveBeenCalled()
+  })
+})
+
+describe('workspace slugs', () => {
+  it('reads as empty when the server sends none', async () => {
+    const api = client(async () => json(200, { workspaces: [{ id: 'ws_1', name: 'Team' }] }))
+    expect(await api.listWorkspaces('org_a')).toEqual([
+      { id: 'ws_1', name: 'Team', orgId: 'org_a', slug: '', orgSlug: '', myRole: null },
+    ])
   })
 })
 

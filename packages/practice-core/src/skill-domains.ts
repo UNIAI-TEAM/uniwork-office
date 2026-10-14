@@ -3,8 +3,9 @@
  * Pin / add / reorder mirrors workbench modules; skills are domain-scoped.
  */
 
+import type { PracticeId } from './types.js'
+
 export type SkillDomainId =
-  | 'education'
   | 'health'
   | 'legal'
   | 'design'
@@ -39,15 +40,6 @@ export interface DomainSkillDef {
 }
 
 export const SKILL_DOMAINS: readonly SkillDomainDef[] = [
-  {
-    id: 'education',
-    labelVi: 'Giáo dục',
-    labelEn: 'Education',
-    hintVi: 'Giảng dạy, học liệu, đánh giá',
-    hintEn: 'Teaching, materials, assessment',
-    color: '#3276CD',
-    available: true,
-  },
   {
     id: 'health',
     labelVi: 'Y tế',
@@ -156,45 +148,6 @@ function skill(
 
 /** Curated starter skills per domain (expandable later). */
 export const DOMAIN_SKILLS: readonly DomainSkillDef[] = [
-  // Education
-  skill(
-    'education',
-    'giao-an',
-    'soan-thao',
-    'Khung giáo án',
-    'Lesson plan outline',
-    'Lập khung giáo án theo môn/lớp/bài, mục tiêu và hoạt động.',
-    'Outline a lesson plan by subject/grade with goals and activities.',
-  ),
-  skill(
-    'education',
-    'hoc-lieu',
-    'hoc-lieu',
-    'Học liệu tóm tắt',
-    'Study sheet',
-    'Tóm tắt kiến thức trọng tâm thành học liệu ngắn cho học sinh.',
-    'Summarize key knowledge into a short student study sheet.',
-  ),
-  skill(
-    'education',
-    'de-kiem-tra',
-    'danh-gia',
-    'Đề kiểm tra ngắn',
-    'Short quiz',
-    'Soạn đề kiểm tra 10–15 phút kèm đáp án gợi ý.',
-    'Draft a 10–15 minute quiz with suggested answers.',
-  ),
-  skill(
-    'education',
-    'slide-bai',
-    'hoc-lieu',
-    'Slide bài giảng',
-    'Lecture slides',
-    'Dàn ý slide bài giảng rõ mục tiêu và hoạt động.',
-    'Slide outline with objectives and activities.',
-    'slides',
-  ),
-
   // Health
   skill(
     'health',
@@ -457,9 +410,26 @@ export const DOMAIN_SKILLS: readonly DomainSkillDef[] = [
   ),
 ]
 
-/** Domains pinned when the user has never customized Skill tabs. */
-export function defaultPinnedSkillDomains(): SkillDomainId[] {
-  return ['education', 'personal', 'admin']
+/** The Skill tab each role starts on. */
+const PRACTICE_SKILL_DOMAIN: Record<PracticeId, SkillDomainId> = {
+  legal: 'legal',
+  construction: 'project-mgmt',
+  procurement: 'admin',
+  sales: 'sales',
+  'customer-care': 'customer-care',
+  entrepreneur: 'sales',
+  freelancer: 'design',
+  'content-creator': 'design',
+  marketing: 'sales',
+  hr: 'hr',
+  accounting: 'admin',
+  it: 'project-mgmt',
+  'real-estate': 'sales',
+}
+
+/** Domains pinned when the user has never customized Skill tabs: the role's own domain, then office admin. */
+export function defaultPinnedSkillDomains(practiceId: PracticeId): SkillDomainId[] {
+  return [...new Set<SkillDomainId>([PRACTICE_SKILL_DOMAIN[practiceId], 'admin'])]
 }
 
 export function getSkillDomain(id: SkillDomainId): SkillDomainDef | undefined {

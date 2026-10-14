@@ -14,6 +14,8 @@ import {
   type WorkbenchModuleId,
 } from '@uniwork/practice-core'
 import { WorkbenchIcon } from './WorkbenchIcons'
+import { useI18n } from './locale'
+import type { tabCounts } from './work-home'
 import {
   pinModule,
   pinPillar,
@@ -34,6 +36,8 @@ interface WorkbenchTabsProps {
   vi: boolean
   /** Called when pinned modules or pillars change (parent may clear active if unpinned). */
   onPinsChange?: (pins: WorkbenchModuleId[], pillarPins: PracticePillarId[]) => void
+  /** Tasks and Calendar counts from the cached Overview summary (tabCounts) */
+  counts?: ReturnType<typeof tabCounts>
 }
 
 function notifyPinsChanged(): void {
@@ -47,6 +51,7 @@ export function WorkbenchTabs({
   onSelect,
   vi,
   onPinsChange,
+  counts,
 }: WorkbenchTabsProps): ReactElement {
   const [pins, setPins] = useState<WorkbenchModuleId[]>(() => readPinnedModules(practiceId))
   const [pillarPins, setPillarPins] = useState<PracticePillarId[]>(() =>
@@ -57,6 +62,29 @@ export function WorkbenchTabs({
   const [overId, setOverId] = useState<WorkbenchModuleId | null>(null)
   const dragMoved = useRef(false)
   const wrapRef = useRef<HTMLDivElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  // one row that scrolls sideways: bring the selected tab into view
+  useEffect(() => {
+    scrollRef.current
+      ?.querySelector('.wb-tab.active')
+      ?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
+  }, [active])
+
+  // the scrollbar is hidden, so a mouse wheel scrolls the row sideways
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX) || el.scrollWidth <= el.clientWidth) return
+      const before = el.scrollLeft
+      el.scrollLeft += e.deltaY
+      // at either end the row cannot move: let the page scroll instead
+      if (el.scrollLeft !== before) e.preventDefault()
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [])
 
   useEffect(() => {
     setPins(readPinnedModules(practiceId))
@@ -84,7 +112,7 @@ export function WorkbenchTabs({
     return () => document.removeEventListener('mousedown', onDoc)
   }, [menuOpen])
 
-  const label = (a: string, b: string) => (vi ? a : b)
+  const { t } = useI18n()
   const pinnedPillarDefs = pillars.filter((p) => pillarPins.includes(p.id))
   const availablePillars = pillars.filter((p) => !pillarPins.includes(p.id))
   const availableModules = WORKBENCH_MODULES.filter((m) => !pins.includes(m.id))
@@ -165,134 +193,143 @@ export function WorkbenchTabs({
   }
 
   return (
-    <nav className="teacher-tabs" aria-label={label('Khu vực làm việc', 'Workbench areas')}>
-      {pins.map((id) => {
-        const mod = getWorkbenchModule(id)
-        if (!mod) return null
-        const dragging = dragId === id
-        const over = overId === id && dragId !== id
-        return (
-          <button
-            key={id}
-            type="button"
-            draggable
-            className={`teacher-tab teacher-tab-module${active === id ? ' active' : ''}${
-              dragging ? ' is-dragging' : ''
-            }${over ? ' is-drag-over' : ''}`}
-            onClick={() => {
-              if (dragMoved.current) {
-                dragMoved.current = false
-                return
-              }
-              onSelect(id)
-            }}
-            onDragStart={(e) => onDragStart(id, e)}
-            onDragOver={(e) => onDragOver(id, e)}
-            onDrop={(e) => onDrop(id, e)}
-            onDragEnd={onDragEnd}
-            title={`${vi ? mod.hintVi : mod.hintEn} · ${label('Kéo để sắp xếp', 'Drag to reorder')}`}
-          >
-            <span className="teacher-tab-grip" aria-hidden="true" title={label('Kéo', 'Drag')}>
-              ⋮⋮
-            </span>
-            <span className="teacher-tab-icon">
-              <WorkbenchIcon id={id} size={18} />
-            </span>
-            <span>{vi ? mod.labelVi : mod.labelEn}</span>
-            {isCorePinnedModule(id) ? null : (
-              <span
-                className="teacher-tab-unpin"
-                role="button"
-                tabIndex={0}
-                draggable={false}
-                aria-label={label('Bỏ tab', 'Unpin tab')}
-                onClick={(e) => removeModule(id, e)}
-                onMouseDown={(e) => e.stopPropagation()}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    removeModule(id, e as unknown as ReactMouseEvent)
-                  }
-                }}
-              >
-                ×
+    <nav className="wb-tabs" aria-label={t('wbTabsAreas')}>
+      <div className="wb-tabs-scroll" ref={scrollRef}>
+        {pins.map((id) => {
+          const mod = getWorkbenchModule(id)
+          if (!mod) return null
+          const dragging = dragId === id
+          const over = overId === id && dragId !== id
+          const count = id === 'tasks' || id === 'calendar' ? counts?.[id] : undefined
+          return (
+            <button
+              key={id}
+              type="button"
+              draggable
+              aria-current={active === id ? 'page' : undefined}
+              className={`wb-tab wb-tab-module${active === id ? ' active' : ''}${
+                dragging ? ' is-dragging' : ''
+              }${over ? ' is-drag-over' : ''}`}
+              onClick={() => {
+                if (dragMoved.current) {
+                  dragMoved.current = false
+                  return
+                }
+                onSelect(id)
+              }}
+              onDragStart={(e) => onDragStart(id, e)}
+              onDragOver={(e) => onDragOver(id, e)}
+              onDrop={(e) => onDrop(id, e)}
+              onDragEnd={onDragEnd}
+              title={`${vi ? mod.hintVi : mod.hintEn} · ${t('wbCommonDragToReorder')}`}
+            >
+              <span className="wb-tab-grip" aria-hidden="true" title={t('wbTabsDrag')}>
+                ⋮⋮
               </span>
-            )}
-          </button>
-        )
-      })}
+              <span className="wb-tab-icon">
+                <WorkbenchIcon id={id} size={18} />
+              </span>
+              <span>{vi ? mod.labelVi : mod.labelEn}</span>
+              {count ? (
+                <>
+                  <span className={`wb-tab-count wb-num is-${count.tone}`} aria-hidden="true">
+                    {count.n}
+                  </span>
+                  <span className="uw-sr-only">{t(count.key, { count: count.n })}</span>
+                </>
+              ) : null}
+              {isCorePinnedModule(id) ? null : (
+                <span
+                  className="wb-tab-unpin"
+                  role="button"
+                  tabIndex={0}
+                  draggable={false}
+                  aria-label={t('wbCommonUnpin')}
+                  onClick={(e) => removeModule(id, e)}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      removeModule(id, e as unknown as ReactMouseEvent)
+                    }
+                  }}
+                >
+                  ×
+                </span>
+              )}
+            </button>
+          )
+        })}
 
-      {pinnedPillarDefs.map((p) => (
-        <button
-          key={p.id}
-          type="button"
-          className={`teacher-tab teacher-tab-module${active === p.id ? ' active' : ''}`}
-          onClick={() => onSelect(p.id)}
-          title={vi ? p.hintVi : p.hintEn}
-        >
-          <span className="teacher-tab-icon">
-            <WorkbenchIcon id={p.id as PracticePillarId} size={18} />
-          </span>
-          <span>{vi ? p.labelVi : p.labelEn}</span>
-          <span
-            className="teacher-tab-unpin"
-            role="button"
-            tabIndex={0}
-            draggable={false}
-            aria-label={label('Bỏ tab', 'Unpin tab')}
-            onClick={(e) => removePillar(p.id, e)}
-            onMouseDown={(e) => e.stopPropagation()}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault()
-                removePillar(p.id, e as unknown as ReactMouseEvent)
-              }
-            }}
+        {pinnedPillarDefs.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            aria-current={active === p.id ? 'page' : undefined}
+            className={`wb-tab wb-tab-module${active === p.id ? ' active' : ''}`}
+            onClick={() => onSelect(p.id)}
+            title={vi ? p.hintVi : p.hintEn}
           >
-            ×
-          </span>
-        </button>
-      ))}
+            <span className="wb-tab-icon">
+              <WorkbenchIcon id={p.id as PracticePillarId} size={18} />
+            </span>
+            <span>{vi ? p.labelVi : p.labelEn}</span>
+            <span
+              className="wb-tab-unpin"
+              role="button"
+              tabIndex={0}
+              draggable={false}
+              aria-label={t('wbCommonUnpin')}
+              onClick={(e) => removePillar(p.id, e)}
+              onMouseDown={(e) => e.stopPropagation()}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  removePillar(p.id, e as unknown as ReactMouseEvent)
+                }
+              }}
+            >
+              ×
+            </span>
+          </button>
+        ))}
+      </div>
 
-      <div className="teacher-tab-add-wrap" ref={wrapRef}>
+      <div className="wb-tab-add-wrap" ref={wrapRef}>
         <button
           type="button"
-          className={`teacher-tab teacher-tab-add${menuOpen ? ' active' : ''}`}
+          className="wb-tab wb-tab-add"
           aria-haspopup="menu"
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((o) => !o)}
-          title={label('Thêm tab', 'Add tab')}
+          title={t('wbTabsAdd')}
         >
-          <span className="teacher-tab-icon">
+          <span className="wb-tab-icon">
             <WorkbenchIcon id="add" size={18} />
           </span>
         </button>
         {menuOpen && (
-          <div className="teacher-tab-menu" role="menu">
-            <p className="teacher-tab-menu-title">{label('Thêm vào bàn làm việc', 'Add to Workbench')}</p>
+          <div className="wb-tab-menu" role="menu">
+            <p className="wb-tab-menu-title">{t('wbTabsMenuTitle')}</p>
             {nothingToAdd ? (
-              <p className="teacher-tab-menu-empty">
-                {label('Đã thêm đủ khu vực.', 'All areas are pinned.')}
-              </p>
+              <p className="wb-tab-menu-empty">{t('wbTabsAllPinned')}</p>
             ) : (
               <>
                 {availablePillars.length > 0 ? (
                   <>
-                    <p className="teacher-tab-menu-section">
-                      {label('Khu vực chính', 'Core areas')}
-                    </p>
-                    <div className="teacher-tab-menu-grid">
+                    <p className="wb-tab-menu-section">{t('wbTabsCore')}</p>
+                    <div className="wb-tab-menu-grid">
                       {availablePillars.map((p) => (
                         <button
                           key={p.id}
                           type="button"
                           role="menuitem"
-                          className="teacher-tab-menu-item"
+                          className="wb-tab-menu-item"
                           onClick={() => addPillar(p.id)}
                           title={vi ? p.hintVi : p.hintEn}
                         >
-                          <span className="teacher-tab-menu-icon">
-                            <WorkbenchIcon id={p.id} size={22} />
+                          <span className="wb-tab-menu-icon">
+                            <WorkbenchIcon id={p.id} size={18} />
                           </span>
                           <strong>{vi ? p.labelVi : p.labelEn}</strong>
                         </button>
@@ -302,21 +339,19 @@ export function WorkbenchTabs({
                 ) : null}
                 {availableModules.length > 0 ? (
                   <>
-                    <p className="teacher-tab-menu-section">
-                      {label('Module', 'Modules')}
-                    </p>
-                    <div className="teacher-tab-menu-grid">
+                    <p className="wb-tab-menu-section">{t('wbTabsModules')}</p>
+                    <div className="wb-tab-menu-grid">
                       {availableModules.map((m) => (
                         <button
                           key={m.id}
                           type="button"
                           role="menuitem"
-                          className="teacher-tab-menu-item"
+                          className="wb-tab-menu-item"
                           onClick={() => addModule(m.id)}
                           title={vi ? m.hintVi : m.hintEn}
                         >
-                          <span className="teacher-tab-menu-icon">
-                            <WorkbenchIcon id={m.id} size={22} />
+                          <span className="wb-tab-menu-icon">
+                            <WorkbenchIcon id={m.id} size={18} />
                           </span>
                           <strong>{vi ? m.labelVi : m.labelEn}</strong>
                         </button>
