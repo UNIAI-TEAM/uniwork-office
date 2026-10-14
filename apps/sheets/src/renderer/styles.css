@@ -648,7 +648,12 @@ html.genoffice-popover-open .ribbon-tabs {
 }
 
 .workbook-status {
-  max-width: min(360px, 30vw);
+  /* 30% of the visible window, in zoomed units (the header is `zoom`ed: see --ui-vw) */
+  max-width: min(360px, calc(var(--ui-vw) * 30));
+  /* the message yields first when the row is short (interface scale 125%+): far above the tab
+     scroller's shrink of 1, down to a floor; the tabs only scroll beyond that, never sit under it */
+  flex: 0 1000 auto;
+  min-width: 6em;
   overflow: hidden;
   color: var(--text-muted);
   font-size: 12px;
@@ -1636,6 +1641,10 @@ button.check-item:hover {
 .status-bar,
 .copilot {
   zoom: var(--ui-scale);
+  /* Chromium resolves vh/vw inside a zoomed box to the real viewport and zooms the result again;
+     size viewport shares in these units (`calc(var(--ui-vh) * 62)` = 62vh of the visible window) */
+  --ui-vh: calc(1vh / var(--ui-scale, 1));
+  --ui-vw: calc(1vw / var(--ui-scale, 1));
 }
 
 /* AI panel on the left, spanning from the ribbon to the status bar (unified with docs);
@@ -7290,7 +7299,7 @@ body > div:has([data-u-comp='find-replace-dialog']) {
   flex-direction: column;
   box-sizing: border-box;
   width: 100%;
-  max-height: min(560px, 62vh);
+  max-height: min(560px, calc(var(--ui-vh) * 62));
   padding: 12px 16px;
   font-size: 16px;
   color: var(--color-text-primary);
