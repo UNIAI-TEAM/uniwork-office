@@ -357,7 +357,13 @@ export function startUniworkAiChat(deps: {
       .availableAny(orgId)
       .catch(() => false)
       .then((available) => {
-        if (run === generation) setUniworkAiAvailable(available)
+        if (run !== generation) return
+        setUniworkAiAvailable(available)
+        // each renderer has its own provider list: tell them when the flag moves
+        if (available !== lastAiFlag) {
+          lastAiFlag = available
+          aiFlagListener?.(available)
+        }
       })
   }
   // a session that ends (expiry, revoke) or a switch to another account ends the turns too
@@ -375,6 +381,14 @@ export function startUniworkAiChat(deps: {
   return streams
 }
 
+let lastAiFlag = false
+let aiFlagListener: ((available: boolean) => void) | null = null
+
+/** Main wires the broadcast to every renderer here (see ../uniwork-ai-flag). */
+export function setUniworkAiFlagListener(listener: ((available: boolean) => void) | null): void {
+  aiFlagListener = listener
+}
+
 /** the capability TTL: the flag is re-read at least this often */
 const AVAILABILITY_REREAD_MS = 300_000
 let availabilityTimer: ReturnType<typeof setInterval> | null = null
@@ -387,7 +401,9 @@ function endUniworkAiSession(): void {
 
 function identityKey(): string {
   const identity = uniworkSessionIdentity()
-  return identity ? `${identity.deploymentId}/${identity.accountId}/${identity.deviceSessionId}` : ''
+  return identity
+    ? `${identity.deploymentId}/${identity.accountId}/${identity.deviceSessionId}`
+    : ''
 }
 
 /**

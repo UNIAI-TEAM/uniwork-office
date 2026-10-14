@@ -4,6 +4,7 @@ import type { IpcRendererEvent } from 'electron'
 import type { RenderSlide } from '@genoffice/pptx-render'
 import type { ProjectApi } from '@genoffice/project-store'
 import { installAiRunBridge } from '@genoffice/electron-utils/ai-run-bridge'
+import { installUniworkAiFlagBridge } from '@genoffice/electron-utils/uniwork-ai-flag-bridge'
 import { installUniworkCommentsBridge } from '@genoffice/electron-utils/comments-bridge'
 import { installDropOpenBridge } from '@genoffice/electron-utils/drop-open'
 import type {
@@ -515,3 +516,5 @@ installDropOpenBridge()
 // window.uniworkAiRun.reportAiRun: the shell learns when an AI turn runs here
 installUniworkCommentsBridge()
 installAiRunBridge()
+// window.uniworkAiFlag: whether the shell offers UniWork AI (this renderer's provider list mirrors it)
+installUniworkAiFlagBridge()

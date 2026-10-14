@@ -95,6 +95,7 @@ import {
   createAuthCallbackRouter,
   registerAccountIpc,
   routeAuthCallbackUrl,
+  setUniworkAiFlagListener,
   startUniworkAccount,
   startUniworkAiChat,
   startUniworkCloud,
@@ -341,6 +342,7 @@ import { normalizeFileSearchSettings, probeDecision, SearchReranker } from './fi
 import { runHeadlessExport, type HeadlessExporters } from './headless-export'
 import { isVersionRequest } from './version-flag'
 import { registerAiRunIpc } from './ai-run-registry'
+import { broadcastUniworkAiFlag, registerUniworkAiFlagIpc } from './uniwork-ai-flag'
 import { TabManager } from './tab-manager'
 import { installShellCloseGuard } from './window-close-guard'
 import {
@@ -6282,6 +6284,11 @@ registerTabsIpc()
 registerDroppedFilesIpc()
 // editors report a running AI turn per webContents (TabManager.editorDirtyStates reads it)
 registerAiRunIpc(ipcMain)
+// the renderers' own provider lists learn whether UniWork AI is offered (pull + push)
+registerUniworkAiFlagIpc(ipcMain)
+setUniworkAiFlagListener((available) =>
+  broadcastUniworkAiFlag(available, webContents.getAllWebContents()),
+)
 
 // sheets' project:resolveChat goes through the handler registered by docs-main; the sessionId reverse lookup hooks in here
 setSessionPathResolver(resolveSheetsSessionPath)
@@ -6549,10 +6556,12 @@ app.whenReady().then(async () => {
     const uniworkAi = startUniworkAiChat({
       describe: (senderId) => {
         const tab = tabManager?.describeWebContents(senderId)
-        if (tab) return tab.filePath ? { kind: tab.kind, filePath: tab.filePath } : { kind: tab.kind }
+        if (tab)
+          return tab.filePath ? { kind: tab.kind, filePath: tab.filePath } : { kind: tab.kind }
         for (const path of detachedFilePaths()) {
           const found = findDetachedTabByPath(path)
-          if (found && found.webContents.id === senderId) return { kind: found.kind, filePath: path }
+          if (found && found.webContents.id === senderId)
+            return { kind: found.kind, filePath: path }
         }
         return null
       },
