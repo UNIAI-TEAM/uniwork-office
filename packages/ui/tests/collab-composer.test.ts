@@ -302,6 +302,20 @@ describe('root vs discussion composer: Esc and Cancel when empty (V14-01 / V15-0
     expect(dialog()).toBeNull()
   })
 
+  it('root: Esc on an unedited, non-empty initialBody draft neither cancels nor is consumed (untouched, host decides)', () => {
+    const m = render({ mode: 'root', initialBody: 'Suggested comment text.' })
+    const hostEsc = vi.fn()
+    host.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !e.defaultPrevented) hostEsc()
+    })
+    const ev = key('Escape')
+    expect(ev.defaultPrevented).toBe(false)
+    expect(hostEsc).toHaveBeenCalledTimes(1)
+    expect(m.onCancel).not.toHaveBeenCalled()
+    expect(dialog()).toBeNull()
+    expect(ta().value).toBe('Suggested comment text.')
+  })
+
   it('root: Esc with text asks to discard and the host does not act on it (consumed)', () => {
     const m = render({ mode: 'root' })
     const hostEsc = vi.fn()
