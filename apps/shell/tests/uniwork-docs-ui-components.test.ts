@@ -666,11 +666,13 @@ describe('Home quick cards fit', () => {
     return css.slice(start, css.indexOf('}', start))
   }
 
-  it('lays the eight cards out as two rows of four, two columns below 1100px', () => {
+  it('lays the eight cards out as two rows of four, two columns below 1200px', () => {
     expect(body('.quick-cards')).toMatch(/display: grid/)
-    expect(body('.quick-cards')).toMatch(/grid-template-columns: repeat\(4, minmax\(0, 280px\)\)/)
+    // the cards fill the shared content column, so they end where the file list ends
+    expect(body('.quick-cards')).toMatch(/grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/)
+    // the window breakpoint counts the 240px sidebar (~210px a card at the switch)
     expect(css).toMatch(
-      /@media \(max-width: 1100px\) \{\n {2}\.quick-cards \{\n {4}grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/,
+      /@media \(max-width: 1200px\) \{\n {2}\.quick-cards \{\n {4}grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/,
     )
   })
 
