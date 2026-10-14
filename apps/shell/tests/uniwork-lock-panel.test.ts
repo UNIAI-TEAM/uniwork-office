@@ -965,3 +965,52 @@ describe('S11 lock panel (keystore locked)', () => {
     expect(region()).toBeNull()
   })
 })
+
+describe('S11 lock panel (signed out)', () => {
+  const signedOutLock = (name = 'Plan.docx'): UniworkDocLock => ({
+    ...lock(name),
+    reason: 'signed_out',
+  })
+  let accountLogin: ReturnType<typeof vi.fn>
+  const actionButton = () => region()!.querySelector('button')!
+
+  beforeEach(() => {
+    accountLogin = vi.fn(async () => true)
+    ;(window.aiOffice as unknown as { accountLogin: unknown }).accountLogin = accountLogin
+  })
+
+  it('reason signed_out renders uwLockSignedOutTitle / uwLockSignedOut', async () => {
+    expect(lockCopyOf({ reason: 'signed_out' })).toEqual({
+      titleKey: 'uwLockSignedOutTitle',
+      bodyKey: 'uwLockSignedOut',
+      actionKey: 'uwActSignIn',
+      action: 'sign-in',
+    })
+    const { blockedReasonKey } = await import('../src/renderer/src/uniwork-docs-model')
+    expect(blockedReasonKey('signed_out')).toBe('uwReasonSignedOut')
+    expect(blockedReasonKey('store_newer')).toBe('uwReasonStoreNewer')
+
+    await mount(true, 'en')
+    await act(async () => pushLock!(signedOutLock()))
+    await flush()
+    expect(title()!.textContent).toBe(syncStrings.en.uwLockSignedOutTitle)
+    expect(region()!.textContent).toContain(syncStrings.en.uwLockSignedOut)
+    expect(actionButton().textContent).toBe(syncStrings.en.uwActSignIn)
+    expect(alertText()).toBe(
+      `${syncStrings.en.uwLockSignedOutTitle}. ${syncStrings.en.uwLockSignedOut}`,
+    )
+
+    await act(async () => actionButton().click())
+    await flush()
+    expect(accountLogin).toHaveBeenCalledTimes(1)
+    expect(api.dismissUniworkLock).not.toHaveBeenCalled()
+
+    act(() => root.unmount())
+    root = createRoot(host)
+    initial = [signedOutLock()]
+    await mount(true, 'vi')
+    expect(title()!.textContent).toBe(syncStrings.vi.uwLockSignedOutTitle)
+    expect(region()!.textContent).toContain(syncStrings.vi.uwLockSignedOut)
+    expect(actionButton().textContent).toBe(syncStrings.vi.uwActSignIn)
+  })
+})
