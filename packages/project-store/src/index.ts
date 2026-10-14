@@ -3,7 +3,6 @@ export type {
   ChatMessage,
   ChatMeta,
   ChatScope,
-  EduProjectMeta,
   PracticeId,
   PracticeProjectMeta,
   ProjectData,

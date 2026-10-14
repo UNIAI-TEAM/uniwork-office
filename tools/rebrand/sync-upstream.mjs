@@ -1185,7 +1185,7 @@ function reportLines(s) {
   r.push('## Next steps', '')
   if (s.stoppedForConflicts) {
     r.push(
-      '1. Resolve every conflicted file: keep the UniWork brand and teacher-edu work, upstream wins elsewhere.',
+      '1. Resolve every conflicted file: keep the UniWork brand and UniWork work features, upstream wins elsewhere.',
       '2. `git add` the resolved files, then run `node tools/rebrand/sync-upstream.mjs --continue`.',
     )
   } else {

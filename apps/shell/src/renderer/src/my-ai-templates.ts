@@ -4,18 +4,9 @@
  */
 import type { PracticeId } from '@uniwork/practice-core'
 import type { OfficeApp } from './my-ai-router'
-import { readClients, readContracts, readMatters, type WbClientItem } from './workbench-pins'
 
 export type TemplateSlotId =
-  | 'client'
-  | 'party'
-  | 'topic'
-  | 'scope'
-  | 'amount'
-  | 'deadline'
-  | 'investor'
-  | 'project'
-  | 'subject'
+  'client' | 'party' | 'topic' | 'scope' | 'amount' | 'deadline' | 'investor' | 'project'
 
 export interface TemplateSlotDef {
   id: TemplateSlotId
@@ -102,7 +93,12 @@ const TEMPLATES: readonly PracticeDocTemplate[] = [
     app: 'docs',
     slots: [
       { id: 'investor', required: true, labelVi: 'Chủ đầu tư', labelEn: 'Investor / owner' },
-      { id: 'project', required: true, labelVi: 'Công trình / hạng mục', labelEn: 'Project / package' },
+      {
+        id: 'project',
+        required: true,
+        labelVi: 'Công trình / hạng mục',
+        labelEn: 'Project / package',
+      },
       { id: 'deadline', required: false, labelVi: 'Ngày / đợt GS', labelEn: 'Date / visit' },
       { id: 'scope', required: false, labelVi: 'Nội dung kiểm tra', labelEn: 'Inspection focus' },
     ],
@@ -128,7 +124,12 @@ const TEMPLATES: readonly PracticeDocTemplate[] = [
     labelEn: 'Campaign brief',
     app: 'docs',
     slots: [
-      { id: 'topic', required: true, labelVi: 'Tên / mục tiêu chiến dịch', labelEn: 'Campaign name / goal' },
+      {
+        id: 'topic',
+        required: true,
+        labelVi: 'Tên / mục tiêu chiến dịch',
+        labelEn: 'Campaign name / goal',
+      },
       { id: 'client', required: false, labelVi: 'Thương hiệu / khách', labelEn: 'Brand / client' },
       { id: 'scope', required: false, labelVi: 'Audience / kênh', labelEn: 'Audience / channels' },
       { id: 'deadline', required: false, labelVi: 'Timeline', labelEn: 'Timeline' },
@@ -146,30 +147,6 @@ const TEMPLATES: readonly PracticeDocTemplate[] = [
       'Message / big idea',
       'Channels & timeline',
       'Budget & measurement',
-    ],
-  },
-  {
-    id: 'teacher-lesson',
-    playbookId: 'teacher-lesson',
-    labelVi: 'Giáo án',
-    labelEn: 'Lesson plan',
-    app: 'docs',
-    slots: [
-      { id: 'subject', required: true, labelVi: 'Môn / chủ đề', labelEn: 'Subject / topic' },
-      { id: 'scope', required: false, labelVi: 'Lớp / thời lượng', labelEn: 'Grade / duration' },
-      { id: 'deadline', required: false, labelVi: 'Tiết / ngày dạy', labelEn: 'Period / date' },
-    ],
-    outlineVi: [
-      'Mục tiêu bài học',
-      'Chuẩn bị đồ dùng',
-      'Các hoạt động (mở đầu / luyện tập / củng cố)',
-      'Đánh giá & bài tập về nhà',
-    ],
-    outlineEn: [
-      'Learning objectives',
-      'Materials',
-      'Activities (warm-up / practice / wrap-up)',
-      'Assessment & homework',
     ],
   },
   {
@@ -213,10 +190,6 @@ export function listTemplates(): readonly PracticeDocTemplate[] {
 
 export type ResolvedSlots = Partial<Record<TemplateSlotId, string>>
 
-function stripDiacritics(s: string): string {
-  return s.normalize('NFD').replace(/\p{M}/gu, '')
-}
-
 /** Pull slot cues from free text (vi/en). */
 export function extractSlotsFromUserText(text: string): ResolvedSlots {
   const raw = text.trim()
@@ -235,8 +208,7 @@ export function extractSlotsFromUserText(text: string): ResolvedSlots {
     /(?:với|với bên|đối tác|doi tac|bên b|ben b|counterparty)\s*[:\-–]?\s*([^,.;\n]+)/i.exec(raw)
   if (party?.[1]?.trim()) out.party = party[1].trim().slice(0, 120)
 
-  const investor =
-    /(?:chủ đầu tư|chu dau tu|investor|CĐT|cdt)\s*[:\-–]?\s*([^,.;\n]+)/i.exec(raw)
+  const investor = /(?:chủ đầu tư|chu dau tu|investor|CĐT|cdt)\s*[:\-–]?\s*([^,.;\n]+)/i.exec(raw)
   if (investor?.[1]?.trim()) out.investor = investor[1].trim().slice(0, 120)
 
   const project =
@@ -259,9 +231,6 @@ export function extractSlotsFromUserText(text: string): ResolvedSlots {
     if (cleaned.length >= 3) out.topic = cleaned
   }
 
-  const subject = /(?:môn|mon|bài|bai|lesson)\s*[:\-–]?\s*([^,.;\n]+)/i.exec(raw)
-  if (subject?.[1]?.trim()) out.subject = subject[1].trim().slice(0, 120)
-
   const amount =
     /(?:giá|gia|price|amount|giá trị|gia tri)\s*[:\-–]?\s*([0-9][0-9.\s]*\s*(?:đ|vnd|usd|\$)?)/i.exec(
       raw,
@@ -274,29 +243,16 @@ export function extractSlotsFromUserText(text: string): ResolvedSlots {
     )
   if (deadline?.[1]?.trim()) out.deadline = deadline[1].trim().slice(0, 80)
 
-  const scope =
-    /(?:phạm vi|pham vi|scope|audience|kênh|kenh)\s*[:\-–]?\s*([^,.;\n]+)/i.exec(raw)
+  const scope = /(?:phạm vi|pham vi|scope|audience|kênh|kenh)\s*[:\-–]?\s*([^,.;\n]+)/i.exec(raw)
   if (scope?.[1]?.trim()) out.scope = scope[1].trim().slice(0, 160)
 
   return out
-}
-
-function matchClient(nameHint: string, clients: WbClientItem[]): WbClientItem | undefined {
-  const n = stripDiacritics(nameHint.toLowerCase())
-  if (!n) return undefined
-  return (
-    clients.find((c) => stripDiacritics(c.name.toLowerCase()) === n) ||
-    clients.find((c) => stripDiacritics(c.name.toLowerCase()).includes(n)) ||
-    clients.find((c) => n.includes(stripDiacritics(c.name.toLowerCase())))
-  )
 }
 
 export interface TemplateResolveResult {
   template: PracticeDocTemplate
   slots: ResolvedSlots
   missing: TemplateSlotDef[]
-  /** Client row when matched */
-  clientRow?: WbClientItem
 }
 
 export function resolveTemplateSlots(
@@ -308,65 +264,32 @@ export function resolveTemplateSlots(
   if (!template) return null
 
   const slots: ResolvedSlots = { ...extractSlotsFromUserText(userText) }
-  const clients = readClients(practiceId)
-  const contracts = readContracts(practiceId)
-  let clientRow: WbClientItem | undefined
 
-  if (slots.client) {
-    clientRow = matchClient(slots.client, clients)
-    if (clientRow) {
-      slots.client = clientRow.name
-      if (clientRow.contact && !slots.scope) {
-        /* keep contact for brief via clientRow */
-      }
-    }
-  } else if (clients.length === 1) {
-    clientRow = clients[0]
-    slots.client = clientRow!.name
-  }
-
-  // party / investor can reuse client list
+  // party / investor reuse the client named in the request
   if (!slots.party && slots.client) slots.party = slots.client
   if (!slots.investor && slots.client) slots.investor = slots.client
-  if (!slots.party && clients.length === 1) slots.party = clients[0]!.name
-  if (!slots.investor && clients.length === 1) slots.investor = clients[0]!.name
-
-  if (!slots.party && contracts[0]?.party) slots.party = contracts[0].party
-  if (!slots.topic && contracts[0]?.title) slots.topic = contracts[0].title
-
-  try {
-    const matters = readMatters(practiceId)
-    if (!slots.project && matters[0]?.title) slots.project = matters[0].title
-    if (!slots.client && matters[0]?.client) slots.client = matters[0].client
-  } catch {
-    /* matters may be absent in some builds */
-  }
 
   // topic from residual: strip playbook noise if still empty
-  if (!slots.topic && !slots.subject && !slots.project) {
+  if (!slots.topic && !slots.project) {
     const residual = userText
       .replace(
-        /(?:soạn|soan|tạo|tao|viết|viet|draft|create|báo giá|bao gia|quote|hợp đồng|hop dong|chiến dịch|chien dich|giáo án|giao an|nhật ký|nhat ky|word|excel|và.+$)/gi,
+        /(?:soạn|soan|tạo|tao|viết|viet|draft|create|báo giá|bao gia|quote|hợp đồng|hop dong|chiến dịch|chien dich|nhật ký|nhat ky|word|excel|và.+$)/gi,
         ' ',
       )
       .replace(/\s+/g, ' ')
       .trim()
     if (residual.length >= 4) {
-      if (template.slots.some((s) => s.id === 'subject')) slots.subject = residual.slice(0, 160)
-      else if (template.slots.some((s) => s.id === 'project')) slots.project = residual.slice(0, 160)
+      if (template.slots.some((s) => s.id === 'project')) slots.project = residual.slice(0, 160)
       else slots.topic = residual.slice(0, 160)
     }
   }
 
   const missing = template.slots.filter((s) => s.required && !slots[s.id]?.trim())
-  return { template, slots, missing, clientRow }
+  return { template, slots, missing }
 }
 
-export function buildTemplateBrief(
-  result: TemplateResolveResult,
-  vi: boolean,
-): string {
-  const { template, slots, clientRow } = result
+export function buildTemplateBrief(result: TemplateResolveResult, vi: boolean): string {
+  const { template, slots } = result
   const lines: string[] = []
   const title = vi ? template.labelVi : template.labelEn
   lines.push(
@@ -382,12 +305,6 @@ export function buildTemplateBrief(
     const lab = vi ? slot.labelVi : slot.labelEn
     lines.push(`- ${lab}: ${v}`)
   }
-  if (clientRow) {
-    if (clientRow.contact) lines.push(`- ${vi ? 'Liên hệ' : 'Contact'}: ${clientRow.contact}`)
-    if (clientRow.phone) lines.push(`- ${vi ? 'Điện thoại' : 'Phone'}: ${clientRow.phone}`)
-    if (clientRow.email) lines.push(`- Email: ${clientRow.email}`)
-    if (clientRow.note) lines.push(`- ${vi ? 'Ghi chú KH' : 'Client note'}: ${clientRow.note}`)
-  }
   lines.push('')
   lines.push(vi ? 'Khung mục lục bắt buộc:' : 'Required outline:')
   const outline = vi ? template.outlineVi : template.outlineEn
@@ -401,13 +318,17 @@ export function buildTemplateBrief(
   return lines.join('\n')
 }
 
-export function slotPromptPrefix(slot: TemplateSlotDef, template: PracticeDocTemplate, vi: boolean): string {
+export function slotPromptPrefix(
+  slot: TemplateSlotDef,
+  template: PracticeDocTemplate,
+  vi: boolean,
+): string {
   const tpl = vi ? template.labelVi : template.labelEn
   const lab = vi ? slot.labelVi : slot.labelEn
   if (slot.id === 'client' || slot.id === 'party' || slot.id === 'investor') {
     return vi ? `Soạn ${tpl} cho khách ` : `Draft ${tpl} for client `
   }
-  if (slot.id === 'topic' || slot.id === 'subject' || slot.id === 'project') {
+  if (slot.id === 'topic' || slot.id === 'project') {
     return vi ? `Soạn ${tpl} về ` : `Draft ${tpl} about `
   }
   return vi ? `Soạn ${tpl} — ${lab}: ` : `Draft ${tpl} — ${lab}: `

@@ -581,42 +581,42 @@ describe('G5-06 W4b save queue wiring', () => {
     expect((await storedIntent(ctx, path))?.intent.state).toBe('conflict')
   })
 
-  it('G5-06 fix-C item 4 / AC-4: committing at rest is settled by lookup, uploading at rest re-sends', async () => {
-    const seed = async (
-      ctx: Ctx,
-      state: 'uploading' | 'committing',
-      path: string,
-      idempotencyKey: string,
-    ) => {
-      const key = basename(dirname(path))
-      const opened = await ctx.layer.open({ deploymentId: 'default', accountId: 'acc_1' })
-      if (opened.kind !== 'ok') throw new Error('store did not open')
-      const intents = createIntentStore(opened.store.records(INTENT_STORE_REGISTRATION.name))
-      await intents.put(
-        key,
-        {
-          v: 2,
-          intentId: `intent_${key}`,
-          idempotencyKey,
-          documentId: DOC,
-          orgId: 'org_a',
-          workspaceId: 'ws_1',
-          baseRevision: '41',
-          baseVersion: 3,
-          checksum: hex(enc('v4')),
-          length: enc('v4').byteLength,
-          generation: 1,
-          state,
-          attempt: 1,
-          createdAt: '2026-10-13T00:00:00.000Z',
-          updatedAt: '2026-10-13T00:00:00.000Z',
-        },
-        enc('v4'),
-      )
-    }
-    const lookups = (server: ReturnType<typeof fakeServer>) =>
-      server.calls.filter((c) => c.path.endsWith('/versions/commit') && c.method === 'GET')
+  const seed = async (
+    ctx: Ctx,
+    state: 'uploading' | 'committing',
+    path: string,
+    idempotencyKey: string,
+  ) => {
+    const key = basename(dirname(path))
+    const opened = await ctx.layer.open({ deploymentId: 'default', accountId: 'acc_1' })
+    if (opened.kind !== 'ok') throw new Error('store did not open')
+    const intents = createIntentStore(opened.store.records(INTENT_STORE_REGISTRATION.name))
+    await intents.put(
+      key,
+      {
+        v: 2,
+        intentId: `intent_${key}`,
+        idempotencyKey,
+        documentId: DOC,
+        orgId: 'org_a',
+        workspaceId: 'ws_1',
+        baseRevision: '41',
+        baseVersion: 3,
+        checksum: hex(enc('v4')),
+        length: enc('v4').byteLength,
+        generation: 1,
+        state,
+        attempt: 1,
+        createdAt: '2026-10-13T00:00:00.000Z',
+        updatedAt: '2026-10-13T00:00:00.000Z',
+      },
+      enc('v4'),
+    )
+  }
+  const lookups = (server: ReturnType<typeof fakeServer>) =>
+    server.calls.filter((c) => c.path.endsWith('/versions/commit') && c.method === 'GET')
 
+  it('G5-06 fix-C item 4 / AC-4: uploading at rest re-sends the same key, no lookup', async () => {
     // a stop left the record `uploading` at rest (lost lock / crash). The commit
     // POST was never sent, so a lookup would answer 410 commit_intent_unknown
     // for a save the server never saw (AC-4): the poll re-sends the SAME key
@@ -632,23 +632,30 @@ describe('G5-06 W4b save queue wiring', () => {
     expect(uploads(server)[0]!.headers['idempotency-key']).toBe('key_stuck')
     expect(commits(server)[0]!.headers['idempotency-key']).toBe('key_stuck')
     expect(await storedIntent(ctx, path)).toBeNull()
+  })
 
+  it('G5-06 fix-C item 4 / AC-4: committing at rest is settled by lookup', async () => {
     // a record left `committing` (the commit POST may have been sent) whose
     // lookup answers committed settles with the receipt: one lookup, no upload,
     // no commit, and the record is cleared
-    const second = fakeServer({ bytes: enc('v3') })
-    const ctx2 = setup(second)
-    const path2 = await openDoc(ctx2)
-    writeFileSync(path2, 'v4')
-    await ctx2.service.save(path2)
-    const doneKey = commits(second)[0]!.headers['idempotency-key']!
-    await seed(ctx2, 'committing', path2, doneKey)
-    const before = { upload: uploads(second).length, commit: commits(second).length }
-    await ctx2.service.pollSaveQueue()
-    expect(lookups(second)).toHaveLength(1)
-    expect(uploads(second)).toHaveLength(before.upload)
-    expect(commits(second)).toHaveLength(before.commit)
-    expect(await storedIntent(ctx2, path2)).toBeNull()
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    await ctx.service.save(path)
+    await vi.waitFor(async () =>
+      expect(await ctx.service.docStatus(path)).toMatchObject({ state: 'saved' }),
+    )
+    expect(commits(server)).toHaveLength(1)
+    expect(await storedIntent(ctx, path)).toBeNull()
+    const doneKey = commits(server)[0]!.headers['idempotency-key']!
+    await seed(ctx, 'committing', path, doneKey)
+    const before = { upload: uploads(server).length, commit: commits(server).length }
+    await ctx.service.pollSaveQueue()
+    expect(lookups(server)).toHaveLength(1)
+    expect(uploads(server)).toHaveLength(before.upload)
+    expect(commits(server)).toHaveLength(before.commit)
+    expect(await storedIntent(ctx, path)).toBeNull()
   })
 
   it('G506-be-4: teardownSaveQueue awaits the in-flight poll and nothing lands after it resolves', async () => {

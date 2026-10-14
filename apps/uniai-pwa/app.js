@@ -90,129 +90,45 @@ const OFFICE_APPS = [
 const WORKBENCH_TABS = [
   {
     id: 'desk',
-    label: 'Không gian của tôi',
-    hint: 'Tổng quan việc làm & đời sống',
+    label: 'Tổng quan',
+    hint: 'Việc, lịch họp và thông báo hôm nay',
     color: '#3b82f6',
     icon: '<path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
   },
   {
     id: 'calendar',
     label: 'Lịch',
-    hint: 'Lịch & danh sách mốc hạn',
+    hint: 'Việc có hạn và cuộc họp trong 14 ngày tới',
     color: '#ef4444',
     icon: '<rect x="4" y="5" width="16" height="15" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M8 3v4M16 3v4M4 10h16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
   },
   {
     id: 'tasks',
     label: 'Công việc',
-    hint: 'Việc cần làm trên Workbench',
+    hint: 'Việc của bạn trên UniWork, chia theo hạn',
     color: '#22c55e',
     icon: '<path d="M5 7h14M5 12h10M5 17h12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="m15 11 2 2 4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
   },
   {
     id: 'notes',
     label: 'Ghi chú',
-    hint: 'Ghi chú nhanh tại máy',
+    hint: 'Ghi chú nhanh, lưu trên máy này',
     color: '#eab308',
     icon: '<path d="M7 4h8l4 4v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M15 4v4h4M8 13h8M8 17h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
   },
   {
-    id: 'assistant',
-    label: 'Trợ lý AI',
-    hint: 'Lối tắt vào UniAI',
-    color: '#8b5cf6',
-    icon: '<path d="M12 3 13.8 8.2 19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>',
-  },
-  {
     id: 'forms',
     label: 'Biểu mẫu',
-    hint: 'Mẫu giấy tờ hay dùng',
+    hint: 'Thư viện biểu mẫu / mẫu giấy tờ hay dùng',
     color: '#06b6d4',
     icon: '<rect x="5" y="3" width="14" height="18" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M8 8h8M8 12h8M8 16h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
   },
   {
     id: 'personal',
-    label: 'Cá nhân',
-    hint: 'Hồ sơ dùng khi soạn thảo',
+    label: 'Hồ sơ',
+    hint: 'Hồ sơ UniWork của bạn, chỉ đọc',
     color: '#f97316',
     icon: '<circle cx="12" cy="8" r="3.2" stroke="currentColor" stroke-width="1.6"/><path d="M5 19.5a7 7 0 0 1 14 0" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
-  },
-  {
-    id: 'personal-finance',
-    label: 'Tài chính cá nhân',
-    hint: 'Mục tiêu · chi tiêu · đầu tư',
-    color: '#10b981',
-    icon: '<circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.6"/><path d="M12 7v10M9.5 9.5c0-1 1.1-1.8 2.5-1.8s2.5.8 2.5 1.8-1.1 1.7-2.5 1.7-2.5.8-2.5 1.8 1.1 1.8 2.5 1.8 2.5-.8 2.5-1.8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>',
-  },
-  {
-    id: 'events',
-    label: 'Sự kiện',
-    hint: 'Họp, hội thảo sắp tới',
-    color: '#ec4899',
-    icon: '<path d="M5 8h14v11a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V8Z" stroke="currentColor" stroke-width="1.6"/><path d="M5 8V6a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v2M9 12h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
-  },
-  {
-    id: 'health',
-    label: 'Sức khoẻ',
-    hint: 'Chỉ số, tập luyện, dinh dưỡng',
-    color: '#f43f5e',
-    icon: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.6-7 10-7 10Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
-  },
-  {
-    id: 'self-growth',
-    label: 'Phát triển bản thân',
-    hint: 'Mục tiêu học tập & thói quen',
-    color: '#a855f7',
-    icon: '<path d="M12 3v18M7 8l5-4 5 4M7 16l5 4 5-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>',
-  },
-  {
-    id: 'family',
-    label: 'Gia đình tôi',
-    hint: 'Thành viên, thuốc, cột mốc',
-    color: '#fb7185',
-    icon: '<circle cx="8" cy="9" r="2.4" stroke="currentColor" stroke-width="1.5"/><circle cx="16" cy="9" r="2.4" stroke="currentColor" stroke-width="1.5"/><path d="M3.5 19a4.5 4.5 0 0 1 9 0M11.5 19a4.5 4.5 0 0 1 9 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>',
-  },
-  {
-    id: 'friends',
-    label: 'Bạn bè',
-    hint: 'Hồ sơ, sự kiện, kỷ niệm',
-    color: '#38bdf8',
-    icon: '<circle cx="9" cy="9" r="2.6" stroke="currentColor" stroke-width="1.5"/><path d="M4 19a5 5 0 0 1 10 0M16 8a2.4 2.4 0 1 1 0 4.8M14.5 19a4.2 4.2 0 0 1 5.5-3.8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>',
-  },
-  {
-    id: 'pets',
-    label: 'Thú cưng',
-    hint: 'Hồ sơ & album ảnh trên máy',
-    color: '#f97316',
-    icon: '<ellipse cx="12" cy="14" rx="4.2" ry="3.4" stroke="currentColor" stroke-width="1.5"/><circle cx="7.2" cy="8.5" r="1.5" stroke="currentColor" stroke-width="1.4"/><circle cx="10.5" cy="7" r="1.3" stroke="currentColor" stroke-width="1.4"/><circle cx="13.5" cy="7" r="1.3" stroke="currentColor" stroke-width="1.4"/><circle cx="16.8" cy="8.5" r="1.5" stroke="currentColor" stroke-width="1.4"/>',
-  },
-  {
-    id: 'travel',
-    label: 'Du lịch',
-    hint: 'Chuyến đi & hành trình',
-    color: '#0ea5e9',
-    icon: '<path d="M3.5 12.5 20 5l-3.5 14-4.2-4.2L8 17.5l-1.2-3.3L3.5 12.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>',
-  },
-  {
-    id: 'clients',
-    label: 'Khách hàng',
-    hint: 'Danh bạ khách & đối tác',
-    color: '#64748b',
-    icon: '<rect x="4" y="6" width="16" height="13" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M8 6V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1M4 11h16" stroke="currentColor" stroke-width="1.6"/>',
-  },
-  {
-    id: 'contracts',
-    label: 'Hợp đồng',
-    hint: 'Theo dõi hiệu lực hợp đồng',
-    color: '#78716c',
-    icon: '<path d="M8 3h7l4 4v13a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" stroke="currentColor" stroke-width="1.6"/><path d="M15 3v4h4M9 13h6M9 17h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
-  },
-  {
-    id: 'matters',
-    label: 'Vụ việc',
-    hint: 'Hồ sơ pháp lý / luật sư',
-    color: '#57534e',
-    icon: '<path d="M12 3v18M7 7h5l3 3v7H7V7Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M7 20h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
   },
 ]
 
@@ -808,7 +724,7 @@ function renderOfficeHub() {
 
   const toolbar = document.createElement('div')
   toolbar.className = 'office-hub-toolbar'
-  toolbar.innerHTML = `<p class="teacher-hint" style="margin:0">Tài liệu · xem local hoặc mở Desktop</p>`
+  toolbar.innerHTML = `<p class="office-hub-note" style="margin:0">Tài liệu · xem local hoặc mở Desktop</p>`
   const addBtn = document.createElement('button')
   addBtn.type = 'button'
   addBtn.className = 'btn-primary-lite'
@@ -1692,13 +1608,6 @@ function demoReply(text, atts) {
     return lines.join('\n')
   }
 
-  if (lower.includes('health') || lower.includes('sức')) {
-    return (
-      'I can open Health in UniWork Office on this device.\n\n' +
-      `Deep link:\n${intentUrl('health', 'Open Health')}\n\n` +
-      'Hoặc dùng + → Plugin → Workbench → Sức khoẻ.'
-    )
-  }
   if (lower.includes('token')) {
     return (
       'Token Hub meters UniAI usage on your UniWork account.\n\n' +

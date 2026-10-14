@@ -28,12 +28,11 @@ Privacy and network services
   from the interface. Account, credit top-up and download links point at
   UniWork services, and the update feed is configured at build time.
 
-Education and practice features
-  Teacher mode with lesson-pack templates and AI workflow prompts, practice
-  packs for several professions, the UniWork Office Bridge client and its
-  contracts, the UniAI web app, and additional Home panes (tasks, notes,
-  calendar, family, health, finance and others) were added. Vietnamese copy
-  was revised throughout.
+Work and practice features
+  Practice packs for business roles, the UniWork Office Bridge client and its
+  contracts, the UniAI web app, UniWork sign-in and cloud documents, and a
+  Workbench with additional Home panes (tasks, calendar, notes, forms and
+  others) were added. Vietnamese copy was revised throughout.
 
 Packaging metadata
   The copyright, maintainer, vendor, author and homepage of the installers

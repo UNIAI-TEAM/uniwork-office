@@ -1,18 +1,10 @@
 /**
  * Workbench Forms library → My AI fill_form.
- * Uploaded files are read on-device via readAttachment; slots reuse clients when useful.
+ * Uploaded files are read on-device via readAttachment.
  */
 import type { PracticeId } from '@uniwork/practice-core'
-import {
-  getTemplateById,
-  type PracticeDocTemplate,
-} from './my-ai-templates'
-import {
-  readClients,
-  readForms,
-  type WbClientItem,
-  type WbFormItem,
-} from './workbench-pins'
+import type { PracticeDocTemplate } from './my-ai-templates'
+import { readForms, type WbFormItem } from './workbench-pins'
 
 const FORM_EXCERPT_CHARS = 5_500
 
@@ -91,14 +83,10 @@ export function extractFormQuery(raw: string): string {
   const m =
     /(?:điền|dien|soạn|soan|fill|draft|dùng|dung)?\s*(?:theo\s+)?(?:biểu mẫu|bieu mau|form|mẫu|mau)\s*[:\-–]?\s*(.+)$/i.exec(
       raw.trim(),
-    ) ||
-    /(?:theo\s+mẫu|theo\s+mau)\s*[:\-–]?\s*(.+)$/i.exec(raw.trim())
+    ) || /(?:theo\s+mẫu|theo\s+mau)\s*[:\-–]?\s*(.+)$/i.exec(raw.trim())
   let q = (m?.[1] ?? raw).trim()
   q = q
-    .replace(
-      /^(?:điền|dien|soạn|soan|fill|draft|dùng|dung|theo)\s+/i,
-      '',
-    )
+    .replace(/^(?:điền|dien|soạn|soan|fill|draft|dùng|dung|theo)\s+/i, '')
     .replace(/^(?:biểu mẫu|bieu mau|form|mẫu|mau)\s*/i, '')
     .replace(/\b(?:word|excel|slide|pdf|văn bản|van ban)\b/gi, ' ')
     .replace(/\s+/g, ' ')
@@ -107,9 +95,7 @@ export function extractFormQuery(raw: string): string {
 }
 
 export type FormFillRoute =
-  | { kind: 'form'; formId: string }
-  | { kind: 'pick'; forms: WbFormItem[] }
-  | null
+  { kind: 'form'; formId: string } | { kind: 'pick'; forms: WbFormItem[] } | null
 
 /** Route NL → fill a library form (uploaded preferred). */
 export function routeFormFill(practiceId: PracticeId, raw: string): FormFillRoute {
@@ -149,25 +135,13 @@ export async function readFormFileExcerpt(filePath: string): Promise<string> {
   return ''
 }
 
-function matchClientHint(hint: string, clients: WbClientItem[]): WbClientItem | undefined {
-  const n = norm(
-    /(?:cho khách|cho|for client|for|khách)\s+([^,.;\n]+)/i.exec(hint)?.[1]?.trim() || hint,
-  )
-  if (n.length < 2) return undefined
-  return (
-    clients.find((c) => norm(c.name) === n) ||
-    clients.find((c) => norm(c.name).includes(n) || n.includes(norm(c.name)))
-  )
-}
-
 export function buildFormFillBrief(opts: {
   form: WbFormItem
   vi: boolean
   userHint: string
   excerpt?: string
-  clientRow?: WbClientItem
 }): string {
-  const { form, vi, userHint, excerpt, clientRow } = opts
+  const { form, vi, userHint, excerpt } = opts
   const lines: string[] = []
   lines.push(
     vi
@@ -182,13 +156,6 @@ export function buildFormFillBrief(opts: {
   }
   lines.push('')
   lines.push(vi ? 'Thông tin đã có:' : 'Known facts:')
-  if (clientRow) {
-    lines.push(`- ${vi ? 'Khách hàng' : 'Client'}: ${clientRow.name}`)
-    if (clientRow.contact) lines.push(`- ${vi ? 'Liên hệ' : 'Contact'}: ${clientRow.contact}`)
-    if (clientRow.phone) lines.push(`- ${vi ? 'Điện thoại' : 'Phone'}: ${clientRow.phone}`)
-    if (clientRow.email) lines.push(`- Email: ${clientRow.email}`)
-    if (clientRow.note) lines.push(`- ${vi ? 'Ghi chú KH' : 'Client note'}: ${clientRow.note}`)
-  }
   const residual = userHint
     .replace(/(?:điền|dien|soạn|soan|fill|draft|theo)\s+(?:biểu mẫu|bieu mau|form|mẫu|mau)/gi, ' ')
     .replace(new RegExp(form.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), ' ')
@@ -221,17 +188,4 @@ export function buildFormFillBrief(opts: {
       : 'Write clearly, ready to use. Leave explicit placeholders where data is missing.',
   )
   return lines.join('\n')
-}
-
-/** Resolve client hint for a form fill; optional built-in template for richer slots later. */
-export function resolveFormFillContext(
-  practiceId: PracticeId,
-  form: WbFormItem,
-  userHint: string,
-): { clientRow?: WbClientItem; template?: PracticeDocTemplate } {
-  const clients = readClients(practiceId)
-  const clientRow =
-    matchClientHint(userHint, clients) || (clients.length === 1 ? clients[0] : undefined)
-  const template = form.templateId ? getTemplateById(form.templateId) : undefined
-  return { clientRow, template }
 }
