@@ -1065,9 +1065,9 @@ function ProjectPanel({ projects, selectedId, onSelect, onRefresh }: ProjectPane
   )
 }
 
-// ── Sidebar footer: Settings + Sign-in (bottom-left) ─────
-// Settings is its own control. The UniWork account entry (AccountEntry.tsx)
-// starts the browser sign-in or opens Settings → Account.
+// ── Sidebar footer: one dock — AI credits, then account + Settings ─────
+// The UniWork account entry (AccountEntry.tsx) starts the browser sign-in or
+// opens Settings → Account; the gear beside it opens Settings → General.
 
 function SidebarFooter({
   onStatusChange,
@@ -1126,43 +1126,46 @@ function SidebarFooter({
 
   return (
     <div className="sidebar-footer">
-      <CreditWallet onOpenAiSettings={() => openSettings('aiModel')} />
-      <button
-        type="button"
-        className="settings-btn"
-        onClick={() => openSettings('general')}
-        aria-haspopup="dialog"
-        aria-expanded={settingsOpen}
-        data-tip={t('settings')}
-        aria-label={t('settings')}
-      >
-        <span className="settings-icon" aria-hidden="true">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path
-              d="M6.6 2.4h2.8l.35 1.45a4.6 4.6 0 0 1 1.15.65l1.4-.55 1.4 1.4-.55 1.4c.26.36.48.75.65 1.15L15.6 8v2.8l-1.45.35a4.6 4.6 0 0 1-.65 1.15l.55 1.4-1.4 1.4-1.4-.55a4.6 4.6 0 0 1-1.15.65L9.4 15.6H6.6l-.35-1.45a4.6 4.6 0 0 1-1.15-.65l-1.4.55-1.4-1.4.55-1.4a4.6 4.6 0 0 1-.65-1.15L.4 10.8V8l1.45-.35c.17-.4.39-.79.65-1.15l-.55-1.4 1.4-1.4 1.4.55c.36-.26.75-.48 1.15-.65L6.6 2.4z"
-              stroke="currentColor"
-              strokeWidth="1.2"
-              strokeLinejoin="round"
-            />
-            <circle cx="8" cy="9.2" r="2.1" stroke="currentColor" strokeWidth="1.2" />
-          </svg>
-          {skillUpdate && (
-            <span className="account-badge" role="img" aria-label={t('intgUpdateDue')} />
-          )}
-        </span>
-        <span className="settings-label">{t('settings')}</span>
-      </button>
-      <AccountEntry
-        onStatusChange={onStatusChange}
-        settingsOpen={settingsOpen}
-        settingsSection={settingsSection}
-        onOpenSettings={openSettings}
-        onCloseSettings={() => setSettingsOpen(false)}
-        skillUpdate={skillUpdate}
-        onSkillUpdateDue={setSkillUpdate}
-        onFileSearchSettingsChange={onFileSearchSettingsChange}
-        target={target}
-      />
+      <div className="sidebar-dock">
+        <CreditWallet onOpenAiSettings={() => openSettings('aiModel')} />
+        <div className="sidebar-dock-me">
+          <AccountEntry
+            onStatusChange={onStatusChange}
+            settingsOpen={settingsOpen}
+            settingsSection={settingsSection}
+            onOpenSettings={openSettings}
+            onCloseSettings={() => setSettingsOpen(false)}
+            skillUpdate={skillUpdate}
+            onSkillUpdateDue={setSkillUpdate}
+            onFileSearchSettingsChange={onFileSearchSettingsChange}
+            target={target}
+          />
+          <button
+            type="button"
+            className="settings-btn"
+            onClick={() => openSettings('general')}
+            aria-haspopup="dialog"
+            aria-expanded={settingsOpen}
+            data-tip={t('settings')}
+            aria-label={t('settings')}
+          >
+            <span className="settings-icon" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 1 16 16" fill="none">
+                <path
+                  d="M6.6 2.4h2.8l.35 1.45a4.6 4.6 0 0 1 1.15.65l1.4-.55 1.4 1.4-.55 1.4c.26.36.48.75.65 1.15L15.6 8v2.8l-1.45.35a4.6 4.6 0 0 1-.65 1.15l.55 1.4-1.4 1.4-1.4-.55a4.6 4.6 0 0 1-1.15.65L9.4 15.6H6.6l-.35-1.45a4.6 4.6 0 0 1-1.15-.65l-1.4.55-1.4-1.4.55-1.4a4.6 4.6 0 0 1-.65-1.15L.4 10.8V8l1.45-.35c.17-.4.39-.79.65-1.15l-.55-1.4 1.4-1.4 1.4.55c.36-.26.75-.48 1.15-.65L6.6 2.4z"
+                  stroke="currentColor"
+                  strokeWidth="1.2"
+                  strokeLinejoin="round"
+                />
+                <circle cx="8" cy="9.2" r="2.1" stroke="currentColor" strokeWidth="1.2" />
+              </svg>
+              {skillUpdate && (
+                <span className="account-badge" role="img" aria-label={t('intgUpdateDue')} />
+              )}
+            </span>
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
