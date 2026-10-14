@@ -597,7 +597,9 @@ test.describe.serial('UniWork documents', () => {
       ).toBeVisible()
       // FE-304: actions are addressed by role + accessible name
       await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused()
-      await expect(dialog.getByRole('button')).toHaveText([
+      // the head's ✕ is a sixth button in the alertdialog; scope the order check
+      // to the action row: the five Step-1 actions in spec order
+      await expect(dialog.locator('.uw-conflict-actions').getByRole('button')).toHaveText([
         'Reload latest',
         'Save as a copy…',
         'Overwrite…',
