@@ -192,4 +192,17 @@ export const th = {
   aiClarifySubmit: 'ดำเนินการต่อ',
   aiSumClarify: 'ตอบคำถามเพื่อความชัดเจนแล้ว',
   aiSumClarifySkipped: 'ข้ามคำถามเพื่อความชัดเจน',
+  aiStarterMindMap: 'สร้างแผนที่ความคิดของเอกสารนี้',
+  aiMindMapBtn: 'แผนที่ความคิด AI',
+  aiMindMapPrompt:
+    'สร้างแผนที่ความคิดของเอกสารนี้ โดยจัดเรียงหัวข้อหลักและแนวคิดสำคัญตามโครงสร้างส่วนต่างๆ',
+  aiSumMindMap: 'สร้างแผนที่ความคิด',
+  aiMindMapTitle: 'แผนที่ความคิด',
+  aiMindMapNodes: '{count} โหนด',
+  aiMindMapAskPrompt: 'บอกฉันเกี่ยวกับ「{label}」ในเอกสารนี้',
+  aiMindMapJump: 'ไปยังย่อหน้าที่อ้างอิง',
+  aiMindMapExport: 'ส่งออก PNG',
+  aiMindMapReset: 'รีเซ็ตมุมมอง',
+  aiMindMapExpand: 'ขยายสาขา',
+  aiMindMapCollapse: 'ย่อสาขา',
 } satisfies Record<keyof typeof zh, string>

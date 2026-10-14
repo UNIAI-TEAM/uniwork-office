@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from 'react'
+import { useEffect, useRef, useSyncExternalStore } from 'react'
 import {
   DEFAULT_AI_PANEL_PREFS,
   aiPanelZoom,
@@ -60,6 +60,7 @@ function openByDefault(): boolean {
  * render).
  */
 export function aiPanelInitiallyOpen(storageKey: string): boolean {
+  if (!current.showAiSidebar) return false
   if (!current.openInNewDocs) return false
   const remembered = localStorage.getItem(storageKey)
   return remembered === null ? openByDefault() : remembered !== '0'
@@ -82,4 +83,31 @@ export function useAiPanelPrefs(): AiPanelPrefs {
     () => current,
     () => DEFAULT_AI_PANEL_PREFS,
   )
+}
+
+/**
+ * An editor's AI dock reads the "show the AI sidebar" switch through this hook:
+ * pass the panel's own setter (`true` = panel visible) and it returns whether
+ * the switch is currently on.
+ *
+ * The switch is a soft hide, the way Word treats the Copilot pane — an explicit
+ * Ask-AI action (ribbon, context menu, shortcut) still opens the panel, so this
+ * hook never gates the panel itself. Turning the switch *off* is the one thing
+ * that closes it: every entry point only ever asks to open, so a panel left open
+ * behind an off switch could not be re-opened or dismissed and only a reload
+ * recovered. That close is remembered like any other (`rememberAiPanelOpen`), so
+ * turning the switch back on leaves the panel closed rather than resurrecting it.
+ *
+ * The setter is held in a ref and only the switch itself is a dependency: an
+ * editor may pass a setter that is re-created every render, and re-running the
+ * close on a new identity would shut an explicitly opened panel again at once.
+ */
+export function useAiSidebarEnabled(setOpen: (open: boolean) => void): boolean {
+  const enabled = useAiPanelPrefs().showAiSidebar
+  const setOpenRef = useRef(setOpen)
+  setOpenRef.current = setOpen
+  useEffect(() => {
+    if (!enabled) setOpenRef.current(false)
+  }, [enabled])
+  return enabled
 }

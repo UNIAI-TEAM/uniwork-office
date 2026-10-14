@@ -48,8 +48,8 @@
    * (de/ru/ar wrap the slide-2 copy to 3 lines) grow the card instead of
    * overflowing the fixed box and eating the bottom padding */
   min-height: 420px;
-  max-width: calc(100vw - 48px);
-  max-height: calc(100vh - 48px);
+  max-width: calc(var(--ui-vw) * 100 - 48px);
+  max-height: calc(var(--ui-vh) * 100 - 48px);
   border-radius: 20px;
   background: #fff;
   box-shadow:

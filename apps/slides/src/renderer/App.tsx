@@ -117,6 +117,7 @@ import { AnimationPane } from './components/AnimationPane'
 import { AnimPreviewOverlay } from './components/AnimatedSlide'
 import { EquationDialog, HeaderFooterDialog, LinkDialog } from './components/InsertDialogs'
 import { UseAppDialog } from './components/UseAppDialog'
+import { RedactDialog } from './components/RedactDialog'
 import { ZoomDialog } from './components/ZoomDialog'
 import { CutoutDialog } from './components/CutoutDialog'
 import {
@@ -129,6 +130,7 @@ import {
   aiPanelInitiallyOpen,
   rememberAiPanelOpen,
   UniAiMark,
+  useAiSidebarEnabled,
 } from '@genoffice/ui'
 import type { ChartPresetDef, IconDef, SmartArtDef } from './insert-presets'
 import { IconAiBeautify, IconAiFactCheck, IconAiImage } from './components/icons'
@@ -149,6 +151,7 @@ import type {
   EditingState,
   HfDialogState,
   LinkDialogState,
+  RedactDialogState,
   SlideShowState,
   EditPointsState,
   UngroupedSet,
@@ -170,6 +173,7 @@ import * as slideActions from './slide-actions'
 import * as zoomActions from './zoom-actions'
 import { groupSections } from './section-groups'
 import * as pictureEditActions from './picture-edit-actions'
+import * as redactActions from './redact-actions'
 import * as arrangeActions from './arrange-actions'
 import * as tableActions from './table-actions'
 import * as styleActions from './style-actions'
@@ -551,6 +555,11 @@ export function App() {
   const aiEnabled = cap('ai')
   const [showAiPref, setShowAi] = useState(() => aiPanelInitiallyOpen('ai-slides-show-ai'))
   const showAi = aiEnabled && showAiPref
+  // Settings › "show the AI sidebar" off hides the panel and its rail (Word's
+  // Copilot-pane model): an explicit Ask-AI action still opens the panel for
+  // this deck, and closing it returns to hidden. The dock stays mounted; the
+  // hook closes it when the switch itself goes off.
+  const aiSidebarEnabled = useAiSidebarEnabled(setShowAi)
   const [showFormat, setShowFormat] = useState(false)
   const [showBgFormat, setShowBgFormat] = useState(false)
   const [aiSettings, setAiSettings] = useState<AiSettings | null>(null)
@@ -707,6 +716,7 @@ export function App() {
   const [serverOpenCount, setServerOpenCount] = useState(0)
   // ── Insert tab extensions: dialogs + screen recording ──────────────────────
   const [linkDialog, setLinkDialog] = useState<LinkDialogState | null>(null)
+  const [redactDialog, setRedactDialog] = useState<RedactDialogState | null>(null)
   const [hfDialog, setHfDialog] = useState<HfDialogState | null>(null)
   const [eqDialogOpen, setEqDialogOpen] = useState(false)
   const [zoomDialog, setZoomDialog] = useState<zoomActions.ZoomMode | null>(null)
@@ -1823,6 +1833,10 @@ export function App() {
   const openLinkDialog = useCallback(() => insertActions.openLinkDialog(ctxRef.current), [])
   const applyLink = useCallback(
     (target: LinkTargetOp | null) => insertActions.applyLink(ctxRef.current, target),
+    [],
+  )
+  const applyRedaction = useCallback(
+    (label: string | null) => redactActions.applyRedaction(ctxRef.current, label),
     [],
   )
   const insertZooms = useCallback((mode: zoomActions.ZoomMode, keys: number[]) => {
@@ -3301,6 +3315,8 @@ export function App() {
     commitEditPoints,
     linkDialog,
     setLinkDialog,
+    redactDialog,
+    setRedactDialog,
     setHfDialog,
     setEqDialogOpen,
     setChartDataDialogInit,
@@ -3322,6 +3338,7 @@ export function App() {
     setRecording,
     editingActiveRef,
     applySlide,
+    applyDeck,
     flushNotes,
     findNodeCtx,
     groupIdOf,
@@ -3750,7 +3767,11 @@ export function App() {
 
       <div className="app-main">
         {aiEnabled && slide && viewMode !== 'reading' && viewMode !== 'sorter' && (
-          <div className={`ai-dock${aiDockOpen && aiSettings ? '' : ' collapsed'}`}>
+          <div
+            className={`ai-dock${aiDockOpen && aiSettings ? '' : ' collapsed'}${
+              !aiSidebarEnabled && !showAi ? ' ai-dock-off' : ''
+            }`}
+          >
             {/* always mounted once settings load: collapse must not drop state or in-flight runs */}
             {aiSettings ? (
               <Suspense fallback={null}>
@@ -3794,7 +3815,7 @@ export function App() {
                   }
                 />
               </Suspense>
-            ) : (
+            ) : aiSidebarEnabled ? (
               <button
                 className="ai-rail"
                 onClick={toggleAi}
@@ -3803,7 +3824,7 @@ export function App() {
               >
                 <UniAiMark size={22} />
               </button>
-            )}
+            ) : null}
           </div>
         )}
         <div className="app-content">
@@ -4704,6 +4725,13 @@ export function App() {
           currentSlide={current}
           onApply={(target) => void applyLink(target)}
           onClose={() => setLinkDialog(null)}
+        />
+      )}
+      {redactDialog && (
+        <RedactDialog
+          seed={redactDialog.seed}
+          onSubmit={(label) => void applyRedaction(label)}
+          onCancel={() => setRedactDialog(null)}
         />
       )}
       {hfDialog && (

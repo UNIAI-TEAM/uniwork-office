@@ -24,10 +24,16 @@ import { ATTACHMENT_IMAGE_EXTS } from '../../shared/ipc'
 import type { AttachmentAddResult, AttachmentMeta } from '../../shared/ipc'
 import {
   AiComposer,
+  AiQueueStrip,
+  AI_QUEUE_LABELS,
   AiScopeQuote,
   AiTypingIndicator,
+  AiUsageChip,
+  addTokenUsage,
   Markdown,
+  useChatRunQueue,
   type AiScopeQuoteData,
+  type AiTokenUsageView,
 } from '@genoffice/ui'
 import { aiLangDirective, t as tGlobal, useI18n } from '../i18n/locale'
 import sendEnterOn from '../assets/send-enter-on.png'
@@ -74,6 +80,7 @@ import {
   resolveQueue,
   type EditQueueItem,
 } from './edit-queue'
+import { buildProjection } from './redact'
 
 /** [chip label, composer prefill]: blank page → design something new; page with content → rework it */
 const GENERATE_STARTERS = [
@@ -236,6 +243,8 @@ interface ChatEntry {
   scope?: AiScopeQuoteData
   /** the sids this element-scoped turn may edit; a retry resends them */
   fenceSids?: number[]
+  /** tokens the provider billed for this reply, summed across its turns (absent when unreported) */
+  usage?: AiTokenUsageView
 }
 
 /** the whole source text: one string is the exact rollback unit */
@@ -331,6 +340,16 @@ export function AiPanel({
   const [chat, setChat] = useState<ChatEntry[]>([])
   const [prompt, setPrompt] = useState('')
   const [busy, setBusy] = useState(false)
+  /** messages queued while a reply runs; the pump re-runs them through send on settle */
+  const msgQueue = useChatRunQueue<AttachmentMeta[]>({
+    busy,
+    submit: (text, atts) => {
+      const loop = loopRef.current
+      if (!loop || loop.busy) return false
+      send(text, text, false, atts, undefined)
+      return true
+    },
+  })
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null)
   const [snapshots, setSnapshots] = useState<Snapshot[]>([])
   /** questionnaire / brief cards docked in the composer slot while a tool waits for the user */
@@ -534,6 +553,10 @@ export function AiPanel({
   const runMutatedRef = useRef(false)
   /** tool activity of the whole run, for transcript persistence */
   const runToolsRef = useRef<ToolActivity[]>([])
+  /** tokens billed so far in the in-flight run (summed across turns) */
+  const runUsageRef = useRef<AiTokenUsageView | undefined>(undefined)
+  /** tokens billed across the panel's session (the composer chip) */
+  const [sessionUsage, setSessionUsage] = useState<AiTokenUsageView | undefined>(undefined)
   const chatIdsRef = useRef<{ projectId: string; chatId: string } | null>(null)
   /** messages sent before resolveChat returned, flushed once the chat id is known */
   const pendingPersistRef = useRef<
@@ -783,6 +806,11 @@ export function AiPanel({
           patchLast({ streaming: false, waitLine: undefined })
           setChat((prev) => [...prev, { role: 'assistant', text: '', streaming: true }])
         },
+        onUsage: (usage) => {
+          runUsageRef.current = addTokenUsage(runUsageRef.current, usage)
+          setSessionUsage((prev) => addTokenUsage(prev, usage))
+          patchLast({ usage: runUsageRef.current })
+        },
         onDone: ({ text, cancelled, turnLimit, truncated }) => {
           const base = turnLimit
             ? [text, tGlobal('aiTurnLimit')].filter(Boolean).join('\n\n')
@@ -986,6 +1014,7 @@ export function AiPanel({
     runMutatedRef.current = false
     depsRef.current.onPrompt(displayText ?? instruction)
     runToolsRef.current = []
+    runUsageRef.current = undefined
     setChat((prev) => [
       ...prev,
       {
@@ -1030,7 +1059,9 @@ export function AiPanel({
   /** one run for the whole queue; every item is consumed up front, failures go through retry */
   const sendQueue = (): void => {
     const access = depsRef.current.access
-    const entries = liveItems(resolveQueue(access.getText(), access.getMap(), editQueue))
+    const entries = liveItems(
+      resolveQueue(buildProjection(access.getText(), access.getMap()), access.getMap(), editQueue),
+    )
     if (entries.length === 0) {
       onQueueClear()
       return
@@ -1077,6 +1108,17 @@ export function AiPanel({
     })
     queueRunRef.current = false
     setBusy(false)
+  }
+
+  /** Enter while a reply runs: the draft joins the queue above the composer */
+  const enqueueDraft = () => {
+    const text = prompt.trim()
+    if (!text) return
+    // the queued message owns the composer attachments; pump time passes them as an override
+    const atts = attachmentsRef.current
+    if (atts.length > 0) setAttachments([])
+    msgQueue.enqueue(text, atts)
+    setPrompt('')
   }
 
   const stop = (): void => {
@@ -1223,6 +1265,7 @@ export function AiPanel({
             <button
               className="ai-header-btn"
               onClick={() => {
+                msgQueue.clear()
                 stop()
                 loopRef.current?.reset()
                 setBusy(false)
@@ -1381,6 +1424,11 @@ export function AiPanel({
                 )
               )}
               {hasTools && <ToolChipList tools={entry.tools!} />}
+              {entry.usage && (
+                <div className="ai-message-usage">
+                  <AiUsageChip usage={entry.usage} lang={lang} />
+                </div>
+              )}
               {showToolbar && (
                 <div className="ai-msg-toolbar">
                   <button
@@ -1601,6 +1649,20 @@ export function AiPanel({
         )}
         {attachNotice && <div className="ai-attach-notice">{attachNotice}</div>}
         <AiComposer
+          queueStrip={
+            <AiQueueStrip
+              items={msgQueue.queued}
+              labels={AI_QUEUE_LABELS[lang]}
+              onUpdate={msgQueue.update}
+              onRemove={msgQueue.remove}
+              onClear={msgQueue.clear}
+              paused={msgQueue.paused}
+              onTogglePause={msgQueue.togglePaused}
+              onMove={msgQueue.move}
+            />
+          }
+          onQueue={enqueueDraft}
+          queuePlaceholder={AI_QUEUE_LABELS[lang].queuePlaceholder}
           value={prompt}
           busy={busy}
           placeholder={t('aiComposerPlaceholder')}
@@ -1621,6 +1683,7 @@ export function AiPanel({
           footerStart={
             <>
               <AiModelPicker bridge={MODEL_BRIDGE} lang={lang} />
+              {sessionUsage && <AiUsageChip usage={sessionUsage} session lang={lang} />}
               <button
                 type="button"
                 className="ai-attach-btn"

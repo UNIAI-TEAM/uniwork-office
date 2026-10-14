@@ -15,6 +15,8 @@
  * | pdfTextEdit, pdfImageEdit,   | on; turned off when pdfium cannot be compiled in this frame (the    |
  * |   pdfAnnotDelete             |   module CSP carries 'wasm-unsafe-eval' for it)                     |
  * | savedSignatures              | on, encrypted per-user store (./signatures.ts)                      |
+ * | certSign                     | off (certificate signing reads the file on disk and writes a signed  |
+ * |                              |   copy next to it: node:crypto + pdf-lib, desktop only)              |
  * | redaction                    | off (the desktop redacts into a working copy file next to the PDF); |
  * |                              |   the Redact entry stays with the 'use the app' message             |
  * | saveStatus, viewOnlyChip     | off, from MODULE_WEB_CAPABILITIES (the host header owns the save    |
@@ -45,6 +47,8 @@ export const PDF_WEB_CAPABILITIES: Readonly<Record<string, unknown>> = Object.fr
   pdfImageEdit: true,
   pdfAnnotDelete: true,
   savedSignatures: true,
+  // certificate signing reads the file on disk and writes a signed copy next to it (desktop only)
+  certSign: false,
   // redaction writes a working copy next to the file (desktop only)
   redaction: false,
   autoRename: false,

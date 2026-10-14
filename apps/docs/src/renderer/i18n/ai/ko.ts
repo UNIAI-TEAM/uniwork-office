@@ -192,4 +192,17 @@ export const ko = {
   aiClarifySubmit: '계속',
   aiSumClarify: '확인 질문에 답변함',
   aiSumClarifySkipped: '확인 질문을 건너뜀',
+  aiStarterMindMap: '이 문서의 마인드맵 생성',
+  aiMindMapBtn: 'AI 마인드맵',
+  aiMindMapPrompt:
+    '이 문서의 마인드맵을 생성하고, 장 구조에 따라 주요 주제와 핵심 개념을 정리해 주세요',
+  aiSumMindMap: '마인드맵 생성',
+  aiMindMapTitle: '마인드맵',
+  aiMindMapNodes: '노드 {count}개',
+  aiMindMapAskPrompt: '이 문서에서 「{label}」에 대해 설명해 주세요',
+  aiMindMapJump: '해당 단락으로 이동',
+  aiMindMapExport: 'PNG 내보내기',
+  aiMindMapReset: '보기 초기화',
+  aiMindMapExpand: '가지 펼치기',
+  aiMindMapCollapse: '가지 접기',
 } satisfies Record<keyof typeof zh, string>

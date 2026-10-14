@@ -23,6 +23,7 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { copyFile, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { refreshCsvDigest } from './csv-digest'
 import { createServer } from 'node:http'
 import { basename, dirname, isAbsolute, join } from 'node:path'
 
@@ -3190,17 +3191,10 @@ export function registerSheetsIpc(): void {
       Buffer.from(request.content, 'utf8'),
     ])
     await atomicWriteFile(targetPath, csvBytes)
-    // An export can land on a CSV session's own source file — refresh that
-    // session's guard digest so its next Save doesn't mistake this write for
-    // an external change.
+    // An export can land on a CSV session's own source file; refresh the
+    // digest so the next Save does not read this write as an external change.
     const writtenSha = await sha256File(targetPath).catch(() => undefined)
-    if (writtenSha !== undefined) {
-      for (const [sessionId, session] of entry.sessions) {
-        if (session.csvSourcePath === targetPath) {
-          entry.sessions.set(sessionId, { ...session, csvSourceSha: writtenSha })
-        }
-      }
-    }
+    if (writtenSha !== undefined) refreshCsvDigest(entry.sessions, targetPath, writtenSha)
     return { canceled: false, path: targetPath }
   })
 
@@ -3853,6 +3847,7 @@ export function registerSheetsAiIpc(): void {
         onStopReason: (reason) => {
           stopReason = reason
         },
+        onUsage: (usage) => send({ requestId, type: 'usage', usage }),
       })
       // sheets tsconfig sets exactOptionalPropertyTypes: an explicit
       // `stopReason: undefined` is not assignable to AiStreamChunk, so only

@@ -6,7 +6,17 @@ import {
   UniAiMark,
 } from '@genoffice/ui'
 import React, { useEffect, useRef, useState } from 'react'
-import { AiComposer, AiScopeQuote, AiTypingIndicator, type AiScopeQuoteData } from '@genoffice/ui'
+import {
+  AiComposer,
+  AiQueueStrip,
+  AI_QUEUE_LABELS,
+  AiScopeQuote,
+  AiTypingIndicator,
+  AiUsageChip,
+  type AiScopeQuoteData,
+  type AiTokenUsageView,
+  useChatRunQueue,
+} from '@genoffice/ui'
 import { aiNoticeBody, aiNoticeKind } from '@genoffice/ai-provider/browser'
 import { cap, platform } from '../capabilities'
 import type { ChangePlan } from '@genoffice/xlsx-gateway/domain/workbook.types'
@@ -219,6 +229,8 @@ export interface AiChatMessage {
   readonly clarifyReceipts?: readonly (readonly ClarifyQa[])[] | undefined
   /** UniWork AI: the notice or wait line to announce to a screen reader now (the visible text is in `text`) */
   readonly status?: string | undefined
+  /** tokens the provider billed for this reply, summed across its turns (absent when unreported) */
+  readonly usage?: AiTokenUsageView | undefined
 }
 
 const MODEL_BRIDGE: AiModelPickerBridge = {
@@ -235,6 +247,7 @@ const MODEL_BRIDGE: AiModelPickerBridge = {
 
 export function AiChatPanel({
   isOpen,
+  hideRail = false,
   hasContent,
   chat,
   historicChat = [],
@@ -244,9 +257,11 @@ export function AiChatPanel({
   onAddAttachmentPaths,
   onAddPastedImage,
   onRemoveAttachment,
+  onSendQueued,
   prompt,
   preview,
   aiBusy,
+  sessionUsage,
   onPromptChange,
   onSend,
   onStop,
@@ -263,6 +278,8 @@ export function AiChatPanel({
   clarify = null,
 }: {
   readonly isOpen: boolean
+  /** true suppresses even the collapsed rail (the "show the AI sidebar" setting is off) */
+  readonly hideRail?: boolean
   /** the workbook has cells with content — empty workbooks get "build me a sheet" copy instead */
   readonly hasContent: boolean
   readonly chat: readonly AiChatMessage[]
@@ -280,6 +297,8 @@ export function AiChatPanel({
   readonly prompt: string
   readonly preview: ChangePlan | null
   readonly aiBusy: boolean
+  /** tokens billed across the session, shown beside the composer */
+  readonly sessionUsage?: AiTokenUsageView | undefined
   readonly onPromptChange: (prompt: string) => void
   /** Send the composer text, or the given instruction when provided (used by the
    *  failed-run Retry, which also resends the message's original attachments;
@@ -289,6 +308,8 @@ export function AiChatPanel({
     attachments?: readonly AttachmentMeta[],
     retryIndex?: number,
   ) => void
+  /** a queued message is ready to run: return false to keep it queued (panel busy some other way) */
+  readonly onSendQueued?: (instruction: string, attachments: readonly AttachmentMeta[]) => boolean
   readonly onStop: () => void
   readonly onNewChat: () => void
   readonly onUndo: (steps: number) => void
@@ -318,6 +339,11 @@ export function AiChatPanel({
   } | null
 }): React.JSX.Element {
   const { t, lang } = useI18n()
+  /** messages queued while a reply runs; the pump re-sends them through onSend on settle */
+  const msgQueue = useChatRunQueue<readonly AttachmentMeta[]>({
+    busy: aiBusy,
+    submit: (text, atts) => onSendQueued?.(text, atts) ?? false,
+  })
   // Panel chrome follows the UI language; message text follows its own content (dir=auto below)
   const isRtl = lang === 'ar' || lang === 'he'
   const chatRef = useRef<HTMLDivElement | null>(null)
@@ -472,6 +498,8 @@ export function AiChatPanel({
   }
 
   if (!isOpen) {
+    // the sidebar setting is off: nothing to show until an explicit AI action opens the panel
+    if (hideRail) return <></>
     return (
       <aside className="copilot collapsed">
         <button
@@ -495,6 +523,17 @@ export function AiChatPanel({
     if (!canSend) return
     stickToBottomRef.current = true
     onSend()
+  }
+
+  /** Enter while a reply runs: the draft joins the queue above the composer */
+  const enqueueDraft = (): void => {
+    const text = prompt.trim()
+    if (!text) return
+    // the queued message owns the composer attachments; the pump hands them to onSend
+    const atts = attachments
+    for (const a of atts) onRemoveAttachment(a.path)
+    msgQueue.enqueue(text, atts)
+    onPromptChange('')
   }
 
   const onDrop = (e: React.DragEvent): void => {
@@ -560,7 +599,10 @@ export function AiChatPanel({
           {(chat.length > 0 || historicChat.length > 0) && (
             <button
               className="ai-header-btn"
-              onClick={onNewChat}
+              onClick={() => {
+                msgQueue.clear()
+                onNewChat()
+              }}
               data-tip={t('aiNewChat')}
               aria-label={t('aiNewChat')}
             >
@@ -663,6 +705,11 @@ export function AiChatPanel({
             ) : (
               <>
                 {entry.tools.length > 0 && <ToolChipList tools={entry.tools} />}
+                {entry.usage && (
+                  <div className="ai-message-usage">
+                    <AiUsageChip usage={entry.usage} lang={lang} />
+                  </div>
+                )}
                 {entry.text ? (
                   <div dir="auto">
                     <Markdown text={aiNoticeBody(entry.text)} nav={citationNav} />
@@ -767,6 +814,20 @@ export function AiChatPanel({
           </div>
         )}
         <AiComposer
+          queueStrip={
+            <AiQueueStrip
+              items={msgQueue.queued}
+              labels={AI_QUEUE_LABELS[lang]}
+              onUpdate={msgQueue.update}
+              onRemove={msgQueue.remove}
+              onClear={msgQueue.clear}
+              paused={msgQueue.paused}
+              onTogglePause={msgQueue.togglePaused}
+              onMove={msgQueue.move}
+            />
+          }
+          onQueue={enqueueDraft}
+          queuePlaceholder={AI_QUEUE_LABELS[lang].queuePlaceholder}
           header={
             <>
               {/* Only a deliberate multi-cell selection shows here: it tells the
@@ -886,6 +947,7 @@ export function AiChatPanel({
           footerStart={
             <>
               <AiModelPicker bridge={MODEL_BRIDGE} lang={lang} />
+              {sessionUsage && <AiUsageChip usage={sessionUsage} session lang={lang} />}
               {cap('attachments') && (
                 <button
                   className="ai-attach-btn"
