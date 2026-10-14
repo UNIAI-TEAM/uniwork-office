@@ -1,5 +1,6 @@
 /** Session handlers: History batches, AI rollback points, undo/redo, dirty state, save and save-as. */
 import { commitSaved } from '@genoffice/pptx-engine'
+import { uniworkIsLocked } from '../../main/uniwork-policy'
 import type { HandlerContext } from '../host-io'
 import { buildAllRenderSlides } from '../render'
 import {
@@ -115,6 +116,8 @@ export const historySaveHandlers = {
   'slides:save-as': async (ctx: HandlerContext, defaultName: string) => {
     const session = sessions.get(ctx.clientId)
     if (!session) return { ok: false, error: 'no file open' }
+    // G5-03a: a locked working copy leaves as nothing, not even a Save As copy
+    if (uniworkIsLocked(session.path || null)) return { ok: false }
     const target = await ctx.host.saveTarget.saveAs(session.path, defaultName)
     if (!target) return { ok: false }
     // A view-only UniWork path is refused (cancel shape); picking the deck's own

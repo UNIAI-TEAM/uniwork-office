@@ -1729,6 +1729,16 @@ export class UniworkDocsService {
     )
   }
 
+  /**
+   * G5-03a: the server revoked or deleted this open working copy. The module
+   * seam reads this to refuse export / Save As / print-to-PDF; `isReadOnly`
+   * already covers the save side.
+   */
+  isLocked(path: string): boolean {
+    const found: PathBinding = this.store.classify(path)
+    return found.kind === 'bound' && this.lockedFor(found.doc.binding) !== null
+  }
+
   /** moves on every user Save; see noteEditorDirty */
   saveMark(): number {
     return this.saveCounter
