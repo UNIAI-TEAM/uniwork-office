@@ -322,7 +322,7 @@ describe('checkBuildDir', () => {
 
     it('flags a missing feed, another repository and a generic feed', async () => {
       for (const [updateFeed, expected] of [
-        [false, 'holds no app-update.yml'],
+        [false, 'hold no app-update.yml'],
         [githubYml.replace('uniwork-office\n', 'other\n'), 'expected github:UNIAI-TEAM/uniwork-office'],
         ['provider: generic\nurl: https://cdn.example\n', 'expected github:UNIAI-TEAM/uniwork-office'],
       ]) {

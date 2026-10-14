@@ -42,6 +42,8 @@ function loadConfig(env: Record<string, string | undefined>, bakedCliVersion = '
   runInNewContext(readFileSync(resolve(shellRoot, 'electron-builder.cjs'), 'utf8'), {
     module: configModule,
     __dirname: shellRoot,
+    // a fresh context has no WHATWG globals; the config validates URLs with it
+    URL,
     process: { platform: 'linux', arch: 'x64', env, execPath: '/usr/bin/node' },
     require: (id: string) => {
       if (id === './package.json') return shellPackage
