@@ -857,7 +857,10 @@ export function AiPanel({
       events: {
         onText: (text) => patchLastAssistant({ text, waitLine: undefined }),
         // module-level getLang: the loop is created once, the component's lang would go stale
-        onNotice: (notice) =>
+        onNotice: (notice) => {
+          // the question was not sent: it goes back into the composer for the user to send again
+          if (notice.kind === 'conversation-restarted')
+            setInput((current) => current || lastInstructionRef.current)
           patchLastAssistant(
             (last) =>
               noticePatch(
@@ -866,7 +869,8 @@ export function AiPanel({
                 (key, params) => aiUniworkText(getLang(), key, params),
                 'Docs',
               ) ?? {},
-          ),
+          )
+        },
         onToolStart: (call) => {
           // Live "running" chip: replaced in place by onToolExecuted
           patchLastAssistant((last) => ({

@@ -14,7 +14,11 @@ function question(text: string, before: AgentMessage[] = []): AgentMessage[] {
 
 const toolRound: AgentMessage[] = [
   { role: 'user', text: 'bold the title' },
-  { role: 'assistant', text: '', toolCalls: [{ id: 'srv-call-1', name: 'format_text', input: {} }] },
+  {
+    role: 'assistant',
+    text: '',
+    toolCalls: [{ id: 'srv-call-1', name: 'format_text', input: {} }],
+  },
   { role: 'tool', results: [{ id: 'srv-call-1', name: 'format_text', output: 'ok' }] },
 ]
 
@@ -36,7 +40,7 @@ describe('UniWork AI conversation and run ids', () => {
     expect(fake.requests[1]!.headers['X-UniWork-AI-Run']).toBeUndefined()
   })
 
-  it('conversation_expired drops both ids, emits conversation-restarted, does not resend', async () => {
+  it('conversation_expired drops both ids, emits conversation-restarted, ends the turn quietly, does not resend', async () => {
     const conversations = new UniworkConversations()
     const fake = createUniworkFake()
     fake.enqueue(oneChunk('a1', { ids: { conversation: 'conv-old', run: 'run-1' } }))
@@ -45,10 +49,11 @@ describe('UniWork AI conversation and run ids', () => {
     await streamUniwork(fake, turn(question('q1')), recorder().cb, { conversations })
 
     const second = recorder()
-    const err = await streamUniwork(fake, turn(question('q2')), second.cb, { conversations }).catch((e) => e)
-    expect(err).toBeInstanceOf(UniworkError)
-    expect((err as UniworkError).code).toBe('conversation_expired')
-    expect(second.state.notices).toContainEqual({ kind: 'conversation-restarted' })
+    // not a failure: the note is the answer, so the stream ends normally (no error, no Retry)
+    await expect(
+      streamUniwork(fake, turn(question('q2')), second.cb, { conversations }),
+    ).resolves.toBeUndefined()
+    expect(second.state.notices).toEqual([{ kind: 'conversation-restarted' }])
     expect(fake.requests).toHaveLength(2)
 
     await streamUniwork(fake, turn(question('q3')), recorder().cb, { conversations })
@@ -60,7 +65,12 @@ describe('UniWork AI conversation and run ids', () => {
   it('run_expired on a question resends once without the run header', async () => {
     const conversations = new UniworkConversations()
     const fake = createUniworkFake()
-    fake.enqueue(oneChunk('', { toolCalls: [{ id: 'srv-call-1', name: 'format_text', args: {} }], ids: { conversation: 'conv-1', run: 'run-1' } }))
+    fake.enqueue(
+      oneChunk('', {
+        toolCalls: [{ id: 'srv-call-1', name: 'format_text', args: {} }],
+        ids: { conversation: 'conv-1', run: 'run-1' },
+      }),
+    )
     // a question inside the run (the loop's wrap-up note after tool results) carries run-1; the server forgot it
     fake.enqueue(error(409, 'run_expired', { ids: { conversation: 'conv-1' } }))
     fake.enqueue(oneChunk('answer', { ids: { conversation: 'conv-1', run: 'run-2' } }))
@@ -80,7 +90,9 @@ describe('UniWork AI conversation and run ids', () => {
     const conversations = new UniworkConversations()
     const fake = createUniworkFake()
     fake.enqueue(error(409, 'run_expired'), error(409, 'run_expired'))
-    const err = await streamUniwork(fake, turn(question('q1')), recorder().cb, { conversations }).catch((e) => e)
+    const err = await streamUniwork(fake, turn(question('q1')), recorder().cb, {
+      conversations,
+    }).catch((e) => e)
     expect((err as UniworkError).code).toBe('run_expired')
     expect(fake.requests).toHaveLength(2)
   })
@@ -88,11 +100,18 @@ describe('UniWork AI conversation and run ids', () => {
   it('run_expired on a tool-result ends the run (Q-1)', async () => {
     const conversations = new UniworkConversations()
     const fake = createUniworkFake()
-    fake.enqueue(oneChunk('', { toolCalls: [{ id: 'srv-call-1', name: 'format_text', args: {} }], ids: { conversation: 'conv-1', run: 'run-1' } }))
+    fake.enqueue(
+      oneChunk('', {
+        toolCalls: [{ id: 'srv-call-1', name: 'format_text', args: {} }],
+        ids: { conversation: 'conv-1', run: 'run-1' },
+      }),
+    )
     fake.enqueue(error(409, 'run_expired', { ids: { conversation: 'conv-1' } }))
     await streamUniwork(fake, turn(question('bold the title')), recorder().cb, { conversations })
 
-    const err = await streamUniwork(fake, turn(toolRound), recorder().cb, { conversations }).catch((e) => e)
+    const err = await streamUniwork(fake, turn(toolRound), recorder().cb, { conversations }).catch(
+      (e) => e,
+    )
     expect(err).toBeInstanceOf(UniworkError)
     expect((err as UniworkError).code).toBe('run_expired')
     // no automatic resend of the original question (lead decision Q-1 a)
@@ -107,14 +126,19 @@ describe('UniWork AI conversation and run ids', () => {
     fake.enqueue(oneChunk('a3', { ids: { conversation: 'conv-2', run: 'run-3' } }))
     const first = recorder()
     await streamUniwork(fake, turn(question('q1')), first.cb, { conversations })
-    expect(first.state.notices).not.toContainEqual(expect.objectContaining({ kind: 'conversation-boundary' }))
+    expect(first.state.notices).not.toContainEqual(
+      expect.objectContaining({ kind: 'conversation-boundary' }),
+    )
 
     conversations.observe('panel-1', 'openai')
 
     const third = recorder()
     await streamUniwork(fake, turn(question('q3')), third.cb, { conversations })
     expect(fake.requests[1]!.headers['X-UniWork-AI-Conversation']).toBeUndefined()
-    expect(third.state.notices).toContainEqual({ kind: 'conversation-boundary', provider: 'uniwork' })
+    expect(third.state.notices).toContainEqual({
+      kind: 'conversation-boundary',
+      provider: 'uniwork',
+    })
   })
 
   it('a first UniWork turn after a BYOK turn is a boundary too', async () => {
@@ -147,7 +171,9 @@ describe('UniWork AI conversation and run ids', () => {
     fake.enqueue(oneChunk('a1', { ids: { conversation: 'conv-1', run: 'run-1' } }))
     fake.enqueue(error(402, 'credits_exhausted', { ids: false }))
     await streamUniwork(fake, turn(question('q1')), recorder().cb, { conversations })
-    await streamUniwork(fake, turn(question('q2')), recorder().cb, { conversations }).catch(() => undefined)
+    await streamUniwork(fake, turn(question('q2')), recorder().cb, { conversations }).catch(
+      () => undefined,
+    )
     expect(conversations.ids('panel-1').conversationId).toBe('conv-1')
   })
 })

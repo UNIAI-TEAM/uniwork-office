@@ -729,7 +729,10 @@ export function AiPanel({
       events: {
         onText: (text) => patchLast({ text, waitLine: undefined }),
         // transport notices (UniWork AI); langRef: the loop is created once, `lang` would go stale
-        onNotice: (notice) =>
+        onNotice: (notice) => {
+          // the question was not sent: it goes back into the composer for the user to send again
+          if (notice.kind === 'conversation-restarted')
+            setPrompt((current) => current || runDisplayRef.current)
           patchLast(
             (last) =>
               noticePatch(
@@ -738,7 +741,8 @@ export function AiPanel({
                 (key, params) => aiUniworkText(langRef.current, key, params),
                 'HTML',
               ) ?? {},
-          ),
+          )
+        },
         onToolStart: (call) => {
           // Live "running" chip: replaced in place by onToolExecuted
           patchLast((last) => ({

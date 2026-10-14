@@ -132,6 +132,8 @@ export function AiPanel({
   const { lang, t } = useI18n()
   const [chat, setChat] = useState<ChatEntry[]>([])
   const [prompt, setPrompt] = useState('')
+  /** the question of the running turn: a restarted conversation puts it back in the composer */
+  const runQuestionRef = useRef('')
   const [busy, setBusy] = useState(false)
   const [phase, setPhase] = useState<Phase>('thinking')
   /** the scope chip's expandable preview of the selected text */
@@ -432,7 +434,10 @@ export function AiPanel({
           patchLast({ text, waitLine: undefined })
         },
         // transport notices (UniWork AI); langRef: the loop is created once, `lang` would go stale
-        onNotice: (notice) =>
+        onNotice: (notice) => {
+          // the question was not sent: it goes back into the composer for the user to send again
+          if (notice.kind === 'conversation-restarted')
+            setPrompt((current) => current || runQuestionRef.current)
           patchLast(
             (last) =>
               noticePatch(
@@ -441,7 +446,8 @@ export function AiPanel({
                 (key, params) => aiUniworkText(langRef.current, key, params),
                 'PDF',
               ) ?? {},
-          ),
+          )
+        },
         onToolExecuted: ({ call, execution }) => {
           setPhase('working')
           if (execution.mutated) runMutatedRef.current = true
@@ -550,6 +556,7 @@ export function AiPanel({
     const loop = loopRef.current
     if (!instruction || !loop || loop.busy) return
     stickToBottomRef.current = true
+    runQuestionRef.current = instruction
     const scope = retryScope !== undefined ? (retryScope ?? undefined) : selectionScopeQuote()
     persistMessage('user', instruction, undefined, scope)
     segTextRef.current = ''

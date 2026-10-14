@@ -163,6 +163,10 @@ describe('UniWork AI notices (markdown panel)', () => {
     await act(async () => harness.events.onDone({ text: '', cancelled: false, turnLimit: false }))
     expect(notices()).toEqual([ui('aiConversationRestarted')])
     expect(container!.textContent).not.toContain(t('aiNoReply'))
+    // the turn ended quietly: no error line, no Retry, and the question is back in the composer
+    expect(container!.querySelector('.ai-msg-error')).toBeNull()
+    expect(container!.querySelector('.ai-retry-btn')).toBeNull()
+    expect(container!.querySelector('textarea')?.value).toBe('rewrite it')
   })
 
   it('UniWork AI off: one note, no error line, no Retry or regenerate, no empty-reply line', async () => {

@@ -64,8 +64,13 @@ const WAIT_PING_MS = 5_000
  * tools only with office.ai_cloud, never an MCP tool. The server intersects
  * the list with the module allowlist again.
  */
-export function uniworkAllowedTools(tools: AgentToolDef[], policy: UniworkToolPolicy): AgentToolDef[] {
-  return tools.filter((t) => !t.name.startsWith('mcp__') && (policy.cloudTools || !CLOUD_TOOL_NAMES.has(t.name)))
+export function uniworkAllowedTools(
+  tools: AgentToolDef[],
+  policy: UniworkToolPolicy,
+): AgentToolDef[] {
+  return tools.filter(
+    (t) => !t.name.startsWith('mcp__') && (policy.cloudTools || !CLOUD_TOOL_NAMES.has(t.name)),
+  )
 }
 
 /** the `x_uniwork.terminal` frame stopped the read */
@@ -116,15 +121,25 @@ function droppedCalls(raw: unknown): AgentDroppedToolCall[] {
       !!c &&
       typeof c === 'object' &&
       typeof (c as AgentDroppedToolCall).name === 'string' &&
-      ((c as AgentDroppedToolCall).reason === 'view_only' || (c as AgentDroppedToolCall).reason === 'not_allowlisted'),
+      ((c as AgentDroppedToolCall).reason === 'view_only' ||
+        (c as AgentDroppedToolCall).reason === 'not_allowlisted'),
   )
 }
 
 /** `x_uniwork` → notices; a terminal frame ends the read */
 function readExtension(raw: unknown, cb: StreamCallbacks): void {
   if (!raw || typeof raw !== 'object') return
-  const ext = raw as { dropped_tool_calls?: unknown; step?: unknown; limit?: unknown; terminal?: unknown }
-  if (ext.terminal && typeof ext.terminal === 'object' && typeof (ext.terminal as UniworkTerminal).code === 'string') {
+  const ext = raw as {
+    dropped_tool_calls?: unknown
+    step?: unknown
+    limit?: unknown
+    terminal?: unknown
+  }
+  if (
+    ext.terminal &&
+    typeof ext.terminal === 'object' &&
+    typeof (ext.terminal as UniworkTerminal).code === 'string'
+  ) {
     throw new TerminalFrame(ext.terminal as UniworkTerminal)
   }
   const calls = droppedCalls(ext.dropped_tool_calls)
@@ -192,7 +207,11 @@ export async function streamUniwork(
       const decision = decideRateLimitWait(result.retryAfter, waits, Date.now())
       if (decision.kind === 'give-up') throw error
       waits++
-      cb.onNotice?.({ kind: 'rate-limit-wait', seconds: decision.seconds, attempt: decision.attempt })
+      cb.onNotice?.({
+        kind: 'rate-limit-wait',
+        seconds: decision.seconds,
+        attempt: decision.attempt,
+      })
       cb.onActivity?.()
       await waitWithPings(decision.seconds, cb.signal, () => cb.onActivity?.())
       // the answer streamed so far (a terminal frame after content) is dropped before the resend
@@ -203,7 +222,9 @@ export async function streamUniwork(
       case 'conversation_expired':
         conversations.dropConversation(session)
         cb.onNotice?.({ kind: 'conversation-restarted' })
-        throw error
+        // not a failure: the question was not sent, the note is the whole answer and the panel keeps
+        // the question for the user to send again (EXPERIENCE: no error line, no Retry)
+        return
       case 'run_expired':
         conversations.dropRun(session)
         ids = conversations.ids(session)
@@ -277,15 +298,24 @@ async function attempt(
         if (cause instanceof TerminalFrame) {
           const runId = ids.runId
           if (cause.terminal.code === 'ai_rate_limited') {
-            const error = new UniworkError('ai_rate_limited', { status: 429, retryAfterSec: cause.terminal.retry_after, runId })
+            const error = new UniworkError('ai_rate_limited', {
+              status: 429,
+              retryAfterSec: cause.terminal.retry_after,
+              runId,
+            })
             return { kind: 'rate-limited', error, retryAfter: cause.terminal.retry_after }
           }
-          const code = cause.terminal.code === 'ai_provider_timeout' ? 'ai_provider_timeout' : 'ai_provider_error'
+          const code =
+            cause.terminal.code === 'ai_provider_timeout'
+              ? 'ai_provider_timeout'
+              : 'ai_provider_error'
           return { kind: 'failed', error: new UniworkError(code, { cause, runId }) }
         }
         if (wd.signal.aborted) throw cause
         // a broken read is a disconnect; a malformed answer is a provider error, never "(empty stream)"
-        throw new UniworkError(isAiNetworkError(cause) ? 'disconnected' : 'ai_provider_error', { cause })
+        throw new UniworkError(isAiNetworkError(cause) ? 'disconnected' : 'ai_provider_error', {
+          cause,
+        })
       }
     })
   } catch (cause) {

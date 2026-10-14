@@ -173,6 +173,10 @@ describe('UniWork AI notices (slides panel)', () => {
     await flush()
     expect(notices(c)).toEqual([ui('aiConversationRestarted')])
     expect(c.textContent).not.toContain(t('aiNoResponse'))
+    // the turn ended quietly: no error line, no Retry, and the question is back in the composer
+    expect(c.querySelector('.ai-msg-error')).toBeNull()
+    expect(c.querySelector('.ai-retry-btn')).toBeNull()
+    expect(c.querySelector('textarea')?.value).toBe('tighten it')
   })
 
   it('UniWork AI off: one note, no error line, no Retry or regenerate, no empty-reply line', async () => {
