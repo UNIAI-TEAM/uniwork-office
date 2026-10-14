@@ -106,6 +106,7 @@ import {
   refreshUniworkCloudStatus,
   resolveAiSettings,
   selectedProvider,
+  uniworkAiAvailable,
   maxOutputTokensOf,
   sanitizeAiSettings,
   sanitizeCliPath,
@@ -3856,7 +3857,9 @@ export function registerAiIpc(): void {
         defaultAiSettings(),
       ).provider
       sanitized.provider = previous === 'uniwork' ? defaultAiSettings().provider : previous
-    } else {
+    } else if (uniworkAiAvailable()) {
+      // while UniWork AI is hidden the renderer only had the degraded provider to save back: that
+      // is no choice against the account's pick, which stays stored for when the entry returns
       uniworkAiChoiceStore?.write(false)
     }
     writeJsonAtomic(SETTINGS_PATH(), sanitized)

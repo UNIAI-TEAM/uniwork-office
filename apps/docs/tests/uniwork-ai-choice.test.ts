@@ -143,6 +143,20 @@ describe('UniWork AI choice per account (desktop)', () => {
     expect((await getSettings()).provider).toBe('uniwork')
   })
 
+  it('a save while UniWork AI is hidden (the degraded genspark) keeps the stored pick', async () => {
+    const accounts = fakeAccounts()
+    await setSettings(picked('anthropic'))
+    await setSettings(picked('uniwork'))
+    const before = accounts.writes.length
+    setUniworkAiAvailable(false)
+    // the renderer saves what it was handed while hidden (e.g. after a BYOK key edit)
+    await setSettings(picked('genspark'))
+    setUniworkAiAvailable(true)
+    expect((await getSettings()).provider).toBe('uniwork')
+    expect(accounts.choice.get('a-1')).toBe(true)
+    expect(accounts.writes.slice(before)).toEqual([])
+  })
+
   it('BYOK edits made while UniWork AI is chosen still reach ai-settings.json', async () => {
     fakeAccounts()
     await setSettings(picked('uniwork'))
