@@ -975,3 +975,118 @@ describe('G5-06 W4b save queue wiring', () => {
     expect(wipe).not.toMatch(/\n\s+service\.teardownSaveQueue\?\.\(\)\n/)
   })
 })
+
+/**
+ * G8-12 x G5-06: a Save the queue settles (a parked intent dispatched by a
+ * later poll, or a record left `committing` at rest that a lookup finds
+ * committed) moves the comments anchor base to the receipt's version id and
+ * pushes `comments.saved` exactly once, exactly as the inline settle does.
+ */
+describe('G8-12 comments seam on queue-settled saves', () => {
+  /** the service reads `notifySaved` from its deps at push time */
+  const withSavedSpy = (ctx: Ctx) => {
+    const notifySaved = vi.fn()
+    ctx.deps.notifySaved = notifySaved
+    return notifySaved
+  }
+
+  it('a parked Save that a later poll commits moves baseVersionId and pushes saved once', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    expect(binding(path).baseVersionId).toBe('v3')
+    const notifySaved = withSavedSpy(ctx)
+    writeFileSync(path, 'v4')
+    ctx.setCapabilityOffline(true)
+    await ctx.service.save(path)
+    expect(await ctx.service.docStatus(path)).toMatchObject({ state: 'paused_offline' })
+    // nothing settled yet: no push, the base still names the opened version
+    expect(notifySaved).not.toHaveBeenCalled()
+    expect(binding(path).baseVersionId).toBe('v3')
+    ctx.setCapabilityOffline(false)
+    await ctx.service.setQueueOnline(true)
+    await vi.waitFor(async () =>
+      expect(await ctx.service.docStatus(path)).toMatchObject({ state: 'queued' }),
+    )
+    await ctx.service.pollSaveQueue()
+    await vi.waitFor(async () =>
+      expect(await ctx.service.docStatus(path)).toMatchObject({ state: 'saved' }),
+    )
+    await vi.waitFor(() => expect(notifySaved).toHaveBeenCalled())
+    expect(binding(path).baseVersion).toBe(4)
+    expect(binding(path).baseVersionId).toBe('ver_4')
+    // a later poll with nothing pending pushes nothing more
+    await ctx.service.pollSaveQueue()
+    expect(notifySaved.mock.calls).toEqual([[path, 'ver_4']])
+  })
+
+  it('a record left committing at rest that a lookup finds committed pushes saved once', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    const key = basename(dirname(path))
+    // the commit landed on the server but the copy never heard the receipt
+    // (a crash after the POST): the record sits `committing` at rest
+    writeFileSync(path, 'v4')
+    const notifySaved = withSavedSpy(ctx)
+    await ctx.service.save(path)
+    const doneKey = commits(server)[0]!.headers['idempotency-key']!
+    notifySaved.mockClear()
+    const opened = await ctx.layer.open({ deploymentId: 'default', accountId: 'acc_1' })
+    if (opened.kind !== 'ok') throw new Error('store did not open')
+    const intents = createIntentStore(opened.store.records(INTENT_STORE_REGISTRATION.name))
+    await intents.put(
+      key,
+      {
+        v: 2,
+        intentId: `intent_${key}`,
+        idempotencyKey: doneKey,
+        documentId: DOC,
+        orgId: 'org_a',
+        workspaceId: 'ws_1',
+        baseRevision: '41',
+        baseVersion: 3,
+        checksum: hex(enc('v4')),
+        length: enc('v4').byteLength,
+        generation: 1,
+        state: 'committing',
+        attempt: 1,
+        createdAt: '2026-10-13T00:00:00.000Z',
+        updatedAt: '2026-10-13T00:00:00.000Z',
+      },
+      enc('v4'),
+    )
+    // the copy still believes the old base (the receipt was lost)
+    const stale = { ...binding(path), baseRevision: '41', baseVersion: 3, baseVersionId: 'v3' }
+    writeFileSync(join(dirname(path), BINDING_FILE), JSON.stringify(stale))
+    await ctx.service.pollSaveQueue()
+    await vi.waitFor(() => expect(notifySaved).toHaveBeenCalled())
+    expect(binding(path).baseVersion).toBe(4)
+    expect(binding(path).baseVersionId).toBe('ver_4')
+    expect(notifySaved.mock.calls).toEqual([[path, 'ver_4']])
+    expect(await storedIntent(ctx, path)).toBeNull()
+  })
+
+  it('a dispatched Save refused with 403 pushes nothing and caps the level at view', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    expect(binding(path).level).toBe('edit')
+    const notifySaved = withSavedSpy(ctx)
+    writeFileSync(path, 'v4')
+    ctx.setCapabilityOffline(true)
+    await ctx.service.save(path)
+    ctx.setCapabilityOffline(false)
+    await ctx.service.setQueueOnline(true)
+    await vi.waitFor(async () =>
+      expect(await ctx.service.docStatus(path)).toMatchObject({ state: 'queued' }),
+    )
+    server.faults.push({ route: 'commit', kind: 403, code: 'forbidden' })
+    await ctx.service.pollSaveQueue()
+    await vi.waitFor(() => expect(binding(path).state).toBe('blocked'))
+    expect(binding(path).error).toBe('permission_revoked')
+    expect(binding(path).level).toBe('view')
+    expect(binding(path).baseVersionId).toBe('v3')
+    expect(notifySaved).not.toHaveBeenCalled()
+  })
+})
