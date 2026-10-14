@@ -249,6 +249,13 @@ describe('workbench states and the tab toolbar (home.css)', () => {
     expect(rule('.wb-toolbar-text')).toMatch(/max-width: none;/)
     expect(css).not.toMatch(/\.wb-pane-(?:head|title|meta|aside)\b/)
   })
+
+  it('the toast host ends the column even on a short tab, and sticks 24px above the bottom', () => {
+    const body = rule('.wb-toast-host')
+    expect(body).toMatch(/position: sticky;\n {2}bottom: 24px;/)
+    // a short tab: pushed to the column end; 56px padding - 32px = 24px from the edge
+    expect(body).toMatch(/margin-top: auto;\n {2}margin-bottom: -32px;/)
+  })
 })
 
 describe('long titles (review focus: very long workspace and task names)', () => {

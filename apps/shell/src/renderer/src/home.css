@@ -5106,14 +5106,17 @@ body.vib .home {
   padding: 8px 0;
 }
 
-/* the single toast host (WbToastHost): sticks to the bottom of the scrolled content column
- * and takes no room in the page; toasts stack upwards at its right edge */
+/* the single toast host (WbToastHost): takes no room in the page; toasts stack upwards at its
+ * right edge. A short tab: margin-top auto drops it to the column's end, and the negative bottom
+ * margin (24px from the edge minus .wb-home's 56px bottom padding) lands it 24px above the edge.
+ * A long tab: sticky lifts it to 24px above the visible bottom. */
 .wb-toast-host {
   position: sticky;
   bottom: 24px;
   z-index: 60;
   height: 0;
-  margin-top: -16px;
+  margin-top: auto;
+  margin-bottom: -32px;
 }
 
 .wb-toast-stack {

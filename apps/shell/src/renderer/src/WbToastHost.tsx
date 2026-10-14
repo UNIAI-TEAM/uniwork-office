@@ -91,9 +91,15 @@ export function WbToastHost({
     <Ctx.Provider value={toasts}>
       {children}
       <div className="wb-toast-host">
-        <div className="wb-toast-stack">
+        {/* the live region is always there: a region inserted with its text is often not announced;
+            a failure is its own role=alert node, which is announced on insertion */}
+        <div className="wb-toast-stack" aria-live="polite">
           {shown.map((toast) => (
-            <div key={toast.id} className="wb-toast" role={toast.tone ?? 'status'}>
+            <div
+              key={toast.id}
+              className="wb-toast"
+              role={toast.tone === 'alert' ? 'alert' : undefined}
+            >
               <span className="wb-toast-text">{text(toast.message)}</span>
               {toast.actions?.map((a) => (
                 <button

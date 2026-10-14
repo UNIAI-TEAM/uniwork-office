@@ -221,6 +221,8 @@ describe('WbToastHost', () => {
 
   it('stacks toasts in one host; the same id replaces the one shown', () => {
     mount()
+    // the live region exists before the first toast
+    expect(host.querySelector('.wb-toast-stack[aria-live="polite"]')).not.toBeNull()
     act(() => {
       toasts.show({ message: { text: 'First' } })
       toasts.show({ id: 'tool', message: { text: 'Second' } })
@@ -234,7 +236,9 @@ describe('WbToastHost', () => {
     expect(shown()).toHaveLength(2)
     expect(shown()[1]!.textContent).toContain('Third')
     expect(shown()[1]!.getAttribute('role')).toBe('alert')
-    expect(shown()[0]!.getAttribute('role')).toBe('status')
+    // a notice is announced by the stack, a polite live region that is always mounted
+    expect(shown()[0]!.hasAttribute('role')).toBe(false)
+    expect(host.querySelector('.wb-toast-stack')!.getAttribute('aria-live')).toBe('polite')
   })
 
   it('translates a key at render and runs an action (Undo / Retry), then closes', () => {
