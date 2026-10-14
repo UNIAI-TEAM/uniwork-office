@@ -279,7 +279,20 @@ function FormsPane({
 
   // never locked (spec 5.1): the selected pack, else the default one, as the Desk drawer does
   const draft = async (item: WbFormItem) => {
-    await draftFromForm(item, packId, orgId, vi)
+    try {
+      await draftFromForm(item, packId, orgId, vi)
+    } catch (err) {
+      toasts.show({
+        id: `draft-failed:${item.id}`,
+        tone: 'alert',
+        message: {
+          key: 'wbFormsDraftFailed',
+          params: { name: item.title, error: err instanceof Error ? err.message : String(err) },
+        },
+        actions: [{ label: 'acctRetry', onClick: () => void draft(item) }],
+      })
+      return
+    }
     if (packId && item.linkedProjectId !== packId) {
       persist(
         readForms(practiceId).map((x) =>
@@ -339,7 +352,7 @@ function FormsPane({
         <div className="wb-banner wb-forms-banner">
           <span>{t('wbFormsBannerInto')}</span>
           <WbPackChip packs={packs} selectedPackId={selectedPackId} onSelectPack={onSelectPack} />
-          <span className="wb-row-sub">{t('wbFormsBannerDefault')}</span>
+          {selectedPackId ? null : <span className="wb-row-sub">{t('wbFormsBannerDefault')}</span>}
         </div>
       ) : null}
       {card ? (

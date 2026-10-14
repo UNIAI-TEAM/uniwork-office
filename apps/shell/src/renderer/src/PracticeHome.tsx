@@ -618,7 +618,7 @@ export function PracticeHome({
       }
       await rememberRole(created.id, seedRole)
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      failed('wbMatCreateFailed', {}, err, () => void draftFirstDoc(created))
     }
   }
 
@@ -696,6 +696,8 @@ export function PracticeHome({
       }
       await rememberRole(selected.id, addRole)
       setNotice({ key: 'wbMatRoleAdded', params: { role: vi ? roleDef.labelVi : roleDef.labelEn } })
+    } catch (err) {
+      failed('wbMatCreateFailed', {}, err, () => void addMaterial(addRole))
     } finally {
       setBusy(null)
     }
@@ -719,6 +721,8 @@ export function PracticeHome({
         await openDocs(selected.id, `${tpl.labelVi} — ${meta.title}`, html)
       }
       await rememberRole(selected.id, tpl.materialRole)
+    } catch (err) {
+      failed('wbMatCreateFailed', {}, err, () => void openTemplate(templateId))
     } finally {
       setBusy(null)
     }
@@ -761,6 +765,11 @@ export function PracticeHome({
         await rememberRole(selected.id, role)
       }
       setNotice({ key: 'wbSkRan', params: { skill: vi ? skill.labelVi : skill.labelEn } })
+    } catch (err) {
+      // Retry asks again: a run spends AI credit
+      failed('wbSkRunFailed', { skill: vi ? skill.labelVi : skill.labelEn }, err, () =>
+        setAsk(skillAsk('domain', skillId)),
+      )
     } finally {
       setBusy(null)
     }
@@ -796,6 +805,10 @@ export function PracticeHome({
         await rememberRole(selected.id, role)
       }
       setNotice({ key: 'wbSkRanRole', params: { skill: vi ? skill.labelVi : skill.labelEn } })
+    } catch (err) {
+      failed('wbSkRunFailed', { skill: vi ? skill.labelVi : skill.labelEn }, err, () =>
+        setAsk(skillAsk('practice', skillId)),
+      )
     } finally {
       setBusy(null)
     }
@@ -837,6 +850,9 @@ export function PracticeHome({
         await rememberRole(selected.id, tpl.materialRole)
       }
       setNotice({ key: 'wbMatChainOpened' })
+    } catch (err) {
+      // no Retry: the documents before the failure exist, a rerun would open them twice
+      failed('wbMatCreateFailed', {}, err)
     } finally {
       setBusy(null)
     }
@@ -1376,7 +1392,7 @@ export function PracticeHome({
                           type="button"
                           className="wb-mat-tile"
                           disabled={!!busy}
-                          onClick={() => void b.open(selected.id)}
+                          onClick={() => void openBlank(b, selected.id)}
                         >
                           <FileBadge ext={b.ext} size={28} />
                           <span>{t(b.label)}</span>

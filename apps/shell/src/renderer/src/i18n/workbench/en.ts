@@ -167,7 +167,6 @@ export const en = {
   wbFormsNoSupportedFile: 'No supported file selected.',
   wbFormsHint:
     '“Draft” creates a new document in the selected pack and prefills it from your UniWork profile.',
-  wbFormsDraftNeedsPackHint: 'Select a Knowledge pack before drafting.',
   wbFormsTitle: 'Form title',
   wbFormsTitlePlaceholder: 'e.g. Leave request',
   wbFormsNote: 'Note (optional)',
@@ -178,7 +177,6 @@ export const en = {
   wbFormsAdd: 'Add to library',
   wbFormsEmpty: 'No forms yet',
   wbFormsDraft: 'Draft',
-  wbFormsDraftNeedsPack: 'Select a Knowledge pack first',
   wbFormsNewTitle: 'New form',
   wbFormsEditTitle: 'Edit form',
   wbFormsTemplateLabel: 'Template file',
@@ -206,6 +204,10 @@ export const en = {
   wbDeskShowInFolder: 'Show in folder',
   wbDeskToolBusy: 'Another tool is still running.',
   wbDeskToolFailed: 'That did not work. Try again.',
+  wbLoading: 'Loading…',
+  wbMatCreateFailed: 'Couldn’t create the document. {error}',
+  wbSkRunFailed: 'Couldn’t run “{skill}”. {error}',
+  wbFormsDraftFailed: 'Couldn’t draft from “{name}”. {error}',
   wbDeskToolEncrypted:
     'This PDF is password-protected. Open it in the PDF app and remove the password first.',
   wbDeskToolSamePath: 'Pick a file name different from the source.',

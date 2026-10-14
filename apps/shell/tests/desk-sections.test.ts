@@ -11,6 +11,7 @@ import { DeskDrawer } from '../src/renderer/src/DeskDrawer'
 import { DeskInProgress } from '../src/renderer/src/DeskInProgress'
 import { DeskInTray } from '../src/renderer/src/DeskInTray'
 import { LocaleProvider } from '../src/renderer/src/locale'
+import { WbToastHost, createWbToasts } from '../src/renderer/src/WbToastHost'
 import type { WorkLoad } from '../src/renderer/src/work-cache'
 import { readForms, writeForms } from '../src/renderer/src/workbench-pins'
 
@@ -474,7 +475,7 @@ describe('DeskDrawer', () => {
     expect(onPackLinked).toHaveBeenCalledTimes(1)
   })
 
-  it('locks a form chip when there is no pack to draft into', async () => {
+  it('never locks a form chip (spec 5.1): with no pack at all it drafts a plain document', async () => {
     writeForms('legal', [{ id: 'f1', title: 'Quote' }])
     await render(
       createElement(DeskDrawer, {
@@ -485,8 +486,65 @@ describe('DeskDrawer', () => {
         onManage: vi.fn(),
       }),
     )
-    expect(button('Quote')!.disabled).toBe(true)
-    expect(host.querySelector('.wb-forms-locked')?.textContent).toBeTruthy()
+    expect(button('Quote')!.disabled).toBe(false)
+    expect(host.querySelector('.wb-forms-locked')).toBeNull()
+    await act(async () => button('Quote')!.click())
+    await act(async () => {
+      for (let i = 0; i < 10; i++) await Promise.resolve()
+    })
+    expect(api.newDoc).toHaveBeenCalledWith(expect.objectContaining({ projectId: undefined }))
+    expect(readForms('legal')[0]!.linkedProjectId).toBeUndefined()
+  })
+
+  it('a long form name ends in an ellipsis; the chip title keeps it whole', async () => {
+    const long = 'Proposal to approve the 2027 office equipment purchase plan for every branch'
+    writeForms('legal', [{ id: 'f1', title: long, note: 'Admin' }])
+    await render(
+      createElement(DeskDrawer, {
+        practiceId: 'legal',
+        packId: 'p1',
+        orgId: null,
+        vi: false,
+        onManage: vi.fn(),
+      }),
+    )
+    const chip = button(long)!
+    expect(chip.querySelector('.wb-desk-chip-text')?.textContent).toBe(long)
+    expect(chip.title).toBe(`${long} — Admin`)
+  })
+
+  it('a draft that fails shows an alert toast with Retry', async () => {
+    writeForms('legal', [{ id: 'f1', title: 'Quote' }])
+    api.newDoc.mockRejectedValueOnce(new Error('no space'))
+    await render(
+      createElement(
+        WbToastHost,
+        { toasts: createWbToasts() },
+        createElement(DeskDrawer, {
+          practiceId: 'legal',
+          packId: 'p1',
+          orgId: null,
+          vi: false,
+          onManage: vi.fn(),
+        }),
+      ),
+    )
+    await act(async () => button('Quote')!.click())
+    await act(async () => {
+      for (let i = 0; i < 10; i++) await Promise.resolve()
+    })
+    const toast = host.querySelector('.wb-toast[role="alert"]')!
+    expect(toast.textContent).toContain('Couldn’t draft from “Quote”. no space')
+    await act(async () =>
+      Array.from(toast.querySelectorAll('button'))
+        .find((b) => b.textContent === 'Retry')!
+        .click(),
+    )
+    await act(async () => {
+      for (let i = 0; i < 10; i++) await Promise.resolve()
+    })
+    expect(api.newDoc).toHaveBeenCalledTimes(2)
+    expect(readForms('legal')[0]!.linkedProjectId).toBe('p1')
   })
 
   it('shows the target pack chip, picks another pack, and adds a form from the ghost button', async () => {

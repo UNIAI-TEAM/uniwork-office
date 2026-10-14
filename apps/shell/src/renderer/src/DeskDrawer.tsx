@@ -4,6 +4,7 @@ import type { PracticeId } from '@uniwork/practice-core'
 import { FileBadge } from './FileBadge'
 import { draftFromForm } from './form-draft'
 import { useI18n } from './locale'
+import { useWbToast } from './WbToastHost'
 import { readForms, writeForms, type WbFormItem } from './workbench-pins'
 import { WbGlyph, WorkbenchIcon } from './WorkbenchIcons'
 
@@ -22,7 +23,7 @@ export function DeskDrawer({
   onSelectPack,
 }: {
   practiceId: PracticeId
-  /** where a draft goes (selected pack, else the default one); null = none yet */
+  /** where a draft goes (selected pack, else the default one); null = a plain new document */
   packId: string | null
   /** the packs the chip offers; "Default project" stands for no selection */
   packs?: readonly { id: string; title: string }[]
@@ -36,17 +37,34 @@ export function DeskDrawer({
   onPackLinked?: () => void
 }): ReactElement {
   const { t } = useI18n()
+  const toasts = useWbToast()
   const titleId = useId()
   // the Desk remounts each time its tab is shown, so a read on mount sees Forms' edits
   const [forms] = useState(() => readForms(practiceId).slice(0, DRAWER_FORMS))
 
-  // the Forms tab's Draft action (WorkbenchModulePanes openForm): draft, link the form, refresh
-  const draft = async (item: WbFormItem, pack: string) => {
-    await draftFromForm(item, pack, orgId, vi)
-    if (item.linkedProjectId !== pack)
+  // the Forms tab's Draft action (WorkbenchModulePanes draft): draft, link the form, refresh;
+  // never locked (spec 5.1): with no pack at all it is a plain new document
+  const draft = async (item: WbFormItem) => {
+    try {
+      await draftFromForm(item, packId, orgId, vi)
+    } catch (err) {
+      toasts.show({
+        id: `draft-failed:${item.id}`,
+        tone: 'alert',
+        message: {
+          key: 'wbFormsDraftFailed',
+          params: { name: item.title, error: err instanceof Error ? err.message : String(err) },
+        },
+        actions: [{ label: 'acctRetry', onClick: () => void draft(item) }],
+      })
+      return
+    }
+    if (packId && item.linkedProjectId !== packId)
       writeForms(
         practiceId,
-        readForms(practiceId).map((x) => (x.id === item.id ? { ...x, linkedProjectId: pack } : x)),
+        readForms(practiceId).map((x) =>
+          x.id === item.id ? { ...x, linkedProjectId: packId } : x,
+        ),
       )
     onPackLinked?.()
   }
@@ -74,33 +92,27 @@ export function DeskDrawer({
           {add}
         </div>
       ) : (
-        <>
-          {/* visible, not only a tooltip: a disabled chip's title never reaches keyboard users */}
-          {packId ? null : <p className="wb-forms-locked">{t('wbFormsDraftNeedsPackHint')}</p>}
-          <ul className="wb-desk-chips">
-            {forms.map((f) => (
-              <li key={f.id}>
-                <button
-                  type="button"
-                  className="wb-btn wb-btn-secondary wb-desk-chip"
-                  disabled={!packId}
-                  title={packId ? (f.note ?? f.title) : t('wbFormsDraftNeedsPack')}
-                  onClick={() => {
-                    if (packId) void draft(f, packId)
-                  }}
-                >
-                  {f.fileExt ? (
-                    <FileBadge ext={f.fileExt.replace(/^\./, '')} size={16} />
-                  ) : (
-                    <WorkbenchIcon id="forms" size={16} />
-                  )}
-                  {f.title}
-                </button>
-              </li>
-            ))}
-            <li>{add}</li>
-          </ul>
-        </>
+        <ul className="wb-desk-chips">
+          {forms.map((f) => (
+            <li key={f.id}>
+              <button
+                type="button"
+                className="wb-btn wb-btn-secondary wb-desk-chip"
+                // the whole name (the chip may cut it short), then the note
+                title={f.note ? `${f.title} — ${f.note}` : f.title}
+                onClick={() => void draft(f)}
+              >
+                {f.fileExt ? (
+                  <FileBadge ext={f.fileExt.replace(/^\./, '')} size={16} />
+                ) : (
+                  <WorkbenchIcon id="forms" size={16} />
+                )}
+                <span className="wb-desk-chip-text">{f.title}</span>
+              </button>
+            </li>
+          ))}
+          <li>{add}</li>
+        </ul>
       )}
     </section>
   )

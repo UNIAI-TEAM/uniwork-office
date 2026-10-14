@@ -545,6 +545,31 @@ describe('Materials (redesign spec 4.8)', () => {
     expect(window.aiOffice.newSheet).toHaveBeenCalledWith({ projectId: 'p1' })
     expect(buttonByText('Open the template sequence in order')?.className).toBe('wb-link')
   })
+
+  it('a quick create that fails says what failed in an alert toast; Retry creates again', async () => {
+    ;(window.aiOffice.newSheet as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error('no space left'),
+    )
+    await openPillar([PACK], 'p1', 'materials')
+    const tiles = Array.from(host.querySelectorAll<HTMLButtonElement>('.wb-mat-tile'))
+    await click(tiles[1])
+    const toast = host.querySelector('.wb-toast[role="alert"]')!
+    expect(toast.textContent).toContain('Couldn’t create the document. no space left')
+    await click(buttonByText('Retry', toast))
+    expect(window.aiOffice.newSheet).toHaveBeenCalledTimes(2)
+    expect(host.querySelector('.wb-toast[role="alert"]')).toBeNull()
+  })
+
+  it('a role template that fails is reported too, not swallowed', async () => {
+    ;(window.aiOffice.newDoc as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('boom'))
+    await openPillar([PACK], 'p1', 'materials')
+    const tpl = host.querySelector<HTMLButtonElement>('.wb-pillar-section .wb-chip-row button')
+    expect(tpl).toBeTruthy()
+    await click(tpl)
+    expect(host.querySelector('.wb-toast[role="alert"]')?.textContent).toContain(
+      'Couldn’t create the document. boom',
+    )
+  })
 })
 
 describe('Skills (redesign spec 4.9)', () => {
@@ -598,6 +623,21 @@ describe('Skills (redesign spec 4.9)', () => {
     expect(dialog.querySelector('.wb-btn-primary')?.textContent).toBe('Run')
     await key(dialog as HTMLElement, 'Escape')
     expect(host.querySelector('.wb-confirm')).toBeNull()
+  })
+
+  it('a run that fails names the skill in an alert toast; Retry asks again before spending', async () => {
+    ;(window.aiOffice.newDoc as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('offline'))
+    ;(window.aiOffice.newSlide as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('offline'))
+    await openPillar([PACK], 'p1', 'skills')
+    const row = host.querySelector('.wb-sk-row')!
+    const name = row.querySelector('.wb-sk-name')!.textContent
+    await click(row.querySelector('button'))
+    await click(host.querySelector<HTMLButtonElement>('.wb-confirm .wb-btn-primary'))
+    const toast = host.querySelector('.wb-toast[role="alert"]')!
+    expect(toast.textContent).toContain(`Couldn’t run “${name}”. offline`)
+    await click(buttonByText('Retry', toast))
+    // the run costs a credit: Retry opens the confirm, it does not run on its own
+    expect(host.querySelector('.wb-confirm .wb-confirm-title')?.textContent).toContain(name!)
   })
 })
 

@@ -198,6 +198,29 @@ describe('Forms tab (redesign spec 4.4)', () => {
     expect(readForms('sales')[0]!.linkedProjectId).toBe('p-default')
   })
 
+  it('the banner names the default project only while no pack is selected', async () => {
+    writeForms('sales', [{ id: 'f1', title: 'Leave request' }])
+    await mount('forms', { packId: 'p1', selectedPackId: 'p1' })
+    const banner = host.querySelector('.wb-forms-banner')!
+    expect(banner.querySelector('.wb-crumb-name')?.textContent).toBe('Q4 launch')
+    expect(banner.textContent).not.toContain('With no pack selected')
+  })
+
+  it('a Draft that fails says so in an alert toast, and Retry drafts again', async () => {
+    writeForms('sales', [{ id: 'f1', title: 'Leave request' }])
+    api.newDoc!.mockRejectedValueOnce(new Error('disk full'))
+    await mount('forms', { packId: 'p1' })
+    await click(button('Draft'))
+    const toast = host.querySelector('.wb-toast')!
+    expect(toast.getAttribute('role')).toBe('alert')
+    expect(toast.textContent).toContain('Couldn’t draft from “Leave request”. disk full')
+    // a failed draft links nothing
+    expect(readForms('sales')[0]!.linkedProjectId).toBeUndefined()
+    await click(Array.from(toast.querySelectorAll('button')).find((b) => b.textContent === 'Retry'))
+    expect(api.newDoc).toHaveBeenCalledTimes(2)
+    expect(readForms('sales')[0]!.linkedProjectId).toBe('p1')
+  })
+
   it('Draft with no pack at all still drafts, as a plain new document', async () => {
     writeForms('sales', [{ id: 'f1', title: 'Leave request' }])
     await mount('forms')

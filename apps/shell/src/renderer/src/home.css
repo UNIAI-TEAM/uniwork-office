@@ -4797,12 +4797,6 @@ body.vib .home {
   height: 24px;
 }
 
-.wb-desk-section .wb-forms-locked {
-  display: block;
-  margin: 0 0 8px;
-  white-space: normal;
-}
-
 .wb-desk-chips {
   display: flex;
   flex-wrap: wrap;
@@ -7005,14 +6999,6 @@ html[dir='rtl'] .quick-title-row {
   color: var(--text-secondary);
   font-size: 12px;
   line-height: 16px;
-}
-
-/* the Desk drawer's lock line */
-.wb-forms-locked {
-  flex: none;
-  color: var(--text-secondary);
-  font-size: 12px;
-  white-space: nowrap;
 }
 
 /* Notes (spec 4.5): a composer card, then the notes as cards in columns */
