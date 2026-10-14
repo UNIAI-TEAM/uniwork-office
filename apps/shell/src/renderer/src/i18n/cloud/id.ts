@@ -37,4 +37,6 @@ export const id = {
   aiTestErrLimit: 'Batas penyedia tercapai. Coba lagi nanti',
   aiTestErrUnavailable: 'Layanan tidak merespons. Coba lagi nanti',
   aiTestErrMisconfigured: 'Pengaturan belum lengkap: periksa alamat layanan dan kolom akun',
+  setAiUniworkNote:
+    'UniWork AI memakai paket organisasi Anda. Tidak perlu mengisi kunci atau memilih model.',
 } satisfies Record<keyof typeof zh, string>

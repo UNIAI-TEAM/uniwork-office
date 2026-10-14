@@ -37,4 +37,5 @@ export const he = {
   aiTestErrLimit: 'הגעתם למגבלת הספק. נסו שוב מאוחר יותר',
   aiTestErrUnavailable: 'השירות אינו מגיב. נסו שוב מאוחר יותר',
   aiTestErrMisconfigured: 'ההגדרות חסרות. בדקו את כתובת השירות ואת שדות החשבון',
+  setAiUniworkNote: 'UniWork AI משתמש בחבילה של הארגון שלך. אין צורך להגדיר מפתח או מודל.',
 } satisfies Record<keyof typeof zh, string>

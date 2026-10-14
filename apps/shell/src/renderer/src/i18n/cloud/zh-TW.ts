@@ -33,4 +33,5 @@ export const zhTW = {
   aiTestErrLimit: '已達服務商的用量或頻率限制，請稍後再試',
   aiTestErrUnavailable: '服務暫無回應，請稍後再試',
   aiTestErrMisconfigured: '設定不完整，請檢查服務位址與帳號欄位',
+  setAiUniworkNote: '「UniWork AI」使用你所屬組織的方案，無需填寫金鑰或選擇模型。',
 } satisfies Record<keyof typeof zh, string>
