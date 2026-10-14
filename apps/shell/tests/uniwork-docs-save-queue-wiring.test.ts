@@ -641,6 +641,10 @@ describe('G5-06 W4b save queue wiring', () => {
     const path2 = await openDoc(ctx2)
     writeFileSync(path2, 'v4')
     await ctx2.service.save(path2)
+    // the save may hand the commit to the queue: wait for it to land before
+    // reading its key, or the read races the commit POST
+    await vi.waitFor(() => expect(commits(second)).toHaveLength(1))
+    await vi.waitFor(async () => expect(await storedIntent(ctx2, path2)).toBeNull())
     const doneKey = commits(second)[0]!.headers['idempotency-key']!
     await seed(ctx2, 'committing', path2, doneKey)
     const before = { upload: uploads(second).length, commit: commits(second).length }
