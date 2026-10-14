@@ -8,7 +8,12 @@ import type {
   UniworkScope,
   UniworkTurnRequest,
 } from '@genoffice/ai-provider'
-import { UniworkError, defaultAiSettings } from '@genoffice/ai-provider'
+import {
+  UniworkError,
+  defaultAiSettings,
+  streamUniwork,
+  uniworkErrorKey,
+} from '@genoffice/ai-provider'
 import type { DeploymentProfile } from '../src/main/uniwork-auth/deployment'
 import { TransportError, type FetchLike } from '../src/main/uniwork-auth/transport'
 import {
@@ -230,6 +235,47 @@ describe('UniWork AI chat transport (shell main)', () => {
       fetch,
     })
     await expect(transport.post(chatRequest(docScope))).rejects.toThrow()
+  })
+
+  it('a request that never connects while the machine is offline rejects with offline', async () => {
+    const fetch: FetchLike = async () => {
+      throw new TypeError('fetch failed')
+    }
+    const offline = createUniworkAiChatTransport({
+      profile: () => profile,
+      authorized: authorizedDouble(),
+      fetch,
+      online: () => false,
+    })
+    const err = await offline.post(chatRequest(docScope)).catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(UniworkError)
+    expect((err as UniworkError).code).toBe('offline')
+    // through the real adapter: the panel reads aiErrOffline, not "the connection dropped"
+    const adapterErr = await streamUniwork(
+      offline,
+      {
+        scope: docScope,
+        messages: [{ role: 'user', text: 'hi' }],
+        tools: [],
+        toolPolicy: { cloudTools: false },
+      },
+      {
+        signal: new AbortController().signal,
+        onDelta: () => undefined,
+        onToolCall: () => undefined,
+      },
+    ).catch((e: unknown) => e)
+    expect((adapterErr as UniworkError).code).toBe('offline')
+    expect(uniworkErrorKey('offline')).toBe('aiErrOffline')
+    // online, the same failure stays a plain rejection (the adapter reads it as disconnected)
+    const online = createUniworkAiChatTransport({
+      profile: () => profile,
+      authorized: authorizedDouble(),
+      fetch,
+      online: () => true,
+    })
+    const onlineErr = await online.post(chatRequest(docScope)).catch((e: unknown) => e)
+    expect(onlineErr).not.toBeInstanceOf(UniworkError)
   })
 })
 

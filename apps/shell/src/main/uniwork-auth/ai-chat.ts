@@ -48,6 +48,8 @@ export interface UniworkAiChatTransportDeps {
   /** account manager: a token per call, one refresh + retry on TransportError `unauthorized` */
   authorized<T>(call: (token: string) => Promise<T>): Promise<T>
   fetch?: FetchLike
+  /** the machine has a network (Electron net.isOnline); unknown = assumed online */
+  online?(): boolean
 }
 
 /** the façade URL of a desktop scope; throws for the web frame route or an id that is not one */
@@ -120,6 +122,11 @@ export function createUniworkAiChatTransport(
       } catch (error) {
         if (error instanceof TransportError && error.code === 'unauthorized') {
           return unauthorized ?? sessionEnded()
+        }
+        // no answer at all while the machine has no network: offline (aiErrOffline), not a turn
+        // that dropped mid-way (the adapter reads any other rejection as disconnected)
+        if (!request.signal.aborted && deps.online?.() === false) {
+          throw new UniworkError('offline', { cause: error })
         }
         throw error
       }

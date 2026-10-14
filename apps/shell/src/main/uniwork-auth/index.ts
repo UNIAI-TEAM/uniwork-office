@@ -1,4 +1,4 @@
-import { app, safeStorage, shell, type IpcMain, type WebContents } from 'electron'
+import { app, net, safeStorage, shell, type IpcMain, type WebContents } from 'electron'
 import {
   onUniworkCloudStatus,
   setUniworkAiAvailable,
@@ -319,6 +319,7 @@ export function startUniworkAiChat(deps: {
     createUniworkAiChatTransport({
       profile: () => account.deploymentProfile(),
       authorized: (call) => authorizedRequest(call),
+      online: () => net.isOnline(),
     }),
   )
   const availability = createUniworkAiAvailability({
