@@ -85,6 +85,13 @@ beforeEach(() => {
       ok: true,
       value: { documents: [], nextCursor: null },
     })),
+    uniworkListSharedWithMe: vi.fn(async () => ({
+      ok: true,
+      value: { documents: [], nextCursor: null },
+    })),
+    uniworkDocStatus: vi.fn(async () => null),
+    onUniworkDocStatus: vi.fn(() => () => undefined),
+    listDrafts: vi.fn(async () => []),
     setLanguage: vi.fn(async () => undefined),
   } as unknown as HomeApi
   window.uniworkWork = {

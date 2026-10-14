@@ -36,7 +36,12 @@ const RAW_COLOR = /#[0-9a-fA-F]{3,8}\b|\b(?:rgb|rgba|hsl|hsla)\(/
 const WORKBENCH_TSX = [
   'WorkbenchTopBar.tsx',
   'WorkbenchTabs.tsx',
-  'WorkOverview.tsx',
+  'DeskView.tsx',
+  'DeskTools.tsx',
+  'DeskInTray.tsx',
+  'DeskInProgress.tsx',
+  'DeskDrawer.tsx',
+  'DeskToday.tsx',
   'WorkTasksPane.tsx',
   'WorkCalendarPane.tsx',
   'WorkProfilePane.tsx',
@@ -220,13 +225,12 @@ const PAINTED = [
   '.wb-pill.is-danger',
   '.wb-pill.is-warning',
   '.wb-crumb-role',
-  '.wb-ov-avatar',
   '.wb-check input:checked + .wb-check-box',
 ]
 
 describe('Workbench painted pills and tiles', () => {
   it.each(Object.keys(OPENERS) as Theme[])(
-    '%s: the pills, chips, avatar and ticked box paint AA text on their own fill',
+    '%s: the pills, chips and ticked box paint AA text on their own fill',
     (theme) => {
       const failing = PAINTED.flatMap((selector) => {
         const body = rules.find((r) => r.selector === selector)?.body ?? ''

@@ -35,7 +35,7 @@ import { WorkbenchIcon } from './WorkbenchIcons'
 import { WorkPaneHeader } from './WorkPaneHeader'
 import { WorkbenchTabs } from './WorkbenchTabs'
 import { WorkbenchTopBar, type WorkbenchNewItem } from './WorkbenchTopBar'
-import { pinPillar } from './workbench-pins'
+import { pinModule, pinPillar } from './workbench-pins'
 import { WbDeleteBtn, WbOpenBtn, WbRowActions } from './WbRowActions'
 import {
   WB_REFRESH_EVENT,
@@ -47,7 +47,7 @@ import {
 } from './work-cache'
 import { tabCounts } from './work-home'
 import { WorkStatePanel } from './WorkErrorState'
-import { WorkOverview } from './WorkOverview'
+import { DeskView } from './DeskView'
 
 interface PracticeHomeProps {
   practice: PracticeDefinition
@@ -148,10 +148,13 @@ export function PracticeHome({
     setRefreshTick((n) => n + 1)
   }
 
-  const openCompose = () => {
-    pinPillar(practice.id, 'compose')
-    window.dispatchEvent(new Event('uniwork:wb-pins-changed'))
-    setTab('compose')
+  const openDeskTab = (id: 'tasks' | 'forms') => {
+    // Forms is opt-in on the tab bar; the Desk's "Manage" pins it first
+    if (id === 'forms') {
+      pinModule(practice.id, 'forms')
+      window.dispatchEvent(new Event('uniwork:wb-pins-changed'))
+    }
+    setTab(id)
   }
 
   const [tab, setTab] = useState<string>('desk')
@@ -626,14 +629,17 @@ export function PracticeHome({
       {notice && <p className="wb-hint">{showMsg(notice)}</p>}
 
       {tab === 'desk' ? (
-        <WorkOverview
+        <DeskView
+          practiceId={practice.id}
+          vi={vi}
           workspaces={workspaces}
           workspaceId={workspaceId}
           workspaceError={workspaceError}
           refreshTick={refreshTick}
+          packId={selectedId ?? projects.find((p) => p.isDefault)?.id ?? null}
           onReload={refresh}
-          onCompose={openCompose}
           onSummary={setHomeSummary}
+          onOpenTab={openDeskTab}
         />
       ) : isWorkbenchModuleId(tab) ? (
         <WorkbenchModulePane

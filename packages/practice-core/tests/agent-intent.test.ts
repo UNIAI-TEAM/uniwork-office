@@ -51,7 +51,11 @@ describe('agent-intent catalog', () => {
     expect(resolveAgentIntentFromText('Mở tab sức khoẻ giúp tôi')).toBeNull()
   })
 
-  it('opens the Overview tab by its new name', () => {
+  it('opens the Desk tab by its name and its old Overview name', () => {
+    expect(resolveAgentIntentFromText('Mở tab mặt bàn')?.target).toEqual({
+      kind: 'module',
+      id: 'desk',
+    })
     expect(resolveAgentIntentFromText('Mở tab tổng quan')?.target).toEqual({
       kind: 'module',
       id: 'desk',

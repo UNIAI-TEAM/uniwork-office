@@ -3,7 +3,7 @@ import type { PracticeId } from './types.js'
 /**
  * Optional Workbench modules (pinned via Tab +).
  * Pillars (knowledge / materials / skills / compose) are also opt-in via Tab +.
- * Core always-on modules: My Space / Tasks / Calendar.
+ * Core always-on modules: Desk / Tasks / Calendar.
  * "Projects" is intentionally omitted — it maps to the Knowledge pillar.
  */
 export type WorkbenchModuleId = 'desk' | 'tasks' | 'calendar' | 'forms' | 'notes' | 'personal'
@@ -21,10 +21,10 @@ export interface WorkbenchModuleDef {
 export const WORKBENCH_MODULES: readonly WorkbenchModuleDef[] = [
   {
     id: 'desk',
-    labelVi: 'Tổng quan',
-    labelEn: 'Overview',
-    hintVi: 'Việc, lịch họp và thông báo hôm nay',
-    hintEn: 'Today’s work, meetings and notifications',
+    labelVi: 'Mặt bàn',
+    labelEn: 'Desk',
+    hintVi: 'Tài liệu cần xử lý, đang làm dở và dụng cụ',
+    hintEn: 'Documents to handle, work in progress and tools',
     available: true,
   },
   {
