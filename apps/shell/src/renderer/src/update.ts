@@ -65,12 +65,18 @@ function render(state: UpdateUiState): void {
       action.style.display = ''
       action.textContent = s.openDownload
       break
+    case 'notify':
+      desc.textContent = s.notifyDesc
+      progress.style.display = 'none'
+      action.style.display = ''
+      action.textContent = s.notifyDownload
+      break
   }
 }
 
 action.addEventListener('click', () => {
   if (phase === 'downloaded') api.install()
-  else if (phase === 'manual') api.openDownload()
+  else if (phase === 'manual' || phase === 'notify') api.openDownload()
   else api.download()
 })
 later.addEventListener('click', () => api.later())

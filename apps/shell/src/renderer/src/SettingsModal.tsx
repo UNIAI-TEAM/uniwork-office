@@ -1534,6 +1534,7 @@ export function SettingsModal({
   const [cliLinkBusy, setCliLinkBusy] = useState(false)
   const [aiPrefs, setAiPrefs] = useState<AiPanelPrefs>(DEFAULT_AI_PANEL_PREFS)
   const [channel, setChannel] = useState<'stable' | 'beta'>('stable')
+  const [pinnedChannel, setPinnedChannel] = useState<string | null>(null)
   const [appVersion, setAppVersion] = useState('')
   const [updateState, setUpdateState] = useState<UpdateUiState | null>(null)
   const [legalOpenFailed, setLegalOpenFailed] = useState(false)
@@ -1579,6 +1580,9 @@ export function SettingsModal({
     })
     void window.aiOffice.getUpdateChannel?.().then((ch) => {
       if (alive) setChannel(ch)
+    })
+    void window.aiOffice.getPinnedUpdateChannel?.().then((ch) => {
+      if (alive) setPinnedChannel(ch)
     })
     void window.aiOffice.getAppVersion?.().then((v) => {
       if (alive && v) setAppVersion(v)
@@ -1989,21 +1993,34 @@ export function SettingsModal({
                   <div className="set-field-text">
                     <label className="set-field-label">{t('updateChannel')}</label>
                   </div>
-                  <Dropdown
-                    className="set-dd"
-                    value={channel}
-                    ariaLabel={t('updateChannel')}
-                    options={CHANNEL_OPTIONS.map((opt) => ({
-                      value: opt.value,
-                      label: t(opt.labelKey),
-                    }))}
-                    onPick={(v) => {
-                      const next = v === 'beta' ? 'beta' : 'stable'
-                      setChannel(next)
-                      void window.aiOffice.setUpdateChannel(next)
-                    }}
-                  />
+                  {pinnedChannel !== null ? (
+                    <span className="set-about-channel-pinned">
+                      {pinnedChannel === 'dev'
+                        ? t('channelDev')
+                        : pinnedChannel === 'beta'
+                          ? t('channelBeta')
+                          : pinnedChannel}
+                    </span>
+                  ) : (
+                    <Dropdown
+                      className="set-dd"
+                      value={channel}
+                      ariaLabel={t('updateChannel')}
+                      options={CHANNEL_OPTIONS.map((opt) => ({
+                        value: opt.value,
+                        label: t(opt.labelKey),
+                      }))}
+                      onPick={(v) => {
+                        const next = v === 'beta' ? 'beta' : 'stable'
+                        setChannel(next)
+                        void window.aiOffice.setUpdateChannel(next)
+                      }}
+                    />
+                  )}
                 </div>
+                {pinnedChannel !== null && (
+                  <p className="set-field-desc">{t('updateChannelPinnedNote')}</p>
+                )}
                 <div className="set-about-legal">
                   <p className="set-about-copyright">
                     {t('setAboutCopyright', {
