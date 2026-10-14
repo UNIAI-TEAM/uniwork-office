@@ -32,6 +32,7 @@ import type {
   AiMediaProviderMeta,
   AiMediaSettings,
   AiModelSource,
+  AiProviderConfig,
   AiProviderId,
   AiSearchProviderMeta,
   AiSearchSettings,
@@ -412,6 +413,13 @@ function AiModelPane({
   const [hubChecking, setHubChecking] = useState(false)
   /** free-typed value of the output-cap field; committed (and clamped) on blur */
   const [maxTokensDraft, setMaxTokensDraft] = useState<string | null>(null)
+  /**
+   * Providers served by a key on UniWork whose row the user opened for a key on this computer:
+   * the value is the slot as it was when the row opened, so Cancel restores it untouched.
+   */
+  const [localKeyRows, setLocalKeyRows] = useState<Partial<Record<AiProviderId, AiProviderConfig>>>(
+    {},
+  )
 
   const refreshCodexModels = useCallback(async (cliPath = '', selectedModel = '') => {
     if (!window.aiOffice.getCodexModels) return
@@ -445,6 +453,7 @@ function AiModelPane({
         setTesting(false)
         setTestResult(null)
         setSaved(false)
+        setLocalKeyRows({})
         setSettings(s)
         const codex = s.providers.codex
         if (codex) {
@@ -548,7 +557,11 @@ function AiModelPane({
   const provider = settings.provider
   const meta = catalog.find((c) => c.id === provider)
   const source = settings.modelSources?.[provider]
-  const isOrgKey = source?.origin === 'org'
+  // a row served by a key on UniWork; it turns into the normal key fields while the user types a key
+  // for this computer instead (the local key then wins in main)
+  const isOrgServed = source?.origin === 'org'
+  const useLocalKey = isOrgServed && localKeyRows[provider] !== undefined
+  const isOrgKey = isOrgServed && !useLocalKey
   const config = settings.providers[provider] ?? {
     apiKey: '',
     model: meta?.defaultModel ?? '',
@@ -561,8 +574,12 @@ function AiModelPane({
   // UniWork AI runs on the organization's plan: no key, model or endpoint to set or test
   const isUniwork = provider === 'uniwork'
   const isTokenHub = isGenspark || isOpenRouter
+  // an org-served row shows the model main resolved (modelSources[id].chosen), never a copy of it in
+  // the local slot
   const effectiveModel =
-    config.model || (isOrgKey ? source?.chosen : '') || meta?.defaultModel || ''
+    (isOrgServed ? source?.chosen?.trim() || config.model : config.model) ||
+    meta?.defaultModel ||
+    ''
   const modelIds = paneModelIds(
     meta?.models ?? [],
     source,
@@ -581,22 +598,33 @@ function AiModelPane({
   }
   const updateConfig = (patch: Partial<typeof config>) => {
     if (isOrgKey && ('apiKey' in patch || 'baseUrl' in patch)) return
-    const nextSlot = isOrgKey
-      ? {
-          ...config,
-          model: patch.model ?? config.model,
-          apiKey: '',
-          baseUrl: undefined,
-        }
-      : { ...config, ...patch }
+    // only this provider's slot changes; an org row keeps whatever key/base URL it was loaded with
+    const nextSlot = { ...config, ...patch }
     const providers = { ...settings.providers, [provider]: nextSlot }
     // UniAI and OpenRouter share one Token Hub key — mirror apiKey only.
     if (!isOrgKey && isTokenHub && patch.apiKey !== undefined) {
       const other = provider === 'genspark' ? 'openrouter' : 'genspark'
       providers[other] = { ...settings.providers[other], apiKey: nextSlot.apiKey }
     }
-    setSettings({ ...settings, providers })
+    // the row reads the org model from modelSources: a pick shows there too until the next reload
+    const modelSources =
+      isOrgServed && patch.model !== undefined && source
+        ? { ...settings.modelSources, [provider]: { ...source, chosen: patch.model } }
+        : settings.modelSources
+    setSettings({ ...settings, providers, ...(modelSources ? { modelSources } : {}) })
     touch()
+  }
+  const openLocalKey = () => {
+    setLocalKeyRows((rows) => ({ ...rows, [provider]: { ...config } }))
+  }
+  const cancelLocalKey = () => {
+    const slot = localKeyRows[provider]
+    if (slot) setSettings({ ...settings, providers: { ...settings.providers, [provider]: slot } })
+    setLocalKeyRows((rows) => {
+      const rest = { ...rows }
+      delete rest[provider]
+      return rest
+    })
   }
   /** Commit the output-cap input: clamp what was typed and drop a no-op edit */
   const commitMaxTokens = () => {
@@ -613,22 +641,10 @@ function AiModelPane({
   }
   const save = () => {
     setSaveError(null)
-    const nextProviders = { ...settings.providers }
-    if (settings.modelSources) {
-      for (const [id, src] of Object.entries(settings.modelSources)) {
-        const pid = id as AiProviderId
-        if (src?.origin === 'org' && nextProviders[pid]) {
-          nextProviders[pid] = {
-            ...nextProviders[pid],
-            apiKey: '',
-            baseUrl: undefined,
-          }
-        }
-      }
-    }
-    const payload: AiSettings = { ...settings, providers: nextProviders }
+    // Every slot goes out as loaded plus this form's edits: an org-served provider's slot has no
+    // key from main, and a key or base URL kept on this computer is never rewritten here.
     window.aiOffice
-      .setAiSettings?.(payload, SETTINGS_PICK)
+      .setAiSettings?.(settings, SETTINGS_PICK)
       .then(() => {
         setDirty(false)
         setSaved(true)
@@ -809,34 +825,64 @@ function AiModelPane({
               />
             </div>
           ) : isOrgKey ? (
-            <div className="set-field" data-org-key-row={provider}>
-              <div className="set-field-text">
-                <div className="set-field-stack">
-                  <div className="set-field-label">{t('setAiApiKey')}</div>
-                  <div className="set-field-desc" data-org-key-note="">
-                    {pickerStrings.orgKeyNote}
+            <>
+              <div className="set-field" data-org-key-row={provider}>
+                <div className="set-field-text">
+                  <div className="set-field-stack">
+                    <div className="set-field-label">{t('setAiApiKey')}</div>
+                    <div className="set-field-desc" data-org-key-note="">
+                      {pickerStrings.orgKeyNote}
+                    </div>
                   </div>
+                  <span
+                    className="set-field-value"
+                    data-org-key-tag=""
+                    title={pickerStrings.orgKeyNote}
+                    data-tip={pickerStrings.orgKeyNote}
+                  >
+                    {pickerStrings.orgKeyTag}
+                  </span>
                 </div>
-                <span
-                  className="set-field-value"
-                  data-org-key-tag=""
-                  title={pickerStrings.orgKeyNote}
-                  data-tip={pickerStrings.orgKeyNote}
+                <button
+                  type="button"
+                  className="set-btn"
+                  data-org-key-manage=""
+                  onClick={() => void window.open(orgKeyManageUrl, '_blank', 'noopener,noreferrer')}
                 >
-                  {pickerStrings.orgKeyTag}
-                </span>
+                  {pickerStrings.orgKeyManage}
+                </button>
               </div>
-              <button
-                type="button"
-                className="set-btn"
-                data-org-key-manage=""
-                onClick={() => void window.open(orgKeyManageUrl, '_blank', 'noopener,noreferrer')}
-              >
-                {pickerStrings.orgKeyManage}
-              </button>
-            </div>
+              <div className="set-field" data-org-key-local-action={provider}>
+                <div className="set-field-text" />
+                <button
+                  type="button"
+                  className="set-btn"
+                  data-org-key-use-local=""
+                  onClick={openLocalKey}
+                >
+                  {pickerStrings.orgKeyUseLocal}
+                </button>
+              </div>
+            </>
           ) : (
             <>
+              {useLocalKey && (
+                <div className="set-field" data-org-key-local-row={provider}>
+                  <div className="set-field-text">
+                    <div className="set-field-stack">
+                      <div className="set-field-label">{pickerStrings.orgKeyUseLocal}</div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="set-btn"
+                    data-org-key-use-local-cancel=""
+                    onClick={cancelLocalKey}
+                  >
+                    {pickerStrings.orgKeyUseLocalCancel}
+                  </button>
+                </div>
+              )}
               <div className="set-field">
                 <div className="set-field-text">
                   <div className="set-field-stack">

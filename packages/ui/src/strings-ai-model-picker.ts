@@ -23,6 +23,10 @@ export interface AiModelPickerStrings {
   orgKeyNote: string
   /** Settings link to manage keys saved on UniWork in the web app */
   orgKeyManage: string
+  /** Settings action on a row served by a key on UniWork: type a key stored on this computer instead */
+  orgKeyUseLocal: string
+  /** Settings action that drops that typed key and goes back to the key saved on UniWork */
+  orgKeyUseLocalCancel: string
 }
 
 export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
@@ -39,6 +43,8 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     orgKeyNote:
       '通过组织的 UniWork 服务器并使用你在 UniWork 上保存的密钥发送。UniWork 仅记录用量，不保存内容。',
     orgKeyManage: '在 UniWork（网页版）管理密钥',
+    orgKeyUseLocal: '在此电脑上使用密钥',
+    orgKeyUseLocalCancel: '返回 UniWork 上的密钥',
   },
   en: {
     title: 'Model',
@@ -53,6 +59,8 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     orgKeyNote:
       "Sent through your organization's UniWork server with the key you saved on UniWork. UniWork records usage only and does not store the content.",
     orgKeyManage: 'Manage keys on UniWork (web)',
+    orgKeyUseLocal: 'Use a key on this computer',
+    orgKeyUseLocalCancel: 'Back to the key on UniWork',
   },
   ja: {
     title: 'モデル',
@@ -67,6 +75,8 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     orgKeyNote:
       'UniWork に保存したキーを使い、組織の UniWork サーバー経由で送信されます。UniWork は利用量のみを記録し、内容は保存しません。',
     orgKeyManage: 'UniWork（Web）でキーを管理',
+    orgKeyUseLocal: 'このコンピューターのキーを使う',
+    orgKeyUseLocalCancel: 'UniWork のキーに戻す',
   },
   ko: {
     title: '모델',
@@ -81,6 +91,8 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     orgKeyNote:
       'UniWork에 저장한 키로 조직의 UniWork 서버를 통해 전송됩니다. UniWork는 사용량만 기록하며 내용은 저장하지 않습니다.',
     orgKeyManage: 'UniWork(웹)에서 키 관리',
+    orgKeyUseLocal: '이 컴퓨터의 키 사용',
+    orgKeyUseLocalCancel: 'UniWork 키로 돌아가기',
   },
   fr: {
     title: 'Modèle',
@@ -95,6 +107,8 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     orgKeyNote:
       'Envoyé via le serveur UniWork de votre organisation avec la clé enregistrée sur UniWork. UniWork n’enregistre que l’utilisation et ne stocke pas le contenu.',
     orgKeyManage: 'Gérer les clés sur UniWork (web)',
+    orgKeyUseLocal: 'Utiliser une clé sur cet ordinateur',
+    orgKeyUseLocalCancel: 'Revenir à la clé sur UniWork',
   },
   de: {
     title: 'Modell',
@@ -111,6 +125,8 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     orgKeyNote:
       'Wird über den UniWork-Server Ihrer Organisation mit dem auf UniWork gespeicherten Schlüssel gesendet. UniWork erfasst nur die Nutzung und speichert keine Inhalte.',
     orgKeyManage: 'Schlüssel auf UniWork verwalten (Web)',
+    orgKeyUseLocal: 'Schlüssel auf diesem Computer verwenden',
+    orgKeyUseLocalCancel: 'Zurück zum Schlüssel auf UniWork',
   },
   es: {
     title: 'Modelo',
@@ -125,6 +141,8 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     orgKeyNote:
       'Se envía a través del servidor UniWork de tu organización con la clave que guardaste en UniWork. UniWork solo registra el uso y no almacena el contenido.',
     orgKeyManage: 'Gestionar claves en UniWork (web)',
+    orgKeyUseLocal: 'Usar una clave en este equipo',
+    orgKeyUseLocalCancel: 'Volver a la clave en UniWork',
   },
   th: {
     title: 'โมเดล',
@@ -139,6 +157,8 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     orgKeyNote:
       'ส่งผ่านเซิร์ฟเวอร์ UniWork ขององค์กรด้วยคีย์ที่คุณบันทึกไว้บน UniWork โดย UniWork จะบันทึกเฉพาะข้อมูลการใช้งานและไม่เก็บเนื้อหา',
     orgKeyManage: 'จัดการคีย์บน UniWork (เว็บ)',
+    orgKeyUseLocal: 'ใช้คีย์บนคอมพิวเตอร์เครื่องนี้',
+    orgKeyUseLocalCancel: 'กลับไปใช้คีย์บน UniWork',
   },
   id: {
     title: 'Model',
@@ -153,6 +173,8 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     orgKeyNote:
       'Dikirim melalui server UniWork organisasi Anda dengan kunci yang Anda simpan di UniWork. UniWork hanya mencatat penggunaan dan tidak menyimpan konten.',
     orgKeyManage: 'Kelola kunci di UniWork (web)',
+    orgKeyUseLocal: 'Gunakan kunci di komputer ini',
+    orgKeyUseLocalCancel: 'Kembali ke kunci di UniWork',
   },
   ru: {
     title: 'Модель',
@@ -167,6 +189,8 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     orgKeyNote:
       'Отправляется через сервер UniWork вашей организации с ключом, сохранённым в UniWork. UniWork учитывает только использование и не хранит содержимое.',
     orgKeyManage: 'Управление ключами в UniWork (веб)',
+    orgKeyUseLocal: 'Использовать ключ на этом компьютере',
+    orgKeyUseLocalCancel: 'Вернуться к ключу в UniWork',
   },
   ar: {
     title: 'النموذج',
@@ -181,6 +205,8 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     orgKeyNote:
       'يُرسل عبر خادم UniWork الخاص بمؤسستك باستخدام المفتاح الذي حفظته على UniWork. يسجّل UniWork الاستخدام فقط ولا يخزّن المحتوى.',
     orgKeyManage: 'إدارة المفاتيح على UniWork (الويب)',
+    orgKeyUseLocal: 'استخدام مفتاح على هذا الكمبيوتر',
+    orgKeyUseLocalCancel: 'العودة إلى المفتاح على UniWork',
   },
   pt: {
     title: 'Modelo',
@@ -195,6 +221,8 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     orgKeyNote:
       'Enviado pelo servidor UniWork da sua organização com a chave que você salvou no UniWork. O UniWork registra apenas o uso e não armazena o conteúdo.',
     orgKeyManage: 'Gerenciar chaves no UniWork (web)',
+    orgKeyUseLocal: 'Usar uma chave neste computador',
+    orgKeyUseLocalCancel: 'Voltar à chave no UniWork',
   },
   it: {
     title: 'Modello',
@@ -209,6 +237,8 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     orgKeyNote:
       'Inviato tramite il server UniWork della tua organizzazione con la chiave salvata su UniWork. UniWork registra solo l’utilizzo e non memorizza il contenuto.',
     orgKeyManage: 'Gestisci chiavi su UniWork (web)',
+    orgKeyUseLocal: 'Usa una chiave su questo computer',
+    orgKeyUseLocalCancel: 'Torna alla chiave su UniWork',
   },
   pl: {
     title: 'Model',
@@ -223,6 +253,8 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     orgKeyNote:
       'Wysyłane przez serwer UniWork Twojej organizacji przy użyciu klucza zapisanego w UniWork. UniWork rejestruje wyłącznie użycie i nie przechowuje treści.',
     orgKeyManage: 'Zarządzaj kluczami w UniWork (WWW)',
+    orgKeyUseLocal: 'Użyj klucza na tym komputerze',
+    orgKeyUseLocalCancel: 'Wróć do klucza w UniWork',
   },
   cs: {
     title: 'Model',
@@ -237,6 +269,8 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     orgKeyNote:
       'Odesíláno přes server UniWork vaší organizace s klíčem uloženým na UniWork. UniWork zaznamenává pouze využití a neukládá obsah.',
     orgKeyManage: 'Spravovat klíče na UniWork (web)',
+    orgKeyUseLocal: 'Použít klíč v tomto počítači',
+    orgKeyUseLocalCancel: 'Zpět ke klíči na UniWork',
   },
   nl: {
     title: 'Model',
@@ -251,6 +285,8 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     orgKeyNote:
       'Verzonden via de UniWork-server van uw organisatie met de sleutel die u op UniWork hebt opgeslagen. UniWork registreert alleen het gebruik en slaat de inhoud niet op.',
     orgKeyManage: 'Sleutels beheren op UniWork (web)',
+    orgKeyUseLocal: 'Een sleutel op deze computer gebruiken',
+    orgKeyUseLocalCancel: 'Terug naar de sleutel op UniWork',
   },
   ms: {
     title: 'Model',
@@ -265,6 +301,8 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     orgKeyNote:
       'Dihantar melalui pelayan UniWork organisasi anda dengan kunci yang anda simpan pada UniWork. UniWork hanya merekodkan penggunaan dan tidak menyimpan kandungan.',
     orgKeyManage: 'Urus kunci pada UniWork (web)',
+    orgKeyUseLocal: 'Guna kunci pada komputer ini',
+    orgKeyUseLocalCancel: 'Kembali ke kunci pada UniWork',
   },
   he: {
     title: 'מודל',
@@ -279,6 +317,8 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     orgKeyNote:
       'נשלח דרך שרת UniWork של הארגון שלך עם המפתח ששמרת ב-UniWork. מערכת UniWork מתעדת שימוש בלבד ואינה שומרת את התוכן.',
     orgKeyManage: 'ניהול מפתחות ב-UniWork (אינטרנט)',
+    orgKeyUseLocal: 'שימוש במפתח במחשב זה',
+    orgKeyUseLocalCancel: 'חזרה למפתח ב-UniWork',
   },
   hi: {
     title: 'मॉडल',
@@ -293,6 +333,8 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     orgKeyNote:
       'UniWork पर सहेजी गई कुंजी के साथ आपके संगठन के UniWork सर्वर के माध्यम से भेजा जाता है। UniWork केवल उपयोग रिकॉर्ड करता है और सामग्री संग्रहीत नहीं करता।',
     orgKeyManage: 'UniWork (वेब) पर कुंजियाँ प्रबंधित करें',
+    orgKeyUseLocal: 'इस कंप्यूटर पर कुंजी का उपयोग करें',
+    orgKeyUseLocalCancel: 'UniWork पर कुंजी पर वापस जाएँ',
   },
   'zh-TW': {
     title: '模型',
@@ -307,6 +349,8 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     orgKeyNote:
       '透過組織的 UniWork 伺服器並使用你在 UniWork 上儲存的金鑰傳送。UniWork 僅記錄用量，不儲存內容。',
     orgKeyManage: '在 UniWork（網頁版）管理金鑰',
+    orgKeyUseLocal: '在這台電腦上使用金鑰',
+    orgKeyUseLocalCancel: '返回 UniWork 上的金鑰',
   },
   vi: {
     title: 'Mô hình',
@@ -321,5 +365,7 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     orgKeyNote:
       'Gửi qua máy chủ UniWork của tổ chức bằng khóa bạn đã lưu trên UniWork. UniWork chỉ ghi số liệu sử dụng, không lưu nội dung.',
     orgKeyManage: 'Quản lý khóa trên UniWork (web)',
+    orgKeyUseLocal: 'Dùng khóa trên máy này',
+    orgKeyUseLocalCancel: 'Quay lại khóa trên UniWork',
   },
 }

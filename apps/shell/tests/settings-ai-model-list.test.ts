@@ -68,6 +68,12 @@ function installApi(settings: AiSettings): void {
   } as unknown as HomeApi
 }
 
+/** React-controlled inputs only see the value through the native setter */
+function setNativeValue(input: HTMLInputElement, value: string): void {
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value)
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+}
+
 async function click(button: HTMLButtonElement): Promise<void> {
   await act(async () => {
     button.click()
@@ -198,38 +204,184 @@ describe('Settings › AI model: org-managed provider row (G6-05k)', () => {
     )
   })
 
-  it('never writes an org provider key slot when saving Settings', async () => {
-    const settings = stored('claude-sonnet-5', {
-      chosen: 'claude-sonnet-5',
-      origin: 'org',
-      listed: CATALOG,
-    })
-    // Simulate a stray key hint on the incoming settings object; saving must still write ''
-    settings.providers.anthropic.apiKey = '•••9f2a'
-    settings.providers.anthropic.baseUrl = 'https://stray.example.com'
-    installApi(settings)
-
-    await openAiPane()
-
-    // Change model via dropdown to mark pane dirty and trigger save
+  /** the model dropdown pick that marks the pane dirty, then Save; returns what was sent */
+  async function pickOpusAndSave(): Promise<AiSettings> {
     const trigger = host.querySelector<HTMLButtonElement>('.gs-dd-btn[aria-label="Model"]')!
     await click(trigger)
     const opusOption = Array.from(
       host.querySelectorAll<HTMLButtonElement>('.gs-dd-pop [role="option"]'),
     ).find((opt) => (opt.getAttribute('aria-label') ?? opt.textContent) === 'claude-opus-5')!
     await click(opusOption)
-
     const saveBtn = host.querySelector<HTMLButtonElement>('button.set-btn.primary')!
-    expect(saveBtn).not.toBeNull()
     expect(saveBtn.disabled).toBe(false)
     await click(saveBtn)
-
     const setAiSettingsMock = vi.mocked(window.aiOffice.setAiSettings)
     expect(setAiSettingsMock).toHaveBeenCalledTimes(1)
-    const saved = setAiSettingsMock.mock.calls[0][0]
-    expect(saved.providers.anthropic.model).toBe('claude-opus-5')
-    expect(saved.providers.anthropic.apiKey).toBe('')
-    expect(saved.providers.anthropic.baseUrl).toBeUndefined()
+    return setAiSettingsMock.mock.calls[0][0]
+  }
+
+  it('saving Settings keeps the local key and base URL of the org provider and of every other provider byte-identical', async () => {
+    const settings = stored('claude-sonnet-5', {
+      chosen: 'claude-sonnet-5',
+      origin: 'org',
+      listed: CATALOG,
+    })
+    // a key typed on this machine earlier that is not "usable" yet, next to other local slots
+    settings.providers.anthropic = {
+      apiKey: 'sk-ant-local-9f2a',
+      baseUrl: 'https://anthropic.local.example',
+      model: '',
+    }
+    settings.providers.openai = {
+      apiKey: 'sk-openai-local',
+      baseUrl: 'https://openai.local.example/v1',
+      model: 'gpt-local',
+    }
+    settings.providers.custom = { apiKey: '', baseUrl: 'http://127.0.0.1:11434/v1', model: 'llama' }
+    const before = JSON.stringify(settings.providers)
+    installApi(settings)
+
+    await openAiPane()
+    const saved = await pickOpusAndSave()
+
+    // only the edited provider's model moved; no key or base URL slot was rewritten
+    expect(saved.providers.anthropic).toEqual({
+      apiKey: 'sk-ant-local-9f2a',
+      baseUrl: 'https://anthropic.local.example',
+      model: 'claude-opus-5',
+    })
+    expect(JSON.stringify({ ...saved.providers, anthropic: settings.providers.anthropic })).toBe(
+      before,
+    )
+  })
+
+  it('shows the model main resolved (modelSources chosen) for an org row, not a model left in the local slot', async () => {
+    const settings = stored('claude-stale-local', {
+      chosen: 'claude-sonnet-5',
+      origin: 'org',
+      listed: CATALOG,
+    })
+    settings.providers.anthropic = { apiKey: '', model: 'claude-stale-local' }
+    installApi(settings)
+    await openAiPane()
+    const trigger = host.querySelector<HTMLButtonElement>('.gs-dd-btn[aria-label="Model"]')!
+    expect(trigger.textContent).toContain('claude-sonnet-5')
+    expect(trigger.textContent).not.toContain('claude-stale-local')
+  })
+
+  it('never writes the org-resolved model into the local slot of an untouched provider', async () => {
+    const settings = stored('', { chosen: 'claude-sonnet-5', origin: 'org', listed: CATALOG })
+    settings.providers.anthropic = { apiKey: '', model: '' }
+    installApi(settings)
+    await openAiPane()
+    // the row shows the model main resolved
+    const trigger = host.querySelector<HTMLButtonElement>('.gs-dd-btn[aria-label="Model"]')!
+    expect(trigger.textContent).toContain('claude-sonnet-5')
+
+    // an unrelated edit (output cap) makes the form dirty, then Save
+    const cap = host.querySelector<HTMLInputElement>('#set-ai-max-tokens')!
+    await act(async () => {
+      setNativeValue(cap, '8192')
+      cap.dispatchEvent(new FocusEvent('focusout', { bubbles: true }))
+    })
+    await click(host.querySelector<HTMLButtonElement>('button.set-btn.primary')!)
+    const sent = vi.mocked(window.aiOffice.setAiSettings).mock.calls[0][0]
+    expect(sent.providers.anthropic.model).toBe('')
+    expect(sent.providers.anthropic.apiKey).toBe('')
+  })
+
+  it('"use a key on this computer" opens the normal key and base URL fields; a typed key is sent on save', async () => {
+    const settings = stored('claude-sonnet-5', {
+      chosen: 'claude-sonnet-5',
+      origin: 'org',
+      listed: CATALOG,
+    })
+    settings.providers.anthropic.apiKey = ''
+    installApi(settings)
+    await openAiPane()
+
+    const useLocal = host.querySelector<HTMLButtonElement>('[data-org-key-use-local]')!
+    expect(useLocal.tagName).toBe('BUTTON')
+    expect(useLocal.getAttribute('tabindex')).not.toBe('-1')
+    expect(useLocal.textContent).toBe('Use a key on this computer')
+    await click(useLocal)
+
+    expect(host.querySelector('[data-org-key-row]')).toBeNull()
+    const key = host.querySelector<HTMLInputElement>('#set-ai-key')!
+    expect(key).not.toBeNull()
+    expect(host.querySelector('#set-ai-base-url')).not.toBeNull()
+    expect(host.querySelector(`label[for="set-ai-key"]`)).not.toBeNull()
+    await act(async () => setNativeValue(key, 'sk-ant-new-local'))
+    await click(host.querySelector<HTMLButtonElement>('button.set-btn.primary')!)
+
+    const sent = vi.mocked(window.aiOffice.setAiSettings).mock.calls[0][0]
+    expect(sent.providers.anthropic.apiKey).toBe('sk-ant-new-local')
+  })
+
+  it('cancel on the local key fields restores the read-only org row and drops the typed key', async () => {
+    installApi(
+      stored('claude-sonnet-5', { chosen: 'claude-sonnet-5', origin: 'org', listed: CATALOG }),
+    )
+    await openAiPane()
+    await click(host.querySelector<HTMLButtonElement>('[data-org-key-use-local]')!)
+    const key = host.querySelector<HTMLInputElement>('#set-ai-key')!
+    await act(async () => setNativeValue(key, 'sk-ant-typed'))
+    const cancel = host.querySelector<HTMLButtonElement>('[data-org-key-use-local-cancel]')!
+    expect(cancel.textContent).toBe('Back to the key on UniWork')
+    await click(cancel)
+
+    expect(host.querySelector('#set-ai-key')).toBeNull()
+    expect(host.querySelector('[data-org-key-row]')).not.toBeNull()
+    expect(host.querySelector('[data-org-key-use-local]')).not.toBeNull()
+    // a later save still carries the slot as it was loaded, not the typed text
+    await click(host.querySelector<HTMLButtonElement>('button.set-btn.primary')!)
+    const sent = vi.mocked(window.aiOffice.setAiSettings).mock.calls[0]?.[0]
+    if (sent) expect(sent.providers.anthropic.apiKey).not.toBe('sk-ant-typed')
+  })
+
+  it.each([
+    ['en', 'Use a key on this computer', 'Back to the key on UniWork'],
+    ['vi', 'Dùng khóa trên máy này', 'Quay lại khóa trên UniWork'],
+  ] as const)('labels the local key actions in %s', async (locale, useLocal, back) => {
+    installApi(
+      stored('claude-sonnet-5', { chosen: 'claude-sonnet-5', origin: 'org', listed: CATALOG }),
+    )
+    await openAiPaneWithLocale(locale)
+    const action = host.querySelector<HTMLButtonElement>('[data-org-key-use-local]')!
+    expect(action.textContent).toBe(useLocal)
+    await click(action)
+    expect(
+      host.querySelector<HTMLButtonElement>('[data-org-key-use-local-cancel]')!.textContent,
+    ).toBe(back)
+  })
+
+  it('opens the manage page on the signed-in server', async () => {
+    installApi(
+      stored('claude-sonnet-5', { chosen: 'claude-sonnet-5', origin: 'org', listed: CATALOG }),
+    )
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null)
+    await act(async () => {
+      root.render(
+        createElement(
+          LocaleProvider,
+          { initial: 'en' },
+          createElement(SettingsModal, {
+            onClose: vi.fn(),
+            initialSection: 'aiModel',
+            account: { status: { serverUrl: 'https://org.example.com/' } } as never,
+          }),
+        ),
+      )
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    await click(host.querySelector<HTMLButtonElement>('[data-org-key-manage]')!)
+    expect(openSpy).toHaveBeenCalledWith(
+      'https://org.example.com/settings/ai',
+      '_blank',
+      'noopener,noreferrer',
+    )
+    openSpy.mockRestore()
   })
 
   it('keeps the editable API key input when origin is local or absent', async () => {
