@@ -10,6 +10,7 @@ import { AiPanel } from './ai/AiPanel'
 import { AiAskPopover, type AskAnchorRect } from './AiAskPopover'
 import { AppOnlyNote } from './AppOnlyNote'
 import { narrowPane, widthFitScale } from './fit-scale'
+import { useAiDockLayout } from './ai-dock-layout'
 import { appMayDrawText } from './font-notice'
 import { appOpenAvailable, cap, platform } from './capabilities'
 import {
@@ -142,6 +143,15 @@ import { useI18n } from './i18n/locale'
 import { useAutosave } from './useAutosave'
 import { drainedOrigin, forcesBoundSave, type SaveOrigin } from './uniwork-save'
 import { queryPdfUniworkState } from './uniwork-state'
+import { collabStrings } from '@genoffice/ui/collab'
+import { PdfServerCommentsHost, type PdfServerComments } from './server-comments/PdfServerComments'
+import { commentFrameBox, rerunOnResize, scrollLeftToReveal } from './server-comments/reveal-view'
+import { createPdfAnchorAdapter } from './server-comments/pdf-adapter'
+import { startFailureNotice } from './server-comments/start-notice'
+import { withoutFileNoteWrites } from './server-comments/bound-save'
+import { pdfCommentsBridge } from './server-comments/pdf-comments-context'
+import { FileNotesList, type FileNoteThread } from './server-comments/FileNotesList'
+import type { PdfRect } from './server-comments/pdf-anchor'
 import { isUniworkRefusal } from '../shared/uniwork-refusal'
 import type {
   AnnotDeleteInput,
@@ -301,6 +311,10 @@ import {
 
 GlobalWorkerOptions.workerSrc = workerUrl
 
+/** G8-15: the server comments toggle and panel (aria-controls / focus return on close) */
+const SERVER_COMMENTS_TOGGLE_ID = 'pdf-server-comments-toggle'
+const SERVER_COMMENTS_PANEL_ID = 'pdf-server-comments-panel'
+
 const DRAW_TOOLS = [
   { tool: 'ink' as const, icon: IconInk, key: 'drawInk' as const },
   { tool: 'rect' as const, icon: IconRect, key: 'drawRect' as const },
@@ -391,6 +405,12 @@ export default function App() {
   useEffect(() => {
     rememberAiPanelOpen('genoffice-pdf-show-ai', !aiCollapsed)
   }, [aiCollapsed])
+  /** G8-15: bound documents' comments panel; declared here so the AI dock can fold away for it */
+  const [serverPanelOpen, setServerPanelOpen] = useState(false)
+  /** what the dock shows: the stored choice above, folded while the comments panel is open in a narrow window */
+  const aiDock = useAiDockLayout(aiCollapsed, setAiCollapsed, serverPanelOpen)
+  const aiDockRef = useRef(aiDock)
+  aiDockRef.current = aiDock
   /** One-shot prompt pushed by the ribbon AI buttons; the panel auto-runs it (docs preset pattern) */
   const [aiPreset, setAiPreset] = useState<{ text: string; nonce: number } | null>(null)
   const [ribbonTab, setRibbonTab] = useState<RibbonTab>('home')
@@ -852,8 +872,8 @@ export default function App() {
   // the first AI turn should already know whether the file carries review
   // feedback, so an open panel starts the scan before the user sends anything
   useEffect(() => {
-    if (!aiCollapsed) startAiAnnotCountScan()
-  }, [aiCollapsed, startAiAnnotCountScan])
+    if (!aiDock.collapsed) startAiAnnotCountScan()
+  }, [aiDock.collapsed, startAiAnnotCountScan])
   const [selected, setSelected] = useState<AnnotSelection | null>(null)
   /** Transparency presets fold-out inside the image selection popup */
   const [opacityMenu, setOpacityMenu] = useState(false)
@@ -1406,7 +1426,7 @@ export default function App() {
   useEffect(() => {
     return window.pdfApi.onAiPreset?.((preset) => {
       if (!preset?.text) return
-      setAiCollapsed(false)
+      aiDockRef.current.open()
       setAiPreset({ text: preset.text, nonce: Date.now() })
     })
   }, [])
@@ -1430,6 +1450,10 @@ export default function App() {
       live = false
     }
   }, [filePath])
+
+  /** G8-15: a bound document with the comments bridge keeps its comments on UniWork (server mode) */
+  const commentsBridge = useMemo(() => pdfCommentsBridge(), [])
+  const serverComments = uniwork.bound && commentsBridge !== null && !!filePath
 
   /** pdf-lib cannot write encrypted files, including owner-protected files that open without a password. */
   const encryptedReadOnly =
@@ -1528,14 +1552,17 @@ export default function App() {
   /** Reserve the WPS-style comments margin while the doc has notes or one is being added */
   const noteMarginOn = useMemo(
     () =>
-      drawTool === 'note' ||
-      noteDraft !== null ||
-      drawings.some((d) => d.input.kind === 'note') ||
-      (() => {
-        const deletedObjs = new Set(annotDeletes.map((d) => d.annot.objNum))
-        return [...savedNotes.values()].some((l) => l.some((a) => !deletedObjs.has(a.objNum)))
-      })(),
-    [drawTool, noteDraft, drawings, annotDeletes, savedNotes],
+      // a bound document never drafts a file note: the margin only shows the file's own notes, and
+      // not while the panel lists them in its "Comments in the file" section (V15-08)
+      !(serverComments && serverPanelOpen) &&
+      ((drawTool === 'note' && !serverComments) ||
+        noteDraft !== null ||
+        drawings.some((d) => d.input.kind === 'note') ||
+        (() => {
+          const deletedObjs = new Set(annotDeletes.map((d) => d.annot.objNum))
+          return [...savedNotes.values()].some((l) => l.some((a) => !deletedObjs.has(a.objNum)))
+        })()),
+    [drawTool, noteDraft, drawings, annotDeletes, savedNotes, serverComments, serverPanelOpen],
   )
 
   const recomputeFit = useCallback(() => {
@@ -1660,6 +1687,129 @@ export default function App() {
     if (!el) return
     const target = Math.min(Math.max(1, n), pageCount)
     el.scrollTop = rowTop(rowOfVis(target - 1)) - PAGE_GAP / 2
+  }
+
+  // ── G8-15 server comments: a bound document keeps its comments on UniWork ──
+  // (the file's own notes stay read-only; new threads, replies and resolves go to the server)
+  const serverRef = useRef<PdfServerComments | null>(null)
+  useEffect(() => {
+    if (!serverComments) setServerPanelOpen(false)
+  }, [serverComments])
+  /** the control a new comment was started from (Note tool, or what had the focus): Discard and Esc
+      on an empty composer put the focus back there; without one it is the Comments button */
+  const composerOpenerRef = useRef<HTMLElement | null>(null)
+  const focusComposerOpener = () => {
+    const back = composerOpenerRef.current
+    composerOpenerRef.current = null
+    const target =
+      back?.isConnected && !back.closest('.pdf-server-comments')
+        ? back
+        : document.getElementById(SERVER_COMMENTS_TOGGLE_ID)
+    target?.focus()
+  }
+  // the Note tool switched off (or another tool picked) cancels a new-thread composer nobody typed in
+  useEffect(() => {
+    if (serverComments && drawTool !== 'note') serverRef.current?.cancelEmptyThread()
+  }, [serverComments, drawTool])
+  /** The rect a reveal / "go to" framed, or the one a new thread is being written for */
+  const [commentFrame, setCommentFrame] = useState<{ origIdx: number; rect: PdfRect } | null>(null)
+  const [pendingCommentFrame, setPendingCommentFrame] = useState<{
+    origIdx: number
+    rect: PdfRect
+  } | null>(null)
+  useEffect(() => setCommentFrame(null), [filePath])
+  const goToCommentRef = useRef<(origIdx: number, rect: PdfRect) => void>(() => undefined)
+  const stopRevealWatchRef = useRef<() => void>(() => undefined)
+  useEffect(() => () => stopRevealWatchRef.current(), [])
+  goToCommentRef.current = (origIdx, rect) => {
+    const visIdx = visList.indexOf(origIdx)
+    if (visIdx < 0) return
+    scrollToPage(visIdx + 1)
+    const el = scrollRef.current
+    if (el) {
+      // bring the rect itself into view, not only the page top
+      const top = pdfRectToCss(pageGeom(origIdx), rect, scale).top
+      el.scrollTop += Math.max(0, top - el.clientHeight * 0.3)
+      // and sideways: a narrow viewer (AI dock + thumbnails + this panel) shows only part of a page.
+      // A reveal that also opens the panel narrows the scroller only after React lays the panel out:
+      // after the next frame, and again on every resize for a moment (the first pass can be too early).
+      const sideways = () => {
+        const page = el.querySelector<HTMLElement>(`.pdf-page[data-page="${origIdx}"]`)
+        if (!page) return
+        const box = commentFrameBox(pdfRectToCss(pageGeom(origIdx), rect, scale))
+        const pageLeft =
+          page.getBoundingClientRect().left - el.getBoundingClientRect().left + el.scrollLeft
+        el.scrollLeft = scrollLeftToReveal({
+          scrollLeft: el.scrollLeft,
+          viewWidth: el.clientWidth,
+          left: pageLeft + box.left,
+          width: box.width,
+        })
+      }
+      sideways()
+      requestAnimationFrame(sideways)
+      stopRevealWatchRef.current()
+      stopRevealWatchRef.current = rerunOnResize(el, sideways)
+    }
+    setCurrentPage(visIdx + 1)
+    setPageInput(String(visIdx + 1))
+    setCommentFrame({ origIdx, rect })
+  }
+  const commentAdapter = useMemo(
+    () =>
+      createPdfAnchorAdapter({
+        pageCount: sizes.length,
+        isShown: (origIdx) => !deleted.has(origIdx),
+        viewTop: (origIdx, rect) => pdfRectToCss(pageGeom(origIdx), rect, 1).top,
+        goTo: (origIdx, rect) => goToCommentRef.current(origIdx, rect),
+      }),
+    [sizes.length, deleted, pageGeom],
+  )
+  const commentStrings = useMemo(() => collabStrings(lang), [lang])
+  /** The file's own note threads for the panel's read-only "Comments in the file" section;
+      read from every page once the panel opens (the margin cache only holds visible pages) */
+  const [fileNoteThreads, setFileNoteThreads] = useState<FileNoteThread[]>([])
+  useEffect(() => {
+    if (!serverComments || !serverPanelOpen || !doc) return
+    let live = true
+    void (async () => {
+      const out: FileNoteThread[] = []
+      for (let origIdx = 0; origIdx < doc.numPages; origIdx++) {
+        try {
+          const { notes } = await loadSavedAnnots(doc, origIdx)
+          for (const root of visibleNoteThreads(notes, [], new Set(), new Map()))
+            out.push({ origIdx, root })
+        } catch {
+          // one unreadable page leaves out its notes only; the other pages still list theirs
+        }
+        if (!live) return
+      }
+      setFileNoteThreads(out)
+    })()
+    return () => {
+      live = false
+    }
+  }, [serverComments, serverPanelOpen, doc])
+
+  /** The note tool on a bound document opens the panel's composer at the click (no file note) */
+  const startServerComment = (origIdx: number, at: [number, number], aiText?: string): boolean => {
+    const active = document.activeElement
+    if (active instanceof HTMLElement && active !== document.body) {
+      if (!active.closest('.pdf-server-comments')) composerOpenerRef.current = active
+    } else {
+      // a click on the page leaves the focus on the body: the Note tool is what started it
+      composerOpenerRef.current = document.querySelector<HTMLElement>('[data-draw-tool="note"]')
+    }
+    setServerPanelOpen(true)
+    const server = serverRef.current
+    if (!server?.startAt(origIdx + 1, at, aiText)) {
+      // an unknown open version asks to save first through the panel footer (opened just above);
+      // anything else is the generic line
+      const key = startFailureNotice(server?.needsSave === true)
+      if (key) showNotice(t(key))
+      return false
+    }
+    return true
   }
 
   // genoffice CLI (`open --page`, `selection`): the shell evaluates this hook
@@ -3565,10 +3715,16 @@ export default function App() {
   /** Pending edits in SavePdfRequest form; shared by in-place Save and Save As.
       `noteFlush` carries the drawings/noteEdits returned by commitNoteEdit — the
       state values in this closure predate that flush. */
+  // G8-15: a bound document never writes a note into the file (the last gate; see bound-save.ts)
   const editsPayload = (
     edits: LocalTextEdit[] = textEdits,
     noteFlush?: { drawings: LocalDrawing[]; noteEdits: LocalNoteEdit[] },
     extraDrawings: LocalDrawing[] = [],
+  ) => withoutFileNoteWrites(rawEditsPayload(edits, noteFlush, extraDrawings), serverComments)
+  const rawEditsPayload = (
+    edits: LocalTextEdit[],
+    noteFlush: { drawings: LocalDrawing[]; noteEdits: LocalNoteEdit[] } | undefined,
+    extraDrawings: LocalDrawing[],
   ) => ({
     markups: markups.map(({ id: _id, ...rest }) => rest),
     annotDeletes: annotDeletes.map((d): AnnotDeleteInput => ({
@@ -3697,6 +3853,8 @@ export default function App() {
       }
       // the restored draft is the file's new version now
       setRecovered(false)
+      // G8-15: the server anchors follow this save's page layout once UniWork reports the version
+      if (serverComments) serverRef.current?.saved(snapshot.pageMap)
       if (!anythingToSave) {
         // Forced save of a clean bound document: the file is unchanged, nothing to reload
         setSaveState('saved')
@@ -5632,6 +5790,8 @@ export default function App() {
     pageCount: () => sizes.length,
     currentPage: () => (visList[currentPage - 1] ?? 0) + 1,
     readOnly: () => readOnly,
+    serverComments: () => serverComments,
+    draftServerComment: (origIdx, at, text) => startServerComment(origIdx, at, text),
     uniworkBound: () => uniwork.bound,
     ocrText: (origIdx) => ocrPages.get(origIdx)?.entry.text ?? null,
     selection: () => aiSelection,
@@ -6210,7 +6370,7 @@ export default function App() {
 
   /** Ribbon AI buttons: expand the dock and auto-run the prompt in the assistant */
   const runAiPreset = (text: string): void => {
-    setAiCollapsed(false)
+    aiDock.open()
     setAiPreset({ text, nonce: Date.now() })
   }
 
@@ -6629,9 +6789,9 @@ export default function App() {
                 <div className="ribbon-group">
                   <div className="ribbon-group-items">
                     <button
-                      className={`rb-big ai-entry${aiCollapsed ? '' : ' active'}`}
+                      className={`rb-big ai-entry${aiDock.collapsed ? '' : ' active'}`}
                       data-tip={t('aiOpenAssistant')}
-                      onClick={() => setAiCollapsed((v) => !v)}
+                      onClick={() => (aiDock.collapsed ? aiDock.open() : aiDock.collapse())}
                     >
                       <span className="rb-big-icon">
                         <UniAiMark size={26} />
@@ -6818,6 +6978,7 @@ export default function App() {
                     <button
                       key={tool}
                       className={`rb-big${drawTool === tool ? ' active' : ''}`}
+                      data-draw-tool={tool}
                       disabled={readOnly}
                       data-tip={t(key)}
                       onClick={() => {
@@ -6835,6 +6996,23 @@ export default function App() {
                       {t(key)}
                     </button>
                   ))}
+                  {/* G8-15: the server comments panel of a bound document (spine S12: the
+                      button carries the panel title, expanded = open) */}
+                  {serverComments && (
+                    <button
+                      id={SERVER_COMMENTS_TOGGLE_ID}
+                      className={`rb-big${serverPanelOpen ? ' active' : ''}`}
+                      aria-expanded={serverPanelOpen}
+                      aria-controls={SERVER_COMMENTS_PANEL_ID}
+                      data-tip={commentStrings.collabComments}
+                      onClick={() => setServerPanelOpen((v) => !v)}
+                    >
+                      <span className="rb-big-icon">
+                        <IconNote />
+                      </span>
+                      {commentStrings.collabComments}
+                    </button>
+                  )}
                   {/* redaction writes a working copy next to the file: desktop only (cap 'redaction');
                       the web keeps the entry and says to use the app */}
                   {!cap('redaction') && (
@@ -7375,16 +7553,16 @@ export default function App() {
             the panel stays mounted while collapsed so the chat history survives */}
         {cap('ai') && (
           <div
-            className={`ai-dock${aiCollapsed ? ' collapsed' : ''}${
-              !aiSidebarEnabled && aiCollapsed ? ' ai-dock-off' : ''
+            className={`ai-dock${aiDock.collapsed ? ' collapsed' : ''}${
+              !aiSidebarEnabled && aiDock.collapsed ? ' ai-dock-off' : ''
             }`}
           >
-            {aiCollapsed && aiSidebarEnabled && (
+            {aiDock.collapsed && aiSidebarEnabled && (
               <button
                 className="ai-rail"
                 data-tip={t('aiOpenAssistant')}
                 aria-label={t('aiOpenAssistant')}
-                onClick={() => setAiCollapsed(false)}
+                onClick={aiDock.open}
               >
                 <UniAiMark size={22} />
               </button>
@@ -7393,8 +7571,8 @@ export default function App() {
               api={aiApi}
               filePath={filePath}
               preset={aiPreset}
-              open={!aiCollapsed}
-              onCollapse={() => setAiCollapsed(true)}
+              open={!aiDock.collapsed}
+              onCollapse={aiDock.collapse}
               readOnly={readOnly}
               onRunDone={() => void autoSaveAfterAiRun()}
               onClearSelection={() => setAiSelection(null)}
@@ -8642,7 +8820,8 @@ export default function App() {
                                 onCommit={(input) => commitDrawing(origIdx, input)}
                                 onNoteAt={(at) => {
                                   setActiveNote(null)
-                                  setNoteDraft({ origIdx, at })
+                                  if (serverComments) startServerComment(origIdx, at)
+                                  else setNoteDraft({ origIdx, at })
                                 }}
                                 onNoteOpen={(key) => {
                                   setNoteDraft(null)
@@ -8706,6 +8885,23 @@ export default function App() {
                                     </div>
                                   )
                                 })()}
+                              {/* G8-15: the server comment a reveal / "go to" framed, and the
+                                  rect of the new thread being written */}
+                              {serverComments &&
+                                [commentFrame, serverPanelOpen ? pendingCommentFrame : null].map(
+                                  (frame, i) =>
+                                    frame && frame.origIdx === origIdx ? (
+                                      <div
+                                        key={i}
+                                        className={`pdf-comment-frame${i === 1 ? ' pdf-comment-frame-new' : ''}`}
+                                        data-comment-frame={i === 1 ? 'new' : 'revealed'}
+                                        aria-hidden="true"
+                                        style={commentFrameBox(
+                                          pdfRectToCss(geom, frame.rect, scale),
+                                        )}
+                                      />
+                                    ) : null,
+                                )}
                               <LinkLayer
                                 doc={doc}
                                 pageNo={origIdx + 1}
@@ -8749,7 +8945,7 @@ export default function App() {
                         }
                         author={noteAuthor}
                         lang={lang}
-                        readOnly={readOnly}
+                        readOnly={readOnly || serverComments}
                         t={t}
                         onActivate={(th) => {
                           setNoteDraft(null)
@@ -9564,6 +9760,49 @@ export default function App() {
                 }
                 onApply={(_png, crop) => confirmPageCrop(crop)}
                 onCancel={() => setPageCropDlg(null)}
+              />
+            )}
+            {serverComments && commentsBridge && (
+              <PdfServerCommentsHost
+                key={filePath}
+                bridge={commentsBridge}
+                path={filePath}
+                lang={lang}
+                readOnly={readOnly}
+                adapter={commentAdapter}
+                open={serverPanelOpen}
+                panelId={SERVER_COMMENTS_PANEL_ID}
+                apiRef={serverRef}
+                onRevealRequest={() => setServerPanelOpen(true)}
+                onClose={() => {
+                  setServerPanelOpen(false)
+                  setCommentFrame(null)
+                  document.getElementById(SERVER_COMMENTS_TOGGLE_ID)?.focus()
+                }}
+                onFocusOpener={focusComposerOpener}
+                onPendingAnchor={(anchor) =>
+                  setPendingCommentFrame(
+                    anchor ? { origIdx: anchor.page - 1, rect: anchor.rect } : null,
+                  )
+                }
+                inFile={{
+                  count: fileNoteThreads.length,
+                  content: (
+                    <FileNotesList
+                      threads={fileNoteThreads}
+                      lang={lang}
+                      pageLabel={commentStrings.collabAnchorPage ?? ''}
+                      neutralAuthor={t('noteNeutralAuthor')}
+                      onShow={(th) => {
+                        const visIdx = visList.indexOf(th.origIdx)
+                        if (visIdx < 0) return
+                        scrollToPage(visIdx + 1)
+                        setActiveNote({ origIdx: th.origIdx, rootKey: th.root.key })
+                      }}
+                    />
+                  ),
+                }}
+                saveFirstText={t('serverCommentSaveFirst')}
               />
             )}
           </div>
