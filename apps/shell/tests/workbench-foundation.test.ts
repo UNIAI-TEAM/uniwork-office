@@ -32,10 +32,11 @@ const rule = (selector: string) => {
 }
 
 describe('workbench tokens', () => {
-  it('defines --wb-shadow, --wb-row-hover, --wb-check-border and --wb-focus-ring in all three theme blocks', () => {
+  it('defines --wb-row-hover, --wb-check-border and --wb-focus-ring in all three theme blocks', () => {
     expect(blocks).toHaveLength(3)
     for (const block of blocks) {
-      expect(block).toMatch(/\n\s*--wb-shadow: [^;]+;/)
+      // cards are border only (spec 1.3): no card shadow token left
+      expect(block).not.toMatch(/--wb-shadow/)
       expect(hexIn(block, '--wb-row-hover')).toBeDefined()
       expect(hexIn(block, '--wb-check-border')).toBeDefined()
     }
@@ -49,9 +50,6 @@ describe('workbench tokens', () => {
     expect(blocks[2]).toMatch(
       /\n {4}--wb-focus-ring: color-mix\(in srgb, var\(--accent\) 35%, transparent\);/,
     )
-    // dark blocks separate by their border, not a shadow
-    expect(blocks[1]).toMatch(/\n {2}--wb-shadow: none;/)
-    expect(blocks[2]).toMatch(/\n {4}--wb-shadow: none;/)
   })
 
   it.each([
@@ -67,7 +65,8 @@ describe('workbench tokens', () => {
       const border = hexIn(block, '--wb-check-border')!
       expect(contrast(border, surface)).toBeGreaterThanOrEqual(3)
       expect(contrast(border, hover)).toBeGreaterThanOrEqual(3)
-      expect(contrast(hover, surface)).toBeGreaterThanOrEqual(1.05)
+      // a hover that shows (P3-1: #f7f8fa on white was 1.06:1)
+      expect(contrast(hover, surface)).toBeGreaterThanOrEqual(1.1)
     },
   )
 })
@@ -197,7 +196,7 @@ describe('workbench primitives (home.css)', () => {
   it('numbers, mono ids, blocks and rows read from tokens', () => {
     expect(rule('.wb-num')).toMatch(/font-variant-numeric: tabular-nums;/)
     expect(rule('.wb-mono')).toMatch(/color: var\(--text-secondary\);/)
-    expect(rule('.wb-block')).toMatch(/box-shadow: var\(--wb-shadow\);/)
+    expect(rule('.wb-block')).not.toMatch(/box-shadow/)
     expect(rule('.wb-row:hover')).toMatch(/background: var\(--wb-row-hover\);/)
     expect(rule('.wb-row + .wb-row')).toMatch(/border-top: 1px solid var\(--border-subtle\);/)
     expect(rule('.wb-group-head.is-overdue')).toMatch(/color: var\(--danger-text\);/)
@@ -279,5 +278,37 @@ describe('long titles (review focus: very long workspace and task names)', () =>
     for (const selector of ['.wb-row-title', '.wb-toolbar-summary', '.wb-ov-meet']) {
       expect(rule(selector), selector).toMatch(/min-width: 0;/)
     }
+  })
+})
+
+describe('the Workbench lays out by its own width (impeccable audit P1-2, P2-1, P2-3..6, P3-2, P3-3)', () => {
+  it('rows never shrink; breakpoints are container queries on .wb-home, not the window', () => {
+    expect(rule('.wb-home')).toMatch(/container: wb-home \/ inline-size;/)
+    expect(rule('.wb-home > :not(.wb-confirm)')).toMatch(/flex-shrink: 0;/)
+    // a viewport query misses the sidebar and the interface scale (zoom)
+    expect(css).not.toMatch(/@media \(max-width: \d+px\) \{\n {2}\.wb-/)
+    expect(css).toMatch(
+      /@container wb-home \(max-width: 760px\) \{\n {2}\.wb-desk \{\n {4}grid-template-columns: minmax\(0, 1fr\);\n {2}\}\n\n {2}\.wb-desk-today \{\n {4}order: -1;/,
+    )
+    expect(css).toMatch(/@container wb-home \(max-width: 760px\) \{\n {2}\.wb-kn \{/)
+  })
+
+  it('the pack head wraps its actions; chips and the tool divider stay inside their card', () => {
+    expect(rule('.wb-kn-head')).toMatch(/flex-wrap: wrap;/)
+    expect(rule('.wb-kn-head-text')).toMatch(/flex: 1 1 240px;/)
+    expect(rule('.wb-desk-chip')).toMatch(/max-width: 100%;/)
+    expect(rule('.wb-desk-chip-text')).toMatch(/text-overflow: ellipsis;/)
+    expect(rule('.wb-desk-tools')).toMatch(/container-type: inline-size;/)
+    expect(css).toMatch(
+      /@container \(max-width: 720px\) \{\n {2}\.wb-desk-tool-sep \{\n {4}display: none;/,
+    )
+    expect(rule('.wb-desk-head')).toMatch(/flex-wrap: wrap;/)
+  })
+
+  it('field and secondary-button outlines use the 3:1 control border; the active tab clears the fade', () => {
+    expect(rule('.wb-input')).toMatch(/border: 1px solid var\(--border-control\);/)
+    expect(rule('.wb-btn-secondary')).toMatch(/border-color: var\(--border-control\);/)
+    expect(rule('.wb-kn-tags')).toMatch(/border: 1px solid var\(--border-control\);/)
+    expect(rule('.wb-tabs-scroll')).toMatch(/scroll-padding-inline: 40px;/)
   })
 })

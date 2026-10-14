@@ -3603,7 +3603,7 @@ body.vib .home {
 }
 
 .wb-btn-secondary {
-  border-color: var(--border-strong);
+  border-color: var(--border-control);
   background: var(--surface);
   color: var(--text);
 }
@@ -3666,7 +3666,6 @@ body.vib .home {
   border: 1px solid var(--border);
   border-radius: var(--radius-12);
   background: var(--surface);
-  box-shadow: var(--wb-shadow);
   overflow: hidden;
 }
 
@@ -5231,7 +5230,7 @@ body.vib .home {
   min-width: 0;
   height: 32px;
   padding: 0 10px;
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--border-control);
   border-radius: var(--radius-8);
   background: var(--surface);
   color: var(--text);
@@ -5250,7 +5249,7 @@ textarea.wb-input {
 }
 
 .wb-input:hover {
-  border-color: var(--border-control);
+  border-color: var(--text-secondary);
 }
 
 .wb-input:focus,
@@ -5483,7 +5482,7 @@ textarea.wb-input {
   gap: 6px;
   min-height: 32px;
   padding: 4px 6px;
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--border-control);
   border-radius: var(--radius-8);
   background: var(--surface);
   transition:
@@ -7007,7 +7006,7 @@ html[dir='rtl'] .quick-title-row {
   gap: 8px;
   height: 32px;
   padding: 0 2px 0 8px;
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--border-control);
   border-radius: var(--radius-8);
 }
 
