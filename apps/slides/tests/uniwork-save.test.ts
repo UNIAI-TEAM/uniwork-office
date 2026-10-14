@@ -93,10 +93,15 @@ let session: Session
 let deckPath: string
 const hook = vi.fn<(path: string) => void>()
 
-function bindPolicy(opts: { bound?: string[]; readOnly?: string[] }): void {
-  const bound = new Set([...(opts.bound ?? []), ...(opts.readOnly ?? [])])
+function bindPolicy(opts: { bound?: string[]; readOnly?: string[]; locked?: string[] }): void {
+  const bound = new Set([...(opts.bound ?? []), ...(opts.readOnly ?? []), ...(opts.locked ?? [])])
   const ro = new Set(opts.readOnly ?? [])
-  setUniworkDocumentPolicy({ isBound: (p) => bound.has(p), isReadOnly: (p) => ro.has(p) })
+  const locked = new Set(opts.locked ?? [])
+  setUniworkDocumentPolicy({
+    isBound: (p) => bound.has(p),
+    isReadOnly: (p) => ro.has(p),
+    isLocked: (p) => locked.has(p),
+  })
 }
 
 /** true once the deck file holds a pptx (zip) instead of the placeholder bytes */
@@ -284,6 +289,18 @@ describe('slides:save-as and MCP save UniWork seam', () => {
     const r = (await call('slides:save-as', 'deck.pptx')) as { ok: boolean }
     expect(r).toEqual({ ok: false })
     expect(readFileSync(ro, 'utf8')).toBe(ORIGINAL)
+    expect(session.path).toBe(deckPath)
+    expect(hook).not.toHaveBeenCalled()
+  })
+
+  it('Save As of a locked working copy is refused before the target picker opens', async () => {
+    bindPolicy({ locked: [deckPath] })
+    const pickersBefore = env.saveDialogOptions.length
+    const r = (await call('slides:save-as', 'deck.pptx')) as { ok: boolean }
+    expect(r).toEqual({ ok: false })
+    // the host seam answers the lock (the session core never imports main/)
+    expect(env.saveDialogOptions).toHaveLength(pickersBefore)
+    expect(readFileSync(deckPath, 'utf8')).toBe(ORIGINAL)
     expect(session.path).toBe(deckPath)
     expect(hook).not.toHaveBeenCalled()
   })

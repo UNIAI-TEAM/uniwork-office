@@ -35,6 +35,21 @@ const json = (status: number, body: unknown) =>
 const envelope = (status: number, code: string) => json(status, { error: { code, message: 'x' } })
 const row = (id: string, revision: string | number) =>
   `{"document_id":"${id}","kind":"file","revision":${revision},"current_version":1,"version_id":null}`
+const feedRow = (
+  id: string,
+  revision: string | number,
+  version: number,
+  versionId: string | null,
+) =>
+  `{"document_id":"${id}","change_kind":"upsert","kind":"file","revision":${revision},` +
+  `"current_version":${version},"version_id":${versionId === null ? 'null' : `"${versionId}"`},` +
+  `"archived":false,"removal":""}`
+const removalRow = (id: string, revision: string | number) =>
+  `{"document_id":"${id}","change_kind":"removal","kind":"","revision":${revision},` +
+  `"current_version":0,"version_id":null,"archived":false,"removal":"permission_revoked"}`
+const feedPage = (rows: string, options: { hasMore?: boolean; next?: string } = {}) =>
+  `{"phase":"feed","changes":[],"feed":[${rows}],"has_more":${options.hasMore ?? false},` +
+  `"next_cursor":"${options.next ?? 'feed:1'}","expires_at":"2026-10-20T00:00:00Z"}`
 
 /**
  * A fake G5-01a server. No cursor opens a snapshot of the workspace's rows
@@ -243,6 +258,39 @@ describe('feed client', () => {
     }
   })
 
+  it('reads a G5-01b feed page from `feed` (its `changes` is empty), revision exact', () => {
+    const page = parseFeedPage(feedPage(feedRow('d1', '9007199254740993', 7, 'v7')))
+    expect(page.phase).toBe('feed')
+    expect(page.changes).toEqual([
+      {
+        documentId: 'd1',
+        kind: 'file',
+        revision: '9007199254740993',
+        currentVersion: 7,
+        versionId: 'v7',
+      },
+    ])
+  })
+
+  it('a feed removal never enters the change stream as a document state', () => {
+    const page = parseFeedPage(feedPage(`${removalRow('d1', '9')},${feedRow('d2', '10', 2, 'v2')}`))
+    expect(page.changes.map((change) => change.documentId)).toEqual(['d2'])
+  })
+
+  it('a feed page without its `feed` array is malformed, never silently empty', () => {
+    const bad = () =>
+      parseFeedPage(
+        '{"phase":"feed","changes":[],"has_more":false,"next_cursor":"feed:1","expires_at":""}',
+      )
+    expect(bad).toThrow(FeedError)
+    try {
+      bad()
+    } catch (error) {
+      const failure = (error as FeedError).failure
+      expect(failure.kind === 'other' && failure.error.code).toBe('malformed_response')
+    }
+  })
+
   it('sends the cursor in the query only, clamps the limit, and maps the final 401 to session_expired', async () => {
     const fetch = vi.fn<FetchLike>(async () => new Response('', { status: 401 }))
     let attempts = 0
@@ -292,6 +340,21 @@ describe('feed consumer', () => {
       ['d3', '3'],
     ])
     expect(await t.cursors.get(cursorKey(SCOPE))).toBe('feed:0')
+  })
+
+  it('a G5-01b feed page delivers its upserts to the cache and moves the cursor', async () => {
+    const t = setup({ cursors: createMemoryCursorStore([[cursorKey(SCOPE), 'feed:0']]) })
+    t.server.script.push(
+      () => new Response(feedPage(feedRow('d1', '42', 2, 'v2')), { status: 200 }),
+      () => new Response(feedPage(removalRow('d1', '43'), { next: 'feed:2' }), { status: 200 }),
+    )
+    expect(await t.consumer.sync()).toEqual({ kind: 'synced', pages: 1, resynced: false })
+    expect([...t.cache.entries]).toEqual([['d1', '42']])
+    expect(await t.cursors.get(cursorKey(SCOPE))).toBe('feed:1')
+    // the removal has no state to apply: the page commits nothing and is not a failure
+    expect(await t.consumer.sync()).toEqual({ kind: 'synced', pages: 1, resynced: false })
+    expect([...t.cache.entries]).toEqual([['d1', '42']])
+    expect(t.log).not.toHaveBeenCalled()
   })
 
   it('crash between page apply and cursor save -> the same page replays, one effect', async () => {
