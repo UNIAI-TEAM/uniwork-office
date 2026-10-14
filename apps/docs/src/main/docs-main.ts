@@ -96,6 +96,7 @@ import {
   aiChatFailure,
   aiChatFailureFromError,
   aiStreamErrorFields,
+  AI_PROVIDERS,
   chatForProvider,
   defaultAiSettings,
   probeOpenRouterKey,
@@ -121,6 +122,7 @@ import {
   type AiChatFailure,
   type AiChatRequest,
   type AiChatResponse,
+  type AiModelSource,
   type AiProviderConfig,
   type AiProviderId,
   type AiSettings,
@@ -132,7 +134,9 @@ import {
   type LegacyAiSettings,
 } from '@genoffice/ai-provider'
 import { listCodexModels, shutdownCodexAppServers } from '@genoffice/ai-provider/codex-app-server'
+import { isProviderUsable } from '@genoffice/ai-provider/browser'
 import { listCustomModelsForIpc } from '@genoffice/ai-provider/custom-models'
+import { ProviderModelCache } from '@genoffice/ai-provider/provider-models'
 import {
   generateImageTool,
   testSearchProvider,
@@ -3773,6 +3777,8 @@ export interface UniworkAiHost {
     send(chunk: AiStreamChunk): void
     signal: AbortSignal
   }): Promise<void>
+  /** the model UniWork AI serves for the signed-in organization (cloud status); '' = unknown */
+  uniworkModel(): string
 }
 
 let uniworkAiHost: UniworkAiHost | null = null
@@ -3837,6 +3843,29 @@ function broadcastAiSettingsChanged(): void {
     if (!wc.isDestroyed()) wc.send('ai:settings-changed')
 }
 
+/** live `/models` per provider for the model chip, listed in the background (10 min TTL) */
+const providerModelCache = new ProviderModelCache()
+
+/**
+ * Per provider that can send: the model chosen in the Settings pane (this file) and the provider's
+ * live list. The list never blocks the read: a first call answers `loading` and starts the
+ * listing, which announces itself through `ai:settings-changed` when it lands.
+ */
+function modelSourcesOf(settings: AiSettings): Partial<Record<AiProviderId, AiModelSource>> {
+  const sources: Partial<Record<AiProviderId, AiModelSource>> = {}
+  for (const meta of AI_PROVIDERS) {
+    const id = meta.id
+    // UniWork AI has no model to choose; its row text is `uniworkModel`
+    if (id === 'uniwork' || !isProviderUsable(settings, id)) continue
+    const config = withUniAiOpenRouterAuth(settings, id, settings.providers[id])
+    sources[id] = {
+      chosen: (settings.providers[id]?.model ?? '').trim(),
+      ...providerModelCache.read(id, config, broadcastAiSettingsChanged),
+    }
+  }
+  return sources
+}
+
 /**
  * AI settings + chat/stream proxy handlers. Split out so the shell can
  * register them exactly once for all window types (docs, sheets, home) —
@@ -3854,6 +3883,10 @@ export function registerAiIpc(): void {
     if ((isUniworkAiEditor(event) || wantsUniworkPick(options)) && uniworkAiChoiceStore?.read())
       settings.provider = 'uniwork'
     settings.provider = selectedProvider(settings)
+    // derived, never saved: what the model chip shows besides the catalog
+    settings.modelSources = modelSourcesOf(settings)
+    const uniworkModel = uniworkAiAvailable() ? uniworkAiHost?.uniworkModel().trim() : ''
+    if (uniworkModel) settings.uniworkModel = uniworkModel
     return settings
   })
 
@@ -3880,6 +3913,7 @@ export function registerAiIpc(): void {
     // SECURITY.md: payloads are schema-checked in the main process. The settings
     // file feeds cliPath into spawn() and baseUrl receives a bearer token,
     // so the renderer's copy is sanitized before it touches disk.
+    // (it also drops the derived `modelSources` / `uniworkModel` the renderer spreads back in)
     const sanitized = sanitizeAiSettings(settings)
     if (!sanitized) {
       console.warn('[ai] rejected invalid ai:set-settings payload')
