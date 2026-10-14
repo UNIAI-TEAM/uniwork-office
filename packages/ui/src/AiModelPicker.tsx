@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { Lang } from '@genoffice/i18n'
-import type { AiSettings } from '@genoffice/ai-provider/browser'
+import type { AiProviderId, AiSettings } from '@genoffice/ai-provider/browser'
 import {
   aiModelPickerGroups,
   aiModelPickerNeed,
@@ -29,6 +29,25 @@ export interface AiModelPickerBridge {
   readonly requireModel?: boolean | undefined
 }
 
+const ORG_NOTE_SEEN_PREFIX = 'uniwork.ai.orgKeyNoteSeen.'
+
+/** whether this machine already showed the first-use privacy note of a key-on-UniWork provider */
+function readOrgNoteSeen(provider: string): boolean {
+  try {
+    return window.localStorage.getItem(ORG_NOTE_SEEN_PREFIX + provider) === '1'
+  } catch {
+    return false
+  }
+}
+
+function writeOrgNoteSeen(provider: string): void {
+  try {
+    window.localStorage.setItem(ORG_NOTE_SEEN_PREFIX + provider, '1')
+  } catch {
+    // storage blocked: the in-memory set of the picker still keeps it quiet until the next start
+  }
+}
+
 /**
  * Composer footer chip showing the active provider + model; the popover lists
  * every usable provider's models for a one-click switch (saved globally, the
@@ -46,7 +65,11 @@ export function AiModelPicker({
   const [settings, setSettings] = useState<AiSettings | null>(null)
   const [loggedIn, setLoggedIn] = useState(false)
   const [open, setOpen] = useState(false)
-  const [orgNoteSeen, setOrgNoteSeen] = useState(false)
+  // providers whose first-use note was shown once (open + close); persisted per provider, and kept
+  // here too so a blocked store still stops the re-announcing while the window lives
+  const [seenOrgNotes, setSeenOrgNotes] = useState<ReadonlySet<string>>(() => new Set())
+  const shownOrgNotesRef = useRef<Set<string>>(new Set())
+  const orgDescId = useId()
   const [popStyle, setPopStyle] = useState<React.CSSProperties>({})
   const chipRef = useRef<HTMLButtonElement | null>(null)
   const popRef = useRef<HTMLDivElement | null>(null)
@@ -85,26 +108,29 @@ export function AiModelPicker({
     () => (settings ? aiModelPickerGroups(settings, loggedIn) : []),
     [settings, loggedIn],
   )
-  const hasOrgGroup = groups.some((g) => settings?.modelSources?.[g.id]?.origin === 'org')
+  const isOrgGroup = (id: string) =>
+    settings?.modelSources?.[id as AiProviderId]?.origin === 'org'
+  const hasOrgGroup = groups.some((g) => isOrgGroup(g.id))
+  const noteDue = (id: string) =>
+    isOrgGroup(id) && !seenOrgNotes.has(id) && !readOrgNoteSeen(id)
+  const orgNoteDue = groups.some((g) => noteDue(g.id))
   // what the listbox's quiet notes say, read out once through a live region beside the listbox
   const listNote = [
     ...[...new Set(groups.map((g) => g.listState))].map((state) =>
       state === 'loading' ? strings.modelsLoading : state ? strings.modelsUnavailable : '',
     ),
-    hasOrgGroup && !orgNoteSeen ? strings.orgKeyNote : '',
+    orgNoteDue ? strings.orgKeyNote : '',
   ]
     .filter(Boolean)
     .join('. ')
   const rawCurrent = settings ? aiModelPickerSelection(settings) : null
-  const current = useMemo<AiModelPickerSelection | null>(() => {
-    if (!settings || !rawCurrent) return rawCurrent
-    const src = settings.modelSources?.[rawCurrent.provider]
-    const storedModel = settings.providers?.[rawCurrent.provider]?.model?.trim() ?? ''
-    if (src?.origin === 'org' && !storedModel && src.chosen.trim()) {
-      return { provider: rawCurrent.provider, model: src.chosen.trim() }
-    }
-    return rawCurrent
-  }, [settings, rawCurrent])
+  // an org-served provider's model is what main resolved (modelSources[id].chosen); the local slot
+  // never carries a copy of it
+  const orgChosen = rawCurrent ? (settings?.modelSources?.[rawCurrent.provider]?.chosen ?? '') : ''
+  const current: AiModelPickerSelection | null =
+    rawCurrent && isOrgGroup(rawCurrent.provider) && orgChosen.trim()
+      ? { provider: rawCurrent.provider, model: orgChosen.trim() }
+      : rawCurrent
   const currentUsable = groups.some((g) => g.id === current?.provider)
   // the wanted provider is read raw (a key list that failed to load masks nothing here)
   const wanted = settings?.provider
@@ -139,6 +165,23 @@ export function AiModelPicker({
     return () => setAiModelNeedHint(null)
   }, [needHint, openSettings, openSettingsOnce])
 
+  // the first-use note counts as read once it was on screen and the popover closed again
+  const shownIds = groups
+    .filter((g) => noteDue(g.id))
+    .map((g) => g.id)
+    .join('\n')
+  useEffect(() => {
+    if (open) {
+      for (const id of shownIds ? shownIds.split('\n') : []) shownOrgNotesRef.current.add(id)
+      return
+    }
+    const shown = [...shownOrgNotesRef.current]
+    if (shown.length === 0) return
+    shownOrgNotesRef.current.clear()
+    for (const id of shown) writeOrgNoteSeen(id)
+    setSeenOrgNotes((prev) => new Set([...prev, ...shown]))
+  }, [open, shownIds])
+
   const toggle = () => {
     // every open re-reads the settings (host data: Settings pick, live lists, served model); a host
     // answers from its cache and announces a newer listing through onSettingsChanged
@@ -162,10 +205,13 @@ export function AiModelPicker({
   const pick = (sel: AiModelPickerSelection) => {
     setOpen(false)
     if (!settings) return
-    if (settings.modelSources?.[sel.provider]?.origin === 'org') {
-      setOrgNoteSeen(true)
-    }
-    const next = withAiModelSelection(settings, sel)
+    const picked = withAiModelSelection(settings, sel)
+    const source = settings.modelSources?.[sel.provider]
+    // the chip reads an org-served provider's model from its source: show the pick there too
+    const next: AiSettings =
+      source?.origin === 'org'
+        ? { ...picked, modelSources: { ...settings.modelSources, [sel.provider]: { ...source, chosen: sel.model } } }
+        : picked
     setSettings(next)
     void bridge.setSettings(next).catch(() => {})
   }
@@ -227,7 +273,7 @@ export function AiModelPicker({
         >
           <div className="ai-model-pop-list">
             {groups.map((g) => {
-              const isOrg = settings.modelSources?.[g.id]?.origin === 'org'
+              const isOrg = isOrgGroup(g.id)
               return (
                 <div key={g.id} className="ai-model-group" data-origin={isOrg ? 'org' : undefined}>
                   <div className="ai-model-group-head">
@@ -238,19 +284,18 @@ export function AiModelPicker({
                         data-org-key-tag=""
                         title={strings.orgKeyNote}
                         data-tip={strings.orgKeyNote}
-                        style={ORG_KEY_TAG_STYLE}
+                        className="ai-model-org-tag"
                       >
                         {strings.orgKeyTag}
                       </span>
                     )}
                   </div>
-                  {isOrg && !orgNoteSeen && (
+                  {isOrg && noteDue(g.id) && (
                     <div
-                      className="ai-model-group-head"
+                      className="ai-model-group-head ai-model-org-note"
                       role="presentation"
                       aria-hidden
                       data-org-key-note=""
-                      style={ORG_KEY_NOTE_STYLE}
                     >
                       {strings.orgKeyNote}
                     </div>
@@ -272,6 +317,7 @@ export function AiModelPicker({
                         type="button"
                         role="option"
                         aria-selected={selected}
+                        aria-describedby={isOrg ? orgDescId : undefined}
                         className={`ai-model-item${selected ? ' selected' : ''}`}
                         onClick={() => pick({ provider: g.id, model: m })}
                       >
@@ -319,30 +365,14 @@ export function AiModelPicker({
       <div aria-live="polite" style={VISUALLY_HIDDEN}>
         {open ? listNote : ''}
       </div>
+      {open && hasOrgGroup && (
+        // what an option of a key-on-UniWork group is described by: where its prompt goes
+        <div hidden id={orgDescId}>
+          {strings.orgKeyTag}. {strings.orgKeyNote}
+        </div>
+      )}
     </div>
   )
-}
-
-const ORG_KEY_TAG_STYLE: React.CSSProperties = {
-  marginLeft: 'auto',
-  padding: '1px 6px',
-  borderRadius: 'var(--radius-6)',
-  background: 'var(--surface-subtle)',
-  border: '1px solid var(--border-subtle)',
-  color: 'var(--text-secondary)',
-  fontSize: 10,
-  fontWeight: 500,
-  lineHeight: 1.4,
-  whiteSpace: 'nowrap',
-}
-
-const ORG_KEY_NOTE_STYLE: React.CSSProperties = {
-  paddingTop: 2,
-  paddingBottom: 4,
-  color: 'var(--text-secondary)',
-  fontSize: 11,
-  fontWeight: 400,
-  lineHeight: 1.4,
 }
 
 /** screen-reader-only: the box stays in the layout flow but takes no space and shows nothing */
