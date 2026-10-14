@@ -684,4 +684,64 @@ describe('UniworkConflictDialog UI (G5-09 S5 desktop)', () => {
     expect(document.querySelector('[role="alertdialog"]')).toBeNull()
     expect(document.activeElement).toBe(activeTab)
   })
+
+  it('FE-202: arrow keys in the Reload radio group skip an aria-disabled radio and Home/End move to the first/last enabled radio', async () => {
+    // 1. When Keep is aria-disabled, arrow keys and Home/End skip Keep and focus/select Discard
+    await act(async () => {
+      pushConflict?.(makeView({ keepDraft: 'store_full' }))
+    })
+
+    let dialog = document.querySelector('[role="alertdialog"]') as HTMLElement
+    const reloadBtn = dialog.querySelector('[data-conflict-action="reload"]') as HTMLButtonElement
+    await act(async () => {
+      reloadBtn.click()
+    })
+
+    let keepRadio = dialog.querySelector('input[value="draft"]') as HTMLInputElement
+    let discardRadio = dialog.querySelector('input[value="discard"]') as HTMLInputElement
+    expect(keepRadio.getAttribute('aria-disabled')).toBe('true')
+
+    discardRadio.focus()
+    await act(async () => {
+      discardRadio.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }))
+    })
+    expect(document.activeElement).toBe(discardRadio)
+    expect(discardRadio.checked).toBe(true)
+
+    await act(async () => {
+      discardRadio.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+    })
+    expect(document.activeElement).toBe(discardRadio)
+
+    await act(async () => {
+      discardRadio.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }))
+    })
+    expect(document.activeElement).toBe(discardRadio)
+
+    // 2. When both radios are enabled, Home/End move to the first/last enabled radio and select it
+    await act(async () => {
+      pushConflict?.(makeView({ sessionId: 'sess-fe-202-ok', keepDraft: 'ok' }))
+    })
+    dialog = document.querySelector('[role="alertdialog"]') as HTMLElement
+    await act(async () => {
+      ;(dialog.querySelector('[data-conflict-action="reload"]') as HTMLButtonElement).click()
+    })
+
+    keepRadio = dialog.querySelector('input[value="draft"]') as HTMLInputElement
+    discardRadio = dialog.querySelector('input[value="discard"]') as HTMLInputElement
+    keepRadio.focus()
+    expect(keepRadio.checked).toBe(true)
+
+    await act(async () => {
+      keepRadio.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }))
+    })
+    expect(document.activeElement).toBe(discardRadio)
+    expect(discardRadio.checked).toBe(true)
+
+    await act(async () => {
+      discardRadio.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }))
+    })
+    expect(document.activeElement).toBe(keepRadio)
+    expect(keepRadio.checked).toBe(true)
+  })
 })

@@ -225,7 +225,9 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
         e.key === 'ArrowDown' ||
         e.key === 'ArrowRight' ||
         e.key === 'ArrowUp' ||
-        e.key === 'ArrowLeft'
+        e.key === 'ArrowLeft' ||
+        e.key === 'Home' ||
+        e.key === 'End'
       ) {
         const dialog = dialogRef.current
         const active = document.activeElement
@@ -235,23 +237,32 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
           active.type === 'radio' &&
           active.name
         ) {
-          const group = Array.from(
+          const enabledGroup = Array.from(
             dialog.querySelectorAll<HTMLInputElement>('input[type="radio"]:not(:disabled)'),
-          ).filter((r) => r.name === active.name)
-          if (group.length > 1) {
+          ).filter((r) => r.name === active.name && r.getAttribute('aria-disabled') !== 'true')
+          if (enabledGroup.length > 0) {
             e.preventDefault()
-            const idx = group.indexOf(active)
-            const forward = e.key === 'ArrowDown' || e.key === 'ArrowRight'
-            const nextIdx = forward
-              ? (idx + 1) % group.length
-              : (idx - 1 + group.length) % group.length
-            const nextRadio = group[nextIdx]
+            const idx = enabledGroup.indexOf(active)
+            let nextRadio: HTMLInputElement | undefined
+            if (e.key === 'Home') {
+              nextRadio = enabledGroup[0]
+            } else if (e.key === 'End') {
+              nextRadio = enabledGroup[enabledGroup.length - 1]
+            } else {
+              const forward = e.key === 'ArrowDown' || e.key === 'ArrowRight'
+              const nextIdx =
+                idx === -1
+                  ? forward
+                    ? 0
+                    : enabledGroup.length - 1
+                  : forward
+                    ? (idx + 1) % enabledGroup.length
+                    : (idx - 1 + enabledGroup.length) % enabledGroup.length
+              nextRadio = enabledGroup[nextIdx]
+            }
             if (nextRadio) {
               nextRadio.focus()
-              if (
-                nextRadio.getAttribute('aria-disabled') !== 'true' &&
-                (nextRadio.value === 'draft' || nextRadio.value === 'discard')
-              ) {
+              if (nextRadio.value === 'draft' || nextRadio.value === 'discard') {
                 setState((s) =>
                   applyConflictSelectKeep(s, view, nextRadio.value as 'draft' | 'discard'),
                 )
