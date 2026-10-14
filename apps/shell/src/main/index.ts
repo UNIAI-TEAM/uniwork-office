@@ -4671,6 +4671,8 @@ function registerHomeIpc(): void {
       busy: () => deskToolRunning || exportingPdfDocx,
       setBusy: (on) => {
         deskToolRunning = on
+      },
+      progress: (on) => {
         if (!host.isDestroyed()) host.setProgressBar(on ? 2 : -1)
       },
       pickFiles: async ({ exportable, multi }) => {
@@ -4719,7 +4721,7 @@ function registerHomeIpc(): void {
       },
       mergePdf: mergePdfBytes,
       splitPdf: splitPdfBytes,
-      isOpenInTab: (path) => !!tabManager?.findPdfTabByPath(path),
+      isOpenInTab: (path) => !!tabManager?.findPdfTabByPath(path) || !!findDetachedTabByPath(path),
       isFile: (path) => existsSync(path) && statSync(path).isFile(),
       exists: existsSync,
       readFile: async (path) => new Uint8Array(readFileSync(path)),
@@ -5832,7 +5834,7 @@ async function savePdfAs(): Promise<void> {
  */
 let exportingPdfDocx = false
 
-/** a Desk tool (export / merge / split) is running; PDF → Office runs under exportingPdfDocx */
+/** a Desk tool run is in flight (picker to last write); PDF → Office also takes exportingPdfDocx */
 let deskToolRunning = false
 
 type PdfOfficeKind = 'docx' | 'pptx' | 'xlsx'
@@ -6037,7 +6039,8 @@ async function exportActivePdfAsOffice(kind: PdfOfficeKind): Promise<void> {
   const tab = activePdfTarget()
   const host = pdfHostWindow(tab)
   if (!tab?.filePath || !host) return
-  if (exportingPdfDocx) {
+  // shared with the Desk, so the PDF tab menu and a Desk tool never overlap
+  if (exportingPdfDocx || deskToolRunning) {
     void dialog.showMessageBox(host, { type: 'info', message: tm(PDF_OFFICE_COPY[kind].busy) })
     return
   }

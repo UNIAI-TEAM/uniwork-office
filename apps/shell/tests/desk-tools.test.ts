@@ -14,6 +14,7 @@ function deps(over: Partial<DeskToolDeps> = {}) {
     setBusy: (on) => {
       busy = on
     },
+    progress: vi.fn<DeskToolDeps['progress']>(),
     pickFiles: vi.fn<DeskToolDeps['pickFiles']>(async () => []),
     pickSavePath: vi.fn<DeskToolDeps['pickSavePath']>(async (p) => p),
     pickFolder: vi.fn<DeskToolDeps['pickFolder']>(async () => '/out'),
@@ -73,6 +74,31 @@ describe('desk tools: input checks', () => {
     expect(d.pickFiles).not.toHaveBeenCalled()
   })
 
+  it('holds the lock from the picker on, so a second run is busy', async () => {
+    let answer: (paths: string[]) => void = () => {}
+    const { d } = deps({
+      pickFiles: () => new Promise<string[]>((r) => (answer = r)),
+    })
+    const a = runDeskTool({ tool: 'merge-pdf' }, d)
+    expect(await runDeskTool({ tool: 'split-pdf', inputs: ['/w/a.pdf'] }, d)).toEqual({
+      ok: false,
+      error: 'busy',
+    })
+    answer(['/w/a.pdf', '/w/b.pdf'])
+    expect(await a).toEqual({ ok: true, outputs: ['/w/a-merged.pdf'] })
+    expect(d.busy()).toBe(false)
+  })
+
+  it('a rejected picker comes back as failed and frees the tool', async () => {
+    const { d } = deps({
+      pickFiles: async () => {
+        throw new Error('dialog gone')
+      },
+    })
+    expect(await runDeskTool({ tool: 'merge-pdf' }, d)).toEqual({ ok: false, error: 'failed' })
+    expect(d.busy()).toBe(false)
+  })
+
   it('asks for files when none were dropped; a cancelled picker is quiet', async () => {
     const { d } = deps()
     expect(await runDeskTool({ tool: 'merge-pdf' }, d)).toEqual({ ok: false, canceled: true })
@@ -112,12 +138,20 @@ describe('desk tools: runs', () => {
     expect(
       await runDeskTool({ tool: 'merge-pdf', inputs: ['/w/a.pdf', '/w/b.pdf'] }, same.d),
     ).toEqual({ ok: false, error: 'same-path' })
+    // APFS / NTFS are case-insensitive by default: A.pdf would replace a.pdf
+    if (process.platform === 'darwin' || process.platform === 'win32') {
+      const cased = deps({ pickSavePath: async () => '/w/A.pdf' })
+      expect(
+        await runDeskTool({ tool: 'merge-pdf', inputs: ['/w/a.pdf', '/w/b.pdf'] }, cased.d),
+      ).toEqual({ ok: false, error: 'same-path' })
+    }
     const open = deps({ isOpenInTab: () => true })
     expect(await runDeskTool({ tool: 'export-pdf', inputs: ['/w/report.docx'] }, open.d)).toEqual({
       ok: false,
       error: 'target-open',
     })
     expect(open.d.exportPdf).not.toHaveBeenCalled()
+    expect(open.d.progress).not.toHaveBeenCalledWith(true)
   })
 
   it('splits into a fresh folder and never overwrites earlier parts', async () => {

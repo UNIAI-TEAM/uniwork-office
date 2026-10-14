@@ -20,6 +20,8 @@ export interface DeskToolDeps {
   /** a Desk tool or a PDF tab conversion is already running */
   busy(): boolean
   setBusy(on: boolean): void
+  /** taskbar / dock progress, shown once the user picked where to write */
+  progress(on: boolean): void
   /** [] when the picker was cancelled */
   pickFiles(opts: { exportable: boolean; multi: boolean }): Promise<string[]>
   /** null when cancelled */
@@ -42,7 +44,11 @@ export interface DeskToolDeps {
   recordRecent(path: string): void
 }
 
-const norm = (p: string) => (process.platform === 'win32' ? resolve(p).toLowerCase() : resolve(p))
+// APFS and NTFS default to case-insensitive; on a case-sensitive volume this only refuses more
+const norm = (p: string) =>
+  process.platform === 'win32' || process.platform === 'darwin'
+    ? resolve(p).toLowerCase()
+    : resolve(p)
 const stem = (path: string) => basename(path, extname(path))
 
 /** Input check at the trust boundary: absolute paths, extension, count, existence. */
@@ -85,34 +91,35 @@ export async function runDeskTool(raw: unknown, deps: DeskToolDeps): Promise<Des
   if (typeof every !== 'number' || !Number.isInteger(every) || every < 1 || every > 999) return bad
   if (req.inputs !== undefined && !Array.isArray(req.inputs)) return bad
   if (deps.busy()) return { ok: false, error: 'busy' }
-
-  let inputs: unknown[] = (req.inputs as unknown[] | undefined) ?? []
-  if (inputs.length === 0) {
-    inputs = await deps.pickFiles({
-      exportable: tool === 'export-pdf',
-      multi: tool === 'merge-pdf',
-    })
-    if (inputs.length === 0) return canceled
-  }
-  const refused = checkDeskInputs(tool, inputs, deps.isFile)
-  if (refused) return refused
-  const paths = inputs as string[]
-  const first = paths[0]!
-
-  if (tool === 'pdf-to-docx' || tool === 'pdf-to-xlsx' || tool === 'pdf-to-pptx') {
-    // the PDF tab's flow keeps its own busy flag, dialogs and error reporting
-    const kind = tool.slice('pdf-to-'.length) as 'docx' | 'xlsx' | 'pptx'
-    const out = await deps.convertPdf(kind, first)
-    if (!out) return canceled
-    deps.recordRecent(out)
-    return { ok: true, outputs: [out] }
-  }
-
+  // one lock from the picker to the last write, so a second request can never interleave
   deps.setBusy(true)
   try {
+    let inputs: unknown[] = (req.inputs as unknown[] | undefined) ?? []
+    if (inputs.length === 0) {
+      inputs = await deps.pickFiles({
+        exportable: tool === 'export-pdf',
+        multi: tool === 'merge-pdf',
+      })
+      if (inputs.length === 0) return canceled
+    }
+    const refused = checkDeskInputs(tool, inputs, deps.isFile)
+    if (refused) return refused
+    const paths = inputs as string[]
+    const first = paths[0]!
+
+    if (tool === 'pdf-to-docx' || tool === 'pdf-to-xlsx' || tool === 'pdf-to-pptx') {
+      // the PDF tab's flow keeps its own busy flag, dialogs and error reporting
+      const kind = tool.slice('pdf-to-'.length) as 'docx' | 'xlsx' | 'pptx'
+      const out = await deps.convertPdf(kind, first)
+      if (!out) return canceled
+      deps.recordRecent(out)
+      return { ok: true, outputs: [out] }
+    }
+
     if (tool === 'split-pdf') {
       const where = await deps.pickFolder(dirname(first))
       if (!where) return canceled
+      deps.progress(true)
       const parts = await deps.splitPdf(await deps.readFile(first), every)
       const base = stem(first).replace(/[/\\:*?"<>|]/g, '_')
       // a fresh folder, so a split never overwrites earlier parts
@@ -135,6 +142,7 @@ export async function runDeskTool(raw: unknown, deps: DeskToolDeps): Promise<Des
     if (!out) return canceled
     if (paths.some((p) => norm(p) === norm(out))) return { ok: false, error: 'same-path' }
     if (deps.isOpenInTab(out)) return { ok: false, error: 'target-open' }
+    deps.progress(true)
     if (tool === 'export-pdf') {
       await deps.exportPdf(first, out)
     } else {
@@ -148,6 +156,7 @@ export async function runDeskTool(raw: unknown, deps: DeskToolDeps): Promise<Des
     console.error('[shell] desk tool failed:', err)
     return { ok: false, error: 'failed' }
   } finally {
+    deps.progress(false)
     deps.setBusy(false)
   }
 }
