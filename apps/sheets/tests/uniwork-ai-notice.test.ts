@@ -267,7 +267,7 @@ describe('UniWork AI notices are announced through a separate status node (G05FE
       expect(live!.textContent).toBe('')
     })
 
-    it('the AI panel adds no role=status node: a workbook with it mounted keeps exactly one, the workbook status', () => {
+    it('the AI panel adds no role=status node: its one polite node is the aria-live region, so the workbook status stays the only role=status (RF2-7)', () => {
       vi.stubGlobal(
         'desktopApi',
         new Proxy(
@@ -294,12 +294,8 @@ describe('UniWork AI notices are announced through a separate status node (G05FE
       ])
       expect(container.querySelector('.ai-sr-status')!.textContent).toBe('Try again in 30 s.')
       expect(container.querySelectorAll('[role="status"]')).toHaveLength(0)
-      // ExcelShell (which mounts this panel under cap('ai')) owns the one status node of the workbook
-      const shell = readFileSync(
-        join(dirname(fileURLToPath(import.meta.url)), '../src/renderer/ExcelShell.tsx'),
-        'utf8',
-      )
-      expect(shell).toMatch(/className="workbook-status"\s+role="status"/)
+      // the one polite node of the panel is the live region itself, not a role=status node
+      expect(container.querySelectorAll('[aria-live]')).toHaveLength(1)
     })
   })
 })
