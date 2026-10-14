@@ -794,4 +794,20 @@ describe('styles', () => {
     expect(coarse).toMatch(/\.collab-mention-option[^}]*min-height:\s*44px/s)
     expect(coarse).toMatch(/\.collab-composer-btn[^}]*min-height:\s*44px/s)
   })
+
+  it('keeps the composer action row on one line at 300px by shrinking the hint with ellipsis (V14-05)', () => {
+    const actions = /\.collab-composer-actions\s*\{([^}]*)\}/s.exec(css)?.[1] ?? ''
+    expect(actions).toMatch(/flex-wrap:\s*nowrap/)
+    expect(actions).not.toMatch(/flex-wrap:\s*wrap/)
+    const hint = /\.collab-composer-hint\s*\{([^}]*)\}/s.exec(css)?.[1] ?? ''
+    expect(hint).toMatch(/min-width:\s*0/)
+    expect(hint).toMatch(/overflow:\s*hidden/)
+    expect(hint).toMatch(/text-overflow:\s*ellipsis/)
+    expect(hint).toMatch(/white-space:\s*nowrap/)
+    const btn = /\.collab-composer-btn\s*\{([^}]*)\}/s.exec(css)?.[1] ?? ''
+    expect(btn).toMatch(/flex:\s*none/)
+    expect(btn).toMatch(/white-space:\s*nowrap/)
+    const panelCss = readFileSync(resolve(import.meta.dirname, '../src/collab/collab.css'), 'utf8')
+    expect(panelCss).toMatch(/\.collab-comp-slot\s*>\s*\.collab-composer\s*\{[^}]*padding:\s*0/s)
+  })
 })
