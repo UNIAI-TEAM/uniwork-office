@@ -67,7 +67,9 @@ export function CertSignDialog({
   onCancel: () => void
   onSigned: (path: string) => void
 }): ReactElement {
-  const dialogRef = useModalDialog(onCancel)
+  const [busy, setBusy] = useState(false)
+  // Esc, like the backdrop and the buttons, must not abandon a signing run in flight
+  const dialogRef = useModalDialog(onCancel, { escape: !busy })
   const [source, setSource] = useState<'system' | 'file'>('system')
   const [cert, setCert] = useState<{ certId: string; fileName: string } | null>(null)
   const [systemCerts, setSystemCerts] = useState<SystemCertificateInfo[]>([])
@@ -86,11 +88,11 @@ export function CertSignDialog({
   const [location, setLocation] = useState('')
   const [contact, setContact] = useState('')
   const [visible, setVisible] = useState(true)
-  const [page, setPage] = useState(currentPage)
+  // text, not a number: a cleared field must stay empty while the user types a new page
+  const [pageText, setPageText] = useState(String(currentPage))
   const [position, setPosition] = useState<SignaturePosition>('bottom-right')
   const [certify, setCertify] = useState(false)
   const [level, setLevel] = useState<1 | 2 | 3>(2)
-  const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // A different password or certificate invalidates what was checked
@@ -185,7 +187,7 @@ export function CertSignDialog({
         certifyLevel: certify && !hasSignatures ? level : undefined,
         visible: png
           ? {
-              pageIndex: Math.min(Math.max(page, 1), pageCount) - 1,
+              pageIndex: Math.min(Math.max(Number(pageText) || 1, 1), pageCount) - 1,
               position,
               width: BOX_WIDTH,
               height: BOX_HEIGHT,
@@ -221,6 +223,7 @@ export function CertSignDialog({
           <span>{t('certSource')}</span>
           <select
             className="pdf-modal-input"
+            aria-label={t('certSource')}
             value={source}
             disabled={busy}
             onChange={(e) => setSource(e.target.value as 'system' | 'file')}
@@ -236,6 +239,7 @@ export function CertSignDialog({
               <span>{t('certSigner')}</span>
               <select
                 className="pdf-modal-input"
+                aria-label={t('certSigner')}
                 value={systemId}
                 disabled={busy || systemCerts.length === 0}
                 onChange={(e) => setSystemId(e.target.value)}
@@ -270,6 +274,7 @@ export function CertSignDialog({
                 <input
                   className="pdf-modal-input"
                   type="password"
+                  aria-label={t('certStorePassword')}
                   autoComplete="off"
                   value={storePassword}
                   onChange={(e) => setStorePassword(e.target.value)}
@@ -412,13 +417,18 @@ export function CertSignDialog({
               type="number"
               min={1}
               max={pageCount}
-              value={page}
+              value={pageText}
+              aria-label={t('certPage')}
               disabled={busy}
-              onChange={(e) => setPage(Number(e.target.value) || 1)}
+              onChange={(e) => setPageText(e.target.value)}
+              onBlur={() =>
+                setPageText(String(Math.min(Math.max(Number(pageText) || 1, 1), pageCount)))
+              }
             />
             <span>{t('certPosition')}</span>
             <select
               className="pdf-modal-input"
+              aria-label={t('certPosition')}
               value={position}
               disabled={busy}
               onChange={(e) => setPosition(e.target.value as SignaturePosition)}
@@ -449,6 +459,7 @@ export function CertSignDialog({
             <span />
             <select
               className="pdf-modal-input"
+              aria-label={t('certCertify')}
               value={level}
               disabled={busy}
               onChange={(e) => setLevel(Number(e.target.value) as 1 | 2 | 3)}
