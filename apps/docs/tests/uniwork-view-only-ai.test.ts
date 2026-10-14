@@ -36,7 +36,11 @@ function createEditor(): Editor {
   })
 }
 
-function renderPanel(editor: Editor, readOnly: boolean, provider: AiSettings['provider'] = 'anthropic') {
+function renderPanel(
+  editor: Editor,
+  readOnly: boolean,
+  provider: AiSettings['provider'] = 'anthropic',
+) {
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)

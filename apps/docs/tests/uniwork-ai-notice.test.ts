@@ -351,4 +351,40 @@ describe('UniWork AI notices (docs panel)', () => {
     expect(document.activeElement).toBe(container!.querySelector('textarea'))
     await pastGrace()
   })
+
+  it('Stop before the first token on UniWork AI: no Answer chip and exactly one stopped line (RF2-1)', async () => {
+    act(() =>
+      root!.render(
+        createElement(LocaleProvider, {
+          initial: 'vi',
+          children: createElement(AiPanel, {
+            editor: editor!,
+            blocks: [],
+            settings: { ...settings, provider: 'uniwork' },
+            open: true,
+            filePath: '/docs/a.docx',
+            preset: { text: 'summarize it', nonce: 1, autoRun: true },
+          }),
+        }),
+      ),
+    )
+    // the main process ends a cancelled stream with a done chunk
+    ;(window as any).desktop.aiStreamCancel = async () => {
+      listener?.({ requestId, type: 'done' })
+    }
+    const stop = stopButton()
+    expect(stop).not.toBeNull()
+    await act(async () => stop!.click())
+    await flush()
+    await pastGrace()
+    expect(container!.querySelector('.ai-result-chip')).toBeNull()
+    const stoppedLines = [...container!.querySelectorAll('.ai-msg-assistant *')].filter(
+      (el) => el.children.length === 0 && el.textContent === ui('aiRunStopped'),
+    )
+    expect(stoppedLines).toHaveLength(1)
+    expect(container!.querySelector('.ai-msg-answer')?.textContent ?? '').not.toContain(
+      t('aiStopped'),
+    )
+    expect(container!.querySelector('.ai-sr-status')?.textContent).toBe(ui('aiRunStopped'))
+  })
 })

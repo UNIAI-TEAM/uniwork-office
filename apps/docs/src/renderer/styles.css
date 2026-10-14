@@ -8705,6 +8705,13 @@ body.docs-crop-active
   color: var(--text-dim);
 }
 
+/* the one stopped line of a UniWork AI turn the user stopped (aiRunStopped) */
+.ai-run-stopped {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
 .ai-msg-actions {
   margin-top: 8px;
   display: flex;

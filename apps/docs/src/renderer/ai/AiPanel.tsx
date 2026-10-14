@@ -141,6 +141,8 @@ interface ChatEntry {
   streaming?: boolean
   turnLimit?: boolean
   stopped?: boolean
+  /** the turn streamed real text before it ended (a stop filler is not text) */
+  streamedText?: boolean | undefined
   /** tool executions performed during this assistant turn */
   tools?: ToolActivity[]
   /** interactive mind map from generate_mindmap's side-channel display (session-only;
@@ -1017,6 +1019,7 @@ export function AiPanel({
             waitLine: undefined,
             turnLimit,
             stopped: cancelled,
+            streamedText: Boolean(text?.trim()),
             // a restarted conversation or UniWork AI being off ends the turn on purpose: the note is the whole reply
             text:
               finalText ||
@@ -1523,7 +1526,7 @@ export function AiPanel({
                   provider: settings.provider,
                   mutated: Boolean(lastEntry.snapshot),
                   stopped: Boolean(lastEntry.stopped),
-                  hasStreamedText: Boolean(lastEntry.text?.trim()),
+                  hasStreamedText: lastEntry.streamedText ?? Boolean(lastEntry.text?.trim()),
                   clarifyAsked: Boolean(lastEntry.clarifyReceipts?.length),
                   notes: lastEntry.notes,
                   toolExecutions: lastEntry.tools,
@@ -1697,7 +1700,7 @@ export function AiPanel({
               provider: settings.provider,
               mutated: Boolean(entry.snapshot),
               stopped: Boolean(entry.stopped),
-              hasStreamedText: Boolean(entry.text?.trim()),
+              hasStreamedText: entry.streamedText ?? Boolean(entry.text?.trim()),
               clarifyAsked: Boolean(entry.clarifyReceipts?.length),
               notes: entry.notes,
               toolExecutions: entry.tools,
@@ -1706,6 +1709,10 @@ export function AiPanel({
           )
           const chip = chipView?.chip ?? null
           const chipLabel = chipView?.labelText ?? null
+          const stoppedText = chipView?.stoppedText ?? null
+          // a stop before the first token leaves only the stop filler as body: the stopped line replaces it
+          const bodyText =
+            stoppedText && entry.stopped && entry.streamedText === false ? '' : entry.text
           return (
             <div
               key={i}
@@ -1738,13 +1745,18 @@ export function AiPanel({
                       <span className="ai-result-chip" data-chip={chip.chip} data-tone={chip.tone}>
                         {chipLabel}
                       </span>
-                      {entry.text ? <span className="ai-result-chip-sep">: </span> : null}
+                      {bodyText ? <span className="ai-result-chip-sep">: </span> : null}
                     </>
                   )}
-                  {entry.text && <Markdown text={entry.text} nav={docNav} />}
+                  {bodyText && <Markdown text={bodyText} nav={docNav} />}
                 </div>
               ) : (
                 <span dir="auto">{entry.text}</span>
+              )}
+              {stoppedText && (
+                <div className="ai-run-stopped" dir="auto">
+                  {stoppedText}
+                </div>
               )}
               {chip?.chip === 'edited' && (
                 <div className="ai-result-actions">
