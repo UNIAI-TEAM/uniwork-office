@@ -133,9 +133,26 @@ describe('ai-uniwork string shards', () => {
     }
   })
 
+  it.each([...LANGS])(
+    'RF2-2: locale %s speaks the credits the same way the picker shows them (aria twin == cloudCreditsLeft)',
+    (lang) => {
+      expect(table(lang).aiUniworkCreditsAria).toBe(table(lang).cloudCreditsLeft)
+    },
+  )
+
+  it.each([...LANGS])(
+    'RF2-3: locale %s has a generic S9 error line that is not the unavailable text',
+    (lang) => {
+      const generic = table(lang).aiErrGeneric
+      expect(generic?.trim().length).toBeGreaterThan(0)
+      expect(generic).not.toBe(table(lang).aiErrUnavailable)
+      expect(placeholdersOf(generic!)).toBe('')
+    },
+  )
+
   it('fills the placeholders through aiUniworkText', () => {
     expect(aiUniworkText('en', 'aiUniworkCreditsAria', { remaining: 12, limit: 50 })).toBe(
-      '12 of 50 credits left',
+      '12 / 50 left',
     )
     expect(aiUniworkText('vi', 'aiErrRateLimited', { seconds: 30 })).toBe(
       'Bạn đang gửi quá nhanh. Thử lại sau 30 giây.',

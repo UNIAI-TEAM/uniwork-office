@@ -565,12 +565,17 @@ describe('AiComposer — Send/Stop labels, polite live announcements, Escape gua
     })
     const composerListbox = document.createElement('div')
     composerListbox.setAttribute('role', 'listbox')
-    inputBox.append(composerListbox)
+    composerListbox.id = 'composer-owned-popup'
+    const composerTrigger = document.createElement('button')
+    composerTrigger.setAttribute('aria-controls', 'composer-owned-popup')
+    composerTrigger.setAttribute('aria-expanded', 'true')
+    inputBox.append(composerTrigger, composerListbox)
     act(() => {
       textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
     })
     expect(onStop).not.toHaveBeenCalled()
     composerListbox.remove()
+    composerTrigger.remove()
 
     // Persistent listbox or aria-expanded="true" OUTSIDE the composer (e.g. StylesPane/NavPane, thread toggles) must NOT block Escape
     const outsideListbox = document.createElement('div')
@@ -592,6 +597,73 @@ describe('AiComposer — Send/Stop labels, polite live announcements, Escape gua
     outsideListbox.remove()
     outsideToggle.remove()
     inlineToggle.remove()
+  })
+
+  it('RF2-8: only an open popup owned by the composer blocks Escape; a persistent or hidden inline menu does not', () => {
+    const onStop = vi.fn()
+    renderComposer({
+      lang: 'vi',
+      busy: true,
+      onStop,
+      uniwork: { active: true, provider: 'uniwork' },
+    })
+    const textarea = host.querySelector<HTMLTextAreaElement>('.ai-input')!
+    const inputBox = host.querySelector<HTMLElement>('.ai-input-box')!
+    textarea.focus()
+    const pressEscape = () =>
+      act(() => {
+        textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+      })
+
+    // A visible inline menu whose owner is collapsed is persistent chrome, not an open popup
+    const menu = document.createElement('div')
+    menu.setAttribute('role', 'menu')
+    menu.id = 'inline-menu'
+    const owner = document.createElement('button')
+    owner.setAttribute('aria-controls', 'inline-menu')
+    owner.setAttribute('aria-expanded', 'false')
+    inputBox.append(owner, menu)
+    pressEscape()
+    expect(onStop).toHaveBeenCalledTimes(1)
+
+    // A visible menu nobody owns is not a popup either
+    owner.remove()
+    pressEscape()
+    expect(onStop).toHaveBeenCalledTimes(2)
+
+    // An expanded owner makes it an open popup, so Escape belongs to the popup
+    owner.setAttribute('aria-expanded', 'true')
+    inputBox.append(owner)
+    pressEscape()
+    expect(onStop).toHaveBeenCalledTimes(2)
+
+    // ...unless the popup itself is hidden
+    menu.setAttribute('hidden', '')
+    pressEscape()
+    expect(onStop).toHaveBeenCalledTimes(3)
+    menu.removeAttribute('hidden')
+    menu.setAttribute('aria-hidden', 'true')
+    pressEscape()
+    expect(onStop).toHaveBeenCalledTimes(4)
+    menu.remove()
+    owner.remove()
+
+    // A modal dialog inside the composer is open by definition
+    const dialog = document.createElement('div')
+    dialog.setAttribute('role', 'dialog')
+    dialog.setAttribute('aria-modal', 'true')
+    inputBox.append(dialog)
+    pressEscape()
+    expect(onStop).toHaveBeenCalledTimes(4)
+    dialog.remove()
+
+    // The composer's own popups (model picker, dropdown) are open while rendered
+    const pop = document.createElement('div')
+    pop.className = 'ai-model-pop'
+    inputBox.append(pop)
+    pressEscape()
+    expect(onStop).toHaveBeenCalledTimes(4)
+    pop.remove()
   })
 
   it('defines 44x44px coarse pointer targets, uses only semantic tokens, and exports/imports ai-uniwork-composer.css from @genoffice/ui (RF1-3)', () => {

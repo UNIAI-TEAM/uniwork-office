@@ -6,6 +6,7 @@ import {
   ack,
   clearUniworkAcks,
   isAcked,
+  serializeUniworkAckKey,
   subscribeUniworkAck,
   useUniworkDisclosureAck,
   type UniworkAckKey,
@@ -95,18 +96,30 @@ describe('UniWork AI disclosure acknowledgement store (G6-05u S8)', () => {
     host.remove()
   })
 
-  it('works with empty account, org or document fields using documented fallback scope (RF1-17)', () => {
-    const emptyAll: UniworkAckKey = { account: '', org: '', document: '' }
-    expect(isAcked(emptyAll)).toBe(false)
-    ack(emptyAll)
-    expect(isAcked(emptyAll)).toBe(true)
+  it('RF2-5: an empty account is never stored and always needs an ack, while an empty org or document keeps the documented fallback scope', () => {
+    for (const account of ['', '  ']) {
+      const noAccount: UniworkAckKey = { account, org: 'org-1', document: 'doc-2' }
+      expect(isAcked(noAccount)).toBe(false)
+      ack(noAccount)
+      expect(isAcked(noAccount)).toBe(false)
+      // nothing leaked into the shared bucket: neither storage nor another empty-account key
+      expect(localStorage.getItem('uniwork.office.ai.disclosure.ack.v1')).toBeNull()
+      expect(isAcked({ account, org: 'org-1', document: 'doc-2' })).toBe(false)
+      expect(isAcked({ account: 'local-account', org: 'org-1', document: 'doc-2' })).toBe(false)
+    }
+    expect(serializeUniworkAckKey({ account: '', org: '', document: '' })).toBeNull()
 
-    // Changing a non-empty field still scopes separately and re-prompts
-    const emptyAccountOtherDoc: UniworkAckKey = { account: '  ', org: 'org-1', document: 'doc-2' }
-    expect(isAcked(emptyAccountOtherDoc)).toBe(false)
-    ack(emptyAccountOtherDoc)
-    expect(isAcked(emptyAccountOtherDoc)).toBe(true)
-    expect(isAcked({ account: '', org: 'org-1', document: 'doc-3' })).toBe(false)
+    // A personal account without an org is valid: org falls back to local-org and persists
+    const noOrg: UniworkAckKey = { account: 'acc-1', org: '', document: 'doc-3' }
+    expect(isAcked(noOrg)).toBe(false)
+    ack(noOrg)
+    expect(isAcked(noOrg)).toBe(true)
+    expect(isAcked({ account: 'acc-1', org: '  ', document: 'doc-3' })).toBe(true)
+    expect(isAcked({ account: 'acc-1', org: 'org-1', document: 'doc-3' })).toBe(false)
+    expect(isAcked({ account: 'acc-1', org: '', document: 'doc-4' })).toBe(false)
+    // an empty document falls back to the local bucket of that account + org
+    ack({ account: 'acc-1', org: 'org-1', document: '' })
+    expect(isAcked({ account: 'acc-1', org: 'org-1', document: 'local' })).toBe(true)
   })
 
   it('parses localStorage once rather than on every render when unacked, and reacts to window storage events (RF1-17)', () => {

@@ -323,7 +323,11 @@ describe('resultChip deterministic priority table', () => {
       error: { code: 'some_unforeseen_server_code', message: 'Internal stack trace' },
     })
     expect(unknownErr.chip).toBe('error')
-    expect(unknownErr.errorLine?.key).toBe('aiErrUnavailable')
+    expect(unknownErr.errorLine?.key).toBe('aiErrGeneric')
+    // RF2-3: an unknown code is not a "service unavailable" and offers no Retry
+    expect(unknownErr.errorLine?.action).toBeNull()
+    expect(unknownErr.errorLine?.actionKey).toBeNull()
+    expect(unknownErr.errorLine?.rawMessage).toBeUndefined()
   })
 
   it('RF1-9: Stop before any write takes priority over dropped tool calls and ask_clarification (answer chip if text, null chip if no text, plus aiRunStopped)', () => {
@@ -436,5 +440,83 @@ describe('resultChip deterministic priority table', () => {
     expect(stepLimitWithText.errorLine?.key).toBe('aiErrRunLimit')
     expect(stepLimitWithText.errorLine?.action).toBe('ask-again')
     expect(stepLimitWithText.errorLine?.actionKey).toBe('aiRunAskAgain')
+  })
+
+  it('RF2-3: an abort-type error during Stop is dropped, while the same error outside Stop is a generic error without Retry', () => {
+    for (const error of [
+      'AbortError',
+      { code: 'ABORT_ERR', message: 'The operation was aborted' },
+      { code: 'aborted' },
+      { message: 'This operation was aborted' },
+      { code: 'cancelled' },
+      { code: 'ERR_CANCELED', message: 'canceled' },
+    ]) {
+      const stoppedNoText = resultChip({ text: '', stopped: true, error })
+      expect(stoppedNoText.errorLine, JSON.stringify(error)).toBeNull()
+      expect(stoppedNoText.chip).toBeNull()
+      expect(stoppedNoText.stoppedKey).toBe('aiRunStopped')
+      const stoppedWithText = resultChip({ text: 'partial', stopped: true, error })
+      expect(stoppedWithText.errorLine, JSON.stringify(error)).toBeNull()
+      expect(stoppedWithText.chip).toBe('answer')
+      const notStopped = resultChip({ text: '', error })
+      expect(notStopped.errorLine?.key, JSON.stringify(error)).toBe('aiErrGeneric')
+      expect(notStopped.errorLine?.action).toBeNull()
+    }
+    // A real error that happens during Stop is still kept (RF1-10)
+    const real = resultChip({ text: '', stopped: true, error: { code: 'timeout' } })
+    expect(real.errorLine?.key).toBe('aiErrUnavailable')
+  })
+
+  it('RF2-4: an unqualified A1 range needs a left boundary, so ABCDEF1:B2 does not match as DEF1:B2', () => {
+    expect(
+      extractSheetsCellsMeta([
+        { name: 'propose_operations', summary: 'Wrote 4 cells in ABCDEF1:B2' },
+      ]),
+    ).toBeNull()
+    expect(
+      extractSheetsCellsMeta([{ name: 'propose_operations', summary: 'Wrote 4 cells in $A$1:B2' }]),
+    ).toMatchObject({ range: '$A$1:B2', written: 4 })
+    expect(
+      extractSheetsCellsMeta([{ name: 'propose_operations', summary: 'Wrote 4 cells (A1:B2)' }]),
+    ).toMatchObject({ range: 'A1:B2', written: 4 })
+    expect(
+      extractSheetsCellsMeta([
+        { name: 'propose_operations', summary: 'Wrote 4 cells in Sheet1!B4:C9' },
+      ]),
+    ).toMatchObject({ sheet: 'Sheet1', range: 'Sheet1!B4:C9' })
+  })
+
+  it('RF2-10: dedupe keeps view_only over not_allowlisted for the same tool, and an unknown overwritten count is null, not 0', () => {
+    const mixed = resultChip({
+      text: 'x',
+      moduleName: 'Sheets',
+      droppedToolCalls: [
+        { name: 'apply_ops', reason: 'not_allowlisted', module: 'Sheets' },
+        { name: 'apply_ops', reason: 'view_only', module: 'Sheets' },
+      ],
+    })
+    expect(mixed.chip).toBe('unsupported')
+    expect(mixed.reasonKey).toBe('aiErrViewOnlyEdit')
+
+    const unknown = resultChip({
+      text: 'x',
+      mutated: true,
+      cellsMeta: { range: 'A1:B2', written: 4 },
+    })
+    expect(unknown.meta?.overwritten).toBeUndefined()
+    expect(unknown.meta?.cellsMetaParams?.overwritten).toBeNull()
+
+    const known = resultChip({
+      text: 'x',
+      mutated: true,
+      cellsMeta: { range: 'A1:B2', written: 4, overwritten: 0 },
+    })
+    expect(known.meta?.cellsMetaParams?.overwritten).toBe(0)
+
+    // prose with no overwritten count: unknown stays null
+    const prose = extractSheetsCellsMeta([
+      { name: 'propose_operations', summary: 'Wrote 12 cells in Sheet1!B4:C9' },
+    ])
+    expect(prose?.overwritten).toBeUndefined()
   })
 })
