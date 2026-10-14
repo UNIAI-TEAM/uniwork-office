@@ -116,6 +116,8 @@
   --wb-shadow: 0 1px 2px rgb(16 24 40 / 5%), 0 1px 3px rgb(16 24 40 / 4%);
   --wb-row-hover: #f7f8fa;
   --wb-check-border: #858b94;
+  /* the 3px ring around a focused Workbench input (spec 2.2) */
+  --wb-focus-ring: color-mix(in srgb, var(--accent) 22%, transparent);
 
   color-scheme: light;
 }
@@ -208,8 +210,9 @@
 
   /* Workbench redesign: no shadow in dark, blocks separate by their border */
   --wb-shadow: none;
-  --wb-row-hover: #26282c;
+  --wb-row-hover: #2a2d33;
   --wb-check-border: #72777f;
+  --wb-focus-ring: color-mix(in srgb, var(--accent) 35%, transparent);
 
   color-scheme: dark;
 }
@@ -303,8 +306,9 @@
 
     /* Workbench redesign: no shadow in dark, blocks separate by their border */
     --wb-shadow: none;
-    --wb-row-hover: #26282c;
+    --wb-row-hover: #2a2d33;
     --wb-check-border: #72777f;
+    --wb-focus-ring: color-mix(in srgb, var(--accent) 35%, transparent);
 
     color-scheme: dark;
   }
