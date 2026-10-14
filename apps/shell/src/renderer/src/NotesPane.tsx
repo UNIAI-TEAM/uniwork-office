@@ -5,7 +5,7 @@ import { useI18n } from './locale'
 import { MODULE_TONES } from './module-tones'
 import { editedWhen } from './work-home'
 import { WbIconBtn } from './WbRowActions'
-import { useWbToast } from './WbToastHost'
+import { useWbToast, useWbUndoKey } from './WbToastHost'
 import { WbGlyph, WorkbenchIcon } from './WorkbenchIcons'
 import { WorkStatePanel } from './WorkErrorState'
 import { WorkToolbar, type WorkToolbarProps } from './WorkToolbar'
@@ -42,6 +42,8 @@ export function NotesPane({
 }): ReactElement {
   const { t, dateLocale } = useI18n()
   const toasts = useWbToast()
+  // ⌘/Ctrl+Z off the text fields brings back the last deleted note (the toast may be out of reach)
+  useWbUndoKey('notes-delete:')
   const [items, setItems] = useState<WbStickyNote[]>(() => readStickyNotes(practiceId))
   const [draft, setDraftState] = useState(() => composerDrafts.get(practiceId) ?? '')
   const setDraft = (text: string) => {
@@ -158,6 +160,8 @@ export function NotesPane({
         {
           label: 'wbCommonUndo',
           onClick: () => {
+            // write any pending typing first (⌘Z leaves the focus where it is), then read
+            flush()
             // the stored list, not this render's: other edits may have landed since
             const now = readStickyNotes(practiceId).filter((n) => n.id !== note.id)
             now.splice(Math.min(at, now.length), 0, note)

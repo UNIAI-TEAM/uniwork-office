@@ -12,7 +12,7 @@ import { draftFromForm } from './form-draft'
 import { WorkCalendarPane } from './WorkCalendarPane'
 import { WorkTasksPane } from './WorkTasksPane'
 import { WorkToolbar, type WorkToolbarProps } from './WorkToolbar'
-import { useWbToast } from './WbToastHost'
+import { toastError, useWbToast, useWbUndoKey } from './WbToastHost'
 import { WbIconBtn, WbRowActions } from './WbRowActions'
 import { WbMenuButton } from './WbMenu'
 import { WbPackChip } from './DeskDrawer'
@@ -157,6 +157,8 @@ function FormsPane({
 }): ReactElement {
   const { t } = useI18n()
   const toasts = useWbToast()
+  // ⌘/Ctrl+Z off the text fields brings back the last deleted form (the toast may be out of reach)
+  useWbUndoKey('forms-delete:')
   const baseId = useId()
   const [items, setItems] = useState<WbFormItem[]>(() => readForms(practiceId))
   // the "New form" card: closed, adding (null id) or editing a form
@@ -287,7 +289,7 @@ function FormsPane({
         tone: 'alert',
         message: {
           key: 'wbFormsDraftFailed',
-          params: { name: item.title, error: err instanceof Error ? err.message : String(err) },
+          params: { name: item.title, error: toastError(err) },
         },
         actions: [{ label: 'acctRetry', onClick: () => void draft(item) }],
       })

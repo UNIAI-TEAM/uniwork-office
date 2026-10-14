@@ -4,7 +4,7 @@ import type { PracticeId } from '@uniwork/practice-core'
 import { FileBadge } from './FileBadge'
 import { draftFromForm } from './form-draft'
 import { useI18n } from './locale'
-import { useWbToast } from './WbToastHost'
+import { toastError, useWbToast } from './WbToastHost'
 import { readForms, writeForms, type WbFormItem } from './workbench-pins'
 import { WbGlyph, WorkbenchIcon } from './WorkbenchIcons'
 
@@ -53,7 +53,7 @@ export function DeskDrawer({
         tone: 'alert',
         message: {
           key: 'wbFormsDraftFailed',
-          params: { name: item.title, error: err instanceof Error ? err.message : String(err) },
+          params: { name: item.title, error: toastError(err) },
         },
         actions: [{ label: 'acctRetry', onClick: () => void draft(item) }],
       })

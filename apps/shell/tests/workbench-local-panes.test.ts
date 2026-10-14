@@ -495,6 +495,56 @@ describe('Notes tab (redesign spec 4.5)', () => {
 
   const bodies = () =>
     Array.from(host.querySelectorAll<HTMLTextAreaElement>('.wb-note textarea')).map((t) => t.value)
+  const cmdZ = (target: Element) =>
+    act(async () => {
+      target.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true }),
+      )
+    })
+
+  it('⌘/Ctrl+Z off the text fields runs the newest Undo still shown; in a note it is the text’s own', async () => {
+    createStickyNote('sales', 'A')
+    createStickyNote('sales', 'B')
+    createStickyNote('sales', 'C')
+    await mount('notes')
+    const del = (i: number) =>
+      click(
+        host.querySelectorAll<HTMLButtonElement>('.wb-note button[aria-label="Delete note"]')[i],
+      )
+    await del(0)
+    await del(0)
+    expect(bodies()).toEqual(['A'])
+    // the Undo toasts never run out: a keyboard user may take as long as they like
+    await act(async () => toasts.show({ message: { text: 'Copied' } }))
+    // in a note's textarea the shortcut is the browser's text undo
+    await cmdZ(host.querySelector('.wb-note textarea')!)
+    expect(bodies()).toEqual(['A'])
+    // on the wall: the newest delete (B) comes back first, then C
+    await cmdZ(host.querySelector('.wb-notes-wall')!)
+    expect(bodies()).toEqual(['B', 'A'])
+    await cmdZ(host.querySelector('.wb-notes-wall')!)
+    expect(bodies()).toEqual(['C', 'B', 'A'])
+    expect(host.querySelectorAll('.wb-toast')).toHaveLength(1)
+    // nothing left to undo: the key does nothing
+    await cmdZ(host.querySelector('.wb-notes-wall')!)
+    expect(bodies()).toEqual(['C', 'B', 'A'])
+  })
+
+  it('Undo writes a note’s pending typing first, then puts the deleted note back', async () => {
+    createStickyNote('sales', 'A')
+    createStickyNote('sales', 'B')
+    await mount('notes')
+    await click(host.querySelector<HTMLButtonElement>('.wb-note button[aria-label="Delete note"]'))
+    const left = host.querySelector<HTMLTextAreaElement>('.wb-note textarea')!
+    await type(left, 'A typed')
+    // the toast's Undo runs while the typing is still pending (no blur in between)
+    const undo = Array.from(host.querySelectorAll<HTMLButtonElement>('.wb-toast button')).find(
+      (b) => b.textContent === 'Undo',
+    )!
+    await act(async () => undo.click())
+    expect(bodies()).toEqual(['B', 'A typed'])
+    expect(readStickyNotes('sales').map((n) => n.body)).toEqual(['B', 'A typed'])
+  })
 
   it('Undo after leaving the tab and coming back shows the note, and the next edit keeps it', async () => {
     createStickyNote('sales', 'A')

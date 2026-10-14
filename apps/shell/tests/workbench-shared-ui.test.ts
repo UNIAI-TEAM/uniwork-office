@@ -366,8 +366,8 @@ describe('WbToastHost', () => {
     mount()
     act(() =>
       toasts.show({
-        message: { text: 'Deleted' },
-        actions: [{ label: 'wbCommonUndo', onClick: vi.fn() }],
+        message: { text: 'Failed' },
+        actions: [{ label: 'acctRetry', onClick: vi.fn() }],
       }),
     )
     act(() => vi.advanceTimersByTime(ACTION_DISMISS_MS - 1000))
@@ -391,16 +391,16 @@ describe('WbToastHost', () => {
     expect(shown()).toHaveLength(0)
   })
 
-  it('never closes while keyboard focus is in it: Undo stays reachable', () => {
+  it('never closes while keyboard focus is in it: Retry stays reachable', () => {
     mount()
     act(() =>
       toasts.show({
-        message: { text: 'Deleted' },
-        actions: [{ label: 'wbCommonUndo', onClick: vi.fn() }],
+        message: { text: 'Failed' },
+        actions: [{ label: 'acctRetry', onClick: vi.fn() }],
       }),
     )
     const undo = Array.from(shown()[0]!.querySelectorAll('button')).find(
-      (b) => b.textContent === 'Undo',
+      (b) => b.textContent === 'Retry',
     )!
     act(() => undo.focus())
     act(() => vi.advanceTimersByTime(ACTION_DISMISS_MS * 5))
@@ -438,6 +438,93 @@ describe('WbToastHost', () => {
       act(() => action.click())
       expect(undo).toHaveBeenCalledTimes(1)
       expect(document.activeElement).toBe(outside)
+    } finally {
+      outside.remove()
+    }
+  })
+
+  it('an Undo has no clock: it closes only on ×, Undo or a toast with its id', () => {
+    mount()
+    const undo = vi.fn()
+    act(() =>
+      toasts.show({
+        id: 'del',
+        message: { text: 'Deleted' },
+        actions: [{ label: 'wbCommonUndo', onClick: undo }],
+      }),
+    )
+    act(() => vi.advanceTimersByTime(ACTION_DISMISS_MS * 30))
+    expect(shown()).toHaveLength(1)
+    // replaced by the same id: the new toast is the one shown
+    act(() =>
+      toasts.show({
+        id: 'del',
+        message: { text: 'Deleted again' },
+        actions: [{ label: 'wbCommonUndo', onClick: undo }],
+      }),
+    )
+    expect(shown().map((t) => t.querySelector('.wb-toast-text')?.textContent)).toEqual([
+      'Deleted again',
+    ])
+    act(() => shown()[0]!.querySelector<HTMLButtonElement>('button[aria-label="Dismiss"]')!.click())
+    expect(shown()).toHaveLength(0)
+    expect(undo).not.toHaveBeenCalled()
+  })
+
+  it('over the cap a toast without actions gives way first, then the oldest action toast', () => {
+    mount()
+    const text = () => shown().map((t) => t.querySelector('.wb-toast-text')?.textContent)
+    const undo = (n: string) => ({
+      message: { text: n },
+      actions: [{ label: 'wbCommonUndo' as const, onClick: vi.fn() }],
+    })
+    act(() => {
+      toasts.show(undo('Deleted A'))
+      toasts.show({ message: { text: 'Copied' } })
+      toasts.show({ message: { text: 'Copied 2' } })
+      toasts.show({ message: { text: 'Copied 3' } })
+    })
+    // the plain toasts went, not the older Undo
+    expect(text()).toEqual(['Deleted A', 'Copied 2', 'Copied 3'])
+    act(() => {
+      toasts.show(undo('Deleted B'))
+      toasts.show(undo('Deleted C'))
+    })
+    expect(text()).toEqual(['Deleted A', 'Deleted B', 'Deleted C'])
+    act(() => toasts.show(undo('Deleted D')))
+    expect(text()).toEqual(['Deleted B', 'Deleted C', 'Deleted D'])
+  })
+
+  it('a focused toast pushed out by the cap hands the focus back, not to <body>', () => {
+    const outside = document.createElement('button')
+    document.body.append(outside)
+    try {
+      mount()
+      act(() =>
+        toasts.show({
+          message: { text: 'Failed' },
+          actions: [{ label: 'acctRetry', onClick: vi.fn() }],
+        }),
+      )
+      outside.focus()
+      const retry = shown()[0]!.querySelector<HTMLButtonElement>('button.wb-link')!
+      act(() => retry.focus())
+      act(() => {
+        for (let i = 0; i < MAX_TOASTS; i++)
+          toasts.show({
+            message: { text: `F${i}` },
+            actions: [{ label: 'acctRetry', onClick: vi.fn() }],
+          })
+      })
+      expect(retry.isConnected).toBe(false)
+      expect(document.activeElement).toBe(outside)
+      // focus left the stack: a later programmatic entry does not send it back there
+      act(() => vi.advanceTimersByTime(0))
+      outside.blur()
+      const next = shown()[0]!.querySelector<HTMLButtonElement>('button.wb-link')!
+      act(() => next.focus())
+      act(() => next.click())
+      expect(document.activeElement).not.toBe(outside)
     } finally {
       outside.remove()
     }
