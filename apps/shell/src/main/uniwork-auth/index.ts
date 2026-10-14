@@ -75,7 +75,7 @@ let aiStreams: UniworkAiStreams | null = null
  * sign-out does not happen), `after` clears what the next person must not see.
  */
 export interface UniworkSignOutHooks {
-  before(): Promise<boolean>
+  before(options?: { confirmed?: boolean; prompt?: boolean }): Promise<boolean>
   after(): void
 }
 
@@ -84,9 +84,12 @@ export function setUniworkSignOutHooks(hooks: UniworkSignOutHooks | null): void 
 }
 
 /** Sign out from the account UI: the hooks around AccountManager.logout. */
-export async function signOutUniwork(account: AccountManager): Promise<AccountStatus> {
+export async function signOutUniwork(
+  account: AccountManager,
+  options?: { confirmed?: boolean; prompt?: boolean },
+): Promise<AccountStatus> {
   const hooks = signOutHooks
-  if (hooks && !(await hooks.before())) return account.status()
+  if (hooks && !(await hooks.before(options))) return account.status()
   const status = await account.logout()
   // the session is gone: every UniWork AI turn still running ends now (aiErrSession)
   endUniworkAiSession()
@@ -163,7 +166,7 @@ export const applyUniworkProfile = serializeProfileApplies(
       current: () => account.deploymentProfile(),
       confirm: options.confirm,
       endSession: async () => {
-        await signOutUniwork(account)
+        await signOutUniwork(account, { prompt: true })
         // the sign-out hooks may be cancelled by the user: the session then stays
         return account.sessionIdentity() === null
       },
@@ -499,8 +502,13 @@ export function registerAccountIpc(
   ipcMain.handle(HOME_CHANNELS.accountStatus, (event) => account(event.sender).status())
   ipcMain.handle(HOME_CHANNELS.accountLogin, (event) => account(event.sender).login())
   ipcMain.handle(HOME_CHANNELS.accountLoginOpenUrl, (event) => account(event.sender).openLoginUrl())
-  ipcMain.handle(HOME_CHANNELS.accountLogout, async (event) => {
-    await signOutUniwork(account(event.sender))
+  ipcMain.handle(HOME_CHANNELS.accountLogout, async (event, options?: unknown) => {
+    const confirmed = Boolean(
+      options &&
+      typeof options === 'object' &&
+      (options as { confirmed?: unknown }).confirmed === true,
+    )
+    await signOutUniwork(account(event.sender), { confirmed })
   })
   ipcMain.handle(HOME_CHANNELS.accountCancelLogin, (event) => {
     account(event.sender).cancelLogin()

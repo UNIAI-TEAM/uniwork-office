@@ -52,7 +52,7 @@ function harness(
   const forgotten: string[] = []
   const shownLocks = [...locks]
   const forgottenLocks: string[] = []
-  const wiped: Array<{ accountId: string; deploymentId: string } | null> = []
+  const locked: Array<{ accountId: string; deploymentId: string } | null> = []
   const order: string[] = []
   const deps = {
     root,
@@ -85,9 +85,9 @@ function harness(
     }),
     closeConflictPrompt: vi.fn(),
     sessionOwner: () => sessionOwner,
-    wipeStore: vi.fn(async (owner: { accountId: string; deploymentId: string } | null) => {
-      order.push('wipeStore')
-      wiped.push(owner)
+    lockStore: vi.fn(async (owner: { accountId: string; deploymentId: string } | null) => {
+      order.push('lockStore')
+      locked.push(owner)
     }),
   }
   return {
@@ -98,7 +98,7 @@ function harness(
     forgotten,
     shownLocks,
     forgottenLocks,
-    wiped,
+    locked,
     order,
   }
 }
@@ -208,37 +208,47 @@ describe('Sign out', () => {
   })
 })
 
-describe('the durable store at the account boundary (W3b)', () => {
-  it('sign-out wipes the outgoing scope, after the locks and with a live owner', async () => {
+describe('the durable store at the account boundary (W3b / G5-11)', () => {
+  it('sign-out locks the outgoing scope, after the locks and with a live owner', async () => {
     const h = harness([aSheet], [], new Set(), [aSheet], ownerA)
     expect(await h.boundary.beforeSignOut()).toBe(true)
-    expect(h.wiped).toEqual([ownerA])
-    // the locks are forgotten first: a wipe must not wait behind panel state
-    expect(h.order.indexOf('forgetLocks')).toBeLessThan(h.order.indexOf('wipeStore'))
+    expect(h.locked).toEqual([ownerA])
+    // the locks are forgotten first: a lock must not wait behind panel state
+    expect(h.order.indexOf('forgetLocks')).toBeLessThan(h.order.indexOf('lockStore'))
   })
 
-  it('a cancelled sign-out keeps the store: the account did not go away', async () => {
+  it('a cancelled sign-out keeps the store open: the account did not go away', async () => {
     const h = harness([aSheet], [], new Set([aSheet]), [aSheet], ownerA)
-    // a live session first (the first owner has nothing to wipe)
+    // a live session first (the first owner has nothing to lock)
     await h.boundary.enforce(ownerA)
-    expect(h.wiped).toEqual([])
+    expect(h.locked).toEqual([])
     expect(await h.boundary.beforeSignOut()).toBe(false)
-    expect(h.wiped).toEqual([])
-    // the sign-out does go ahead afterwards: the last owner loses its store
+    expect(h.locked).toEqual([])
+    // the sign-out does go ahead afterwards: the last owner locks its store
     h.boundary.afterSignOut()
-    expect(h.wiped).toEqual([ownerA])
+    expect(h.locked).toEqual([ownerA])
   })
 
-  it('a sign-in as another account wipes only the switched-out scope', async () => {
+  it('a sign-in as another account locks only the switched-out scope', async () => {
     const h = harness([aSheet], [], new Set(), [], ownerA)
-    // the first live session has nothing to wipe (no owner before it)
+    // the first live session has nothing to lock (no owner before it)
     await h.boundary.enforce(ownerA)
-    expect(h.wiped).toEqual([])
+    expect(h.locked).toEqual([])
     await h.boundary.enforce(ownerB)
-    expect(h.wiped).toEqual([ownerA])
-    // the same owner again (a status push): nothing is wiped twice
+    expect(h.locked).toEqual([ownerA])
+    // the same owner again (a status push): nothing is locked twice
     await h.boundary.enforce(ownerB)
-    expect(h.wiped).toEqual([ownerA])
+    expect(h.locked).toEqual([ownerA])
+  })
+
+  it('a deployment switch for the same account locks the outgoing deployment scope', async () => {
+    const dep1 = { accountId: 'acc_a', deploymentId: 'dep_1' }
+    const dep2 = { accountId: 'acc_a', deploymentId: 'dep_2' }
+    const h = harness([aSheet], [], new Set(), [], dep1)
+    await h.boundary.enforce(dep1)
+    expect(h.locked).toEqual([])
+    await h.boundary.enforce(dep2)
+    expect(h.locked).toEqual([dep1])
   })
 })
 

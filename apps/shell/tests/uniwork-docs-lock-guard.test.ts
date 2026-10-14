@@ -17,6 +17,7 @@ import {
   LAST_OWNER_FILE,
 } from '../src/main/uniwork-docs/binding-store'
 import { INTENT_STORE_REGISTRATION, createIntentStore } from '../src/main/uniwork-sync/intent-store'
+import { PARKED_STORE_REGISTRATION, createParkedStore } from '../src/main/uniwork-sync/queue/parked'
 import { createSafeStorageKeyProvider } from '../src/main/uniwork-sync/keys'
 import { createSyncStoreAccess } from '../src/main/uniwork-sync/session-store'
 import { createStoreLayer } from '../src/main/uniwork-sync/store'
@@ -133,6 +134,7 @@ function setup(opts: { account?: string | null; keystoreLocked?: boolean } = {})
     clock: () => 1_700_000_000_000,
   })
   layer.register(INTENT_STORE_REGISTRATION)
+  layer.register(PARKED_STORE_REGISTRATION)
   const syncStore = createSyncStoreAccess({
     layer,
     scope: () => (account ? { deploymentId: 'default', accountId: account } : null),
@@ -650,5 +652,41 @@ describe('a locked keychain holds a pre-store intent (W3b)', () => {
     expect(intent?.intent.idempotencyKey).toBe(LEGACY_INTENT.idempotencyKey)
     expect((await ctx.service.openSyncStore()).kind).toBe('ok')
     expect(intentRecords()).toHaveLength(1)
+  })
+
+  it('a signed-out N′ session restores no parked copy of a newer store and creates no intent', async () => {
+    const ctx = setup()
+    const opened = await ctx.layer.open({ deploymentId: 'default', accountId: 'acc_1' })
+    if (opened.kind !== 'ok') throw new Error(opened.kind)
+    const parked = createParkedStore(opened.store.records(PARKED_STORE_REGISTRATION.name))
+    const parkRes = await parked.park({
+      documentKey: DOC,
+      binding: {
+        schema: 2,
+        documentId: DOC,
+        workspaceId: 'ws_1',
+        orgId: 'org_a',
+        title: 'Plan.docx',
+        filename: 'Plan.docx',
+        format: 'docx',
+        access: 'edit',
+        baseRevision: '41',
+        baseVersion: 3,
+        baseChecksum: hex(enc('server bytes')),
+        state: 'dirty',
+        minStoreLevel: 3,
+      },
+      bytes: enc('n+1 bytes from newer store'),
+      parkedAt: '2026-04-17T00:00:00.000Z',
+    })
+    expect(parkRes).toBe('ok')
+
+    await ctx.service.restoreParked({ deploymentId: 'default', accountId: 'acc_1' })
+
+    // No working copy restored onto disk, parked record remains intact for N+1 build, no intent created
+    expect(() => readFileSync(docPath())).toThrow()
+    expect(await parked.list()).toEqual([DOC])
+    expect(intentRecords()).toEqual([])
+    expect(calls).toEqual([])
   })
 })

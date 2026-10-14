@@ -967,19 +967,19 @@ describe('G5-06 W4b save queue wiring', () => {
     expect(commits(server)[0]!.headers['idempotency-key']).toBe('key_reconcile')
   })
 
-  it('G506-be-d1-1: the account-boundary wipe awaits teardownSaveQueue before the wipe', () => {
-    // the wiring source pins the order: the in-flight poll/dispatch must unwind
-    // before the scope is wiped, so no settle lookup runs into a wiped scope
+  it('G506-be-d1-1 / G5-11: the account-boundary lock stops runtime and awaits lockSession', () => {
+    // the wiring source pins the order: runtime.stop() runs before service.lockSession
+    // (which waits for in-flight saves, parks N+1, and locks the store without wiping)
     const source = readFileSync(join(__dirname, '..', 'src/main/uniwork-docs/wiring.ts'), 'utf8')
-    const wipe = source.slice(source.indexOf('wipeStore: async (owner) =>'))
-    const awaited = wipe.indexOf('await service.teardownSaveQueue?.()')
-    const lockAndWipe = wipe.indexOf('lockAndWipe(')
-    expect(awaited).toBeGreaterThan(-1)
-    expect(lockAndWipe).toBeGreaterThan(-1)
-    expect(awaited).toBeLessThan(lockAndWipe)
-    // and it is awaited, not a fire-and-forget call
-    expect(wipe).toMatch(/await service\.teardownSaveQueue\?\.\(\)/)
-    expect(wipe).not.toMatch(/\n\s+service\.teardownSaveQueue\?\.\(\)\n/)
+    const lockIdx = source.indexOf('lockStore: async (owner')
+    expect(lockIdx).toBeGreaterThan(-1)
+    const lockBlock = source.slice(lockIdx)
+    const stopIdx = lockBlock.indexOf('runtime.stop()')
+    const sessionIdx = lockBlock.indexOf('await service.lockSession(')
+    expect(stopIdx).toBeGreaterThan(-1)
+    expect(sessionIdx).toBeGreaterThan(-1)
+    expect(stopIdx).toBeLessThan(sessionIdx)
+    expect(source).not.toContain('lockAndWipe(')
   })
 })
 

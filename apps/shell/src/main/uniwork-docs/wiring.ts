@@ -1,9 +1,14 @@
 import { app, BrowserWindow, dialog, safeStorage, type IpcMain, type WebContents } from 'electron'
+import { randomUUID } from 'node:crypto'
 import { basename, join } from 'node:path'
 import { COMMENTS_CHANNELS } from '@genoffice/electron-utils/comments-ipc'
 import {
   UNIWORK_DOC_CHANNELS,
   type AccountStatus,
+  type SignOutPlan,
+  type SignOutProgress,
+  type SignOutPromptAnswer,
+  type SignOutPromptRequest,
   type UniworkConflictChoice,
   type UniworkCreateDocInput,
   type UniworkDocFormat,
@@ -32,17 +37,13 @@ import {
 } from './comments-wiring'
 import type { CommentsRevealPayload } from '@genoffice/electron-utils/comments-ipc'
 import { setUniworkCloseGuard } from './close-guard'
-import { INTENT_STORE_REGISTRATION } from '../uniwork-sync/intent-store'
-import { DRAFTS_STORE_REGISTRATION } from '../uniwork-sync/queue/drafts'
-import { PAUSE_STORE_REGISTRATION } from '../uniwork-sync/queue/pause'
 import { createSafeStorageKeyProvider } from '../uniwork-sync/keys'
+import { SyncRuntime, type SyncRuntimeTargets } from '../uniwork-sync/runtime'
 import {
-  DOC_INDEX_REGISTRATION,
-  FEED_CURSORS_REGISTRATION,
-  SyncRuntime,
-  type SyncRuntimeTargets,
-} from '../uniwork-sync/runtime'
-import { createSyncStoreAccess, type SyncStoreAccess } from '../uniwork-sync/session-store'
+  createSyncStoreAccess,
+  SYNC_STORE_REGISTRATIONS,
+  type SyncStoreAccess,
+} from '../uniwork-sync/session-store'
 import { createStoreLayer, type StoreLayer } from '../uniwork-sync/store'
 import { createFeedClient, type FeedClient } from '../uniwork-sync/feed/client'
 import { createCapabilityFetch } from '../uniwork-sync/capability/client'
@@ -79,7 +80,7 @@ export interface UniworkDocsWiring {
    */
   refuseLockedPath(path: string): boolean
   isPathOpen(path: string): boolean
-  requestModuleSave(path: string, onNotWritten?: () => void): boolean
+  requestModuleSave(path: string, onNotWritten?: () => void, mode?: 'save' | 'capture'): boolean
   reloadPath(path: string): void
   /**
    * G5-03a: the FRESH editor state of one path, summed over every view that
@@ -345,21 +346,17 @@ export const SYNC_STORE_BUDGET_BYTES = 256 * 1024 * 1024
  * The durable sync store of the session. One key provider (keys wrapped by
  * Electron safeStorage) and one layer under `userData/uniwork-sync/`, holding
  * every store this build registers; the records are encrypted, budgeted and
- * wiped at the account boundary. The wrapped keys sit beside the layer root,
- * outside the wiped scope, so unlocking after a sign-out reads them again.
+ * locked at the account boundary. The wrapped keys sit beside the layer root,
+ * outside the scope, so unlocking after a sign-out reads them again.
  */
-function createSyncStoreLayer(root: string): StoreLayer {
+export function createSyncStoreLayer(root: string): StoreLayer {
   const layer = createStoreLayer({
     root: join(root, 'store'),
     keys: createSafeStorageKeyProvider({ safeStorage, dir: join(root, 'keys') }),
     budgetBytes: SYNC_STORE_BUDGET_BYTES,
     clock: () => Date.now(),
   })
-  layer.register(INTENT_STORE_REGISTRATION)
-  layer.register(DRAFTS_STORE_REGISTRATION)
-  layer.register(PAUSE_STORE_REGISTRATION)
-  layer.register(FEED_CURSORS_REGISTRATION)
-  layer.register(DOC_INDEX_REGISTRATION)
+  for (const reg of SYNC_STORE_REGISTRATIONS) layer.register(reg)
   return layer
 }
 
@@ -513,6 +510,7 @@ export function createSyncRuntime(
     // and mirror the pass's connectivity onto the queue's waiting intents (a
     // failed round trip parks them, a working one wakes them)
     onPoll: async (online) => {
+      await service.restoreParked?.()
       // `undefined` = the pass had nothing to do (no chosen org, no scope): no
       // verdict to apply, so the queue's intents are left where they are
       // (G506-be-3). A real failed round trip parks them, a reached one wakes them
@@ -528,6 +526,33 @@ export function createSyncRuntime(
     },
     log: (message) => console.warn(message),
   })
+}
+
+async function promptSignOutFallback(
+  wiring: UniworkDocsWiring,
+  plan: SignOutPlan,
+): Promise<boolean> {
+  const lang = wiring.lang()
+  const count = Math.max(plan.count, plan.ramOnly)
+  const detail =
+    plan.keystoreLocked && plan.ramOnly > 0 && plan.count === 0
+      ? tUniworkDocs(lang, 'signOutKeystore')
+      : tUniworkDocs(lang, 'signOutBody', { count })
+  const options: Electron.MessageBoxOptions = {
+    type: 'warning',
+    title: tUniworkDocs(lang, 'signOutTitle'),
+    message: tUniworkDocs(lang, 'signOutTitle'),
+    detail,
+    buttons: [tUniworkDocs(lang, 'signOutGo'), tUniworkDocs(lang, 'signOutBack')],
+    defaultId: 1,
+    cancelId: 1,
+    noLink: true,
+  }
+  const parent = wiring.shellWindow()
+  const { response } = parent
+    ? await dialog.showMessageBox(parent, options)
+    : await dialog.showMessageBox(options)
+  return response === 0
 }
 
 /** Registers the IPC handlers (safe before app ready: nothing touches the account yet). */
@@ -568,7 +593,8 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
       return wiring.openPath(path)
     },
     isPathOpen: (path) => wiring.isPathOpen(path),
-    requestModuleSave: (path, onNotWritten) => wiring.requestModuleSave(path, onNotWritten),
+    requestModuleSave: (path, onNotWritten, mode) =>
+      wiring.requestModuleSave(path, onNotWritten, mode),
     reloadPath: (path) => wiring.reloadPath(path),
     // G5-03a: the fresh editor state of one path (W2's live read; the wiring
     // placeholder is what index.ts installs today)
@@ -584,6 +610,8 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     notifyTitleRenamed: (path, title) => wiring.notifyTitleRenamed?.(path, title),
     ui: conflictUi(wiring),
     pushStatus: (status) => push(UNIWORK_DOC_CHANNELS.docStatusEvent, status),
+    pushSignOutProgress: (event: SignOutProgress) =>
+      push(UNIWORK_DOC_CHANNELS.signOutProgress, event),
     // the save queue's lane verdicts read the same per-org capability cache the
     // feed runtime does (see the SyncRuntimeSeam note), so `sync_write` is read
     // once per account and cleared on an account switch for both
@@ -706,6 +734,20 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   ipcMain.handle(UNIWORK_DOC_CHANNELS.dismissLock, (_event, path: unknown) => {
     if (typeof path === 'string') service.dismissLock(path)
   })
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.signOutPlan, () => service.signOutPlan())
+  let signOutPromptPending: {
+    requestId: string
+    resolve: (confirmed: boolean) => void
+  } | null = null
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.signOutPromptAnswer, (_event, payload: unknown) => {
+    const answer =
+      payload && typeof payload === 'object' ? (payload as Partial<SignOutPromptAnswer>) : null
+    const pending = signOutPromptPending
+    if (!pending) return
+    if (answer?.requestId && answer.requestId !== pending.requestId) return
+    signOutPromptPending = null
+    pending.resolve(answer?.confirmed === true)
+  })
   setUniworkCloseGuard(service)
   const runtime = createSyncRuntime(service)
   seamRef.runtime = runtime
@@ -715,7 +757,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     root: service.store.root,
     openPaths: () => wiring.openPaths(),
     closeDocument: (path) => wiring.closePath(path),
-    confirmClose: (path) => wiring.confirmClosePath(path),
+    confirmClose: async () => true,
     closeNow: (path) => wiring.closePathNow(path),
     aiHistoryPaths: () => wiring.aiHistoryPaths(),
     forgetAiHistory: (paths) => wiring.forgetAiHistory(paths),
@@ -729,26 +771,35 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
         ? { accountId: identity.accountId, deploymentId: identity.deploymentId }
         : null
     },
-    // the outgoing account's durable store (intents, feed cursors, doc index)
-    // is locked and wiped with its documents; the feed and the save queue stop
-    // first so no in-flight consumer or dispatch writes into a wiped scope
-    wipeStore: async (owner) => {
+    confirmSignOut: async (owner, options) => {
+      if (options?.confirmed === true) return true
+      const plan = await service.signOutPlan(owner)
+      if (plan.count === 0 && plan.ramOnly === 0) return true
+      const wc = wiring.shellContents()
+      if (wc && !wc.isDestroyed()) {
+        const requestId = randomUUID()
+        return new Promise<boolean>((resolve) => {
+          signOutPromptPending = { requestId, resolve }
+          const req: SignOutPromptRequest = { requestId, plan }
+          wc.send(UNIWORK_DOC_CHANNELS.signOutPrompt, req)
+        })
+      }
+      return promptSignOutFallback(wiring, plan)
+    },
+    // G5-11: the outgoing account's durable store is locked (never wiped) after
+    // waiting for any in-flight save, capturing N+1 editor/disk working copies
+    // into `parked`, and deleting plaintext working + recovery copies.
+    lockStore: async (owner) => {
       runtime.stop()
-      // await the queue teardown BEFORE the wipe: the in-flight poll/dispatch
-      // must unwind (and release its locks) before the scope is wiped, so no
-      // lookup or record write runs into a wiped scope (G506-be-d1-1)
-      await service.teardownSaveQueue?.()
-      if (!owner) return
-      const store = syncStoreFor()
-      store.access.forget()
-      await store.layer.lockAndWipe({
-        deploymentId: owner.deploymentId,
-        accountId: owner.accountId,
-      })
+      const res = await service.lockSession(owner, () =>
+        push(UNIWORK_DOC_CHANNELS.signOutProgress, { phase: 'waiting' }),
+      )
+      push(UNIWORK_DOC_CHANNELS.signOutProgress, { phase: 'done' })
+      return res.ok
     },
   })
   setUniworkSignOutHooks({
-    before: () => boundary.beforeSignOut(),
+    before: (options) => boundary.beforeSignOut(options),
     after: () => boundary.afterSignOut(),
   })
 
@@ -768,7 +819,12 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
         // G8-16 S16: changing the organization reloads the library data
         service.noteSelectedOrg(status.org?.id ?? null)
         const identity = uniworkSessionIdentity()
-        if (identity) void boundary.enforce(identity).catch(() => undefined)
+        if (identity) {
+          void boundary
+            .enforce(identity)
+            .then(() => service.restoreParked(identity))
+            .catch(() => undefined)
+        }
         const now = status.state === 'signed-in'
         if (now && !signedIn) void service.launch.onSignedIn()
         signedIn = now

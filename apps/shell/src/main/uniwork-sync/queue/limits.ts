@@ -24,6 +24,9 @@ export const QUEUE_LIMITS = {
   backoffMaxMs: 300_000,
   /** documents dispatched at once */
   concurrency: 2,
+  /** bounded wait for an in-flight upload/commit receipt at sign-out (G5-11 D4) */
+  signOutReceiptWaitMs: 30_000,
 } as const
 
+export const SIGN_OUT_RECEIPT_WAIT_MS = QUEUE_LIMITS.signOutReceiptWaitMs
 export type QueueLimits = typeof QUEUE_LIMITS

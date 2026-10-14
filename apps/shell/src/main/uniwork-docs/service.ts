@@ -1,9 +1,11 @@
-import { readFileSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync, statSync, unlinkSync } from 'node:fs'
 import { copyFile, readFile, rename, stat } from 'node:fs/promises'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type {
   RecentUniworkSource,
+  SignOutPlan,
+  SignOutProgress,
   UniworkConflictChoice,
   UniworkCreateDocInput,
   UniworkDocAccess,
@@ -81,6 +83,8 @@ import {
   PAUSE_STORE_REGISTRATION,
   type PauseStore,
 } from '../uniwork-sync/queue/pause'
+import { createParkedStore, PARKED_STORE_REGISTRATION } from '../uniwork-sync/queue/parked'
+import { SIGN_OUT_RECEIPT_WAIT_MS } from '../uniwork-sync/queue/limits'
 import {
   QueueDispatcher,
   type QueueCapabilityRead,
@@ -186,8 +190,10 @@ export interface UniworkDocsServiceDeps {
    * Runs the owning tab's module Save; false when no tab shows the path.
    * `onNotWritten` is called when the module reports that it did not write
    * (so no user-save hook will follow); modules that cannot tell never call it.
+   * `mode: 'capture'` (G5-11 D3) flushes editor bytes to disk without firing
+   * `onUserSave`.
    */
-  requestModuleSave(path: string, onNotWritten?: () => void): boolean
+  requestModuleSave(path: string, onNotWritten?: () => void, mode?: 'save' | 'capture'): boolean
   /** remounts the tab showing the path so it re-reads the file */
   reloadPath(path: string): void
   activePath(): string | undefined
@@ -226,6 +232,14 @@ export interface UniworkDocsServiceDeps {
   ui: ConflictUi
   pushStatus(status: UniworkDocStatus): void
   pushLaunch(event: UniworkLaunchEvent): void
+  /** G5-11: sign-out progress push (`waiting` | `done`) */
+  pushSignOutProgress?(event: SignOutProgress): void
+  /** G5-11: optional hooks so lockSession can run step 1 runtime stop and step 3 view/history cleanup directly */
+  stopRuntime?(): void
+  openPaths?(): string[]
+  closePathNow?(path: string): void
+  aiHistoryPaths?(): string[]
+  forgetAiHistory?(paths: string[]): void
   /**
    * The org capability cache (the same one the sync runtime reads), for the
    * save queue's lane verdicts. Absent = writes allowed (tests that never read
@@ -1161,7 +1175,8 @@ export class UniworkDocsService {
     // this exact id, so a torn-down or switched session reads false
     const id = randomUUID()
     const dispatcher = new QueueDispatcher({
-      intents: async () => ({ kind: 'ok', intents }),
+      intents: async () =>
+        this.deadQueueSessions.has(id) ? { kind: 'unavailable' } : { kind: 'ok', intents },
       client: {
         upload: (input) =>
           this.api().upload({ ...input, format: input.format as UniworkDocFormat }),
@@ -1194,7 +1209,10 @@ export class UniworkDocsService {
           this.owns(bound)
         )
       },
-      publish: (record) => this.publishRecord(record),
+      publish: (record) => {
+        if (this.deadQueueSessions.has(id)) return
+        this.publishRecord(record)
+      },
     })
     this.queueSession = { id, token, dispatcher, lock, intents, drafts, pause }
     return { kind: 'ok', ...this.queueSession }
@@ -1235,6 +1253,8 @@ export class UniworkDocsService {
     }
   }
 
+  private readonly pendingApplyRecords = new Set<Promise<void>>()
+
   /**
    * The queue's status push: it lands on the document's binding too, so a
    * dispatched state (queued / paused_* / reconciling / blocked) is what the
@@ -1242,7 +1262,10 @@ export class UniworkDocsService {
    * live binding (a version copy, or one of another account) is dropped.
    */
   private publishRecord(record: IntentRecordV2): void {
-    void this.applyRecord(record)
+    const p = this.applyRecord(record).finally(() => {
+      this.pendingApplyRecords.delete(p)
+    })
+    this.pendingApplyRecords.add(p)
   }
 
   /** resolve the live session's working copy of a document, or null */
@@ -1531,7 +1554,34 @@ export class UniworkDocsService {
   }
 
   /** the queue sessions whose dispatcher must not commit any more (torn down) */
+  /** the queue sessions whose dispatcher must not start a new upload/commit */
+  private readonly stoppingQueueSessions = new Set<string>()
+  /** the queue sessions whose dispatcher must not commit or write any more (torn down) */
   private readonly deadQueueSessions = new Set<string>()
+  /** scopes explicitly locked by sign-out / account switch until the account signs in again */
+  private readonly lockedScopes = new Set<string>()
+  /** paths armed for a one-shot capture save (G5-11 D3) */
+  private readonly armedCaptures = new Map<string, () => void>()
+
+  /**
+   * G5-11 D3: arms a one-shot capture save for `path` so the owning module writes
+   * the bound file to disk without firing the user-save hook.
+   */
+  armCapture(path: string, onConsumed?: () => void): void {
+    this.armedCaptures.set(pathKey(path), onConsumed ?? (() => undefined))
+  }
+
+  /**
+   * G5-11 D3: consumes a one-shot capture request for `path`.
+   */
+  consumeCapture(path: string): boolean {
+    const key = pathKey(path)
+    const cb = this.armedCaptures.get(key)
+    if (!cb) return false
+    this.armedCaptures.delete(key)
+    setImmediate(cb)
+    return true
+  }
 
   /**
    * Whether `session` is still the live queue session of this service. The
@@ -1542,7 +1592,11 @@ export class UniworkDocsService {
   private isQueueSessionCurrent(session: { id?: string } | null | undefined): boolean {
     const id = session?.id
     if (!id || !this.queueSession) return false
-    return this.queueSession.id === id && !this.deadQueueSessions.has(id)
+    return (
+      this.queueSession.id === id &&
+      !this.deadQueueSessions.has(id) &&
+      !this.stoppingQueueSessions.has(id)
+    )
   }
 
   /**
@@ -1551,7 +1605,10 @@ export class UniworkDocsService {
    */
   private stopQueue(): void {
     const session = this.queueSession
-    if (session) this.deadQueueSessions.add(session.id)
+    if (session) {
+      this.stoppingQueueSessions.add(session.id)
+      this.deadQueueSessions.add(session.id)
+    }
     this.queueSession = null
   }
 
@@ -1565,11 +1622,473 @@ export class UniworkDocsService {
    */
   async teardownSaveQueue(): Promise<void> {
     const session = this.queueSession
-    if (session) this.deadQueueSessions.add(session.id)
+    if (session) {
+      this.stoppingQueueSessions.add(session.id)
+      this.deadQueueSessions.add(session.id)
+    }
     // the dispatcher's next `canCommit` reads false now; wait for the pass that
     // is already running to unwind (and release its locks) before the records go
     await this.queuePass?.catch(() => undefined)
     this.stopQueue()
+  }
+
+  private sleepMs(ms: number): Promise<void> {
+    if (this.deps.sleep) return this.deps.sleep(ms)
+    return new Promise((resolveWait) => {
+      const timer = setTimeout(resolveWait, ms)
+      ;(timer as { unref?: () => void }).unref?.()
+    })
+  }
+
+  private nowIso(): string {
+    return new Date(this.deps.now ? this.deps.now() : Date.now()).toISOString()
+  }
+
+  /**
+   * G5-11: inspects the target owner's working copies, open editors, and durable
+   * intent store to compute what the sign-out prompt needs without changing anything.
+   */
+  async planSignOut(owner?: LastOwner | null): Promise<SignOutPlan> {
+    const target = owner ?? this.liveIdentity() ?? this.lastOwner
+    if (!target) {
+      return {
+        count: 0,
+        waiting: 0,
+        keystoreLocked: false,
+        ramOnly: 0,
+      }
+    }
+    const keystoreLocked = this.storeLocked()
+    const access = !keystoreLocked
+      ? await this.intentAccess()
+      : ({ kind: 'keystore_locked' } as const)
+    const storeLockedNow = keystoreLocked || access.kind === 'keystore_locked'
+    const unsavedDocs = new Set<string>()
+    const waitingDocs = new Set<string>()
+    const ramOnlyDocs = new Set<string>()
+
+    for (const dir of scopeWorkingCopyDirs(this.store.root, target)) {
+      if (this.store.newerStoreIn(dir)) continue
+      const binding = await this.store.readDir(dir)
+      if (!binding) continue
+      const key = basename(dir)
+      const path = join(dir, binding.filename)
+      if (this.coordinator.isSaving(path) || this.queueInFlight.has(key)) {
+        waitingDocs.add(key)
+        unsavedDocs.add(key)
+      }
+      if (access.kind === 'ok') {
+        const stored = await access.intents.read(key, {
+          orgId: binding.orgId,
+          workspaceId: binding.workspaceId,
+          baseVersion: binding.baseVersion,
+          length: 0,
+        })
+        if (stored && !isTerminalQueueState(stored.intent.state)) {
+          unsavedDocs.add(key)
+          if (
+            stored.intent.state === 'validating' ||
+            stored.intent.state === 'uploading' ||
+            stored.intent.state === 'committing' ||
+            stored.intent.state === 'reconciling'
+          ) {
+            waitingDocs.add(key)
+          }
+        }
+      } else if (binding.state === 'saving' || binding.state === 'reconciling') {
+        waitingDocs.add(key)
+        unsavedDocs.add(key)
+      }
+      let diskDirty = KEEP_LOCAL_STATES.has(binding.state)
+      if (!diskDirty && this.store.exists(path)) {
+        try {
+          const diskHash = sha256Hex(new Uint8Array(readFileSync(path)))
+          if (diskHash !== binding.baseChecksum) diskDirty = true
+        } catch {
+          // ignore unreadable working copy
+        }
+      }
+      let edDirty = this.editorDirty.has(path) || this.editorDirty.has(pathKey(path))
+      if (!edDirty && this.deps.isPathOpen(path) && this.deps.editorStateOf) {
+        const st = await this.editorState(path)
+        if (st.dirty === true) edDirty = true
+      }
+      if (diskDirty || edDirty) {
+        unsavedDocs.add(key)
+        if (storeLockedNow) ramOnlyDocs.add(key)
+      }
+    }
+
+    return {
+      count: unsavedDocs.size,
+      waiting: waitingDocs.size,
+      keystoreLocked: storeLockedNow,
+      ramOnly: storeLockedNow ? ramOnlyDocs.size : 0,
+    }
+  }
+
+  /** Alias for `planSignOut` used by IPC handler (`UNIWORK_DOC_CHANNELS.signOutPlan`). */
+  async signOutPlan(owner?: LastOwner | null): Promise<SignOutPlan> {
+    return this.planSignOut(owner)
+  }
+
+  /**
+   * G5-11: 6-step sign-out / account-switch / deployment-switch session lock:
+   * 1. Stop runtime + mark queue session stopping, bounded wait (`SIGN_OUT_RECEIPT_WAIT_MS`)
+   *    for any in-flight upload/commit, transitioning still-in-flight records to
+   *    `reconciling` and marking the queue session dead so late responses write nothing.
+   * 2. Capture N+1 editor/disk working copies into the encrypted `parked` store
+   *    (skipped when `keystoreLocked`).
+   * 3. Close every open view of `owner`'s working copies with no prompt, forget AI
+   *    history and locks.
+   * 4. Delete plaintext working copies and docs/sheets recovery copies of `owner`
+   *    (only for docs where step 2 succeeded, or after keystore confirmation).
+   * 5. Clear all in-memory caches on the service.
+   * 6. Lock the encrypted store (`syncStore.lock(owner)`).
+   */
+  async lockSession(owner?: LastOwner | null, onWaiting?: () => void): Promise<{ ok: boolean }> {
+    const target = owner ?? this.liveIdentity() ?? this.lastOwner
+    if (!target) return { ok: true }
+    const scopeToken = `${target.deploymentId}/${target.accountId}`
+    const keystoreLocked = this.storeLocked()
+
+    // Step 1: stop runtime, block new commits, bounded receipt wait (30s)
+    this.deps.stopRuntime?.()
+    if (this.queueSession) {
+      this.stoppingQueueSessions.add(this.queueSession.id)
+    }
+    const dirs = scopeWorkingCopyDirs(this.store.root, target)
+    const savingPromises: Promise<unknown>[] = []
+    if (this.queuePass) savingPromises.push(this.queuePass.catch(() => undefined))
+    let hasInFlightRecord = false
+    const open = !keystoreLocked
+      ? await this.openSyncStore()
+      : ({ kind: 'keystore_locked' } as const)
+    const intents =
+      open.kind === 'ok' ? createIntentStore(open.records(INTENT_STORE_REGISTRATION.name)) : null
+
+    for (const dir of dirs) {
+      if (this.store.newerStoreIn(dir)) continue
+      const binding = await this.store.readDir(dir)
+      if (!binding) continue
+      const key = basename(dir)
+      const path = join(dir, binding.filename)
+      if (this.coordinator.isSaving(path)) {
+        savingPromises.push(this.coordinator.settled(path).catch(() => undefined))
+      }
+      if (intents) {
+        const stored = await intents.read(key, {
+          orgId: binding.orgId,
+          workspaceId: binding.workspaceId,
+          baseVersion: binding.baseVersion,
+          length: 0,
+        })
+        if (
+          stored &&
+          (stored.intent.state === 'validating' ||
+            stored.intent.state === 'uploading' ||
+            stored.intent.state === 'committing')
+        ) {
+          hasInFlightRecord = true
+        }
+      }
+    }
+
+    let announcedWaiting = false
+    if (savingPromises.length > 0 || hasInFlightRecord) {
+      announcedWaiting = true
+      onWaiting?.()
+      this.deps.pushSignOutProgress?.({ phase: 'waiting' })
+      if (savingPromises.length > 0) {
+        await Promise.race([Promise.all(savingPromises), this.sleepMs(SIGN_OUT_RECEIPT_WAIT_MS)])
+      } else {
+        await this.sleepMs(SIGN_OUT_RECEIPT_WAIT_MS)
+      }
+    }
+    if (this.pendingApplyRecords.size > 0) {
+      await Promise.all([...this.pendingApplyRecords])
+    }
+
+    // Mark the queue session dead so any late HTTP response writes nothing
+    this.stopQueue()
+
+    // Transition any record still in validating | uploading | committing to reconciling
+    if (intents) {
+      const now = this.nowIso()
+      for (const dir of dirs) {
+        if (this.store.newerStoreIn(dir)) continue
+        const binding = await this.store.readDir(dir)
+        if (!binding) continue
+        const key = basename(dir)
+        const stored = await intents.read(key, {
+          orgId: binding.orgId,
+          workspaceId: binding.workspaceId,
+          baseVersion: binding.baseVersion,
+          length: 0,
+        })
+        if (
+          stored &&
+          (stored.intent.state === 'validating' ||
+            stored.intent.state === 'uploading' ||
+            stored.intent.state === 'committing')
+        ) {
+          const reconciled: IntentRecordV2 = {
+            ...stored.intent,
+            state: 'reconciling',
+            reconcileSince: stored.intent.reconcileSince ?? now,
+            updatedAt: now,
+          }
+          await intents.put(key, reconciled, stored.payload)
+        }
+      }
+    }
+
+    // Step 2: capture N+1 from open editors and park dirty / queued working copies
+    const parkFailedDirs = new Set<string>()
+    if (!keystoreLocked && open.kind === 'ok' && intents) {
+      const parked = createParkedStore(open.records(PARKED_STORE_REGISTRATION.name))
+      for (const dir of dirs) {
+        if (this.store.newerStoreIn(dir)) continue
+        const binding = await this.store.readDir(dir)
+        if (!binding) continue
+        const key = basename(dir)
+        const path = join(dir, binding.filename)
+        const isOpen = this.deps.isPathOpen(path)
+        let edDirty = this.editorDirty.has(path) || this.editorDirty.has(pathKey(path))
+        if (!edDirty && isOpen && this.deps.editorStateOf) {
+          const st = await this.editorState(path)
+          if (st.dirty === true) edDirty = true
+        }
+        if (isOpen && edDirty) {
+          const beforeHash = this.store.exists(path)
+            ? sha256Hex(new Uint8Array(readFileSync(path)))
+            : null
+          await new Promise<void>((resolveCapture) => {
+            let done = false
+            const finish = () => {
+              if (done) return
+              done = true
+              this.armedCaptures.delete(pathKey(path))
+              resolveCapture()
+            }
+            this.armCapture(path, finish)
+            const started = this.deps.requestModuleSave(path, finish, 'capture')
+            if (!started) {
+              finish()
+              return
+            }
+            const afterHash = this.store.exists(path)
+              ? sha256Hex(new Uint8Array(readFileSync(path)))
+              : null
+            if (afterHash !== beforeHash || !this.armedCaptures.has(pathKey(path))) {
+              finish()
+              return
+            }
+            void Promise.resolve().then(() => {
+              const nextHash = this.store.exists(path)
+                ? sha256Hex(new Uint8Array(readFileSync(path)))
+                : null
+              if (nextHash !== beforeHash || !this.armedCaptures.has(pathKey(path))) {
+                finish()
+              }
+            })
+            void this.sleepMs(5_000).then(finish)
+          })
+        }
+        if (!this.store.exists(path)) continue
+        const bytes = new Uint8Array(readFileSync(path))
+        const diskHash = sha256Hex(bytes)
+        const stored = await intents.read(key, {
+          orgId: binding.orgId,
+          workspaceId: binding.workspaceId,
+          baseVersion: binding.baseVersion,
+          length: bytes.byteLength,
+        })
+        const hasActiveIntent = stored !== null && !isTerminalQueueState(stored.intent.state)
+        const needsPark =
+          diskHash !== binding.baseChecksum ||
+          KEEP_LOCAL_STATES.has(binding.state) ||
+          hasActiveIntent
+        if (needsPark) {
+          const parkRes = await parked.park({
+            documentKey: key,
+            binding: {
+              ...binding,
+              state: 'dirty',
+              minStoreLevel: APP_STORE_LEVEL,
+              minAppVersion: this.buildVersion(),
+            },
+            bytes,
+            parkedAt: this.nowIso(),
+          })
+          if (parkRes !== 'ok') {
+            parkFailedDirs.add(dir)
+          }
+        }
+      }
+    }
+
+    // Step 3: close every view of the owner's copies with NO prompt, forget AI history + locks
+    this.closeConflictPrompt()
+    const ownedPath = (p: string): boolean => {
+      const rel = relative(resolve(this.store.root), resolve(p))
+      if (!rel || rel.startsWith('..') || isAbsolute(rel)) return false
+      const [dep, acc] = rel.split(sep)
+      return dep === target.deploymentId && acc === target.accountId
+    }
+    this.forgetLocksWhere(ownedPath)
+    if (this.deps.closePathNow && parkFailedDirs.size === 0) {
+      const openPaths = this.deps.openPaths ? this.deps.openPaths() : []
+      for (const p of openPaths) {
+        if (ownedPath(p)) this.deps.closePathNow(p)
+      }
+    }
+    if (this.deps.aiHistoryPaths && this.deps.forgetAiHistory && parkFailedDirs.size === 0) {
+      const toForget = this.deps.aiHistoryPaths().filter(ownedPath)
+      if (toForget.length > 0) this.deps.forgetAiHistory(toForget)
+    }
+
+    // Step 4: delete plaintext working copies and docs/sheets recovery copies
+    // (only for docs where step 2 succeeded, or after keystore confirmation)
+    let keptDir = false
+    for (const dir of scopeWorkingCopyDirs(this.store.root, target)) {
+      if (this.store.newerStoreIn(dir) || parkFailedDirs.has(dir)) {
+        keptDir = true
+        continue
+      }
+      const binding = await this.store.readDir(dir)
+      const filename = binding?.filename ?? documentNameIn(dir)
+      const path = join(dir, filename)
+      this.deleteRecoveryCopies(path)
+      rmSync(dir, { recursive: true, force: true })
+    }
+    if (!keptDir) {
+      const accountDir = join(this.store.root, target.deploymentId, target.accountId)
+      rmSync(accountDir, { recursive: true, force: true })
+    }
+
+    // Step 5: clear all 15 in-memory caches on the service
+    this.lockedScopes.add(scopeToken)
+    this.locks.clear()
+    this.hashMemo.clear()
+    this.editorDirty.clear()
+    this.lastUserSave.clear()
+    this.otherWindowStatus.clear()
+    this.selfRenamed.clear()
+    this.remoteBars.clear()
+    this.remoteNotices.clear()
+    this.remoteHeld.clear()
+    this.ownEcho.clear()
+    this.remoteLocked.clear()
+    this.editorAi.clear()
+    this.remoteReloads.clear()
+    this.orgMemberNames.clear()
+    this.orgMemberNamesOrg = null
+    this.orgMemberNamesInFlight = null
+    this.migratedScopes.delete(scopeToken)
+
+    // Step 6: lock the encrypted store for this scope
+    await this.deps.syncStore?.lock({
+      deploymentId: target.deploymentId,
+      accountId: target.accountId,
+    })
+    this.syncOpen = null
+    this.storeOpenKind = 'unknown'
+    if (announcedWaiting) {
+      this.deps.pushSignOutProgress?.({ phase: 'done' })
+    }
+
+    return { ok: parkFailedDirs.size === 0 }
+  }
+
+  private clearRecoveryFn: ((path: string) => void) | null = null
+
+  setClearRecovery(clear: (path: string) => void): void {
+    this.clearRecoveryFn = clear
+  }
+
+  private deleteRecoveryCopies(filePath: string): void {
+    try {
+      this.clearRecoveryFn?.(filePath)
+    } catch {
+      // ignore when Electron app path is not initialized in unit tests
+    }
+    for (const candidate of [filePath, resolve(filePath)]) {
+      const hash = createHash('sha1').update(candidate).digest('hex')
+      const shortHash = hash.slice(0, 16)
+      const docsDir = join(this.deps.userDataDir, 'docs-autosave')
+      const sheetsDir = join(this.deps.userDataDir, 'sheets-autosave')
+      for (const target of [
+        join(docsDir, `${shortHash}.docx`),
+        join(docsDir, `${hash}.docx`),
+        join(docsDir, `${hash}.json`),
+        join(sheetsDir, `${shortHash}.xlsx`),
+        join(sheetsDir, `${hash}.xlsx`),
+        join(sheetsDir, `${hash}.recovery.json`),
+      ]) {
+        try {
+          if (existsSync(target)) unlinkSync(target)
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }
+
+  /**
+   * G5-11: on same-account sign-in, restores any parked working copies from the
+   * encrypted `parked` store back to `uniwork-documents/<dep>/<acc>/<doc>/`,
+   * verifies the written file's sha256 against the parked bytes, and removes
+   * the parked record only after verification succeeds. Refuses to restore
+   * records whose binding declares a newer `minStoreLevel`.
+   */
+  async restoreParked(owner?: LastOwner | null): Promise<void> {
+    const target = owner ?? this.liveIdentity()
+    if (!target || !this.deps.syncStore) return
+    const scope = this.deps.syncStore.scope()
+    if (
+      !scope ||
+      scope.deploymentId !== target.deploymentId ||
+      scope.accountId !== target.accountId
+    ) {
+      return
+    }
+    this.lockedScopes.delete(`${target.deploymentId}/${target.accountId}`)
+    this.clearSignedOutLocks()
+    const open = await this.openSyncStore()
+    if (open.kind !== 'ok') return
+    const parked = createParkedStore(open.records(PARKED_STORE_REGISTRATION.name))
+    const keys = await parked.list()
+    for (const key of keys) {
+      const copy = await parked.take(key)
+      if (!copy) continue
+      if ((copy.binding.minStoreLevel ?? APP_STORE_LEVEL) > APP_STORE_LEVEL) continue
+      const dir = this.store.dirFor(target.deploymentId, target.accountId, copy.documentKey)
+      if (this.store.newerStoreIn(dir)) continue
+      const filePath = await this.store.writeWorkingCopy(dir, copy.binding.filename, copy.bytes)
+      const written = await this.store.write(dir, {
+        ...copy.binding,
+        state: 'dirty',
+        minStoreLevel: APP_STORE_LEVEL,
+        minAppVersion: this.buildVersion(),
+      })
+      if (!written) continue
+      const readBack = new Uint8Array(await readFile(filePath))
+      if (sha256Hex(readBack) === sha256Hex(copy.bytes)) {
+        await parked.remove(key)
+      }
+    }
+  }
+
+  private clearSignedOutLocks(): void {
+    let cleared = false
+    for (const [key, lock] of [...this.locks]) {
+      if (lock.reason === 'signed_out') {
+        this.locks.delete(key)
+        cleared = true
+      }
+    }
+    if (cleared) this.deps.pushLocks?.()
   }
 
   /** whether the durable store holds an intent for `doc`; 'locked' = unreachable now */
@@ -1649,9 +2168,9 @@ export class UniworkDocsService {
    * The lock for a working copy that must not open: a folder whose binding
    * declares a store this build does not read (schema >= 2 outside the level
    * window), or - while the session store is locked - a copy still holding a
-   * pre-store pending intent. Recorded and pushed, so the shell shows the S11
-   * panel. True = nothing may open for that path. Nothing is written and no
-   * client call is made for it.
+   * pre-store pending intent, or - while signed out - a residual working copy
+   * of a signed-out account (G5-11). Recorded and pushed, so the shell shows
+   * the S11 panel. True = nothing may open for that path.
    */
   refuseLockedPath(path: string): boolean {
     const lock = this.store.newerStoreAt(path)
@@ -1661,6 +2180,14 @@ export class UniworkDocsService {
     }
     if (this.storeLocked() && this.store.legacyIntentAt(path)) {
       this.recordPathLock(path, 'keystore_locked')
+      return true
+    }
+    if (
+      !this.deps.identity() &&
+      !this.storeLocked() &&
+      this.store.classify(path).kind === 'bound'
+    ) {
+      this.recordPathLock(path, 'signed_out')
       return true
     }
     return false
@@ -1830,11 +2357,21 @@ export class UniworkDocsService {
     )
   }
 
+  private isSignedOutLocked(path: string, doc: BoundDocument): boolean {
+    if (this.locks.get(pathKey(path))?.reason === 'signed_out') return true
+    return (
+      !this.deps.identity() &&
+      !this.storeLocked() &&
+      this.lockedScopes.has(`${doc.deploymentId}/${doc.userId}`)
+    )
+  }
+
   /** view access, another account's copy, a newer store this build cannot read, or an S6 lock (one read) */
   isReadOnly(path: string): boolean {
     const found: PathBinding = this.store.classify(path)
     if (found.kind === 'newer') return true
     if (found.kind !== 'bound') return false
+    if (this.isSignedOutLocked(path, found.doc)) return true
     // G5-03a: a document the server has revoked or deleted while it is open is
     // read-only for good (its module refuses the save, and W4's export gate
     // reads the same answer)
@@ -1851,13 +2388,16 @@ export class UniworkDocsService {
   }
 
   /**
-   * G5-03a: the server revoked or deleted this open working copy. The module
-   * seam reads this to refuse export / Save As / print-to-PDF; `isReadOnly`
-   * already covers the save side.
+   * G5-03a: the server revoked or deleted this open working copy, or (G5-11)
+   * it is a residual working copy while signed out. The module seam reads this
+   * to refuse export / Save As / print-to-PDF; `isReadOnly` already covers the
+   * save side.
    */
   isLocked(path: string): boolean {
     const found: PathBinding = this.store.classify(path)
-    return found.kind === 'bound' && this.lockedFor(found.doc.binding) !== null
+    if (found.kind !== 'bound') return false
+    if (this.isSignedOutLocked(path, found.doc)) return true
+    return this.lockedFor(found.doc.binding) !== null
   }
 
   /** moves on every user Save; see noteEditorDirty */

@@ -42,6 +42,12 @@ export interface UniworkModuleSeam {
    * save writes the working copy to disk without firing the user-save hook.
    */
   consumeCapture?(path: string): boolean
+  /**
+   * G5-11: registers the docs/sheets crash-recovery cleaner so sign-out can
+   * bump recovery epochs and delete recovery files without service.ts importing
+   * the Electron-bound module mains.
+   */
+  setClearRecovery?(clear: (path: string) => void): void
   onUserSave(path: string): void
   /**
    * G5-04g: true when the path's folder declares a store this build does not
@@ -117,6 +123,10 @@ export function installUniworkModuleSeams(
   seam: UniworkModuleSeam | null,
   commentAuthor: CommentAuthorResolver | null = null,
 ): void {
+  seam?.setClearRecovery?.((path: string) => {
+    clearDocsRecoveryCopy(path)
+    clearWorkbookRecovery(path)
+  })
   const author = commentAuthor ?? (() => NEUTRAL_COMMENT_AUTHOR)
   const policy = seam
     ? {
