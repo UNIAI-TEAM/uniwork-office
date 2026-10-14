@@ -25,6 +25,9 @@
   --shadow-btn-lift: 0 4px 16px rgb(0 0 0 / 12%);
   --shadow-btn-primary: 0 2px 6px rgb(10 82 230 / 28%), 0 6px 18px rgb(10 82 230 / 18%);
   --on-accent: #ffffff;
+  /* unscaled viewport unit defaults (overridden on .app-frame in tabbar.css when zoomed) */
+  --ui-vh: 1vh;
+  --ui-vw: 1vw;
 }
 
 /* ── Dark mode overrides ─────────────────────────────────── */

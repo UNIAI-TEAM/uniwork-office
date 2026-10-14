@@ -31,11 +31,17 @@ function rule(css: string, selector: string): string {
 }
 
 describe('viewport tokens under the zoomed frame', () => {
-  it('defines --ui-vh and --ui-vw on .app-frame, dividing by the scale', () => {
+  it('defines --ui-vh and --ui-vw on .app-frame, dividing by the scale, with :root defaults in tabbar.css and home.css', () => {
     const frame = rule(src('tabbar.css'), '.app-frame')
     expect(frame).toMatch(/--ui-vh:\s*calc\(1vh\s*\/\s*var\(--ui-scale,\s*1\)\)/)
     expect(src('tabbar.css')).toMatch(/:root\s*\{\s*--ui-vh:\s*1vh;\s*--ui-vw:\s*1vw;/)
     expect(frame).toMatch(/--ui-vw:\s*calc\(1vw\s*\/\s*var\(--ui-scale,\s*1\)\)/)
+    const homeRoot = rule(src('home.css'), ':root')
+    expect(homeRoot).toMatch(/--ui-vh:\s*1vh;/)
+    expect(homeRoot).toMatch(/--ui-vw:\s*1vw;/)
+    expect(rule(src('home.css'), '.row-menu')).toMatch(
+      /max-height:\s*calc\(var\(--ui-vh\)\s*\*\s*100\s*-\s*16px\)/,
+    )
   })
 
   it.each(['home.css', 'settings.css', 'onboarding.css'])(
