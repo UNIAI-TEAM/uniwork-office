@@ -410,4 +410,17 @@ describe('visual r1 fixes (panel / thread)', () => {
     expect(coarse).toMatch(/\.collab-cmh \.collab-link\s*\{[^}]*min-height: 24px/)
     expect(coarse).toMatch(/\.collab-cmh \.collab-link::after\s*\{[^}]*content: ''[^}]*inset:/)
   })
+
+  it('keeps the comment head row (.collab-cmh) on one line at 300px even with the Edited chip (V14-07)', () => {
+    const css = readFileSync(`${__dirname}/../src/collab/collab.css`, 'utf8')
+    const cmhAt = css.indexOf('.collab-cmh {')
+    const cmh = css.slice(cmhAt, css.indexOf('}', cmhAt))
+    expect(cmh).toMatch(/flex-wrap:\s*nowrap/)
+    expect(css).toMatch(/\.collab-cmh \.collab-link\s*\{[^}]*min-width:\s*0/)
+    expect(css).toMatch(/\.collab-cmh \.collab-link\s*\{[^}]*text-overflow:\s*ellipsis/)
+    expect(css).toMatch(/\.collab-cmh \.collab-link\s*\{[^}]*white-space:\s*nowrap/)
+    const dtAt = css.indexOf('.collab-dt {')
+    const dt = css.slice(dtAt, css.indexOf('}', dtAt))
+    expect(dt).toMatch(/white-space:\s*nowrap/)
+  })
 })
