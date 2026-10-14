@@ -164,6 +164,35 @@ describe('UniWork AI notices (slides panel)', () => {
     expect(notices(c)).toEqual([])
   })
 
+  const regenerate = (c: HTMLElement) =>
+    c.querySelector<HTMLButtonElement>(`button[aria-label="${t('aiRegenerate')}"]`)
+
+  it('a wait that gives up ends as an error and Retry IS offered', async () => {
+    const c = await startRun()
+    await notify({ kind: 'rate-limit-wait', seconds: 5, attempt: 1 })
+    // the positive control of the wait test: no regenerate while waiting ...
+    expect(regenerate(c)).toBeNull()
+    await act(async () => harness.events!.onError?.('too fast'))
+    await flush()
+    expect(notices(c)).toEqual([])
+    // ... and the same control is there once the wait gave up, so the null above can fail
+    expect(regenerate(c), 'Retry after the give-up').not.toBeNull()
+  })
+
+  it('a wait after an earlier failed turn still shows Stop only', async () => {
+    const c = await startRun()
+    await act(async () => harness.events!.onError?.('first failed'))
+    await flush()
+    const retry = regenerate(c)
+    expect(retry, 'Retry after the first failure').not.toBeNull()
+    await act(async () => retry!.click())
+    await flush()
+    await notify({ kind: 'rate-limit-wait', seconds: 30, attempt: 1 })
+    expect(notices(c)).toEqual([ui('aiErrRateLimited', { seconds: 30 })])
+    expect(c.querySelector(`button[aria-label="${t('aiStop')}"]`), 'Stop stays').not.toBeNull()
+    expect(regenerate(c)).toBeNull()
+  })
+
   it('a restarted conversation keeps its note and no empty-reply line', async () => {
     const c = await startRun()
     await notify({ kind: 'conversation-restarted' })

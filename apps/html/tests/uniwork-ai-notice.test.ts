@@ -10,13 +10,14 @@ import { buildParseMap } from '../src/renderer/document/parse-map'
 import { usableAiSettings } from './helpers/ai-settings'
 
 // the loop is replaced by a harness that hands over its events and never finishes on its own
-const harness = vi.hoisted(() => ({ events: null as any }))
+const harness = vi.hoisted(() => ({ events: null as any, loop: null as any }))
 vi.mock('@genoffice/agent-core', async (orig) => {
   const real = (await orig()) as Record<string, unknown>
   class FakeLoop {
     busy = false
     constructor(readonly opts: any) {
       harness.events = opts.events
+      harness.loop = this
     }
     async run(): Promise<void> {
       this.busy = true
@@ -153,6 +154,37 @@ describe('UniWork AI notices (html panel)', () => {
     await act(async () => harness.events.onText('the answer'))
     expect(notices()).toEqual([])
     expect(container!.textContent).toContain('the answer')
+  })
+
+  const retryButton = () => container!.querySelector<HTMLButtonElement>('.ai-retry-btn')
+
+  it('a wait that gives up ends as an error and Retry IS offered', async () => {
+    await started()
+    await notify({ kind: 'rate-limit-wait', seconds: 5, attempt: 1 })
+    // the positive control of the wait test: no Retry while waiting ...
+    expect(retryButton()).toBeNull()
+    await act(async () => harness.events.onError('too fast'))
+    expect(notices()).toEqual([])
+    // ... and the same control is there once the wait gave up, so the null above can fail
+    expect(retryButton(), 'Retry after the give-up').not.toBeNull()
+  })
+
+  it('a wait after an earlier failed turn still shows Stop only', async () => {
+    await started()
+    await act(async () => harness.events.onError('first failed'))
+    // the real loop is idle after a failure; the fake never finishes on its own
+    harness.loop.busy = false
+    const retry = retryButton()
+    expect(retry, 'Retry after the first failure').not.toBeNull()
+    await act(async () => retry!.click())
+    await flush()
+    await notify({ kind: 'rate-limit-wait', seconds: 30, attempt: 1 })
+    expect(notices()).toEqual([ui('aiErrRateLimited', { seconds: 30 })])
+    expect(
+      container!.querySelector(`button[aria-label="${t('aiStop')}"]`),
+      'Stop stays',
+    ).not.toBeNull()
+    expect(retryButton()).toBeNull()
   })
 
   it('a restarted conversation keeps its note and no empty-reply line', async () => {

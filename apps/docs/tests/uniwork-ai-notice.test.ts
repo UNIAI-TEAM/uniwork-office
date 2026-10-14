@@ -140,13 +140,40 @@ describe('UniWork AI notices (docs panel)', () => {
     expect(reports.map((r) => r.state)).toEqual(['running', 'idle'])
   })
 
-  it('a wait that gives up ends as an error with one idle (Retry is then allowed)', async () => {
+  const regenerateButton = () =>
+    container!.querySelector<HTMLButtonElement>(`button[aria-label="${t('aiRegenerateTitle')}"]`)
+
+  it('a wait that gives up ends as an error with one idle, and Retry IS offered', async () => {
     await emit({ type: 'notice', notice: { kind: 'rate-limit-wait', seconds: 5, attempt: 1 } })
+    // the positive control of the wait test: while waiting there is no regenerate control ...
+    expect(regenerateButton()).toBeNull()
     await emit({ type: 'error', error: 'too fast', uniworkCode: 'ai_rate_limited' })
     expect(notices()).toEqual([])
     expect(container!.querySelector('.ai-msg-error')).not.toBeNull()
+    // ... and once it gave up the same control is there, so the null above can fail
+    expect(regenerateButton(), 'Retry after the give-up').not.toBeNull()
     await pastGrace()
     expect(reports.map((r) => r.state)).toEqual(['running', 'idle'])
+  })
+
+  it('a wait after an earlier failed turn still shows Stop only (the old error keeps no Retry live)', async () => {
+    await emit({ type: 'error', error: 'first failed', uniworkCode: 'ai_provider_error' })
+    expect(container!.querySelector('.ai-msg-error')).not.toBeNull()
+    await pastGrace()
+    const retry = regenerateButton()
+    expect(retry, 'Retry after the first failure').not.toBeNull()
+    // Retry starts the next turn; its 429 wait is a status line with Stop only
+    requestId = ''
+    await act(async () => retry!.click())
+    for (let i = 0; i < 6 && !requestId; i++) await flush()
+    expect(requestId, 'the retried turn started').not.toBe('')
+    await emit({ type: 'notice', notice: { kind: 'rate-limit-wait', seconds: 30, attempt: 1 } })
+    expect(notices()).toEqual([ui('aiErrRateLimited', { seconds: 30 })])
+    expect(stopButton(), 'Stop stays').not.toBeNull()
+    expect(regenerateButton()).toBeNull()
+    expect(container!.querySelector('.ai-retry-btn')).toBeNull()
+    await emit({ type: 'done' })
+    await pastGrace()
   })
 
   it('a restarted conversation shows its note and not an empty-reply line', async () => {
