@@ -1,0 +1,102 @@
+import type { zh } from './zh'
+
+export const fr = {
+  setClose: 'Fermer',
+  setRetry: 'Réessayer',
+  setUnsavedTitle: 'Modifications non enregistrées',
+  setUnsavedBody: 'Quitter cette page sans enregistrer ? Vos modifications seront perdues.',
+  setUnsavedKeep: 'Continuer la modification',
+  setUnsavedDiscard: 'Abandonner les modifications',
+  setAiSaveFailed: 'Impossible d’enregistrer : {error}',
+  setAiCreditLeft: 'Crédits : {remain} restants · {used} utilisés',
+  setAiCreditUsedNoLimit: 'Crédits utilisés : {used} (clé sans limite)',
+  setAiCreditRate: '1 USD de solde de clé = 1 000 crédits IA',
+  setGrpAppearance: 'Apparence',
+  setGrpAiPanel: 'Panneau IA',
+  setGrpFiles: 'Fichiers et enregistrement',
+  setGrpSystem: 'Système',
+  setChannelBetaDesc:
+    'Les versions bêta reçoivent les nouveautés en premier et peuvent être moins stables.',
+  setMcpApplyFailed: 'Impossible d’appliquer les paramètres du serveur MCP.',
+  intgActionFailed:
+    'Impossible de terminer. Vérifiez que le dossier est accessible en écriture, puis réessayez.',
+  intgLoadFailed: 'Impossible de lire l’état de l’intégration.',
+
+  bkLead:
+    'Les modules payants sauvegardent votre Plan de travail sur UniWork Cloud et ajoutent de l’espace de stockage. L’exportation et la restauration sur cet appareil restent toujours gratuites.',
+  bkPlanLabel: 'Formule de sauvegarde',
+  bkPlanNone: 'Aucune',
+  bkQuotaLabel: 'Stockage cloud',
+  bkQuotaLocal: 'Aucun (cet appareil uniquement)',
+  bkLastLabel: 'Dernière sauvegarde cloud',
+  bkSimulated: 'Achat simulé en cours d’utilisation (version de développement).',
+  bkSignInPrompt:
+    'Connectez-vous à votre compte UniWork pour acheter des modules et sauvegarder dans le cloud.',
+  bkSignIn: 'Se connecter',
+  bkFreeHeading: 'Gratuit sur cet appareil',
+  bkExportHeading: 'Exporter',
+  bkRestoreHeading: 'Restaurer',
+  bkExportZip: 'Exporter une sauvegarde (ZIP)',
+  bkExportJson: 'Exporter une sauvegarde (JSON)',
+  bkImportZip: 'Restaurer depuis un ZIP…',
+  bkImportJson: 'Restaurer depuis un JSON…',
+  bkRestoreConfirm:
+    'La restauration remplace les données du Plan de travail sur cet appareil par le contenu de la sauvegarde. Cette action est irréversible.',
+  bkRestoreChoose: 'Choisir un fichier de sauvegarde…',
+  bkCloudHeading: 'UniWork Cloud',
+  bkCloudBackup: 'Sauvegarder dans le cloud',
+  bkCloudNeedsPlan: 'Nécessite une formule de sauvegarde',
+  bkPlansHeading: 'Formules de sauvegarde',
+  bkPacksHeading: 'Stockage supplémentaire',
+  bkClearSimulated: 'Effacer les achats simulés (dev)',
+  bkActive: 'Actif',
+  bkPrice: 'Prix',
+  bkQuota: 'Stockage',
+  bkCadence: 'Fréquence',
+  bkRetentionDays: 'conservé {n} jours',
+  bkManage: 'Gérer',
+  bkBuy: 'Acheter le module',
+  bkSimulate: 'Simuler',
+  bkBuySignIn: 'Connectez-vous à UniWork pour acheter des modules cloud.',
+  bkBuyOpened:
+    'La page de paiement du module est ouverte. Après l’achat, le module apparaîtra sur cet appareil.',
+  bkExportedJson: 'Sauvegarde de {n} éléments exportée.',
+  bkExportedZip: 'Sauvegarde enregistrée dans {path}',
+  bkExportFailed: 'Impossible d’exporter la sauvegarde.',
+  bkRestored:
+    '{n} éléments restaurés. Rechargez l’app si les onglets ouverts ne semblent pas à jour.',
+  bkImportFailed: 'Impossible de restaurer la sauvegarde.',
+  bkInvalidFile: 'Ce fichier n’est pas une sauvegarde UniWork.',
+  bkUnreadableFile: 'Impossible de lire ce fichier.',
+  bkCloudNeedsPlanMsg:
+    'Une formule de sauvegarde est nécessaire pour sauvegarder sur UniWork Cloud.',
+  bkCloudSignIn: 'Connectez-vous pour sauvegarder dans le cloud.',
+  bkCloudSimulated: 'Sauvegarde cloud simulée (dev).',
+  bkCloudPending:
+    'La sauvegarde cloud n’est pas encore disponible. Votre formule est prête et la sauvegarde démarrera dès qu’elle le sera.',
+  bkSimActivated: 'Achat simulé activé.',
+  bkSimPack: 'Pack de stockage simulé ajouté.',
+  bkSimCleared: 'Achats simulés effacés.',
+
+  uaiTitle: 'UniAI sur le web',
+  uaiLead:
+    'Une app de chat IA autonome. Connectez-vous avec votre compte UniWork dans n’importe quel navigateur ; UniWork Office n’est pas nécessaire.',
+  uaiQrAlt: 'Code QR qui ouvre UniAI',
+  uaiQrHint: 'Scannez-le avec votre téléphone pour ouvrir ou installer UniAI.',
+  uaiOpen: 'Ouvrir et installer UniAI',
+  uaiInstallHeading: 'Installer sur votre appareil',
+  uaiStepScan:
+    'Scannez le code QR ci-dessus ou cliquez sur « Ouvrir et installer UniAI » sur cet appareil.',
+  uaiStepWinLabel: 'Windows, Chrome ou Edge :',
+  uaiStepWin:
+    'le menu ⋮ ou l’icône d’installation dans la barre d’adresse → « Installer l’application ».',
+  uaiStepMacLabel: 'macOS, Chrome ou Edge :',
+  uaiStepMac: 'l’icône d’installation dans la barre d’adresse, ou Fichier → « Installer UniAI… ».',
+  uaiStepSafariLabel: 'Safari (macOS / iOS) :',
+  uaiStepSafari: 'Partager → « Ajouter au Dock » / « Sur l’écran d’accueil ».',
+  uaiStandaloneHeading: 'Fonctionne de façon autonome',
+  uaiStandalone1:
+    'Les conversations et l’historique restent dans le navigateur ou l’app installée ; l’utilisation de l’IA est décomptée de votre formule UniWork.',
+  uaiStandalone2:
+    'UniWork Office n’est pas nécessaire pour discuter. Office n’est requis que lorsqu’une commande du chat doit ouvrir un onglet du Plan de travail sur cet ordinateur.',
+} satisfies Record<keyof typeof zh, string>

@@ -1,0 +1,101 @@
+import type { zh } from './zh'
+
+export const es = {
+  setClose: 'Cerrar',
+  setRetry: 'Reintentar',
+  setUnsavedTitle: 'Cambios sin guardar',
+  setUnsavedBody: '¿Salir de esta página sin guardar? Se perderán tus cambios.',
+  setUnsavedKeep: 'Seguir editando',
+  setUnsavedDiscard: 'Descartar cambios',
+  setAiSaveFailed: 'No se pudo guardar: {error}',
+  setAiCreditLeft: 'Créditos: quedan {remain} · usados {used}',
+  setAiCreditUsedNoLimit: 'Créditos usados: {used} (clave sin límite)',
+  setAiCreditRate: '1 USD de saldo de la clave = 1000 créditos de IA',
+  setGrpAppearance: 'Apariencia',
+  setGrpAiPanel: 'Panel de IA',
+  setGrpFiles: 'Archivos y guardado',
+  setGrpSystem: 'Sistema',
+  setChannelBetaDesc:
+    'Las versiones beta reciben antes las funciones nuevas y pueden ser menos estables.',
+  setMcpApplyFailed: 'No se pudo aplicar la configuración del servidor MCP.',
+  intgActionFailed:
+    'No se pudo completar. Comprueba que se pueda escribir en la carpeta y vuelve a intentarlo.',
+  intgLoadFailed: 'No se pudo leer el estado de la integración.',
+
+  bkLead:
+    'Los complementos de pago hacen copias de seguridad de tu Mesa de trabajo en UniWork Cloud y añaden espacio de almacenamiento. Exportar y restaurar en este dispositivo siempre es gratis.',
+  bkPlanLabel: 'Plan de copia de seguridad',
+  bkPlanNone: 'Ninguno',
+  bkQuotaLabel: 'Almacenamiento en la nube',
+  bkQuotaLocal: 'Ninguno (solo este dispositivo)',
+  bkLastLabel: 'Última copia en la nube',
+  bkSimulated: 'Usando una compra simulada (versión de desarrollo).',
+  bkSignInPrompt:
+    'Inicia sesión con tu cuenta de UniWork para comprar complementos y hacer copias en la nube.',
+  bkSignIn: 'Iniciar sesión',
+  bkFreeHeading: 'Gratis en este dispositivo',
+  bkExportHeading: 'Exportar',
+  bkRestoreHeading: 'Restaurar',
+  bkExportZip: 'Exportar copia de seguridad (ZIP)',
+  bkExportJson: 'Exportar copia de seguridad (JSON)',
+  bkImportZip: 'Restaurar desde ZIP…',
+  bkImportJson: 'Restaurar desde JSON…',
+  bkRestoreConfirm:
+    'Al restaurar, los datos de la Mesa de trabajo de este dispositivo se reemplazan por el contenido de la copia. Esta acción no se puede deshacer.',
+  bkRestoreChoose: 'Elegir archivo de copia…',
+  bkCloudHeading: 'UniWork Cloud',
+  bkCloudBackup: 'Copiar en la nube',
+  bkCloudNeedsPlan: 'Requiere un plan de copia de seguridad',
+  bkPlansHeading: 'Planes de copia de seguridad',
+  bkPacksHeading: 'Almacenamiento adicional',
+  bkClearSimulated: 'Borrar compras simuladas (dev)',
+  bkActive: 'Activo',
+  bkPrice: 'Precio',
+  bkQuota: 'Almacenamiento',
+  bkCadence: 'Frecuencia',
+  bkRetentionDays: 'se conserva {n} días',
+  bkManage: 'Gestionar',
+  bkBuy: 'Comprar complemento',
+  bkSimulate: 'Simular',
+  bkBuySignIn: 'Inicia sesión en UniWork para comprar complementos en la nube.',
+  bkBuyOpened:
+    'Se abrió la página de pago del complemento. Tras la compra, el complemento aparecerá en este dispositivo.',
+  bkExportedJson: 'Se exportó una copia de seguridad con {n} elementos.',
+  bkExportedZip: 'Copia de seguridad guardada en {path}',
+  bkExportFailed: 'No se pudo exportar la copia de seguridad.',
+  bkRestored:
+    'Se restauraron {n} elementos. Vuelve a cargar la app si las pestañas abiertas parecen desactualizadas.',
+  bkImportFailed: 'No se pudo restaurar la copia de seguridad.',
+  bkInvalidFile: 'Ese archivo no es una copia de seguridad de UniWork.',
+  bkUnreadableFile: 'No se pudo leer ese archivo.',
+  bkCloudNeedsPlanMsg: 'Se necesita un plan de copia de seguridad para copiar en UniWork Cloud.',
+  bkCloudSignIn: 'Inicia sesión para hacer copias en la nube.',
+  bkCloudSimulated: 'Se simuló una copia en la nube (dev).',
+  bkCloudPending:
+    'La copia en la nube aún no está disponible. Tu plan está listo y empezará a hacer copias en cuanto lo esté.',
+  bkSimActivated: 'Compra simulada activada.',
+  bkSimPack: 'Paquete de almacenamiento simulado añadido.',
+  bkSimCleared: 'Compras simuladas borradas.',
+
+  uaiTitle: 'UniAI en la web',
+  uaiLead:
+    'Una app de chat con IA independiente. Inicia sesión con tu cuenta de UniWork en cualquier navegador; no necesitas UniWork Office.',
+  uaiQrAlt: 'Código QR que abre UniAI',
+  uaiQrHint: 'Escanéalo con el teléfono para abrir o instalar UniAI.',
+  uaiOpen: 'Abrir e instalar UniAI',
+  uaiInstallHeading: 'Instalar en tu dispositivo',
+  uaiStepScan:
+    'Escanea el código QR de arriba o haz clic en «Abrir e instalar UniAI» en este dispositivo.',
+  uaiStepWinLabel: 'Windows, Chrome o Edge:',
+  uaiStepWin:
+    'el menú ⋮ o el icono de instalación de la barra de direcciones → «Instalar aplicación».',
+  uaiStepMacLabel: 'macOS, Chrome o Edge:',
+  uaiStepMac: 'el icono de instalación de la barra de direcciones, o Archivo → «Instalar UniAI…».',
+  uaiStepSafariLabel: 'Safari (macOS / iOS):',
+  uaiStepSafari: 'Compartir → «Añadir al Dock» / «Añadir a pantalla de inicio».',
+  uaiStandaloneHeading: 'Funciona por sí sola',
+  uaiStandalone1:
+    'Los chats y el historial se quedan en el navegador o en la app instalada; el uso de IA cuenta para tu plan de UniWork.',
+  uaiStandalone2:
+    'No necesitas UniWork Office para chatear. Office solo hace falta cuando un comando del chat debe abrir una pestaña de la Mesa de trabajo en este ordenador.',
+} satisfies Record<keyof typeof zh, string>

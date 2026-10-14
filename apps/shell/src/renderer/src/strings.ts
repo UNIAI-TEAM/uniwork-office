@@ -7525,7 +7525,7 @@ export const strings = {
     setAboutLicense: 'Giấy phép',
     setAboutLegalOpenFailed: 'Không thể mở tệp này.',
     setSecIntegrations: 'Tích hợp',
-    setSecBackup: 'Backup & Lưu trữ',
+    setSecBackup: 'Sao lưu & lưu trữ',
     setSecUniAi: 'UniAI',
     intgHeroTitle: 'Dùng UniWork Office từ trợ lý AI của bạn',
     intgHeroDesc:

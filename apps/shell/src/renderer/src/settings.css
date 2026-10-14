@@ -27,6 +27,32 @@
   overflow: hidden;
 }
 
+/* one visible focus ring for keyboard users across all panes */
+.set-dialog :is(button, a[href], summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.set-dialog :is(.set-btn, .set-nav-item, .set-close, .set-about-legal-btn) {
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.1s ease;
+}
+
+.set-dialog
+  :is(.set-btn, .set-close, .set-about-legal-btn):active:not(:disabled):not(
+    [aria-disabled='true']
+  ) {
+  transform: translateY(1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .set-dialog * {
+    transition: none !important;
+  }
+}
+
 .set-header {
   flex: 0 0 auto;
   display: flex;
@@ -98,11 +124,11 @@
 }
 
 .set-nav-item:hover:not(.active) {
-  background: var(--bg-content);
+  background: var(--bg-hover);
 }
 
 .set-nav-item.active {
-  background: var(--bg-hover);
+  background: var(--bg-hover-strong);
   font-weight: 600;
 }
 
@@ -187,7 +213,8 @@
   border-bottom: 1px solid var(--border-subtle);
 }
 
-.set-field:last-child {
+.set-field:last-child,
+.set-field:has(+ .set-pane-subtitle) {
   border-bottom: none;
 }
 
@@ -212,7 +239,7 @@
   color: var(--text-secondary);
   text-align: right;
   user-select: text;
-  word-break: break-all;
+  overflow-wrap: anywhere;
 }
 
 /* stacked label + secondary description (analytics toggle row) */
@@ -354,61 +381,7 @@
   cursor: default;
 }
 
-/* GenMail-style select pill: the visible layer is just the current value +
-   chevron (width hugs the content); the real <select> sits on top invisibly
-   and only supplies the click target and the native popup. */
-.set-select-wrap {
-  position: relative;
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.set-select-wrap:hover,
-.set-select-wrap:focus-within {
-  background: var(--bg-hover);
-}
-
-.set-select-text {
-  font-size: 14px;
-  color: var(--text-primary);
-  white-space: nowrap;
-}
-
-.set-select-wrap::after {
-  content: '';
-  flex-shrink: 0;
-  width: 7px;
-  height: 7px;
-  margin-top: -4px;
-  border-right: 1.5px solid var(--text-primary);
-  border-bottom: 1.5px solid var(--text-primary);
-  transform: rotate(45deg);
-}
-
-.set-select {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  font: inherit;
-  cursor: pointer;
-  /* the element is invisible, but the OS popup that opens on click reads its
-     computed color/background to render the option list */
-  color: var(--text-primary);
-  background: var(--surface);
-}
-
-.set-select option {
-  color: var(--text-primary);
-  background: var(--surface);
-}
-
-/* Shared dropdown (@genoffice/ui gs-dd) in settings rows: borderless text
- * trigger matching the old .set-select-wrap look */
+/* Shared dropdown (@genoffice/ui gs-dd) in settings rows: borderless text trigger */
 .set-dd {
   flex-shrink: 0;
 }
@@ -470,7 +443,7 @@
   cursor: pointer;
 }
 
-.set-btn:hover:not([aria-disabled='true']) {
+.set-btn:hover:not(:disabled):not([aria-disabled='true']) {
   background: var(--bg-hover-strong);
 }
 
@@ -486,7 +459,7 @@
   color: var(--color-btn-primary-text);
 }
 
-.set-btn.primary:hover:not([aria-disabled='true']) {
+.set-btn.primary:hover:not(:disabled):not([aria-disabled='true']) {
   background: var(--color-btn-primary-hover);
 }
 
@@ -543,6 +516,7 @@
 .set-input:focus {
   outline: none;
   border-color: var(--accent, var(--text-primary));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
 .set-input::placeholder {
@@ -864,7 +838,7 @@
 }
 
 .set-intg-confirm .set-field-desc {
-  word-break: break-all;
+  overflow-wrap: anywhere;
 }
 
 .set-intg-notice {
@@ -909,6 +883,7 @@
 .set-backup-status strong {
   font-size: 13px;
   color: var(--text);
+  font-variant-numeric: tabular-nums;
 }
 
 .set-backup-sim {
@@ -938,13 +913,6 @@
   color: var(--text);
 }
 
-.set-backup-h {
-  margin: 6px 0 0;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text);
-}
-
 .set-backup-actions {
   display: flex;
   flex-wrap: wrap;
@@ -962,10 +930,9 @@
   flex-direction: column;
   gap: 8px;
   padding: 14px;
-  border-radius: 14px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  box-shadow: var(--shadow-btn);
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-content);
 }
 
 .set-backup-card.is-active {
@@ -993,20 +960,29 @@
   line-height: 1.4;
 }
 
-.set-backup-card ul {
+.set-backup-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
   margin: 0;
-  padding: 0 0 0 16px;
   font-size: 12px;
+}
+
+.set-backup-facts dt {
+  color: var(--text-secondary);
+}
+
+.set-backup-facts dd {
+  margin: 0;
   color: var(--text);
+  font-variant-numeric: tabular-nums;
 }
 
 .set-backup-badge {
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  padding: 2px 7px;
-  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
   color: var(--accent);
   background: color-mix(in srgb, var(--accent) 16%, transparent);
 }
@@ -1015,7 +991,9 @@
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  /* buttons line up across cards whatever the description length */
   margin-top: auto;
+  padding-top: 4px;
 }
 
 .set-backup-msg {
@@ -1044,9 +1022,9 @@
   justify-content: space-between;
   gap: 12px;
   padding: 14px;
-  border-radius: 14px;
-  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
-  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-content);
 }
 
 .set-uniai-qr-block {
@@ -1061,7 +1039,7 @@
 .set-uniai-qr {
   width: 160px;
   height: 160px;
-  border-radius: 12px;
+  border-radius: 8px;
   border: 1px solid var(--border);
   background: var(--surface);
   flex-shrink: 0;
@@ -1105,22 +1083,6 @@
 .set-uniai-steps li + li,
 .set-uniai-bullets li + li {
   margin-top: 8px;
-}
-
-/* Settings → About: the one-click update entry next to the version row */
-.set-update-btn {
-  height: 26px;
-  padding: 0 12px;
-  border: 1px solid var(--border-strong);
-  border-radius: 3px;
-  background: none;
-  color: var(--text);
-  font: inherit;
-  cursor: pointer;
-}
-
-.set-update-btn:hover {
-  background: var(--hover);
 }
 
 /* Settings → About: product identity above the version rows */
@@ -1178,7 +1140,7 @@
   height: 26px;
   padding: 0 12px;
   border: 1px solid var(--border-strong);
-  border-radius: 3px;
+  border-radius: 6px;
   background: none;
   color: var(--text);
   font: inherit;
@@ -1240,7 +1202,7 @@
   background: var(--account-avatar-bg);
   color: var(--surface);
   font-size: 15px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .acct-card-text {
@@ -1278,7 +1240,7 @@
   align-items: flex-start;
   gap: 10px;
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: 12px;
   border: 1px solid var(--border-subtle);
   background: var(--accent-soft);
   color: var(--text-primary);
@@ -1335,6 +1297,18 @@
   .acct-dot-spinner {
     animation: none;
   }
+}
+
+/* server address form: label over a full-width field, actions under it */
+.acct-server-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.acct-server-form .set-input {
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .acct-actions {
@@ -1435,7 +1409,7 @@
   min-height: 44px;
   padding: 6px 10px;
   border: 1px solid var(--border-subtle);
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--surface);
   cursor: pointer;
 }
@@ -1581,4 +1555,29 @@
 .cloud-renews {
   margin-left: 8px;
   font-size: 12px;
+}
+
+/* unsaved-changes prompt pinned to the bottom of the dialog */
+.set-leave {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 22px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-content);
+}
+
+/* a pane that could not load: the reason and a retry, inline */
+.set-inline-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface));
+  font-size: 13px;
+  color: var(--danger-text);
 }

@@ -67,10 +67,17 @@ export function IntegrationsPane({
   /** one-line outcome shown until the next action: installed hint, saved zip path, copied */
   const [notice, setNotice] = useState<{ agentId?: AgentId; text: string } | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
+  const [loadFailed, setLoadFailed] = useState(false)
 
   const refresh = useCallback(async () => {
-    const s = await api()?.status()
-    if (!s) return
+    const s = await api()
+      ?.status()
+      .catch(() => undefined)
+    if (!s) {
+      setLoadFailed(true)
+      return
+    }
+    setLoadFailed(false)
     setStatus(s)
     onStatus?.(s)
   }, [onStatus])
@@ -96,6 +103,9 @@ export function IntegrationsPane({
       )
       setPending(null)
       await refresh()
+    } catch {
+      setNotice({ agentId: pending.agentId, text: t('intgActionFailed') })
+      setPending(null)
     } finally {
       setBusy(false)
     }
@@ -162,7 +172,18 @@ export function IntegrationsPane({
     return (
       <>
         <h3 className="set-pane-title">{t('setSecIntegrations')}</h3>
-        <div className="set-field-desc">{t('intgLoading')}</div>
+        {loadFailed ? (
+          <div className="set-inline-error" role="alert">
+            <span>{t('intgLoadFailed')}</span>
+            <button type="button" className="set-btn" onClick={() => void refresh()}>
+              {t('setRetry')}
+            </button>
+          </div>
+        ) : (
+          <div className="set-field-desc" role="status">
+            {t('intgLoading')}
+          </div>
+        )}
       </>
     )
   }
