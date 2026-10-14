@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react'
-import type { ReactElement } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
+import type { FormEvent, ReactElement } from 'react'
 import { getWorkbenchModule, type PracticeId, type WorkbenchModuleId } from '@uniwork/practice-core'
 import type { UniworkWorkspaceRef } from '../../shared/home-api'
 import type { UniworkWorkError } from '../../shared/uniwork-work-api'
 import { NotesPane } from './NotesPane'
 import { MODULE_TONES } from './module-tones'
-import { WorkbenchIcon } from './WorkbenchIcons'
+import { WbGlyph, WorkbenchIcon } from './WorkbenchIcons'
 import { useI18n } from './locale'
 import { WorkProfilePane } from './WorkProfilePane'
 import { draftFromForm } from './form-draft'
@@ -13,7 +13,10 @@ import { WorkCalendarPane } from './WorkCalendarPane'
 import { WorkTasksPane } from './WorkTasksPane'
 import { WorkToolbar, type WorkToolbarProps } from './WorkToolbar'
 import { useWbToast } from './WbToastHost'
-import { WbDeleteBtn, WbDraftBtn, WbEditBtn, WbFileBtn, WbRowActions } from './WbRowActions'
+import { WbIconBtn, WbRowActions } from './WbRowActions'
+import { WbMenu, WbMenuItem } from './WbMenu'
+import { WbPackChip } from './DeskDrawer'
+import { FileBadge } from './FileBadge'
 import { readForms, writeForms, type WbFormItem } from './workbench-pins'
 import {
   WorkSkeleton,
@@ -27,8 +30,12 @@ interface Props {
   practiceId: PracticeId
   vi: boolean
   contextTitle?: string | null
-  /** Selected Tri thức pack — Soạn from modules joins Tài liệu on first save. */
+  /** where Soạn from Forms goes: the selected Tri thức pack, else the default project */
   packId?: string | null
+  /** the Forms banner's pack chip: the role's packs and the Knowledge selection */
+  packs?: readonly { id: string; title: string }[]
+  selectedPackId?: string | null
+  onSelectPack?: (id: string | null) => void
   onPackLinked?: () => void
   /** the active UniWork workspace; null = signed out or a member of none */
   workspace: UniworkWorkspaceRef | null
@@ -52,6 +59,9 @@ export function WorkbenchModulePane({
   vi,
   contextTitle,
   packId = null,
+  packs = [],
+  selectedPackId = null,
+  onSelectPack,
   onPackLinked,
   workspace,
   workspaceError,
@@ -72,7 +82,14 @@ export function WorkbenchModulePane({
   // the tab hint (and the open pack) until the tab's data can say more
   const head: WorkToolbarProps = {
     title,
-    summary: `${vi ? mod.hintVi : mod.hintEn}${contextTitle ? ` · ${contextTitle}` : ''}`,
+    summary:
+      moduleId === 'personal' ? (
+        <>
+          <strong>{t('wbProfileSummary')}</strong> · {t('wbProfileReadOnly')}
+        </>
+      ) : (
+        `${vi ? mod.hintVi : mod.hintEn}${contextTitle ? ` · ${contextTitle}` : ''}`
+      ),
   }
   const local = moduleId === 'forms' || moduleId === 'notes'
 
@@ -88,8 +105,7 @@ export function WorkbenchModulePane({
 
   return (
     <section className="wb-pane" aria-label={title}>
-      {/* Tasks, Calendar, Notes and Forms draw their own toolbar: its summary counts what they load */}
-      {moduleId === 'personal' ? <WorkToolbar {...head} /> : null}
+      {/* each tab draws its own toolbar: its summary counts what it loads, Profile adds Edit on the web */}
       {moduleId === 'calendar' && <WorkCalendarPane {...server} head={head} />}
       {moduleId === 'tasks' && <WorkTasksPane {...server} head={head} onWritten={onTasksWritten} />}
       {moduleId === 'notes' && <NotesPane practiceId={practiceId} head={head} />}
@@ -98,12 +114,15 @@ export function WorkbenchModulePane({
           practiceId={practiceId}
           vi={vi}
           packId={packId}
+          packs={packs}
+          selectedPackId={selectedPackId}
+          onSelectPack={onSelectPack}
           onPackLinked={onPackLinked}
           orgId={workspace?.orgId ?? null}
           head={head}
         />
       )}
-      {moduleId === 'personal' && <WorkProfilePane {...server} />}
+      {moduleId === 'personal' && <WorkProfilePane {...server} head={head} />}
     </section>
   )
 }
@@ -117,13 +136,20 @@ function FormsPane({
   practiceId,
   vi,
   packId,
+  packs,
+  selectedPackId,
+  onSelectPack,
   onPackLinked,
   orgId,
   head,
 }: {
   practiceId: PracticeId
   vi: boolean
-  packId?: string | null
+  /** where a draft goes: the selected pack, else the default one; null = no pack at all */
+  packId: string | null
+  packs: readonly { id: string; title: string }[]
+  selectedPackId: string | null
+  onSelectPack?: (id: string | null) => void
   onPackLinked?: () => void
   /** the active org, for the cached UniWork profile the compose merge reads; null when signed out */
   orgId: string | null
@@ -131,8 +157,10 @@ function FormsPane({
 }): ReactElement {
   const { t } = useI18n()
   const toasts = useWbToast()
+  const baseId = useId()
   const [items, setItems] = useState<WbFormItem[]>(() => readForms(practiceId))
-  const [editingId, setEditingId] = useState<string | null>(null)
+  // the "New form" card: closed, adding (null id) or editing a form
+  const [card, setCard] = useState<{ editingId: string | null } | null>(null)
   const [title, setTitle] = useState('')
   const [note, setNote] = useState('')
   const [draftFile, setDraftFile] = useState<{
@@ -140,33 +168,44 @@ function FormsPane({
     fileName: string
     fileExt: string
   } | null>(null)
+  const addRef = useRef<HTMLButtonElement>(null)
+  const listRef = useRef<HTMLUListElement>(null)
+  // a removed row took the focus with it: land on the list (or Add when it is gone) after the render
+  const refocus = useRef(false)
 
   useEffect(() => {
     setItems(readForms(practiceId))
-    setEditingId(null)
+    setCard(null)
     setTitle('')
     setNote('')
     setDraftFile(null)
   }, [practiceId])
+
+  useEffect(() => {
+    if (!refocus.current) return
+    refocus.current = false
+    ;(listRef.current ?? addRef.current)?.focus()
+  }, [items])
 
   const persist = (next: WbFormItem[]) => {
     setItems(next)
     writeForms(practiceId, next)
   }
 
-  const clearForm = () => {
-    setEditingId(null)
+  const closeCard = () => {
+    setCard(null)
     setTitle('')
     setNote('')
     setDraftFile(null)
+    addRef.current?.focus()
   }
 
-  const startEdit = (it: WbFormItem) => {
-    setEditingId(it.id)
-    setTitle(it.title)
-    setNote(it.note ?? '')
+  const openCard = (it?: WbFormItem) => {
+    setCard({ editingId: it?.id ?? null })
+    setTitle(it?.title ?? '')
+    setNote(it?.note ?? '')
     setDraftFile(
-      it.filePath
+      it?.filePath
         ? {
             filePath: it.filePath,
             fileName: it.fileName || it.filePath.split(/[\\/]/).pop() || it.title,
@@ -201,18 +240,20 @@ function FormsPane({
     toasts.dismiss('forms-upload')
   }
 
-  const save = () => {
-    const t = title.trim() || draftFile?.fileName.replace(/\.[^.]+$/, '') || ''
-    if (!t) return
+  const save = (e: FormEvent) => {
+    e.preventDefault()
+    const name = title.trim()
+    if (!name || !card) return
+    const editingId = card.editingId
     const existing = editingId ? items.find((x) => x.id === editingId) : undefined
     const row: WbFormItem = {
       id: editingId ?? newId(),
-      title: t,
+      title: name,
       ...(note.trim() ? { note: note.trim() } : {}),
       ...(existing?.linkedProjectId
         ? { linkedProjectId: existing.linkedProjectId }
-        : packId
-          ? { linkedProjectId: packId }
+        : selectedPackId
+          ? { linkedProjectId: selectedPackId }
           : {}),
       ...(draftFile
         ? {
@@ -223,78 +264,145 @@ function FormsPane({
         : {}),
       ...(existing?.templateId ? { templateId: existing.templateId } : {}),
     }
-    if (editingId) {
-      persist(items.map((x) => (x.id === editingId ? row : x)))
-    } else {
-      persist([row, ...items])
-    }
-    clearForm()
+    persist(editingId ? items.map((x) => (x.id === editingId ? row : x)) : [row, ...items])
+    closeCard()
   }
 
-  const openForm = async (item: WbFormItem) => {
-    const targetPack = packId ?? item.linkedProjectId
-    if (!targetPack) return
-    await draftFromForm(item, targetPack, orgId, vi)
-    if (!item.linkedProjectId || item.linkedProjectId !== targetPack) {
-      persist(items.map((x) => (x.id === item.id ? { ...x, linkedProjectId: targetPack } : x)))
+  // never locked (spec 5.1): the selected pack, else the default one, as the Desk drawer does
+  const draft = async (item: WbFormItem) => {
+    await draftFromForm(item, packId, orgId, vi)
+    if (packId && item.linkedProjectId !== packId) {
+      persist(
+        readForms(practiceId).map((x) =>
+          x.id === item.id ? { ...x, linkedProjectId: packId } : x,
+        ),
+      )
     }
     onPackLinked?.()
   }
 
-  const openTemplateFile = async (item: WbFormItem) => {
-    if (!item.filePath) return
-    await window.aiOffice.openPath?.(item.filePath)
+  // removed at once, with Undo in the toast (spec 5.3); Undo puts it back where it was
+  const remove = (item: WbFormItem) => {
+    const at = items.findIndex((x) => x.id === item.id)
+    if (card?.editingId === item.id) closeCard()
+    refocus.current = true
+    persist(items.filter((x) => x.id !== item.id))
+    toasts.show({
+      id: `forms-delete:${item.id}`,
+      message: { key: 'wbFormsDeleted', params: { title: item.title } },
+      actions: [
+        {
+          label: 'wbCommonUndo',
+          onClick: () => {
+            // the stored list, not this render's: other edits may have landed since
+            const now = readForms(practiceId).filter((x) => x.id !== item.id)
+            now.splice(Math.min(at, now.length), 0, item)
+            persist(now)
+          },
+        },
+      ],
+    })
   }
+
+  const ext = (it: WbFormItem) => it.fileExt?.replace(/^\./, '') ?? ''
 
   return (
     <>
-      <WorkToolbar {...head} summary={t('wbFormsCount', { count: items.length })} local />
-      <p className="wb-forms-hint" title={t('wbFormsHint')}>
-        {t('wbFormsHint')}
-      </p>
-      <div className="wb-forms-add">
-        <input
-          className="wb-input wb-forms-title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          aria-label={t('wbFormsTitle')}
-          placeholder={t('wbFormsTitle')}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') save()
-          }}
-        />
-        <input
-          className="wb-input wb-forms-note"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          aria-label={t('wbFormsNote')}
-          placeholder={t('wbFormsNote')}
-        />
-        <button
-          type="button"
-          className="wb-btn wb-btn-secondary"
-          onClick={() => void pickTemplateFile()}
+      <WorkToolbar
+        {...head}
+        summary={<strong>{t('wbFormsCount', { count: items.length })}</strong>}
+        local
+        actions={
+          <button
+            ref={addRef}
+            type="button"
+            className="wb-btn wb-btn-secondary"
+            aria-expanded={card !== null}
+            onClick={() => (card ? closeCard() : openCard())}
+          >
+            <WbGlyph id="plus" />
+            {t('wbDeskDrawerAdd')}
+          </button>
+        }
+      />
+      {items.length > 0 ? (
+        <div className="wb-banner wb-forms-banner">
+          <span>{t('wbFormsBannerInto')}</span>
+          <WbPackChip packs={packs} selectedPackId={selectedPackId} onSelectPack={onSelectPack} />
+          <span className="wb-row-sub">{t('wbFormsBannerDefault')}</span>
+        </div>
+      ) : null}
+      {card ? (
+        <form
+          key={card.editingId ?? 'new'}
+          className="wb-block wb-forms-new"
+          aria-labelledby={`${baseId}-new`}
+          onSubmit={save}
         >
-          {draftFile ? t('wbFormsReplaceFile') : t('wbFormsUploadFile')}
-        </button>
-        {draftFile ? (
-          <button type="button" className="wb-btn wb-btn-ghost" onClick={() => setDraftFile(null)}>
-            {t('wbFormsClearFile')}
-          </button>
-        ) : null}
-        <button type="button" className="wb-btn wb-btn-primary" onClick={save}>
-          {editingId ? t('wbFormsSave') : t('wbFormsAdd')}
-        </button>
-        {editingId ? (
-          <button type="button" className="wb-btn wb-btn-ghost" onClick={clearForm}>
-            {t('wbFormsCancelEdit')}
-          </button>
-        ) : null}
-      </div>
-      {draftFile ? (
-        <p className="wb-hint">
-          {t('wbFormsTemplateFile')} {draftFile.fileName}
-        </p>
+          <div className="wb-desk-head">
+            <h3 id={`${baseId}-new`}>
+              {t(card.editingId ? 'wbFormsEditTitle' : 'wbFormsNewTitle')}
+            </h3>
+            <span className="wb-desk-head-end">
+              <WbIconBtn label={t('wbOvDismiss')} onClick={closeCard}>
+                <WbGlyph id="close" />
+              </WbIconBtn>
+            </span>
+          </div>
+          <div className="wb-forms-fields">
+            <label className="wb-field">
+              <span className="wb-field-label">
+                {t('wbFormsTitle')} <span aria-hidden="true">*</span>
+              </span>
+              <input
+                className="wb-input"
+                value={title}
+                required
+                autoFocus
+                placeholder={t('wbFormsTitlePlaceholder')}
+                onChange={(e) => setTitle(e.target.value)}
+              />
+            </label>
+            <label className="wb-field">
+              <span className="wb-field-label">{t('wbFormsNote')}</span>
+              <input className="wb-input" value={note} onChange={(e) => setNote(e.target.value)} />
+            </label>
+            <div className="wb-field" role="group" aria-labelledby={`${baseId}-file`}>
+              <span className="wb-field-label" id={`${baseId}-file`}>
+                {t('wbFormsTemplateLabel')}
+              </span>
+              {draftFile ? (
+                <div className="wb-forms-file">
+                  <FileBadge ext={draftFile.fileExt.replace(/^\./, '')} size={16} />
+                  <span className="wb-forms-file-name">{draftFile.fileName}</span>
+                  <button type="button" className="wb-link" onClick={() => void pickTemplateFile()}>
+                    {t('wbFormsReplaceFile')}
+                  </button>
+                  <WbIconBtn label={t('wbFormsClearFile')} onClick={() => setDraftFile(null)}>
+                    <WbGlyph id="close" size={14} />
+                  </WbIconBtn>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="wb-btn wb-btn-secondary"
+                  onClick={() => void pickTemplateFile()}
+                >
+                  <WbGlyph id="upload" />
+                  {t('wbFormsUploadFile')}
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="wb-forms-new-actions">
+            <button type="button" className="wb-btn wb-btn-ghost" onClick={closeCard}>
+              {t('wbCommonCancel')}
+            </button>
+            <button type="submit" className="wb-btn wb-btn-primary" disabled={!title.trim()}>
+              {t(card.editingId ? 'wbFormsSave' : 'wbFormsAdd')}
+            </button>
+          </div>
+        </form>
       ) : null}
       {items.length === 0 ? (
         <WorkStatePanel
@@ -303,53 +411,106 @@ function FormsPane({
           title={t('wbFormsEmpty')}
         />
       ) : (
-        <ul className="wb-block wb-forms-list">
-          {items.map((it) => {
-            const canOpen = Boolean(packId ?? it.linkedProjectId)
-            const caption = [
-              it.note ?? '',
-              it.fileName ? `${t('wbFormsFile')} ${it.fileName}` : '',
-              it.linkedProjectId ? t('wbFormsLinked') : '',
-            ]
-              .filter(Boolean)
-              .join(' · ')
-            return (
-              <li key={it.id} className="wb-row">
-                <div className="wb-forms-text">
-                  <strong>{it.title}</strong>
-                  {caption ? <span>{caption}</span> : null}
-                </div>
-                {/* outside the hover-only actions: it explains why Draft is locked */}
-                {canOpen ? null : (
-                  <span className="wb-forms-locked">{t('wbFormsDraftNeedsPackHint')}</span>
+        <>
+          <ul
+            ref={listRef}
+            className="wb-block wb-forms-list"
+            tabIndex={-1}
+            aria-label={t('wbFormsCount', { count: items.length })}
+          >
+            {items.map((it) => (
+              <li key={it.id} className="wb-row wb-forms-row">
+                {ext(it) ? (
+                  <FileBadge ext={ext(it)} size={28} />
+                ) : (
+                  <WorkbenchIcon id="forms" size={28} />
                 )}
-                <WbRowActions>
-                  <WbEditBtn label={t('wbFormsEdit')} onClick={() => startEdit(it)} />
-                  {it.filePath ? (
-                    <WbFileBtn
-                      label={t('wbFormsOpenFile')}
-                      onClick={() => void openTemplateFile(it)}
-                    />
+                <div className="wb-forms-text">
+                  <span className="wb-forms-name" id={`${baseId}-${it.id}`}>
+                    {it.title}
+                  </span>
+                  {it.note ? <span className="wb-row-sub">{it.note}</span> : null}
+                </div>
+                <span className="wb-forms-file-cell">
+                  {it.fileName ? (
+                    <>
+                      <FileBadge ext={ext(it)} size={16} />
+                      <span>{it.fileName}</span>
+                    </>
                   ) : null}
-                  <WbDraftBtn
-                    label={t('wbFormsDraft')}
-                    disabled={!canOpen}
-                    title={canOpen ? t('wbFormsDraft') : t('wbFormsDraftNeedsPack')}
-                    onClick={() => void openForm(it)}
-                  />
-                  <WbDeleteBtn
-                    label={t('wbCommonDelete')}
-                    onClick={() => {
-                      if (editingId === it.id) clearForm()
-                      persist(items.filter((x) => x.id !== it.id))
-                    }}
+                </span>
+                <button
+                  type="button"
+                  className="wb-btn wb-btn-secondary wb-btn-sm"
+                  aria-describedby={`${baseId}-${it.id}`}
+                  onClick={() => void draft(it)}
+                >
+                  {t('wbFormsDraft')}
+                </button>
+                <WbRowActions>
+                  <FormMenu
+                    item={it}
+                    onOpenFile={() => void window.aiOffice.openPath?.(it.filePath!)}
+                    onEdit={() => openCard(it)}
+                    onRemove={() => remove(it)}
                   />
                 </WbRowActions>
               </li>
-            )
-          })}
-        </ul>
+            ))}
+          </ul>
+          <p className="wb-forms-foot">{t('wbFormsHint')}</p>
+        </>
       )}
     </>
+  )
+}
+
+/** a form row's ⋯ menu: open the source template, edit, remove */
+function FormMenu({
+  item,
+  onOpenFile,
+  onEdit,
+  onRemove,
+}: {
+  item: WbFormItem
+  onOpenFile: () => void
+  onEdit: () => void
+  onRemove: () => void
+}): ReactElement {
+  const { t } = useI18n()
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLButtonElement>(null)
+  const run = (fn: () => void) => () => {
+    setOpen(false)
+    fn()
+  }
+  return (
+    <div className="wb-menu-wrap">
+      <button
+        ref={ref}
+        type="button"
+        className="wb-icon-btn"
+        aria-label={t('wbFormsMore', { title: item.title })}
+        title={t('wbFormsMore', { title: item.title })}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+      >
+        <WbGlyph id="more" />
+      </button>
+      <WbMenu open={open} onClose={() => setOpen(false)} anchorRef={ref} label={item.title}>
+        {item.filePath ? (
+          <WbMenuItem icon={<WbGlyph id="external" />} onSelect={run(onOpenFile)}>
+            {t('wbFormsOpenTemplate')}
+          </WbMenuItem>
+        ) : null}
+        <WbMenuItem icon={<WbGlyph id="pencil" />} onSelect={run(onEdit)}>
+          {t('wbFormsEditMenu')}
+        </WbMenuItem>
+        <WbMenuItem icon={<WbGlyph id="trash" />} danger onSelect={run(onRemove)}>
+          {t('wbFormsRemove')}
+        </WbMenuItem>
+      </WbMenu>
+    </div>
   )
 }

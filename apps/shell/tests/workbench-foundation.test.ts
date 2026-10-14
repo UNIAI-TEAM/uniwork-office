@@ -259,27 +259,18 @@ describe('workbench states and the tab toolbar (home.css)', () => {
 })
 
 describe('long titles (review focus: very long workspace and task names)', () => {
-  it.each(['.wb-row-title', '.wb-row-sub', '.wb-crumb-name'])(
-    '%s truncates to one line with an ellipsis instead of pushing its row apart',
-    (selector) => {
-      const body = rule(selector)
-      expect(body).toMatch(/overflow: hidden;/)
-      expect(body).toMatch(/text-overflow: ellipsis;/)
-      expect(body).toMatch(/white-space: nowrap;/)
-    },
-  )
-
-  // the pack context and the Forms instructions are sentences: an ellipsis after ~700px hid them
-  it.each(['.wb-forms-hint'])(
-    '%s uses the pane width and wraps to at most two lines',
-    (selector) => {
-      const body = rule(selector)
-      expect(body).not.toMatch(/white-space: nowrap|text-overflow: ellipsis/)
-      expect(body).toMatch(/max-width: none;/)
-      expect(body).toMatch(/-webkit-line-clamp: 2;/)
-      expect(body).toMatch(/text-wrap: pretty;/)
-    },
-  )
+  it.each([
+    '.wb-row-title',
+    '.wb-row-sub',
+    '.wb-crumb-name',
+    '.wb-forms-name',
+    '.wb-forms-file-name',
+  ])('%s truncates to one line with an ellipsis instead of pushing its row apart', (selector) => {
+    const body = rule(selector)
+    expect(body).toMatch(/overflow: hidden;/)
+    expect(body).toMatch(/text-overflow: ellipsis;/)
+    expect(body).toMatch(/white-space: nowrap;/)
+  })
 
   it('the flexible title cells can shrink below their text width', () => {
     for (const selector of ['.wb-row-title', '.wb-toolbar-summary', '.wb-ov-meet']) {

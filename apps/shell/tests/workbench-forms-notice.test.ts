@@ -46,9 +46,11 @@ it('the Forms upload notice follows a language switch while it is shown', async 
       ),
     )
   })
-  const upload = Array.from(host.querySelectorAll('button')).find(
-    (b) => b.textContent === 'Upload template file…',
-  )!
+  const byText = (text: string) =>
+    Array.from(host.querySelectorAll('button')).find((b) => b.textContent === text)!
+  // the upload button sits in the New form card
+  await act(async () => byText('Add a form').click())
+  const upload = byText('Upload template file…')
   await act(async () => upload.click())
   // a toast in the page's one host, translated at render
   expect(host.querySelector('.wb-toast')?.textContent).toContain('No supported file selected.')

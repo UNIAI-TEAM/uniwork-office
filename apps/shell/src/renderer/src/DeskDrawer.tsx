@@ -51,8 +51,6 @@ export function DeskDrawer({
     onPackLinked?.()
   }
 
-  const packLabel =
-    (selectedPackId && packs.find((p) => p.id === selectedPackId)?.title) || t('wbDeskDefaultPack')
   const add = (
     <button type="button" className="wb-btn wb-btn-ghost" onClick={onManage}>
       <WbGlyph id="plus" />
@@ -65,26 +63,7 @@ export function DeskDrawer({
       <div className="wb-desk-drawer-head">
         <h3 id={titleId}>{t('wbDeskDrawer')}</h3>
         <span className="wb-desk-head-note">{t('wbDeskDrawerInto')}</span>
-        <span className="wb-crumb wb-desk-pack">
-          <span className="wb-crumb-name" aria-hidden="true">
-            {packLabel}
-          </span>
-          <span className="wb-crumb-caret" aria-hidden="true">
-            <WbGlyph id="chevronDown" size={12} />
-          </span>
-          <select
-            aria-label={t('wbDeskDrawerPack')}
-            value={selectedPackId ?? ''}
-            onChange={(e) => onSelectPack?.(e.target.value || null)}
-          >
-            <option value="">{t('wbDeskDefaultPack')}</option>
-            {packs.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.title}
-              </option>
-            ))}
-          </select>
-        </span>
+        <WbPackChip packs={packs} selectedPackId={selectedPackId} onSelectPack={onSelectPack} />
         <button type="button" className="wb-link wb-desk-head-end" onClick={onManage}>
           {t('wbDeskDrawerManage')}
         </button>
@@ -124,5 +103,45 @@ export function DeskDrawer({
         </>
       )}
     </section>
+  )
+}
+
+/**
+ * The chip that picks where drafts from forms go (spec 4.1, 4.4): a transparent select over the
+ * chip, like the workspace chip. "Default project" stands for no selection.
+ */
+export function WbPackChip({
+  packs,
+  selectedPackId,
+  onSelectPack,
+}: {
+  packs: readonly { id: string; title: string }[]
+  selectedPackId: string | null
+  onSelectPack?: (id: string | null) => void
+}): ReactElement {
+  const { t } = useI18n()
+  const packLabel =
+    (selectedPackId && packs.find((p) => p.id === selectedPackId)?.title) || t('wbDeskDefaultPack')
+  return (
+    <span className="wb-crumb wb-desk-pack">
+      <span className="wb-crumb-name" aria-hidden="true">
+        {packLabel}
+      </span>
+      <span className="wb-crumb-caret" aria-hidden="true">
+        <WbGlyph id="chevronDown" size={12} />
+      </span>
+      <select
+        aria-label={t('wbDeskDrawerPack')}
+        value={selectedPackId ?? ''}
+        onChange={(e) => onSelectPack?.(e.target.value || null)}
+      >
+        <option value="">{t('wbDeskDefaultPack')}</option>
+        {packs.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.title}
+          </option>
+        ))}
+      </select>
+    </span>
   )
 }

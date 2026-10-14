@@ -59,6 +59,30 @@ export function clock(iso: string, locale: string, timeZone?: string): string {
   }
 }
 
+/**
+ * When something local was last edited (spec 4.5): "Edited 10:42" today, "Edited yesterday",
+ * else the day and month in the UI locale. A key and params, translated at render.
+ */
+export function editedWhen(
+  iso: string,
+  locale: string,
+  now = new Date(),
+): { key: StringKey; params?: Record<string, string> } {
+  const d = new Date(iso)
+  const midnight = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime()
+  // rounded: a DST day is 23 or 25 hours long
+  const days = Math.round((midnight(now) - midnight(d)) / 86_400_000)
+  if (days === 0) return { key: 'wbEditedAt', params: { time: clock(iso, locale) } }
+  if (days === 1) return { key: 'wbEditedYesterday' }
+  // the locale's day/month order, always with a slash (vi CLDR writes 13-10; the spec wants 13/10)
+  const date = new Intl.DateTimeFormat(locale, { day: '2-digit', month: '2-digit' })
+    .formatToParts(d)
+    .filter((p) => p.type !== 'literal')
+    .map((p) => p.value)
+    .join('/')
+  return { key: 'wbEditedOn', params: { date } }
+}
+
 /** a YYYY-MM-DD day as written (no zone shift): long = weekday, day and month */
 export function formatDay(day: string, locale: string, long: boolean): string {
   const date = new Date(`${day}T12:00:00Z`)

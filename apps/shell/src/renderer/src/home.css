@@ -5055,7 +5055,9 @@ body.vib .home {
 
 /* focus landing spots after a confirm (WbConfirm returnFocus), not controls: no ring */
 .wb-pane:focus,
-.wb-pack-list:focus {
+.wb-pack-list:focus,
+.wb-forms-list:focus,
+.wb-notes-wall:focus {
   outline: none;
 }
 
@@ -6256,11 +6258,6 @@ html[dir='rtl'] .quick-title-row {
   margin-left: 0;
 }
 
-.wb-work-muted {
-  color: var(--text-secondary);
-  font-size: 12px;
-}
-
 /* Calendar (spec 4.3): one card; clip, not hidden, so the day heads stick to the page scroll */
 .wb-agenda {
   overflow: clip;
@@ -6419,62 +6416,109 @@ html[dir='rtl'] .quick-title-row {
   border-radius: 3px;
 }
 
-.wb-profile-card {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  max-width: 640px;
-  padding: 20px;
+/* Profile (spec 4.6): the identity card | the work details card */
+.wb-profile-grid {
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .wb-profile-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .wb-profile-id {
   display: flex;
-  align-items: center;
-  gap: 14px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 24px;
 }
 
+/* round, like the sidebar account avatar */
 .wb-profile-avatar {
   display: inline-flex;
   flex: none;
   align-items: center;
   justify-content: center;
-  width: 48px;
-  height: 48px;
-  border-radius: var(--radius-12);
+  width: 64px;
+  height: 64px;
+  margin-bottom: 12px;
+  border-radius: 50%;
   font-size: 20px;
   font-weight: 600;
 }
 
+.wb-profile-avatar.is-small {
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  font-size: 12px;
+}
+
 .wb-profile-name {
-  display: block;
+  margin: 0;
   color: var(--text);
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 600;
-  line-height: 1.3;
+  line-height: 28px;
 }
 
 .wb-profile-title {
-  margin: 2px 0 0;
+  margin: 0;
   color: var(--text-secondary);
-  font-size: 12px;
+}
+
+.wb-profile-id .wb-row-sub {
+  max-width: 100%;
+  margin: 8px 0 0;
 }
 
 .wb-profile {
   display: grid;
-  grid-template-columns: minmax(120px, max-content) 1fr;
-  gap: 8px 24px;
+  grid-template-columns: 180px minmax(0, 1fr);
   margin: 0;
-  font-size: 13px;
+}
+
+.wb-profile dt,
+.wb-profile dd {
+  margin: 0;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.wb-profile > :nth-child(-n + 2) {
+  border-top: none;
 }
 
 .wb-profile dt {
+  display: flex;
+  align-items: center;
   color: var(--text-secondary);
-  font-size: 12px;
 }
 
 .wb-profile dd {
-  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow-wrap: anywhere;
   color: var(--text);
+  font-weight: 500;
+}
+
+.wb-profile-foot {
+  max-width: none;
+  margin: 0;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 16px;
 }
 
 /* ── Local-only tabs (Forms / Notes / pillars) ───────────── */
@@ -6489,69 +6533,132 @@ html[dir='rtl'] .quick-title-row {
   font-weight: 600;
 }
 
-/* instructions: the full pane width, wrapping to at most two lines (the title attribute keeps the rest) */
-.wb-forms-hint {
-  margin: 0;
+/* Forms (spec 4.4): one banner, the "New form" card, then rows on the same columns */
+.wb-forms-banner {
+  background: var(--surface);
+}
+
+.wb-forms-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 16px;
+  padding: 16px;
+}
+
+@media (max-width: 900px) {
+  .wb-forms-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.wb-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.wb-field-label {
   color: var(--text-secondary);
   font-size: 12px;
-  display: -webkit-box;
-  max-width: none;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  text-wrap: pretty;
+  font-weight: 500;
+  line-height: 16px;
 }
 
-.wb-forms-add {
+.wb-field > .wb-btn {
+  align-self: flex-start;
+}
+
+.wb-forms-file {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+  height: 32px;
+  padding: 0 2px 0 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-8);
 }
 
-.wb-forms-title {
-  flex: 1 1 200px;
+.wb-forms-file-name {
+  flex: 1;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.wb-forms-note {
-  flex: 0 1 220px;
-  width: 220px;
-  min-width: 0;
+.wb-forms-new-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 0 16px 16px;
 }
 
+/* visible overflow: a row's menu opens past the card; the end rows keep the card's corners */
 .wb-forms-list {
   margin: 0;
   padding: 0;
+  overflow: visible;
   list-style: none;
+}
+
+.wb-forms-row:first-child {
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
+}
+
+.wb-forms-row:last-child {
+  border-bottom-left-radius: inherit;
+  border-bottom-right-radius: inherit;
+}
+
+/* badge | name + note | template file | Draft | more */
+.wb-forms-row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1.4fr) minmax(0, 1fr) auto 28px;
+  min-height: 52px;
+}
+
+.wb-forms-row > .wb-row-actions {
+  margin-left: 0;
 }
 
 .wb-forms-text {
   display: flex;
-  flex: 1 1 auto;
   flex-direction: column;
-  gap: 1px;
   min-width: 0;
 }
 
-.wb-forms-text strong {
+.wb-forms-name {
   overflow: hidden;
-  color: var(--text);
-  font-size: 13px;
   font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.wb-forms-text span {
-  overflow: hidden;
+.wb-forms-file-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
   color: var(--text-secondary);
   font-size: 12px;
+}
+
+.wb-forms-file-cell > span {
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.wb-forms-foot {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+/* the Desk drawer's lock line */
 .wb-forms-locked {
   flex: none;
   color: var(--text-secondary);
@@ -6589,47 +6696,25 @@ html[dir='rtl'] .quick-title-row {
   align-self: flex-start;
 }
 
+/* Notes (spec 4.5): a composer card, then the notes as cards in columns */
 .wb-notes {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
 }
 
-.wb-notes-add {
-  display: flex;
-  gap: 8px;
+.wb-notes-composer {
+  max-width: 640px;
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 
-.wb-notes-add .wb-input {
-  flex: 1;
-}
-
-.wb-notes-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.wb-notes-card {
-  align-items: flex-start;
-}
-
-.wb-notes-card:focus-within {
-  background: var(--wb-row-hover);
-  box-shadow: inset 2px 0 0 var(--accent);
-}
-
-.wb-notes-text {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.wb-notes-text textarea {
+.wb-notes-composer textarea,
+.wb-note textarea {
+  display: block;
+  box-sizing: border-box;
   width: 100%;
-  min-height: 20px;
   padding: 0;
   border: none;
   resize: none;
@@ -6637,17 +6722,83 @@ html[dir='rtl'] .quick-title-row {
   background: transparent;
   color: var(--text);
   font: inherit;
-  font-size: 13px;
-  line-height: 1.5;
+  line-height: 20px;
 }
 
-.wb-notes-text textarea:focus {
+.wb-notes-composer textarea {
+  min-height: 64px;
+  padding: 12px 16px 4px;
+}
+
+.wb-notes-composer textarea:focus,
+.wb-note textarea:focus {
   outline: none;
 }
 
-.wb-notes-edited {
-  color: var(--text-secondary);
-  font-size: 12px;
+/* the borderless fields show focus on their card: an accent border and the ring */
+.wb-notes-composer:focus-within,
+.wb-note:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--wb-focus-ring);
+}
+
+.wb-notes-composer-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px 12px 16px;
+}
+
+.wb-notes-wall {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  columns: 3 280px;
+  column-gap: 16px;
+}
+
+.wb-note {
+  break-inside: avoid;
+  margin: 0 0 16px;
+  padding: 12px 16px 8px;
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.wb-note:hover {
+  border-color: var(--border-strong);
+}
+
+.wb-note textarea {
+  margin-bottom: 8px;
+}
+
+.wb-note-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 28px;
+}
+
+.wb-note-actions {
+  display: inline-flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.wb-note:hover .wb-note-actions,
+.wb-note:focus-within .wb-note-actions {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .wb-note-actions {
+    opacity: 1;
+  }
 }
 
 .wb-domain-badge {

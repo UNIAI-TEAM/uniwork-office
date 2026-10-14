@@ -1,10 +1,13 @@
 import { escapeHtml, profileForDraft, profileMergeHtml } from './form-merge'
 import type { WbFormItem } from './workbench-pins'
 
-/** "Soạn" from a saved form: a new Docs file in `packId`, the UniWork profile fields merged in. */
+/**
+ * "Soạn" from a saved form: a new Docs file in `packId`, the UniWork profile fields merged in.
+ * With no pack at all (no selection and no default project) it is a plain new document.
+ */
 export async function draftFromForm(
   item: WbFormItem,
-  packId: string,
+  packId: string | null,
   orgId: string | null,
   vi: boolean,
 ): Promise<void> {
@@ -21,5 +24,8 @@ export async function draftFromForm(
       <h2>${vi ? 'Nội dung' : 'Content'}</h2>
       <p></p>
     `.trim()
-  await window.aiOffice.newDoc({ projectId: packId, aiContent: { title: item.title, html } })
+  await window.aiOffice.newDoc({
+    projectId: packId ?? undefined,
+    aiContent: { title: item.title, html },
+  })
 }

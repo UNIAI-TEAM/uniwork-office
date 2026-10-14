@@ -322,6 +322,8 @@ export function PracticeHome({
         }),
     [projects, practice.id, practice.projectKind],
   )
+  // where Soạn from a form goes (Desk drawer and Forms): the selected pack, else the default one
+  const draftPackId = selectedId ?? projects.find((p) => p.isDefault)?.id ?? null
   const pillar = practice.pillars.find((p) => p.id === tab)
   const pillarTitleId = useId()
   /** a pillar's empty sentence on the shared state template (spec 5): its tinted tile and one line */
@@ -713,7 +715,7 @@ export function PracticeHome({
               workspaceId={workspaceId}
               workspaceError={workspaceError}
               refreshTick={refreshTick}
-              packId={selectedId ?? projects.find((p) => p.isDefault)?.id ?? null}
+              packId={draftPackId}
               onReload={refresh}
               onSummary={setHomeSummary}
               onOpenTab={openDeskTab}
@@ -729,7 +731,10 @@ export function PracticeHome({
               practiceId={practice.id}
               vi={vi}
               contextTitle={meta?.title}
-              packId={selectedId}
+              packId={draftPackId}
+              packs={deskPacks}
+              selectedPackId={selectedId}
+              onSelectPack={onSelectPack}
               onPackLinked={onRefresh}
               workspace={workspace}
               workspaceError={workspaceError}

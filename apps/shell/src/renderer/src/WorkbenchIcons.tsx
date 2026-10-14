@@ -186,6 +186,21 @@ const UI_GLYPH = {
   folder: (
     <path d="M2.5 4.5a1 1 0 0 1 1-1h3L8 5h4.5a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z" />
   ),
+  more: (
+    <>
+      <circle cx="3.5" cy="8" r="0.6" />
+      <circle cx="8" cy="8" r="0.6" />
+      <circle cx="12.5" cy="8" r="0.6" />
+    </>
+  ),
+  copy: (
+    <>
+      <rect x="5.5" y="5.5" width="8" height="8" rx="1.5" />
+      <path d="M10.5 5.5v-2a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2" />
+    </>
+  ),
+  pencil: <path d="M11 2.5 13.5 5 6 12.5H3.5V10z" />,
+  trash: <path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.5 8.5h6l.5-8.5" />,
   grip: (
     <>
       <circle cx="6" cy="4" r="0.6" />
