@@ -2582,9 +2582,10 @@ export class UniworkDocsService {
   }
 
   /**
-   * The S6 bar's actions. `later`/`close` hide the bar in this session (`later`
-   * until the next notice arrives, the pill stays remote-newer for W3), `reload`
-   * opens the existing conflict dialog flow (S5 proper is G5-09), and
+   * The S6 bar's actions. `later` keeps the bar in the status - the renderer is
+   * what hides it (per path + bar signature), so the chip's `remote-newer` pill
+   * stays; `close` is the action that clears it in this session. `reload` opens
+   * the existing conflict dialog flow (S5 proper is G5-09), and
    * `retry`/`reload-now` are the guarded clean reload again.
    */
   async remoteAction(path: string, action: UniworkRemoteAction): Promise<UniworkDocStatus | null> {
@@ -2594,10 +2595,15 @@ export class UniworkDocsService {
     const notice = this.remoteNotices.get(key)
     switch (action) {
       case 'later':
-      case 'close': {
+        // EXPERIENCE S6: Later only hides the BAR, in the window that pressed it
+        // (the renderer keeps that per path + bar signature); main keeps the bar
+        // in the status, so the chip's `remote-newer` pill stays. A newer
+        // revision replaces the version as usual.
+        return this.statusOf(doc)
+      case 'close':
+        // Close hides the info bar for this session (one bar, no stacking)
         this.remoteBars.set(key, null)
         return this.statusOf(doc)
-      }
       case 'retry':
       case 'reload-now': {
         if (!notice) return this.statusOf(doc)

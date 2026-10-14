@@ -513,20 +513,25 @@ describe('G5-03a S6 service: hold, later and the persisted rebuild', () => {
     expect(h.client.calls.download).toBe(0)
   })
 
-  it('later hides the warn bar until a newer revision arrives', async () => {
+  it('later keeps remote (pill stays), close clears it', async () => {
     seedCopy({ state: 'dirty' })
     const h = setup()
     notice(h, '10', 4)
     await waitForBar(h, { kind: 'newer-dirty', version: 4 })
 
-    const hidden = await h.service.remoteAction(docPath(), 'later')
-    expect(hidden?.remote).toBeUndefined()
-    // the same revision never re-shows it
-    await drain()
-    expect(await barOf(h)).toBeUndefined()
+    // EXPERIENCE S6: Later hides the BAR in the renderer (per path + bar
+    // signature), so main keeps the bar and the chip's remote-newer pill stays
+    const kept = await h.service.remoteAction(docPath(), 'later')
+    expect(kept?.remote).toEqual({ kind: 'newer-dirty', version: 4 })
+    expect(await barOf(h)).toEqual({ kind: 'newer-dirty', version: 4 })
 
+    // a newer revision replaces the version as usual
     notice(h, '11', 5)
     await waitForBar(h, { kind: 'newer-dirty', version: 5 })
+
+    // Close is the action that clears it
+    expect((await h.service.remoteAction(docPath(), 'close'))?.remote).toBeUndefined()
+    expect(await barOf(h)).toBeUndefined()
   })
 
   it('a second notice replaces the version: one bar, no stacking', async () => {
