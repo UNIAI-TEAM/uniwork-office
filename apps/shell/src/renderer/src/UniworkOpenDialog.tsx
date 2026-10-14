@@ -44,6 +44,7 @@ import {
   type LibraryDocRow,
   type PickerState,
 } from './uniwork-docs-model'
+import { readActiveWorkspaceId, writeActiveWorkspaceId } from './active-workspace'
 import {
   archiveDocument,
   cancelUploadDocument,
@@ -125,7 +126,9 @@ export function UniworkOpenDialog({
   onSignIn: () => void
 }) {
   const { t, dateLocale } = useI18n()
-  const [state, dispatch] = useReducer(pickerReducer, undefined, initialPickerState)
+  const [state, dispatch] = useReducer(pickerReducer, undefined, () =>
+    initialPickerState(readActiveWorkspaceId()),
+  )
   const stateRef = useRef(state)
   stateRef.current = state
   const mounted = useRef(true)
@@ -746,7 +749,10 @@ export function UniworkOpenDialog({
                 infoRequest.current++
                 setInfo(null)
                 if (e.target.value === SHARED_SOURCE_VALUE) dispatch({ type: 'select-shared' })
-                else dispatch({ type: 'select-workspace', id: e.target.value })
+                else {
+                  writeActiveWorkspaceId(e.target.value)
+                  dispatch({ type: 'select-workspace', id: e.target.value })
+                }
               }}
             >
               <optgroup label={t('uwPickWorkspace')}>

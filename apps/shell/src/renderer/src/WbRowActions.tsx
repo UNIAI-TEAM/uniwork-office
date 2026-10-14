@@ -144,7 +144,13 @@ export function WbOpenBtn({
   title?: string
 }): ReactElement {
   return (
-    <WbIconBtn label={label} variant="accent" onClick={onClick} disabled={disabled} title={title ?? label}>
+    <WbIconBtn
+      label={label}
+      variant="accent"
+      onClick={onClick}
+      disabled={disabled}
+      title={title ?? label}
+    >
       <IconOpen />
     </WbIconBtn>
   )
@@ -162,7 +168,13 @@ export function WbDraftBtn({
   title?: string
 }): ReactElement {
   return (
-    <WbIconBtn label={label} variant="accent" onClick={onClick} disabled={disabled} title={title ?? label}>
+    <WbIconBtn
+      label={label}
+      variant="accent"
+      onClick={onClick}
+      disabled={disabled}
+      title={title ?? label}
+    >
       <IconDoc />
     </WbIconBtn>
   )
@@ -180,55 +192,6 @@ export function WbFileBtn({
   return (
     <WbIconBtn label={label} onClick={onClick} disabled={disabled}>
       <IconFile />
-    </WbIconBtn>
-  )
-}
-
-export function IconMail(): ReactElement {
-  return (
-    <Svg>
-      <rect x="2.5" y="4" width="11" height="8" rx="1.2" />
-      <path d="M3 4.8 8 8.5 13 4.8" />
-    </Svg>
-  )
-}
-
-export function IconChevron({ open }: { open?: boolean }): ReactElement {
-  return (
-    <Svg>
-      {open ? <path d="M4 10 8 6l4 4" /> : <path d="M4 6 8 10l4-4" />}
-    </Svg>
-  )
-}
-
-export function WbMailBtn({
-  label,
-  onClick,
-  disabled,
-}: {
-  label: string
-  onClick: () => void
-  disabled?: boolean
-}): ReactElement {
-  return (
-    <WbIconBtn label={label} variant="accent" onClick={onClick} disabled={disabled}>
-      <IconMail />
-    </WbIconBtn>
-  )
-}
-
-export function WbExpandBtn({
-  label,
-  open,
-  onClick,
-}: {
-  label: string
-  open: boolean
-  onClick: () => void
-}): ReactElement {
-  return (
-    <WbIconBtn label={label} onClick={onClick} aria-expanded={open}>
-      <IconChevron open={open} />
     </WbIconBtn>
   )
 }

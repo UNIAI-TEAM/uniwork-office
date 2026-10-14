@@ -25,15 +25,7 @@ export interface WorkbenchBackupManifest {
 function isMediaDump(value: unknown): value is WorkbenchIdbMediaDump {
   if (!value || typeof value !== 'object') return false
   const v = value as WorkbenchIdbMediaDump
-  return (
-    v.version === 1 &&
-    typeof v.tasks === 'object' &&
-    v.tasks != null &&
-    typeof v.pets === 'object' &&
-    v.pets != null &&
-    typeof v.health === 'object' &&
-    v.health != null
-  )
+  return v.version === 1 && typeof v.tasks === 'object' && v.tasks != null
 }
 
 export async function exportWorkbenchBackup(

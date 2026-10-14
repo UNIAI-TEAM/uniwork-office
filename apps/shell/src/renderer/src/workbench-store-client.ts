@@ -26,9 +26,7 @@ function allowedKey(key: string): boolean {
   return (
     key.startsWith('uniwork.wb.') ||
     key.startsWith('uniwork.skill.') ||
-    key.startsWith('uniwork.teacher') ||
     key.startsWith('uniwork.activePractice') ||
-    key === 'uniwork.teacherUiLang' ||
     key === 'uniwork.addons.entitlements' ||
     key.startsWith('uniwork.my-ai.') ||
     key.startsWith('uniwork.ai.')

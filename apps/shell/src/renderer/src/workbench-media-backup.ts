@@ -1,6 +1,6 @@
 /**
  * Dump / restore Workbench IndexedDB media blobs for ZIP backup.
- * Stores: tasks attachments (Blob), pets photos (data URL), health body (data URL).
+ * Stores: tasks attachments (Blob).
  */
 
 import { isWorkbenchBucketCleared, wbMediaDbName } from './workbench-bucket'
@@ -8,19 +8,10 @@ import { isWorkbenchBucketCleared, wbMediaDbName } from './workbench-bucket'
 export interface WbIdbMediaDump {
   version: 1
   tasks: Record<string, string>
-  pets: Record<string, string>
-  health: Record<string, string>
 }
 
 const STORES = [
   { db: 'uniwork.wb.tasks.media', store: 'blobs', slot: 'tasks' as const, kind: 'blob' as const },
-  { db: 'uniwork.wb.pets.media', store: 'photos', slot: 'pets' as const, kind: 'string' as const },
-  {
-    db: 'uniwork.wb.health.media',
-    store: 'blobs',
-    slot: 'health' as const,
-    kind: 'string' as const,
-  },
 ]
 
 function openDb(name: string, store: string): Promise<IDBDatabase> {
@@ -124,7 +115,7 @@ async function restoreStore(
 }
 
 export async function collectWorkbenchIdbMedia(): Promise<WbIdbMediaDump> {
-  const dump: WbIdbMediaDump = { version: 1, tasks: {}, pets: {}, health: {} }
+  const dump: WbIdbMediaDump = { version: 1, tasks: {} }
   // no bucket (the account just changed): nothing of any account to read
   if (isWorkbenchBucketCleared()) return dump
   for (const s of STORES) {
@@ -208,13 +199,5 @@ export async function moveLegacyWorkbenchIdbMedia(bucket: string): Promise<void>
 export function isWbIdbMediaDump(value: unknown): value is WbIdbMediaDump {
   if (!value || typeof value !== 'object') return false
   const v = value as WbIdbMediaDump
-  return (
-    v.version === 1 &&
-    typeof v.tasks === 'object' &&
-    v.tasks != null &&
-    typeof v.pets === 'object' &&
-    v.pets != null &&
-    typeof v.health === 'object' &&
-    v.health != null
-  )
+  return v.version === 1 && typeof v.tasks === 'object' && v.tasks != null
 }

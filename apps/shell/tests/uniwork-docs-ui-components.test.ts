@@ -160,6 +160,8 @@ const buttonByText = (text: string) =>
   Array.from(host.querySelectorAll<HTMLButtonElement>('button')).find((b) => b.textContent === text)
 
 beforeEach(() => {
+  // the picker remembers its workspace (active-workspace.ts, localStorage-backed here): no carry-over between tests
+  localStorage.clear()
   host = document.createElement('div')
   document.body.append(host)
   root = createRoot(host)

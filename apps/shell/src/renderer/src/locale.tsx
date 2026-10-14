@@ -14,6 +14,7 @@ import { accountStrings } from './i18n/strings-account'
 import { cloudStrings } from './i18n/strings-cloud'
 import { uniworkDocumentStrings } from './i18n/strings-uniwork-documents'
 import { syncStrings } from './i18n/strings-sync'
+import { workbenchStrings } from './i18n/strings-workbench'
 import { discussionStrings } from './i18n/strings-discussion'
 
 export type StringKey =
@@ -22,6 +23,7 @@ export type StringKey =
   | keyof typeof cloudStrings.zh
   | keyof typeof uniworkDocumentStrings.zh
   | keyof typeof syncStrings.zh
+  | keyof typeof workbenchStrings.zh
   | keyof typeof discussionStrings.zh
 
 // the home table plus the sharded domains (each shard type-checks its own key set)
@@ -34,6 +36,7 @@ const dicts = Object.fromEntries(
       ...cloudStrings[l],
       ...uniworkDocumentStrings[l],
       ...syncStrings[l],
+      ...workbenchStrings[l],
       ...discussionStrings[l],
     },
   ]),

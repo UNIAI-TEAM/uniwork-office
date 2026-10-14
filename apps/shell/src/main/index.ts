@@ -81,7 +81,6 @@ import { controlHandler } from './control-handlers'
 import { cliLinkStatus, healCliLinks, installCliLinkOnRequest, recordCliLauncher } from './cli-link'
 import { createDefaultAppService, execFileRunner } from './default-app'
 import { registerIntegrationsIpc } from './integrations-ipc'
-import { exportLessonPackZip, probeAiHub } from './edu-commercial'
 import { handleDroppedFiles } from './dropped-files'
 import {
   handleOfficeLaunchUrl,
@@ -103,8 +102,12 @@ import {
   onUniworkAccountStatus,
   uniworkAccountDisplayName,
   uniworkSessionIdentity,
+  authorizedRequest,
+  uniworkAccount,
+  uniworkDeploymentProfile,
 } from './uniwork-auth'
 import { createUniworkDocs, type UniworkDocsHandle } from './uniwork-docs/wiring'
+import { registerUniworkWork } from './uniwork-work/wiring'
 import { refuseLockedOpenPath } from './uniwork-docs/service'
 import {
   COMMENT_AUTHOR_CHANGED_CHANNEL,
@@ -2934,14 +2937,18 @@ function workbenchAccounts(): WorkbenchAccounts {
 }
 
 /**
- * Points the workbench store at the live session's account (none = the
- * signed-out bucket). On a change the Home renderer drops everything it shows
- * and reloads from the new bucket.
+ * Points the workbench store at the live session's account and selected org
+ * (none = the signed-out bucket). On a change (sign-in, sign-out, org switch)
+ * the Home renderer drops everything it shows and reloads from the new bucket.
  */
 function syncWorkbenchOwner(): void {
   const identity = uniworkSessionIdentity()
   const owner = identity
-    ? { deploymentId: identity.deploymentId, accountId: identity.accountId }
+    ? {
+        deploymentId: identity.deploymentId,
+        accountId: identity.accountId,
+        orgId: uniworkAccount().status().org?.id ?? '',
+      }
     : null
   if (!workbenchAccounts().setOwner(owner)) return
   const wc = shellWindow && !shellWindow.isDestroyed() ? shellWindow.webContents : null
@@ -4262,6 +4269,14 @@ function registerHomeIpc(): void {
   )
   // UniWork documents (open from UniWork, launch links, Save to UniWork); logic in ./uniwork-docs
   uniworkDocs = createUniworkDocs(ipcMain, uniworkDocsWiring())
+  // UniWork work data for the Workbench (home, tasks, calendar, profile); logic in ./uniwork-work
+  registerUniworkWork(ipcMain, {
+    profile: () => uniworkDeploymentProfile(),
+    identity: () => uniworkSessionIdentity(),
+    org: () => uniworkAccount().status().org ?? null,
+    authorized: (call) => authorizedRequest(call),
+    openExternal: (url) => shell.openExternal(url),
+  })
   const uniworkService = uniworkDocs.service
   // G8-02: the single comment-author source. A bound document takes the
   // signed-in account's display name; local files and signed-out sessions take
@@ -4550,25 +4565,6 @@ function registerHomeIpc(): void {
       properties: ['openFile', 'multiSelections'],
     })
     if (!result.canceled) for (const path of result.filePaths) openDocumentPath(path)
-  })
-
-  ipcMain.handle(HOME_CHANNELS.probeAiHub, (_event, opts?: { baseUrl?: string; apiKey?: string }) =>
-    probeAiHub(
-      typeof opts?.baseUrl === 'string' ? opts.baseUrl : '',
-      typeof opts?.apiKey === 'string' ? opts.apiKey : '',
-    ),
-  )
-
-  ipcMain.handle(HOME_CHANNELS.exportLessonPack, async (event, projectId: unknown) => {
-    if (typeof projectId !== 'string' || !projectId) {
-      return { ok: false, error: 'Invalid project id.' }
-    }
-    const win = BrowserWindow.fromWebContents(event.sender) ?? shellWindow
-    return exportLessonPackZip({
-      userDataPath: app.getPath('userData'),
-      projectId,
-      parent: win,
-    })
   })
 
   ipcMain.handle(HOME_CHANNELS.newDoc, (_event, opts?: HomeNewOpts) => {

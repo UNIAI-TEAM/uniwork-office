@@ -240,8 +240,8 @@ describe('workspaces with my role (S17)', () => {
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.value).toEqual([
-      { id: 'ws_1', name: 'Team', orgId: 'org_a', myRole: null },
-      { id: 'ws_2', name: 'Sales', orgId: 'org_a', myRole: null },
+      { id: 'ws_1', name: 'Team', orgId: 'org_a', slug: '', orgSlug: '', myRole: null },
+      { id: 'ws_2', name: 'Sales', orgId: 'org_a', slug: '', orgSlug: '', myRole: null },
     ])
     expect(server.calls.filter((c) => c.path.endsWith('/me'))).toHaveLength(2)
   })
@@ -259,8 +259,8 @@ describe('workspaces with my role (S17)', () => {
     expect(result).toEqual({
       ok: true,
       value: [
-        { id: 'ws_1', name: 'Team', orgId: 'org_a', myRole: 'admin' },
-        { id: 'ws_2', name: 'Sales', orgId: 'org_a', myRole: 'member' },
+        { id: 'ws_1', name: 'Team', orgId: 'org_a', slug: '', orgSlug: '', myRole: 'admin' },
+        { id: 'ws_2', name: 'Sales', orgId: 'org_a', slug: '', orgSlug: '', myRole: 'member' },
       ],
     })
   })

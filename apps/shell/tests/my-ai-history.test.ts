@@ -31,7 +31,7 @@ describe('P0 My AI history', () => {
 
   afterEach(() => {
     clearMyAiHistory('sales')
-    clearMyAiHistory('teacher')
+    clearMyAiHistory('entrepreneur')
   })
 
   it('persists and loads per practice', () => {
@@ -39,21 +39,21 @@ describe('P0 My AI history', () => {
       { id: '1', role: 'user', text: 'Mở báo giá' },
       { id: '2', role: 'assistant', text: 'Đã mở', contextUsed: true },
     ])
-    saveMyAiHistory('teacher', [{ id: 't1', role: 'user', text: 'Soạn giáo án' }])
+    saveMyAiHistory('entrepreneur', [{ id: 't1', role: 'user', text: 'Soạn báo giá' }])
 
     expect(loadMyAiHistory('sales')).toEqual([
       { id: '1', role: 'user', text: 'Mở báo giá' },
       { id: '2', role: 'assistant', text: 'Đã mở', contextUsed: true },
     ])
-    expect(loadMyAiHistory('teacher')).toHaveLength(1)
+    expect(loadMyAiHistory('entrepreneur')).toHaveLength(1)
     expect(loadMyAiHistory('hr')).toEqual([])
   })
 
   it('clear removes only that practice thread', () => {
     saveMyAiHistory('sales', [{ id: '1', role: 'user', text: 'a' }])
-    saveMyAiHistory('teacher', [{ id: '2', role: 'user', text: 'b' }])
+    saveMyAiHistory('entrepreneur', [{ id: '2', role: 'user', text: 'b' }])
     clearMyAiHistory('sales')
     expect(loadMyAiHistory('sales')).toEqual([])
-    expect(loadMyAiHistory('teacher')).toHaveLength(1)
+    expect(loadMyAiHistory('entrepreneur')).toHaveLength(1)
   })
 })
