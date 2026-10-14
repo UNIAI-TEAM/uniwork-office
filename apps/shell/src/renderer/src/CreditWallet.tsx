@@ -9,8 +9,6 @@ import {
   type AiUsageEntry,
 } from './ai-usage-ledger'
 import {
-  CREDIT_RATE_NOTE_EN,
-  CREDIT_RATE_NOTE_VI,
   creditWalletFromOpenRouter,
   formatCreditCount,
   type CreditWalletSnapshot,
@@ -31,6 +29,8 @@ function hubKeyFromSettings(settings: {
   )
 }
 
+const FOCUS_REFRESH_MS = 60_000
+
 function formatTime(iso: string, locale: string): string {
   try {
     return new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(
@@ -42,8 +42,7 @@ function formatTime(iso: string, locale: string): string {
 }
 
 export function CreditWallet({ onOpenAiSettings }: Props): ReactElement {
-  const { lang, dateLocale } = useI18n()
-  const vi = lang === 'vi'
+  const { t, dateLocale } = useI18n()
   const [snap, setSnap] = useState<CreditWalletSnapshot>(() =>
     creditWalletFromOpenRouter(null, false),
   )
@@ -89,7 +88,14 @@ export function CreditWallet({ onOpenAiSettings }: Props): ReactElement {
 
   useEffect(() => {
     void refresh()
-    const onFocus = () => void refresh()
+    // coming back to the window re-reads the balance at most once a minute: every
+    // alt-tab would otherwise be a request to the key provider
+    let lastFocusRefresh = Date.now()
+    const onFocus = () => {
+      if (Date.now() - lastFocusRefresh < FOCUS_REFRESH_MS) return
+      lastFocusRefresh = Date.now()
+      void refresh()
+    }
     const onCustom = () => void refresh()
     window.addEventListener('focus', onFocus)
     window.addEventListener('uniwork:credit-refresh', onCustom)
@@ -101,89 +107,60 @@ export function CreditWallet({ onOpenAiSettings }: Props): ReactElement {
     }
   }, [refresh])
 
-  const label = (a: string, b: string) => (vi ? a : b)
   const fmt = (n: number) => formatCreditCount(n, dateLocale)
   const fmtEst = (n: number) => formatEstCredits(n, dateLocale)
 
-  let title: string
-  let sub: string
+  // one value on the right of the row; the meter only when the key has a limit
+  let value: string
+  let tone: 'cta' | 'warn' | '' = ''
+  let share: number | null = null
   if (snap.missingKey) {
-    title = label('Tín dụng AI', 'AI credits')
-    sub = label('Chưa có khóa AI', 'No AI key yet')
+    value = t('cwAddKey')
+    tone = 'cta'
   } else if (!snap.ok) {
-    title = label('Tín dụng AI', 'AI credits')
-    sub = busy
-      ? label('Đang cập nhật…', 'Updating…')
-      : label('Không đọc được số dư', 'Couldn’t load balance')
+    value = busy ? t('cwUpdating') : t('cwLoadFailed')
+    if (!busy) tone = 'warn'
   } else if (snap.unlimited || snap.remaining == null) {
-    title = label('Tín dụng AI', 'AI credits')
-    sub = label(`Đã dùng ${fmt(snap.used)}`, `Used ${fmt(snap.used)}`)
+    value = t('cwUsed', { n: fmt(snap.used) })
   } else {
-    title = label(`Còn ${fmt(snap.remaining)} Credit`, `${fmt(snap.remaining)} Credits left`)
-    sub = label(`Đã dùng ${fmt(snap.used)}`, `Used ${fmt(snap.used)}`)
+    value = t('cwLeft', { n: fmt(snap.remaining) })
+    const total = snap.remaining + snap.used
+    share = total > 0 ? snap.remaining / total : 0
   }
-
-  if (todayCredits > 0) {
-    sub = `${sub} · ${label(`Hôm nay ≈ ${fmtEst(todayCredits)}`, `Today ≈ ${fmtEst(todayCredits)}`)}`
-  }
-
+  const status = snap.missingKey ? t('cwNoKey') : value
   const tip = [
-    title,
-    sub,
-    vi ? CREDIT_RATE_NOTE_VI : CREDIT_RATE_NOTE_EN,
-    label(
-      'Nhật ký AI trên máy (ước lượng). Bấm Ví → Settings; mũi tên → lịch sử.',
-      'On-device AI log (estimated). Click wallet → Settings; chevron → history.',
-    ),
-  ].join('\n')
+    `${t('cwTitle')}: ${status}`,
+    todayCredits > 0 ? t('cwToday', { n: fmtEst(todayCredits) }) : '',
+    t('setAiCreditRate'),
+    t('cwOpenHint'),
+  ]
+    .filter(Boolean)
+    .join('\n')
 
   return (
     <div className="credit-wallet-wrap">
       <div className="credit-wallet-row">
         <button
           type="button"
-          className={`credit-wallet${snap.missingKey ? ' is-empty' : ''}${!snap.ok && !snap.missingKey ? ' is-warn' : ''}`}
+          className="credit-wallet"
           onClick={() => onOpenAiSettings()}
           onContextMenu={(e) => {
             e.preventDefault()
             void window.aiOffice.openCreditUsage?.()
           }}
           data-tip={tip}
-          aria-label={tip}
-          title={tip}
+          aria-label={`${t('cwTitle')}: ${status}`}
         >
-          <span className="credit-wallet-icon" aria-hidden="true">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <rect
-                x="1.75"
-                y="4"
-                width="12.5"
-                height="9"
-                rx="2"
-                stroke="currentColor"
-                strokeWidth="1.3"
-              />
-              <path
-                d="M1.75 6.5h12.5M10.5 10.2h2"
-                stroke="currentColor"
-                strokeWidth="1.3"
-                strokeLinecap="round"
-              />
-            </svg>
-          </span>
-          <span className="credit-wallet-text">
-            <span className="credit-wallet-title">{title}</span>
-            <span className="credit-wallet-sub">
-              {busy && snap.ok ? label('Đang cập nhật…', 'Updating…') : sub}
-            </span>
-          </span>
+          <span className="credit-wallet-title">{t('cwTitle')}</span>
+          <span className={`credit-wallet-value${tone ? ` is-${tone}` : ''}`}>{value}</span>
         </button>
         <button
           type="button"
           className={`credit-wallet-toggle${openLog ? ' is-open' : ''}`}
           aria-expanded={openLog}
-          aria-label={label('Nhật ký Credit', 'Credit history')}
-          title={label('Nhật ký tiêu thụ AI', 'AI usage history')}
+          aria-controls="credit-wallet-log"
+          aria-label={t('cwHistory')}
+          data-tip={t('cwHistory')}
           onClick={() => {
             refreshLedger()
             setOpenLog((v) => !v)
@@ -200,28 +177,42 @@ export function CreditWallet({ onOpenAiSettings }: Props): ReactElement {
           </svg>
         </button>
       </div>
+      {share !== null && (
+        <div
+          className={`credit-wallet-meter${share < 0.1 ? ' is-low' : ''}`}
+          role="meter"
+          aria-label={t('cwTitle')}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(share * 100)}
+          aria-valuetext={value}
+        >
+          <span style={{ transform: `scaleX(${Math.max(0.02, share)})` }} />
+        </div>
+      )}
+      {todayCredits > 0 && (
+        <div className="credit-wallet-today">{t('cwToday', { n: fmtEst(todayCredits) })}</div>
+      )}
       {openLog ? (
-        <div className="credit-wallet-log" role="region" aria-label={label('Nhật ký', 'History')}>
-          <p className="credit-wallet-log-note">
-            {label(
-              'Ước lượng trên máy (chưa phải hóa đơn Hub).',
-              'On-device estimate (not the Hub invoice).',
-            )}
-          </p>
+        <div
+          id="credit-wallet-log"
+          className="credit-wallet-log"
+          role="region"
+          aria-label={t('cwHistory')}
+        >
+          <p className="credit-wallet-log-note">{t('cwLogNote')}</p>
           {recent.length === 0 ? (
-            <p className="credit-wallet-log-empty">
-              {label('Chưa có lần gọi AI nào được ghi.', 'No AI calls logged yet.')}
-            </p>
+            <p className="credit-wallet-log-empty">{t('cwLogEmpty')}</p>
           ) : (
             <ul className="credit-wallet-log-list">
               {recent.map((e) => (
                 <li key={e.id} className={!e.ok ? 'is-fail' : undefined}>
                   <span className="credit-wallet-log-time">{formatTime(e.at, dateLocale)}</span>
-                  <span className="credit-wallet-log-sum" title={e.summary}>
+                  <span className="credit-wallet-log-sum" data-tip={e.summary}>
                     {e.summary || e.source}
                   </span>
                   <span className="credit-wallet-log-cred">
-                    {e.ok && !e.cancelled ? `≈ ${fmtEst(e.estCredits)}` : label('—', '—')}
+                    {e.ok && !e.cancelled ? `≈ ${fmtEst(e.estCredits)}` : '—'}
                   </span>
                 </li>
               ))}

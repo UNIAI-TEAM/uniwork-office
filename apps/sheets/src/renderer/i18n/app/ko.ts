@@ -1491,6 +1491,7 @@ export const ko = {
   appCtxResolveComment: '메모 해결',
   appThreadConverted: '메모 {count}개를 노트로 변환했습니다.',
   appThreadNoneAtSelection: '선택한 셀에 스레드 메모가 없습니다.',
+  appCommentSaveFirst: '메모를 추가하려면 먼저 통합 문서를 저장하세요',
   appThreadCellHasNote: '선택한 셀에 이미 노트가 있어 메모를 추가할 수 없습니다.',
   appThreadHoverHint: '메모 창에서 회신',
   appNoteCellHasThread: '선택한 셀에 이미 스레드 메모가 있어 노트를 추가할 수 없습니다.',

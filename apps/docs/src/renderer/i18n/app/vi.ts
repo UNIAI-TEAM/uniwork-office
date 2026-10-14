@@ -110,6 +110,7 @@ export const vi = {
   appMixedExportOpening:
     'Nhiều khổ giấy: đang mở bản xem trước phân trang để xuất các trang đã gộp…',
   appSelectTextToComment: 'Chọn đoạn văn bản cần bình luận trước',
+  appCommentSaveFirst: 'Hãy lưu tài liệu trước khi thêm bình luận',
   appCommentSelectionLost: 'Vùng chọn không còn hiệu lực; hãy chọn lại đoạn văn bản cần bình luận',
   appCommentAdded: 'Đã thêm bình luận; sẽ được ghi vào tài liệu khi lưu',
   appCommentEdited: 'Đã cập nhật bình luận; sẽ được ghi vào tài liệu khi lưu',

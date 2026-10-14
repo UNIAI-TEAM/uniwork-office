@@ -224,9 +224,60 @@ describe('detachedEditorStates (AI run signal)', () => {
     )
     for (const i of [0, 2, 4]) registry.noteAiRun(fakeSender(60 + i), { state: 'running' })
     const states = await detached.detachedEditorStates((path) => path.startsWith('C:/uw/'))
-    expect(states.map((s) => [s.path, s.aiRunning])).toEqual(
-      kinds.map((kind, i) => [`C:/uw/${kind}.bin`, i % 2 === 0]),
+    expect(states.map((s) => [s.path, s.aiRunning, s.aiEpoch])).toEqual(
+      kinds.map((kind, i) => [`C:/uw/${kind}.bin`, i % 2 === 0, i % 2 === 0 ? 1 : 0]),
     )
+  })
+
+  it('carries the AI epoch of each window and never rolls it back', async () => {
+    const registry = await import('../src/main/ai-run-registry')
+    detached.createDetachedEditorWindow({
+      view: fakeView(80) as never,
+      kind: 'docs',
+      title: 'a',
+      filePath: 'C:/uw/a.docx',
+      applyMenuFor: () => {},
+    })
+    const sender = fakeSender(80)
+    registry.noteAiRun(sender, { state: 'running', runId: 'turn-1' })
+    registry.noteAiRun(sender, { state: 'idle', runId: 'turn-1' })
+    const states = await detached.detachedEditorStates(() => true)
+    expect(states).toEqual([{ path: 'C:/uw/a.docx', dirty: false, aiRunning: false, aiEpoch: 1 }])
+  })
+
+  it('a window closed mid-turn clears aiRunning', async () => {
+    const registry = await import('../src/main/ai-run-registry')
+    detached.createDetachedEditorWindow({
+      view: fakeView(81) as never,
+      kind: 'sheets',
+      title: 'b',
+      filePath: 'C:/uw/b.xlsx',
+      applyMenuFor: () => {},
+    })
+    registry.noteAiRun(fakeSender(81), { state: 'running' })
+    expect((await detached.detachedEditorStates(() => true))[0].aiRunning).toBe(true)
+    expect(detached.closeDetachedWithoutPrompt('detached:81')).toBe(true)
+    expect(registry.isAiRunning(81)).toBe(false)
+    await expect(detached.detachedEditorStates(() => true)).resolves.toEqual([])
+  })
+
+  it('a window closed while its dirty query yields reads nothing', async () => {
+    const registry = await import('../src/main/ai-run-registry')
+    detached.createDetachedEditorWindow({
+      view: fakeView(82) as never,
+      kind: 'docs',
+      title: 'c',
+      filePath: 'C:/uw/c.docx',
+      applyMenuFor: () => {},
+    })
+    registry.noteAiRun(fakeSender(82), { state: 'running' })
+    const win = instances[0]!
+    const { docsQueryDirty } = await import('../../docs/src/main/docs-main')
+    vi.mocked(docsQueryDirty).mockImplementationOnce(async () => {
+      win.destroyed = true
+      return false
+    })
+    await expect(detached.detachedEditorStates(() => true)).resolves.toEqual([])
   })
 
   it('a window closed mid-run drops out; files not wanted are skipped', async () => {

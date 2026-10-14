@@ -365,6 +365,20 @@ textarea:disabled {
   background: var(--surface);
 }
 
+/* web frame: a bar above the app (the Discussion document bar, the new-version bar) makes the page a
+   column and #root the remaining height (web/modules/shared/discussion.css, remote-bar.css). The
+   body gets a definite height so that remaining height is definite, and the shell fills it instead
+   of a full viewport (which pushed the status bar and the sheet tabs below the fold). */
+html.uw-disc-on body,
+html.uw-remote-bar-on body {
+  height: 100vh;
+}
+
+html.uw-disc-on .app-shell,
+html.uw-remote-bar-on .app-shell {
+  height: 100%;
+}
+
 /* Go To arrow injected beside Univer's formula-bar Name Box (the
    defined-name selector) — see the ensure() effect in ExcelShell. */
 .goto-in-bar {
@@ -6612,6 +6626,38 @@ body > div:has([data-u-comp='find-replace-dialog']) {
   display: grid;
   gap: 10px;
   align-content: start;
+}
+
+/* G8-13: the server comment panel (shared collab kit) floats where the threaded-comments pane does.
+   In the web frame it is the only side panel open (the Discussion panel closes when it opens). */
+.sheets-server-comments {
+  position: fixed;
+  top: calc(96px + var(--uw-disc-bar-h, 0px));
+  right: 24px;
+  bottom: 48px;
+  z-index: 120;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: min(340px, calc(100vw - 32px));
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow-modal);
+  overflow: hidden;
+}
+
+/* the kit panel fills the box; the box owns the border and the optional save-first line */
+.sheets-server-comments .sheets-server-panel {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+  border-left: 0;
+}
+
+.sheets-server-comments .sheets-server-save-first {
+  border-top: 1px solid var(--warning-border);
+  border-bottom: 0;
 }
 
 .tc-empty {
