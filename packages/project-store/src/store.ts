@@ -35,7 +35,6 @@ import { basename, dirname, join } from 'node:path'
 import type {
   ChatMeta,
   ChatMessage,
-  EduProjectMeta,
   PracticeProjectMeta,
   ProjectData,
   ProjectIndex,
@@ -50,11 +49,9 @@ import type {
 // ────────────────────────────────────────────────────────────
 
 const PROJECT_KINDS: readonly ProjectKind[] = [
-  'education',
   'legal',
   'construction',
   'procurement',
-  'principal',
   'sales',
   'customer-care',
   'entrepreneur',
@@ -68,7 +65,6 @@ const PROJECT_KINDS: readonly ProjectKind[] = [
 ]
 
 function practiceKindToProjectKind(practiceId: string): ProjectKind {
-  if (practiceId === 'teacher') return 'education'
   if ((PROJECT_KINDS as readonly string[]).includes(practiceId)) {
     return practiceId as ProjectKind
   }
@@ -367,10 +363,6 @@ export class ProjectStore {
   private chatPath(projectId: string, chatId: string): string {
     assertSafeId(chatId, 'chatId')
     return join(this.chatsDir(projectId), `${chatId}.jsonl`)
-  }
-
-  private eduMetaPath(projectId: string): string {
-    return join(this.projectDir(projectId), 'edu', 'meta.json')
   }
 
   private practiceMetaPath(projectId: string): string {
@@ -1006,45 +998,18 @@ export class ProjectStore {
       for (const c of chats) {
         if (c.updatedAt > lastActiveAt) lastActiveAt = c.updatedAt
       }
-      const edu = this.getEduMeta(info.id) ?? undefined
       const practice = this.getPracticeMeta(info.id) ?? undefined
       const kind =
-        info.kind ??
-        edu?.kind ??
-        (practice ? practiceKindToProjectKind(practice.practiceId) : undefined)
+        info.kind ?? (practice ? practiceKindToProjectKind(practice.practiceId) : undefined)
       return {
         ...info,
         ...(kind ? { kind } : {}),
         fileCount,
         lastActiveAt,
         isDefault: info.id === 'default',
-        ...(edu ? { edu } : {}),
         ...(practice ? { practice } : {}),
       }
     })
-  }
-
-  getEduMeta(projectId: string): EduProjectMeta | null {
-    const raw = readJson<EduProjectMeta>(this.eduMetaPath(projectId))
-    if (!raw || raw.kind !== 'education') return null
-    return raw
-  }
-
-  setEduMeta(projectId: string, meta: EduProjectMeta): void {
-    const proj = this.readProject(projectId)
-    if (!proj) throw new Error(`Project does not exist: ${projectId}`)
-    writeJson(this.eduMetaPath(projectId), meta)
-    const now = nowIso()
-    const next: ProjectData = { ...proj, kind: 'education', updatedAt: now }
-    this.writeProject(next)
-    const index = this.readIndex()
-    const entry = index.projects.find((p) => p.id === projectId)
-    if (entry) {
-      entry.kind = 'education'
-      entry.updatedAt = now
-      entry.name = proj.name
-      this.writeIndex(index)
-    }
   }
 
   /**
@@ -1098,44 +1063,6 @@ export class ProjectStore {
     return data
   }
 
-  /**
-   * Creates a teacher lesson pack: regular project + kind=education + edu/meta.json.
-   */
-  createEducationProject(name: string, meta: EduProjectMeta): ProjectData {
-    const data = this.createProject(name)
-    const stamped: EduProjectMeta = {
-      ...meta,
-      version: meta.version ?? 2,
-      kind: 'education',
-      materials: meta.materials ?? {},
-      createdAt: meta.createdAt || data.createdAt,
-      updatedAt: data.updatedAt,
-    }
-    this.setEduMeta(data.id, stamped)
-    return this.readProject(data.id) ?? { ...data, kind: 'education' }
-  }
-
-  /** Patch education metadata (tags, notes, materials, objectives, …). */
-  patchEduMeta(projectId: string, patch: Partial<EduProjectMeta>): EduProjectMeta {
-    const current = this.getEduMeta(projectId)
-    if (!current) throw new Error(`Education meta missing for ${projectId}`)
-    const next: EduProjectMeta = {
-      ...current,
-      ...patch,
-      version: 2,
-      kind: 'education',
-      subject: (patch.subject ?? current.subject).trim(),
-      grade: (patch.grade ?? current.grade).trim(),
-      lessonTitle: (patch.lessonTitle ?? current.lessonTitle).trim(),
-      objectives: patch.objectives ?? current.objectives,
-      createdAt: current.createdAt,
-      updatedAt: nowIso(),
-      materials: patch.materials ?? current.materials ?? {},
-    }
-    this.setEduMeta(projectId, next)
-    return next
-  }
-
   getPracticeMeta(projectId: string): PracticeProjectMeta | null {
     const raw = readJson<PracticeProjectMeta>(this.practiceMetaPath(projectId))
     if (!raw || raw.kind !== 'practice') return null
@@ -1160,14 +1087,8 @@ export class ProjectStore {
     }
   }
 
-  /**
-   * Creates a non-teacher practice pack: project + kind + practice/meta.json.
-   * Teacher packs continue to use createEducationProject.
-   */
+  /** Creates a practice pack: project + kind + practice/meta.json. */
   createPracticeProject(name: string, meta: PracticeProjectMeta): ProjectData {
-    if (meta.practiceId === 'teacher') {
-      throw new Error('Use createEducationProject for teacher packs')
-    }
     const data = this.createProject(name)
     const stamped: PracticeProjectMeta = {
       ...meta,

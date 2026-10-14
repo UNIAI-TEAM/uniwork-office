@@ -16,6 +16,7 @@ import type {
   FileSearchRerank,
 } from '../../shared/home-api'
 import type { IntegrationsApi } from '../../shared/integrations-api'
+import type { UniworkWorkApi } from '../../shared/uniwork-work-api'
 import { markText } from '../../shared/text-marks'
 import { useDismissablePopover } from '@genoffice/ui'
 import { boxOf, clipBoxesOf, followMenuAnchor } from './folder-menu-anchor'
@@ -26,11 +27,10 @@ import { CreditWallet } from './CreditWallet'
 import type { SettingsSectionId, SettingsTarget } from './SettingsModal'
 import { AccountEntry } from './AccountEntry'
 import { skillUpdateDue } from './IntegrationsPane'
-import { getPractice, isPracticeId, listPractices, type PracticeId } from '@uniwork/practice-core'
+import { getPractice, isPracticeId, requirePractice, type PracticeId } from '@uniwork/practice-core'
 import { AgentIntentBanner } from './AgentIntentBanner'
 import { NewChatPane } from './NewChatPane'
 import { PracticeHome } from './PracticeHome'
-import { TeacherHome } from './TeacherHome'
 import { wbStoreGetRaw, wbStoreSetRaw } from './workbench-store-client'
 import { onFilesChanged } from './file-events'
 import { FileBadge } from './FileBadge'
@@ -49,6 +49,8 @@ declare global {
     aiOffice: HomeApi
     aiOfficeIntegrations?: IntegrationsApi
     aiOfficeProject?: ProjectHomeApi
+    /** UniWork work data (preload, same lifetime as aiOffice); declared here only */
+    uniworkWork: UniworkWorkApi
   }
 }
 
@@ -3429,7 +3431,7 @@ export function Home() {
                   strokeLinejoin="round"
                 />
               </svg>
-              <span className="nav-label">{t('navTeacher')}</span>
+              <span className="nav-label">{t('navWorkbench')}</span>
             </button>
           )}
         </nav>
@@ -3467,44 +3469,23 @@ export function Home() {
       {selectedProjectId ? (
         renderProjectContent()
       ) : eduMode ? (
-        activePracticeId === 'teacher' ? (
-          <TeacherHome
-            projects={projects}
-            selectedId={eduSelectedId}
-            onSelectPack={setEduSelectedId}
-            onOpenPackFiles={(id) => {
-              setEduMode(false)
-              setChatMode(false)
-              setSelectedProjectId(id)
-              setSelectedFolder(null)
-              setSelected(new Set())
-              setRowMenu(null)
-            }}
-            onRefresh={refresh}
-            onSwitchPractice={switchPractice}
-          />
-        ) : (
-          <PracticeHome
-            practice={
-              getPractice(activePracticeId) ??
-              listPractices().find((p) => p.id !== 'teacher') ??
-              listPractices()[0]!
-            }
-            projects={projects}
-            selectedId={eduSelectedId}
-            onSelectPack={setEduSelectedId}
-            onOpenPackFiles={(id) => {
-              setEduMode(false)
-              setChatMode(false)
-              setSelectedProjectId(id)
-              setSelectedFolder(null)
-              setSelected(new Set())
-              setRowMenu(null)
-            }}
-            onRefresh={refresh}
-            onSwitchPractice={switchPractice}
-          />
-        )
+        <PracticeHome
+          practice={getPractice(activePracticeId) ?? requirePractice('entrepreneur')}
+          projects={projects}
+          selectedId={eduSelectedId}
+          onSelectPack={setEduSelectedId}
+          onOpenPackFiles={(id) => {
+            setEduMode(false)
+            setChatMode(false)
+            setSelectedProjectId(id)
+            setSelectedFolder(null)
+            setSelected(new Set())
+            setRowMenu(null)
+          }}
+          onRefresh={refresh}
+          onSwitchPractice={switchPractice}
+          newItems={NEW_ITEMS}
+        />
       ) : selectedFolder && rootOf(selectedFolder, roots)?.readable ? (
         renderFolderContent()
       ) : chatMode ? (

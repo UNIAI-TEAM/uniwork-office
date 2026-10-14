@@ -4,11 +4,7 @@ import type {
   MouseEvent as ReactMouseEvent,
   ReactElement,
 } from 'react'
-import {
-  SKILL_DOMAINS,
-  getSkillDomain,
-  type SkillDomainId,
-} from '@uniwork/practice-core'
+import { SKILL_DOMAINS, getSkillDomain, type SkillDomainId } from '@uniwork/practice-core'
 import {
   pinSkillDomain,
   readActiveSkillDomain,
@@ -17,6 +13,8 @@ import {
   unpinSkillDomain,
   writeActiveSkillDomain,
 } from './skill-domain-pins'
+import { MODULE_TONES, tintStyle } from './module-tones'
+import { useI18n } from './locale'
 
 interface Props {
   vi: boolean
@@ -29,20 +27,13 @@ function DomainBadge({ id, size = 18 }: { id: SkillDomainId; size?: number }): R
   const def = getSkillDomain(id)
   const letter = (def?.labelEn ?? id).slice(0, 1).toUpperCase()
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden>
-      <rect width="24" height="24" rx="6" fill={def?.color ?? '#64748B'} />
-      <text
-        x="12"
-        y="16"
-        textAnchor="middle"
-        fill="#fff"
-        fontSize="12"
-        fontWeight="700"
-        fontFamily="system-ui, sans-serif"
-      >
-        {letter}
-      </text>
-    </svg>
+    <span
+      className="wb-domain-badge"
+      style={{ ...tintStyle(MODULE_TONES.skills), width: size, height: size }}
+      aria-hidden
+    >
+      {letter}
+    </span>
   )
 }
 
@@ -53,7 +44,7 @@ export function SkillDomainTabs({ vi, active, onSelect, onPinsChange }: Props): 
   const [overId, setOverId] = useState<SkillDomainId | null>(null)
   const dragMoved = useRef(false)
   const wrapRef = useRef<HTMLDivElement>(null)
-  const label = (a: string, b: string) => (vi ? a : b)
+  const { t } = useI18n()
 
   useEffect(() => {
     const next = readPinnedSkillDomains()
@@ -95,7 +86,7 @@ export function SkillDomainTabs({ vi, active, onSelect, onPinsChange }: Props): 
     const next = unpinSkillDomain(id)
     setPins(next)
     onPinsChange?.(next)
-    if (active === id) select(next[0] ?? 'education')
+    if (active === id) select(readActiveSkillDomain(next))
   }
 
   const onDragStart = (id: SkillDomainId, e: ReactDragEvent) => {
@@ -133,7 +124,7 @@ export function SkillDomainTabs({ vi, active, onSelect, onPinsChange }: Props): 
   }
 
   return (
-    <nav className="skill-domain-tabs" aria-label={label('Tab kỹ năng chuyên môn', 'Skill domain tabs')}>
+    <nav className="skill-domain-tabs" aria-label={t('wbSkTabsNav')}>
       {pins.map((id) => {
         const mod = getSkillDomain(id)
         if (!mod) return null
@@ -161,7 +152,7 @@ export function SkillDomainTabs({ vi, active, onSelect, onPinsChange }: Props): 
               setDragId(null)
               setOverId(null)
             }}
-            title={`${vi ? mod.hintVi : mod.hintEn} · ${label('Kéo để sắp xếp', 'Drag to reorder')}`}
+            title={`${vi ? mod.hintVi : mod.hintEn} · ${t('wbCommonDragToReorder')}`}
           >
             <span className="skill-domain-tab-grip" aria-hidden>
               ⋮⋮
@@ -176,7 +167,7 @@ export function SkillDomainTabs({ vi, active, onSelect, onPinsChange }: Props): 
                 role="button"
                 tabIndex={0}
                 draggable={false}
-                aria-label={label('Bỏ tab', 'Unpin tab')}
+                aria-label={t('wbCommonUnpin')}
                 onClick={(e) => remove(id, e)}
                 onMouseDown={(e) => e.stopPropagation()}
                 onKeyDown={(e) => {
@@ -200,7 +191,7 @@ export function SkillDomainTabs({ vi, active, onSelect, onPinsChange }: Props): 
           aria-haspopup="menu"
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((o) => !o)}
-          title={label('Thêm tab kỹ năng', 'Add Skill tab')}
+          title={t('wbSkTabsAdd')}
         >
           <span className="skill-domain-tab-icon" aria-hidden>
             +
@@ -208,13 +199,9 @@ export function SkillDomainTabs({ vi, active, onSelect, onPinsChange }: Props): 
         </button>
         {menuOpen && (
           <div className="skill-domain-menu" role="menu">
-            <p className="skill-domain-menu-title">
-              {label('Thêm lĩnh vực kỹ năng', 'Add Skill domain')}
-            </p>
+            <p className="skill-domain-menu-title">{t('wbSkTabsMenuTitle')}</p>
             {availableToAdd.length === 0 ? (
-              <p className="skill-domain-menu-empty">
-                {label('Đã thêm đủ lĩnh vực.', 'All domains are pinned.')}
-              </p>
+              <p className="skill-domain-menu-empty">{t('wbSkTabsAllPinned')}</p>
             ) : (
               <div className="skill-domain-menu-grid">
                 {availableToAdd.map((m) => (

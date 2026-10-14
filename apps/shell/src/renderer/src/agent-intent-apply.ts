@@ -9,28 +9,15 @@ import {
 import {
   pinModule,
   pinPillar,
-  readCalendar,
-  readEmails,
-  readEvents,
-  readFinance,
-  readGrowth,
-  readHealth,
   readStickyNotes,
-  createEmailDraft,
   createStickyNote,
   readPinnedModules,
-  readTasks,
-  writeCalendar,
-  writeEmails,
-  writeEvents,
-  writeFinance,
-  writeGrowth,
-  writeHealth,
   writeStickyNotes,
-  writeTasks,
 } from './workbench-pins'
 import { pinSkillDomain, writeActiveSkillDomain } from './skill-domain-pins'
 import { workbenchModuleLabel } from './my-ai-consent'
+import { pickActiveWorkspace, readActiveWorkspaceId } from './active-workspace'
+import { settleWork } from './work-cache'
 
 export interface AgentAddUndo {
   moduleId: WorkbenchModuleId
@@ -46,49 +33,54 @@ export interface AgentIntentApplyResult {
   undo?: AgentAddUndo
 }
 
-function newId(): string {
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
-}
-
-function todayIso(): string {
-  return new Date().toISOString().slice(0, 10)
-}
-
 function ensurePinned(practiceId: PracticeId, moduleId: WorkbenchModuleId): void {
   const pins = readPinnedModules(practiceId)
   if (!pins.includes(moduleId)) pinModule(practiceId, moduleId)
 }
 
-function addItem(
+interface AddItemOutcome {
+  vi: string
+  en: string
+  /** on-device rows only: a UniWork task has no local Undo */
+  undo?: AgentAddUndo
+  failed?: boolean
+}
+
+/** The workspace a My AI task lands in: the Workbench's active one, else the first listed. */
+async function agentWorkspaceId(): Promise<string | null> {
+  const listed = await window.aiOffice.uniworkListWorkspaces().catch(() => null)
+  return listed?.ok ? pickActiveWorkspace(listed.value, readActiveWorkspaceId()) : null
+}
+
+async function addItem(
   practiceId: PracticeId,
   moduleId: WorkbenchModuleId,
   text: string,
-): { vi: string; en: string; undo: AgentAddUndo } | null {
+): Promise<AddItemOutcome | null> {
   const title = text.trim() || 'Untitled'
   if (!moduleSupportsAddItem(moduleId)) return null
   const place = workbenchModuleLabel(moduleId, true)
   const placeEn = workbenchModuleLabel(moduleId, false)
 
   if (moduleId === 'tasks') {
-    const id = newId()
-    const now = new Date().toISOString()
-    writeTasks(practiceId, [
-      {
-        id,
-        title,
-        done: false,
-        status: 'todo',
-        priority: 'medium',
-        createdAt: now,
-        updatedAt: now,
-      },
-      ...readTasks(practiceId),
-    ])
-    return {
-      vi: `Đã thêm vào ${place}: ${title}`,
-      en: `Added to ${placeEn}: ${title}`,
-      undo: { moduleId, itemId: id },
+    const workspaceId = await agentWorkspaceId()
+    const created = workspaceId
+      ? await settleWork(
+          window.uniworkWork.createTask({
+            workspaceId,
+            title,
+            idempotencyKey: crypto.randomUUID(),
+          }),
+        )
+      : null
+    if (!created?.ok) {
+      return {
+        vi: `Không thêm được vào ${place} trên UniWork: ${title}`,
+        en: `Could not add to ${placeEn} on UniWork: ${title}`,
+        failed: true,
+      }
     }
+    return { vi: `Đã thêm vào ${place}: ${title}`, en: `Added to ${placeEn}: ${title}` }
   }
   if (moduleId === 'notes') {
     const note = createStickyNote(practiceId, title)
@@ -96,62 +88,6 @@ function addItem(
       vi: `Đã thêm vào ${place}: ${title}`,
       en: `Added to ${placeEn}: ${title}`,
       undo: { moduleId, itemId: note.id },
-    }
-  }
-  if (moduleId === 'email') {
-    const draft = createEmailDraft(practiceId, { subject: title, body: '' })
-    return {
-      vi: `Đã tạo nháp trong ${place}: ${title}`,
-      en: `Created draft in ${placeEn}: ${title}`,
-      undo: { moduleId, itemId: draft.id },
-    }
-  }
-  if (moduleId === 'calendar') {
-    const id = newId()
-    writeCalendar(practiceId, [{ id, date: todayIso(), title }, ...readCalendar(practiceId)])
-    return {
-      vi: `Đã thêm vào ${place}: ${title}`,
-      en: `Added to ${placeEn}: ${title}`,
-      undo: { moduleId, itemId: id },
-    }
-  }
-  if (moduleId === 'events') {
-    const id = newId()
-    writeEvents(practiceId, [{ id, date: todayIso(), title }, ...readEvents(practiceId)])
-    return {
-      vi: `Đã thêm vào ${place}: ${title}`,
-      en: `Added to ${placeEn}: ${title}`,
-      undo: { moduleId, itemId: id },
-    }
-  }
-  if (moduleId === 'personal-finance') {
-    const id = newId()
-    writeFinance([
-      { id, date: todayIso(), kind: 'expense', amount: 0, label: title },
-      ...readFinance(),
-    ])
-    return {
-      vi: `Đã ghi trong ${place}: ${title}`,
-      en: `Logged in ${placeEn}: ${title}`,
-      undo: { moduleId, itemId: id },
-    }
-  }
-  if (moduleId === 'health') {
-    const id = newId()
-    writeHealth([{ id, date: todayIso(), kind: 'other', note: title }, ...readHealth()])
-    return {
-      vi: `Đã ghi trong ${place}: ${title}`,
-      en: `Logged in ${placeEn}: ${title}`,
-      undo: { moduleId, itemId: id },
-    }
-  }
-  if (moduleId === 'self-growth') {
-    const id = newId()
-    writeGrowth([{ id, title, progress: 0, done: false }, ...readGrowth()])
-    return {
-      vi: `Đã thêm vào ${place}: ${title}`,
-      en: `Added to ${placeEn}: ${title}`,
-      undo: { moduleId, itemId: id },
     }
   }
   return null
@@ -165,37 +101,11 @@ export function undoAgentAddItem(
   const { moduleId, itemId } = undo
   const place = workbenchModuleLabel(moduleId, true)
   const placeEn = workbenchModuleLabel(moduleId, false)
-  if (moduleId === 'tasks') {
-    writeTasks(
-      practiceId,
-      readTasks(practiceId).filter((t) => t.id !== itemId),
-    )
-  } else if (moduleId === 'notes') {
+  if (moduleId === 'notes') {
     writeStickyNotes(
       practiceId,
       readStickyNotes(practiceId).filter((n) => n.id !== itemId),
     )
-  } else if (moduleId === 'email') {
-    writeEmails(
-      practiceId,
-      readEmails(practiceId).filter((m) => m.id !== itemId),
-    )
-  } else if (moduleId === 'calendar') {
-    writeCalendar(
-      practiceId,
-      readCalendar(practiceId).filter((c) => c.id !== itemId),
-    )
-  } else if (moduleId === 'events') {
-    writeEvents(
-      practiceId,
-      readEvents(practiceId).filter((e) => e.id !== itemId),
-    )
-  } else if (moduleId === 'personal-finance') {
-    writeFinance(readFinance().filter((f) => f.id !== itemId))
-  } else if (moduleId === 'health') {
-    writeHealth(readHealth().filter((h) => h.id !== itemId))
-  } else if (moduleId === 'self-growth') {
-    writeGrowth(readGrowth().filter((g) => g.id !== itemId))
   } else {
     return {
       ok: false,
@@ -211,10 +121,10 @@ export function undoAgentAddItem(
 }
 
 /** Apply a consented intent on-device (pin tab + optional store write). */
-export function applyAgentIntent(
+export async function applyAgentIntent(
   intent: AgentIntent,
   practiceId: PracticeId,
-): AgentIntentApplyResult {
+): Promise<AgentIntentApplyResult> {
   const tabId = tabIdForTarget(intent.target)
 
   if (intent.target.kind === 'module') {
@@ -234,14 +144,14 @@ export function applyAgentIntent(
   }
 
   if (intent.action === 'add_item' && intent.target.kind === 'module') {
-    const msg = addItem(practiceId, intent.target.id, intent.text ?? intent.summary)
+    const msg = await addItem(practiceId, intent.target.id, intent.text ?? intent.summary)
     if (msg) {
       return {
-        ok: true,
+        ok: !msg.failed,
         tabId,
         messageVi: msg.vi,
         messageEn: msg.en,
-        undo: msg.undo,
+        ...(msg.undo ? { undo: msg.undo } : {}),
       }
     }
   }
@@ -254,7 +164,7 @@ export function applyAgentIntent(
     )
     return {
       ok: true,
-      tabId: 'assistant',
+      tabId,
       messageVi: 'Đã mở My AI để tóm tắt ngữ cảnh trên máy.',
       messageEn: 'Opened My AI to summarize on-device context.',
     }

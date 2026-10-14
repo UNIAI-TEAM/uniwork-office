@@ -170,11 +170,7 @@ export function wantsLocalContext(text: string): boolean {
 }
 
 function detectApp(lower: string): OfficeApp | null {
-  if (
-    /\b(pdf)\b/i.test(lower) ||
-    lower.includes('file pdf') ||
-    lower.includes('tài liệu pdf')
-  ) {
+  if (/\b(pdf)\b/i.test(lower) || lower.includes('file pdf') || lower.includes('tài liệu pdf')) {
     return 'pdf'
   }
   if (
@@ -276,9 +272,7 @@ export function isSubstantiveCreateBrief(brief: string): boolean {
     return false
   }
   // Mostly filler / politeness
-  if (
-    /^(giúp|giup|help)\s+(tôi|toi|mình|minh|me)\s+(với|voi|nhé|nhe|đi|di)?[!?.…]*$/i.test(b)
-  ) {
+  if (/^(giúp|giup|help)\s+(tôi|toi|mình|minh|me)\s+(với|voi|nhé|nhe|đi|di)?[!?.…]*$/i.test(b)) {
     return false
   }
   return true
@@ -481,28 +475,36 @@ export function synthesizePlanGoal(
   const addNamesVi = [
     ...new Set(
       adds
-        .map((s) => (s.intent.target.kind === 'module' ? moduleLabel(s.intent.target.id, true) : null))
+        .map((s) =>
+          s.intent.target.kind === 'module' ? moduleLabel(s.intent.target.id, true) : null,
+        )
         .filter(Boolean),
     ),
   ] as string[]
   const addNamesEn = [
     ...new Set(
       adds
-        .map((s) => (s.intent.target.kind === 'module' ? moduleLabel(s.intent.target.id, false) : null))
+        .map((s) =>
+          s.intent.target.kind === 'module' ? moduleLabel(s.intent.target.id, false) : null,
+        )
         .filter(Boolean),
     ),
   ] as string[]
   const openNamesVi = [
     ...new Set(
       opens
-        .map((s) => (s.intent.target.kind === 'module' ? moduleLabel(s.intent.target.id, true) : null))
+        .map((s) =>
+          s.intent.target.kind === 'module' ? moduleLabel(s.intent.target.id, true) : null,
+        )
         .filter(Boolean),
     ),
   ] as string[]
   const openNamesEn = [
     ...new Set(
       opens
-        .map((s) => (s.intent.target.kind === 'module' ? moduleLabel(s.intent.target.id, false) : null))
+        .map((s) =>
+          s.intent.target.kind === 'module' ? moduleLabel(s.intent.target.id, false) : null,
+        )
         .filter(Boolean),
     ),
   ] as string[]
@@ -664,7 +666,9 @@ function tryBuildPlan(raw: string): Extract<MyAiRoute, { kind: 'plan' }> | null 
  * Route a single clause (no multi-tool planning).
  * Prefer specific file ops before generic Workbench NL.
  */
-export function routeMyAiTextSingle(text: string): MyAiStep | Extract<MyAiRoute, { kind: 'unknown' }> {
+export function routeMyAiTextSingle(
+  text: string,
+): MyAiStep | Extract<MyAiRoute, { kind: 'unknown' }> {
   const raw = text.trim()
   if (!raw) {
     return {
@@ -747,12 +751,7 @@ export function routeMyAiTextSingle(text: string): MyAiStep | Extract<MyAiRoute,
   // 4) Summarize recent files
   if (looksLikeSummarizeRecents(lower) || looksLikeSummarizeRecents(lowerNorm)) {
     const query = stripCreateNoise(
-      extractAfter(
-        [
-          /(?:tóm tắt|tom tat|summarize|summary|tổng hợp|tong hop)\s+(.+)$/i,
-        ],
-        raw,
-      ),
+      extractAfter([/(?:tóm tắt|tom tat|summarize|summary|tổng hợp|tong hop)\s+(.+)$/i], raw),
       null,
     )
     return {
@@ -789,9 +788,9 @@ export function routeMyAiTextSingle(text: string): MyAiStep | Extract<MyAiRoute,
   return {
     kind: 'unknown',
     hintVi:
-      'Thử: “Soạn báo giá Word và thêm việc follow-up, mở tab Clients”, “Mở file báo cáo”, “Tóm tắt file gần đây”.',
+      'Thử: “Soạn báo giá Word và thêm việc follow-up”, “Mở file báo cáo”, “Tóm tắt file gần đây”.',
     hintEn:
-      'Try: “Draft a Word quote and add a follow-up task, open Clients”, “Open report file”, “Summarize recent files”.',
+      'Try: “Draft a Word quote and add a follow-up task”, “Open report file”, “Summarize recent files”.',
   }
 }
 

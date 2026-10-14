@@ -64,11 +64,9 @@ export interface ChatScope {
 
 /** Optional project classification; omitted/undefined means a generic project. */
 export type ProjectKind =
-  | 'education'
   | 'legal'
   | 'construction'
   | 'procurement'
-  | 'principal'
   | 'sales'
   | 'customer-care'
   | 'entrepreneur'
@@ -80,13 +78,11 @@ export type ProjectKind =
   | 'it'
   | 'real-estate'
 
-/** Practice pack ids (teacher uses legacy education kind). */
+/** Practice pack ids. */
 export type PracticeId =
-  | 'teacher'
   | 'legal'
   | 'construction'
   | 'procurement'
-  | 'principal'
   | 'sales'
   | 'customer-care'
   | 'entrepreneur'
@@ -98,14 +94,11 @@ export type PracticeId =
   | 'it'
   | 'real-estate'
 
-/**
- * Generic practice pack metadata (projects/<id>/practice/meta.json).
- * Teacher/education packs continue to use edu/meta.json.
- */
+/** Generic practice pack metadata (projects/<id>/practice/meta.json). */
 export interface PracticeProjectMeta {
   version: 1
   kind: 'practice'
-  practiceId: Exclude<PracticeId, 'teacher'> | PracticeId
+  practiceId: PracticeId
   title: string
   facets: Record<string, string>
   tags?: string[]
@@ -115,43 +108,12 @@ export interface PracticeProjectMeta {
   updatedAt: string
 }
 
-/**
- * Education lesson-pack metadata (projects/<id>/edu/meta.json).
- * Kept structurally aligned with @uniwork/edu-core EduMeta.
- */
-export type EduMaterialRole =
-  | 'giao-an'
-  | 'khdh'
-  | 'slide'
-  | 'phieu-hoc-tap'
-  | 'ppct'
-  | 'de-kiem-tra'
-  | 'tai-lieu-tham-khao'
-  | 'khac'
-
-export interface EduProjectMeta {
-  version: 1 | 2
-  kind: 'education'
-  subject: string
-  grade: string
-  week?: string
-  lessonTitle: string
-  durationMinutes?: number
-  objectives: string[]
-  tags?: string[]
-  notes?: string
-  /** absolute path → material role */
-  materials?: Partial<Record<string, EduMaterialRole>>
-  createdAt: string
-  updatedAt: string
-}
-
 export interface ProjectInfo {
   id: string
   name: string
   createdAt: string
   updatedAt: string
-  /** Set for teacher / practice packs */
+  /** Set for practice packs */
   kind?: ProjectKind
 }
 
@@ -194,9 +156,7 @@ export interface ProjectSummary extends ProjectInfo {
   lastActiveAt: string
   /** Whether this is the default project (cannot be deleted/renamed) */
   isDefault: boolean
-  /** Present when kind === 'education' and edu/meta.json exists */
-  edu?: EduProjectMeta
-  /** Present when a non-teacher practice pack has practice/meta.json */
+  /** Present when a practice pack has practice/meta.json */
   practice?: PracticeProjectMeta
 }
 

@@ -46,14 +46,12 @@ import type { BlockCheck, TestedBlock, TestResult } from './ai-connection-test'
 import { AccountPane } from './AccountPane'
 import type { AccountController } from './account-model'
 import { BackupStoragePane } from './BackupStoragePane'
-import { BillingPaymentPane } from './BillingPaymentPane'
 import {
   CREDIT_RATE_NOTE_EN,
   CREDIT_RATE_NOTE_VI,
   creditWalletFromOpenRouter,
   formatCreditCount,
 } from './credit-wallet'
-import { LicenseDevicesPane } from './LicenseDevicesPane'
 import { UniAiPwaPane } from './UniAiPwaPane'
 import {
   UniworkCloudAccountRows,
@@ -1727,14 +1725,6 @@ export function SettingsModal({
                 </div>
                 {account && <AccountPane account={account} />}
                 {loggedIn && <UniworkCloudAccountRows status={cloud} />}
-                <LicenseDevicesPane
-                  lang={lang}
-                  loggedIn={loggedIn}
-                  accountPlanName={
-                    (loggedIn && account?.status?.entitlements?.planName) || undefined
-                  }
-                />
-                <BillingPaymentPane lang={lang} signedIn={loggedIn} />
               </>
             )}
             {section === 'aiModel' && <AiModelPane t={t} cloud={cloud} />}
