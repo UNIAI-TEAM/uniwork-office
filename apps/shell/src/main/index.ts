@@ -5969,7 +5969,15 @@ async function exportActivePdfAsOffice(kind: PdfOfficeKind): Promise<void> {
     void dialog.showMessageBox(host, { type: 'info', message: tm(PDF_OFFICE_COPY[kind].busy) })
     return
   }
-  if (!(await flushPdfForExport(flushPdfSave, tab.webContents))) return
+  // hold the guard across the flush: pdf-main keeps one save waiter per webContents
+  exportingPdfDocx = true
+  let flushed: boolean
+  try {
+    flushed = await flushPdfForExport(flushPdfSave, tab.webContents)
+  } finally {
+    exportingPdfDocx = false
+  }
+  if (!flushed) return
   const out = await convertPdfToOffice(kind, tab.filePath, host, tab.id)
   if (out) openDocumentPath(out)
 }
