@@ -49,7 +49,7 @@ export function capStatPaths(paths: readonly string[]): string[] {
 
 export function normalizeRecentQuery(
   raw: unknown,
-): Required<Omit<RecentQuery, 'ext'>> & { ext?: string } {
+): Required<Omit<RecentQuery, 'ext' | 'group'>> & { ext?: string } {
   const query = (raw ?? {}) as RecentQuery
   // offset/limit cross the preload boundary, so an IPC caller may send "10" rather
   // than 10; without coercion every page silently restarted at the first page.
@@ -97,20 +97,34 @@ export function matchesExtFamily(entryExt: string, filterExt: string): boolean {
  */
 export type RecentUniworkLookup = (path: string) => RecentUniworkSource | 'hidden' | null
 
+/** the starred group a query is scoped to, or undefined for every group */
+export function starredGroupFilter(raw: unknown): string | undefined {
+  const group = (raw as { group?: unknown } | null | undefined)?.group
+  return typeof group === 'string' && group ? group : undefined
+}
+
 /**
  * Starred files sort by mtime, which requires stat-ing them all first; they are
  * hand-picked and few, so this is fine. Applies the same UniWork lookup as recents:
  * copies of another account or deployment are hidden, bound ones carry `uniwork`.
+ * A `group` on the query scopes the whole page (totals included) and every entry
+ * carries the group it belongs to, so the Starred view can filter on it.
  */
 export function pageStarredPaths(
   paths: readonly string[],
   raw: unknown,
   uniwork?: RecentUniworkLookup,
+  groupOf?: ReadonlyMap<string, string>,
 ): RecentPage {
   const { offset, limit, ext } = normalizeRecentQuery(raw)
-  const all = enrichWithUniwork(statPathEntries(paths, new Set(paths)), uniwork).sort(
-    (a, b) => b.mtimeMs - a.mtimeMs,
-  )
+  const group = starredGroupFilter(raw)
+  const scoped = group ? paths.filter((path) => groupOf?.get(path) === group) : paths
+  const all = enrichWithUniwork(statPathEntries(scoped, new Set(paths)), uniwork)
+    .map((entry) => {
+      const entryGroup = groupOf?.get(entry.path)
+      return entryGroup ? { ...entry, group: entryGroup } : entry
+    })
+    .sort((a, b) => b.mtimeMs - a.mtimeMs)
   const filtered = ext ? all.filter((entry) => matchesExtFamily(entry.ext, ext)) : all
   return {
     entries: limit === 0 ? [] : filtered.slice(offset, offset + limit),

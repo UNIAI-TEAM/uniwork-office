@@ -2,6 +2,7 @@ import type { AgentSkill, AgentToolDef } from '@genoffice/agent-core'
 import type { Editor } from '@tiptap/core'
 import { cap } from '../capabilities'
 import type { AiDocWriter } from './doc-writer'
+import { redactLabelsOf, placeholderInstruction } from '../editor/redact'
 import {
   AGENT_TOOLS,
   buildDocContext,
@@ -61,6 +62,13 @@ const AGENT_SYSTEM_PROMPT = [
   '- The plan: a single `#` title, `##` sections with the key points of each, tone and target length; tables for comparisons, task lists for actionable items, blockquotes for important notes.',
   '- Never invent facts or numbers; use web_search when the topic needs current information, put the findings into context, and attribute sources.',
   '',
+  '## Mind map',
+  '- When the user asks for a mind map / knowledge structure / overview diagram of the document or a topic, call generate_mindmap with the whole tree in one call — never draw it with text and never ask the user to confirm first;',
+  '- The root is the document title (or the focus topic when the user named one — also pass it as `focus`); its children are the main sections/headings, then key concepts, 2-5 per node, 2-4 levels deep;',
+  "- Labels are short phrases (2-8 words) in the document's own language and wording, taken from its headings and key sentences — never invent topics the document does not cover;",
+  "- Cite each node's source with `block` (a block index from the current block list); omit it for nodes that span several blocks. Only cite indexes that exist;",
+  '- generate_mindmap does not modify the document. After it returns, reply with one short sentence (e.g. that the map is ready and branches can be expanded).',
+  '',
   '## Conversation',
   '- Answer questions about the document directly, without editing it.',
   '- Keep replies short; the edits themselves are the deliverable. Summarize what you changed in one or two sentences.',
@@ -72,6 +80,7 @@ export const READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
   'read_blocks',
   'read_frontmatter',
   'ask_clarification',
+  'generate_mindmap', // only returns a display payload for the chat card
 ])
 
 const VIEW_ONLY_NOTE =
@@ -112,12 +121,18 @@ export function createMarkdownSkill(
     id: 'markdown',
     // live: the predicates are re-read before every model request
     get systemPrompt() {
-      if (isReadOnly?.()) return AGENT_SYSTEM_PROMPT + VIEW_ONLY_NOTE
+      const editor = getEditor()
+      const labels = editor ? redactLabelsOf(editor.getJSON() as never) : []
+      // only when the open document actually withholds something, so a
+      // document without spans pays nothing and the model is not told to
+      // look for markers that are not there
+      const redact = labels.length > 0 ? `\n\n${placeholderInstruction(labels)}` : ''
+      if (isReadOnly?.()) return AGENT_SYSTEM_PROMPT + VIEW_ONLY_NOTE + redact
       const prompt =
         imageGenAvailable?.() === false
           ? AGENT_SYSTEM_PROMPT + IMAGE_GEN_OFF_NOTE
           : AGENT_SYSTEM_PROMPT
-      return hostOffers('insert_image') ? prompt : prompt + IMAGE_FETCH_OFF_NOTE
+      return (hostOffers('insert_image') ? prompt : prompt + IMAGE_FETCH_OFF_NOTE) + redact
     },
     get tools() {
       if (isReadOnly?.()) return withAsk(AGENT_TOOLS, true)

@@ -1906,9 +1906,18 @@ describe('min_app_version is the core semver (R1-be-12)', () => {
     expect(binding(path)).toMatchObject({ schema: 2, min_app_version: '0.11.0' })
   })
 
+  it('a 1.0.0-beta.2 build stamps the core 1.0.0 (beta.2 upgrade path)', async () => {
+    const server = fakeServer({ bytes: enc('v3 bytes') })
+    const ctx = setup(server, { appVersion: '1.0.0-beta.2' })
+    const path = await openDoc(ctx)
+    expect(binding(path)).toMatchObject({ schema: 2, min_app_version: '1.0.0' })
+  })
+
   it('strips the prerelease and build metadata, and keeps anything else verbatim', () => {
     expect(coreSemver('0.11.0-beta.9')).toBe('0.11.0')
     expect(coreSemver('0.11.0-dev.3')).toBe('0.11.0')
+    expect(coreSemver('1.0.0-beta.2')).toBe('1.0.0')
+    expect(coreSemver('1.0.0')).toBe('1.0.0')
     expect(coreSemver('1.2.3+build.7')).toBe('1.2.3')
     expect(coreSemver(' 0.11.0 ')).toBe('0.11.0')
     expect(coreSemver('dev')).toBe('dev')

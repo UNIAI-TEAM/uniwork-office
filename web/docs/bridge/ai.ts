@@ -83,6 +83,8 @@ export default {
     customFontSize: 14,
     spellcheck: true,
     openInNewDocs: true,
+    // the web frame has no AI sidebar to hide; keep the shipped default
+    showAiSidebar: true,
   }),
 
   aiChat: async (): Promise<AiChatResponse> => ({

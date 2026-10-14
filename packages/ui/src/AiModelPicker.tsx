@@ -132,8 +132,16 @@ export function AiModelPicker({
     if (!open) {
       refresh()
       const rect = chipRef.current?.getBoundingClientRect()
-      // the composer sits at the panel bottom: open upwards, pinned to the chip
-      if (rect) setPopStyle({ left: rect.left, bottom: window.innerHeight - rect.top + 6 })
+      const zoom = effectiveZoom(chipRef.current)
+      // the composer sits at the panel bottom: open upwards, pinned to the chip;
+      // divide window-px offsets and the 70vh cap by any ancestor CSS zoom (.copilot, .app-frame)
+      if (rect) {
+        setPopStyle({
+          left: rect.left / zoom,
+          bottom: (window.innerHeight - rect.top + 6) / zoom,
+          maxHeight: Math.min(420, (window.innerHeight * 0.7) / zoom),
+        })
+      }
     }
     setOpen((v) => !v)
   }
@@ -156,6 +164,7 @@ export function AiModelPicker({
     currentUsable && current
       ? current.model || groupLabel(groups, current.provider)
       : strings.choose
+  const chipLabel = `${strings.title}: ${chipText}`
 
   return (
     <div
@@ -175,8 +184,9 @@ export function AiModelPicker({
         onClick={toggle}
         aria-haspopup="listbox"
         aria-expanded={open}
-        data-tip={strings.title}
-        aria-label={`${strings.title}: ${chipText}`}
+        title={chipLabel}
+        data-tip={chipLabel}
+        aria-label={chipLabel}
       >
         {currentUsable && current && <ProviderLogo id={current.provider} />}
         <span className="ai-model-chip-text">{chipText}</span>
@@ -282,6 +292,24 @@ const VISUALLY_HIDDEN: React.CSSProperties = {
   clip: 'rect(0 0 0 0)',
   whiteSpace: 'nowrap',
   border: 0,
+}
+
+function effectiveZoom(el: HTMLElement | null): number {
+  if (!el) return 1
+  let zoom = 1
+  for (let cur: HTMLElement | null = el; cur; cur = cur.parentElement) {
+    const raw = window.getComputedStyle?.(cur)?.zoom
+    if (raw) {
+      const n = raw.endsWith('%') ? parseFloat(raw) / 100 : parseFloat(raw)
+      if (Number.isFinite(n) && n > 0) zoom *= n
+    }
+  }
+  if (zoom !== 1) return zoom
+  const cssZoom = (el as HTMLElement & { currentCSSZoom?: unknown }).currentCSSZoom
+  if (typeof cssZoom === 'number' && Number.isFinite(cssZoom) && cssZoom > 0) {
+    return cssZoom
+  }
+  return 1
 }
 
 function groupLabel(groups: ReadonlyArray<{ id: string; label: string }>, id: string): string {
