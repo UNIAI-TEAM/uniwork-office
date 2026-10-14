@@ -115,6 +115,7 @@ export const es = {
   appMixedExportOpening:
     'Tamaños de papel mixtos: abriendo la vista previa de paginación para exportar las páginas combinadas…',
   appSelectTextToComment: 'Seleccione primero el texto que desea comentar',
+  appCommentSaveFirst: 'Guarda primero el documento para añadir un comentario',
   appCommentSelectionLost:
     'La selección ya no es válida; vuelva a seleccionar el texto que desea comentar',
   appCommentAdded: 'Comentario agregado; se escribirá en el documento al guardar',

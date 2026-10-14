@@ -400,6 +400,7 @@ describe('the comments IPC wiring (unbound -> zero requests)', () => {
         COMMENTS_CHANNELS.anchors,
         COMMENTS_CHANNELS.searchMentions,
         COMMENTS_CHANNELS.revealPending,
+        COMMENTS_CHANNELS.context,
       ].sort(),
     )
   })
@@ -688,5 +689,101 @@ describe('reload while composing a reply to a deleted thread (§9 rule 2)', () =
       details: { code: 'comment_deleted' },
     })
     expect(draft).toBe('my unsent reply')
+  })
+})
+
+describe('the comments context + saved push (G8-12 §3.1)', () => {
+  const OTHER = '/home/u/UniWork/Other.docx'
+  const context = {
+    documentId: DOC,
+    versionId: 'ver_7',
+    level: 'edit' as const,
+    myUserId: 'acc_1',
+  }
+
+  function mountContext(options: { bound?: boolean } = {}) {
+    const { ipcMain, handlers } = fakeIpc()
+    const server = createFakeCommentServer()
+    const saved: Array<{ path: string; versionId: string }> = []
+    const bound = options.bound ?? true
+    const service = {
+      recentSource: (path: string) =>
+        bound && path === PATH
+          ? { documentId: DOC, workspaceId: 'ws-1', title: 'Plan', access: 'edit' as const }
+          : null,
+      commentContext: (path: string) => (bound && path === PATH ? context : null),
+    } as unknown as Parameters<typeof createUniworkComments>[1]['service']
+    const handle = createUniworkComments(ipcMain, {
+      service,
+      profile: () => ({ apiOrigin: ORIGIN }),
+      authorized: <T>(call: (t: string) => Promise<T>) => call('tok'),
+      isSignedIn: () => true,
+      fetch: server.fetch,
+      sendReveal: () => 'delivered',
+      // editor 1 shows PATH, editor 2 shows OTHER
+      shownPath: (sender) => (sender.id === 1 ? PATH : sender.id === 2 ? OTHER : null),
+      sendSaved: (payload) => void saved.push(payload),
+    })
+    return { handle, handlers, server, saved }
+  }
+
+  it('answers documentId + versionId (+ level, my id) for the sender own bound path, no request', async () => {
+    const { handlers, server } = mountContext()
+    expect(
+      await handlers.get(COMMENTS_CHANNELS.context)!({ sender: { id: 1 } }, { path: PATH }),
+    ).toEqual({ ok: true, value: context })
+    expect(server.calls).toHaveLength(0)
+  })
+
+  it('ignores a renderer-supplied document or version id', async () => {
+    const { handlers } = mountContext()
+    const reply = await handlers.get(COMMENTS_CHANNELS.context)!(
+      { sender: { id: 1 } },
+      { path: PATH, documentId: 'evil', versionId: 'evil' },
+    )
+    expect(reply).toEqual({ ok: true, value: context })
+  })
+
+  it('an unbound path answers not_found and makes no request', async () => {
+    const { handlers, server } = mountContext({ bound: false })
+    expect(
+      await handlers.get(COMMENTS_CHANNELS.context)!({ sender: { id: 1 } }, { path: PATH }),
+    ).toEqual({
+      ok: false,
+      error: {
+        code: 'not_found',
+        message: 'comments: document is not bound to UniWork',
+        retryable: false,
+      },
+    })
+    expect(server.calls).toHaveLength(0)
+  })
+
+  it('a sender that does not show the path is refused', async () => {
+    const { handlers } = mountContext()
+    for (const id of [2, 3]) {
+      const reply = (await handlers.get(COMMENTS_CHANNELS.context)!(
+        { sender: { id } },
+        { path: PATH },
+      )) as { ok: boolean; error?: { code: string } }
+      expect(reply).toMatchObject({ ok: false, error: { code: 'forbidden' } })
+    }
+  })
+
+  it('a malformed request is refused', async () => {
+    const { handlers } = mountContext()
+    expect(await handlers.get(COMMENTS_CHANNELS.context)!({ sender: { id: 1 } }, {})).toMatchObject(
+      {
+        ok: false,
+        error: { code: 'malformed' },
+      },
+    )
+  })
+
+  it('saved pushes once to the editor owning a bound path, nothing for an unbound one', () => {
+    const { handle, saved } = mountContext()
+    handle.saved(PATH, 'ver_8')
+    handle.saved(OTHER, 'ver_9')
+    expect(saved).toEqual([{ path: PATH, versionId: 'ver_8' }])
   })
 })

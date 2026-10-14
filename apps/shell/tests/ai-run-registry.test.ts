@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AI_RUN_CHANNEL } from '@genoffice/electron-utils/ai-run'
 import {
+  aiEpochOf,
   clearAiRun,
   isAiRunning,
   noteAiRun,
@@ -68,5 +69,40 @@ describe('AI run registry', () => {
     // a late report from the dead view does not resurrect it
     noteAiRun(wc, { state: 'running' })
     expect(isAiRunning(5)).toBe(false)
+  })
+
+  it('the AI epoch counts every accepted running report and never decreases', () => {
+    const wc = fakeSender(6)
+    expect(aiEpochOf(6)).toBe(0)
+    noteAiRun(wc, { state: 'running', runId: 'turn-1' })
+    expect(aiEpochOf(6)).toBe(1)
+    // an idle ends the turn but not the epoch: the reload race compares epochs
+    noteAiRun(wc, { state: 'idle', runId: 'turn-1' })
+    expect(isAiRunning(6)).toBe(false)
+    expect(aiEpochOf(6)).toBe(1)
+    noteAiRun(wc, { state: 'running', runId: 'turn-2' })
+    noteAiRun(wc, { state: 'running', runId: 'turn-3' })
+    expect(aiEpochOf(6)).toBe(3)
+    // a reload or a crashed renderer clears the flag, never the count
+    ;(wc as unknown as { emit(e: string): void }).emit('did-start-loading')
+    ;(wc as unknown as { emit(e: string): void }).emit('render-process-gone')
+    expect(aiEpochOf(6)).toBe(3)
+    // malformed payloads and another view's reports move nothing
+    expect(noteAiRun(wc, { state: 'busy' })).toBe(false)
+    noteAiRun(fakeSender(7), { state: 'running' })
+    expect(aiEpochOf(6)).toBe(3)
+    expect(aiEpochOf(7)).toBe(1)
+  })
+
+  it('closing a tab mid-turn clears aiRunning and the epoch with the destroyed view', () => {
+    const wc = fakeSender(8)
+    noteAiRun(wc, { state: 'running', runId: 'turn-1' })
+    // a docs tab is blanked, not destroyed: the shell forgets the turn itself
+    clearAiRun(8)
+    expect(isAiRunning(8)).toBe(false)
+    noteAiRun(wc, { state: 'running', runId: 'turn-2' })
+    wc.destroy()
+    expect(isAiRunning(8)).toBe(false)
+    expect(aiEpochOf(8)).toBe(0)
   })
 })

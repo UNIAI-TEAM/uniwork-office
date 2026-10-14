@@ -1377,6 +1377,7 @@ export const zhTW = {
   appCtxResolveComment: '解決註解',
   appThreadConverted: '已將 {count} 則註解轉換為附註。',
   appThreadNoneAtSelection: '所選儲存格沒有註解對話。',
+  appCommentSaveFirst: '請先儲存活頁簿再新增註解',
   appThreadCellHasNote: '所選儲存格已有附註，無法再新增註解。',
   appThreadHoverHint: '在「註解」窗格中回覆',
   appNoteCellHasThread: '所選儲存格已有註解對話，無法再新增附註。',

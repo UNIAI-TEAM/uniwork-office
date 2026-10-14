@@ -2,6 +2,7 @@ import {
   notifyUniworkUserSave,
   setUniworkUserSaveHook,
   uniworkIsBound,
+  uniworkIsLocked,
   uniworkIsReadOnly,
   uniworkRefusesOpen,
   uniworkRequestOrigin,
@@ -1656,6 +1657,18 @@ function sessionFor(event: IpcMainInvokeEvent): SheetsTabSession {
 }
 
 /**
+ * G5-03a: a document this tab holds was locked (the server revoked or deleted
+ * it while it is open): the tab's export / Save As / print write nothing - the
+ * data of a revoked document may not leave the app, merged sheets included.
+ */
+function tabHoldsLockedDocument(entry: SheetsTabSession): boolean {
+  for (const session of entry.sessions.values()) {
+    if (uniworkIsLocked(sessionDocumentPath(session))) return true
+  }
+  return false
+}
+
+/**
  * Local media roots for a sheets renderer: the directories of the workbooks its
  * tab has open, plus the directory sheets stages pasted images in. A tab can
  * hold several workbook sessions, so every open one contributes its directory —
@@ -3101,7 +3114,9 @@ export function registerSheetsIpc(): void {
   })
 
   ipcMain.handle(IPC_CHANNELS.exportPdf, async (event, input: unknown) => {
-    sessionFor(event)
+    const entry = sessionFor(event)
+    // G5-03a: a locked document exports nothing (cancel shape = no UI)
+    if (tabHoldsLockedDocument(entry)) return { canceled: true }
     const request = workbookExportPdfRequestSchema.parse(input)
     const result = await exportPdf(event, request)
     if (!result.canceled && result.path) openGeneratedFile(result.path)
@@ -3109,7 +3124,9 @@ export function registerSheetsIpc(): void {
   })
 
   ipcMain.handle(IPC_CHANNELS.printWorkbook, async (event, input: unknown) => {
-    sessionFor(event)
+    const entry = sessionFor(event)
+    // G5-03a: a locked document prints nothing
+    if (tabHoldsLockedDocument(entry)) return { ok: false }
     return printWorkbook(event, workbookExportPdfRequestSchema.parse(input))
   })
 
@@ -3126,6 +3143,8 @@ export function registerSheetsIpc(): void {
 
   ipcMain.handle(IPC_CHANNELS.exportCsv, async (event, input: unknown) => {
     const entry = sessionFor(event)
+    // G5-03a: a locked document exports nothing
+    if (tabHoldsLockedDocument(entry)) return { canceled: true }
     const request = workbookExportCsvRequestSchema.parse(input)
     const parent = dialogParent(event)
     if (request.hasFormulas) {
@@ -3254,6 +3273,8 @@ export function registerSheetsIpc(): void {
     const request = resolveTransferredEdits(entry, workbookSaveRequestSchema.parse(input))
     const session = entry.sessions.get(request.sessionId)
     if (!session) throw new Error('Unknown workbook session.')
+    // G5-03a: a Save As out of a locked document is refused before any dialog
+    if (request.mode === 'save-as' && tabHoldsLockedDocument(entry)) return { canceled: true }
 
     // A CSV session's plain Save keeps the CSV identity: the xlsx save lands
     // on the temp copy and the serialized csvContent is written back to the
