@@ -1,5 +1,6 @@
 import {
   resultChip,
+  type ResultChipErrorKey,
   type ResultChipInput,
   type ResultChipLabelKey,
   type ResultChipOutput,
@@ -19,7 +20,7 @@ export interface UniworkPanelEntryLike {
 }
 
 export type UniworkTranslateFn = (
-  key: ResultChipLabelKey | ResultChipStoppedKey,
+  key: ResultChipLabelKey | ResultChipStoppedKey | ResultChipErrorKey,
   vars?: Record<string, string | number>,
 ) => string
 
@@ -34,6 +35,18 @@ export interface PanelLiveAnnouncementInput {
   busy: boolean
   translate: UniworkTranslateFn
   lastEntryChipInput?: ResultChipInput | null | undefined
+}
+
+/**
+ * The text a fallback chip input falls back to. An explicit `hasStreamedText: false` means the
+ * entry text is a filler the panel wrote (for example after a Stop before the first token), so it
+ * must not count as an answer.
+ */
+function fallbackChipText(
+  entry: UniworkPanelEntryLike,
+  input: ResultChipInput,
+): string | null | undefined {
+  return input.text ?? (input.hasStreamedText === false ? '' : entry.text)
 }
 
 function isEmptyResultChip(chip: ResultChipOutput | null | undefined): boolean {
@@ -85,7 +98,7 @@ export function resolveEntryResultChip(
       : fallbackInput
         ? resultChip({
             ...fallbackInput,
-            text: fallbackInput.text ?? entry.text,
+            text: fallbackChipText(entry, fallbackInput),
           })
         : null
   return isEmptyResultChip(resolved) ? null : (resolved ?? null)
@@ -114,9 +127,8 @@ export function getEntryResultChipView(
  * Computes the polite live-region announcement for an AI panel thread:
  * 1. Active `waitLine` / `status` (plus any streaming in-thread note) on the latest entry.
  * 2. Latest in-thread note while streaming when no wait line is set.
- * 3. On turn completion (`!streaming && !busy`), ONLY the ResultChip line
- *    (or stopped line when stopped before any write) — never the full assistant
- *    answer body (RF1-19).
+ * 3. On turn completion (`!streaming && !busy`), ONLY the ResultChip label, its error line and
+ *    the stopped line, in that order (RF2-9) — never the full assistant answer body (RF1-19).
  */
 export function panelLiveAnnouncement(input: PanelLiveAnnouncementInput): string {
   const { entries, busy, translate, lastEntryChipInput } = input
@@ -141,16 +153,17 @@ export function panelLiveAnnouncement(input: PanelLiveAnnouncementInput): string
         : lastEntryChipInput
           ? resultChip({
               ...lastEntryChipInput,
-              text: lastEntryChipInput.text ?? lastEntry.text,
+              text: fallbackChipText(lastEntry, lastEntryChipInput),
             })
           : null
     if (!rawChip || isEmptyResultChip(rawChip)) return ''
-    if (rawChip.labelKey !== null) {
-      return translate(rawChip.labelKey)
-    }
-    if (rawChip.stoppedKey !== null) {
-      return translate(rawChip.stoppedKey)
-    }
+    // label, then the error line, then the stopped line: what the visible turn shows, never the body
+    const parts: string[] = []
+    if (rawChip.labelKey !== null) parts.push(translate(rawChip.labelKey))
+    if (rawChip.errorLine?.key)
+      parts.push(translate(rawChip.errorLine.key, rawChip.errorLine.params))
+    if (rawChip.stoppedKey !== null) parts.push(translate(rawChip.stoppedKey))
+    return parts.join('. ')
   }
   return ''
 }

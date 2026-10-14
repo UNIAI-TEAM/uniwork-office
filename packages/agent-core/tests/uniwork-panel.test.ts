@@ -128,6 +128,25 @@ describe('uniwork-panel shared helper (RF1-14, RF1-19)', () => {
     })
   })
 
+  describe('stop filler is not streamed text (RF2-1)', () => {
+    it('hasStreamedText=false wins over a filler entry.text: no Answer chip, stopped line only', () => {
+      const entries: UniworkPanelEntryLike[] = [
+        { role: 'user', text: 'Q' },
+        { role: 'assistant', text: '(stopped filler)', streaming: false },
+      ]
+      const view = getEntryResultChipView(entries, 1, false, mockTranslate, {
+        provider: 'uniwork',
+        stopped: true,
+        hasStreamedText: false,
+      })
+      expect(view).toEqual({
+        chip: expect.objectContaining({ chip: null, labelKey: null }),
+        labelText: null,
+        stoppedText: '[aiRunStopped]',
+      })
+    })
+  })
+
   describe('panelLiveAnnouncement (RF1-19)', () => {
     it('returns waitLine or status first while running, joining streaming notes when both exist', () => {
       expect(
@@ -204,6 +223,56 @@ describe('uniwork-panel shared helper (RF1-14, RF1-19)', () => {
 
       expect(announced).toBe('[aiResultAnswer]')
       expect(announced).not.toContain(longAnswer)
+    })
+
+    it('a stopped Answer announces its label and the stopped line (RF2-9)', () => {
+      const announced = panelLiveAnnouncement({
+        entries: [
+          { role: 'user', text: 'Q' },
+          {
+            role: 'assistant',
+            text: 'partial answer',
+            streaming: false,
+            resultChip: resultChip({ provider: 'uniwork', stopped: true, text: 'partial answer' }),
+          },
+        ],
+        busy: false,
+        translate: mockTranslate,
+      })
+      expect(announced).toBe('[aiResultAnswer]. [aiRunStopped]')
+    })
+
+    it('an error chip announces its error line after the label (RF2-9)', () => {
+      const announced = panelLiveAnnouncement({
+        entries: [
+          { role: 'user', text: 'Q' },
+          {
+            role: 'assistant',
+            text: '',
+            streaming: false,
+            resultChip: resultChip({
+              provider: 'uniwork',
+              error: { code: 'unavailable', message: 'down' },
+            }),
+          },
+        ],
+        busy: false,
+        translate: mockTranslate,
+      })
+      expect(announced).toBe('[aiResultError]. [aiErrUnavailable]')
+    })
+
+    it('a stop with nothing streamed announces the stopped line only (RF2-1)', () => {
+      const announced = panelLiveAnnouncement({
+        entries: [
+          { role: 'user', text: 'Q' },
+          { role: 'assistant', text: '(stopped filler)', streaming: false },
+        ],
+        busy: false,
+        translate: mockTranslate,
+        lastEntryChipInput: { provider: 'uniwork', stopped: true, hasStreamedText: false },
+      })
+      expect(announced).toBe('[aiRunStopped]')
     })
 
     it('returns empty string on completion when provider is not UniWork (no resultChip)', () => {
