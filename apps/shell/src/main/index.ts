@@ -96,6 +96,7 @@ import {
   registerAccountIpc,
   routeAuthCallbackUrl,
   startUniworkAccount,
+  startUniworkAiChat,
   startUniworkCloud,
   stopUniworkAccount,
   onUniworkAccountStatus,
@@ -151,6 +152,7 @@ import {
   setDocsFileSavedHook,
   setDocsFileOpenedHook,
   setSessionPathResolver,
+  setUniworkAiHost,
   defaultSaveDir,
   uniquePathIn,
   authorizeMcpDocWrite,
@@ -6539,6 +6541,26 @@ app.whenReady().then(async () => {
     },
   })
   startUniworkCloud()
+  // G6-05: UniWork AI turns (the `uniwork` provider) run here, scoped to the
+  // sender's tab: a bound document goes to its document route, a local file
+  // to the selected organization
+  const uniworkDocsHandle = uniworkDocs
+  if (uniworkDocsHandle) {
+    const uniworkAi = startUniworkAiChat({
+      describe: (senderId) => {
+        const tab = tabManager?.describeWebContents(senderId)
+        if (tab) return tab.filePath ? { kind: tab.kind, filePath: tab.filePath } : { kind: tab.kind }
+        for (const path of detachedFilePaths()) {
+          const found = findDetachedTabByPath(path)
+          if (found && found.webContents.id === senderId) return { kind: found.kind, filePath: path }
+        }
+        return null
+      },
+      binding: (path) => uniworkDocsHandle.aiBinding(path),
+      capability: (orgId) => uniworkDocsHandle.capabilityRead(orgId),
+    })
+    setUniworkAiHost({ stream: (call) => uniworkAi.run(call) })
+  }
   authCallbacks.start(routeAuthCallback)
   // UniWork document launch links (held since startup) route from here on
   uniworkDocs?.activate((route) => authCallbacks.startLaunch(route))

@@ -3786,6 +3786,16 @@ export function registerSheetsAiIpc(): void {
     const send = (chunk: AiStreamChunk) => {
       if (!event.sender.isDestroyed()) event.sender.send(IPC_CHANNELS.aiStreamChunk, chunk)
     }
+    if (provider === 'uniwork') {
+      // UniWork AI needs the UniWork session of the shell; this standalone module has none
+      send({
+        requestId,
+        type: 'error',
+        error: 'UniWork AI is not available here.',
+        uniworkCode: 'ai_disabled',
+      })
+      return
+    }
     if (!config || (provider !== 'codex' && !config.apiKey)) {
       send({
         requestId,
