@@ -8,7 +8,7 @@ import type {
   UniworkScope,
   UniworkTurnRequest,
 } from '@genoffice/ai-provider'
-import { defaultAiSettings } from '@genoffice/ai-provider'
+import { UniworkError, defaultAiSettings } from '@genoffice/ai-provider'
 import type { DeploymentProfile } from '../src/main/uniwork-auth/deployment'
 import { TransportError, type FetchLike } from '../src/main/uniwork-auth/transport'
 import {
@@ -444,6 +444,18 @@ describe('ai:stream uniwork runner', () => {
     expect(error).toMatchObject({ type: 'error', uniworkCode: 'run_limit_reached' })
     expect(error!.errorCode).toBeUndefined()
     expect(error!.error).not.toContain('run_limit_reached')
+  })
+
+  it("the adapter's UniworkError maps through aiStreamErrorFields: code + Retry-After, no code in the text", async () => {
+    const streams = runner(async () => {
+      throw new UniworkError('ai_uniwork_busy', { status: 429, retryAfterSec: 5 })
+    })
+    const { chunks, done } = run(streams)
+    await done
+    const [error] = terminal(chunks)
+    expect(error).toMatchObject({ type: 'error', uniworkCode: 'ai_uniwork_busy', retryAfterSec: 5 })
+    expect(error!.errorCode).toBeUndefined()
+    expect(error!.error).not.toContain('ai_uniwork_busy')
   })
 
   it('a 429 give-up carries its Retry-After seconds', async () => {

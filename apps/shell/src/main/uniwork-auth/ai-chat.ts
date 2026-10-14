@@ -1,5 +1,8 @@
 import { extname } from 'node:path'
+import { getUiLang } from '@genoffice/i18n'
 import {
+  UniworkError,
+  aiStreamErrorFields,
   streamUniwork,
   type AiStreamChunk,
   type AiStreamRequest,
@@ -208,13 +211,15 @@ export function uniworkAiOffered(
   return capabilities.ai_uniwork_formats.includes(format)
 }
 
+const UNIWORK_FORMATS: readonly UniworkFormat[] = ['docx', 'xlsx', 'pptx', 'pdf', 'markdown', 'html']
+
 /** the cloud-only pre-check: every format on, so only the cloud status decides */
 const ALL_FORMATS_ON: OfficeCapabilities = {
   sync_feed: false,
   sync_write: false,
   offline_library: false,
   ai_uniwork: true,
-  ai_uniwork_formats: ['docx', 'xlsx', 'pptx', 'pdf', 'markdown', 'html'],
+  ai_uniwork_formats: [...UNIWORK_FORMATS],
 }
 
 export interface UniworkAiAvailabilityDeps {
@@ -226,7 +231,10 @@ export interface UniworkAiAvailabilityDeps {
 
 export interface UniworkAiAvailability {
   available(orgId: string | null, format: UniworkFormat): Promise<boolean>
+  /** offered for at least one format of this org (the process-wide provider entry) */
+  availableAny(orgId: string | null): Promise<boolean>
 }
+
 
 export function createUniworkAiAvailability(
   deps: UniworkAiAvailabilityDeps,
@@ -246,6 +254,10 @@ export function createUniworkAiAvailability(
       // a 401 re-evaluates the session elsewhere; it never offers AI meanwhile
       if (read.kind !== 'ok') return false
       return uniworkAiOffered(deps.cloud(), read.capabilities, format)
+    },
+    async availableAny(orgId) {
+      for (const format of UNIWORK_FORMATS) if (await this.available(orgId, format)) return true
+      return false
     },
   }
 }
@@ -301,6 +313,17 @@ interface UniworkFailure {
 
 /** the adapter's UniworkError (or anything shaped like it): its server code decides */
 function failureOf(error: unknown): UniworkFailure {
+  if (error instanceof UniworkError) {
+    // uniworkCode + retryAfterSec, never an overload errorCode; its text names the code, so
+    // the line the renderer may show stays the fallback below
+    const fields = aiStreamErrorFields(error, getUiLang())
+    if (fields.uniworkCode) {
+      return {
+        code: fields.uniworkCode,
+        ...(fields.retryAfterSec !== undefined ? { retryAfterSec: fields.retryAfterSec } : {}),
+      }
+    }
+  }
   if (error && typeof error === 'object') {
     const { code, retryAfterSec } = error as { code?: unknown; retryAfterSec?: unknown }
     if (typeof code === 'string' && /^[a-z][a-z0-9_]{0,63}$/.test(code)) {
@@ -326,7 +349,12 @@ export function createUniworkAiStreams(deps: UniworkAiStreamDeps): UniworkAiStre
     const requestId = request.requestId
     const send = (chunk: Omit<AiStreamChunk, 'requestId'>) => call.send({ requestId, ...chunk })
     const fail = (failure: UniworkFailure) =>
-      send({ type: 'error', error: FALLBACK_TEXT, uniworkCode: failure.code, ...pick(failure) })
+      send({
+        type: 'error',
+        error: FALLBACK_TEXT,
+        uniworkCode: failure.code,
+        ...pick(failure),
+      })
 
     const resolved = deps.scope(call.senderId)
     if (!resolved.ok) {

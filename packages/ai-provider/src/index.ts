@@ -32,7 +32,9 @@ export {
   maxOutputTokensOf,
   resolveAiSettings,
   selectedProvider,
+  setUniworkAiAvailable,
   uniAiOpenRouterKey,
+  uniworkAiAvailable,
   withUniAiOpenRouterAuth,
 } from './providers'
 export {
@@ -62,6 +64,8 @@ export * from './uniwork/types'
 export { setUniworkChatTransport, uniworkChatTransport } from './uniwork/transport'
 export { streamUniwork } from './uniwork/protocol'
 export type { UniworkTurnRequest } from './uniwork/protocol'
+export { UniworkError, uniworkErrorKey } from './uniwork/errors'
+export { UniworkConversations, uniworkConversations } from './uniwork/conversation'
 export * from './ai-notice'
 export * from './ai-test-failure'
 export {

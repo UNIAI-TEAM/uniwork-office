@@ -147,6 +147,14 @@ describe('UniWork AI availability (desktop)', () => {
     expect(h.reads()).toBe(0)
   })
 
+  it('availableAny: one listed format is enough for the provider entry', async () => {
+    const h = harness(caps({ ai_uniwork_formats: ['pdf'] }))
+    expect(await h.availability.availableAny(ORG)).toBe(true)
+    const off = harness(caps({ ai_uniwork_formats: [] }))
+    expect(await off.availability.availableAny(ORG)).toBe(false)
+    expect(await h.availability.availableAny(null)).toBe(false)
+  })
+
   it('the rule itself is pure', () => {
     const on = caps()
     expect(uniworkAiOffered(readyCloud(), on as never, 'docx')).toBe(true)
