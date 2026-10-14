@@ -59,4 +59,9 @@ export const en = {
     'UniWork AI was just turned off for this document, so the run stopped after its current step.',
   aiErrUnsupported: 'UniWork AI can’t do this in {module} yet.',
   aiErrViewOnlyEdit: 'You only have view access to this document, so AI can’t edit it.',
+  // UniWork AI question limits (the façade takes text up to 8,000 characters)
+  aiErrQuestionTooLong:
+    'Your request is too long for UniWork AI. Shorten it to under 8,000 characters and send again.',
+  aiErrQuestionRejected: 'UniWork AI couldn’t accept this request. Change it, then send it again.',
+  aiUniworkImagesNotSent: 'Images aren’t sent to UniWork AI; only your text was sent.',
 } satisfies Record<keyof typeof zh, string>

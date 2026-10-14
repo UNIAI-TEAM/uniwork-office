@@ -16,11 +16,12 @@ export type NoticeKey =
   | 'aiErrUnsupported'
   | 'aiUniworkOff'
   | 'aiUniworkProvider'
+  | 'aiUniworkImagesNotSent'
 
 export type NoticeTranslate = (key: NoticeKey, params?: Record<string, string | number>) => string
 
 export interface PanelNote {
-  kind: 'restarted' | 'boundary' | 'dropped' | 'off'
+  kind: 'restarted' | 'boundary' | 'dropped' | 'off' | 'images'
   text: string
 }
 
@@ -66,6 +67,8 @@ export function noticePatch(
       })
     case 'uniwork-off':
       return addNote({ kind: 'off', text: tr('aiUniworkOff') })
+    case 'images-not-sent':
+      return addNote({ kind: 'images', text: tr('aiUniworkImagesNotSent') })
     case 'dropped-tool-calls': {
       let next = notes
       for (const call of notice.calls) {

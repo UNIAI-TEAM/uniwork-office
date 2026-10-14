@@ -33,19 +33,12 @@ describe('sliceUniworkTurn', () => {
     expect(slice.messages).toEqual([{ role: 'user', content: 'second question' }])
   })
 
-  it('question turn with images sends content parts', () => {
+  it('question turn with images sends the text only (the façade takes a string) and says so', () => {
     const slice = sliceUniworkTurn([
       { role: 'user', text: 'what is this', images: [{ mime: 'image/png', base64: 'AAAA' }] },
     ])
-    expect(slice.messages).toEqual([
-      {
-        role: 'user',
-        content: [
-          { type: 'text', text: 'what is this' },
-          { type: 'image_url', image_url: { url: 'data:image/png;base64,AAAA' } },
-        ],
-      },
-    ])
+    expect(slice.messages).toEqual([{ role: 'user', content: 'what is this' }])
+    expect(slice.imagesDropped).toBe(true)
   })
 
   it('tool-result turn sends only the trailing tool results', () => {

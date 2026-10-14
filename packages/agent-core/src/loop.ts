@@ -605,6 +605,7 @@ export class AgentLoop<TSnapshot = unknown> {
         role: 'user',
         text: format(instruction, context),
         ...(images?.length ? { images } : {}),
+        ...(context ? { instruction } : {}),
       }
       void this.beginRun(userMsg)
     } catch (err) {

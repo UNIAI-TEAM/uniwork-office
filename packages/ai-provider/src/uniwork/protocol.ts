@@ -184,12 +184,14 @@ export async function streamUniwork(
   try {
     slice = sliceUniworkTurn(request.messages)
   } catch (cause) {
+    if (cause instanceof UniworkError) throw cause
     throw new UniworkError('protocol_error', { cause })
   }
   const tools = uniworkAllowedTools(request.tools, request.toolPolicy)
   const body = requestBody(slice, tools, request.scope)
   const start = conversations.begin(session, request.scope, slice.continuesRun)
   if (start.boundary) cb.onNotice?.({ kind: 'conversation-boundary', provider: 'uniwork' })
+  if (slice.imagesDropped) cb.onNotice?.({ kind: 'images-not-sent' })
   // a tool-result turn without the run header is a 400 (API §3.7): the run is already gone
   if (slice.kind === 'tool-result' && !start.ids.runId) throw new UniworkError('run_expired')
 
@@ -239,6 +241,16 @@ export async function streamUniwork(
         throw error
       case 'access_revoked':
         conversations.dropConversation(session)
+        throw error
+      case 'invalid_request':
+        // the façade refused the question itself (shape or size): the same question cannot succeed
+        if (slice.kind === 'question' && error.status === 400) {
+          throw new UniworkError('question_rejected', {
+            status: 400,
+            cause: error,
+            runId: error.runId,
+          })
+        }
         throw error
       case 'office_capability_off':
         // off before the run started: hide UniWork AI instead of an error chip (EXPERIENCE › Cap-off)

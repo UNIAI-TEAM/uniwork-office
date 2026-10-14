@@ -35,7 +35,17 @@ export interface AgentImage {
 }
 
 export type AgentMessage =
-  | { role: 'user'; text: string; images?: AgentImage[] | undefined }
+  | {
+      role: 'user'
+      text: string
+      images?: AgentImage[] | undefined
+      /**
+       * the user's own words when `text` also carries the editor context the loop appended
+       * (text = instruction + context); a transport with a question cap (UniWork AI) keeps
+       * these whole and clips only the context
+       */
+      instruction?: string | undefined
+    }
   /** reasoning: opaque vendor thinking captured during the turn; interleaved-thinking
    * models (MiniMax M3, DeepSeek V4) degrade in tool loops unless it is echoed back */
   | {
@@ -135,6 +145,7 @@ export interface AgentDroppedToolCall {
  * - `conversation-restarted`: the server conversation expired; the question was not sent
  * - `conversation-boundary`: this turn starts a new server conversation after a provider switch
  * - `uniwork-off`: UniWork AI is off for this organization or format (hide it, no error chip)
+ * - `images-not-sent`: the question's images were left out (UniWork AI takes text only)
  */
 export type AgentStreamNotice =
   | { kind: 'dropped-tool-calls'; calls: AgentDroppedToolCall[] }
@@ -143,6 +154,7 @@ export type AgentStreamNotice =
   | { kind: 'conversation-restarted' }
   | { kind: 'conversation-boundary'; provider: string }
   | { kind: 'uniwork-off' }
+  | { kind: 'images-not-sent' }
 
 export interface AgentStreamHandle {
   /** abort the in-flight turn; the transport must still emit onDone afterwards */

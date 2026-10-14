@@ -217,6 +217,20 @@ export function terminal(
   })
 }
 
+/** the façade's question cap, in runes (Unicode code points) */
+export const FACADE_QUESTION_MAX_RUNES = 8000
+
+/** the 400 the façade answers a body it cannot accept with; null when the body is fine */
+function facadeRefusal(request: RecordedUniworkRequest): Response | null {
+  for (const m of request.body.messages) {
+    if (typeof m.content !== 'string') return error(400, 'invalid_request', { ids: false })
+    if (m.role === 'user' && [...m.content].length > FACADE_QUESTION_MAX_RUNES) {
+      return error(400, 'invalid_request', { ids: false })
+    }
+  }
+  return null
+}
+
 export interface FakeUniworkServer extends UniworkChatTransport {
   requests: RecordedUniworkRequest[]
   /** queue the next answers, in order */
@@ -238,6 +252,10 @@ export function createUniworkFake(): FakeUniworkServer {
         body: JSON.parse(request.body) as RecordedUniworkRequest['body'],
       }
       requests.push(recorded)
+      // the façade decodes `content` as a string and caps a question at 8000 runes
+      // (openai_facade.go UniworkQuestionMaxRunes): anything else is a 400 before any model call
+      const refused = facadeRefusal(recorded)
+      if (refused) return refused
       const next = queue.shift()
       if (!next) throw new Error('fake UniWork server: no scripted answer left')
       return typeof next === 'function' ? next(recorded) : next

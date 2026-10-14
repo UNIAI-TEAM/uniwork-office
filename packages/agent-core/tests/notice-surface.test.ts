@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createTextNoticeSurface, noticePatch, type NoticeKey } from '../src'
+import { createTextNoticeSurface, endsQuietly, noticePatch, type NoticeKey } from '../src'
 
 // the panels translate with aiUniworkText; a keyed echo is enough to pin the mapping
 const tr = (key: NoticeKey, params?: Record<string, string | number>) =>
@@ -66,6 +66,15 @@ describe('noticePatch', () => {
     ])
     expect(noticePatch({}, { kind: 'step', step: 1, limit: 5 }, tr, 'Docs')).toBeNull()
     expect(noticePatch({}, { kind: 'from-the-future' } as never, tr, 'Docs')).toBeNull()
+  })
+})
+
+describe('noticePatch: images left out of a UniWork AI question', () => {
+  it('is a one-line note, once per run, and the turn is not quiet', () => {
+    const patch = noticePatch({}, { kind: 'images-not-sent' }, tr, 'Docs')
+    expect(patch?.notes).toEqual([{ kind: 'images', text: 'aiUniworkImagesNotSent' }])
+    expect(noticePatch(patch!, { kind: 'images-not-sent' }, tr, 'Docs')).toBeNull()
+    expect(endsQuietly(patch?.notes)).toBe(false)
   })
 })
 
