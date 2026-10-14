@@ -124,8 +124,16 @@ export function AiModelPicker({
     if (!open && settings?.credentialsUnavailable) refresh()
     if (!open) {
       const rect = chipRef.current?.getBoundingClientRect()
-      // the composer sits at the panel bottom: open upwards, pinned to the chip
-      if (rect) setPopStyle({ left: rect.left, bottom: window.innerHeight - rect.top + 6 })
+      const zoom = effectiveZoom(chipRef.current)
+      // the composer sits at the panel bottom: open upwards, pinned to the chip;
+      // divide window-px offsets and the 70vh cap by any ancestor CSS zoom (.copilot, .app-frame)
+      if (rect) {
+        setPopStyle({
+          left: rect.left / zoom,
+          bottom: (window.innerHeight - rect.top + 6) / zoom,
+          maxHeight: Math.min(420, (window.innerHeight * 0.7) / zoom),
+        })
+      }
     }
     setOpen((v) => !v)
   }
@@ -251,6 +259,24 @@ export function AiModelPicker({
       )}
     </div>
   )
+}
+
+function effectiveZoom(el: HTMLElement | null): number {
+  if (!el) return 1
+  let zoom = 1
+  for (let cur: HTMLElement | null = el; cur; cur = cur.parentElement) {
+    const raw = window.getComputedStyle?.(cur)?.zoom
+    if (raw) {
+      const n = raw.endsWith('%') ? parseFloat(raw) / 100 : parseFloat(raw)
+      if (Number.isFinite(n) && n > 0) zoom *= n
+    }
+  }
+  if (zoom !== 1) return zoom
+  const cssZoom = (el as HTMLElement & { currentCSSZoom?: unknown }).currentCSSZoom
+  if (typeof cssZoom === 'number' && Number.isFinite(cssZoom) && cssZoom > 0) {
+    return cssZoom
+  }
+  return 1
 }
 
 function groupLabel(groups: ReadonlyArray<{ id: string; label: string }>, id: string): string {
