@@ -22,7 +22,7 @@ import { AUDIO_EXTS, VIDEO_EXTS } from '../shared/media-kinds'
 import { ELEMENT_CLIPBOARD_FORMAT, elementClipboardMarkerMatches } from './element-clipboard'
 import { tm } from './i18n-main'
 import { dialogParent } from './session-state'
-import { uniworkCommentAuthor } from './uniwork-policy'
+import { uniworkCommentAuthor, uniworkIsLocked } from './uniwork-policy'
 
 const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'tif', 'tiff']
 
@@ -144,6 +144,9 @@ export function createElectronHostIO(files: ElectronFileHooks): HostIO {
     },
     writeDeck: (opened, target) => savePptxToFile(opened, target),
     saved: (event) => files.saved(event),
+    // G5-03a: the lock answer the environment-neutral session core asks for — the
+    // same policy helper the module's own IPC guards use
+    isLocked: (path) => uniworkIsLocked(path),
     saveGate: files.saveGate,
     userSaved: files.userSaved,
   }

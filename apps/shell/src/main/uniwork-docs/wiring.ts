@@ -9,6 +9,7 @@ import {
   type UniworkDocFormat,
   type UniworkDocListQuery,
   type UniworkDocLock,
+  type UniworkRemoteAction,
   type UniworkUploadDocInput,
   type UniworkSharedQuery,
 } from '../../shared/home-api'
@@ -80,6 +81,16 @@ export interface UniworkDocsWiring {
   isPathOpen(path: string): boolean
   requestModuleSave(path: string, onNotWritten?: () => void): boolean
   reloadPath(path: string): void
+  /**
+   * G5-03a: the FRESH editor state of one path, summed over every view that
+   * shows it (tab, detached window, present view of its owner tab): unsaved
+   * edits (null = no view answered), any running AI turn, and the sum of the
+   * views' AI epochs (never decreases). The guarded clean reload reads this
+   * before and after its fetch; it is never served from the 1 s poll cache.
+   */
+  editorStateOf(
+    path: string,
+  ): Promise<{ dirty: boolean | null; aiRunning: boolean; aiEpoch: number }>
   activePath(): string | undefined
   reveal(): void
   /**
@@ -99,8 +110,16 @@ export interface UniworkDocsWiring {
   discussionTabPaths?(sender: { id: number }): readonly string[] | null
   /** G8-11: the shell webContents that has `path` open as a tab, for the reveal push */
   discussionTarget?(path: string): DiscussionPushTarget | null
-  /** G8-11: narrow / restore the active editor view of the sender's window */
+  /**
+   * G8-11: narrow / restore the active editor view of the sender's window
+   */
   setDiscussionPanel?(sender: { id: number }, panel: { open: boolean; width: number }): void
+  /**
+   * ADVISOR D4 (a): this build's packaging flag (index.ts passes
+   * app.isPackaged), read by the dev-only S6 display fixture. Optional and
+   * absent = packaged, so a wiring that does not set it keeps the fixture off.
+   */
+  isPackaged?: boolean
   lang(): string
   defaultSaveDir(): string
   /** every file path a tab or detached editor window shows */
@@ -464,7 +483,16 @@ export function createSyncRuntime(
     // so a rename on the web reaches the open desktop copy
     // the change's revision, so the echo of this service's own rename is
     // recognised by it and a genuine later change is never swallowed (R1-6)
-    onFeedChange: (change) => service.noteFeedChange(change.documentId, change.revision),
+    // G5-03a: the same change IS the S6 newer-version notice (head version +
+    // version id), so one feed tick drives both
+    onFeedChange: (change) => service.noteFeedChange(change.documentId, change.revision, change),
+    // G5-03a: a full resync that no longer lists an open, bound document asks
+    // the service to classify it (403/404 -> revoked, 410 -> deleted); the
+    // runtime learns ids only, never paths
+    isOpenBound: (documentId) => service.isOpenBound(documentId),
+    onFeedGone: (documentId) => {
+      void service.noteFeedGone(documentId).catch(() => undefined)
+    },
     targets,
     capability: async (orgId) => {
       const found = clients()
@@ -542,7 +570,12 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     isPathOpen: (path) => wiring.isPathOpen(path),
     requestModuleSave: (path, onNotWritten) => wiring.requestModuleSave(path, onNotWritten),
     reloadPath: (path) => wiring.reloadPath(path),
+    // G5-03a: the fresh editor state of one path (W2's live read; the wiring
+    // placeholder is what index.ts installs today)
+    editorStateOf: (path) => wiring.editorStateOf(path),
     activePath: () => wiring.activePath(),
+    // ADVISOR D4 (a): the dev-only fixture gate; index.ts passes app.isPackaged
+    isPackaged: wiring.isPackaged,
     // S18: main owns the native dialog (Electron); the service stays Electron-free
     pickUploadFile: () => pickUploadFile(wiring),
     pushUploadProgress: (event) => push(UNIWORK_DOC_CHANNELS.uploadProgress, event),
@@ -663,6 +696,11 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   ipcMain.handle(UNIWORK_DOC_CHANNELS.save, (_event, path: unknown) => service.save(path as string))
   ipcMain.handle(UNIWORK_DOC_CHANNELS.resolveConflict, (_event, path: unknown) =>
     service.resolveConflict(path as string),
+  )
+  // G5-03a: the S6 bar's actions. The barInset handler is NOT registered here:
+  // it belongs to the window chrome (index.ts, W2).
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.remoteAction, (_event, path: unknown, action: unknown) =>
+    service.remoteAction(path as string, action as UniworkRemoteAction),
   )
   ipcMain.handle(UNIWORK_DOC_CHANNELS.locks, () => service.currentLocks())
   ipcMain.handle(UNIWORK_DOC_CHANNELS.dismissLock, (_event, path: unknown) => {

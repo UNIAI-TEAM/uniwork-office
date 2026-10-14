@@ -27,6 +27,12 @@ import {
 export interface UniworkModuleSeam {
   isBound(path: string): boolean
   isReadOnly(path: string): boolean
+  /**
+   * G5-03a: the server revoked or deleted this open working copy, so its module
+   * refuses export, Save As and print-to-PDF. Optional: a seam that never locks
+   * (older tests) reads as not locked.
+   */
+  isLocked?(path: string): boolean
   onUserSave(path: string): void
   /**
    * G5-04g: true when the path's folder declares a store this build does not
@@ -107,6 +113,9 @@ export function installUniworkModuleSeams(
     ? {
         isBound: (path: string) => seam.isBound(path),
         isReadOnly: (path: string) => seam.isReadOnly(path),
+        // G5-03a: an S6 lock (revoked / deleted while open) refuses export,
+        // Save As and print-to-PDF in every module
+        isLocked: (path: string) => seam.isLocked?.(path) === true,
         refuseOpen: (path: string) => seam.refuseLockedPath(path),
         commentAuthor: (path: string) => author(path),
       }

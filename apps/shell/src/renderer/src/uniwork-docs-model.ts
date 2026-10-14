@@ -7,6 +7,7 @@ import type {
   UniworkDocStatus,
   UniworkDocSummary,
   UniworkLaunchEvent,
+  UniworkRemoteAction,
   UniworkResult,
   UniworkSaveState,
   UniworkWorkspaceRef,
@@ -146,7 +147,7 @@ export function errorActionOf(error: UniworkDocErrorCode): ErrorAction {
 // ── Status chip ─────────────────────────────────────────
 
 export type ChipTone = 'ok' | 'neutral' | 'busy' | 'warn' | 'error'
-export type ChipActionKind = 'retry' | 'sign-in' | 'resolve'
+export type ChipActionKind = 'retry' | 'sign-in' | 'resolve' | 'reload'
 
 export interface ChipModel {
   tone: ChipTone
@@ -170,6 +171,27 @@ function isServerSideError(error: UniworkDocErrorCode | undefined): boolean {
 const QUIET_STATES: ReadonlySet<UniworkSaveState> = new Set(['ready', 'saved', 'dirty', 'saving'])
 
 /**
+ * States that outrank `remote-newer` in the Save pill priority (EXPERIENCE: store_newer / blocked >
+ * signed-out > failed > error > conflict > reconciling-stuck > reconciling > remote-newer > ...).
+ * Every other state (paused_admin, queued, saving, view-only, offline, dirty, saved ...) yields to it.
+ */
+const OUTRANKS_REMOTE_NEWER: ReadonlySet<UniworkSaveState> = new Set([
+  'blocked',
+  'signed-out',
+  'failed',
+  'error',
+  'conflict',
+  'reconciling-stuck',
+  'reconciling',
+])
+
+/** the pill reads "newer version on UniWork": a newer-* bar and no state that outranks it */
+function remoteNewerChip(status: UniworkDocStatus): boolean {
+  const kind = status.remote?.kind
+  return (kind === 'newer-dirty' || kind === 'newer-ai') && !OUTRANKS_REMOTE_NEWER.has(status.state)
+}
+
+/**
  * The chip for a bound document. `needsSignIn` is the account state: when the
  * save state is signed-out and the account is signed in again, the way forward
  * is Retry, not another browser sign-in. `queuedAt` is when the waiting save was
@@ -183,6 +205,17 @@ export function chipModelOf(
   ctx: { needsSignIn: boolean; queuedAt?: string } = { needsSignIn: true },
 ): ChipModel {
   const { state, access, error } = status
+  if (remoteNewerChip(status)) {
+    // the Reload of the bar is not available yet (a save in flight, a stuck one, an AI run): no
+    // button here either, the tooltip says why the document didn't reload
+    const reloadable = status.remote?.kind === 'newer-dirty' && !status.remote.wait
+    return {
+      tone: 'warn',
+      labelKey: 'uwChipRemoteNewer',
+      tipKey: 'uwTipRemoteNewer',
+      action: reloadable ? { kind: 'reload', labelKey: 'uwActResolve' } : undefined,
+    }
+  }
   if (access === 'view' && QUIET_STATES.has(state)) {
     return { tone: 'neutral', labelKey: 'uwChipViewOnly', tipKey: 'uwTipViewOnly' }
   }
@@ -296,6 +329,135 @@ export function chipCopy(
   const tip = t(model.tipKey, tipParams)
   const fullTip = model.errorKey ? `${t(model.errorKey)} ${tip}` : tip
   return { label, tip: fullTip, title: `${label}\n${fullTip}` }
+}
+
+// ── New-version bar (S6) ────────────────────────────────
+
+export type RemoteBarTone = 'info' | 'warn' | 'error'
+
+export interface RemoteBarAction {
+  kind: UniworkRemoteAction
+  labelKey: StringKey
+  /** why the button cannot be used yet: it stays focusable (`aria-disabled`) and the reason describes it */
+  disabledReasonKey?: StringKey
+}
+
+export interface RemoteBarModel {
+  tone: RemoteBarTone
+  /** the landmark name: the new-version bar, or the document-status one for a lock / failure */
+  regionKey: 'uwRemoteRegion' | 'uwLockRegion'
+  messageKey: StringKey
+  params: Record<string, string | number>
+  actions: RemoteBarAction[]
+  /** a clean-reload notice hides itself after this long unless hovered or focused (EXPERIENCE: 8 s) */
+  autoHideMs?: number
+}
+
+export const REMOTE_BAR_AUTO_HIDE_MS = 8_000
+
+const RELOAD_LATER: RemoteBarAction[] = [
+  { kind: 'reload', labelKey: 'uwRemoteReload' },
+  { kind: 'later', labelKey: 'uwRemoteLater' },
+]
+
+/**
+ * The S6 bar for a document, or null when it has none (EXPERIENCE State Patterns >
+ * New-version bar). `who` is the author and time of the loaded version when the host knows
+ * them: until a source for them exists the "updated" bar reads `uwRemoteUpdatedNoRev`, never
+ * a sentence with a hole in it.
+ *
+ * Deferred: the stuck-save reason also offers `uwQueueOpenCenter`, which needs the sync
+ * center opener; the shell has none yet, so only the reason is shown.
+ */
+export function remoteBarModelOf(
+  status: UniworkDocStatus,
+  who: { author?: string; time?: string } = {},
+): RemoteBarModel | null {
+  const bar = status.remote
+  if (!bar) return null
+  switch (bar.kind) {
+    case 'updated': {
+      const close: RemoteBarAction[] = [{ kind: 'close', labelKey: 'uwRemoteClose' }]
+      if (bar.version !== null && who.author && who.time) {
+        return {
+          tone: 'info',
+          regionKey: 'uwRemoteRegion',
+          messageKey: 'uwRemoteUpdated',
+          params: { n: bar.version, author: who.author, time: who.time },
+          actions: close,
+          autoHideMs: REMOTE_BAR_AUTO_HIDE_MS,
+        }
+      }
+      return {
+        tone: 'info',
+        regionKey: 'uwRemoteRegion',
+        messageKey: 'uwRemoteUpdatedNoRev',
+        params: {},
+        actions: close,
+        autoHideMs: REMOTE_BAR_AUTO_HIDE_MS,
+      }
+    }
+    case 'newer-dirty': {
+      const reason: StringKey | undefined =
+        bar.wait === 'commit'
+          ? 'uwRemoteWaitCommit'
+          : bar.wait === 'stuck'
+            ? 'uwRemoteWaitStuck'
+            : undefined
+      return {
+        tone: 'warn',
+        regionKey: 'uwRemoteRegion',
+        messageKey: 'uwRemoteNewerDirty',
+        params: { n: bar.version },
+        actions: [{ ...RELOAD_LATER[0], disabledReasonKey: reason }, { ...RELOAD_LATER[1] }],
+      }
+    }
+    case 'newer-ai':
+      // D3: no editor reports an AI run yet and there is no stop channel, so Reload waits;
+      // the sentence of the bar already says why (AI is running)
+      return {
+        tone: 'warn',
+        regionKey: 'uwRemoteRegion',
+        messageKey: 'uwRemoteNewerAi',
+        params: { n: bar.version },
+        actions: [
+          { ...RELOAD_LATER[0], disabledReasonKey: 'uwRemoteNewerAi' },
+          { ...RELOAD_LATER[1] },
+        ],
+      }
+    case 'now-clean':
+      return {
+        tone: 'info',
+        regionKey: 'uwRemoteRegion',
+        messageKey: 'uwRemoteNowClean',
+        params: { n: bar.version },
+        actions: [{ kind: 'reload-now', labelKey: 'uwConflictReloadGo' }],
+      }
+    case 'reload-failed':
+      return {
+        tone: 'error',
+        regionKey: 'uwLockRegion',
+        messageKey: 'uwRemoteReloadFailed',
+        params: { n: bar.version },
+        actions: [{ kind: 'retry', labelKey: 'uwActRetry' }],
+      }
+    case 'revoked':
+      return {
+        tone: 'error',
+        regionKey: 'uwLockRegion',
+        messageKey: 'uwRemoteRevoked',
+        params: {},
+        actions: [{ kind: 'close', labelKey: 'uwRemoteClose' }],
+      }
+    case 'deleted':
+      return {
+        tone: 'error',
+        regionKey: 'uwLockRegion',
+        messageKey: 'uwRemoteDeleted',
+        params: {},
+        actions: [{ kind: 'close', labelKey: 'uwRemoteClose' }],
+      }
+  }
 }
 
 // status of a bound tab is keyed by the shared pathKey, so a path spelled with

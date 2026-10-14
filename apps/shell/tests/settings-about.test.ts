@@ -85,7 +85,7 @@ describe('Settings > About', () => {
   it('lets a build without a pinned channel pick Stable or Beta', async () => {
     await openAbout('en', 'About')
     const pane = host.querySelector('.set-pane')!
-    expect(pane.textContent).toContain('Update Channel')
+    expect(pane.textContent).toContain('Update channel')
     expect(pane.textContent).toContain('Beta')
     expect(pane.querySelector('.set-about-channel-pinned')).toBeNull()
   })
@@ -117,7 +117,7 @@ describe('Settings > About', () => {
       /app-icon/,
     )
     expect(pane.textContent).toContain('1.2.3')
-    expect(pane.textContent).toContain('Update Channel')
+    expect(pane.textContent).toContain('Update channel')
     expect(pane.querySelector('.set-about-copyright')?.textContent).toBe(
       `© ${legal.copyrightYear} ${legal.company}`,
     )

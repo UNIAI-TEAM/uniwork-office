@@ -16,6 +16,7 @@ import { uniworkDocumentStrings } from './i18n/strings-uniwork-documents'
 import { syncStrings } from './i18n/strings-sync'
 import { workbenchStrings } from './i18n/strings-workbench'
 import { discussionStrings } from './i18n/strings-discussion'
+import { settingsStrings } from './i18n/strings-settings'
 
 export type StringKey =
   | keyof typeof strings.zh
@@ -25,6 +26,7 @@ export type StringKey =
   | keyof typeof syncStrings.zh
   | keyof typeof workbenchStrings.zh
   | keyof typeof discussionStrings.zh
+  | keyof typeof settingsStrings.zh
 
 // the home table plus the sharded domains (each shard type-checks its own key set)
 const dicts = Object.fromEntries(
@@ -38,6 +40,7 @@ const dicts = Object.fromEntries(
       ...syncStrings[l],
       ...workbenchStrings[l],
       ...discussionStrings[l],
+      ...settingsStrings[l],
     },
   ]),
 ) as unknown as LangDicts<Record<StringKey, string>>

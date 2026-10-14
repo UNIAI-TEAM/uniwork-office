@@ -145,6 +145,19 @@ export interface SaveCoordinatorDeps {
   dispatcherBusy?(docKey: string): boolean
 }
 
+/**
+ * G5-03a FF: the base (`baseRevision` + `baseChecksum`) a binding rewrite was
+ * decided from. `commitState` compares it inside the per-key chain, against
+ * the binding as it is at write time, and writes nothing when the document no
+ * longer carries it: a guarded reload/restore (or any other base-moving write)
+ * that committed after the decision can never be overwritten by state derived
+ * from the superseded read.
+ */
+export interface CommitBaseGuard {
+  baseRevision: string
+  baseChecksum: string
+}
+
 export function toStatus(doc: BoundDocument, pendingNext = false): UniworkDocStatus {
   const b = doc.binding
   return {
@@ -766,11 +779,32 @@ export class SaveCoordinator {
    * is not a failure: nothing was written, so the document keeps its binding
    * (and the copy keeps its plaintext intent) and the old status is what the
    * chip shows.
+   *
+   * `guard`: write only while the document still carries the base (see
+   * CommitBaseGuard), compared inside the per-key chain - a reload/restore that
+   * committed after the decision is never overwritten by the superseded read.
    */
-  async commitState(doc: BoundDocument, binding: Binding): Promise<BoundDocument> {
+  async commitState(
+    doc: BoundDocument,
+    binding: Binding,
+    guard?: CommitBaseGuard,
+  ): Promise<BoundDocument> {
     // one writer per document key: the inline pipeline and the dispatcher's
     // `publish` both rewrite binding.json, so chain them (G506-be-7)
-    return this.serializeBinding(doc.key, () => this.writeBinding(doc, binding))
+    return this.serializeBinding(doc.key, () => {
+      if (!guard) return this.writeBinding(doc, binding)
+      const latest = this.deps.store.lookup(doc.path)
+      if (
+        !latest ||
+        latest.binding.baseRevision !== guard.baseRevision ||
+        latest.binding.baseChecksum !== guard.baseChecksum
+      ) {
+        // the base moved since the decision (a reload/restore, a save): the
+        // binding as it is now wins, and this write never lands
+        return Promise.resolve(latest ?? doc)
+      }
+      return this.writeBinding(latest, binding)
+    })
   }
 
   /** the binding write itself, always run inside the per-key chain */

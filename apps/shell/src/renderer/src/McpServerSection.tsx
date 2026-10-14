@@ -115,7 +115,7 @@ export function McpServerSection({ t }: { t: TFunc }) {
         logging: patch.logging ?? logging,
       })
       .then(takeStatus)
-      .catch(() => {})
+      .catch(() => setError(t('setMcpApplyFailed')))
       .finally(() => setSaving(false))
   }
 

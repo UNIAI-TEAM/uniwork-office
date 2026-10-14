@@ -14,6 +14,8 @@
   --border: #e3e6ea;
   --border-subtle: #efefef;
   --border-strong: #d9d9d9;
+  /* boundary of a form control (input, switch track): ≥3:1 on surfaces, WCAG 1.4.11 */
+  --border-control: #878c93;
   --border-hover: #d3d7dd;
   --text: #242424;
   --text-primary: #232425;
@@ -126,6 +128,7 @@
   --border: #3a3a3a;
   --border-subtle: #3a3a3a;
   --border-strong: #555;
+  --border-control: #707070;
   --border-hover: #555;
   --text: #e4e4e4;
   --text-primary: #e4e4e4;
@@ -220,6 +223,7 @@
     --border: #3a3a3a;
     --border-subtle: #3a3a3a;
     --border-strong: #555;
+    --border-control: #707070;
     --border-hover: #555;
     --text: #e4e4e4;
     --text-primary: #e4e4e4;
