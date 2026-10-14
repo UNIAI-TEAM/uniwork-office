@@ -13,6 +13,8 @@ export const strings = {
     aiToolClarify: '已回答澄清问题',
     aiToolClarifySkipped: '跳过了澄清问题',
     aiViewOnlyNotice: '仅查看文档:AI 可以阅读并回答问题,但无法编辑。',
+    mdThemeTitle: '文档主题',
+    mdThemeDefault: '默认（跟随文档主题）',
     renameNeedsSave: '先保存或放弃改动，再改文件后缀',
     redactMenuLabel: '把选中的内容对 AI 隐藏',
     redactDialogDesc:
@@ -285,6 +287,8 @@ export const strings = {
     aiToolClarifySkipped: 'Clarification skipped',
     aiViewOnlyNotice:
       'View-only document: AI can read it and answer questions, but editing is turned off.',
+    mdThemeTitle: 'Document theme',
+    mdThemeDefault: 'Default (follow the document theme)',
     renameNeedsSave: 'Save or discard your changes before changing the extension',
     redactMenuLabel: 'Hide the selection from AI',
     redactDialogDesc:
@@ -566,6 +570,8 @@ export const strings = {
     aiToolClarifySkipped: 'Đã bỏ qua câu hỏi làm rõ',
     aiViewOnlyNotice:
       'Tài liệu chỉ xem: AI có thể đọc và trả lời câu hỏi, nhưng không thể chỉnh sửa.',
+    mdThemeTitle: 'Chủ đề tài liệu',
+    mdThemeDefault: 'Mặc định (theo chủ đề tài liệu)',
     renameNeedsSave: 'Hãy lưu hoặc hủy thay đổi trước khi đổi phần mở rộng',
     redactMenuLabel: 'Ẩn phần đã chọn khỏi AI',
     redactDialogDesc:
@@ -845,6 +851,8 @@ export const strings = {
     aiToolClarifySkipped: '確認の質問をスキップ',
     aiViewOnlyNotice:
       '閲覧専用のドキュメント: AI は内容の読み取りと質問への回答はできますが、編集はできません。',
+    mdThemeTitle: 'ドキュメントテーマ',
+    mdThemeDefault: 'デフォルト（ドキュメントテーマに従う）',
     renameNeedsSave: '拡張子を変更する前に変更を保存または破棄してください',
     redactMenuLabel: '選択範囲をAIから隠す',
     redactDialogDesc:
@@ -1124,6 +1132,8 @@ export const strings = {
     aiToolClarifySkipped: '확인 질문을 건너뜀',
     aiViewOnlyNotice:
       '보기 전용 문서: AI는 내용을 읽고 질문에 답할 수 있지만 편집할 수는 없습니다.',
+    mdThemeTitle: '문서 테마',
+    mdThemeDefault: '기본값(문서 테마 따르기)',
     renameNeedsSave: '확장자를 바꾸기 전에 변경 사항을 저장하거나 버리세요',
     redactMenuLabel: '선택한 부분을 AI에서 숨기기',
     redactDialogDesc:
@@ -1404,6 +1414,8 @@ export const strings = {
     aiToolClarifySkipped: 'Précisions ignorées',
     aiViewOnlyNotice:
       'Document en lecture seule : l’IA peut le lire et répondre à des questions, mais ne peut pas le modifier.',
+    mdThemeTitle: 'Thème du document',
+    mdThemeDefault: 'Par défaut (suivre le thème du document)',
     renameNeedsSave: "Enregistrez ou annulez vos modifications avant de changer l'extension",
     redactMenuLabel: 'Masquer la sélection à l’IA',
     redactDialogDesc:
@@ -1689,6 +1701,8 @@ export const strings = {
     aiToolClarifySkipped: 'Rückfragen übersprungen',
     aiViewOnlyNotice:
       'Schreibgeschütztes Dokument: Die KI kann es lesen und Fragen beantworten, aber nicht bearbeiten.',
+    mdThemeTitle: 'Dokumentthema',
+    mdThemeDefault: 'Standard (dem Dokumentthema folgen)',
     renameNeedsSave:
       'Speichern oder verwerfen Sie Ihre Änderungen, bevor Sie die Erweiterung ändern',
     redactMenuLabel: 'Auswahl vor der KI verbergen',
@@ -1974,6 +1988,8 @@ export const strings = {
     aiToolClarifySkipped: 'Aclaración omitida',
     aiViewOnlyNotice:
       'Documento de solo lectura: la IA puede leerlo y responder preguntas, pero no puede editarlo.',
+    mdThemeTitle: 'Tema del documento',
+    mdThemeDefault: 'Predeterminado (seguir el tema del documento)',
     renameNeedsSave: 'Guarda o descarta los cambios antes de cambiar la extensión',
     redactMenuLabel: 'Ocultar la selección a la IA',
     redactDialogDesc:
@@ -2258,6 +2274,8 @@ export const strings = {
     aiToolClarify: 'ตอบคำถามเพื่อความชัดเจนแล้ว',
     aiToolClarifySkipped: 'ข้ามคำถามเพื่อความชัดเจน',
     aiViewOnlyNotice: 'เอกสารแบบดูอย่างเดียว: AI อ่านและตอบคำถามได้ แต่แก้ไขไม่ได้',
+    mdThemeTitle: 'ธีมเอกสาร',
+    mdThemeDefault: 'ค่าเริ่มต้น (ตามธีมเอกสาร)',
     renameNeedsSave: 'บันทึกหรือยกเลิกการเปลี่ยนแปลงก่อนเปลี่ยนนามสกุลไฟล์',
     redactMenuLabel: 'ซ่อนส่วนที่เลือกจาก AI',
     redactDialogDesc:
@@ -2535,6 +2553,8 @@ export const strings = {
     aiToolClarifySkipped: 'Klarifikasi dilewati',
     aiViewOnlyNotice:
       'Dokumen hanya-lihat: AI dapat membaca dan menjawab pertanyaan, tetapi tidak dapat mengedit.',
+    mdThemeTitle: 'Tema dokumen',
+    mdThemeDefault: 'Bawaan (ikuti tema dokumen)',
     renameNeedsSave: 'Simpan atau batalkan perubahan Anda sebelum mengubah ekstensi',
     redactMenuLabel: 'Sembunyikan pilihan dari AI',
     redactDialogDesc:
@@ -2815,6 +2835,8 @@ export const strings = {
     aiToolClarifySkipped: 'Уточнения пропущены',
     aiViewOnlyNotice:
       'Документ только для просмотра: ИИ может читать его и отвечать на вопросы, но не может редактировать.',
+    mdThemeTitle: 'Тема документа',
+    mdThemeDefault: 'По умолчанию (как тема документа)',
     renameNeedsSave: 'Сохраните или отмените изменения перед сменой расширения',
     redactMenuLabel: 'Скрыть выделение от ИИ',
     redactDialogDesc:
@@ -3096,6 +3118,8 @@ export const strings = {
     aiToolClarifySkipped: 'تم تخطي أسئلة التوضيح',
     aiViewOnlyNotice:
       'مستند للعرض فقط: يمكن للذكاء الاصطناعي قراءته والإجابة عن الأسئلة، لكنه لا يستطيع تعديله.',
+    mdThemeTitle: 'سمة المستند',
+    mdThemeDefault: 'الافتراضي (اتباع سمة المستند)',
     renameNeedsSave: 'احفظ تغييراتك أو تجاهلها قبل تغيير الامتداد',
     redactMenuLabel: 'إخفاء التحديد عن الذكاء الاصطناعي',
     redactDialogDesc:
@@ -3373,6 +3397,8 @@ export const strings = {
     aiToolClarifySkipped: 'Esclarecimento ignorado',
     aiViewOnlyNotice:
       'Documento somente leitura: a IA pode lê-lo e responder a perguntas, mas não pode editá-lo.',
+    mdThemeTitle: 'Tema do documento',
+    mdThemeDefault: 'Padrão (seguir o tema do documento)',
     renameNeedsSave: 'Salve ou descarte as alterações antes de mudar a extensão',
     redactMenuLabel: 'Ocultar a seleção da IA',
     redactDialogDesc:
@@ -3656,6 +3682,8 @@ export const strings = {
     aiToolClarifySkipped: 'Chiarimenti saltati',
     aiViewOnlyNotice:
       'Documento di sola lettura: l’IA può leggerlo e rispondere a domande, ma non può modificarlo.',
+    mdThemeTitle: 'Tema del documento',
+    mdThemeDefault: 'Predefinito (segui il tema del documento)',
     renameNeedsSave: "Salva o annulla le modifiche prima di cambiare l'estensione",
     redactMenuLabel: 'Nascondi la selezione all’IA',
     redactDialogDesc:
@@ -3939,6 +3967,8 @@ export const strings = {
     aiToolClarifySkipped: 'Pominięto wyjaśnienia',
     aiViewOnlyNotice:
       'Dokument tylko do odczytu: AI może go czytać i odpowiadać na pytania, ale nie może go edytować.',
+    mdThemeTitle: 'Motyw dokumentu',
+    mdThemeDefault: 'Domyślnie (zgodnie z motywem dokumentu)',
     renameNeedsSave: 'Zapisz lub odrzuć zmiany przed zmianą rozszerzenia',
     redactMenuLabel: 'Ukryj zaznaczenie przed AI',
     redactDialogDesc:
@@ -4220,6 +4250,8 @@ export const strings = {
     aiToolClarifySkipped: 'Upřesnění přeskočeno',
     aiViewOnlyNotice:
       'Dokument jen pro čtení: AI jej může číst a odpovídat na otázky, ale nemůže jej upravovat.',
+    mdThemeTitle: 'Motiv dokumentu',
+    mdThemeDefault: 'Výchozí (podle motivu dokumentu)',
     renameNeedsSave: 'Před změnou přípony uložte nebo zrušte změny',
     redactMenuLabel: 'Skrýt výběr před AI',
     redactDialogDesc:
@@ -4500,6 +4532,8 @@ export const strings = {
     aiToolClarifySkipped: 'Verduidelijking overgeslagen',
     aiViewOnlyNotice:
       'Alleen-lezen document: AI kan het lezen en vragen beantwoorden, maar niet bewerken.',
+    mdThemeTitle: 'Documentthema',
+    mdThemeDefault: 'Standaard (documentthema volgen)',
     renameNeedsSave: 'Sla uw wijzigingen op of verwerp ze voordat u de extensie wijzigt',
     redactMenuLabel: 'Selectie verbergen voor de AI',
     redactDialogDesc:
@@ -4782,6 +4816,8 @@ export const strings = {
     aiToolClarifySkipped: 'Penjelasan dilangkau',
     aiViewOnlyNotice:
       'Dokumen lihat sahaja: AI boleh membaca dan menjawab soalan, tetapi tidak boleh mengedit.',
+    mdThemeTitle: 'Tema dokumen',
+    mdThemeDefault: 'Lalai (ikut tema dokumen)',
     renameNeedsSave: 'Simpan atau buang perubahan anda sebelum menukar sambungan',
     redactMenuLabel: 'Sembunyikan pilihan daripada AI',
     redactDialogDesc:
@@ -5061,6 +5097,8 @@ export const strings = {
     aiToolClarify: 'שאלות ההבהרה נענו',
     aiToolClarifySkipped: 'שאלות ההבהרה דולגו',
     aiViewOnlyNotice: 'מסמך לצפייה בלבד: ה-AI יכול לקרוא אותו ולענות על שאלות, אך לא לערוך אותו.',
+    mdThemeTitle: 'ערכת נושא של המסמך',
+    mdThemeDefault: 'ברירת מחדל (בהתאם לערכת המסמך)',
     renameNeedsSave: 'שמור או בטל את השינויים לפני שינוי הסיומת',
     redactMenuLabel: 'הסתרת הבחירה מהמודל',
     redactDialogDesc:
@@ -5336,6 +5374,8 @@ export const strings = {
     aiToolClarifySkipped: 'स्पष्टीकरण छोड़ा गया',
     aiViewOnlyNotice:
       'केवल-देखने योग्य दस्तावेज़: AI इसे पढ़ सकता है और प्रश्नों के उत्तर दे सकता है, लेकिन संपादित नहीं कर सकता।',
+    mdThemeTitle: 'दस्तावेज़ थीम',
+    mdThemeDefault: 'डिफ़ॉल्ट (दस्तावेज़ थीम का पालन करें)',
     renameNeedsSave: 'एक्सटेंशन बदलने से पहले अपने बदलाव सहेजें या छोड़ें',
     redactMenuLabel: 'चयन को AI से छिपाएँ',
     redactDialogDesc:
@@ -5615,6 +5655,8 @@ export const strings = {
     aiToolClarify: '已回答釐清問題',
     aiToolClarifySkipped: '已略過釐清問題',
     aiViewOnlyNotice: '唯讀文件:AI 可以閱讀並回答問題,但無法編輯。',
+    mdThemeTitle: '文件主題',
+    mdThemeDefault: '預設（跟隨文件主題）',
     renameNeedsSave: '先儲存或捨棄變更，再更改副檔名',
     redactMenuLabel: '把選中的內容對 AI 隱藏',
     redactDialogDesc:

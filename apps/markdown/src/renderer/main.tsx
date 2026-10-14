@@ -15,8 +15,10 @@ import '@genoffice/ui/ai-scope-quote.css'
 import '@genoffice/ui/image-viewer.css'
 import 'katex/dist/katex.min.css'
 import './styles.css'
+import './markdown-themes.css'
 import { applyAiPanelPrefs, installScreenTips } from '@genoffice/ui'
 import { mirrorUniworkAiFlag } from '@genoffice/ai-provider/browser'
+import type { MarkdownTheme } from '../shared/markdown-theme'
 
 installScreenTips()
 // this renderer's own provider list shows the UniWork AI entry only while the shell offers it
@@ -27,6 +29,12 @@ function applyTheme(theme: UiTheme): void {
   else document.documentElement.setAttribute('data-theme', theme)
 }
 
+function applyMarkdownTheme(theme: MarkdownTheme): void {
+  // a picked paper theme overrides the light/dark document theme for the paper
+  if (theme === 'default') document.documentElement.removeAttribute('data-markdown-theme')
+  else document.documentElement.setAttribute('data-markdown-theme', theme)
+}
+
 function applyDocumentTheme(theme: DocTheme): void {
   // data-doc-theme drives the preview paper (genoffice#1811); absent means 'follow' the UI theme
   if (theme === 'follow') document.documentElement.removeAttribute('data-doc-theme')
@@ -34,15 +42,17 @@ function applyDocumentTheme(theme: DocTheme): void {
 }
 
 void (async () => {
-  const [lang, theme, docTheme] = await Promise.all([
+  const [lang, theme, docTheme, mdTheme] = await Promise.all([
     window.markdownApi.getLanguage().catch(() => 'zh' as const),
     window.markdownApi.getTheme().catch(() => 'system' as const),
     window.markdownApi.getDocumentTheme?.().catch(() => 'follow' as const),
+    window.markdownApi.getMarkdownTheme?.().catch(() => 'default' as const),
   ])
   document.documentElement.lang = htmlLang(lang as Lang)
   document.documentElement.dir = htmlDir(lang)
   applyTheme(theme)
   applyDocumentTheme(docTheme ?? 'follow')
+  applyMarkdownTheme(mdTheme)
   window.markdownApi.onThemeChanged(applyTheme)
   window.markdownApi.onDocumentThemeChanged?.(applyDocumentTheme)
   await window.markdownApi
