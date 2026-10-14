@@ -507,6 +507,22 @@ describe('AiComposer — Send/Stop labels, polite live announcements, Escape gua
     })
     expect(onStop).toHaveBeenCalledTimes(1)
     expect(liveEl.textContent).toBe(aiUniworkText('vi', 'aiRunStopped'))
+
+    // When uniwork.onAnnounce is provided, AiComposer delegates to the panel's live region
+    // and does NOT render a second [role="status"][aria-live="polite"] node (S9 single live region)
+    const onAnnounce = vi.fn()
+    renderComposer({
+      lang: 'vi',
+      busy: false,
+      onStop,
+      uniwork: {
+        active: true,
+        provider: 'uniwork',
+        onAnnounce,
+        disclosure: { ackKey, orgName: 'Org', variant: 'document' },
+      },
+    })
+    expect(host.querySelectorAll('[role="status"][aria-live="polite"]').length).toBe(0)
   })
 
   it('Escape stops the run when focus is inside the composer, ignores persistent document listboxes/expanded elements, and blocks only on composer-owned popups (RF1-8)', () => {

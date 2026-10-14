@@ -285,9 +285,11 @@ export function AiComposer({
 
   return (
     <>
-      <div className="ai-uniwork-sr-only" role="status" aria-live="polite" aria-atomic="true">
-        {liveText}
-      </div>
+      {!onAnnounceProp && (
+        <div className="ai-uniwork-sr-only" role="status" aria-live="polite" aria-atomic="true">
+          {liveText}
+        </div>
+      )}
       {unacked && (
         <span id={autoNeedsAckId} className="ai-uniwork-sr-only">
           {aiUniworkText(resolvedLang, 'aiUniworkSendNeedsAck')}
