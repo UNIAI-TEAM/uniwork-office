@@ -146,4 +146,22 @@ describe('toProxyRequest (ai-provider wire format -> BYOK proxy routes)', () => 
     const authFailed = jsonResponse(424, { code: 'provider_auth_failed' })
     expect(await proxyAnswered(authFailed)).toBe(true)
   })
+
+  it('counts a 402 or 503 as a proxy answer only with a UniWork code (vendor ones pass through)', async () => {
+    const vendor402 = jsonResponse(402, { error: { message: 'Insufficient Balance' } })
+    expect(await proxyAnswered(vendor402)).toBe(false)
+    const vendor503 = jsonResponse(503, { error: { type: 'overloaded_error', message: 'busy' } })
+    expect(await proxyAnswered(vendor503)).toBe(false)
+    const htmlGateway = new Response('<html>busy</html>', { status: 503 })
+    expect(await proxyAnswered(htmlGateway)).toBe(false)
+
+    for (const [status, code] of [
+      [402, 'credits_exhausted'],
+      [503, 'cloud_unavailable'],
+      [503, 'ai_credentials_unavailable'],
+      [503, 'unavailable'],
+    ] as const) {
+      expect(await proxyAnswered(jsonResponse(status, { error: { code } })), code).toBe(true)
+    }
+  })
 })

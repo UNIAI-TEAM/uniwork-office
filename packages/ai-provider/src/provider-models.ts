@@ -77,6 +77,15 @@ function geminiIds(body: unknown): string[] | null {
 }
 
 /**
+ * The chat model ids of a `/models` body in either wire shape (`data[].id` for OpenAI-compatible
+ * and Anthropic, `models[].name` for Gemini, which also drops models that cannot chat), deduped
+ * and capped like a direct listing. Shared with the desktop's listing through the UniWork proxy.
+ */
+export function modelIdsOfListBody(body: unknown): string[] {
+  return openAiIds(body) ?? geminiIds(body) ?? []
+}
+
+/**
  * The model ids one provider advertises.
  *
  * Never throws: an unlistable provider, an unusable base URL, a refusal, an

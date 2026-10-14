@@ -144,9 +144,36 @@ export async function isProxy404(res: Response): Promise<boolean> {
   }
 }
 
-/** a 404 is a contract failure only when the proxy says so (a provider's own 404 passes through) */
+/**
+ * Codes the UniWork server itself answers 402 / 503 with. The proxy passes a vendor's own 402
+ * (an exhausted vendor balance) and 503 (overloaded) through with the vendor's status, so those
+ * two statuses are a proxy answer only when the body carries one of these codes.
+ */
+const PROXY_402_503_CODES = new Set([
+  'credits_exhausted',
+  'cloud_unavailable',
+  'ai_credentials_unavailable',
+  'unavailable',
+])
+
+async function bodyCode(res: Response): Promise<string | undefined> {
+  try {
+    return proxyErrorBodyFields(await res.clone().json()).code
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * A contract failure the proxy answered itself. A 404 counts only with `credential_missing`, a 402
+ * or 503 only with a UniWork code; a provider's own 404 / 402 / 503 passes through to ai-provider.
+ */
 export async function proxyAnswered(res: Response): Promise<boolean> {
   if (!isProxyContractStatus(res.status)) return false
-  if (res.status !== 404) return true
-  return isProxy404(res)
+  if (res.status === 404) return isProxy404(res)
+  if (res.status === 402 || res.status === 503) {
+    const code = await bodyCode(res)
+    return code !== undefined && PROXY_402_503_CODES.has(code)
+  }
+  return true
 }
