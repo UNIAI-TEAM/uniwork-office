@@ -1671,6 +1671,451 @@ describe('the model of a provider with a key (UNI-1232 FX2: N3-01 / G-N1)', () =
   })
 })
 
+// ------------------------------------------------------------------ the chip data (G6-05m slice B)
+// What the model chip reads on the web: the person's own Settings row (`modelSources[p].chosen`), the
+// provider's live list (background, cached, never blocking), the newer of this browser's pick and
+// the server stamp, a choice key per user, and the model UniWork AI serves.
+describe('the model chip data on the web (G6-05m)', () => {
+  const CHOICE = 'uniwork.office.web.ai.choice'
+  const T0 = Date.parse('2026-10-14T08:00:00Z')
+  const MIN = 60_000
+  beforeEach(() => {
+    const data = new Map<string, string>()
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => data.get(k) ?? null,
+      setItem: (k: string, v: string) => void data.set(k, String(v)),
+      removeItem: (k: string) => void data.delete(k),
+      clear: () => data.clear(),
+    })
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  const row = (provider: string, model = '', at = '', updated = '2026-10-09T00:00:00Z') => ({
+    ...CREDENTIALS.items[0]!,
+    provider,
+    key_hint: '…ab12',
+    updated_at: updated,
+    model,
+    model_updated_at: at,
+  })
+  /** an older server: no model fields at all */
+  const bare = (provider: string) => {
+    const { model: _m, model_updated_at: _t, ...rest } = row(provider)
+    return rest
+  }
+
+  type Answer = Response | Promise<Response>
+  /** a fake world: credentials, per-provider `/models` answers, the cloud status, every call recorded */
+  function world(
+    opts: {
+      items?: unknown[]
+      models?: Record<string, (n: number) => Answer>
+      cloud?: unknown
+      user?: { displayName: string; id?: string }
+      put?: (c: Call) => Answer
+    } = {},
+  ) {
+    const live = { items: opts.items ?? [], cloud: opts.cloud ?? CLOUD }
+    const asked: Record<string, number> = {}
+    const { calls, fetch } = recorder((c) => {
+      if (c.init.method === 'PUT') {
+        return opts.put
+          ? opts.put(c)
+          : jsonResponse(200, {
+              ...(live.items.find((i) =>
+                c.url.endsWith(`/${(i as { provider: string }).provider}`),
+              ) as object),
+              ...(JSON.parse(String(c.init.body)) as object),
+              model_updated_at: new Date(T0).toISOString(),
+            })
+      }
+      if (c.url.endsWith('/credentials')) {
+        return jsonResponse(200, { items: live.items, providers: CREDENTIALS.providers })
+      }
+      const m = /\/byok\/([^/]+)\/models$/.exec(c.url)
+      if (m) {
+        asked[m[1]!] = (asked[m[1]!] ?? 0) + 1
+        const answer = opts.models?.[m[1]!]
+        return answer ? answer(asked[m[1]!]!) : jsonResponse(200, { data: [] })
+      }
+      return jsonResponse(200, live.cloud)
+    })
+    const clock = { t: T0 }
+    const ai = createWebAi({
+      port: {
+        whenInitialized: async () => ({
+          documentId: 'doc-1',
+          apiBase: 'https://app.test/api/v1',
+          capabilities: { ai: true, uniworkAi: true },
+          ...(opts.user ? { user: opts.user } : {}),
+        }),
+        ...tokens(),
+      },
+      capabilities: { ai: true, uniworkAi: true },
+      fetch,
+      origin: ORIGIN,
+      now: () => clock.t,
+    })
+    const listCalls = (p: string) => calls.filter((c) => c.url.endsWith(`/byok/${p}/models`)).length
+    const credentialGets = () =>
+      calls.filter((c) => c.url.endsWith('/credentials') && c.init.method !== 'PUT').length
+    return { ai, live, calls, clock, listCalls, credentialGets }
+  }
+  const listedOf = async (ai: ReturnType<typeof world>['ai'], p: string) =>
+    (await ai.settings()).modelSources?.[p as 'openai']?.listed
+  const settled = () => new Promise((r) => setTimeout(r, 0))
+
+  describe('chip matches Settings', () => {
+    it('the Settings rows are the chosen models and the latest stamp is the default provider', async () => {
+      const { ai } = world({
+        items: [
+          row('openai', 'gpt-5.6-sol', '2026-10-14T07:00:00Z'),
+          row('anthropic', 'claude-sonnet-5', '2026-10-13T07:00:00Z'),
+        ],
+      })
+      const s = await ai.settings()
+      expect(s.provider).toBe('openai')
+      expect(s.providers.openai.model).toBe('gpt-5.6-sol')
+      expect(s.modelSources?.openai?.chosen).toBe('gpt-5.6-sol')
+      expect(s.modelSources?.anthropic?.chosen).toBe('claude-sonnet-5')
+      // a provider with no key has no source: the chip never lists it
+      expect(s.modelSources?.gemini).toBeUndefined()
+    })
+
+    it('a model changed in Settings after an older local pick wins over that pick', async () => {
+      localStorage.setItem(
+        CHOICE,
+        JSON.stringify({
+          provider: 'anthropic',
+          providerAt: T0 - 2 * 60 * MIN,
+          models: { anthropic: 'claude-old' },
+          at: { anthropic: T0 - 2 * 60 * MIN },
+        }),
+      )
+      const { ai } = world({
+        items: [
+          row('anthropic', 'claude-new', new Date(T0 - 60 * MIN).toISOString()),
+          row('openai', 'gpt-5.6-sol', new Date(T0 - 3 * 60 * MIN).toISOString()),
+        ],
+      })
+      const s = await ai.settings()
+      expect(s.provider).toBe('anthropic')
+      expect(s.providers.anthropic.model).toBe('claude-new')
+    })
+
+    it('a Settings change on another provider after the pick moves the default provider too', async () => {
+      localStorage.setItem(
+        CHOICE,
+        JSON.stringify({
+          provider: 'anthropic',
+          providerAt: T0 - 2 * 60 * MIN,
+          models: { anthropic: 'claude-old' },
+          at: { anthropic: T0 - 2 * 60 * MIN },
+        }),
+      )
+      const { ai } = world({
+        items: [
+          row('anthropic', 'claude-old', new Date(T0 - 2 * 60 * MIN).toISOString()),
+          row('openai', 'gpt-5.6-sol', new Date(T0 - 60 * MIN).toISOString()),
+        ],
+      })
+      const s = await ai.settings()
+      expect(s.provider).toBe('openai')
+      expect(s.providers.openai.model).toBe('gpt-5.6-sol')
+    })
+
+    it('a local pick newer than the server stamp wins (a save that did not reach the server)', async () => {
+      const { ai, clock } = world({
+        items: [row('openai', 'gpt-5.6-sol', new Date(T0 - 60 * MIN).toISOString())],
+        put: () => jsonResponse(503, { code: 'cloud_unavailable' }),
+      })
+      await ai.settings()
+      ai.choose('openai', 'gpt-mine')
+      clock.t += MIN
+      await settled()
+      const s = await ai.settings()
+      expect(s.providers.openai.model).toBe('gpt-mine')
+      expect(s.modelSources?.openai?.chosen).toBe('gpt-5.6-sol')
+    })
+
+    it('a local entry without a time (an older build) loses to any server stamp', async () => {
+      localStorage.setItem(
+        CHOICE,
+        JSON.stringify({ provider: 'anthropic', models: { anthropic: 'claude-local' } }),
+      )
+      const { ai } = world({
+        items: [
+          row('anthropic', 'claude-server', '2026-10-01T00:00:00Z'),
+          row('openai', 'gpt-5.6-sol', '2026-10-02T00:00:00Z'),
+        ],
+      })
+      const s = await ai.settings()
+      expect(s.provider).toBe('openai')
+      expect(s.providers.anthropic.model).toBe('claude-server')
+    })
+
+    it('after a saved pick the local time is the server stamp, so a later Settings change wins despite a fast clock', async () => {
+      const { ai, live, clock } = world({
+        items: [row('openai', 'gpt-5.6-sol', '2026-10-01T00:00:00Z')],
+        put: (c) =>
+          jsonResponse(200, {
+            ...row('openai', (JSON.parse(String(c.init.body)) as { model: string }).model),
+            // the server clock is 10 min behind this browser
+            model_updated_at: new Date(T0 - 10 * MIN).toISOString(),
+          }),
+      })
+      await ai.settings()
+      ai.choose('openai', 'gpt-mine')
+      await vi.waitFor(async () =>
+        expect((await ai.settings()).modelSources?.openai?.chosen).toBe('gpt-mine'),
+      )
+      // Settings (another tab) changes it 5 min later by the server clock: still before this browser's own clock
+      live.items = [row('openai', 'gpt-settings', new Date(T0 - 5 * MIN).toISOString())]
+      clock.t += 5_000
+      await ai.state(true)
+      expect((await ai.settings()).providers.openai.model).toBe('gpt-settings')
+    })
+
+    it('a pick of UniWork AI loses to a later Settings change, and wins while the server has no stamp', async () => {
+      localStorage.setItem(
+        CHOICE,
+        JSON.stringify({ provider: 'uniwork', providerAt: T0 - 60 * MIN, models: {} }),
+      )
+      const newer = world({ items: [row('openai', 'gpt-5.6-sol', new Date(T0).toISOString())] })
+      expect((await newer.ai.settings()).provider).toBe('openai')
+      const none = world({ items: [row('openai')] })
+      expect((await none.ai.settings()).provider).toBe('uniwork')
+    })
+  })
+
+  describe('a server with missing fields never breaks the chip', () => {
+    it('no model fields: no chosen model, the catalog default runs, nothing is listed', async () => {
+      const { ai } = world({ items: [bare('openai')] })
+      const s = await ai.settings()
+      expect(s.provider).toBe('openai')
+      expect(s.providers.openai.model).toBeTruthy()
+      expect(s.modelSources?.openai?.chosen).toBe('')
+      expect(s.modelSources?.openai?.listed).toBeUndefined()
+    })
+
+    it('a local pick still wins when the server has no stamp', async () => {
+      localStorage.setItem(
+        CHOICE,
+        JSON.stringify({ provider: 'openai', models: { openai: 'gpt-mine' } }),
+      )
+      const { ai } = world({ items: [bare('openai')] })
+      expect((await ai.settings()).providers.openai.model).toBe('gpt-mine')
+    })
+
+    it.each([
+      ['a 502', () => jsonResponse(502, { code: 'provider_unreachable' })],
+      ['a 405 of an older server', () => jsonResponse(405, { code: 'method_not_allowed' })],
+      ['a body that is not JSON', () => new Response('<html>nope</html>', { status: 200 })],
+      ['a network failure', () => Promise.reject(new TypeError('Failed to fetch'))],
+    ])(
+      '%s on the listing: the catalog stays, the state says error, nothing throws',
+      async (_n, answer) => {
+        const { ai } = world({
+          items: [row('openai', 'gpt-5.6-sol', '2026-10-14T07:00:00Z')],
+          models: { openai: answer },
+        })
+        const first = await ai.settings()
+        expect(first.modelSources?.openai?.listState).toBe('loading')
+        await vi.waitFor(async () =>
+          expect((await ai.settings()).modelSources?.openai?.listState).toBe('error'),
+        )
+        const s = await ai.settings()
+        expect(s.modelSources?.openai?.listed).toBeUndefined()
+        expect(s.modelSources?.openai?.chosen).toBe('gpt-5.6-sol')
+        expect(s.credentialsUnavailable).toBeUndefined()
+      },
+    )
+
+    it('an empty list is not an error and shows the catalog', async () => {
+      const { ai } = world({
+        items: [row('openai')],
+        models: { openai: () => jsonResponse(200, { data: [] }) },
+      })
+      await ai.settings()
+      await settled()
+      await settled()
+      const s = await ai.settings()
+      expect(s.modelSources?.openai?.listed).toBeUndefined()
+      expect(s.modelSources?.openai?.listState).toBeUndefined()
+    })
+
+    it('no uniwork_model (an older server): no model for the UniWork AI row', async () => {
+      const { ai } = world({ items: [row('openai')] })
+      const s = await ai.settings()
+      expect(s.providers.uniwork).toBeDefined()
+      expect(s.uniworkModel ?? '').toBe('')
+    })
+
+    it('uniwork_model names the model of the UniWork AI row', async () => {
+      const { ai } = world({
+        items: [row('openai')],
+        cloud: { ...CLOUD, uniwork_model: ' claude-opus-5 ' },
+      })
+      expect((await ai.settings()).uniworkModel).toBe('claude-opus-5')
+    })
+
+    it('readCloudStatus reads uniwork_model, a missing or non-text one is ""', () => {
+      expect(readCloudStatus({ ...CLOUD, uniwork_model: 'claude-opus-5' }).uniwork_model).toBe(
+        'claude-opus-5',
+      )
+      expect(readCloudStatus(CLOUD).uniwork_model).toBe('')
+      expect(readCloudStatus({ ...CLOUD, uniwork_model: 7 }).uniwork_model).toBe('')
+    })
+  })
+
+  describe('the live list', () => {
+    it('lists every provider with a key in the background and tells the chips', async () => {
+      const { ai, listCalls } = world({
+        items: [row('openai'), row('gemini')],
+        models: {
+          openai: () => jsonResponse(200, { data: [{ id: 'gpt-5.6-sol' }, { id: 'gpt-5.7-x' }] }),
+          gemini: () => jsonResponse(200, { models: [{ name: 'models/gemini-3.8-flash' }] }),
+        },
+      })
+      const changed = vi.fn()
+      ai.onChanged(changed)
+      const first = await ai.settings()
+      // the read never waits for a listing
+      expect(first.modelSources?.openai?.listed).toBeUndefined()
+      expect(first.modelSources?.openai?.listState).toBe('loading')
+      await vi.waitFor(() => expect(changed).toHaveBeenCalled())
+      expect(await listedOf(ai, 'openai')).toEqual(['gpt-5.6-sol', 'gpt-5.7-x'])
+      expect(await listedOf(ai, 'gemini')).toEqual(['gemini-3.8-flash'])
+      expect((await ai.settings()).modelSources?.openai?.listState).toBeUndefined()
+      expect(listCalls('openai')).toBe(1)
+    })
+
+    it('one listing per provider and key stamp within 10 minutes, then again; a changed key lists again', async () => {
+      const { ai, live, clock, listCalls } = world({
+        items: [row('openai')],
+        models: { openai: () => jsonResponse(200, { data: [{ id: 'a' }] }) },
+      })
+      await ai.settings()
+      await vi.waitFor(async () => expect(await listedOf(ai, 'openai')).toEqual(['a']))
+      await ai.settings()
+      clock.t += 9 * MIN
+      await ai.settings()
+      await settled()
+      expect(listCalls('openai')).toBe(1)
+      clock.t += 2 * MIN
+      await ai.settings()
+      await vi.waitFor(() => expect(listCalls('openai')).toBe(2))
+      // a key replaced in Settings (new stamp) is listed at once, not after the TTL
+      live.items = [row('openai', '', '', '2026-10-14T08:05:00Z')]
+      await ai.state(true)
+      await ai.settings()
+      await vi.waitFor(() => expect(listCalls('openai')).toBe(3))
+    })
+
+    it('a refresh over a kept list leaves the state unset, and a failed refresh keeps the list without an error', async () => {
+      const { ai, clock, listCalls } = world({
+        items: [row('openai')],
+        models: {
+          openai: (n) =>
+            n === 1 ? jsonResponse(200, { data: [{ id: 'a' }] }) : jsonResponse(502, {}),
+        },
+      })
+      await ai.settings()
+      await vi.waitFor(async () => expect(await listedOf(ai, 'openai')).toEqual(['a']))
+      clock.t += 11 * MIN
+      const during = await ai.settings()
+      expect(during.modelSources?.openai?.listed).toEqual(['a'])
+      expect(during.modelSources?.openai?.listState).toBeUndefined()
+      await vi.waitFor(() => expect(listCalls('openai')).toBe(2))
+      await settled()
+      const after = await ai.settings()
+      expect(after.modelSources?.openai?.listed).toEqual(['a'])
+      expect(after.modelSources?.openai?.listState).toBeUndefined()
+    })
+
+    it('a failed listing is not retried on every chip open, only after a pause', async () => {
+      const { ai, clock, listCalls } = world({
+        items: [row('openai')],
+        models: { openai: () => jsonResponse(502, {}) },
+      })
+      await ai.settings()
+      await vi.waitFor(async () =>
+        expect((await ai.settings()).modelSources?.openai?.listState).toBe('error'),
+      )
+      for (let i = 0; i < 5; i++) await ai.settings()
+      await settled()
+      expect(listCalls('openai')).toBe(1)
+      clock.t += 2 * MIN
+      await ai.settings()
+      await vi.waitFor(() => expect(listCalls('openai')).toBe(2))
+    })
+
+    it('a 404 credential_missing reloads the credentials, and the provider stops being listed', async () => {
+      const { ai, live, credentialGets } = world({
+        items: [row('openai')],
+        models: { openai: () => jsonResponse(404, { code: 'credential_missing' }) },
+      })
+      await ai.settings()
+      const before = credentialGets()
+      live.items = []
+      await vi.waitFor(() => expect(credentialGets()).toBeGreaterThan(before))
+      await vi.waitFor(async () =>
+        expect((await ai.settings()).modelSources?.openai).toBeUndefined(),
+      )
+    })
+
+    it('the model-less discovery still runs on the same cache: one model runs, several keep the model empty', async () => {
+      const { ai } = world({
+        items: [row('custom')],
+        models: { custom: () => jsonResponse(200, { data: [{ id: 'router-one' }] }) },
+      })
+      await ai.settings()
+      await vi.waitFor(async () =>
+        expect((await ai.settings()).providers.custom.model).toBe('router-one'),
+      )
+    })
+  })
+
+  describe('the choice key per user', () => {
+    it('a pick is stored under the viewer, and a second viewer of the same storage does not inherit it', async () => {
+      const first = world({
+        user: { displayName: 'A', id: 'u-1' },
+        items: [row('anthropic', 'claude-server', '2026-10-01T00:00:00Z'), row('openai')],
+      })
+      first.ai.choose('openai', 'gpt-mine')
+      await first.ai.settings()
+      expect(localStorage.getItem(CHOICE)).toBeNull()
+      expect(JSON.parse(localStorage.getItem(`${CHOICE}:u-1`)!)).toMatchObject({
+        provider: 'openai',
+        models: { openai: 'gpt-mine' },
+      })
+      const again = world({
+        user: { displayName: 'A', id: 'u-1' },
+        items: [row('anthropic', 'claude-server', '2026-10-01T00:00:00Z'), row('openai')],
+      })
+      expect((await again.ai.settings()).providers.openai.model).toBe('gpt-mine')
+      const other = world({
+        user: { displayName: 'B', id: 'u-2' },
+        items: [row('anthropic', 'claude-server', '2026-10-01T00:00:00Z'), row('openai')],
+      })
+      const s = await other.ai.settings()
+      expect(s.provider).toBe('anthropic')
+      expect(s.providers.openai.model).not.toBe('gpt-mine')
+    })
+
+    it('a viewer without an id keeps the old key', async () => {
+      const { ai } = world({ items: [row('openai')] })
+      await ai.settings()
+      ai.choose('openai', 'gpt-mine')
+      expect(JSON.parse(localStorage.getItem(CHOICE)!)).toMatchObject({
+        models: { openai: 'gpt-mine' },
+      })
+    })
+  })
+})
+
 // ------------------------------------------------------------------ UniWork AI (G6-05 slice C)
 // The frame side of the `uniwork` provider: the frame route client, the host transport handed to
 // the adapter, the aiStream branch (never the BYOK proxy), the Grant formula, the unlocked settings
