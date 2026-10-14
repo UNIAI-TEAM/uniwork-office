@@ -234,6 +234,7 @@ export const ru = {
   appPageOf: 'Страница {current} из {total}',
   appWordCountTitle: 'Статистика',
   appWordCountN: 'Слов: {n}',
+  appWordCountSelection: 'Выбрано {selected} из {total} слов',
   appTrackChangesOn: 'Исправления: вкл.',
   appTrackChangesOff: 'Исправления: выкл.',
   appAcTitle: 'Параметры автозамены',
