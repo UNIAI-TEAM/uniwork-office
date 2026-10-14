@@ -25,7 +25,7 @@ export type DroppedToolReason = 'view_only' | 'not_allowlisted'
 export function classifyDroppedToolReason(
   reason?: string | null,
 ): 'view_only' | 'not_allowlisted' | 'other' {
-  if (reason === 'view_only' || reason === 'readonly' || reason === 'read_only') {
+  if (reason === 'view_only') {
     return 'view_only'
   }
   if (reason === 'not_allowlisted') {
@@ -122,8 +122,9 @@ export function noticePatch(
     case 'dropped-tool-calls': {
       let next = notes
       for (const call of notice.calls) {
-        const structuredReason: DroppedToolReason =
-          classifyDroppedToolReason(call.reason) === 'view_only' ? 'view_only' : 'not_allowlisted'
+        const classified = classifyDroppedToolReason(call.reason)
+        if (classified === 'other') continue
+        const structuredReason: DroppedToolReason = classified
         const text =
           structuredReason === 'view_only'
             ? tr('aiErrViewOnlyEdit')
