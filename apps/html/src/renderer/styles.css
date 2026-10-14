@@ -593,7 +593,7 @@ html.genoffice-popover-open .ribbon-tabs {
   border-radius: var(--radius-8);
   background: var(--surface-subtle);
   color: var(--text);
-  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-family: 'SF Mono', Menlo, Consolas, 'Noto Sans Mono', 'Liberation Mono', monospace;
   font-size: 12.5px;
   word-break: break-all;
 }
