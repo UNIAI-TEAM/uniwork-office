@@ -35,7 +35,9 @@ export const UNIWORK_CLOUD_TOOLS: readonly UniworkCloudTool[] = [
  * UniWork AI existed (an older shell's IPC payload, a test fixture) still
  * reads as "chat off".
  */
-export type UniworkCloudToolFlags = Record<Exclude<UniworkCloudTool, 'chat'>, boolean> & { chat?: boolean }
+export type UniworkCloudToolFlags = Record<Exclude<UniworkCloudTool, 'chat'>, boolean> & {
+  chat?: boolean
+}
 
 /**
  * What the UI shows:

@@ -7,7 +7,11 @@
  * conversation and run id headers unless a script says otherwise (`ids: false`,
  * the responses that come before the server knows the ids).
  */
-import type { UniworkChatRequest, UniworkChatTransport, UniworkExtension } from '../../src/uniwork/types'
+import type {
+  UniworkChatRequest,
+  UniworkChatTransport,
+  UniworkExtension,
+} from '../../src/uniwork/types'
 
 export interface RecordedUniworkRequest {
   scope: UniworkChatRequest['scope']
@@ -41,7 +45,8 @@ function idHeaders(ids: FakeIds | false): Record<string, string> {
 function sse(events: unknown[], done = true): ReadableStream<Uint8Array> {
   return new ReadableStream({
     start(controller) {
-      for (const event of events) controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`))
+      for (const event of events)
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`))
       if (done) controller.enqueue(encoder.encode('data: [DONE]\n\n'))
       controller.close()
     },
@@ -103,9 +108,22 @@ export function realStream(
     const args = JSON.stringify(c.args)
     const half = Math.floor(args.length / 2)
     events.push({
-      choices: [{ index: 0, delta: { tool_calls: [{ index, id: c.id, function: { name: c.name, arguments: args.slice(0, half) } }] } }],
+      choices: [
+        {
+          index: 0,
+          delta: {
+            tool_calls: [
+              { index, id: c.id, function: { name: c.name, arguments: args.slice(0, half) } },
+            ],
+          },
+        },
+      ],
     })
-    events.push({ choices: [{ index: 0, delta: { tool_calls: [{ index, function: { arguments: args.slice(half) } }] } }] })
+    events.push({
+      choices: [
+        { index: 0, delta: { tool_calls: [{ index, function: { arguments: args.slice(half) } }] } },
+      ],
+    })
   })
   events.push({
     choices: [{ index: 0, delta: {}, finish_reason: calls.length ? 'tool_calls' : 'stop' }],
@@ -133,7 +151,13 @@ export function json(
             role: 'assistant',
             content: answer,
             ...(calls.length
-              ? { tool_calls: calls.map((c) => ({ id: c.id, type: 'function', function: { name: c.name, arguments: JSON.stringify(c.args) } })) }
+              ? {
+                  tool_calls: calls.map((c) => ({
+                    id: c.id,
+                    type: 'function',
+                    function: { name: c.name, arguments: JSON.stringify(c.args) },
+                  })),
+                }
               : {}),
           },
           finish_reason: calls.length ? 'tool_calls' : 'stop',
@@ -141,7 +165,10 @@ export function json(
       ],
       x_uniwork: { step: 0, limit: 8, ...opts.ext },
     }),
-    { status: 200, headers: { 'content-type': 'application/json', ...idHeaders(opts.ids ?? DEFAULT_IDS) } },
+    {
+      status: 200,
+      headers: { 'content-type': 'application/json', ...idHeaders(opts.ids ?? DEFAULT_IDS) },
+    },
   )
 }
 
@@ -151,14 +178,21 @@ export function error(
   code: string,
   opts: { retryAfter?: string; fields?: Record<string, unknown>; ids?: FakeIds | false } = {},
 ): Response {
-  return new Response(JSON.stringify({ code, message: `synthetic ${code}`, ...(opts.fields ? { fields: opts.fields } : {}) }), {
-    status,
-    headers: {
-      'content-type': 'application/json',
-      ...(opts.retryAfter !== undefined ? { 'Retry-After': opts.retryAfter } : {}),
-      ...idHeaders(opts.ids ?? DEFAULT_IDS),
+  return new Response(
+    JSON.stringify({
+      code,
+      message: `synthetic ${code}`,
+      ...(opts.fields ? { fields: opts.fields } : {}),
+    }),
+    {
+      status,
+      headers: {
+        'content-type': 'application/json',
+        ...(opts.retryAfter !== undefined ? { 'Retry-After': opts.retryAfter } : {}),
+        ...idHeaders(opts.ids ?? DEFAULT_IDS),
+      },
     },
-  })
+  )
 }
 
 /** the reserved end-of-stream frame: optional content first, then x_uniwork.terminal + [DONE] */
@@ -166,9 +200,16 @@ export function terminal(
   code: string,
   opts: { retryAfter?: number; before?: string[]; ids?: FakeIds | false } = {},
 ): Response {
-  const events: unknown[] = (opts.before ?? []).map((d) => ({ choices: [{ index: 0, delta: { content: d } }] }))
+  const events: unknown[] = (opts.before ?? []).map((d) => ({
+    choices: [{ index: 0, delta: { content: d } }],
+  }))
   events.push({
-    x_uniwork: { terminal: { code, ...(opts.retryAfter !== undefined ? { retry_after: opts.retryAfter } : {}) } },
+    x_uniwork: {
+      terminal: {
+        code,
+        ...(opts.retryAfter !== undefined ? { retry_after: opts.retryAfter } : {}),
+      },
+    },
   })
   return new Response(sse(events), {
     status: 200,

@@ -7,7 +7,15 @@ import { streamUniwork, type UniworkTurnRequest } from '../src/uniwork/protocol'
 import { setUniworkChatTransport } from '../src/uniwork/transport'
 import type { UniworkScope } from '../src/uniwork/types'
 import { okResponse, sseStream } from './test-utils'
-import { createUniworkFake, error, json, oneChunk, realStream, recorder, terminal } from './fixtures/uniwork-fake'
+import {
+  createUniworkFake,
+  error,
+  json,
+  oneChunk,
+  realStream,
+  recorder,
+  terminal,
+} from './fixtures/uniwork-fake'
 
 afterEach(() => {
   vi.useRealTimers()
@@ -23,9 +31,17 @@ const tool = (name: string): AgentToolDef => ({
   inputSchema: { type: 'object', properties: {} },
 })
 
-const moduleTools = [tool('read_document'), tool('format_text'), tool('web_search'), tool('generate_image')]
+const moduleTools = [
+  tool('read_document'),
+  tool('format_text'),
+  tool('web_search'),
+  tool('generate_image'),
+]
 
-function turn(messages: AgentMessage[], over: Partial<UniworkTurnRequest> = {}): UniworkTurnRequest {
+function turn(
+  messages: AgentMessage[],
+  over: Partial<UniworkTurnRequest> = {},
+): UniworkTurnRequest {
   return { scope, messages, tools: moduleTools, toolPolicy: { cloudTools: false }, ...over }
 }
 
@@ -41,7 +57,9 @@ describe('streamUniwork: wire', () => {
     const fake = createUniworkFake()
     fake.enqueue(oneChunk('Done.', { toolCalls: calls, ext: { step: 1, limit: 8 } }))
     const rec = recorder()
-    await streamUniwork(fake, turn(q('bold it')), rec.cb, { conversations: new UniworkConversations() })
+    await streamUniwork(fake, turn(q('bold it')), rec.cb, {
+      conversations: new UniworkConversations(),
+    })
     expect(rec.state.text).toBe('Done.')
     expect(rec.state.toolCalls).toEqual([
       expect.objectContaining({ id: 'srv-call-1', name: 'format_text', input: { bold: true } }),
@@ -77,7 +95,9 @@ describe('streamUniwork: wire', () => {
     const rec = recorder()
     await streamUniwork(fake, turn(q('x')), rec.cb, { conversations: new UniworkConversations() })
     expect(rec.state.text).toBe('Plain JSON answer.')
-    expect(rec.state.toolCalls).toEqual([expect.objectContaining({ id: 'srv-call-1', name: 'format_text' })])
+    expect(rec.state.toolCalls).toEqual([
+      expect.objectContaining({ id: 'srv-call-1', name: 'format_text' }),
+    ])
     expect(rec.state.notices).toContainEqual({ kind: 'step', step: 2, limit: 8 })
   })
 
@@ -92,8 +112,18 @@ describe('streamUniwork: wire', () => {
   it('second request carries only the tool results and both ids, never an assistant turn', async () => {
     const conversations = new UniworkConversations()
     const fake = createUniworkFake()
-    fake.enqueue(oneChunk('Working on it.', { toolCalls: calls, ids: { conversation: 'conv-7', run: 'run-7' } }))
-    fake.enqueue(oneChunk('All done.', { ids: { conversation: 'conv-7', run: 'run-7' }, ext: { step: 1, limit: 8 } }))
+    fake.enqueue(
+      oneChunk('Working on it.', {
+        toolCalls: calls,
+        ids: { conversation: 'conv-7', run: 'run-7' },
+      }),
+    )
+    fake.enqueue(
+      oneChunk('All done.', {
+        ids: { conversation: 'conv-7', run: 'run-7' },
+        ext: { step: 1, limit: 8 },
+      }),
+    )
     const history: AgentMessage[] = [{ role: 'user', text: 'bold the title and read it back' }]
     await streamUniwork(fake, turn(history), recorder().cb, { conversations })
     history.push(
@@ -118,21 +148,42 @@ describe('streamUniwork: wire', () => {
       { role: 'tool', tool_call_id: 'srv-call-1', content: 'bolded' },
       { role: 'tool', tool_call_id: 'srv-call-2', content: 'Title' },
     ])
-    expect(second.body.messages.some((m) => m.role === 'assistant' || m.role === 'system')).toBe(false)
+    expect(second.body.messages.some((m) => m.role === 'assistant' || m.role === 'system')).toBe(
+      false,
+    )
     expect(second.body.module).toBe('docx')
   })
 
   it('sends only the module tools, cloud tools only with office.ai_cloud', async () => {
     const fake = createUniworkFake()
     fake.enqueue(oneChunk('a'), oneChunk('b'))
-    const withMcp = [...moduleTools, tool('mcp__files__read'), tool('transcribe'), tool('analyze_media')]
-    await streamUniwork(fake, turn(q('x'), { tools: withMcp }), recorder().cb, { conversations: new UniworkConversations() })
-    await streamUniwork(fake, turn(q('x'), { tools: withMcp, toolPolicy: { cloudTools: true } }), recorder().cb, {
+    const withMcp = [
+      ...moduleTools,
+      tool('mcp__files__read'),
+      tool('transcribe'),
+      tool('analyze_media'),
+    ]
+    await streamUniwork(fake, turn(q('x'), { tools: withMcp }), recorder().cb, {
       conversations: new UniworkConversations(),
     })
+    await streamUniwork(
+      fake,
+      turn(q('x'), { tools: withMcp, toolPolicy: { cloudTools: true } }),
+      recorder().cb,
+      {
+        conversations: new UniworkConversations(),
+      },
+    )
     const names = (i: number) => (fake.requests[i]!.body.tools ?? []).map((t) => t.function.name)
     expect(names(0)).toEqual(['read_document', 'format_text'])
-    expect(names(1)).toEqual(['read_document', 'format_text', 'web_search', 'generate_image', 'transcribe', 'analyze_media'])
+    expect(names(1)).toEqual([
+      'read_document',
+      'format_text',
+      'web_search',
+      'generate_image',
+      'transcribe',
+      'analyze_media',
+    ])
     for (const i of [0, 1]) {
       expect(names(i).every((n) => withMcp.some((t) => t.name === n))).toBe(true)
       expect(names(i).some((n) => n.startsWith('mcp'))).toBe(false)
@@ -140,7 +191,11 @@ describe('streamUniwork: wire', () => {
     }
     expect(fake.requests[0]!.body.tools![0]).toEqual({
       type: 'function',
-      function: { name: 'read_document', description: 'read_document tool', parameters: { type: 'object', properties: {} } },
+      function: {
+        name: 'read_document',
+        description: 'read_document tool',
+        parameters: { type: 'object', properties: {} },
+      },
     })
   })
 
@@ -150,7 +205,11 @@ describe('streamUniwork: wire', () => {
       { index: 1, name: 'format_text', reason: 'view_only' as const },
       { index: 2, name: 'delete_sheet', reason: 'not_allowlisted' as const },
     ]
-    fake.enqueue(oneChunk('I could only read it.', { ext: { dropped_tool_calls: dropped, step: 1, limit: 8 } }))
+    fake.enqueue(
+      oneChunk('I could only read it.', {
+        ext: { dropped_tool_calls: dropped, step: 1, limit: 8 },
+      }),
+    )
     const rec = recorder()
     await streamUniwork(fake, turn(q('x')), rec.cb, { conversations: new UniworkConversations() })
     expect(rec.state.notices).toContainEqual({ kind: 'dropped-tool-calls', calls: dropped })
@@ -163,7 +222,9 @@ describe('streamUniwork: wire', () => {
       { role: 'assistant', text: '', toolCalls: [{ id: 'c', name: 'format_text', input: {} }] },
       { role: 'tool', results: [{ id: 'c', name: 'format_text', output: 'ok' }] },
     ]
-    const err = await streamUniwork(fake, turn(history), recorder().cb, { conversations: new UniworkConversations() }).catch((e) => e)
+    const err = await streamUniwork(fake, turn(history), recorder().cb, {
+      conversations: new UniworkConversations(),
+    }).catch((e) => e)
     expect(err).toBeInstanceOf(UniworkError)
     expect(fake.requests).toHaveLength(0)
   })
@@ -174,13 +235,19 @@ describe('streamUniwork: Retry-After (429 rule)', () => {
     vi.useFakeTimers()
     const conversations = new UniworkConversations()
     const fake = createUniworkFake()
-    fake.enqueue(oneChunk('', { toolCalls: [calls[0]!], ids: { conversation: 'conv-1', run: 'run-1' } }))
+    fake.enqueue(
+      oneChunk('', { toolCalls: [calls[0]!], ids: { conversation: 'conv-1', run: 'run-1' } }),
+    )
     fake.enqueue(error(429, 'ai_rate_limited', { retryAfter: '2', ids: false }))
     fake.enqueue(oneChunk('ok', { ids: { conversation: 'conv-1', run: 'run-1' } }))
     await streamUniwork(fake, turn(q('x')), recorder().cb, { conversations })
     const history: AgentMessage[] = [
       { role: 'user', text: 'x' },
-      { role: 'assistant', text: '', toolCalls: [{ id: 'srv-call-1', name: 'format_text', input: {} }] },
+      {
+        role: 'assistant',
+        text: '',
+        toolCalls: [{ id: 'srv-call-1', name: 'format_text', input: {} }],
+      },
       { role: 'tool', results: [{ id: 'srv-call-1', name: 'format_text', output: 'ok' }] },
     ]
     const rec = recorder()
@@ -201,7 +268,9 @@ describe('streamUniwork: Retry-After (429 rule)', () => {
     fake.enqueue(oneChunk('after the wait'))
     const rec = recorder()
     let settled = false
-    const run = streamUniwork(fake, turn(q('x')), rec.cb, { conversations: new UniworkConversations() }).finally(() => {
+    const run = streamUniwork(fake, turn(q('x')), rec.cb, {
+      conversations: new UniworkConversations(),
+    }).finally(() => {
       settled = true
     })
     await vi.advanceTimersByTimeAsync(119_000)
@@ -221,7 +290,9 @@ describe('streamUniwork: Retry-After (429 rule)', () => {
     const fake = createUniworkFake()
     fake.enqueue(error(429, 'rate_limited', { retryAfter: '0' }), oneChunk('now'))
     const rec = recorder()
-    const run = streamUniwork(fake, turn(q('x')), rec.cb, { conversations: new UniworkConversations() })
+    const run = streamUniwork(fake, turn(q('x')), rec.cb, {
+      conversations: new UniworkConversations(),
+    })
     await vi.advanceTimersByTimeAsync(0)
     await run
     expect(rec.state.text).toBe('now')
@@ -233,7 +304,9 @@ describe('streamUniwork: Retry-After (429 rule)', () => {
       const fake = createUniworkFake()
       fake.enqueue(error(429, 'ai_rate_limited', retryAfter === undefined ? {} : { retryAfter }))
       const rec = recorder()
-      const err = await streamUniwork(fake, turn(q('x')), rec.cb, { conversations: new UniworkConversations() }).catch((e) => e)
+      const err = await streamUniwork(fake, turn(q('x')), rec.cb, {
+        conversations: new UniworkConversations(),
+      }).catch((e) => e)
       expect(err).toBeInstanceOf(UniworkError)
       expect((err as UniworkError).code).toBe('ai_rate_limited')
       expect(uniworkErrorKey((err as UniworkError).code)).toBe('aiErrRateLimitedNoWait')
@@ -247,12 +320,16 @@ describe('streamUniwork: Retry-After (429 rule)', () => {
     const fake = createUniworkFake()
     for (let i = 0; i < 4; i++) fake.enqueue(error(429, 'ai_rate_limited', { retryAfter: '1' }))
     const rec = recorder()
-    const run = streamUniwork(fake, turn(q('x')), rec.cb, { conversations: new UniworkConversations() }).catch((e) => e)
+    const run = streamUniwork(fake, turn(q('x')), rec.cb, {
+      conversations: new UniworkConversations(),
+    }).catch((e) => e)
     await vi.advanceTimersByTimeAsync(5_000)
     const err = await run
     expect((err as UniworkError).code).toBe('ai_rate_limited')
     expect(fake.requests).toHaveLength(4)
-    expect(rec.state.notices.filter((n) => (n as { kind: string }).kind === 'rate-limit-wait')).toHaveLength(3)
+    expect(
+      rec.state.notices.filter((n) => (n as { kind: string }).kind === 'rate-limit-wait'),
+    ).toHaveLength(3)
   })
 
   it('Stop during a wait ends the turn at once without a resend', async () => {
@@ -261,7 +338,9 @@ describe('streamUniwork: Retry-After (429 rule)', () => {
     fake.enqueue(error(429, 'ai_rate_limited', { retryAfter: '120' }), oneChunk('never'))
     const ctl = new AbortController()
     const rec = recorder(ctl.signal)
-    const run = streamUniwork(fake, turn(q('x')), rec.cb, { conversations: new UniworkConversations() }).catch((e) => e)
+    const run = streamUniwork(fake, turn(q('x')), rec.cb, {
+      conversations: new UniworkConversations(),
+    }).catch((e) => e)
     await vi.advanceTimersByTimeAsync(10_000)
     ctl.abort()
     await vi.advanceTimersByTimeAsync(0)
@@ -275,7 +354,13 @@ describe('streamUniwork: Retry-After (429 rule)', () => {
     vi.useFakeTimers()
     const conversations = new UniworkConversations()
     const fake = createUniworkFake()
-    fake.enqueue(terminal('ai_rate_limited', { retryAfter: 3, before: ['partial an'], ids: { conversation: 'conv-1', run: 'run-1' } }))
+    fake.enqueue(
+      terminal('ai_rate_limited', {
+        retryAfter: 3,
+        before: ['partial an'],
+        ids: { conversation: 'conv-1', run: 'run-1' },
+      }),
+    )
     fake.enqueue(oneChunk('The full answer.', { ids: { conversation: 'conv-1', run: 'run-1' } }))
     const rec = recorder()
     const run = streamUniwork(fake, turn(q('x')), rec.cb, { conversations })
@@ -292,7 +377,9 @@ describe('streamUniwork: Retry-After (429 rule)', () => {
     const fake = createUniworkFake()
     fake.enqueue(terminal('ai_provider_error'))
     const rec = recorder()
-    const err = await streamUniwork(fake, turn(q('x')), rec.cb, { conversations: new UniworkConversations() }).catch((e) => e)
+    const err = await streamUniwork(fake, turn(q('x')), rec.cb, {
+      conversations: new UniworkConversations(),
+    }).catch((e) => e)
     expect(err).toBeInstanceOf(UniworkError)
     expect((err as UniworkError).code).toBe('ai_provider_error')
     expect((err as Error).message).not.toContain('(empty stream)')
@@ -304,16 +391,29 @@ describe('streamUniwork: run limits and errors', () => {
   it('run_limit_reached ends the run with aiErrRunLimit, next question opens a new run in the same conversation', async () => {
     const conversations = new UniworkConversations()
     const fake = createUniworkFake()
-    fake.enqueue(oneChunk('', { toolCalls: [calls[0]!], ids: { conversation: 'conv-1', run: 'run-1' } }))
-    fake.enqueue(error(409, 'run_limit_reached', { fields: { limit: 'tool_rounds' }, ids: { conversation: 'conv-1', run: 'run-1' } }))
+    fake.enqueue(
+      oneChunk('', { toolCalls: [calls[0]!], ids: { conversation: 'conv-1', run: 'run-1' } }),
+    )
+    fake.enqueue(
+      error(409, 'run_limit_reached', {
+        fields: { limit: 'tool_rounds' },
+        ids: { conversation: 'conv-1', run: 'run-1' },
+      }),
+    )
     fake.enqueue(oneChunk('fresh', { ids: { conversation: 'conv-1', run: 'run-2' } }))
     await streamUniwork(fake, turn(q('x')), recorder().cb, { conversations })
     const history: AgentMessage[] = [
       { role: 'user', text: 'x' },
-      { role: 'assistant', text: '', toolCalls: [{ id: 'srv-call-1', name: 'format_text', input: {} }] },
+      {
+        role: 'assistant',
+        text: '',
+        toolCalls: [{ id: 'srv-call-1', name: 'format_text', input: {} }],
+      },
       { role: 'tool', results: [{ id: 'srv-call-1', name: 'format_text', output: 'ok' }] },
     ]
-    const err = await streamUniwork(fake, turn(history), recorder().cb, { conversations }).catch((e) => e)
+    const err = await streamUniwork(fake, turn(history), recorder().cb, { conversations }).catch(
+      (e) => e,
+    )
     expect(err).toBeInstanceOf(UniworkError)
     expect((err as UniworkError).code).toBe('run_limit_reached')
     expect((err as UniworkError).fields).toEqual({ limit: 'tool_rounds' })
@@ -321,18 +421,30 @@ describe('streamUniwork: run limits and errors', () => {
     expect(uniworkErrorKey('run_limit_reached')).toBe('aiErrRunLimit')
     expect(fake.requests).toHaveLength(2)
 
-    await streamUniwork(fake, turn([...history, { role: 'assistant', text: '' }, { role: 'user', text: 'continue' }]), recorder().cb, {
-      conversations,
-    })
+    await streamUniwork(
+      fake,
+      turn([...history, { role: 'assistant', text: '' }, { role: 'user', text: 'continue' }]),
+      recorder().cb,
+      {
+        conversations,
+      },
+    )
     expect(fake.requests[2]!.headers['X-UniWork-AI-Conversation']).toBe('conv-1')
     expect(fake.requests[2]!.headers['X-UniWork-AI-Run']).toBeUndefined()
   })
 
   it('office_capability_off before any run id reports uniwork-off', async () => {
     const fake = createUniworkFake()
-    fake.enqueue(error(403, 'office_capability_off', { fields: { capability: 'ai_uniwork_docx' }, ids: false }))
+    fake.enqueue(
+      error(403, 'office_capability_off', {
+        fields: { capability: 'ai_uniwork_docx' },
+        ids: false,
+      }),
+    )
     const rec = recorder()
-    const err = await streamUniwork(fake, turn(q('x')), rec.cb, { conversations: new UniworkConversations() }).catch((e) => e)
+    const err = await streamUniwork(fake, turn(q('x')), rec.cb, {
+      conversations: new UniworkConversations(),
+    }).catch((e) => e)
     expect((err as UniworkError).code).toBe('office_capability_off')
     expect(rec.state.notices).toContainEqual({ kind: 'uniwork-off' })
   })
@@ -340,7 +452,9 @@ describe('streamUniwork: run limits and errors', () => {
   it('a transport that never answers mid-turn is a disconnect, not overloaded', async () => {
     const rec = recorder()
     const transport = { post: () => Promise.reject(new TypeError('fetch failed')) }
-    const err = await streamUniwork(transport, turn(q('x')), rec.cb, { conversations: new UniworkConversations() }).catch((e) => e)
+    const err = await streamUniwork(transport, turn(q('x')), rec.cb, {
+      conversations: new UniworkConversations(),
+    }).catch((e) => e)
     expect((err as UniworkError).code).toBe('disconnected')
   })
 
@@ -349,10 +463,19 @@ describe('streamUniwork: run limits and errors', () => {
     fake.enqueue(error(503, 'ai_disabled', { ids: false }))
     setUniworkChatTransport(fake)
     const first = recorder()
-    const err = await streamForProvider('uniwork', { apiKey: '', model: '' }, 'system', q('x'), moduleTools, 4096, first.cb, {
-      scope,
-      toolPolicy: { cloudTools: false },
-    }).catch((e) => e)
+    const err = await streamForProvider(
+      'uniwork',
+      { apiKey: '', model: '' },
+      'system',
+      q('x'),
+      moduleTools,
+      4096,
+      first.cb,
+      {
+        scope,
+        toolPolicy: { cloudTools: false },
+      },
+    ).catch((e) => e)
     expect((err as UniworkError).code).toBe('ai_disabled')
     expect(uniworkErrorKey('ai_disabled')).toBe('aiErrUnavailable')
 
@@ -367,7 +490,15 @@ describe('streamUniwork: run limits and errors', () => {
     )
     vi.stubGlobal('fetch', fetchMock)
     const second = recorder()
-    await streamForProvider('openai', { apiKey: 'sk-test', model: 'gpt-test' }, 'system', q('y'), moduleTools, 4096, second.cb)
+    await streamForProvider(
+      'openai',
+      { apiKey: 'sk-test', model: 'gpt-test' },
+      'system',
+      q('y'),
+      moduleTools,
+      4096,
+      second.cb,
+    )
     expect(second.state.text).toBe('BYOK answer')
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
@@ -379,10 +510,19 @@ describe('streamUniwork: run limits and errors', () => {
     fake.enqueue(oneChunk('via adapter'))
     setUniworkChatTransport(fake)
     const rec = recorder()
-    await streamForProvider('uniwork', { apiKey: '', model: '' }, 'system prompt', q('x'), moduleTools, 4096, rec.cb, {
-      scope,
-      toolPolicy: { cloudTools: false },
-    })
+    await streamForProvider(
+      'uniwork',
+      { apiKey: '', model: '' },
+      'system prompt',
+      q('x'),
+      moduleTools,
+      4096,
+      rec.cb,
+      {
+        scope,
+        toolPolicy: { cloudTools: false },
+      },
+    )
     expect(rec.state.text).toBe('via adapter')
     expect(fetchMock).not.toHaveBeenCalled()
     expect(JSON.stringify(fake.requests[0]!.body)).not.toContain('system prompt')
@@ -390,13 +530,30 @@ describe('streamUniwork: run limits and errors', () => {
 
   it('streamForProvider without a session transport or a scope fails with a UniWork code', async () => {
     const rec = recorder()
-    const noTransport = await streamForProvider('uniwork', { apiKey: '', model: '' }, 's', q('x'), [], 4096, rec.cb, {
-      scope,
-      toolPolicy: { cloudTools: false },
-    }).catch((e) => e)
+    const noTransport = await streamForProvider(
+      'uniwork',
+      { apiKey: '', model: '' },
+      's',
+      q('x'),
+      [],
+      4096,
+      rec.cb,
+      {
+        scope,
+        toolPolicy: { cloudTools: false },
+      },
+    ).catch((e) => e)
     expect((noTransport as UniworkError).code).toBe('session_expired')
     setUniworkChatTransport(createUniworkFake())
-    const noScope = await streamForProvider('uniwork', { apiKey: '', model: '' }, 's', q('x'), [], 4096, rec.cb).catch((e) => e)
+    const noScope = await streamForProvider(
+      'uniwork',
+      { apiKey: '', model: '' },
+      's',
+      q('x'),
+      [],
+      4096,
+      rec.cb,
+    ).catch((e) => e)
     expect(noScope).toBeInstanceOf(UniworkError)
   })
 })

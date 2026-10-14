@@ -15,7 +15,11 @@ describe('decideRateLimitWait (EXPERIENCE 429 rule, G6-02: max 3 waits, cap 300 
 
   it('300 is still waited, 301 gives up', () => {
     expect(decideRateLimitWait('300', 0, NOW)).toMatchObject({ kind: 'wait', seconds: 300 })
-    expect(decideRateLimitWait('301', 0, NOW)).toEqual({ kind: 'give-up', reason: 'over-cap', seconds: 301 })
+    expect(decideRateLimitWait('301', 0, NOW)).toEqual({
+      kind: 'give-up',
+      reason: 'over-cap',
+      seconds: 301,
+    })
   })
 
   it('HTTP-date converts; past date retries once', () => {
@@ -36,7 +40,11 @@ describe('decideRateLimitWait (EXPERIENCE 429 rule, G6-02: max 3 waits, cap 300 
 
   it('a fourth wait gives up', () => {
     expect(decideRateLimitWait('5', 2, NOW)).toEqual({ kind: 'wait', seconds: 5, attempt: 3 })
-    expect(decideRateLimitWait('5', 3, NOW)).toEqual({ kind: 'give-up', reason: 'max-waits', seconds: 5 })
+    expect(decideRateLimitWait('5', 3, NOW)).toEqual({
+      kind: 'give-up',
+      reason: 'max-waits',
+      seconds: 5,
+    })
   })
 
   it('parseRetryAfterSeconds reads delta-seconds and HTTP-dates only', () => {

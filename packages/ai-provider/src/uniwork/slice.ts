@@ -27,7 +27,10 @@ export function sliceUniworkTurn(history: AgentMessage[]): UniworkTurnSlice {
     const content = last.images?.length
       ? [
           ...(last.text ? [{ type: 'text', text: last.text }] : []),
-          ...last.images.map((img) => ({ type: 'image_url', image_url: { url: `data:${img.mime};base64,${img.base64}` } })),
+          ...last.images.map((img) => ({
+            type: 'image_url',
+            image_url: { url: `data:${img.mime};base64,${img.base64}` },
+          })),
         ]
       : last.text
     return {

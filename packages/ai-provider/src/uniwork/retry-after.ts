@@ -12,7 +12,10 @@ export type RateLimitDecision =
   | { kind: 'give-up'; reason: 'over-cap' | 'max-waits'; seconds: number }
 
 /** Retry-After as whole seconds (>= 0), or null when absent or unreadable */
-export function parseRetryAfterSeconds(value: string | number | null | undefined, now: number): number | null {
+export function parseRetryAfterSeconds(
+  value: string | number | null | undefined,
+  now: number,
+): number | null {
   if (typeof value === 'number') return Number.isInteger(value) && value >= 0 ? value : null
   if (typeof value !== 'string') return null
   const text = value.trim()
@@ -33,7 +36,9 @@ export function decideRateLimitWait(
 ): RateLimitDecision {
   const seconds = parseRetryAfterSeconds(retryAfter, now)
   if (seconds === null) return { kind: 'give-up', reason: 'missing' }
-  if (seconds > UNIWORK_RETRY_AFTER_CAP_SECONDS) return { kind: 'give-up', reason: 'over-cap', seconds }
-  if (waitsDone >= UNIWORK_MAX_RATE_LIMIT_WAITS) return { kind: 'give-up', reason: 'max-waits', seconds }
+  if (seconds > UNIWORK_RETRY_AFTER_CAP_SECONDS)
+    return { kind: 'give-up', reason: 'over-cap', seconds }
+  if (waitsDone >= UNIWORK_MAX_RATE_LIMIT_WAITS)
+    return { kind: 'give-up', reason: 'max-waits', seconds }
   return { kind: 'wait', seconds, attempt: waitsDone + 1 }
 }

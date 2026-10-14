@@ -372,7 +372,9 @@ export const AI_PROVIDER_ADAPTERS: Record<AiProviderId, ProviderAdapter> = {
     capabilities: { auth: 'uniwork-session', vision: false },
     resolveEndpoint() {
       // never a BYOK endpoint: the adapter (./uniwork/protocol.ts) talks to the UniWork façade route
-      throw new Error('UniWork AI has no provider endpoint; it is streamed through the UniWork adapter')
+      throw new Error(
+        'UniWork AI has no provider endpoint; it is streamed through the UniWork adapter',
+      )
     },
   },
 }

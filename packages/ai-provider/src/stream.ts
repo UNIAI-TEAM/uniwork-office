@@ -50,7 +50,11 @@ export async function streamForProvider(
     // no session transport: signed out (or a process without one)
     if (!transport) throw new UniworkError('session_expired')
     if (!uniwork) throw new UniworkError('protocol_error')
-    return streamUniwork(transport, { scope: uniwork.scope, messages, tools, toolPolicy: uniwork.toolPolicy }, cb)
+    return streamUniwork(
+      transport,
+      { scope: uniwork.scope, messages, tools, toolPolicy: uniwork.toolPolicy },
+      cb,
+    )
   }
   uniworkConversations.observe(cb.sessionId, provider)
   const endpoint = getProviderAdapter(provider).resolveEndpoint(config)

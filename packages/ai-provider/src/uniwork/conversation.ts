@@ -22,7 +22,9 @@ export interface UniworkTurnStart {
 }
 
 export function uniworkScopeKey(scope: UniworkScope): string {
-  return scope.kind === 'org' ? `org:${scope.orgId}:${scope.format}` : `${scope.kind}:${scope.documentId}`
+  return scope.kind === 'org'
+    ? `org:${scope.orgId}:${scope.format}`
+    : `${scope.kind}:${scope.documentId}`
 }
 
 const DEFAULT_SESSION = ''
@@ -54,7 +56,11 @@ export class UniworkConversations {
    * header) unless it continues the run right after tool results; a turn in
    * another scope (document, organization/format) starts its own conversation.
    */
-  begin(sessionId: string | undefined, scope: UniworkScope, continuesRun: boolean): UniworkTurnStart {
+  begin(
+    sessionId: string | undefined,
+    scope: UniworkScope,
+    continuesRun: boolean,
+  ): UniworkTurnStart {
     const s = this.state(sessionId)
     const scopeKey = uniworkScopeKey(scope)
     const boundary = s.lastProvider !== undefined && s.lastProvider !== 'uniwork'

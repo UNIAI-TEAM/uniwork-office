@@ -14,7 +14,8 @@ import type { UniworkWireCode } from './types'
  * - `offline`: the host knew it was offline before sending (its transport rejects with this code)
  * - `protocol_error`: the request could not be built (a history the adapter cannot slice)
  */
-export type UniworkClientCode = 'session_expired' | 'access_revoked' | 'disconnected' | 'offline' | 'protocol_error'
+export type UniworkClientCode =
+  'session_expired' | 'access_revoked' | 'disconnected' | 'offline' | 'protocol_error'
 
 export type UniworkErrorCode = UniworkWireCode | UniworkClientCode
 
@@ -39,7 +40,11 @@ const WIRE_CODES: ReadonlySet<string> = new Set<UniworkWireCode>([
 ])
 
 /** the 429 codes the Retry-After rule applies to */
-export const UNIWORK_RATE_LIMIT_CODES: ReadonlySet<string> = new Set(['ai_rate_limited', 'ai_uniwork_busy', 'rate_limited'])
+export const UNIWORK_RATE_LIMIT_CODES: ReadonlySet<string> = new Set([
+  'ai_rate_limited',
+  'ai_uniwork_busy',
+  'rate_limited',
+])
 
 export interface UniworkErrorInit {
   status?: number | undefined
@@ -61,7 +66,10 @@ export class UniworkError extends Error {
 
   constructor(code: UniworkErrorCode, init: UniworkErrorInit = {}) {
     // the text is for logs only: the code decides what people read
-    super(`UniWork AI ${code}${init.status ? ` (${init.status})` : ''}`, init.cause === undefined ? undefined : { cause: init.cause })
+    super(
+      `UniWork AI ${code}${init.status ? ` (${init.status})` : ''}`,
+      init.cause === undefined ? undefined : { cause: init.cause },
+    )
     this.name = 'UniworkError'
     this.code = code
     this.status = init.status
@@ -87,15 +95,23 @@ function codeForStatus(status: number): UniworkErrorCode {
 function bodyCode(body: unknown): { code?: string; fields?: Record<string, unknown> } {
   if (!body || typeof body !== 'object') return {}
   const b = body as { code?: unknown; fields?: unknown; error?: unknown }
-  const inner = b.error && typeof b.error === 'object' ? (b.error as { code?: unknown; fields?: unknown }) : undefined
-  const code = typeof b.code === 'string' ? b.code : typeof inner?.code === 'string' ? inner.code : undefined
+  const inner =
+    b.error && typeof b.error === 'object'
+      ? (b.error as { code?: unknown; fields?: unknown })
+      : undefined
+  const code =
+    typeof b.code === 'string' ? b.code : typeof inner?.code === 'string' ? inner.code : undefined
   const rawFields = b.fields ?? inner?.fields
-  const fields = rawFields && typeof rawFields === 'object' ? (rawFields as Record<string, unknown>) : undefined
+  const fields =
+    rawFields && typeof rawFields === 'object' ? (rawFields as Record<string, unknown>) : undefined
   return { ...(code ? { code } : {}), ...(fields ? { fields } : {}) }
 }
 
 /** the error of a non-2xx façade answer; consumes the body */
-export async function uniworkErrorFromResponse(response: Response, now: number = Date.now()): Promise<UniworkError> {
+export async function uniworkErrorFromResponse(
+  response: Response,
+  now: number = Date.now(),
+): Promise<UniworkError> {
   let parsed: unknown
   try {
     parsed = JSON.parse(await response.text())
@@ -104,10 +120,12 @@ export async function uniworkErrorFromResponse(response: Response, now: number =
   }
   const { code, fields } = bodyCode(parsed)
   const status = response.status
-  let resolved: UniworkErrorCode = code && WIRE_CODES.has(code) ? (code as UniworkWireCode) : codeForStatus(status)
+  let resolved: UniworkErrorCode =
+    code && WIRE_CODES.has(code) ? (code as UniworkWireCode) : codeForStatus(status)
   // a 403 that is not one of the two gates is a lost document/organization access
   if (status === 403 && resolved === 'invalid_request') resolved = 'access_revoked'
-  const retryAfterSec = parseRetryAfterSeconds(response.headers.get('Retry-After'), now) ?? undefined
+  const retryAfterSec =
+    parseRetryAfterSeconds(response.headers.get('Retry-After'), now) ?? undefined
   return new UniworkError(resolved, {
     status,
     retryAfterSec,
@@ -120,7 +138,10 @@ export async function uniworkErrorFromResponse(response: Response, now: number =
 export type UniworkHost = 'desktop' | 'web'
 
 /** the S9 message key (packages/ui/src/ai-uniwork) of a code */
-export function uniworkErrorKey(code: UniworkErrorCode | (string & {}), host: UniworkHost = 'desktop'): string {
+export function uniworkErrorKey(
+  code: UniworkErrorCode | (string & {}),
+  host: UniworkHost = 'desktop',
+): string {
   switch (code) {
     case 'conversation_expired':
       return 'aiConversationRestarted'

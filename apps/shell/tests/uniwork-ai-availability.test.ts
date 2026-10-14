@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { UNIWORK_CLOUD_SIGNED_OUT, type UniworkCloudStatus } from '@genoffice/ai-provider'
-import {
-  createUniworkAiAvailability,
-  uniworkAiOffered,
-} from '../src/main/uniwork-auth/ai-chat'
+import { createUniworkAiAvailability, uniworkAiOffered } from '../src/main/uniwork-auth/ai-chat'
 import {
   cloudChatEnabled,
   parseCloudStatus,
@@ -170,9 +167,9 @@ describe('cloud status reads tools.chat', () => {
       credits: null,
     })
     expect(cloudChatEnabled(parsed)).toBe(true)
-    expect(
-      cloudChatEnabled(parseCloudStatus({ enabled: true, tools: { web_search: true } })),
-    ).toBe(false)
+    expect(cloudChatEnabled(parseCloudStatus({ enabled: true, tools: { web_search: true } }))).toBe(
+      false,
+    )
     expect(cloudChatEnabled(parseCloudStatus({ enabled: true, tools: { chat: 'yes' } }))).toBe(
       false,
     )

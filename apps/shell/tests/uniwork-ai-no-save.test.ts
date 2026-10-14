@@ -248,9 +248,7 @@ describe('G6-A03 desktop: AI never saves', () => {
     const during = server.calls.slice(callsBefore)
     expect(during).toEqual([{ method: 'POST', path: CHAT }])
     expect(server.calls.filter((c) => c.path !== CHAT && c.method !== 'GET')).toEqual([])
-    expect(
-      server.calls.filter((c) => /\/uploads$|\/versions\/commit$/.test(c.path)),
-    ).toEqual([])
+    expect(server.calls.filter((c) => /\/uploads$|\/versions\/commit$/.test(c.path))).toEqual([])
     // no module save was requested and no save intent was recorded
     expect(ctx.requestModuleSave).not.toHaveBeenCalled()
     expect(await intentFor(ctx.layer, path)).toBeNull()

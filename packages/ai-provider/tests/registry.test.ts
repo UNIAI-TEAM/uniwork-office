@@ -28,7 +28,9 @@ describe('provider registry', () => {
   })
 
   it('UniWork AI has no BYOK endpoint (the adapter streams it)', () => {
-    expect(() => AI_PROVIDER_ADAPTERS.uniwork.resolveEndpoint(config(''))).toThrow(/UniWork adapter/)
+    expect(() => AI_PROVIDER_ADAPTERS.uniwork.resolveEndpoint(config(''))).toThrow(
+      /UniWork adapter/,
+    )
   })
 
   it('routes UniAI (genspark) chat through OpenRouter', () => {

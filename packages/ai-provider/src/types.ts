@@ -1,4 +1,9 @@
-import type { AgentMessage, AgentStreamNotice, AgentToolCall, AgentToolDef } from '@genoffice/agent-core'
+import type {
+  AgentMessage,
+  AgentStreamNotice,
+  AgentToolCall,
+  AgentToolDef,
+} from '@genoffice/agent-core'
 
 export type AiProviderId =
   | 'genspark'

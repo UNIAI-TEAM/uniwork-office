@@ -25,7 +25,10 @@ const history: AgentMessage[] = [
 
 describe('sliceUniworkTurn', () => {
   it('question turn sends exactly one user message', () => {
-    const slice = sliceUniworkTurn([...history.slice(0, 2), { role: 'user', text: 'second question' }])
+    const slice = sliceUniworkTurn([
+      ...history.slice(0, 2),
+      { role: 'user', text: 'second question' },
+    ])
     expect(slice.kind).toBe('question')
     expect(slice.messages).toEqual([{ role: 'user', content: 'second question' }])
   })
@@ -52,7 +55,9 @@ describe('sliceUniworkTurn', () => {
       { role: 'tool', tool_call_id: 'call-a', content: 'ok' },
       { role: 'tool', tool_call_id: 'call-b', content: 'Error: no such range' },
     ])
-    expect(JSON.stringify(slice.messages)).not.toMatch(/assistant|system|first question|make the title bold/)
+    expect(JSON.stringify(slice.messages)).not.toMatch(
+      /assistant|system|first question|make the title bold/,
+    )
   })
 
   it('refuses a history that ends with an assistant turn or is empty', () => {
