@@ -4939,6 +4939,108 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
   }
 }
 
+/* ── G8-15: server comments of a bound document (S12 panel on the right of the pages) ── */
+.pdf-server-comments {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  width: 340px;
+  max-width: 45%;
+  min-height: 0;
+  border-left: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.pdf-server-comments > .collab-panel {
+  flex: 1;
+  min-height: 0;
+}
+
+.pdf-server-comments-note {
+  margin: 0;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* The rect a revealed comment points at; the new thread's rect is dashed until it is sent */
+.pdf-comment-frame {
+  position: absolute;
+  z-index: 5;
+  box-sizing: border-box;
+  border: 2px solid var(--accent);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  pointer-events: none;
+}
+
+.pdf-comment-frame-new {
+  border-style: dashed;
+}
+
+/* "Comments in the file": read-only threads saved inside the PDF */
+.pdf-file-notes {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pdf-file-note {
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+
+.pdf-file-note-page {
+  min-height: 24px;
+  padding: 2px 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.pdf-file-note-page:hover {
+  text-decoration: underline;
+}
+
+.pdf-file-note-page:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.pdf-file-note-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 0;
+  font-size: 13px;
+}
+
+.pdf-file-note-reply {
+  padding-left: 12px;
+}
+
+.pdf-file-note-author {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.pdf-file-note-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--text);
+}
+
+@media (pointer: coarse) {
+  .pdf-file-note-page {
+    min-height: 44px;
+  }
+}
+
 /* ── Digital signatures: banner, panel, certificate dialog ── */
 
 .pdf-sig-banner {
