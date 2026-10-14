@@ -483,6 +483,11 @@ h3.collab-cmh {
   padding: 8px 12px 10px;
 }
 
+.collab-comp-root > .collab-composer,
+.collab-comp-slot > .collab-composer {
+  padding: 0;
+}
+
 /* actions menu */
 .collab-menu-wrap {
   position: relative;
