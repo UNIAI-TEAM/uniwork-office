@@ -3,10 +3,12 @@ import { readFileSync } from 'node:fs'
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { CollabComposer } from '../src/collab/CollabComposer'
 import { CollabPanel } from '../src/collab/CollabPanel'
 import { useCollabThreads, type CollabController } from '../src/collab/use-collab-threads'
 import type { CollabHostState, CollabSource } from '../src/collab/types'
 import { COLLAB_LIVE_REGION_ID } from '../src/collab/live-region'
+import { COMPOSER_STRINGS } from './collab-composer-fixtures'
 import { EN, cm, err, fakeSource, flush, host, list, type FakeSource } from './collab-kit'
 
 let el: HTMLDivElement
@@ -169,7 +171,7 @@ describe('delete', () => {
 })
 
 describe('edit', () => {
-  it('textarea labelled Edit; Esc without changes closes', async () => {
+  it('textarea labelled Edit; Esc or Cancel without changes closes and restores focus to the comment menu trigger', async () => {
     const src = fakeSource(list([cm({ id: 'a', author_id: 'me', body: 'old' })]))
     await mount(src)
     await click(btn(EN.collabEdit, await openMenu('a')))
@@ -181,9 +183,15 @@ describe('edit', () => {
     expect(document.activeElement).toBe(area)
     await key(area, 'Escape')
     expect($('.collab-edit')).toBeNull()
+    expect(document.activeElement).toBe($('[data-comment-id="a"] button[aria-haspopup="menu"]'))
+
+    await click(btn(EN.collabEdit, await openMenu('a')))
+    await click(btn(EN.collabCancel, $('.collab-edit')!))
+    expect($('.collab-edit')).toBeNull()
+    expect(document.activeElement).toBe($('[data-comment-id="a"] button[aria-haspopup="menu"]'))
   })
 
-  it('Esc with changes asks; Keep writing is the default and returns to the box; Discard closes', async () => {
+  it('Esc with changes asks; Keep writing is the default and returns to the box; Discard closes and restores focus to the comment menu trigger', async () => {
     const src = fakeSource(list([cm({ id: 'a', author_id: 'me', body: 'old' })]))
     await mount(src)
     await click(btn(EN.collabEdit, await openMenu('a')))
@@ -200,9 +208,10 @@ describe('edit', () => {
     await click(btn(EN.collabDiscard))
     expect($('.collab-edit')).toBeNull()
     expect(src.update).not.toHaveBeenCalled()
+    expect(document.activeElement).toBe($('[data-comment-id="a"] button[aria-haspopup="menu"]'))
   })
 
-  it('Save sends the update', async () => {
+  it('Save (button and Ctrl+Enter) sends the update and restores focus to the comment menu trigger', async () => {
     const src = fakeSource(list([cm({ id: 'a', author_id: 'me', body: 'old' })]))
     await mount(src)
     await click(btn(EN.collabEdit, await openMenu('a')))
@@ -210,6 +219,38 @@ describe('edit', () => {
     await click(btn(EN.collabSave))
     expect(src.update).toHaveBeenCalledWith({ comment_id: 'a', body: 'new' })
     expect($('.collab-edit')).toBeNull()
+    expect(document.activeElement).toBe($('[data-comment-id="a"] button[aria-haspopup="menu"]'))
+
+    await click(btn(EN.collabEdit, await openMenu('a')))
+    const area2 = $<HTMLTextAreaElement>('.collab-edit textarea')!
+    await type(area2, 'newer')
+    await key(area2, 'Enter', { ctrlKey: true })
+    expect(src.update).toHaveBeenLastCalledWith({ comment_id: 'a', body: 'newer' })
+    expect($('.collab-edit')).toBeNull()
+    expect(document.activeElement).toBe($('[data-comment-id="a"] button[aria-haspopup="menu"]'))
+  })
+
+  it('auto-grows the edit textarea to fit multi-line content up to max-height with scroll (V14-11)', async () => {
+    Object.defineProperty(HTMLTextAreaElement.prototype, 'scrollHeight', {
+      configurable: true,
+      get(this: HTMLTextAreaElement) {
+        return Math.max(56, this.value.split('\n').length * 22 + 12)
+      },
+    })
+    const src = fakeSource(
+      list([cm({ id: 'a', author_id: 'me', body: 'line 1\nline 2\nline 3\nline 4\nline 5' })]),
+    )
+    await mount(src)
+    await click(btn(EN.collabEdit, await openMenu('a')))
+    const area = $<HTMLTextAreaElement>('.collab-edit textarea')!
+    expect(Number.parseInt(area.style.height, 10)).toBeGreaterThanOrEqual(120)
+    await type(area, Array.from({ length: 15 }, (_, i) => `line ${i + 1}`).join('\n'))
+    expect(area.style.height).toBe('200px')
+    const css = readFileSync(`${__dirname}/../src/collab/collab.css`, 'utf8')
+    const taAt = css.indexOf('.collab-textarea {')
+    const ta = css.slice(taAt, css.indexOf('}', taAt))
+    expect(ta).toMatch(/max-height:\s*200px/)
+    expect(ta).toMatch(/overflow-y:\s*auto/)
   })
 })
 
@@ -322,6 +363,73 @@ describe('resolve / reply / conflict', () => {
     await click(btn(EN.collabCopyText, box))
     expect(writeText).toHaveBeenCalledWith('keep me')
   })
+
+  it('reply composer: Cancel, Discard, and Send (button and Ctrl+Enter) restore focus to the Reply button', async () => {
+    const src = fakeSource(list([cm({ id: 'a' })], 't1'))
+    await act(async () => {
+      root.render(
+        createElement(function H() {
+          ctl = useCollabThreads(src, host(), { strings: EN })
+          return createElement(CollabPanel, {
+            controller: ctl,
+            strings: EN,
+            renderComposer: (slot) =>
+              createElement(CollabComposer, {
+                ...slot,
+                strings: { ...EN, ...COMPOSER_STRINGS },
+              }),
+          })
+        }),
+      )
+      await flush()
+    })
+
+    const replyBtn = () => btn(EN.collabReply, $('[data-thread-id="a"]')!)!
+
+    // 1. Empty reply Cancel (via Escape) -> focus returns to Reply button
+    replyBtn().focus()
+    await click(replyBtn())
+    let replyTa = $<HTMLTextAreaElement>('[data-thread-id="a"] textarea')!
+    expect(document.activeElement).toBe(replyTa)
+    await key(replyTa, 'Escape')
+    expect($('[data-thread-id="a"] textarea')).toBeNull()
+    expect(document.activeElement).toBe(replyBtn())
+
+    // 2. Dirty reply Discard -> focus returns to Reply button
+    await click(replyBtn())
+    replyTa = $<HTMLTextAreaElement>('[data-thread-id="a"] textarea')!
+    await type(replyTa, 'draft reply')
+    await click(btn(EN.collabCancel, $('[data-thread-id="a"]')!))
+    await click(btn(EN.collabDiscard))
+    expect($('[data-thread-id="a"] textarea')).toBeNull()
+    expect(document.activeElement).toBe(replyBtn())
+
+    // 3. Reply Send via button -> focus returns to Reply button
+    await click(replyBtn())
+    replyTa = $<HTMLTextAreaElement>('[data-thread-id="a"] textarea')!
+    await type(replyTa, 'first reply')
+    await click(btn(EN.collabSend, $('[data-thread-id="a"]')!))
+    expect(src.create).toHaveBeenCalledWith({
+      kind: 'comment',
+      parent_id: 'a',
+      body: 'first reply',
+    })
+    expect($('[data-thread-id="a"] textarea')).toBeNull()
+    expect(document.activeElement).toBe(replyBtn())
+
+    // 4. Reply Send via Ctrl+Enter -> focus returns to Reply button
+    await click(replyBtn())
+    replyTa = $<HTMLTextAreaElement>('[data-thread-id="a"] textarea')!
+    await type(replyTa, 'second reply')
+    await key(replyTa, 'Enter', { ctrlKey: true })
+    expect(src.create).toHaveBeenLastCalledWith({
+      kind: 'comment',
+      parent_id: 'a',
+      body: 'second reply',
+    })
+    expect($('[data-thread-id="a"] textarea')).toBeNull()
+    expect(document.activeElement).toBe(replyBtn())
+  })
 })
 
 describe('visual r1 fixes (panel / thread)', () => {
@@ -409,5 +517,28 @@ describe('visual r1 fixes (panel / thread)', () => {
     const coarse = css.slice(css.indexOf('@media (pointer: coarse)'))
     expect(coarse).toMatch(/\.collab-cmh \.collab-link\s*\{[^}]*min-height: 24px/)
     expect(coarse).toMatch(/\.collab-cmh \.collab-link::after\s*\{[^}]*content: ''[^}]*inset:/)
+  })
+
+  it('keeps the comment head row (.collab-cmh) on one line at 300px even with the Edited chip (V14-07)', () => {
+    const css = readFileSync(`${__dirname}/../src/collab/collab.css`, 'utf8')
+    const cmhAt = css.indexOf('.collab-cmh {')
+    const cmh = css.slice(cmhAt, css.indexOf('}', cmhAt))
+    expect(cmh).toMatch(/flex-wrap:\s*nowrap/)
+    expect(css).toMatch(/\.collab-cmh \.collab-link\s*\{[^}]*min-width:\s*0/)
+    expect(css).toMatch(/\.collab-cmh \.collab-link\s*\{[^}]*text-overflow:\s*ellipsis/)
+    expect(css).toMatch(/\.collab-cmh \.collab-link\s*\{[^}]*white-space:\s*nowrap/)
+    const dtAt = css.indexOf('.collab-dt {')
+    const dt = css.slice(dtAt, css.indexOf('}', dtAt))
+    expect(dt).toMatch(/white-space:\s*nowrap/)
+  })
+
+  it('keeps the thread action row (.collab-acts) on one line at 300px without wrapping (V14-08)', () => {
+    const css = readFileSync(`${__dirname}/../src/collab/collab.css`, 'utf8')
+    const actsAt = css.indexOf('.collab-acts {')
+    const acts = css.slice(actsAt, css.indexOf('}', actsAt))
+    expect(acts).toMatch(/flex-wrap:\s*nowrap/)
+    expect(css).toMatch(/\.collab-acts \.collab-link\s*\{[^}]*min-width:\s*0/)
+    expect(css).toMatch(/\.collab-acts \.collab-link\s*\{[^}]*text-overflow:\s*ellipsis/)
+    expect(css).toMatch(/\.collab-acts \.collab-link\s*\{[^}]*white-space:\s*nowrap/)
   })
 })
