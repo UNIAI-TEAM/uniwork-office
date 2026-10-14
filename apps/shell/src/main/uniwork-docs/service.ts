@@ -2840,10 +2840,9 @@ export class UniworkDocsService {
     if (bytes) {
       await this.store.writeWorkingCopy(doc.dir, binding.filename, bytes).catch(() => undefined)
     }
-    const written = await this.store.write(doc.dir, binding).catch(() => false)
-    if (!written) return
-    const fresh = this.store.lookup(doc.path)
-    if (fresh) this.publish(toStatus(fresh))
+    // the coordinator's chain, so the restore cannot interleave with a save's
+    // own binding write for the same document
+    await this.coordinator.commitState(doc, binding)
   }
 
   /** the rule order again for a notice whose bar needs a fresh verdict (an AI turn ended) */
