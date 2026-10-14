@@ -255,6 +255,20 @@ describe('Settings › AI model: org-managed provider row (G6-05k)', () => {
     )
   })
 
+  it('shows the model main resolved (modelSources chosen) for an org row, not a model left in the local slot', async () => {
+    const settings = stored('claude-stale-local', {
+      chosen: 'claude-sonnet-5',
+      origin: 'org',
+      listed: CATALOG,
+    })
+    settings.providers.anthropic = { apiKey: '', model: 'claude-stale-local' }
+    installApi(settings)
+    await openAiPane()
+    const trigger = host.querySelector<HTMLButtonElement>('.gs-dd-btn[aria-label="Model"]')!
+    expect(trigger.textContent).toContain('claude-sonnet-5')
+    expect(trigger.textContent).not.toContain('claude-stale-local')
+  })
+
   it('never writes the org-resolved model into the local slot of an untouched provider', async () => {
     const settings = stored('', { chosen: 'claude-sonnet-5', origin: 'org', listed: CATALOG })
     settings.providers.anthropic = { apiKey: '', model: '' }
@@ -268,7 +282,7 @@ describe('Settings › AI model: org-managed provider row (G6-05k)', () => {
     const cap = host.querySelector<HTMLInputElement>('#set-ai-max-tokens')!
     await act(async () => {
       setNativeValue(cap, '8192')
-      cap.dispatchEvent(new Event('blur', { bubbles: true }))
+      cap.dispatchEvent(new FocusEvent('focusout', { bubbles: true }))
     })
     await click(host.querySelector<HTMLButtonElement>('button.set-btn.primary')!)
     const sent = vi.mocked(window.aiOffice.setAiSettings).mock.calls[0][0]

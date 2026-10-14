@@ -108,11 +108,9 @@ export function AiModelPicker({
     () => (settings ? aiModelPickerGroups(settings, loggedIn) : []),
     [settings, loggedIn],
   )
-  const isOrgGroup = (id: string) =>
-    settings?.modelSources?.[id as AiProviderId]?.origin === 'org'
+  const isOrgGroup = (id: string) => settings?.modelSources?.[id as AiProviderId]?.origin === 'org'
   const hasOrgGroup = groups.some((g) => isOrgGroup(g.id))
-  const noteDue = (id: string) =>
-    isOrgGroup(id) && !seenOrgNotes.has(id) && !readOrgNoteSeen(id)
+  const noteDue = (id: string) => isOrgGroup(id) && !seenOrgNotes.has(id) && !readOrgNoteSeen(id)
   const orgNoteDue = groups.some((g) => noteDue(g.id))
   // what the listbox's quiet notes say, read out once through a live region beside the listbox
   const listNote = [
@@ -210,7 +208,13 @@ export function AiModelPicker({
     // the chip reads an org-served provider's model from its source: show the pick there too
     const next: AiSettings =
       source?.origin === 'org'
-        ? { ...picked, modelSources: { ...settings.modelSources, [sel.provider]: { ...source, chosen: sel.model } } }
+        ? {
+            ...picked,
+            modelSources: {
+              ...settings.modelSources,
+              [sel.provider]: { ...source, chosen: sel.model },
+            },
+          }
         : picked
     setSettings(next)
     void bridge.setSettings(next).catch(() => {})

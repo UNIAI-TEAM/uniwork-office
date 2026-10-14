@@ -417,7 +417,9 @@ function AiModelPane({
    * Providers served by a key on UniWork whose row the user opened for a key on this computer:
    * the value is the slot as it was when the row opened, so Cancel restores it untouched.
    */
-  const [localKeyRows, setLocalKeyRows] = useState<Partial<Record<AiProviderId, AiProviderConfig>>>({})
+  const [localKeyRows, setLocalKeyRows] = useState<Partial<Record<AiProviderId, AiProviderConfig>>>(
+    {},
+  )
 
   const refreshCodexModels = useCallback(async (cliPath = '', selectedModel = '') => {
     if (!window.aiOffice.getCodexModels) return
@@ -824,43 +826,43 @@ function AiModelPane({
             </div>
           ) : isOrgKey ? (
             <>
-            <div className="set-field" data-org-key-row={provider}>
-              <div className="set-field-text">
-                <div className="set-field-stack">
-                  <div className="set-field-label">{t('setAiApiKey')}</div>
-                  <div className="set-field-desc" data-org-key-note="">
-                    {pickerStrings.orgKeyNote}
+              <div className="set-field" data-org-key-row={provider}>
+                <div className="set-field-text">
+                  <div className="set-field-stack">
+                    <div className="set-field-label">{t('setAiApiKey')}</div>
+                    <div className="set-field-desc" data-org-key-note="">
+                      {pickerStrings.orgKeyNote}
+                    </div>
                   </div>
+                  <span
+                    className="set-field-value"
+                    data-org-key-tag=""
+                    title={pickerStrings.orgKeyNote}
+                    data-tip={pickerStrings.orgKeyNote}
+                  >
+                    {pickerStrings.orgKeyTag}
+                  </span>
                 </div>
-                <span
-                  className="set-field-value"
-                  data-org-key-tag=""
-                  title={pickerStrings.orgKeyNote}
-                  data-tip={pickerStrings.orgKeyNote}
+                <button
+                  type="button"
+                  className="set-btn"
+                  data-org-key-manage=""
+                  onClick={() => void window.open(orgKeyManageUrl, '_blank', 'noopener,noreferrer')}
                 >
-                  {pickerStrings.orgKeyTag}
-                </span>
+                  {pickerStrings.orgKeyManage}
+                </button>
               </div>
-              <button
-                type="button"
-                className="set-btn"
-                data-org-key-manage=""
-                onClick={() => void window.open(orgKeyManageUrl, '_blank', 'noopener,noreferrer')}
-              >
-                {pickerStrings.orgKeyManage}
-              </button>
-            </div>
-            <div className="set-field" data-org-key-local-action={provider}>
-              <div className="set-field-text" />
-              <button
-                type="button"
-                className="set-btn"
-                data-org-key-use-local=""
-                onClick={openLocalKey}
-              >
-                {pickerStrings.orgKeyUseLocal}
-              </button>
-            </div>
+              <div className="set-field" data-org-key-local-action={provider}>
+                <div className="set-field-text" />
+                <button
+                  type="button"
+                  className="set-btn"
+                  data-org-key-use-local=""
+                  onClick={openLocalKey}
+                >
+                  {pickerStrings.orgKeyUseLocal}
+                </button>
+              </div>
             </>
           ) : (
             <>
