@@ -195,7 +195,9 @@ export interface UniworkDocsServiceDeps {
    * it before and after its fetch, so an AI turn that starts in between drops
    * the result. Absent = a clean, idle editor (tests that never poll).
    */
-  editorStateOf?(path: string): Promise<{ dirty: boolean | null; aiRunning: boolean; aiEpoch: number }>
+  editorStateOf?(
+    path: string,
+  ): Promise<{ dirty: boolean | null; aiRunning: boolean; aiEpoch: number }>
   /**
    * S18: the native open dialog for an upload (Electron-free seam). Null when
    * the person cancelled or the file is not usable.
@@ -397,15 +399,16 @@ function samePath(a: string, b: string): boolean {
 }
 
 /**
- * G5-03a: the S6 lock verdict of a failed documents call. A 403/404 (and their
- * coded forms) revokes the copy, a 410 tombstone (or `document_deleted`)
- * deletes it; anything else - a bare gateway 403, a timeout, a 5xx - is a
- * transient failure the bar calls `reload-failed`, never a lock.
+ * G5-03a: the S6 lock verdict of a failed documents call, read from the CODES
+ * the client's own mapping produced - a coded 403/404 is `forbidden` /
+ * `permission_revoked` / `not_found`, a coded 410 is `deleted`, and the
+ * tombstone code `document_deleted`. A bare 403/404 (no UniWork envelope: a
+ * gateway, a captive portal) stays `server_error` on purpose, so it is
+ * transient here too - the bar says `reload-failed`, never a lock.
  */
 function lockVerdict(error: unknown): 'revoked' | 'deleted' | null {
   if (!(error instanceof UniworkDocError)) return null
   if (error.code === 'document_deleted' || error.code === 'deleted') return 'deleted'
-  if (error.status === 410) return 'deleted'
   if (
     error.code === 'permission_revoked' ||
     error.code === 'forbidden' ||
@@ -413,7 +416,6 @@ function lockVerdict(error: unknown): 'revoked' | 'deleted' | null {
   ) {
     return 'revoked'
   }
-  if (error.status === 403 || error.status === 404) return 'revoked'
   return null
 }
 
@@ -2789,12 +2791,9 @@ export class UniworkDocsService {
       )
       return
     }
-    let previousBytes: Uint8Array | null = null
-    try {
-      previousBytes = new Uint8Array(await readFile(fresh.path))
-    } catch {
-      previousBytes = null
-    }
+    const previousBytes = await readFile(fresh.path)
+      .then((bytes) => new Uint8Array(bytes))
+      .catch(() => null)
     const previousBinding = fresh.binding
     await this.store.writeWorkingCopy(fresh.dir, fresh.binding.filename, fetched.bytes)
     const next: Binding = {

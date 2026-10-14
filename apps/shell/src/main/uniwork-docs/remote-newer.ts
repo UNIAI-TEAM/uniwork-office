@@ -70,7 +70,8 @@ export function decideRemote(n: RemoteNotice, l: RemoteLocal): RemoteDecision {
   if (n.documentId !== l.documentId) return { kind: 'ignore', reason: 'other-doc' }
   if (!l.feedOn) return { kind: 'ignore', reason: 'feed-off' }
   if (l.locked) return { kind: 'ignore', reason: 'locked' }
-  if (compareRevision(n.revision, l.baseRevision) <= 0) return { kind: 'ignore', reason: 'not-newer' }
+  if (compareRevision(n.revision, l.baseRevision) <= 0)
+    return { kind: 'ignore', reason: 'not-newer' }
   if (l.ownEcho.has(n.revision) || l.receiptRevision === n.revision) {
     return { kind: 'ignore', reason: 'own-echo' }
   }

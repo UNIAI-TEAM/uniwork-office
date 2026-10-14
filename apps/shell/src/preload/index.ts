@@ -294,7 +294,11 @@ function asUniworkRemoteBar(raw: unknown): UniworkRemoteBar | null {
 }
 
 function asUniworkStatus(result: unknown): UniworkDocStatus | null {
-  if (result && typeof result === 'object' && typeof (result as UniworkDocStatus).path === 'string') {
+  if (
+    result &&
+    typeof result === 'object' &&
+    typeof (result as UniworkDocStatus).path === 'string'
+  ) {
     const status = result as UniworkDocStatus
     const { remote, ...rest } = status
     if (remote === undefined) return status

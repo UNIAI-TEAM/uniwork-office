@@ -84,7 +84,9 @@ export interface UniworkDocsWiring {
    * views' AI epochs (never decreases). The guarded clean reload reads this
    * before and after its fetch; it is never served from the 1 s poll cache.
    */
-  editorStateOf(path: string): Promise<{ dirty: boolean | null; aiRunning: boolean; aiEpoch: number }>
+  editorStateOf(
+    path: string,
+  ): Promise<{ dirty: boolean | null; aiRunning: boolean; aiEpoch: number }>
   activePath(): string | undefined
   reveal(): void
   /**
@@ -656,10 +658,8 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   )
   // G5-03a: the S6 bar's actions. The barInset handler is NOT registered here:
   // it belongs to the window chrome (index.ts, W2).
-  ipcMain.handle(
-    UNIWORK_DOC_CHANNELS.remoteAction,
-    (_event, path: unknown, action: unknown) =>
-      service.remoteAction(path as string, action as UniworkRemoteAction),
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.remoteAction, (_event, path: unknown, action: unknown) =>
+    service.remoteAction(path as string, action as UniworkRemoteAction),
   )
   ipcMain.handle(UNIWORK_DOC_CHANNELS.locks, () => service.currentLocks())
   ipcMain.handle(UNIWORK_DOC_CHANNELS.dismissLock, (_event, path: unknown) => {

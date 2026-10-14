@@ -87,9 +87,9 @@ describe('decideRemote — rule order', () => {
       ),
     ).toEqual({ kind: 'reload' })
     // the same width, single-digit difference: never lexicographic
-    expect(
-      decideRemote(notice({ revision: '100' }), local({ baseRevision: '99' })),
-    ).toEqual({ kind: 'reload' })
+    expect(decideRemote(notice({ revision: '100' }), local({ baseRevision: '99' }))).toEqual({
+      kind: 'reload',
+    })
   })
 
   it('ignores a notice that is not newer than the base (equal or lower)', () => {
