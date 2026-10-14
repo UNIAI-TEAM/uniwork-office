@@ -9,6 +9,7 @@ import {
   type UniworkDocFormat,
   type UniworkDocListQuery,
   type UniworkDocLock,
+  type UniworkRemoteAction,
   type UniworkUploadDocInput,
   type UniworkSharedQuery,
 } from '../../shared/home-api'
@@ -450,7 +451,16 @@ export function createSyncRuntime(
     // so a rename on the web reaches the open desktop copy
     // the change's revision, so the echo of this service's own rename is
     // recognised by it and a genuine later change is never swallowed (R1-6)
-    onFeedChange: (change) => service.noteFeedChange(change.documentId, change.revision),
+    // G5-03a: the same change IS the S6 newer-version notice (head version +
+    // version id), so one feed tick drives both
+    onFeedChange: (change) => service.noteFeedChange(change.documentId, change.revision, change),
+    // G5-03a: a full resync that no longer lists an open, bound document asks
+    // the service to classify it (403/404 -> revoked, 410 -> deleted); the
+    // runtime learns ids only, never paths
+    isOpenBound: (documentId) => service.isOpenBound(documentId),
+    onFeedGone: (documentId) => {
+      void service.noteFeedGone(documentId).catch(() => undefined)
+    },
     targets,
     capability: async (orgId) => {
       const found = clients()
@@ -528,6 +538,9 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     isPathOpen: (path) => wiring.isPathOpen(path),
     requestModuleSave: (path, onNotWritten) => wiring.requestModuleSave(path, onNotWritten),
     reloadPath: (path) => wiring.reloadPath(path),
+    // G5-03a: the fresh editor state of one path (W2's live read; the wiring
+    // placeholder is what index.ts installs today)
+    editorStateOf: (path) => wiring.editorStateOf(path),
     activePath: () => wiring.activePath(),
     // S18: main owns the native dialog (Electron); the service stays Electron-free
     pickUploadFile: () => pickUploadFile(wiring),
@@ -640,6 +653,13 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   ipcMain.handle(UNIWORK_DOC_CHANNELS.save, (_event, path: unknown) => service.save(path as string))
   ipcMain.handle(UNIWORK_DOC_CHANNELS.resolveConflict, (_event, path: unknown) =>
     service.resolveConflict(path as string),
+  )
+  // G5-03a: the S6 bar's actions. The barInset handler is NOT registered here:
+  // it belongs to the window chrome (index.ts, W2).
+  ipcMain.handle(
+    UNIWORK_DOC_CHANNELS.remoteAction,
+    (_event, path: unknown, action: unknown) =>
+      service.remoteAction(path as string, action as UniworkRemoteAction),
   )
   ipcMain.handle(UNIWORK_DOC_CHANNELS.locks, () => service.currentLocks())
   ipcMain.handle(UNIWORK_DOC_CHANNELS.dismissLock, (_event, path: unknown) => {
