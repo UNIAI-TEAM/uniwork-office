@@ -6,10 +6,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { UNIWORK_DOC_CHANNELS, type UniworkDocLock } from '../src/shared/home-api'
 import { BINDING_FILE, INTENT_PAYLOAD_FILE } from '../src/main/uniwork-docs/binding-store'
-import {
-  INTENT_STORE_REGISTRATION,
-  createIntentStore,
-} from '../src/main/uniwork-sync/intent-store'
+import { INTENT_STORE_REGISTRATION, createIntentStore } from '../src/main/uniwork-sync/intent-store'
 import { SyncRuntime } from '../src/main/uniwork-sync/runtime'
 
 /**
@@ -23,8 +20,7 @@ import { SyncRuntime } from '../src/main/uniwork-sync/runtime'
 let dir: string
 let identity: { accountId: string; deviceSessionId: string; deploymentId: string } | null = null
 let statusListener:
-  | ((status: { state: string; org?: { id: string; slug: string } | null }) => void)
-  | null = null
+  ((status: { state: string; org?: { id: string; slug: string } | null }) => void) | null = null
 /** the account state the mocked auth module reports (keystore-locked after a lock) */
 let accountState = 'signed-out'
 /** the chosen org the mocked auth module reports (null = the picker is up) */
@@ -337,9 +333,9 @@ describe('the durable store at the account boundary (W3b)', () => {
     // a same-account sign-in reopens the scope and reads the record back
     const again = await handle.service.openSyncStore()
     if (again.kind !== 'ok') throw new Error(again.kind)
-    const record = await createIntentStore(
-      again.records(INTENT_STORE_REGISTRATION.name),
-    ).get('doc_1')
+    const record = await createIntentStore(again.records(INTENT_STORE_REGISTRATION.name)).get(
+      'doc_1',
+    )
     expect(record?.intent.intentId).toBe('intent_1')
     // another account's scope is not touched
     const otherScope = join(dir, 'uniwork-sync', 'store', 'default', 'acc_9', 'feed-cursors')
@@ -468,13 +464,16 @@ describe('the account boundary at the production wiring (G511-be-3)', () => {
     const closePathNow = vi.fn()
     const confirmClosePath = vi.fn(async () => true)
     const forgetAiHistory = vi.fn()
-    const { handle, sent } = await setup(vi.fn(() => true), {
-      openPaths: () => [docPath()],
-      closePathNow,
-      confirmClosePath,
-      aiHistoryPaths: () => [docPath()],
-      forgetAiHistory,
-    })
+    const { handle, sent } = await setup(
+      vi.fn(() => true),
+      {
+        openPaths: () => [docPath()],
+        closePathNow,
+        confirmClosePath,
+        aiHistoryPaths: () => [docPath()],
+        forgetAiHistory,
+      },
+    )
     // unsaved edits: the plan has a count, and the renderer already confirmed
     handle.service.noteEditorDirty(docPath(), true)
 

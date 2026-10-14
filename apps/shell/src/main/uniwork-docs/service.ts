@@ -83,7 +83,11 @@ import {
   PAUSE_STORE_REGISTRATION,
   type PauseStore,
 } from '../uniwork-sync/queue/pause'
-import { createParkedStore, PARKED_STORE_REGISTRATION, type ParkedStore } from '../uniwork-sync/queue/parked'
+import {
+  createParkedStore,
+  PARKED_STORE_REGISTRATION,
+  type ParkedStore,
+} from '../uniwork-sync/queue/parked'
 import { SIGN_OUT_RECEIPT_WAIT_MS } from '../uniwork-sync/queue/limits'
 import {
   QueueDispatcher,
@@ -1767,10 +1771,7 @@ export class UniworkDocsService {
    * 5. Clear all in-memory caches on the service.
    * 6. Lock the encrypted store (`syncStore.lock(owner)`).
    */
-  async lockSession(
-    owner?: LastOwner | null,
-    onWaiting?: () => void,
-  ): Promise<SignOutLockResult> {
+  async lockSession(owner?: LastOwner | null, onWaiting?: () => void): Promise<SignOutLockResult> {
     const target = owner ?? this.liveIdentity() ?? this.lastOwner
     if (!target) return { ok: true, captureFailed: [] }
     const scopeToken = `${target.deploymentId}/${target.accountId}`
@@ -1992,11 +1993,7 @@ export class UniworkDocsService {
     const keptDirs = new Set<string>()
     const deletedPaths = new Set<string>()
     for (const dir of scopeWorkingCopyDirs(this.store.root, target)) {
-      if (
-        this.store.newerStoreIn(dir) ||
-        parkFailedDirs.has(dir) ||
-        captureFailedDirs.has(dir)
-      ) {
+      if (this.store.newerStoreIn(dir) || parkFailedDirs.has(dir) || captureFailedDirs.has(dir)) {
         keptDirs.add(dir)
         continue
       }
