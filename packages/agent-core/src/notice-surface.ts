@@ -15,6 +15,7 @@ export type NoticeKey =
   | 'aiErrViewOnlyEdit'
   | 'aiErrUnsupported'
   | 'aiUniworkOff'
+  | 'aiUniworkProvider'
 
 export type NoticeTranslate = (key: NoticeKey, params?: Record<string, string | number>) => string
 
@@ -50,7 +51,10 @@ export function noticePatch(
     case 'conversation-boundary':
       return addNote({
         kind: 'boundary',
-        text: tr('aiConversationBoundary', { provider: notice.provider }),
+        // the adapter names the new conversation's provider by id; 'uniwork' reads as the product name
+        text: tr('aiConversationBoundary', {
+          provider: notice.provider === 'uniwork' ? tr('aiUniworkProvider') : notice.provider,
+        }),
       })
     case 'uniwork-off':
       return addNote({ kind: 'off', text: tr('aiUniworkOff') })

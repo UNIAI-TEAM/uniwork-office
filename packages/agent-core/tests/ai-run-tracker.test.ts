@@ -137,3 +137,33 @@ describe('onChange and stop()', () => {
     expect(sent).toHaveLength(2)
   })
 })
+
+describe('setRunId', () => {
+  it('a server run id replaces the local one: running again with it, and the idle carries it', () => {
+    const t = tracker(0)
+    t.begin('s1')
+    t.setRunId('run-from-server')
+    t.setRunId('run-from-server')
+    t.end('s1')
+    expect(sent).toEqual([
+      { state: 'running', run_id: 'r1' },
+      { state: 'running', run_id: 'run-from-server' },
+      { state: 'idle', run_id: 'run-from-server' },
+    ])
+  })
+
+  it('an id that arrives while idle names the next run; an empty id is ignored', () => {
+    const t = tracker(0)
+    t.setRunId('')
+    t.setRunId('early')
+    expect(sent).toEqual([])
+    t.begin('s1')
+    t.end('s1')
+    expect(sent).toEqual([
+      { state: 'running', run_id: 'early' },
+      { state: 'idle', run_id: 'early' },
+    ])
+    t.begin('s2')
+    expect(sent.at(-1)).toEqual({ state: 'running', run_id: 'r1' })
+  })
+})

@@ -22,12 +22,14 @@ describe('noticePatch', () => {
     expect(restarted?.notes).toEqual([{ kind: 'restarted', text: 'aiConversationRestarted' }])
     const boundary = noticePatch(
       { notes: restarted!.notes! },
-      { kind: 'conversation-boundary', provider: 'UniWork AI' },
+      { kind: 'conversation-boundary', provider: 'uniwork' },
       tr,
       'Docs',
     )
     expect(boundary?.notes?.map((n) => n.kind)).toEqual(['restarted', 'boundary'])
-    expect(boundary?.notes?.[1]?.text).toBe('aiConversationBoundary:{"provider":"UniWork AI"}')
+    expect(boundary?.notes?.[1]?.text).toBe(
+      'aiConversationBoundary:{"provider":"aiUniworkProvider"}',
+    )
   })
 
   it('dropped calls fall back to text by reason, once per reason', () => {

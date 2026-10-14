@@ -31,6 +31,13 @@ export interface AiRunTracker {
   onChange(listener: (running: boolean) => void): () => void
   /** cancel every active stream and resolve once the run is idle */
   stop(): Promise<void>
+  /**
+   * the server's id for this turn (UniWork AI `X-UniWork-AI-Run`) replaces the local one in the
+   * payloads. While running it is announced at once with a repeated `running` (a host ignores an
+   * idle whose id differs from the running one, so both must carry the same id); while idle it
+   * names the next run.
+   */
+  setRunId(id: string): void
   /** where `aiRun` events go (the protocol client); undefined = nobody listens */
   bind(report: ((payload: AiRunPayload) => void) | undefined): void
 }
@@ -47,6 +54,8 @@ export function createAiRunTracker(opts: AiRunTrackerOptions = {}): AiRunTracker
   const listeners = new Set<(running: boolean) => void>()
   let isRunning = false
   let runId = ''
+  /** a server run id that arrived while idle: names the next run */
+  let nextRunId = ''
   let seq = 0
   let timer: ReturnType<typeof setTimeout> | null = null
   /** stop() cancelled the streams: their end is the end of the run, no grace */
@@ -83,7 +92,8 @@ export function createAiRunTracker(opts: AiRunTrackerOptions = {}): AiRunTracker
       }
       active.set(streamId, cancel)
       if (!isRunning) {
-        runId = `r${++seq}`
+        runId = nextRunId || `r${++seq}`
+        nextRunId = ''
         flip(true)
       }
     },
@@ -115,6 +125,20 @@ export function createAiRunTracker(opts: AiRunTrackerOptions = {}): AiRunTracker
           settle()
         }
       })
+    },
+    setRunId(id) {
+      if (!id) return
+      if (!isRunning) {
+        nextRunId = id
+        return
+      }
+      if (id === runId) return
+      runId = id
+      try {
+        report?.({ state: 'running', run_id: runId })
+      } catch (err) {
+        console.warn('[ai-run] aiRun report failed:', err)
+      }
     },
     bind(next) {
       report = next
