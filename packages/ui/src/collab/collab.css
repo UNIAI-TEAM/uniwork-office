@@ -19,6 +19,12 @@
 }
 
 .collab-panel {
+  --collab-mention-bg: var(--accent-soft, var(--bg-hover-subtle));
+  --collab-mention-fg: color-mix(
+    in srgb,
+    var(--accent, var(--color-brand-secondary)) 75%,
+    var(--text)
+  );
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -412,8 +418,8 @@ h3.collab-cmh {
   place-items: center;
   font-size: 10px;
   font-weight: 600;
-  background: var(--accent-soft, var(--bg-hover-subtle));
-  color: var(--accent, var(--color-brand-secondary));
+  background: var(--collab-mention-bg);
+  color: var(--collab-mention-fg);
   border: 1px solid var(--border);
 }
 
