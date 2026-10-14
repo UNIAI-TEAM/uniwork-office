@@ -81,7 +81,7 @@ export function AccountEntry({
   target?: SettingsTarget | null
 }) {
   const { t } = useI18n()
-  const account = useAccount()
+  const account = useAccount({ ownsSignOutPrompt: true })
   const { status, view, error } = account
 
   useEffect(() => {
