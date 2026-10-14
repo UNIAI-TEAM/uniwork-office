@@ -8,7 +8,7 @@ import type { UpdateUiState } from '../src/shared/update-api'
  * Install / Later actions come back through update-window.ts callbacks.
  */
 
-const appState = { isPackaged: true }
+const appState = { isPackaged: true, version: '0.1.0' }
 
 const openExternal = vi.hoisted(() => vi.fn())
 const showMessageBox = vi.hoisted(() =>
@@ -16,13 +16,18 @@ const showMessageBox = vi.hoisted(() =>
 )
 const readFileSyncMock = vi.hoisted(() => vi.fn<(...args: unknown[]) => string>())
 const existsSyncMock = vi.hoisted(() => vi.fn<(...args: unknown[]) => boolean>())
+const netFetch = vi.hoisted(() => vi.fn<(url: string, init?: unknown) => Promise<unknown>>())
 
 vi.mock('electron', () => ({
   app: {
     get isPackaged() {
       return appState.isPackaged
     },
-    getVersion: () => '0.1.0',
+    getVersion: () => appState.version,
+    getAppPath: () => '/app',
+  },
+  net: {
+    fetch: (url: string, init?: unknown) => netFetch(url, init),
   },
   shell: {
     openExternal: (url: string) => openExternal(url),
@@ -46,6 +51,7 @@ const updaterState = {
   disableDifferentialDownload: false,
   channel: null as string | null,
   allowDowngrade: false,
+  allowPrerelease: false,
 }
 const checkForUpdates = vi.fn(() => Promise.resolve(null))
 const downloadUpdate = vi.fn<(token?: FakeCancellationToken) => Promise<unknown>>(() =>
@@ -91,6 +97,9 @@ vi.mock('electron-updater', () => ({
     },
     get allowDowngrade() {
       return updaterState.allowDowngrade
+    },
+    set allowPrerelease(v: boolean) {
+      updaterState.allowPrerelease = v
     },
   },
 }))
@@ -150,6 +159,7 @@ beforeEach(() => {
   vi.resetModules()
   vi.useFakeTimers()
   appState.isPackaged = true
+  appState.version = '0.1.0'
   delete process.env.GENOFFICE_FAKE_UPDATE
   updaterState.listeners.clear()
   updaterState.autoDownload = true
@@ -157,6 +167,7 @@ beforeEach(() => {
   updaterState.disableDifferentialDownload = false
   updaterState.channel = null
   updaterState.allowDowngrade = false
+  updaterState.allowPrerelease = false
   checkForUpdates.mockClear()
   downloadUpdate.mockReset()
   downloadUpdate.mockImplementation(() => Promise.resolve([]))
@@ -219,6 +230,47 @@ describe('initAutoUpdater', () => {
     applyUpdateChannel('stable')
     expect(updaterState.channel).toBeNull()
     expect(checkForUpdates).not.toHaveBeenCalled()
+  })
+
+  it('pins a dev build with a GitHub feed to its own channel and accepts pre-releases', async () => {
+    platformSpy?.restore()
+    setPlatform('win32')
+    appState.version = '0.11.0-dev.12'
+    readFileSyncMock.mockReturnValue(
+      'owner: UNIAI-TEAM\nrepo: uniwork-office\nprovider: github\nchannel: dev\n',
+    )
+    const { initAutoUpdater, applyUpdateChannel, getPinnedUpdateChannel } = await loadUpdater()
+    expect(getPinnedUpdateChannel()).toBeNull()
+    initAutoUpdater(() => null, 'beta')
+    expect(getPinnedUpdateChannel()).toBe('dev')
+    expect(updaterState.channel).toBe('dev')
+    expect(updaterState.allowPrerelease).toBe(true)
+    expect(updaterState.allowDowngrade).toBe(false)
+    vi.advanceTimersByTime(FIRST_CHECK_DELAY_MS)
+    expect(checkForUpdates).toHaveBeenCalledTimes(1)
+    // the Settings stable / beta switch does not move a pinned build
+    applyUpdateChannel('stable')
+    expect(updaterState.channel).toBe('dev')
+    expect(checkForUpdates).toHaveBeenCalledTimes(1)
+  })
+
+  it('pins a beta build with a GitHub feed to beta', async () => {
+    appState.version = '0.11.0-beta.3'
+    readFileSyncMock.mockReturnValue('provider: github\nowner: UNIAI-TEAM\nrepo: uniwork-office\n')
+    const { initAutoUpdater } = await loadUpdater()
+    initAutoUpdater(() => null)
+    expect(updaterState.channel).toBe('beta')
+    expect(updaterState.allowPrerelease).toBe(true)
+  })
+
+  it('keeps the Settings channel for a generic feed even on a pre-release version', async () => {
+    appState.version = '0.11.0-dev.12'
+    readFileSyncMock.mockReturnValue('provider: generic\nurl: https://cdn.example.com/office\n')
+    const { initAutoUpdater, getPinnedUpdateChannel } = await loadUpdater()
+    initAutoUpdater(() => null, 'beta')
+    expect(updaterState.channel).toBe('beta')
+    expect(updaterState.allowPrerelease).toBe(false)
+    expect(getPinnedUpdateChannel()).toBeNull()
   })
 
   it('configures manual full-package download and checks after the initial delay', async () => {
@@ -581,10 +633,8 @@ describe('manual download fallback', () => {
     expect(openExternal).toHaveBeenCalledWith((await loadUpdater()).DOWNLOAD_PAGE_URL)
   })
 
-  it('uses the release list as the generic download page (pre-releases have no /latest)', async () => {
-    expect((await loadUpdater()).DOWNLOAD_PAGE_URL).toBe(
-      'https://github.com/UNIAI-TEAM/uniwork-office/releases',
-    )
+  it('uses the UniWork Office download page as the generic download page', async () => {
+    expect((await loadUpdater()).DOWNLOAD_PAGE_URL).toBe('https://uniworkos.com/office')
   })
 
   it('falls back to the generic download page when the feed base cannot be read', async () => {
@@ -872,5 +922,123 @@ describe('checkForUpdatesNow (r148 manual check)', () => {
     expect(showUpdateWindow).toHaveBeenCalledTimes(1)
     expect(lastShownState().version).toBe('9.9.9')
     expect(showMessageBox).not.toHaveBeenCalled()
+  })
+})
+
+describe('unsigned mac release app (release notice)', () => {
+  const feed = { owner: 'UNIAI-TEAM', repo: 'uniwork-office', channel: 'dev' }
+  const dmg = (version: string, arch: string) =>
+    `UniWork-Office_${version}_unsigned_darwin_${arch}.dmg`
+  const release = (version: string) => ({
+    tag_name: `v${version}`,
+    draft: false,
+    assets: [{ name: dmg(version, 'arm64') }, { name: dmg(version, 'x64') }],
+  })
+
+  function bake(pkg: Record<string, unknown>): void {
+    existsSyncMock.mockReturnValue(false)
+    readFileSyncMock.mockImplementation((file) => {
+      if (file === path.join('/app', 'package.json')) return JSON.stringify(pkg)
+      throw new Error(`unexpected read ${String(file)}`)
+    })
+  }
+
+  function answer(releases: unknown[]): void {
+    netFetch.mockImplementation(() =>
+      Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(releases) }),
+    )
+  }
+
+  function lastDialogOpts(): { type: string; message: string } {
+    return showMessageBox.mock.calls.at(-1)![0] as never
+  }
+
+  beforeEach(() => {
+    netFetch.mockReset()
+    appState.version = '0.11.0-dev.1'
+    bake({ uniworkReleaseFeed: feed })
+  })
+
+  it('offers the newer dmg of its own arch after the initial delay', async () => {
+    answer([release('0.11.0-dev.3'), release('0.11.0-dev.2')])
+    const { initAutoUpdater, getPinnedUpdateChannel } = await loadUpdater()
+    initAutoUpdater(() => null)
+    expect(getPinnedUpdateChannel()).toBe('dev')
+    await vi.advanceTimersByTimeAsync(FIRST_CHECK_DELAY_MS)
+
+    expect(netFetch.mock.calls[0][0]).toBe(
+      'https://api.github.com/repos/UNIAI-TEAM/uniwork-office/releases?per_page=30',
+    )
+    expect(updaterState.listeners.size).toBe(0)
+    expect(showUpdateWindow).toHaveBeenCalledTimes(1)
+    expect(lastShownState().phase).toBe('notify')
+    expect(lastShownState().version).toBe('0.11.0-dev.3')
+    lastShownActions().onOpenDownload()
+    expect(openExternal).toHaveBeenCalledWith(
+      'https://github.com/UNIAI-TEAM/uniwork-office/releases/download/v0.11.0-dev.3/' +
+        dmg('0.11.0-dev.3', process.arch),
+    )
+  })
+
+  it('stays quiet about a version put off with later until a manual check', async () => {
+    answer([release('0.11.0-dev.3')])
+    const { initAutoUpdater, checkForUpdatesNow } = await loadUpdater()
+    initAutoUpdater(() => null)
+    await vi.advanceTimersByTimeAsync(FIRST_CHECK_DELAY_MS)
+    lastShownActions().onLater()
+    expect(closeUpdateWindow).toHaveBeenCalled()
+
+    await vi.advanceTimersByTimeAsync(RECHECK_INTERVAL_MS)
+    expect(netFetch).toHaveBeenCalledTimes(2)
+    expect(showUpdateWindow).toHaveBeenCalledTimes(1)
+
+    await checkForUpdatesNow()
+    expect(showUpdateWindow).toHaveBeenCalledTimes(2)
+    expect(showMessageBox).not.toHaveBeenCalled()
+  })
+
+  it('answers a manual check with up-to-date when nothing newer is out', async () => {
+    answer([release('0.11.0-dev.1'), release('0.10.0-dev.9')])
+    const { initAutoUpdater, checkForUpdatesNow } = await loadUpdater()
+    initAutoUpdater(() => null)
+
+    await checkForUpdatesNow()
+
+    expect(showUpdateWindow).not.toHaveBeenCalled()
+    expect(lastDialogOpts().type).toBe('info')
+    expect(lastDialogOpts().message).toContain('0.11.0-dev.1')
+  })
+
+  it('answers a manual check with the failure dialog when GitHub cannot be read', async () => {
+    netFetch.mockImplementation(() => Promise.resolve({ ok: false, status: 403 }))
+    const { initAutoUpdater, checkForUpdatesNow } = await loadUpdater()
+    initAutoUpdater(() => null)
+
+    await checkForUpdatesNow()
+
+    expect(lastDialogOpts().type).toBe('warning')
+    // a background check that fails stays silent
+    await vi.advanceTimersByTimeAsync(FIRST_CHECK_DELAY_MS)
+    expect(showMessageBox).toHaveBeenCalledTimes(1)
+  })
+
+  it('stays inactive when the build version is not on the baked channel', async () => {
+    appState.version = '0.11.0-beta.1'
+    const { initAutoUpdater, checkForUpdatesNow } = await loadUpdater()
+    initAutoUpdater(() => null)
+    await vi.advanceTimersByTimeAsync(FIRST_CHECK_DELAY_MS)
+    expect(netFetch).not.toHaveBeenCalled()
+
+    await checkForUpdatesNow()
+    expect(lastDialogOpts().message).toBe('此版本的更新需从下载页面获取并安装。')
+  })
+
+  it('is mac only: a Windows build without app-update.yml ignores the release feed', async () => {
+    platformSpy?.restore()
+    setPlatform('win32')
+    const { initAutoUpdater } = await loadUpdater()
+    initAutoUpdater(() => null)
+    await vi.advanceTimersByTimeAsync(FIRST_CHECK_DELAY_MS)
+    expect(netFetch).not.toHaveBeenCalled()
   })
 })

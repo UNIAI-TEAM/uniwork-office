@@ -591,6 +591,8 @@ export interface HomeApi {
   setLanguage(lang: UiLanguage): Promise<void>
   /** current update channel (persisted in userData/app-settings.json; default 'stable') */
   getUpdateChannel(): Promise<UpdateChannel>
+  /** the release channel a dev / beta build is pinned to (setUpdateChannel is ignored), else null */
+  getPinnedUpdateChannel(): Promise<string | null>
   /** switch + persist the update channel; triggers an immediate update check */
   setUpdateChannel(channel: UpdateChannel): Promise<void>
   /** UniWork account status (desktop session sync TBD; Sign-in opens the UniWork web link) */
@@ -1221,6 +1223,7 @@ export const HOME_CHANNELS = {
   getLanguage: 'home:get-language',
   setLanguage: 'home:set-language',
   getUpdateChannel: 'home:get-update-channel',
+  getPinnedUpdateChannel: 'home:get-pinned-update-channel',
   setUpdateChannel: 'home:set-update-channel',
   accountStatus: 'home:account-status',
   accountLogin: 'home:account-login',

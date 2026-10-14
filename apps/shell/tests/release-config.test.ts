@@ -19,7 +19,10 @@ interface BuilderConfig {
   artifactName: string
   copyright: string
   publish?: unknown
-  extraMetadata?: { version?: string }
+  extraMetadata?: {
+    version?: string
+    uniworkReleaseFeed?: { owner: string; repo: string; channel: string }
+  }
   fileAssociations: { ext: string; name: string; description?: string; rank?: string }[]
   nsis: Record<string, unknown>
   mac: Record<string, unknown> & { target: { target: string; arch: string[] }[] }
@@ -42,6 +45,8 @@ function loadConfig(env: Record<string, string | undefined>, bakedCliVersion = '
   runInNewContext(readFileSync(resolve(shellRoot, 'electron-builder.cjs'), 'utf8'), {
     module: configModule,
     __dirname: shellRoot,
+    // a fresh context has no WHATWG globals; the config validates URLs with it
+    URL,
     process: { platform: 'linux', arch: 'x64', env, execPath: '/usr/bin/node' },
     require: (id: string) => {
       if (id === './package.json') return shellPackage
@@ -113,6 +118,13 @@ describe('installer identity', () => {
     expect(config.mac.notarize).toBe(true)
     expect(config.dmg.sign).toBe(true)
     expect(config.publish).toBeUndefined()
+  })
+
+  it('takes any other HTTPS update URL as a generic feed on the latest channel', () => {
+    const config = loadConfig({ UNIWORK_UPDATE_URL: 'https://updates.example/office/' })
+    expect(config.publish).toEqual([
+      { provider: 'generic', url: 'https://updates.example/office', channel: 'latest' },
+    ])
   })
 })
 
@@ -203,13 +215,62 @@ describe('dev / beta release builds', () => {
     expect(() => loadConfig({ UNIWORK_RELEASE_CHANNEL: 'nightly' })).toThrow(/dev, beta/)
   })
 
-  it('refuse an update feed', () => {
-    expect(() =>
-      loadConfig({
-        UNIWORK_RELEASE_CHANNEL: 'dev',
-        GENOFFICE_UPDATE_URL: 'https://updates.example/office',
-      }),
-    ).toThrow(/GENOFFICE_UPDATE_URL/)
+  it('read their update feed from the GitHub releases of the repository UNIWORK_UPDATE_URL names', () => {
+    const config = loadConfig({
+      UNIWORK_RELEASE_CHANNEL: 'dev',
+      UNIWORK_UPDATE_URL: 'https://github.com/UNIAI-TEAM/uniwork-office/',
+    })
+    expect(config.publish).toEqual([
+      { provider: 'github', owner: 'UNIAI-TEAM', repo: 'uniwork-office', channel: 'dev' },
+    ])
+    const beta = loadConfig({
+      UNIWORK_RELEASE_CHANNEL: 'beta',
+      UNIWORK_UPDATE_URL: 'https://github.com/UNIAI-TEAM/uniwork-office',
+    })
+    expect(beta.publish).toEqual([
+      { provider: 'github', owner: 'UNIAI-TEAM', repo: 'uniwork-office', channel: 'beta' },
+    ])
+  })
+
+  it('bake no feed into the unsigned mac app (Squirrel.Mac needs a signed one)', () => {
+    const config = loadConfig({
+      UNIWORK_RELEASE_CHANNEL: 'dev',
+      UNIWORK_UPDATE_URL: 'https://github.com/UNIAI-TEAM/uniwork-office',
+    })
+    expect(config.mac.publish).toBeNull()
+    expect(config.mac.target.map((entry) => entry.target)).toEqual(['dmg'])
+  })
+
+  it('name the release repository and channel for the mac update notice', () => {
+    const config = loadConfig({
+      UNIWORK_RELEASE_CHANNEL: 'beta',
+      UNIWORK_UPDATE_URL: 'https://github.com/UNIAI-TEAM/uniwork-office/',
+    })
+    expect(config.extraMetadata?.uniworkReleaseFeed).toEqual({
+      owner: 'UNIAI-TEAM',
+      repo: 'uniwork-office',
+      channel: 'beta',
+    })
+    // no feed without a github URL or outside a release build
+    for (const env of [
+      { UNIWORK_RELEASE_CHANNEL: 'dev' },
+      { UNIWORK_RELEASE_CHANNEL: 'dev', UNIWORK_UPDATE_URL: 'https://updates.example/office' },
+      { UNIWORK_UPDATE_URL: 'https://github.com/UNIAI-TEAM/uniwork-office' },
+    ]) {
+      expect(loadConfig(env).extraMetadata?.uniworkReleaseFeed).toBeUndefined()
+    }
+  })
+
+  it('refuse an update URL that is not a plain HTTPS base URL', () => {
+    for (const url of [
+      'http://github.com/UNIAI-TEAM/uniwork-office',
+      'https://user:pass@github.com/UNIAI-TEAM/uniwork-office',
+      'https://github.com/UNIAI-TEAM/uniwork-office?x=1',
+    ]) {
+      expect(() => loadConfig({ UNIWORK_RELEASE_CHANNEL: 'dev', UNIWORK_UPDATE_URL: url })).toThrow(
+        /UNIWORK_UPDATE_URL/,
+      )
+    }
   })
 
   it('require the <shell version>-<channel>.<n> version at packaging time', async () => {
