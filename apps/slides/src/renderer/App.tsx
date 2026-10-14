@@ -156,6 +156,7 @@ import type {
 import type { PathCmd } from './edit-points'
 import { createPreviewTracker, type EditPointsCommit } from './edit-points-actions'
 import { FIT_WIDTH, NARROW_FRAME_PX } from './app-constants'
+import { aiDockShouldYield, useWindowWidth } from './narrow-dock'
 import { StageRuler } from './components/StageRuler'
 import { formatRulerValue, type RulerUnit } from './ruler-ticks'
 import * as fileActions from './file-actions'
@@ -679,6 +680,23 @@ export function App() {
   // ── Review tab: comments ────────────────────────────────────────────────
   const [comments, setComments] = useState<SlideComment[]>([])
   const [showComments, setShowComments] = useState(false)
+  // V14b-01: a narrow window with the comments pane open: the AI dock shows its rail so the stage
+  // keeps a usable width. Display only (the stored preference is untouched); the user can still
+  // expand the dock for as long as the pane stays open
+  const windowWidth = useWindowWidth()
+  const dockYields =
+    aiEnabled &&
+    aiDockShouldYield({
+      paneOpen: showComments,
+      windowWidth,
+      thumbsWidth: showThumbs ? thumbsW : 0,
+    })
+  const [dockExpandedByUser, setDockExpandedByUser] = useState(false)
+  useEffect(() => setDockExpandedByUser(false), [dockYields])
+  const dockYieldsRef = useRef({ yields: false, preferred: false })
+  dockYieldsRef.current = { yields: dockYields, preferred: showAi }
+  /** the dock the layout shows: the stored preference, unless it yields to the stage */
+  const aiDockOpen = showAi && !(dockYields && !dockExpandedByUser)
   const [commentsFocusNonce, setCommentsFocusNonce] = useState(0)
   /** Notes/comments must be re-fetched after undo/redo (they're not in RenderSlide) */
   const [annotationsNonce, setAnnotationsNonce] = useState(0)
@@ -772,7 +790,7 @@ export function App() {
       const viewportW =
         el?.clientWidth ||
         stageViewportSize.w ||
-        window.innerWidth - (showThumbs ? thumbsW : 0) - (showAi ? 360 : aiEnabled ? 34 : 0)
+        window.innerWidth - (showThumbs ? thumbsW : 0) - (aiDockOpen ? 360 : aiEnabled ? 34 : 0)
       const viewportH = el?.clientHeight || stageViewportSize.h || window.innerHeight - 150
       // 56 = the stage's 2 x 32 padding minus slack; a phone-width WINDOW pads 12 px a side (the
       // styles.css media query keys off the window, not the stage, so this must too: a narrow stage
@@ -782,7 +800,7 @@ export function App() {
       const availH = viewportH - 72
       return Math.min(availW / s.widthPx, availH / s.heightPx)
     },
-    [showThumbs, showAi, aiEnabled, stageViewportSize.h, stageViewportSize.w, thumbsW],
+    [showThumbs, aiDockOpen, aiEnabled, stageViewportSize.h, stageViewportSize.w, thumbsW],
   )
   /** Fit zoom for display: rawFit clamped to the 0.1–1.5 auto-fit range */
   const fitZoom = useCallback(
@@ -1404,6 +1422,12 @@ export function App() {
   }, [slides.length])
 
   const toggleAi = useCallback(() => {
+    // while the dock yields to the stage the click only expands / re-collapses it for this pane
+    // session; the stored preference stays
+    if (dockYieldsRef.current.yields && dockYieldsRef.current.preferred) {
+      setDockExpandedByUser((v) => !v)
+      return
+    }
     setShowAi((v) => {
       rememberAiPanelOpen('ai-slides-show-ai', !v)
       return !v
@@ -1423,6 +1447,7 @@ export function App() {
         rememberAiPanelOpen('ai-slides-show-ai', true)
         return true
       })
+      if (dockYieldsRef.current.yields) setDockExpandedByUser(true)
       setAiPreset({
         text,
         nonce: Date.now(),
@@ -1565,6 +1590,7 @@ export function App() {
         rememberAiPanelOpen('ai-slides-show-ai', true)
         return true
       })
+      if (dockYieldsRef.current.yields) setDockExpandedByUser(true)
     },
     [askState, askTargets, current],
   )
@@ -3418,7 +3444,7 @@ export function App() {
         onZoom={previewZoom}
         showThumbs={showThumbs}
         onToggleThumbs={() => setShowThumbs((v) => !v)}
-        aiOpen={showAi}
+        aiOpen={aiDockOpen}
         onToggleAi={toggleAi}
         onAiPreset={(text, opts) => pushAiPreset(text, true, undefined, undefined, opts?.slideShot)}
         onPickShape={pickShape}
@@ -3724,7 +3750,7 @@ export function App() {
 
       <div className="app-main">
         {aiEnabled && slide && viewMode !== 'reading' && viewMode !== 'sorter' && (
-          <div className={`ai-dock${showAi && aiSettings ? '' : ' collapsed'}`}>
+          <div className={`ai-dock${aiDockOpen && aiSettings ? '' : ' collapsed'}`}>
             {/* always mounted once settings load: collapse must not drop state or in-flight runs */}
             {aiSettings ? (
               <Suspense fallback={null}>
@@ -3740,7 +3766,7 @@ export function App() {
                   fitWidthPx={FIT_WIDTH}
                   settings={aiSettings}
                   preset={aiPreset}
-                  open={showAi}
+                  open={aiDockOpen}
                   onExpand={toggleAi}
                   onCollapse={toggleAi}
                   onUndo={() => void undo()}
@@ -4117,7 +4143,7 @@ export function App() {
                           <div className="stage-ai-bar">
                             <div className="stage-ai-group">
                               <button
-                                className={`stage-ai-btn${showAi ? ' active' : ''}`}
+                                className={`stage-ai-btn${aiDockOpen ? ' active' : ''}`}
                                 data-tip={t('aiOpenAssistant')}
                                 onClick={toggleAi}
                               >
