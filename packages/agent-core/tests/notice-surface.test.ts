@@ -58,6 +58,22 @@ describe('noticePatch', () => {
       'Sheets',
     )
     expect(again).toBeNull()
+
+    // RF1-13: unknown, undefined, or non-wire 'readonly' reasons are ignored rather than mapped to not_allowlisted or view_only
+    const unknownReasons = noticePatch(
+      {},
+      {
+        kind: 'dropped-tool-calls',
+        calls: [
+          { index: 0, name: 'x', reason: 'readonly' as never },
+          { index: 1, name: 'y', reason: 'unknown_reason' as never },
+          { index: 2, name: 'z', reason: undefined as never },
+        ],
+      },
+      tr,
+      'Sheets',
+    )
+    expect(unknownReasons).toBeNull()
   })
 
   it('uniwork-off is a plain note; step and unknown kinds are ignored', () => {
