@@ -75,7 +75,7 @@ import type { ChartSeriesVisualState } from '@genoffice/xlsx-gateway/domain/char
 import type { ChangePlan } from '@genoffice/xlsx-gateway/domain/workbook.types'
 import type { AttachmentMeta } from '../shared/desktop-api'
 import { AiChatPanel, type AiChatMessage } from './ai/AiChatPanel'
-import { resolveCopilotOpen } from './ai/copilot-open'
+import { copilotShellClass, resolveCopilotOpen } from './ai/copilot-open'
 import { AiSelectionAsk } from './ai/AiSelectionAsk'
 import type { SelectionAskAnchor } from './ai/selection-ask'
 import {
@@ -906,7 +906,7 @@ export function ExcelShell({
 
   return (
     <main
-      className={`app-shell ${!cap('ai') ? 'no-copilot' : isCopilotOpen ? '' : 'copilot-collapsed'}`}
+      className={`app-shell ${copilotShellClass(cap('ai'), aiSidebarEnabled, isCopilotOpen)}`}
       inert={openingWorkbook}
       aria-busy={openingWorkbook}
     >
