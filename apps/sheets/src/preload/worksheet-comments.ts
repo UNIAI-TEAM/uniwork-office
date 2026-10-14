@@ -21,6 +21,9 @@ function isText(input: unknown, max: number): input is string {
   return typeof input === 'string' && input.length <= max
 }
 
+/** same bound as a reply's text (and a workbook note's) */
+const MAX_TEXT = 32_767
+
 function parseReply(input: unknown): CommentThread['replies'][number] {
   if (
     !isRecord(input) ||
@@ -28,7 +31,7 @@ function parseReply(input: unknown): CommentThread['replies'][number] {
     !isText(input.personId, 64) ||
     !isText(input.author, 255) ||
     !isText(input.dT, 40) ||
-    !isText(input.text, 32_767)
+    !isText(input.text, MAX_TEXT)
   ) {
     throw new Error('Invalid threaded comment reply.')
   }
@@ -49,7 +52,7 @@ function parseThread(input: unknown): CommentThread {
     !isText(input.author, 255) ||
     !isText(input.dT, 40) ||
     typeof input.done !== 'boolean' ||
-    typeof input.text !== 'string' ||
+    !isText(input.text, MAX_TEXT) ||
     !Array.isArray(input.replies) ||
     input.replies.length > 500
   ) {
@@ -72,7 +75,7 @@ export function parseWorksheetComment(comment: unknown): WorksheetComment {
     !isNonnegativeInteger(comment.row) ||
     !isNonnegativeInteger(comment.column) ||
     typeof comment.author !== 'string' ||
-    typeof comment.text !== 'string'
+    !isText(comment.text, MAX_TEXT)
   ) {
     throw new Error('Invalid worksheet comment.')
   }

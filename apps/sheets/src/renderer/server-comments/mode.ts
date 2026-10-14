@@ -42,14 +42,17 @@ export async function resolveServerMode(
 ): Promise<ServerMode | null> {
   if (!api || typeof api.context !== 'function') return null
   const p = path ?? ''
+  let mode: ServerMode | null = null
   try {
     const reply = await api.context({ path: p })
-    if (!reply || !reply.ok) return null
-    const ctx = readContext(reply.value)
-    return ctx ? { ...ctx, api, path: p } : null
+    const ctx = reply && reply.ok ? readContext(reply.value) : null
+    if (ctx) mode = { ...ctx, api, path: p }
   } catch {
-    return null
+    // no server mode
   }
+  // the web frame waits for this editor's reveal owner: with no server mode none will come
+  if (!mode) api.noEditor?.()
+  return mode
 }
 
 /**
