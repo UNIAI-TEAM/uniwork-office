@@ -291,6 +291,8 @@ interface ChatEntry {
   /** UniWork AI: restarted conversation / provider boundary / dropped call, shown above the answer */
   notes?: PanelNote[] | undefined
   stopped?: boolean | undefined
+  /** the turn streamed real text before it ended (a stop filler is not text) */
+  streamedText?: boolean | undefined
   /** tokens the provider billed for this reply, summed across its turns (absent when unreported) */
   usage?: AiTokenUsageView
 }
@@ -1556,6 +1558,7 @@ export function AiPanel({
               ...last,
               streaming: false,
               stopped: cancelled,
+              streamedText: Boolean(text?.trim()),
               waitLine: undefined,
               // a restarted conversation or UniWork AI being off ends the turn on purpose: the note is the whole reply
               text:
@@ -2270,7 +2273,7 @@ export function AiPanel({
                   provider: settings.provider,
                   mutated: lastEntry.snapshotId != null,
                   stopped: Boolean(lastEntry.stopped),
-                  hasStreamedText: Boolean(lastEntry.text?.trim()),
+                  hasStreamedText: lastEntry.streamedText ?? Boolean(lastEntry.text?.trim()),
                   clarifyAsked: clarifyAnswers.some((c) => c.afterIdx === chat.length - 1),
                   notes: lastEntry.notes,
                   toolExecutions: lastEntry.tools,
@@ -2464,7 +2467,7 @@ export function AiPanel({
               provider: settings.provider,
               mutated: entry.snapshotId != null,
               stopped: Boolean(entry.stopped),
-              hasStreamedText: Boolean(entry.text?.trim()),
+              hasStreamedText: entry.streamedText ?? Boolean(entry.text?.trim()),
               clarifyAsked: clarifyAnswers.some((c) => c.afterIdx === i),
               notes: entry.notes,
               toolExecutions: entry.tools,
@@ -2473,6 +2476,10 @@ export function AiPanel({
           )
           const chip = chipView?.chip ?? null
           const chipLabel = chipView?.labelText ?? null
+          const stoppedText = chipView?.stoppedText ?? null
+          // a stop before the first token leaves only the stop filler as body: the stopped line replaces it
+          const bodyText =
+            stoppedText && entry.stopped && entry.streamedText === false ? '' : entry.text
           return (
             <div
               key={i}
@@ -2505,13 +2512,18 @@ export function AiPanel({
                       <span className="ai-result-chip" data-chip={chip.chip} data-tone={chip.tone}>
                         {chipLabel}
                       </span>
-                      {entry.text ? <span className="ai-result-chip-sep">: </span> : null}
+                      {bodyText ? <span className="ai-result-chip-sep">: </span> : null}
                     </>
                   )}
-                  {entry.text && <Markdown text={entry.text} />}
+                  {bodyText && <Markdown text={bodyText} />}
                 </div>
               ) : (
                 <span dir="auto">{entry.text}</span>
+              )}
+              {stoppedText && (
+                <div className="ai-run-stopped" dir="auto">
+                  {stoppedText}
+                </div>
               )}
               {chip?.chip === 'edited' && (
                 <div className="ai-result-actions">

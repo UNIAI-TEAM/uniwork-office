@@ -9585,10 +9585,16 @@ body.show-curtain::after {
   color: var(--color-text-tertiary);
 }
 
+/* the one stopped line of a UniWork AI turn the user stopped (aiRunStopped) */
+.ai-run-stopped {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
 .ai-uniwork-view-only {
   font-size: 12px;
   line-height: 1.4;
   color: var(--color-text-secondary);
   padding: 4px 2px 0;
 }
-

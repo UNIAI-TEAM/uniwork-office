@@ -312,6 +312,19 @@ describe('UniWork AI notices (slides panel)', () => {
     expect(live?.textContent).not.toContain('Bố cục trang 1 đã gọn hơn.')
   })
 
+  it('Stop before the first token on UniWork AI: no Answer chip and exactly one stopped line (RF2-1)', async () => {
+    const c = await startRun('uniwork')
+    await act(async () => harness.events!.onDone?.({ text: '', cancelled: true, turnLimit: false }))
+    await flush()
+    expect(c.querySelector('.ai-result-chip')).toBeNull()
+    const stoppedLines = [...c.querySelectorAll('.ai-msg-assistant *')].filter(
+      (el) => el.children.length === 0 && el.textContent === ui('aiRunStopped'),
+    )
+    expect(stoppedLines).toHaveLength(1)
+    expect(c.querySelector('.ai-msg-answer')?.textContent ?? '').not.toContain(t('aiStoppedNote'))
+    expect(c.querySelector('.ai-sr-status')?.textContent).toBe(ui('aiRunStopped'))
+  })
+
   it('clicking Stop returns keyboard focus to the composer textarea (RF1-12, RF1-23b)', async () => {
     const c = await startRun()
     const stopBtn = c.querySelector<HTMLButtonElement>(`button[aria-label="${t('aiStop')}"]`)
