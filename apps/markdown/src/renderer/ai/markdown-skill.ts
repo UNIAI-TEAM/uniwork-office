@@ -2,6 +2,7 @@ import type { AgentSkill, AgentToolDef } from '@genoffice/agent-core'
 import type { Editor } from '@tiptap/core'
 import { cap } from '../capabilities'
 import type { AiDocWriter } from './doc-writer'
+import { redactLabelsOf, placeholderInstruction } from '../editor/redact'
 import {
   AGENT_TOOLS,
   buildDocContext,
@@ -112,12 +113,18 @@ export function createMarkdownSkill(
     id: 'markdown',
     // live: the predicates are re-read before every model request
     get systemPrompt() {
-      if (isReadOnly?.()) return AGENT_SYSTEM_PROMPT + VIEW_ONLY_NOTE
+      const editor = getEditor()
+      const labels = editor ? redactLabelsOf(editor.getJSON() as never) : []
+      // only when the open document actually withholds something, so a
+      // document without spans pays nothing and the model is not told to
+      // look for markers that are not there
+      const redact = labels.length > 0 ? `\n\n${placeholderInstruction(labels)}` : ''
+      if (isReadOnly?.()) return AGENT_SYSTEM_PROMPT + VIEW_ONLY_NOTE + redact
       const prompt =
         imageGenAvailable?.() === false
           ? AGENT_SYSTEM_PROMPT + IMAGE_GEN_OFF_NOTE
           : AGENT_SYSTEM_PROMPT
-      return hostOffers('insert_image') ? prompt : prompt + IMAGE_FETCH_OFF_NOTE
+      return (hostOffers('insert_image') ? prompt : prompt + IMAGE_FETCH_OFF_NOTE) + redact
     },
     get tools() {
       if (isReadOnly?.()) return withAsk(AGENT_TOOLS, true)
