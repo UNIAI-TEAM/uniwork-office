@@ -391,11 +391,15 @@ test.describe.serial('UniWork documents', () => {
       })
       await expect(label(shell)).toHaveText('Saved to UniWork')
       expect(stub.exchangeAttempts(ticket)).toBe(1)
-      // the descriptor's own document: detail and bytes of it, nothing of the decoy
-      expect(callsFor(stub, doc.id).map((c) => c.route)).toEqual([
-        `/documents/${doc.id}`,
-        `/documents/${doc.id}/download`,
-      ])
+      // the descriptor's own document: the open reads its detail and bytes, in
+      // that order, and nothing of the decoy
+      const routes = callsFor(stub, doc.id).map((c) => c.route)
+      expect(routes.slice(0, 2)).toEqual([`/documents/${doc.id}`, `/documents/${doc.id}/download`])
+      // G8-17 (S18 renamed-elsewhere): activating the launched tab re-reads the
+      // document's metadata (main: index.ts refreshPath -> refreshMetadataFor ->
+      // GET /documents/<id>), so extra detail reads may follow the open - and
+      // only those.
+      expect(routes.slice(2).filter((route) => route !== `/documents/${doc.id}`)).toEqual([])
 
       // the same link handed over again is not redeemed again and opens nothing new
       await deliverUrl(launched, shellEnv(stub), url)
