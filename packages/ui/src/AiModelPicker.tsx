@@ -84,6 +84,13 @@ export function AiModelPicker({
     () => (settings ? aiModelPickerGroups(settings, loggedIn) : []),
     [settings, loggedIn],
   )
+  // what the listbox's quiet notes say, read out once through a live region beside the listbox
+  const listNote = [...new Set(groups.map((g) => g.listState))]
+    .map((state) =>
+      state === 'loading' ? strings.modelsLoading : state ? strings.modelsUnavailable : '',
+    )
+    .filter(Boolean)
+    .join('. ')
   const current = settings ? aiModelPickerSelection(settings) : null
   const currentUsable = groups.some((g) => g.id === current?.provider)
   // the wanted provider is read raw (a key list that failed to load masks nothing here)
@@ -200,7 +207,9 @@ export function AiModelPicker({
                   <span>{g.label}</span>
                 </div>
                 {g.listState && (
-                  <div className="ai-model-group-head" role="status">
+                  // plain text for sighted users; screen readers get it from the live region
+                  // outside the listbox, since a listbox may only own options and groups
+                  <div className="ai-model-group-head" role="presentation" aria-hidden>
                     {g.listState === 'loading' ? strings.modelsLoading : strings.modelsUnavailable}
                   </div>
                 )}
@@ -255,8 +264,24 @@ export function AiModelPicker({
           )}
         </div>
       )}
+      <div aria-live="polite" style={VISUALLY_HIDDEN}>
+        {open ? listNote : ''}
+      </div>
     </div>
   )
+}
+
+/** screen-reader-only: the box stays in the layout flow but takes no space and shows nothing */
+const VISUALLY_HIDDEN: React.CSSProperties = {
+  position: 'absolute',
+  width: 1,
+  height: 1,
+  margin: -1,
+  padding: 0,
+  overflow: 'hidden',
+  clip: 'rect(0 0 0 0)',
+  whiteSpace: 'nowrap',
+  border: 0,
 }
 
 function groupLabel(groups: ReadonlyArray<{ id: string; label: string }>, id: string): string {

@@ -169,6 +169,38 @@ describe('list state note', () => {
     expect(rows()).toEqual(['claude-chosen', ...anthropicModels])
   })
 
+  it('announces the note through one polite live region outside the listbox', async () => {
+    const m = await mount(
+      anthropic({ anthropic: { chosen: 'claude-chosen', listState: 'loading' } }),
+    )
+    await m.open()
+    const regions = host.querySelectorAll('[aria-live]')
+    expect(regions).toHaveLength(1)
+    const region = regions[0]!
+    expect(region.getAttribute('aria-live')).toBe('polite')
+    expect(region.textContent).toBe(AI_MODEL_PICKER_STRINGS.en.modelsLoading)
+    expect(region.closest('[role=listbox]')).toBeNull()
+    // a listbox owns options and groups only: no live region or status inside it
+    expect(
+      host.querySelector('[role=listbox] [aria-live], [role=listbox] [role=status]'),
+    ).toBeNull()
+  })
+
+  it('announces the failure the same way, and nothing when the list is fine', async () => {
+    const failed = await mount(
+      anthropic({ anthropic: { chosen: 'claude-chosen', listState: 'error' } }),
+    )
+    await failed.open()
+    expect(host.querySelector('[aria-live]')!.textContent).toBe(
+      AI_MODEL_PICKER_STRINGS.en.modelsUnavailable,
+    )
+    act(() => root.unmount())
+    root = createRoot(host)
+    const fine = await mount(anthropic({ anthropic: { chosen: 'claude-chosen', listed: ['a'] } }))
+    await fine.open()
+    expect(host.querySelector('[aria-live]')?.textContent ?? '').toBe('')
+  })
+
   it('says nothing when the list is fine or not asked', async () => {
     const m = await mount(anthropic({ anthropic: { chosen: 'claude-chosen', listed: ['a'] } }))
     await m.open()
