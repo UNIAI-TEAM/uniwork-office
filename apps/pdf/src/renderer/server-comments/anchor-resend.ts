@@ -12,8 +12,8 @@
  *
  * Pure: the transport is injected, so the tests drive it without React or IPC.
  */
-import { remapAnchorsAfterSave, type AnchorRemapItem } from './pdf-anchor'
-import type { CollabComment } from '@genoffice/ui/collab'
+import type { AnchorSyncOutcome, CollabAnchorUpdate, CollabComment } from '@genoffice/ui/collab'
+import { remapAnchorsAfterSave } from './pdf-anchor'
 
 /** a then b: an old page index -> its index after both saves; a page either save dropped is gone */
 export function composePageMaps(
@@ -31,11 +31,8 @@ export function composePageMaps(
 export interface AnchorResendDeps {
   /** the anchored roots the server holds now (the controller's open + resolved threads) */
   roots(): ReadonlyArray<Pick<CollabComment, 'id' | 'anchor' | 'anchor_state'>>
-  /** the whole map for one version (the sender chunks by 500); rejects only for an error other than `anchor_version_invalid` */
-  send(
-    versionId: string,
-    items: AnchorRemapItem[],
-  ): Promise<{ outcome: 'synced'; updated: string[] } | { outcome: 'retry_next_save' }>
+  /** the whole map for one version: the kit's `sendAnchorMap` (chunks by 500, `anchor_version_invalid` -> `retry_next_save`); rejects for any other error */
+  send(versionId: string, items: CollabAnchorUpdate[]): Promise<AnchorSyncOutcome>
   /** the server changed rows: reload the full list (never reuse the PUT's list_token) */
   onUpdated(): void
   /** a transport failure or an unexpected server error: the shown anchors stay as they are, nothing is retried */
@@ -60,7 +57,7 @@ export function createAnchorResend(deps: AnchorResendDeps): AnchorResend {
   const flush = (): void => {
     if (!live || pendingMap === null || pendingVersion === null) return
     const map = carriedMap ? composePageMaps(carriedMap, pendingMap) : pendingMap
-    const items: AnchorRemapItem[] = remapAnchorsAfterSave(deps.roots(), map)
+    const items = remapAnchorsAfterSave(deps.roots(), map)
     const versionId = pendingVersion
     carriedMap = null
     pendingMap = null

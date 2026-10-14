@@ -13,7 +13,7 @@
  *
  * Pure: no React, no pdf.js, so the save path and the tests share it.
  */
-import type { CollabAnchor } from '@genoffice/ui/collab'
+import type { CollabAnchor, CollabAnchorUpdate } from '@genoffice/ui/collab'
 
 export const PDF_ANCHOR_FORMAT = 'pdf'
 export const PDF_ANCHOR_VERSION = 1
@@ -75,14 +75,8 @@ export function pdfAnchorOrder(anchor: PdfAnchor, viewTop: number): number {
   return anchor.page * 1_000_000 + top
 }
 
-export interface AnchorRemapItem {
-  commentId: string
-  anchor: Record<string, unknown>
-  state: 'exact' | 'lost'
-}
-
 /**
- * The `comments.anchors` items after a Save. `pageMap` maps a page index of the
+ * The `comments.anchors` items after a Save (the kit sender chunks them by 500). `pageMap` maps a page index of the
  * file as it was open (0-based, before the save) to its index in the saved file;
  * a page missing from the map was deleted, so its comments become `lost` and keep
  * their old anchor (contract §2.6: "keep the old anchor when state=lost").
@@ -91,31 +85,22 @@ export interface AnchorRemapItem {
 export function remapAnchorsAfterSave(
   roots: ReadonlyArray<{ id: string; anchor?: CollabAnchor | null; anchor_state?: string | null }>,
   pageMap: ReadonlyMap<number, number>,
-): AnchorRemapItem[] {
-  const out: AnchorRemapItem[] = []
+): CollabAnchorUpdate[] {
+  const out: CollabAnchorUpdate[] = []
   for (const root of roots) {
     if (root.anchor_state === 'lost') continue
     const anchor = parsePdfAnchor(root.anchor)
     if (!anchor) continue
     const next = pageMap.get(anchor.page - 1)
     if (next === undefined) {
-      out.push({ commentId: root.id, anchor: { ...anchor }, state: 'lost' })
+      out.push({ comment_id: root.id, anchor: { ...anchor }, state: 'lost' })
     } else {
       out.push({
-        commentId: root.id,
+        comment_id: root.id,
         anchor: makePdfAnchor(next + 1, anchor.rect),
         state: 'exact',
       })
     }
   }
-  return out
-}
-
-/** contract §2.6: at most 500 items per `PUT anchors` */
-export const ANCHORS_PER_REQUEST = 500
-
-export function chunkAnchors<T>(items: readonly T[], size = ANCHORS_PER_REQUEST): T[][] {
-  const out: T[][] = []
-  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size))
   return out
 }

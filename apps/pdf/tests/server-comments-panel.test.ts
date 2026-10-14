@@ -10,17 +10,17 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { collabStrings, type CollabComment } from '@genoffice/ui/collab'
-import type { CommentsRevealPayload } from '@genoffice/electron-utils/comments-ipc'
+import type {
+  CommentsContextResult,
+  CommentsRevealPayload,
+  UniworkCommentsApi,
+} from '@genoffice/electron-utils/comments-ipc'
 import {
   PdfServerCommentsHost,
   type PdfServerComments,
 } from '../src/renderer/server-comments/PdfServerComments'
 import { createPdfAnchorAdapter } from '../src/renderer/server-comments/pdf-adapter'
 import { makePdfAnchor } from '../src/renderer/server-comments/pdf-anchor'
-import type {
-  PdfCommentsBridge,
-  PdfCommentsContextResult,
-} from '../src/renderer/server-comments/pdf-comments-source'
 
 const PATH = '/work/uniwork/doc-1/report.pdf'
 const RECT: [number, number, number, number] = [72, 540, 300, 560]
@@ -61,7 +61,7 @@ function comment(over: Partial<CollabComment> & { id: string }): CollabComment {
   }
 }
 
-interface FakeBridge extends PdfCommentsBridge {
+interface FakeBridge extends UniworkCommentsApi {
   comments: CollabComment[]
   discussion: CollabComment[]
   reveal(payload: CommentsRevealPayload): void
@@ -70,9 +70,9 @@ interface FakeBridge extends PdfCommentsBridge {
 }
 
 /** what `context({path})` answers: a value, or an error envelope (unbound, no session) */
-type ContextAnswer = PdfCommentsContextResult | { error: { code: string; message: string } }
+type ContextAnswer = CommentsContextResult | { error: { code: string; message: string } }
 
-const boundContext = (over: Partial<PdfCommentsContextResult> = {}): PdfCommentsContextResult => ({
+const boundContext = (over: Partial<CommentsContextResult> = {}): CommentsContextResult => ({
   documentId: 'doc-1',
   versionId: 'ver-1',
   level: 'edit',

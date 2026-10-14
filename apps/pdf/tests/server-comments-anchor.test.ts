@@ -15,11 +15,6 @@ import {
 } from '../src/renderer/server-comments/pdf-anchor'
 import { composePageMaps, createAnchorResend } from '../src/renderer/server-comments/anchor-resend'
 import {
-  PDF_MAX_ANCHORS,
-  sendPdfAnchorMap,
-  type PdfCommentsBridge,
-} from '../src/renderer/server-comments/pdf-comments-source'
-import {
   createPdfAnchorAdapter,
   locatePdfAnchor,
 } from '../src/renderer/server-comments/pdf-adapter'
@@ -74,9 +69,9 @@ describe('remap after Save', () => {
       [2, 1],
     ])
     expect(remapAnchorsAfterSave([root('a', 1), root('b', 2), root('c', 3)], pageMap)).toEqual([
-      { commentId: 'a', anchor: makePdfAnchor(1, [72, 540, 300, 560]), state: 'exact' },
-      { commentId: 'b', anchor: makePdfAnchor(2, [72, 540, 300, 560]), state: 'lost' },
-      { commentId: 'c', anchor: makePdfAnchor(2, [72, 540, 300, 560]), state: 'exact' },
+      { comment_id: 'a', anchor: makePdfAnchor(1, [72, 540, 300, 560]), state: 'exact' },
+      { comment_id: 'b', anchor: makePdfAnchor(2, [72, 540, 300, 560]), state: 'lost' },
+      { comment_id: 'c', anchor: makePdfAnchor(2, [72, 540, 300, 560]), state: 'exact' },
     ])
   })
 
@@ -122,8 +117,8 @@ describe('anchor re-send after the save receipt (contract §2.6)', () => {
     await flush()
     expect(send).toHaveBeenCalledTimes(1)
     expect(send).toHaveBeenCalledWith('ver-2', [
-      { commentId: 'a', anchor: makePdfAnchor(1, [72, 540, 300, 560]), state: 'exact' },
-      { commentId: 'b', anchor: makePdfAnchor(2, [72, 540, 300, 560]), state: 'lost' },
+      { comment_id: 'a', anchor: makePdfAnchor(1, [72, 540, 300, 560]), state: 'exact' },
+      { comment_id: 'b', anchor: makePdfAnchor(2, [72, 540, 300, 560]), state: 'lost' },
     ])
     expect(onUpdated).toHaveBeenCalledTimes(1)
   })
@@ -138,7 +133,7 @@ describe('anchor re-send after the save receipt (contract §2.6)', () => {
     resend.saved(new Map([[0, 0]]))
     await flush()
     expect(send).toHaveBeenCalledWith('ver-3', [
-      { commentId: 'a', anchor: makePdfAnchor(1, [72, 540, 300, 560]), state: 'exact' },
+      { comment_id: 'a', anchor: makePdfAnchor(1, [72, 540, 300, 560]), state: 'exact' },
     ])
     // nothing changed on the server: no reload
     expect(onUpdated).not.toHaveBeenCalled()
@@ -175,8 +170,8 @@ describe('anchor re-send after the save receipt (contract §2.6)', () => {
     resend.saved(new Map([[0, 0]]))
     await flush()
     expect(send).toHaveBeenLastCalledWith('ver-3', [
-      { commentId: 'a', anchor: makePdfAnchor(1, [72, 540, 300, 560]), state: 'lost' },
-      { commentId: 'b', anchor: makePdfAnchor(1, [72, 540, 300, 560]), state: 'exact' },
+      { comment_id: 'a', anchor: makePdfAnchor(1, [72, 540, 300, 560]), state: 'lost' },
+      { comment_id: 'b', anchor: makePdfAnchor(1, [72, 540, 300, 560]), state: 'exact' },
     ])
     expect(onUpdated).toHaveBeenCalledTimes(1)
   })
@@ -201,60 +196,6 @@ describe('anchor re-send after the save receipt (contract §2.6)', () => {
     resend.receipt('ver-y')
     await flush()
     expect(send).toHaveBeenCalledTimes(1)
-  })
-})
-
-describe('sendPdfAnchorMap (the kit sendAnchorMap behaviour)', () => {
-  const items = (n: number) =>
-    Array.from({ length: n }, (_, i) => ({
-      commentId: `c${i}`,
-      anchor: makePdfAnchor(1, [72, 540, 300, 560]) as unknown as Record<string, unknown>,
-      state: 'exact' as const,
-    }))
-  const bridgeWith = (anchors: ReturnType<typeof vi.fn>) =>
-    ({ anchors }) as unknown as PdfCommentsBridge
-
-  it('chunks by 500 in order and merges the answers (list_token = the last one)', async () => {
-    const anchors = vi.fn(async (input: { anchors: Array<{ commentId: string }> }) => ({
-      ok: true as const,
-      value: {
-        updated: input.anchors.map((a) => a.commentId),
-        skipped: [{ comment_id: `s${input.anchors.length}`, reason: 'older_version' as const }],
-        list_token: `t${input.anchors.length}`,
-      },
-    }))
-    const out = await sendPdfAnchorMap(
-      bridgeWith(anchors),
-      '/p.pdf',
-      'v1',
-      items(PDF_MAX_ANCHORS + 1),
-    )
-    expect(anchors.mock.calls.map((c) => c[0].anchors.length)).toEqual([PDF_MAX_ANCHORS, 1])
-    expect(out).toMatchObject({ outcome: 'synced', list_token: 't1' })
-    expect(out.outcome === 'synced' && out.updated).toHaveLength(PDF_MAX_ANCHORS + 1)
-    expect(out.outcome === 'synced' && out.skipped.map((s) => s.comment_id)).toEqual(['s500', 's1'])
-  })
-
-  it('400 anchor_version_invalid (details.code) resolves retry_next_save, never throws', async () => {
-    const anchors = vi.fn(async () => ({
-      ok: false as const,
-      error: { code: 'malformed', message: 'x', details: { code: 'anchor_version_invalid' } },
-    }))
-    await expect(sendPdfAnchorMap(bridgeWith(anchors), '/p.pdf', 'v1', items(3))).resolves.toEqual({
-      outcome: 'retry_next_save',
-    })
-  })
-
-  it('any other failure rejects with the protocol error', async () => {
-    const anchors = vi.fn(async () => ({
-      ok: false as const,
-      error: { code: 'forbidden', message: 'no' },
-    }))
-    await expect(
-      sendPdfAnchorMap(bridgeWith(anchors), '/p.pdf', 'v1', items(1)),
-    ).rejects.toMatchObject({
-      code: 'forbidden',
-    })
   })
 })
 

@@ -26,7 +26,9 @@ import {
   CollabComposer,
   CollabPanel,
   collabStrings,
+  createUniworkCommentsSource,
   loadDraft,
+  sendAnchorMap,
   useCollabThreads,
   type CollabActions,
   type CollabAnchorAdapter,
@@ -35,20 +37,19 @@ import {
   type CollabNewThread,
 } from '@genoffice/ui/collab'
 import { createCommentsPoll } from '@genoffice/electron-utils/comments-poll'
+import type { UniworkCommentsApi } from '@genoffice/electron-utils/comments-ipc'
 import { createAnchorResend, type AnchorResend } from './anchor-resend'
 import {
-  createPdfCommentsSource,
   fallbackPdfCommentsContext,
   followPdfUniworkSaves,
   loadPdfCommentsContext,
-  sendPdfAnchorMap,
-  type PdfCommentsBridge,
   type PdfCommentsContext,
-} from './pdf-comments-source'
+} from './pdf-comments-context'
 import { makePdfAnchor, pointAnchorRect, type PdfAnchor } from './pdf-anchor'
 
 export interface PdfServerCommentsOptions {
-  bridge: PdfCommentsBridge
+  /** `window.uniworkComments` as the preload (or the web frame bridge) exposes it */
+  bridge: UniworkCommentsApi
   /** the working copy the editor shows */
   path: string
   lang: Lang
@@ -102,7 +103,7 @@ export function usePdfServerComments(o: PdfServerCommentsOptions): PdfServerComm
     }
   }, [bridge, path, readOnly])
 
-  const source = useMemo(() => createPdfCommentsSource(bridge, path), [bridge, path])
+  const source = useMemo(() => createUniworkCommentsSource(bridge, path, 'comment'), [bridge, path])
   const platform = useMemo<CollabHostState['platform']>(
     () => (/mac/i.test(navigator.platform) ? 'mac' : 'other'),
     [],
@@ -178,7 +179,7 @@ export function usePdfServerComments(o: PdfServerCommentsOptions): PdfServerComm
         const c = ctlRef.current
         return [...c.threads, ...c.resolved].map((t) => t.root)
       },
-      send: (versionId, items) => sendPdfAnchorMap(bridge, path, versionId, items),
+      send: (versionId, items) => sendAnchorMap(source, versionId, items),
       onUpdated: () => void ctlRef.current.reload(),
     })
     resendRef.current = resend
@@ -192,7 +193,7 @@ export function usePdfServerComments(o: PdfServerCommentsOptions): PdfServerComm
       resend.dispose()
       resendRef.current = null
     }
-  }, [bridge, path])
+  }, [bridge, path, source])
 
   const saved = useCallback((pageMap: ReadonlyMap<number, number>) => {
     resendRef.current?.saved(pageMap)

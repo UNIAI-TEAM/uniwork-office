@@ -144,7 +144,7 @@ import { PdfServerCommentsHost, type PdfServerComments } from './server-comments
 import { commentFrameBox, rerunOnResize, scrollLeftToReveal } from './server-comments/reveal-view'
 import { createPdfAnchorAdapter } from './server-comments/pdf-adapter'
 import { withoutFileNoteWrites } from './server-comments/bound-save'
-import { pdfCommentsBridge } from './server-comments/pdf-comments-source'
+import { pdfCommentsBridge } from './server-comments/pdf-comments-context'
 import { FileNotesList, type FileNoteThread } from './server-comments/FileNotesList'
 import type { PdfRect } from './server-comments/pdf-anchor'
 import { isUniworkRefusal } from '../shared/uniwork-refusal'
