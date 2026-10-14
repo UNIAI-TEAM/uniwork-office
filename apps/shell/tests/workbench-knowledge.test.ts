@@ -422,6 +422,28 @@ describe('in-app confirmations and page toasts (redesign spec 2.3, 5.3)', () => 
     native.mockRestore()
   })
 
+  it('the confirm deletes the pack it names, even when another pack was selected meanwhile', async () => {
+    const props = await openPillar([PACK, PACK2], 'p1')
+    await chooseMenu(byLabel('More actions')!, 'Delete pack…')
+    expect(host.querySelector('.wb-confirm')?.textContent).toContain('Delete pack “Acme deal”?')
+    // select p2 behind the open confirm (a scripted click: no mousedown closes it)
+    const beta = Array.from(host.querySelectorAll<HTMLElement>('.wb-pack-item')).find((b) =>
+      b.textContent?.includes('Beta lease'),
+    )!
+    await act(async () => beta.click())
+    await flush()
+    expect(props.onSelectPack).toHaveBeenLastCalledWith('p2')
+    expect(host.querySelector('.wb-confirm')).not.toBeNull()
+    await act(async () =>
+      host.querySelector<HTMLButtonElement>('.wb-confirm .wb-btn-danger')!.click(),
+    )
+    await flush()
+    expect(project.deleteProject).toHaveBeenCalledTimes(1)
+    expect(project.deleteProject).toHaveBeenCalledWith('p1')
+    // p2 is still the selection: only a delete of the selected pack clears it
+    expect(props.onSelectPack).not.toHaveBeenCalledWith(null)
+  })
+
   it('Delete file… in a Materials row asks in a WbConfirm, then sends the file to the trash', async () => {
     const native = vi.spyOn(window, 'confirm')
     project.listFiles.mockResolvedValue(['/a/Plan.docx'])

@@ -168,12 +168,36 @@ describe('WbConfirm', () => {
   it('is a labelled alertdialog with its line, and focus starts on Cancel', () => {
     const { dialog } = render()
     expect(dialog.getAttribute('role')).toBe('alertdialog')
+    expect(dialog.getAttribute('aria-modal')).toBe('true')
     const title = document.getElementById(dialog.getAttribute('aria-labelledby')!)
     expect(title?.textContent).toBe('Delete pack “Acme”?')
     const body = document.getElementById(dialog.getAttribute('aria-describedby')!)
     expect(body?.textContent).toBe('Files move to the default project.')
     expect(document.activeElement?.textContent).toBe('Cancel')
     expect((document.activeElement as HTMLElement).className).toBe('wb-btn wb-btn-ghost')
+  })
+
+  it('Tab and Shift+Tab cycle its two buttons; focus never wanders out to the page', () => {
+    const outside = document.createElement('button')
+    document.body.append(outside)
+    const { dialog } = render()
+    const [cancel, confirm] = Array.from(dialog.querySelectorAll('button'))
+    const tab = (shiftKey = false) =>
+      act(() => {
+        document.activeElement!.dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'Tab', shiftKey, bubbles: true, cancelable: true }),
+        )
+      })
+    expect(document.activeElement).toBe(cancel)
+    tab()
+    expect(document.activeElement).toBe(confirm)
+    tab()
+    expect(document.activeElement).toBe(cancel)
+    tab(true)
+    expect(document.activeElement).toBe(confirm)
+    tab(true)
+    expect(document.activeElement).toBe(cancel)
+    outside.remove()
   })
 
   it('Escape cancels; the confirm button calls back', () => {

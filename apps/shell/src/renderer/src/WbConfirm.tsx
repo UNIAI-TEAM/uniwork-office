@@ -5,7 +5,8 @@ import type { CSSProperties, ReactElement } from 'react'
  * A light in-app confirmation (redesign spec 2.3): a title, one line, Cancel
  * (ghost) and the confirm button (primary or danger). It opens next to the
  * control that was focused when it appeared (centred when there is none),
- * focuses Cancel, closes on Escape or a click outside, and gives focus back:
+ * focuses Cancel and keeps Tab inside itself (a modal alertdialog: nothing behind it
+ * can change while it waits), closes on Escape or a click outside, and gives focus back:
  * to the opener, or when the answer disabled or removed it, to `returnFocus`
  * (else the nearest `tabindex="-1"` container of the opener).
  */
@@ -89,6 +90,7 @@ export function WbConfirm({
       ref={ref}
       className="wb-confirm"
       role="alertdialog"
+      aria-modal="true"
       aria-labelledby={titleId}
       aria-describedby={body ? bodyId : undefined}
       style={pos}
@@ -97,6 +99,15 @@ export function WbConfirm({
           e.preventDefault()
           e.stopPropagation()
           onCancel()
+        } else if (e.key === 'Tab') {
+          // Tab and Shift+Tab cycle Cancel and the answer, never out to the page
+          const stops = Array.from(
+            ref.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? [],
+          )
+          const at = stops.indexOf(document.activeElement as HTMLButtonElement)
+          const next = stops[(at + (e.shiftKey ? -1 : 1) + stops.length) % stops.length]
+          e.preventDefault()
+          next?.focus()
         }
       }}
     >

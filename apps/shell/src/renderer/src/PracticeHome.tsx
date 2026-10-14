@@ -92,9 +92,9 @@ function toPracticeMeta(entry: ProjectSummaryEntry, practiceId: PracticeId): Pra
 
 type Msg = string | { key: StringKey; params?: Parameters<TFunc>[1] }
 
-/** what a WbConfirm runs on yes; resolved at that render, so it acts on the pack shown then */
+/** what a WbConfirm runs on yes; a pack delete carries the pack it names, whatever is selected by then */
 type ConfirmAction =
-  | { kind: 'delete-pack' }
+  | { kind: 'delete-pack'; id: string }
   | { kind: 'delete-file'; path: string }
   | { kind: 'run-skill'; skill: 'domain' | 'practice'; id: string }
 
@@ -207,6 +207,24 @@ export function PracticeHome({
   const toastText = (m: Msg): WbToastText => (typeof m === 'string' ? { text: m } : m)
   const setNotice = (m: Msg) => toasts.show({ message: toastText(m) })
   const setError = (m: Msg) => toasts.show({ message: toastText(m), tone: 'alert' })
+  /** a create or run that failed: what failed, the reason, and Retry where one is safe */
+  const failed = (
+    key: StringKey,
+    params: Record<string, string>,
+    err: unknown,
+    retry?: () => void,
+  ) =>
+    toasts.show({
+      message: {
+        key,
+        params: { ...params, error: err instanceof Error ? err.message : String(err) },
+      },
+      tone: 'alert',
+      ...(retry ? { actions: [{ label: 'acctRetry' as const, onClick: retry }] } : {}),
+    })
+  // the selection now, for a delete that finishes after the user picked another pack
+  const selectedIdRef = useRef(selectedId)
+  selectedIdRef.current = selectedId
   const [ask, setAsk] = useState<ConfirmAsk | null>(null)
   const packListRef = useRef<HTMLUListElement>(null)
   const paneRef = useRef<HTMLElement>(null)
@@ -506,16 +524,15 @@ export function PracticeHome({
       body: text.body,
       confirm: 'wbKnDeletePack',
       tone: 'danger',
-      action: { kind: 'delete-pack' },
+      action: { kind: 'delete-pack', id: selected.id },
     })
   }
 
-  const removePack = async () => {
-    if (!selected) return
+  const removePack = async (id: string) => {
     setBusy('delete-pack')
     try {
-      await window.aiOfficeProject!.deleteProject(selected.id)
-      onSelectPack(null)
+      await window.aiOfficeProject!.deleteProject(id)
+      if (selectedIdRef.current === id) onSelectPack(null)
       onRefresh()
       setNotice({ key: 'wbKnPackDeleted' })
     } catch (err) {
@@ -784,8 +801,15 @@ export function PracticeHome({
     }
   }
 
+  const openBlank = (b: (typeof BLANKS)[number], projectId: string): Promise<void> =>
+    b
+      .open(projectId)
+      .catch((err: unknown) =>
+        failed('wbMatCreateFailed', {}, err, () => void openBlank(b, projectId)),
+      )
+
   const runAsk = (a: ConfirmAction) => {
-    if (a.kind === 'delete-pack') void removePack()
+    if (a.kind === 'delete-pack') void removePack(a.id)
     else if (a.kind === 'delete-file') void removeMaterialFile(a.path)
     else void (a.skill === 'practice' ? runPracticeSkill(a.id) : runDomainSkill(a.id))
   }
