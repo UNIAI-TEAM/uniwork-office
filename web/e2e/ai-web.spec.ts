@@ -163,7 +163,8 @@ for (const module of ['docs', 'markdown'] as const) {
               status: s.status,
               ...(s.status === 429 ? {} : { code: s.code }),
               ...('retryAfter' in s ? { retryAfter: s.retryAfter } : {}),
-              path: '/byok/',
+              // the chat call only: the background /byok/<p>/models listing would eat a one-shot rule
+              path: '/chat/completions',
             },
           ],
         })

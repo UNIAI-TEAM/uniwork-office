@@ -317,7 +317,7 @@ test.describe('sheets: web AI', () => {
             status: s.status,
             ...(s.status === 429 ? {} : { code: s.code }),
             ...('retryAfter' in s ? { retryAfter: s.retryAfter } : {}),
-            path: '/byok/',
+            path: '/chat/completions',
           },
         ],
       })
@@ -396,7 +396,7 @@ test.describe('sheets: web AI', () => {
         })
         await page.screenshot({ path: screenshotPath('ai', `sheets-panel-${theme}-${lang}`) })
         await fake(request, {
-          fail: [{ status: 402, code: 'credits_exhausted', path: '/byok/' }],
+          fail: [{ status: 402, code: 'credits_exhausted', path: '/chat/completions' }],
         })
         await ask(frame, 'Again')
         await expect(frame.locator('.ai-msg-assistant').last()).toContainText(
