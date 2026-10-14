@@ -24,3 +24,10 @@ export function broadcastUniworkAiFlag(
 ): void {
   for (const wc of targets) if (!wc.isDestroyed()) wc.send(UNIWORK_AI_FLAG_CHANGED, available)
 }
+
+export {
+  broadcastUniworkCloudStatus,
+  registerUniworkCloudStatusIpc,
+  type UniworkCloudStatusIpcDeps,
+} from './uniwork-cloud-status'
+

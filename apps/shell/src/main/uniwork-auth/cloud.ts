@@ -439,6 +439,8 @@ export class UniworkCloudController {
   private retryTimer: ReturnType<typeof setTimeout> | null = null
   private retryAttempt = 0
   private lastAccountRefresh = 0
+  private hasRead = false
+  private lastReason: string | null = null
 
   constructor(deps: CloudControllerDeps) {
     this.deps = deps
@@ -482,6 +484,16 @@ export class UniworkCloudController {
     return this.current
   }
 
+  /** true once at least one status read (or signed-out check) has settled */
+  hasCompletedRead(): boolean {
+    return this.hasRead
+  }
+
+  /** server/error reason for the current status (e.g. 'cloud_unavailable' vs 'network') */
+  unavailableReason(): string | null {
+    return this.lastReason
+  }
+
   private set(next: UniworkCloudStatus, orgId: string | null): void {
     this.current = next
     this.currentOrg = orgId
@@ -500,6 +512,8 @@ export class UniworkCloudController {
       this.generation++
       this.inFlight = null
       this.clearRetry()
+      this.hasRead = true
+      this.lastReason = null
       if (this.current.state !== 'signed-out') this.set(UNIWORK_CLOUD_SIGNED_OUT, null)
       return Promise.resolve(this.current)
     }
@@ -516,12 +530,19 @@ export class UniworkCloudController {
   private async read(account: CloudAccountView, generation: number): Promise<UniworkCloudStatus> {
     let next: UniworkCloudStatus
     let answered = false
+    let reason: string | null = null
     try {
-      next = statusFromServer(await this.deps.client.status(), account)
+      const server = await this.deps.client.status()
+      next = statusFromServer(server, account)
       answered = true
+      reason =
+        next.state === 'unavailable'
+          ? (server.reason ?? 'cloud_unavailable')
+          : (server.reason ?? null)
     } catch (error) {
       if (generation !== this.generation) return this.current
       const code = error instanceof UniworkCloudError ? error.code : 'network'
+      reason = code
       if (code === 'signed_out') {
         next = UNIWORK_CLOUD_SIGNED_OUT
       } else if (code === 'entitlement_required') {
@@ -547,6 +568,8 @@ export class UniworkCloudController {
     // its own; a failure that left a status keeps its pending retry
     if (answered && next.state === 'unavailable') this.scheduleRetry()
     else if (answered || next.state !== 'unavailable') this.clearRetry()
+    this.hasRead = true
+    this.lastReason = reason
     this.set(next, account.orgId)
     return next
   }
@@ -556,13 +579,17 @@ export class UniworkCloudController {
     if (!(error instanceof UniworkCloudError)) return
     const orgId = this.currentOrg
     if (error.code === 'credits_exhausted' && this.current.enabled) {
+      this.lastReason = 'credits_exhausted'
       const credits = this.current.credits ? { ...this.current.credits, remaining: 0 } : null
       this.set({ ...this.current, state: 'credits-exhausted', credits }, orgId)
     } else if (error.code === 'entitlement_required') {
+      this.lastReason = 'entitlement_required'
       this.set({ ...UNIWORK_CLOUD_SIGNED_OUT, state: 'not-entitled' }, orgId)
     } else if (error.code === 'subscription_inactive') {
+      this.lastReason = 'subscription_inactive'
       this.set({ ...UNIWORK_CLOUD_SIGNED_OUT, state: 'subscription-inactive' }, orgId)
     } else if (error.code === 'no_access') {
+      this.lastReason = 'no_access'
       this.set({ ...UNIWORK_CLOUD_SIGNED_OUT, state: 'unavailable' }, orgId)
       this.refreshAccountSoon()
     }
