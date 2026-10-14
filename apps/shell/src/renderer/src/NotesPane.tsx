@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import type { FormEvent, ReactElement } from 'react'
 import type { PracticeId } from '@uniwork/practice-core'
 import { useI18n } from './locale'
@@ -20,6 +20,9 @@ import {
 
 const IS_MAC = navigator.platform.toLowerCase().includes('mac')
 
+/** the composer's unsaved text per practice: it outlives a tab switch, not the app */
+const composerDrafts = new Map<PracticeId, string>()
+
 /** typing in a note writes the whole list over IPC: once per pause, not per keystroke */
 export const NOTE_WRITE_DELAY_MS = 300
 
@@ -40,7 +43,13 @@ export function NotesPane({
   const { t, dateLocale } = useI18n()
   const toasts = useWbToast()
   const [items, setItems] = useState<WbStickyNote[]>(() => readStickyNotes(practiceId))
-  const [draft, setDraft] = useState('')
+  const [draft, setDraftState] = useState(() => composerDrafts.get(practiceId) ?? '')
+  const setDraft = (text: string) => {
+    if (text) composerDrafts.set(practiceId, text)
+    else composerDrafts.delete(practiceId)
+    setDraftState(text)
+  }
+  const ids = useId()
   const wallRef = useRef<HTMLUListElement>(null)
   const composerRef = useRef<HTMLTextAreaElement>(null)
   // a deleted card took the focus with it: land on the wall (or the composer) after the render
@@ -77,7 +86,7 @@ export function NotesPane({
 
   useEffect(() => {
     setItems(readStickyNotes(practiceId))
-    setDraft('')
+    setDraftState(composerDrafts.get(practiceId) ?? '')
   }, [practiceId])
 
   // follow storage (an Undo from an earlier mount, an agent write); the note being typed in keeps its text
@@ -114,6 +123,8 @@ export function NotesPane({
     createStickyNote(practiceId, body)
     setItems(readStickyNotes(practiceId))
     setDraft('')
+    // a clicked Save goes disabled with the empty draft: keep the focus in the composer
+    composerRef.current?.focus()
   }
 
   // shown at once, written after a pause (another note's pending text is written first)
@@ -129,8 +140,8 @@ export function NotesPane({
   const copy = (note: WbStickyNote) =>
     void navigator.clipboard.writeText(note.body).then(
       () => toasts.show({ id: 'notes-copy', message: { key: 'wbNotesCopied' } }),
-      // clipboard denied: no toast rather than claim success
-      () => undefined,
+      // clipboard denied: say so rather than claim success
+      () => toasts.show({ id: 'notes-copy', tone: 'alert', message: { key: 'wbNotesCopyFailed' } }),
     )
 
   // removed at once, with Undo in the toast (spec 5.3); Undo puts it back where it was
@@ -172,6 +183,8 @@ export function NotesPane({
           onChange={(e) => setDraft(e.target.value)}
           // ⌘/Ctrl+Enter saves; Enter alone is a new line
           onKeyDown={(e) => {
+            // mid-composition (Telex, IME) the Enter belongs to the IME: saving now leaves a fragment
+            if (e.nativeEvent.isComposing || e.keyCode === 229) return
             if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) add(e)
           }}
           placeholder={t('wbNotesPlaceholder')}
@@ -207,9 +220,11 @@ export function NotesPane({
         >
           {items.map((note, i) => {
             const when = editedWhen(note.updatedAt, dateLocale)
+            const bodyId = `${ids}-note-${i}`
             return (
               <li key={note.id} className="wb-block wb-note" data-note-id={note.id}>
                 <textarea
+                  id={bodyId}
                   value={note.body}
                   rows={1}
                   // each note its own name in a screen reader's list of fields
@@ -220,10 +235,19 @@ export function NotesPane({
                 <div className="wb-note-foot">
                   <span className="wb-row-sub wb-num">{t(when.key, when.params)}</span>
                   <span className="wb-note-actions">
-                    <WbIconBtn label={t('wbNotesCopy')} onClick={() => copy(note)}>
+                    {/* described by the note's name ("Note 2"): one card's buttons from another's */}
+                    <WbIconBtn
+                      label={t('wbNotesCopy')}
+                      aria-describedby={bodyId}
+                      onClick={() => copy(note)}
+                    >
                       <WbGlyph id="copy" />
                     </WbIconBtn>
-                    <WbIconBtn label={t('wbNotesDelete')} onClick={() => remove(note)}>
+                    <WbIconBtn
+                      label={t('wbNotesDelete')}
+                      aria-describedby={bodyId}
+                      onClick={() => remove(note)}
+                    >
                       <WbGlyph id="trash" />
                     </WbIconBtn>
                   </span>

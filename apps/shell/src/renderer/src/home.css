@@ -7128,9 +7128,10 @@ html[dir='rtl'] .quick-title-row {
   outline: none;
 }
 
-/* the borderless fields show focus on their card: an accent border and the ring */
+/* the borderless fields show focus on their card: an accent border and the ring. A note card
+ * wears it only while its text is edited (spec 4.5), not when Tab reaches Copy or Delete */
 .wb-notes-composer:focus-within,
-.wb-note:focus-within {
+.wb-note:has(textarea:focus) {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--wb-focus-ring);
 }

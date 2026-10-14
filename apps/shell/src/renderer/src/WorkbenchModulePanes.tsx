@@ -351,8 +351,18 @@ function FormsPane({
       {items.length > 0 ? (
         <div className="wb-banner wb-forms-banner">
           <span>{t('wbFormsBannerInto')}</span>
-          <WbPackChip packs={packs} selectedPackId={selectedPackId} onSelectPack={onSelectPack} />
-          {selectedPackId ? null : <span className="wb-row-sub">{t('wbFormsBannerDefault')}</span>}
+          <WbPackChip
+            packs={packs}
+            selectedPackId={selectedPackId}
+            onSelectPack={onSelectPack}
+            // no default project either: a draft is a plain document, so the chip says no pack
+            noneLabel={packId ? undefined : t('wbMatPackNone')}
+          />
+          {selectedPackId ? null : (
+            <span className="wb-row-sub">
+              {t(packId ? 'wbFormsBannerDefault' : 'wbFormsBannerNoPack')}
+            </span>
+          )}
         </div>
       ) : null}
       {card ? (

@@ -69,13 +69,17 @@ export function editedWhen(
   now = new Date(),
 ): { key: StringKey; params?: Record<string, string> } {
   const d = new Date(iso)
+  // a stored note may carry any string: an unreadable time must not throw in render
+  if (Number.isNaN(d.getTime())) return { key: 'wbEditedOn', params: { date: '—' } }
   const midnight = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime()
   // rounded: a DST day is 23 or 25 hours long
   const days = Math.round((midnight(now) - midnight(d)) / 86_400_000)
   if (days === 0) return { key: 'wbEditedAt', params: { time: clock(iso, locale) } }
   if (days === 1) return { key: 'wbEditedYesterday' }
   // the locale's day/month order, always with a slash (vi CLDR writes 13-10; the spec wants 13/10)
-  const date = new Intl.DateTimeFormat(locale, { day: '2-digit', month: '2-digit' })
+  // another year's day and month alone would read as this year's
+  const year = d.getFullYear() !== now.getFullYear() ? { year: 'numeric' as const } : {}
+  const date = new Intl.DateTimeFormat(locale, { day: '2-digit', month: '2-digit', ...year })
     .formatToParts(d)
     .filter((p) => p.type !== 'literal')
     .map((p) => p.value)

@@ -81,7 +81,13 @@ export function DeskDrawer({
       <div className="wb-desk-drawer-head">
         <h3 id={titleId}>{t('wbDeskDrawer')}</h3>
         <span className="wb-desk-head-note">{t('wbDeskDrawerInto')}</span>
-        <WbPackChip packs={packs} selectedPackId={selectedPackId} onSelectPack={onSelectPack} />
+        <WbPackChip
+          packs={packs}
+          selectedPackId={selectedPackId}
+          onSelectPack={onSelectPack}
+          // no default project either: a draft is a plain document, so the chip says no pack
+          noneLabel={packId ? undefined : t('wbMatPackNone')}
+        />
         <button type="button" className="wb-link wb-desk-head-end" onClick={onManage}>
           {t('wbDeskDrawerManage')}
         </button>

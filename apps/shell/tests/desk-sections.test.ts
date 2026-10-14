@@ -496,6 +496,8 @@ describe('DeskDrawer', () => {
     )
     expect(button('Quote')!.disabled).toBe(false)
     expect(host.querySelector('.wb-forms-locked')).toBeNull()
+    // no default project to fall back on: the chip does not promise one
+    expect(host.querySelector('.wb-desk-pack .wb-crumb-name')?.textContent).toBe('No pack selected')
     await act(async () => button('Quote')!.click())
     await act(async () => {
       for (let i = 0; i < 10; i++) await Promise.resolve()

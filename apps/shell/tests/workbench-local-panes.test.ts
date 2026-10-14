@@ -228,6 +228,11 @@ describe('Forms tab (redesign spec 4.4)', () => {
   it('Draft with no pack at all still drafts, as a plain new document', async () => {
     writeForms('sales', [{ id: 'f1', title: 'Leave request' }])
     await mount('forms')
+    // no default project either: the banner says where a draft really goes
+    const banner = host.querySelector('.wb-forms-banner')!
+    expect(banner.querySelector('.wb-crumb-name')?.textContent).toBe('No pack selected')
+    expect(banner.textContent).toContain('With no pack selected, a draft is a document of its own')
+    expect(banner.textContent).not.toContain('Default project')
     await click(button('Draft'))
     expect(api.newDoc).toHaveBeenCalledWith(expect.objectContaining({ projectId: undefined }))
   })
@@ -352,6 +357,62 @@ describe('Notes tab (redesign spec 4.5)', () => {
     await type(composer(), 'Book the room')
     await key({ metaKey: true })
     expect(readStickyNotes('sales')).toHaveLength(2)
+  })
+
+  it('⌘/Ctrl+Enter while an IME is composing does not save: the word is still being typed', async () => {
+    await mount('notes')
+    await type(composer(), 'gọi lại anh Tuấn')
+    await act(async () => {
+      const e = new KeyboardEvent('keydown', {
+        key: 'Enter',
+        ctrlKey: true,
+        bubbles: true,
+        cancelable: true,
+      })
+      Object.defineProperty(e, 'isComposing', { value: true })
+      composer().dispatchEvent(e)
+    })
+    expect(readStickyNotes('sales')).toHaveLength(0)
+    expect(composer().value).toBe('gọi lại anh Tuấn')
+  })
+
+  it('a clicked Save note keeps the focus in the composer, not <body>', async () => {
+    await mount('notes')
+    await type(composer(), 'Call the notary')
+    save().focus()
+    await click(save())
+    expect(readStickyNotes('sales')).toHaveLength(1)
+    expect(document.activeElement).toBe(composer())
+  })
+
+  it('half-written composer text survives a tab switch; saving it clears it', async () => {
+    await mount('notes')
+    await type(composer(), 'Line one\nline two')
+    await mount('forms')
+    await mount('notes')
+    expect(composer().value).toBe('Line one\nline two')
+    await key({ ctrlKey: true })
+    expect(readStickyNotes('sales').map((n) => n.body)).toEqual(['Line one\nline two'])
+    await mount('forms')
+    await mount('notes')
+    expect(composer().value).toBe('')
+  })
+
+  it('a copy the clipboard refuses says so in an alert toast; each card button names its note', async () => {
+    createStickyNote('sales', 'Call the notary')
+    const writeText = vi.fn(async () => {
+      throw new Error('denied')
+    })
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    await mount('notes')
+    const copy = host.querySelector<HTMLButtonElement>('.wb-note button[aria-label="Copy"]')!
+    const body = host.querySelector<HTMLTextAreaElement>('.wb-note textarea')!
+    expect(copy.getAttribute('aria-describedby')).toBe(body.id)
+    expect(body.getAttribute('aria-label')).toBe('Note 1')
+    await click(copy)
+    const toast = host.querySelector('.wb-toast')!
+    expect(toast.getAttribute('role')).toBe('alert')
+    expect(toast.textContent).toContain('Couldn’t copy the note')
   })
 
   it('a note is a card in the wall, edited in place and saved as you type', async () => {
@@ -490,5 +551,14 @@ describe('editedWhen (the shared relative edit time)', () => {
     expect(editedWhen(new Date(2026, 9, 13, 9, 0).toISOString(), 'en-US', now).params).toEqual({
       date: '10/13',
     })
+  })
+
+  it('another year shows its year; an unreadable time is a dash, never a crash', () => {
+    expect(editedWhen(new Date(2025, 9, 13, 9, 0).toISOString(), 'vi', now)).toEqual({
+      key: 'wbEditedOn',
+      params: { date: '13/10/2025' },
+    })
+    expect(editedWhen('', 'vi', now)).toEqual({ key: 'wbEditedOn', params: { date: '—' } })
+    expect(editedWhen('not a date', 'en-US', now).params).toEqual({ date: '—' })
   })
 })
