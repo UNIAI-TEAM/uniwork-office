@@ -2688,7 +2688,7 @@ export function AiPanel({
                 lang={lang}
                 provider={settings.provider}
                 onSignIn={() => void readUniworkCloudStatus()?.signIn?.()}
-                onChooseProvider={() => void window.desktop?.openAiSettings?.()}
+                onChooseProvider={() => void window.slidesApi.openAiModelSettings().catch(() => {})}
                 onAnnounce={setComposerAnnouncement}
               />
             )}
