@@ -2207,7 +2207,7 @@ describe('UniWork AI on the web (G6-05)', () => {
       expect(s.providers.openai.apiKey).toBe('…abcd')
     })
 
-    it('without the uniworkAi grant there is no UniWork AI entry, and a stored choice of it is ignored', async () => {
+    it('without the uniworkAi grant there is no UniWork AI entry, and a stored choice of it stays selected (no silent switch to a BYOK provider)', async () => {
       localStorage.setItem(
         'uniwork.office.web.ai.choice',
         JSON.stringify({ provider: 'uniwork', models: {} }),
@@ -2225,8 +2225,10 @@ describe('UniWork AI on the web (G6-05)', () => {
         now: () => 0,
       })
       const s = await ai.settings()
-      expect(s.provider).toBe('openai')
+      // the picker shows the unavailable state and Send is blocked; a send ends in a notice, no request
+      expect(s.provider).toBe('uniwork')
       expect(s.providers.uniwork?.apiKey ?? '').toBe('')
+      expect(s.providers.openai.apiKey).toBe('…abcd')
     })
 
     it('the scope carries the document and the module of the session as the format token', async () => {
@@ -2286,7 +2288,9 @@ describe('UniWork AI on the web (G6-05)', () => {
       expect(document.querySelector('.ow-ai-state')).toBeNull()
       const s = await ai.settings()
       expect(s.providers.uniwork?.apiKey ?? '').toBe('')
-      expect(s.provider).toBe('openai')
+      // the viewer's pick stays (unavailable state, Send blocked) instead of turning into their BYOK provider
+      expect(s.provider).toBe('uniwork')
+      expect(s.providers.openai.apiKey).toBe('…abcd')
       expect(chunks.at(-1)!.type).toBe('done')
       expect(chunks.some((c) => c.type === 'error')).toBe(false)
     })
