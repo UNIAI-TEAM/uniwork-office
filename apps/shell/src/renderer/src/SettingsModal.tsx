@@ -31,6 +31,7 @@ import type {
   AiMediaProviderId,
   AiMediaProviderMeta,
   AiMediaSettings,
+  AiModelSource,
   AiSearchProviderMeta,
   AiSearchSettings,
   AiSettings,
@@ -354,6 +355,23 @@ function foldModels(providerId: string, models: string[]) {
     )
 }
 
+/**
+ * The ids the Model dropdown offers: the provider's live list (the one the composer chip reads)
+ * with the saved pick on top, else the catalog. A provider whose catalog is already live (Codex,
+ * a custom endpoint) keeps it; no list, an empty one or a failed listing leaves the catalog.
+ */
+function paneModelIds(
+  catalogModels: readonly string[],
+  source: AiModelSource | undefined,
+  liveCatalog: boolean,
+  selected: string,
+): readonly string[] {
+  const live = liveCatalog || source?.listState === 'error' ? [] : (source?.listed ?? [])
+  if (live.length === 0) return catalogModels
+  const pick = selected.trim()
+  return pick ? [pick, ...live.filter((id) => id !== pick)] : live
+}
+
 /** AI model pane: provider / model / key / base URL, saved to userData/ai-settings.json */
 function AiModelPane({ t, cloud }: { t: TFunc; cloud: UniworkCloudStatus | null }) {
   const { lang } = useI18n()
@@ -510,6 +528,12 @@ function AiModelPane({ t, cloud }: { t: TFunc; cloud: UniworkCloudStatus | null 
   // UniWork AI runs on the organization's plan: no key, model or endpoint to set or test
   const isUniwork = provider === 'uniwork'
   const isTokenHub = isGenspark || isOpenRouter
+  const modelIds = paneModelIds(
+    meta?.models ?? [],
+    settings.modelSources?.[provider],
+    isCodex || !!meta?.needsBaseUrl,
+    config.model,
+  )
 
   const touch = () => {
     setDirty(true)
@@ -677,12 +701,12 @@ function AiModelPane({ t, cloud }: { t: TFunc; cloud: UniworkCloudStatus | null 
             <div className="set-field-text">
               <label className="set-field-label">{t('setAiModelId')}</label>
             </div>
-            {meta && meta.models.length > 0 ? (
+            {meta && modelIds.length > 0 ? (
               <Dropdown
                 className="set-dd"
                 value={config.model || meta.defaultModel}
                 ariaLabel={t('setAiModelId')}
-                options={meta.models.map((m) => ({ value: m, label: m }))}
+                options={modelIds.map((m) => ({ value: m, label: m }))}
                 onPick={(m) => updateConfig({ model: m })}
               />
             ) : (
