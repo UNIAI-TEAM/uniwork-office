@@ -94,7 +94,10 @@ export function DeskView({
         (d) => {
           if (live && req === latest) setDrafts(d)
         },
-        () => undefined,
+        // a failed first answer must not hold In progress on the skeleton: the recents still show
+        () => {
+          if (live && req === latest) setDrafts((d) => d ?? [])
+        },
       )
     }
     load()

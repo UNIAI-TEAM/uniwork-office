@@ -125,6 +125,32 @@ describe('DeskView', () => {
     expect(card.textContent).not.toContain('No documents in progress')
   })
 
+  it('a failed listDrafts does not hold In progress on the skeleton: the recents still show', async () => {
+    api.listDrafts = vi.fn(async () => {
+      throw new Error('bridge down')
+    })
+    api.recents = vi.fn(async () => ({
+      entries: [
+        {
+          path: '/w/Plan.docx',
+          name: 'Plan.docx',
+          ext: 'docx',
+          mtimeMs: Date.now(),
+          sizeBytes: 1,
+          starred: false,
+        },
+      ],
+      total: 1,
+      totalAll: 1,
+    }))
+    await mount()
+    const card = Array.from(host.querySelectorAll('section')).find(
+      (s) => s.querySelector('h3')?.textContent === 'In progress',
+    )!
+    expect(card.querySelector('.wb-work-skeleton')).toBeNull()
+    expect(card.textContent).toContain('Plan.docx')
+  })
+
   it('greets by the short name and sums up what waits, from data already loaded', async () => {
     api.listDrafts = vi.fn(async () => [
       { kind: 'unsaved', title: 'A.docx', app: 'docs', tabId: 'a' },
