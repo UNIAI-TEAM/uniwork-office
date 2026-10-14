@@ -102,10 +102,19 @@ export interface AgentPhase {
 
 // ---- LLM transport (how one model turn is streamed; app supplies the impl) ----
 
+/**
+ * What a request is for. Absent = an agent turn of the loop. `summary` (the
+ * loop's context compaction) and `one-shot` (streamText writers) are not the
+ * user's question: a transport whose server keeps the conversation (UniWork
+ * AI) refuses them instead of sending them as one.
+ */
+export type AgentRequestPurpose = 'summary' | 'one-shot'
+
 export interface AgentStreamRequest {
   system: string
   messages: AgentMessage[]
   tools: AgentToolDef[]
+  purpose?: AgentRequestPurpose | undefined
 }
 
 export interface AgentStreamCallbacks {

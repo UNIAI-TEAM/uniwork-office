@@ -753,6 +753,7 @@ export class AgentLoop<TSnapshot = unknown> {
               { role: 'user', text: 'Compress the conversation above as instructed.' },
             ],
             tools: [],
+            purpose: 'summary',
           },
           {
             onDelta: (t) => {

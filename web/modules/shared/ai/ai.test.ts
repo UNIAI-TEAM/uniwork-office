@@ -1882,6 +1882,18 @@ describe('UniWork AI on the web (G6-05)', () => {
       expect(cb.sessionId).toBe('sess-1')
     })
 
+    it.each(['summary', 'one-shot'])(
+      'a %s request (not an agent turn) is refused with unsupported before any request',
+      async (purpose) => {
+        const r = rig(async () => {})
+        await uniworkTurn(r.s, 'u1', { purpose })
+        expect(r.stream).not.toHaveBeenCalled()
+        expect(r.calls).toHaveLength(0)
+        expect(r.chunks).toHaveLength(1)
+        expect(r.chunks[0]).toMatchObject({ type: 'error', uniworkCode: 'unsupported' })
+      },
+    )
+
     it('passes the adapter notices and a turn reset on to the panel, in order', async () => {
       const r = rig(async (_t, _req, cb) => {
         cb.onDelta('partial')

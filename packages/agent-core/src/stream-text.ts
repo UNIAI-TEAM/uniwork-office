@@ -81,7 +81,12 @@ export function streamText(opts: StreamTextOptions): Promise<StreamTextOutcome> 
       return
     }
     handle = opts.transport.stream(
-      { system: opts.system, messages: [{ role: 'user', text: opts.user }], tools: [] },
+      {
+        system: opts.system,
+        messages: [{ role: 'user', text: opts.user }],
+        tools: [],
+        purpose: 'one-shot',
+      },
       {
         onDelta: (delta) => {
           if (settled) return

@@ -1,5 +1,6 @@
 import type {
   AgentMessage,
+  AgentRequestPurpose,
   AgentStreamNotice,
   AgentToolCall,
   AgentToolDef,
@@ -218,6 +219,8 @@ export interface AiStreamRequest {
   messages: AgentMessage[]
   tools?: AgentToolDef[]
   maxTokens?: number
+  /** not an agent turn: the loop's context summary or a one-shot writer (UniWork AI refuses both) */
+  purpose?: AgentRequestPurpose
 }
 
 export interface AiStreamChunk {

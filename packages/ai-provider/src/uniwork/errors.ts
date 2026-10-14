@@ -15,6 +15,7 @@ import type { UniworkWireCode } from './types'
  * - `protocol_error`: the request could not be built (a history the adapter cannot slice)
  * - `question_too_long`: the user's own words are over the façade's question cap; nothing was sent
  * - `question_rejected`: the façade refused the question (400 `invalid_request`); sending it again cannot help
+ * - `unsupported`: not an agent turn (the loop's context summary, a one-shot writer); refused before any request
  */
 export type UniworkClientCode =
   | 'session_expired'
@@ -24,6 +25,7 @@ export type UniworkClientCode =
   | 'protocol_error'
   | 'question_too_long'
   | 'question_rejected'
+  | 'unsupported'
 
 export type UniworkErrorCode = UniworkWireCode | UniworkClientCode
 

@@ -5,6 +5,7 @@ import type {
   AgentTransport,
   AgentMessage,
   AgentStreamNotice,
+  AgentRequestPurpose,
 } from './types'
 import { createAiRunTracker, type AiRunTracker } from './ai-run-tracker'
 
@@ -43,6 +44,8 @@ export interface IpcStreamStart<S> {
   system: string
   messages: AgentMessage[]
   tools: AgentToolDef[]
+  /** not an agent turn (the loop's summary, a one-shot writer); absent for agent turns */
+  purpose?: AgentRequestPurpose
 }
 
 /**
@@ -195,6 +198,7 @@ export function createIpcTransport<S>(options: IpcTransportOptions<S>): AgentTra
             system: request.system,
             messages: request.messages,
             tools: request.tools,
+            ...(request.purpose ? { purpose: request.purpose } : {}),
           }),
         ).catch((err: unknown) => {
           fail(err instanceof Error ? err.message : options.unknownErrorText())

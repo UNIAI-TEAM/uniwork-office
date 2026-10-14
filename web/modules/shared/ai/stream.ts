@@ -201,6 +201,18 @@ export function createWebAiStreams(deps: StreamDeps): WebAiStreams {
     const { requestId, messages } = request
     const uniwork = deps.uniwork
     const chat = deps.client.uniworkChat
+    if (request.purpose) {
+      // the loop's context summary and the one-shot writers are not the user's question: the
+      // server keeps the conversation, so they never go out (the loop folds old turns mechanically)
+      const failure: UniworkFailure = { code: 'unsupported' }
+      emit({
+        requestId,
+        type: 'error',
+        error: uniwork?.describeFailure(failure) ?? 'UniWork AI does not take this request.',
+        uniworkCode: failure.code,
+      })
+      return
+    }
     const scope = uniwork?.scope() ?? null
     if (!uniwork || !chat || !scope) {
       // not available in this frame (grant off, format off): hidden, never an error chip. The turn

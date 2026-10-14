@@ -360,6 +360,12 @@ export function createUniworkAiStreams(deps: UniworkAiStreamDeps): UniworkAiStre
         uniworkCode: failure.code,
         ...pick(failure),
       })
+    // the loop's context summary and the one-shot writers are not the user's question: the server
+    // keeps the conversation, so they never go out (the loop then folds old turns mechanically)
+    if (request.purpose) {
+      fail({ code: 'unsupported' })
+      return
+    }
 
     const resolved = deps.scope(call.senderId)
     if (!resolved.ok) {
