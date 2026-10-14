@@ -795,23 +795,33 @@ export function AiPanel({
             )
           }
           const hasTools = (entry.tools?.length ?? 0) > 0
-          if (!entry.text && !hasTools && !entry.notes?.length && !entry.waitLine) return null
+          // a streaming bubble stays mounted while empty: its live region must exist before a
+          // notice arrives, or a screen reader may not announce the note
+          if (
+            !entry.text &&
+            !hasTools &&
+            !entry.notes?.length &&
+            !entry.waitLine &&
+            !entry.streaming
+          )
+            return null
           return (
             <div
               key={i}
               className={`ai-msg ai-msg-assistant${entry.isError && !aiNoticeKind(entry.text) ? ' ai-msg-error' : ''}`}
             >
-              {entry.notes?.map((note, k) => (
-                <div key={`un${k}`} className="ai-msg-notice" role="status">
-                  {note.text}
+              {/* one persistent, empty-until-needed live region: a node that mounts with its text is often not announced */}
+              {
+                <div className="ai-msg-live" aria-live="polite">
+                  {entry.notes?.map((note, k) => (
+                    <div key={`un${k}`} className="ai-msg-notice">
+                      {note.text}
+                    </div>
+                  ))}
+                  {entry.waitLine && <div className="ai-msg-notice">{entry.waitLine}</div>}
                 </div>
-              ))}
+              }
               {hasTools && <ToolChipList tools={entry.tools!} />}
-              {entry.waitLine && (
-                <div className="ai-msg-notice" role="status">
-                  {entry.waitLine}
-                </div>
-              )}
               {entry.text && (
                 <div dir="auto">
                   <Markdown text={aiNoticeBody(entry.text)} nav={pdfNav} />

@@ -193,6 +193,22 @@ describe('UniWork AI notices (slides panel)', () => {
     expect(regenerate(c)).toBeNull()
   })
 
+  it('one persistent aria-live region is mounted before the notice, and the note lands inside it', async () => {
+    const c = await startRun()
+    const live = c.querySelector('.ai-msg-assistant [aria-live="polite"]')
+    expect(live, 'live region before any notice').not.toBeNull()
+    expect(live!.textContent).toBe('')
+    await notify({ kind: 'rate-limit-wait', seconds: 30, attempt: 1 })
+    // the same node (not a new one mounted with its text) now holds the note, and nothing else announces
+    expect(c.querySelector('.ai-msg-assistant [aria-live="polite"]')).toBe(live)
+    expect(live!.textContent).toBe(ui('aiErrRateLimited', { seconds: 30 }))
+    expect(c.querySelectorAll('.ai-msg-notice [role="status"]')).toHaveLength(0)
+    expect(live!.querySelectorAll('.ai-msg-notice')).toHaveLength(1)
+    // a restart note joins the wait line in the same region
+    await notify({ kind: 'conversation-restarted' })
+    expect(live!.textContent).toContain(ui('aiConversationRestarted'))
+  })
+
   it('a restarted conversation keeps its note and no empty-reply line', async () => {
     const c = await startRun()
     await notify({ kind: 'conversation-restarted' })

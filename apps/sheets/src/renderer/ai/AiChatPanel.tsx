@@ -217,6 +217,8 @@ export interface AiChatMessage {
   readonly scope?: AiScopeQuoteData | undefined
   /** answered ask_clarification cards of this message's run (view-only receipts) */
   readonly clarifyReceipts?: readonly (readonly ClarifyQa[])[] | undefined
+  /** UniWork AI: the notice or wait line to announce to a screen reader now (the visible text is in `text`) */
+  readonly status?: string | undefined
 }
 
 const MODEL_BRIDGE: AiModelPickerBridge = {
@@ -586,6 +588,10 @@ export function AiChatPanel({
         </div>
       </header>
 
+      {/* one persistent live node: a notice folded into a message mounts with its text and is often not announced */}
+      <div className="ai-sr-status" role="status" aria-live="polite">
+        {chat.at(-1)?.role === 'assistant' ? (chat.at(-1)?.status ?? '') : ''}
+      </div>
       <div className="ai-chat" ref={chatRef} onScroll={onChatScroll}>
         {/* Past conversation (read-only transcript), shown continuously with the current turn */}
         {historicChat.length > 0 && (

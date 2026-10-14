@@ -3706,6 +3706,12 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
   color: var(--pdf-error);
 }
 
+/* the empty live region of a bubble that has nothing to show yet takes no room: the chat's 16px flex
+   gap on both sides of a zero-height block would otherwise open a 32px hole above the typing dots */
+.ai-msg-assistant:has(> .ai-msg-live:empty:only-child) {
+  margin-top: -16px;
+}
+
 /* a UniWork AI status line or note (a Retry-After wait, a restart, a provider boundary, a dropped
    call, "off"): set apart from the reply, never a failure; the colour is inherited (light + dark) */
 .ai-msg-notice {

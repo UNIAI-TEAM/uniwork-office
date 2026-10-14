@@ -2296,11 +2296,17 @@ export function AiPanel({
               {entry.role === 'user' && entry.attachments && entry.attachments.length > 0 && (
                 <SentAttachments atts={entry.attachments} previews={attachmentPreviews} />
               )}
-              {entry.notes?.map((note, k) => (
-                <div key={`un${k}`} className="ai-msg-notice" role="status">
-                  {note.text}
+              {/* one persistent, empty-until-needed live region: a node that mounts with its text is often not announced */}
+              {entry.role === 'assistant' && (
+                <div className="ai-msg-live" aria-live="polite">
+                  {entry.notes?.map((note, k) => (
+                    <div key={`un${k}`} className="ai-msg-notice">
+                      {note.text}
+                    </div>
+                  ))}
+                  {entry.waitLine && <div className="ai-msg-notice">{entry.waitLine}</div>}
                 </div>
-              ))}
+              )}
               {entry.role === 'assistant' && !entry.text && entry.streaming ? (
                 <span className="ai-typing-row">
                   <AiTypingIndicator
@@ -2313,11 +2319,6 @@ export function AiPanel({
                 </div>
               ) : (
                 <span dir="auto">{entry.text}</span>
-              )}
-              {entry.waitLine && (
-                <div className="ai-msg-notice" role="status">
-                  {entry.waitLine}
-                </div>
               )}
               {entry.tools && entry.tools.length > 0 && <ToolChipList tools={entry.tools} />}
               {entry.error &&

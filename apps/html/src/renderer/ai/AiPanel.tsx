@@ -1353,11 +1353,17 @@ export function AiPanel({
               key={i}
               className={`ai-msg ai-msg-assistant${entry.isError && !aiNoticeKind(entry.text) ? ' ai-msg-error' : ''}${entry.streaming ? ' ai-msg-streaming' : ''}`}
             >
-              {entry.notes?.map((note, k) => (
-                <div key={`un${k}`} className="ai-msg-notice" role="status">
-                  {note.text}
+              {/* one persistent, empty-until-needed live region: a node that mounts with its text is often not announced */}
+              {
+                <div className="ai-msg-live" aria-live="polite">
+                  {entry.notes?.map((note, k) => (
+                    <div key={`un${k}`} className="ai-msg-notice">
+                      {note.text}
+                    </div>
+                  ))}
+                  {entry.waitLine && <div className="ai-msg-notice">{entry.waitLine}</div>}
                 </div>
-              ))}
+              }
               {!entry.text && entry.streaming ? (
                 <span className="ai-typing-row">
                   <AiTypingIndicator label={hasTools ? t('aiWorking') : t('aiThinking')} />
@@ -1368,11 +1374,6 @@ export function AiPanel({
                     <Markdown text={aiNoticeBody(entry.text)} nav={docNav} />
                   </div>
                 )
-              )}
-              {entry.waitLine && (
-                <div className="ai-msg-notice" role="status">
-                  {entry.waitLine}
-                </div>
               )}
               {hasTools && <ToolChipList tools={entry.tools!} />}
               {showToolbar && (

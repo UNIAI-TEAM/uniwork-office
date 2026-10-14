@@ -176,6 +176,22 @@ describe('UniWork AI notices (docs panel)', () => {
     await pastGrace()
   })
 
+  it('one persistent aria-live region is mounted before the notice, and the note lands inside it', async () => {
+    const live = container!.querySelector('.ai-msg-assistant [aria-live="polite"]')
+    expect(live, 'live region before any notice').not.toBeNull()
+    expect(live!.textContent).toBe('')
+    await emit({ type: 'notice', notice: { kind: 'rate-limit-wait', seconds: 30, attempt: 1 } })
+    // the same node (not a new one mounted with its text) now holds the note, and nothing else announces
+    expect(container!.querySelector('.ai-msg-assistant [aria-live="polite"]')).toBe(live)
+    expect(live!.textContent).toBe(ui('aiErrRateLimited', { seconds: 30 }))
+    expect(container!.querySelectorAll('.ai-msg-notice [role="status"]')).toHaveLength(0)
+    expect(live!.querySelectorAll('.ai-msg-notice')).toHaveLength(1)
+    // a restart note joins the wait line in the same region
+    await emit({ type: 'notice', notice: { kind: 'conversation-restarted' } })
+    expect(live!.textContent).toContain(ui('aiConversationRestarted'))
+    await emit({ type: 'done' })
+  })
+
   it('a restarted conversation shows its note and not an empty-reply line', async () => {
     await emit({ type: 'notice', notice: { kind: 'conversation-restarted' } })
     await emit({ type: 'done' })

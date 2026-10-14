@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 // UniWork AI notices in the Sheets panel (G6-05 review G05FE-5/8): Sheets folds the notices into the
 // one text of the assistant message, so the run's notice state lives in ai/run-notices.ts and App.tsx
 // only forwards the loop's events to it. These tests drive the same events the loop sends (wait,
@@ -7,9 +8,13 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { COMPLETED_VIA_TOOLS_TEXT } from '@genoffice/agent-core'
 import { aiUniworkText } from '@genoffice/ui'
-import { describe, expect, it } from 'vitest'
+import { act, createElement } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
+import { AiChatPanel, type AiChatMessage } from '../src/renderer/ai/AiChatPanel'
 import { createRunNotices, type RunCopy } from '../src/renderer/ai/run-notices'
+import { LocaleProvider } from '../src/renderer/i18n/locale'
 
 const tr = (key: Parameters<typeof aiUniworkText>[1], params?: Record<string, string | number>) =>
   aiUniworkText('vi', key, params)
@@ -147,5 +152,102 @@ describe('UniWork AI notices (sheets panel text)', () => {
     expect(source).toContain('setPrompt((current) => current || runQuestionRef.current)')
     // the old split state (a text ref that a reset forgot) is gone
     expect(source).not.toContain('runLastTextRef')
+  })
+})
+
+describe('UniWork AI notices are announced through a separate status node (G05FE-7)', () => {
+  it('announcement() is the latest notice or wait line, and a reset or a new run empties it', () => {
+    const run = createRunNotices()
+    expect(run.announcement()).toBe('')
+    run.notice({ kind: 'rate-limit-wait', seconds: 30, attempt: 1 }, tr, 'Sheets')
+    expect(run.announcement()).toBe(tr('aiErrRateLimited', { seconds: 30 }))
+    run.reset()
+    expect(run.announcement()).toBe('')
+    run.notice({ kind: 'conversation-restarted' }, tr, 'Sheets')
+    expect(run.announcement()).toBe(tr('aiConversationRestarted'))
+    run.clear()
+    expect(run.announcement()).toBe('')
+  })
+
+  describe('AiChatPanel', () => {
+    let root: Root | null = null
+    let container: HTMLElement | null = null
+    beforeAll(() => {
+      ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+      Element.prototype.scrollTo ??= () => {}
+    })
+    afterEach(() => {
+      if (root) act(() => root!.unmount())
+      container?.remove()
+      root = null
+      container = null
+      vi.unstubAllGlobals()
+    })
+    const props = (chat: readonly AiChatMessage[]) => ({
+      isOpen: true,
+      hasContent: true,
+      chat,
+      attachments: [],
+      attachNotice: null,
+      onPickAttachments: () => {},
+      onAddAttachmentPaths: () => {},
+      onAddPastedImage: () => {},
+      onRemoveAttachment: () => {},
+      prompt: '',
+      preview: null,
+      aiBusy: true,
+      onPromptChange: () => {},
+      onSend: () => {},
+      onStop: () => {},
+      onNewChat: () => {},
+      onUndo: () => {},
+      scopeRange: null,
+      scopeColumns: null,
+      scopeLocked: false,
+      onScopeDismiss: () => {},
+      onCitation: () => {},
+      onExpand: () => {},
+      onCollapse: () => {},
+    })
+    const render = (chat: readonly AiChatMessage[]) =>
+      act(() =>
+        root!.render(
+          createElement(
+            LocaleProvider,
+            { initial: 'en', children: null },
+            createElement(AiChatPanel, props(chat)),
+          ),
+        ),
+      )
+
+    it('the live status node exists, empty, before the notice, and the notice text lands in the same node', () => {
+      vi.stubGlobal(
+        'desktopApi',
+        new Proxy(
+          {},
+          {
+            get: (_t, prop: string) =>
+              /^on[A-Z]/.test(prop) ? () => () => {} : () => Promise.resolve(undefined),
+          },
+        ),
+      )
+      container = document.createElement('div')
+      document.body.appendChild(container)
+      root = createRoot(container)
+      const user: AiChatMessage = { role: 'user', text: 'sum it', tools: [] }
+      const streaming: AiChatMessage = { role: 'assistant', text: '', tools: [], streaming: true }
+      render([user, streaming])
+      const live = container.querySelector('.ai-sr-status')
+      expect(live, 'status node before any notice').not.toBeNull()
+      expect(live!.getAttribute('aria-live')).toBe('polite')
+      expect(live!.textContent).toBe('')
+      render([user, { ...streaming, text: 'wait text', status: 'Try again in 30 s.' }])
+      expect(container.querySelector('.ai-sr-status')).toBe(live)
+      expect(live!.textContent).toBe('Try again in 30 s.')
+      // the visible note stays in the message text, not in a second live region
+      expect(container.querySelectorAll('[aria-live]')).toHaveLength(1)
+      render([user, { ...streaming, text: 'the answer', streaming: false }])
+      expect(live!.textContent).toBe('')
+    })
   })
 })

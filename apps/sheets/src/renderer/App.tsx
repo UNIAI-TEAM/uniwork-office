@@ -1501,6 +1501,7 @@ export function App({
           patchLastAssistant((entry) => ({
             ...entry,
             text: runNoticesRef.current.text(text),
+            status: runNoticesRef.current.announcement(),
             isError: false,
           }))
         },
@@ -1515,11 +1516,20 @@ export function App({
             'Sheets',
           )
           if (shown !== null)
-            patchLastAssistant((entry) => ({ ...entry, text: shown, isError: false }))
+            patchLastAssistant((entry) => ({
+              ...entry,
+              text: shown,
+              isError: false,
+              status: runNoticesRef.current.announcement(),
+            }))
         },
         onTurnReset: () => {
           const shown = runNoticesRef.current.reset()
-          patchLastAssistant((entry) => ({ ...entry, text: shown }))
+          patchLastAssistant((entry) => ({
+            ...entry,
+            text: shown,
+            status: runNoticesRef.current.announcement(),
+          }))
         },
         onToolStart: (call) => {
           // Live "running" chip: replaced in place by onToolExecuted
@@ -1602,6 +1612,7 @@ export function App({
             ...entry,
             // notes above the answer; what is persisted below stays the bare answer
             text: display,
+            status: '',
             streaming: false,
             isError: false,
             // A stop mid-tool can leave a running placeholder behind — drop it

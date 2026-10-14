@@ -24,6 +24,8 @@ export function markRunFailed(
   if (last?.role === 'assistant') {
     next[next.length - 1] = {
       ...last,
+      // a stale wait announcement must not outlive the failed run
+      status: '',
       text: error,
       isError: true,
       streaming: false,

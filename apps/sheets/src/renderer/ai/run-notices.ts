@@ -1,6 +1,7 @@
 import {
   COMPLETED_VIA_TOOLS_TEXT,
   createTextNoticeSurface,
+  noticePatch,
   type AgentStreamNotice,
   type NoticeTranslate,
 } from '@genoffice/agent-core'
@@ -42,6 +43,12 @@ export interface RunNotices {
   notice(notice: AgentStreamNotice, tr: NoticeTranslate, moduleName: string): string | null
   /** the transport restarts the turn: what it streamed so far is dropped, including the fallback text */
   reset(): string
+  /**
+   * what a screen reader should hear now: the latest notice or wait line, '' when none. The panel keeps
+   * one persistent live node for it, because a notice folded into the message text mounts with its
+   * content already in it and is often not announced.
+   */
+  announcement(): string
   /** the notes are the whole answer (restarted, or UniWork AI off) */
   quiet(): boolean
   /** the run ended: `display` is the message text (notes above the answer), `persisted` the bare answer */
@@ -55,15 +62,34 @@ export function createRunNotices(): RunNotices {
   // last non-empty streamed text of the run: a final empty turn falls back to it instead of wiping
   // the model's own summary from the tool-call turn
   let lastText = ''
+  let announced = ''
+  let announcedIsWait = false
   return {
     text(raw) {
       if (raw) lastText = raw
+      // the wait is over once text streams in; a note stays announced until the run ends
+      if (raw && announcedIsWait) announced = ''
       return surface.text(raw)
     },
-    notice: (notice, tr, moduleName) => surface.notice(notice, tr, moduleName),
+    notice(notice, tr, moduleName) {
+      const shown = surface.notice(notice, tr, moduleName)
+      if (shown !== null) {
+        const patch = noticePatch({}, notice, tr, moduleName)
+        if (patch?.waitLine) {
+          announced = patch.waitLine
+          announcedIsWait = true
+        } else if (patch?.notes?.length) {
+          announced = patch.notes.map((n) => n.text).join(' ')
+          announcedIsWait = false
+        }
+      }
+      return shown
+    },
+    announcement: () => announced,
     reset() {
       // the dropped partial answer must not come back as the fallback of a tools-only resend
       lastText = ''
+      if (announcedIsWait) announced = ''
       return surface.reset()
     },
     quiet: () => surface.quiet(),
@@ -86,10 +112,13 @@ export function createRunNotices(): RunNotices {
         ? [prose, copy.turnLimit].filter(Boolean).join('\n\n')
         : prose || (surface.quiet() ? '' : fallback)
       const persisted = truncated ? [base, copy.truncated].filter(Boolean).join('\n\n') : base
+      announced = ''
       return { display: surface.compose(persisted), persisted }
     },
     clear() {
       lastText = ''
+      announced = ''
+      announcedIsWait = false
       surface.clear()
     },
   }
