@@ -1,0 +1,73 @@
+import { useId, useState } from 'react'
+import type { ReactElement } from 'react'
+import type { PracticeId } from '@uniwork/practice-core'
+import { FileBadge } from './FileBadge'
+import { draftFromForm } from './form-draft'
+import { useI18n } from './locale'
+import { readForms } from './workbench-pins'
+import { WorkbenchIcon } from './WorkbenchIcons'
+
+const DRAWER_FORMS = 8
+
+/** "Ngăn kéo" (office desk spec §3.3): the saved forms, one click to draft. */
+export function DeskDrawer({
+  practiceId,
+  packId,
+  orgId,
+  vi,
+  onManage,
+}: {
+  practiceId: PracticeId
+  /** where a draft goes (selected pack, else the default one); null = none yet */
+  packId: string | null
+  orgId: string | null
+  vi: boolean
+  onManage: () => void
+}): ReactElement {
+  const { t } = useI18n()
+  const titleId = useId()
+  // the Desk remounts each time its tab is shown, so a read on mount sees Forms' edits
+  const [forms] = useState(() => readForms(practiceId).slice(0, DRAWER_FORMS))
+
+  return (
+    <section className="wb-desk-section" aria-labelledby={titleId}>
+      <div className="wb-desk-head">
+        <h3 id={titleId}>{t('wbDeskDrawer')}</h3>
+        <button type="button" className="wb-link" onClick={onManage}>
+          {t('wbDeskDrawerManage')} →
+        </button>
+      </div>
+      {forms.length === 0 ? (
+        <p className="wb-ov-note">
+          {t('wbDeskDrawerEmpty')} ·{' '}
+          <button type="button" className="wb-link" onClick={onManage}>
+            {t('wbDeskDrawerAdd')}
+          </button>
+        </p>
+      ) : (
+        <ul className="wb-desk-chips">
+          {forms.map((f) => (
+            <li key={f.id}>
+              <button
+                type="button"
+                className="wb-btn wb-btn-secondary wb-btn-sm wb-desk-chip"
+                disabled={!packId}
+                title={packId ? (f.note ?? f.title) : t('wbFormsDraftNeedsPack')}
+                onClick={() => {
+                  if (packId) void draftFromForm(f, packId, orgId, vi)
+                }}
+              >
+                {f.fileExt ? (
+                  <FileBadge ext={f.fileExt.replace(/^\./, '')} size={16} />
+                ) : (
+                  <WorkbenchIcon id="forms" size={16} />
+                )}
+                {f.title}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+}
