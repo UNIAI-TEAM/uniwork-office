@@ -14,6 +14,7 @@ import {
   errorBodyFields,
   rawFailureAsTyped,
   retryAfterSeconds,
+  uniworkFailureKey,
 } from './errors'
 import { aiNoticeBody, aiNoticeKind } from '../../../../packages/ai-provider/src/ai-notice'
 import {
@@ -2288,6 +2289,46 @@ describe('UniWork AI on the web (G6-05)', () => {
       expect(s.provider).toBe('openai')
       expect(chunks.at(-1)!.type).toBe('done')
       expect(chunks.some((c) => c.type === 'error')).toBe(false)
+    })
+
+    it('maps payload_too_large to aiErrWorkbookTooLarge in uniworkFailureKey (G6-05u)', () => {
+      expect(uniworkFailureKey({ code: 'payload_too_large' })).toBe('aiErrWorkbookTooLarge')
+      expect(uniworkFailureKey({ code: 'office_capability_off' })).toBe('aiUniworkOff')
+      expect(uniworkFailureKey({ code: 'office_capability_off', runId: 'run-1' })).toBe(
+        'aiErrAccessRevoked',
+      )
+    })
+
+    it('exposes uniworkIdentity from session and GET cloud org_id / org_name', async () => {
+      const { fetch } = recorder(() =>
+        jsonResponse(200, {
+          ...CLOUD,
+          org_id: 'org-cloud-1',
+          org_name: 'UniWork Org',
+        }),
+      )
+      const ai = createWebAi({
+        port: {
+          whenInitialized: async () => ({
+            documentId: 'doc-42',
+            workspaceId: 'ws-1',
+            apiBase: 'https://app.test/api/v1',
+            capabilities: { ai: true, uniworkAi: true, webSearch: true },
+            user: { id: 'user-7', displayName: 'Alice' },
+          }),
+          ...tokens(),
+        },
+        capabilities: { ai: true, uniworkAi: true, webSearch: true },
+        fetch,
+        origin: ORIGIN,
+      })
+      await ai.state(true)
+      expect(ai.uniworkIdentity()).toEqual({
+        account: 'user-7',
+        org: 'org-cloud-1',
+        orgName: 'UniWork Org',
+        document: 'doc-42',
+      })
     })
   })
 })

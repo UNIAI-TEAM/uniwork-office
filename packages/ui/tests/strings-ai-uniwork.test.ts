@@ -140,6 +140,34 @@ describe('ai-uniwork string shards', () => {
     expect(aiUniworkText('vi', 'aiErrRateLimited', { seconds: 30 })).toBe(
       'Bạn đang gửi quá nhanh. Thử lại sau 30 giây.',
     )
+    expect(aiUniworkText('en', 'cloudCreditsLeft', { remaining: 10, limit: 100 })).toBe(
+      '10 of 100 left',
+    )
+    expect(aiUniworkText('en', 'cloudCreditsRenews', { date: '2026-11-01' })).toBe(
+      'Renews 2026-11-01',
+    )
+    expect(aiUniworkText('en', 'aiResultCellsMeta', { count: 4, sheets: 2 })).toBe(
+      '4 cells · 2 sheets',
+    )
+  })
+
+  it('includes the G6-05u cloud, account, local-file restart, sheet meta and web 413 keys in all locales', () => {
+    expect(aiUniworkText('en', 'acctSignIn')).toBe('Sign in to UniWork')
+    expect(aiUniworkText('vi', 'acctSignIn')).toBe('Đăng nhập UniWork')
+    expect(aiUniworkText('en', 'acctSignInAgain')).toBe('Sign in again')
+    expect(aiUniworkText('vi', 'acctSignInAgain')).toBe('Đăng nhập lại')
+    expect(aiUniworkText('en', 'cloudStateReady')).toBe('Available')
+    expect(aiUniworkText('vi', 'cloudStateReady')).toBe('Sẵn sàng')
+    expect(aiUniworkText('en', 'cloudInactiveBody')).toContain('subscription is not active')
+    expect(aiUniworkText('vi', 'cloudInactiveBody')).toContain('chưa hoạt động')
+    expect(aiUniworkText('en', 'aiUniworkLocalFileRestart')).toContain(
+      'Closing or reopening this local file starts a new conversation',
+    )
+    expect(aiUniworkText('vi', 'aiUniworkLocalFileRestart')).toContain(
+      'Đóng hoặc mở lại tệp cục bộ này sẽ bắt đầu cuộc trò chuyện mới',
+    )
+    expect(aiUniworkText('en', 'aiErrWorkbookTooLarge')).toContain('workbook is too large')
+    expect(aiUniworkText('vi', 'aiErrWorkbookTooLarge')).toContain('Bảng tính này quá lớn')
   })
 })
 
