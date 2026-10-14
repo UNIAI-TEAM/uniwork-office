@@ -67,6 +67,10 @@ export type {
   UniworkTurnIds,
   UniworkWireCode,
 } from './uniwork/types'
+export { streamUniwork } from './uniwork/protocol'
+export { UniworkError, isUniworkError, uniworkErrorKey } from './uniwork/errors'
+export { uniworkConversations } from './uniwork/conversation'
+export { setUniworkAiAvailable, uniworkAiAvailable } from './providers'
 export { aiNoticeBody, aiNoticeKind, aiNoticeKindForCloud, aiNoticeText } from './ai-notice'
 export type { AiNoticeKind } from './ai-notice'
 export { normalizeAiTestFailureKind } from './ai-test-failure'

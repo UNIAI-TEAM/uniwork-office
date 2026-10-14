@@ -22,7 +22,11 @@
  * The status decides; the body's `code` only refines a 400 (and is kept in `serverCode`).
  */
 
-import type { AiUniworkStringKey } from '../../../../packages/ui/src/strings-ai-uniwork'
+import { UniworkError, uniworkErrorKey } from '../../../../packages/ai-provider/src/uniwork/errors'
+import {
+  aiUniworkStrings,
+  type AiUniworkStringKey,
+} from '../../../../packages/ui/src/strings-ai-uniwork'
 
 export type AiWebErrorCode =
   | 'credits_exhausted'
@@ -195,90 +199,34 @@ export function isContractFailure(status: number): boolean {
 // ------------------------------------------------------------------ UniWork AI (G6-05)
 
 /**
- * A failed UniWork AI turn as the adapter reports it (its `UniworkError`: the façade's `code`, the
- * HTTP status, `Retry-After` seconds, the run id when one was open). The text is picked from the code,
- * never from the message; these are not AiWebErrors (no card, no BYOK state).
+ * What the panel text of a failed UniWork AI turn is picked from: the adapter's `UniworkError`
+ * (the façade's `code`, `Retry-After` seconds, the run id when one was open). The text comes from
+ * the code, never from the message; these are not AiWebErrors (no card, no BYOK state).
  */
 export interface UniworkFailure {
   code: string
-  status: number
   retryAfterSec?: number
-  fields?: Record<string, unknown>
   /** a run was open when it failed (the capability went off mid-run, not before the first one) */
   runId?: string
 }
 
-const UNIWORK_WIRE_CODES: ReadonlySet<string> = new Set([
-  'conversation_expired',
-  'run_expired',
-  'run_limit_reached',
-  'credits_exhausted',
-  'entitlement_required',
-  'office_capability_off',
-  'ai_rate_limited',
-  'ai_uniwork_busy',
-  'rate_limited',
-  'ai_provider_timeout',
-  'ai_provider_error',
-  'provider_unreachable',
-  'cloud_unavailable',
-  'ai_disabled',
-  'ai_tool_result_too_large',
-  'payload_too_large',
-  'invalid_request',
-  // raised by the adapter / this frame, not the server
-  'unauthorized',
-  'offline',
-  'disconnected',
-])
-
-/** the adapter's error (or a lookalike) as a UniworkFailure; undefined for anything else */
+/** the adapter's error as a UniworkFailure; undefined for anything else */
 export function asUniworkFailure(err: unknown): UniworkFailure | undefined {
-  if (!(err instanceof Error) || err instanceof AiWebError) return undefined
-  const e = err as Error & {
-    code?: unknown
-    status?: unknown
-    retryAfterSec?: unknown
-    fields?: unknown
-    runId?: unknown
-  }
-  if (typeof e.code !== 'string') return undefined
-  if (e.name !== 'UniworkError' && !UNIWORK_WIRE_CODES.has(e.code)) return undefined
+  if (!(err instanceof UniworkError)) return undefined
   return {
-    code: e.code,
-    status: typeof e.status === 'number' ? e.status : 0,
-    ...(typeof e.retryAfterSec === 'number' ? { retryAfterSec: e.retryAfterSec } : {}),
-    ...(e.fields && typeof e.fields === 'object'
-      ? { fields: e.fields as Record<string, unknown> }
-      : {}),
-    ...(typeof e.runId === 'string' && e.runId ? { runId: e.runId } : {}),
+    code: err.code,
+    ...(err.retryAfterSec !== undefined ? { retryAfterSec: err.retryAfterSec } : {}),
+    ...(err.runId ? { runId: err.runId } : {}),
   }
 }
 
-/** the S9/S10 string of a failed UniWork AI turn (design 3.9); 413 is aiErrUnavailable on the web too (no U-02 string yet) */
+/**
+ * The S9/S10 string of a failed UniWork AI turn: the adapter's `uniworkErrorKey` (web host), except
+ * that "off" before any run is the entry's own note (`aiUniworkOff`), and a key U-02 has no string
+ * for yet (the web 413 `aiErrWorkbookTooLarge`) reads as `aiErrUnavailable`.
+ */
 export function uniworkFailureKey(failure: UniworkFailure): AiUniworkStringKey {
-  switch (failure.code) {
-    case 'credits_exhausted':
-      return 'aiErrCredits'
-    case 'entitlement_required':
-      return 'aiErrEntitlement'
-    case 'office_capability_off':
-      return failure.runId ? 'aiErrCapabilityOff' : 'aiUniworkOff'
-    case 'run_limit_reached':
-      return 'aiErrRunLimit'
-    case 'ai_rate_limited':
-    case 'ai_uniwork_busy':
-    case 'rate_limited':
-      return 'aiErrRateLimitedNoWait'
-    case 'unauthorized':
-      return 'aiErrSession'
-    case 'offline':
-      return 'aiErrOffline'
-    case 'disconnected':
-      return 'aiErrDisconnected'
-    default:
-      if (failure.status === 401) return 'aiErrSession'
-      if (failure.status === 403) return 'aiErrRevoked'
-      return 'aiErrUnavailable'
-  }
+  if (failure.code === 'office_capability_off' && !failure.runId) return 'aiUniworkOff'
+  const key = uniworkErrorKey(failure.code, 'web')
+  return key in aiUniworkStrings.zh ? (key as AiUniworkStringKey) : 'aiErrUnavailable'
 }

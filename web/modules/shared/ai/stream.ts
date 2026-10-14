@@ -44,6 +44,7 @@ import type {
   AiStreamChunk,
   AiStreamRequest,
 } from '../../../../packages/ai-provider/src/types'
+import { uniworkConversations } from '../../../../packages/ai-provider/src/uniwork/conversation'
 import { streamUniwork } from '../../../../packages/ai-provider/src/uniwork/protocol'
 import {
   UNIWORK_PROVIDER_ID,
@@ -203,7 +204,7 @@ export function createWebAiStreams(deps: StreamDeps): WebAiStreams {
     const scope = uniwork?.scope() ?? null
     if (!uniwork || !chat || !scope) {
       // not available in this frame (grant off, format off): hidden, never an error chip
-      const failure: UniworkFailure = { code: 'office_capability_off', status: 403 }
+      const failure: UniworkFailure = { code: 'office_capability_off' }
       uniwork?.onOff()
       emit({ requestId, type: 'notice', notice: { kind: 'uniwork-off' } })
       emit({
@@ -283,9 +284,10 @@ export function createWebAiStreams(deps: StreamDeps): WebAiStreams {
                 typeof navigator !== 'undefined' && navigator.onLine === false
                   ? 'offline'
                   : 'disconnected',
-              status: 0,
             } satisfies UniworkFailure)
           : undefined)
+      // a lost session may come back as another account: nothing of this one is sent again
+      if (failure?.code === 'session_expired') uniworkConversations.clear()
       if (failure?.code === 'office_capability_off' && !off) {
         off = true
         uniwork.onOff()
@@ -311,6 +313,9 @@ export function createWebAiStreams(deps: StreamDeps): WebAiStreams {
     const { requestId, settings, system, messages } = request
     const provider = settings.provider
     if (provider === UNIWORK_PROVIDER_ID) return uniworkTurn(request)
+    // a turn of another provider on this session ends the UniWork AI conversation (the next UniWork
+    // turn opens a new one with a boundary notice)
+    uniworkConversations.observe(request.sessionId, provider)
     const protocol = deps.protocolOf(provider)
     if (!protocol) {
       emit({ requestId, type: 'error', error: typed(missing(provider), provider) })
@@ -389,8 +394,7 @@ export function createWebAiStreams(deps: StreamDeps): WebAiStreams {
       return {
         ok: false,
         error:
-          deps.uniwork?.describeFailure({ code: 'ai_disabled', status: 0 }) ??
-          'UniWork AI is not available',
+          deps.uniwork?.describeFailure({ code: 'ai_disabled' }) ?? 'UniWork AI is not available',
       }
     }
     const protocol = deps.protocolOf(provider)

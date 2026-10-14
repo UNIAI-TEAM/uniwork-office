@@ -30,6 +30,7 @@ import type {
   AiStreamChunk,
 } from '../../../../packages/ai-provider/src/types'
 import { setUniworkCloudStatus } from '../../../../packages/ai-provider/src/uniwork-cloud'
+import { setUniworkAiAvailable } from '../../../../packages/ai-provider/src/providers'
 import type { streamUniwork } from '../../../../packages/ai-provider/src/uniwork/protocol'
 import {
   UNIWORK_PROVIDER_ID,
@@ -262,6 +263,8 @@ export function createWebAi(opts: {
         return false
       }
       const granted = session.capabilities
+      // the availability flag adds the `uniwork` entry to AI_PROVIDERS (every list built from it)
+      setUniworkAiAvailable(uniworkGranted)
       // BYOK always reads the cloud switches (as before); a UniWork-only frame only when it was
       // granted a cloud tool: nothing is asked of the server for a grant that is not there
       cloudWanted =
@@ -441,6 +444,7 @@ export function createWebAi(opts: {
   function turnUniworkOff(): void {
     if (uniworkOff) return
     uniworkOff = true
+    setUniworkAiAvailable(false)
     const caps = opts.capabilities
     caps.uniworkAi = false
     if (!byokGranted) caps.ai = false

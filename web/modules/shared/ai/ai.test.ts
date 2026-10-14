@@ -16,6 +16,12 @@ import {
   retryAfterSeconds,
 } from './errors'
 import { aiNoticeBody, aiNoticeKind } from '../../../../packages/ai-provider/src/ai-notice'
+import {
+  setUniworkAiAvailable,
+  uniworkAiAvailable,
+} from '../../../../packages/ai-provider/src/providers'
+import { uniworkConversations } from '../../../../packages/ai-provider/src/uniwork/conversation'
+import { UniworkError } from '../../../../packages/ai-provider/src/uniwork/errors'
 import { createProxyFetch, toProxyRequest } from './transport'
 import { createAiRunTracker, type AiRunTracker } from '../ai-run'
 import { createWebAiStreams } from './stream'
@@ -117,6 +123,8 @@ const CLOUD = {
 
 afterEach(() => {
   setPrimaryFetch(null)
+  setUniworkAiAvailable(false)
+  uniworkConversations.clear()
   hideAiState()
   document.body.replaceChildren()
   try {
@@ -1756,8 +1764,11 @@ describe('UniWork AI on the web (G6-05)', () => {
       ...extra,
     } as never)
 
-  const failure = (code: string, status: number, more: object = {}) =>
-    Object.assign(new Error(`uniwork ${code}`), { name: 'UniworkError', code, status, ...more })
+  const failure = (
+    code: string,
+    status: number,
+    more: { retryAfterSec?: number; runId?: string } = {},
+  ) => new UniworkError(code as never, { status, ...more })
 
   describe('Grant formula', () => {
     it('aiHostGrants: uniworkAi alone opens the panel, no credentials, no cloud tools', () => {
@@ -1983,7 +1994,7 @@ describe('UniWork AI on the web (G6-05)', () => {
         [
           '401',
           async () => {
-            throw failure('unauthorized', 401)
+            throw failure('session_expired', 401)
           },
         ],
         [
@@ -2086,6 +2097,47 @@ describe('UniWork AI on the web (G6-05)', () => {
       expect(s.uniAiAvailable).toBe(false)
       // no BYOK listing, no cloud read without a cloud grant: nothing was asked of the server
       expect(calls).toEqual([])
+    })
+
+    it('the grant sets the availability flag (the entry in AI_PROVIDERS); off clears it', async () => {
+      const capabilities: Record<string, unknown> = { ai: true, uniworkAi: true }
+      const ai = createWebAi({
+        port: uniworkPort({ uniworkAi: true }),
+        capabilities,
+        fetch: recorder(() => jsonResponse(404, {})).fetch,
+        origin: ORIGIN,
+        uniworkStream: async () => {
+          throw failure('office_capability_off', 403)
+        },
+      })
+      await ai.active()
+      expect(uniworkAiAvailable()).toBe(true)
+      await ai.streams.aiStream({
+        requestId: 'f1',
+        settings: await ai.settings(),
+        system: '',
+        messages: [{ role: 'user', content: 'hi' }],
+      } as never)
+      expect(uniworkAiAvailable()).toBe(false)
+    })
+
+    it('a BYOK turn between two UniWork turns ends the UniWork conversation; a lost session clears them', async () => {
+      const r = rig(async () => {
+        throw failure('session_expired', 401)
+      })
+      uniworkConversations.update('sess-1', { conversationId: 'c1', runId: 'r1' })
+      await r.s.aiStream({
+        requestId: 'b2',
+        sessionId: 'sess-1',
+        settings: { provider: 'openai', providers: { openai: { apiKey: 'x', model: 'm' } } },
+        system: '',
+        messages: [{ role: 'user', content: 'hi' }],
+      } as never)
+      expect(uniworkConversations.ids('sess-1')).toEqual({})
+      uniworkConversations.update('sess-2', { conversationId: 'c2' })
+      await uniworkTurn(r.s)
+      expect(r.chunks.at(-1)).toMatchObject({ uniworkCode: 'session_expired' })
+      expect(uniworkConversations.ids('sess-2')).toEqual({})
     })
 
     it('with ai and uniworkAi both: BYOK stays the default, UniWork AI is chosen on request', async () => {
