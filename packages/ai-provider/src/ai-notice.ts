@@ -172,7 +172,7 @@ export interface ComposerNote {
 export function composerNoteFor(input: ComposerNoteInput): ComposerNote | null {
   const selected = input.uniworkSelected ?? input.provider === 'uniwork'
   if (!selected) return null
-  if (input.signedIn === false || input.cloudState === 'signed-out') {
+  if (input.signedOut === true || input.cloudState === 'signed-out') {
     return { kind: 'signed-out', key: 'aiUniworkSignedOut', action: 'sign-in' }
   }
   if (
@@ -201,5 +201,3 @@ export function composerNoteFor(input: ComposerNoteInput): ComposerNote | null {
   }
   return null
 }
-
-

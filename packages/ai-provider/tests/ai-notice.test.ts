@@ -124,7 +124,7 @@ describe('composerNoteFor (G6-05u S7/S11)', () => {
     expect(
       composerNoteFor({
         uniworkSelected: true,
-        signedIn: true,
+        signedOut: false,
         cloudState: 'ready',
         capabilityOn: true,
         formatOn: true,
@@ -139,7 +139,9 @@ describe('composerNoteFor (G6-05u S7/S11)', () => {
       key: 'aiUniworkSignedOut',
       action: 'sign-in',
     })
-    expect(composerNoteFor({ uniworkSelected: true, signedIn: false, cloudState: 'ready' })).toEqual({
+    expect(
+      composerNoteFor({ uniworkSelected: true, signedOut: true, cloudState: 'ready' }),
+    ).toEqual({
       kind: 'signed-out',
       key: 'aiUniworkSignedOut',
       action: 'sign-in',
@@ -198,7 +200,7 @@ describe('composerNoteFor (G6-05u S7/S11)', () => {
     expect(
       composerNoteFor({
         uniworkSelected: true,
-        signedIn: false,
+        signedOut: true,
         cloudState: 'credits-exhausted',
         capabilityOn: false,
         off: true,
@@ -208,7 +210,7 @@ describe('composerNoteFor (G6-05u S7/S11)', () => {
     expect(
       composerNoteFor({
         uniworkSelected: true,
-        signedIn: true,
+        signedOut: false,
         cloudState: 'not-entitled',
         capabilityOn: false,
       })?.kind,
@@ -217,7 +219,7 @@ describe('composerNoteFor (G6-05u S7/S11)', () => {
     expect(
       composerNoteFor({
         uniworkSelected: true,
-        signedIn: true,
+        signedOut: false,
         cloudState: 'subscription-inactive',
         formatOn: false,
       })?.kind,
@@ -226,7 +228,7 @@ describe('composerNoteFor (G6-05u S7/S11)', () => {
     expect(
       composerNoteFor({
         uniworkSelected: true,
-        signedIn: true,
+        signedOut: false,
         cloudState: 'credits-exhausted',
         toolsChat: false,
       })?.kind,
@@ -235,7 +237,7 @@ describe('composerNoteFor (G6-05u S7/S11)', () => {
     expect(
       composerNoteFor({
         uniworkSelected: true,
-        signedIn: true,
+        signedOut: false,
         cloudState: 'unavailable',
         off: true,
       })?.kind,
@@ -263,4 +265,3 @@ describe('composerNoteFor (G6-05u S7/S11)', () => {
     ).toBeNull()
   })
 })
-
