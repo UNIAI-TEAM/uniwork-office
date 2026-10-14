@@ -7,6 +7,7 @@ import { useI18n } from './locale'
 import {
   DiscussionToggle,
   UniworkNotice,
+  UniworkRemoteBar,
   UniworkStatusChip,
   UniworkTabMarker,
   useUniworkStatuses,
@@ -651,6 +652,8 @@ export function TabBar() {
         </svg>
       </button>
       <div className="tab-bar-caption-spacer" />
+      {/* S6: hangs under the strip; main moves the active editor view down by its height */}
+      <UniworkRemoteBar status={activeStatus} onStatus={uniwork.apply} />
     </div>
   )
 }
