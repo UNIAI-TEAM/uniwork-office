@@ -150,6 +150,16 @@ export interface AiSearchSettings {
   providers: Record<Exclude<AiSearchProviderId, 'auto'>, { apiKey: string }>
 }
 
+/** where one provider's chip rows come from (G6-05m): Settings first, the live list, the catalog as fallback */
+export interface AiModelSource {
+  /** the model chosen for this provider in Settings (server row on web, ai-settings.json on desktop); '' = none */
+  readonly chosen: string
+  /** the provider's live model ids from its own /models; absent = not listed (yet), the catalog is shown */
+  readonly listed?: readonly string[] | undefined
+  /** 'loading' while a first listing runs, 'error' after a failed one (the catalog is shown); absent = ok or not asked */
+  readonly listState?: 'loading' | 'error' | undefined
+}
+
 export interface AiSettings {
   provider: AiProviderId
   providers: Record<AiProviderId, AiProviderConfig>
@@ -179,6 +189,14 @@ export interface AiSettings {
    * stays available (the server decides); the next read retries. Absent means the keys are known.
    */
   credentialsUnavailable?: boolean
+  /**
+   * Per provider: the model chosen in Settings and the provider's live model list (G6-05m).
+   * Derived by the host on every read and never saved: a host writing settings back drops it.
+   * A provider without an entry (older host or server) gets the hard-coded catalog.
+   */
+  modelSources?: Partial<Record<AiProviderId, AiModelSource>> | undefined
+  /** the model UniWork AI serves (server policy); '' or absent = unknown, the row shows its label. Derived, never saved */
+  uniworkModel?: string | undefined
   /**
    * Output-token cap for ONE model turn of agent runs (default
    * DEFAULT_MAX_OUTPUT_TOKENS). Reasoning models bill their thinking against
