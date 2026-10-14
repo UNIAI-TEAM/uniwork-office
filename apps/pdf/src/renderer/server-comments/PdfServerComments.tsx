@@ -70,8 +70,9 @@ export interface PdfServerComments {
   needsSave: boolean
   /** open the root composer at a point placement (the note tool click), optionally pre-filled by AI */
   startAt(page: number, at: readonly [number, number], aiText?: string): boolean
-  /** drop the pending new-thread composer when nothing was typed (no draft text, no AI draft) */
-  cancelEmptyThread(): void
+  /** drop the pending new-thread composer when nothing was typed (no draft text, no AI draft);
+      true when it was dropped, false when there was none or it holds text or an AI draft */
+  cancelEmptyThread(): boolean
   /** the AI draft of the pending root composer, if any */
   aiDraft: { draftKey: string; text: string } | null
   /** the renderer's save of this document landed: queue the anchor re-send */
@@ -221,13 +222,14 @@ export function usePdfServerComments(o: PdfServerCommentsOptions): PdfServerComm
 
   const documentIdRef = useRef(context.documentId)
   documentIdRef.current = context.documentId
-  const cancelEmptyThread = useCallback(() => {
+  const cancelEmptyThread = useCallback((): boolean => {
     const c = ctlRef.current
-    if (!c.newThread) return
+    if (!c.newThread) return false
     const draftKey = rootDraftKey(c.newThread.anchor as PdfAnchor)
-    if (aiDraftRef.current?.draftKey === draftKey) return
-    if (loadDraft({ documentId: documentIdRef.current, threadKey: draftKey })) return
+    if (aiDraftRef.current?.draftKey === draftKey) return false
+    if (loadDraft({ documentId: documentIdRef.current, threadKey: draftKey })) return false
     c.cancelThread()
+    return true
   }, [])
 
   // the AI label belongs to one pending root composer only
@@ -324,12 +326,13 @@ export function PdfCommentsPanel(p: PdfCommentsPanelProps) {
 
   // Esc: the kit consumes it in a dirty composer, an edit box, a menu and a dialog; an EMPTY
   // new-thread composer lets it fall through. It is dropped (with its page frame) and the panel closes.
+  // An unedited AI draft is not dirty to the kit either, but it is not empty: it stays untouched.
   const onKeyDown = (e: ReactKeyboardEvent) => {
     if (e.key !== 'Escape' || e.defaultPrevented || e.nativeEvent.isComposing) return
     if (!baseRef.current.newThread || !(e.target as HTMLElement).closest('.collab-thread--new'))
       return
+    if (!comments.cancelEmptyThread()) return
     e.stopPropagation()
-    baseRef.current.cancelThread()
     onClose()
     focusOpenerRef.current?.()
   }
