@@ -388,7 +388,7 @@ describe('streamUniwork: Retry-After (429 rule)', () => {
 })
 
 describe('streamUniwork: run limits and errors', () => {
-  it('run_limit_reached ends the run with aiErrRunLimit, next question opens a new run in the same conversation', async () => {
+  it('run_limit_reached ends the run with aiErrRunLimit; the unanswered calls make the next question a new conversation', async () => {
     const conversations = new UniworkConversations()
     const fake = createUniworkFake()
     fake.enqueue(
@@ -421,16 +421,23 @@ describe('streamUniwork: run limits and errors', () => {
     expect(uniworkErrorKey('run_limit_reached')).toBe('aiErrRunLimit')
     expect(fake.requests).toHaveLength(2)
 
+    const next = recorder()
     await streamUniwork(
       fake,
       turn([...history, { role: 'assistant', text: '' }, { role: 'user', text: 'continue' }]),
-      recorder().cb,
+      next.cb,
       {
         conversations,
       },
     )
-    expect(fake.requests[2]!.headers['X-UniWork-AI-Conversation']).toBe('conv-1')
+    // the refused tool results never entered the server transcript (it appends only answered
+    // turns), so it ends in dangling tool_calls: "Hỏi tiếp" opens a new conversation, said so
+    expect(fake.requests[2]!.headers['X-UniWork-AI-Conversation']).toBeUndefined()
     expect(fake.requests[2]!.headers['X-UniWork-AI-Run']).toBeUndefined()
+    expect(next.state.notices).toContainEqual({
+      kind: 'conversation-boundary',
+      provider: 'uniwork',
+    })
   })
 
   it('office_capability_off before any run id reports uniwork-off', async () => {

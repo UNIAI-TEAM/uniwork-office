@@ -189,8 +189,14 @@ export async function streamUniwork(
   }
   const tools = uniworkAllowedTools(request.tools, request.toolPolicy)
   const body = requestBody(slice, tools, request.scope)
-  const start = conversations.begin(session, request.scope, slice.continuesRun)
-  if (start.boundary) cb.onNotice?.({ kind: 'conversation-boundary', provider: 'uniwork' })
+  // a question after tool calls nobody answered (Stop while tools ran, a dropped answer) cannot go
+  // onto that transcript: it starts a new conversation, said like a provider boundary
+  const dangling = slice.kind === 'question' && conversations.hasOpenToolCalls(session)
+  if (dangling) conversations.dropConversation(session)
+  const start = conversations.begin(session, request.scope, slice.continuesRun && !dangling)
+  if (start.boundary || dangling) {
+    cb.onNotice?.({ kind: 'conversation-boundary', provider: 'uniwork' })
+  }
   if (slice.imagesDropped) cb.onNotice?.({ kind: 'images-not-sent' })
   // a tool-result turn without the run header is a 400 (API §3.7): the run is already gone
   if (slice.kind === 'tool-result' && !start.ids.runId) throw new UniworkError('run_expired')
@@ -198,12 +204,26 @@ export async function streamUniwork(
   let ids = start.ids
   let waits = 0
   let resentAfterRunExpired = false
+  let callsThisAttempt: boolean
+  const turnCb: StreamCallbacks = {
+    ...cb,
+    onToolCall: (call) => {
+      callsThisAttempt = true
+      conversations.toolCallsIssued(session)
+      cb.onToolCall(call)
+    },
+  }
   for (;;) {
     if (cb.signal.aborted) throw abortError(cb.signal)
-    const result = await attempt(transport, request.scope, body, ids, cb, (next) => {
+    callsThisAttempt = false
+    const result = await attempt(transport, request.scope, body, ids, turnCb, (next) => {
       ids = conversations.update(session, next)
     })
-    if (result.kind === 'done') return
+    if (result.kind === 'done') {
+      // the tool results were taken (or a plain answer came back): nothing waits for results now
+      if (!callsThisAttempt) conversations.toolCallsSettled(session)
+      return
+    }
     const error = result.error
     if (result.kind === 'rate-limited') {
       const decision = decideRateLimitWait(result.retryAfter, waits, Date.now())

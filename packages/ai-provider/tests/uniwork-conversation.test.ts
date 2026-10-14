@@ -71,19 +71,22 @@ describe('UniWork AI conversation and run ids', () => {
         ids: { conversation: 'conv-1', run: 'run-1' },
       }),
     )
+    // the tool results are answered, so the run has no open calls
+    fake.enqueue(oneChunk('', { ids: { conversation: 'conv-1', run: 'run-1' } }))
     // a question inside the run (the loop's wrap-up note after tool results) carries run-1; the server forgot it
     fake.enqueue(error(409, 'run_expired', { ids: { conversation: 'conv-1' } }))
     fake.enqueue(oneChunk('answer', { ids: { conversation: 'conv-1', run: 'run-2' } }))
     await streamUniwork(fake, turn(question('bold the title')), recorder().cb, { conversations })
+    await streamUniwork(fake, turn(toolRound), recorder().cb, { conversations })
 
     const rec = recorder()
     await streamUniwork(fake, turn(question('wrap up', toolRound)), rec.cb, { conversations })
     expect(rec.state.text).toBe('answer')
-    expect(fake.requests).toHaveLength(3)
-    expect(fake.requests[1]!.headers['X-UniWork-AI-Run']).toBe('run-1')
-    expect(fake.requests[2]!.headers['X-UniWork-AI-Run']).toBeUndefined()
-    expect(fake.requests[2]!.headers['X-UniWork-AI-Conversation']).toBe('conv-1')
-    expect(fake.requests[2]!.body.messages).toEqual([{ role: 'user', content: 'wrap up' }])
+    expect(fake.requests).toHaveLength(4)
+    expect(fake.requests[2]!.headers['X-UniWork-AI-Run']).toBe('run-1')
+    expect(fake.requests[3]!.headers['X-UniWork-AI-Run']).toBeUndefined()
+    expect(fake.requests[3]!.headers['X-UniWork-AI-Conversation']).toBe('conv-1')
+    expect(fake.requests[3]!.body.messages).toEqual([{ role: 'user', content: 'wrap up' }])
   })
 
   it('run_expired twice on a question gives up after one resend', async () => {
@@ -117,6 +120,88 @@ describe('UniWork AI conversation and run ids', () => {
     // no automatic resend of the original question (lead decision Q-1 a)
     expect(fake.requests).toHaveLength(2)
     expect(conversations.ids('panel-1')).toEqual({ conversationId: 'conv-1' })
+  })
+
+  it('Stop while the server’s tool calls run: the next question starts a new conversation (G05BE-3)', async () => {
+    const conversations = new UniworkConversations()
+    const fake = createUniworkFake()
+    fake.enqueue(
+      oneChunk('', {
+        toolCalls: [{ id: 'srv-call-1', name: 'format_text', args: {} }],
+        ids: { conversation: 'conv-1', run: 'run-1' },
+      }),
+    )
+    fake.enqueue(oneChunk('fresh', { ids: { conversation: 'conv-2', run: 'run-9' } }))
+    await streamUniwork(fake, turn(question('bold the title')), recorder().cb, { conversations })
+    // Stop: the loop pushed the (aborted) tool results, nothing went to the server
+    const rec = recorder()
+    await streamUniwork(fake, turn(question('something else', toolRound)), rec.cb, {
+      conversations,
+    })
+    expect(fake.requests).toHaveLength(2)
+    expect(fake.requests[1]!.headers['X-UniWork-AI-Conversation']).toBeUndefined()
+    expect(fake.requests[1]!.headers['X-UniWork-AI-Run']).toBeUndefined()
+    expect(fake.requests[1]!.body.messages).toEqual([{ role: 'user', content: 'something else' }])
+    expect(rec.state.notices).toContainEqual({ kind: 'conversation-boundary', provider: 'uniwork' })
+    expect(conversations.ids('panel-1')).toEqual({ conversationId: 'conv-2', runId: 'run-9' })
+  })
+
+  it('a tool-calling answer the client dropped (Stop mid-stream) also starts a new conversation', async () => {
+    const conversations = new UniworkConversations()
+    const fake = createUniworkFake()
+    const stop = new AbortController()
+    fake.enqueue(
+      oneChunk('', {
+        toolCalls: [{ id: 'srv-call-1', name: 'format_text', args: {} }],
+        ids: { conversation: 'conv-1', run: 'run-1' },
+      }),
+    )
+    fake.enqueue(oneChunk('fresh', { ids: { conversation: 'conv-2', run: 'run-2' } }))
+    const first = recorder(stop.signal)
+    first.cb.onToolCall = () => stop.abort()
+    await streamUniwork(fake, turn(question('bold the title')), first.cb, {
+      conversations,
+    }).catch(() => undefined)
+    // the loop rolled the aborted answer back: the history ends with the next question
+    await streamUniwork(
+      fake,
+      turn(
+        question('again', [
+          { role: 'user', text: 'x' },
+          { role: 'assistant', text: 'y' },
+        ]),
+      ),
+      recorder().cb,
+      { conversations },
+    )
+    expect(fake.requests[1]!.headers['X-UniWork-AI-Conversation']).toBeUndefined()
+  })
+
+  it('answered tool results clear the guard: the next question keeps the conversation', async () => {
+    const conversations = new UniworkConversations()
+    const fake = createUniworkFake()
+    fake.enqueue(
+      oneChunk('', {
+        toolCalls: [{ id: 'srv-call-1', name: 'format_text', args: {} }],
+        ids: { conversation: 'conv-1', run: 'run-1' },
+      }),
+    )
+    fake.enqueue(oneChunk('Bolded.', { ids: { conversation: 'conv-1', run: 'run-1' } }))
+    fake.enqueue(oneChunk('next', { ids: { conversation: 'conv-1', run: 'run-2' } }))
+    await streamUniwork(fake, turn(question('bold the title')), recorder().cb, { conversations })
+    await streamUniwork(fake, turn(toolRound), recorder().cb, { conversations })
+    const rec = recorder()
+    await streamUniwork(
+      fake,
+      turn(question('now italic', [...toolRound, { role: 'assistant', text: 'Bolded.' }])),
+      rec.cb,
+      { conversations },
+    )
+    expect(fake.requests[2]!.headers['X-UniWork-AI-Conversation']).toBe('conv-1')
+    expect(fake.requests[2]!.headers['X-UniWork-AI-Run']).toBeUndefined()
+    expect(rec.state.notices).not.toContainEqual(
+      expect.objectContaining({ kind: 'conversation-boundary' }),
+    )
   })
 
   it('a BYOK turn between two UniWork turns starts a new conversation with a boundary notice', async () => {

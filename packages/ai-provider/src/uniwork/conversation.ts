@@ -13,6 +13,12 @@ interface SessionState {
   scopeKey?: string
   conversationId?: string
   runId?: string
+  /**
+   * the server issued tool calls in this conversation and no tool-result turn answered them yet
+   * (Stop while tools ran, an answer the client dropped): the server transcript ends in an
+   * assistant turn with dangling tool_calls, so it cannot take another question
+   */
+  openToolCalls?: boolean
 }
 
 export interface UniworkTurnStart {
@@ -49,6 +55,7 @@ export class UniworkConversations {
     s.lastProvider = provider
     delete s.conversationId
     delete s.runId
+    delete s.openToolCalls
   }
 
   /**
@@ -67,6 +74,7 @@ export class UniworkConversations {
     if (boundary || s.scopeKey !== scopeKey) {
       delete s.conversationId
       delete s.runId
+      delete s.openToolCalls
     }
     s.lastProvider = 'uniwork'
     s.scopeKey = scopeKey
@@ -82,6 +90,21 @@ export class UniworkConversations {
     return this.ids(sessionId)
   }
 
+  /** the server handed this session tool calls (set as soon as one arrives, Stop or not) */
+  toolCallsIssued(sessionId: string | undefined): void {
+    this.state(sessionId).openToolCalls = true
+  }
+
+  /** a turn completed without new tool calls: nothing in the server transcript waits for results */
+  toolCallsSettled(sessionId: string | undefined): void {
+    delete this.state(sessionId).openToolCalls
+  }
+
+  /** tool calls of this conversation are still unanswered */
+  hasOpenToolCalls(sessionId: string | undefined): boolean {
+    return this.sessions.get(sessionId ?? DEFAULT_SESSION)?.openToolCalls === true
+  }
+
   /** the run is over (run_expired, run_limit_reached): the next turn opens a new run in the same conversation */
   dropRun(sessionId: string | undefined): void {
     delete this.state(sessionId).runId
@@ -92,6 +115,7 @@ export class UniworkConversations {
     const s = this.state(sessionId)
     delete s.conversationId
     delete s.runId
+    delete s.openToolCalls
   }
 
   ids(sessionId: string | undefined): UniworkTurnIds {
