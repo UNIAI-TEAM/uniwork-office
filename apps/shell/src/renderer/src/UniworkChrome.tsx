@@ -468,7 +468,8 @@ export function UniworkRemoteBar({
     }
   }, [visible])
 
-  // main moves the active editor view down by the bar's height: 0 when there is no bar or no document tab
+  // main moves the active editor view down by the bar's unscaled CSS-px height (main multiplies by
+  // the interface scale): 0 when there is no bar or no document tab
   const report = useCallback((px: number) => {
     try {
       void Promise.resolve(window.aiOffice.uniworkSetBarInset(px)).catch(() => undefined)
@@ -483,13 +484,21 @@ export function UniworkRemoteBar({
       report(0)
       return
     }
+    const cssHeight = () => {
+      const rawScale = Number.parseFloat(
+        getComputedStyle(bar).getPropertyValue('--ui-scale') ||
+          document.documentElement.style.getPropertyValue('--ui-scale'),
+      )
+      const scale = Number.isFinite(rawScale) && rawScale > 0 ? rawScale : 1
+      return Math.ceil(bar.getBoundingClientRect().height / scale)
+    }
     const measure = () => {
-      const px = Math.ceil(bar.getBoundingClientRect().height)
+      const px = cssHeight()
       if (px === heightRef.current) return
       heightRef.current = px
       report(px)
     }
-    heightRef.current = Math.ceil(bar.getBoundingClientRect().height)
+    heightRef.current = cssHeight()
     report(heightRef.current)
     if (typeof ResizeObserver === 'undefined') return
     const observer = new ResizeObserver(measure)

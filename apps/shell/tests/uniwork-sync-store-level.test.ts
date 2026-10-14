@@ -58,4 +58,13 @@ describe('uniwork store level gate (OQ-P4 b)', () => {
     // a garbage min_app_version changes nothing
     expect(readStoreGate({ schema: 2, min_store_level: 2, min_app_version: 42 })).toBe('open')
   })
+
+  it('reads a 0.11.0-beta.1 store in 1.0.0 without a migration refusal (upgrade path)', () => {
+    // 0.11.0-beta.1 / 0.11.0-dev.N stamp schema 2, level 2 and the core
+    // `min_app_version` '0.11.0'; 1.0.0 reads that store as 'open'
+    expect(readStoreGate({ schema: 2, min_store_level: 2, min_app_version: '0.11.0' })).toBe('open')
+    // reverse, unchanged: a store written by 1.0.0 decides the same way in an
+    // older build - min_app_version never gates
+    expect(readStoreGate({ schema: 2, min_store_level: 2, min_app_version: '1.0.0' })).toBe('open')
+  })
 })

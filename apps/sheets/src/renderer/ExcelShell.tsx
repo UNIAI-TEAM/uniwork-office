@@ -1,5 +1,5 @@
 import type { IFunctionInfo } from '@univerjs/engine-formula'
-import { useEffect, useMemo, useRef, useState, type ComponentProps } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from 'react'
 import { platformShortcuts } from '@genoffice/i18n'
 import {
   Dropdown,
@@ -10,6 +10,8 @@ import {
   aiPanelInitiallyOpen,
   rememberAiPanelOpen,
   UniAiMark,
+  useAiSidebarEnabled,
+  type AiTokenUsageView,
 } from '@genoffice/ui'
 
 import {
@@ -73,7 +75,7 @@ import type { ChartSeriesVisualState } from '@genoffice/xlsx-gateway/domain/char
 import type { ChangePlan } from '@genoffice/xlsx-gateway/domain/workbook.types'
 import type { AttachmentMeta } from '../shared/desktop-api'
 import { AiChatPanel, type AiChatMessage } from './ai/AiChatPanel'
-import { resolveCopilotOpen } from './ai/copilot-open'
+import { copilotShellClass, resolveCopilotOpen } from './ai/copilot-open'
 import { AiSelectionAsk } from './ai/AiSelectionAsk'
 import type { SelectionAskAnchor } from './ai/selection-ask'
 import {
@@ -241,6 +243,8 @@ interface ExcelShellProps {
   readonly sheetHasContent: boolean
   /// true while the real LLM agent is running (composer disabled meanwhile).
   readonly aiBusy: boolean
+  /** tokens billed across the session, shown beside the composer */
+  readonly sessionUsage?: AiTokenUsageView
   readonly chat: readonly AiChatMessage[]
   readonly historicChat?: readonly AiChatMessage[]
   /// Chat attachments (chips + 📎 button + drag-and-drop), same structure as the
@@ -428,6 +432,8 @@ export interface PageLayoutEcho {
   readonly printHeadings?: boolean | undefined
   readonly showGridlines: boolean
   readonly showHeadings: boolean
+  /// Mirrored grid (column A at the right edge) for the active sheet.
+  readonly rightToLeft: boolean
   readonly printArea?: string | null | undefined
   readonly printTitles?: string | null | undefined
   readonly header?: HeaderFooterParts | null | undefined
@@ -464,6 +470,7 @@ export function ExcelShell({
   formatPainterActive,
   sheetHasContent,
   aiBusy,
+  sessionUsage,
   chat,
   historicChat,
   attachments,
@@ -576,10 +583,13 @@ export function ExcelShell({
   // a waiting ask_clarification keeps the dock open: its card lives there
   const askingRef = useRef(aiClarify !== null)
   askingRef.current = aiClarify !== null
-  const setIsCopilotOpen: typeof setIsCopilotOpenState = (next) => {
+  // stable identity: useAiSidebarEnabled and the effects below must not see a new setter per render
+  const setIsCopilotOpen: typeof setIsCopilotOpenState = useCallback((next) => {
     if (cap('ai'))
       setIsCopilotOpenState((prev) => resolveCopilotOpen(prev, next, askingRef.current))
-  }
+  }, [])
+  // the sidebar switch is a soft hide; it closes the panel when it turns off
+  const aiSidebarEnabled = useAiSidebarEnabled(setIsCopilotOpen)
   useEffect(() => {
     if (aiClarify && !isCopilotOpen) setIsCopilotOpen(true)
   })
@@ -606,6 +616,9 @@ export function ExcelShell({
     const timer = window.setTimeout(() => onSend(aiPreset.text), 120)
     return () => window.clearTimeout(timer)
   }, [aiPreset?.nonce])
+  // the "show the AI sidebar" setting off hides the copilot rail (soft hide):
+  // an explicit AI action (ribbon run, toggle) still opens the panel, and
+  // closing it returns to hidden — no dead affordances, no invisible runs
   const [showFormatCells, setShowFormatCells] = useState(false)
   const [axisSizeTarget, setAxisSizeTarget] = useState<'row' | 'col' | null>(null)
   const [showLinkDialog, setShowLinkDialog] = useState(false)
@@ -893,7 +906,7 @@ export function ExcelShell({
 
   return (
     <main
-      className={`app-shell ${!cap('ai') ? 'no-copilot' : isCopilotOpen ? '' : 'copilot-collapsed'}`}
+      className={`app-shell ${copilotShellClass(cap('ai'), aiSidebarEnabled, isCopilotOpen)}`}
       inert={openingWorkbook}
       aria-busy={openingWorkbook}
     >
@@ -1034,6 +1047,7 @@ export function ExcelShell({
         {cap('ai') && (
           <AiChatPanel
             isOpen={isCopilotOpen}
+            hideRail={!aiSidebarEnabled}
             hasContent={sheetHasContent}
             chat={chat}
             {...(historicChat !== undefined ? { historicChat } : {})}
@@ -1046,8 +1060,14 @@ export function ExcelShell({
             prompt={prompt}
             preview={preview}
             aiBusy={aiBusy}
+            sessionUsage={sessionUsage}
             onPromptChange={onPromptChange}
             onSend={onSend}
+            onSendQueued={(text, atts) => {
+              if (aiBusy) return false
+              onSend(text, atts)
+              return true
+            }}
             onStop={onStop}
             onNewChat={onNewChat}
             onUndo={onUndo}
@@ -3098,7 +3118,7 @@ function Ribbon({
           <RibbonButton
             large
             label={t('appFilter')}
-            detail={t('appFilterToggleDetail')}
+            detail={platformShortcuts(t('appFilterToggleDetail'))}
             symbol="▽"
             onClick={() => onCommand('filter-toggle')}
           />
@@ -3255,6 +3275,14 @@ function Ribbon({
             >
               <i className="check-box">{pageLayout.showHeadings ? '✓' : ''}</i>
               {t('appHeadings')}
+            </button>
+            <button
+              className="check-item"
+              data-tip={t('appRightToLeft')}
+              onClick={() => onCommand('toggle-right-to-left')}
+            >
+              <i className="check-box">{pageLayout.rightToLeft ? '✓' : ''}</i>
+              {t('appRightToLeft')}
             </button>
             <button
               className="check-item"

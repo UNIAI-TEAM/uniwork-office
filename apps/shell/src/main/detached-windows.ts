@@ -28,7 +28,7 @@ import { canonicalPath } from './tab-manager'
 import { confirmUniworkClose } from './uniwork-docs/close-guard'
 import type { DetachedTab } from './tab-manager'
 import type { OpenDocumentTab, TabKind } from '../shared/tabs-api'
-import { DOCK_DWELL_MS, dockBand, pointInRect } from '../shared/tab-drag-geometry'
+import { DOCK_BAND_SLACK, DOCK_DWELL_MS, dockBand, pointInRect } from '../shared/tab-drag-geometry'
 
 /**
  * Detached editor windows: a tab's live WebContentsView reparented into its
@@ -474,11 +474,14 @@ function trackDockHover(rec: DetachedRecord): void {
   }, DOCK_DWELL_MS)
 }
 
-/** screen rect of the shell's dock band for a given shell window (null when hidden) */
-export function dockBandFor(shellWindow: BrowserWindow | null): Rectangle | null {
+/** screen rect of the shell's dock band for a given shell window (null when hidden).
+ *  `scale` is the live interface scale: the band has to cover the strip as it is
+ *  actually rendered, or a scaled-up strip outgrows the band and re-docking
+ *  misses. */
+export function dockBandFor(shellWindow: BrowserWindow | null, scale = 1): Rectangle | null {
   if (!shellWindow || shellWindow.isDestroyed() || !shellWindow.isVisible()) return null
   if (shellWindow.isMinimized()) return null
-  return dockBand(shellWindow.getContentBounds())
+  return dockBand(shellWindow.getContentBounds(), DOCK_BAND_SLACK, scale)
 }
 
 /** frame origin that puts the pointer (at) inside the new window's title bar,

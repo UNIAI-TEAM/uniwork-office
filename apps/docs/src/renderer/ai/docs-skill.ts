@@ -45,6 +45,7 @@ export const READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
   'image_search',
   'analyze_media',
   'ask_clarification',
+  'generate_mindmap', // only returns a display payload for the chat card
 ])
 
 /**

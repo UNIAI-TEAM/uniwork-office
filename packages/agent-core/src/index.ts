@@ -6,11 +6,13 @@ export type {
   AgentStreamHandle,
   AgentStreamNotice,
   AgentStreamRequest,
+  AgentTokenUsage,
   AgentRequestPurpose,
   AgentToolCall,
   AgentToolDef,
   AgentToolResult,
   AgentTransport,
+  MindMapTreeNode,
   ToolDisplay,
   ToolExecution,
 } from './types'

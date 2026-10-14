@@ -154,6 +154,7 @@ vi.mock('../../html/src/main/html-main', () => ({
 import { isAiRunning, noteAiRun, resetAiRunRegistry } from '../src/main/ai-run-registry'
 import { TabManager } from '../src/main/tab-manager'
 import type { TabKind } from '../src/shared/tabs-api'
+import { tabStripHeight } from '../src/shared/tab-drag-geometry'
 
 const TAB_STRIP_HEIGHT = 40
 const WINDOW_WIDTH = 800
@@ -1387,6 +1388,28 @@ describe('the Discussion panel narrows the active editor view (G8-11 D1)', () =>
     expect(view.setBounds).toHaveBeenLastCalledWith(full)
   })
 
+  // R1-3: the panel reports window pixels and the renderer divides its box by --ui-scale, so main
+  // frees the same width at any interface scale (only the tab strip height follows the scale).
+  it('frees the reported window-pixel width at interface scale 1.5', () => {
+    manager = new TabManager(
+      shellWindow as never,
+      () => onChanged(),
+      (kind) => applyMenuFor(kind),
+      undefined,
+      () => 1.5,
+    )
+    manager.openDocsTab()
+    const view = lastCreatedView(createDocsView)
+    manager.setDiscussionPanel({ open: true, width: 320 })
+    const strip = tabStripHeight(1.5)
+    expect(view.setBounds).toHaveBeenLastCalledWith({
+      x: 0,
+      y: strip,
+      width: WINDOW_WIDTH - 320,
+      height: WINDOW_HEIGHT - strip,
+    })
+  })
+
   it('re-applies on tab switch and on window resize', () => {
     const docsId = manager.openDocsTab()
     const docsView = lastCreatedView(createDocsView)
@@ -1515,6 +1538,35 @@ describe('the S6 bar inset moves the active editor view down (G5-03a)', () => {
       y: 0,
       width: WINDOW_WIDTH,
       height: WINDOW_HEIGHT,
+    })
+  })
+
+  it('scales the CSS-px inset at interface scale 1.5 and re-layouts on a scale change without a new report (R4-2, R4-5)', () => {
+    let scale = 1.5
+    manager = new TabManager(
+      shellWindow as never,
+      () => onChanged(),
+      (kind) => applyMenuFor(kind),
+      undefined,
+      () => scale,
+    )
+    manager.openDocsTab()
+    const view = lastCreatedView(createDocsView)
+    manager.setTopInset(40)
+    expect(view.setBounds).toHaveBeenLastCalledWith({
+      x: 0,
+      y: 60 + 60,
+      width: WINDOW_WIDTH,
+      height: WINDOW_HEIGHT - 120,
+    })
+    // a scale change triggers layout() only, without a new bar report
+    scale = 1
+    manager.layout()
+    expect(view.setBounds).toHaveBeenLastCalledWith({
+      x: 0,
+      y: TAB_STRIP_HEIGHT + 40,
+      width: WINDOW_WIDTH,
+      height: WINDOW_HEIGHT - TAB_STRIP_HEIGHT - 40,
     })
   })
 })

@@ -595,6 +595,8 @@ export const fr = {
   appPrintFailed: 'Impression impossible.',
   appPrintNeedsFullLoad:
     'L’impression nécessite le chargement complet du classeur ; attendez la fin du chargement.',
+  appPrintWorkbookTooLarge:
+    'Ce classeur est trop volumineux pour être chargé entièrement en mémoire ; il ne peut donc pas être imprimé ni exporté en PDF.',
   appCsvExportNeedsFullLoad:
     "L'export CSV nécessite un classeur entièrement chargé — attendez la fin du chargement.",
   appCsvExportTooLarge: 'La feuille est trop grande pour être exportée en CSV.',
@@ -1141,6 +1143,9 @@ export const fr = {
   appHeadings: 'En-têtes',
   appHeadingsHidden: 'En-têtes masqués.',
   appHeadingsShown: 'En-têtes affichés.',
+  appRightToLeft: 'De droite à gauche',
+  appRightToLeftOn: 'Sens de la grille : de droite à gauche.',
+  appRightToLeftOff: 'Sens de la grille : de gauche à droite.',
   appPrintHeadingsTitle: 'Imprimer les en-têtes de lignes et de colonnes',
   appGroupFunctionLibrary: 'Bibliothèque de fonctions',
   appInsertFunction: 'Insérer une fonction',

@@ -92,6 +92,8 @@ import { printPdf } from './print'
 import { PasswordDialog } from './PasswordDialog'
 import { StaticTextDialog } from './StaticTextDialog'
 import { PropertiesDialog } from './PropertiesDialog'
+import { CertSignDialog } from './CertSignDialog'
+import { SignaturesDialog, overallSignatureStatus } from './SignaturesDialog'
 import { SignatureDialog, fileToCanvas } from './SignatureDialog'
 import type { SignatureData } from './SignatureDialog'
 import { signatureDrawingForField } from './signature-field'
@@ -135,6 +137,7 @@ import {
   useDismissablePopover,
   useRibbonCollapse,
   UniAiMark,
+  useAiSidebarEnabled,
 } from '@genoffice/ui'
 import { useI18n } from './i18n/locale'
 import { useAutosave } from './useAutosave'
@@ -162,6 +165,7 @@ import type {
   NoteEditInput,
   PageImageRef,
   PdfConvertFormat,
+  PdfSignatureInfo,
   PdfUniworkState,
   SavePdfRequest,
   StaticFormFillRecord,
@@ -248,6 +252,8 @@ import {
   IconArrow,
   IconNote,
   IconSign,
+  IconCertSign,
+  IconSignatures,
   IconPreviousField,
   IconNextField,
   IconCompleteForm,
@@ -392,6 +398,10 @@ export default function App() {
   const [aiCollapsed, setAiCollapsed] = useState(
     () => !aiPanelInitiallyOpen('genoffice-pdf-show-ai'),
   )
+  /** the panel setter in the "true = visible" sense the sidebar hook expects */
+  const setAiOpen = useCallback((open: boolean) => setAiCollapsed(!open), [])
+  // the sidebar switch is a soft hide; it closes the panel when it turns off
+  const aiSidebarEnabled = useAiSidebarEnabled(setAiOpen)
   useEffect(() => {
     rememberAiPanelOpen('genoffice-pdf-show-ai', !aiCollapsed)
   }, [aiCollapsed])
@@ -790,6 +800,10 @@ export default function App() {
   const [dragFrom, setDragFrom] = useState<number | null>(null)
   const [dragOver, setDragOver] = useState<number | null>(null)
   const [signDlg, setSignDlg] = useState(false)
+  /** Certificate (digital) signatures found in the file on disk, verified by the main process */
+  const [digitalSignatures, setDigitalSignatures] = useState<PdfSignatureInfo[]>([])
+  const [certSignDlg, setCertSignDlg] = useState(false)
+  const [signaturesDlg, setSignaturesDlg] = useState(false)
   /** Confirmed signature awaiting placement; when non-null the page enters click-to-place mode */
   const [pendingSign, setPendingSign] = useState<SignatureData | null>(null)
   /** A /Sig widget selected from the form layer; confirmed signatures fit this rect directly. */
@@ -6262,6 +6276,27 @@ export default function App() {
 
   // renamed / moved from the shell: keep saving to the file's new location
   useEffect(() => window.pdfApi.onFileRenamed((next) => setFilePath(next)), [])
+
+  // Re-read the signatures whenever the document on screen is (re)loaded: a save rewrites the
+  // file, which is exactly when an old signature stops matching
+  useEffect(() => {
+    if (!doc || !filePath) {
+      setDigitalSignatures([])
+      return
+    }
+    let cancelled = false
+    void window.pdfApi
+      .listDigitalSignatures(filePath)
+      .then((list) => {
+        if (!cancelled) setDigitalSignatures(list)
+      })
+      .catch(() => {
+        if (!cancelled) setDigitalSignatures([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [doc, filePath])
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
@@ -6553,6 +6588,36 @@ export default function App() {
     widget.signed || signedFormWidgetIds.has(widget.id)
   const firstSignatureWidget =
     formWidgets.find((widget) => widget.kind === 'signature' && !formWidgetSigned(widget)) ?? null
+
+  const openCertSignDialog = () => {
+    if (dirty || saveInFlightRef.current !== null) {
+      showNotice(t('certSaveFirst'))
+      return
+    }
+    setCertSignDlg(true)
+  }
+
+  /** The signed copy becomes this tab's document; reload it like a Save As target */
+  const adoptSignedFile = async (path: string) => {
+    setCertSignDlg(false)
+    const scrollTop = scrollRef.current?.scrollTop ?? 0
+    setFilePath(path)
+    setStatus('loading')
+    try {
+      await loadDoc(path, doc)
+      searchIndexCache.clear()
+      setSearchMatches([])
+      setSearchCur(0)
+      setStatus('ready')
+      requestAnimationFrame(() => {
+        if (scrollRef.current) scrollRef.current.scrollTop = scrollTop
+      })
+      showNotice(t('certSigned', { name: path.split(/[\\/]/).pop() ?? path }))
+    } catch (err) {
+      setStatus('error')
+      opFailed(err instanceof Error ? err.message : String(err))
+    }
+  }
 
   const openSignatureDialog = (target: FormWidget | null) => {
     setEditTextMode(false)
@@ -7030,6 +7095,33 @@ export default function App() {
                     </span>
                     {t('sign')}
                   </button>
+                  {/* certificate signing reads the file on disk and writes a new one: desktop only
+                      (cap 'certSign'); the web frame hides the entries */}
+                  {cap('certSign') && (
+                    <button
+                      className="rb-big"
+                      disabled={readOnly || status !== 'ready'}
+                      data-tip={t('certSignHint')}
+                      onClick={openCertSignDialog}
+                    >
+                      <span className="rb-big-icon">
+                        <IconCertSign />
+                      </span>
+                      {t('certSign')}
+                    </button>
+                  )}
+                  {cap('certSign') && digitalSignatures.length > 0 && (
+                    <button
+                      className="rb-big"
+                      data-tip={t('sigPanelHint')}
+                      onClick={() => setSignaturesDlg(true)}
+                    >
+                      <span className="rb-big-icon">
+                        <IconSignatures />
+                      </span>
+                      {t('sigPanel')}
+                    </button>
+                  )}
                   <div ref={drawColorWrapRef} className="rb-drop-wrap">
                     <button
                       className={`rb-big${colorOpen ? ' active' : ''}`}
@@ -7460,8 +7552,12 @@ export default function App() {
         {/* dock wrapper animates the width between panel and rail (docs-style 180ms ease);
             the panel stays mounted while collapsed so the chat history survives */}
         {cap('ai') && (
-          <div className={`ai-dock${aiDock.collapsed ? ' collapsed' : ''}`}>
-            {aiDock.collapsed && (
+          <div
+            className={`ai-dock${aiDock.collapsed ? ' collapsed' : ''}${
+              !aiSidebarEnabled && aiDock.collapsed ? ' ai-dock-off' : ''
+            }`}
+          >
+            {aiDock.collapsed && aiSidebarEnabled && (
               <button
                 className="ai-rail"
                 data-tip={t('aiOpenAssistant')}
@@ -7484,6 +7580,28 @@ export default function App() {
           </div>
         )}
         <div className="app-content">
+          {digitalSignatures.length > 0 && (
+            <div className={`pdf-sig-banner ${overallSignatureStatus(digitalSignatures)}`}>
+              <IconSignatures />
+              <span>
+                {t(
+                  {
+                    valid: 'sigBannerValid',
+                    warning: 'sigBannerWarning',
+                    invalid: 'sigBannerInvalid',
+                  }[overallSignatureStatus(digitalSignatures)] as 'sigBannerValid',
+                )}
+                {overallSignatureStatus(digitalSignatures) === 'valid' &&
+                  digitalSignatures.some((sig) =>
+                    sig.problems.some((p) => p === 'self-signed' || p === 'untrusted-issuer'),
+                  ) &&
+                  ` — ${t('sigBannerUntrustedNote')}`}
+              </span>
+              <button className="pdf-modal-btn" onClick={() => setSignaturesDlg(true)}>
+                {t('sigBannerView')}
+              </button>
+            </div>
+          )}
           <div className="pdf-body">
             {sidebar === 'outline' && outline && (
               <div className="pdf-thumbs pdf-outline-pane" style={{ width: sidebarW }}>
@@ -9295,6 +9413,25 @@ export default function App() {
                   setPropsDlg(false)
                   applyEditOps([{ op: 'setMetadata', metadata: meta }])
                 }}
+              />
+            )}
+            {certSignDlg && (
+              <CertSignDialog
+                t={t}
+                filePath={filePath}
+                pageCount={pageCount}
+                currentPage={currentPage}
+                hasSignatures={digitalSignatures.length > 0}
+                onCancel={() => setCertSignDlg(false)}
+                onSigned={(path) => void adoptSignedFile(path)}
+              />
+            )}
+            {signaturesDlg && (
+              <SignaturesDialog
+                t={t}
+                signatures={digitalSignatures}
+                onClose={() => setSignaturesDlg(false)}
+                onGoToPage={(pageIndex) => scrollToPage(pageIndex + 1)}
               />
             )}
             {signDlg && (

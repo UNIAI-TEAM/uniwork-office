@@ -197,4 +197,17 @@ export const cs = {
   aiClarifySubmit: 'Pokračovat',
   aiSumClarify: 'Upřesnění zodpovězeno',
   aiSumClarifySkipped: 'Upřesnění přeskočeno',
+  aiStarterMindMap: 'Vytvořit myšlenkovou mapu tohoto dokumentu',
+  aiMindMapBtn: 'Myšlenková mapa AI',
+  aiMindMapPrompt:
+    'Vytvoř myšlenkovou mapu tohoto dokumentu a uspořádej hlavní témata a klíčové pojmy podle struktury sekcí',
+  aiSumMindMap: 'Vytvořit myšlenkovou mapu',
+  aiMindMapTitle: 'Myšlenková mapa',
+  aiMindMapNodes: '{count} uzlů',
+  aiMindMapAskPrompt: 'Pověz mi o „{label}“ v tomto dokumentu',
+  aiMindMapJump: 'Přejít na citovanou pasáž',
+  aiMindMapExport: 'Exportovat PNG',
+  aiMindMapReset: 'Obnovit zobrazení',
+  aiMindMapExpand: 'Rozbalit větev',
+  aiMindMapCollapse: 'Sbalit větev',
 } satisfies Record<keyof typeof zh, string>

@@ -708,4 +708,16 @@ describe('UniworkRemoteBar: the inset under the tab strip', () => {
     await mount(status({ kind: 'revoked' }))
     expect(bar()).not.toBeNull()
   })
+
+  it('divides the zoomed bounding-rect height by --ui-scale so main receives unscaled CSS px (R4-2)', async () => {
+    document.documentElement.style.setProperty('--ui-scale', '1.5')
+    try {
+      // 52 CSS px rendered inside the 1.5x zoomed .app-frame reports 78 window px from getBoundingClientRect
+      barHeight = 78
+      await mount(status({ kind: 'newer-dirty', version: 4 }))
+      expect(setBarInset).toHaveBeenLastCalledWith(52)
+    } finally {
+      document.documentElement.style.removeProperty('--ui-scale')
+    }
+  })
 })

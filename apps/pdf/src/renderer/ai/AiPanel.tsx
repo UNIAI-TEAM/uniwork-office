@@ -17,7 +17,18 @@ import {
   imageGenerationAvailable,
   type AiSettings,
 } from '@genoffice/ai-provider/browser'
-import { AiComposer, AiScopeQuote, AiTypingIndicator, type AiScopeQuoteData } from '@genoffice/ui'
+import {
+  AiComposer,
+  AiQueueStrip,
+  AI_QUEUE_LABELS,
+  AiScopeQuote,
+  AiTypingIndicator,
+  AiUsageChip,
+  addTokenUsage,
+  useChatRunQueue,
+  type AiScopeQuoteData,
+  type AiTokenUsageView,
+} from '@genoffice/ui'
 import { cap, platform } from '../capabilities'
 import { aiLangDirective, t as tGlobal, useI18n } from '../i18n/locale'
 import { Markdown } from '@genoffice/ui'
@@ -81,6 +92,8 @@ interface ChatEntry {
   tools?: ToolActivity[]
   /** the passage this user message targeted, frozen at send */
   scope?: AiScopeQuoteData
+  /** tokens the provider billed for this reply, summed across its turns (absent when unreported) */
+  usage?: AiTokenUsageView
 }
 
 /** longest selection excerpt echoed on a user bubble */
@@ -136,6 +149,16 @@ export function AiPanel({
   /** the question of the running turn: a restarted conversation puts it back in the composer */
   const runQuestionRef = useRef('')
   const [busy, setBusy] = useState(false)
+  /** messages queued while a reply runs; the pump re-runs them through send on settle */
+  const msgQueue = useChatRunQueue<void>({
+    busy,
+    submit: (text) => {
+      const loop = loopRef.current
+      if (!loop || loop.busy) return false
+      send(text, null)
+      return true
+    },
+  })
   const [phase, setPhase] = useState<Phase>('thinking')
   /** the scope chip's expandable preview of the selected text */
   const [scopePreviewOpen, setScopePreviewOpen] = useState(false)
@@ -150,6 +173,10 @@ export function AiPanel({
       assistant rows would break restore() on strict-alternation providers) */
   const runTextsRef = useRef<string[]>([])
   const runToolsRef = useRef<ToolActivity[]>([])
+  /** tokens billed so far in the in-flight run (summed across turns) */
+  const runUsageRef = useRef<AiTokenUsageView | undefined>(undefined)
+  /** tokens billed across the panel's session (the composer chip) */
+  const [sessionUsage, setSessionUsage] = useState<AiTokenUsageView | undefined>(undefined)
   const chatStore = () =>
     (
       window as Window & {
@@ -482,6 +509,11 @@ export function AiPanel({
           patchLast({ streaming: false, waitLine: undefined })
           setChat((prev) => [...prev, { role: 'assistant', text: '', streaming: true }])
         },
+        onUsage: (usage) => {
+          runUsageRef.current = addTokenUsage(runUsageRef.current, usage)
+          setSessionUsage((prev) => addTokenUsage(prev, usage))
+          patchLast({ usage: runUsageRef.current })
+        },
         onDone: ({ text, cancelled, turnLimit, truncated }) => {
           const base = turnLimit
             ? [text, tGlobal('aiTurnLimit')].filter(Boolean).join('\n\n')
@@ -572,6 +604,7 @@ export function AiPanel({
     segTextRef.current = ''
     runTextsRef.current = []
     runToolsRef.current = []
+    runUsageRef.current = undefined
     setChat((prev) => [
       ...prev,
       { role: 'user', text: instruction, ...(scope ? { scope } : {}) },
@@ -597,6 +630,14 @@ export function AiPanel({
   }
 
   const stop = (): void => loopRef.current?.cancel()
+
+  /** Enter while a reply runs: the draft joins the queue above the composer */
+  const enqueueDraft = () => {
+    const text = prompt.trim()
+    if (!text) return
+    msgQueue.enqueue(text, undefined)
+    setPrompt('')
+  }
 
   // One-click AI actions from the ribbon / Ask popover; while a run is active the
   // preset lands in the composer instead of being dropped silently (markdown parity)
@@ -723,6 +764,7 @@ export function AiPanel({
                 loopRef.current?.reset()
                 clarify.dismiss()
                 clarify.clearReceipts()
+                msgQueue.clear()
                 setBusy(false)
                 setChat([])
               }}
@@ -832,6 +874,11 @@ export function AiPanel({
                 </div>
               }
               {hasTools && <ToolChipList tools={entry.tools!} />}
+              {entry.usage && (
+                <div className="ai-message-usage">
+                  <AiUsageChip usage={entry.usage} lang={lang} />
+                </div>
+              )}
               {entry.text && (
                 <div dir="auto">
                   <Markdown text={aiNoticeBody(entry.text)} nav={pdfNav} />
@@ -888,6 +935,20 @@ export function AiPanel({
           </div>
         )}
         <AiComposer
+          queueStrip={
+            <AiQueueStrip
+              items={msgQueue.queued}
+              labels={AI_QUEUE_LABELS[lang]}
+              onUpdate={msgQueue.update}
+              onRemove={msgQueue.remove}
+              onClear={msgQueue.clear}
+              paused={msgQueue.paused}
+              onTogglePause={msgQueue.togglePaused}
+              onMove={msgQueue.move}
+            />
+          }
+          onQueue={enqueueDraft}
+          queuePlaceholder={AI_QUEUE_LABELS[lang].queuePlaceholder}
           value={prompt}
           busy={busy}
           header={
@@ -944,7 +1005,12 @@ export function AiPanel({
           sendLabel={t('aiSend')}
           stopLabel={t('aiStop')}
           iconOnly
-          footerStart={<AiModelPicker bridge={MODEL_BRIDGE} lang={lang} />}
+          footerStart={
+            <>
+              <AiModelPicker bridge={MODEL_BRIDGE} lang={lang} />
+              {sessionUsage && <AiUsageChip usage={sessionUsage} session lang={lang} />}
+            </>
+          }
           sendIconEnabled={<img src={sendEnterOn} alt="" aria-hidden />}
           sendIconDisabled={<img src={sendEnterOff} alt="" aria-hidden />}
           stopIcon={<img src={sendStop} alt="" aria-hidden />}
