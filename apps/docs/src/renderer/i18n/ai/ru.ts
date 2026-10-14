@@ -197,4 +197,17 @@ export const ru = {
   aiClarifySubmit: 'Продолжить',
   aiSumClarify: 'Уточнения получены',
   aiSumClarifySkipped: 'Уточнения пропущены',
+  aiStarterMindMap: 'Создать ментальную карту документа',
+  aiMindMapBtn: 'ИИ-ментальная карта',
+  aiMindMapPrompt:
+    'Создай ментальную карту этого документа, организовав основные темы и ключевые понятия по структуре разделов',
+  aiSumMindMap: 'Создать ментальную карту',
+  aiMindMapTitle: 'Ментальная карта',
+  aiMindMapNodes: '{count} узлов',
+  aiMindMapAskPrompt: 'Расскажи про «{label}» в этом документе',
+  aiMindMapJump: 'Перейти к цитируемому фрагменту',
+  aiMindMapExport: 'Экспорт PNG',
+  aiMindMapReset: 'Сбросить вид',
+  aiMindMapExpand: 'Развернуть ветку',
+  aiMindMapCollapse: 'Свернуть ветку',
 } satisfies Record<keyof typeof zh, string>

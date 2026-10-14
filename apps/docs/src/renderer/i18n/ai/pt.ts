@@ -200,4 +200,17 @@ export const pt = {
   aiClarifySubmit: 'Continuar',
   aiSumClarify: 'Esclarecimento respondido',
   aiSumClarifySkipped: 'Esclarecimento ignorado',
+  aiStarterMindMap: 'Gerar um mapa mental deste documento',
+  aiMindMapBtn: 'Mapa mental IA',
+  aiMindMapPrompt:
+    'Gere um mapa mental deste documento, organizando os temas principais e conceitos-chave pela estrutura de seções',
+  aiSumMindMap: 'Gerar mapa mental',
+  aiMindMapTitle: 'Mapa mental',
+  aiMindMapNodes: '{count} nós',
+  aiMindMapAskPrompt: 'Fale sobre "{label}" neste documento',
+  aiMindMapJump: 'Ir para o trecho citado',
+  aiMindMapExport: 'Exportar PNG',
+  aiMindMapReset: 'Redefinir visualização',
+  aiMindMapExpand: 'Expandir ramo',
+  aiMindMapCollapse: 'Recolher ramo',
 } satisfies Record<keyof typeof zh, string>
