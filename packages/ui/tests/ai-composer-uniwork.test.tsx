@@ -6,12 +6,7 @@ import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { aiNoticeText, composerNoteFor, type ComposerNote } from '@genoffice/ai-provider'
 import { AiComposer, type AiComposerProps } from '../src/AiComposer'
-import {
-  ack,
-  clearUniworkAcks,
-  isAcked,
-  type UniworkAckKey,
-} from '../src/ai-uniwork-composer'
+import { ack, clearUniworkAcks, isAcked, type UniworkAckKey } from '../src/ai-uniwork-composer'
 import { aiUniworkText } from '../src/strings-ai-uniwork'
 
 let host: HTMLDivElement
@@ -135,6 +130,39 @@ describe('AiComposer — UniWork AI composer note (S7) and view-only coexistence
     }
   })
 
+  it('translates not_entitled and credits_exhausted composer notes in the active locale across non-en/vi locales (RF1-18)', () => {
+    const enNotEntitled = aiNoticeText('not_entitled', 'en')
+    const enExhausted = aiNoticeText('credits_exhausted', 'en')
+
+    for (const lang of ['de', 'ja', 'zh', 'fr'] as const) {
+      renderComposer({
+        lang,
+        uniwork: {
+          active: true,
+          provider: 'uniwork',
+          note: { kind: 'not-entitled', key: 'not_entitled', action: 'choose-provider' },
+        },
+      })
+      const notEntitledText =
+        host.querySelector<HTMLElement>('.ai-uniwork-composer-note-text')?.textContent ?? ''
+      expect(notEntitledText.length).toBeGreaterThan(0)
+      expect(notEntitledText).not.toBe(enNotEntitled)
+
+      renderComposer({
+        lang,
+        uniwork: {
+          active: true,
+          provider: 'uniwork',
+          note: { kind: 'credits-exhausted', key: 'credits_exhausted', action: 'choose-provider' },
+        },
+      })
+      const exhaustedText =
+        host.querySelector<HTMLElement>('.ai-uniwork-composer-note-text')?.textContent ?? ''
+      expect(exhaustedText.length).toBeGreaterThan(0)
+      expect(exhaustedText).not.toBe(enExhausted)
+    }
+  })
+
   it('never auto-hides over time, clears when its action button is clicked, and resets when provider changes', () => {
     vi.useFakeTimers()
     try {
@@ -247,9 +275,7 @@ describe('AiComposer — First-use disclosure & local-file variant (S8 + G05BE-6
 
     const region = host.querySelector<HTMLElement>('[role="region"]')
     expect(region).not.toBeNull()
-    expect(region!.getAttribute('aria-label')).toBe(
-      aiUniworkText('vi', 'aiUniworkDisclosureLabel'),
-    )
+    expect(region!.getAttribute('aria-label')).toBe(aiUniworkText('vi', 'aiUniworkDisclosureLabel'))
     expect(region!.getAttribute('tabindex')).toBe('-1')
     expect(region!.textContent).toContain(
       aiUniworkText('vi', 'aiUniworkDisclosure', { org: 'Acme Corp' }),
@@ -314,7 +340,9 @@ describe('AiComposer — First-use disclosure & local-file variant (S8 + G05BE-6
     // Must NOT be native disabled so keyboard users can tab to it and hear aria-describedby
     expect(sendBtn.disabled).toBe(false)
 
-    const describedBy = (sendBtn.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(Boolean)
+    const describedBy = (sendBtn.getAttribute('aria-describedby') ?? '')
+      .split(/\s+/)
+      .filter(Boolean)
     expect(describedBy.length).toBeGreaterThanOrEqual(2)
     const describedText = describedBy
       .map((id) => document.getElementById(id)?.textContent ?? '')
@@ -399,9 +427,9 @@ describe('AiComposer — First-use disclosure & local-file variant (S8 + G05BE-6
       },
     })
     expect(host.querySelector('[role="region"]')).not.toBeNull()
-    expect(host.querySelector<HTMLButtonElement>('.ai-send-btn')!.getAttribute('aria-disabled')).toBe(
-      'true',
-    )
+    expect(
+      host.querySelector<HTMLButtonElement>('.ai-send-btn')!.getAttribute('aria-disabled'),
+    ).toBe('true')
   })
 })
 
@@ -412,10 +440,12 @@ describe('AiComposer — Send/Stop labels, polite live announcements, Escape gua
     ack(ackKey)
   })
 
-  it('uses aiRunSend and aiRunStop when UniWork AI is active and announces aiRunRunning / aiRunStopped politely', () => {
+  it('announces aiRunRunning when starting, does NOT announce aiRunStopped on normal completion, and announces aiRunStopped when user stops (RF1-5)', () => {
+    const onStop = vi.fn()
     renderComposer({
       lang: 'vi',
       busy: false,
+      onStop,
       uniwork: {
         active: true,
         provider: 'uniwork',
@@ -431,6 +461,7 @@ describe('AiComposer — Send/Stop labels, polite live announcements, Escape gua
     renderComposer({
       lang: 'vi',
       busy: true,
+      onStop,
       uniwork: {
         active: true,
         provider: 'uniwork',
@@ -445,20 +476,40 @@ describe('AiComposer — Send/Stop labels, polite live announcements, Escape gua
     const liveEl = host.querySelector<HTMLElement>('[role="status"][aria-live="polite"]')!
     expect(liveEl.textContent).toBe(aiUniworkText('vi', 'aiRunRunning'))
 
-    // Transition busy: true -> false
+    // Normal completion (busy: true -> false without clicking Stop or pressing Escape) must NOT announce aiRunStopped
     renderComposer({
       lang: 'vi',
       busy: false,
+      onStop,
       uniwork: {
         active: true,
         provider: 'uniwork',
         disclosure: { ackKey, orgName: 'Org', variant: 'document' },
       },
     })
+    expect(liveEl.textContent).not.toBe(aiUniworkText('vi', 'aiRunStopped'))
+
+    // Start a second run and stop via the Stop button -> announces aiRunStopped
+    renderComposer({
+      lang: 'vi',
+      busy: true,
+      onStop,
+      uniwork: {
+        active: true,
+        provider: 'uniwork',
+        disclosure: { ackKey, orgName: 'Org', variant: 'document' },
+      },
+    })
+    expect(liveEl.textContent).toBe(aiUniworkText('vi', 'aiRunRunning'))
+
+    act(() => {
+      host.querySelector<HTMLButtonElement>('.ai-stop-btn')!.click()
+    })
+    expect(onStop).toHaveBeenCalledTimes(1)
     expect(liveEl.textContent).toBe(aiUniworkText('vi', 'aiRunStopped'))
   })
 
-  it('Escape stops the run only when focus is inside the composer and no popup is open', () => {
+  it('Escape stops the run when focus is inside the composer, ignores persistent document listboxes/expanded elements, and blocks only on composer-owned popups (RF1-8)', () => {
     const onStop = vi.fn()
     renderComposer({
       lang: 'vi',
@@ -472,6 +523,7 @@ describe('AiComposer — Send/Stop labels, polite live announcements, Escape gua
     })
 
     const textarea = host.querySelector<HTMLTextAreaElement>('.ai-input')!
+    const inputBox = host.querySelector<HTMLElement>('.ai-input-box')!
     textarea.focus()
 
     // While popupOpen prop is true, Escape does NOT call onStop
@@ -487,7 +539,7 @@ describe('AiComposer — Send/Stop labels, polite live announcements, Escape gua
     })
     expect(onStop).not.toHaveBeenCalled()
 
-    // While a DOM listbox/menu/dialog is open, Escape does NOT call onStop
+    // While a listbox/menu/dialog is open INSIDE the composer (.ai-input-box), Escape does NOT call onStop
     renderComposer({
       lang: 'vi',
       busy: true,
@@ -495,23 +547,38 @@ describe('AiComposer — Send/Stop labels, polite live announcements, Escape gua
       popupOpen: false,
       uniwork: { active: true, provider: 'uniwork' },
     })
-    const listbox = document.createElement('div')
-    listbox.setAttribute('role', 'listbox')
-    document.body.append(listbox)
+    const composerListbox = document.createElement('div')
+    composerListbox.setAttribute('role', 'listbox')
+    inputBox.append(composerListbox)
     act(() => {
       textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
     })
     expect(onStop).not.toHaveBeenCalled()
-    listbox.remove()
+    composerListbox.remove()
 
-    // With no popup open and focus inside composer, Escape calls onStop
+    // Persistent listbox or aria-expanded="true" OUTSIDE the composer (e.g. StylesPane/NavPane, thread toggles) must NOT block Escape
+    const outsideListbox = document.createElement('div')
+    outsideListbox.setAttribute('role', 'listbox')
+    const outsideToggle = document.createElement('button')
+    outsideToggle.setAttribute('aria-expanded', 'true')
+    document.body.append(outsideListbox, outsideToggle)
+
+    // Inline collapsible without aria-haspopup inside the composer (e.g. AiQueueStrip toggle) must NOT block Escape
+    const inlineToggle = document.createElement('button')
+    inlineToggle.setAttribute('aria-expanded', 'true')
+    inputBox.append(inlineToggle)
+
     act(() => {
       textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
     })
     expect(onStop).toHaveBeenCalledTimes(1)
+
+    outsideListbox.remove()
+    outsideToggle.remove()
+    inlineToggle.remove()
   })
 
-  it('defines 44x44px coarse pointer targets and uses only semantic tokens in ai-uniwork-composer.css', () => {
+  it('defines 44x44px coarse pointer targets, uses only semantic tokens, and exports/imports ai-uniwork-composer.css from @genoffice/ui (RF1-3)', () => {
     const css = readFileSync(
       resolve(__dirname, '../src/ai-uniwork-composer/ai-uniwork-composer.css'),
       'utf8',
@@ -521,5 +588,18 @@ describe('AiComposer — Send/Stop labels, polite live announcements, Escape gua
     expect(css).toMatch(/min-height:\s*44px/)
     expect(css).not.toMatch(/#[0-9a-fA-F]{3,8}\b/)
     expect(css).not.toMatch(/\brgba?\s*\(/)
+
+    const pkgJson = JSON.parse(readFileSync(resolve(__dirname, '../package.json'), 'utf8')) as {
+      exports?: Record<string, string>
+    }
+    expect(pkgJson.exports?.['./ai-uniwork-composer.css']).toBe(
+      './src/ai-uniwork-composer/ai-uniwork-composer.css',
+    )
+
+    const composerIndexSrc = readFileSync(
+      resolve(__dirname, '../src/ai-uniwork-composer/index.tsx'),
+      'utf8',
+    )
+    expect(composerIndexSrc).toContain("import './ai-uniwork-composer.css'")
   })
 })

@@ -141,33 +141,62 @@ describe('ai-uniwork string shards', () => {
       'Bạn đang gửi quá nhanh. Thử lại sau 30 giây.',
     )
     expect(aiUniworkText('en', 'cloudCreditsLeft', { remaining: 10, limit: 100 })).toBe(
-      '10 of 100 left',
+      '10 / 100 left',
     )
     expect(aiUniworkText('en', 'cloudCreditsRenews', { date: '2026-11-01' })).toBe(
       'Renews 2026-11-01',
     )
-    expect(aiUniworkText('en', 'aiResultCellsMeta', { count: 4, sheets: 2 })).toBe(
-      '4 cells · 2 sheets',
-    )
+    expect(
+      aiUniworkText('en', 'aiResultCellsMeta', {
+        written: 4,
+        range: 'A1:B2',
+        overwritten: 2,
+      }),
+    ).toBe('Cells written: 4 (A1:B2) · Existing cells overwritten: 2')
   })
 
-  it('includes the G6-05u cloud, account, local-file restart, sheet meta and web 413 keys in all locales', () => {
-    expect(aiUniworkText('en', 'acctSignIn')).toBe('Sign in to UniWork')
-    expect(aiUniworkText('vi', 'acctSignIn')).toBe('Đăng nhập UniWork')
+  it('includes the G6-05u cloud, account, local-file restart, sheet meta, web 413 and composer notice keys in all locales (C6, RF1-18)', () => {
+    expect(aiUniworkText('en', 'acctSignIn')).toBe('Sign in')
+    expect(aiUniworkText('vi', 'acctSignIn')).toBe('Đăng nhập')
     expect(aiUniworkText('en', 'acctSignInAgain')).toBe('Sign in again')
     expect(aiUniworkText('vi', 'acctSignInAgain')).toBe('Đăng nhập lại')
     expect(aiUniworkText('en', 'cloudStateReady')).toBe('Available')
     expect(aiUniworkText('vi', 'cloudStateReady')).toBe('Sẵn sàng')
     expect(aiUniworkText('en', 'cloudInactiveBody')).toContain('subscription is not active')
-    expect(aiUniworkText('vi', 'cloudInactiveBody')).toContain('chưa hoạt động')
+    expect(aiUniworkText('vi', 'cloudInactiveBody')).toContain('không hoạt động')
     expect(aiUniworkText('en', 'aiUniworkLocalFileRestart')).toContain(
-      'Closing or reopening this local file starts a new conversation',
+      'Local files start a new conversation',
     )
     expect(aiUniworkText('vi', 'aiUniworkLocalFileRestart')).toContain(
-      'Đóng hoặc mở lại tệp cục bộ này sẽ bắt đầu cuộc trò chuyện mới',
+      'Tệp trên máy bắt đầu cuộc trò chuyện mới',
     )
     expect(aiUniworkText('en', 'aiErrWorkbookTooLarge')).toContain('workbook is too large')
     expect(aiUniworkText('vi', 'aiErrWorkbookTooLarge')).toContain('Bảng tính này quá lớn')
+
+    // RF1-18: not_entitled and credits_exhausted composer note keys in all 19 locales
+    expect(aiUniworkText('en', 'not_entitled' as never)).toContain(
+      'plan does not include UniWork AI',
+    )
+    expect(aiUniworkText('vi', 'not_entitled' as never)).toContain(
+      'Gói của tổ chức bạn chưa bao gồm UniWork AI',
+    )
+    expect(aiUniworkText('en', 'credits_exhausted' as never)).toContain(
+      'used all its AI credits for this period',
+    )
+    expect(aiUniworkText('vi', 'credits_exhausted' as never)).toContain(
+      'đã dùng hết tín dụng AI trong kỳ này',
+    )
+    for (const lang of LANGS) {
+      const t = table(lang)
+      expect(t.not_entitled?.trim().length, `${lang} not_entitled`).toBeGreaterThan(0)
+      expect(t.credits_exhausted?.trim().length, `${lang} credits_exhausted`).toBeGreaterThan(0)
+      if (lang !== 'en') {
+        expect(t.not_entitled, `${lang} not_entitled localized`).not.toBe(table('en').not_entitled)
+        expect(t.credits_exhausted, `${lang} credits_exhausted localized`).not.toBe(
+          table('en').credits_exhausted,
+        )
+      }
+    }
   })
 })
 

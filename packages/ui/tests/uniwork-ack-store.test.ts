@@ -94,4 +94,64 @@ describe('UniWork AI disclosure acknowledgement store (G6-05u S8)', () => {
     act(() => root.unmount())
     host.remove()
   })
+
+  it('works with empty account, org or document fields using documented fallback scope (RF1-17)', () => {
+    const emptyAll: UniworkAckKey = { account: '', org: '', document: '' }
+    expect(isAcked(emptyAll)).toBe(false)
+    ack(emptyAll)
+    expect(isAcked(emptyAll)).toBe(true)
+
+    // Changing a non-empty field still scopes separately and re-prompts
+    const emptyAccountOtherDoc: UniworkAckKey = { account: '  ', org: 'org-1', document: 'doc-2' }
+    expect(isAcked(emptyAccountOtherDoc)).toBe(false)
+    ack(emptyAccountOtherDoc)
+    expect(isAcked(emptyAccountOtherDoc)).toBe(true)
+    expect(isAcked({ account: '', org: 'org-1', document: 'doc-3' })).toBe(false)
+  })
+
+  it('parses localStorage once rather than on every render when unacked, and reacts to window storage events (RF1-17)', () => {
+    const key: UniworkAckKey = { account: 'acc-1', org: 'org-1', document: 'doc-storage' }
+    localStorage.setItem('uniwork.office.ai.disclosure.ack.v1', JSON.stringify(['other|org|doc']))
+
+    const getItemSpy = vi.spyOn(Storage.prototype, 'getItem')
+
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root = createRoot(host)
+
+    let latestAcked = false
+    function Probe({ tick }: { tick: number }) {
+      const { acked } = useUniworkDisclosureAck(key)
+      latestAcked = acked
+      return createElement('span', { 'data-tick': String(tick), 'data-acked': String(acked) })
+    }
+
+    act(() => root.render(createElement(Probe, { tick: 1 })))
+    expect(latestAcked).toBe(false)
+    const initialCalls = getItemSpy.mock.calls.length
+    expect(initialCalls).toBe(1)
+
+    // Subsequent re-renders while unacked must NOT re-read or re-parse localStorage
+    act(() => root.render(createElement(Probe, { tick: 2 })))
+    act(() => root.render(createElement(Probe, { tick: 3 })))
+    expect(getItemSpy.mock.calls.length).toBe(1)
+
+    // Simulate another tab acknowledging the key via a window storage event
+    const nextRaw = JSON.stringify(['other|org|doc', 'acc-1|org-1|doc-storage'])
+    localStorage.setItem('uniwork.office.ai.disclosure.ack.v1', nextRaw)
+    act(() => {
+      window.dispatchEvent(
+        new StorageEvent('storage', {
+          key: 'uniwork.office.ai.disclosure.ack.v1',
+          newValue: nextRaw,
+        }),
+      )
+    })
+    expect(latestAcked).toBe(true)
+    expect(isAcked(key)).toBe(true)
+
+    getItemSpy.mockRestore()
+    act(() => root.unmount())
+    host.remove()
+  })
 })

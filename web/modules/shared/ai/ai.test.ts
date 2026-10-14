@@ -2291,15 +2291,19 @@ describe('UniWork AI on the web (G6-05)', () => {
       expect(chunks.some((c) => c.type === 'error')).toBe(false)
     })
 
-    it('maps payload_too_large to aiErrWorkbookTooLarge in uniworkFailureKey (G6-05u)', () => {
+    it('maps payload_too_large, mid-run office_capability_off, and unknown keys in uniworkFailureKey (G6-05u, C10, RF1-7)', () => {
       expect(uniworkFailureKey({ code: 'payload_too_large' })).toBe('aiErrWorkbookTooLarge')
       expect(uniworkFailureKey({ code: 'office_capability_off' })).toBe('aiUniworkOff')
       expect(uniworkFailureKey({ code: 'office_capability_off', runId: 'run-1' })).toBe(
-        'aiErrAccessRevoked',
+        'aiErrCapabilityOff',
       )
+      expect(uniworkFailureKey({ code: 'access_revoked' })).toBe('aiErrRevoked')
+      expect(
+        uniworkFailureKey({ code: 'future_unmapped_code' }, () => 'aiErrNotInDictionary'),
+      ).toBe('aiErrUnavailable')
     })
 
-    it('exposes uniworkIdentity from session and GET cloud org_id / org_name', async () => {
+    it('exposes uniworkIdentity from session and GET cloud org_id / org_name, and falls back orgName to UniWork instead of raw documentId (RF1-17)', async () => {
       const { fetch } = recorder(() =>
         jsonResponse(200, {
           ...CLOUD,
@@ -2328,6 +2332,29 @@ describe('UniWork AI on the web (G6-05)', () => {
         org: 'org-cloud-1',
         orgName: 'UniWork Org',
         document: 'doc-42',
+      })
+
+      // UniWork-only frame without cloud tools does not fetch GET /cloud; orgName must not fall back to raw documentId
+      const uniworkOnly = createWebAi({
+        port: {
+          whenInitialized: async () => ({
+            documentId: 'doc-raw-uuid-99',
+            apiBase: 'https://app.test/api/v1',
+            capabilities: { ai: false, uniworkAi: true },
+            user: { id: 'user-9', displayName: 'Bob' },
+          }),
+          ...tokens(),
+        },
+        capabilities: { ai: false, uniworkAi: true },
+        fetch,
+        origin: ORIGIN,
+      })
+      await uniworkOnly.active()
+      expect(uniworkOnly.uniworkIdentity()).toEqual({
+        account: 'user-9',
+        org: 'doc-raw-uuid-99',
+        orgName: 'UniWork',
+        document: 'doc-raw-uuid-99',
       })
     })
   })
