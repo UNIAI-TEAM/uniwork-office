@@ -36,15 +36,19 @@ import { createLockableCredentialStore } from './uniwork-auth-fakes'
  * after the session is back - and that sweep runs exactly once.
  */
 
-// counts real sweep runs without changing what the sweep does
-const sweeps = vi.hoisted(() => ({ calls: 0 }))
+// counts real sweep runs (started and finished) without changing what the sweep does
+const sweeps = vi.hoisted(() => ({ calls: 0, done: 0 }))
 vi.mock('../src/main/uniwork-sync/migration', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../src/main/uniwork-sync/migration')>()
   return {
     ...actual,
     migrateLegacyIntents: async (deps: Parameters<typeof actual.migrateLegacyIntents>[0]) => {
       sweeps.calls += 1
-      return actual.migrateLegacyIntents(deps)
+      try {
+        return await actual.migrateLegacyIntents(deps)
+      } finally {
+        sweeps.done += 1
+      }
     },
   }
 })
@@ -74,6 +78,7 @@ let dir: string
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'uw-lock-retry-'))
   sweeps.calls = 0
+  sweeps.done = 0
 })
 afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
@@ -261,7 +266,10 @@ describe('unlock + Retry ends in a live session with one migration (l.480-481)',
 
     // no explicit open here: the account listener opened the store on the
     // status push, so the sweep count below depends on the listener alone
-    await vi.waitFor(() => expect(intentRecords()).toHaveLength(1))
+    // the sweep writes the record first and rewrites the binding / drops the
+    // payload after it: wait for the sweep to finish, not just for the record
+    await vi.waitFor(() => expect(sweeps.done).toBe(1))
+    expect(intentRecords()).toHaveLength(1)
     expect(sweeps.calls).toBe(1)
     const migrated = JSON.parse(bindingText()) as Record<string, unknown>
     expect(migrated).toMatchObject({ schema: 2, min_store_level: 2 })
