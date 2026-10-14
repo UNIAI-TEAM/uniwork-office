@@ -13,6 +13,20 @@ export interface AiModelPickerStrings {
   needKey: string
   /** composer hint while a custom endpoint has a model but no server URL (its API key is optional) */
   needBaseUrl: string
+  /** S7 desktop picker footer: plan does not include UniWork AI */
+  cloudStateNotEntitled: string
+  /** S7 desktop picker footer: organization subscription is inactive */
+  cloudStateInactive: string
+  /** S7 desktop picker footer: organization AI credits are exhausted */
+  cloudStateExhausted: string
+  /** S7 desktop picker footer: UniWork cloud AI is unavailable (cloud_unavailable) */
+  cloudStateUnavailable: string
+  /** S7 desktop provider row visible credits sub-line ({remaining} / {limit}) */
+  cloudCreditsLeft: string
+  /** S7 desktop provider row credits when limit is null */
+  cloudCreditsUnlimited: string
+  /** S7 desktop picker footer action when signed out */
+  acctSignIn: string
 }
 
 export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
@@ -23,6 +37,13 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     needModel: '请先选择模型再发送',
     needKey: '请在 AI 设置中添加 API 密钥后再使用助手。',
     needBaseUrl: '请在 AI 设置中添加服务器地址后再使用助手。',
+    cloudStateNotEntitled: '套餐不含此功能',
+    cloudStateInactive: '订阅未生效',
+    cloudStateExhausted: 'AI 额度已用完',
+    cloudStateUnavailable: '暂不可用',
+    cloudCreditsLeft: '剩余 {remaining} / {limit}',
+    cloudCreditsUnlimited: '不限量',
+    acctSignIn: '登录',
   },
   en: {
     title: 'Model',
@@ -31,6 +52,13 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     needModel: 'Choose a model to send',
     needKey: 'Add an API key in AI settings to use the assistant.',
     needBaseUrl: 'Add the server URL in AI settings to use the assistant.',
+    cloudStateNotEntitled: 'Not in your plan',
+    cloudStateInactive: 'Subscription inactive',
+    cloudStateExhausted: 'Out of AI credits',
+    cloudStateUnavailable: 'Unavailable',
+    cloudCreditsLeft: '{remaining} / {limit} left',
+    cloudCreditsUnlimited: 'Unlimited',
+    acctSignIn: 'Sign in',
   },
   ja: {
     title: 'モデル',
@@ -39,6 +67,13 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     needModel: '送信するにはモデルを選択してください',
     needKey: 'アシスタントを使うには、AI 設定で API キーを追加してください。',
     needBaseUrl: 'アシスタントを使うには、AI 設定でサーバー URL を追加してください。',
+    cloudStateNotEntitled: 'プランに含まれていません',
+    cloudStateInactive: 'サブスクリプション無効',
+    cloudStateExhausted: 'AI クレジットを使い切りました',
+    cloudStateUnavailable: '現在利用できません',
+    cloudCreditsLeft: '残り {remaining} / {limit}',
+    cloudCreditsUnlimited: '無制限',
+    acctSignIn: 'ログイン',
   },
   ko: {
     title: '모델',
@@ -47,6 +82,13 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     needModel: '보내려면 모델을 선택하세요',
     needKey: '어시스턴트를 사용하려면 AI 설정에서 API 키를 추가하세요.',
     needBaseUrl: '어시스턴트를 사용하려면 AI 설정에서 서버 URL을 추가하세요.',
+    cloudStateNotEntitled: '플랜에 포함되지 않음',
+    cloudStateInactive: '구독이 활성 상태가 아님',
+    cloudStateExhausted: 'AI 크레딧 소진',
+    cloudStateUnavailable: '현재 사용할 수 없음',
+    cloudCreditsLeft: '{remaining} / {limit} 남음',
+    cloudCreditsUnlimited: '무제한',
+    acctSignIn: '로그인',
   },
   fr: {
     title: 'Modèle',
@@ -55,6 +97,13 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     needModel: 'Choisissez un modèle pour envoyer',
     needKey: 'Ajoutez une clé API dans les paramètres IA pour utiliser l’assistant.',
     needBaseUrl: 'Ajoutez l’URL du serveur dans les paramètres IA pour utiliser l’assistant.',
+    cloudStateNotEntitled: 'Non inclus dans votre offre',
+    cloudStateInactive: 'Abonnement inactif',
+    cloudStateExhausted: 'Crédits IA épuisés',
+    cloudStateUnavailable: 'Indisponible',
+    cloudCreditsLeft: '{remaining} / {limit} restants',
+    cloudCreditsUnlimited: 'Illimité',
+    acctSignIn: 'Se connecter',
   },
   de: {
     title: 'Modell',
@@ -65,6 +114,13 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
       'Fügen Sie in den KI-Einstellungen einen API-Schlüssel hinzu, um den Assistenten zu nutzen.',
     needBaseUrl:
       'Fügen Sie in den KI-Einstellungen die Server-URL hinzu, um den Assistenten zu nutzen.',
+    cloudStateNotEntitled: 'Nicht in Ihrem Tarif',
+    cloudStateInactive: 'Abonnement inaktiv',
+    cloudStateExhausted: 'KI-Guthaben aufgebraucht',
+    cloudStateUnavailable: 'Nicht verfügbar',
+    cloudCreditsLeft: '{remaining} / {limit} übrig',
+    cloudCreditsUnlimited: 'Unbegrenzt',
+    acctSignIn: 'Anmelden',
   },
   es: {
     title: 'Modelo',
@@ -73,6 +129,13 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     needModel: 'Elige un modelo para enviar',
     needKey: 'Añade una clave de API en los ajustes de IA para usar el asistente.',
     needBaseUrl: 'Añade la URL del servidor en los ajustes de IA para usar el asistente.',
+    cloudStateNotEntitled: 'No incluido en tu plan',
+    cloudStateInactive: 'Suscripción inactiva',
+    cloudStateExhausted: 'Sin créditos de IA',
+    cloudStateUnavailable: 'No disponible',
+    cloudCreditsLeft: 'Quedan {remaining} / {limit}',
+    cloudCreditsUnlimited: 'Ilimitado',
+    acctSignIn: 'Iniciar sesión',
   },
   th: {
     title: 'โมเดล',
@@ -81,6 +144,13 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     needModel: 'เลือกโมเดลก่อนส่ง',
     needKey: 'เพิ่มคีย์ API ในการตั้งค่า AI เพื่อใช้ผู้ช่วย',
     needBaseUrl: 'เพิ่ม URL ของเซิร์ฟเวอร์ในการตั้งค่า AI เพื่อใช้ผู้ช่วย',
+    cloudStateNotEntitled: 'ไม่รวมในแพ็กเกจของคุณ',
+    cloudStateInactive: 'การสมัครสมาชิกไม่ใช้งาน',
+    cloudStateExhausted: 'เครดิต AI หมดแล้ว',
+    cloudStateUnavailable: 'ใช้งานไม่ได้ในขณะนี้',
+    cloudCreditsLeft: 'เหลือ {remaining} / {limit}',
+    cloudCreditsUnlimited: 'ไม่จำกัด',
+    acctSignIn: 'ลงชื่อเข้าใช้',
   },
   id: {
     title: 'Model',
@@ -89,6 +159,13 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     needModel: 'Pilih model untuk mengirim',
     needKey: 'Tambahkan kunci API di pengaturan AI untuk memakai asisten.',
     needBaseUrl: 'Tambahkan URL server di pengaturan AI untuk memakai asisten.',
+    cloudStateNotEntitled: 'Tidak termasuk dalam paket Anda',
+    cloudStateInactive: 'Langganan tidak aktif',
+    cloudStateExhausted: 'Kredit AI habis',
+    cloudStateUnavailable: 'Tidak tersedia',
+    cloudCreditsLeft: 'Sisa {remaining} / {limit}',
+    cloudCreditsUnlimited: 'Tanpa batas',
+    acctSignIn: 'Masuk',
   },
   ru: {
     title: 'Модель',
@@ -97,6 +174,13 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     needModel: 'Выберите модель, чтобы отправить',
     needKey: 'Добавьте ключ API в настройках ИИ, чтобы пользоваться помощником.',
     needBaseUrl: 'Добавьте URL сервера в настройках ИИ, чтобы пользоваться помощником.',
+    cloudStateNotEntitled: 'Не входит в ваш тариф',
+    cloudStateInactive: 'Подписка неактивна',
+    cloudStateExhausted: 'Кредиты ИИ закончились',
+    cloudStateUnavailable: 'Недоступен',
+    cloudCreditsLeft: 'Осталось {remaining} / {limit}',
+    cloudCreditsUnlimited: 'Без ограничений',
+    acctSignIn: 'Войти',
   },
   ar: {
     title: 'النموذج',
@@ -105,6 +189,13 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     needModel: 'اختر نموذجًا للإرسال',
     needKey: 'أضف مفتاح API في إعدادات الذكاء الاصطناعي لاستخدام المساعد.',
     needBaseUrl: 'أضف عنوان URL للخادم في إعدادات الذكاء الاصطناعي لاستخدام المساعد.',
+    cloudStateNotEntitled: 'غير مضمّن في خطتك',
+    cloudStateInactive: 'الاشتراك غير نشط',
+    cloudStateExhausted: 'نفدت أرصدة الذكاء الاصطناعي',
+    cloudStateUnavailable: 'غير متاح',
+    cloudCreditsLeft: 'متبقٍ {remaining} / {limit}',
+    cloudCreditsUnlimited: 'غير محدود',
+    acctSignIn: 'تسجيل الدخول',
   },
   pt: {
     title: 'Modelo',
@@ -113,6 +204,13 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     needModel: 'Escolha um modelo para enviar',
     needKey: 'Adicione uma chave de API nas configurações de IA para usar o assistente.',
     needBaseUrl: 'Adicione o URL do servidor nas configurações de IA para usar o assistente.',
+    cloudStateNotEntitled: 'Não incluído no seu plano',
+    cloudStateInactive: 'Assinatura inativa',
+    cloudStateExhausted: 'Créditos de IA esgotados',
+    cloudStateUnavailable: 'Indisponível',
+    cloudCreditsLeft: 'Restam {remaining} / {limit}',
+    cloudCreditsUnlimited: 'Ilimitado',
+    acctSignIn: 'Entrar',
   },
   it: {
     title: 'Modello',
@@ -121,6 +219,13 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     needModel: 'Scegli un modello per inviare',
     needKey: 'Aggiungi una chiave API nelle impostazioni IA per usare l’assistente.',
     needBaseUrl: 'Aggiungi l’URL del server nelle impostazioni IA per usare l’assistente.',
+    cloudStateNotEntitled: 'Non incluso nel tuo piano',
+    cloudStateInactive: 'Abbonamento inattivo',
+    cloudStateExhausted: 'Crediti IA esauriti',
+    cloudStateUnavailable: 'Non disponibile',
+    cloudCreditsLeft: '{remaining} / {limit} rimasti',
+    cloudCreditsUnlimited: 'Illimitato',
+    acctSignIn: 'Accedi',
   },
   pl: {
     title: 'Model',
@@ -129,6 +234,13 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     needModel: 'Wybierz model, aby wysłać',
     needKey: 'Dodaj klucz API w ustawieniach AI, aby korzystać z asystenta.',
     needBaseUrl: 'Dodaj adres URL serwera w ustawieniach AI, aby korzystać z asystenta.',
+    cloudStateNotEntitled: 'Nie ma w Twoim planie',
+    cloudStateInactive: 'Subskrypcja nieaktywna',
+    cloudStateExhausted: 'Brak kredytów AI',
+    cloudStateUnavailable: 'Niedostępna',
+    cloudCreditsLeft: 'Pozostało {remaining} / {limit}',
+    cloudCreditsUnlimited: 'Bez limitu',
+    acctSignIn: 'Zaloguj się',
   },
   cs: {
     title: 'Model',
@@ -137,6 +249,13 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     needModel: 'Pro odeslání vyberte model',
     needKey: 'Pro použití asistenta přidejte v nastavení AI klíč API.',
     needBaseUrl: 'Pro použití asistenta přidejte v nastavení AI adresu URL serveru.',
+    cloudStateNotEntitled: 'Není ve vašem tarifu',
+    cloudStateInactive: 'Předplatné není aktivní',
+    cloudStateExhausted: 'Kredity AI vyčerpány',
+    cloudStateUnavailable: 'Nedostupné',
+    cloudCreditsLeft: 'Zbývá {remaining} / {limit}',
+    cloudCreditsUnlimited: 'Neomezeně',
+    acctSignIn: 'Přihlásit se',
   },
   nl: {
     title: 'Model',
@@ -145,6 +264,13 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     needModel: 'Kies een model om te versturen',
     needKey: 'Voeg een API-sleutel toe in de AI-instellingen om de assistent te gebruiken.',
     needBaseUrl: 'Voeg de server-URL toe in de AI-instellingen om de assistent te gebruiken.',
+    cloudStateNotEntitled: 'Niet in je abonnement',
+    cloudStateInactive: 'Abonnement inactief',
+    cloudStateExhausted: 'AI-tegoed op',
+    cloudStateUnavailable: 'Niet beschikbaar',
+    cloudCreditsLeft: '{remaining} / {limit} over',
+    cloudCreditsUnlimited: 'Onbeperkt',
+    acctSignIn: 'Aanmelden',
   },
   ms: {
     title: 'Model',
@@ -153,6 +279,13 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     needModel: 'Pilih model untuk menghantar',
     needKey: 'Tambah kunci API dalam tetapan AI untuk menggunakan pembantu.',
     needBaseUrl: 'Tambah URL pelayan dalam tetapan AI untuk menggunakan pembantu.',
+    cloudStateNotEntitled: 'Tiada dalam pelan anda',
+    cloudStateInactive: 'Langganan tidak aktif',
+    cloudStateExhausted: 'Kredit AI habis',
+    cloudStateUnavailable: 'Tidak tersedia',
+    cloudCreditsLeft: 'Baki {remaining} / {limit}',
+    cloudCreditsUnlimited: 'Tanpa had',
+    acctSignIn: 'Log masuk',
   },
   he: {
     title: 'מודל',
@@ -161,6 +294,13 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     needModel: 'בחרו מודל כדי לשלוח',
     needKey: 'הוסף מפתח API בהגדרות ה-AI כדי להשתמש בעוזר.',
     needBaseUrl: 'הוסף את כתובת ה-URL של השרת בהגדרות ה-AI כדי להשתמש בעוזר.',
+    cloudStateNotEntitled: 'לא כלול בתוכנית שלך',
+    cloudStateInactive: 'המנוי אינו פעיל',
+    cloudStateExhausted: 'נגמרו קרדיטי ה-AI',
+    cloudStateUnavailable: 'לא זמין',
+    cloudCreditsLeft: 'נותרו {remaining} / {limit}',
+    cloudCreditsUnlimited: 'ללא הגבלה',
+    acctSignIn: 'התחברות',
   },
   hi: {
     title: 'मॉडल',
@@ -169,6 +309,13 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     needModel: 'भेजने के लिए मॉडल चुनें',
     needKey: 'सहायक का उपयोग करने के लिए AI सेटिंग में API कुंजी जोड़ें।',
     needBaseUrl: 'सहायक का उपयोग करने के लिए AI सेटिंग में सर्वर URL जोड़ें।',
+    cloudStateNotEntitled: 'आपके प्लान में शामिल नहीं',
+    cloudStateInactive: 'सदस्यता सक्रिय नहीं है',
+    cloudStateExhausted: 'AI क्रेडिट खत्म',
+    cloudStateUnavailable: 'अभी उपलब्ध नहीं',
+    cloudCreditsLeft: '{remaining} / {limit} शेष',
+    cloudCreditsUnlimited: 'असीमित',
+    acctSignIn: 'साइन इन करें',
   },
   'zh-TW': {
     title: '模型',
@@ -177,6 +324,13 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     needModel: '請先選擇模型再傳送',
     needKey: '請在 AI 設定中新增 API 金鑰後再使用助理。',
     needBaseUrl: '請在 AI 設定中新增伺服器網址後再使用助理。',
+    cloudStateNotEntitled: '方案未包含此功能',
+    cloudStateInactive: '訂閱未生效',
+    cloudStateExhausted: 'AI 額度已用完',
+    cloudStateUnavailable: '暫時無法使用',
+    cloudCreditsLeft: '剩餘 {remaining} / {limit}',
+    cloudCreditsUnlimited: '不限量',
+    acctSignIn: '登入',
   },
   vi: {
     title: 'Mô hình',
@@ -185,5 +339,12 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     needModel: 'Chọn mô hình để gửi',
     needKey: 'Thêm khóa API trong Cài đặt AI để dùng trợ lý.',
     needBaseUrl: 'Thêm URL máy chủ trong Cài đặt AI để dùng trợ lý.',
+    cloudStateNotEntitled: 'Gói hiện tại chưa bao gồm',
+    cloudStateInactive: 'Gói đăng ký không hoạt động',
+    cloudStateExhausted: 'Đã hết tín dụng AI',
+    cloudStateUnavailable: 'Tạm thời không dùng được',
+    cloudCreditsLeft: 'Còn {remaining} / {limit}',
+    cloudCreditsUnlimited: 'Không giới hạn',
+    acctSignIn: 'Đăng nhập',
   },
 }

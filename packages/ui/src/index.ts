@@ -154,3 +154,9 @@ export {
   type AiModelPickerSelection,
 } from './ai-model-picker-options'
 export { ProviderLogo } from './provider-logos'
+export type {
+  AiModelPickerCloudCredits,
+  AiModelPickerCloudState,
+  AiModelPickerCloudStatus,
+} from './AiModelPicker'
+
