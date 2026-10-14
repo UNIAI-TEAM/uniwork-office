@@ -274,6 +274,12 @@ export function CollabComposer(props: CollabComposerProps) {
     } else if (e.key === 'Escape') {
       // an empty persistent discussion composer has nothing to cancel: Esc falls through so the host closes its panel
       if (isDiscussion && !dirty) return
+      // an empty new-thread composer cancels itself but leaves the Esc unconsumed, so a host that closes
+      // its pane on a non-prevented Esc (Slides) still sees it; a dirty one keeps the Discard dialog
+      if (mode === 'root' && !dirty) {
+        requestCancel()
+        return
+      }
       e.preventDefault()
       e.stopPropagation()
       requestCancel()
