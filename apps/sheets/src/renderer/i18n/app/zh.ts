@@ -486,6 +486,7 @@ export const zh = {
   appPrintCanceled: '打印已取消。',
   appPrintFailed: '无法打印。',
   appPrintNeedsFullLoad: '打印需要工作簿完整加载——请等待加载完成。',
+  appPrintWorkbookTooLarge: '此工作簿过大，无法完整载入内存，因此无法打印或导出为 PDF。',
   appCsvExportNeedsFullLoad: 'CSV 导出需要工作簿完整加载——请等待加载完成。',
   appCsvExportTooLarge: '工作表太大,无法导出 CSV。',
   appCsvExportCanceled: 'CSV 导出已取消。',
@@ -1014,6 +1015,9 @@ export const zh = {
   appHeadings: '标题',
   appHeadingsHidden: '行列标题已隐藏。',
   appHeadingsShown: '行列标题已显示。',
+  appRightToLeft: '从右到左',
+  appRightToLeftOn: '网格方向：从右到左。',
+  appRightToLeftOff: '网格方向：从左到右。',
   appPrintHeadingsTitle: '打印行号列标',
   // Formulas tab
   appGroupFunctionLibrary: '函数库',

@@ -25,6 +25,9 @@ export const MARKDOWN_WEB_CAPABILITIES = Object.freeze({
   imageHost: false,
   // AI insert_image downloads through the desktop main process; fetchImage is a stub here
   aiImageFetch: false,
+  // the paper theme persists in the desktop's image-host config file (markdown:get/set-theme);
+  // a picker that cannot remember the choice after a reload is a dead control
+  mdTheme: false,
 })
 
 /**
@@ -142,6 +145,17 @@ export function createMarkdownWebApi(ctx: ModuleBridgeContext, opts: TextWebApiO
     | 'onThemeChanged'
     | 'getAutoSaveDefault'
     | 'onAutoSaveDefaultChanged'
+    // desktop-only setting (mdTheme capability off): hidden, never called on the web
+    | 'getMarkdownTheme'
+    | 'setMarkdownTheme'
+    // wiki links resolve against the file tree and open a note through the shell; a frame
+    // holds one document and has neither. The renderer already tolerates the absence: the
+    // resolver call is caught (links simply stay undecorated) and the fragment take is
+    // typeof-guarded, so nothing throws.
+    | 'resolveWikiLinks'
+    | 'rememberWikiFragment'
+    | 'takeWikiFragment'
+    | 'openSourcePath'
   >
   return Object.assign(api, {
     // web-only (renderer: editor/localImage.ts): relative pictures through OpenPayload.assets

@@ -30,6 +30,8 @@ import type { MenuItemConstructorOptions, NativeImage, WebContents } from 'elect
 import { atomicCopyFile, atomicWriteFile } from './atomic-write'
 import { tabStripOverlay } from './title-bar-overlay'
 import { legalDocPath, openLegalDoc, type LegalDocEnv } from './legal-docs'
+import { applyUiScaleTo, applyUiScaleToAll, onUiScaleChanged, readUiScale } from './ui-scale'
+import { uiScaleMenuItems, withViewMenu } from './ui-scale-menu'
 import menuDocxIcon1x from './assets/menu-docx.png?asset'
 import menuDocxIcon2x from './assets/menu-docx@2x.png?asset'
 import menuXlsxIcon1x from './assets/menu-xlsx.png?asset'
@@ -135,12 +137,15 @@ import {
   docsFileRenamed,
   readRecentFiles,
   readStarredFiles,
+  readStarredGroupMap,
+  readStarredGroups,
   recordRecentFile,
   removeRecentFiles,
   removeStarredFiles,
   replaceRecentFile,
   registerAiIpc,
   registerProjectIpc,
+  setStarredGroup,
   toggleStarredFile,
   registerDocsIpc,
   exportDocsHeadless,
@@ -404,11 +409,30 @@ import { isUpdateChannel, type UpdateChannel } from '../shared/update-api'
 // run silently quits and forwards its argv to the running installed UniWork Office.
 // GENOFFICE_USER_DATA: test drivers point this at a scratch dir so an
 // automated instance can run alongside the dev instance (separate lock).
-if (!app.isPackaged)
-  app.setPath(
-    'userData',
-    process.env.GENOFFICE_USER_DATA ?? join(app.getPath('appData'), 'UniWork Office Dev'),
-  )
+if (!app.isPackaged) {
+  if (process.env.GENOFFICE_USER_DATA) {
+    app.setPath('userData', process.env.GENOFFICE_USER_DATA)
+  } else {
+    // The dev profile used to live in "UniWork Office Dev"; the space breaks
+    // unquoted shell expansions, rsync targets and .desktop Exec= lines, and
+    // XDG config entries are single tokens (#1817). "UniWork-Office-Dev" keeps
+    // the UniWork product name of the packaged profile. The old directory
+    // moves once — it sits on the same volume as appData, so the rename is
+    // atomic, and a concurrent dev instance keeps its open file handles.
+    const appData = app.getPath('appData')
+    const devDir = join(appData, 'UniWork-Office-Dev')
+    const oldDevDir = join(appData, 'UniWork Office Dev')
+    if (existsSync(oldDevDir) && !existsSync(devDir)) {
+      try {
+        renameSync(oldDevDir, devDir)
+      } catch {
+        // another dev instance is mid-migration or holds the directory:
+        // continuing with a fresh profile beats failing the launch
+      }
+    }
+    app.setPath('userData', devDir)
+  }
+}
 
 /**
  * `--headless-export <file> --to <format> --out <path> [--json]`: one document, no
@@ -622,6 +646,7 @@ function currentAiPanelPrefs(): AiPanelPrefs {
     customFontSize: saved.aiPanelCustomFontSize,
     spellcheck: saved.aiPanelSpellcheck,
     openInNewDocs: saved.aiPanelOpenInNewDocs,
+    showAiSidebar: saved.aiPanelShowSidebar,
   })
   return cachedAiPanelPrefs
 }
@@ -665,6 +690,10 @@ const tMain = createI18n({
     menuSaveAs: '另存为…',
     menuClose: '关闭',
     menuEdit: '编辑',
+    menuView: '视图',
+    menuUiZoomIn: '界面放大',
+    menuUiZoomOut: '界面缩小',
+    menuUiZoomReset: '界面缩放重置为 100%',
     menuWindow: '窗口',
     menuHome: '首页',
     backToHome: '返回首页',
@@ -744,6 +773,10 @@ const tMain = createI18n({
     errFolderRootUnusable: 'The selected folder cannot be read',
     menuFile: 'File',
     menuSectionNew: 'New',
+    menuView: 'View',
+    menuUiZoomIn: 'Interface Zoom In',
+    menuUiZoomOut: 'Interface Zoom Out',
+    menuUiZoomReset: 'Reset Interface Zoom',
     menuOpenInNewWindow: 'Open in New Window',
     menuNewDoc: 'AI Docs',
     menuNewSheet: 'AI Sheets',
@@ -877,6 +910,10 @@ const tMain = createI18n({
     menuSaveAs: 'Lưu dưới dạng…',
     menuClose: 'Đóng',
     menuEdit: 'Chỉnh sửa',
+    menuView: 'Hiển thị',
+    menuUiZoomIn: 'Phóng to giao diện',
+    menuUiZoomOut: 'Thu nhỏ giao diện',
+    menuUiZoomReset: 'Đặt lại mức phóng giao diện về 100%',
     menuWindow: 'Cửa sổ',
     menuHome: 'Trang chủ',
     backToHome: 'Quay lại Trang chủ',
@@ -987,6 +1024,10 @@ const tMain = createI18n({
     menuSaveAs: '名前を付けて保存…',
     menuClose: '閉じる',
     menuEdit: '編集',
+    menuView: '表示',
+    menuUiZoomIn: 'UI を拡大',
+    menuUiZoomOut: 'UI を縮小',
+    menuUiZoomReset: 'UI の拡大率を 100% にリセット',
     menuWindow: 'ウィンドウ',
     menuHome: 'ホーム',
     backToHome: 'ホームに戻る',
@@ -1097,6 +1138,10 @@ const tMain = createI18n({
     menuSaveAs: '다른 이름으로 저장…',
     menuClose: '닫기',
     menuEdit: '편집',
+    menuView: '보기',
+    menuUiZoomIn: 'UI 확대',
+    menuUiZoomOut: 'UI 축소',
+    menuUiZoomReset: 'UI 배율을 100%로 다시 설정',
     menuWindow: '창',
     menuHome: '홈',
     backToHome: '홈으로 돌아가기',
@@ -1206,6 +1251,10 @@ const tMain = createI18n({
     menuSaveAs: 'Enregistrer sous…',
     menuClose: 'Fermer',
     menuEdit: 'Édition',
+    menuView: 'Affichage',
+    menuUiZoomIn: "Agrandir l'interface",
+    menuUiZoomOut: "Réduire l'interface",
+    menuUiZoomReset: "Réinitialiser le zoom de l'interface à 100%",
     menuWindow: 'Fenêtre',
     menuHome: 'Accueil',
     backToHome: "Retour à l'accueil",
@@ -1317,6 +1366,10 @@ const tMain = createI18n({
     menuSaveAs: 'Speichern unter…',
     menuClose: 'Schließen',
     menuEdit: 'Bearbeiten',
+    menuView: 'Ansicht',
+    menuUiZoomIn: 'Oberfläche vergrößern',
+    menuUiZoomOut: 'Oberfläche verkleinern',
+    menuUiZoomReset: 'Zoom der Oberfläche auf 100% zurücksetzen',
     menuWindow: 'Fenster',
     menuHome: 'Startseite',
     backToHome: 'Zurück zur Startseite',
@@ -1429,6 +1482,10 @@ const tMain = createI18n({
     menuSaveAs: 'Guardar como…',
     menuClose: 'Cerrar',
     menuEdit: 'Edición',
+    menuView: 'Ver',
+    menuUiZoomIn: 'Agrandar la interfaz',
+    menuUiZoomOut: 'Reducir la interfaz',
+    menuUiZoomReset: 'Restablecer el zoom de la interfaz al 100%',
     menuWindow: 'Ventana',
     menuHome: 'Inicio',
     backToHome: 'Volver al inicio',
@@ -1540,6 +1597,10 @@ const tMain = createI18n({
     menuSaveAs: 'บันทึกเป็น…',
     menuClose: 'ปิด',
     menuEdit: 'แก้ไข',
+    menuView: 'มุมมอง',
+    menuUiZoomIn: 'ขยายส่วนติดต่อผู้ใช้',
+    menuUiZoomOut: 'ย่อส่วนติดต่อผู้ใช้',
+    menuUiZoomReset: 'รีเซ็ตสเกลส่วนติดต่อผู้ใช้เป็น 100%',
     menuWindow: 'หน้าต่าง',
     menuHome: 'หน้าแรก',
     backToHome: 'กลับไปหน้าแรก',
@@ -1647,6 +1708,10 @@ const tMain = createI18n({
     menuSaveAs: 'Simpan Sebagai…',
     menuClose: 'Tutup',
     menuEdit: 'Edit',
+    menuView: 'Tampilan',
+    menuUiZoomIn: 'Perbesar Antarmuka',
+    menuUiZoomOut: 'Perkecil Antarmuka',
+    menuUiZoomReset: 'Atur Ulang Skala Antarmuka ke 100%',
     menuWindow: 'Jendela',
     menuHome: 'Beranda',
     backToHome: 'Kembali ke Beranda',
@@ -1758,6 +1823,10 @@ const tMain = createI18n({
     menuSaveAs: 'Сохранить как…',
     menuClose: 'Закрыть',
     menuEdit: 'Правка',
+    menuView: 'Вид',
+    menuUiZoomIn: 'Увеличить интерфейс',
+    menuUiZoomOut: 'Уменьшить интерфейс',
+    menuUiZoomReset: 'Сбросить масштаб интерфейса к 100%',
     menuWindow: 'Окно',
     menuHome: 'Главная',
     backToHome: 'Вернуться на главную',
@@ -1869,6 +1938,10 @@ const tMain = createI18n({
     menuSaveAs: 'حفظ باسم…',
     menuClose: 'إغلاق',
     menuEdit: 'تحرير',
+    menuView: 'عرض',
+    menuUiZoomIn: 'تكبير واجهة المستخدم',
+    menuUiZoomOut: 'تصغير واجهة المستخدم',
+    menuUiZoomReset: 'إعادة تعيين مقياس الواجهة إلى 100%',
     menuWindow: 'نافذة',
     menuHome: 'الصفحة الرئيسية',
     backToHome: 'العودة إلى الصفحة الرئيسية',
@@ -1976,6 +2049,10 @@ const tMain = createI18n({
     menuSaveAs: 'Salvar Como…',
     menuClose: 'Fechar',
     menuEdit: 'Editar',
+    menuView: 'Visualização',
+    menuUiZoomIn: 'Aumentar a interface',
+    menuUiZoomOut: 'Diminuir a interface',
+    menuUiZoomReset: 'Redefinir a escala da interface para 100%',
     menuWindow: 'Janela',
     menuHome: 'Início',
     backToHome: 'Voltar ao início',
@@ -2087,6 +2164,10 @@ const tMain = createI18n({
     menuSaveAs: 'Salva con nome…',
     menuClose: 'Chiudi',
     menuEdit: 'Modifica',
+    menuView: 'Vista',
+    menuUiZoomIn: 'Ingrandisci interfaccia',
+    menuUiZoomOut: 'Riduci interfaccia',
+    menuUiZoomReset: "Reimposta la scala dell'interfaccia al 100%",
     menuWindow: 'Finestra',
     menuHome: 'Home',
     backToHome: 'Torna alla Home',
@@ -2198,6 +2279,10 @@ const tMain = createI18n({
     menuSaveAs: 'Zapisz jako…',
     menuClose: 'Zamknij',
     menuEdit: 'Edycja',
+    menuView: 'Widok',
+    menuUiZoomIn: 'Powiększ interfejs',
+    menuUiZoomOut: 'Pomniejsz interfejs',
+    menuUiZoomReset: 'Resetuj skalę interfejsu do 100%',
     menuWindow: 'Okno',
     menuHome: 'Strona główna',
     backToHome: 'Wróć do strony głównej',
@@ -2309,6 +2394,10 @@ const tMain = createI18n({
     menuSaveAs: 'Uložit jako…',
     menuClose: 'Zavřít',
     menuEdit: 'Úpravy',
+    menuView: 'Zobrazení',
+    menuUiZoomIn: 'Zvětšit rozhraní',
+    menuUiZoomOut: 'Zmenšit rozhraní',
+    menuUiZoomReset: 'Obnovit měřítko rozhraní na 100%',
     menuWindow: 'Okno',
     menuHome: 'Domů',
     backToHome: 'Zpět na domovskou stránku',
@@ -2418,6 +2507,10 @@ const tMain = createI18n({
     menuSaveAs: 'Opslaan als…',
     menuClose: 'Sluiten',
     menuEdit: 'Bewerken',
+    menuView: 'Weergave',
+    menuUiZoomIn: 'Interface vergroten',
+    menuUiZoomOut: 'Interface verkleinen',
+    menuUiZoomReset: 'Interfaceschaal herstellen naar 100%',
     menuWindow: 'Venster',
     menuHome: 'Start',
     backToHome: 'Terug naar start',
@@ -2529,6 +2622,10 @@ const tMain = createI18n({
     menuSaveAs: 'Simpan Sebagai…',
     menuClose: 'Tutup',
     menuEdit: 'Edit',
+    menuView: 'Paparan',
+    menuUiZoomIn: 'Besarkan Antara Muka',
+    menuUiZoomOut: 'Kecilkan Antara Muka',
+    menuUiZoomReset: 'Set semula Skala Antara Muka kepada 100%',
     menuWindow: 'Tetingkap',
     menuHome: 'Laman Utama',
     backToHome: 'Kembali ke Laman Utama',
@@ -2639,6 +2736,10 @@ const tMain = createI18n({
     menuSaveAs: 'שמירה בשם…',
     menuClose: 'סגירה',
     menuEdit: 'עריכה',
+    menuView: 'תצוגה',
+    menuUiZoomIn: 'הגדלת ממשק',
+    menuUiZoomOut: 'הקטנת ממשק',
+    menuUiZoomReset: 'איפוס מקנה המידה של הממשק ל־100%',
     menuWindow: 'חלון',
     menuHome: 'דף הבית',
     backToHome: 'חזרה לדף הבית',
@@ -2747,6 +2848,10 @@ const tMain = createI18n({
     menuSaveAs: 'इस रूप में सहेजें…',
     menuClose: 'बंद करें',
     menuEdit: 'संपादन',
+    menuView: 'व्यू',
+    menuUiZoomIn: 'इंटरफ़ेस बड़ा करें',
+    menuUiZoomOut: 'इंटरफ़ेस छोटा करें',
+    menuUiZoomReset: 'इंटरफ़ेस स्केल को 100% पर रीसेट करें',
     menuWindow: 'विंडो',
     menuHome: 'होम',
     backToHome: 'होम पर वापस जाएँ',
@@ -2858,6 +2963,10 @@ const tMain = createI18n({
     menuSaveAs: '另存新檔…',
     menuClose: '關閉',
     menuEdit: '編輯',
+    menuView: '檢視',
+    menuUiZoomIn: '放大介面',
+    menuUiZoomOut: '縮小介面',
+    menuUiZoomReset: '將介面縮放重設為 100%',
     menuWindow: '視窗',
     menuHome: '首頁',
     backToHome: '返回首頁',
@@ -3316,11 +3425,44 @@ function applyMenuFor(kind: TabKind): void {
     default:
       buildHomeMenu()
   }
+  withViewMenu(kind, tm, APP_SETTINGS_PATH)
+}
+
+/** The Home menu's View menu: the interface-scale items (Home follows the scale). */
+function viewMenuTemplate(): MenuItemConstructorOptions {
+  return { label: tm('menuView'), submenu: uiScaleMenuItems(tm, APP_SETTINGS_PATH) }
+}
+
+/// Interface scale (genoffice#1913). Read once at boot, then replaced by the View menu.
+let currentUiScale = 1
+
+/**
+ * Stamp the stored interface scale into every renderer — now, and for any
+ * window created later.
+ *
+ * `web-contents-created` is the hook that covers all three window kinds at
+ * once: the shell window, every tab's WebContentsView, and a detached editor
+ * window. Each gets it on `did-finish-load`, because a stylesheet inserted
+ * before the document exists is thrown away.
+ */
+function installUiScale(): void {
+  currentUiScale = readUiScale(APP_SETTINGS_PATH())
+  app.on('web-contents-created', (_event, contents) => {
+    contents.on('did-finish-load', () => applyUiScaleTo(contents, currentUiScale))
+  })
+  applyUiScaleToAll(currentUiScale)
+  // A scale change moves the tab strip, so the editor views below it have to
+  // move too — and the Windows/Linux caption band is sized from it.
+  onUiScaleChanged((scale) => {
+    currentUiScale = scale
+    tabManager?.layout()
+    refreshTitleBarOverlay()
+  })
 }
 
 function refreshTitleBarOverlay(): void {
   if (process.platform === 'darwin' || !shellWindow || shellWindow.isDestroyed()) return
-  shellWindow.setTitleBarOverlay(tabStripOverlay(nativeTheme.shouldUseDarkColors))
+  shellWindow.setTitleBarOverlay(tabStripOverlay(nativeTheme.shouldUseDarkColors, currentUiScale))
 }
 
 /**
@@ -3354,7 +3496,7 @@ function createShellWindow(): void {
           // stays registered for its accelerators and opens from the strip's
           // menu button (Alt still reveals the native bar where one exists)
           titleBarStyle: 'hidden' as const,
-          titleBarOverlay: tabStripOverlay(nativeTheme.shouldUseDarkColors),
+          titleBarOverlay: tabStripOverlay(nativeTheme.shouldUseDarkColors, currentUiScale),
           autoHideMenuBar: true,
         }),
     webPreferences: {
@@ -3406,6 +3548,8 @@ function createShellWindow(): void {
             : kind === 'html'
               ? tm('untitledHtml')
               : tm('untitledSheet'),
+    // the tab strip is interface chrome, so its height follows the scale
+    () => currentUiScale,
   )
   tabManager = manager
 
@@ -3413,7 +3557,7 @@ function createShellWindow(): void {
   // document back. The strip reports the insertion slot for each preview
   // (lastDockIndex); the slot is consumed by the dock that follows.
   setDockHost({
-    band: () => dockBandFor(win),
+    band: () => dockBandFor(win, currentUiScale),
     preview: (x) => {
       if (!win.isDestroyed())
         win.webContents.send(TABS_CHANNELS.dockPreview, x === null ? null : { x })
@@ -4335,8 +4479,9 @@ function registerHomeIpc(): void {
     noteEditorState: (path, state, mark) => uniworkService.noteEditorState(path, state, mark),
   })
 
-  // G5-03a: the S6 bar's height under the tab strip; the shell renderer reports
-  // it for the active tab only and resends on every tab switch (0 hides it)
+  // G5-03a: the S6 bar's unscaled CSS-px height under the tab strip (TabManager
+  // scales it by the interface scale); the shell renderer reports it for the
+  // active tab only and resends on every tab switch (0 hides it)
   ipcMain.handle(UNIWORK_DOC_CHANNELS.barInset, (event, heightPx: unknown) => {
     if (typeof heightPx !== 'number' || !Number.isFinite(heightPx)) return
     if (!shellWindow || shellWindow.isDestroyed()) return
@@ -4454,9 +4599,18 @@ function registerHomeIpc(): void {
     return result
   })
 
+  // Starred files sort by mtime, which requires stat-ing them all first; they
+  // are hand-picked and few, so this is fine. The Starred view's group pills
+  // scope the whole query (totals included) through the group map.
   ipcMain.handle(HOME_CHANNELS.starred, (_event, query: unknown): RecentPage =>
-    pageStarredPaths(readStarredFiles(), query, uniworkRecentLookup),
+    pageStarredPaths(readStarredFiles(), query, uniworkRecentLookup, readStarredGroupMap()),
   )
+
+  ipcMain.handle(HOME_CHANNELS.starredGroups, (): string[] => readStarredGroups())
+
+  ipcMain.handle(HOME_CHANNELS.setStarredGroup, (_event, paths: unknown, group: unknown) => {
+    setStarredGroup(stringPaths(paths), typeof group === 'string' && group ? group : null)
+  })
 
   ipcMain.handle(HOME_CHANNELS.statPaths, (_event, paths: unknown): RecentEntry[] =>
     statEntries(capStatPaths(stringPaths(paths))),
@@ -4680,6 +4834,14 @@ function registerHomeIpc(): void {
     // an unavailable entry's star must go with it, or the Starred view keeps
     // a dead dimmed row the recents list no longer shows
     removeStarredFiles(list.filter((p) => !existsSync(p)))
+  })
+
+  // Bulk unstar from the Starred view: every row there is a favorite, so the
+  // selection action is "unstar", not "remove from recents" — removeRecent
+  // keeps existing files' stars on purpose, which made the Starred view's
+  // bulk removal a no-op for anything still on disk
+  ipcMain.handle(HOME_CHANNELS.unstarPaths, (_event, paths: unknown) => {
+    removeStarredFiles(stringPaths(paths))
   })
 
   ipcMain.handle(HOME_CHANNELS.revealPath, (_event, path: unknown) => {
@@ -4915,6 +5077,7 @@ function registerHomeIpc(): void {
       customFontSize: 'customFontSize' in raw ? raw.customFontSize : prev.customFontSize,
       spellcheck: 'spellcheck' in raw ? raw.spellcheck : prev.spellcheck,
       openInNewDocs: 'openInNewDocs' in raw ? raw.openInNewDocs : prev.openInNewDocs,
+      showAiSidebar: 'showAiSidebar' in raw ? raw.showAiSidebar : prev.showAiSidebar,
     })
     if (sameAiPanelPrefs(next, prev)) return prev
     cachedAiPanelPrefs = next
@@ -4924,6 +5087,7 @@ function registerHomeIpc(): void {
       aiPanelCustomFontSize: next.customFontSize,
       aiPanelSpellcheck: next.spellcheck,
       aiPanelOpenInNewDocs: next.openInNewDocs,
+      aiPanelShowSidebar: next.showAiSidebar,
     })
     for (const wc of webContents.getAllWebContents()) wc.send('app:ai-panel-prefs-changed', next)
     return next
@@ -5448,6 +5612,7 @@ function buildHomeMenu(): void {
         { role: 'close', label: tm('menuClose') },
       ],
     },
+    viewMenuTemplate(),
     editMenuTemplate(process.platform, appMenuLabels(currentLang())),
     windowMenuTemplate(process.platform, appMenuLabels(currentLang())),
     {
@@ -6577,6 +6742,7 @@ app.whenReady().then(async () => {
   void startMcpFromSettings(currentMcpSettings()).catch((error) => {
     console.error('[mcp] failed to start on boot:', error)
   })
+  installUiScale()
   createShellWindow()
   // deferred to ready: labels need currentLang(), which reads app.getLocale()
   if (!app.isPackaged) {

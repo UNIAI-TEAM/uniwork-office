@@ -223,11 +223,20 @@ export interface AiStreamRequest {
   purpose?: AgentRequestPurpose
 }
 
+/** Token usage a provider reported for one model turn. Both fields are best-effort:
+ * some providers never report usage, and consumers must
+ * treat an absent figure as "unknown", never as zero. */
+export interface AiTokenUsage {
+  inputTokens?: number
+  outputTokens?: number
+}
+
 export interface AiStreamChunk {
   requestId: string
   /** 'ping' = wire-level keepalive so the renderer can tell a live stream from a dead one;
    * 'reasoning' = model thinking delta (text carries it), stored for interleaved-thinking echo */
-  type: 'delta' | 'reasoning' | 'tool-call' | 'done' | 'error' | 'ping' | 'notice' | 'reset'
+  type:
+    'delta' | 'reasoning' | 'tool-call' | 'usage' | 'done' | 'error' | 'ping' | 'notice' | 'reset'
   text?: string
   /** complete parsed tool call (emitted once its arguments finish streaming) */
   toolCall?: AgentToolCall
@@ -244,4 +253,6 @@ export interface AiStreamChunk {
   stopReason?: string
   /** the server's run id of this turn (UniWork AI `X-UniWork-AI-Run`), on the chunk after it is known */
   runId?: string
+  /** tokens the provider billed for this turn, carried on 'usage' (always sent before 'done') */
+  usage?: AiTokenUsage
 }

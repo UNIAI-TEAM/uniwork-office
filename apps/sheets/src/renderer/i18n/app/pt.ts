@@ -575,6 +575,8 @@ export const pt = {
   appPrintFailed: 'Não foi possível imprimir.',
   appPrintNeedsFullLoad:
     'A impressão requer que a pasta de trabalho esteja totalmente carregada; aguarde o fim do carregamento.',
+  appPrintWorkbookTooLarge:
+    'Esta pasta de trabalho é grande demais para ser carregada por completo na memória, por isso não pode ser impressa nem exportada para PDF.',
   appCsvExportNeedsFullLoad:
     'A exportação de CSV requer a pasta de trabalho totalmente carregada — aguarde o carregamento terminar.',
   appCsvExportTooLarge: 'A planilha é grande demais para exportar como CSV.',
@@ -1115,6 +1117,9 @@ export const pt = {
   appHeadings: 'Títulos',
   appHeadingsHidden: 'Cabeçalhos ocultos.',
   appHeadingsShown: 'Cabeçalhos exibidos.',
+  appRightToLeft: 'Da direita para a esquerda',
+  appRightToLeftOn: 'Direção da grade: da direita para a esquerda.',
+  appRightToLeftOff: 'Direção da grade: da esquerda para a direita.',
   appPrintHeadingsTitle: 'Imprimir títulos de linha e coluna',
   appGroupFunctionLibrary: 'Biblioteca de Funções',
   appInsertFunction: 'Inserir Função',
