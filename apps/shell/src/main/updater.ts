@@ -581,6 +581,12 @@ let updaterActive = false
 // the dev / beta release channel the feed is pinned to (github feeds), which
 // the Settings stable / beta switch must not override
 let pinnedChannel: string | null = null
+
+/** The release channel this build is pinned to (dev / beta builds with a baked
+ * GitHub feed), or null when the Settings stable / beta choice applies. */
+export function getPinnedUpdateChannel(): string | null {
+  return pinnedChannel
+}
 // true for a packaged build shipped without resources/app-update.yml (the
 // unsigned mac release app, local packs): the manual check then explains where updates come
 // from instead of reporting a failed automatic update
@@ -797,6 +803,7 @@ export function initAutoUpdater(
   if (!existsSync(path.join(process.resourcesPath, 'app-update.yml'))) {
     const macFeed = process.platform === 'darwin' ? bakedMacReleaseFeed() : null
     if (macFeed !== null) {
+      pinnedChannel = macFeed.channel
       log('no app-update.yml; notifying of', macFeed.channel, 'releases')
       initMacReleaseNotifier(getWindow, macFeed)
       return

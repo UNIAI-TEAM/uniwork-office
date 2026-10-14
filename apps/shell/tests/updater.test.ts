@@ -239,8 +239,10 @@ describe('initAutoUpdater', () => {
     readFileSyncMock.mockReturnValue(
       'owner: UNIAI-TEAM\nrepo: uniwork-office\nprovider: github\nchannel: dev\n',
     )
-    const { initAutoUpdater, applyUpdateChannel } = await loadUpdater()
+    const { initAutoUpdater, applyUpdateChannel, getPinnedUpdateChannel } = await loadUpdater()
+    expect(getPinnedUpdateChannel()).toBeNull()
     initAutoUpdater(() => null, 'beta')
+    expect(getPinnedUpdateChannel()).toBe('dev')
     expect(updaterState.channel).toBe('dev')
     expect(updaterState.allowPrerelease).toBe(true)
     expect(updaterState.allowDowngrade).toBe(false)
@@ -264,10 +266,11 @@ describe('initAutoUpdater', () => {
   it('keeps the Settings channel for a generic feed even on a pre-release version', async () => {
     appState.version = '0.11.0-dev.12'
     readFileSyncMock.mockReturnValue('provider: generic\nurl: https://cdn.example.com/office\n')
-    const { initAutoUpdater } = await loadUpdater()
+    const { initAutoUpdater, getPinnedUpdateChannel } = await loadUpdater()
     initAutoUpdater(() => null, 'beta')
     expect(updaterState.channel).toBe('beta')
     expect(updaterState.allowPrerelease).toBe(false)
+    expect(getPinnedUpdateChannel()).toBeNull()
   })
 
   it('configures manual full-package download and checks after the initial delay', async () => {
@@ -958,8 +961,9 @@ describe('unsigned mac release app (release notice)', () => {
 
   it('offers the newer dmg of its own arch after the initial delay', async () => {
     answer([release('0.11.0-dev.3'), release('0.11.0-dev.2')])
-    const { initAutoUpdater } = await loadUpdater()
+    const { initAutoUpdater, getPinnedUpdateChannel } = await loadUpdater()
     initAutoUpdater(() => null)
+    expect(getPinnedUpdateChannel()).toBe('dev')
     await vi.advanceTimersByTimeAsync(FIRST_CHECK_DELAY_MS)
 
     expect(netFetch.mock.calls[0][0]).toBe(
