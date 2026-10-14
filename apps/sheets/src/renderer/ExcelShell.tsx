@@ -10,6 +10,7 @@ import {
   aiPanelInitiallyOpen,
   rememberAiPanelOpen,
   UniAiMark,
+  useAiSidebarEnabled,
   type AiTokenUsageView,
 } from '@genoffice/ui'
 
@@ -584,6 +585,8 @@ export function ExcelShell({
     if (cap('ai'))
       setIsCopilotOpenState((prev) => resolveCopilotOpen(prev, next, askingRef.current))
   }
+  // the sidebar switch is a soft hide; it closes the panel when it turns off
+  const aiSidebarEnabled = useAiSidebarEnabled(setIsCopilotOpen)
   useEffect(() => {
     if (aiClarify && !isCopilotOpen) setIsCopilotOpen(true)
   })
@@ -610,6 +613,9 @@ export function ExcelShell({
     const timer = window.setTimeout(() => onSend(aiPreset.text), 120)
     return () => window.clearTimeout(timer)
   }, [aiPreset?.nonce])
+  // the "show the AI sidebar" setting off hides the copilot rail (soft hide):
+  // an explicit AI action (ribbon run, toggle) still opens the panel, and
+  // closing it returns to hidden — no dead affordances, no invisible runs
   const [showFormatCells, setShowFormatCells] = useState(false)
   const [axisSizeTarget, setAxisSizeTarget] = useState<'row' | 'col' | null>(null)
   const [showLinkDialog, setShowLinkDialog] = useState(false)
@@ -1038,6 +1044,7 @@ export function ExcelShell({
         {cap('ai') && (
           <AiChatPanel
             isOpen={isCopilotOpen}
+            hideRail={!aiSidebarEnabled}
             hasContent={sheetHasContent}
             chat={chat}
             {...(historicChat !== undefined ? { historicChat } : {})}

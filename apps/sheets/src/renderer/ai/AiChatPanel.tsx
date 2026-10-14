@@ -247,6 +247,7 @@ const MODEL_BRIDGE: AiModelPickerBridge = {
 
 export function AiChatPanel({
   isOpen,
+  hideRail = false,
   hasContent,
   chat,
   historicChat = [],
@@ -277,6 +278,8 @@ export function AiChatPanel({
   clarify = null,
 }: {
   readonly isOpen: boolean
+  /** true suppresses even the collapsed rail (the "show the AI sidebar" setting is off) */
+  readonly hideRail?: boolean
   /** the workbook has cells with content — empty workbooks get "build me a sheet" copy instead */
   readonly hasContent: boolean
   readonly chat: readonly AiChatMessage[]
@@ -495,6 +498,8 @@ export function AiChatPanel({
   }
 
   if (!isOpen) {
+    // the sidebar setting is off: nothing to show until an explicit AI action opens the panel
+    if (hideRail) return <></>
     return (
       <aside className="copilot collapsed">
         <button

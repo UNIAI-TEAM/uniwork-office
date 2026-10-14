@@ -173,6 +173,9 @@ export const strings = {
     setCliLinkInstall: '添加到终端',
     setCliLinkBlocked: '无法自动添加。请在终端中运行：{cmd}',
     setAiSpellcheckDesc: '在 AI 对话输入框中输入时标出拼写错误的单词。',
+    setAiShowSidebar: '显示 AI 侧栏',
+    setAiShowSidebarDesc:
+      '关闭后，编辑器会隐藏 AI 侧栏和侧边按钮；功能区或菜单里的 AI 操作仍会打开面板，新文档也不会自动打开。',
     setAiOpenInNewDocs: '新文档中打开 AI 面板',
     setAiOpenInNewDocsDesc: '关闭后，新打开的文档默认收起 AI 面板；需要时点一下即可展开。',
     settings: '设置',
@@ -548,6 +551,9 @@ export const strings = {
     setCliLinkInstall: 'Add to terminal',
     setCliLinkBlocked: 'Could not add it automatically. Run this in a terminal: {cmd}',
     setAiSpellcheckDesc: 'Underline misspelled words while typing in the AI chat input.',
+    setAiShowSidebar: 'Show the AI sidebar',
+    setAiShowSidebarDesc:
+      'When off, the editors hide the AI sidebar and its side button; an AI action in the ribbon or a menu still opens the panel, and new documents never open it.',
     setAiOpenInNewDocs: 'Open the AI panel in new documents',
     setAiOpenInNewDocsDesc:
       'When off, newly opened documents start with the AI panel collapsed; it is one click away when needed.',
@@ -945,6 +951,9 @@ export const strings = {
     setCliLinkInstall: 'ターミナルに追加',
     setCliLinkBlocked: '自動で追加できませんでした。ターミナルで次を実行してください：{cmd}',
     setAiSpellcheckDesc: 'AI チャットの入力欄で入力中にスペルミスの単語に下線を表示します。',
+    setAiShowSidebar: 'AI サイドバーを表示',
+    setAiShowSidebarDesc:
+      'オフにすると、エディターは AI サイドバーとサイドボタンを非表示にします。リボンやメニューの AI 操作ならパネルを開けますが、新規ドキュメントでは自動的に開きません。',
     setAiOpenInNewDocs: '新しいドキュメントで AI パネルを開く',
     setAiOpenInNewDocsDesc:
       'オフにすると、新しく開いたドキュメントは AI パネルを折りたたんだ状態で始まります。必要なときはワンクリックで開けます。',
@@ -1347,6 +1356,9 @@ export const strings = {
     setCliLinkInstall: '터미널에 추가',
     setCliLinkBlocked: '자동으로 추가하지 못했습니다. 터미널에서 다음을 실행하세요: {cmd}',
     setAiSpellcheckDesc: 'AI 채팅 입력란에 입력할 때 잘못된 단어에 밑줄을 표시합니다.',
+    setAiShowSidebar: 'AI 사이드바 표시',
+    setAiShowSidebarDesc:
+      '끄면 편집기가 AI 사이드바와 측면 버튼을 숨깁니다. 리본이나 메뉴의 AI 작업으로는 패널을 열 수 있지만, 새 문서에서는 자동으로 열리지 않습니다.',
     setAiOpenInNewDocs: '새 문서에서 AI 패널 열기',
     setAiOpenInNewDocsDesc:
       '끄면 새로 여는 문서는 AI 패널이 접힌 상태로 시작합니다. 필요할 때 한 번 클릭하면 열립니다.',
@@ -1748,6 +1760,9 @@ export const strings = {
     setCliLinkInstall: 'Ajouter au terminal',
     setCliLinkBlocked: 'Ajout automatique impossible. Exécutez ceci dans un terminal : {cmd}',
     setAiSpellcheckDesc: 'Souligne les mots mal orthographiés pendant la saisie dans le chat IA.',
+    setAiShowSidebar: 'Afficher le panneau IA',
+    setAiShowSidebarDesc:
+      'Désactivé, les éditeurs masquent le panneau IA et son bouton latéral ; une action IA dans le ruban ou un menu l’ouvre toujours, et les nouveaux documents ne l’ouvrent jamais.',
     setAiOpenInNewDocs: 'Ouvrir le panneau IA dans les nouveaux documents',
     setAiOpenInNewDocsDesc:
       "Désactivé : les documents nouvellement ouverts démarrent avec le panneau IA replié ; un clic suffit pour l'afficher.",
@@ -2162,6 +2177,9 @@ export const strings = {
     setCliLinkBlocked: 'Automatisches Hinzufügen nicht möglich. Führen Sie im Terminal aus: {cmd}',
     setAiSpellcheckDesc:
       'Unterstreicht falsch geschriebene Wörter beim Tippen im KI-Chat-Eingabefeld.',
+    setAiShowSidebar: 'KI-Seitenleiste anzeigen',
+    setAiShowSidebarDesc:
+      'Wenn aus, blenden die Editoren die KI-Seitenleiste und ihre Seitenschaltfläche aus; eine KI-Aktion im Menüband oder im Menü öffnet das Panel weiterhin, und neue Dokumente öffnen es nie.',
     setAiOpenInNewDocs: 'KI-Panel in neuen Dokumenten öffnen',
     setAiOpenInNewDocsDesc:
       'Wenn aus, starten neu geöffnete Dokumente mit eingeklapptem KI-Panel; ein Klick genügt, um es zu öffnen.',
@@ -2572,6 +2590,9 @@ export const strings = {
     setCliLinkBlocked: 'No se pudo añadir automáticamente. Ejecuta esto en un terminal: {cmd}',
     setAiSpellcheckDesc:
       'Subraya las palabras mal escritas al escribir en el cuadro del chat de IA.',
+    setAiShowSidebar: 'Mostrar el panel de IA',
+    setAiShowSidebarDesc:
+      'Desactivado, los editores ocultan el panel de IA y su botón lateral; una acción de IA en la cinta o en un menú sigue abriendo el panel, y los documentos nuevos no lo abren.',
     setAiOpenInNewDocs: 'Abrir el panel de IA en documentos nuevos',
     setAiOpenInNewDocsDesc:
       'Si está desactivado, los documentos recién abiertos empiezan con el panel de IA plegado; se abre con un clic cuando lo necesites.',
@@ -2975,6 +2996,9 @@ export const strings = {
     setCliLinkInstall: 'เพิ่มลงในเทอร์มินัล',
     setCliLinkBlocked: 'เพิ่มโดยอัตโนมัติไม่สำเร็จ โปรดรันคำสั่งนี้ในเทอร์มินัล: {cmd}',
     setAiSpellcheckDesc: 'ขีดเส้นใต้คำที่สะกดผิดขณะพิมพ์ในช่องแชท AI',
+    setAiShowSidebar: 'แสดงแถบข้าง AI',
+    setAiShowSidebarDesc:
+      'เมื่อปิด ตัวแก้ไขจะซ่อนแถบข้าง AI และปุ่มด้านข้าง; คำสั่ง AI ในริบบิ้นหรือเมนูยังเปิดแผง AI ได้ และเอกสารใหม่จะไม่เปิดให้',
     setAiOpenInNewDocs: 'เปิดแผง AI ในเอกสารใหม่',
     setAiOpenInNewDocsDesc:
       'เมื่อปิด เอกสารที่เปิดใหม่จะเริ่มโดยพับแผง AI ไว้ คลิกครั้งเดียวเพื่อเปิดเมื่อต้องการ',
@@ -3373,6 +3397,9 @@ export const strings = {
     setCliLinkBlocked:
       'Tidak dapat menambahkannya secara otomatis. Jalankan ini di terminal: {cmd}',
     setAiSpellcheckDesc: 'Garis bawahi kata yang salah eja saat mengetik di kotak obrolan AI.',
+    setAiShowSidebar: 'Tampilkan bilah sisi AI',
+    setAiShowSidebarDesc:
+      'Saat nonaktif, editor menyembunyikan bilah sisi AI dan tombol sisinya; tindakan AI di pita atau menu tetap membuka panel, dan dokumen baru tidak membukanya.',
     setAiOpenInNewDocs: 'Buka panel AI di dokumen baru',
     setAiOpenInNewDocsDesc:
       'Jika nonaktif, dokumen yang baru dibuka dimulai dengan panel AI terlipat; cukup satu klik saat dibutuhkan.',
@@ -3774,6 +3801,9 @@ export const strings = {
     setCliLinkInstall: 'Добавить в терминал',
     setCliLinkBlocked: 'Не удалось добавить автоматически. Выполните в терминале: {cmd}',
     setAiSpellcheckDesc: 'Подчёркивать слова с ошибками при вводе в поле чата ИИ.',
+    setAiShowSidebar: 'Показывать панель ИИ',
+    setAiShowSidebarDesc:
+      'Когда выключено, редакторы скрывают панель ИИ и боковую кнопку; команда ИИ на ленте или в меню по-прежнему открывает панель, а новые документы не открывают её.',
     setAiOpenInNewDocs: 'Открывать панель ИИ в новых документах',
     setAiOpenInNewDocsDesc:
       'Если выключено, новые документы открываются со свёрнутой панелью ИИ; она доступна в один клик.',
@@ -4178,6 +4208,9 @@ export const strings = {
     setCliLinkBlocked: 'تعذّرت الإضافة تلقائيًا. شغّل هذا في الطرفية: {cmd}',
     setAiSpellcheckDesc:
       'وضع خط تحت الكلمات الخاطئة إملائيًا أثناء الكتابة في حقل محادثة الذكاء الاصطناعي.',
+    setAiShowSidebar: 'إظهار الشريط الجانبي للذكاء الاصطناعي',
+    setAiShowSidebarDesc:
+      'عند الإيقاف، تخفي المحررات الشريط الجانبي للذكاء الاصطناعي وزره الجانبي؛ ويظل إجراء الذكاء الاصطناعي في الشريط أو في القائمة يفتح اللوحة، ولا تفتح المستندات الجديدة اللوحة.',
     setAiOpenInNewDocs: 'فتح لوحة الذكاء الاصطناعي في المستندات الجديدة',
     setAiOpenInNewDocsDesc:
       'عند الإيقاف، تبدأ المستندات المفتوحة حديثًا بلوحة الذكاء الاصطناعي مطوية؛ تكفي نقرة واحدة لفتحها عند الحاجة.',
@@ -4572,6 +4605,9 @@ export const strings = {
     setCliLinkBlocked: 'Não foi possível adicionar automaticamente. Execute no terminal: {cmd}',
     setAiSpellcheckDesc:
       'Sublinha palavras com erros ortográficos ao digitar na caixa do chat de IA.',
+    setAiShowSidebar: 'Mostrar a barra lateral de IA',
+    setAiShowSidebarDesc:
+      'Desligada, os editores ocultam a barra lateral de IA e o botão lateral; uma ação de IA na faixa ou em um menu ainda abre o painel, e novos documentos não o abrem.',
     setAiOpenInNewDocs: 'Abrir o painel de IA em novos documentos',
     setAiOpenInNewDocsDesc:
       'Quando desativado, os documentos recém-abertos começam com o painel de IA recolhido; basta um clique quando precisar.',
@@ -4969,6 +5005,9 @@ export const strings = {
     setCliLinkInstall: 'Aggiungi al terminale',
     setCliLinkBlocked: 'Impossibile aggiungerlo automaticamente. Esegui nel terminale: {cmd}',
     setAiSpellcheckDesc: 'Sottolinea le parole errate durante la digitazione nella chat IA.',
+    setAiShowSidebar: 'Mostra il pannello IA',
+    setAiShowSidebarDesc:
+      'Quando è spento, gli editor nascondono il pannello IA e il pulsante laterale; un’azione IA nella scheda o in un menu apre comunque il pannello, e i nuovi documenti non lo aprono.',
     setAiOpenInNewDocs: 'Apri il pannello IA nei nuovi documenti',
     setAiOpenInNewDocsDesc:
       'Se disattivato, i documenti appena aperti iniziano con il pannello IA ridotto; basta un clic quando serve.',
@@ -5366,6 +5405,9 @@ export const strings = {
     setCliLinkInstall: 'Dodaj do terminala',
     setCliLinkBlocked: 'Nie udało się dodać automatycznie. Uruchom w terminalu: {cmd}',
     setAiSpellcheckDesc: 'Podkreśla błędnie napisane słowa podczas pisania w polu czatu AI.',
+    setAiShowSidebar: 'Pokaż panel AI',
+    setAiShowSidebarDesc:
+      'Gdy wyłączone, edytory ukrywają panel AI i przycisk boczny; działanie AI na wstążce lub w menu nadal otwiera panel, a nowe dokumenty go nie otwierają.',
     setAiOpenInNewDocs: 'Otwieraj panel AI w nowych dokumentach',
     setAiOpenInNewDocsDesc:
       'Gdy wyłączone, nowo otwarte dokumenty zaczynają ze zwiniętym panelem AI; wystarczy jedno kliknięcie, gdy jest potrzebny.',
@@ -5962,6 +6004,9 @@ export const strings = {
     setCliLinkInstall: 'Přidat do terminálu',
     setCliLinkBlocked: 'Automatické přidání se nezdařilo. Spusťte v terminálu: {cmd}',
     setAiSpellcheckDesc: 'Podtrhávat překlepy při psaní do vstupního pole chatu AI.',
+    setAiShowSidebar: 'Zobrazit AI panel',
+    setAiShowSidebarDesc:
+      'Při vypnutí editory skryjí AI panel a boční tlačítko; akce AI na pásu karet nebo v nabídce panel stále otevře a nové dokumenty ho neotevřou.',
     setAiOpenInNewDocs: 'Otevírat panel AI v nových dokumentech',
     setAiOpenInNewDocsDesc:
       'Když je vypnuto, nově otevřené dokumenty začínají se sbaleným panelem AI; v případě potřeby stačí jedno kliknutí.',
@@ -6155,6 +6200,9 @@ export const strings = {
     setCliLinkBlocked: 'Automatisch toevoegen is niet gelukt. Voer dit uit in een terminal: {cmd}',
     setAiSpellcheckDesc:
       'Onderstreept verkeerd gespelde woorden tijdens het typen in het AI-chatveld.',
+    setAiShowSidebar: 'AI-zijbalk weergeven',
+    setAiShowSidebarDesc:
+      'Uitgeschakeld verbergen de editors de AI-zijbalk en de zijknop; een AI-actie in het lint of een menu opent het paneel wel, en nieuwe documenten openen het niet.',
     setAiOpenInNewDocs: 'AI-paneel openen in nieuwe documenten',
     setAiOpenInNewDocsDesc:
       'Indien uit, starten nieuw geopende documenten met een ingeklapt AI-paneel; één klik volstaat wanneer je het nodig hebt.',
@@ -6553,6 +6601,9 @@ export const strings = {
       'Tidak dapat menambahnya secara automatik. Jalankan ini dalam terminal: {cmd}',
     setAiSpellcheckDesc:
       'Gariskan perkataan yang salah ejaan semasa menaip dalam kotak sembang AI.',
+    setAiShowSidebar: 'Tunjuk bar sisi AI',
+    setAiShowSidebarDesc:
+      'Bila dimatikan, editor menyembunyikan bar sisi AI dan butang sisi; tindakan AI pada riben atau menu masih membuka panel, dan dokumen baru tidak membukanya.',
     setAiOpenInNewDocs: 'Buka panel AI dalam dokumen baharu',
     setAiOpenInNewDocsDesc:
       'Jika dimatikan, dokumen yang baru dibuka bermula dengan panel AI dilipat; cukup satu klik apabila diperlukan.',
@@ -6947,6 +6998,9 @@ export const strings = {
     setCliLinkInstall: 'הוספה לטרמינל',
     setCliLinkBlocked: 'לא ניתן להוסיף אוטומטית. הריצו בטרמינל: {cmd}',
     setAiSpellcheckDesc: 'סימון מילים עם שגיאות כתיב בעת הקלדה בתיבת הצ׳אט של ה-AI.',
+    setAiShowSidebar: 'הצג את סרגל ה-AI',
+    setAiShowSidebarDesc:
+      'כשכבוי, העורכים מסתירים את סרגל ה-AI ואת כפתור הצד; פעולת AI בסרגל הכלים או בתפריט עדיין פותחת את הלוח, ומסמכים חדשים אינם פותחים אותו.',
     setAiOpenInNewDocs: 'פתיחת לוח ה-AI במסמכים חדשים',
     setAiOpenInNewDocsDesc:
       'כאשר כבוי, מסמכים שנפתחו זה עתה מתחילים עם לוח ה-AI מקופל; לחיצה אחת מספיקה כשצריך.',
@@ -7333,6 +7387,9 @@ export const strings = {
     setCliLinkInstall: 'टर्मिनल में जोड़ें',
     setCliLinkBlocked: 'अपने आप नहीं जोड़ा जा सका। टर्मिनल में यह चलाएँ: {cmd}',
     setAiSpellcheckDesc: 'AI चैट इनपुट में टाइप करते समय गलत वर्तनी वाले शब्दों को रेखांकित करें।',
+    setAiShowSidebar: 'AI साइडबार दिखाएँ',
+    setAiShowSidebarDesc:
+      'बंद होने पर संपादक AI साइडबार और उसका साइड बटन छिपा देते हैं; रिबन या मेन्यू में AI क्रिया से पैनल फिर भी खुलता है, और नए दस्तावेज़ इसे नहीं खोलते।',
     setAiOpenInNewDocs: 'नए दस्तावेज़ों में AI पैनल खोलें',
     setAiOpenInNewDocsDesc:
       'बंद होने पर, नए खोले गए दस्तावेज़ AI पैनल संक्षिप्त अवस्था में शुरू होते हैं; ज़रूरत पड़ने पर एक क्लिक में खुल जाता है।',
@@ -7885,6 +7942,9 @@ export const strings = {
       'Thêm lệnh {cmd} vào terminal để tập lệnh và trợ lý AI có thể dùng UniWork Office.',
     setCliLinkInstall: 'Thêm vào terminal',
     setCliLinkBlocked: 'Không thể tự động thêm. Hãy chạy lệnh này trong terminal: {cmd}',
+    setAiShowSidebar: 'Hiện thanh bên AI',
+    setAiShowSidebarDesc:
+      'Khi tắt, trình soạn thảo ẩn thanh bên AI và nút bên; thao tác AI trong dải công cụ hoặc trình đơn vẫn mở bảng AI, và tài liệu mới sẽ không mở nó.',
     setAiOpenInNewDocs: 'Mở bảng AI trong tài liệu mới',
     setAiOpenInNewDocsDesc:
       'Khi tắt, tài liệu mới mở sẽ thu gọn bảng AI; chỉ cần một lần bấm để mở lại khi cần.',
@@ -8106,6 +8166,9 @@ export const strings = {
     setCliLinkInstall: '加入終端機',
     setCliLinkBlocked: '無法自動加入。請在終端機執行：{cmd}',
     setAiSpellcheckDesc: '在 AI 對話輸入框中輸入時標示拼錯的單字。',
+    setAiShowSidebar: '顯示 AI 側欄',
+    setAiShowSidebarDesc:
+      '關閉後，編輯器會隱藏 AI 側欄和側邊按鈕；功能區或選單中的 AI 操作仍可開啟面板，新文件也不會自動開啟。',
     setAiOpenInNewDocs: '在新文件中開啟 AI 面板',
     setAiOpenInNewDocsDesc: '關閉後，新開啟的文件預設收合 AI 面板；需要時點一下即可展開。',
     settings: '設定',
