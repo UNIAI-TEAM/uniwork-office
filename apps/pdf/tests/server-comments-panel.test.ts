@@ -420,19 +420,23 @@ describe('the shared comments seam: context + onSaved (G8-12 shape)', () => {
 })
 
 describe('anchor_version_invalid keeps the anchors stale and retries on the next Save (G8-15)', () => {
+  const STALE = collabStrings('en').collabAnchorStale
+  const invalid = {
+    ok: false as const,
+    error: {
+      code: 'malformed' as const,
+      message: 'anchor_version_invalid',
+      details: { code: 'anchor_version_invalid' },
+    },
+  }
+  /** the thread card of a comment as the panel draws it now */
+  const card = (id: string) => el.querySelector(`[data-thread-id="${id}"]`)?.textContent ?? ''
+
   it('a 400 anchor_version_invalid never throws; the next Save sends both layout changes', async () => {
     const bridge = fakeBridge([
       comment({ id: 'c1', anchor: makePdfAnchor(1, RECT) }),
       comment({ id: 'c2', anchor: makePdfAnchor(2, RECT) }),
     ])
-    const invalid = {
-      ok: false as const,
-      error: {
-        code: 'malformed' as const,
-        message: 'anchor_version_invalid',
-        details: { code: 'anchor_version_invalid' },
-      },
-    }
     ;(bridge.anchors as ReturnType<typeof vi.fn>).mockResolvedValueOnce(invalid)
     const { api } = await mount(bridge)
     const listCalls = (bridge.list as ReturnType<typeof vi.fn>).mock.calls.length
@@ -447,7 +451,7 @@ describe('anchor_version_invalid keeps the anchors stale and retries on the next
       await flush()
     })
     expect(bridge.anchors).toHaveBeenCalledTimes(1)
-    // nothing changed on the server: no reload, the thread stays where the server has it
+    // nothing changed on the server: no reload
     expect((bridge.list as ReturnType<typeof vi.fn>).mock.calls.length).toBe(listCalls)
     await act(async () => {
       api.current!.saved(new Map([[0, 0]])) // the next Save keeps page 1 (old page 2)
@@ -463,6 +467,53 @@ describe('anchor_version_invalid keeps the anchors stale and retries on the next
         { commentId: 'c2', anchor: makePdfAnchor(1, RECT), state: 'exact' },
       ],
     })
+  })
+
+  it('shows the anchors whose page the refused layout change moved or dropped as stale, the rest exact', async () => {
+    const bridge = fakeBridge([
+      comment({ id: 'c1', anchor: makePdfAnchor(1, RECT) }),
+      comment({ id: 'c2', anchor: makePdfAnchor(2, RECT) }),
+      comment({ id: 'c3', anchor: makePdfAnchor(3, RECT) }),
+    ])
+    ;(bridge.anchors as ReturnType<typeof vi.fn>).mockResolvedValueOnce(invalid)
+    const { api } = await mount(bridge)
+    for (const id of ['c1', 'c2', 'c3']) expect(card(id)).not.toContain(STALE)
+    await act(async () => {
+      // the Save deleted page 2: 1 -> 0, 3 -> 1; the server still counts pages in the old layout
+      api.current!.saved(
+        new Map([
+          [0, 0],
+          [2, 1],
+        ]),
+      )
+      bridge.receipt('ver-2')
+      await flush()
+    })
+    expect(bridge.anchors).toHaveBeenCalledTimes(1)
+    expect(card('c1')).not.toContain(STALE) // page 1 is still page 1
+    expect(card('c2')).toContain(STALE) // dropped
+    expect(card('c3')).toContain(STALE) // moved: the open file's page 3 is another page
+    // another Save before the receipt moves pages again: still stale, not exact on a wrong page
+    await act(async () => {
+      api.current!.saved(new Map([[0, 0]]))
+      await flush()
+    })
+    expect(card('c2')).toContain(STALE)
+    expect(card('c3')).toContain(STALE)
+    // the next Save lands the anchors: the server answers, the list reloads, nothing stays stale
+    bridge.comments = [
+      comment({ id: 'c1', anchor: makePdfAnchor(1, RECT) }),
+      comment({ id: 'c2', anchor: makePdfAnchor(2, RECT), anchor_state: 'lost' }),
+      comment({ id: 'c3', anchor: makePdfAnchor(1, RECT) }),
+    ]
+    await act(async () => {
+      bridge.receipt('ver-3')
+      await flush()
+    })
+    expect(bridge.anchors).toHaveBeenCalledTimes(2)
+    expect(card('c1')).not.toContain(STALE)
+    expect(card('c2')).not.toContain(STALE)
+    expect(card('c3')).not.toContain(STALE)
   })
 })
 

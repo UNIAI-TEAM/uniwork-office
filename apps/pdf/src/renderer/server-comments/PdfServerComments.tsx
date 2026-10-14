@@ -39,6 +39,7 @@ import {
 import { createCommentsPoll } from '@genoffice/electron-utils/comments-poll'
 import type { UniworkCommentsApi } from '@genoffice/electron-utils/comments-ipc'
 import { createAnchorResend, type AnchorResend } from './anchor-resend'
+import { withLayoutShift } from './pdf-adapter'
 import {
   fallbackPdfCommentsContext,
   followPdfUniworkSaves,
@@ -84,7 +85,10 @@ export interface PdfServerComments {
 export const rootDraftKey = (anchor: PdfAnchor): string => `root:${JSON.stringify(anchor)}`
 
 export function usePdfServerComments(o: PdfServerCommentsOptions): PdfServerComments {
-  const { bridge, path, lang, readOnly, adapter, open } = o
+  const { bridge, path, lang, readOnly, open } = o
+  // pages the server's anchors still count in an older layout (a refused anchor send): shown stale
+  const [shift, setShift] = useState<ReadonlyMap<number, number> | null>(null)
+  const adapter = useMemo(() => withLayoutShift(o.adapter, shift), [o.adapter, shift])
   const [context, setContext] = useState<PdfCommentsContext>(() =>
     fallbackPdfCommentsContext(path, readOnly),
   )
@@ -174,6 +178,7 @@ export function usePdfServerComments(o: PdfServerCommentsOptions): PdfServerComm
   // the anchor re-send after a Save (contract §2.6): page map from the save, version from the receipt
   const resendRef = useRef<AnchorResend | null>(null)
   useEffect(() => {
+    setShift(null)
     const resend = createAnchorResend({
       roots: () => {
         const c = ctlRef.current
@@ -181,6 +186,7 @@ export function usePdfServerComments(o: PdfServerCommentsOptions): PdfServerComm
       },
       send: (versionId, items) => sendAnchorMap(source, versionId, items),
       onUpdated: () => void ctlRef.current.reload(),
+      onShift: setShift,
     })
     resendRef.current = resend
     const off = followPdfUniworkSaves(bridge, path, (versionId) => {

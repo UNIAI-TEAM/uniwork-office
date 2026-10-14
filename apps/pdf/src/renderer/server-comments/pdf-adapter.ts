@@ -6,6 +6,11 @@
  * deleted in this session but not saved yet cannot be located (the thread reads
  * "position may have changed" until the Save turns it `lost`); a page moved by
  * an unsaved reorder is still found, at its new place in the view.
+ *
+ * After a Save whose anchor send the server refused (`retry_next_save`) the server still
+ * holds the anchors of the layout before that Save: `withLayoutShift` marks the ones whose
+ * page moved or was dropped as not located (shown stale), because the open file's page at
+ * that index is another page, until a later Save lands them.
  */
 import type { CollabAnchor, CollabAnchorAdapter } from '@genoffice/ui/collab'
 import { parsePdfAnchor, pdfAnchorOrder, type PdfRect } from './pdf-anchor'
@@ -46,6 +51,26 @@ export function createPdfAnchorAdapter(deps: PdfAdapterDeps): CollabAnchorAdapte
     goTo(anchor) {
       const at = locatePdfAnchor(anchor, deps)
       if (at) deps.goTo(at.origIdx, at.rect)
+    },
+  }
+}
+
+/**
+ * `adapter` for a server that still holds anchors of an older layout: `shift` maps a page index
+ * of that layout to its index in the open file. An anchor whose page moved or was dropped is not
+ * located; the rest behave as before.
+ */
+export function withLayoutShift(
+  adapter: CollabAnchorAdapter,
+  shift: ReadonlyMap<number, number> | null,
+): CollabAnchorAdapter {
+  if (!shift) return adapter
+  return {
+    ...adapter,
+    locate(anchor) {
+      const a = parsePdfAnchor(anchor)
+      if (a && shift.get(a.page - 1) !== a.page - 1) return false
+      return adapter.locate(anchor)
     },
   }
 }
