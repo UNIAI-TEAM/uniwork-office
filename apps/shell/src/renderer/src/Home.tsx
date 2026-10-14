@@ -3522,6 +3522,7 @@ export function Home() {
           onRefresh={refresh}
           onSwitchPractice={switchPractice}
           newItems={NEW_ITEMS}
+          accountName={accountName}
         />
       ) : selectedFolder && rootOf(selectedFolder, roots)?.readable ? (
         renderFolderContent()

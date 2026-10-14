@@ -111,3 +111,11 @@ export function inProgressRows(
       .map((doc) => ({ kind: 'recent' as const, doc })),
   ].slice(0, limit)
 }
+
+/** up to two letters for a person's avatar: first and last word ("Lan Phạm" -> "LP") */
+export function initials(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean)
+  const first = Array.from(words[0] ?? '')[0] ?? ''
+  const last = words.length > 1 ? (Array.from(words[words.length - 1]!)[0] ?? '') : ''
+  return (first + last).toLocaleUpperCase()
+}

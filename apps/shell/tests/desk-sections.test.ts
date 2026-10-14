@@ -110,6 +110,10 @@ describe('DeskInTray', () => {
     const h = home([comment])
     await render(createElement(DeskInTray, { home: h, signedIn: true, view: 'ready', local: [] }))
     expect(host.textContent).toContain('Contract-012')
+    // a person's comment: their initials and an info pill; the date is not mono
+    expect(host.querySelector('.wb-desk-avatar')!.textContent).toBe('L')
+    expect(host.querySelector('.wb-pill.is-info')!.textContent).toBe('Comment')
+    expect(host.querySelector('.wb-desk-when')!.className).not.toContain('wb-mono')
     await act(async () => button('Contract-012')!.click())
     await act(async () => {
       for (let i = 0; i < 10; i++) await Promise.resolve()
@@ -193,7 +197,78 @@ describe('DeskInTray', () => {
       createElement(DeskInTray, { home: home([]), signedIn: true, view: 'ready', local }),
     )
     expect(host.textContent).toContain('Proposal')
-    expect(host.textContent).toContain('Version conflict')
+    expect(host.textContent).toContain('This copy and the one on UniWork differ')
+    // the most serious state is the loudest: a danger pill and a visible Resolve
+    expect(host.querySelector('.wb-pill.is-danger')!.textContent).toBe('Conflict')
+    const resolve = button('Resolve')!
+    expect(resolve.className).toContain('wb-btn-secondary')
+    await act(async () => resolve.click())
+    await act(async () => {
+      for (let i = 0; i < 10; i++) await Promise.resolve()
+    })
+    expect(api.uniworkOpenDocument).toHaveBeenCalledWith('d9')
+  })
+
+  it('shows a failed sync as a danger "Not synced" pill with Resolve', async () => {
+    api.uniworkDocStatus.mockResolvedValue({
+      path: '/c/p.docx',
+      documentId: 'd9',
+      workspaceId: 'w',
+      title: 'Proposal',
+      format: 'docx',
+      access: 'edit',
+      state: 'failed',
+    })
+    const local = [
+      {
+        path: '/c/p.docx',
+        name: 'p.docx',
+        ext: 'docx',
+        mtimeMs: 1,
+        sizeBytes: 1,
+        starred: false,
+        uniwork: { documentId: 'd9' },
+      } as RecentEntry,
+    ]
+    await render(
+      createElement(DeskInTray, { home: home([]), signedIn: true, view: 'ready', local }),
+    )
+    expect(host.querySelector('.wb-pill.is-danger')!.textContent).toBe('Not synced')
+    expect(button('Resolve')).toBeDefined()
+  })
+
+  it('marks a mention info and a new share neutral', async () => {
+    api.uniworkListSharedWithMe.mockResolvedValueOnce({
+      ok: true,
+      value: {
+        documents: [
+          {
+            id: 's1',
+            workspaceId: 'w',
+            title: 'Plan',
+            format: 'docx',
+            updatedAt: new Date().toISOString(),
+          },
+        ],
+        nextCursor: null,
+      },
+    })
+    await render(
+      createElement(DeskInTray, {
+        home: home([{ ...comment, kind: 'document_mentioned' }]),
+        signedIn: true,
+        view: 'ready',
+        local: [],
+      }),
+    )
+    const pills = Array.from(host.querySelectorAll('.wb-pill')).map((p) => [
+      p.textContent,
+      p.className,
+    ])
+    expect(pills).toEqual([
+      ['Mention', 'wb-pill is-info'],
+      ['Newly shared', 'wb-pill'],
+    ])
   })
 
   it('reloads "Shared with you" on the top bar Refresh', async () => {
@@ -204,7 +279,7 @@ describe('DeskInTray', () => {
     expect(api.uniworkListSharedWithMe).toHaveBeenCalledTimes(2)
   })
 
-  it('invites sign-in when signed out and the tray is empty', async () => {
+  it('leaves the sign-in prompt to the Desk banner when signed out', async () => {
     await render(
       createElement(DeskInTray, {
         home: { ...home([]), value: null },
@@ -214,8 +289,9 @@ describe('DeskInTray', () => {
       }),
     )
     expect(api.uniworkListSharedWithMe).not.toHaveBeenCalled()
-    await act(async () => host.querySelector<HTMLButtonElement>('.wb-ov-note .wb-link')!.click())
-    expect(api.accountLogin).toHaveBeenCalled()
+    expect(host.textContent).not.toContain('Sign in')
+    expect(host.querySelector('button')).toBeNull()
+    expect(host.textContent).toContain('Nothing from UniWork yet')
   })
 
   it('offers Retry, not "nothing waiting", when the notifications failed to load', async () => {
@@ -248,6 +324,7 @@ describe('DeskInTray', () => {
     expect(host.textContent).not.toContain('Nothing is waiting on you')
     expect(host.textContent).not.toContain('Sign in')
     expect(host.querySelector('.wb-ov-partial')).toBeNull()
+    expect(host.querySelector('.wb-work-skeleton')).not.toBeNull()
   })
 
   it('says there is no workspace instead of inviting sign-in', async () => {
@@ -290,10 +367,43 @@ describe('DeskInProgress', () => {
     expect(api.openPath).toHaveBeenCalledWith('/w/old.xlsx')
   })
 
-  it('offers Open file when nothing is in progress', async () => {
+  it('offers Open file in the card head, and says when nothing is in progress', async () => {
     await render(createElement(DeskInProgress, { drafts: [], recent: [], local: [] }))
-    await act(async () => button('Open file')!.click())
+    expect(host.textContent).toContain('No documents in progress')
+    const open = button('Open file')!
+    expect(open.closest('.wb-desk-head')).not.toBeNull()
+    await act(async () => open.click())
     expect(api.browse).toHaveBeenCalled()
+  })
+
+  it('shows a skeleton, not the empty line, while drafts or recents load', async () => {
+    await render(
+      createElement(DeskInProgress, { drafts: [], recent: [], local: [], loading: true }),
+    )
+    expect(host.querySelector('.wb-work-skeleton')).not.toBeNull()
+    expect(host.textContent).not.toContain('No documents in progress')
+  })
+
+  it('gives each draft its pill and a visible secondary action', async () => {
+    await render(
+      createElement(DeskInProgress, {
+        drafts: [
+          { kind: 'unsaved', title: 'Report', app: 'docs', tabId: 't1' },
+          { kind: 'recovery', title: 'old.xlsx', app: 'sheets', filePath: '/w/old.xlsx' },
+        ],
+        recent: [],
+        local: [],
+      }),
+    )
+    expect(host.querySelector('.wb-pill.is-warning')!.textContent).toBe('Unsaved')
+    expect(host.querySelector('.wb-pill.is-info')!.textContent).toBe('Recovered copy')
+    await act(async () => button('Restore')!.click())
+    expect(api.openPath).toHaveBeenCalledWith('/w/old.xlsx')
+    const switchTo = button('Switch to')!
+    expect(switchTo.className).toContain('wb-btn-secondary')
+    expect(switchTo.getAttribute('aria-hidden')).toBeNull()
+    await act(async () => switchTo.click())
+    expect(window.aiOfficeTabs.activate).toHaveBeenCalledWith('t1')
   })
 })
 
@@ -359,5 +469,35 @@ describe('DeskDrawer', () => {
     )
     expect(button('Quote')!.disabled).toBe(true)
     expect(host.querySelector('.wb-forms-locked')?.textContent).toBeTruthy()
+  })
+
+  it('shows the target pack chip, picks another pack, and adds a form from the ghost button', async () => {
+    writeForms('legal', [{ id: 'f1', title: 'Quote' }])
+    const onSelectPack = vi.fn()
+    const onManage = vi.fn()
+    const props = {
+      practiceId: 'legal' as const,
+      packId: 'p0',
+      orgId: null,
+      vi: false,
+      onManage,
+      packs: [{ id: 'p1', title: 'Launch' }],
+      onSelectPack,
+    }
+    await render(createElement(DeskDrawer, { ...props, selectedPackId: null }))
+    expect(host.querySelector('.wb-desk-pack')!.textContent).toContain('Default project')
+    const select = host.querySelector<HTMLSelectElement>('.wb-desk-pack select')!
+    await act(async () => {
+      select.value = 'p1'
+      select.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    expect(onSelectPack).toHaveBeenCalledWith('p1')
+    await render(createElement(DeskDrawer, { ...props, selectedPackId: 'p1' }))
+    expect(host.querySelector('.wb-desk-pack')!.textContent).toContain('Launch')
+    const add = button('Add a form')!
+    expect(add.className).toContain('wb-btn-ghost')
+    await act(async () => add.click())
+    expect(onManage).toHaveBeenCalled()
+    expect(button('Quote')!.className).toContain('wb-btn-secondary')
   })
 })

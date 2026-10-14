@@ -223,12 +223,15 @@ export function useRecentDocuments(
   /** this device's recents as listed (working copies included), for the Desk's tray */
   local: RecentEntry[]
   cloudFailed: boolean
+  /** false until the first answer: an empty list before it is not "nothing recent" */
+  loaded: boolean
   reload: () => void
 } {
   const [state, setState] = useState({
     docs: [] as WorkRecentDocument[],
     local: [] as RecentEntry[],
     cloudFailed: false,
+    loaded: false,
   })
   const [tick, setTick] = useState(0)
   const reload = useCallback(() => setTick((n) => n + 1), [])
@@ -260,6 +263,7 @@ export function useRecentDocuments(
           docs: mergeRecentDocuments(c ?? [], l, limit),
           local: l,
           cloudFailed: c === null,
+          loaded: true,
         })
       }
     })

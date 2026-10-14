@@ -152,6 +152,40 @@ const UI_GLYPH = {
       <path d="m10.5 10.5 3 3" />
     </>
   ),
+  exportPdf: (
+    <>
+      <path d="M4 2.5h5.5L12 5v3M4 2.5v11h4" />
+      <path d="M10 11.5h4M12 9.5l2 2-2 2" />
+    </>
+  ),
+  merge: (
+    <>
+      <path d="M3 3h4v4H3zM3 9h4v4H3z" />
+      <path d="M7 5h2.5A1.5 1.5 0 0 1 11 6.5V8M7 11h2.5A1.5 1.5 0 0 0 11 9.5V8h2.5" />
+    </>
+  ),
+  split: (
+    <>
+      <path d="M3 2.5h10v4H3zM3 9.5h10v4H3z" />
+      <path d="M1.5 8h1.5M6.5 8h3M13 8h1.5" />
+    </>
+  ),
+  upload: <path d="M8 10.5V3M5 6l3-3 3 3M3 10.5v2a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-2" />,
+  bell: (
+    <>
+      <path d="M4 11V7.5a4 4 0 0 1 8 0V11l1 1.5H3z" />
+      <path d="M6.5 13.5a1.5 1.5 0 0 0 3 0" />
+    </>
+  ),
+  video: (
+    <>
+      <rect x="2" y="4.5" width="8.5" height="7" rx="1.5" />
+      <path d="m10.5 7 3.5-2v6l-3.5-2" />
+    </>
+  ),
+  folder: (
+    <path d="M2.5 4.5a1 1 0 0 1 1-1h3L8 5h4.5a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z" />
+  ),
   grip: (
     <>
       <circle cx="6" cy="4" r="0.6" />

@@ -76,7 +76,7 @@ test.describe.serial('Workbench Desk', () => {
       await expect(desk.getByRole('button', { name: 'PDF → Word' })).toBeVisible({
         timeout: 30_000,
       })
-      for (const title of ['Needs you', 'In progress', 'Forms drawer', 'Today']) {
+      for (const title of ['Needs you', 'In progress', 'Frequent forms', 'Today']) {
         await expect(desk.getByRole('heading', { name: title, exact: true })).toBeVisible()
       }
 

@@ -60,6 +60,8 @@ interface PracticeHomeProps {
   onSwitchPractice: (id: PracticeId) => void
   /** Home's NEW_ITEMS, for the top bar's + New menu */
   newItems: readonly WorkbenchNewItem[]
+  /** the signed-in person's display name ('' when unknown), for the Desk greeting */
+  accountName?: string
 }
 
 function toPracticeMeta(entry: ProjectSummaryEntry, practiceId: PracticeId): PracticeMeta | null {
@@ -114,6 +116,7 @@ export function PracticeHome({
   onRefresh,
   onSwitchPractice,
   newItems,
+  accountName = '',
 }: PracticeHomeProps): ReactElement {
   const { lang, t } = useI18n()
   // State keeps keys (or raw server text), translated at render so a language switch applies.
@@ -295,6 +298,17 @@ export function PracticeHome({
       )
       .sort((a, b) => (b.entry.lastActiveAt > a.entry.lastActiveAt ? 1 : -1))
   }, [projects, practice.id, practice.projectKind, qQuery])
+  // the Desk drawer's pack chip lists every pack of this role (the Knowledge search does not apply)
+  const deskPacks = useMemo(
+    () =>
+      projects
+        .filter((p) => p.kind === practice.projectKind && !!p.practice)
+        .flatMap((p) => {
+          const m = toPracticeMeta(p, practice.id)
+          return m ? [{ id: p.id, title: m.title }] : []
+        }),
+    [projects, practice.id, practice.projectKind],
+  )
   const pillar = practice.pillars.find((p) => p.id === tab)
   const pillarTitleId = useId()
   /** a pillar's empty sentence on the shared state template (spec 5): its tinted tile and one line */
@@ -689,6 +703,10 @@ export function PracticeHome({
             onSummary={setHomeSummary}
             onOpenTab={openDeskTab}
             onPackLinked={onRefresh}
+            userName={accountName}
+            packs={deskPacks}
+            selectedPackId={selectedId}
+            onSelectPack={onSelectPack}
           />
         ) : isWorkbenchModuleId(tab) ? (
           <WorkbenchModulePane

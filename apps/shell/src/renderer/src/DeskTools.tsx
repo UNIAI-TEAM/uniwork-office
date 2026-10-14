@@ -1,19 +1,41 @@
-import { useEffect, useRef, useState } from 'react'
-import type { KeyboardEvent, ReactElement } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
+import type { KeyboardEvent, ReactElement, ReactNode } from 'react'
 import type { DeskToolId, DeskToolResult } from '../../shared/home-api'
 import { applicableTools } from './desk-model'
 import { FileBadge } from './FileBadge'
 import { useI18n, type StringKey } from './locale'
 import { useWbToast } from './WbToastHost'
+import { WbGlyph } from './WorkbenchIcons'
 
-const TOOLS: readonly { id: DeskToolId; label: StringKey; ext: string }[] = [
-  { id: 'pdf-to-docx', label: 'wbDeskToolPdfToDocx', ext: 'docx' },
-  { id: 'pdf-to-xlsx', label: 'wbDeskToolPdfToXlsx', ext: 'xlsx' },
-  { id: 'pdf-to-pptx', label: 'wbDeskToolPdfToPptx', ext: 'pptx' },
-  { id: 'export-pdf', label: 'wbDeskToolExportPdf', ext: 'pdf' },
-  { id: 'merge-pdf', label: 'wbDeskToolMergePdf', ext: 'pdf' },
-  { id: 'split-pdf', label: 'wbDeskToolSplitPdf', ext: 'pdf' },
+/**
+ * `label` is the full name (the accessible name and the drop panel's button); `short` is the
+ * visible text next to the "PDF to" group label. Office format names stay untranslated.
+ */
+const TOOLS: readonly { id: DeskToolId; label: StringKey; short?: string; icon: ReactNode }[] = [
+  {
+    id: 'pdf-to-docx',
+    label: 'wbDeskToolPdfToDocx',
+    short: 'Word',
+    icon: <FileBadge ext="docx" size={16} />,
+  },
+  {
+    id: 'pdf-to-xlsx',
+    label: 'wbDeskToolPdfToXlsx',
+    short: 'Excel',
+    icon: <FileBadge ext="xlsx" size={16} />,
+  },
+  {
+    id: 'pdf-to-pptx',
+    label: 'wbDeskToolPdfToPptx',
+    short: 'PowerPoint',
+    icon: <FileBadge ext="pptx" size={16} />,
+  },
+  { id: 'export-pdf', label: 'wbDeskToolExportPdf', icon: <WbGlyph id="exportPdf" /> },
+  { id: 'merge-pdf', label: 'wbDeskToolMergePdf', icon: <WbGlyph id="merge" /> },
+  { id: 'split-pdf', label: 'wbDeskToolSplitPdf', icon: <WbGlyph id="split" /> },
 ]
+const CONVERT = TOOLS.slice(0, 3)
+const PDF_TOOLS = TOOLS.slice(3)
 
 type ToolError = Extract<DeskToolResult, { error: string }>['error']
 const ERROR_KEY: Record<ToolError, StringKey> = {
@@ -28,6 +50,7 @@ const ERROR_KEY: Record<ToolError, StringKey> = {
 
 const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path
 const folderOf = (path: string) => path.replace(/[\\/][^\\/]*$/, '')
+const extOf = (path: string) => /\.([^.\\/]+)$/.exec(path)?.[1]?.toLowerCase() ?? ''
 const TOOL_TOAST = 'desk-tool'
 const clampEvery = (raw: string) => Math.min(999, Math.max(1, Math.floor(Number(raw)) || 1))
 
@@ -44,6 +67,8 @@ export function DeskTools({
   unsavedPaths: ReadonlySet<string>
 }): ReactElement {
   const { t } = useI18n()
+  const titleId = useId()
+  const convertId = useId()
   const [running, setRunning] = useState<DeskToolId | null>(null)
   const [splitFor, setSplitFor] = useState<{ inputs?: string[] } | null>(null)
   // raw text so a cleared field can be retyped; clamped when the split runs
@@ -132,33 +157,50 @@ export function DeskTools({
   const busy = running !== null
   const fitting = dropped ? applicableTools(dropped) : []
 
+  const strip = (tool: (typeof TOOLS)[number]) => (
+    <button
+      key={tool.id}
+      type="button"
+      className="wb-btn wb-btn-secondary wb-desk-tool"
+      disabled={busy}
+      aria-busy={running === tool.id}
+      // the short "Word" sits under the visible "PDF to" label; the name says it in full
+      aria-label={tool.short ? t(tool.label) : undefined}
+      ref={(el) => {
+        if (el) stripRefs.current.set(tool.id, el)
+        else stripRefs.current.delete(tool.id)
+      }}
+      onClick={() => void run(tool.id)}
+    >
+      {tool.icon}
+      {tool.short ?? t(tool.label)}
+    </button>
+  )
+
   return (
-    <section className="wb-desk-section" aria-label={t('wbDeskTools')}>
+    <section className="wb-desk-card wb-block" aria-labelledby={titleId}>
+      <div className="wb-desk-head">
+        <h3 id={titleId}>{t('wbDeskTools')}</h3>
+        <span className="wb-desk-head-note wb-desk-head-end">
+          <WbGlyph id="upload" size={14} />
+          {t('wbDeskDropHint')}
+        </span>
+      </div>
       <div className="wb-desk-tools">
-        {TOOLS.map((tool) => (
-          <button
-            key={tool.id}
-            type="button"
-            className="wb-btn wb-btn-secondary wb-btn-sm wb-desk-tool"
-            disabled={busy}
-            aria-busy={running === tool.id}
-            ref={(el) => {
-              if (el) stripRefs.current.set(tool.id, el)
-              else stripRefs.current.delete(tool.id)
-            }}
-            onClick={() => void run(tool.id)}
-          >
-            <FileBadge ext={tool.ext} size={16} />
-            {t(tool.label)}
-          </button>
-        ))}
-        <p className="wb-desk-hint">{t('wbDeskDropHint')}</p>
+        <div className="wb-desk-tool-group" role="group" aria-labelledby={convertId}>
+          <span className="wb-desk-tool-label" id={convertId}>
+            {t('wbDeskToolPdfTo')}
+          </span>
+          {CONVERT.map(strip)}
+        </div>
+        <span className="wb-desk-tool-sep" aria-hidden="true" />
+        <div className="wb-desk-tool-group">{PDF_TOOLS.map(strip)}</div>
       </div>
 
       {splitFor ? (
-        <div className="wb-desk-panel wb-block wb-desk-split" onKeyDown={onEscape(closeSplit)}>
-          <label>
-            {t('wbDeskSplitEvery')}{' '}
+        <div className="wb-desk-panel" onKeyDown={onEscape(closeSplit)}>
+          <label className="wb-desk-split">
+            {t('wbDeskSplitEvery')}
             <input
               className="wb-input"
               type="number"
@@ -169,58 +211,75 @@ export function DeskTools({
               onChange={(e) => setEvery(e.target.value)}
             />
           </label>
-          <button
-            type="button"
-            className="wb-btn wb-btn-primary wb-btn-sm"
-            onClick={() => void run('split-pdf', splitFor.inputs, true)}
-          >
-            {t('wbDeskSplitRun')}
-          </button>
-          <button type="button" className="wb-btn wb-btn-ghost wb-btn-sm" onClick={closeSplit}>
-            {t('wbCommonCancel')}
-          </button>
+          <div className="wb-desk-panel-actions">
+            <span className="wb-desk-panel-end">
+              <button type="button" className="wb-btn wb-btn-ghost wb-btn-sm" onClick={closeSplit}>
+                {t('wbCommonCancel')}
+              </button>
+              <button
+                type="button"
+                className="wb-btn wb-btn-primary wb-btn-sm"
+                onClick={() => void run('split-pdf', splitFor.inputs, true)}
+              >
+                {t('wbDeskSplitRun')}
+              </button>
+            </span>
+          </div>
         </div>
       ) : null}
 
       {dropped ? (
         <div
-          className="wb-desk-panel wb-block"
+          className="wb-desk-panel"
           role="group"
-          aria-label={t('wbDeskDropHint')}
+          aria-label={t('wbDeskDropped')}
           onKeyDown={onEscape(closeDrop)}
         >
-          <p>{dropped.map(fileName).join(', ')}</p>
-          {fitting.length === 0 ? <p>{t('wbDeskDropNone')}</p> : null}
-          {fitting.map((id) => (
-            <button
-              key={id}
-              type="button"
-              className="wb-btn wb-btn-primary wb-btn-sm"
-              disabled={busy}
-              onClick={() => {
-                focusStrip()
-                void run(id, [...dropped])
-              }}
-            >
-              {t(TOOLS.find((x) => x.id === id)!.label)}
-            </button>
-          ))}
-          <button
-            type="button"
-            className="wb-btn wb-btn-secondary wb-btn-sm"
-            onClick={() => {
-              for (const p of dropped) void window.aiOffice.openPath(p)
-              closeDrop()
-            }}
-          >
-            {t('wbCommonOpen')}
-          </button>
-          <button type="button" className="wb-btn wb-btn-ghost wb-btn-sm" onClick={closeDrop}>
-            {t('wbCommonCancel')}
-          </button>
-          {fitting.includes('export-pdf') && dropped.some((p) => unsavedPaths.has(p)) ? (
-            <p>{t('wbDeskFromSaved')}</p>
+          <ul className="wb-desk-files">
+            {dropped.map((p) => (
+              <li key={p}>
+                <FileBadge ext={extOf(p)} size={16} />
+                <span>{fileName(p)}</span>
+              </li>
+            ))}
+          </ul>
+          {fitting.length === 0 ? (
+            <p className="wb-desk-panel-note">{t('wbDeskDropNone')}</p>
           ) : null}
+          {fitting.includes('export-pdf') && dropped.some((p) => unsavedPaths.has(p)) ? (
+            <p className="wb-desk-panel-note">{t('wbDeskFromSaved')}</p>
+          ) : null}
+          <div className="wb-desk-panel-actions">
+            {fitting.map((id) => (
+              <button
+                key={id}
+                type="button"
+                className="wb-btn wb-btn-secondary wb-btn-sm"
+                disabled={busy}
+                onClick={() => {
+                  focusStrip()
+                  void run(id, [...dropped])
+                }}
+              >
+                {t(TOOLS.find((x) => x.id === id)!.label)}
+              </button>
+            ))}
+            <span className="wb-desk-panel-end">
+              <button type="button" className="wb-btn wb-btn-ghost wb-btn-sm" onClick={closeDrop}>
+                {t('wbCommonCancel')}
+              </button>
+              <button
+                type="button"
+                className="wb-btn wb-btn-secondary wb-btn-sm"
+                onClick={() => {
+                  for (const p of dropped) void window.aiOffice.openPath(p)
+                  closeDrop()
+                }}
+              >
+                {t('wbCommonOpen')}
+              </button>
+            </span>
+          </div>
         </div>
       ) : null}
     </section>

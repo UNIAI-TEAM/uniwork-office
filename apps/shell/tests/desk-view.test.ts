@@ -51,7 +51,7 @@ afterEach(() => {
   host.remove()
 })
 
-async function mount() {
+async function mount(over: Partial<Parameters<typeof DeskView>[0]> = {}) {
   await act(async () => {
     root.render(
       createElement(
@@ -67,6 +67,7 @@ async function mount() {
           packId: null,
           onReload: vi.fn(),
           onOpenTab: vi.fn(),
+          ...over,
         }),
       ),
     )
@@ -79,11 +80,64 @@ async function mount() {
 describe('DeskView', () => {
   it('lays out tools, tray, work in progress, drawer and Today, even signed out', async () => {
     await mount()
-    const text = host.textContent ?? ''
-    for (const s of ['PDF → Word', 'Needs you', 'In progress', 'Forms drawer', 'Today']) {
-      expect(text).toContain(s)
+    const headings = Array.from(host.querySelectorAll('h3')).map((h) => h.textContent)
+    for (const s of ['Tools', 'Needs you', 'In progress', 'Frequent forms', 'Today']) {
+      expect(headings).toContain(s)
     }
+    expect(host.querySelector('button[aria-label="PDF → Word"]')).not.toBeNull()
     expect(api.listDrafts).toHaveBeenCalled()
+  })
+
+  it('shows one sign-in banner when signed out; the tray and Today do not repeat it', async () => {
+    await mount()
+    const banners = host.querySelectorAll('.wb-banner')
+    expect(banners).toHaveLength(1)
+    expect(banners[0]!.className).toContain('is-info')
+    const signIn = Array.from(host.querySelectorAll('button')).filter((b) =>
+      /sign in/i.test(b.textContent ?? ''),
+    )
+    expect(signIn).toHaveLength(1)
+    expect(banners[0]!.contains(signIn[0]!)).toBe(true)
+    // the banner sits above the Desk grid, so both columns still start at the same line
+    expect(host.querySelector('.wb-desk')!.contains(banners[0]!)).toBe(false)
+    await act(async () => signIn[0]!.click())
+    expect(api.accountLogin).toHaveBeenCalled()
+  })
+
+  it('shows one offline banner with Retry when UniWork cannot be reached', async () => {
+    const onReload = vi.fn()
+    await mount({ workspaceError: 'offline', onReload })
+    const banners = host.querySelectorAll('.wb-banner')
+    expect(banners).toHaveLength(1)
+    expect(banners[0]!.className).toContain('is-warning')
+    expect(host.querySelectorAll('.wb-ov-partial')).toHaveLength(0)
+    await act(async () => banners[0]!.querySelector('button')!.click())
+    expect(onReload).toHaveBeenCalled()
+  })
+
+  it('shows the In progress skeleton, not the empty line, until drafts load', async () => {
+    api.listDrafts = vi.fn(() => new Promise<unknown[]>(() => undefined))
+    await mount()
+    const card = Array.from(host.querySelectorAll('section')).find(
+      (s) => s.querySelector('h3')?.textContent === 'In progress',
+    )!
+    expect(card.querySelector('.wb-work-skeleton')).not.toBeNull()
+    expect(card.textContent).not.toContain('No documents in progress')
+  })
+
+  it('greets by the short name and sums up what waits, from data already loaded', async () => {
+    api.listDrafts = vi.fn(async () => [
+      { kind: 'unsaved', title: 'A.docx', app: 'docs', tabId: 'a' },
+      { kind: 'recovery', title: 'B.xlsx', app: 'sheets', filePath: '/b.xlsx' },
+    ])
+    await mount({ userName: 'Phan Đức Quang' })
+    const text = host.querySelector('.wb-toolbar-text')!.textContent
+    expect(text).toMatch(/^Good (morning|afternoon|evening), Quang\. Unsaved documents: 1$/)
+  })
+
+  it('drops the greeting when no name is known', async () => {
+    await mount()
+    expect(host.querySelector('.wb-toolbar-text')).toBeNull()
   })
 
   it('claims a file drop so the open-on-drop bridge leaves it alone, and offers the tools', async () => {

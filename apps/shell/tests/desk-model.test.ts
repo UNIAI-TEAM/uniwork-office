@@ -11,6 +11,7 @@ import {
   docNotifications,
   freshShared,
   inProgressRows,
+  initials,
   inTrayRows,
   syncProblems,
 } from '../src/renderer/src/desk-model'
@@ -153,5 +154,14 @@ describe('inProgressRows', () => {
         r.kind === 'draft' ? r.draft.title : r.doc.source === 'uniwork' ? r.doc.doc.id : '',
       ),
     ).toEqual(['P', 'd7'])
+  })
+})
+
+describe('initials', () => {
+  it('takes the first and last words, upper case, and copes with one word or none', () => {
+    expect(initials('Lan Phạm')).toBe('LP')
+    expect(initials('  Phan Đức Quang ')).toBe('PQ')
+    expect(initials('ada')).toBe('A')
+    expect(initials('')).toBe('')
   })
 })

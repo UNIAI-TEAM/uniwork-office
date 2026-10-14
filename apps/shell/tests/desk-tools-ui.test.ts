@@ -43,8 +43,11 @@ async function render(props: Parameters<typeof DeskTools>[0]) {
     )
   })
 }
+// a PDF-to button shows "Word" under the "PDF to" label; its name says "PDF → Word"
 const button = (label: string) =>
-  Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.trim() === label)
+  Array.from(host.querySelectorAll('button')).find(
+    (b) => (b.getAttribute('aria-label') ?? b.textContent?.trim()) === label,
+  )
 const click = async (label: string) => {
   await act(async () => button(label)!.click())
   await act(async () => {
@@ -171,6 +174,46 @@ describe('DeskTools', () => {
     await render({ dropped: ['/w/a.pdf'], onDropHandled, unsavedPaths: new Set() })
     await escape(host.querySelector('.wb-desk-panel')!)
     expect(onDropHandled).toHaveBeenCalled()
+  })
+
+  it('groups the tools: PDF to (file badges), then Export / Merge / Split (own glyphs), all secondary', async () => {
+    await render(noDrop)
+    const groups = host.querySelectorAll('.wb-desk-tool-group')
+    expect(groups).toHaveLength(2)
+    expect(groups[0]!.getAttribute('role')).toBe('group')
+    expect(groups[0]!.textContent).toContain('PDF to')
+    expect(Array.from(groups[0]!.querySelectorAll('button')).map((b) => b.textContent)).toEqual([
+      'Word',
+      'Excel',
+      'PowerPoint',
+    ])
+    expect(groups[0]!.querySelectorAll('button img')).toHaveLength(3)
+    const pdf = Array.from(groups[1]!.querySelectorAll('button'))
+    expect(pdf.map((b) => b.textContent)).toEqual(['Export PDF', 'Merge PDFs', 'Split PDF'])
+    const glyphs = pdf.map((b) => b.querySelector('svg')!.innerHTML)
+    expect(new Set(glyphs).size).toBe(3)
+    for (const b of host.querySelectorAll('.wb-desk-tool')) {
+      expect(b.className).toContain('wb-btn-secondary')
+    }
+    expect(host.querySelector('.wb-desk-head h3')!.textContent).toBe('Tools')
+  })
+
+  it('lays out the drop panel: files on top, the note above the buttons, tools left, Cancel / Open right', async () => {
+    await render({
+      dropped: ['/w/r.docx'],
+      onDropHandled: vi.fn(),
+      unsavedPaths: new Set(['/w/r.docx']),
+    })
+    const panel = host.querySelector('.wb-desk-panel')!
+    const kids = Array.from(panel.children).map((c) => c.className)
+    expect(kids).toEqual(['wb-desk-files', 'wb-desk-panel-note', 'wb-desk-panel-actions'])
+    expect(panel.querySelector('.wb-desk-files')!.textContent).toBe('r.docx')
+    const actions = panel.querySelector('.wb-desk-panel-actions')!
+    expect(actions.firstElementChild!.textContent).toBe('Export PDF')
+    expect(actions.firstElementChild!.className).toContain('wb-btn-secondary')
+    expect(
+      Array.from(actions.querySelectorAll('.wb-desk-panel-end button')).map((b) => b.textContent),
+    ).toEqual(['Cancel', 'Open'])
   })
 
   it('shows no toast when a tool creates no files', async () => {

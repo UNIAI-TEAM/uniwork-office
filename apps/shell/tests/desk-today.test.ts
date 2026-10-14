@@ -118,7 +118,6 @@ const base = (home: WorkLoad<WorkHomeSummary>) => ({
   home,
   view: 'ready' as const,
   workspace: WS,
-  workspaceError: null,
   onReload: vi.fn(),
   onOpenTasks: vi.fn(),
 })
@@ -134,9 +133,9 @@ describe('DeskToday', () => {
     expect(text).not.toContain('Later')
     expect(text).toContain('Weekly sync')
     // the document comment belongs to the tray; one other notification is left
-    expect(text).toContain('Other notifications (1)')
-    // a note line, not a bare flex child that stretches and inherits the column's font
-    expect(button('Other notifications')!.parentElement!.className).toBe('wb-ov-note')
+    expect(text).toContain('Other notifications on UniWork: 1')
+    // the card's footer line (bell + link at body size), not a bare flex child
+    expect(button('Other notifications')!.parentElement!.className).toBe('wb-desk-today-foot')
     await act(async () => button('Other notifications')!.click())
     expect(work.openWeb).toHaveBeenCalledWith({ kind: 'inbox', orgSlug: 'acme', wsSlug: 'team' })
   })
@@ -144,7 +143,7 @@ describe('DeskToday', () => {
   it('counts other notifications from the unread total, not the capped inbox preview', async () => {
     const s = summary()
     await render(base(load({ ...s, counts: { ...s.counts, unread: 30 } })))
-    expect(host.textContent).toContain('Other notifications (29)')
+    expect(host.textContent).toContain('Other notifications on UniWork: 29')
   })
 
   it('ticks a task through the server and reloads; a refusal puts it back and offers Retry', async () => {
@@ -169,14 +168,33 @@ describe('DeskToday', () => {
     expect(props.onOpenTasks).toHaveBeenCalled()
   })
 
-  it('shows the sign-in panel in its column when signed out', async () => {
-    await render({
-      ...base(load(null)),
-      view: 'signed-out',
-      workspace: null,
-      workspaceError: 'signed-out',
-    })
-    expect(host.querySelector('.wb-state')).not.toBeNull()
+  it('leaves the sign-in prompt to the Desk banner when signed out', async () => {
+    await render({ ...base(load(null)), view: 'signed-out', workspace: null })
+    expect(host.querySelector('.wb-state')).toBeNull()
+    expect(host.textContent).not.toContain('Sign in')
     expect(host.textContent).toContain('Today')
+    expect(host.textContent).toContain('Nothing from UniWork yet')
+  })
+
+  it('heads the card with the date, labels due tasks and meetings, and joins a live meeting', async () => {
+    await render(base(load(summary())))
+    const head = host.querySelector('.wb-desk-head')!
+    expect(head.querySelector('h3')!.textContent).toBe('Today')
+    expect(head.textContent).toContain('Tuesday, October 13')
+    const labels = Array.from(host.querySelectorAll('.wb-desk-sublabel')).map((h) => h.textContent)
+    expect(labels).toEqual(['Due tasks', 'Meetings'])
+    // the live meeting: a success sub-line and a secondary Join (one primary per screen)
+    expect(host.querySelector('.wb-row-sub.is-live')!.textContent).toContain('In progress')
+    const join = button('Join')!
+    expect(join.className).toContain('wb-btn-secondary')
+    await act(async () => join.click())
+    expect(work.openWeb).toHaveBeenCalledWith({
+      kind: 'room',
+      orgSlug: 'acme',
+      wsSlug: 'team',
+      id: 'm1',
+    })
+    // times are not mono
+    expect(host.querySelector('.wb-ov-time')!.className).not.toContain('wb-mono')
   })
 })

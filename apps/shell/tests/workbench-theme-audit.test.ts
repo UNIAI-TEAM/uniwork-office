@@ -203,6 +203,10 @@ const PAIRS: readonly (readonly [fg: string, bg: string, min: number])[] = [
   ),
   ['--info', '--info-bg', TEXT],
   ['--success', '--success-bg', TEXT],
+  // the Desk: a live meeting's sub-line on the Today card, and the sign-in / offline banner
+  ['--success', '--surface', TEXT],
+  ['--text', '--info-bg', TEXT],
+  ['--text', '--warning-bg', TEXT],
   ['--on-accent', '--accent', TEXT],
   ['--on-accent', '--accent-hover', TEXT],
   ...['--surface', '--bg-content', '--wb-row-hover'].map((bg) => ['--accent', bg, TEXT] as const),

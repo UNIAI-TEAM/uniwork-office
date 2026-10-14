@@ -5,18 +5,19 @@ import type { WorkHomeSummary } from '../../shared/uniwork-work-api'
 import {
   docNotifications,
   freshShared,
+  initials,
   inTrayRows,
   syncProblems,
   type InTrayRow,
 } from './desk-model'
 import { FileBadge } from './FileBadge'
-import { useI18n } from './locale'
+import { useI18n, type StringKey } from './locale'
 import { docExtension, formatWhen } from './uniwork-docs-model'
 import { openUniworkDocument } from './uniwork-open'
 import { WorkbenchIcon } from './WorkbenchIcons'
 import { notificationKey, type OverviewView } from './work-home'
 import type { WorkLoad } from './work-cache'
-import { WorkStatePanel } from './WorkErrorState'
+import { WorkSkeleton, WorkStatePanel } from './WorkErrorState'
 
 const TRAY_ROWS = 8
 /** working copies whose sync state is asked for (one stat each in main) */
@@ -139,19 +140,34 @@ export function DeskInTray({
     key: string
     icon: ReactNode
     title: string
-    reason: string
+    sub: string
+    pill: { tone: 'danger' | 'info' | 'neutral'; label: StringKey }
     at: string
+    /** a sync problem's visible next step; other rows show their time */
+    resolve: boolean
     open: () => void
   } => {
     if (r.kind === 'note') {
       const n = r.note
       const title = n.params.document ?? ''
+      const actor = n.params.actor ?? ''
       return {
         key: `n:${n.id}`,
-        icon: <WorkbenchIcon id="inbox" size={20} tint="blue" />,
+        icon: actor ? (
+          <span className="wb-desk-avatar" aria-hidden="true">
+            {initials(actor)}
+          </span>
+        ) : (
+          <WorkbenchIcon id="inbox" size={28} tint="blue" />
+        ),
         title,
-        reason: t(notificationKey(n.kind), n.params),
+        sub: t(notificationKey(n.kind), n.params),
+        pill: {
+          tone: 'info',
+          label: n.kind === 'document_mentioned' ? 'wbDeskPillMention' : 'wbDeskPillComment',
+        },
         at: n.created_at,
+        resolve: false,
         open: () => void openNote(n.id, n.resource_id, title),
       }
     }
@@ -159,53 +175,38 @@ export function DeskInTray({
       const d = r.doc
       return {
         key: `s:${d.id}`,
-        icon: <FileBadge ext={docExtension(d)} size={20} />,
+        icon: <FileBadge ext={docExtension(d)} size={24} />,
         title: d.title,
-        reason: t('wbDeskReasonShared'),
+        sub: [t('wbDeskReasonShared'), d.workspaceName].filter(Boolean).join(' · '),
+        pill: { tone: 'neutral', label: 'wbDeskPillShared' },
         at: d.updatedAt,
+        resolve: false,
         open: () => void openUniworkDocument({ documentId: d.id, title: d.title }, window.aiOffice),
       }
     }
     const s = r.status
+    const conflict = s.state === 'conflict'
     return {
       key: `y:${s.path}`,
-      icon: <FileBadge ext={s.format} size={20} />,
+      icon: <FileBadge ext={s.format} size={24} />,
       title: s.title,
-      reason: t(s.state === 'conflict' ? 'wbDeskReasonConflict' : 'wbDeskReasonSync'),
+      sub: t(conflict ? 'wbDeskReasonConflict' : 'wbDeskReasonSync'),
+      pill: { tone: 'danger', label: conflict ? 'wbDeskPillConflict' : 'wbDeskPillSync' },
       at: s.lastSavedAt ?? '',
+      resolve: true,
       open: () =>
         void openUniworkDocument({ documentId: s.documentId, title: s.title }, window.aiOffice),
     }
   }
 
-  // an empty tray only says "nothing waiting" when the notifications really loaded
+  // an empty tray only says "nothing waiting" when the notifications really loaded;
+  // signed out, offline or locked out, the Desk banner (or Today) already says why
   const empty = (): ReactNode => {
-    if (view === 'signed-out')
-      return (
-        <p className="wb-ov-note">
-          {t('wbOvSignedOutTitle')} ·{' '}
-          <button
-            type="button"
-            className="wb-link"
-            onClick={() => void window.aiOffice.accountLogin().catch(() => false)}
-          >
-            {t('acctSignInUniwork')}
-          </button>
-        </p>
-      )
-    if (view === 'loading')
-      return (
-        <div className="wb-ov-skel" aria-hidden="true">
-          <span className="wb-skel wb-skel-row" />
-        </div>
-      )
+    if (view === 'loading') return <WorkSkeleton rows={2} />
+    if (view === 'signed-out' || view === 'unreachable' || view === 'forbidden')
+      return <p className="wb-ov-note">{t('wbDeskNoServerData')}</p>
     if (view === 'no-workspace') return <p className="wb-ov-note">{t('wbOvNoWorkspaceTitle')}</p>
-    if (
-      view === 'forbidden' ||
-      view === 'unreachable' ||
-      home.error ||
-      home.value?.partial.includes('notifications')
-    )
+    if (home.error || home.value?.partial.includes('notifications'))
       return (
         <p className="wb-ov-partial">
           {t('wbOvLoadFailed')} ·{' '}
@@ -220,34 +221,48 @@ export function DeskInTray({
         icon={<WorkbenchIcon id="inbox" size={20} />}
         title={t('wbDeskInTrayEmpty')}
         role="status"
+        compact
       />
     )
   }
 
   return (
-    <section className="wb-desk-section" aria-labelledby={titleId}>
+    <section className="wb-desk-card wb-block" aria-labelledby={titleId}>
       <div className="wb-desk-head">
         <h3 id={titleId}>{t('wbDeskInTray')}</h3>
-        {rows.length > 0 ? <span className="wb-count wb-num">{rows.length}</span> : null}
+        {rows.length > 0 ? <span className="wb-desk-count wb-num">{rows.length}</span> : null}
       </div>
       {rows.length === 0 ? (
         empty()
       ) : (
-        <ul ref={listRef} className="wb-ov-list wb-block">
+        <ul ref={listRef} className="wb-ov-list">
           {visible.map((r) => {
             const d = describe(r)
             return (
-              <li key={d.key} className="wb-row">
+              <li key={d.key} className="wb-row wb-desk-row">
                 {d.icon}
                 <span className="wb-desk-row-main">
                   <button type="button" className="wb-row-title wb-desk-row-title" onClick={d.open}>
                     {d.title}
                   </button>
-                  <span className="wb-desk-reason">{d.reason}</span>
+                  {d.sub ? <span className="wb-desk-reason">{d.sub}</span> : null}
                 </span>
-                {d.at ? (
-                  <span className="wb-mono wb-num">{formatWhen(d.at, dateLocale)}</span>
-                ) : null}
+                <span className={`wb-pill${d.pill.tone === 'neutral' ? '' : ` is-${d.pill.tone}`}`}>
+                  {t(d.pill.label)}
+                </span>
+                {d.resolve ? (
+                  <button
+                    type="button"
+                    className="wb-btn wb-btn-secondary wb-btn-sm wb-desk-row-act"
+                    onClick={d.open}
+                  >
+                    {t('wbDeskResolve')}
+                  </button>
+                ) : (
+                  <span className="wb-desk-when wb-num">
+                    {d.at ? formatWhen(d.at, dateLocale) : null}
+                  </span>
+                )}
               </li>
             )
           })}

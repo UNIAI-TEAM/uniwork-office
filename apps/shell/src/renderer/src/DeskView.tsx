@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DragEvent, ReactElement } from 'react'
-import type { PracticeId } from '@uniwork/practice-core'
 import type { DeskDraft, UniworkWorkspaceRef } from '../../shared/home-api'
 import type { UniworkWorkError, WorkHomeSummary } from '../../shared/uniwork-work-api'
 import { DeskDrawer } from './DeskDrawer'
@@ -8,8 +7,13 @@ import { DeskInProgress } from './DeskInProgress'
 import { DeskInTray } from './DeskInTray'
 import { DeskToday } from './DeskToday'
 import { DeskTools } from './DeskTools'
-import { HOME_REFRESH_MS, overviewView, useRecentDocuments } from './work-home'
+import { getWorkbenchModule, type PracticeId } from '@uniwork/practice-core'
+import { useI18n } from './locale'
+import { greetingName, HOME_REFRESH_MS, overviewView, useRecentDocuments } from './work-home'
 import { useWorkLoad } from './work-cache'
+import { WorkToolbar } from './WorkToolbar'
+
+const DESK = getWorkbenchModule('desk')!
 
 interface Props {
   practiceId: PracticeId
@@ -28,11 +32,17 @@ interface Props {
   onOpenTab: (id: 'tasks' | 'forms') => void
   /** a Drawer draft linked a form to a pack: refresh the packs */
   onPackLinked?: () => void
+  /** the signed-in person's display name ('' when unknown): the toolbar greets them */
+  userName?: string
+  /** the Drawer's pack chip: the role's packs, the one picked in Knowledge, and picking another */
+  packs?: readonly { id: string; title: string }[]
+  selectedPackId?: string | null
+  onSelectPack?: (id: string | null) => void
 }
 
 const IN_PROGRESS_ROWS = 10
 
-/** Mặt bàn (office desk spec): tools, what needs you, work in progress, the forms drawer, Today. */
+/** Mặt bàn (redesign spec 4.1): toolbar, one sign-in banner, tools, tray, in progress, forms, Today. */
 export function DeskView({
   practiceId,
   vi,
@@ -45,7 +55,12 @@ export function DeskView({
   onSummary,
   onOpenTab,
   onPackLinked,
+  userName = '',
+  packs,
+  selectedPackId,
+  onSelectPack,
 }: Props): ReactElement {
+  const { t } = useI18n()
   const workspace = workspaces?.find((w) => w.id === workspaceId) ?? null
   const wsId = workspace?.id ?? null
   const home = useWorkLoad<WorkHomeSummary>(
@@ -55,7 +70,8 @@ export function DeskView({
   )
   const view = overviewView({ workspaces, workspaceError, summary: home.value, error: home.error })
   const recents = useRecentDocuments(wsId, refreshTick, IN_PROGRESS_ROWS)
-  const [drafts, setDrafts] = useState<DeskDraft[]>([])
+  // null until listDrafts answers: an empty list before that is not "nothing in progress"
+  const [drafts, setDrafts] = useState<DeskDraft[] | null>(null)
   const [dropped, setDropped] = useState<string[] | null>(null)
   const [dragging, setDragging] = useState(false)
   const dragDepth = useRef(0)
@@ -106,7 +122,10 @@ export function DeskView({
   }, [])
 
   const unsavedPaths = useMemo(
-    () => new Set(drafts.flatMap((d) => (d.kind === 'unsaved' && d.filePath ? [d.filePath] : []))),
+    () =>
+      new Set(
+        (drafts ?? []).flatMap((d) => (d.kind === 'unsaved' && d.filePath ? [d.filePath] : [])),
+      ),
     [drafts],
   )
 
@@ -139,46 +158,107 @@ export function DeskView({
     setDropped(paths.length > 0 ? paths : null)
   }
 
+  // the toolbar: a greeting when a name is known, then what waits, from data already loaded
+  const hour = new Date().getHours()
+  const greeting =
+    hour >= 6 && hour < 12
+      ? 'greetMorning'
+      : hour >= 12 && hour < 18
+        ? 'greetAfternoon'
+        : 'greetEvening'
+  const name = greetingName(userName)
+  const s = home.value
+  const due =
+    s && !s.partial.includes('tasks') && s.counts.overdue !== null && s.counts.due_today !== null
+      ? s.counts.overdue + s.counts.due_today
+      : 0
+  const unsaved = (drafts ?? []).filter((d) => d.kind === 'unsaved').length
+  const facts = [
+    due > 0 ? t('wbDeskSummaryTasks', { count: due }) : null,
+    unsaved > 0 ? t('wbDeskSummaryUnsaved', { count: unsaved }) : null,
+  ].filter(Boolean)
+  const summary =
+    name || facts.length > 0 ? (
+      <>
+        {name ? <strong>{t('wbDeskGreeting', { greeting: t(greeting), name })}</strong> : null}
+        {name && facts.length > 0 ? ' ' : null}
+        {facts.join(' · ')}
+      </>
+    ) : null
+
+  // the one sign-in / offline notice on the Desk (spec 1.6): the tray and Today do not repeat it
+  const banner =
+    view === 'signed-out' ? (
+      <div className="wb-banner is-info" role="status">
+        <p>{t('wbDeskSignInBanner')}</p>
+        <button
+          type="button"
+          className="wb-btn wb-btn-secondary wb-btn-sm"
+          onClick={() => void window.aiOffice.accountLogin().catch(() => false)}
+        >
+          {t('wbDeskSignIn')}
+        </button>
+      </div>
+    ) : view === 'unreachable' ? (
+      <div className="wb-banner is-warning" role="alert">
+        <p>{t('wbDeskOfflineBanner')}</p>
+        <button type="button" className="wb-btn wb-btn-secondary wb-btn-sm" onClick={onReload}>
+          {t('acctRetry')}
+        </button>
+      </div>
+    ) : null
+
   return (
-    <div
-      className={`wb-desk${dragging ? ' is-dragging' : ''}`}
-      onDragEnter={onDragEnter}
-      onDragLeave={onDragLeave}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
-    >
-      <div className="wb-desk-main">
-        <DeskTools
-          dropped={dropped}
-          onDropHandled={() => setDropped(null)}
-          unsavedPaths={unsavedPaths}
-        />
-        <DeskInTray
+    <>
+      <WorkToolbar title={vi ? DESK.labelVi : DESK.labelEn} summary={summary} />
+      {banner}
+      <div
+        className={`wb-desk${dragging ? ' is-dragging' : ''}`}
+        onDragEnter={onDragEnter}
+        onDragLeave={onDragLeave}
+        onDragOver={onDragOver}
+        onDrop={onDrop}
+      >
+        <div className="wb-desk-main">
+          <DeskTools
+            dropped={dropped}
+            onDropHandled={() => setDropped(null)}
+            unsavedPaths={unsavedPaths}
+          />
+          <DeskInTray
+            home={home}
+            signedIn={workspace !== null}
+            view={view}
+            local={recents.local}
+            onReload={onReload}
+            refreshTick={refreshTick}
+          />
+          <DeskInProgress
+            drafts={drafts ?? []}
+            recent={recents.docs}
+            local={recents.local}
+            loading={drafts === null || !recents.loaded}
+          />
+          <DeskDrawer
+            practiceId={practiceId}
+            packId={packId}
+            orgId={workspace?.orgId ?? null}
+            vi={vi}
+            onManage={() => onOpenTab('forms')}
+            onPackLinked={onPackLinked}
+            packs={packs}
+            selectedPackId={selectedPackId}
+            onSelectPack={onSelectPack}
+          />
+        </div>
+        <DeskToday
           home={home}
-          signedIn={workspace !== null}
           view={view}
-          local={recents.local}
+          workspace={workspace}
           onReload={onReload}
-          refreshTick={refreshTick}
-        />
-        <DeskInProgress drafts={drafts} recent={recents.docs} local={recents.local} />
-        <DeskDrawer
-          practiceId={practiceId}
-          packId={packId}
-          orgId={workspace?.orgId ?? null}
-          vi={vi}
-          onManage={() => onOpenTab('forms')}
-          onPackLinked={onPackLinked}
+          onOpenTasks={() => onOpenTab('tasks')}
         />
       </div>
-      <DeskToday
-        home={home}
-        view={view}
-        workspace={workspace}
-        workspaceError={workspaceError}
-        onReload={onReload}
-        onOpenTasks={() => onOpenTab('tasks')}
-      />
-    </div>
+    </>
   )
 }
