@@ -446,6 +446,8 @@ describe('Tasks tab layout (redesign spec 4.2)', () => {
     expect(web.textContent).toBe('Open on the web')
     await click(web)
     expect(api.openWeb).toHaveBeenCalledWith({ kind: 'my-tasks', orgSlug: 'acme', wsSlug: 'ops' })
+    // the card is no second "Tasks" region inside the pane's
+    expect(host.querySelector('.wb-block.wb-tasks')!.hasAttribute('aria-label')).toBe(false)
   })
 
   it('with a head: the hint while loading, the toolbar stays above the skeleton', async () => {

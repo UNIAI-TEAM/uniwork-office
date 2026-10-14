@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import type { ReactElement } from 'react'
 import type { UniworkWorkspaceRef } from '../../shared/home-api'
 import type { WorkCalendarEvent, WorkWebTarget } from '../../shared/uniwork-work-api'
@@ -68,6 +69,12 @@ export function WorkCalendarPane({
       ...agendaRequest(localIsoDate(new Date())),
     }),
   )
+  // live and ended move with the clock while the tab stays open
+  const [now, setNow] = useState(Date.now)
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 60_000)
+    return () => window.clearInterval(timer)
+  }, [])
   const openWeb = (target: WorkWebTarget) =>
     void window.uniworkWork.openWeb(target).catch(() => false)
 
@@ -124,7 +131,6 @@ export function WorkCalendarPane({
     )
   }
 
-  const now = Date.now()
   const tomorrow = agendaRange(today, 2).to
 
   return (
@@ -170,7 +176,9 @@ export function WorkCalendarPane({
                       (e.status == null
                         ? Date.parse(e.start) <= now && now < end
                         : e.status === 'IN_PROGRESS')
-                    const past = !live && kind !== 'task' && !e.all_day && end <= now
+                    // a meeting the server says has ended is ended, even inside its slot
+                    const past =
+                      !live && kind !== 'task' && !e.all_day && (end <= now || e.status === 'ENDED')
                     const dur = duration(e, t)
                     return (
                       <li key={e.id} className={`wb-row wb-agenda-row${past ? ' is-past' : ''}`}>
@@ -207,6 +215,7 @@ export function WorkCalendarPane({
                           <button
                             type="button"
                             className="wb-btn wb-btn-secondary wb-btn-sm"
+                            aria-label={`${t('wbOvJoin')}: ${e.title}`}
                             onClick={() =>
                               openWeb({
                                 kind: 'room',

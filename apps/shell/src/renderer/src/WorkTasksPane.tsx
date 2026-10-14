@@ -213,7 +213,8 @@ export function WorkTasksPane({
         {list.stale && list.updatedAt !== null ? (
           <WorkStaleNote at={list.updatedAt} onRetry={onReload} />
         ) : null}
-        <section className="wb-block wb-tasks" aria-label={head?.title}>
+        {/* unnamed: the pane around it is already the "Tasks" region */}
+        <section className="wb-block wb-tasks">
           <form className="wb-work-quick" onSubmit={submit}>
             <span className="wb-work-quick-plus" aria-hidden="true">
               <WbGlyph id="plus" size={10} />

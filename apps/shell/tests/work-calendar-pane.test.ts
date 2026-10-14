@@ -174,8 +174,16 @@ describe('Calendar tab', () => {
     expect(card).toMatch(/overflow: clip;/)
   })
 
+  // mid-morning: no row of these tests can fall on yesterday, so every assert runs
+  const atTenAm = () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2026, 9, 15, 10, 0))
+    return Date.now()
+  }
+  afterEach(() => vi.useRealTimers())
+
   it('a meeting under way: success pill and Join opens the room; an ended one is quieter', async () => {
-    const now = Date.now()
+    const now = atTenAm()
     api.calendarEvents.mockResolvedValueOnce({
       ok: true,
       value: [
@@ -197,22 +205,24 @@ describe('Calendar tab', () => {
           end: new Date(now - 300_000).toISOString(),
           all_day: false,
         },
-        // just after midnight a row would fall on yesterday and is left out
-      ].filter((e) => localIsoDate(new Date(e.start)) === TODAY),
+      ],
     })
     await mount()
     const row = (title: string) =>
       Array.from(host.querySelectorAll('.wb-agenda-row')).find((r) =>
         r.textContent?.includes(title),
       )
-    const live = row('Stand-up')
-    if (live) {
+    const live = row('Stand-up')!
+    expect(live).toBeTruthy()
+    {
       expect(live.querySelector('.wb-pill.is-success')?.textContent).toBe('In progress')
       expect(live.querySelector('.wb-agenda-dur')?.textContent).toBe('40 min')
       const join = Array.from(live.querySelectorAll('button')).find(
         (b) => b.textContent === 'Join',
       )!
       expect(join.className).toBe('wb-btn wb-btn-secondary wb-btn-sm')
+      // each Join names its meeting in a screen reader's list of buttons
+      expect(join.getAttribute('aria-label')).toBe('Join: Stand-up')
       await act(async () => join.click())
       expect(api.openWeb).toHaveBeenCalledWith({
         kind: 'room',
@@ -221,8 +231,9 @@ describe('Calendar tab', () => {
         id: 'live',
       })
     }
-    const past = row('Early review')
-    if (past) {
+    const past = row('Early review')!
+    expect(past).toBeTruthy()
+    {
       expect(past.classList.contains('is-past')).toBe(true)
       expect(past.querySelector('.wb-row-sub')?.textContent).toBe('Meeting · Ended')
       expect(past.querySelector('button.wb-btn')).toBeNull()
@@ -230,7 +241,7 @@ describe('Calendar tab', () => {
   })
 
   it('a meeting inside its slot is not live when the server says it is not running (C-I2)', async () => {
-    const now = Date.now()
+    const now = atTenAm()
     const slot = (id: string, status: string) => ({
       id: `meeting:${id}`,
       kind: 'meeting',
@@ -250,8 +261,6 @@ describe('Calendar tab', () => {
       Array.from(host.querySelectorAll('.wb-agenda-row')).find((r) =>
         r.textContent?.includes(title),
       )
-    // a slot that began a minute ago can fall on yesterday just after midnight
-    if (!row('Meeting ended')) return
     for (const title of ['Meeting ended', 'Meeting scheduled']) {
       expect(row(title)!.querySelector('.wb-pill.is-success')).toBeNull()
       expect(
@@ -259,6 +268,38 @@ describe('Calendar tab', () => {
       ).toBe(false)
     }
     expect(row('Meeting on')!.querySelector('.wb-pill.is-success')?.textContent).toBe('In progress')
+    // ended early: muted and marked ended, not read as an upcoming meeting
+    expect(row('Meeting ended')!.classList.contains('is-past')).toBe(true)
+    expect(row('Meeting ended')!.querySelector('.wb-row-sub')?.textContent).toBe('Meeting · Ended')
+    expect(row('Meeting scheduled')!.classList.contains('is-past')).toBe(false)
+  })
+
+  it('live and ended follow the clock while the tab stays open', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] })
+    vi.setSystemTime(new Date(2026, 9, 15, 10, 0))
+    const now = Date.now()
+    api.calendarEvents.mockResolvedValueOnce({
+      ok: true,
+      value: [
+        {
+          id: 'meeting:soon',
+          kind: 'meeting',
+          entity_id: 'soon',
+          title: 'Short sync',
+          start: new Date(now - 600_000).toISOString(),
+          end: new Date(now + 90_000).toISOString(),
+          all_day: false,
+        },
+      ],
+    })
+    await mount()
+    const row = () => host.querySelector('.wb-agenda-row')!
+    expect(row().querySelector('.wb-pill.is-success')).not.toBeNull()
+    await act(async () => {
+      vi.advanceTimersByTime(120_000)
+    })
+    expect(row().querySelector('.wb-pill.is-success')).toBeNull()
+    expect(row().classList.contains('is-past')).toBe(true)
   })
 
   it('with a head: the toolbar says 14 days and the item count, the legend, and opens the web calendar', async () => {
