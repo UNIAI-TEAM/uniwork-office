@@ -2012,6 +2012,36 @@ describe('UniWork AI on the web (G6-05)', () => {
             throw failure('ai_rate_limited', 429)
           },
         ],
+        [
+          'wait, then 429 give-up',
+          async (_t, _req, cb) => {
+            cb.onNotice?.({ kind: 'rate-limit-wait', seconds: 5, attempt: 1 })
+            cb.onTurnReset?.()
+            throw failure('ai_rate_limited', 429)
+          },
+        ],
+        [
+          'session lost after a wait',
+          async (_t, _req, cb) => {
+            cb.onNotice?.({ kind: 'rate-limit-wait', seconds: 5, attempt: 1 })
+            cb.onTurnReset?.()
+            throw failure('session_expired', 401)
+          },
+        ],
+        [
+          'session lost mid-stream (sign-out)',
+          async (_t, _req, cb) => {
+            cb.onDelta('partial')
+            throw failure('session_expired', 401)
+          },
+        ],
+        [
+          'UniWork AI off before a run id (a note, then a quiet done)',
+          async (_t, _req, cb) => {
+            cb.onNotice?.({ kind: 'uniwork-off' })
+            throw failure('office_capability_off', 403)
+          },
+        ],
       ]
       it.each(paths)('%s', async (_name, script) => {
         const sent: string[] = []
