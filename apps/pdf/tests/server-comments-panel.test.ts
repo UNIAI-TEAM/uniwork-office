@@ -508,6 +508,23 @@ describe('an empty new-thread composer can be dismissed (V15-02)', () => {
     expect(m.onClose).not.toHaveBeenCalled()
   })
 
+  it('Esc on an unedited AI-drafted composer keeps the thread, the draft and the panel (RFE15b-01)', async () => {
+    const m = await mount(fakeBridge())
+    await act(async () => {
+      m.api.current!.startAt(1, [100, 700], 'The total on this page does not add up.')
+      await flush()
+    })
+    await act(async () => {
+      esc()
+      await flush()
+    })
+    expect(el.querySelector('.collab-thread--new')).not.toBeNull()
+    expect(box().value).toBe('The total on this page does not add up.')
+    expect(lastPending(m)).toMatchObject({ page: 1 })
+    expect(m.onClose).not.toHaveBeenCalled()
+    expect(m.api.current!.aiDraft?.text).toBe('The total on this page does not add up.')
+  })
+
   it('closing the panel drops an empty composer and its frame; a typed draft survives the close', async () => {
     const m = await mount(fakeBridge())
     await act(async () => {
