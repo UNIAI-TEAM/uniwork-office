@@ -15,15 +15,27 @@
  */
 
 export type UniworkCloudTool =
-  'web_search' | 'image_search' | 'image_generate' | 'media_analyze' | 'transcribe'
+  'web_search' | 'image_search' | 'image_generate' | 'media_analyze' | 'transcribe' | 'chat'
 
+/**
+ * The per-tool flags of `GET …/ai/cloud`. `chat` is UniWork AI (the `uniwork`
+ * chat provider), a status flag only: it is never offered to a model as a tool.
+ */
 export const UNIWORK_CLOUD_TOOLS: readonly UniworkCloudTool[] = [
   'web_search',
   'image_search',
   'image_generate',
   'media_analyze',
   'transcribe',
+  'chat',
 ]
+
+/**
+ * The status flags per tool. `chat` is optional so a status built before
+ * UniWork AI existed (an older shell's IPC payload, a test fixture) still
+ * reads as "chat off".
+ */
+export type UniworkCloudToolFlags = Record<Exclude<UniworkCloudTool, 'chat'>, boolean> & { chat?: boolean }
 
 /**
  * What the UI shows:
@@ -64,7 +76,7 @@ export interface UniworkCloudStatus {
   state: UniworkCloudState
   /** signed in and the plan includes the cloud (calls may still answer 402 / 503) */
   enabled: boolean
-  tools: Record<UniworkCloudTool, boolean>
+  tools: UniworkCloudToolFlags
   credits: UniworkCloudCredits | null
   /** display only: the signed-in account and plan */
   email?: string
@@ -77,6 +89,7 @@ const NO_TOOLS: Record<UniworkCloudTool, boolean> = {
   image_generate: false,
   media_analyze: false,
   transcribe: false,
+  chat: false,
 }
 
 export const UNIWORK_CLOUD_SIGNED_OUT: UniworkCloudStatus = Object.freeze({
