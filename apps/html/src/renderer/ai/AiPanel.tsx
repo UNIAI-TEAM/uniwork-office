@@ -6,6 +6,7 @@ import {
   AiModelPicker,
   type AiModelPickerBridge,
   UniAiMark,
+  composerNoteFor,
 } from '@genoffice/ui'
 import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement, ReactNode } from 'react'
@@ -13,15 +14,24 @@ import {
   AgentLoop,
   endsQuietly,
   noticePatch,
+  resultChip,
   type PanelNote,
   composeSkills,
 } from '@genoffice/agent-core'
 import type { AgentImage } from '@genoffice/agent-core'
 import type { AiSettings } from '@genoffice/ai-provider'
 import { aiNoticeBody, aiNoticeKind } from '@genoffice/ai-provider/browser'
+import type {
+  UniworkCloudStatusBridge,
+  UniworkCloudStatusSnapshot,
+} from '@genoffice/electron-utils/uniwork-ai-flag'
 import { platform } from '../capabilities'
 import { ATTACHMENT_IMAGE_EXTS } from '../../shared/ipc'
 import type { AttachmentAddResult, AttachmentMeta } from '../../shared/ipc'
+
+function readUniworkCloudStatus(): UniworkCloudStatusBridge | undefined {
+  return (window as Window & { uniworkCloudStatus?: UniworkCloudStatusBridge }).uniworkCloudStatus
+}
 import {
   AiComposer,
   AiScopeQuote,
@@ -236,6 +246,8 @@ interface ChatEntry {
   scope?: AiScopeQuoteData
   /** the sids this element-scoped turn may edit; a retry resends them */
   fenceSids?: number[]
+  stopped?: boolean | undefined
+  mutated?: boolean | undefined
 }
 
 /** the whole source text: one string is the exact rollback unit */
@@ -795,6 +807,8 @@ export function AiPanel({
             : base
           patchLast((last) => ({
             streaming: false,
+            stopped: cancelled,
+            mutated: runMutatedRef.current,
             waitLine: undefined,
             // a restarted conversation or UniWork AI being off ends the turn on purpose: the note is the whole reply
             text:
@@ -1008,7 +1022,9 @@ export function AiPanel({
     const seq = ++sendSeqRef.current
     void (async () => {
       try {
-        settingsRef.current = await window.htmlApi.getAiSettings()
+        const s = await window.htmlApi.getAiSettings()
+        settingsRef.current = s
+        if (mountedRef.current) setProvider(s?.provider)
         const images = sentAtts.length > 0 ? await collectImages(sentAtts) : []
         if (!mountedRef.current || seq !== sendSeqRef.current) return
         await loop.run(instruction, images.length > 0 ? images : undefined)
@@ -1182,7 +1198,86 @@ export function AiPanel({
     resizer.setPointerCapture(e.pointerId)
   }
 
+  const [provider, setProvider] = useState<string | undefined>(
+    () => settingsRef.current?.provider,
+  )
+  useEffect(() => {
+    let cancelled = false
+    void window.htmlApi
+      ?.getAiSettings?.()
+      .then((s) => {
+        if (cancelled) return
+        settingsRef.current = s
+        setProvider(s?.provider)
+      })
+      .catch(() => {})
+    const off = window.htmlApi?.onAiSettingsChanged?.((s) => {
+      if (cancelled) return
+      settingsRef.current = s
+      setProvider(s?.provider)
+    })
+    return () => {
+      cancelled = true
+      off?.()
+    }
+  }, [])
+  const isUniwork = provider === 'uniwork'
+
+  const [cloudSnapshot, setCloudSnapshot] = useState<UniworkCloudStatusSnapshot | null>(null)
+  useEffect(() => {
+    const bridge = readUniworkCloudStatus()
+    if (!bridge) return
+    let cancelled = false
+    void bridge
+      .get()
+      .then((snap) => {
+        if (!cancelled) setCloudSnapshot(snap)
+      })
+      .catch(() => {})
+    const off = bridge.onChange((snap) => {
+      if (!cancelled) setCloudSnapshot(snap)
+    })
+    return () => {
+      cancelled = true
+      off()
+    }
+  }, [])
+  const composerNoteState = composerNoteFor(cloudSnapshot, provider ?? null)
+
   const docEmpty = chat.length === 0 && isDocEmpty(deps.access.getText())
+
+  const lastEntry = chat.at(-1)
+  const lastAssistantCompleted =
+    lastEntry && lastEntry.role === 'assistant' && !lastEntry.streaming && !busy ? lastEntry : null
+  const lastAssistantChip = lastAssistantCompleted
+    ? resultChip({
+        provider: provider ?? settingsRef.current?.provider ?? null,
+        mutated: Boolean(lastAssistantCompleted.mutated),
+        stopped: Boolean(lastAssistantCompleted.stopped),
+        hasStreamedText: Boolean(lastAssistantCompleted.text?.trim()),
+        clarifyAsked: receipts.some((r) => Boolean(r.qa)),
+        notes: lastAssistantCompleted.notes,
+        toolExecutions: lastAssistantCompleted.tools,
+        isError: Boolean(lastAssistantCompleted.isError),
+        error: lastAssistantCompleted.isError ? lastAssistantCompleted.text : null,
+      })
+    : null
+  const panelLiveAnnouncement = (() => {
+    if (lastEntry?.role === 'assistant') {
+      if (lastEntry.waitLine) return lastEntry.waitLine
+      if (lastEntry.notes?.length && lastEntry.streaming) {
+        return lastEntry.notes[lastEntry.notes.length - 1].text
+      }
+      if (!lastEntry.streaming && !busy) {
+        const body = aiNoticeBody(lastEntry.text)
+        const chipPrefix = lastAssistantChip
+          ? `${aiUniworkText(lang, lastAssistantChip.labelKey)}${body ? ': ' : ''}`
+          : ''
+        return `${chipPrefix}${body || ''}`.trim()
+      }
+    }
+    return ''
+  })()
 
   return (
     <aside
@@ -1249,7 +1344,16 @@ export function AiPanel({
         </div>
       </header>
 
-      <div className="ai-chat" ref={chatRef} onScroll={onChatScroll}>
+      <div className="ai-sr-status" aria-live="polite" aria-atomic="true">
+        {panelLiveAnnouncement}
+      </div>
+
+      <div
+        className="ai-chat"
+        ref={chatRef}
+        aria-busy={busy ? 'true' : undefined}
+        onScroll={onChatScroll}
+      >
         {chat.length === 0 && (
           <div className="ai-chat-empty">
             <div className="ai-chat-empty-title">
@@ -1346,21 +1450,43 @@ export function AiPanel({
             )
           }
           const hasTools = (entry.tools?.length ?? 0) > 0
-          if (!entry.text && !entry.streaming && !hasTools && !entry.notes?.length) return null
+          if (
+            !entry.text &&
+            !entry.streaming &&
+            !hasTools &&
+            !entry.notes?.length &&
+            !entry.stopped &&
+            !entry.mutated
+          )
+            return null
           const isLast = i === chat.length - 1
           // Action row appears once per completed reply: on the turn's final segment only
           // (mid-turn segments have a following assistant entry; the live turn ends when !busy)
           const nextEntry = chat[i + 1]
           const turnEnded = nextEntry ? nextEntry.role === 'user' : !busy
           const showToolbar = !entry.streaming && turnEnded && !!entry.text && !entry.isError
+          const chip =
+            !entry.streaming && turnEnded
+              ? resultChip({
+                  provider: provider ?? settingsRef.current?.provider ?? null,
+                  mutated: Boolean(entry.mutated),
+                  stopped: Boolean(entry.stopped),
+                  hasStreamedText: Boolean(entry.text?.trim()),
+                  clarifyAsked: receipts.some((r) => Boolean(r.qa)),
+                  notes: entry.notes,
+                  toolExecutions: entry.tools,
+                  isError: Boolean(entry.isError),
+                  error: entry.isError ? entry.text : null,
+                })
+              : null
+          const chipLabel = chip ? aiUniworkText(lang, chip.labelKey) : null
           return (
             <div
               key={i}
               className={`ai-msg ai-msg-assistant${entry.isError && !aiNoticeKind(entry.text) ? ' ai-msg-error' : ''}${entry.streaming ? ' ai-msg-streaming' : ''}`}
             >
-              {/* one persistent, empty-until-needed live region: a node that mounts with its text is often not announced */}
-              {
-                <div className="ai-msg-live" aria-live="polite">
+              {Boolean(entry.notes?.length || entry.waitLine) && (
+                <div className="ai-msg-live">
                   {entry.notes?.map((note, k) => (
                     <div key={`un${k}`} className="ai-msg-notice">
                       {note.text}
@@ -1368,17 +1494,46 @@ export function AiPanel({
                   ))}
                   {entry.waitLine && <div className="ai-msg-notice">{entry.waitLine}</div>}
                 </div>
-              }
+              )}
               {!entry.text && entry.streaming ? (
                 <span className="ai-typing-row">
                   <AiTypingIndicator label={hasTools ? t('aiWorking') : t('aiThinking')} />
                 </span>
               ) : (
-                entry.text && (
-                  <div dir="auto">
-                    <Markdown text={aiNoticeBody(entry.text)} nav={docNav} />
+                (entry.text || chip) && (
+                  <div className="ai-msg-answer" dir="auto">
+                    {chip && chipLabel && (
+                      <>
+                        <span
+                          className="ai-result-chip"
+                          data-chip={chip.chip}
+                          data-tone={chip.tone}
+                        >
+                          {chipLabel}
+                        </span>
+                        {entry.text ? <span className="ai-result-chip-sep">: </span> : null}
+                      </>
+                    )}
+                    {entry.text && <Markdown text={aiNoticeBody(entry.text)} nav={docNav} />}
                   </div>
                 )
+              )}
+              {chip?.chip === 'edited' && (
+                <div className="ai-result-actions">
+                  <button
+                    type="button"
+                    className="ai-result-view-changes"
+                    onClick={() => {
+                      const firstSid = depsRef.current.access.getMap()[0]?.sid ?? 1
+                      depsRef.current.navigateTo(firstSid)
+                    }}
+                  >
+                    {aiUniworkText(lang, 'aiResultViewChanges')}
+                  </button>
+                  <span className="ai-result-edited-hint">
+                    {aiUniworkText(lang, 'aiResultEditedHint')}
+                  </span>
+                </div>
               )}
               {hasTools && <ToolChipList tools={entry.tools!} />}
               {showToolbar && (
@@ -1524,7 +1679,7 @@ export function AiPanel({
         className="ai-composer"
         style={activeClarify || activeBrief || activePartial ? { display: 'none' } : undefined}
       >
-        {readOnly && (
+        {readOnly && !isUniwork && (
           <div className="ai-readonly-notice" role="note">
             {t('aiViewOnlyNotice')}
           </div>
@@ -1618,6 +1773,20 @@ export function AiPanel({
           onStop={stop}
           onPasteFiles={(files) => void onPasteFiles(files)}
           onPasteText={onPasteText}
+          lang={lang}
+          viewOnly={isUniwork && readOnly ? true : undefined}
+          uniwork={
+            isUniwork
+              ? {
+                  noteState: composerNoteState,
+                  onSignIn: () => void readUniworkCloudStatus()?.signIn(),
+                  onOpenAccountSettings: () => void readUniworkCloudStatus()?.openAccountSettings(),
+                  onRetry: retry,
+                  onOpenByokSettings: () => void window.htmlApi?.openAiModelSettings?.(),
+                  disclosure: { ackKey: cloudSnapshot?.accountId ?? null },
+                }
+              : undefined
+          }
           footerStart={
             <>
               <AiModelPicker bridge={MODEL_BRIDGE} lang={lang} />
