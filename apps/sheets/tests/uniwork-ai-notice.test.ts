@@ -85,6 +85,18 @@ describe('UniWork AI notices (sheets panel text)', () => {
     expect(final.display).not.toContain('(no action)')
   })
 
+  it('the images-not-sent note sits above the answer, which still follows', () => {
+    const run = createRunNotices()
+    run.notice({ kind: 'images-not-sent' }, tr, 'Sheets')
+    expect(run.quiet()).toBe(false)
+    run.text('the answer')
+    const final = run.finish(done('the answer'))
+    expect(final.display.split('\n\n')).toEqual([tr('aiUniworkImagesNotSent'), 'the answer'])
+    expect(tr('aiUniworkImagesNotSent')).toBe(
+      'UniWork AI không nhận ảnh; chỉ phần chữ đã được gửi.',
+    )
+  })
+
   it('a dropped tool call and a provider boundary are notes above the answer', () => {
     const run = createRunNotices()
     run.notice({ kind: 'conversation-boundary', provider: 'uniwork' }, tr, 'Sheets')

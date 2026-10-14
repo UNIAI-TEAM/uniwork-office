@@ -232,6 +232,19 @@ describe('UniWork AI notices (docs panel)', () => {
     expect(container!.querySelector('textarea')?.value).toBe('')
   })
 
+  it('the images-not-sent note shows above the answer and the turn is no error', async () => {
+    await emit({ type: 'notice', notice: { kind: 'images-not-sent' } })
+    await emit({ type: 'delta', text: 'the answer' })
+    await emit({ type: 'done' })
+    expect(notices()).toEqual([ui('aiUniworkImagesNotSent')])
+    expect(notices()).toEqual(['UniWork AI không nhận ảnh; chỉ phần chữ đã được gửi.'])
+    const text = container!.textContent!
+    expect(text.indexOf(ui('aiUniworkImagesNotSent'))).toBeGreaterThanOrEqual(0)
+    expect(text.indexOf(ui('aiUniworkImagesNotSent'))).toBeLessThan(text.indexOf('the answer'))
+    expect(container!.querySelector('.ai-msg-error')).toBeNull()
+    expect(text).not.toContain(t('aiNoReply'))
+  })
+
   it('UniWork AI off: one note, no error line, no Retry or regenerate, no empty-reply line', async () => {
     await emit({ type: 'notice', notice: { kind: 'uniwork-off' } })
     await emit({ type: 'done' })
