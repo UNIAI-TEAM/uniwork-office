@@ -14,7 +14,7 @@ test('Jev reranking lives in the AI Media & Search pane, saves with it, and repo
     await page.locator('.set-nav-item').filter({ hasText: 'General' }).click()
     await expect(page.getByRole('switch', { name: 'Jev search reranking' })).toHaveCount(0)
 
-    await page.locator('.set-nav-item').filter({ hasText: 'AI Media & Search' }).click()
+    await page.locator('.set-nav-item').filter({ hasText: 'AI media & search' }).click()
     const block = page.locator('section', {
       has: page.locator('.set-pane-subtitle', { hasText: 'Local file search' }),
     })
