@@ -1,10 +1,17 @@
 import { test, expect, type Page } from '@playwright/test'
 import JSZip from 'jszip'
-import { createDecipheriv, createHash } from 'node:crypto'
+import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { appendFile, copyFile, mkdtemp, readdir, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
+// The product's store codec and drafts payload decoder (`no Electron` in their
+// import chain): the kept-draft reader must decode the REAL record shape
+// instead of re-implementing it.
+import { keyFilePath } from '../apps/shell/src/main/uniwork-sync/keys'
+import { createDraftStore, type KeptDraft } from '../apps/shell/src/main/uniwork-sync/queue/drafts'
+import { recordPath, type StoreRecords } from '../apps/shell/src/main/uniwork-sync/store'
+import { openRecord, readRecordFrame } from '../apps/shell/src/main/uniwork-sync/store/codec'
 import {
   closeAndSaveVideo,
   launchShell,
@@ -12,6 +19,7 @@ import {
   waitForPageWithUrl,
   type LaunchedApp,
 } from './helpers'
+import { STUB_ACCOUNT, STUB_DEPLOYMENT_ID } from './fixtures/uniwork-auth-stub'
 import {
   startUniworkDocumentsStub,
   type StubCall,
@@ -506,52 +514,39 @@ test.describe.serial('UniWork documents', () => {
     return { doc, editor, path: (await activeStatus(ctx.shell))!.path }
   }
 
+  /** the store scope of the signed-in stub account: the key and the records keyed under it */
+  const storeScope = { deploymentId: STUB_DEPLOYMENT_ID, accountId: STUB_ACCOUNT.id }
+
   /**
-   * Decrypts the durable kept-drafts record (`uniwork-sync/store/.../drafts/<sha256(docId)>.rec`)
-   * using the account's store key unwrapped via Electron `safeStorage.decryptString`.
+   * Decrypts the durable kept-drafts record (`uniwork-sync/store/.../drafts/<sha256(docId)>.rec`).
+   * The frame is parsed by the product codec (`store/codec.ts`), so the real
+   * `UWS1` shape decides the read - magic, header length and header JSON bound
+   * to the ciphertext as additional data - and the plaintext goes through the
+   * product drafts decoder (`queue/drafts.ts`) behind its store interface. The
+   * record key is unwrapped via Electron `safeStorage.decryptString`.
    */
-  async function readKeptDrafts(
-    launched: LaunchedApp,
-    docId: string,
-  ): Promise<Array<{ id: string; createdAt: string; title: string; snapshot: Buffer }>> {
-    const recPath = join(
-      launched.userDataDir,
-      'uniwork-sync',
-      'store',
-      'default',
-      'acct_e2e_01',
-      'drafts',
-      `${sha256(Buffer.from(docId, 'utf8'))}.rec`,
-    )
+  async function readKeptDrafts(launched: LaunchedApp, docId: string): Promise<KeptDraft[]> {
+    const root = join(launched.userDataDir, 'uniwork-sync')
+    const recPath = recordPath(join(root, 'store'), storeScope, 'drafts', docId)
     if (!existsSync(recPath)) return []
-    const keyPath = join(launched.userDataDir, 'uniwork-sync', 'keys', 'default', 'acct_e2e_01.key')
-    const wrappedB64 = (await readFile(keyPath)).toString('base64')
+    const wrapped = await readFile(keyFilePath(join(root, 'keys'), storeScope))
     const rawKeyB64 = await launched.app.evaluate(
       ({ safeStorage }, b64) => safeStorage.decryptString(Buffer.from(b64, 'base64')),
-      wrappedB64,
+      wrapped.toString('base64'),
     )
     const key = Buffer.from(rawKeyB64, 'base64')
-    const frame = await readFile(recPath)
-    // UWS1 frame: 4B magic ("UWS1") + 12B IV + 16B GCM tag + ciphertext (AAD = "UWS1:drafts:<docId>")
-    const iv = frame.subarray(4, 16)
-    const tag = frame.subarray(16, 32)
-    const ciphertext = frame.subarray(32)
-    const decipher = createDecipheriv('aes-256-gcm', key, iv)
-    decipher.setAAD(Buffer.from(`UWS1:drafts:${docId}`, 'utf8'))
-    decipher.setAuthTag(tag)
-    const plain = Buffer.concat([decipher.update(ciphertext), decipher.final()])
-    if (plain.byteLength < 4) return []
-    const metaLen = plain.readUInt32BE(0)
-    const meta = JSON.parse(plain.subarray(4, 4 + metaLen).toString('utf8')) as {
-      v: 1
-      items: Array<{ id: string; createdAt: string; title: string; byteLength: number }>
+    const frame = readRecordFrame(await readFile(recPath))
+    if (!frame) throw new Error(`kept-drafts record is not a UWS1 frame: ${recPath}`)
+    const value = openRecord(key, frame)
+    if (!value) throw new Error(`kept-drafts record did not decrypt with the store key: ${recPath}`)
+    // a records source serving the bytes the frame just yielded: `list` runs
+    // the same draft payload decoder the app's own draft store runs
+    const records: StoreRecords = {
+      write: async () => ({ kind: 'refused' }),
+      read: async () => ({ kind: 'ok', value }),
+      delete: async () => ({ kind: 'ok' }),
     }
-    let offset = 4 + metaLen
-    return meta.items.map((item) => {
-      const snapshot = Buffer.from(plain.subarray(offset, offset + item.byteLength))
-      offset += item.byteLength
-      return { id: item.id, createdAt: item.createdAt, title: item.title, snapshot }
-    })
+    return createDraftStore(records).list(docId)
   }
 
   test('d. conflict: 409 keeps the local edit and the base, Save refuses, S5 Overwrite commits on the new base', async () => {
