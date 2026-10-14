@@ -216,7 +216,9 @@ describe('App wiring', () => {
 
   it('draws the dock from the derived state and persists only the stored choice', () => {
     expect(app).toContain('useAiDockLayout(aiCollapsed, setAiCollapsed, serverPanelOpen)')
-    expect(app).toContain("className={`ai-dock${aiDock.collapsed ? ' collapsed' : ''}`}")
+    expect(app).toContain("`ai-dock${aiDock.collapsed ? ' collapsed' : ''}${")
+    expect(app).toContain("!aiSidebarEnabled && aiDock.collapsed ? ' ai-dock-off' : ''")
+    expect(app).toContain('{aiDock.collapsed && aiSidebarEnabled && (')
     expect(app).toContain("rememberAiPanelOpen('genoffice-pdf-show-ai', !aiCollapsed)")
   })
 })
