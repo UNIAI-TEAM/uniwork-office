@@ -15,6 +15,8 @@ export type {
 } from './types'
 export { AI_RUN_IDLE_GRACE_MS, createAiRunTracker } from './ai-run-tracker'
 export type { AiRunPayload, AiRunState, AiRunTracker, AiRunTrackerOptions } from './ai-run-tracker'
+export { noticePatch } from './notice-surface'
+export type { NoticeKey, NoticeSurface, NoticeTranslate, PanelNote } from './notice-surface'
 export { composeSkills } from './skill'
 export type { AgentSkill, ExecutedToolCall } from './skill'
 export {
