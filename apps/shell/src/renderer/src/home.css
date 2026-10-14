@@ -4431,6 +4431,8 @@ body.vib .home {
   margin: 0;
   font-size: 13px;
   font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   color: var(--text);
 }
 

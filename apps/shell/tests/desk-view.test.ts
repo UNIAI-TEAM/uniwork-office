@@ -100,4 +100,47 @@ describe('DeskView', () => {
     expect(drop.defaultPrevented).toBe(true)
     expect(host.querySelector('.wb-desk-panel')?.textContent).toContain('PDF → Word')
   })
+
+  it("keeps a file drag's enter inside the Desk, so Home's Drop to open overlay stays hidden", async () => {
+    await mount()
+    const onWindowEnter = vi.fn()
+    window.addEventListener('dragenter', onWindowEnter)
+    const fileDrag = (target: Element) => {
+      const e = new Event('dragenter', { bubbles: true }) as Event & { dataTransfer: unknown }
+      e.dataTransfer = { types: ['Files'], files: [] }
+      act(() => {
+        target.dispatchEvent(e)
+      })
+    }
+    fileDrag(host.querySelector('.wb-desk-main')!)
+    expect(onWindowEnter).not.toHaveBeenCalled()
+    expect(host.querySelector('.wb-desk.is-dragging')).not.toBeNull()
+    // leaving the window mid-drag eats the dragleave: blur drops the highlight
+    act(() => {
+      window.dispatchEvent(new Event('blur'))
+    })
+    expect(host.querySelector('.wb-desk.is-dragging')).toBeNull()
+    fileDrag(document.body)
+    expect(onWindowEnter).toHaveBeenCalledTimes(1)
+    window.removeEventListener('dragenter', onWindowEnter)
+  })
+
+  it('shows the newest drafts even when an older listDrafts answer lands last', async () => {
+    const answers: Array<(d: unknown[]) => void> = []
+    api.listDrafts = vi.fn(() => new Promise<unknown[]>((r) => answers.push(r)))
+    await mount()
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'))
+    })
+    const draft = (title: string) => ({ kind: 'unsaved', title, app: 'docs', tabId: title })
+    await act(async () => {
+      answers[1]!([draft('Newer.docx')])
+    })
+    await act(async () => {
+      answers[0]!([draft('Older.docx')])
+    })
+    const text = host.textContent ?? ''
+    expect(text).toContain('Newer.docx')
+    expect(text).not.toContain('Older.docx')
+  })
 })

@@ -67,10 +67,13 @@ export function DeskView({
   // drafts follow the tabs: a save, a close or a new unsaved tab changes them
   useEffect(() => {
     let live = true
+    // a slow older answer must not replace a newer one
+    let latest = 0
     const load = () => {
+      const req = ++latest
       void window.aiOffice.listDrafts().then(
         (d) => {
-          if (live) setDrafts(d)
+          if (live && req === latest) setDrafts(d)
         },
         () => undefined,
       )
@@ -85,19 +88,36 @@ export function DeskView({
     }
   }, [refreshTick])
 
+  // a dragleave eaten by leaving the window, or a drop outside the Desk, must not leave the highlight on
+  useEffect(() => {
+    const reset = () => {
+      dragDepth.current = 0
+      setDragging(false)
+    }
+    window.addEventListener('drop', reset)
+    window.addEventListener('blur', reset)
+    return () => {
+      window.removeEventListener('drop', reset)
+      window.removeEventListener('blur', reset)
+    }
+  }, [])
+
   const unsavedPaths = useMemo(
     () => new Set(drafts.flatMap((d) => (d.kind === 'unsaved' && d.filePath ? [d.filePath] : []))),
     [drafts],
   )
 
   const hasFiles = (e: DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes('Files')
+  // enter/leave stay inside the Desk, so Home's "Drop to open" overlay hides over it
   const onDragEnter = (e: DragEvent) => {
     if (!hasFiles(e)) return
+    e.stopPropagation()
     dragDepth.current += 1
     setDragging(true)
   }
   const onDragLeave = (e: DragEvent) => {
     if (!hasFiles(e)) return
+    e.stopPropagation()
     dragDepth.current = Math.max(0, dragDepth.current - 1)
     if (dragDepth.current === 0) setDragging(false)
   }
