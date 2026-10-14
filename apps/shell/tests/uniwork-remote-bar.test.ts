@@ -488,6 +488,20 @@ describe('UniworkRemoteBar: actions', () => {
     expect(remoteAction).toHaveBeenLastCalledWith(PATH, 'reload-now')
   })
 
+  it('the bar region is aria-busy while an action is in flight, buttons aria-disabled', async () => {
+    let finish: (s: UniworkDocStatus | null) => void = () => undefined
+    remoteAction.mockReturnValueOnce(new Promise((resolve) => (finish = resolve)))
+    await mount(status({ kind: 'reload-failed', version: 3 }))
+    expect(bar()!.hasAttribute('aria-busy')).toBe(false)
+    await click(button('retry'))
+    expect(bar()!.getAttribute('aria-busy')).toBe('true')
+    expect(button('retry')!.getAttribute('aria-disabled')).toBe('true')
+    await act(async () => finish(null))
+    await flush()
+    expect(bar()!.hasAttribute('aria-busy')).toBe(false)
+    expect(button('retry')!.hasAttribute('aria-disabled')).toBe(false)
+  })
+
   it('a bridge that rejects leaves the bar as it was', async () => {
     remoteAction.mockRejectedValueOnce(new Error('gone'))
     await mount(status({ kind: 'reload-failed', version: 3 }))

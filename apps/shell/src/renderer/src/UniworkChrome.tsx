@@ -512,6 +512,7 @@ export function UniworkRemoteBar({
           className="uw-remote-bar"
           role="region"
           aria-label={t(model.regionKey)}
+          aria-busy={busy ? 'true' : undefined}
           data-tone={model.tone}
           data-kind={status?.remote?.kind}
           onMouseEnter={() => setHovered(true)}
