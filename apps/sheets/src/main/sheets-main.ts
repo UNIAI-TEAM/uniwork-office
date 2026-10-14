@@ -68,6 +68,7 @@ import {
   registerRendererScheme,
   rendererUrl,
   writeJsonAtomic,
+  newerCopyMtime,
 } from '@genoffice/electron-utils'
 import { answerUniworkAiFlagOff } from '@genoffice/electron-utils/uniwork-ai-flag'
 import { createI18n, getUiLang, type Lang, normalizeLang, setUiLang } from '@genoffice/i18n'
@@ -1910,14 +1911,7 @@ const recoveryPathFor = (filePath: string) =>
 
 /** mtime of a crash copy newer than `filePath`, or null; read-only (the shell's Desk lists it, opening offers the restore) */
 export function recoveryCopyMtime(filePath: string): number | null {
-  try {
-    const copy = recoveryPathFor(filePath)
-    if (!existsSync(copy)) return null
-    const at = statSync(copy).mtimeMs
-    return at > statSync(filePath).mtimeMs ? at : null
-  } catch {
-    return null
-  }
+  return newerCopyMtime(recoveryPathFor(filePath), filePath)
 }
 
 function clearWorkbookRecovery(filePath: string): void {

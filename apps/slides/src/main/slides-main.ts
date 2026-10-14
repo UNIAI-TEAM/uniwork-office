@@ -55,6 +55,7 @@ import {
   rendererUrl,
   MAX_REMOTE_IMAGE_BYTES,
   readBodyCapped,
+  newerCopyMtime,
 } from '@genoffice/electron-utils'
 import { answerUniworkAiFlagOff } from '@genoffice/electron-utils/uniwork-ai-flag'
 import { buildPagePptx, parsePageSpec } from '@genoffice/pipelines/slides'
@@ -388,14 +389,7 @@ const autosavePathFor = (filePath: string) =>
 
 /** mtime of a crash copy newer than `filePath`, or null; read-only (the shell's Desk lists it, opening offers the restore) */
 export function recoveryCopyMtime(filePath: string): number | null {
-  try {
-    const copy = autosavePathFor(filePath)
-    if (!existsSync(copy)) return null
-    const at = statSync(copy).mtimeMs
-    return at > statSync(filePath).mtimeMs ? at : null
-  } catch {
-    return null
-  }
+  return newerCopyMtime(autosavePathFor(filePath), filePath)
 }
 
 /**

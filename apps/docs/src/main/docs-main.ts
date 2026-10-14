@@ -77,6 +77,7 @@ import {
   MAX_REMOTE_IMAGE_BYTES,
   readBodyCapped,
   writeJsonAtomic,
+  newerCopyMtime,
 } from '@genoffice/electron-utils'
 import { answerUniworkAiFlagOff } from '@genoffice/electron-utils/uniwork-ai-flag'
 import { configureMetricsCache, familyVerticalMetrics } from '@genoffice/font-metrics'
@@ -3449,14 +3450,7 @@ const recoveryPathFor = (filePath: string) =>
 
 /** mtime of a crash copy newer than `filePath`, or null; read-only (the shell's Desk lists it, opening offers the restore) */
 export function recoveryCopyMtime(filePath: string): number | null {
-  try {
-    const copy = recoveryPathFor(filePath)
-    if (!existsSync(copy)) return null
-    const at = statSync(copy).mtimeMs
-    return at > statSync(filePath).mtimeMs ? at : null
-  } catch {
-    return null
-  }
+  return newerCopyMtime(recoveryPathFor(filePath), filePath)
 }
 
 /** Bumped by every clear: an in-flight docs:write-recovery that started before
