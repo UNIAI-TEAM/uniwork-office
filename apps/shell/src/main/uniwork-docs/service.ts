@@ -464,6 +464,10 @@ function queueBindingPatch(record: IntentRecordV2): Partial<Binding> | null {
   else if (state === 'blocked') patched.error = error ?? 'server_error'
   else if (state === 'reconciling-stuck') patched.error = error ?? 'intent_unknown'
   else if (state === 'failed') patched.error = error ?? 'server_error'
+  // G8-12: a refused permission is a fact about the caller's level, as on the inline path
+  if (patched.error === 'permission_revoked' || patched.error === 'forbidden') {
+    patched.level = 'view'
+  }
   return patched
 }
 
@@ -1093,10 +1097,19 @@ export class UniworkDocsService {
       baseChecksum: record.checksum,
       state: current === record.checksum ? 'saved' : 'dirty',
       lastSavedAt: new Date().toISOString(),
+      // G8-12: the comments anchor base moves with the base version (the
+      // queue's receipt always names the produced version)
+      baseVersionId: record.receipt.versionId,
     }
     delete next.error
     delete next.serverRevision
-    await this.coordinator.commitState(doc, next)
+    const done = await this.coordinator.commitState(doc, next)
+    // G8-12: a queue-settled Save (dispatched, or found committed by a lookup
+    // at rest) tells the editor's comment panel its new version, exactly as
+    // the inline settle does; a refused binding write pushes nothing
+    if (done.binding.baseVersionId === record.receipt.versionId) {
+      this.deps.notifySaved?.(done.path, record.receipt.versionId)
+    }
   }
 
   /**
