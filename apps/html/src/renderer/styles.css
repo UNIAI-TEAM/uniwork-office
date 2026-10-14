@@ -577,6 +577,14 @@ html.genoffice-popover-open .ribbon-tabs {
   color: var(--text-dim);
 }
 
+/* the disclaimer that the file still holds the words: same rhythm as the description */
+.redact-dialog-scope {
+  margin: 0 0 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+
 /* the marker as the model will see it, live as the label is typed */
 .redact-dialog-preview {
   margin-bottom: 8px;

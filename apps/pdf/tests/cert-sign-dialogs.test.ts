@@ -266,6 +266,58 @@ describe('CertSignDialog', () => {
     expect(listSystemCertificates).toHaveBeenLastCalledWith('pw')
   })
 
+  it('ignores Escape while a signing run is in flight', async () => {
+    let finish: (v: { ok: true; path: string }) => void = () => {}
+    installApi({
+      pickCertificate: async () => ({ certId: 'c1', fileName: 'me.p12' }),
+      inspectCertificate: async () => ({ ok: true, signer: cert, chain: [cert] }),
+      signWithCertificate: () => new Promise((resolve) => (finish = resolve)),
+    })
+    const onCancel = vi.fn()
+    const onSigned = vi.fn()
+    const dialog = await mount(createElement(CertSignDialog, { ...props, onCancel, onSigned }))
+    await useFileSource(dialog)
+    await act(async () => buttonWithText(dialog, 'certChoose').click())
+    await flush()
+    await act(async () => buttonWithText(dialog, 'certCheck').click())
+    await flush()
+    await act(async () => buttonWithText(dialog, 'certSignButton').click())
+    await flush()
+    const escape = () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await act(async () => escape())
+    expect(onCancel).not.toHaveBeenCalled()
+    await act(async () => finish({ ok: true, path: '/docs/a-signed.pdf' }))
+    await flush()
+    expect(onSigned).toHaveBeenCalledWith('/docs/a-signed.pdf')
+    // idle again: Escape cancels as before
+    await act(async () => escape())
+    expect(onCancel).toHaveBeenCalledTimes(1)
+  })
+
+  it('gives every select and input a programmatic name', async () => {
+    installApi({
+      listSystemCertificates: async () => ({ certs: [], issues: ['store-locked' as const] }),
+    })
+    const dialog = await mount(createElement(CertSignDialog, { ...props, onSigned: () => {} }))
+    await flush()
+    // reveal the optional rows: certify level (the second checkbox)
+    const certify = dialog.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')[1]!
+    await act(async () => certify.click())
+    const controls = [...dialog.querySelectorAll<HTMLElement>('select, input')]
+    expect(controls.length).toBeGreaterThan(6)
+    const unnamed = controls.filter((el) => !el.getAttribute('aria-label') && !el.closest('label'))
+    expect(unnamed.map((el) => el.outerHTML)).toEqual([])
+  })
+
+  it('lets the page field be cleared without snapping back to 1', async () => {
+    installApi({})
+    const dialog = await mount(createElement(CertSignDialog, { ...props, onSigned: () => {} }))
+    const page = dialog.querySelector<HTMLInputElement>('input.pdf-cert-page')!
+    expect(page.value).toBe('2')
+    await act(async () => setValue(page, ''))
+    expect(dialog.querySelector<HTMLInputElement>('input.pdf-cert-page')!.value).toBe('')
+  })
+
   it('offers certification only for a document that has no signatures yet', async () => {
     installApi({})
     const dialog = await mount(

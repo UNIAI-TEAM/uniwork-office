@@ -4070,6 +4070,13 @@ div.tiptap-mathematics-render {
   line-height: 1.5;
 }
 
+.redact-dialog-scope {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0 0 14px;
+  line-height: 1.5;
+}
+
 .redact-dialog-preview {
   font-family: 'SF Mono', Menlo, Consolas, monospace;
   font-size: 12px;

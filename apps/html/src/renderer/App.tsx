@@ -1852,7 +1852,7 @@ export default function App() {
                 onBeforeReplace={flushPending}
                 // withholding means "the model does not read this", and the model lives behind
                 // `ai`: with the key off (web frame) the source pane keeps Chromium's own menu
-                onRedact={aiEnabled ? onRedactSelection : undefined}
+                onRedact={aiEnabled && canEdit && !uniwork.readOnly ? onRedactSelection : undefined}
               />
             </div>
           </div>

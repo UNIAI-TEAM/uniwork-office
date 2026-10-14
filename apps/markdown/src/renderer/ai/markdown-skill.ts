@@ -80,6 +80,7 @@ export const READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
   'read_blocks',
   'read_frontmatter',
   'ask_clarification',
+  'generate_mindmap', // only returns a display payload for the chat card
 ])
 
 const VIEW_ONLY_NOTE =

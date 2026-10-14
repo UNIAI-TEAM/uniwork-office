@@ -54,7 +54,7 @@ void (async () => {
   document.documentElement.dir = htmlDir(lang)
   applyTheme(theme)
   applyDocumentTheme(docTheme ?? 'follow')
-  applyMarkdownTheme(mdTheme)
+  applyMarkdownTheme(mdTheme ?? 'default')
   window.markdownApi.onThemeChanged(applyTheme)
   window.markdownApi.onDocumentThemeChanged?.(applyDocumentTheme)
   await window.markdownApi

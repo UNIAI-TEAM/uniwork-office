@@ -1435,7 +1435,10 @@ export default function App() {
         <SlashMenu ref={slashMenuRef} state={slashState} onDismiss={() => setSlashState(null)} />
       )}
       {/* the model lives behind `ai`: with the key off (web frame) a stored toggle has nothing to hide from */}
-      <RedactMenu editor={editor} enabled={aiEnabled && redactEnabled} />
+      <RedactMenu
+        editor={editor}
+        enabled={aiEnabled && redactEnabled && canEdit && !uniwork.readOnly}
+      />
       <ToastHost />
       {imageHostOpen && (
         <ImageHostDialog onClose={() => setImageHostOpen(false)} onSaved={() => {}} />
