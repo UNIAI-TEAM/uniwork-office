@@ -135,12 +135,15 @@ import {
   docsFileRenamed,
   readRecentFiles,
   readStarredFiles,
+  readStarredGroupMap,
+  readStarredGroups,
   recordRecentFile,
   removeRecentFiles,
   removeStarredFiles,
   replaceRecentFile,
   registerAiIpc,
   registerProjectIpc,
+  setStarredGroup,
   toggleStarredFile,
   registerDocsIpc,
   exportDocsHeadless,
@@ -4411,9 +4414,18 @@ function registerHomeIpc(): void {
     return result
   })
 
+  // Starred files sort by mtime, which requires stat-ing them all first; they
+  // are hand-picked and few, so this is fine. The Starred view's group pills
+  // scope the whole query (totals included) through the group map.
   ipcMain.handle(HOME_CHANNELS.starred, (_event, query: unknown): RecentPage =>
-    pageStarredPaths(readStarredFiles(), query, uniworkRecentLookup),
+    pageStarredPaths(readStarredFiles(), query, uniworkRecentLookup, readStarredGroupMap()),
   )
+
+  ipcMain.handle(HOME_CHANNELS.starredGroups, (): string[] => readStarredGroups())
+
+  ipcMain.handle(HOME_CHANNELS.setStarredGroup, (_event, paths: unknown, group: unknown) => {
+    setStarredGroup(stringPaths(paths), typeof group === 'string' && group ? group : null)
+  })
 
   ipcMain.handle(HOME_CHANNELS.statPaths, (_event, paths: unknown): RecentEntry[] =>
     statEntries(capStatPaths(stringPaths(paths))),
@@ -4637,6 +4649,14 @@ function registerHomeIpc(): void {
     // an unavailable entry's star must go with it, or the Starred view keeps
     // a dead dimmed row the recents list no longer shows
     removeStarredFiles(list.filter((p) => !existsSync(p)))
+  })
+
+  // Bulk unstar from the Starred view: every row there is a favorite, so the
+  // selection action is "unstar", not "remove from recents" — removeRecent
+  // keeps existing files' stars on purpose, which made the Starred view's
+  // bulk removal a no-op for anything still on disk
+  ipcMain.handle(HOME_CHANNELS.unstarPaths, (_event, paths: unknown) => {
+    removeStarredFiles(stringPaths(paths))
   })
 
   ipcMain.handle(HOME_CHANNELS.revealPath, (_event, path: unknown) => {
