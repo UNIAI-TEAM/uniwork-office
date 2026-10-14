@@ -196,6 +196,20 @@ const bar = () => host.querySelector<HTMLElement>('.uw-remote-bar')
 const button = (action: string) =>
   host.querySelector<HTMLButtonElement>(`.uw-remote-action[data-action="${action}"]`)
 
+/** counts the sentences the live nodes were given (each announcement mounts a fresh child) */
+function watchAnnouncements(): { count: () => number; stop: () => void } {
+  let added = 0
+  const observer = new MutationObserver((records) => {
+    for (const record of records) {
+      if (!(record.target instanceof HTMLElement)) continue
+      if (!record.target.classList.contains('uw-sr-only')) continue
+      added += Array.from(record.addedNodes).filter((n) => n instanceof HTMLElement).length
+    }
+  })
+  observer.observe(host, { childList: true, subtree: true })
+  return { count: () => added, stop: () => observer.disconnect() }
+}
+
 async function click(el: HTMLElement | null): Promise<void> {
   expect(el, 'element to click').toBeTruthy()
   await act(async () => {
@@ -418,6 +432,30 @@ describe('UniworkRemoteBar: actions', () => {
     expect(bar()!.querySelector('.uw-remote-message')!.textContent).toContain('version 5')
   })
 
+  it('Later holds for the notice, not for its wait: a settled commit keeps the bar hidden, a newer version brings it back', async () => {
+    await mount(status({ kind: 'newer-dirty', version: 4, wait: 'commit' }))
+    expect(button('later')!.hasAttribute('aria-disabled')).toBe(false)
+    await click(button('later'))
+    expect(bar()).toBeNull()
+    const watch = watchAnnouncements()
+    // the commit settled: main drops `wait`, same version, same notice
+    await mount(status({ kind: 'newer-dirty', version: 4 }))
+    expect(bar()).toBeNull()
+    // the same version as an AI notice is still the put-off notice
+    await mount(status({ kind: 'newer-ai', version: 4 }))
+    expect(bar()).toBeNull()
+    expect(watch.count()).toBe(0)
+    // a newer revision shows it again, once, announced
+    await mount(status({ kind: 'newer-dirty', version: 5 }))
+    expect(bars()).toHaveLength(1)
+    expect(bar()!.querySelector('.uw-remote-message')!.textContent).toContain('version 5')
+    expect(watch.count()).toBe(1)
+    expect(host.querySelector('[role="status"]')!.textContent).toBe(
+      text('en', 'uwRemoteNewerDirty', { n: 5 }),
+    )
+    watch.stop()
+  })
+
   it('Close (updated, revoked) calls the bridge and hides the bar', async () => {
     await mount(status({ kind: 'updated', version: null }))
     await click(button('close'))
@@ -450,6 +488,20 @@ describe('UniworkRemoteBar: actions', () => {
     expect(remoteAction).toHaveBeenLastCalledWith(PATH, 'reload-now')
   })
 
+  it('the bar region is aria-busy while an action is in flight, buttons aria-disabled', async () => {
+    let finish: (s: UniworkDocStatus | null) => void = () => undefined
+    remoteAction.mockReturnValueOnce(new Promise((resolve) => (finish = resolve)))
+    await mount(status({ kind: 'reload-failed', version: 3 }))
+    expect(bar()!.hasAttribute('aria-busy')).toBe(false)
+    await click(button('retry'))
+    expect(bar()!.getAttribute('aria-busy')).toBe('true')
+    expect(button('retry')!.getAttribute('aria-disabled')).toBe('true')
+    await act(async () => finish(null))
+    await flush()
+    expect(bar()!.hasAttribute('aria-busy')).toBe(false)
+    expect(button('retry')!.hasAttribute('aria-disabled')).toBe(false)
+  })
+
   it('a bridge that rejects leaves the bar as it was', async () => {
     remoteAction.mockRejectedValueOnce(new Error('gone'))
     await mount(status({ kind: 'reload-failed', version: 3 }))
@@ -472,6 +524,33 @@ describe('UniworkRemoteBar: announcements', () => {
     const spoken = polite().firstElementChild
     await mount(status({ kind: 'newer-dirty', version: 4 }, { state: 'saved' }))
     expect(polite().firstElementChild).toBe(spoken)
+  })
+
+  it('switching tabs away and back does not announce the same bar again', async () => {
+    const other = 'C:\\ud\\uniwork-documents\\d2\\Other.docx'
+    await mount(status({ kind: 'newer-dirty', version: 4 }))
+    const watch = watchAnnouncements()
+    await mount(status(undefined, { path: other }))
+    await mount(status({ kind: 'newer-dirty', version: 4 }))
+    expect(bar()).not.toBeNull()
+    expect(watch.count()).toBe(0)
+    // another tab with a notice of its own is announced, once
+    await mount(status({ kind: 'newer-dirty', version: 4 }, { path: other }))
+    expect(watch.count()).toBe(1)
+    await mount(status({ kind: 'newer-dirty', version: 4 }))
+    expect(watch.count()).toBe(1)
+    watch.stop()
+  })
+
+  it('a newer version of the same notice is announced again, and the live text is cleared when the bar hides', async () => {
+    await mount(status({ kind: 'newer-dirty', version: 4 }))
+    expect(polite().textContent).not.toBe('')
+    await mount(status({ kind: 'newer-dirty', version: 5 }))
+    expect(polite().textContent).toBe(text('en', 'uwRemoteNewerDirty', { n: 5 }))
+    await click(button('later'))
+    expect(bar()).toBeNull()
+    expect(polite().textContent).toBe('')
+    expect(alert().textContent).toBe('')
   })
 
   it('an error kind is announced as an alert', async () => {
