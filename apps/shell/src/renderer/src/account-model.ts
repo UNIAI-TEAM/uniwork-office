@@ -107,14 +107,14 @@ export function initialsOf(profile: AccountProfile | undefined, email = ''): str
   return mail ? (Array.from(mail)[0] ?? '?').toUpperCase() : '?'
 }
 
-/** whether signing out needs confirmation (S3): unsent saves or a locked keychain */
+/** whether signing out needs confirmation (S3): unsent saves or RAM-only working copies */
 export function signOutNeedsPrompt(plan: SignOutPlan): boolean {
-  return plan.count > 0 || plan.keystoreLocked || plan.ramOnly > 0
+  return plan.count > 0 || plan.ramOnly > 0
 }
 
 /** whether the sign-out prompt shows the keychain warning variant (danger button + uwSignOutKeystore) */
 export function signOutIsKeystoreVariant(plan: SignOutPlan): boolean {
-  return plan.keystoreLocked && (plan.ramOnly > 0 || plan.count === 0)
+  return plan.keystoreLocked && plan.ramOnly > 0
 }
 
 export interface AccountController {
@@ -156,7 +156,8 @@ export interface AccountController {
  * Account state for the sidebar entry and Settings → Account. Main pushes every
  * state change (onAccountStatus); the initial value comes from accountStatus().
  */
-export function useAccount(): AccountController {
+export function useAccount(options?: { ownsSignOutPrompt?: boolean }): AccountController {
+  const ownsSignOutPrompt = options?.ownsSignOutPrompt ?? false
   const [status, setStatus] = useState<AccountStatus | null>(null)
   // click → accountLogin() resolved: main has not reported signing-in yet
   const [launching, setLaunching] = useState(false)
@@ -178,6 +179,7 @@ export function useAccount(): AccountController {
   const copiedTimer = useRef<number | null>(null)
   const retrying = useRef(false)
   const signingOut = useRef(false)
+  const waitingForDone = useRef(false)
   const promptReqId = useRef<string | null>(null)
 
   const apply = useCallback((next: AccountStatus) => {
@@ -224,25 +226,34 @@ export function useAccount(): AccountController {
         setLocalError(ev.error ?? 'server_error')
       }
     })
-    const offProgress = window.aiOffice.onSignOutProgress?.((p) => {
-      if (p.phase === 'waiting') {
-        setSignOutWaiting(true)
-      } else if (p.phase === 'done') {
-        setSignOutWaiting(false)
-        setSignOutPrompt(null)
-        refresh()
-      }
-    })
-    const offPrompt = window.aiOffice.onSignOutPrompt?.((req) => {
-      if (promptReqId.current !== null) {
-        const stale = promptReqId.current
-        promptReqId.current = null
-        void window.aiOffice.answerSignOutPrompt?.(stale, false)
-      }
-      promptReqId.current = req.requestId
-      setSignOutWaiting(false)
-      setSignOutPrompt(req.plan)
-    })
+    const offProgress = ownsSignOutPrompt
+      ? window.aiOffice.onSignOutProgress?.((p) => {
+          if (p.phase === 'waiting') {
+            waitingForDone.current = true
+            setSignOutWaiting(true)
+          } else if (p.phase === 'done') {
+            waitingForDone.current = false
+            signingOut.current = false
+            setBusy(null)
+            setSignOutWaiting(false)
+            setSignOutPrompt(null)
+            refresh()
+          }
+        })
+      : undefined
+    const offPrompt = ownsSignOutPrompt
+      ? window.aiOffice.onSignOutPrompt?.((req) => {
+          if (promptReqId.current !== null) {
+            const stale = promptReqId.current
+            promptReqId.current = null
+            void window.aiOffice.answerSignOutPrompt?.(stale, false)
+          }
+          promptReqId.current = req.requestId
+          waitingForDone.current = false
+          setSignOutWaiting(false)
+          setSignOutPrompt(req.plan)
+        })
+      : undefined
     return () => {
       offStatus?.()
       offLogin?.()
@@ -256,7 +267,7 @@ export function useAccount(): AccountController {
       if (copiedTimer.current !== null) window.clearTimeout(copiedTimer.current)
       if (noticeTimer.current !== null) window.clearTimeout(noticeTimer.current)
     }
-  }, [apply, refresh])
+  }, [apply, ownsSignOutPrompt, refresh])
 
   const mainState = status ? viewOf(status) : null
   const view: AccountView =
@@ -320,6 +331,7 @@ export function useAccount(): AccountController {
       .accountLogout({ confirmed: true })
       .catch(() => undefined)
       .finally(() => {
+        waitingForDone.current = false
         signingOut.current = false
         setSignOutWaiting(false)
         setSignOutPrompt(null)
@@ -348,6 +360,7 @@ export function useAccount(): AccountController {
           promptReqId.current = null
           void window.aiOffice.answerSignOutPrompt?.(stale, false)
         }
+        waitingForDone.current = false
         setSignOutWaiting(false)
         setSignOutPrompt(plan)
       })
@@ -361,9 +374,21 @@ export function useAccount(): AccountController {
     if (promptReqId.current !== null) {
       const reqId = promptReqId.current
       promptReqId.current = null
-      setSignOutPrompt(null)
-      setSignOutWaiting(false)
-      void window.aiOffice.answerSignOutPrompt?.(reqId, true)
+      signingOut.current = true
+      setBusy('signing-out')
+      if ((signOutPrompt?.waiting ?? 0) > 0) {
+        waitingForDone.current = true
+        setSignOutWaiting(true)
+      }
+      void Promise.resolve(window.aiOffice.answerSignOutPrompt?.(reqId, true))
+        .catch(() => undefined)
+        .finally(() => {
+          if (waitingForDone.current) return
+          signingOut.current = false
+          setBusy(null)
+          setSignOutWaiting(false)
+          setSignOutPrompt(null)
+        })
       return
     }
     runLogout()
@@ -376,6 +401,7 @@ export function useAccount(): AccountController {
       promptReqId.current = null
       void window.aiOffice.answerSignOutPrompt?.(reqId, false)
     }
+    waitingForDone.current = false
     setSignOutPrompt(null)
     setSignOutWaiting(false)
   }

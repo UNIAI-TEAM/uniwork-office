@@ -16,6 +16,7 @@ import type {
   SignOutPromptRequest,
 } from '../src/shared/home-api'
 import { AccountEntry } from '../src/renderer/src/AccountEntry'
+import { useAccount } from '../src/renderer/src/account-model'
 import { LocaleProvider } from '../src/renderer/src/locale'
 import type { Lang } from '../src/renderer/src/locale'
 import type { SettingsSectionId } from '../src/renderer/src/SettingsModal'
@@ -73,8 +74,8 @@ function makeApi(
 ) {
   let pushStatus: ((s: AccountStatus) => void) | null = null
   let pushLogin: ((ev: AccountLoginEvent) => void) | null = null
-  let pushProgress: ((p: SignOutProgress) => void) | null = null
-  let pushPrompt: ((req: SignOutPromptRequest) => void) | null = null
+  const progressSubs = new Set<(p: SignOutProgress) => void>()
+  const promptSubs = new Set<(req: SignOutPromptRequest) => void>()
   const fns = {
     accountStatus: vi.fn(async () => initial),
     onAccountStatus: vi.fn((h: (s: AccountStatus) => void) => {
@@ -103,15 +104,15 @@ function makeApi(
     openLoginUrl: vi.fn(async () => undefined),
     signOutPlan: vi.fn(async (): Promise<SignOutPlan> => defaultPlan),
     onSignOutProgress: vi.fn((h: (p: SignOutProgress) => void) => {
-      pushProgress = h
+      progressSubs.add(h)
       return () => {
-        pushProgress = null
+        progressSubs.delete(h)
       }
     }),
     onSignOutPrompt: vi.fn((h: (req: SignOutPromptRequest) => void) => {
-      pushPrompt = h
+      promptSubs.add(h)
       return () => {
-        pushPrompt = null
+        promptSubs.delete(h)
       }
     }),
     answerSignOutPrompt: vi.fn(async (_requestId: string, _confirmed: boolean) => undefined),
@@ -129,8 +130,12 @@ function makeApi(
     ...fns,
     pushStatus: (s: AccountStatus) => pushStatus?.(s),
     pushLogin: (ev: AccountLoginEvent) => pushLogin?.(ev),
-    pushProgress: (p: SignOutProgress) => pushProgress?.(p),
-    pushPrompt: (req: SignOutPromptRequest) => pushPrompt?.(req),
+    pushProgress: (p: SignOutProgress) => {
+      for (const cb of [...progressSubs]) cb(p)
+    },
+    pushPrompt: (req: SignOutPromptRequest) => {
+      for (const cb of [...promptSubs]) cb(req)
+    },
   }
 }
 
@@ -425,5 +430,144 @@ describe('Settings → Account sign-out prompt (S3)', () => {
     act(() => root.unmount())
     expect(api.answerSignOutPrompt).toHaveBeenCalledTimes(2)
     expect(api.answerSignOutPrompt).toHaveBeenLastCalledWith('req-second', false)
+  })
+
+  it('two hook instances mounted, unmounting the non-owner with a live request makes no answerSignOutPrompt call', async () => {
+    function NonOwner() {
+      useAccount()
+      return null
+    }
+    let unmountNonOwner!: () => void
+    function MultiHarness() {
+      const [showOther, setShowOther] = useState(true)
+      unmountNonOwner = () => setShowOther(false)
+      return createElement(
+        LocaleProvider,
+        { initial: 'vi' },
+        createElement(Harness, { open: true }),
+        showOther ? createElement(NonOwner) : null,
+      )
+    }
+
+    api = makeApi(statusFor('signed-in'))
+    await act(async () => {
+      root.render(createElement(MultiHarness))
+    })
+    await flush()
+
+    expect(api.onSignOutPrompt).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      api.pushPrompt({
+        requestId: 'req-live',
+        plan: { count: 2, waiting: 0, keystoreLocked: false, ramOnly: 0 },
+      })
+    })
+    await flush()
+    expect(promptDialog()).not.toBeNull()
+
+    await act(async () => {
+      unmountNonOwner()
+    })
+    await flush()
+
+    expect(api.answerSignOutPrompt).not.toHaveBeenCalled()
+    expect(promptDialog()).not.toBeNull()
+
+    await click(promptButton(syncVi.uwSignOutGo))
+    expect(api.answerSignOutPrompt).toHaveBeenCalledTimes(1)
+    expect(api.answerSignOutPrompt).toHaveBeenCalledWith('req-live', true)
+  })
+
+  it('main-initiated confirm with a waiting progress keeps the prompt: uwSignOutWaiting polite, Đăng xuất aria-disabled, until done', async () => {
+    await render(statusFor('signed-in'), { lang: 'vi', open: false })
+    await act(async () => {
+      api.pushPrompt({
+        requestId: 'req-wait',
+        plan: { count: 2, waiting: 1, keystoreLocked: false, ramOnly: 0 },
+      })
+    })
+    await flush()
+
+    const goBtn = promptButton(syncVi.uwSignOutGo)!
+    expect(goBtn).toBeDefined()
+    await act(async () => {
+      goBtn.click()
+      api.pushProgress({ phase: 'waiting' })
+    })
+    await flush()
+
+    expect(api.answerSignOutPrompt).toHaveBeenCalledTimes(1)
+    expect(api.answerSignOutPrompt).toHaveBeenCalledWith('req-wait', true)
+
+    const dialog = promptDialog()!
+    expect(dialog).not.toBeNull()
+    const live = dialog.querySelector<HTMLElement>('[role="status"][aria-live="polite"]')!
+    expect(live).not.toBeNull()
+    expect(live.textContent).toBe(syncVi.uwSignOutWaiting)
+    const busyGo = promptButton(syncVi.uwSignOutGo)!
+    expect(busyGo.getAttribute('aria-disabled')).toBe('true')
+    expect(busyGo.disabled).toBe(false)
+
+    // a second click while waiting does not answer again or call accountLogout
+    await act(async () => {
+      busyGo.click()
+    })
+    expect(api.answerSignOutPrompt).toHaveBeenCalledTimes(1)
+    expect(api.accountLogout).not.toHaveBeenCalled()
+
+    await act(async () => {
+      api.pushProgress({ phase: 'done' })
+    })
+    await flush()
+    expect(promptDialog()).toBeNull()
+  })
+
+  it('count 0 + keystoreLocked + ramOnly 0 signs out at once, no prompt', async () => {
+    await render(statusFor('signed-in'), {
+      plan: { count: 0, waiting: 0, keystoreLocked: true, ramOnly: 0 },
+    })
+    await click(button(en.acctSignOut))
+    expect(api.signOutPlan).toHaveBeenCalledTimes(1)
+    expect(promptDialog()).toBeNull()
+    expect(api.accountLogout).toHaveBeenCalledTimes(1)
+    expect(api.accountLogout).toHaveBeenCalledWith({ confirmed: true })
+  })
+
+  it('Escape = Quay lại: no logout call, focus back on the sign-out button', async () => {
+    await render(statusFor('signed-in'), {
+      lang: 'vi',
+      plan: { count: 2, waiting: 0, keystoreLocked: false, ramOnly: 0 },
+    })
+    await click(button(vi_.acctSignOut))
+    expect(promptDialog()).not.toBeNull()
+
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    })
+    await flush()
+
+    expect(promptDialog()).toBeNull()
+    expect(api.accountLogout).not.toHaveBeenCalled()
+    const signOutBtn = button(vi_.acctSignOut)!
+    expect(signOutBtn).toBeDefined()
+    expect(document.activeElement).toBe(signOutBtn)
+  })
+
+  it('closing Settings with a live main-initiated prompt answers it false', async () => {
+    await render(statusFor('signed-in'), { lang: 'vi', open: false })
+    await act(async () => {
+      api.pushPrompt({
+        requestId: 'req-close',
+        plan: { count: 2, waiting: 0, keystoreLocked: false, ramOnly: 0 },
+      })
+    })
+    await flush()
+    expect(promptDialog()).not.toBeNull()
+
+    await click(host.querySelector<HTMLButtonElement>('.set-close'))
+    expect(host.querySelector('.set-dialog')).toBeNull()
+    expect(api.answerSignOutPrompt).toHaveBeenCalledTimes(1)
+    expect(api.answerSignOutPrompt).toHaveBeenCalledWith('req-close', false)
   })
 })

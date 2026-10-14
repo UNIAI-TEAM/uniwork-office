@@ -79,14 +79,19 @@ export function AccountPane({ account }: { account: AccountController }) {
   const signOutBusy = signOutWaiting || busy === 'signing-out'
   const signOutBtnRef = useRef<HTMLButtonElement>(null)
   const backBtnRef = useRef<HTMLButtonElement>(null)
-  const restoreSignOutFocus = useRef(false)
+  const promptWasOpen = useRef(false)
+  const confirmingSignOut = useRef(false)
 
   useLayoutEffect(() => {
     if (signOutPrompt) {
+      promptWasOpen.current = true
+      confirmingSignOut.current = false
       backBtnRef.current?.focus()
-    } else if (restoreSignOutFocus.current) {
-      restoreSignOutFocus.current = false
-      signOutBtnRef.current?.focus()
+    } else if (promptWasOpen.current) {
+      promptWasOpen.current = false
+      const shouldRestore = !confirmingSignOut.current
+      confirmingSignOut.current = false
+      if (shouldRestore) signOutBtnRef.current?.focus()
     }
   }, [signOutPrompt])
 
@@ -355,7 +360,6 @@ export function AccountPane({ account }: { account: AccountController }) {
               autoFocus
               onClick={() => {
                 if (signOutBusy) return
-                restoreSignOutFocus.current = true
                 account.cancelSignOut?.()
               }}
             >
@@ -367,7 +371,9 @@ export function AccountPane({ account }: { account: AccountController }) {
               aria-disabled={signOutBusy ? true : undefined}
               aria-busy={signOutBusy ? true : undefined}
               onClick={() => {
-                if (!signOutBusy) (account.confirmSignOut ?? account.signOut)()
+                if (signOutBusy) return
+                confirmingSignOut.current = true
+                ;(account.confirmSignOut ?? account.signOut)()
               }}
             >
               {t('uwSignOutGo')}

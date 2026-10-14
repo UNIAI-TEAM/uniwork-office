@@ -1590,7 +1590,11 @@ export function SettingsModal({
     if (paneDirtyRef.current) setLeaveAction(() => action)
     else action()
   }
-  const requestClose = () => guardLeave(onClose)
+  const requestClose = () =>
+    guardLeave(() => {
+      if (account?.signOutPrompt) account.cancelSignOut?.()
+      onClose()
+    })
   const goToSection = (id: SectionId) => {
     if (id !== section) guardLeave(() => setSection(id))
   }
