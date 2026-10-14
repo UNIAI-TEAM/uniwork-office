@@ -1,0 +1,21 @@
+git fetch -q --unshallow origin 2>/dev/null; git fetch -q origin main; git rev-parse HEAD origin/main
+echo "node $(node -v) at $(command -v node)"; type -a node; ls -l /usr/bin/node 2>&1; /usr/bin/node -v 2>&1; node -e "new (require('node:sqlite').DatabaseSync)(':memory:').exec('create virtual table t using fts5(x)')" 2>&1 | grep -v ExperimentalWarning || true; node -e "new (require('node:sqlite').DatabaseSync)(':memory:').exec('create virtual table t using fts5(x)')" >/dev/null 2>&1 || { echo "FATAL: node $(node -v) at $(command -v node) has no FTS5 in node:sqlite"; exit 1; }
+npm run licenses
+if [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ]; then FORMAT_BASE_REF=$(git rev-parse HEAD^1); else FORMAT_BASE_REF=$(git merge-base HEAD origin/main); fi; export FORMAT_BASE_REF; npm run format:check
+if [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ]; then FORMAT_BASE_REF=$(git rev-parse HEAD^1); else FORMAT_BASE_REF=$(git merge-base HEAD origin/main); fi; export FORMAT_BASE_REF; npm run check:theme-colors
+npm run check:brand
+npm run test:rebrand
+node --test tools/release/*.test.mjs
+npm run legal:check && npm run test:legal
+npm run check:egress
+set +e; files=$(git grep -I -l --all-match -e '^<<<<<<< ' -e '^=======$' -e '^>>>>>>> '); rc=$?; set -e; if [ "$rc" -eq 0 ]; then echo "Unresolved merge-conflict markers committed in:"; echo "$files"; exit 1; fi; if [ "$rc" -gt 1 ]; then exit "$rc"; fi
+if [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ]; then FORMAT_BASE_REF=$(git rev-parse HEAD^1); else FORMAT_BASE_REF=$(git merge-base HEAD origin/main); fi; export FORMAT_BASE_REF; npm run check:skill-version
+if [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ]; then FORMAT_BASE_REF=$(git rev-parse HEAD^1); else FORMAT_BASE_REF=$(git merge-base HEAD origin/main); fi; export FORMAT_BASE_REF; if [ -f tools/check-public-hygiene.mjs ]; then node tools/check-public-hygiene.mjs; else echo "public-hygiene gate not present in this checkout; skipped"; fi
+npm run check:english-comments
+npm run lint
+npm run typecheck
+npm run fixtures
+git diff --exit-code -- fixtures/generated
+command -v xmllint >/dev/null || { sudo apt-get update && sudo apt-get install -y --no-install-recommends libxml2-utils; }
+extra=$(dpkg -l | awk '/^ii/ && $2 ~ /^fonts-/ {print $2}' | grep -vxE 'fonts-dejavu-core|fonts-liberation'); sudo apt-get purge -y $extra xfonts-base xfonts-cyrillic xfonts-encodings xfonts-scalable xfonts-terminus xfonts-utils >/dev/null 2>&1; rm -rf apps/sheets/native/xlsx-engine/target; npm test
+npm run fixtures -w @genoffice/sheets && npm run compat -w @genoffice/sheets
