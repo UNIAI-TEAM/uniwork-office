@@ -25,8 +25,8 @@ const contrast = (a: string, b: string) => {
   return (hi! + 0.05) / (lo! + 0.05)
 }
 /** the body of the rule whose selector line is exactly `selector` */
-/** the column rows: the page's, and the Desk's inside its box-less drop wrapper */
-const COLUMN_ROWS = '.wb-home > :not(.wb-confirm, .wb-desk-drop),\n.wb-desk-drop > *'
+/** the column rows of the page */
+const COLUMN_ROWS = '.wb-home > :not(.wb-confirm)'
 const rule = (selector: string) => {
   const start = css.indexOf(`\n${selector} {\n`)
   expect(start, selector).toBeGreaterThanOrEqual(0)
@@ -284,7 +284,6 @@ describe('long titles (review focus: very long workspace and task names)', () =>
 describe('the Workbench lays out by its own width (impeccable audit P1-2, P2-1, P2-3..6, P3-2, P3-3)', () => {
   it('rows never shrink; breakpoints are container queries on .wb-home, not the window', () => {
     expect(rule('.wb-home')).toMatch(/container: wb-home \/ inline-size;/)
-    expect(rule('.wb-desk-drop')).toMatch(/display: contents;/)
     expect(rule(COLUMN_ROWS)).toMatch(/flex-shrink: 0;/)
     // a viewport query misses the sidebar and the interface scale (zoom)
     expect(css).not.toMatch(/@media \(max-width: \d+px\) \{\n {2}\.wb-/)

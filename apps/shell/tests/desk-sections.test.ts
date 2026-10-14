@@ -422,6 +422,15 @@ describe('DeskInProgress', () => {
     expect(onRetry).not.toHaveBeenCalled()
   })
 
+  it('a Retry that succeeds hands the focus to the section, not <body>', async () => {
+    const props = { drafts: [], recent: [], local: [], onRetry: vi.fn() }
+    await render(createElement(DeskInProgress, { ...props, cloudFailed: true }))
+    host.querySelector<HTMLButtonElement>('.wb-ov-partial button')!.focus()
+    await render(createElement(DeskInProgress, { ...props, cloudFailed: false }))
+    expect(host.querySelector('.wb-ov-partial')).toBeNull()
+    expect(document.activeElement).toBe(host.querySelector('section.wb-desk-card'))
+  })
+
   it('shows a skeleton, not the empty line, while drafts or recents load', async () => {
     await render(
       createElement(DeskInProgress, { drafts: [], recent: [], local: [], loading: true }),

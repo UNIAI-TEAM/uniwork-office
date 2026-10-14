@@ -57,7 +57,7 @@ import {
   WorkStatePanel,
   WorkspacePickerContext,
 } from './WorkErrorState'
-import { DeskView } from './DeskView'
+import { DeskView, useDeskDrop } from './DeskView'
 
 interface PracticeHomeProps {
   practice: PracticeDefinition
@@ -306,6 +306,13 @@ export function PracticeHome({
   const [tab, setTab] = useState<string>('desk')
   const [qQuery, setQQuery] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
+  // the Desk's file drop covers the whole page while the Desk shows (its gaps and margins too)
+  const deskDrop = useDeskDrop()
+  const { setDropped: setDeskDropped } = deskDrop
+  // a dropped file's tool chooser does not wait behind another tab
+  useEffect(() => {
+    if (tab !== 'desk') setDeskDropped(null)
+  }, [tab, setDeskDropped])
   const [skillDomain, setSkillDomain] = useState<SkillDomainId>(() =>
     readActiveSkillDomain(readPinnedSkillDomains()),
   )
@@ -965,7 +972,7 @@ export function PracticeHome({
   }
 
   return (
-    <main className="content wb-home">
+    <main className="content wb-home" {...(tab === 'desk' ? deskDrop.handlers : {})}>
       <WbToastHost toasts={toasts}>
         <WorkbenchTopBar
           practice={practice}
@@ -1015,6 +1022,7 @@ export function PracticeHome({
               packs={deskPacks}
               selectedPackId={selectedId}
               onSelectPack={onSelectPack}
+              drop={deskDrop}
             />
           ) : isWorkbenchModuleId(tab) ? (
             <WorkbenchModulePane

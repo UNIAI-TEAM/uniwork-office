@@ -38,9 +38,70 @@ interface Props {
   packs?: readonly { id: string; title: string }[]
   selectedPackId?: string | null
   onSelectPack?: (id: string | null) => void
+  /** the page's file drop (useDeskDrop): its handlers sit on the whole Workbench page */
+  drop: DeskDrop
 }
 
 const IN_PROGRESS_ROWS = 10
+
+export type DeskDrop = ReturnType<typeof useDeskDrop>
+
+/**
+ * A file dropped anywhere on the Desk page (spec 4.1) offers the tools. The page spreads
+ * `handlers` on its root, so its gaps, padding and margins take the drop too: one that
+ * reached the window instead would be opened by the preload's drop-to-open bridge.
+ */
+export function useDeskDrop() {
+  const [dropped, setDropped] = useState<string[] | null>(null)
+  const [dragging, setDragging] = useState(false)
+  const dragDepth = useRef(0)
+
+  // a dragleave eaten by leaving the window, or a drop outside the Desk, must not leave the highlight on
+  useEffect(() => {
+    const reset = () => {
+      dragDepth.current = 0
+      setDragging(false)
+    }
+    window.addEventListener('drop', reset)
+    window.addEventListener('blur', reset)
+    return () => {
+      window.removeEventListener('drop', reset)
+      window.removeEventListener('blur', reset)
+    }
+  }, [])
+
+  const hasFiles = (e: DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes('Files')
+  const handlers = {
+    // enter/leave stay inside the page, so Home's "Drop to open" overlay hides over it
+    onDragEnter: (e: DragEvent) => {
+      if (!hasFiles(e)) return
+      e.stopPropagation()
+      dragDepth.current += 1
+      setDragging(true)
+    },
+    onDragLeave: (e: DragEvent) => {
+      if (!hasFiles(e)) return
+      e.stopPropagation()
+      dragDepth.current = Math.max(0, dragDepth.current - 1)
+      if (dragDepth.current === 0) setDragging(false)
+    },
+    onDragOver: (e: DragEvent) => {
+      if (hasFiles(e)) e.preventDefault()
+    },
+    onDrop: (e: DragEvent) => {
+      if (!hasFiles(e)) return
+      // claimed here: the preload's drop-to-open bridge skips a drop the page handled
+      e.preventDefault()
+      dragDepth.current = 0
+      setDragging(false)
+      const paths = Array.from(e.dataTransfer.files)
+        .map((f) => window.aiOffice.pathForFile(f))
+        .filter((p) => p.length > 0)
+      setDropped(paths.length > 0 ? paths : null)
+    },
+  }
+  return { dropped, setDropped, dragging, handlers }
+}
 
 /** Mặt bàn (redesign spec 4.1): toolbar, one sign-in banner, tools, tray, in progress, forms, Today. */
 export function DeskView({
@@ -59,6 +120,7 @@ export function DeskView({
   packs,
   selectedPackId,
   onSelectPack,
+  drop,
 }: Props): ReactElement {
   const { t } = useI18n()
   const workspace = workspaces?.find((w) => w.id === workspaceId) ?? null
@@ -72,9 +134,6 @@ export function DeskView({
   const recents = useRecentDocuments(wsId, refreshTick, IN_PROGRESS_ROWS)
   // null until listDrafts answers: an empty list before that is not "nothing in progress"
   const [drafts, setDrafts] = useState<DeskDraft[] | null>(null)
-  const [dropped, setDropped] = useState<string[] | null>(null)
-  const [dragging, setDragging] = useState(false)
-  const dragDepth = useRef(0)
 
   // a ref, so an inline callback never re-fires the effect
   const onSummaryRef = useRef(onSummary)
@@ -110,20 +169,6 @@ export function DeskView({
     }
   }, [refreshTick])
 
-  // a dragleave eaten by leaving the window, or a drop outside the Desk, must not leave the highlight on
-  useEffect(() => {
-    const reset = () => {
-      dragDepth.current = 0
-      setDragging(false)
-    }
-    window.addEventListener('drop', reset)
-    window.addEventListener('blur', reset)
-    return () => {
-      window.removeEventListener('drop', reset)
-      window.removeEventListener('blur', reset)
-    }
-  }, [])
-
   const unsavedPaths = useMemo(
     () =>
       new Set(
@@ -131,35 +176,6 @@ export function DeskView({
       ),
     [drafts],
   )
-
-  const hasFiles = (e: DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes('Files')
-  // enter/leave stay inside the Desk, so Home's "Drop to open" overlay hides over it
-  const onDragEnter = (e: DragEvent) => {
-    if (!hasFiles(e)) return
-    e.stopPropagation()
-    dragDepth.current += 1
-    setDragging(true)
-  }
-  const onDragLeave = (e: DragEvent) => {
-    if (!hasFiles(e)) return
-    e.stopPropagation()
-    dragDepth.current = Math.max(0, dragDepth.current - 1)
-    if (dragDepth.current === 0) setDragging(false)
-  }
-  const onDragOver = (e: DragEvent) => {
-    if (hasFiles(e)) e.preventDefault()
-  }
-  const onDrop = (e: DragEvent) => {
-    if (!hasFiles(e)) return
-    // claimed here: the preload's drop-to-open bridge skips a drop the page handled
-    e.preventDefault()
-    dragDepth.current = 0
-    setDragging(false)
-    const paths = Array.from(e.dataTransfer.files)
-      .map((f) => window.aiOffice.pathForFile(f))
-      .filter((p) => p.length > 0)
-    setDropped(paths.length > 0 ? paths : null)
-  }
 
   // the toolbar: a greeting when a name is known, then what waits, from data already loaded
   const hour = new Date().getHours()
@@ -211,23 +227,15 @@ export function DeskView({
       </div>
     ) : null
 
-  // the toolbar and banner take a file drop too ("anywhere on the Desk"): the drop target is a
-  // box-less wrapper, so the three stay rows of the page column
   return (
-    <div
-      className="wb-desk-drop"
-      onDragEnter={onDragEnter}
-      onDragLeave={onDragLeave}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
-    >
+    <>
       <WorkToolbar title={vi ? DESK.labelVi : DESK.labelEn} summary={summary} />
       {banner}
-      <div className={`wb-desk${dragging ? ' is-dragging' : ''}`}>
+      <div className={`wb-desk${drop.dragging ? ' is-dragging' : ''}`}>
         <div className="wb-desk-main">
           <DeskTools
-            dropped={dropped}
-            onDropHandled={() => setDropped(null)}
+            dropped={drop.dropped}
+            onDropHandled={() => drop.setDropped(null)}
             unsavedPaths={unsavedPaths}
           />
           <DeskInTray
@@ -268,6 +276,6 @@ export function DeskView({
           onOpenTasks={() => onOpenTab('tasks')}
         />
       </div>
-    </div>
+    </>
   )
 }

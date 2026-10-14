@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { HomeApi } from '../src/shared/home-api'
 import type { TabsApi } from '../src/shared/tabs-api'
 import type { UniworkWorkApi } from '../src/shared/uniwork-work-api'
-import { DeskView } from '../src/renderer/src/DeskView'
+import { DeskView, useDeskDrop } from '../src/renderer/src/DeskView'
 import { LocaleProvider } from '../src/renderer/src/locale'
 
 const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -52,25 +52,29 @@ afterEach(() => {
 })
 
 async function mount(over: Partial<Parameters<typeof DeskView>[0]> = {}) {
-  await act(async () => {
-    root.render(
-      createElement(
-        LocaleProvider,
-        { initial: 'en' },
-        createElement(DeskView, {
-          practiceId: 'legal',
-          vi: false,
-          workspaces: [],
-          workspaceId: null,
-          workspaceError: 'signed-out',
-          refreshTick: 0,
-          packId: null,
-          onReload: vi.fn(),
-          onOpenTab: vi.fn(),
-          ...over,
-        }),
-      ),
+  // the Desk inside its page, which carries the file drop as PracticeHome's <main> does
+  function Page() {
+    const drop = useDeskDrop()
+    return createElement(
+      'main',
+      { className: 'wb-home', ...drop.handlers },
+      createElement(DeskView, {
+        practiceId: 'legal',
+        vi: false,
+        workspaces: [],
+        workspaceId: null,
+        workspaceError: 'signed-out',
+        refreshTick: 0,
+        packId: null,
+        onReload: vi.fn(),
+        onOpenTab: vi.fn(),
+        drop,
+        ...over,
+      }),
     )
+  }
+  await act(async () => {
+    root.render(createElement(LocaleProvider, { initial: 'en' }, createElement(Page)))
   })
   await act(async () => {
     for (let i = 0; i < 10; i++) await Promise.resolve()
@@ -239,9 +243,10 @@ describe('DeskView', () => {
     expect(host.querySelector('.wb-desk-panel')?.textContent).toContain('PDF → Word')
   })
 
-  it("a file dropped on the toolbar or the banner is the Desk's too: it offers the tools", async () => {
+  it("a file dropped on the toolbar, the banner or a gap of the page is the Desk's too", async () => {
     await mount()
-    for (const target of ['.wb-toolbar', '.wb-banner']) {
+    // the page itself stands for its gaps, padding and side margins (m3)
+    for (const target of ['.wb-toolbar', '.wb-banner', '.wb-home']) {
       const drop = new Event('drop', { bubbles: true, cancelable: true }) as Event & {
         dataTransfer: unknown
       }

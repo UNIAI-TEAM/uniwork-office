@@ -1,4 +1,4 @@
-import { useId } from 'react'
+import { useEffect, useId, useRef } from 'react'
 import type { ReactElement } from 'react'
 import type { DeskDraft, RecentEntry } from '../../shared/home-api'
 import type { DocumentTabKind } from '../../shared/tabs-api'
@@ -50,6 +50,15 @@ export function DeskInProgress({
   const titleId = useId()
   const rows = inProgressRows(drafts, recent, local)
   const when = (ms: number) => formatWhen(new Date(ms).toISOString(), dateLocale)
+  const sectionRef = useRef<HTMLElement>(null)
+  const retryRef = useRef<HTMLButtonElement>(null)
+  const partial = !loading && cloudFailed
+  // the partial line goes (the list loaded) while its Retry holds the focus: read before the
+  // commit removes the button, so the section can take the focus instead of <body>
+  const retryLeaving = !partial && document.activeElement === retryRef.current && !!retryRef.current
+  useEffect(() => {
+    if (retryLeaving) sectionRef.current?.focus()
+  }, [retryLeaving])
 
   const body = () => {
     if (loading) return <WorkSkeleton rows={3} />
@@ -169,7 +178,12 @@ export function DeskInProgress({
   }
 
   return (
-    <section className="wb-desk-card wb-block" aria-labelledby={titleId}>
+    <section
+      ref={sectionRef}
+      className="wb-desk-card wb-block"
+      aria-labelledby={titleId}
+      tabIndex={-1}
+    >
       <div className="wb-desk-head">
         <h3 id={titleId}>{t('wbDeskInProgress')}</h3>
         {!loading && rows.length > 0 ? (
@@ -184,10 +198,11 @@ export function DeskInProgress({
         </button>
       </div>
       {body()}
-      {!loading && cloudFailed ? (
+      {partial ? (
         <p className="wb-ov-partial">
           {t('wbDeskCloudFailed')} ·{' '}
           <button
+            ref={retryRef}
             type="button"
             className="wb-link"
             aria-disabled={retrying || undefined}
