@@ -968,13 +968,15 @@ describe('G5-06 W4b save queue wiring', () => {
   })
 
   it('G506-be-d1-1 / G5-11: the account-boundary lock stops runtime and awaits lockSession', () => {
-    // the wiring source pins the order: runtime.stop() runs before service.lockSession
-    // (which waits for in-flight saves, parks N+1, and locks the store without wiping)
+    // the wiring source pins the order: the feed pass stops before
+    // service.lockSession (which waits for in-flight saves, parks N+1, and locks
+    // the store without wiping). The behavioural pin - an account switch stops
+    // the runtime and runs lockSession - lives in uniwork-docs-lock-wiring.
     const source = readFileSync(join(__dirname, '..', 'src/main/uniwork-docs/wiring.ts'), 'utf8')
     const lockIdx = source.indexOf('lockStore: async (owner')
     expect(lockIdx).toBeGreaterThan(-1)
     const lockBlock = source.slice(lockIdx)
-    const stopIdx = lockBlock.indexOf('runtime.stop()')
+    const stopIdx = lockBlock.indexOf('stopFeed()')
     const sessionIdx = lockBlock.indexOf('await service.lockSession(')
     expect(stopIdx).toBeGreaterThan(-1)
     expect(sessionIdx).toBeGreaterThan(-1)
