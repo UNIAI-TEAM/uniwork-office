@@ -368,8 +368,14 @@ describe('every export / Save As / print entry point refuses a locked source', (
     ]) {
       expect(handlerBody(source, channel)).toContain('uniworkIsLocked(')
     }
+    // the session core is environment-neutral and must not import main/, so the
+    // save-as handler asks the host seam; the desktop host answers with the same
+    // policy helper the four IPC guards above use
     const history = readRepo('apps/slides/src/session/handlers/history-save.ts')
-    expect(handlerBody(history, /'slides:save-as'/)).toContain('uniworkIsLocked(')
+    expect(handlerBody(history, /'slides:save-as'/)).toContain('ctx.host.isLocked?.(')
+    expect(readRepo('apps/slides/src/main/electron-host-io.ts')).toContain(
+      'isLocked: (path) => uniworkIsLocked(path)',
+    )
   })
 
   it('pdf: Save As (and the redaction copy), print, export-images and a save-as target', () => {
