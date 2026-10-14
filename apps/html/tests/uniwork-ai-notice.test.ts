@@ -2,8 +2,7 @@
 // Stop only (no Retry while the run waits); a restarted conversation, a provider boundary and a
 // dropped call are plain notes. The loop is replaced by a harness that hands over its events.
 import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, createElement } from 'react'
 import { aiUniworkText } from '@genoffice/ui'
@@ -11,6 +10,8 @@ import type { AgentStreamNotice } from '@genoffice/agent-core'
 import { createRoot, type Root } from 'react-dom/client'
 import { buildParseMap } from '../src/renderer/document/parse-map'
 import { usableAiSettings } from './helpers/ai-settings'
+// the stylesheet is only loaded as text so jsdom can compute the rendered style (vitest stubs css imports)
+const appStyles = readFileSync(resolve(__dirname, '../src/renderer/styles.css'), 'utf8')
 
 // the loop is replaced by a harness that hands over its events and never finishes on its own
 const harness = vi.hoisted(() => ({ events: null as any, loop: null as any }))
@@ -190,15 +191,21 @@ describe('UniWork AI notices (html panel)', () => {
     expect(retryButton()).toBeNull()
   })
 
-  it('the notice line has its own style rule (set apart from the reply, no raw colours)', () => {
-    const css = readFileSync(
-      join(dirname(fileURLToPath(import.meta.url)), '../src/renderer/styles.css'),
-      'utf8',
-    )
-    const rule = /\n\.ai-msg-notice \{([^}]*)\}/.exec(css)
-    expect(rule, '.ai-msg-notice rule').not.toBeNull()
-    expect(rule![1]).toMatch(/margin-top:/)
-    expect(rule![1]).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(/i)
+  it('the notice line is set apart from the reply by its rendered style, with no raw colour (RF2-7)', async () => {
+    await started()
+    await notify({ kind: 'rate-limit-wait', seconds: 120, attempt: 1 })
+    const line = container!.querySelector<HTMLElement>('.ai-msg-notice')
+    expect(line, 'the notice line is rendered').not.toBeNull()
+    const sheet = document.createElement('style')
+    sheet.textContent = appStyles
+    document.head.appendChild(sheet)
+    try {
+      const style = getComputedStyle(line!)
+      expect(Number.parseFloat(style.marginTop), 'margin above the notice').toBeGreaterThan(0)
+      expect(style.color).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(/i)
+    } finally {
+      sheet.remove()
+    }
   })
 
   it('one persistent aria-live region is mounted before the notice, and the note lands inside it', async () => {
@@ -309,6 +316,24 @@ describe('UniWork AI notices (html panel)', () => {
     const live = container!.querySelector('.ai-sr-status')
     expect(live?.textContent).toBe(ui('aiResultAnswer'))
     expect(live?.textContent).not.toContain('Intro tightened.')
+  })
+
+  it('Stop before the first token on UniWork AI: no Answer chip and exactly one stopped line (RF2-1)', async () => {
+    ;(window as any).htmlApi.getAiSettings = vi.fn(async () => ({
+      ...usableAiSettings(),
+      provider: 'uniwork',
+    }))
+    await started()
+    await act(async () => harness.events.onDone({ text: '', cancelled: true, turnLimit: false }))
+    expect(container!.querySelector('.ai-result-chip')).toBeNull()
+    const stoppedLines = [...container!.querySelectorAll('.ai-msg-assistant *')].filter(
+      (el) => el.children.length === 0 && el.textContent === ui('aiRunStopped'),
+    )
+    expect(stoppedLines).toHaveLength(1)
+    expect(container!.querySelector('.ai-msg-answer')?.textContent ?? '').not.toContain(
+      t('aiStopped'),
+    )
+    expect(container!.querySelector('.ai-sr-status')?.textContent).toBe(ui('aiRunStopped'))
   })
 
   it('clicking Stop returns keyboard focus to the composer textarea (RF1-12, RF1-23b)', async () => {
