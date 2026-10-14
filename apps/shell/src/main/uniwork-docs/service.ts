@@ -3673,11 +3673,16 @@ export class UniworkDocsService {
     let serverRevision = open.knownServerRevision ?? chosen.binding.serverRevision ?? null
     if (!serverRevision && currentView.online) {
       try {
-        const detail = await this.api().getDocument(chosen.binding.documentId)
+        const api = this.api()
+        const detail = await api.getDocument(chosen.binding.documentId)
+        const props =
+          typeof api.documentProperties === 'function'
+            ? await api.documentProperties(chosen.binding.documentId).catch(() => null)
+            : null
         serverRevision = detail.revision
         open.knownServerRevision = detail.revision
         open.knownServerVersion = detail.file.version
-        open.knownServerSavedAt = detail.updatedAt || null
+        open.knownServerSavedAt = props?.updatedAt ?? open.knownServerSavedAt
       } catch (error) {
         if (error instanceof UniworkDocError) {
           if (error.code === 'permission_revoked' || error.code === 'forbidden') {
