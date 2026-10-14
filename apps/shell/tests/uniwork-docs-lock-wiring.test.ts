@@ -5,6 +5,10 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { UNIWORK_DOC_CHANNELS, type UniworkDocLock } from '../src/shared/home-api'
 import { BINDING_FILE, INTENT_PAYLOAD_FILE } from '../src/main/uniwork-docs/binding-store'
+import {
+  INTENT_STORE_REGISTRATION,
+  createIntentStore,
+} from '../src/main/uniwork-sync/intent-store'
 
 /**
  * G5-04g wiring: the lock IPC and the open-route diversion. `lock` is a push
@@ -252,17 +256,48 @@ describe('the newer-store lock IPC (G5-04g)', () => {
 })
 
 describe('the durable store at the account boundary (W3b)', () => {
-  it('an explicit Sign out locks and wipes the outgoing scope', async () => {
+  it('an explicit Sign out locks the outgoing scope and keeps its ciphertext for the next sign-in', async () => {
     seed({ schema: 2 })
     const { handle } = await setup()
-    // the account's store scope holds a record
-    const scopeDir = join(dir, 'uniwork-sync', 'store', 'default', 'acc_1', 'feed-cursors')
-    mkdirSync(scopeDir, { recursive: true })
-    writeFileSync(join(scopeDir, 'record.rec'), 'encrypted bytes')
+    // the account's store scope holds a record, read through a handle that is
+    // open when the sign-out runs
+    const opened = await handle.service.openSyncStore()
+    if (opened.kind !== 'ok') throw new Error(opened.kind)
+    const records = opened.records(INTENT_STORE_REGISTRATION.name)
+    await createIntentStore(records).put(
+      'doc_1',
+      {
+        v: 2,
+        intentId: 'intent_1',
+        idempotencyKey: 'idem_1',
+        documentId: 'doc_1',
+        orgId: 'org_a',
+        workspaceId: 'ws_1',
+        baseRevision: '41',
+        baseVersion: 3,
+        checksum: 'abc',
+        length: 3,
+        generation: 1,
+        state: 'queued',
+        attempt: 0,
+        createdAt: '2026-04-17T00:00:00.000Z',
+        updatedAt: '2026-04-17T00:00:00.000Z',
+      },
+      new TextEncoder().encode('v4'),
+    )
     // the hooks the shell's sign-out runs (see uniwork-auth's signOutUniwork)
     expect(await handle.boundary.beforeSignOut()).toBe(true)
     handle.boundary.afterSignOut()
-    expect(existsSync(join(dir, 'uniwork-sync', 'store', 'default', 'acc_1'))).toBe(false)
+    // lock-and-keep: the scope directory survives, the pre-lock handle is dead
+    expect(existsSync(join(dir, 'uniwork-sync', 'store', 'default', 'acc_1'))).toBe(true)
+    expect(await records.read('doc_1')).toEqual({ kind: 'interrupted' })
+    // a same-account sign-in reopens the scope and reads the record back
+    const again = await handle.service.openSyncStore()
+    if (again.kind !== 'ok') throw new Error(again.kind)
+    const record = await createIntentStore(
+      again.records(INTENT_STORE_REGISTRATION.name),
+    ).get('doc_1')
+    expect(record?.intent.intentId).toBe('intent_1')
     // another account's scope is not touched
     const otherScope = join(dir, 'uniwork-sync', 'store', 'default', 'acc_9', 'feed-cursors')
     mkdirSync(otherScope, { recursive: true })
