@@ -12,6 +12,7 @@ import {
   writeFileSync,
   writeSync,
 } from 'node:fs'
+import { readFile as readFileAsync } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import {
@@ -4724,7 +4725,7 @@ function registerHomeIpc(): void {
       isOpenInTab: (path) => !!tabManager?.findPdfTabByPath(path) || !!findDetachedTabByPath(path),
       isFile: (path) => existsSync(path) && statSync(path).isFile(),
       exists: existsSync,
-      readFile: async (path) => new Uint8Array(readFileSync(path)),
+      readFile: async (path) => new Uint8Array(await readFileAsync(path)),
       writeFile: (path, bytes) => atomicWriteFile(path, bytes),
       mkdir: async (path) => {
         mkdirSync(path, { recursive: true })
