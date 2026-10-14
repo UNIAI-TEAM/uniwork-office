@@ -77,10 +77,10 @@ export async function signIn(launched: LaunchedApp, stub: UniworkAuthStub): Prom
   await accountButton(page).click()
   await expect(accountButton(page)).toHaveAttribute('data-state', 'signing-in')
   await expect.poll(() => stub.lastAttempt()?.state ?? '').not.toBe('')
-  // Only Windows writes `os_crypt.encrypted_key` to `Local State`; Linux with
-  // a Secret Service (`gnome-keyring` / `libsecret`) and macOS keep the key in
-  // the OS keyring and never write `encrypted_key` to disk.
-  if (process.platform === 'win32') await waitForSafeStorageKeyOnDisk(launched)
+  // FE-302: every platform but macOS goes through the wait and the helper's own
+  // backend check decides - Windows (DPAPI) waits for `Local State`, a Linux
+  // Secret Service returns early, Linux `basic_text` keeps the original wait.
+  if (process.platform !== 'darwin') await waitForSafeStorageKeyOnDisk(launched)
   const url = stub.approve()
   await deliverUrl(launched, shellEnv(stub), url)
   await expect(accountButton(page)).toHaveAttribute('data-state', 'signed-in', { timeout: 30_000 })
