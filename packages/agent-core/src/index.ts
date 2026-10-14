@@ -11,6 +11,7 @@ export type {
   AgentToolDef,
   AgentToolResult,
   AgentTransport,
+  MindMapTreeNode,
   ToolDisplay,
   ToolExecution,
 } from './types'
