@@ -111,8 +111,11 @@ export function useServerComments(o: ServerCommentsOptions): ServerComments {
   lostRef.current = lost
 
   // 30 s + focus while visible and open; the kit keeps the list token, the scheduler only times reloads
+  // (the web frame reloads on its own `comments.changed`: no poll there, as in docs/sheets)
   const pollRef = useRef<ReturnType<typeof createCommentsPoll> | null>(null)
+  const inFrame = context.frame === true
   useEffect(() => {
+    if (inFrame) return
     const poll = createCommentsPoll({
       fetch: async () => {
         await ctlRef.current.reload()
@@ -132,10 +135,10 @@ export function useServerComments(o: ServerCommentsOptions): ServerComments {
       poll.dispose()
       pollRef.current = null
     }
-  }, [source])
+  }, [source, inFrame])
   useEffect(() => {
     pollRef.current?.setPanelOpen(open)
-  }, [open, source])
+  }, [open, source, inFrame])
 
   // the shell's reveal for this window's document
   useEffect(

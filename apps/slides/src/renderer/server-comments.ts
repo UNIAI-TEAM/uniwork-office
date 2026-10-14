@@ -303,5 +303,7 @@ export async function loadCommentsContext(
     versionId: v.versionId,
     ...(readOnly ? { level: 'view' as const } : level ? { level } : {}),
     ...(isId(v.myUserId) ? { myUserId: v.myUserId } : {}),
+    // web frame only: the frame reloads on its own push, so the desktop poll stays off there
+    ...(v.frame === true ? { frame: true as const } : {}),
   }
 }

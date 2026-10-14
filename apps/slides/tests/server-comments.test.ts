@@ -442,6 +442,15 @@ describe('server mode only for a bound document with the bridge', () => {
     ).toEqual({ documentId: 'doc-1', versionId: null })
     // a read-only copy never writes, whatever the context says
     expect((await loadCommentsContext(bridge, '/p.pptx', true))?.level).toBe('view')
+    // the web-frame flag is carried (RFE14c-02), only when it is exactly true
+    const withFrame = (frame: unknown) =>
+      ({
+        context: async () => ({ ok: true, value: { documentId: 'doc-1', versionId: null, frame } }),
+      }) as never
+    expect((await loadCommentsContext(withFrame(true), '/p.pptx', false))?.frame).toBe(true)
+    expect(await loadCommentsContext(withFrame('yes'), '/p.pptx', false)).not.toHaveProperty(
+      'frame',
+    )
   })
 
   it('an error envelope, a thrown call or a malformed answer is no server context', async () => {
@@ -657,6 +666,8 @@ interface MountOpts {
   open?: boolean
   fileComments?: SlideComment[][]
   fake?: FakeOpts
+  /** the context carries the web-frame flag */
+  frame?: true
 }
 
 async function mountHost(o: MountOpts) {
@@ -680,6 +691,7 @@ async function mountHost(o: MountOpts) {
       level: 'edit' as const,
       myUserId: 'me',
       versionId: o.versionId ?? null,
+      ...(o.frame ? { frame: true as const } : {}),
     },
     slides: o.slides,
     slot: o.open === false ? null : slot,
@@ -700,13 +712,25 @@ async function mountHost(o: MountOpts) {
     })
   }
   await render()
+  const unmount = () => act(() => root.render(null))
   const save = async (versionId: string, savedPath = path) =>
     act(async () => {
       server.emitSaved({ path: savedPath, versionId })
       await flush()
       await flush()
     })
-  return { server, goTo, onOpen, onCollapse, handleRef, render, save, readFileComments, statuses }
+  return {
+    server,
+    goTo,
+    onOpen,
+    onCollapse,
+    handleRef,
+    render,
+    unmount,
+    save,
+    readFileComments,
+    statuses,
+  }
 }
 
 describe('ServerCommentsHost over the comments bridge', () => {
@@ -845,6 +869,64 @@ describe('ServerCommentsHost over the comments bridge', () => {
     expect(h.server.calls.find((c) => c.op === 'create')?.input).toMatchObject({
       baseVersionId: 'v1',
     })
+  })
+
+  it('RFE14c-01: an unmounted host is unsubscribed from onSaved and onReveal: no round, no reveal', async () => {
+    const slides = deck('slide1')
+    const h = await mountHost({
+      slides,
+      versionId: 'v1',
+      rows: [rootRow('x1', anchorOn(slides, 0))],
+    })
+    expect(h.server.savedListeners()).toBe(1)
+    await h.unmount()
+    // the bridge holds no listener of the gone host any more
+    expect(h.server.savedListeners()).toBe(0)
+    await h.save('v2')
+    expect(h.server.ops()).not.toContain('anchors')
+    await act(async () => {
+      h.server.reveal({ path: '/work/deck.pptx', commentId: 'x1' })
+      await flush()
+    })
+    expect(h.onOpen).not.toHaveBeenCalled()
+  })
+
+  it('RFE14c-01: a deck path switch (key={path}) drops the old path’s subscription; its receipt makes no anchors call', async () => {
+    const slides = deck('slide1')
+    const h = await mountHost({
+      slides,
+      versionId: 'v1',
+      rows: [rootRow('x1', anchorOn(slides, 0))],
+    })
+    await h.render({ path: '/work/other.pptx' })
+    // exactly one live subscription, the one of the new path
+    expect(h.server.savedListeners()).toBe(1)
+    h.server.calls.length = 0
+    await h.save('v7', '/work/deck.pptx')
+    expect(h.server.ops()).not.toContain('anchors')
+    await h.save('v8', '/work/other.pptx')
+    expect(h.server.ops().filter((op) => op === 'anchors')).toHaveLength(1)
+  })
+
+  it('RFE14c-02: a web-frame context skips the desktop poll, a desktop one reloads on focus', async () => {
+    const slides = deck('slide1')
+    const lists = (h: Awaited<ReturnType<typeof mountHost>>) =>
+      h.server.ops().filter((op) => op === 'list').length
+    const focus = async () =>
+      act(async () => {
+        window.dispatchEvent(new Event('focus'))
+        await flush()
+        await flush()
+      })
+    const desktop = await mountHost({ slides, versionId: 'v1' })
+    const before = lists(desktop)
+    await focus()
+    expect(lists(desktop)).toBeGreaterThan(before)
+    await desktop.unmount()
+    const frame = await mountHost({ slides, versionId: 'v1', frame: true })
+    const framed = lists(frame)
+    await focus()
+    expect(lists(frame)).toBe(framed)
   })
 
   it('anchor_version_invalid: nothing thrown, no reload, the shown anchors stay, the next Save sends again', async () => {
