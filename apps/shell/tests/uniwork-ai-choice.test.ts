@@ -12,10 +12,10 @@ import { UNIWORK_AI_CHOICE_KEY, createUniworkAiChoiceStore } from '../src/main/u
 
 function sqliteAvailable(): boolean {
   try {
+    // Node < 22 does not ship node:sqlite.
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return (
-      typeof (require('node:sqlite') as typeof import('node:sqlite')).DatabaseSync === 'function'
-    )
+    const mod = require('node:sqlite') as typeof import('node:sqlite')
+    return typeof mod.DatabaseSync === 'function'
   } catch {
     return false
   }

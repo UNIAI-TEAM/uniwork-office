@@ -2,7 +2,7 @@
 // a fake main process behind window.desktop. A Retry-After wait is a status line with Stop only
 // (no Retry while the run is waiting), a restarted conversation / provider boundary / dropped
 // call are plain notes, and every ending path reports exactly one aiRun idle.
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { Editor } from '@tiptap/core'

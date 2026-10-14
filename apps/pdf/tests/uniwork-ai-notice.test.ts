@@ -42,7 +42,6 @@ const flush = async (): Promise<void> => {
 describe('UniWork AI notices (pdf panel)', () => {
   let root: Root | null = null
   let container: HTMLElement | null = null
-  let resolveHistory: (msgs: unknown[]) => void = () => {}
 
   beforeAll(() => {
     ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
@@ -72,7 +71,7 @@ describe('UniWork AI notices (pdf panel)', () => {
     if (history === 'deferred') {
       ;(window as any).projectApi = {
         resolveChat: async () => ({ projectId: 'p', chatId: 'c' }),
-        loadChat: () => new Promise((resolve) => (resolveHistory = resolve)),
+        loadChat: () => new Promise(() => {}),
         appendChat: async () => {},
         rebindChat: async () => null,
       }

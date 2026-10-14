@@ -12,7 +12,6 @@ import { createRoot, type Root } from 'react-dom/client'
 import { Editor } from '@tiptap/core'
 import { buildExtensions } from '../src/renderer/editor/extensions'
 import { LocaleProvider, t } from '../src/renderer/i18n/locale'
-import { strings } from '../src/renderer/i18n/strings'
 import { usableAiSettings } from './helpers/ai-settings'
 
 // the loop is replaced by a harness that hands over its events and never finishes on its own
@@ -47,7 +46,6 @@ describe('UniWork AI notices (markdown panel)', () => {
   let root: Root | null = null
   let container: HTMLElement | null = null
   let editor: Editor | null = null
-  let resolveHistory: (msgs: unknown[]) => void = () => {}
 
   beforeAll(() => {
     ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
@@ -85,7 +83,7 @@ describe('UniWork AI notices (markdown panel)', () => {
     if (history === 'deferred') {
       ;(window as any).projectApi = {
         resolveChat: async () => ({ projectId: 'p', chatId: 'c' }),
-        loadChat: () => new Promise((resolve) => (resolveHistory = resolve)),
+        loadChat: () => new Promise(() => {}),
         appendChat: async () => {},
         rebindChat: async () => null,
       }
