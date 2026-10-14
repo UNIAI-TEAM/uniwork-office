@@ -1,5 +1,5 @@
 import { Dropdown } from '@genoffice/ui'
-import type { ReactNode } from 'react'
+import { useLayoutEffect, useRef, type ReactNode } from 'react'
 import { OrgChoiceStep } from './OrgChoiceStep'
 import { ServerConnect } from './ServerConnect'
 import { useI18n } from './locale'
@@ -9,6 +9,7 @@ import {
   errorKeyFor,
   initialsOf,
   showsProfile,
+  signOutIsKeystoreVariant,
   type AccountController,
   type AccountView,
 } from './account-model'
@@ -73,6 +74,22 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 export function AccountPane({ account }: { account: AccountController }) {
   const { t } = useI18n()
   const { status, view, error, busy } = account
+  const signOutPrompt = account.signOutPrompt ?? null
+  const signOutWaiting = Boolean(account.signOutWaiting)
+  const signOutBusy = signOutWaiting || busy === 'signing-out'
+  const signOutBtnRef = useRef<HTMLButtonElement>(null)
+  const backBtnRef = useRef<HTMLButtonElement>(null)
+  const restoreSignOutFocus = useRef(false)
+
+  useLayoutEffect(() => {
+    if (signOutPrompt) {
+      backBtnRef.current?.focus()
+    } else if (restoreSignOutFocus.current) {
+      restoreSignOutFocus.current = false
+      signOutBtnRef.current?.focus()
+    }
+  }, [signOutPrompt])
+
   const profile = status?.profile
   const email = profile?.email || status?.email || ''
   const name = displayNameOf(status)
@@ -92,6 +109,7 @@ export function AccountPane({ account }: { account: AccountController }) {
 
   const signOutBtn = (
     <button
+      ref={signOutBtnRef}
       type="button"
       className="set-btn danger"
       disabled={busy === 'signing-out'}
@@ -192,6 +210,8 @@ export function AccountPane({ account }: { account: AccountController }) {
     // not-configured / loading: nothing the user can press here
   }
 
+  const keystoreVariant = signOutPrompt ? signOutIsKeystoreVariant(signOutPrompt) : false
+
   return (
     <section className="acct-pane" aria-labelledby="acct-pane-title" data-state={view}>
       <h4 className="acct-heading" id="acct-pane-title">
@@ -242,7 +262,7 @@ export function AccountPane({ account }: { account: AccountController }) {
           {retryBtn}
         </div>
       )}
-      {withProfile && !orgChoice.loadError && orgChoice.needed && (
+      {withProfile && !orgChoice.loadError && orgChoice.needed && !signOutPrompt && (
         <OrgChoiceStep
           orgs={orgChoice.rows}
           rememberedGone={orgChoice.rememberedGone}
@@ -306,8 +326,58 @@ export function AccountPane({ account }: { account: AccountController }) {
           unreachableServer={unreachable ? server : null}
         />
       )}
-      {/* the organization step carries its own Sign out */}
-      {actions && !(withProfile && orgChoice.needed && !orgChoice.loadError) && (
+
+      {signOutPrompt && (
+        <div
+          className="set-intg-confirm acct-signout-confirm"
+          role="alertdialog"
+          aria-labelledby="acct-signout-title"
+          aria-describedby="acct-signout-body"
+        >
+          <div className="set-field-stack">
+            <div className="set-field-label" id="acct-signout-title">
+              {t('uwSignOutTitle')}
+            </div>
+            <div className="set-field-desc" id="acct-signout-body">
+              {keystoreVariant
+                ? t('uwSignOutKeystore')
+                : t('uwSignOutBody', { count: signOutPrompt.count })}
+            </div>
+            <div className="set-field-desc acct-signout-wait" role="status" aria-live="polite">
+              {signOutWaiting ? t('uwSignOutWaiting') : null}
+            </div>
+          </div>
+          <div className="set-btn-row">
+            <button
+              ref={backBtnRef}
+              type="button"
+              className="set-btn primary"
+              autoFocus
+              onClick={() => {
+                if (signOutBusy) return
+                restoreSignOutFocus.current = true
+                account.cancelSignOut?.()
+              }}
+            >
+              {t('uwActBack')}
+            </button>
+            <button
+              type="button"
+              className={`set-btn${keystoreVariant ? ' danger' : ''}`}
+              aria-disabled={signOutBusy ? true : undefined}
+              aria-busy={signOutBusy ? true : undefined}
+              onClick={() => {
+                if (!signOutBusy) (account.confirmSignOut ?? account.signOut)()
+              }}
+            >
+              {t('uwSignOutGo')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* the organization step and the sign-out prompt each carry their own Sign out */}
+      {actions && !signOutPrompt && !(withProfile && orgChoice.needed && !orgChoice.loadError) && (
         <div className="set-pane-footer acct-actions">{actions}</div>
       )}
     </section>

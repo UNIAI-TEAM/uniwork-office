@@ -5,6 +5,7 @@ import type {
   AccountProfile,
   AccountState,
   AccountStatus,
+  SignOutPlan,
 } from '../../shared/home-api'
 import type { StringKey } from './locale'
 
@@ -106,6 +107,16 @@ export function initialsOf(profile: AccountProfile | undefined, email = ''): str
   return mail ? (Array.from(mail)[0] ?? '?').toUpperCase() : '?'
 }
 
+/** whether signing out needs confirmation (S3): unsent saves or a locked keychain */
+export function signOutNeedsPrompt(plan: SignOutPlan): boolean {
+  return plan.count > 0 || plan.keystoreLocked || plan.ramOnly > 0
+}
+
+/** whether the sign-out prompt shows the keychain warning variant (danger button + uwSignOutKeystore) */
+export function signOutIsKeystoreVariant(plan: SignOutPlan): boolean {
+  return plan.keystoreLocked && (plan.ramOnly > 0 || plan.count === 0)
+}
+
 export interface AccountController {
   status: AccountStatus | null
   view: AccountView
@@ -122,11 +133,17 @@ export interface AccountController {
   orgSwitchFailed: boolean
   /** the last typed server address failed (null once one is accepted) */
   connectError: ServerConnectError | null
+  /** S3 sign-out confirmation plan when a prompt is open */
+  signOutPrompt?: SignOutPlan | null
+  /** true while main is waiting for an in-flight save before finishing sign-out */
+  signOutWaiting?: boolean
   signIn(): void
   cancelSignIn(): void
   openLoginUrl(): void
   copyLoginUrl(): void
   signOut(): void
+  confirmSignOut?(): void
+  cancelSignOut?(): void
   retry(): void
   selectOrg(orgId: string): void
   /** connect to the server at a typed address; main validates it and saves the profile */
@@ -150,6 +167,8 @@ export function useAccount(): AccountController {
   const [orgSwitchFailed, setOrgSwitchFailed] = useState(false)
   const [connectError, setConnectError] = useState<ServerConnectError | null>(null)
   const [callbackNotice, setCallbackNotice] = useState(false)
+  const [signOutPrompt, setSignOutPrompt] = useState<SignOutPlan | null>(null)
+  const [signOutWaiting, setSignOutWaiting] = useState(false)
   const noticeTimer = useRef<number | null>(null)
   // bumped on sign-out so an in-flight status read (which can still report
   // signed-in) is discarded instead of resurrecting the profile
@@ -158,6 +177,8 @@ export function useAccount(): AccountController {
   const loginErrorSeen = useRef(false)
   const copiedTimer = useRef<number | null>(null)
   const retrying = useRef(false)
+  const signingOut = useRef(false)
+  const promptReqId = useRef<string | null>(null)
 
   const apply = useCallback((next: AccountStatus) => {
     setStatus(next)
@@ -203,9 +224,35 @@ export function useAccount(): AccountController {
         setLocalError(ev.error ?? 'server_error')
       }
     })
+    const offProgress = window.aiOffice.onSignOutProgress?.((p) => {
+      if (p.phase === 'waiting') {
+        setSignOutWaiting(true)
+      } else if (p.phase === 'done') {
+        setSignOutWaiting(false)
+        setSignOutPrompt(null)
+        refresh()
+      }
+    })
+    const offPrompt = window.aiOffice.onSignOutPrompt?.((req) => {
+      if (promptReqId.current !== null) {
+        const stale = promptReqId.current
+        promptReqId.current = null
+        void window.aiOffice.answerSignOutPrompt?.(stale, false)
+      }
+      promptReqId.current = req.requestId
+      setSignOutWaiting(false)
+      setSignOutPrompt(req.plan)
+    })
     return () => {
       offStatus?.()
       offLogin?.()
+      offProgress?.()
+      offPrompt?.()
+      if (promptReqId.current !== null) {
+        const stale = promptReqId.current
+        promptReqId.current = null
+        void window.aiOffice.answerSignOutPrompt?.(stale, false)
+      }
       if (copiedTimer.current !== null) window.clearTimeout(copiedTimer.current)
       if (noticeTimer.current !== null) window.clearTimeout(noticeTimer.current)
     }
@@ -264,18 +311,73 @@ export function useAccount(): AccountController {
       .catch(() => undefined)
   }
 
-  const signOut = () => {
+  const runLogout = () => {
+    if (signingOut.current) return
+    signingOut.current = true
     seq.current++
     setBusy('signing-out')
     void window.aiOffice
-      .accountLogout()
+      .accountLogout({ confirmed: true })
       .catch(() => undefined)
       .finally(() => {
+        signingOut.current = false
+        setSignOutWaiting(false)
+        setSignOutPrompt(null)
         setBusy(null)
         setLocalError(null)
         // main pushes the new state too; this covers a push that raced the logout
         refresh()
       })
+  }
+
+  const signOut = () => {
+    if (signingOut.current) return
+    const planFn = window.aiOffice.signOutPlan
+    if (!planFn) {
+      runLogout()
+      return
+    }
+    void planFn()
+      .then((plan) => {
+        if (!plan || !signOutNeedsPrompt(plan)) {
+          runLogout()
+          return
+        }
+        if (promptReqId.current !== null) {
+          const stale = promptReqId.current
+          promptReqId.current = null
+          void window.aiOffice.answerSignOutPrompt?.(stale, false)
+        }
+        setSignOutWaiting(false)
+        setSignOutPrompt(plan)
+      })
+      .catch(() => {
+        runLogout()
+      })
+  }
+
+  const confirmSignOut = () => {
+    if (signingOut.current || signOutWaiting) return
+    if (promptReqId.current !== null) {
+      const reqId = promptReqId.current
+      promptReqId.current = null
+      setSignOutPrompt(null)
+      setSignOutWaiting(false)
+      void window.aiOffice.answerSignOutPrompt?.(reqId, true)
+      return
+    }
+    runLogout()
+  }
+
+  const cancelSignOut = () => {
+    if (signingOut.current || signOutWaiting) return
+    if (promptReqId.current !== null) {
+      const reqId = promptReqId.current
+      promptReqId.current = null
+      void window.aiOffice.answerSignOutPrompt?.(reqId, false)
+    }
+    setSignOutPrompt(null)
+    setSignOutWaiting(false)
   }
 
   const retry = () => {
@@ -332,11 +434,15 @@ export function useAccount(): AccountController {
     busy,
     orgSwitchFailed,
     connectError,
+    signOutPrompt,
+    signOutWaiting,
     signIn,
     cancelSignIn,
     openLoginUrl: () => void window.aiOffice.openLoginUrl?.(),
     copyLoginUrl,
     signOut,
+    confirmSignOut,
+    cancelSignOut,
     retry,
     selectOrg,
     connectServer,

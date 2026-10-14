@@ -1577,6 +1577,9 @@ export function SettingsModal({
   useEffect(() => {
     if (target) setSection(target.section)
   }, [target])
+  useEffect(() => {
+    if (account?.signOutPrompt) setSection('account')
+  }, [account?.signOutPrompt])
   // the AI panes report unsaved edits; leaving them (close, other section) asks first
   const paneDirtyRef = useRef(false)
   const onPaneDirty = useCallback((dirty: boolean) => {
@@ -1675,11 +1678,14 @@ export function SettingsModal({
     return () => off?.()
   }, [])
 
-  // modal focus: start on the current section, Tab cycles inside, closing hands focus back
+  // modal focus: start on the current section (unless an in-pane alertdialog already claimed focus),
+  // Tab cycles inside, closing hands focus back
   const dialogRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
-    dialogRef.current?.querySelector<HTMLElement>('.set-nav-item.active')?.focus()
+    if (!dialogRef.current?.querySelector('[role="alertdialog"]')) {
+      dialogRef.current?.querySelector<HTMLElement>('.set-nav-item.active')?.focus()
+    }
     return () => opener?.focus()
   }, [])
   const trapTab = (e: ReactKeyboardEvent) => {
@@ -1703,6 +1709,7 @@ export function SettingsModal({
   const escapeRef = useRef<() => void>(() => undefined)
   escapeRef.current = () => {
     if (leaveAction) setLeaveAction(null)
+    else if (account?.signOutPrompt) account.cancelSignOut?.()
     else requestClose()
   }
   useEffect(() => {

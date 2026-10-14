@@ -89,14 +89,15 @@ export function AccountEntry({
   }, [status, onStatusChange])
 
   const withProfile = showsProfile(view, status)
-  // signed in to several organizations and none chosen yet: the choice step
-  // lives in Settings › Account, so bring it up right after sign-in
+  // signed in to several organizations and none chosen yet, or a main-initiated
+  // sign-out prompt needs an answer: bring up Settings › Account
   const choiceNeeded = withProfile && orgChoiceOf(status).needed
+  const signOutPromptNeeded = Boolean(account.signOutPrompt)
   useEffect(() => {
-    if (choiceNeeded && !settingsOpen) onOpenSettings('account')
+    if ((choiceNeeded || signOutPromptNeeded) && !settingsOpen) onOpenSettings('account')
     // reacts to the step appearing only, not to Settings being closed again
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [choiceNeeded])
+  }, [choiceNeeded, signOutPromptNeeded])
 
   const email = status?.profile?.email || status?.email || ''
   const name = withProfile || view === 'wrong-deployment' ? displayNameOf(status) : ''

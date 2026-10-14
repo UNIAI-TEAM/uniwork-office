@@ -1343,7 +1343,21 @@
   padding-top: 12px;
 }
 
+.acct-signout-confirm {
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.acct-signout-confirm .set-field-stack {
+  flex: 1 1 14rem;
+}
+
+.acct-signout-wait:empty {
+  display: none;
+}
+
 .acct-actions .set-btn:focus-visible,
+.acct-signout-confirm .set-btn:focus-visible,
 .acct-org-dd .gs-dd-btn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
