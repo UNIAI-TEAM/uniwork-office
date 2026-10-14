@@ -595,7 +595,8 @@ test.describe.serial('UniWork documents', () => {
       await expect(
         dialog.getByRole('heading', { name: 'This document was changed elsewhere' }),
       ).toBeVisible()
-      await expect(dialog.locator('[data-conflict-action="cancel"]')).toBeFocused()
+      // FE-304: actions are addressed by role + accessible name
+      await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused()
       await expect(dialog.getByRole('button')).toHaveText([
         'Reload latest',
         'Save as a copy…',
@@ -607,11 +608,11 @@ test.describe.serial('UniWork documents', () => {
       await shell.screenshot({ path: screenshotPath('uniwork-docs-conflict-dialog-step1') })
 
       // AC3: Overwrite… -> Step 2 confirmation -> Overwrite commits on the server's revision
-      await dialog.locator('[data-conflict-action="overwrite"]').click()
+      await dialog.getByRole('button', { name: 'Overwrite…', exact: true }).click()
       await expect(
         dialog.getByRole('heading', { name: 'Overwrite with your version?' }),
       ).toBeVisible()
-      await dialog.locator('[data-conflict-action="overwrite-go"]').click()
+      await dialog.getByRole('button', { name: 'Overwrite', exact: true }).click()
       await expect(dialog).toBeHidden()
       await expectState(shell, 'saved')
       expect(await seenMessageBoxes(launched)).toHaveLength(0)
@@ -641,7 +642,7 @@ test.describe.serial('UniWork documents', () => {
 
       const dialog = shell.getByRole('alertdialog')
       await expect(dialog).toBeVisible()
-      await dialog.locator('[data-conflict-action="reload"]').click()
+      await dialog.getByRole('button', { name: 'Reload latest', exact: true }).click()
       await expect(dialog.getByRole('heading', { name: 'Reload latest' })).toBeVisible()
 
       const keepRadio = dialog.getByRole('radio', { name: /Keep my version as a draft/ })
@@ -649,7 +650,7 @@ test.describe.serial('UniWork documents', () => {
       await expect(keepRadio).toBeChecked()
       await expect(discardRadio).not.toBeChecked()
 
-      await dialog.locator('[data-conflict-action="reload-go"]').click()
+      await dialog.getByRole('button', { name: 'Reload', exact: true }).click()
       await expect(dialog).toBeHidden()
       await expectState(shell, 'saved')
       expect(await seenMessageBoxes(launched)).toHaveLength(0)
@@ -680,10 +681,10 @@ test.describe.serial('UniWork documents', () => {
 
       await chip(shell).getByRole('button', { name: 'Resolve…' }).click()
       await expect(dialog).toBeVisible()
-      await dialog.locator('[data-conflict-action="reload"]').click()
+      await dialog.getByRole('button', { name: 'Reload latest', exact: true }).click()
       await discardRadio.check()
       await expect(discardRadio).toBeChecked()
-      await dialog.locator('[data-conflict-action="reload-go"]').click()
+      await dialog.getByRole('button', { name: 'Reload', exact: true }).click()
       await expect(dialog).toBeHidden()
       await expectState(shell, 'saved')
 
@@ -714,15 +715,15 @@ test.describe.serial('UniWork documents', () => {
       const dialog = shell.getByRole('alertdialog')
       await expect(dialog).toBeVisible()
 
-      await dialog.locator('[data-conflict-action="save-copy"]').click()
+      await dialog.getByRole('button', { name: 'Save as a copy…', exact: true }).click()
       await expect(dialog.getByRole('heading', { name: 'Save as a copy?' })).toBeVisible()
-      await dialog.locator('[data-conflict-action="save-copy-go"]').click()
+      await dialog.getByRole('button', { name: 'Create copy', exact: true }).click()
 
       // pending G5-12: main returns the `save_copy_failed` notice in the dialog's alert region
       await expect(dialog.getByRole('alert')).toContainText(
         'Couldn’t create the copy. Your changes are still safe; try again.',
       )
-      await dialog.locator('[data-conflict-action="close-x"]').click()
+      await dialog.getByRole('button', { name: 'Close', exact: true }).click()
       await expect(dialog).toBeHidden()
 
       // no native message box or save dialog was invoked; the document stays in conflict with its local edit intact
