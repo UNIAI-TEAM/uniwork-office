@@ -20,9 +20,59 @@ export type NoticeKey =
 
 export type NoticeTranslate = (key: NoticeKey, params?: Record<string, string | number>) => string
 
+export type DroppedToolReason = 'view_only' | 'not_allowlisted'
+
+export function classifyDroppedToolReason(
+  reason?: string | null,
+): 'view_only' | 'not_allowlisted' | 'other' {
+  if (reason === 'view_only' || reason === 'readonly' || reason === 'read_only') {
+    return 'view_only'
+  }
+  if (reason === 'not_allowlisted') {
+    return 'not_allowlisted'
+  }
+  return 'other'
+}
+
+export interface LegacyDroppedNoticeNote {
+  readonly kind: 'dropped'
+  readonly key: 'aiNoticeDroppedTool'
+  readonly params: Readonly<{ name: string }>
+  readonly reason?: string
+  readonly module?: string
+}
+
+export function noticeToPanelNote(event: {
+  readonly kind: string
+  readonly calls?: ReadonlyArray<{
+    readonly name: string
+    readonly reason?: string
+    readonly module?: string
+  }>
+}): LegacyDroppedNoticeNote | null {
+  if (event.kind === 'dropped_tool_calls' || event.kind === 'dropped-tool-calls') {
+    const first = event.calls?.[0]
+    if (!first) return null
+    return {
+      kind: 'dropped',
+      key: 'aiNoticeDroppedTool',
+      params: { name: first.name },
+      ...(first.reason ? { reason: first.reason } : {}),
+      ...(first.module ? { module: first.module } : {}),
+    }
+  }
+  return null
+}
+
 export interface PanelNote {
   kind: 'restarted' | 'boundary' | 'dropped' | 'off' | 'images'
   text: string
+  /** Structured reason when `kind === 'dropped'` (`'view_only'` | `'not_allowlisted'`) */
+  reason?: DroppedToolReason | undefined
+  /** Module name interpolated into `aiErrUnsupported` when `kind === 'dropped'` */
+  module?: string | undefined
+  /** Tool name from `x_uniwork.dropped_tool_calls` when `kind === 'dropped'` */
+  toolName?: string | undefined
 }
 
 /**
@@ -72,12 +122,23 @@ export function noticePatch(
     case 'dropped-tool-calls': {
       let next = notes
       for (const call of notice.calls) {
+        const structuredReason: DroppedToolReason =
+          classifyDroppedToolReason(call.reason) === 'view_only' ? 'view_only' : 'not_allowlisted'
         const text =
-          call.reason === 'view_only'
+          structuredReason === 'view_only'
             ? tr('aiErrViewOnlyEdit')
             : tr('aiErrUnsupported', { module: moduleName })
         if (!next.some((n) => n.kind === 'dropped' && n.text === text))
-          next = [...next, { kind: 'dropped', text }]
+          next = [
+            ...next,
+            {
+              kind: 'dropped',
+              text,
+              reason: structuredReason,
+              module: moduleName,
+              toolName: call.name,
+            },
+          ]
       }
       return next === notes ? null : { notes: next }
     }
@@ -105,6 +166,8 @@ export interface TextNoticeSurface {
   restarted(): boolean
   /** the notes are the whole answer (restarted, or UniWork AI off): an empty answer is on purpose */
   quiet(): boolean
+  /** structured notes collected during the run */
+  getNotes?(): readonly PanelNote[]
   /** a new run starts */
   clear(): void
 }
@@ -142,6 +205,7 @@ export function createTextNoticeSurface(): TextNoticeSurface {
     },
     restarted: () => notes.some((n) => n.kind === 'restarted'),
     quiet: () => endsQuietly(notes),
+    getNotes: () => notes,
     clear() {
       notes = []
       waitLine = undefined
