@@ -3270,6 +3270,11 @@ export function readStarredGroupMap(): Map<string, string> {
 // ---- original archive (pass-through base: original file archived by content hash) ----
 
 async function archiveOriginal(filePath: string, hash: string, size: number): Promise<void> {
+  // G5-11 be-2: a bound working copy is UniWork's own copy, not the user's
+  // local file. Archiving it kept plaintext of the account under userData
+  // outside the working-copy root, and the name is a content hash, so sign-out
+  // could not find it by path.
+  if (uniworkIsBound(filePath)) return
   // a copy larger than the whole cap would only evict every other original
   if (size > ORIGINALS_MAX_BYTES) return
   const dir = userDataPath('originals')
@@ -3277,6 +3282,24 @@ async function archiveOriginal(filePath: string, hash: string, size: number): Pr
   const target = join(dir, `${hash}.docx`)
   if (!existsSync(target)) await copyFile(filePath, target)
   void pruneOriginals(dir)
+}
+
+/**
+ * G5-11 be-2: sign-out drops the archived originals of the owner's working
+ * copies (the shell hands the paths just before it deletes them). The archive
+ * is content-addressed, so each path is hashed exactly as `archiveOriginal`
+ * hashed it and only the copy of those bytes can be named.
+ */
+export function clearDocsOriginalsFor(paths: string[]): void {
+  const dir = userDataPath('originals')
+  for (const filePath of paths) {
+    try {
+      const target = join(dir, `${sha256Hex(readFileSync(filePath))}.docx`)
+      if (existsSync(target)) unlinkSync(target)
+    } catch {
+      // unreadable / already deleted: no archive of it can be named
+    }
+  }
 }
 
 const ORIGINALS_MAX_BYTES = 500 * 1024 * 1024

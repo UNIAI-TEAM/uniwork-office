@@ -1,4 +1,5 @@
 import {
+  clearDocsOriginalsFor,
   clearDocsRecoveryCopy,
   setDocsUserSaveHook,
   setUniworkDocumentPolicy as setDocsUniworkPolicy,
@@ -48,6 +49,12 @@ export interface UniworkModuleSeam {
    * the Electron-bound module mains.
    */
   setClearRecovery?(clear: (path: string) => void): void
+  /**
+   * G5-11 be-2: registers the docs originals-archive cleaner so sign-out drops
+   * the archived plaintext of the account's working copies (the archive is
+   * content-addressed, so the module hashes the bytes the shell still holds).
+   */
+  setClearOriginals?(clear: (paths: string[]) => void): void
   onUserSave(path: string): void
   /**
    * G5-04g: true when the path's folder declares a store this build does not
@@ -127,6 +134,7 @@ export function installUniworkModuleSeams(
     clearDocsRecoveryCopy(path)
     clearWorkbookRecovery(path)
   })
+  seam?.setClearOriginals?.((paths: string[]) => clearDocsOriginalsFor(paths))
   const author = commentAuthor ?? (() => NEUTRAL_COMMENT_AUTHOR)
   const policy = seam
     ? {
