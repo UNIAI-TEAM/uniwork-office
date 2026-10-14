@@ -3560,7 +3560,7 @@ export class UniworkDocsService {
       if (usage) {
         let fileBytes: number
         try {
-          fileBytes = statSync(doc.path).size
+          fileBytes = (await stat(doc.path)).size
         } catch {
           fileBytes = 0
         }
