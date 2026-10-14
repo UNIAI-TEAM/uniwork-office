@@ -24,6 +24,10 @@
 
 import { UniworkError, uniworkErrorKey } from '../../../../packages/ai-provider/src/uniwork/errors'
 import {
+  isProxyContractStatus,
+  proxyErrorBodyFields,
+} from '../../../../packages/ai-provider/src/proxy-url'
+import {
   aiUniworkStrings,
   type AiUniworkStringKey,
 } from '../../../../packages/ui/src/strings-ai-uniwork'
@@ -133,22 +137,10 @@ export function retryAfterSeconds(value: string | null, now = Date.now()): numbe
 }
 
 /**
- * `code` / `message` of a server error body. The UniWork API wraps them as `{ "error": { code,
- * message } }` (sdo.NewErrorSDO); the flat `{ code, message }` shape is read too, so a typed state
- * never depends on which of the two a route answers.
+ * `code` / `message` of a server error body (`{ "error": { code, message } }` or the flat shape);
+ * the shared reader of the BYOK proxy (packages/ai-provider/src/proxy-url.ts).
  */
-export function errorBodyFields(body: unknown): { code?: string; message?: string } {
-  const read = (v: unknown): { code?: string; message?: string } => {
-    if (!v || typeof v !== 'object') return {}
-    const { code, message } = v as { code?: unknown; message?: unknown }
-    return {
-      ...(typeof code === 'string' ? { code } : {}),
-      ...(typeof message === 'string' ? { message } : {}),
-    }
-  }
-  const wrapped = read((body as { error?: unknown } | null | undefined)?.error)
-  return wrapped.code !== undefined ? wrapped : read(body)
-}
+export const errorBodyFields = proxyErrorBodyFields
 
 /** read a failed response once into an AiWebError (the body is consumed) */
 export async function aiErrorFromResponse(res: Response): Promise<AiWebError> {
@@ -192,9 +184,7 @@ export function rawFailureAsTyped(err: unknown): AiWebError | undefined {
  * Statuses the BYOK proxy answers itself (contract errors). A provider's own 400/422 (bad model,
  * output cap) is passed to ai-provider unchanged: its output-cap fallback reads that body.
  */
-export function isContractFailure(status: number): boolean {
-  return status in BY_STATUS
-}
+export const isContractFailure = isProxyContractStatus
 
 // ------------------------------------------------------------------ UniWork AI (G6-05)
 

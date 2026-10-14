@@ -370,6 +370,26 @@ describe('proxy transport (ai-provider wire format -> BYOK routes)', () => {
     )
   })
 
+  it('rethrows a malformed Gemini body as the parser error, not a typed refusal', () => {
+    expect(() =>
+      toProxyRequest(BASE, `${p}/gemini/models/gemini-3.8-flash:generateContent`, {
+        body: '{not json',
+      }),
+    ).toThrow(SyntaxError)
+  })
+
+  it('passes a vendor 402 / 503 through; a UniWork-coded one is the typed state', async () => {
+    let answer = jsonResponse(402, { error: { message: 'Insufficient Balance' } })
+    const proxied = createProxyFetch({ base: BASE, fetch: vi.fn(async () => answer) })
+    expect((await proxied(`${p}/openai/chat/completions`, { body: '{}' })).status).toBe(402)
+    answer = jsonResponse(503, { error: { type: 'overloaded_error', message: 'busy' } })
+    expect((await proxied(`${p}/openai/chat/completions`, { body: '{}' })).status).toBe(503)
+    answer = jsonResponse(503, { error: { code: 'cloud_unavailable' } })
+    await expect(proxied(`${p}/openai/chat/completions`, { body: '{}' })).rejects.toMatchObject({
+      code: 'cloud_unavailable',
+    })
+  })
+
   it('refuses a proxy URL that leaves the byok mount after normalisation', () => {
     for (const url of [
       `${BASE}/byok/../../x`,

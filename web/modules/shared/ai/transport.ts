@@ -23,6 +23,7 @@
  * model, output-cap rejection) reaches ai-provider unchanged.
  */
 import {
+  ProxyUrlError,
   proxyAnswered,
   toProxyRequest as toSharedProxyRequest,
   type ProxyRequest,
@@ -37,11 +38,9 @@ export function toProxyRequest(aiBase: string, url: string, init: RequestInit = 
   try {
     return toSharedProxyRequest(aiBase, url, init)
   } catch (err) {
-    throw new AiWebError({
-      code: 'bad_request',
-      status: 0,
-      message: err instanceof Error ? err.message : 'not an AI proxy URL',
-    })
+    // only a refused URL becomes the typed state; anything else (a malformed Gemini body) is rethrown as before
+    if (!(err instanceof ProxyUrlError)) throw err
+    throw new AiWebError({ code: 'bad_request', status: 0, message: err.message })
   }
 }
 
