@@ -414,6 +414,17 @@ describe('Esc and cancel', () => {
     expect(loadDraft(DRAFT_KEY)).toBeNull()
   })
 
+  it('Discard on a persistent composer (discussion) clears the text box and keeps focus in the textarea instead of BODY', () => {
+    render({ mode: 'discussion' })
+    type('draft post')
+    act(() => buttonByText('Cancel').click())
+    act(() =>
+      [...dialog()!.querySelectorAll('button')].find((b) => b.textContent === 'Discard')!.click(),
+    )
+    expect(ta().value).toBe('')
+    expect(document.activeElement).toBe(ta())
+  })
+
   it('the Cancel button follows the same rule', () => {
     const m = render()
     act(() => buttonByText('Cancel').click())
