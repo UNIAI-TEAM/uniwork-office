@@ -423,4 +423,14 @@ describe('visual r1 fixes (panel / thread)', () => {
     const dt = css.slice(dtAt, css.indexOf('}', dtAt))
     expect(dt).toMatch(/white-space:\s*nowrap/)
   })
+
+  it('keeps the thread action row (.collab-acts) on one line at 300px without wrapping (V14-08)', () => {
+    const css = readFileSync(`${__dirname}/../src/collab/collab.css`, 'utf8')
+    const actsAt = css.indexOf('.collab-acts {')
+    const acts = css.slice(actsAt, css.indexOf('}', actsAt))
+    expect(acts).toMatch(/flex-wrap:\s*nowrap/)
+    expect(css).toMatch(/\.collab-acts \.collab-link\s*\{[^}]*min-width:\s*0/)
+    expect(css).toMatch(/\.collab-acts \.collab-link\s*\{[^}]*text-overflow:\s*ellipsis/)
+    expect(css).toMatch(/\.collab-acts \.collab-link\s*\{[^}]*white-space:\s*nowrap/)
+  })
 })

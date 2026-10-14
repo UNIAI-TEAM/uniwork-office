@@ -184,6 +184,7 @@ describe('collab strings: spine text', () => {
     expect(p.vi.collabAnchorDocx).toBe('Đoạn: “{quote}”')
     expect(p.en.collabAnchorSlide).toBe('Slide {slide}')
     expect(p.vi.collabResolved).toBe('Đã giải quyết')
+    expect(p.vi.collabResolve).toBe('Giải quyết')
     expect(p.en.collabReopen).toBe('Reopen')
     expect(p.en.collabDeleteBody).toBe(
       'The text and edit history will be permanently deleted. Any replies stay.',
