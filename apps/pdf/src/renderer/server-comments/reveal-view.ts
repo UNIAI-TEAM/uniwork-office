@@ -42,3 +42,22 @@ export function scrollLeftToReveal(o: {
   if (o.left - pad < next) next = o.left - pad
   return Math.max(0, next)
 }
+
+/**
+ * Runs `run` again each time `el` is resized, for `ms` (default 800), so a reveal that also opens the
+ * comments panel lands its sideways scroll after the panel has narrowed the viewer. Returns a stop
+ * function; a no-op where `ResizeObserver` does not exist.
+ */
+export function rerunOnResize(el: Element, run: () => void, ms = 800): () => void {
+  if (typeof ResizeObserver === 'undefined') return () => undefined
+  let timer: ReturnType<typeof setTimeout> | null = null
+  const ro = new ResizeObserver(() => run())
+  const stop = () => {
+    ro.disconnect()
+    if (timer !== null) clearTimeout(timer)
+    timer = null
+  }
+  ro.observe(el)
+  timer = setTimeout(stop, ms)
+  return stop
+}

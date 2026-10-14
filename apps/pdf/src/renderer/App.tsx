@@ -141,7 +141,7 @@ import { drainedOrigin, forcesBoundSave, type SaveOrigin } from './uniwork-save'
 import { queryPdfUniworkState } from './uniwork-state'
 import { collabStrings } from '@genoffice/ui/collab'
 import { PdfServerCommentsHost, type PdfServerComments } from './server-comments/PdfServerComments'
-import { commentFrameBox, scrollLeftToReveal } from './server-comments/reveal-view'
+import { commentFrameBox, rerunOnResize, scrollLeftToReveal } from './server-comments/reveal-view'
 import { createPdfAnchorAdapter } from './server-comments/pdf-adapter'
 import { withoutFileNoteWrites } from './server-comments/bound-save'
 import { pdfCommentsBridge } from './server-comments/pdf-comments-source'
@@ -1698,6 +1698,8 @@ export default function App() {
   } | null>(null)
   useEffect(() => setCommentFrame(null), [filePath])
   const goToCommentRef = useRef<(origIdx: number, rect: PdfRect) => void>(() => undefined)
+  const stopRevealWatchRef = useRef<() => void>(() => undefined)
+  useEffect(() => () => stopRevealWatchRef.current(), [])
   goToCommentRef.current = (origIdx, rect) => {
     const visIdx = visList.indexOf(origIdx)
     if (visIdx < 0) return
@@ -1708,7 +1710,8 @@ export default function App() {
       const top = pdfRectToCss(pageGeom(origIdx), rect, scale).top
       el.scrollTop += Math.max(0, top - el.clientHeight * 0.3)
       // and sideways: a narrow viewer (AI dock + thumbnails + this panel) shows only part of a page.
-      // After the frame so a panel a reveal just opened has already narrowed the scroller.
+      // A reveal that also opens the panel narrows the scroller only after React lays the panel out:
+      // after the next frame, and again on every resize for a moment (the first pass can be too early).
       const sideways = () => {
         const page = el.querySelector<HTMLElement>(`.pdf-page[data-page="${origIdx}"]`)
         if (!page) return
@@ -1724,6 +1727,8 @@ export default function App() {
       }
       sideways()
       requestAnimationFrame(sideways)
+      stopRevealWatchRef.current()
+      stopRevealWatchRef.current = rerunOnResize(el, sideways)
     }
     setCurrentPage(visIdx + 1)
     setPageInput(String(visIdx + 1))
