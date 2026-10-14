@@ -1,6 +1,6 @@
 import { test, expect, type ElectronApplication } from '@playwright/test'
 import { existsSync } from 'node:fs'
-import { mkdir, mkdtemp, readFile, readdir, utimes, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, stat, utimes, writeFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -174,6 +174,63 @@ test('Desk tools merge, split, convert and export PDFs', async () => {
         expect((await readFile(out)).subarray(0, 2).toString()).toBe('PK')
       })
     }
+
+    await test.step('PDF → docx closes a detached window showing the target first', async () => {
+      const target = join(dir, 'target.docx')
+      await writeFile(target, await readFile(docx))
+      const tabs = () =>
+        page.evaluate(() =>
+          (
+            window as unknown as {
+              aiOfficeTabs: { list(): Promise<Array<{ id: string; filePath?: string }>> }
+            }
+          ).aiOfficeTabs.list(),
+        )
+      await page.evaluate(
+        (p) =>
+          (
+            window as unknown as { aiOffice: { openPath(p: string): Promise<void> } }
+          ).aiOffice.openPath(p),
+        target,
+      )
+      await expect.poll(async () => (await tabs()).some((t) => t.filePath === target)).toBe(true)
+      const tabId = (await tabs()).find((t) => t.filePath === target)!.id
+      await page.evaluate(
+        (id) =>
+          (
+            window as unknown as { aiOfficeTabs: { detach(id: string): Promise<void> } }
+          ).aiOfficeTabs.detach(id),
+        tabId,
+      )
+      const windowCount = () =>
+        app.evaluate(
+          ({ BrowserWindow }) =>
+            BrowserWindow.getAllWindows().filter((w) => !w.isDestroyed()).length,
+        )
+      await expect.poll(windowCount).toBe(2)
+      // note when the detached window goes away, to check the write came after it
+      await app.evaluate(({ BrowserWindow }) => {
+        for (const w of BrowserWindow.getAllWindows()) {
+          if (w.getTitle().includes('target.docx')) {
+            w.once('closed', () => {
+              ;(globalThis as { detachedClosedAt?: number }).detachedClosedAt = Date.now()
+            })
+          }
+        }
+      })
+      await stubDialogs(app, target, dir)
+      expect(await run({ tool: 'pdf-to-docx', inputs: [a] })).toEqual({
+        ok: true,
+        outputs: [target],
+      })
+      expect(await windowCount()).toBe(1)
+      const closedAt = await app.evaluate(
+        () => (globalThis as { detachedClosedAt?: number }).detachedClosedAt,
+      )
+      expect(closedAt).toBeGreaterThan(0)
+      expect((await stat(target)).mtimeMs).toBeGreaterThanOrEqual(closedAt!)
+      expect((await readFile(target)).equals(await readFile(docx))).toBe(false)
+    })
 
     for (const [input, folder] of [
       [docx, 'docs-autosave'],
