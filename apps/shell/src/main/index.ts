@@ -3814,6 +3814,10 @@ function uniworkDocsWiring() {
       if (target?.tabId && tabManager) tabManager.reloadTab(target.tabId)
       else if (target && !target.webContents.isDestroyed()) target.webContents.reload()
     },
+    // G5-03a placeholder (W2 replaces it with the live registry read over
+    // tabs + detached windows + present views): the guarded reload sees a
+    // clean, idle editor until then, so it never blocks on the race guard
+    editorStateOf: async () => ({ dirty: null, aiRunning: false, aiEpoch: 0 }),
     activePath: () => tabManager?.activeFilePath(),
     reveal: revealShellWindow,
     // G8-08: the editor showing the path (its preload listens for the reveal)

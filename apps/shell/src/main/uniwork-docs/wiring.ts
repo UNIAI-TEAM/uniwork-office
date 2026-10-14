@@ -76,6 +76,14 @@ export interface UniworkDocsWiring {
   isPathOpen(path: string): boolean
   requestModuleSave(path: string, onNotWritten?: () => void): boolean
   reloadPath(path: string): void
+  /**
+   * G5-03a: the FRESH editor state of one path, summed over every view that
+   * shows it (tab, detached window, present view of its owner tab): unsaved
+   * edits (null = no view answered), any running AI turn, and the sum of the
+   * views' AI epochs (never decreases). The guarded clean reload reads this
+   * before and after its fetch; it is never served from the 1 s poll cache.
+   */
+  editorStateOf(path: string): Promise<{ dirty: boolean | null; aiRunning: boolean; aiEpoch: number }>
   activePath(): string | undefined
   reveal(): void
   /**
