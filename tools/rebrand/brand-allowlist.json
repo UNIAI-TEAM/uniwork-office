@@ -69,11 +69,10 @@
       "reason": "Functional identifiers of the Markdown image host's repository adapter only: the persisted provider id 'github' (settings files, ImageHostKind, the dialog option value) and the REST API endpoint / headers it must send (api.github.com, vnd.github+json, X-GitHub-Api-Version). Never rendered: every label, placeholder and upload error says 'repository' / 'access token' (apps/markdown/tests/image-host-wording.test.ts pins the dialog strings in all 21 locales and the error text)."
     },
     {
-      "path": "apps/shell/src/main/updater.ts",
-      "pattern": "github\\.com/UNIAI-TEAM/uniwork-office/releases'",
-      "kind": "debt",
-      "reason": "DOWNLOAD_PAGE_URL, the manual-download target of the update dialog when a build has no self-update feed. Functional URL, never displayed as text (the dialog says 'Download'); moves to a UniWork download page once one exists.",
-      "tracker": "GO-A8 (release / download page) + GO-A4 UNI-1005 (release URLs)"
+      "path": "{apps/shell/src/main/updater.ts,apps/shell/src/main/release-notifier.ts}",
+      "pattern": "[Gg]it[Hh]ub",
+      "kind": "permanent",
+      "reason": "Functional identifiers of the desktop update feed only: the app-update.yml provider id 'github' the updater matches, and the release repository's REST endpoint / headers (api.github.com, vnd.github+json, X-GitHub-Api-Version) and dmg download URL the unsigned mac app's update notice uses. Never rendered: the update window says 'new version' / 'Download Installer'."
     },
     {
       "path": "packages/cli/src/agent-skills.ts",

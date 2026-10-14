@@ -11,10 +11,12 @@ import {
   checkDebControl,
   checkDesktopEntry,
   checkInfoPlist,
+  checkReleaseFeed,
   impliedUnpackedDir,
   parseControl,
   parseDesktopEntry,
   parsePlist,
+  parseUpdateFeed,
   parseVersionInfo,
   visibleDebMembers,
 } from './check-build-brand.mjs'
@@ -231,7 +233,10 @@ async function fakeWindowsOutput({
   const resources = join(root, 'win-unpacked', 'resources')
   mkdirSync(resources, { recursive: true })
   writeFileSync(join(root, 'win-unpacked', 'UniWork Office.exe'), fakeExe(exeStrings))
-  if (updateFeed) writeFileSync(join(resources, 'app-update.yml'), 'provider: generic\n')
+  if (updateFeed) {
+    const yml = typeof updateFeed === 'string' ? updateFeed : 'provider: generic\n'
+    writeFileSync(join(resources, 'app-update.yml'), yml)
+  }
   await writeAsar(root, resources, pkg)
   return root
 }
@@ -243,6 +248,7 @@ async function fakeMacOutput({
   helper = 'UniWork Office Helper.app',
   plist = plistXml(),
   updateFeed = false,
+  pkg = {},
 } = {}) {
   const root = newRoot()
   for (const arch of arches) {
@@ -257,7 +263,7 @@ async function fakeMacOutput({
     mkdirSync(join(contents, 'Frameworks', 'Electron Framework.framework'))
     writeFileSync(join(contents, 'Info.plist'), plist)
     if (updateFeed) writeFileSync(join(resources, 'app-update.yml'), 'provider: generic\n')
-    await writeAsar(root, resources, {})
+    await writeAsar(root, resources, pkg)
   }
   return root
 }
@@ -299,6 +305,95 @@ describe('checkBuildDir', () => {
     assert.ok(result.problems.some((p) => p.includes('app-update.yml')))
   })
 
+  describe('with --update-feed github:UNIAI-TEAM/uniwork-office', () => {
+    const feed = parseUpdateFeed('github:UNIAI-TEAM/uniwork-office')
+    const githubYml =
+      'owner: UNIAI-TEAM\nrepo: uniwork-office\nprovider: github\nchannel: dev\n' +
+      'updaterCacheDirName: uniwork-office-updater\n'
+    const installer = 'UniWork-Office_0.11.0-dev.0_unsigned_win32_x64-setup.exe'
+    const channelYml = (name) =>
+      `version: 0.11.0-dev.0\nfiles:\n  - url: ${name}\n    sha512: x\n    size: 1\npath: ${name}\n`
+
+    it('passes the github feed and a channel file that lists the installer', async () => {
+      const root = await fakeWindowsOutput({ updateFeed: githubYml })
+      writeFileSync(join(root, 'dev.yml'), channelYml(installer))
+      const result = checkBuildDir(root, { updateFeed: feed })
+      assert.deepEqual(result.problems, [])
+      assert.ok(result.checked.includes('win-unpacked app-update.yml'))
+    })
+
+    it('flags a missing feed, another repository and a generic feed', async () => {
+      for (const [updateFeed, expected] of [
+        [false, 'hold no app-update.yml'],
+        [
+          githubYml.replace('uniwork-office\n', 'other\n'),
+          'expected github:UNIAI-TEAM/uniwork-office',
+        ],
+        [
+          'provider: generic\nurl: https://cdn.example\n',
+          'expected github:UNIAI-TEAM/uniwork-office',
+        ],
+      ]) {
+        const result = checkBuildDir(await fakeWindowsOutput({ updateFeed }), { updateFeed: feed })
+        assert.ok(
+          result.problems.some((p) => p.includes(expected)),
+          `${expected}: ${result.problems}`,
+        )
+      }
+    })
+
+    it('flags a channel file listing a name that is not in the output', async () => {
+      const root = await fakeWindowsOutput({ updateFeed: githubYml })
+      writeFileSync(join(root, 'dev.yml'), channelYml('UniWork-Office-0.11.0-dev.0-setup.exe'))
+      const result = checkBuildDir(root, { updateFeed: feed })
+      assert.ok(result.problems.some((p) => p.includes('which is not in the output')))
+    })
+
+    it('still flags any feed in the mac app', async () => {
+      const result = checkBuildDir(await fakeMacOutput({ arches: ['arm64'], updateFeed: true }), {
+        updateFeed: feed,
+      })
+      assert.ok(result.problems.some((p) => p.includes('auto-update must stay off')))
+    })
+
+    const releaseFeed = { owner: 'UNIAI-TEAM', repo: 'uniwork-office', channel: 'dev' }
+
+    it('passes a mac app that names the repository for its update notice', async () => {
+      const root = await fakeMacOutput({ pkg: { uniworkReleaseFeed: releaseFeed } })
+      const result = checkBuildDir(root, { updateFeed: feed })
+      assert.deepEqual(result.problems, [])
+      assert.ok(result.checked.includes('UniWork Office.app uniworkReleaseFeed'))
+    })
+
+    it('flags a mac app without the release feed, or with another one', () => {
+      for (const pkg of [
+        {},
+        { uniworkReleaseFeed: { ...releaseFeed, repo: 'other' } },
+        { uniworkReleaseFeed: { ...releaseFeed, channel: 'latest' } },
+      ]) {
+        const problems = []
+        checkReleaseFeed('app', pkg, feed, {
+          problem: (p) => problems.push(p),
+          checked: () => {},
+        })
+        assert.equal(problems.length, 1, JSON.stringify(pkg))
+        assert.ok(problems[0].includes('expected github:UNIAI-TEAM/uniwork-office'))
+      }
+    })
+
+    it('refuses anything but github:<owner>/<repo>', () => {
+      assert.throws(() => parseUpdateFeed('https://github.com/UNIAI-TEAM/uniwork-office'))
+      assert.throws(() => parseUpdateFeed('github:UNIAI-TEAM'))
+    })
+  })
+
+  it('flags a dev channel file when no feed is expected', async () => {
+    const root = await fakeWindowsOutput()
+    writeFileSync(join(root, 'dev.yml'), 'version: 0.11.0-dev.0\n')
+    const result = checkBuildDir(root)
+    assert.ok(result.problems.some((p) => p.startsWith('dev.yml: update feed metadata')))
+  })
+
   it('flags an upstream-branded installer exe', async () => {
     const result = checkBuildDir(
       await fakeWindowsOutput({
@@ -336,6 +431,15 @@ describe('checkBuildDir', () => {
     assert.deepEqual(result.problems, [
       'mac: unpacked app directory missing (required by --expect)',
     ])
+  })
+
+  it('flags a release feed in a mac app built without --update-feed', async () => {
+    const root = await fakeMacOutput({
+      arches: ['arm64'],
+      pkg: { uniworkReleaseFeed: { owner: 'UNIAI-TEAM', repo: 'uniwork-office', channel: 'dev' } },
+    })
+    const result = checkBuildDir(root)
+    assert.ok(result.problems.some((p) => p.includes('carries uniworkReleaseFeed')))
   })
 
   it('passes a clean dual-arch mac output', async () => {

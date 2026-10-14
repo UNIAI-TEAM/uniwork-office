@@ -17,6 +17,7 @@
  *     cloud/images                     POST           { prompt, aspect_ratio?, ... } -> { images, model }
  *     cloud/media/analyze              POST           { requirements, media: [...] } -> { text }
  *     cloud/transcribe                 POST           { prompt?, audio } -> { text }
+ *     uniwork/chat/completions         POST           UniWork AI: one agent turn, openai-compatible, raw Response
  *
  * A key is never read back: `key_hint` is "…" + the last four characters. `model` is the model the
  * person chose for that provider, saved with the credential (an older server omits it: read as "").
@@ -113,6 +114,16 @@ export interface AiWebClient {
   readonly base: string
   /** authorised fetch of `base + path` (or of an absolute URL under `base`) */
   fetch(path: string, init?: RequestInit): Promise<Response>
+  /**
+   * One UniWork AI request (`uniwork/chat/completions`): authorised like every AI call (frame token,
+   * one refresh after a 401) and returned RAW, a non-2xx answer included. The UniWork AI adapter reads
+   * the status, the body's `code` and the id headers itself (a thrown AiWebError would hide them).
+   */
+  uniworkChat(request: {
+    headers: Record<string, string>
+    body: string
+    signal?: AbortSignal
+  }): Promise<Response>
   /** as fetch, but a non-2xx answer throws its AiWebError and the JSON body is returned */
   json<T>(path: string, init?: RequestInit): Promise<T>
   listCredentials(): Promise<AiCredentialList>
@@ -247,6 +258,13 @@ export function createAiWebClient(options: AiWebClientOptions): AiWebClient {
   return {
     base,
     fetch: authorised,
+    uniworkChat: (request) =>
+      authorised('uniwork/chat/completions', {
+        method: 'POST',
+        headers: request.headers,
+        body: request.body,
+        ...(request.signal ? { signal: request.signal } : {}),
+      }),
     json,
     listCredentials: async () => readCredentialList(await json('credentials')),
     saveCredential: async (provider, input) =>

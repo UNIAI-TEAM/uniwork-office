@@ -58,4 +58,9 @@ export const ar = {
   aiErrCapabilityOff: 'تم إيقاف UniWork AI للتو لهذا المستند، لذا توقف التشغيل بعد خطوته الحالية.',
   aiErrUnsupported: 'لا يستطيع UniWork AI فعل ذلك في {module} بعد.',
   aiErrViewOnlyEdit: 'لديك وصول للعرض فقط إلى هذا المستند، لذا لا يمكن للذكاء الاصطناعي تحريره.',
+  // UniWork AI question limits (the façade takes text up to 8,000 characters)
+  aiErrQuestionTooLong:
+    'طلبك طويل جدًا على UniWork AI. اختصره إلى أقل من 8000 حرف ثم أرسله مرة أخرى.',
+  aiErrQuestionRejected: 'تعذّر على UniWork AI قبول هذا الطلب. عدّله ثم أرسله مرة أخرى.',
+  aiUniworkImagesNotSent: 'لا تُرسل الصور إلى UniWork AI؛ أُرسل النص فقط.',
 } satisfies Record<keyof typeof zh, string>

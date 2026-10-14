@@ -96,6 +96,6 @@ npm run build -w @genoffice/pdf
 npm run dist:mac
 ```
 
-Do **not** export `GENOFFICE_GA4_MEASUREMENT_ID`, `GENOFFICE_GA4_API_SECRET`, or `GENOFFICE_UPDATE_URL` for UniWork GO-1.
+Do **not** export `GENOFFICE_GA4_MEASUREMENT_ID` or `GENOFFICE_GA4_API_SECRET` for UniWork GO-1. `UNIWORK_UPDATE_URL` (the update feed) is set only by the release workflow; see `tools/release/README.md`.
 
 Windows / Linux installers are not produced on the macOS validation host; use `npm run dist:win` / `npm run dist:linux` on those platforms.
