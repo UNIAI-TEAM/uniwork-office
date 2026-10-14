@@ -6143,10 +6143,22 @@ html[dir='rtl'] .quick-title-row {
   gap: 12px;
 }
 
+/* Tasks (spec 4.2): one card, quick add, a column header and grid rows on the same columns */
+.wb-work-quick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 12px;
+  min-height: 48px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+}
+
 .wb-work-quick:focus-within {
   box-shadow: inset 2px 0 0 var(--accent);
 }
 
+/* the only dashed border in the Workbench: an empty slot waiting for a new task */
 .wb-work-quick-plus {
   display: inline-flex;
   flex: none;
@@ -6154,7 +6166,7 @@ html[dir='rtl'] .quick-title-row {
   justify-content: center;
   width: 16px;
   height: 16px;
-  border: 1px dashed var(--border);
+  border: 1px dashed var(--border-strong);
   border-radius: 4px;
   color: var(--text-secondary);
 }
@@ -6172,7 +6184,53 @@ html[dir='rtl'] .quick-title-row {
   font-size: 13px;
 }
 
-.wb-work-group {
+.wb-kbd {
+  flex: none;
+  padding: 0 4px;
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  line-height: 16px;
+}
+
+/* under the input, aligned with its text (16px tile + 12px gap) */
+.wb-work-quick-error {
+  flex-basis: 100%;
+  margin: -4px 0 0;
+  padding: 0 0 8px 28px;
+  color: var(--danger-text);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.wb-tasks > .wb-state {
+  padding: 12px 16px;
+}
+
+/* checkbox | title | ID | status | due | open */
+.wb-work-cols,
+.wb-work-row {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) 64px 112px 108px 28px;
+  gap: 12px;
+  align-items: center;
+}
+
+.wb-work-cols {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+}
+
+.wb-work-group + .wb-work-group {
   border-top: 1px solid var(--border-subtle);
 }
 
@@ -6182,9 +6240,20 @@ html[dir='rtl'] .quick-title-row {
   list-style: none;
 }
 
-.wb-work-row .wb-mono,
-.wb-work-row .wb-pill {
-  flex: none;
+.wb-work-row > .wb-mono {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wb-work-row > .wb-pill {
+  justify-self: start;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.wb-work-row > .wb-row-actions {
+  margin-left: 0;
 }
 
 .wb-work-muted {
@@ -6192,32 +6261,9 @@ html[dir='rtl'] .quick-title-row {
   font-size: 12px;
 }
 
-.wb-agenda-head {
-  position: sticky;
-  /* offsets .wb-home's 24px padding-top so the head hugs the visible top edge */
-  top: -24px;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0;
-  padding: 6px 0;
-  background: var(--bg-content);
-  color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.wb-agenda-head.is-today {
-  color: var(--text);
-}
-
-.wb-agenda-dot {
-  flex: none;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
+/* Calendar (spec 4.3): one card; clip, not hidden, so the day heads stick to the page scroll */
+.wb-agenda {
+  overflow: clip;
 }
 
 .wb-agenda-day ul {
@@ -6226,58 +6272,151 @@ html[dir='rtl'] .quick-title-row {
   list-style: none;
 }
 
-.wb-agenda-day li + li {
-  border-top: 1px solid var(--border-subtle);
-}
-
-.wb-agenda-row {
+/* sticks to the top of the scrolling column while its day is in view; the next day pushes it off */
+.wb-agenda-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   display: flex;
   align-items: center;
-  gap: 10px;
-  width: 100%;
-  min-height: 36px;
-  padding: 7px 12px;
-  border: none;
-  background: transparent;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 16px;
+  border-block: 1px solid var(--border);
+  background: var(--surface-subtle);
   color: var(--text);
-  font: inherit;
   font-size: 13px;
-  text-align: start;
-  cursor: pointer;
+  font-weight: 400;
 }
 
-.wb-agenda-row:hover {
-  background: var(--wb-row-hover);
+.wb-agenda-day:first-child .wb-agenda-head {
+  border-top: 0;
 }
 
-.wb-agenda-row:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
+.wb-agenda-head strong {
+  font-weight: 600;
 }
 
-.wb-agenda-icon {
-  display: inline-flex;
+.wb-agenda-head-date {
+  color: var(--text-secondary);
+}
+
+.wb-agenda-head-count {
+  margin-left: auto;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.wb-agenda-dot {
   flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+/* time | tint bar | title and sub-line | pill or Join */
+.wb-agenda-row {
+  display: grid;
+  grid-template-columns: 96px 3px minmax(0, 1fr) auto;
+  gap: 12px;
   align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  border-radius: var(--radius-6);
+  min-height: 52px;
 }
 
 .wb-agenda-time {
-  flex: none;
-  width: 64px;
-  color: var(--text-secondary);
-  font-size: 11.5px;
+  display: flex;
+  flex-direction: column;
+  color: var(--text);
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
-.wb-agenda-title {
+.wb-agenda-dur {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+}
+
+/* "All day": a chip in the same family as the times */
+.wb-agenda-allday {
+  display: inline-flex;
+  align-items: center;
+  width: max-content;
+  height: 20px;
+  padding: 0 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-6);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.wb-agenda-bar {
+  align-self: stretch;
+  margin: 4px 0;
+  border-radius: 2px;
+}
+
+.wb-agenda-main {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+.wb-agenda-main .wb-row-title {
+  flex: none;
+}
+
+.wb-agenda-main .wb-row-sub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* the kind tints: the row bar and the toolbar legend swatch */
+.is-task:is(.wb-agenda-bar, .wb-agenda-swatch) {
+  background: var(--tint-green-fg);
+}
+
+.is-meeting:is(.wb-agenda-bar, .wb-agenda-swatch) {
+  background: var(--tint-violet-fg);
+}
+
+.is-external:is(.wb-agenda-bar, .wb-agenda-swatch) {
+  background: var(--text-secondary);
+}
+
+/* an entry that has ended: quieter (secondary keeps AA, tertiary would not), faded bar */
+.wb-agenda-row.is-past :is(.wb-agenda-time, .wb-row-title) {
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+.wb-agenda-row.is-past .wb-agenda-bar {
+  opacity: 0.5;
+}
+
+.wb-agenda-legend {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-left: 12px;
+  font-size: 12px;
+}
+
+.wb-agenda-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.wb-agenda-swatch {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
 }
 
 .wb-profile-card {

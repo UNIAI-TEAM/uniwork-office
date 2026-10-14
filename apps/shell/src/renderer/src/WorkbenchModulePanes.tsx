@@ -88,9 +88,9 @@ export function WorkbenchModulePane({
 
   return (
     <section className="wb-pane" aria-label={title}>
-      {/* Tasks, Notes and Forms draw their own toolbar: its summary counts what they load */}
-      {moduleId === 'calendar' || moduleId === 'personal' ? <WorkToolbar {...head} /> : null}
-      {moduleId === 'calendar' && <WorkCalendarPane {...server} />}
+      {/* Tasks, Calendar, Notes and Forms draw their own toolbar: its summary counts what they load */}
+      {moduleId === 'personal' ? <WorkToolbar {...head} /> : null}
+      {moduleId === 'calendar' && <WorkCalendarPane {...server} head={head} />}
       {moduleId === 'tasks' && <WorkTasksPane {...server} head={head} onWritten={onTasksWritten} />}
       {moduleId === 'notes' && <NotesPane practiceId={practiceId} head={head} />}
       {moduleId === 'forms' && (

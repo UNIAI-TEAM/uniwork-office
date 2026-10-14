@@ -1,6 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
@@ -103,6 +105,13 @@ async function click(el: Element | null | undefined): Promise<void> {
     ;(el as HTMLElement).click()
   })
   await flush()
+}
+
+async function type(input: HTMLInputElement, value: string): Promise<void> {
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value)
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  })
 }
 
 const checkbox = () => host.querySelector<HTMLInputElement>('.wb-work-row input[type="checkbox"]')!
@@ -264,6 +273,10 @@ describe('Tasks tab', () => {
     await mount({ ...WS, id: 'w-empty' })
     expect(host.querySelector('.wb-work-quick input')).not.toBeNull()
     const panel = host.querySelector('.wb-state')!
+    // compact, inside the card, right under quick add
+    expect(panel.classList.contains('is-compact')).toBe(true)
+    expect(panel.previousElementSibling?.classList.contains('wb-work-quick')).toBe(true)
+    expect(panel.parentElement?.classList.contains('wb-block')).toBe(true)
     expect(panel.querySelector('.wb-state-title')?.textContent).toBe('No open tasks.')
     expect(panel.querySelector<HTMLElement>('.wb-state-icon')!.style.background).toBe(
       'var(--tint-green)',
@@ -293,16 +306,18 @@ async function mountWithHead(
   await flush()
 }
 
-describe('Tasks tab layout (redesign spec 4.3)', () => {
+describe('Tasks tab layout (redesign spec 4.2)', () => {
   it('quick add is the first row of the list block; rows are grouped, keyed in mono, no table', async () => {
     await mount({ ...WS, id: 'w-layout' })
     expect(host.querySelector('table')).toBeNull()
+    // one card: quick add, the column header, then the groups
+    expect(host.querySelectorAll('.wb-block')).toHaveLength(1)
     const block = host.querySelector('.wb-block')!
     expect(block.firstElementChild?.classList.contains('wb-work-quick')).toBe(true)
+    expect(block.children[1]?.classList.contains('wb-work-cols')).toBe(true)
     expect(block.querySelector('.wb-work-quick-plus')).not.toBeNull()
-    expect(host.querySelector('.wb-work-quick button[type="submit"]')?.className).toBe(
-      'wb-btn wb-btn-primary wb-btn-sm',
-    )
+    // no Add button: Enter adds
+    expect(host.querySelector('.wb-work-quick button')).toBeNull()
     expect(host.querySelector('.wb-group-head')?.textContent).toBe('Today 1')
     expect(host.querySelector('.wb-work-row .wb-mono')?.textContent).toBe('OPS-7')
     // the status is a neutral pill with a dot
@@ -314,12 +329,113 @@ describe('Tasks tab layout (redesign spec 4.3)', () => {
     expect(checkbox().closest('label.wb-check')?.querySelector('.wb-check-box')).not.toBeNull()
   })
 
+  it('the column header and every row share the six grid columns', async () => {
+    await mount({ ...WS, id: 'w-cols' })
+    const cols = host.querySelector('.wb-work-cols')!
+    expect(cols.getAttribute('aria-hidden')).toBe('true')
+    expect(Array.from(cols.children).map((c) => c.textContent)).toEqual([
+      '',
+      'Task',
+      'ID',
+      'Status',
+      'Due',
+      '',
+    ])
+    const row = host.querySelector('.wb-work-row')!
+    expect(row.classList.contains('wb-row')).toBe(true)
+    // checkbox | title | ID | status | due | open on web, in that order
+    expect(Array.from(row.children).map((c) => c.className)).toEqual([
+      'wb-check',
+      'wb-row-title',
+      'wb-mono',
+      'wb-pill',
+      'wb-pill wb-num is-warning',
+      'wb-row-actions',
+    ])
+    const css = readFileSync(join(__dirname, '../src/renderer/src/home.css'), 'utf8')
+    expect(css).toContain(
+      '.wb-work-cols,\n.wb-work-row {\n  display: grid;\n  grid-template-columns: 16px minmax(0, 1fr) 64px 112px 108px 28px;',
+    )
+    const open = row.querySelector<HTMLButtonElement>('.wb-row-actions .wb-icon-btn')!
+    expect(open.getAttribute('aria-label')).toBe('Open on the web: Send the quote')
+    await click(open)
+    expect(api.openWeb).toHaveBeenCalledWith({
+      kind: 'task',
+      orgSlug: 'acme',
+      wsSlug: 'ops',
+      id: 't1',
+    })
+  })
+
+  it('Enter adds a task: no button, the form submits on its own and the field clears', async () => {
+    api.createTask.mockResolvedValueOnce({
+      ok: true,
+      value: { ...TASK, id: 't9', title: 'Book a room' },
+    })
+    await mount({ ...WS, id: 'w-enter' })
+    const form = host.querySelector<HTMLFormElement>('form.wb-work-quick')!
+    expect(form.querySelector('button')).toBeNull()
+    const input = form.querySelector('input')!
+    await type(input, 'Book a room')
+    // implicit submission: what Enter in the form's only field does
+    await act(async () => form.requestSubmit())
+    await flush()
+    expect(api.createTask).toHaveBeenCalledWith({
+      workspaceId: 'w-enter',
+      title: 'Book a room',
+      idempotencyKey: expect.any(String),
+    })
+    expect(input.value).toBe('')
+    expect(input.disabled).toBe(false)
+    expect(host.textContent).toContain('Book a room')
+  })
+
+  it('Enter on an empty name: the error sits at the field, no request', async () => {
+    await mount({ ...WS, id: 'w-empty-name' })
+    const form = host.querySelector<HTMLFormElement>('form.wb-work-quick')!
+    const input = form.querySelector('input')!
+    await act(async () => form.requestSubmit())
+    expect(api.createTask).not.toHaveBeenCalled()
+    const error = form.querySelector('.wb-work-quick-error')!
+    expect(error.textContent).toBe('Type a task name first.')
+    expect(input.getAttribute('aria-invalid')).toBe('true')
+    expect(input.getAttribute('aria-describedby')).toBe(error.id)
+    // no toast for a typing slip
+    expect(host.querySelector('.wb-toast')).toBeNull()
+    await type(input, 'B')
+    expect(form.querySelector('.wb-work-quick-error')).toBeNull()
+  })
+
+  it('a just-done row stays, struck through, until the next load drops it', async () => {
+    await mount({ ...WS, id: 'w-done' })
+    await click(checkbox())
+    await flush()
+    const row = host.querySelector('.wb-work-row')!
+    expect(row.classList.contains('is-done')).toBe(true)
+    expect(row.querySelector('.wb-row-title')?.textContent).toBe('Send the quote')
+    expect(row.querySelector('.wb-pill:not(.wb-num)')?.className).toBe('wb-pill is-success')
+    const css = readFileSync(join(__dirname, '../src/renderer/src/home.css'), 'utf8')
+    expect(css).toMatch(/\n\.wb-row\.is-done \.wb-row-title \{[^}]*text-decoration: line-through;/)
+    // a refresh: the server no longer lists it as open
+    api.myTasks.mockResolvedValueOnce({ ok: true, value: [{ ...TASK, status: 'done' }] })
+    await act(async () => {
+      window.dispatchEvent(new Event(WB_REFRESH_EVENT))
+    })
+    await flush()
+    expect(host.querySelector('.wb-work-row')).toBeNull()
+  })
+
   it('with a head: the toolbar summary counts open, overdue and due-today tasks once loaded', async () => {
     await mountWithHead({ ...WS, id: 'w-head' })
     expect(host.querySelectorAll('.wb-toolbar')).toHaveLength(1)
     // the tab name is a heading for screen readers only: the tab row shows it
     expect(host.querySelector('.wb-toolbar h2.uw-sr-only')?.textContent).toBe('Tasks')
     expect(host.querySelector('.wb-toolbar-text')?.textContent).toBe('Open: 1 · Due today: 1')
+    expect(host.querySelector('.wb-toolbar-text strong')?.textContent).toBe('Open: 1')
+    const web = host.querySelector<HTMLButtonElement>('.wb-toolbar-actions .wb-btn-ghost')!
+    expect(web.textContent).toBe('Open on the web')
+    await click(web)
+    expect(api.openWeb).toHaveBeenCalledWith({ kind: 'my-tasks', orgSlug: 'acme', wsSlug: 'ops' })
   })
 
   it('with a head: the hint while loading, the toolbar stays above the skeleton', async () => {
