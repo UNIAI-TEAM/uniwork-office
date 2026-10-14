@@ -147,6 +147,7 @@ Dùng lại và chuẩn hóa những gì đã có, không thêm thư viện.
   - Liên kết "Quản lý biểu mẫu".
   - Các chip là nút phụ có FileBadge; thêm nút ghost "Thêm biểu mẫu".
 - **Hôm nay** (thẻ bên phải, 320px):
+  - _Sửa đổi (audit Impeccable P2-6):_ khi cột Bàn làm việc hẹp hơn 760px (cửa sổ hẹp hoặc phóng to giao diện), Mặt bàn còn một cột và "Hôm nay" lên đầu.
   - Đầu thẻ: "Hôm nay" + ngày.
   - Nhãn phụ "Việc đến hạn", các dòng checkbox + tiêu đề + pill, liên kết "Tất cả việc".
   - Nhãn phụ "Lịch họp", các dòng giờ (600, tabular) + tiêu đề + dòng phụ. Cuộc họp đang diễn ra có dòng phụ màu success và nút phụ "Vào họp".

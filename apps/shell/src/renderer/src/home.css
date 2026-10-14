@@ -3512,6 +3512,9 @@ body.vib .home {
 /* ── Workbench ── */
 
 .wb-home {
+  /* the Workbench lays out by its own width, not the window's: the sidebar takes part of the
+     window, and the interface scale (zoom) narrows the column without moving any media query */
+  container: wb-home / inline-size;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -3527,8 +3530,11 @@ body.vib .home {
   font-family: inherit;
 }
 
-/* the 1200px content column, centred; the fixed confirm popover places itself */
+/* the 1200px content column, centred; the fixed confirm popover places itself. A long tab
+ * scrolls the page: no row of it may shrink below its content (a squeezed top bar painted its
+ * wrapped buttons over the tabs at 150%) */
 .wb-home > :not(.wb-confirm) {
+  flex-shrink: 0;
   width: 100%;
   max-width: 1200px;
   margin-inline: auto;
@@ -4198,6 +4204,8 @@ body.vib .home {
   margin-bottom: -1px;
   overflow-x: auto;
   overflow-y: hidden;
+  /* scrollIntoView keeps the selected tab clear of the 32px edge fade */
+  scroll-padding-inline: 40px;
   scrollbar-width: none;
 }
 
@@ -4539,9 +4547,14 @@ body.vib .home {
   align-items: start;
 }
 
-@media (max-width: 1000px) {
+/* one column: Today (meetings to join, what is due) leads, it is the Desk's most urgent card */
+@container wb-home (max-width: 760px) {
   .wb-desk {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .wb-desk-today {
+    order: -1;
   }
 }
 
@@ -4595,6 +4608,7 @@ body.vib .home {
 /* a card head: sentence-case 13/600 title, its count, a note or link on the right */
 .wb-desk-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   min-height: 44px;
@@ -4604,6 +4618,7 @@ body.vib .home {
 
 .wb-desk-head h3,
 .wb-desk-drawer-head h3 {
+  flex: none;
   margin: 0;
   font-size: 13px;
   font-weight: 600;
@@ -4646,6 +4661,7 @@ body.vib .home {
 }
 
 .wb-desk-tools {
+  container-type: inline-size;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -4672,6 +4688,14 @@ body.vib .home {
   height: 20px;
   margin: 0 4px;
   background: var(--border);
+}
+
+/* too narrow for both groups on one line (Vietnamese needs about 720px): the second group
+   wraps, and a divider left at the end of the first line would point at nothing */
+@container (max-width: 720px) {
+  .wb-desk-tool-sep {
+    display: none;
+  }
 }
 
 /* the drop chooser and the split prompt: files, a note, then tools left and Cancel / Open right */
@@ -4805,6 +4829,22 @@ body.vib .home {
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+/* a long form name ends in an ellipsis (the chip's title has it whole), never past the column */
+.wb-desk-chips > li {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.wb-desk-chip {
+  max-width: 100%;
+}
+
+.wb-desk-chip-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .wb-desk-chips .wb-ov-note {
@@ -5255,7 +5295,7 @@ textarea.wb-input {
   align-items: start;
 }
 
-@media (max-width: 900px) {
+@container wb-home (max-width: 760px) {
   .wb-kn {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -5344,14 +5384,17 @@ textarea.wb-input {
 
 .wb-kn-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
   padding: 20px 20px 16px;
 }
 
+/* below 240px the title would break every few letters: the actions take their own line */
 .wb-kn-head-text {
   display: flex;
+  flex: 1 1 240px;
   flex-direction: column;
   gap: 8px;
   min-width: 0;
@@ -5379,6 +5422,7 @@ textarea.wb-input {
 .wb-kn-head-actions {
   display: flex;
   flex: none;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
@@ -5562,7 +5606,7 @@ textarea.wb-input {
   gap: 12px;
 }
 
-@media (max-width: 900px) {
+@container wb-home (max-width: 640px) {
   .wb-mat-tiles {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -5648,7 +5692,7 @@ textarea.wb-input {
   align-items: start;
 }
 
-@media (max-width: 1000px) {
+@container wb-home (max-width: 700px) {
   .wb-cmp {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -5683,7 +5727,7 @@ textarea.wb-input {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-@media (max-width: 640px) {
+@container wb-home (max-width: 380px) {
   .wb-cmp-fields.is-two {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -6560,7 +6604,7 @@ html[dir='rtl'] .quick-title-row {
 .wb-work-cols,
 .wb-work-row {
   display: grid;
-  grid-template-columns: 16px minmax(0, 1fr) 64px 112px 108px 28px;
+  grid-template-columns: 16px minmax(0, 1fr) 64px minmax(112px, 160px) 108px 28px;
   gap: 12px;
   align-items: center;
 }
@@ -6595,6 +6639,51 @@ html[dir='rtl'] .quick-title-row {
   justify-self: start;
   max-width: 100%;
   overflow: hidden;
+}
+
+/* a long workspace status ends in an ellipsis; the pill's title has the whole name */
+.wb-work-row .wb-pill-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* a narrow column: no ID, the status and due pills under the title, no column heads */
+@container wb-home (max-width: 600px) {
+  .wb-work-cols {
+    display: none;
+  }
+
+  .wb-work-row {
+    grid-template-columns: 16px auto minmax(0, 1fr) 28px;
+    column-gap: 8px;
+    row-gap: 4px;
+  }
+
+  .wb-work-row > .wb-check {
+    grid-area: 1 / 1;
+  }
+
+  .wb-work-row > .wb-row-title {
+    grid-area: 1 / 2 / 2 / 4;
+  }
+
+  .wb-work-row > .wb-row-actions {
+    grid-area: 1 / 4;
+  }
+
+  .wb-work-row > .wb-mono {
+    display: none;
+  }
+
+  .wb-work-row > .wb-work-status {
+    grid-area: 2 / 2;
+  }
+
+  .wb-work-row > .wb-work-due {
+    grid-area: 2 / 3;
+  }
 }
 
 .wb-work-row > .wb-row-actions {
@@ -6767,7 +6856,7 @@ html[dir='rtl'] .quick-title-row {
   align-items: start;
 }
 
-@media (max-width: 900px) {
+@container wb-home (max-width: 640px) {
   .wb-profile-grid {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -6888,7 +6977,7 @@ html[dir='rtl'] .quick-title-row {
   padding: 16px;
 }
 
-@media (max-width: 900px) {
+@container wb-home (max-width: 640px) {
   .wb-forms-fields {
     grid-template-columns: minmax(0, 1fr);
   }

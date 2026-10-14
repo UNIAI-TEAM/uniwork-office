@@ -301,12 +301,17 @@ export function WorkTasksPane({
                         {task.title}
                       </button>
                       <span className="wb-mono">{task.identifier}</span>
-                      <span className={`wb-pill${tone ? ` ${tone}` : ''}`}>
+                      <span
+                        className={`wb-pill wb-work-status${tone ? ` ${tone}` : ''}`}
+                        title={statusName.get(task.status) ?? task.status}
+                      >
                         <span className="wb-pill-dot" aria-hidden="true" />
-                        {statusName.get(task.status) ?? task.status}
+                        <span className="wb-pill-text">
+                          {statusName.get(task.status) ?? task.status}
+                        </span>
                       </span>
                       {day ? (
-                        <span className={`wb-pill wb-num${dueTone}`}>
+                        <span className={`wb-pill wb-num wb-work-due${dueTone}`}>
                           {day === today
                             ? t('wbTasksGroupToday')
                             : formatDay(day, dateLocale, false)}

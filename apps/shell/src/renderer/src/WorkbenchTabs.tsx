@@ -185,7 +185,8 @@ export function WorkbenchTabs({
 
   const step = (dir: 1 | -1) => {
     const el = scrollRef.current
-    el?.scrollBy?.({ left: dir * el.clientWidth * 0.6, behavior: 'smooth' })
+    const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    el?.scrollBy?.({ left: dir * el.clientWidth * 0.6, behavior: still ? 'auto' : 'smooth' })
   }
 
   const onDragStart = (id: WorkbenchModuleId, e: ReactDragEvent) => {

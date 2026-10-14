@@ -322,8 +322,11 @@ describe('Tasks tab layout (redesign spec 4.2)', () => {
     expect(host.querySelector('.wb-work-row .wb-mono')?.textContent).toBe('OPS-7')
     // the status is a neutral pill with a dot
     const status = host.querySelector('.wb-work-row .wb-pill:not(.wb-num)')!
-    expect(status.className).toBe('wb-pill')
+    expect(status.className).toBe('wb-pill wb-work-status')
     expect(status.textContent).toBe('To do')
+    // a long status ends in an ellipsis: its text has its own box, the pill's title the whole name
+    expect(status.querySelector('.wb-pill-text')?.textContent).toBe('To do')
+    expect(status.getAttribute('title')).toBe('To do')
     expect(status.querySelector('.wb-pill-dot')).not.toBeNull()
     expect(checkbox().classList.contains('uw-sr-only')).toBe(true)
     expect(checkbox().closest('label.wb-check')?.querySelector('.wb-check-box')).not.toBeNull()
@@ -348,14 +351,19 @@ describe('Tasks tab layout (redesign spec 4.2)', () => {
       'wb-check',
       'wb-row-title',
       'wb-mono',
-      'wb-pill',
-      'wb-pill wb-num is-warning',
+      'wb-pill wb-work-status',
+      'wb-pill wb-num wb-work-due is-warning',
       'wb-row-actions',
     ])
     const css = readFileSync(join(__dirname, '../src/renderer/src/home.css'), 'utf8')
     expect(css).toContain(
-      '.wb-work-cols,\n.wb-work-row {\n  display: grid;\n  grid-template-columns: 16px minmax(0, 1fr) 64px 112px 108px 28px;',
+      '.wb-work-cols,\n.wb-work-row {\n  display: grid;\n  grid-template-columns: 16px minmax(0, 1fr) 64px minmax(112px, 160px) 108px 28px;',
     )
+    // a narrow Workbench (window, sidebar or interface scale): the pills go under the title
+    expect(css).toMatch(
+      /@container wb-home \(max-width: 600px\) \{\n {2}\.wb-work-cols \{\n {4}display: none;/,
+    )
+    expect(css).toMatch(/\.wb-work-row \.wb-pill-text \{[^}]*text-overflow: ellipsis;/)
     const open = row.querySelector<HTMLButtonElement>('.wb-row-actions .wb-icon-btn')!
     expect(open.getAttribute('aria-label')).toBe('Open on the web: Send the quote')
     await click(open)
@@ -413,7 +421,9 @@ describe('Tasks tab layout (redesign spec 4.2)', () => {
     const row = host.querySelector('.wb-work-row')!
     expect(row.classList.contains('is-done')).toBe(true)
     expect(row.querySelector('.wb-row-title')?.textContent).toBe('Send the quote')
-    expect(row.querySelector('.wb-pill:not(.wb-num)')?.className).toBe('wb-pill is-success')
+    expect(row.querySelector('.wb-pill:not(.wb-num)')?.className).toBe(
+      'wb-pill wb-work-status is-success',
+    )
     const css = readFileSync(join(__dirname, '../src/renderer/src/home.css'), 'utf8')
     expect(css).toMatch(/\n\.wb-row\.is-done \.wb-row-title \{[^}]*text-decoration: line-through;/)
     // a refresh: the server no longer lists it as open
