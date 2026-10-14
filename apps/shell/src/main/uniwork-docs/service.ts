@@ -2857,6 +2857,11 @@ export class UniworkDocsService {
       ...doc.binding,
       state: 'blocked',
       error: verdict === 'revoked' ? 'permission_revoked' : 'document_deleted',
+      // G8-12: a locked copy can never be edited again, so its comments level
+      // caps at view here exactly as on the inline 403 path - a queue refusal
+      // (and the metadata/feed reads) settles through this writer, so the cap
+      // in queueBindingPatch never sees it
+      level: 'view',
     }
     await this.coordinator.commitState(doc, next)
   }
