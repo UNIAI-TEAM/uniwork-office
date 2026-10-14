@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import JSZip from 'jszip'
-import { createHash } from 'node:crypto'
+import { createDecipheriv, createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { appendFile, copyFile, mkdtemp, readdir, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -502,7 +502,55 @@ test.describe.serial('UniWork documents', () => {
     return { doc, editor, path: (await activeStatus(ctx.shell))!.path }
   }
 
-  test('d. conflict: 409 keeps the local edit and the base, Save refuses, overwrite commits on the new base', async () => {
+  /**
+   * Decrypts the durable kept-drafts record (`uniwork-sync/store/.../drafts/<sha256(docId)>.rec`)
+   * using the account's store key unwrapped via Electron `safeStorage.decryptString`.
+   */
+  async function readKeptDrafts(
+    launched: LaunchedApp,
+    docId: string,
+  ): Promise<Array<{ id: string; createdAt: string; title: string; snapshot: Buffer }>> {
+    const recPath = join(
+      launched.userDataDir,
+      'uniwork-sync',
+      'store',
+      'default',
+      'acct_e2e_01',
+      'drafts',
+      `${sha256(Buffer.from(docId, 'utf8'))}.rec`,
+    )
+    if (!existsSync(recPath)) return []
+    const keyPath = join(launched.userDataDir, 'uniwork-sync', 'keys', 'default', 'acct_e2e_01.key')
+    const wrappedB64 = (await readFile(keyPath)).toString('base64')
+    const rawKeyB64 = await launched.app.evaluate(
+      ({ safeStorage }, b64) => safeStorage.decryptString(Buffer.from(b64, 'base64')),
+      wrappedB64,
+    )
+    const key = Buffer.from(rawKeyB64, 'base64')
+    const frame = await readFile(recPath)
+    // UWS1 frame: 4B magic ("UWS1") + 12B IV + 16B GCM tag + ciphertext (AAD = "UWS1:drafts:<docId>")
+    const iv = frame.subarray(4, 16)
+    const tag = frame.subarray(16, 32)
+    const ciphertext = frame.subarray(32)
+    const decipher = createDecipheriv('aes-256-gcm', key, iv)
+    decipher.setAAD(Buffer.from(`UWS1:drafts:${docId}`, 'utf8'))
+    decipher.setAuthTag(tag)
+    const plain = Buffer.concat([decipher.update(ciphertext), decipher.final()])
+    if (plain.byteLength < 4) return []
+    const metaLen = plain.readUInt32BE(0)
+    const meta = JSON.parse(plain.subarray(4, 4 + metaLen).toString('utf8')) as {
+      v: 1
+      items: Array<{ id: string; createdAt: string; title: string; byteLength: number }>
+    }
+    let offset = 4 + metaLen
+    return meta.items.map((item) => {
+      const snapshot = Buffer.from(plain.subarray(offset, offset + item.byteLength))
+      offset += item.byteLength
+      return { id: item.id, createdAt: item.createdAt, title: item.title, snapshot }
+    })
+  }
+
+  test('d. conflict: 409 keeps the local edit and the base, Save refuses, S5 Overwrite commits on the new base', async () => {
     test.setTimeout(180_000)
     await withApp('uniwork-docs-conflict', async (ctx) => {
       const { shell, launched } = ctx
@@ -533,20 +581,37 @@ test.describe.serial('UniWork documents', () => {
       expect(stub.callCount()).toBe(sent)
       await expectState(shell, 'conflict', 5_000)
 
-      // "Save my version as the newest version" -> commit on the server's revision
-      await answerMessageBoxes(launched, [0])
+      // AC1 + AC2: Resolve… opens the in-app S5 alertdialog (never a native message box),
+      // with Cancel focused by default and the Step-1 action buttons in spec order
+      await answerMessageBoxes(launched, [])
       await chip(shell).getByRole('button', { name: 'Resolve…' }).click()
-      await expectState(shell, 'saved')
 
-      const boxes = await seenMessageBoxes(launched)
-      expect(boxes).toHaveLength(1)
-      expect(boxes[0]!.message).toContain('conflict-overwrite.docx')
-      expect(boxes[0]!.buttons).toEqual([
-        'Save my version as the newest version',
-        'Save a copy on this computer',
-        'Discard my changes and open the latest',
-        'Decide later',
+      const dialog = shell.getByRole('alertdialog')
+      await expect(dialog).toBeVisible()
+      await expect(
+        dialog.getByRole('heading', { name: 'This document was changed elsewhere' }),
+      ).toBeVisible()
+      await expect(dialog.locator('[data-conflict-action="cancel"]')).toBeFocused()
+      await expect(dialog.getByRole('button')).toHaveText([
+        'Reload latest',
+        'Save as a copy…',
+        'Overwrite…',
+        'Cancel',
+        'Close',
       ])
+      expect(await seenMessageBoxes(launched)).toHaveLength(0)
+      await shell.screenshot({ path: screenshotPath('uniwork-docs-conflict-dialog-step1') })
+
+      // AC3: Overwrite… -> Step 2 confirmation -> Overwrite commits on the server's revision
+      await dialog.locator('[data-conflict-action="overwrite"]').click()
+      await expect(
+        dialog.getByRole('heading', { name: 'Overwrite with your version?' }),
+      ).toBeVisible()
+      await dialog.locator('[data-conflict-action="overwrite-go"]').click()
+      await expect(dialog).toBeHidden()
+      await expectState(shell, 'saved')
+      expect(await seenMessageBoxes(launched)).toHaveLength(0)
+
       const commits = stub.commits(doc.id)
       expect(commits).toHaveLength(2)
       expect(commits[1]).toMatchObject({ status: 200, baseRevision: '42' })
@@ -559,60 +624,113 @@ test.describe.serial('UniWork documents', () => {
     })
   })
 
-  test('d2. conflict: "Discard my changes and open the latest" asks twice, then shows the web version', async () => {
+  test('d2. conflict: S5 "Reload latest" keeps a draft by default (or discards when chosen) and loads the server version', async () => {
     test.setTimeout(180_000)
     const web = await docxOtherBytes()
     await withApp('uniwork-docs-conflict-latest', async (ctx) => {
       const { shell, launched } = ctx
-      const { doc, path } = await intoConflict(ctx, 'conflict-latest.docx', web)
+      const { doc, editor, path } = await intoConflict(ctx, 'conflict-latest.docx', web)
 
-      // choice 3 (open the latest), then confirm the discard
-      await answerMessageBoxes(launched, [2, 0])
+      // AC4: Reload latest -> Step 2 with "Keep my version as a draft" preselected -> Reload
+      await answerMessageBoxes(launched, [])
       await chip(shell).getByRole('button', { name: 'Resolve…' }).click()
-      await expectState(shell, 'saved')
 
-      const boxes = await seenMessageBoxes(launched)
-      expect(boxes).toHaveLength(2)
-      expect(boxes[1]!.buttons).toEqual(['Discard and open the latest', 'Cancel'])
-      // the working copy is now the web version, nothing was committed
+      const dialog = shell.getByRole('alertdialog')
+      await expect(dialog).toBeVisible()
+      await dialog.locator('[data-conflict-action="reload"]').click()
+      await expect(dialog.getByRole('heading', { name: 'Reload latest' })).toBeVisible()
+
+      const keepRadio = dialog.getByRole('radio', { name: /Keep my version as a draft/ })
+      const discardRadio = dialog.getByRole('radio', { name: /Discard my changes/ })
+      await expect(keepRadio).toBeChecked()
+      await expect(discardRadio).not.toBeChecked()
+
+      await dialog.locator('[data-conflict-action="reload-go"]').click()
+      await expect(dialog).toBeHidden()
+      await expectState(shell, 'saved')
+      expect(await seenMessageBoxes(launched)).toHaveLength(0)
+
+      // the working copy is now the server version and nothing was committed
       expect(sha256(await readFile(path))).toBe(sha256(web))
       expect(stub.commits(doc.id)).toHaveLength(1)
       expect(await binding(path)).toMatchObject({ state: 'saved', baseRevision: '42' })
       expect(await zipEntry(await readFile(path), 'word/document.xml')).not.toContain(MARKER)
+
+      // the local version was durably stored in the encrypted draft store before reloading
+      const drafts = await readKeptDrafts(launched, doc.id)
+      expect(drafts).toHaveLength(1)
+      expect(drafts[0]!.title).toBe('conflict-latest.docx')
+      expect(await zipEntry(drafts[0]!.snapshot, 'word/document.xml')).toContain(MARKER)
+
+      // second conflict on the same document: exercise the "Discard my changes" radio choice
+      await editor.waitForFunction(
+        () => Boolean((window as unknown as AidocsWindow).__aidocs?.editor),
+        undefined,
+        { timeout: 30_000 },
+      )
+      await editor.locator('.doc-page').first().waitFor({ timeout: 30_000 })
+      await typeInDocs(editor, MARKER)
+      stub.bumpRevision(doc.id, web)
+      await saveShortcut(editor)
+      await expectState(shell, 'conflict')
+
+      await chip(shell).getByRole('button', { name: 'Resolve…' }).click()
+      await expect(dialog).toBeVisible()
+      await dialog.locator('[data-conflict-action="reload"]').click()
+      await discardRadio.check()
+      await expect(discardRadio).toBeChecked()
+      await dialog.locator('[data-conflict-action="reload-go"]').click()
+      await expect(dialog).toBeHidden()
+      await expectState(shell, 'saved')
+
+      expect(sha256(await readFile(path))).toBe(sha256(web))
+      expect(await binding(path)).toMatchObject({ state: 'saved', baseRevision: '43' })
+      // discarding did not add a second draft
+      expect(await readKeptDrafts(launched, doc.id)).toHaveLength(1)
     })
   })
 
-  test('d3. conflict: "Save a copy on this computer" writes a plain local file and the document stays in conflict', async () => {
+  test('d3. conflict: S5 "Save as a copy…" is pending G5-12, shows the failure alert, and keeps the document in conflict', async () => {
     test.setTimeout(180_000)
-    const copyDir = await mkdtemp(join(tmpdir(), 'uniwork-e2e-copy-'))
-    const copyPath = join(copyDir, 'conflict-copy (my copy).docx')
     await withApp('uniwork-docs-conflict-copy', async (ctx) => {
       const { shell, launched } = ctx
       const { doc, path } = await intoConflict(ctx, 'conflict-copy.docx')
 
-      await answerMessageBoxes(launched, [1])
-      const suggested = await launched.app.evaluate(({ dialog }, target) => {
-        const g = globalThis as unknown as { __e2eSavePath?: string }
-        dialog.showSaveDialog = (async (...args: unknown[]) => {
-          const options = (args.length > 1 ? args[1] : args[0]) as { defaultPath?: string }
-          g.__e2eSavePath = options.defaultPath
-          return { canceled: false, filePath: target }
+      await answerMessageBoxes(launched, [])
+      await launched.app.evaluate(({ dialog }) => {
+        const g = globalThis as unknown as { __e2eSaveCalls?: number }
+        g.__e2eSaveCalls = 0
+        dialog.showSaveDialog = (async () => {
+          g.__e2eSaveCalls = (g.__e2eSaveCalls ?? 0) + 1
+          return { canceled: true, filePath: '' }
         }) as typeof dialog.showSaveDialog
-        return true
-      }, copyPath)
-      expect(suggested).toBe(true)
-      await chip(shell).getByRole('button', { name: 'Resolve…' }).click()
+      })
 
-      await expect.poll(() => existsSync(copyPath), { timeout: 15_000 }).toBe(true)
-      const proposed = await launched.app.evaluate(
-        () => (globalThis as unknown as { __e2eSavePath?: string }).__e2eSavePath ?? '',
+      await chip(shell).getByRole('button', { name: 'Resolve…' }).click()
+      const dialog = shell.getByRole('alertdialog')
+      await expect(dialog).toBeVisible()
+
+      await dialog.locator('[data-conflict-action="save-copy"]').click()
+      await expect(dialog.getByRole('heading', { name: 'Save as a copy?' })).toBeVisible()
+      await dialog.locator('[data-conflict-action="save-copy-go"]').click()
+
+      // pending G5-12: main returns the `save_copy_failed` notice in the dialog's alert region
+      await expect(dialog.getByRole('alert')).toContainText(
+        'Couldn’t create the copy. Your changes are still safe; try again.',
       )
-      expect(proposed).toMatch(/conflict-copy \(my copy\)\.docx$/)
-      expect(await zipEntry(await readFile(copyPath), 'word/document.xml')).toContain(MARKER)
-      // the document itself is still in conflict and nothing more was sent
+      await dialog.locator('[data-conflict-action="close-x"]').click()
+      await expect(dialog).toBeHidden()
+
+      // no native message box or save dialog was invoked; the document stays in conflict with its local edit intact
+      expect(await seenMessageBoxes(launched)).toHaveLength(0)
+      const saveCalls = await launched.app.evaluate(
+        () => (globalThis as unknown as { __e2eSaveCalls?: number }).__e2eSaveCalls ?? 0,
+      )
+      expect(saveCalls).toBe(0)
       await expectState(shell, 'conflict', 5_000)
       expect(stub.commits(doc.id)).toHaveLength(1)
       expect(await binding(path)).toMatchObject({ state: 'conflict', baseRevision: '41' })
+      expect(await zipEntry(await readFile(path), 'word/document.xml')).toContain(MARKER)
     })
   })
 
