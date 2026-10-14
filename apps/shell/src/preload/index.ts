@@ -44,6 +44,9 @@ import type {
   FileSearchPage,
   FileSearchRerank,
   FileSearchSettings,
+  UniworkConflictAction,
+  UniworkConflictReply,
+  UniworkConflictView,
   UniworkCreateDocInput,
   UniworkDocActionResult,
   UniworkDocErrorCode,
@@ -270,6 +273,27 @@ function asUniworkStatus(result: unknown): UniworkDocStatus | null {
     typeof (result as UniworkDocStatus).path === 'string'
     ? (result as UniworkDocStatus)
     : null
+}
+
+function asUniworkConflictView(raw: unknown): UniworkConflictView | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Partial<UniworkConflictView>
+  if (typeof r.sessionId !== 'string' || !r.sessionId) return null
+  if (typeof r.path !== 'string' || !r.path) return null
+  if (typeof r.documentId !== 'string' || !r.documentId) return null
+  return raw as UniworkConflictView
+}
+
+function asUniworkConflictReply(raw: unknown): UniworkConflictReply {
+  if (raw && typeof raw === 'object') {
+    const r = raw as { kind?: unknown; view?: unknown }
+    if (r.kind === 'closed') return { kind: 'closed' }
+    if (r.kind === 'view') {
+      const view = asUniworkConflictView(r.view)
+      if (view) return { kind: 'view', view }
+    }
+  }
+  return { kind: 'closed' }
 }
 
 /** a connection test answer for the renderer: the failure kind only, never the provider's raw text (that stays in the main process log) */
@@ -997,6 +1021,19 @@ const homeApi: HomeApi = {
   },
   async uniworkResolveConflict(path) {
     return asUniworkStatus(await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.resolveConflict, path))
+  },
+  onUniworkConflict(cb) {
+    const listener = (_event: IpcRendererEvent, raw: unknown) => {
+      const view = asUniworkConflictView(raw)
+      if (view) cb(view)
+    }
+    ipcRenderer.on(UNIWORK_DOC_CHANNELS.conflictOpen, listener)
+    return () => ipcRenderer.removeListener(UNIWORK_DOC_CHANNELS.conflictOpen, listener)
+  },
+  async uniworkConflictAct(sessionId, action) {
+    return asUniworkConflictReply(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.conflictAct, sessionId, action),
+    )
   },
   onUniworkLaunch(cb) {
     return uniworkLaunches.subscribe(cb)

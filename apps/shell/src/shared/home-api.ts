@@ -15,6 +15,20 @@ import type {
   UniworkCloudStatus,
 } from '@genoffice/ai-provider'
 import type { UpdateChannel, UpdateUiState } from './update-api'
+import type {
+  UniworkConflictAction,
+  UniworkConflictReply,
+  UniworkConflictView,
+} from './uniwork-conflict'
+
+export type {
+  UniworkConflictAction,
+  UniworkConflictIntentBlock,
+  UniworkConflictKeepDraft,
+  UniworkConflictNotice,
+  UniworkConflictReply,
+  UniworkConflictView,
+} from './uniwork-conflict'
 
 /** Legal files shipped beside the app and opened from Settings > About. */
 /** The Settings window shows and saves the account's UniWork AI pick; My AI, email and one-click never pass this. */
@@ -780,6 +794,13 @@ export interface HomeApi {
   onUniworkDocStatus(cb: (status: UniworkDocStatus) => void): () => void
   uniworkSave(path: string): Promise<UniworkDocStatus | null>
   uniworkResolveConflict(path: string): Promise<UniworkDocStatus | null>
+  /** G5-09: main pushes the conflict dialog view when S5 opens or updates in place */
+  onUniworkConflict(cb: (view: UniworkConflictView) => void): () => void
+  /** G5-09: answer the open conflict dialog session */
+  uniworkConflictAct(
+    sessionId: string,
+    action: UniworkConflictAction,
+  ): Promise<UniworkConflictReply>
   onUniworkLaunch(cb: (event: UniworkLaunchEvent) => void): () => void
   /** newer-store locks pushed from main; returns an unsubscribe */
   onUniworkLock(cb: (lock: UniworkDocLock) => void): () => void
@@ -1324,6 +1345,10 @@ export const UNIWORK_DOC_CHANNELS = {
   docStatusEvent: 'uniwork-doc:status-event',
   save: 'uniwork-doc:save',
   resolveConflict: 'uniwork-doc:resolve-conflict',
+  /** main -> shell renderer: open or update the S5 conflict dialog (G5-09) */
+  conflictOpen: 'uniwork-doc:conflict-open',
+  /** invoke(sessionId, action) -> UniworkConflictReply (G5-09) */
+  conflictAct: 'uniwork-doc:conflict-act',
   launchEvent: 'uniwork-doc:launch-event',
   /** main -> shell renderer: a working copy refused by the newer-store guard */
   lock: 'uniwork-doc:lock',
