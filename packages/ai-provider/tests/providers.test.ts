@@ -11,6 +11,7 @@ import {
   maxOutputTokensOf,
   resolveAiSettings,
   selectedProvider,
+  setUniworkAiAvailable,
   uniAiOpenRouterKey,
   withUniAiOpenRouterAuth,
 } from '../src/providers'
@@ -400,6 +401,16 @@ describe('selectedProvider / isProviderUsable', () => {
     const settings = defaultAiSettings()
     settings.provider = 'nonsense' as AiProviderId
     expect(selectedProvider(settings)).toBe('genspark')
+  })
+
+  it('keeps a saved uniwork whether or not it is offered: never a silent switch to UniAI', () => {
+    const settings = defaultAiSettings()
+    settings.provider = 'uniwork'
+    setUniworkAiAvailable(false)
+    expect(selectedProvider(settings)).toBe('uniwork')
+    setUniworkAiAvailable(true)
+    expect(selectedProvider(settings)).toBe('uniwork')
+    setUniworkAiAvailable(false)
   })
 
   it('UniAI stays selectable without a key (Token Hub key is required at request time)', () => {

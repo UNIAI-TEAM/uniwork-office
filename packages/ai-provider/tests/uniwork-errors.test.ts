@@ -138,10 +138,10 @@ describe('uniwork provider entry (Q-4)', () => {
     expect(AI_PROVIDERS.map((m) => m.id)).toEqual(before)
   })
 
-  it('needs no key and is kept as the selection only while available', () => {
+  it('needs no key and stays the selection whether or not it is offered (no silent switch to UniAI)', () => {
     const settings = { ...defaultAiSettings(), provider: 'uniwork' as const }
     expect(providerNeed(settings, 'uniwork')).toBeNull()
-    expect(selectedProvider(settings)).toBe('genspark')
+    expect(selectedProvider(settings)).toBe('uniwork')
     setUniworkAiAvailable(true)
     expect(providerNeed(settings, 'uniwork')).toBeNull()
     expect(selectedProvider(settings)).toBe('uniwork')
