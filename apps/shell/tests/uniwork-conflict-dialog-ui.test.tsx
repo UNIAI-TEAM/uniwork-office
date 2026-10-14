@@ -634,11 +634,10 @@ describe('UniworkConflictDialog UI (G5-09 S5 desktop)', () => {
     expect(appSiblingEl.hasAttribute('inert')).toBe(false)
     expect(document.activeElement).toBe(document.getElementById('opener-trigger'))
 
-    // If opener is no longer in DOM, falls back to active tab or document.body
-    const tabBtn = document.createElement('button')
-    tabBtn.setAttribute('role', 'tab')
-    tabBtn.setAttribute('aria-selected', 'true')
-    appSiblingEl.appendChild(tabBtn)
+    // If opener is no longer in DOM, falls back to active tab (.tab-item.active) or document.body
+    const tabEl = document.createElement('div')
+    tabEl.className = 'tab-item active'
+    appSiblingEl.appendChild(tabEl)
     const openerEl = document.getElementById('opener-trigger')!
     openerEl.focus()
 
@@ -651,10 +650,38 @@ describe('UniworkConflictDialog UI (G5-09 S5 desktop)', () => {
       pushConflictClosed?.('sess-open-2')
     })
     expect(document.querySelector('[role="alertdialog"]')).toBeNull()
-    expect(document.activeElement).toBe(tabBtn)
+    expect(document.activeElement).toBe(tabEl)
 
     // Unmount cleans up subscription
     act(() => root.unmount())
     expect(pushConflictClosed).toBeNull()
+  })
+
+  it('FE-201: restores focus to the real active tab (.tab-item.active) when the opener was detached from the DOM before close', async () => {
+    const inactiveTab = document.createElement('div')
+    inactiveTab.className = 'tab-item'
+    appSiblingEl.appendChild(inactiveTab)
+
+    const activeTab = document.createElement('div')
+    activeTab.className = 'tab-item active'
+    appSiblingEl.appendChild(activeTab)
+
+    const openerEl = document.getElementById('opener-trigger')!
+    openerEl.focus()
+
+    await act(async () => {
+      pushConflict?.(makeView({ sessionId: 'sess-fe-201' }))
+    })
+
+    // Detach the opener while the conflict dialog is open
+    openerEl.remove()
+
+    const dialog = document.querySelector('[role="alertdialog"]') as HTMLElement
+    await act(async () => {
+      dialog.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    })
+
+    expect(document.querySelector('[role="alertdialog"]')).toBeNull()
+    expect(document.activeElement).toBe(activeTab)
   })
 })

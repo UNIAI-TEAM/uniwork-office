@@ -693,9 +693,13 @@ export const UniworkConflictHost: React.FC<UniworkConflictHostProps> = ({ onView
     if (opener && typeof opener.focus === 'function' && opener.isConnected) {
       opener.focus()
     } else if (typeof document !== 'undefined') {
-      const fallback =
-        document.querySelector<HTMLElement>('.tab.active, [role="tab"][aria-selected="true"]') ??
-        document.body
+      const activeTab = document.querySelector<HTMLElement>(
+        '.tab-item.active, [role="tab"][aria-selected="true"]',
+      )
+      if (activeTab && !activeTab.hasAttribute('tabindex') && activeTab.tabIndex < 0) {
+        activeTab.setAttribute('tabindex', '-1')
+      }
+      const fallback = activeTab ?? document.body
       fallback?.focus?.()
     }
   }, [])
