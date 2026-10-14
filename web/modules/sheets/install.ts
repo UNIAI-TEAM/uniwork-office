@@ -15,6 +15,7 @@
 // must stay the first import: switches zod to jitless before any schema is constructed
 import './zod-jitless'
 import { installModuleBridge } from '../../docs/bridge/module-bridge'
+import { installFrameComments } from '../shared/comments'
 import { createSheetsWebApi } from './bridge'
 import { sheetsHostGrants, sheetsWebCapabilities } from './capabilities'
 import { createWorkerChannel } from './engine/channel'
@@ -37,8 +38,11 @@ let sheetsApi: ReturnType<typeof createSheetsWebApi> | null = null
 
 export const bridge = installModuleBridge({
   module: 'sheets',
-  // no frame comments yet: the page panel serves Comments + Discussion until the in-frame comments land
-  frameComments: false,
+  // G8-13: the editor serves the cell comments (S12) through window.uniworkComments, so the frame
+  // claims `comments` and its panels are the page's only comments surfaces (invariant 8)
+  frameComments: true,
+  // the editor panel owns anchored ids and shows its own S15 line on a miss
+  discussionRevealMissing: 'silent',
   // what this frame build supports (effective = frame ∩ host grant)
   frameCapabilities: { save: true, saveAs: true, filePick: true, print: true, exportPdf: true },
   capabilities: { defaults: sheetsWebCapabilities(transport), grants: sheetsHostGrants },
@@ -49,6 +53,11 @@ export const bridge = installModuleBridge({
     },
   },
 })
+
+// the editor's S12 panel reads window.uniworkComments once init says `comments` is effective; it
+// awaits this promise first, since the install itself waits for init
+;(window as unknown as { uniworkCommentsReady?: Promise<unknown> }).uniworkCommentsReady =
+  installFrameComments(bridge.client)
 
 // read-only inspection for e2e and support: which session the frame shows (no cell data)
 ;(window as unknown as { __sheetsWebState: unknown }).__sheetsWebState = {

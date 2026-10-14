@@ -1469,6 +1469,7 @@ export const hi = {
   appCtxResolveComment: 'टिप्पणी हल करें',
   appThreadConverted: '{count} टिप्पणियाँ नोट में बदली गईं।',
   appThreadNoneAtSelection: 'चयनित सेल में कोई थ्रेडेड टिप्पणी नहीं है।',
+  appCommentSaveFirst: 'टिप्पणी जोड़ने के लिए पहले वर्कबुक सहेजें',
   appThreadCellHasNote: 'चयनित सेल में पहले से एक नोट है; टिप्पणी नहीं जोड़ी जा सकती।',
   appThreadHoverHint: 'टिप्पणियाँ फलक में उत्तर दें',
   appNoteCellHasThread: 'चयनित सेल में पहले से एक थ्रेडेड टिप्पणी है; नोट नहीं जोड़ा जा सकता।',

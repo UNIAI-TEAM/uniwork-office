@@ -23,7 +23,7 @@ import { pdfIsDirty, requestPdfClose } from '../../../pdf/src/main/pdf-main'
 import { markdownIsDirty, requestMarkdownClose } from '../../../markdown/src/main/markdown-main'
 import { htmlIsDirty, requestHtmlClose } from '../../../html/src/main/html-main'
 import { blankRetiredPage } from './retire-page'
-import { isAiRunning, type EditorState } from './ai-run-registry'
+import { aiEpochOf, clearAiRun, isAiRunning, type EditorState } from './ai-run-registry'
 import { canonicalPath } from './tab-manager'
 import { confirmUniworkClose } from './uniwork-docs/close-guard'
 import type { DetachedTab } from './tab-manager'
@@ -339,7 +339,12 @@ export async function detachedEditorStates(
     if (rec.window.isDestroyed() || !rec.filePath || !wanted(rec.filePath)) continue
     const dirty = await detachedIsDirty(rec)
     if (rec.window.isDestroyed() || rec.view.webContents.isDestroyed()) continue
-    out.push({ path: rec.filePath, dirty, aiRunning: isAiRunning(wcId) })
+    out.push({
+      path: rec.filePath,
+      dirty,
+      aiRunning: isAiRunning(wcId),
+      aiEpoch: aiEpochOf(wcId),
+    })
   }
   return out
 }
@@ -524,6 +529,9 @@ export function createDetachedEditorWindow(options: {
     if (torn?.rec === rec) torn = null
     win.contentView.removeChildView(view)
     detached.delete(wcId)
+    // G5-03a: the window is closed mid AI turn — the document must not stay
+    // "busy" (a docs view is blanked, not destroyed, so nothing else clears it)
+    clearAiRun(wcId)
     if (kind === 'docs') {
       teardownDocsRenderer(view.webContents)
       blankRetiredPage(view.webContents)

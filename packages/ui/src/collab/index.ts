@@ -1,6 +1,14 @@
 /** Shared collab UI (server comments S12, Discussion S13): import styles from `@genoffice/ui/collab.css`. */
 export * from './types'
 export {
+  COLLAB_MAX_ANCHORS,
+  createUniworkCommentsSource,
+  sendAnchorMap,
+  type AnchorSyncOutcome,
+  type CollabReply,
+  type UniworkCommentsLike,
+} from './uniwork-source'
+export {
   COMMENTS_REVEAL_WAIT_MS,
   buildCollabThreads,
   collabInsertIndex,
