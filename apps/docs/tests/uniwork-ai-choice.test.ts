@@ -207,6 +207,29 @@ describe('UniWork AI choice per account (desktop)', () => {
     expect(file().provider).toBe('openai')
   })
 
+  it('a deliberate BYOK choice while UniWork AI is hidden and the pick is on is written and clears the pick', async () => {
+    const accounts = fakeAccounts()
+    await setSettings(picked('anthropic'))
+    await setSettings(picked('uniwork'))
+    setUniworkAiAvailable(false)
+    // the pane shows the degraded genspark; picking openai is a real choice, not the fallback
+    await setSettings(picked('openai'))
+    expect(file().provider).toBe('openai')
+    expect(accounts.choice.get('a-1')).toBe(false)
+    setUniworkAiAvailable(true)
+    expect((await getSettings()).provider).toBe('openai')
+  })
+
+  it('saving the degraded provider back while hidden (pick on) still keeps the file provider and the pick', async () => {
+    const accounts = fakeAccounts()
+    await setSettings(picked('anthropic'))
+    await setSettings(picked('uniwork'))
+    setUniworkAiAvailable(false)
+    await setSettings(picked('genspark'))
+    expect(file().provider).toBe('anthropic')
+    expect(accounts.choice.get('a-1')).toBe(true)
+  })
+
   it('BYOK edits made while UniWork AI is chosen still reach ai-settings.json', async () => {
     fakeAccounts()
     await setSettings(picked('uniwork'))
