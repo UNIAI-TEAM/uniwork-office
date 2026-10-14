@@ -39,6 +39,8 @@ import type { Lang } from '@genoffice/i18n'
 
 const ORIGIN = 'https://app.test'
 const BASE = `${ORIGIN}/api/v1/office-frame/documents/doc-1/ai`
+// a clock after every credential stamp of these fixtures: a local pick made "now" is newer than the server rows
+const AFTER_STAMPS = Date.parse('2026-10-14T00:00:00Z')
 
 interface Call {
   url: string
@@ -1207,21 +1209,26 @@ describe('model chip source and credential refresh (UNI-1232 A4)', () => {
     const ai = createAi(fetch, () => t, win)
     const api = withWebAi({}, ai)
     await ai.settings()
+    // the background listing of the first read is over before the count starts
+    await new Promise((r) => setTimeout(r, 0))
     const changed = vi.fn()
     const off = (api.onAiSettingsChanged as (h: () => void) => () => void)(changed)
     live.items = [anthropicCred]
     win.dispatchEvent(new Event('focus'))
-    await vi.waitFor(() => expect(changed).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() => expect(changed).toHaveBeenCalled())
     expect((await ai.settings()).providers.anthropic.apiKey).toBe('…wxyz')
+    // the new key's background listing is over before the count starts
+    await new Promise((r) => setTimeout(r, 10))
+    const heard = changed.mock.calls.length
     // an unchanged list is not a change
     win.dispatchEvent(new Event('focus'))
-    await new Promise((r) => setTimeout(r, 0))
-    expect(changed).toHaveBeenCalledTimes(1)
+    await new Promise((r) => setTimeout(r, 10))
+    expect(changed).toHaveBeenCalledTimes(heard)
     off()
     live.items = []
     win.dispatchEvent(new Event('focus'))
-    await new Promise((r) => setTimeout(r, 0))
-    expect(changed).toHaveBeenCalledTimes(1)
+    await new Promise((r) => setTimeout(r, 10))
+    expect(changed).toHaveBeenCalledTimes(heard)
   })
 
   it('choosing a model notifies the chips and a failed refresh keeps the last answer', async () => {
@@ -1300,7 +1307,7 @@ describe('the chosen model is saved on the server (UNI-1240 4b)', () => {
       capabilities: { ai: true },
       fetch,
       origin: ORIGIN,
-      now: () => 0,
+      now: () => AFTER_STAMPS,
     })
     const puts = () => calls.filter((c) => c.init.method === 'PUT')
     return { ai, puts }
@@ -1386,7 +1393,12 @@ describe('the chosen model is saved on the server (UNI-1240 4b)', () => {
   it('the local cache wins while its provider has a key', async () => {
     localStorage.setItem(
       CHOICE_KEY,
-      JSON.stringify({ provider: 'openai', models: { openai: 'local-model' } }),
+      JSON.stringify({
+        provider: 'openai',
+        providerAt: AFTER_STAMPS,
+        models: { openai: 'local-model' },
+        at: { openai: AFTER_STAMPS },
+      }),
     )
     const { ai } = create([
       cred('openai', 'gpt-4.1-mini', '2026-10-10T08:00:00Z'),
@@ -1413,12 +1425,16 @@ describe('the chosen model is saved on the server (UNI-1240 4b)', () => {
       cred('anthropic', ''),
     ])
     await ai.settings()
+    // the background listings of the first read are over before the count starts
+    await new Promise((r) => setTimeout(r, 10))
     const changed = vi.fn()
     ai.onChanged(changed)
     ai.choose('anthropic', 'claude-sonnet-4-5')
     expect(JSON.parse(localStorage.getItem(CHOICE_KEY)!)).toEqual({
       provider: 'anthropic',
+      providerAt: AFTER_STAMPS,
       models: { anthropic: 'claude-sonnet-4-5' },
+      at: { anthropic: AFTER_STAMPS },
     })
     await vi.waitFor(() => expect(puts()).toHaveLength(1))
     expect(puts()[0]!.url).toBe(`${BASE}/credentials/anthropic`)
@@ -1584,7 +1600,8 @@ describe('the model of a provider with a key (UNI-1232 FX2: N3-01 / G-N1)', () =
     const s = await ai.settings()
     expect(s.provider).toBe('openai')
     expect(s.providers.openai.model).toBeTruthy()
-    expect(calls.some((c) => c.url.endsWith('/models'))).toBe(false)
+    // its live list is asked in the background (the chip's rows), never needed to run
+    await vi.waitFor(() => expect(calls.some((c) => c.url.endsWith('/models'))).toBe(true))
   })
 
   it('a model-less provider that lists exactly one model runs on it', async () => {
@@ -2641,7 +2658,7 @@ describe('UniWork AI on the web (G6-05)', () => {
         capabilities: { ai: true, uniworkAi: true },
         fetch,
         origin: ORIGIN,
-        now: () => 0,
+        now: () => AFTER_STAMPS,
       })
       expect((await ai.settings()).provider).toBe('openai')
       ai.choose('uniwork')
@@ -2707,7 +2724,7 @@ describe('UniWork AI on the web (G6-05)', () => {
         capabilities,
         fetch,
         origin: ORIGIN,
-        now: () => 0,
+        now: () => AFTER_STAMPS,
         uniworkStream: async (_t, _r, cb) => {
           cb.onNotice?.({ kind: 'uniwork-off' })
           throw failure('office_capability_off', 403)

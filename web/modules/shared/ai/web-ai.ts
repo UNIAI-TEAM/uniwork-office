@@ -107,20 +107,37 @@ export function providerLabel(id: string): string {
 
 /**
  * This browser's provider/model choice (not a secret). The model is saved with the person's
- * credential on the server; this is only the cache that wins on this browser and keeps working
- * when the server is older or a save failed.
+ * credential on the server; this is the cache that keeps working when the server is older or a save
+ * failed. Every entry carries the time it was made (epoch ms, `at` per provider and `providerAt`):
+ * against the server's `model_updated_at` the newer one wins, and an entry without a time (written by
+ * an older build) counts as older than any server stamp.
  */
 interface AiChoice {
   provider?: string
+  providerAt: number
   models: Record<string, string>
+  at: Record<string, number>
 }
 
 const CHOICE_KEY = 'uniwork.office.web.ai.choice'
 
-function readChoice(): AiChoice {
+/** the storage key of one viewer; a frame that does not know the user id keeps the shared key */
+function choiceKeyOf(userId: string | undefined): string {
+  return userId ? `${CHOICE_KEY}:${userId}` : CHOICE_KEY
+}
+
+const emptyChoice = (): AiChoice => ({ providerAt: 0, models: {}, at: {} })
+
+function readChoice(key: string): AiChoice {
   try {
-    const raw = JSON.parse(localStorage.getItem(CHOICE_KEY) ?? 'null') as AiChoice | null
+    const raw = JSON.parse(localStorage.getItem(key) ?? 'null') as Partial<AiChoice> | null
     if (raw && typeof raw === 'object') {
+      const at: Record<string, number> = {}
+      if (raw.at && typeof raw.at === 'object') {
+        for (const [id, when] of Object.entries(raw.at)) {
+          if (typeof when === 'number' && Number.isFinite(when)) at[id] = when
+        }
+      }
       return {
         // only a provider the web can run: the value comes from localStorage and ends up in a URL
         // (`uniwork` has a fixed route; settings() still drops it while the grant is off)
@@ -128,18 +145,23 @@ function readChoice(): AiChoice {
         (WEB_PROVIDER_IDS.has(raw.provider) || raw.provider === UNIWORK_PROVIDER_ID)
           ? { provider: raw.provider }
           : {}),
+        providerAt:
+          typeof raw.providerAt === 'number' && Number.isFinite(raw.providerAt)
+            ? raw.providerAt
+            : 0,
         models: raw.models && typeof raw.models === 'object' ? raw.models : {},
+        at,
       }
     }
   } catch {
     // storage blocked or unreadable: defaults
   }
-  return { models: {} }
+  return emptyChoice()
 }
 
-function writeChoice(choice: AiChoice): void {
+function writeChoice(key: string, choice: AiChoice): void {
   try {
-    localStorage.setItem(CHOICE_KEY, JSON.stringify(choice))
+    localStorage.setItem(key, JSON.stringify(choice))
   } catch {
     // storage blocked: the choice lasts for this page only
   }
@@ -186,6 +208,12 @@ const EMPTY: WebAiState = { credentials: { items: [], providers: [] }, cloud: nu
  */
 export const CREDENTIALS_TTL_MS = 4000
 
+/** how long a provider's live model list is trusted before the next settings read lists it again */
+export const MODEL_LIST_TTL_MS = 10 * 60 * 1000
+
+/** a failed listing is tried again after this pause, never on every chip open */
+const MODEL_LIST_RETRY_MS = 60 * 1000
+
 /** what a change of the credential list looks like to a subscriber (never a key) */
 function credentialSignature(list: AiCredentialList): string {
   return list.items
@@ -224,7 +252,11 @@ export function createWebAi(opts: {
   let loading: Promise<WebAiState> | null = null
   let loadedAt = 0
   let everLoaded = false
-  let choice = readChoice()
+  // the choice is read once the viewer is known (the key is per user); a pick made before that is
+  // kept in memory and written with the rest
+  let choiceKey = CHOICE_KEY
+  let choiceReady = false
+  let choice = emptyChoice()
   // what the host granted this frame (set at activation): BYOK, UniWork AI, and which cloud tools
   let byokGranted = false
   let uniworkGranted = false
@@ -232,8 +264,20 @@ export function createWebAi(opts: {
   /** UniWork AI turned off by the server after the grant was minted (capability / format off) */
   let uniworkOff = false
   let frameSession: { documentId: string; module?: OfficeModule } | null = null
-  /** provider -> model ids its own `/models` route listed (only asked for a provider with no default model) */
-  const listed = new Map<string, string[]>()
+  /**
+   * provider -> what its own `/models` route listed: the ids (kept while a refresh runs or fails), the
+   * key stamp and time of the last good answer, and the time of the last failure (the list is never
+   * stored outside this instance)
+   */
+  interface ListEntry {
+    ids: string[]
+    stamp: string
+    at: number
+    failedAt: number
+    failedStamp: string
+  }
+  const lists = new Map<string, ListEntry>()
+  /** provider -> the key stamp of the listing that is in flight (one per provider) */
   const listing = new Map<string, string>()
   const changeListeners = new Set<() => void>()
   const now = opts.now ?? Date.now
@@ -252,6 +296,11 @@ export function createWebAi(opts: {
     .whenInitialized()
     .then((session) => {
       const tokens = opts.port
+      choiceKey = choiceKeyOf(
+        typeof session.user?.id === 'string' && session.user.id ? session.user.id : undefined,
+      )
+      adoptStoredChoice()
+      choiceReady = true
       byokGranted = session.capabilities?.ai === true
       uniworkGranted = session.capabilities?.uniworkAi === true
       if (
@@ -307,7 +356,7 @@ export function createWebAi(opts: {
       loadedAt = now()
       everLoaded = true
       applyCloud(cloud)
-      void discoverModels()
+      void refreshLists(true)
       if (changed) notifyChanged()
       return state
     })()
@@ -321,30 +370,93 @@ export function createWebAi(opts: {
     }
   }
 
+  /** this browser's stored picks join the ones made before the viewer was known (the newer wins) */
+  function adoptStoredChoice(): void {
+    const stored = readChoice(choiceKey)
+    const early = choice
+    const models = { ...stored.models, ...early.models }
+    const at = { ...stored.at, ...early.at }
+    const providerAt = Math.max(stored.providerAt, early.providerAt)
+    const provider =
+      early.provider && early.providerAt >= stored.providerAt ? early.provider : stored.provider
+    choice = { ...(provider ? { provider } : {}), providerAt, models, at }
+    if (early.provider || Object.keys(early.models).length) writeChoice(choiceKey, choice)
+  }
+
+  function stampOf(credential: { key_hint: string; base_url: string; updated_at: string }): string {
+    return `${credential.key_hint}:${credential.base_url}:${credential.updated_at}`
+  }
+
+  /** what the chip is told about one provider's live list (never a key) */
+  function listedOf(id: string): { listed?: string[]; listState?: 'loading' | 'error' } {
+    const entry = lists.get(id)
+    const have = entry && entry.at > 0
+    if (have && entry.ids.length > 0) return { listed: entry.ids }
+    // 'loading' only while nothing was listed yet; 'error' only when the last listing failed and no
+    // list is kept (an empty answer is an answer: the catalog shows, nothing to say)
+    if (have) return {}
+    if (listing.has(id)) return { listState: 'loading' }
+    return entry && entry.failedAt > 0 ? { listState: 'error' } : {}
+  }
+
+  const listSignature = (id: string): string => JSON.stringify(listedOf(id))
+
   /**
-   * A provider with a key but no default model (a custom endpoint) has no model the frame could
-   * name. Ask its own `/models` route once per stored key; a provider that lists exactly one model
-   * runs on it, otherwise the listing only feeds the AI settings dialog's suggestions.
+   * Lists each usable provider's own `/models` route in the background: when it has no list yet, the
+   * list is older than the TTL or the key changed, one request in flight per provider. A failure is
+   * remembered (the catalog shows, the chip may say so) and retried after a pause; a 404
+   * `credential_missing` means the key was deleted elsewhere, so the credentials reload. The answer
+   * reaches the chips through the change signal; the read that started it never waits.
+   * `onlyModelless` = the discovery of a custom endpoint that has no default model to name.
    */
-  async function discoverModels(): Promise<void> {
+  async function refreshLists(onlyModelless = false): Promise<void> {
     const client = clientRef
     if (!client) return
-    for (const credential of state.credentials.items) {
-      const id = credential.provider
-      if (!WEB_PROVIDER_IDS.has(id) || !protocolOf(id)) continue
-      if (defaultModelOf(id)) continue
-      const stamp = `${credential.key_hint}:${credential.base_url}:${credential.updated_at}`
-      if (listing.get(id) === stamp) continue
-      listing.set(id, stamp)
-      try {
-        const ids = modelIdsOf(await client.json(`byok/${encodeURIComponent(id)}/models`))
-        if (ids.join('|') === (listed.get(id) ?? []).join('|')) continue
-        listed.set(id, ids)
-        notifyChanged()
-      } catch {
-        // the listing is a convenience: without it the person picks a model in the AI settings
-      }
-    }
+    const usable = new Set(usableProviders())
+    for (const id of [...lists.keys()]) if (!usable.has(id)) lists.delete(id)
+    await Promise.all(
+      state.credentials.items.map(async (credential) => {
+        const id = credential.provider
+        if (!usable.has(id) || listing.has(id)) return
+        if (onlyModelless && defaultModelOf(id)) return
+        const stamp = stampOf(credential)
+        const entry = lists.get(id)
+        const t = now()
+        const fresh =
+          entry !== undefined &&
+          entry.at > 0 &&
+          entry.stamp === stamp &&
+          t - entry.at < MODEL_LIST_TTL_MS
+        // a failure of this very key is not asked again before the pause
+        const paused =
+          entry !== undefined &&
+          entry.failedAt > 0 &&
+          entry.failedStamp === stamp &&
+          t - entry.failedAt < MODEL_LIST_RETRY_MS
+        if (fresh || paused) return
+        listing.set(id, stamp)
+        const before = listSignature(id)
+        let missing = false
+        try {
+          const ids = modelIdsOf(await client.json(`byok/${encodeURIComponent(id)}/models`))
+          lists.set(id, { ids, stamp, at: Math.max(now(), 1), failedAt: 0, failedStamp: '' })
+        } catch (err) {
+          missing = isAiWebError(err) && err.code === 'credential_missing'
+          const kept = lists.get(id)
+          lists.set(id, {
+            ids: kept?.ids ?? [],
+            stamp: kept?.stamp ?? '',
+            at: kept?.at ?? 0,
+            failedAt: Math.max(now(), 1),
+            failedStamp: stamp,
+          })
+        } finally {
+          listing.delete(id)
+        }
+        if (missing) void load(true).catch(() => {})
+        if (listSignature(id) !== before) notifyChanged()
+      }),
+    )
   }
 
   /** back in the tab / window: a key may have been added in UniWork settings meanwhile */
@@ -460,30 +572,51 @@ export function createWebAi(opts: {
       () => false,
       () => !everLoaded,
     )
+    // the live lists start in the background; this read never waits for them
+    void refreshLists()
     const usable = usableProviders()
     const fallback = state.credentials.providers.find((p) => WEB_PROVIDER_IDS.has(p.id))?.id
     const uniworkOn = uniworkEffective()
-    // this browser's pick when its provider still has a key, else the server's default (the provider
-    // whose model was set last), else the first usable one; UniWork AI when the viewer picked it, or
-    // when it is all there is (no key of their own)
+    // the newer of this browser's pick and the server's default (the provider whose model was set
+    // last) decides the provider: a model changed in UniWork Settings after the pick reaches this
+    // browser too. Without a server stamp (an older server, nothing saved) the pick stands. The
+    // winner is this browser's pick when its provider still has a key, else the server's default,
+    // else the first usable one; UniWork AI when the viewer picked it (and it won), or when it is
+    // all there is (no key of their own)
     const serverDefault = serverDefaultProvider(usable)
+    const localWins =
+      choice.provider !== undefined && (!serverDefault || choice.providerAt > serverDefault.at)
     const picked = choice.provider === UNIWORK_PROVIDER_ID ? undefined : choice.provider
+    const winner = localWins ? picked : undefined
     const keyed =
-      picked && usable.includes(picked) ? picked : (serverDefault ?? usable[0] ?? undefined)
+      winner && usable.includes(winner)
+        ? winner
+        : (serverDefault?.provider ?? usable[0] ?? undefined)
     const provider = (
-      choice.provider === UNIWORK_PROVIDER_ID && uniworkOn
+      choice.provider === UNIWORK_PROVIDER_ID && uniworkOn && localWins
         ? UNIWORK_PROVIDER_ID
         : (keyed ?? (uniworkOn ? UNIWORK_PROVIDER_ID : (picked ?? fallback ?? 'openai')))
     ) as AiProviderId
     const providers = { ...base.providers }
+    const modelSources: NonNullable<AiSettings['modelSources']> = {}
     for (const id of Object.keys(providers) as AiProviderId[]) {
-      // this browser's pick, else the model saved on the server, else the provider's default; a
-      // model-less provider that lists exactly one model runs on it (the chip shows it), otherwise it
-      // stays empty: the panel asks for a pick
-      const only = listed.get(id)?.length === 1 ? listed.get(id)![0] : ''
+      // the newer of this browser's pick and the model saved on the server, else the provider's
+      // default; a model-less provider that lists exactly one model runs on it (the chip shows it),
+      // otherwise it stays empty: the panel asks for a pick
+      const live = lists.get(id)?.ids ?? []
+      const only = live.length === 1 ? live[0]! : ''
       const stored = state.credentials.items.find((c) => c.provider === id)
-      const model = choice.models[id] || stored?.model || (defaultModelOf(id) ? '' : only)
+      const chosen = stored?.model ?? ''
+      const mine = choice.models[id] ?? ''
+      const savedAt = chosen ? Date.parse(stored?.model_updated_at ?? '') : Number.NaN
+      const model =
+        mine && chosen
+          ? Number.isFinite(savedAt) && (choice.at[id] ?? 0) <= savedAt
+            ? chosen
+            : mine
+          : mine || chosen || (defaultModelOf(id) ? '' : only)
       const usableHere = usable.includes(id)
+      if (usableHere) modelSources[id] = { chosen, ...listedOf(id) }
       providers[id] = {
         ...providers[id],
         // The real key never reaches the frame. A provider with a key stored in UniWork carries
@@ -499,6 +632,7 @@ export function createWebAi(opts: {
     // UniWork AI: no key, never locked (a non-empty slot reads as configured); the server's policy
     // picks the model, so none is named here
     if (uniworkOn) providers[UNIWORK_PROVIDER_ID] = { apiKey: '…', model: '' }
+    const uniworkModel = uniworkOn ? (state.cloud?.uniwork_model ?? '') : ''
     const cloudOn = opts.capabilities.imageGeneration === true
     // UniAI is the desktop's pool of cloud models: the web runs only the viewer's own providers
     return {
@@ -507,6 +641,8 @@ export function createWebAi(opts: {
       providers,
       gskToolsEnabled: cloudOn,
       uniAiAvailable: false,
+      modelSources,
+      ...(uniworkModel ? { uniworkModel } : {}),
       ...(listFailed ? { credentialsUnavailable: true } : {}),
     }
   }
@@ -516,7 +652,7 @@ export function createWebAi(opts: {
    * choice): a usable item with a model and the latest `model_updated_at`; ties go to the provider id
    * order. Null while no usable provider has a model saved (older server, nothing chosen yet).
    */
-  function serverDefaultProvider(usable: string[]): string | null {
+  function serverDefaultProvider(usable: string[]): { provider: string; at: number } | null {
     let best: { provider: string; at: number } | null = null
     for (const c of state.credentials.items) {
       if (!c.model || !usable.includes(c.provider)) continue
@@ -526,7 +662,7 @@ export function createWebAi(opts: {
         best = { provider: c.provider, at: when }
       }
     }
-    return best?.provider ?? null
+    return best
   }
 
   // One PUT in flight per provider and only the latest pick waiting behind it, so two quick picks
@@ -560,6 +696,17 @@ export function createWebAi(opts: {
               items: state.credentials.items.map((c) => (c.provider === provider ? saved : c)),
             },
           }
+          // the pick now carries the server's clock, so a later change in Settings (also stamped by
+          // the server) is compared on one clock, whatever this browser's own is
+          const stamp = Date.parse(saved.model_updated_at)
+          if (Number.isFinite(stamp) && choice.models[provider] === want) {
+            choice = {
+              ...choice,
+              ...(choice.provider === provider ? { providerAt: stamp } : {}),
+              at: { ...choice.at, [provider]: stamp },
+            }
+            writeChoice(choiceKey, choice)
+          }
           notifyChanged()
         } catch {
           // kept in this browser's cache only
@@ -572,11 +719,14 @@ export function createWebAi(opts: {
   }
 
   function choose(provider: string, model?: string): void {
+    const at = now()
     choice = {
       provider,
+      providerAt: at,
       models: { ...choice.models, ...(model ? { [provider]: model } : {}) },
+      at: { ...choice.at, ...(model ? { [provider]: at } : {}) },
     }
-    writeChoice(choice)
+    if (choiceReady) writeChoice(choiceKey, choice)
     notifyChanged()
     if (model) void saveModel(provider, model)
   }
@@ -609,7 +759,7 @@ export function createWebAi(opts: {
       models: (id) => [
         ...new Set([
           ...(AI_PROVIDERS.find((p) => p.id === id)?.models ?? []),
-          ...(listed.get(id) ?? []),
+          ...(lists.get(id)?.ids ?? []),
         ]),
       ],
     })
