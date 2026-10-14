@@ -1,7 +1,7 @@
 import { readFileSync, statSync } from 'node:fs'
 import { copyFile, readFile, rename, stat } from 'node:fs/promises'
-import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { randomUUID } from 'node:crypto'
+import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type {
   RecentUniworkSource,
   UniworkConflictChoice,
@@ -59,9 +59,32 @@ import { LaunchController } from './launch'
 import { actionFlags, type DocumentDetail, type LaunchDescriptor } from './parse'
 import { SaveCoordinator, toStatus, type IntentAccess } from './save-coordinator'
 import type { SyncStoreAccess, SyncStoreOpen } from '../uniwork-sync/session-store'
-import { createIntentStore, INTENT_STORE_REGISTRATION } from '../uniwork-sync/intent-store'
+import {
+  createIntentStore,
+  INTENT_STORE_REGISTRATION,
+  type IntentStore,
+} from '../uniwork-sync/intent-store'
 import { migrateLegacyIntents } from '../uniwork-sync/migration'
 import { APP_STORE_LEVEL } from '../uniwork-sync/store-level'
+import { createDocLock, type DocLock } from '../uniwork-sync/doc-lock'
+import {
+  createDraftStore,
+  DRAFTS_STORE_REGISTRATION,
+  type DraftStore,
+} from '../uniwork-sync/queue/drafts'
+import {
+  createPauseStore,
+  PAUSE_STORE_REGISTRATION,
+  type PauseStore,
+} from '../uniwork-sync/queue/pause'
+import {
+  QueueDispatcher,
+  type QueueCapabilityRead,
+  type QueueDoc,
+} from '../uniwork-sync/queue/dispatcher'
+import { isTerminalQueueState, type IntentRecordV2 } from '../uniwork-sync/queue/record'
+import type { StoreRecords } from '../uniwork-sync/store'
+import { queueChipState, type SaveQueueEngine } from './save-coordinator'
 
 /**
  * UniWork documents in the shell main process: the picker reads, the open
@@ -187,6 +210,12 @@ export interface UniworkDocsServiceDeps {
   ui: ConflictUi
   pushStatus(status: UniworkDocStatus): void
   pushLaunch(event: UniworkLaunchEvent): void
+  /**
+   * The org capability cache (the same one the sync runtime reads), for the
+   * save queue's lane verdicts. Absent = writes allowed (tests that never read
+   * a capability); the production wiring passes the runtime's cache.
+   */
+  capability?: { get(orgId: string): Promise<QueueCapabilityRead> }
   /** a working copy refused by the newer-store guard (S11 lock panel) */
   pushLock?(lock: UniworkDocLock): void
   /**
@@ -371,6 +400,48 @@ export function coreSemver(version: string): string {
   return /^\d+\.\d+\.\d+/.exec(version.trim())?.[0] ?? version
 }
 
+/**
+ * The save queue of the live session, or why it cannot be reached. `ok` hands
+ * back the dispatcher and the three stores it was built from; a locked keychain
+ * and a session without a store are the two refusals a save can meet.
+ */
+type QueueEngineAccess =
+  | {
+      kind: 'ok'
+      /** the session's unique id (see isQueueSessionCurrent) */
+      id: string
+      token: string
+      dispatcher: QueueDispatcher
+      lock: DocLock
+      intents: IntentStore
+      drafts: DraftStore
+      pause: PauseStore
+    }
+  | { kind: 'keystore_locked' }
+  | { kind: 'unavailable' }
+
+/** what a queue call reports when the engine cannot be built (nothing was done) */
+const EMPTY_DISPATCH = { dispatched: 0, parked: 0, outcomes: new Map() }
+
+/**
+ * The chip a queue record maps onto, or null for a record that leaves the chip
+ * where it is (a committed/cancelled record is spent; the front's own settle or
+ * cancel already moved the binding). This is the ONE mapping from a durable
+ * queue state to the binding a restart reads back.
+ */
+function queueBindingPatch(record: IntentRecordV2): Partial<Binding> | null {
+  const state = queueChipState(record.state)
+  if (!state) return null
+  const error = record.lastError
+  const patched: Partial<Binding> = { state }
+  if (state === 'paused_admin') patched.error = 'capability_off'
+  else if (state === 'paused_offline') patched.error = 'network'
+  else if (state === 'blocked') patched.error = error ?? 'server_error'
+  else if (state === 'reconciling-stuck') patched.error = error ?? 'intent_unknown'
+  else if (state === 'failed') patched.error = error ?? 'server_error'
+  return patched
+}
+
 export class UniworkDocsService {
   readonly store: BindingStore
   readonly coordinator: SaveCoordinator
@@ -404,6 +475,34 @@ export class UniworkDocsService {
   private storeOpenKind: SyncStoreOpen['kind'] | 'unknown' = 'unknown'
   /** scopes whose schema 1 -> 2 sweep has finished in this process */
   private readonly migratedScopes = new Set<string>()
+  /**
+   * The save queue of the live session: one `QueueDispatcher` per account
+   * boundary, built lazily the first time the session's store opens and torn
+   * down when the scope is wiped (sign-out / switch). It carries the account
+   * scope and a per-window lock owner, so two windows contend for one document.
+   */
+  private queueSession: {
+    /** a unique id per built session; the dispatcher's canCommit guard reads it */
+    id: string
+    token: string
+    dispatcher: QueueDispatcher
+    lock: DocLock
+    intents: IntentStore
+    drafts: DraftStore
+    pause: PauseStore
+  } | null = null
+  /** the per-window lock owner (one window = one service instance) */
+  private readonly windowOwner = `${process.pid}:${randomUUID()}`
+  /** the document keys the current poll pass is dispatching (see dispatcherBusy) */
+  private readonly queueInFlight = new Set<string>()
+  /**
+   * A read-only window's own `blocked/other_window` status, keyed by path. It is
+   * window-local and never written to the shared binding.json: the holder reads
+   * the same file and keeps its own chip (G506-be-d1-2).
+   */
+  private readonly otherWindowStatus = new Map<string, UniworkDocStatus>()
+  /** the poll pass in flight right now, awaited by teardownSaveQueue (G506-be-4) */
+  private queuePass: Promise<void> | null = null
   /**
    * The one conflict dialog open (native dialogs are window-wide, not per
    * tab). `fromClose` = opened by the close prompt of that document's tab.
@@ -449,6 +548,59 @@ export class UniworkDocsService {
       ownsBinding: (doc) => this.owns(doc),
       intents: () => this.intentAccess(),
       publish: (status) => this.publish(status),
+      capability: {
+        get: (orgId) =>
+          deps.capability
+            ? deps.capability.get(orgId)
+            : Promise.resolve({
+                kind: 'ok',
+                capabilities: { sync_write: true },
+                source: 'default',
+              }),
+      },
+      pause: {
+        isPaused: async () => (await this.queueStores())?.pause.isPaused() ?? false,
+        setPaused: async (paused) =>
+          (await this.queueStores())?.pause.setPaused(paused) ?? { kind: 'interrupted' },
+      },
+      drafts: {
+        keep: async (key, snapshot, meta) =>
+          (await this.queueStores())?.drafts.keep(key, snapshot, meta) ?? 'keystore_locked',
+      },
+      // The queue front: the coordinator's own `save` still runs the inline
+      // pipeline (it never calls these), so the injected dispatcher serves only
+      // the EXPERIENCE actions. Each is a no-op while the engine cannot be built
+      // (a locked keychain, a store without the queue's registrations): the save
+      // itself is refused by `intents()` before any of this is reached.
+      dispatcher: {
+        mint: async (input) => (await this.requireQueueEngine()).mint(input),
+        enqueue: async (doc) => (await this.requireQueueEngine()).enqueue(doc),
+        dispatchAll: async (docs) =>
+          (await this.queueEngineOrNull())?.dispatchAll(docs) ?? EMPTY_DISPATCH,
+        reconcile: async (doc, now) =>
+          (await this.queueEngineOrNull())?.reconcile(doc, now) ?? doc.record.state,
+        recheck: async (doc, now) =>
+          (await this.queueEngineOrNull())?.recheck(doc, now) ?? doc.record.state,
+        pause: async () => {
+          await (await this.queueEngineOrNull())?.pause()
+        },
+        resume: async (docs) => (await this.queueEngineOrNull())?.resume(docs) ?? [],
+        cancel: async (doc, options) =>
+          (await this.queueEngineOrNull())?.cancel(doc, options) ?? doc.record.state,
+        discard: async (doc, options) =>
+          (await this.queueEngineOrNull())?.discard(doc, options) ?? doc.record.state,
+        supersede: async (doc) => {
+          const engine = await this.queueEngineOrNull()
+          const st = (await engine?.supersede(doc)) ?? doc.record.state
+          return st
+        },
+        tombstone: async (doc) =>
+          (await this.queueEngineOrNull())?.tombstone(doc) ?? doc.record.state,
+        isOtherWindow: (key) => this.queueSession?.dispatcher.isOtherWindow(key) === true,
+      },
+      // the queue engine exposes no public in-flight state, so the service
+      // reports the keys its own poll pass is running right now (G506-be-1)
+      dispatcherBusy: (key) => this.queueInFlight.has(key),
       ...(deps.sleep ? { sleep: deps.sleep } : {}),
     })
     this.launch = new LaunchController({
@@ -500,6 +652,10 @@ export class UniworkDocsService {
    * the rest are never hidden by the editor state.
    */
   private present(status: UniworkDocStatus): UniworkDocStatus {
+    // a read-only window's own status wins for THIS window (never written to the
+    // shared binding, so the holder is unaffected) - G506-be-d1-2
+    const overlay = this.otherWindowStatus.get(status.path)
+    if (overlay) return overlay
     const quiet = status.state === 'ready' || status.state === 'saved'
     return quiet && status.access === 'edit' && this.editorDirty.has(status.path)
       ? { ...status, state: 'dirty' }
@@ -730,6 +886,421 @@ export class UniworkDocsService {
       }
     }
     return open.kind === 'keystore_locked' ? { kind: 'keystore_locked' } : { kind: 'unavailable' }
+  }
+
+  // ---- durable save queue (G5-06 W4b) ---------------------------------------
+
+  /**
+   * The save queue of the live session, built on the first store open and
+   * rebuilt if the scope moved. It is one `QueueDispatcher` per account
+   * boundary, over the same durable layer the intent store lives in: the three
+   * queue stores (`intents`, `drafts`, `pause`), a document lock owned by this
+   * window under the account store root, and the shared capability cache the
+   * sync runtime reads. The dispatcher's `publish` re-maps a record onto the
+   * document's binding, so a dispatched state lands on the chip too.
+   */
+  private async queueEngine(): Promise<QueueEngineAccess> {
+    const sync = this.deps.syncStore
+    if (!sync) return { kind: 'unavailable' }
+    const open = await this.openSyncStore()
+    if (open.kind !== 'ok') {
+      return open.kind === 'keystore_locked' ? { kind: 'keystore_locked' } : { kind: 'unavailable' }
+    }
+    const scope = sync.scope()
+    if (!scope) return { kind: 'unavailable' }
+    const token = `${scope.deploymentId}/${scope.accountId}`
+    if (this.queueSession?.token === token) return { kind: 'ok', ...this.queueSession }
+    const records = (name: string): StoreRecords => open.records(name)
+    const intents = createIntentStore(records(INTENT_STORE_REGISTRATION.name))
+    const drafts = createDraftStore(records(DRAFTS_STORE_REGISTRATION.name))
+    const pause = createPauseStore(records(PAUSE_STORE_REGISTRATION.name))
+    const lock = createDocLock({
+      root: this.store.root,
+      scope,
+      clock: () => Date.now(),
+      owner: this.windowOwner,
+    })
+    // the session this dispatcher belongs to: the canCommit guard below reads
+    // this exact id, so a torn-down or switched session reads false
+    const id = randomUUID()
+    const dispatcher = new QueueDispatcher({
+      intents: async () => ({ kind: 'ok', intents }),
+      client: {
+        upload: (input) =>
+          this.api().upload({ ...input, format: input.format as UniworkDocFormat }),
+        commit: (input) => this.api().commit(input),
+        lookupCommit: (input) => this.api().lookupCommit(input),
+      },
+      capability: {
+        get: (orgId) =>
+          this.deps.capability
+            ? this.deps.capability.get(orgId)
+            : Promise.resolve({
+                kind: 'ok',
+                capabilities: { sync_write: true },
+                source: 'default',
+              }),
+      },
+      lock,
+      pause,
+      drafts,
+      clock: () => Date.now(),
+      // an account switch (or a sign-out) between the upload and the commit
+      // must not commit this copy under the other account: the dispatcher
+      // re-asks this right before the upload and right before the commit
+      canCommit: (doc) => {
+        const bound = this.store.lookup(doc.path)
+        return (
+          this.isQueueSessionCurrent({ id }) &&
+          this.deps.identity() !== null &&
+          bound !== null &&
+          this.owns(bound)
+        )
+      },
+      publish: (record) => this.publishRecord(record),
+    })
+    this.queueSession = { id, token, dispatcher, lock, intents, drafts, pause }
+    return { kind: 'ok', ...this.queueSession }
+  }
+
+  /**
+   * The queue engine of the live session, or null when it cannot be reached
+   * right now (a locked keychain, no session). Never throws: a save that cannot
+   * reach the queue falls back to the legacy pipeline.
+   */
+  private async queueEngineOrNull(): Promise<SaveQueueEngine | null> {
+    try {
+      const access = await this.queueEngine()
+      return access.kind === 'ok' ? access.dispatcher : null
+    } catch {
+      return null
+    }
+  }
+
+  /**
+   * The queue engine for the coordinator's injected dispatcher: it throws when
+   * the store cannot be reached, which the front treats like any other queue
+   * failure (the intent stays, nothing is sent).
+   */
+  private async requireQueueEngine(): Promise<QueueDispatcher> {
+    const access = await this.queueEngine()
+    if (access.kind !== 'ok') throw new UniworkDocError('keystore_locked')
+    return access.dispatcher
+  }
+
+  /** the pause + drafts stores of the live session, or null when unreachable */
+  private async queueStores(): Promise<{ pause: PauseStore; drafts: DraftStore } | null> {
+    try {
+      const access = await this.queueEngine()
+      return access.kind === 'ok' ? { pause: access.pause, drafts: access.drafts } : null
+    } catch {
+      return null
+    }
+  }
+
+  /**
+   * The queue's status push: it lands on the document's binding too, so a
+   * dispatched state (queued / paused_* / reconciling / blocked) is what the
+   * chip reads after a restart, and the shell window is told. A record with no
+   * live binding (a version copy, or one of another account) is dropped.
+   */
+  private publishRecord(record: IntentRecordV2): void {
+    void this.applyRecord(record)
+  }
+
+  /** resolve the live session's working copy of a document, or null */
+  private async boundDocFor(documentId: string): Promise<BoundDocument | null> {
+    const identity = this.deps.identity()
+    if (!identity) return null
+    const dir = this.store.dirFor(identity.deploymentId, identity.accountId, documentId)
+    const binding = await this.store.readDir(dir)
+    if (!binding || binding.documentId !== documentId) return null
+    const doc = this.store.lookup(join(dir, binding.filename))
+    return doc && this.ownsLocally(doc) ? doc : null
+  }
+
+  /** a queue record change: move the chip, or settle the base on a commit */
+  private async applyRecord(record: IntentRecordV2): Promise<void> {
+    const doc = await this.boundDocFor(record.documentId)
+    if (!doc) return
+    if (record.state === 'blocked' && record.lastError === 'other_window') {
+      // a read-only window's own status: pushed to THIS window only, never the
+      // shared binding.json - the holder reads the same file and must keep its
+      // own chip (G506-be-d1-2)
+      const local: UniworkDocStatus = {
+        ...this.statusOf(doc),
+        state: 'blocked',
+        error: 'other_window',
+      }
+      this.otherWindowStatus.set(doc.path, local)
+      this.publish(local)
+      return
+    }
+    // a real record change ends the window-local read-only status
+    this.otherWindowStatus.delete(doc.path)
+    if (record.state === 'committed') {
+      await this.settleFromRecord(doc, record)
+      return
+    }
+    const patch = queueBindingPatch(record)
+    if (patch) await this.coordinator.commitState(doc, { ...doc.binding, ...patch })
+  }
+
+  /**
+   * A queue-dispatched commit landed: the base moves to the receipt's revision
+   * and the intent's checksum, exactly as the inline settle does. The record is
+   * the queue's own, so its checksum is what these bytes are; the file decides
+   * only whether the copy is clean (`saved`) or has moved on (`dirty`).
+   */
+  private async settleFromRecord(doc: BoundDocument, record: IntentRecordV2): Promise<void> {
+    if (!record.receipt) return
+    let current: string | null
+    try {
+      current = sha256Hex(new Uint8Array(await readFile(doc.path)))
+    } catch {
+      current = null
+    }
+    const next: Binding = {
+      ...doc.binding,
+      baseRevision: record.receipt.revision,
+      baseVersion: record.receipt.version,
+      baseChecksum: record.checksum,
+      state: current === record.checksum ? 'saved' : 'dirty',
+      lastSavedAt: new Date().toISOString(),
+    }
+    delete next.error
+    delete next.serverRevision
+    await this.coordinator.commitState(doc, next)
+  }
+
+  /**
+   * One pending intent per document, from the binding store's folders of the
+   * live scope: the payload bytes come from the durable intent record itself,
+   * so the drafts folder is never read at startup (see EXPERIENCE - Queue
+   * rows). A folder whose binding is not the live session's, or which holds no
+   * pending intent, is skipped.
+   */
+  private async pendingQueueDocs(): Promise<QueueDoc[]> {
+    const sync = this.deps.syncStore
+    const scope = sync?.scope()
+    if (!scope) return []
+    const access = await this.intentAccess()
+    if (access.kind !== 'ok') return []
+    const docs: QueueDoc[] = []
+    for (const dir of scopeWorkingCopyDirs(this.store.root, scope)) {
+      const binding = await this.store.readDir(dir)
+      if (!binding) continue
+      const key = basename(dir)
+      const stored = await access.intents.read(key, {
+        orgId: binding.orgId,
+        workspaceId: binding.workspaceId,
+        baseVersion: binding.baseVersion,
+        length: 0,
+      })
+      if (!stored || isTerminalQueueState(stored.intent.state)) continue
+      // the inline pipeline is saving this very key right now: one writer per
+      // intent, so the poll leaves it to the pipeline (G506-be-1)
+      if (this.coordinator.isSaving(join(dir, binding.filename))) continue
+      docs.push({
+        key,
+        path: join(dir, binding.filename),
+        filename: binding.filename,
+        format: binding.format,
+        orgId: stored.intent.orgId || binding.orgId,
+        workspaceId: stored.intent.workspaceId || binding.workspaceId,
+        baseVersion: stored.intent.baseVersion || binding.baseVersion,
+        record: stored.intent,
+        payload: stored.payload,
+      })
+    }
+    return docs
+  }
+
+  /**
+   * One poll pass of the durable save queue: enumerate the pending intents,
+   * advance their reconciling clocks (`tick`) and dispatch what can move
+   * (`dispatchAll`). Called on sign-in and on the sync interval (see
+   * wiring's `onPoll`), never on its own timer.
+   */
+  async pollSaveQueue(): Promise<void> {
+    const pass = this.runQueuePass()
+    // teardownSaveQueue awaits this very pass, so it must be observable while it runs
+    this.queuePass = pass
+    try {
+      await pass
+    } finally {
+      if (this.queuePass === pass) this.queuePass = null
+    }
+  }
+
+  /** one poll pass; see pollSaveQueue */
+  private async runQueuePass(): Promise<void> {
+    const access = await this.queueEngine()
+    if (access.kind !== 'ok') return
+    // a teardown may have marked this session dead while the store was opening:
+    // a dead session dispatches nothing (G506-be-4)
+    if (!this.isQueueSessionCurrent(access)) return
+    const docs = await this.pendingQueueDocs()
+    if (docs.length === 0) return
+    if (!this.isQueueSessionCurrent(access)) return
+    // the keys this pass is about to run, marked BEFORE `tick`: the inline
+    // pipeline skips them for the WHOLE pass, so the poll's tick/reconcile and
+    // its dispatch never race a Save of the same intent (G506-be-1, d1-3)
+    for (const doc of docs) this.queueInFlight.add(doc.key)
+    try {
+      await access.dispatcher.tick(docs)
+      await access.dispatcher.dispatchAll(docs)
+    } finally {
+      for (const doc of docs) this.queueInFlight.delete(doc.key)
+    }
+  }
+
+  /**
+   * The session's connectivity changed (a network failure or a successful
+   * request the service already saw): move the waiting intents with it. Going
+   * online wakes the `paused_offline` ones (the next poll dispatches them);
+   * going offline parks the waiting ones. A store that cannot be read right now
+   * is left alone - nothing may move without being persisted.
+   */
+  async setQueueOnline(online: boolean): Promise<void> {
+    const access = await this.queueEngine()
+    if (access.kind !== 'ok') return
+    if (!this.isQueueSessionCurrent(access)) return
+    const docs = await this.pendingQueueDocs()
+    if (docs.length === 0) return
+    await access.dispatcher.setOnline(docs, online)
+  }
+
+  /** "Tạm dừng gửi": the durable per-account pause flag (nothing is deleted) */
+  async pauseSending(): Promise<void> {
+    await this.coordinator.pause()
+  }
+
+  /** "Tiếp tục gửi": clear the flag and move waiting intents back to queued */
+  async resumeSending(): Promise<void> {
+    await this.coordinator.resume(await this.pendingQueueDocs())
+  }
+
+  /** "Hủy lần lưu" of one document; `closed` = its tab is closed -> kept draft */
+  async cancelSave(path: string, closed = false): Promise<void> {
+    const doc = typeof path === 'string' ? this.store.lookup(path) : null
+    if (!doc || !this.ownsLocally(doc)) return
+    const queueDoc = await this.queueDocFromStore(doc)
+    if (!queueDoc) return
+    await this.coordinator.cancel(queueDoc, {
+      documentClosed: closed,
+      title: doc.binding.title,
+    })
+    // the document is still open and its work is now unsent: the chip reads
+    // "unsaved changes" (EXPERIENCE - Cancel intent). A closed document has no
+    // chip to move; its snapshot is a kept draft.
+    if (!closed) {
+      const fresh = this.store.lookup(doc.path)
+      if (fresh) {
+        const next: Binding = { ...fresh.binding, state: 'dirty' }
+        delete next.error
+        await this.coordinator.commitState(fresh, next)
+      }
+    }
+  }
+
+  /** "Bỏ lần lưu..." on a stuck intent: the snapshot becomes a kept draft */
+  async discardSave(path: string): Promise<void> {
+    const doc = typeof path === 'string' ? this.store.lookup(path) : null
+    if (!doc || !this.ownsLocally(doc)) return
+    const queueDoc = await this.queueDocFromStore(doc)
+    if (!queueDoc) return
+    await this.coordinator.discard(queueDoc, { title: doc.binding.title })
+  }
+
+  /** "Kiểm tra lại" (check again): a lookup of the intent only, never a new attempt */
+  async recheckSave(path: string): Promise<void> {
+    const doc = typeof path === 'string' ? this.store.lookup(path) : null
+    if (!doc || !this.ownsLocally(doc)) return
+    const queueDoc = await this.queueDocFromStore(doc)
+    if (!queueDoc) return
+    await this.coordinator.recheck(queueDoc)
+  }
+
+  /** true while another window holds this document's lock (this one is read-only) */
+  isOtherWindow(path: string): boolean {
+    const doc = typeof path === 'string' ? this.store.lookup(path) : null
+    return doc ? this.coordinator.isOtherWindow(doc.key) : false
+  }
+
+  /**
+   * "Ghi đè" / "Tải lại" / "Lưu lại": the old intent is superseded BEFORE the
+   * new one is minted or the base is replaced (EXPERIENCE - Superseded, :239).
+   */
+  private async supersedePending(doc: BoundDocument): Promise<void> {
+    const queueDoc = await this.queueDocFromStore(doc)
+    if (queueDoc) await this.coordinator.supersede(queueDoc)
+  }
+
+  /** the document's stored intent as a queue doc, or null when there is none */
+  private async queueDocFromStore(doc: BoundDocument): Promise<QueueDoc | null> {
+    const access = await this.intentAccess()
+    if (access.kind !== 'ok') return null
+    const stored = await access.intents.read(doc.key, {
+      orgId: doc.binding.orgId,
+      workspaceId: doc.binding.workspaceId,
+      baseVersion: doc.binding.baseVersion,
+      length: 0,
+    })
+    if (!stored || isTerminalQueueState(stored.intent.state)) return null
+    return {
+      key: doc.key,
+      path: doc.path,
+      filename: doc.binding.filename,
+      format: doc.binding.format,
+      orgId: stored.intent.orgId || doc.binding.orgId,
+      workspaceId: stored.intent.workspaceId || doc.binding.workspaceId,
+      baseVersion: stored.intent.baseVersion || doc.binding.baseVersion,
+      record: stored.intent,
+      payload: stored.payload,
+    }
+  }
+
+  /** the queue sessions whose dispatcher must not commit any more (torn down) */
+  private readonly deadQueueSessions = new Set<string>()
+
+  /**
+   * Whether `session` is still the live queue session of this service. The
+   * dispatcher's `canCommit` guard reads this right before a request, so a
+   * torn-down session commits nothing (G506-be-4). The check is the session's
+   * unique id: the service hands the dispatcher its own session value.
+   */
+  private isQueueSessionCurrent(session: { id?: string } | null | undefined): boolean {
+    const id = session?.id
+    if (!id || !this.queueSession) return false
+    return this.queueSession.id === id && !this.deadQueueSessions.has(id)
+  }
+
+  /**
+   * The account boundary wiped this scope: stop the queue before the wipe. No
+   * request runs after this, and the in-flight dispatch's lock is released.
+   */
+  private stopQueue(): void {
+    const session = this.queueSession
+    if (session) this.deadQueueSessions.add(session.id)
+    this.queueSession = null
+  }
+
+  /**
+   * The account boundary is about to wipe the live scope: mark the session dead
+   * FIRST (so an in-flight dispatch's `canCommit` reads false and sends nothing
+   * more), await any in-flight poll/dispatch - whose own `finally` releases the
+   * document locks it took - and only then drop the queue. Nothing is torn down
+   * before the in-flight pass unwinds, so no request can outlive the boundary.
+   * A later open rebuilds the queue for the next session (the scope token moves).
+   */
+  async teardownSaveQueue(): Promise<void> {
+    const session = this.queueSession
+    if (session) this.deadQueueSessions.add(session.id)
+    // the dispatcher's next `canCommit` reads false now; wait for the pass that
+    // is already running to unwind (and release its locks) before the records go
+    await this.queuePass?.catch(() => undefined)
+    this.stopQueue()
   }
 
   /** whether the durable store holds an intent for `doc`; 'locked' = unreachable now */
@@ -980,9 +1551,15 @@ export class UniworkDocsService {
   isReadOnly(path: string): boolean {
     const found: PathBinding = this.store.classify(path)
     if (found.kind === 'newer') return true
+    if (found.kind !== 'bound') return false
+    // G5-06: another window holds this document's lock: this one is read-only
+    // (EXPERIENCE - Second-window bar, :129). The queue never writes for it, and
+    // the module is told so too. No extra binding read: `classify` already gave
+    // the document key the in-memory lock map is keyed by.
     return (
-      found.kind === 'bound' &&
-      (found.doc.binding.access === 'view' || !this.ownsLocally(found.doc))
+      found.doc.binding.access === 'view' ||
+      !this.ownsLocally(found.doc) ||
+      this.coordinator.isOtherWindow(found.doc.key)
     )
   }
 
@@ -1376,10 +1953,13 @@ export class UniworkDocsService {
       return names
     } catch (error) {
       // a 403/404 is a stable answer ("names unavailable for this org"); a
-      // transient failure is not cached and is retried on the next open
+      // coded 403 maps to permission_revoked (errors.ts), so both spellings
+      // count. A transient failure is not cached and is retried on the next open.
       const stable =
         error instanceof UniworkDocError &&
-        (error.code === 'forbidden' || error.code === 'not_found')
+        (error.code === 'forbidden' ||
+          error.code === 'permission_revoked' ||
+          error.code === 'not_found')
       if (stable) {
         const empty = new Map<string, string>()
         this.orgMemberNames = empty
@@ -1651,6 +2231,9 @@ export class UniworkDocsService {
     if (b.access === 'view' || b.state === 'conflict' || this.coordinator.isSaving(doc.path)) {
       return false
     }
+    // another window holds the document lock: this window is read-only and
+    // never writes (EXPERIENCE - Second-window bar, :129)
+    if (this.coordinator.isOtherWindow(doc.key)) return false
     return !(b.state === 'blocked' && b.error !== 'quota_exceeded')
   }
 
@@ -1969,6 +2552,9 @@ export class UniworkDocsService {
     }
     delete next.error
     delete next.serverRevision
+    // "Ghi đè": the old intent is superseded BEFORE a new one is minted, so the
+    // user's snapshot is spent (superseded), never replayed against the new base
+    await this.supersedePending(doc)
     // the old base's intent is invalid on the server's revision
     await this.dropIntent(doc)
     const ready = await this.coordinator.commitState(doc, next)
@@ -1980,6 +2566,9 @@ export class UniworkDocsService {
   /** "Discard my changes and open the latest": download, replace, reload the tab */
   private async replaceWithLatest(doc: BoundDocument): Promise<BoundDocument> {
     const { detail, bytes } = await this.fetchLatest(doc.binding.documentId)
+    // "Tải lại": the old intent is superseded BEFORE the base is replaced, so
+    // it is spent (cancelled/superseded), never replayed against the new base
+    await this.supersedePending(doc)
     await this.store.writeWorkingCopy(doc.dir, doc.binding.filename, bytes)
     // the local work (and its intent) is discarded: nothing is left to replay
     await this.dropIntent(doc)
@@ -1990,6 +2579,7 @@ export class UniworkDocsService {
       baseRevision: detail.revision,
       baseVersion: detail.file.version,
       baseChecksum: sha256Hex(bytes),
+      // the old intent is superseded below; the copy reads saved
       state: 'saved',
     }
     delete next.error
@@ -2079,7 +2669,13 @@ export class UniworkDocsService {
           // copy view-only; once the server grants edit again, its local work
           // can be saved (dirty), otherwise it stays view-only
           const binding: Binding = { ...existing, title: detail.title, access }
-          if (existing.state === 'blocked' && existing.error === 'forbidden' && access === 'edit') {
+          // G5-06 W4b: the queue's refusal code is `permission_revoked` (the old
+          // `forbidden`); a re-granted edit level clears the copy for saving
+          if (
+            existing.state === 'blocked' &&
+            (existing.error === 'permission_revoked' || existing.error === 'forbidden') &&
+            access === 'edit'
+          ) {
             binding.state = 'dirty'
             delete binding.error
           }
@@ -2094,7 +2690,9 @@ export class UniworkDocsService {
           // 404): its local work can be saved once more
           if (
             existing.state === 'blocked' &&
-            (existing.error === 'not_found' || existing.error === 'deleted')
+            (existing.error === 'not_found' ||
+              existing.error === 'deleted' ||
+              existing.error === 'document_deleted')
           ) {
             binding.state = localChecksum === existing.baseChecksum ? 'ready' : 'dirty'
             delete binding.error

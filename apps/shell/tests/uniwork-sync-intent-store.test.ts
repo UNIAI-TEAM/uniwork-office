@@ -14,9 +14,13 @@ import {
   INTENT_STORE_REGISTRATION,
   createIntentStore,
   type IntentStore,
-  type PendingIntentRecord,
 } from '../src/main/uniwork-sync/intent-store'
-import { createSafeStorageKeyProvider } from '../src/main/uniwork-sync/keys'
+import { createSafeStorageKeyProvider, type StoreKeyProvider } from '../src/main/uniwork-sync/keys'
+import type {
+  IntentBindFacts,
+  IntentRecordV2,
+  PendingIntentRecord,
+} from '../src/main/uniwork-sync/queue/record'
 import { APP_STORE_LEVEL } from '../src/main/uniwork-sync/store-level'
 import {
   RECORD_IV_BYTES,
@@ -27,6 +31,7 @@ import {
   type RecordHeader,
   type StoreLayer,
 } from '../src/main/uniwork-sync/store'
+import { sealRecord } from '../src/main/uniwork-sync/store/codec'
 import {
   createLockableSafeStorage,
   runStoreCompliance,
@@ -36,14 +41,35 @@ import {
 } from '../src/main/uniwork-sync/test-kit/compliance'
 
 const SCOPE = { deploymentId: 'dep_1', accountId: 'acc_1' }
+const FACTS: IntentBindFacts = {
+  orgId: 'org_1',
+  workspaceId: 'ws_1',
+  baseVersion: 7,
+  length: 12,
+}
 
-const intent = (overrides: Partial<PendingIntentRecord> = {}): PendingIntentRecord => ({
+/** the G5-04 record, still written by callers this build has not replaced */
+const legacy = (overrides: Partial<PendingIntentRecord> = {}): PendingIntentRecord => ({
   intentId: 'intent_1',
   idempotencyKey: 'idem_1',
   documentId: 'doc_1',
   baseRevision: '9007199254740993',
   checksum: 'a'.repeat(64),
   createdAt: '2026-10-12T00:00:00.000Z',
+  ...overrides,
+})
+
+const record = (overrides: Partial<IntentRecordV2> = {}): IntentRecordV2 => ({
+  v: 2,
+  ...legacy(),
+  orgId: 'org_1',
+  workspaceId: 'ws_1',
+  baseVersion: 7,
+  length: 12,
+  generation: 1,
+  state: 'queued',
+  attempt: 0,
+  updatedAt: '2026-10-12T00:00:00.000Z',
   ...overrides,
 })
 
@@ -60,22 +86,34 @@ function makeIntentLayer(
 ): {
   layer: StoreLayer
   safeStorage: LockableSafeStorage
+  keys: StoreKeyProvider
 } {
   const safeStorage = options.safeStorage ?? createLockableSafeStorage()
+  const keys = createSafeStorageKeyProvider({ safeStorage, dir: join(base, 'keys') })
   const layer = createStoreLayer({
     root: join(base, 'records'),
-    keys: createSafeStorageKeyProvider({ safeStorage, dir: join(base, 'keys') }),
+    keys,
     budgetBytes: options.budgetBytes ?? 1 << 20,
     clock: () => 1_700_000_000_000,
   })
   layer.register(INTENT_STORE_REGISTRATION)
-  return { layer, safeStorage }
+  return { layer, safeStorage, keys }
 }
 
 async function openIntentStore(layer: StoreLayer): Promise<IntentStore> {
   const opened = await layer.open(SCOPE)
   if (opened.kind !== 'ok') throw new Error(`intent store did not open: ${opened.kind}`)
   return createIntentStore(opened.store.records(INTENT_STORE_REGISTRATION.name))
+}
+
+/** `<meta length BE><meta JSON><payload>`, the layout the store writes */
+function encodeRaw(meta: unknown, payload: Uint8Array): Uint8Array {
+  const metaBytes = Buffer.from(JSON.stringify(meta), 'utf8')
+  const out = Buffer.alloc(4 + metaBytes.length + payload.length)
+  out.writeUInt32BE(metaBytes.length, 0)
+  metaBytes.copy(out, 4)
+  out.set(payload, 4 + metaBytes.length)
+  return out
 }
 
 function forgeIntentRecord(key: string, header: RecordHeader): string {
@@ -94,25 +132,81 @@ function forgeIntentRecord(key: string, header: RecordHeader): string {
 }
 
 describe('uniwork sync intent store', () => {
-  it('round-trips the intent fields and the exact payload bytes', async () => {
+  it('round-trips a v2 record and the exact payload bytes', async () => {
     const { layer } = makeIntentLayer()
     const store = await openIntentStore(layer)
     const payload = Buffer.from([0, 1, 2, 255, 254, 0, 7, 13, 10])
-    expect(await store.put('doc-key-1', intent(), payload)).toEqual({ kind: 'ok' })
-    const value = await store.get('doc-key-1')
+    expect(await store.put('doc-key-1', record(), payload)).toEqual({ kind: 'ok' })
+    const value = await store.read('doc-key-1', FACTS)
     expect(value).not.toBeNull()
     if (!value) throw new Error('intent missing')
-    expect(value.intent).toEqual(intent())
+    expect(value.intent).toEqual(record())
     expect(Buffer.from(value.payload)).toEqual(payload)
-    expect(await store.get('another-document')).toBeNull()
+    // the stored view serves the v2 record as it is
+    expect((await store.get('doc-key-1'))?.intent).toEqual(record())
+    expect(await store.read('another-document', FACTS)).toBeNull()
+  })
+
+  it('serves a v1 record the G5-04 front wrote verbatim, and upgrades it on `read` with the facts', async () => {
+    const { layer, keys } = makeIntentLayer()
+    const store = await openIntentStore(layer)
+    const payload = Buffer.alloc(12, 7)
+    const sealed = sealRecord(
+      await keys.key(SCOPE),
+      { schema: INTENT_STORE_REGISTRATION.schema, min_store_level: APP_STORE_LEVEL },
+      encodeRaw(legacy(), payload),
+    )
+    const path = recordPath(
+      join(base, 'records'),
+      SCOPE,
+      INTENT_STORE_REGISTRATION.name,
+      'doc-key-1',
+    )
+    mkdirSync(dirname(path), { recursive: true })
+    writeFileSync(path, sealed)
+
+    // the G5-04 view: field for field what was stored
+    const stored = await store.get('doc-key-1')
+    expect(stored?.intent).toEqual(legacy())
+    expect(Buffer.from(stored?.payload ?? [])).toEqual(payload)
+
+    const value = await store.read('doc-key-1', FACTS)
+    expect(value?.intent).toEqual(
+      record({
+        updatedAt: legacy().createdAt,
+        orgId: FACTS.orgId,
+        workspaceId: FACTS.workspaceId,
+        baseVersion: FACTS.baseVersion,
+        length: FACTS.length,
+      }),
+    )
+    expect(Buffer.from(value?.payload ?? [])).toEqual(payload)
+  })
+
+  it('keeps writing a v1 put from a G5-04 caller, upgrading it on the queue read', async () => {
+    const { layer } = makeIntentLayer()
+    const store = await openIntentStore(layer)
+    const payload = Buffer.alloc(12, 3)
+    expect(await store.put('doc-key-1', legacy(), payload)).toEqual({ kind: 'ok' })
+    // stored verbatim: the G5-04 caller still sees its own record
+    expect((await store.get('doc-key-1'))?.intent).toEqual(legacy())
+    const value = await store.read('doc-key-1', FACTS)
+    expect(value?.intent.v).toBe(2)
+    expect(value?.intent.state).toBe('queued')
+    expect(value?.intent.attempt).toBe(0)
+    expect(value?.intent.generation).toBe(1)
+    expect(value?.intent.orgId).toBe('org_1')
+    expect(value?.intent.baseVersion).toBe(7)
+    expect(value?.intent.baseRevision).toBe(legacy().baseRevision)
+    expect(Buffer.from(value?.payload ?? [])).toEqual(payload)
   })
 
   it('keeps only the latest intent of a document', async () => {
     const { layer } = makeIntentLayer()
     const store = await openIntentStore(layer)
-    await store.put('doc-key-1', intent({ intentId: 'intent_1' }), Buffer.from('first'))
-    await store.put('doc-key-1', intent({ intentId: 'intent_2' }), Buffer.from('second'))
-    const value = await store.get('doc-key-1')
+    await store.put('doc-key-1', record({ intentId: 'intent_1' }), Buffer.from('first'))
+    await store.put('doc-key-1', record({ intentId: 'intent_2' }), Buffer.from('second'))
+    const value = await store.read('doc-key-1', FACTS)
     expect(value?.intent.intentId).toBe('intent_2')
     expect(value && Buffer.from(value.payload).toString()).toBe('second')
     expect(
@@ -123,16 +217,17 @@ describe('uniwork sync intent store', () => {
   it('deletes an intent and treats a repeated delete as done', async () => {
     const { layer } = makeIntentLayer()
     const store = await openIntentStore(layer)
-    await store.put('doc-key-1', intent(), Buffer.from('payload'))
+    await store.put('doc-key-1', record(), Buffer.from('payload'))
     await store.delete('doc-key-1')
     expect(await store.get('doc-key-1')).toBeNull()
+    expect(await store.read('doc-key-1', FACTS)).toBeNull()
     await expect(store.delete('doc-key-1')).resolves.toBeUndefined()
   })
 
   it('reads a corrupt record as no intent instead of throwing', async () => {
     const { layer } = makeIntentLayer()
     const store = await openIntentStore(layer)
-    await store.put('doc-key-1', intent(), Buffer.from('payload'))
+    await store.put('doc-key-1', record(), Buffer.from('payload'))
     const path = recordPath(
       join(base, 'records'),
       SCOPE,
@@ -142,7 +237,7 @@ describe('uniwork sync intent store', () => {
     const bytes = readFileSync(path)
     bytes[bytes.length - 1] = (bytes[bytes.length - 1] ?? 0) ^ 0xff
     writeFileSync(path, bytes)
-    await expect(store.get('doc-key-1')).resolves.toBeNull()
+    await expect(store.read('doc-key-1', FACTS)).resolves.toBeNull()
   })
 
   it('reads a record needing a newer store level as no intent and keeps it', async () => {
@@ -152,8 +247,23 @@ describe('uniwork sync intent store', () => {
       schema: INTENT_STORE_REGISTRATION.schema,
       min_store_level: APP_STORE_LEVEL + 1,
     })
-    await expect(store.get('doc-key-1')).resolves.toBeNull()
+    await expect(store.read('doc-key-1', FACTS)).resolves.toBeNull()
     expect(existsSync(path)).toBe(true)
+  })
+
+  it('refuses an intent whose record shape is broken', async () => {
+    const { layer } = makeIntentLayer()
+    const store = await openIntentStore(layer)
+    await expect(
+      store.put(
+        'doc-key-1',
+        { ...record(), state: 'sending' } as unknown as IntentRecordV2,
+        Buffer.from('x'),
+      ),
+    ).rejects.toThrow('invalid save intent')
+    await expect(
+      store.put('doc-key-1', { ...legacy(), intentId: '' }, Buffer.from('x')),
+    ).rejects.toThrow('invalid save intent')
   })
 
   it('reports keystore_locked when the keychain is locked', async () => {

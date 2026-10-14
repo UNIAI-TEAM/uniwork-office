@@ -198,7 +198,9 @@ describe('feed errors', () => {
   it('401 -> session_expired; anything else -> the documents mapping', () => {
     expect(parseFeedError(401, undefined)).toEqual({ kind: 'session_expired' })
     const other = parseFeedError(410, { error: { code: 'document_deleted', message: 'x' } })
-    expect(other.kind === 'other' && other.error.code).toBe('deleted')
+    // the contract's tombstone code is document_deleted (the feed passes the
+    // documents mapping through unchanged)
+    expect(other.kind === 'other' && other.error.code).toBe('document_deleted')
     const bare = parseFeedError(502, undefined)
     expect(bare.kind === 'other' && bare.error.code).toBe('server_error')
   })
