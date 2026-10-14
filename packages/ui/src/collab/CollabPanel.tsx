@@ -8,7 +8,15 @@
  * deleted frame / the notice line); a focused thread that disappears hands focus to the next thread, else
  * the panel title; resolve / reopen keeps focus on the same button after the thread moves group.
  */
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from 'react'
 import { format } from '@genoffice/i18n'
 import { announcePolite } from './live-region'
 import {
@@ -37,6 +45,14 @@ export interface CollabPanelProps {
   strings: CollabStrings
   /** absent: no close button (e.g. a tab of a larger panel) */
   onClose?(): void
+  /** optional ref to the host button that opened the panel; focused when Close is activated */
+  openerRef?: RefObject<HTMLElement | null>
+  /** optional callback invoked when Close restores focus to the host opener */
+  onRestoreFocus?(): void
+  /** optional ref to the host button that starts a new comment thread; focused when a new-thread composer is cancelled */
+  newThreadOpenerRef?: RefObject<HTMLElement | null>
+  /** optional callback invoked when a new-thread composer is cancelled or discarded */
+  onCancelThread?(): void
   renderBody?: CollabRenderBody
   renderAnchor?: CollabRenderAnchor
   renderComposer?: CollabRenderComposer
@@ -76,10 +92,61 @@ export function CollabPanel(p: CollabPanelProps) {
   const [inFileOpen, setInFileOpen] = useState(false)
   const asideRef = useRef<HTMLElement>(null)
   const titleRef = useRef<HTMLHeadingElement>(null)
+  const closeBtnRef = useRef<HTMLButtonElement>(null)
   const noticeRef = useRef<HTMLParagraphElement>(null)
   /** the thread focus was last inside, and the visible order at that moment */
   const focusedRef = useRef<{ id: string; order: string[] } | null>(null)
   const keepFocusRef = useRef<string | null>(null)
+  const panelOpenerRef = useRef<HTMLElement | null>(null)
+  const closingByBtnRef = useRef(false)
+  const prevNewThreadRef = useRef(ctl.newThread)
+  const newThreadOpenerRef = useRef<HTMLElement | null>(null)
+  const afterNewThreadRef = useRef<
+    | { kind: 'cancel'; insertAt: number; opener: HTMLElement | null }
+    | { kind: 'send'; prevIds: Set<string>; insertAt: number; opener: HTMLElement | null }
+    | null
+  >(null)
+
+  if (ctl.newThread !== prevNewThreadRef.current) {
+    if (ctl.newThread && !prevNewThreadRef.current && typeof document !== 'undefined') {
+      const active = document.activeElement
+      newThreadOpenerRef.current =
+        active instanceof HTMLElement &&
+        active !== document.body &&
+        !active.closest('.collab-thread--new')
+          ? active
+          : null
+    }
+    prevNewThreadRef.current = ctl.newThread
+  }
+
+  useLayoutEffect(() => {
+    const active = document.activeElement
+    if (
+      active instanceof HTMLElement &&
+      active !== document.body &&
+      !asideRef.current?.contains(active)
+    ) {
+      panelOpenerRef.current = active
+    }
+    return () => {
+      if (!closingByBtnRef.current) return
+      closingByBtnRef.current = false
+      const activeNow = document.activeElement
+      if (!activeNow || activeNow === document.body) {
+        const target = p.openerRef?.current ?? panelOpenerRef.current
+        if (target?.isConnected) target.focus()
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // V14-04: calling startThread while a new-thread composer is already open moves focus back to its textarea
+  useEffect(() => {
+    if (!ctl.newThread) return
+    const ta = asideRef.current?.querySelector<HTMLTextAreaElement>('.collab-thread--new textarea')
+    if (ta && document.activeElement !== ta) ta.focus()
+  }, [ctl.newThread])
 
   const title = host.kind === 'discussion' ? strings.collabDiscussion : strings.collabComments
   const visible: CollabThreadView[] = ctl.resolvedOpen
@@ -143,6 +210,50 @@ export function CollabPanel(p: CollabPanelProps) {
   // a reload replaced the list: keep focus where it was, or move it to the next thread if it vanished
   const visibleKey = visibleIds.join('\u0000')
   useLayoutEffect(() => {
+    const afterNt = afterNewThreadRef.current
+    if (!ctl.newThread && afterNt) {
+      const fallbackHeading = (insertAt: number) => {
+        const headings = asideRef.current?.querySelectorAll<HTMLElement>(
+          'ul.collab-list > li[data-thread-id] [data-thread-heading]',
+        )
+        return headings && headings.length > 0
+          ? (headings[Math.min(insertAt, headings.length - 1)] ?? headings[0] ?? null)
+          : null
+      }
+      if (afterNt.kind === 'cancel') {
+        afterNewThreadRef.current = null
+        const active = document.activeElement
+        if (!active || active === document.body || !active.isConnected) {
+          const target =
+            (afterNt.opener?.isConnected ? afterNt.opener : null) ??
+            fallbackHeading(afterNt.insertAt) ??
+            closeBtnRef.current ??
+            titleRef.current
+          target?.focus()
+        }
+      } else {
+        const created = ctl.threads.find((t) => !afterNt.prevIds.has(t.id))
+        const createdHeading = created
+          ? asideRef.current?.querySelector<HTMLElement>(
+              `[data-thread-id="${cssEscape(created.id)}"] [data-thread-heading]`,
+            )
+          : null
+        if (createdHeading) {
+          afterNewThreadRef.current = null
+          createdHeading.focus()
+        } else {
+          const active = document.activeElement
+          if (!active || active === document.body || !active.isConnected) {
+            const target =
+              fallbackHeading(afterNt.insertAt) ??
+              (afterNt.opener?.isConnected ? afterNt.opener : null) ??
+              closeBtnRef.current ??
+              titleRef.current
+            target?.focus()
+          }
+        }
+      }
+    }
     const keep = keepFocusRef.current
     if (keep) {
       const btn = asideRef.current?.querySelector<HTMLElement>(
@@ -175,7 +286,7 @@ export function CollabPanel(p: CollabPanelProps) {
     focusedRef.current = null
     ;(next ?? titleRef.current)?.focus()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visibleKey])
+  }, [ctl.newThread, visibleKey])
 
   const onFocusCapture = (e: React.FocusEvent) => {
     const item = (e.target as HTMLElement).closest<HTMLElement>('[data-thread-id]')
@@ -220,6 +331,7 @@ export function CollabPanel(p: CollabPanelProps) {
       host,
       adapter: ctl.adapter,
     }
+    const insertAt = collabInsertIndex(ctl.threads, nt.anchor, ctl.adapter)
     return (
       <li
         key="__new"
@@ -240,8 +352,25 @@ export function CollabPanel(p: CollabPanelProps) {
             draftKey: `root:${JSON.stringify(nt.anchor)}`,
             ...disabled,
             autoFocus: true,
-            onSubmit: (body) => ctl.actions.create(body, nt),
-            onCancel: ctl.cancelThread,
+            onSubmit: async (body) => {
+              const prevIds = new Set(ctl.threads.map((t) => t.id))
+              const opener = p.newThreadOpenerRef?.current ?? newThreadOpenerRef.current
+              afterNewThreadRef.current = { kind: 'send', prevIds, insertAt, opener }
+              try {
+                await ctl.actions.create(body, nt)
+                newThreadOpenerRef.current = null
+              } catch (err) {
+                afterNewThreadRef.current = null
+                throw err
+              }
+            },
+            onCancel: () => {
+              const opener = p.newThreadOpenerRef?.current ?? newThreadOpenerRef.current
+              afterNewThreadRef.current = { kind: 'cancel', insertAt, opener }
+              newThreadOpenerRef.current = null
+              ctl.cancelThread()
+              p.onCancelThread?.()
+            },
           })}
         </div>
       </li>
@@ -356,6 +485,23 @@ export function CollabPanel(p: CollabPanelProps) {
     keepFocusRef.current = threadId
   }
 
+  function handleClose() {
+    closingByBtnRef.current = true
+    p.onClose?.()
+    p.onRestoreFocus?.()
+    const target = p.openerRef?.current ?? panelOpenerRef.current
+    const active = document.activeElement
+    if (
+      target?.isConnected &&
+      (!active ||
+        active === document.body ||
+        active === closeBtnRef.current ||
+        asideRef.current?.contains(active))
+    ) {
+      target.focus()
+    }
+  }
+
   return (
     <aside
       ref={asideRef}
@@ -373,10 +519,11 @@ export function CollabPanel(p: CollabPanelProps) {
         )}
         {p.onClose && (
           <button
+            ref={closeBtnRef}
             type="button"
             className="collab-ico collab-close"
             aria-label={format(strings.collabClosePanel ?? '', { panel: title ?? '' })}
-            onClick={p.onClose}
+            onClick={handleClose}
           >
             <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
               <path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" strokeWidth="1.6" />

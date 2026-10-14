@@ -280,17 +280,27 @@ describe('draft', () => {
   })
 })
 
-describe('root composer: Esc and Cancel when empty (W11F)', () => {
-  it.each(['root', 'discussion'] as const)(
-    '%s: Esc in an empty composer is left to the host (not consumed, nothing cancelled)',
-    (mode) => {
-      const m = render({ mode })
-      const ev = key('Escape')
-      expect(ev.defaultPrevented).toBe(false)
-      expect(m.onCancel).not.toHaveBeenCalled()
-      expect(dialog()).toBeNull()
-    },
-  )
+describe('root vs discussion composer: Esc and Cancel when empty (V14-01 / V15-02)', () => {
+  it('discussion: Esc in an empty composer is left to the host (not consumed, nothing cancelled)', () => {
+    const m = render({ mode: 'discussion' })
+    const ev = key('Escape')
+    expect(ev.defaultPrevented).toBe(false)
+    expect(m.onCancel).not.toHaveBeenCalled()
+    expect(dialog()).toBeNull()
+  })
+
+  it('root: Esc in an empty new-thread composer is consumed and cancels at once without a Discard dialog', () => {
+    const m = render({ mode: 'root' })
+    const hostEsc = vi.fn()
+    host.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !e.defaultPrevented) hostEsc()
+    })
+    const ev = key('Escape')
+    expect(ev.defaultPrevented).toBe(true)
+    expect(hostEsc).not.toHaveBeenCalled()
+    expect(m.onCancel).toHaveBeenCalledTimes(1)
+    expect(dialog()).toBeNull()
+  })
 
   it.each(['root', 'discussion'] as const)(
     '%s: Esc with text still asks before discarding, and is consumed',
@@ -320,22 +330,28 @@ describe('root composer: Esc and Cancel when empty (W11F)', () => {
     expect(m.onCancel).toHaveBeenCalledTimes(1)
   })
 
-  it.each(['root', 'discussion'] as const)(
-    '%s: Cancel is not offered while empty, and appears once there is text',
+  it('discussion: Cancel is not offered while empty, and appears once there is text', () => {
+    render({ mode: 'discussion' })
+    expect(buttons().some((b) => b.textContent === 'Cancel')).toBe(false)
+    type('x')
+    expect(buttons().some((b) => b.textContent === 'Cancel')).toBe(true)
+    type('')
+    expect(buttons().some((b) => b.textContent === 'Cancel')).toBe(false)
+  })
+
+  it.each(['root', 'reply', 'edit'] as const)(
+    '%s keeps secondary Cancel while empty and cancels at once on click',
     (mode) => {
-      render({ mode })
-      expect(buttons().some((b) => b.textContent === 'Cancel')).toBe(false)
-      type('x')
-      expect(buttons().some((b) => b.textContent === 'Cancel')).toBe(true)
-      type('')
-      expect(buttons().some((b) => b.textContent === 'Cancel')).toBe(false)
+      const m = render({ mode, initialBody: mode === 'edit' ? 'same' : undefined })
+      const cancelBtn = buttonByText('Cancel')
+      expect(cancelBtn).toBeTruthy()
+      expect(cancelBtn.classList.contains('collab-composer-btn')).toBe(true)
+      expect(cancelBtn.classList.contains('collab-composer-btn-send')).toBe(false)
+      act(() => cancelBtn.click())
+      expect(m.onCancel).toHaveBeenCalledTimes(1)
+      expect(dialog()).toBeNull()
     },
   )
-
-  it.each(['reply', 'edit'] as const)('%s keeps Cancel while empty', (mode) => {
-    render({ mode, initialBody: mode === 'edit' ? 'same' : undefined })
-    expect(buttons().some((b) => b.textContent === 'Cancel')).toBe(true)
-  })
 })
 
 describe('Esc and cancel', () => {
@@ -396,6 +412,17 @@ describe('Esc and cancel', () => {
     )
     expect(m.onCancel).toHaveBeenCalledTimes(1)
     expect(loadDraft(DRAFT_KEY)).toBeNull()
+  })
+
+  it('Discard on a persistent composer (discussion) clears the text box and keeps focus in the textarea instead of BODY', () => {
+    render({ mode: 'discussion' })
+    type('draft post')
+    act(() => buttonByText('Cancel').click())
+    act(() =>
+      [...dialog()!.querySelectorAll('button')].find((b) => b.textContent === 'Discard')!.click(),
+    )
+    expect(ta().value).toBe('')
+    expect(document.activeElement).toBe(ta())
   })
 
   it('the Cancel button follows the same rule', () => {

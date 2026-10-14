@@ -3,10 +3,12 @@ import { readFileSync } from 'node:fs'
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { CollabComposer } from '../src/collab/CollabComposer'
 import { CollabPanel } from '../src/collab/CollabPanel'
 import { useCollabThreads, type CollabController } from '../src/collab/use-collab-threads'
 import type { CollabHostState, CollabSource } from '../src/collab/types'
 import { COLLAB_LIVE_REGION_ID } from '../src/collab/live-region'
+import { COMPOSER_STRINGS } from './collab-composer-fixtures'
 import { EN, cm, err, fakeSource, flush, host, list, type FakeSource } from './collab-kit'
 
 let el: HTMLDivElement
@@ -169,7 +171,7 @@ describe('delete', () => {
 })
 
 describe('edit', () => {
-  it('textarea labelled Edit; Esc without changes closes', async () => {
+  it('textarea labelled Edit; Esc or Cancel without changes closes and restores focus to the comment menu trigger', async () => {
     const src = fakeSource(list([cm({ id: 'a', author_id: 'me', body: 'old' })]))
     await mount(src)
     await click(btn(EN.collabEdit, await openMenu('a')))
@@ -181,9 +183,15 @@ describe('edit', () => {
     expect(document.activeElement).toBe(area)
     await key(area, 'Escape')
     expect($('.collab-edit')).toBeNull()
+    expect(document.activeElement).toBe($('[data-comment-id="a"] button[aria-haspopup="menu"]'))
+
+    await click(btn(EN.collabEdit, await openMenu('a')))
+    await click(btn(EN.collabCancel, $('.collab-edit')!))
+    expect($('.collab-edit')).toBeNull()
+    expect(document.activeElement).toBe($('[data-comment-id="a"] button[aria-haspopup="menu"]'))
   })
 
-  it('Esc with changes asks; Keep writing is the default and returns to the box; Discard closes', async () => {
+  it('Esc with changes asks; Keep writing is the default and returns to the box; Discard closes and restores focus to the comment menu trigger', async () => {
     const src = fakeSource(list([cm({ id: 'a', author_id: 'me', body: 'old' })]))
     await mount(src)
     await click(btn(EN.collabEdit, await openMenu('a')))
@@ -200,9 +208,10 @@ describe('edit', () => {
     await click(btn(EN.collabDiscard))
     expect($('.collab-edit')).toBeNull()
     expect(src.update).not.toHaveBeenCalled()
+    expect(document.activeElement).toBe($('[data-comment-id="a"] button[aria-haspopup="menu"]'))
   })
 
-  it('Save sends the update', async () => {
+  it('Save (button and Ctrl+Enter) sends the update and restores focus to the comment menu trigger', async () => {
     const src = fakeSource(list([cm({ id: 'a', author_id: 'me', body: 'old' })]))
     await mount(src)
     await click(btn(EN.collabEdit, await openMenu('a')))
@@ -210,6 +219,15 @@ describe('edit', () => {
     await click(btn(EN.collabSave))
     expect(src.update).toHaveBeenCalledWith({ comment_id: 'a', body: 'new' })
     expect($('.collab-edit')).toBeNull()
+    expect(document.activeElement).toBe($('[data-comment-id="a"] button[aria-haspopup="menu"]'))
+
+    await click(btn(EN.collabEdit, await openMenu('a')))
+    const area2 = $<HTMLTextAreaElement>('.collab-edit textarea')!
+    await type(area2, 'newer')
+    await key(area2, 'Enter', { ctrlKey: true })
+    expect(src.update).toHaveBeenLastCalledWith({ comment_id: 'a', body: 'newer' })
+    expect($('.collab-edit')).toBeNull()
+    expect(document.activeElement).toBe($('[data-comment-id="a"] button[aria-haspopup="menu"]'))
   })
 
   it('auto-grows the edit textarea to fit multi-line content up to max-height with scroll (V14-11)', async () => {
@@ -344,6 +362,73 @@ describe('resolve / reply / conflict', () => {
     expect(box.textContent).toContain(EN.collabCommentDeleted)
     await click(btn(EN.collabCopyText, box))
     expect(writeText).toHaveBeenCalledWith('keep me')
+  })
+
+  it('reply composer: Cancel, Discard, and Send (button and Ctrl+Enter) restore focus to the Reply button', async () => {
+    const src = fakeSource(list([cm({ id: 'a' })], 't1'))
+    await act(async () => {
+      root.render(
+        createElement(function H() {
+          ctl = useCollabThreads(src, host(), { strings: EN })
+          return createElement(CollabPanel, {
+            controller: ctl,
+            strings: EN,
+            renderComposer: (slot) =>
+              createElement(CollabComposer, {
+                ...slot,
+                strings: { ...EN, ...COMPOSER_STRINGS },
+              }),
+          })
+        }),
+      )
+      await flush()
+    })
+
+    const replyBtn = () => btn(EN.collabReply, $('[data-thread-id="a"]')!)!
+
+    // 1. Empty reply Cancel (via Escape) -> focus returns to Reply button
+    replyBtn().focus()
+    await click(replyBtn())
+    let replyTa = $<HTMLTextAreaElement>('[data-thread-id="a"] textarea')!
+    expect(document.activeElement).toBe(replyTa)
+    await key(replyTa, 'Escape')
+    expect($('[data-thread-id="a"] textarea')).toBeNull()
+    expect(document.activeElement).toBe(replyBtn())
+
+    // 2. Dirty reply Discard -> focus returns to Reply button
+    await click(replyBtn())
+    replyTa = $<HTMLTextAreaElement>('[data-thread-id="a"] textarea')!
+    await type(replyTa, 'draft reply')
+    await click(btn(EN.collabCancel, $('[data-thread-id="a"]')!))
+    await click(btn(EN.collabDiscard))
+    expect($('[data-thread-id="a"] textarea')).toBeNull()
+    expect(document.activeElement).toBe(replyBtn())
+
+    // 3. Reply Send via button -> focus returns to Reply button
+    await click(replyBtn())
+    replyTa = $<HTMLTextAreaElement>('[data-thread-id="a"] textarea')!
+    await type(replyTa, 'first reply')
+    await click(btn(EN.collabSend, $('[data-thread-id="a"]')!))
+    expect(src.create).toHaveBeenCalledWith({
+      kind: 'comment',
+      parent_id: 'a',
+      body: 'first reply',
+    })
+    expect($('[data-thread-id="a"] textarea')).toBeNull()
+    expect(document.activeElement).toBe(replyBtn())
+
+    // 4. Reply Send via Ctrl+Enter -> focus returns to Reply button
+    await click(replyBtn())
+    replyTa = $<HTMLTextAreaElement>('[data-thread-id="a"] textarea')!
+    await type(replyTa, 'second reply')
+    await key(replyTa, 'Enter', { ctrlKey: true })
+    expect(src.create).toHaveBeenLastCalledWith({
+      kind: 'comment',
+      parent_id: 'a',
+      body: 'second reply',
+    })
+    expect($('[data-thread-id="a"] textarea')).toBeNull()
+    expect(document.activeElement).toBe(replyBtn())
   })
 })
 
