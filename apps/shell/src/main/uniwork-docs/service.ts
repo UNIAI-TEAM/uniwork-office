@@ -2964,7 +2964,7 @@ export class UniworkDocsService {
       .catch(() => null)
     const previousBinding = fresh.binding
     await this.store.writeWorkingCopy(fresh.dir, fresh.binding.filename, fetched.bytes)
-    const next: Binding = {
+    const reloaded: Binding = {
       ...previousBinding,
       title: fetched.detail.title,
       access: accessFor(fetched.detail.myLevel),
@@ -2973,6 +2973,10 @@ export class UniworkDocsService {
       baseChecksum: sha256Hex(fetched.bytes),
       state: 'saved',
     }
+    // the base moved to the fetched head: the anchor base and the comments
+    // level come from the read, so an id or level it does not name is dropped
+    delete reloaded.baseVersionId
+    const next = withServerContext(reloaded, fetched.detail)
     delete next.error
     delete next.serverRevision
     delete next.serverVersion
