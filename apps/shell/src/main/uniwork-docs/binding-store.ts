@@ -197,6 +197,16 @@ const STATES: ReadonlySet<string> = new Set([
   'offline',
   'signed-out',
   'error',
+  // G5-06 durable save queue: the chip states an intent's record maps onto
+  // (see save-coordinator's queueBindingPatch). They are written to the binding
+  // so a restart reads the same chip, and must read back like any other state.
+  'queued',
+  'paused_offline',
+  'paused_user',
+  'paused_admin',
+  'reconciling',
+  'reconciling-stuck',
+  'failed',
 ])
 
 function segment(value: string): string {

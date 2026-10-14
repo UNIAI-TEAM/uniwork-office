@@ -75,19 +75,23 @@ export interface LiveResponse {
 }
 
 export interface LiveApi {
-  /** one real request; a transport failure throws a LiveApiError with status 0 */
+  /**
+   * one real request; a transport failure throws a LiveApiError with status 0.
+   * `headers` carries the extra headers a route needs (the G5-07 commit-intent
+   * lookup is addressed by `Idempotency-Key`, never by the URL).
+   */
   request(
     step: string,
     method: string,
     path: string,
-    options?: { token?: string; body?: unknown },
+    options?: { token?: string; body?: unknown; headers?: Record<string, string> },
   ): Promise<LiveResponse>
   /** the same, but a non-2xx answer throws a LiveApiError naming method, path and status */
   ok(
     step: string,
     method: string,
     path: string,
-    options?: { token?: string; body?: unknown },
+    options?: { token?: string; body?: unknown; headers?: Record<string, string> },
   ): Promise<LiveResponse>
   count(): number
 }
@@ -98,6 +102,9 @@ export function createLiveApi(origin: string): LiveApi {
     const headers: Record<string, string> = { Accept: 'application/json' }
     if (options.token) headers.Authorization = `Bearer ${options.token}`
     if (options.body !== undefined) headers['Content-Type'] = 'application/json'
+    // a route's own header (the commit-intent lookup's Idempotency-Key) rides
+    // last, so it can override a default; a token never enters this map
+    Object.assign(headers, options.headers ?? {})
     let response: Response
     try {
       response = await fetch(`${origin}${path}`, {
@@ -356,6 +363,104 @@ export function tamperCursor(cursor: string): string {
   const at = head + Math.floor((tail - head) / 2)
   const replacement = cursor[at] === 'A' ? 'B' : 'A'
   return cursor.slice(0, at) + replacement + cursor.slice(at + 1)
+}
+
+/**
+ * One page of `GET /api/v1/documents/{id}/versions` (newest first): the count
+ * and the version ids/ordinals. The AC-4 save-queue suite uses it as the
+ * "exactly one version" oracle - a commit or a dispatch that appended a
+ * version changes the count, a replay or a lookup-only settle does not.
+ */
+export async function listDocumentVersions(
+  api: LiveApi,
+  token: string,
+  documentId: string,
+): Promise<{ count: number; ids: string[]; versions: number[] }> {
+  const raw = await api.ok(
+    'versions:list',
+    'GET',
+    `/api/v1/documents/${encodeURIComponent(documentId)}/versions`,
+    { token },
+  )
+  const versions = (raw.body as { versions?: unknown } | undefined)?.versions
+  if (!Array.isArray(versions)) {
+    throw new Error('versions:list: the response carries no versions array')
+  }
+  const rows = versions as Array<Record<string, unknown>>
+  return {
+    count: rows.length,
+    ids: rows.map((row) => String(row.id)),
+    versions: rows.map((row) => Number(row.version)),
+  }
+}
+
+/** one file document seeded through the multipart create route */
+export interface SeededFileDocument {
+  documentId: string
+  /** decimal string */
+  revision: string
+  currentVersion: number
+}
+
+/**
+ * Create one FILE document through the D API's multipart route
+ * (`POST /api/v1/workspaces/{workspaceID}/documents/files`) - the seeding call
+ * the G7-01 harness makes (`document-step.mjs`, pinned by `api-contract.mjs`).
+ * The save-queue suite needs a file document (only file documents take staged
+ * versions); the response carries the id, the revision and the current version
+ * so a new version can be staged against them.
+ */
+export async function seedFileDocument(
+  origin: string,
+  token: string,
+  workspaceId: string,
+  filename: string,
+  bytes: Uint8Array,
+): Promise<SeededFileDocument> {
+  const path = '/api/v1/workspaces/{workspaceID}/documents/files'
+  const form = new FormData()
+  // the text field precedes the file part: the server streams the file part
+  // and a title that trails it would fall back to the file name
+  form.set('title', filename)
+  form.set('file', new Blob([bytes as BlobPart], { type: 'application/octet-stream' }), filename)
+  let response: Response
+  try {
+    response = await fetch(
+      `${origin}/api/v1/workspaces/${encodeURIComponent(workspaceId)}/documents/files`,
+      {
+        method: 'POST',
+        headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+        body: form,
+        signal: AbortSignal.timeout(30_000),
+      },
+    )
+  } catch (error) {
+    const reason = error instanceof Error ? error.name : 'unknown'
+    throw new LiveApiError('seed:create-file-document', 'POST', path, 0, `network:${reason}`)
+  }
+  const text = await response.text()
+  if (response.status < 200 || response.status >= 300) {
+    throw new LiveApiError(
+      'seed:create-file-document',
+      'POST',
+      path,
+      response.status,
+      envelopeCode(parseJson(text)),
+    )
+  }
+  const doc = (parseJson(text) as { document?: Record<string, unknown> } | undefined)?.document
+  if (!doc || typeof doc.id !== 'string' || doc.id.length === 0) {
+    throw new Error('seed:create-file-document: the response carries no document id')
+  }
+  if (typeof doc.revision !== 'string' || !/^\d{1,30}$/.test(doc.revision)) {
+    throw new Error('seed:create-file-document: the response revision is not a decimal string')
+  }
+  const currentVersion = Number(doc.current_version ?? 0)
+  return {
+    documentId: doc.id,
+    revision: doc.revision,
+    currentVersion: Number.isSafeInteger(currentVersion) ? currentVersion : 0,
+  }
 }
 
 /** wait past a point in time; used only where the run must observe an expiry */
