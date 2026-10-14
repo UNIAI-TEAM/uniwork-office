@@ -46,4 +46,12 @@ describe('pdf certificate signing strings', () => {
       )
     }
   })
+
+  it('pt is Brazilian Portuguese, like the rest of the PDF app (R3-3)', () => {
+    // European forms the shard used before: the password prompt for opening a PDF says "Senha"
+    const europeanForms =
+      /ficheiro|palavra-passe|guard(?:ar|e|ad[oa])|contacto|ecrã|\bA (?:verificar|assinar)\b/i
+    const hits = certKeys.filter((key) => europeanForms.test(dicts.pt![key] ?? ''))
+    expect(hits, `pt shard still has European Portuguese in: ${hits.join(', ')}`).toEqual([])
+  })
 })
