@@ -40,6 +40,7 @@ vi.mock('electron', () => {
   }
 })
 
+const { appMenuLabels, viewMenuTemplate } = await import('@genoffice/electron-utils')
 const { chromeFollowsUiScale, withViewMenu } = await import('../src/main/ui-scale-menu')
 
 const labels = {
@@ -96,4 +97,43 @@ describe('the interface-scale View items (R1-4)', () => {
     expect(accelerators().filter((a) => a === 'CmdOrCtrl+Alt+=')).toHaveLength(1)
     expect(state.items.map((i) => i.label)).toEqual(['File', 'View', 'Help'])
   })
+
+  it.each([
+    ['vi', 'Hiển thị'],
+    ['it', 'Vista'],
+    ['nl', 'Weergave'],
+    ['pt', 'Visualização'],
+    ['hi', 'व्यू'],
+  ] as const)(
+    'appends scale items to the existing Sheets View menu in %s instead of inserting a duplicate (R2-4)',
+    async (lang, shellMenuView) => {
+      const { Menu } = await import('electron')
+      const appLabels = appMenuLabels(lang)
+      expect(appLabels.view).not.toBe(shellMenuView)
+      state.items = Menu.buildFromTemplate([
+        { label: 'File', submenu: [] },
+        viewMenuTemplate(appLabels, { pageZoom: false }),
+        { label: appLabels.window, submenu: [] },
+        { label: appLabels.help, role: 'help' },
+      ]).items as unknown as FakeItem[]
+
+      const shellLabel = (key: keyof typeof labels) =>
+        key === 'menuView' ? shellMenuView : labels[key]
+
+      withViewMenu('sheets', shellLabel, () => '/tmp/settings.json')
+      withViewMenu('sheets', shellLabel, () => '/tmp/settings.json')
+
+      expect(state.items.map((i) => i.label)).toEqual([
+        'File',
+        appLabels.view,
+        appLabels.window,
+        appLabels.help,
+      ])
+      const viewSubmenu = state.items[1]?.submenu?.items ?? []
+      expect(viewSubmenu.map((i) => i.accelerator).filter(Boolean)).toContain('CmdOrCtrl+Alt+=')
+      expect(viewSubmenu.map((i) => i.accelerator).filter(Boolean)).toContain('CmdOrCtrl+Alt+-')
+      expect(viewSubmenu.map((i) => i.accelerator).filter(Boolean)).toContain('CmdOrCtrl+Alt+0')
+      expect(accelerators().filter((a) => a === 'CmdOrCtrl+Alt+=')).toHaveLength(1)
+    },
+  )
 })
