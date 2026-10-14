@@ -100,7 +100,11 @@ describe('AgentLoop', () => {
     })
     expect(loop.busy).toBe(false)
     // user message carries the skill context
-    expect(loop.messages[0]).toEqual({ role: 'user', text: 'question\n\nCTX' })
+    expect(loop.messages[0]).toEqual({
+      role: 'user',
+      text: 'question\n\nCTX',
+      instruction: 'question',
+    })
     expect(loop.messages[1]).toEqual({ role: 'assistant', text: 'Hello, world' })
   })
 
@@ -115,7 +119,12 @@ describe('AgentLoop', () => {
     const images = [{ base64: 'AAAA', mime: 'image/png' }]
     loop.run('describe the image', images)
     await flush()
-    expect(loop.messages[0]).toEqual({ role: 'user', text: 'describe the image\n\nCTX', images })
+    expect(loop.messages[0]).toEqual({
+      role: 'user',
+      text: 'describe the image\n\nCTX',
+      images,
+      instruction: 'describe the image',
+    })
     expect('images' in (loop.messages[0] as object)).toBe(true)
   })
 

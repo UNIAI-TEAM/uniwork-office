@@ -64,4 +64,9 @@ export const ru = {
   aiErrUnsupported: 'UniWork AI пока не умеет делать это в {module}.',
   aiErrViewOnlyEdit:
     'У вас есть только доступ на просмотр этого документа, поэтому ИИ не может его редактировать.',
+  // UniWork AI question limits (the façade takes text up to 8,000 characters)
+  aiErrQuestionTooLong:
+    'Запрос слишком длинный для UniWork AI. Сократите его до 8 000 символов и отправьте снова.',
+  aiErrQuestionRejected: 'UniWork AI не может принять этот запрос. Измените его и отправьте снова.',
+  aiUniworkImagesNotSent: 'Изображения не отправляются в UniWork AI; отправлен только ваш текст.',
 } satisfies Record<keyof typeof zh, string>

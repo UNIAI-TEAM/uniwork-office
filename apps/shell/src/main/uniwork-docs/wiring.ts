@@ -45,7 +45,11 @@ import { createSyncStoreAccess, type SyncStoreAccess } from '../uniwork-sync/ses
 import { createStoreLayer, type StoreLayer } from '../uniwork-sync/store'
 import { createFeedClient, type FeedClient } from '../uniwork-sync/feed/client'
 import { createCapabilityFetch } from '../uniwork-sync/capability/client'
-import { CapabilityCache, NEVER_READ_CAPABILITIES } from '../uniwork-sync/capability/cache'
+import {
+  CapabilityCache,
+  NEVER_READ_CAPABILITIES,
+  type CapabilityRead,
+} from '../uniwork-sync/capability/cache'
 import { createUniworkDocsClient, type FetchLike, type UniworkDocsClient } from './client'
 import {
   UniworkDocsService,
@@ -295,6 +299,24 @@ export interface UniworkDocsHandle {
    * once sign-in completes, and routes launch links from now on.
    */
   activate(startLaunch: (route: (url: string) => void) => void): void
+  /**
+   * G6-05: the UniWork binding a UniWork AI turn runs against (document +
+   * its org), 'hidden' for another account's copy, null for a local file.
+   */
+  aiBinding(path: string): { documentId: string; orgId: string } | 'hidden' | null
+  /** G6-05: the per-org capability read (shared cache, TTL rule) UniWork AI availability uses */
+  capabilityRead(orgId: string): Promise<CapabilityRead>
+}
+
+/** the binding of a path as UniWork AI sees it (see UniworkDocsHandle.aiBinding) */
+export function uniworkAiBinding(
+  service: Pick<UniworkDocsService, 'store' | 'owns'>,
+  path: string,
+): { documentId: string; orgId: string } | 'hidden' | null {
+  const doc = service.store.lookup(path)
+  if (!doc) return service.store.isInside(path) ? 'hidden' : null
+  if (!service.owns(doc)) return 'hidden'
+  return { documentId: doc.binding.documentId, orgId: doc.binding.orgId }
 }
 
 /** encrypted bytes the account's sync store (intents, cursors, index) may keep */
@@ -696,6 +718,8 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     service,
     boundary,
     comments,
+    aiBinding: (path) => uniworkAiBinding(service, path),
+    capabilityRead: (orgId) => runtime.capabilityRead(orgId),
     activate(startLaunch) {
       let signedIn = uniworkAccount().status().state === 'signed-in'
       /** the org the feed currently runs for; null = no pass may run */

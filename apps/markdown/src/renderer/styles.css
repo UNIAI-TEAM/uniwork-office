@@ -1269,6 +1269,14 @@ html.genoffice-popover-open .ribbon-tabs {
   color: var(--md-error);
 }
 
+/* a UniWork AI status line or note (a Retry-After wait, a restart, a provider boundary, a dropped
+   call, "off"): set apart from the reply, never a failure; the colour is inherited (light + dark) */
+.ai-msg-notice {
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .ai-md p,
 .ai-md ul,
 .ai-md ol {

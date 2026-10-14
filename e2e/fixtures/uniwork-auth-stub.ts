@@ -346,10 +346,9 @@ export async function startUniworkAuthStub(
     const entitled = reason === null
     const toolsOn = cloudMode === 'ready' || cloudMode === 'credits_exhausted'
     const tools = Object.fromEntries(
-      ['web_search', 'image_search', 'image_generate', 'media_analyze', 'transcribe'].map((t) => [
-        t,
-        entitled && toolsOn,
-      ]),
+      ['web_search', 'image_search', 'image_generate', 'media_analyze', 'transcribe', 'chat'].map(
+        (t) => [t, entitled && toolsOn],
+      ),
     )
     return {
       enabled: entitled,

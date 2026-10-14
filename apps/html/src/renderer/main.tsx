@@ -5,6 +5,7 @@ import { PresentView } from './PresentView'
 import { LocaleProvider } from './i18n/locale'
 import type { UiTheme } from '../shared/ipc'
 import { applyAiPanelPrefs, installScreenTips } from '@genoffice/ui'
+import { mirrorUniworkAiFlag } from '@genoffice/ai-provider/browser'
 import '@genoffice/ui/tokens.css'
 import '@genoffice/ui/screentip.css'
 import '@genoffice/ui/ai-model-picker.css'
@@ -18,6 +19,8 @@ import '@genoffice/ui/image-dialogs.css'
 import './styles.css'
 
 installScreenTips()
+// this renderer's own provider list shows the UniWork AI entry only while the shell offers it
+mirrorUniworkAiFlag()
 
 function applyTheme(theme: UiTheme): void {
   if (theme === 'system') document.documentElement.removeAttribute('data-theme')

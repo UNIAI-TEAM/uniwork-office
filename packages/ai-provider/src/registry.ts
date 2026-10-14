@@ -1,15 +1,15 @@
 import { OPENROUTER_API_BASE } from './openrouter'
 import { ANTHROPIC_BASE_URL } from './protocols/anthropic'
 import { GEMINI_BASE_URL } from './protocols/gemini'
-import { AI_PROVIDERS, DEEPSEEK_V41_FLASH } from './providers'
+import { AI_PROVIDERS, DEEPSEEK_V41_FLASH, UNIWORK_PROVIDER_META } from './providers'
 import type { AiProviderConfig, AiProviderId, AiProviderMeta } from './types'
 
 /** Wire protocols every provider maps onto, including the official Codex app-server bridge. */
 export type AiProtocol = 'anthropic' | 'gemini' | 'openai-compatible' | 'codex-app-server'
 
 export interface ProviderCapabilities {
-  /** How the provider authenticates: OpenRouter/user key, or the Codex CLI's existing login. */
-  auth: 'api-key' | 'codex-chatgpt'
+  /** How the provider authenticates: OpenRouter/user key, the Codex CLI's existing login, or the UniWork session (UniWork AI). */
+  auth: 'api-key' | 'codex-chatgpt' | 'uniwork-session'
   /** chat models accept image input (declarative; for custom endpoints it is assumed, not known) */
   vision: boolean
 }
@@ -364,6 +364,17 @@ export const AI_PROVIDER_ADAPTERS: Record<AiProviderId, ProviderAdapter> = {
         baseUrl: normalizeBaseUrl(config.baseUrl, ''),
         ...(modelHasFixedSampling(config.model) ? { omitTemperature: true } : {}),
       }
+    },
+  },
+  uniwork: {
+    meta: UNIWORK_PROVIDER_META,
+    // the host's session transport carries auth; the server's policy picks the model
+    capabilities: { auth: 'uniwork-session', vision: false },
+    resolveEndpoint() {
+      // never a BYOK endpoint: the adapter (./uniwork/protocol.ts) talks to the UniWork façade route
+      throw new Error(
+        'UniWork AI has no provider endpoint; it is streamed through the UniWork adapter',
+      )
     },
   },
 }

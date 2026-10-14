@@ -65,4 +65,10 @@ export const pt = {
   aiErrUnsupported: 'O UniWork AI ainda não consegue fazer isso em {module}.',
   aiErrViewOnlyEdit:
     'Você só tem acesso de visualização a este documento, então a IA não pode editá-lo.',
+  // UniWork AI question limits (the façade takes text up to 8,000 characters)
+  aiErrQuestionTooLong:
+    'Sua solicitação é longa demais para o UniWork AI. Reduza para menos de 8.000 caracteres e envie novamente.',
+  aiErrQuestionRejected:
+    'O UniWork AI não pôde aceitar esta solicitação. Altere-a e envie novamente.',
+  aiUniworkImagesNotSent: 'Imagens não são enviadas ao UniWork AI; apenas o seu texto foi enviado.',
 } satisfies Record<keyof typeof zh, string>

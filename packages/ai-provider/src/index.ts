@@ -22,6 +22,7 @@ export type {
 } from './types'
 export {
   AI_PROVIDERS,
+  UNIWORK_PROVIDER_META,
   DEFAULT_MAX_OUTPUT_TOKENS,
   MAX_MAX_OUTPUT_TOKENS,
   MIN_MAX_OUTPUT_TOKENS,
@@ -31,7 +32,9 @@ export {
   maxOutputTokensOf,
   resolveAiSettings,
   selectedProvider,
+  setUniworkAiAvailable,
   uniAiOpenRouterKey,
+  uniworkAiAvailable,
   withUniAiOpenRouterAuth,
 } from './providers'
 export {
@@ -57,6 +60,12 @@ export {
 } from './media'
 export type { MediaCapability } from './media'
 export * from './uniwork-cloud'
+export * from './uniwork/types'
+export { setUniworkChatTransport, uniworkChatTransport } from './uniwork/transport'
+export { streamUniwork } from './uniwork/protocol'
+export type { UniworkTurnRequest } from './uniwork/protocol'
+export { UniworkError, uniworkErrorKey } from './uniwork/errors'
+export { UniworkConversations, uniworkConversations } from './uniwork/conversation'
 export * from './ai-notice'
 export * from './ai-test-failure'
 export {

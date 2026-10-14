@@ -39,4 +39,6 @@ export const fr = {
   aiTestErrUnavailable: 'Le service ne répond pas. Réessayez plus tard',
   aiTestErrMisconfigured:
     'Réglages incomplets : vérifiez l’adresse du service et les champs du compte',
+  setAiUniworkNote:
+    "UniWork AI utilise l'offre de votre organisation. Aucune clé ni aucun modèle à configurer.",
 } satisfies Record<keyof typeof zh, string>

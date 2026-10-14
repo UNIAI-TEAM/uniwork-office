@@ -37,4 +37,6 @@ export const ru = {
   aiTestErrLimit: 'Достигнут лимит провайдера. Повторите позже',
   aiTestErrUnavailable: 'Сервис не отвечает. Повторите позже',
   aiTestErrMisconfigured: 'Настройки неполные: проверьте адрес сервиса и поля учётной записи',
+  setAiUniworkNote:
+    'UniWork AI работает по тарифу вашей организации. Ключ и модель указывать не нужно.',
 } satisfies Record<keyof typeof zh, string>

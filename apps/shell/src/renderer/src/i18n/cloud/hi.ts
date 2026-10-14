@@ -36,4 +36,6 @@ export const hi = {
   aiTestErrLimit: 'प्रदाता की सीमा पूरी हो गई। बाद में फिर कोशिश करें',
   aiTestErrUnavailable: 'सेवा जवाब नहीं दे रही। बाद में फिर कोशिश करें',
   aiTestErrMisconfigured: 'सेटिंग अधूरी हैं: सेवा का पता और खाते के फ़ील्ड जाँचें',
+  setAiUniworkNote:
+    'UniWork AI आपके संगठन के प्लान का उपयोग करता है। कोई कुंजी या मॉडल सेट करने की ज़रूरत नहीं है।',
 } satisfies Record<keyof typeof zh, string>

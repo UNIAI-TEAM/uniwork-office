@@ -1,4 +1,6 @@
 import {
+  aiUniworkText,
+  isUniworkQuestionRefusal,
   aiPanelWidthAtPointer,
   AiPanelSideButton,
   AiModelPicker,
@@ -9,7 +11,15 @@ import {
 import { useEffect, useRef, useState } from 'react'
 import type { Editor } from '@tiptap/core'
 import type { Block } from '@genoffice/docx-engine'
-import { AgentLoop, composeSkills, streamText, type AgentImage } from '@genoffice/agent-core'
+import {
+  AgentLoop,
+  composeSkills,
+  endsQuietly,
+  noticePatch,
+  streamText,
+  type AgentImage,
+  type PanelNote,
+} from '@genoffice/agent-core'
 import {
   aiNoticeBody,
   aiNoticeKind,
@@ -63,7 +73,7 @@ import { currentDocGeneration } from '../file-actions'
 import { createFilesSkill } from './files-skill'
 import { boundChatHistory } from './chat-retention'
 import { createElectronTransport } from './transport'
-import { useI18n, t as tModule, aiLangDirective, type StringKey } from '../i18n/locale'
+import { useI18n, t as tModule, aiLangDirective, getLang, type StringKey } from '../i18n/locale'
 import { Markdown } from '@genoffice/ui'
 import { AiComposer, AiScopeQuote, AiTypingIndicator, type AiScopeQuoteData } from '@genoffice/ui'
 import sendEnterOn from '../assets/send-enter-on.png'
@@ -127,6 +137,10 @@ interface ChatEntry {
   scope?: AiScopeQuoteData
   /** answered ask_clarification cards of this message's run (view-only receipts) */
   clarifyReceipts?: ClarifyQa[][]
+  /** UniWork AI: the transport is waiting out a Retry-After; the run goes on, Stop is the only action */
+  waitLine?: string | undefined
+  /** UniWork AI: restarted conversation / provider boundary / dropped call, shown above the answer */
+  notes?: PanelNote[] | undefined
 }
 
 /** longest selection excerpt echoed on a user bubble */
@@ -842,7 +856,22 @@ export function AiPanel({
       ]),
       captureSnapshot: () => captureRunSnapshot(editorRef.current, sideStateRef.current),
       events: {
-        onText: (text) => patchLastAssistant({ text }),
+        onText: (text) => patchLastAssistant({ text, waitLine: undefined }),
+        // module-level getLang: the loop is created once, the component's lang would go stale
+        onNotice: (notice) => {
+          // the question was not sent: it goes back into the composer for the user to send again
+          if (notice.kind === 'conversation-restarted')
+            setInput((current) => current || lastInstructionRef.current)
+          patchLastAssistant(
+            (last) =>
+              noticePatch(
+                last,
+                notice,
+                (key, params) => aiUniworkText(getLang(), key, params),
+                'Docs',
+              ) ?? {},
+          )
+        },
         onToolStart: (call) => {
           // Live "running" chip: replaced in place by onToolExecuted
           patchLastAssistant((last) => ({
@@ -889,7 +918,7 @@ export function AiPanel({
           })
         },
         onTurnEnd: () => {
-          patchLastAssistant({ streaming: false })
+          patchLastAssistant({ streaming: false, waitLine: undefined })
           setChat((prev) =>
             boundChatHistory([...prev, { role: 'assistant', text: '', streaming: true }]),
           )
@@ -904,8 +933,12 @@ export function AiPanel({
             : baseText
           patchLastAssistant((last) => ({
             streaming: false,
+            waitLine: undefined,
             turnLimit,
-            text: finalText || (last.tools?.length ? last.text : tModule('aiNoReply')),
+            // a restarted conversation or UniWork AI being off ends the turn on purpose: the note is the whole reply
+            text:
+              finalText ||
+              (last.tools?.length || endsQuietly(last.notes) ? last.text : tModule('aiNoReply')),
             // A stop mid-tool can leave a running placeholder behind — drop it
             tools: last.tools?.filter((tl) => !tl.running),
             snapshot: runSnapshotRef.current ?? undefined,
@@ -921,6 +954,10 @@ export function AiPanel({
           }
         },
         onError: (error) => {
+          // a refused question (too long, rejected) was not answered: it goes back into the composer
+          // to be shortened or fixed, as the message says
+          if (isUniworkQuestionRefusal(error))
+            setInput((current) => current || lastInstructionRef.current)
           setChat((prev) => {
             const next = [...prev]
             const last = next.at(-1)
@@ -928,6 +965,7 @@ export function AiPanel({
               next[next.length - 1] = {
                 ...last,
                 streaming: false,
+                waitLine: undefined,
                 error,
                 tools: last.tools?.filter((tl) => !tl.running),
                 snapshot: runSnapshotRef.current ?? undefined,
@@ -1450,6 +1488,7 @@ export function AiPanel({
             !entry.text &&
             !entry.streaming &&
             !entry.error &&
+            !entry.notes?.length &&
             !entry.tools?.length
           ) {
             return null
@@ -1473,6 +1512,17 @@ export function AiPanel({
               {entry.role === 'user' && entry.scope && <AiScopeQuote scope={entry.scope} />}
               {entry.role === 'user' && entry.attachments && entry.attachments.length > 0 && (
                 <SentAttachments atts={entry.attachments} previews={attachmentPreviews} />
+              )}
+              {/* one persistent, empty-until-needed live region: a node that mounts with its text is often not announced */}
+              {entry.role === 'assistant' && (
+                <div className="ai-msg-live" aria-live="polite">
+                  {entry.notes?.map((note, k) => (
+                    <div key={`un${k}`} className="ai-msg-notice">
+                      {note.text}
+                    </div>
+                  ))}
+                  {entry.waitLine && <div className="ai-msg-notice">{entry.waitLine}</div>}
+                </div>
               )}
               {entry.role === 'assistant' && !entry.text && entry.streaming ? (
                 <span className="ai-typing-row">
@@ -1549,32 +1599,36 @@ export function AiPanel({
                       )}
                     </button>
                   )}
-                  {isLast && !busy && lastInstructionRef.current && !aiNoticeKind(entry.error) && (
-                    <button
-                      className="ai-msg-tool-btn"
-                      onClick={retry}
-                      aria-label={t('aiRegenerateTitle')}
-                      data-tip={t('aiRegenerateTitle')}
-                    >
-                      {/* 24-canvas glyph at 18px (near-full-bleed paths, sized for optical
-                          parity with the copy icon): stroke 1.5 paints 1.125px (1:16) */}
-                      <svg
-                        style={{ width: 18, height: 18 }}
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden
+                  {isLast &&
+                    !busy &&
+                    lastInstructionRef.current &&
+                    !aiNoticeKind(entry.error) &&
+                    !isUniworkQuestionRefusal(entry.error) && (
+                      <button
+                        className="ai-msg-tool-btn"
+                        onClick={retry}
+                        aria-label={t('aiRegenerateTitle')}
+                        data-tip={t('aiRegenerateTitle')}
                       >
-                        <path d="M3.68881 9.85339C4.1791 8.0054 5.28205 6.30704 6.9459 5.09101C10.8046 2.27085 16.2188 3.11279 19.0389 6.97147C19.7242 7.90904 20.1932 8.93842 20.4553 10.0001" />
-                        <path d="M2.00452 8.46411L2.87229 10.7059C2.96814 10.9535 3.24658 11.0765 3.4942 10.9807L5.73594 10.1129" />
-                        <path d="M20.3308 14.4908C19.8405 16.3388 18.7376 18.0372 17.0738 19.2532C13.215 22.0734 7.80083 21.2314 4.98071 17.3728C4.22167 16.3342 3.72792 15.183 3.48686 13.9999" />
-                        <path d="M22.0151 15.8801L21.1474 13.6384C21.0515 13.3908 20.7731 13.2677 20.5255 13.3636L18.2837 14.2314" />
-                      </svg>
-                    </button>
-                  )}
+                        {/* 24-canvas glyph at 18px (near-full-bleed paths, sized for optical
+                          parity with the copy icon): stroke 1.5 paints 1.125px (1:16) */}
+                        <svg
+                          style={{ width: 18, height: 18 }}
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden
+                        >
+                          <path d="M3.68881 9.85339C4.1791 8.0054 5.28205 6.30704 6.9459 5.09101C10.8046 2.27085 16.2188 3.11279 19.0389 6.97147C19.7242 7.90904 20.1932 8.93842 20.4553 10.0001" />
+                          <path d="M2.00452 8.46411L2.87229 10.7059C2.96814 10.9535 3.24658 11.0765 3.4942 10.9807L5.73594 10.1129" />
+                          <path d="M20.3308 14.4908C19.8405 16.3388 18.7376 18.0372 17.0738 19.2532C13.215 22.0734 7.80083 21.2314 4.98071 17.3728C4.22167 16.3342 3.72792 15.183 3.48686 13.9999" />
+                          <path d="M22.0151 15.8801L21.1474 13.6384C21.0515 13.3908 20.7731 13.2677 20.5255 13.3636L18.2837 14.2314" />
+                        </svg>
+                      </button>
+                    )}
                   {entry.snapshot && (
                     <>
                       {/* hairline between reply actions (icons) and the document action (icon+label);
