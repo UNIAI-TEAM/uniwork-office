@@ -1828,6 +1828,10 @@ function withCharIndents(
     ),
     // the save path cancels these when it rebuilds w:ind in twips
     charIndents: chars,
+    // the editor's direct-formatting mirror: only what the paragraph's own
+    // w:ind declares (an indent the style chain provides must not become
+    // direct formatting on a round trip)
+    ...(direct ? { directCharIndents: direct } : {}),
   }
 }
 
@@ -4073,7 +4077,19 @@ function extractRuns(
       const id = attrsOf(noteRefNode)['w:id']
       if (id) {
         const num = ctx.noteNumbers.get(`${kind}:${id}`)
-        pushRun({ text: String(num ?? '*'), noteRef: { kind, id } }, rev)
+        // the marker's rPr rides along verbatim (rStyle FootnoteReference, the
+        // fonts, the size): the run skips buildRun, so without this the
+        // properties exist nowhere and any edit to the paragraph restyles the
+        // marker to a bare superscript
+        const markerRPr = findChild(node, 'w:rPr')
+        pushRun(
+          {
+            text: String(num ?? '*'),
+            noteRef: { kind, id },
+            ...(markerRPr ? { rawRPr: serializeXNode(markerRPr) } : {}),
+          },
+          rev,
+        )
         return
       }
     }

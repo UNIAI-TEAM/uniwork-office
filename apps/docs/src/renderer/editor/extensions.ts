@@ -268,6 +268,10 @@ const anchorAttrs = {
   indentLeft: { default: null as number | null },
   indentRight: { default: null as number | null },
   indentFirstLine: { default: null as number | null },
+  /** w:firstLineChars (hundredths of a character, 200 = 2 chars): the first-line
+   *  indent as a character unit — rescales with the first run's font size
+   *  (issue #1892); indentFirstLine carries the resolved twips twin */
+  indentFirstLineChars: { default: null as number | null },
   spaceBefore: { default: null as number | null },
   spaceAfter: { default: null as number | null },
   /** w:beforeAutospacing / w:afterAutospacing: Word's HTML auto spacing (14pt) replaces
@@ -649,6 +653,7 @@ const CLIPBOARD_PARA_ATTR_TYPES: Record<string, 'string' | 'number' | 'boolean'>
   indentLeft: 'number',
   indentRight: 'number',
   indentFirstLine: 'number',
+  indentFirstLineChars: 'number',
   spaceBefore: 'number',
   spaceAfter: 'number',
   spaceBeforeAuto: 'boolean',
@@ -891,8 +896,13 @@ function blockAttrs(
     styles.push(`margin-inline-end:${Number(node.attrs.indentRight) / 20}pt`)
   if (node.attrs.indentFirstLine != null) {
     const firstLine = Number(node.attrs.indentFirstLine)
+    // the character-unit indent renders in em so it rescales with the first
+    // run's font size (w:firstLineChars semantics), not frozen at the twips twin
+    const chars = Number(node.attrs.indentFirstLineChars)
+    const indent =
+      chars > 0 ? `text-indent:calc(${chars / 100}em)` : `text-indent:${firstLine / 20}pt`
     if (listGeometry && firstLine < 0) styles.push(`--li-hang:${-firstLine / 20}pt`)
-    else if (!listGeometry || firstLine > 0) styles.push(`text-indent:${firstLine / 20}pt`)
+    else if (!listGeometry || firstLine > 0) styles.push(indent)
   }
   // explicit 0 must still emit (w:after="0" overrides the style/docDefaults margin)
   // autospacing replaces the literal with Word's HTML auto value (14pt, measured);
@@ -1027,6 +1037,9 @@ export const DocNoteRef = Node.create({
       kind: { default: 'footnote' as 'footnote' | 'endnote' },
       id: { default: '' },
       num: { default: 1 },
+      // the marker run's own rPr bytes, so a styled reference survives a save
+      // that rebuilds its paragraph (same bargain as the inline image's attr)
+      rawRPr: { default: null as string | null, rendered: false },
     }
   },
   parseHTML() {
