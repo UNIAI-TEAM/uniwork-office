@@ -1371,6 +1371,13 @@ html.genoffice-popover-open .ribbon-tabs {
   color: var(--color-text-tertiary);
 }
 
+/* the one stopped line of a UniWork AI turn the user stopped (aiRunStopped) */
+.ai-run-stopped {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
 .ai-md p,
 .ai-md ul,
 .ai-md ol {
