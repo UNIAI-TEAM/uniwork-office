@@ -125,6 +125,15 @@ export function WbToastHost({
   const text = (m: WbToastText) => ('key' in m ? t(m.key, m.params) : m.text)
   const stackRef = useRef<HTMLDivElement>(null)
   const hovered = useRef(false)
+  // where the focus was before it entered the stack: a closing toast hands it back there
+  const before = useRef<HTMLElement | null>(null)
+  const close = (id: string) => {
+    const back = before.current
+    if (stackRef.current?.contains(document.activeElement) && back?.isConnected) {
+      back.focus({ preventScroll: true })
+    }
+    toasts.dismiss(id)
+  }
   // the clocks run again once neither the pointer nor the focus is in the stack
   const settle = () => {
     const focused = stackRef.current?.contains(document.activeElement) ?? false
@@ -155,7 +164,13 @@ export function WbToastHost({
             hovered.current = false
             settle()
           }}
-          onFocus={settle}
+          onFocus={(e) => {
+            const from = e.relatedTarget
+            if (from instanceof HTMLElement && !stackRef.current?.contains(from)) {
+              before.current = from
+            }
+            settle()
+          }}
           // focus is still on the old element during blur: decide once it has moved
           onBlur={() => setTimeout(settle)}
         >
@@ -172,7 +187,7 @@ export function WbToastHost({
                   type="button"
                   className="wb-link"
                   onClick={() => {
-                    toasts.dismiss(toast.id)
+                    close(toast.id)
                     a.onClick()
                   }}
                 >
@@ -184,7 +199,7 @@ export function WbToastHost({
                 className="wb-icon-btn wb-toast-close"
                 aria-label={t('wbOvDismiss')}
                 title={t('wbOvDismiss')}
-                onClick={() => toasts.dismiss(toast.id)}
+                onClick={() => close(toast.id)}
               >
                 <WbGlyph id="close" size={14} />
               </button>

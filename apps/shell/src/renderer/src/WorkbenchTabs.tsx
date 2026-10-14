@@ -178,7 +178,8 @@ export function WorkbenchTabs({
     // the row runs right to left in an RTL locale
     const forward = (e.key === 'ArrowRight') !== (document.dir === 'rtl')
     const target = pins[forward ? i + 1 : i - 1]
-    if (!target) return
+    // only non-core tabs move (spec 3): a core neighbour is a wall, not a swap partner
+    if (!target || isCorePinnedModule(target)) return
     refocus.current = id
     emitChange(reorderPinnedModules(practiceId, id, target), pillarPins)
   }

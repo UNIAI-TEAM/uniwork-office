@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import { SKILL_DOMAINS, getSkillDomain, type SkillDomainId } from '@uniwork/practice-core'
 import {
@@ -83,8 +83,18 @@ export function SkillDomainTabs({ vi, active, onSelect, onPinsChange }: Props): 
     select(id)
   }
 
+  const groupRef = useRef<HTMLDivElement>(null)
+  // the unpinned segment (and with one pin left, the ⋯ that had focus) is gone: focus the shown one
+  const refocus = useRef(false)
+  useEffect(() => {
+    if (!refocus.current) return
+    refocus.current = false
+    groupRef.current?.querySelector<HTMLElement>('.skill-domain-tab.active')?.focus()
+  })
+
   const remove = (id: SkillDomainId) => {
     const next = unpinSkillDomain(id)
+    refocus.current = true
     update(next)
     select(readActiveSkillDomain(next))
   }
@@ -97,7 +107,7 @@ export function SkillDomainTabs({ vi, active, onSelect, onPinsChange }: Props): 
 
   return (
     <div className="skill-domain-bar">
-      <div className="skill-domain-tabs" role="group" aria-label={t('wbSkTabsNav')}>
+      <div ref={groupRef} className="skill-domain-tabs" role="group" aria-label={t('wbSkTabsNav')}>
         {pins.map((id) => {
           const mod = getSkillDomain(id)
           if (!mod) return null
@@ -116,7 +126,8 @@ export function SkillDomainTabs({ vi, active, onSelect, onPinsChange }: Props): 
           )
         })}
       </div>
-      {pins.length > 1 ? (
+      {/* an agent can show a domain that is not pinned: nothing here could move or unpin it */}
+      {pins.length > 1 && at >= 0 ? (
         <WbMenuButton
           label={t('wbSkDomainMore')}
           items={[
@@ -129,7 +140,7 @@ export function SkillDomainTabs({ vi, active, onSelect, onPinsChange }: Props): 
             {
               label: t('wbSkMoveLater', { name: name(active) }),
               icon: <WbGlyph id="chevronRight" />,
-              disabled: at < 0 || at >= pins.length - 1,
+              disabled: at >= pins.length - 1,
               onSelect: () => move(1),
             },
             {

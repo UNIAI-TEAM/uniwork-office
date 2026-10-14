@@ -693,6 +693,40 @@ describe('skill domains: a segmented control (redesign spec 4.9)', () => {
     expect(onSelect).toHaveBeenLastCalledWith('health')
   })
 
+  it('unpinning down to one pin removes the ⋯: focus lands on the shown domain, not <body>', async () => {
+    store.set('uniwork.skill.domain.pins', JSON.stringify(['health', 'legal']))
+    function Harness() {
+      const [active, setActive] = useState<'health' | 'legal'>('legal')
+      return createElement(SkillDomainTabs, {
+        vi: false,
+        active,
+        onSelect: (id) => setActive(id as 'health' | 'legal'),
+      })
+    }
+    await act(async () => {
+      root.render(createElement(LocaleProvider, { initial: 'en' }, createElement(Harness)))
+    })
+    await chooseMenu(byLabel('Arrange fields')!, 'Unpin “Law & Compliance”')
+    expect(byLabel('Arrange fields')).toBeNull()
+    expect(document.activeElement).toBe(segments()[0])
+    expect(segments()[0]!.getAttribute('aria-pressed')).toBe('true')
+  })
+
+  it('a shown domain that is not pinned (an agent opened it) gets no ⋯ that could not act on it', async () => {
+    store.set('uniwork.skill.domain.pins', JSON.stringify(['health', 'legal']))
+    await act(async () => {
+      root.render(
+        createElement(
+          LocaleProvider,
+          { initial: 'en' },
+          createElement(SkillDomainTabs, { vi: false, active: 'design', onSelect: vi.fn() }),
+        ),
+      )
+    })
+    expect(segments()).toHaveLength(2)
+    expect(byLabel('Arrange fields')).toBeNull()
+  })
+
   it('Add a field is a ghost button that opens a menu of unpinned domains', async () => {
     const onSelect = await mountTabs()
     const add = buttonByText('Add a field')!

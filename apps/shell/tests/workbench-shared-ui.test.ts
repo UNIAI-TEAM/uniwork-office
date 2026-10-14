@@ -9,7 +9,7 @@ import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LocaleProvider } from '../src/renderer/src/locale'
 import { WbConfirm } from '../src/renderer/src/WbConfirm'
-import { WbMenu, WbMenuItem, WbMenuLabel } from '../src/renderer/src/WbMenu'
+import { WbMenu, WbMenuButton, WbMenuItem, WbMenuLabel } from '../src/renderer/src/WbMenu'
 import {
   ACTION_DISMISS_MS,
   AUTO_DISMISS_MS,
@@ -120,6 +120,25 @@ describe('WbMenu', () => {
       document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
     })
     expect(menu()).toBeNull()
+  })
+
+  it('a menu with nothing to choose takes the focus itself, so Escape still closes it', async () => {
+    await act(async () =>
+      root.render(
+        createElement(
+          LocaleProvider,
+          { initial: 'en' },
+          createElement(WbMenuButton, { label: 'Add', items: [], empty: 'All pinned' }),
+        ),
+      ),
+    )
+    const button = host.querySelector<HTMLButtonElement>('button[aria-haspopup="menu"]')!
+    button.focus()
+    await act(async () => button.click())
+    expect(document.activeElement).toBe(menu())
+    key(document.activeElement!, 'Escape')
+    expect(menu()).toBeNull()
+    expect(document.activeElement).toBe(button)
   })
 
   it('opens upwards when there is no room below the trigger', async () => {
@@ -391,6 +410,37 @@ describe('WbToastHost', () => {
     act(() => vi.advanceTimersByTime(0))
     act(() => vi.advanceTimersByTime(ACTION_DISMISS_MS))
     expect(shown()).toHaveLength(0)
+  })
+
+  it('a toast closed from the keyboard hands the focus back to where it was, not to <body>', () => {
+    const outside = document.createElement('button')
+    document.body.append(outside)
+    try {
+      mount()
+      const undo = vi.fn()
+      act(() =>
+        toasts.show({
+          message: { text: 'Deleted' },
+          actions: [{ label: 'wbCommonUndo', onClick: undo }],
+        }),
+      )
+      act(() => toasts.show({ message: { text: 'Saved' } }))
+      outside.focus()
+      const close = shown()[1]!.querySelector<HTMLButtonElement>('button[aria-label="Dismiss"]')!
+      act(() => close.focus())
+      act(() => close.click())
+      expect(shown()).toHaveLength(1)
+      expect(document.activeElement).toBe(outside)
+      const action = Array.from(shown()[0]!.querySelectorAll('button')).find(
+        (b) => b.textContent === 'Undo',
+      )!
+      act(() => action.focus())
+      act(() => action.click())
+      expect(undo).toHaveBeenCalledTimes(1)
+      expect(document.activeElement).toBe(outside)
+    } finally {
+      outside.remove()
+    }
   })
 
   it(`keeps at most ${MAX_TOASTS}: the oldest gives way`, () => {

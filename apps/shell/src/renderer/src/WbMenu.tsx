@@ -51,7 +51,8 @@ export function WbMenu({
     if (!open) return
     const menu = ref.current
     const anchor = anchorRef.current
-    menu?.querySelector<HTMLElement>(ITEMS)?.focus()
+    // a menu with nothing to choose (only its caption) takes the focus itself, so Escape still closes it
+    ;(menu?.querySelector<HTMLElement>(ITEMS) ?? menu)?.focus()
     const onDoc = (e: MouseEvent) => {
       const t = e.target as Node
       if (menu?.contains(t) || anchor?.contains(t)) return
@@ -91,6 +92,7 @@ export function WbMenu({
       ref={ref}
       role="menu"
       aria-label={label}
+      tabIndex={-1}
       className={`wb-menu ${place.end ? 'is-end' : 'is-start'}${place.up ? ' is-up' : ''}${
         className ? ` ${className}` : ''
       }`}
@@ -200,9 +202,10 @@ export function WbMenuButton({
       </button>
       <WbMenu open={open} onClose={() => setOpen(false)} anchorRef={ref} label={menuLabel ?? label}>
         {items.length === 0 && empty ? <WbMenuLabel>{empty}</WbMenuLabel> : null}
-        {items.map((it) => (
+        {items.map((it, i) => (
           <WbMenuItem
-            key={it.label}
+            // two entries may share a label (user data): the position keeps the keys apart
+            key={`${i}:${it.label}`}
             icon={it.icon}
             hint={it.hint}
             danger={it.danger}

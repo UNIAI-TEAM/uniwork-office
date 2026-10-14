@@ -159,6 +159,9 @@ describe('Workbench tab unpin', () => {
     expect(document.activeElement).toBe(tabs()[3])
     press(tabs()[3]!, 'ArrowRight')
     expect(ids()).toEqual(['desk', 'tasks', 'calendar', 'personal', 'notes'])
+    // nor does a non-core tab swap places with a core neighbour (spec 3)
+    press(tabs()[3]!, 'ArrowLeft')
+    expect(ids()).toEqual(['desk', 'tasks', 'calendar', 'personal', 'notes'])
     // a core tab does not move
     press(tabs()[1]!, 'ArrowRight')
     expect(ids()).toEqual(['desk', 'tasks', 'calendar', 'personal', 'notes'])
