@@ -10,7 +10,7 @@ import { AI_RUN_IDLE_GRACE_MS } from '@genoffice/agent-core'
 import { aiUniworkText } from '@genoffice/ui'
 import { editorExtensions } from '../src/renderer/editor/extensions'
 import { AiPanel } from '../src/renderer/ai/AiPanel'
-import { getLang, t } from '../src/renderer/i18n/locale'
+import { getLang, LocaleProvider, setModuleLang, t } from '../src/renderer/i18n/locale'
 import { AI_PROVIDERS, type AiSettings } from '../src/shared/ipc'
 
 const settings: AiSettings = {
@@ -49,6 +49,8 @@ describe('UniWork AI notices (docs panel)', () => {
   })
 
   beforeEach(async () => {
+    // product copy is vi/en; the module default (zh) is not what users read here
+    setModuleLang('vi')
     reports = []
     listener = undefined
     ;(window as any).uniworkAiRun = { reportAiRun: (r: any) => reports.push(r) }
@@ -63,6 +65,7 @@ describe('UniWork AI notices (docs panel)', () => {
         requestId = request.requestId
       },
       aiStreamCancel: async () => {},
+      onLanguageChanged: () => () => {},
     }
     editor = new Editor({
       element: document.createElement('div'),
@@ -79,13 +82,16 @@ describe('UniWork AI notices (docs panel)', () => {
     root = createRoot(container)
     act(() =>
       root!.render(
-        createElement(AiPanel, {
-          editor: editor!,
-          blocks: [],
-          settings,
-          open: true,
-          filePath: '/docs/a.docx',
-          preset: { text: 'summarize it', nonce: 1, autoRun: true },
+        createElement(LocaleProvider, {
+          initial: 'vi',
+          children: createElement(AiPanel, {
+            editor: editor!,
+            blocks: [],
+            settings,
+            open: true,
+            filePath: '/docs/a.docx',
+            preset: { text: 'summarize it', nonce: 1, autoRun: true },
+          }),
         }),
       ),
     )
@@ -105,6 +111,7 @@ describe('UniWork AI notices (docs panel)', () => {
     editor = null
     delete (window as any).desktop
     delete (window as any).uniworkAiRun
+    setModuleLang('zh')
   })
 
   const notices = () => [...container!.querySelectorAll('.ai-msg-notice')].map((n) => n.textContent)
@@ -113,6 +120,8 @@ describe('UniWork AI notices (docs panel)', () => {
   it('waiting shows Stop only, no Retry', async () => {
     await emit({ type: 'notice', notice: { kind: 'rate-limit-wait', seconds: 120, attempt: 1 } })
     expect(notices()).toEqual([ui('aiErrRateLimited', { seconds: 120 })])
+    // the copy itself is pinned in the product languages, not only echoed through aiUniworkText
+    expect(notices()).toEqual(['Bạn đang gửi quá nhanh. Thử lại sau 120 giây.'])
     expect(stopButton(), 'Stop stays available').not.toBeNull()
     // no retry / regenerate / error line while the run waits
     expect(container!.querySelector('.ai-retry-btn')).toBeNull()

@@ -60,7 +60,7 @@ vi.mock('react-konva', () => {
 })
 
 import { AiPanel } from '../src/renderer/ai/AiPanel'
-import { getLang, t } from '../src/renderer/i18n/locale'
+import { getLang, LocaleProvider, setModuleLang, t } from '../src/renderer/i18n/locale'
 import { AI_PROVIDERS, type AiSettings } from '../src/shared/ipc'
 
 const settings: AiSettings = {
@@ -86,19 +86,22 @@ async function startRun(): Promise<HTMLElement> {
   const root = createRoot(container)
   act(() =>
     root.render(
-      createElement(AiPanel, {
-        slides: [],
-        current: 0,
-        selectedIds: [],
-        images: new Map(),
-        applySlide: () => {},
-        applyDeck: () => {},
-        fitWidthPx: 960,
-        settings,
-        open: true,
-        onExpand: () => {},
-        onCollapse: () => {},
-        preset: { text: 'tighten it', nonce: 1, autoRun: true },
+      createElement(LocaleProvider, {
+        initial: 'vi',
+        children: createElement(AiPanel, {
+          slides: [],
+          current: 0,
+          selectedIds: [],
+          images: new Map(),
+          applySlide: () => {},
+          applyDeck: () => {},
+          fitWidthPx: 960,
+          settings,
+          open: true,
+          onExpand: () => {},
+          onCollapse: () => {},
+          preset: { text: 'tighten it', nonce: 1, autoRun: true },
+        }),
       }),
     ),
   )
@@ -117,6 +120,8 @@ beforeAll(() => {
 })
 
 beforeEach(() => {
+  // product copy is vi/en; the module default (zh) is not what users read here
+  setModuleLang('vi')
   harness.events = null
   harness.run.mockReset()
   Object.defineProperty(window, 'slidesApi', {
@@ -126,6 +131,7 @@ beforeEach(() => {
       beginHistoryBatch: vi.fn(async () => false),
       endHistoryBatch: vi.fn(async () => null),
       aiLogRunFailure: vi.fn(async () => undefined),
+      onLanguageChanged: () => () => {},
     },
   })
   Object.defineProperty(window, 'projectApi', { configurable: true, value: undefined })
@@ -136,6 +142,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  setModuleLang('zh')
   for (const { root, container } of mounted.splice(0)) {
     act(() => root.unmount())
     container.remove()
@@ -147,6 +154,8 @@ describe('UniWork AI notices (slides panel)', () => {
     const c = await startRun()
     await notify({ kind: 'rate-limit-wait', seconds: 90, attempt: 1 })
     expect(notices(c)).toEqual([ui('aiErrRateLimited', { seconds: 90 })])
+    // the copy itself is pinned in the product languages, not only echoed through aiUniworkText
+    expect(notices(c)).toEqual(['Bạn đang gửi quá nhanh. Thử lại sau 90 giây.'])
     expect(c.querySelector(`button[aria-label="${t('aiStop')}"]`), 'Stop stays').not.toBeNull()
     expect(c.querySelector(`button[aria-label="${t('aiRegenerate')}"]`)).toBeNull()
     expect(c.querySelector('.ai-msg-error')).toBeNull()

@@ -65,6 +65,70 @@ describe('ai-uniwork string shards', () => {
     expect(aiUniworkStrings.vi.aiRunOpenInApp).toBe('Mở bằng ứng dụng')
   })
 
+  it('pins the run-notice copy of the adapter, loop and panels in vi and en (G6-05 S2)', () => {
+    const pins: Array<
+      [
+        Parameters<typeof aiUniworkText>[1],
+        Record<string, string | number> | undefined,
+        string,
+        string,
+      ]
+    > = [
+      [
+        'aiErrRateLimited',
+        { seconds: 120 },
+        'You’re sending too fast. Try again in 120 s.',
+        'Bạn đang gửi quá nhanh. Thử lại sau 120 giây.',
+      ],
+      [
+        'aiErrRateLimitedNoWait',
+        undefined,
+        'You’re sending too fast. Try again in a few minutes.',
+        'Bạn đang gửi quá nhanh. Hãy thử lại sau ít phút.',
+      ],
+      [
+        'aiConversationRestarted',
+        undefined,
+        'The previous conversation expired, so UniWork AI started a new one and no longer remembers earlier turns. Send your question again to continue.',
+        'Cuộc trò chuyện trước đã hết hạn nên UniWork AI bắt đầu cuộc mới và không còn nhớ các lượt trước. Gửi lại câu hỏi để tiếp tục.',
+      ],
+      [
+        'aiConversationBoundary',
+        { provider: 'UniWork AI' },
+        'New conversation with UniWork AI: the turns above aren’t sent along.',
+        'Cuộc trò chuyện mới với UniWork AI: các lượt phía trên không được gửi kèm.',
+      ],
+      [
+        'aiErrViewOnlyEdit',
+        undefined,
+        'You only have view access to this document, so AI can’t edit it.',
+        'Bạn chỉ có quyền xem tài liệu này nên AI không sửa được.',
+      ],
+      [
+        'aiErrUnsupported',
+        { module: 'Docs' },
+        'UniWork AI can’t do this in Docs yet.',
+        'UniWork AI chưa làm được thao tác này trong Docs.',
+      ],
+      [
+        'aiUniworkOff',
+        undefined,
+        'UniWork AI is off for this document. Choose another provider.',
+        'UniWork AI đang tắt cho tài liệu này. Chọn nhà cung cấp khác.',
+      ],
+      [
+        'aiErrRunLimit',
+        undefined,
+        'This run reached UniWork AI’s step limit. Results so far are kept; split the request and ask again.',
+        'Lượt này đã chạm giới hạn số bước của UniWork AI. Kết quả tới đây vẫn được giữ; hãy chia nhỏ yêu cầu rồi hỏi tiếp.',
+      ],
+    ]
+    for (const [key, params, en, vi] of pins) {
+      expect(aiUniworkText('en', key, params), `en ${key}`).toBe(en)
+      expect(aiUniworkText('vi', key, params), `vi ${key}`).toBe(vi)
+    }
+  })
+
   it('fills the placeholders through aiUniworkText', () => {
     expect(aiUniworkText('en', 'aiUniworkCreditsAria', { remaining: 12, limit: 50 })).toBe(
       '12 of 50 credits left',

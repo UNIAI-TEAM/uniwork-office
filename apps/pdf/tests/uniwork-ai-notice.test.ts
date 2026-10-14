@@ -27,7 +27,7 @@ vi.mock('@genoffice/agent-core', async (orig) => {
 })
 
 import { AiPanel } from '../src/renderer/ai/AiPanel'
-import { t } from '../src/renderer/i18n/locale'
+import { LocaleProvider, t } from '../src/renderer/i18n/locale'
 
 const flush = async (): Promise<void> => {
   await act(async () => {
@@ -63,6 +63,7 @@ describe('UniWork AI notices (pdf panel)', () => {
       getAiSettings: async () => ({}),
       setAiPanelPrefs: () => {},
       gskStatus: async () => ({ loggedIn: false }),
+      onLanguageChanged: () => () => {},
     }
     if (history === 'deferred') {
       ;(window as any).projectApi = {
@@ -78,19 +79,23 @@ describe('UniWork AI notices (pdf panel)', () => {
     const render = (filePath: string | undefined, nonce = 1) =>
       act(() =>
         root!.render(
-          createElement(AiPanel, {
-            api: api as never,
-            filePath,
-            onCollapse: () => {},
-            open: true,
-            preset: { text: 'which pages?', nonce },
-          }),
+          createElement(
+            LocaleProvider,
+            { initial: 'vi' },
+            createElement(AiPanel, {
+              api: api as never,
+              filePath,
+              onCollapse: () => {},
+              open: true,
+              preset: { text: 'which pages?', nonce },
+            }),
+          ),
         ),
       )
     return { render }
   }
 
-  const L = 'zh' as const
+  const L = 'vi' as const
   const ui = (key: Parameters<typeof aiUniworkText>[1], params?: Record<string, string | number>) =>
     aiUniworkText(L, key, params)
   const notices = () => [...container!.querySelectorAll('.ai-msg-notice')].map((n) => n.textContent)
@@ -110,6 +115,8 @@ describe('UniWork AI notices (pdf panel)', () => {
     await started()
     await notify({ kind: 'rate-limit-wait', seconds: 90, attempt: 1 })
     expect(notices()).toEqual([ui('aiErrRateLimited', { seconds: 90 })])
+    // the copy itself is pinned in the product languages, not only echoed through aiUniworkText
+    expect(notices()).toEqual(['Bạn đang gửi quá nhanh. Thử lại sau 90 giây.'])
     expect(
       container!.querySelector(`button[aria-label="${t('aiStop')}"]`),
       'Stop stays',

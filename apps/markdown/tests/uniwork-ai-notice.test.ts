@@ -142,6 +142,8 @@ describe('UniWork AI notices (markdown panel)', () => {
     await started()
     await notify({ kind: 'rate-limit-wait', seconds: 90, attempt: 1 })
     expect(notices()).toEqual([ui('aiErrRateLimited', { seconds: 90 })])
+    // the copy itself is pinned in the product languages, not only echoed through aiUniworkText
+    expect(notices()).toEqual(['You’re sending too fast. Try again in 90 s.'])
     expect(
       container!.querySelector(`button[aria-label="${t('aiStop')}"]`),
       'Stop stays',
