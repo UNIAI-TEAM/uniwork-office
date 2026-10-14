@@ -13,6 +13,7 @@ import type {
 } from '../../shared/home-api'
 import { pathKey } from '../../shared/path-key'
 import type { AccountView } from './account-model'
+import { pickActiveWorkspace } from './active-workspace'
 import type { StringKey, TFunc } from './locale'
 
 /**
@@ -491,10 +492,11 @@ export type PickerAction =
   /** a row was archived or restored from its menu */
   | { type: 'doc-archived'; id: string; archived: boolean }
 
-export function initialPickerState(): PickerState {
+/** `workspaceId`: the stored active workspace (active-workspace.ts), kept when still listed */
+export function initialPickerState(workspaceId: string | null = null): PickerState {
   return {
     workspaces: { status: 'loading', items: [] },
-    workspaceId: null,
+    workspaceId,
     source: 'workspace',
     query: '',
     list: { status: 'loading', docs: [], nextCursor: null, loadingMore: false, requestId: 0 },
@@ -572,8 +574,7 @@ export function pickerReducer(state: PickerState, action: PickerAction): PickerS
         }
       }
       const items = action.result.value
-      const keep = items.find((w) => w.id === state.workspaceId)
-      const workspaceId = keep?.id ?? items[0]?.id ?? null
+      const workspaceId = pickActiveWorkspace(items, state.workspaceId)
       return {
         ...state,
         workspaces: { status: 'ready', items },

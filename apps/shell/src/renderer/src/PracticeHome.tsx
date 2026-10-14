@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import {
   domainSkillPrompt,
@@ -6,7 +6,6 @@ import {
   getSkillDomain,
   isPracticePillarId,
   isWorkbenchModuleId,
-  listPracticeGroups,
   practiceMaterialSeedHtml,
   practiceMatchesFilter,
   practiceSkillPrompt,
@@ -14,29 +13,41 @@ import {
   type PracticeDefinition,
   type PracticeId,
   type PracticeMeta,
+  type PracticePillarId,
   type SkillDomainId,
 } from '@uniwork/practice-core'
-import type { ProjectSummaryEntry } from '../../shared/home-api'
+import type { ProjectSummaryEntry, UniworkResult, UniworkWorkspaceRef } from '../../shared/home-api'
+import type { WorkHomeSummary } from '../../shared/uniwork-work-api'
+import {
+  afterWorkspaceList,
+  readActiveWorkspaceId,
+  writeActiveWorkspaceId,
+  type WorkspaceListState,
+} from './active-workspace'
 import { onAgentIntentNavigate } from './agent-intent-bus'
-import { useI18n } from './locale'
+import { useI18n, type StringKey, type TFunc } from './locale'
 import { SkillDomainTabs } from './SkillDomainTabs'
 import { readActiveSkillDomain, readPinnedSkillDomains } from './skill-domain-pins'
 import { WorkbenchModulePane } from './WorkbenchModulePanes'
+import { LocalTag } from './LocalTag'
+import { MODULE_TONES } from './module-tones'
+import { WorkbenchIcon } from './WorkbenchIcons'
+import { WorkPaneHeader } from './WorkPaneHeader'
 import { WorkbenchTabs } from './WorkbenchTabs'
+import { WorkbenchTopBar, type WorkbenchNewItem } from './WorkbenchTopBar'
 import { pinPillar } from './workbench-pins'
 import { WbDeleteBtn, WbOpenBtn, WbRowActions } from './WbRowActions'
-
-const UI_LANG_KEY = 'uniwork.teacherUiLang'
-
-type WorkbenchUiLang = 'vi' | 'en'
-
-function persistWorkbenchUiLang(next: WorkbenchUiLang): void {
-  try {
-    localStorage.setItem(UI_LANG_KEY, next)
-  } catch {
-    /* ignore */
-  }
-}
+import {
+  WB_REFRESH_EVENT,
+  cacheWork,
+  cachedWork,
+  cachedWorkspaceListState,
+  settleWork,
+  workCacheSlot,
+} from './work-cache'
+import { tabCounts } from './work-home'
+import { WorkStatePanel } from './WorkErrorState'
+import { WorkOverview } from './WorkOverview'
 
 interface PracticeHomeProps {
   practice: PracticeDefinition
@@ -46,6 +57,8 @@ interface PracticeHomeProps {
   onOpenPackFiles: (id: string) => void
   onRefresh: () => void
   onSwitchPractice: (id: PracticeId) => void
+  /** Home's NEW_ITEMS, for the top bar's + New menu */
+  newItems: readonly WorkbenchNewItem[]
 }
 
 function toPracticeMeta(entry: ProjectSummaryEntry, practiceId: PracticeId): PracticeMeta | null {
@@ -65,6 +78,8 @@ function toPracticeMeta(entry: ProjectSummaryEntry, practiceId: PracticeId): Pra
   }
 }
 
+type Msg = string | { key: StringKey; params?: Parameters<TFunc>[1] }
+
 export function PracticeHome({
   practice,
   projects,
@@ -73,22 +88,77 @@ export function PracticeHome({
   onOpenPackFiles,
   onRefresh,
   onSwitchPractice,
+  newItems,
 }: PracticeHomeProps): ReactElement {
-  const { lang, setLang } = useI18n()
+  const { lang, t } = useI18n()
+  // State keeps keys (or raw server text), translated at render so a language switch applies.
+  const showMsg = (m: Msg): string => (typeof m === 'string' ? m : t(m.key, m.params))
   const vi = lang === 'vi'
-  const uiLang: WorkbenchUiLang = vi ? 'vi' : 'en'
-  const label = (a: string, b: string) => (vi ? a : b)
 
-  const changeUiLang = (next: WorkbenchUiLang) => {
-    persistWorkbenchUiLang(next)
-    setLang(next)
+  // starts from this bucket's cached list (this pane remounts whenever the user returns
+  // to the Workbench), then one load per mount plus Refresh
+  const [wsState, setWsState] = useState<WorkspaceListState>(cachedWorkspaceListState)
+  const { workspaces, workspaceId, workspaceError } = wsState
+  const workspace = workspaces?.find((w) => w.id === workspaceId) ?? null
+  const [refreshTick, setRefreshTick] = useState(0)
+  // set by the Overview when its summary changes, only to redraw the tab counts (they read the cache)
+  const [, setHomeSummary] = useState<WorkHomeSummary | null>(null)
+
+  useEffect(() => {
+    let live = true
+    const listSlot = workCacheSlot('workspaces') // taken before the call, like every cached answer
+    void window.aiOffice
+      .uniworkListWorkspaces()
+      // a rejected bridge call reads as offline, like every other work call
+      .catch((): UniworkResult<UniworkWorkspaceRef[]> => ({ ok: false, error: 'network' }))
+      .then((result) => {
+        if (!live) return
+        // My AI reads the first listed workspace when none is stored (cachedOpenTasks)
+        if (result.ok) cacheWork(listSlot, result.value)
+        setWsState((prev) => afterWorkspaceList(prev, result, readActiveWorkspaceId()))
+      })
+    return () => {
+      live = false
+    }
+  }, [refreshTick])
+
+  // the workspace on screen is the stored one: My AI and Open from UniWork read the same id
+  useEffect(() => {
+    if (workspaceId && workspaceId !== readActiveWorkspaceId()) writeActiveWorkspaceId(workspaceId)
+  }, [workspaceId])
+
+  const selectWorkspace = (id: string) => setWsState((s) => ({ ...s, workspaceId: id }))
+
+  // a write in the Tasks tab moves the tab counts: reload the summary they read from the cache
+  const homeSeq = useRef(0)
+  const reloadHomeSummary = () => {
+    if (!workspace) return
+    const mine = ++homeSeq.current
+    const slot = workCacheSlot(`home:${workspace.id}`)
+    void settleWork(window.uniworkWork.homeSummary(workspace.id)).then((r) => {
+      if (mine !== homeSeq.current || !r.ok) return // a newer reload is on its way
+      cacheWork(slot, r.value)
+      setHomeSummary(r.value)
+    })
+  }
+
+  const refresh = () => {
+    window.dispatchEvent(new Event(WB_REFRESH_EVENT))
+    onRefresh()
+    setRefreshTick((n) => n + 1)
+  }
+
+  const openCompose = () => {
+    pinPillar(practice.id, 'compose')
+    window.dispatchEvent(new Event('uniwork:wb-pins-changed'))
+    setTab('compose')
   }
 
   const [tab, setTab] = useState<string>('desk')
   const [qQuery, setQQuery] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
+  const [error, setError] = useState<Msg | null>(null)
+  const [notice, setNotice] = useState<Msg | null>(null)
   const [confirmSkill, setConfirmSkill] = useState<{
     kind: 'domain' | 'practice'
     id: string
@@ -137,16 +207,7 @@ export function PracticeHome({
         .toLowerCase()
         .trim()
       if (!hint || !hasSelectedPack) {
-        setNotice(
-          label(
-            hasSelectedPack
-              ? 'Mở Skills — chọn kỹ năng và xác nhận Token.'
-              : 'Mở Skills — chọn gói Tri thức rồi chạy kỹ năng.',
-            hasSelectedPack
-              ? 'Opened Skills — pick a skill and confirm Tokens.'
-              : 'Opened Skills — select a Knowledge pack, then run a skill.',
-          ),
-        )
+        setNotice({ key: 'wbSkOpenedNeedPack' })
         return
       }
       const hit =
@@ -163,12 +224,7 @@ export function PracticeHome({
             hint.includes(s.labelEn.toLowerCase()),
         )
       if (!hit) {
-        setNotice(
-          label(
-            'Mở Skills — chọn kỹ năng và xác nhận Token.',
-            'Opened Skills — pick a skill and confirm Tokens.',
-          ),
-        )
+        setNotice({ key: 'wbSkOpenedPick' })
         return
       }
       const isPractice = roleSkills.some((s) => s.id === hit.id)
@@ -180,7 +236,7 @@ export function PracticeHome({
       window.removeEventListener('uniwork:wb-open-module', openMod)
       window.removeEventListener('uniwork:agent-run-skill', onRunSkill)
     }
-  }, [roleSkills, domainSkills, hasSelectedPack, vi, practice.id])
+  }, [roleSkills, domainSkills, hasSelectedPack, lang, practice.id])
 
   useEffect(() => {
     return onAgentIntentNavigate((tabId, intent) => {
@@ -188,9 +244,9 @@ export function PracticeHome({
       if (intent.target.kind === 'skill-domain') {
         setSkillDomain(intent.target.id)
       }
-      setNotice(label('Đã áp dụng lệnh AI trên máy.', 'Applied AI intent on device.'))
+      setNotice({ key: 'wbAgentApplied' })
     })
-  }, [vi])
+  }, [lang])
 
   const packs = useMemo(() => {
     return projects
@@ -211,6 +267,16 @@ export function PracticeHome({
       )
       .sort((a, b) => (b.entry.lastActiveAt > a.entry.lastActiveAt ? 1 : -1))
   }, [projects, practice.id, practice.projectKind, qQuery])
+  const pillar = practice.pillars.find((p) => p.id === tab)
+  const pillarTitleId = useId()
+  /** a pillar's empty sentence on the shared state template (spec 5): its tinted tile and one line */
+  const pillarState = (id: PracticePillarId, title: StringKey) => (
+    <WorkStatePanel
+      tone={MODULE_TONES[id]}
+      icon={<WorkbenchIcon id={id} size={20} />}
+      title={t(title)}
+    />
+  )
 
   useEffect(() => {
     if (!meta) {
@@ -242,12 +308,7 @@ export function PracticeHome({
 
   const deletePack = async () => {
     if (!selected) return
-    const ok = window.confirm(
-      label(
-        `Xóa gói “${meta?.title ?? selected.name}”?\nFile trong gói sẽ về dự án mặc định, không mất nội dung.`,
-        `Delete pack “${meta?.title ?? selected.name}”?\nFiles move to the default project; content is not lost.`,
-      ),
-    )
+    const ok = window.confirm(t('wbKnDeletePackConfirm', { title: meta?.title ?? selected.name }))
     if (!ok) return
     setBusy('delete-pack')
     setError(null)
@@ -255,7 +316,7 @@ export function PracticeHome({
       await window.aiOfficeProject!.deleteProject(selected.id)
       onSelectPack(null)
       onRefresh()
-      setNotice(label('Đã xóa gói khỏi Tri thức.', 'Pack removed from Knowledge.'))
+      setNotice({ key: 'wbKnPackDeleted' })
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -266,7 +327,7 @@ export function PracticeHome({
   const deleteMaterialFile = async (filePath: string) => {
     if (!selected) return
     const base = filePath.split(/[/\\]/).pop() || filePath
-    const ok = window.confirm(label(`Xóa tệp “${base}”?`, `Delete file “${base}”?`))
+    const ok = window.confirm(t('wbMatDeleteFileConfirm', { name: base }))
     if (!ok) return
     setBusy(`del-file:${filePath}`)
     setError(null)
@@ -308,13 +369,13 @@ export function PracticeHome({
     setError(null)
     const title = titleDraft.trim()
     if (!title) {
-      setError(label('Cần nhập tiêu đề gói.', 'Pack title is required.'))
+      setError({ key: 'wbCmpTitleRequired' })
       return
     }
     for (const f of practice.facets) {
       if (f.id === practice.titleFacetId) continue
       if (f.required && !(facetDraft[f.id] ?? '').trim()) {
-        setError(label(`Thiếu: ${f.labelVi}`, `Missing: ${f.labelEn}`))
+        setError({ key: 'wbCmpMissing', params: { field: vi ? f.labelVi : f.labelEn } })
         return
       }
     }
@@ -324,11 +385,8 @@ export function PracticeHome({
         .split(/[,;]/)
         .map((t) => t.trim())
         .filter(Boolean)
-      if (practice.id === 'teacher') {
-        throw new Error('Teacher packs use TeacherHome')
-      }
       const created = await window.aiOfficeProject!.createPracticeProject({
-        practiceId: practice.id as Exclude<PracticeId, 'teacher'>,
+        practiceId: practice.id,
         title,
         facets: facetDraft,
         tags,
@@ -358,7 +416,7 @@ export function PracticeHome({
       pinPillar(practice.id, 'materials')
       window.dispatchEvent(new Event('uniwork:wb-pins-changed'))
       setTab('materials')
-      setNotice(label('Đã tạo gói trong Tri thức.', 'Pack added to Knowledge.'))
+      setNotice({ key: 'wbCmpCreated' })
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -379,7 +437,7 @@ export function PracticeHome({
         patch: { notes: noteDraft, tags },
       })
       onRefresh()
-      setNotice(label('Đã lưu.', 'Saved.'))
+      setNotice({ key: 'wbKnSaved' })
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -400,7 +458,7 @@ export function PracticeHome({
         await openDocs(selected.id, `${roleDef.labelVi} — ${meta.title}`, html)
       }
       await rememberRole(selected.id, addRole)
-      setNotice(label(`Đã thêm: ${roleDef.labelVi}`, `Added: ${roleDef.labelEn}`))
+      setNotice({ key: 'wbMatRoleAdded', params: { role: vi ? roleDef.labelVi : roleDef.labelEn } })
     } finally {
       setBusy(null)
     }
@@ -466,7 +524,7 @@ export function PracticeHome({
         await openDocs(selected.id, `${skill.labelVi} — ${meta.title}`, html, preset)
         await rememberRole(selected.id, role)
       }
-      setNotice(label(`Đã chạy kỹ năng: ${skill.labelVi}`, `Ran skill: ${skill.labelEn}`))
+      setNotice({ key: 'wbSkRan', params: { skill: vi ? skill.labelVi : skill.labelEn } })
     } finally {
       setBusy(null)
     }
@@ -502,7 +560,7 @@ export function PracticeHome({
         await openDocs(selected.id, `${skill.labelVi} — ${meta.title}`, html, preset)
         await rememberRole(selected.id, role)
       }
-      setNotice(label(`Đã chạy kỹ năng vai: ${skill.labelVi}`, `Ran role skill: ${skill.labelEn}`))
+      setNotice({ key: 'wbSkRanRole', params: { skill: vi ? skill.labelVi : skill.labelEn } })
     } finally {
       setBusy(null)
     }
@@ -530,58 +588,24 @@ export function PracticeHome({
         }
         await rememberRole(selected.id, tpl.materialRole)
       }
-      setNotice(
-        label('Đã mở chuỗi mẫu miễn phí theo thứ tự.', 'Opened the free template chain in order.'),
-      )
+      setNotice({ key: 'wbMatChainOpened' })
     } finally {
       setBusy(null)
     }
   }
 
   return (
-    <main className="content teacher-home">
-      <section className="teacher-hero">
-        <div className="teacher-hero-top">
-          <div>
-            <p className="teacher-hint">{label('Vai trò làm việc', 'Practice role')}</p>
-            <h1 className="teacher-title">{vi ? practice.labelVi : practice.labelEn}</h1>
-            <p className="teacher-subtitle">{vi ? practice.subtitleVi : practice.subtitleEn}</p>
-            <p className="teacher-hint">
-              {label(`${packs.length} gói trong thư viện`, `${packs.length} packs in library`)}
-            </p>
-          </div>
-          <div className="teacher-hero-controls">
-            <label className="teacher-lang">
-              <span>{label('Vai trò', 'Role')}</span>
-              <select
-                value={practice.id}
-                onChange={(e) => onSwitchPractice(e.target.value as PracticeId)}
-              >
-                {listPracticeGroups(vi).map((g) => (
-                  <optgroup key={g.label} label={g.label}>
-                    {g.practices.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {vi ? p.labelVi : p.labelEn}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
-            </label>
-            <label className="teacher-lang">
-              <span>{label('Ngôn ngữ', 'Language')}</span>
-              <select
-                value={uiLang}
-                onChange={(e) => changeUiLang(e.target.value as WorkbenchUiLang)}
-                aria-label={label('Ngôn ngữ bàn làm việc', 'Workbench language')}
-              >
-                <option value="vi">Tiếng Việt</option>
-                <option value="en">English</option>
-              </select>
-            </label>
-          </div>
-        </div>
-      </section>
+    <main className="content wb-home">
+      <WorkbenchTopBar
+        practice={practice}
+        onSwitchPractice={onSwitchPractice}
+        workspaces={workspaces ?? []}
+        workspaceId={workspaceId}
+        onSelectWorkspace={selectWorkspace}
+        newItems={newItems}
+        onNewTask={() => setTab('tasks')}
+        onRefresh={refresh}
+      />
 
       <WorkbenchTabs
         practiceId={practice.id}
@@ -589,16 +613,29 @@ export function PracticeHome({
         active={tab}
         onSelect={setTab}
         vi={vi}
+        counts={tabCounts(
+          workspace ? (cachedWork<WorkHomeSummary>(`home:${workspace.id}`)?.value ?? null) : null,
+        )}
         onPinsChange={(pins, pillarPins) => {
           if (isWorkbenchModuleId(tab) && !pins.includes(tab)) setTab('desk')
           if (isPracticePillarId(tab) && !pillarPins.includes(tab)) setTab('desk')
         }}
       />
 
-      {error && <p className="teacher-error">{error}</p>}
-      {notice && <p className="teacher-hint">{notice}</p>}
+      {error && <p className="wb-error">{showMsg(error)}</p>}
+      {notice && <p className="wb-hint">{showMsg(notice)}</p>}
 
-      {isWorkbenchModuleId(tab) ? (
+      {tab === 'desk' ? (
+        <WorkOverview
+          workspaces={workspaces}
+          workspaceId={workspaceId}
+          workspaceError={workspaceError}
+          refreshTick={refreshTick}
+          onReload={refresh}
+          onCompose={openCompose}
+          onSummary={setHomeSummary}
+        />
+      ) : isWorkbenchModuleId(tab) ? (
         <WorkbenchModulePane
           moduleId={tab}
           practiceId={practice.id}
@@ -606,42 +643,65 @@ export function PracticeHome({
           contextTitle={meta?.title}
           packId={selectedId}
           onPackLinked={onRefresh}
+          workspace={workspace}
+          workspaceError={workspaceError}
+          onReload={refresh}
+          onTasksWritten={reloadHomeSummary}
+          loading={workspaces === null}
+        />
+      ) : null}
+
+      {pillar ? (
+        <WorkPaneHeader
+          module={pillar.id}
+          title={vi ? pillar.labelVi : pillar.labelEn}
+          meta={`${vi ? pillar.hintVi : pillar.hintEn}${meta?.title ? ` · ${meta.title}` : ''}`}
+          aside={<LocalTag />}
+          titleId={pillarTitleId}
         />
       ) : null}
 
       {tab === 'knowledge' && (
-        <section className="teacher-panel">
-          <label className="teacher-form-wide">
-            <span>{label('Tìm', 'Search')}</span>
+        <section className="wb-pane" aria-labelledby={pillarTitleId}>
+          <label className="wb-kn-search">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
+              <path
+                d="M20 20l-3.5-3.5"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
             <input
+              type="search"
               value={qQuery}
               onChange={(e) => setQQuery(e.target.value)}
-              placeholder={label('Tên gói, thẻ, ghi chú…', 'Title, tags, notes…')}
+              aria-label={t('wbKnSearch')}
+              placeholder={t('wbKnSearchPlaceholder')}
             />
           </label>
-          <div className="teacher-layout">
-            <section className="teacher-packs">
-              <h2>
-                {label('Thư viện', 'Library')}
-                <span className="teacher-count">{packs.length}</span>
-              </h2>
+          <div className="wb-layout">
+            <section className="wb-packs">
+              <h3>
+                {t('wbKnLibrary')}
+                <span className="wb-count wb-num">{packs.length}</span>
+              </h3>
               {packs.length === 0 ? (
-                <p className="teacher-empty">
-                  {label('Chưa có gói. Tạo ở tab Soạn mới.', 'No packs yet. Create in Compose.')}
-                </p>
+                pillarState('knowledge', 'wbKnEmpty')
               ) : (
-                <ul className="teacher-pack-list">
+                <ul className="wb-pack-list">
                   {packs.map(({ entry, meta: m }) => (
                     <li key={entry.id}>
                       <button
                         type="button"
-                        className={`teacher-pack-item${entry.id === selectedId ? ' active' : ''}`}
+                        className={`wb-pack-item${entry.id === selectedId ? ' active' : ''}`}
                         onClick={() => onSelectPack(entry.id === selectedId ? null : entry.id)}
                       >
                         <strong>{m.title}</strong>
                         <span>{Object.values(m.facets).filter(Boolean).join(' · ')}</span>
-                        <em>
-                          {entry.fileCount} {label('tệp', 'files')}
+                        <em className="wb-num">
+                          {entry.fileCount} {t('wbKnFiles')}
                         </em>
                       </button>
                     </li>
@@ -649,46 +709,46 @@ export function PracticeHome({
                 </ul>
               )}
             </section>
-            <aside className="teacher-detail">
+            <aside className="wb-detail">
               {selected && meta ? (
                 <>
-                  <h2>{meta.title}</h2>
+                  <h3>{meta.title}</h3>
                   <p>{Object.values(meta.facets).filter(Boolean).join(' · ')}</p>
-                  <div className="teacher-chip-row">
+                  <div className="wb-chip-row">
                     <button
                       type="button"
-                      className="btn btn-secondary"
+                      className="wb-btn wb-btn-secondary"
                       onClick={() => {
                         pinPillar(practice.id, 'materials')
                         window.dispatchEvent(new Event('uniwork:wb-pins-changed'))
                         setTab('materials')
                       }}
                     >
-                      {label('Tài liệu', 'Materials')}
+                      {t('wbCommonMaterials')}
                     </button>
                     <button
                       type="button"
-                      className="btn btn-secondary"
+                      className="wb-btn wb-btn-secondary"
                       onClick={() => onOpenPackFiles(selected.id)}
                     >
-                      {label('Xem file', 'View files')}
+                      {t('wbKnViewFiles')}
                     </button>
                     <button
                       type="button"
-                      className="btn btn-secondary"
+                      className="wb-btn wb-btn-secondary"
                       disabled={busy === 'delete-pack'}
                       onClick={() => void deletePack()}
                     >
-                      {label('Xóa gói', 'Delete pack')}
+                      {t('wbKnDeletePack')}
                     </button>
                   </div>
-                  <div className="teacher-form teacher-form-spaced">
-                    <label className="teacher-form-wide">
-                      <span>{label('Thẻ', 'Tags')}</span>
+                  <div className="wb-form wb-form-spaced">
+                    <label className="wb-form-wide">
+                      <span>{t('wbCommonTags')}</span>
                       <input value={tagDraft} onChange={(e) => setTagDraft(e.target.value)} />
                     </label>
-                    <label className="teacher-form-wide">
-                      <span>{label('Ghi chú', 'Notes')}</span>
+                    <label className="wb-form-wide">
+                      <span>{t('wbCommonNotes')}</span>
                       <textarea
                         rows={3}
                         value={noteDraft}
@@ -698,15 +758,15 @@ export function PracticeHome({
                   </div>
                   <button
                     type="button"
-                    className="btn btn-primary"
+                    className="wb-btn wb-btn-primary"
                     disabled={!!busy}
                     onClick={() => void saveMeta()}
                   >
-                    {label('Lưu', 'Save')}
+                    {t('wbCommonSave')}
                   </button>
                 </>
               ) : (
-                <p className="teacher-empty">{label('Chọn một gói.', 'Select a pack.')}</p>
+                pillarState('knowledge', 'wbKnSelectPack')
               )}
             </aside>
           </div>
@@ -714,26 +774,19 @@ export function PracticeHome({
       )}
 
       {tab === 'materials' && (
-        <section className="teacher-panel teacher-detail">
+        <section className="wb-pane" aria-labelledby={pillarTitleId}>
           {!selected || !meta ? (
-            <p className="teacher-empty">
-              {label('Chọn gói ở Tri thức trước.', 'Select a Knowledge pack first.')}
-            </p>
+            pillarState('materials', 'wbMatSelectPackFirst')
           ) : (
             <>
-              <h2>
-                {label('Tài liệu', 'Materials')} · {meta.title}
-              </h2>
-              <ul className="teacher-material-list">
-                {packFiles.length === 0 ? (
-                  <li className="teacher-empty">
-                    {label('Chưa có file — thêm bên dưới.', 'No files yet — add below.')}
-                  </li>
-                ) : (
-                  packFiles.map((fp) => {
+              {packFiles.length === 0 ? (
+                pillarState('materials', 'wbMatEmpty')
+              ) : (
+                <ul className="wb-material-list">
+                  {packFiles.map((fp) => {
                     const base = fp.split(/[/\\]/).pop() || fp
                     return (
-                      <li key={fp} className="teacher-material-row">
+                      <li key={fp} className="wb-material-row">
                         <div>
                           <strong>{base}</strong>
                           <span>
@@ -742,23 +795,23 @@ export function PracticeHome({
                         </div>
                         <WbRowActions>
                           <WbOpenBtn
-                            label={label('Mở', 'Open')}
+                            label={t('wbCommonOpen')}
                             onClick={() => void window.aiOffice.openPath(fp)}
                           />
                           <WbDeleteBtn
-                            label={label('Xóa', 'Delete')}
+                            label={t('wbCommonDelete')}
                             disabled={busy === `del-file:${fp}`}
                             onClick={() => void deleteMaterialFile(fp)}
                           />
                         </WbRowActions>
                       </li>
                     )
-                  })
-                )}
-              </ul>
-              <div className="teacher-add-row">
+                  })}
+                </ul>
+              )}
+              <div className="wb-add-row">
                 <label>
-                  <span>{label('Thêm tài liệu', 'Add material')}</span>
+                  <span>{t('wbMatAdd')}</span>
                   <select value={addRole} onChange={(e) => setAddRole(e.target.value)}>
                     {practice.materialRoles.map((r) => (
                       <option key={r.id} value={r.id}>
@@ -769,23 +822,18 @@ export function PracticeHome({
                 </label>
                 <button
                   type="button"
-                  className="btn btn-primary"
+                  className="wb-btn wb-btn-primary"
                   disabled={!!busy}
                   onClick={() => void addMaterial()}
                 >
-                  {label('Thêm & mở', 'Add & open')}
+                  {t('wbMatAddOpen')}
                 </button>
               </div>
-              <p className="teacher-hint">
-                {label(
-                  'Tạo nhanh Office vào gói này (lưu lần đầu = hiện trong danh sách). File đã có: chuyển gói từ Home → danh sách file.',
-                  'Quick-create Office into this pack (first save lists it here). Existing files: move pack from Home → file list.',
-                )}
-              </p>
-              <div className="teacher-chip-row">
+              <p className="wb-hint">{t('wbMatQuickCreateHint')}</p>
+              <div className="wb-chip-row">
                 <button
                   type="button"
-                  className="teacher-chip"
+                  className="wb-btn wb-btn-secondary wb-btn-sm"
                   disabled={!!busy}
                   onClick={() => void window.aiOffice.newDoc({ projectId: selected.id })}
                 >
@@ -793,7 +841,7 @@ export function PracticeHome({
                 </button>
                 <button
                   type="button"
-                  className="teacher-chip"
+                  className="wb-btn wb-btn-secondary wb-btn-sm"
                   disabled={!!busy}
                   onClick={() => void window.aiOffice.newSheet({ projectId: selected.id })}
                 >
@@ -801,7 +849,7 @@ export function PracticeHome({
                 </button>
                 <button
                   type="button"
-                  className="teacher-chip"
+                  className="wb-btn wb-btn-secondary wb-btn-sm"
                   disabled={!!busy}
                   onClick={() => void window.aiOffice.newSlide({ projectId: selected.id })}
                 >
@@ -809,20 +857,20 @@ export function PracticeHome({
                 </button>
                 <button
                   type="button"
-                  className="teacher-chip"
+                  className="wb-btn wb-btn-secondary wb-btn-sm"
                   disabled={!!busy}
                   onClick={() => void window.aiOffice.newPdf({ projectId: selected.id })}
                 >
                   PDF
                 </button>
               </div>
-              <h3>{label('Mẫu nhanh (miễn phí)', 'Quick templates (free)')}</h3>
-              <div className="teacher-chip-row">
+              <h3>{t('wbMatQuickTemplates')}</h3>
+              <div className="wb-chip-row">
                 {practice.templates.map((t) => (
                   <button
                     key={t.id}
                     type="button"
-                    className="teacher-chip"
+                    className="wb-btn wb-btn-secondary wb-btn-sm"
                     disabled={!!busy}
                     onClick={() => void openTemplate(t.id)}
                   >
@@ -831,14 +879,14 @@ export function PracticeHome({
                 ))}
               </div>
               {practice.freeChainTemplateIds && practice.freeChainTemplateIds.length > 0 ? (
-                <div className="teacher-chip-row">
+                <div className="wb-chip-row">
                   <button
                     type="button"
-                    className="btn btn-secondary"
+                    className="wb-btn wb-btn-secondary"
                     disabled={!!busy}
                     onClick={() => void openFreeChain()}
                   >
-                    {label('Mở chuỗi mẫu miễn phí', 'Open free template chain')}
+                    {t('wbMatOpenChain')}
                   </button>
                 </div>
               ) : null}
@@ -848,47 +896,36 @@ export function PracticeHome({
       )}
 
       {tab === 'skills' && (
-        <section className="teacher-panel teacher-detail">
-          <h2>{label('Kỹ năng', 'Skills')}</h2>
+        <section className="wb-pane" aria-labelledby={pillarTitleId}>
           {!selected || !meta ? (
-            <p className="teacher-empty">
-              {label(
-                'Chọn gói ở Tri thức để gắn ngữ cảnh trước khi chạy.',
-                'Select a Knowledge pack for context before running.',
-              )}
-            </p>
+            pillarState('skills', 'wbSkNeedPack')
           ) : (
             <p>
-              {label('Ngữ cảnh:', 'Context:')} <strong>{meta.title}</strong>
+              {t('wbSkContext')} <strong>{meta.title}</strong>
             </p>
           )}
 
           {roleSkills.length > 0 ? (
             <>
-              <h3>{label('Kỹ năng theo vai', 'Role skills')}</h3>
-              <p className="teacher-hint">
-                {label(
-                  'Kỹ năng gắn với vai trò hiện tại. Mỗi lần chạy hỏi xác nhận Token.',
-                  'Skills for this practice role. Each run asks to confirm Tokens.',
-                )}
-              </p>
-              <ul className="teacher-skill-list">
+              <h3>{t('wbSkRoleSkills')}</h3>
+              <p className="wb-hint">{t('wbSkRoleHint')}</p>
+              <ul className="wb-skill-list">
                 {roleSkills.map((s) => (
-                  <li key={s.id} className="teacher-skill-row">
+                  <li key={s.id} className="wb-skill-row">
                     <div>
                       <strong>{vi ? s.labelVi : s.labelEn}</strong>
                       <span>{vi ? s.descVi : s.descEn}</span>
                       <em>
-                        {s.category} · {label('Tốn Token', 'Uses Tokens')}
+                        {s.category} · {t('wbCommonUsesTokens')}
                       </em>
                     </div>
                     <button
                       type="button"
-                      className="btn btn-primary"
+                      className="wb-btn wb-btn-primary wb-btn-sm"
                       disabled={!!busy || !selected}
                       onClick={() => setConfirmSkill({ kind: 'practice', id: s.id })}
                     >
-                      {label('Chạy', 'Run')}
+                      {t('wbCommonRun')}
                     </button>
                   </li>
                 ))}
@@ -896,13 +933,8 @@ export function PracticeHome({
             </>
           ) : null}
 
-          <h3>{label('Kỹ năng lĩnh vực', 'Domain skills')}</h3>
-          <p className="teacher-hint">
-            {label(
-              'Thêm tab lĩnh vực bằng +. Mỗi lần chạy hỏi xác nhận Token.',
-              'Add domain tabs with +. Each run asks to confirm Tokens.',
-            )}
-          </p>
+          <h3>{t('wbSkDomainSkills')}</h3>
+          <p className="wb-hint">{t('wbSkDomainHint')}</p>
           <SkillDomainTabs vi={vi} active={skillDomain} onSelect={setSkillDomain} />
           <div className="skill-domain-panel">
             <h3>
@@ -910,28 +942,28 @@ export function PracticeHome({
                 ? vi
                   ? skillDomainDef.labelVi
                   : skillDomainDef.labelEn
-                : label('Kỹ năng', 'Skills')}
+                : t('wbCommonSkills')}
             </h3>
-            <p className="teacher-hint">
+            <p className="wb-hint">
               {skillDomainDef ? (vi ? skillDomainDef.hintVi : skillDomainDef.hintEn) : ''}
             </p>
-            <ul className="teacher-skill-list">
+            <ul className="wb-skill-list">
               {domainSkills.map((s) => (
-                <li key={s.id} className="teacher-skill-row">
+                <li key={s.id} className="wb-skill-row">
                   <div>
                     <strong>{vi ? s.labelVi : s.labelEn}</strong>
                     <span>{vi ? s.descVi : s.descEn}</span>
                     <em>
-                      {s.category} · {label('Tốn Token', 'Uses Tokens')}
+                      {s.category} · {t('wbCommonUsesTokens')}
                     </em>
                   </div>
                   <button
                     type="button"
-                    className="btn btn-primary"
+                    className="wb-btn wb-btn-primary wb-btn-sm"
                     disabled={!!busy || !selected}
                     onClick={() => setConfirmSkill({ kind: 'domain', id: s.id })}
                   >
-                    {label('Chạy', 'Run')}
+                    {t('wbCommonRun')}
                   </button>
                 </li>
               ))}
@@ -941,13 +973,12 @@ export function PracticeHome({
       )}
 
       {tab === 'compose' && (
-        <section className="teacher-panel teacher-create">
-          <h2>{label('Soạn gói mới', 'New pack')}</h2>
-          <div className="teacher-form">
+        <section className="wb-block wb-cmp" aria-labelledby={pillarTitleId}>
+          <div className="wb-form">
             {practice.facets.map((f) => {
               if (f.id === practice.titleFacetId) {
                 return (
-                  <label key={f.id} className="teacher-form-wide">
+                  <label key={f.id} className="wb-form-wide">
                     <span>{vi ? f.labelVi : f.labelEn}</span>
                     <input
                       value={titleDraft}
@@ -981,20 +1012,18 @@ export function PracticeHome({
                 </label>
               )
             })}
-            <label className="teacher-form-wide">
-              <span>{label('Thẻ', 'Tags')}</span>
+            <label className="wb-form-wide">
+              <span>{t('wbCommonTags')}</span>
               <input value={tagsText} onChange={(e) => setTagsText(e.target.value)} />
             </label>
           </div>
           <button
             type="button"
-            className="btn btn-primary"
+            className="wb-btn wb-btn-primary"
             disabled={busy === 'create'}
             onClick={() => void submitCreate()}
           >
-            {busy === 'create'
-              ? label('Đang tạo…', 'Creating…')
-              : label('Tạo gói vào Tri thức', 'Create pack in Knowledge')}
+            {busy === 'create' ? t('wbCmpCreating') : t('wbCmpCreate')}
           </button>
         </section>
       )}
@@ -1007,20 +1036,15 @@ export function PracticeHome({
             aria-modal="true"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3>{label('Dùng Token AI?', 'Use AI Tokens?')}</h3>
-            <p>
-              {label(
-                'Thao tác này gọi Hub AI và có thể trừ token.',
-                'This calls your AI Hub and may spend tokens.',
-              )}
-            </p>
+            <h3>{t('wbSkConfirmTitle')}</h3>
+            <p>{t('wbSkConfirmBody')}</p>
             <div className="modal-buttons">
               <button
                 className="btn btn-secondary"
                 type="button"
                 onClick={() => setConfirmSkill(null)}
               >
-                {label('Huỷ', 'Cancel')}
+                {t('wbCommonCancel')}
               </button>
               <button
                 className="btn btn-primary"
@@ -1030,7 +1054,7 @@ export function PracticeHome({
                   else void runDomainSkill(confirmSkill.id)
                 }}
               >
-                {label('Chạy AI', 'Run AI')}
+                {t('wbSkConfirmRun')}
               </button>
             </div>
           </div>

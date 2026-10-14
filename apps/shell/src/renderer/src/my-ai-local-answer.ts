@@ -4,17 +4,11 @@
  */
 import type { PracticeId } from '@uniwork/practice-core'
 import type { MyAiRecentHint } from './context-manager'
-import { readCalendar, readEmails, readNotes, readTasks } from './workbench-pins'
+import { readNotes } from './workbench-pins'
+import { cachedAgendaItems, cachedOpenTasks } from './work-cache'
 
 export type LocalAnswerTopic =
-  | 'calendar'
-  | 'tasks'
-  | 'recents'
-  | 'notes'
-  | 'email'
-  | 'pulse'
-  | 'off_topic'
-  | 'fallback'
+  'calendar' | 'tasks' | 'recents' | 'notes' | 'pulse' | 'off_topic' | 'fallback'
 
 export interface LocalAnswer {
   text: string
@@ -25,10 +19,11 @@ export interface LocalAnswer {
 }
 
 export interface LocalAnswerSnapshot {
-  tasks: { title: string; done: boolean }[]
-  calendar: { date: string; title: string }[]
+  /** null = not loaded from UniWork yet (never read as "no open tasks") */
+  tasks: { title: string; done: boolean }[] | null
+  /** null = not loaded from UniWork yet (never read as "calendar empty") */
+  calendar: { date: string; title: string }[] | null
   notes: string
-  emails: { subject: string; folder: string; to?: string; from?: string }[]
   recents: { name: string; ext: string }[]
 }
 
@@ -50,6 +45,11 @@ function bullets(items: string[], emptyVi: string, emptyEn: string, vi: boolean)
   return items.map((t) => `• ${t}`).join('\n')
 }
 
+const TASKS_NOT_LOADED_VI = '• Chưa tải danh sách việc từ UniWork: mở mục Công việc để tải.'
+const TASKS_NOT_LOADED_EN = '• Tasks are not loaded from UniWork yet: open the Tasks tab.'
+const CAL_NOT_LOADED_VI = '• Chưa tải lịch từ UniWork: mở mục Lịch để tải.'
+const CAL_NOT_LOADED_EN = '• The calendar is not loaded from UniWork yet: open the Calendar tab.'
+
 function looksOffTopic(lower: string): boolean {
   return /(?:ý nghĩa cuộc sống|meaning of life|triết học|philosophy|kể chuyện cười|tell (?:me )?a joke|thời tiết|weather|bóng đá|crypto tip|chứng khoán hôm nay)/i.test(
     lower,
@@ -67,11 +67,13 @@ function wantsTasks(lower: string): boolean {
   if (/(?:sắp xếp|sap xep|ưu tiên|uu tien|priorit|kế hoạch tuần|ke hoach tuan)/i.test(lower)) {
     return false
   }
-  return /(?:việc đang|viec dang|việc mở|viec mo|việc chưa|open tasks?|todo list|danh sách việc|danh sach viec|có việc gì|co viec gi)/i.test(
-    lower,
-  ) ||
+  return (
+    /(?:việc đang|viec dang|việc mở|viec mo|việc chưa|open tasks?|todo list|danh sách việc|danh sach viec|có việc gì|co viec gi)/i.test(
+      lower,
+    ) ||
     (/(?:công việc|cong viec|\btasks?\b|\btodos?\b)/i.test(lower) &&
       /(?:đang mở|dang mo|open|chưa xong|chua xong|còn lại|con lai|\?)/i.test(lower))
+  )
 }
 
 function wantsRecents(lower: string): boolean {
@@ -82,10 +84,6 @@ function wantsRecents(lower: string): boolean {
 
 function wantsNotes(lower: string): boolean {
   return /(?:ghi chú|ghi chu|\bnotes?\b|sticky)/i.test(lower)
-}
-
-function wantsEmail(lower: string): boolean {
-  return /(?:\bemail\b|hộp thư|hop thu|thư đến|thu den|mailbox)/i.test(lower)
 }
 
 function wantsPulse(lower: string): boolean {
@@ -137,19 +135,21 @@ export function answerMyAiLocally(
     }
   }
 
-  const openTasks = snap.tasks.filter((t) => !t.done).map((t) => t.title)
+  const tasksLoaded = snap.tasks !== null
+  const openTasks = (snap.tasks ?? []).filter((t) => !t.done).map((t) => t.title)
   const today = todayIsoLocal(now)
   const tomorrow = tomorrowIsoLocal(now)
-  const calToday = snap.calendar.filter((c) => c.date === today).map((c) => c.title)
-  const calTomorrow = snap.calendar.filter((c) => c.date === tomorrow).map((c) => c.title)
-  const calAll = snap.calendar.slice(0, 8).map((c) => `${c.date} — ${c.title}`)
+  const cal = snap.calendar ?? []
+  const calToday = cal.filter((c) => c.date === today).map((c) => c.title)
+  const calTomorrow = cal.filter((c) => c.date === tomorrow).map((c) => c.title)
+  const calAll = cal.slice(0, 8).map((c) => `${c.date} — ${c.title}`)
+  // a calendar never loaded from UniWork is "not loaded yet", never "empty"
+  const calList = (items: string[], emptyVi: string, emptyEn: string) =>
+    snap.calendar === null
+      ? bullets(items, CAL_NOT_LOADED_VI, CAL_NOT_LOADED_EN, vi)
+      : bullets(items, emptyVi, emptyEn, vi)
   const recentLines = snap.recents.slice(0, 6).map((e) => `${e.name} (.${e.ext})`)
   const notePreview = snap.notes.trim()
-  const mailLines = snap.emails.slice(0, 5).map((m) => {
-    const sub = m.subject?.trim() || (vi ? '(không tiêu đề)' : '(no subject)')
-    return `[${m.folder}] ${sub}`
-  })
-
   const calendarFocused = /(?:calendar|lịch|lich|cuộc họp|cuoc hop|meeting|sự kiện|su kien)/i.test(
     lower,
   )
@@ -165,7 +165,7 @@ export function answerMyAiLocally(
       return {
         text: [
           vi ? `Ngày mai (${tomorrow}):` : `Tomorrow (${tomorrow}):`,
-          bullets(calTomorrow, '• Chưa có sự kiện.', '• No events.', vi),
+          calList(calTomorrow, '• Chưa có sự kiện.', '• No events.'),
         ].join('\n'),
         topic: 'calendar',
         offerAi: false,
@@ -176,7 +176,7 @@ export function answerMyAiLocally(
       return {
         text: [
           vi ? `Lịch hôm nay (${today}):` : `Today’s calendar (${today}):`,
-          bullets(calToday, '• Chưa có sự kiện.', '• No events.', vi),
+          calList(calToday, '• Chưa có sự kiện.', '• No events.'),
         ].join('\n'),
         topic: 'calendar',
         offerAi: false,
@@ -186,7 +186,7 @@ export function answerMyAiLocally(
     return {
       text: [
         vi ? 'Lịch gần đây:' : 'Upcoming calendar:',
-        bullets(calAll, '• Lịch trống.', '• Calendar empty.', vi),
+        calList(calAll, '• Lịch trống.', '• Calendar empty.'),
       ].join('\n'),
       topic: 'calendar',
       offerAi: false,
@@ -198,19 +198,20 @@ export function answerMyAiLocally(
     const parts: string[] = []
     parts.push(
       vi ? `Hôm nay (${today}):` : `Today (${today}):`,
-      bullets(calToday, '• Chưa có sự kiện trên lịch.', '• No calendar events.', vi),
+      calList(calToday, '• Chưa có sự kiện trên lịch.', '• No calendar events.'),
     )
     parts.push(
       '',
       vi ? 'Việc đang mở:' : 'Open tasks:',
-      bullets(openTasks, '• Không có việc đang mở.', '• No open tasks.', vi),
+      bullets(
+        openTasks,
+        tasksLoaded ? '• Không có việc đang mở.' : TASKS_NOT_LOADED_VI,
+        tasksLoaded ? '• No open tasks.' : TASKS_NOT_LOADED_EN,
+        vi,
+      ),
     )
     if (recentLines.length > 0) {
-      parts.push(
-        '',
-        vi ? 'File gần đây:' : 'Recent files:',
-        ...recentLines.map((l) => `• ${l}`),
-      )
+      parts.push('', vi ? 'File gần đây:' : 'Recent files:', ...recentLines.map((l) => `• ${l}`))
     }
     return {
       text: parts.join('\n'),
@@ -224,7 +225,12 @@ export function answerMyAiLocally(
     return {
       text: [
         vi ? 'Việc đang mở:' : 'Open tasks:',
-        bullets(openTasks, '• Không có việc đang mở.', '• No open tasks.', vi),
+        bullets(
+          openTasks,
+          tasksLoaded ? '• Không có việc đang mở.' : TASKS_NOT_LOADED_VI,
+          tasksLoaded ? '• No open tasks.' : TASKS_NOT_LOADED_EN,
+          vi,
+        ),
       ].join('\n'),
       topic: 'tasks',
       offerAi: false,
@@ -260,18 +266,6 @@ export function answerMyAiLocally(
     }
   }
 
-  if (wantsEmail(lower)) {
-    return {
-      text: [
-        vi ? 'Email gần đây:' : 'Recent email:',
-        bullets(mailLines, '• Hộp thư trống.', '• Mailbox empty.', vi),
-      ].join('\n'),
-      topic: 'email',
-      offerAi: false,
-      contextUsed: true,
-    }
-  }
-
   // Soft fallback: short redirect + tiny pulse (not a system hint dump)
   const pulseBits: string[] = []
   if (calToday.length > 0) {
@@ -292,9 +286,7 @@ export function answerMyAiLocally(
     ? 'Mình chưa chắc ý bạn — mình xem giúp lịch, việc đang mở hay file gần đây; cũng có thể soạn Word hoặc thêm việc nếu bạn muốn.'
     : 'I’m not sure what you need yet — I can check calendar, open tasks, or recent files; or draft Word / add a task if you’d like.'
   const text =
-    pulseBits.length > 0
-      ? `${head}\n\n${pulseBits.map((b) => `• ${b}`).join('\n')}`
-      : head
+    pulseBits.length > 0 ? `${head}\n\n${pulseBits.map((b) => `• ${b}`).join('\n')}` : head
 
   return {
     text,
@@ -310,15 +302,9 @@ export function buildLocalAnswerSnapshot(
   recents?: readonly MyAiRecentHint[],
 ): LocalAnswerSnapshot {
   return {
-    tasks: readTasks(practiceId).map((t) => ({ title: t.title, done: t.done })),
-    calendar: readCalendar(practiceId).map((c) => ({ date: c.date, title: c.title })),
+    tasks: cachedOpenTasks()?.map((t) => ({ title: t.title, done: false })) ?? null,
+    calendar: cachedAgendaItems(),
     notes: readNotes(practiceId) || '',
-    emails: readEmails(practiceId).map((m) => ({
-      subject: m.subject || '',
-      folder: m.folder,
-      to: m.to,
-      from: m.from,
-    })),
     recents: (recents ?? []).map((e) => ({ name: e.name, ext: e.ext })),
   }
 }

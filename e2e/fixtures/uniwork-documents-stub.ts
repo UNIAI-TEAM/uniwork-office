@@ -10,6 +10,7 @@
  *   POST /documents/{id}/uploads                   (multipart `file`, Idempotency-Key)
  *   POST /documents/{id}/versions/commit           ({upload_id, base_revision}, same key)
  *   POST /office/sessions/exchange                 (single-use ticket, device match)
+ *   GET  /workspaces/{ws}/home                     (uniwork-work-stub.ts)
  *
  * Shapes follow the server SDOs (`handler/dto/sdo/{document,office_launch}.go`);
  * revisions are decimal strings. A stale `base_revision` answers 409
@@ -29,8 +30,9 @@ import {
   type StubRouteContext,
   type UniworkAuthStub,
 } from './uniwork-auth-stub'
+import { workRoute } from './uniwork-work-stub'
 
-export const STUB_WORKSPACE = { id: 'ws_e2e_01', name: 'Engineering notes' }
+export const STUB_WORKSPACE = { id: 'ws_e2e_01', name: 'Engineering notes', slug: 'engineering' }
 /** the 120 s lifetime of a launch ticket */
 const TICKET_TTL_MS = 120_000
 
@@ -267,7 +269,13 @@ export async function startUniworkDocumentsStub(): Promise<UniworkDocumentsStub>
       }
       ctx.send(200, {
         workspaces: [
-          { id: STUB_WORKSPACE.id, name: STUB_WORKSPACE.name, organization_id: STUB_ORG.id },
+          {
+            id: STUB_WORKSPACE.id,
+            name: STUB_WORKSPACE.name,
+            slug: STUB_WORKSPACE.slug,
+            organization_id: STUB_ORG.id,
+            organization_slug: STUB_ORG.slug,
+          },
         ],
       })
       return true
@@ -530,7 +538,9 @@ export async function startUniworkDocumentsStub(): Promise<UniworkDocumentsStub>
     return false
   }
 
-  const base = await startUniworkAuthStub({ extend: documentsRoute })
+  const base = await startUniworkAuthStub({
+    extend: async (ctx) => (await documentsRoute(ctx)) || workRoute(ctx),
+  })
 
   const need = (documentId: string): StubDocument => {
     const doc = documents.get(documentId)

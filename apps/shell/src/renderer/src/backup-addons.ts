@@ -193,11 +193,9 @@ function isBackupKey(k: string): boolean {
   return (
     k.startsWith('uniwork.wb.') ||
     k.startsWith('uniwork.skill.') ||
-    k.startsWith('uniwork.teacher') ||
     k.startsWith('uniwork.activePractice') ||
     k.startsWith('uniwork.my-ai.') ||
     k.startsWith('uniwork.ai.') ||
-    k === 'uniwork.teacherUiLang' ||
     k === ENTITLEMENT_KEY
   )
 }
