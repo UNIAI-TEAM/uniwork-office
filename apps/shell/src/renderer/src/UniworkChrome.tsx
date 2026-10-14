@@ -426,20 +426,31 @@ export function UniworkRemoteBar({
     })
   }, [path, noticeKey, hidden])
 
-  // announced once per bar that appears
+  // announced once per notice of a document: coming back to a tab does not say it again, a bar
+  // that went away (no remote) and returns does, and a hidden bar leaves no stale sentence behind
+  const announced = useRef(new Map<string, string>())
   const shownKey = visible && model && path ? `${path}\n${signature}` : null
+  const announceKey = visible && model && path && noticeKey ? `${path}\n${noticeKey}` : null
   const modelRef = useRef(model)
   modelRef.current = model
   useEffect(() => {
+    if (path !== null && model === null) announced.current.delete(path)
+  }, [path, model])
+  useEffect(() => {
     const current = modelRef.current
-    if (!shownKey || !current) return
+    if (!announceKey || !current || path === null || noticeKey === null) {
+      setSay(null)
+      return
+    }
+    if (announced.current.get(path) === noticeKey) return
+    announced.current.set(path, noticeKey)
     setSay((prev) => ({
       key: current.messageKey,
       params: current.params,
       assertive: current.tone === 'error',
       n: (prev?.n ?? 0) + 1,
     }))
-  }, [shownKey])
+  }, [announceKey, path, noticeKey])
 
   // an information bar hides itself unless the pointer or the focus is in it; leaving restarts the 8 s
   const autoHideMs = visible ? model?.autoHideMs : undefined

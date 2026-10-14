@@ -512,6 +512,33 @@ describe('UniworkRemoteBar: announcements', () => {
     expect(polite().firstElementChild).toBe(spoken)
   })
 
+  it('switching tabs away and back does not announce the same bar again', async () => {
+    const other = 'C:\\ud\\uniwork-documents\\d2\\Other.docx'
+    await mount(status({ kind: 'newer-dirty', version: 4 }))
+    const watch = watchAnnouncements()
+    await mount(status(undefined, { path: other }))
+    await mount(status({ kind: 'newer-dirty', version: 4 }))
+    expect(bar()).not.toBeNull()
+    expect(watch.count()).toBe(0)
+    // another tab with a notice of its own is announced, once
+    await mount(status({ kind: 'newer-dirty', version: 4 }, { path: other }))
+    expect(watch.count()).toBe(1)
+    await mount(status({ kind: 'newer-dirty', version: 4 }))
+    expect(watch.count()).toBe(1)
+    watch.stop()
+  })
+
+  it('a newer version of the same notice is announced again, and the live text is cleared when the bar hides', async () => {
+    await mount(status({ kind: 'newer-dirty', version: 4 }))
+    expect(polite().textContent).not.toBe('')
+    await mount(status({ kind: 'newer-dirty', version: 5 }))
+    expect(polite().textContent).toBe(text('en', 'uwRemoteNewerDirty', { n: 5 }))
+    await click(button('later'))
+    expect(bar()).toBeNull()
+    expect(polite().textContent).toBe('')
+    expect(alert().textContent).toBe('')
+  })
+
   it('an error kind is announced as an alert', async () => {
     await mount(status({ kind: 'deleted' }))
     expect(alert().textContent).toBe(text('en', 'uwRemoteDeleted'))
