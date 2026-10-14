@@ -746,4 +746,46 @@ describe('G5-09 desktop conflict dialog S5 session (main)', () => {
       await ctx.service.conflictAct(sessionId2, { kind: 'reload', keep: 'discard', stopAi: false }),
     ).toEqual({ kind: 'closed' })
   })
+
+  it('BE-01a: cancelSave(path, true) (tab closed -> kept draft) ends the open session and pushes conflictClosed once with the session id', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const path = await openAndConflict(ctx, server)
+
+    const resolvePromise = ctx.service.resolveConflict(path)
+    await vi.waitFor(() => expect(ctx.views).toHaveLength(1))
+    const sessionId = ctx.views[0]!.sessionId
+
+    // cancelSave(path, false) does not close the document or the open conflict session
+    await ctx.service.cancelSave(path, false)
+    expect(ctx.closedSessions).toEqual([])
+
+    // Re-conflict and test cancelSave(path, true) while S5 is open
+    writeFileSync(path, 'mine v4 again')
+    await ctx.service.save(path)
+    await ctx.service.cancelSave(path, true)
+    expect(ctx.closedSessions).toEqual([sessionId])
+    expect(await resolvePromise).toMatchObject({ state: 'conflict' })
+    expect(await ctx.service.conflictAct(sessionId, { kind: 'overwrite', stopAi: false })).toEqual({
+      kind: 'closed',
+    })
+  })
+
+  it('BE-01b: confirmClose choosing "close" ends the open session and pushes conflictClosed once with the session id', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const path = await openAndConflict(ctx, server)
+
+    const resolvePromise = ctx.service.resolveConflict(path)
+    await vi.waitFor(() => expect(ctx.views).toHaveLength(1))
+    const sessionId = ctx.views[0]!.sessionId
+
+    vi.mocked(ctx.ui.chooseUnsavedClose).mockResolvedValueOnce('close')
+    expect(await ctx.service.confirmClose(path)).toBe(true)
+    expect(ctx.closedSessions).toEqual([sessionId])
+    expect(await resolvePromise).toMatchObject({ state: 'conflict' })
+    expect(await ctx.service.conflictAct(sessionId, { kind: 'overwrite', stopAi: false })).toEqual({
+      kind: 'closed',
+    })
+  })
 })
