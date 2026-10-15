@@ -220,6 +220,14 @@ export class SaveCoordinator {
   /** paths whose working copy has moved past their pending intent (an unsent N+1) */
   private readonly pendingNext = new Set<string>()
   /**
+   * Paths whose last inline attempt ended without committing: the record is
+   * dropped (or was never written) and the base is where the attempt found it.
+   * That outcome is the only thing telling a settle that FAILED from a first
+   * save that has not minted its intent yet - both leave no record and an
+   * unmoved base (RBE6u4-01). The next attempt of the path replaces it.
+   */
+  private readonly uncommittedAttempts = new Set<string>()
+  /**
    * Per-document serialization of the binding writes. The inline pipeline and
    * the dispatcher's `publish` both rewrite `binding.json` for the same key;
    * chaining them per key keeps the last state in event order (G506-be-7).
@@ -300,12 +308,22 @@ export class SaveCoordinator {
       return this.requestPopover(doc, options)
     }
     this.saving.add(doc.path)
+    // a fresh attempt replaces the last one's outcome (see uncommittedAttempts)
+    this.uncommittedAttempts.delete(doc.path)
     const attempt = this.run(doc, options).catch(() =>
       this.commitState(doc, { ...doc.binding, state: 'error', error: 'server_error' }),
     )
     this.running.set(doc.path, attempt)
     try {
-      return await attempt
+      const ended = await attempt
+      // the attempt is over: remember that it did not move the base, so a press
+      // whose reads land after it still knows the settle failed instead of
+      // reading "no record, base unchanged" as "the intent is not minted yet"
+      // (RBE6u4-01; see movedPastSettledSave)
+      if (ended.binding.baseChecksum === doc.binding.baseChecksum) {
+        this.uncommittedAttempts.add(doc.path)
+      }
+      return ended
     } finally {
       this.saving.delete(doc.path)
       this.running.delete(doc.path)
@@ -381,13 +399,18 @@ export class SaveCoordinator {
    * was saving. If the running save settled underneath the press, its commit
    * already moved the binding's base (the record is deleted right after): a
    * copy still different from that fresh base is an unsent N+1, so the press
-   * keeps its popover (RBE6u3-01). A binding that did not move means the first
-   * save has not stored its intent yet (nothing to say), and a clean copy has
-   * nothing to mark. Never writes, mints or replays.
+   * keeps its popover (RBE6u3-01). A settle that ended without a commit leaves
+   * the base where the press found it - the attempt's own outcome says so - and
+   * the same copy check decides, because that copy is just as unsent
+   * (RBE6u4-01). A binding that did not move while the attempt is still running
+   * means the first save has not stored its intent yet (nothing to say), and a
+   * clean copy has nothing to mark. Never writes, mints or replays.
    */
   private async movedPastSettledSave(doc: BoundDocument): Promise<boolean> {
     const fresh = this.deps.store.lookup(doc.path)
-    if (!fresh || fresh.binding.baseChecksum === doc.binding.baseChecksum) return false
+    if (!fresh) return false
+    const committed = fresh.binding.baseChecksum !== doc.binding.baseChecksum
+    if (!committed && !this.uncommittedAttempts.has(doc.path)) return false
     return sha256Hex(await this.readBytes(doc.path)) !== fresh.binding.baseChecksum
   }
 
