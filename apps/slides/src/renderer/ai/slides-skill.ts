@@ -141,6 +141,8 @@ export interface DeckAccess {
    * (no style sidecar next to the working copy); generated pages stay unsaved in the editor
    */
   uniworkBound?(): boolean
+  /** live predicate: the active AI provider is UniWork AI (absent = BYOK); read before every model request */
+  uniworkAi?(): boolean
   /**
    * Cloud single-page generation (gsk slide_generate), used by generate_deck's self-driven
    * pipeline: given the unified style + this page's brief/layout/images, the cloud service
@@ -1081,10 +1083,31 @@ function hiddenMediaTools(access: DeckAccess): Set<string> {
   return hidden
 }
 
-function mediaToolsOffNote(hidden: Set<string>): string {
+/** every tool withheld this request: media tools, plus (provider = UniWork AI only; BYOK keeps them) the UniWork set */
+function hiddenTools(access: DeckAccess): Set<string> {
+  const hidden = hiddenMediaTools(access)
+  if (access.uniworkAi?.()) for (const n of UNIWORK_AI_HIDDEN_TOOLS) hidden.add(n)
+  return hidden
+}
+
+/** tools a UniWork AI turn never gets (signed policy; mirrored in the server table officeUniworkModulesV1) */
+const UNIWORK_AI_HIDDEN_TOOLS: readonly string[] = [
+  'insert_web_image',
+  'replace_image',
+  'regenerate_slide',
+  'save_style_template',
+  'generate_deck',
+]
+
+const UNIWORK_AI_TOOLS_OFF_NOTE = `\n\nNote: ${UNIWORK_AI_HIDDEN_TOOLS.join(', ')} are not available here. generate_deck is unavailable: do not create a new deck; edit the open one with apply_ops and execute_slide_script. Do not call or promise those tools.`
+
+function mediaToolsOffNote(hidden: Set<string>, uniworkAi: boolean): string {
   if (hidden.size === 0) return ''
   const plural = hidden.size > 1
-  return `\n\nNote: ${[...hidden].join(' and ')} ${plural ? 'are' : 'is'} currently unavailable (no image/media provider: signed out of UniWork or cloud tools off, and no media API key in Settings). Do not call or promise ${plural ? 'them' : 'it'}; for imagery use image_search + insert_web_image instead.`
+  // insert_web_image is one of the tools UniWork AI turns hide, so it cannot be the fallback there
+  const fallback = uniworkAi ? 'image_search' : 'image_search + insert_web_image'
+
+  return `\n\nNote: ${[...hidden].join(' and ')} ${plural ? 'are' : 'is'} currently unavailable (no image/media provider: signed out of UniWork or cloud tools off, and no media API key in Settings). Do not call or promise ${plural ? 'them' : 'it'}; for imagery use ${fallback} instead.`
 }
 
 /** the only tools a view-only deck may run: none of them changes the deck */
@@ -1130,14 +1153,15 @@ export function createSlidesSkill(access: DeckAccess): AgentSkill {
       const redact = labels.length > 0 ? `\n\n${placeholderInstruction(labels)}` : ''
       return (
         systemPrompt +
-        mediaToolsOffNote(hiddenMediaTools(access)) +
+        mediaToolsOffNote(hiddenMediaTools(access), access.uniworkAi?.() === true) +
+        (access.uniworkAi?.() ? UNIWORK_AI_TOOLS_OFF_NOTE : '') +
         (access.readOnly?.() ? VIEW_ONLY_NOTE : '') +
         redact
       )
     },
     // live view: the predicates are re-read before every model request
     get tools() {
-      const hidden = hiddenMediaTools(access)
+      const hidden = hiddenTools(access)
       const readOnly = access.readOnly?.() === true
       if (!readOnly && hidden.size === 0) return TOOLS
       return TOOLS.filter((t) => !hidden.has(t.name) && (!readOnly || READ_ONLY_TOOLS.has(t.name)))
@@ -1441,6 +1465,12 @@ async function executeTool(
   // defense in depth: a view-only deck refuses every tool outside the read-only set
   if (access.readOnly?.() && !READ_ONLY_TOOLS.has(call.name))
     return fail(t('aiViewOnlyNotice'), `${call.name} is not available: the deck is view-only`)
+  // same set the live `tools` getter withholds: a hidden tool the model calls anyway never runs
+  if (hiddenTools(access).has(call.name))
+    return fail(
+      call.name,
+      `${call.name} is unavailable here. Do not call it again; use the tools you were offered instead.`,
+    )
   const slides = access.getSlides()
   switch (call.name) {
     case 'read_slide': {

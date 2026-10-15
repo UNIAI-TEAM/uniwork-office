@@ -64,7 +64,70 @@ const IMAGE_GEN_OFF_NOTE =
   '\n\nNote: generate_image is currently unavailable (no image model is configured under Settings → AI media). Do not call or promise it; use image_search for imagery.'
 
 const BOUND_NOTE =
-  '\n\nNote: this document belongs to UniWork. create_document is unavailable here; do not call or promise it. Give results in your reply instead.'
+  '\n\nNote: this document belongs to UniWork. create_document is unavailable here; do not call or promise it. Give results in your reply instead. The file-level page tools are unavailable too (insert_blank_page, set_page_size, crop_pages, replace_pages, extract_pages, split_pdf, split_pages, merge_pages); use the pending apply_ops ops (deletePage, setPageOrder, rotatePages) instead.'
+
+const TEXT_EDIT_OFF_NOTE =
+  '\n\nNote: the text-editing tools are unavailable here (edit_text, edit_block, move_text_block, insert_text). Do not call or promise text edits; you can still highlight, annotate, and add notes.'
+
+const IMAGE_EDIT_OFF_NOTE =
+  '\n\nNote: the image-editing tools are unavailable here (transform_image, rotate_image, replace_image, flip_image, set_image_opacity, crop_image, remove_image_background, delete_image). Do not call or promise edits to images already in the document; insert_image can still add one.'
+
+/** pdfium text patching (G6-01: edit_text, edit_block, move_text_block, insert_text); the `pdfTextEdit` capability */
+const TEXT_EDIT_TOOLS: readonly string[] = [
+  'edit_text',
+  'edit_block',
+  'move_text_block',
+  'insert_text',
+]
+
+/** pdfium edits of images already in the page (the `pdfImageEdit` capability); insert_image adds a new one and stays */
+const IMAGE_EDIT_TOOLS: readonly string[] = [
+  'transform_image',
+  'rotate_image',
+  'replace_image',
+  'flip_image',
+  'set_image_opacity',
+  'crop_image',
+  'remove_image_background',
+  'delete_image',
+]
+
+/** tools that save the file and rewrite it on disk / on the server: never on a UniWork-bound document (policy Q3, Q4) */
+const FILE_LEVEL_TOOLS: readonly string[] = [
+  'insert_blank_page',
+  'set_page_size',
+  'crop_pages',
+  'replace_pages',
+  'extract_pages',
+  'split_pdf',
+  'split_pages',
+  'merge_pages',
+]
+
+/** the capability is off only when the host says so; an absent reader keeps the tool (desktop sets none) */
+function capabilityOff(deps: PdfAiDeps, key: 'pdfTextEdit' | 'pdfImageEdit'): boolean {
+  return deps.capability?.(key) === false
+}
+
+/**
+ * Every tool withheld this request. One function feeds both the `tools` getter and `executeTool`, so
+ * the offered set and the refused set cannot drift.
+ */
+function hiddenTools(deps: PdfAiDeps): Set<string> {
+  const hidden = new Set<string>()
+  // C-BOUND: a UniWork-bound copy never gets the tool that writes a new file beside it
+  if (deps.uniworkBound?.()) {
+    hidden.add('create_document')
+    for (const n of FILE_LEVEL_TOOLS) hidden.add(n)
+  }
+  // provider = UniWork AI: the model must not be offered edit tools the host cannot run (BYOK keeps them)
+  if (deps.uniworkAi?.()) {
+    if (capabilityOff(deps, 'pdfTextEdit')) for (const n of TEXT_EDIT_TOOLS) hidden.add(n)
+    if (capabilityOff(deps, 'pdfImageEdit')) for (const n of IMAGE_EDIT_TOOLS) hidden.add(n)
+  }
+  if (deps.imageGenAvailable?.() === false) hidden.add('generate_image')
+  return hidden
+}
 
 export function createPdfSkill(deps: PdfAiDeps): AgentSkill {
   return {
@@ -74,16 +137,17 @@ export function createPdfSkill(deps: PdfAiDeps): AgentSkill {
       if (deps.readOnly()) return SYSTEM_PROMPT + VIEW_ONLY_NOTE
       let prompt = SYSTEM_PROMPT
       if (deps.uniworkBound?.()) prompt += BOUND_NOTE
+      if (deps.uniworkAi?.()) {
+        if (capabilityOff(deps, 'pdfTextEdit')) prompt += TEXT_EDIT_OFF_NOTE
+        if (capabilityOff(deps, 'pdfImageEdit')) prompt += IMAGE_EDIT_OFF_NOTE
+      }
       if (deps.imageGenAvailable?.() === false) prompt += IMAGE_GEN_OFF_NOTE
       return prompt
     },
     // live view: the predicate is re-read before every model request
     get tools() {
       if (deps.readOnly()) return AGENT_TOOLS.filter((t) => READ_ONLY_TOOLS.has(t.name))
-      // C-BOUND: a UniWork-bound copy never gets the tool that writes a new file beside it
-      const hidden = new Set<string>()
-      if (deps.uniworkBound?.()) hidden.add('create_document')
-      if (deps.imageGenAvailable?.() === false) hidden.add('generate_image')
+      const hidden = hiddenTools(deps)
       return hidden.size === 0 ? AGENT_TOOLS : AGENT_TOOLS.filter((t) => !hidden.has(t.name))
     },
     buildContext: () => {
@@ -125,6 +189,20 @@ export function createPdfSkill(deps: PdfAiDeps): AgentSkill {
       if (deps.readOnly() && !READ_ONLY_TOOLS.has(call.name)) {
         return {
           output: 'This document is view-only; it cannot be edited.',
+          isError: true,
+          mutated: false,
+          summary: call.name,
+        }
+      }
+      // defense in depth: a hidden tool the model calls anyway (stale history, provider switch, injected call) never runs
+      if (hiddenTools(deps).has(call.name)) {
+        const boundWrite =
+          deps.uniworkBound?.() &&
+          (call.name === 'create_document' || FILE_LEVEL_TOOLS.includes(call.name))
+        return {
+          output: boundWrite
+            ? `${call.name} is unavailable here: this is a UniWork document, so the AI cannot write files outside it or rewrite it on the server. Use the pending edit tools instead.`
+            : `${call.name} is unavailable here. Do not call it again; use the tools you were offered instead.`,
           isError: true,
           mutated: false,
           summary: call.name,

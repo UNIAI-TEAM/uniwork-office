@@ -443,6 +443,9 @@ export function AiPanel({
       draftServerComment: (idx, at, text) =>
         apiRef.current.draftServerComment?.(idx, at, text) ?? false,
       uniworkBound: () => apiRef.current.uniworkBound?.() ?? false,
+      // the provider refreshes settingsRef on every run and on a settings change
+      uniworkAi: () => settingsRef.current?.provider === 'uniwork',
+      capability: (key) => cap(key),
       ocrText: (idx) => apiRef.current.ocrText(idx),
       selection: () => apiRef.current.selection(),
       pendingSummary: () => apiRef.current.pendingSummary(),

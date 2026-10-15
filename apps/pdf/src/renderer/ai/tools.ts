@@ -189,6 +189,10 @@ export interface PdfAiDeps {
   setStamps(cfg: StampConfig | null): void
   /** live predicate: the open PDF is a UniWork-bound copy (C-BOUND: no file written outside it); absent = plain local file */
   uniworkBound?(): boolean
+  /** live predicate: the active AI provider is UniWork AI (absent = BYOK); read before every model request */
+  uniworkAi?(): boolean
+  /** live host capability reader for the edit tools (`cap()` in the renderer); absent = every capability on */
+  capability?(key: 'pdfTextEdit' | 'pdfImageEdit'): boolean
   /** Questionnaire card shown in the panel; the run blocks until the user answers, skips, stops or starts a new chat (cancelled) */
   askClarification?(
     questions: ClarifyQuestion[],
