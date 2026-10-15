@@ -237,3 +237,51 @@ describe('GET /documents/{id}/versions/commit (lookupCommit)', () => {
     expect(fetch).not.toHaveBeenCalled()
   })
 })
+
+describe('parseDetail / commentsLevelOf (G8-18 / DOC-05)', () => {
+  const detailEnvelope = (myLevel?: unknown) => ({
+    document: {
+      id: DOC,
+      organization_id: 'org_1',
+      workspace_id: 'ws_1',
+      title: 'Plan.docx',
+      kind: 'file',
+      revision: '41',
+      current_version: 1,
+      ...(myLevel !== undefined ? { my_level: myLevel } : {}),
+      file: {
+        filename: 'Plan.docx',
+        mime_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        version: 1,
+        checksum_sha256: 'a'.repeat(64),
+        size_bytes: 128,
+      },
+    },
+  })
+
+  it.each(['view', 'comment', 'edit', 'manage'] as const)(
+    'passes %s through unchanged',
+    (level) => {
+      expect(parse.commentsLevelOf(level)).toBe(level)
+      expect(parse.parseDetail(detailEnvelope(level)).myLevel).toBe(level)
+    },
+  )
+
+  it.each(['suggest', 'admin', 'owner', 'future_level'])(
+    'downgrades an unknown level %s to view (never more)',
+    (unknownLevel) => {
+      expect(parse.commentsLevelOf(unknownLevel)).toBe('view')
+      expect(parse.parseDetail(detailEnvelope(unknownLevel)).myLevel).toBe('view')
+    },
+  )
+
+  it('keeps missing, null, or empty my_level as null and rejects non-strings', () => {
+    expect(parse.commentsLevelOf(undefined)).toBeNull()
+    expect(parse.commentsLevelOf(null)).toBeNull()
+    expect(parse.commentsLevelOf('')).toBeNull()
+    expect(parse.parseDetail(detailEnvelope()).myLevel).toBeNull()
+    expect(parse.parseDetail(detailEnvelope(null)).myLevel).toBeNull()
+    expect(parse.parseDetail(detailEnvelope('')).myLevel).toBeNull()
+    expect(() => parse.commentsLevelOf(42)).toThrow(UniworkDocError)
+  })
+})
