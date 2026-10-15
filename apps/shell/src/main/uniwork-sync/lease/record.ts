@@ -98,10 +98,7 @@ function isValidId(value: unknown): value is string {
   return typeof value === 'string' && ID.test(value) && isStoreSegment(value)
 }
 
-function resolveScopeField(
-  topLevel: unknown,
-  nested: unknown,
-): string | null {
+function resolveScopeField(topLevel: unknown, nested: unknown): string | null {
   if (topLevel !== undefined && nested !== undefined && topLevel !== nested) {
     return null
   }
@@ -125,7 +122,11 @@ export function parseLeaseRecord(raw: unknown): LeaseRecord | null {
   if (!isValidIsoTimestamp(r.renew_after)) return null
   if (r.issued_at !== undefined && !isValidIsoTimestamp(r.issued_at)) return null
   if (!isLeaseLevel(r.level)) return null
-  if (typeof r.version_id !== 'string' || r.version_id.trim().length === 0 || !ID.test(r.version_id)) {
+  if (
+    typeof r.version_id !== 'string' ||
+    r.version_id.trim().length === 0 ||
+    !ID.test(r.version_id)
+  ) {
     return null
   }
   if (!isSafeIntAtLeast(r.version, 0)) return null

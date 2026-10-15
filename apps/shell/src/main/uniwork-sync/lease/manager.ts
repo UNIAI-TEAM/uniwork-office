@@ -13,12 +13,7 @@ import {
   type LeaseFailure,
   type OfficeOfflineLeaseSDO,
 } from './client'
-import {
-  LEASE_RECORD_SCHEMA,
-  parseLeaseRecord,
-  type LeaseLevel,
-  type LeaseRecord,
-} from './record'
+import { LEASE_RECORD_SCHEMA, parseLeaseRecord, type LeaseLevel, type LeaseRecord } from './record'
 import type { LeaseStore } from './store'
 
 /**
@@ -65,10 +60,7 @@ export type LeaseEffectiveStateKind =
   | 'none'
 
 export type LeaseLockReason =
-  | 'signed_out'
-  | 'account_switch'
-  | 'deployment_switch'
-  | 'session_expired'
+  'signed_out' | 'account_switch' | 'deployment_switch' | 'session_expired'
 
 export type LeaseStateReason =
   | 'lease_expired'

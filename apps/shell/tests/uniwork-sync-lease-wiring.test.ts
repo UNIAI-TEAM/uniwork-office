@@ -126,7 +126,13 @@ beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'uw-sync-lease-wiring-'))
   statusListener = null
   identity = { accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' }
-  statusNow = { loggedIn: true, state: 'signed-in', needsOrgChoice: false, org: ORGS[0], orgs: ORGS }
+  statusNow = {
+    loggedIn: true,
+    state: 'signed-in',
+    needsOrgChoice: false,
+    org: ORGS[0],
+    orgs: ORGS,
+  }
   requests.length = 0
   serverNow = Date.parse('2026-10-13T08:00:00Z')
   issuedAgoMs = 0
@@ -164,7 +170,11 @@ describe('the production lease wiring (W1f)', () => {
     issuedAgoMs = 13 * HOUR
     await runtime.leases.grant('doc_1')
     expect(leaseRequests()).toEqual([
-      { method: 'PUT', path: '/api/v1/documents/doc_1/office/offline-lease', auth: 'Bearer fake-token' },
+      {
+        method: 'PUT',
+        path: '/api/v1/documents/doc_1/office/offline-lease',
+        auth: 'Bearer fake-token',
+      },
     ])
 
     await runtime.tick()
@@ -266,7 +276,9 @@ describe('the account boundary locks leases on sign-out only (W1f)', () => {
     identity = { accountId: 'acc_2', deviceSessionId: 'dev_2', deploymentId: 'default' }
     statusListener?.(statusNow)
     await vi.waitFor(() => expect(lockBoundary).toHaveReturnedWith('account_switch'))
-    expect(lockBoundary).toHaveBeenCalledWith(expect.objectContaining({ deploymentId: 'default', accountId: 'acc_1' }))
+    expect(lockBoundary).toHaveBeenCalledWith(
+      expect.objectContaining({ deploymentId: 'default', accountId: 'acc_1' }),
+    )
     // acc_2 never sees acc_1's lease, is not locked, and can take its own
     expect((await manager.effectiveState('doc_1')).state).toBe('none')
     expect((await manager.grant('doc_1')).kind).toBe('renewed')
@@ -281,7 +293,9 @@ describe('the account boundary locks leases on sign-out only (W1f)', () => {
     identity = { accountId: 'acc_1', deviceSessionId: 'dev_2', deploymentId: 'other' }
     statusListener?.(statusNow)
     await vi.waitFor(() => expect(lockBoundary).toHaveReturnedWith('deployment_switch'))
-    expect(lockBoundary).toHaveBeenCalledWith(expect.objectContaining({ deploymentId: 'default', accountId: 'acc_1' }))
+    expect(lockBoundary).toHaveBeenCalledWith(
+      expect.objectContaining({ deploymentId: 'default', accountId: 'acc_1' }),
+    )
     expect((await manager.effectiveState('doc_1')).state).toBe('none')
     expect((await manager.grant('doc_1')).kind).toBe('renewed')
     expect(requests.filter((r) => r.method === 'DELETE')).toEqual([])

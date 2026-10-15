@@ -2,7 +2,10 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { NEVER_READ_CAPABILITIES, type CapabilityRead } from '../src/main/uniwork-sync/capability/cache'
+import {
+  NEVER_READ_CAPABILITIES,
+  type CapabilityRead,
+} from '../src/main/uniwork-sync/capability/cache'
 import type { FeedClient } from '../src/main/uniwork-sync/feed/client'
 import { UniworkDocError } from '../src/main/uniwork-docs/errors'
 import { FeedError } from '../src/main/uniwork-sync/feed/errors'
@@ -29,7 +32,10 @@ const T0 = Date.parse('2026-10-13T08:00:00Z')
 const HOUR = 60 * 60 * 1000
 const SCOPE = { deploymentId: 'dep_1', accountId: 'acc_1' }
 
-function makeSdo(nowMs: number, overrides: Partial<OfficeOfflineLeaseSDO> = {}): OfficeOfflineLeaseSDO {
+function makeSdo(
+  nowMs: number,
+  overrides: Partial<OfficeOfflineLeaseSDO> = {},
+): OfficeOfflineLeaseSDO {
   return {
     lease: `ofl1.token-at-${nowMs}`,
     lease_id: '01J8X4LEASE1P2Q3R4S5T6U7V8',

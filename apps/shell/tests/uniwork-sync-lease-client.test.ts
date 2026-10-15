@@ -29,7 +29,12 @@ const SAMPLE_SDO: OfficeOfflineLeaseSDO = {
 
 describe('uniwork-sync lease client (G5-08c)', () => {
   it('PUT grant sends empty body, PUT renew sends {"lease": "<previous signed lease>"}, DELETE releases, and parses SDO', async () => {
-    const calls: Array<{ url: string; method: string; body: string | undefined; auth: string | null }> = []
+    const calls: Array<{
+      url: string
+      method: string
+      body: string | undefined
+      auth: string | null
+    }> = []
 
     const client = createLeaseClient({
       apiOrigin: 'https://uniwork.example',
@@ -98,9 +103,7 @@ describe('uniwork-sync lease client (G5-08c)', () => {
       status: 403,
     })
 
-    expect(
-      parseLeaseError(403, { error: { code: 'offline_lease_device_required' } }),
-    ).toEqual({
+    expect(parseLeaseError(403, { error: { code: 'offline_lease_device_required' } })).toEqual({
       kind: 'device_required',
       code: 'offline_lease_device_required',
       status: 403,
@@ -181,7 +184,10 @@ describe('uniwork-sync lease client (G5-08c)', () => {
 
   it('R1BE-9: a numeric revision is kept as its exact decimal string, small or above 2^53', () => {
     const body = (revision: string) =>
-      JSON.stringify({ ...SAMPLE_SDO, revision: 0 }).replace('"revision":0', `"revision":${revision}`)
+      JSON.stringify({ ...SAMPLE_SDO, revision: 0 }).replace(
+        '"revision":0',
+        `"revision":${revision}`,
+      )
     expect(parseLeaseSDO(body('42')).revision).toBe('42')
     expect(parseLeaseSDO(body('9007199254740995')).revision).toBe('9007199254740995')
     expect(parseLeaseSDO(body('9223372036854775807')).revision).toBe('9223372036854775807')

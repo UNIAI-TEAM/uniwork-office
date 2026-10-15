@@ -138,7 +138,12 @@ export function parseLeaseSDO(input: string | unknown): OfficeOfflineLeaseSDO {
   if (typeof generation !== 'number' || !Number.isSafeInteger(generation) || generation < 1) {
     malformed()
   }
-  if (!isIsoDate(expires_at) || !isIsoDate(renew_after) || !isIsoDate(server_time) || !isIsoDate(issued_at)) {
+  if (
+    !isIsoDate(expires_at) ||
+    !isIsoDate(renew_after) ||
+    !isIsoDate(server_time) ||
+    !isIsoDate(issued_at)
+  ) {
     malformed()
   }
   if (typeof policy_epoch !== 'number' || !Number.isSafeInteger(policy_epoch) || policy_epoch < 0) {
@@ -170,7 +175,12 @@ export function parseLeaseError(status: number, body: unknown): LeaseFailure {
   const envelope = readEnvelope(body)
   const code = envelope?.code
 
-  if (status === 401 || code === 'unauthorized' || code === 'device_revoked' || code === 'refresh_reused') {
+  if (
+    status === 401 ||
+    code === 'unauthorized' ||
+    code === 'device_revoked' ||
+    code === 'refresh_reused'
+  ) {
     return {
       kind: 'session_expired',
       code: code === 'device_revoked' || code === 'refresh_reused' ? code : 'session_expired',
@@ -200,7 +210,9 @@ export function parseLeaseError(status: number, body: unknown): LeaseFailure {
       kind: 'limit_reached',
       code: 'offline_lease_limit_reached',
       status,
-      ...(typeof rawLimit === 'number' && Number.isSafeInteger(rawLimit) ? { limit: rawLimit } : {}),
+      ...(typeof rawLimit === 'number' && Number.isSafeInteger(rawLimit)
+        ? { limit: rawLimit }
+        : {}),
     }
   }
 

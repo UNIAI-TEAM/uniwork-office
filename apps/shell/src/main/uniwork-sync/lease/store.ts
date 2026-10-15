@@ -36,9 +36,7 @@ export const LEASE_STORE_REGISTRATION: StoreRegistration = {
 
 /** the store cannot be reached right now, and why */
 export type LeaseStoreUnavailable =
-  | { kind: 'keystore_locked' }
-  | { kind: 'keyring_unavailable' }
-  | { kind: 'no_session' }
+  { kind: 'keystore_locked' } | { kind: 'keyring_unavailable' } | { kind: 'no_session' }
 
 export type LeaseStoreReadResult =
   | { kind: 'ok'; record: LeaseRecord }
@@ -74,8 +72,7 @@ export type LeaseStoreSource =
   | StoreRecords
 
 type ResolvedRecords =
-  | { kind: 'ok'; records: StoreRecords; scope: StoreScope | null }
-  | LeaseStoreUnavailable
+  { kind: 'ok'; records: StoreRecords; scope: StoreScope | null } | LeaseStoreUnavailable
 
 /** a key status that is not ok, as the store's unavailable outcome */
 function unavailable(status: Exclude<StoreKeyStatus, 'ok'>): LeaseStoreUnavailable {
@@ -93,7 +90,10 @@ function isSyncStoreAccess(source: LeaseStoreSource): source is SyncStoreAccess 
 function isLayerSource(
   source: LeaseStoreSource,
 ): source is { layer: StoreLayer; scope: StoreScope | (() => StoreScope | null) } {
-  return typeof (source as { layer?: unknown }).layer === 'object' && (source as { layer?: unknown }).layer !== null
+  return (
+    typeof (source as { layer?: unknown }).layer === 'object' &&
+    (source as { layer?: unknown }).layer !== null
+  )
 }
 
 function isDirectRecords(source: LeaseStoreSource): source is StoreRecords {
@@ -104,19 +104,14 @@ function isDirectRecords(source: LeaseStoreSource): source is StoreRecords {
   )
 }
 
-function readScope(
-  scope?: StoreScope | (() => StoreScope | null),
-): StoreScope | null {
+function readScope(scope?: StoreScope | (() => StoreScope | null)): StoreScope | null {
   if (!scope) return null
   return typeof scope === 'function' ? scope() : scope
 }
 
 function matchesScope(record: LeaseRecord, scope: StoreScope | null): boolean {
   if (!scope) return true
-  return (
-    record.deployment_id === scope.deploymentId &&
-    record.user_id === scope.accountId
-  )
+  return record.deployment_id === scope.deploymentId && record.user_id === scope.accountId
 }
 
 export function createLeaseStore(source: LeaseStoreSource): LeaseStore {
@@ -160,7 +155,9 @@ export function createLeaseStore(source: LeaseStoreSource): LeaseStore {
       }
     } catch (error) {
       if (error instanceof CredentialStoreError) {
-        return { kind: error.code === 'keyring_unavailable' ? 'keyring_unavailable' : 'keystore_locked' }
+        return {
+          kind: error.code === 'keyring_unavailable' ? 'keyring_unavailable' : 'keystore_locked',
+        }
       }
       throw error
     }

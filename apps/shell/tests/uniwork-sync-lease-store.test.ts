@@ -19,10 +19,7 @@ import {
   parseLeaseRecord,
   type LeaseRecordInput,
 } from '../src/main/uniwork-sync/lease/record'
-import {
-  LEASE_STORE_REGISTRATION,
-  createLeaseStore,
-} from '../src/main/uniwork-sync/lease/store'
+import { LEASE_STORE_REGISTRATION, createLeaseStore } from '../src/main/uniwork-sync/lease/store'
 import { createSyncStoreAccess } from '../src/main/uniwork-sync/session-store'
 import {
   RECORD_IV_BYTES,
@@ -283,7 +280,10 @@ describe('uniwork-sync lease record and store (G5-08c)', () => {
     writeFileSync(
       targetPath,
       encodeRecord(
-        { schema: LEASE_STORE_REGISTRATION.schema, min_store_level: LEASE_STORE_REGISTRATION.minStoreLevel },
+        {
+          schema: LEASE_STORE_REGISTRATION.schema,
+          min_store_level: LEASE_STORE_REGISTRATION.minStoreLevel,
+        },
         Buffer.alloc(RECORD_IV_BYTES, 1),
         Buffer.alloc(RECORD_TAG_BYTES, 2),
         Buffer.from(forgedPlaintext, 'utf8'),

@@ -8,10 +8,7 @@ import {
   type LeaseClient,
   type OfficeOfflineLeaseSDO,
 } from '../src/main/uniwork-sync/lease/client'
-import {
-  createLeaseManager,
-  type LeaseRevokeNotice,
-} from '../src/main/uniwork-sync/lease/manager'
+import { createLeaseManager, type LeaseRevokeNotice } from '../src/main/uniwork-sync/lease/manager'
 import {
   LEASE_STORE_REGISTRATION,
   createLeaseStore,
@@ -199,7 +196,11 @@ const OTHER_ACCOUNT = { deploymentId: 'dep_1', accountId: 'user_2' }
 const OTHER_DEPLOYMENT = { deploymentId: 'dep_2', accountId: 'user_1' }
 const LEASE_ID = '01J8X4LEASE1P2Q3R4S5T6U7V8'
 
-function leaseError(kind: LeaseClientError['kind'], code: string, status: number): LeaseClientError {
+function leaseError(
+  kind: LeaseClientError['kind'],
+  code: string,
+  status: number,
+): LeaseClientError {
   return new LeaseClientError({ kind, code, status })
 }
 
@@ -721,9 +722,15 @@ describe('uniwork-sync lease manager (G5-08c)', () => {
 
     // another user's event and malformed payloads: ignored
     expect(
-      await h.manager.handleFeedRevoked({ user_id: 'user_2', document_id: 'doc_1', lease_id: LEASE_ID }),
+      await h.manager.handleFeedRevoked({
+        user_id: 'user_2',
+        document_id: 'doc_1',
+        lease_id: LEASE_ID,
+      }),
     ).toBeNull()
-    expect(await h.manager.handleFeedRevoked({ user_id: SCOPE.accountId, document_id: 'doc_1' })).toBeNull()
+    expect(
+      await h.manager.handleFeedRevoked({ user_id: SCOPE.accountId, document_id: 'doc_1' }),
+    ).toBeNull()
     expect(await h.manager.handleFeedRevoked('office_lease.revoked')).toBeNull()
     expect((await h.manager.effectiveState('doc_1')).state).toBe('valid')
 
