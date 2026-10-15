@@ -490,5 +490,10 @@ describe('DOC5-W04: the comment level reaches the Discussion panel', () => {
     expect(discussionTargetOf(status(PATH_A, { access: 'view' }), true, bridge)?.level).toBe('view')
     expect(discussionTargetOf(status(PATH_A, { access: 'edit' }), true, bridge)?.level).toBe('edit')
     expect(collabLevelOf('comment')).toBe('comment')
+    // an unknown word never falls back upward
+    expect(collabLevelOf('admin')).toBe('view')
+    expect(collabLevelOf('')).toBe('view')
+    expect(collabLevelOf('edit')).toBe('edit')
+    expect(collabLevelOf('owner')).toBe('manage')
   })
 })

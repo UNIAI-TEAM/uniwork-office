@@ -840,6 +840,26 @@ describe('DOC-05 comment level + G8-18 post-send inline notice', () => {
     expect(returned).toMatchObject({ id: 'c-post' })
   })
 
+  it('N2: the notice is announced once, through the shared live region and not as a live region itself', async () => {
+    vi.useFakeTimers()
+    const src = Object.assign(fakeSource(list([])), { shareView: vi.fn() })
+    src.create.mockResolvedValue({
+      comment: sentComment({ mentions_without_access: WITHOUT_ACCESS }),
+    })
+    const { send } = await mountDiscussion(src)
+    await send()
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100)
+    })
+    const notice = $('[data-post-send-for="c-post"]')!
+    expect(notice.getAttribute('role')).toBeNull()
+    expect(notice.getAttribute('aria-live')).toBeNull()
+    expect(notice.closest('[role="status"], [aria-live]')).toBeNull()
+    expect(document.getElementById(COLLAB_LIVE_REGION_ID)?.textContent).toBe(
+      "Minh Anh and Mai Hương can't view this document, so they weren't notified.",
+    )
+  })
+
   it('renders the post-send notice for the sent comment and shares view access from it (G8-18)', async () => {
     const shareView = vi.fn(async () => ({ ok: true as const }))
     const src = Object.assign(fakeSource(list([])), { shareView })
@@ -852,7 +872,6 @@ describe('DOC-05 comment level + G8-18 post-send inline notice', () => {
 
     const notice = $('[data-post-send-for="c-post"]')!
     expect(notice).not.toBeNull()
-    expect(notice.getAttribute('role')).toBe('status')
     expect(notice.textContent).toContain(
       "Minh Anh and Mai Hương can't view this document, so they weren't notified.",
     )

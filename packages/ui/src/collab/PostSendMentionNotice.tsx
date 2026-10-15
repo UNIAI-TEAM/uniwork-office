@@ -61,7 +61,8 @@ export function PostSendMentionNotice(p: {
     remaining.length > 0
       ? format(strings.collabPostSendNoAccess, { names: namesOf(remaining) })
       : ''
-  // the sentence is announced once when the notice appears, and the share failure when it happens
+  // The shared live region announces the sentence once when the notice appears, and the share failure
+  // when it happens. The notice itself is not a live region (no role=status), so nothing reads twice.
   useEffect(() => {
     if (text) announcePolite(text)
   }, [text])
@@ -95,12 +96,7 @@ export function PostSendMentionNotice(p: {
   }
 
   return (
-    <div
-      ref={rootRef}
-      className="collab-post-send-notice"
-      role="status"
-      data-post-send-for={commentId}
-    >
+    <div ref={rootRef} className="collab-post-send-notice" data-post-send-for={commentId}>
       <p className="collab-post-send-text">{text}</p>
       {unshareable.length > 0 && shareable.length > 0 ? (
         <p className="collab-post-send-sub">
