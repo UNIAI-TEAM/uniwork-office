@@ -47,4 +47,14 @@ describe('sheets AI settings keep uniwork', () => {
     expect(body.slice(0, guard)).not.toMatch(/streamForProvider|chatForProvider/)
     expect(body.slice(guard, body.indexOf('return', guard))).not.toMatch(/streamForProvider/)
   })
+
+  it('the panel send entry (presets, retry, queue, selection ask all land in handleSend) stops on the model-need hint', () => {
+    // App.tsx cannot be mounted in a unit test; the one shared entry is pinned from the source
+    const app = readFileSync(join(__dirname, '..', 'src', 'renderer', 'App.tsx'), 'utf8')
+    expect(app).toMatch(/const needModelHint = useAiModelNeedHint\(\)/)
+    const start = app.indexOf('  function handleSend(')
+    expect(start).toBeGreaterThan(-1)
+    const body = app.slice(start, app.indexOf('runToolsRef.current = []', start))
+    expect(body).toMatch(/needModelHint !== null/)
+  })
 })

@@ -75,6 +75,7 @@ import {
   isUniworkQuestionRefusal,
   useAutoSavePref,
   useCloudSignedIn,
+  useAiModelNeedHint,
   addTokenUsage,
   type AiTokenUsageView,
   type AiScopeQuoteData,
@@ -1106,6 +1107,9 @@ export function App({
   const { loggedInRef: gskLoggedInRef, refresh: refreshGskStatus } = useCloudSignedIn(() =>
     window.desktopApi?.aiGskStatus(),
   )
+  // a picked UniWork AI that is not offered (or any provider still missing a model) keeps every
+  // send entry closed - presets, retry, queue and selection ask included - the hint says why
+  const needModelHint = useAiModelNeedHint()
   const [aiBusy, setAiBusy] = useState(false)
   /** ask_clarification card waiting for the user; its resolver unblocks the tool */
   const [aiClarify, setAiClarify] = useState<readonly ClarifyQuestion[] | null>(null)
@@ -3541,7 +3545,7 @@ export function App({
     retryIndex?: number,
   ): void {
     const instruction = (overrideInstruction ?? prompt).trim()
-    if (!instruction || aiBusy) return
+    if (needModelHint !== null || !instruction || aiBusy) return
     runToolsRef.current = []
     runUsageRef.current = undefined
     // The message consumes the composer attachments: they ride along (echoed on the
