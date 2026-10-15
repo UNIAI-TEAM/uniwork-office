@@ -83,6 +83,10 @@ export const fr = {
   acctErrKeyringUnavailable: 'Le stockage sécurisé de cet ordinateur est indisponible.',
   acctErrKeystoreLocked:
     'Le trousseau de cet ordinateur est verrouillé. Déverrouillez-le, puis réessayez.',
+  acctReplaceTitle: 'Remplacer la connexion enregistrée sur cet ordinateur ?',
+  acctReplaceBody:
+    'Cet ordinateur ne peut pas ouvrir la connexion enregistrée. Vous reconnecter la remplace. Les modifications hors ligne en attente de synchronisation restent sur cet ordinateur, verrouillées ; rien n’est supprimé.',
+  acctReplaceGo: 'Se reconnecter',
   acctErrServerError: 'UniWork a rencontré un problème. Veuillez réessayer plus tard.',
   acctErrMalformedResponse:
     'UniWork a envoyé une réponse inattendue. Veuillez réessayer plus tard.',

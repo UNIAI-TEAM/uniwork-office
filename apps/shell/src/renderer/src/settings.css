@@ -1329,6 +1329,11 @@
   color: var(--text-secondary);
 }
 
+.acct-notice-live:empty {
+  /* the live region stays mounted: cancel the flex gap it would add while empty */
+  margin-top: -2px;
+}
+
 .acct-notice-error,
 .acct-inline-error {
   font-size: 12px;

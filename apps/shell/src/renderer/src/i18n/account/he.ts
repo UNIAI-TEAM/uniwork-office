@@ -75,6 +75,10 @@ export const he = {
   acctErrNotConfigured: 'האפליקציה הזו אינה מקושרת לשרת UniWork.',
   acctErrKeyringUnavailable: 'האחסון המאובטח במחשב זה אינו זמין.',
   acctErrKeystoreLocked: 'מחזיק המפתחות של מחשב זה נעול. בטלו את הנעילה ונסו שוב.',
+  acctReplaceTitle: 'להחליף את הכניסה השמורה במחשב הזה?',
+  acctReplaceBody:
+    'המחשב הזה לא יכול לפתוח את הכניסה השמורה. כניסה מחדש תחליף אותה. עריכות לא מקוונות שממתינות לסנכרון נשארות במחשב הזה, נעולות; שום דבר לא נמחק.',
+  acctReplaceGo: 'כניסה מחדש',
   acctErrServerError: 'אירעה בעיה ב-UniWork. נסה שוב מאוחר יותר.',
   acctErrMalformedResponse: 'UniWork שלח תגובה בלתי צפויה. נסה שוב מאוחר יותר.',
   wbLoadFailedTitle: 'לא ניתן היה לטעון את הנתונים השמורים שלך',

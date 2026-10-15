@@ -114,7 +114,10 @@ export async function stageSnapshot(input: StageInput): Promise<StageOutcome> {
   let done = 0
 
   const fail = async (outcome: StageOutcome): Promise<StageOutcome> => {
-    await wipeKeys(store, written)
+    // a moved boundary means the scope is locked and wiped (or about to be): a
+    // delete here would re-open it and re-create its empty folder. The staging
+    // keys are on the row, so the wipe or the next recover() takes them.
+    if (input.live()) await wipeKeys(store, written)
     return outcome
   }
 

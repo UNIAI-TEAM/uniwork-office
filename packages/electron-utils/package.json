@@ -21,6 +21,8 @@
     "./font-catalog": "./src/font-catalog.ts",
     "./font-store": "./src/font-store.ts",
     "./headless-export": "./src/headless-export.ts",
+    "./recovery-copy": "./src/recovery-copy.ts",
+    "./recovery-epochs": "./src/recovery-epochs.ts",
     "./print-window": "./src/print-window.ts",
     "./remote-image": "./src/remote-image.ts",
     "./renderer-protocol": "./src/renderer-protocol.ts",
