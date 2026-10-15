@@ -676,7 +676,8 @@ test.describe.serial('UniWork documents', () => {
         .poll(
           async () => {
             const text = await docsText(reloaded)
-            return text.includes('E=mc^2') && !text.includes(MARKER)
+            // Plain heading text, not the OMML math: formulas are atomic nodes outside textContent.
+            return text.includes('第一章 概述') && !text.includes(MARKER)
           },
           { timeout: 30_000 },
         )
@@ -725,7 +726,8 @@ test.describe.serial('UniWork documents', () => {
         .poll(
           async () => {
             const text = await docsText(reloaded)
-            return text.includes('E=mc^2') && !text.includes(MARKER)
+            // Plain heading text, not the OMML math: formulas are atomic nodes outside textContent.
+            return text.includes('第一章 概述') && !text.includes(MARKER)
           },
           { timeout: 30_000 },
         )
