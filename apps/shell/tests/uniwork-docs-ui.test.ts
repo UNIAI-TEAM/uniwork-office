@@ -77,8 +77,8 @@ describe('chipModelOf: save state -> chip', () => {
     ['saved', 'Saved to UniWork', 'ok', undefined],
     ['dirty', 'Unsaved changes', 'neutral', undefined],
     ['saving', 'Saving…', 'busy', undefined],
-    ['offline', 'Not saved: offline', 'warn', 'retry'],
-    ['signed-out', 'Sign in again to save', 'warn', 'sign-in'],
+    ['offline', 'Not saved: offline', 'neutral', 'retry'],
+    ['signed-out', 'Sign in again to save', 'error', 'sign-in'],
     ['conflict', 'Version conflict', 'warn', 'resolve'],
     ['error', 'Couldn’t save', 'error', 'retry'],
   ])('%s -> "%s" (%s, action %s)', (state, label, tone, action) => {
@@ -109,13 +109,17 @@ describe('chipModelOf: save state -> chip', () => {
     ['quota_exceeded', 'Blocked: storage full'],
     ['too_large', 'Blocked: file too large'],
     ['server_error', 'Blocked: unavailable'],
-  ] as const)('blocked with %s reads "%s" and keeps the local copy promise', (error, label) => {
-    const chip = labelOf({ state: 'blocked', error })
-    expect(chip.label).toBe(label)
-    expect(chip.tone).toBe('error')
-    expect(chip.action).toBeUndefined()
-    expect(chip.tip).toContain('Your changes are kept on this computer.')
-  })
+  ] as const)(
+    'blocked with %s reads "%s", opens the queue and keeps the local copy promise',
+    (error, label) => {
+      const chip = labelOf({ state: 'blocked', error })
+      expect(chip.label).toBe(label)
+      expect(chip.tone).toBe('error')
+      // blocked opens the queue popover for the reason's next step (G5-06u)
+      expect(chip.action).toEqual({ kind: 'view-queue', labelKey: 'uwActViewQueue' })
+      expect(chip.tip).toContain('Your changes are kept on this computer.')
+    },
+  )
 
   it('says "offline" only when the network is the problem', () => {
     for (const error of [undefined, 'network'] as const) {
@@ -131,7 +135,7 @@ describe('chipModelOf: save state -> chip', () => {
       const chip = labelOf({ state: 'offline', error })
       expect(chip.label).toBe("Can't reach UniWork · not saved")
       expect(chip.tip).toBe('Your changes are safe on this computer. Retry in a moment.')
-      expect(chip.tone).toBe('warn')
+      expect(chip.tone).toBe('neutral')
       expect(chip.action?.kind).toBe('retry')
     },
   )
@@ -231,9 +235,9 @@ describe('G5-06 save queue: states -> chip', () => {
   const en = { ...syncStrings.en, ...uniworkDocumentStrings.en }
 
   it.each<[UniworkSaveState, StringKey, StringKey, string]>([
-    ['queued', 'uwChipQueued', 'uwTipQueued', 'neutral'],
-    ['paused_offline', 'uwChipQueued', 'uwTipQueued', 'neutral'],
-    ['paused_user', 'uwChipQueued', 'uwTipPausedUser', 'neutral'],
+    ['queued', 'uwChipQueued', 'uwTipQueued', 'info'],
+    ['paused_offline', 'uwChipQueued', 'uwTipQueued', 'info'],
+    ['paused_user', 'uwChipQueued', 'uwTipPausedUser', 'info'],
     ['paused_admin', 'uwChipPausedAdmin', 'uwTipPausedAdmin', 'neutral'],
     ['reconciling', 'uwChipReconciling', 'uwTipReconciling', 'warn'],
     ['reconciling-stuck', 'uwChipReconcileStuck', 'uwTipReconciling', 'warn'],
@@ -242,7 +246,8 @@ describe('G5-06 save queue: states -> chip', () => {
     expect(model.labelKey).toBe(labelKey)
     expect(model.tipKey).toBe(tipKey)
     expect(model.tone).toBe(tone)
-    expect(model.action).toBeUndefined()
+    // the queue states open the queue popover (G5-06u)
+    expect(model.action).toEqual({ kind: 'view-queue', labelKey: 'uwActViewQueue' })
     expect(chipOf({ state }).label).toBe(en[labelKey])
   })
 

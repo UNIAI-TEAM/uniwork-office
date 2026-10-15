@@ -130,6 +130,7 @@ function installWindow(): void {
       return (active?.filePath && statuses.get(active.filePath)) || null
     }),
     onUniworkDocStatus: vi.fn(() => () => undefined),
+    onUniworkQueuePopover: vi.fn(() => () => undefined),
     onUniworkLaunch: vi.fn(() => () => undefined),
     accountStatus: vi.fn(async () => ({
       loggedIn: accountState === 'signed-in',

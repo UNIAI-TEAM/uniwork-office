@@ -23,6 +23,7 @@ import type {
   UniworkDocStatus,
   UniworkLaunchEvent,
   UniworkLockReason,
+  UniworkQueuePopoverRequest,
   UniworkRemoteAction,
   UniworkRemoteBar,
   UniworkResult,
@@ -272,6 +273,14 @@ export interface UniworkDocsServiceDeps {
   notifyTitleRenamed?(path: string, title: string): void
   ui: ConflictUi
   pushStatus(status: UniworkDocStatus): void
+  /** G5-06u: ask the shell renderer to open the queue popover of a path */
+  pushQueuePopover?(request: UniworkQueuePopoverRequest): void
+  /**
+   * G5-06u: whether `path` is a tab of the shell window (the only window with
+   * a pill and a queue popover). False for a detached editor window, whose
+   * Ctrl/Cmd+S keeps the inline replay. Absent = every path is a shell tab.
+   */
+  isShellTab?(path: string): boolean
   pushLaunch(event: UniworkLaunchEvent): void
   /** G5-11: sign-out progress push (`waiting` | `done`) */
   pushSignOutProgress?(event: SignOutProgress): void
@@ -797,6 +806,7 @@ export class UniworkDocsService {
       ownsBinding: (doc) => this.owns(doc),
       intents: () => this.intentAccess(),
       publish: (status) => this.publish(status),
+      requestQueuePopover: (path) => this.deps.pushQueuePopover?.({ path }),
       onSaved: (doc, versionId) => this.deps.notifySaved?.(doc.path, versionId),
       capability: {
         get: (orgId) =>
@@ -1490,6 +1500,9 @@ export class UniworkDocsService {
     }
     // a real record change ends the window-local read-only status
     this.otherWindowStatus.delete(doc.path)
+    // a spent record (committed / cancelled) leaves no intent for an N+1 to
+    // wait behind (RBE6u-02)
+    if (isTerminalQueueState(record.state)) this.coordinator.clearPendingNext(doc.path)
     if (record.state === 'committed') {
       await this.settleFromRecord(doc, record)
       return
@@ -1530,6 +1543,8 @@ export class UniworkDocsService {
     delete next.error
     delete next.serverRevision
     delete next.serverVersion
+    // the intent landed: nothing newer waits behind it (RBE6u-02)
+    this.coordinator.clearPendingNext(doc.path)
     const done = await this.coordinator.commitState(doc, next)
     // G8-12: a queue-settled Save (dispatched, or found committed by a lookup
     // at rest) tells the editor's comment panel its new version, exactly as
@@ -2943,7 +2958,11 @@ export class UniworkDocsService {
       this.refuseMigration(doc)
       return
     }
-    void this.coordinator.save(path)
+    // G5-06u: the user's own Save: a pending intent is not replayed and no
+    // second one is minted; the coordinator asks for the queue popover instead.
+    // Only a shell tab has the pill and popover: a detached editor window keeps
+    // the inline replay, so its Ctrl/Cmd+S is never a silent no-op (RBE6u-03)
+    void this.coordinator.save(path, { userSave: this.deps.isShellTab?.(path) ?? true })
   }
 
   // ---- renderer API ----------------------------------------------------------

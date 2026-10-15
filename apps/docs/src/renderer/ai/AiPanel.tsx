@@ -23,6 +23,7 @@ import type { Block } from '@genoffice/docx-engine'
 import {
   AgentLoop,
   composeSkills,
+  createImageUrlRegistry,
   droppedCallsOfNotes,
   endsQuietly,
   getEntryResultChipView,
@@ -946,6 +947,15 @@ export function AiPanel({
           () => boundRef.current,
           () => askClarification,
           () => protectionRef.current,
+          // an image URL the AI inserts must come from this run's image_search / generate_image or
+          // an image attached to its message (UniWork AI turns only; BYOK keeps today's rules)
+          createImageUrlRegistry({
+            enforce: () => settingsRef.current.provider === 'uniwork',
+            attachments: () =>
+              lastAttachmentsRef.current
+                .filter((a) => ATTACHMENT_IMAGE_EXTS.has(a.ext))
+                .map((a) => a.path),
+          }),
         ),
         createFilesSkill(availableAttachments),
       ]),

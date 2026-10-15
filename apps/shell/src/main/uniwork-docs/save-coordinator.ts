@@ -119,6 +119,11 @@ export interface SaveCoordinatorDeps {
   /** status push for every state change */
   publish(status: UniworkDocStatus): void
   /**
+   * G5-06u: the user's Ctrl/Cmd+S met a document with a pending save (or a
+   * refused one): ask the shell renderer to open the queue popover of `path`.
+   */
+  requestQueuePopover?(path: string): void
+  /**
    * G8-12: a Save of `doc` settled with a commit and the binding now names the
    * server version `versionId` (the comments anchor base). Never called for a
    * failed, conflicted or no-op Save.
@@ -216,6 +221,14 @@ export class SaveCoordinator {
   /** paths whose working copy has moved past their pending intent (an unsent N+1) */
   private readonly pendingNext = new Set<string>()
   /**
+   * Paths whose last inline attempt ended without committing: the record is
+   * dropped (or was never written) and the base is where the attempt found it.
+   * That outcome is the only thing telling a settle that FAILED from a first
+   * save that has not minted its intent yet - both leave no record and an
+   * unmoved base (RBE6u4-01). The next attempt of the path replaces it.
+   */
+  private readonly uncommittedAttempts = new Set<string>()
+  /**
    * Per-document serialization of the binding writes. The inline pipeline and
    * the dispatcher's `publish` both rewrite `binding.json` for the same key;
    * chaining them per key keeps the last state in event order (G506-be-7).
@@ -266,8 +279,16 @@ export class SaveCoordinator {
   /**
    * The UniWork step of one explicit Save of `path`. Resolves with the
    * document after the attempt (null for an unbound path); never throws.
+   *
+   * `userSave`: the user's own Ctrl/Cmd+S (G5-06u). A pending intent is then
+   * never replayed inline and no second one is minted: the working copy's N+1
+   * is only marked (`pendingNext`), the status published and the queue popover
+   * requested. Other callers (Retry, the close guard) keep the inline replay.
    */
-  async save(path: string, options?: { forceOffline?: boolean }): Promise<BoundDocument | null> {
+  async save(
+    path: string,
+    options?: { forceOffline?: boolean; userSave?: boolean },
+  ): Promise<BoundDocument | null> {
     // G5-04g defence in depth: a working copy whose folder declares a store this
     // build does not read never reaches the intent, the upload or the commit,
     // even if a module somehow has it open.
@@ -277,28 +298,126 @@ export class SaveCoordinator {
     if (found.kind === 'newer') return null
     if (found.kind !== 'bound') return null
     const doc = found.doc
-    if (this.saving.has(doc.path)) return doc
+    if (this.saving.has(doc.path)) {
+      return options?.userSave ? this.requestPopoverWhileSaving(doc, options) : doc
+    }
     const b = doc.binding
     if (b.access === 'view') return doc
-    if (b.state === 'conflict') return doc
+    if (b.state === 'conflict') return this.requestPopover(doc, options)
     // permission and existence refusals stay until the document is opened again
-    if (b.state === 'blocked' && b.error !== 'quota_exceeded') return doc
+    if (b.state === 'blocked' && b.error !== 'quota_exceeded') {
+      return this.requestPopover(doc, options)
+    }
     this.saving.add(doc.path)
+    // a fresh attempt replaces the last one's outcome (see uncommittedAttempts)
+    this.uncommittedAttempts.delete(doc.path)
     const attempt = this.run(doc, options).catch(() =>
       this.commitState(doc, { ...doc.binding, state: 'error', error: 'server_error' }),
     )
     this.running.set(doc.path, attempt)
     try {
-      return await attempt
+      const ended = await attempt
+      // the attempt is over: remember that it did not move the base, so a press
+      // whose reads land after it still knows the settle failed instead of
+      // reading "no record, base unchanged" as "the intent is not minted yet"
+      // (RBE6u4-01; see movedPastSettledSave)
+      if (ended.binding.baseChecksum === doc.binding.baseChecksum) {
+        this.uncommittedAttempts.add(doc.path)
+      }
+      return ended
     } finally {
       this.saving.delete(doc.path)
       this.running.delete(doc.path)
     }
   }
 
+  /**
+   * A user Save that changes nothing asks for the queue popover instead
+   * (G5-06u). `pendingNext` is given only where the working copy was compared
+   * with the pending intent: true = the copy moved past it (an unsent N+1).
+   * The flag change is published inside the per-key chain from a fresh binding
+   * read, so a dispatcher write that landed during this save is never
+   * overwritten on the chip by the stale `doc` (RBE6u-01). Exactly one popover
+   * request per call.
+   */
+  private async requestPopover(
+    doc: BoundDocument,
+    options: { userSave?: boolean } | undefined,
+    pendingNext?: boolean,
+  ): Promise<BoundDocument> {
+    if (!options?.userSave) return doc
+    if (pendingNext !== undefined) {
+      const had = this.pendingNext.has(doc.path)
+      if (pendingNext) this.pendingNext.add(doc.path)
+      else this.pendingNext.delete(doc.path)
+      if (pendingNext || had) {
+        await this.serializeBinding(doc.key, async () =>
+          this.publish(this.deps.store.lookup(doc.path) ?? doc),
+        )
+      }
+    }
+    this.deps.requestQueuePopover?.(doc.path)
+    return doc
+  }
+
+  /**
+   * The user's Ctrl/Cmd+S while an inline save of the same path is in flight
+   * (RBE6u2-01). With a pending intent stored this is the same request as the
+   * stored-intent branch of `run`: a read only (the running writer owns the
+   * record and is never disturbed, nothing is minted or replayed), the N+1
+   * marked only when the copy moved past the intent, one popover push. With no
+   * intent yet (the first save is still reading or minting), or when the intent
+   * store cannot be read, the early return stays: no push, nothing changed.
+   * The one exception is a press whose read lost the race to the running save's
+   * settle (the record is gone, the binding moved): see `movedPastSettledSave`
+   * (RBE6u3-01).
+   */
+  private async requestPopoverWhileSaving(
+    doc: BoundDocument,
+    options: { userSave?: boolean },
+  ): Promise<BoundDocument> {
+    let moved: boolean
+    try {
+      const bytes = await this.readBytes(doc.path)
+      const access = await this.deps.intents()
+      if (access.kind !== 'ok') return doc
+      const stored = await access.intents.read(doc.key, factsOf(doc, bytes.byteLength))
+      if (stored && !isTerminalQueueState(stored.intent.state)) {
+        moved = stored.intent.checksum !== sha256Hex(bytes)
+      } else if (await this.movedPastSettledSave(doc)) {
+        moved = true
+      } else {
+        return doc
+      }
+    } catch {
+      return doc
+    }
+    return this.requestPopover(doc, options, moved)
+  }
+
+  /**
+   * One read-only re-check for a press that found no live intent while the path
+   * was saving. If the running save settled underneath the press, its commit
+   * already moved the binding's base (the record is deleted right after): a
+   * copy still different from that fresh base is an unsent N+1, so the press
+   * keeps its popover (RBE6u3-01). A settle that ended without a commit leaves
+   * the base where the press found it - the attempt's own outcome says so - and
+   * the same copy check decides, because that copy is just as unsent
+   * (RBE6u4-01). A binding that did not move while the attempt is still running
+   * means the first save has not stored its intent yet (nothing to say), and a
+   * clean copy has nothing to mark. Never writes, mints or replays.
+   */
+  private async movedPastSettledSave(doc: BoundDocument): Promise<boolean> {
+    const fresh = this.deps.store.lookup(doc.path)
+    if (!fresh) return false
+    const committed = fresh.binding.baseChecksum !== doc.binding.baseChecksum
+    if (!committed && !this.uncommittedAttempts.has(doc.path)) return false
+    return sha256Hex(await this.readBytes(doc.path)) !== fresh.binding.baseChecksum
+  }
+
   private async run(
     doc: BoundDocument,
-    options?: { forceOffline?: boolean },
+    options?: { forceOffline?: boolean; userSave?: boolean },
   ): Promise<BoundDocument> {
     const { store } = this.deps
     let bytes: Uint8Array
@@ -317,15 +436,23 @@ export class SaveCoordinator {
       // a locked keychain (or a session without a store) refuses the save: no
       // intent, no request, no other save path
       const error = access.kind === 'keystore_locked' ? 'keystore_locked' : 'server_error'
-      return this.commitState(doc, { ...doc.binding, state: 'error', error })
+      const refused = await this.commitState(doc, { ...doc.binding, state: 'error', error })
+      return error === 'keystore_locked' ? this.requestPopover(refused, options) : refused
     }
     // the queue dispatcher is running this same key right now: the inline
     // pipeline must not start a second writer of the one intent. The dispatcher
     // owns the record and the chip, so this returns the document untouched
     // (G506-be-1)
-    if (this.dispatcherActive(doc.key)) return doc
     const { intents } = access
     const facts = factsOf(doc, bytes.byteLength)
+    if (this.dispatcherActive(doc.key)) {
+      if (!options?.userSave) return doc
+      // a read only (the dispatcher owns the record): the N+1 is marked only
+      // when the copy really moved past the intent being dispatched (RBE6u-02)
+      const running = await intents.read(doc.key, facts).catch(() => null)
+      const live = running && !isTerminalQueueState(running.intent.state) ? running : null
+      return this.requestPopover(doc, options, live ? live.intent.checksum !== checksum : false)
+    }
 
     const stored = await intents.read(doc.key, facts)
     // a terminal record (cancelled / committed) is spent: the next Save mints a
@@ -364,7 +491,12 @@ export class SaveCoordinator {
       minted.state = state
       const written = await intents.put(doc.key, minted, bytes)
       if (written.kind === 'store_full') {
-        return this.commitState(doc, { ...doc.binding, state: 'error', error: 'store_full' })
+        const refused = await this.commitState(doc, {
+          ...doc.binding,
+          state: 'error',
+          error: 'store_full',
+        })
+        return this.requestPopover(refused, options)
       }
       if (written.kind === 'interrupted') {
         // the account boundary wiped the scope under this save
@@ -384,6 +516,12 @@ export class SaveCoordinator {
         this.pendingNext.delete(doc.path)
         return this.commitState(doc, { ...doc.binding, state, error: errorForState(state) })
       }
+    } else if (options?.userSave) {
+      // G5-06u: the user's Ctrl/Cmd+S with an intent pending: never a second
+      // intent and no inline replay (a paused_user / paused_admin intent stays
+      // paused); the N+1 is marked only when the copy moved past the intent
+      // (RBE6u-02) and the queue popover tells the user why
+      return this.requestPopover(doc, options, checksum !== intent.checksum)
     } else {
       // an intent is already pending: never a second one. The status says so
       // (pendingNext = an unsent N+1) and the SAME record and key are replayed

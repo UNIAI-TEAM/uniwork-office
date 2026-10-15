@@ -1,6 +1,20 @@
-import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+  type RefObject,
+} from 'react'
 import type { TabSummary } from '../../shared/tabs-api'
 import type { UniworkDocStatus } from '../../shared/home-api'
+import { asSyncCenterSnapshot } from '../../shared/sync-center'
 import { useI18n, type StringKey } from './locale'
 import { useAccount } from './account-model'
 import { onLocalRename, onUniworkNotice } from './uniwork-notice-bus'
@@ -16,9 +30,13 @@ import {
 import { collabStrings } from '@genoffice/ui/collab'
 import { showsProfile } from './account-model'
 import {
+  FOCUS_TIP_MIN_PX,
   chipCopy,
   chipModelOf,
+  focusTipRoomOf,
   launchNoticeOf,
+  miniGlyphOf,
+  type MiniGlyph,
   pathKey,
   remoteBarModelOf,
   type ChipActionKind,
@@ -26,6 +44,24 @@ import {
   type RemoteBarAction,
 } from './uniwork-docs-model'
 import { UniworkConflictHost } from './UniworkConflictDialog'
+import { UniworkQueuePopover } from './UniworkQueuePopover'
+import {
+  failedReasonKeyOf,
+  findQueueRow,
+  isQueuePopoverState,
+  type QueuePopoverOpener,
+} from './queue-popover-model'
+import { announce } from './uniwork-live'
+import {
+  measurePillFit,
+  pillFitStepOf,
+  shortLabelOf,
+  type PillVariant,
+  type PillWidths,
+  type ToggleWidths,
+} from './uniwork-pill-fit'
+import { setTopInsetPart, uiScaleOf } from './uniwork-top-inset'
+import type { SyncCenterRow } from '../../shared/sync-center'
 
 /**
  * UniWork pieces of the tab strip. The strip is shell DOM that stays visible
@@ -48,6 +84,79 @@ function Spinner() {
         strokeLinecap="round"
       />
     </svg>
+  )
+}
+
+/** the dot of the mini pill: a shape per state, so the state is never told by colour alone */
+function MiniGlyphIcon({ glyph }: { glyph: MiniGlyph }) {
+  const draw = (children: ReactNode) => (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {children}
+    </svg>
+  )
+  let icon: ReactNode
+  switch (glyph) {
+    case 'check':
+      icon = draw(<path d="M3.5 8.5l3 3 6-7" />)
+      break
+    case 'clock':
+      icon = draw(
+        <>
+          <circle cx="8" cy="8" r="5.5" />
+          <path d="M8 5v3.2l2 1.3" />
+        </>,
+      )
+      break
+    case 'pause':
+      icon = draw(<path d="M6 4.5v7M10 4.5v7" />)
+      break
+    case 'alert':
+      icon = draw(
+        <>
+          <circle cx="8" cy="8" r="6" />
+          <path d="M8 4.8v3.8M8 11.2h.01" />
+        </>,
+      )
+      break
+    case 'warn':
+      icon = draw(<path d="M8 2.8l6 10.4H2zM8 6.6v3M8 11.5h.01" />)
+      break
+    case 'lock':
+      icon = draw(
+        <>
+          <rect x="3.5" y="7" width="9" height="6.5" rx="1.5" />
+          <path d="M5.5 7V5.5a2.5 2.5 0 015 0V7" />
+        </>,
+      )
+      break
+    case 'offline':
+      icon = draw(
+        <>
+          <circle cx="8" cy="8" r="6" />
+          <path d="M3.8 3.8l8.4 8.4" />
+        </>,
+      )
+      break
+    case 'busy':
+      icon = <Spinner />
+      break
+    default:
+      icon = draw(<circle cx="8" cy="8" r="4.5" />)
+  }
+  return (
+    <span className="uw-pill-mini-glyph" data-glyph={glyph} aria-hidden="true">
+      {icon}
+    </span>
   )
 }
 
@@ -146,7 +255,190 @@ export function UniworkTabMarker({ status }: { status: UniworkDocStatus }) {
   )
 }
 
-/** Saved / Unsaved / Saving / View only / Offline / Sign in / Conflict / Blocked / Error for the active tab */
+/** save states in which the waiting save has a time worth showing in the tooltip */
+const QUEUED_STATES: ReadonlySet<UniworkDocStatus['state']> = new Set([
+  'queued',
+  'paused_offline',
+  'paused_user',
+])
+
+/**
+ * The sync center row of this document (G5-10) while the pill reads from it: the time of a
+ * waiting save, the reason of a failed one. None without the sync center.
+ */
+function useQueueRowOf(status: UniworkDocStatus): SyncCenterRow | undefined {
+  const [row, setRow] = useState<SyncCenterRow | undefined>(undefined)
+  const wanted = QUEUED_STATES.has(status.state) || status.state === 'failed'
+  const documentId = status.documentId
+  useEffect(() => {
+    const api = window.uniworkSyncCenter
+    if (!wanted || !api) {
+      setRow(undefined)
+      return
+    }
+    let live = true
+    const take = (value: unknown) => {
+      if (live) setRow(findQueueRow(asSyncCenterSnapshot(value), documentId))
+    }
+    void api
+      .getSnapshot()
+      .then(take)
+      .catch(() => undefined)
+    const unsubscribe = api.subscribe(take)
+    return () => {
+      live = false
+      unsubscribe()
+    }
+  }, [wanted, documentId])
+  return row
+}
+
+/**
+ * Whether the Discussion toggle beside the pill is icon-only. The pill's fit decides it (the toggle
+ * is the next thing to give when even the compact pill leaves the strip below its floor), the
+ * toggle, a sibling in the holder, reads it. Without a scope around the holder the toggle stays full.
+ */
+const ToggleFitContext = createContext<{
+  iconOnly: boolean
+  setIconOnly: (value: boolean) => void
+}>({ iconOnly: false, setIconOnly: () => undefined })
+
+/** the holder's scope: the pill's fit writes whether the toggle is icon-only, the toggle reads it */
+export function PillFitScope({ children }: { children: ReactNode }) {
+  const [iconOnly, setIconOnly] = useState(false)
+  const value = useMemo(() => ({ iconOnly, setIconOnly }), [iconOnly])
+  return <ToggleFitContext.Provider value={value}>{children}</ToggleFitContext.Provider>
+}
+
+/**
+ * Which variant of the pill the tab bar has room for (U-1), and whether the Discussion toggle beside
+ * it gives up its label. The pill is drawn in its full form, measured against the room the strip can
+ * spare, and stepped down (short label, then dot + action, then an icon-only toggle) until it fits;
+ * a variant already measured is not drawn again to find out. It measures again when the label or the
+ * interface scale changes, on a window resize, when the bar or the holder changes size, and when a
+ * tab opens or closes or the holder gains or loses a part. A host with no layout to measure keeps the
+ * full pill. The effect runs before paint, so the steps are never seen.
+ */
+function usePillFit(
+  groupRef: RefObject<HTMLDivElement | null>,
+  key: string,
+  hasShort: boolean,
+): PillVariant {
+  const { iconOnly: drawnIconOnly, setIconOnly: publish } = useContext(ToggleFitContext)
+  const [variant, setVariant] = useState<PillVariant>('full')
+  const [iconToggle, setIconToggle] = useState(false)
+  // bumped by whatever changes the room (a resize, a tab, the holder's size): measure again
+  const [pass, setPass] = useState(0)
+  const widths = useRef<PillWidths>({})
+  const toggleWidths = useRef<ToggleWidths>({})
+  const lastKey = useRef('')
+
+  useLayoutEffect(() => {
+    const el = groupRef.current
+    if (!el) return
+    const measuredKey = `${key}
+${uiScaleOf(el)}`
+    if (lastKey.current !== measuredKey) {
+      // another label (or scale): the widths measured so far describe something else
+      lastKey.current = measuredKey
+      widths.current = {}
+      toggleWidths.current = {}
+      if (variant !== 'full' || iconToggle) {
+        setVariant('full')
+        setIconToggle(false)
+        return
+      }
+    }
+    const fit = measurePillFit(el)
+    if (!fit) {
+      widths.current = {}
+      toggleWidths.current = {}
+      if (variant !== 'full') setVariant('full')
+      if (iconToggle) setIconToggle(false)
+      return
+    }
+    widths.current[variant] = fit.natural
+    // the toggle as it is drawn right now (the DOM is the truth, the state may be one commit ahead)
+    if (fit.toggle) toggleWidths.current[fit.toggle.iconOnly ? 'icon' : 'full'] = fit.toggle.width
+    else toggleWidths.current = {}
+    const next = pillFitStepOf({
+      budget: fit.budget,
+      toggle: fit.toggle,
+      toggleWidths: toggleWidths.current,
+      widths: widths.current,
+      hasShort,
+      miniSlack: fit.miniSlack,
+    })
+    if (next.variant !== variant) setVariant(next.variant)
+    if (next.iconToggle !== iconToggle) setIconToggle(next.iconToggle)
+    // drawnIconOnly: the toggle took its new form (the sibling re-rendered), measure it as drawn
+  }, [groupRef, key, variant, iconToggle, drawnIconOnly, hasShort, pass])
+
+  // the toggle (a sibling) reads it; it goes back to its full form with this pill
+  useLayoutEffect(() => {
+    publish(iconToggle)
+  }, [iconToggle, publish])
+  useLayoutEffect(() => () => publish(false), [publish])
+
+  useEffect(() => {
+    const el = groupRef.current
+    const chrome = el?.parentElement
+    const bar = chrome?.parentElement
+    const strip = bar
+      ? (Array.from(bar.children).find((child) => child.classList.contains('tab-strip')) ?? null)
+      : null
+    // no tab strip beside the holder (a chip shown elsewhere): there is no room to share
+    if (!strip) return undefined
+    const again = () => setPass((n) => n + 1)
+    window.addEventListener('resize', again)
+    // a tab opening or closing changes the floor the strip keeps; the Discussion toggle or a
+    // notice joining the holder changes what is left for the pill
+    const tabs = typeof MutationObserver !== 'undefined' ? new MutationObserver(again) : null
+    tabs?.observe(strip, { childList: true })
+    if (chrome) tabs?.observe(chrome, { childList: true })
+    // the holder changing size (the Discussion toggle or a notice coming and going) moves the budget;
+    // answered in the next frame so a size change caused by this very step is not reported in the same one
+    let frame = 0
+    let sizes: ResizeObserver | undefined
+    if (typeof ResizeObserver !== 'undefined' && bar && chrome) {
+      sizes = new ResizeObserver(() => {
+        cancelAnimationFrame(frame)
+        frame = requestAnimationFrame(again)
+      })
+      sizes.observe(bar)
+      sizes.observe(chrome)
+    }
+    return () => {
+      window.removeEventListener('resize', again)
+      tabs?.disconnect()
+      sizes?.disconnect()
+      cancelAnimationFrame(frame)
+    }
+  }, [groupRef])
+
+  return variant
+}
+
+/** the states whose arrival is said to a screen reader at once (EXPERIENCE: blocked, failed, conflict) */
+function isUrgent(status: UniworkDocStatus, labelKey: StringKey): boolean {
+  return status.state === 'failed' || labelKey === 'uwChipBlocked' || labelKey === 'uwChipConflict'
+}
+
+/**
+ * Saved / Unsaved / Saving / Queued / Blocked / Error ... for the active tab (Save pill, S1).
+ *
+ * One reading channel: the label is plain text; the explanation is a visually hidden node that the
+ * button, or the pill itself when it has no button, points at through aria-describedby (read
+ * once: aria-describedby wins over title). Sighted users get the native title tooltip on hover,
+ * which Electron draws above the editor view (shell DOM below the 40px strip would be covered by
+ * it). Chromium shows no title on keyboard focus, so a focus-visible pill also shows the sentence
+ * in up to two lines inside the strip, over the tab titles left of it (aria-hidden: it is the
+ * description again), never wider than the room between the window edge and the pill; Esc or
+ * pointer use hides it until the pill is focused again.
+ * A change of the pill is said once through the window live host. The
+ * queue states open the queue popover (S4); so does Ctrl/Cmd+S on a waiting save (main pushes
+ * the request, the chip of the active document opens it).
+ */
 export function UniworkStatusChip({
   status,
   onStatus,
@@ -156,14 +448,131 @@ export function UniworkStatusChip({
 }) {
   const { t, dateLocale } = useI18n()
   const account = useAccount()
+  const tipId = useId()
+  // the dot alone is named by these two hidden texts (aria-labelledby): the full label, then the action
+  const nameId = useId()
+  const actionNameId = useId()
   const [busy, setBusy] = useState(false)
+  const [popover, setPopover] = useState<QueuePopoverOpener | null>(null)
+  const [ctrlS, setCtrlS] = useState(0)
+  const [tipOff, setTipOff] = useState(false)
+  const [tipRoom, setTipRoom] = useState<number | null>(null)
+  const [focusWithin, setFocusWithin] = useState(false)
+  const groupRef = useRef<HTMLDivElement>(null)
+  const buttonRef = useRef<HTMLButtonElement | null>(null)
   const accountOk = account.view === 'signed-in' || account.view === 'refreshing'
-  const model = chipModelOf(status, { needsSignIn: !accountOk })
-  const { label, title } = chipCopy(model, t, dateLocale)
+  const row = useQueueRowOf(status)
+  const queuedAt = QUEUED_STATES.has(status.state) ? row?.savedAt : undefined
+  const failedReasonKey = status.state === 'failed' ? failedReasonKeyOf(status, row) : undefined
+  const model = chipModelOf(status, { needsSignIn: !accountOk, queuedAt, failedReasonKey })
+  const { label, tip, title } = chipCopy(model, t, dateLocale)
+  const action = model.action
+  const shortLabel = shortLabelOf(label)
+  const glyph = miniGlyphOf(model, status.state)
+  const variant = usePillFit(
+    groupRef,
+    `${label}
+${action ? t(action.labelKey) : ''}`,
+    shortLabel !== label,
+  )
+
+  // the button never leaves while focus is on it without the pill taking the focus first (a
+  // callback ref runs before the node is removed; focus dropped to <body> would lose the place).
+  // A step that replaces the button (compact <-> the dot) gives the focus to the new one right
+  // after the commit, below. The button is also state, so the queue popover's opener is the node
+  // that is drawn now, not the one of the render before it.
+  const [buttonEl, setButtonEl] = useState<HTMLButtonElement | null>(null)
+  const focusFollows = useRef(false)
+  const setButton = useCallback((el: HTMLButtonElement | null) => {
+    const previous = buttonRef.current
+    buttonRef.current = el
+    setButtonEl(el)
+    if (!el && previous && document.activeElement === previous) {
+      focusFollows.current = true
+      groupRef.current?.focus()
+    }
+  }, [])
+  // after the commit that swapped the button (the refs are set before this runs): the focus the old
+  // button had goes to the new one. Only that commit counts; a button that comes later (a waiting
+  // save after a settled one) never takes a focus the user has put elsewhere.
+  useLayoutEffect(() => {
+    if (!focusFollows.current) return
+    focusFollows.current = false
+    buttonRef.current?.focus()
+  })
+
+  // one sentence per change of this document's pill, none when the pill first shows (a tab
+  // switch mounts another chip: the chip is keyed by path)
+  const signature = `${status.path}\n${model.labelKey}\n${model.reasonKey ?? ''}\n${status.state}`
+  const lastSignature = useRef(signature)
+  const lastPendingNext = useRef(Boolean(status.pendingNext))
+  const labelRef = useRef(label)
+  labelRef.current = label
+  const popoverRef = useRef(popover)
+  popoverRef.current = popover
+  useEffect(() => {
+    const pendingNextArrived = !lastPendingNext.current && Boolean(status.pendingNext)
+    lastPendingNext.current = Boolean(status.pendingNext)
+    if (lastSignature.current === signature) return
+    const [lastPath, , , lastState] = lastSignature.current.split('\n')
+    lastSignature.current = signature
+    if (lastPath !== status.path) return
+    // a newer version waiting behind the same save only comes from Ctrl/Cmd+S, which main follows
+    // with the queue popover: its line 1 is the one sentence of that press. A popover the pill
+    // already opened stays as it is and says nothing again, so then the pill says it.
+    if (pendingNextArrived && lastState === status.state && popoverRef.current !== 'pill') return
+    announce(t('uwSyncRowAnnounce', { doc: status.title, state: labelRef.current }), {
+      assertive: isUrgent(status, model.labelKey),
+    })
+    // t is not referentially stable (CLAUDE.md): the key is the dependency, the text is made now
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [signature, status.pendingNext])
+
+  // Ctrl/Cmd+S on a document with a waiting save: main asks for the popover (a conflict opens the
+  // resolve choice instead). This chip only exists for the active tab, so another path is ignored.
+  useEffect(
+    () =>
+      window.aiOffice.onUniworkQueuePopover((request) => {
+        if (pathKey(request.path) === pathKey(status.path)) setCtrlS((n) => n + 1)
+      }),
+    [status.path],
+  )
+  const statusRef = useRef(status)
+  statusRef.current = status
+  useEffect(() => {
+    if (ctrlS === 0) return
+    const current = statusRef.current
+    if (current.state === 'conflict') {
+      setBusy(true)
+      void window.aiOffice
+        .uniworkResolveConflict(current.path)
+        .then((next) => {
+          if (next) onStatus(next)
+        })
+        .catch(() => undefined)
+        .finally(() => setBusy(false))
+      return
+    }
+    // a status that settled in between (no waiting save any more) has nothing to say; a popover
+    // the pill opened stays the pill's (Esc goes back to the pill button)
+    if (isQueuePopoverState(current)) setPopover((open) => open ?? 'ctrl-s')
+    // only a new request counts, not a changed onStatus
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ctrlS])
 
   const run = (kind: ChipActionKind) => {
+    if (busy) return
     if (kind === 'sign-in') {
       account.signIn()
+      return
+    }
+    if (kind === 'view-queue' || kind === 'details') {
+      // the button controls the popover whatever opened it: a click on an open one closes it
+      setPopover((open) => (open ? null : 'pill'))
+      return
+    }
+    if (kind === 'stop-ai') {
+      // the AI run a save waits for has no owner in main yet (`saveWait` is never set): nothing to stop
       return
     }
     setBusy(true)
@@ -181,30 +590,153 @@ export function UniworkStatusChip({
       .finally(() => setBusy(false))
   }
 
+  // the focus chip hangs left of the pill: its width is the room up to the window edge, measured
+  // when the pill takes the focus and again on a resize while it has it
+  const measureTip = useCallback(() => {
+    const el = groupRef.current
+    if (el) setTipRoom(focusTipRoomOf(el.getBoundingClientRect().left, uiScaleOf(el)))
+  }, [])
+  useEffect(() => {
+    if (!focusWithin) return
+    window.addEventListener('resize', measureTip)
+    let observer: ResizeObserver | undefined
+    if (typeof ResizeObserver !== 'undefined' && groupRef.current) {
+      observer = new ResizeObserver(measureTip)
+      observer.observe(groupRef.current)
+    }
+    return () => {
+      window.removeEventListener('resize', measureTip)
+      observer?.disconnect()
+    }
+  }, [focusWithin, measureTip])
+  const tipStyle =
+    tipRoom === null ? undefined : ({ '--uw-tip-room': `${tipRoom}px` } as CSSProperties)
+
+  // the pill group is the keyboard stop only when it has no button to carry the description
+  const describedHere = !action
   return (
-    <div
-      className="uw-pill"
-      role="group"
-      aria-label={t('uwChipAria')}
-      data-tone={model.tone}
-      data-state={status.state}
-      title={title}
-    >
-      <span className="uw-pill-status" role="status">
-        {model.tone === 'busy' ? <Spinner /> : <span className="uw-pill-dot" aria-hidden="true" />}
-        <span className="uw-pill-label">{label}</span>
-      </span>
-      {model.action && (
-        <button
-          type="button"
-          className="uw-pill-action"
-          disabled={busy}
-          onClick={() => run(model.action!.kind)}
-        >
-          {t(model.action.labelKey)}
-        </button>
+    <>
+      <div
+        ref={groupRef}
+        className="uw-pill"
+        role="group"
+        aria-label={t('uwChipAria')}
+        data-tone={model.tone}
+        data-state={status.state}
+        data-variant={variant}
+        tabIndex={describedHere ? 0 : -1}
+        title={describedHere ? title : undefined}
+        aria-describedby={describedHere ? tipId : undefined}
+        data-tip-off={tipOff ? '' : undefined}
+        data-tip-room={tipRoom !== null && tipRoom < FOCUS_TIP_MIN_PX ? 'none' : undefined}
+        style={tipStyle}
+        onFocus={() => {
+          setTipOff(false)
+          setFocusWithin(true)
+          measureTip()
+        }}
+        onBlur={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+            setFocusWithin(false)
+          }
+        }}
+        onPointerDown={() => setTipOff(true)}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') setTipOff(true)
+        }}
+      >
+        <span id={tipId} className="uw-sr-only">
+          {tip}
+        </span>
+        {variant === 'mini' ? (
+          // the dot alone (the strip is below its floor even with the narrowest pill): with a button
+          // the dot IS the button, named by the full label and the action; without one it is a plain dot
+          action ? (
+            <button
+              ref={setButton}
+              type="button"
+              className="uw-pill-mini"
+              aria-labelledby={`${nameId} ${actionNameId}`}
+              aria-disabled={busy ? 'true' : undefined}
+              aria-describedby={tipId}
+              title={title}
+              aria-expanded={
+                action.kind === 'view-queue' || action.kind === 'details'
+                  ? popover !== null
+                  : undefined
+              }
+              onClick={() => run(action.kind)}
+            >
+              <MiniGlyphIcon glyph={glyph} />
+              <span id={nameId} className="uw-sr-only">
+                {label}
+              </span>
+              <span id={actionNameId} className="uw-sr-only">
+                {t(action.labelKey)}
+              </span>
+            </button>
+          ) : (
+            <span className="uw-pill-status">
+              <MiniGlyphIcon glyph={glyph} />
+              <span className="uw-pill-label">
+                <span className="uw-sr-only">{label}</span>
+              </span>
+            </span>
+          )
+        ) : (
+          <>
+            <span className="uw-pill-status">
+              {model.tone === 'busy' ? (
+                <Spinner />
+              ) : (
+                <span className="uw-pill-dot" aria-hidden="true" />
+              )}
+              {variant === 'full' ? (
+                <span className="uw-pill-label">{label}</span>
+              ) : (
+                // fewer words drawn, the same sentence read: the hidden text is the whole label
+                <span className="uw-pill-label">
+                  <span className="uw-sr-only">{label}</span>
+                  {variant === 'short' && <span aria-hidden="true">{shortLabel}</span>}
+                </span>
+              )}
+            </span>
+            {action && (
+              <button
+                ref={setButton}
+                type="button"
+                className="uw-pill-action"
+                aria-disabled={busy ? 'true' : undefined}
+                aria-describedby={tipId}
+                title={title}
+                aria-expanded={
+                  action.kind === 'view-queue' || action.kind === 'details'
+                    ? popover !== null
+                    : undefined
+                }
+                onClick={() => run(action.kind)}
+              >
+                {t(action.labelKey)}
+              </button>
+            )}
+          </>
+        )}
+        <span className="uw-pill-focus-tip" aria-hidden="true">
+          <span className="uw-pill-focus-tip-text">{tip}</span>
+        </span>
+      </div>
+      {popover && (
+        <UniworkQueuePopover
+          status={status}
+          opener={popover}
+          anchorEl={groupRef.current}
+          openerEl={popover === 'pill' ? buttonEl : null}
+          onClose={() => setPopover(null)}
+          onSignIn={() => account.signIn()}
+          onFocusEditor={() => window.aiOfficeTabs?.focusActive()}
+        />
       )}
-    </div>
+    </>
   )
 }
 
@@ -314,6 +846,7 @@ export function DiscussionToggle({ status }: { status: UniworkDocStatus }) {
   const { lang } = useI18n()
   const account = useAccount()
   const open = useDiscussionOpen()
+  const { iconOnly } = useContext(ToggleFitContext)
   const bridge = discussionBridge()
   if (!discussionTargetOf(status, showsProfile(account.view, account.status), bridge)) return null
   const label = collabStrings(lang).collabDiscussion
@@ -322,6 +855,10 @@ export function DiscussionToggle({ status }: { status: UniworkDocStatus }) {
       type="button"
       id={DISCUSSION_TOGGLE_ID}
       className="uw-discussion-toggle"
+      // the same name and tooltip whether or not the label is drawn (icon-only at the narrowest
+      // widths, see usePillFit): the label stays in the button as visually hidden text
+      title={label}
+      data-icon-only={iconOnly ? 'true' : undefined}
       aria-expanded={open}
       aria-controls={open ? DISCUSSION_PANEL_ID : undefined}
       data-open={open ? 'true' : undefined}
@@ -474,14 +1011,9 @@ export function UniworkRemoteBar({
   }, [visible])
 
   // main moves the active editor view down by the bar's unscaled CSS-px height (main multiplies by
-  // the interface scale): 0 when there is no bar or no document tab
-  const report = useCallback((px: number) => {
-    try {
-      void Promise.resolve(window.aiOffice.uniworkSetBarInset(px)).catch(() => undefined)
-    } catch {
-      // a host without the channel has no inset to move
-    }
-  }, [])
+  // the interface scale): 0 when there is no bar or no document tab. An open queue popover adds
+  // its own height below the bar; the inset owner sends the sum.
+  const report = useCallback((px: number) => setTopInsetPart('bar', px), [])
   useEffect(() => {
     const bar = barRef.current
     if (!visible || !bar) {

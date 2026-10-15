@@ -15,6 +15,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react'
 import {
   AgentLoop,
+  createImageUrlRegistry,
   droppedCallsOfNotes,
   endsQuietly,
   getEntryResultChipView,
@@ -443,6 +444,13 @@ export function AiPanel({
       draftServerComment: (idx, at, text) =>
         apiRef.current.draftServerComment?.(idx, at, text) ?? false,
       uniworkBound: () => apiRef.current.uniworkBound?.() ?? false,
+      // the provider refreshes settingsRef on every run and on a settings change
+      uniworkAi: () => settingsRef.current?.provider === 'uniwork',
+      // an image URL the AI inserts must come from this run's image_search / generate_image (UniWork AI turns only)
+      imageUrls: createImageUrlRegistry({
+        enforce: () => settingsRef.current?.provider === 'uniwork',
+      }),
+      capability: (key) => cap(key),
       ocrText: (idx) => apiRef.current.ocrText(idx),
       selection: () => apiRef.current.selection(),
       pendingSummary: () => apiRef.current.pendingSummary(),

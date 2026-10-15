@@ -151,7 +151,7 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
     if (!scrim || typeof document === 'undefined') return
     const newlyInerted: Element[] = []
     for (const child of Array.from(document.body.children)) {
-      if (child === scrim || child.contains(scrim)) continue
+      if (child === scrim || child.contains(scrim) || child.hasAttribute('data-uw-live')) continue
       if (!child.hasAttribute('inert')) {
         child.setAttribute('inert', '')
         newlyInerted.push(child)

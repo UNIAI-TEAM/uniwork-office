@@ -453,6 +453,7 @@ body.overlay-title-bar .tab-bar-drag-spacer {
 }
 
 .uw-pill {
+  position: relative;
   box-sizing: border-box;
   display: inline-flex;
   align-items: center;
@@ -482,6 +483,48 @@ body.overlay-title-bar .tab-bar-drag-spacer {
   min-width: 0;
 }
 
+/* narrow tab bar (see uniwork-pill-fit.ts): the label is drawn short, or not at all; the dot (or spinner)
+   then sits next to the button with the pill's own gap, the full text stays in the hidden label */
+.uw-pill[data-variant='compact'] > .uw-pill-status {
+  gap: 0;
+}
+
+/* mini (the last step of uniwork-pill-fit.ts): the dot alone, a circle the height of the pill. With a
+   button the dot is the button; the shape inside it (check, clock, ...) tells the state, not the
+   colour alone */
+.uw-pill[data-variant='mini'] {
+  width: 28px;
+  padding: 0;
+  gap: 0;
+  justify-content: center;
+}
+
+.uw-pill[data-variant='mini'] > .uw-pill-status {
+  gap: 0;
+}
+
+.uw-pill-mini {
+  position: relative;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.uw-pill-mini-glyph {
+  display: grid;
+  place-items: center;
+  line-height: 0;
+}
+
 .uw-pill-label {
   min-width: 0;
   overflow: hidden;
@@ -505,6 +548,12 @@ body.overlay-title-bar .tab-bar-drag-spacer {
   color: var(--success);
 }
 
+.uw-pill[data-tone='info'] {
+  border-color: var(--info);
+  background: var(--info-bg);
+  color: var(--info);
+}
+
 .uw-pill[data-tone='warn'] {
   border-color: var(--warning-border);
   background: var(--warning-bg);
@@ -519,6 +568,7 @@ body.overlay-title-bar .tab-bar-drag-spacer {
 
 .uw-pill-action,
 .uw-pill-close {
+  position: relative;
   box-sizing: border-box;
   flex: 0 0 auto;
   height: 22px;
@@ -556,20 +606,148 @@ body.overlay-title-bar .tab-bar-drag-spacer {
   margin-left: -4px;
 }
 
-.uw-pill-action:hover:not(:disabled),
+.uw-pill-action:hover:not([aria-disabled='true']),
+.uw-pill-mini:hover:not([aria-disabled='true']),
 .uw-pill-close:hover {
   background: var(--hover);
 }
 
-.uw-pill-action:disabled {
+/* busy: the button stays in the tab order (aria-disabled, never disabled) so focus is not dropped */
+.uw-pill-action[aria-disabled='true'] {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.uw-pill-mini[aria-disabled='true'] {
   cursor: default;
   opacity: 0.6;
 }
 
 .uw-pill-action:focus-visible,
-.uw-pill-close:focus-visible {
+.uw-pill-mini:focus-visible,
+.uw-pill-close:focus-visible,
+.uw-pill:focus-visible {
   outline: 2px solid var(--color-border-brand);
   outline-offset: 1px;
+}
+
+/* keyboard focus has no native title tooltip: the description shows inside the strip, left of the
+   pill and over the tab titles (absolute: the tabs never move). Below the strip the editor view
+   would cover it. Hover keeps the native title. Up to two lines of 12px text: 28px for one line,
+   at most 36px for two, centred on the 28px pill (y 2..38 of the 40px strip). Its width is the
+   smallest of 480px, 40% of the window and the room left of the pill (`--uw-tip-room`, measured on
+   focus), so it never passes the window's left edge. */
+.uw-pill-focus-tip {
+  display: none;
+  position: absolute;
+  right: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 5;
+  box-sizing: border-box;
+  width: max-content;
+  min-height: 28px;
+  max-height: 36px;
+  max-width: min(480px, calc(var(--ui-vw) * 40), var(--uw-tip-room, 480px));
+  padding: 2px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  box-shadow: var(--shadow-btn-hover);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 15px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* the ellipsis comes only after line 2 */
+.uw-pill-focus-tip-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.uw-pill:focus-visible > .uw-pill-focus-tip,
+.uw-pill-action:focus-visible ~ .uw-pill-focus-tip {
+  display: flex;
+  align-items: center;
+}
+
+/* the dot of the mini pill carries the keyboard focus: same chip (before the off rule below, same specificity) */
+.uw-pill-mini:focus-visible ~ .uw-pill-focus-tip {
+  display: flex;
+  align-items: center;
+}
+
+/* Esc or a pointer press hides it until the pill is focused again; so does too little room */
+.uw-pill[data-tip-off] > .uw-pill-focus-tip,
+.uw-pill[data-tip-room='none'] > .uw-pill-focus-tip {
+  display: none;
+}
+
+/* a 22px button gets a 24px hit area (WCAG 2.5.8) without growing the 28px pill */
+.uw-pill-action::before,
+.uw-pill-close::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+}
+
+/* the 26px dot of the mini pill is already past 24px; the hit area is the dot's own box */
+.uw-pill-mini::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
+/* touch: the holder is the whole 40px bar so a finger on the pill's edge still lands on its button;
+   it stays no-drag (base rule), and nothing extends past the bar */
+@media (pointer: coarse) {
+  .uw-chrome {
+    align-self: stretch;
+    height: 40px;
+  }
+
+  /* bar 40 = pill 28 + 6 + 6, button 22 centred in the pill: 9px to the bar edge */
+  .uw-pill-action::before,
+  .uw-pill-close::before {
+    top: -9px;
+    bottom: -9px;
+  }
+
+  /* Action and Close sit 4px apart: each reaches away from the other, so they never overlap */
+  .uw-pill-action::before {
+    left: -8px;
+    right: -1px;
+  }
+
+  .uw-pill-close::before {
+    left: -1px;
+    right: -8px;
+  }
+
+  /* the dot of the mini pill: the pill widens to 44px and the hit area reaches 44px tall (26px dot +
+     9px above and below, as the Discussion toggle does); sideways it stays inside the 44px pill (-1px
+     is its border), so it never reaches the strip or the toggle */
+  .uw-pill[data-variant='mini'] {
+    width: 44px;
+  }
+
+  .uw-pill-mini {
+    width: 42px;
+  }
+
+  .uw-pill-mini::before {
+    top: -9px;
+    bottom: -9px;
+    left: -1px;
+    right: -1px;
+  }
 }
 
 .uw-spinner {
@@ -606,6 +784,10 @@ body.overlay-title-bar .tab-bar-drag-spacer {
 
 .uw-tab-marker[data-tone='ok'] {
   background: var(--success);
+}
+
+.uw-tab-marker[data-tone='info'] {
+  background: var(--info);
 }
 
 .uw-tab-marker[data-tone='warn'] {

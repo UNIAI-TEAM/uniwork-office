@@ -10,6 +10,8 @@ function makeDeps(over: Record<string, unknown>): PdfAiDeps {
     pageCount: () => 2,
     readOnly: () => false,
     uniworkBound: () => false,
+    // optional host dep: absent here (the proxy would answer an unknown prop with a throwing function)
+    imageUrls: undefined,
     ...over,
   }
   return new Proxy(target, {

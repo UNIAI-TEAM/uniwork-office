@@ -32,6 +32,8 @@ function makeDeps(fetchImage: PdfAiDeps['fetchImage']): PdfAiDeps {
     replaceImage: vi.fn(),
     gotoPage: vi.fn(() => true),
     fetchImage,
+    // no image URL rule here: this file pins the SSRF guard behind fetchImage
+    imageUrls: undefined,
   }
   return new Proxy(target, {
     get(t, prop: string) {

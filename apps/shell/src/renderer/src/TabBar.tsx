@@ -6,6 +6,7 @@ import { notifyFilesChanged } from './file-events'
 import { useI18n } from './locale'
 import {
   DiscussionToggle,
+  PillFitScope,
   UniworkNotice,
   UniworkRemoteBar,
   UniworkStatusChip,
@@ -613,16 +614,18 @@ export function TabBar() {
         </button>
       </div>
       <div className="uw-chrome">
-        <UniworkNotice openDocumentIds={openDocumentIds} />
-        {activeStatus && <DiscussionToggle status={activeStatus} />}
-        {activeStatus && (
-          // one chip per document: a Resolve still running stays with its own tab
-          <UniworkStatusChip
-            key={activeStatus.path}
-            status={activeStatus}
-            onStatus={uniwork.apply}
-          />
-        )}
+        <PillFitScope>
+          <UniworkNotice openDocumentIds={openDocumentIds} />
+          {activeStatus && <DiscussionToggle status={activeStatus} />}
+          {activeStatus && (
+            // one chip per document: a Resolve still running stays with its own tab
+            <UniworkStatusChip
+              key={activeStatus.path}
+              status={activeStatus}
+              onStatus={uniwork.apply}
+            />
+          )}
+        </PillFitScope>
       </div>
       <button
         className="tab-overflow-btn"
