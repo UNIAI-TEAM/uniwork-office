@@ -2442,11 +2442,17 @@ export class UniworkDocsService {
       this.recordPathLock(path, 'keystore_locked')
       return true
     }
-    if (
-      !this.deps.identity() &&
-      !this.storeLocked() &&
-      this.store.classify(path).kind === 'bound'
-    ) {
+    if (!this.deps.identity()) {
+      if (!this.storeLocked() && this.store.classify(path).kind === 'bound') {
+        this.recordPathLock(path, 'signed_out')
+        return true
+      }
+      return false
+    }
+    // d2-2: a folder a sign-out kept (park refused, newer store) stays locked
+    // for every other live identity; only its own account reopens it
+    const found = this.store.classify(path)
+    if (found.kind === 'bound' && this.lockedForOtherIdentity(found.doc)) {
       this.recordPathLock(path, 'signed_out')
       return true
     }
@@ -2619,10 +2625,20 @@ export class UniworkDocsService {
 
   private isSignedOutLocked(path: string, doc: BoundDocument): boolean {
     if (this.locks.get(pathKey(path))?.reason === 'signed_out') return true
+    if (this.lockedForOtherIdentity(doc)) return true
     return (
       !this.deps.identity() &&
       !this.storeLocked() &&
       this.lockedScopes.has(`${doc.deploymentId}/${doc.userId}`)
+    )
+  }
+
+  /** d2-2: a signed-out account's copy while a different identity is live */
+  private lockedForOtherIdentity(doc: BoundDocument): boolean {
+    return (
+      !!this.deps.identity() &&
+      this.lockedScopes.has(`${doc.deploymentId}/${doc.userId}`) &&
+      !this.owns(doc)
     )
   }
 

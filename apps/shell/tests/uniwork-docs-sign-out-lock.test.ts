@@ -1153,6 +1153,35 @@ describe('G5-11 sign-out lock-and-keep, N+1 park, and restoreParked', () => {
     expect(new TextDecoder().decode(taken?.bytes)).toBe(`v4 slides recovery ${marker}`)
   })
 
+  it("20. d2-2: park refused (store_full) for A keeps the folder locked so signed-in B cannot open it; A signing back in reopens", async () => {
+    const path = seedWorkingCopy({ bytes: 'v5 secret A', baseBytes: 'v3 base', state: 'dirty' })
+    const ctx = setup({ openPaths: [path], budgetBytes: 16 })
+
+    const res = await ctx.service.lockSession(ownerA)
+    expect(res.ok).toBe(false)
+    // Folder stays on disk because park was refused with store_full
+    expect(existsSync(path)).toBe(true)
+
+    // Account B signs in: opening A's kept path is refused and treated as locked/read-only
+    ctx.setAccount('acc_2')
+    expect(ctx.service.refuseLockedPath(path)).toBe(true)
+    expect(ctx.locks.at(-1)).toEqual({
+      path,
+      reason: 'signed_out',
+      name: 'Plan.docx',
+    })
+    expect(ctx.service.isReadOnly(path)).toBe(true)
+    expect(ctx.service.isLocked(path)).toBe(true)
+
+    // Account A signs back in (the wiring runs restoreParked on sign-in): the
+    // kept path is no longer refused or locked
+    ctx.setAccount('acc_1')
+    await ctx.service.restoreParked()
+    expect(ctx.service.refuseLockedPath(path)).toBe(false)
+    expect(ctx.service.isReadOnly(path)).toBe(false)
+    expect(ctx.service.isLocked(path)).toBe(false)
+  })
+
   it('21. d2-3: findNewestRecoveryBytes picks the newest candidate by mtime when the disk file is missing', async () => {
     const path = seedWorkingCopy({ bytes: 'v3 base', baseBytes: 'v3 base', state: 'saved' })
     // Working copy file is missing on disk while binding and recovery candidates exist
