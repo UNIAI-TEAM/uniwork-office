@@ -7,7 +7,9 @@ import { en } from '../src/renderer/src/i18n/sync/en'
 import { en as enDocs } from '../src/renderer/src/i18n/uniwork-documents/en'
 import { UniworkLiveHost, resetLiveForTests } from '../src/renderer/src/uniwork-live'
 import { UniworkQueuePopover } from '../src/renderer/src/UniworkQueuePopover'
+import { setTopInsetPart } from '../src/renderer/src/uniwork-top-inset'
 import {
+  failedReasonKeyOf,
   findQueueRow,
   formatQueueTime,
   isQueuePopoverState,
@@ -150,6 +152,15 @@ describe('queue popover model (S4)', () => {
     )
     expect(model.line1).toMatchObject({ key: 'uwTipFailed', reasonKey: 'uwReasonQuota' })
     expect(model.actions.map((a) => a.id)).toEqual(['save-again', 'cancel', 'open-center'])
+  })
+
+  it('RFE6u-07: one failed-reason source: the row when there is one, else the status code', () => {
+    const status = makeStatus({ state: 'failed', error: 'too_large' })
+    expect(failedReasonKeyOf(status, makeRow({ state: 'failed', failedReason: 'quota' }))).toBe(
+      'uwReasonQuota',
+    )
+    expect(failedReasonKeyOf(status, undefined)).toBe('uwReasonTooLarge')
+    expect(queuePopoverModelOf(status, undefined, 'pill').line1.reasonKey).toBe('uwReasonTooLarge')
   })
 
   it('Cancel only in the cancellable states and only when a row id is known', () => {
@@ -595,5 +606,137 @@ describe('UniworkQueuePopover (S4)', () => {
     await mount(makeStatus())
     expect(dialog()!.textContent).toContain(en.uwQueueBlockedSave)
     expect(buttons().map((b) => b.textContent)).toEqual([en.uwQueueOpenCenter])
+  })
+
+  // FX6u (review r1)
+  it('RFE6u-02: an action that closes it returns focus to the pill button, never to <body>', async () => {
+    await mount(makeStatus())
+    await mount(makeStatus()) // second render: the opener ref is filled
+    await act(async () => {
+      buttonByText(en.uwQueueCancel)!.click()
+    })
+    await act(async () => {
+      buttonByText(en.uwQueueCancelGo)!.click()
+    })
+    expect(onClose).toHaveBeenCalledTimes(1)
+    expect(document.activeElement).not.toBe(document.body)
+    expect(document.activeElement).toBe(document.getElementById('pill-view-queue'))
+  })
+
+  it('RFE6u-02: Save again / sign in also hand focus back (the pill, or the editor after Ctrl/Cmd+S)', async () => {
+    snapshot = makeSnapshot([], [makeRow({ state: 'failed' })])
+    await mount(makeStatus({ state: 'failed' }))
+    await mount(makeStatus({ state: 'failed' }))
+    buttonByText(en.uwActSaveAgain)!.focus()
+    await act(async () => {
+      buttonByText(en.uwActSaveAgain)!.click()
+    })
+    expect(document.activeElement).toBe(document.getElementById('pill-view-queue'))
+    act(() => root.unmount())
+    root = createRoot(hostEl)
+
+    snapshot = makeSnapshot([], [makeRow({ state: 'blocked', blockedReason: 'session_expired' })])
+    await mount(makeStatus({ state: 'blocked', error: 'session_expired' }), { opener: 'ctrl-s' })
+    buttonByText(en.uwActSignInAgain)!.focus()
+    await act(async () => {
+      buttonByText(en.uwActSignInAgain)!.click()
+    })
+    expect(onSignIn).toHaveBeenCalledTimes(1)
+    expect(onFocusEditor).toHaveBeenCalledTimes(1)
+  })
+
+  it('RFE6u-02: Open sync center leaves the focus to the sync center (no hand-back)', async () => {
+    await mount(makeStatus(), { opener: 'ctrl-s' })
+    await act(async () => {
+      buttonByText(en.uwQueueOpenCenter)!.click()
+    })
+    expect(onFocusEditor).not.toHaveBeenCalled()
+  })
+
+  it('RFE6u-05: Esc in the cancel confirmation backs out of it first, a second Esc closes', async () => {
+    await mount(makeStatus())
+    await act(async () => {
+      buttonByText(en.uwQueueCancel)!.click()
+    })
+    expect(dialog()!.textContent).toContain(en.uwQueueCancelConfirm)
+    const esc = () =>
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    await act(async () => esc())
+    expect(dialog()).not.toBeNull()
+    expect(dialog()!.textContent).not.toContain(en.uwQueueCancelConfirm)
+    expect(document.activeElement).toBe(buttonByText(en.uwQueueCancel))
+    expect(onClose).not.toHaveBeenCalled()
+    expect(api.cancelSave).not.toHaveBeenCalled()
+    await act(async () => esc())
+    expect(dialog()).toBeNull()
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('RFE6u-07: without a row the failed reason comes from the status code, like the pill', async () => {
+    snapshot = makeSnapshot([])
+    await mount(makeStatus({ state: 'failed', error: 'quota_exceeded' }))
+    expect(dialog()!.textContent).toContain(
+      en.uwTipFailed.replace('{reason}', enDocs.uwReasonQuota),
+    )
+  })
+
+  describe('RFE6u-01: the popover lives in the reserved band under the strip', () => {
+    let setBarInset: ReturnType<typeof vi.fn>
+    const lastInset = () => setBarInset.mock.calls.at(-1)?.[0]
+    let rectSpy: ReturnType<typeof vi.spyOn>
+
+    beforeEach(() => {
+      setBarInset = vi.fn(async () => undefined)
+      ;(window as unknown as { aiOffice?: unknown }).aiOffice = { uniworkSetBarInset: setBarInset }
+      rectSpy = vi
+        .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+        .mockImplementation(function (this: HTMLElement) {
+          const height = this.hasAttribute('data-uw-queue-band') ? 120 : 0
+          return {
+            x: 0,
+            y: 0,
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: height,
+            width: 0,
+            height,
+          } as DOMRect
+        })
+    })
+
+    afterEach(() => {
+      rectSpy.mockRestore()
+      setTopInsetPart('bar', 0)
+      delete (window as unknown as { aiOffice?: unknown }).aiOffice
+    })
+
+    it('adds its band height to the S6 bar height and gives it back on close', async () => {
+      setTopInsetPart('bar', 36)
+      expect(lastInset()).toBe(36)
+      await mount(makeStatus())
+      // the sum, never one overwriting the other
+      expect(lastInset()).toBe(36 + 120)
+      const band = document.querySelector<HTMLElement>('[data-uw-queue-band]')!
+      expect(band.contains(dialog())).toBe(true)
+      // drawn right under the strip and the bar
+      expect(band.style.top).toContain('36px')
+      // the bar changing while the popover is open still sends the sum
+      setTopInsetPart('bar', 50)
+      expect(lastInset()).toBe(50 + 120)
+      await act(async () => {
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+      })
+      expect(dialog()).toBeNull()
+      expect(lastInset()).toBe(50)
+    })
+
+    it('without a bar the inset is the band alone, and 0 after close', async () => {
+      await mount(makeStatus())
+      expect(lastInset()).toBe(120)
+      await mount(makeStatus({ state: 'saved' }))
+      expect(dialog()).toBeNull()
+      expect(lastInset()).toBe(0)
+    })
   })
 })

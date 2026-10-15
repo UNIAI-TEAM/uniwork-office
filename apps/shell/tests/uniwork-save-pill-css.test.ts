@@ -106,14 +106,24 @@ describe('Save pill tones and buttons', () => {
     expect(css).toMatch(/\.uw-pill-action:hover:not\(\[aria-disabled='true'\]\)/)
   })
 
-  it('the tooltip node is hidden until hover or focus, then shown, with tokens only', () => {
-    const tip = rule('.uw-pill-tip')
-    expect(tip).toMatch(/position: absolute/)
-    expect(tip).toMatch(/visibility: hidden/)
-    expect(tip).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(/)
-    expect(css).toMatch(/\.uw-pill:hover > \.uw-pill-tip/)
-    expect(css).toMatch(/\.uw-pill:focus-within > \.uw-pill-tip/)
-    expect(rule('.uw-pill')).toMatch(/position: relative/)
+  it('RFE6u-01: no DOM tooltip under the 40px strip (the editor view would cover it)', () => {
+    expect(css).not.toMatch(/\.uw-pill-tip/)
+  })
+
+  it('RFE6u-01: the queue popover band sits right under the strip, full width, tokens only', () => {
+    const popCss = readFileSync(
+      resolve(__dirname, '../src/renderer/src/queue-popover.css'),
+      'utf8',
+    ).replace(/\r\n/g, '\n')
+    const band = /\.uw-queue-band \{([^}]*)\}/.exec(popCss)?.[1] ?? ''
+    expect(band).toMatch(/position: fixed/)
+    expect(band).toMatch(/top: var\(--tab-bar-height, 40px\)/)
+    expect(band).toMatch(/left: 0/)
+    expect(band).toMatch(/right: 0/)
+    expect(band).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(/)
+    // the dialog is laid out inside the band, not placed on its own below the strip
+    const pop = /\.uw-queue-pop \{([^}]*)\}/.exec(popCss)?.[1] ?? ''
+    expect(pop).not.toMatch(/position: fixed/)
   })
 
   it('a no-button pill that takes focus shows the same focus ring as the buttons', () => {

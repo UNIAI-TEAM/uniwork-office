@@ -18,12 +18,16 @@ import {
   type QueuePopoverOpener,
 } from './queue-popover-model'
 import { announce } from './uniwork-live'
+import { setTopInsetPart, unscaledHeightOf, useTopInsetPart } from './uniwork-top-inset'
 import './queue-popover.css'
 
 /**
  * Queue popover (S4): what the save pill's "View queue" / "Details" button, a blocked reason's
  * button, or Ctrl/Cmd+S on a document with a waiting save opens. A non-modal dialog under the pill:
- * no focus trap, no inert, Esc or a click outside closes it. Rows and the cancel / save-again calls
+ * no focus trap, no inert, Esc or a click outside closes it. The active editor view covers the
+ * window below the tab strip, so the popover lives in a band of its own right under the strip
+ * (and under the S6 bar when there is one): its height is added to the top inset while it is
+ * open and the editor moves down by it. Rows and the cancel / save-again calls
  * come from the sync center (`window.uniworkSyncCenter`); without it the popover still opens and
  * only offers "Open sync center".
  */
@@ -31,7 +35,7 @@ import './queue-popover.css'
 export interface UniworkQueuePopoverProps {
   status: UniworkDocStatus
   opener: QueuePopoverOpener
-  /** the pill group: the popover sits below it, and focus returns here when the opener button is gone */
+  /** the pill group: focus returns here when the opener button is gone */
   anchorEl: HTMLElement | null
   /** the pill button that opened it (null when Ctrl/Cmd+S did); a click on it is the parent's toggle */
   openerEl: HTMLElement | null
@@ -42,7 +46,13 @@ export interface UniworkQueuePopoverProps {
   onFocusEditor?: () => void
 }
 
-type CloseKind = 'esc' | 'state' | 'outside' | 'action'
+/**
+ * esc / action: focus goes back to where the popover came from (the pill button, else the pill;
+ * the editor after a Ctrl/Cmd+S opening). handoff: an action that opens another surface which takes
+ * the focus (the sync center). state: back to the pill only if focus was inside. outside: the
+ * click put focus where it wanted.
+ */
+type CloseKind = 'esc' | 'state' | 'outside' | 'action' | 'handoff'
 
 /** the sync-center row of one document, kept current by the pushed snapshots */
 function useQueueRow(documentId: string): { row: SyncCenterRow | undefined; settled: boolean } {
@@ -100,7 +110,8 @@ export function UniworkQueuePopover({
   const [confirming, setConfirming] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<StringKey | null>(null)
-  const [place, setPlace] = useState<{ top: number; right: number } | null>(null)
+  const bandRef = useRef<HTMLDivElement>(null)
+  const barPx = useTopInsetPart('bar')
   const lineId = useId()
   const confirmId = useId()
 
@@ -117,9 +128,9 @@ export function UniworkQueuePopover({
   const line1Text = lineText(model.line1)
 
   // keep the newest callbacks reachable from the long-lived listeners
-  const live = useRef({ onClose, onFocusEditor, openerEl, anchorEl, opener })
+  const live = useRef({ onClose, onFocusEditor, openerEl, anchorEl, opener, confirming })
   useLayoutEffect(() => {
-    live.current = { onClose, onFocusEditor, openerEl, anchorEl, opener }
+    live.current = { onClose, onFocusEditor, openerEl, anchorEl, opener, confirming }
   })
 
   const close = useCallback((kind: CloseKind) => {
@@ -127,8 +138,9 @@ export function UniworkQueuePopover({
     closedRef.current = true
     const cur = live.current
     const inside = dialogRef.current?.contains(document.activeElement) ?? false
-    if (kind === 'esc' || (kind === 'state' && inside)) {
-      if (kind === 'esc' && cur.opener === 'ctrl-s') {
+    // an action that closes it also leaves focus inside the dialog about to unmount: never to <body>
+    if (kind === 'esc' || ((kind === 'state' || kind === 'action') && inside)) {
+      if (kind !== 'state' && cur.opener === 'ctrl-s') {
         cur.onFocusEditor?.()
       } else {
         const target = cur.openerEl?.isConnected ? cur.openerEl : cur.anchorEl
@@ -155,7 +167,13 @@ export function UniworkQueuePopover({
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') close('esc')
+      if (event.key !== 'Escape') return
+      // the top-most popup first: Esc backs out of the cancel confirmation, a second one closes
+      if (live.current.confirming) {
+        setConfirming(false)
+        return
+      }
+      close('esc')
     }
     const onPointerDown = (event: Event) => {
       const target = event.target as Node | null
@@ -182,16 +200,22 @@ export function UniworkQueuePopover({
     if (pathRef.current !== status.path) close('outside')
   }, [status.path, close])
 
+  // the band's height joins the top inset while it is open; closing gives the editor the room back
   useLayoutEffect(() => {
-    const measure = () => {
-      const rect = live.current.anchorEl?.getBoundingClientRect()
-      if (!rect) return setPlace(null)
-      setPlace({ top: rect.bottom + 4, right: Math.max(0, window.innerWidth - rect.right) })
-    }
+    const band = bandRef.current
+    if (!band) return
+    const measure = () => setTopInsetPart('popover', unscaledHeightOf(band))
     measure()
-    window.addEventListener('resize', measure)
-    return () => window.removeEventListener('resize', measure)
-  }, [anchorEl])
+    let observer: ResizeObserver | undefined
+    if (typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(measure)
+      observer.observe(band)
+    }
+    return () => {
+      observer?.disconnect()
+      setTopInsetPart('popover', 0)
+    }
+  }, [])
 
   const wasConfirming = useRef(false)
   useEffect(() => {
@@ -248,7 +272,7 @@ export function UniworkQueuePopover({
         window.dispatchEvent(
           new CustomEvent('uniwork:open-settings', { detail: { section: 'sync' } }),
         )
-        close('action')
+        close('handoff')
         return
     }
   }
@@ -273,48 +297,58 @@ export function UniworkQueuePopover({
 
   return (
     <div
-      ref={dialogRef}
-      className="uw-queue-pop"
-      role="dialog"
-      tabIndex={-1}
-      aria-labelledby={lineId}
-      style={place ? { top: place.top, right: place.right } : undefined}
+      ref={bandRef}
+      className="uw-queue-band"
+      data-uw-queue-band=""
+      style={{ top: `calc(var(--tab-bar-height, 40px) + ${barPx}px)` }}
     >
-      <p id={lineId} className="uw-queue-pop-line">
-        {line1Text}
-      </p>
-      {model.line2 && <p className="uw-queue-pop-line uw-queue-pop-sub">{lineText(model.line2)}</p>}
-      {model.line3 && <p className="uw-queue-pop-line uw-queue-pop-sub">{lineText(model.line3)}</p>}
-      {error && <p className="uw-queue-pop-error">{t(error, { cap: QUEUE_DRAFT_CAP })}</p>}
-      {confirming ? (
-        <>
-          <p id={confirmId} className="uw-queue-pop-line">
-            {t('uwQueueCancelConfirm')}
-          </p>
-          <div className="uw-queue-pop-actions">
-            <button
-              type="button"
-              className="uw-queue-pop-btn uw-queue-pop-danger"
-              aria-describedby={confirmId}
-              aria-disabled={busy === 'cancel' ? 'true' : undefined}
-              onClick={goCancel}
-            >
-              {t('uwQueueCancelGo')}
-            </button>
-            <button
-              type="button"
-              className="uw-queue-pop-btn"
-              data-popover-back=""
-              aria-describedby={confirmId}
-              onClick={() => setConfirming(false)}
-            >
-              {t('uwActBack')}
-            </button>
-          </div>
-        </>
-      ) : (
-        <div className="uw-queue-pop-actions">{model.actions.map(actionButton)}</div>
-      )}
+      <div
+        ref={dialogRef}
+        className="uw-queue-pop"
+        role="dialog"
+        tabIndex={-1}
+        aria-labelledby={lineId}
+      >
+        <p id={lineId} className="uw-queue-pop-line">
+          {line1Text}
+        </p>
+        {model.line2 && (
+          <p className="uw-queue-pop-line uw-queue-pop-sub">{lineText(model.line2)}</p>
+        )}
+        {model.line3 && (
+          <p className="uw-queue-pop-line uw-queue-pop-sub">{lineText(model.line3)}</p>
+        )}
+        {error && <p className="uw-queue-pop-error">{t(error, { cap: QUEUE_DRAFT_CAP })}</p>}
+        {confirming ? (
+          <>
+            <p id={confirmId} className="uw-queue-pop-line">
+              {t('uwQueueCancelConfirm')}
+            </p>
+            <div className="uw-queue-pop-actions">
+              <button
+                type="button"
+                className="uw-queue-pop-btn uw-queue-pop-danger"
+                aria-describedby={confirmId}
+                aria-disabled={busy === 'cancel' ? 'true' : undefined}
+                onClick={goCancel}
+              >
+                {t('uwQueueCancelGo')}
+              </button>
+              <button
+                type="button"
+                className="uw-queue-pop-btn"
+                data-popover-back=""
+                aria-describedby={confirmId}
+                onClick={() => setConfirming(false)}
+              >
+                {t('uwActBack')}
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="uw-queue-pop-actions">{model.actions.map(actionButton)}</div>
+        )}
+      </div>
     </div>
   )
 }

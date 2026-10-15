@@ -236,7 +236,9 @@ const VIEW_QUEUE = { kind: 'view-queue', labelKey: 'uwActViewQueue' } as const
  */
 export function chipModelOf(
   status: UniworkDocStatus,
-  ctx: { needsSignIn: boolean; queuedAt?: string } = { needsSignIn: true },
+  ctx: { needsSignIn: boolean; queuedAt?: string; failedReasonKey?: StringKey } = {
+    needsSignIn: true,
+  },
 ): ChipModel {
   const { state, access, error } = status
   // 1 blocked
@@ -264,7 +266,9 @@ export function chipModelOf(
       return {
         tone: 'error',
         labelKey: 'uwChipError',
-        reasonKey: blockedReasonKey(error),
+        // the sync-center row's reason when the shell has it (failedReasonKeyOf), the same one the
+        // queue popover shows; else the status' error code
+        reasonKey: ctx.failedReasonKey ?? blockedReasonKey(error),
         tipKey: 'uwTipFailed',
         action: { kind: 'details', labelKey: 'uwActDetails' },
       }

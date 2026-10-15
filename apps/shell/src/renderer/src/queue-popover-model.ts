@@ -126,6 +126,18 @@ const FAILED_REASON_KEY: Record<string, StringKey> = {
   other: 'uwReasonOther',
 }
 
+/**
+ * `{reason}` of a failed save, the one source for the pill tooltip and the popover: the row's
+ * failed reason when the sync center has the row, else what the status' error code says.
+ */
+export function failedReasonKeyOf(
+  status: UniworkDocStatus,
+  row: SyncCenterRow | undefined,
+): StringKey {
+  if (row?.failedReason) return FAILED_REASON_KEY[row.failedReason] ?? 'uwReasonOther'
+  return blockedReasonKey(status.error)
+}
+
 /** the blocked reason of this save: the row's, else what the status' error code says */
 function blockedReasonOf(
   status: UniworkDocStatus,
@@ -171,10 +183,7 @@ export function queuePopoverModelOf(
   const blocked = status.state === 'blocked'
   let line1: PopoverLine
   if (failed) {
-    line1 = {
-      key: 'uwTipFailed',
-      reasonKey: FAILED_REASON_KEY[row?.failedReason ?? 'other'] ?? 'uwReasonOther',
-    }
+    line1 = { key: 'uwTipFailed', reasonKey: failedReasonKeyOf(status, row) }
   } else if (opener === 'ctrl-s' || !row) {
     line1 = { key: 'uwQueueBlockedSave' }
   } else {

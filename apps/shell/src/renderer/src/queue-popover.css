@@ -1,11 +1,26 @@
 /* Queue popover (S4): a small non-modal dialog under the save pill. Tokens only. */
-.uw-queue-pop {
+
+/* The band right under the tab strip (and under the S6 bar: the component adds its height to
+ * `top`). The editor view covers everything below the strip except the top inset, so the
+ * band's height joins that inset while the popover is open and the dialog is drawn inside it,
+ * at the pill's end of the window. */
+.uw-queue-band {
   box-sizing: border-box;
   position: fixed;
-  /* below the 40px tab bar; placed under the pill by the component when it can measure it */
-  top: 44px;
-  right: 12px;
+  top: var(--tab-bar-height, 40px);
+  left: 0;
+  right: 0;
   z-index: 30;
+  display: flex;
+  justify-content: flex-end;
+  padding: 6px 12px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-subtle);
+  -webkit-app-region: no-drag;
+}
+
+.uw-queue-pop {
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: 6px;

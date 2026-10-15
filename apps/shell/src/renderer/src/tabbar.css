@@ -590,53 +590,6 @@ body.overlay-title-bar .tab-bar-drag-spacer {
   inset: -1px;
 }
 
-/* the one description of the pill: shown on hover and on focus, read through aria-describedby */
-.uw-pill-tip {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  z-index: 40;
-  box-sizing: border-box;
-  width: max-content;
-  max-width: min(320px, 90vw);
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-  box-shadow: var(--shadow-menu);
-  color: var(--text);
-  font-size: 12px;
-  font-weight: 400;
-  line-height: 1.45;
-  text-align: start;
-  white-space: normal;
-  visibility: hidden;
-  opacity: 0;
-  pointer-events: none;
-  transition:
-    opacity 0.12s ease,
-    visibility 0.12s;
-}
-
-.uw-pill:hover > .uw-pill-tip,
-.uw-pill:focus-within > .uw-pill-tip,
-.uw-pill:focus > .uw-pill-tip {
-  visibility: visible;
-  opacity: 1;
-}
-
-/* Esc dismisses it without moving focus (WCAG 1.4.13) until the pointer or focus leaves */
-.uw-pill[data-tip-dismissed] > .uw-pill-tip {
-  visibility: hidden;
-  opacity: 0;
-}
-
-.uw-pill-tip-label {
-  display: block;
-  margin-bottom: 2px;
-  font-weight: 600;
-}
-
 /* touch: the holder is the whole 40px bar so a finger on the pill's edge still lands on its button;
    it stays no-drag (base rule), and nothing extends past the bar */
 @media (pointer: coarse) {

@@ -527,12 +527,16 @@ describe('status chip', () => {
     expect(label().textContent).toBe('Blocked: storage full')
     // a blocked save opens the queue popover from its one button
     expect(chip().querySelector('button')!.textContent).toBe('View queue')
-    // the explanation is the tooltip node, not a title attribute
+    // the explanation: the button's native title (drawn above the editor view) and a visually
+    // hidden description for assistive tech
     expect(chip().hasAttribute('title')).toBe(false)
+    expect(chip().querySelector('button')!.getAttribute('title')).toContain(
+      'Your UniWork storage is full.',
+    )
     const tip = host.querySelector<HTMLElement>(
       `#${chip().querySelector('button')!.getAttribute('aria-describedby')}`,
     )!
-    expect(tip.getAttribute('role')).toBe('tooltip')
+    expect(tip.className).toBe('uw-sr-only')
     expect(tip.textContent).toContain('Your UniWork storage is full.')
   })
 
@@ -573,7 +577,7 @@ describe('chip truncation and hover text', () => {
 
   for (const locale of ['en', 'vi'] as const) {
     for (const [name, partial] of STATES) {
-      it(`${locale}: ${name} shows its label, truncates it, and carries the full text in the tooltip node`, async () => {
+      it(`${locale}: ${name} shows its label, truncates it, and carries the full text in the native title`, async () => {
         account = 'session-expired'
         await mount(
           createElement(UniworkStatusChip, { status: status(partial), onStatus: vi.fn() }),
@@ -582,12 +586,16 @@ describe('chip truncation and hover text', () => {
         const label = labelOf()
         expect(label.textContent!.trim().length).toBeGreaterThan(0)
         expect(label.classList.contains('uw-pill-label')).toBe(true)
-        // no title attribute: the full label leads the tooltip node (hover and focus), then the explanation
-        expect(pillOf().hasAttribute('title')).toBe(false)
-        const tip = pillOf().querySelector<HTMLElement>('[role="tooltip"]')!
+        // the native title (button, or the group without one) leads with the full label, then the
+        // explanation; assistive tech reads the explanation from a visually hidden node
+        const titled = pillOf().querySelector('button') ?? pillOf()
+        const title = titled.getAttribute('title')!
+        expect(title.startsWith(`${label.textContent!}\n`)).toBe(true)
+        expect(title.length).toBeGreaterThan(label.textContent!.length + 1)
+        expect(host.querySelector('.uw-pill-tip, [role="tooltip"]')).toBeNull()
+        const tip = pillOf().querySelector<HTMLElement>('.uw-sr-only')!
         expect(tip.id).toBeTruthy()
-        expect(tip.textContent!.startsWith(label.textContent!)).toBe(true)
-        expect(tip.textContent!.length).toBeGreaterThan(label.textContent!.length + 1)
+        expect(tip.textContent!.length).toBeGreaterThan(0)
         // exactly one element reads it: the button, or the group when there is none
         const describedBy = host.querySelectorAll(`[aria-describedby="${tip.id}"]`)
         expect(describedBy).toHaveLength(1)

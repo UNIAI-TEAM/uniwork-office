@@ -28,8 +28,15 @@ import {
 } from './uniwork-docs-model'
 import { UniworkConflictHost } from './UniworkConflictDialog'
 import { UniworkQueuePopover } from './UniworkQueuePopover'
-import { findQueueRow, isQueuePopoverState, type QueuePopoverOpener } from './queue-popover-model'
+import {
+  failedReasonKeyOf,
+  findQueueRow,
+  isQueuePopoverState,
+  type QueuePopoverOpener,
+} from './queue-popover-model'
 import { announce } from './uniwork-live'
+import { setTopInsetPart } from './uniwork-top-inset'
+import type { SyncCenterRow } from '../../shared/sync-center'
 
 /**
  * UniWork pieces of the tab strip. The strip is shell DOM that stays visible
@@ -157,20 +164,23 @@ const QUEUED_STATES: ReadonlySet<UniworkDocStatus['state']> = new Set([
   'paused_user',
 ])
 
-/** when the waiting save was made: the sync center row of this document (G5-10), none without it */
-function useQueuedAt(status: UniworkDocStatus): string | undefined {
-  const [savedAt, setSavedAt] = useState<string | undefined>(undefined)
-  const wanted = QUEUED_STATES.has(status.state)
+/**
+ * The sync center row of this document (G5-10) while the pill reads from it: the time of a
+ * waiting save, the reason of a failed one. None without the sync center.
+ */
+function useQueueRowOf(status: UniworkDocStatus): SyncCenterRow | undefined {
+  const [row, setRow] = useState<SyncCenterRow | undefined>(undefined)
+  const wanted = QUEUED_STATES.has(status.state) || status.state === 'failed'
   const documentId = status.documentId
   useEffect(() => {
     const api = window.uniworkSyncCenter
     if (!wanted || !api) {
-      setSavedAt(undefined)
+      setRow(undefined)
       return
     }
     let live = true
     const take = (value: unknown) => {
-      if (live) setSavedAt(findQueueRow(asSyncCenterSnapshot(value), documentId)?.savedAt)
+      if (live) setRow(findQueueRow(asSyncCenterSnapshot(value), documentId))
     }
     void api
       .getSnapshot()
@@ -182,7 +192,7 @@ function useQueuedAt(status: UniworkDocStatus): string | undefined {
       unsubscribe()
     }
   }, [wanted, documentId])
-  return savedAt
+  return row
 }
 
 /** the states whose arrival is said to a screen reader at once (EXPERIENCE: blocked, failed, conflict) */
@@ -193,9 +203,11 @@ function isUrgent(status: UniworkDocStatus, labelKey: StringKey): boolean {
 /**
  * Saved / Unsaved / Saving / Queued / Blocked / Error ... for the active tab (Save pill, S1).
  *
- * One reading channel: the label is plain text, the explanation is the tooltip node (hover and
- * focus) that the button, or the pill itself when it has no button, points at through
- * aria-describedby, and a change of the pill is said once through the window live host. The
+ * One reading channel: the label is plain text; the explanation is a visually hidden node that the
+ * button, or the pill itself when it has no button, points at through aria-describedby (read
+ * once: aria-describedby wins over title). Sighted users get the native title tooltip, which
+ * Electron draws above the editor view (shell DOM below the 40px strip would be covered by it).
+ * A change of the pill is said once through the window live host. The
  * queue states open the queue popover (S4); so does Ctrl/Cmd+S on a waiting save (main pushes
  * the request, the chip of the active document opens it).
  */
@@ -212,13 +224,14 @@ export function UniworkStatusChip({
   const [busy, setBusy] = useState(false)
   const [popover, setPopover] = useState<QueuePopoverOpener | null>(null)
   const [ctrlS, setCtrlS] = useState(0)
-  const [tipDismissed, setTipDismissed] = useState(false)
   const groupRef = useRef<HTMLDivElement>(null)
   const buttonRef = useRef<HTMLButtonElement | null>(null)
   const accountOk = account.view === 'signed-in' || account.view === 'refreshing'
-  const queuedAt = useQueuedAt(status)
-  const model = chipModelOf(status, { needsSignIn: !accountOk, queuedAt })
-  const { label, tip } = chipCopy(model, t, dateLocale)
+  const row = useQueueRowOf(status)
+  const queuedAt = QUEUED_STATES.has(status.state) ? row?.savedAt : undefined
+  const failedReasonKey = status.state === 'failed' ? failedReasonKeyOf(status, row) : undefined
+  const model = chipModelOf(status, { needsSignIn: !accountOk, queuedAt, failedReasonKey })
+  const { label, tip, title } = chipCopy(model, t, dateLocale)
   const action = model.action
 
   // the button never leaves while focus is on it without the pill taking the focus first (a
@@ -233,19 +246,25 @@ export function UniworkStatusChip({
   // switch mounts another chip: the chip is keyed by path)
   const signature = `${status.path}\n${model.labelKey}\n${model.reasonKey ?? ''}\n${status.state}`
   const lastSignature = useRef(signature)
+  const lastPendingNext = useRef(Boolean(status.pendingNext))
   const labelRef = useRef(label)
   labelRef.current = label
   useEffect(() => {
+    const pendingNextArrived = !lastPendingNext.current && Boolean(status.pendingNext)
+    lastPendingNext.current = Boolean(status.pendingNext)
     if (lastSignature.current === signature) return
-    const samePath = lastSignature.current.split('\n')[0] === status.path
+    const [lastPath, , , lastState] = lastSignature.current.split('\n')
     lastSignature.current = signature
-    if (!samePath) return
+    if (lastPath !== status.path) return
+    // a newer version waiting behind the same save only comes from Ctrl/Cmd+S, which main follows
+    // with the queue popover: its line 1 is the one sentence of that press
+    if (pendingNextArrived && lastState === status.state) return
     announce(t('uwSyncRowAnnounce', { doc: status.title, state: labelRef.current }), {
       assertive: isUrgent(status, model.labelKey),
     })
     // t is not referentially stable (CLAUDE.md): the key is the dependency, the text is made now
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [signature])
+  }, [signature, status.pendingNext])
 
   // Ctrl/Cmd+S on a document with a waiting save: main asks for the popover (a conflict opens the
   // resolve choice instead). This chip only exists for the active tab, so another path is ignored.
@@ -278,9 +297,6 @@ export function UniworkStatusChip({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ctrlS])
 
-  // the tooltip hides on Esc without moving focus, and comes back with the next hover / focus
-  const showTip = () => setTipDismissed(false)
-
   const run = (kind: ChipActionKind) => {
     if (busy) return
     if (kind === 'sign-in') {
@@ -288,7 +304,8 @@ export function UniworkStatusChip({
       return
     }
     if (kind === 'view-queue' || kind === 'details') {
-      setPopover((open) => (open === 'pill' ? null : 'pill'))
+      // the button controls the popover whatever opened it: a click on an open one closes it
+      setPopover((open) => (open ? null : 'pill'))
       return
     }
     if (kind === 'stop-ai') {
@@ -321,19 +338,11 @@ export function UniworkStatusChip({
         aria-label={t('uwChipAria')}
         data-tone={model.tone}
         data-state={status.state}
-        data-tip-dismissed={tipDismissed ? '' : undefined}
         tabIndex={describedHere ? 0 : -1}
+        title={describedHere ? title : undefined}
         aria-describedby={describedHere ? tipId : undefined}
-        onMouseEnter={showTip}
-        onFocus={showTip}
-        onKeyDown={(event) => {
-          if (event.key === 'Escape' && !popover) setTipDismissed(true)
-        }}
       >
-        <span id={tipId} className="uw-pill-tip" role="tooltip">
-          <span className="uw-pill-tip-label" aria-hidden="true">
-            {label}
-          </span>
+        <span id={tipId} className="uw-sr-only">
           {tip}
         </span>
         <span className="uw-pill-status">
@@ -351,9 +360,10 @@ export function UniworkStatusChip({
             className="uw-pill-action"
             aria-disabled={busy ? 'true' : undefined}
             aria-describedby={tipId}
+            title={title}
             aria-expanded={
               action.kind === 'view-queue' || action.kind === 'details'
-                ? popover === 'pill'
+                ? popover !== null
                 : undefined
             }
             onClick={() => run(action.kind)}
@@ -643,14 +653,9 @@ export function UniworkRemoteBar({
   }, [visible])
 
   // main moves the active editor view down by the bar's unscaled CSS-px height (main multiplies by
-  // the interface scale): 0 when there is no bar or no document tab
-  const report = useCallback((px: number) => {
-    try {
-      void Promise.resolve(window.aiOffice.uniworkSetBarInset(px)).catch(() => undefined)
-    } catch {
-      // a host without the channel has no inset to move
-    }
-  }, [])
+  // the interface scale): 0 when there is no bar or no document tab. An open queue popover adds
+  // its own height below the bar; the inset owner sends the sum.
+  const report = useCallback((px: number) => setTopInsetPart('bar', px), [])
   useEffect(() => {
     const bar = barRef.current
     if (!visible || !bar) {

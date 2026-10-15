@@ -6,6 +6,7 @@ import { LocaleProvider } from '../src/renderer/src/locale'
 import { UniworkStatusChip } from '../src/renderer/src/UniworkChrome'
 import { UniworkLiveHost, resetLiveForTests } from '../src/renderer/src/uniwork-live'
 import { en } from '../src/renderer/src/i18n/sync/en'
+import { en as enDocs } from '../src/renderer/src/i18n/uniwork-documents/en'
 import type {
   AccountState,
   HomeApi,
@@ -115,17 +116,33 @@ afterEach(() => {
 })
 
 describe('Save pill reads once (T3)', () => {
-  it('the label is plain text: no role, no aria-live, no title anywhere in the pill', async () => {
+  it('the label is plain text: no role, no aria-live, no title on the label', async () => {
     await mount(status({ state: 'queued' }))
     const label = pill().querySelector<HTMLElement>('.uw-pill-label')!
     expect(label.textContent).toBe(en.uwChipQueued)
     for (let el: HTMLElement | null = label; el && el !== pill(); el = el.parentElement) {
       expect(el.hasAttribute('role'), el.className).toBe(false)
       expect(el.hasAttribute('aria-live'), el.className).toBe(false)
+      expect(el.hasAttribute('title'), el.className).toBe(false)
     }
     expect(pill().querySelector('[role="status"], [role="alert"], [aria-live]')).toBeNull()
+  })
+
+  it('RFE6u-01: the tooltip is the native title of the button (drawn above the editor view), no DOM tip', async () => {
+    await mount(status({ state: 'queued' }))
+    expect(host.querySelector('.uw-pill-tip, [role="tooltip"]')).toBeNull()
+    const title = button()!.getAttribute('title')!
+    expect(title.startsWith(`${en.uwChipQueued}\n`)).toBe(true)
+    expect(title).toContain('queued')
     expect(pill().hasAttribute('title')).toBe(false)
-    expect(pill().querySelector('[title]')).toBeNull()
+    expect(host.querySelectorAll('[title]')).toHaveLength(1)
+  })
+
+  it('RFE6u-01: without a button the group carries the native title', async () => {
+    await mount(status({ state: 'dirty' }))
+    expect(button()).toBeNull()
+    expect(pill().getAttribute('title')).toMatch(/\n/)
+    expect(host.querySelector('.uw-pill-tip, [role="tooltip"]')).toBeNull()
   })
 
   it('is a labelled group', async () => {
@@ -134,15 +151,18 @@ describe('Save pill reads once (T3)', () => {
     expect(pill().getAttribute('aria-label')).toBe('UniWork save status')
   })
 
-  it('with a button, only the button points at the tooltip node', async () => {
+  it('with a button, only the button points at the visually hidden description', async () => {
     await mount(status({ state: 'queued' }))
     const described = Array.from(host.querySelectorAll('[aria-describedby]'))
     expect(described).toEqual([button()])
     expect(pill().hasAttribute('aria-describedby')).toBe(false)
     const tip = document.getElementById(button()!.getAttribute('aria-describedby')!)!
-    expect(tip.getAttribute('role')).toBe('tooltip')
+    expect(tip.className).toBe('uw-sr-only')
+    expect(tip.hasAttribute('role')).toBe(false)
     expect(pill().contains(tip)).toBe(true)
-    expect(tip.textContent).toContain('queued')
+    expect(tip.textContent).toContain('kept safely on this computer')
+    // the description is the tip only: the label is not read a second time
+    expect(tip.textContent).not.toContain(en.uwChipQueued)
   })
 
   it('without a button the group itself is focusable and described (still one reading)', async () => {
@@ -150,7 +170,8 @@ describe('Save pill reads once (T3)', () => {
     expect(button()).toBeNull()
     expect(pill().getAttribute('tabindex')).toBe('0')
     const tip = document.getElementById(pill().getAttribute('aria-describedby')!)!
-    expect(tip.getAttribute('role')).toBe('tooltip')
+    expect(tip.className).toBe('uw-sr-only')
+    expect(tip.textContent).not.toBe('')
     expect(host.querySelectorAll('[aria-describedby]')).toHaveLength(1)
   })
 
@@ -329,6 +350,76 @@ describe('Ctrl/Cmd+S and the queue popover (T8)', () => {
     await click(button())
     await mount(status({ state: 'saved' }))
     expect(popover()).toBeNull()
+  })
+
+  it('RFE6u-03: Ctrl/Cmd+S on a queued save writes exactly one polite sentence (the popover line)', async () => {
+    await mount(status({ state: 'queued' }))
+    const node = document.querySelector('#uw-live-host [role=status]')!
+    const writes: string[] = []
+    const observer = new MutationObserver((records) => {
+      for (const record of records) {
+        for (const added of Array.from(record.addedNodes)) writes.push(added.textContent ?? '')
+      }
+    })
+    observer.observe(node, { childList: true })
+    // main sets pendingNext, publishes the status, then pushes the popover request
+    await mount(status({ state: 'queued', pendingNext: true }))
+    await act(async () => pushPopover!({ path: PATH }))
+    await flush()
+    observer.disconnect()
+    expect(pill().querySelector('.uw-pill-label')!.textContent).toBe(en.uwChipQueuedNewer)
+    expect(popover()).not.toBeNull()
+    expect(writes).toEqual([en.uwQueueBlockedSave])
+    expect(assertive()).toBe('')
+  })
+
+  it('RFE6u-03: other queued changes are still announced by the pill', async () => {
+    await mount(status({ state: 'queued', pendingNext: true }))
+    await mount(status({ state: 'paused_user', pendingNext: true }))
+    expect(polite()).not.toBe('')
+  })
+
+  it('RFE6u-04: aria-expanded is true for a Ctrl/Cmd+S opening too, and a click then closes it', async () => {
+    await mount(status({ state: 'queued' }))
+    expect(button()!.getAttribute('aria-expanded')).toBe('false')
+    await act(async () => pushPopover!({ path: PATH }))
+    await flush()
+    expect(popover()).not.toBeNull()
+    expect(button()!.getAttribute('aria-expanded')).toBe('true')
+    await click(button())
+    expect(popover()).toBeNull()
+    expect(button()!.getAttribute('aria-expanded')).toBe('false')
+  })
+
+  it('RFE6u-07: a failed save names the row reason in the pill, the same one as the popover', async () => {
+    const row = {
+      id: 'row-1',
+      documentId: 'd1',
+      documentKey: 'k1',
+      title: 'Plan',
+      ext: 'docx',
+      state: 'failed',
+      savedAt: '2026-03-02T08:30:00Z',
+      canEdit: true,
+      failedReason: 'quota',
+    }
+    const snap = {
+      header: { status: 'online' },
+      storeError: false,
+      tabs: { attention: [row], pending: [], recent: [] },
+      defaultTab: 'attention',
+    }
+    ;(window as unknown as { uniworkSyncCenter?: unknown }).uniworkSyncCenter = {
+      getSnapshot: vi.fn(async () => snap),
+      subscribe: vi.fn(() => () => undefined),
+    }
+    // the status code says "other" (server_error); the row says quota
+    await mount(status({ state: 'failed', error: 'server_error' }))
+    await flush()
+    const tip = document.getElementById(button()!.getAttribute('aria-describedby')!)!
+    expect(tip.textContent).toContain(enDocs.uwReasonQuota)
+    await click(button())
+    expect(popover()!.textContent).toContain(enDocs.uwReasonQuota)
   })
 
   it('stop the subscription when the pill goes away', async () => {
