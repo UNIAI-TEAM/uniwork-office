@@ -2,9 +2,11 @@
 // state beside the text (header/footer, styles, page setup, watermark, comments) the run changed
 // can no longer be put back; the panel says which parts stayed instead of restoring silently in
 // part. Without a save, Roll back restores everything and says nothing.
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { act } from 'react'
-import { createAiSideState } from '../src/renderer/ai/run-snapshot'
+import { createAiSideState, sidePartOf } from '../src/renderer/ai/run-snapshot'
 import { t } from '../src/renderer/i18n/locale'
 import { fixture } from './helpers/g6-12-side-fixture'
 import { mountDocsAiPanel, type DocsAiHarness } from './helpers/docs-ai-run-harness'
@@ -86,7 +88,7 @@ describe('Roll back after a mid-run Save (docs)', () => {
     expect(el!.getAttribute('role')).toBe('status')
     expect(el!.textContent).toBe(
       t('aiRollbackKept', {
-        parts: [t('aiSidePartHeaderFooter'), t('aiSidePartWatermark')].join(', '),
+        parts: [t('aiSidePartHeaderFooter'), t('aiSidePartWatermark')].join(t('aiSidePartSep')),
       }),
     )
   })
@@ -110,5 +112,21 @@ describe('Roll back after a mid-run Save (docs)', () => {
     await rollBack()
     expect(f.header.value).toEqual({})
     expect(notice()).toBeNull()
+  })
+})
+
+describe('side-state parts', () => {
+  it('every slice the App hands to the rollback snapshot belongs to a part the notice can name', () => {
+    const app = readFileSync(join(__dirname, '../src/renderer/App.tsx'), 'utf8')
+    const block = app.slice(
+      app.indexOf('return createAiSideState('),
+      app.indexOf('() => fileCtxRef.current.doc,'),
+    )
+    const names = [...block.matchAll(/^ {8}(\w+): /gm)].map((m) => m[1]!)
+    expect(names.length).toBeGreaterThan(20)
+    expect(names.filter((n) => sidePartOf(n) === null)).toEqual([])
+    expect(sidePartOf('sectionHfEdits')).toBe('headerFooter')
+    expect(sidePartOf('sections')).toBe('pageSetup')
+    expect(sidePartOf('styleUpserts')).toBe('styles')
   })
 })

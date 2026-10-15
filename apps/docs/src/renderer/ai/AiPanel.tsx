@@ -47,9 +47,11 @@ import {
 import type { AiSettings, AttachmentAddResult, AttachmentMeta } from '../../shared/ipc'
 import { ATTACHMENT_IMAGE_EXTS } from '../../shared/ipc'
 import {
+  AI_SIDE_PARTS,
   captureRunSnapshot,
   restoreRunSnapshot,
   type AiRunSnapshot,
+  type AiSidePart,
   type AiSideState,
 } from './run-snapshot'
 import { countWords, findNumId, type NumIds } from './protocol'
@@ -157,6 +159,8 @@ interface ChatEntry {
   mindmap?: MindMapTreeNode
   /** document state before this turn's first edit — rendered as an inline roll-back action */
   snapshot?: AiRunSnapshot
+  /** a Roll back after a save could not put these parts back (the notice under the turn) */
+  rollbackKept?: AiSidePart[]
   /** attachments consumed from the composer by this user message (read-only echo chips) */
   attachments?: AttachmentMeta[]
   /** the selection this user message targeted, frozen at send */
@@ -223,6 +227,15 @@ const EDIT_STARTER_PROMPTS: StringKey[] = [
 
 /** a view-only document keeps only the starter that does not edit it */
 const READ_ONLY_STARTER_PROMPTS: StringKey[] = ['aiStarterSummarize']
+
+/** the name of each side-state part in the Roll back notice */
+const SIDE_PART_KEYS: Record<AiSidePart, StringKey> = {
+  comments: 'aiSidePartComments',
+  headerFooter: 'aiSidePartHeaderFooter',
+  styles: 'aiSidePartStyles',
+  pageSetup: 'aiSidePartPageSetup',
+  watermark: 'aiSidePartWatermark',
+}
 
 /** resizable panel width: persisted, clamped so neither pane collapses */
 const PANEL_WIDTH_KEY = 'docs-ai-panel-width'
@@ -496,6 +509,9 @@ export function AiPanel({
   /** a send waiting on a phased open's tail; Stop / New chat abort it before it runs */
   const pendingSendRef = useRef<{ aborted: boolean } | null>(null)
   const [chat, setChat] = useState<ChatEntry[]>([])
+  /** latest chat for listeners registered once (the pre-save hook reads its rollback points) */
+  const chatRef = useRef(chat)
+  chatRef.current = chat
   /** a streamed write stopped early: the draft stays in the document until the user keeps or discards it */
   const [activePartial, setActivePartial] = useState<{ blocks: number } | null>(null)
   /** ask_clarification card docked in the composer slot while the run waits for the user */
@@ -700,6 +716,23 @@ export function AiPanel({
   /** document state before the run's first edit — attached to the turn's final
       segment at run end (mid-turn segments never show the action toolbar) */
   const runSnapshotRef = useRef<AiRunSnapshot | null>(null)
+  /**
+   * Per rollback point: the side-state parts a save already wrote (Roll back can no longer put
+   * them back) and the capture later changes are measured from (null until the next tool after
+   * a save takes a fresh one). Side values are read through refs the App updates on render, so
+   * they are compared at quiet moments: a save, the next tool start, the Roll back click.
+   */
+  const keptRef = useRef(
+    new WeakMap<AiRunSnapshot, { base: unknown | null; parts: Set<AiSidePart> }>(),
+  )
+  const keptOf = (snap: AiRunSnapshot) => {
+    let k = keptRef.current.get(snap)
+    if (!k) {
+      k = { base: snap.side ?? null, parts: new Set() }
+      keptRef.current.set(snap, k)
+    }
+    return k
+  }
   /** last sent instruction, for one-click retry */
   const lastInstructionRef = useRef('')
   /** Tool activity of the whole run (with args/output, accumulated across turns) — for full
@@ -971,6 +1004,13 @@ export function AiPanel({
           )
         },
         onToolStart: (call) => {
+          // after a save, side changes are measured from the reloaded state
+          const snap = runSnapshotRef.current
+          const side = sideStateRef.current
+          if (snap?.side !== undefined && side) {
+            const k = keptOf(snap)
+            if (k.base === null) k.base = side.capture()
+          }
           // Live "running" chip: replaced in place by onToolExecuted
           patchLastAssistant((last) => ({
             tools: [
@@ -1425,7 +1465,21 @@ export function AiPanel({
   // a Save accepts the marker: saveOnce fires this right before it snapshots the document, so
   // the cleared marker is part of what it compares against the reloaded file (history survives)
   useEffect(() => {
-    const onSave = () => clearAiHighlights()
+    const onSave = () => {
+      // what the run changed beside the text is written now: Roll back cannot take it back
+      const side = sideStateRef.current
+      if (side?.changedParts) {
+        const now = side.capture()
+        for (const snap of [runSnapshotRef.current, ...chatRef.current.map((e) => e.snapshot)]) {
+          if (snap?.side === undefined) continue
+          const k = keptOf(snap)
+          if (k.base === null) continue
+          for (const part of side.changedParts(k.base, now)) k.parts.add(part)
+          k.base = null
+        }
+      }
+      clearAiHighlights()
+    }
     window.addEventListener('ai-docs-commit-tables', onSave)
     return () => window.removeEventListener('ai-docs-commit-tables', onSave)
   }, [])
@@ -1439,12 +1493,28 @@ export function AiPanel({
   }
 
   const rollback = (entryIdx: number, snapshot: AiRunSnapshot) => {
+    const side = sideStateRef.current
+    const k = keptRef.current.get(snapshot)
     // the PM tree plus the state saved beside it (comments, header/footer, styles, page setup, watermark)
-    restoreRunSnapshot(editor, snapshot, sideStateRef.current)
+    const { sideRestored } = restoreRunSnapshot(editor, snapshot, side)
+    // a save since the run re-read the file: only the text came back, so say what stayed
+    let kept: AiSidePart[] = []
+    if (snapshot.side !== undefined && !sideRestored && side?.changedParts) {
+      const parts = new Set(k?.parts)
+      const base = k ? k.base : snapshot.side
+      if (base !== null) for (const part of side.changedParts(base, side.capture())) parts.add(part)
+      kept = AI_SIDE_PARTS.filter((part) => parts.has(part))
+    }
     // The document rewound to before this turn, so this and every later
     // rollback point now describe discarded futures
     setChat((prev) =>
-      prev.map((e, i) => (i >= entryIdx && e.snapshot ? { ...e, snapshot: undefined } : e)),
+      prev.map((e, i) =>
+        i === entryIdx
+          ? { ...e, snapshot: undefined, rollbackKept: kept.length > 0 ? kept : undefined }
+          : i > entryIdx && e.snapshot
+            ? { ...e, snapshot: undefined }
+            : e,
+      ),
     )
   }
 
@@ -1755,7 +1825,8 @@ export function AiPanel({
             !entry.notes?.length &&
             !entry.tools?.length &&
             !entry.stopped &&
-            !entry.snapshot
+            !entry.snapshot &&
+            !entry.rollbackKept
           ) {
             return null
           }
@@ -1839,6 +1910,15 @@ export function AiPanel({
               {stoppedText && (
                 <div className="ai-run-stopped" dir="auto">
                   {stoppedText}
+                </div>
+              )}
+              {entry.rollbackKept && (
+                <div className="ai-run-stopped ai-rollback-kept" role="status" dir="auto">
+                  {t('aiRollbackKept', {
+                    parts: entry.rollbackKept
+                      .map((part) => t(SIDE_PART_KEYS[part]))
+                      .join(t('aiSidePartSep')),
+                  })}
                 </div>
               )}
               {(chip?.chip === 'edited' || i === acceptAt) && (
