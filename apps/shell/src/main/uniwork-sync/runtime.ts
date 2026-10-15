@@ -424,8 +424,12 @@ export class SyncRuntime {
    * G5-10: the user's "Đồng bộ ngay" after the feed stopped on refused resyncs:
    * every feed consumer forgets its refusal count and backoff, so the next pass
    * tries the resync again (a stopped feed waits for this click or a restart).
+   * A pass already in flight settles first: tick() joins it, so a reset made under it would be
+   * undone by its pre-reset counts and the retry that follows would not be a fresh pass.
    */
-  resetFeedResync(): void {
+  async resetFeedResync(): Promise<void> {
+    const inFlight = this.ticking
+    if (inFlight) await inFlight.catch(() => undefined)
     for (const consumer of this.running.values()) consumer.resetResyncRefusals()
     this.lastFeedVerdict = { ...this.lastFeedVerdict, resyncFailed: false }
   }

@@ -105,7 +105,7 @@ function wired(
     feed?: () => SyncFeedVerdict
     /** the runtime pass "Đồng bộ ngay" runs (default: nothing) */
     tick?: () => Promise<void>
-    resetFeed?: () => void
+    resetFeed?: () => Promise<void>
     status?: Record<string, unknown>
     usage?: { bytes: number; budgetBytes: number }
     /** the lease manager's effective state per document id (RES-3) */
@@ -277,7 +277,7 @@ function wired(
       : {}),
     feedVerdict: options.feed ?? (() => ({ resynced: false, resyncFailed: false })),
     tickRuntime: options.tick ?? (async () => undefined),
-    ...(options.resetFeed ? { resetFeedResync: options.resetFeed } : {}),
+    resetFeedResync: options.resetFeed ?? (async () => undefined),
     openPath: (path) => {
       opened.push(path)
       openPaths.add(path)
@@ -607,10 +607,26 @@ function runtimeHarness(options: { pages?: () => FeedPage | Error } = {}) {
   layer.register(INTENT_STORE_REGISTRATION)
   layer.register(FEED_CURSORS_REGISTRATION)
   layer.register(DOC_INDEX_REGISTRATION)
-  const state = { fail: true, expire: false }
+  const state: {
+    fail: boolean
+    expire: boolean
+    gate?: Promise<void>
+    /** requests still to let through before one parks at the gate */
+    skip: number
+    onHeld?: () => void
+  } = { fail: true, expire: false, skip: 0 }
   const client: FeedClient = {
     async listChanges() {
-      if (state.expire) throw new FeedError({ kind: 'cursor_expired' })
+      // the server's answer is decided when the request is made, a held request still gets it
+      const refused = state.expire
+      if (state.gate) {
+        if (state.skip > 0) state.skip -= 1
+        else {
+          state.onHeld?.()
+          await state.gate
+        }
+      }
+      if (refused) throw new FeedError({ kind: 'cursor_expired' })
       const scripted = state.fail ? options.pages?.() : undefined
       if (scripted instanceof Error) throw scripted
       return (
@@ -653,6 +669,24 @@ function runtimeHarness(options: { pages?: () => FeedPage | Error } = {}) {
     },
     set expire(next: boolean) {
       state.expire = next
+    },
+    /**
+     * park the feed request after `skip` others until `release` is called (a pass left in
+     * flight); `reached` settles once a request is parked at the gate
+     */
+    hold(skip = 0): { release: () => void; reached: Promise<void> } {
+      state.skip = skip
+      let release = () => undefined as void
+      state.gate = new Promise<void>((resolve) => {
+        release = () => {
+          state.gate = undefined
+          resolve()
+        }
+      })
+      const reached = new Promise<void>((resolve) => {
+        state.onHeld = resolve
+      })
+      return { release, reached }
     },
   }
 }
@@ -760,6 +794,30 @@ describe('W10: "Đồng bộ ngay" restarts a feed stopped on refused resyncs, e
     tick.mockClear()
     expect(await h.controller.syncNow()).toEqual({ ok: false, code: 'offline' })
     expect(tick).not.toHaveBeenCalled()
+  })
+
+  it('BE-3n-2: a click while a pass is in flight runs a fresh pass after the reset and ends online', async () => {
+    const { rt, h, tick } = await stoppedFeed()
+    // a pass is already in flight and will be refused (the server answered before it recovered)
+    rt.clock.ms += 2 * 60 * 60_000
+    // the pass's first request finds the cursor expired; its resync request is the one held,
+    // so the refusal is still to come when the click lands
+    const { release, reached } = rt.hold(1)
+    const inFlight = rt.runtime.tick()
+    await reached
+    // the server answers again, but the in-flight pass has its refusal already on the way
+    rt.expire = false
+    const click = h.controller.syncNow()
+    release()
+    await inFlight
+    expect(await click).toEqual({ ok: true })
+    // the click did not join the in-flight pass: it ran its own after the reset
+    expect(tick).toHaveBeenCalledTimes(1)
+    expect(rt.runtime.feedVerdict().resyncFailed).toBe(false)
+    const after = (await h.controller.getSnapshot()).header
+    expect(after.online).toBe(true)
+    expect(after.resyncFailed).toBe(false)
+    expect(after.status).toBe('online')
   })
 
   it('wiring.ts hands the runtime reset to the sync center', () => {

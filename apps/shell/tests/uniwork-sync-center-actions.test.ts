@@ -296,6 +296,8 @@ function createHarness(
     drafts: () => Promise.resolve(draftStore),
     listQueueDocs: async () => [...docs.values()],
     newId: () => `new-${++idSeq}`,
+    isResyncFailed: () => false,
+    resetFeedResync: async () => undefined,
     syncNow: async () => {
       syncNowCalls += 1
     },

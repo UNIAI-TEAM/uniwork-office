@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { chmod, mkdir, rm, writeFile } from 'node:fs/promises'
-import { basename, extname, isAbsolute, join, relative, resolve } from 'node:path'
+import { basename, extname, join } from 'node:path'
+import { DRAFT_PREVIEW_DIR, isDraftPreviewPath } from '@genoffice/electron-utils/draft-preview'
 import {
   SYNC_CENTER_ATTENTION_STATES,
   SYNC_CENTER_DISCARDABLE_BLOCKED_REASONS,
@@ -472,9 +473,12 @@ export interface SyncCenterControllerDeps {
   newId?(): string
   syncNow(): Promise<void>
   /** the feed stopped on refused resyncs (header 7): "Đồng bộ ngay" must still try, even offline */
-  isResyncFailed?(): boolean
-  /** forget the feed's refused resyncs and backoff before that retry pass */
-  resetFeedResync?(): void
+  isResyncFailed(): boolean
+  /**
+   * forget the feed's refused resyncs and backoff before that retry pass; it settles any pass
+   * already in flight first, so the retry that follows is a fresh pass and not that one
+   */
+  resetFeedResync(): Promise<void>
   setSendingPaused?(paused: boolean): Promise<boolean>
   writeClipboard(text: string): void
   openDocument(documentId: string, path?: string): Promise<boolean>
@@ -660,10 +664,10 @@ export function createSyncCenterController(deps: SyncCenterControllerDeps): Sync
       // a feed stopped on refused resyncs is only restarted by this click, so it is never
       // refused as offline up front: the pass really tries, and a device that is truly
       // offline fails it and gets the normal offline answer below
-      const retryingFeed = deps.isResyncFailed?.() === true
+      const retryingFeed = deps.isResyncFailed()
       if (!retryingFeed && !deps.isOnline()) return { ok: false, code: 'offline' }
       try {
-        if (retryingFeed) deps.resetFeedResync?.()
+        if (retryingFeed) await deps.resetFeedResync()
         await deps.syncNow()
         notifyChanged()
         if (retryingFeed && !deps.isOnline()) return { ok: false, code: 'offline' }
@@ -1009,17 +1013,8 @@ const STORE_NEWER: UniworkLockReason = 'store_newer'
  */
 export const DRAFT_PREVIEW_CLOSE_GRACE_MS = 30_000
 
-/** the directory (under userData) that holds the read-only copies of kept drafts */
-export const DRAFT_PREVIEW_DIR = 'uniwork-drafts-preview'
-
-/**
- * True for a file inside the draft-preview root: a preview is a temporary decrypted copy, not a
- * file the user opened, so it never belongs in the recent-files list.
- */
-export function isDraftPreviewPath(userDataDir: string, filePath: string): boolean {
-  const rel = relative(resolve(userDataDir, DRAFT_PREVIEW_DIR), resolve(filePath))
-  return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel)
-}
+/** the preview root name and its path test live in electron-utils (docs/slides guard their own recents with them) */
+export { DRAFT_PREVIEW_DIR, isDraftPreviewPath }
 
 /** the feed runtime's verdict of its last pass (header conditions 7 and 9) */
 export interface SyncFeedVerdict {
@@ -1065,7 +1060,7 @@ export interface WiredSyncCenterDeps {
   /** the feed runtime's last pass verdict (resynced / resync refused past the cap) */
   feedVerdict(): SyncFeedVerdict
   /** the runtime forgets its feeds' refused resyncs and backoff (the retry of header 7) */
-  resetFeedResync?(): void
+  resetFeedResync(): Promise<void>
   /**
    * G5-08c: the lease manager's effective state of a document (RES-3). Only its
    * `expired` and `clock_rollback` states are read, as a blocked row's reason.
@@ -1172,7 +1167,7 @@ export function createWiredSyncCenter(deps: WiredSyncCenterDeps): WiredSyncCente
   const controller = createSyncCenterController({
     isOnline: () => online,
     isResyncFailed: () => deps.feedVerdict().resyncFailed,
-    resetFeedResync: () => deps.resetFeedResync?.(),
+    resetFeedResync: () => deps.resetFeedResync(),
     getFacts: async (): Promise<SyncCenterFacts> => {
       const status = deps.accountStatus()
       const storeNewer = deps.service.currentLocks().some((lock) => lock.reason === STORE_NEWER)

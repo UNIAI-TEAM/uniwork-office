@@ -556,6 +556,18 @@ describe('SyncCenterPane', () => {
     expect(api.syncNow).toHaveBeenCalledTimes(1)
   })
 
+  it('FE-3n-2: a stopped-feed retry answered offline announces uwSyncNowOffline in the live region', async () => {
+    const s = snapshot()
+    s.header = { ...s.header, online: false, resyncFailed: true, status: 'offline' }
+    const api = fakeApi(s)
+    api.syncNow.mockResolvedValueOnce({ ok: false, code: 'offline' })
+    await render(api)
+    expect(status().textContent).not.toContain(vi_.uwSyncNowOffline!)
+    await click(button(vi_.uwSyncNow!))
+    expect(api.syncNow).toHaveBeenCalledTimes(1)
+    expect(status().textContent).toBe(vi_.uwSyncNowOffline)
+  })
+
   it('other organization line and status changes are announced', async () => {
     const api = fakeApi(snapshot())
     await render(api)
