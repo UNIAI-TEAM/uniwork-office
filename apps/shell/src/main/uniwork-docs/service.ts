@@ -687,12 +687,14 @@ export class UniworkDocsService {
   /** the outcome of the last store open; 'unknown' until it is asked for */
   private storeOpenKind: SyncStoreOpen['kind'] | 'unknown' = 'unknown'
   /**
-   * d7-2: the document keys the last `planSignOut` counted as RAM-only, for the
-   * account it planned. The switch notice sums that count with the lock's own
-   * lost documents, so the lock leaves these keys out: a document is counted
-   * once. Read and cleared by the next `lockSession`.
+   * d7-2/d1-3: per scope token, the document keys the last `planSignOut` of that
+   * scope counted as RAM-only. The switch notice sums that count with the lock's
+   * own lost documents, so the lock of the scope leaves these keys out: a
+   * document is counted once. A re-plan replaces the scope's entry and the lock
+   * drops it, so an interleaved plan of another scope cannot clobber it and the
+   * map never holds more than one entry per scope.
    */
-  private plannedRamOnly: { token: string; keys: Set<string> } | null = null
+  private readonly plannedRamOnly = new Map<string, Set<string>>()
   /** scopes whose schema 1 -> 2 sweep has finished in this process */
   private readonly migratedScopes = new Set<string>()
   /**
@@ -1911,10 +1913,11 @@ export class UniworkDocsService {
       }
     }
 
-    this.plannedRamOnly = {
-      token: `${target.deploymentId}/${target.accountId}`,
-      keys: storeLockedNow ? ramOnlyDocs : new Set<string>(),
-    }
+    // d1-3: the entry belongs to this scope alone, and a re-plan replaces it
+    // (an empty plan drops it) so a scope that is never locked cannot grow it
+    const planToken = `${target.deploymentId}/${target.accountId}`
+    if (storeLockedNow) this.plannedRamOnly.set(planToken, ramOnlyDocs)
+    else this.plannedRamOnly.delete(planToken)
     return {
       count: unsavedDocs.size,
       waiting: waitingDocs.size,
@@ -1956,9 +1959,11 @@ export class UniworkDocsService {
     const switching = options?.switch === true
     const scopeToken = `${target.deploymentId}/${target.accountId}`
     const keystoreLocked = this.storeLocked()
-    // d7-2: what the plan just counted as RAM-only is not counted again as lost
-    const planned = this.plannedRamOnly?.token === scopeToken ? this.plannedRamOnly.keys : null
-    this.plannedRamOnly = null
+    // d7-2/d1-3: what the plan of THIS scope just counted as RAM-only is not
+    // counted again as lost; the entry is consumed here, so a plan of another
+    // scope (or a later lock) can never reuse it
+    const planned = this.plannedRamOnly.get(scopeToken)
+    this.plannedRamOnly.delete(scopeToken)
 
     // Step 1: stop runtime, block new commits, bounded receipt wait (30s)
     this.deps.stopRuntime?.()
@@ -2525,7 +2530,11 @@ export class UniworkDocsService {
     ) {
       return
     }
-    this.lockedScopes.delete(`${target.deploymentId}/${target.accountId}`)
+    const scopeToken = `${target.deploymentId}/${target.accountId}`
+    this.lockedScopes.delete(scopeToken)
+    // d1-3: a plan of a scope that is live again is stale; it must not suppress
+    // the lost count of that scope's next lock
+    this.plannedRamOnly.delete(scopeToken)
     this.clearSignedOutLocks()
     const open = await this.openSyncStore()
     if (open.kind !== 'ok') return

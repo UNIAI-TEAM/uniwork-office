@@ -121,6 +121,11 @@ function newRun(owner: LastOwner): Run {
   const done = new Promise<void>((resolve, reject) => {
     settle = { resolve, reject }
   })
+  // d1-2: a run is observed from the moment it exists. Every caller that awaits
+  // `run.done` still receives the rejection; this no-op handler only makes sure a
+  // run whose push promise is dropped (or was never awaited) cannot turn a lock
+  // failure into a process-level unhandled rejection.
+  void done.catch(() => undefined)
   return { owner, done, settle }
 }
 
