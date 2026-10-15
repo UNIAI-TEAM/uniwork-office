@@ -76,3 +76,33 @@ describe('U-2: queue-popover.css puts the dialog where the component says', () =
     expect(rule('.uw-queue-pop')).not.toMatch(/position: (fixed|absolute)/)
   })
 })
+
+describe('U-2: at the numbers measured in the real shell', () => {
+  it('1280px: the pill ends at 1104, so the 360px dialog is 744..1104 (it was 923..1283, 179px past the pill)', () => {
+    const left = popoverLeftOf({ pillRight: 1104, width: 360, windowWidth: 1280 })
+    expect(left).toBe(744)
+    expect(left + 360).toBe(1104)
+  })
+
+  it('800, 890 and 1024: the same, right edge on the pill whatever the window', () => {
+    for (const w of [800, 890, 1024, 1280]) {
+      const pillRight = w - 176
+      expect(popoverLeftOf({ pillRight, width: 360, windowWidth: w }) + 360, `${w}px`).toBe(
+        pillRight,
+      )
+    }
+  })
+
+  it('722px (V6u4-04): a 360px dialog under a 314px pill that starts at x 218 sticks out 46px left of it and still fits', () => {
+    const pillRight = 218 + 314
+    const left = popoverLeftOf({ pillRight, width: 360, windowWidth: 722 })
+    expect(left).toBe(172)
+    expect(218 - left).toBe(46)
+    expect(left).toBeGreaterThanOrEqual(8)
+    expect(left + 360).toBeLessThanOrEqual(722 - 8)
+  })
+
+  it('a pill so far left that the dialog would pass the window edge is clamped to the 8px gutter', () => {
+    expect(popoverLeftOf({ pillRight: 300, width: 360, windowWidth: 722 })).toBe(8)
+  })
+})

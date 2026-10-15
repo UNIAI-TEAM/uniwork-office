@@ -233,3 +233,106 @@ describe('U-1: the tab bar at 800, 890, 1024 and 1280 with one to three document
     expect(layout(800, 1).variant).toBe('compact')
   })
 })
+
+/**
+ * The numbers the visual tester measured in the real shell (r4, 2 document tabs, queued pill): the
+ * pill is 314px wide and ends 176px before the window's right edge (caption buttons, overflow
+ * button, holder margin), so at 800px it sat at x 310..624 over the second tab x 297..401. Tab
+ * rects here are the unclipped layout rects (what the tester reads), laid out like the strip does:
+ * Home at its width, document tabs sharing the rest between their 104px minimum and 240px.
+ */
+describe('U-1: at the numbers measured in the real shell, no tab rect reaches the pill', () => {
+  const REAL = {
+    left: 40,
+    right: 160,
+    margins: 22,
+    home: 109,
+    tabMin: 104,
+    padding: 20,
+    newButton: 32,
+  }
+  const REAL_PILL = { full: 314, short: 187, compact: 113 }
+
+  function tabRects(stripLeft: number, stripWidth: number, docTabs: number) {
+    const inner = stripWidth - REAL.padding - REAL.newButton
+    const docWidth = Math.min(240, Math.max(REAL.tabMin, (inner - REAL.home) / docTabs))
+    const rects = [{ left: stripLeft + 10, right: stripLeft + 10 + REAL.home }]
+    let x = rects[0].right
+    for (let i = 0; i < docTabs; i++) {
+      rects.push({ left: x, right: x + docWidth })
+      x += docWidth
+    }
+    return rects
+  }
+
+  function real(barWidth: number, docTabs: number, toggle: number) {
+    const l = barLayoutOf({
+      barWidth,
+      ...REAL,
+      docTabs,
+      toggle,
+      pill: REAL_PILL,
+      hasShort: true,
+    })
+    const pill = { left: l.chrome.right - REAL_PILL[l.variant], right: l.chrome.right }
+    return { l, pill, tabs: tabRects(l.strip.left, l.strip.right - l.strip.left, docTabs) }
+  }
+
+  it('the old layout (full pill always): at 800px the pill starts at 310 over the tab ending at 401', () => {
+    const old = barLayoutOf({
+      barWidth: 800,
+      ...REAL,
+      docTabs: 2,
+      toggle: 0,
+      pill: { full: 314, short: 314, compact: 314 },
+      hasShort: false,
+    })
+    expect(old.chrome.right).toBe(800 - 160 - 16)
+    const pillLeft = old.chrome.right - 314
+    expect(pillLeft).toBe(310)
+    // the tab rects of the old strip (its width was what the 314px holder left it)
+    const tabs = tabRects(old.strip.left, old.strip.right - old.strip.left, 2)
+    expect(tabs[2].right).toBeGreaterThan(pillLeft)
+  })
+
+  it('800, 890, 1024, 1280 (and the 722 minimum) x 1-3 document tabs, with and without the Discussion toggle', () => {
+    for (const w of [722, 800, 890, 1024, 1280]) {
+      for (const n of [1, 2, 3]) {
+        for (const toggle of [0, 108]) {
+          const { pill, tabs, l } = real(w, n, toggle)
+          const beyondWindow = w === 722 && n === 3
+          for (const [i, tab] of tabs.entries()) {
+            // Home and three tabs at their 104px minimum need 471px: the 722px window has 433 left of
+            // the pill, so the third tab scrolls (clipped by the strip) and only its visible part is checked
+            const reach = beyondWindow ? Math.min(tab.right, l.strip.right) : tab.right
+            expect(reach, `${w}px ${n} tabs toggle ${toggle}: tab ${i}`).toBeLessThanOrEqual(
+              pill.left,
+            )
+          }
+          expect(pill.right, `${w}px`).toBeLessThanOrEqual(w - 160 - 16)
+          expect(l.strip.right, `${w}px`).toBeLessThanOrEqual(l.chrome.left)
+        }
+      }
+    }
+  })
+
+  it('the reported 800px / 2 tabs case gets the short label, the whole strip back and every tab inside it', () => {
+    const { l, tabs } = real(800, 2, 0)
+    expect(l.variant).toBe('short')
+    expect(tabs[2].right).toBeLessThanOrEqual(l.strip.right)
+  })
+
+  it('a 134px pill (a state with a short label, such as Saved) never needs a step down at 800 with two tabs', () => {
+    const l = barLayoutOf({
+      barWidth: 800,
+      ...REAL,
+      docTabs: 2,
+      toggle: 0,
+      pill: { full: 134, short: 134, compact: 30 },
+      hasShort: false,
+    })
+    expect(l.variant).toBe('full')
+    const tabs = tabRects(l.strip.left, l.strip.right - l.strip.left, 2)
+    expect(tabs[2].right).toBeLessThanOrEqual(l.chrome.right - 134)
+  })
+})
