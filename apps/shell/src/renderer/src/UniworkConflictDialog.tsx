@@ -19,6 +19,7 @@ import {
   getStep1Model,
   isSaveCopyDownloadStep,
   resolveConflictNotice,
+  viewAfterConflictBack,
   type ConflictDialogState,
   type ConflictStep1ActionId,
 } from './uniwork-conflict-model'
@@ -325,6 +326,12 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
       return
     }
     setState((prev) => applyConflictStep1Click(prev, view, actionId))
+  }
+
+  const handleSaveCopyBack = () => {
+    const cleared = viewAfterConflictBack(state, view)
+    setState((s) => applyConflictBack(s))
+    if (cleared) onViewChange(cleared)
   }
 
   const handleConfirmStep2 = () => {
@@ -673,7 +680,7 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
               type="button"
               className="uw-conflict-btn"
               data-conflict-action="back"
-              onClick={() => setState((s) => applyConflictBack(s))}
+              onClick={handleSaveCopyBack}
             >
               {t('uwConflictBack')}
             </button>

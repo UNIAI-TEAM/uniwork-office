@@ -380,6 +380,19 @@ export function isSaveCopyDownloadStep(view: UniworkConflictView): boolean {
   return view.notice === 'save_copy_no_seat' || view.notice === 'download_failed'
 }
 
+/**
+ * FE-12-01: Back from the Download step drops the notice that made it one, so step 1 does not
+ * say "you can download your version" (it has no Download button) and re-entering "Save as a
+ * copy…" shows the create-copy step again. Null when Back leaves the view as it is.
+ */
+export function viewAfterConflictBack(
+  state: ConflictDialogState,
+  view: UniworkConflictView,
+): UniworkConflictView | null {
+  if (state.step !== 'save-copy' || !isSaveCopyDownloadStep(view)) return null
+  return { ...view, notice: null, noticeArg: null }
+}
+
 export function getActionFailureNotice(
   action: UniworkConflictAction,
 ): UniworkConflictNotice | null {

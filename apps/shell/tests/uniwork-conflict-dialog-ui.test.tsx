@@ -802,6 +802,44 @@ describe('UniworkConflictDialog UI (G5-09 S5 desktop)', () => {
       )
     })
 
+    it('FE-12-01 / FE-12-04: Back from the Download step returns to step 1 without the no-seat notice, and re-entering Save as a copy shows the create-copy step again', async () => {
+      const dialog = await openStep2()
+      nextReply = { kind: 'view', view: makeView({ notice: 'save_copy_no_seat' }) }
+      await act(async () => {
+        ;(
+          dialog.querySelector('[data-conflict-action="save-copy-go"]') as HTMLButtonElement
+        ).click()
+      })
+      expect(dialog.querySelector('[data-conflict-action="download-go"]')).not.toBeNull()
+
+      await act(async () => {
+        ;(dialog.querySelector('[data-conflict-action="back"]') as HTMLButtonElement).click()
+      })
+      // step 1, and the alert no longer says "you can download your version" (step 1 has no
+      // Download button)
+      expect(dialog.querySelector('[data-conflict-action="reload"]')).not.toBeNull()
+      expect(dialog.querySelector('[data-conflict-action="download-go"]')).toBeNull()
+      expect(dialog.querySelector('[role="alert"]')?.textContent ?? '').toBe('')
+      expect(dialog.textContent).not.toContain(en.uwConflictSaveCopyNoSeat)
+      expect(document.activeElement).toBe(
+        dialog.querySelector('[data-conflict-action="save-copy"]') as HTMLElement,
+      )
+
+      await act(async () => {
+        ;(dialog.querySelector('[data-conflict-action="save-copy"]') as HTMLButtonElement).click()
+      })
+      const heading = dialog.querySelector('h2') as HTMLElement
+      expect(heading.textContent).toBe(en.uwConflictSaveCopyTitle)
+      const primary = dialog.querySelector('[data-conflict-action="save-copy-go"]') as HTMLElement
+      expect(primary).not.toBeNull()
+      expect(dialog.querySelector('[data-conflict-action="download-go"]')).toBeNull()
+      expect(dialog.querySelector('[role="alert"]')?.textContent ?? '').toBe('')
+      // Back is local: no request reached main beyond the one refused copy
+      expect(actCalls).toEqual([
+        { sessionId: 'sess-ui-1', action: { kind: 'save-copy', stopAi: false } },
+      ])
+    })
+
     it('a download_done reply returns to step 1 with the file name in an ok alert; Reload / Overwrite / Save as a copy stay available', async () => {
       const dialog = await openStep2()
       nextReply = { kind: 'view', view: makeView({ notice: 'save_copy_no_seat' }) }
