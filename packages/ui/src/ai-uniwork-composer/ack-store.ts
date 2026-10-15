@@ -124,7 +124,18 @@ export function subscribeUniworkAck(listener: () => void): () => void {
   }
 }
 
-/** React hook binding an ack key to `isAcked` / `ack` state */
+/** Stable identity of a key before it is trimmed and serialized; used for the in-memory ack */
+function rawAckIdentity(key: UniworkAckKey | null | undefined): string | null {
+  if (!key) return null
+  return JSON.stringify([key.account ?? '', key.org ?? '', key.document ?? ''])
+}
+
+/**
+ * React hook binding an ack key to `isAcked` / `ack` state.
+ * A key without an account cannot be stored (see `serializeUniworkAckKey`), so `acknowledge`
+ * keeps that ack in this hook instance only: it lets this composer send for the current key,
+ * is never written to storage, and is dropped as soon as the key changes.
+ */
 export function useUniworkDisclosureAck(key: UniworkAckKey | null | undefined): {
   readonly acked: boolean
   readonly needsAck: boolean
@@ -132,9 +143,19 @@ export function useUniworkDisclosureAck(key: UniworkAckKey | null | undefined): 
   readonly acknowledge: () => void
 } {
   const [, setTick] = useState(0)
+  const [memoryAckedFor, setMemoryAckedFor] = useState<string | null>(null)
   useEffect(() => subscribeUniworkAck(() => setTick((n) => n + 1)), [])
-  const acked = isAcked(key)
+  const identity = rawAckIdentity(key)
+  const unscoped = key != null && serializeUniworkAckKey(key) === null
+  useEffect(() => {
+    setMemoryAckedFor(null)
+  }, [identity])
+  const acked = isAcked(key) || (unscoped && memoryAckedFor === identity)
   const acknowledge = useCallback(() => {
+    if (key != null && serializeUniworkAckKey(key) === null) {
+      setMemoryAckedFor(rawAckIdentity(key))
+      return
+    }
     ack(key)
     setTick((n) => n + 1)
   }, [key])

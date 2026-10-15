@@ -122,7 +122,9 @@ export function AiComposer({
   const resolvedPopupOpen = Boolean(popupOpen ?? uniwork?.popupOpen)
 
   const disclosureCfg = uniworkActive ? uniwork?.disclosure : undefined
-  const { acked } = useUniworkDisclosureAck(disclosureCfg?.ackKey)
+  const { acked, acknowledge: acknowledgeDisclosure } = useUniworkDisclosureAck(
+    disclosureCfg?.ackKey,
+  )
   const unacked = Boolean(
     disclosureCfg && (disclosureCfg.needsAck ?? (disclosureCfg.ackKey ? !acked : false)),
   )
@@ -170,6 +172,14 @@ export function AiComposer({
     ta.style.height = 'auto'
     ta.style.height = `${Math.min(ta.scrollHeight, MAX_TEXTAREA_HEIGHT)}px`
   }, [value, ref])
+
+  // the disclosure region owns its own ack hook; an ack that cannot be stored (empty account)
+  // lives in this composer's hook, so it has to be recorded here too
+  const disclosureOnAck = disclosureCfg?.onAck
+  const handleDisclosureAck = useCallback(() => {
+    acknowledgeDisclosure()
+    disclosureOnAck?.()
+  }, [acknowledgeDisclosure, disclosureOnAck])
 
   const handleBlockedByAck = useCallback(() => {
     announce(aiUniworkText(resolvedLang, 'aiUniworkSendNeedsAck'))
@@ -316,7 +326,7 @@ export function AiComposer({
           lang={resolvedLang}
           sentenceId={sentenceId}
           regionRef={disclosureCfg.regionRef ?? internalDisclosureRegionRef}
-          onAck={disclosureCfg.onAck}
+          onAck={handleDisclosureAck}
           onLearnMore={disclosureCfg.onLearnMore}
           onAnnounce={announce}
         />
