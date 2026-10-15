@@ -13,6 +13,7 @@ import {
   getReloadStepModel,
   getStep1Model,
   resolveConflictNotice,
+  viewAfterConflictBack,
 } from '../src/renderer/src/uniwork-conflict-model'
 
 function makeView(overrides: Partial<UniworkConflictView> = {}): UniworkConflictView {
@@ -257,6 +258,41 @@ describe('uniwork-conflict-model (G5-09 S5 desktop)', () => {
     state = applyConflictViewUpdate(state, revokedView)
     expect(state.step).toBe('locked')
     expect(state.focusTarget).toBe('title')
+  })
+
+  it('FE-12-22: viewAfterConflictBack drops the no-seat / download_failed notice only on the save-copy step, and is null everywhere else', () => {
+    const onSaveCopy = (view: UniworkConflictView) => {
+      let state = createInitialConflictState(view)
+      state = applyConflictStep1Click(state, view, 'save-copy')
+      expect(state.step).toBe('save-copy')
+      return state
+    }
+    for (const notice of ['save_copy_no_seat', 'download_failed'] as const) {
+      const view = makeView({ notice, noticeArg: 'Contract (my version).docx' })
+      const cleared = viewAfterConflictBack(onSaveCopy(view), view)
+      expect(cleared).toEqual({ ...view, notice: null, noticeArg: null })
+      // a fresh view: the live one is never mutated
+      expect(view.notice).toBe(notice)
+    }
+
+    // the create-copy step (no Download notice): the view stays as it is
+    const plain = makeView({ notice: 'head_moved' })
+    expect(viewAfterConflictBack(onSaveCopy(plain), plain)).toBeNull()
+    const noNotice = makeView()
+    expect(viewAfterConflictBack(onSaveCopy(noNotice), noNotice)).toBeNull()
+
+    // another step (or step 1) with the notice on the view: Back leaves it alone
+    const withSeatNotice = makeView({ notice: 'save_copy_no_seat' })
+    const overwriteState = applyConflictStep1Click(
+      createInitialConflictState(withSeatNotice),
+      withSeatNotice,
+      'overwrite',
+    )
+    expect(overwriteState.step).toBe('overwrite')
+    expect(viewAfterConflictBack(overwriteState, withSeatNotice)).toBeNull()
+    expect(
+      viewAfterConflictBack(createInitialConflictState(withSeatNotice), withSeatNotice),
+    ).toBeNull()
   })
 
   it('FE-03: maps rejected conflict actions to their failure notice (or null for cancel)', () => {
