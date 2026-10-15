@@ -3,10 +3,8 @@ import type { RecentEntry, UniworkDocSummary } from '../../shared/home-api'
 import type {
   UniworkWorkError,
   WorkHomeSummary,
-  WorkNotification,
   WorkRecentDocument,
   WorkTask,
-  WorkWebTarget,
 } from '../../shared/uniwork-work-api'
 import { workbenchStrings } from './i18n/strings-workbench'
 import type { StringKey } from './locale'
@@ -49,21 +47,6 @@ export function localDay(iso: string, timeZone: string): string {
   }
 }
 
-/** hour of day (0-23) now, in the given zone when it is a real one */
-export function hourIn(timeZone: string | undefined, now = new Date()): number {
-  try {
-    const h = new Intl.DateTimeFormat('en-GB', {
-      hour: 'numeric',
-      hourCycle: 'h23',
-      timeZone: timeZone || undefined,
-    }).format(now)
-    const n = Number.parseInt(h, 10)
-    return Number.isNaN(n) ? now.getHours() : n
-  } catch {
-    return now.getHours()
-  }
-}
-
 /** wall-clock HH:mm of an instant, in the summary's zone when it names one */
 export function clock(iso: string, locale: string, timeZone?: string): string {
   const d = new Date(iso)
@@ -74,6 +57,34 @@ export function clock(iso: string, locale: string, timeZone?: string): string {
   } catch {
     return new Intl.DateTimeFormat(locale, opts).format(d)
   }
+}
+
+/**
+ * When something local was last edited (spec 4.5): "Edited 10:42" today, "Edited yesterday",
+ * else the day and month in the UI locale. A key and params, translated at render.
+ */
+export function editedWhen(
+  iso: string,
+  locale: string,
+  now = new Date(),
+): { key: StringKey; params?: Record<string, string> } {
+  const d = new Date(iso)
+  // a stored note may carry any string: an unreadable time must not throw in render
+  if (Number.isNaN(d.getTime())) return { key: 'wbEditedOn', params: { date: '—' } }
+  const midnight = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime()
+  // rounded: a DST day is 23 or 25 hours long
+  const days = Math.round((midnight(now) - midnight(d)) / 86_400_000)
+  if (days === 0) return { key: 'wbEditedAt', params: { time: clock(iso, locale) } }
+  if (days === 1) return { key: 'wbEditedYesterday' }
+  // the locale's day/month order, always with a slash (vi CLDR writes 13-10; the spec wants 13/10)
+  // another year's day and month alone would read as this year's
+  const year = d.getFullYear() !== now.getFullYear() ? { year: 'numeric' as const } : {}
+  const date = new Intl.DateTimeFormat(locale, { day: '2-digit', month: '2-digit', ...year })
+    .formatToParts(d)
+    .filter((p) => p.type !== 'literal')
+    .map((p) => p.value)
+    .join('/')
+  return { key: 'wbEditedOn', params: { date } }
 }
 
 /** a YYYY-MM-DD day as written (no zone shift): long = weekday, day and month */
@@ -88,14 +99,6 @@ export function formatDay(day: string, locale: string, long: boolean): string {
   ).format(date)
   // the long form opens a heading: sentence case ("mercredi 14 octobre" -> "Mercredi 14 octobre")
   return long ? text.charAt(0).toLocaleUpperCase(locale) + text.slice(1) : text
-}
-
-/** same bands as the web home */
-export function greetingKey(hour: number): StringKey {
-  if (hour < 11) return 'wbOvGreetingMorning'
-  if (hour < 14) return 'wbOvGreetingNoon'
-  if (hour < 18) return 'wbOvGreetingAfternoon'
-  return 'wbOvGreetingEvening'
 }
 
 /**
@@ -122,66 +125,6 @@ export function greetingName(displayName: string): string {
   return VI_FAMILY_NAMES.has(plainWord(words[0]!)) ? words[words.length - 1]! : words[0]!
 }
 
-export interface WorkHeadline {
-  key: StringKey
-  params: Record<string, string | number>
-  /** a meeting start the view formats into {time} */
-  at?: string
-  /** a meeting in progress, which the header offers to join */
-  liveMeetingId?: string
-}
-
-function oldestOverdue(summary: WorkHomeSummary): WorkTask | undefined {
-  return summary.my_work.find(
-    (t) => t.status !== 'done' && overdueDays(summary.today, t.due_date) > 0,
-  )
-}
-
-function nextMeetingToday(summary: WorkHomeSummary) {
-  return summary.upcoming_meetings.find(
-    (m) =>
-      m.status !== 'IN_PROGRESS' &&
-      localDay(m.starts_at, summary.timezone || 'UTC') === summary.today,
-  )
-}
-
-/**
- * The one sentence under the greeting: a live meeting, then a failed source
- * (its zeros are not true), the oldest overdue task, the next meeting today,
- * what is due today, what is unread, else a clear day.
- */
-export function buildHeadline(summary: WorkHomeSummary): WorkHeadline {
-  const { counts, today } = summary
-  const live = summary.upcoming_meetings.find((m) => m.status === 'IN_PROGRESS')
-  if (live)
-    return { key: 'wbOvHeadlineLive', params: { title: live.title }, liveMeetingId: live.id }
-  // a failed source, or a count the server sent malformed (null): its zeros are not true
-  if (summary.partial.length > 0 || Object.values(counts).some((n) => n === null)) {
-    return { key: 'wbOvHeadlinePartial', params: {} }
-  }
-  const overdue = counts.overdue ?? 0
-  const meetingsToday = counts.meetings_today ?? 0
-  const dueToday = counts.due_today ?? 0
-  const unread = counts.unread ?? 0
-  if (overdue > 0) {
-    const oldest = oldestOverdue(summary)
-    return oldest
-      ? {
-          key: 'wbOvHeadlineOverdue',
-          params: { title: oldest.title, count: overdueDays(today, oldest.due_date) },
-        }
-      : { key: 'wbOvHeadlineOverduePlain', params: { count: overdue } }
-  }
-  if (meetingsToday > 0) {
-    const next = nextMeetingToday(summary)
-    if (next)
-      return { key: 'wbOvHeadlineMeeting', params: { title: next.title }, at: next.starts_at }
-  }
-  if (dueToday > 0) return { key: 'wbOvHeadlineDueToday', params: { count: dueToday } }
-  if (unread > 0) return { key: 'wbOvHeadlineUnread', params: { count: unread } }
-  return { key: 'wbOvHeadlineClear', params: {} }
-}
-
 export type DueState = 'overdue' | 'today' | 'later' | 'none'
 
 export function dueState(task: WorkTask, today: string): DueState {
@@ -205,17 +148,6 @@ export function myWorkGroups(
   return (['overdue', 'today', 'upcoming'] as const)
     .filter((key) => groups[key].length > 0)
     .map((key) => ({ key, tasks: groups[key] }))
-}
-
-/** nothing assigned, scheduled or unread, and every source and count answered */
-export function isQuiet(summary: WorkHomeSummary): boolean {
-  return (
-    summary.partial.length === 0 &&
-    summary.my_work.length === 0 &&
-    summary.upcoming_meetings.length === 0 &&
-    summary.inbox.length === 0 &&
-    Object.values(summary.counts).every((n) => n === 0)
-  )
 }
 
 export type TabCount = { n: number; key: StringKey; tone: 'danger' | 'muted' }
@@ -275,15 +207,6 @@ export function mergeRecentDocuments(
     .map((r) => r.row)
 }
 
-export function inboxTarget(
-  n: WorkNotification,
-  ws: { orgSlug: string; wsSlug: string },
-): WorkWebTarget {
-  if (n.resource_type === 'task') return { kind: 'task', ...ws, id: n.resource_id }
-  if (n.resource_type === 'meeting') return { kind: 'meeting', ...ws, id: n.resource_id }
-  return { kind: 'inbox', ...ws }
-}
-
 /** the server sends title_key + params; the desktop keeps one sentence per kind (C10) */
 export function notificationKey(kind: string): StringKey {
   const key = `wbNotif_${kind}`
@@ -322,8 +245,25 @@ export const HOME_REFRESH_MS = 60_000
 export function useRecentDocuments(
   workspaceId: string | null,
   refreshTick: number,
-): { docs: WorkRecentDocument[]; cloudFailed: boolean; reload: () => void } {
-  const [state, setState] = useState({ docs: [] as WorkRecentDocument[], cloudFailed: false })
+  limit = 6,
+): {
+  docs: WorkRecentDocument[]
+  /** this device's recents as listed (working copies included), for the Desk's tray */
+  local: RecentEntry[]
+  cloudFailed: boolean
+  /** false until the first answer: an empty list before it is not "nothing recent" */
+  loaded: boolean
+  /** a load is on its way (the first one, Refresh, Retry): a Retry can say it is trying */
+  checking: boolean
+  reload: () => void
+} {
+  const [state, setState] = useState({
+    docs: [] as WorkRecentDocument[],
+    local: [] as RecentEntry[],
+    cloudFailed: false,
+    loaded: false,
+    checking: true,
+  })
   const [tick, setTick] = useState(0)
   const reload = useCallback(() => setTick((n) => n + 1), [])
   useEffect(() => {
@@ -338,7 +278,8 @@ export function useRecentDocuments(
   }, [reload])
   useEffect(() => {
     let live = true
-    const local = window.aiOffice.recents({ limit: 12 }).then(
+    setState((s) => (s.checking ? s : { ...s, checking: true }))
+    const local = window.aiOffice.recents({ limit: 20 }).then(
       (page) => page.entries,
       () => [] as RecentEntry[],
     )
@@ -349,11 +290,19 @@ export function useRecentDocuments(
         )
       : Promise.resolve([])
     void Promise.all([cloud, local]).then(([c, l]) => {
-      if (live) setState({ docs: mergeRecentDocuments(c ?? [], l), cloudFailed: c === null })
+      if (live) {
+        setState({
+          docs: mergeRecentDocuments(c ?? [], l, limit),
+          local: l,
+          cloudFailed: c === null,
+          loaded: true,
+          checking: false,
+        })
+      }
     })
     return () => {
       live = false
     }
-  }, [workspaceId, refreshTick, tick])
+  }, [workspaceId, refreshTick, tick, limit])
   return { ...state, reload }
 }

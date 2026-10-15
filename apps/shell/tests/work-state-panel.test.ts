@@ -86,6 +86,22 @@ describe('WorkStatePanel', () => {
     )
     expect(button()!.className).toBe('wb-btn wb-btn-secondary')
   })
+
+  it('full by default; compact for a narrow area, with a small action button', async () => {
+    await render(createElement(WorkStatePanel, { tone: 'gray', icon: null, title: 'All clear' }))
+    expect(panel().className).toBe('wb-state')
+    await render(
+      createElement(WorkStatePanel, {
+        tone: 'gray',
+        icon: null,
+        title: 'All clear',
+        action: { label: 'Retry', onClick: () => undefined },
+        compact: true,
+      }),
+    )
+    expect(panel().className).toBe('wb-state is-compact')
+    expect(button()!.className).toBe('wb-btn wb-btn-primary wb-btn-sm')
+  })
 })
 
 describe('WorkErrorState and WorkNoWorkspace render through the panel', () => {
@@ -141,11 +157,23 @@ describe('WorkErrorState and WorkNoWorkspace render through the panel', () => {
 })
 
 describe('workLoadState', () => {
-  it('loading: three shimmer rows inside the kept .wb-work-skeleton wrapper', async () => {
+  it('loading: three row-shaped skeletons (icon, two bars, a pill) by default', async () => {
     await render(workLoadState({ value: null, error: null, reload: () => undefined })!)
     const skeleton = host.querySelector('.wb-work-skeleton')!
     expect(skeleton.getAttribute('aria-busy')).toBe('true')
-    expect(skeleton.querySelectorAll('.wb-skel.wb-skel-row')).toHaveLength(3)
+    expect(skeleton.classList.contains('is-rows')).toBe(true)
+    const rows = skeleton.querySelectorAll('.wb-skel-line')
+    expect(rows).toHaveLength(3)
+    expect(rows[0]!.querySelector('.wb-skel-dot')).not.toBeNull()
+    expect(rows[0]!.querySelectorAll('.wb-skel-bar')).toHaveLength(2)
+    expect(rows[0]!.querySelector('.wb-skel-pill')).not.toBeNull()
+  })
+
+  it('loading: an agenda adds a day head; a card adds an avatar line', async () => {
+    await render(workLoadState({ value: null, error: null, reload: () => undefined }, 'agenda')!)
+    expect(host.querySelector('.wb-work-skeleton.is-agenda > .wb-skel-head')).not.toBeNull()
+    await render(workLoadState({ value: null, error: null, reload: () => undefined }, 'card')!)
+    expect(host.querySelector('.wb-work-skeleton.is-card .wb-skel-avatar')).not.toBeNull()
   })
 
   it('with data: nothing in the way', () => {

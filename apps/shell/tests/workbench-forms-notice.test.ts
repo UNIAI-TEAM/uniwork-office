@@ -6,6 +6,7 @@ import { createRoot } from 'react-dom/client'
 import { expect, it, vi } from 'vitest'
 import type { HomeApi } from '../src/shared/home-api'
 import { LocaleProvider, useI18n } from '../src/renderer/src/locale'
+import { WbToastHost, createWbToasts } from '../src/renderer/src/WbToastHost'
 import { WorkbenchModulePane } from '../src/renderer/src/WorkbenchModulePanes'
 
 const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -30,22 +31,29 @@ it('the Forms upload notice follows a language switch while it is shown', async 
         LocaleProvider,
         { initial: 'en' },
         createElement(SwitchToVi),
-        createElement(WorkbenchModulePane, {
-          moduleId: 'forms',
-          practiceId: 'sales',
-          vi: false,
-          workspace: null,
-          workspaceError: null,
-          onReload: () => {},
-        }),
+        createElement(
+          WbToastHost,
+          { toasts: createWbToasts() },
+          createElement(WorkbenchModulePane, {
+            moduleId: 'forms',
+            practiceId: 'sales',
+            vi: false,
+            workspace: null,
+            workspaceError: null,
+            onReload: () => {},
+          }),
+        ),
       ),
     )
   })
-  const upload = Array.from(host.querySelectorAll('button')).find(
-    (b) => b.textContent === 'Upload template file…',
-  )!
+  const byText = (text: string) =>
+    Array.from(host.querySelectorAll('button')).find((b) => b.textContent === text)!
+  // the upload button sits in the New form card
+  await act(async () => byText('Add a form').click())
+  const upload = byText('Upload template file…')
   await act(async () => upload.click())
-  expect(host.textContent).toContain('No supported file selected.')
+  // a toast in the page's one host, translated at render
+  expect(host.querySelector('.wb-toast')?.textContent).toContain('No supported file selected.')
   await act(async () => host.querySelector<HTMLButtonElement>('#to-vi')!.click())
   expect(host.textContent).toContain('Không chọn được tệp được hỗ trợ.')
   act(() => root.unmount())

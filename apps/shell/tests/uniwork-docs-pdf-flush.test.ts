@@ -25,6 +25,7 @@ describe('internal PDF flushes never count as a user Save', () => {
     expect(source).toMatch(
       /click: \(\) => \{\s*const tab = activePdfTarget\(\)\s*if \(tab\) void flushPdfSave\(tab\.webContents\)/,
     )
-    expect(source.match(/flushPdfForExport\(flushPdfSave,/g)).toHaveLength(3)
+    // the Word / PowerPoint / Excel exports share one flush in exportActivePdfAsOffice
+    expect(source.match(/flushPdfForExport\(flushPdfSave,/g)).toHaveLength(1)
   })
 })

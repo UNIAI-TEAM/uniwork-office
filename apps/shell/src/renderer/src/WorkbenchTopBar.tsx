@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import type { ReactElement } from 'react'
+import { useRef, useState } from 'react'
+import type { ReactElement, RefObject } from 'react'
 import {
   listPracticeGroups,
   type PracticeDefinition,
@@ -8,7 +8,8 @@ import {
 import type { UniworkWorkspaceRef } from '../../shared/home-api'
 import { FileBadge } from './FileBadge'
 import { useI18n } from './locale'
-import { WorkbenchIcon } from './WorkbenchIcons'
+import { WbMenu, WbMenuItem } from './WbMenu'
+import { WbGlyph, WorkbenchIcon } from './WorkbenchIcons'
 
 /** one entry of Home's "New" list (Home.tsx NEW_ITEMS) */
 export interface WorkbenchNewItem {
@@ -24,15 +25,17 @@ interface Props {
   workspaces: readonly UniworkWorkspaceRef[]
   workspaceId: string | null
   onSelectWorkspace: (id: string) => void
+  /** the workspace select, so a lost-access panel can open it (spec 4.11) */
+  workspaceRef?: RefObject<HTMLSelectElement | null>
   newItems: readonly WorkbenchNewItem[]
   onNewTask: () => void
   onRefresh: () => void
 }
 
 /**
- * Workbench breadcrumb (workspace / title, role), Refresh and + New. Each chip
- * lays a transparent native select over itself, so keyboard and screen readers
- * keep the platform picker.
+ * Workbench page head (redesign spec 3): the title, the workspace and role chips,
+ * Refresh and New. Each chip lays a transparent native select over itself, so
+ * keyboard and screen readers keep the platform picker.
  */
 export function WorkbenchTopBar({
   practice,
@@ -40,6 +43,7 @@ export function WorkbenchTopBar({
   workspaces,
   workspaceId,
   onSelectWorkspace,
+  workspaceRef,
   newItems,
   onNewTask,
   onRefresh,
@@ -47,25 +51,9 @@ export function WorkbenchTopBar({
   const { t, lang } = useI18n()
   const vi = lang === 'vi'
   const [menuOpen, setMenuOpen] = useState(false)
-  const wrapRef = useRef<HTMLDivElement>(null)
+  const newRef = useRef<HTMLButtonElement>(null)
   // a select whose value is not listed shows its first option, so the chip does too
   const ws = workspaces.find((w) => w.id === workspaceId) ?? workspaces[0]
-
-  useEffect(() => {
-    if (!menuOpen) return
-    const onDoc = (e: MouseEvent) => {
-      if (!wrapRef.current?.contains(e.target as Node)) setMenuOpen(false)
-    }
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setMenuOpen(false)
-    }
-    document.addEventListener('mousedown', onDoc)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('mousedown', onDoc)
-      document.removeEventListener('keydown', onKey)
-    }
-  }, [menuOpen])
 
   const run = (action: () => unknown) => {
     setMenuOpen(false)
@@ -74,45 +62,41 @@ export function WorkbenchTopBar({
 
   return (
     <header className="wb-topbar">
-      {ws ? (
-        <>
-          <span className="wb-crumb wb-crumb-ws">
-            <span className="wb-crumb-mark" aria-hidden="true">
-              {Array.from(ws.name.trim())[0]?.toUpperCase()}
-            </span>
-            <span className="wb-crumb-name" aria-hidden="true">
-              {ws.name}
-            </span>
-            <span
-              className={`wb-crumb-caret${workspaces.length === 1 ? ' is-muted' : ''}`}
-              aria-hidden="true"
-            >
-              ▾
-            </span>
-            <select
-              aria-label={t('wbTopWorkspace')}
-              value={workspaceId ?? ''}
-              onChange={(e) => onSelectWorkspace(e.target.value)}
-            >
-              {workspaces.map((w) => (
-                <option key={w.id} value={w.id}>
-                  {w.name}
-                </option>
-              ))}
-            </select>
-          </span>
-          <span className="wb-crumb-sep" aria-hidden="true">
-            /
-          </span>
-        </>
-      ) : null}
       <h1 className="wb-topbar-title">{t('wbTopTitle')}</h1>
+      {ws ? (
+        <span className="wb-crumb wb-crumb-ws">
+          <span className="wb-crumb-mark" aria-hidden="true">
+            {Array.from(ws.name.trim())[0]?.toUpperCase()}
+          </span>
+          <span className="wb-crumb-name" aria-hidden="true">
+            {ws.name}
+          </span>
+          <span
+            className={`wb-crumb-caret${workspaces.length === 1 ? ' is-muted' : ''}`}
+            aria-hidden="true"
+          >
+            <WbGlyph id="chevronDown" size={14} />
+          </span>
+          <select
+            ref={workspaceRef}
+            aria-label={t('wbTopWorkspace')}
+            value={workspaceId ?? ''}
+            onChange={(e) => onSelectWorkspace(e.target.value)}
+          >
+            {workspaces.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name}
+              </option>
+            ))}
+          </select>
+        </span>
+      ) : null}
       <span className="wb-crumb wb-crumb-role">
         <span className="wb-crumb-name" aria-hidden="true">
           {vi ? practice.labelVi : practice.labelEn}
         </span>
         <span className="wb-crumb-caret" aria-hidden="true">
-          ▾
+          <WbGlyph id="chevronDown" size={14} />
         </span>
         <select
           aria-label={t('wbTopRole')}
@@ -133,56 +117,48 @@ export function WorkbenchTopBar({
       <div className="wb-topbar-actions">
         <button
           type="button"
-          className="wb-btn wb-btn-ghost wb-btn-icon"
+          className="wb-btn wb-btn-secondary wb-btn-icon"
           aria-label={t('wbTopRefresh')}
           title={t('wbTopRefresh')}
           onClick={onRefresh}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path
-              d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4.5v4h-4"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+          <WbGlyph id="refresh" />
         </button>
-        <div className="wb-new-wrap" ref={wrapRef}>
+        <div className="wb-menu-wrap">
           <button
+            ref={newRef}
             type="button"
             className="wb-btn wb-btn-primary"
             aria-haspopup="menu"
             aria-expanded={menuOpen}
             onClick={() => setMenuOpen((o) => !o)}
           >
-            + {t('wbTopNew')}
+            <WbGlyph id="plus" />
+            {t('wbTopNew')}
+            <WbGlyph id="chevronDown" size={14} />
           </button>
-          {menuOpen ? (
-            <div className="wb-new-menu" role="menu">
-              <button
-                type="button"
-                role="menuitem"
-                className="wb-new-item"
-                onClick={() => run(onNewTask)}
+          <WbMenu
+            open={menuOpen}
+            onClose={() => setMenuOpen(false)}
+            anchorRef={newRef}
+            label={t('wbTopNew')}
+          >
+            <WbMenuItem
+              icon={<WorkbenchIcon id="tasks" size={18} />}
+              onSelect={() => run(onNewTask)}
+            >
+              {t('wbTopNewTask')}
+            </WbMenuItem>
+            {newItems.map((item) => (
+              <WbMenuItem
+                key={item.ext}
+                icon={<FileBadge ext={item.ext} size={18} />}
+                onSelect={() => run(item.action)}
               >
-                <WorkbenchIcon id="tasks" size={18} />
-                <span>{t('wbTopNewTask')}</span>
-              </button>
-              {newItems.map((item) => (
-                <button
-                  key={item.ext}
-                  type="button"
-                  role="menuitem"
-                  className="wb-new-item"
-                  onClick={() => run(item.action)}
-                >
-                  <FileBadge ext={item.ext} size={18} />
-                  <span>{item.title}</span>
-                </button>
-              ))}
-            </div>
-          ) : null}
+                {item.title}
+              </WbMenuItem>
+            ))}
+          </WbMenu>
         </div>
       </div>
     </header>

@@ -112,6 +112,13 @@ beforeEach(() => {
       ok: true,
       value: { documents: [], nextCursor: null },
     })),
+    uniworkListSharedWithMe: vi.fn(async () => ({
+      ok: true,
+      value: { documents: [], nextCursor: null },
+    })),
+    uniworkDocStatus: vi.fn(async () => null),
+    onUniworkDocStatus: vi.fn(() => () => undefined),
+    listDrafts: vi.fn(async () => []),
     setLanguage: vi.fn(async () => undefined),
   } as unknown as HomeApi
   window.uniworkWork = {
@@ -126,7 +133,7 @@ afterEach(() => {
   host.remove()
 })
 
-describe('Workbench tab counts follow the Overview summary', () => {
+describe('Workbench tab counts follow the Desk summary', () => {
   it('no count before the summary lands; the counts appear when it does, without a tab switch', async () => {
     await renderHome()
     expect(window.uniworkWork.homeSummary).toHaveBeenCalled()
