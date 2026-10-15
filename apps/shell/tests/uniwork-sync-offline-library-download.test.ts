@@ -366,6 +366,34 @@ describe('G5-05 download: sign-out during download', () => {
     })
   })
 
+  it('d6-5: an unwinding download never re-creates the wiped scope folder', async () => {
+    const h = createHarness()
+    addDoc(h, 'doc_1', 1)
+    const mkdir = h.fs.mkdir.bind(h.fs)
+    let armed = false
+    const created: string[] = []
+    h.fs.mkdir = async (path, mode) => {
+      if (armed) created.push(path)
+      return mkdir(path, mode)
+    }
+    const staging = recordFileName(blobKey('doc_1', '00000001', 'main'))
+    let wiped: Promise<void> | null = null
+    h.fs.failWrite = (path) => {
+      if (path.includes(staging) && !wiped) {
+        armed = true
+        // beforeSignOut: the session is still A's while the boundary locks and wipes
+        h.manager.lockBoundary()
+        wiped = h.layer.lockAndWipe(SCOPE)
+      }
+      return false
+    }
+    rowOf(await pinDoc(h))
+    await wiped
+    // the boundary moved: no delete of the unwinding job re-opens (and re-creates) the scope
+    expect(created).toEqual([])
+    expect(h.storeFiles()).toEqual([])
+  })
+
   it('sign-out while the verified bytes are being staged -> never committed', async () => {
     const h = createHarness()
     const doc = addDoc(h, 'doc_1', 1)

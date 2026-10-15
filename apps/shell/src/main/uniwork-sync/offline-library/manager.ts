@@ -616,10 +616,9 @@ export class OfflineLibraryManager {
       progress: null,
     }
     // the scope was wiped or switched: nothing of it is kept, nothing is written
-    if (!live()) {
-      await wipeKeys(this.options.store, keys)
-      return stopped
-    }
+    // (not even a delete: it would re-open the wiped scope and re-create its
+    // folder; the staging keys are on the row, so the wipe or recover() takes them)
+    if (!live()) return stopped
     const read = await this.options.store.getPin(documentId)
     if (read.kind !== 'ok' || read.record.staging?.generation !== generation) {
       await wipeKeys(this.options.store, keys)
@@ -648,7 +647,7 @@ export class OfflineLibraryManager {
     // the one atomic commit: this row write is what makes the copy ready
     const written = await this.options.store.putPin(committed)
     if (written.kind !== 'ok' || !live()) {
-      await wipeKeys(this.options.store, keys)
+      if (live()) await wipeKeys(this.options.store, keys)
       const failure: StageOutcome =
         written.kind === 'store_full'
           ? { kind: 'store_full' }
