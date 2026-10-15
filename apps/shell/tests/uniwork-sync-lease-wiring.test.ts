@@ -209,11 +209,27 @@ describe('the account boundary locks leases on sign-out only (W1f)', () => {
     return created
   }
 
-  it('R1BE-1: an org change does not lock leases and sends no DELETE', async () => {
+  /**
+   * Starts the production wiring and returns the one lease manager it built
+   * (read off the poll's own call into it) with a lease already granted. The
+   * server clock is the real one: the runtime stamps receipts with Date.now().
+   */
+  async function started() {
+    serverNow = Date.now()
+    const onPass = vi.spyOn(LeaseManager.prototype, 'onOnlinePass')
+    const created = await handle()
+    statusListener?.(statusNow)
+    await vi.waitFor(() => expect(onPass).toHaveBeenCalled())
+    const manager = onPass.mock.contexts[0] as LeaseManager
+    expect((await manager.grant('doc_1')).kind).toBe('renewed')
+    expect((await manager.effectiveState('doc_1')).state).toBe('valid')
+    return { created, manager }
+  }
+
+  it('R1BE-1/T2-1: an org change does not lock leases: a granted lease still reads valid, no DELETE', async () => {
     const lockBoundary = vi.spyOn(LeaseManager.prototype, 'lockBoundary')
     const lockAll = vi.spyOn(LeaseManager.prototype, 'lockAll')
-    await handle()
-    statusListener?.(statusNow)
+    const { manager } = await started()
     await vi.waitFor(() =>
       expect(requests.some((r) => r.path === '/api/v1/orgs/org_a/office/capabilities')).toBe(true),
     )
@@ -225,14 +241,49 @@ describe('the account boundary locks leases on sign-out only (W1f)', () => {
     expect(lockBoundary).not.toHaveBeenCalled()
     expect(lockAll).not.toHaveBeenCalled()
     expect(requests.filter((r) => r.method === 'DELETE')).toEqual([])
+    const state = await manager.effectiveState('doc_1')
+    expect(state.state).toBe('valid')
+    expect(state.usable).toBe(true)
   })
 
-  it('R1BE-1/R1BE-10: sign-out locks the leases at once at the account boundary', async () => {
+  it('R1BE-1/R1BE-10/T2-2: sign-out locks the leases at once at the account boundary', async () => {
     const lockBoundary = vi.spyOn(LeaseManager.prototype, 'lockBoundary')
-    const created = await handle()
-    statusListener?.(statusNow)
+    const { created, manager } = await started()
     expect(await created.boundary.beforeSignOut()).toBe(true)
     expect(lockBoundary).toHaveBeenCalledWith({ deploymentId: 'default', accountId: 'acc_1' })
     expect(lockBoundary).toHaveReturnedWith('signed_out')
+    const state = await manager.effectiveState('doc_1')
+    expect(state.state).toBe('locked')
+    expect(state.reason).toBe('signed_out')
+    expect(state.usable).toBe(false)
+  })
+
+  it('T2-2: an account switch drops the outgoing lease at the boundary and never locks the incoming account', async () => {
+    const lockBoundary = vi.spyOn(LeaseManager.prototype, 'lockBoundary')
+    const { manager } = await started()
+    // the first status push finished enforcing acc_1 (the owner a switch leaves)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    identity = { accountId: 'acc_2', deviceSessionId: 'dev_2', deploymentId: 'default' }
+    statusListener?.(statusNow)
+    await vi.waitFor(() => expect(lockBoundary).toHaveReturnedWith('account_switch'))
+    expect(lockBoundary).toHaveBeenCalledWith(expect.objectContaining({ deploymentId: 'default', accountId: 'acc_1' }))
+    // acc_2 never sees acc_1's lease, is not locked, and can take its own
+    expect((await manager.effectiveState('doc_1')).state).toBe('none')
+    expect((await manager.grant('doc_1')).kind).toBe('renewed')
+    expect((await manager.effectiveState('doc_1')).state).toBe('valid')
+    expect(requests.filter((r) => r.method === 'DELETE')).toEqual([])
+  })
+
+  it('T2-2: a deployment switch drops the outgoing lease at the boundary and never locks the incoming deployment', async () => {
+    const lockBoundary = vi.spyOn(LeaseManager.prototype, 'lockBoundary')
+    const { manager } = await started()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    identity = { accountId: 'acc_1', deviceSessionId: 'dev_2', deploymentId: 'other' }
+    statusListener?.(statusNow)
+    await vi.waitFor(() => expect(lockBoundary).toHaveReturnedWith('deployment_switch'))
+    expect(lockBoundary).toHaveBeenCalledWith(expect.objectContaining({ deploymentId: 'default', accountId: 'acc_1' }))
+    expect((await manager.effectiveState('doc_1')).state).toBe('none')
+    expect((await manager.grant('doc_1')).kind).toBe('renewed')
+    expect(requests.filter((r) => r.method === 'DELETE')).toEqual([])
   })
 })
