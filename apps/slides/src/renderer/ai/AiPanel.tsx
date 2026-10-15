@@ -19,6 +19,7 @@ import '@genoffice/ui/ai-uniwork-composer.css'
 import {
   AgentLoop,
   composeSkills,
+  createImageUrlRegistry,
   droppedCallsOfNotes,
   IPC_STREAM_SILENCE_TIMEOUT_MS,
   endsQuietly,
@@ -1006,6 +1007,13 @@ export function AiPanel({
       readOnly: () => readOnlyRef.current,
       uniworkBound: () => uniworkBoundRef.current,
       uniworkAi: () => settingsRef.current.provider === 'uniwork',
+      imageUrls: createImageUrlRegistry({
+        enforce: () => settingsRef.current.provider === 'uniwork',
+        attachments: () =>
+          lastAttachmentsRef.current
+            .filter((a) => ATTACHMENT_IMAGE_EXTS.has(a.ext))
+            .map((a) => a.path),
+      }),
       getSlides: () => slidesRef.current,
       getCurrent: () => currentRef.current,
       // A queue run names its targets explicitly; whatever is selected on the

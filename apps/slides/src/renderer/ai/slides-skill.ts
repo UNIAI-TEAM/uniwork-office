@@ -1,4 +1,4 @@
-import type { AgentSkill, ToolDisplay } from '@genoffice/agent-core'
+import type { AgentSkill, ImageUrlRegistry, ToolDisplay } from '@genoffice/agent-core'
 import type {
   GroupRenderNode,
   PictureRenderNode,
@@ -143,6 +143,12 @@ export interface DeckAccess {
   uniworkBound?(): boolean
   /** live predicate: the active AI provider is UniWork AI (absent = BYOK); read before every model request */
   uniworkAi?(): boolean
+  /**
+   * image URLs this run's image_search / generate_image returned, reset at every run. Recording only:
+   * UniWork AI turns are not offered insert_web_image / replace_image at all, and BYOK keeps today's
+   * rules (no enforcement), so no slides tool consults it for a refusal.
+   */
+  imageUrls?: ImageUrlRegistry
   /**
    * Cloud single-page generation (gsk slide_generate), used by generate_deck's self-driven
    * pipeline: given the unified style + this page's brief/layout/images, the cloud service
@@ -1167,6 +1173,8 @@ export function createSlidesSkill(access: DeckAccess): AgentSkill {
       return TOOLS.filter((t) => !hidden.has(t.name) && (!readOnly || READ_ONLY_TOOLS.has(t.name)))
     },
     buildContext: () => {
+      // one buildContext per loop.run: the image URLs of the previous request stop being on record
+      access.imageUrls?.beginRun()
       const outline = `<deck outline>\n${buildDeckOutline(access.getSlides(), access.getCurrent(), access.getSelectedIds())}\n</deck outline>`
       const progress = buildProgressNote(state)
       return progress ? `${outline}\n${progress}` : outline
@@ -1588,6 +1596,7 @@ async function executeTool(
           `image search failed (service error, not an empty result — you may retry): ${r.error ?? 'unknown error'}`,
         )
       }
+      for (const im of r.images) access.imageUrls?.register(im.imageUrl, 'image_search')
       // output for the LLM: keep the existing format (the LLM needs to read URLs into image_queries; format unchanged)
       const lines = r.images.map(
         (im, i) =>
@@ -1620,6 +1629,7 @@ async function executeTool(
         transparentBackground: call.input.transparentBackground === true,
       })
       if (!r.url) return fail(t('aiFailGenImage'), r.error ?? 'Generation failed')
+      access.imageUrls?.register(r.url, 'generate_image')
       const display: ToolDisplay = {
         kind: 'images',
         items: [{ url: r.url, title: prompt.slice(0, 60) }],
