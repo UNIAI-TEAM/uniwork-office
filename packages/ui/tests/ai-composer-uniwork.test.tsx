@@ -433,6 +433,73 @@ describe('AiComposer — First-use disclosure & local-file variant (S8 + G05BE-6
   })
 })
 
+describe('AiComposer — disclosure ack with an unscoped key (RF3-1)', () => {
+  const unscoped: UniworkAckKey = { account: '', org: '', document: 'doc-42' }
+
+  function renderUnscoped(key: UniworkAckKey, onSend = vi.fn()) {
+    renderComposer({
+      lang: 'vi',
+      value: 'Hello',
+      onSend,
+      uniwork: {
+        active: true,
+        provider: 'uniwork',
+        disclosure: { ackKey: key, orgName: 'Acme Corp', variant: 'document' },
+      },
+    })
+    return onSend
+  }
+
+  const sendBtn = () => host.querySelector<HTMLButtonElement>('.ai-send-btn')!
+
+  it('lets one in-memory ack through for an empty account, stores nothing and asks again when the key changes', () => {
+    const onSend = renderUnscoped(unscoped)
+    expect(host.querySelector('[role="region"]')).not.toBeNull()
+    expect(sendBtn().getAttribute('aria-disabled')).toBe('true')
+
+    act(() => {
+      host.querySelector<HTMLButtonElement>('[role="region"] button')!.click()
+    })
+    expect(host.querySelector('[role="region"]')).toBeNull()
+    expect(sendBtn().getAttribute('aria-disabled')).toBeNull()
+    expect(sendBtn().disabled).toBe(false)
+    act(() => {
+      sendBtn().click()
+    })
+    expect(onSend).toHaveBeenCalledTimes(1)
+
+    // never written to storage and never shared through the ack store
+    expect(localStorage.getItem('uniwork.office.ai.disclosure.ack.v1')).toBeNull()
+    expect(isAcked(unscoped)).toBe(false)
+
+    // another document, org or the account arriving later: ack required again
+    for (const next of [
+      { ...unscoped, document: 'doc-99' },
+      { ...unscoped, org: 'org-2' },
+    ]) {
+      renderUnscoped(next, onSend)
+      expect(host.querySelector('[role="region"]')).not.toBeNull()
+      expect(sendBtn().getAttribute('aria-disabled')).toBe('true')
+    }
+    // and going back to the first key does not resurrect the old ack
+    renderUnscoped(unscoped, onSend)
+    expect(host.querySelector('[role="region"]')).not.toBeNull()
+    expect(sendBtn().getAttribute('aria-disabled')).toBe('true')
+    expect(localStorage.getItem('uniwork.office.ai.disclosure.ack.v1')).toBeNull()
+  })
+
+  it('does not count an in-memory ack for the account that arrives later', () => {
+    renderUnscoped(unscoped)
+    act(() => {
+      host.querySelector<HTMLButtonElement>('[role="region"] button')!.click()
+    })
+    expect(host.querySelector('[role="region"]')).toBeNull()
+    renderUnscoped({ account: 'acc-1', org: '', document: 'doc-42' })
+    expect(host.querySelector('[role="region"]')).not.toBeNull()
+    expect(sendBtn().getAttribute('aria-disabled')).toBe('true')
+  })
+})
+
 describe('AiComposer — Send/Stop labels, polite live announcements, Escape guard & coarse pointer (S9)', () => {
   const ackKey: UniworkAckKey = { account: 'u1', org: 'o1', document: 'd1' }
 
