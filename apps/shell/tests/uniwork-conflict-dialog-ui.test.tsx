@@ -727,6 +727,58 @@ describe('UniworkConflictDialog UI (G5-09 S5 desktop)', () => {
       expect(dialog.textContent).not.toMatch(/\b(git|GitHub|UNI-\d+|GO-\d+)\b/)
     })
 
+    it.each([
+      ['en', 'save_copy_no_seat'],
+      ['en', 'download_failed'],
+      ['vi', 'save_copy_no_seat'],
+      ['vi', 'download_failed'],
+    ] as const)(
+      'in the no-seat Download state (%s, %s) the heading is "Download my version", the confirm body is not rendered and the dialog ids are not dangling',
+      async (lang, notice) => {
+        const strings = lang === 'vi' ? viStrings : en
+        // remount under the wanted language (the provider keeps its initial lang in state)
+        await act(async () => {
+          root.render(
+            React.createElement(
+              LocaleProvider,
+              { initial: lang, key: lang },
+              React.createElement(UniworkConflictHost),
+            ),
+          )
+        })
+        const dialog = await openStep2()
+        // normal step 2 first: the Save-copy heading and its confirm body
+        expect(dialog.querySelector('h2')?.textContent).toBe(strings.uwConflictSaveCopyTitle)
+        nextReply = { kind: 'view', view: makeView({ notice: 'save_copy_no_seat' }) }
+        await act(async () => {
+          ;(
+            dialog.querySelector('[data-conflict-action="save-copy-go"]') as HTMLButtonElement
+          ).click()
+        })
+        if (notice === 'download_failed') {
+          nextReply = { kind: 'view', view: makeView({ notice: 'download_failed' }) }
+          await act(async () => {
+            ;(
+              dialog.querySelector('[data-conflict-action="download-go"]') as HTMLButtonElement
+            ).click()
+          })
+        }
+        const heading = dialog.querySelector('h2') as HTMLElement
+        expect(heading.textContent).toBe(strings.uwActDownloadMine)
+        expect(dialog.querySelector('.uw-conflict-body')).toBeNull()
+        expect(dialog.textContent).not.toContain(strings.uwConflictSaveCopyConfirm.slice(0, 20))
+        expect(dialog.getAttribute('aria-labelledby')).toBe(heading.id)
+        // no dangling id: the description (if any) points at an element that exists
+        const describedBy = dialog.getAttribute('aria-describedby')
+        if (describedBy) {
+          for (const id of describedBy.split(/\s+/)) {
+            expect(document.getElementById(id)).not.toBeNull()
+          }
+        }
+        expect(dialog.querySelectorAll('[role="alert"]')).toHaveLength(1)
+      },
+    )
+
     it('the Download primary sends download-mine (with stopAi from the stop-AI step)', async () => {
       const dialog = await openStep2()
       nextReply = { kind: 'view', view: makeView({ notice: 'save_copy_no_seat' }) }

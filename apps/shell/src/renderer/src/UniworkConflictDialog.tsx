@@ -367,6 +367,11 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
       server: serverVerStr,
       author: serverAuthor,
     })
+  } else if (state.step === 'save-copy' && saveCopyDownload) {
+    // No seat / failed download: the alert carries the reason, so the heading names the
+    // primary action and no "create a new document" confirm body is shown.
+    headingText = t('uwActDownloadMine')
+    bodyText = ''
   } else if (state.step === 'save-copy') {
     headingText = t('uwConflictSaveCopyTitle')
     bodyText = fmt(t('uwConflictSaveCopyConfirm'), {
@@ -404,7 +409,7 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
         role="alertdialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        aria-describedby={bodyId}
+        aria-describedby={bodyText ? bodyId : undefined}
         onKeyDown={handleKeyDown}
         onBlur={clearInitialFocusMark}
         onPointerDown={clearInitialFocusMark}
@@ -413,9 +418,11 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
           <h2 ref={titleRef} id={titleId} className="uw-conflict-title" tabIndex={-1}>
             {headingText}
           </h2>
-          <p id={bodyId} className="uw-conflict-body">
-            {bodyText}
-          </p>
+          {bodyText && (
+            <p id={bodyId} className="uw-conflict-body">
+              {bodyText}
+            </p>
+          )}
 
           {state.step === 'step1' && (
             <>
