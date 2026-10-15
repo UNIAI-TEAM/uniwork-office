@@ -25,17 +25,23 @@ import { OP_META, type OpMeta } from './ops'
  *
  * What lives outside the ProseMirror document rides the same step through `AiRunStep`, a step
  * that changes nothing in the document: it carries the properties block (frontmatter) before and
- * after, so undo/redo of the group re-applies it through `setRunFrontmatterSink`, and it tells the
- * panel which run was undone or redone (`onRunHistoryChange`), so the pictures that run saved
- * can be dropped the way Roll back drops them.
+ * after, so undo/redo of the group re-applies it through `setRunFrontmatterSink`.
+ *
+ * The run's FIRST history group also carries a marker `AiRunStep` (`first`), appended to the run's
+ * first edit. It is what tells the panel which run was undone or redone (`onRunHistoryChange`), so
+ * the pictures that run saved can be dropped the way Roll back drops them. History is a stack: when
+ * the first group is undone every later piece of the run is already undone, so by then no picture
+ * of the run is left in the document; undoing a later piece alone leaves the files for its redo.
+ * The marker never lives in a group of its own (the end of a run adds no history item), so a user
+ * edit that is the last thing before the end cannot make the first Ctrl+Z hit an empty step.
  */
 
 interface RunState {
   runId: string
   /** the run's next edit must open a new history group (first edit, after a user edit or an undo) */
   fresh: boolean
-  /** history items the run has produced so far */
-  items: number
+  /** history groups the run has opened so far (the first one carries the run's marker) */
+  groups: number
 }
 
 type RunMeta =
@@ -52,6 +58,8 @@ class AiRunStep extends Step {
     readonly runId: string,
     /** properties block (raw, fences included) before / after; applying the step sets `to` */
     readonly fm: { from: string; to: string } | null,
+    /** the marker of the run's first group: its undo / redo is the run's undo / redo */
+    readonly first: boolean,
     /** true for the inverse a history undo applies, false for the original and for a redo */
     readonly reverted: boolean,
   ) {
@@ -67,6 +75,7 @@ class AiRunStep extends Step {
     return new AiRunStep(
       this.runId,
       this.fm ? { from: this.fm.to, to: this.fm.from } : null,
+      this.first,
       !this.reverted,
     )
   }
@@ -74,13 +83,19 @@ class AiRunStep extends Step {
     return this
   }
   toJSON(): unknown {
-    return { stepType: 'aiRun', runId: this.runId, fm: this.fm, reverted: this.reverted }
+    return {
+      stepType: 'aiRun',
+      runId: this.runId,
+      fm: this.fm,
+      first: this.first,
+      reverted: this.reverted,
+    }
   }
   static fromJSON(
     _schema: Schema,
-    json: { runId: string; fm: AiRunStep['fm']; reverted: boolean },
+    json: { runId: string; fm: AiRunStep['fm']; first: boolean; reverted: boolean },
   ) {
-    return new AiRunStep(json.runId, json.fm, json.reverted)
+    return new AiRunStep(json.runId, json.fm, json.first, json.reverted)
   }
 }
 Step.jsonID('aiRun', AiRunStep)
@@ -128,20 +143,34 @@ export const AiRunHistory = Extension.create<unknown, RunHistoryStorage>({
           init: () => null,
           apply(tr, value) {
             const meta = tr.getMeta(runKey) as RunMeta | undefined
-            if (meta?.type === 'begin') return { runId: meta.runId, fresh: true, items: 0 }
+            if (meta?.type === 'begin') return { runId: meta.runId, fresh: true, groups: 0 }
             if (meta?.type === 'end') return null
             if (!value || tr.getMeta('appendedTransaction')) return value
             const kind = classify(tr)
-            if (kind === 'ai') return { ...value, fresh: false, items: value.items + 1 }
+            if (kind === 'ai') {
+              return { ...value, fresh: false, groups: value.groups + (value.fresh ? 1 : 0) }
+            }
             // a user edit or a history step in the middle of the run: its next edit starts a new group
             if (kind === 'user' || isHistoryTransaction(tr)) return { ...value, fresh: true }
             return value
           },
         },
+        // the run's first edit carries the run's marker, in the same history group
+        appendTransaction(trs, oldState, newState) {
+          const before = runKey.getState(oldState)
+          if (!before || before.groups > 0) return null
+          const opener = trs.find(
+            (tr) => !tr.getMeta('appendedTransaction') && classify(tr) === 'ai',
+          )
+          if (!opener || runSteps(opener).some((s) => s.first)) return null
+          return newState.tr
+            .step(new AiRunStep(before.runId, null, true, false))
+            .setMeta(runKey, { type: 'member' } satisfies RunMeta)
+        },
         filterTransaction(tr, state: EditorState) {
           // a redo of a run whose pictures were discarded would bring back dead image links
           if (isHistoryTransaction(tr) && storage.redoGuard) {
-            const redo = runSteps(tr).filter((s) => !s.reverted)
+            const redo = runSteps(tr).filter((s) => s.first && !s.reverted)
             if (redo.some((s) => storage.redoGuard?.(s.runId))) return false
           }
           const run = runKey.getState(state)
@@ -169,7 +198,7 @@ export const AiRunHistory = Extension.create<unknown, RunHistoryStorage>({
       if (!history && !rollback) continue
       for (const step of runSteps(tr)) {
         if (step.fm) storage.frontmatterSink?.(step.fm.to)
-        if (history && !seen.has(step.runId)) {
+        if (history && step.first && !seen.has(step.runId)) {
           seen.add(step.runId)
           const change: RunHistoryChange = {
             runId: step.runId,
@@ -216,18 +245,18 @@ export function runHistoryOf(editor: Editor): MarkdownRunHistory {
     end(runId) {
       const run = current()
       if (!run || run.runId !== runId) return
-      // the group is whatever history items the run produced: a read-only run, or a stop before
-      // any edit, produced none and leaves no step (the loop reports a tool cut off by Stop as
-      // may-have-mutated, so `mutated` is not the test)
-      if (run.items > 0) send({ type: 'member' }, [new AiRunStep(runId, null, false)])
+      // the run's groups are whatever its edits opened: a read-only run, or a stop before any edit,
+      // opened none and leaves no step (the loop reports a tool cut off by Stop as
+      // may-have-mutated, so `mutated` is not the test). The marker is already in the first group.
       // close the group so the user's next keystroke is a step of its own, then leave the run
       const tr = editor.state.tr.setMeta(runKey, { type: 'end', runId } satisfies RunMeta)
       editor.view.dispatch(closeHistory(tr))
     },
     recordFrontmatter(before, after) {
       if (before === after || !current()) return
+      const run = current()!
       send({ type: 'member' }, [
-        new AiRunStep(current()!.runId, { from: before, to: after }, false),
+        new AiRunStep(run.runId, { from: before, to: after }, run.groups === 0, false),
       ])
     },
     refuseRedo(guard) {

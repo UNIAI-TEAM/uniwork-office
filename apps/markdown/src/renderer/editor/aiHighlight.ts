@@ -44,16 +44,24 @@ function changedRanges(tr: Transaction): Range[] {
   return ranges
 }
 
-/** Remove every AI-change highlight (called when a run finishes) */
+/** Remove every AI-change highlight (a new run starts, or the panel goes away) */
 export function clearAiHighlights(editor: Editor): void {
   editor.view.dispatch(editor.state.tr.setMeta('aiHighlightClear', true))
 }
 
 /**
- * Transient yellow wash over content the AI just wrote (every transaction an
- * AI-sourced runOps dispatches), so the user can see what changed during a
- * run. Display-only: decorations never touch the document or the serialized
- * markdown.
+ * The highlight outlives its run and goes when the user saves; an autosave is not the user
+ * accepting the change, so it keeps the highlight.
+ */
+export function clearAiHighlightsOnSave(editor: Editor, origin?: 'auto'): void {
+  if (origin !== 'auto') clearAiHighlights(editor)
+}
+
+/**
+ * Yellow wash over content the AI wrote (every transaction an AI-sourced runOps dispatches), so
+ * the user can see what changed. It stays after the run until the user saves or the next run
+ * starts. Display-only: decorations never touch the document, the serialized markdown or any
+ * export.
  */
 export const AiHighlight = Extension.create({
   name: 'aiHighlight',

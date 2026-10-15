@@ -41,6 +41,7 @@ import { PlainTextEditor, type PlainTextEditorHandle } from './source/PlainTextE
 import { buildExtensions } from './editor/extensions'
 import { tiptapFindTarget } from './editor/findTarget'
 import { runHistoryOf, setRunFrontmatterSink } from './editor/aiRunHistory'
+import { clearAiHighlightsOnSave } from './editor/aiHighlight'
 import { syncEditorEditable } from './editor/editable-sync'
 import { collectOutline, type OutlineItem } from './editor/outline'
 import { rewriteRawHtmlImages } from './editor/rawHtml'
@@ -721,6 +722,8 @@ export default function App() {
           }
           setImageBaseDir(dirOf(result.path))
           setFilePath(result.path)
+          // the AI marker goes with a user Save (an autosave keeps it)
+          if (editorRef.current) clearAiHighlightsOnSave(editorRef.current, origin)
           if (unchanged) {
             dirtyRef.current = false
             setDirty(false)

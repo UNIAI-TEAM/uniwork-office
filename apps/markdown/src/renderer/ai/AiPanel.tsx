@@ -560,6 +560,8 @@ export function AiPanel({
       const ed = depsRef.current.getEditor()
       if (!ed) return
       watchUndo(ed)
+      // the previous run's marker goes when the next run starts
+      clearAiHighlights(ed)
       runHistoryOf(ed).begin(runId)
     },
     end: (runId, mutated) => {
@@ -718,10 +720,8 @@ export function AiPanel({
           }))
           persistMessage('assistant', final, runToolsRef.current)
           const editor = depsRef.current.getEditor()
-          if (editor) {
-            clearAiHighlights(editor)
-            endRunFence(editor)
-          }
+          // the AI marker stays after the run (until a user Save or the next run)
+          if (editor) endRunFence(editor)
           // an offer only for an unsaved document the run changed: one card, replacing any older one
           const offer = depsRef.current.onRunDone(runMutatedRef.current)
           setSaveOffer(typeof offer === 'string' ? { name: offer } : null)
