@@ -3,7 +3,7 @@ import type { zh } from './zh'
 export const ko = {
   // S7 provider row, picker footer and composer notes
   aiUniworkProvider: 'UniWork AI',
-  aiUniworkCreditsAria: '{remaining} / {limit} 남음',
+  aiUniworkCreditsAria: '크레딧 {limit} 중 {remaining} 남음',
   aiUniworkFooterSignIn: 'UniWork AI를 사용하려면 UniWork에 로그인하세요',
   aiUniworkSignedOut: 'UniWork에서 로그아웃되었습니다. 다른 제공자를 선택하거나 다시 로그인하세요.',
   aiUniworkOff: '이 문서에서는 UniWork AI가 꺼져 있습니다. 다른 제공자를 선택하세요.',

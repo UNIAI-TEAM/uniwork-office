@@ -3,7 +3,7 @@ import type { zh } from './zh'
 export const vi = {
   // S7 provider row, picker footer and composer notes
   aiUniworkProvider: 'UniWork AI',
-  aiUniworkCreditsAria: 'Còn {remaining} / {limit}',
+  aiUniworkCreditsAria: 'Còn {remaining} trên {limit} tín dụng',
   aiUniworkFooterSignIn: 'Đăng nhập UniWork để dùng UniWork AI',
   aiUniworkSignedOut: 'Phiên UniWork đã đăng xuất. Chọn nhà cung cấp khác hoặc đăng nhập lại.',
   aiUniworkOff: 'UniWork AI đang tắt cho tài liệu này. Chọn nhà cung cấp khác.',

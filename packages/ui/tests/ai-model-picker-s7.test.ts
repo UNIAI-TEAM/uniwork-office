@@ -152,8 +152,8 @@ describe('AiModelPicker S7 — row UniWork AI & credits sub-line', () => {
     )
     expect(descEl!.getAttribute('aria-live')).toBeNull()
     expect(descEl!.getAttribute('role')).toBeNull()
-    // RF2-2: the spoken text carries the visible text, so the two never disagree
-    expect(descEl!.textContent).toContain(subLine!.textContent)
+    // RF3-2: the spoken text is the catalogue wording; the visible "/" line stays aria-hidden
+    expect(descEl!.textContent).toBe('Còn 8200 trên 10000 tín dụng')
   })
 
   it.each([

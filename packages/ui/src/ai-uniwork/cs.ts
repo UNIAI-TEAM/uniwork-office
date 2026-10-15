@@ -3,7 +3,7 @@ import type { zh } from './zh'
 export const cs = {
   // S7 provider row, picker footer and composer notes
   aiUniworkProvider: 'UniWork AI',
-  aiUniworkCreditsAria: 'Zbývá {remaining} / {limit}',
+  aiUniworkCreditsAria: 'Zbývající kredity: {remaining} z {limit}',
   aiUniworkFooterSignIn: 'Pro UniWork AI se přihlaste do UniWork',
   aiUniworkSignedOut:
     'Jste odhlášeni z UniWork. Vyberte jiného poskytovatele nebo se znovu přihlaste.',

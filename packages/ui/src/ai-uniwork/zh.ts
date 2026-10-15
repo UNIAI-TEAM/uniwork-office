@@ -7,7 +7,7 @@
 export const zh = {
   // S7 provider row, picker footer and composer notes
   aiUniworkProvider: 'UniWork AI',
-  aiUniworkCreditsAria: '剩余 {remaining} / {limit}',
+  aiUniworkCreditsAria: '剩余 {remaining} / {limit} 额度',
   aiUniworkFooterSignIn: '登录 UniWork 以使用 UniWork AI',
   aiUniworkSignedOut: '你已退出 UniWork。请选择其他服务商或重新登录。',
   aiUniworkOff: '此文档已关闭 UniWork AI。请选择其他服务商。',

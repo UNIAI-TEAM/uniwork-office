@@ -134,11 +134,19 @@ describe('ai-uniwork string shards', () => {
   })
 
   it.each([...LANGS])(
-    'RF2-2: locale %s speaks the credits the same way the picker shows them (aria twin == cloudCreditsLeft)',
+    'RF3-2: locale %s keeps the r2 catalogue spoken credits wording (not the visible line)',
     (lang) => {
-      expect(table(lang).aiUniworkCreditsAria).toBe(table(lang).cloudCreditsLeft)
+      const aria = table(lang).aiUniworkCreditsAria
+      expect(aria).not.toBe(table(lang).cloudCreditsLeft)
+      expect(placeholdersOf(aria)).toBe(placeholdersOf(table(lang).cloudCreditsLeft))
     },
   )
+
+  it('RF3-2: pins the catalogue vi/en spoken credits strings', () => {
+    const params = { remaining: 12, limit: 50 }
+    expect(aiUniworkText('en', 'aiUniworkCreditsAria', params)).toBe('12 of 50 credits left')
+    expect(aiUniworkText('vi', 'aiUniworkCreditsAria', params)).toBe('Còn 12 trên 50 tín dụng')
+  })
 
   it.each([...LANGS])(
     'RF2-3: locale %s has a generic S9 error line that is not the unavailable text',
@@ -152,7 +160,7 @@ describe('ai-uniwork string shards', () => {
 
   it('fills the placeholders through aiUniworkText', () => {
     expect(aiUniworkText('en', 'aiUniworkCreditsAria', { remaining: 12, limit: 50 })).toBe(
-      '12 / 50 left',
+      '12 of 50 credits left',
     )
     expect(aiUniworkText('vi', 'aiErrRateLimited', { seconds: 30 })).toBe(
       'Bạn đang gửi quá nhanh. Thử lại sau 30 giây.',
