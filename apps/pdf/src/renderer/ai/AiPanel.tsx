@@ -5,6 +5,7 @@ import {
   isUniworkQuestionRefusal,
   aiPanelWidthAtPointer,
   AiPanelSideButton,
+  AiSaveDraftCard,
   AiModelPicker,
   useCloudSignedIn,
   useAiModelNeedHint,
@@ -158,6 +159,7 @@ export function AiPanel({
   onCollapse,
   preset,
   onRunDone,
+  onSaveOffer,
   onClearSelection,
   open = true,
   onExpand,
@@ -169,8 +171,14 @@ export function AiPanel({
   onCollapse: () => void
   /** Ribbon AI buttons push a one-shot prompt; a new nonce triggers an auto-run */
   preset?: { text: string; nonce: number } | null
-  /** Fired when a run that mutated the document finishes (drives the untitled-blank auto-save) */
-  onRunDone?: () => void
+  /**
+   * Fired when a run that mutated the document finishes. Resolves to the file name to offer saving
+   * under when the document is a blank the user has not named (the panel then asks, nothing is
+   * saved), or null when no offer applies.
+   */
+  onRunDone?: () => Promise<string | null> | string | null
+  /** The user chose Save on the offer card: save the document (the shell then names the blank) */
+  onSaveOffer?: (name: string) => void
   /** The × on the scope chip: drop the cached selection so runs target the whole document */
   onClearSelection?: () => void
   /** false keeps the instance mounted (chat state) but skips panel render work */
@@ -374,6 +382,12 @@ export function AiPanel({
   apiRef.current = api
   const onRunDoneRef = useRef(onRunDone)
   onRunDoneRef.current = onRunDone
+  const onSaveOfferRef = useRef(onSaveOffer)
+  onSaveOfferRef.current = onSaveOffer
+  /** the ask-before-saving card of the last run; at most one, gone on the next send / New chat */
+  const [saveOffer, setSaveOffer] = useState<{ name: string } | null>(null)
+  /** bumped by every send and every run end: a late answer for an older run is dropped */
+  const offerEpochRef = useRef(0)
   /** Any tool in the current run reported mutated: true */
   const runMutatedRef = useRef(false)
 
@@ -592,7 +606,13 @@ export function AiPanel({
           setBusy(false)
           if (runMutatedRef.current) {
             runMutatedRef.current = false
-            onRunDoneRef.current?.()
+            const epoch = ++offerEpochRef.current
+            void Promise.resolve(onRunDoneRef.current?.())
+              .then((offer) => {
+                if (epoch === offerEpochRef.current)
+                  setSaveOffer(typeof offer === 'string' ? { name: offer } : null)
+              })
+              .catch(() => {})
           }
         },
         onError: (error) => {
@@ -650,6 +670,8 @@ export function AiPanel({
     if (uniworkGate.refuse()) return false
     stickToBottomRef.current = true
     runQuestionRef.current = instruction
+    offerEpochRef.current++
+    setSaveOffer(null)
     const scope = retryScope !== undefined ? (retryScope ?? undefined) : selectionScopeQuote()
     persistMessage('user', instruction, undefined, scope)
     segTextRef.current = ''
@@ -924,6 +946,8 @@ export function AiPanel({
                 clarify.clearReceipts()
                 msgQueue.clear()
                 setBusy(false)
+                offerEpochRef.current++
+                setSaveOffer(null)
                 setChat([])
               }}
               data-tip={t('aiNewChat')}
@@ -1135,6 +1159,18 @@ export function AiPanel({
             </div>
           )
         })}
+        {saveOffer && !busy && (
+          <AiSaveDraftCard
+            lang={lang}
+            name={saveOffer.name}
+            onSave={() => {
+              const { name } = saveOffer
+              setSaveOffer(null)
+              onSaveOfferRef.current?.(name)
+            }}
+            onLater={() => setSaveOffer(null)}
+          />
+        )}
         {fileOpConfirm && (
           <div className="ai-confirm-card" role="group" aria-label={t('aiFileOpConfirmTitle')}>
             <div className="ai-confirm-title">{t('aiFileOpConfirmTitle')}</div>

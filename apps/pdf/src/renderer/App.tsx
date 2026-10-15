@@ -7,6 +7,7 @@ import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist/legacy/build/pdf.mj
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url'
 import { AiPanel } from './ai/AiPanel'
+import { aiRunSaveOffer, nameCandidateFromInserts } from './ai-save-offer'
 import { AiAskPopover, type AskAnchorRect } from './AiAskPopover'
 import { AppOnlyNote } from './AppOnlyNote'
 import { narrowPane, widthFitScale } from './fit-scale'
@@ -3891,12 +3892,7 @@ export default function App() {
       // carrying its untitled name takes its file name from the topmost text this
       // save inserted; the main process no-ops for every other file, so
       // user-chosen names are never touched.
-      const nameCandidate = [...textInserts]
-        .sort(
-          (a, b) => a.input.pageIndex - b.input.pageIndex || b.input.origin[1] - a.input.origin[1],
-        )[0]
-        ?.input.text.split('\n')[0]
-        ?.trim()
+      const nameCandidate = nameCandidateFromInserts(textInserts)
       if (nameCandidate && cap('autoRename')) {
         try {
           const renamed = await window.pdfApi.autoRename(filePath, nameCandidate)
@@ -6043,22 +6039,28 @@ export default function App() {
   }
 
   /**
-   * After an AI run that mutated a shell-created blank still carrying its untitled
-   * name, silently save once: the save's auto-rename then derives the file name from
-   * the inserted text — mirrors docs/sheets, where AI generation names the draft.
-   * PDFs the user merely opened keep the pending-until-⌘S contract (isUntitled is
-   * false for them, and the main process would refuse the rename anyway).
+   * After an AI run that mutated a shell-created blank still carrying its untitled name, the AI
+   * panel asks before anything is saved: this answers with the name to offer (null for every
+   * other document). PDFs the user merely opened keep the pending-until-⌘S contract (isUntitled
+   * is false for them, and the main process would refuse the rename anyway).
    */
-  const autoSaveAfterAiRun = async () => {
-    if (!filePath || readOnly) return
-    try {
-      if (!(await window.pdfApi.isUntitled(filePath))) return
-    } catch {
-      return
-    }
+  const aiSaveOffer = (): Promise<string | null> =>
+    aiRunSaveOffer({
+      filePath,
+      readOnly,
+      isUntitled: (path) => window.pdfApi.isUntitled(path),
+      name: nameCandidateFromInserts(textInsertsRef.current),
+    })
+
+  /**
+   * The Save click on that card: an explicit save writes the pending edits to the blank, and
+   * the save's auto-rename then derives the file name from the inserted text, the name the
+   * card showed.
+   */
+  const saveAfterAiOffer = () => {
     // A file we created ourselves is safe to keep autosaving from here on
     savedOnceRef.current = true
-    void save('auto')
+    void save('user')
   }
 
   /** Internal destination of a Link annotation → jump to that page */
@@ -7575,7 +7577,8 @@ export default function App() {
               onExpand={aiDock.open}
               onCollapse={aiDock.collapse}
               readOnly={readOnly}
-              onRunDone={() => void autoSaveAfterAiRun()}
+              onRunDone={aiSaveOffer}
+              onSaveOffer={saveAfterAiOffer}
               onClearSelection={() => setAiSelection(null)}
             />
           </div>
