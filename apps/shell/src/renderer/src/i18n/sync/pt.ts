@@ -288,6 +288,14 @@ export const pt = {
     'Sua versão foi salva como um novo documento: {title}. Este documento não mudou; você ainda pode recarregar ou substituir.',
   uwConflictSaveCopyFailed:
     'Não foi possível criar a cópia. Suas alterações continuam seguras; tente novamente.',
+  uwConflictSaveCopyNoSeat:
+    'Não foi possível criar a cópia porque você não é membro do espaço de trabalho em que este documento está. Suas alterações continuam seguras; você pode baixar sua versão.',
+  uwConflictSaveCopyFolderRefused:
+    'Você não pode criar documentos nesta pasta. Baixe sua versão em vez disso.',
+  uwConflictDownloadDone:
+    'Sua versão foi salva neste computador: {file}. Este documento não mudou; você ainda pode recarregar ou substituir.',
+  uwConflictDownloadFailedDesktop:
+    'Não foi possível salvar o arquivo. Suas alterações continuam seguras; tente novamente.',
   uwConflictSaveCopyOffline:
     'Você está offline. Criar uma cópia precisa de conexão; suas alterações são mantidas.',
   uwConflictReloadFailed:

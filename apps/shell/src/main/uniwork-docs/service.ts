@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, rmSync, statSync, unlinkSync } from 'node:fs'
-import { readFile, rename, stat } from 'node:fs/promises'
+import { readFile, rename, stat, writeFile } from 'node:fs/promises'
 import { createHash, randomUUID } from 'node:crypto'
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type {
@@ -61,6 +61,7 @@ import {
 import { type FetchLike, type UniworkDocsClient, createUniworkDocsClient } from './client'
 import { UniworkDocError } from './errors'
 import {
+  copyTitleFor,
   formatForMime,
   formatForName,
   hasReplacementChar,
@@ -69,6 +70,7 @@ import {
 } from './formats'
 import { pathKey } from '../../shared/path-key'
 import { LaunchController } from './launch'
+import { tUniworkDocs } from './strings'
 import type { CommentsContextResult } from '@genoffice/electron-utils/comments-ipc'
 import { actionFlags, type DocumentDetail, type LaunchDescriptor } from './parse'
 import {
@@ -287,6 +289,13 @@ export interface UniworkDocsServiceDeps {
   isAiRunning?(path: string): boolean
   /** G5-09 S5: stops the AI turn running in the editor showing `path` */
   stopAiRun?(path: string): void
+  /** G5-12: the app's UI language, for the title of a saved copy (absent = en) */
+  lang?(): string
+  /**
+   * G5-12: the native save dialog of "Download my version" (Electron-free seam),
+   * suggesting `defaultName`. Null when the person cancelled.
+   */
+  pickDownloadPath?(defaultName: string): Promise<string | null>
   /** G5-09 S5: seam for G5-05 offline head availability (default false until G5-05 lands) */
   hasOfflineHead?(documentId: string, revision?: string): boolean
   /**
@@ -623,10 +632,28 @@ interface ConflictSession {
   serverOnline: boolean
   locked?: 'revoked' | 'deleted'
   draftBlock?: UniworkConflictKeepDraft
+  /**
+   * G5-12: the notice that put the dialog on the "Download my version" step 2
+   * (no_seat, folder_refused, or download_failed after a failed write); a cancelled
+   * OS dialog answers with it again so the alert does not change
+   */
+  downloadNotice?: DownloadStepNotice
   opened: boolean
   done: Promise<UniworkDocStatus | null>
   finish: () => void
 }
+
+/** BE-12F-01: the one wait before the copy's commit lookup is asked again */
+const COPY_LOOKUP_WAIT_MS = 1500
+
+/** the notices that make step 2 of Save as a copy the "Download my version" step */
+type DownloadStepNotice = 'save_copy_no_seat' | 'save_copy_folder_refused' | 'download_failed'
+
+/** BE-12-201: the server's refusal of a copy for a caller with no seat in the source's workspace */
+const COPY_NO_SEAT_CODE = 'workspace_seat_required'
+
+/** BE-12-304: the server's plain refusal of a copy by the parent folder gate */
+const COPY_FOLDER_REFUSED_CODE = 'forbidden'
 
 export class UniworkDocsService {
   readonly store: BindingStore
@@ -4338,18 +4365,10 @@ export class UniworkDocsService {
       return { kind: 'view', view: currentView }
     }
     if (action.kind === 'save-copy') {
-      if (!currentView.canEdit) {
-        return { kind: 'view', view: { ...currentView, notice: null, noticeArg: null } }
-      }
-      if (action.stopAi) this.deps.stopAiRun?.(chosen.path)
-      return {
-        kind: 'view',
-        view: await this.buildConflictView(open, {
-          fetchServer: false,
-          notice: 'save_copy_failed',
-          noticeArg: null,
-        }),
-      }
+      return this.saveCopyInConflict(open, chosen, action, currentView)
+    }
+    if (action.kind === 'download-mine') {
+      return this.downloadMineInConflict(open, chosen, action)
     }
     if (action.kind === 'reload') {
       return this.reloadInConflict(open, chosen, action, currentView)
@@ -4686,6 +4705,337 @@ export class UniworkDocsService {
     open.controller.abort()
     open.finish()
     return { kind: 'closed' }
+  }
+
+  /**
+   * G5-12 S5 "Save as a copy": the user's local version becomes a new document
+   * and the conflicted one is left exactly as it is (binding, intent, editor).
+   * Online only, edit access only; two steps, nothing queued:
+   *   1. flush the module's unsaved bytes (the non-uploading flush Reload
+   *      keep=draft uses), then POST /documents/{id}/copies (the copy starts as
+   *      the server's head bytes, version 1);
+   *   2. upload the local bytes and commit them as version 2 of the copy, retried
+   *      once. A copy that never got step 2 holds the SERVER's content, so it is
+   *      archived (best effort, logged when that fails) and never reported done.
+   * A dialog closed mid-flight shows no notice, but the copy it left is archived
+   * and logged, never kept silently.
+   */
+  private async saveCopyInConflict(
+    open: ConflictSession,
+    chosen: BoundDocument,
+    action: Extract<UniworkConflictAction, { kind: 'save-copy' }>,
+    currentView: UniworkConflictView,
+  ): Promise<UniworkConflictReply> {
+    if (!currentView.canEdit) {
+      return { kind: 'view', view: { ...currentView, notice: null, noticeArg: null } }
+    }
+    if (!currentView.online) {
+      return { kind: 'view', view: currentView }
+    }
+    if (action.stopAi) this.deps.stopAiRun?.(chosen.path)
+    const aborted = () => open.controller.signal.aborted
+    const failed = async (): Promise<UniworkConflictReply> => ({
+      kind: 'view',
+      view: await this.buildConflictView(open, {
+        fetchServer: false,
+        notice: open.locked ? null : 'save_copy_failed',
+      }),
+    })
+    const lockOn = (error: unknown) => {
+      if (!(error instanceof UniworkDocError)) return
+      if (error.code === 'permission_revoked' || error.code === 'forbidden') {
+        open.locked = 'revoked'
+        open.knownCanEdit = false
+      } else if (
+        error.code === 'document_deleted' ||
+        error.code === 'deleted' ||
+        error.code === 'not_found'
+      ) {
+        open.locked = 'deleted'
+        open.knownCanEdit = false
+      }
+    }
+
+    const editor = await this.editorState(chosen.path)
+    if (editor.dirty === true || this.editorDirty.has(chosen.path)) {
+      if (!(await this.flushModuleForDraft(open, chosen.path))) {
+        return aborted() ? { kind: 'closed' } : failed()
+      }
+      if (aborted()) return { kind: 'closed' }
+      if (open.locked) {
+        return { kind: 'view', view: await this.buildConflictView(open, { fetchServer: false }) }
+      }
+      chosen = await this.refreshDirty(chosen)
+      open.doc = chosen
+    }
+    let localBytes: Uint8Array
+    try {
+      localBytes = new Uint8Array(await readFile(chosen.path))
+    } catch {
+      return failed()
+    }
+
+    const api = this.api()
+    const documentId = chosen.binding.documentId
+    const title = copyTitleFor(
+      chosen.binding.title,
+      tUniworkDocs(this.deps.lang?.() ?? 'en', 'copyMyVersion'),
+      chosen.binding.format,
+    )
+    let parentId: string | null
+    try {
+      // the copy is filed next to its source (a fresh read: the source may have moved)
+      parentId = (await api.getDocument(documentId)).parentId ?? null
+    } catch (error) {
+      lockOn(error)
+      return aborted() ? { kind: 'closed' } : failed()
+    }
+    if (aborted()) return { kind: 'closed' }
+    let created: { summary: UniworkDocSummary; revision: string }
+    try {
+      created = await api.copyDocument({
+        documentId,
+        title,
+        parentId,
+        idempotencyKey: this.newIdempotencyKey(),
+      })
+    } catch (error) {
+      if (aborted()) return { kind: 'closed' }
+      // BE-12-201: the server's seat refusal (403 workspace_seat_required): the person is not a
+      // member of the source's workspace, so no copy can be made for them. Their version is
+      // still local; the dialog offers "Download my version". Any other 403 - a deactivated
+      // member, a suspended organization - says nothing about the seat and stays a plain failure
+      // (`forbidden` is the folder refusal, below)
+      if (
+        error instanceof UniworkDocError &&
+        error.status === 403 &&
+        error.serverCode === COPY_NO_SEAT_CODE
+      ) {
+        open.downloadNotice = 'save_copy_no_seat'
+        return {
+          kind: 'view',
+          view: await this.buildConflictView(open, {
+            fetchServer: false,
+            notice: 'save_copy_no_seat',
+          }),
+        }
+      }
+      // BE-12-304: a plain 403 `forbidden` of the copy route is the parent folder gate (the request
+      // carries the source's own parent_id): the member holds a seat but may not create documents
+      // in that folder, and a retry meets the same gate. Same Download step, its own reason
+      if (
+        error instanceof UniworkDocError &&
+        error.status === 403 &&
+        error.serverCode === COPY_FOLDER_REFUSED_CODE
+      ) {
+        open.downloadNotice = 'save_copy_folder_refused'
+        return {
+          kind: 'view',
+          view: await this.buildConflictView(open, {
+            fetchServer: false,
+            notice: 'save_copy_folder_refused',
+          }),
+        }
+      }
+      // any other refusal of the copy itself (owner_requires_copy, a 5xx) is "couldn't create
+      // the copy"
+      return failed()
+    }
+    const copyId = created.summary.id
+
+    // step 2: the local bytes become version 2 of the copy; one retry, same keys
+    const commitKey = this.newIdempotencyKey()
+    // BE-12F-02: the account that made the copy; the cleanup below only talks to the server
+    // while it is still signed in (the new account has no access to this copy)
+    const owner = this.deps.identity()
+    let committed = false
+    for (let attempt = 0; attempt < 2 && !committed && !aborted(); attempt += 1) {
+      try {
+        const upload = await api.upload({
+          documentId: copyId,
+          bytes: localBytes,
+          filename: chosen.binding.filename,
+          format: chosen.binding.format,
+          idempotencyKey: commitKey,
+        })
+        if (upload.checksumSha256 !== sha256Hex(localBytes)) {
+          throw new UniworkDocError('malformed_response', {
+            serverCode: 'upload_checksum_mismatch',
+          })
+        }
+        // an account switch during the upload must not commit this copy under the other account
+        if (!this.liveIdentity() || !this.ownsLocally(chosen)) {
+          throw new UniworkDocError('not_signed_in')
+        }
+        await api.commit({
+          documentId: copyId,
+          uploadId: upload.uploadId,
+          baseRevision: created.revision,
+          idempotencyKey: commitKey,
+        })
+        committed = true
+      } catch (error) {
+        if (error instanceof UniworkDocError && error.code === 'not_signed_in') break
+      }
+    }
+    if (!committed) {
+      const current = this.deps.identity()
+      if (
+        !owner ||
+        !current ||
+        current.accountId !== owner.accountId ||
+        current.deploymentId !== owner.deploymentId
+      ) {
+        // BE-12F-02: nothing is sent under the other account; say what was left behind
+        console.warn(
+          `uniwork docs: save-copy: copy ${copyId} of account ${owner?.accountId ?? 'unknown'} was left behind after an account switch`,
+        )
+        return aborted() ? { kind: 'closed' } : failed()
+      }
+      // BE-12F-01: "no answer" is not "not committed": the commit may have landed with its
+      // answer lost, and the server refuses to archive a copy that already holds version 2
+      const verdict = await this.lookupCopyCommit(copyId, commitKey)
+      if (verdict === 'committed') {
+        committed = true
+      } else if (verdict === 'in_flight') {
+        console.warn(
+          `uniwork docs: save-copy: copy ${copyId} is still being saved by the server; it was not archived`,
+        )
+        return aborted() ? { kind: 'closed' } : failed()
+      }
+    }
+    if (committed) {
+      if (aborted()) {
+        console.warn(`uniwork docs: save-copy: the dialog closed after copy ${copyId} was saved`)
+        return { kind: 'closed' }
+      }
+      return {
+        kind: 'view',
+        view: await this.buildConflictView(open, {
+          fetchServer: false,
+          notice: 'save_copy_done',
+          noticeArg: created.summary.title || title,
+        }),
+      }
+    }
+    // never leave the server's bytes behind as "your version"
+    try {
+      await api.archive(copyId, this.newIdempotencyKey())
+    } catch (error) {
+      console.warn(
+        `uniwork docs: save-copy: copy ${copyId} was not completed and could not be archived`,
+        error instanceof UniworkDocError ? error.code : 'unknown',
+      )
+    }
+    if (aborted()) {
+      console.warn(`uniwork docs: save-copy: the dialog closed before copy ${copyId} was complete`)
+      return { kind: 'closed' }
+    }
+    return failed()
+  }
+
+  /**
+   * BE-12F-01: what became of the copy's step-2 commit, asked by its own key.
+   * `in_flight` gets one bounded wait and a second look; a lookup that cannot
+   * be answered (network, malformed) is `not_committed`, so the caller falls
+   * back to the cleanup it would have done without it.
+   */
+  private async lookupCopyCommit(
+    copyId: string,
+    commitKey: string,
+  ): Promise<'committed' | 'not_committed' | 'in_flight'> {
+    for (let look = 0; look < 2; look += 1) {
+      let outcome: string
+      try {
+        outcome = (await this.api().lookupCommit({ documentId: copyId, idempotencyKey: commitKey }))
+          .outcome
+      } catch {
+        return 'not_committed'
+      }
+      if (outcome === 'committed') return 'committed'
+      if (outcome !== 'in_flight') return 'not_committed'
+      if (look === 0)
+        await (this.deps.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms))))(
+          COPY_LOOKUP_WAIT_MS,
+        )
+    }
+    return 'in_flight'
+  }
+
+  /**
+   * G5-12 "Download my version" (the step-2 button once Save as a copy was
+   * refused with no seat): the local version goes to a file the person picks,
+   * so no edit is lost. Local only: no server call, no intent, no change to
+   * the source, its binding or the editor beyond the same non-uploading flush
+   * a kept draft uses. A cancelled OS dialog changes nothing (the notice that
+   * opened this step is answered again); a write error stays on step 2.
+   */
+  private async downloadMineInConflict(
+    open: ConflictSession,
+    chosen: BoundDocument,
+    action: Extract<UniworkConflictAction, { kind: 'download-mine' }>,
+  ): Promise<UniworkConflictReply> {
+    if (action.stopAi) this.deps.stopAiRun?.(chosen.path)
+    const aborted = () => open.controller.signal.aborted
+    const stay = async (notice: DownloadStepNotice): Promise<UniworkConflictReply> => {
+      open.downloadNotice = notice
+      return {
+        kind: 'view',
+        view: await this.buildConflictView(open, { fetchServer: false, notice }),
+      }
+    }
+    const failed = () => (aborted() ? { kind: 'closed' as const } : stay('download_failed'))
+
+    const editor = await this.editorState(chosen.path)
+    if (editor.dirty === true || this.editorDirty.has(chosen.path)) {
+      if (!(await this.flushModuleForDraft(open, chosen.path))) return failed()
+      if (aborted()) return { kind: 'closed' }
+      if (open.locked) {
+        return { kind: 'view', view: await this.buildConflictView(open, { fetchServer: false }) }
+      }
+      chosen = await this.refreshDirty(chosen)
+      open.doc = chosen
+    }
+    let localBytes: Uint8Array
+    try {
+      localBytes = new Uint8Array(await readFile(chosen.path))
+    } catch {
+      return failed()
+    }
+
+    const format = chosen.binding.format
+    let defaultName = copyTitleFor(
+      chosen.binding.title,
+      tUniworkDocs(this.deps.lang?.() ?? 'en', 'copyMyVersion'),
+      format,
+    )
+    if (formatForName(defaultName) !== format) defaultName = `${defaultName}.${format}`
+    let target: string | null
+    try {
+      target = (await this.deps.pickDownloadPath?.(defaultName)) ?? null
+    } catch {
+      return failed()
+    }
+    if (aborted()) return { kind: 'closed' }
+    if (!target) {
+      // the person cancelled the OS dialog: nothing changed
+      return stay(open.downloadNotice ?? 'save_copy_no_seat')
+    }
+    try {
+      await writeFile(target, localBytes)
+    } catch {
+      return failed()
+    }
+    if (aborted()) return { kind: 'closed' }
+    open.downloadNotice = undefined
+    return {
+      kind: 'view',
+      view: await this.buildConflictView(open, {
+        fetchServer: false,
+        notice: 'download_done',
+        noticeArg: basename(target),
+      }),
+    }
   }
 
   private async overwriteInConflict(

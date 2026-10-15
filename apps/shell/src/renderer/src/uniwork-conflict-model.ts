@@ -66,6 +66,10 @@ export interface ConflictResolvedNotice {
     | 'uwConflictOverwriteFailed'
     | 'uwConflictSaveCopyDone'
     | 'uwConflictSaveCopyFailed'
+    | 'uwConflictSaveCopyNoSeat'
+    | 'uwConflictSaveCopyFolderRefused'
+    | 'uwConflictDownloadDone'
+    | 'uwConflictDownloadFailedDesktop'
   args: Record<string, string>
 }
 
@@ -359,12 +363,39 @@ export function buildConfirmPayload(
     }
   }
   if (state.step === 'save-copy') {
+    // G5-12: once the copy was refused for lack of a seat, the same primary button
+    // downloads the local version instead
+    if (isSaveCopyDownloadStep(view)) {
+      return { kind: 'download-mine', stopAi: state.stopAi }
+    }
     return {
       kind: 'save-copy',
       stopAi: state.stopAi,
     }
   }
   return null
+}
+
+/** the Save-copy step 2 offers "Download my version" in place of "Create copy" */
+export function isSaveCopyDownloadStep(view: UniworkConflictView): boolean {
+  return (
+    view.notice === 'save_copy_no_seat' ||
+    view.notice === 'save_copy_folder_refused' ||
+    view.notice === 'download_failed'
+  )
+}
+
+/**
+ * FE-12-01: Back from the Download step drops the notice that made it one, so step 1 does not
+ * say "you can download your version" (it has no Download button) and re-entering "Save as a
+ * copy…" shows the create-copy step again. Null when Back leaves the view as it is.
+ */
+export function viewAfterConflictBack(
+  state: ConflictDialogState,
+  view: UniworkConflictView,
+): UniworkConflictView | null {
+  if (state.step !== 'save-copy' || !isSaveCopyDownloadStep(view)) return null
+  return { ...view, notice: null, noticeArg: null }
 }
 
 export function getActionFailureNotice(
@@ -377,6 +408,8 @@ export function getActionFailureNotice(
       return 'overwrite_failed'
     case 'save-copy':
       return 'save_copy_failed'
+    case 'download-mine':
+      return 'download_failed'
     case 'cancel':
       return null
   }
@@ -400,7 +433,11 @@ export function applyConflictViewUpdate(
     }
   }
 
-  if (nextView.notice === 'head_moved' || nextView.notice === 'save_copy_done') {
+  if (
+    nextView.notice === 'head_moved' ||
+    nextView.notice === 'save_copy_done' ||
+    nextView.notice === 'download_done'
+  ) {
     return {
       ...state,
       step: 'step1',
@@ -441,6 +478,14 @@ export function resolveConflictNotice(view: UniworkConflictView): ConflictResolv
       }
     case 'save_copy_failed':
       return { key: 'uwConflictSaveCopyFailed', args: {} }
+    case 'save_copy_no_seat':
+      return { key: 'uwConflictSaveCopyNoSeat', args: {} }
+    case 'save_copy_folder_refused':
+      return { key: 'uwConflictSaveCopyFolderRefused', args: {} }
+    case 'download_done':
+      return { key: 'uwConflictDownloadDone', args: { file: view.noticeArg ?? view.title } }
+    case 'download_failed':
+      return { key: 'uwConflictDownloadFailedDesktop', args: {} }
     default:
       return null
   }

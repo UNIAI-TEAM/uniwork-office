@@ -284,6 +284,14 @@ export const pl = {
     'Twoja wersja została zapisana jako nowy dokument: {title}. Ten dokument się nie zmienił; nadal możesz wczytać ponownie lub zastąpić.',
   uwConflictSaveCopyFailed:
     'Nie udało się utworzyć kopii. Zmiany są nadal bezpieczne; spróbuj ponownie.',
+  uwConflictSaveCopyNoSeat:
+    'Nie udało się utworzyć kopii, ponieważ nie jesteś członkiem przestrzeni roboczej, w której znajduje się ten dokument. Zmiany są nadal bezpieczne; możesz pobrać swoją wersję.',
+  uwConflictSaveCopyFolderRefused:
+    'Nie możesz tworzyć dokumentów w tym folderze. Pobierz zamiast tego swoją wersję.',
+  uwConflictDownloadDone:
+    'Twoja wersja została zapisana na tym komputerze: {file}. Ten dokument się nie zmienił; nadal możesz wczytać ponownie lub zastąpić.',
+  uwConflictDownloadFailedDesktop:
+    'Nie udało się zapisać pliku. Zmiany są nadal bezpieczne; spróbuj ponownie.',
   uwConflictSaveCopyOffline:
     'Jesteś offline. Utworzenie kopii wymaga połączenia; zmiany zostają zachowane.',
   uwConflictReloadFailed:

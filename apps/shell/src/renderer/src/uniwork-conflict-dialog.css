@@ -267,6 +267,11 @@
   color: var(--text-secondary);
 }
 
+/* V12-01: the first step-1 reason clears Cancel's focus ring (2px outline + 2px offset) */
+.uw-conflict-actions + .uw-conflict-reason {
+  margin-top: 8px;
+}
+
 .uw-conflict-link {
   appearance: none;
   border: 0;
