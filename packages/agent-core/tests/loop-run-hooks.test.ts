@@ -176,15 +176,12 @@ describe('AgentLoop run hooks', () => {
         cb.onDone()
       },
     ])
-    let loop: AgentLoop | undefined
     const skill = makeSkill((c) => {
-      if (c.id === 'a') {
-        loop?.cancel()
-        return { output: 'ok', summary: 'done', mutated: true }
-      }
+      // the user hits stop while the first tool runs; it still finishes its edit
+      if (c.id === 'a') loop.cancel()
       return { output: 'ok', summary: 'done', mutated: true }
     })
-    loop = new AgentLoop({ transport, skill, events: recorder(log) })
+    const loop = new AgentLoop({ transport, skill, events: recorder(log) })
     loop.run('go')
     await settle()
     const id = onePair(log)
