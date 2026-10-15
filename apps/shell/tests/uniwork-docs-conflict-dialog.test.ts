@@ -406,7 +406,8 @@ function setup(
     stopAiRun,
     pushLaunch: vi.fn(),
     reveal: vi.fn(),
-    sleep: async () => undefined,
+    // BE-12-204: the bounded lookup wait is instant in tests; the in-flight cases assert its length
+    sleep: vi.fn(async (_ms: number) => undefined),
     capability: {
       get: async () => {
         if (capabilityOffline) throw new Error('offline')
@@ -1657,7 +1658,7 @@ describe('G5-12 Save as a copy (main)', () => {
     const ctx = setup(server)
     const path = await openAndConflict(ctx, server)
     const { view } = await openDialog(ctx, path)
-    const sleep = vi.spyOn(ctx.deps, 'sleep')
+    const sleep = vi.mocked(ctx.deps.sleep)
 
     const reply = await ctx.service.conflictAct(view.sessionId, {
       kind: 'save-copy',
@@ -1669,6 +1670,8 @@ describe('G5-12 Save as a copy (main)', () => {
       callsTo(server, `${COPY}/versions/commit`).filter((c) => c.method === 'GET'),
     ).toHaveLength(2)
     expect(sleep).toHaveBeenCalledTimes(1)
+    // BE-12-204: one COPY_LOOKUP_WAIT_MS wait, stubbed so the case spends no wall-clock time
+    expect(sleep).toHaveBeenCalledWith(1500)
     expect(callsTo(server, `${COPY}/archive`)).toHaveLength(0)
     await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
   })
