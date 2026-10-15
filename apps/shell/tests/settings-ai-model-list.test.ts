@@ -1,6 +1,9 @@
 /**
  * @vitest-environment jsdom
  */
+import { readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
@@ -448,6 +451,81 @@ describe('Settings › AI model: org-managed provider row (G6-05k)', () => {
     await openAiPane()
     expect(host.querySelector('[data-org-key-row]')).toBeNull()
     expect(host.querySelector<HTMLInputElement>('#set-ai-key')?.value).toBe('sk-ant-x')
+  })
+
+  const ORG = { chosen: 'claude-sonnet-5', origin: 'org', listed: CATALOG } as const
+
+  it('puts the "Key on UniWork" tag on the label line as a pill, not next to the buttons (F-1)', async () => {
+    installApi(stored('claude-sonnet-5', ORG))
+    await openAiPane()
+    const row = host.querySelector<HTMLElement>('[data-org-key-row]')!
+    const tag = row.querySelector<HTMLElement>('[data-org-key-tag]')!
+    expect(tag.classList.contains('set-org-key-tag')).toBe(true)
+    const head = tag.parentElement!
+    expect(head.classList.contains('set-org-key-head')).toBe(true)
+    // the same line as the "API key" label, which is a sibling of the tag
+    expect(head.querySelector('.set-field-label')?.textContent).toBe('API key')
+    // the note stays a separate line below, and the tag is not part of the actions column
+    expect(head.contains(row.querySelector('[data-org-key-note]'))).toBe(false)
+    expect(row.querySelector('.set-org-key-actions')!.contains(tag)).toBe(false)
+  })
+
+  it('styles the tag pill like the composer chip tag: no wrap, no shrink, tokens only (F-1)', () => {
+    const css = readFileSync(
+      resolve(dirname(fileURLToPath(import.meta.url)), '../src/renderer/src/settings.css'),
+      'utf8',
+    )
+    const rule = /\.set-org-key-tag\s*\{([^}]*)\}/.exec(css)?.[1] ?? ''
+    expect(rule).toMatch(/white-space:\s*nowrap/)
+    expect(rule).toMatch(/flex-shrink:\s*0/)
+    expect(rule).toMatch(/border:\s*1px solid var\(--border-subtle\)/)
+    expect(rule).toMatch(/background:\s*var\(--surface-subtle\)/)
+    expect(rule).not.toMatch(/#[0-9a-f]{3,8}\b|rgb\(/i)
+  })
+
+  it('says chats go through the key on UniWork above Model, not "your own key" (F-2)', async () => {
+    installApi(stored('claude-sonnet-5', ORG))
+    await openAiPaneWithLocale('en')
+    const hint = host.querySelector('.set-ai-note')!
+    expect(hint.textContent).toBe(
+      'Chats go through the key saved on UniWork. Image generation, media analysis and web search follow the AI Media section.',
+    )
+    expect(hint.textContent).not.toContain('your own key')
+
+    await openAiPaneWithLocale('vi')
+    expect(host.querySelector('.set-ai-note')!.textContent).toBe(
+      'Chat đi qua key đã lưu trên UniWork. Tạo ảnh, phân tích media và tìm kiếm web theo mục AI Media.',
+    )
+  })
+
+  it('keeps the own-key chat hint for a provider with a local key (F-2)', async () => {
+    installApi(stored('claude-sonnet-5', { ...ORG, origin: 'local' }))
+    await openAiPane()
+    expect(host.querySelector('.set-ai-note')!.textContent).toContain('Chats use your own key')
+  })
+
+  it('keeps the own-key chat hint after "use a key on this computer" on an org provider (F-2)', async () => {
+    installApi(stored('claude-sonnet-5', ORG))
+    await openAiPane()
+    await click(host.querySelector<HTMLButtonElement>('[data-org-key-use-local]')!)
+    expect(host.querySelector('.set-ai-note')!.textContent).toContain('Chats use your own key')
+  })
+
+  it('shares the API key row between the use-a-local-key and manage buttons, with no empty-label row (F-3)', async () => {
+    installApi(stored('claude-sonnet-5', ORG))
+    await openAiPane()
+    const row = host.querySelector<HTMLElement>('[data-org-key-row]')!
+    const useLocal = row.querySelector<HTMLButtonElement>('[data-org-key-use-local]')
+    expect(useLocal).not.toBeNull()
+    expect(row.querySelector('[data-org-key-manage]')).not.toBeNull()
+    expect(useLocal!.parentElement).toBe(row.querySelector('[data-org-key-manage]')!.parentElement)
+    // no second row whose label cell is empty
+    expect(host.querySelectorAll('[data-org-key-use-local]')).toHaveLength(1)
+    expect(
+      Array.from(host.querySelectorAll('.set-field-text')).filter(
+        (cell) => !cell.textContent && !cell.children.length,
+      ),
+    ).toHaveLength(0)
   })
 
   it('picks for two org-served providers before one Save are all sent in that save', async () => {

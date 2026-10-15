@@ -810,7 +810,9 @@ function AiModelPane({
             ? t('setAiGensparkHint')
             : isCodex
               ? t('setAiCodexHint')
-              : t('setAiByokNote')}
+              : isOrgKey
+                ? pickerStrings.orgKeyChatHint
+                : t('setAiByokNote')}
       </div>
       {!isUniwork && (
         <>
@@ -870,39 +872,42 @@ function AiModelPane({
               <div className="set-field" data-org-key-row={provider}>
                 <div className="set-field-text">
                   <div className="set-field-stack">
-                    <div className="set-field-label">{t('setAiApiKey')}</div>
+                    <div className="set-org-key-head">
+                      <div className="set-field-label">{t('setAiApiKey')}</div>
+                      <span
+                        className="set-org-key-tag"
+                        data-org-key-tag=""
+                        title={pickerStrings.orgKeyNote}
+                        data-tip={pickerStrings.orgKeyNote}
+                      >
+                        {pickerStrings.orgKeyTag}
+                      </span>
+                    </div>
                     <div className="set-field-desc" data-org-key-note="">
                       {pickerStrings.orgKeyNote}
                     </div>
                   </div>
-                  <span
-                    className="set-field-value"
-                    data-org-key-tag=""
-                    title={pickerStrings.orgKeyNote}
-                    data-tip={pickerStrings.orgKeyNote}
-                  >
-                    {pickerStrings.orgKeyTag}
-                  </span>
                 </div>
-                <button
-                  type="button"
-                  className="set-btn"
-                  data-org-key-manage=""
-                  onClick={() => void window.open(orgKeyManageUrl, '_blank', 'noopener,noreferrer')}
-                >
-                  {pickerStrings.orgKeyManage}
-                </button>
-              </div>
-              <div className="set-field" data-org-key-local-action={provider}>
-                <div className="set-field-text" />
-                <button
-                  type="button"
-                  className="set-btn"
-                  data-org-key-use-local=""
-                  onClick={openLocalKey}
-                >
-                  {pickerStrings.orgKeyUseLocal}
-                </button>
+                <div className="set-org-key-actions" data-org-key-local-action={provider}>
+                  <button
+                    type="button"
+                    className="set-btn"
+                    data-org-key-use-local=""
+                    onClick={openLocalKey}
+                  >
+                    {pickerStrings.orgKeyUseLocal}
+                  </button>
+                  <button
+                    type="button"
+                    className="set-btn"
+                    data-org-key-manage=""
+                    onClick={() =>
+                      void window.open(orgKeyManageUrl, '_blank', 'noopener,noreferrer')
+                    }
+                  >
+                    {pickerStrings.orgKeyManage}
+                  </button>
+                </div>
               </div>
             </>
           ) : (
