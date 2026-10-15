@@ -22,8 +22,13 @@ import {
 } from './offline-library'
 import type { SyncStoreAccess } from './session-store'
 import { APP_STORE_LEVEL } from './store-level'
-import type { StoreReadResult, StoreRecords, StoreRegistration, StoreWriteResult } from './store'
-import type { StoreLayer } from './store'
+import type {
+  StoreLayer,
+  StoreReadResult,
+  StoreRecords,
+  StoreRegistration,
+  StoreWriteResult,
+} from './store'
 
 export {
   LEASE_STORE_REGISTRATION,
