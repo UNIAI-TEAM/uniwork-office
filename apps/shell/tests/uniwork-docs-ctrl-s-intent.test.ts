@@ -538,6 +538,14 @@ describe('G5-06u T9: branches and BE review r1 fixes', () => {
   })
 })
 
+/**
+ * Every poll in this file waits at most this long: a parallel run of dozens of
+ * files starves the event loop for seconds, and the 1 s default of vi.waitFor
+ * then fails a case that is only slow. A failing case still fails (the wait
+ * throws the last assertion error), it just takes longer to say so.
+ */
+const WAIT = { timeout: 10_000, interval: 10 }
+
 type CoordinatorDeps = { deps: { intents: () => Promise<unknown> } }
 const coordinatorDeps = (ctx: Ctx) => (ctx.service.coordinator as unknown as CoordinatorDeps).deps
 
@@ -553,14 +561,20 @@ function holdUploads(server: ReturnType<typeof fakeServer>) {
     release = resolve
   })
   const reached = { uploads: 0 }
+  // settles when the first upload is on the wire (event-driven, no polling)
+  let markReached: () => void = () => undefined
+  const uploadReached = new Promise<void>((resolve) => {
+    markReached = resolve
+  })
   server.fetch.mockImplementation(async (url: string, init: RequestInit) => {
     if (new URL(url).pathname.endsWith('/uploads')) {
       reached.uploads += 1
+      markReached()
       await gate
     }
     return original(url, init)
   })
-  return { release, reached }
+  return { release, reached, uploadReached }
 }
 
 /** starts an inline save of 'v4' and waits until its upload is in flight */
@@ -569,7 +583,15 @@ async function inlineSaveInFlight(ctx: Ctx, server: ReturnType<typeof fakeServer
   const path = await openDoc(ctx)
   writeFileSync(path, 'v4')
   const first = ctx.service.save(path)
-  await vi.waitFor(() => expect(hold.reached.uploads).toBe(1))
+  // the upload gate holds `first` open, so it can only settle early if the save
+  // failed before the wire; the race then fails at once instead of timing out
+  const early = first.then(
+    () => 'settled' as const,
+    () => 'settled' as const,
+  )
+  const outcome = await Promise.race([hold.uploadReached.then(() => 'uploading' as const), early])
+  if (outcome !== 'uploading') throw new Error('the inline save settled before its upload')
+  expect(hold.reached.uploads).toBe(1)
   expect(ctx.service.coordinator.isSaving(path)).toBe(true)
   return { path, first, ...hold }
 }
@@ -623,7 +645,7 @@ describe('G5-06u T9: RBE6u2 fix round', () => {
     writeFileSync(path, 'v5')
     ctx.statuses.length = 0
     ctx.service.onUserSave(path)
-    await vi.waitFor(() => expect(ctx.popovers).toEqual([{ path }]))
+    await vi.waitFor(() => expect(ctx.popovers).toEqual([{ path }]), WAIT)
     // the running writer is not touched: no second upload, same record, still saving
     expect(reached.uploads).toBe(1)
     expect(ctx.service.coordinator.isSaving(path)).toBe(true)
@@ -644,7 +666,7 @@ describe('G5-06u T9: RBE6u2 fix round', () => {
     const { path, first, release, reached } = await inlineSaveInFlight(ctx, server)
     ctx.statuses.length = 0
     ctx.service.onUserSave(path)
-    await vi.waitFor(() => expect(ctx.popovers).toEqual([{ path }]))
+    await vi.waitFor(() => expect(ctx.popovers).toEqual([{ path }]), WAIT)
     expect(reached.uploads).toBe(1)
     expect(ctx.service.coordinator.hasPendingNext(path)).toBe(false)
     expect(ctx.statuses.some((s) => s.pendingNext)).toBe(false)
@@ -687,10 +709,10 @@ describe('G5-06u T9: RBE6u2 fix round', () => {
       return intentsOf()
     }
     const first = ctx.service.save(path)
-    await vi.waitFor(() => expect(ctx.service.coordinator.isSaving(path)).toBe(true))
+    await vi.waitFor(() => expect(ctx.service.coordinator.isSaving(path)).toBe(true), WAIT)
     ctx.service.onUserSave(path)
     // the second press reached the stubbed intents() (call 1 is the first save's)
-    await vi.waitFor(() => expect(calls).toBeGreaterThan(1))
+    await vi.waitFor(() => expect(calls).toBeGreaterThan(1), WAIT)
     await flushMicrotasks()
     expect(ctx.popovers).toEqual([])
     open()
@@ -730,7 +752,7 @@ describe('G5-06u T9: RBE6u2 fix round', () => {
       }
       writeFileSync(path, 'v5')
       ctx.service.onUserSave(path)
-      await vi.waitFor(() => expect(reachedByPress).toBe(1))
+      await vi.waitFor(() => expect(reachedByPress).toBe(1), WAIT)
       await flushMicrotasks()
       expect(ctx.popovers).toEqual([])
       expect(ctx.service.coordinator.hasPendingNext(path)).toBe(false)
@@ -755,16 +777,22 @@ function holdNextIntentsRead(ctx: Ctx) {
     release = resolve
   })
   const state = { parked: false }
+  // settles when the press has reached its intent read (event-driven)
+  let markParked: () => void = () => undefined
+  const parked = new Promise<void>((resolve) => {
+    markParked = resolve
+  })
   let armed = true
   deps.intents = async () => {
     if (armed) {
       armed = false
       state.parked = true
+      markParked()
       await gate
     }
     return original()
   }
-  return { release, state }
+  return { release, state, parked }
 }
 
 describe('G5-06u T9: RBE6u3-01 the intent read lands after the running save settled', () => {
@@ -777,7 +805,8 @@ describe('G5-06u T9: RBE6u3-01 the intent read lands after the running save sett
     ctx.statuses.length = 0
     // the coordinator's own call, so the press itself can be awaited
     const pressed = ctx.service.coordinator.save(path, { userSave: true })
-    await vi.waitFor(() => expect(press.state.parked).toBe(true))
+    await press.parked
+    expect(press.state.parked).toBe(true)
     // the running save settles (record deleted, pendingNext cleared) before
     // the press's intent read resolves
     release()
@@ -805,7 +834,8 @@ describe('G5-06u T9: RBE6u3-01 the intent read lands after the running save sett
     ctx.statuses.length = 0
     // the coordinator's own call, so the press itself can be awaited
     const pressed = ctx.service.coordinator.save(path, { userSave: true })
-    await vi.waitFor(() => expect(press.state.parked).toBe(true))
+    await press.parked
+    expect(press.state.parked).toBe(true)
     release()
     await first
     expect(binding(path)).toMatchObject({ state: 'saved' })
