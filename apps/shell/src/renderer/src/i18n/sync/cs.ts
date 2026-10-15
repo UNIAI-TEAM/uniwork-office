@@ -123,7 +123,7 @@ export const cs = {
     'Některé neuložené změny se nepodařilo včas zachytit; pro váš účet je ponechána poslední uložená nebo automaticky uložená verze.',
   uwSwitchLostTitle: 'Některé neuložené změny předchozího účtu byly ztraceny',
   uwSwitchLostBody:
-    'Na tomto počítači se přihlásil jiný účet, takže předchozí účet byl uzamčen. Dokumenty, jejichž neuložené změny existovaly jen v otevřených oknech a nešlo je zachovat: {count}. Vše ostatní zůstává pro tento účet na tomto počítači uzamčeno.',
+    'Na tomto počítači se přihlásil jiný účet, takže předchozí účet byl uzamčen. Dokumenty, jejichž neuložené změny nešlo zachovat: {count}. Vše ostatní zůstává pro tento účet na tomto počítači uzamčeno.',
   uwSwitchLostOk: 'Rozumím',
 
   // S2 sync center

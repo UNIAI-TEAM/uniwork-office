@@ -128,7 +128,7 @@ export const pt = {
     'Algumas alterações não salvas não puderam ser capturadas a tempo; a versão salva ou salva automaticamente mais recente é mantida para sua conta.',
   uwSwitchLostTitle: 'Algumas alterações não salvas da conta anterior foram perdidas',
   uwSwitchLostBody:
-    'Outra conta entrou neste computador, então a conta anterior foi bloqueada. Documentos cujas alterações não salvas existiam apenas em janelas abertas e não puderam ser mantidas: {count}. Todo o resto continua bloqueado neste computador para essa conta.',
+    'Outra conta entrou neste computador, então a conta anterior foi bloqueada. Documentos cujas alterações não salvas não puderam ser mantidas: {count}. Todo o resto continua bloqueado neste computador para essa conta.',
   uwSwitchLostOk: 'OK',
 
   // S2 sync center

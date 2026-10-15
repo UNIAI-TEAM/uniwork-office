@@ -135,6 +135,8 @@ function setup(
       mode?: 'save' | 'capture',
     ) => boolean
     fetch?: (url: string, init?: RequestInit) => Promise<Response>
+    /** wires the service's own no-prompt close (lockSession step 3) to the open set */
+    closeNow?: boolean
   } = {},
 ) {
   const statuses: UniworkDocStatus[] = []
@@ -246,6 +248,7 @@ function setup(
     }),
     isPathOpen: vi.fn((p: string) => openSet.has(p)),
     openPaths: () => [...openSet],
+    ...(opts.closeNow ? { closePathNow: (p: string) => void openSet.delete(p) } : {}),
     requestModuleSave,
     reloadPath: vi.fn(),
     activePath: () => undefined,
@@ -1270,6 +1273,90 @@ describe('G5-11 sign-out lock-and-keep, N+1 park, and restoreParked', () => {
         .filter((f) => f.endsWith('.rec'))
         .sort(),
     ).toEqual(recFiles)
+  })
+
+  it('23. d5-1: a switch whose park is refused (store full) still closes A, keeps no plaintext of A and counts the loss in one notice', async () => {
+    const marker = 'MARKER-SWITCH-d5-1-71b3'
+    const path = seedWorkingCopy({
+      name: 'Deck.pptx',
+      format: 'pptx',
+      bytes: `${'x'.repeat(2048)} ${marker}`,
+      baseBytes: 'v3 base deck',
+      state: 'dirty',
+    })
+    // a newer slides autosave copy of the same deck, too big for the store as well
+    const slidesRecoveryDir = join(dir, 'slides-autosave')
+    mkdirSync(slidesRecoveryDir, { recursive: true })
+    const slidesRecovery = join(
+      slidesRecoveryDir,
+      `${createHash('sha1').update(path).digest('hex').slice(0, 16)}.pptx`,
+    )
+    await new Promise((r) => setTimeout(r, 15))
+    writeFileSync(slidesRecovery, `${'y'.repeat(2048)} autosave ${marker}`)
+    // tiny budget: every park of A's N+1 is refused with store_full
+    const ctx = setup({ openPaths: [path], budgetBytes: 256, closeNow: true })
+
+    const noticeSwitchLoss = vi.fn()
+    const boundary = new AccountBoundary({
+      root: join(dir, 'uniwork-documents'),
+      openPaths: () => [...ctx.openSet],
+      // a close prompt the user cancels: only the lock's own close may remove the tab
+      closeDocument: async () => false,
+      confirmClose: async () => true,
+      closeNow: (p) => ctx.openSet.delete(p),
+      aiHistoryPaths: () => [],
+      forgetAiHistory: () => undefined,
+      forgetLocks: () => undefined,
+      closeConflictPrompt: () => undefined,
+      planSignOut: (owner) => ctx.service.signOutPlan(owner),
+      noticeSwitchLoss,
+      lockSession: async (owner, onWaiting, options) => {
+        const res = await ctx.service.lockSession(owner, onWaiting, options)
+        return { ok: res.ok, lost: res.lost?.length ?? 0 }
+      },
+    })
+    await boundary.enforce(ownerA)
+    ctx.setAccount('acc_2')
+    ctx.service.noteSessionIdentity()
+    await boundary.enforce({ deploymentId: 'default', accountId: 'acc_2' })
+
+    // A's tab is closed and no plaintext of A is left: no folder, no autosave copy
+    expect(ctx.openSet.has(path)).toBe(false)
+    expect(existsSync(docDir())).toBe(false)
+    expect(existsSync(slidesRecovery)).toBe(false)
+    expect(filesContaining(dir, marker)).toEqual([])
+    // the loss is told once, counting the deck whose N+1 could not be kept
+    expect(noticeSwitchLoss).toHaveBeenCalledTimes(1)
+    expect(noticeSwitchLoss).toHaveBeenCalledWith(ownerA, expect.objectContaining({ ramOnly: 1 }))
+    // and nothing of A went into the store of B
+    const live = await ctx.syncStore.open()
+    if (live.kind !== 'ok') throw new Error(live.kind)
+    expect(await createParkedStore(live.records(PARKED_STORE_REGISTRATION.name)).list()).toEqual([])
+  })
+
+  it('24. d5-1: an explicit sign-out with the same refused park still aborts: the tab stays, nothing is deleted', async () => {
+    const path = seedWorkingCopy({ bytes: 'x'.repeat(2048), baseBytes: 'v3 base', state: 'dirty' })
+    const ctx = setup({ openPaths: [path], budgetBytes: 256, closeNow: true })
+    const boundary = new AccountBoundary({
+      root: join(dir, 'uniwork-documents'),
+      openPaths: () => [...ctx.openSet],
+      closeDocument: async (p) => ctx.openSet.delete(p),
+      confirmClose: async () => true,
+      closeNow: (p) => ctx.openSet.delete(p),
+      aiHistoryPaths: () => [],
+      forgetAiHistory: () => undefined,
+      forgetLocks: () => undefined,
+      closeConflictPrompt: () => undefined,
+      sessionOwner: () => ownerA,
+      planSignOut: (owner) => ctx.service.signOutPlan(owner),
+      lockSession: async (owner, onWaiting, options) => {
+        const res = await ctx.service.lockSession(owner, onWaiting, options)
+        return { ok: res.ok, lost: res.lost?.length ?? 0 }
+      },
+    })
+    expect(await boundary.beforeSignOut({ confirmed: true })).toBe(false)
+    expect(ctx.openSet.has(path)).toBe(true)
+    expect(readFileSync(path, 'utf8')).toBe('x'.repeat(2048))
   })
 
   it('21. d2-3: findNewestRecoveryBytes picks the newest candidate by mtime when the disk file is missing', async () => {

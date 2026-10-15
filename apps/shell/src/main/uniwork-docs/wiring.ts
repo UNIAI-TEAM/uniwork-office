@@ -858,7 +858,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     // G5-11: the outgoing account's durable store is locked (never wiped) after
     // waiting for any in-flight save, capturing N+1 editor/disk working copies
     // into `parked`, and deleting plaintext working + recovery copies.
-    lockStore: async (owner) => {
+    lockStore: async (owner, options) => {
       // G5-08c: the leases lock at the account boundary itself (sign-out at
       // once; a switch never locks the incoming account), not on stop()
       runtime.leases.lockBoundary(owner)
@@ -867,8 +867,11 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
       stopFeed()
       let captureFailed = 0
       try {
-        // the service itself pushes the one `waiting` through pushSignOutProgress
-        const res = await service.lockSession(owner)
+        // the service itself pushes the one `waiting` through pushSignOutProgress;
+        // on a switch a refused park cannot abort (d5-1), its loss is counted
+        const res = await service.lockSession(owner, undefined, {
+          switch: options?.switch === true,
+        })
         captureFailed = res.captureFailed.length
         // G5-05 OQ-UX11 (a): the pinned offline copies go at sign-out and at a
         // switch, beside the locked sync scope (their own layer, not parked
@@ -879,7 +882,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
             accountId: owner.accountId,
           })
         }
-        return res.ok
+        return { ok: res.ok, lost: res.lost?.length ?? 0 }
       } finally {
         push(UNIWORK_DOC_CHANNELS.signOutProgress, {
           phase: 'done',

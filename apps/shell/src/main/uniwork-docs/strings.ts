@@ -55,7 +55,7 @@ const en = {
   signOutBack: 'Back',
   switchLostTitle: 'Some unsaved changes of the previous account were lost',
   switchLostBody:
-    'Another account signed in on this computer, so the previous account was locked. Documents whose unsaved changes existed only in open windows and could not be kept: {count}. Everything else stays locked on this computer for that account.',
+    'Another account signed in on this computer, so the previous account was locked. Documents whose unsaved changes could not be kept: {count}. Everything else stays locked on this computer for that account.',
   switchLostOk: 'OK',
 }
 
@@ -112,7 +112,7 @@ const vi = {
   signOutBack: 'Quay lại',
   switchLostTitle: 'Một số thay đổi chưa lưu của tài khoản trước đã mất',
   switchLostBody:
-    'Một tài khoản khác đã đăng nhập trên máy này nên tài khoản trước đã được khóa. Tài liệu có thay đổi chưa lưu chỉ còn trong cửa sổ đang mở và không giữ lại được: {count}. Mọi thứ khác vẫn được giữ khóa trên máy này cho tài khoản đó.',
+    'Một tài khoản khác đã đăng nhập trên máy này nên tài khoản trước đã được khóa. Tài liệu có thay đổi chưa lưu không giữ lại được: {count}. Mọi thứ khác vẫn được giữ khóa trên máy này cho tài khoản đó.',
   switchLostOk: 'Đã hiểu',
 } satisfies Record<Key, string>
 

@@ -324,9 +324,10 @@ describe('a sign-in that changes the account', () => {
       () => new Promise<boolean>((resolve) => (release = resolve)),
     )
     const first = h.boundary.enforce(ownerB)
-    await h.boundary.enforce(ownerB)
+    // the second push joins the run in progress: it resolves once that run ended
+    const second = h.boundary.enforce(ownerB)
     release(true)
-    await first
+    await Promise.all([first, second])
     expect(h.deps.closeDocument).toHaveBeenCalledTimes(1)
   })
 })
@@ -401,6 +402,71 @@ describe('an account switch that is already effective (Q2 = a)', () => {
     await h.boundary.enforce(ownerB)
     expect(h.locked).toEqual([ownerA])
     expect(h.closed).toEqual([aSheet])
+  })
+
+  it('d5-1: a switch lock that could not keep N+1 is told it is a switch, and the one notice counts the lost documents with the RAM-only ones', async () => {
+    const h = switching({ count: 3, ramOnly: 1 })
+    h.deps.lockStore.mockImplementation(async (owner: Owner | null) => {
+      h.order.push('lock')
+      h.locked.push(owner)
+      return { ok: true, lost: 2 }
+    })
+    await h.boundary.enforce(ownerA)
+    await h.boundary.enforce(ownerB)
+    expect(h.deps.lockStore).toHaveBeenCalledWith(ownerA, { switch: true })
+    expect(h.deps.noticeSwitchLoss).toHaveBeenCalledTimes(1)
+    expect(h.deps.noticeSwitchLoss).toHaveBeenCalledWith(
+      ownerA,
+      expect.objectContaining({ ramOnly: 3 }),
+    )
+    expect(h.order).toEqual(['lock', 'notice'])
+    expect(h.closed).toEqual([aSheet])
+  })
+
+  it('d5-1: a lost N+1 alone (nothing RAM-only) still sends the notice', async () => {
+    const h = switching({ count: 1, ramOnly: 0 })
+    h.deps.lockStore.mockImplementation(async () => ({ ok: true, lost: 1 }))
+    await h.boundary.enforce(ownerA)
+    await h.boundary.enforce(ownerB)
+    expect(h.deps.noticeSwitchLoss).toHaveBeenCalledTimes(1)
+    expect(h.deps.noticeSwitchLoss).toHaveBeenCalledWith(
+      ownerA,
+      expect.objectContaining({ ramOnly: 1 }),
+    )
+  })
+
+  it('A -> B -> C while the lock of A runs: C runs right after it without another status push, never two runs at once', async () => {
+    const ownerC = { accountId: 'acc_c', deploymentId: 'default' }
+    const h = switching({ count: 0, ramOnly: 0 })
+    let active = 0
+    let maxActive = 0
+    let releaseA: () => void = () => undefined
+    h.deps.lockStore.mockImplementation(async (owner: Owner | null) => {
+      active += 1
+      maxActive = Math.max(maxActive, active)
+      h.locked.push(owner)
+      if (owner?.accountId === 'acc_a') {
+        await new Promise<void>((resolve) => {
+          releaseA = resolve
+        })
+      }
+      active -= 1
+    })
+    await h.boundary.enforce(ownerA)
+    const toB = h.boundary.enforce(ownerB)
+    await vi.waitFor(() => expect(h.locked).toEqual([ownerA]))
+    const toC = h.boundary.enforce(ownerC)
+    // C's push lands while A's lock is held: nothing else starts yet
+    await Promise.resolve()
+    expect(h.locked).toEqual([ownerA])
+    releaseA()
+    await Promise.all([toB, toC])
+    // B was live and is left for C, so B is locked next, with no new push
+    expect(h.locked).toEqual([ownerA, ownerB])
+    expect(maxActive).toBe(1)
+    // C's boundary is enforced: its next push changes nothing
+    await h.boundary.enforce(ownerC)
+    expect(h.locked).toEqual([ownerA, ownerB])
   })
 
   it('an explicit Sign out still asks, and a cancel there changes nothing', async () => {

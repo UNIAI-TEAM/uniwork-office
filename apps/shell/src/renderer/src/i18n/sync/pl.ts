@@ -124,7 +124,7 @@ export const pl = {
     'Niektórych niezapisanych zmian nie udało się przechwycić na czas; dla Twojego konta zachowano najnowszą zapisaną lub automatycznie zapisaną wersję.',
   uwSwitchLostTitle: 'Część niezapisanych zmian poprzedniego konta została utracona',
   uwSwitchLostBody:
-    'Na tym komputerze zalogowało się inne konto, więc poprzednie konto zostało zablokowane. Dokumenty, których niezapisane zmiany istniały tylko w otwartych oknach i nie mogły zostać zachowane: {count}. Wszystko inne pozostaje zablokowane na tym komputerze dla tamtego konta.',
+    'Na tym komputerze zalogowało się inne konto, więc poprzednie konto zostało zablokowane. Dokumenty, których niezapisanych zmian nie udało się zachować: {count}. Wszystko inne pozostaje zablokowane na tym komputerze dla tamtego konta.',
   uwSwitchLostOk: 'OK',
 
   // S2 sync center

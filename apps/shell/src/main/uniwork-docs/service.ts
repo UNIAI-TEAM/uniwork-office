@@ -184,6 +184,12 @@ export type UnsavedCloseChoice = 'save' | 'resolve' | 'close' | 'cancel'
 export interface SignOutLockResult {
   ok: boolean
   captureFailed: string[]
+  /**
+   * G5-11 d5-1, account switch only: the document keys whose N+1 could not be
+   * parked by any candidate (store full). Their plaintext is deleted anyway,
+   * so the bytes are lost and the switch notice counts them. Absent when none.
+   */
+  lost?: string[]
 }
 
 export interface UniworkDocsServiceDeps {
@@ -1867,7 +1873,11 @@ export class UniworkDocsService {
    * 5. Clear all in-memory caches on the service.
    * 6. Lock the encrypted store (`syncStore.lock(owner)`).
    */
-  async lockSession(owner?: LastOwner | null, onWaiting?: () => void): Promise<SignOutLockResult> {
+  async lockSession(
+    owner?: LastOwner | null,
+    onWaiting?: () => void,
+    options?: { switch?: boolean },
+  ): Promise<SignOutLockResult> {
     const target = owner ?? this.liveIdentity() ?? this.lastOwner
     if (!target) return { ok: true, captureFailed: [] }
     const scopeToken = `${target.deploymentId}/${target.accountId}`
@@ -1876,6 +1886,9 @@ export class UniworkDocsService {
     // Step 1: stop runtime, block new commits, bounded receipt wait (30s)
     this.deps.stopRuntime?.()
     if (this.queueSession) {
+    // d5-1: an account switch is already effective, so a refused park cannot
+    // abort it; an explicit sign-out keeps the folder and aborts instead
+    const switching = options?.switch === true
       this.stoppingQueueSessions.add(this.queueSession.id)
     }
     const dirs = scopeWorkingCopyDirs(this.store.root, target)
@@ -1974,10 +1987,59 @@ export class UniworkDocsService {
     const captureFailedKeys = new Set<string>()
     let parked: ParkedStore | null = null
     if (!keystoreLocked && open.kind === 'ok' && intents) {
-      parked = createParkedStore(open.records(PARKED_STORE_REGISTRATION.name))
+      const store = createParkedStore(open.records(PARKED_STORE_REGISTRATION.name))
+      parked = store
+      const parkBytes = async (
+        key: string,
+        binding: Binding,
+        bytes: Uint8Array,
+      ): Promise<boolean> => {
+        try {
+          const res = await store.park({
+            documentKey: key,
+            binding: {
+              ...binding,
+              state: 'dirty',
+              minStoreLevel: APP_STORE_LEVEL,
+              minAppVersion: this.buildVersion(),
+            },
+            bytes,
+            parkedAt: this.nowIso(),
+          })
+          return res === 'ok'
+        } catch {
+          return false
+        }
+      }
+      /**
+       * A park of `tried` was refused. Sign-out: the folder is kept and the
+       * lock reports `ok: false`. Switch (d5-1): the other candidate bytes are
+       * tried (the d1-1 capture-failed fallback); when none parks, the
+       * document is lost and counted, and its folder still goes, so no
+       * plaintext of the leaving account stays readable by the next one.
+       */
+      const parkRefused = async (
+        dir: string,
+        key: string,
+        binding: Binding,
+        tried: Uint8Array,
+        others: Array<Uint8Array | null>,
+      ): Promise<void> => {
+        if (!switching) {
+          parkFailedDirs.add(dir)
+          return
+        }
+        const triedHash = sha256Hex(tried)
+        for (const bytes of others) {
+          if (!bytes || sha256Hex(bytes) === triedHash) continue
+          if (await parkBytes(key, binding, bytes)) return
+        }
+        lostKeys.add(key)
+      }
       for (const dir of dirs) {
         if (this.store.newerStoreIn(dir)) continue
         const binding = await this.store.readDir(dir)
+    const lostKeys = new Set<string>()
         if (!binding) continue
         const key = basename(dir)
         const path = join(dir, binding.filename)
@@ -2056,21 +2118,10 @@ export class UniworkDocsService {
           const recoveryBytes = this.findNewestRecoveryBytes(path, diskMtimeMs)
           const candidateBytes =
             recoveryBytes ?? (diskBytes && diskHash !== binding.baseChecksum ? diskBytes : null)
-          if (candidateBytes) {
-            const parkRes = await parked.park({
-              documentKey: key,
-              binding: {
-                ...binding,
-                state: 'dirty',
-                minStoreLevel: APP_STORE_LEVEL,
-                minAppVersion: this.buildVersion(),
-              },
-              bytes: candidateBytes,
-              parkedAt: this.nowIso(),
-            })
-            if (parkRes !== 'ok') {
-              parkFailedDirs.add(dir)
-            }
+          if (candidateBytes && !(await parkBytes(key, binding, candidateBytes))) {
+            await parkRefused(dir, key, binding, candidateBytes, [
+              diskBytes && diskHash !== binding.baseChecksum ? diskBytes : null,
+            ])
           }
           continue
         }
@@ -2087,39 +2138,17 @@ export class UniworkDocsService {
           KEEP_LOCAL_STATES.has(binding.state) ||
           hasActiveIntent
         if (needsPark) {
-          const parkRes = await parked.park({
-            documentKey: key,
-            binding: {
-              ...binding,
-              state: 'dirty',
-              minStoreLevel: APP_STORE_LEVEL,
-              minAppVersion: this.buildVersion(),
-            },
-            bytes: diskBytes,
-            parkedAt: this.nowIso(),
-          })
-          if (parkRes !== 'ok') {
-            parkFailedDirs.add(dir)
+          if (!(await parkBytes(key, binding, diskBytes))) {
+            await parkRefused(dir, key, binding, diskBytes, [
+              this.findNewestRecoveryBytes(path, diskMtimeMs),
+            ])
           }
         } else if (captureNeeded) {
           // the disk still holds only the base bytes: the capture did not land
           captureFailedKeys.add(key)
           const recoveryBytes = this.findNewestRecoveryBytes(path, diskMtimeMs)
-          if (recoveryBytes) {
-            const parkRes = await parked.park({
-              documentKey: key,
-              binding: {
-                ...binding,
-                state: 'dirty',
-                minStoreLevel: APP_STORE_LEVEL,
-                minAppVersion: this.buildVersion(),
-              },
-              bytes: recoveryBytes,
-              parkedAt: this.nowIso(),
-            })
-            if (parkRes !== 'ok') {
-              parkFailedDirs.add(dir)
-            }
+          if (recoveryBytes && !(await parkBytes(key, binding, recoveryBytes))) {
+            await parkRefused(dir, key, binding, recoveryBytes, [])
           }
         }
       }
@@ -2228,6 +2257,7 @@ export class UniworkDocsService {
   private clearRecoveryFn: ((path: string) => void) | null = null
 
   setClearRecovery(clear: (path: string) => void): void {
+      ...(lostKeys.size > 0 ? { lost: [...lostKeys] } : {}),
     this.clearRecoveryFn = clear
   }
 
