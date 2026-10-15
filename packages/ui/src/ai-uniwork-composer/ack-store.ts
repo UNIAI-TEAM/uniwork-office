@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 export const UNIWORK_ACK_STORAGE_KEY = 'uniwork.office.ai.disclosure.ack.v1'
 
@@ -26,6 +26,12 @@ export function serializeUniworkAckKey(key: UniworkAckKey | null | undefined): s
 }
 
 const memoryAcks = new Set<string>()
+/**
+ * Acks of keys that have no account (see `serializeUniworkAckKey`), keyed by the raw key identity.
+ * Memory only: never written to storage, never read for a key that has an account, and shared by
+ * every hook instance so the inline disclosure, an externally rendered one and the composer agree.
+ */
+const unscopedAcks = new Set<string>()
 const listeners = new Set<() => void>()
 let hydrated = false
 let storageListenerAttached = false
@@ -103,8 +109,9 @@ export function ack(key: UniworkAckKey | null | undefined): void {
 
 /** Clears all stored disclosure acknowledgments (used by tests and sign-out cleanup) */
 export function clearUniworkAcks(): void {
-  const hadAny = memoryAcks.size > 0
+  const hadAny = memoryAcks.size > 0 || unscopedAcks.size > 0
   memoryAcks.clear()
+  unscopedAcks.clear()
   hydrated = false
   if (typeof localStorage !== 'undefined') {
     try {
@@ -130,11 +137,16 @@ function rawAckIdentity(key: UniworkAckKey | null | undefined): string | null {
   return JSON.stringify([key.account ?? '', key.org ?? '', key.document ?? ''])
 }
 
+function isUnscopedAcked(key: UniworkAckKey | null | undefined): boolean {
+  const identity = rawAckIdentity(key)
+  return identity !== null && serializeUniworkAckKey(key) === null && unscopedAcks.has(identity)
+}
+
 /**
  * React hook binding an ack key to `isAcked` / `ack` state.
  * A key without an account cannot be stored (see `serializeUniworkAckKey`), so `acknowledge`
- * keeps that ack in this hook instance only: it lets this composer send for the current key,
- * is never written to storage, and is dropped as soon as the key changes.
+ * keeps that ack in one shared in-memory set instead: it lets every region and composer showing
+ * that key send, is never written to storage, and is dropped as soon as the key changes.
  */
 export function useUniworkDisclosureAck(key: UniworkAckKey | null | undefined): {
   readonly acked: boolean
@@ -143,17 +155,24 @@ export function useUniworkDisclosureAck(key: UniworkAckKey | null | undefined): 
   readonly acknowledge: () => void
 } {
   const [, setTick] = useState(0)
-  const [memoryAckedFor, setMemoryAckedFor] = useState<string | null>(null)
   useEffect(() => subscribeUniworkAck(() => setTick((n) => n + 1)), [])
   const identity = rawAckIdentity(key)
-  const unscoped = key != null && serializeUniworkAckKey(key) === null
+  const previousIdentityRef = useRef(identity)
   useEffect(() => {
-    setMemoryAckedFor(null)
+    const previous = previousIdentityRef.current
+    previousIdentityRef.current = identity
+    if (previous !== null && previous !== identity && unscopedAcks.delete(previous)) {
+      notifyListeners()
+    }
   }, [identity])
-  const acked = isAcked(key) || (unscoped && memoryAckedFor === identity)
+  const acked = isAcked(key) || isUnscopedAcked(key)
   const acknowledge = useCallback(() => {
     if (key != null && serializeUniworkAckKey(key) === null) {
-      setMemoryAckedFor(rawAckIdentity(key))
+      const raw = rawAckIdentity(key)
+      if (raw !== null && !unscopedAcks.has(raw)) {
+        unscopedAcks.add(raw)
+        notifyListeners()
+      }
       return
     }
     ack(key)

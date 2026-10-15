@@ -133,6 +133,15 @@ export function AiComposer({
 
   const canSend = value.trim().length > 0 && !busy && needModelHint === null && !unacked
 
+  // the panel's queue honours the same disclosure gate as Send: a held message must not reach
+  // UniWork AI before the user has acknowledged the disclosure
+  const onSendBlockedChange = uniwork?.onSendBlockedChange
+  useEffect(() => {
+    if (!onSendBlockedChange) return undefined
+    onSendBlockedChange(unacked)
+    return () => onSendBlockedChange(false)
+  }, [onSendBlockedChange, unacked])
+
   const [liveText, setLiveText] = useState('')
   const onAnnounceProp = uniwork?.onAnnounce
   const announce = useCallback(

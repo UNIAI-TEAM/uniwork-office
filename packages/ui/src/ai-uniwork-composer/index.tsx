@@ -340,6 +340,13 @@ export interface AiComposerUniworkProps {
   readonly stopLabelKey?: AiUniworkStringKey | undefined
   /** Optional callback to mirror polite live announcements to a panel/window live node */
   readonly onAnnounce?: ((text: string) => void) | undefined
+  /**
+   * Reports whether the disclosure gate currently blocks Send (UniWork AI active and not yet
+   * acknowledged). Called on every change and with `false` when the composer unmounts or this
+   * callback is dropped. A panel keeps the value so its message queue honours the same gate as
+   * the Send button; the queue must not dequeue while it is `true`.
+   */
+  readonly onSendBlockedChange?: ((blocked: boolean) => void) | undefined
 }
 
 /** True when `el` is hidden from view or from assistive tech (own attributes or inline style). */
