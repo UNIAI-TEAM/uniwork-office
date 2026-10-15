@@ -349,6 +349,9 @@ export class SaveCoordinator {
    * marked only when the copy moved past the intent, one popover push. With no
    * intent yet (the first save is still reading or minting), or when the intent
    * store cannot be read, the early return stays: no push, nothing changed.
+   * The one exception is a press whose read lost the race to the running save's
+   * settle (the record is gone, the binding moved): see `movedPastSettledSave`
+   * (RBE6u3-01).
    */
   private async requestPopoverWhileSaving(
     doc: BoundDocument,
@@ -360,12 +363,32 @@ export class SaveCoordinator {
       const access = await this.deps.intents()
       if (access.kind !== 'ok') return doc
       const stored = await access.intents.read(doc.key, factsOf(doc, bytes.byteLength))
-      if (!stored || isTerminalQueueState(stored.intent.state)) return doc
-      moved = stored.intent.checksum !== sha256Hex(bytes)
+      if (stored && !isTerminalQueueState(stored.intent.state)) {
+        moved = stored.intent.checksum !== sha256Hex(bytes)
+      } else if (await this.movedPastSettledSave(doc)) {
+        moved = true
+      } else {
+        return doc
+      }
     } catch {
       return doc
     }
     return this.requestPopover(doc, options, moved)
+  }
+
+  /**
+   * One read-only re-check for a press that found no live intent while the path
+   * was saving. If the running save settled underneath the press, its commit
+   * already moved the binding's base (the record is deleted right after): a
+   * copy still different from that fresh base is an unsent N+1, so the press
+   * keeps its popover (RBE6u3-01). A binding that did not move means the first
+   * save has not stored its intent yet (nothing to say), and a clean copy has
+   * nothing to mark. Never writes, mints or replays.
+   */
+  private async movedPastSettledSave(doc: BoundDocument): Promise<boolean> {
+    const fresh = this.deps.store.lookup(doc.path)
+    if (!fresh || fresh.binding.baseChecksum === doc.binding.baseChecksum) return false
+    return sha256Hex(await this.readBytes(doc.path)) !== fresh.binding.baseChecksum
   }
 
   private async run(
