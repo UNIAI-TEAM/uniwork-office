@@ -38,6 +38,7 @@ export const nl = {
   uwQueueCancel: 'Opslaan annuleren…',
   uwQueueCancelConfirm:
     'Opslag in de wachtrij annuleren? Je wijzigingen blijven op deze computer; het document op UniWork verandert niet.',
+  uwQueueCancelGo: 'Opslaan annuleren',
   uwQueueCancelled: 'Opslag in wachtrij geannuleerd. Je wijzigingen blijven op deze computer.',
 
   // {reason} fragments of the blocked/failed rows (the existing uwReason* keys stay in the uniwork-documents shard)
@@ -160,6 +161,7 @@ export const nl = {
   uwSyncEmptyQueue: 'Er wacht niets op opslaan.',
   uwSyncEmptyAttention: 'Niets vraagt aandacht.',
   uwSyncEmptyRecent: 'Geen recente opslagen.',
+  uwSyncActionFailed: 'Dat is niet gelukt. Er is niets verwijderd; probeer het opnieuw.',
   uwSyncRowAnnounce: '{doc}: {state}',
 
   // S3 offline library

@@ -35,6 +35,7 @@ export const en = {
   uwQueueCancel: 'Cancel save…',
   uwQueueCancelConfirm:
     'Cancel the queued save? Your changes stay on this computer; the document on UniWork doesn’t change.',
+  uwQueueCancelGo: 'Cancel save',
   uwQueueCancelled: 'Queued save cancelled. Your changes stay on this computer.',
 
   // {reason} fragments of the blocked/failed rows (the existing uwReason* keys stay in the uniwork-documents shard)
@@ -155,6 +156,7 @@ export const en = {
   uwSyncEmptyQueue: 'Nothing is waiting to save.',
   uwSyncEmptyAttention: 'Nothing needs attention.',
   uwSyncEmptyRecent: 'No recent saves.',
+  uwSyncActionFailed: 'That didn’t work. Nothing was deleted; try again.',
   uwSyncRowAnnounce: '{doc}: {state}',
 
   // S3 offline library

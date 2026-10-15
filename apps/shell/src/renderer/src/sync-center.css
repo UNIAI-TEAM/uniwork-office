@@ -1,0 +1,397 @@
+/* G5-10 (UNI-1357): S2 Sync center. Semantic tokens only (packages/ui/src/tokens.css + the shell accent). */
+
+.sc {
+  max-width: 880px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  color: var(--text-primary);
+}
+
+/* Sync header */
+.sc-header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sc-account {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  font-size: 13px;
+}
+
+.sc-account-name {
+  font-weight: 600;
+}
+
+.sc-account-org,
+.sc-budget {
+  color: var(--text-secondary);
+}
+
+.sc-status-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.sc-status-line[data-tone='error'] {
+  color: var(--danger-text);
+}
+
+.sc-status-line[data-tone='warn'] {
+  color: var(--warning-text);
+}
+
+.sc-status-line[data-tone='ok'] {
+  color: var(--success);
+}
+
+.sc-other-org {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.sc-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.sc-reason {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* link-style action (Đăng xuất, Quay lại) */
+.sc-link {
+  min-height: 24px;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--accent-text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.sc-link:focus-visible,
+.sc-doc-btn:focus-visible,
+.sc-tab:focus-visible,
+.sc-panel:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Sync tab */
+.sc-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+
+.sc-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sc-tab[aria-selected='true'] {
+  color: var(--text-primary);
+  border-bottom-color: var(--accent);
+}
+
+.sc-tab-count {
+  min-width: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 18px;
+  text-align: center;
+}
+
+/* Sync row table */
+.sc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.sc-caption,
+.sc-col-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.sc-row > th,
+.sc-row > td {
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  text-align: start;
+  vertical-align: top;
+}
+
+.sc-doc {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.sc-doc-btn {
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.sc-doc-btn:hover {
+  text-decoration: underline;
+}
+
+.sc-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.sc-badge[data-tone='info'] {
+  border-color: var(--accent-soft);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.sc-badge[data-tone='warn'] {
+  border-color: var(--warning-border);
+  background: var(--warning-bg);
+  color: var(--warning-text);
+}
+
+.sc-badge[data-tone='error'] {
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+.sc-badge[data-tone='ok'] {
+  border-color: var(--success-border);
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.sc-detail {
+  color: var(--text-secondary);
+}
+
+.sc-sub,
+.sc-more-text {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.sc-more-text {
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.sc-progress {
+  display: block;
+  height: 4px;
+  margin-top: 6px;
+  border-radius: 2px;
+  background: var(--surface-subtle);
+  overflow: hidden;
+}
+
+.sc-progress-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.sc-actions {
+  text-align: end;
+}
+
+.sc-act-wrap {
+  display: inline-block;
+  margin: 0 0 4px 6px;
+}
+
+.sc-act {
+  min-height: 24px;
+}
+
+.sc-act-danger {
+  color: var(--danger-text);
+}
+
+.sc-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px 8px;
+}
+
+.sc-confirm-text {
+  flex-basis: 100%;
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-align: start;
+}
+
+.sc-empty {
+  margin: 16px 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+/* store error: replaces the table */
+.sc-store-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 12px;
+  border: 1px solid var(--danger-border);
+  border-radius: 6px;
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+.sc-store-error p {
+  margin: 0;
+}
+
+/* first load */
+.sc-skeleton-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 3fr;
+  gap: 12px;
+  padding: 12px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sc-skeleton-row span {
+  height: 12px;
+  border-radius: 4px;
+  background: var(--surface-subtle);
+}
+
+/* S11 store_newer panel in place of the center */
+.sc-lock {
+  padding: 16px;
+  border: 1px solid var(--danger-border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.sc-lock-title {
+  margin: 0 0 6px;
+  font-size: 15px;
+}
+
+.sc-lock-body {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+/* narrow (< 640px): one column, the sub-line wraps, first action + "…" */
+.sc.is-narrow .sc-table,
+.sc.is-narrow .sc-table tbody,
+.sc.is-narrow .sc-row,
+.sc.is-narrow .sc-row > th,
+.sc.is-narrow .sc-row > td {
+  display: block;
+  width: auto;
+}
+
+.sc.is-narrow .sc-table thead {
+  display: none;
+}
+
+.sc.is-narrow .sc-row > th,
+.sc.is-narrow .sc-row > td {
+  padding: 2px 8px;
+  border-bottom: 0;
+}
+
+.sc.is-narrow .sc-row {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.sc.is-narrow .sc-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  text-align: start;
+}
+
+.sc.is-narrow .sc-act-wrap {
+  margin: 0;
+}
+
+@media (pointer: coarse) {
+  .sc-act,
+  .sc-link,
+  .sc-doc-btn,
+  .sc-tab {
+    min-height: 44px;
+  }
+}
+
+@media (forced-colors: active) {
+  .sc-badge {
+    border-color: CanvasText;
+  }
+
+  .sc-tab[aria-selected='true'] {
+    border-bottom-color: Highlight;
+    outline: 2px solid Highlight;
+  }
+
+  .sc-progress-fill {
+    forced-color-adjust: none;
+    background: Highlight;
+  }
+}

@@ -31,6 +31,7 @@ export const zhTW = {
   uwQueueOpenCenter: '開啟同步中心',
   uwQueueCancel: '取消儲存…',
   uwQueueCancelConfirm: '取消佇列中的儲存？你的變更仍保留在這台電腦上；UniWork 上的文件不會改變。',
+  uwQueueCancelGo: '取消儲存',
   uwQueueCancelled: '已取消佇列中的儲存。你的變更仍保留在這台電腦上。',
 
   // {reason} fragments of the blocked/failed rows (the existing uwReason* keys stay in the uniwork-documents shard)
@@ -148,6 +149,7 @@ export const zhTW = {
   uwSyncEmptyQueue: '沒有等待儲存的內容。',
   uwSyncEmptyAttention: '沒有需要處理的內容。',
   uwSyncEmptyRecent: '最近沒有儲存。',
+  uwSyncActionFailed: '未能完成。沒有刪除任何內容，請再試一次。',
   uwSyncRowAnnounce: '{doc}：{state}',
 
   // S3 offline library

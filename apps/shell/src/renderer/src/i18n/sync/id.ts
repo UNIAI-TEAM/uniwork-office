@@ -39,6 +39,7 @@ export const id = {
   uwQueueCancel: 'Batalkan penyimpanan…',
   uwQueueCancelConfirm:
     'Batalkan penyimpanan dalam antrean? Perubahan Anda tetap di komputer ini; dokumen di UniWork tidak berubah.',
+  uwQueueCancelGo: 'Batalkan simpan',
   uwQueueCancelled: 'Penyimpanan dalam antrean dibatalkan. Perubahan Anda tetap di komputer ini.',
 
   // {reason} fragments of the blocked/failed rows (the existing uwReason* keys stay in the uniwork-documents shard)
@@ -159,6 +160,7 @@ export const id = {
   uwSyncEmptyQueue: 'Tidak ada yang menunggu disimpan.',
   uwSyncEmptyAttention: 'Tidak ada yang perlu ditindaklanjuti.',
   uwSyncEmptyRecent: 'Tidak ada penyimpanan terbaru.',
+  uwSyncActionFailed: 'Tidak berhasil. Tidak ada yang dihapus; coba lagi.',
   uwSyncRowAnnounce: '{doc}: {state}',
 
   // S3 offline library
