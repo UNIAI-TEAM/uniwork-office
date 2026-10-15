@@ -127,6 +127,8 @@ export const pl = {
   uwSyncOpenFromSettings: 'Centrum synchronizacji',
   uwSyncOnline: 'Połączono z UniWork · zsynchronizowano {time}',
   uwSyncOffline: 'Offline · ostatnia synchronizacja {time}',
+  uwSyncOnlineNoTime: 'Połączono z UniWork',
+  uwSyncOfflineNoTime: 'Offline',
   uwSyncPaused: 'Wysyłanie wstrzymane — nowe zapisy poczekają',
   uwSyncAdminPaused: 'Administrator wstrzymał wysyłanie. Zapisy pozostają na tym komputerze.',
   uwSyncFeedOff:

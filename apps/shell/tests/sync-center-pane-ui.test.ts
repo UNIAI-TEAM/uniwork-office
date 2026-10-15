@@ -658,6 +658,16 @@ describe('SyncCenterPane live announcements (FE-1, FE-5, FE-6, FE-9)', () => {
     expect(status().textContent).toContain(vi_.uwSyncOffline!.split('{')[0]!.trim())
   })
 
+  it('BE-2n-3: a session with no verdict yet shows the online line without a dangling time', async () => {
+    const s = snapshot()
+    s.header = { ...s.header, lastSyncAt: undefined }
+    await render(fakeApi(s))
+    const text = host.querySelector('.sc-status-line')!.textContent!
+    expect(text).toContain(vi_.uwSyncOnlineNoTime!)
+    expect(text).not.toContain('{')
+    expect(text).not.toContain(vi_.uwSyncOnline!.split(' · ')[1]!.split('{')[0]!.trim())
+  })
+
   it('a row the user did not act on that changes state is read once, politely', async () => {
     const api = fakeApi(snapshot())
     await render(api)

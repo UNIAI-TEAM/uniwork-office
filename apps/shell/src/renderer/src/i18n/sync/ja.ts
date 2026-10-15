@@ -129,6 +129,8 @@ export const ja = {
   uwSyncOpenFromSettings: '同期センター',
   uwSyncOnline: 'UniWork に接続済み · {time} に同期',
   uwSyncOffline: 'オフライン · 最終同期 {time}',
+  uwSyncOnlineNoTime: 'UniWork に接続済み',
+  uwSyncOfflineNoTime: 'オフライン',
   uwSyncPaused: '送信を一時停止中 — 新しい保存は待機します',
   uwSyncAdminPaused:
     '管理者が送信を一時停止しています。保存内容はこのコンピューターに保持されます。',

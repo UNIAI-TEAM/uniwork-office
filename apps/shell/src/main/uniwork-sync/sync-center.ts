@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { chmod, mkdir, rm, writeFile } from 'node:fs/promises'
-import { basename, extname, join } from 'node:path'
+import { basename, extname, isAbsolute, join, relative, resolve } from 'node:path'
 import {
   SYNC_CENTER_ATTENTION_STATES,
   SYNC_CENTER_DISCARDABLE_BLOCKED_REASONS,
@@ -999,6 +999,18 @@ const STORE_NEWER: UniworkLockReason = 'store_newer'
  */
 export const DRAFT_PREVIEW_CLOSE_GRACE_MS = 30_000
 
+/** the directory (under userData) that holds the read-only copies of kept drafts */
+export const DRAFT_PREVIEW_DIR = 'uniwork-drafts-preview'
+
+/**
+ * True for a file inside the draft-preview root: a preview is a temporary decrypted copy, not a
+ * file the user opened, so it never belongs in the recent-files list.
+ */
+export function isDraftPreviewPath(userDataDir: string, filePath: string): boolean {
+  const rel = relative(resolve(userDataDir, DRAFT_PREVIEW_DIR), resolve(filePath))
+  return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel)
+}
+
 /** the feed runtime's verdict of its last pass (header conditions 7 and 9) */
 export interface SyncFeedVerdict {
   /** a consumer of the last pass rebuilt from a full resync */
@@ -1090,7 +1102,7 @@ export function createWiredSyncCenter(deps: WiredSyncCenterDeps): WiredSyncCente
    * draft discard, once its window is closed (sweep), at an account boundary, and at the
    * next startup (the whole preview root is removed when the sync center is built).
    */
-  const previewRoot = join(deps.userDataDir, 'uniwork-drafts-preview')
+  const previewRoot = join(deps.userDataDir, DRAFT_PREVIEW_DIR)
   let previewSession = randomUUID()
   const previews = new Map<string, { dir: string; path: string; openedAt: number }>()
   const removeDir = (dir: string) =>

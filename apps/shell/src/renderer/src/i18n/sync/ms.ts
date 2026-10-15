@@ -133,6 +133,8 @@ export const ms = {
   uwSyncOpenFromSettings: 'Pusat penyegerakan',
   uwSyncOnline: 'Disambungkan ke UniWork · disegerakkan {time}',
   uwSyncOffline: 'Luar talian · kali terakhir disegerakkan {time}',
+  uwSyncOnlineNoTime: 'Disambungkan ke UniWork',
+  uwSyncOfflineNoTime: 'Luar talian',
   uwSyncPaused: 'Penghantaran dijeda — simpanan baharu akan menunggu',
   uwSyncAdminPaused:
     'Pentadbir anda telah menjeda penghantaran. Simpanan disimpan pada komputer ini.',

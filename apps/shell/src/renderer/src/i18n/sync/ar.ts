@@ -126,6 +126,8 @@ export const ar = {
   uwSyncOpenFromSettings: 'مركز المزامنة',
   uwSyncOnline: 'متصل بـ UniWork · تمت المزامنة {time}',
   uwSyncOffline: 'غير متصل · آخر مزامنة {time}',
+  uwSyncOnlineNoTime: 'متصل بـ UniWork',
+  uwSyncOfflineNoTime: 'غير متصل',
   uwSyncPaused: 'الإرسال متوقف مؤقتًا — ستنتظر عمليات الحفظ الجديدة',
   uwSyncAdminPaused: 'أوقف المسؤول الإرسال مؤقتًا. تبقى عمليات الحفظ على هذا الكمبيوتر.',
   uwSyncFeedOff:

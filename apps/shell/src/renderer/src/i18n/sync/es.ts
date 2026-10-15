@@ -129,6 +129,8 @@ export const es = {
   uwSyncOpenFromSettings: 'Centro de sincronización',
   uwSyncOnline: 'Conectado a UniWork · sincronizado {time}',
   uwSyncOffline: 'Sin conexión · última sincronización {time}',
+  uwSyncOnlineNoTime: 'Conectado a UniWork',
+  uwSyncOfflineNoTime: 'Sin conexión',
   uwSyncPaused: 'Envío en pausa: los nuevos guardados esperarán',
   uwSyncAdminPaused:
     'Tu administrador ha pausado el envío. Los guardados se conservan en este equipo.',

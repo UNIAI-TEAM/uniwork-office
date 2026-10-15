@@ -126,6 +126,8 @@ export const en = {
   uwSyncOpenFromSettings: 'Sync center',
   uwSyncOnline: 'Connected to UniWork · synced {time}',
   uwSyncOffline: 'Offline · last synced {time}',
+  uwSyncOnlineNoTime: 'Connected to UniWork',
+  uwSyncOfflineNoTime: 'Offline',
   uwSyncPaused: 'Sending paused — new saves will wait',
   uwSyncAdminPaused: 'Your admin has paused sending. Saves are kept on this computer.',
   uwSyncFeedOff:

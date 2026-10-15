@@ -128,6 +128,8 @@ export const ru = {
   uwSyncOpenFromSettings: 'Центр синхронизации',
   uwSyncOnline: 'Подключено к UniWork · синхронизировано {time}',
   uwSyncOffline: 'Нет сети · последняя синхронизация {time}',
+  uwSyncOnlineNoTime: 'Подключено к UniWork',
+  uwSyncOfflineNoTime: 'Нет сети',
   uwSyncPaused: 'Отправка приостановлена — новые сохранения будут ждать',
   uwSyncAdminPaused: 'Администратор приостановил отправку. Сохранения хранятся на этом компьютере.',
   uwSyncFeedOff:

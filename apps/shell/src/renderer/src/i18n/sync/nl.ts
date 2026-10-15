@@ -130,6 +130,8 @@ export const nl = {
   uwSyncOpenFromSettings: 'Synchronisatiecentrum',
   uwSyncOnline: 'Verbonden met UniWork · gesynchroniseerd {time}',
   uwSyncOffline: 'Offline · laatst gesynchroniseerd {time}',
+  uwSyncOnlineNoTime: 'Verbonden met UniWork',
+  uwSyncOfflineNoTime: 'Offline',
   uwSyncPaused: 'Verzenden gepauzeerd — nieuwe opslagen wachten',
   uwSyncAdminPaused: 'Je beheerder heeft verzenden gepauzeerd. Opslagen blijven op deze computer.',
   uwSyncFeedOff:

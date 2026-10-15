@@ -126,6 +126,8 @@ export const ko = {
   uwSyncOpenFromSettings: '동기화 센터',
   uwSyncOnline: 'UniWork에 연결됨 · {time} 동기화',
   uwSyncOffline: '오프라인 · 마지막 동기화 {time}',
+  uwSyncOnlineNoTime: 'UniWork에 연결됨',
+  uwSyncOfflineNoTime: '오프라인',
   uwSyncPaused: '전송 일시 중지됨 — 새 저장은 대기합니다',
   uwSyncAdminPaused: '관리자가 전송을 일시 중지했습니다. 저장 내용은 이 컴퓨터에 보관됩니다.',
   uwSyncFeedOff:

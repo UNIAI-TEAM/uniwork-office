@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createWiredSyncCenter,
   DRAFT_PREVIEW_CLOSE_GRACE_MS,
+  isDraftPreviewPath,
   type SyncFeedVerdict,
 } from '../src/main/uniwork-sync/sync-center'
 import { QueueDispatcher, type QueueIntents } from '../src/main/uniwork-sync/queue/dispatcher'
@@ -260,11 +261,16 @@ function wired(
       capabilities: {
         sync_write: true,
         sync_feed: true,
-        ...(options.offlineLibrary === undefined ? {} : { offline_library: options.offlineLibrary }),
+        ...(options.offlineLibrary === undefined
+          ? {}
+          : { offline_library: options.offlineLibrary }),
       },
     }),
     ...(options.lease
-      ? { leaseState: async (documentId: string) => ({ state: options.lease!(documentId) }) as never }
+      ? {
+          leaseState: async (documentId: string) =>
+            ({ state: options.lease!(documentId) }) as never,
+        }
       : {}),
     feedVerdict: options.feed ?? (() => ({ resynced: false, resyncFailed: false })),
     tickRuntime: async () => undefined,
@@ -578,7 +584,9 @@ describe('RES-3: the lease manager produces lease_expired / clock_rollback on th
 
   it('wiring.ts hands the runtime lease manager to the sync center', () => {
     const source = readFileSync(join(__dirname, '..', 'src/main/uniwork-docs/wiring.ts'), 'utf8')
-    expect(source).toContain('leaseState: (documentId) => runtime.leases.effectiveState(documentId),')
+    expect(source).toContain(
+      'leaseState: (documentId) => runtime.leases.effectiveState(documentId),',
+    )
   })
 })
 
@@ -644,3 +652,48 @@ function runtimeHarness(options: { pages?: () => FeedPage | Error } = {}) {
     },
   }
 }
+
+describe('BE-2n-2: a read-only draft preview is not a recent file', () => {
+  it('the path a preview opens through is recognised, a normal document path is not', async () => {
+    const h = wired({ docs: [{ key: 'doc-1' }] })
+    await h.cancelSave(h.pathOf('doc-1'), true)
+    const row = (await h.controller.getSnapshot()).tabs.attention.find(
+      (r) => r.state === 'kept_draft',
+    )!
+    expect(await h.controller.openDraft(row.id)).toEqual({ ok: true })
+    const [file] = filesUnder(h.previewRoot)
+    expect(file).toBeDefined()
+    // the very path the shell was asked to open is the one the recents guard must skip
+    expect(h.openPaths.has(file!)).toBe(true)
+    expect(isDraftPreviewPath(h.userDataDir, file!)).toBe(true)
+    expect(isDraftPreviewPath(h.userDataDir, h.pathOf('doc-1'))).toBe(false)
+    expect(isDraftPreviewPath(h.userDataDir, h.previewRoot)).toBe(false)
+    expect(
+      isDraftPreviewPath(h.userDataDir, join(h.userDataDir, 'uniwork-drafts-preview-x', 'a.docx')),
+    ).toBe(false)
+  })
+
+  it('every recents write in the shell main process goes through the preview guard', () => {
+    const source = readFileSync(join(__dirname, '..', 'src/main/index.ts'), 'utf8')
+    expect(source).toContain('recordRecentFile as recordRecentFileRaw,')
+    const guard = source.slice(source.indexOf('function recordRecentFile('))
+    expect(guard.slice(0, guard.indexOf('function routeDocumentPath('))).toContain(
+      "if (isDraftPreviewPath(app.getPath('userData'), filePath)) return",
+    )
+    // the raw recorder is called from the guard only
+    expect(source.match(/recordRecentFileRaw\(/g)).toHaveLength(1)
+  })
+})
+
+describe('BE-2n-3: no verdict yet is not a synced time', () => {
+  it('a signed-in session with no verdict has no sync time, and a no-verdict pass sets none', async () => {
+    const h = wired()
+    const before = (await h.controller.getSnapshot()).header
+    expect(before.lastSyncAt).toBeUndefined()
+    expect(before.status).toBe('online')
+    await h.notePoll(undefined)
+    const after = (await h.controller.getSnapshot()).header
+    expect(after.lastSyncAt).toBeUndefined()
+    expect(after.status).toBe('online')
+  })
+})

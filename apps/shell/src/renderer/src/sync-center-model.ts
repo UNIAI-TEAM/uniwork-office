@@ -434,7 +434,8 @@ export function headerLine(
   header: SyncCenterHeader,
   signedOut: SyncCenterSignedOutSummary | undefined,
 ): SyncHeaderLine | null {
-  const time = { time: header.lastSyncAt ?? '' }
+  // no verdict yet (a pass that attempted nothing) has no sync time: never render an empty {time}
+  const time = header.lastSyncAt ? { time: header.lastSyncAt } : undefined
   switch (resolveHeaderStatus(header)) {
     case 'store_newer':
       return null
@@ -449,7 +450,9 @@ export function headerLine(
     case 'admin_paused':
       return { key: 'uwSyncAdminPaused', tone: 'warn' }
     case 'offline':
-      return { key: 'uwSyncOffline', timeParams: time, tone: 'neutral' }
+      return time
+        ? { key: 'uwSyncOffline', timeParams: time, tone: 'neutral' }
+        : { key: 'uwSyncOfflineNoTime', tone: 'neutral' }
     case 'paused':
       return { key: 'uwSyncPaused', tone: 'neutral' }
     case 'resync_failed':
@@ -457,9 +460,13 @@ export function headerLine(
     case 'feed_off':
       return { key: 'uwSyncFeedOff', tone: 'neutral' }
     case 'resynced':
-      return { key: 'uwSyncResynced', timeParams: time, tone: 'ok' }
+      return time
+        ? { key: 'uwSyncResynced', timeParams: time, tone: 'ok' }
+        : { key: 'uwSyncOnlineNoTime', tone: 'ok' }
     case 'online':
-      return { key: 'uwSyncOnline', timeParams: time, tone: 'ok' }
+      return time
+        ? { key: 'uwSyncOnline', timeParams: time, tone: 'ok' }
+        : { key: 'uwSyncOnlineNoTime', tone: 'ok' }
   }
 }
 

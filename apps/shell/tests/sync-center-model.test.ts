@@ -90,8 +90,23 @@ describe('header status priority (Đầu trang S2)', () => {
     expect(headerLine(header({ paused: true }), undefined)?.key).toBe('uwSyncPaused')
     expect(headerLine(header({ resyncFailed: true }), undefined)?.key).toBe('uwSyncResyncFailed')
     expect(headerLine(header({ feedOff: true }), undefined)?.key).toBe('uwSyncFeedOff')
-    expect(headerLine(header({ resynced: true }), undefined)?.key).toBe('uwSyncResynced')
-    expect(headerLine(header(), undefined)?.key).toBe('uwSyncOnline')
+    expect(headerLine(header({ resynced: true, lastSyncAt: 'x' }), undefined)?.key).toBe(
+      'uwSyncResynced',
+    )
+    expect(headerLine(header({ lastSyncAt: 'x' }), undefined)).toMatchObject({
+      key: 'uwSyncOnline',
+      timeParams: { time: 'x' },
+    })
+  })
+
+  it('BE-2n-3: with no sync time yet the line never carries an empty {time}', () => {
+    const online = headerLine(header(), undefined)!
+    expect(online.key).toBe('uwSyncOnlineNoTime')
+    expect(online.timeParams).toBeUndefined()
+    const offline = headerLine(header({ online: false }), undefined)!
+    expect(offline.key).toBe('uwSyncOfflineNoTime')
+    expect(offline.timeParams).toBeUndefined()
+    expect(headerLine(header({ resynced: true }), undefined)?.timeParams).toBeUndefined()
   })
 })
 

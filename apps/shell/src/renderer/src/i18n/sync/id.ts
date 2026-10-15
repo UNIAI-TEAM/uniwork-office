@@ -130,6 +130,8 @@ export const id = {
   uwSyncOpenFromSettings: 'Pusat sinkronisasi',
   uwSyncOnline: 'Terhubung ke UniWork · disinkronkan {time}',
   uwSyncOffline: 'Offline · terakhir disinkronkan {time}',
+  uwSyncOnlineNoTime: 'Terhubung ke UniWork',
+  uwSyncOfflineNoTime: 'Offline',
   uwSyncPaused: 'Pengiriman dijeda — penyimpanan baru akan menunggu',
   uwSyncAdminPaused: 'Admin Anda menjeda pengiriman. Simpanan tetap ada di komputer ini.',
   uwSyncFeedOff:
