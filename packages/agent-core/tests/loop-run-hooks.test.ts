@@ -188,7 +188,7 @@ describe('AgentLoop run hooks', () => {
     expect(log.slice(-2)).toEqual([`end:${id}:true:aborted`, 'done'])
   })
 
-  it('a stop while a tool never resolves still ends the run as aborted', async () => {
+  it('a stop while a tool never resolves ends the run as aborted and may-have-mutated', async () => {
     const log: string[] = []
     const transport = scriptedTransport([
       (cb) => {
@@ -203,7 +203,8 @@ describe('AgentLoop run hooks', () => {
     loop.cancel()
     await settle()
     const id = onePair(log)
-    expect(log.slice(-2)).toEqual([`end:${id}:false:aborted`, 'done'])
+    // the cut-off tool may already have edited the document: keep its undo step
+    expect(log.slice(-2)).toEqual([`end:${id}:true:aborted`, 'done'])
   })
 
   it('a stop while the model is streaming ends the run as aborted', async () => {
