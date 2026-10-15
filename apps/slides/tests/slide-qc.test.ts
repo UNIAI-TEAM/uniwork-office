@@ -132,16 +132,16 @@ describe('vision capability fallback', () => {
 
   it('decides from the model main will use for a provider served by a key on UniWork', () => {
     // the slot holds the stored default (vision-capable); the org source serves a text-only model
-    const settings: AiSettings = { ...defaultAiSettings(), provider: 'genspark' }
-    settings.providers.genspark.model = 'claude-opus-4-7'
-    settings.modelSources = { genspark: { chosen: 'deep-seek-v4-flash', origin: 'org' } }
+    const settings: AiSettings = { ...defaultAiSettings(), provider: 'anthropic' }
+    settings.providers.anthropic.model = 'claude-opus-4-7'
+    settings.modelSources = { anthropic: { chosen: 'deep-seek-v4-flash', origin: 'org' } }
     expect(settingsSupportVision(settings)).toBe(false)
     // and the other way round: a text-only slot, a vision-capable served model
-    settings.providers.genspark.model = 'deep-seek-v4-flash'
-    settings.modelSources = { genspark: { chosen: 'claude-opus-4-7', origin: 'org' } }
+    settings.providers.anthropic.model = 'deep-seek-v4-flash'
+    settings.modelSources = { anthropic: { chosen: 'claude-opus-4-7', origin: 'org' } }
     expect(settingsSupportVision(settings)).toBe(true)
     // a source without a chosen model falls back to the slot
-    settings.modelSources = { genspark: { chosen: '', origin: 'org' } }
+    settings.modelSources = { anthropic: { chosen: '', origin: 'org' } }
     expect(settingsSupportVision(settings)).toBe(false)
   })
 
