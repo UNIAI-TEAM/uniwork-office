@@ -174,11 +174,11 @@ export function createSyncStoreAccess(options: {
       dropHandle()
     },
     async lock(explicitScope) {
-      const left = explicitScope ?? opened?.scope ?? pending?.scope ?? lastScope ?? options.scope()
-      if (!left) {
-        dropHandle()
-        return
-      }
+      // A bare lock() names the scope this access last handed out. With none
+      // cached there is nothing to leave: it never falls back to the live scope,
+      // which by then may be the incoming session's.
+      const left = explicitScope ?? opened?.scope ?? pending?.scope ?? lastScope
+      if (!left) return
       // only the scope being left loses its handles; another scope's open or
       // cached handle (the incoming session's) stays valid
       const token = tokenOf(left)
