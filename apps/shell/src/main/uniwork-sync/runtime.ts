@@ -3,9 +3,28 @@ import type { FeedChange, FeedClient } from './feed/client'
 import { FeedConsumer, type DocCache, type DocCacheCommit } from './feed/consumer'
 import { cursorKey, type CursorStore, type FeedScope } from './feed/cursor-store'
 import { compareRevision } from './feed/revision'
+import {
+  LEASE_STORE_REGISTRATION,
+  LeaseManager,
+  createLeaseClient,
+  createLeaseManager,
+  createLeaseStore,
+  type LeaseClient,
+  type LeaseRevokeNotice,
+} from './lease'
 import type { SyncStoreAccess } from './session-store'
 import { APP_STORE_LEVEL } from './store-level'
 import type { StoreReadResult, StoreRecords, StoreRegistration, StoreWriteResult } from './store'
+
+export {
+  LEASE_STORE_REGISTRATION,
+  LeaseManager,
+  createLeaseClient,
+  createLeaseManager,
+  createLeaseStore,
+  type LeaseClient,
+  type LeaseRevokeNotice,
+}
 
 /**
  * The change-feed runtime of the signed-in account. For every (org, workspace)
@@ -262,13 +281,32 @@ export interface SyncRuntimeOptions {
    * one metadata read; nothing is evicted by the feed for a kept draft.
    */
   onFeedGone?(documentId: string): void
+  /**
+   * G5-08c: what the runtime's one lease manager needs beyond the store and
+   * the clock - the lease client of the active deployment (null while none is
+   * usable) and the live session id (a new sign-in resets the boundary).
+   * Without it the manager has no client: every grant or renewal is offline.
+   */
+  lease?: SyncRuntimeLeaseOptions
   intervalMs?: number
   /** test seam: schedule `run` on the interval, return the cancel */
   schedule?(run: () => void): () => void
   log?(message: string): void
 }
 
+export interface SyncRuntimeLeaseOptions {
+  client(): LeaseClient | null
+  /** the live session id of the scope (the device session) */
+  session(): string | null
+  /** test seam: the monotonic clock (default `performance.now()`) */
+  monotonicNow?(): number
+  /** revoke marks the committed cache for deletion (drafts kept) - W2/G5-05 */
+  onRevoked?(notice: LeaseRevokeNotice): void
+}
+
 export class SyncRuntime {
+  /** G5-08c: the offline lease manager of the signed-in session (the only one) */
+  readonly leases: LeaseManager
   private readonly options: SyncRuntimeOptions
   private readonly running = new Map<string, FeedConsumer>()
   private readonly capabilities = new Map<string, OfficeCapabilities>()
@@ -276,9 +314,25 @@ export class SyncRuntime {
   private ticking: Promise<void> | null = null
   /** bumped by stop(): a pass that started before it is no longer current */
   private generation = 0
+  /** the last pass's connectivity verdict; false keeps every lease request home */
+  private online: boolean | undefined = undefined
 
   constructor(options: SyncRuntimeOptions) {
     this.options = options
+    const lease = options.lease
+    this.leases = createLeaseManager({
+      store: createLeaseStore(options.store),
+      client: () => lease?.client() ?? null,
+      clock: {
+        wallNow: () => options.clock.now(),
+        monotonicNow: () => lease?.monotonicNow?.() ?? Math.trunc(performance.now()),
+      },
+      scope: () => options.store.scope(),
+      session: () => lease?.session() ?? null,
+      isOnline: () => this.online !== false,
+      ...(lease?.onRevoked ? { onRevoked: (notice) => lease.onRevoked?.(notice) } : {}),
+      ...(options.onSessionExpired ? { onSessionExpired: options.onSessionExpired } : {}),
+    })
   }
 
   /** starts the interval and runs one pass now (sign-in, app ready) */
@@ -300,9 +354,11 @@ export class SyncRuntime {
 
   /**
    * Stops the interval and forgets every consumer (sign-out, account switch, a
-   * wiped scope). The generation bump makes any run in flight stop at its next
-   * await: it creates no consumer, issues no further request, and cannot write
-   * back into the pass a later start owns.
+   * wiped scope, an org change). The generation bump makes any run in flight
+   * stop at its next await: it creates no consumer, issues no further request,
+   * and cannot write back into the pass a later start owns. The leases are not
+   * touched: an org change is a stop()/start() pair of the same account, and
+   * the account boundary locks them itself (`leases.lockBoundary`).
    */
   stop(): void {
     this.generation += 1
@@ -399,7 +455,13 @@ export class SyncRuntime {
     // a real failed round trip marks the queue offline, a reached one marks it
     // online, and a pass with nothing to do (no chosen org) reports neither
     // (G506-be-3)
-    await this.options.onPoll?.(attempted ? !transportFailed : undefined)
+    const verdict = attempted ? !transportFailed : undefined
+    await this.options.onPoll?.(verdict)
+    if (!current()) return
+    // G5-08c row 2: the same verdict gates the lease renewal pass - an online
+    // pass renews the held leases that are due, an offline one sends nothing
+    if (verdict !== undefined) this.online = verdict
+    await this.leases.onOnlinePass(verdict).catch(() => undefined)
   }
 
   private consumerFor(

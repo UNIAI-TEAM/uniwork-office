@@ -102,6 +102,38 @@
   font-weight: 600;
 }
 
+/* quiet tag on a group served by a key saved on UniWork: pushed to the row end, never wider than half
+ * of it so a long translation ellipsizes instead of squeezing the provider name */
+.ai-model-org-tag {
+  flex-shrink: 0;
+  max-width: 50%;
+  margin-inline-start: auto;
+  padding: 1px 6px;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-6);
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* the first-use privacy note: plain wrapped text under the group head; block (not the head's flex
+ * row) so a long note wraps inside the popover and the list scrolls instead of growing it */
+.ai-model-org-note {
+  display: block;
+  min-width: 0;
+  padding-top: 2px;
+  padding-bottom: 4px;
+  color: var(--text-secondary);
+  font-weight: 400;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
 .ai-model-item {
   display: flex;
   align-items: center;

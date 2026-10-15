@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   aiSettingsReady,
   looksLikeMissingAiActivation,
+  myAiTurnTarget,
   openAiSettingsLabel,
   softAiActivationMessage,
 } from '../src/renderer/src/my-ai-activation'
@@ -22,6 +23,28 @@ describe('my-ai-activation', () => {
     const s = defaultAiSettings()
     s.providers.openrouter = { ...s.providers.openrouter, apiKey: 'sk-or-hub' }
     expect(aiSettingsReady(s)).toBe(true)
+  })
+
+  it('is ready for a provider served by a key saved on UniWork, not without that source', () => {
+    const s = defaultAiSettings()
+    s.provider = 'anthropic'
+    s.providers.anthropic = { ...s.providers.anthropic, apiKey: '', model: 'claude-slot' }
+    expect(aiSettingsReady(s)).toBe(false)
+    s.modelSources = { anthropic: { origin: 'org', chosen: 'claude-org' } }
+    expect(aiSettingsReady(s)).toBe(true)
+    // a local source is not a key on UniWork
+    s.modelSources = { anthropic: { origin: 'local', chosen: 'claude-slot' } }
+    expect(aiSettingsReady(s)).toBe(false)
+  })
+
+  it('the My AI usage record carries the model main serves for an org-served provider', () => {
+    const s = defaultAiSettings()
+    s.provider = 'anthropic'
+    s.providers.anthropic = { ...s.providers.anthropic, apiKey: '', model: 'claude-slot' }
+    s.modelSources = { anthropic: { origin: 'org', chosen: 'claude-org' } }
+    expect(myAiTurnTarget(s)).toEqual({ provider: 'anthropic', model: 'claude-org', ready: true })
+    s.modelSources = undefined
+    expect(myAiTurnTarget(s)).toMatchObject({ model: 'claude-slot', ready: false })
   })
 
   it('matches soft / legacy no-key errors and the product notices', () => {

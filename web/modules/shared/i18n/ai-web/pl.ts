@@ -41,6 +41,8 @@ export const pl = {
     'UniWork nie mógł połączyć się z dostawcą AI. Spróbuj ponownie za chwilę.',
   aiWebStateCloudTitle: 'Narzędzie chmurowe niedostępne',
   aiWebStateCloudBody: 'To narzędzie UniWork AI nie jest jeszcze skonfigurowane na serwerze.',
+  aiWebStateOutageTitle: 'UniWork chwilowo niedostępny',
+  aiWebStateOutageBody: 'Nie można teraz połączyć się z UniWork. Spróbuj ponownie za chwilę.',
   aiWebStateSessionTitle: 'Sesja wygasła',
   aiWebStateSessionBody: 'Otwórz dokument ponownie z UniWork, aby kontynuować.',
   aiWebStateRefusedTitle: 'Żądanie odrzucone',

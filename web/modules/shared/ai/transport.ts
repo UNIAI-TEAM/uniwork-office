@@ -22,78 +22,25 @@
  * before ai-provider reads the body, so the UI shows a typed state; a provider's own 4xx (bad
  * model, output-cap rejection) reaches ai-provider unchanged.
  */
-import { AiWebError, aiErrorFromResponse, errorBodyFields, isContractFailure } from './errors'
+import {
+  ProxyUrlError,
+  proxyAnswered,
+  toProxyRequest as toSharedProxyRequest,
+  type ProxyRequest,
+} from '../../../../packages/ai-provider/src/proxy-url'
 import type { AiWebClient } from './client'
-import { isInsideAiMount } from './mount'
+import { AiWebError, aiErrorFromResponse } from './errors'
 
-const DROPPED_HEADERS = new Set(['authorization', 'x-api-key', 'x-goog-api-key', 'user-agent'])
-
-function plainHeaders(given: HeadersInit | undefined): Record<string, string> {
-  const out: Record<string, string> = {}
-  new Headers(given).forEach((value, name) => {
-    if (!DROPPED_HEADERS.has(name.toLowerCase())) out[name] = value
-  })
-  return out
-}
-
-export interface ProxyRequest {
-  url: string
-  init: RequestInit
-}
+export type { ProxyRequest }
 
 /** vendor-shaped request -> the proxy request (pure; throws AiWebError for a foreign URL) */
 export function toProxyRequest(aiBase: string, url: string, init: RequestInit = {}): ProxyRequest {
-  const byok = `${aiBase}/byok/`
-  // a parsed, normalised path check (a raw string prefix lets `byok/../../x` through)
-  if (!url.startsWith(byok) || !isInsideAiMount(url, `${aiBase}/byok`)) {
-    throw new AiWebError({ code: 'bad_request', status: 0, message: 'not an AI proxy URL' })
-  }
-  const parsed = new URL(url)
-  const rest = parsed.pathname.slice(new URL(byok).pathname.length)
-  const slash = rest.indexOf('/')
-  const provider = slash < 0 ? rest : rest.slice(0, slash)
-  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(provider)) {
-    throw new AiWebError({ code: 'bad_request', status: 0, message: 'not an AI proxy URL' })
-  }
-  const tail = slash < 0 ? '' : rest.slice(slash)
-  const providerBase = `${aiBase}/byok/${provider}`
-  const headers = plainHeaders(init.headers)
-  const base: RequestInit = { ...init, headers }
-
-  if (tail === '/chat/completions' || tail === '/models' || tail === '/messages') {
-    return { url: `${providerBase}${tail}`, init: base }
-  }
-  if (tail === '/v1/messages') return { url: `${providerBase}/messages`, init: base }
-  const gemini = /^\/models\/([^/:]+):(streamGenerateContent|generateContent)$/.exec(tail)
-  if (gemini) {
-    const [, model, method] = gemini
-    let request: unknown = {}
-    if (typeof init.body === 'string' && init.body) request = JSON.parse(init.body)
-    return {
-      url: `${providerBase}/generate`,
-      init: {
-        ...base,
-        method: 'POST',
-        headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: decodeURIComponent(model!),
-          stream: method === 'streamGenerateContent',
-          request,
-        }),
-      },
-    }
-  }
-  throw new AiWebError({ code: 'bad_request', status: 0, message: `no proxy route for ${tail}` })
-}
-
-/** a 404 is a contract failure only when the proxy says so (a provider's own 404 passes through) */
-async function proxyAnswered(res: Response): Promise<boolean> {
-  if (!isContractFailure(res.status)) return false
-  if (res.status !== 404) return true
   try {
-    return errorBodyFields(await res.clone().json()).code === 'credential_missing'
-  } catch {
-    return false
+    return toSharedProxyRequest(aiBase, url, init)
+  } catch (err) {
+    // only a refused URL becomes the typed state; anything else (a malformed Gemini body) is rethrown as before
+    if (!(err instanceof ProxyUrlError)) throw err
+    throw new AiWebError({ code: 'bad_request', status: 0, message: err.message })
   }
 }
 

@@ -58,13 +58,23 @@ export async function waitForSafeStorageKeyOnDisk(launched: LaunchedApp): Promis
     .toBe(true)
 }
 
-export async function signIn(launched: LaunchedApp, stub: UniworkAuthStub): Promise<void> {
+/**
+ * `inMemoryStore`: the shell runs with UNIWORK_AUTH_E2E_PLAIN_STORE (no keyring needed), so no
+ * safeStorage key is written to disk and there is nothing to wait for.
+ */
+export async function signIn(
+  launched: LaunchedApp,
+  stub: UniworkAuthStub,
+  options: { inMemoryStore?: boolean } = {},
+): Promise<void> {
   const { page } = launched
   await expect(accountButton(page)).toHaveAttribute('data-state', 'signed-out')
   await accountButton(page).click()
   await expect(accountButton(page)).toHaveAttribute('data-state', 'signing-in')
   await expect.poll(() => stub.lastAttempt()?.state ?? '').not.toBe('')
-  if (process.platform !== 'darwin') await waitForSafeStorageKeyOnDisk(launched)
+  if (process.platform !== 'darwin' && !options.inMemoryStore) {
+    await waitForSafeStorageKeyOnDisk(launched)
+  }
   const url = stub.approve()
   await deliverUrl(launched, shellEnv(stub), url)
   await expect(accountButton(page)).toHaveAttribute('data-state', 'signed-in', { timeout: 30_000 })

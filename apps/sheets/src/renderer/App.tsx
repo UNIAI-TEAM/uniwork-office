@@ -143,6 +143,7 @@ import {
 import { AgentLoop, composeSkills, type AgentImage } from '@genoffice/agent-core'
 import { createRunNotices } from './ai/run-notices'
 import { imageGenerationAvailable, type AiSettings } from '@genoffice/ai-provider/browser'
+import { agentConfigured } from './ai/agent-configured'
 import { type WorkbookOperation } from '@genoffice/xlsx-gateway/domain/workbook-dsl'
 import {
   columnLabel,
@@ -1666,16 +1667,7 @@ export function App({
   }
 
   function isAgentConfigured(): boolean {
-    const settings = aiSettingsRef.current
-    if (!settings) return false
-    const config = settings.providers[settings.provider]
-    if (!config?.model) return false
-    // web: the keys live in UniWork and never reach the frame (`apiKey` is always ''); a missing
-    // or refused key comes back as a typed state card (credential_missing, provider_auth_failed)
-    if (cap('aiCredentials')) return true
-    // the built-in UniAI provider's key never lands in the settings file; the
-    // main process injects it. Missing access surfaces as a request error.
-    return settings.provider === 'genspark' || !!config.apiKey
+    return agentConfigured(aiSettingsRef.current, cap('aiCredentials'))
   }
 
   /** Image attachments read as base64 and sent multimodal with this user message

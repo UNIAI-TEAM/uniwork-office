@@ -42,6 +42,8 @@ export const fr = {
     "UniWork n'a pas pu joindre le fournisseur IA. Réessayez dans un instant.",
   aiWebStateCloudTitle: 'Outil cloud indisponible',
   aiWebStateCloudBody: "Cet outil UniWork AI n'est pas encore configuré sur le serveur.",
+  aiWebStateOutageTitle: 'UniWork temporairement indisponible',
+  aiWebStateOutageBody: 'UniWork est injoignable pour le moment. Réessayez dans un instant.',
   aiWebStateSessionTitle: 'Session expirée',
   aiWebStateSessionBody: 'Rouvrez le document depuis UniWork pour continuer.',
   aiWebStateRefusedTitle: 'Requête refusée',

@@ -14,7 +14,11 @@ import { safeExternalUrl } from '@genoffice/electron-utils'
 import { getUiLang } from '@genoffice/i18n'
 import { HOME_CHANNELS, type AccountEntitlements, type AccountStatus } from '../../shared/home-api'
 import { readAppSettings, writeAppSetting } from '../app-settings'
-import { createCredentialStore } from './credentials'
+import {
+  createCredentialStore,
+  createMemoryCredentialStore,
+  type CredentialStore,
+} from './credentials'
 import {
   callbackSchemeForChannel,
   isLoopbackHost,
@@ -40,6 +44,8 @@ import {
   type UniworkAiScopeDeps,
   type UniworkAiStreams,
 } from './ai-chat'
+import { createUniworkKeysHost, type UniworkKeysHost } from './keys'
+import { appSettingsModelPicks, refreshAfterDeviceRevoked } from './keys-wiring'
 import type { CapabilityRead } from '../uniwork-sync/capability/cache'
 import { AccountManager } from './manager'
 import { TransportError, createUniworkTransport } from './transport'
@@ -52,6 +58,21 @@ export {
 export type { AccountManager } from './manager'
 export { TransportError } from './transport'
 export type { DeploymentProfile } from './deployment'
+export {
+  createUniworkKeysHost,
+  UniworkKeyError,
+  isUniworkKeyError,
+  describeUniworkKeyError,
+  parseCredentialsResponse,
+  type UniworkKeysHost,
+  type UniworkKeysHostDeps,
+  type UniworkCredentialItem,
+  type UniworkCredentialsResponse,
+  type UniworkKeyErrorCode,
+} from './keys'
+
+const UNIWORK_KEYS_HOST_SYMBOL = Symbol.for('genoffice.uniworkKeysHost')
+const BROADCAST_AI_SETTINGS_SYMBOL = Symbol.for('genoffice.broadcastAiSettingsChanged')
 
 /**
  * Electron wiring for the UniWork account: one AccountManager per process,
@@ -62,6 +83,7 @@ export type { DeploymentProfile } from './deployment'
 
 let manager: AccountManager | null = null
 let cloud: UniworkCloudController | null = null
+let keys: UniworkKeysHost | null = null
 let settingsPath: (() => string) | null = null
 const entitlementListeners = new Set<(entitlements: AccountEntitlements | null) => void>()
 /** set by registerAccountIpc: delivers a push to the account renderers */
@@ -190,6 +212,20 @@ export async function connectUniworkServer(
     : { ok: false, error: 'refused' }
 }
 
+/**
+ * The credential store of this run: the keyring-backed file store, except for
+ * one E2E seam. The CI machines that run the Electron e2e have no Secret
+ * Service, so without it no spec could ever sign in there; the seam keeps the
+ * session in memory only (nothing is written, a restart forgets it) and exists
+ * in unpackaged builds only, like UNIWORK_AUTH_E2E_NO_BROWSER above.
+ */
+export function accountCredentialStore(): CredentialStore {
+  if (!app.isPackaged && process.env.UNIWORK_AUTH_E2E_PLAIN_STORE === '1') {
+    return createMemoryCredentialStore()
+  }
+  return createCredentialStore({ userDataDir: app.getPath('userData'), safeStorage })
+}
+
 /** The process-wide manager; created on first use, which is after app ready. */
 export function uniworkAccount(): AccountManager {
   if (manager) return manager
@@ -198,7 +234,7 @@ export function uniworkAccount(): AccountManager {
   const created = new AccountManager({
     resolveProfile: () => resolveDeploymentProfile(resolveOptions()),
     createTransport: (profile) => createUniworkTransport(profile),
-    credentials: createCredentialStore({ userDataDir: app.getPath('userData'), safeStorage }),
+    credentials: accountCredentialStore(),
     openBrowser: openAuthorizationUrl,
     // G8-16 S16: the remembered organization is per account + machine, so a
     // choice made by one account is never read back for another on this install
@@ -207,7 +243,10 @@ export function uniworkAccount(): AccountManager {
       writeAppSetting(settings(), 'uniworkOrgId', { accountId, orgId }),
     device: deviceInfo(process.platform, app.getVersion()),
   })
-  created.onStatus((status) => push?.(HOME_CHANNELS.accountStatusEvent, status))
+  created.onStatus((status) => {
+    keys?.onAccountStatus(status)
+    push?.(HOME_CHANNELS.accountStatusEvent, status)
+  })
   created.onLoginEvent((event) => push?.(HOME_CHANNELS.accountLoginEvent, event))
   created.onEntitlementsChanged((current) => {
     for (const listener of entitlementListeners) listener(current)
@@ -288,12 +327,55 @@ export function uniworkCloud(): UniworkCloudController {
 }
 
 /**
+ * Organization AI keys (G6-05k, desktop BYOK proxy): R1/R5 client, per-org
+ * cache, per-call fetch via toProxyRequest + authorized(), and stream abort
+ * on sign-out / org switch / device_revoked.
+ */
+export function uniworkKeys(): UniworkKeysHost {
+  if (keys) return keys
+  const account = uniworkAccount()
+  keys = createUniworkKeysHost({
+    profile: () => account.deploymentProfile(),
+    orgId: () => {
+      const status = account.status()
+      return status.state === 'signed-in' && !status.needsOrgChoice
+        ? (status.org?.id ?? null)
+        : null
+    },
+    sessionKey: () => identityKey(),
+    accountKey: () => {
+      const identity = uniworkSessionIdentity()
+      return identity ? `${identity.deploymentId}/${identity.accountId}` : null
+    },
+    modelPicks: settingsPath ? appSettingsModelPicks(settingsPath) : undefined,
+    authorized: (call) => authorizedRequest(call),
+    online: () => (typeof net?.isOnline === 'function' ? net.isOnline() : true),
+    onChanged: () => {
+      const broadcast = (globalThis as Record<symbol, unknown>)[BROADCAST_AI_SETTINGS_SYMBOL]
+      if (typeof broadcast === 'function') (broadcast as () => void)()
+    },
+    // the server said the device is revoked: the account's own refresh gets the same answer and
+    // runs the shell's signed-out flow (status push, documents, UniWork AI turns)
+    onDeviceRevoked: refreshAfterDeviceRevoked(account),
+  })
+  ;(globalThis as Record<symbol, unknown>)[UNIWORK_KEYS_HOST_SYMBOL] = keys
+  return keys
+}
+
+export function startUniworkKeys(): UniworkKeysHost {
+  const host = uniworkKeys()
+  void host.list().catch(() => undefined)
+  return host
+}
+
+/**
  * Installs the cloud transport and keeps the status current: re-read on
  * sign-in / sign-out / organization or plan change (entitlements), after
  * every tool call (credits), and once now.
  */
 export function startUniworkCloud(): void {
   const controller = uniworkCloud()
+  startUniworkKeys()
   setUniworkCloudTransport(controller.transport())
   // a cloud tool or an AI panel that finds the cloud off re-reads it first (the plan may have changed since)
   setUniworkCloudRefresher(() => controller.refresh())
@@ -315,6 +397,7 @@ export function startUniworkAiChat(deps: {
 }): UniworkAiStreams {
   if (aiStreams) return aiStreams
   const account = uniworkAccount()
+  startUniworkKeys()
   setUniworkChatTransport(
     createUniworkAiChatTransport({
       profile: () => account.deploymentProfile(),
@@ -397,6 +480,7 @@ let availabilityTimer: ReturnType<typeof setInterval> | null = null
 /** sign-out / account switch: running turns end and the server conversation ids are forgotten */
 function endUniworkAiSession(): void {
   aiStreams?.cancelAll()
+  keys?.clear()
   uniworkConversations.clear()
 }
 
@@ -468,6 +552,9 @@ export function stopUniworkAccount(): void {
   availabilityTimer = null
   setUniworkChatTransport(null)
   setUniworkCloudTransport(null)
+  keys?.clear()
+  keys = null
+  ;(globalThis as Record<symbol, unknown>)[UNIWORK_KEYS_HOST_SYMBOL] = null
   cloud?.dispose()
   manager?.dispose()
 }
