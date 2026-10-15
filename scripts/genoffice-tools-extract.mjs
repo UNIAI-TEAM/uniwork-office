@@ -2022,7 +2022,8 @@ function toolDetail(value) {
   const reason = schemaReason || (descriptionReason ? `description:${descriptionReason}` : null)
   return {
     description: typeof description === 'string' ? description : null,
-    schema: reason ? null : schema,
+    // kept whenever the schema itself resolved, even if the description did not
+    schema: schemaReason ? null : schema,
     reason,
   }
 }
@@ -2177,9 +2178,11 @@ const SCHEMA_MODULES = ['docs', 'sheets', 'slides', 'pdf', 'markdown', 'html']
  *   catalogue   one entry per mechanical table row (agent-core rows included),
  *               table order: module, name, host (`renderer` | `agent-core`), source,
  *               schemaComplete, inputSchemaSha256 (the table's hash), and for an
- *               incomplete tool the `reason` plus its `description` when that
- *               resolved. A tool that cannot be fully resolved is listed here and
- *               left out of its module array: never guessed, never silently dropped.
+ *               incomplete tool the `reason`, its `description` when that resolved
+ *               and its `inputSchema` when that resolved (a description built by
+ *               calling product code, `opNames()`, leaves the schema intact). A
+ *               tool that cannot be fully resolved is listed here and left out of
+ *               its module array: never guessed, never silently dropped.
  *
  * The result is a pure function of the rev, so the same rev writes the same bytes.
  */
@@ -2199,6 +2202,8 @@ export function buildSchemaFile({ sha, rows, text }) {
       source: row.source,
       schemaComplete: reason === null,
     }
+    // the table's hash is the schema's sha256 exactly when the schema resolved
+    const schemaResolved = schema !== null
     if (reason === null) {
       entry.inputSchemaSha256 = row.hash
       if (SCHEMA_MODULES.includes(row.module))
@@ -2209,7 +2214,8 @@ export function buildSchemaFile({ sha, rows, text }) {
     } else {
       entry.reason = reason
       entry.description = description
-      entry.inputSchemaSha256 = null
+      if (schemaResolved) entry.inputSchema = schema
+      entry.inputSchemaSha256 = schemaResolved ? row.hash : null
     }
     catalogue.push(entry)
   }
