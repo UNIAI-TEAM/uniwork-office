@@ -39,6 +39,7 @@ export const pt = {
   uwQueueCancel: 'Cancelar salvamento…',
   uwQueueCancelConfirm:
     'Cancelar o salvamento na fila? Suas alterações continuam neste computador; o documento no UniWork não muda.',
+  uwQueueCancelGo: 'Cancelar salvamento',
   uwQueueCancelled: 'Salvamento na fila cancelado. Suas alterações continuam neste computador.',
 
   // {reason} fragments of the blocked/failed rows (the existing uwReason* keys stay in the uniwork-documents shard)
@@ -130,6 +131,8 @@ export const pt = {
   uwSyncOpenFromSettings: 'Central de sincronização',
   uwSyncOnline: 'Conectado ao UniWork · sincronizado {time}',
   uwSyncOffline: 'Offline · última sincronização {time}',
+  uwSyncOnlineNoTime: 'Conectado ao UniWork',
+  uwSyncOfflineNoTime: 'Offline',
   uwSyncPaused: 'Envio pausado — novos salvamentos vão aguardar',
   uwSyncAdminPaused:
     'Seu administrador pausou o envio. Os salvamentos ficam guardados neste computador.',
@@ -161,6 +164,7 @@ export const pt = {
   uwSyncEmptyQueue: 'Nada aguardando salvamento.',
   uwSyncEmptyAttention: 'Nada requer atenção.',
   uwSyncEmptyRecent: 'Nenhum salvamento recente.',
+  uwSyncActionFailed: 'Não foi possível concluir. Nada foi excluído; tente novamente.',
   uwSyncRowAnnounce: '{doc}: {state}',
 
   // S3 offline library

@@ -47,6 +47,10 @@ import {
 } from '../uniwork-sync/runtime'
 import { createSyncStoreAccess, type SyncStoreAccess } from '../uniwork-sync/session-store'
 import { createStoreLayer, type StoreLayer } from '../uniwork-sync/store'
+import {
+  OFFLINE_LIBRARY_LAYER_BUDGET_BYTES,
+  OFFLINE_LIBRARY_STORE_REGISTRATION,
+} from '../uniwork-sync/offline-library'
 import { createFeedClient, type FeedClient } from '../uniwork-sync/feed/client'
 import { createCapabilityFetch } from '../uniwork-sync/capability/client'
 import {
@@ -62,6 +66,9 @@ import {
   type UnsavedCloseKind,
 } from './service'
 import { tUniworkDocs } from './strings'
+import { UNIWORK_SYNC_CENTER_CHANNELS } from '../../shared/sync-center'
+import { createWiredSyncCenter } from '../uniwork-sync/sync-center'
+import { clipboard } from 'electron'
 
 /**
  * Electron binding of the UniWork documents service: IPC handlers for every
@@ -362,6 +369,31 @@ function syncStoreFor(): { layer: StoreLayer; access: SyncStoreAccess } {
 }
 
 /**
+ * G5-05: the offline library's own encrypted layer under
+ * `userData/uniwork-sync/library/` - its own root, safeStorage-wrapped key per
+ * scope and budget, so pinned bytes never count against the sync store budget
+ * (lead decision on W5 "A"). Wiped at the account boundary beside the sync
+ * scope. Residual: moves into G5-11's SYNC_STORE_REGISTRATIONS when it lands.
+ */
+const libraryLayers = new Map<string, StoreLayer>()
+
+function libraryLayerFor(): StoreLayer {
+  const root = join(app.getPath('userData'), 'uniwork-sync', 'library')
+  let layer = libraryLayers.get(root)
+  if (!layer) {
+    layer = createStoreLayer({
+      root: join(root, 'store'),
+      keys: createSafeStorageKeyProvider({ safeStorage, dir: join(root, 'keys') }),
+      budgetBytes: OFFLINE_LIBRARY_LAYER_BUDGET_BYTES,
+      clock: () => Date.now(),
+    })
+    layer.register(OFFLINE_LIBRARY_STORE_REGISTRATION)
+    libraryLayers.set(root, layer)
+  }
+  return layer
+}
+
+/**
  * Test seams of the feed runtime: the HTTP round trip of the capability and
  * feed clients, and the clock their caches read. Production leaves both out.
  */
@@ -456,7 +488,7 @@ export function createSyncRuntime(
       return (await found.docs.listWorkspaces(orgId)).map((workspace) => workspace.id)
     },
   }
-  return new SyncRuntime({
+  const runtime: SyncRuntime = new SyncRuntime({
     store: syncStoreFor().access,
     // S18: a change the feed applies for a bound document re-reads its metadata,
     // so a rename on the web reaches the open desktop copy
@@ -471,6 +503,9 @@ export function createSyncRuntime(
     isOpenBound: (documentId) => service.isOpenBound(documentId),
     onFeedGone: (documentId) => {
       void service.noteFeedGone(documentId).catch(() => undefined)
+      // T5-3: a pinned document, closed too, is classified by the library
+      // (403/404 -> revoked, 410 -> deleted)
+      void runtime.library?.refresh(documentId).catch(() => undefined)
     },
     targets,
     capability: async (orgId) => {
@@ -488,6 +523,11 @@ export function createSyncRuntime(
     lease: {
       client: () => clients()?.lease ?? null,
       session: () => uniworkSessionIdentity()?.deviceSessionId ?? null,
+    },
+    library: {
+      layer: libraryLayerFor(),
+      docs: () => clients()?.docs ?? null,
+      hasLocalWork: (documentId) => service.hasLocalDraft(documentId),
     },
     keepDraft: (documentId) => service.hasLocalDraft(documentId),
     clock: { now: () => Date.now() },
@@ -511,11 +551,20 @@ export function createSyncRuntime(
     },
     log: (message) => console.warn(message),
   })
+  return runtime
 }
 
 /** Registers the IPC handlers (safe before app ready: nothing touches the account yet). */
 export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): UniworkDocsHandle {
+  // told as a document status or the lock list is pushed (the sync center re-reads its snapshot)
+  const changeListeners: Array<() => void> = []
   const push = (channel: string, payload: unknown) => {
+    if (
+      channel === UNIWORK_DOC_CHANNELS.docStatusEvent ||
+      channel === UNIWORK_DOC_CHANNELS.locksChanged
+    ) {
+      for (const listener of changeListeners) listener()
+    }
     const wc = wiring.shellContents()
     if (wc && !wc.isDestroyed()) wc.send(channel, payload)
   }
@@ -733,6 +782,8 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
       // G5-08c: the leases lock at the account boundary itself (sign-out at
       // once; a switch never locks the incoming account), not on stop()
       runtime.leases.lockBoundary(owner)
+      // G5-05: every library download stops before the scope is wiped
+      runtime.library?.lockBoundary()
       runtime.stop()
       // await the queue teardown BEFORE the wipe: the in-flight poll/dispatch
       // must unwind (and release its locks) before the scope is wiped, so no
@@ -745,12 +796,50 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
         deploymentId: owner.deploymentId,
         accountId: owner.accountId,
       })
+      // G5-05 OQ-UX11 (a): the pinned copies go at sign-out, beside the sync scope
+      await libraryLayerFor().lockAndWipe({
+        deploymentId: owner.deploymentId,
+        accountId: owner.accountId,
+      })
     },
   })
   setUniworkSignOutHooks({
     before: () => boundary.beforeSignOut(),
     after: () => boundary.afterSignOut(),
   })
+  // G5-10 Sync center (S2): its read model and actions over the live service and runtime
+  const syncCenter = createWiredSyncCenter({
+    ipcMain,
+    userDataDir: app.getPath('userData'),
+    service,
+    store: syncStoreFor(),
+    accountStatus: () => uniworkAccount().status(),
+    capabilityRead: (orgId) => runtime.capabilityRead(orgId),
+    feedVerdict: () => runtime.feedVerdict(),
+    resetFeedResync: () => runtime.resetFeedResync(),
+    leaseState: (documentId) => runtime.leases.effectiveState(documentId),
+    tickRuntime: () => runtime.tick(),
+    openPath: (path) => (wiring.refuseLockedPath(path) ? false : wiring.openPath(path)),
+    isPathOpen: (path) => wiring.isPathOpen(path),
+    defaultSaveDir: () => wiring.defaultSaveDir(),
+    writeClipboard: (text) => clipboard.writeText(text),
+    pickSaveDialog: async ({ defaultPath, ext }) => {
+      const parent = wiring.shellWindow()
+      const options: Electron.SaveDialogOptions = {
+        title: tUniworkDocs(wiring.lang(), 'copyDialogTitle'),
+        defaultPath,
+        filters: [{ name: String(ext).toUpperCase(), extensions: [String(ext)] }],
+      }
+      const picked = parent
+        ? await dialog.showSaveDialog(parent, options)
+        : await dialog.showSaveDialog(options)
+      return picked.canceled || !picked.filePath ? null : picked.filePath
+    },
+    pushChanged: (snapshot) => push(UNIWORK_SYNC_CENTER_CHANNELS.changedEvent, snapshot),
+  })
+  changeListeners.push(() => syncCenter.controller.notifyChanged())
+  // every feed pass's connectivity verdict: the offline header, its refusals and lastSyncAt
+  runtime.onPollVerdict((online) => void syncCenter.notePoll(online))
 
   return {
     service,
@@ -767,6 +856,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
         service.noteSessionIdentity()
         // G8-16 S16: changing the organization reloads the library data
         service.noteSelectedOrg(status.org?.id ?? null)
+        void syncCenter.noteAccount()
         const identity = uniworkSessionIdentity()
         if (identity) void boundary.enforce(identity).catch(() => undefined)
         const now = status.state === 'signed-in'

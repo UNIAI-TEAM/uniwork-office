@@ -41,6 +41,7 @@ export const fr = {
   uwQueueCancel: 'Annuler l’enregistrement…',
   uwQueueCancelConfirm:
     'Annuler l’enregistrement en file d’attente ? Vos modifications restent sur cet ordinateur ; le document sur UniWork ne change pas.',
+  uwQueueCancelGo: 'Annuler l’enregistrement',
   uwQueueCancelled:
     'Enregistrement en file d’attente annulé. Vos modifications restent sur cet ordinateur.',
 
@@ -133,6 +134,8 @@ export const fr = {
   uwSyncOpenFromSettings: 'Centre de synchronisation',
   uwSyncOnline: 'Connecté à UniWork · synchronisé {time}',
   uwSyncOffline: 'Hors ligne · dernière synchronisation {time}',
+  uwSyncOnlineNoTime: 'Connecté à UniWork',
+  uwSyncOfflineNoTime: 'Hors ligne',
   uwSyncPaused: 'Envoi suspendu — les nouveaux enregistrements attendront',
   uwSyncAdminPaused:
     'Votre administrateur a suspendu l’envoi. Les enregistrements sont conservés sur cet ordinateur.',
@@ -166,6 +169,7 @@ export const fr = {
   uwSyncEmptyQueue: 'Aucun enregistrement en attente.',
   uwSyncEmptyAttention: 'Rien à traiter.',
   uwSyncEmptyRecent: 'Aucun enregistrement récent.',
+  uwSyncActionFailed: 'L’action n’a pas abouti. Rien n’a été supprimé ; réessayez.',
   uwSyncRowAnnounce: '{doc} : {state}',
 
   // S3 offline library

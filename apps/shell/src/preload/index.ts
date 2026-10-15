@@ -87,6 +87,8 @@ import type {
   WorkTask,
   WorkTaskStatus,
 } from '../shared/uniwork-work-api'
+import { asSyncCenterSnapshot, UNIWORK_SYNC_CENTER_CHANNELS } from '../shared/sync-center'
+import type { SyncCenterActionResult, UniworkSyncCenterApi } from '../shared/sync-center'
 import { createLaunchReplay } from './launch-replay'
 
 // subscribed at preload time: a cold-start launch event can arrive before the
@@ -1373,3 +1375,97 @@ installDropOpenBridge()
 // UniWork comments client through its own bridge (main checks the sender is
 // this shell and the path an open, bound tab of its window)
 installUniworkDiscussionBridge()
+
+function asSyncCenterActionResult(result: unknown): SyncCenterActionResult {
+  if (
+    result &&
+    typeof result === 'object' &&
+    typeof (result as { ok?: unknown }).ok === 'boolean'
+  ) {
+    return result as SyncCenterActionResult
+  }
+  return { ok: false, code: 'other' }
+}
+
+const syncCenterApi: UniworkSyncCenterApi = {
+  async getSnapshot() {
+    const snapshot = asSyncCenterSnapshot(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.snapshot),
+    )
+    if (!snapshot) throw new Error('uniwork sync center: malformed snapshot')
+    return snapshot
+  },
+  async syncNow() {
+    return asSyncCenterActionResult(await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.syncNow))
+  },
+  async setSendingPaused(paused) {
+    return asSyncCenterActionResult(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.setSendingPaused, paused === true),
+    )
+  },
+  async sendNow(rowId) {
+    return asSyncCenterActionResult(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.sendNow, rowId),
+    )
+  },
+  async cancelSave(rowId) {
+    return asSyncCenterActionResult(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.cancelSave, rowId),
+    )
+  },
+  async recheck(rowId) {
+    return asSyncCenterActionResult(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.recheck, rowId),
+    )
+  },
+  async copySupportCode(rowId) {
+    return asSyncCenterActionResult(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.copySupportCode, rowId),
+    )
+  },
+  async discardSave(rowId) {
+    return asSyncCenterActionResult(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.discardSave, rowId),
+    )
+  },
+  async openDocument(rowId) {
+    return asSyncCenterActionResult(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.openDocument, rowId),
+    )
+  },
+  async openDraft(rowId) {
+    return asSyncCenterActionResult(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.openDraft, rowId),
+    )
+  },
+  async discardDraft(rowId) {
+    return asSyncCenterActionResult(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.discardDraft, rowId),
+    )
+  },
+  async saveAgain(rowId) {
+    return asSyncCenterActionResult(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.saveAgain, rowId),
+    )
+  },
+  async saveMyCopy(rowId) {
+    return asSyncCenterActionResult(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.saveMyCopy, rowId),
+    )
+  },
+  async retryStore() {
+    return asSyncCenterActionResult(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.retryStore),
+    )
+  },
+  subscribe(cb) {
+    const listener = (_event: IpcRendererEvent, value: unknown) => {
+      const snapshot = asSyncCenterSnapshot(value)
+      if (snapshot) cb(snapshot)
+    }
+    ipcRenderer.on(UNIWORK_SYNC_CENTER_CHANNELS.changedEvent, listener)
+    return () => ipcRenderer.removeListener(UNIWORK_SYNC_CENTER_CHANNELS.changedEvent, listener)
+  },
+}
+
+contextBridge.exposeInMainWorld('uniworkSyncCenter', syncCenterApi)
