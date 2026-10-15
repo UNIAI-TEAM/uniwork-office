@@ -4,7 +4,7 @@ import { rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { UniworkDocStatus } from '../src/shared/home-api'
+import type { UniworkConflictView, UniworkDocStatus } from '../src/shared/home-api'
 import type { DeploymentProfile } from '../src/main/uniwork-auth/deployment'
 import {
   UniworkDocsService,
@@ -207,6 +207,7 @@ interface Ctx {
   deps: Record<string, unknown>
   ui: ConflictUi
   statuses: UniworkDocStatus[]
+  views: UniworkConflictView[]
   layer: StoreLayer
   account: () => string | null
   signOut: () => void
@@ -225,6 +226,7 @@ function setup(
   } = {},
 ) {
   const statuses: UniworkDocStatus[] = []
+  const views: UniworkConflictView[] = []
   let account: string | null = opts.account === undefined ? 'acc_1' : opts.account
   /** true = the capability read fails (the lane is offline for the next save) */
   let capabilityOffline = false
@@ -245,13 +247,6 @@ function setup(
     scope: () => (account ? { deploymentId: 'default', accountId: account } : null),
   })
   const ui: ConflictUi = {
-    chooseConflict: vi.fn(async () => 'later'),
-    confirmDiscard: vi.fn(async () => true),
-    pickCopyPath: vi.fn(async (stem: string, format: string) =>
-      join(dir, `${stem} (my copy).${format}`),
-    ),
-    showOpenLatestFailed: vi.fn(),
-    showCopyFailed: vi.fn(),
     chooseUnsavedClose: vi.fn(async () => 'cancel' as UnsavedCloseChoice),
   }
   const deps = {
@@ -271,6 +266,7 @@ function setup(
     activePath: () => undefined,
     ui,
     pushStatus: (s: UniworkDocStatus) => statuses.push(s),
+    pushConflict: (v: UniworkConflictView) => views.push(v),
     pushLaunch: vi.fn(),
     reveal: vi.fn(),
     sleep: async () => undefined,
@@ -292,6 +288,7 @@ function setup(
     deps,
     ui,
     statuses,
+    views,
     layer,
     account: () => account,
     signOut: () => {
@@ -496,9 +493,11 @@ describe('G5-06 W4b save queue wiring', () => {
     await ctx.service.save(path)
     expect(binding(path)).toMatchObject({ state: 'conflict' })
     const oldKey = commits(server)[0]?.headers['idempotency-key']
-    vi.mocked(ctx.ui.chooseConflict).mockResolvedValue('overwrite')
     vi.mocked(ctx.deps.requestModuleSave as () => boolean).mockReturnValue(false)
-    const status = await ctx.service.resolveConflict(path)
+    const resolving = ctx.service.resolveConflict(path)
+    await vi.waitFor(() => expect(ctx.views).toHaveLength(1))
+    await ctx.service.conflictAct(ctx.views[0]!.sessionId, { kind: 'overwrite', stopAi: false })
+    const status = await resolving
     expect(status).toMatchObject({ state: 'saved' })
     const lastKey = commits(server).at(-1)?.headers['idempotency-key']
     expect(lastKey).not.toBe(oldKey)

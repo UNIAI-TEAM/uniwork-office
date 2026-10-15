@@ -71,10 +71,13 @@ vi.mock('../src/main/shaped-metrics', () => ({
 
 import { createBlankPptx, openPptx } from '@genoffice/pptx-engine'
 import {
+  queueSlidesForView,
+  recoveryCopyMtime,
   registerSlidesIpc,
   saveSessionDeckTo,
   setSlidesUserSaveHook,
   setUniworkDocumentPolicy,
+  trackSlidesWebContents,
 } from '../src/main/slides-main'
 import { sessions, type Session } from '../src/main/session-state'
 import { parseUniworkSaveOrigin, uniworkSaveDecision } from '../src/main/uniwork-policy'
@@ -370,5 +373,190 @@ describe('crash-recovery copy', () => {
     expect(existsSync(join(dir, boundCopy))).toBe(false)
     expect(readFileSync(deckPath, 'utf8')).toBe(ORIGINAL)
     expect(hook).not.toHaveBeenCalled()
+  })
+})
+
+describe('queueSlidesForView and slides:consume-pending-open reload routing', () => {
+  it('re-opens the queued deck from disk instead of returning the stale in-memory session', async () => {
+    writeFileSync(deckPath, await createBlankPptx())
+    await call('slides:add-blank-slide', { sourceIndex: 0, before: false, fitWidthPx: FIT })
+    expect(session.opened.deck.slides).toHaveLength(2)
+
+    // Write a newer crash-recovery copy first: queueSlidesForView must clear it so
+    // maybeRecoverBytes does not prompt Restore/Discard on S5 "Reload latest".
+    vi.advanceTimersByTime(30_000)
+    const dir = join(env.dir, 'slides-autosave')
+    for (let i = 0; i < 100; i++) {
+      await new Promise((r) => setTimeout(r, 50))
+      const copies = existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith('.pptx')) : []
+      if (copies.length && statSync(join(dir, copies[0]!)).size > 0) break
+    }
+
+    queueSlidesForView({ id: WC } as never, deckPath)
+    expect(sessions.get(WC)).toBeUndefined()
+
+    const r = (await call('slides:consume-pending-open', FIT)) as {
+      path: string
+      slides: unknown[]
+    } | null
+    expect(r?.path).toBe(deckPath)
+    expect(r?.slides).toHaveLength(1)
+    expect(sessions.get(WC)?.opened.deck.slides).toHaveLength(1)
+  })
+
+  it('keeps aliased peers on the old session during the reload window, then swaps them to the fresh one', async () => {
+    const PEER_WC = 2
+    writeFileSync(deckPath, await createBlankPptx())
+    await call('slides:add-blank-slide', { sourceIndex: 0, before: false, fitWidthPx: FIT })
+    expect(session.opened.deck.slides).toHaveLength(2)
+    sessions.set(PEER_WC, session)
+
+    queueSlidesForView({ id: WC } as never, deckPath)
+    // only the reloading view drops its session; the peer keeps editing the old one until the fresh deck exists
+    expect(sessions.get(WC)).toBeUndefined()
+    expect(sessions.get(PEER_WC)).toBe(session)
+
+    const r = (await call('slides:consume-pending-open', FIT)) as {
+      path: string
+      slides: unknown[]
+    } | null
+    expect(r?.slides).toHaveLength(1)
+    expect(sessions.get(WC)?.opened.deck.slides).toHaveLength(1)
+    expect(sessions.get(PEER_WC)).toBe(sessions.get(WC))
+    expect(sessions.get(WC)).not.toBe(session)
+  })
+
+  it('a failed re-open (file gone) restores the reloading view and keeps the peers on the old session', async () => {
+    const PEER_WC = 2
+    sessions.set(PEER_WC, session)
+    queueSlidesForView({ id: WC } as never, deckPath)
+    rmSync(deckPath)
+
+    const r = (await call('slides:consume-pending-open', FIT)) as {
+      path: string
+      slides: unknown[]
+    } | null
+    expect(r?.path).toBe(deckPath)
+    expect(r?.slides).toHaveLength(1)
+    expect(sessions.get(WC)).toBe(session)
+    expect(sessions.get(PEER_WC)).toBe(session)
+    // the dead queue entry does not linger for the next remount
+    const again = (await call('slides:consume-pending-open', FIT)) as { path: string } | null
+    expect(again?.path).toBe(deckPath)
+  })
+
+  it('a refused re-open (newer-store working copy) restores the reloading view on its UniWork path', async () => {
+    const PEER_WC = 2
+    sessions.set(PEER_WC, session)
+    queueSlidesForView({ id: WC } as never, deckPath)
+    // G5-04g: the folder declares a store this build does not read
+    setUniworkDocumentPolicy({
+      isBound: () => true,
+      isReadOnly: () => false,
+      refuseOpen: (p) => p === deckPath,
+    })
+
+    const r = (await call('slides:consume-pending-open', FIT)) as {
+      path: string
+      slides: unknown[]
+    } | null
+    expect(r?.path).toBe(deckPath)
+    expect(r?.slides).toHaveLength(1)
+    expect(sessions.get(WC)).toBe(session)
+    expect(sessions.get(PEER_WC)).toBe(session)
+  })
+
+  it('a re-open that throws resolves with the previous deck instead of rejecting (no blank boot)', async () => {
+    const PEER_WC = 2
+    sessions.set(PEER_WC, session)
+    queueSlidesForView({ id: WC } as never, deckPath)
+    // deckPath still holds the placeholder bytes: not a pptx, openPptx throws
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    // a rejection would make the renderer boot a blank deck over the restored session (BE-502)
+    const r = (await call('slides:consume-pending-open', FIT)) as {
+      path: string
+      slides: unknown[]
+    } | null
+    expect(r?.path).toBe(deckPath)
+    expect(r?.slides).toHaveLength(1)
+    expect(sessions.get(WC)).toBe(session)
+    expect(sessions.get(PEER_WC)).toBe(session)
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
+
+    // the dead queue entry is dropped, so the next remount restores the session instead of retrying
+    const again = (await call('slides:consume-pending-open', FIT)) as { path: string } | null
+    expect(again?.path).toBe(deckPath)
+    expect(sessions.get(WC)).toBe(session)
+  })
+
+  it('restores the in-memory session when reloading without queueSlidesForView (freeze recovery)', async () => {
+    writeFileSync(deckPath, await createBlankPptx())
+    await call('slides:add-blank-slide', { sourceIndex: 0, before: false, fitWidthPx: FIT })
+    expect(session.opened.deck.slides).toHaveLength(2)
+
+    const r = (await call('slides:consume-pending-open', FIT)) as {
+      path: string
+      slides: unknown[]
+    } | null
+    expect(r?.path).toBe(deckPath)
+    expect(r?.slides).toHaveLength(2)
+    expect(sessions.get(WC)).toBe(session)
+  })
+})
+
+describe('reload window state tied to the webContents lifecycle', () => {
+  /** a webContents stand-in that records its lifecycle handlers so a test can fire `destroyed` */
+  function trackedWc(id: number) {
+    const once = new Map<string, () => void>()
+    const wc = {
+      id,
+      on: () => wc,
+      once: (event: string, fn: () => void) => {
+        once.set(event, fn)
+        return wc
+      },
+      setWindowOpenHandler: () => {},
+    }
+    trackSlidesWebContents(wc as never)
+    return { wc, destroy: () => once.get('destroyed')?.() }
+  }
+
+  it('a peer destroyed during the reload window is not swapped onto the fresh session', async () => {
+    const PEER_WC = 2
+    writeFileSync(deckPath, await createBlankPptx())
+    sessions.set(PEER_WC, session)
+    const peer = trackedWc(PEER_WC)
+    queueSlidesForView({ id: WC } as never, deckPath)
+
+    peer.destroy()
+    expect(sessions.has(PEER_WC)).toBe(false)
+
+    await call('slides:consume-pending-open', FIT)
+    expect(sessions.get(WC)).not.toBeUndefined()
+    expect(sessions.has(PEER_WC)).toBe(false)
+  })
+
+  it('a reloading view destroyed before it consumes leaves no queue, no session and no restored deck', async () => {
+    const view = trackedWc(WC)
+    queueSlidesForView({ id: WC } as never, deckPath)
+    view.destroy()
+
+    expect(await call('slides:consume-pending-open', FIT)).toBeNull()
+    expect(sessions.has(WC)).toBe(false)
+  })
+})
+
+describe('recovery copy cleared while an autosave tick is in flight', () => {
+  it('removes the copy the tick wrote after queueSlidesForView cleared it (target gone)', async () => {
+    session.metaDirty = true
+    expect(recoveryCopyMtime(deckPath)).toBeNull()
+
+    vi.advanceTimersByTime(30_000) // the tick is now awaiting its write of the recovery copy
+    queueSlidesForView({ id: WC } as never, deckPath) // S5 reload: bumps the clear epoch mid-tick
+
+    await new Promise((r) => setTimeout(r, 1500)) // the tick finishes its write, then must undo it
+    expect(recoveryCopyMtime(deckPath)).toBeNull()
   })
 })

@@ -194,7 +194,9 @@ describe('each open chokepoint refuses before its first file read', () => {
     expect(fn.slice(0, guard)).toMatch(/Promise<OpenResult \| null>/)
     // the open routes (picker, path, queued restore) all funnel through it
     expect(source).toMatch(/return openAndBuild\(e\.sender, path, fitWidthPx\)/)
-    expect(source).toMatch(/const result = await openAndBuild\(e\.sender, queued, fitWidthPx\)/)
+    expect(source).toMatch(
+      /result = await openAndBuild\(e\.sender, queued, fitWidthPx, reloading\)/,
+    )
     // G5-04g (R1-be-2-3): each route also guards the ORIGINAL path before
     // rejectLegacyPpt reads it, not only inside openAndBuild
     expect(source).toMatch(
@@ -204,7 +206,7 @@ describe('each open chokepoint refuses before its first file read', () => {
       /if \(uniworkRefusesOpen\(path\)\) return null\n\s*if \(await rejectLegacyPpt\(path\)\) return null/,
     )
     expect(source).toMatch(
-      /if \(uniworkRefusesOpen\(queued\)\) \{\n\s*dropQueued\(\)\n\s*return null\n\s*\}\n\s*if \(await rejectLegacyPpt\(queued\)\)/,
+      /if \(uniworkRefusesOpen\(queued\) \|\| \(await rejectLegacyPpt\(queued\)\)\) \{/,
     )
   })
 

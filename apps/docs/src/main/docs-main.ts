@@ -3551,6 +3551,12 @@ export function clearRecoveryCopy(filePath: string): void {
 
 export { clearRecoveryCopy as clearDocsRecoveryCopy }
 
+/** queue a document this tab's next consume-pending-open opens without a dialog (shell reload routing) */
+export function queueDocsForView(contents: WebContents, path: string): void {
+  clearRecoveryCopy(path)
+  pendingWindowOpens.set(contents.id, path)
+}
+
 interface MaybeRecoveredDocBytes {
   bytes: Buffer
   recovered: boolean
