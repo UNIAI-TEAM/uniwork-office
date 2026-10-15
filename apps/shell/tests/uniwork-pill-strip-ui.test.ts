@@ -40,7 +40,8 @@ function status(over: Partial<UniworkDocStatus> = {}): UniworkDocStatus {
   }
 }
 
-const PILL = { full: 309, short: 190, compact: 111 }
+/** `mini` (the dot alone) is a 28px circle: the pill's height */
+const PILL = { full: 309, short: 190, compact: 111, mini: 28 }
 const TOGGLE = 108
 /** the Discussion toggle without its label (FXT6u): 8px padding, the 14px glyph, the 1px borders */
 const TOGGLE_ICON = 32
@@ -54,6 +55,8 @@ const NEW_BUTTON = 28
 let barWidth = 1280
 let pillRightOverride: number | null = null
 let pillLeftOverride: number | null = null
+/** a holder with no Discussion toggle models none (the older tests model one that is not rendered) */
+let noToggleModel = false
 let rectCalls = 0
 
 let bar: HTMLDivElement
@@ -76,7 +79,8 @@ function currentPillWidth(): number {
 /** the toggle's width as drawn now: full, or icon-only; a holder with no toggle models the full one */
 function currentToggleWidth(): number {
   const toggle = chrome.querySelector('.uw-discussion-toggle')
-  return toggle?.getAttribute('data-icon-only') === 'true' ? TOGGLE_ICON : TOGGLE
+  if (!toggle) return noToggleModel ? 0 : TOGGLE
+  return toggle.getAttribute('data-icon-only') === 'true' ? TOGGLE_ICON : TOGGLE
 }
 
 function chromeWidth(): number {
@@ -200,6 +204,8 @@ async function resizeTo(width: number): Promise<void> {
 const pill = () => chrome.querySelector<HTMLElement>('.uw-pill')!
 const variant = () => pill().getAttribute('data-variant')
 const action = () => pill().querySelector<HTMLButtonElement>('.uw-pill-action')
+/** the button that opens the queue popover: the action button, or the dot itself in the mini pill */
+const opener = () => pill().querySelector<HTMLButtonElement>('.uw-pill-action, .uw-pill-mini')
 const label = () => pill().querySelector<HTMLElement>('.uw-pill-label')!
 /** what a sighted user reads in the label: everything that is not visually hidden */
 const visibleLabel = () =>
@@ -221,6 +227,7 @@ beforeEach(() => {
   barWidth = 1280
   pillRightOverride = null
   pillLeftOverride = null
+  noToggleModel = false
   rectCalls = 0
   document.documentElement.removeAttribute('dir')
   makeApi()
@@ -490,32 +497,33 @@ describe('FXT6u: the Discussion toggle goes icon-only when the compact pill stil
         document.documentElement.dir = dir
       })
 
-      it('722px, 3 document tabs: the pill is compact, the toggle is icon-only, the strip and the holder never meet', async () => {
+      it('722px, 3 document tabs: the toggle is icon-only (and the pill the dot alone), the strip and the holder never meet', async () => {
         buildBar(3)
         stubLayout()
         barWidth = 722
         await mountBoth(status())
         expect(toggle()).not.toBeNull()
-        expect(variant()).toBe('compact')
+        expect(variant()).toBe('mini')
         expect(iconOnly()).toBe(true)
         assertHolderApart(`${dir} 722/3`)
         // the room it gave up went back to the strip
         const shared = 722 - FIXED_LEFT - FIXED_RIGHT - MARGINS
-        expect(strip.getBoundingClientRect().width).toBe(shared - TOGGLE_ICON - PILL.compact)
+        expect(strip.getBoundingClientRect().width).toBe(shared - TOGGLE_ICON - PILL.mini)
       })
 
-      it('722px, 3 tabs: the strip gains the whole difference of the two toggle forms, and the first two tabs show their labels', async () => {
+      it('722px, 3 tabs: the strip gains what the toggle and the pill gave up, and every tab shows its label', async () => {
         buildBar(3)
         stubLayout()
         barWidth = 722
         await mountBoth(status())
-        const iconStrip = strip.getBoundingClientRect().width
-        expect(visibleLabelPx(1)).toBe(36)
-        expect(visibleLabelPx(2)).toBe(36)
-        // with the toggle full the same window would leave the strip this much less
+        const miniStrip = strip.getBoundingClientRect().width
+        for (const n of [1, 2, 3]) {
+          expect(visibleLabelPx(n), `${dir} tab ${n}`).toBe(36)
+        }
+        // with the full toggle and the compact pill the same window leaves the strip this much less
         const shared = 722 - FIXED_LEFT - FIXED_RIGHT - MARGINS
-        const fullStrip = shared - TOGGLE - PILL.compact
-        expect(iconStrip - fullStrip).toBe(TOGGLE - TOGGLE_ICON)
+        const before = shared - TOGGLE - PILL.compact
+        expect(miniStrip - before).toBe(TOGGLE - TOGGLE_ICON + PILL.compact - PILL.mini)
       })
 
       it('icon-only keeps the toggle named and titled "Discussion", a button with the same state', async () => {
@@ -560,7 +568,7 @@ describe('FXT6u: the Discussion toggle goes icon-only when the compact pill stil
         barWidth = 800
         await mountBoth(status())
         // 800px with three tabs: the compact pill still leaves the strip below its floor
-        expect(variant()).toBe('compact')
+        expect(variant()).toBe('mini')
         expect(iconOnly()).toBe(true)
         await act(async () => {
           strip.querySelectorAll('.tab-item:not(.tab-home)')[2].remove()
@@ -569,6 +577,7 @@ describe('FXT6u: the Discussion toggle goes icon-only when the compact pill stil
         await flush()
         expect(docTabCount()).toBe(1)
         expect(iconOnly()).toBe(false)
+        expect(variant()).toBe('compact')
         await act(async () => {
           for (let i = 0; i < 2; i++) {
             const tab = document.createElement('div')
@@ -579,10 +588,12 @@ describe('FXT6u: the Discussion toggle goes icon-only when the compact pill stil
         await flush()
         expect(docTabCount()).toBe(3)
         expect(iconOnly()).toBe(true)
+        expect(variant()).toBe('mini')
       })
 
       it('800, 890, 1024 and 1280 x 1-3 tabs: icon-only exactly where even the compact pill leaves the strip below its floor', async () => {
         const iconCases: string[] = []
+        const miniCases: string[] = []
         for (const w of [800, 890, 1024, 1280]) {
           for (const n of [1, 2, 3]) {
             document.body.innerHTML = ''
@@ -605,14 +616,17 @@ describe('FXT6u: the Discussion toggle goes icon-only when the compact pill stil
             expect(iconOnly(), tag).toBe(compactStrip < floor)
             if (iconOnly()) {
               iconCases.push(`${w}/${n}`)
-              expect(variant(), tag).toBe('compact')
+              expect(['compact', 'mini'], tag).toContain(variant())
             }
+            if (variant() === 'mini') miniCases.push(`${w}/${n}`)
             assertHolderApart(tag)
             act(() => root.unmount())
           }
         }
         // the wide windows keep the full toggle
         expect(iconCases).toEqual(['800/2', '800/3', '890/3'])
+        // the dot alone only where even compact + an icon-only toggle leaves the strip below its floor
+        expect(miniCases).toEqual(['800/3'])
       })
 
       it('the repeated measures at the boundary never flip the toggle back and forth', async () => {
@@ -655,7 +669,226 @@ describe('FXT6u: the Discussion toggle goes icon-only when the compact pill stil
         barWidth = 722
         await mount(status())
         expect(toggle()).toBeNull()
-        expect(variant()).toBe('compact')
+        // no toggle to give up: the pill goes from compact to the dot at once, strip below its floor
+        expect(variant()).toBe('mini')
+      })
+
+      describe('the mini pill: the dot alone', () => {
+        const dialogEl = () => document.querySelector<HTMLElement>('[role="dialog"]')
+        const marginLeft = () => Number.parseFloat(dialogEl()!.style.marginLeft)
+        const miniDot = () => pill().querySelector<HTMLButtonElement>('.uw-pill-mini')
+        const glyph = () => pill().querySelector('[data-glyph]')?.getAttribute('data-glyph')
+        /** where the dialog's left edge goes: its right edge on the pill's (left-to-right), its left edge on the pill's (right-to-left), clamped */
+        function expectedMargin(width: number): number {
+          const rect = pill().getBoundingClientRect()
+          return dir === 'rtl'
+            ? Math.min(width - 8 - 360, Math.max(8, rect.left))
+            : Math.min(width - 8 - 360, Math.max(8, rect.right - 360))
+        }
+
+        async function mountMini(s: UniworkDocStatus = status(), width = 722): Promise<void> {
+          buildBar(3)
+          stubLayout()
+          noToggleModel = true
+          barWidth = width
+          await mount(s)
+        }
+
+        it('722px / 3 tabs without a Discussion toggle: the dot alone, every document tab label shows, the strip and holder never meet', async () => {
+          await mountMini()
+          expect(variant()).toBe('mini')
+          for (const n of [1, 2, 3]) expect(visibleLabelPx(n), `${dir} tab ${n}`).toBe(36)
+          assertHolderApart(`${dir} 722/3 no toggle`)
+          expect(strip.getBoundingClientRect().width).toBe(
+            722 - FIXED_LEFT - FIXED_RIGHT - MARGINS - PILL.mini,
+          )
+        })
+
+        it('722px / 3 tabs with the toggle: icon-only toggle and the dot, every document tab label shows', async () => {
+          buildBar(3)
+          stubLayout()
+          barWidth = 722
+          await mountBoth(status())
+          expect(variant()).toBe('mini')
+          expect(iconOnly()).toBe(true)
+          for (const n of [1, 2, 3]) expect(visibleLabelPx(n), `${dir} tab ${n}`).toBe(36)
+          assertHolderApart(`${dir} 722/3`)
+        })
+
+        it('the dot is a button named by the full label and the action, titled and described, with no visible text', async () => {
+          await mountMini()
+          const dot = miniDot()!
+          expect(dot.tagName).toBe('BUTTON')
+          expect(dot.getAttribute('type')).toBe('button')
+          expect(dot.getAttribute('aria-label')).toBe(`${en.uwChipQueued}. ${en.uwActViewQueue}`)
+          expect(dot.getAttribute('title')!.startsWith(`${en.uwChipQueued}\n`)).toBe(true)
+          const tip = document.getElementById(dot.getAttribute('aria-describedby')!)!
+          expect(tip.textContent).toContain(en.uwTipQueued.split('{')[0])
+          expect(dot.textContent).toBe('')
+          expect(dot.querySelector('svg')!.getAttribute('aria-hidden')).toBe('true')
+          // one control: no second button, and the group still names the pill
+          expect(pill().querySelectorAll('button')).toHaveLength(1)
+          expect(pill().getAttribute('role')).toBe('group')
+          expect(pill().getAttribute('aria-label')).toBe(enDocs.uwChipAria)
+          expect(dot.getAttribute('tabindex')).toBeNull()
+          expect(dot.getAttribute('aria-expanded')).toBe('false')
+        })
+
+        it("the focused dot is the keyboard stop (Enter and Space are the button's own)", async () => {
+          await mountMini()
+          const dot = miniDot()!
+          dot.focus()
+          expect(document.activeElement).toBe(dot)
+          expect(dot.matches('button:not([disabled])')).toBe(true)
+        })
+
+        it('a click opens the queue popover and the dialog anchors to the mini pill; a second click closes it', async () => {
+          await mountMini()
+          await act(async () => miniDot()!.click())
+          await flush()
+          expect(dialogEl()).not.toBeNull()
+          expect(miniDot()!.getAttribute('aria-expanded')).toBe('true')
+          expect(marginLeft()).toBe(expectedMargin(722))
+          if (dir === 'ltr') expect(marginLeft() + 360).toBe(pill().getBoundingClientRect().right)
+          else expect(marginLeft()).toBe(pill().getBoundingClientRect().left)
+          await act(async () => miniDot()!.click())
+          await flush()
+          expect(dialogEl()).toBeNull()
+        })
+
+        it('the dialog keeps the gutters when the mini pill is near an edge', async () => {
+          await mountMini()
+          // the pill's box near the left edge, then near the right edge
+          pillLeftOverride = 2
+          await resizeTo(722)
+          await act(async () => miniDot()!.click())
+          await flush()
+          expect(marginLeft()).toBe(8)
+          await act(async () => miniDot()!.click())
+          await flush()
+          pillLeftOverride = 700
+          await resizeTo(722)
+          await act(async () => miniDot()!.click())
+          await flush()
+          expect(marginLeft()).toBe(722 - 8 - 360)
+        })
+
+        it('a Ctrl/Cmd+S opening anchors to the mini pill the same way', async () => {
+          buildBar(3)
+          stubLayout()
+          noToggleModel = true
+          barWidth = 722
+          let push: ((request: { path: string }) => void) | null = null
+          window.aiOffice.onUniworkQueuePopover = vi.fn(
+            (cb: (request: { path: string }) => void) => {
+              push = cb
+              return () => undefined
+            },
+          ) as unknown as HomeApi['onUniworkQueuePopover']
+          await mount(status())
+          expect(variant()).toBe('mini')
+          await act(async () => push!({ path: PATH }))
+          await flush()
+          expect(dialogEl()).not.toBeNull()
+          expect(marginLeft()).toBe(expectedMargin(722))
+        })
+
+        it('a button-less pill (saved) stays a non-interactive dot with its shape, still named, described and focusable as a group', async () => {
+          await mountMini(status({ state: 'saved' }))
+          expect(variant()).toBe('mini')
+          expect(miniDot()).toBeNull()
+          expect(pill().querySelectorAll('button')).toHaveLength(0)
+          expect(glyph()).toBe('check')
+          expect(visibleLabel()).toBe('')
+          expect(label().querySelector('.uw-sr-only')!.textContent).toBe('Saved to UniWork')
+          expect(pill().getAttribute('tabindex')).toBe('0')
+          expect(pill().getAttribute('aria-describedby')).toBeTruthy()
+          expect(pill().getAttribute('title')).toContain('Saved')
+        })
+
+        it('colour is never the only cue: each tone has its own shape', async () => {
+          await mountMini()
+          const shapes: Record<string, string | null | undefined> = {}
+          for (const [name, state] of [
+            ['ok', 'saved'],
+            ['info', 'queued'],
+            ['warn', 'conflict'],
+            ['error', 'failed'],
+            ['busy', 'saving'],
+            ['neutral', 'dirty'],
+          ] as const) {
+            await mount(status({ state }))
+            expect(variant(), name).toBe('mini')
+            shapes[name] = glyph()
+            expect(shapes[name], name).toBeTruthy()
+          }
+          expect(new Set(Object.values(shapes)).size).toBe(6)
+          expect(shapes.ok).toBe('check')
+          expect(shapes.info).toBe('clock')
+          expect(shapes.error).toBe('alert')
+          expect(shapes.busy).toBe('busy')
+        })
+
+        it('a change of state while mini is still said in full, once', async () => {
+          await mountMini(status({ state: 'saved' }))
+          expect(variant()).toBe('mini')
+          await mount(status({ state: 'queued' }))
+          expect(polite()).toBe(`Plan: ${en.uwChipQueued}`)
+        })
+
+        it('room returning restores upward: the dot, the compact pill, the short and the full one', async () => {
+          await mountMini()
+          expect(variant()).toBe('mini')
+          const seen = [variant()]
+          for (const w of [800, 890, 1024, 1280]) {
+            await resizeTo(w)
+            seen.push(variant())
+          }
+          const rank = { mini: 3, compact: 2, short: 1, full: 0 } as const
+          const ranks = seen.map((v) => rank[v as keyof typeof rank])
+          expect([...ranks].sort((a, b) => b - a)).toEqual(ranks)
+          expect(seen[seen.length - 1]).toBe('full')
+          await resizeTo(722)
+          expect(variant()).toBe('mini')
+        })
+
+        it('closing a tab gives the dot back its compact pill', async () => {
+          await mountMini(status(), 800)
+          expect(variant()).toBe('mini')
+          await act(async () => {
+            strip.querySelectorAll('.tab-item:not(.tab-home)')[2].remove()
+          })
+          await flush()
+          expect(variant()).not.toBe('mini')
+        })
+
+        it('no flip-flop across the whole sweep of widths: the steps come once each, in order', async () => {
+          buildBar(3)
+          stubLayout()
+          barWidth = 700
+          await mountBoth(status())
+          const forms: string[] = []
+          for (let w = 700; w <= 1150; w++) {
+            await resizeTo(w)
+            const form = `${variant()}${iconOnly() ? '+icon' : ''}`
+            forms.push(form)
+            await act(async () => {
+              window.dispatchEvent(new Event('resize'))
+            })
+            await flush()
+            expect(`${variant()}${iconOnly() ? '+icon' : ''}`, `${w}px again`).toBe(form)
+          }
+          const steps = forms.filter((f, i) => i === 0 || f !== forms[i - 1])
+          expect(steps).toEqual(['mini+icon', 'compact+icon', 'compact', 'short', 'full'])
+        })
+
+        it('does not keep measuring once the dot has settled', async () => {
+          await mountMini()
+          const settled = rectCalls
+          await flush()
+          await flush()
+          expect(rectCalls).toBe(settled)
+        })
       })
     })
   }
@@ -670,7 +903,7 @@ describe('U-2: the queue popover is anchored under the pill', () => {
     stubLayout()
     barWidth = width
     await mount(status())
-    await act(async () => action()!.click())
+    await act(async () => opener()!.click())
     await flush()
     expect(dialog()).not.toBeNull()
   }
@@ -705,7 +938,7 @@ describe('U-2: the queue popover is anchored under the pill', () => {
     barWidth = 890
     pillRightOverride = 200
     await mount(status())
-    await act(async () => action()!.click())
+    await act(async () => opener()!.click())
     await flush()
     expect(leftOf()).toBe(8)
   })
@@ -716,7 +949,7 @@ describe('U-2: the queue popover is anchored under the pill', () => {
     barWidth = 890
     pillRightOverride = 890
     await mount(status())
-    await act(async () => action()!.click())
+    await act(async () => opener()!.click())
     await flush()
     expect(leftOf() + 360).toBe(890 - 8)
   })
@@ -783,7 +1016,7 @@ describe('U-2: the queue popover is anchored under the pill', () => {
     stubLayout()
     barWidth = 1600
     await mount(status())
-    await act(async () => action()!.click())
+    await act(async () => opener()!.click())
     await flush()
     const pillRight = pill().getBoundingClientRect().right
     // the dialog is 360 window px wide in the stub = 288 unscaled
@@ -796,7 +1029,7 @@ describe('U-2: the queue popover is anchored under the pill', () => {
     barWidth = 890
     pillRightOverride = Number.NaN
     await mount(status())
-    await act(async () => action()!.click())
+    await act(async () => opener()!.click())
     await flush()
     expect(leftOf() + 360).toBe(890 - 8)
   })
@@ -813,7 +1046,7 @@ describe('U-2: the queue popover is anchored under the pill', () => {
       barWidth = width
       pillLeftOverride = pillLeft
       await mount(status())
-      await act(async () => action()!.click())
+      await act(async () => opener()!.click())
       await flush()
       expect(dialog()).not.toBeNull()
     }

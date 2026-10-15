@@ -132,7 +132,8 @@ const BAR = {
   padding: 20,
   newButton: 32,
 }
-const PILL = { full: 309, short: 190, compact: 111 }
+/** `mini` is the dot alone: a 28px circle (the pill's height) */
+const PILL = { full: 309, short: 190, compact: 111, mini: 28 }
 
 function layout(barWidth: number, docTabs: number, extra: Partial<BarLayoutInput> = {}) {
   return barLayoutOf({
@@ -192,9 +193,9 @@ describe('U-1: the tab bar at 800, 890, 1024 and 1280 with one to three document
   })
 
   it('a wider window never picks a narrower variant', () => {
-    const rank = { full: 0, short: 1, compact: 2 } as const
+    const rank = { full: 0, short: 1, compact: 2, mini: 3 } as const
     for (const n of tabCounts) {
-      let previous = 2
+      let previous = 3
       for (let w = 720; w <= 1400; w += 10) {
         const r = rank[layout(w, n).variant]
         expect(r, `${w}px ${n} tabs`).toBeLessThanOrEqual(previous)
@@ -204,7 +205,7 @@ describe('U-1: the tab bar at 800, 890, 1024 and 1280 with one to three document
   })
 
   it('more document tabs never give the pill more room', () => {
-    const rank = { full: 0, short: 1, compact: 2 } as const
+    const rank = { full: 0, short: 1, compact: 2, mini: 3 } as const
     for (const w of widths) {
       let previous = 0
       for (const n of tabCounts) {
@@ -219,9 +220,9 @@ describe('U-1: the tab bar at 800, 890, 1024 and 1280 with one to three document
     for (const n of tabCounts) expect(layout(1280, n).variant, `${n} tabs`).toBe('full')
   })
 
-  it('720px (the window minimum) degrades to icon + action and still leaves the strip all the rest', () => {
+  it('720px (the window minimum) with three tabs degrades to the dot alone and leaves the strip all the rest', () => {
     const l = layout(720, 3)
-    expect(l.variant).toBe('compact')
+    expect(l.variant).toBe('mini')
     expect(l.strip.right - l.strip.left).toBeGreaterThan(0)
   })
 
@@ -252,7 +253,7 @@ describe('U-1: at the numbers measured in the real shell, no tab rect reaches th
     padding: 20,
     newButton: 32,
   }
-  const REAL_PILL = { full: 314, short: 187, compact: 113 }
+  const REAL_PILL = { full: 314, short: 187, compact: 113, mini: 28 }
 
   function tabRects(stripLeft: number, stripWidth: number, docTabs: number) {
     const inner = stripWidth - REAL.padding - REAL.newButton
@@ -349,9 +350,9 @@ describe('FXT6u: the Discussion toggle gives up its label before the strip gives
   const withIcon = (w: number, n: number, extra: Partial<BarLayoutInput> = {}) =>
     layout(w, n, { toggleIcon: TOGGLE_ICON, ...extra })
 
-  it("722px with three tabs: compact pill, icon-only toggle, the strip gains the toggle's label width", () => {
+  it("722px with three tabs: icon-only toggle, the strip gains the toggle's label width", () => {
     const l = withIcon(722, 3)
-    expect(l.variant).toBe('compact')
+    expect(['compact', 'mini']).toContain(l.variant)
     expect(l.iconToggle).toBe(true)
     const before = layout(722, 3)
     expect(before.iconToggle).toBe(false)
@@ -369,7 +370,8 @@ describe('FXT6u: the Discussion toggle gives up its label before the strip gives
         expect(l.iconToggle, `${w}px ${n} tabs`).toBe(compactStrip < floor)
         if (l.iconToggle) {
           iconCases.push(`${w}/${n}`)
-          expect(l.variant, `${w}px ${n} tabs`).toBe('compact')
+          // the pill is already in one of its two narrowest forms
+          expect(['compact', 'mini'], `${w}px ${n} tabs`).toContain(l.variant)
         }
         expect(l.strip.right, `${w}px ${n} tabs`).toBeLessThanOrEqual(l.chrome.left)
       }
@@ -449,7 +451,7 @@ describe('FXT6u: the Discussion toggle gives up its label before the strip gives
     it('with no toggle in the holder there is nothing to give up', () => {
       expect(
         pillFitStepOf({ budget: -50, toggle: null, toggleWidths: {}, widths, hasShort: true }),
-      ).toEqual({ variant: 'compact', iconToggle: false })
+      ).toEqual({ variant: 'mini', iconToggle: false })
     })
 
     it('a toggle drawn icon-only before its full width was ever measured is drawn full first', () => {
@@ -486,5 +488,154 @@ describe('FXT6u: the Discussion toggle gives up its label before the strip gives
       })
       expect(step).toEqual({ variant: 'short', iconToggle: false })
     })
+  })
+})
+
+/**
+ * FXT6u part 2: the MINI step. When even the compact pill, with the Discussion toggle already
+ * icon-only, still leaves the strip below its floor, the pill is the dot alone (28px). Order: full,
+ * short, compact, mini. Every threshold is read off the budget the holder has with the toggle drawn
+ * FULL, so a window gives the same step whichever form is on screen.
+ */
+describe('FXT6u: the dot-only mini pill is the last step', () => {
+  const TOGGLE_ICON = 32
+  const DELTA = 108 - TOGGLE_ICON
+  const widths = { full: 309, short: 190, compact: 111, mini: 28 }
+  const step = (budget: number, over: Partial<Parameters<typeof pillFitStepOf>[0]> = {}) =>
+    pillFitStepOf({
+      budget,
+      toggle: { width: 108, iconOnly: false },
+      toggleWidths: { full: 108, icon: TOGGLE_ICON },
+      widths,
+      hasShort: true,
+      ...over,
+    })
+  const withIcon = (w: number, n: number, extra: Partial<BarLayoutInput> = {}) =>
+    layout(w, n, { toggleIcon: TOGGLE_ICON, ...extra })
+
+  it('mini only when compact still leaves the strip below its floor with the toggle icon-only', () => {
+    // compact + icon toggle fits: budget (full toggle) + delta >= compact
+    expect(step(111 - DELTA)).toEqual({ variant: 'compact', iconToggle: true })
+    expect(step(111 - DELTA - 1)).toEqual({ variant: 'mini', iconToggle: true })
+    // compact fits with the full toggle: no icon, no mini
+    expect(step(111)).toEqual({ variant: 'compact', iconToggle: false })
+    // a wider variant fits: nothing narrower
+    expect(step(200)).toEqual({ variant: 'short', iconToggle: false })
+    expect(step(400)).toEqual({ variant: 'full', iconToggle: false })
+  })
+
+  it('a holder without a toggle goes mini when compact alone leaves the strip below its floor', () => {
+    const none = { toggle: null, toggleWidths: {} }
+    expect(step(111, none)).toEqual({ variant: 'compact', iconToggle: false })
+    expect(step(110, none)).toEqual({ variant: 'mini', iconToggle: false })
+  })
+
+  it('the toggle drawn full, its icon width not measured yet: it goes icon-only first, mini after the measure', () => {
+    expect(step(-50, { toggleWidths: { full: 108 } })).toEqual({
+      variant: 'compact',
+      iconToggle: true,
+    })
+    expect(step(-50)).toEqual({ variant: 'mini', iconToggle: true })
+  })
+
+  it('the compact pill never measured: no mini (nothing is guessed)', () => {
+    const sofar = { full: 309, short: 190 }
+    expect(step(-50, { widths: sofar }).variant).not.toBe('mini')
+  })
+
+  it('the same window gives the same step whichever form of the toggle is on screen (no flip-flop)', () => {
+    for (let budgetFull = -200; budgetFull <= 450; budgetFull++) {
+      const fullDrawn = step(budgetFull)
+      const iconDrawn = step(budgetFull + DELTA, {
+        toggle: { width: TOGGLE_ICON, iconOnly: true },
+      })
+      expect(iconDrawn, `budget ${budgetFull}`).toEqual(fullDrawn)
+    }
+  })
+
+  it('a wider budget never takes a narrower step; icon-only and mini each switch exactly once', () => {
+    const rank = { full: 0, short: 1, compact: 2, mini: 3 } as const
+    let previous = 3
+    const forms: string[] = []
+    for (let budget = -200; budget <= 450; budget++) {
+      const s = step(budget)
+      expect(rank[s.variant], `budget ${budget}`).toBeLessThanOrEqual(previous)
+      previous = rank[s.variant]
+      forms.push(`${s.variant}${s.iconToggle ? '+icon' : ''}`)
+    }
+    const flips = forms.filter((v, i) => i > 0 && v !== forms[i - 1])
+    // mini+icon, compact+icon, compact, short, full
+    expect(flips).toEqual(['compact+icon', 'compact', 'short', 'full'])
+  })
+
+  it("722px with three tabs: the strip ends after the third tab's label (toggle shown and toggle absent)", () => {
+    // Home 109 + 10 padding on the start side, three tabs at 104, the label 36px in and 36px wide
+    const labelOfThird = 10 + 109 + 2 * 104 + 36 + 36
+    for (const toggleIcon of [TOGGLE_ICON, undefined]) {
+      const l = withIcon(722, 3, toggleIcon === undefined ? { toggle: 0, toggleIcon } : {})
+      expect(l.variant).toBe('mini')
+      const stripWidth = l.strip.right - l.strip.left
+      expect(stripWidth, `toggle ${toggleIcon}`).toBeGreaterThanOrEqual(labelOfThird)
+      expect(l.strip.right).toBeLessThanOrEqual(l.chrome.left)
+      expect(l.chrome.right - l.chrome.left).toBe((toggleIcon ?? 0) + 28)
+    }
+  })
+
+  it('722px / 3 tabs: the widths the report states (toggle shown)', () => {
+    const l = withIcon(722, 3)
+    const shared = 722 - BAR.left - BAR.right - BAR.margins
+    expect(l.iconToggle).toBe(true)
+    expect(l.strip.right - l.strip.left).toBe(shared - TOGGLE_ICON - 28)
+    // before: compact pill and the full toggle
+    const before = shared - 108 - PILL.compact
+    expect(l.strip.right - l.strip.left - before).toBe(108 - TOGGLE_ICON + PILL.compact - 28)
+  })
+
+  it('which cells of 722/800/890/1024/1280 x 1-3 tabs are mini: with the toggle shown, and with none', () => {
+    const shown: string[] = []
+    const none: string[] = []
+    for (const w of [722, 800, 890, 1024, 1280]) {
+      for (const n of [1, 2, 3]) {
+        if (withIcon(w, n).variant === 'mini') shown.push(`${w}/${n}`)
+        if (withIcon(w, n, { toggle: 0, toggleIcon: undefined }).variant === 'mini') {
+          none.push(`${w}/${n}`)
+        }
+      }
+    }
+    expect(shown).toEqual(['722/2', '722/3', '800/3'])
+    expect(none).toEqual(['722/3', '800/3'])
+  })
+
+  it('800 to 1280 with one or two tabs, and 890 and wider with three: no mini, the layout is the one of the icon-only step', () => {
+    for (const [w, n] of [
+      [800, 1],
+      [800, 2],
+      [890, 1],
+      [890, 2],
+      [890, 3],
+      [1024, 1],
+      [1024, 2],
+      [1024, 3],
+      [1280, 1],
+      [1280, 2],
+      [1280, 3],
+    ]) {
+      expect(withIcon(w, n).variant, `${w}px ${n} tabs`).not.toBe('mini')
+    }
+  })
+
+  it('a wider window never goes back to a narrower step, with the toggle shown or not', () => {
+    const rank = { full: 0, short: 1, compact: 2, mini: 3 } as const
+    for (const n of [1, 2, 3]) {
+      for (const none of [false, true]) {
+        let previous = 3
+        for (let w = 600; w <= 1400; w++) {
+          const l = withIcon(w, n, none ? { toggle: 0, toggleIcon: undefined } : {})
+          expect(rank[l.variant], `${w}px ${n} tabs`).toBeLessThanOrEqual(previous)
+          previous = rank[l.variant]
+          expect(l.strip.right, `${w}px ${n} tabs`).toBeLessThanOrEqual(l.chrome.left)
+        }
+      }
+    }
   })
 })
