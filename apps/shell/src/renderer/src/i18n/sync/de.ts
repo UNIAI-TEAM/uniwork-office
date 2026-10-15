@@ -293,6 +293,14 @@ export const de = {
     'Ihre Version wurde als neues Dokument gespeichert: {title}. Dieses Dokument ist unverändert; Sie können weiterhin neu laden oder überschreiben.',
   uwConflictSaveCopyFailed:
     'Die Kopie konnte nicht erstellt werden. Ihre Änderungen sind weiterhin sicher; versuchen Sie es erneut.',
+  uwConflictSaveCopyNoSeat:
+    'Die Kopie konnte nicht erstellt werden, weil Sie kein Mitglied des Arbeitsbereichs sind, in dem sich dieses Dokument befindet. Ihre Änderungen sind weiterhin sicher; Sie können Ihre Version herunterladen.',
+  uwConflictSaveCopyFolderRefused:
+    'Sie können in diesem Ordner keine Dokumente erstellen. Laden Sie stattdessen Ihre Version herunter.',
+  uwConflictDownloadDone:
+    'Ihre Version wurde auf diesem Computer gespeichert: {file}. Dieses Dokument ist unverändert; Sie können weiterhin neu laden oder überschreiben.',
+  uwConflictDownloadFailedDesktop:
+    'Die Datei konnte nicht gespeichert werden. Ihre Änderungen sind weiterhin sicher; versuchen Sie es erneut.',
   uwConflictSaveCopyOffline:
     'Sie sind offline. Zum Erstellen einer Kopie ist eine Verbindung nötig; Ihre Änderungen bleiben erhalten.',
   uwConflictReloadFailed:

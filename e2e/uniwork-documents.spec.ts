@@ -17,6 +17,8 @@ import { keyFilePath } from '../apps/shell/src/main/uniwork-sync/keys'
 import { createDraftStore, type KeptDraft } from '../apps/shell/src/main/uniwork-sync/queue/drafts'
 import { recordPath, type StoreRecords } from '../apps/shell/src/main/uniwork-sync/store'
 import { openRecord, readRecordFrame } from '../apps/shell/src/main/uniwork-sync/store/codec'
+// the en shard of the conflict dialog strings (FE-12-03): an alert check follows the copy
+import { en as syncEn } from '../apps/shell/src/renderer/src/i18n/sync/en'
 import {
   closeAndSaveVideo,
   launchShell,
@@ -790,11 +792,13 @@ test.describe.serial('UniWork documents', () => {
     })
   })
 
-  test('d3. conflict: S5 "Save as a copy…" is pending G5-12, shows the failure alert, and keeps the document in conflict', async () => {
+  test('d3. conflict: S5 "Save as a copy…" creates a real copy with the LOCAL bytes, shows the done notice and keeps the document in conflict', async () => {
     test.setTimeout(180_000)
     await withApp('uniwork-docs-conflict-copy', async (ctx) => {
       const { shell, launched } = ctx
       const { doc, path } = await intoConflict(ctx, 'conflict-copy.docx')
+      const intentBefore = await readPendingIntent(launched, doc.id)
+      const localBytes = await readFile(path)
 
       await answerMessageBoxes(launched, [])
       await launched.app.evaluate(({ dialog }) => {
@@ -814,23 +818,293 @@ test.describe.serial('UniWork documents', () => {
       await expect(dialog.getByRole('heading', { name: 'Save as a copy?' })).toBeVisible()
       await dialog.getByRole('button', { name: 'Create copy', exact: true }).click()
 
-      // pending G5-12: main returns the `save_copy_failed` notice in the dialog's alert region
+      // the done notice names the copy; the dialog stays on step 1
+      const copyTitle = 'conflict-copy (my version).docx'
       await expect(dialog.getByRole('alert')).toContainText(
-        'Couldn’t create the copy. Your changes are still safe; try again.',
+        `Your version was saved as a new document: ${copyTitle}.`,
       )
+      await expect(dialog.getByRole('button', { name: 'Create copy', exact: true })).toBeHidden()
+
+      // the stub saw one /copies request and a commit on the copy carrying the LOCAL bytes
+      const copies = stub.copiesOf(doc.id)
+      expect(copies).toHaveLength(1)
+      const copy = copies[0]!
+      expect(copy).toMatchObject({ title: copyTitle, archived: false })
+      expect(copy.state.checksum).toBe(sha256(localBytes))
+      expect(await zipEntry(copy.state.bytes, 'word/document.xml')).toContain(MARKER)
+      expect(stub.uploads(copy.id)).toHaveLength(1)
+      expect(stub.commits(copy.id)).toEqual([
+        expect.objectContaining({ status: 200, baseRevision: '1' }),
+      ])
+      expect(
+        stub
+          .calls()
+          .filter((c) => c.method === 'POST' && c.route === `/documents/${doc.id}/copies`),
+      ).toEqual([expect.objectContaining({ status: 201, idempotencyKey: expect.any(String) })])
+
       await dialog.getByRole('button', { name: 'Close', exact: true }).click()
       await expect(dialog).toBeHidden()
 
-      // no native message box or save dialog was invoked; the document stays in conflict with its local edit intact
+      // no native message box or save dialog; the source stays in conflict with no new intent
       expect(await seenMessageBoxes(launched)).toHaveLength(0)
       const saveCalls = await launched.app.evaluate(
         () => (globalThis as unknown as { __e2eSaveCalls?: number }).__e2eSaveCalls ?? 0,
       )
       expect(saveCalls).toBe(0)
       await expectState(shell, 'conflict', 5_000)
+      expect(stub.uploads(doc.id)).toHaveLength(1)
+      expect(stub.commits(doc.id)).toHaveLength(1)
+      expect(await readPendingIntent(launched, doc.id)).toEqual(intentBefore)
+      expect(await binding(path)).toMatchObject({ state: 'conflict', baseRevision: '41' })
+      expect(await readFile(path)).toEqual(localBytes)
+    })
+  })
+
+  test('d3b. conflict: a failing step 2 archives the copy, shows the failure alert and keeps the document in conflict', async () => {
+    test.setTimeout(180_000)
+    await withApp('uniwork-docs-conflict-copy-fail', async (ctx) => {
+      const { shell, launched } = ctx
+      const { doc, path } = await intoConflict(ctx, 'conflict-copy-fail.docx')
+      const localBytes = await readFile(path)
+      await answerMessageBoxes(launched, [])
+      // the first try and its one retry both fail
+      stub.failCopyCommits(2)
+
+      await chip(shell).getByRole('button', { name: 'Resolve…' }).click()
+      const dialog = shell.getByRole('alertdialog')
+      await expect(dialog).toBeVisible()
+      await dialog.getByRole('button', { name: 'Save as a copy…', exact: true }).click()
+      await dialog.getByRole('button', { name: 'Create copy', exact: true }).click()
+
+      await expect(dialog.getByRole('alert')).toContainText(
+        'Couldn’t create the copy. Your changes are still safe; try again.',
+      )
+      // still on step 2, and the copy that held the server's bytes is archived
+      await expect(dialog.getByRole('button', { name: 'Create copy', exact: true })).toBeVisible()
+      const copies = stub.copiesOf(doc.id)
+      expect(copies).toHaveLength(1)
+      expect(copies[0]).toMatchObject({ archived: true })
+      expect(stub.commits(copies[0]!.id)).toEqual([
+        expect.objectContaining({ status: 503 }),
+        expect.objectContaining({ status: 503 }),
+      ])
+
+      await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+      await expect(dialog).toBeHidden()
+      await expectState(shell, 'conflict', 5_000)
       expect(stub.commits(doc.id)).toHaveLength(1)
       expect(await binding(path)).toMatchObject({ state: 'conflict', baseRevision: '41' })
-      expect(await zipEntry(await readFile(path), 'word/document.xml')).toContain(MARKER)
+      expect(await readFile(path)).toEqual(localBytes)
+    })
+  })
+
+  test('d3c. conflict: a 403 on the copy (no seat in the workspace) shows the reason, offers Download my version and writes the LOCAL bytes to the picked file', async () => {
+    test.setTimeout(180_000)
+    await withApp('uniwork-docs-conflict-copy-noseat', async (ctx) => {
+      const { shell, launched } = ctx
+      const { doc, path } = await intoConflict(ctx, 'conflict-noseat.docx')
+      const localBytes = await readFile(path)
+      const outDir = await mkdtemp(join(tmpdir(), 'uniwork-e2e-noseat-'))
+      const target = join(outDir, 'picked name.docx')
+      await answerMessageBoxes(launched, [])
+      // the OS save dialog is stubbed: it records the suggested name and picks `target`
+      await launched.app.evaluate(({ dialog }, picked) => {
+        const g = globalThis as unknown as { __e2eSaveNames?: string[] }
+        g.__e2eSaveNames = []
+        dialog.showSaveDialog = (async (...args: unknown[]) => {
+          const options = (args.length > 1 ? args[1] : args[0]) as { defaultPath?: string }
+          g.__e2eSaveNames!.push(options.defaultPath ?? '')
+          return { canceled: false, filePath: picked }
+        }) as typeof dialog.showSaveDialog
+      }, target)
+      stub.denyCopies(true)
+      try {
+        await chip(shell).getByRole('button', { name: 'Resolve…' }).click()
+        const dialog = shell.getByRole('alertdialog')
+        await expect(dialog).toBeVisible()
+        await dialog.getByRole('button', { name: 'Save as a copy…', exact: true }).click()
+        await dialog.getByRole('button', { name: 'Create copy', exact: true }).click()
+
+        // the reason is shown, the primary is now Download my version, Back stays
+        await expect(dialog.getByRole('alert')).toHaveText(syncEn.uwConflictSaveCopyNoSeat)
+        await expect(dialog.getByRole('button', { name: 'Create copy', exact: true })).toBeHidden()
+        const download = dialog.getByRole('button', { name: 'Download my version', exact: true })
+        await expect(download).toBeVisible()
+        await expect(dialog.getByRole('button', { name: 'Back', exact: true })).toBeVisible()
+        await shell.screenshot({ path: screenshotPath('uniwork-docs-conflict-no-seat') })
+
+        await download.click()
+        await expect(dialog.getByRole('alert')).toHaveText(
+          syncEn.uwConflictDownloadDone.replace('{file}', 'picked name.docx'),
+        )
+        // back on step 1; the picked file holds the LOCAL bytes; the suggestion was the copy name
+        await expect(
+          dialog.getByRole('button', { name: 'Reload latest', exact: true }),
+        ).toBeVisible()
+        expect(sha256(await readFile(target))).toBe(sha256(localBytes))
+        expect(
+          await launched.app.evaluate(
+            () => (globalThis as unknown as { __e2eSaveNames?: string[] }).__e2eSaveNames,
+          ),
+        ).toEqual([expect.stringMatching(/conflict-noseat \(my version\)\.docx$/)])
+
+        await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+        await expect(dialog).toBeHidden()
+        // no copy, no upload, no intent change: the source is still in conflict
+        expect(stub.copiesOf(doc.id)).toHaveLength(0)
+        expect(stub.uploads(doc.id)).toHaveLength(1)
+        expect(stub.commits(doc.id)).toHaveLength(1)
+        await expectState(shell, 'conflict', 5_000)
+        expect(await readFile(path)).toEqual(localBytes)
+      } finally {
+        stub.denyCopies(false)
+      }
+    })
+  })
+
+  test('d3d. conflict: a copy commit that landed but lost its answer twice is kept (lookup says committed), no archive request, done notice', async () => {
+    test.setTimeout(180_000)
+    await withApp('uniwork-docs-conflict-copy-lost', async (ctx) => {
+      const { shell, launched } = ctx
+      const { doc, path } = await intoConflict(ctx, 'conflict-copy-lost.docx')
+      const localBytes = await readFile(path)
+      await answerMessageBoxes(launched, [])
+
+      await chip(shell).getByRole('button', { name: 'Resolve…' }).click()
+      const dialog = shell.getByRole('alertdialog')
+      await expect(dialog).toBeVisible()
+      await dialog.getByRole('button', { name: 'Save as a copy…', exact: true }).click()
+      // the copy's first commit and its retry both land but their answers are dropped
+      stub.failNextCommit('after', 2)
+      await dialog.getByRole('button', { name: 'Create copy', exact: true }).click()
+
+      await expect(dialog.getByRole('alert')).toHaveText(
+        syncEn.uwConflictSaveCopyDone.replace('{title}', 'conflict-copy-lost (my version).docx'),
+      )
+      const copies = stub.copiesOf(doc.id)
+      expect(copies).toHaveLength(1)
+      expect(copies[0]).toMatchObject({ archived: false })
+      expect(copies[0]!.state.checksum).toBe(sha256(localBytes))
+      // the server (like the real one) would refuse an archive of this copy: none was sent
+      expect(
+        stub
+          .calls()
+          .filter((c) => c.method === 'POST' && c.route === `/documents/${copies[0]!.id}/archive`),
+      ).toHaveLength(0)
+      // both commits reached the server with the same key; the lookup asked for it
+      const commitKeys = stub.commits(copies[0]!.id).map((c) => c.idempotencyKey)
+      expect(new Set(commitKeys).size).toBe(1)
+      expect(
+        stub
+          .calls()
+          .filter(
+            (c) => c.method === 'GET' && c.route === `/documents/${copies[0]!.id}/versions/commit`,
+          ),
+      ).toEqual([expect.objectContaining({ status: 200, idempotencyKey: commitKeys[0] })])
+
+      await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+      await expect(dialog).toBeHidden()
+      await expectState(shell, 'conflict', 5_000)
+      expect(stub.commits(doc.id)).toHaveLength(1)
+      expect(await readFile(path)).toEqual(localBytes)
+    })
+  })
+
+  test('d3e. conflict: a copy commit that landed with its answer lost and a retry cut before the server is found by the lookup (committed): kept, done notice, no archive', async () => {
+    test.setTimeout(180_000)
+    await withApp('uniwork-docs-conflict-copy-landed', async (ctx) => {
+      const { shell, launched } = ctx
+      const { doc, path } = await intoConflict(ctx, 'conflict-copy-landed.docx')
+      const localBytes = await readFile(path)
+      await answerMessageBoxes(launched, [])
+
+      await chip(shell).getByRole('button', { name: 'Resolve…' }).click()
+      const dialog = shell.getByRole('alertdialog')
+      await expect(dialog).toBeVisible()
+      await dialog.getByRole('button', { name: 'Save as a copy…', exact: true }).click()
+      // BE-12-202: the first commit lands and its answer is lost; the retry never reaches the
+      // server, so only the lookup can tell the app the copy holds its bytes
+      stub.failCommitsInOrder(['after', 'before'])
+      await dialog.getByRole('button', { name: 'Create copy', exact: true }).click()
+
+      await expect(dialog.getByRole('alert')).toHaveText(
+        syncEn.uwConflictSaveCopyDone.replace('{title}', 'conflict-copy-landed (my version).docx'),
+      )
+      const copies = stub.copiesOf(doc.id)
+      expect(copies).toHaveLength(1)
+      expect(copies[0]).toMatchObject({ archived: false })
+      expect(copies[0]!.state.checksum).toBe(sha256(localBytes))
+      expect(
+        stub
+          .calls()
+          .filter((c) => c.method === 'POST' && c.route === `/documents/${copies[0]!.id}/archive`),
+      ).toHaveLength(0)
+      // one key for both attempts: the first committed, the retry was cut; one lookup with it
+      const commits = stub.commits(copies[0]!.id)
+      expect(commits.map((c) => c.status)).toEqual([200, 'dropped'])
+      const commitKeys = commits.map((c) => c.idempotencyKey)
+      expect(new Set(commitKeys).size).toBe(1)
+      expect(
+        stub
+          .calls()
+          .filter(
+            (c) => c.method === 'GET' && c.route === `/documents/${copies[0]!.id}/versions/commit`,
+          ),
+      ).toEqual([expect.objectContaining({ status: 200, idempotencyKey: commitKeys[0] })])
+
+      await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+      await expect(dialog).toBeHidden()
+      await expectState(shell, 'conflict', 5_000)
+      expect(stub.commits(doc.id)).toHaveLength(1)
+      expect(await readFile(path)).toEqual(localBytes)
+    })
+  })
+
+  test('d3f. conflict: both copy commits cut before the server acts -> the lookup says not_committed, the pristine copy is archived, failure alert', async () => {
+    test.setTimeout(180_000)
+    await withApp('uniwork-docs-conflict-copy-cut', async (ctx) => {
+      const { shell, launched } = ctx
+      const { doc, path } = await intoConflict(ctx, 'conflict-copy-cut.docx')
+      const localBytes = await readFile(path)
+      await answerMessageBoxes(launched, [])
+
+      await chip(shell).getByRole('button', { name: 'Resolve…' }).click()
+      const dialog = shell.getByRole('alertdialog')
+      await expect(dialog).toBeVisible()
+      await dialog.getByRole('button', { name: 'Save as a copy…', exact: true }).click()
+      // BE-12-203: neither commit reaches the server
+      stub.failNextCommit('before', 2)
+      await dialog.getByRole('button', { name: 'Create copy', exact: true }).click()
+
+      await expect(dialog.getByRole('alert')).toHaveText(syncEn.uwConflictSaveCopyFailed)
+      const copies = stub.copiesOf(doc.id)
+      expect(copies).toHaveLength(1)
+      // the copy never got the person's bytes and is archived: no server bytes posing as theirs
+      expect(copies[0]).toMatchObject({ archived: true })
+      expect(copies[0]!.state.checksum).not.toBe(sha256(localBytes))
+      expect(copies[0]!.state.version).toBe(1)
+      expect(
+        stub
+          .calls()
+          .filter((c) => c.method === 'POST' && c.route === `/documents/${copies[0]!.id}/archive`),
+      ).toEqual([expect.objectContaining({ status: 200 })])
+      const commits = stub.commits(copies[0]!.id)
+      expect(commits.map((c) => c.status)).toEqual(['dropped', 'dropped'])
+      const commitKeys = commits.map((c) => c.idempotencyKey)
+      expect(new Set(commitKeys).size).toBe(1)
+      expect(
+        stub
+          .calls()
+          .filter(
+            (c) => c.method === 'GET' && c.route === `/documents/${copies[0]!.id}/versions/commit`,
+          ),
+      ).toEqual([expect.objectContaining({ status: 200, idempotencyKey: commitKeys[0] })])
+
+      await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+      await expect(dialog).toBeHidden()
+      await expectState(shell, 'conflict', 5_000)
+      expect(stub.commits(doc.id)).toHaveLength(1)
+      expect(await readFile(path)).toEqual(localBytes)
     })
   })
 

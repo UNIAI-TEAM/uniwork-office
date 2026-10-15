@@ -101,6 +101,7 @@ import type { AiDocContent, AiSettings, MenuCommand, OpenDocxResult } from '../s
 import { AI_PROVIDERS } from '../shared/ipc'
 import { ZoteroDocumentController } from './zotero/controller'
 import { AiPanel, AI_REVISION_AUTHOR } from './ai/AiPanel'
+import { aiProtectionOf } from './ai/docs-skill'
 import type { AiCommentsAccess, AiDocExtras, AiHeaderFooterAccess } from './ai/tools'
 import { createAiSideState, type AiSideSlice, type AiSideState } from './ai/run-snapshot'
 import type { AiStyleInfo } from './ai/style-ops'
@@ -7298,6 +7299,7 @@ export function App() {
               notesAccess={aiNotesAccess}
               readOnly={uniwork.readOnly}
               bound={uniwork.bound}
+              protection={aiProtectionOf(protection, writeLocked)}
               sideState={aiSideState}
             />
           </div>
