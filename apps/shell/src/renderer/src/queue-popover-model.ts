@@ -5,7 +5,7 @@ import type {
   SyncCenterSnapshot,
 } from '../../shared/sync-center'
 import type { StringKey } from './locale'
-import { blockedReasonKey } from './uniwork-docs-model'
+import { blockedReasonKey, formatSaveTime } from './uniwork-docs-model'
 
 /**
  * Pure model of the queue popover (S4, EXPERIENCE "Queue popover"): which lines it reads, which
@@ -212,18 +212,13 @@ export function queuePopoverModelOf(
 }
 
 // seam G5-10: same as formatTime of sync-center-model.ts; the second lander imports that one.
-/** a timestamp as the user reads it: time today, else date + time; a non-date label stays as given */
+/**
+ * a timestamp as the user reads it: time today, else date + time; a non-date label stays as given.
+ * The save pill's tooltip reads the same `formatSaveTime`, so one saved-at time reads the same in
+ * the pill and in the popover.
+ */
 export function formatQueueTime(value: string, locale: string, now = new Date()): string {
-  if (!value) return '—'
-  const at = new Date(value)
-  if (Number.isNaN(at.getTime())) return value
-  const sameDay = at.toDateString() === now.toDateString()
-  return new Intl.DateTimeFormat(
-    locale,
-    sameDay
-      ? { hour: '2-digit', minute: '2-digit' }
-      : { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' },
-  ).format(at)
+  return formatSaveTime(value, locale, now)
 }
 
 /** kept drafts per document (OQ-UX2, U-15): the `{cap}` of `uwConflictDraftCapReached` */

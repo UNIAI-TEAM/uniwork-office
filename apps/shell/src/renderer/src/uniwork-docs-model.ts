@@ -403,7 +403,7 @@ export function chipCopy(
     ? t(model.labelKey, { reason: t(model.reasonKey) })
     : t(model.labelKey)
   const tipParams: Record<string, string> = {}
-  if (model.savedAt) tipParams.time = formatWhen(model.savedAt, dateLocale, now)
+  if (model.savedAt) tipParams.time = formatSaveTime(model.savedAt, dateLocale, now)
   else if (QUEUED_TIME_TIPS.has(model.tipKey)) tipParams.time = '—'
   if (model.reasonKey) tipParams.reason = t(model.reasonKey)
   const tip = t(model.tipKey, tipParams)
@@ -1095,6 +1095,23 @@ export function nameWithExtension(name: string, format: NewDocFormat): string {
 }
 
 // ── Time ────────────────────────────────────────────────
+
+/**
+ * a save's time as the pill and the queue popover both show it: time today, else date + time; a
+ * non-date label stays as given. One formatter, so the same saved-at time reads the same in both.
+ */
+export function formatSaveTime(value: string, locale: string, now: Date = new Date()): string {
+  if (!value) return '—'
+  const at = new Date(value)
+  if (Number.isNaN(at.getTime())) return value
+  const sameDay = at.toDateString() === now.toDateString()
+  return new Intl.DateTimeFormat(
+    locale,
+    sameDay
+      ? { hour: '2-digit', minute: '2-digit' }
+      : { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' },
+  ).format(at)
+}
 
 /** "10:42" for today, a medium date otherwise; '' when the server sent no usable time */
 export function formatWhen(iso: string, locale: string, now: Date = new Date()): string {

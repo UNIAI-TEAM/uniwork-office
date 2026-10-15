@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { UniworkDocErrorCode, UniworkDocStatus } from '../src/shared/home-api'
 import { chipCopy, chipModelOf, type ChipModel } from '../src/renderer/src/uniwork-docs-model'
+import { formatQueueTime } from '../src/renderer/src/queue-popover-model'
 import { uniworkDocumentStrings } from '../src/renderer/src/i18n/strings-uniwork-documents'
 import { accountStrings } from '../src/renderer/src/i18n/strings-account'
 import { syncStrings } from '../src/renderer/src/i18n/strings-sync'
@@ -506,5 +507,52 @@ describe('T2: Save pill priority (the higher row wins)', () => {
     for (const error of codes) {
       expect(chip({ state: 'error', error }).labelKey).toBe('uwChipError')
     }
+  })
+})
+
+describe('V6u-05: one formatter for the saved-at time (pill and popover)', () => {
+  // local wall-clock times so the same-day branch does not depend on the runner's time zone
+  const now = new Date(2026, 4, 1, 12, 0)
+  const sameDay = new Date(2026, 4, 1, 8, 5).toISOString()
+  const otherDay = new Date(2026, 3, 28, 8, 5).toISOString()
+
+  it('the queued tooltip reads the time exactly as the popover line does', () => {
+    for (const locale of ['en-US', 'vi-VN']) {
+      for (const at of [sameDay, otherDay]) {
+        for (const state of ['queued', 'paused_offline', 'paused_user'] as const) {
+          const model = chipModelOf(
+            {
+              path: '/p',
+              documentId: 'd',
+              workspaceId: 'w',
+              title: 'P',
+              format: 'docx',
+              access: 'edit',
+              state,
+            } as UniworkDocStatus,
+            { needsSignIn: false, queuedAt: at },
+          )
+          expect(chipCopy(model, t, locale, now).tip).toContain(formatQueueTime(at, locale, now))
+        }
+      }
+    }
+  })
+
+  it('the saved-at tooltip of a clean document uses the same formatter', () => {
+    const model = chipModelOf(
+      {
+        path: '/p',
+        documentId: 'd',
+        workspaceId: 'w',
+        title: 'P',
+        format: 'docx',
+        access: 'edit',
+        state: 'saved',
+        lastSavedAt: sameDay,
+      } as UniworkDocStatus,
+      { needsSignIn: false },
+    )
+    expect(model.tipKey).toBe('uwTipSavedAt')
+    expect(chipCopy(model, t, 'en-US', now).tip).toContain(formatQueueTime(sameDay, 'en-US', now))
   })
 })
