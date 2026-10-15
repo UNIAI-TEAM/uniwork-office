@@ -582,9 +582,12 @@ body.overlay-title-bar .tab-bar-drag-spacer {
   outline-offset: 1px;
 }
 
-/* keyboard focus has no native title tooltip: the description shows on one line inside the strip,
-   left of the pill and over the tab titles (absolute: the tabs never move). Below the strip the
-   editor view would cover it. Hover keeps the native title. */
+/* keyboard focus has no native title tooltip: the description shows inside the strip, left of the
+   pill and over the tab titles (absolute: the tabs never move). Below the strip the editor view
+   would cover it. Hover keeps the native title. Up to two lines of 12px text: 28px for one line,
+   at most 36px for two, centred on the 28px pill (y 2..38 of the 40px strip). Its width is the
+   smallest of 480px, 40% of the window and the room left of the pill (`--uw-tip-room`, measured on
+   focus), so it never passes the window's left edge. */
 .uw-pill-focus-tip {
   display: none;
   position: absolute;
@@ -593,9 +596,11 @@ body.overlay-title-bar .tab-bar-drag-spacer {
   transform: translateY(-50%);
   z-index: 5;
   box-sizing: border-box;
-  height: 28px;
-  max-width: min(480px, calc(var(--ui-vw) * 40));
-  padding: 0 10px;
+  width: max-content;
+  min-height: 28px;
+  max-height: 36px;
+  max-width: min(480px, calc(var(--ui-vw) * 40), var(--uw-tip-room, 480px));
+  padding: 2px 10px;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--surface);
@@ -603,20 +608,30 @@ body.overlay-title-bar .tab-bar-drag-spacer {
   color: var(--text);
   font-size: 12px;
   font-weight: 400;
-  line-height: 26px;
-  white-space: nowrap;
+  line-height: 15px;
   overflow: hidden;
-  text-overflow: ellipsis;
   pointer-events: none;
+}
+
+/* the ellipsis comes only after line 2 */
+.uw-pill-focus-tip-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
 }
 
 .uw-pill:focus-visible > .uw-pill-focus-tip,
 .uw-pill-action:focus-visible ~ .uw-pill-focus-tip {
-  display: block;
+  display: flex;
+  align-items: center;
 }
 
-/* Esc or a pointer press hides it until the pill is focused again */
-.uw-pill[data-tip-off] > .uw-pill-focus-tip {
+/* Esc or a pointer press hides it until the pill is focused again; so does too little room */
+.uw-pill[data-tip-off] > .uw-pill-focus-tip,
+.uw-pill[data-tip-room='none'] > .uw-pill-focus-tip {
   display: none;
 }
 

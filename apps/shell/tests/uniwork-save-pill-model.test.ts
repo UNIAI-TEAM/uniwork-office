@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { UniworkDocErrorCode, UniworkDocStatus } from '../src/shared/home-api'
-import { chipCopy, chipModelOf, type ChipModel } from '../src/renderer/src/uniwork-docs-model'
+import {
+  FOCUS_TIP_MIN_PX,
+  chipCopy,
+  chipModelOf,
+  focusTipRoomOf,
+  type ChipModel,
+} from '../src/renderer/src/uniwork-docs-model'
 import { formatQueueTime } from '../src/renderer/src/queue-popover-model'
 import { uniworkDocumentStrings } from '../src/renderer/src/i18n/strings-uniwork-documents'
 import { accountStrings } from '../src/renderer/src/i18n/strings-account'
@@ -554,5 +560,32 @@ describe('V6u-05: one formatter for the saved-at time (pill and popover)', () =>
     )
     expect(model.tipKey).toBe('uwTipSavedAt')
     expect(chipCopy(model, t, 'en-US', now).tip).toContain(formatQueueTime(sameDay, 'en-US', now))
+  })
+})
+
+describe('V6u2-01: the in-strip focus chip fits left of the pill', () => {
+  it('room = pill left edge minus the 8px gap and the 8px window gutter (unscaled px)', () => {
+    // the narrowest real window (720 px minimum): the pill starts at x 216
+    expect(focusTipRoomOf(216, 1)).toBe(200)
+    // 1280 px window: the pill starts at x 775, far more room than the 480px cap needs
+    expect(focusTipRoomOf(775, 1)).toBe(759)
+  })
+
+  it('a zoomed interface measures window px and lays out in unscaled px', () => {
+    expect(focusTipRoomOf(216, 1.25)).toBe(156)
+    expect(focusTipRoomOf(216, 0.8)).toBe(254)
+  })
+
+  it('never negative; no room (or a bad measure) is 0', () => {
+    expect(focusTipRoomOf(10, 1)).toBe(0)
+    expect(focusTipRoomOf(-50, 1)).toBe(0)
+    expect(focusTipRoomOf(Number.NaN, 1)).toBe(0)
+    expect(focusTipRoomOf(216, 0)).toBe(200)
+    expect(focusTipRoomOf(216, Number.NaN)).toBe(200)
+  })
+
+  it('a minimum below which the chip is not drawn at all', () => {
+    expect(FOCUS_TIP_MIN_PX).toBeGreaterThan(0)
+    expect(focusTipRoomOf(216, 1)).toBeGreaterThanOrEqual(FOCUS_TIP_MIN_PX)
   })
 })

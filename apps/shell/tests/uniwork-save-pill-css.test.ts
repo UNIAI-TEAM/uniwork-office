@@ -145,11 +145,8 @@ describe('V6u-01: the in-strip description on keyboard focus', () => {
     expect(tip).toMatch(/top: 50%/)
     expect(tip).toMatch(/transform: translateY\(-50%\)/)
     expect(tip).not.toMatch(/top: calc\(100%/)
-    expect(px(/height: (\d+px)/.exec(tip)?.[1])).toBeLessThanOrEqual(28)
-    // one line, ellipsis when long; it overlays (no layout shift) and never takes a click
-    expect(tip).toMatch(/white-space: nowrap/)
+    // it overlays (no layout shift) and never takes a click
     expect(tip).toMatch(/overflow: hidden/)
-    expect(tip).toMatch(/text-overflow: ellipsis/)
     expect(tip).toMatch(/pointer-events: none/)
     expect(tip).toMatch(/z-index: \d+/)
   })
@@ -166,14 +163,67 @@ describe('V6u-01: the in-strip description on keyboard focus', () => {
     const shown = rule(
       '.uw-pill:focus-visible > .uw-pill-focus-tip,\n.uw-pill-action:focus-visible ~ .uw-pill-focus-tip',
     )
-    expect(shown).toMatch(/display: block/)
+    expect(shown).toMatch(/display: (block|flex)/)
     const showAt = css.indexOf('.uw-pill:focus-visible > .uw-pill-focus-tip')
-    const off = rule('.uw-pill[data-tip-off] > .uw-pill-focus-tip')
+    const off = rule(
+      ".uw-pill[data-tip-off] > .uw-pill-focus-tip,\n.uw-pill[data-tip-room='none'] > .uw-pill-focus-tip",
+    )
     expect(off).toMatch(/display: none/)
     // same specificity: the off rule must come later to win
     expect(css.indexOf('.uw-pill[data-tip-off] > .uw-pill-focus-tip')).toBeGreaterThan(showAt)
     // never on plain :focus or :hover (hover keeps the native title)
     expect(css).not.toMatch(/:hover[^{]*\.uw-pill-focus-tip/)
     expect(css).not.toMatch(/:focus(?!-visible)[^{]*\.uw-pill-focus-tip/)
+  })
+})
+
+describe('V6u2-01: the focus chip never passes the window edge', () => {
+  it('its width is capped by the room measured left of the pill, never by the window alone', () => {
+    const tip = rule('.uw-pill-focus-tip')
+    // as wide as its text (not the 28px pill it hangs from), up to the smallest cap
+    expect(tip).toMatch(/width: max-content/)
+    expect(tip).toMatch(/max-width: min\([^;]*var\(--uw-tip-room, \d+px\)[^;]*\)/)
+    expect(tip).toMatch(/max-width: min\(480px/)
+  })
+})
+
+describe('V6u2-02: the focus chip reads in two lines inside the 40px strip', () => {
+  it('the chip is 28px for one line and at most 36px for two, centred on the 28px pill', () => {
+    const tip = rule('.uw-pill-focus-tip')
+    expect(px(/min-height: (\d+px)/.exec(tip)?.[1])).toBe(28)
+    const max = px(/max-height: (\d+px)/.exec(tip)?.[1])
+    expect(max).toBeLessThanOrEqual(36)
+    // centred on the pill (strip 40, pill 28 at y 6): y from 20 - max/2 to 20 + max/2 stays in 0..40
+    expect(20 - max / 2).toBeGreaterThanOrEqual(0)
+    expect(20 + max / 2).toBeLessThanOrEqual(40)
+    expect(tip).toMatch(/top: 50%/)
+    expect(tip).toMatch(/transform: translateY\(-50%\)/)
+    // two lines + padding + border fit the max height
+    const line = px(/line-height: (\d+px)/.exec(tip)?.[1])
+    const padY = px(/padding: (\d+px) \d+px/.exec(tip)?.[1])
+    expect(2 * line + 2 * padY + 2).toBeLessThanOrEqual(max)
+    expect(tip).toMatch(/font-size: 12px/)
+    expect(tip).not.toMatch(/white-space: nowrap/)
+  })
+
+  it('the text wraps and is cut with an ellipsis only after line 2', () => {
+    const text = rule('.uw-pill-focus-tip-text')
+    expect(text).toMatch(/display: -webkit-box/)
+    expect(text).toMatch(/-webkit-box-orient: vertical/)
+    expect(text).toMatch(/-webkit-line-clamp: 2/)
+    expect(text).toMatch(/overflow: hidden/)
+    expect(text).not.toMatch(/white-space: nowrap/)
+  })
+
+  it('the shown chip centres one line vertically', () => {
+    const shown = rule(
+      '.uw-pill:focus-visible > .uw-pill-focus-tip,\n.uw-pill-action:focus-visible ~ .uw-pill-focus-tip',
+    )
+    expect(shown).toMatch(/display: flex/)
+    expect(shown).toMatch(/align-items: center/)
+  })
+
+  it('theme tokens only for the text node too', () => {
+    expect(rule('.uw-pill-focus-tip-text')).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(/i)
   })
 })

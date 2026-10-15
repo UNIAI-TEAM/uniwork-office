@@ -233,6 +233,93 @@ describe('V6u-01: keyboard focus shows the description inside the strip', () => 
   })
 })
 
+describe('V6u2-01: the focus chip is bounded by the room left of the pill', () => {
+  const room = () => pill().style.getPropertyValue('--uw-tip-room')
+  /** the pill's window-px rect as Chromium would report it */
+  const placePill = (left: number) => {
+    pill().getBoundingClientRect = () =>
+      ({
+        left,
+        right: left + 314,
+        top: 6,
+        bottom: 34,
+        width: 314,
+        height: 28,
+        x: left,
+        y: 6,
+      }) as DOMRect
+  }
+
+  afterEach(() => {
+    document.documentElement.style.removeProperty('--ui-scale')
+  })
+
+  it('focus measures the pill and sets the room as a custom property (720 px window)', async () => {
+    await mount(status({ state: 'queued' }))
+    placePill(216)
+    act(() => button()!.focus())
+    expect(room()).toBe('200px')
+    expect(pill().hasAttribute('data-tip-room')).toBe(false)
+    // V6u2-02: the sentence sits in a text node the CSS clamps to two lines
+    const text = pill().querySelector('.uw-pill-focus-tip > .uw-pill-focus-tip-text')
+    expect(text?.textContent).toBe(pill().querySelector('.uw-pill-focus-tip')!.textContent)
+  })
+
+  it('a button-less pill measures on its own focus too', async () => {
+    await mount(status({ state: 'dirty' }))
+    placePill(700)
+    act(() => pill().focus())
+    expect(room()).toBe('684px')
+  })
+
+  it('a resize while it shows measures again', async () => {
+    await mount(status({ state: 'queued' }))
+    placePill(775)
+    act(() => button()!.focus())
+    expect(room()).toBe('759px')
+    placePill(216)
+    act(() => {
+      window.dispatchEvent(new Event('resize'))
+    })
+    expect(room()).toBe('200px')
+  })
+
+  it('a resize after focus left does not measure', async () => {
+    await mount(status({ state: 'queued' }))
+    placePill(775)
+    act(() => button()!.focus())
+    act(() => (document.getElementById('editor-stand-in') as HTMLElement).focus())
+    placePill(216)
+    act(() => {
+      window.dispatchEvent(new Event('resize'))
+    })
+    expect(room()).toBe('759px')
+  })
+
+  it('the interface scale is taken out (the chip lays out in unscaled px)', async () => {
+    document.documentElement.style.setProperty('--ui-scale', '1.25')
+    await mount(status({ state: 'queued' }))
+    placePill(216)
+    act(() => button()!.focus())
+    expect(room()).toBe('156px')
+  })
+
+  it('never negative: with no usable room the chip is not drawn', async () => {
+    await mount(status({ state: 'queued' }))
+    placePill(10)
+    act(() => button()!.focus())
+    expect(room()).toBe('0px')
+    expect(pill().getAttribute('data-tip-room')).toBe('none')
+    // room again (a wider window): drawn again
+    placePill(400)
+    act(() => {
+      window.dispatchEvent(new Event('resize'))
+    })
+    expect(room()).toBe('384px')
+    expect(pill().hasAttribute('data-tip-room')).toBe(false)
+  })
+})
+
 describe('Save pill announces each change once (T4)', () => {
   it('says nothing on the first render', async () => {
     await mount(status({ state: 'dirty' }))

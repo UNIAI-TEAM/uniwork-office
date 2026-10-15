@@ -411,6 +411,24 @@ export function chipCopy(
   return { label, tip: fullTip, title: `${label}\n${fullTip}` }
 }
 
+/** the in-strip focus chip sits this far left of the pill (`right: calc(100% + 8px)` in tabbar.css) */
+const FOCUS_TIP_GAP_PX = 8
+/** and keeps this far from the window's left edge */
+const FOCUS_TIP_EDGE_PX = 8
+/** less room than this and the chip is not drawn (the description is still read and in the title) */
+export const FOCUS_TIP_MIN_PX = 80
+
+/**
+ * The width the focus chip may take left of the pill, in the unscaled CSS px it lays out in:
+ * the pill's left edge (window px, as measured) over the interface scale, minus the gap and the
+ * window gutter. Never negative.
+ */
+export function focusTipRoomOf(pillLeft: number, scale: number): number {
+  const s = Number.isFinite(scale) && scale > 0 ? scale : 1
+  const room = Math.floor(pillLeft / s - FOCUS_TIP_GAP_PX - FOCUS_TIP_EDGE_PX)
+  return Number.isFinite(room) && room > 0 ? room : 0
+}
+
 // ── New-version bar (S6) ────────────────────────────────
 
 export type RemoteBarTone = 'info' | 'warn' | 'error'

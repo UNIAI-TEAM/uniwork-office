@@ -57,12 +57,16 @@ export function useTopInsetPart(part: TopInsetPart): number {
   )
 }
 
-/** an element's height in unscaled CSS px (main multiplies the inset by the interface scale) */
-export function unscaledHeightOf(el: HTMLElement): number {
+/** the interface scale (`zoom: var(--ui-scale)` on the frame) an element is drawn at */
+export function uiScaleOf(el: HTMLElement): number {
   const rawScale = Number.parseFloat(
     getComputedStyle(el).getPropertyValue('--ui-scale') ||
       document.documentElement.style.getPropertyValue('--ui-scale'),
   )
-  const scale = Number.isFinite(rawScale) && rawScale > 0 ? rawScale : 1
-  return Math.ceil(el.getBoundingClientRect().height / scale)
+  return Number.isFinite(rawScale) && rawScale > 0 ? rawScale : 1
+}
+
+/** an element's height in unscaled CSS px (main multiplies the inset by the interface scale) */
+export function unscaledHeightOf(el: HTMLElement): number {
+  return Math.ceil(el.getBoundingClientRect().height / uiScaleOf(el))
 }

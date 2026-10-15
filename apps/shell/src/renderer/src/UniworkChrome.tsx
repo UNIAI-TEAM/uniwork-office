@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState, type CSSProperties } from 'react'
 import type { TabSummary } from '../../shared/tabs-api'
 import type { UniworkDocStatus } from '../../shared/home-api'
 import { asSyncCenterSnapshot } from '../../shared/sync-center'
@@ -17,8 +17,10 @@ import {
 import { collabStrings } from '@genoffice/ui/collab'
 import { showsProfile } from './account-model'
 import {
+  FOCUS_TIP_MIN_PX,
   chipCopy,
   chipModelOf,
+  focusTipRoomOf,
   launchNoticeOf,
   pathKey,
   remoteBarModelOf,
@@ -35,7 +37,7 @@ import {
   type QueuePopoverOpener,
 } from './queue-popover-model'
 import { announce } from './uniwork-live'
-import { setTopInsetPart } from './uniwork-top-inset'
+import { setTopInsetPart, uiScaleOf } from './uniwork-top-inset'
 import type { SyncCenterRow } from '../../shared/sync-center'
 
 /**
@@ -208,8 +210,9 @@ function isUrgent(status: UniworkDocStatus, labelKey: StringKey): boolean {
  * once: aria-describedby wins over title). Sighted users get the native title tooltip on hover,
  * which Electron draws above the editor view (shell DOM below the 40px strip would be covered by
  * it). Chromium shows no title on keyboard focus, so a focus-visible pill also shows the sentence
- * on one line inside the strip, over the tab titles left of it (aria-hidden: it is the
- * description again); Esc or pointer use hides it until the pill is focused again.
+ * in up to two lines inside the strip, over the tab titles left of it (aria-hidden: it is the
+ * description again), never wider than the room between the window edge and the pill; Esc or
+ * pointer use hides it until the pill is focused again.
  * A change of the pill is said once through the window live host. The
  * queue states open the queue popover (S4); so does Ctrl/Cmd+S on a waiting save (main pushes
  * the request, the chip of the active document opens it).
@@ -228,6 +231,8 @@ export function UniworkStatusChip({
   const [popover, setPopover] = useState<QueuePopoverOpener | null>(null)
   const [ctrlS, setCtrlS] = useState(0)
   const [tipOff, setTipOff] = useState(false)
+  const [tipRoom, setTipRoom] = useState<number | null>(null)
+  const [focusWithin, setFocusWithin] = useState(false)
   const groupRef = useRef<HTMLDivElement>(null)
   const buttonRef = useRef<HTMLButtonElement | null>(null)
   const accountOk = account.view === 'signed-in' || account.view === 'refreshing'
@@ -335,6 +340,28 @@ export function UniworkStatusChip({
       .finally(() => setBusy(false))
   }
 
+  // the focus chip hangs left of the pill: its width is the room up to the window edge, measured
+  // when the pill takes the focus and again on a resize while it has it
+  const measureTip = useCallback(() => {
+    const el = groupRef.current
+    if (el) setTipRoom(focusTipRoomOf(el.getBoundingClientRect().left, uiScaleOf(el)))
+  }, [])
+  useEffect(() => {
+    if (!focusWithin) return
+    window.addEventListener('resize', measureTip)
+    let observer: ResizeObserver | undefined
+    if (typeof ResizeObserver !== 'undefined' && groupRef.current) {
+      observer = new ResizeObserver(measureTip)
+      observer.observe(groupRef.current)
+    }
+    return () => {
+      window.removeEventListener('resize', measureTip)
+      observer?.disconnect()
+    }
+  }, [focusWithin, measureTip])
+  const tipStyle =
+    tipRoom === null ? undefined : ({ '--uw-tip-room': `${tipRoom}px` } as CSSProperties)
+
   // the pill group is the keyboard stop only when it has no button to carry the description
   const describedHere = !action
   return (
@@ -350,7 +377,18 @@ export function UniworkStatusChip({
         title={describedHere ? title : undefined}
         aria-describedby={describedHere ? tipId : undefined}
         data-tip-off={tipOff ? '' : undefined}
-        onFocus={() => setTipOff(false)}
+        data-tip-room={tipRoom !== null && tipRoom < FOCUS_TIP_MIN_PX ? 'none' : undefined}
+        style={tipStyle}
+        onFocus={() => {
+          setTipOff(false)
+          setFocusWithin(true)
+          measureTip()
+        }}
+        onBlur={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+            setFocusWithin(false)
+          }
+        }}
         onPointerDown={() => setTipOff(true)}
         onKeyDown={(event) => {
           if (event.key === 'Escape') setTipOff(true)
@@ -386,7 +424,7 @@ export function UniworkStatusChip({
           </button>
         )}
         <span className="uw-pill-focus-tip" aria-hidden="true">
-          {tip}
+          <span className="uw-pill-focus-tip-text">{tip}</span>
         </span>
       </div>
       {popover && (
