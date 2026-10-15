@@ -124,6 +124,12 @@ export const id = {
     'Rantai kunci komputer terkunci, jadi perubahan yang belum disimpan hanya ada di jendela yang terbuka. Keluar sekarang akan membuangnya; yang sudah disimpan terenkripsi tetap ada. Untuk menyimpannya, buka kunci komputer terlebih dahulu.',
   uwSignOutGo: 'Keluar',
   uwSignOutWaiting: 'Menyelesaikan penyimpanan yang sedang berjalan sebelum keluar…',
+  uwSignOutCaptureFailed:
+    'Beberapa perubahan yang belum disimpan tidak sempat ditangkap tepat waktu; versi tersimpan atau simpan otomatis terbaru tetap disimpan untuk akun Anda.',
+  uwSwitchLostTitle: 'Sebagian perubahan yang belum disimpan dari akun sebelumnya hilang',
+  uwSwitchLostBody:
+    'Akun lain masuk di komputer ini, jadi akun sebelumnya dikunci. Dokumen yang perubahan belum disimpannya tidak dapat dipertahankan: {count}. Semua yang lain tetap terkunci di komputer ini untuk akun tersebut.',
+  uwSwitchLostOk: 'Mengerti',
 
   // S2 sync center
   uwSyncTitle: 'Pusat sinkronisasi',

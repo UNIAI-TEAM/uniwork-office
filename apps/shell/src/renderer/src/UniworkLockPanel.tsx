@@ -185,12 +185,14 @@ export function UniworkLockPanel({
   titleRef,
   onDismiss,
   onRetry,
+  onSignIn,
   retrying = false,
 }: {
   lock: UniworkDocLock
   titleRef: RefObject<HTMLHeadingElement | null>
   onDismiss: (path: string) => void
   onRetry?: () => void
+  onSignIn?: () => void
   /** the retry is in flight: its button is aria-disabled, not disabled (focus stays on it) and ignores activation */
   retrying?: boolean
 }) {
@@ -223,8 +225,13 @@ export function UniworkLockPanel({
           aria-disabled={copy.action === 'retry' && retrying ? true : undefined}
           aria-busy={copy.action === 'retry' && retrying ? true : undefined}
           onClick={() => {
-            if (copy.action !== 'retry') onDismiss(lock.path)
-            else if (!retrying) onRetry?.()
+            if (copy.action === 'retry') {
+              if (!retrying) onRetry?.()
+            } else if (copy.action === 'sign-in') {
+              onSignIn?.()
+            } else {
+              onDismiss(lock.path)
+            }
           }}
         >
           {t(copy.actionKey)}
@@ -274,6 +281,9 @@ export function UniworkLockHost({
         refresh()
       })
   }, [refresh])
+  const signIn = useCallback(() => {
+    void window.aiOffice.accountLogin?.()
+  }, [])
   const shownKey = lock ? pathKey(lock.path) : null
   const titleRef = useRef<HTMLHeadingElement>(null)
   const regionRef = useRef<HTMLDivElement>(null)
@@ -357,6 +367,7 @@ export function UniworkLockHost({
           titleRef={titleRef}
           onDismiss={dismiss}
           onRetry={retry}
+          onSignIn={signIn}
           retrying={retrying}
         />
       )}

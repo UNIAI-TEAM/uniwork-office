@@ -3296,6 +3296,11 @@ export function readStarredGroupMap(): Map<string, string> {
 // ---- original archive (pass-through base: original file archived by content hash) ----
 
 async function archiveOriginal(filePath: string, hash: string, size: number): Promise<void> {
+  // G5-11 be-2: a bound working copy is UniWork's own copy, not the user's
+  // local file. Archiving it kept plaintext of the account under userData
+  // outside the working-copy root, and the name is a content hash, so sign-out
+  // could not find it by path.
+  if (uniworkIsBound(filePath)) return
   // a copy larger than the whole cap would only evict every other original
   if (size > ORIGINALS_MAX_BYTES) return
   const dir = userDataPath('originals')
@@ -3303,6 +3308,36 @@ async function archiveOriginal(filePath: string, hash: string, size: number): Pr
   const target = join(dir, `${hash}.docx`)
   if (!existsSync(target)) await copyFile(filePath, target)
   void pruneOriginals(dir)
+}
+
+/**
+ * G5-11 be-2 / d1-3: sign-out drops the archived originals of the owner's
+ * working copies (the shell hands the paths and their open-time `baseChecksum`
+ * just before it deletes them). The archive is content-addressed by the bytes
+ * at open time (`baseChecksum`) as well as any current on-disk bytes.
+ */
+export function clearDocsOriginalsFor(
+  entries: ReadonlyArray<string | { path: string; baseChecksum?: string }>,
+): void {
+  const dir = userDataPath('originals')
+  for (const entry of entries) {
+    const filePath = typeof entry === 'string' ? entry : entry.path
+    const baseChecksum = typeof entry === 'string' ? undefined : entry.baseChecksum
+    if (baseChecksum) {
+      try {
+        const baseTarget = join(dir, `${baseChecksum}.docx`)
+        if (existsSync(baseTarget)) unlinkSync(baseTarget)
+      } catch {
+        // ignore missing or unreadable archive
+      }
+    }
+    try {
+      const target = join(dir, `${sha256Hex(readFileSync(filePath))}.docx`)
+      if (existsSync(target)) unlinkSync(target)
+    } catch {
+      // unreadable / already deleted: no archive of it can be named
+    }
+  }
 }
 
 const ORIGINALS_MAX_BYTES = 500 * 1024 * 1024
@@ -3512,7 +3547,7 @@ export function recoveryCopyMtime(filePath: string): number | null {
  * the bump must not recreate the file it is about to land (stale-recovery race). */
 const recoveryClearEpochs = new Map<string, number>()
 
-function clearRecoveryCopy(filePath: string): void {
+export function clearRecoveryCopy(filePath: string): void {
   recoveryClearEpochs.set(filePath, (recoveryClearEpochs.get(filePath) ?? 0) + 1)
   try {
     unlinkSync(recoveryPathFor(filePath))
@@ -3520,6 +3555,8 @@ function clearRecoveryCopy(filePath: string): void {
     /* nothing to clean */
   }
 }
+
+export { clearRecoveryCopy as clearDocsRecoveryCopy }
 
 /** queue a document this tab's next consume-pending-open opens without a dialog (shell reload routing) */
 export function queueDocsForView(contents: WebContents, path: string): void {

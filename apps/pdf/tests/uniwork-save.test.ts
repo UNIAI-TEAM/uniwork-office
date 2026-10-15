@@ -130,6 +130,36 @@ describe('uniworkSaveDecision (pure)', () => {
       false,
     )
   })
+
+  it('capture origin writes a bound editable PDF with forceWrite and without firing the hook, and refuses read-only', () => {
+    bound.add('a.pdf')
+    bound.add('ro.pdf')
+    readOnly.add('ro.pdf')
+    expect(
+      uniworkSaveDecision({
+        origin: 'capture',
+        currentPath: 'a.pdf',
+        targetPath: 'a.pdf',
+        saveAs: false,
+      }),
+    ).toEqual({
+      write: true,
+      fireHook: false,
+      forceWrite: true,
+    })
+    expect(
+      uniworkSaveDecision({
+        origin: 'capture',
+        currentPath: 'ro.pdf',
+        targetPath: 'ro.pdf',
+        saveAs: false,
+      }),
+    ).toMatchObject({
+      write: false,
+      fireHook: false,
+      forceWrite: false,
+    })
+  })
 })
 
 describe('pdf:save UniWork seam', () => {

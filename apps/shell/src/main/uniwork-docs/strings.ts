@@ -47,6 +47,17 @@ const en = {
   uploadPickTitle: 'Choose a file to upload',
   uploadPickDocuments: 'Documents',
   uploadPickAll: 'All files',
+  signOutTitle: 'Sign out of UniWork?',
+  signOutBody:
+    'Documents with unsaved changes or queued saves: {count}. They stay locked on this computer and only your account can open them again.',
+  signOutKeystore:
+    'The computer’s keychain is locked, so unsaved changes exist only in open windows. Signing out now discards them; anything already kept encrypted stays. To keep them, unlock the computer first.',
+  signOutGo: 'Sign out',
+  signOutBack: 'Back',
+  switchLostTitle: 'Some unsaved changes of the previous account were lost',
+  switchLostBody:
+    'Another account signed in on this computer, so the previous account was locked. Documents whose unsaved changes could not be kept: {count}. Everything else stays locked on this computer for that account.',
+  switchLostOk: 'OK',
 }
 
 type Key = keyof typeof en
@@ -94,11 +105,28 @@ const vi = {
   uploadPickTitle: 'Chọn tệp để tải lên',
   uploadPickDocuments: 'Tài liệu',
   uploadPickAll: 'Mọi tệp',
+  signOutTitle: 'Đăng xuất khỏi UniWork?',
+  signOutBody:
+    'Tài liệu còn thay đổi chưa lưu hoặc lần lưu đang chờ: {count}. Chúng được giữ khóa trên máy này và chỉ tài khoản của bạn mở lại được.',
+  signOutKeystore:
+    'Kho khóa của máy đang khóa nên thay đổi chưa lưu chỉ còn trong cửa sổ đang mở. Đăng xuất bây giờ sẽ bỏ các thay đổi đó; những gì đã được giữ mã hóa vẫn còn. Muốn giữ chúng, hãy mở khóa máy trước.',
+  signOutGo: 'Đăng xuất',
+  signOutBack: 'Quay lại',
+  switchLostTitle: 'Một số thay đổi chưa lưu của tài khoản trước đã mất',
+  switchLostBody:
+    'Một tài khoản khác đã đăng nhập trên máy này nên tài khoản trước đã được khóa. Tài liệu có thay đổi chưa lưu không giữ lại được: {count}. Mọi thứ khác vẫn được giữ khóa trên máy này cho tài khoản đó.',
+  switchLostOk: 'Đã hiểu',
 } satisfies Record<Key, string>
 
 export const UNIWORK_DOC_STRINGS = { en, vi } as const
 
-export function tUniworkDocs(lang: string, key: Key, params: { title?: string } = {}): string {
+export function tUniworkDocs(
+  lang: string,
+  key: Key,
+  params: { title?: string; count?: number } = {},
+): string {
   const table: Record<Key, string> = lang === 'vi' ? vi : en
-  return table[key].replace('{title}', params.title ?? '')
+  return table[key]
+    .replace('{title}', params.title ?? '')
+    .replace('{count}', String(params.count ?? 0))
 }

@@ -9,7 +9,12 @@ import {
 } from '../src/main/uniwork-sync/queue/pause'
 import { createSafeStorageKeyProvider } from '../src/main/uniwork-sync/keys'
 import { createStoreLayer } from '../src/main/uniwork-sync/store'
-import { createLockableSafeStorage } from '../src/main/uniwork-sync/test-kit/compliance'
+import {
+  createLockableSafeStorage,
+  runStoreCompliance,
+  type ComplianceEnv,
+  type ComplianceSubject,
+} from '../src/main/uniwork-sync/test-kit/compliance'
 
 const SCOPE = { deploymentId: 'dep_1', accountId: 'acc_1' }
 
@@ -68,5 +73,24 @@ describe('uniwork sync pause flag store', () => {
     layer.register(PAUSE_STORE_REGISTRATION)
     expect(await layer.open(SCOPE)).toEqual({ kind: 'keystore_locked' })
     safeStorage.unlock()
+  })
+
+  runStoreCompliance('uniwork-sync pause store', async (env: ComplianceEnv) => {
+    const layer = createStoreLayer({
+      root: env.root,
+      keys: createSafeStorageKeyProvider({ safeStorage: env.safeStorage, dir: env.keyDir }),
+      budgetBytes: env.budgetBytes,
+      clock: env.clock,
+    })
+    layer.register(PAUSE_STORE_REGISTRATION)
+    const opened = await layer.open(env.scope)
+    if (opened.kind !== 'ok') throw new Error(`pause store did not open: ${opened.kind}`)
+    const subject: ComplianceSubject = {
+      registration: PAUSE_STORE_REGISTRATION,
+      layer,
+      scope: env.scope,
+      records: opened.store.records(PAUSE_STORE_REGISTRATION.name),
+    }
+    return subject
   })
 })

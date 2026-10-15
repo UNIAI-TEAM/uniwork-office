@@ -349,7 +349,7 @@ function setup(
   const statuses: UniworkDocStatus[] = []
   const views: UniworkConflictView[] = []
   const closedSessions: string[] = []
-  const account: string | null = 'acc_1'
+  let account: string | null = 'acc_1'
   let capabilityOffline = false
   let keystoreLocked = opts.keystoreLocked ?? false
   let aiRunning = opts.aiRunning ?? false
@@ -445,6 +445,9 @@ function setup(
     },
     setEditorDirty: (v: boolean | null) => {
       editorDirty = v
+    },
+    setAccount: (next: string | null) => {
+      account = next
     },
   }
 }
@@ -1040,6 +1043,43 @@ describe('G5-09 desktop conflict dialog S5 session (main)', () => {
     expect(new TextDecoder().decode(drafts[0]!.snapshot)).toBe(
       'mine v4 + unsaved editor keystrokes',
     )
+  })
+
+  it("G5-11 d5-2: an account switch between the flush and drafts.keep closes the dialog and keeps nothing in the new account's drafts", async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const path = await openAndConflict(ctx, server)
+    ctx.setEditorDirty(true)
+    vi.mocked(ctx.deps.requestModuleSave).mockImplementation((targetPath: string) => {
+      setTimeout(() => {
+        writeFileSync(targetPath, 'mine of acc_1, flushed')
+        ctx.setEditorDirty(false)
+        ctx.service.onUserSave(targetPath)
+        // B signs in right after the flush landed, before the draft is kept
+        ctx.setAccount('acc_2')
+      }, 15)
+      return true
+    })
+
+    void ctx.service.resolveConflict(path)
+    await vi.waitFor(() => expect(ctx.views).toHaveLength(1))
+    const reply = await ctx.service.conflictAct(ctx.views[0]!.sessionId, {
+      kind: 'reload',
+      keep: 'draft',
+      stopAi: false,
+    })
+    expect(reply).toEqual({ kind: 'closed' })
+
+    const other = await ctx.layer.open({ deploymentId: 'default', accountId: 'acc_2' })
+    if (other.kind !== 'ok') throw new Error(other.kind)
+    expect(
+      await createDraftStore(other.store.records(DRAFTS_STORE_REGISTRATION.name)).list(
+        basename(dirname(path)),
+      ),
+    ).toEqual([])
+    // the copy is not replaced either
+    expect(readFileSync(path, 'utf8')).toBe('mine of acc_1, flushed')
+    expect(ctx.deps.reloadPath).not.toHaveBeenCalled()
   })
 
   it('BE-02/BE-302: reload keep=draft refuses with reload_failed when a dirty module does not write; keep=discard stays as-is without flushing', async () => {

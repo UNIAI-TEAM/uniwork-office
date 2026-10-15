@@ -14,11 +14,9 @@ import {
 import {
   NO_KEYRING_SKIP,
   accountButton,
-  deliverUrl,
   hasOsKeyring,
   shellEnv,
   signIn,
-  waitForSafeStorageKeyOnDisk,
 } from './fixtures/uniwork-signin-steps'
 
 /**
@@ -168,48 +166,46 @@ test.describe('UniWork account sign-in', () => {
     }
   })
 
-  test('a stored sign-in this computer cannot decrypt offers retry and sign in again', async () => {
+  test('a stored sign-in this computer cannot decrypt shows a locked keystore with Retry only', async () => {
     test.setTimeout(90_000)
     const stub = await startUniworkAuthStub()
     // bytes no key on this machine can open (e.g. written under an older OS key)
+    const unreadable = randomBytes(256)
     const userDataDir = await mkdtemp(join(tmpdir(), 'genoffice-e2e-'))
     await mkdir(join(userDataDir, 'uniwork-auth'), { recursive: true })
-    await writeFile(sessionFile(userDataDir), randomBytes(256))
+    await writeFile(sessionFile(userDataDir), unreadable)
     const launched = await launchShell({
       userDataDir,
       onboardingSeen: true,
-      videoDir: 'uniwork-signin-keyring',
+      videoDir: 'uniwork-signin-keystore-locked',
       env: shellEnv(stub),
     })
     try {
       test.skip(!(await hasOsKeyring(launched)), NO_KEYRING_SKIP)
       const { page } = launched
-      await expect(accountButton(page)).toHaveAttribute('data-state', 'keyring-unavailable', {
+      // a working keyring that cannot open this file is a transient lock, not
+      // a missing keyring: the file is kept for the next try
+      await expect(accountButton(page)).toHaveAttribute('data-state', 'keystore-locked', {
         timeout: 30_000,
       })
       await accountButton(page).click()
       const pane = page.locator('.acct-pane')
-      await expect(pane).toHaveAttribute('data-state', 'keyring-unavailable')
+      await expect(pane).toHaveAttribute('data-state', 'keystore-locked')
+      // signing in again is refused while locked (it would overwrite the saved
+      // sign-in), so Retry is the only action
+      await expect(pane.getByRole('button', { name: 'Sign in again' })).toHaveCount(0)
 
-      // Retry reads the file again: still unreadable, and it is kept
+      // Retry reads the file again: still unreadable, and it is kept untouched
       await pane.getByRole('button', { name: 'Retry' }).click()
-      await expect(pane).toHaveAttribute('data-state', 'keyring-unavailable')
+      await expect(pane).toHaveAttribute('data-state', 'keystore-locked')
+      await expect(accountButton(page)).toHaveAttribute('data-state', 'keystore-locked')
+      await expect(pane.getByRole('button', { name: 'Retry' })).toBeVisible()
       expect(existsSync(sessionFile(userDataDir))).toBe(true)
+      expect((await readFile(sessionFile(userDataDir))).equals(unreadable)).toBe(true)
       expect(stub.refreshCalls()).toBe(0)
-
-      // Sign in again replaces it with a credential this machine can read
-      await pane.getByRole('button', { name: 'Sign in again' }).click()
-      await expect(accountButton(page)).toHaveAttribute('data-state', 'signing-in')
-      await expect.poll(() => stub.lastAttempt()?.state ?? '').not.toBe('')
-      if (process.platform !== 'darwin') await waitForSafeStorageKeyOnDisk(launched)
-      await deliverUrl(launched, shellEnv(stub), stub.approve())
-      await expect(accountButton(page)).toHaveAttribute('data-state', 'signed-in', {
-        timeout: 30_000,
-      })
-      await openAccountPane(page) // the account change remounts Home, which closes Settings
-      await expect(pane).toContainText(STUB_PLAN.name)
+      expect(stub.lastAttempt()).toBeFalsy()
     } finally {
-      await closeAndSaveVideo(launched, 'uniwork-signin-keyring')
+      await closeAndSaveVideo(launched, 'uniwork-signin-keystore-locked')
       await stub.close()
     }
   })
