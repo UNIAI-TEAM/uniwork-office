@@ -564,6 +564,9 @@ export function AiChatPanel({
 
   const [cloudSnapshot, setCloudSnapshot] = useState<UniworkCloudStatusSnapshot | null>(null)
   const [composerAnnouncement, setComposerAnnouncement] = useState('')
+  // the model picker's list note, written into the panel's own polite node (never a node of the
+  // picker's); it stands while the announcement it was written over is the current one
+  const [pickerNote, setPickerNote] = useState<{ text: string; over: string } | null>(null)
   useEffect(() => {
     const bridge = readUniworkCloudStatus()
     if (!bridge) return
@@ -697,6 +700,10 @@ export function AiChatPanel({
         })
       : composerAnnouncement
 
+  const liveText =
+    pickerNote && pickerNote.over === panelLiveAnnouncement
+      ? pickerNote.text
+      : panelLiveAnnouncement
   return (
     <aside
       ref={asideRef}
@@ -768,7 +775,7 @@ export function AiChatPanel({
       {/* one persistent live node: a notice folded into a message mounts with its text and is often not announced.
           No role=status: the workbook's own status node is the one role=status of the window */}
       <div className="ai-sr-status" aria-live="polite" aria-atomic="true">
-        {panelLiveAnnouncement}
+        {liveText}
       </div>
       <div
         className="ai-chat"
@@ -1206,7 +1213,11 @@ export function AiChatPanel({
           }
           footerStart={
             <>
-              <AiModelPicker bridge={MODEL_BRIDGE} lang={lang} />
+              <AiModelPicker
+                bridge={MODEL_BRIDGE}
+                lang={lang}
+                onAnnounce={(text) => setPickerNote({ text, over: panelLiveAnnouncement })}
+              />
               {sessionUsage && <AiUsageChip usage={sessionUsage} session lang={lang} />}
               {cap('attachments') && (
                 <button

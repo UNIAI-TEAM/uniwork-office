@@ -1,7 +1,7 @@
 // RF6-1 (pdf panel): the model picker writes its list note into the panel's own polite node and
 // mounts no live region of its own, so the panel keeps its fixed live nodes (Accessibility Floor:
 // present from load, never mounted at runtime).
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { defaultAiSettings, type AiSettings } from '@genoffice/ai-provider'
@@ -18,23 +18,6 @@ function loadingSettings(): AiSettings {
     providers: { ...base.providers, anthropic: { apiKey: 'k', model: 'claude-x' } },
     modelSources: { anthropic: { chosen: 'claude-x', listState: 'loading' } },
   } as AiSettings
-}
-
-/** a preload bridge answering every call; getAiSettings hands over the loading-list settings */
-function bridgeProxy(): Record<string, ReturnType<typeof vi.fn>> {
-  const stubs: Record<string, ReturnType<typeof vi.fn>> = {}
-  return new Proxy(stubs, {
-    get(target, prop: string) {
-      if (!(prop in target)) {
-        target[prop] = /^on[A-Z]/.test(prop)
-          ? vi.fn(() => () => {})
-          : prop === 'getAiSettings'
-            ? vi.fn(async () => loadingSettings())
-            : vi.fn(async () => undefined)
-      }
-      return target[prop]
-    },
-  })
 }
 
 const settle = async (): Promise<void> => {

@@ -169,7 +169,6 @@ describe('UniWork AI chip wiring (html panel)', () => {
   it.each([
     ['credits_exhausted', 'aiErrCredits', 'aiRunChooseOther'],
     ['session_expired', 'aiErrSession', 'acctSignInAgain'],
-    ['cloud_unavailable', 'aiErrUnavailable', 'aiRunRetry'],
     ['run_limit_reached', 'aiErrRunLimit', 'aiRunAskAgain'],
   ] as const)(
     'F1/F2: a %s error turn shows its labelled action and announces the line it shows',
@@ -236,9 +235,8 @@ describe('UniWork AI chip wiring (html panel)', () => {
     harness.loop.busy = false
     // the model picker of this harness never reads a model: clear its hint like the send-guard tests
     act(() => setAiModelNeedHint(null))
-    await act(async () =>
-      root_().querySelector<HTMLButtonElement>('.ai-error-action button')!.click(),
-    )
+    // a failed send keeps one Retry, on the undelivered message (RF6-2); it resends the turn
+    await act(async () => root_().querySelector<HTMLButtonElement>('.ai-retry-btn')!.click())
     await new Promise((r) => setTimeout(r, 50))
     expect(run).toHaveBeenCalledTimes(1)
     await failWith('credits_exhausted', 'aiErrCredits')
@@ -255,6 +253,11 @@ describe('UniWork AI chip wiring (html panel)', () => {
     const undelivered = root_().querySelector('.ai-msg-undelivered')
     expect(undelivered, 'the message is marked undelivered').not.toBeNull()
     expect(undelivered!.querySelector('.ai-retry-btn')).not.toBeNull()
+    // the turn still announces and shows the line, as for every other error
+    expect(root_().querySelector('.ai-sr-status')?.textContent).toBe(
+      `${ui('aiResultError')}. ${ui('aiErrUnavailable')}`,
+    )
+    expect(visibleErrorText()).toBe(ui('aiErrUnavailable'))
     // so the error turn must not add a second control for the same resend
     expect(root_().querySelector('.ai-error-action button')).toBeNull()
     expect(

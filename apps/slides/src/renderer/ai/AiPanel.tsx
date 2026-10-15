@@ -2227,6 +2227,9 @@ export function AiPanel({
   const isUniwork = settings.provider === 'uniwork'
   const [cloudSnapshot, setCloudSnapshot] = useState<UniworkCloudStatusSnapshot | null>(null)
   const [composerAnnouncement, setComposerAnnouncement] = useState('')
+  // the model picker's list note, written into the panel's own polite node (never a node of the
+  // picker's); it stands while the announcement it was written over is the current one
+  const [pickerNote, setPickerNote] = useState<{ text: string; over: string } | null>(null)
   const [refusalAnnouncement, setRefusalAnnouncement] = useState('')
   const pendingRefusalRef = useRef(false)
   const disclosureRegionRef = useRef<HTMLElement | null>(null)
@@ -2330,6 +2333,10 @@ export function AiPanel({
         })
       : composerAnnouncement
 
+  const liveText =
+    pickerNote && pickerNote.over === (refusalAnnouncement || panelLiveAnnouncement)
+      ? pickerNote.text
+      : refusalAnnouncement || panelLiveAnnouncement
   return (
     <aside
       ref={asideRef}
@@ -2390,7 +2397,7 @@ export function AiPanel({
 
       {/* Single panel-level polite live region: announces transport notices while running and the finished answer once when it ends */}
       <div className="ai-sr-status" aria-live="polite" aria-atomic="true">
-        {refusalAnnouncement || panelLiveAnnouncement}
+        {liveText}
       </div>
 
       <div
@@ -2912,7 +2919,13 @@ export function AiPanel({
               </div>
             )}
             <div className="ai-input-footer">
-              <AiModelPicker bridge={MODEL_BRIDGE} lang={lang} />
+              <AiModelPicker
+                bridge={MODEL_BRIDGE}
+                lang={lang}
+                onAnnounce={(text) =>
+                  setPickerNote({ text, over: refusalAnnouncement || panelLiveAnnouncement })
+                }
+              />
               {sessionUsage && <AiUsageChip usage={sessionUsage} session lang={lang} />}
               <button
                 className="ai-attach-btn"

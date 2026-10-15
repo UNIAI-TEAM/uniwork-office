@@ -169,9 +169,15 @@ function writeOrgNoteSeen(provider: string): void {
 export function AiModelPicker({
   bridge,
   lang,
+  onAnnounce,
 }: {
   readonly bridge: AiModelPickerBridge
   readonly lang: Lang
+  /**
+   * The host panel's fixed polite live node: the list note is written into it after the popover
+   * opens. The picker mounts no live region of its own, so without this prop it announces nothing.
+   */
+  readonly onAnnounce?: ((text: string) => void) | undefined
 }): React.JSX.Element | null {
   const strings = AI_MODEL_PICKER_STRINGS[lang] ?? AI_MODEL_PICKER_STRINGS.en
   const [settings, setSettings] = useState<AiSettings | null>(null)
@@ -354,11 +360,12 @@ export function AiModelPicker({
     return () => setAiModelNeedHint(null)
   }, [needHint, openSettings, openSettingsOnce])
 
-  // the live region mounts empty with the popover; the note is written into it afterwards so
-  // screen readers announce it as a change
-  const [shownNote, setShownNote] = useState('')
+  // the note goes into the host panel's fixed polite node once the popover is open (Accessibility
+  // Floor: live nodes exist from load and are never mounted at runtime)
+  const onAnnounceRef = useRef(onAnnounce)
+  onAnnounceRef.current = onAnnounce
   useEffect(() => {
-    setShownNote(open ? listNote : '')
+    if (open && listNote) onAnnounceRef.current?.(listNote)
   }, [open, listNote])
 
   // the first-use note counts as read once it was on screen and the popover closed again
@@ -757,13 +764,6 @@ export function AiModelPicker({
           )}
         </div>
       )}
-      {open && (
-        // mounted only while the popover is open, so a closed picker adds no second live region
-        // to the panel; the note lands one commit after the empty region (shownNote)
-        <div aria-live="polite" style={VISUALLY_HIDDEN}>
-          {shownNote}
-        </div>
-      )}
       {open && hasOrgGroup && (
         // what an option of a key-on-UniWork group is described by: where its prompt goes
         <div hidden id={orgDescId}>
@@ -772,19 +772,6 @@ export function AiModelPicker({
       )}
     </div>
   )
-}
-
-/** screen-reader-only: the box stays in the layout flow but takes no space and shows nothing */
-const VISUALLY_HIDDEN: React.CSSProperties = {
-  position: 'absolute',
-  width: 1,
-  height: 1,
-  margin: -1,
-  padding: 0,
-  overflow: 'hidden',
-  clip: 'rect(0 0 0 0)',
-  whiteSpace: 'nowrap',
-  border: 0,
 }
 
 function effectiveZoom(el: HTMLElement | null): number {

@@ -1293,6 +1293,9 @@ export function AiPanel({
 
   const [cloudSnapshot, setCloudSnapshot] = useState<UniworkCloudStatusSnapshot | null>(null)
   const [composerAnnouncement, setComposerAnnouncement] = useState('')
+  // the model picker's list note, written into the panel's own polite node (never a node of the
+  // picker's); it stands while the announcement it was written over is the current one
+  const [pickerNote, setPickerNote] = useState<{ text: string; over: string } | null>(null)
   useEffect(() => {
     const bridge = readUniworkCloudStatus()
     if (!bridge) return
@@ -1361,6 +1364,10 @@ export function AiPanel({
         })
       : composerAnnouncement
 
+  const liveText =
+    pickerNote && pickerNote.over === panelLiveAnnouncement
+      ? pickerNote.text
+      : panelLiveAnnouncement
   return (
     <aside
       ref={asideRef}
@@ -1428,7 +1435,7 @@ export function AiPanel({
       </header>
 
       <div className="ai-sr-status" aria-live="polite" aria-atomic="true">
-        {panelLiveAnnouncement}
+        {liveText}
       </div>
 
       <div
@@ -1634,7 +1641,12 @@ export function AiPanel({
                 chip={chip}
                 lang={lang}
                 waiting={Boolean(entry.waitLine)}
-                onRetry={isLast && !busy && runInstructionRef.current ? retry : undefined}
+                // a failed send already carries its own Retry on the undelivered message above
+                onRetry={
+                  isLast && !busy && runInstructionRef.current && !chat[i - 1]?.undelivered
+                    ? retry
+                    : undefined
+                }
                 onChooseProvider={() => void window.htmlApi?.openAiModelSettings?.()}
                 onSignIn={() => void readUniworkCloudStatus()?.signIn?.()}
                 onAskAgain={isLast && !busy ? () => inputRef.current?.focus() : undefined}
@@ -1928,7 +1940,11 @@ export function AiPanel({
           }
           footerStart={
             <>
-              <AiModelPicker bridge={MODEL_BRIDGE} lang={lang} />
+              <AiModelPicker
+                bridge={MODEL_BRIDGE}
+                lang={lang}
+                onAnnounce={(text) => setPickerNote({ text, over: panelLiveAnnouncement })}
+              />
               {sessionUsage && <AiUsageChip usage={sessionUsage} session lang={lang} />}
               <button
                 type="button"
