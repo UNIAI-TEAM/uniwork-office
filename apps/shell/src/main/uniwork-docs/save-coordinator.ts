@@ -310,18 +310,30 @@ export class SaveCoordinator {
     }
   }
 
-  /** a user Save that changes nothing asks for the queue popover instead (G5-06u) */
-  private requestPopover(
+  /**
+   * A user Save that changes nothing asks for the queue popover instead
+   * (G5-06u). `pendingNext` is given only where the working copy was compared
+   * with the pending intent: true = the copy moved past it (an unsent N+1).
+   * The flag change is published inside the per-key chain from a fresh binding
+   * read, so a dispatcher write that landed during this save is never
+   * overwritten on the chip by the stale `doc` (RBE6u-01). Exactly one popover
+   * request per call.
+   */
+  private async requestPopover(
     doc: BoundDocument,
     options: { userSave?: boolean } | undefined,
-    pendingNext = false,
-  ): BoundDocument {
+    pendingNext?: boolean,
+  ): Promise<BoundDocument> {
     if (!options?.userSave) return doc
-    if (pendingNext) {
-      // the working copy moved past the pending intent: an unsent N+1, shown
-      // on the chip before the popover opens
-      this.pendingNext.add(doc.path)
-      this.publish(doc)
+    if (pendingNext !== undefined) {
+      const had = this.pendingNext.has(doc.path)
+      if (pendingNext) this.pendingNext.add(doc.path)
+      else this.pendingNext.delete(doc.path)
+      if (pendingNext || had) {
+        await this.serializeBinding(doc.key, async () =>
+          this.publish(this.deps.store.lookup(doc.path) ?? doc),
+        )
+      }
     }
     this.deps.requestQueuePopover?.(doc.path)
     return doc
@@ -355,9 +367,16 @@ export class SaveCoordinator {
     // pipeline must not start a second writer of the one intent. The dispatcher
     // owns the record and the chip, so this returns the document untouched
     // (G506-be-1)
-    if (this.dispatcherActive(doc.key)) return this.requestPopover(doc, options, true)
     const { intents } = access
     const facts = factsOf(doc, bytes.byteLength)
+    if (this.dispatcherActive(doc.key)) {
+      if (!options?.userSave) return doc
+      // a read only (the dispatcher owns the record): the N+1 is marked only
+      // when the copy really moved past the intent being dispatched (RBE6u-02)
+      const running = await intents.read(doc.key, facts).catch(() => null)
+      const live = running && !isTerminalQueueState(running.intent.state) ? running : null
+      return this.requestPopover(doc, options, live ? live.intent.checksum !== checksum : false)
+    }
 
     const stored = await intents.read(doc.key, facts)
     // a terminal record (cancelled / committed) is spent: the next Save mints a
@@ -424,8 +443,9 @@ export class SaveCoordinator {
     } else if (options?.userSave) {
       // G5-06u: the user's Ctrl/Cmd+S with an intent pending: never a second
       // intent and no inline replay (a paused_user / paused_admin intent stays
-      // paused); the N+1 is marked and the queue popover tells the user why
-      return this.requestPopover(doc, options, true)
+      // paused); the N+1 is marked only when the copy moved past the intent
+      // (RBE6u-02) and the queue popover tells the user why
+      return this.requestPopover(doc, options, checksum !== intent.checksum)
     } else {
       // an intent is already pending: never a second one. The status says so
       // (pendingNext = an unsent N+1) and the SAME record and key are replayed
