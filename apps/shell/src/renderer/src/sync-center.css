@@ -44,6 +44,22 @@
   color: var(--text-primary);
 }
 
+.sc-status-line > span:first-child::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-inline-end: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  vertical-align: middle;
+}
+
+/* informational (signed out, offline): neutral text, a muted dot, never the error red */
+.sc-status-line[data-tone='neutral'] > span:first-child::before {
+  background: var(--text-secondary);
+}
+
 .sc-status-line[data-tone='error'] {
   color: var(--danger-text);
 }
@@ -136,11 +152,38 @@
   text-align: center;
 }
 
-/* Sync row table */
+/* Sync row table: fixed column widths, so an open in-row confirm only changes the actions cell */
 .sc-table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
   font-size: 13px;
+}
+
+.sc-table thead th {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  text-align: start;
+}
+
+.sc-col-doc {
+  width: 30%;
+}
+
+.sc-col-state {
+  width: 148px;
+}
+
+.sc-col-detail {
+  width: 27%;
+}
+
+.sc-col-actions {
+  width: 25%;
 }
 
 .sc-caption,
@@ -264,6 +307,23 @@
   color: var(--danger-text);
 }
 
+/* outranks the shared .set-btn rules (settings.css), which load after this file */
+.sc .set-btn.sc-act-danger {
+  box-sizing: border-box;
+  border: 1px solid var(--danger-border);
+  color: var(--danger-text);
+}
+
+.sc .set-btn.sc-act-danger:hover:not(:disabled):not([aria-disabled='true']) {
+  border-color: var(--danger-text);
+  background: var(--danger-bg);
+}
+
+.sc .set-btn.sc-act-danger:focus-visible {
+  outline: 2px solid var(--danger-text);
+  outline-offset: 1px;
+}
+
 .sc-confirm {
   display: flex;
   flex-wrap: wrap;
@@ -296,6 +356,7 @@
   border-radius: 6px;
   background: var(--danger-bg);
   color: var(--danger-text);
+  font-size: 13px;
 }
 
 .sc-store-error p {
@@ -343,6 +404,10 @@
 .sc.is-narrow .sc-row > td {
   display: block;
   width: auto;
+}
+
+.sc.is-narrow .sc-table {
+  table-layout: auto;
 }
 
 .sc.is-narrow .sc-table thead {

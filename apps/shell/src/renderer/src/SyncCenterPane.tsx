@@ -505,7 +505,7 @@ export function SyncCenterPane({
         <span key={a.id} className="sc-act-wrap">
           <button
             type="button"
-            className={`set-btn sc-act${a.confirm ? ' sc-act-danger' : ''}`}
+            className={`set-btn sc-act${a.primary ? ' primary' : ''}${a.confirm ? ' sc-act-danger' : ''}`}
             data-action={a.id}
             aria-disabled={a.unavailableKey || running || rowBusy ? true : undefined}
             aria-busy={running || undefined}
@@ -613,8 +613,11 @@ export function SyncCenterPane({
     )
   }
 
+  // an unreadable queue: only the notice + Thử lại under the title, no "connected" claim or sync controls
+  const storeFailed = loadFailed || Boolean(snap?.storeError)
+
   const renderBody = () => {
-    if (loadFailed || snap?.storeError) {
+    if (storeFailed) {
       return (
         <div className="sc-store-error">
           <p>{t('uwSyncStoreError')}</p>
@@ -694,17 +697,17 @@ export function SyncCenterPane({
               <caption className="sc-caption">{t(current.labelKey)}</caption>
               <thead>
                 <tr>
-                  <th scope="col" className="sc-col-hidden">
+                  <th scope="col" className="sc-col sc-col-doc">
                     {t('uwSyncColDoc')}
                   </th>
-                  <th scope="col" className="sc-col-hidden">
+                  <th scope="col" className="sc-col sc-col-state">
                     {t('uwSyncColState')}
                   </th>
-                  <th scope="col" className="sc-col-hidden">
+                  <th scope="col" className="sc-col sc-col-detail">
                     {t('uwSyncColDetail')}
                   </th>
-                  <th scope="col" className="sc-col-hidden">
-                    {t('uwSyncColActions')}
+                  <th scope="col" className="sc-col sc-col-actions">
+                    <span className="sc-col-hidden">{t('uwSyncColActions')}</span>
                   </th>
                 </tr>
               </thead>
@@ -723,7 +726,7 @@ export function SyncCenterPane({
       aria-labelledby={`${base}-title`}
     >
       {title}
-      {header && line && (
+      {header && line && !storeFailed && (
         <div className="sc-header">
           {!signedOut && header.account && (
             <div className="sc-account">

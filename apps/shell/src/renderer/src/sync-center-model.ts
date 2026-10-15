@@ -43,6 +43,8 @@ export interface SyncRowAction {
   confirm?: { sentenceKey: StringKey; goKey: StringKey }
   /** shown but does not run: aria-disabled, described by this reason */
   unavailableKey?: StringKey
+  /** the row's one most urgent action, drawn as the accent (primary) button */
+  primary?: boolean
 }
 
 /** a sub-line: `params` go in as they are, `keyParams` are translated, time/size params are formatted */
@@ -210,7 +212,7 @@ const ACTIONS: Record<SyncRowActionId, Omit<SyncRowAction, 'id'>> = {
     labelKey: 'uwActDiscardSave',
     confirm: { sentenceKey: 'uwStuckDiscardConfirm', goKey: 'uwActDiscard' },
   },
-  openToResolve: { labelKey: 'uwActOpenToResolve' },
+  openToResolve: { labelKey: 'uwActOpenToResolve', primary: true },
   details: { labelKey: 'uwActDetails' },
   saveAgain: { labelKey: 'uwActSaveAgain' },
   open: { labelKey: 'uwActOpen' },
@@ -439,8 +441,8 @@ export function headerLine(
     case 'signed_out': {
       const count = signedOut?.lockedCount ?? 0
       return count > 0
-        ? { key: 'uwSyncSignedOut', params: { count }, tone: 'error', action: 'signIn' }
-        : { key: 'uwSyncSignedOutEmpty', tone: 'error', action: 'signIn' }
+        ? { key: 'uwSyncSignedOut', params: { count }, tone: 'neutral', action: 'signIn' }
+        : { key: 'uwSyncSignedOutEmpty', tone: 'neutral', action: 'signIn' }
     }
     case 'session_expired':
       return { key: 'uwSyncSessionExpired', tone: 'error', action: 'signInAgain' }

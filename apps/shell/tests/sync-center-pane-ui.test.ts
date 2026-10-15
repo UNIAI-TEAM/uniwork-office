@@ -1,6 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
@@ -932,5 +934,112 @@ describe('SyncCenterPane foreign account and loading (FE-8, FE-11)', () => {
     expect(skeleton.getAttribute('aria-busy')).toBe('true')
     expect(wbLoading).not.toBe('')
     expect(skeleton.querySelector('.uw-sr-only')?.textContent).toBe(wbLoading)
+  })
+})
+
+describe('SyncCenterPane visual review fixes (VIS-1..VIS-8)', () => {
+  const css = readFileSync(resolve(__dirname, '../src/renderer/src/sync-center.css'), 'utf8')
+  const ruleBody = (selector: string): string => {
+    const at = css.indexOf(`${selector} {`)
+    if (at < 0) throw new Error(`no css rule "${selector}"`)
+    return css.slice(css.indexOf('{', at), css.indexOf('}', at))
+  }
+
+  it('VIS-3: the conflict row Mở để xử lý is the primary action, the other actions are not', async () => {
+    await render(
+      fakeApi(
+        snapshot({
+          tabs: {
+            attention: [
+              row('conf', 'conflict', { conflict: { version: 9, author: 'Lan', savedAt: 't' } }),
+              row('stuck', 'reconciling_stuck', { reconcileAttempts: 4, supportCode: 'SUP-1' }),
+            ],
+            pending: [],
+            recent: [],
+          },
+        }),
+      ),
+    )
+    const open = button(vi_.uwActOpenToResolve!, rowEl('conf'))
+    expect(open.classList.contains('primary')).toBe(true)
+    for (const b of buttons(rowEl('stuck').querySelector('.sc-actions')!)) {
+      expect(b.classList.contains('primary')).toBe(false)
+    }
+  })
+
+  it('VIS-1: the discard actions carry the danger class and the danger rule outranks .set-btn', async () => {
+    await render(fakeApi(snapshot()))
+    expect(button(vi_.uwActDiscardSave!, rowEl('stuck')).classList.contains('sc-act-danger')).toBe(
+      true,
+    )
+    expect(button(vi_.uwActDiscardDraft!, rowEl('draft')).classList.contains('sc-act-danger')).toBe(
+      true,
+    )
+    expect(button(vi_.uwActRecheck!, rowEl('stuck')).classList.contains('sc-act-danger')).toBe(
+      false,
+    )
+    // `.set-btn` (settings.css) loads later: the danger rule needs more specificity than one class
+    const body = ruleBody('.sc .set-btn.sc-act-danger')
+    expect(body).toContain('color: var(--danger-text)')
+    expect(body).toContain('border: 1px solid var(--danger-border)')
+    expect(css).toContain(
+      ".sc .set-btn.sc-act-danger:hover:not(:disabled):not([aria-disabled='true'])",
+    )
+    expect(css).toContain('.sc .set-btn.sc-act-danger:focus-visible')
+  })
+
+  it('VIS-2 and VIS-6: fixed column widths, a status column that holds a pill, doc wider than details', () => {
+    expect(ruleBody('.sc-table')).toContain('table-layout: fixed')
+    expect(ruleBody('.sc-col-state')).toMatch(/width: 1[4-9]\d+px/)
+    const pct = (sel: string) => Number(/width: (\d+)%/.exec(ruleBody(sel))?.[1])
+    expect(pct('.sc-col-doc')).toBeGreaterThan(pct('.sc-col-detail'))
+  })
+
+  it('VIS-5: Tài liệu / Trạng thái / Chi tiết are visible real column headers; Hành động stays screen-reader only', async () => {
+    await render(fakeApi(snapshot()))
+    const heads = Array.from(host.querySelectorAll<HTMLElement>('thead th[scope="col"]'))
+    expect(heads.map((h) => h.textContent)).toEqual([
+      vi_.uwSyncColDoc,
+      vi_.uwSyncColState,
+      vi_.uwSyncColDetail,
+      vi_.uwSyncColActions,
+    ])
+    for (const h of heads.slice(0, 3)) {
+      expect(h.classList.contains('sc-col-hidden')).toBe(false)
+      expect(h.querySelector('.sc-col-hidden')).toBeNull()
+    }
+    expect(heads[3]!.querySelector('.sc-col-hidden')?.textContent).toBe(vi_.uwSyncColActions)
+  })
+
+  it('VIS-4: signed out is an informational line (neutral tone) with Đăng nhập as the primary button', async () => {
+    const s = snapshot({
+      signedOut: { lockedCount: 3 },
+      tabs: { attention: [], pending: [], recent: [] },
+    })
+    s.header = { ...s.header, status: 'signed_out', account: undefined, storeBudget: undefined }
+    await render(fakeApi(s))
+    const line = host.querySelector('.sc-status-line')!
+    expect(line.getAttribute('data-tone')).toBe('neutral')
+    expect(button(vi_.uwActSignIn!, line).classList.contains('primary')).toBe(true)
+    expect(css).not.toMatch(/sc-status-line\[data-tone='neutral'\]\s*\{[^}]*danger/)
+  })
+
+  it('VIS-8: a store error shows only the notice and Thử lại, no connected line or sync controls', async () => {
+    await render(
+      fakeApi(snapshot({ storeError: true, tabs: { attention: [], pending: [], recent: [] } })),
+    )
+    expect(host.querySelector('.sc-store-error')?.textContent).toContain(vi_.uwSyncStoreError)
+    expect(host.querySelector('.sc-header')).toBeNull()
+    expect(host.querySelector('.sc-status-line')).toBeNull()
+    expect(buttons().map((b) => b.textContent?.trim())).toEqual([vi_.uwActRetry])
+    expect(ruleBody('.sc-store-error')).toContain('font-size: 13px')
+  })
+
+  it('VIS-8: a snapshot that cannot be read leaves no header either', async () => {
+    const api = fakeApi(snapshot())
+    api.getSnapshot.mockImplementation(() => Promise.reject(new Error('boom')))
+    await render(api)
+    expect(host.querySelector('.sc-store-error')).not.toBeNull()
+    expect(host.querySelector('.sc-header')).toBeNull()
   })
 })
