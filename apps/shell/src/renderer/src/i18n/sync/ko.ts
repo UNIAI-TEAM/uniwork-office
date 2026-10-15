@@ -35,6 +35,7 @@ export const ko = {
   uwQueueCancel: '저장 취소…',
   uwQueueCancelConfirm:
     '대기 중인 저장을 취소할까요? 변경 사항은 이 컴퓨터에 남고 UniWork의 문서는 바뀌지 않습니다.',
+  uwQueueCancelGo: '저장 취소',
   uwQueueCancelled: '대기 중인 저장을 취소했습니다. 변경 사항은 이 컴퓨터에 남아 있습니다.',
 
   // {reason} fragments of the blocked/failed rows (the existing uwReason* keys stay in the uniwork-documents shard)
@@ -125,6 +126,8 @@ export const ko = {
   uwSyncOpenFromSettings: '동기화 센터',
   uwSyncOnline: 'UniWork에 연결됨 · {time} 동기화',
   uwSyncOffline: '오프라인 · 마지막 동기화 {time}',
+  uwSyncOnlineNoTime: 'UniWork에 연결됨',
+  uwSyncOfflineNoTime: '오프라인',
   uwSyncPaused: '전송 일시 중지됨 — 새 저장은 대기합니다',
   uwSyncAdminPaused: '관리자가 전송을 일시 중지했습니다. 저장 내용은 이 컴퓨터에 보관됩니다.',
   uwSyncFeedOff:
@@ -155,6 +158,7 @@ export const ko = {
   uwSyncEmptyQueue: '저장 대기 중인 항목이 없습니다.',
   uwSyncEmptyAttention: '조치가 필요한 항목이 없습니다.',
   uwSyncEmptyRecent: '최근 저장이 없습니다.',
+  uwSyncActionFailed: '완료하지 못했습니다. 삭제된 것은 없습니다. 다시 시도하세요.',
   uwSyncRowAnnounce: '{doc}: {state}',
 
   // S3 offline library

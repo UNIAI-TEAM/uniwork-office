@@ -40,6 +40,7 @@ export const it = {
   uwQueueCancel: 'Annulla salvataggio…',
   uwQueueCancelConfirm:
     'Annullare il salvataggio in coda? Le modifiche restano su questo computer; il documento su UniWork non cambia.',
+  uwQueueCancelGo: 'Annulla salvataggio',
   uwQueueCancelled: 'Salvataggio in coda annullato. Le modifiche restano su questo computer.',
 
   // {reason} fragments of the blocked/failed rows (the existing uwReason* keys stay in the uniwork-documents shard)
@@ -131,6 +132,8 @@ export const it = {
   uwSyncOpenFromSettings: 'Centro di sincronizzazione',
   uwSyncOnline: 'Connesso a UniWork · sincronizzato {time}',
   uwSyncOffline: 'Offline · ultima sincronizzazione {time}',
+  uwSyncOnlineNoTime: 'Connesso a UniWork',
+  uwSyncOfflineNoTime: 'Offline',
   uwSyncPaused: 'Invio in pausa — i nuovi salvataggi resteranno in attesa',
   uwSyncAdminPaused:
     'L’amministratore ha messo in pausa l’invio. I salvataggi restano su questo computer.',
@@ -162,6 +165,7 @@ export const it = {
   uwSyncEmptyQueue: 'Nessun salvataggio in attesa.',
   uwSyncEmptyAttention: 'Niente da gestire.',
   uwSyncEmptyRecent: 'Nessun salvataggio recente.',
+  uwSyncActionFailed: 'Operazione non riuscita. Non è stato eliminato nulla; riprova.',
   uwSyncRowAnnounce: '{doc}: {state}',
 
   // S3 offline library

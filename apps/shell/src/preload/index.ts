@@ -46,6 +46,8 @@ import type {
   FileSearchPage,
   FileSearchRerank,
   FileSearchSettings,
+  UniworkConflictReply,
+  UniworkConflictView,
   UniworkCreateDocInput,
   UniworkDocActionResult,
   UniworkDocErrorCode,
@@ -85,6 +87,8 @@ import type {
   WorkTask,
   WorkTaskStatus,
 } from '../shared/uniwork-work-api'
+import { asSyncCenterSnapshot, UNIWORK_SYNC_CENTER_CHANNELS } from '../shared/sync-center'
+import type { SyncCenterActionResult, UniworkSyncCenterApi } from '../shared/sync-center'
 import { createLaunchReplay } from './launch-replay'
 
 // subscribed at preload time: a cold-start launch event can arrive before the
@@ -319,6 +323,27 @@ function asUniworkStatus(result: unknown): UniworkDocStatus | null {
     return bar ? { ...rest, remote: bar } : rest
   }
   return null
+}
+
+function asUniworkConflictView(raw: unknown): UniworkConflictView | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Partial<UniworkConflictView>
+  if (typeof r.sessionId !== 'string' || !r.sessionId) return null
+  if (typeof r.path !== 'string' || !r.path) return null
+  if (typeof r.documentId !== 'string' || !r.documentId) return null
+  return raw as UniworkConflictView
+}
+
+function asUniworkConflictReply(raw: unknown): UniworkConflictReply {
+  if (raw && typeof raw === 'object') {
+    const r = raw as { kind?: unknown; view?: unknown }
+    if (r.kind === 'closed') return { kind: 'closed' }
+    if (r.kind === 'view') {
+      const view = asUniworkConflictView(r.view)
+      if (view) return { kind: 'view', view }
+    }
+  }
+  return { kind: 'closed' }
 }
 
 /** a connection test answer for the renderer: the failure kind only, never the provider's raw text (that stays in the main process log) */
@@ -1068,6 +1093,29 @@ const homeApi: HomeApi = {
   async uniworkResolveConflict(path) {
     return asUniworkStatus(await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.resolveConflict, path))
   },
+  onUniworkConflict(cb) {
+    const listener = (_event: IpcRendererEvent, raw: unknown) => {
+      const view = asUniworkConflictView(raw)
+      if (view) cb(view)
+    }
+    ipcRenderer.on(UNIWORK_DOC_CHANNELS.conflictOpen, listener)
+    return () => ipcRenderer.removeListener(UNIWORK_DOC_CHANNELS.conflictOpen, listener)
+  },
+  onUniworkConflictClosed(cb) {
+    const listener = (_event: IpcRendererEvent, raw: unknown) => {
+      if (raw && typeof raw === 'object') {
+        const sessionId = (raw as { sessionId?: unknown }).sessionId
+        if (typeof sessionId === 'string' && sessionId) cb(sessionId)
+      }
+    }
+    ipcRenderer.on(UNIWORK_DOC_CHANNELS.conflictClosed, listener)
+    return () => ipcRenderer.removeListener(UNIWORK_DOC_CHANNELS.conflictClosed, listener)
+  },
+  async uniworkConflictAct(sessionId, action) {
+    return asUniworkConflictReply(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.conflictAct, sessionId, action),
+    )
+  },
   async uniworkRemoteAction(path, action: UniworkRemoteAction) {
     return asUniworkStatus(
       await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.remoteAction, path, action),
@@ -1327,3 +1375,97 @@ installDropOpenBridge()
 // UniWork comments client through its own bridge (main checks the sender is
 // this shell and the path an open, bound tab of its window)
 installUniworkDiscussionBridge()
+
+function asSyncCenterActionResult(result: unknown): SyncCenterActionResult {
+  if (
+    result &&
+    typeof result === 'object' &&
+    typeof (result as { ok?: unknown }).ok === 'boolean'
+  ) {
+    return result as SyncCenterActionResult
+  }
+  return { ok: false, code: 'other' }
+}
+
+const syncCenterApi: UniworkSyncCenterApi = {
+  async getSnapshot() {
+    const snapshot = asSyncCenterSnapshot(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.snapshot),
+    )
+    if (!snapshot) throw new Error('uniwork sync center: malformed snapshot')
+    return snapshot
+  },
+  async syncNow() {
+    return asSyncCenterActionResult(await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.syncNow))
+  },
+  async setSendingPaused(paused) {
+    return asSyncCenterActionResult(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.setSendingPaused, paused === true),
+    )
+  },
+  async sendNow(rowId) {
+    return asSyncCenterActionResult(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.sendNow, rowId),
+    )
+  },
+  async cancelSave(rowId) {
+    return asSyncCenterActionResult(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.cancelSave, rowId),
+    )
+  },
+  async recheck(rowId) {
+    return asSyncCenterActionResult(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.recheck, rowId),
+    )
+  },
+  async copySupportCode(rowId) {
+    return asSyncCenterActionResult(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.copySupportCode, rowId),
+    )
+  },
+  async discardSave(rowId) {
+    return asSyncCenterActionResult(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.discardSave, rowId),
+    )
+  },
+  async openDocument(rowId) {
+    return asSyncCenterActionResult(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.openDocument, rowId),
+    )
+  },
+  async openDraft(rowId) {
+    return asSyncCenterActionResult(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.openDraft, rowId),
+    )
+  },
+  async discardDraft(rowId) {
+    return asSyncCenterActionResult(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.discardDraft, rowId),
+    )
+  },
+  async saveAgain(rowId) {
+    return asSyncCenterActionResult(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.saveAgain, rowId),
+    )
+  },
+  async saveMyCopy(rowId) {
+    return asSyncCenterActionResult(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.saveMyCopy, rowId),
+    )
+  },
+  async retryStore() {
+    return asSyncCenterActionResult(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.retryStore),
+    )
+  },
+  subscribe(cb) {
+    const listener = (_event: IpcRendererEvent, value: unknown) => {
+      const snapshot = asSyncCenterSnapshot(value)
+      if (snapshot) cb(snapshot)
+    }
+    ipcRenderer.on(UNIWORK_SYNC_CENTER_CHANNELS.changedEvent, listener)
+    return () => ipcRenderer.removeListener(UNIWORK_SYNC_CENTER_CHANNELS.changedEvent, listener)
+  },
+}
+
+contextBridge.exposeInMainWorld('uniworkSyncCenter', syncCenterApi)

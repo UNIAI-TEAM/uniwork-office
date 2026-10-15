@@ -31,6 +31,7 @@ import type { MenuItemConstructorOptions, NativeImage, WebContents } from 'elect
 import { atomicCopyFile, atomicWriteFile } from './atomic-write'
 import { tabStripOverlay } from './title-bar-overlay'
 import { legalDocPath, openLegalDoc, type LegalDocEnv } from './legal-docs'
+import { isDraftPreviewPath } from './uniwork-sync/sync-center'
 import { applyUiScaleTo, applyUiScaleToAll, onUiScaleChanged, readUiScale } from './ui-scale'
 import { uiScaleMenuItems, withViewMenu } from './ui-scale-menu'
 import menuDocxIcon1x from './assets/menu-docx.png?asset'
@@ -141,7 +142,7 @@ import {
   readStarredFiles,
   readStarredGroupMap,
   readStarredGroups,
-  recordRecentFile,
+  recordRecentFile as recordRecentFileRaw,
   removeRecentFiles,
   removeStarredFiles,
   replaceRecentFile,
@@ -358,10 +359,11 @@ import { FileIndexStore } from './file-index/store'
 import { normalizeFileSearchSettings, probeDecision, SearchReranker } from './file-index/rerank'
 import { runHeadlessExport, type HeadlessExporters } from './headless-export'
 import { isVersionRequest } from './version-flag'
-import { registerAiRunIpc } from './ai-run-registry'
+import { clearAiRun, isAiRunning, registerAiRunIpc } from './ai-run-registry'
 import { broadcastUniworkAiFlag, registerUniworkAiFlagIpc } from './uniwork-ai-flag'
 import { createUniworkAiChoiceStore } from './uniwork-ai-choice'
 import { canonicalPath, TabManager } from './tab-manager'
+import { reloadPathTarget } from './reload-view'
 import { listDeskDrafts } from './desk-drafts'
 import { runDeskTool } from './desk-tools'
 import { installShellCloseGuard } from './window-close-guard'
@@ -4007,9 +4009,7 @@ function uniworkDocsWiring() {
     // the module's own Save (same path as the menu), which ends in the user-save hook
     requestModuleSave: requestUniworkModuleSave,
     reloadPath: (path: string) => {
-      const target = webContentsForPath(path)
-      if (target?.tabId && tabManager) tabManager.reloadTab(target.tabId)
-      else if (target && !target.webContents.isDestroyed()) target.webContents.reload()
+      reloadPathTarget(webContentsForPath(path), path, (tabId) => tabManager?.reloadTab(tabId))
     },
     // G5-03a: the FRESH editor state of one path (never the 1 s poll cache),
     // summed over its tab (present views of it folded in) and detached windows.
@@ -4073,6 +4073,15 @@ function uniworkDocsWiring() {
     // the copy kept its name (an editor holds it): re-title the open tab/window
     // by path and tell the editor, without moving any file
     notifyTitleRenamed: (path: string, title: string) => afterTitleChanged(path, title),
+    isAiRunning: (path: string) => {
+      const target = webContentsForPath(path)
+      return !!target && !target.webContents.isDestroyed() && isAiRunning(target.webContents.id)
+    },
+    stopAiRun: (path: string) => {
+      const target = webContentsForPath(path)
+      if (!target || target.webContents.isDestroyed()) return
+      clearAiRun(target.webContents.id)
+    },
   }
 }
 
@@ -4104,6 +4113,12 @@ function openGeneratedDocument(filePath: string): boolean {
     }
   }
   return openDocumentPath(filePath)
+}
+
+/** G5-10: a read-only draft preview (a temp copy under userData) is not a recent file */
+function recordRecentFile(filePath: string): void {
+  if (isDraftPreviewPath(app.getPath('userData'), filePath)) return
+  recordRecentFileRaw(filePath)
 }
 
 function routeDocumentPath(filePath: string): boolean {

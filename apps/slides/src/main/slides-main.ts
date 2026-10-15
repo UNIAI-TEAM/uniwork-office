@@ -31,7 +31,7 @@ import type { WebContents } from 'electron'
 import { execFile } from 'node:child_process'
 import { readFile, writeFile, rm, stat, mkdir, open } from 'node:fs/promises'
 import { createHash, randomUUID } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
 import { cleanupExpiredGeneratedPages } from './generated-page-temp'
 import { exportSlidesPdf } from './pdf-export'
@@ -58,6 +58,7 @@ import {
   readBodyCapped,
   newerCopyMtime,
 } from '@genoffice/electron-utils'
+import { isDraftPreviewPath } from '@genoffice/electron-utils/draft-preview'
 import { answerUniworkAiFlagOff } from '@genoffice/electron-utils/uniwork-ai-flag'
 import { buildPagePptx, parsePageSpec } from '@genoffice/pipelines/slides'
 import { sniffImageMime } from './media-mime'
@@ -155,6 +156,12 @@ export { applySessionTxn } from '../session'
 let pendingOpenPath: string | null = null
 /** tab mode: each view queues its own path; the renderer consumes it after mounting */
 const pendingByWc = new Map<number, string>()
+/**
+ * Views waiting to re-open their deck from disk (queueSlidesForView), mapped to the session they
+ * showed before: consume-pending-open restores it when the re-open fails and swaps every window
+ * still on it to the fresh session when it succeeds.
+ */
+const reloadingByWc = new Map<number, Session | null>()
 
 export interface SlidesAiPresetPayload {
   text: string
@@ -241,7 +248,7 @@ async function handleRendererFreeze(wc: WebContents): Promise<void> {
   }
 }
 
-function trackSlidesWebContents(wc: WebContents): void {
+export function trackSlidesWebContents(wc: WebContents): void {
   windowRefs.activeWebContents = wc
   wc.on('unresponsive', () => void handleRendererFreeze(wc))
   // The AI panel opens links via window.open; route them to the system
@@ -258,6 +265,7 @@ function trackSlidesWebContents(wc: WebContents): void {
     else untitledRecovery.delete(wc.id)
     sessions.delete(wc.id)
     pendingByWc.delete(wc.id)
+    reloadingByWc.delete(wc.id)
     forgetClient(wc.id)
     closeSaveWaiters.get(wc.id)?.(false)
     closeSaveWaiters.delete(wc.id)
@@ -350,6 +358,8 @@ export function readSlidesRecentFiles(): string[] {
 async function pushRecent(path: string): Promise<void> {
   // A headless export is not a document the user opened.
   if (isHeadlessMode()) return
+  // A kept-draft preview is a temporary decrypted copy, not a file the user opened.
+  if (isDraftPreviewPath(app.getPath('userData'), path)) return
   const cur = await readRecent()
   const next = [path, ...cur.filter((p) => p !== path)].slice(0, 10)
   try {
@@ -404,6 +414,19 @@ const autosaveBackoff = new Map<string, number>()
 const AUTOSAVE_BACKOFF_TICKS = 10
 let autosaveRunning = false
 
+/** Bumped by every clear so an in-flight 30s autosave tick that started before the clear cannot leave a stale recovery copy behind */
+const recoveryClearEpochs = new Map<string, number>()
+
+function clearRecoveryCopy(filePath: string): void {
+  recoveryClearEpochs.set(filePath, (recoveryClearEpochs.get(filePath) ?? 0) + 1)
+  autosaveBackoff.delete(filePath)
+  try {
+    rmSync(autosavePathFor(filePath), { force: true })
+  } catch {
+    /* nothing to clean */
+  }
+}
+
 /**
  * Recovery drafts for never-saved decks (wcId → visible path in <Documents>/UniWork Office):
  * the sha1-keyed recovery copy needs session.path, so before the first save a freeze or
@@ -415,6 +438,25 @@ function dropUntitledRecovery(wcId: number): void {
   const draft = untitledRecovery.get(wcId)
   if (draft) void rm(draft, { force: true }).catch(() => {})
   untitledRecovery.delete(wcId)
+}
+
+/**
+ * Queue a deck this tab's next consume-pending-open opens from disk without a recovery prompt (shell reload routing).
+ * Only the reloading view's own session is dropped (so its consume re-reads the file instead of
+ * aliasing onto a peer's stale session). Windows sharing the deck keep editing the old session
+ * until the fresh one exists; consume-pending-open then swaps them over, or restores the old
+ * session on every window when the re-open fails.
+ */
+export function queueSlidesForView(contents: WebContents, path: string): void {
+  clearRecoveryCopy(path)
+  dropUntitledRecovery(contents.id)
+  // the session the view shows now; on a retry after a failed re-open it is already evicted, so keep the earlier entry
+  reloadingByWc.set(
+    contents.id,
+    sessions.get(contents.id) ?? reloadingByWc.get(contents.id) ?? null,
+  )
+  sessions.delete(contents.id)
+  pendingByWc.set(contents.id, path)
 }
 
 setInterval(() => {
@@ -443,9 +485,14 @@ setInterval(() => {
         autosaveBackoff.set(backoffKey, skip - 1)
         continue
       }
+      const epoch = recoveryClearEpochs.get(backoffKey) ?? 0
       try {
         await mkdir(dirname(target), { recursive: true })
         await savePptxToFile(session.opened, target)
+        if ((recoveryClearEpochs.get(backoffKey) ?? 0) !== epoch) {
+          await rm(target, { force: true }).catch(() => {})
+          continue
+        }
         autosaveBackoff.delete(backoffKey)
       } catch (error) {
         autosaveBackoff.set(backoffKey, AUTOSAVE_BACKOFF_TICKS)
@@ -690,10 +737,22 @@ function adoptEmbeddedFonts(opened: OpenedPptx): void {
   }
 }
 
+/** The renderer's open payload for a deck the main process already holds. */
+function buildSessionOpenResult(session: Session, fitWidthPx: number): OpenResult {
+  return {
+    path: session.path,
+    slides: buildAllRenderSlides(session.opened, fitWidthPx),
+    size: { cx: session.opened.deck.size.cx, cy: session.opened.deck.size.cy },
+    defaultFont: deckDefaultFont(session.opened),
+  }
+}
+
 async function openAndBuild(
   wc: WebContents,
   path: string,
   fitWidthPx: number,
+  /** reload: read the file from disk even when another window already holds a session for it */
+  fresh = false,
 ): Promise<OpenResult | null> {
   // G5-04g: a deck whose folder declares a store this build does not read is
   // refused before any read of the file (the shell already pushed the S11
@@ -704,7 +763,7 @@ async function openAndBuild(
   // save). Both windows then see the same live deck; edits propagate via
   // scheduleDeckBroadcast. Untitled sessions have path '' and never alias.
   const wanted = resolve(path)
-  for (const [id, existing] of sessions) {
+  for (const [id, existing] of fresh ? [] : sessions) {
     if (id === wc.id || !existing.path || resolve(existing.path) !== wanted) continue
     sessions.set(wc.id, existing)
     scheduleHistoryNotify(existing)
@@ -1011,41 +1070,76 @@ export function registerSlidesIpc(): void {
     // renderer app just mounted: safe to reveal the vibrancy material behind
     // the (now painted) page without flashing raw desktop during load
     vibFlip.get(e.sender.id)?.('#00000000')
-    const queued = pendingByWc.get(e.sender.id) ?? pendingOpenPath
+    const wcId = e.sender.id
+    const queued = pendingByWc.get(wcId) ?? pendingOpenPath
+    const reloading = reloadingByWc.has(wcId)
+    const previous = reloadingByWc.get(wcId) ?? null
+    // A failed reload re-open leaves the view on the deck it showed (and every window sharing it on
+    // theirs): nothing is lost, the tab stays on its UniWork path, and the queue entry is dropped so
+    // the next remount is not stuck retrying a file that cannot open
+    const keepPreviousDeck = (): OpenResult | null => {
+      if (pendingByWc.get(wcId) === queued) pendingByWc.delete(wcId)
+      reloadingByWc.delete(wcId)
+      if (!previous) return null
+      if (!sessions.has(wcId)) sessions.set(wcId, previous)
+      previous.fitWidthPx = fitWidthPx
+      return buildSessionOpenResult(previous, fitWidthPx)
+    }
     if (queued && existsSync(queued)) {
       const dropQueued = () => {
-        if (pendingByWc.get(e.sender.id) === queued) pendingByWc.delete(e.sender.id)
+        if (pendingByWc.get(wcId) === queued) pendingByWc.delete(wcId)
         if (pendingOpenPath === queued) pendingOpenPath = null
+        reloadingByWc.delete(wcId)
       }
       // A CFB file (legacy .ppt / encrypted, possibly misnamed .pptx) can never
       // parse: tell the user and drop it, or every relaunch restores a blank tab
       // G5-04g: a locked working copy is refused before rejectLegacyPpt reads it
-      if (uniworkRefusesOpen(queued)) {
-        dropQueued()
-        return null
-      }
-      if (await rejectLegacyPpt(queued)) {
+      if (uniworkRefusesOpen(queued) || (await rejectLegacyPpt(queued))) {
+        if (reloading) return keepPreviousDeck()
         dropQueued()
         return null
       }
       // Clear the queue only after a successful open: keep it on parse failure or a mid-flight renderer reload, so a remount can retry
-      const result = await openAndBuild(e.sender, queued, fitWidthPx)
+      let result: OpenResult | null
+      try {
+        result = await openAndBuild(e.sender, queued, fitWidthPx, reloading)
+      } catch (error) {
+        // A reload must never reject: the renderer's rejection handler boots a blank deck over the
+        // restored session and the bound UniWork document silently detaches. Keep the previous deck
+        // like the other failures, which also drops the queue entry (no endless retry: the renderer
+        // does not re-consume after this mount anyway). A first open still throws to its caller.
+        if (reloading && previous) {
+          console.warn('slides: reload re-open failed, keeping the previous deck', error)
+          return keepPreviousDeck()
+        }
+        throw error
+      }
+      const fresh = sessions.get(wcId)
+      if (reloading && previous && (!result || !fresh)) return keepPreviousDeck()
       dropQueued()
+      if (reloading && result && fresh) {
+        // every window still on the old deck (same session object, or the same file) moves to the fresh one
+        const wanted = resolve(queued)
+        for (const [id, existing] of sessions) {
+          if (id === wcId || existing === fresh) continue
+          if (existing === previous || (existing.path && resolve(existing.path) === wanted)) {
+            sessions.set(id, fresh)
+          }
+        }
+        scheduleHistoryNotify(fresh)
+        scheduleDeckBroadcast(fresh)
+      }
       return result
     }
+    if (reloading) keepPreviousDeck()
     // No queued path but the main process already has a session (remount after an HMR full
     // reload/crash recovery) -> restore from the session; otherwise the document is lost leaving
     // only the start screen, and reopening the same file just activates this empty tab with no
     // way to self-heal
-    const session = sessions.get(e.sender.id)
+    const session = sessions.get(wcId)
     if (session) {
       session.fitWidthPx = fitWidthPx
-      return {
-        path: session.path,
-        slides: buildAllRenderSlides(session.opened, fitWidthPx),
-        size: { cx: session.opened.deck.size.cx, cy: session.opened.deck.size.cy },
-        defaultFont: deckDefaultFont(session.opened),
-      } satisfies OpenResult
+      return buildSessionOpenResult(session, fitWidthPx)
     }
     return null
   })

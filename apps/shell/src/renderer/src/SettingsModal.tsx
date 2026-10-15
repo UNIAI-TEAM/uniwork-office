@@ -60,6 +60,7 @@ import {
 } from './UniworkCloudPane'
 import type { UniworkCloudStatus } from '@genoffice/ai-provider/browser'
 import { IntegrationsPane, skillUpdateDue } from './IntegrationsPane'
+import { SyncCenterPane } from './SyncCenterPane'
 import './settings.css'
 
 // ── Settings modal (opened from the sidebar Settings entry) ─
@@ -175,12 +176,22 @@ function CustomFontSizeInput({
 }
 
 export type SettingsSectionId =
-  'account' | 'aiModel' | 'aiMedia' | 'uniai' | 'general' | 'backup' | 'integrations' | 'about'
+  | 'account'
+  | 'aiModel'
+  | 'aiMedia'
+  | 'uniai'
+  | 'general'
+  | 'backup'
+  | 'integrations'
+  | 'about'
+  // G5-10: Settings › Sync center (S2)
+  | 'sync'
 
 export type SectionId = SettingsSectionId
 
 const SECTIONS: readonly { id: SectionId; labelKey: StringKey }[] = [
   { id: 'account', labelKey: 'setSecAccount' },
+  { id: 'sync', labelKey: 'uwSyncTitle' },
   { id: 'aiModel', labelKey: 'setSecAiModel' },
   { id: 'aiMedia', labelKey: 'setSecAiMedia' },
   // shortcut: UniAI pane hidden for now (pane code kept); re-add this entry to show it again
@@ -277,6 +288,19 @@ function SectionIcon({ id }: { id: SectionId }) {
         />
         <path
           d="M8 7.5v4M6.5 10 8 11.5 9.5 10"
+          stroke="currentColor"
+          strokeWidth="1.3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    )
+  }
+  if (id === 'sync') {
+    return (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path
+          d="M13 6.5A5 5 0 0 0 3.6 5M3 9.5A5 5 0 0 0 12.4 11M3.5 2.5V5h2.5M12.5 13.5V11H10"
           stroke="currentColor"
           strokeWidth="1.3"
           strokeLinecap="round"
@@ -2024,7 +2048,19 @@ export function SettingsModal({
                 <h3 className="set-pane-title">{t('setSecAccount')}</h3>
                 {account && <AccountPane account={account} />}
                 {loggedIn && <UniworkCloudAccountRows status={cloud} />}
+                {loggedIn && (
+                  <button type="button" className="sc-link" onClick={() => goToSection('sync')}>
+                    {t('uwSyncOpenFromSettings')}
+                  </button>
+                )}
               </>
+            )}
+            {section === 'sync' && (
+              <SyncCenterPane
+                onSignIn={signIn}
+                onSignOut={account?.signOut}
+                onSwitchAccount={() => goToSection('account')}
+              />
             )}
             {section === 'aiModel' && (
               <AiModelPane

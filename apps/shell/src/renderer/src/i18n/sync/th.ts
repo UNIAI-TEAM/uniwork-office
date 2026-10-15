@@ -36,6 +36,7 @@ export const th = {
   uwQueueCancel: 'ยกเลิกการบันทึก…',
   uwQueueCancelConfirm:
     'ยกเลิกการบันทึกที่อยู่ในคิวหรือไม่ การเปลี่ยนแปลงยังอยู่บนคอมพิวเตอร์เครื่องนี้ และเอกสารบน UniWork ไม่เปลี่ยนแปลง',
+  uwQueueCancelGo: 'ยกเลิกการบันทึก',
   uwQueueCancelled: 'ยกเลิกการบันทึกในคิวแล้ว การเปลี่ยนแปลงยังอยู่บนคอมพิวเตอร์เครื่องนี้',
 
   // {reason} fragments of the blocked/failed rows (the existing uwReason* keys stay in the uniwork-documents shard)
@@ -126,6 +127,8 @@ export const th = {
   uwSyncOpenFromSettings: 'ศูนย์ซิงค์',
   uwSyncOnline: 'เชื่อมต่อกับ UniWork · ซิงค์เมื่อ {time}',
   uwSyncOffline: 'ออฟไลน์ · ซิงค์ล่าสุด {time}',
+  uwSyncOnlineNoTime: 'เชื่อมต่อกับ UniWork',
+  uwSyncOfflineNoTime: 'ออฟไลน์',
   uwSyncPaused: 'หยุดการส่งชั่วคราว — การบันทึกใหม่จะรอ',
   uwSyncAdminPaused: 'ผู้ดูแลระบบหยุดการส่งชั่วคราว การบันทึกถูกเก็บไว้บนคอมพิวเตอร์เครื่องนี้',
   uwSyncFeedOff: 'หยุดการแจ้งเตือนเวอร์ชันใหม่ชั่วคราว UniWork ยังตรวจสอบความขัดแย้งเมื่อคุณบันทึก',
@@ -155,6 +158,7 @@ export const th = {
   uwSyncEmptyQueue: 'ไม่มีรายการที่รอบันทึก',
   uwSyncEmptyAttention: 'ไม่มีอะไรต้องจัดการ',
   uwSyncEmptyRecent: 'ไม่มีการบันทึกล่าสุด',
+  uwSyncActionFailed: 'ทำไม่สำเร็จ ไม่มีสิ่งใดถูกลบ โปรดลองอีกครั้ง',
   uwSyncRowAnnounce: '{doc}: {state}',
 
   // S3 offline library

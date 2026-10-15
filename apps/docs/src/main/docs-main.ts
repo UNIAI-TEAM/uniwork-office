@@ -93,6 +93,7 @@ import {
   writeJsonAtomic,
   newerCopyMtime,
 } from '@genoffice/electron-utils'
+import { isDraftPreviewPath } from '@genoffice/electron-utils/draft-preview'
 import { answerUniworkAiFlagOff } from '@genoffice/electron-utils/uniwork-ai-flag'
 import { configureMetricsCache, familyVerticalMetrics } from '@genoffice/font-metrics'
 import { createI18n, getUiLang, normalizeLang, setUiLang } from '@genoffice/i18n'
@@ -3175,6 +3176,9 @@ const RECENT_PATH = () => userDataPath('recent.json')
 const RECENT_LIMIT = 100
 
 function pushRecent(filePath: string): void {
+  // A kept-draft preview is a temporary decrypted copy opened through loadDocx, which lands
+  // here too: it is not a file the user opened, so it never becomes a recent entry.
+  if (isDraftPreviewPath(app.getPath('userData'), filePath)) return
   const recent = readJson<string[]>(RECENT_PATH(), [])
   // Every save lands here (autosave = every 30s): skip the write and the menu
   // rebuild when the file is already at the head of the list
@@ -3512,6 +3516,12 @@ function clearRecoveryCopy(filePath: string): void {
   } catch {
     /* nothing to clean */
   }
+}
+
+/** queue a document this tab's next consume-pending-open opens without a dialog (shell reload routing) */
+export function queueDocsForView(contents: WebContents, path: string): void {
+  clearRecoveryCopy(path)
+  pendingWindowOpens.set(contents.id, path)
 }
 
 interface MaybeRecoveredDocBytes {

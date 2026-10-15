@@ -33,7 +33,6 @@ import {
 } from '../../../html/src/main/html-main'
 import {
   createPdfView,
-  clearPdfDirty,
   pdfIsDirty,
   queuePdfAiPreset,
   requestPdfClose,
@@ -64,6 +63,7 @@ import { clampDiscussionPanelWidth } from '@genoffice/electron-utils/comments-ip
 import { aiEpochOf, clearAiRun, isAiRunning, type EditorState } from './ai-run-registry'
 import { isCloseTabChord } from './close-tab-chord'
 import { blankRetiredPage } from './retire-page'
+import { reloadViewFromDisk } from './reload-view'
 
 /** a tab lifted out of the strip with its live view: what "Open in New Window",
  *  tear-off and dock hand back and forth between the shell and a detached window */
@@ -657,11 +657,7 @@ export class TabManager {
     const tab = this.tabs.find((t) => t.id === id)
     const wc = tab?.view?.webContents
     if (!wc || wc.isDestroyed()) return
-    if (tab.kind === 'pdf') clearPdfDirty(wc.id)
-    // a sheets renderer gets its file only through the one-shot queue, which
-    // the first open consumed: without it the reloaded tab waits forever
-    if (tab.kind === 'sheets' && tab.filePath) queueWorkbookForView(wc, tab.filePath)
-    wc.reload()
+    reloadViewFromDisk(wc, tab.kind, tab.filePath)
   }
 
   openMarkdownTab(openPath?: string): string {
