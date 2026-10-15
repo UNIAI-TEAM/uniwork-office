@@ -2,6 +2,8 @@ import { unlinkSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
+import { RecoveryClearEpochs } from '@genoffice/electron-utils/recovery-copy'
+
 /**
  * The current xlsx patcher materializes worksheet XML as JavaScript strings.
  * Rewriting a large entry can therefore require several times its uncompressed
@@ -23,13 +25,14 @@ export function allowsAutomaticWorkbookRecovery(
 /**
  * Bumped by every clear of a recovery copy: a write that started before the
  * bump must not leave the file it lands behind (stale-recovery race, e.g. the
- * shell's sign-out sweep deleting the account's copies mid-write).
+ * shell's sign-out sweep deleting the account's copies mid-write). Keyed by the
+ * normalized path and held only while a write is in flight.
  */
-const recoveryClearEpochs = new Map<string, number>()
+const recoveryClearEpochs = new RecoveryClearEpochs()
 
 /** Deletes the recovery copy `target` of `key` (the path it recovers); a missing file is fine. */
 export function clearRecoveryFile(key: string, target: string): void {
-  recoveryClearEpochs.set(key, (recoveryClearEpochs.get(key) ?? 0) + 1)
+  recoveryClearEpochs.bump(key)
   try {
     unlinkSync(target)
   } catch {
@@ -47,12 +50,21 @@ export async function writeRecoveryFile(
   write: () => Promise<unknown>,
 ): Promise<boolean> {
   // snapshot before any await
-  const epoch = recoveryClearEpochs.get(key) ?? 0
-  await mkdir(dirname(target), { recursive: true })
-  await write()
-  if ((recoveryClearEpochs.get(key) ?? 0) !== epoch) {
-    clearRecoveryFile(key, target)
-    return false
+  const ticket = recoveryClearEpochs.begin(key)
+  try {
+    await mkdir(dirname(target), { recursive: true })
+    await write()
+    if (recoveryClearEpochs.cleared(ticket)) {
+      clearRecoveryFile(key, target)
+      return false
+    }
+    return true
+  } finally {
+    recoveryClearEpochs.end(ticket)
   }
-  return true
+}
+
+/** open clear-epoch entries (tests): bounded by the writes in flight */
+export function recoveryEpochEntries(): number {
+  return recoveryClearEpochs.size
 }

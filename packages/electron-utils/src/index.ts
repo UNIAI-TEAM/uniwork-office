@@ -146,4 +146,9 @@ export {
   type CommentsPollFetch,
   type CommentsPollState,
 } from './comments-poll'
-export { newerCopyMtime } from './recovery-copy'
+export {
+  newerCopyMtime,
+  RecoveryClearEpochs,
+  recoveryEpochKey,
+  type RecoveryWriteTicket,
+} from './recovery-copy'
