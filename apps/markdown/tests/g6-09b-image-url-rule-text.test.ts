@@ -46,6 +46,10 @@ const FORMS: Record<string, (url: string) => string> = {
   'reference ![alt][id]': (u) => `![alt text][pic]\n\n[pic]: ${u}`,
   'raw <img src>': (u) => `<img src="${u}" alt="alt text">`,
   'raw <img> in a paragraph': (u) => `some words <img src='${u}'> more words`,
+  'angle-bracket ![alt](<url>)': (u) => `![alt text](<${u}>)`,
+  'newline inside the link': (u) => `![alt text](\n${u}\n)`,
+  'HTML-entity scheme (<img>)': (u) => `<img src="${u.replace('h', '&#x68;')}" alt="alt text">`,
+  'uppercase <IMG SRC>': (u) => `<IMG SRC="${u}" ALT="alt text">`,
 }
 
 function setup(uniwork: boolean, initial = 'Body') {
@@ -219,5 +223,107 @@ describe('markdown text tools under UniWork AI: other cases', () => {
       ops: [{ op: 'insertContent', after: 0, markdown: `![x](${STRANGER})` }],
     })
     expect(r.output).not.toMatch(/UNI-|G6-|N3|Q5/)
+  })
+})
+
+describe('markdown text tools under UniWork AI: spellings that are not image references', () => {
+  it('accepts a fenced block, inline code and an escaped bang that only mention an image', async () => {
+    const { run, md } = setup(true)
+    const r = await run('apply_ops', {
+      ops: [
+        {
+          op: 'insertContent',
+          after: 0,
+          markdown: [
+            'Write `![a](' + STRANGER + ')` to embed a picture.',
+            '',
+            '```md',
+            `![a](${STRANGER})`,
+            `<img src="${STRANGER}">`,
+            '```',
+            '',
+            `an escaped one: \\![a](${STRANGER})`,
+          ].join('\n'),
+        },
+      ],
+    })
+    expect(r.isError).toBeFalsy()
+    expect(md()).toContain(STRANGER)
+  })
+
+  it('an entity-spelled scheme in markdown link syntax stays literal text, so no remote image lands', async () => {
+    const { run, editor } = setup(true)
+    const r = await run('apply_ops', {
+      ops: [
+        { op: 'insertContent', after: 0, markdown: `![a](${STRANGER.replace('h', '&#104;')})` },
+      ],
+    })
+    expect(r.isError).toBeFalsy()
+    const srcs: string[] = []
+    editor.state.doc.descendants((n) => {
+      if (n.type.name === 'image') srcs.push(String(n.attrs.src))
+    })
+    expect(srcs.filter((src) => /^(?:https?:|data:|\/\/)/i.test(src.trim()))).toEqual([])
+  })
+
+  it('an <img srcset> never lands a remote image: refused or not kept, the document holds no such image', async () => {
+    const { run, editor } = setup(true)
+    await run('apply_ops', {
+      ops: [
+        {
+          op: 'insertContent',
+          after: 0,
+          markdown: `<img srcset="${STRANGER} 2x" alt="a">\n\n<img src="${FOUND}" srcset="${STRANGER} 2x">`,
+        },
+      ],
+    })
+    const srcs: string[] = []
+    editor.state.doc.descendants((n) => {
+      if (n.type.name === 'image') srcs.push(String(n.attrs.src))
+    })
+    expect(srcs).not.toContain(STRANGER)
+    expect(JSON.stringify(editor.getJSON())).not.toContain(STRANGER)
+  })
+})
+
+describe('write_document truncated fallback under UniWork AI', () => {
+  const pause = () => new Promise((resolve) => setTimeout(resolve, 400))
+
+  /** a writer whose first tick renders `landing`, then the kept final text stops mid-placeholder so it no longer parses */
+  function brokenTailWriter(landing: string): AiDocWriter {
+    return {
+      write: async (_spec, onProgress) => {
+        onProgress(landing)
+        await pause()
+        const markdown = `${landing}\n\nand then {{na`
+        onProgress(markdown)
+        return { ok: true, markdown, truncated: true }
+      },
+    }
+  }
+
+  it('refuses when the prefix that lands carries an unregistered remote image', async () => {
+    const { run, md } = setup(true, 'Body {{secret}}')
+    const before = md()
+    const r = await run(
+      'write_document',
+      { plan: 'p', afterIndex: 0 },
+      brokenTailWriter(`{{secret}}\n\n![x](${STRANGER})`),
+    )
+    expect(r.isError).toBe(true)
+    expect(r.output).toContain(IMAGE_URL_REFUSAL)
+    expect(md()).toBe(before)
+  })
+
+  it('lands the prefix when its image is registered', async () => {
+    const { run, md } = setup(true, 'Body {{secret}}')
+    await run('image_search', { query: 'cat' })
+    const r = await run(
+      'write_document',
+      { plan: 'p', afterIndex: 0 },
+      brokenTailWriter(`{{secret}}\n\n![x](${FOUND})`),
+    )
+    expect(r.isError).toBeFalsy()
+    expect(md()).toContain(FOUND)
   })
 })
