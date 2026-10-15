@@ -58,6 +58,7 @@ import {
   readBodyCapped,
   newerCopyMtime,
 } from '@genoffice/electron-utils'
+import { isDraftPreviewPath } from '@genoffice/electron-utils/draft-preview'
 import {
   answerUniworkAiFlagOff,
   answerUniworkCloudStatusOff,
@@ -360,6 +361,8 @@ export function readSlidesRecentFiles(): string[] {
 async function pushRecent(path: string): Promise<void> {
   // A headless export is not a document the user opened.
   if (isHeadlessMode()) return
+  // A kept-draft preview is a temporary decrypted copy, not a file the user opened.
+  if (isDraftPreviewPath(app.getPath('userData'), path)) return
   const cur = await readRecent()
   const next = [path, ...cur.filter((p) => p !== path)].slice(0, 10)
   try {

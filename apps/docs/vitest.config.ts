@@ -42,6 +42,9 @@ export default defineConfig({
       '@genoffice/electron-utils/uniwork-ai-flag': local(
         '../../packages/electron-utils/src/uniwork-ai-flag.ts',
       ),
+      '@genoffice/electron-utils/draft-preview': local(
+        '../../packages/electron-utils/src/draft-preview.ts',
+      ),
       '@genoffice/electron-utils/ai-run': local('../../packages/electron-utils/src/ai-run.ts'),
       '@genoffice/electron-utils/drop-open': local(
         '../../packages/electron-utils/src/drop-open.ts',

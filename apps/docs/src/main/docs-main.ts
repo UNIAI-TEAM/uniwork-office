@@ -93,6 +93,7 @@ import {
   writeJsonAtomic,
   newerCopyMtime,
 } from '@genoffice/electron-utils'
+import { isDraftPreviewPath } from '@genoffice/electron-utils/draft-preview'
 import {
   answerUniworkAiFlagOff,
   answerUniworkCloudStatusOff,
@@ -3178,6 +3179,9 @@ const RECENT_PATH = () => userDataPath('recent.json')
 const RECENT_LIMIT = 100
 
 function pushRecent(filePath: string): void {
+  // A kept-draft preview is a temporary decrypted copy opened through loadDocx, which lands
+  // here too: it is not a file the user opened, so it never becomes a recent entry.
+  if (isDraftPreviewPath(app.getPath('userData'), filePath)) return
   const recent = readJson<string[]>(RECENT_PATH(), [])
   // Every save lands here (autosave = every 30s): skip the write and the menu
   // rebuild when the file is already at the head of the list

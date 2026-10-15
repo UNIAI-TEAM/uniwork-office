@@ -1471,6 +1471,11 @@ export class UniworkDocsService {
     }
   }
 
+  /** G5-10: expose the live session's queue dispatcher and stores to Sync Center */
+  async syncCenterEngine(): Promise<QueueEngineAccess> {
+    return this.queueEngine()
+  }
+
   /** one poll pass; see pollSaveQueue */
   private async runQueuePass(): Promise<void> {
     const access = await this.queueEngine()

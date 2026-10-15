@@ -37,6 +37,7 @@ export const es = {
   uwQueueCancel: 'Cancelar guardado…',
   uwQueueCancelConfirm:
     '¿Cancelar el guardado en cola? Tus cambios siguen en este equipo; el documento en UniWork no cambia.',
+  uwQueueCancelGo: 'Cancelar guardado',
   uwQueueCancelled: 'Guardado en cola cancelado. Tus cambios siguen en este equipo.',
 
   // {reason} fragments of the blocked/failed rows (the existing uwReason* keys stay in the uniwork-documents shard)
@@ -128,6 +129,8 @@ export const es = {
   uwSyncOpenFromSettings: 'Centro de sincronización',
   uwSyncOnline: 'Conectado a UniWork · sincronizado {time}',
   uwSyncOffline: 'Sin conexión · última sincronización {time}',
+  uwSyncOnlineNoTime: 'Conectado a UniWork',
+  uwSyncOfflineNoTime: 'Sin conexión',
   uwSyncPaused: 'Envío en pausa: los nuevos guardados esperarán',
   uwSyncAdminPaused:
     'Tu administrador ha pausado el envío. Los guardados se conservan en este equipo.',
@@ -159,6 +162,7 @@ export const es = {
   uwSyncEmptyQueue: 'No hay nada pendiente de guardar.',
   uwSyncEmptyAttention: 'Nada requiere atención.',
   uwSyncEmptyRecent: 'No hay guardados recientes.',
+  uwSyncActionFailed: 'No se pudo completar. No se eliminó nada; inténtalo de nuevo.',
   uwSyncRowAnnounce: '{doc}: {state}',
 
   // S3 offline library
