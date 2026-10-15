@@ -113,6 +113,7 @@ describe('handshake', () => {
         download: false,
         uniworkAi: false,
         comments: false,
+        commentsShareView: false,
       },
     })
     expect(session).toMatchObject({

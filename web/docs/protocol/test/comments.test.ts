@@ -134,6 +134,7 @@ describe('G8-08 protocol shape', () => {
   it('keeps PROTOCOL_VERSION 1 and adds the comments types and capability', () => {
     expect(PROTOCOL_VERSION).toBe(1)
     expect(CAPABILITY_KEYS).toContain('comments')
+    expect(CAPABILITY_KEYS).toContain('commentsShareView')
     expect(FRAME_REQUEST_TYPES).toEqual(
       expect.arrayContaining([
         'comments.list',
@@ -144,13 +145,15 @@ describe('G8-08 protocol shape', () => {
         'comments.reopen',
         'comments.revisions',
         'comments.anchors',
+        'comments.shareView',
         'mentions.search',
       ]),
     )
     expect(HOST_EVENT_TYPES).toContain('comments.changed')
     expect(HOST_REQUEST_TYPES).toContain('comments.reveal')
-    expect(COMMENTS_LEVELS).toEqual(['view', 'edit', 'manage'])
+    expect(COMMENTS_LEVELS).toEqual(['view', 'comment', 'edit', 'manage'])
     expect(isCommentsRequestType('comments.list')).toBe(true)
+    expect(isCommentsRequestType('comments.shareView')).toBe(true)
     expect(isCommentsRequestType('mentions.search')).toBe(true)
     expect(isCommentsRequestType('api.open')).toBe(false)
   })
@@ -158,7 +161,7 @@ describe('G8-08 protocol shape', () => {
   it('init: user.id and commentsLevel are optional and typed', () => {
     const init = { ...baseInit(), protocolVersion: PROTOCOL_VERSION }
     expect(isInitPayload(init)).toBe(true)
-    for (const level of ['view', 'edit', 'manage'] as const) {
+    for (const level of ['view', 'comment', 'edit', 'manage'] as const) {
       expect(isInitPayload({ ...init, commentsLevel: level })).toBe(true)
     }
     const { commentsLevel: _l, user: _u, ...bare } = init
@@ -252,10 +255,16 @@ describe('G8-08 protocol shape', () => {
     bad('comments.anchors', { version_id: 'v2', anchors: [{ ...item, state: 'stale' }] }) // server-only
     bad('comments.anchors', { anchors: [item] })
 
+    ok('comments.shareView', { user_id: '01J8X4USR0BBBBBBBBBBBBBBBB' })
+    bad('comments.shareView', { user_id: '' })
+    bad('comments.shareView', {})
+
     ok('mentions.search', { q: '' })
     ok('mentions.search', { q: 'nguyen', limit: 20 })
+    ok('mentions.search', { q: 'nguyen', limit: 20, include: 'no_access' })
     bad('mentions.search', {})
     bad('mentions.search', { q: 'x', limit: 0 })
+    bad('mentions.search', { q: 'x', include: 'all' })
   })
 
   it('responses', () => {
@@ -298,6 +307,21 @@ describe('G8-08 protocol shape', () => {
 
     for (const t of ['comments.create', 'comments.update', 'comments.resolve', 'comments.reopen']) {
       ok(t, { comment: COMMENT })
+      ok(t, {
+        comment: {
+          ...COMMENT,
+          mentions_without_access: [
+            { user_id: '01J8X4USR0BBBBBBBBBBBBBBBB', display_name: 'Trần Bình', can_share: true },
+            { user_id: '01J8X4USR0CCCCCCCCCCCCCCCC', can_share: false },
+          ],
+        },
+      })
+      bad(t, {
+        comment: {
+          ...COMMENT,
+          mentions_without_access: [{ user_id: 'u1', can_share: 'yes' }],
+        },
+      })
       bad(t, {})
     }
     ok('comments.delete', { outcome: 'tombstoned' })
@@ -351,9 +375,16 @@ describe('G8-08 protocol shape', () => {
       skipped: [{ comment_id: 'c2', reason: 'nope' }],
       list_token: 'x',
     })
+    ok('comments.shareView', { ok: true })
+    bad('comments.shareView', { ok: false })
+    bad('comments.shareView', {})
     ok('mentions.search', {
-      candidates: [{ user_id: 'u1', display_name: 'An', email: 'a@x.test' }],
+      candidates: [
+        { user_id: 'u1', display_name: 'An', email: 'a@x.test', can_view: true },
+        { user_id: 'u2', display_name: 'Bình', can_view: false },
+      ],
     })
+    bad('mentions.search', { candidates: [{ user_id: 'u1', display_name: 'An', can_view: 'no' }] })
     bad('mentions.search', { candidates: [{ display_name: 'An' }] })
     ok('comments.reveal', { revealed: false })
     bad('comments.reveal', {})
@@ -385,9 +416,11 @@ describe('commentsErrorFromHttp (contract §9, fixed table)', () => {
 
   it.each([
     [409, 'idempotency_payload_mismatch', 'conflict'],
+    [409, 'document_owned_by_work_product', 'conflict'],
     [400, 'anchor_version_invalid', 'malformed'],
     [400, 'invalid_request', 'malformed'],
     [413, 'payload_too_large', 'too_large'],
+    [422, 'principal_not_in_organization', 'invalid_arg'],
   ] as const)('%i %s -> %s with details.code', (status, code, expected) => {
     const e = commentsErrorFromHttp(status, body(code))
     expect(e.toShape()).toMatchObject({
@@ -491,6 +524,27 @@ describe('commentsLevel and the frame affordances', () => {
     }
   })
 
+  it('comment: compose, own edit/delete, resolve/reopen ONLY threads whose root author is the caller (G8-18)', () => {
+    const a = commentsAccess(session({ commentsLevel: 'comment' }))
+    expect(a).toMatchObject({ enabled: true, level: 'comment', canCreate: true })
+    expect(canActOnComment(a, mine, 'edit')).toBe(true)
+    expect(canActOnComment(a, mine, 'delete')).toBe(true)
+    expect(canActOnComment(a, theirs, 'edit')).toBe(false)
+    expect(canActOnComment(a, theirs, 'delete')).toBe(false)
+    // root comment authored by me -> resolve/reopen allowed
+    expect(canActOnComment(a, mine, 'resolve')).toBe(true)
+    expect(canActOnComment(a, mine, 'reopen')).toBe(true)
+    // root comment authored by someone else -> resolve/reopen denied
+    expect(canActOnComment(a, theirs, 'resolve')).toBe(false)
+    expect(canActOnComment(a, theirs, 'reopen')).toBe(false)
+    // thread_author_id overrides comment.author_id when passed (e.g. reply by me on their thread, or reply by them on my thread)
+    expect(canActOnComment(a, { ...mine, thread_author_id: theirs.author_id }, 'resolve')).toBe(
+      false,
+    )
+    expect(canActOnComment(a, { ...theirs, thread_author_id: me }, 'resolve')).toBe(true)
+    expect(canActOnComment(a, { ...mine, thread_author_id: null }, 'resolve')).toBe(false)
+  })
+
   it('edit: compose, own edit/delete, resolve/reopen any', () => {
     const a = commentsAccess(session({ commentsLevel: 'edit' }))
     expect(a).toMatchObject({ enabled: true, level: 'edit', canCreate: true })
@@ -558,6 +612,7 @@ describe('commentsLevel and the frame affordances', () => {
       })
     }
     expect(checkInitComments({ ...base, commentsLevel: 'view' })).toBeNull()
+    expect(checkInitComments({ ...base, commentsLevel: 'comment' })).toBeNull()
     // not granted: the value is not looked at
     expect(
       checkInitComments({ ...base, capabilities: { save: true }, commentsLevel: 'admin' } as never),
