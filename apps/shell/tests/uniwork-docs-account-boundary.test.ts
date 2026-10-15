@@ -506,6 +506,67 @@ describe('an account switch that is already effective (Q2 = a)', () => {
     expect(h.locked).toEqual([ownerX, ownerA, ownerB])
   })
 
+  it("d6-4: a push resolves when its own run ended, not when a later owner's lock did", async () => {
+    const ownerC = { accountId: 'acc_c', deploymentId: 'default' }
+    const h = switching({ count: 0, ramOnly: 0 })
+    let releaseB: () => void = () => undefined
+    h.deps.lockStore.mockImplementation(async (owner: Owner | null) => {
+      h.locked.push(owner)
+      // B's lock (the run of C) is held
+      if (owner?.accountId === 'acc_b') {
+        await new Promise<void>((resolve) => {
+          releaseB = resolve
+        })
+      }
+    })
+    await h.boundary.enforce(ownerA)
+    const settled: string[] = []
+    const toB = h.boundary.enforce(ownerB).then(() => settled.push('B'))
+    const toC = h.boundary.enforce(ownerC).then(() => settled.push('C'))
+    // B's run (it locked A) is over and its push resolves while C's run is still locking B
+    await vi.waitFor(() => expect(h.locked).toEqual([ownerA, ownerB]))
+    await toB
+    expect(settled).toEqual(['B'])
+    releaseB()
+    await toC
+    expect(settled).toEqual(['B', 'C'])
+  })
+
+  it('d6-4: a failed run rejects only its own push; a later owner still runs and resolves', async () => {
+    const ownerC = { accountId: 'acc_c', deploymentId: 'default' }
+    const h = switching({ count: 0, ramOnly: 0 })
+    h.deps.closeDocument.mockRejectedValueOnce(new Error('close failed'))
+    await h.boundary.enforce(ownerA)
+    const toB = h.boundary.enforce(ownerB)
+    const toBFails = expect(toB).rejects.toThrow('close failed')
+    const toC = h.boundary.enforce(ownerC)
+    await toBFails
+    await expect(toC).resolves.toBeUndefined()
+    expect(h.locked).toEqual([ownerA, ownerB])
+  })
+
+  it('d7-1: a non-adjacent repeat of an owner locks each account exactly once (every run locks the owner before it)', async () => {
+    const ownerX = { accountId: 'acc_x', deploymentId: 'default' }
+    const h = switching({ count: 0, ramOnly: 0 })
+    let releaseX: () => void = () => undefined
+    h.deps.lockStore.mockImplementation(async (owner: Owner | null) => {
+      h.locked.push(owner)
+      if (owner?.accountId === 'acc_x') {
+        await new Promise<void>((resolve) => {
+          releaseX = resolve
+        })
+      }
+    })
+    await h.boundary.enforce(ownerX)
+    const toA = h.boundary.enforce(ownerA)
+    await vi.waitFor(() => expect(h.locked).toEqual([ownerX]))
+    // X(running) A B A: B was live between the two A pushes, so the second A is a run of its own
+    const rest = [ownerB, ownerA].map((owner) => h.boundary.enforce(owner))
+    releaseX()
+    await Promise.all([toA, ...rest])
+    expect(h.locked).toEqual([ownerX, ownerA, ownerB])
+  })
+
   it('an explicit Sign out still asks, and a cancel there changes nothing', async () => {
     const h = switching({ count: 1, ramOnly: 0 })
     await h.boundary.enforce(ownerA)

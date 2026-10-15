@@ -109,6 +109,21 @@ export function workingCopyOwner(
   return { deploymentId, userId }
 }
 
+/** one queued run: the owner and a promise that settles when that run ends (d6-4) */
+interface Run {
+  owner: LastOwner
+  done: Promise<void>
+  settle: { resolve(): void; reject(error: unknown): void }
+}
+
+function newRun(owner: LastOwner): Run {
+  let settle!: Run['settle']
+  const done = new Promise<void>((resolve, reject) => {
+    settle = { resolve, reject }
+  })
+  return { owner, done, settle }
+}
+
 /** `deploymentId/accountId`: one account's boundary key */
 function ownerKey(owner: LastOwner): string {
   return `${owner.deploymentId}/${owner.accountId}`
@@ -120,16 +135,20 @@ export class AccountBoundary {
   private enforced: string | null = null
   /** the last live owner `enforce` saw (the account an account switch leaves) */
   private lastOwner: LastOwner | null = null
-  /** the drain of `enforce` runs in progress (one at a time); null = idle */
+  /** the drain of `enforce` runs in progress (one at a time); null = idle. Never rejects. */
   private running: Promise<void> | null = null
-  /** the owner whose run the drain is in right now; null = between runs */
-  private current: LastOwner | null = null
+  /** the run the drain is in right now; null = between runs */
+  private current: Run | null = null
   /**
-   * The distinct owners status pushes asked for while a run was in progress,
-   * oldest first. Each was live at its push (its store opened, its documents
+   * The runs status pushes asked for while a run was in progress, oldest
+   * first. Each owner was live at its push (its store opened, its documents
    * editable), so each gets its own run: the run after it locks it (d6-1).
+   * A repeat of the owner right before it joins that run; a repeat after
+   * another owner is a new run on purpose (that owner was live in between and
+   * must be locked by it), and it never re-locks anyone: each run locks only
+   * the owner of the run before it.
    */
-  private readonly queued: LastOwner[] = []
+  private readonly queued: Run[] = []
 
   constructor(deps: AccountBoundaryDeps) {
     this.deps = deps
@@ -222,13 +241,19 @@ export class AccountBoundary {
    * names the same owner as the run or push before it) and every queued owner
    * runs in order right after it, without waiting for another push, so an
    * owner that was live only between two pushes is still locked by the next
-   * run; the call resolves once the drain that covers it has finished.
+   * run. The call resolves once the run that covers its owner has ended (d6-4:
+   * not the whole drain, so a push never waits for a later owner's lock) and
+   * rejects with that run's own failure.
    */
   async enforce(owner: LastOwner): Promise<void> {
     const last = this.queued[this.queued.length - 1] ?? this.current
-    if (!last || ownerKey(last) !== ownerKey(owner)) this.queued.push(owner)
+    let run = last
+    if (!run || ownerKey(run.owner) !== ownerKey(owner)) {
+      run = newRun(owner)
+      this.queued.push(run)
+    }
     if (!this.running) this.running = this.drain()
-    await this.running
+    await run.done
   }
 
   /** runs the queued owners one after another, oldest first, until none is left */
@@ -238,10 +263,10 @@ export class AccountBoundary {
       while (next) {
         this.current = next
         try {
-          await this.enforceOnce(next)
+          await this.enforceOnce(next.owner)
+          next.settle.resolve()
         } catch (error) {
-          // a newer owner still gets its run; the last one reports its failure
-          if (this.queued.length === 0) throw error
+          next.settle.reject(error)
         } finally {
           this.current = null
         }
