@@ -486,7 +486,64 @@ function canonicalJson(value) {
 function parseExpression(tokens, i, scope, depth = 0) {
   if (depth > 24) return { value: U('recursion'), i }
   const primary = parsePrimary(tokens, i, scope, depth)
-  return parsePostfix(primary.value, tokens, primary.i, scope, depth)
+  const left = parsePostfix(primary.value, tokens, primary.i, scope, depth)
+  return scope.ctx && scope.ctx.strict ? parseAddition(left, tokens, scope, depth) : left
+}
+
+/**
+ * `a + b + c` for `--emit-schemas` only (`ctx.strict`). The table's evaluator stops
+ * a value at the `+` and skips the operator, which a hash may keep pinned but a
+ * description the model reads must not: a string concatenation is folded here,
+ * left to right, and an operand that is unresolved makes the sum unresolved.
+ */
+function parseAddition(left, tokens, scope, depth) {
+  let acc = left
+  for (;;) {
+    const op = tokens[acc.i]
+    if (!op || op.type !== 'punct' || op.value !== '+') return acc
+    const primary = parsePrimary(tokens, acc.i + 1, scope, depth)
+    const right = parsePostfix(primary.value, tokens, primary.i, scope, depth)
+    let value
+    if (isU(acc.value)) value = acc.value
+    else if (isU(right.value)) value = right.value
+    else if (
+      (typeof acc.value === 'string' || typeof acc.value === 'number') &&
+      (typeof right.value === 'string' || typeof right.value === 'number')
+    )
+      value =
+        typeof acc.value === 'number' && typeof right.value === 'number'
+          ? acc.value + right.value
+          : String(acc.value) + String(right.value)
+    else value = U('operator')
+    acc = { value, i: right.i }
+  }
+}
+
+/**
+ * `--emit-schemas` only: a property value or array element must be followed by its
+ * separator. Anything else is an operator the evaluator does not fold (`||`, `?`,
+ * `-`, ...); instead of cutting the value there and carrying on, the element is
+ * unresolved and the rest of it is skipped up to the next separator.
+ */
+function strictElement(tokens, r, closer, scope) {
+  const next = tokens[r.i]
+  if (!(scope.ctx && scope.ctx.strict) || !next || next.value === ',' || next.value === closer)
+    return r
+  let idx = r.i
+  let nest = 0
+  while (idx < tokens.length) {
+    const v = tokens[idx].value
+    if (tokens[idx].type === 'punct') {
+      if (v === '(' || v === '[' || v === '{') nest += 1
+      else if (v === ')' || v === ']' || v === '}') {
+        if (nest === 0) break
+        nest -= 1
+      } else if (v === ',' && nest === 0) break
+    }
+    idx += 1
+  }
+  const operator = next.type === 'punct' ? next.value : next.type
+  return { value: isU(r.value) ? r.value : U(`operator:${operator}`), i: idx }
 }
 
 function parsePrimary(tokens, i, scope, depth) {
@@ -761,7 +818,12 @@ function parseObject(tokens, i, scope, depth) {
     }
     const next = tokens[idx]
     if (next && next.value === ':') {
-      const val = parseExpression(tokens, idx + 1, scope, depth + 1)
+      const val = strictElement(
+        tokens,
+        parseExpression(tokens, idx + 1, scope, depth + 1),
+        '}',
+        scope,
+      )
       out[key] = val.value
       idx = val.i
       continue
@@ -828,7 +890,7 @@ function parseArray(tokens, i, scope, depth) {
       }
       continue
     }
-    const r = parseExpression(tokens, idx, scope, depth + 1)
+    const r = strictElement(tokens, parseExpression(tokens, idx, scope, depth + 1), ']', scope)
     out.push(r.value)
     idx = r.i
   }
@@ -2004,12 +2066,30 @@ function findToolObjectTokens(tokens) {
   return out
 }
 
+/** the tool object again under the strict rules of `--emit-schemas` (`ctx.strict`) */
+function strictValue(parse, tokens, objIdx, scope, ctx) {
+  ctx.strict = true
+  try {
+    return parse(tokens, objIdx, scope, 0).value
+  } finally {
+    ctx.strict = false
+  }
+}
+
 /**
  * What `--emit-schemas` needs from one resolved tool object: its description and
  * schema as the evaluator folded them, or the first unresolved reason. Never
  * part of the table text.
  */
 function toolDetail(value) {
+  if (!isPlainObject(value)) {
+    return {
+      name: null,
+      description: null,
+      schema: null,
+      reason: isU(value) ? value.__unresolved : 'object',
+    }
+  }
   const description = value.description
   const descriptionReason = isU(description) ? description.__unresolved : null
   const hasSchema = Object.prototype.hasOwnProperty.call(value, 'inputSchema')
@@ -2021,6 +2101,7 @@ function toolDetail(value) {
       : findUnresolved(schema)
   const reason = schemaReason || (descriptionReason ? `description:${descriptionReason}` : null)
   return {
+    name: typeof value.name === 'string' ? value.name : null,
     description: typeof description === 'string' ? description : null,
     // kept whenever the schema itself resolved, even if the description did not
     schema: schemaReason ? null : schema,
@@ -2140,7 +2221,7 @@ export function extract({ repo, rev }) {
           hash,
           write,
           source: analysis.path,
-          detail: toolDetail(value),
+          detail: toolDetail(strictValue(parseExpression, analysis.tokens, objIdx, scope, ctx)),
         })
       }
     }
@@ -2164,6 +2245,9 @@ export function extract({ repo, rev }) {
 /** the modules the holdout harness maps, in the order the file lists them */
 const SCHEMA_MODULES = ['docs', 'sheets', 'slides', 'pdf', 'markdown', 'html']
 
+const canonicalSha256 = (schema) =>
+  createHash('sha256').update(canonicalJson(schema), 'utf8').digest('hex')
+
 /**
  * The `--emit-schemas` document for one `extract()` result.
  *
@@ -2177,14 +2261,19 @@ const SCHEMA_MODULES = ['docs', 'sheets', 'slides', 'pdf', 'markdown', 'html']
  *               these objects to the model as they are, so nothing else lives in them.
  *   catalogue   one entry per mechanical table row (agent-core rows included),
  *               table order: module, name, host (`renderer` | `agent-core`), source,
- *               schemaComplete, inputSchemaSha256 (the table's hash), and for an
- *               incomplete tool the `reason`, its `description` when that resolved
+ *               schemaComplete, inputSchemaSha256 (sha256 of the schema this file
+ *               embeds, canonical JSON), tableHash (the table's own cell: it can
+ *               differ, because the table's evaluator cuts a property value at a
+ *               `+` that this file folds), and for an incomplete tool the `reason`, its `description` when that resolved
  *               and its `inputSchema` when that resolved (a description built by
  *               calling product code, `opNames()`, leaves the schema intact). A
  *               tool that cannot be fully resolved is listed here and left out of
  *               its module array: never guessed, never silently dropped.
  *
- * The result is a pure function of the rev, so the same rev writes the same bytes.
+ * The file is read with stricter rules than the table (`ctx.strict`: `+` folded,
+ * any other operator makes the element unresolved), so a text the evaluator would
+ * have cut short is listed as incomplete instead of being offered truncated. The
+ * result is a pure function of the rev, so the same rev writes the same bytes.
  */
 export function buildSchemaFile({ sha, rows, text }) {
   const counts = {}
@@ -2194,7 +2283,12 @@ export function buildSchemaFile({ sha, rows, text }) {
   const catalogue = []
   for (const row of rows) {
     counts[row.module] = (counts[row.module] ?? 0) + 1
-    const { description, schema, reason } = row.detail
+    // the table's evaluator can misread an object (see `strictValue`) and hand a row another tool's name:
+    // such a row is listed with that reason and carries nothing read from the object
+    const same = row.detail.name === row.tool
+    const reason = same ? row.detail.reason : `name:${row.detail.name}`
+    const description = same ? row.detail.description : null
+    const schema = same ? row.detail.schema : null
     const entry = {
       module: row.module,
       name: row.tool,
@@ -2202,10 +2296,9 @@ export function buildSchemaFile({ sha, rows, text }) {
       source: row.source,
       schemaComplete: reason === null,
     }
-    // the table's hash is the schema's sha256 exactly when the schema resolved
     const schemaResolved = schema !== null
     if (reason === null) {
-      entry.inputSchemaSha256 = row.hash
+      entry.inputSchemaSha256 = canonicalSha256(schema)
       if (SCHEMA_MODULES.includes(row.module))
         file[row.module].push({
           type: 'function',
@@ -2215,8 +2308,9 @@ export function buildSchemaFile({ sha, rows, text }) {
       entry.reason = reason
       entry.description = description
       if (schemaResolved) entry.inputSchema = schema
-      entry.inputSchemaSha256 = schemaResolved ? row.hash : null
+      entry.inputSchemaSha256 = schemaResolved ? canonicalSha256(schema) : null
     }
+    entry.tableHash = row.hash
     catalogue.push(entry)
   }
   file.header = {
