@@ -1,6 +1,6 @@
-# Offline library engine - contract (G5-05, UNI-1359)
+# Offline library engine - contract (card G5-05)
 
-Read-only pinning (UNI-1645): pin, download (progress + cancel), verify, cache, `openCached()`
+Read-only pinning (the read-only pinning / edit-lock decision): pin, download (progress + cancel), verify, cache, `openCached()`
 read-only, refresh, unpin, quota. No offline editing, no "Giữ quyền sửa khi offline" hold, no
 drafts created offline (G5-08d); no renderer / i18n / S3 UI and no wiring of `openCached()` into
 the docs open path (G5-05u / G5-08d). Values come from U-01 and EXPERIENCE S3; nothing here
