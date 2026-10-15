@@ -770,10 +770,15 @@ export class OfflineLibraryManager {
     return this.purge(documentId, 'revoked')
   }
 
-  /** the lease manager's revoke notice (renew lost permission, feed revoke) */
+  /**
+   * The lease manager's revoke notice (renew lost permission, feed revoke). Its
+   * reason is the server code: a delete found at renewal (`document_deleted`,
+   * `deleted`) shows `deleted`, every permission loss `revoked` (T5-4).
+   */
   async handleLeaseRevoked(notice: LeaseRevokeNotice): Promise<PinRow | null> {
     if (!notice.deleteCommittedCache) return null
-    return this.purge(notice.documentId, 'revoked')
+    const deleted = notice.reason === 'document_deleted' || notice.reason === 'deleted'
+    return this.purge(notice.documentId, deleted ? 'deleted' : 'revoked')
   }
 
   /** archived on the server: the row stays and opens until the lease ends */

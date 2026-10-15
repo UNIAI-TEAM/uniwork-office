@@ -664,3 +664,35 @@ describe('T5-2 an in-flight re-download never blocks the old copy', () => {
     expect(await h.manager.openCached('doc_1')).toEqual({ kind: 'refused', code: 'deleted' })
   })
 })
+
+describe('T5-4 the lease revoke notice honours its reason', () => {
+  const notice = (reason: string) => ({
+    documentId: 'doc_1',
+    reason,
+    deleteCommittedCache: true as const,
+    keepDrafts: true as const,
+  })
+
+  it('a delete found at lease renewal (document_deleted) -> row deleted', async () => {
+    const h = createHarness()
+    addDoc(h, 'doc_1', 1)
+    rowOf(await pinDoc(h))
+    expect(await h.manager.handleLeaseRevoked(notice('document_deleted'))).toMatchObject({
+      state: 'deleted',
+      bytes: 0,
+    })
+    expect(h.storeFiles()).toEqual([recordFile('index'), recordFile(pinKey('doc_1'))].sort())
+  })
+
+  it('a permission loss at lease renewal -> row revoked', async () => {
+    for (const reason of ['permission_revoked', 'forbidden', 'offline_lease_revoked']) {
+      const h = createHarness()
+      addDoc(h, 'doc_1', 1)
+      rowOf(await pinDoc(h))
+      expect(await h.manager.handleLeaseRevoked(notice(reason))).toMatchObject({
+        state: 'revoked',
+        bytes: 0,
+      })
+    }
+  })
+})
