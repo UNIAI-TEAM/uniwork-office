@@ -3,13 +3,18 @@
  * genoffice-tools-extract v1 — deterministic, read-only extractor for the
  * genoffice agent tool table (G6-01 / UNI-1363, lane g6-fork_tools).
  *
- *   node scripts/genoffice-tools-extract.mjs [--rev <git-rev>] [--repo <dir>]
+ *   node scripts/genoffice-tools-extract.mjs [--rev <git-rev>] [--repo <dir>] [--emit-schemas <out.json>]
  *
  * Defaults: --rev HEAD, --repo = the git toplevel of the current directory.
  * Every file is read through git (`git ls-tree`, `git show <rev>:<path>`) at the
  * given revision: nothing is checked out, no product code is executed, and the
  * process never touches the network. Exit 0 on success; non-zero with a message
  * on a bad rev or an unusable repo.
+ *
+ * `--emit-schemas <out.json>` (G6-09 W10, G7-12 residual R2) writes the resolved
+ * tool definitions as JSON instead of printing the table (stdout stays empty):
+ * the file the uniwork G7-12 holdout harness loads with `--tool-schemas`. See
+ * `buildSchemaFile` for the shape.
  *
  * Dependencies: none. The sources are parsed with the small literal evaluator in
  * this file (strings / numbers / objects / arrays / spreads / template
@@ -121,11 +126,13 @@
  */
 
 import { execFileSync } from 'node:child_process'
+import { writeFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { createHash } from 'node:crypto'
 import { posix } from 'node:path'
 
-const USAGE = 'usage: node scripts/genoffice-tools-extract.mjs [--rev <git-rev>] [--repo <dir>]'
+const USAGE =
+  'usage: node scripts/genoffice-tools-extract.mjs [--rev <git-rev>] [--repo <dir>] [--emit-schemas <out.json>]'
 
 /** module → the two source roots the table covers */
 const SCAN_ROOTS = [
@@ -1997,6 +2004,29 @@ function findToolObjectTokens(tokens) {
   return out
 }
 
+/**
+ * What `--emit-schemas` needs from one resolved tool object: its description and
+ * schema as the evaluator folded them, or the first unresolved reason. Never
+ * part of the table text.
+ */
+function toolDetail(value) {
+  const description = value.description
+  const descriptionReason = isU(description) ? description.__unresolved : null
+  const hasSchema = Object.prototype.hasOwnProperty.call(value, 'inputSchema')
+  const schema = hasSchema ? value.inputSchema : undefined
+  const schemaReason = !hasSchema
+    ? 'missing'
+    : isU(schema)
+      ? schema.__unresolved
+      : findUnresolved(schema)
+  const reason = schemaReason || (descriptionReason ? `description:${descriptionReason}` : null)
+  return {
+    description: typeof description === 'string' ? description : null,
+    schema: reason ? null : schema,
+    reason,
+  }
+}
+
 export function extract({ repo, rev }) {
   const sha = git(repo, ['rev-parse', '--verify', `${rev}^{commit}`]).trim()
   const listing = git(repo, ['ls-tree', '-r', '--name-only', sha]).split('\n').filter(Boolean)
@@ -2109,6 +2139,7 @@ export function extract({ repo, rev }) {
           hash,
           write,
           source: analysis.path,
+          detail: toolDetail(value),
         })
       }
     }
@@ -2127,14 +2158,81 @@ export function extract({ repo, rev }) {
   return { sha, rows, text: `${lines.join('\n')}\n` }
 }
 
+// ───────────────────────────── schema file (--emit-schemas) ─────────────────────────────
+
+/** the modules the holdout harness maps, in the order the file lists them */
+const SCHEMA_MODULES = ['docs', 'sheets', 'slides', 'pdf', 'markdown', 'html']
+
+/**
+ * The `--emit-schemas` document for one `extract()` result.
+ *
+ *   header      kind, version, the resolved rev, the sha256 of the mechanical block
+ *               (the default stdout text of the same run) and the row count per module
+ *   <module>    for each of docs/sheets/slides/pdf/markdown/html, the tools whose
+ *               schema resolved completely, as `{ type: 'function', function:
+ *               { name, description, parameters } }` with `parameters` = the
+ *               `inputSchema` in source key order. This is the shape
+ *               `holdout-backend.mjs` reads from a `--tool-schemas` file; it sends
+ *               these objects to the model as they are, so nothing else lives in them.
+ *   catalogue   one entry per mechanical table row (agent-core rows included),
+ *               table order: module, name, host (`renderer` | `agent-core`), source,
+ *               schemaComplete, inputSchemaSha256 (the table's hash), and for an
+ *               incomplete tool the `reason` plus its `description` when that
+ *               resolved. A tool that cannot be fully resolved is listed here and
+ *               left out of its module array: never guessed, never silently dropped.
+ *
+ * The result is a pure function of the rev, so the same rev writes the same bytes.
+ */
+export function buildSchemaFile({ sha, rows, text }) {
+  const counts = {}
+  for (const module of SCHEMA_MODULES) counts[module] = 0
+  const file = { header: null }
+  for (const module of SCHEMA_MODULES) file[module] = []
+  const catalogue = []
+  for (const row of rows) {
+    counts[row.module] = (counts[row.module] ?? 0) + 1
+    const { description, schema, reason } = row.detail
+    const entry = {
+      module: row.module,
+      name: row.tool,
+      host: row.source.startsWith('packages/agent-core/') ? 'agent-core' : 'renderer',
+      source: row.source,
+      schemaComplete: reason === null,
+    }
+    if (reason === null) {
+      entry.inputSchemaSha256 = row.hash
+      if (SCHEMA_MODULES.includes(row.module))
+        file[row.module].push({
+          type: 'function',
+          function: { name: row.tool, description, parameters: schema },
+        })
+    } else {
+      entry.reason = reason
+      entry.description = description
+      entry.inputSchemaSha256 = null
+    }
+    catalogue.push(entry)
+  }
+  file.header = {
+    kind: 'genoffice-tool-schemas',
+    version: 1,
+    rev: sha,
+    mechanicalBlockSha256: createHash('sha256').update(text, 'utf8').digest('hex'),
+    counts,
+  }
+  file.catalogue = catalogue
+  return file
+}
+
 // ──────────────────────────────── CLI ────────────────────────────────
 
 function parseArgs(argv) {
-  const args = { rev: 'HEAD', repo: null }
+  const args = { rev: 'HEAD', repo: null, emitSchemas: null }
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i]
     if (a === '--rev') args.rev = argv[++i]
     else if (a === '--repo') args.repo = argv[++i]
+    else if (a === '--emit-schemas') args.emitSchemas = argv[++i]
     else if (a === '--help' || a === '-h') args.help = true
     else {
       process.stderr.write(`genoffice-tools-extract: unknown argument: ${a}\n${USAGE}\n`)
@@ -2170,6 +2268,15 @@ function main() {
       `genoffice-tools-extract: cannot read rev "${args.rev}" in ${repo}: ${message}\n`,
     )
     process.exit(1)
+  }
+  if (args.emitSchemas) {
+    const file = buildSchemaFile(result)
+    writeFileSync(args.emitSchemas, `${JSON.stringify(file, null, 2)}\n`)
+    const counts = Object.entries(file.header.counts)
+      .map(([module, n]) => `${module}=${n}`)
+      .join(' ')
+    process.stderr.write(`genoffice-tools-extract: wrote ${args.emitSchemas} (${counts})\n`)
+    return
   }
   process.stdout.write(result.text)
 }
