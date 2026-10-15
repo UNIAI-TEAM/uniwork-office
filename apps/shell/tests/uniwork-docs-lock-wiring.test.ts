@@ -534,8 +534,10 @@ describe('the account boundary at the production wiring (G511-be-3)', () => {
       new TextEncoder().encode('v4'),
     )
     // the receipt wait is a real timer in production; skip it here
-    vi.spyOn(handle.service as unknown as { sleepMs: () => Promise<void> }, 'sleepMs')
-      .mockResolvedValue(undefined)
+    vi.spyOn(
+      handle.service as unknown as { sleepMs: () => Promise<void> },
+      'sleepMs',
+    ).mockResolvedValue(undefined)
 
     await handle.boundary.beforeSignOut({ confirmed: true })
 

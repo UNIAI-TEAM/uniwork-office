@@ -1154,7 +1154,7 @@ describe('G5-11 sign-out lock-and-keep, N+1 park, and restoreParked', () => {
     expect(new TextDecoder().decode(taken?.bytes)).toBe(`v4 slides recovery ${marker}`)
   })
 
-  it("20. d2-2: park refused (store_full) for A keeps the folder locked so signed-in B cannot open it; A signing back in reopens", async () => {
+  it('20. d2-2: park refused (store_full) for A keeps the folder locked so signed-in B cannot open it; A signing back in reopens', async () => {
     const path = seedWorkingCopy({ bytes: 'v5 secret A', baseBytes: 'v3 base', state: 'dirty' })
     const ctx = setup({ openPaths: [path], budgetBytes: 16 })
 
