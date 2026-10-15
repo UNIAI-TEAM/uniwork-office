@@ -76,6 +76,14 @@ export interface DownloadResult {
   bytes: Uint8Array
 }
 
+/** G5-05: what a streamed download reports and how it is cancelled */
+export interface DownloadStreamOptions {
+  /** aborts the request, and the body read once the server answered */
+  signal?: AbortSignal
+  /** after every received chunk; `totalBytes` is the Content-Length when sent */
+  onProgress?(progress: { receivedBytes: number; totalBytes: number | null }): void
+}
+
 export interface UniworkDocsClient {
   listWorkspaces(orgId: string): Promise<UniworkWorkspaceRef[]>
   /** the caller's effective role in one workspace, or null when the server sends none */
@@ -144,6 +152,16 @@ export interface UniworkDocsClient {
   }): Promise<OrgMemberPage>
   getDocument(documentId: string): Promise<DocumentDetail>
   download(documentId: string, version?: number): Promise<DownloadResult>
+  /**
+   * G5-05: the same download read chunk by chunk, with progress and cancel.
+   * Same route and the same 256 MiB cap, checked from Content-Length and again
+   * while the body streams. A cancel or a broken body is `network`.
+   */
+  downloadStream(
+    documentId: string,
+    version: number | undefined,
+    options?: DownloadStreamOptions,
+  ): Promise<DownloadResult>
   upload(input: {
     documentId: string
     bytes: Uint8Array
@@ -555,6 +573,67 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
           if (length > MAX_DOWNLOAD_BYTES) throw new UniworkDocError('too_large')
           const bytes = new Uint8Array(await response.arrayBuffer())
           if (bytes.byteLength > MAX_DOWNLOAD_BYTES) throw new UniworkDocError('too_large')
+          return { bytes }
+        },
+      })
+    },
+
+    async downloadStream(documentId, version, streamOptions = {}) {
+      const query = new URLSearchParams()
+      if (version !== undefined && version > 0) query.set('version', String(Math.floor(version)))
+      const { signal, onProgress } = streamOptions
+      return send({
+        method: 'GET',
+        route: `/documents/${id(documentId)}/download`,
+        query,
+        timeoutMs: transferTimeout,
+        ...(signal ? { signal } : {}),
+        async read(response) {
+          const header = response.headers.get('Content-Length')
+          const declared = header === null ? NaN : Number(header)
+          if (declared > MAX_DOWNLOAD_BYTES) throw new UniworkDocError('too_large')
+          const totalBytes = Number.isSafeInteger(declared) && declared >= 0 ? declared : null
+          if (!response.body) {
+            const bytes = new Uint8Array(await response.arrayBuffer())
+            if (bytes.byteLength > MAX_DOWNLOAD_BYTES) throw new UniworkDocError('too_large')
+            onProgress?.({ receivedBytes: bytes.byteLength, totalBytes })
+            return { bytes }
+          }
+          const reader = response.body.getReader()
+          // send() detaches the caller's abort once the server answered: the
+          // body read listens to it itself, so a cancel ends the stream too
+          const stop = () => void reader.cancel().catch(() => undefined)
+          signal?.addEventListener('abort', stop, { once: true })
+          const chunks: Uint8Array[] = []
+          let receivedBytes = 0
+          try {
+            for (;;) {
+              if (signal?.aborted) throw new UniworkDocError('network')
+              let step: ReadableStreamReadResult<Uint8Array>
+              try {
+                step = await reader.read()
+              } catch {
+                throw new UniworkDocError('network')
+              }
+              if (signal?.aborted) throw new UniworkDocError('network')
+              if (step.done) break
+              receivedBytes += step.value.byteLength
+              if (receivedBytes > MAX_DOWNLOAD_BYTES) {
+                stop()
+                throw new UniworkDocError('too_large')
+              }
+              chunks.push(step.value)
+              onProgress?.({ receivedBytes, totalBytes })
+            }
+          } finally {
+            signal?.removeEventListener('abort', stop)
+          }
+          const bytes = new Uint8Array(receivedBytes)
+          let offset = 0
+          for (const chunk of chunks) {
+            bytes.set(chunk, offset)
+            offset += chunk.byteLength
+          }
           return { bytes }
         },
       })
