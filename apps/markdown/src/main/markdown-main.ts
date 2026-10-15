@@ -671,24 +671,17 @@ async function resolveSaveTarget(
 ): Promise<string | null | 'canceled'> {
   const current = savePathByWc.get(e.sender.id)
   if (mode === 'save' && current) return current
-  // AI auto-naming: silent first save of an untitled document
-  if (mode === 'save' && !current && suggestedName) {
-    const base = suggestedName
-      .replace(/[/\\:*?"<>|]/g, '_')
-      .slice(0, 80)
-      .trim()
-    if (base) {
-      const dir = configuredDefaultSaveDir(app)
-      let target = join(dir, `${base}.md`)
-      for (let n = 1; existsSync(target); n++) target = join(dir, `${base}-${n}.md`)
-      return target
-    }
-  }
+  // a name the AI panel suggested after a run only pre-fills the dialog below: an untitled
+  // document is never written without the user seeing where it goes
+  const suggestedBase = suggestedName
+    ?.replace(/[/\\:*?"<>|]/g, '_')
+    .slice(0, 80)
+    .trim()
   const win =
     BrowserWindow.fromWebContents(e.sender) ?? BrowserWindow.getFocusedWindow() ?? undefined
   const defaultPath = current
     ? uniworkSaveAsDefault(current)
-    : join(configuredDefaultSaveDir(app), `${tm('untitledFile')}.md`)
+    : join(configuredDefaultSaveDir(app), `${suggestedBase || tm('untitledFile')}.md`)
   const picked = await showSaveDialogWithMemory(dialog, win, {
     title: tm('dlgSaveTitle'),
     defaultPath,

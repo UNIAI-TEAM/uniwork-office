@@ -4,6 +4,7 @@ import {
   isUniworkQuestionRefusal,
   aiPanelWidthAtPointer,
   AiPanelSideButton,
+  AiSaveDraftCard,
   AiModelPicker,
   useCloudSignedIn,
   useAiModelNeedHint,
@@ -224,8 +225,13 @@ export interface MarkdownAiDeps {
   getSnapshot(): DocSnapshot
   /** rollback: replace the document (body and frontmatter) with a snapshot */
   restoreSnapshot(snapshot: DocSnapshot): void
-  /** fired when a run with at least one mutation finishes (auto-save hook) */
-  onRunDone(mutated: boolean): void
+  /**
+   * fired when a run finishes. Returns the file name to offer saving under when the run changed a
+   * never-saved document (the panel then asks, nothing is written), or null when no offer applies.
+   */
+  onRunDone(mutated: boolean): string | null
+  /** the user chose Save on the offer card: run the first-save flow with this name */
+  onSaveOffer(name: string): void
 }
 
 const MODEL_BRIDGE: AiModelPickerBridge = {
@@ -381,6 +387,8 @@ export function AiPanel({
     })
   }
   const runMutatedRef = useRef(false)
+  /** the ask-before-saving card of the last run; at most one, gone on the next send / New chat */
+  const [saveOffer, setSaveOffer] = useState<{ name: string } | null>(null)
   /** pictures the in-flight run saved; the run's snapshot keeps this same array so Roll back can name them */
   const runAssetsRef = useRef<string[]>([])
   /** tool activity of the whole run, for transcript persistence */
@@ -644,7 +652,9 @@ export function AiPanel({
             clearAiHighlights(editor)
             endRunFence(editor)
           }
-          depsRef.current.onRunDone(runMutatedRef.current)
+          // an offer only for an unsaved document the run changed: one card, replacing any older one
+          const offer = depsRef.current.onRunDone(runMutatedRef.current)
+          setSaveOffer(typeof offer === 'string' ? { name: offer } : null)
           setBusy(false)
         },
         onError: (error) => {
@@ -797,6 +807,7 @@ export function AiPanel({
     runInstructionRef.current = instruction
     runDisplayRef.current = displayText ?? instruction
     runMutatedRef.current = false
+    setSaveOffer(null)
     runAssetsRef.current = []
     runToolsRef.current = []
     runUsageRef.current = undefined
@@ -1172,6 +1183,7 @@ export function AiPanel({
                 msgQueue.clear()
                 loopRef.current?.reset()
                 setBusy(false)
+                setSaveOffer(null)
                 setChat([])
               }}
               data-tip={t('aiNewChat')}
@@ -1471,6 +1483,18 @@ export function AiPanel({
             </div>
           )
         })}
+        {saveOffer && !busy && (
+          <AiSaveDraftCard
+            lang={lang}
+            name={saveOffer.name}
+            onSave={() => {
+              const { name } = saveOffer
+              setSaveOffer(null)
+              depsRef.current.onSaveOffer(name)
+            }}
+            onLater={() => setSaveOffer(null)}
+          />
+        )}
       </div>
 
       {snapshots.length > 0 && (

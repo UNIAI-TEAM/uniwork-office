@@ -1192,11 +1192,13 @@ export default function App() {
       markDirty()
     },
     onRunDone: (mutated) => {
-      // AI wrote into a never-saved document → name it from the content and save silently
-      if (!mutated || filePathRef.current || !editorRef.current) return
-      const name = deriveAutoFileName(editorRef.current)
-      if (name) void doSave('save', name)
+      // AI wrote into a never-saved document: the panel asks before anything is saved, offering
+      // a name from the content ('' = nothing to derive, the dialog starts with the untitled name)
+      if (!mutated || filePathRef.current || !editorRef.current) return null
+      return deriveAutoFileName(editorRef.current) ?? ''
     },
+    // the Save click on that offer: the normal first-save dialog, pre-filled with the name
+    onSaveOffer: (name) => void doSave('save', name || undefined),
   }
 
   const fileName = filePath ? filePath.replace(/^.*[/\\]/, '') : null
