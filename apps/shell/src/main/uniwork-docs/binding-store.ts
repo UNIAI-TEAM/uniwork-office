@@ -82,6 +82,17 @@ export function docLevelOf(value: unknown): UniworkDocLevel | undefined {
     : undefined
 }
 
+/**
+ * Is this working copy editable by its caller? Edit access, and a level that is unread (older
+ * binding) or edit-or-better. A level below edit (`view`, `comment`) or a word this build does not
+ * know never rides on a stale `edit` access, so nothing here reads an unknown level upward.
+ */
+export function bindingCanEdit(binding: Pick<Binding, 'access' | 'level'>): boolean {
+  if (binding.access !== 'edit') return false
+  const level: unknown = binding.level
+  return level === undefined || level === 'edit' || level === 'manage'
+}
+
 export interface BoundDocument {
   /** the working copy */
   path: string

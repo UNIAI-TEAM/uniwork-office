@@ -28,7 +28,7 @@ import type {
   UniworkDocFormat,
   UniworkLockReason,
 } from '../../shared/home-api'
-import { scopeWorkingCopyDirs, type BindingStore } from '../uniwork-docs/binding-store'
+import { bindingCanEdit, scopeWorkingCopyDirs, type BindingStore } from '../uniwork-docs/binding-store'
 import type { QueueDispatcher, QueueDoc } from './queue/dispatcher'
 import type { DraftStore, KeptDraftMeta } from './queue/drafts'
 import { QUEUE_LIMITS } from './queue/limits'
@@ -1236,7 +1236,7 @@ export function createWiredSyncCenter(deps: WiredSyncCenterDeps): WiredSyncCente
         const binding = await deps.service.store.readDir(dir)
         if (!binding) continue
         const key = basename(dir)
-        const canEdit = binding.access === 'edit' && binding.level !== 'view'
+        const canEdit = bindingCanEdit(binding)
         const revoked =
           binding.state === 'blocked' &&
           (binding.error === 'permission_revoked' || binding.error === 'forbidden')
@@ -1347,7 +1347,7 @@ export function createWiredSyncCenter(deps: WiredSyncCenterDeps): WiredSyncCente
             },
             title: binding.title,
             ext: binding.format,
-            canEdit: binding.access === 'edit' && binding.level !== 'view',
+            canEdit: bindingCanEdit(binding),
             // an open window holds the working copy the intent was snapshotted from, or a
             // newer one: a cancel keeps that work in the window instead of minting a draft
             openWindowHasNewer: deps.isPathOpen(path),
