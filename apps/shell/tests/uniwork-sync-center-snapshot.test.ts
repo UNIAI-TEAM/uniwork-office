@@ -9,7 +9,9 @@ import type { IntentRecordV2, QueueState } from '../src/main/uniwork-sync/queue/
 const NOW_MS = Date.parse('2026-10-15T09:00:00.000Z')
 const NOW_ISO = new Date(NOW_MS).toISOString()
 
-function makeRecord(overrides: Partial<IntentRecordV2> & { state?: QueueState } = {}): IntentRecordV2 {
+function makeRecord(
+  overrides: Partial<IntentRecordV2> & { state?: QueueState } = {},
+): IntentRecordV2 {
   const id = overrides.intentId ?? 'intent-1'
   return {
     v: 2,
@@ -425,5 +427,101 @@ describe('G5-10 buildSyncCenterSnapshot — tab split, defaultTab, org filter, 2
     expect(snap.tabs.attention).toEqual([])
     expect(snap.tabs.pending).toEqual([])
     expect(snap.tabs.recent).toEqual([])
+  })
+})
+
+describe('G5-10 buildSyncCenterSnapshot — blocked reasons follow the spine contract', () => {
+  const blockedRow = (
+    lastError: IntentRecordV2['lastError'] | undefined,
+    extra: Partial<SyncCenterIntentFact> = {},
+    facts: Partial<SyncCenterFacts> = {},
+  ) => {
+    const snap = buildSyncCenterSnapshot(
+      baseFacts({
+        ...facts,
+        intents: [
+          {
+            ...makeIntentFact({ id: 'blk-1', state: 'blocked' }),
+            record: makeRecord({
+              intentId: 'blk-1',
+              state: 'blocked',
+              ...(lastError ? { lastError } : {}),
+            }),
+            ...extra,
+          },
+        ],
+      }),
+    )
+    return snap.tabs.attention[0]
+  }
+
+  it.each([
+    ['session_expired', 'session_expired'],
+    ['not_signed_in', 'session_expired'],
+    ['wrong_deployment', 'session_expired'],
+    ['permission_revoked', 'permission_revoked'],
+    ['forbidden', 'permission_revoked'],
+    ['not_found', 'permission_revoked'],
+    ['document_deleted', 'document_deleted'],
+    ['deleted', 'document_deleted'],
+    ['organization_suspended', 'organization_suspended'],
+    ['member_deactivated', 'member_deactivated'],
+    ['keystore_locked', 'keystore_locked'],
+    ['store_full', 'store_full'],
+  ] as const)('maps the queue error %s to the blocked reason %s', (lastError, reason) => {
+    expect(blockedRow(lastError)?.blockedReason).toBe(reason)
+  })
+
+  it('maps an unrecognised queue error to permission_revoked, never to a retired name', () => {
+    expect(blockedRow('other_window')?.blockedReason).toBe('permission_revoked')
+    expect(blockedRow(undefined)?.blockedReason).toBe('permission_revoked')
+  })
+
+  it('lets an explicit fact reason win over the queue error (document_archived, foreign_account, lease_expired, clock_rollback)', () => {
+    for (const reason of [
+      'document_archived',
+      'foreign_account',
+      'lease_expired',
+      'clock_rollback',
+      'signed_out',
+      'store_newer',
+    ] as const) {
+      expect(blockedRow('permission_revoked', { blockedReason: reason })?.blockedReason).toBe(
+        reason,
+      )
+    }
+  })
+
+  it('declares exactly the 13 blocked reasons of the spine, in the spine order', async () => {
+    const { SYNC_CENTER_BLOCKED_REASONS } = await import('../src/shared/sync-center')
+    expect([...SYNC_CENTER_BLOCKED_REASONS]).toEqual([
+      'session_expired',
+      'signed_out',
+      'foreign_account',
+      'permission_revoked',
+      'document_deleted',
+      'document_archived',
+      'organization_suspended',
+      'member_deactivated',
+      'lease_expired',
+      'keystore_locked',
+      'clock_rollback',
+      'store_full',
+      'store_newer',
+    ])
+  })
+
+  it('marks libraryOff only on lease_expired while offline_library is off', () => {
+    const lease = { blockedReason: 'lease_expired' } as const
+    expect(blockedRow(undefined, lease, { offlineLibrary: false })?.libraryOff).toBe(true)
+    expect(blockedRow(undefined, lease, { offlineLibrary: true })?.libraryOff).toBeUndefined()
+    expect(blockedRow(undefined, lease)?.libraryOff).toBeUndefined()
+    expect(
+      blockedRow('permission_revoked', {}, { offlineLibrary: false })?.libraryOff,
+    ).toBeUndefined()
+    expect(
+      blockedRow(undefined, { blockedReason: 'clock_rollback' }, { offlineLibrary: false })
+        ?.libraryOff,
+    ).toBeUndefined()
   })
 })

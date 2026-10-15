@@ -3,9 +3,21 @@ import {
   createSyncCenterController,
   registerSyncCenterIpc,
 } from '../src/main/uniwork-sync/sync-center'
-import { UNIWORK_SYNC_CENTER_CHANNELS } from '../src/shared/sync-center'
-import { QueueDispatcher, type QueueDoc, type QueueIntents } from '../src/main/uniwork-sync/queue/dispatcher'
-import { createDraftStore, type DraftKeepResult, type DraftStore, type KeptDraft } from '../src/main/uniwork-sync/queue/drafts'
+import {
+  UNIWORK_SYNC_CENTER_CHANNELS,
+  type SyncCenterBlockedReason,
+} from '../src/shared/sync-center'
+import {
+  QueueDispatcher,
+  type QueueDoc,
+  type QueueIntents,
+} from '../src/main/uniwork-sync/queue/dispatcher'
+import {
+  createDraftStore,
+  type DraftKeepResult,
+  type DraftStore,
+  type KeptDraft,
+} from '../src/main/uniwork-sync/queue/drafts'
 import type { IntentRecordV2 } from '../src/main/uniwork-sync/queue/record'
 import type { StoreRecords, StoreWriteResult } from '../src/main/uniwork-sync/store'
 
@@ -33,7 +45,9 @@ function createMemoryRecords(options: { storeFull?: boolean } = {}): StoreRecord
   }
 }
 
-function makeQueueDoc(overrides: Partial<QueueDoc> & { state?: IntentRecordV2['state'] } = {}): QueueDoc {
+function makeQueueDoc(
+  overrides: Partial<QueueDoc> & { state?: IntentRecordV2['state'] } = {},
+): QueueDoc {
   const key = overrides.key ?? 'doc-1'
   const record: IntentRecordV2 = {
     v: 2,
@@ -67,13 +81,25 @@ function makeQueueDoc(overrides: Partial<QueueDoc> & { state?: IntentRecordV2['s
   }
 }
 
-function createHarness(options: {
-  online?: boolean
-  storeFull?: boolean
-  canEdit?: boolean
-  revokedDraft?: boolean
-  initialDocs?: QueueDoc[]
-} = {}) {
+/** a doc whose record carries extra fields (`makeQueueDoc` spreads an override over its own record) */
+function withRecord(doc: QueueDoc, patch: Partial<IntentRecordV2>): QueueDoc {
+  doc.record = { ...doc.record, ...patch }
+  return doc
+}
+
+function createHarness(
+  options: {
+    online?: boolean
+    storeFull?: boolean
+    canEdit?: boolean
+    revokedDraft?: boolean
+    initialDocs?: QueueDoc[]
+    /** explicit blocked reasons the read model derived, by document key (e.g. `document_archived`) */
+    blockedReasons?: Record<string, SyncCenterBlockedReason>
+    /** the intent store refuses every record `saveAgain` mints (budget full) */
+    refuseNewIntent?: boolean
+  } = {},
+) {
   let online = options.online ?? true
   let paused = false
   let storeError = false
@@ -91,6 +117,9 @@ function createHarness(options: {
       return doc ? { intent: doc.record, payload: doc.payload } : null
     },
     async put(documentKey, intent, payload) {
+      if (options.refuseNewIntent && intent.intentId.startsWith('office-intent-')) {
+        return { kind: 'store_full' }
+      }
       const existing = docs.get(documentKey)
       if (existing) {
         existing.record = intent
@@ -108,6 +137,7 @@ function createHarness(options: {
   }
 
   let seq = 0
+  let idSeq = 0
   const published: IntentRecordV2[] = []
   const lookupCommit = vi.fn(async () => ({
     outcome: 'committed' as const,
@@ -214,7 +244,11 @@ function createHarness(options: {
           title: 'Báo cáo Q3',
           ext: 'docx',
           record: doc.record,
-          supportCode: doc.record.state === 'reconciling-stuck' ? `SUP-${doc.record.intentId}` : undefined,
+          supportCode:
+            doc.record.state === 'reconciling-stuck' ? `SUP-${doc.record.intentId}` : undefined,
+          ...(options.blockedReasons?.[doc.key]
+            ? { blockedReason: options.blockedReasons[doc.key] }
+            : {}),
           canEdit: options.canEdit ?? true,
         })),
         drafts: allDrafts,
@@ -238,6 +272,7 @@ function createHarness(options: {
     dispatcher: () => Promise.resolve(dispatcher),
     drafts: () => Promise.resolve(draftStore),
     listQueueDocs: async () => [...docs.values()],
+    newId: () => `new-${++idSeq}`,
     syncNow: async () => {
       syncNowCalls += 1
     },
@@ -272,6 +307,7 @@ function createHarness(options: {
     docs,
     draftStore,
     dispatcher,
+    published,
     clipboardWrites,
     openedDocs,
     openedDrafts,
@@ -348,11 +384,11 @@ describe('G5-10 Sync Center actions and change notifications', () => {
 
     // Seed 3 kept drafts to hit the per-document cap of 3
     for (let i = 1; i <= 3; i += 1) {
-      const kept: DraftKeepResult = await h.draftStore.keep(
-        'doc-stuck',
-        new Uint8Array([i]),
-        { id: `existing-${i}`, createdAt: NOW_ISO, title: `Draft ${i}` },
-      )
+      const kept: DraftKeepResult = await h.draftStore.keep('doc-stuck', new Uint8Array([i]), {
+        id: `existing-${i}`,
+        createdAt: NOW_ISO,
+        title: `Draft ${i}`,
+      })
       expect(kept).toBe('ok')
     }
 
@@ -427,9 +463,7 @@ describe('G5-10 Sync Center actions and change notifications', () => {
     expect(h.openedDocs).toEqual(['doc-1'])
 
     expect(await h.controller.openDraft('draft:doc-draft:d-1')).toEqual({ ok: true })
-    expect(h.openedDrafts).toEqual([
-      { documentKey: 'doc-draft', draftId: 'd-1', readOnly: true },
-    ])
+    expect(h.openedDrafts).toEqual([{ documentKey: 'doc-draft', draftId: 'd-1', readOnly: true }])
 
     expect(await h.controller.discardDraft('draft:doc-draft:d-1')).toEqual({ ok: true })
     expect(await h.draftStore.list('doc-draft')).toHaveLength(0)
@@ -437,6 +471,128 @@ describe('G5-10 Sync Center actions and change notifications', () => {
     h.setStoreError(true)
     expect(await h.controller.retryStore()).toEqual({ ok: true })
     expect(h.getRetryStoreCalls()).toBe(1)
+  })
+
+  it('discardDraft drops a blocked intent for the access-lost reasons without keeping a draft', async () => {
+    const lost: Array<[SyncCenterBlockedReason, Partial<IntentRecordV2>]> = [
+      ['permission_revoked', { lastError: 'permission_revoked' }],
+      ['document_deleted', { lastError: 'document_deleted' }],
+      ['member_deactivated', { lastError: 'member_deactivated' }],
+      ['document_archived', {}],
+    ]
+    for (const [reason, record] of lost) {
+      const doc = withRecord(makeQueueDoc({ key: 'doc-1', state: 'blocked' }), record)
+      const h = createHarness({
+        initialDocs: [doc],
+        blockedReasons: reason === 'document_archived' ? { 'doc-1': 'document_archived' } : {},
+      })
+
+      expect(await h.controller.discardDraft(doc.record.intentId), reason).toEqual({ ok: true })
+      expect(h.docs.has('doc-1'), reason).toBe(false)
+      expect(await h.draftStore.list('doc-1'), reason).toHaveLength(0)
+      const last = h.published[h.published.length - 1]
+      expect(last?.state, reason).toBe('cancelled')
+      expect(last?.cancelReason, reason).toBe('user')
+    }
+  })
+
+  it('discardDraft refuses a blocked intent whose reason has no discard action and leaves it blocked', async () => {
+    const cases: Array<[string, Partial<IntentRecordV2>, SyncCenterBlockedReason | undefined]> = [
+      ['session_expired', { lastError: 'session_expired' }, undefined],
+      ['organization_suspended', { lastError: 'organization_suspended' }, undefined],
+      ['keystore_locked', { lastError: 'keystore_locked' }, undefined],
+      ['store_full', { lastError: 'store_full' }, undefined],
+      ['lease_expired', {}, 'lease_expired'],
+      ['clock_rollback', {}, 'clock_rollback'],
+    ]
+    for (const [reason, record, explicit] of cases) {
+      const doc = withRecord(makeQueueDoc({ key: 'doc-1', state: 'blocked' }), record)
+      const h = createHarness({
+        initialDocs: [doc],
+        blockedReasons: explicit ? { 'doc-1': explicit } : {},
+      })
+      expect(await h.controller.discardDraft(doc.record.intentId), reason).toEqual({
+        ok: false,
+        code: 'busy',
+      })
+      expect(h.docs.get('doc-1')?.record.state, reason).toBe('blocked')
+      expect(h.published, reason).toEqual([])
+    }
+  })
+
+  it('discardDraft never discards an intent that is not blocked, and reports an unknown row', async () => {
+    for (const state of ['queued', 'failed', 'conflict', 'reconciling-stuck'] as const) {
+      const doc = makeQueueDoc({ key: 'doc-1', state })
+      const h = createHarness({ initialDocs: [doc] })
+      expect(await h.controller.discardDraft(doc.record.intentId), state).toEqual({
+        ok: false,
+        code: 'busy',
+      })
+      expect(h.docs.get('doc-1')?.record.state, state).toBe(state)
+    }
+    const h = createHarness()
+    expect(await h.controller.discardDraft('missing-row')).toEqual({ ok: false, code: 'not_found' })
+  })
+
+  it('saveAgain supersedes a failed intent, then mints a new one from the same snapshot', async () => {
+    const payload = new Uint8Array([4, 5, 6])
+    const doc = withRecord(makeQueueDoc({ key: 'doc-1', state: 'failed', payload }), {
+      lastError: 'quota_exceeded',
+    })
+    const old = doc.record
+    const h = createHarness({ initialDocs: [doc] })
+
+    expect(await h.controller.saveAgain(old.intentId)).toEqual({ ok: true })
+
+    // the old intent was superseded first, before the new one was published
+    expect(h.published.map((r) => [r.intentId, r.state, r.cancelReason])).toEqual([
+      [old.intentId, 'cancelled', 'superseded'],
+      ['office-intent-new-1', 'queued', undefined],
+    ])
+    const next = h.docs.get('doc-1')!.record
+    expect(next.intentId).toBe('office-intent-new-1')
+    expect(next.idempotencyKey).toBe('office-key-new-1')
+    expect(next.state).toBe('queued')
+    expect(next.generation).toBe(old.generation + 1)
+    expect(next.attempt).toBe(0)
+    expect(next.lastError).toBeUndefined()
+    // same snapshot: bytes, checksum, base and binding carry over
+    expect(next.checksum).toBe(old.checksum)
+    expect(next.baseRevision).toBe(old.baseRevision)
+    expect(next.baseVersion).toBe(old.baseVersion)
+    expect(next.length).toBe(old.length)
+    expect(next.documentId).toBe(old.documentId)
+    expect(next.orgId).toBe(old.orgId)
+    expect(Array.from(h.docs.get('doc-1')!.payload)).toEqual([4, 5, 6])
+    // no draft is kept: nothing was discarded
+    expect(await h.draftStore.list('doc-1')).toHaveLength(0)
+  })
+
+  it('saveAgain refuses a row that is not failed or unknown, leaving the intent untouched', async () => {
+    const states = ['queued', 'blocked', 'conflict', 'reconciling', 'reconciling-stuck'] as const
+    for (const state of states) {
+      const doc = makeQueueDoc({ key: 'doc-1', state })
+      const h = createHarness({ initialDocs: [doc] })
+      expect(await h.controller.saveAgain(doc.record.intentId), state).toEqual({
+        ok: false,
+        code: 'busy',
+      })
+      expect(h.docs.get('doc-1')?.record.intentId, state).toBe(doc.record.intentId)
+      expect(h.docs.get('doc-1')?.record.state, state).toBe(state)
+      expect(h.published, state).toEqual([])
+    }
+    const h = createHarness()
+    expect(await h.controller.saveAgain('missing-row')).toEqual({ ok: false, code: 'not_found' })
+    expect(await h.controller.saveAgain('')).toEqual({ ok: false, code: 'not_found' })
+  })
+
+  it('saveAgain reports store_full when the store takes no new intent', async () => {
+    const doc = makeQueueDoc({ key: 'doc-1', state: 'failed' })
+    const h = createHarness({ initialDocs: [doc], refuseNewIntent: true })
+    expect(await h.controller.saveAgain(doc.record.intentId)).toEqual({
+      ok: false,
+      code: 'store_full',
+    })
   })
 
   it('subscribe pushes a debounced fresh snapshot on state changes', async () => {
@@ -485,6 +641,8 @@ describe('G5-10 Sync Center actions and change notifications', () => {
     expect(handlers.has(UNIWORK_SYNC_CENTER_CHANNELS.openDocument)).toBe(true)
     expect(handlers.has(UNIWORK_SYNC_CENTER_CHANNELS.openDraft)).toBe(true)
     expect(handlers.has(UNIWORK_SYNC_CENTER_CHANNELS.discardDraft)).toBe(true)
+    expect(handlers.has(UNIWORK_SYNC_CENTER_CHANNELS.saveAgain)).toBe(true)
+    expect(UNIWORK_SYNC_CENTER_CHANNELS.saveAgain).toBe('uniwork-sync-center:save-again')
     expect(handlers.has(UNIWORK_SYNC_CENTER_CHANNELS.saveMyCopy)).toBe(true)
     expect(handlers.has(UNIWORK_SYNC_CENTER_CHANNELS.retryStore)).toBe(true)
 
@@ -495,4 +653,3 @@ describe('G5-10 Sync Center actions and change notifications', () => {
     unsubscribe()
   })
 })
-
