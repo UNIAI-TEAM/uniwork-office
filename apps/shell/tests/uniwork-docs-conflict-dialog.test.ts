@@ -1529,9 +1529,9 @@ describe('G5-12 Save as a copy (main)', () => {
     await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
   })
 
-  it('W-F2: a 403 from the copy route (not a member of the source workspace) replies save_copy_no_seat without locking the dialog', async () => {
+  it('W-F2: a 403 workspace_seat_required from the copy route (not a member of the source workspace) replies save_copy_no_seat without locking the dialog', async () => {
     const server = fakeServer()
-    server.faults.push({ route: 'copy', kind: 403, code: 'forbidden' })
+    server.faults.push({ route: 'copy', kind: 403, code: 'workspace_seat_required' })
     const ctx = setup(server)
     const path = await openAndConflict(ctx, server)
     const { view } = await openDialog(ctx, path)
@@ -1549,9 +1549,12 @@ describe('G5-12 Save as a copy (main)', () => {
     await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
   })
 
-  it('W-F2: any plain 403 is no_seat; a deactivated member / suspended org, 5xx and network errors stay save_copy_failed', async () => {
+  it('BE-12-201: only workspace_seat_required is no_seat; forbidden, any other 403, a deactivated member / suspended org, 5xx and network errors stay save_copy_failed', async () => {
     const cases: Array<[Fault, string]> = [
-      [{ route: 'copy', kind: 403, code: 'some_other_refusal' }, 'save_copy_no_seat'],
+      [{ route: 'copy', kind: 403, code: 'workspace_seat_required' }, 'save_copy_no_seat'],
+      [{ route: 'copy', kind: 403, code: 'forbidden' }, 'save_copy_failed'],
+      [{ route: 'copy', kind: 403, code: 'permission_revoked' }, 'save_copy_failed'],
+      [{ route: 'copy', kind: 403, code: 'some_other_refusal' }, 'save_copy_failed'],
       [{ route: 'copy', kind: 403, code: 'member_deactivated' }, 'save_copy_failed'],
       [{ route: 'copy', kind: 403, code: 'organization_suspended' }, 'save_copy_failed'],
       [{ route: 'copy', kind: 500, code: 'x' }, 'save_copy_failed'],
@@ -1570,6 +1573,30 @@ describe('G5-12 Save as a copy (main)', () => {
       expect(reply).toMatchObject({ kind: 'view', view: { notice, locked: 'none' } })
       await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
     }
+  })
+
+  it('BE-12-201: a member whose copy is refused by the parent folder gate (403 forbidden) is told the copy failed, never that they have no seat', async () => {
+    const server = fakeServer()
+    // the source sits in a folder the caller cannot edit: the server's parent gate answers 403
+    server.state.parentId = FOLDER
+    server.faults.push({ route: 'copy', kind: 403, code: 'forbidden' })
+    const ctx = setup(server)
+    const path = await openAndConflict(ctx, server)
+    const { view } = await openDialog(ctx, path)
+
+    const reply = await ctx.service.conflictAct(view.sessionId, {
+      kind: 'save-copy',
+      stopAi: false,
+    })
+
+    expect(callsTo(server, `${DOC}/copies`)).toMatchObject([{ body: { parent_id: FOLDER } }])
+    expect(reply).toMatchObject({
+      kind: 'view',
+      view: { notice: 'save_copy_failed', locked: 'none', canEdit: true },
+    })
+    expect(callsTo(server, `${COPY}/uploads`)).toHaveLength(0)
+    expect(callsTo(server, `${COPY}/archive`)).toHaveLength(0)
+    await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
   })
 
   it('AC3: offline refuses the action before any request (no copy is created)', async () => {
@@ -1923,7 +1950,7 @@ describe('G5-12 W-F2 "Download my version" (main)', () => {
 
   it('the person cancelling the OS dialog changes nothing: the step-2 notice that opened it stays, nothing is written', async () => {
     const server = fakeServer()
-    server.faults.push({ route: 'copy', kind: 403, code: 'forbidden' })
+    server.faults.push({ route: 'copy', kind: 403, code: 'workspace_seat_required' })
     const ctx = setup(server)
     const path = await openAndConflict(ctx, server)
     const { view } = await openDialog(ctx, path)
@@ -1948,7 +1975,7 @@ describe('G5-12 W-F2 "Download my version" (main)', () => {
 
   it('a write error stays on step 2 with download_failed (and a cancel after it keeps download_failed); the source is untouched', async () => {
     const server = fakeServer()
-    server.faults.push({ route: 'copy', kind: 403, code: 'forbidden' })
+    server.faults.push({ route: 'copy', kind: 403, code: 'workspace_seat_required' })
     const ctx = setup(server)
     const path = await openAndConflict(ctx, server)
     const intentBefore = await storedIntent(ctx, path)

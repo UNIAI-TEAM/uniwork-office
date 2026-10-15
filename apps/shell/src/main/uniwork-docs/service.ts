@@ -603,6 +603,9 @@ interface ConflictSession {
 /** BE-12F-01: the one wait before the copy's commit lookup is asked again */
 const COPY_LOOKUP_WAIT_MS = 1500
 
+/** BE-12-201: the server's refusal of a copy for a caller with no seat in the source's workspace */
+const COPY_NO_SEAT_CODE = 'workspace_seat_required'
+
 export class UniworkDocsService {
   readonly store: BindingStore
   readonly coordinator: SaveCoordinator
@@ -3837,14 +3840,15 @@ export class UniworkDocsService {
       })
     } catch (error) {
       if (aborted()) return { kind: 'closed' }
-      // a 403 on the copy while the source was just readable and editable: the person is not a
+      // BE-12-201: the server's seat refusal (403 workspace_seat_required): the person is not a
       // member of the source's workspace, so no copy can be made for them. Their version is
-      // still local; the dialog offers "Download my version" (a deactivated member or a
-      // suspended organization has its own error code and stays a plain failure)
+      // still local; the dialog offers "Download my version". Any other 403 - `forbidden` from
+      // the parent folder gate, a deactivated member, a suspended organization - says nothing
+      // about the seat and stays a plain failure
       if (
         error instanceof UniworkDocError &&
         error.status === 403 &&
-        (error.code === 'forbidden' || error.code === 'permission_revoked')
+        error.serverCode === COPY_NO_SEAT_CODE
       ) {
         open.downloadNotice = 'save_copy_no_seat'
         return {

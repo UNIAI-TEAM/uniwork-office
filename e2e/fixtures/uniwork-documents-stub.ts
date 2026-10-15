@@ -137,8 +137,9 @@ export interface UniworkDocumentsStub extends UniworkAuthStub {
    */
   failCopyCommits(count: number): void
   /**
-   * `/copies` answers 403 `forbidden` while on: the server's rule for a caller
-   * who is not a member of the source document's workspace (G5-12 no-seat).
+   * `/copies` answers 403 `workspace_seat_required` while on: the server's rule
+   * for a caller who is not a member of the source document's workspace (G5-12
+   * no-seat, BE-12-201).
    */
   denyCopies(denied?: boolean): void
   /** the copies made from a document, oldest first */
@@ -226,7 +227,7 @@ export async function startUniworkDocumentsStub(): Promise<UniworkDocumentsStub>
     dropRemaining -= 1
     if (dropRemaining <= 0) dropNextCommit = null
   }
-  /** G5-12: `/copies` answers 403 forbidden (the caller is no member of the source's workspace) */
+  /** G5-12: `/copies` answers 403 workspace_seat_required (the caller is no member of the source's workspace) */
   let copiesDenied = false
   let copyCommitFailures = 0
   const copyByKey = new Map<string, string>()
@@ -392,9 +393,15 @@ export async function startUniworkDocumentsStub(): Promise<UniworkDocumentsStub>
           ctx.send(404, envelope('not_found'))
           return true
         }
-        if ((doc.myLevel !== 'edit' && doc.myLevel !== 'manage') || copiesDenied) {
+        if (doc.myLevel !== 'edit' && doc.myLevel !== 'manage') {
           log(ctx, { ...base, status: 403 })
           ctx.send(403, envelope('forbidden'))
+          return true
+        }
+        // BE-12-201: the seat refusal has its own code; a plain `forbidden` is never "no seat"
+        if (copiesDenied) {
+          log(ctx, { ...base, status: 403 })
+          ctx.send(403, envelope('workspace_seat_required'))
           return true
         }
         if (body.consent !== 'copy') {
