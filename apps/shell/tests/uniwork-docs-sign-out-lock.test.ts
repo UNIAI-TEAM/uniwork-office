@@ -1474,6 +1474,46 @@ describe('G5-11 sign-out lock-and-keep, N+1 park, and restoreParked', () => {
     expect(noticeSwitchLoss).toHaveBeenCalledWith(ownerA, expect.objectContaining({ ramOnly: 1 }))
   })
 
+  it('27. d7-2: a document the plan counted as RAM-only is not counted again as lost in the one notice', async () => {
+    const path = seedWorkingCopy({ bytes: 'A unsaved d7-2', baseBytes: 'v3 base' })
+    const ctx = setup({ closeNow: true })
+    const noticeSwitchLoss = vi.fn()
+    const boundary = new AccountBoundary({
+      root: join(dir, 'uniwork-documents'),
+      openPaths: () => [...ctx.openSet],
+      closeDocument: async (p) => ctx.openSet.delete(p),
+      confirmClose: async () => true,
+      closeNow: (p) => ctx.openSet.delete(p),
+      aiHistoryPaths: () => [],
+      forgetAiHistory: () => undefined,
+      forgetLocks: () => undefined,
+      closeConflictPrompt: () => undefined,
+      planSignOut: (owner) => ctx.service.signOutPlan(owner),
+      noticeSwitchLoss,
+      lockSession: async (owner, onWaiting, options) => {
+        const res = await ctx.service.lockSession(owner, onWaiting, options)
+        return { ok: res.ok, lost: res.lost?.length ?? 0 }
+      },
+    })
+    await boundary.enforce(ownerA)
+    ctx.setAccount('acc_2')
+    ctx.service.noteSessionIdentity()
+    // the plan sees a locked keychain (RAM-only) while the lock's own check does not,
+    // and A's own store cannot open: the same document is in both counts
+    vi.spyOn(
+      ctx.service as unknown as { intentAccess: () => Promise<unknown> },
+      'intentAccess',
+    ).mockResolvedValue({ kind: 'keystore_locked' })
+    vi.spyOn(ctx.syncStore as Required<typeof ctx.syncStore>, 'openScope').mockResolvedValue({
+      kind: 'no_session',
+    })
+    await boundary.enforce({ deploymentId: 'default', accountId: 'acc_2' })
+
+    expect(existsSync(path)).toBe(false)
+    expect(noticeSwitchLoss).toHaveBeenCalledTimes(1)
+    expect(noticeSwitchLoss).toHaveBeenCalledWith(ownerA, expect.objectContaining({ ramOnly: 1 }))
+  })
+
   it('21. d2-3: findNewestRecoveryBytes picks the newest candidate by mtime when the disk file is missing', async () => {
     const path = seedWorkingCopy({ bytes: 'v3 base', baseBytes: 'v3 base', state: 'saved' })
     // Working copy file is missing on disk while binding and recovery candidates exist

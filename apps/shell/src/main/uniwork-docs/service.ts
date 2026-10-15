@@ -659,6 +659,13 @@ export class UniworkDocsService {
   private syncOpen: Promise<SyncStoreOpen> | null = null
   /** the outcome of the last store open; 'unknown' until it is asked for */
   private storeOpenKind: SyncStoreOpen['kind'] | 'unknown' = 'unknown'
+  /**
+   * d7-2: the document keys the last `planSignOut` counted as RAM-only, for the
+   * account it planned. The switch notice sums that count with the lock's own
+   * lost documents, so the lock leaves these keys out: a document is counted
+   * once. Read and cleared by the next `lockSession`.
+   */
+  private plannedRamOnly: { token: string; keys: Set<string> } | null = null
   /** scopes whose schema 1 -> 2 sweep has finished in this process */
   private readonly migratedScopes = new Set<string>()
   /**
@@ -1877,6 +1884,10 @@ export class UniworkDocsService {
       }
     }
 
+    this.plannedRamOnly = {
+      token: `${target.deploymentId}/${target.accountId}`,
+      keys: storeLockedNow ? ramOnlyDocs : new Set<string>(),
+    }
     return {
       count: unsavedDocs.size,
       waiting: waitingDocs.size,
@@ -1918,6 +1929,9 @@ export class UniworkDocsService {
     const switching = options?.switch === true
     const scopeToken = `${target.deploymentId}/${target.accountId}`
     const keystoreLocked = this.storeLocked()
+    // d7-2: what the plan just counted as RAM-only is not counted again as lost
+    const planned = this.plannedRamOnly?.token === scopeToken ? this.plannedRamOnly.keys : null
+    this.plannedRamOnly = null
 
     // Step 1: stop runtime, block new commits, bounded receipt wait (30s)
     this.deps.stopRuntime?.()
@@ -2307,6 +2321,7 @@ export class UniworkDocsService {
     this.syncOpen = null
     this.storeOpenKind = 'unknown'
     const captureFailed = [...captureFailedKeys]
+    if (planned) for (const key of planned) lostKeys.delete(key)
     // The single `done` of a sign-out is pushed by the caller's finally (the
     // wiring's lockStore), so it also fires when this method throws.
 
