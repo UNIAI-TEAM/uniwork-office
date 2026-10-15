@@ -62,6 +62,16 @@ let rectCalls = 0
 const TAB_MIN = 104
 let tabLabelStart = 36
 let tabTail = 32
+/**
+ * G5-06u-TS: the interface scale the stub lays out at (every CSS length x scale, the caption buttons
+ * are window px) and whether the bar is in its compact form (Home icon-only, inactive tabs 80px
+ * without the close button and the gap before it, the first document tab active).
+ */
+let uiScale = 1
+let compactModel = false
+const CAPTION = 138
+const COMPACT_HOME = 40
+const CLOSE_AND_GAP = 16 + 8
 
 let bar: HTMLDivElement
 let strip: HTMLDivElement
@@ -113,42 +123,57 @@ function rectOf(left: number, width: number, height = 28): DOMRect {
 }
 
 /** the flex layout of tabbar.css as Chromium measured it: the strip takes what the holder leaves */
+/** a document tab's width at its minimum in the model, and what follows its title (CSS px) */
+function tabMinOf(tab: Element): number {
+  return compactModel && !tab.classList.contains('active') ? TAB_MIN - CLOSE_AND_GAP : TAB_MIN
+}
+function tabTailOf(tab: Element): number {
+  return compactModel && !tab.classList.contains('active') ? tabTail - CLOSE_AND_GAP : tabTail
+}
+
 function stubLayout(): void {
   rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
     this: HTMLElement,
   ) {
     rectCalls++
-    const shared = barWidth - FIXED_LEFT - FIXED_RIGHT - MARGINS
-    const stripWidth = Math.max(0, shared - chromeWidth())
+    const k = uiScale
+    const FIXED_LEFT_K = FIXED_LEFT * k
+    const home = (compactModel ? COMPACT_HOME : HOME) * k
+    const shared = barWidth - FIXED_LEFT_K - (CAPTION + (FIXED_RIGHT - CAPTION) * k) - MARGINS * k
+    const stripWidth = Math.max(0, shared - chromeWidth() * k)
+    const docLeft = (tab: Element): number => {
+      const tabs = Array.from(strip.querySelectorAll('.tab-item:not(.tab-home)'))
+      const before = tabs.slice(0, Math.max(0, tabs.indexOf(tab)))
+      return FIXED_LEFT_K + 10 * k + home + before.reduce((sum, t) => sum + tabMinOf(t) * k, 0)
+    }
     // the same flex row mirrored: a left edge in the left-to-right row is `bar - left - width`
     const at = (left: number, width: number, height?: number): DOMRect =>
       rectOf(isRtl() ? barWidth - left - width : left, width, height)
     if (this.classList.contains('tab-bar')) return rectOf(0, barWidth, 40)
-    if (this.classList.contains('tab-strip')) return at(FIXED_LEFT, stripWidth, 40)
+    if (this.classList.contains('tab-strip')) return at(FIXED_LEFT_K, stripWidth, 40)
     if (this.classList.contains('uw-chrome')) {
-      return at(FIXED_LEFT + stripWidth + 6, chromeWidth())
+      return at(FIXED_LEFT_K + stripWidth + 6, chromeWidth() * k)
     }
     if (this.classList.contains('uw-pill')) {
-      const width = currentPillWidth()
+      const width = currentPillWidth() * k
       if (pillLeftOverride !== null) return rectOf(pillLeftOverride, width)
       if (pillRightOverride !== null) return rectOf(pillRightOverride - width, width)
-      return at(FIXED_LEFT + stripWidth + 6 + currentToggleWidth(), width)
+      return at(FIXED_LEFT_K + stripWidth + 6 + currentToggleWidth() * k, width)
     }
     if (this.classList.contains('uw-discussion-toggle')) {
-      return at(FIXED_LEFT + stripWidth + 6, currentToggleWidth())
+      return at(FIXED_LEFT_K + stripWidth + 6, currentToggleWidth() * k)
     }
-    if (this.classList.contains('tab-home')) return at(FIXED_LEFT + 10, HOME)
-    // a document tab at its minimum width, and its title inside it (what the fit reads of the first tab)
+    if (this.classList.contains('tab-home')) return at(FIXED_LEFT_K + 10 * k, home)
+    // a document tab at its minimum width, and its title inside it (what the fit reads of the last counted tab)
     if (this.classList.contains('tab-title') && this.parentElement) {
-      const tabs = Array.from(strip.querySelectorAll('.tab-item:not(.tab-home)'))
-      const left = FIXED_LEFT + 10 + HOME + tabs.indexOf(this.parentElement) * TAB_MIN
-      return at(left + tabLabelStart, TAB_MIN - tabLabelStart - tabTail)
+      const tab = this.parentElement
+      return at(
+        docLeft(tab) + tabLabelStart * k,
+        (tabMinOf(tab) - tabLabelStart - tabTailOf(tab)) * k,
+      )
     }
-    if (this.classList.contains('tab-item')) {
-      const tabs = Array.from(strip.querySelectorAll('.tab-item:not(.tab-home)'))
-      return at(FIXED_LEFT + 10 + HOME + Math.max(0, tabs.indexOf(this)) * TAB_MIN, TAB_MIN)
-    }
-    if (this.classList.contains('tab-new-btn')) return rectOf(0, NEW_BUTTON)
+    if (this.classList.contains('tab-item')) return at(docLeft(this), tabMinOf(this) * k)
+    if (this.classList.contains('tab-new-btn')) return rectOf(0, NEW_BUTTON * k)
     if (this.hasAttribute('data-uw-queue-band')) return rectOf(0, barWidth, 120)
     if (this.classList.contains('uw-queue-pop')) return rectOf(0, 360, 100)
     return rectOf(0, 0, 0)
@@ -158,13 +183,19 @@ function stubLayout(): void {
 function buildBar(docTabs: number): void {
   bar = document.createElement('div')
   bar.className = 'tab-bar'
+  if (compactModel) bar.setAttribute('data-strip', 'compact')
   strip = document.createElement('div')
   strip.className = 'tab-strip'
+  // the compact form: the first document tab is the active one, the others take tabbar.css's
+  // calc(var(--tab-min) - var(--tab-close-size) - var(--tab-gap)) (jsdom computes no var(): inline px)
   strip.innerHTML =
     '<div class="tab-item tab-home"></div>' +
-    Array.from(
-      { length: docTabs },
-      () => '<div class="tab-item"><span class="tab-title"></span></div>',
+    Array.from({ length: docTabs }, (_, i) =>
+      !compactModel
+        ? '<div class="tab-item"><span class="tab-title"></span></div>'
+        : i === 0
+          ? '<div class="tab-item active"><span class="tab-title"></span></div>'
+          : `<div class="tab-item" style="min-width: ${TAB_MIN - CLOSE_AND_GAP}px"><span class="tab-title"></span></div>`,
     ).join('') +
     '<button class="tab-new-btn"></button>'
   chrome = document.createElement('div')
@@ -274,6 +305,8 @@ beforeEach(() => {
   rectCalls = 0
   tabLabelStart = 36
   tabTail = 32
+  uiScale = 1
+  compactModel = false
   document.documentElement.removeAttribute('dir')
   makeApi()
   ;(window as unknown as { aiOfficeTabs?: unknown }).aiOfficeTabs = { focusActive: vi.fn() }
@@ -1366,5 +1399,98 @@ describe('U-2: the queue popover is anchored under the pill', () => {
       expect(dialogEl().getAttribute('dir')).toBe('ltr')
       expect(leftOf() + 360).toBe(Math.min(pill().getBoundingClientRect().right, 890 - 8))
     })
+  })
+})
+
+describe('G5-06u-TS: the compact strip at UI scale 1.25 (V6u8-02)', () => {
+  async function mountWith(s: UniworkDocStatus, withToggle: boolean): Promise<void> {
+    noToggleModel = !withToggle
+    if (withToggle) (window as unknown as Record<string, unknown>)[DISCUSSION_BRIDGE_KEY] = {}
+    await act(async () => {
+      root.render(
+        createElement(
+          LocaleProvider,
+          { initial: 'en' },
+          createElement(UniworkLiveHost),
+          createElement(
+            PillFitScope,
+            null,
+            withToggle ? createElement(DiscussionToggle, { status: s }) : null,
+            createElement(UniworkStatusChip, { key: s.path, status: s, onStatus: () => undefined }),
+          ),
+        ),
+      )
+    })
+    await flush()
+  }
+
+  const iconOnly = () =>
+    chrome.querySelector('.uw-discussion-toggle')?.getAttribute('data-icon-only') === 'true'
+
+  /** the third tab's visible window px: the strip's padding, Home 40, the active 104 and an inactive 80 before it */
+  function lastTabPx(): number {
+    const room = strip.getBoundingClientRect().width - (10 + COMPACT_HOME + TAB_MIN + 80) * uiScale
+    return Math.max(0, Math.min(80 * uiScale, room))
+  }
+
+  function assertApart(tag: string): void {
+    const s = strip.getBoundingClientRect()
+    const c = chrome.getBoundingClientRect()
+    if (isRtl()) expect(c.right, tag).toBeLessThanOrEqual(s.left)
+    else expect(s.right, tag).toBeLessThanOrEqual(c.left)
+  }
+
+  for (const dir of ['ltr', 'rtl'] as const) {
+    it(`${dir}: 722 / 800 x 3 tabs, toggle shown and none: the step, the toggle form, the last tab px / label px`, async () => {
+      document.documentElement.dir = dir
+      // RTL: the title starts 32 in (physical padding) and 12 + the close follow it
+      if (dir === 'rtl') {
+        tabLabelStart = 32
+        tabTail = 36
+      }
+      const cells: string[] = []
+      for (const w of [722, 800]) {
+        for (const withToggle of [true, false]) {
+          document.body.innerHTML = ''
+          rectSpy?.mockRestore()
+          uiScale = 1.25
+          compactModel = true
+          document.documentElement.style.setProperty('--ui-scale', '1.25')
+          buildBar(3)
+          stubLayout()
+          barWidth = w
+          await mountWith(status(), withToggle)
+          const tag = `${dir} ${w}${withToggle ? '+t' : ''}`
+          assertApart(tag)
+          const px = lastTabPx()
+          const labelPx = Math.min(36 * uiScale, px - tabLabelStart * uiScale)
+          expect(px, tag).toBeGreaterThanOrEqual((tabLabelStart + 36) * uiScale)
+          expect(labelPx, tag).toBe(45)
+          cells.push(`${w}${withToggle ? '+t' : ''} ${variant()}${iconOnly() ? '+icon' : ''} ${px}`)
+          act(() => root.unmount())
+        }
+      }
+      expect(cells).toEqual([
+        '722+t mini+icon 91.5',
+        '722 mini 100',
+        '800+t mini+icon 100',
+        '800 compact 100',
+      ])
+    })
+  }
+
+  it('the strip changing form (data-strip on the bar) measures the pill again', async () => {
+    buildBar(3)
+    stubLayout()
+    barWidth = 800
+    await mountWith(status(), true)
+    const settled = rectCalls
+    await flush()
+    expect(rectCalls).toBe(settled)
+    await act(async () => {
+      bar.setAttribute('data-strip', 'compact')
+    })
+    await flush()
+    expect(rectCalls).toBeGreaterThan(settled)
   })
 })

@@ -914,3 +914,106 @@ describe('FXT6u2: the mini step needs the last tab only up to its readable label
     })
   })
 })
+
+/**
+ * G5-06u-TS (V6u8-02): the compact strip at UI scale 1.25. Home is icon-only (12 + 16 + 12 = 40) and
+ * the inactive document tabs drop their close button (104 - 16 - 8 = 80), so the floor and the
+ * mini slack are read per tab: the floor sums the counted tabs' own minimums, the slack is what
+ * the LAST counted tab has after its label. The bar below is section 0 of the contract in CSS px x
+ * 1.25 (window px): drag spacer + menu 40, overflow 38 + the 138 win px caption (divided by the
+ * scale since the caption spacer fix), the holder's 22 of margins.
+ */
+describe('G5-06u-TS: the floor and the slack read each counted tab', () => {
+  const COMPACT = { home: 40, tabMin: 104, tabMins: [104, 80, 80], padding: 20, newButton: 32 }
+
+  it('stripFloorOf sums the per-tab minimums: Home 40 + 104 + 80 + 80 + 20 + 32 = 356', () => {
+    expect(stripFloorOf({ ...COMPACT, docTabs: 3 })).toBe(356)
+    expect(stripFloorOf({ ...COMPACT, docTabs: 2 })).toBe(40 + 184 + 52)
+    // the floor counts three tabs; a fourth one scrolls
+    expect(stripFloorOf({ ...COMPACT, tabMins: [104, 80, 80, 80], docTabs: 4 })).toBe(356)
+    expect(stripFloorOf({ ...COMPACT, docTabs: 0 })).toBe(40 + 52)
+  })
+
+  it('equal per-tab minimums are the floor of tabMin x n (the scale-1 strip is unchanged)', () => {
+    for (const n of [0, 1, 2, 3, 4]) {
+      const base = { home: 109, tabMin: 104, padding: 20, newButton: 32, docTabs: n }
+      expect(stripFloorOf({ ...base, tabMins: Array(n).fill(104) })).toBe(stripFloorOf(base))
+      expect(
+        miniSlackOf({ ...base, tabMins: Array(n).fill(104), labelStart: 36, labelMin: 36 }),
+      ).toBe(miniSlackOf({ ...base, labelStart: 36, labelMin: 36 }))
+    }
+  })
+
+  it('miniSlackOf reads the last counted tab: an inactive compact tab has 8 after its label (50), 12 in RTL (54)', () => {
+    expect(miniSlackOf({ ...COMPACT, docTabs: 3, labelStart: 36, labelMin: 36 })).toBe(8 + 32 + 10)
+    expect(miniSlackOf({ ...COMPACT, docTabs: 3, labelStart: 32, labelMin: 36 })).toBe(12 + 32 + 10)
+    // two tabs: the last counted one is the second
+    expect(
+      miniSlackOf({ ...COMPACT, tabMins: [104, 80], docTabs: 2, labelStart: 36, labelMin: 36 }),
+    ).toBe(50)
+  })
+
+  describe('barLayoutOf at UI scale 1.25, 722 / 800 x 3 tabs, toggle shown and none', () => {
+    const S = 1.25
+    const TS_PILL = { full: 309 * S, short: 190 * S, compact: 111 * S, mini: 28 * S }
+    const compactBar = (w: number, extra: Partial<BarLayoutInput> = {}) =>
+      barLayoutOf({
+        barWidth: w,
+        left: 40 * S,
+        right: 38 * S + 138,
+        margins: 22 * S,
+        home: 40 * S,
+        tabMin: 104 * S,
+        tabMins: [104 * S, 80 * S, 80 * S],
+        docTabs: 3,
+        padding: 20 * S,
+        newButton: 32 * S,
+        toggle: 108 * S,
+        toggleIcon: 32 * S,
+        labelStart: 36 * S,
+        labelMin: 36 * S,
+        pill: TS_PILL,
+        hasShort: true,
+        ...extra,
+      })
+    const none = { toggle: 0, toggleIcon: undefined }
+    /** the third tab's visible window px: the strip starts with 10 of padding, then Home 40, 104, 80 */
+    const lastPx = (l: ReturnType<typeof barLayoutOf>) =>
+      Math.max(0, Math.min(80 * S, l.strip.right - l.strip.left - (10 + 40 + 104 + 80) * S))
+
+    it('the cells: the step, the toggle form and the last tab px / label px (LTR needs 90 / 45)', () => {
+      const cells = [722, 800].flatMap((w) =>
+        [{}, none].map((extra) => {
+          const l = compactBar(w, extra)
+          const px = lastPx(l)
+          expect(l.strip.right, `${w}`).toBeLessThanOrEqual(l.chrome.left)
+          return `${w}${extra === none ? '' : '+t'} ${l.variant}${l.iconToggle ? '+icon' : ''} ${px}/${Math.min(36 * S, px - 36 * S)}`
+        }),
+      )
+      expect(cells).toEqual([
+        '722+t mini+icon 91.5/45',
+        '722 mini 100/45',
+        '800+t mini+icon 100/45',
+        '800 compact 100/45',
+      ])
+    })
+
+    it('RTL (label start 32, 12 after the label): the same steps, the last tab past 85 / 45', () => {
+      for (const w of [722, 800]) {
+        for (const extra of [{}, none]) {
+          const ltr = compactBar(w, extra)
+          const rtl = compactBar(w, { ...extra, labelStart: 32 * S, labelMin: 36 * S })
+          expect(rtl.variant, `${w}`).toBe(ltr.variant)
+          expect(rtl.iconToggle, `${w}`).toBe(ltr.iconToggle)
+          expect(lastPx(rtl) - 32 * S, `${w}`).toBeGreaterThanOrEqual(36 * S)
+        }
+      }
+    })
+
+    it('without the compact form (Home 144.8, three 104px tabs) the third tab is out of the strip', () => {
+      const full = compactBar(722, { home: 144.8 * S, tabMins: undefined })
+      const third = full.strip.right - full.strip.left - (10 + 144.8 + 208) * S
+      expect(third).toBeLessThan((36 + 36) * S)
+    })
+  })
+})
