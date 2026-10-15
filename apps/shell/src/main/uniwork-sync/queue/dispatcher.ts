@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+﻿import { randomUUID } from 'node:crypto'
 import type { CommitLookup } from '../../uniwork-docs/parse'
 import { UniworkDocError } from '../../uniwork-docs/errors'
 import type { DocLock } from '../doc-lock'
