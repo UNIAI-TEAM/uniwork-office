@@ -70,11 +70,12 @@ describe('header status priority (Đầu trang S2)', () => {
     expect(headerLine(header({ status: 'signed_out' }), { lockedCount: 4 })).toEqual({
       key: 'uwSyncSignedOut',
       params: { count: 4 },
-      tone: 'error',
+      tone: 'neutral',
       action: 'signIn',
     })
     expect(headerLine(header({ status: 'signed_out' }), { lockedCount: 0 })).toMatchObject({
       key: 'uwSyncSignedOutEmpty',
+      tone: 'neutral',
       action: 'signIn',
     })
     expect(headerLine(header({ status: 'session_expired' }), undefined)).toMatchObject({
@@ -194,6 +195,8 @@ describe('queue rows (badge, sub-line, actions)', () => {
     expect(v.badge).toEqual({ tone: 'warn', key: 'uwBadgeConflict' })
     expect(v.sub).toMatchObject({ key: 'uwRowConflict', params: { n: 9, author: 'Lan' } })
     expect(v.actions.map((a) => a.id)).toEqual(['openToResolve'])
+    // VIS-3: the conflict's one action is the row's primary action
+    expect(v.actions.map((a) => a.primary)).toEqual([true])
     expect(rowView(row('conflict', { conflict: { version: 9 } }), ctx).sub.keyParams).toEqual({
       author: 'uwAuthorFallback',
     })
