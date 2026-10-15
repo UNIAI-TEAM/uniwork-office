@@ -6,7 +6,11 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { defaultAiSettings } from '@genoffice/ai-provider'
 import { LocaleProvider } from '../src/renderer/i18n/locale'
-import { aiRunSaveOffer, nameCandidateFromInserts } from '../src/renderer/ai-save-offer'
+import {
+  aiRunSaveOffer,
+  nameCandidateFromInserts,
+  saveNameFor,
+} from '../src/renderer/ai-save-offer'
 
 interface FakeEvents {
   onToolExecuted?: (e: { call: unknown; execution: unknown }) => void
@@ -257,5 +261,16 @@ describe('nameCandidateFromInserts', () => {
   })
   it('is empty when nothing was inserted', () => {
     expect(nameCandidateFromInserts([])).toBe('')
+  })
+})
+
+describe('saveNameFor (RFB-4: the card and the saved name agree)', () => {
+  const inserts = [{ input: { pageIndex: 0, origin: [10, 700], text: 'Changed later' } }]
+  it('keeps the name the card offered even when the inserts changed after the card', () => {
+    expect(saveNameFor('Quarterly plan', inserts)).toBe('Quarterly plan')
+  })
+  it('falls back to the inserted text when no name was offered', () => {
+    expect(saveNameFor(null, inserts)).toBe('Changed later')
+    expect(saveNameFor('', inserts)).toBe('Changed later')
   })
 })

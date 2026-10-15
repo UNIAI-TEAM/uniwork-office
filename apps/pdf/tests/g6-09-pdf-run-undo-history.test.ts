@@ -172,6 +172,113 @@ describe('pdf edit history: one undo step per AI run', () => {
   })
 })
 
+describe('pdf edit history: hand edits are paused while a run is open (RFB-2)', () => {
+  /** App.tsx applyEditOps: a hand edit asks the history first, the run's own tools go through asAi */
+  function guarded(initial: string[] = []) {
+    const w = world(initial)
+    return {
+      ...w,
+      /** a move / annotate / delete by hand: refused while a run is open */
+      handEdit(item: string): boolean {
+        if (!w.history.mayEdit()) return false
+        w.edit(item)
+        return true
+      },
+      /** the same write path, reached from an AI tool */
+      aiEdit(item: string) {
+        w.history.asAi(() => w.edit(item))
+      },
+    }
+  }
+
+  it('refuses a hand edit during a run and the run entry still restores the exact pre-run document', () => {
+    const w = guarded(['user-a'])
+    w.beginRun('r1')
+    w.aiEdit('ai-1')
+    expect(w.handEdit('user-during')).toBe(false)
+    w.aiEdit('ai-2')
+    w.endRun('r1', true)
+    expect(w.items).toEqual(['user-a', 'ai-1', 'ai-2'])
+    expect(w.ctrlZ()).toBe(true)
+    expect(w.items).toEqual(['user-a'])
+  })
+
+  it('a read-only run still refuses a hand edit and leaves no entry', () => {
+    const w = guarded(['user-a'])
+    w.beginRun('r1')
+    expect(w.handEdit('user-during')).toBe(false)
+    w.endRun('r1', false)
+    expect(w.items).toEqual(['user-a'])
+    expect(w.history.undoStack).toHaveLength(0)
+  })
+
+  it('lets hand edits through again once the run has ended, as their own undo step', () => {
+    const w = guarded()
+    w.beginRun('r1')
+    w.aiEdit('ai-1')
+    w.endRun('r1', true)
+    expect(w.handEdit('user-after')).toBe(true)
+    expect(w.history.undoStack).toHaveLength(2)
+    w.ctrlZ()
+    expect(w.items).toEqual(['ai-1'])
+  })
+
+  it('treats an async AI tool as the AI until its promise settles, and a hand edit after that as refused', async () => {
+    const w = guarded()
+    w.beginRun('r1')
+    let release: () => void = () => {}
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const tool = w.history.asAi(async () => {
+      await gate
+      w.edit('ai-late') // after an await, still the tool's write
+    })
+    release()
+    await tool
+    expect(w.items).toEqual(['ai-late'])
+    expect(w.handEdit('user-during')).toBe(false)
+    w.endRun('r1', true)
+    expect(w.items).toEqual(['ai-late'])
+  })
+
+  it('releases the AI scope when the tool throws', () => {
+    const w = guarded()
+    w.beginRun('r1')
+    expect(() =>
+      w.history.asAi(() => {
+        throw new Error('tool failed')
+      }),
+    ).toThrow('tool failed')
+    expect(w.handEdit('user-during')).toBe(false)
+  })
+
+  it('scopeApi wraps every function of the tool api and passes plain values through', async () => {
+    const w = guarded()
+    w.beginRun('r1')
+    const api = w.history.scopeApi({
+      label: 'x',
+      sync: () => w.history.mayEdit(),
+      later: async () => {
+        await Promise.resolve()
+        return w.history.mayEdit()
+      },
+    })
+    expect(api.label).toBe('x')
+    expect(api.sync()).toBe(true)
+    expect(await api.later()).toBe(true)
+    expect(w.history.mayEdit()).toBe(false)
+  })
+
+  it('reports the open run for the paused notice, and no run once it ended', () => {
+    const w = guarded()
+    expect(w.history.runOpen).toBe(false)
+    w.beginRun('r1')
+    expect(w.history.runOpen).toBe(true)
+    w.endRun('r1', false)
+    expect(w.history.runOpen).toBe(false)
+    expect(w.history.mayEdit()).toBe(true)
+  })
+})
+
 describe('pdf edit history: the state of a run for its Undo this run button', () => {
   it('is ready while the run is the latest step', () => {
     const w = world(['user-a'])
