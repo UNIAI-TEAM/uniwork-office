@@ -123,6 +123,18 @@ export function getEntryResultChipView(
   return { chip, labelText, stoppedText }
 }
 
+const TERMINAL_PUNCTUATION_RE = /[.!?。！？]$/
+
+function joinAnnouncementParts(parts: readonly string[]): string {
+  const nonEmpty = parts.map((p) => p.trim()).filter((p) => p.length > 0)
+  if (nonEmpty.length === 0) return ''
+  return nonEmpty
+    .map((part, idx) =>
+      idx < nonEmpty.length - 1 && !TERMINAL_PUNCTUATION_RE.test(part) ? `${part}.` : part,
+    )
+    .join(' ')
+}
+
 /**
  * Computes the polite live-region announcement for an AI panel thread:
  * 1. Active `waitLine` / `status` (plus any streaming in-thread note) on the latest entry.
@@ -163,7 +175,7 @@ export function panelLiveAnnouncement(input: PanelLiveAnnouncementInput): string
     if (rawChip.errorLine?.key)
       parts.push(translate(rawChip.errorLine.key, rawChip.errorLine.params))
     if (rawChip.stoppedKey !== null) parts.push(translate(rawChip.stoppedKey))
-    return parts.join('. ')
+    return joinAnnouncementParts(parts)
   }
   return ''
 }
