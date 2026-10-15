@@ -92,6 +92,8 @@ interface TabRecord {
 }
 
 const HOME_ID = 'home'
+/** the highest top inset main accepts (CSS px): the S6 bar plus an open queue popover */
+const TOP_INSET_MAX = 400
 
 /**
  * Owns every open tab (Home + docs + sheets) inside the shell's single
@@ -239,17 +241,18 @@ export class TabManager {
   }
 
   /**
-   * G5-03a: the unscaled CSS-px height of the S6 "new version available" bar
-   * the shell renderer draws under the tab strip (`contentBounds` multiplies by
-   * `uiScale()` so a scale change re-layouts without a new report). The bar
-   * shows for the active tab only, so the renderer resends it on every tab
-   * switch; 0 hides it and restores the view. Clamped to 0..200 CSS px and
-   * rounded, so a stray report cannot blank the editor. Full-bleed / fullscreen
-   * views ignore it (contentBounds).
+   * G5-03a: the unscaled CSS-px height of the band the shell renderer draws
+   * under the tab strip: the S6 "new version available" bar plus the open
+   * queue popover (G5-06u; the renderer sends their sum). `contentBounds`
+   * multiplies by `uiScale()` so a scale change re-layouts without a new
+   * report. The band shows for the active tab only, so the renderer resends it
+   * on every tab switch; 0 hides it and restores the view. Clamped to 0..400
+   * CSS px (bar + popover) and rounded, so a stray report cannot blank the
+   * editor. Full-bleed / fullscreen views ignore it (contentBounds).
    */
   setTopInset(px: number): void {
     if (!Number.isFinite(px)) return
-    const next = Math.min(200, Math.max(0, Math.round(px)))
+    const next = Math.min(TOP_INSET_MAX, Math.max(0, Math.round(px)))
     if (next === this.topInset) return
     this.topInset = next
     this.layout()
