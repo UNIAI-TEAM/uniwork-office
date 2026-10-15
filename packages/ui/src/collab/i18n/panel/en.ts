@@ -99,4 +99,5 @@ export const en = {
   collabPostSendShareAction: 'Share view access',
   collabPostSendNoRetroNote:
     "Sharing now won't notify them about this comment; mention them in a new comment to notify.",
+  collabDismissNotice: 'Dismiss',
 } satisfies Record<keyof typeof zh, string>

@@ -93,4 +93,5 @@ export const nl = {
   collabPostSendShareAction: 'Weergavetoegang delen',
   collabPostSendNoRetroNote:
     'Nu delen stuurt geen melding over deze opmerking; vermeld hen in een nieuwe opmerking om een melding te sturen.',
+  collabDismissNotice: 'Sluiten',
 } satisfies Record<keyof typeof zh, string>

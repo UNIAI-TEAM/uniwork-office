@@ -94,4 +94,5 @@ export const ru = {
   collabPostSendShareAction: 'Предоставить доступ для просмотра',
   collabPostSendNoRetroNote:
     'Предоставление доступа сейчас не отправит уведомление об этом комментарии; упомяните их в новом комментарии, чтобы уведомить.',
+  collabDismissNotice: 'Закрыть',
 } satisfies Record<keyof typeof zh, string>

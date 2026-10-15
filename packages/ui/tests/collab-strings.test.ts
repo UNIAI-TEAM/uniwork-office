@@ -105,6 +105,7 @@ const PANEL_KEYS = [
   'collabPostSendNoAccess',
   'collabPostSendShareAction',
   'collabPostSendNoRetroNote',
+  'collabDismissNotice',
 ] as const
 
 // Picker mention (S14)
@@ -280,6 +281,7 @@ describe('collab strings: spine text', () => {
     expect(p.en.collabPostSendNoRetroNote).toBe(
       "Sharing now won't notify them about this comment; mention them in a new comment to notify.",
     )
+    expect(p.en.collabDismissNotice).toBe('Dismiss')
   })
 
   it('uses the fork sign-in verb in en (spine: fork writes "Sign in", D writes "Log in")', () => {

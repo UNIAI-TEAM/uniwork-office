@@ -89,4 +89,5 @@ export const ko = {
   collabPostSendShareAction: '보기 권한 공유',
   collabPostSendNoRetroNote:
     '지금 공유해도 이 댓글에 대한 알림은 전송되지 않습니다. 알림을 보내려면 새 댓글에서 다시 멘션하세요.',
+  collabDismissNotice: '닫기',
 } satisfies Record<keyof typeof zh, string>

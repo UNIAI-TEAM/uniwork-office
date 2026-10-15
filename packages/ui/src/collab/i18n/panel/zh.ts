@@ -100,4 +100,5 @@ export const zh = {
   collabPostSendShareAction: '共享查看权限',
   collabPostSendNoRetroNote:
     '现在共享不会补发上面这条评论的通知；如需通知他们，请在新评论中再次提及。',
+  collabDismissNotice: '关闭通知',
 }

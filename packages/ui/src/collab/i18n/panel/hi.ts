@@ -92,4 +92,5 @@ export const hi = {
   collabPostSendShareAction: 'देखने की पहुँच साझा करें',
   collabPostSendNoRetroNote:
     'अभी साझा करने से उन्हें इस टिप्पणी के बारे में अधिसूचना नहीं मिलेगी; अधिसूचित करने के लिए नई टिप्पणी में उनका उल्लेख करें।',
+  collabDismissNotice: 'खारिज करें',
 } satisfies Record<keyof typeof zh, string>

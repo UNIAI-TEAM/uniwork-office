@@ -87,4 +87,5 @@ export const he = {
   collabPostSendShareAction: 'שיתוף הרשאת צפייה',
   collabPostSendNoRetroNote:
     'שיתוף כעת לא ישלח להם התראה על התגובה הזו; הזכירו אותם בתגובה חדשה כדי להתריע.',
+  collabDismissNotice: 'סגירה',
 } satisfies Record<keyof typeof zh, string>

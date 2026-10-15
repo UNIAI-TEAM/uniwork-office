@@ -84,4 +84,5 @@ export const th = {
   collabPostSendShareAction: 'แชร์สิทธิ์ดู',
   collabPostSendNoRetroNote:
     'การแชร์ตอนนี้จะไม่ส่งการแจ้งเตือนย้อนหลังสำหรับความคิดเห็นนี้ โปรดกล่าวถึงพวกเขาในความคิดเห็นใหม่หากต้องการแจ้งเตือน',
+  collabDismissNotice: 'ปิด',
 } satisfies Record<keyof typeof zh, string>

@@ -89,4 +89,5 @@ export const cs = {
   collabPostSendShareAction: 'Nasdílet oprávnění k zobrazení',
   collabPostSendNoRetroNote:
     'Sdílení nyní je na tento komentář neupozorní; zmiňte je v novém komentáři, pokud je chcete upozornit.',
+  collabDismissNotice: 'Zavřít',
 } satisfies Record<keyof typeof zh, string>

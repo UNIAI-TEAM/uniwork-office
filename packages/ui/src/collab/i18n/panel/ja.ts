@@ -88,4 +88,5 @@ export const ja = {
   collabPostSendShareAction: '閲覧権限を共有',
   collabPostSendNoRetroNote:
     'いま共有してもこのコメントの通知は送られません。通知するには新しいコメントでメンションしてください。',
+  collabDismissNotice: '閉じる',
 } satisfies Record<keyof typeof zh, string>

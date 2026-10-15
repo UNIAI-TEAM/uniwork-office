@@ -95,4 +95,5 @@ export const fr = {
   collabPostSendShareAction: 'Partager l’accès en lecture',
   collabPostSendNoRetroNote:
     'Partager maintenant n’enverra pas de notification pour ce commentaire ; mentionnez-les dans un nouveau commentaire pour les notifier.',
+  collabDismissNotice: 'Ignorer',
 } satisfies Record<keyof typeof zh, string>

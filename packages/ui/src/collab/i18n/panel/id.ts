@@ -90,4 +90,5 @@ export const id = {
   collabPostSendShareAction: 'Bagikan akses lihat',
   collabPostSendNoRetroNote:
     'Membagikan sekarang tidak akan memberi tahu mereka tentang komentar ini; sebut mereka di komentar baru untuk memberi tahu.',
+  collabDismissNotice: 'Tutup',
 } satisfies Record<keyof typeof zh, string>

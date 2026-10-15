@@ -84,4 +84,5 @@ export const zhTW = {
   collabPostSendShareAction: '共用檢視權限',
   collabPostSendNoRetroNote:
     '現在共用不會補發上面這則留言的通知；如需通知他們，請在新留言中再次提及。',
+  collabDismissNotice: '關閉通知',
 } satisfies Record<keyof typeof zh, string>

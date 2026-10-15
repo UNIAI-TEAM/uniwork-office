@@ -95,4 +95,5 @@ export const it = {
   collabPostSendShareAction: 'Condividi accesso in visualizzazione',
   collabPostSendNoRetroNote:
     'Condividere ora non invierà una notifica per questo commento; menzionali in un nuovo commento per avvisarli.',
+  collabDismissNotice: 'Chiudi',
 } satisfies Record<keyof typeof zh, string>

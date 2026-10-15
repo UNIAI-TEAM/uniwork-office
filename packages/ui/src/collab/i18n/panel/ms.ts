@@ -93,4 +93,5 @@ export const ms = {
   collabPostSendShareAction: 'Kongsi akses lihat',
   collabPostSendNoRetroNote:
     'Berkongsi sekarang tidak akan memaklumkan mereka tentang komen ini; sebut mereka dalam komen baharu untuk memaklumkan.',
+  collabDismissNotice: 'Tutup',
 } satisfies Record<keyof typeof zh, string>

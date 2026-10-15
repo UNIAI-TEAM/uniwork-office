@@ -94,4 +94,5 @@ export const pl = {
   collabPostSendShareAction: 'Udostępnij podgląd',
   collabPostSendNoRetroNote:
     'Udostępnienie teraz nie wyśle powiadomienia o tym komentarzu; wspomnij o nich w nowym komentarzu, aby ich powiadomić.',
+  collabDismissNotice: 'Zamknij',
 } satisfies Record<keyof typeof zh, string>

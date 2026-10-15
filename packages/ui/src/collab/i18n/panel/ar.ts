@@ -87,4 +87,5 @@ export const ar = {
   collabPostSendShareAction: 'مشاركة صلاحية العرض',
   collabPostSendNoRetroNote:
     'المشاركة الآن لن ترسل إشعارًا بهذا التعليق؛ أشر إليهم في تعليق جديد لإشعارهم.',
+  collabDismissNotice: 'إغلاق',
 } satisfies Record<keyof typeof zh, string>

@@ -100,4 +100,5 @@ export const vi = {
   collabPostSendShareAction: 'Chia sẻ quyền Xem',
   collabPostSendNoRetroNote:
     'Chia sẻ lúc này không gửi lại thông báo cho bình luận trên; hãy nhắc lại họ ở bình luận mới nếu cần.',
+  collabDismissNotice: 'Đóng thông báo',
 } satisfies Record<keyof typeof zh, string>

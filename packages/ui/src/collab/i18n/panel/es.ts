@@ -92,4 +92,5 @@ export const es = {
   collabPostSendShareAction: 'Compartir acceso de lectura',
   collabPostSendNoRetroNote:
     'Compartir ahora no les notificará sobre este comentario; menciónalos en un comentario nuevo para notificarles.',
+  collabDismissNotice: 'Descartar',
 } satisfies Record<keyof typeof zh, string>
