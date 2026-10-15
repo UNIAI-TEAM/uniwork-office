@@ -57,6 +57,8 @@ import {
   MAX_REMOTE_IMAGE_BYTES,
   readBodyCapped,
   newerCopyMtime,
+  RecoveryClearEpochs,
+  recoveryEpochKey,
 } from '@genoffice/electron-utils'
 import { isDraftPreviewPath } from '@genoffice/electron-utils/draft-preview'
 import {
@@ -417,17 +419,38 @@ const autosaveBackoff = new Map<string, number>()
 const AUTOSAVE_BACKOFF_TICKS = 10
 let autosaveRunning = false
 
-/** Bumped by every clear so an in-flight 30s autosave tick that started before the clear cannot leave a stale recovery copy behind */
-const recoveryClearEpochs = new Map<string, number>()
+/** Bumped by every clear so an in-flight 30s autosave tick that started before the clear cannot leave a stale recovery copy behind; held only while a write is in flight */
+const recoveryClearEpochs = new RecoveryClearEpochs()
+
+/** open clear-epoch entries (tests): bounded by the autosave writes in flight */
+export function slidesRecoveryEpochEntries(): number {
+  return recoveryClearEpochs.size
+}
 
 function clearRecoveryCopy(filePath: string): void {
-  recoveryClearEpochs.set(filePath, (recoveryClearEpochs.get(filePath) ?? 0) + 1)
+  recoveryClearEpochs.bump(filePath)
   autosaveBackoff.delete(filePath)
   try {
     rmSync(autosavePathFor(filePath), { force: true })
   } catch {
     /* nothing to clean */
   }
+}
+
+/**
+ * Paths the shell's sign-out sweep cleared while a session of the deck may still
+ * be alive (its view closes on a later turn). The autosave tick skips them: the
+ * sweep also deleted the binding, so the bound-path gate no longer holds and a
+ * tick landing in that gap would write the deck's plaintext back after the
+ * sweep. Dropped when a session opens the path again, and pruned once no live
+ * session has the path.
+ */
+const sweptRecoveryPaths = new Set<string>()
+
+/** The shell's sign-out sweep: drops the deck's recovery copy, undoes a write in flight, and keeps the tick from writing it again */
+export function clearSlidesRecovery(filePath: string): void {
+  sweptRecoveryPaths.add(recoveryEpochKey(filePath))
+  clearRecoveryCopy(filePath)
 }
 
 /**
@@ -467,6 +490,11 @@ setInterval(() => {
   autosaveRunning = true
   void (async () => {
     const seen = new Set<Session>() // aliased entries share the session; save it once
+    if (sweptRecoveryPaths.size > 0) {
+      const live = new Set<string>()
+      for (const open of sessions.values()) if (open.path) live.add(recoveryEpochKey(open.path))
+      for (const key of [...sweptRecoveryPaths]) if (!live.has(key)) sweptRecoveryPaths.delete(key)
+    }
     for (const [wcId, session] of sessions.entries()) {
       if (seen.has(session)) continue
       seen.add(session)
@@ -474,6 +502,7 @@ setInterval(() => {
       // G5-11: a bound UniWork working copy keeps no plaintext copy under
       // userData (sign-out deletes the account's folder; a copy here would outlive it)
       if (session.path && uniworkIsBound(session.path)) continue
+      if (session.path && sweptRecoveryPaths.has(recoveryEpochKey(session.path))) continue
       let target: string
       if (session.path) {
         target = autosavePathFor(session.path)
@@ -491,11 +520,11 @@ setInterval(() => {
         autosaveBackoff.set(backoffKey, skip - 1)
         continue
       }
-      const epoch = recoveryClearEpochs.get(backoffKey) ?? 0
+      const ticket = recoveryClearEpochs.begin(backoffKey)
       try {
         await mkdir(dirname(target), { recursive: true })
         await savePptxToFile(session.opened, target)
-        if ((recoveryClearEpochs.get(backoffKey) ?? 0) !== epoch) {
+        if (recoveryClearEpochs.cleared(ticket)) {
           await rm(target, { force: true }).catch(() => {})
           continue
         }
@@ -503,6 +532,8 @@ setInterval(() => {
       } catch (error) {
         autosaveBackoff.set(backoffKey, AUTOSAVE_BACKOFF_TICKS)
         console.warn('[slides] autosave failed, retrying in ~5 min:', error)
+      } finally {
+        recoveryClearEpochs.end(ticket)
       }
     }
   })().finally(() => {
@@ -793,6 +824,7 @@ async function openAndBuild(
   await shapedMetricsReady() // Lay out only after complex-script shaped metrics are ready, avoiding an init race falling back to estimation
   const opened = await openPptx(bytes)
   adoptEmbeddedFonts(opened)
+  if (path) sweptRecoveryPaths.delete(recoveryEpochKey(path))
   sessions.set(wc.id, {
     path,
     opened,

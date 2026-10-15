@@ -1974,7 +1974,13 @@ export class UniworkDocsService {
       await Promise.all([...this.pendingApplyRecords])
     }
 
-    // Mark the queue session dead so any late HTTP response writes nothing
+    // Mark the queue session dead so any late HTTP response writes nothing.
+    // Deliberately AFTER the bounded wait above (unlike teardownSaveQueue, which
+    // marks dead first): a pass that answers inside the wait must still record
+    // its receipt so the document settles as committed instead of reconciling
+    // (sign-out-lock tests 5/5b). New commits are already blocked by
+    // stoppingQueueSessions, and the store lock below is last, so a late write
+    // reads `interrupted`.
     this.stopQueue()
 
     // Transition any record still in validating | uploading | committing to reconciling
