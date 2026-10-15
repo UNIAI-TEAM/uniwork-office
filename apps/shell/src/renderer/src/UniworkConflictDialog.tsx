@@ -329,6 +329,9 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
   }
 
   const handleSaveCopyBack = () => {
+    // FE-12-21: like the other step-2 controls, inert while a request is in flight, so a late
+    // reply cannot put the Download notice back on step 1
+    if (busyRef.current) return
     const cleared = viewAfterConflictBack(state, view)
     setState((s) => applyConflictBack(s))
     if (cleared) onViewChange(cleared)
@@ -680,6 +683,7 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
               type="button"
               className="uw-conflict-btn"
               data-conflict-action="back"
+              aria-disabled={busy ? 'true' : undefined}
               onClick={handleSaveCopyBack}
             >
               {t('uwConflictBack')}

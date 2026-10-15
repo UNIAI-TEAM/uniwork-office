@@ -840,6 +840,193 @@ describe('UniworkConflictDialog UI (G5-09 S5 desktop)', () => {
       ])
     })
 
+    it('FE-12-22: Back from the Download step after a download_failed reply also returns to step 1 without the notice, and re-entering Save as a copy shows the create-copy step', async () => {
+      const dialog = await openStep2()
+      nextReply = { kind: 'view', view: makeView({ notice: 'save_copy_no_seat' }) }
+      await act(async () => {
+        ;(
+          dialog.querySelector('[data-conflict-action="save-copy-go"]') as HTMLButtonElement
+        ).click()
+      })
+      nextReply = { kind: 'view', view: makeView({ notice: 'download_failed' }) }
+      await act(async () => {
+        ;(dialog.querySelector('[data-conflict-action="download-go"]') as HTMLButtonElement).click()
+      })
+      expect((dialog.querySelector('[role="alert"]') as HTMLElement).textContent).toBe(
+        en.uwConflictDownloadFailedDesktop,
+      )
+
+      await act(async () => {
+        ;(dialog.querySelector('[data-conflict-action="back"]') as HTMLButtonElement).click()
+      })
+      expect(dialog.querySelector('[data-conflict-action="reload"]')).not.toBeNull()
+      expect(dialog.querySelector('[data-conflict-action="download-go"]')).toBeNull()
+      expect(dialog.querySelector('[role="alert"]')?.textContent ?? '').toBe('')
+      expect(dialog.textContent).not.toContain(en.uwConflictDownloadFailedDesktop)
+
+      await act(async () => {
+        ;(dialog.querySelector('[data-conflict-action="save-copy"]') as HTMLButtonElement).click()
+      })
+      expect((dialog.querySelector('h2') as HTMLElement).textContent).toBe(
+        en.uwConflictSaveCopyTitle,
+      )
+      expect(dialog.querySelector('[data-conflict-action="save-copy-go"]')).not.toBeNull()
+      expect(dialog.querySelector('[data-conflict-action="download-go"]')).toBeNull()
+      expect(dialog.querySelector('[role="alert"]')?.textContent ?? '').toBe('')
+      // Back is local: only the refused copy and the failed download reached main
+      expect(actCalls.map((c) => c.action.kind)).toEqual(['save-copy', 'download-mine'])
+    })
+
+    it('FE-12-22: Back from the create-copy step (no Download notice) leaves the view untouched: an unrelated step-1 notice survives and no view change is pushed', async () => {
+      await act(async () => {
+        pushConflict?.(makeView({ notice: 'head_moved' }))
+      })
+      const dialog = document.querySelector('[role="alertdialog"]') as HTMLElement
+      const noticeBefore = dialog.querySelector('[role="alert"]')?.textContent ?? ''
+      expect(noticeBefore).not.toBe('')
+      await act(async () => {
+        ;(dialog.querySelector('[data-conflict-action="save-copy"]') as HTMLButtonElement).click()
+      })
+      expect(dialog.querySelector('[data-conflict-action="save-copy-go"]')).not.toBeNull()
+      await act(async () => {
+        ;(dialog.querySelector('[data-conflict-action="back"]') as HTMLButtonElement).click()
+      })
+      expect(dialog.querySelector('[data-conflict-action="reload"]')).not.toBeNull()
+      expect(dialog.querySelector('[role="alert"]')?.textContent ?? '').toBe(noticeBefore)
+      // Back is local and clears nothing here
+      expect(actCalls).toEqual([])
+    })
+
+    describe('FE-12-21: Back is busy-guarded like the other step-2 controls', () => {
+      /** the next uniworkConflictAct call stays pending until `release()` */
+      const deferNextAct = () => {
+        let release: (() => void) | null = null
+        const bridge = (window as unknown as { api: { uniworkConflictAct: unknown } }).api
+        const original = bridge.uniworkConflictAct as (
+          s: string,
+          a: UniworkConflictAction,
+        ) => Promise<UniworkConflictReply>
+        bridge.uniworkConflictAct = (s: string, a: UniworkConflictAction) =>
+          new Promise<UniworkConflictReply>((resolve) => {
+            release = () => {
+              bridge.uniworkConflictAct = original
+              resolve(original(s, a))
+            }
+          })
+        return () => release?.()
+      }
+
+      it('a late no-seat reply to Download my version (picker cancelled) never lands on step 1: Back is inert while the request is in flight', async () => {
+        const dialog = await openStep2()
+        nextReply = { kind: 'view', view: makeView({ notice: 'save_copy_no_seat' }) }
+        await act(async () => {
+          ;(
+            dialog.querySelector('[data-conflict-action="save-copy-go"]') as HTMLButtonElement
+          ).click()
+        })
+        const release = deferNextAct()
+        await act(async () => {
+          ;(
+            dialog.querySelector('[data-conflict-action="download-go"]') as HTMLButtonElement
+          ).click()
+        })
+        const back = dialog.querySelector('[data-conflict-action="back"]') as HTMLButtonElement
+        expect(back.getAttribute('aria-disabled')).toBe('true')
+        await act(async () => {
+          back.click()
+        })
+        // still the Download step, notice intact: the click did nothing
+        expect(dialog.querySelector('[data-conflict-action="download-go"]')).not.toBeNull()
+        expect(dialog.querySelector('[data-conflict-action="reload"]')).toBeNull()
+        expect((dialog.querySelector('[role="alert"]') as HTMLElement).textContent).toBe(
+          en.uwConflictSaveCopyNoSeat,
+        )
+
+        // the picker was cancelled: main answers with the same notice, still step 2
+        nextReply = { kind: 'view', view: makeView({ notice: 'save_copy_no_seat' }) }
+        await act(async () => {
+          release()
+        })
+        // the same notice again is re-announced: the text is cleared for one frame
+        await act(async () => {
+          await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+        })
+        expect(dialog.querySelector('[data-conflict-action="download-go"]')).not.toBeNull()
+        expect(dialog.querySelector('[data-conflict-action="reload"]')).toBeNull()
+        expect((dialog.querySelector('[role="alert"]') as HTMLElement).textContent).toBe(
+          en.uwConflictSaveCopyNoSeat,
+        )
+        expect(
+          (dialog.querySelector('[data-conflict-action="back"]') as HTMLElement).getAttribute(
+            'aria-disabled',
+          ),
+        ).not.toBe('true')
+
+        // once the reply landed Back works again and starts step 1 clean
+        await act(async () => {
+          ;(dialog.querySelector('[data-conflict-action="back"]') as HTMLButtonElement).click()
+        })
+        expect(dialog.querySelector('[data-conflict-action="reload"]')).not.toBeNull()
+        expect(dialog.querySelector('[role="alert"]')?.textContent ?? '').toBe('')
+      })
+
+      it('a late download_failed reply never lands on step 1 either', async () => {
+        const dialog = await openStep2()
+        nextReply = { kind: 'view', view: makeView({ notice: 'save_copy_no_seat' }) }
+        await act(async () => {
+          ;(
+            dialog.querySelector('[data-conflict-action="save-copy-go"]') as HTMLButtonElement
+          ).click()
+        })
+        const release = deferNextAct()
+        await act(async () => {
+          ;(
+            dialog.querySelector('[data-conflict-action="download-go"]') as HTMLButtonElement
+          ).click()
+        })
+        await act(async () => {
+          ;(dialog.querySelector('[data-conflict-action="back"]') as HTMLButtonElement).click()
+        })
+        nextReply = { kind: 'view', view: makeView({ notice: 'download_failed' }) }
+        await act(async () => {
+          release()
+        })
+        expect(dialog.querySelector('[data-conflict-action="download-go"]')).not.toBeNull()
+        expect(dialog.querySelector('[data-conflict-action="reload"]')).toBeNull()
+        expect((dialog.querySelector('[role="alert"]') as HTMLElement).textContent).toBe(
+          en.uwConflictDownloadFailedDesktop,
+        )
+      })
+
+      it('a late no-seat reply to Create copy never lands on step 1: Back is inert while the copy is in flight', async () => {
+        const dialog = await openStep2()
+        const release = deferNextAct()
+        await act(async () => {
+          ;(
+            dialog.querySelector('[data-conflict-action="save-copy-go"]') as HTMLButtonElement
+          ).click()
+        })
+        const back = dialog.querySelector('[data-conflict-action="back"]') as HTMLButtonElement
+        expect(back.getAttribute('aria-disabled')).toBe('true')
+        await act(async () => {
+          back.click()
+        })
+        expect(dialog.querySelector('[data-conflict-action="save-copy-go"]')).not.toBeNull()
+        expect(dialog.querySelector('[data-conflict-action="reload"]')).toBeNull()
+
+        nextReply = { kind: 'view', view: makeView({ notice: 'save_copy_no_seat' }) }
+        await act(async () => {
+          release()
+        })
+        // the reply turns step 2 into the Download step, not a stray step-1 alert
+        expect(dialog.querySelector('[data-conflict-action="download-go"]')).not.toBeNull()
+        expect(dialog.querySelector('[data-conflict-action="reload"]')).toBeNull()
+        expect((dialog.querySelector('[role="alert"]') as HTMLElement).textContent).toBe(
+          en.uwConflictSaveCopyNoSeat,
+        )
+      })
+    })
+
     it('a download_done reply returns to step 1 with the file name in an ok alert; Reload / Overwrite / Save as a copy stay available', async () => {
       const dialog = await openStep2()
       nextReply = { kind: 'view', view: makeView({ notice: 'save_copy_no_seat' }) }
