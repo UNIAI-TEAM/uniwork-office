@@ -537,3 +537,192 @@ describe('G5-06u T9: branches and BE review r1 fixes', () => {
     expect(ctx.popovers).toEqual([{ path }])
   })
 })
+
+type CoordinatorDeps = { deps: { intents: () => Promise<unknown> } }
+const coordinatorDeps = (ctx: Ctx) => (ctx.service.coordinator as unknown as CoordinatorDeps).deps
+
+/**
+ * holds the inline upload of the first save on the wire: the path stays in the
+ * coordinator's `saving` set (with its intent stored) until `release()`
+ */
+function holdUploads(server: ReturnType<typeof fakeServer>) {
+  const original = server.fetch.getMockImplementation()
+  if (!original) throw new Error('fake server has no implementation')
+  let release: () => void = () => undefined
+  const gate = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  const reached = { uploads: 0 }
+  server.fetch.mockImplementation(async (url: string, init: RequestInit) => {
+    if (new URL(url).pathname.endsWith('/uploads')) {
+      reached.uploads += 1
+      await gate
+    }
+    return original(url, init)
+  })
+  return { release, reached }
+}
+
+/** starts an inline save of 'v4' and waits until its upload is in flight */
+async function inlineSaveInFlight(ctx: Ctx, server: ReturnType<typeof fakeServer>) {
+  const hold = holdUploads(server)
+  const path = await openDoc(ctx)
+  writeFileSync(path, 'v4')
+  const first = ctx.service.save(path)
+  await vi.waitFor(() => expect(hold.reached.uploads).toBe(1))
+  expect(ctx.service.coordinator.isSaving(path)).toBe(true)
+  return { path, first, ...hold }
+}
+
+const unavailableAccess: Array<[string, () => Promise<unknown>]> = [
+  ['not ready (unavailable)', async () => ({ kind: 'unavailable' })],
+  [
+    'throws',
+    async () => {
+      throw new Error('store failed to open')
+    },
+  ],
+]
+
+describe('G5-06u T9: RBE6u2 fix round', () => {
+  it('RBE6u2-02 (a): a quota-blocked copy with a stored intent: no save, pendingNext for a newer copy, one push', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const { ctx, path } = await parkedIntent(server)
+    const before = recordFacts((await storedIntent(ctx, path))?.intent as unknown as IntentRecordV2)
+    rewriteBinding(path, { state: 'blocked', error: 'quota_exceeded' })
+    writeFileSync(path, 'v5')
+    ctx.statuses.length = 0
+    await userSave(ctx, path)
+    await expectNoSecondIntent(ctx, path, server, before)
+    expect(binding(path)).toMatchObject({ state: 'blocked', error: 'quota_exceeded' })
+  })
+
+  it('RBE6u2-02 (a): quota-blocked with a stored intent and no new edits: no pendingNext, one push', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const { ctx, path } = await parkedIntent(server)
+    rewriteBinding(path, { state: 'blocked', error: 'quota_exceeded' })
+    ctx.statuses.length = 0
+    await userSave(ctx, path)
+    expect(sent(server)).toHaveLength(0)
+    expect(ctx.service.coordinator.hasPendingNext(path)).toBe(false)
+    expect(ctx.statuses.some((s) => s.pendingNext)).toBe(false)
+    expect(ctx.popovers).toEqual([{ path }])
+  })
+
+  it('RBE6u2-01/02 (b): Ctrl/S while the inline save is in flight, with new edits: one push, pendingNext, nothing disturbed', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const { path, first, release, reached } = await inlineSaveInFlight(ctx, server)
+    const before = recordFacts((await storedIntent(ctx, path))?.intent as unknown as IntentRecordV2)
+    writeFileSync(path, 'v5')
+    ctx.statuses.length = 0
+    ctx.service.onUserSave(path)
+    await vi.waitFor(() => expect(ctx.popovers).toEqual([{ path }]))
+    // the running writer is not touched: no second upload, same record, still saving
+    expect(reached.uploads).toBe(1)
+    expect(ctx.service.coordinator.isSaving(path)).toBe(true)
+    expect(ctx.service.coordinator.hasPendingNext(path)).toBe(true)
+    expect(ctx.statuses.at(-1)).toMatchObject({ path, pendingNext: true })
+    const after = (await storedIntent(ctx, path))?.intent as unknown as IntentRecordV2
+    expect(recordFacts(after)).toEqual(before)
+    release()
+    await first
+    expect(ctx.popovers).toEqual([{ path }])
+    // the inline save settled the v4 intent and left the v5 copy dirty
+    expect(binding(path)).toMatchObject({ state: 'dirty' })
+  })
+
+  it('RBE6u2-01/02 (b): Ctrl/S while the inline save is in flight, no new edits: one push, no pendingNext', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const { path, first, release, reached } = await inlineSaveInFlight(ctx, server)
+    ctx.statuses.length = 0
+    ctx.service.onUserSave(path)
+    await vi.waitFor(() => expect(ctx.popovers).toEqual([{ path }]))
+    expect(reached.uploads).toBe(1)
+    expect(ctx.service.coordinator.hasPendingNext(path)).toBe(false)
+    expect(ctx.statuses.some((s) => s.pendingNext)).toBe(false)
+    release()
+    await first
+    expect(ctx.popovers).toEqual([{ path }])
+    expect(binding(path)).toMatchObject({ state: 'saved' })
+  })
+
+  it('RBE6u2-01: a non-user save (Retry, close guard) during the in-flight save still returns at once, no push', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const { path, first, release, reached } = await inlineSaveInFlight(ctx, server)
+    writeFileSync(path, 'v5')
+    await ctx.service.save(path)
+    expect(reached.uploads).toBe(1)
+    expect(ctx.popovers).toEqual([])
+    expect(ctx.service.coordinator.hasPendingNext(path)).toBe(false)
+    release()
+    await first
+  })
+
+  it('RBE6u2-01: Ctrl/S while the first save has no stored intent yet keeps the early return, no push', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    // the first save is between save() and its intent write (the intent store
+    // opens late): a second Ctrl/S finds the path saving and no intent
+    const deps = coordinatorDeps(ctx)
+    const intentsOf = deps.intents
+    let open: () => void = () => undefined
+    const opened = new Promise<void>((resolve) => {
+      open = resolve
+    })
+    let calls = 0
+    deps.intents = async () => {
+      calls += 1
+      if (calls === 1) await opened
+      return intentsOf()
+    }
+    const first = ctx.service.save(path)
+    await vi.waitFor(() => expect(ctx.service.coordinator.isSaving(path)).toBe(true))
+    ctx.service.onUserSave(path)
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(ctx.popovers).toEqual([])
+    open()
+    await first
+    expect(binding(path)).toMatchObject({ state: 'saved' })
+    expect(ctx.popovers).toEqual([])
+  })
+
+  it.each(unavailableAccess)(
+    'RBE6u2-02 (c): intent access %s: no crash, server_error, no push, nothing sent',
+    async (_name, access) => {
+      const server = fakeServer({ bytes: enc('v3') })
+      const ctx = setup(server)
+      const path = await openDoc(ctx)
+      writeFileSync(path, 'v4')
+      coordinatorDeps(ctx).intents = access
+      await userSave(ctx, path)
+      expect(binding(path)).toMatchObject({ state: 'error', error: 'server_error' })
+      expect(sent(server)).toHaveLength(0)
+      expect(ctx.service.coordinator.hasPendingNext(path)).toBe(false)
+      expect(ctx.popovers).toEqual([])
+    },
+  )
+
+  it.each(unavailableAccess)(
+    'RBE6u2-02 (c): intent access %s during the in-flight save: no crash, no push, the writer settles',
+    async (_name, access) => {
+      const server = fakeServer({ bytes: enc('v3') })
+      const ctx = setup(server)
+      const { path, first, release, reached } = await inlineSaveInFlight(ctx, server)
+      coordinatorDeps(ctx).intents = access
+      writeFileSync(path, 'v5')
+      ctx.service.onUserSave(path)
+      await new Promise((resolve) => setTimeout(resolve, 20))
+      expect(ctx.popovers).toEqual([])
+      expect(ctx.service.coordinator.hasPendingNext(path)).toBe(false)
+      expect(reached.uploads).toBe(1)
+      release()
+      await first
+      expect(binding(path)).toMatchObject({ state: 'dirty' })
+    },
+  )
+})
