@@ -159,6 +159,24 @@ describe('docs panel send entry with an unavailable UniWork AI pick', () => {
     render(1)
     await flush()
     await flush()
+    return {
+      /** the user picks `next` in the model picker: the panel gets new settings */
+      pick: async (next: AiSettings['provider']) => {
+        const picked = settingsFor(next)
+        act(() =>
+          root!.render(
+            createElement(AiPanel, {
+              editor: editor!,
+              blocks: [],
+              settings: picked,
+              open: true,
+              preset: { text: 'rewrite it', autoRun: true, nonce: 1 },
+            } as never),
+          ),
+        )
+        await flush()
+      },
+    }
   }
 
   it('uniwork picked and not offered: a preset starts no turn and leaves no bubble', async () => {
@@ -187,5 +205,34 @@ describe('docs panel send entry with an unavailable UniWork AI pick', () => {
     expect(harness.runs).toEqual(['rewrite it'])
     expect(container!.querySelectorAll('.ai-msg-user')).toHaveLength(1)
     expect(container!.querySelector('.ai-queue-strip')).not.toBeNull()
+  })
+
+  it('a queued item stays queued while UniWork AI is picked with an unacknowledged disclosure, and sends after the ack (RF4-1)', async () => {
+    const panel = await mountThenPreset('anthropic')
+    expect(harness.runs).toEqual(['rewrite it'])
+    enqueueInComposer(container!, 'queued follow-up')
+
+    // the hint holds the item while the run settles, then the user picks UniWork AI
+    act(() => setAiModelNeedHint('Choose a model to send'))
+    act(() => harness.finishRun?.())
+    await flush()
+    setUniworkAiAvailable(true)
+    await panel.pick('uniwork')
+    act(() => setAiModelNeedHint(null))
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 900))
+    })
+
+    expect(container!.querySelector('[role="region"]')).not.toBeNull()
+    expect(harness.runs).toEqual(['rewrite it'])
+    expect(container!.querySelector('.ai-queue-strip')).not.toBeNull()
+
+    act(() => {
+      container!.querySelector<HTMLButtonElement>('[role="region"] button')!.click()
+    })
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 900))
+    })
+    expect(harness.runs).toEqual(['rewrite it', 'queued follow-up'])
   })
 })

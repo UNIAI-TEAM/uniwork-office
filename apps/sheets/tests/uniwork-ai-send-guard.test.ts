@@ -128,6 +128,122 @@ describe('sheets panel send entry and queue submit with model-need hint (RF3-3)'
     expect(container.querySelector('.ai-queue-strip')).not.toBeNull()
   })
 
+  it('a queued item stays queued while UniWork AI is picked with an unacknowledged disclosure, and sends after the ack (RF4-1)', async () => {
+    const runs: string[] = []
+    let saved = 'openai'
+    const changed: Array<() => void> = []
+    vi.stubGlobal(
+      'desktopApi',
+      new Proxy(
+        {},
+        {
+          get: (_t, prop: string) =>
+            prop === 'getAiSettings'
+              ? () => Promise.resolve({ provider: saved, providers: {} })
+              : prop === 'onAiSettingsChanged'
+                ? (handler: () => void) => {
+                    changed.push(handler)
+                    return () => {}
+                  }
+                : /^on[A-Z]/.test(prop)
+                  ? () => () => {}
+                  : () => Promise.resolve(undefined),
+        },
+      ),
+    )
+    container = document.createElement('div')
+    document.body.appendChild(container)
+    root = createRoot(container)
+
+    const chat: AiChatMessage[] = [
+      { role: 'user', text: 'first turn', tools: [] },
+      { role: 'assistant', text: '', tools: [], streaming: true },
+    ]
+    let currentPrompt = 'queued follow-up'
+    const render = (aiBusy: boolean, promptText = currentPrompt) => {
+      currentPrompt = promptText
+      act(() =>
+        root!.render(
+          createElement(
+            LocaleProvider,
+            { initial: 'en', children: null },
+            createElement(AiChatPanel, {
+              isOpen: true,
+              hasContent: true,
+              chat,
+              attachments: [],
+              attachNotice: null,
+              onPickAttachments: () => {},
+              onAddAttachmentPaths: () => {},
+              onAddPastedImage: () => {},
+              onRemoveAttachment: () => {},
+              prompt: currentPrompt,
+              preview: null,
+              aiBusy,
+              onPromptChange: (next) => {
+                currentPrompt = next
+              },
+              onSend: (text) => {
+                if (text) runs.push(text)
+              },
+              // matches ExcelShell.tsx's onSendQueued wrapper around onSend
+              onSendQueued: (text) => {
+                if (aiBusy) return false
+                runs.push(text)
+                return true
+              },
+              onStop: () => {},
+              onNewChat: () => {},
+              onUndo: () => {},
+              scopeRange: null,
+              scopeColumns: null,
+              scopeLocked: false,
+              onScopeDismiss: () => {},
+              onCitation: () => {},
+              onExpand: () => {},
+              onCollapse: () => {},
+            }),
+          ),
+        ),
+      )
+    }
+
+    render(true, 'queued follow-up')
+    await flush()
+
+    const textarea = container.querySelector<HTMLTextAreaElement>('textarea.ai-input')!
+    act(() => {
+      textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    })
+    expect(container.querySelector('.ai-queue-strip')).not.toBeNull()
+    expect(runs).toEqual([])
+
+    act(() => setAiModelNeedHint('Choose a model to send'))
+    render(false, '')
+    await flush()
+
+    // the user picks UniWork AI: the saved settings change and the panel is told
+    saved = 'uniwork'
+    act(() => changed.forEach((handler) => handler()))
+    await flush()
+    act(() => setAiModelNeedHint(null))
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 900))
+    })
+
+    expect(container.querySelector('[role="region"]')).not.toBeNull()
+    expect(runs).toEqual([])
+    expect(container.querySelector('.ai-queue-strip')).not.toBeNull()
+
+    act(() => {
+      container.querySelector<HTMLButtonElement>('[role="region"] button')!.click()
+    })
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 900))
+    })
+    expect(runs).toEqual(['queued follow-up'])
+  })
+
   it('App.tsx handleSend returns false while needModelHint is set (App.tsx cannot be mounted in jsdom)', () => {
     const app = readFileSync(
       join(dirname(fileURLToPath(import.meta.url)), '../src/renderer/App.tsx'),

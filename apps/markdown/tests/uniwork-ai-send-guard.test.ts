@@ -99,16 +99,24 @@ describe('markdown panel send entry with an unavailable UniWork AI pick', () => 
     Element.prototype.scrollTo = () => {}
     vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {}, removeItem: () => {} })
     const stubs: Record<string, ReturnType<typeof vi.fn>> = {}
+    let saved: string = provider
+    const changed: Array<() => void> = []
     vi.stubGlobal(
       'markdownApi',
       new Proxy(stubs, {
         get(target, prop: string) {
           if (!(prop in target)) {
-            target[prop] = /^on[A-Z]/.test(prop)
-              ? vi.fn(() => () => {})
-              : prop === 'getAiSettings'
-                ? vi.fn(async () => ({ ...usableAiSettings(), provider }))
-                : vi.fn(async () => undefined)
+            target[prop] =
+              prop === 'onAiSettingsChanged'
+                ? vi.fn((handler: () => void) => {
+                    changed.push(handler)
+                    return () => {}
+                  })
+                : /^on[A-Z]/.test(prop)
+                  ? vi.fn(() => () => {})
+                  : prop === 'getAiSettings'
+                    ? vi.fn(async () => ({ ...usableAiSettings(), provider: saved }))
+                    : vi.fn(async () => undefined)
           }
           return target[prop]
         },
@@ -153,6 +161,14 @@ describe('markdown panel send entry with an unavailable UniWork AI pick', () => 
     render(1)
     await flush()
     await flush()
+    return {
+      /** the user picks `next` in the model picker: the saved settings change and the panel is told */
+      pick: async (next: string) => {
+        saved = next
+        act(() => changed.forEach((handler) => handler()))
+        await flush()
+      },
+    }
   }
 
   it('uniwork picked and not offered: a preset starts no turn and leaves no bubble', async () => {
@@ -181,5 +197,34 @@ describe('markdown panel send entry with an unavailable UniWork AI pick', () => 
     expect(harness.runs).toEqual(['rewrite it'])
     expect(container!.querySelectorAll('.ai-msg-user')).toHaveLength(1)
     expect(container!.querySelector('.ai-queue-strip')).not.toBeNull()
+  })
+
+  it('a queued item stays queued while UniWork AI is picked with an unacknowledged disclosure, and sends after the ack (RF4-1)', async () => {
+    const panel = await mountThenPreset('openai')
+    expect(harness.runs).toEqual(['rewrite it'])
+    enqueueInComposer(container!, 'queued follow-up')
+
+    // the hint holds the item while the run settles, then the user picks UniWork AI
+    act(() => setAiModelNeedHint('Choose a model to send'))
+    act(() => harness.finishRun?.())
+    await flush()
+    setUniworkAiAvailable(true)
+    await panel.pick('uniwork')
+    act(() => setAiModelNeedHint(null))
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 900))
+    })
+
+    expect(container!.querySelector('[role="region"]')).not.toBeNull()
+    expect(harness.runs).toEqual(['rewrite it'])
+    expect(container!.querySelector('.ai-queue-strip')).not.toBeNull()
+
+    act(() => {
+      container!.querySelector<HTMLButtonElement>('[role="region"] button')!.click()
+    })
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 900))
+    })
+    expect(harness.runs).toEqual(['rewrite it', 'queued follow-up'])
   })
 })
