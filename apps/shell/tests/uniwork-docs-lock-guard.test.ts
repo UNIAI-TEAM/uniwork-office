@@ -138,11 +138,6 @@ function setup(opts: { account?: string | null; keystoreLocked?: boolean } = {})
     scope: () => (account ? { deploymentId: 'default', accountId: account } : null),
   })
   const ui: ConflictUi = {
-    chooseConflict: vi.fn(async () => 'later'),
-    confirmDiscard: vi.fn(async () => false),
-    pickCopyPath: vi.fn(async () => null),
-    showOpenLatestFailed: vi.fn(),
-    showCopyFailed: vi.fn(),
     chooseUnsavedClose: vi.fn(async () => 'cancel'),
   }
   const deps = {
@@ -162,6 +157,7 @@ function setup(opts: { account?: string | null; keystoreLocked?: boolean } = {})
     activePath: () => undefined,
     ui,
     pushStatus: (s: UniworkDocStatus) => statuses.push(s),
+    pushConflict: vi.fn(),
     pushLaunch: (e: UniworkLaunchEvent) => launches.push(e),
     pushLock: (lock: UniworkDocLock) => locks.push(lock),
     reveal: vi.fn(),
@@ -446,7 +442,7 @@ describe('no intent, no module save, no client call for a locked path (AC-2)', (
     expect(await ctx.service.resolveConflict(docPath())).toBeNull()
     ctx.service.noteEditorDirty(docPath(), true)
     ctx.service.noteActivePath(docPath())
-    expect(ctx.ui.chooseConflict).not.toHaveBeenCalled()
+    expect(ctx.deps.pushConflict).not.toHaveBeenCalled()
     expect(ctx.ui.chooseUnsavedClose).not.toHaveBeenCalled()
     expect(ctx.statuses).toEqual([])
     expect(calls).toEqual([])

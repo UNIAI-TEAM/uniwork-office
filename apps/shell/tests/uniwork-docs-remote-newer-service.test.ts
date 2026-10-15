@@ -3,7 +3,11 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { UniworkConflictChoice, UniworkDocStatus } from '../src/shared/home-api'
+import type {
+  UniworkConflictChoice,
+  UniworkConflictView,
+  UniworkDocStatus,
+} from '../src/shared/home-api'
 import {
   BINDING_FILE,
   type Binding,
@@ -134,6 +138,7 @@ interface Harness {
   capability: { syncFeed: boolean }
   /** what the conflict dialog (the bar's `reload` action) answers */
   ui: { conflict: UniworkConflictChoice; discard: boolean }
+  views: UniworkConflictView[]
 }
 
 function setup(): Harness {
@@ -150,6 +155,7 @@ function setup(): Harness {
   const syncStore = createSyncStoreAccess({ layer, scope: () => ({ ...SCOPE }) })
 
   const statuses: UniworkDocStatus[] = []
+  const views: UniworkConflictView[] = []
   const reloaded: string[] = []
   const openPaths = new Set<string>([docPath()])
   const editorStates: EditorState[] = [CLEAN]
@@ -217,6 +223,7 @@ function setup(): Harness {
     client: api as unknown as UniworkDocsClient,
     ui,
     pushStatus: (status) => statuses.push(status),
+    pushConflict: (view) => views.push(view),
     pushLaunch: vi.fn(),
     reveal: vi.fn(),
   })
@@ -235,6 +242,7 @@ function setup(): Harness {
     },
     capability,
     ui: uiState,
+    views,
   }
 }
 
@@ -808,9 +816,14 @@ describe('G5-03a S6 service: the poll edges and the reload action', () => {
     notice(h)
     await waitForBar(h, { kind: 'newer-dirty', version: 4 })
 
-    h.ui.conflict = 'open-latest'
-    h.ui.discard = true
-    const status = await h.service.remoteAction(docPath(), 'reload')
+    const pending = h.service.remoteAction(docPath(), 'reload')
+    await vi.waitFor(() => expect(h.views).toHaveLength(1))
+    await h.service.conflictAct(h.views[0]!.sessionId, {
+      kind: 'reload',
+      keep: 'discard',
+      stopAi: false,
+    })
+    const status = await pending
     expect(status?.remote).toEqual({ kind: 'updated', version: 4 })
     expect(hex(copyBytes())).toBe(hex(HEAD_BYTES))
     expect(bindingOf()).toMatchObject({ baseRevision: '10', baseVersion: 4, state: 'saved' })
@@ -823,8 +836,10 @@ describe('G5-03a S6 service: the poll edges and the reload action', () => {
     notice(h)
     await waitForBar(h, { kind: 'newer-dirty', version: 4 })
 
-    h.ui.conflict = 'later'
-    const status = await h.service.remoteAction(docPath(), 'reload')
+    const pending = h.service.remoteAction(docPath(), 'reload')
+    await vi.waitFor(() => expect(h.views).toHaveLength(1))
+    await h.service.conflictAct(h.views[0]!.sessionId, { kind: 'cancel' })
+    const status = await pending
     expect(status?.remote).toEqual({ kind: 'newer-dirty', version: 4 })
     expect(hex(copyBytes())).toBe(hex(BASE_BYTES))
     expect(h.reloaded).toEqual([])

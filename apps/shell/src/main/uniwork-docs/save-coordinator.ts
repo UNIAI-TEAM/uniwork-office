@@ -257,11 +257,16 @@ export class SaveCoordinator {
     return this.pendingNext.has(path)
   }
 
+  /** clears the unsent N+1 marker once the pending intent is superseded or dropped */
+  clearPendingNext(path: string): void {
+    this.pendingNext.delete(path)
+  }
+
   /**
    * The UniWork step of one explicit Save of `path`. Resolves with the
    * document after the attempt (null for an unbound path); never throws.
    */
-  async save(path: string): Promise<BoundDocument | null> {
+  async save(path: string, options?: { forceOffline?: boolean }): Promise<BoundDocument | null> {
     // G5-04g defence in depth: a working copy whose folder declares a store this
     // build does not read never reaches the intent, the upload or the commit,
     // even if a module somehow has it open.
@@ -278,7 +283,7 @@ export class SaveCoordinator {
     // permission and existence refusals stay until the document is opened again
     if (b.state === 'blocked' && b.error !== 'quota_exceeded') return doc
     this.saving.add(doc.path)
-    const attempt = this.run(doc).catch(() =>
+    const attempt = this.run(doc, options).catch(() =>
       this.commitState(doc, { ...doc.binding, state: 'error', error: 'server_error' }),
     )
     this.running.set(doc.path, attempt)
@@ -290,7 +295,10 @@ export class SaveCoordinator {
     }
   }
 
-  private async run(doc: BoundDocument): Promise<BoundDocument> {
+  private async run(
+    doc: BoundDocument,
+    options?: { forceOffline?: boolean },
+  ): Promise<BoundDocument> {
     const { store } = this.deps
     let bytes: Uint8Array
     try {
@@ -330,7 +338,9 @@ export class SaveCoordinator {
         return this.commitState(doc, withoutError({ ...binding, state: 'saved' }))
       }
       // the Ctrl/Cmd+S decision table: the intent's first state (see the module doc)
-      const verdict = await laneVerdict(this.deps.capability, binding.orgId)
+      const verdict = options?.forceOffline
+        ? 'offline'
+        : await laneVerdict(this.deps.capability, binding.orgId)
       const pausedUser = (await this.deps.pause?.isPaused().catch(() => false)) === true
       // the fresh intent is one past the record the store still holds (the
       // same aging QueueDispatcher.mint applies): a second inline save of one

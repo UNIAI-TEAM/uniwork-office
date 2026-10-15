@@ -73,6 +73,7 @@ const createDocsView = vi.fn(() => makeFakeView())
 const docsQueryDirty = vi.fn(() => Promise.resolve(false))
 const docsQueryEditorDirty = vi.fn((): Promise<boolean | null> => Promise.resolve(false))
 const markDocsNewBlank = vi.fn()
+const queueDocsForView = vi.fn()
 const requestDocsClose = vi.fn(() => Promise.resolve(true))
 const setActiveDocsResolver = vi.fn()
 const teardownDocsRenderer = vi.fn()
@@ -82,6 +83,7 @@ vi.mock('../../docs/src/main/docs-main', () => ({
   docsQueryDirty: (...args: unknown[]) => docsQueryDirty(...(args as [])),
   docsQueryEditorDirty: (...args: unknown[]) => docsQueryEditorDirty(...(args as [])),
   markDocsNewBlank: (...args: unknown[]) => markDocsNewBlank(...args),
+  queueDocsForView: (...args: unknown[]) => queueDocsForView(...args),
   requestDocsClose: (...args: unknown[]) => requestDocsClose(...(args as [])),
   setActiveDocsResolver: (...args: unknown[]) => setActiveDocsResolver(...args),
   teardownDocsRenderer: (...args: unknown[]) => teardownDocsRenderer(...args),
@@ -118,12 +120,14 @@ vi.mock('../../sheets/src/main/sheets-main', () => ({
 }))
 
 const createSlidesView = vi.fn(() => makeFakeView())
+const queueSlidesForView = vi.fn()
 const requestSlidesClose = vi.fn(() => Promise.resolve(true))
 const setActiveSlidesWebContents = vi.fn()
 const slidesIsDirty = vi.fn(() => false)
 
 vi.mock('../../slides/src/main/slides-main', () => ({
   createSlidesView: (...args: unknown[]) => createSlidesView(...(args as [])),
+  queueSlidesForView: (...args: unknown[]) => queueSlidesForView(...args),
   requestSlidesClose: (...args: unknown[]) => requestSlidesClose(...(args as [])),
   setActiveSlidesWebContents: (...args: unknown[]) => setActiveSlidesWebContents(...args),
   slidesIsDirty: (...args: unknown[]) => slidesIsDirty(...(args as [])),
@@ -1051,6 +1055,25 @@ describe('file path bookkeeping', () => {
     expect(view.webContents.reload).toHaveBeenCalledTimes(1)
   })
 
+  it('reloading a docs tab queues its document again (the reloaded renderer opens it)', () => {
+    const id = manager.openDocsTab('/tmp/report.docx')
+    const view = lastCreatedView(createDocsView)
+    queueDocsForView.mockClear()
+    manager.reloadTab(id)
+    expect(queueDocsForView).toHaveBeenCalledWith(view.webContents, '/tmp/report.docx')
+    expect(queueDocsForView.mock.invocationCallOrder[0]).toBeLessThan(
+      view.webContents.reload.mock.invocationCallOrder[0]!,
+    )
+    expect(view.webContents.reload).toHaveBeenCalledTimes(1)
+  })
+
+  it('reloading an untitled docs tab queues nothing', () => {
+    const id = manager.openDocsTab()
+    queueDocsForView.mockClear()
+    manager.reloadTab(id)
+    expect(queueDocsForView).not.toHaveBeenCalled()
+  })
+
   it('reloading a sheets tab queues its workbook again (the reloaded renderer opens it)', () => {
     const id = manager.openSheetsTab('/tmp/book.xlsx')
     const view = lastCreatedView(createSheetsView)
@@ -1068,6 +1091,25 @@ describe('file path bookkeeping', () => {
     queueWorkbookForView.mockClear()
     manager.reloadTab(id)
     expect(queueWorkbookForView).not.toHaveBeenCalled()
+  })
+
+  it('reloading a slides tab queues its deck again (the reloaded renderer opens it)', () => {
+    const id = manager.openSlidesTab('/tmp/deck.pptx')
+    const view = lastCreatedView(createSlidesView)
+    queueSlidesForView.mockClear()
+    manager.reloadTab(id)
+    expect(queueSlidesForView).toHaveBeenCalledWith(view.webContents, '/tmp/deck.pptx')
+    expect(queueSlidesForView.mock.invocationCallOrder[0]).toBeLessThan(
+      view.webContents.reload.mock.invocationCallOrder[0]!,
+    )
+    expect(view.webContents.reload).toHaveBeenCalledTimes(1)
+  })
+
+  it('reloading an untitled slides tab queues nothing', () => {
+    const id = manager.openSlidesTab()
+    queueSlidesForView.mockClear()
+    manager.reloadTab(id)
+    expect(queueSlidesForView).not.toHaveBeenCalled()
   })
 
   it('reports the active pdf tab with its id (so callers can re-activate it)', () => {

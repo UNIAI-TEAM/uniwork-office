@@ -4,9 +4,8 @@ import { COMMENTS_CHANNELS } from '@genoffice/electron-utils/comments-ipc'
 import {
   UNIWORK_DOC_CHANNELS,
   type AccountStatus,
-  type UniworkConflictChoice,
+  type UniworkConflictAction,
   type UniworkCreateDocInput,
-  type UniworkDocFormat,
   type UniworkDocListQuery,
   type UniworkDocLock,
   type UniworkRemoteAction,
@@ -65,10 +64,9 @@ import { tUniworkDocs } from './strings'
 
 /**
  * Electron binding of the UniWork documents service: IPC handlers for every
- * HomeApi UniWork method, status and launch pushes to the shell window, the
- * native conflict dialogs (shown from main so they sit above module views),
- * and redeeming a held launch ticket once sign-in completes. Payloads carry
- * paths, ids, titles and states only; the access token never leaves main.
+ * HomeApi UniWork method, status, conflict and launch pushes to the shell
+ * window, and redeeming a held launch ticket once sign-in completes. Payloads
+ * carry paths, ids, titles and states only; the access token never leaves main.
  */
 
 export interface UniworkDocsWiring {
@@ -148,14 +146,11 @@ export interface UniworkDocsWiring {
    * its own rename IPC; no file moves. Absent in tests that do not open tabs.
    */
   notifyTitleRenamed?(path: string, title: string): void
+  /** G5-09 S5: whether an AI turn is running in the editor showing `path` */
+  isAiRunning?(path: string): boolean
+  /** G5-09 S5: stops the AI turn running in the editor showing `path` */
+  stopAiRun?(path: string): void
 }
-
-const CHOICES: readonly UniworkConflictChoice[] = [
-  'overwrite',
-  'save-local-copy',
-  'open-latest',
-  'later',
-]
 
 /** the one question a web link may ask: connect this install to the server it names? */
 async function confirmConnect(wiring: UniworkDocsWiring, origin: string): Promise<boolean> {
@@ -213,57 +208,6 @@ function conflictUi(wiring: UniworkDocsWiring): ConflictUi {
     return parent ? dialog.showMessageBox(parent, options) : dialog.showMessageBox(options)
   }
   return {
-    async chooseConflict(title, signal) {
-      const { response } = await box({
-        type: 'warning',
-        title: t('conflictTitle'),
-        message: t('conflictMessage', title),
-        detail: t('conflictDetail'),
-        buttons: [
-          t('conflictOverwrite'),
-          t('conflictSaveCopy'),
-          t('conflictOpenLatest'),
-          t('conflictLater'),
-        ],
-        defaultId: 3,
-        cancelId: 3,
-        noLink: true,
-        ...(signal ? { signal } : {}),
-      })
-      return CHOICES[response] ?? 'later'
-    },
-    async confirmDiscard(title, signal) {
-      const { response } = await box({
-        type: 'warning',
-        title: t('discardTitle'),
-        message: t('discardMessage', title),
-        detail: t('discardDetail'),
-        buttons: [t('discardConfirm'), t('discardCancel')],
-        defaultId: 1,
-        cancelId: 1,
-        noLink: true,
-        ...(signal ? { signal } : {}),
-      })
-      return response === 0
-    },
-    async pickCopyPath(stem: string, format: UniworkDocFormat) {
-      const parent = wiring.shellWindow()
-      const options: Electron.SaveDialogOptions = {
-        title: t('copyDialogTitle'),
-        defaultPath: join(wiring.defaultSaveDir(), `${stem} ${t('copySuffix')}.${format}`),
-        filters: [{ name: format.toUpperCase(), extensions: [format] }],
-      }
-      const picked = parent
-        ? await dialog.showSaveDialog(parent, options)
-        : await dialog.showSaveDialog(options)
-      return picked.canceled || !picked.filePath ? null : picked.filePath
-    },
-    showOpenLatestFailed() {
-      void box({ type: 'error', message: t('openLatestFailed'), buttons: ['OK'], noLink: true })
-    },
-    showCopyFailed() {
-      void box({ type: 'error', message: t('copyFailed'), buttons: ['OK'], noLink: true })
-    },
     async chooseUnsavedClose(title, kind, reason) {
       // over whichever window is closing (a detached editor or the shell)
       const focused = BrowserWindow.getFocusedWindow()
@@ -560,6 +504,11 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   const service = new UniworkDocsService({
     userDataDir: app.getPath('userData'),
     syncStore,
+    storeUsage: async () => {
+      const store = syncStoreFor()
+      const scope = store.access.scope()
+      return scope ? store.layer.usage(scope) : null
+    },
     appVersion: () => app.getVersion(),
     profile: () => uniworkDeploymentProfile(),
     channel: () => uniworkAppChannel(),
@@ -596,6 +545,10 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     notifyTitleRenamed: (path, title) => wiring.notifyTitleRenamed?.(path, title),
     ui: conflictUi(wiring),
     pushStatus: (status) => push(UNIWORK_DOC_CHANNELS.docStatusEvent, status),
+    pushConflict: (view) => push(UNIWORK_DOC_CHANNELS.conflictOpen, view),
+    pushConflictClosed: (sessionId) => push(UNIWORK_DOC_CHANNELS.conflictClosed, { sessionId }),
+    isAiRunning: (path) => wiring.isAiRunning?.(path) === true,
+    stopAiRun: (path) => wiring.stopAiRun?.(path),
     // the save queue's lane verdicts read the same per-org capability cache the
     // feed runtime does (see the SyncRuntimeSeam note), so `sync_write` is read
     // once per account and cleared on an account switch for both
@@ -708,6 +661,9 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   ipcMain.handle(UNIWORK_DOC_CHANNELS.save, (_event, path: unknown) => service.save(path as string))
   ipcMain.handle(UNIWORK_DOC_CHANNELS.resolveConflict, (_event, path: unknown) =>
     service.resolveConflict(path as string),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.conflictAct, (_event, sessionId: unknown, action: unknown) =>
+    service.conflictAct(sessionId as string, action as UniworkConflictAction),
   )
   // G5-03a: the S6 bar's actions. The barInset handler is NOT registered here:
   // it belongs to the window chrome (index.ts, W2).

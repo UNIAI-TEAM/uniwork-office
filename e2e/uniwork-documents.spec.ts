@@ -5,6 +5,18 @@ import { existsSync } from 'node:fs'
 import { appendFile, copyFile, mkdtemp, readdir, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
+// The product's store codec, intent decoder and drafts payload decoder (`no Electron`
+// in their import chain): the store readers must decode the REAL record shapes
+// instead of re-implementing them.
+import {
+  createIntentStore,
+  INTENT_STORE_REGISTRATION,
+  type PendingIntentRecord,
+} from '../apps/shell/src/main/uniwork-sync/intent-store'
+import { keyFilePath } from '../apps/shell/src/main/uniwork-sync/keys'
+import { createDraftStore, type KeptDraft } from '../apps/shell/src/main/uniwork-sync/queue/drafts'
+import { recordPath, type StoreRecords } from '../apps/shell/src/main/uniwork-sync/store'
+import { openRecord, readRecordFrame } from '../apps/shell/src/main/uniwork-sync/store/codec'
 import {
   closeAndSaveVideo,
   launchShell,
@@ -12,6 +24,7 @@ import {
   waitForPageWithUrl,
   type LaunchedApp,
 } from './helpers'
+import { STUB_ACCOUNT, STUB_DEPLOYMENT_ID } from './fixtures/uniwork-auth-stub'
 import {
   startUniworkDocumentsStub,
   type StubCall,
@@ -391,11 +404,15 @@ test.describe.serial('UniWork documents', () => {
       })
       await expect(label(shell)).toHaveText('Saved to UniWork')
       expect(stub.exchangeAttempts(ticket)).toBe(1)
-      // the descriptor's own document: detail and bytes of it, nothing of the decoy
-      expect(callsFor(stub, doc.id).map((c) => c.route)).toEqual([
-        `/documents/${doc.id}`,
-        `/documents/${doc.id}/download`,
-      ])
+      // the descriptor's own document: the open reads its detail and bytes, in
+      // that order, and nothing of the decoy
+      const routes = callsFor(stub, doc.id).map((c) => c.route)
+      expect(routes.slice(0, 2)).toEqual([`/documents/${doc.id}`, `/documents/${doc.id}/download`])
+      // G8-17 (S18 renamed-elsewhere): activating the launched tab re-reads the
+      // document's metadata (main: index.ts refreshPath -> refreshMetadataFor ->
+      // GET /documents/<id>), so extra detail reads may follow the open - and
+      // only those.
+      expect(routes.slice(2).filter((route) => route !== `/documents/${doc.id}`)).toEqual([])
 
       // the same link handed over again is not redeemed again and opens nothing new
       await deliverUrl(launched, shellEnv(stub), url)
@@ -502,7 +519,88 @@ test.describe.serial('UniWork documents', () => {
     return { doc, editor, path: (await activeStatus(ctx.shell))!.path }
   }
 
-  test('d. conflict: 409 keeps the local edit and the base, Save refuses, overwrite commits on the new base', async () => {
+  /** the store scope of the signed-in stub account: the key and the records keyed under it */
+  const storeScope = { deploymentId: STUB_DEPLOYMENT_ID, accountId: STUB_ACCOUNT.id }
+
+  /**
+   * Decrypts the durable kept-drafts record (`uniwork-sync/store/.../drafts/<sha256(docId)>.rec`).
+   * The frame is parsed by the product codec (`store/codec.ts`), so the real
+   * `UWS1` shape decides the read - magic, header length and header JSON bound
+   * to the ciphertext as additional data - and the plaintext goes through the
+   * product drafts decoder (`queue/drafts.ts`) behind its store interface. The
+   * record key is unwrapped via Electron `safeStorage.decryptString`.
+   */
+  async function readKeptDrafts(launched: LaunchedApp, docId: string): Promise<KeptDraft[]> {
+    const root = join(launched.userDataDir, 'uniwork-sync')
+    const recPath = recordPath(join(root, 'store'), storeScope, 'drafts', docId)
+    if (!existsSync(recPath)) return []
+    const wrapped = await readFile(keyFilePath(join(root, 'keys'), storeScope))
+    const rawKeyB64 = await launched.app.evaluate(
+      ({ safeStorage }, b64) => safeStorage.decryptString(Buffer.from(b64, 'base64')),
+      wrapped.toString('base64'),
+    )
+    const key = Buffer.from(rawKeyB64, 'base64')
+    const frame = readRecordFrame(await readFile(recPath))
+    if (!frame) throw new Error(`kept-drafts record is not a UWS1 frame: ${recPath}`)
+    const value = openRecord(key, frame)
+    if (!value) throw new Error(`kept-drafts record did not decrypt with the store key: ${recPath}`)
+    // a records source serving the bytes the frame just yielded: `list` runs
+    // the same draft payload decoder the app's own draft store runs
+    const records: StoreRecords = {
+      write: async () => ({ kind: 'refused' }),
+      read: async () => ({ kind: 'ok', value }),
+      delete: async () => ({ kind: 'ok' }),
+    }
+    return createDraftStore(records).list(docId)
+  }
+
+  /**
+   * Decrypts the durable pending-intent record (`uniwork-sync/store/.../intents/<sha256(docId)>.rec`).
+   * The frame is parsed by the product codec (`store/codec.ts`) and the
+   * plaintext goes through the product intent store decoder (`intent-store.ts`)
+   * behind its store interface, with the record key unwrapped via Electron
+   * `safeStorage.decryptString`.
+   */
+  async function readPendingIntent(
+    launched: LaunchedApp,
+    docId: string,
+  ): Promise<PendingIntentRecord | null> {
+    const root = join(launched.userDataDir, 'uniwork-sync')
+    const recPath = recordPath(
+      join(root, 'store'),
+      storeScope,
+      INTENT_STORE_REGISTRATION.name,
+      docId,
+    )
+    if (!existsSync(recPath)) return null
+    let rawFrame: Buffer
+    try {
+      rawFrame = await readFile(recPath)
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null
+      throw error
+    }
+    const wrapped = await readFile(keyFilePath(join(root, 'keys'), storeScope))
+    const rawKeyB64 = await launched.app.evaluate(
+      ({ safeStorage }, b64) => safeStorage.decryptString(Buffer.from(b64, 'base64')),
+      wrapped.toString('base64'),
+    )
+    const key = Buffer.from(rawKeyB64, 'base64')
+    const frame = readRecordFrame(rawFrame)
+    if (!frame) throw new Error(`pending-intent record is not a UWS1 frame: ${recPath}`)
+    const value = openRecord(key, frame)
+    if (!value) {
+      throw new Error(`pending-intent record did not decrypt with the store key: ${recPath}`)
+    }
+    const records: StoreRecords = {
+      write: async () => ({ kind: 'refused' }),
+      read: async () => ({ kind: 'ok', value }),
+      delete: async () => ({ kind: 'ok' }),
+    }
+    return (await createIntentStore(records).get(docId))?.intent ?? null
+  }
+
+  test('d. conflict: 409 keeps the local edit and the base, Save refuses, S5 Overwrite commits on the new base', async () => {
     test.setTimeout(180_000)
     await withApp('uniwork-docs-conflict', async (ctx) => {
       const { shell, launched } = ctx
@@ -533,20 +631,52 @@ test.describe.serial('UniWork documents', () => {
       expect(stub.callCount()).toBe(sent)
       await expectState(shell, 'conflict', 5_000)
 
-      // "Save my version as the newest version" -> commit on the server's revision
-      await answerMessageBoxes(launched, [0])
+      // AC1 + AC2: Resolve… opens the in-app S5 alertdialog (never a native message box),
+      // with Cancel focused by default and the Step-1 action buttons in spec order
+      await answerMessageBoxes(launched, [])
       await chip(shell).getByRole('button', { name: 'Resolve…' }).click()
-      await expectState(shell, 'saved')
 
-      const boxes = await seenMessageBoxes(launched)
-      expect(boxes).toHaveLength(1)
-      expect(boxes[0]!.message).toContain('conflict-overwrite.docx')
-      expect(boxes[0]!.buttons).toEqual([
-        'Save my version as the newest version',
-        'Save a copy on this computer',
-        'Discard my changes and open the latest',
-        'Decide later',
+      const dialog = shell.getByRole('alertdialog')
+      await expect(dialog).toBeVisible()
+      await expect(
+        dialog.getByRole('heading', { name: 'This document was changed elsewhere' }),
+      ).toBeVisible()
+      // FE-304: actions are addressed by role + accessible name
+      await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused()
+      // the head's ✕ sits outside the action row and has no text, only the
+      // accessible name "Close"; scope the order check to the action row:
+      // the four Step-1 actions in spec order
+      await expect(dialog.locator('.uw-conflict-actions').getByRole('button')).toHaveText([
+        'Reload latest',
+        'Save as a copy…',
+        'Overwrite…',
+        'Cancel',
       ])
+      // the ✕ in turn is addressed by role + name: it must be visible and come
+      // after Cancel in DOM (Tab) order - it is rendered last in the alertdialog
+      const closeX = dialog.getByRole('button', { name: 'Close', exact: true })
+      await expect(closeX).toBeVisible()
+      const buttonOrder = await dialog
+        .getByRole('button')
+        .evaluateAll((buttons) =>
+          buttons.map(
+            (button) => button.getAttribute('aria-label') ?? button.textContent?.trim() ?? '',
+          ),
+        )
+      expect(buttonOrder.indexOf('Close')).toBeGreaterThan(buttonOrder.indexOf('Cancel'))
+      expect(await seenMessageBoxes(launched)).toHaveLength(0)
+      await shell.screenshot({ path: screenshotPath('uniwork-docs-conflict-dialog-step1') })
+
+      // AC3: Overwrite… -> Step 2 confirmation -> Overwrite commits on the server's revision
+      await dialog.getByRole('button', { name: 'Overwrite…', exact: true }).click()
+      await expect(
+        dialog.getByRole('heading', { name: 'Overwrite with your version?' }),
+      ).toBeVisible()
+      await dialog.getByRole('button', { name: 'Overwrite', exact: true }).click()
+      await expect(dialog).toBeHidden()
+      await expectState(shell, 'saved')
+      expect(await seenMessageBoxes(launched)).toHaveLength(0)
+
       const commits = stub.commits(doc.id)
       expect(commits).toHaveLength(2)
       expect(commits[1]).toMatchObject({ status: 200, baseRevision: '42' })
@@ -559,60 +689,148 @@ test.describe.serial('UniWork documents', () => {
     })
   })
 
-  test('d2. conflict: "Discard my changes and open the latest" asks twice, then shows the web version', async () => {
+  test('d2. conflict: S5 "Reload latest" keeps a draft by default and loads the server version', async () => {
     test.setTimeout(180_000)
     const web = await docxOtherBytes()
     await withApp('uniwork-docs-conflict-latest', async (ctx) => {
       const { shell, launched } = ctx
       const { doc, path } = await intoConflict(ctx, 'conflict-latest.docx', web)
 
-      // choice 3 (open the latest), then confirm the discard
-      await answerMessageBoxes(launched, [2, 0])
+      // AC4: Reload latest -> Step 2 with "Keep my version as a draft" preselected -> Reload
+      await answerMessageBoxes(launched, [])
       await chip(shell).getByRole('button', { name: 'Resolve…' }).click()
-      await expectState(shell, 'saved')
 
-      const boxes = await seenMessageBoxes(launched)
-      expect(boxes).toHaveLength(2)
-      expect(boxes[1]!.buttons).toEqual(['Discard and open the latest', 'Cancel'])
-      // the working copy is now the web version, nothing was committed
+      const dialog = shell.getByRole('alertdialog')
+      await expect(dialog).toBeVisible()
+      await dialog.getByRole('button', { name: 'Reload latest', exact: true }).click()
+      await expect(dialog.getByRole('heading', { name: 'Reload latest' })).toBeVisible()
+
+      const keepRadio = dialog.getByRole('radio', { name: /Keep my version as a draft/ })
+      const discardRadio = dialog.getByRole('radio', { name: /Discard my changes/ })
+      await expect(keepRadio).toBeChecked()
+      await expect(discardRadio).not.toBeChecked()
+
+      await dialog.getByRole('button', { name: 'Reload', exact: true }).click()
+      await expect(dialog).toBeHidden()
+      await expectState(shell, 'saved')
+      expect(await seenMessageBoxes(launched)).toHaveLength(0)
+
+      // the working copy is now the server version and nothing was committed
       expect(sha256(await readFile(path))).toBe(sha256(web))
       expect(stub.commits(doc.id)).toHaveLength(1)
       expect(await binding(path)).toMatchObject({ state: 'saved', baseRevision: '42' })
       expect(await zipEntry(await readFile(path), 'word/document.xml')).not.toContain(MARKER)
+
+      // the reloaded editor displays the server version rather than a blank doc or the local edit
+      const reloaded = await docsEditor(launched.app)
+      await expect
+        .poll(
+          async () => {
+            const text = await docsText(reloaded)
+            // Plain heading text, not the OMML math: formulas are atomic nodes outside textContent.
+            return text.includes('第一章 概述') && !text.includes(MARKER)
+          },
+          { timeout: 30_000 },
+        )
+        .toBe(true)
+      expect(await activeStatus(shell)).toMatchObject({ documentId: doc.id, state: 'saved' })
+
+      // the local version was durably stored in the encrypted draft store before reloading
+      const drafts = await readKeptDrafts(launched, doc.id)
+      expect(drafts).toHaveLength(1)
+      expect(drafts[0]!.title).toBe('conflict-latest.docx')
+      expect(await zipEntry(drafts[0]!.snapshot, 'word/document.xml')).toContain(MARKER)
     })
   })
 
-  test('d3. conflict: "Save a copy on this computer" writes a plain local file and the document stays in conflict', async () => {
+  test('d2b. conflict: S5 "Reload latest" with "Discard my changes" loads the server version without keeping a draft', async () => {
     test.setTimeout(180_000)
-    const copyDir = await mkdtemp(join(tmpdir(), 'uniwork-e2e-copy-'))
-    const copyPath = join(copyDir, 'conflict-copy (my copy).docx')
+    const web = await docxOtherBytes()
+    await withApp('uniwork-docs-conflict-discard', async (ctx) => {
+      const { shell, launched } = ctx
+      const { doc, path } = await intoConflict(ctx, 'conflict-discard.docx', web)
+
+      await answerMessageBoxes(launched, [])
+      await chip(shell).getByRole('button', { name: 'Resolve…' }).click()
+
+      const dialog = shell.getByRole('alertdialog')
+      await expect(dialog).toBeVisible()
+      await dialog.getByRole('button', { name: 'Reload latest', exact: true }).click()
+      await expect(dialog.getByRole('heading', { name: 'Reload latest' })).toBeVisible()
+
+      const discardRadio = dialog.getByRole('radio', { name: /Discard my changes/ })
+      await discardRadio.check()
+      await expect(discardRadio).toBeChecked()
+
+      await dialog.getByRole('button', { name: 'Reload', exact: true }).click()
+      await expect(dialog).toBeHidden()
+      await expectState(shell, 'saved')
+      expect(await seenMessageBoxes(launched)).toHaveLength(0)
+
+      expect(sha256(await readFile(path))).toBe(sha256(web))
+      expect(stub.commits(doc.id)).toHaveLength(1)
+      expect(await binding(path)).toMatchObject({ state: 'saved', baseRevision: '42' })
+      expect(await zipEntry(await readFile(path), 'word/document.xml')).not.toContain(MARKER)
+
+      const reloaded = await docsEditor(launched.app)
+      await expect
+        .poll(
+          async () => {
+            const text = await docsText(reloaded)
+            // Plain heading text, not the OMML math: formulas are atomic nodes outside textContent.
+            return text.includes('第一章 概述') && !text.includes(MARKER)
+          },
+          { timeout: 30_000 },
+        )
+        .toBe(true)
+      expect(await activeStatus(shell)).toMatchObject({ documentId: doc.id, state: 'saved' })
+
+      // discarding did not write a draft
+      expect(await readKeptDrafts(launched, doc.id)).toHaveLength(0)
+    })
+  })
+
+  test('d3. conflict: S5 "Save as a copy…" is pending G5-12, shows the failure alert, and keeps the document in conflict', async () => {
+    test.setTimeout(180_000)
     await withApp('uniwork-docs-conflict-copy', async (ctx) => {
       const { shell, launched } = ctx
       const { doc, path } = await intoConflict(ctx, 'conflict-copy.docx')
 
-      await answerMessageBoxes(launched, [1])
-      const suggested = await launched.app.evaluate(({ dialog }, target) => {
-        const g = globalThis as unknown as { __e2eSavePath?: string }
-        dialog.showSaveDialog = (async (...args: unknown[]) => {
-          const options = (args.length > 1 ? args[1] : args[0]) as { defaultPath?: string }
-          g.__e2eSavePath = options.defaultPath
-          return { canceled: false, filePath: target }
+      await answerMessageBoxes(launched, [])
+      await launched.app.evaluate(({ dialog }) => {
+        const g = globalThis as unknown as { __e2eSaveCalls?: number }
+        g.__e2eSaveCalls = 0
+        dialog.showSaveDialog = (async () => {
+          g.__e2eSaveCalls = (g.__e2eSaveCalls ?? 0) + 1
+          return { canceled: true, filePath: '' }
         }) as typeof dialog.showSaveDialog
-        return true
-      }, copyPath)
-      expect(suggested).toBe(true)
-      await chip(shell).getByRole('button', { name: 'Resolve…' }).click()
+      })
 
-      await expect.poll(() => existsSync(copyPath), { timeout: 15_000 }).toBe(true)
-      const proposed = await launched.app.evaluate(
-        () => (globalThis as unknown as { __e2eSavePath?: string }).__e2eSavePath ?? '',
+      await chip(shell).getByRole('button', { name: 'Resolve…' }).click()
+      const dialog = shell.getByRole('alertdialog')
+      await expect(dialog).toBeVisible()
+
+      await dialog.getByRole('button', { name: 'Save as a copy…', exact: true }).click()
+      await expect(dialog.getByRole('heading', { name: 'Save as a copy?' })).toBeVisible()
+      await dialog.getByRole('button', { name: 'Create copy', exact: true }).click()
+
+      // pending G5-12: main returns the `save_copy_failed` notice in the dialog's alert region
+      await expect(dialog.getByRole('alert')).toContainText(
+        'Couldn’t create the copy. Your changes are still safe; try again.',
       )
-      expect(proposed).toMatch(/conflict-copy \(my copy\)\.docx$/)
-      expect(await zipEntry(await readFile(copyPath), 'word/document.xml')).toContain(MARKER)
-      // the document itself is still in conflict and nothing more was sent
+      await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+      await expect(dialog).toBeHidden()
+
+      // no native message box or save dialog was invoked; the document stays in conflict with its local edit intact
+      expect(await seenMessageBoxes(launched)).toHaveLength(0)
+      const saveCalls = await launched.app.evaluate(
+        () => (globalThis as unknown as { __e2eSaveCalls?: number }).__e2eSaveCalls ?? 0,
+      )
+      expect(saveCalls).toBe(0)
       await expectState(shell, 'conflict', 5_000)
       expect(stub.commits(doc.id)).toHaveLength(1)
       expect(await binding(path)).toMatchObject({ state: 'conflict', baseRevision: '41' })
+      expect(await zipEntry(await readFile(path), 'word/document.xml')).toContain(MARKER)
     })
   })
 
@@ -671,7 +889,8 @@ test.describe.serial('UniWork documents', () => {
 
       // the intent was persisted with its key before the network was used
       const path = (await activeStatus(shell))!.path
-      const intent = (await binding(path)).pendingIntent as { idempotencyKey: string }
+      const intent = (await readPendingIntent(launched, doc.id))!
+      expect(intent).not.toBeNull()
       expect(intent.idempotencyKey).toMatch(/^office-key-/)
       expect(stub.uploads(doc.id)).toHaveLength(1)
       expect(stub.commits(doc.id)).toEqual([expect.objectContaining({ status: 'dropped' })])
@@ -688,7 +907,7 @@ test.describe.serial('UniWork documents', () => {
         expect(call.idempotencyKey).toBe(intent.idempotencyKey)
       }
       expect(stub.state(doc.id).revision).toBe('42')
-      expect(await binding(path)).not.toHaveProperty('pendingIntent')
+      await expect.poll(() => readPendingIntent(launched, doc.id)).toBeNull()
       await expect(label(shell)).toHaveText('Saved to UniWork')
     })
   })
@@ -1126,8 +1345,9 @@ test.describe.serial('UniWork documents', () => {
         stub.failNextCommit('before')
         await save()
         await expectState(ctx.shell, 'offline')
-        const path = (await activeStatus(ctx.shell))!.path
-        const intent = (await binding(path)).pendingIntent as { idempotencyKey: string }
+        const intent = (await readPendingIntent(ctx.launched, doc.id))!
+        expect(intent).not.toBeNull()
+        expect(intent.idempotencyKey).toMatch(/^office-key-/)
 
         await chip(ctx.shell).getByRole('button', { name: 'Retry' }).click()
         try {
@@ -1147,6 +1367,7 @@ test.describe.serial('UniWork documents', () => {
         ])
         expect(stub.state(doc.id).revision).toBe('42')
         expect(await driver.carriesEdit(stub.state(doc.id).bytes)).toBe(true)
+        await expect.poll(() => readPendingIntent(ctx.launched, doc.id)).toBeNull()
       })
     })
   }
