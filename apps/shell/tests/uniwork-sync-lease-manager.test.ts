@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createSafeStorageKeyProvider } from '../src/main/uniwork-sync/keys'
 import {
   LeaseClientError,
@@ -201,6 +201,17 @@ const LEASE_ID = '01J8X4LEASE1P2Q3R4S5T6U7V8'
 
 function leaseError(kind: LeaseClientError['kind'], code: string, status: number): LeaseClientError {
   return new LeaseClientError({ kind, code, status })
+}
+
+/** a promise the test settles by hand: the server's answer arrives when the test says so */
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason: unknown) => void
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res
+    reject = rej
+  })
+  return { promise, resolve, reject }
 }
 
 describe('uniwork-sync lease manager (G5-08c)', () => {
@@ -775,5 +786,124 @@ describe('uniwork-sync lease manager (G5-08c)', () => {
     expect(revoked?.state).toBe('revoked')
     expect(h.revokedNotices).toHaveLength(1)
     expect(h.revokedNotices[0]?.documentId).toBe('doc_9')
+  })
+
+  it('R2BE-3: a store that answers keyring_unavailable -> keyring_unavailable state (with its reason) and no grant request', async () => {
+    const h = makeHarness({
+      wrapStore: (store) => ({ ...store, get: async () => ({ kind: 'keyring_unavailable' }) }),
+    })
+    const state = await h.manager.effectiveState('doc_1')
+    expect(state.state).toBe('keyring_unavailable')
+    expect(state.reason).toBe('keyring_unavailable')
+    expect(state.locked).toBe(true)
+    expect(state.usable).toBe(false)
+
+    const grant = await h.manager.grant('doc_1')
+    expect(grant.kind).toBe('keyring_unavailable')
+    expect(h.grantCalls).toEqual([])
+  })
+
+  it('R2BE-3: a store that answers no_session -> none (state and grant), no grant request', async () => {
+    const h = makeHarness({
+      wrapStore: (store) => ({ ...store, get: async () => ({ kind: 'no_session' }) }),
+    })
+    const state = await h.manager.effectiveState('doc_1')
+    expect(state.state).toBe('none')
+    expect(state.usable).toBe(false)
+
+    const grant = await h.manager.grant('doc_1')
+    expect(grant.kind).toBe('none')
+    expect(h.grantCalls).toEqual([])
+  })
+
+  it('R2BE-2: a grant answered after a sign-out lock is dropped: not locked open, not kept', async () => {
+    const answer = deferred<OfficeOfflineLeaseSDO>()
+    const h = makeHarness({ grantImpl: () => answer.promise })
+    const pending = h.manager.grant('doc_1')
+    await vi.waitFor(() => expect(h.grantCalls).toEqual(['doc_1']))
+
+    expect(h.manager.lockBoundary({ ...SCOPE })).toBe('signed_out')
+    answer.resolve(makeSdo(h.getWallClock()))
+    const result = await pending
+
+    expect(result.kind).toBe('locked')
+    const state = await h.manager.effectiveState('doc_1')
+    expect(state.state).toBe('locked')
+    expect(state.usable).toBe(false)
+    // nothing was kept: the next session of the account starts without it
+    h.setSession('dev_2')
+    expect((await h.manager.effectiveState('doc_1')).state).toBe('none')
+  })
+
+  it('R2BE-2: a renewal answered after a session_expired lock does not lift it', async () => {
+    const answer = deferred<OfficeOfflineLeaseSDO>()
+    const h = makeHarness({ renewImpl: () => answer.promise })
+    await h.manager.grant('doc_1')
+    h.advanceTime(13 * HOUR)
+    const pending = h.manager.renew('doc_1')
+    await vi.waitFor(() => expect(h.renewCalls).toHaveLength(1))
+
+    h.manager.lockAll('session_expired')
+    answer.resolve(makeSdo(h.getWallClock(), { generation: 2, renewed: true }))
+    const result = await pending
+
+    expect(result.kind).toBe('locked')
+    const state = await h.manager.effectiveState('doc_1')
+    expect(state.state).toBe('locked')
+    expect(state.reason).toBe('session_expired')
+  })
+
+  it('R2BE-2: a grant answered after an account switch is not served to the incoming account', async () => {
+    const answer = deferred<OfficeOfflineLeaseSDO>()
+    const h = makeHarness({ grantImpl: () => answer.promise })
+    const pending = h.manager.grant('doc_1')
+    await vi.waitFor(() => expect(h.grantCalls).toEqual(['doc_1']))
+
+    h.setScope({ ...OTHER_ACCOUNT })
+    expect(h.manager.lockBoundary({ ...SCOPE })).toBe('account_switch')
+    answer.resolve(makeSdo(h.getWallClock()))
+    const result = await pending
+
+    expect(result.kind).toBe('none')
+    expect((await h.manager.effectiveState('doc_1')).state).toBe('none')
+  })
+
+  it('R2BE-2: a grant refused after a sign-out lock is dropped: no revoke, no notice', async () => {
+    const answer = deferred<OfficeOfflineLeaseSDO>()
+    const h = makeHarness({ grantImpl: () => answer.promise })
+    const pending = h.manager.grant('doc_1')
+    await vi.waitFor(() => expect(h.grantCalls).toEqual(['doc_1']))
+
+    h.manager.lockBoundary({ ...SCOPE })
+    answer.reject(leaseError('revoked', 'offline_lease_revoked', 403))
+    const result = await pending
+
+    expect(result.kind).toBe('locked')
+    expect(h.revokedNotices).toEqual([])
+    expect((await h.manager.effectiveState('doc_1')).state).toBe('locked')
+  })
+
+  it('R2BE-2: a lock that lands while the store keeps the answer still drops the answer', async () => {
+    let lockWhileWriting: (() => void) | null = null
+    const h = makeHarness({
+      wrapStore: (store) => ({
+        ...store,
+        put: async (record) => {
+          const written = await store.put(record)
+          lockWhileWriting?.()
+          return written
+        },
+      }),
+    })
+    await h.manager.grant('doc_1')
+    h.advanceTime(13 * HOUR)
+
+    lockWhileWriting = () => h.manager.lockAll('session_expired')
+    const result = await h.manager.renew('doc_1')
+
+    expect(result.kind).toBe('locked')
+    const state = await h.manager.effectiveState('doc_1')
+    expect(state.state).toBe('locked')
+    expect(state.reason).toBe('session_expired')
   })
 })
