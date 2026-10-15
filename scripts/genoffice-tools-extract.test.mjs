@@ -7,13 +7,14 @@
 // duplicate tool name, a schema the evaluator must refuse to guess).
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { after, describe, it } from 'node:test'
 
 import { extract } from './genoffice-tools-extract.mjs'
+import * as extractor from './genoffice-tools-extract.mjs'
 
 const SCRIPT = fileURLToPath(new URL('./genoffice-tools-extract.mjs', import.meta.url))
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url))
@@ -1650,7 +1651,7 @@ describe('division after a property name (G7-06 r4)', () => {
       '      / 2 / write(call)',
       "  if (call.name === 'sib_div_postfix_dec') return write(call)",
       "  if (call.name === 'ctrl_regex_return')",
-      "    return / 2 /.test(String(read(call).output)) && write(call)",
+      '    return / 2 /.test(String(read(call).output)) && write(call)',
       "  if (call.name === 'sib_ctrl_regex_return') return write(call)",
       "  if (call.name === 'ctrl_regex_and')",
       '    return read(call) &&',
@@ -1854,5 +1855,199 @@ describe('real repo', () => {
       assert.ok(['yes', 'no', 'undeclared'].includes(row.write))
       assert.ok(!row.source.startsWith('/'))
     }
+  })
+})
+
+// ────────────────────────── --emit-schemas (G6-09 W10, R2) ──────────────────────────
+
+const EMIT_FIXTURE = {
+  'apps/docs/src/renderer/ai/tools.ts': [
+    "import type { AgentToolDef } from '@genoffice/agent-core'",
+    '',
+    'export const AGENT_TOOLS: AgentToolDef[] = [',
+    '  {',
+    "    name: 'literal_tool',",
+    "    description: 'a literal schema',",
+    '    inputSchema: {',
+    "      type: 'object',",
+    '      properties: { zeta: { type: "string" }, alpha: { type: "integer" } },',
+    "      required: ['alpha'],",
+    '    },',
+    '  },',
+    '  {',
+    "    name: 'unresolvable',",
+    "    description: `built by ${'a call'}`,",
+    "    inputSchema: buildSchema('unresolvable'),",
+    '  },',
+    '  {',
+    "    name: 'schemaless',",
+    "    description: 'a tool with no inputSchema',",
+    '  },',
+    ']',
+    '',
+  ].join('\n'),
+  'apps/sheets/src/renderer/ai/tools.ts': [
+    "import type { AgentToolDef } from '@genoffice/agent-core'",
+    '',
+    'export const WORKBOOK_TOOLS: AgentToolDef[] = [',
+    '  {',
+    "    name: 'sheet_tool',",
+    "    description: 'one tool in a second module',",
+    "    inputSchema: { type: 'object', properties: { range: { type: 'string' } } },",
+    '  },',
+    ']',
+    '',
+  ].join('\n'),
+  'packages/agent-core/src/shared-tools.ts': [
+    "import type { AgentToolDef } from './types'",
+    '',
+    'export const SHARED_TOOLS: AgentToolDef[] = [',
+    '  {',
+    "    name: 'ask_clarification',",
+    "    description: 'shared by every module',",
+    "    inputSchema: { type: 'object', properties: { question: { type: 'string' } } },",
+    '  },',
+    ']',
+    '',
+  ].join('\n'),
+}
+
+const MODULE_KEYS = ['docs', 'sheets', 'slides', 'pdf', 'markdown', 'html']
+
+describe('--emit-schemas', () => {
+  const build = (repo, rev) => {
+    assert.equal(typeof extractor.buildSchemaFile, 'function', 'buildSchemaFile is exported')
+    return extractor.buildSchemaFile(extract({ repo, rev }))
+  }
+
+  it('emits the schema file the G7-12 harness loads, with the incomplete tools listed', () => {
+    const { dir, sha } = fixture(EMIT_FIXTURE)
+    const result = extract({ repo: dir, rev: sha })
+    const file = build(dir, sha)
+
+    assert.deepEqual(Object.keys(file), ['header', ...MODULE_KEYS, 'catalogue'])
+    assert.deepEqual(file.header, {
+      kind: 'genoffice-tool-schemas',
+      version: 1,
+      rev: sha,
+      mechanicalBlockSha256: sha256(result.text),
+      counts: { docs: 3, sheets: 1, slides: 0, pdf: 0, markdown: 0, html: 0, 'agent-core': 1 },
+    })
+
+    // the shape holdout-backend.mjs reads: per module, `{ type: 'function', function: { name, description, parameters } }`
+    assert.deepEqual(file.docs, [
+      {
+        type: 'function',
+        function: {
+          name: 'literal_tool',
+          description: 'a literal schema',
+          parameters: LITERAL_SCHEMA,
+        },
+      },
+    ])
+    // source key order is kept (`zeta` before `alpha`), not sorted
+    assert.deepEqual(Object.keys(file.docs[0].function.parameters.properties), ['zeta', 'alpha'])
+    assert.deepEqual(file.sheets, [
+      {
+        type: 'function',
+        function: {
+          name: 'sheet_tool',
+          description: 'one tool in a second module',
+          parameters: { type: 'object', properties: { range: { type: 'string' } } },
+        },
+      },
+    ])
+    for (const module of ['slides', 'pdf', 'markdown', 'html']) assert.deepEqual(file[module], [])
+
+    assert.deepEqual(file.catalogue, [
+      {
+        module: 'agent-core',
+        name: 'ask_clarification',
+        host: 'agent-core',
+        source: 'packages/agent-core/src/shared-tools.ts',
+        schemaComplete: true,
+        inputSchemaSha256: hashOf({ type: 'object', properties: { question: { type: 'string' } } }),
+      },
+      {
+        module: 'docs',
+        name: 'literal_tool',
+        host: 'renderer',
+        source: 'apps/docs/src/renderer/ai/tools.ts',
+        schemaComplete: true,
+        inputSchemaSha256: hashOf(LITERAL_SCHEMA),
+      },
+      {
+        module: 'docs',
+        name: 'schemaless',
+        host: 'renderer',
+        source: 'apps/docs/src/renderer/ai/tools.ts',
+        schemaComplete: false,
+        reason: 'missing',
+        description: 'a tool with no inputSchema',
+        inputSchemaSha256: null,
+      },
+      {
+        module: 'docs',
+        name: 'unresolvable',
+        host: 'renderer',
+        source: 'apps/docs/src/renderer/ai/tools.ts',
+        schemaComplete: false,
+        reason: 'identifier:buildSchema',
+        description: 'built by a call',
+        inputSchemaSha256: null,
+      },
+      {
+        module: 'sheets',
+        name: 'sheet_tool',
+        host: 'renderer',
+        source: 'apps/sheets/src/renderer/ai/tools.ts',
+        schemaComplete: true,
+        inputSchemaSha256: hashOf({ type: 'object', properties: { range: { type: 'string' } } }),
+      },
+    ])
+  })
+
+  it('is deterministic: two runs write byte-identical files', () => {
+    const { dir, sha } = fixture(EMIT_FIXTURE)
+    const a = JSON.stringify(build(dir, sha))
+    const b = JSON.stringify(build(dir, sha))
+    assert.equal(a, b)
+  })
+
+  it('lists one catalogue entry per mechanical table row, module by module', () => {
+    const { dir, sha } = fixture(FIXTURE)
+    const result = extract({ repo: dir, rev: sha })
+    const file = build(dir, sha)
+    const perModule = new Map()
+    for (const row of result.rows) perModule.set(row.module, (perModule.get(row.module) ?? 0) + 1)
+    const fromCatalogue = new Map()
+    for (const entry of file.catalogue)
+      fromCatalogue.set(entry.module, (fromCatalogue.get(entry.module) ?? 0) + 1)
+    assert.deepEqual(fromCatalogue, perModule)
+    assert.equal(file.catalogue.length, result.rows.length)
+    // a complete schema is offered, an incomplete one is only listed
+    const names = (module) => file[module].map((t) => t.function.name)
+    assert.ok(names('docs').includes('literal_tool'))
+    assert.ok(!names('docs').includes('unresolvable'))
+    assert.ok(file.catalogue.some((e) => e.name === 'unresolvable' && e.schemaComplete === false))
+  })
+
+  it('CLI --emit-schemas writes the file and leaves the default markdown untouched', () => {
+    const { dir, sha } = fixture(EMIT_FIXTURE)
+    const out = join(dir, '..', `emit-${sha.slice(0, 8)}.json`)
+    roots.push(out)
+    const plain = execFileSync(process.execPath, [SCRIPT, '--repo', dir, '--rev', sha], {
+      encoding: 'utf8',
+    })
+    assert.equal(plain, extract({ repo: dir, rev: sha }).text)
+    const withFlag = execFileSync(
+      process.execPath,
+      [SCRIPT, '--repo', dir, '--rev', sha, '--emit-schemas', out],
+      { encoding: 'utf8' },
+    )
+    assert.equal(withFlag, '')
+    const written = readFileSync(out, 'utf8')
+    assert.ok(written.endsWith('}\n'))
+    assert.deepEqual(JSON.parse(written), build(dir, sha))
   })
 })
