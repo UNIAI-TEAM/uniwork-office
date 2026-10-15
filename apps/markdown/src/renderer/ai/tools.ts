@@ -1,7 +1,12 @@
 import { modelTextOf, redactJson, redactTextBetween } from '../editor/redact'
 import type { Editor, JSONContent } from '@tiptap/core'
 import type { Node as PmNode } from '@tiptap/pm/model'
-import type { AgentToolCall, AgentToolDef, ToolExecution } from '@genoffice/agent-core'
+import type {
+  AgentToolCall,
+  AgentToolDef,
+  ImageUrlRegistry,
+  ToolExecution,
+} from '@genoffice/agent-core'
 import {
   OP_SPECS,
   blockIndexRange,
@@ -591,6 +596,8 @@ export function executeTool(
   writer?: AiDocWriter,
   /** the panel's questionnaire card; without one ask_clarification reports it is unavailable */
   ask?: AskClarification,
+  /** image URLs this run may insert (image_search / generate_image results); absent = no rule */
+  imageUrls?: ImageUrlRegistry,
 ): ToolExecution | Promise<ToolExecution> {
   if (call.name === 'ask_clarification') return askClarification(call, ask)
   const doc = editor.state.doc
@@ -658,6 +665,7 @@ export function executeTool(
               t('aiToolImageSearch'),
             )
           }
+          for (const im of r.images) imageUrls?.register(im.imageUrl, 'image_search')
           const lines = r.images.map(
             (im, i) =>
               `${i + 1}. ${im.title || '(untitled)'} [${im.width ?? '?'}x${im.height ?? '?'}]\n   ${im.imageUrl}`,
@@ -674,6 +682,8 @@ export function executeTool(
       if (editedExternally(editor)) return fail(STALE_DOC_ERROR, t('aiToolInsertImage'))
       const url = String(call.input.url ?? '')
       if (!/^https?:\/\//.test(url)) return fail('invalid url', t('aiToolInsertImage'))
+      const refusal = imageUrls?.check(url)
+      if (refusal) return fail(refusal, t('aiToolInsertImage'))
       return insertImageFromUrl(editor, url, call.input, signal, {
         fail: t('aiToolInsertImage'),
         done: t('aiToolInsertImageDone'),
@@ -694,6 +704,7 @@ export function executeTool(
           if (!generated.url) {
             return fail(generated.error ?? 'image generation failed', t('aiToolGenImage'))
           }
+          imageUrls?.register(generated.url, 'generate_image')
           return insertImageFromUrl(editor, generated.url, call.input, signal, {
             fail: t('aiToolGenImage'),
             done: t('aiToolGenImageDone'),
