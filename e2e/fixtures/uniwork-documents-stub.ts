@@ -132,6 +132,11 @@ export interface UniworkDocumentsStub extends UniworkAuthStub {
    */
   failNextCommit(mode?: CommitDrop, count?: number): void
   /**
+   * The next commits are cut one per entry, in order (BE-12-202: the first
+   * lands with its answer lost, the retry is cut before the server acts).
+   */
+  failCommitsInOrder(modes: CommitDrop[]): void
+  /**
    * The next `count` commits on a document made through `/copies` answer a 5xx
    * (G5-12: the copy's step 2 fails and the app archives the copy).
    */
@@ -220,12 +225,10 @@ export async function startUniworkDocumentsStub(): Promise<UniworkDocumentsStub>
   const uploadByKey = new Map<string, StoredUpload>()
   const commitByKey = new Map<string, StoredCommit>()
   const calls: StubCall[] = []
-  let dropNextCommit: CommitDrop | null = null
-  /** how many more commits the pending drop applies to */
-  let dropRemaining = 0
+  /** the pending commit drops, one per commit, oldest first */
+  let commitDrops: CommitDrop[] = []
   const consumeDrop = () => {
-    dropRemaining -= 1
-    if (dropRemaining <= 0) dropNextCommit = null
+    commitDrops.shift()
   }
   /** G5-12: `/copies` answers 403 workspace_seat_required (the caller is no member of the source's workspace) */
   let copiesDenied = false
@@ -544,7 +547,7 @@ export async function startUniworkDocumentsStub(): Promise<UniworkDocumentsStub>
           ...(idempotencyKey ? { idempotencyKey } : {}),
           ...(baseRevision ? { baseRevision } : {}),
         }
-        const dropMode = dropNextCommit
+        const dropMode = commitDrops[0] ?? null
         if (dropMode === 'before') {
           consumeDrop()
           log(ctx, { ...base, status: 'dropped' })
@@ -746,8 +749,10 @@ export async function startUniworkDocumentsStub(): Promise<UniworkDocumentsStub>
       need(documentId).myLevel = level
     },
     failNextCommit(mode = 'before', count = 1) {
-      dropNextCommit = mode
-      dropRemaining = count
+      commitDrops = Array.from({ length: count }, () => mode)
+    },
+    failCommitsInOrder(modes) {
+      commitDrops = [...modes]
     },
     denyCopies(denied = true) {
       copiesDenied = denied

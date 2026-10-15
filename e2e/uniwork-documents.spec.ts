@@ -1010,6 +1010,104 @@ test.describe.serial('UniWork documents', () => {
     })
   })
 
+  test('d3e. conflict: a copy commit that landed with its answer lost and a retry cut before the server is found by the lookup (committed): kept, done notice, no archive', async () => {
+    test.setTimeout(180_000)
+    await withApp('uniwork-docs-conflict-copy-landed', async (ctx) => {
+      const { shell, launched } = ctx
+      const { doc, path } = await intoConflict(ctx, 'conflict-copy-landed.docx')
+      const localBytes = await readFile(path)
+      await answerMessageBoxes(launched, [])
+
+      await chip(shell).getByRole('button', { name: 'Resolve…' }).click()
+      const dialog = shell.getByRole('alertdialog')
+      await expect(dialog).toBeVisible()
+      await dialog.getByRole('button', { name: 'Save as a copy…', exact: true }).click()
+      // BE-12-202: the first commit lands and its answer is lost; the retry never reaches the
+      // server, so only the lookup can tell the app the copy holds its bytes
+      stub.failCommitsInOrder(['after', 'before'])
+      await dialog.getByRole('button', { name: 'Create copy', exact: true }).click()
+
+      await expect(dialog.getByRole('alert')).toHaveText(
+        syncEn.uwConflictSaveCopyDone.replace('{title}', 'conflict-copy-landed (my version).docx'),
+      )
+      const copies = stub.copiesOf(doc.id)
+      expect(copies).toHaveLength(1)
+      expect(copies[0]).toMatchObject({ archived: false })
+      expect(copies[0]!.state.checksum).toBe(sha256(localBytes))
+      expect(
+        stub
+          .calls()
+          .filter((c) => c.method === 'POST' && c.route === `/documents/${copies[0]!.id}/archive`),
+      ).toHaveLength(0)
+      // one key for both attempts: the first committed, the retry was cut; one lookup with it
+      const commits = stub.commits(copies[0]!.id)
+      expect(commits.map((c) => c.status)).toEqual([200, 'dropped'])
+      const commitKeys = commits.map((c) => c.idempotencyKey)
+      expect(new Set(commitKeys).size).toBe(1)
+      expect(
+        stub
+          .calls()
+          .filter(
+            (c) => c.method === 'GET' && c.route === `/documents/${copies[0]!.id}/versions/commit`,
+          ),
+      ).toEqual([expect.objectContaining({ status: 200, idempotencyKey: commitKeys[0] })])
+
+      await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+      await expect(dialog).toBeHidden()
+      await expectState(shell, 'conflict', 5_000)
+      expect(stub.commits(doc.id)).toHaveLength(1)
+      expect(await readFile(path)).toEqual(localBytes)
+    })
+  })
+
+  test('d3f. conflict: both copy commits cut before the server acts -> the lookup says not_committed, the pristine copy is archived, failure alert', async () => {
+    test.setTimeout(180_000)
+    await withApp('uniwork-docs-conflict-copy-cut', async (ctx) => {
+      const { shell, launched } = ctx
+      const { doc, path } = await intoConflict(ctx, 'conflict-copy-cut.docx')
+      const localBytes = await readFile(path)
+      await answerMessageBoxes(launched, [])
+
+      await chip(shell).getByRole('button', { name: 'Resolve…' }).click()
+      const dialog = shell.getByRole('alertdialog')
+      await expect(dialog).toBeVisible()
+      await dialog.getByRole('button', { name: 'Save as a copy…', exact: true }).click()
+      // BE-12-203: neither commit reaches the server
+      stub.failNextCommit('before', 2)
+      await dialog.getByRole('button', { name: 'Create copy', exact: true }).click()
+
+      await expect(dialog.getByRole('alert')).toHaveText(syncEn.uwConflictSaveCopyFailed)
+      const copies = stub.copiesOf(doc.id)
+      expect(copies).toHaveLength(1)
+      // the copy never got the person's bytes and is archived: no server bytes posing as theirs
+      expect(copies[0]).toMatchObject({ archived: true })
+      expect(copies[0]!.state.checksum).not.toBe(sha256(localBytes))
+      expect(copies[0]!.state.version).toBe(1)
+      expect(
+        stub
+          .calls()
+          .filter((c) => c.method === 'POST' && c.route === `/documents/${copies[0]!.id}/archive`),
+      ).toEqual([expect.objectContaining({ status: 200 })])
+      const commits = stub.commits(copies[0]!.id)
+      expect(commits.map((c) => c.status)).toEqual(['dropped', 'dropped'])
+      const commitKeys = commits.map((c) => c.idempotencyKey)
+      expect(new Set(commitKeys).size).toBe(1)
+      expect(
+        stub
+          .calls()
+          .filter(
+            (c) => c.method === 'GET' && c.route === `/documents/${copies[0]!.id}/versions/commit`,
+          ),
+      ).toEqual([expect.objectContaining({ status: 200, idempotencyKey: commitKeys[0] })])
+
+      await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+      await expect(dialog).toBeHidden()
+      await expectState(shell, 'conflict', 5_000)
+      expect(stub.commits(doc.id)).toHaveLength(1)
+      expect(await readFile(path)).toEqual(localBytes)
+    })
+  })
+
   // e ───────────────────────────────────────────────────────────────────────
   test('e. view-only: opens read-only, typing changes nothing, Ctrl+S sends nothing', async () => {
     test.setTimeout(150_000)
