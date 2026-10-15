@@ -1298,6 +1298,18 @@ describe('UniworkConflictDialog CSS (G5-09 S5 visual-1 fixes)', () => {
     expect(rule('.uw-conflict-title')).toContain('padding-right')
   })
 
+  it('V12-01: the first step-1 reason line clears the focus ring of the button above it (outline + offset), with no raw colors', () => {
+    const ring = rule('.uw-conflict-btn[data-conflict-initial-focus]')
+    const width = Number(/outline:\s*(\d+)px/.exec(ring)![1])
+    const offset = Number(/outline-offset:\s*(\d+)px/.exec(ring)![1])
+    const body = rule('.uw-conflict-actions + .uw-conflict-reason')
+    const top = /margin-top:\s*(-?\d+)px/.exec(body)
+    expect(top).not.toBeNull()
+    // at least 2px of air between the ring's outer edge and the reason text
+    expect(Number(top![1])).toBeGreaterThanOrEqual(width + offset + 2)
+    expect(body).not.toMatch(/#[0-9a-f]{3,8}\b|rgb\(/i)
+  })
+
   it('V-06: Overwrite (danger) hover keeps white-on-red at >= 4.5:1 in light and dark (no opacity fade)', () => {
     const hover = rule(".uw-conflict-btn--danger:hover:not([aria-disabled='true'])")
     expect(hover).not.toContain('opacity')
