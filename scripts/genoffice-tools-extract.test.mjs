@@ -1864,6 +1864,8 @@ const EMIT_FIXTURE = {
   'apps/docs/src/renderer/ai/tools.ts': [
     "import type { AgentToolDef } from '@genoffice/agent-core'",
     '',
+    "const SIZES = [{ label: 'A4' }, { label: 'Letter' }]",
+    '',
     'export const AGENT_TOOLS: AgentToolDef[] = [',
     '  {',
     "    name: 'literal_tool',",
@@ -1873,6 +1875,19 @@ const EMIT_FIXTURE = {
     '      properties: { zeta: { type: "string" }, alpha: { type: "integer" } },',
     "      required: ['alpha'],",
     '    },',
+    '  },',
+    '  {',
+    "    name: 'enum_tool',",
+    "    description: 'an enum built with an arrow function',",
+    '    inputSchema: {',
+    "      type: 'object',",
+    "      properties: { size: { type: 'string', enum: SIZES.map((p) => p.label) } },",
+    '    },',
+    '  },',
+    '  {',
+    "    name: 'guide_tool',",
+    "    description: 'Intro. ' + buildGuide(),",
+    "    inputSchema: { type: 'object', properties: {} },",
     '  },',
     '  {',
     "    name: 'unresolvable',",
@@ -1931,6 +1946,7 @@ const EMIT_FIXTURE = {
   ].join('\n'),
 }
 
+const RUNTIME_MARK = '[generated at runtime]'
 const MODULE_KEYS = ['docs', 'sheets', 'slides', 'pdf', 'markdown', 'html']
 
 describe('--emit-schemas', () => {
@@ -1950,32 +1966,28 @@ describe('--emit-schemas', () => {
       version: 1,
       rev: sha,
       mechanicalBlockSha256: sha256(result.text),
-      counts: { docs: 6, sheets: 1, slides: 0, pdf: 0, markdown: 0, html: 0, 'agent-core': 1 },
+      counts: { docs: 8, sheets: 1, slides: 0, pdf: 0, markdown: 0, html: 0, 'agent-core': 1 },
     })
 
     // the shape holdout-backend.mjs reads: per module, `{ type: 'function', function: { name, description, parameters } }`
+    const tool = (module, name) => file[module].find((t) => t.function.name === name)
     assert.deepEqual(
       file.docs.map((t) => t.function.name),
-      ['concat_tool', 'literal_tool'],
+      ['computed_description', 'concat_tool', 'enum_tool', 'guide_tool', 'literal_tool'],
     )
-    assert.deepEqual(
-      file.docs.find((t) => t.function.name === 'literal_tool'),
-      {
-        type: 'function',
-        function: {
-          name: 'literal_tool',
-          description: 'a literal schema',
-          parameters: LITERAL_SCHEMA,
-        },
+    assert.deepEqual(tool('docs', 'literal_tool'), {
+      type: 'function',
+      function: {
+        name: 'literal_tool',
+        description: 'a literal schema',
+        parameters: LITERAL_SCHEMA,
       },
-    )
+    })
     // source key order is kept (`zeta` before `alpha`), not sorted
-    assert.deepEqual(
-      Object.keys(
-        file.docs.find((t) => t.function.name === 'literal_tool').function.parameters.properties,
-      ),
-      ['zeta', 'alpha'],
-    )
+    assert.deepEqual(Object.keys(tool('docs', 'literal_tool').function.parameters.properties), [
+      'zeta',
+      'alpha',
+    ])
     assert.deepEqual(file.sheets, [
       {
         type: 'function',
@@ -1988,64 +2000,96 @@ describe('--emit-schemas', () => {
     ])
     for (const module of ['slides', 'pdf', 'markdown', 'html']) assert.deepEqual(file[module], [])
 
+    // `first part. ` + `second part.` is one description, not its first operand
+    assert.equal(tool('docs', 'concat_tool').function.description, 'first part. second part.')
+    // an arrow function inside a call (`.map((p) => p.label)`) is folded, not flagged as an operator
+    assert.deepEqual(tool('docs', 'enum_tool').function.parameters.properties.size.enum, [
+      'A4',
+      'Letter',
+    ])
+    // a description that needs product code is offered partial: the literal text, a neutral marker where the code ran
+    assert.equal(tool('docs', 'computed_description').function.description, `ops: ${RUNTIME_MARK}`)
+    assert.equal(tool('docs', 'guide_tool').function.description, `Intro. ${RUNTIME_MARK}`)
+
     const CONCAT_FULL = {
       type: 'object',
       properties: { q: { type: 'string', description: 'long text' } },
     }
-    // the table's evaluator stops the value at the `+` and reads `'text'` as a key of its own: its cell is unresolved
     const askSchema = { type: 'object', properties: { question: { type: 'string' } } }
     const opsSchema = { type: 'object', properties: { ops: { type: 'array' } } }
     const rangeSchema = { type: 'object', properties: { range: { type: 'string' } } }
     const nSchema = { type: 'object', properties: { n: { type: 'number' } } }
+    const emptySchema = { type: 'object', properties: {} }
+    const enumSchema = {
+      type: 'object',
+      properties: { size: { type: 'string', enum: ['A4', 'Letter'] } },
+    }
     const DOCS_SRC = 'apps/docs/src/renderer/ai/tools.ts'
+    const base = (module, name, source) => ({
+      module,
+      name,
+      host: source.startsWith('packages/') ? 'agent-core' : 'renderer',
+      source,
+    })
     assert.deepEqual(file.catalogue, [
       {
-        module: 'agent-core',
-        name: 'ask_clarification',
-        host: 'agent-core',
-        source: 'packages/agent-core/src/shared-tools.ts',
+        ...base('agent-core', 'ask_clarification', 'packages/agent-core/src/shared-tools.ts'),
         schemaComplete: true,
+        descriptionComplete: true,
+        offered: true,
         inputSchemaSha256: hashOf(askSchema),
         tableHash: hashOf(askSchema),
       },
       {
-        module: 'docs',
-        name: 'computed_description',
-        host: 'renderer',
-        source: DOCS_SRC,
-        schemaComplete: false,
+        // partial: the schema is real, the description has a marker where `opNames()` ran
+        ...base('docs', 'computed_description', DOCS_SRC),
+        schemaComplete: true,
+        descriptionComplete: false,
+        offered: true,
         reason: 'description:identifier:opNames',
-        description: null,
-        // the schema resolved, only the description needs product code: kept for a consumer that supplies its own
-        inputSchema: opsSchema,
         inputSchemaSha256: hashOf(opsSchema),
         tableHash: hashOf(opsSchema),
       },
       {
-        module: 'docs',
-        name: 'concat_tool',
-        host: 'renderer',
-        source: DOCS_SRC,
+        ...base('docs', 'concat_tool', DOCS_SRC),
         schemaComplete: true,
+        descriptionComplete: true,
+        offered: true,
         inputSchemaSha256: hashOf(CONCAT_FULL),
+        // the table's evaluator stops the value at the `+` and reads `'text'` as a key of its own
         tableHash: 'unresolved:identifier:text',
       },
       {
-        module: 'docs',
-        name: 'literal_tool',
-        host: 'renderer',
-        source: DOCS_SRC,
+        ...base('docs', 'enum_tool', DOCS_SRC),
         schemaComplete: true,
+        descriptionComplete: true,
+        offered: true,
+        inputSchemaSha256: hashOf(enumSchema),
+        tableHash: hashOf(enumSchema),
+      },
+      {
+        ...base('docs', 'guide_tool', DOCS_SRC),
+        schemaComplete: true,
+        descriptionComplete: false,
+        offered: true,
+        reason: 'description:identifier:buildGuide',
+        inputSchemaSha256: hashOf(emptySchema),
+        tableHash: hashOf(emptySchema),
+      },
+      {
+        ...base('docs', 'literal_tool', DOCS_SRC),
+        schemaComplete: true,
+        descriptionComplete: true,
+        offered: true,
         inputSchemaSha256: hashOf(LITERAL_SCHEMA),
         tableHash: hashOf(LITERAL_SCHEMA),
       },
       {
-        // `'x' || 'y'` is an operator the evaluator does not fold: listed, never cut at the operator
-        module: 'docs',
-        name: 'operator_tool',
-        host: 'renderer',
-        source: DOCS_SRC,
-        schemaComplete: false,
+        // `'x' || 'y'` is an operator the evaluator does not fold: no description at all, so not offered
+        ...base('docs', 'operator_tool', DOCS_SRC),
+        schemaComplete: true,
+        descriptionComplete: false,
+        offered: false,
         reason: 'description:operator:||',
         description: null,
         inputSchema: nSchema,
@@ -2053,41 +2097,34 @@ describe('--emit-schemas', () => {
         tableHash: hashOf(nSchema),
       },
       {
-        module: 'docs',
-        name: 'schemaless',
-        host: 'renderer',
-        source: DOCS_SRC,
+        ...base('docs', 'schemaless', DOCS_SRC),
         schemaComplete: false,
+        descriptionComplete: true,
+        offered: false,
         reason: 'missing',
         description: 'a tool with no inputSchema',
         inputSchemaSha256: null,
         tableHash: 'unresolved:missing',
       },
       {
-        module: 'docs',
-        name: 'unresolvable',
-        host: 'renderer',
-        source: DOCS_SRC,
+        ...base('docs', 'unresolvable', DOCS_SRC),
         schemaComplete: false,
+        descriptionComplete: true,
+        offered: false,
         reason: 'identifier:buildSchema',
         description: 'built by a call',
         inputSchemaSha256: null,
         tableHash: 'unresolved:identifier:buildSchema',
       },
       {
-        module: 'sheets',
-        name: 'sheet_tool',
-        host: 'renderer',
-        source: 'apps/sheets/src/renderer/ai/tools.ts',
+        ...base('sheets', 'sheet_tool', 'apps/sheets/src/renderer/ai/tools.ts'),
         schemaComplete: true,
+        descriptionComplete: true,
+        offered: true,
         inputSchemaSha256: hashOf(rangeSchema),
         tableHash: hashOf(rangeSchema),
       },
     ])
-    // `first part. ` + `second part.` is one description, not its first operand
-    const concat = file.docs.find((t) => t.function.name === 'concat_tool')
-    assert.equal(concat.function.description, 'first part. second part.')
-    assert.deepEqual(concat.function.parameters, CONCAT_FULL)
   })
 
   it('lists a table row whose object the default evaluator misread, instead of trusting its name', () => {
