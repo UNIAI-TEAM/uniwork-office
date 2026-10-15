@@ -391,6 +391,23 @@ describe('UNI-1380 G7-03a test-only sync trace + queue timer hooks', () => {
     ])
   })
 
+  it('traces the state the coordinator ends in for a quota_exceeded failure (blocked, not failed)', async () => {
+    const traceFile = join(tempDir, 'trace', 'coordinator-quota.jsonl')
+    process.env.UNIWORK_SYNC_TRACE_FILE = traceFile
+
+    const fx = await buildFixture()
+    fx.serverState.commitError = new UniworkDocError('quota_exceeded', { status: 413 })
+    const ended = await fx.coordinator.save(fx.docPath)
+
+    const lines = readTraceLines(traceFile)
+    assertOnlyAllowedKeys(lines)
+    const last = lines[lines.length - 1]
+    expect(last?.from).toBe('queued')
+    expect(last?.to).toBe('blocked')
+    expect(last?.code).toBe('quota_exceeded')
+    expect(ended.binding.state).toBe('blocked')
+  })
+
   it('honours stuckAfterMs and recheckMs overrides only with UNIWORK_SYNC_TRACE_FILE set and unpackaged; ignores invalid values', async () => {
     // 1. Defaults when unset
     expect(QUEUE_LIMITS.stuckAfterMs).toBe(3_600_000)

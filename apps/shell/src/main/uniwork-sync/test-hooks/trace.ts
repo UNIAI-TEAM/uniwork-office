@@ -16,8 +16,8 @@
 import { appendFileSync, mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { UniworkDocError } from '../../uniwork-docs/errors'
-import { transition, type QueueEvent } from '../queue/machine'
-import type { IntentRecordV2, QueueState } from '../queue/record'
+import type { QueueEvent } from '../queue/machine'
+import { isQueueState, type IntentRecordV2, type QueueState } from '../queue/record'
 import { resolveSyncTraceFile, type TestHookEnvOptions } from './limits'
 
 export interface IntentTraceLine {
@@ -158,7 +158,13 @@ export function traceQueueTransition(
 export type CoordinatorTraceEvent =
   | { type: 'minted' }
   | { type: 'settled'; now: Date }
-  | { type: 'failed'; error: UniworkDocError; now: Date }
+  | { type: 'failed'; error: UniworkDocError; to: string; now: Date }
+
+/** The coordinator's own end state (a binding state) as a queue state for the trace. */
+function traceStateOf(state: string): QueueState {
+  if (isQueueState(state)) return state
+  return state === 'offline' ? 'paused_offline' : 'failed'
+}
 
 /**
  * Hook called from `SaveCoordinator` when an inline Save mints, settles, or
@@ -197,14 +203,8 @@ export function traceCoordinatorTransition(
     )
     return
   }
-  const nowMs = event.now.getTime()
-  const next = transition(
-    intent,
-    { type: 'commitFailed', error: event.error.code },
-    { now: nowMs },
-  ).record
-  const to = next?.state ?? 'failed'
-  const code = next?.lastError ?? event.error.code
+  const to = traceStateOf(event.to)
+  const code = event.error.code
   traceIntentTransition(
     {
       ts: event.now.toISOString(),

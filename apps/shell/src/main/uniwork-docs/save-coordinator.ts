@@ -624,7 +624,17 @@ export class SaveCoordinator {
     intents: IntentStore,
   ): Promise<BoundDocument> {
     const error = raw instanceof UniworkDocError ? raw : new UniworkDocError('server_error')
-    this.trace(intent, { type: 'failed', error, now: this.now() })
+    const ended = await this.applyFailure(doc, intent, error, intents)
+    this.trace(intent, { type: 'failed', error, to: ended.binding.state, now: this.now() })
+    return ended
+  }
+
+  private async applyFailure(
+    doc: BoundDocument,
+    intent: IntentRecordV2,
+    error: UniworkDocError,
+    intents: IntentStore,
+  ): Promise<BoundDocument> {
     const base = doc.binding
     const dropped = isTerminalRefusal(error)
     if (dropped) {
