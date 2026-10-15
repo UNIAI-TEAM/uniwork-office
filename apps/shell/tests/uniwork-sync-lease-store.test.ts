@@ -327,6 +327,90 @@ describe('uniwork-sync lease record and store (G5-08c)', () => {
   })
 })
 
+describe('uniwork-sync lease store outcomes and on-disk hygiene (W1f)', () => {
+  it('R1BE-8: no usable keyring surfaces as keyring_unavailable, not keystore_locked', async () => {
+    const root = join(base, 'records')
+    const layer = createStoreLayer({
+      root,
+      keys: createSafeStorageKeyProvider({
+        safeStorage: { ...safeStorage, getSelectedStorageBackend: () => 'basic_text' },
+        dir: join(base, 'keys'),
+      }),
+      budgetBytes: 1 << 20,
+      clock: () => 1_760_342_400_000,
+    })
+    layer.register(LEASE_STORE_REGISTRATION)
+    const store = createLeaseStore(createSyncStoreAccess({ layer, scope: () => ({ ...SCOPE }) }))
+    expect(await store.put(sampleLease())).toEqual({ kind: 'keyring_unavailable' })
+    expect(await store.get('doc_1')).toEqual({ kind: 'keyring_unavailable' })
+    expect(await store.delete('doc_1')).toEqual({ kind: 'keyring_unavailable' })
+    expect(listFilesUnder(root)).toEqual([])
+  })
+
+  it('R1BE-8: no session surfaces as no_session, distinct from a locked keychain', async () => {
+    const env = makeEnv()
+    env.setScope(null)
+    expect(await env.store.put(sampleLease())).toEqual({ kind: 'no_session' })
+    expect(await env.store.get('doc_1')).toEqual({ kind: 'no_session' })
+    expect(await env.store.delete('doc_1')).toEqual({ kind: 'no_session' })
+    expect(listFilesUnder(env.root)).toEqual([])
+  })
+
+  it('T1-6: no plaintext SDO field reaches the disk', async () => {
+    const env = makeEnv()
+    const distinct = sampleLease({
+      lease: 'ofl1.plaintext-scan-token',
+      lease_id: '01J8X4LEASEPLAINSCAN000001',
+      version_id: '01J8X4VERSIONPLAINSCAN0001',
+      revision: '8100200300400500600',
+      expires_at: '2026-10-14T08:00:00.000Z',
+      renew_after: '2026-10-13T20:00:00.000Z',
+      scope: {
+        user_id: SCOPE.accountId,
+        deployment_id: SCOPE.deploymentId,
+        organization_id: 'org_plainscan',
+        workspace_id: 'ws_plainscan',
+      },
+    })
+    expect((await env.store.put(distinct)).kind).toBe('ok')
+    for (const field of [
+      'ofl1.plaintext-scan-token',
+      '01J8X4LEASEPLAINSCAN000001',
+      '01J8X4VERSIONPLAINSCAN0001',
+      '8100200300400500600',
+      '2026-10-14T08:00:00.000Z',
+      '2026-10-13T20:00:00.000Z',
+      'org_plainscan',
+      'ws_plainscan',
+      '"level"',
+    ]) {
+      expect(filesContaining(base, Buffer.from(field)), field).toEqual([])
+    }
+  })
+
+  it('T1-6: a truncated or empty lease record is refused', async () => {
+    const env = makeEnv()
+    await env.store.put(sampleLease({ document_id: 'doc_1' }))
+    const path = recordPath(env.root, SCOPE, LEASE_STORE_REGISTRATION.name, 'doc_1')
+    const full = readFileSync(path)
+
+    writeFileSync(path, full.subarray(0, Math.floor(full.length / 2)))
+    expect(await env.store.get('doc_1')).toEqual({ kind: 'refused' })
+    writeFileSync(path, Buffer.alloc(0))
+    expect(await env.store.get('doc_1')).toEqual({ kind: 'refused' })
+
+    // an encrypted record whose plaintext is empty, or a cut JSON body
+    const opened = await env.layer.open(SCOPE)
+    if (opened.kind !== 'ok') throw new Error('store did not open')
+    const records = opened.store.records(LEASE_STORE_REGISTRATION.name)
+    await records.write('doc_2', new Uint8Array())
+    expect(await env.store.get('doc_2')).toEqual({ kind: 'refused' })
+    const body = encodeLeaseRecord(sampleLease({ document_id: 'doc_3' }))
+    await records.write('doc_3', body.subarray(0, body.length - 5))
+    expect(await env.store.get('doc_3')).toEqual({ kind: 'refused' })
+  })
+})
+
 runStoreCompliance('uniwork-sync offline-leases', async (env: ComplianceEnv) => {
   const layer = createStoreLayer({
     root: env.root,

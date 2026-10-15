@@ -20,7 +20,9 @@ import {
  * and paths outside the store namespace are refused.
  *
  * - Keystore locked -> every operation returns `{ kind: 'keystore_locked' }`
- *   with nothing written.
+ *   with nothing written. No usable keyring at all (`keyring_unavailable`) and
+ *   no signed-in session (`no_session`) are reported as they are, never folded
+ *   into `keystore_locked` (a lock is transient, the other two are not).
  * - Store full -> `{ kind: 'store_full' }` with nothing written.
  * - Survives lock-and-keep: records stay encrypted on disk and become readable
  *   again once the keystore unlocks and the scope reopens.
@@ -32,19 +34,25 @@ export const LEASE_STORE_REGISTRATION: StoreRegistration = {
   minStoreLevel: APP_STORE_LEVEL,
 }
 
+/** the store cannot be reached right now, and why */
+export type LeaseStoreUnavailable =
+  | { kind: 'keystore_locked' }
+  | { kind: 'keyring_unavailable' }
+  | { kind: 'no_session' }
+
 export type LeaseStoreReadResult =
   | { kind: 'ok'; record: LeaseRecord }
   | { kind: 'missing' }
   | { kind: 'refused' }
-  | { kind: 'keystore_locked' }
+  | LeaseStoreUnavailable
 
 export type LeaseStoreWriteResult =
   | { kind: 'ok'; record: LeaseRecord }
   | { kind: 'store_full' }
   | { kind: 'refused' }
-  | { kind: 'keystore_locked' }
+  | LeaseStoreUnavailable
 
-export type LeaseStoreDeleteResult = { kind: 'ok' } | { kind: 'keystore_locked' }
+export type LeaseStoreDeleteResult = { kind: 'ok' } | LeaseStoreUnavailable
 
 export interface LeaseStore {
   get(documentId: string): Promise<LeaseStoreReadResult>
@@ -67,7 +75,12 @@ export type LeaseStoreSource =
 
 type ResolvedRecords =
   | { kind: 'ok'; records: StoreRecords; scope: StoreScope | null }
-  | { kind: 'keystore_locked' }
+  | LeaseStoreUnavailable
+
+/** a key status that is not ok, as the store's unavailable outcome */
+function unavailable(status: Exclude<StoreKeyStatus, 'ok'>): LeaseStoreUnavailable {
+  return { kind: status }
+}
 
 function isSyncStoreAccess(source: LeaseStoreSource): source is SyncStoreAccess {
   return (
@@ -111,9 +124,9 @@ export function createLeaseStore(source: LeaseStoreSource): LeaseStore {
     try {
       if (isSyncStoreAccess(source)) {
         const currentScope = source.scope()
-        if (!currentScope) return { kind: 'keystore_locked' }
+        if (!currentScope) return { kind: 'no_session' }
         const opened = await source.open()
-        if (opened.kind !== 'ok') return { kind: 'keystore_locked' }
+        if (opened.kind !== 'ok') return { kind: opened.kind }
         return {
           kind: 'ok',
           records: opened.records(LEASE_STORE_REGISTRATION.name),
@@ -122,11 +135,11 @@ export function createLeaseStore(source: LeaseStoreSource): LeaseStore {
       }
       if (isLayerSource(source)) {
         const currentScope = readScope(source.scope)
-        if (!currentScope) return { kind: 'keystore_locked' }
+        if (!currentScope) return { kind: 'no_session' }
         const keyStatus = await source.layer.verifyKey(currentScope)
-        if (keyStatus !== 'ok') return { kind: 'keystore_locked' }
+        if (keyStatus !== 'ok') return unavailable(keyStatus)
         const opened = await source.layer.open(currentScope)
-        if (opened.kind !== 'ok') return { kind: 'keystore_locked' }
+        if (opened.kind !== 'ok') return { kind: opened.kind }
         return {
           kind: 'ok',
           records: opened.store.records(LEASE_STORE_REGISTRATION.name),
@@ -138,7 +151,7 @@ export function createLeaseStore(source: LeaseStoreSource): LeaseStore {
       }
       if (source.verifyKey) {
         const status = await source.verifyKey()
-        if (status !== 'ok') return { kind: 'keystore_locked' }
+        if (status !== 'ok') return unavailable(status)
       }
       return {
         kind: 'ok',
@@ -147,7 +160,7 @@ export function createLeaseStore(source: LeaseStoreSource): LeaseStore {
       }
     } catch (error) {
       if (error instanceof CredentialStoreError) {
-        return { kind: 'keystore_locked' }
+        return { kind: error.code === 'keyring_unavailable' ? 'keyring_unavailable' : 'keystore_locked' }
       }
       throw error
     }
