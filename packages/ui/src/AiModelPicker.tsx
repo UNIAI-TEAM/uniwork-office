@@ -115,6 +115,15 @@ function pickerCloudText(
   )
 }
 
+/** credits grouped by the UI language (vi 380.000, en 380,000); a runtime without that locale prints plain digits */
+function formatCreditCount(lang: Lang, value: number): string {
+  try {
+    return new Intl.NumberFormat(lang).format(value)
+  } catch {
+    return String(value)
+  }
+}
+
 function restoreChipFocusUnlessMoved(
   chip: HTMLButtonElement | null,
   pop: HTMLDivElement | null,
@@ -390,6 +399,24 @@ export function AiModelPicker({
     setOpen((v) => !v)
   }
 
+  // opening moves focus into the list, onto the selected (else first) option, so arrows work at once;
+  // only the open edge does it: later settings refreshes must not pull focus back
+  useEffect(() => {
+    if (!open) return
+    listRef.current?.querySelector<HTMLButtonElement>('[role="option"][tabindex="0"]')?.focus()
+  }, [open])
+
+  const onChipKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+    e.preventDefault()
+    e.stopPropagation()
+    if (open) {
+      listRef.current?.querySelector<HTMLButtonElement>('[role="option"][tabindex="0"]')?.focus()
+    } else {
+      toggle()
+    }
+  }
+
   const pick = (sel: AiModelPickerSelection) => {
     const pop = popRef.current
     setOpen(false)
@@ -458,8 +485,8 @@ export function AiModelPicker({
       ? pickerCloudText(lang, strings, 'cloudCreditsUnlimited')
       : desktopCredits.remaining !== null
         ? pickerCloudText(lang, strings, 'cloudCreditsLeft', {
-            remaining: desktopCredits.remaining,
-            limit: desktopCredits.limit,
+            remaining: formatCreditCount(lang, desktopCredits.remaining),
+            limit: formatCreditCount(lang, desktopCredits.limit),
           })
         : null
     : null
@@ -468,8 +495,8 @@ export function AiModelPicker({
       ? pickerCloudText(lang, strings, 'cloudCreditsUnlimited')
       : desktopCredits.remaining !== null
         ? aiUniworkText(lang, 'aiUniworkCreditsAria', {
-            remaining: desktopCredits.remaining,
-            limit: desktopCredits.limit,
+            remaining: formatCreditCount(lang, desktopCredits.remaining),
+            limit: formatCreditCount(lang, desktopCredits.limit),
           })
         : null
     : null
@@ -570,6 +597,7 @@ export function AiModelPicker({
         type="button"
         className={`ai-model-chip${open ? ' open' : ''}`}
         onClick={toggle}
+        onKeyDown={onChipKeyDown}
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={open ? listId : undefined}

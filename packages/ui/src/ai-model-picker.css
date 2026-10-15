@@ -3,9 +3,10 @@
 
 .ai-model-picker {
   display: inline-flex;
-  /* shrinks ahead of the usage chip while the footer has room, then holds ~8-10 chars of the label */
+  /* shrinks ahead of the usage chip while the footer has room, then holds the whole "UniWork AI"
+     label (logo + 10 characters + caret); the footer usage chip yields below that floor */
   flex-shrink: 1000;
-  min-width: 88px;
+  min-width: 116px;
 }
 
 .ai-model-chip {
@@ -16,9 +17,9 @@
   min-height: 24px;
   max-width: min(200px, 100%);
   padding: 0 7px 0 6px;
-  /* yields to its footer neighbours (usage chip, attach, track changes, send): the label
-     ellipsizes instead of painting over them, keeping ~8-10 characters readable */
-  min-width: 88px;
+  /* yields to its footer neighbours (usage chip, attach, track changes, send): a long model name
+     ellipsizes instead of painting over them, but the provider name "UniWork AI" stays readable */
+  min-width: 116px;
   border: 1px solid transparent;
   border-radius: var(--radius-30);
   background: none;
