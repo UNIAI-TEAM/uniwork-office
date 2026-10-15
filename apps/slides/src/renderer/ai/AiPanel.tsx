@@ -467,9 +467,12 @@ export function AiPanel({
   // no key or no known model (web): send stays off and the hint says why, as in AiComposer
   const needModelHint = useAiModelNeedHint()
   const needModelAction = useAiModelNeedAction()
-  // the panel's own composer gates Send on the UniWork disclosure (set below, once the ack hook
-  // has run); the queue must honour the same gate or a held message goes out before the ack
-  const disclosureUnackedRef = useRef(false)
+  // the panel's own composer gates Send on the UniWork disclosure and on a UniWork composer note
+  // (both set below, once the ack hook has run). Every send entry honours the same gate: the queue
+  // pump reads the flag silently, and runWith (presets, retry, continue, start screen) refuses
+  // through the function, which announces and focuses the disclosure as Send does
+  const uniworkSendBlockedRef = useRef(false)
+  const refuseUniworkSendRef = useRef<() => boolean>(() => false)
   const [busy, setBusy] = useState(false)
   /** messages queued while a reply runs; the pump re-runs them through runWith on settle */
   const msgQueue = useChatRunQueue<{
@@ -480,7 +483,7 @@ export function AiPanel({
     submit: (text, meta) => {
       // the QC pass edits the deck with busy=false: refuse and let the pump retry
       if (needModelHint !== null || qcRunningRef.current || runStartingRef.current) return false
-      if (disclosureUnackedRef.current) return false
+      if (uniworkSendBlockedRef.current) return false
       const loop = loopRef.current
       if (!loop || loop.busy) return false
       return runWith(text, text, { attachments: meta.attachments, scope: meta.scope })
@@ -1781,6 +1784,8 @@ export function AiPanel({
   ): boolean => {
     // starters and retry too: nothing runs until a model is chosen (the hint beside Send says so)
     if (needModelHint !== null) return false
+    // ... nor until the UniWork disclosure is acknowledged and the composer note is clear
+    if (refuseUniworkSendRef.current()) return false
     const loop = loopRef.current
     // runStartingRef: loop.run is called only after attachments are read asynchronously, during which loop.busy is still false,
     // so duplicate triggers must be blocked synchronously (e.g. StrictMode double-running the preset autoRun effect),
@@ -2250,7 +2255,16 @@ export function AiPanel({
     : null
   const { acked: disclosureAcked } = useUniworkDisclosureAck(ackKey)
   const disclosureUnacked = isUniwork && !disclosureAcked
-  disclosureUnackedRef.current = disclosureUnacked
+  uniworkSendBlockedRef.current = disclosureUnacked || (isUniwork && composerNoteState !== null)
+  refuseUniworkSendRef.current = () => {
+    if (!uniworkSendBlockedRef.current) return false
+    // a composer note alone only keeps Send off (as in the composer); the disclosure also speaks
+    if (disclosureUnacked) {
+      setComposerAnnouncement(aiUniworkText(lang, 'aiUniworkSendNeedsAck'))
+      disclosureRegionRef.current?.focus()
+    }
+    return true
+  }
 
   // collapsed: rail only — after all hooks, so the instance and its state survive
   if (!open) {

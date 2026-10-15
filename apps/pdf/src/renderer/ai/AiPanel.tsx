@@ -11,7 +11,7 @@ import {
   type AiModelPickerBridge,
   UniAiMark,
 } from '@genoffice/ui'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react'
 import {
   AgentLoop,
@@ -40,6 +40,8 @@ import {
   AiUsageChip,
   addTokenUsage,
   useChatRunQueue,
+  useUniworkDisclosureAck,
+  useUniworkSendGate,
   type AiScopeQuoteData,
   type AiTokenUsageView,
 } from '@genoffice/ui'
@@ -174,12 +176,9 @@ export function AiPanel({
   // a picked UniWork AI that is not offered (or any provider still missing a model) keeps every
   // send entry closed - presets, retry, continue and queue runs included - the hint says why
   const needModelHint = useAiModelNeedHint()
-  // the composer reports whether the UniWork disclosure still blocks Send; the queue must honour
-  // the same gate, or a held message reaches UniWork AI before the user has acknowledged it
-  const uniworkSendBlockedRef = useRef(false)
-  const onUniworkSendBlockedChange = useCallback((blocked: boolean) => {
-    uniworkSendBlockedRef.current = blocked
-  }, [])
+  // the UniWork disclosure gate of every send entry: the composer feeds it, the queue pump asks it
+  // silently, and presets, retry and continue refuse through the send entry (announce + focus)
+  const uniworkGate = useUniworkSendGate()
   const [chat, setChat] = useState<ChatEntry[]>([])
   const [prompt, setPrompt] = useState('')
   /** the question of the running turn: a restarted conversation puts it back in the composer */
@@ -192,7 +191,7 @@ export function AiPanel({
       const loop = loopRef.current
       if (needModelHint !== null || !loop || loop.busy) return false
       // held until the user acknowledges the UniWork disclosure, as Send is
-      if (uniworkSendBlockedRef.current) return false
+      if (uniworkGate.isBlocked()) return false
       return send(text, null)
     },
   })
@@ -639,6 +638,8 @@ export function AiPanel({
     const instruction = text.trim()
     const loop = loopRef.current
     if (needModelHint !== null || !instruction || !loop || loop.busy) return false
+    // presets, retry and continue refuse like Send until the UniWork disclosure is acknowledged
+    if (uniworkGate.refuse()) return false
     stickToBottomRef.current = true
     runQuestionRef.current = instruction
     const scope = retryScope !== undefined ? (retryScope ?? undefined) : selectionScopeQuote()
@@ -758,6 +759,18 @@ export function AiPanel({
     cloudState: cloudSnapshot?.state ?? null,
     signedOut: cloudSnapshot ? !cloudSnapshot.signedIn : undefined,
   })
+  // the disclosure gate must not depend on the composer being mounted (collapsed rail): the panel
+  // reads the same ack key itself, so a ribbon action that fires while collapsed is refused too
+  const { acked: uniworkDisclosureAcked } = useUniworkDisclosureAck(
+    isUniwork
+      ? {
+          account: cloudSnapshot?.accountId ?? '',
+          org: cloudSnapshot?.orgId ?? '',
+          document: filePath ?? 'local',
+        }
+      : null,
+  )
+  uniworkGate.setPanelBlocked(isUniwork && !uniworkDisclosureAcked)
 
   const lastEntry = chat.at(-1)
   const panelLiveAnnouncement =
@@ -1144,7 +1157,8 @@ export function AiPanel({
                   onSignIn: () => void readUniworkCloudStatus()?.signIn?.(),
                   onChooseProvider: () => void window.pdfApi?.openAiModelSettings?.(),
                   onAnnounce: setComposerAnnouncement,
-                  onSendBlockedChange: onUniworkSendBlockedChange,
+                  onSendBlockedChange: uniworkGate.onSendBlockedChange,
+                  registerBlockedHandler: uniworkGate.registerBlockedHandler,
                   disclosure: {
                     orgName: cloudSnapshot?.orgName ?? undefined,
                     ackKey: {

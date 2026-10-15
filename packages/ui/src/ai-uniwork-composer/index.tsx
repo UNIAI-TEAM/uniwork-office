@@ -15,6 +15,7 @@ export {
   useUniworkDisclosureAck,
   type UniworkAckKey,
 } from './ack-store'
+export { createUniworkSendGate, useUniworkSendGate, type UniworkSendGate } from './send-gate'
 
 export type UniworkDisclosureVariant = 'document' | 'local'
 
@@ -347,6 +348,13 @@ export interface AiComposerUniworkProps {
    * the Send button; the queue must not dequeue while it is `true`.
    */
   readonly onSendBlockedChange?: ((blocked: boolean) => void) | undefined
+  /**
+   * Hands the panel what a refused user action must do while the disclosure blocks Send:
+   * announce the needs-ack line and focus the disclosure region (what clicking Send does).
+   * Called with a stable function on mount and with `null` on unmount; a panel's presets, retry
+   * and continue call it when its send entry refuses (see `useUniworkSendGate`).
+   */
+  readonly registerBlockedHandler?: ((handler: (() => void) | null) => void) | undefined
 }
 
 /** True when `el` is hidden from view or from assistive tech (own attributes or inline style). */

@@ -7,7 +7,7 @@ import {
   UniAiMark,
   composerNoteFor,
 } from '@genoffice/ui'
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import '@genoffice/ui/ai-uniwork-composer.css'
 import {
   AiComposer,
@@ -20,6 +20,9 @@ import {
   type AiTokenUsageView,
   useAiModelNeedHint,
   useChatRunQueue,
+  useUniworkDisclosureAck,
+  useUniworkSendGate,
+  type UniworkSendGate,
 } from '@genoffice/ui'
 import { aiNoticeBody, aiNoticeKind } from '@genoffice/ai-provider/browser'
 import {
@@ -274,6 +277,7 @@ export function AiChatPanel({
   onAddPastedImage,
   onRemoveAttachment,
   onSendQueued,
+  sendGate,
   prompt,
   preview,
   aiBusy,
@@ -326,6 +330,11 @@ export function AiChatPanel({
   ) => void
   /** a queued message is ready to run: return false to keep it queued (panel busy some other way) */
   readonly onSendQueued?: (instruction: string, attachments: readonly AttachmentMeta[]) => boolean
+  /**
+   * The UniWork disclosure gate shared with the shell, so entries outside this panel (ribbon runs,
+   * presets, the selection ask) are refused by the same state; the panel makes its own when absent
+   */
+  readonly sendGate?: UniworkSendGate | undefined
   readonly onStop: () => void
   readonly onNewChat: () => void
   readonly onUndo: (steps: number) => void
@@ -356,19 +365,17 @@ export function AiChatPanel({
 }): React.JSX.Element {
   const { t, lang } = useI18n()
   const needModelHint = useAiModelNeedHint()
-  // the composer reports whether the UniWork disclosure still blocks Send; the queue must honour
-  // the same gate, or a held message reaches UniWork AI before the user has acknowledged it
-  const uniworkSendBlockedRef = useRef(false)
-  const onUniworkSendBlockedChange = useCallback((blocked: boolean) => {
-    uniworkSendBlockedRef.current = blocked
-  }, [])
+  // the UniWork disclosure gate of every send entry: the composer feeds it, the queue pump asks it
+  // silently, and retry (and, through ExcelShell, presets and ribbon runs) refuse through it
+  const ownGate = useUniworkSendGate()
+  const uniworkGate = sendGate ?? ownGate
   /** messages queued while a reply runs; the pump re-sends them through onSend on settle */
   const msgQueue = useChatRunQueue<readonly AttachmentMeta[]>({
     busy: aiBusy,
     submit: (text, atts) => {
       if (needModelHint !== null) return false
       // held until the user acknowledges the UniWork disclosure, as Send is
-      if (uniworkSendBlockedRef.current) return false
+      if (uniworkGate.isBlocked()) return false
       return onSendQueued?.(text, atts) ?? false
     },
   })
@@ -569,6 +576,17 @@ export function AiChatPanel({
     cloudState: cloudSnapshot?.state ?? null,
     signedOut: cloudSnapshot ? !cloudSnapshot.signedIn : undefined,
   })
+  // the gate must not depend on the composer being mounted (collapsed rail): read the ack key here
+  const { acked: uniworkDisclosureAcked } = useUniworkDisclosureAck(
+    isUniwork
+      ? {
+          account: cloudSnapshot?.accountId ?? '',
+          org: cloudSnapshot?.orgId ?? '',
+          document: 'local',
+        }
+      : null,
+  )
+  uniworkGate.setPanelBlocked(isUniwork && !uniworkDisclosureAcked)
 
   if (!isOpen) {
     // the sidebar setting is off: nothing to show until an explicit AI action opens the panel
@@ -594,6 +612,7 @@ export function AiChatPanel({
 
   const send = (): void => {
     if (!canSend) return
+    if (uniworkGate.refuse()) return
     stickToBottomRef.current = true
     onSend()
   }
@@ -820,7 +839,10 @@ export function AiChatPanel({
                       {!aiBusy && (
                         <button
                           className="ai-retry-btn"
-                          onClick={() => onSend(entry.text, entry.attachments ?? [], index)}
+                          onClick={() => {
+                            if (uniworkGate.refuse()) return
+                            onSend(entry.text, entry.attachments ?? [], index)
+                          }}
                         >
                           {t('aiRetry')}
                         </button>
@@ -1126,7 +1148,8 @@ export function AiChatPanel({
                   onSignIn: () => void readUniworkCloudStatus()?.signIn?.(),
                   onChooseProvider: () => void window.desktopApi?.openAiSettings?.(),
                   onAnnounce: setComposerAnnouncement,
-                  onSendBlockedChange: onUniworkSendBlockedChange,
+                  onSendBlockedChange: uniworkGate.onSendBlockedChange,
+                  registerBlockedHandler: uniworkGate.registerBlockedHandler,
                   disclosure: {
                     orgName: cloudSnapshot?.orgName ?? undefined,
                     ackKey: {

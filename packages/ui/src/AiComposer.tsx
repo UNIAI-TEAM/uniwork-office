@@ -197,6 +197,17 @@ export function AiComposer({
     disclosureCfg?.onRequestFocus?.()
   }, [announce, resolvedLang, disclosureCfg])
 
+  // a panel's presets, retry and continue refuse through this same handler; it is registered once
+  // and reads the latest closure, so a re-render never re-registers it
+  const blockedByAckRef = useRef(handleBlockedByAck)
+  blockedByAckRef.current = handleBlockedByAck
+  const registerBlockedHandler = uniwork?.registerBlockedHandler
+  useEffect(() => {
+    if (!registerBlockedHandler) return undefined
+    registerBlockedHandler(() => blockedByAckRef.current())
+    return () => registerBlockedHandler(null)
+  }, [registerBlockedHandler])
+
   const effectiveSendLabel = uniworkActive
     ? aiUniworkText(resolvedLang, uniwork?.sendLabelKey ?? 'aiRunSend')
     : sendLabel

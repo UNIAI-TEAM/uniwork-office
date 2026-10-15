@@ -170,12 +170,14 @@ export {
   UniworkDisclosureShort,
   ack,
   clearUniworkAcks,
+  createUniworkSendGate,
   isAcked,
   isComposerPopupOpen,
   resolveComposerNoteText,
   serializeUniworkAckKey,
   subscribeUniworkAck,
   useUniworkDisclosureAck,
+  useUniworkSendGate,
   type AiComposerUniworkDisclosureConfig,
   type AiComposerUniworkProps,
   type UniworkAckKey,
@@ -183,6 +185,7 @@ export {
   type UniworkDisclosureProps,
   type UniworkDisclosureShortProps,
   type UniworkDisclosureVariant,
+  type UniworkSendGate,
 } from './ai-uniwork-composer'
 export {
   composerNoteFor,
