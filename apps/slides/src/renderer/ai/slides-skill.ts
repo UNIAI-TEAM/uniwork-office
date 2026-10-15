@@ -1462,6 +1462,12 @@ async function executeTool(
   // defense in depth: a view-only deck refuses every tool outside the read-only set
   if (access.readOnly?.() && !READ_ONLY_TOOLS.has(call.name))
     return fail(t('aiViewOnlyNotice'), `${call.name} is not available: the deck is view-only`)
+  // same set the live `tools` getter withholds: a hidden tool the model calls anyway never runs
+  if (hiddenTools(access).has(call.name))
+    return fail(
+      call.name,
+      `${call.name} is unavailable here. Do not call it again; use the tools you were offered instead.`,
+    )
   const slides = access.getSlides()
   switch (call.name) {
     case 'read_slide': {

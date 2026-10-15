@@ -103,6 +103,26 @@ function capabilityOff(deps: PdfAiDeps, key: 'pdfTextEdit' | 'pdfImageEdit'): bo
   return deps.capability?.(key) === false
 }
 
+/**
+ * Every tool withheld this request. One function feeds both the `tools` getter and `executeTool`, so
+ * the offered set and the refused set cannot drift.
+ */
+function hiddenTools(deps: PdfAiDeps): Set<string> {
+  const hidden = new Set<string>()
+  // C-BOUND: a UniWork-bound copy never gets the tool that writes a new file beside it
+  if (deps.uniworkBound?.()) {
+    hidden.add('create_document')
+    for (const n of FILE_LEVEL_TOOLS) hidden.add(n)
+  }
+  // provider = UniWork AI: the model must not be offered edit tools the host cannot run (BYOK keeps them)
+  if (deps.uniworkAi?.()) {
+    if (capabilityOff(deps, 'pdfTextEdit')) for (const n of TEXT_EDIT_TOOLS) hidden.add(n)
+    if (capabilityOff(deps, 'pdfImageEdit')) for (const n of IMAGE_EDIT_TOOLS) hidden.add(n)
+  }
+  if (deps.imageGenAvailable?.() === false) hidden.add('generate_image')
+  return hidden
+}
+
 export function createPdfSkill(deps: PdfAiDeps): AgentSkill {
   return {
     id: 'pdf',
@@ -117,18 +137,7 @@ export function createPdfSkill(deps: PdfAiDeps): AgentSkill {
     // live view: the predicate is re-read before every model request
     get tools() {
       if (deps.readOnly()) return AGENT_TOOLS.filter((t) => READ_ONLY_TOOLS.has(t.name))
-      // C-BOUND: a UniWork-bound copy never gets the tool that writes a new file beside it
-      const hidden = new Set<string>()
-      if (deps.uniworkBound?.()) {
-        hidden.add('create_document')
-        for (const n of FILE_LEVEL_TOOLS) hidden.add(n)
-      }
-      // provider = UniWork AI: the model must not be offered edit tools the host cannot run (BYOK keeps them)
-      if (deps.uniworkAi?.()) {
-        if (capabilityOff(deps, 'pdfTextEdit')) for (const n of TEXT_EDIT_TOOLS) hidden.add(n)
-        if (capabilityOff(deps, 'pdfImageEdit')) for (const n of IMAGE_EDIT_TOOLS) hidden.add(n)
-      }
-      if (deps.imageGenAvailable?.() === false) hidden.add('generate_image')
+      const hidden = hiddenTools(deps)
       return hidden.size === 0 ? AGENT_TOOLS : AGENT_TOOLS.filter((t) => !hidden.has(t.name))
     },
     buildContext: () => {
@@ -170,6 +179,15 @@ export function createPdfSkill(deps: PdfAiDeps): AgentSkill {
       if (deps.readOnly() && !READ_ONLY_TOOLS.has(call.name)) {
         return {
           output: 'This document is view-only; it cannot be edited.',
+          isError: true,
+          mutated: false,
+          summary: call.name,
+        }
+      }
+      // defense in depth: a hidden tool the model calls anyway (stale history, provider switch, injected call) never runs
+      if (hiddenTools(deps).has(call.name)) {
+        return {
+          output: `${call.name} is unavailable here. Do not call it again; use the tools you were offered instead.`,
           isError: true,
           mutated: false,
           summary: call.name,
