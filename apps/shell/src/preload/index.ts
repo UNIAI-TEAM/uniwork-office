@@ -807,8 +807,13 @@ const homeApi: HomeApi = {
   getAiProviders() {
     return AI_PROVIDERS.map((meta) => {
       let defaultBaseUrl = ''
-      // genspark routes by model and custom has no default — both stay ''
-      if (meta.id !== 'genspark' && !meta.needsBaseUrl && !meta.needsCliPath) {
+      // genspark routes by model, uniwork rides the session adapter, custom has no default — all stay ''
+      if (
+        meta.id !== 'genspark' &&
+        meta.id !== 'uniwork' &&
+        !meta.needsBaseUrl &&
+        !meta.needsCliPath
+      ) {
         defaultBaseUrl = getProviderAdapter(meta.id).resolveEndpoint({
           apiKey: '',
           model: meta.defaultModel,
