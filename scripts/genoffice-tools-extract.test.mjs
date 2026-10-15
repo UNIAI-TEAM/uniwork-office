@@ -1890,7 +1890,7 @@ const EMIT_FIXTURE = {
     "      'second part.',",
     '    inputSchema: {',
     "      type: 'object',",
-    "      properties: { q: { type: 'string', description: 'long ' + 'text' } },",
+    "      properties: { q: { type: 'string', description: 'long ' + 'text', } },",
     '    },',
     '  },',
     '  {',
@@ -1992,11 +1992,7 @@ describe('--emit-schemas', () => {
       type: 'object',
       properties: { q: { type: 'string', description: 'long text' } },
     }
-    // the table hashes what the default evaluator reads: it stops a property value at a `+`
-    const CONCAT_TABLE = {
-      type: 'object',
-      properties: { q: { type: 'string', description: 'long ' } },
-    }
+    // the table's evaluator stops the value at the `+` and reads `'text'` as a key of its own: its cell is unresolved
     const askSchema = { type: 'object', properties: { question: { type: 'string' } } }
     const opsSchema = { type: 'object', properties: { ops: { type: 'array' } } }
     const rangeSchema = { type: 'object', properties: { range: { type: 'string' } } }
@@ -2032,7 +2028,7 @@ describe('--emit-schemas', () => {
         source: DOCS_SRC,
         schemaComplete: true,
         inputSchemaSha256: hashOf(CONCAT_FULL),
-        tableHash: hashOf(CONCAT_TABLE),
+        tableHash: 'unresolved:identifier:text',
       },
       {
         module: 'docs',
@@ -2092,6 +2088,39 @@ describe('--emit-schemas', () => {
     const concat = file.docs.find((t) => t.function.name === 'concat_tool')
     assert.equal(concat.function.description, 'first part. second part.')
     assert.deepEqual(concat.function.parameters, CONCAT_FULL)
+  })
+
+  it('lists a table row whose object the default evaluator misread, instead of trusting its name', () => {
+    // a `+` right before the `}` of a nested object: the default evaluator reads the string as a shorthand key and
+    // swallows the closing brace, so the object runs on into the next tool and its `name` is overwritten
+    const { dir, sha } = fixture({
+      'apps/docs/src/renderer/ai/tools.ts': [
+        "import type { AgentToolDef } from '@genoffice/agent-core'",
+        '',
+        'export const AGENT_TOOLS: AgentToolDef[] = [',
+        '  {',
+        "    name: 'swallowed',",
+        "    description: 'first',",
+        '    inputSchema: {',
+        "      type: 'object',",
+        "      properties: { q: { type: 'string', description: 'long ' + 'text' } },",
+        '    },',
+        '  },',
+        '  {',
+        "    name: 'next_tool',",
+        "    description: 'second',",
+        "    inputSchema: { type: 'object', properties: {} },",
+        '  },',
+        ']',
+        '',
+      ].join('\n'),
+    })
+    const file = build(dir, sha)
+    const flagged = file.catalogue.filter((e) => !e.schemaComplete)
+    assert.ok(flagged.length > 0, 'the misread row is listed as incomplete')
+    for (const entry of flagged) assert.match(entry.reason, /^name:/)
+    // and it is never offered under a name it does not carry
+    assert.ok(!file.docs.some((t) => t.function.name === 'swallowed'))
   })
 
   it('is deterministic: two runs write byte-identical files', () => {
