@@ -1,4 +1,12 @@
-import { app, BrowserWindow, dialog, safeStorage, type IpcMain, type WebContents } from 'electron'
+import {
+  app,
+  BrowserWindow,
+  clipboard,
+  dialog,
+  safeStorage,
+  type IpcMain,
+  type WebContents,
+} from 'electron'
 import { basename, join } from 'node:path'
 import { COMMENTS_CHANNELS } from '@genoffice/electron-utils/comments-ipc'
 import {
@@ -59,6 +67,8 @@ import {
   type UnsavedCloseKind,
 } from './service'
 import { tUniworkDocs } from './strings'
+import { UNIWORK_SYNC_CENTER_CHANNELS } from '../../shared/sync-center'
+import { createWiredSyncCenter, type SyncCenterController } from '../uniwork-sync/sync-center'
 
 /**
  * Electron binding of the UniWork documents service: IPC handlers for every
@@ -540,7 +550,9 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   // the service is built before the runtime, but its save queue reads the
   // runtime's capability cache: this holder breaks the cycle (the read happens
   // only after `createSyncRuntime` assigned it, below)
-  const seamRef: { runtime: SyncRuntime | null } = { runtime: null }
+  const seamRef: { runtime: SyncRuntime | null; syncCenter?: SyncCenterController } = {
+    runtime: null,
+  }
   // the comments handle is built after the service (it resolves bindings through
   // it) but the service needs it for the launch-ticket reveal: a holder breaks
   // the cycle, and the reveal only runs once both exist
@@ -583,7 +595,10 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     notifyPathRenamed: (oldPath, newPath) => wiring.notifyPathRenamed(oldPath, newPath),
     notifyTitleRenamed: (path, title) => wiring.notifyTitleRenamed?.(path, title),
     ui: conflictUi(wiring),
-    pushStatus: (status) => push(UNIWORK_DOC_CHANNELS.docStatusEvent, status),
+    pushStatus: (status) => {
+      push(UNIWORK_DOC_CHANNELS.docStatusEvent, status)
+      seamRef.syncCenter?.notifyChanged()
+    },
     // the save queue's lane verdicts read the same per-org capability cache the
     // feed runtime does (see the SyncRuntimeSeam note), so `sync_write` is read
     // once per account and cleared on an account switch for both
@@ -605,7 +620,10 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     ),
     // the whole list when locks clear (a Retry that unlocked the keychain): the
     // shell replaces its list, so the S11 panel does not outlive the lock
-    pushLocks: () => push(UNIWORK_DOC_CHANNELS.locksChanged, service.currentLocks()),
+    pushLocks: () => {
+      push(UNIWORK_DOC_CHANNELS.locksChanged, service.currentLocks())
+      seamRef.syncCenter?.notifyChanged()
+    },
     reveal: () => wiring.reveal(),
     revealComment: (path, commentId) => comments?.reveal(path, commentId),
     // G8-12: a settled Save tells the editor's comment panel its new version
@@ -709,6 +727,33 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   setUniworkCloseGuard(service)
   const runtime = createSyncRuntime(service)
   seamRef.runtime = runtime
+  const syncCenter = createWiredSyncCenter({
+    ipcMain,
+    userDataDir: app.getPath('userData'),
+    service,
+    store: syncStoreFor(),
+    accountStatus: () => uniworkAccount().status(),
+    capabilityRead: (orgId) => runtime.capabilityRead(orgId),
+    tickRuntime: () => runtime.tick(),
+    openPath: (path) => (wiring.refuseLockedPath(path) ? false : wiring.openPath(path)),
+    isPathOpen: (path) => wiring.isPathOpen(path),
+    defaultSaveDir: () => wiring.defaultSaveDir(),
+    writeClipboard: (text) => clipboard.writeText(text),
+    pickSaveDialog: async ({ defaultPath, ext }) => {
+      const parent = wiring.shellWindow()
+      const options: Electron.SaveDialogOptions = {
+        title: tUniworkDocs(wiring.lang(), 'copyDialogTitle'),
+        defaultPath,
+        filters: [{ name: String(ext).toUpperCase(), extensions: [String(ext)] }],
+      }
+      const picked = parent
+        ? await dialog.showSaveDialog(parent, options)
+        : await dialog.showSaveDialog(options)
+      return picked.canceled || !picked.filePath ? null : picked.filePath
+    },
+    pushChanged: (snapshot) => push(UNIWORK_SYNC_CENTER_CHANNELS.changedEvent, snapshot),
+  })
+  seamRef.syncCenter = syncCenter.controller
   // Sign out and a sign-in as someone else close the previous account's
   // documents and delete their AI history (see account-boundary.ts)
   const boundary = new AccountBoundary({
@@ -767,6 +812,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
         service.noteSessionIdentity()
         // G8-16 S16: changing the organization reloads the library data
         service.noteSelectedOrg(status.org?.id ?? null)
+        syncCenter.controller.notifyChanged()
         const identity = uniworkSessionIdentity()
         if (identity) void boundary.enforce(identity).catch(() => undefined)
         const now = status.state === 'signed-in'
