@@ -22,6 +22,7 @@ import {
   setUniworkDocumentPolicy as setSheetsUniworkPolicy,
 } from '../../../../sheets/src/main/sheets-main'
 import {
+  clearSlidesRecovery,
   setSlidesUserSaveHook,
   setUniworkDocumentPolicy as setSlidesUniworkPolicy,
 } from '../../../../slides/src/main/slides-main'
@@ -44,7 +45,7 @@ export interface UniworkModuleSeam {
    */
   consumeCapture?(path: string): boolean
   /**
-   * G5-11: registers the docs/sheets crash-recovery cleaner so sign-out can
+   * G5-11: registers the docs/sheets/slides crash-recovery cleaner so sign-out can
    * bump recovery epochs and delete recovery files without service.ts importing
    * the Electron-bound module mains.
    */
@@ -135,6 +136,7 @@ export function installUniworkModuleSeams(
   seam?.setClearRecovery?.((path: string) => {
     clearDocsRecoveryCopy(path)
     clearWorkbookRecovery(path)
+    clearSlidesRecovery(path)
   })
   seam?.setClearOriginals?.((entries) => clearDocsOriginalsFor(entries))
   const author = commentAuthor ?? (() => NEUTRAL_COMMENT_AUTHOR)

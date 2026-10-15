@@ -92,6 +92,7 @@ import {
   readBodyCapped,
   writeJsonAtomic,
   newerCopyMtime,
+  RecoveryClearEpochs,
 } from '@genoffice/electron-utils'
 import { isDraftPreviewPath } from '@genoffice/electron-utils/draft-preview'
 import {
@@ -3544,11 +3545,17 @@ export function recoveryCopyMtime(filePath: string): number | null {
 }
 
 /** Bumped by every clear: an in-flight docs:write-recovery that started before
- * the bump must not recreate the file it is about to land (stale-recovery race). */
-const recoveryClearEpochs = new Map<string, number>()
+ * the bump must not recreate the file it is about to land (stale-recovery race).
+ * Keyed by the normalized path, held only while a write is in flight. */
+const recoveryClearEpochs = new RecoveryClearEpochs()
+
+/** open clear-epoch entries (tests): bounded by the recovery writes in flight */
+export function docsRecoveryEpochEntries(): number {
+  return recoveryClearEpochs.size
+}
 
 export function clearRecoveryCopy(filePath: string): void {
-  recoveryClearEpochs.set(filePath, (recoveryClearEpochs.get(filePath) ?? 0) + 1)
+  recoveryClearEpochs.bump(filePath)
   try {
     unlinkSync(recoveryPathFor(filePath))
   } catch {
@@ -5126,27 +5133,31 @@ export function registerDocsIpc(): void {
         return { ok: false }
       // snapshot before any await: a save or discard that clears the recovery
       // copy while this write is in flight bumps the epoch and invalidates it
-      const epoch = recoveryClearEpochs.get(filePath) ?? 0
-      await mkdir(recoveryDir(), { recursive: true })
-      // Recovery follows the current disk state, never the desired next-save
-      // password. Missing state for an encrypted disk file skips the tick so
-      // plaintext can never be written as its recovery copy.
-      const bytes = prepareRecoveryDocx(event.sender.id, filePath, Buffer.from(data))
-      if (!bytes) return { ok: false }
-      await atomicWriteFile(recoveryPathFor(filePath), bytes)
-      // The tab may have been closed ("Don't Save" clears the copy, teardown
-      // revokes access) or the document saved (docs:save clears the copy) while
-      // the write was in flight. A write that lost either race would offer
-      // discarded or already-saved content as recovery on the next open — undo it.
-      if (
-        tornDownWcIds.has(event.sender.id) ||
-        !canDocWrite(event.sender.id, filePath) ||
-        (recoveryClearEpochs.get(filePath) ?? 0) !== epoch
-      ) {
-        clearRecoveryCopy(filePath)
-        return { ok: false }
+      const ticket = recoveryClearEpochs.begin(filePath)
+      try {
+        await mkdir(recoveryDir(), { recursive: true })
+        // Recovery follows the current disk state, never the desired next-save
+        // password. Missing state for an encrypted disk file skips the tick so
+        // plaintext can never be written as its recovery copy.
+        const bytes = prepareRecoveryDocx(event.sender.id, filePath, Buffer.from(data))
+        if (!bytes) return { ok: false }
+        await atomicWriteFile(recoveryPathFor(filePath), bytes)
+        // The tab may have been closed ("Don't Save" clears the copy, teardown
+        // revokes access) or the document saved (docs:save clears the copy) while
+        // the write was in flight. A write that lost either race would offer
+        // discarded or already-saved content as recovery on the next open — undo it.
+        if (
+          tornDownWcIds.has(event.sender.id) ||
+          !canDocWrite(event.sender.id, filePath) ||
+          recoveryClearEpochs.cleared(ticket)
+        ) {
+          clearRecoveryCopy(filePath)
+          return { ok: false }
+        }
+        return { ok: true }
+      } finally {
+        recoveryClearEpochs.end(ticket)
       }
-      return { ok: true }
     } catch {
       return { ok: false }
     }

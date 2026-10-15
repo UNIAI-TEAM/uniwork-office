@@ -673,6 +673,15 @@ export function registerAccountIpc(
     return { ...result, status: current.status() }
   })
   ipcMain.handle(HOME_CHANNELS.accountRetry, (event) => account(event.sender).retry())
+  ipcMain.handle(HOME_CHANNELS.accountReplaceLockedSignIn, (event) => {
+    const current = account(event.sender)
+    // replaces the saved sign-in, so only the shell's own page (Settings >
+    // Account) may ask; the manager itself refuses unless keystore-locked
+    // after a failed Retry
+    const fromShell =
+      event.sender === shellContents() && event.senderFrame === event.sender.mainFrame
+    return fromShell ? current.replaceLockedSignIn() : false
+  })
   ipcMain.handle(HOME_CHANNELS.uniworkCloudStatus, (event) => {
     account(event.sender)
     return uniworkCloud().status()

@@ -686,6 +686,15 @@ export class UniworkDocsService {
   private syncOpen: Promise<SyncStoreOpen> | null = null
   /** the outcome of the last store open; 'unknown' until it is asked for */
   private storeOpenKind: SyncStoreOpen['kind'] | 'unknown' = 'unknown'
+  /**
+   * d7-2/d1-3: per scope token, the document keys the last `planSignOut` of that
+   * scope counted as RAM-only. The switch notice sums that count with the lock's
+   * own lost documents, so the lock of the scope leaves these keys out: a
+   * document is counted once. A re-plan replaces the scope's entry and the lock
+   * drops it, so an interleaved plan of another scope cannot clobber it and the
+   * map never holds more than one entry per scope.
+   */
+  private readonly plannedRamOnly = new Map<string, Set<string>>()
   /** scopes whose schema 1 -> 2 sweep has finished in this process */
   private readonly migratedScopes = new Set<string>()
   /**
@@ -1904,6 +1913,11 @@ export class UniworkDocsService {
       }
     }
 
+    // d1-3: the entry belongs to this scope alone, and a re-plan replaces it
+    // (an empty plan drops it) so a scope that is never locked cannot grow it
+    const planToken = `${target.deploymentId}/${target.accountId}`
+    if (storeLockedNow) this.plannedRamOnly.set(planToken, ramOnlyDocs)
+    else this.plannedRamOnly.delete(planToken)
     return {
       count: unsavedDocs.size,
       waiting: waitingDocs.size,
@@ -1945,6 +1959,11 @@ export class UniworkDocsService {
     const switching = options?.switch === true
     const scopeToken = `${target.deploymentId}/${target.accountId}`
     const keystoreLocked = this.storeLocked()
+    // d7-2/d1-3: what the plan of THIS scope just counted as RAM-only is not
+    // counted again as lost; the entry is consumed here, so a plan of another
+    // scope (or a later lock) can never reuse it
+    const planned = this.plannedRamOnly.get(scopeToken)
+    this.plannedRamOnly.delete(scopeToken)
 
     // Step 1: stop runtime, block new commits, bounded receipt wait (30s)
     this.deps.stopRuntime?.()
@@ -2001,7 +2020,13 @@ export class UniworkDocsService {
       await Promise.all([...this.pendingApplyRecords])
     }
 
-    // Mark the queue session dead so any late HTTP response writes nothing
+    // Mark the queue session dead so any late HTTP response writes nothing.
+    // Deliberately AFTER the bounded wait above (unlike teardownSaveQueue, which
+    // marks dead first): a pass that answers inside the wait must still record
+    // its receipt so the document settles as committed instead of reconciling
+    // (sign-out-lock tests 5/5b). New commits are already blocked by
+    // stoppingQueueSessions, and the store lock below is last, so a late write
+    // reads `interrupted`.
     this.stopQueue()
 
     // Transition any record still in validating | uploading | committing to reconciling
@@ -2334,6 +2359,7 @@ export class UniworkDocsService {
     this.syncOpen = null
     this.storeOpenKind = 'unknown'
     const captureFailed = [...captureFailedKeys]
+    if (planned) for (const key of planned) lostKeys.delete(key)
     // The single `done` of a sign-out is pushed by the caller's finally (the
     // wiring's lockStore), so it also fires when this method throws.
 
@@ -2504,7 +2530,11 @@ export class UniworkDocsService {
     ) {
       return
     }
-    this.lockedScopes.delete(`${target.deploymentId}/${target.accountId}`)
+    const scopeToken = `${target.deploymentId}/${target.accountId}`
+    this.lockedScopes.delete(scopeToken)
+    // d1-3: a plan of a scope that is live again is stale; it must not suppress
+    // the lost count of that scope's next lock
+    this.plannedRamOnly.delete(scopeToken)
     this.clearSignedOutLocks()
     const open = await this.openSyncStore()
     if (open.kind !== 'ok') return

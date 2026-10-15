@@ -161,6 +161,10 @@ export interface AccountController {
   signOutWaiting?: boolean
   /** d1-2: true after a sign-out whose done event reported captureFailed > 0 */
   signOutCaptureFailed?: boolean
+  /** keystore-locked after a failed Retry: main accepts a sign-in that replaces the saved one */
+  canReplaceLockedSignIn?: boolean
+  /** the "replace the saved sign-in?" confirmation is open */
+  replaceLockedPrompt?: boolean
   signIn(): void
   cancelSignIn(): void
   openLoginUrl(): void
@@ -170,6 +174,12 @@ export interface AccountController {
   cancelSignOut?(): void
   /** closes the switch notice and answers its request once */
   acknowledgeSignOutNotice?(): void
+  /** opens the "replace the saved sign-in?" confirmation (only when canReplaceLockedSignIn) */
+  askReplaceLockedSignIn?(): void
+  /** closes that confirmation; nothing is sent to main */
+  cancelReplaceLockedSignIn?(): void
+  /** confirmed: starts the sign-in that replaces the saved one (one main call) */
+  confirmReplaceLockedSignIn?(): void
   retry(): void
   selectOrg(orgId: string): void
   /** connect to the server at a typed address; main validates it and saves the profile */
@@ -198,6 +208,7 @@ export function useAccount(options?: { ownsSignOutPrompt?: boolean }): AccountCo
   const [signOutNotice, setSignOutNotice] = useState<SignOutPlan | null>(null)
   const [signOutWaiting, setSignOutWaiting] = useState(false)
   const [signOutCaptureFailed, setSignOutCaptureFailed] = useState(false)
+  const [replacePromptOpen, setReplacePromptOpen] = useState(false)
   const noticeTimer = useRef<number | null>(null)
   // bumped on sign-out so an in-flight status read (which can still report
   // signed-in) is discarded instead of resurrecting the profile
@@ -231,6 +242,10 @@ export function useAccount(options?: { ownsSignOutPrompt?: boolean }): AccountCo
     if (state === 'signed-in' || state === 'refreshing') {
       setLocalError(null)
       setSignOutCaptureFailed(false)
+    }
+    // the replace confirmation only stands while main still allows it
+    if (state !== 'keystore-locked' || next.canReplaceLockedSignIn !== true) {
+      setReplacePromptOpen(false)
     }
   }, [])
 
@@ -352,8 +367,12 @@ export function useAccount(options?: { ownsSignOutPrompt?: boolean }): AccountCo
       : (mainState ?? 'loading')
   const error =
     view === 'signed-in' || view === 'refreshing' ? null : (localError ?? status?.error ?? null)
+  // main says so only in keystore-locked after a failed Retry
+  const canReplaceLockedSignIn =
+    view === 'keystore-locked' && status?.canReplaceLockedSignIn === true
+  const replaceLockedPrompt = replacePromptOpen && canReplaceLockedSignIn
 
-  const signIn = () => {
+  const launchLogin = (start: () => Promise<boolean>) => {
     setLocalError(null)
     setSignOutCaptureFailed(false)
     setCallbackNotice(false)
@@ -361,8 +380,7 @@ export function useAccount(options?: { ownsSignOutPrompt?: boolean }): AccountCo
     setUrlCopied(false)
     setLaunching(true)
     loginErrorSeen.current = false
-    void window.aiOffice
-      .accountLogin()
+    void start()
       .then((launched) => {
         if (!launched && !loginErrorSeen.current) setLocalError('launch')
       })
@@ -373,6 +391,22 @@ export function useAccount(options?: { ownsSignOutPrompt?: boolean }): AccountCo
         setLaunching(false)
         refresh()
       })
+  }
+
+  const signIn = () => launchLogin(() => window.aiOffice.accountLogin())
+
+  const askReplaceLockedSignIn = () => {
+    // a Retry in flight may still withdraw the offer: wait for it to settle
+    if (canReplaceLockedSignIn && !retrying.current) setReplacePromptOpen(true)
+  }
+
+  const cancelReplaceLockedSignIn = () => setReplacePromptOpen(false)
+
+  const confirmReplaceLockedSignIn = () => {
+    if (!replaceLockedPrompt) return
+    setReplacePromptOpen(false)
+    const replace = window.aiOffice.accountReplaceLockedSignIn
+    launchLogin(() => (replace ? replace() : Promise.resolve(false)))
   }
 
   const cancelSignIn = () => {
@@ -500,6 +534,9 @@ export function useAccount(options?: { ownsSignOutPrompt?: boolean }): AccountCo
     // one restore at a time: a second click before the busy state renders must not start another
     if (retrying.current) return
     retrying.current = true
+    // a failure line from an earlier attempt (a sign-in that timed out) describes
+    // that attempt, not this Retry
+    setLocalError(null)
     setBusy('retrying')
     // an absent accountRetry (older main) resolves at once, so the busy state never sticks
     void Promise.resolve(window.aiOffice.accountRetry?.())
@@ -554,6 +591,8 @@ export function useAccount(options?: { ownsSignOutPrompt?: boolean }): AccountCo
     signOutNotice,
     signOutWaiting,
     signOutCaptureFailed,
+    canReplaceLockedSignIn,
+    replaceLockedPrompt,
     signIn,
     cancelSignIn,
     openLoginUrl: () => void window.aiOffice.openLoginUrl?.(),
@@ -562,6 +601,9 @@ export function useAccount(options?: { ownsSignOutPrompt?: boolean }): AccountCo
     confirmSignOut,
     cancelSignOut,
     acknowledgeSignOutNotice,
+    askReplaceLockedSignIn,
+    cancelReplaceLockedSignIn,
+    confirmReplaceLockedSignIn,
     retry,
     selectOrg,
     connectServer,

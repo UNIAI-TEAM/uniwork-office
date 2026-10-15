@@ -81,6 +81,10 @@ export const es = {
   acctErrKeyringUnavailable: 'El almacenamiento seguro de este equipo no está disponible.',
   acctErrKeystoreLocked:
     'El llavero de este equipo está bloqueado. Desbloquéalo y vuelve a intentarlo.',
+  acctReplaceTitle: '¿Reemplazar el inicio de sesión guardado en este equipo?',
+  acctReplaceBody:
+    'Este equipo no puede abrir el inicio de sesión guardado. Al volver a iniciar sesión se reemplaza. Las ediciones sin conexión pendientes de sincronizar se quedan en este equipo, bloqueadas; no se elimina nada.',
+  acctReplaceGo: 'Volver a iniciar sesión',
   acctErrServerError: 'UniWork ha tenido un problema. Inténtalo de nuevo más tarde.',
   acctErrMalformedResponse: 'UniWork envió una respuesta inesperada. Inténtalo de nuevo más tarde.',
   wbLoadFailedTitle: 'No se pudieron cargar tus datos guardados',

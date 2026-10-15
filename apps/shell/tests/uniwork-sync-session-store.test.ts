@@ -342,6 +342,35 @@ describe('createSyncStoreAccess', () => {
     expect(await outgoing.read('doc_1')).toEqual({ kind: 'interrupted' })
   })
 
+  it('a bare lock() with nothing cached leaves the live scope untouched (G5-11f d4-r1)', async () => {
+    const { layer } = make()
+    const locked: string[] = []
+    const tracking: StoreLayer = {
+      ...layer,
+      lock: async (scope) => {
+        locked.push(`${scope.deploymentId}/${scope.accountId}`)
+        return layer.lock(scope)
+      },
+    }
+    const access = createSyncStoreAccess({
+      layer: tracking,
+      scope: () => ({ deploymentId: 'dep_1', accountId: 'acc_live' }),
+    })
+
+    // nothing was opened through this access, so there is no scope being left
+    await access.lock()
+    expect(locked).toEqual([])
+
+    // and the live scope still opens and serves its records
+    const open = await access.open()
+    if (open.kind !== 'ok') throw new Error(open.kind)
+    expect(
+      await open.records(INTENT_STORE_REGISTRATION.name).write('doc_1', Buffer.from('x')),
+    ).toEqual({
+      kind: 'ok',
+    })
+  })
+
   it("openScope opens the leaving account's own store while another account is live, and never caches it (G5-11 F7)", async () => {
     const { layer } = make()
     let account = 'acc_1'
