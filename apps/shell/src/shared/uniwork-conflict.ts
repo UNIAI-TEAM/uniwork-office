@@ -18,6 +18,8 @@ export type UniworkConflictNotice =
   | 'save_copy_failed'
   /** G5-12: the copy was refused because the person is not a member of the source's workspace */
   | 'save_copy_no_seat'
+  /** G5-12 (BE-12-304): the copy was refused by the folder the source sits in (403 forbidden) */
+  | 'save_copy_folder_refused'
   /** G5-12: "Download my version" wrote the file (noticeArg = its name) */
   | 'download_done'
   | 'download_failed'

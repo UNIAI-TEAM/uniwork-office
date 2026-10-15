@@ -278,6 +278,8 @@ export const id = {
   uwConflictSaveCopyFailed: 'Tidak dapat membuat salinan. Perubahan Anda tetap aman; coba lagi.',
   uwConflictSaveCopyNoSeat:
     'Tidak dapat membuat salinan karena Anda bukan anggota ruang kerja tempat dokumen ini berada. Perubahan Anda tetap aman; Anda bisa mengunduh versi Anda.',
+  uwConflictSaveCopyFolderRefused:
+    'Anda tidak dapat membuat dokumen di folder ini. Unduh versi Anda sebagai gantinya.',
   uwConflictDownloadDone:
     'Versi Anda disimpan di komputer ini: {file}. Dokumen ini tidak berubah; Anda masih bisa memuat ulang atau menimpa.',
   uwConflictDownloadFailedDesktop:

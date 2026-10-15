@@ -591,10 +591,10 @@ interface ConflictSession {
   draftBlock?: UniworkConflictKeepDraft
   /**
    * G5-12: the notice that put the dialog on the "Download my version" step 2
-   * (no_seat, or download_failed after a failed write); a cancelled OS dialog
-   * answers with it again so the alert does not change
+   * (no_seat, folder_refused, or download_failed after a failed write); a cancelled
+   * OS dialog answers with it again so the alert does not change
    */
-  downloadNotice?: 'save_copy_no_seat' | 'download_failed'
+  downloadNotice?: DownloadStepNotice
   opened: boolean
   done: Promise<UniworkDocStatus | null>
   finish: () => void
@@ -603,8 +603,14 @@ interface ConflictSession {
 /** BE-12F-01: the one wait before the copy's commit lookup is asked again */
 const COPY_LOOKUP_WAIT_MS = 1500
 
+/** the notices that make step 2 of Save as a copy the "Download my version" step */
+type DownloadStepNotice = 'save_copy_no_seat' | 'save_copy_folder_refused' | 'download_failed'
+
 /** BE-12-201: the server's refusal of a copy for a caller with no seat in the source's workspace */
 const COPY_NO_SEAT_CODE = 'workspace_seat_required'
+
+/** BE-12-304: the server's plain refusal of a copy by the parent folder gate */
+const COPY_FOLDER_REFUSED_CODE = 'forbidden'
 
 export class UniworkDocsService {
   readonly store: BindingStore
@@ -3847,9 +3853,9 @@ export class UniworkDocsService {
       if (aborted()) return { kind: 'closed' }
       // BE-12-201: the server's seat refusal (403 workspace_seat_required): the person is not a
       // member of the source's workspace, so no copy can be made for them. Their version is
-      // still local; the dialog offers "Download my version". Any other 403 - `forbidden` from
-      // the parent folder gate, a deactivated member, a suspended organization - says nothing
-      // about the seat and stays a plain failure
+      // still local; the dialog offers "Download my version". Any other 403 - a deactivated
+      // member, a suspended organization - says nothing about the seat and stays a plain failure
+      // (`forbidden` is the folder refusal, below)
       if (
         error instanceof UniworkDocError &&
         error.status === 403 &&
@@ -3861,6 +3867,23 @@ export class UniworkDocsService {
           view: await this.buildConflictView(open, {
             fetchServer: false,
             notice: 'save_copy_no_seat',
+          }),
+        }
+      }
+      // BE-12-304: a plain 403 `forbidden` of the copy route is the parent folder gate (the request
+      // carries the source's own parent_id): the member holds a seat but may not create documents
+      // in that folder, and a retry meets the same gate. Same Download step, its own reason
+      if (
+        error instanceof UniworkDocError &&
+        error.status === 403 &&
+        error.serverCode === COPY_FOLDER_REFUSED_CODE
+      ) {
+        open.downloadNotice = 'save_copy_folder_refused'
+        return {
+          kind: 'view',
+          view: await this.buildConflictView(open, {
+            fetchServer: false,
+            notice: 'save_copy_folder_refused',
           }),
         }
       }
@@ -4004,9 +4027,7 @@ export class UniworkDocsService {
   ): Promise<UniworkConflictReply> {
     if (action.stopAi) this.deps.stopAiRun?.(chosen.path)
     const aborted = () => open.controller.signal.aborted
-    const stay = async (
-      notice: 'save_copy_no_seat' | 'download_failed',
-    ): Promise<UniworkConflictReply> => {
+    const stay = async (notice: DownloadStepNotice): Promise<UniworkConflictReply> => {
       open.downloadNotice = notice
       return {
         kind: 'view',

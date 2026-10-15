@@ -282,6 +282,8 @@ export const es = {
     'No se pudo crear la copia. Tus cambios siguen a salvo; vuelve a intentarlo.',
   uwConflictSaveCopyNoSeat:
     'No se pudo crear la copia porque no eres miembro del espacio de trabajo en el que está este documento. Tus cambios siguen a salvo; puedes descargar tu versión.',
+  uwConflictSaveCopyFolderRefused:
+    'No puedes crear documentos en esta carpeta. Descarga tu versión en su lugar.',
   uwConflictDownloadDone:
     'Tu versión se guardó en este equipo: {file}. Este documento no ha cambiado; aún puedes recargar o sobrescribir.',
   uwConflictDownloadFailedDesktop:

@@ -260,6 +260,8 @@ export const he = {
   uwConflictSaveCopyFailed: 'לא ניתן היה ליצור את העותק. השינויים שלך עדיין בטוחים; נסה שוב.',
   uwConflictSaveCopyNoSeat:
     'לא ניתן היה ליצור את העותק כי אינך חבר במרחב העבודה שבו נמצא המסמך הזה. השינויים שלך עדיין בטוחים; אפשר להוריד את הגרסה שלך.',
+  uwConflictSaveCopyFolderRefused:
+    'אי אפשר ליצור מסמכים בתיקייה הזו. אפשר להוריד את הגרסה שלך במקום זאת.',
   uwConflictDownloadDone:
     'הגרסה שלך נשמרה במחשב הזה: {file}. המסמך הזה לא השתנה; עדיין אפשר לטעון מחדש או לדרוס.',
   uwConflictDownloadFailedDesktop:

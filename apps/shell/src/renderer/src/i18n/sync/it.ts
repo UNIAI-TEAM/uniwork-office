@@ -285,6 +285,8 @@ export const it = {
     'Impossibile creare la copia. Le modifiche sono ancora al sicuro; riprova.',
   uwConflictSaveCopyNoSeat:
     'Impossibile creare la copia perché non sei membro dello spazio di lavoro in cui si trova questo documento. Le modifiche sono ancora al sicuro; puoi scaricare la tua versione.',
+  uwConflictSaveCopyFolderRefused:
+    'Non puoi creare documenti in questa cartella. Scarica invece la tua versione.',
   uwConflictDownloadDone:
     'La tua versione è stata salvata su questo computer: {file}. Questo documento non è cambiato; puoi ancora ricaricare o sovrascrivere.',
   uwConflictDownloadFailedDesktop:

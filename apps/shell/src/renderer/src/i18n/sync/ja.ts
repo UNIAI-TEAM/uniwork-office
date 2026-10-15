@@ -283,6 +283,8 @@ export const ja = {
     'コピーを作成できませんでした。変更は引き続き安全です。もう一度お試しください。',
   uwConflictSaveCopyNoSeat:
     'このドキュメントがあるワークスペースのメンバーではないため、コピーを作成できませんでした。変更は引き続き安全です。自分のバージョンをダウンロードできます。',
+  uwConflictSaveCopyFolderRefused:
+    'このフォルダーにはドキュメントを作成できません。代わりに自分のバージョンをダウンロードしてください。',
   uwConflictDownloadDone:
     'あなたのバージョンをこのコンピューターに保存しました：{file}。このドキュメントは変わっていません。再読み込みまたは上書きを選ぶこともできます。',
   uwConflictDownloadFailedDesktop:

@@ -67,6 +67,7 @@ export interface ConflictResolvedNotice {
     | 'uwConflictSaveCopyDone'
     | 'uwConflictSaveCopyFailed'
     | 'uwConflictSaveCopyNoSeat'
+    | 'uwConflictSaveCopyFolderRefused'
     | 'uwConflictDownloadDone'
     | 'uwConflictDownloadFailedDesktop'
   args: Record<string, string>
@@ -377,7 +378,11 @@ export function buildConfirmPayload(
 
 /** the Save-copy step 2 offers "Download my version" in place of "Create copy" */
 export function isSaveCopyDownloadStep(view: UniworkConflictView): boolean {
-  return view.notice === 'save_copy_no_seat' || view.notice === 'download_failed'
+  return (
+    view.notice === 'save_copy_no_seat' ||
+    view.notice === 'save_copy_folder_refused' ||
+    view.notice === 'download_failed'
+  )
 }
 
 /**
@@ -475,6 +480,8 @@ export function resolveConflictNotice(view: UniworkConflictView): ConflictResolv
       return { key: 'uwConflictSaveCopyFailed', args: {} }
     case 'save_copy_no_seat':
       return { key: 'uwConflictSaveCopyNoSeat', args: {} }
+    case 'save_copy_folder_refused':
+      return { key: 'uwConflictSaveCopyFolderRefused', args: {} }
     case 'download_done':
       return { key: 'uwConflictDownloadDone', args: { file: view.noticeArg ?? view.title } }
     case 'download_failed':

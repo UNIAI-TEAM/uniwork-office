@@ -285,6 +285,8 @@ export const ms = {
     'Tidak dapat mencipta salinan. Perubahan anda masih selamat; cuba lagi.',
   uwConflictSaveCopyNoSeat:
     'Tidak dapat mencipta salinan kerana anda bukan ahli ruang kerja yang mengandungi dokumen ini. Perubahan anda masih selamat; anda boleh memuat turun versi anda.',
+  uwConflictSaveCopyFolderRefused:
+    'Anda tidak boleh mencipta dokumen dalam folder ini. Sila muat turun versi anda sebagai gantinya.',
   uwConflictDownloadDone:
     'Versi anda disimpan pada komputer ini: {file}. Dokumen ini tidak berubah; anda masih boleh memuat semula atau menulis ganti.',
   uwConflictDownloadFailedDesktop:

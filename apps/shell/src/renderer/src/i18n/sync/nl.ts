@@ -281,6 +281,8 @@ export const nl = {
     'Kan de kopie niet maken. Je wijzigingen zijn nog veilig; probeer het opnieuw.',
   uwConflictSaveCopyNoSeat:
     'Kan de kopie niet maken omdat je geen lid bent van de werkruimte waarin dit document staat. Je wijzigingen zijn nog veilig; je kunt je versie downloaden.',
+  uwConflictSaveCopyFolderRefused:
+    'Je kunt in deze map geen documenten maken. Download in plaats daarvan je versie.',
   uwConflictDownloadDone:
     'Je versie is op deze computer opgeslagen: {file}. Dit document is niet gewijzigd; je kunt nog steeds opnieuw laden of overschrijven.',
   uwConflictDownloadFailedDesktop:

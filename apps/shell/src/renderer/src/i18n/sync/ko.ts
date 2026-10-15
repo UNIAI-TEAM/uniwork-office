@@ -275,6 +275,8 @@ export const ko = {
     '사본을 만들지 못했습니다. 변경 사항은 여전히 안전합니다. 다시 시도하세요.',
   uwConflictSaveCopyNoSeat:
     '이 문서가 있는 작업 공간의 구성원이 아니어서 사본을 만들지 못했습니다. 변경 사항은 여전히 안전합니다. 내 버전을 다운로드할 수 있습니다.',
+  uwConflictSaveCopyFolderRefused:
+    '이 폴더에는 문서를 만들 수 없습니다. 대신 내 버전을 다운로드하세요.',
   uwConflictDownloadDone:
     '내 버전을 이 컴퓨터에 저장했습니다: {file}. 이 문서는 바뀌지 않았으며, 여전히 다시 불러오거나 덮어쓸 수 있습니다.',
   uwConflictDownloadFailedDesktop:

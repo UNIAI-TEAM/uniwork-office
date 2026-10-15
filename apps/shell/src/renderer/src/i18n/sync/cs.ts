@@ -274,6 +274,8 @@ export const cs = {
     'Kopii se nepodařilo vytvořit. Vaše změny jsou stále v bezpečí; zkuste to znovu.',
   uwConflictSaveCopyNoSeat:
     'Kopii se nepodařilo vytvořit, protože nejste členem pracovního prostoru, ve kterém je tento dokument. Vaše změny jsou stále v bezpečí; svou verzi si můžete stáhnout.',
+  uwConflictSaveCopyFolderRefused:
+    'V této složce nemůžete vytvářet dokumenty. Stáhněte si místo toho svou verzi.',
   uwConflictDownloadDone:
     'Vaše verze byla uložena do tohoto počítače: {file}. Tento dokument se nezměnil; stále můžete znovu načíst nebo přepsat.',
   uwConflictDownloadFailedDesktop:
