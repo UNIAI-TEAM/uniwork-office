@@ -2829,8 +2829,10 @@ export function AiPanel({
               rows={1}
             />
             {needModelHint !== null && !busy && (
-              // own full-width row above the footer (as in AiComposer): beside the chip it clipped
-              <div className="ai-input-need">
+              // own full-width row above the footer (as in AiComposer): beside the chip it clipped.
+              // It is the idle composer's own status line (as in AiComposer) and its text never goes
+              // through the panel live region, so role=status does not announce it twice.
+              <div className="ai-input-need" role="status">
                 {needModelAction ? (
                   <button type="button" className="ai-input-need-link" onClick={needModelAction}>
                     {needModelHint}
