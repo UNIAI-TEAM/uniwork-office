@@ -125,7 +125,11 @@ describe('queue popover model (S4)', () => {
 
     it('without a row reason the status error code still decides (unchanged)', () => {
       for (const error of ['session_expired', 'not_signed_in', 'keystore_locked'] as const) {
-        const model = queuePopoverModelOf(makeStatus({ state: 'blocked', error }), undefined, 'pill')
+        const model = queuePopoverModelOf(
+          makeStatus({ state: 'blocked', error }),
+          undefined,
+          'pill',
+        )
         const reason = error === 'not_signed_in' ? 'signed_out' : error
         expect(model.line3?.reasonKey, error).toBe(blockedCopy(reason).reasonKey)
       }

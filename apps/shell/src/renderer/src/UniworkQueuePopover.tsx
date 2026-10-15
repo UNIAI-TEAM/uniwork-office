@@ -247,6 +247,8 @@ export function UniworkQueuePopover({
     if (typeof ResizeObserver !== 'undefined') {
       observer = new ResizeObserver(measure)
       observer.observe(band)
+      // the band can sit at its cap while the text shrinks inside it: the body is what changes
+      if (bodyRef.current) observer.observe(bodyRef.current)
     }
     return () => observer?.disconnect()
   }, [bandReady])

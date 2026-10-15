@@ -5,6 +5,7 @@ import type {
   SyncCenterSnapshot,
 } from '../../shared/sync-center'
 import type { StringKey } from './locale'
+import { blockedCopy } from './sync-center-model'
 import { blockedReasonKey, formatSaveTime } from './uniwork-docs-model'
 
 /**
@@ -87,27 +88,12 @@ export function findQueueRow(
   )
 }
 
-// seam G5-10: replace with blockedCopy (sync-center-model.ts); the second lander deletes this map.
-const BLOCKED_REASON_KEY: Record<SyncCenterBlockedReason, StringKey> = {
-  session_expired: 'uwReasonSession',
-  signed_out: 'uwReasonSignedOut',
-  foreign_account: 'uwReasonForeign',
-  permission_revoked: 'uwReasonForbidden',
-  document_deleted: 'uwReasonDeleted',
-  document_archived: 'uwReasonArchived',
-  organization_suspended: 'uwReasonSuspended',
-  member_deactivated: 'uwReasonDeactivated',
-  lease_expired: 'uwReasonLease',
-  keystore_locked: 'uwReasonKeystore',
-  clock_rollback: 'uwReasonClock',
-  store_full: 'uwReasonStoreFull',
-  store_newer: 'uwReasonStoreNewer',
-}
-
 /**
  * The reason's own next step inside the popover. Sign-in reasons sign in; the access reasons and a
  * locked keychain re-check (needs the row). The rest ("reconnect", "switch account", nothing) is
- * reached through "Open sync center", which always stays.
+ * reached through "Open sync center", which always stays. Not derived from
+ * `blockedCopy(reason).actions`: those are the sync center row's buttons (retry for a locked
+ * keychain, discard draft, ...), the popover offers fewer and with the pill's own labels.
  */
 const REASON_ACTION: Partial<Record<SyncCenterBlockedReason, PopoverAction>> = {
   session_expired: { id: 'sign-in-again', labelKey: 'uwActSignInAgain' },
@@ -157,7 +143,7 @@ function blockedReasonOf(
 }
 
 function reasonKeyOf(reason: SyncCenterBlockedReason | undefined, status: UniworkDocStatus) {
-  return reason ? BLOCKED_REASON_KEY[reason] : blockedReasonKey(status.error)
+  return reason ? blockedCopy(reason).reasonKey : blockedReasonKey(status.error)
 }
 
 export function queuePopoverModelOf(
