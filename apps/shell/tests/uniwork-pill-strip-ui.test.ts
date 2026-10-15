@@ -466,15 +466,16 @@ describe('FXT6u: the Discussion toggle goes icon-only when the compact pill stil
   const toggle = () => chrome.querySelector<HTMLButtonElement>('.uw-discussion-toggle')
   const iconOnly = () => toggle()?.getAttribute('data-icon-only') === 'true'
 
-  /** a document tab's visible px in the strip (Home, then tabs at their 104px minimum, 10px of padding) */
+  /**
+   * A document tab's visible px in the strip: Home, then tabs at their 104px minimum, 10px of padding
+   * on the side the tabs start from (the strip's width is the same in both directions).
+   */
   function visibleTabPx(n: number): number {
-    const stripRect = strip.getBoundingClientRect()
-    const first = stripRect.left + 10 + HOME
-    const left = first + (n - 1) * 104
-    return Math.max(0, Math.min(104, stripRect.right - left))
+    const room = strip.getBoundingClientRect().width - 10 - HOME - (n - 1) * 104
+    return Math.max(0, Math.min(104, room))
   }
-  /** the title starts 36px into a tab (icon and padding, as measured in the real shell) */
-  const visibleLabelPx = (n: number) => Math.max(0, visibleTabPx(n) - 36)
+  /** the title starts 36px into a tab (icon and padding) and is 36px wide at the minimum (real shell: 104 / 36) */
+  const visibleLabelPx = (n: number) => Math.max(0, Math.min(36, visibleTabPx(n) - 36))
 
   function assertHolderApart(tag: string): void {
     const stripRect = strip.getBoundingClientRect()

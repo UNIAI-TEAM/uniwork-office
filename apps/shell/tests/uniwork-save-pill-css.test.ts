@@ -256,3 +256,37 @@ describe('U-1: the pill is a flex item of the tab bar, never laid over a tab', (
     )
   })
 })
+
+describe('FXT6u: the icon-only Discussion toggle keeps its label as visually hidden text', () => {
+  const discussion = readFileSync(
+    resolve(__dirname, '../src/renderer/src/discussion.css'),
+    'utf8',
+  ).replace(/\r\n/g, '\n')
+  const body = (selector: string): string => {
+    const at = discussion.indexOf(`${selector} {`)
+    expect(at, selector).toBeGreaterThanOrEqual(0)
+    const start = at + selector.length + 3
+    return discussion.slice(start, discussion.indexOf('}', start))
+  }
+
+  it('the label is clipped out of the layout, not removed or display:none (the name stays)', () => {
+    const label = body(".uw-discussion-toggle[data-icon-only='true'] .uw-discussion-toggle-label")
+    expect(label).toMatch(/position: absolute/)
+    expect(label).toMatch(/width: 1px/)
+    expect(label).toMatch(/clip: rect\(0 0 0 0\)/)
+    expect(label).not.toMatch(/display: none|visibility: hidden/)
+  })
+
+  it('the toggle narrows its padding in the icon-only form and keeps its height', () => {
+    expect(body(".uw-discussion-toggle[data-icon-only='true']")).toMatch(/padding: 0 8px/)
+    expect(body('.uw-discussion-toggle')).toMatch(/height: 28px/)
+  })
+
+  it('theme tokens only', () => {
+    const rules = [
+      body(".uw-discussion-toggle[data-icon-only='true']"),
+      body(".uw-discussion-toggle[data-icon-only='true'] .uw-discussion-toggle-label"),
+    ].join('\n')
+    expect(rules).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(/i)
+  })
+})

@@ -411,7 +411,6 @@ describe('FXT6u: the Discussion toggle gives up its label before the strip gives
 
   describe('pillFitStepOf', () => {
     const widths = { full: 309, short: 190, compact: 111 }
-    const has = { short: true }
 
     it("the boundary is the compact pill's own width: budget == compact keeps the full toggle, one less gives it up", () => {
       const toggle = { width: 108, iconOnly: false }
