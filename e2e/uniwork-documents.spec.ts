@@ -638,12 +638,12 @@ test.describe.serial('UniWork documents', () => {
     })
   })
 
-  test('d2. conflict: S5 "Reload latest" keeps a draft by default (or discards when chosen) and loads the server version', async () => {
+  test('d2. conflict: S5 "Reload latest" keeps a draft by default and loads the server version', async () => {
     test.setTimeout(180_000)
     const web = await docxOtherBytes()
     await withApp('uniwork-docs-conflict-latest', async (ctx) => {
       const { shell, launched } = ctx
-      const { doc, editor, path } = await intoConflict(ctx, 'conflict-latest.docx', web)
+      const { doc, path } = await intoConflict(ctx, 'conflict-latest.docx', web)
 
       // AC4: Reload latest -> Step 2 with "Keep my version as a draft" preselected -> Reload
       await answerMessageBoxes(launched, [])
@@ -670,37 +670,70 @@ test.describe.serial('UniWork documents', () => {
       expect(await binding(path)).toMatchObject({ state: 'saved', baseRevision: '42' })
       expect(await zipEntry(await readFile(path), 'word/document.xml')).not.toContain(MARKER)
 
+      // the reloaded editor displays the server version rather than a blank doc or the local edit
+      const reloaded = await docsEditor(launched.app)
+      await expect
+        .poll(
+          async () => {
+            const text = await docsText(reloaded)
+            return text.includes('E=mc^2') && !text.includes(MARKER)
+          },
+          { timeout: 30_000 },
+        )
+        .toBe(true)
+      expect(await activeStatus(shell)).toMatchObject({ documentId: doc.id, state: 'saved' })
+
       // the local version was durably stored in the encrypted draft store before reloading
       const drafts = await readKeptDrafts(launched, doc.id)
       expect(drafts).toHaveLength(1)
       expect(drafts[0]!.title).toBe('conflict-latest.docx')
       expect(await zipEntry(drafts[0]!.snapshot, 'word/document.xml')).toContain(MARKER)
+    })
+  })
 
-      // second conflict on the same document: exercise the "Discard my changes" radio choice
-      await editor.waitForFunction(
-        () => Boolean((window as unknown as AidocsWindow).__aidocs?.editor),
-        undefined,
-        { timeout: 30_000 },
-      )
-      await editor.locator('.doc-page').first().waitFor({ timeout: 30_000 })
-      await typeInDocs(editor, MARKER)
-      stub.bumpRevision(doc.id, web)
-      await saveShortcut(editor)
-      await expectState(shell, 'conflict')
+  test('d2b. conflict: S5 "Reload latest" with "Discard my changes" loads the server version without keeping a draft', async () => {
+    test.setTimeout(180_000)
+    const web = await docxOtherBytes()
+    await withApp('uniwork-docs-conflict-discard', async (ctx) => {
+      const { shell, launched } = ctx
+      const { doc, path } = await intoConflict(ctx, 'conflict-discard.docx', web)
 
+      await answerMessageBoxes(launched, [])
       await chip(shell).getByRole('button', { name: 'Resolve…' }).click()
+
+      const dialog = shell.getByRole('alertdialog')
       await expect(dialog).toBeVisible()
       await dialog.getByRole('button', { name: 'Reload latest', exact: true }).click()
+      await expect(dialog.getByRole('heading', { name: 'Reload latest' })).toBeVisible()
+
+      const discardRadio = dialog.getByRole('radio', { name: /Discard my changes/ })
       await discardRadio.check()
       await expect(discardRadio).toBeChecked()
+
       await dialog.getByRole('button', { name: 'Reload', exact: true }).click()
       await expect(dialog).toBeHidden()
       await expectState(shell, 'saved')
+      expect(await seenMessageBoxes(launched)).toHaveLength(0)
 
       expect(sha256(await readFile(path))).toBe(sha256(web))
-      expect(await binding(path)).toMatchObject({ state: 'saved', baseRevision: '43' })
-      // discarding did not add a second draft
-      expect(await readKeptDrafts(launched, doc.id)).toHaveLength(1)
+      expect(stub.commits(doc.id)).toHaveLength(1)
+      expect(await binding(path)).toMatchObject({ state: 'saved', baseRevision: '42' })
+      expect(await zipEntry(await readFile(path), 'word/document.xml')).not.toContain(MARKER)
+
+      const reloaded = await docsEditor(launched.app)
+      await expect
+        .poll(
+          async () => {
+            const text = await docsText(reloaded)
+            return text.includes('E=mc^2') && !text.includes(MARKER)
+          },
+          { timeout: 30_000 },
+        )
+        .toBe(true)
+      expect(await activeStatus(shell)).toMatchObject({ documentId: doc.id, state: 'saved' })
+
+      // discarding did not write a draft
+      expect(await readKeptDrafts(launched, doc.id)).toHaveLength(0)
     })
   })
 
