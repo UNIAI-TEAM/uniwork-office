@@ -48,6 +48,7 @@ import {
   addTokenUsage,
   Markdown,
   uniworkErrorForChip,
+  uniworkErrorKeyOfText,
   useChatRunQueue,
   useUniworkDisclosureAck,
   useUniworkSendGate,
@@ -1222,6 +1223,13 @@ export function AiPanel({
         )}
         {chat.map((entry, i) => {
           if (entry.role === 'user') {
+            // a UniWork error turn carries its own labelled S9 action (Retry only where the table allows
+            // it), so the "not sent" bubble adds no Retry of its own; failures of other providers keep it
+            const next = chat[i + 1]
+            const uniworkErrorFollows =
+              next?.role === 'assistant' &&
+              Boolean(next.isError) &&
+              uniworkErrorKeyOfText(next.text) !== null
             return (
               <div key={i} className="ai-msg ai-msg-user">
                 {entry.scope && <AiScopeQuote scope={entry.scope} />}
@@ -1239,7 +1247,7 @@ export function AiPanel({
                 {entry.undelivered && (
                   <div className="ai-msg-undelivered">
                     {t('aiUndelivered')}
-                    {canRetryEntry(entry, busy) && (
+                    {canRetryEntry(entry, busy) && !uniworkErrorFollows && (
                       <button
                         className="ai-retry-btn"
                         onClick={() => send(entry.text, undefined, entry)}

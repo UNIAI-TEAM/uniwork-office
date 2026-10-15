@@ -406,12 +406,32 @@ export function AiModelPicker({
     setOpen((v) => !v)
   }
 
-  // opening moves focus into the list, onto the selected (else first) option, so arrows work at once;
-  // only the open edge does it: later settings refreshes must not pull focus back
+  // opening moves focus into the list, onto the selected (else first) option, so arrows work at once.
+  // Once per open: later settings refreshes must not pull focus back. A host that has no option at
+  // the open edge (the read an open triggers is what finds the model) gets it when the first one
+  // arrives, unless focus went elsewhere meanwhile
+  const focusedThisOpenRef = useRef(false)
+  const hasOptions = flatOptions.length > 0
   useEffect(() => {
-    if (!open) return
-    listRef.current?.querySelector<HTMLButtonElement>('[role="option"][tabindex="0"]')?.focus()
-  }, [open])
+    if (!open) {
+      focusedThisOpenRef.current = false
+      return
+    }
+    if (focusedThisOpenRef.current || !hasOptions) return
+    const active = document.activeElement
+    const stayed =
+      !active ||
+      active === document.body ||
+      Boolean(chipRef.current?.contains(active)) ||
+      Boolean(popRef.current?.contains(active))
+    if (!stayed) return
+    const option = listRef.current?.querySelector<HTMLButtonElement>(
+      '[role="option"][tabindex="0"]',
+    )
+    if (!option) return
+    option.focus()
+    focusedThisOpenRef.current = true
+  }, [open, hasOptions])
 
   const onChipKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return

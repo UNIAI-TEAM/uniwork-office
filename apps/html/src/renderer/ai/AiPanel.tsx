@@ -49,6 +49,7 @@ import {
   addTokenUsage,
   Markdown,
   uniworkErrorForChip,
+  uniworkErrorKeyOfText,
   useChatRunQueue,
   useUniworkDisclosureAck,
   useUniworkSendGate,
@@ -1487,6 +1488,13 @@ export function AiPanel({
         )}
         {chat.map((entry, i) => {
           if (entry.role === 'user') {
+            // a UniWork error turn carries its own labelled S9 action (Retry only where the table allows
+            // it), so the "not sent" bubble adds no Retry of its own; failures of other providers keep it
+            const next = chat[i + 1]
+            const uniworkErrorFollows =
+              next?.role === 'assistant' &&
+              Boolean(next.isError) &&
+              uniworkErrorKeyOfText(next.text) !== null
             const own = receipts.filter((r) => r.afterIdx === i)
             return (
               <div key={i} className="ai-msg ai-msg-user">
@@ -1517,7 +1525,7 @@ export function AiPanel({
                 {entry.undelivered && (
                   <div className="ai-msg-undelivered">
                     {t('aiUndelivered')}
-                    {!busy && (
+                    {!busy && !uniworkErrorFollows && (
                       <button
                         className="ai-retry-btn"
                         onClick={() =>
@@ -1641,12 +1649,7 @@ export function AiPanel({
                 chip={chip}
                 lang={lang}
                 waiting={Boolean(entry.waitLine)}
-                // a failed send already carries its own Retry on the undelivered message above
-                onRetry={
-                  isLast && !busy && runInstructionRef.current && !chat[i - 1]?.undelivered
-                    ? retry
-                    : undefined
-                }
+                onRetry={isLast && !busy && runInstructionRef.current ? retry : undefined}
                 onChooseProvider={() => void window.htmlApi?.openAiModelSettings?.()}
                 onSignIn={() => void readUniworkCloudStatus()?.signIn?.()}
                 onAskAgain={isLast && !busy ? () => inputRef.current?.focus() : undefined}
