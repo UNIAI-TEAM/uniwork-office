@@ -28,7 +28,11 @@ import type {
   UniworkDocFormat,
   UniworkLockReason,
 } from '../../shared/home-api'
-import { bindingCanEdit, scopeWorkingCopyDirs, type BindingStore } from '../uniwork-docs/binding-store'
+import {
+  bindingCanEdit,
+  scopeWorkingCopyDirs,
+  type BindingStore,
+} from '../uniwork-docs/binding-store'
 import type { QueueDispatcher, QueueDoc } from './queue/dispatcher'
 import type { DraftStore, KeptDraftMeta } from './queue/drafts'
 import { QUEUE_LIMITS } from './queue/limits'
