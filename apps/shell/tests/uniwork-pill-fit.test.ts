@@ -8,6 +8,7 @@ import {
   nextPillVariantOf,
   pillFitStepOf,
   pillBudgetOf,
+  pillRoomOf,
   shortLabelOf,
   stripFloorOf,
   type BarLayoutInput,
@@ -677,6 +678,42 @@ describe('FXT6u2: the mini step needs the last tab only up to its readable label
     return Math.max(0, Math.min(104, l.strip.right - l.strip.left - 10 - 109 - (n - 1) * 104))
   }
   const lastLabelPx = (px: number) => Math.max(0, Math.min(36, px - 36))
+
+  describe('pillRoomOf: the budget before it is clamped', () => {
+    it('is the budget where it is positive and keeps how far below the floor the strip would be where it is not', () => {
+      expect(pillRoomOf({ shared: 654, floor: 381, others: 106 })).toBe(167)
+      expect(pillRoomOf({ shared: 300, floor: 485, others: 106 })).toBe(-291)
+      expect(pillRoomOf({ shared: Number.NaN, floor: 100, others: 0 })).toBe(0)
+      // the clamped budget is the room, never negative
+      expect(pillBudgetOf({ shared: 300, floor: 485, others: 106 })).toBe(0)
+    })
+
+    it('the step reads the unclamped room: the toggle drawn full or icon-only gives the same step at 722 x 3 (the first pass is the last)', () => {
+      // 722 x 3, toggle drawn full: room -97 (budgetOf says 0); drawn icon-only: -21, the saving of 76 taken back is -97 again
+      const full = pillRoomOf({ shared: 484, floor: 473, others: 108 })
+      const icon = pillRoomOf({ shared: 484, floor: 473, others: 32 })
+      expect(full).toBe(-97)
+      expect(icon).toBe(-21)
+      const base = {
+        toggleWidths: { full: 108, icon: 32 },
+        widths: { full: 309, short: 190, compact: 111, mini: 28 },
+        hasShort: true,
+        miniSlack: 74,
+      }
+      expect(
+        pillFitStepOf({ ...base, budget: full, toggle: { width: 108, iconOnly: false } }),
+      ).toEqual({
+        variant: 'mini',
+        iconToggle: true,
+      })
+      expect(
+        pillFitStepOf({ ...base, budget: icon, toggle: { width: 32, iconOnly: true } }),
+      ).toEqual({
+        variant: 'mini',
+        iconToggle: true,
+      })
+    })
+  })
 
   describe('miniSlackOf: what the mini step may take off the floor', () => {
     const base = { ...BAR, docTabs: 3, ...LABEL }
