@@ -97,7 +97,7 @@ interface BlockedCopy {
 
 /**
  * `store_full` ("Mở trung tâm đồng bộ") and `store_newer` ("Đóng") have no row
- * action here: the user is already in the sync center, and the store_newer header
+ * action here, nor has `lease_expired` on a row with `libraryOff` (see `rowView`): the user is already in the sync center, and the store_newer header
  * replaces the whole center with the S11 panel.
  */
 export const BLOCKED_REASONS: Record<SyncBlockedReason, BlockedCopy> = {
@@ -343,10 +343,13 @@ export function rowView(row: SyncCenterRow, ctx: { online: boolean }): SyncRowVi
       const copy = blockedCopy(row.blockedReason)
       const reason = row.blockedReason ?? ''
       const foreign = reason === 'foreign_account'
+      // lease_expired with the offline library capability off cannot be renewed ("Kết nối lại"
+      // would do nothing): like store_full the user is already in the sync center, no row action
+      const libraryOff = reason === 'lease_expired' && row.libraryOff === true
       return {
         badge: { tone: copy.tone, key: copy.badgeKey },
         sub: { key: 'uwRowBlocked', keyParams: { reason: copy.reasonKey } },
-        actions: copy.actions.map((id) => action(id)),
+        actions: libraryOff ? [] : copy.actions.map((id) => action(id)),
         opens: NOT_OPENABLE.has(reason) ? null : 'document',
         hideTitle: foreign,
       }

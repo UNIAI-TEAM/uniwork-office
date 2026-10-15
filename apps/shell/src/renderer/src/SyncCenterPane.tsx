@@ -234,8 +234,10 @@ export function SyncCenterPane({
         return api.openDraft(rowId)
       case 'discardDraft':
         return api.discardDraft(rowId)
+      case 'saveAgain':
+        return api.saveAgain(rowId)
       default:
-        // Kiểm tra lại / Kết nối lại / Thử lại / Lưu lại: main re-verifies (and re-dispatches) the intent
+        // Kiểm tra lại / Kết nối lại / Thử lại: main re-verifies (and re-dispatches) the intent
         return api.recheck(rowId)
     }
   }
