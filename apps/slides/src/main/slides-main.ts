@@ -1101,8 +1101,14 @@ export function registerSlidesIpc(): void {
       try {
         result = await openAndBuild(e.sender, queued, fitWidthPx, reloading)
       } catch (error) {
-        // the retry re-reads from disk (the reloading entry stays), meanwhile the view and its peers keep the old deck
-        if (previous && !sessions.has(wcId)) sessions.set(wcId, previous)
+        // A reload must never reject: the renderer's rejection handler boots a blank deck over the
+        // restored session and the bound UniWork document silently detaches. Keep the previous deck
+        // like the other failures, which also drops the queue entry (no endless retry: the renderer
+        // does not re-consume after this mount anyway). A first open still throws to its caller.
+        if (reloading && previous) {
+          console.warn('slides: reload re-open failed, keeping the previous deck', error)
+          return keepPreviousDeck()
+        }
         throw error
       }
       const fresh = sessions.get(wcId)

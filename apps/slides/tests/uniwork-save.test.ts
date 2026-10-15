@@ -421,27 +421,39 @@ describe('queueSlidesForView and slides:consume-pending-open reload routing', ()
       refuseOpen: (p) => p === deckPath,
     })
 
-    const r = (await call('slides:consume-pending-open', FIT)) as { path: string } | null
+    const r = (await call('slides:consume-pending-open', FIT)) as {
+      path: string
+      slides: unknown[]
+    } | null
     expect(r?.path).toBe(deckPath)
+    expect(r?.slides).toHaveLength(1)
     expect(sessions.get(WC)).toBe(session)
     expect(sessions.get(PEER_WC)).toBe(session)
   })
 
-  it('a re-open that throws restores the old session, rejects, and re-reads from disk on the retry', async () => {
+  it('a re-open that throws resolves with the previous deck instead of rejecting (no blank boot)', async () => {
     const PEER_WC = 2
     sessions.set(PEER_WC, session)
     queueSlidesForView({ id: WC } as never, deckPath)
     // deckPath still holds the placeholder bytes: not a pptx, openPptx throws
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
-    await expect(call('slides:consume-pending-open', FIT)).rejects.toThrow()
+    // a rejection would make the renderer boot a blank deck over the restored session (BE-502)
+    const r = (await call('slides:consume-pending-open', FIT)) as {
+      path: string
+      slides: unknown[]
+    } | null
+    expect(r?.path).toBe(deckPath)
+    expect(r?.slides).toHaveLength(1)
     expect(sessions.get(WC)).toBe(session)
     expect(sessions.get(PEER_WC)).toBe(session)
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
 
-    writeFileSync(deckPath, await createBlankPptx())
-    const r = (await call('slides:consume-pending-open', FIT)) as { slides: unknown[] } | null
-    expect(r?.slides).toHaveLength(1)
-    expect(sessions.get(WC)).not.toBe(session)
-    expect(sessions.get(PEER_WC)).toBe(sessions.get(WC))
+    // the dead queue entry is dropped, so the next remount restores the session instead of retrying
+    const again = (await call('slides:consume-pending-open', FIT)) as { path: string } | null
+    expect(again?.path).toBe(deckPath)
+    expect(sessions.get(WC)).toBe(session)
   })
 
   it('restores the in-memory session when reloading without queueSlidesForView (freeze recovery)', async () => {
