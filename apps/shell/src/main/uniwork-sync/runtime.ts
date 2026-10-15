@@ -3,9 +3,28 @@ import type { FeedChange, FeedClient } from './feed/client'
 import { FeedConsumer, type DocCache, type DocCacheCommit } from './feed/consumer'
 import { cursorKey, type CursorStore, type FeedScope } from './feed/cursor-store'
 import { compareRevision } from './feed/revision'
+import {
+  LEASE_STORE_REGISTRATION,
+  LeaseManager,
+  createLeaseClient,
+  createLeaseManager,
+  createLeaseStore,
+  type LeaseClient,
+  type LeaseRevokeNotice,
+} from './lease'
 import type { SyncStoreAccess } from './session-store'
 import { APP_STORE_LEVEL } from './store-level'
 import type { StoreReadResult, StoreRecords, StoreRegistration, StoreWriteResult } from './store'
+
+export {
+  LEASE_STORE_REGISTRATION,
+  LeaseManager,
+  createLeaseClient,
+  createLeaseManager,
+  createLeaseStore,
+  type LeaseClient,
+  type LeaseRevokeNotice,
+}
 
 /**
  * The change-feed runtime of the signed-in account. For every (org, workspace)
@@ -262,6 +281,10 @@ export interface SyncRuntimeOptions {
    * one metadata read; nothing is evicted by the feed for a kept draft.
    */
   onFeedGone?(documentId: string): void
+  /** G5-08c: optional lease manager or client factory for the runtime */
+  leases?: LeaseManager
+  leaseClient?(): LeaseClient | null
+  onLeaseRevoked?(notice: LeaseRevokeNotice): void
   intervalMs?: number
   /** test seam: schedule `run` on the interval, return the cancel */
   schedule?(run: () => void): () => void
@@ -269,6 +292,7 @@ export interface SyncRuntimeOptions {
 }
 
 export class SyncRuntime {
+  readonly leases: LeaseManager
   private readonly options: SyncRuntimeOptions
   private readonly running = new Map<string, FeedConsumer>()
   private readonly capabilities = new Map<string, OfficeCapabilities>()
@@ -279,6 +303,24 @@ export class SyncRuntime {
 
   constructor(options: SyncRuntimeOptions) {
     this.options = options
+    this.leases =
+      options.leases ??
+      createLeaseManager({
+        store: createLeaseStore(options.store),
+        client: () => options.leaseClient?.() ?? null,
+        clock: {
+          wallNow: () => options.clock.now(),
+          monotonicNow: () => Math.trunc(performance.now()),
+        },
+        scope: () => options.store.scope(),
+        ...(options.onLeaseRevoked ? { onRevoked: options.onLeaseRevoked } : {}),
+        ...(options.onSessionExpired ? { onSessionExpired: options.onSessionExpired } : {}),
+      })
+  }
+
+  /** G5-08c: returns the runtime's offline lease manager */
+  leaseManager(): LeaseManager {
+    return this.leases
   }
 
   /** starts the interval and runs one pass now (sign-in, app ready) */
@@ -313,6 +355,7 @@ export class SyncRuntime {
     for (const consumer of this.running.values()) consumer.cancel()
     this.running.clear()
     this.capabilities.clear()
+    this.leases.lockAll('logout')
   }
 
   /** one pass; concurrent calls share it */
