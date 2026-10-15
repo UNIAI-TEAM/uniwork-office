@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent, ReactElement, ReactNode } from 'react'
 import { getPractice, type PracticeId, type WorkbenchModuleId } from '@uniwork/practice-core'
-import { aiEffectiveModel } from '@genoffice/ai-provider/browser'
 import { AiTypingIndicator, IconSend, IconStop, UniAiMark } from '@genoffice/ui'
 import { applyAgentIntent, undoAgentAddItem } from './agent-intent-apply'
 import { emitAgentIntentNavigate } from './agent-intent-bus'
@@ -50,7 +49,7 @@ import {
 } from './my-ai-router'
 import { streamMyAiReply } from './my-ai-stream'
 import {
-  aiSettingsReady,
+  myAiTurnTarget,
   openAiSettingsLabel,
   looksLikeMissingAiActivation,
   softAiActivationMessage,
@@ -596,11 +595,9 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
     if (!api.getAiSettings) return { ok: false, error: 'AI unavailable' }
     const settings = await api.getAiSettings()
 
-    const provider = settings.provider
-    // the model main will use (a key saved on UniWork serves its own, not the slot's)
-    const model = aiEffectiveModel(settings, provider)
+    const { provider, model, ready } = myAiTurnTarget(settings)
 
-    if (!aiSettingsReady(settings)) {
+    if (!ready) {
       return activationFailure(opts.messageId, showBubble)
     }
 

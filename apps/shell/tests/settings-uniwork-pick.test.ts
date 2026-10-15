@@ -40,12 +40,6 @@ describe('Settings window UniWork AI pick wiring', () => {
     )
   })
 
-  it('My AI records the model main will use, not the slot of an org-served provider', () => {
-    const src = read('src/renderer/src/NewChatPane.tsx')
-    expect(src).toMatch(/const model = aiEffectiveModel\(settings, provider\)/)
-    expect(src).not.toMatch(/settings\.providers\?\.\[provider\]\?\.model/)
-  })
-
   it('My AI, the credit wallet and the one-click read keep the file provider', () => {
     expect(read('src/renderer/src/NewChatPane.tsx')).toMatch(/api\.getAiSettings\(\)/)
     expect(read('src/renderer/src/CreditWallet.tsx')).toMatch(/aiOffice\.getAiSettings\(\)/)

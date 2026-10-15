@@ -476,6 +476,15 @@ export function isProviderUsable(settings: AiSettings, id: AiProviderId): boolea
 }
 
 /**
+ * True when a key saved on UniWork serves `id` (the host resolved an `origin: 'org'` source) and a
+ * model is known, so a call can go out although the slot holds no key. main's ai:chat / ai:stream
+ * route such a provider through the UniWork proxy, so My AI and the agents treat it as ready.
+ */
+export function isOrgServedReady(settings: AiSettings, id: AiProviderId): boolean {
+  return settings.modelSources?.[id]?.origin === 'org' && providerNeed(settings, id) === null
+}
+
+/**
  * The provider the user chose. It is never swapped for another when its config
  * is incomplete: Settings and every module picker keep showing it with a
  * needs-key / choose-model state (`providerNeed`), so a half-filled setup never

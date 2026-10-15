@@ -34,6 +34,7 @@ export {
   cloudToolsEnabled,
   defaultAiSettings,
   aiEffectiveModel,
+  isOrgServedReady,
   isProviderUsable,
   maxOutputTokensOf,
   providerNeed,
