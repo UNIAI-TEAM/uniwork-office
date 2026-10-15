@@ -1101,10 +1101,13 @@ const UNIWORK_AI_HIDDEN_TOOLS: readonly string[] = [
 
 const UNIWORK_AI_TOOLS_OFF_NOTE = `\n\nNote: ${UNIWORK_AI_HIDDEN_TOOLS.join(', ')} are not available here. generate_deck is unavailable: do not create a new deck; edit the open one with apply_ops and execute_slide_script. Do not call or promise those tools.`
 
-function mediaToolsOffNote(hidden: Set<string>): string {
+function mediaToolsOffNote(hidden: Set<string>, uniworkAi: boolean): string {
   if (hidden.size === 0) return ''
   const plural = hidden.size > 1
-  return `\n\nNote: ${[...hidden].join(' and ')} ${plural ? 'are' : 'is'} currently unavailable (no image/media provider: signed out of UniWork or cloud tools off, and no media API key in Settings). Do not call or promise ${plural ? 'them' : 'it'}; for imagery use image_search + insert_web_image instead.`
+  // insert_web_image is one of the tools UniWork AI turns hide, so it cannot be the fallback there
+  const fallback = uniworkAi ? 'image_search' : 'image_search + insert_web_image'
+
+  return `\n\nNote: ${[...hidden].join(' and ')} ${plural ? 'are' : 'is'} currently unavailable (no image/media provider: signed out of UniWork or cloud tools off, and no media API key in Settings). Do not call or promise ${plural ? 'them' : 'it'}; for imagery use ${fallback} instead.`
 }
 
 /** the only tools a view-only deck may run: none of them changes the deck */
@@ -1150,7 +1153,7 @@ export function createSlidesSkill(access: DeckAccess): AgentSkill {
       const redact = labels.length > 0 ? `\n\n${placeholderInstruction(labels)}` : ''
       return (
         systemPrompt +
-        mediaToolsOffNote(hiddenMediaTools(access)) +
+        mediaToolsOffNote(hiddenMediaTools(access), access.uniworkAi?.() === true) +
         (access.uniworkAi?.() ? UNIWORK_AI_TOOLS_OFF_NOTE : '') +
         (access.readOnly?.() ? VIEW_ONLY_NOTE : '') +
         redact

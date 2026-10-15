@@ -66,6 +66,12 @@ const IMAGE_GEN_OFF_NOTE =
 const BOUND_NOTE =
   '\n\nNote: this document belongs to UniWork. create_document is unavailable here; do not call or promise it. Give results in your reply instead. The file-level page tools are unavailable too (insert_blank_page, set_page_size, crop_pages, replace_pages, extract_pages, split_pdf, split_pages, merge_pages); use the pending apply_ops ops (deletePage, setPageOrder, rotatePages) instead.'
 
+const TEXT_EDIT_OFF_NOTE =
+  '\n\nNote: the text-editing tools are unavailable here (edit_text, edit_block, move_text_block, insert_text). Do not call or promise text edits; you can still highlight, annotate, and add notes.'
+
+const IMAGE_EDIT_OFF_NOTE =
+  '\n\nNote: the image-editing tools are unavailable here (transform_image, rotate_image, replace_image, flip_image, set_image_opacity, crop_image, remove_image_background, delete_image). Do not call or promise edits to images already in the document; insert_image can still add one.'
+
 /** pdfium text patching (G6-01: edit_text, edit_block, move_text_block, insert_text); the `pdfTextEdit` capability */
 const TEXT_EDIT_TOOLS: readonly string[] = [
   'edit_text',
@@ -131,6 +137,10 @@ export function createPdfSkill(deps: PdfAiDeps): AgentSkill {
       if (deps.readOnly()) return SYSTEM_PROMPT + VIEW_ONLY_NOTE
       let prompt = SYSTEM_PROMPT
       if (deps.uniworkBound?.()) prompt += BOUND_NOTE
+      if (deps.uniworkAi?.()) {
+        if (capabilityOff(deps, 'pdfTextEdit')) prompt += TEXT_EDIT_OFF_NOTE
+        if (capabilityOff(deps, 'pdfImageEdit')) prompt += IMAGE_EDIT_OFF_NOTE
+      }
       if (deps.imageGenAvailable?.() === false) prompt += IMAGE_GEN_OFF_NOTE
       return prompt
     },
