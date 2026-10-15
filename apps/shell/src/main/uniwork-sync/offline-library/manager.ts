@@ -781,6 +781,20 @@ export class OfflineLibraryManager {
     return this.purge(notice.documentId, deleted ? 'deleted' : 'revoked')
   }
 
+  /**
+   * R5BE-1b: the feed's archived flag of a document (an archive does not bump
+   * the revision, so the flag itself is the signal). Archived -> the row is
+   * marked (no metadata read); restored -> the head is read again, which
+   * clears the mark. A document that is not pinned is not touched.
+   */
+  async noteArchived(documentId: string, archived: boolean): Promise<PinRow | null> {
+    const row = await this.row(documentId)
+    if (!row || row.archived === archived) return row
+    if (archived) return this.handleArchived(documentId)
+    const refreshed = await this.refresh(documentId)
+    return refreshed.kind === 'ok' ? refreshed.row : this.row(documentId)
+  }
+
   /** archived on the server: the row stays and opens until the lease ends */
   async handleArchived(documentId: string): Promise<PinRow | null> {
     this.checkBoundary()

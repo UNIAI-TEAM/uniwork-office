@@ -6,7 +6,7 @@ import {
   NEVER_READ_CAPABILITIES,
   type CapabilityRead,
 } from '../src/main/uniwork-sync/capability/cache'
-import type { FeedClient } from '../src/main/uniwork-sync/feed/client'
+import { parseFeedPage, type FeedClient } from '../src/main/uniwork-sync/feed/client'
 import { createSafeStorageKeyProvider } from '../src/main/uniwork-sync/keys'
 import {
   LeaseClientError,
@@ -85,7 +85,7 @@ interface HarnessOptions {
 }
 
 function harness(options: HarnessOptions = {}) {
-  const wallMs = T0
+  let wallMs = T0
   let revokeRenew = false
   const safeStorage = createLockableSafeStorage()
   const syncLayer = createStoreLayer({
@@ -149,7 +149,11 @@ function harness(options: HarnessOptions = {}) {
     keepDraft: async () => false,
     clock: { now: () => wallMs },
     schedule: () => () => undefined,
-    lease: { client: () => leaseClient, session: () => 'dev_1', monotonicNow: () => 5_000 },
+    lease: {
+      client: () => leaseClient,
+      session: () => 'dev_1',
+      monotonicNow: () => 5_000 + (wallMs - T0),
+    },
     library: {
       layer: libraryLayer,
       docs: () => (docsOnline ? docs : null),
@@ -168,6 +172,10 @@ function harness(options: HarnessOptions = {}) {
     },
     revokeOnRegrant: () => {
       revokeRenew = true
+    },
+    /** wall and monotonic clocks move together (a lease reaches its end) */
+    advance: (ms: number) => {
+      wallMs += ms
     },
   }
 }
@@ -322,5 +330,214 @@ describe('T5-3 a feed delete/revoke of a CLOSED pinned document reaches the libr
     await h.runtime.tick()
     await new Promise((resolve) => setTimeout(resolve, 20))
     expect(gone).toEqual([])
+  })
+})
+
+/** a pinned (never opened) doc_1 with a draft and an intent in the sync store */
+async function pinnedNeverOpened(h: ReturnType<typeof harness>) {
+  addDoc(h, 'doc_1', 1)
+  await h.runtime.library!.pin({ documentId: 'doc_1', orgId: ORG, workspaceId: WS })
+  expect(await h.runtime.library!.row('doc_1')).toMatchObject({ readyVersion: 1, open: false })
+  const opened = await h.syncLayer.open(SCOPE)
+  if (opened.kind !== 'ok') throw new Error('sync store did not open')
+  const records = opened.store.records
+  await records(INTENT_STORE_REGISTRATION.name).write('doc_1', plaintext('intent', 64))
+  await records(DRAFTS_STORE_REGISTRATION.name).write('doc_1/1', plaintext('draft', 64))
+  return async () => {
+    expect((await records(INTENT_STORE_REGISTRATION.name).read('doc_1')).kind).toBe('ok')
+    expect((await records(DRAFTS_STORE_REGISTRATION.name).read('doc_1/1')).kind).toBe('ok')
+  }
+}
+
+/** the production wiring's onFeedGone (uniwork-docs/wiring.ts): the library re-checks the doc */
+const wiringFeedGone = (runtime: SyncRuntime, documentId: string) => {
+  void runtime.library?.refresh(documentId).catch(() => undefined)
+}
+
+/** snapshot lists doc_1, then the cursor is refused and a resync no longer lists it */
+const feedDropping = () =>
+  new FakeFeedClient([
+    {
+      phase: 'snapshot',
+      rows: [{ document_id: 'doc_1', revision: '1', current_version: 1 }],
+      next_cursor: 'c1',
+    },
+    cursorInvalid(),
+    { phase: 'snapshot', rows: [], next_cursor: 'c2' },
+  ])
+
+/** snapshot lists doc_1, then feed pages re-send it with an archived flag (same revision) */
+const feedArchiving = (archived: boolean[]) =>
+  new FakeFeedClient([
+    {
+      phase: 'snapshot',
+      rows: [{ document_id: 'doc_1', revision: '1', current_version: 1 }],
+      next_cursor: 'c1',
+    },
+    ...archived.map((flag, index) => ({
+      phase: 'feed',
+      rows: [{ document_id: 'doc_1', revision: '1', current_version: 1, archived: flag }],
+      next_cursor: `f${index + 1}`,
+    })),
+  ])
+
+describe('R5BE-15 delete / revoke / archive of a pinned, never opened doc through the real SyncRuntime feed path', () => {
+  it.each([
+    ['410 document_deleted', new UniworkDocError('document_deleted', { status: 410 }), 'deleted'],
+    [
+      '403 permission_revoked',
+      new UniworkDocError('permission_revoked', { status: 403 }),
+      'revoked',
+    ],
+    ['404 not_found', new UniworkDocError('not_found', { status: 404 }), 'revoked'],
+  ] as const)(
+    'feed drop -> %s -> row %s, its blobs gone from the store root listing, drafts kept',
+    async (_label, error, state) => {
+      const h = harness({ feed: feedDropping(), onFeedGone: wiringFeedGone })
+      const draftsKept = await pinnedNeverOpened(h)
+      expect(filesUnder(h.libraryRoot).length).toBeGreaterThan(2)
+      h.docs.docs.get('doc_1')!.error = error
+      await h.runtime.tick()
+      await h.runtime.tick()
+      await vi.waitFor(async () => {
+        expect(await h.runtime.library!.row('doc_1')).toMatchObject({ state, bytes: 0 })
+      })
+      // only the pin row and the index remain under the library root
+      expect(filesUnder(h.libraryRoot)).toHaveLength(2)
+      expect(await h.runtime.library!.openCached('doc_1')).toEqual({ kind: 'refused', code: state })
+      await draftsKept()
+    },
+  )
+
+  it('feed upsert archived=true -> row archived, its blobs kept, still opens read-only, drafts kept', async () => {
+    const h = harness({ feed: feedArchiving([true]), onFeedGone: wiringFeedGone })
+    const draftsKept = await pinnedNeverOpened(h)
+    const before = filesUnder(h.libraryRoot).filter((file) => !file.endsWith('.tmp'))
+    h.docs.docs.get('doc_1')!.archivedAt = '2026-10-13T09:00:00Z'
+    await h.runtime.tick()
+    await h.runtime.tick()
+    await vi.waitFor(async () => {
+      expect(await h.runtime.library!.row('doc_1')).toMatchObject({
+        state: 'archived',
+        archived: true,
+        readyVersion: 1,
+      })
+    })
+    expect(filesUnder(h.libraryRoot)).toEqual(before)
+    expect(await h.runtime.library!.openCached('doc_1')).toMatchObject({
+      kind: 'ok',
+      readOnly: true,
+    })
+    await draftsKept()
+  })
+})
+
+describe('R5BE-1b an archived pinned document reaches the library (handleArchived routed)', () => {
+  it('the feed parser keeps a feed upsert archived flag (G5-01b DocumentChangeFeedSDO.archived)', () => {
+    const page = parseFeedPage(
+      JSON.stringify({
+        phase: 'feed',
+        changes: [],
+        feed: [
+          {
+            document_id: 'doc_1',
+            change_kind: 'upsert',
+            kind: 'file',
+            revision: '7',
+            current_version: 1,
+            version_id: null,
+            archived: true,
+            removal: '',
+          },
+        ],
+        has_more: false,
+        next_cursor: 'f1',
+        expires_at: '',
+      }),
+    )
+    expect(page.changes).toEqual([
+      expect.objectContaining({ documentId: 'doc_1', revision: '7', archived: true }),
+    ])
+    // a snapshot row has no archived field: nothing is read into it
+    const snapshot = parseFeedPage(
+      JSON.stringify({
+        phase: 'snapshot',
+        changes: [{ document_id: 'doc_1', kind: 'file', revision: '7', current_version: 1 }],
+        has_more: false,
+        next_cursor: 'c1',
+      }),
+    )
+    expect(snapshot.changes[0]).not.toHaveProperty('archived')
+  })
+
+  it('a feed archived=true for a pinned doc marks it with no metadata read; archived=false re-checks and clears it', async () => {
+    const h = harness({ feed: feedArchiving([true, false]), onFeedGone: wiringFeedGone })
+    await pinnedNeverOpened(h)
+    const reads = vi.spyOn(h.docs, 'getDocument')
+    await h.runtime.tick()
+    await h.runtime.tick()
+    await vi.waitFor(async () => {
+      expect(await h.runtime.library!.row('doc_1')).toMatchObject({ archived: true })
+    })
+    expect(reads).not.toHaveBeenCalled()
+    // restored on the server: the next feed row says so, the head is read again
+    await h.runtime.tick()
+    await vi.waitFor(async () => {
+      expect(await h.runtime.library!.row('doc_1')).toMatchObject({
+        archived: false,
+        state: 'view-only',
+      })
+    })
+    expect(reads).toHaveBeenCalledWith('doc_1')
+  })
+
+  it('a feed archived flag for a doc that is not pinned touches nothing', async () => {
+    const h = harness({ feed: feedArchiving([true]), onFeedGone: wiringFeedGone })
+    addDoc(h, 'doc_1', 1)
+    const reads = vi.spyOn(h.docs, 'getDocument')
+    await h.runtime.tick()
+    await h.runtime.tick()
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(await h.runtime.library!.row('doc_1')).toBeNull()
+    expect(reads).not.toHaveBeenCalled()
+  })
+
+  it('the feed-gone re-check (refresh) of a closed pinned doc whose head is archived -> archived, opens until lease end, then locked', async () => {
+    const h = harness({ feed: feedDropping(), onFeedGone: wiringFeedGone })
+    const draftsKept = await pinnedNeverOpened(h)
+    h.docs.docs.get('doc_1')!.archivedAt = '2026-10-13T09:00:00Z'
+    await h.runtime.tick()
+    await h.runtime.tick()
+    await vi.waitFor(async () => {
+      expect(await h.runtime.library!.row('doc_1')).toMatchObject({ state: 'archived' })
+    })
+    expect(await h.runtime.library!.openCached('doc_1')).toMatchObject({ kind: 'ok' })
+    // the lease (24 h) ends: the row locks, the copy no longer opens, its bytes stay
+    h.advance(25 * HOUR)
+    expect(await h.runtime.library!.row('doc_1')).toMatchObject({
+      state: 'lease-expired',
+      archived: true,
+    })
+    expect(await h.runtime.library!.openCached('doc_1')).toMatchObject({
+      kind: 'refused',
+      code: 'lease_unusable',
+    })
+    expect(filesUnder(h.libraryRoot).length).toBeGreaterThan(2)
+    await draftsKept()
+  })
+
+  it('the reconnect pass: a pin that waited for the network and is archived on the server downloads and reads archived', async () => {
+    const h = harness()
+    addDoc(h, 'doc_1', 1).archivedAt = '2026-10-13T09:00:00Z'
+    h.setDocsOnline(false)
+    await h.runtime.library!.pin({ documentId: 'doc_1', orgId: ORG, workspaceId: WS })
+    expect(await h.runtime.library!.row('doc_1')).toMatchObject({ state: 'waiting-network' })
+    h.setDocsOnline(true)
+    await h.runtime.tick()
+    expect(await h.runtime.library!.row('doc_1')).toMatchObject({
+      state: 'archived',
+      readyVersion: 1,
+    })
+    expect(await h.runtime.library!.openCached('doc_1')).toMatchObject({ kind: 'ok' })
   })
 })

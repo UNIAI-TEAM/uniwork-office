@@ -572,12 +572,41 @@ export class SyncRuntime {
   }
 
   /**
+   * R5BE-1b: every row of a committed page that carries the feed's archived
+   * flag reaches the library (which ignores a document it has not pinned). An
+   * archive does not bump the revision, so the page's own rows are read, not
+   * only the ones the cache applied. Dropped once the pass that built the
+   * consumer is no longer current.
+   */
+  private archivingCache(cache: DocCache): DocCache {
+    const library = this.library
+    if (!library) return cache
+    const generation = this.generation
+    const live = () => this.generation === generation
+    return {
+      async applyPage(changes) {
+        const commit = await cache.applyPage(changes)
+        if (commit.kind === 'ok') {
+          for (const change of changes) {
+            if (change.archived === undefined || !live()) continue
+            void library.noteArchived(change.documentId, change.archived).catch(() => undefined)
+          }
+        }
+        return commit
+      },
+      reconcile: (ids, options) => cache.reconcile(ids, options),
+    }
+  }
+
+  /**
    * The doc cache, plus the S18 change notice: every page the cache committed is
    * handed to `onFeedChange` once, after the commit, so a rename on the web
    * reaches an open desktop working copy. A page the cache refused announces
    * nothing (it is replayed on the next tick).
    */
   private announcingCache(cache: DocCache): DocCache {
+    // R5BE-1b: the archived flags of a committed page reach the library too
+    cache = this.archivingCache(cache)
     const notify = this.options.onFeedChange
     if (!notify) return cache
     return {
