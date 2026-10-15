@@ -542,7 +542,10 @@ export function createSyncRuntime(
 
 /** Registers the IPC handlers (safe before app ready: nothing touches the account yet). */
 export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): UniworkDocsHandle {
+  // told as the lock list is pushed (the sync center re-reads its snapshot)
+  const locksListeners: Array<() => void> = []
   const push = (channel: string, payload: unknown) => {
+    if (channel === UNIWORK_DOC_CHANNELS.locksChanged) for (const l of locksListeners) l()
     const wc = wiring.shellContents()
     if (wc && !wc.isDestroyed()) wc.send(channel, payload)
   }
@@ -620,10 +623,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     ),
     // the whole list when locks clear (a Retry that unlocked the keychain): the
     // shell replaces its list, so the S11 panel does not outlive the lock
-    pushLocks: () => {
-      push(UNIWORK_DOC_CHANNELS.locksChanged, service.currentLocks())
-      seamRef.syncCenter?.notifyChanged()
-    },
+    pushLocks: () => push(UNIWORK_DOC_CHANNELS.locksChanged, service.currentLocks()),
     reveal: () => wiring.reveal(),
     revealComment: (path, commentId) => comments?.reveal(path, commentId),
     // G8-12: a settled Save tells the editor's comment panel its new version
@@ -754,6 +754,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     pushChanged: (snapshot) => push(UNIWORK_SYNC_CENTER_CHANNELS.changedEvent, snapshot),
   })
   seamRef.syncCenter = syncCenter.controller
+  locksListeners.push(() => syncCenter.controller.notifyChanged())
   // Sign out and a sign-in as someone else close the previous account's
   // documents and delete their AI history (see account-boundary.ts)
   const boundary = new AccountBoundary({
