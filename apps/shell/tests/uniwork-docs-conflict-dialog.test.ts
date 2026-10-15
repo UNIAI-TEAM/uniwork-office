@@ -64,7 +64,7 @@ type Fault = {
     | 'copyCommit'
     | 'archive'
   /** 'lost' (copyCommit only): the server applies the commit, the answer never arrives */
-  kind: 'network' | 'lost' | number
+  kind: 'network' | 'lost' | 'bad_checksum' | number
   code?: string
   fields?: Record<string, unknown>
 }
@@ -256,7 +256,8 @@ function fakeServer(
       const id = `up_copy_${state.copy!.staged.size}`
       return json(201, {
         upload_id: id,
-        checksum_sha256: hex(bytes),
+        // BE-12F-05: a receipt whose checksum is not the uploaded bytes'
+        checksum_sha256: fault?.kind === 'bad_checksum' ? hex(enc('other bytes')) : hex(bytes),
         size_bytes: bytes.byteLength,
         claim_expires_at: '2026-10-10T00:00:00Z',
       })
@@ -1720,6 +1721,75 @@ describe('G5-12 Save as a copy (main)', () => {
     expect(warn).toHaveBeenCalledWith(expect.stringMatching(new RegExp(`${COPY}.*account`)))
     warn.mockRestore()
     ctx.service.closeConflictPrompt()
+  })
+
+  it('BE-12F-05: an upload receipt whose checksum is not the local bytes is never committed; the copy is archived and the reply is save_copy_failed', async () => {
+    const server = fakeServer()
+    server.faults.push(
+      { route: 'copyUpload', kind: 'bad_checksum' },
+      { route: 'copyUpload', kind: 'bad_checksum' },
+    )
+    const ctx = setup(server)
+    const path = await openAndConflict(ctx, server)
+    const { view } = await openDialog(ctx, path)
+
+    const reply = await ctx.service.conflictAct(view.sessionId, {
+      kind: 'save-copy',
+      stopAi: false,
+    })
+
+    expect(reply).toMatchObject({ kind: 'view', view: { notice: 'save_copy_failed' } })
+    expect(
+      callsTo(server, `${COPY}/versions/commit`).filter((c) => c.method === 'POST'),
+    ).toHaveLength(0)
+    expect(server.state.copy!.archived).toBe(true)
+    await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
+  })
+
+  it('BE-12F-05: the source read before the copy locks the dialog on a revoked grant and is a plain failure on a network error; no copy is made either way', async () => {
+    for (const [fault, expected] of [
+      [
+        { route: 'detail', kind: 403, code: 'forbidden' },
+        { notice: null, locked: 'revoked' },
+      ],
+      [
+        { route: 'detail', kind: 'network' },
+        { notice: 'save_copy_failed', locked: 'none' },
+      ],
+    ] as Array<[Fault, Record<string, unknown>]>) {
+      const server = fakeServer()
+      const ctx = setup(server)
+      const path = await openAndConflict(ctx, server)
+      const { view } = await openDialog(ctx, path)
+      server.faults.push(fault)
+
+      const reply = await ctx.service.conflictAct(view.sessionId, {
+        kind: 'save-copy',
+        stopAi: false,
+      })
+
+      expect(reply).toMatchObject({ kind: 'view', view: expected })
+      expect(callsTo(server, '/copies')).toHaveLength(0)
+      await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
+    }
+  })
+
+  it('BE-12F-05: an unreadable working copy is a plain failure and nothing reaches the server', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const path = await openAndConflict(ctx, server)
+    const { view } = await openDialog(ctx, path)
+    await rm(path)
+    const callsBefore = server.calls.length
+
+    const reply = await ctx.service.conflictAct(view.sessionId, {
+      kind: 'save-copy',
+      stopAi: false,
+    })
+
+    expect(reply).toMatchObject({ kind: 'view', view: { notice: 'save_copy_failed' } })
+    expect(server.calls).toHaveLength(callsBefore)
+    await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
   })
 
   it('abort-safety: the dialog closed while the copy exists archives it, logs it and shows no notice', async () => {
