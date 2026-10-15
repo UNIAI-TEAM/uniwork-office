@@ -16,6 +16,8 @@ export interface FakeFeedRow {
   revision: string
   current_version?: number
   version_id?: string | null
+  /** a feed (G5-01b) upsert's archived flag; absent on a snapshot row */
+  archived?: boolean
 }
 
 export interface FakeFeedPage {
@@ -36,6 +38,7 @@ function rowOf(row: FakeFeedRow): FeedChange {
     revision: row.revision,
     currentVersion: row.current_version ?? 1,
     versionId: row.version_id ?? null,
+    ...(row.archived === undefined ? {} : { archived: row.archived }),
   }
 }
 

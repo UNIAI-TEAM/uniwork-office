@@ -980,7 +980,14 @@ describe('G5-06 W4b save queue wiring', () => {
     expect(stopIdx).toBeGreaterThan(-1)
     expect(sessionIdx).toBeGreaterThan(-1)
     expect(stopIdx).toBeLessThan(sessionIdx)
-    expect(source).not.toContain('lockAndWipe(')
+    // the sync store is never wiped at the boundary; the only wipe is the
+    // pinned offline library (G5-05), after lockSession, its lock before stopFeed
+    const wipes = source.split('lockAndWipe(').length - 1
+    expect(wipes).toBe(source.split('libraryLayerFor().lockAndWipe(').length - 1)
+    const libLockIdx = lockBlock.indexOf('runtime.library?.lockBoundary()')
+    expect(libLockIdx).toBeGreaterThan(-1)
+    expect(libLockIdx).toBeLessThan(stopIdx)
+    expect(lockBlock.indexOf('libraryLayerFor().lockAndWipe(')).toBeGreaterThan(sessionIdx)
   })
 })
 

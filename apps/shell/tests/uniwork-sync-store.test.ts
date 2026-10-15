@@ -474,13 +474,15 @@ describe('uniwork sync store layer', () => {
     const testFiles = readdirSync(__dirname).filter(
       (name) => name.startsWith('uniwork-sync-') && name.endsWith('.test.ts'),
     )
+    // stores registered on another layer (the offline library has its own layer, see libraryLayerFor in wiring.ts)
+    const otherLayers = new Set(['OFFLINE_LIBRARY_STORE_REGISTRATION'])
     const covered = new Set<string>()
     for (const file of testFiles) {
       const source = readFileSync(join(__dirname, file), 'utf8')
       const matches = source.matchAll(/runStoreCompliance\([\s\S]*?registration:\s*([A-Z0-9_]+)/g)
       for (const match of matches) {
         const symbol = match[1]
-        if (symbol) covered.add(bySymbol.get(symbol) ?? symbol)
+        if (symbol && !otherLayers.has(symbol)) covered.add(bySymbol.get(symbol) ?? symbol)
       }
     }
     const registered = SYNC_STORE_REGISTRATIONS.map((r) => r.name).sort()
