@@ -21,6 +21,7 @@ import type {
   QueuePause,
 } from '../uniwork-sync/queue/dispatcher'
 import { QUEUE_LIMITS } from '../uniwork-sync/queue/limits'
+import { traceCoordinatorTransition } from '../uniwork-sync/test-hooks/trace'
 
 /**
  * The Ctrl/Cmd+S front of the UniWork save queue (EXPERIENCE - Ctrl/Cmd+S,
@@ -511,6 +512,7 @@ export class SaveCoordinator {
       }
       intent = minted
       payload = bytes
+      this.trace(minted, { type: 'minted' })
       // a paused intent is recorded and shown, never dispatched
       if (state !== 'queued') {
         this.pendingNext.delete(doc.path)
@@ -635,6 +637,7 @@ export class SaveCoordinator {
     // Compare-then-delete: a newer intent (N+1) minted while this one settled
     // is never erased by this generation's cleanup (G5-06 fix-C item 3).
     await this.cleanupIntent(intents, doc, intent)
+    this.trace(intent, { type: 'settled', now: this.now() })
     if (landed.versionId && done.binding.baseVersionId === landed.versionId) {
       this.deps.onSaved?.(done, landed.versionId)
     }
@@ -770,6 +773,17 @@ export class SaveCoordinator {
     intents: IntentStore,
   ): Promise<BoundDocument> {
     const error = raw instanceof UniworkDocError ? raw : new UniworkDocError('server_error')
+    const ended = await this.applyFailure(doc, intent, error, intents)
+    this.trace(intent, { type: 'failed', error, to: ended.binding.state, now: this.now() })
+    return ended
+  }
+
+  private async applyFailure(
+    doc: BoundDocument,
+    intent: IntentRecordV2,
+    error: UniworkDocError,
+    intents: IntentStore,
+  ): Promise<BoundDocument> {
     const base = doc.binding
     const dropped = isTerminalRefusal(error)
     if (dropped) {
@@ -976,6 +990,13 @@ export class SaveCoordinator {
 
   private publish(doc: BoundDocument): void {
     this.deps.publish(toStatus(doc, this.pendingNext.has(doc.path)))
+  }
+
+  private trace(
+    intent: IntentRecordV2,
+    event: Parameters<typeof traceCoordinatorTransition>[1],
+  ): void {
+    traceCoordinatorTransition(intent, event)
   }
 
   /**
