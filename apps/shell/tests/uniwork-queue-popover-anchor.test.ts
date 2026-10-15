@@ -47,6 +47,61 @@ describe('U-2: the popover is right-aligned to the pill, inside the window', () 
   })
 })
 
+describe('RFE6u6-01: right-to-left, the dialog is placed by its physical box', () => {
+  const rtl = (pillLeft: number, windowWidth = 890) =>
+    popoverLeftOf({ dir: 'rtl', pillLeft, pillRight: pillLeft + 309, width: 360, windowWidth })
+
+  it('its LEFT edge is the pill LEFT edge, so it opens toward the window centre', () => {
+    for (const pillLeft of [8, 40, 150, 300, 522]) {
+      expect(rtl(pillLeft), `pill at ${pillLeft}`).toBe(pillLeft)
+    }
+  })
+
+  it('a pill at the left window edge keeps the dialog inside the left gutter', () => {
+    expect(rtl(0)).toBe(8)
+    expect(rtl(-30)).toBe(8)
+    expect(rtl(7)).toBe(8)
+  })
+
+  it('a pill near the right edge keeps the dialog inside the right gutter', () => {
+    expect(rtl(600) + 360).toBe(882)
+    expect(rtl(2000) + 360).toBe(882)
+  })
+
+  it('a dialog wider than the window minus the gutters sits at the left gutter', () => {
+    expect(
+      popoverLeftOf({ dir: 'rtl', pillLeft: 100, pillRight: 400, width: 900, windowWidth: 720 }),
+    ).toBe(8)
+  })
+
+  it('a bad measure stays inside the window, never NaN', () => {
+    const left = popoverLeftOf({
+      dir: 'rtl',
+      pillLeft: Number.NaN,
+      pillRight: Number.NaN,
+      width: 360,
+      windowWidth: 890,
+    })
+    expect(Number.isFinite(left)).toBe(true)
+    expect(left).toBeGreaterThanOrEqual(8)
+    expect(left + 360).toBeLessThanOrEqual(882)
+  })
+
+  it('left-to-right is the same whether or not the direction is given', () => {
+    for (const pillRight of [400, 520, 700, 862]) {
+      const plain = popoverLeftOf({ pillRight, width: 360, windowWidth: 890 })
+      const given = popoverLeftOf({
+        dir: 'ltr',
+        pillLeft: 0,
+        pillRight,
+        width: 360,
+        windowWidth: 890,
+      })
+      expect(given).toBe(plain)
+    }
+  })
+})
+
 describe('U-2: queue-popover.css puts the dialog where the component says', () => {
   const css = readFileSync(
     resolve(__dirname, '../src/renderer/src/queue-popover.css'),
@@ -63,6 +118,14 @@ describe('U-2: queue-popover.css puts the dialog where the component says', () =
     expect(rule('.uw-queue-band')).toMatch(/justify-content: flex-start/)
     expect(rule('.uw-queue-band')).toMatch(/padding: 6px 0 8px/)
     expect(rule('.uw-queue-band')).not.toMatch(/justify-content: flex-end/)
+  })
+
+  it('RFE6u6-01: the band lays out left-to-right whatever the document, so flex-start and margin-left are the physical left', () => {
+    expect(rule('.uw-queue-band')).toMatch(/direction: ltr/)
+  })
+
+  it('RFE6u6-01: the dialog forces no text direction (its dir attribute gives the document one)', () => {
+    expect(rule('.uw-queue-pop')).not.toMatch(/(^|\s)direction:/)
   })
 
   it('the dialog never passes the window minus the two gutters', () => {

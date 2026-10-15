@@ -46,6 +46,7 @@ const NEW_BUTTON = 28
 /** the window (bar) width the stubbed layout is at, and the number of document tabs in the strip */
 let barWidth = 1280
 let pillRightOverride: number | null = null
+let pillLeftOverride: number | null = null
 let rectCalls = 0
 
 let bar: HTMLDivElement
@@ -73,6 +74,9 @@ function docTabCount(): number {
   return strip.querySelectorAll('.tab-item:not(.tab-home)').length
 }
 
+/** right-to-left (ar, he) mirrors the bar: the holder on the left, the tab strip right of it */
+const isRtl = () => document.documentElement.dir === 'rtl'
+
 function rectOf(left: number, width: number, height = 28): DOMRect {
   return {
     x: left,
@@ -95,17 +99,21 @@ function stubLayout(): void {
     rectCalls++
     const shared = barWidth - FIXED_LEFT - FIXED_RIGHT - MARGINS
     const stripWidth = Math.max(0, shared - chromeWidth())
+    // the same flex row mirrored: a left edge in the left-to-right row is `bar - left - width`
+    const at = (left: number, width: number, height?: number): DOMRect =>
+      rectOf(isRtl() ? barWidth - left - width : left, width, height)
     if (this.classList.contains('tab-bar')) return rectOf(0, barWidth, 40)
-    if (this.classList.contains('tab-strip')) return rectOf(FIXED_LEFT, stripWidth, 40)
+    if (this.classList.contains('tab-strip')) return at(FIXED_LEFT, stripWidth, 40)
     if (this.classList.contains('uw-chrome')) {
-      return rectOf(FIXED_LEFT + stripWidth + 6, chromeWidth())
+      return at(FIXED_LEFT + stripWidth + 6, chromeWidth())
     }
     if (this.classList.contains('uw-pill')) {
       const width = currentPillWidth()
-      const right = pillRightOverride ?? FIXED_LEFT + stripWidth + 6 + TOGGLE + width
-      return rectOf(right - width, width)
+      if (pillLeftOverride !== null) return rectOf(pillLeftOverride, width)
+      if (pillRightOverride !== null) return rectOf(pillRightOverride - width, width)
+      return at(FIXED_LEFT + stripWidth + 6 + TOGGLE, width)
     }
-    if (this.classList.contains('tab-home')) return rectOf(FIXED_LEFT + 10, HOME)
+    if (this.classList.contains('tab-home')) return at(FIXED_LEFT + 10, HOME)
     if (this.classList.contains('tab-new-btn')) return rectOf(0, NEW_BUTTON)
     if (this.hasAttribute('data-uw-queue-band')) return rectOf(0, barWidth, 120)
     if (this.classList.contains('uw-queue-pop')) return rectOf(0, 360, 100)
@@ -196,7 +204,9 @@ beforeEach(() => {
   account = 'signed-in'
   barWidth = 1280
   pillRightOverride = null
+  pillLeftOverride = null
   rectCalls = 0
+  document.documentElement.removeAttribute('dir')
   makeApi()
   ;(window as unknown as { aiOfficeTabs?: unknown }).aiOfficeTabs = { focusActive: vi.fn() }
   delete (window as unknown as { uniworkSyncCenter?: unknown }).uniworkSyncCenter
@@ -210,6 +220,7 @@ afterEach(() => {
   setTopInsetPart('popover', 0)
   resetLiveForTests()
   document.body.innerHTML = ''
+  document.documentElement.removeAttribute('dir')
 })
 
 describe('U-1: the pill degrades so the tabs keep their room', () => {
@@ -338,6 +349,50 @@ describe('U-1: the pill degrades so the tabs keep their room', () => {
         act(() => root.unmount())
       }
     }
+  })
+
+  it('RFE6u6-02: right-to-left (ar, he) picks the same variant at every width of the matrix, strip and holder never intersect', async () => {
+    const picked: Record<string, string[]> = { ltr: [], rtl: [] }
+    for (const dir of ['ltr', 'rtl']) {
+      document.documentElement.dir = dir
+      for (const w of [800, 890, 1024, 1280]) {
+        for (const n of [1, 2, 3]) {
+          document.body.innerHTML = ''
+          rectSpy?.mockRestore()
+          buildBar(n)
+          stubLayout()
+          barWidth = w
+          await mount(status())
+          const stripRect = strip.getBoundingClientRect()
+          const chromeRect = chrome.getBoundingClientRect()
+          const tag = `${dir} ${w}px ${n} tabs`
+          picked[dir].push(`${w}/${n}:${variant()}`)
+          if (dir === 'rtl') {
+            // mirrored: the holder is on the left, the strip starts where it ends
+            expect(chromeRect.right, tag).toBeLessThanOrEqual(stripRect.left)
+          } else {
+            expect(stripRect.right, tag).toBeLessThanOrEqual(chromeRect.left)
+          }
+          act(() => root.unmount())
+        }
+      }
+    }
+    expect(picked.rtl).toEqual(picked.ltr)
+    // the narrow windows did step down, so the comparison is not full == full
+    expect(picked.rtl).toContain('890/2:compact')
+  })
+
+  it('RFE6u6-02: right-to-left, the reported 890px / 2 tabs case is compact and a resize restores the full pill', async () => {
+    document.documentElement.dir = 'rtl'
+    buildBar(2)
+    stubLayout()
+    barWidth = 890
+    await mount(status())
+    expect(variant()).toBe('compact')
+    expect(visibleLabel()).toBe('')
+    expect(label().querySelector('.uw-sr-only')!.textContent).toBe(en.uwChipQueued)
+    await resizeTo(1280)
+    expect(variant()).toBe('full')
   })
 
   it('a change of state while compact is still said in full', async () => {
@@ -500,5 +555,81 @@ describe('U-2: the queue popover is anchored under the pill', () => {
     await act(async () => action()!.click())
     await flush()
     expect(leftOf() + 360).toBe(890 - 8)
+  })
+
+  describe('RFE6u6-01: right-to-left (ar, he), the dialog is placed by the physical box', () => {
+    const dialogEl = () => document.querySelector<HTMLElement>('[role="dialog"]')!
+    const placedFor = (pillLeft: number, width: number) =>
+      Math.min(width - 8 - 360, Math.max(8, pillLeft))
+
+    async function openRtl(width: number, pillLeft: number | null = null): Promise<void> {
+      document.documentElement.dir = 'rtl'
+      buildBar(2)
+      stubLayout()
+      barWidth = width
+      pillLeftOverride = pillLeft
+      await mount(status())
+      await act(async () => action()!.click())
+      await flush()
+      expect(dialog()).not.toBeNull()
+    }
+
+    it('its left edge is the pill left edge, so it opens toward the window centre (890 and 1280)', async () => {
+      for (const w of [890, 1280]) {
+        document.body.innerHTML = ''
+        rectSpy?.mockRestore()
+        await openRtl(w)
+        const pillLeft = pill().getBoundingClientRect().left
+        expect(Math.abs(leftOf() - placedFor(pillLeft, w)), `${w}px`).toBeLessThan(1)
+        act(() => root.unmount())
+      }
+    })
+
+    it('left == pill left within 1px for several pill positions', async () => {
+      for (const pillLeft of [20, 120, 300, 450, 520]) {
+        document.body.innerHTML = ''
+        rectSpy?.mockRestore()
+        await openRtl(890, pillLeft)
+        expect(Math.abs(leftOf() - pillLeft), `pill at ${pillLeft}`).toBeLessThan(1)
+        act(() => root.unmount())
+      }
+    })
+
+    it('a pill at the left window edge keeps the dialog inside the left 8px gutter', async () => {
+      await openRtl(890, 2)
+      expect(leftOf()).toBe(8)
+    })
+
+    it('a pill near the right window edge keeps the dialog inside the right gutter', async () => {
+      await openRtl(890, 800)
+      expect(leftOf() + 360).toBe(890 - 8)
+    })
+
+    it('an unusable pill measure stays inside the window', async () => {
+      await openRtl(890, Number.NaN)
+      expect(leftOf()).toBeGreaterThanOrEqual(8)
+      expect(leftOf() + 360).toBeLessThanOrEqual(890 - 8)
+    })
+
+    it('the dialog keeps the document direction for its own text', async () => {
+      await openRtl(890)
+      expect(dialogEl().getAttribute('dir')).toBe('rtl')
+    })
+
+    it('switching the document direction while it is open places it again, both ways', async () => {
+      await open(890)
+      expect(dialogEl().getAttribute('dir')).toBe('ltr')
+      expect(leftOf() + 360).toBe(Math.min(pill().getBoundingClientRect().right, 890 - 8))
+      document.documentElement.dir = 'rtl'
+      await flush()
+      expect(dialogEl().getAttribute('dir')).toBe('rtl')
+      expect(Math.abs(leftOf() - placedFor(pill().getBoundingClientRect().left, 890))).toBeLessThan(
+        1,
+      )
+      document.documentElement.dir = 'ltr'
+      await flush()
+      expect(dialogEl().getAttribute('dir')).toBe('ltr')
+      expect(leftOf() + 360).toBe(Math.min(pill().getBoundingClientRect().right, 890 - 8))
+    })
   })
 })
