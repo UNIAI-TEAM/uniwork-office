@@ -263,6 +263,12 @@ export const zh = {
   uwConflictSaveCopyDone:
     '你的版本已另存为新文档：{title}。此文档未改变；你仍可选择重新加载或覆盖。',
   uwConflictSaveCopyFailed: '无法创建副本。你的更改仍然安全；请重试。',
+  uwConflictSaveCopyNoSeat:
+    '无法创建副本，因为你不是此文档所在工作区的成员。你的更改仍然安全；你可以下载自己的版本。',
+  uwConflictSaveCopyFolderRefused: '你无法在此文件夹中创建文档。请改为下载你的版本。',
+  uwConflictDownloadDone:
+    '你的版本已保存到此电脑：{file}。此文档未改变；你仍可选择重新加载或覆盖。',
+  uwConflictDownloadFailedDesktop: '无法保存文件。你的更改仍然安全；请重试。',
   uwConflictSaveCopyOffline: '离线中。创建副本需要网络连接；你的更改会保留。',
   uwConflictReloadFailed: '无法加载最新版本。你的文档没有改变；请重试。',
   uwConflictOverwriteFailed: '暂时无法覆盖。你的文档没有改变；请重试。',
