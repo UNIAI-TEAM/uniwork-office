@@ -38,9 +38,7 @@ describe('AiSaveDraftCard', () => {
     expect(buttons().map((b) => b.textContent)).toEqual(['Save', 'Not now'])
     // the group is named by its question (Accessibility Floor), not by an internal code
     const labelledBy = group.getAttribute('aria-labelledby')!
-    expect(host.querySelector(`#${CSS.escape(labelledBy)}`)?.textContent).toBe(
-      'Save this document?',
-    )
+    expect(document.getElementById(labelledBy)?.textContent).toBe('Save this document?')
     // never a modal
     expect(host.querySelector('[role="dialog"], [aria-modal]')).toBeNull()
   })
