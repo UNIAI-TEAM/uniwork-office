@@ -896,6 +896,120 @@ test.describe.serial('UniWork documents', () => {
     })
   })
 
+  test('d3c. conflict: a 403 on the copy (no seat in the workspace) shows the reason, offers Download my version and writes the LOCAL bytes to the picked file', async () => {
+    test.setTimeout(180_000)
+    await withApp('uniwork-docs-conflict-copy-noseat', async (ctx) => {
+      const { shell, launched } = ctx
+      const { doc, path } = await intoConflict(ctx, 'conflict-noseat.docx')
+      const localBytes = await readFile(path)
+      const outDir = await mkdtemp(join(tmpdir(), 'uniwork-e2e-noseat-'))
+      const target = join(outDir, 'picked name.docx')
+      await answerMessageBoxes(launched, [])
+      // the OS save dialog is stubbed: it records the suggested name and picks `target`
+      await launched.app.evaluate(({ dialog }, picked) => {
+        const g = globalThis as unknown as { __e2eSaveNames?: string[] }
+        g.__e2eSaveNames = []
+        dialog.showSaveDialog = (async (...args: unknown[]) => {
+          const options = (args.length > 1 ? args[1] : args[0]) as { defaultPath?: string }
+          g.__e2eSaveNames!.push(options.defaultPath ?? '')
+          return { canceled: false, filePath: picked }
+        }) as typeof dialog.showSaveDialog
+      }, target)
+      stub.denyCopies(true)
+      try {
+        await chip(shell).getByRole('button', { name: 'Resolve…' }).click()
+        const dialog = shell.getByRole('alertdialog')
+        await expect(dialog).toBeVisible()
+        await dialog.getByRole('button', { name: 'Save as a copy…', exact: true }).click()
+        await dialog.getByRole('button', { name: 'Create copy', exact: true }).click()
+
+        // the reason is shown, the primary is now Download my version, Back stays
+        await expect(dialog.getByRole('alert')).toContainText(
+          'Couldn’t create the copy because you’re not a member of the workspace this document is in.',
+        )
+        await expect(dialog.getByRole('button', { name: 'Create copy', exact: true })).toBeHidden()
+        const download = dialog.getByRole('button', { name: 'Download my version', exact: true })
+        await expect(download).toBeVisible()
+        await expect(dialog.getByRole('button', { name: 'Back', exact: true })).toBeVisible()
+        await shell.screenshot({ path: screenshotPath('uniwork-docs-conflict-no-seat') })
+
+        await download.click()
+        await expect(dialog.getByRole('alert')).toContainText(
+          'Your version was saved to this computer: picked name.docx.',
+        )
+        // back on step 1; the picked file holds the LOCAL bytes; the suggestion was the copy name
+        await expect(
+          dialog.getByRole('button', { name: 'Reload latest', exact: true }),
+        ).toBeVisible()
+        expect(sha256(await readFile(target))).toBe(sha256(localBytes))
+        expect(
+          await launched.app.evaluate(
+            () => (globalThis as unknown as { __e2eSaveNames?: string[] }).__e2eSaveNames,
+          ),
+        ).toEqual([expect.stringMatching(/conflict-noseat \(my version\)\.docx$/)])
+
+        await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+        await expect(dialog).toBeHidden()
+        // no copy, no upload, no intent change: the source is still in conflict
+        expect(stub.copiesOf(doc.id)).toHaveLength(0)
+        expect(stub.uploads(doc.id)).toHaveLength(1)
+        expect(stub.commits(doc.id)).toHaveLength(1)
+        await expectState(shell, 'conflict', 5_000)
+        expect(await readFile(path)).toEqual(localBytes)
+      } finally {
+        stub.denyCopies(false)
+      }
+    })
+  })
+
+  test('d3d. conflict: a copy commit that landed but lost its answer twice is kept (lookup says committed), no archive request, done notice', async () => {
+    test.setTimeout(180_000)
+    await withApp('uniwork-docs-conflict-copy-lost', async (ctx) => {
+      const { shell, launched } = ctx
+      const { doc, path } = await intoConflict(ctx, 'conflict-copy-lost.docx')
+      const localBytes = await readFile(path)
+      await answerMessageBoxes(launched, [])
+
+      await chip(shell).getByRole('button', { name: 'Resolve…' }).click()
+      const dialog = shell.getByRole('alertdialog')
+      await expect(dialog).toBeVisible()
+      await dialog.getByRole('button', { name: 'Save as a copy…', exact: true }).click()
+      // the copy's first commit and its retry both land but their answers are dropped
+      stub.failNextCommit('after', 2)
+      await dialog.getByRole('button', { name: 'Create copy', exact: true }).click()
+
+      await expect(dialog.getByRole('alert')).toContainText(
+        'Your version was saved as a new document: conflict-copy-lost (my version).docx.',
+      )
+      const copies = stub.copiesOf(doc.id)
+      expect(copies).toHaveLength(1)
+      expect(copies[0]).toMatchObject({ archived: false })
+      expect(copies[0]!.state.checksum).toBe(sha256(localBytes))
+      // the server (like the real one) would refuse an archive of this copy: none was sent
+      expect(
+        stub
+          .calls()
+          .filter((c) => c.method === 'POST' && c.route === `/documents/${copies[0]!.id}/archive`),
+      ).toHaveLength(0)
+      // both commits reached the server with the same key; the lookup asked for it
+      const commitKeys = stub.commits(copies[0]!.id).map((c) => c.idempotencyKey)
+      expect(new Set(commitKeys).size).toBe(1)
+      expect(
+        stub
+          .calls()
+          .filter(
+            (c) => c.method === 'GET' && c.route === `/documents/${copies[0]!.id}/versions/commit`,
+          ),
+      ).toEqual([expect.objectContaining({ status: 200, idempotencyKey: commitKeys[0] })])
+
+      await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+      await expect(dialog).toBeHidden()
+      await expectState(shell, 'conflict', 5_000)
+      expect(stub.commits(doc.id)).toHaveLength(1)
+      expect(await readFile(path)).toEqual(localBytes)
+    })
+  })
+
   // e ───────────────────────────────────────────────────────────────────────
   test('e. view-only: opens read-only, typing changes nothing, Ctrl+S sends nothing', async () => {
     test.setTimeout(150_000)

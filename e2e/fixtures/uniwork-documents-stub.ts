@@ -10,7 +10,10 @@
  *   POST /documents/{id}/uploads                   (multipart `file`, Idempotency-Key)
  *   POST /documents/{id}/versions/commit           ({upload_id, base_revision}, same key)
  *   POST /documents/{id}/copies                    ({consent:"copy", title, parent_id}, Idempotency-Key)
- *   POST /documents/{id}/archive                   (the only way a document leaves the lists)
+ *   GET  /documents/{id}/versions/commit           (the commit-intent lookup, Idempotency-Key)
+ *   POST /documents/{id}/archive                   (the only way a document leaves the lists; like
+ *                                                   the server's pristine-copy cleanup it is refused
+ *                                                   with 403 once the document has a version 2)
  *   POST /office/sessions/exchange                 (single-use ticket, device match)
  *   GET  /workspaces/{ws}/home                     (uniwork-work-stub.ts)
  *
@@ -127,12 +130,17 @@ export interface UniworkDocumentsStub extends UniworkAuthStub {
    * server acts ('before', nothing committed) or after it committed ('after',
    * the response is lost).
    */
-  failNextCommit(mode?: CommitDrop): void
+  failNextCommit(mode?: CommitDrop, count?: number): void
   /**
    * The next `count` commits on a document made through `/copies` answer a 5xx
    * (G5-12: the copy's step 2 fails and the app archives the copy).
    */
   failCopyCommits(count: number): void
+  /**
+   * `/copies` answers 403 `forbidden` while on: the server's rule for a caller
+   * who is not a member of the source document's workspace (G5-12 no-seat).
+   */
+  denyCopies(denied?: boolean): void
   /** the copies made from a document, oldest first */
   copiesOf(sourceId: string): StubCopyState[]
   /** every documents-route request so far, oldest first */
@@ -212,6 +220,14 @@ export async function startUniworkDocumentsStub(): Promise<UniworkDocumentsStub>
   const commitByKey = new Map<string, StoredCommit>()
   const calls: StubCall[] = []
   let dropNextCommit: CommitDrop | null = null
+  /** how many more commits the pending drop applies to */
+  let dropRemaining = 0
+  const consumeDrop = () => {
+    dropRemaining -= 1
+    if (dropRemaining <= 0) dropNextCommit = null
+  }
+  /** G5-12: `/copies` answers 403 forbidden (the caller is no member of the source's workspace) */
+  let copiesDenied = false
   let copyCommitFailures = 0
   const copyByKey = new Map<string, string>()
 
@@ -376,7 +392,7 @@ export async function startUniworkDocumentsStub(): Promise<UniworkDocumentsStub>
           ctx.send(404, envelope('not_found'))
           return true
         }
-        if (doc.myLevel !== 'edit' && doc.myLevel !== 'manage') {
+        if ((doc.myLevel !== 'edit' && doc.myLevel !== 'manage') || copiesDenied) {
           log(ctx, { ...base, status: 403 })
           ctx.send(403, envelope('forbidden'))
           return true
@@ -420,6 +436,13 @@ export async function startUniworkDocumentsStub(): Promise<UniworkDocumentsStub>
         if (!doc) {
           log(ctx, { status: 404 })
           ctx.send(404, envelope('not_found'))
+          return true
+        }
+        // the server's pristineCopyCleanup: a creator with edit may only archive a copy that
+        // still holds version 1; once the person's bytes landed (version 2) it is refused
+        if (doc.versions.length > 1 && doc.myLevel !== 'manage') {
+          log(ctx, { ...(idempotencyKey ? { idempotencyKey } : {}), status: 403 })
+          ctx.send(403, envelope('forbidden'))
           return true
         }
         doc.archivedAt ??= new Date().toISOString()
@@ -475,6 +498,32 @@ export async function startUniworkDocumentsStub(): Promise<UniworkDocumentsStub>
         return true
       }
 
+      if (method === 'GET' && tail === '/versions/commit') {
+        // the commit-intent lookup: what became of the commit made with this key
+        const stored = doc ? commitByKey.get(`${doc.id}:${idempotencyKey ?? ''}`) : undefined
+        if (!doc || !idempotencyKey) {
+          log(ctx, { ...(idempotencyKey ? { idempotencyKey } : {}), status: doc ? 400 : 404 })
+          ctx.send(doc ? 400 : 404, envelope(doc ? 'invalid_request' : 'not_found'))
+          return true
+        }
+        log(ctx, { idempotencyKey, status: 200 })
+        if (!stored) {
+          ctx.send(200, { outcome: 'not_committed' })
+          return true
+        }
+        const committed = stored.body as {
+          document: { revision: string }
+          version: { id: string; version: number }
+        }
+        ctx.send(200, {
+          outcome: 'committed',
+          version_id: committed.version.id,
+          version: committed.version.version,
+          revision: committed.document.revision,
+        })
+        return true
+      }
+
       if (method === 'POST' && tail === '/versions/commit') {
         const raw = await ctx.readBody()
         let body: { upload_id?: unknown; base_revision?: unknown } = {}
@@ -490,7 +539,7 @@ export async function startUniworkDocumentsStub(): Promise<UniworkDocumentsStub>
         }
         const dropMode = dropNextCommit
         if (dropMode === 'before') {
-          dropNextCommit = null
+          consumeDrop()
           log(ctx, { ...base, status: 'dropped' })
           req.socket.destroy()
           return true
@@ -529,7 +578,7 @@ export async function startUniworkDocumentsStub(): Promise<UniworkDocumentsStub>
           // the stored answer, whatever the document is now
           log(ctx, { ...base, status: replay.status })
           if (dropMode === 'after') {
-            dropNextCommit = null
+            consumeDrop()
             req.socket.destroy()
             return true
           }
@@ -579,7 +628,7 @@ export async function startUniworkDocumentsStub(): Promise<UniworkDocumentsStub>
         log(ctx, { ...base, status: 200 })
         if (dropMode === 'after') {
           // committed, but the response never arrives
-          dropNextCommit = null
+          consumeDrop()
           req.socket.destroy()
           return true
         }
@@ -689,8 +738,12 @@ export async function startUniworkDocumentsStub(): Promise<UniworkDocumentsStub>
     setAccess(documentId, level) {
       need(documentId).myLevel = level
     },
-    failNextCommit(mode = 'before') {
+    failNextCommit(mode = 'before', count = 1) {
       dropNextCommit = mode
+      dropRemaining = count
+    },
+    denyCopies(denied = true) {
+      copiesDenied = denied
     },
     failCopyCommits(count) {
       copyCommitFailures = count
