@@ -87,7 +87,7 @@ import { createFilesSkill } from './files-skill'
 import { boundChatHistory } from './chat-retention'
 import { createElectronTransport } from './transport'
 import { useI18n, t as tModule, aiLangDirective, getLang, type StringKey } from '../i18n/locale'
-import { Markdown } from '@genoffice/ui'
+import { Markdown, useAiModelNeedHint } from '@genoffice/ui'
 import { AiComposer, AiScopeQuote, AiTypingIndicator, type AiScopeQuoteData } from '@genoffice/ui'
 import sendEnterOn from '../assets/send-enter-on.png'
 import sendEnterOff from '../assets/send-enter-off.png'
@@ -462,6 +462,9 @@ export function AiPanel({
   const { t, lang } = useI18n()
   // Panel chrome follows the UI language; message text follows its own content (dir=auto below)
   const isRtl = lang === 'ar' || lang === 'he'
+  // a picked UniWork AI that is not offered (or any provider still missing a model) keeps every
+  // send entry closed - presets, retry, continue and queue runs included - the hint says why
+  const needModelHint = useAiModelNeedHint()
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   /** messages queued while a reply runs; the pump re-runs them through runWith on settle */
@@ -1189,7 +1192,8 @@ export function AiPanel({
     retryScope?: AiScopeQuoteData | null,
   ) => {
     const loop = loopRef.current
-    if (!instruction || !loop || loop.busy || pendingSendRef.current) return
+    if (needModelHint !== null || !instruction || !loop || loop.busy || pendingSendRef.current)
+      return
     setInput('')
     // The message consumes the composer attachments: they ride along (echoed on the
     // bubble, images multimodal, files via the files skill) and the composer clears.

@@ -64,6 +64,7 @@ describe('docs panel send entry with an unavailable UniWork AI pick', () => {
     harness.runs.length = 0
     act(() => setAiModelNeedHint(null))
     setUniworkAiAvailable(false)
+    delete (window as any).desktop
   })
 
   /** mount with `provider` saved, let the picker publish its need, then fire an auto-run preset */
@@ -86,6 +87,22 @@ describe('docs panel send entry with an unavailable UniWork AI pick', () => {
     document.body.appendChild(container)
     root = createRoot(container)
     const settings = settingsFor(provider)
+    // the model chip (and so the need hint) reads the saved settings through the preload bridge
+    const stubs: Record<string, unknown> = { capabilities: { platform: 'desktop' } }
+    ;(window as any).desktop = new Proxy(stubs, {
+      get(target, prop: string) {
+        if (!(prop in target)) {
+          target[prop] = /^on[A-Z]/.test(prop)
+            ? vi.fn(() => () => {})
+            : prop === 'getAiSettings'
+              ? vi.fn(async () => settings)
+              : prop === 'aiGskStatus'
+                ? vi.fn(async () => ({ loggedIn: false }))
+                : vi.fn(async () => undefined)
+        }
+        return target[prop]
+      },
+    })
     const render = (nonce: number | null) =>
       act(() =>
         root!.render(

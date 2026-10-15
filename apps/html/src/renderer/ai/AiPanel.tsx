@@ -4,6 +4,7 @@ import {
   aiPanelWidthAtPointer,
   AiPanelSideButton,
   AiModelPicker,
+  useAiModelNeedHint,
   type AiModelPickerBridge,
   UniAiMark,
   composerNoteFor,
@@ -354,6 +355,9 @@ export function AiPanel({
   onCollapse: () => void
 }): ReactElement {
   const { lang, t } = useI18n()
+  // a picked UniWork AI that is not offered (or any provider still missing a model) keeps every
+  // send entry closed - presets, retry, continue and queue runs included - the hint says why
+  const needModelHint = useAiModelNeedHint()
   const [chat, setChat] = useState<ChatEntry[]>([])
   const [prompt, setPrompt] = useState('')
   const [busy, setBusy] = useState(false)
@@ -1012,7 +1016,7 @@ export function AiPanel({
   ): boolean => {
     const instruction = text.trim()
     const loop = loopRef.current
-    if (!instruction || !loop || loop.busy) return false
+    if (needModelHint !== null || !instruction || !loop || loop.busy) return false
     // the message consumes the composer attachments: echoed on the bubble, images multimodal, files via the skill
     const sentAtts = attachmentsOverride ?? attachmentsRef.current
     if (sentAtts.length > 0) {

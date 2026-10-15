@@ -6,6 +6,7 @@ import {
   AiPanelSideButton,
   AiModelPicker,
   useCloudSignedIn,
+  useAiModelNeedHint,
   type AiModelPickerBridge,
   UniAiMark,
 } from '@genoffice/ui'
@@ -254,6 +255,9 @@ export function AiPanel({
   open?: boolean
 }): ReactElement {
   const { lang, t } = useI18n()
+  // a picked UniWork AI that is not offered (or any provider still missing a model) keeps every
+  // send entry closed - presets, retry, continue and queue runs included - the hint says why
+  const needModelHint = useAiModelNeedHint()
   const readOnlyRef = useRef(readOnly)
   readOnlyRef.current = readOnly
   const [chat, setChat] = useState<ChatEntry[]>([])
@@ -755,7 +759,7 @@ export function AiPanel({
   ): void => {
     const instruction = text.trim()
     const loop = loopRef.current
-    if (!instruction || !loop || loop.busy) return
+    if (needModelHint !== null || !instruction || !loop || loop.busy) return
     stickToBottomRef.current = true
     runInstructionRef.current = instruction
     runDisplayRef.current = displayText ?? instruction

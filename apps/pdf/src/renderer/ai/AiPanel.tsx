@@ -7,6 +7,7 @@ import {
   AiPanelSideButton,
   AiModelPicker,
   useCloudSignedIn,
+  useAiModelNeedHint,
   type AiModelPickerBridge,
   UniAiMark,
 } from '@genoffice/ui'
@@ -170,6 +171,9 @@ export function AiPanel({
   readOnly?: boolean
 }): ReactElement | null {
   const { lang, t } = useI18n()
+  // a picked UniWork AI that is not offered (or any provider still missing a model) keeps every
+  // send entry closed - presets, retry, continue and queue runs included - the hint says why
+  const needModelHint = useAiModelNeedHint()
   const [chat, setChat] = useState<ChatEntry[]>([])
   const [prompt, setPrompt] = useState('')
   /** the question of the running turn: a restarted conversation puts it back in the composer */
@@ -627,7 +631,7 @@ export function AiPanel({
   const send = (text: string, retryScope?: AiScopeQuoteData | null): void => {
     const instruction = text.trim()
     const loop = loopRef.current
-    if (!instruction || !loop || loop.busy) return
+    if (needModelHint !== null || !instruction || !loop || loop.busy) return
     stickToBottomRef.current = true
     runQuestionRef.current = instruction
     const scope = retryScope !== undefined ? (retryScope ?? undefined) : selectionScopeQuote()
