@@ -1571,14 +1571,17 @@ export default function App() {
       window.htmlApi.setProvisionalTitle(name)
     },
     onRunDone: (mutated) => {
-      // AI wrote into a never-saved document: save it silently under the page's own title,
-      // falling back to the name of the request that started it
-      if (!mutated || pathRef.current) return
+      // AI wrote into a never-saved document: the panel asks before anything is saved, offering
+      // the page's own title, else the name of the request that started it ('' = nothing to
+      // derive, the dialog starts with its usual name)
+      if (!mutated || pathRef.current) return null
       const text = textRef.current
-      const name =
-        derivePageTitleName(text) || provisionalNameRef.current || deriveAutoFileName(text)
-      if (name) void doSave('save', name)
+      return (
+        derivePageTitleName(text) || provisionalNameRef.current || deriveAutoFileName(text) || ''
+      )
     },
+    // the Save click on that offer: the normal first-save dialog, pre-filled with the name
+    onSaveOffer: (name) => void doSave('save', name || undefined),
     clearHighlights: () => editorRef.current?.clearHighlights(),
     onBriefConfirmed: (brief) => {
       briefRef.current = brief

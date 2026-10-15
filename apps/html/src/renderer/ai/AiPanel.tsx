@@ -3,6 +3,7 @@ import {
   isUniworkQuestionRefusal,
   aiPanelWidthAtPointer,
   AiPanelSideButton,
+  AiSaveDraftCard,
   AiModelPicker,
   useAiModelNeedHint,
   type AiModelPickerBridge,
@@ -307,8 +308,13 @@ export interface HtmlAiDeps {
   restoreSnapshot(snapshot: DocSnapshot): void
   /** the user sent a request (the text as shown in the bubble); names an untitled document */
   onPrompt(text: string): void
-  /** fired when a run with at least one mutation finishes (auto-save hook) */
-  onRunDone(mutated: boolean): void
+  /**
+   * fired when a run finishes. Returns the file name to offer saving under when the run changed a
+   * never-saved page (the panel then asks, nothing is written), or null when no offer applies.
+   */
+  onRunDone(mutated: boolean): string | null
+  /** the user chose Save on the offer card: run the first-save flow with this name */
+  onSaveOffer(name: string): void
   clearHighlights(): void
   /** [label](htmlnav://sid/N) citation clicked */
   navigateTo(sid: number): void
@@ -589,6 +595,8 @@ export function AiPanel({
   /** sids the current turn may edit (Ask AI on an element, queue run); null = the whole page */
   const fenceRef = useRef<readonly number[] | null>(null)
   const runMutatedRef = useRef(false)
+  /** the ask-before-saving card of the last run; at most one, gone on the next send / New chat */
+  const [saveOffer, setSaveOffer] = useState<{ name: string } | null>(null)
   /** tool activity of the whole run, for transcript persistence */
   const runToolsRef = useRef<ToolActivity[]>([])
   /** tokens billed so far in the in-flight run (summed across turns) */
@@ -874,7 +882,9 @@ export function AiPanel({
           }))
           persistMessage('assistant', final, runToolsRef.current)
           depsRef.current.clearHighlights()
-          depsRef.current.onRunDone(runMutatedRef.current)
+          // an offer only for an unsaved page the run changed: one card, replacing any older one
+          const offer = depsRef.current.onRunDone(runMutatedRef.current)
+          setSaveOffer(typeof offer === 'string' ? { name: offer } : null)
           queueRunRef.current = false
           setBusy(false)
         },
@@ -1055,6 +1065,7 @@ export function AiPanel({
     const fence = sendFence(fenceSids)
     fenceRef.current = fence
     runMutatedRef.current = false
+    setSaveOffer(null)
     depsRef.current.onPrompt(displayText ?? instruction)
     runToolsRef.current = []
     runUsageRef.current = undefined
@@ -1412,6 +1423,7 @@ export function AiPanel({
                 stop()
                 loopRef.current?.reset()
                 setBusy(false)
+                setSaveOffer(null)
                 setChat([])
                 setReceipts([])
                 setAttachments([])
@@ -1723,6 +1735,18 @@ export function AiPanel({
             </div>
           )
         })}
+        {saveOffer && !busy && (
+          <AiSaveDraftCard
+            lang={lang}
+            name={saveOffer.name}
+            onSave={() => {
+              const { name } = saveOffer
+              setSaveOffer(null)
+              depsRef.current.onSaveOffer(name)
+            }}
+            onLater={() => setSaveOffer(null)}
+          />
+        )}
       </div>
 
       {snapshots.length > 0 && (

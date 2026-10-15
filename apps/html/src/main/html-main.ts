@@ -1215,21 +1215,14 @@ async function resolveSaveTarget(
 ): Promise<string | null | 'canceled'> {
   const current = savePathByWc.get(e.sender.id)
   if (mode === 'save' && current) return current
-  // AI auto-naming: silent first save of an untitled document
-  if (mode === 'save' && !current && suggestedName) {
-    const base = fileNameBase(suggestedName)
-    if (base) {
-      const dir = configuredDefaultSaveDir(app)
-      let target = join(dir, `${base}.html`)
-      for (let n = 1; existsSync(target); n++) target = join(dir, `${base}-${n}.html`)
-      return target
-    }
-  }
   const win =
     BrowserWindow.fromWebContents(e.sender) ?? BrowserWindow.getFocusedWindow() ?? undefined
   const defaultPath = current
     ? join(dirname(current), basename(current))
-    : join(configuredDefaultSaveDir(app), `${fileNameBase(defaultName) || tm('untitledFile')}.html`)
+    : join(
+        configuredDefaultSaveDir(app),
+        `${fileNameBase(suggestedName) || fileNameBase(defaultName) || tm('untitledFile')}.html`,
+      )
   const picked = await showSaveDialogWithMemory(dialog, win, {
     title: tm('dlgSaveTitle'),
     defaultPath,
