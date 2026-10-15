@@ -1235,11 +1235,6 @@ export class UniworkDocsService {
     }
   }
 
-  /** G5-10: expose the live session's queue dispatcher and stores to Sync Center */
-  async syncCenterEngine(): Promise<QueueEngineAccess> {
-    return this.queueEngine()
-  }
-
   /**
    * The queue's status push: it lands on the document's binding too, so a
    * dispatched state (queued / paused_* / reconciling / blocked) is what the
@@ -1405,6 +1400,11 @@ export class UniworkDocsService {
     } finally {
       if (this.queuePass === pass) this.queuePass = null
     }
+  }
+
+  /** G5-10: expose the live session's queue dispatcher and stores to Sync Center */
+  async syncCenterEngine(): Promise<QueueEngineAccess> {
+    return this.queueEngine()
   }
 
   /** one poll pass; see pollSaveQueue */

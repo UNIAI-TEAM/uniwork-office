@@ -155,7 +155,7 @@ const CAPABILITY_PAUSABLE = new Set<QueueState>([
 ])
 
 /** cancel knows the commit did not happen: still queued or waiting on the user */
-const CANCELLABLE = new Set<QueueState>([
+export const CANCELLABLE: ReadonlySet<QueueState> = new Set<QueueState>([
   'queued',
   'paused_offline',
   'paused_user',

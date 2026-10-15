@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+  cancelRefusalCode,
   createSyncCenterController,
   createWiredSyncCenter,
   registerSyncCenterIpc,
+  type SyncCenterFacts,
 } from '../src/main/uniwork-sync/sync-center'
 import {
   UNIWORK_SYNC_CENTER_CHANNELS,
@@ -104,6 +106,8 @@ function createHarness(
   let online = options.online ?? true
   let paused = false
   let storeError = false
+  const cancelCalls: Array<{ key: string; documentClosed: boolean }> = []
+  const discardedDrafts: string[] = []
   const docs = new Map<string, QueueDoc>()
   for (const doc of options.initialDocs ?? []) {
     docs.set(doc.key, doc)
@@ -202,8 +206,6 @@ function createHarness(
     now: () => NOW_MS,
     debounceMs: 5,
     isOnline: () => online,
-    isPaused: async () => paused,
-    isStoreError: () => storeError,
     getFacts: async () => {
       const allDrafts: Array<{
         id: string
@@ -273,6 +275,23 @@ function createHarness(
       }
       return null
     },
+    // the service's cancel path (the save pill's): its dispatcher refusal is mapped the same way
+    cancelSave: async (entry, documentClosed) => {
+      cancelCalls.push({ key: entry.doc.key, documentClosed })
+      const prev: IntentRecordV2 = { ...entry.doc.record }
+      const state = await dispatcher.cancel(entry.doc, {
+        documentClosed,
+        title: entry.title,
+        now: NOW_MS,
+      })
+      if (state === 'cancelled') return { ok: true }
+      const refusal = entry.doc.record.lastError
+      entry.doc.record = prev
+      return cancelRefusalCode(refusal)
+    },
+    draftDiscarded: async (documentKey, draftId) => {
+      discardedDrafts.push(`${documentKey}:${draftId}`)
+    },
     dispatcher: () => Promise.resolve(dispatcher),
     drafts: () => Promise.resolve(draftStore),
     listQueueDocs: async () => [...docs.values()],
@@ -310,6 +329,8 @@ function createHarness(
     controller,
     docs,
     draftStore,
+    cancelCalls,
+    discardedDrafts,
     dispatcher,
     published,
     writes,
@@ -341,6 +362,7 @@ describe('G5-10 wired Sync Center facts: header account', () => {
         currentLocks: () => [],
         syncCenterEngine: async () => ({ kind: 'unavailable' as const }),
       },
+      feedVerdict: () => ({ resynced: false, resyncFailed: false }),
       store: { access: { scope: () => ({ deploymentId: 'dep-1', accountId: 'acc-1' }) } },
       accountStatus: () => ({ loggedIn: true, state: 'signed-in', ...status }),
       capabilityRead: async () => ({ kind: 'ok', capabilities: { sync_write: true } }),
@@ -426,6 +448,7 @@ describe('G5-10 Sync Center actions and change notifications', () => {
     const drafts = await h.draftStore.list('doc-1')
     expect(drafts).toHaveLength(1)
     expect(Array.from(drafts[0]!.snapshot)).toEqual([9, 8, 7, 6])
+    expect(h.cancelCalls).toEqual([{ key: 'doc-1', documentClosed: true }])
   })
 
   it('discardSave converts reconciling_stuck to kept draft and refuses with draft_cap or store_full leaving intent untouched', async () => {
@@ -481,6 +504,18 @@ describe('G5-10 Sync Center actions and change notifications', () => {
     expect(h.clipboardWrites).toEqual([`SUP-${stuckDoc.record.intentId}`])
   })
 
+  it('BE-10: copySupportCode refuses every row that is not reconciling-stuck', async () => {
+    for (const state of ['queued', 'reconciling', 'failed', 'blocked'] as const) {
+      const doc = makeQueueDoc({ key: 'doc-1', state })
+      const h = createHarness({ initialDocs: [doc] })
+      expect(await h.controller.copySupportCode(doc.record.intentId), state).toEqual({
+        ok: false,
+        code: 'busy',
+      })
+      expect(h.clipboardWrites, state).toEqual([])
+    }
+  })
+
   it('saveMyCopy uses default name "{title} (bản của tôi).{ext}" and guards on canEdit', async () => {
     const payload = new Uint8Array([10, 20, 30])
     const stuckDoc = makeQueueDoc({ key: 'doc-stuck', state: 'reconciling-stuck', payload })
@@ -517,6 +552,8 @@ describe('G5-10 Sync Center actions and change notifications', () => {
 
     expect(await h.controller.discardDraft('draft:doc-draft:d-1')).toEqual({ ok: true })
     expect(await h.draftStore.list('doc-draft')).toHaveLength(0)
+    // BE-3: the preview of a discarded draft is dropped with it
+    expect(h.discardedDrafts).toEqual(['doc-draft:d-1'])
 
     h.setStoreError(true)
     expect(await h.controller.retryStore()).toEqual({ ok: true })
@@ -582,6 +619,39 @@ describe('G5-10 Sync Center actions and change notifications', () => {
     }
     const h = createHarness()
     expect(await h.controller.discardDraft('missing-row')).toEqual({ ok: false, code: 'not_found' })
+  })
+
+  it('BE-12: a kept-draft row whose draft is gone is not_found and never discards a blocked intent', async () => {
+    const doc = withRecord(makeQueueDoc({ key: 'doc-1', state: 'blocked' }), {
+      lastError: 'permission_revoked',
+    })
+    const h = createHarness({ initialDocs: [doc] })
+    for (const rowId of ['draft:doc-1:gone', `draft:doc-1:${doc.record.intentId}`]) {
+      expect(await h.controller.discardDraft(rowId), rowId).toEqual({
+        ok: false,
+        code: 'not_found',
+      })
+    }
+    expect(h.docs.get('doc-1')?.record.state).toBe('blocked')
+    expect(h.published).toEqual([])
+    expect(h.discardedDrafts).toEqual([])
+  })
+
+  it('BE-5: a blocked intent without a known cause is not discardable (recheck only)', async () => {
+    for (const lastError of [undefined, 'server_error', 'made_up_code'] as const) {
+      const doc = withRecord(makeQueueDoc({ key: 'doc-1', state: 'blocked' }), {
+        ...(lastError ? { lastError: lastError as IntentRecordV2['lastError'] } : {}),
+      })
+      const h = createHarness({ initialDocs: [doc] })
+      const row = (await h.controller.getSnapshot()).tabs.attention[0]
+      expect(row?.blockedReason, String(lastError)).toBeUndefined()
+      expect(await h.controller.discardDraft(doc.record.intentId), String(lastError)).toEqual({
+        ok: false,
+        code: 'busy',
+      })
+      expect(h.docs.get('doc-1')?.record.state).toBe('blocked')
+      expect(h.published).toEqual([])
+    }
   })
 
   it('saveAgain supersedes a failed intent, then mints a new one from the same snapshot', async () => {
@@ -677,6 +747,49 @@ describe('G5-10 Sync Center actions and change notifications', () => {
 
     expect(received).toEqual(['offline'])
     unsubscribe()
+  })
+
+  it('BE-11: snapshot rebuilds coalesce (one in flight, one queued behind it)', async () => {
+    let calls = 0
+    let release: () => void = () => undefined
+    const facts: SyncCenterFacts = {
+      sessionState: 'signed_in',
+      online: true,
+      paused: false,
+      adminPaused: false,
+    }
+    const controller = createSyncCenterController({
+      debounceMs: 5,
+      isOnline: () => true,
+      getFacts: () => {
+        calls += 1
+        return new Promise<SyncCenterFacts>((resolve) => {
+          release = () => resolve(facts)
+        })
+      },
+    } as never)
+    const first = controller.getSnapshot()
+    const second = controller.getSnapshot()
+    const third = controller.getSnapshot()
+    expect(calls).toBe(1)
+    release()
+    await first
+    await vi.waitFor(() => expect(calls).toBe(2))
+    release()
+    const [a, b] = await Promise.all([second, third])
+    expect(a).toBe(b)
+    expect(calls).toBe(2)
+
+    // three pushes in the same tick: one debounced rebuild
+    const pushed: unknown[] = []
+    controller.subscribe((snap) => pushed.push(snap))
+    controller.notifyChanged()
+    controller.notifyChanged()
+    controller.notifyChanged()
+    await vi.waitFor(() => expect(calls).toBe(3))
+    release()
+    await vi.waitFor(() => expect(pushed).toHaveLength(1))
+    expect(calls).toBe(3)
   })
 
   it('registerSyncCenterIpc binds all Sync Center channels and forwards changed snapshots', async () => {

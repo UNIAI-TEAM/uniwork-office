@@ -85,12 +85,8 @@ import type {
   WorkTask,
   WorkTaskStatus,
 } from '../shared/uniwork-work-api'
-import { UNIWORK_SYNC_CENTER_CHANNELS } from '../shared/sync-center'
-import type {
-  SyncCenterActionResult,
-  SyncCenterSnapshot,
-  UniworkSyncCenterApi,
-} from '../shared/sync-center'
+import { asSyncCenterSnapshot, UNIWORK_SYNC_CENTER_CHANNELS } from '../shared/sync-center'
+import type { SyncCenterActionResult, UniworkSyncCenterApi } from '../shared/sync-center'
 import { createLaunchReplay } from './launch-replay'
 
 // subscribed at preload time: a cold-start launch event can arrive before the
@@ -1342,7 +1338,11 @@ function asSyncCenterActionResult(result: unknown): SyncCenterActionResult {
 
 const syncCenterApi: UniworkSyncCenterApi = {
   async getSnapshot() {
-    return (await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.snapshot)) as SyncCenterSnapshot
+    const snapshot = asSyncCenterSnapshot(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.snapshot),
+    )
+    if (!snapshot) throw new Error('uniwork sync center: malformed snapshot')
+    return snapshot
   },
   async syncNow() {
     return asSyncCenterActionResult(await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.syncNow))
@@ -1408,8 +1408,9 @@ const syncCenterApi: UniworkSyncCenterApi = {
     )
   },
   subscribe(cb) {
-    const listener = (_event: IpcRendererEvent, snapshot: SyncCenterSnapshot) => {
-      if (snapshot && typeof snapshot === 'object') cb(snapshot)
+    const listener = (_event: IpcRendererEvent, value: unknown) => {
+      const snapshot = asSyncCenterSnapshot(value)
+      if (snapshot) cb(snapshot)
     }
     ipcRenderer.on(UNIWORK_SYNC_CENTER_CHANNELS.changedEvent, listener)
     return () => ipcRenderer.removeListener(UNIWORK_SYNC_CENTER_CHANNELS.changedEvent, listener)

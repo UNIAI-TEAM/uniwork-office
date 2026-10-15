@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { chmod, mkdir, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, rm, writeFile } from 'node:fs/promises'
 import { basename, extname, join } from 'node:path'
 import {
   SYNC_CENTER_ATTENTION_STATES,
@@ -21,10 +21,17 @@ import {
   type SyncCenterStoreBudget,
   type UniworkSyncCenterApi,
 } from '../../shared/sync-center'
-import type { AccountStatus, UniworkDocErrorCode, UniworkDocFormat } from '../../shared/home-api'
+import type {
+  AccountStatus,
+  UniworkDocErrorCode,
+  UniworkDocFormat,
+  UniworkLockReason,
+} from '../../shared/home-api'
 import { scopeWorkingCopyDirs, type BindingStore } from '../uniwork-docs/binding-store'
 import type { QueueDispatcher, QueueDoc } from './queue/dispatcher'
 import type { DraftStore, KeptDraftMeta } from './queue/drafts'
+import { QUEUE_LIMITS } from './queue/limits'
+import { CANCELLABLE } from './queue/machine'
 import type { PauseStore } from './queue/pause'
 import type { IntentStore } from './intent-store'
 import type { StoreLayer } from './store'
@@ -167,15 +174,22 @@ export function accountInfoOf(status: AccountStatus): SyncCenterAccountInfo | un
 /**
  * A blocked intent's reason in the spine's vocabulary. `explicit` (a fact the
  * caller derived: `document_archived`, `lease_expired`, `foreign_account`, ...)
- * wins; otherwise the queue's `lastError` decides. Anything else the queue
- * parks as `blocked` is access this account no longer has (`permission_revoked`).
+ * wins; otherwise the queue's `lastError` decides. Only the codes the queue
+ * machine files as lost access (`forbidden`, `not_found`, `permission_revoked`)
+ * read `permission_revoked`; an absent or unknown error has no reason at all
+ * (undefined), which the row renders read-only ("Kiểm tra lại" only): a cause
+ * nobody knows must never offer the destructive "Bỏ nháp…".
  */
 export function mapBlockedReason(
   error: UniworkDocErrorCode | undefined,
   explicit?: SyncCenterBlockedReason,
-): SyncCenterBlockedReason {
+): SyncCenterBlockedReason | undefined {
   if (explicit) return explicit
   switch (error) {
+    case 'forbidden':
+    case 'not_found':
+    case 'permission_revoked':
+      return 'permission_revoked'
     case 'session_expired':
     case 'not_signed_in':
     case 'wrong_deployment':
@@ -195,8 +209,13 @@ export function mapBlockedReason(
       // the server's archived refusal (G5-08s) is not a `UniworkDocErrorCode` yet; a record
       // keeps any error string, so it is read here, not by a queue transition
       if ((error as string | undefined) === 'document_archived') return 'document_archived'
-      return 'permission_revoked'
+      return undefined
   }
+}
+
+/** whether a blocked reason offers "Bỏ nháp…"; an unknown reason never does */
+export function isDiscardableBlockedReason(reason: SyncCenterBlockedReason | undefined): boolean {
+  return reason !== undefined && SYNC_CENTER_DISCARDABLE_BLOCKED_REASONS.includes(reason)
 }
 
 function mapFailedReason(
@@ -215,7 +234,7 @@ function blockedFields(
 ): Pick<SyncCenterRow, 'blockedReason' | 'libraryOff'> {
   const blockedReason = mapBlockedReason(item.record.lastError, item.blockedReason)
   return {
-    blockedReason,
+    ...(blockedReason ? { blockedReason } : {}),
     ...(blockedReason === 'lease_expired' && offlineLibrary === false ? { libraryOff: true } : {}),
   }
 }
@@ -224,6 +243,20 @@ export function formatSupportCode(record: IntentRecordV2): string {
   const docPart = (record.documentId || 'DOC').slice(0, 8)
   const keyPart = (record.idempotencyKey || record.intentId || 'KEY').slice(0, 8)
   return `UW-${docPart}-${keyPart}`
+}
+
+/**
+ * The action code of a cancel the dispatcher refused: the reason its kept draft could not
+ * be written (`drafts_full`, `store_full`, a locked/interrupted store), else the record was
+ * simply not in a cancellable state.
+ */
+export function cancelRefusalCode(
+  lastError: UniworkDocErrorCode | undefined,
+): Exclude<SyncCenterActionResult, { ok: true }> {
+  if (lastError === 'drafts_full') return { ok: false, code: 'draft_cap' }
+  if (lastError === 'store_full') return { ok: false, code: 'store_full' }
+  if (lastError === 'keystore_locked') return { ok: false, code: 'other' }
+  return { ok: false, code: 'busy' }
 }
 
 function isWithinRecentWindow(savedAtIso: string, nowMs: number): boolean {
@@ -422,12 +455,18 @@ export interface SyncCenterControllerDeps {
   now?(): number
   debounceMs?: number
   isOnline(): boolean
-  isPaused?(): Promise<boolean>
-  isStoreError?(): boolean
   getFacts(): Promise<SyncCenterFacts>
   findDoc(rowId: string): Promise<ResolvedQueueDocEntry | null>
   dispatcher(): Promise<QueueDispatcher | null>
   drafts(): Promise<DraftStore | null>
+  /**
+   * "Hủy lần lưu…" through the same service path the save pill uses. `documentClosed`
+   * = no open window holds the document (its snapshot becomes a kept draft); an open
+   * document keeps its work in the window and its chip goes back to unsaved.
+   */
+  cancelSave(entry: ResolvedQueueDocEntry, documentClosed: boolean): Promise<SyncCenterActionResult>
+  /** a kept draft was discarded: drop anything derived from it (its read-only preview) */
+  draftDiscarded(documentKey: string, draftId: string): Promise<void>
   listQueueDocs(): Promise<QueueDoc[]>
   /** a fresh unique id for the intent `saveAgain` mints (defaults to a random UUID) */
   newId?(): string
@@ -489,10 +528,34 @@ export function createSyncCenterController(deps: SyncCenterControllerDeps): Sync
   const listeners = new Set<(snapshot: SyncCenterSnapshot) => void>()
   const debounceMs = deps.debounceMs ?? 16
   let timer: ReturnType<typeof setTimeout> | null = null
+  // one rebuild in flight, at most one queued behind it: a read during a build gets the
+  // queued one (its facts may predate the change), and every further read shares it
+  let building: Promise<SyncCenterSnapshot> | null = null
+  let queued: Promise<SyncCenterSnapshot> | null = null
 
-  const getSnapshot = async (): Promise<SyncCenterSnapshot> => {
-    const facts = await deps.getFacts()
-    return buildSyncCenterSnapshot(facts)
+  const build = (): Promise<SyncCenterSnapshot> => {
+    const run = deps
+      .getFacts()
+      .then(buildSyncCenterSnapshot)
+      .finally(() => {
+        if (building === run) building = null
+      })
+    building = run
+    return run
+  }
+
+  const getSnapshot = (): Promise<SyncCenterSnapshot> => {
+    if (!building) return build()
+    if (!queued) {
+      const next = building
+        .catch(() => undefined)
+        .then(() => {
+          if (queued === next) queued = null
+          return building ?? build()
+        })
+      queued = next
+    }
+    return queued
   }
 
   const flushListeners = async (): Promise<void> => {
@@ -573,9 +636,7 @@ export function createSyncCenterController(deps: SyncCenterControllerDeps): Sync
       (item) => item.record.intentId === entry.doc.record.intentId,
     )
     const reason = mapBlockedReason(entry.doc.record.lastError, fact?.blockedReason)
-    if (!SYNC_CENTER_DISCARDABLE_BLOCKED_REASONS.includes(reason)) {
-      return { ok: false, code: 'busy' }
-    }
+    if (!isDiscardableBlockedReason(reason)) return { ok: false, code: 'busy' }
     const dispatcher = await deps.dispatcher()
     if (!dispatcher) return { ok: false, code: 'other' }
     const prevRecord: IntentRecordV2 = { ...entry.doc.record }
@@ -656,31 +717,13 @@ export function createSyncCenterController(deps: SyncCenterControllerDeps): Sync
       if (typeof rowId !== 'string' || !rowId) return { ok: false, code: 'not_found' }
       const entry = await deps.findDoc(rowId)
       if (!entry) return { ok: false, code: 'not_found' }
-      const dispatcher = await deps.dispatcher()
-      if (!dispatcher) return { ok: false, code: 'other' }
-
-      const now = deps.now?.() ?? Date.now()
-      const prevRecord: IntentRecordV2 = { ...entry.doc.record }
-      // Safe cancel: keep snapshot as a kept draft whenever no open window holds a newer copy
+      // Safe cancel: an open window holds the work (the intent's snapshot or newer), so
+      // nothing is kept and its chip goes back to unsaved; a closed document's snapshot
+      // becomes a kept draft. Either way no typed work is lost.
       const documentClosed = entry.openWindowHasNewer !== true
-      const nextState = await dispatcher.cancel(entry.doc, {
-        documentClosed,
-        title: entry.title,
-        now,
-      })
-
-      if (nextState === 'cancelled') {
-        notifyChanged()
-        return { ok: true }
-      }
-
-      const refusalError = entry.doc.record.lastError
-      // Restore in-memory record to match the untouched stored intent on refusal
-      entry.doc.record = prevRecord
-      if (refusalError === 'drafts_full') return { ok: false, code: 'draft_cap' }
-      if (refusalError === 'store_full') return { ok: false, code: 'store_full' }
-      if (refusalError === 'keystore_locked') return { ok: false, code: 'other' }
-      return { ok: false, code: 'busy' }
+      const result = await deps.cancelSave(entry, documentClosed)
+      if (result.ok) notifyChanged()
+      return result
     },
 
     async recheck(rowId: string): Promise<SyncCenterActionResult> {
@@ -701,6 +744,8 @@ export function createSyncCenterController(deps: SyncCenterControllerDeps): Sync
       if (typeof rowId !== 'string' || !rowId) return { ok: false, code: 'not_found' }
       const entry = await deps.findDoc(rowId)
       if (!entry) return { ok: false, code: 'not_found' }
+      // only the stuck row offers this action
+      if (entry.doc.record.state !== 'reconciling-stuck') return { ok: false, code: 'busy' }
       const code = entry.supportCode ?? formatSupportCode(entry.doc.record)
       deps.writeClipboard(code)
       return { ok: true }
@@ -772,10 +817,16 @@ export function createSyncCenterController(deps: SyncCenterControllerDeps): Sync
     async discardDraft(rowId: string): Promise<SyncCenterActionResult> {
       if (typeof rowId !== 'string' || !rowId) return { ok: false, code: 'not_found' }
       const resolved = await resolveDraftRow(rowId)
-      if (!resolved) return discardBlockedIntent(rowId)
+      if (!resolved) {
+        // a kept-draft row whose draft is gone stays gone: it is never reread as a
+        // blocked-intent discard (that would drop a queued save nobody chose to discard)
+        if (parseDraftRowId(rowId)) return { ok: false, code: 'not_found' }
+        return discardBlockedIntent(rowId)
+      }
       const draftStore = await deps.drafts()
       if (!draftStore) return { ok: false, code: 'other' }
       await draftStore.remove(resolved.documentKey, resolved.draftId)
+      await deps.draftDiscarded(resolved.documentKey, resolved.draftId).catch(() => undefined)
       notifyChanged()
       return { ok: true }
     },
@@ -938,9 +989,27 @@ export function registerSyncCenterIpc(
   return () => undefined
 }
 
+/** the S11 lock reason of a store written by a newer app (header priority 1) */
+const STORE_NEWER: UniworkLockReason = 'store_newer'
+
+/**
+ * A kept draft opened read-only is closed again, by the user, before its preview is
+ * swept: a preview whose window is gone for this long is deleted (the shell has no
+ * close event for a path, so the sweep reads `isPathOpen` on every poll and change).
+ */
+export const DRAFT_PREVIEW_CLOSE_GRACE_MS = 30_000
+
+/** the feed runtime's verdict of its last pass (header conditions 7 and 9) */
+export interface SyncFeedVerdict {
+  /** a consumer of the last pass rebuilt from a full resync */
+  resynced: boolean
+  /** a consumer's full resync was refused past the retry cap */
+  resyncFailed: boolean
+}
+
 export interface WiredSyncCenterService {
   readonly store: BindingStore
-  currentLocks(): ReadonlyArray<{ reason: string }>
+  currentLocks(): ReadonlyArray<{ reason: UniworkLockReason }>
   syncCenterEngine(): Promise<
     | {
         kind: 'ok'
@@ -956,6 +1025,8 @@ export interface WiredSyncCenterService {
   pollSaveQueue(): Promise<void>
   pauseSending(): Promise<void>
   resumeSending(): Promise<void>
+  /** the save pill's "Hủy lần lưu": `closed` = no tab holds it (its snapshot is kept) */
+  cancelSave(path: string, closed: boolean): Promise<void>
   openDocument(documentId: string): Promise<{ ok: boolean }>
 }
 
@@ -969,6 +1040,8 @@ export interface WiredSyncCenterDeps {
     kind: string
     capabilities: { sync_write: boolean; sync_feed?: boolean; offline_library?: boolean }
   }>
+  /** the feed runtime's last pass verdict (resynced / resync refused past the cap) */
+  feedVerdict(): SyncFeedVerdict
   tickRuntime(): Promise<void>
   openPath(path: string): boolean
   isPathOpen(path: string): boolean
@@ -979,18 +1052,70 @@ export interface WiredSyncCenterDeps {
     ext: UniworkDocFormat | string
   }): Promise<string | null>
   pushChanged(snapshot: SyncCenterSnapshot): void
+  /** test seam: the clock of the preview sweep */
+  now?(): number
+}
+
+export interface WiredSyncCenter {
+  controller: SyncCenterController
+  /** the runtime's poll verdict (`undefined` = the pass had nothing to do) */
+  notePoll(online: boolean | undefined): Promise<void>
+  /**
+   * An account status push. Crossing an account boundary (sign-out, another account)
+   * deletes every read-only draft preview of the outgoing session.
+   */
+  noteAccount(): Promise<void>
+  /** deletes the previews no window shows any more (also run by every poll) */
+  sweepPreviews(): Promise<void>
 }
 
 /**
  * Production bridge used by `uniwork-docs/wiring.ts` to bind the live
  * `UniworkDocsService`, `SyncRuntime`, and `StoreLayer` to `registerSyncCenterIpc`.
  */
-export function createWiredSyncCenter(deps: WiredSyncCenterDeps): {
-  controller: SyncCenterController
-  notePoll(online: boolean | undefined): void
-} {
+export function createWiredSyncCenter(deps: WiredSyncCenterDeps): WiredSyncCenter {
+  // online until the first poll says otherwise (a pass that attempted nothing has no verdict)
   let online = true
   let lastSyncAt: string | undefined
+  const now = () => deps.now?.() ?? Date.now()
+
+  /*
+   * "Mở nháp" (read-only): the editors only open files, so a kept draft is shown through a
+   * decrypted temp copy. It lives under a directory of THIS app session, and is deleted on
+   * draft discard, once its window is closed (sweep), at an account boundary, and at the
+   * next startup (the whole preview root is removed when the sync center is built).
+   */
+  const previewRoot = join(deps.userDataDir, 'uniwork-drafts-preview')
+  let previewSession = randomUUID()
+  const previews = new Map<string, { dir: string; path: string; openedAt: number }>()
+  const removeDir = (dir: string) =>
+    rm(dir, { recursive: true, force: true, maxRetries: 2 }).catch(() => undefined)
+  // startup sweep: a crash or a power cut left the previous session's previews behind
+  const startupSweep = removeDir(previewRoot)
+  let lastAccount: string | undefined
+
+  const dropPreview = async (draftId: string): Promise<void> => {
+    const found = previews.get(draftId)
+    if (!found) return
+    previews.delete(draftId)
+    await removeDir(found.dir)
+  }
+
+  const sweepPreviews = async (): Promise<void> => {
+    const at = now()
+    for (const [draftId, preview] of [...previews]) {
+      if (deps.isPathOpen(preview.path)) continue
+      if (at - preview.openedAt < DRAFT_PREVIEW_CLOSE_GRACE_MS) continue
+      await dropPreview(draftId)
+    }
+  }
+
+  const dropAllPreviews = async (): Promise<void> => {
+    previews.clear()
+    const session = previewSession
+    previewSession = randomUUID()
+    await removeDir(join(previewRoot, session))
+  }
 
   const readSessionDocs = async () => {
     const scope = deps.store.access.scope()
@@ -1005,7 +1130,7 @@ export function createWiredSyncCenter(deps: WiredSyncCenterDeps): {
     isOnline: () => online,
     getFacts: async (): Promise<SyncCenterFacts> => {
       const status = deps.accountStatus()
-      const storeNewer = deps.service.currentLocks().some((lock) => lock.reason === 'newer_store')
+      const storeNewer = deps.service.currentLocks().some((lock) => lock.reason === STORE_NEWER)
       const sessionState: SyncCenterFacts['sessionState'] =
         status.state === 'session-expired'
           ? 'session_expired'
@@ -1035,6 +1160,11 @@ export function createWiredSyncCenter(deps: WiredSyncCenterDeps): {
         }
       }
 
+      const feed = deps.feedVerdict()
+      const feedFacts = {
+        ...(feed.resyncFailed ? { resyncFailed: true } : {}),
+        ...(feed.resynced ? { resynced: true } : {}),
+      }
       const { engine, dirs, scope } = await readSessionDocs()
       if (!engine || engine.kind !== 'ok') {
         return {
@@ -1043,6 +1173,7 @@ export function createWiredSyncCenter(deps: WiredSyncCenterDeps): {
           online,
           paused: false,
           adminPaused: false,
+          ...feedFacts,
           ...(lastSyncAt ? { lastSyncAt } : {}),
           ...(account ? { account } : {}),
           ...(org ? { org } : {}),
@@ -1129,6 +1260,7 @@ export function createWiredSyncCenter(deps: WiredSyncCenterDeps): {
         paused,
         adminPaused,
         feedOff,
+        ...feedFacts,
         ...(offlineLibrary === undefined ? {} : { offlineLibrary }),
         ...(lastSyncAt ? { lastSyncAt } : {}),
         ...(account ? { account } : {}),
@@ -1171,12 +1303,49 @@ export function createWiredSyncCenter(deps: WiredSyncCenterDeps): {
             title: binding.title,
             ext: binding.format,
             canEdit: binding.access === 'edit' && binding.level !== 'view',
-            openWindowHasNewer: false,
+            // an open window holds the working copy the intent was snapshotted from, or a
+            // newer one: a cancel keeps that work in the window instead of minting a draft
+            openWindowHasNewer: deps.isPathOpen(path),
           }
         }
       }
       return null
     },
+
+    cancelSave: async (entry, documentClosed) => {
+      const { doc } = entry
+      await deps.service.cancelSave(doc.path, documentClosed)
+      const engine = await deps.service.syncCenterEngine()
+      if (engine.kind !== 'ok') return { ok: false, code: 'other' }
+      const stored = await engine.intents.read(doc.key, {
+        orgId: doc.orgId,
+        workspaceId: doc.workspaceId,
+        baseVersion: doc.baseVersion,
+        length: 0,
+      })
+      if (
+        !stored ||
+        stored.intent.intentId !== doc.record.intentId ||
+        isTerminalQueueState(stored.intent.state)
+      ) {
+        return { ok: true }
+      }
+      // refused: the stored intent is exactly as it was. The service reports no reason, so
+      // it is read back from the facts the dispatcher's refusal depends on
+      if (!CANCELLABLE.has(stored.intent.state) || !documentClosed) {
+        return { ok: false, code: 'busy' }
+      }
+      const kept = await engine.drafts.list(doc.key)
+      if (kept.length >= QUEUE_LIMITS.draftsPerDocument) return cancelRefusalCode('drafts_full')
+      const scope = deps.store.access.scope()
+      const usage = scope ? await deps.store.layer.usage(scope).catch(() => null) : null
+      if (usage && usage.bytes + doc.payload.byteLength > usage.budgetBytes) {
+        return cancelRefusalCode('store_full')
+      }
+      return cancelRefusalCode('keystore_locked')
+    },
+
+    draftDiscarded: (_documentKey, draftId) => dropPreview(draftId),
 
     dispatcher: async () => {
       const engine = await deps.service.syncCenterEngine()
@@ -1221,7 +1390,7 @@ export function createWiredSyncCenter(deps: WiredSyncCenterDeps): {
     syncNow: async () => {
       await deps.tickRuntime()
       await deps.service.pollSaveQueue()
-      lastSyncAt = new Date().toISOString()
+      lastSyncAt = new Date(now()).toISOString()
     },
 
     setSendingPaused: async (paused) => {
@@ -1241,10 +1410,16 @@ export function createWiredSyncCenter(deps: WiredSyncCenterDeps): {
     },
 
     openDraft: async ({ draftId, title, ext, snapshot }) => {
-      const previewDir = join(deps.userDataDir, 'uniwork-drafts-preview', draftId)
-      await mkdir(previewDir, { recursive: true })
+      await startupSweep
+      const shown = previews.get(draftId)
+      // already open: show that window again rather than writing a second copy
+      if (shown && deps.isPathOpen(shown.path)) return deps.openPath(shown.path)
+      await dropPreview(draftId)
+      const dir = join(previewRoot, previewSession, draftId)
+      await mkdir(dir, { recursive: true })
       const safeStem = (title.replace(/[<>:"/\\|?*]+/g, '_').trim() || 'draft').slice(0, 120)
-      const filePath = join(previewDir, `${safeStem}.${ext}`)
+      const filePath = join(dir, `${safeStem}.${ext}`)
+      previews.set(draftId, { dir, path: filePath, openedAt: now() })
       await writeFile(filePath, snapshot)
       await chmod(filePath, 0o444).catch(() => undefined)
       return deps.openPath(filePath)
@@ -1272,12 +1447,22 @@ export function createWiredSyncCenter(deps: WiredSyncCenterDeps): {
 
   return {
     controller,
-    notePoll(nextOnline) {
+    async notePoll(nextOnline) {
       if (nextOnline !== undefined) {
         online = nextOnline
-        if (nextOnline) lastSyncAt = new Date().toISOString()
+        if (nextOnline) lastSyncAt = new Date(now()).toISOString()
       }
       controller.notifyChanged()
+      await sweepPreviews()
     },
+    async noteAccount() {
+      const scope = deps.store.access.scope()
+      const account = scope ? `${scope.deploymentId}/${scope.accountId}` : ''
+      controller.notifyChanged()
+      if (account === lastAccount) return
+      lastAccount = account
+      await dropAllPreviews()
+    },
+    sweepPreviews,
   }
 }

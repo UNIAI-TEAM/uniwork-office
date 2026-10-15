@@ -224,6 +224,21 @@ export interface SyncCenterSnapshot {
   defaultTab: SyncCenterDefaultTab
 }
 
+/**
+ * A snapshot the renderer's model can read without crashing: a header with a status
+ * and the three tab arrays. Anything else (an older main, a malformed push) is null.
+ */
+export function asSyncCenterSnapshot(value: unknown): SyncCenterSnapshot | null {
+  if (!value || typeof value !== 'object') return null
+  const snap = value as { header?: unknown; tabs?: unknown }
+  const header = snap.header as { status?: unknown } | null | undefined
+  const tabs = snap.tabs as Record<string, unknown> | null | undefined
+  if (!header || typeof header !== 'object' || typeof header.status !== 'string') return null
+  if (!tabs || typeof tabs !== 'object') return null
+  if (!['attention', 'pending', 'recent'].every((tab) => Array.isArray(tabs[tab]))) return null
+  return value as SyncCenterSnapshot
+}
+
 export type SyncCenterActionErrorCode =
   'draft_cap' | 'store_full' | 'offline' | 'not_found' | 'busy' | 'other'
 
@@ -240,9 +255,10 @@ export interface UniworkSyncCenterApi {
   sendNow(rowId: string): Promise<SyncCenterActionResult>
   /**
    * Cancel a pending/blocked/failed save (`Hủy lần lưu…`) after UI confirmation.
-   * Safe cancel: never loses the user's typed content — delegates to `dispatcher.cancel`
-   * with `openWindowHasNewer: false` when no open editor holds a newer copy so the
-   * intent snapshot is preserved as a `kept_draft` (up to the 3-draft / store cap).
+   * Safe cancel: never loses the user's typed content — goes through the save pill's own
+   * cancel path; a document open in a window keeps its work there (its chip goes back to
+   * unsaved), a closed one keeps the intent snapshot as a `kept_draft` (up to the 3-draft /
+   * store cap; a refusal leaves the intent as it was: `'draft_cap'` / `'store_full'`).
    */
   cancelSave(rowId: string): Promise<SyncCenterActionResult>
   /** Re-verify a `reconciling` / `reconciling_stuck` / `blocked` / `failed` intent (`Kiểm tra lại` / `Thử lại`). */

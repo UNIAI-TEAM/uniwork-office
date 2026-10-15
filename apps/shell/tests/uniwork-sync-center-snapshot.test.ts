@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildSyncCenterSnapshot,
+  isDiscardableBlockedReason,
+  mapBlockedReason,
   type SyncCenterFacts,
   type SyncCenterIntentFact,
 } from '../src/main/uniwork-sync/sync-center'
@@ -476,9 +478,16 @@ describe('G5-10 buildSyncCenterSnapshot — blocked reasons follow the spine con
     expect(blockedRow('document_archived' as never)?.blockedReason).toBe('document_archived')
   })
 
-  it('maps an unrecognised queue error to permission_revoked, never to a retired name', () => {
-    expect(blockedRow('other_window')?.blockedReason).toBe('permission_revoked')
-    expect(blockedRow(undefined)?.blockedReason).toBe('permission_revoked')
+  it('BE-5: an absent or unrecognised queue error has no reason and is never discardable', () => {
+    for (const error of [undefined, 'other_window', 'server_error'] as const) {
+      const row = blockedRow(error)
+      expect(row?.state, String(error)).toBe('blocked')
+      expect(row?.blockedReason, String(error)).toBeUndefined()
+      expect(row && 'blockedReason' in row, String(error)).toBe(false)
+      expect(mapBlockedReason(error), String(error)).toBeUndefined()
+      expect(isDiscardableBlockedReason(mapBlockedReason(error)), String(error)).toBe(false)
+    }
+    expect(isDiscardableBlockedReason('permission_revoked')).toBe(true)
   })
 
   it('lets an explicit fact reason win over the queue error (document_archived, foreign_account, lease_expired, clock_rollback)', () => {
@@ -527,5 +536,27 @@ describe('G5-10 buildSyncCenterSnapshot — blocked reasons follow the spine con
       blockedRow(undefined, { blockedReason: 'clock_rollback' }, { offlineLibrary: false })
         ?.libraryOff,
     ).toBeUndefined()
+  })
+})
+
+describe('BE-10: the preload boundary validates the snapshot shape', () => {
+  it('accepts a built snapshot and refuses one the renderer model could not read', async () => {
+    const { asSyncCenterSnapshot } = await import('../src/shared/sync-center')
+    const good = buildSyncCenterSnapshot(baseFacts())
+    expect(asSyncCenterSnapshot(good)).toBe(good)
+    for (const bad of [
+      null,
+      undefined,
+      'snapshot',
+      {},
+      { header: good.header },
+      { tabs: good.tabs },
+      { header: {}, tabs: good.tabs },
+      { header: good.header, tabs: { attention: [], pending: [] } },
+      { header: good.header, tabs: { attention: [], pending: null, recent: [] } },
+    ]) {
+      expect(() => asSyncCenterSnapshot(bad)).not.toThrow()
+      expect(asSyncCenterSnapshot(bad), JSON.stringify(bad)).toBeNull()
+    }
   })
 })

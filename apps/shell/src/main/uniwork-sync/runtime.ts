@@ -33,6 +33,12 @@ export const DOC_INDEX_REGISTRATION: StoreRegistration = {
 
 export const FEED_INTERVAL_MS = 60_000
 
+/**
+ * Full resyncs refused in a row (410 again) before the header shows
+ * `uwSyncResyncFailed` (OQ-UX2 proposal: 5).
+ */
+export const FEED_RESYNC_FAILED_AFTER = 5
+
 /** the store-backed cursor of one feed stream */
 export function createStoreCursorStore(records: StoreRecords): CursorStore {
   return {
@@ -276,6 +282,10 @@ export class SyncRuntime {
   private ticking: Promise<void> | null = null
   /** bumped by stop(): a pass that started before it is no longer current */
   private generation = 0
+  /** told after every pass's onPoll, with the same verdict (G5-10 sync center) */
+  private readonly pollListeners = new Set<(online: boolean | undefined) => void>()
+  /** the feed verdict of the last completed pass (G5-10 header conditions 7 and 9) */
+  private lastFeedVerdict = { resynced: false, resyncFailed: false }
 
   constructor(options: SyncRuntimeOptions) {
     this.options = options
@@ -313,6 +323,7 @@ export class SyncRuntime {
     for (const consumer of this.running.values()) consumer.cancel()
     this.running.clear()
     this.capabilities.clear()
+    this.lastFeedVerdict = { resynced: false, resyncFailed: false }
   }
 
   /** one pass; concurrent calls share it */
@@ -335,6 +346,36 @@ export class SyncRuntime {
     return this.options.capability(orgId)
   }
 
+  /**
+   * G5-10: listen to every pass's connectivity verdict (after the save queue's
+   * own onPoll ran). Returns the unsubscribe.
+   */
+  onPollVerdict(listener: (online: boolean | undefined) => void): () => void {
+    this.pollListeners.add(listener)
+    return () => this.pollListeners.delete(listener)
+  }
+
+  /**
+   * G5-10: whether the last completed pass rebuilt a feed from a full resync,
+   * and whether a feed's resync is refused past FEED_RESYNC_FAILED_AFTER. A
+   * stop() (sign-out, account switch) forgets both.
+   */
+  feedVerdict(): { resynced: boolean; resyncFailed: boolean } {
+    return { ...this.lastFeedVerdict }
+  }
+
+  /** the pass's verdict: the save queue's onPoll first, then the listeners */
+  private async reportPoll(online: boolean | undefined): Promise<void> {
+    await this.options.onPoll?.(online)
+    for (const listener of [...this.pollListeners]) {
+      try {
+        listener(online)
+      } catch {
+        // a listener never breaks the pass
+      }
+    }
+  }
+
   private async run(): Promise<void> {
     const generation = this.generation
     const current = () => this.generation === generation
@@ -344,7 +385,7 @@ export class SyncRuntime {
       if (current()) this.running.clear()
       // no session to reach the server: nothing was attempted, so there is no
       // connectivity verdict to report (G506-be-3)
-      await this.options.onPoll?.(undefined)
+      await this.reportPoll(undefined)
       return
     }
     const open = await this.options.store.open()
@@ -353,7 +394,7 @@ export class SyncRuntime {
       // no feed without the store: a cursor cannot move without its record.
       // Nothing was attempted, so there is no verdict either (G506-be-3)
       this.running.clear()
-      await this.options.onPoll?.(undefined)
+      await this.reportPoll(undefined)
       return
     }
     /** whether any capability or feed round trip was attempted at all */
@@ -363,6 +404,7 @@ export class SyncRuntime {
 
     const wanted = new Set<string>()
     let sessionExpired = false
+    let resynced = false
     for (const orgId of this.options.targets.orgs()) {
       if (!current()) return
       const capability = await this.options.capability(orgId)
@@ -389,17 +431,24 @@ export class SyncRuntime {
         if (result.kind === 'session_expired') sessionExpired = true
         // a failed or backed-off feed round trip is a real transport failure
         if (result.kind === 'failed' || result.kind === 'backoff') transportFailed = true
+        if (result.kind === 'synced' && result.resynced) resynced = true
       }
     }
     if (!current()) return
     for (const key of [...this.running.keys()]) {
       if (!wanted.has(key)) this.running.delete(key)
     }
+    this.lastFeedVerdict = {
+      resynced,
+      resyncFailed: [...this.running.values()].some(
+        (consumer) => consumer.resyncRefusalCount >= FEED_RESYNC_FAILED_AFTER,
+      ),
+    }
     if (sessionExpired) this.options.onSessionExpired?.()
     // a real failed round trip marks the queue offline, a reached one marks it
     // online, and a pass with nothing to do (no chosen org) reports neither
     // (G506-be-3)
-    await this.options.onPoll?.(attempted ? !transportFailed : undefined)
+    await this.reportPoll(attempted ? !transportFailed : undefined)
   }
 
   private consumerFor(
