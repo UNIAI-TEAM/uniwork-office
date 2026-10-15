@@ -34,6 +34,7 @@ import {
   blobKey,
   generationKeys,
   type LibraryIndex,
+  type LibraryWriteResult,
   type OfflineLibraryStore,
 } from './store'
 
@@ -171,6 +172,26 @@ interface Job {
   controller: AbortController
   done: Promise<unknown>
 }
+
+/** one download: the row it started from and the staging generation it writes */
+interface DownloadJob {
+  record: PinRecord
+  manifest: PinManifest
+  generation: string
+  keys: string[]
+  controller: AbortController
+  /** false once a boundary (sign-out, account switch) passed */
+  live(): boolean
+}
+
+/** a download that was started under the document lock and runs outside it */
+type Started = { kind: 'started'; done: Promise<PinRecord> }
+
+type DownloadStart =
+  | Started
+  | { kind: 'settled'; record: PinRecord }
+  /** the update does not fit the 2 GiB quota: nothing was written */
+  | { kind: 'over_quota' }
 
 type Unavailable = {
   kind: 'no_session' | 'keystore_locked' | 'keyring_unavailable' | 'interrupted'
@@ -480,114 +501,169 @@ export class OfflineLibraryManager {
   // ---------------------------------------------------------------- download
 
   /**
-   * Download `manifest` into staging and commit it, or settle the row by the
-   * failure. The committed copy of `record` (if any) is untouched until the
-   * new one is committed, then its blobs are deleted.
+   * Start downloading `manifest` into staging. Called under the document lock:
+   * the `downloading` row (with its staging keys) is written here - under the
+   * index lock too when `quota` asks for the 2 GiB check (T5-1), so that write
+   * is the reservation. The transfer itself runs WITHOUT the document lock
+   * (T5-2): `openCached` keeps serving the committed copy meanwhile. The job
+   * takes the lock again only to settle, against the row as it is then.
    */
-  private runDownload(record: PinRecord, manifest: PinManifest): Promise<PinRecord> {
+  private async beginDownload(
+    record: PinRecord,
+    manifest: PinManifest,
+    options: { quota?: boolean } = {},
+  ): Promise<DownloadStart> {
     const documentId = record.documentId
-    const controller = new AbortController()
     const epoch = this.epoch
     const token = this.token()
     const live = () => this.epoch === epoch && this.token() === token
-    const run = async (): Promise<PinRecord> => {
-      const generation = this.newGeneration()
-      const keys = generationKeys(documentId, generation, manifest.assets.length)
-      const total = manifestBytes(manifest)
-      const downloading: PinRecord = {
-        ...record,
-        manifest,
-        state: 'downloading',
-        staging: { generation, keys },
-        progress: { receivedBytes: 0, totalBytes: total },
-      }
-      delete downloading.failure
-      // the staging keys are on record before any byte is written, so a crash
-      // still names every staging blob for recover() to delete
-      const started = await this.options.store.putPin(downloading)
-      if (started.kind !== 'ok') {
-        const outcome: StageOutcome =
-          started.kind === 'store_full'
-            ? { kind: 'store_full' }
-            : started.kind === 'interrupted'
-              ? { kind: 'interrupted', reason: 'boundary' }
-              : started.kind === 'refused'
-                ? { kind: 'failed', code: 'refused' }
-                : started
-        return this.settleFailure(record, outcome, live)
-      }
-      this.progress.set(documentId, { receivedBytes: 0, totalBytes: total })
-      this.changed(documentId)
-      const outcome = await stageSnapshot({
-        store: this.options.store,
-        docs: this.options.docs() ?? {
-          getDocument: () => Promise.reject(new UniworkDocError('network')),
-          downloadStream: () => Promise.reject(new UniworkDocError('network')),
-        },
-        ...(this.options.fetchAsset ? { fetchAsset: this.options.fetchAsset } : {}),
-        documentId,
-        manifest,
-        generation,
-        signal: controller.signal,
-        live,
-        onProgress: (progress) => {
-          if (!live()) return
-          this.progress.set(documentId, progress)
-          this.changed(documentId)
-        },
-        onVerifying: async () => {
-          if (!live()) return
-          await this.options.store.putPin({ ...downloading, state: 'verifying' })
-          this.changed(documentId)
-        },
-      })
-      this.progress.delete(documentId)
-      if (outcome.kind !== 'staged') return this.settleFailure(record, outcome, live)
-      if (!live()) {
-        await wipeKeys(this.options.store, keys)
-        return this.settleFailure(record, { kind: 'interrupted', reason: 'boundary' }, live)
-      }
-      const committed: PinRecord = {
-        ...record,
-        manifest,
-        readyManifest: manifest,
-        readyGeneration: generation,
-        readyVersion: manifest.main.version,
-        state: 'ready',
-        bytes: outcome.bytes,
-        lastVerifiedAt: this.options.clock.now(),
-        staging: null,
-        progress: null,
-        updateAvailable: false,
-        updateKept: false,
-      }
-      delete committed.failure
-      // the one atomic commit: this row write is what makes the copy ready
-      const written = await this.options.store.putPin(committed)
-      if (written.kind !== 'ok' || !live()) {
-        await wipeKeys(this.options.store, keys)
-        const failure: StageOutcome =
-          written.kind === 'store_full'
-            ? { kind: 'store_full' }
-            : { kind: 'interrupted', reason: 'boundary' }
-        return this.settleFailure(record, failure, live)
-      }
-      // the previous copy is replaced: its blobs go
-      if (record.readyGeneration && record.readyManifest) {
-        await wipeKeys(
-          this.options.store,
-          generationKeys(documentId, record.readyGeneration, record.readyManifest.assets.length),
-        )
-      }
-      this.changed(documentId)
-      return committed
+    const generation = this.newGeneration()
+    const keys = generationKeys(documentId, generation, manifest.assets.length)
+    const total = manifestBytes(manifest)
+    const downloading: PinRecord = {
+      ...record,
+      manifest,
+      state: 'downloading',
+      staging: { generation, keys },
+      progress: { receivedBytes: 0, totalBytes: total },
     }
-    const done = run().finally(() => {
+    delete downloading.failure
+    // the staging keys are on record before any byte is written, so a crash
+    // still names every staging blob for recover() to delete
+    const write = () => this.options.store.putPin(downloading)
+    const started: LibraryWriteResult | 'over_quota' = options.quota
+      ? await this.withIndex<LibraryWriteResult | 'over_quota'>(async (index) => {
+          const used = await this.usedBytes(index, documentId)
+          if (typeof used !== 'number') return { write: false, value: used }
+          if (used + total > this.limits.maxBytes) {
+            return { write: false, value: 'over_quota' as const }
+          }
+          return { write: false, value: await write() }
+        })
+      : await write()
+    if (started === 'over_quota') return { kind: 'over_quota' }
+    if (started.kind !== 'ok') {
+      const outcome: StageOutcome =
+        started.kind === 'store_full'
+          ? { kind: 'store_full' }
+          : started.kind === 'interrupted'
+            ? { kind: 'interrupted', reason: 'boundary' }
+            : started.kind === 'refused'
+              ? { kind: 'failed', code: 'refused' }
+              : started
+      return { kind: 'settled', record: await this.settleFailure(record, outcome, live) }
+    }
+    this.progress.set(documentId, { receivedBytes: 0, totalBytes: total })
+    this.changed(documentId)
+    const controller = new AbortController()
+    const job: DownloadJob = { record, manifest, generation, keys, controller, live }
+    const done = this.transfer(job).finally(() => {
       if (this.jobs.get(documentId)?.controller === controller) this.jobs.delete(documentId)
       this.progress.delete(documentId)
     })
     this.jobs.set(documentId, { controller, done })
-    return done
+    return { kind: 'started', done }
+  }
+
+  /** the network part of a download: no document lock is held while it runs */
+  private async transfer(job: DownloadJob): Promise<PinRecord> {
+    const { manifest, generation, live } = job
+    const documentId = job.record.documentId
+    const outcome = await stageSnapshot({
+      store: this.options.store,
+      docs: this.options.docs() ?? {
+        getDocument: () => Promise.reject(new UniworkDocError('network')),
+        downloadStream: () => Promise.reject(new UniworkDocError('network')),
+      },
+      ...(this.options.fetchAsset ? { fetchAsset: this.options.fetchAsset } : {}),
+      documentId,
+      manifest,
+      generation,
+      signal: job.controller.signal,
+      live,
+      onProgress: (progress) => {
+        if (!live()) return
+        this.progress.set(documentId, progress)
+        this.changed(documentId)
+      },
+      onVerifying: () =>
+        this.withDoc(documentId, async () => {
+          if (!live()) return
+          const current = await this.options.store.getPin(documentId)
+          if (current.kind !== 'ok' || current.record.staging?.generation !== generation) return
+          await this.options.store.putPin({ ...current.record, state: 'verifying' })
+          this.changed(documentId)
+        }),
+    })
+    this.progress.delete(documentId)
+    return this.withDoc(documentId, () => this.settleDownload(job, outcome))
+  }
+
+  /**
+   * Commit or settle a finished transfer, under the document lock, against the
+   * row as it is NOW: a revoke, a delete, an unpin or an eviction that ran
+   * meanwhile took the staging off the row, and then nothing of this download
+   * is kept or committed. Otherwise the commit is one atomic row write; the
+   * replaced copy's blobs go after it.
+   */
+  private async settleDownload(job: DownloadJob, outcome: StageOutcome): Promise<PinRecord> {
+    const { manifest, generation, keys, live } = job
+    const documentId = job.record.documentId
+    const stopped: PinRecord = {
+      ...job.record,
+      state: 'interrupted',
+      staging: null,
+      progress: null,
+    }
+    // the scope was wiped or switched: nothing of it is kept, nothing is written
+    if (!live()) {
+      await wipeKeys(this.options.store, keys)
+      return stopped
+    }
+    const read = await this.options.store.getPin(documentId)
+    if (read.kind !== 'ok' || read.record.staging?.generation !== generation) {
+      await wipeKeys(this.options.store, keys)
+      return read.kind === 'ok' ? read.record : stopped
+    }
+    const current = read.record
+    if (outcome.kind !== 'staged') {
+      await wipeKeys(this.options.store, keys)
+      return this.settleFailure(current, outcome, live)
+    }
+    const committed: PinRecord = {
+      ...current,
+      manifest,
+      readyManifest: manifest,
+      readyGeneration: generation,
+      readyVersion: manifest.main.version,
+      state: 'ready',
+      bytes: outcome.bytes,
+      lastVerifiedAt: this.options.clock.now(),
+      staging: null,
+      progress: null,
+      updateAvailable: false,
+      updateKept: false,
+    }
+    delete committed.failure
+    // the one atomic commit: this row write is what makes the copy ready
+    const written = await this.options.store.putPin(committed)
+    if (written.kind !== 'ok' || !live()) {
+      await wipeKeys(this.options.store, keys)
+      const failure: StageOutcome =
+        written.kind === 'store_full'
+          ? { kind: 'store_full' }
+          : { kind: 'interrupted', reason: 'boundary' }
+      return this.settleFailure(current, failure, live)
+    }
+    // the previous copy is replaced: its blobs go
+    if (current.readyGeneration && current.readyManifest) {
+      await wipeKeys(
+        this.options.store,
+        generationKeys(documentId, current.readyGeneration, current.readyManifest.assets.length),
+      )
+    }
+    this.changed(documentId)
+    return committed
   }
 
   /**
@@ -721,7 +797,7 @@ export class OfflineLibraryManager {
     if (!this.validIds(documentId, orgId, workspaceId)) return refused('invalid')
     // OQ-UX11 (a): with the capability off no new pin is taken
     if (!(await this.options.capability(orgId))) return refused('capability_off')
-    return this.withDoc(documentId, async (): Promise<PinResult> => {
+    const outcome = await this.withDoc(documentId, async (): Promise<PinResult | Started> => {
       const existing = await this.options.store.getPin(documentId)
       if (isUnavailable(existing)) return refused(existing.kind)
       if (existing.kind === 'ok') return { kind: 'pinned', row: await this.view(existing.record) }
@@ -787,9 +863,16 @@ export class OfflineLibraryManager {
       }
       this.changed(documentId)
       if (!manifest) return { kind: 'pinned', row: await this.view(record) }
-      const settled = await this.runDownload(record, manifest)
-      return { kind: 'pinned', row: await this.view(settled) }
+      const begun = await this.beginDownload(record, manifest)
+      if (begun.kind === 'started') return begun
+      return {
+        kind: 'pinned',
+        row: await this.view(begun.kind === 'settled' ? begun.record : record),
+      }
     })
+    // the transfer runs outside the document lock (T5-2)
+    if (outcome.kind !== 'started') return outcome
+    return { kind: 'pinned', row: await this.view(await outcome.done) }
   }
 
   /** "Hủy tải": the download stops, staging is wiped, the old copy (if any) stays */
@@ -807,7 +890,7 @@ export class OfflineLibraryManager {
    */
   async refresh(documentId: string, options: { download?: boolean } = {}): Promise<RowResult> {
     if (!this.checkBoundary()) return refused('no_session')
-    return this.withDoc(documentId, async (): Promise<RowResult> => {
+    const outcome = await this.withDoc(documentId, async (): Promise<RowResult | Started> => {
       const read = await this.options.store.getPin(documentId)
       if (isUnavailable(read)) return refused(read.kind)
       if (read.kind !== 'ok') return refused('not_pinned')
@@ -823,6 +906,8 @@ export class OfflineLibraryManager {
       } catch (error) {
         const kind = classify(error)
         if (kind === 'deleted' || kind === 'revoked') {
+          // a download in flight stops; its settle finds the staging gone and keeps nothing
+          this.jobs.get(documentId)?.controller.abort()
           const purged = await this.purgeRecord(record, kind)
           return purged ? { kind: 'ok', row: await this.view(purged) } : refused(kind)
         }
@@ -846,7 +931,8 @@ export class OfflineLibraryManager {
         record = { ...record, state: 'ready' }
         delete record.failure
       }
-      if (!options.download || !newer) {
+      // a download already in flight is not started twice
+      if (!options.download || !newer || this.jobs.has(documentId)) {
         await this.put(record)
         return { kind: 'ok', row: await this.view(record) }
       }
@@ -854,19 +940,20 @@ export class OfflineLibraryManager {
         const kept = await this.settleFailure(record, { kind: 'too_large' }, () => true)
         return { kind: 'ok', row: await this.view(kept) }
       }
-      const index = await this.options.store.readIndex()
-      if (index.kind !== 'ok') return refused(isUnavailable(index) ? index.kind : 'invalid')
-      const used = await this.usedBytes(index.index, documentId)
-      if (typeof used !== 'number') return refused(used.kind)
-      if (used + manifestBytes(manifest) > this.limits.maxBytes) {
+      const lease = await this.ensureLease(documentId)
+      if (lease) return lease
+      // the 2 GiB check and the downloading row are one step (T5-1)
+      const begun = await this.beginDownload(record, manifest, { quota: true })
+      if (begun.kind === 'over_quota') {
         await this.put({ ...record, manifest: read.record.manifest })
         return refused('offline_cap_reached')
       }
-      const lease = await this.ensureLease(documentId)
-      if (lease) return lease
-      const settled = await this.runDownload(record, manifest)
-      return { kind: 'ok', row: await this.view(settled) }
+      if (begun.kind === 'started') return begun
+      return { kind: 'ok', row: await this.view(begun.record) }
     })
+    // the transfer runs outside the document lock (T5-2)
+    if (outcome.kind !== 'started') return outcome
+    return { kind: 'ok', row: await this.view(await outcome.done) }
   }
 
   /** "Tải ngay" / "Thử lại" */

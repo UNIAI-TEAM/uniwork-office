@@ -526,6 +526,17 @@ function slowDownload(h: Harness, documentId: string, at = 2) {
   return { release, waiting }
 }
 
+const settleWithin = <T>(promise: Promise<T>, ms = 300): Promise<T | 'BLOCKED'> =>
+  Promise.race([
+    promise,
+    new Promise<'BLOCKED'>((resolve) => setTimeout(() => resolve('BLOCKED'), ms)),
+  ])
+
+const bytesOf = (copy: unknown): Buffer | null => {
+  const read = copy as { kind: string; bytes?: Uint8Array }
+  return read.kind === 'ok' && read.bytes ? Buffer.from(read.bytes) : null
+}
+
 describe('T5-1 caps hold under concurrent pins (check + reserve + index-add are one step)', () => {
   it('199 pins + two concurrent pins -> exactly one refused offline_cap_reached, nothing downloaded for it', async () => {
     const h = createHarness()
@@ -591,5 +602,65 @@ describe('T5-1 caps hold under concurrent pins (check + reserve + index-add are 
     slow.release()
     expect(rowOf(await pinning).state).toBe('interrupted')
     expect(await h.manager.quota()).toMatchObject({ usedBytes: 0, pins: 1 })
+  })
+})
+
+describe('T5-2 an in-flight re-download never blocks the old copy', () => {
+  it('a slow re-download of a ready pin: openCached serves the old bytes at once, the new ones after commit', async () => {
+    const h = createHarness()
+    const v1 = addDoc(h, 'doc_1', 1, 8192)
+    rowOf(await pinDoc(h))
+    const v2 = addDoc(h, 'doc_1', 2, 8192)
+    const slow = slowDownload(h, 'doc_1')
+    const download = h.manager.downloadNow('doc_1')
+    await slow.waiting
+    const during = await settleWithin(h.manager.openCached('doc_1'))
+    expect(during).toMatchObject({ kind: 'ok', readOnly: true })
+    expect(bytesOf(during)?.equals(Buffer.from(v1.bytes))).toBe(true)
+    // handleArchived is not held up by the transfer either
+    expect(await settleWithin(h.manager.handleArchived('doc_1'))).toMatchObject({
+      documentId: 'doc_1',
+    })
+    slow.release()
+    expect(await download).toMatchObject({ row: { readyVersion: 2 } })
+    expect(bytesOf(await h.manager.openCached('doc_1'))?.equals(Buffer.from(v2.bytes))).toBe(true)
+    // the archived mark set during the download survived the commit
+    expect(await h.manager.row('doc_1')).toMatchObject({ archived: true, readyVersion: 2 })
+    expect(h.storeFiles()).not.toContain(recordFile(blobKey('doc_1', '00000001', 'main')))
+  })
+
+  it('a revoke arriving mid-download still wins: cache gone, staging wiped, nothing ready', async () => {
+    const h = createHarness()
+    addDoc(h, 'doc_1', 1, 8192)
+    rowOf(await pinDoc(h))
+    addDoc(h, 'doc_1', 2, 8192)
+    const slow = slowDownload(h, 'doc_1')
+    const download = h.manager.downloadNow('doc_1')
+    await slow.waiting
+    const revoking = h.manager.handlePermissionRevoked('doc_1')
+    slow.release()
+    expect(await revoking).toMatchObject({ state: 'revoked', bytes: 0 })
+    await download
+    expect(await h.manager.row('doc_1')).toMatchObject({ state: 'revoked', readyVersion: null })
+    expect(h.storeFiles()).toEqual([recordFile('index'), recordFile(pinKey('doc_1'))].sort())
+    expect(await h.manager.openCached('doc_1')).toEqual({ kind: 'refused', code: 'revoked' })
+  })
+
+  it('a server delete found by refresh mid-download still wins', async () => {
+    const h = createHarness()
+    addDoc(h, 'doc_1', 1, 8192)
+    rowOf(await pinDoc(h))
+    const v2 = addDoc(h, 'doc_1', 2, 8192)
+    const slow = slowDownload(h, 'doc_1')
+    const download = h.manager.downloadNow('doc_1')
+    await slow.waiting
+    v2.error = new UniworkDocError('document_deleted')
+    const refreshing = h.manager.refresh('doc_1')
+    slow.release()
+    expect(await refreshing).toMatchObject({ kind: 'ok', row: { state: 'deleted' } })
+    await download
+    expect(await h.manager.row('doc_1')).toMatchObject({ state: 'deleted', readyVersion: null })
+    expect(h.storeFiles()).toEqual([recordFile('index'), recordFile(pinKey('doc_1'))].sort())
+    expect(await h.manager.openCached('doc_1')).toEqual({ kind: 'refused', code: 'deleted' })
   })
 })
