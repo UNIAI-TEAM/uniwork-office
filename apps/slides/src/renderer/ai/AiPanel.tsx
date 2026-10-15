@@ -476,11 +476,10 @@ export function AiPanel({
     busy,
     submit: (text, meta) => {
       // the QC pass edits the deck with busy=false: refuse and let the pump retry
-      if (qcRunningRef.current || runStartingRef.current) return false
+      if (needModelHint !== null || qcRunningRef.current || runStartingRef.current) return false
       const loop = loopRef.current
       if (!loop || loop.busy) return false
-      runWith(text, text, { attachments: meta.attachments, scope: meta.scope })
-      return true
+      return runWith(text, text, { attachments: meta.attachments, scope: meta.scope })
     },
   })
   const [chat, setChat] = useState<ChatEntry[]>([])
@@ -1775,15 +1774,16 @@ export function AiPanel({
       /** resend of the last message: quote what it quoted */
       retry?: boolean
     },
-  ) => {
+  ): boolean => {
     // starters and retry too: nothing runs until a model is chosen (the hint beside Send says so)
-    if (needModelHint !== null) return
+    if (needModelHint !== null) return false
     const loop = loopRef.current
     // runStartingRef: loop.run is called only after attachments are read asynchronously, during which loop.busy is still false,
     // so duplicate triggers must be blocked synchronously (e.g. StrictMode double-running the preset autoRun effect),
     // otherwise two sets of bubbles get pushed and the earlier assistant placeholder stays at "thinking" forever.
     // qcRunningRef: the post-generation QC pass edits the deck outside the main loop — no concurrent runs
-    if (!instruction || !loop || loop.busy || runStartingRef.current || qcRunningRef.current) return
+    if (!instruction || !loop || loop.busy || runStartingRef.current || qcRunningRef.current)
+      return false
     runStartingRef.current = true
     setInput('')
     // The message consumes the composer attachments: they ride along (echoed on the
@@ -1862,6 +1862,7 @@ export function AiPanel({
         runStartingRef.current = false
         void finishHistoryBatch().finally(() => setBusy(false))
       })
+    return true
   }
 
   /** One page of a queue submission — runWith's bookkeeping minus the composer and the user bubble */

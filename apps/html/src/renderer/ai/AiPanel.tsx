@@ -366,9 +366,8 @@ export function AiPanel({
     busy,
     submit: (text, atts) => {
       const loop = loopRef.current
-      if (!loop || loop.busy) return false
-      send(text, text, false, atts, undefined)
-      return true
+      if (needModelHint !== null || !loop || loop.busy) return false
+      return send(text, text, false, atts, undefined)
     },
   })
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null)

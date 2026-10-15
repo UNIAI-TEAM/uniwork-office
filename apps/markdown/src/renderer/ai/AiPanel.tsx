@@ -291,11 +291,10 @@ export function AiPanel({
     busy,
     submit: (text) => {
       const loop = loopRef.current
-      if (!loop || loop.busy) return false
+      if (needModelHint !== null || !loop || loop.busy) return false
       // undefined retryOf = a new turn: the queue batch's own display text means
       // no selection quote is captured (the fork's edit-fence send signature)
-      send(text, text)
-      return true
+      return send(text, text)
     },
   })
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null)
@@ -756,10 +755,10 @@ export function AiPanel({
     displayText?: string,
     retryOf?: Pick<ChatEntry, 'scope' | 'fence'>,
     queueFence?: FenceRange[],
-  ): void => {
+  ): boolean => {
     const instruction = text.trim()
     const loop = loopRef.current
-    if (needModelHint !== null || !instruction || !loop || loop.busy) return
+    if (needModelHint !== null || !instruction || !loop || loop.busy) return false
     stickToBottomRef.current = true
     runInstructionRef.current = instruction
     runDisplayRef.current = displayText ?? instruction
@@ -818,6 +817,7 @@ export function AiPanel({
         setBusy(false)
       }
     })()
+    return true
   }
 
   const stop = (): void => {
@@ -834,12 +834,13 @@ export function AiPanel({
     setPrompt('')
   }
 
-  const retry = (): void =>
+  const retry = (): void => {
     send(
       runInstructionRef.current,
       runDisplayRef.current,
       chat.findLast((entry) => entry.role === 'user') ?? {},
     )
+  }
 
   // keep the scope chip & queue rows in sync with the editor selection/content
   useEffect(() => {

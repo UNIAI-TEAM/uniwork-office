@@ -3543,9 +3543,9 @@ export function App({
     overrideInstruction?: string,
     overrideAttachments?: readonly AttachmentMeta[],
     retryIndex?: number,
-  ): void {
+  ): boolean {
     const instruction = (overrideInstruction ?? prompt).trim()
-    if (needModelHint !== null || !instruction || aiBusy) return
+    if (needModelHint !== null || !instruction || aiBusy) return false
     runToolsRef.current = []
     runUsageRef.current = undefined
     // The message consumes the composer attachments: they ride along (echoed on the
@@ -3594,12 +3594,13 @@ export function App({
     // (kept for offline use and for the fixed micro-DSL it still supports).
     if (agentConfigured) {
       runAgent(instruction, sentAtts)
-      return
+      return true
     }
     const outcome = runDeterministicPlan(instruction)
     setMessage(outcome.text)
     appendChat({ role: 'assistant', text: outcome.text, tools: [], isError: outcome.isError })
     persistChatMessage('assistant', outcome.text)
+    return true
   }
 
   /// AI edits on imported workbooks preview against the live sheet, then

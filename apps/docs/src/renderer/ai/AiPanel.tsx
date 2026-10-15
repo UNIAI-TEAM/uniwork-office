@@ -475,9 +475,8 @@ export function AiPanel({
     busy,
     submit: (text, meta) => {
       const loop = loopRef.current
-      if (!loop || loop.busy || pendingSendRef.current) return false
-      runWith(text, text, meta.attachments, meta.scope)
-      return true
+      if (needModelHint !== null || !loop || loop.busy || pendingSendRef.current) return false
+      return runWith(text, text, meta.attachments, meta.scope)
     },
   })
   /** Wall-clock start of the current run, drives the elapsed badge */
@@ -1190,10 +1189,10 @@ export function AiPanel({
     attachmentsOverride?: AttachmentMeta[],
     /** null = a retry that had no scope; undefined = capture the live selection */
     retryScope?: AiScopeQuoteData | null,
-  ) => {
+  ): boolean => {
     const loop = loopRef.current
     if (needModelHint !== null || !instruction || !loop || loop.busy || pendingSendRef.current)
-      return
+      return false
     setInput('')
     // The message consumes the composer attachments: they ride along (echoed on the
     // bubble, images multimodal, files via the files skill) and the composer clears.
@@ -1268,6 +1267,7 @@ export function AiPanel({
         }
         return loop.run(instruction, images)
       })
+    return true
   }
 
   const cancel = () => {

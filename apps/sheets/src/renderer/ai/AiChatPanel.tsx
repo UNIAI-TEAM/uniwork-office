@@ -18,6 +18,7 @@ import {
   AiUsageChip,
   type AiScopeQuoteData,
   type AiTokenUsageView,
+  useAiModelNeedHint,
   useChatRunQueue,
 } from '@genoffice/ui'
 import { aiNoticeBody, aiNoticeKind } from '@genoffice/ai-provider/browser'
@@ -354,10 +355,14 @@ export function AiChatPanel({
   } | null
 }): React.JSX.Element {
   const { t, lang } = useI18n()
+  const needModelHint = useAiModelNeedHint()
   /** messages queued while a reply runs; the pump re-sends them through onSend on settle */
   const msgQueue = useChatRunQueue<readonly AttachmentMeta[]>({
     busy: aiBusy,
-    submit: (text, atts) => onSendQueued?.(text, atts) ?? false,
+    submit: (text, atts) => {
+      if (needModelHint !== null) return false
+      return onSendQueued?.(text, atts) ?? false
+    },
   })
   // Panel chrome follows the UI language; message text follows its own content (dir=auto below)
   const isRtl = lang === 'ar' || lang === 'he'

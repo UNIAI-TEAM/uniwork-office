@@ -184,9 +184,8 @@ export function AiPanel({
     busy,
     submit: (text) => {
       const loop = loopRef.current
-      if (!loop || loop.busy) return false
-      send(text, null)
-      return true
+      if (needModelHint !== null || !loop || loop.busy) return false
+      return send(text, null)
     },
   })
   const [phase, setPhase] = useState<Phase>('thinking')
@@ -628,10 +627,10 @@ export function AiPanel({
   }
 
   /** retryScope: null = a retry that had no scope; undefined = capture the live selection */
-  const send = (text: string, retryScope?: AiScopeQuoteData | null): void => {
+  const send = (text: string, retryScope?: AiScopeQuoteData | null): boolean => {
     const instruction = text.trim()
     const loop = loopRef.current
-    if (needModelHint !== null || !instruction || !loop || loop.busy) return
+    if (needModelHint !== null || !instruction || !loop || loop.busy) return false
     stickToBottomRef.current = true
     runQuestionRef.current = instruction
     const scope = retryScope !== undefined ? (retryScope ?? undefined) : selectionScopeQuote()
@@ -664,6 +663,7 @@ export function AiPanel({
         setBusy(false)
       }
     })()
+    return true
   }
 
   const stop = (): void => {
