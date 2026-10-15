@@ -232,6 +232,7 @@ import type { LocalTextEdit, LocalTextInsert, TextDraft } from './text-edit-prev
 import { planEditOps, reduceBucket } from './edit-ops'
 import type { Bucket, Op, OpContext, PlanResult } from './edit-ops'
 import { rectsNear } from './edit-state'
+import { EditHistory, sameEditSnapshot, type RunUndoDeps } from './ai/edit-history'
 import type {
   StampConfig,
   SavedMarkupAnnot,
@@ -898,8 +899,15 @@ export default function App() {
   const [searchMatches, setSearchMatches] = useState<SearchMatch[]>([])
   const [searchCur, setSearchCur] = useState(0)
   const [printing, setPrinting] = useState(false)
-  const [undoStack, setUndoStack] = useState<EditSnapshot[]>([])
-  const [redoStack, setRedoStack] = useState<EditSnapshot[]>([])
+  // The undo/redo stacks live in an external store (an AI run folds into one entry and has to
+  // read them from async loop events); the tick re-renders the ribbon and the AI panel when they move
+  const [, setHistoryTick] = useState(0)
+  const historyRef = useRef<EditHistory<EditSnapshot> | null>(null)
+  historyRef.current ??= new EditHistory<EditSnapshot>({
+    same: sameEditSnapshot,
+    onChange: () => setHistoryTick((n) => n + 1),
+  })
+  const history = historyRef.current
   const [pwInput, setPwInput] = useState('')
   const [pwWrong, setPwWrong] = useState(false)
   const [extractDlg, setExtractDlg] = useState(false)
@@ -1341,8 +1349,7 @@ export default function App() {
       setFileSize(data.byteLength)
       setSelected(null)
       setDeleteToast(false)
-      setUndoStack([])
-      setRedoStack([])
+      history.clear()
       outlineDocRef.current = loaded
       // A save-reload keeps the current tree (page indices already remapped
       // above) visible while headings rescan
@@ -1369,7 +1376,7 @@ export default function App() {
       if (previous) void previous.loadingTask.destroy()
       return loaded.numPages
     },
-    [],
+    [history],
   )
 
   const openPath = useCallback(
@@ -1997,9 +2004,8 @@ export default function App() {
   const pushUndo = (coalesceKey?: string) => {
     if (coalesceKey && coalesceKeyRef.current === coalesceKey) return
     coalesceKeyRef.current = coalesceKey ?? null
-    const snap = snapshot()
-    setUndoStack((prev) => [...prev.slice(-49), snap])
-    setRedoStack([])
+    // inside an AI run the tools push nothing: the run leaves one entry when it ends
+    history.push(snapshot())
   }
 
   const newId = () => `d${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
@@ -2159,24 +2165,43 @@ export default function App() {
   }
 
   const undo = () => {
-    const top = undoStack[undoStack.length - 1]
-    if (!top) return
-    // Taken before applySnapshot rewrites the refs; the updater may run after it
-    const cur = snapshot()
-    setRedoStack((r) => [...r, cur])
-    setUndoStack((u) => u.slice(0, -1))
-    applySnapshot(top)
+    // The current state is taken before applySnapshot rewrites the refs
+    const restore = history.undo(snapshot())
+    if (!restore) return
+    applySnapshot(restore)
     coalesceKeyRef.current = null
   }
 
   const redo = () => {
-    const top = redoStack[redoStack.length - 1]
-    if (!top) return
-    const cur = snapshot()
-    setUndoStack((u) => [...u, cur])
-    setRedoStack((r) => r.slice(0, -1))
-    applySnapshot(top)
+    const restore = history.redo(snapshot())
+    if (!restore) return
+    applySnapshot(restore)
     coalesceKeyRef.current = null
+  }
+
+  /** The AI panel's run hooks and its "Undo this run" button: one run = one undo entry */
+  const aiRunUndo: Required<RunUndoDeps> = {
+    runHistory: {
+      get activeRunId() {
+        return history.activeRunId
+      },
+      begin: (runId) => {
+        coalesceKeyRef.current = null
+        history.beginRun(runId, snapshot())
+      },
+      end: (runId, mutated) => {
+        coalesceKeyRef.current = null
+        history.endRun(runId, mutated, snapshot())
+      },
+    },
+    runUndoState: (runId) => history.runState(runId),
+    undoRun: (runId) => {
+      const restore = history.undoRun(runId, snapshot())
+      if (!restore) return false
+      applySnapshot(restore)
+      coalesceKeyRef.current = null
+      return true
+    },
   }
 
   // ── Full-text search ──
@@ -5781,6 +5806,7 @@ export default function App() {
   }
 
   const aiApi: PdfAppDeps = {
+    ...aiRunUndo,
     doc: () => doc,
     fileName: () => fileName,
     pageCount: () => sizes.length,
@@ -6713,7 +6739,7 @@ export default function App() {
             className="qa-btn"
             data-tip={`${t('undo')} (${platformShortcuts('⌘Z')})`}
             aria-label={`${t('undo')} (${platformShortcuts('⌘Z')})`}
-            disabled={undoStack.length === 0}
+            disabled={!history.canUndo}
             onClick={undo}
           >
             <IconUndo />
@@ -6722,7 +6748,7 @@ export default function App() {
             className="qa-btn"
             data-tip={`${t('redo')} (${platformShortcuts('⇧⌘Z')})`}
             aria-label={`${t('redo')} (${platformShortcuts('⇧⌘Z')})`}
-            disabled={redoStack.length === 0}
+            disabled={!history.canRedo}
             onClick={redo}
           >
             <IconRedo />

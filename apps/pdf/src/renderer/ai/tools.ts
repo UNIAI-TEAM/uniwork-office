@@ -28,6 +28,7 @@ import { t } from '../i18n/locale'
 import { buildFormCatalog } from '../form-catalog'
 import { flattenThread, type NoteThreadItem } from '../note-threads'
 import type { StampConfig } from '../edit-state'
+import type { RunUndoDeps } from './edit-history'
 import { boldToken } from '../text-edit-preview'
 import type { LocalTextInsert } from '../text-edit-preview'
 import { DEFAULT_HEADER_FOOTER, DEFAULT_WATERMARK } from '../stamps'
@@ -249,7 +250,7 @@ export type SplitPdfOutcome =
   { ok: true; savedDir: string; count: number } | FileOpCanceled | { ok: false; error: string }
 
 /** App-side capability surface: everything but the confirmation and questionnaire cards, which the panel renders */
-export type PdfAppDeps = Omit<PdfAiDeps, 'confirmFileOp' | 'askClarification'>
+export type PdfAppDeps = Omit<PdfAiDeps, 'confirmFileOp' | 'askClarification'> & RunUndoDeps
 
 export const AGENT_TOOLS: AgentToolDef[] = [
   {

@@ -1,6 +1,7 @@
 import { webStrings } from './strings-web'
 import { serverCommentsStrings } from './strings-server-comments'
 import { certSignStrings } from './cert-sign-strings'
+import { aiRunUndoStrings } from './strings-ai-run-undo'
 
 const fillFormStrings = {
   ribbonTabFillForm: 'Fill Form',
@@ -209,6 +210,7 @@ export const strings = {
   zh: {
     ...fillFormStringsFor('zh'),
     ...webStrings.zh,
+    ...aiRunUndoStrings.zh,
     ...serverCommentsStrings.zh,
     aiViewOnlyNotice: '仅查看文档:AI 可以阅读并回答问题,但无法编辑。',
     ...certSignStrings['zh'],
@@ -557,6 +559,7 @@ export const strings = {
   en: {
     ...fillFormStringsFor('en'),
     ...webStrings.en,
+    ...aiRunUndoStrings.en,
     ...serverCommentsStrings.en,
     aiViewOnlyNotice:
       'View-only document: AI can read it and answer questions, but editing is turned off.',
@@ -915,6 +918,7 @@ export const strings = {
   vi: {
     ...fillFormStringsFor('vi'),
     ...webStrings.vi,
+    ...aiRunUndoStrings.vi,
     ...serverCommentsStrings.vi,
     aiViewOnlyNotice:
       'Tài liệu chỉ xem: AI có thể đọc và trả lời câu hỏi, nhưng không thể chỉnh sửa.',
@@ -1276,6 +1280,7 @@ export const strings = {
   ja: {
     ...fillFormStringsFor('ja'),
     ...webStrings.ja,
+    ...aiRunUndoStrings.ja,
     ...serverCommentsStrings.ja,
     aiViewOnlyNotice:
       '閲覧専用のドキュメント: AI は内容の読み取りと質問への回答はできますが、編集はできません。',
@@ -1633,6 +1638,7 @@ export const strings = {
   ko: {
     ...fillFormStringsFor('ko'),
     ...webStrings.ko,
+    ...aiRunUndoStrings.ko,
     ...serverCommentsStrings.ko,
     aiViewOnlyNotice:
       '보기 전용 문서: AI는 내용을 읽고 질문에 답할 수 있지만 편집할 수는 없습니다.',
@@ -1989,6 +1995,7 @@ export const strings = {
   fr: {
     ...fillFormStringsFor('fr'),
     ...webStrings.fr,
+    ...aiRunUndoStrings.fr,
     ...serverCommentsStrings.fr,
     aiViewOnlyNotice:
       'Document en lecture seule : l’IA peut le lire et répondre à des questions, mais ne peut pas le modifier.',
@@ -2355,6 +2362,7 @@ export const strings = {
   de: {
     ...fillFormStringsFor('de'),
     ...webStrings.de,
+    ...aiRunUndoStrings.de,
     ...serverCommentsStrings.de,
     aiViewOnlyNotice:
       'Schreibgeschütztes Dokument: Die KI kann es lesen und Fragen beantworten, aber nicht bearbeiten.',
@@ -2719,6 +2727,7 @@ export const strings = {
   es: {
     ...fillFormStringsFor('es'),
     ...webStrings.es,
+    ...aiRunUndoStrings.es,
     ...serverCommentsStrings.es,
     aiViewOnlyNotice:
       'Documento de solo lectura: la IA puede leerlo y responder preguntas, pero no puede editarlo.',
@@ -3083,6 +3092,7 @@ export const strings = {
   th: {
     ...fillFormStringsFor('th'),
     ...webStrings.th,
+    ...aiRunUndoStrings.th,
     ...serverCommentsStrings.th,
     aiViewOnlyNotice: 'เอกสารแบบดูอย่างเดียว: AI อ่านและตอบคำถามได้ แต่แก้ไขไม่ได้',
     ...certSignStrings['th'],
@@ -3438,6 +3448,7 @@ export const strings = {
   id: {
     ...fillFormStringsFor('id'),
     ...webStrings.id,
+    ...aiRunUndoStrings.id,
     ...serverCommentsStrings.id,
     aiViewOnlyNotice:
       'Dokumen hanya-lihat: AI dapat membaca dan menjawab pertanyaan, tetapi tidak dapat mengedit.',
@@ -3799,6 +3810,7 @@ export const strings = {
   ru: {
     ...fillFormStringsFor('ru'),
     ...webStrings.ru,
+    ...aiRunUndoStrings.ru,
     ...serverCommentsStrings.ru,
     aiViewOnlyNotice:
       'Документ только для просмотра: ИИ может читать его и отвечать на вопросы, но не может редактировать.',
@@ -4161,6 +4173,7 @@ export const strings = {
   ar: {
     ...fillFormStringsFor('ar'),
     ...webStrings.ar,
+    ...aiRunUndoStrings.ar,
     ...serverCommentsStrings.ar,
     aiViewOnlyNotice:
       'مستند للعرض فقط: يمكن للذكاء الاصطناعي قراءته والإجابة عن الأسئلة، لكنه لا يستطيع تعديله.',
@@ -4516,6 +4529,7 @@ export const strings = {
   pt: {
     ...fillFormStringsFor('pt'),
     ...webStrings.pt,
+    ...aiRunUndoStrings.pt,
     ...serverCommentsStrings.pt,
     aiViewOnlyNotice:
       'Documento somente leitura: a IA pode lê-lo e responder a perguntas, mas não pode editá-lo.',
@@ -4879,6 +4893,7 @@ export const strings = {
   it: {
     ...fillFormStringsFor('it'),
     ...webStrings.it,
+    ...aiRunUndoStrings.it,
     ...serverCommentsStrings.it,
     aiViewOnlyNotice:
       'Documento di sola lettura: l’IA può leggerlo e rispondere a domande, ma non può modificarlo.',
@@ -5245,6 +5260,7 @@ export const strings = {
   pl: {
     ...fillFormStringsFor('pl'),
     ...webStrings.pl,
+    ...aiRunUndoStrings.pl,
     ...serverCommentsStrings.pl,
     aiViewOnlyNotice:
       'Dokument tylko do odczytu: AI może go czytać i odpowiadać na pytania, ale nie może go edytować.',
@@ -5606,6 +5622,7 @@ export const strings = {
   cs: {
     ...fillFormStringsFor('cs'),
     ...webStrings.cs,
+    ...aiRunUndoStrings.cs,
     ...serverCommentsStrings.cs,
     aiViewOnlyNotice:
       'Dokument jen pro čtení: AI jej může číst a odpovídat na otázky, ale nemůže jej upravovat.',
@@ -5965,6 +5982,7 @@ export const strings = {
   nl: {
     ...fillFormStringsFor('nl'),
     ...webStrings.nl,
+    ...aiRunUndoStrings.nl,
     ...serverCommentsStrings.nl,
     aiViewOnlyNotice:
       'Alleen-lezen document: AI kan het lezen en vragen beantwoorden, maar niet bewerken.',
@@ -6326,6 +6344,7 @@ export const strings = {
   ms: {
     ...fillFormStringsFor('ms'),
     ...webStrings.ms,
+    ...aiRunUndoStrings.ms,
     ...serverCommentsStrings.ms,
     aiViewOnlyNotice:
       'Dokumen lihat sahaja: AI boleh membaca dan menjawab soalan, tetapi tidak boleh mengedit.',
@@ -6686,6 +6705,7 @@ export const strings = {
   he: {
     ...fillFormStringsFor('he'),
     ...webStrings.he,
+    ...aiRunUndoStrings.he,
     ...serverCommentsStrings.he,
     aiViewOnlyNotice: 'מסמך לצפייה בלבד: ה-AI יכול לקרוא אותו ולענות על שאלות, אך לא לערוך אותו.',
     ...certSignStrings['he'],
@@ -7036,6 +7056,7 @@ export const strings = {
   hi: {
     ...fillFormStringsFor('hi'),
     ...webStrings.hi,
+    ...aiRunUndoStrings.hi,
     ...serverCommentsStrings.hi,
     aiViewOnlyNotice:
       'केवल-देखने योग्य दस्तावेज़: AI इसे पढ़ सकता है और प्रश्नों के उत्तर दे सकता है, लेकिन संपादित नहीं कर सकता।',
@@ -7393,6 +7414,7 @@ export const strings = {
   'zh-TW': {
     ...fillFormStringsFor('zh-TW'),
     ...webStrings['zh-TW'],
+    ...aiRunUndoStrings['zh-TW'],
     ...serverCommentsStrings['zh-TW'],
     aiViewOnlyNotice: '唯讀文件:AI 可以閱讀並回答問題,但無法編輯。',
     ...certSignStrings['zh-TW'],

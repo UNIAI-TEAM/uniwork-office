@@ -21,8 +21,10 @@ import {
   getEntryResultChipView,
   noticePatch,
   panelLiveAnnouncement as computePanelLiveAnnouncement,
+  runHistoryEvents,
   singleShortcutHint,
   type PanelNote,
+  type RunHistoryGroup,
 } from '@genoffice/agent-core'
 import {
   aiNoticeBody,
@@ -63,6 +65,7 @@ import { ClarifyCard } from './ClarifyCard'
 import { useClarify } from './use-clarify'
 import { PDF_NAV_SCHEME, parsePdfNavHref } from './pdf-nav'
 import type { FileOpConfirm, PdfAiDeps, PdfAppDeps } from './tools'
+import { RunUndoAction } from './RunUndoAction'
 
 function readUniworkCloudStatus(): UniworkCloudStatusBridge | undefined {
   return (window as Window & { uniworkCloudStatus?: UniworkCloudStatusBridge }).uniworkCloudStatus
@@ -115,6 +118,8 @@ interface ChatEntry {
   streamedText?: boolean | undefined
   /** at least one tool mutated the document in this turn */
   mutated?: boolean | undefined
+  /** the loop run that changed the document: the id its undo step is addressed by */
+  runId?: string | undefined
   /** UniWork AI: the transport is waiting out a Retry-After; the run goes on, Stop is the only action */
   waitLine?: string | undefined
   /** UniWork AI: restarted conversation / provider boundary / dropped call, shown above the answer */
@@ -390,6 +395,8 @@ export function AiPanel({
   const offerEpochRef = useRef(0)
   /** Any tool in the current run reported mutated: true */
   const runMutatedRef = useRef(false)
+  /** id of the run in flight (or the last one): the answer that changed the document keeps it */
+  const runIdRef = useRef<string | null>(null)
 
   /** Confirmation card for irreversible file operations; one at a time, a second request is refused */
   const [fileOpConfirm, setFileOpConfirm] = useState<FileOpConfirm | null>(null)
@@ -520,6 +527,17 @@ export function AiPanel({
       skill: createPdfSkill(deps),
       systemSuffix: () => aiLangDirective(langRef.current),
       events: {
+        // every change of a run is ONE undo step of the document (the app closes the group at run end)
+        ...runHistoryEvents({
+          get activeRunId() {
+            return apiRef.current.runHistory?.activeRunId ?? null
+          },
+          begin: (runId) => {
+            runIdRef.current = runId
+            apiRef.current.runHistory?.begin(runId)
+          },
+          end: (runId, mutated) => apiRef.current.runHistory?.end(runId, mutated),
+        } satisfies RunHistoryGroup),
         onText: (text) => {
           setPhase('replying')
           segTextRef.current = text
@@ -597,6 +615,7 @@ export function AiPanel({
             stopped: cancelled,
             streamedText: Boolean(text?.trim()),
             mutated: mutatedThisRun,
+            ...(mutatedThisRun && runIdRef.current ? { runId: runIdRef.current } : {}),
             waitLine: undefined,
             // a restarted conversation or UniWork AI being off ends the turn on purpose: the note is the whole reply
             text:
@@ -1139,6 +1158,14 @@ export function AiPanel({
                     </div>
                   )}
                 </div>
+              )}
+              {entry.runId && !entry.isError && (
+                <RunUndoAction
+                  runId={entry.runId}
+                  state={apiRef.current.runUndoState?.(entry.runId) ?? 'none'}
+                  busy={busy}
+                  onUndo={() => apiRef.current.undoRun?.(entry.runId!)}
+                />
               )}
               <AiErrorAction
                 chip={chip}

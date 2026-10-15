@@ -3801,6 +3801,50 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
   color: var(--color-text-tertiary);
 }
 
+/* "Undo this run" under an answer that changed the document; a blocked one keeps its reason beside it */
+.ai-run-undo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+}
+
+.ai-run-undo-btn {
+  padding: 2px 8px;
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  background: var(--color-bg-page);
+  color: var(--color-text-primary);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.ai-run-undo-btn:hover {
+  background: var(--color-bg-subtle);
+}
+
+.ai-run-undo-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--pdf-focus-ring);
+}
+
+.ai-run-undo-btn[aria-disabled='true'] {
+  color: var(--color-text-secondary);
+  cursor: not-allowed;
+}
+
+.ai-run-undo-btn[aria-disabled='true']:hover {
+  background: var(--color-bg-page);
+}
+
+.ai-run-undo-note {
+  color: var(--color-text-tertiary);
+}
+
 /* the one stopped line of a UniWork AI turn the user stopped (aiRunStopped) */
 .ai-run-stopped {
   margin-top: 4px;
