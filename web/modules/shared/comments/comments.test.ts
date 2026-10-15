@@ -17,12 +17,14 @@ import {
   type CommentsListResult,
   type DocumentComment,
 } from '../../../docs/protocol/types'
+import { frameCommentsClaim } from '../discussion/claim'
 import { mountFrameDiscussion, type DiscussionPort } from '../discussion/mount'
 import {
   FRAME_SIDE_PANEL_EVENT,
   announceFrameSidePanel,
   createFrameCommentsApi,
   createFrameDocVersion,
+  frameMentionAccess,
   frameRevealRouter,
   installFrameComments,
   onFrameSidePanel,
@@ -57,11 +59,19 @@ const listOf = (comments: DocumentComment[], token = 'lt1'): CommentsListResult 
 
 /** the mock port plus the real client's reveal hook (one handler per port, like the client) */
 function framePort(
-  session: { comments?: boolean; level?: 'view' | 'edit' | 'manage' | null } = {},
+  session: {
+    comments?: boolean
+    commentsShareView?: boolean
+    level?: 'view' | 'comment' | 'edit' | 'manage' | null
+  } = {},
 ) {
   const mock = createMockPort({
     documentId: 'doc-1',
-    capabilities: { save: true, comments: session.comments ?? true },
+    capabilities: {
+      save: true,
+      comments: session.comments ?? true,
+      ...(session.commentsShareView ? { commentsShareView: true } : {}),
+    },
     user: { displayName: 'An', id: ME },
     ...(session.level === null ? {} : { commentsLevel: session.level ?? 'edit' }),
   } as never)
@@ -203,6 +213,82 @@ describe('createFrameCommentsApi: the desktop shape over the frame protocol', ()
     const reply = (await api.context({ path: '' })) as { ok: true; value: object }
     expect(reply.value).not.toHaveProperty('level')
     expect(reply.value).toMatchObject({ documentId: 'doc-1', myUserId: ME, frame: true })
+  })
+})
+
+describe('G8-18 mention access through the frame bridge (F1)', () => {
+  const searchRows = { candidates: [{ user_id: 'u1', display_name: 'Ann', can_view: false }] }
+
+  async function installed(session: Parameters<typeof framePort>[0]) {
+    const p = framePort(session)
+    const target: Record<string, unknown> = {}
+    const pending = installFrameComments(p.port, { version: createFrameDocVersion() }, target)
+    p.mock.init()
+    const api = (await pending)!
+    return { p, api }
+  }
+
+  it('searchMentions passes include through to mentions.search (it used to drop it)', async () => {
+    const { p, api } = await installed({ level: 'manage' })
+    p.mock.override('mentions.search', () => searchRows)
+    expect(
+      await api.searchMentions({ path: '', q: 'an', limit: 20, include: 'no_access' } as never),
+    ).toEqual({ ok: true, value: searchRows })
+    await api.searchMentions({ path: '', q: 'an' })
+    expect(p.calls('mentions.search').map((c) => c.payload)).toEqual([
+      { q: 'an', limit: 20, include: 'no_access' },
+      { q: 'an' },
+    ])
+  })
+
+  it('shareView calls comments.shareView with the user id only when the capability is effective', async () => {
+    const { p, api } = await installed({ level: 'manage', commentsShareView: true })
+    p.mock.override('comments.shareView', () => ({ ok: true as const }))
+    expect(api.shareView).toBeTypeOf('function')
+    expect(await api.shareView!({ userId: 'u1' })).toEqual({ ok: true, value: { ok: true } })
+    // the level is the host's decision: the frame never sends one
+    expect(p.calls('comments.shareView').map((c) => c.payload)).toEqual([{ user_id: 'u1' }])
+  })
+
+  it('a failed share resolves to the error envelope like every other call', async () => {
+    const { p, api } = await installed({ level: 'manage', commentsShareView: true })
+    p.mock.override('comments.shareView', () => {
+      throw { code: 'forbidden', message: 'no', retryable: false }
+    })
+    expect(await api.shareView!({ userId: 'u1' })).toMatchObject({
+      ok: false,
+      error: { code: 'forbidden' },
+    })
+  })
+
+  it('without the capability there is no shareView, so the editor offers no share action', async () => {
+    const { p, api } = await installed({ level: 'edit' })
+    expect(api.shareView).toBeUndefined()
+    expect(p.calls('comments.shareView')).toEqual([])
+  })
+
+  it('canListMembers follows the caller: manage level or a granted commentsShareView', async () => {
+    expect((await installed({ level: 'manage' })).api.canListMembers).toBe(true)
+    expect((await installed({ level: 'edit', commentsShareView: true })).api.canListMembers).toBe(
+      true,
+    )
+    expect((await installed({ level: 'edit' })).api.canListMembers).toBe(false)
+    expect((await installed({ level: 'comment' })).api.canListMembers).toBe(false)
+  })
+
+  it('the frame claims commentsShareView with comments, so the host grant can become effective', () => {
+    expect(frameCommentsClaim(true)).toEqual({ comments: true, commentsShareView: true })
+    expect(frameCommentsClaim(false)).toEqual({})
+    expect(
+      frameMentionAccess({ capabilities: { comments: true, commentsShareView: true } }),
+    ).toEqual({
+      commentsShareView: true,
+      canListMembers: true,
+    })
+    // an unrelated grant never turns it on
+    expect(
+      frameMentionAccess({ capabilities: { commentsShareView: true } }).commentsShareView,
+    ).toBe(false)
   })
 })
 

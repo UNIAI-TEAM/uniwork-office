@@ -30,6 +30,7 @@ import {
 } from '../../../docs/protocol/types'
 import { FrameDiscussion, type FrameDiscussionHandle } from './FrameDiscussion'
 import { createEditorShield, type EditorShield } from './overlay'
+import { frameMentionAccess } from '../comments/mention-access'
 import { createFrameDiscussionSource } from './source'
 import { frameRevealRouter } from '../comments/reveal-router'
 import { announceFrameSidePanel, onFrameSidePanel } from '../comments/side-panel'
@@ -78,7 +79,11 @@ interface RootProps {
 
 function DiscussionRoot({ port, session, revealMissing, doc }: RootProps) {
   const lang = useWebLanguage()
-  const source = useMemo(() => createFrameDiscussionSource(port), [port])
+  const { commentsShareView, canListMembers } = frameMentionAccess(session)
+  const source = useMemo(
+    () => createFrameDiscussionSource(port, { commentsShareView, canListMembers }),
+    [port, commentsShareView, canListMembers],
+  )
   const access = commentsAccess({
     capabilities: session.capabilities ?? {},
     commentsLevel: session.commentsLevel,
