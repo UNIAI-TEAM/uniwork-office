@@ -3,7 +3,12 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LocaleProvider } from '../src/renderer/src/locale'
-import { UniworkStatusChip } from '../src/renderer/src/UniworkChrome'
+import {
+  DiscussionToggle,
+  PillFitScope,
+  UniworkStatusChip,
+} from '../src/renderer/src/UniworkChrome'
+import { DISCUSSION_BRIDGE_KEY } from '@genoffice/electron-utils/comments-ipc'
 import { UniworkLiveHost, resetLiveForTests } from '../src/renderer/src/uniwork-live'
 import { en } from '../src/renderer/src/i18n/sync/en'
 import { en as enDocs } from '../src/renderer/src/i18n/uniwork-documents/en'
@@ -37,6 +42,8 @@ function status(over: Partial<UniworkDocStatus> = {}): UniworkDocStatus {
 
 const PILL = { full: 309, short: 190, compact: 111 }
 const TOGGLE = 108
+/** the Discussion toggle without its label (FXT6u): 8px padding, the 14px glyph, the 1px borders */
+const TOGGLE_ICON = 32
 const FIXED_LEFT = 40
 const FIXED_RIGHT = 176
 const MARGINS = 22
@@ -66,8 +73,14 @@ function currentPillWidth(): number {
   return group ? PILL[variantOf(group)] : 0
 }
 
+/** the toggle's width as drawn now: full, or icon-only; a holder with no toggle models the full one */
+function currentToggleWidth(): number {
+  const toggle = chrome.querySelector('.uw-discussion-toggle')
+  return toggle?.getAttribute('data-icon-only') === 'true' ? TOGGLE_ICON : TOGGLE
+}
+
 function chromeWidth(): number {
-  return currentPillWidth() + TOGGLE
+  return currentPillWidth() + currentToggleWidth()
 }
 
 function docTabCount(): number {
@@ -111,7 +124,10 @@ function stubLayout(): void {
       const width = currentPillWidth()
       if (pillLeftOverride !== null) return rectOf(pillLeftOverride, width)
       if (pillRightOverride !== null) return rectOf(pillRightOverride - width, width)
-      return at(FIXED_LEFT + stripWidth + 6 + TOGGLE, width)
+      return at(FIXED_LEFT + stripWidth + 6 + currentToggleWidth(), width)
+    }
+    if (this.classList.contains('uw-discussion-toggle')) {
+      return at(FIXED_LEFT + stripWidth + 6, currentToggleWidth())
     }
     if (this.classList.contains('tab-home')) return at(FIXED_LEFT + 10, HOME)
     if (this.classList.contains('tab-new-btn')) return rectOf(0, NEW_BUTTON)
@@ -210,6 +226,7 @@ beforeEach(() => {
   makeApi()
   ;(window as unknown as { aiOfficeTabs?: unknown }).aiOfficeTabs = { focusActive: vi.fn() }
   delete (window as unknown as { uniworkSyncCenter?: unknown }).uniworkSyncCenter
+  delete (window as unknown as Record<string, unknown>)[DISCUSSION_BRIDGE_KEY]
   document.documentElement.style.removeProperty('--ui-scale')
 })
 
@@ -415,6 +432,232 @@ describe('U-1: the pill degrades so the tabs keep their room', () => {
     await flush()
     expect(rectCalls).toBe(settled)
   })
+})
+
+/**
+ * FXT6u (V6u5-01): at the narrowest windows the compact pill still leaves the tab strip below its
+ * floor, so the Discussion toggle beside it gives up its label (icon only) and the room goes back to
+ * the strip. The real toggle and the real chip in the stubbed bar: the toggle is a sibling in the
+ * holder, the pill's fit decides.
+ */
+describe('FXT6u: the Discussion toggle goes icon-only when the compact pill still leaves the strip below its floor', () => {
+  const DISCUSSION = 'Discussion'
+
+  async function mountBoth(s: UniworkDocStatus): Promise<void> {
+    ;(window as unknown as Record<string, unknown>)[DISCUSSION_BRIDGE_KEY] = {}
+    await act(async () => {
+      root.render(
+        createElement(
+          LocaleProvider,
+          { initial: 'en' },
+          createElement(UniworkLiveHost),
+          createElement(
+            PillFitScope,
+            null,
+            createElement(DiscussionToggle, { status: s }),
+            createElement(UniworkStatusChip, { key: s.path, status: s, onStatus: () => undefined }),
+          ),
+        ),
+      )
+    })
+    await flush()
+  }
+
+  const toggle = () => chrome.querySelector<HTMLButtonElement>('.uw-discussion-toggle')
+  const iconOnly = () => toggle()?.getAttribute('data-icon-only') === 'true'
+
+  /** a document tab's visible px in the strip (Home, then tabs at their 104px minimum, 10px of padding) */
+  function visibleTabPx(n: number): number {
+    const stripRect = strip.getBoundingClientRect()
+    const first = stripRect.left + 10 + HOME
+    const left = first + (n - 1) * 104
+    return Math.max(0, Math.min(104, stripRect.right - left))
+  }
+  /** the title starts 36px into a tab (icon and padding, as measured in the real shell) */
+  const visibleLabelPx = (n: number) => Math.max(0, visibleTabPx(n) - 36)
+
+  function assertHolderApart(tag: string): void {
+    const stripRect = strip.getBoundingClientRect()
+    const chromeRect = chrome.getBoundingClientRect()
+    if (isRtl()) expect(chromeRect.right, tag).toBeLessThanOrEqual(stripRect.left)
+    else expect(stripRect.right, tag).toBeLessThanOrEqual(chromeRect.left)
+  }
+
+  for (const dir of ['ltr', 'rtl'] as const) {
+    describe(`${dir}`, () => {
+      beforeEach(() => {
+        document.documentElement.dir = dir
+      })
+
+      it('722px, 3 document tabs: the pill is compact, the toggle is icon-only, the strip and the holder never meet', async () => {
+        buildBar(3)
+        stubLayout()
+        barWidth = 722
+        await mountBoth(status())
+        expect(toggle()).not.toBeNull()
+        expect(variant()).toBe('compact')
+        expect(iconOnly()).toBe(true)
+        assertHolderApart(`${dir} 722/3`)
+        // the room it gave up went back to the strip
+        const shared = 722 - FIXED_LEFT - FIXED_RIGHT - MARGINS
+        expect(strip.getBoundingClientRect().width).toBe(shared - TOGGLE_ICON - PILL.compact)
+      })
+
+      it('722px, 3 tabs: the strip gains the whole difference of the two toggle forms, and the first two tabs show their labels', async () => {
+        buildBar(3)
+        stubLayout()
+        barWidth = 722
+        await mountBoth(status())
+        const iconStrip = strip.getBoundingClientRect().width
+        expect(visibleLabelPx(1)).toBe(36)
+        expect(visibleLabelPx(2)).toBe(36)
+        // with the toggle full the same window would leave the strip this much less
+        const shared = 722 - FIXED_LEFT - FIXED_RIGHT - MARGINS
+        const fullStrip = shared - TOGGLE - PILL.compact
+        expect(iconStrip - fullStrip).toBe(TOGGLE - TOGGLE_ICON)
+      })
+
+      it('icon-only keeps the toggle named and titled "Discussion", a button with the same state', async () => {
+        buildBar(3)
+        stubLayout()
+        barWidth = 1280
+        await mountBoth(status())
+        expect(iconOnly()).toBe(false)
+        const nameFull = toggle()!.textContent
+        const titleFull = toggle()!.getAttribute('title')
+        const expandedFull = toggle()!.getAttribute('aria-expanded')
+        await resizeTo(722)
+        expect(iconOnly()).toBe(true)
+        expect(toggle()!.textContent).toBe(nameFull)
+        expect(toggle()!.textContent).toBe(DISCUSSION)
+        expect(toggle()!.getAttribute('title')).toBe(titleFull)
+        expect(toggle()!.getAttribute('title')).toBe(DISCUSSION)
+        expect(toggle()!.getAttribute('aria-expanded')).toBe(expandedFull)
+        expect(toggle()!.tagName).toBe('BUTTON')
+        // the label is still in the button (hidden by CSS), not removed
+        expect(toggle()!.querySelector('.uw-discussion-toggle-label')!.textContent).toBe(DISCUSSION)
+      })
+
+      it('the toggle comes back when room returns: 722 -> 1024 and -> 1280', async () => {
+        buildBar(3)
+        stubLayout()
+        barWidth = 722
+        await mountBoth(status())
+        expect(iconOnly()).toBe(true)
+        await resizeTo(1024)
+        expect(iconOnly()).toBe(false)
+        await resizeTo(1280)
+        expect(iconOnly()).toBe(false)
+        expect(variant()).toBe('full')
+        await resizeTo(722)
+        expect(iconOnly()).toBe(true)
+      })
+
+      it('closing a tab brings the full toggle back, opening one takes it away again', async () => {
+        buildBar(3)
+        stubLayout()
+        barWidth = 800
+        await mountBoth(status())
+        // 800px with three tabs: the compact pill still leaves the strip below its floor
+        expect(variant()).toBe('compact')
+        expect(iconOnly()).toBe(true)
+        await act(async () => {
+          strip.querySelectorAll('.tab-item:not(.tab-home)')[2].remove()
+          strip.querySelectorAll('.tab-item:not(.tab-home)')[1].remove()
+        })
+        await flush()
+        expect(docTabCount()).toBe(1)
+        expect(iconOnly()).toBe(false)
+        await act(async () => {
+          for (let i = 0; i < 2; i++) {
+            const tab = document.createElement('div')
+            tab.className = 'tab-item'
+            strip.insertBefore(tab, strip.querySelector('.tab-new-btn'))
+          }
+        })
+        await flush()
+        expect(docTabCount()).toBe(3)
+        expect(iconOnly()).toBe(true)
+      })
+
+      it('800, 890, 1024 and 1280 x 1-3 tabs: icon-only exactly where even the compact pill leaves the strip below its floor', async () => {
+        const iconCases: string[] = []
+        for (const w of [800, 890, 1024, 1280]) {
+          for (const n of [1, 2, 3]) {
+            document.body.innerHTML = ''
+            rectSpy?.mockRestore()
+            buildBar(n)
+            stubLayout()
+            barWidth = w
+            await mountBoth(status())
+            const tag = `${dir} ${w}/${n}`
+            const floor = stripFloorOf({
+              home: HOME,
+              tabMin: 104,
+              docTabs: n,
+              padding: 20,
+              newButton: NEW_BUTTON + 4,
+            })
+            const shared = w - FIXED_LEFT - FIXED_RIGHT - MARGINS
+            // the strip the full toggle and the compact pill would leave
+            const compactStrip = shared - TOGGLE - PILL.compact
+            expect(iconOnly(), tag).toBe(compactStrip < floor)
+            if (iconOnly()) {
+              iconCases.push(`${w}/${n}`)
+              expect(variant(), tag).toBe('compact')
+            }
+            assertHolderApart(tag)
+            act(() => root.unmount())
+          }
+        }
+        // the wide windows keep the full toggle
+        expect(iconCases).toEqual(['800/2', '800/3', '890/3'])
+      })
+
+      it('the repeated measures at the boundary never flip the toggle back and forth', async () => {
+        // the window width one pixel at a time: icon-only once, the full toggle once the room is there
+        buildBar(3)
+        stubLayout()
+        barWidth = 700
+        await mountBoth(status())
+        const forms: boolean[] = []
+        for (let w = 700; w <= 1100; w += 1) {
+          await resizeTo(w)
+          forms.push(iconOnly())
+          // measuring again at the same width changes nothing
+          await act(async () => {
+            window.dispatchEvent(new Event('resize'))
+          })
+          await flush()
+          expect(iconOnly(), `${w}px again`).toBe(forms[forms.length - 1])
+        }
+        const flips = forms.filter((v, i) => i > 0 && v !== forms[i - 1]).length
+        expect(forms[0]).toBe(true)
+        expect(forms[forms.length - 1]).toBe(false)
+        expect(flips).toBe(1)
+      })
+
+      it('does not keep measuring once the toggle form has settled', async () => {
+        buildBar(3)
+        stubLayout()
+        barWidth = 722
+        await mountBoth(status())
+        const settled = rectCalls
+        await flush()
+        await flush()
+        expect(rectCalls).toBe(settled)
+      })
+
+      it('a holder without a Discussion toggle keeps the pill steps and nothing else', async () => {
+        buildBar(3)
+        stubLayout()
+        barWidth = 722
+        await mount(status())
+        expect(toggle()).toBeNull()
+        expect(variant()).toBe('compact')
+      })
+    })
+  }
 })
 
 describe('U-2: the queue popover is anchored under the pill', () => {

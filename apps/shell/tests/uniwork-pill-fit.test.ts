@@ -5,6 +5,7 @@ import {
   PILL_STRIP_TABS,
   barLayoutOf,
   nextPillVariantOf,
+  pillFitStepOf,
   pillBudgetOf,
   shortLabelOf,
   stripFloorOf,
@@ -334,5 +335,157 @@ describe('U-1: at the numbers measured in the real shell, no tab rect reaches th
     expect(l.variant).toBe('full')
     const tabs = tabRects(l.strip.left, l.strip.right - l.strip.left, 2)
     expect(tabs[2].right).toBeLessThanOrEqual(l.chrome.right - 134)
+  })
+})
+
+/**
+ * FXT6u (V6u5-01): the narrowest step is the Discussion toggle. When even the icon + action pill
+ * leaves the strip below its floor, the toggle in the holder goes icon-only and the room goes back
+ * to the strip. The decision is taken on the budget the holder would have with the toggle FULL, so
+ * the same window gives the same answer whichever form is drawn.
+ */
+describe('FXT6u: the Discussion toggle gives up its label before the strip gives up its tabs', () => {
+  const TOGGLE_ICON = 32
+  const withIcon = (w: number, n: number, extra: Partial<BarLayoutInput> = {}) =>
+    layout(w, n, { toggleIcon: TOGGLE_ICON, ...extra })
+
+  it("722px with three tabs: compact pill, icon-only toggle, the strip gains the toggle's label width", () => {
+    const l = withIcon(722, 3)
+    expect(l.variant).toBe('compact')
+    expect(l.iconToggle).toBe(true)
+    const before = layout(722, 3)
+    expect(before.iconToggle).toBe(false)
+    expect(l.strip.right - before.strip.right).toBe(108 - TOGGLE_ICON)
+    expect(l.strip.right).toBeLessThanOrEqual(l.chrome.left)
+  })
+
+  it('800, 890, 1024, 1280 x 1-3 tabs: icon-only exactly where the compact pill with the full toggle leaves the strip below its floor', () => {
+    const iconCases: string[] = []
+    for (const w of [722, 800, 890, 1024, 1280]) {
+      for (const n of [1, 2, 3]) {
+        const l = withIcon(w, n)
+        const floor = stripFloorOf({ ...BAR, docTabs: n })
+        const compactStrip = w - BAR.left - BAR.right - BAR.margins - 108 - PILL.compact
+        expect(l.iconToggle, `${w}px ${n} tabs`).toBe(compactStrip < floor)
+        if (l.iconToggle) {
+          iconCases.push(`${w}/${n}`)
+          expect(l.variant, `${w}px ${n} tabs`).toBe('compact')
+        }
+        expect(l.strip.right, `${w}px ${n} tabs`).toBeLessThanOrEqual(l.chrome.left)
+      }
+    }
+    expect(iconCases).toEqual(['722/2', '722/3', '800/2', '800/3', '890/3'])
+  })
+
+  it('where the toggle stays full the layout is the one it was (same variant, same strip)', () => {
+    for (const w of [800, 890, 1024, 1280]) {
+      for (const n of [1, 2, 3]) {
+        const l = withIcon(w, n)
+        if (l.iconToggle) continue
+        const was = layout(w, n)
+        expect(l.variant, `${w}px ${n} tabs`).toBe(was.variant)
+        expect(l.strip, `${w}px ${n} tabs`).toEqual(was.strip)
+        expect(l.chrome, `${w}px ${n} tabs`).toEqual(was.chrome)
+      }
+    }
+  })
+
+  it('a holder without a toggle (no icon width) never goes icon-only', () => {
+    for (const w of [722, 800, 890]) {
+      for (const n of [1, 2, 3]) {
+        expect(layout(w, n).iconToggle, `${w}px ${n} tabs`).toBe(false)
+        expect(layout(w, n, { toggle: 0, toggleIcon: TOGGLE_ICON }).iconToggle).toBe(false)
+      }
+    }
+  })
+
+  it('a wider window never goes back to icon-only, and the step happens once (no flip-flop at the boundary)', () => {
+    for (const n of [1, 2, 3]) {
+      const forms: boolean[] = []
+      for (let w = 600; w <= 1400; w++) forms.push(withIcon(w, n).iconToggle)
+      const flips = forms.filter((v, i) => i > 0 && v !== forms[i - 1]).length
+      expect(flips, `${n} tabs`).toBeLessThanOrEqual(1)
+      if (flips === 1) expect(forms[0]).toBe(true)
+    }
+  })
+
+  describe('pillFitStepOf', () => {
+    const widths = { full: 309, short: 190, compact: 111 }
+    const has = { short: true }
+
+    it("the boundary is the compact pill's own width: budget == compact keeps the full toggle, one less gives it up", () => {
+      const toggle = { width: 108, iconOnly: false }
+      const toggleWidths = { full: 108 }
+      expect(pillFitStepOf({ budget: 111, toggle, toggleWidths, widths, hasShort: true })).toEqual({
+        variant: 'compact',
+        iconToggle: false,
+      })
+      expect(pillFitStepOf({ budget: 110, toggle, toggleWidths, widths, hasShort: true })).toEqual({
+        variant: 'compact',
+        iconToggle: true,
+      })
+    })
+
+    it('measured with the toggle drawn icon-only, the answer is the one with it drawn full (hysteresis: the same inputs, the same step)', () => {
+      for (let budgetFull = -40; budgetFull <= 400; budgetFull++) {
+        const full = pillFitStepOf({
+          budget: budgetFull,
+          toggle: { width: 108, iconOnly: false },
+          toggleWidths: { full: 108, icon: 32 },
+          widths,
+          hasShort: true,
+        })
+        // the same window with the toggle drawn icon-only has 76px more budget
+        const icon = pillFitStepOf({
+          budget: budgetFull + 76,
+          toggle: { width: 32, iconOnly: true },
+          toggleWidths: { full: 108, icon: 32 },
+          widths,
+          hasShort: true,
+        })
+        expect(icon, `budget ${budgetFull}`).toEqual(full)
+      }
+    })
+
+    it('with no toggle in the holder there is nothing to give up', () => {
+      expect(
+        pillFitStepOf({ budget: -50, toggle: null, toggleWidths: {}, widths, hasShort: true }),
+      ).toEqual({ variant: 'compact', iconToggle: false })
+    })
+
+    it('a toggle drawn icon-only before its full width was ever measured is drawn full first', () => {
+      expect(
+        pillFitStepOf({
+          budget: 10,
+          toggle: { width: 32, iconOnly: true },
+          toggleWidths: { icon: 32 },
+          widths,
+          hasShort: true,
+        }),
+      ).toEqual({ variant: 'compact', iconToggle: false })
+    })
+
+    it('the compact pill is not measured yet: the toggle is not touched (no guessed width)', () => {
+      expect(
+        pillFitStepOf({
+          budget: 5,
+          toggle: { width: 108, iconOnly: false },
+          toggleWidths: { full: 108 },
+          widths: { full: 309 },
+          hasShort: true,
+        }).iconToggle,
+      ).toBe(false)
+    })
+
+    it('a room that fits a wider variant never touches the toggle', () => {
+      const step = pillFitStepOf({
+        budget: 200,
+        toggle: { width: 108, iconOnly: false },
+        toggleWidths: { full: 108 },
+        widths,
+        hasShort: true,
+      })
+      expect(step).toEqual({ variant: 'short', iconToggle: false })
+    })
   })
 })
