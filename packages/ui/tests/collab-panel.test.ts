@@ -787,6 +787,60 @@ describe('focus', () => {
   })
 })
 
+describe('DOC-05 comment level + G8-18 post-send inline notice', () => {
+  it('comment level: allows writing/replying and resolving own root thread, but hides resolve on someone else’s root thread even when author of a reply', async () => {
+    const src = fakeSource(
+      list([
+        cm({ id: 'mine-root', author_id: 'me' }),
+        cm({ id: 'other-root', author_id: 'other' }),
+        cm({ id: 'my-reply', parent_id: 'other-root', author_id: 'me' }),
+      ]),
+    )
+    await mount(src, host({ level: 'comment', myUserId: 'me' }))
+    expect(ctl.can.canWrite).toBe(true)
+    expect($('[data-thread-id="mine-root"] [data-resolve-for="mine-root"]')).not.toBeNull()
+    expect($('[data-thread-id="other-root"] [data-resolve-for="other-root"]')).toBeNull()
+  })
+
+  it('renders post-send inline notice from mentions_without_access and calls shareView when Share view access is clicked (G8-18)', async () => {
+    const shareView = vi.fn(async () => ({ ok: true as const }))
+    const created = cm({
+      id: 'c-post',
+      body: 'cc @Minh Anh @Mai Hương',
+      mentions_without_access: [
+        { user_id: 'u-a', display_name: 'Minh Anh', can_share: true },
+        { user_id: 'u-b', display_name: 'Mai Hương', can_share: false },
+      ],
+    })
+    const src = Object.assign(fakeSource(list([created])), { shareView })
+    await mount(src, host({ capabilities: { commentsShareView: true } }))
+
+    const notice = $('[data-post-send-for="c-post"]')!
+    expect(notice).not.toBeNull()
+    expect(notice.textContent).toContain(
+      "Minh Anh and Mai Hương can't view this document, so they weren't notified.",
+    )
+    expect(notice.textContent).toContain(
+      "Sharing now won't notify them about this comment; mention them in a new comment to notify.",
+    )
+    const shareBtn = notice.querySelector<HTMLButtonElement>('.collab-post-send-share')!
+    expect(shareBtn).not.toBeNull()
+    expect(shareBtn.textContent).toBe('Share view access')
+
+    await act(async () => {
+      shareBtn.click()
+      await flush()
+    })
+    expect(shareView).toHaveBeenCalledTimes(1)
+    expect(shareView).toHaveBeenCalledWith({ user_id: 'u-a' })
+    // After sharing u-a, only u-b (unshareable) remains in the notice and the share button is gone
+    expect(notice.textContent).toContain(
+      "Mai Hương can't view this document, so they weren't notified.",
+    )
+    expect(notice.querySelector('.collab-post-send-share')).toBeNull()
+  })
+})
+
 describe('collab.css', () => {
   it('tokens only (no raw colours in rules), 24px targets, 44px under a coarse pointer', async () => {
     const { readFileSync } = await import('node:fs')

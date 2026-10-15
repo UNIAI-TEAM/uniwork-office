@@ -7,7 +7,7 @@
  */
 import type { Lang } from '@genoffice/i18n'
 
-export type CollabLevel = 'view' | 'edit' | 'manage'
+export type CollabLevel = 'view' | 'comment' | 'edit' | 'manage'
 export type CollabKind = 'comment' | 'discussion'
 export type CollabAnchorState = 'exact' | 'stale' | 'lost'
 
@@ -16,6 +16,13 @@ export interface CollabAnchor {
   format: string
   v: number
   [k: string]: unknown
+}
+
+/** G8-18: one mentioned user who could not view the document when the comment was saved */
+export interface CollabMentionWithoutAccess {
+  user_id: string
+  display_name?: string
+  can_share: boolean
 }
 
 /** one comment or discussion post (protocol `DocumentComment`) */
@@ -38,6 +45,8 @@ export interface CollabComment {
   updated_at?: string
   display_name?: string
   avatar_url?: string
+  /** G8-18: mentioned people without view access on create/update response */
+  mentions_without_access?: CollabMentionWithoutAccess[]
   [k: string]: unknown
 }
 
@@ -71,6 +80,10 @@ export interface CollabCandidate {
   display_name: string
   avatar_url?: string
   email?: string
+  /** G8-18: false when returned by `include: 'no_access'` and the candidate cannot view the document */
+  can_view?: boolean
+  /** G8-18: whether the caller may grant View access to this candidate (defaults to true when omitted) */
+  can_share?: boolean
 }
 
 /** the error every source call rejects with: `code` = protocol error code, `detailsCode` = `details.code` */
@@ -78,6 +91,7 @@ export interface CollabError {
   code:
     | 'conflict'
     | 'malformed'
+    | 'invalid_arg'
     | 'unauthorized'
     | 'forbidden'
     | 'not_found'
@@ -126,7 +140,15 @@ export interface CollabSource {
   resolve(p: { comment_id: string }): Promise<{ comment: CollabComment }>
   reopen(p: { comment_id: string }): Promise<{ comment: CollabComment }>
   revisions(p: { comment_id: string }): Promise<{ revisions: CollabRevision[] }>
-  searchMentions(p: { q: string; limit?: number }): Promise<{ candidates: CollabCandidate[] }>
+  searchMentions(p: {
+    q: string
+    limit?: number
+    include?: 'no_access'
+  }): Promise<{ candidates: CollabCandidate[] }>
+  /** G8-18: true when the caller may list workspace members so `searchMentions` passes `include: 'no_access'` */
+  canListMembers?: boolean
+  /** G8-18: grant View access to a mentioned user (protocol `comments.shareView`) */
+  shareView?(p: { user_id: string }): Promise<{ ok: true }>
   /**
    * G8-12: re-anchor root comments to `version_id` after a Save receipt (protocol `comments.anchors`).
    * Optional: a Discussion source never has it. Send through `sendAnchorMap`, which chunks and maps
@@ -183,4 +205,12 @@ export interface CollabHostState {
   lang: Lang
   /** picks the Send shortcut text */
   platform: 'mac' | 'other'
+  /** G8-18: host capability flags from `InitPayload.capabilities` */
+  capabilities?: {
+    commentsShareView?: boolean
+  }
+  /** G8-18: convenience alias for `capabilities.commentsShareView` */
+  commentsShareView?: boolean
+  /** G8-18: true when the caller may list workspace members (`include: 'no_access'`) */
+  canListMembers?: boolean
 }

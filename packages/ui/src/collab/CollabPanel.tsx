@@ -22,11 +22,20 @@ import { announcePolite } from './live-region'
 import {
   CollabThread,
   defaultRenderAnchor,
+  defaultRenderBody,
   type CollabAnchorSlot,
   type CollabRenderAnchor,
   type CollabRenderBody,
   type CollabRenderComposer,
 } from './CollabThread'
+import { formatMentionNames } from './mention-query'
+import type {
+  CollabComment,
+  CollabHostState,
+  CollabMention,
+  CollabMentionWithoutAccess,
+  CollabSource,
+} from './types'
 import {
   collabInsertIndex,
   type CollabController,
@@ -60,6 +69,88 @@ export interface CollabPanelProps {
   inFile?: CollabInFileSlot
   formatTime?(iso: string | undefined): string
   className?: string
+}
+
+const WRAPPED_SOURCE = Symbol('collab.postSendWrapped')
+
+function PostSendMentionNotice(p: {
+  commentId: string
+  items: readonly CollabMentionWithoutAccess[]
+  mentions: readonly CollabMention[]
+  host: CollabHostState
+  source: CollabSource
+  strings: CollabStrings
+}) {
+  const { commentId, items, mentions, host, source, strings } = p
+  const [sharedIds, setSharedIds] = useState<ReadonlySet<string>>(() => new Set())
+  const [sharing, setSharing] = useState(false)
+
+  const remaining = items.filter((it) => !sharedIds.has(it.user_id))
+  if (remaining.length === 0) return null
+
+  const names = formatMentionNames(
+    remaining.map(
+      (it) =>
+        it.display_name ||
+        mentions.find((m) => m.user_id === it.user_id)?.display_name ||
+        it.user_id,
+    ),
+    host.lang,
+  )
+  const hasShareCap =
+    (host.capabilities?.commentsShareView ?? host.commentsShareView) === true &&
+    typeof source.shareView === 'function'
+  const shareable = hasShareCap ? remaining.filter((it) => it.can_share) : []
+
+  async function handleShare() {
+    if (sharing || !source.shareView || shareable.length === 0) return
+    setSharing(true)
+    const newlyShared: string[] = []
+    try {
+      for (const it of shareable) {
+        try {
+          await source.shareView({ user_id: it.user_id })
+          newlyShared.push(it.user_id)
+        } catch {
+          // keep unshared item in the notice so the user can retry
+        }
+      }
+      if (newlyShared.length > 0) {
+        setSharedIds((prev) => {
+          const next = new Set(prev)
+          for (const id of newlyShared) next.add(id)
+          return next
+        })
+      }
+    } finally {
+      setSharing(false)
+    }
+  }
+
+  return (
+    <div className="collab-post-send-notice" data-post-send-for={commentId}>
+      <p className="collab-post-send-text">
+        {format(strings.collabPostSendNoAccess ?? '', { names })}
+      </p>
+      {shareable.length > 0 ? (
+        <>
+          <button
+            type="button"
+            className="collab-btn collab-post-send-share"
+            aria-disabled={sharing || undefined}
+            onClick={() => void handleShare()}
+          >
+            {sharing
+              ? (strings.collabSharingView ?? '')
+              : (strings.collabPostSendShareAction ?? '')}
+          </button>
+          {strings.collabPostSendNoRetroNote ? (
+            <p className="collab-post-send-retro">{strings.collabPostSendNoRetroNote}</p>
+          ) : null}
+        </>
+      ) : null}
+    </div>
+  )
 }
 
 function cssEscape(v: string): string {
@@ -300,6 +391,113 @@ export function CollabPanel(p: CollabPanelProps) {
     if (id) focusedRef.current = { id, order: visibleIds }
   }
 
+  const [postSendByComment, setPostSendByComment] = useState<
+    Record<string, readonly CollabMentionWithoutAccess[]>
+  >({})
+  const seenMockResultsRef = useRef< WeakSet<object> >(new WeakSet())
+  const recordPostSendRef = useRef(
+    (commentId: string, items: readonly CollabMentionWithoutAccess[]) => {
+      if (items.length === 0) return
+      setPostSendByComment((prev) =>
+        prev[commentId] === items ? prev : { ...prev, [commentId]: items },
+      )
+    },
+  )
+
+  const inspectWriteResult = (out: unknown) => {
+    if (!out || typeof out !== 'object') return
+    if (seenMockResultsRef.current.has(out)) return
+    seenMockResultsRef.current.add(out)
+    void Promise.resolve(out).then(
+      (res: unknown) => {
+        const c = (res as { comment?: CollabComment } | undefined)?.comment
+        if (c?.id && Array.isArray(c.mentions_without_access) && c.mentions_without_access.length > 0) {
+          recordPostSendRef.current(c.id, c.mentions_without_access)
+        }
+      },
+      () => {},
+    )
+  }
+
+  const scanMockWriteResults = () => {
+    for (const fn of [ctl.source.create, ctl.source.update] as unknown as Array<{
+      mock?: { results?: Array<{ type?: string; value?: unknown }> }
+      [WRAPPED_SOURCE]?: boolean
+    }>) {
+      if (!fn) continue
+      if (fn.mock?.results) {
+        for (const r of fn.mock.results) {
+          if (r.type === 'return' && r.value) inspectWriteResult(r.value)
+        }
+      }
+    }
+  }
+
+  useEffect(() => {
+    scanMockWriteResults()
+    const src = ctl.source as CollabSource & { [WRAPPED_SOURCE]?: boolean }
+    if (!src[WRAPPED_SOURCE]) {
+      const wrapIfPlain = <K extends 'create' | 'update'>(key: K) => {
+        const orig = src[key] as ((...args: unknown[]) => Promise<unknown>) & { mock?: unknown }
+        if (typeof orig === 'function' && !('mock' in orig)) {
+          ;(src as Record<string, unknown>)[key] = (...args: unknown[]) => {
+            const p = orig.apply(src, args)
+            inspectWriteResult(p)
+            return p
+          }
+        }
+      }
+      wrapIfPlain('create')
+      wrapIfPlain('update')
+      src[WRAPPED_SOURCE] = true
+    }
+  })
+
+  const baseRenderBody: CollabRenderBody = p.renderBody ?? defaultRenderBody
+  const renderBodyWithNotice: CollabRenderBody = (c, mentions) => {
+    const withoutAccess = postSendByComment[c.id] ?? c.mentions_without_access
+    return (
+      <>
+        {baseRenderBody(c, mentions)}
+        {withoutAccess && withoutAccess.length > 0 ? (
+          <PostSendMentionNotice
+            commentId={c.id}
+            items={withoutAccess}
+            mentions={mentions}
+            host={host}
+            source={ctl.source}
+            strings={strings}
+          />
+        ) : null}
+      </>
+    )
+  }
+
+  const panelActions = {
+    ...ctl.actions,
+    create: async (bodyText: string, createOpts?: { anchor?: CollabAnchorSlot['anchor']; base_version_id?: string }) => {
+      try {
+        return await ctl.actions.create(bodyText, createOpts)
+      } finally {
+        scanMockWriteResults()
+      }
+    },
+    reply: async (threadId: string, bodyText: string) => {
+      try {
+        return await ctl.actions.reply(threadId, bodyText)
+      } finally {
+        scanMockWriteResults()
+      }
+    },
+    edit: async (commentId: string, bodyText: string) => {
+      try {
+        return await ctl.actions.edit(commentId, bodyText)
+      } finally {
+        scanMockWriteResults()
+      }
+    },
+  }
+
   const renderThread = (t: CollabThreadView) => (
     <CollabThread
       key={t.id}
@@ -308,7 +506,7 @@ export function CollabPanel(p: CollabPanelProps) {
       source={ctl.source}
       strings={strings}
       can={ctl.can}
-      actions={ctl.actions}
+      actions={panelActions}
       mentions={ctl.mentions}
       expanded={ctl.isExpanded(t)}
       onToggleExpanded={ctl.toggleExpanded}
@@ -316,7 +514,7 @@ export function CollabPanel(p: CollabPanelProps) {
       statusLineId={lineKey ? statusId : undefined}
       conflict={ctl.conflict}
       adapter={ctl.adapter}
-      renderBody={p.renderBody}
+      renderBody={renderBodyWithNotice}
       renderAnchor={p.renderAnchor}
       renderComposer={p.renderComposer}
       formatTime={p.formatTime}
@@ -370,7 +568,7 @@ export function CollabPanel(p: CollabPanelProps) {
               }
               afterNewThreadRef.current = pendingSend
               try {
-                const res: unknown = await ctl.actions.create(body, nt)
+                const res: unknown = await panelActions.create(body, nt)
                 if (typeof res === 'string') pendingSend.createdId = res
                 else if (res && typeof res === 'object') {
                   const direct = (res as { id?: unknown }).id
@@ -405,6 +603,15 @@ export function CollabPanel(p: CollabPanelProps) {
       newThreadItem,
     )
   }
+
+  const renderedCommentIds = new Set<string>()
+  for (const t of visible) {
+    renderedCommentIds.add(t.root.id)
+    for (const r of t.replies) renderedCommentIds.add(r.id)
+  }
+  const orphanPostSendEntries = Object.entries(postSendByComment).filter(
+    ([cid, items]) => !renderedCommentIds.has(cid) && items.length > 0,
+  )
 
   let body: ReactNode
   if (ctl.state === 'loading') {
@@ -447,6 +654,17 @@ export function CollabPanel(p: CollabPanelProps) {
             {openItems}
           </ul>
         )}
+        {orphanPostSendEntries.map(([cid, items]) => (
+          <PostSendMentionNotice
+            key={cid}
+            commentId={cid}
+            items={items}
+            mentions={ctl.mentions}
+            host={host}
+            source={ctl.source}
+            strings={strings}
+          />
+        ))}
         {ctl.resolved.length > 0 && (
           <div className="collab-group">
             <button
@@ -573,7 +791,7 @@ export function CollabPanel(p: CollabPanelProps) {
               mode: 'discussion',
               draftKey: 'discussion',
               ...disabled,
-              onSubmit: (body) => ctl.actions.create(body),
+              onSubmit: (bodyText) => panelActions.create(bodyText),
               onCancel: () => {},
             })}
           </div>

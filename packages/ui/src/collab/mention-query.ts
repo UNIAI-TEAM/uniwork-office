@@ -62,6 +62,10 @@ export interface MentionRange {
   label: string
   /** `[@label](mention://member/<id>)` exactly as it goes into the body */
   raw: string
+  /** G8-18: false when picked from the picker with `can_view: false`; undefined when typed or pasted */
+  canView?: boolean
+  /** G8-18: whether the caller may grant View access to this candidate when `canView === false` */
+  canShare?: boolean
 }
 
 export interface MentionDoc {
@@ -72,6 +76,17 @@ export interface MentionDoc {
 }
 
 const displayOf = (label: string) => `@${label}`
+
+/** G8-18: full conjunction list of names in the UI locale (never truncated). */
+export function formatMentionNames(names: readonly string[], lang: string): string {
+  if (names.length === 0) return ''
+  if (names.length === 1) return names[0]!
+  try {
+    return new Intl.ListFormat(lang, { style: 'long', type: 'conjunction' }).format(names)
+  } catch {
+    return new Intl.ListFormat('en', { style: 'long', type: 'conjunction' }).format(names)
+  }
+}
 
 /** The displayed form of a stored body: top-level mention tokens become `@Name` + a range. */
 export function mentionDocFromBody(body: string): MentionDoc {
@@ -215,7 +230,7 @@ export function pickMention(
   doc: MentionDoc,
   trigger: MentionTrigger,
   caret: number,
-  who: { id: string; label: string; raw: string },
+  who: { id: string; label: string; raw: string; canView?: boolean; canShare?: boolean },
 ): { doc: MentionDoc; caret: number } {
   const shown = displayOf(who.label)
   const out = insertMention(doc.text, trigger, caret, shown)
@@ -226,6 +241,8 @@ export function pickMention(
     id: who.id,
     label: who.label,
     raw: who.raw,
+    ...(who.canView !== undefined ? { canView: who.canView } : {}),
+    ...(who.canShare !== undefined ? { canShare: who.canShare } : {}),
   }
   return {
     doc: { text: out.text, ranges: [...kept, range].sort((a, b) => a.start - b.start) },

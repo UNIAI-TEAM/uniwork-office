@@ -795,6 +795,268 @@ describe('mention chip in the composer (the box never shows the id)', () => {
   })
 })
 
+describe('G8-18 mention people without access (chip badge + pre-send warning states)', () => {
+  const ULID_B = '01J8X4USR0BBBBBBBBBBBBBBBB'
+  const ULID_C = '01J8X4USR0CCCCCCCCCCCCCCCC'
+  const dialogBtn = (label: string) =>
+    [...(dialog()?.querySelectorAll<HTMLButtonElement>('button') ?? [])].find((b) =>
+      b.textContent?.includes(label),
+    )
+
+  it('shows lock icon + collabMentionNoAccessBadge on a picked chip with can_view=false', async () => {
+    const source = Object.assign(
+      fakeSource([
+        { ...candidate(ULID_A, 'Minh Anh'), can_view: false, can_share: true },
+      ]),
+      { canListMembers: true },
+    )
+    render({ source })
+    await openPicker()
+    expect(source.searchMentions).toHaveBeenCalledWith({
+      q: 'mi',
+      limit: 20,
+      include: 'no_access',
+    })
+    key('Enter')
+    const chip = host.querySelector('.collab-mention-chip--no-access')!
+    expect(chip).not.toBeNull()
+    expect(chip.querySelector('svg.collab-mention-lock')).not.toBeNull()
+    expect(chip.textContent).toContain('@Minh Anh')
+    expect(chip.textContent).toContain("Can't view")
+    expect(
+      host.querySelector('.collab-composer-mirror mark')?.getAttribute('data-no-access'),
+    ).toBe('true')
+  })
+
+  it('warns before send when can_share=true and shares view access sequentially before sending', async () => {
+    let resolveShareA!: (v: { ok: true }) => void
+    const shareView = vi.fn(
+      (p: { user_id: string }) =>
+        p.user_id === ULID_A
+          ? new Promise<{ ok: true }>((r) => {
+              resolveShareA = r
+            })
+          : Promise.resolve({ ok: true as const }),
+    )
+    const source = Object.assign(
+      fakeSource([
+        { ...candidate(ULID_A, 'Minh Anh'), can_view: false, can_share: true },
+        { ...candidate(ULID_B, 'Mai Hương'), can_view: false, can_share: true },
+      ]),
+      { canListMembers: true, shareView },
+    )
+    const m = render({
+      host: makeHost({ capabilities: { commentsShareView: true } }),
+      source,
+    })
+    await openPicker('Nhờ @m')
+    key('Enter')
+    await openPicker(`${ta().value}@m`)
+    key('ArrowDown')
+    key('Enter')
+
+    await act(async () => {
+      sendKeys()
+    })
+    expect(m.onSubmit).not.toHaveBeenCalled()
+    expect(dialog()).not.toBeNull()
+    expect(dialog()!.textContent).toContain("Mentioned people can't view this document")
+    expect(dialog()!.textContent).toContain(
+      "Minh Anh and Mai Hương can't view this document, so they won't be notified.",
+    )
+
+    await act(async () => {
+      dialogBtn('Share view access, then send')!.click()
+    })
+    expect(dialog()!.textContent).toContain('Sharing view access…')
+    expect(dialogBtn('Sharing view access…')!.getAttribute('aria-disabled')).toBe('true')
+    expect(shareView).toHaveBeenCalledTimes(1)
+    expect(shareView).toHaveBeenNthCalledWith(1, { user_id: ULID_A })
+
+    await act(async () => {
+      resolveShareA({ ok: true })
+    })
+    expect(shareView).toHaveBeenCalledTimes(2)
+    expect(shareView).toHaveBeenNthCalledWith(2, { user_id: ULID_B })
+    expect(m.onSubmit).toHaveBeenCalledTimes(1)
+    expect(dialog()).toBeNull()
+  })
+
+  it('shows collabMentionAskManager and hides share button when commentsShareView capability is absent or can_share=false', async () => {
+    const shareView = vi.fn(async () => ({ ok: true as const }))
+    const source = Object.assign(
+      fakeSource([{ ...candidate(ULID_A, 'Minh Anh'), can_view: false, can_share: false }]),
+      { canListMembers: true, shareView },
+    )
+    const m = render({
+      host: makeHost({ capabilities: { commentsShareView: true } }),
+      source,
+    })
+    await openPicker()
+    key('Enter')
+    await act(async () => {
+      sendKeys()
+    })
+    expect(dialog()!.textContent).toContain(
+      'Ask someone who manages this document to share view access with Minh Anh.',
+    )
+    expect(dialogBtn('Share view access, then send')).toBeUndefined()
+    await act(async () => {
+      dialogBtn('Send without notifying')!.click()
+    })
+    expect(shareView).not.toHaveBeenCalled()
+    expect(m.onSubmit).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows collabMentionMixedUnshareable when some mentions are shareable and others are not, sharing only with shareable', async () => {
+    const shareView = vi.fn(async () => ({ ok: true as const }))
+    const source = Object.assign(
+      fakeSource([
+        { ...candidate(ULID_A, 'Minh Anh'), can_view: false, can_share: true },
+        { ...candidate(ULID_B, 'Mai Hương'), can_view: false, can_share: false },
+      ]),
+      { canListMembers: true, shareView },
+    )
+    const m = render({
+      host: makeHost({ capabilities: { commentsShareView: true } }),
+      source,
+    })
+    await openPicker('Nhờ @m')
+    key('Enter')
+    await openPicker(`${ta().value}@m`)
+    key('ArrowDown')
+    key('Enter')
+    await act(async () => {
+      sendKeys()
+    })
+    expect(dialog()!.textContent).toContain(
+      "Minh Anh and Mai Hương can't view this document, so they won't be notified.",
+    )
+    expect(dialog()!.textContent).toContain("Can't share with Mai Hương; they won't be notified.")
+    await act(async () => {
+      dialogBtn('Share view access, then send')!.click()
+    })
+    expect(shareView).toHaveBeenCalledTimes(1)
+    expect(shareView).toHaveBeenCalledWith({ user_id: ULID_A })
+    expect(m.onSubmit).toHaveBeenCalledTimes(1)
+  })
+
+  it('handles full share failure (collabShareViewFailed + collabRetry) and partial share success (collabShareViewPartial + collabRetryShareFor / collabSendComment)', async () => {
+    let failB = true
+    const shareView = vi.fn(async (p: { user_id: string }) => {
+      if (p.user_id === ULID_B && failB) throw { code: 'invalid_arg' }
+      if (p.user_id === ULID_C) throw { code: 'network' }
+      return { ok: true as const }
+    })
+    const source = Object.assign(
+      fakeSource([
+        { ...candidate(ULID_A, 'Minh Anh'), can_view: false, can_share: true },
+        { ...candidate(ULID_B, 'Mai Hương'), can_view: false, can_share: true },
+        { ...candidate(ULID_C, 'Lê Cường'), can_view: false, can_share: true },
+      ]),
+      { canListMembers: true, shareView },
+    )
+    // Case 1: single user C fails -> collabShareViewFailed
+    const m1 = render({
+      host: makeHost({ capabilities: { commentsShareView: true } }),
+      source,
+    })
+    await openPicker('Nhờ @l')
+    key('ArrowDown')
+    key('ArrowDown')
+    key('Enter')
+    await act(async () => {
+      sendKeys()
+    })
+    await act(async () => {
+      dialogBtn('Share view access, then send')!.click()
+    })
+    expect(dialog()!.textContent).toContain(
+      "Couldn't share view access with Lê Cường. You can try again or send without notifying.",
+    )
+    expect(dialogBtn('Try again')).toBeDefined()
+    await act(async () => {
+      dialogBtn('Cancel')!.click()
+    })
+    expect(dialog()).toBeNull()
+    expect(m1.onSubmit).not.toHaveBeenCalled()
+
+    // Case 2: A succeeds, B fails -> collabShareViewPartial, then retry B only
+    act(() => root.unmount())
+    root = createRoot(host)
+    sessionStorage.clear()
+    const m2 = render({
+      host: makeHost({ capabilities: { commentsShareView: true } }),
+      source,
+    })
+    await openPicker('Nhờ @m')
+    key('Enter')
+    await openPicker(`${ta().value}@m`)
+    key('ArrowDown')
+    key('Enter')
+    await act(async () => {
+      sendKeys()
+    })
+    await act(async () => {
+      dialogBtn('Share view access, then send')!.click()
+    })
+    expect(dialog()!.textContent).toContain(
+      "Shared view access with Minh Anh. Couldn't share with Mai Hương (they won't be notified).",
+    )
+    expect(dialogBtn('Send comment')).toBeDefined()
+    expect(dialogBtn('Try again for Mai Hương')).toBeDefined()
+
+    failB = false
+    shareView.mockClear()
+    await act(async () => {
+      dialogBtn('Try again for Mai Hương')!.click()
+    })
+    expect(shareView).toHaveBeenCalledTimes(1)
+    expect(shareView).toHaveBeenCalledWith({ user_id: ULID_B })
+    expect(m2.onSubmit).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows collabSendFailedAfterShare when onSubmit fails after share succeeded, and does not re-share on retry', async () => {
+    const shareView = vi.fn(async () => ({ ok: true as const }))
+    let submitCalls = 0
+    const onSubmit = vi.fn(async () => {
+      submitCalls += 1
+      if (submitCalls === 1) throw { code: 'internal' }
+    })
+    const source = Object.assign(
+      fakeSource([{ ...candidate(ULID_A, 'Minh Anh'), can_view: false, can_share: true }]),
+      { canListMembers: true, shareView },
+    )
+    render({
+      host: makeHost({ capabilities: { commentsShareView: true } }),
+      source,
+      onSubmit,
+    })
+    await openPicker()
+    key('Enter')
+    await act(async () => {
+      sendKeys()
+    })
+    await act(async () => {
+      dialogBtn('Share view access, then send')!.click()
+    })
+    expect(dialog()).toBeNull()
+    expect(ta().value).toBe('Nhờ @Minh Anh ')
+    expect(host.querySelector('.collab-composer-error')?.textContent).toBe(
+      "Shared view access with Minh Anh, but couldn't send the comment. Your text is still in the box — try sending again.",
+    )
+
+    // Retry sending: does not reopen warn dialog or call shareView again
+    shareView.mockClear()
+    await act(async () => {
+      sendKeys()
+    })
+    expect(dialog()).toBeNull()
+    expect(shareView).not.toHaveBeenCalled()
+    expect(onSubmit).toHaveBeenCalledTimes(2)
+  })
+})
+
 describe('styles', () => {
   const css = readFileSync(
     resolve(import.meta.dirname, '../src/collab/collab-composer.css'),
