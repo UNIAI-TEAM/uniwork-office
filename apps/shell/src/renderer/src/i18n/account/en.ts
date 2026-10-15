@@ -77,6 +77,10 @@ export const en = {
   acctErrNotConfigured: 'This app isn’t linked to a UniWork server.',
   acctErrKeyringUnavailable: 'Secure storage on this computer is unavailable.',
   acctErrKeystoreLocked: 'This computer’s keychain is locked. Unlock it, then try again.',
+  acctReplaceTitle: 'Replace the saved sign-in on this computer?',
+  acctReplaceBody:
+    'This computer can’t open the saved sign-in. Signing in again replaces it. Offline edits waiting to sync stay on this computer, locked; nothing is deleted.',
+  acctReplaceGo: 'Sign in again',
   acctErrServerError: 'UniWork ran into a problem. Please try again later.',
   acctErrMalformedResponse: 'UniWork sent an unexpected response. Please try again later.',
   wbLoadFailedTitle: 'Your saved data could not be loaded',

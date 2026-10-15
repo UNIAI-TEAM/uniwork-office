@@ -203,3 +203,81 @@ export function SignOutPrompt({
     </div>
   )
 }
+
+/**
+ * keystore-locked after a failed Retry: confirms replacing the saved sign-in
+ * this computer cannot open. Same shape as the sign-out prompt: Cancel is
+ * focused on open (not while another modal covers the page), Escape cancels,
+ * and focus goes back to `returnFocusRef` when it closes. Cancel sends nothing
+ * to main; confirm starts the replacing sign-in once.
+ */
+export function ReplaceSignInPrompt({
+  account,
+  returnFocusRef,
+}: {
+  account: AccountController
+  returnFocusRef: RefObject<HTMLElement | null>
+}) {
+  const open = Boolean(account.replaceLockedPrompt)
+  return open ? <ReplaceSignInDialog account={account} returnFocusRef={returnFocusRef} /> : null
+}
+
+function ReplaceSignInDialog({
+  account,
+  returnFocusRef,
+}: {
+  account: AccountController
+  returnFocusRef: RefObject<HTMLElement | null>
+}) {
+  const { t } = useI18n()
+  const cancelBtnRef = useRef<HTMLButtonElement>(null)
+
+  useLayoutEffect(() => {
+    const cancelFocus = focusUnlessCovered(cancelBtnRef.current)
+    return () => {
+      cancelFocus?.()
+      restoreFocus(returnFocusRef)
+    }
+  }, [returnFocusRef])
+
+  return (
+    <div
+      className="set-intg-confirm acct-signout-confirm acct-replace-confirm"
+      role="alertdialog"
+      aria-labelledby="acct-replace-title"
+      aria-describedby="acct-replace-body"
+      onKeyDown={(e) => {
+        if (e.key !== 'Escape') return
+        e.preventDefault()
+        e.stopPropagation()
+        account.cancelReplaceLockedSignIn?.()
+      }}
+    >
+      <div className="set-field-stack">
+        <div className="set-field-label" id="acct-replace-title">
+          {t('acctReplaceTitle')}
+        </div>
+        <div className="set-field-desc" id="acct-replace-body">
+          {t('acctReplaceBody')}
+        </div>
+      </div>
+      <div className="set-btn-row">
+        <button
+          ref={cancelBtnRef}
+          type="button"
+          className="set-btn primary"
+          onClick={() => account.cancelReplaceLockedSignIn?.()}
+        >
+          {t('acctCancel')}
+        </button>
+        <button
+          type="button"
+          className="set-btn"
+          onClick={() => account.confirmReplaceLockedSignIn?.()}
+        >
+          {t('acctReplaceGo')}
+        </button>
+      </div>
+    </div>
+  )
+}

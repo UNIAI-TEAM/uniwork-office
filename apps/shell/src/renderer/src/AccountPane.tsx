@@ -2,7 +2,7 @@ import { Dropdown } from '@genoffice/ui'
 import { useRef, type ReactNode } from 'react'
 import { OrgChoiceStep } from './OrgChoiceStep'
 import { ServerConnect } from './ServerConnect'
-import { SignOutPrompt } from './SignOutPrompt'
+import { ReplaceSignInPrompt, SignOutPrompt } from './SignOutPrompt'
 import { useI18n } from './locale'
 import type { StringKey } from './locale'
 import {
@@ -76,6 +76,8 @@ export function AccountPane({ account }: { account: AccountController }) {
   const { status, view, error, busy } = account
   const signOutPrompt = account.signOutPrompt ?? null
   const signOutBtnRef = useRef<HTMLButtonElement>(null)
+  const replaceBtnRef = useRef<HTMLButtonElement>(null)
+  const replacePrompt = Boolean(account.replaceLockedPrompt)
 
   const profile = status?.profile
   const email = profile?.email || status?.email || ''
@@ -185,10 +187,33 @@ export function AccountPane({ account }: { account: AccountController }) {
       )
       break
     case 'keystore-locked':
-      // Retry re-reads the stored sign-in once the keychain is unlocked; signing in
-      // again is refused while locked (it would overwrite the saved sign-in), so
-      // there is no second button
-      actions = retryBtn
+      // Retry re-reads the stored sign-in once the keychain is unlocked and stays
+      // first. Only after a Retry found it still unreadable does main allow a
+      // fresh sign-in that replaces it, behind a confirmation
+      actions = (
+        <>
+          <button
+            type="button"
+            className="set-btn primary"
+            aria-disabled={busy === 'retrying' ? true : undefined}
+            aria-busy={busy === 'retrying' ? true : undefined}
+            onClick={account.retry}
+          >
+            {busy === 'retrying' ? t('acctRetrying') : t('acctRetry')}
+          </button>
+          {account.canReplaceLockedSignIn && (
+            <button
+              ref={replaceBtnRef}
+              type="button"
+              className="set-btn"
+              aria-haspopup="dialog"
+              onClick={account.askReplaceLockedSignIn}
+            >
+              {t('acctSignInAgain')}
+            </button>
+          )}
+        </>
+      )
       break
     case 'signed-in':
     case 'refreshing':
@@ -321,11 +346,15 @@ export function AccountPane({ account }: { account: AccountController }) {
       )}
 
       <SignOutPrompt account={account} returnFocusRef={signOutBtnRef} />
+      <ReplaceSignInPrompt account={account} returnFocusRef={replaceBtnRef} />
 
       {/* the organization step and the sign-out prompt each carry their own Sign out */}
-      {actions && !signOutPrompt && !(withProfile && orgChoice.needed && !orgChoice.loadError) && (
-        <div className="set-pane-footer acct-actions">{actions}</div>
-      )}
+      {actions &&
+        !signOutPrompt &&
+        !replacePrompt &&
+        !(withProfile && orgChoice.needed && !orgChoice.loadError) && (
+          <div className="set-pane-footer acct-actions">{actions}</div>
+        )}
     </section>
   )
 }

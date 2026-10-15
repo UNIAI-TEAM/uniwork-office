@@ -101,6 +101,7 @@ function makeApi(initial: AccountStatus) {
     accountLogin: vi.fn(async () => true),
     accountCancelLogin: vi.fn(async () => undefined),
     accountRetry: vi.fn(async () => statusFor('signed-in')),
+    accountReplaceLockedSignIn: vi.fn(async () => true),
     accountSetServer: vi.fn(async (_address: string): Promise<AccountSetServerResult> => ({
       ok: true,
       status: statusFor('signed-out'),
@@ -643,6 +644,109 @@ describe('Settings → Account pane', () => {
       await click(retry)
       expect(api.accountRetry).toHaveBeenCalledTimes(1)
     }
+  })
+
+  it('keystore locked: only after a failed Retry is "Sign in again" offered, second to Retry', async () => {
+    await render(statusFor('keystore-locked', { error: 'keystore_locked' }), { open: true })
+    expect(button(en.acctSignInAgain)).toBeUndefined()
+    api.accountRetry.mockImplementationOnce(async () =>
+      statusFor('keystore-locked', { error: 'keystore_locked', canReplaceLockedSignIn: true }),
+    )
+    await click(button(en.acctRetry))
+    expect(api.accountRetry).toHaveBeenCalledTimes(1)
+    // the state's own actions row (the server row above has its own footer)
+    const footer = Array.from(
+      Array.from(host.querySelectorAll('.acct-pane > .set-pane-footer.acct-actions'))
+        .at(-1)!
+        .querySelectorAll('button'),
+    )
+    expect(footer.map((b) => b.textContent)).toEqual([en.acctRetry, en.acctSignInAgain])
+    // Retry stays the primary action; the way out is secondary
+    expect(footer[0]!.classList.contains('primary')).toBe(true)
+    expect(footer[1]!.classList.contains('primary')).toBe(false)
+    expect(api.accountLogin).not.toHaveBeenCalled()
+    expect(api.accountReplaceLockedSignIn).not.toHaveBeenCalled()
+    expectNoRawKeys()
+  })
+
+  it('keystore locked: "Sign in again" asks first; Cancel and Escape change nothing, confirm replaces once', async () => {
+    await render(
+      statusFor('keystore-locked', { error: 'keystore_locked', canReplaceLockedSignIn: true }),
+      { open: true },
+    )
+    const dialog = () => host.querySelector<HTMLElement>('.acct-pane [role="alertdialog"]')
+    const opener = button(en.acctSignInAgain)!
+    opener.focus()
+    await click(opener)
+    expect(dialog()).not.toBeNull()
+    expect(dialog()!.textContent).toContain(en.acctReplaceTitle)
+    expect(dialog()!.textContent).toContain(en.acctReplaceBody)
+    // queued offline edits are said to stay, and the saved sign-in to be replaced
+    expect(en.acctReplaceBody).toMatch(/replaces/)
+    expect(en.acctReplaceBody).toMatch(/nothing is deleted/)
+    // Cancel is focused on open, and the footer actions hide behind the prompt
+    expect(document.activeElement?.textContent).toBe(en.acctCancel)
+    expect(button(en.acctRetry)).toBeUndefined()
+
+    // Escape = cancel: closed, nothing sent, focus back on the opener
+    await act(async () => {
+      dialog()!.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+      )
+    })
+    await flush()
+    expect(dialog()).toBeNull()
+    expect(document.activeElement).toBe(button(en.acctSignInAgain))
+
+    // Cancel: the same
+    await click(button(en.acctSignInAgain))
+    await click(button(en.acctCancel))
+    expect(dialog()).toBeNull()
+    expect(api.accountReplaceLockedSignIn).not.toHaveBeenCalled()
+    expect(api.accountLogin).not.toHaveBeenCalled()
+    expect(pane()?.dataset.state).toBe('keystore-locked')
+
+    // confirm: one replacing sign-in, never the plain sign-in
+    await click(button(en.acctSignInAgain))
+    await click(button(en.acctReplaceGo))
+    expect(api.accountReplaceLockedSignIn).toHaveBeenCalledTimes(1)
+    expect(api.accountLogin).not.toHaveBeenCalled()
+    expect(dialog()).toBeNull()
+  })
+
+  it('keystore locked: the replace prompt closes when main withdraws the offer', async () => {
+    await render(
+      statusFor('keystore-locked', { error: 'keystore_locked', canReplaceLockedSignIn: true }),
+      { open: true },
+    )
+    await click(button(en.acctSignInAgain))
+    expect(host.querySelector('.acct-pane [role="alertdialog"]')).not.toBeNull()
+    await act(async () => api.push(statusFor('signed-in')))
+    await flush()
+    expect(host.querySelector('.acct-pane [role="alertdialog"]')).toBeNull()
+    await act(async () =>
+      api.push(
+        statusFor('keystore-locked', { error: 'keystore_locked', canReplaceLockedSignIn: true }),
+      ),
+    )
+    await flush()
+    // it does not come back on its own
+    expect(host.querySelector('.acct-pane [role="alertdialog"]')).toBeNull()
+  })
+
+  it('keystore locked in Vietnamese: the replace prompt reads in Vietnamese', async () => {
+    await render(
+      statusFor('keystore-locked', { error: 'keystore_locked', canReplaceLockedSignIn: true }),
+      { open: true, lang: 'vi' },
+    )
+    expect(button(vi_.acctRetry)).toBeDefined()
+    await click(button(vi_.acctSignInAgain))
+    const text = host.querySelector('.acct-pane [role="alertdialog"]')?.textContent ?? ''
+    expect(text).toContain(vi_.acctReplaceTitle)
+    expect(text).toContain(vi_.acctReplaceBody)
+    expect(button(vi_.acctCancel)).toBeDefined()
+    expect(button(vi_.acctReplaceGo)).toBeDefined()
+    expectNoRawKeys()
   })
 
   it('keystore locked in Vietnamese reads from the sync shard, offers Thử lại and never reads as signed in', async () => {

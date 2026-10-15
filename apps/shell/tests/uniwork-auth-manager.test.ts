@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -548,6 +548,160 @@ describe('keystore locked', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
+  })
+})
+
+describe('keystore locked: replacing the saved sign-in', () => {
+  /** a working keychain that cannot open bytes it did not write (keyring swapped) */
+  const swappedKeychain: SafeStorageLike = {
+    isEncryptionAvailable: () => true,
+    encryptString: (text) => Buffer.from(`enc:${text}`),
+    decryptString: (buf) => {
+      const raw = buf.toString()
+      if (!raw.startsWith('enc:')) throw new Error('bad ciphertext')
+      return raw.slice(4)
+    },
+  }
+
+  /** every file under `dir` (relative path -> bytes), for byte-for-byte compares */
+  function snapshot(dir: string): Record<string, string> {
+    const out: Record<string, string> = {}
+    for (const entry of readdirSync(dir, { recursive: true, withFileTypes: true })) {
+      if (!entry.isFile()) continue
+      const path = join(entry.parentPath, entry.name)
+      out[path.slice(dir.length + 1)] = readFileSync(path).toString('base64')
+    }
+    return out
+  }
+
+  function lockedUserData() {
+    const dir = mkdtempSync(join(tmpdir(), 'uw-auth-replace-'))
+    const unreadable = Buffer.from('written under another OS key')
+    mkdirSync(join(dir, 'uniwork-auth'), { recursive: true })
+    writeFileSync(join(dir, 'uniwork-auth', 'session.bin'), unreadable)
+    // the account's offline work: store key, queued intents, drafts, parked copies
+    const sync = join(dir, 'uniwork-sync', 'default')
+    mkdirSync(join(sync, 'acc_1', 'intents'), { recursive: true })
+    mkdirSync(join(sync, 'acc_1', 'drafts'), { recursive: true })
+    mkdirSync(join(sync, 'acc_1', 'parked'), { recursive: true })
+    writeFileSync(join(dir, 'uniwork-sync', 'keys-acc_1.key'), 'wrapped-key')
+    writeFileSync(join(sync, 'acc_1', 'intents', 'i1.bin'), 'queued save')
+    writeFileSync(join(sync, 'acc_1', 'drafts', 'd1.bin'), 'draft')
+    writeFileSync(join(sync, 'acc_1', 'parked', 'p1.bin'), 'parked copy')
+    const store = createCredentialStore({ userDataDir: dir, safeStorage: swappedKeychain })
+    return { dir, store, unreadable, session: join(dir, 'uniwork-auth', 'session.bin') }
+  }
+
+  it('a plain sign-in never replaces a saved sign-in this computer cannot open', async () => {
+    const data = lockedUserData()
+    try {
+      const ctx = setup({ credentials: data.store })
+      expect((await ctx.manager.restore()).state).toBe('keystore-locked')
+      expect(await ctx.manager.login()).toBe(false)
+      expect(ctx.transport.start).not.toHaveBeenCalled()
+      expect(ctx.openBrowser).not.toHaveBeenCalled()
+      expect(ctx.events.at(-1)).toEqual({ phase: 'error', error: 'keystore_locked' })
+      expect(readFileSync(data.session)).toEqual(data.unreadable)
+    } finally {
+      rmSync(data.dir, { recursive: true, force: true })
+    }
+  })
+
+  it('is refused until a Retry has failed, and outside keystore-locked', async () => {
+    const data = lockedUserData()
+    try {
+      const ctx = setup({ credentials: data.store })
+      // signed out (nothing read yet): refused
+      expect(await ctx.manager.replaceLockedSignIn()).toBe(false)
+      expect((await ctx.manager.restore()).state).toBe('keystore-locked')
+      // locked, but no Retry yet: refused, and the status does not offer it
+      expect(ctx.manager.status().canReplaceLockedSignIn).toBeUndefined()
+      expect(await ctx.manager.replaceLockedSignIn()).toBe(false)
+      expect(ctx.transport.start).not.toHaveBeenCalled()
+      expect(ctx.openBrowser).not.toHaveBeenCalled()
+      expect(readFileSync(data.session)).toEqual(data.unreadable)
+    } finally {
+      rmSync(data.dir, { recursive: true, force: true })
+    }
+  })
+
+  it('after a failed Retry it is offered; the new sign-in replaces only the saved sign-in', async () => {
+    const data = lockedUserData()
+    try {
+      const ctx = setup({ credentials: data.store, orgId: 'org_a' })
+      expect((await ctx.manager.restore()).state).toBe('keystore-locked')
+      const before = snapshot(data.dir)
+      const retried = await ctx.manager.retry()
+      expect(retried).toMatchObject({ state: 'keystore-locked', canReplaceLockedSignIn: true })
+      // the push carries it too, so every window shows the way out
+      expect(ctx.statuses.at(-1)?.canReplaceLockedSignIn).toBe(true)
+      expect(ctx.transport.refresh).not.toHaveBeenCalled()
+
+      expect(await ctx.manager.replaceLockedSignIn()).toBe(true)
+      expect(ctx.transport.start).toHaveBeenCalledTimes(1)
+      expect(ctx.openBrowser).toHaveBeenCalledTimes(1)
+      expect(ctx.manager.status().state).toBe('signing-in')
+      // nothing is replaced before the new sign-in is redeemed
+      expect(snapshot(data.dir)).toEqual(before)
+      const startArgs = ctx.transport.start.mock.calls.at(-1)?.[0] as { state: string }
+      await ctx.manager.completeCallback(
+        `uniwork-office://auth/callback?code=c1&state=${encodeURIComponent(startArgs.state)}`,
+      )
+      expect(ctx.manager.status()).toMatchObject({ state: 'signed-in', loggedIn: true })
+      expect(ctx.manager.status().canReplaceLockedSignIn).toBeUndefined()
+      // the saved sign-in is the new one; every other file is byte-identical
+      expect(data.store.load()?.refreshToken).toMatch(/^rt_/)
+      expect(readFileSync(data.session)).not.toEqual(data.unreadable)
+      const after = snapshot(data.dir)
+      const credential = join('uniwork-auth', 'session.bin')
+      expect(Object.keys(after).sort()).toEqual(Object.keys(before).sort())
+      for (const path of Object.keys(before)) {
+        if (path !== credential) expect(after[path], path).toBe(before[path])
+      }
+    } finally {
+      rmSync(data.dir, { recursive: true, force: true })
+    }
+  })
+
+  it('a cancelled replacing sign-in leaves the saved sign-in byte-identical', async () => {
+    const data = lockedUserData()
+    try {
+      const ctx = setup({ credentials: data.store })
+      await ctx.manager.restore()
+      await ctx.manager.retry()
+      const before = snapshot(data.dir)
+      expect(await ctx.manager.replaceLockedSignIn()).toBe(true)
+      ctx.manager.cancelLogin()
+      expect(snapshot(data.dir)).toEqual(before)
+      expect(readFileSync(data.session)).toEqual(data.unreadable)
+    } finally {
+      rmSync(data.dir, { recursive: true, force: true })
+    }
+  })
+
+  it('a keychain that cannot store a new sign-in opens no browser, even after a failed Retry', async () => {
+    const locked = createLockableCredentialStore(stored({ refreshToken: 'rt_keep' }))
+    locked.store.canStore = () => false
+    const ctx = setup({ credentials: locked.store })
+    await ctx.manager.restore()
+    expect((await ctx.manager.retry()).canReplaceLockedSignIn).toBe(true)
+    expect(await ctx.manager.replaceLockedSignIn()).toBe(false)
+    expect(ctx.transport.start).not.toHaveBeenCalled()
+    expect(ctx.openBrowser).not.toHaveBeenCalled()
+    expect(ctx.events.at(-1)).toEqual({ phase: 'error', error: 'keystore_locked' })
+    expect(locked.saved()?.refreshToken).toBe('rt_keep')
+  })
+
+  it('a Retry that opens the keychain signs in and withdraws the offer', async () => {
+    const locked = createLockableCredentialStore(stored())
+    const ctx = setup({ credentials: locked.store, orgId: 'org_a' })
+    await ctx.manager.restore()
+    expect((await ctx.manager.retry()).canReplaceLockedSignIn).toBe(true)
+    locked.unlock()
+    const status = await ctx.manager.retry()
+    expect(status.state).toBe('signed-in')
+    expect(status.canReplaceLockedSignIn).toBeUndefined()
+    expect(await ctx.manager.replaceLockedSignIn()).toBe(false)
   })
 })
 
