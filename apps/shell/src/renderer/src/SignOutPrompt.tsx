@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, type RefObject } from 'react'
 import { useI18n } from './locale'
 import { signOutIsKeystoreVariant, type AccountController } from './account-model'
+import { foreignModalOpen, whenNoForeignModal } from './modal-guard'
 import type { SignOutPlan } from '../../shared/home-api'
 
 /** puts focus back on the opener, or on it once it is mounted again */
@@ -9,9 +10,25 @@ function restoreFocus(returnFocusRef: RefObject<HTMLElement | null>): void {
     returnFocusRef.current.focus()
   } else {
     queueMicrotask(() => {
+      // something else (a prompt that replaced this one) may hold focus by now
+      const active = document.activeElement
+      if (active && active !== document.body) return
       if (returnFocusRef.current?.isConnected) returnFocusRef.current.focus()
     })
   }
+}
+
+/**
+ * Focuses `button` on open, but not while another aria-modal dialog covers the
+ * page: then it waits for that dialog to close. Returns the cancel function.
+ */
+function focusUnlessCovered(button: HTMLElement | null): (() => void) | undefined {
+  if (!button) return undefined
+  if (!foreignModalOpen(button)) {
+    button.focus()
+    return undefined
+  }
+  return whenNoForeignModal(() => button.focus(), button)
 }
 
 /**
@@ -33,8 +50,11 @@ function SignOutNotice({
   const okBtnRef = useRef<HTMLButtonElement>(null)
 
   useLayoutEffect(() => {
-    okBtnRef.current?.focus()
-    return () => restoreFocus(returnFocusRef)
+    const cancelFocus = focusUnlessCovered(okBtnRef.current)
+    return () => {
+      cancelFocus?.()
+      restoreFocus(returnFocusRef)
+    }
   }, [returnFocusRef])
 
   return (
@@ -97,7 +117,7 @@ export function SignOutPrompt({
     if (signOutPrompt) {
       promptWasOpen.current = true
       confirmingSignOut.current = false
-      backBtnRef.current?.focus()
+      return focusUnlessCovered(backBtnRef.current)
     } else if (promptWasOpen.current) {
       promptWasOpen.current = false
       const shouldRestore = !confirmingSignOut.current
@@ -106,6 +126,7 @@ export function SignOutPrompt({
         restoreFocus(returnFocusRef)
       }
     }
+    return undefined
   }, [signOutPrompt, returnFocusRef])
 
   useLayoutEffect(
@@ -158,7 +179,6 @@ export function SignOutPrompt({
           ref={backBtnRef}
           type="button"
           className="set-btn primary"
-          autoFocus
           onClick={() => {
             if (signOutBusy) return
             account.cancelSignOut?.()

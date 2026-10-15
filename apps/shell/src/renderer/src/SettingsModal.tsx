@@ -1772,8 +1772,9 @@ export function SettingsModal({
   }
   const requestClose = () =>
     guardLeave(() => {
+      // same order as Escape: a queued notice stays until no prompt is open
       if (account?.signOutPrompt) account.cancelSignOut?.()
-      if (account?.signOutNotice) account.acknowledgeSignOutNotice?.()
+      else if (account?.signOutNotice) account.acknowledgeSignOutNotice?.()
       onClose()
     })
   const goToSection = (id: SectionId) => {

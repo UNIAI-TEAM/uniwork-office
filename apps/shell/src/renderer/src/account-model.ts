@@ -118,6 +118,16 @@ export function signOutIsKeystoreVariant(plan: SignOutPlan): boolean {
   return plan.keystoreLocked && plan.ramOnly > 0
 }
 
+/** two switch notices shown as one: what was lost across both accounts */
+function addNoticePlans(a: SignOutPlan, b: SignOutPlan): SignOutPlan {
+  return {
+    count: a.count + b.count,
+    waiting: a.waiting + b.waiting,
+    keystoreLocked: a.keystoreLocked || b.keystoreLocked,
+    ramOnly: a.ramOnly + b.ramOnly,
+  }
+}
+
 /**
  * FE d1-n1 / d2-2: safety ceiling (SIGN_OUT_RECEIPT_WAIT_MS + 10_000) so a missing
  * `done` push after confirming sign-out never leaves the renderer stuck waiting.
@@ -201,7 +211,8 @@ export function useAccount(options?: { ownsSignOutPrompt?: boolean }): AccountCo
   const logoutInFlight = useRef(false)
   const waitingForDone = useRef(false)
   const promptReqId = useRef<string | null>(null)
-  const noticeReqId = useRef<string | null>(null)
+  // every switch notice not acknowledged yet: one acknowledge answers them all
+  const noticeReqIds = useRef<string[]>([])
 
   const clearWaitTimer = useCallback(() => {
     if (waitTimer.current !== null) {
@@ -299,11 +310,11 @@ export function useAccount(options?: { ownsSignOutPrompt?: boolean }): AccountCo
       ? window.aiOffice.onSignOutPrompt?.((req) => {
           if (req.mode === 'notice') {
             // the switch already happened: nothing to confirm, and an open
-            // sign-out prompt of this account is left as it is
-            const earlier = noticeReqId.current
-            noticeReqId.current = req.requestId
-            if (earlier !== null) void window.aiOffice.answerSignOutPrompt?.(earlier, true)
-            setSignOutNotice(req.plan)
+            // sign-out prompt of this account is left as it is. A notice that
+            // arrives before the last one is acknowledged adds to it, so no
+            // account's loss goes unreported.
+            noticeReqIds.current.push(req.requestId)
+            setSignOutNotice((open) => (open ? addNoticePlans(open, req.plan) : req.plan))
             return
           }
           if (promptReqId.current !== null) {
@@ -479,9 +490,9 @@ export function useAccount(options?: { ownsSignOutPrompt?: boolean }): AccountCo
   }
 
   const acknowledgeSignOutNotice = () => {
-    const reqId = noticeReqId.current
-    noticeReqId.current = null
-    if (reqId !== null) void window.aiOffice.answerSignOutPrompt?.(reqId, true)
+    const reqIds = noticeReqIds.current
+    noticeReqIds.current = []
+    for (const reqId of reqIds) void window.aiOffice.answerSignOutPrompt?.(reqId, true)
     setSignOutNotice(null)
   }
 

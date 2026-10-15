@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import type { AccountStatus } from '../../shared/home-api'
 import { useI18n } from './locale'
 import type { StringKey } from './locale'
@@ -13,6 +13,7 @@ import {
 } from './account-model'
 import { SettingsModal, type SettingsSectionId, type SettingsTarget } from './SettingsModal'
 import { orgChoiceOf } from './uniwork-docs-model'
+import { whenNoForeignModal } from './modal-guard'
 
 /** sidebar sub-line for the states that need attention */
 const STATE_SUB: Partial<Record<AccountView, StringKey>> = {
@@ -92,12 +93,23 @@ export function AccountEntry({
   // signed in to several organizations and none chosen yet, or a main-initiated
   // sign-out prompt needs an answer: bring up Settings › Account
   const choiceNeeded = withProfile && orgChoiceOf(status).needed
-  const signOutPromptNeeded = Boolean(account.signOutPrompt || account.signOutNotice)
+  const hasPrompt = Boolean(account.signOutPrompt)
+  const hasNotice = Boolean(account.signOutNotice)
+  const settingsOpenRef = useRef(settingsOpen)
+  const openSettingsRef = useRef(onOpenSettings)
+  settingsOpenRef.current = settingsOpen
+  openSettingsRef.current = onOpenSettings
   useEffect(() => {
-    if ((choiceNeeded || signOutPromptNeeded) && !settingsOpen) onOpenSettings('account')
-    // reacts to the step appearing only, not to Settings being closed again
+    if (!(choiceNeeded || hasPrompt || hasNotice) || settingsOpen) return undefined
+    // another aria-modal dialog (an S5 conflict) may be up: wait for it to
+    // close instead of opening Settings, and its focus, behind it
+    return whenNoForeignModal(() => {
+      if (!settingsOpenRef.current) openSettingsRef.current('account')
+    })
+    // reacts to the step appearing only, not to Settings being closed again; a
+    // notice left queued when its prompt closes counts as appearing
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [choiceNeeded, signOutPromptNeeded])
+  }, [choiceNeeded, hasPrompt, hasNotice])
 
   const email = status?.profile?.email || status?.email || ''
   const name = withProfile || view === 'wrong-deployment' ? displayNameOf(status) : ''

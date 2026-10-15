@@ -2,6 +2,7 @@
  * @vitest-environment jsdom
  */
 import { act, createElement, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -1087,5 +1088,168 @@ describe('Settings → Account sign-out prompt (S3)', () => {
     expect(api.answerSignOutPrompt).toHaveBeenCalledTimes(2)
     expect(api.answerSignOutPrompt).toHaveBeenLastCalledWith('req-notice', true)
     expect(promptDialog()).toBeNull()
+  })
+
+  it('FE d4-1: a switch notice waits for an open aria-modal dialog: Settings stays closed, then opens and focuses OK', async () => {
+    const conflict = document.createElement('div')
+    conflict.setAttribute('role', 'dialog')
+    conflict.setAttribute('aria-modal', 'true')
+    const conflictBtn = document.createElement('button')
+    conflict.append(conflictBtn)
+    document.body.append(conflict)
+    try {
+      await render(statusFor('signed-in'), { lang: 'en', open: false })
+      conflictBtn.focus()
+      await act(async () => {
+        api.pushPrompt({
+          requestId: 'notice-covered',
+          plan: { count: 1, waiting: 0, keystoreLocked: true, ramOnly: 1 },
+          mode: 'notice',
+        })
+      })
+      await flush()
+      expect(host.querySelector('.set-dialog')).toBeNull()
+      expect(document.activeElement).toBe(conflictBtn)
+
+      await act(async () => {
+        conflict.remove()
+      })
+      await flush()
+      expect(promptDialog()?.textContent).toContain(syncEn.uwSwitchLostTitle)
+      expect(document.activeElement).toBe(promptButton(syncEn.uwSwitchLostOk))
+    } finally {
+      conflict.remove()
+    }
+  })
+
+  it('FE d4-1: with Settings already open, a prompt keeps focus off its button until the aria-modal dialog closes', async () => {
+    await render(statusFor('signed-in'), { lang: 'en', open: true })
+    const conflict = document.createElement('div')
+    conflict.setAttribute('role', 'dialog')
+    conflict.setAttribute('aria-modal', 'true')
+    const conflictBtn = document.createElement('button')
+    conflict.append(conflictBtn)
+    document.body.append(conflict)
+    try {
+      conflictBtn.focus()
+      await act(async () => {
+        api.pushPrompt({
+          requestId: 'confirm-covered',
+          plan: { count: 1, waiting: 0, keystoreLocked: false, ramOnly: 0 },
+        })
+      })
+      await flush()
+      expect(promptButton(syncEn.uwActBack)).toBeDefined()
+      expect(document.activeElement).toBe(conflictBtn)
+
+      await act(async () => {
+        conflict.remove()
+      })
+      await flush()
+      expect(document.activeElement).toBe(promptButton(syncEn.uwActBack))
+    } finally {
+      conflict.remove()
+    }
+  })
+
+  it('FE d4-2: closing Settings with a confirm open cancels only the confirm; the queued notice shows next', async () => {
+    await render(statusFor('signed-in'), { lang: 'en', open: false })
+    await act(async () => {
+      api.pushPrompt({
+        requestId: 'req-confirm',
+        plan: { count: 1, waiting: 0, keystoreLocked: false, ramOnly: 0 },
+      })
+    })
+    await flush()
+    await act(async () => {
+      api.pushPrompt({
+        requestId: 'req-notice',
+        plan: { count: 0, waiting: 0, keystoreLocked: true, ramOnly: 1 },
+        mode: 'notice',
+      })
+    })
+    await flush()
+
+    await click(host.querySelector<HTMLButtonElement>('.set-close'))
+    expect(api.answerSignOutPrompt).toHaveBeenCalledTimes(1)
+    expect(api.answerSignOutPrompt).toHaveBeenCalledWith('req-confirm', false)
+    // the notice was not acknowledged unseen: it is on screen now
+    expect(promptDialog()?.textContent).toContain(syncEn.uwSwitchLostTitle)
+
+    await click(promptButton(syncEn.uwSwitchLostOk))
+    expect(api.answerSignOutPrompt).toHaveBeenCalledTimes(2)
+    expect(api.answerSignOutPrompt).toHaveBeenLastCalledWith('req-notice', true)
+  })
+
+  it('FE d4-3: a second switch notice adds to the open one and one acknowledge answers both', async () => {
+    await render(statusFor('signed-in'), { lang: 'en', open: false })
+    await act(async () => {
+      api.pushPrompt({
+        requestId: 'notice-a',
+        plan: { count: 1, waiting: 0, keystoreLocked: true, ramOnly: 2 },
+        mode: 'notice',
+      })
+    })
+    await flush()
+    expect(promptDialog()?.textContent).toContain(syncEn.uwSwitchLostBody.replace('{count}', '2'))
+    await act(async () => {
+      api.pushPrompt({
+        requestId: 'notice-b',
+        plan: { count: 3, waiting: 0, keystoreLocked: true, ramOnly: 3 },
+        mode: 'notice',
+      })
+    })
+    await flush()
+    // nothing answered yet, and the count covers both accounts
+    expect(api.answerSignOutPrompt).not.toHaveBeenCalled()
+    expect(promptDialog()?.textContent).toContain(syncEn.uwSwitchLostBody.replace('{count}', '5'))
+
+    await click(promptButton(syncEn.uwSwitchLostOk))
+    expect(api.answerSignOutPrompt).toHaveBeenCalledTimes(2)
+    expect(api.answerSignOutPrompt).toHaveBeenCalledWith('notice-a', true)
+    expect(api.answerSignOutPrompt).toHaveBeenCalledWith('notice-b', true)
+    expect(promptDialog()).toBeNull()
+  })
+
+  it('FE d4-4: the focus-return microtask leaves focus alone when something else already holds it', async () => {
+    const opener = document.createElement('button')
+    const other = document.createElement('button')
+    document.body.append(other)
+    const returnFocusRef = { current: opener }
+    const controller = (notice: SignOutPlan | null) =>
+      ({ signOutNotice: notice, acknowledgeSignOutNotice: () => undefined }) as AccountController
+    const mount = (notice: SignOutPlan | null) =>
+      act(async () => {
+        root.render(
+          createElement(
+            LocaleProvider,
+            { initial: 'en' },
+            createElement(SignOutPrompt, { account: controller(notice), returnFocusRef }),
+          ),
+        )
+      })
+    try {
+      await mount({ count: 1, waiting: 0, keystoreLocked: true, ramOnly: 1 })
+      // the opener is detached while the notice closes: the retry is deferred
+      await act(async () => {
+        other.focus()
+        flushSync(() => {
+          root.render(
+            createElement(
+              LocaleProvider,
+              { initial: 'en' },
+              createElement(SignOutPrompt, { account: controller(null), returnFocusRef }),
+            ),
+          )
+        })
+        // reconnected after the close committed but before its microtask runs
+        document.body.append(opener)
+      })
+      await flush()
+      expect(document.activeElement).toBe(other)
+    } finally {
+      opener.remove()
+      other.remove()
+    }
   })
 })
