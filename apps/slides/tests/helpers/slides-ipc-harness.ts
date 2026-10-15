@@ -8,6 +8,7 @@
  * filter list or event payload shows up in the trace.
  */
 import { createHash } from 'node:crypto'
+import { RecoveryClearEpochs, recoveryEpochKey } from '@genoffice/electron-utils/recovery-epochs'
 import { safeExternalUrl } from '@genoffice/electron-utils/safe-external-url'
 
 type Handler = (event: unknown, ...args: unknown[]) => unknown
@@ -208,6 +209,10 @@ export const electronUtilsModule = {
   installContextMenu: () => {},
   installNavigationGuard: () => {},
   isHeadlessMode: () => false,
+  // the real tracker, straight from its own subpath: its keys and epochs are what the
+  // session handlers' autosave/clear race turns on, so a stub would hide the race
+  RecoveryClearEpochs,
+  recoveryEpochKey,
   // the real gate, the same function the session handlers import through the subpath
   safeExternalUrl,
   saveAsSuggestion: (path: string, name: string) => {

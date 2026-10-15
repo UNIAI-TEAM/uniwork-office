@@ -115,6 +115,7 @@ vi.mock('@genoffice/xlsx-gateway/gateway/xlsx-package-io', async (importOriginal
 }))
 
 import { clearWorkbookRecovery, createSheetsView } from '../src/main/sheets-main'
+import { recoveryEpochEntries } from '../src/main/recovery-policy'
 import { IPC_CHANNELS } from '../src/shared/ipc-channels'
 import { workbookSaveRequestSchema } from '../src/shared/desktop-api'
 
@@ -187,5 +188,36 @@ describe('a recovery write racing the sign-out sweep (G5-11 d2-5)', () => {
     expect(res).toEqual({ ok: true })
     const names = readdirSync(join(userData.dir, 'sheets-autosave'))
     expect(names).toHaveLength(1)
+  })
+})
+
+describe('the clear epoch key and lifetime (G5-11f d3-2, d3-3)', () => {
+  it('a sweep that spells the workbook path differently still undoes the write in flight', async () => {
+    const { event, file } = await openedWorkbook()
+    // the shell builds the path from the store, the renderer opened the other spelling
+    const respelled = `${dirname(file)}/sub/../Budget.xlsx`
+    expect(respelled).not.toBe(file)
+    hooks.duringWrite = () => clearWorkbookRecovery(respelled)
+
+    const res = await handlers.get(IPC_CHANNELS.writeWorkbookRecovery)!(event, recoveryRequest())
+
+    expect(res).toEqual({ ok: false })
+    expect(readdirSync(join(userData.dir, 'sheets-autosave'))).toEqual([])
+  })
+
+  it('keeps no epoch entry once the write and the clears are done', async () => {
+    const { event, file } = await openedWorkbook()
+    hooks.duringWrite = () => {
+      // an entry exists while the write is in flight
+      expect(recoveryEpochEntries()).toBe(1)
+      clearWorkbookRecovery(file)
+    }
+    await handlers.get(IPC_CHANNELS.writeWorkbookRecovery)!(event, recoveryRequest())
+    expect(recoveryEpochEntries()).toBe(0)
+
+    hooks.duringWrite = null
+    await handlers.get(IPC_CHANNELS.writeWorkbookRecovery)!(event, recoveryRequest())
+    clearWorkbookRecovery(file)
+    expect(recoveryEpochEntries()).toBe(0)
   })
 })

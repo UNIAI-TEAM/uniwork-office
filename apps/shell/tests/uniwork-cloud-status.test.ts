@@ -220,6 +220,38 @@ describe('shell account + cloud status integration (RB1-1, RB1-4, RB1-8, RB1-9)'
     ])
   })
 
+  it('the replace-locked-sign-in channel answers only the shell page and the manager refuses outside keystore-locked', async () => {
+    const handlers = new Map<string, (event: unknown, ...args: unknown[]) => unknown>()
+    const frame = {}
+    const shellEvent = mainFrameEvent(frame)
+    const shellWc = { ...shellEvent.sender, send: vi.fn() }
+    shellEvent.sender = shellWc
+    registerAccountIpc(
+      {
+        handle: (channel, listener) => {
+          handlers.set(channel, listener as (event: unknown, ...args: unknown[]) => unknown)
+        },
+      } as never,
+      () => shellWc as never,
+    )
+    const replace = handlers.get(HOME_CHANNELS.accountReplaceLockedSignIn)!
+    const spy = vi.spyOn(uniworkAccount(), 'replaceLockedSignIn')
+    // senders that call an account channel get status pushes, so they can receive
+    const withSend = <T extends { sender: object }>(event: T) => ({
+      ...event,
+      sender: { ...event.sender, send: vi.fn() },
+    })
+    // another page or a frame inside the shell never reaches the manager
+    expect(await replace(withSend(mainFrameEvent()))).toBe(false)
+    expect(await replace(withSend(forgedSubframeEvent()))).toBe(false)
+    expect(spy).not.toHaveBeenCalled()
+    // the shell page does, and main refuses: not keystore-locked after a failed Retry
+    await uniworkAccount().restore()
+    expect(await replace(shellEvent)).toBe(false)
+    expect(spy).toHaveBeenCalledTimes(1)
+    spy.mockRestore()
+  })
+
   it('logs console.warn when webContents broadcast throws during status notification (RB1-9)', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     electron.webContents.getAllWebContents.mockReturnValue([
