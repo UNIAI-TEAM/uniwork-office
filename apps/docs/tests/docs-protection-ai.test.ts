@@ -10,11 +10,32 @@ import {
   type AiDocProtection,
 } from '../src/renderer/ai/docs-skill'
 import { AGENT_TOOLS } from '../src/renderer/ai/tools'
+import { aiTrackFor, aiTracksChanges } from '../src/renderer/ai/track-policy'
 
 const NUM_IDS = { bullet: null, ordered: null }
 const EDIT_TOOLS = ['insert_content', 'replace_blocks', 'replace_selection', 'apply_ops']
 const COMMENT_TOOLS = ['add_comment', 'reply_comment']
 const REVIEW_TOOLS = ['accept_changes', 'reject_changes']
+// write tools that cannot record a tracked revision (side state, notes, charts, pictures, floating objects)
+const UNTRACKABLE_TOOLS = [
+  'set_header_footer',
+  'set_page_setup',
+  'insert_section_break',
+  'define_style',
+  'set_watermark',
+  'insert_footnote',
+  'insert_endnote',
+  'edit_note',
+  'delete_note',
+  'insert_chart',
+  'edit_chart',
+  'insert_text_box',
+  'insert_image',
+  'insert_picture',
+  'generate_image',
+]
+// write tools that take `track` and keep working under tracked-changes protection
+const TRACKABLE_TOOLS = ['insert_content', 'replace_blocks', 'replace_selection', 'apply_ops']
 
 function createEditor(): Editor {
   return new Editor({
@@ -112,6 +133,63 @@ describe('AI agent on a protected Word document', () => {
     editor.destroy()
   })
 
+  it('trackedChanges: every write tool that cannot record a revision is hidden and refused', async () => {
+    const editor = createEditor()
+    const before = JSON.stringify(editor.getJSON())
+    const skill = skillFor(editor, () => 'trackedChanges')
+    const got = names(skill)
+    for (const n of UNTRACKABLE_TOOLS) expect(got).not.toContain(n)
+    for (const n of [...TRACKABLE_TOOLS, 'write_document', ...COMMENT_TOOLS]) {
+      expect(got).toContain(n)
+    }
+    for (const n of UNTRACKABLE_TOOLS) {
+      const exec = await skill.executeTool({ id: 't1', name: n, input: {} })
+      expect(exec.isError).toBe(true)
+      expect(exec.mutated).toBe(false)
+    }
+    expect(JSON.stringify(editor.getJSON())).toBe(before)
+    expect(skill.systemPrompt).toContain('tracked changes')
+    editor.destroy()
+  })
+
+  it('refusal text uses plain words, not the camelCase kind', async () => {
+    const editor = createEditor()
+    const skill = skillFor(editor, () => 'trackedChanges')
+    const exec = await skill.executeTool({ id: 't1', name: 'accept_changes', input: {} })
+    expect(exec.output).toContain('tracked changes')
+    expect(exec.output).not.toContain('trackedChanges')
+    editor.destroy()
+  })
+
+  it('BYOK and UniWork AI settings see the same tools under every protection', () => {
+    const editor = createEditor()
+    const build = (imageGen: boolean, mediaAnalysis: boolean, protection: AiDocProtection) =>
+      createDocsSkill(
+        () => editor,
+        () => NUM_IDS,
+        undefined,
+        undefined,
+        undefined,
+        () => imageGen,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        () => mediaAnalysis,
+        () => false,
+        () => false,
+        undefined,
+        () => protection,
+      )
+    for (const kind of ['none', 'readOnly', 'comments', 'forms', 'trackedChanges'] as const) {
+      const byok = build(true, true, kind)
+      const uniwork = build(true, true, kind)
+      expect(names(uniwork)).toEqual(names(byok))
+      expect(uniwork.systemPrompt).toBe(byok.systemPrompt)
+    }
+    editor.destroy()
+  })
+
   it('is live: removing the protection brings every tool back on the next read', () => {
     const editor = createEditor()
     let kind: AiDocProtection = 'readOnly'
@@ -165,7 +243,31 @@ describe('aiProtectionOf', () => {
     expect(aiProtectionOf(on('trackedChanges'), true)).toBe('readOnly')
   })
 
+  it('edit="none" enforced stays unrestricted, like the app own reading', () => {
+    expect(aiProtectionOf(on('none'), false)).toBe('none')
+  })
+
   it('an enforced restriction of an unknown kind is treated as read only', () => {
     expect(aiProtectionOf(on('somethingNew'), false)).toBe('readOnly')
+  })
+})
+
+describe('forced AI tracking', () => {
+  it('tracked-changes protection forces the AI author even with the toggle off', () => {
+    expect(aiTracksChanges(false, 'trackedChanges')).toBe(true)
+    expect(aiTrackFor(false, 'trackedChanges', 'AI Assistant')).toEqual({ author: 'AI Assistant' })
+  })
+
+  it('without protection the panel toggle decides', () => {
+    expect(aiTracksChanges(true, 'none')).toBe(true)
+    expect(aiTrackFor(true, 'none', 'AI Assistant')).toEqual({ author: 'AI Assistant' })
+    expect(aiTracksChanges(false, 'none')).toBe(false)
+    expect(aiTrackFor(false, 'none', 'AI Assistant')).toBeUndefined()
+  })
+
+  it('other protections never turn tracking on by themselves', () => {
+    for (const kind of ['readOnly', 'comments', 'forms'] as const) {
+      expect(aiTracksChanges(false, kind)).toBe(false)
+    }
   })
 })
