@@ -65,8 +65,16 @@ export function createSyncStoreAccess(options: {
     null
   let pending: { scope: StoreScope; token: string; promise: Promise<SyncStoreOpen> } | null = null
   let lastScope: StoreScope | null = null
-  /** bumped by forget / lock: an open that started before it never lands */
+  /** bumped by forget: an open of any scope that started before it never lands */
   let generation = 0
+  /**
+   * bumped per scope by lock: an open of THAT scope that started before it
+   * never lands. Locking the account being left must not discard the incoming
+   * account's open already in flight (an account/deployment switch locks the
+   * outgoing scope while the new session is already reading its own store).
+   */
+  const lockEpochs = new Map<string, number>()
+  const epochOf = (token: string): string => `${generation}:${lockEpochs.get(token) ?? 0}`
 
   const currentToken = (): string | null => {
     const scope = options.scope()
@@ -76,13 +84,13 @@ export function createSyncStoreAccess(options: {
   const openScope = async (
     scope: StoreScope,
     token: string,
-    started: number,
+    started: string,
   ): Promise<SyncStoreOpen> => {
     const result = await options.layer.open(scope)
     if (result.kind !== 'ok') return result
     // the session may have moved, or the boundary locked/wiped the scope, while
     // the key was fetched: that handle belongs to nobody now
-    if (started !== generation || currentToken() !== token) return { kind: 'no_session' }
+    if (started !== epochOf(token) || currentToken() !== token) return { kind: 'no_session' }
     const store = result.store
     const handle = {
       scope: { deploymentId: scope.deploymentId, accountId: scope.accountId },
@@ -95,12 +103,12 @@ export function createSyncStoreAccess(options: {
   }
 
   const openToken = async (scope: StoreScope, token: string): Promise<SyncStoreOpen> => {
-    const started = generation
+    const started = epochOf(token)
     const cached = opened
     if (cached?.token === token) {
       // a handle is only served while its key can still be produced
       const status = await options.layer.verifyKey(scope)
-      if (started !== generation || currentToken() !== token) return { kind: 'no_session' }
+      if (started !== epochOf(token) || currentToken() !== token) return { kind: 'no_session' }
       if (status !== 'ok') {
         if (opened === cached) opened = null
         return { kind: status }
@@ -146,8 +154,18 @@ export function createSyncStoreAccess(options: {
     },
     async lock(explicitScope) {
       const left = explicitScope ?? opened?.scope ?? pending?.scope ?? lastScope ?? options.scope()
-      dropHandle()
-      if (left) await options.layer.lock(left)
+      if (!left) {
+        dropHandle()
+        return
+      }
+      // only the scope being left loses its handles; another scope's open or
+      // cached handle (the incoming session's) stays valid
+      const token = tokenOf(left)
+      lockEpochs.set(token, (lockEpochs.get(token) ?? 0) + 1)
+      if (opened?.token === token) opened = null
+      if (pending?.token === token) pending = null
+      if (lastScope && tokenOf(lastScope) === token) lastScope = null
+      await options.layer.lock(left)
     },
   }
 }

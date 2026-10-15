@@ -307,4 +307,38 @@ describe('createSyncStoreAccess', () => {
     const read = await reopened.records(INTENT_STORE_REGISTRATION.name).read('doc_1')
     expect(read).toEqual({ kind: 'ok', value: new Uint8Array(Buffer.from('kept-ciphertext')) })
   })
+
+  it("locking the scope being left never discards the incoming scope's open (G5-11 F6)", async () => {
+    const { layer } = make()
+    let account = 'acc_1'
+    let releaseOpen: (() => void) | null = null
+    const gated: StoreLayer = {
+      ...layer,
+      open: async (scope) => {
+        // acc_2's key fetch is still in flight when acc_1 is locked
+        if (scope.accountId === 'acc_2') await new Promise<void>((r) => (releaseOpen = r))
+        return layer.open(scope)
+      },
+    }
+    const access = createSyncStoreAccess({
+      layer: gated,
+      scope: () => ({ deploymentId: 'dep_1', accountId: account }),
+    })
+    const first = await access.open()
+    if (first.kind !== 'ok') throw new Error(first.kind)
+    const outgoing = first.records(INTENT_STORE_REGISTRATION.name)
+
+    account = 'acc_2'
+    const incoming = access.open()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await access.lock({ deploymentId: 'dep_1', accountId: 'acc_1' })
+    releaseOpen?.()
+    const opened = await incoming
+    if (opened.kind !== 'ok') throw new Error(opened.kind)
+    const records = opened.records(INTENT_STORE_REGISTRATION.name)
+    expect(await records.write('doc_1', Buffer.from('b'))).toEqual({ kind: 'ok' })
+    // the incoming handle is cached; the outgoing one is dead
+    expect((await access.open()).kind).toBe('ok')
+    expect(await outgoing.read('doc_1')).toEqual({ kind: 'interrupted' })
+  })
 })
