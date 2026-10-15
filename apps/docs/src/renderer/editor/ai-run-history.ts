@@ -40,6 +40,9 @@ export function createDocsRunHistoryGroup(): DocsRunHistoryGroup {
       editable: () => active === null,
     },
     filterTransaction(tr) {
+      // an Undo/Redo command (ribbon, menu) during the run would pop the run's own event or an
+      // older one, and the rest of the run would then merge into the wrong step
+      if (active !== null && isHistoryTransaction(tr)) return false
       if (!recordsHistory(tr)) return true
       if (active !== null) {
         if (fresh) {

@@ -108,7 +108,7 @@ export async function mountDocsAiPanel(
       ...panelExtra,
       filePath: extra.filePath === undefined ? '/docs/a.docx' : extra.filePath,
     })
-    return lang ? createElement(LocaleProvider, { initial: lang }, panel) : panel
+    return lang ? createElement(LocaleProvider, { initial: lang, children: panel }) : panel
   }
   act(() => root.render(element()))
   await settle()
