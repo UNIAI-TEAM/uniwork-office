@@ -90,8 +90,8 @@ const OFFICE_APPS = [
 const WORKBENCH_TABS = [
   {
     id: 'desk',
-    label: 'Tổng quan',
-    hint: 'Việc, lịch họp và thông báo hôm nay',
+    label: 'Mặt bàn',
+    hint: 'Tài liệu cần xử lý, đang làm dở và dụng cụ',
     color: '#3b82f6',
     icon: '<path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
   },

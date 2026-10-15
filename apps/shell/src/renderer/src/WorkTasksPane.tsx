@@ -1,21 +1,26 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { FormEvent, ReactElement } from 'react'
-import type { WorkCreateTaskInput, WorkTask, WorkTaskStatus } from '../../shared/uniwork-work-api'
+import type {
+  WorkCreateTaskInput,
+  WorkTask,
+  WorkTaskStatus,
+  WorkWebTarget,
+} from '../../shared/uniwork-work-api'
 import { useI18n, type StringKey } from './locale'
 import { MODULE_TONES } from './module-tones'
 import { settleWork, useWorkLoad } from './work-cache'
 import { formatDay } from './work-home'
 import { closedStatusKeys, groupTasksByDue, localIsoDate, type TaskDueGroup } from './work-tasks'
-import { CHECK_GLYPH, WorkbenchIcon } from './WorkbenchIcons'
+import { CHECK_GLYPH, WbGlyph, WorkbenchIcon } from './WorkbenchIcons'
 import {
   WorkNoWorkspace,
   WorkStaleNote,
   WorkStatePanel,
-  WorkToast,
   workLoadState,
   type WorkPaneProps,
 } from './WorkErrorState'
-import { WorkPaneHeader, type WorkPaneHeaderProps } from './WorkPaneHeader'
+import { WorkToolbar, type WorkToolbarProps } from './WorkToolbar'
+import { useWbToast } from './WbToastHost'
 
 const GROUP_LABEL: Record<TaskDueGroup, StringKey> = {
   overdue: 'wbTasksGroupOverdue',
@@ -25,17 +30,22 @@ const GROUP_LABEL: Record<TaskDueGroup, StringKey> = {
   none: 'wbTasksGroupNone',
 }
 
-/** A write the server refused: a toast whose Retry repeats the same request (spec §7). */
-interface WriteFailure {
-  message: StringKey
-  retry: () => void
+/** the status pill's signal by catalogue category (spec 1.5); the rest stay neutral */
+const STATUS_TONE: Record<string, string> = {
+  in_progress: 'is-info',
+  in_review: 'is-info',
+  done: 'is-success',
 }
+
+/** the one toast slot of this tab: a refused write, whose Retry repeats the same request */
+const WRITE_TOAST = 'tasks-write'
 
 /**
  * Tasks tab: the signed-in user's UniWork tasks in the active workspace,
- * grouped by due date (device-local today) in one list block whose first row
- * is quick add. Ticking a row sets its status (optimistic, put back on
- * failure); a title opens the task on the web.
+ * grouped by due date (device-local today) in one card (redesign spec 4.2):
+ * quick add (Enter, no button), a column header, then aligned grid rows.
+ * Ticking a row sets its status (optimistic, put back on failure) and the row
+ * stays, struck through, until the next load; a title opens the task on the web.
  */
 export function WorkTasksPane({
   workspace,
@@ -44,8 +54,8 @@ export function WorkTasksPane({
   head,
   onWritten,
 }: WorkPaneProps & {
-  /** the tab header, drawn here so its aside can count the loaded list (WorkbenchModulePane passes it) */
-  head?: Omit<WorkPaneHeaderProps, 'aside'>
+  /** the tab toolbar, drawn here so its summary can count the loaded list (WorkbenchModulePane passes it) */
+  head?: WorkToolbarProps
   /** a write landed: the tab counts (Overview summary) are stale */
   onWritten?: () => void
 }): ReactElement {
@@ -62,20 +72,28 @@ export function WorkTasksPane({
   )
   // ticked this session: stays listed (dimmed) until the next load, like the web
   const [touched, setTouched] = useState<ReadonlySet<string>>(() => new Set())
-  const [failure, setFailure] = useState<WriteFailure | null>(null)
+  const toasts = useWbToast()
   const [draft, setDraft] = useState('')
   const [adding, setAdding] = useState(false)
+  // Enter on an empty name: the error sits at the field
+  const [missing, setMissing] = useState(false)
+  const errorId = useId()
 
   useEffect(() => {
     setTouched(new Set())
   }, [list.updatedAt])
   useEffect(() => {
-    setFailure(null)
-  }, [wsId])
+    toasts.dismiss(WRITE_TOAST)
+  }, [wsId, toasts])
 
   const closed = useMemo(() => closedStatusKeys(catalogue.value ?? []), [catalogue.value])
   const statusName = useMemo(
     () => new Map((catalogue.value ?? []).map((s) => [s.key, s.name])),
+    [catalogue.value],
+  )
+  // a key missing from the catalogue falls back to itself (the built-in keys match their category)
+  const statusCategory = useMemo(
+    () => new Map((catalogue.value ?? []).map((s) => [s.key, s.category])),
     [catalogue.value],
   )
 
@@ -84,7 +102,7 @@ export function WorkTasksPane({
 
   const setDone = async (task: WorkTask, done: boolean): Promise<void> => {
     const next = done ? 'done' : 'todo'
-    setFailure(null)
+    toasts.dismiss(WRITE_TOAST)
     setTouched((cur) => new Set(cur).add(task.id))
     setRowStatus(task.id, next)
     const r = await settleWork(window.uniworkWork.setTaskStatus(task.id, next))
@@ -94,11 +112,19 @@ export function WorkTasksPane({
       return
     }
     setRowStatus(task.id, task.status)
-    setFailure({ message: 'wbTasksSaveFailed', retry: () => void setDone(task, done) })
+    failed('wbTasksSaveFailed', () => void setDone(task, done))
   }
 
+  const failed = (message: StringKey, retry: () => void) =>
+    toasts.show({
+      id: WRITE_TOAST,
+      message: { key: message },
+      tone: 'alert',
+      actions: [{ label: 'acctRetry', onClick: retry }],
+    })
+
   const create = async (input: WorkCreateTaskInput): Promise<void> => {
-    setFailure(null)
+    toasts.dismiss(WRITE_TOAST)
     setAdding(true)
     const r = await settleWork(window.uniworkWork.createTask(input))
     setAdding(false)
@@ -110,27 +136,50 @@ export function WorkTasksPane({
       return
     }
     // Retry sends the same Idempotency-Key: a lost answer never creates a second task
-    setFailure({ message: 'wbTasksAddFailed', retry: () => void create(input) })
+    failed('wbTasksAddFailed', () => void create(input))
   }
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
     const title = draft.trim()
-    if (!wsId || !title || adding) return
+    if (!wsId || adding) return
+    // no Add button: Enter submits, and an empty name says so at the field
+    if (!title) return setMissing(true)
     void create({ workspaceId: wsId, title, idempotencyKey: crypto.randomUUID() })
   }
 
-  const openCount = (list.value ?? []).filter((x) => !closed.has(x.status)).length
-  const header = head ? (
-    <WorkPaneHeader
-      {...head}
-      aside={
-        list.value ? (
-          <span className="wb-num">{t('wbTasksOpenCount', { count: openCount })}</span>
-        ) : undefined
+  const today = localIsoDate(new Date())
+  const open = (list.value ?? []).filter((x) => !closed.has(x.status))
+  // the same date rules as the list's groups, so the summary cannot drift from it
+  const count = (g: TaskDueGroup) =>
+    groupTasksByDue(open, today).find((x) => x.group === g)?.tasks.length ?? 0
+  const overdue = count('overdue')
+  const dueToday = count('today')
+  // a real count once the list loaded (spec 4.2: "6 open · 1 overdue · 2 due today"), else the hint
+  const summary = list.value ? (
+    <>
+      <strong>{t('wbTasksOpenCount', { count: open.length })}</strong>
+      {overdue > 0 ? ` · ${t('wbTasksOverdueCount', { count: overdue })}` : null}
+      {dueToday > 0 ? ` · ${t('wbTasksDueTodayCount', { count: dueToday })}` : null}
+    </>
+  ) : (
+    head?.summary
+  )
+  const openWeb = (target: WorkWebTarget) =>
+    void window.uniworkWork.openWeb(target).catch(() => false)
+  const actions = workspace ? (
+    <button
+      type="button"
+      className="wb-btn wb-btn-ghost wb-btn-sm"
+      onClick={() =>
+        openWeb({ kind: 'my-tasks', orgSlug: workspace.orgSlug, wsSlug: workspace.slug })
       }
-    />
-  ) : null
+    >
+      {t('wbWorkOpenOnWeb')}
+      <WbGlyph id="external" size={14} />
+    </button>
+  ) : undefined
+  const header = head ? <WorkToolbar {...head} summary={summary} actions={actions} /> : null
 
   if (!workspace) {
     return (
@@ -150,15 +199,12 @@ export function WorkTasksPane({
     )
   }
 
-  const today = localIsoDate(new Date())
   const groups = groupTasksByDue(
     (list.value ?? []).filter((x) => !closed.has(x.status) || touched.has(x.id)),
     today,
   )
-  const openOnWeb = (task: WorkTask) =>
-    void window.uniworkWork
-      .openWeb({ kind: 'task', orgSlug: workspace.orgSlug, wsSlug: workspace.slug, id: task.id })
-      .catch(() => false)
+  const openTask = (task: WorkTask) =>
+    openWeb({ kind: 'task', orgSlug: workspace.orgSlug, wsSlug: workspace.slug, id: task.id })
 
   return (
     <>
@@ -167,33 +213,52 @@ export function WorkTasksPane({
         {list.stale && list.updatedAt !== null ? (
           <WorkStaleNote at={list.updatedAt} onRetry={onReload} />
         ) : null}
-        <div className="wb-block">
-          <form className="wb-row wb-work-quick" onSubmit={submit}>
+        {/* unnamed: the pane around it is already the "Tasks" region */}
+        <section className="wb-block wb-tasks">
+          <form className="wb-work-quick" onSubmit={submit}>
             <span className="wb-work-quick-plus" aria-hidden="true">
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                <path
-                  d="M5 1.5v7M1.5 5h7"
-                  stroke="currentColor"
-                  strokeWidth="1.4"
-                  strokeLinecap="round"
-                />
-              </svg>
+              <WbGlyph id="plus" size={10} />
             </span>
             <input
               value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              placeholder={t('wbTasksQuickAdd')}
+              onChange={(e) => {
+                setDraft(e.target.value)
+                setMissing(false)
+              }}
+              placeholder={t('wbTasksQuickAddHint')}
               aria-label={t('wbTasksQuickAdd')}
-              disabled={adding}
+              aria-invalid={missing || undefined}
+              aria-describedby={missing ? errorId : undefined}
+              // read-only, not disabled: focus stays for the next task
+              readOnly={adding}
+              aria-busy={adding || undefined}
             />
-            <button
-              type="submit"
-              className="wb-btn wb-btn-primary wb-btn-sm"
-              disabled={adding || !draft.trim()}
-            >
-              {t('wbTasksAdd')}
-            </button>
+            <kbd className="wb-kbd" aria-hidden="true">
+              ↵
+            </kbd>
+            {missing ? (
+              <p className="wb-work-quick-error" id={errorId} role="alert">
+                {t('wbTasksTitleRequired')}
+              </p>
+            ) : null}
           </form>
+          {groups.length > 0 ? (
+            <div className="wb-work-cols" aria-hidden="true">
+              <span />
+              <span>{t('wbTasksColTask')}</span>
+              <span>{t('wbTasksColId')}</span>
+              <span>{t('wbTasksColStatus')}</span>
+              <span>{t('wbTasksColDue')}</span>
+              <span />
+            </div>
+          ) : (
+            <WorkStatePanel
+              compact
+              tone={MODULE_TONES.tasks}
+              icon={<WorkbenchIcon id="tasks" size={20} />}
+              title={t('wbTasksEmpty')}
+            />
+          )}
           {groups.map(({ group, tasks: rows }) => (
             <section key={group} className="wb-work-group">
               <h3 className={`wb-group-head${group === 'overdue' ? ' is-overdue' : ''}`}>
@@ -203,6 +268,15 @@ export function WorkTasksPane({
                 {rows.map((task) => {
                   const done = closed.has(task.status)
                   const day = task.due_date?.slice(0, 10)
+                  const tone = STATUS_TONE[statusCategory.get(task.status) ?? task.status]
+                  const dueTone =
+                    !day || done
+                      ? ''
+                      : day < today
+                        ? ' is-danger'
+                        : day === today
+                          ? ' is-warning'
+                          : ''
                   return (
                     <li key={task.id} className={`wb-row wb-work-row${done ? ' is-done' : ''}`}>
                       <label className="wb-check">
@@ -221,46 +295,49 @@ export function WorkTasksPane({
                       </label>
                       <button
                         type="button"
-                        className="wb-work-title"
+                        className="wb-row-title"
                         title={t('wbWorkOpenOnWeb')}
-                        onClick={() => openOnWeb(task)}
+                        onClick={() => openTask(task)}
                       >
                         {task.title}
                       </button>
                       <span className="wb-mono">{task.identifier}</span>
-                      <span className="wb-pill is-status">
-                        {statusName.get(task.status) ?? task.status}
+                      <span
+                        className={`wb-pill wb-work-status${tone ? ` ${tone}` : ''}`}
+                        title={statusName.get(task.status) ?? task.status}
+                      >
+                        <span className="wb-pill-dot" aria-hidden="true" />
+                        <span className="wb-pill-text">
+                          {statusName.get(task.status) ?? task.status}
+                        </span>
                       </span>
                       {day ? (
-                        <span
-                          className={`wb-pill wb-num${day < today ? ' is-danger' : day === today ? ' is-warning' : ''}`}
-                        >
+                        <span className={`wb-pill wb-num wb-work-due${dueTone}`}>
                           {day === today
                             ? t('wbTasksGroupToday')
                             : formatDay(day, dateLocale, false)}
                         </span>
-                      ) : null}
+                      ) : (
+                        <span />
+                      )}
+                      <span className="wb-row-actions">
+                        <button
+                          type="button"
+                          className="wb-icon-btn"
+                          aria-label={`${t('wbWorkOpenOnWeb')}: ${task.title}`}
+                          title={t('wbWorkOpenOnWeb')}
+                          onClick={() => openTask(task)}
+                        >
+                          <WbGlyph id="external" size={16} />
+                        </button>
+                      </span>
                     </li>
                   )
                 })}
               </ul>
             </section>
           ))}
-        </div>
-        {groups.length === 0 ? (
-          <WorkStatePanel
-            tone={MODULE_TONES.tasks}
-            icon={<WorkbenchIcon id="tasks" size={20} />}
-            title={t('wbTasksEmpty')}
-          />
-        ) : null}
-        {failure ? (
-          <WorkToast
-            message={failure.message}
-            onRetry={failure.retry}
-            onDismiss={() => setFailure(null)}
-          />
-        ) : null}
+        </section>
       </div>
     </>
   )

@@ -79,6 +79,7 @@ import {
   MAX_REMOTE_IMAGE_BYTES,
   readBodyCapped,
   writeJsonAtomic,
+  newerCopyMtime,
 } from '@genoffice/electron-utils'
 import { answerUniworkAiFlagOff } from '@genoffice/electron-utils/uniwork-ai-flag'
 import { configureMetricsCache, familyVerticalMetrics } from '@genoffice/font-metrics'
@@ -3512,6 +3513,11 @@ const recoveryDir = () => userDataPath('docs-autosave')
 const recoveryPathFor = (filePath: string) =>
   join(recoveryDir(), `${createHash('sha1').update(filePath).digest('hex').slice(0, 16)}.docx`)
 
+/** mtime of a crash copy newer than `filePath`, or null; read-only (the shell's Desk lists it, opening offers the restore) */
+export function recoveryCopyMtime(filePath: string): number | null {
+  return newerCopyMtime(recoveryPathFor(filePath), filePath)
+}
+
 /** Bumped by every clear: an in-flight docs:write-recovery that started before
  * the bump must not recreate the file it is about to land (stale-recovery race). */
 const recoveryClearEpochs = new Map<string, number>()
@@ -3622,7 +3628,10 @@ async function loadDocx(
   // reopen with the user's password), so a bad save never loses the source file
   const hash = lazy?.hash ?? sha256Hex(original)
   await archiveOriginal(filePath, hash, size)
-  const recovery = await maybeRecoverDocBytes(filePath, plainBytes)
+  // an export window must never ask about, or discard, crash recovery (it exports the saved file)
+  const recovery = headlessExportWaiters.has(wcId)
+    ? { bytes: plainBytes, recovered: false }
+    : await maybeRecoverDocBytes(filePath, plainBytes)
   let bytes = recovery.bytes
   let recovered = recovery.recovered
   // recovery copies of a protected document are themselves encrypted (see

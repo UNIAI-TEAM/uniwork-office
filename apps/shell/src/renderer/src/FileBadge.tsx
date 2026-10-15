@@ -26,13 +26,14 @@ export function FileBadge({ ext, size }: { ext: string; size: number }) {
   const label = ext ? ext[0].toUpperCase() : '?'
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true">
-      <rect width="32" height="32" rx="7.5" fill="#98a2b3" />
+      {/* chrome, not document data: the neutral tint pair follows the theme */}
+      <rect width="32" height="32" rx="7.5" style={{ fill: 'var(--tint-gray)' }} />
       <text
         x="16"
         y="16.5"
         textAnchor="middle"
         dominantBaseline="central"
-        fill="#fff"
+        style={{ fill: 'var(--tint-gray-fg)' }}
         fontSize={17}
         fontWeight="700"
         fontFamily="system-ui, -apple-system, 'Segoe UI', sans-serif"

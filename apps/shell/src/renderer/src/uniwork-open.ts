@@ -6,13 +6,13 @@ type OpenApi = Pick<HomeApi, 'openPath' | 'uniworkOpenDocument'>
 /**
  * Open a UniWork document through UniWork (so the binding, the permission
  * check and a fresh download when needed all apply). Progress and failures
- * land in the tab strip's notice.
+ * land in the tab strip's notice. True only when the document opened.
  */
 export async function openUniworkDocument(
   source: { documentId: string; title: string },
   api: Pick<HomeApi, 'uniworkOpenDocument'>,
   notify: (event: UniworkLaunchEvent) => void = publishUniworkNotice,
-): Promise<void> {
+): Promise<boolean> {
   notify({ phase: 'opening', title: source.title })
   try {
     const result = await api.uniworkOpenDocument(source.documentId)
@@ -21,8 +21,10 @@ export async function openUniworkDocument(
         ? { phase: 'opened', path: result.value.path, title: source.title }
         : { phase: 'failed', error: result.error },
     )
+    return result.ok
   } catch {
     notify({ phase: 'failed', error: 'network' })
+    return false
   }
 }
 

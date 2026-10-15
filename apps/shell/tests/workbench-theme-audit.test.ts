@@ -36,7 +36,12 @@ const RAW_COLOR = /#[0-9a-fA-F]{3,8}\b|\b(?:rgb|rgba|hsl|hsla)\(/
 const WORKBENCH_TSX = [
   'WorkbenchTopBar.tsx',
   'WorkbenchTabs.tsx',
-  'WorkOverview.tsx',
+  'DeskView.tsx',
+  'DeskTools.tsx',
+  'DeskInTray.tsx',
+  'DeskInProgress.tsx',
+  'DeskDrawer.tsx',
+  'DeskToday.tsx',
   'WorkTasksPane.tsx',
   'WorkCalendarPane.tsx',
   'WorkProfilePane.tsx',
@@ -44,7 +49,11 @@ const WORKBENCH_TSX = [
   'NotesPane.tsx',
   'PracticeHome.tsx',
   'WorkErrorState.tsx',
-  'WorkPaneHeader.tsx',
+  'WorkToolbar.tsx',
+  'WbMenu.tsx',
+  'WbConfirm.tsx',
+  'WbToastHost.tsx',
+  'FileBadge.tsx',
   'WorkbenchIcons.tsx',
   'WbRowActions.tsx',
   'SkillDomainTabs.tsx',
@@ -61,8 +70,13 @@ describe('Workbench CSS sweep', () => {
     for (const name of WORKBENCH_TSX) expect(tsx(name), name).not.toMatch(RAW_COLOR)
   })
 
-  it('paints text in AA colours: no --text-tertiary, no bare --danger', () => {
-    expect(selectorsWhere(/(?:^|[\s;])color:\s*var\(--text-tertiary\)/)).toEqual([])
+  it('paints text in AA colours: no --text-tertiary (except locked controls), no bare --danger', () => {
+    // a disabled control is exempt from WCAG contrast; locked reads as neutral grey (spec 1.4)
+    expect(
+      selectorsWhere(/(?:^|[\s;])color:\s*var\(--text-tertiary\)/).filter(
+        (s) => !s.split(',').every((part) => part.includes(':disabled')),
+      ),
+    ).toEqual([])
     expect(selectorsWhere(/(?:^|[\s;])color:\s*var\(--danger\)/)).toEqual([])
     // placeholder-only inputs: the UA default #757575 misses 4.5:1 on dark surfaces;
     // --text-secondary on --surface / --wb-row-hover is checked in PAIRS below
@@ -122,14 +136,15 @@ describe('Workbench CSS sweep', () => {
     expect(motion).toMatch(/\.wb-skel[^{]*\{[^}]*animation: none/)
   })
 
-  it('Workbench components use .wb-btn; the shared .btn stays only in the skill-confirm modal', () => {
-    for (const name of WORKBENCH_TSX.filter((n) => n !== 'PracticeHome.tsx')) {
+  it('Workbench components use .wb-btn only; the skill confirm is a WbConfirm, not a .modal', () => {
+    for (const name of WORKBENCH_TSX) {
       expect(tsx(name), name).not.toMatch(/\bbtn btn-/)
+      expect(tsx(name), name).not.toContain('className="modal')
     }
-    const practice = tsx('PracticeHome.tsx')
-    const modal = practice.indexOf('className="modal"')
-    expect(modal).toBeGreaterThan(0)
-    expect(practice.slice(0, modal)).not.toMatch(/\bbtn btn-/)
+  })
+
+  it('no window.confirm: deletes ask through the in-app WbConfirm', () => {
+    for (const name of WORKBENCH_TSX) expect(tsx(name), name).not.toMatch(/window\.confirm/)
   })
 })
 
@@ -188,9 +203,15 @@ const PAIRS: readonly (readonly [fg: string, bg: string, min: number])[] = [
   ),
   ['--info', '--info-bg', TEXT],
   ['--success', '--success-bg', TEXT],
+  // the Desk: a live meeting's sub-line on the Today card, and the sign-in / offline banner
+  ['--success', '--surface', TEXT],
+  ['--text', '--info-bg', TEXT],
+  ['--text', '--warning-bg', TEXT],
   ['--on-accent', '--accent', TEXT],
   ['--on-accent', '--accent-hover', TEXT],
   ...['--surface', '--bg-content', '--wb-row-hover'].map((bg) => ['--accent', bg, TEXT] as const),
+  // Knowledge: the selected pack's title
+  ['--accent-text', '--accent-soft', TEXT],
   ['--wb-check-border', '--surface', UI],
   ['--wb-check-border', '--wb-row-hover', UI],
   ...['gray', 'green', 'yellow', 'violet', 'blue', 'teal', 'pink'].map(
@@ -216,17 +237,22 @@ describe('Workbench colour pairs', () => {
 
 /** rules that paint their own text on their own fill (review focus: dark contrast of the new pills) */
 const PAINTED = [
-  '.wb-pill.is-status',
+  '.wb-pill',
   '.wb-pill.is-danger',
   '.wb-pill.is-warning',
-  '.wb-crumb-role',
-  '.wb-ov-avatar',
+  '.wb-pill.is-success',
+  '.wb-pill.is-info',
+  '.wb-tab-count',
+  '.wb-tab-count.is-danger',
+  '.wb-crumb',
+  '.wb-crumb-mark',
+  '.wb-btn-danger',
   '.wb-check input:checked + .wb-check-box',
 ]
 
 describe('Workbench painted pills and tiles', () => {
   it.each(Object.keys(OPENERS) as Theme[])(
-    '%s: the pills, chips, avatar and ticked box paint AA text on their own fill',
+    '%s: the pills, chips and ticked box paint AA text on their own fill',
     (theme) => {
       const failing = PAINTED.flatMap((selector) => {
         const body = rules.find((r) => r.selector === selector)?.body ?? ''
