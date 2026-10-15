@@ -71,9 +71,11 @@ export const th = {
   collabShareViewThenSend: 'แชร์สิทธิ์ดูแล้วส่ง',
   collabSendWithoutNotify: 'ส่งโดยไม่แจ้งเตือน',
   collabMentionAskManager: 'โปรดขอให้ผู้จัดการเอกสารนี้แชร์สิทธิ์ดูให้กับ {names}',
-  collabMentionMixedUnshareable: 'ไม่สามารถแชร์กับ {unshareable} ได้ และพวกเขาจะไม่ได้รับการแจ้งเตือน',
+  collabMentionMixedUnshareable:
+    'ไม่สามารถแชร์กับ {unshareable} ได้ และพวกเขาจะไม่ได้รับการแจ้งเตือน',
   collabSharingView: 'กำลังแชร์สิทธิ์ดู…',
-  collabShareViewFailed: 'แชร์สิทธิ์ดูให้กับ {failedNames} ไม่สำเร็จ คุณสามารถลองใหม่หรือส่งโดยไม่แจ้งเตือนได้',
+  collabShareViewFailed:
+    'แชร์สิทธิ์ดูให้กับ {failedNames} ไม่สำเร็จ คุณสามารถลองใหม่หรือส่งโดยไม่แจ้งเตือนได้',
   collabShareViewPartial:
     'แชร์สิทธิ์ดูให้กับ {sharedNames} แล้ว แต่แชร์ให้กับ {failedNames} ไม่สำเร็จ (จะไม่ได้รับการแจ้งเตือน)',
   collabSendComment: 'ส่งความคิดเห็น',

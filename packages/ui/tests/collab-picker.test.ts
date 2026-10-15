@@ -185,10 +185,7 @@ describe('useMentionSearch', () => {
     query: string | null,
     announce?: (t: string) => void,
     canListMembers?: boolean,
-  ) =>
-    act(() =>
-      root.render(createElement(Probe, { source, query, announce, canListMembers })),
-    )
+  ) => act(() => root.render(createElement(Probe, { source, query, announce, canListMembers })))
   const texts = () =>
     latest.rows.map((r) => (r.kind === 'candidate' ? r.candidate.display_name : r.text))
 

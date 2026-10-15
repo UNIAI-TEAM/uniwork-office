@@ -74,8 +74,10 @@ export const ko = {
   collabMentionWarnBody: '{names} 님은 이 문서를 볼 수 없어 알림을 받지 못합니다.',
   collabShareViewThenSend: '보기 권한을 공유한 후 보내기',
   collabSendWithoutNotify: '알림 없이 보내기',
-  collabMentionAskManager: '이 문서 관리자에게 {names} 님에게 보기 권한을 공유해 달라고 요청하세요.',
-  collabMentionMixedUnshareable: '{unshareable} 님에게는 공유할 수 없으며 알림이 전송되지 않습니다.',
+  collabMentionAskManager:
+    '이 문서 관리자에게 {names} 님에게 보기 권한을 공유해 달라고 요청하세요.',
+  collabMentionMixedUnshareable:
+    '{unshareable} 님에게는 공유할 수 없으며 알림이 전송되지 않습니다.',
   collabSharingView: '보기 권한 공유 중…',
   collabShareViewFailed:
     '{failedNames} 님에게 보기 권한을 공유하지 못했습니다. 다시 시도하거나 알림 없이 보낼 수 있습니다.',

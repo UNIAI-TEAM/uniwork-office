@@ -73,12 +73,14 @@ export const es = {
   collabInFileHint:
     'Guardados en el archivo y de solo lectura: aquí no puedes editar ni responder.',
   collabMentionWarnTitle: 'Las personas mencionadas no pueden ver este documento',
-  collabMentionWarnBody: '{names} no pueden ver este documento, por lo que no recibirán notificación.',
+  collabMentionWarnBody:
+    '{names} no pueden ver este documento, por lo que no recibirán notificación.',
   collabShareViewThenSend: 'Compartir acceso de lectura y enviar',
   collabSendWithoutNotify: 'Enviar sin notificar',
   collabMentionAskManager:
     'Pide a alguien que administre este documento que comparta acceso de lectura con {names}.',
-  collabMentionMixedUnshareable: 'No se puede compartir con {unshareable}; no recibirán notificación.',
+  collabMentionMixedUnshareable:
+    'No se puede compartir con {unshareable}; no recibirán notificación.',
   collabSharingView: 'Compartiendo acceso de lectura…',
   collabShareViewFailed:
     'No se pudo compartir el acceso de lectura con {failedNames}. Puedes intentarlo de nuevo o enviar sin notificar.',

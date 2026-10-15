@@ -70,7 +70,8 @@ export const id = {
   collabInFileHint:
     'Tersimpan di dalam file dan hanya bisa dibaca: Anda tidak dapat mengedit atau membalas di sini.',
   collabMentionWarnTitle: 'Orang yang disebut tidak dapat melihat dokumen ini',
-  collabMentionWarnBody: '{names} tidak dapat melihat dokumen ini, sehingga tidak akan diberi tahu.',
+  collabMentionWarnBody:
+    '{names} tidak dapat melihat dokumen ini, sehingga tidak akan diberi tahu.',
   collabShareViewThenSend: 'Bagikan akses lihat, lalu kirim',
   collabSendWithoutNotify: 'Kirim tanpa memberi tahu',
   collabMentionAskManager:

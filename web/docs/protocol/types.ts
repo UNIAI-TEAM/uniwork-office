@@ -1476,12 +1476,7 @@ function isCommentAnchor(x: unknown): x is CommentAnchor {
 }
 
 function isCommentMentionWithoutAccess(x: unknown): x is CommentMentionWithoutAccess {
-  return (
-    isObj(x) &&
-    isNonEmptyStr(x.user_id) &&
-    isOpt(x.display_name, isStr) &&
-    isBool(x.can_share)
-  )
+  return isObj(x) && isNonEmptyStr(x.user_id) && isOpt(x.display_name, isStr) && isBool(x.can_share)
 }
 
 function isDocumentComment(x: unknown): x is DocumentComment {

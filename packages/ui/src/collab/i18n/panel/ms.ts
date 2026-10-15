@@ -88,8 +88,7 @@ export const ms = {
   collabRetryShareFor: 'Cuba lagi untuk {failedNames}',
   collabSendFailedAfterShare:
     'Akses lihat telah dikongsi dengan {sharedNames}, tetapi komen gagal dihantar. Teks anda masih ada dalam kotak — cuba hantar semula.',
-  collabPostSendNoAccess:
-    '{names} tidak dapat melihat dokumen ini, jadi mereka tidak dimaklumkan.',
+  collabPostSendNoAccess: '{names} tidak dapat melihat dokumen ini, jadi mereka tidak dimaklumkan.',
   collabPostSendShareAction: 'Kongsi akses lihat',
   collabPostSendNoRetroNote:
     'Berkongsi sekarang tidak akan memaklumkan mereka tentang komen ini; sebut mereka dalam komen baharu untuk memaklumkan.',

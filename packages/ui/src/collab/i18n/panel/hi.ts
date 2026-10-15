@@ -71,7 +71,8 @@ export const hi = {
   collabInFileHint:
     'फ़ाइल में सहेजी गई और केवल पढ़ने के लिए: यहाँ संपादित नहीं किया जा सकता और न ही जवाब दिया जा सकता।',
   collabMentionWarnTitle: 'उल्लिखित लोग इस दस्तावेज़ को नहीं देख सकते',
-  collabMentionWarnBody: '{names} इस दस्तावेज़ को नहीं देख सकते, इसलिए उन्हें अधिसूचित नहीं किया जाएगा।',
+  collabMentionWarnBody:
+    '{names} इस दस्तावेज़ को नहीं देख सकते, इसलिए उन्हें अधिसूचित नहीं किया जाएगा।',
   collabShareViewThenSend: 'देखने की पहुँच साझा करें, फिर भेजें',
   collabSendWithoutNotify: 'बिना अधिसूचित किए भेजें',
   collabMentionAskManager:

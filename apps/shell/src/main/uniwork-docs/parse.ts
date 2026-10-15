@@ -204,12 +204,7 @@ export type DocumentCommentsLevel = 'view' | 'comment' | 'edit' | 'manage'
 export function commentsLevelOf(myLevel: unknown): DocumentCommentsLevel | null {
   if (myLevel === undefined || myLevel === null || myLevel === '') return null
   if (typeof myLevel !== 'string') bad()
-  if (
-    myLevel === 'view' ||
-    myLevel === 'comment' ||
-    myLevel === 'edit' ||
-    myLevel === 'manage'
-  ) {
+  if (myLevel === 'view' || myLevel === 'comment' || myLevel === 'edit' || myLevel === 'manage') {
     return myLevel
   }
   return 'view'

@@ -73,7 +73,8 @@ export const ja = {
   collabMentionWarnBody: '{names} はこのドキュメントを閲覧できないため、通知されません。',
   collabShareViewThenSend: '閲覧権限を共有して送信',
   collabSendWithoutNotify: '通知せずに送信',
-  collabMentionAskManager: 'このドキュメントの管理者に、{names} への閲覧権限の共有を依頼してください。',
+  collabMentionAskManager:
+    'このドキュメントの管理者に、{names} への閲覧権限の共有を依頼してください。',
   collabMentionMixedUnshareable: '{unshareable} とは共有できません（通知されません）。',
   collabSharingView: '閲覧権限を共有中…',
   collabShareViewFailed:
