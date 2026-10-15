@@ -6,8 +6,9 @@ import { createRoot, type Root } from 'react-dom/client'
 import { Editor } from '@tiptap/core'
 import { editorExtensions } from '../../src/renderer/editor/extensions'
 import { AiPanel } from '../../src/renderer/ai/AiPanel'
-import type { AiSideState } from '../../src/renderer/ai/run-snapshot'
 import { AI_PROVIDERS, type AiSettings } from '../../src/shared/ipc'
+
+type AiPanelProps = Parameters<typeof AiPanel>[0]
 
 export const harnessSettings: AiSettings = {
   provider: 'anthropic',
@@ -63,7 +64,12 @@ let callSeq = 0
 /** mount the panel; `extra` props go straight to AiPanel */
 export async function mountDocsAiPanel(
   texts: string[],
-  extra: { sideState?: AiSideState; filePath?: string | null } = {},
+  extra: { filePath?: string | null } & Partial<
+    Pick<
+      AiPanelProps,
+      'sideState' | 'commentsAccess' | 'hfAccess' | 'pageSetupAccess' | 'docExtras'
+    >
+  > = {},
 ): Promise<DocsAiHarness> {
   ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   Element.prototype.scrollTo ??= () => {}
@@ -94,8 +100,8 @@ export async function mountDocsAiPanel(
       blocks: [],
       settings: harnessSettings,
       open: true,
+      ...extra,
       filePath: extra.filePath === undefined ? '/docs/a.docx' : extra.filePath,
-      ...(extra.sideState ? { sideState: extra.sideState } : {}),
     })
   act(() => root.render(element()))
   await settle()
