@@ -507,6 +507,45 @@ describe('the account boundary at the production wiring (G511-be-3)', () => {
     ])
   })
 
+  it('a sign-out with an in-flight record pushes exactly one waiting and one done (d2-4)', async () => {
+    seedReadable()
+    const { handle, sent } = await setup()
+    const opened = await handle.service.openSyncStore()
+    if (opened.kind !== 'ok') throw new Error(opened.kind)
+    await createIntentStore(opened.records(INTENT_STORE_REGISTRATION.name)).put(
+      'doc_1',
+      {
+        v: 2,
+        intentId: 'intent_1',
+        idempotencyKey: 'idem_1',
+        documentId: 'doc_1',
+        orgId: 'org_a',
+        workspaceId: 'ws_1',
+        baseRevision: '41',
+        baseVersion: 3,
+        checksum: 'abc',
+        length: 2,
+        generation: 1,
+        state: 'uploading',
+        attempt: 1,
+        createdAt: '2026-04-17T00:00:00.000Z',
+        updatedAt: '2026-04-17T00:00:00.000Z',
+      },
+      new TextEncoder().encode('v4'),
+    )
+    // the receipt wait is a real timer in production; skip it here
+    vi.spyOn(handle.service as unknown as { sleepMs: () => Promise<void> }, 'sleepMs')
+      .mockResolvedValue(undefined)
+
+    await handle.boundary.beforeSignOut({ confirmed: true })
+
+    expect(
+      sent
+        .filter((m) => m.channel === UNIWORK_DOC_CHANNELS.signOutProgress)
+        .map((m) => (m.payload as { phase: string }).phase),
+    ).toEqual(['waiting', 'done'])
+  })
+
   it('lockStore pushes phase:done in a finally block even if lockSession throws (FE d1-n1)', async () => {
     seedReadable()
     const { handle, sent } = await setup()

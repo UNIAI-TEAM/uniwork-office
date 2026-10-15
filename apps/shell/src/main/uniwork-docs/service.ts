@@ -1823,9 +1823,7 @@ export class UniworkDocsService {
       }
     }
 
-    let announcedWaiting = false
     if (savingPromises.length > 0 || hasInFlightRecord) {
-      announcedWaiting = true
       onWaiting?.()
       this.deps.pushSignOutProgress?.({ phase: 'waiting' })
       if (savingPromises.length > 0) {
@@ -2126,12 +2124,8 @@ export class UniworkDocsService {
     this.syncOpen = null
     this.storeOpenKind = 'unknown'
     const captureFailed = [...captureFailedKeys]
-    if (announcedWaiting) {
-      this.deps.pushSignOutProgress?.({
-        phase: 'done',
-        ...(captureFailed.length > 0 ? { captureFailed: captureFailed.length } : {}),
-      })
-    }
+    // The single `done` of a sign-out is pushed by the caller's finally (the
+    // wiring's lockStore), so it also fires when this method throws.
 
     return {
       ok: parkFailedDirs.size === 0,

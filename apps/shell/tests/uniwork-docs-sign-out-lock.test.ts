@@ -519,7 +519,8 @@ describe('G5-11 sign-out lock-and-keep, N+1 park, and restoreParked', () => {
     })
     expect(res).toEqual({ ok: true, captureFailed: [] })
     expect(waitingCalled).toBe(1)
-    expect(ctx.progress).toEqual([{ phase: 'waiting' }, { phase: 'done' }])
+    // `done` belongs to the caller's finally (one per sign-out), not the service
+    expect(ctx.progress).toEqual([{ phase: 'waiting' }])
     expect(ctx.slept).toContain(SIGN_OUT_RECEIPT_WAIT_MS)
 
     // Reopen store and verify record was transitioned to 'reconciling' with same idempotencyKey and attempt
