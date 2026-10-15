@@ -122,6 +122,8 @@ export {
   type AiUniworkStringKey,
 } from './strings-ai-uniwork'
 export { AiErrorAction, type AiErrorActionProps } from './AiErrorAction'
+export { AiSaveDraftCard, type AiSaveDraftCardProps } from './AiSaveDraftCard'
+export { AI_SAVE_DRAFT_LABELS, type AiSaveDraftLabels } from './strings-ai-save-draft'
 export { ImageViewer, type ImageViewerLabels } from './image-viewer'
 export { trapTab, useModalKeys } from './modal-keys'
 export {
