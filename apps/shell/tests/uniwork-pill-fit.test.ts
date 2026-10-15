@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import {
   PILL_STRIP_TABS,
   barLayoutOf,
+  miniSlackOf,
   nextPillVariantOf,
   pillFitStepOf,
   pillBudgetOf,
@@ -605,8 +606,9 @@ describe('FXT6u: the dot-only mini pill is the last step', () => {
         }
       }
     }
-    expect(shown).toEqual(['722/2', '722/3', '800/3'])
-    expect(none).toEqual(['722/3', '800/3'])
+    // FXT6u2 (RFE6u8-01): the last tab only needs its label, so 722/2 and 800/3 stay compact
+    expect(shown).toEqual(['722/3'])
+    expect(none).toEqual(['722/3'])
   })
 
   it('800 to 1280 with one or two tabs, and 890 and wider with three: no mini, the layout is the one of the icon-only step', () => {
@@ -640,5 +642,238 @@ describe('FXT6u: the dot-only mini pill is the last step', () => {
         }
       }
     }
+  })
+})
+
+/**
+ * FXT6u2 (RFE6u8-01): the mini step uses a looser floor than the other steps. Full, short, compact and
+ * the icon-only toggle keep the floor of Home + three tabs at their minimum + padding + "+"; the dot
+ * alone is only taken when the strip cannot even show the LAST tab's label start and a minimum readable
+ * label (the "+" and the end padding may scroll out, as they did before the mini step existed).
+ */
+describe('FXT6u2: the mini step needs the last tab only up to its readable label', () => {
+  const TOGGLE_ICON = 32
+  const DELTA = 108 - TOGGLE_ICON
+  const widths = { full: 309, short: 190, compact: 111, mini: 28 }
+  /** the stub tab: the title starts 36px in and is 36px wide at the 104px minimum */
+  const LABEL = { labelStart: 36, labelMin: 36 }
+  const SLACK = 104 - 72 + 32 + 10
+  const step = (budget: number, over: Partial<Parameters<typeof pillFitStepOf>[0]> = {}) =>
+    pillFitStepOf({
+      budget,
+      toggle: { width: 108, iconOnly: false },
+      toggleWidths: { full: 108, icon: TOGGLE_ICON },
+      widths,
+      hasShort: true,
+      miniSlack: SLACK,
+      ...over,
+    })
+  const withIcon = (w: number, n: number, extra: Partial<BarLayoutInput> = {}) =>
+    layout(w, n, { toggleIcon: TOGGLE_ICON, ...LABEL, ...extra })
+  const noToggle = { toggle: 0, toggleIcon: undefined }
+  /** the last document tab's visible px (the strip starts with 10px of padding, then Home, then the tabs at 104) */
+  function lastTabPx(w: number, n: number, extra: Partial<BarLayoutInput> = {}): number {
+    const l = withIcon(w, n, extra)
+    return Math.max(0, Math.min(104, l.strip.right - l.strip.left - 10 - 109 - (n - 1) * 104))
+  }
+  const lastLabelPx = (px: number) => Math.max(0, Math.min(36, px - 36))
+
+  describe('miniSlackOf: what the mini step may take off the floor', () => {
+    const base = { ...BAR, docTabs: 3, ...LABEL }
+
+    it('the tab beyond its label (tabMin - label start - minimum label), the "+" and the end padding', () => {
+      expect(miniSlackOf(base)).toBe(104 - 36 - 36 + BAR.newButton + BAR.padding / 2)
+      // derived from the same constants as the floor: the floor less this is what the strip must reach
+      const reach = stripFloorOf(base) - miniSlackOf(base)
+      expect(reach).toBe(10 + 109 + 2 * 104 + 36 + 36)
+    })
+
+    it('a tab whose label runs to its end needs the whole tab (no slack from the tab itself)', () => {
+      expect(miniSlackOf({ ...base, labelStart: 36, labelMin: 68 })).toBe(
+        BAR.newButton + BAR.padding / 2,
+      )
+      // a label measure larger than the tab never makes the slack negative
+      expect(miniSlackOf({ ...base, labelStart: 90, labelMin: 90 })).toBe(
+        BAR.newButton + BAR.padding / 2,
+      )
+    })
+
+    it('no document tab: nothing is loosened', () => {
+      expect(miniSlackOf({ ...base, docTabs: 0 })).toBe(0)
+    })
+
+    it('more tabs than the floor counts: the same slack (the floor counts three)', () => {
+      expect(miniSlackOf({ ...base, docTabs: 7 })).toBe(miniSlackOf(base))
+    })
+  })
+
+  describe('pillFitStepOf with the slack', () => {
+    it('toggle shown: mini only when compact + icon-only toggle + slack still leaves the strip below its floor', () => {
+      const edge = 111 - DELTA - SLACK
+      expect(step(edge)).toEqual({ variant: 'compact', iconToggle: true })
+      expect(step(edge - 1)).toEqual({ variant: 'mini', iconToggle: true })
+    })
+
+    it('no toggle: mini only when compact + slack still leaves the strip below its floor', () => {
+      const none = { toggle: null, toggleWidths: {} }
+      expect(step(111 - SLACK, none)).toEqual({ variant: 'compact', iconToggle: false })
+      expect(step(111 - SLACK - 1, none)).toEqual({ variant: 'mini', iconToggle: false })
+    })
+
+    it('the slack never moves the icon-only toggle or the wider steps (they keep the current floor)', () => {
+      for (let budget = 111 - DELTA - 1; budget <= 450; budget++) {
+        // above the mini range the answer is the one without any slack
+        expect(step(budget), `budget ${budget}`).toEqual(step(budget, { miniSlack: 0 }))
+      }
+      expect(step(110)).toEqual({ variant: 'compact', iconToggle: true })
+      expect(step(111)).toEqual({ variant: 'compact', iconToggle: false })
+    })
+
+    it('mini with the slack is always mini without it (the loosened step is a subset)', () => {
+      for (let budget = -300; budget <= 450; budget++) {
+        if (step(budget).variant === 'mini') {
+          expect(step(budget, { miniSlack: 0 }).variant, `budget ${budget}`).toBe('mini')
+        }
+      }
+    })
+
+    it('the same window gives the same step whichever form of the toggle is on screen (no flip-flop)', () => {
+      for (let budgetFull = -300; budgetFull <= 450; budgetFull++) {
+        const fullDrawn = step(budgetFull)
+        const iconDrawn = step(budgetFull + DELTA, {
+          toggle: { width: TOGGLE_ICON, iconOnly: true },
+        })
+        expect(iconDrawn, `budget ${budgetFull}`).toEqual(fullDrawn)
+      }
+    })
+
+    it('a wider budget never takes a narrower step; icon-only and mini each switch once', () => {
+      const forms: string[] = []
+      for (let budget = -300; budget <= 450; budget++) {
+        const s = step(budget)
+        forms.push(`${s.variant}${s.iconToggle ? '+icon' : ''}`)
+      }
+      const flips = forms.filter((v, i) => i > 0 && v !== forms[i - 1])
+      expect(forms[0]).toBe('mini+icon')
+      expect(flips).toEqual(['compact+icon', 'compact', 'short', 'full'])
+    })
+
+    it('no slack given: the step is the one of FXT6u (the floor of the other steps)', () => {
+      expect(step(111 - DELTA - 1, { miniSlack: undefined })).toEqual({
+        variant: 'mini',
+        iconToggle: true,
+      })
+    })
+  })
+
+  describe('the bar at 722 / 800 / 890 / 1024 / 1280 with one to three tabs', () => {
+    it('722 x 3 stays the dot alone (toggle shown and none): the last tab shows its label', () => {
+      for (const extra of [{}, noToggle]) {
+        const l = withIcon(722, 3, extra)
+        expect(l.variant).toBe('mini')
+        const px = lastTabPx(722, 3, extra)
+        expect(lastLabelPx(px)).toBe(36)
+        expect(l.strip.right).toBeLessThanOrEqual(l.chrome.left)
+      }
+      expect(lastTabPx(722, 3)).toBe(97)
+    })
+
+    it('800 x 3 and 722 x 2 stay compact (every label readable), the toggle behaves as before', () => {
+      for (const [w, n] of [
+        [800, 3],
+        [722, 2],
+      ]) {
+        for (const extra of [{}, noToggle]) {
+          const tag = `${w}/${n} ${extra === noToggle ? 'no toggle' : 'toggle'}`
+          const l = withIcon(w, n, extra)
+          expect(l.variant, tag).toBe('compact')
+          expect(l.iconToggle, tag).toBe(extra !== noToggle)
+          expect(lastLabelPx(lastTabPx(w, n, extra)), tag).toBe(36)
+        }
+      }
+      expect(lastTabPx(800, 3)).toBe(92)
+    })
+
+    it('every cell: the last tab shows at least its label start and minimum label, whatever the step', () => {
+      for (const w of [722, 800, 890, 1024, 1280]) {
+        for (const n of [1, 2, 3]) {
+          for (const extra of [{}, noToggle]) {
+            expect(lastTabPx(w, n, extra), `${w}/${n}`).toBeGreaterThanOrEqual(36 + 36)
+          }
+        }
+      }
+    })
+
+    it('the mini cells with the toggle shown, and with none', () => {
+      const cells = (extra: Partial<BarLayoutInput>) =>
+        [722, 800, 890, 1024, 1280].flatMap((w) =>
+          [1, 2, 3].filter((n) => withIcon(w, n, extra).variant === 'mini').map((n) => `${w}/${n}`),
+        )
+      expect(cells({})).toEqual(['722/3'])
+      expect(cells(noToggle)).toEqual(['722/3'])
+    })
+
+    it('the icon-only toggle cells are the ones of FXT6u (the toggle rule is untouched)', () => {
+      const cells: string[] = []
+      for (const w of [722, 800, 890, 1024, 1280]) {
+        for (const n of [1, 2, 3]) if (withIcon(w, n).iconToggle) cells.push(`${w}/${n}`)
+      }
+      expect(cells).toEqual(['722/2', '722/3', '800/2', '800/3', '890/3'])
+    })
+
+    it('the whole table: variant, toggle form and the last tab px / label px per cell', () => {
+      const rows = (extra: Partial<BarLayoutInput>) =>
+        [722, 800, 890, 1024, 1280].map((w) =>
+          [1, 2, 3]
+            .map((n) => {
+              const l = withIcon(w, n, extra)
+              const px = lastTabPx(w, n, extra)
+              return `${l.variant}${l.iconToggle ? '+icon' : ''} ${px}/${lastLabelPx(px)}`
+            })
+            .join(' | '),
+        )
+      expect(rows({})).toEqual([
+        'compact 104/36 | compact+icon 104/36 | mini+icon 97/36',
+        'compact 104/36 | compact+icon 104/36 | compact+icon 92/36',
+        'short 104/36 | compact 104/36 | compact+icon 104/36',
+        'full 104/36 | full 104/36 | short 104/36',
+        'full 104/36 | full 104/36 | full 104/36',
+      ])
+      expect(rows(noToggle)).toEqual([
+        'short 104/36 | compact 104/36 | mini 104/36',
+        'short 104/36 | short 104/36 | compact 104/36',
+        'full 104/36 | short 104/36 | compact 104/36',
+        'full 104/36 | full 104/36 | full 104/36',
+        'full 104/36 | full 104/36 | full 104/36',
+      ])
+    })
+
+    it('a tab whose label runs to its end (no close button) needs the whole tab: 800 x 3 with the toggle is the dot again', () => {
+      expect(withIcon(800, 3, { labelStart: 36, labelMin: 68 }).variant).toBe('mini')
+      expect(withIcon(800, 3).variant).toBe('compact')
+    })
+
+    it('1px sweeps, toggle shown or not, with a repeated measure: once each, in order, no flip-flop', () => {
+      const rank = ['mini', 'compact', 'short', 'full']
+      for (const n of [1, 2, 3]) {
+        for (const extra of [{}, noToggle]) {
+          const forms: string[] = []
+          for (let w = 600; w <= 1400; w++) {
+            const l = withIcon(w, n, extra)
+            const again = withIcon(w, n, extra)
+            expect(again.variant).toBe(l.variant)
+            expect(again.iconToggle).toBe(l.iconToggle)
+            expect(l.strip.right, `${w}px ${n} tabs`).toBeLessThanOrEqual(l.chrome.left)
+            forms.push(`${l.variant}${l.iconToggle ? '+icon' : ''}`)
+          }
+          const steps = forms.filter((f, i) => i === 0 || f !== forms[i - 1])
+          const ranks = steps.map((f) => rank.indexOf(f.replace('+icon', '')))
+          expect(ranks, `${n} tabs ${JSON.stringify(extra)}`).toEqual(
+            [...ranks].sort((a, b) => a - b),
+          )
+          expect(new Set(steps).size, `${n} tabs`).toBe(steps.length)
+        }
+      }
+    })
   })
 })

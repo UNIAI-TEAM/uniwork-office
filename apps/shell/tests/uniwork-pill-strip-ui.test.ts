@@ -58,6 +58,10 @@ let pillLeftOverride: number | null = null
 /** a holder with no Discussion toggle models none (the older tests model one that is not rendered) */
 let noToggleModel = false
 let rectCalls = 0
+/** a document tab at its minimum: the title starts this far into the tab and this much of the tab follows it (the close button) */
+const TAB_MIN = 104
+let tabLabelStart = 36
+let tabTail = 32
 
 let bar: HTMLDivElement
 let strip: HTMLDivElement
@@ -134,6 +138,16 @@ function stubLayout(): void {
       return at(FIXED_LEFT + stripWidth + 6, currentToggleWidth())
     }
     if (this.classList.contains('tab-home')) return at(FIXED_LEFT + 10, HOME)
+    // a document tab at its minimum width, and its title inside it (what the fit reads of the first tab)
+    if (this.classList.contains('tab-title') && this.parentElement) {
+      const tabs = Array.from(strip.querySelectorAll('.tab-item:not(.tab-home)'))
+      const left = FIXED_LEFT + 10 + HOME + tabs.indexOf(this.parentElement) * TAB_MIN
+      return at(left + tabLabelStart, TAB_MIN - tabLabelStart - tabTail)
+    }
+    if (this.classList.contains('tab-item')) {
+      const tabs = Array.from(strip.querySelectorAll('.tab-item:not(.tab-home)'))
+      return at(FIXED_LEFT + 10 + HOME + Math.max(0, tabs.indexOf(this)) * TAB_MIN, TAB_MIN)
+    }
     if (this.classList.contains('tab-new-btn')) return rectOf(0, NEW_BUTTON)
     if (this.hasAttribute('data-uw-queue-band')) return rectOf(0, barWidth, 120)
     if (this.classList.contains('uw-queue-pop')) return rectOf(0, 360, 100)
@@ -148,7 +162,10 @@ function buildBar(docTabs: number): void {
   strip.className = 'tab-strip'
   strip.innerHTML =
     '<div class="tab-item tab-home"></div>' +
-    Array.from({ length: docTabs }, () => '<div class="tab-item"></div>').join('') +
+    Array.from(
+      { length: docTabs },
+      () => '<div class="tab-item"><span class="tab-title"></span></div>',
+    ).join('') +
     '<button class="tab-new-btn"></button>'
   chrome = document.createElement('div')
   chrome.className = 'uw-chrome'
@@ -220,6 +237,32 @@ const visibleLabel = () =>
     .join('')
 const polite = () => document.querySelector('#uw-live-host [role=status]')?.textContent ?? ''
 
+/** the text a screen reader gets from an element's content: aria-hidden subtrees are left out */
+function contentOf(node: Node): string {
+  if (node.nodeType === 3) return node.textContent ?? ''
+  if (node.nodeType !== 1) return ''
+  if ((node as Element).getAttribute('aria-hidden') === 'true') return ''
+  return Array.from(node.childNodes).map(contentOf).join('')
+}
+/**
+ * The accessible name as the accname algorithm gives it for the controls here: the elements an
+ * aria-labelledby points to (their content, even when they are visually hidden, joined by a space),
+ * else aria-label, else the control's own content.
+ */
+function accessibleNameOf(el: Element): string {
+  const ids = el.getAttribute('aria-labelledby')?.split(/\s+/).filter(Boolean) ?? []
+  if (ids.length > 0) {
+    return ids
+      .map((id) => {
+        const target = el.ownerDocument.getElementById(id)
+        return target ? Array.from(target.childNodes).map(contentOf).join('') : ''
+      })
+      .join(' ')
+      .trim()
+  }
+  return (el.getAttribute('aria-label') ?? contentOf(el)).trim()
+}
+
 beforeEach(() => {
   localStorage.setItem('uniwork-ui-lang', 'en')
   resetLiveForTests()
@@ -229,6 +272,8 @@ beforeEach(() => {
   pillLeftOverride = null
   noToggleModel = false
   rectCalls = 0
+  tabLabelStart = 36
+  tabTail = 32
   document.documentElement.removeAttribute('dir')
   makeApi()
   ;(window as unknown as { aiOfficeTabs?: unknown }).aiOfficeTabs = { focusActive: vi.fn() }
@@ -567,8 +612,8 @@ describe('FXT6u: the Discussion toggle goes icon-only when the compact pill stil
         stubLayout()
         barWidth = 800
         await mountBoth(status())
-        // 800px with three tabs: the compact pill still leaves the strip below its floor
-        expect(variant()).toBe('mini')
+        // 800px with three tabs: the compact pill leaves the strip below its floor, the last tab keeps its label
+        expect(variant()).toBe('compact')
         expect(iconOnly()).toBe(true)
         await act(async () => {
           strip.querySelectorAll('.tab-item:not(.tab-home)')[2].remove()
@@ -588,7 +633,7 @@ describe('FXT6u: the Discussion toggle goes icon-only when the compact pill stil
         await flush()
         expect(docTabCount()).toBe(3)
         expect(iconOnly()).toBe(true)
-        expect(variant()).toBe('mini')
+        expect(variant()).toBe('compact')
       })
 
       it('800, 890, 1024 and 1280 x 1-3 tabs: icon-only exactly where even the compact pill leaves the strip below its floor', async () => {
@@ -625,8 +670,8 @@ describe('FXT6u: the Discussion toggle goes icon-only when the compact pill stil
         }
         // the wide windows keep the full toggle
         expect(iconCases).toEqual(['800/2', '800/3', '890/3'])
-        // the dot alone only where even compact + an icon-only toggle leaves the strip below its floor
-        expect(miniCases).toEqual(['800/3'])
+        // FXT6u2: the dot alone only where the last tab cannot show its label, none of these cells
+        expect(miniCases).toEqual([])
       })
 
       it('the repeated measures at the boundary never flip the toggle back and forth', async () => {
@@ -650,6 +695,97 @@ describe('FXT6u: the Discussion toggle goes icon-only when the compact pill stil
         expect(forms[0]).toBe(true)
         expect(forms[forms.length - 1]).toBe(false)
         expect(flips).toBe(1)
+      })
+
+      it('FXT6u2 (RFE6u8-01): 722/800/890/1024/1280 x 1-3 tabs: the step, the toggle form and the last tab px / label px, toggle shown and none', async () => {
+        const table = async (withToggle: boolean): Promise<string[]> => {
+          const rows: string[] = []
+          for (const w of [722, 800, 890, 1024, 1280]) {
+            const cells: string[] = []
+            for (const n of [1, 2, 3]) {
+              document.body.innerHTML = ''
+              rectSpy?.mockRestore()
+              buildBar(n)
+              stubLayout()
+              barWidth = w
+              noToggleModel = !withToggle
+              if (withToggle) await mountBoth(status())
+              else await mount(status())
+              assertHolderApart(`${dir} ${w}/${n}`)
+              cells.push(
+                `${variant()}${iconOnly() ? '+icon' : ''} ${visibleTabPx(n)}/${visibleLabelPx(n)}`,
+              )
+              act(() => root.unmount())
+            }
+            rows.push(cells.join(' | '))
+          }
+          return rows
+        }
+        expect(await table(true)).toEqual([
+          'compact 104/36 | compact+icon 104/36 | mini+icon 97/36',
+          'compact 104/36 | compact+icon 104/36 | compact+icon 92/36',
+          'short 104/36 | compact 104/36 | compact+icon 104/36',
+          'full 104/36 | full 104/36 | short 104/36',
+          'full 104/36 | full 104/36 | full 104/36',
+        ])
+        expect(await table(false)).toEqual([
+          'short 104/36 | compact 104/36 | mini 104/36',
+          'short 104/36 | short 104/36 | compact 104/36',
+          'full 104/36 | short 104/36 | compact 104/36',
+          'full 104/36 | full 104/36 | full 104/36',
+          'full 104/36 | full 104/36 | full 104/36',
+        ])
+      })
+
+      it('FXT6u2: 800 x 3 and 722 x 2 keep the compact pill, the last tab reads its label, the toggle is icon-only as before', async () => {
+        for (const [w, n] of [
+          [800, 3],
+          [722, 2],
+        ]) {
+          document.body.innerHTML = ''
+          rectSpy?.mockRestore()
+          buildBar(n)
+          stubLayout()
+          barWidth = w
+          await mountBoth(status())
+          const tag = `${dir} ${w}/${n}`
+          expect(variant(), tag).toBe('compact')
+          expect(iconOnly(), tag).toBe(true)
+          expect(visibleLabelPx(n), tag).toBe(36)
+          expect(visibleTabPx(n), tag).toBeGreaterThanOrEqual(36 + 36)
+          act(() => root.unmount())
+        }
+      })
+
+      it('FXT6u2: what the last tab needs is read off the first tab (its title and what follows it), by the direction of the page', async () => {
+        // a title with only 8px after it (no close button): the label runs to the tab's end, 96px are needed
+        tabTail = 8
+        buildBar(3)
+        stubLayout()
+        barWidth = 800
+        await mountBoth(status())
+        // the strip leaves the third tab 92px: its label would be cut, so the dot alone
+        expect(variant()).toBe('mini')
+        tabTail = 32
+        await resizeTo(800)
+        expect(variant()).toBe('compact')
+        // the same tab with a bigger gap after the title needs less
+        tabTail = 60
+        await resizeTo(722)
+        expect(variant()).toBe('mini')
+        await resizeTo(760)
+        expect(variant()).toBe('compact')
+      })
+
+      it('FXT6u2: a bar whose first tab has no title yet (the rename input) uses the constants of the stylesheet', async () => {
+        buildBar(3)
+        stubLayout()
+        barWidth = 800
+        strip.querySelectorAll('.tab-title').forEach((node) => node.remove())
+        await mountBoth(status())
+        expect(variant()).toBe('compact')
+        await resizeTo(722)
+        expect(variant()).toBe('mini')
       })
 
       it('does not keep measuring once the toggle form has settled', async () => {
@@ -720,11 +856,25 @@ describe('FXT6u: the Discussion toggle goes icon-only when the compact pill stil
           const dot = miniDot()!
           expect(dot.tagName).toBe('BUTTON')
           expect(dot.getAttribute('type')).toBe('button')
-          expect(dot.getAttribute('aria-label')).toBe(`${en.uwChipQueued}. ${en.uwActViewQueue}`)
+          // RFE6u8-03: the name is the hidden full label and the action text, read from the DOM (aria-labelledby),
+          // joined by the accessible-name algorithm's space: no separator of ours in the product copy
+          expect(dot.hasAttribute('aria-label')).toBe(false)
+          expect(accessibleNameOf(dot)).toBe(`${en.uwChipQueued} ${en.uwActViewQueue}`)
+          expect(accessibleNameOf(dot)).not.toContain('. ')
+          const named = dot.getAttribute('aria-labelledby')!.split(' ')
+          expect(named).toHaveLength(2)
+          expect(document.getElementById(named[0])!.textContent).toBe(en.uwChipQueued)
+          expect(document.getElementById(named[1])!.textContent).toBe(en.uwActViewQueue)
+          expect(named.every((id) => dot.contains(document.getElementById(id)))).toBe(true)
+          // both are visually hidden text: nothing but the glyph is drawn
+          expect(document.getElementById(named[0])!.classList.contains('uw-sr-only')).toBe(true)
+          expect(document.getElementById(named[1])!.classList.contains('uw-sr-only')).toBe(true)
           expect(dot.getAttribute('title')!.startsWith(`${en.uwChipQueued}\n`)).toBe(true)
           const tip = document.getElementById(dot.getAttribute('aria-describedby')!)!
           expect(tip.textContent).toContain(en.uwTipQueued.split('{')[0])
-          expect(dot.textContent).toBe('')
+          const drawn = dot.cloneNode(true) as HTMLElement
+          drawn.querySelectorAll('.uw-sr-only').forEach((node) => node.remove())
+          expect(drawn.textContent).toBe('')
           expect(dot.querySelector('svg')!.getAttribute('aria-hidden')).toBe('true')
           // one control: no second button, and the group still names the pill
           expect(pill().querySelectorAll('button')).toHaveLength(1)
@@ -740,6 +890,114 @@ describe('FXT6u: the Discussion toggle goes icon-only when the compact pill stil
           dot.focus()
           expect(document.activeElement).toBe(dot)
           expect(dot.matches('button:not([disabled])')).toBe(true)
+        })
+
+        describe('RFE6u8-02: focus follows the button that replaces the focused one', () => {
+          const actionButton = () => pill().querySelector<HTMLButtonElement>('.uw-pill-action')
+          let outside: HTMLInputElement
+
+          beforeEach(() => {
+            outside = document.createElement('input')
+            document.body.append(outside)
+          })
+
+          it('compact -> dot while the action button has focus: the dot has focus, not the group', async () => {
+            await mountMini(status(), 800)
+            expect(variant()).toBe('compact')
+            actionButton()!.focus()
+            expect(document.activeElement).toBe(actionButton())
+            await resizeTo(722)
+            expect(variant()).toBe('mini')
+            expect(miniDot()).not.toBeNull()
+            expect(document.activeElement).toBe(miniDot())
+            expect(document.activeElement).not.toBe(pill())
+          })
+
+          it('dot -> compact while the dot has focus: the action button has focus', async () => {
+            await mountMini(status(), 722)
+            expect(variant()).toBe('mini')
+            miniDot()!.focus()
+            await resizeTo(800)
+            expect(variant()).toBe('compact')
+            expect(document.activeElement).toBe(actionButton())
+          })
+
+          it('dot, compact, dot, compact: the focus stays on the button of the pill each time', async () => {
+            await mountMini(status(), 722)
+            miniDot()!.focus()
+            for (const w of [800, 722, 890, 722]) {
+              await resizeTo(w)
+              expect(document.activeElement, `${w}px`).toBe(opener())
+              expect(document.activeElement?.closest('.uw-pill'), `${w}px`).toBe(pill())
+            }
+          })
+
+          it('focus on something else is left where it is when the variant flips', async () => {
+            await mountMini(status(), 800)
+            outside.focus()
+            await resizeTo(722)
+            expect(variant()).toBe('mini')
+            expect(document.activeElement).toBe(outside)
+            await resizeTo(800)
+            expect(variant()).toBe('compact')
+            expect(document.activeElement).toBe(outside)
+          })
+
+          it('a focus taken by the group (a button-less step) is not turned into a later focus steal', async () => {
+            await mountMini(status(), 722)
+            miniDot()!.focus()
+            // the save settles: the pill has no button any more, the group keeps the focus
+            await mount(status({ state: 'saved' }))
+            expect(miniDot()).toBeNull()
+            outside.focus()
+            // a waiting save again: a new button is drawn, the user is not moved to it
+            await mount(status({ state: 'queued' }))
+            expect(opener()).not.toBeNull()
+            expect(document.activeElement).toBe(outside)
+            await resizeTo(800)
+            expect(document.activeElement).toBe(outside)
+          })
+
+          it('the queue popover opener follows the new button: Esc after the flip returns focus to it', async () => {
+            await mountMini(status(), 800)
+            await act(async () => actionButton()!.click())
+            await flush()
+            expect(dialogEl()).not.toBeNull()
+            await resizeTo(722)
+            expect(variant()).toBe('mini')
+            expect(dialogEl()).not.toBeNull()
+            await act(async () => {
+              document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+            })
+            await flush()
+            expect(dialogEl()).toBeNull()
+            expect(document.activeElement).toBe(miniDot())
+            expect(document.activeElement).not.toBe(pill())
+          })
+
+          it('and the other way: dot -> compact with the popover open, Esc returns to the action button', async () => {
+            await mountMini(status(), 722)
+            await act(async () => miniDot()!.click())
+            await flush()
+            await resizeTo(800)
+            expect(variant()).toBe('compact')
+            await act(async () => {
+              document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+            })
+            await flush()
+            expect(dialogEl()).toBeNull()
+            expect(document.activeElement).toBe(actionButton())
+          })
+
+          it('a click on the new button after the flip still toggles the popover (the opener is not a stale node)', async () => {
+            await mountMini(status(), 800)
+            await act(async () => actionButton()!.click())
+            await flush()
+            await resizeTo(722)
+            await act(async () => miniDot()!.click())
+            await flush()
+            expect(dialogEl()).toBeNull()
+          })
         })
 
         it('a click opens the queue popover and the dialog anchors to the mini pill; a second click closes it', async () => {
@@ -853,7 +1111,7 @@ describe('FXT6u: the Discussion toggle goes icon-only when the compact pill stil
         })
 
         it('closing a tab gives the dot back its compact pill', async () => {
-          await mountMini(status(), 800)
+          await mountMini(status(), 722)
           expect(variant()).toBe('mini')
           await act(async () => {
             strip.querySelectorAll('.tab-item:not(.tab-home)')[2].remove()
