@@ -1,6 +1,7 @@
 import { INTENT_STORE_REGISTRATION } from './intent-store'
 import type { StoreScope } from './keys'
 import { DRAFTS_STORE_REGISTRATION } from './queue/drafts'
+import { LEASE_STORE_REGISTRATION } from './lease/store'
 import { PARKED_STORE_REGISTRATION } from './queue/parked'
 import { PAUSE_STORE_REGISTRATION } from './queue/pause'
 import { DOC_INDEX_REGISTRATION, FEED_CURSORS_REGISTRATION } from './runtime'
@@ -34,6 +35,7 @@ export const SYNC_STORE_REGISTRATIONS: readonly StoreRegistration[] = [
   PARKED_STORE_REGISTRATION,
   FEED_CURSORS_REGISTRATION,
   DOC_INDEX_REGISTRATION,
+  LEASE_STORE_REGISTRATION,
 ]
 
 export type SyncStoreOpen =
