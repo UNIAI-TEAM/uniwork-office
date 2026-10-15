@@ -675,6 +675,10 @@ const homeApi: HomeApi = {
     const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.accountRetry)
     return (result ?? { loggedIn: false, state: 'signed-out' }) as AccountStatus
   },
+  async accountReplaceLockedSignIn() {
+    const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.accountReplaceLockedSignIn)
+    return result === true
+  },
   async accountSetServer(address) {
     const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.accountSetServer, address)
     const value = (result ?? {}) as Partial<AccountSetServerResult>

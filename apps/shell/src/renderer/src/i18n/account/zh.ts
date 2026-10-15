@@ -71,6 +71,10 @@ export const zh = {
   acctErrNotConfigured: '此应用尚未关联 UniWork 服务器。',
   acctErrKeyringUnavailable: '此电脑上的安全存储不可用。',
   acctErrKeystoreLocked: '此电脑的钥匙串已锁定。请解锁后重试。',
+  acctReplaceTitle: '替换此电脑上保存的登录信息？',
+  acctReplaceBody:
+    '此电脑无法打开保存的登录信息。重新登录将替换它。等待同步的离线修改会保留在此电脑上，保持锁定，不会被删除。',
+  acctReplaceGo: '重新登录',
   acctErrServerError: 'UniWork 出现问题，请稍后再试。',
   acctErrMalformedResponse: 'UniWork 返回了意外的响应，请稍后再试。',
   wbLoadFailedTitle: '无法加载你保存的数据',

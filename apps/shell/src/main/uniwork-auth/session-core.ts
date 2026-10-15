@@ -87,6 +87,11 @@ export class SessionCore {
   protected cachedEntitlements: AccountEntitlements | null = null
   private publishedEntitlements: AccountEntitlements | null = null
   protected generation = 0
+  /**
+   * keystore-locked and a Retry found the saved sign-in still unreadable: only
+   * now may a fresh sign-in replace it. Cleared by any other state.
+   */
+  protected lockedRetryFailed = false
   protected refreshInFlight: Promise<void> | null = null
   protected refreshTimer: ReturnType<typeof setTimeout> | null = null
   private recoveryTimer: ReturnType<typeof setTimeout> | null = null
@@ -133,6 +138,9 @@ export class SessionCore {
       ...(showsAccount ? { entitlements: this.entitlements ?? this.cachedEntitlements } : {}),
       ...(this.profile
         ? { serverOrigin: new URL(this.profile.apiOrigin).host, serverUrl: this.profile.apiOrigin }
+        : {}),
+      ...(this.state === 'keystore-locked' && this.lockedRetryFailed
+        ? { canReplaceLockedSignIn: true }
         : {}),
       ...(this.error ? { error: this.error } : {}),
     }
@@ -491,6 +499,7 @@ export class SessionCore {
   protected setState(state: AccountState, error?: AccountErrorCode): void {
     this.state = state
     this.error = error
+    if (state !== 'keystore-locked') this.lockedRetryFailed = false
     if (state === 'server-unreachable' && this.session) {
       this.lastRecoveryAt = this.now()
       this.scheduleRecovery()

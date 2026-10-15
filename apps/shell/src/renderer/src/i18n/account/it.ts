@@ -79,6 +79,10 @@ export const it = {
   acctErrNotConfigured: 'Questa app non è collegata a un server UniWork.',
   acctErrKeyringUnavailable: 'L’archivio sicuro di questo computer non è disponibile.',
   acctErrKeystoreLocked: 'Il portachiavi di questo computer è bloccato. Sbloccalo e riprova.',
+  acctReplaceTitle: 'Sostituire l’accesso salvato su questo computer?',
+  acctReplaceBody:
+    'Questo computer non riesce ad aprire l’accesso salvato. Accedendo di nuovo lo sostituisci. Le modifiche offline in attesa di sincronizzazione restano su questo computer, bloccate; non viene eliminato nulla.',
+  acctReplaceGo: 'Accedi di nuovo',
   acctErrServerError: 'UniWork ha riscontrato un problema. Riprova più tardi.',
   acctErrMalformedResponse: 'UniWork ha inviato una risposta imprevista. Riprova più tardi.',
   wbLoadFailedTitle: 'Impossibile caricare i tuoi dati salvati',

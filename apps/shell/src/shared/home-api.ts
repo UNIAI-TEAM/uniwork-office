@@ -783,6 +783,13 @@ export interface HomeApi {
   accountCancelLogin(): Promise<void>
   /** retry after server-unreachable (refresh + profile reload); resolves with the new status */
   accountRetry(): Promise<AccountStatus>
+  /**
+   * keystore-locked after a failed Retry: start a fresh browser sign-in that
+   * replaces the saved sign-in this computer cannot open (queued offline edits
+   * stay locked and kept). Refused by main in any other state; resolves like
+   * accountLogin (whether the browser launched).
+   */
+  accountReplaceLockedSignIn?(): Promise<boolean>
   /** connect to the server at this address (validated, saved as the profile); the status after */
   accountSetServer(address: string): Promise<AccountSetServerResult>
   /** choose the active organization (persists uniworkOrgId, reloads entitlements) */
@@ -1146,6 +1153,12 @@ export interface AccountStatus {
    * keeps its own state and error.
    */
   orgsError?: AccountErrorCode
+  /**
+   * keystore-locked only: a Retry already found the saved sign-in still
+   * unreadable, so main now accepts accountReplaceLockedSignIn (a fresh
+   * sign-in that replaces it). Absent in every other state.
+   */
+  canReplaceLockedSignIn?: boolean
   error?: AccountErrorCode
 }
 
@@ -1438,6 +1451,7 @@ export const HOME_CHANNELS = {
   accountStatusEvent: 'home:account-status-event',
   accountCancelLogin: 'home:account-cancel-login',
   accountRetry: 'home:account-retry',
+  accountReplaceLockedSignIn: 'home:account-replace-locked-sign-in',
   accountSetServer: 'home:account-set-server',
   accountSelectOrg: 'home:account-select-org',
   /** UniWork cloud AI status (token-free UniworkCloudStatus); refresh re-reads credits */

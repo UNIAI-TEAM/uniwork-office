@@ -79,6 +79,10 @@ export const pt = {
   acctErrKeyringUnavailable: 'O armazenamento seguro deste computador está indisponível.',
   acctErrKeystoreLocked:
     'O chaveiro deste computador está bloqueado. Desbloqueie-o e tente novamente.',
+  acctReplaceTitle: 'Substituir o início de sessão guardado neste computador?',
+  acctReplaceBody:
+    'Este computador não consegue abrir o início de sessão guardado. Iniciar sessão novamente substitui-o. As edições offline à espera de sincronização ficam neste computador, bloqueadas; nada é eliminado.',
+  acctReplaceGo: 'Iniciar sessão novamente',
   acctErrServerError: 'O UniWork encontrou um problema. Tente novamente mais tarde.',
   acctErrMalformedResponse: 'O UniWork enviou uma resposta inesperada. Tente novamente mais tarde.',
   wbLoadFailedTitle: 'Não foi possível carregar seus dados salvos',

@@ -80,6 +80,10 @@ export const cs = {
   acctErrNotConfigured: 'Tato aplikace není propojena se serverem UniWork.',
   acctErrKeyringUnavailable: 'Zabezpečené úložiště v tomto počítači není dostupné.',
   acctErrKeystoreLocked: 'Klíčenka tohoto počítače je zamčená. Odemkněte ji a zkuste to znovu.',
+  acctReplaceTitle: 'Nahradit uložené přihlášení na tomto počítači?',
+  acctReplaceBody:
+    'Tento počítač nemůže otevřít uložené přihlášení. Opětovným přihlášením se nahradí. Offline úpravy čekající na synchronizaci zůstanou na tomto počítači zamčené; nic se nesmaže.',
+  acctReplaceGo: 'Přihlásit se znovu',
   acctErrServerError: 'V UniWork došlo k problému. Zkuste to prosím později.',
   acctErrMalformedResponse: 'UniWork odeslal neočekávanou odpověď. Zkuste to prosím později.',
   wbLoadFailedTitle: 'Uložená data se nepodařilo načíst',

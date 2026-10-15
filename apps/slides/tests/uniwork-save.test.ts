@@ -71,7 +71,9 @@ vi.mock('../src/main/shaped-metrics', () => ({
 
 import { createBlankPptx, openPptx } from '@genoffice/pptx-engine'
 import {
+  clearSlidesRecovery,
   queueSlidesForView,
+  slidesRecoveryEpochEntries,
   recoveryCopyMtime,
   registerSlidesIpc,
   saveSessionDeckTo,
@@ -558,5 +560,33 @@ describe('recovery copy cleared while an autosave tick is in flight', () => {
 
     await new Promise((r) => setTimeout(r, 1500)) // the tick finishes its write, then must undo it
     expect(recoveryCopyMtime(deckPath)).toBeNull()
+  })
+})
+
+describe('the sign-out sweep against the autosave tick (G5-11f d3-1, d3-3)', () => {
+  it('removes the copy a tick wrote after the sweep cleared the deck (target gone)', async () => {
+    session.metaDirty = true
+    expect(recoveryCopyMtime(deckPath)).toBeNull()
+
+    vi.advanceTimersByTime(30_000) // the tick is awaiting its write of the recovery copy
+    clearSlidesRecovery(deckPath) // the sweep's clearer runs mid-tick
+
+    await new Promise((r) => setTimeout(r, 1500))
+    expect(recoveryCopyMtime(deckPath)).toBeNull()
+    expect(slidesRecoveryEpochEntries()).toBe(0)
+  })
+
+  it('a tick that starts after the sweep writes no copy while the deck is still open', async () => {
+    // the sweep deleted the binding, so the bound gate no longer holds
+    bindPolicy({})
+    session.metaDirty = true
+    clearSlidesRecovery(deckPath)
+
+    vi.advanceTimersByTime(30_000)
+    await new Promise((r) => setTimeout(r, 1500))
+    expect(recoveryCopyMtime(deckPath)).toBeNull()
+    const dir = join(env.dir, 'slides-autosave')
+    const bound = `${createHash('sha1').update(deckPath).digest('hex').slice(0, 16)}.pptx`
+    expect(existsSync(join(dir, bound))).toBe(false)
   })
 })
