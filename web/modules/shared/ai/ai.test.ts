@@ -2789,9 +2789,10 @@ describe('UniWork AI on the web (G6-05)', () => {
     })
 
     it('without the uniworkAi grant there is no UniWork AI entry, and a stored choice of it stays selected (no silent switch to a BYOK provider)', async () => {
+      // the pick is newer than the server's model stamp, so only availability could move it
       localStorage.setItem(
         'uniwork.office.web.ai.choice',
-        JSON.stringify({ provider: 'uniwork', models: {} }),
+        JSON.stringify({ provider: 'uniwork', providerAt: AFTER_STAMPS, models: {} }),
       )
       const { fetch } = recorder((c) =>
         c.url.endsWith('/credentials')
