@@ -235,4 +235,39 @@ describe('html bound and view-only UniWork copies', () => {
     bindPolicy(path, true)
     expect(state({ sender: contents })).toEqual({ bound: true, readOnly: true })
   })
+
+  it('capture origin writes a bound editable copy without firing the user-save hook, and refuses read-only', async () => {
+    const { uniworkSaveDecision } = await import('../src/main/uniwork-policy')
+    const { path, contents } = await openDocument()
+    const hook = vi.fn()
+    setHtmlUserSaveHook(hook)
+    setUniworkDocumentPolicy({
+      isBound: (p) => p === path,
+      isReadOnly: () => false,
+      consumeCapture: (p) => p === path,
+    })
+    expect(
+      uniworkSaveDecision({
+        origin: 'capture',
+        mode: 'save',
+        currentPath: path,
+        targetPath: path,
+        mcp: false,
+      }),
+    ).toEqual({ write: true, fireHook: false })
+    await expect(save(contents, {})).resolves.toMatchObject({ ok: true, path })
+    expect(await readFile(path, 'utf8')).toBe('new')
+    expect(hook).not.toHaveBeenCalled()
+
+    bindPolicy(path, true)
+    expect(
+      uniworkSaveDecision({
+        origin: 'capture',
+        mode: 'save',
+        currentPath: path,
+        targetPath: path,
+        mcp: false,
+      }),
+    ).toEqual({ write: false, fireHook: false })
+  })
 })

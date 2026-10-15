@@ -13,6 +13,8 @@ export interface ModuleSaveTarget {
   webContents: WebContents
 }
 
+export type UniworkModuleSaveMode = 'save' | 'capture'
+
 export interface ModuleSaveDeps {
   /** the tab or detached window showing the path */
   targetForPath(path: string): ModuleSaveTarget | undefined
@@ -20,17 +22,21 @@ export interface ModuleSaveDeps {
   sheetsMenuChannel: string
   requestMarkdownSave(contents: WebContents, mode: 'save'): Promise<boolean>
   requestHtmlSave(contents: WebContents, mode: 'save'): Promise<boolean>
-  flushPdfSave(contents: WebContents): Promise<boolean>
+  flushPdfSave(contents: WebContents, options?: { explicit?: boolean }): Promise<boolean>
+  /** G5-11: optional hook called when a save is triggered in capture mode */
+  armCapture?(path: string): void
 }
 
 /**
  * false when nothing shows the path (or its view is gone): the caller falls
  * back. `onNotWritten` is called when the module says its Save wrote nothing.
+ * `mode === 'capture'` flushes the working copy to disk without firing the
+ * user-save hook.
  */
 export function createModuleSaveRequester(
   deps: ModuleSaveDeps,
-): (path: string, onNotWritten?: () => void) => boolean {
-  return (path, onNotWritten) => {
+): (path: string, onNotWritten?: () => void, mode?: UniworkModuleSaveMode) => boolean {
+  return (path, onNotWritten, mode = 'save') => {
     const target = deps.targetForPath(path)
     if (!target || target.webContents.isDestroyed()) return false
     const wc = target.webContents
@@ -46,22 +52,32 @@ export function createModuleSaveRequester(
       )
     switch (target.kind) {
       case 'docs':
+        if (mode === 'capture') deps.armCapture?.(path)
         wc.send('menu:command', 'save')
         return true
       case 'sheets':
+        if (mode === 'capture') deps.armCapture?.(path)
         wc.send(deps.sheetsMenuChannel, 'save')
         return true
       case 'slides':
+        if (mode === 'capture') deps.armCapture?.(path)
         wc.send('slides:menu', 'save')
         return true
       case 'markdown':
+        if (mode === 'capture') deps.armCapture?.(path)
         ignore(deps.requestMarkdownSave(wc, 'save'))
         return true
       case 'html':
+        if (mode === 'capture') deps.armCapture?.(path)
         ignore(deps.requestHtmlSave(wc, 'save'))
         return true
       case 'pdf':
-        ignore(deps.flushPdfSave(wc))
+        if (mode === 'capture') {
+          deps.armCapture?.(path)
+          ignore(deps.flushPdfSave(wc, { explicit: false }))
+        } else {
+          ignore(deps.flushPdfSave(wc))
+        }
         return true
       default:
         return false

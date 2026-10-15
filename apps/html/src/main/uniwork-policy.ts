@@ -16,6 +16,11 @@ export interface UniworkDocumentPolicy {
    * locks.
    */
   isLocked?(path: string): boolean
+  /**
+   * G5-11: consumes a one-shot capture request for `path` so a main-triggered
+   * save writes the working copy to disk without firing the user-save hook.
+   */
+  consumeCapture?(path: string): boolean
 }
 
 let policy: UniworkDocumentPolicy | null = null
@@ -86,7 +91,7 @@ export function notifyUniworkUserSave(path: string): void {
   }
 }
 
-export type UniworkSaveOrigin = 'user' | 'auto'
+export type UniworkSaveOrigin = 'user' | 'auto' | 'capture'
 
 export interface UniworkSaveInput {
   /** absent = an explicit user save (the pre-UniWork renderer never sent one) */
@@ -99,6 +104,15 @@ export interface UniworkSaveInput {
   mcp?: boolean
 }
 
+function consumeCaptureFor(path: string | null | undefined): boolean {
+  if (!path || !policy?.consumeCapture) return false
+  try {
+    return policy.consumeCapture(path) === true
+  } catch {
+    return false
+  }
+}
+
 /**
  * Whether a save may write `targetPath`, and whether it counts as the user's
  * explicit Save of the document they already had open (a Save As onto its own
@@ -109,7 +123,9 @@ export function uniworkSaveDecision(input: UniworkSaveInput): {
   write: boolean
   fireHook: boolean
 } {
-  const origin = input.origin ?? 'user'
+  const rawOrigin = input.origin ?? 'user'
+  const origin: UniworkSaveOrigin =
+    rawOrigin === 'user' && consumeCaptureFor(input.targetPath) ? 'capture' : rawOrigin
   if (uniworkIsReadOnly(input.targetPath)) return { write: false, fireHook: false }
   if (origin === 'auto' && uniworkIsBound(input.targetPath))
     return { write: false, fireHook: false }

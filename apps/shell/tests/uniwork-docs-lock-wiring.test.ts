@@ -1,10 +1,13 @@
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { UNIWORK_DOC_CHANNELS, type UniworkDocLock } from '../src/shared/home-api'
 import { BINDING_FILE, INTENT_PAYLOAD_FILE } from '../src/main/uniwork-docs/binding-store'
+import { INTENT_STORE_REGISTRATION, createIntentStore } from '../src/main/uniwork-sync/intent-store'
+import { SyncRuntime } from '../src/main/uniwork-sync/runtime'
 
 /**
  * G5-04g wiring: the lock IPC and the open-route diversion. `lock` is a push
@@ -16,9 +19,12 @@ import { BINDING_FILE, INTENT_PAYLOAD_FILE } from '../src/main/uniwork-docs/bind
 
 let dir: string
 let identity: { accountId: string; deviceSessionId: string; deploymentId: string } | null = null
-let statusListener: ((status: { state: string }) => void) | null = null
+let statusListener:
+  ((status: { state: string; org?: { id: string; slug: string } | null }) => void) | null = null
 /** the account state the mocked auth module reports (keystore-locked after a lock) */
 let accountState = 'signed-out'
+/** the chosen org the mocked auth module reports (null = the picker is up) */
+let accountOrg: { id: string; slug: string } | null = null
 
 const safe = vi.hoisted(() => ({ locked: false }))
 
@@ -44,11 +50,13 @@ vi.mock('electron', () => ({
 vi.mock('../src/main/uniwork-auth', () => ({
   authorizedRequest: vi.fn(),
   setUniworkSignOutHooks: vi.fn(),
-  onUniworkAccountStatus: (listener: (status: { state: string }) => void) => {
+  onUniworkAccountStatus: (
+    listener: (status: { state: string; org?: { id: string; slug: string } | null }) => void,
+  ) => {
     statusListener = listener
     return () => undefined
   },
-  uniworkAccount: () => ({ status: () => ({ state: accountState, org: null }) }),
+  uniworkAccount: () => ({ status: () => ({ state: accountState, org: accountOrg }) }),
   uniworkDeploymentProfile: () => ({
     deploymentId: 'default',
     apiOrigin: 'https://uniwork.example',
@@ -63,6 +71,7 @@ beforeEach(() => {
   identity = { accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' }
   statusListener = null
   accountState = 'signed-out'
+  accountOrg = null
   safe.locked = false
 })
 /**
@@ -127,7 +136,41 @@ function seedLegacyIntent(): void {
   writeFileSync(join(docDir(), INTENT_PAYLOAD_FILE), 'working copy bytes')
 }
 
-async function setup(openPath = vi.fn(() => true)) {
+/** a working copy with a binding this build reads (schema 2, gate open) */
+function seedReadable(bytes = 'working copy bytes'): void {
+  mkdirSync(docDir(), { recursive: true })
+  writeFileSync(docPath(), bytes)
+  writeFileSync(
+    join(docDir(), BINDING_FILE),
+    JSON.stringify({
+      schema: 2,
+      documentId: 'doc_1',
+      workspaceId: 'ws_1',
+      orgId: 'org_a',
+      title: 'Plan.docx',
+      filename: 'Plan.docx',
+      format: 'docx',
+      access: 'edit',
+      baseRevision: '41',
+      baseVersion: 3,
+      baseChecksum: createHash('sha256').update(bytes).digest('hex'),
+      state: 'saved',
+      min_store_level: 2,
+      min_app_version: '0.11.0',
+    }),
+  )
+}
+
+async function setup(
+  openPath = vi.fn(() => true),
+  overrides: {
+    openPaths?: () => string[]
+    closePathNow?: (path: string) => void
+    confirmClosePath?: (path: string) => Promise<boolean>
+    aiHistoryPaths?: () => string[]
+    forgetAiHistory?: (paths: string[]) => void
+  } = {},
+) {
   const { createUniworkDocs } = await import('../src/main/uniwork-docs/wiring')
   const handlers = new Map<string, (event: unknown, ...args: unknown[]) => unknown>()
   const sent: Array<{ channel: string; payload: unknown }> = []
@@ -147,19 +190,19 @@ async function setup(openPath = vi.fn(() => true)) {
       shellContents: () => wc as never,
       openPath,
       refuseLockedPath: (path: string) => handle.service.refuseLockedPath(path),
-      isPathOpen: () => false,
+      isPathOpen: (path: string) => (overrides.openPaths?.() ?? []).includes(path),
       requestModuleSave: () => false,
       reloadPath: () => undefined,
       activePath: () => undefined,
       reveal: () => undefined,
       lang: () => 'en',
       defaultSaveDir: () => dir,
-      openPaths: () => [],
+      openPaths: overrides.openPaths ?? (() => []),
       closePath: async () => true,
-      confirmClosePath: async () => true,
-      closePathNow: () => undefined,
-      aiHistoryPaths: () => [],
-      forgetAiHistory: () => undefined,
+      confirmClosePath: overrides.confirmClosePath ?? (async () => true),
+      closePathNow: overrides.closePathNow ?? (() => undefined),
+      aiHistoryPaths: overrides.aiHistoryPaths ?? (() => []),
+      forgetAiHistory: overrides.forgetAiHistory ?? (() => undefined),
     },
   )
   handle.activate(() => undefined)
@@ -252,17 +295,48 @@ describe('the newer-store lock IPC (G5-04g)', () => {
 })
 
 describe('the durable store at the account boundary (W3b)', () => {
-  it('an explicit Sign out locks and wipes the outgoing scope', async () => {
+  it('an explicit Sign out locks the outgoing scope and keeps its ciphertext for the next sign-in', async () => {
     seed({ schema: 2 })
     const { handle } = await setup()
-    // the account's store scope holds a record
-    const scopeDir = join(dir, 'uniwork-sync', 'store', 'default', 'acc_1', 'feed-cursors')
-    mkdirSync(scopeDir, { recursive: true })
-    writeFileSync(join(scopeDir, 'record.rec'), 'encrypted bytes')
+    // the account's store scope holds a record, read through a handle that is
+    // open when the sign-out runs
+    const opened = await handle.service.openSyncStore()
+    if (opened.kind !== 'ok') throw new Error(opened.kind)
+    const records = opened.records(INTENT_STORE_REGISTRATION.name)
+    await createIntentStore(records).put(
+      'doc_1',
+      {
+        v: 2,
+        intentId: 'intent_1',
+        idempotencyKey: 'idem_1',
+        documentId: 'doc_1',
+        orgId: 'org_a',
+        workspaceId: 'ws_1',
+        baseRevision: '41',
+        baseVersion: 3,
+        checksum: 'abc',
+        length: 3,
+        generation: 1,
+        state: 'queued',
+        attempt: 0,
+        createdAt: '2026-04-17T00:00:00.000Z',
+        updatedAt: '2026-04-17T00:00:00.000Z',
+      },
+      new TextEncoder().encode('v4'),
+    )
     // the hooks the shell's sign-out runs (see uniwork-auth's signOutUniwork)
     expect(await handle.boundary.beforeSignOut()).toBe(true)
     handle.boundary.afterSignOut()
-    expect(existsSync(join(dir, 'uniwork-sync', 'store', 'default', 'acc_1'))).toBe(false)
+    // lock-and-keep: the scope directory survives, the pre-lock handle is dead
+    expect(existsSync(join(dir, 'uniwork-sync', 'store', 'default', 'acc_1'))).toBe(true)
+    expect(await records.read('doc_1')).toEqual({ kind: 'interrupted' })
+    // a same-account sign-in reopens the scope and reads the record back
+    const again = await handle.service.openSyncStore()
+    if (again.kind !== 'ok') throw new Error(again.kind)
+    const record = await createIntentStore(again.records(INTENT_STORE_REGISTRATION.name)).get(
+      'doc_1',
+    )
+    expect(record?.intent.intentId).toBe('intent_1')
     // another account's scope is not touched
     const otherScope = join(dir, 'uniwork-sync', 'store', 'default', 'acc_9', 'feed-cursors')
     mkdirSync(otherScope, { recursive: true })
@@ -327,5 +401,165 @@ describe('the lock list push when a keystore lock clears (R1-fe-1 BE)', () => {
     // a later open that clears nothing does not push the list again
     expect((await handle.service.openSyncStore()).kind).toBe('ok')
     expect(sent.filter((m) => m.channel === UNIWORK_DOC_CHANNELS.locksChanged)).toHaveLength(1)
+  })
+})
+
+describe('the account boundary at the production wiring (G511-be-3)', () => {
+  it('an account switch runs the real lockSession and restarts the feed for the new session', async () => {
+    seedReadable()
+    const stop = vi.spyOn(SyncRuntime.prototype, 'stop')
+    const start = vi.spyOn(SyncRuntime.prototype, 'start')
+    accountOrg = { id: 'org_a', slug: 'acme' }
+    accountState = 'signed-in'
+    const { handle } = await setup()
+    // the signed-in push starts the feed for the chosen org
+    statusListener?.({ state: 'signed-in', org: accountOrg })
+    await vi.waitFor(() => expect(start).toHaveBeenCalledTimes(1))
+    // a live store handle from before the switch
+    const opened = await handle.service.openSyncStore()
+    if (opened.kind !== 'ok') throw new Error(opened.kind)
+    const records = opened.records(INTENT_STORE_REGISTRATION.name)
+    await createIntentStore(records).put(
+      'doc_1',
+      {
+        v: 2,
+        intentId: 'intent_boundary',
+        idempotencyKey: 'idem_boundary',
+        documentId: 'doc_1',
+        orgId: 'org_a',
+        workspaceId: 'ws_1',
+        baseRevision: '41',
+        baseVersion: 3,
+        checksum: 'abc',
+        length: 3,
+        generation: 1,
+        state: 'queued',
+        attempt: 0,
+        createdAt: '2026-04-17T00:00:00.000Z',
+        updatedAt: '2026-04-17T00:00:00.000Z',
+      },
+      new TextEncoder().encode('v4'),
+    )
+
+    // acc_2 signs in for the same org: enforce locks acc_1 through the real
+    // lockSession, which stops the feed pass itself
+    identity = { accountId: 'acc_2', deviceSessionId: 'dev_2', deploymentId: 'default' }
+    statusListener?.({ state: 'signed-in', org: accountOrg })
+    // the real lockSession ran for acc_1: the pre-switch handle is dead and the
+    // outgoing account's working copy is gone
+    await vi.waitFor(async () =>
+      expect(await records.read('doc_1')).toEqual({ kind: 'interrupted' }),
+    )
+    expect(existsSync(docDir())).toBe(false)
+    // and the forced stop does not leave the feed dead: it restarts for the new
+    // session once the boundary settled
+    await vi.waitFor(() => expect(start.mock.calls.length).toBeGreaterThan(1))
+    expect(stop.mock.calls.length).toBeGreaterThan(1)
+    stop.mockRestore()
+    start.mockRestore()
+  })
+
+  it("a confirmed sign-out closes the owner's views with no module or UniWork close prompt (row 7)", async () => {
+    seedReadable()
+    const closePathNow = vi.fn()
+    const confirmClosePath = vi.fn(async () => true)
+    const forgetAiHistory = vi.fn()
+    const { handle, sent } = await setup(
+      vi.fn(() => true),
+      {
+        openPaths: () => [docPath()],
+        closePathNow,
+        confirmClosePath,
+        aiHistoryPaths: () => [docPath()],
+        forgetAiHistory,
+      },
+    )
+    // unsaved edits: the plan has a count, and the renderer already confirmed
+    handle.service.noteEditorDirty(docPath(), true)
+
+    expect(await handle.boundary.beforeSignOut({ confirmed: true })).toBe(true)
+
+    expect(closePathNow).toHaveBeenCalledWith(docPath())
+    // neither the module's unsaved-changes prompt nor a UniWork close prompt ran
+    expect(confirmClosePath).not.toHaveBeenCalled()
+    expect(sent.filter((m) => m.channel === UNIWORK_DOC_CHANNELS.signOutPrompt)).toEqual([])
+    // the outgoing account's AI history went with its views
+    expect(forgetAiHistory).toHaveBeenCalledWith([docPath()])
+  })
+
+  it('lockStore pushes phase:done with captureFailed count when capture fails (d1-2)', async () => {
+    seedReadable()
+    const { handle, sent } = await setup(
+      vi.fn(() => true),
+      {
+        openPaths: () => [docPath()],
+      },
+    )
+    handle.service.noteEditorDirty(docPath(), true)
+
+    expect(await handle.boundary.beforeSignOut({ confirmed: true })).toBe(true)
+
+    expect(sent.filter((m) => m.channel === UNIWORK_DOC_CHANNELS.signOutProgress)).toEqual([
+      {
+        channel: UNIWORK_DOC_CHANNELS.signOutProgress,
+        payload: { phase: 'done', captureFailed: 1 },
+      },
+    ])
+  })
+
+  it('a sign-out with an in-flight record pushes exactly one waiting and one done (d2-4)', async () => {
+    seedReadable()
+    const { handle, sent } = await setup()
+    const opened = await handle.service.openSyncStore()
+    if (opened.kind !== 'ok') throw new Error(opened.kind)
+    await createIntentStore(opened.records(INTENT_STORE_REGISTRATION.name)).put(
+      'doc_1',
+      {
+        v: 2,
+        intentId: 'intent_1',
+        idempotencyKey: 'idem_1',
+        documentId: 'doc_1',
+        orgId: 'org_a',
+        workspaceId: 'ws_1',
+        baseRevision: '41',
+        baseVersion: 3,
+        checksum: 'abc',
+        length: 2,
+        generation: 1,
+        state: 'uploading',
+        attempt: 1,
+        createdAt: '2026-04-17T00:00:00.000Z',
+        updatedAt: '2026-04-17T00:00:00.000Z',
+      },
+      new TextEncoder().encode('v4'),
+    )
+    // the receipt wait is a real timer in production; skip it here
+    vi.spyOn(
+      handle.service as unknown as { sleepMs: () => Promise<void> },
+      'sleepMs',
+    ).mockResolvedValue(undefined)
+
+    await handle.boundary.beforeSignOut({ confirmed: true })
+
+    expect(
+      sent
+        .filter((m) => m.channel === UNIWORK_DOC_CHANNELS.signOutProgress)
+        .map((m) => (m.payload as { phase: string }).phase),
+    ).toEqual(['waiting', 'done'])
+  })
+
+  it('lockStore pushes phase:done in a finally block even if lockSession throws (FE d1-n1)', async () => {
+    seedReadable()
+    const { handle, sent } = await setup()
+    vi.spyOn(handle.service, 'lockSession').mockRejectedValueOnce(new Error('syncStore boom'))
+
+    await handle.boundary.beforeSignOut({ confirmed: true })
+
+    expect(sent.filter((m) => m.channel === UNIWORK_DOC_CHANNELS.signOutProgress)).toEqual([
+      {
+        channel: UNIWORK_DOC_CHANNELS.signOutProgress,
+        payload: { phase: 'done' },
+      },
+    ])
   })
 })

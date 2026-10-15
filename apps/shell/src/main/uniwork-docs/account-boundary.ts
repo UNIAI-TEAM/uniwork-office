@@ -1,4 +1,5 @@
 import { isAbsolute, relative, resolve, sep } from 'node:path'
+import type { SignOutPlan } from '../../shared/home-api'
 import type { LastOwner } from './binding-store'
 
 /**
@@ -6,15 +7,26 @@ import type { LastOwner } from './binding-store'
  * copy lives under `<root>/<deploymentId>/<userId>/...`, so its path names
  * the account it belongs to. When the account goes away (an explicit Sign
  * out) or another one takes over (a sign-in as someone else), the documents
- * of the previous account are closed through the normal close (the module's
- * unsaved-changes prompt, then the UniWork prompt: the working copy stays on
- * this computer as the draft that reopening restores), and the AI chat
- * history of those documents is deleted, so none of it is shown to the next
- * person, and the S11 locks of those working copies are forgotten. Local files
- * outside the root are not account data and are never touched. Electron-free:
- * tabs, windows, the chat store and the lock map come in through `deps` (see
- * wiring.ts).
+ * of the previous account are closed, the AI chat history of those documents
+ * is deleted, so none of it is shown to the next person, and the S11 locks of
+ * those working copies are forgotten. Local files outside the root are not
+ * account data and are never touched. Electron-free: tabs, windows, the chat
+ * store and the lock map come in through `deps` (see wiring.ts).
  */
+
+/**
+ * What a session lock settled to: `false` aborts a sign-out (a park was
+ * refused and the folder kept); `{ lost }` counts the documents an account
+ * switch could not keep (d5-1). `void` / `true` = locked, nothing lost.
+ */
+export type LockOutcome = boolean | void | { ok: boolean; lost?: number }
+
+/** the options of a lock: `switch` = the other account is already live, no abort is possible */
+export interface LockOptions {
+  confirmed?: boolean
+  prompt?: boolean
+  switch?: boolean
+}
 
 export interface AccountBoundaryDeps {
   /** the working-copy root (BindingStore.root) */
@@ -41,16 +53,47 @@ export interface AccountBoundaryDeps {
   closeConflictPrompt(): void
   /**
    * The owner of the live session (the account about to sign out), when there
-   * is one. `wipeStore` falls back to the last owner `enforce` saw.
+   * is one. `lockStore` / `lockSession` falls back to the last owner `enforce` saw.
    */
   sessionOwner?(): LastOwner | null
   /**
-   * Locks and wipes the durable store of the account that goes away (intents,
-   * feed cursors, doc index). Runs after `forgetLocks`; a failure never stops
-   * the documents from closing - the records are encrypted and belong to an
-   * account that no longer has a key path into them here.
+   * G5-11: computes the sign-out plan for `owner` without changing anything.
    */
-  wipeStore?(owner: LastOwner | null): Promise<void>
+  planSignOut?(owner?: LastOwner | null): Promise<SignOutPlan>
+  /**
+   * Optional sign-out confirmation check (G5-11): runs before any document tab
+   * or conflict prompt is closed. False = the user cancelled the sign-out.
+   * Only asked before the account goes away (Sign out, a deployment switch that
+   * signs out first); an account switch that is already effective never asks.
+   */
+  confirmSignOut?(
+    owner: LastOwner | null,
+    options?: { confirmed?: boolean; prompt?: boolean; plan?: SignOutPlan },
+  ): Promise<boolean>
+  /**
+   * G5-11 (Q2 = a): an account switch that is already effective always locks
+   * the account it leaves; when content of that account was lost (RAM-only
+   * content, or N+1 the lock could not park, d5-1) the user is told so
+   * afterwards, with `plan.ramOnly` carrying the count of both. Fire-and-forget:
+   * the lock never waits on this notice.
+   */
+  noticeSwitchLoss?(owner: LastOwner, plan: SignOutPlan): void
+  /**
+   * G5-11: locks the session of `owner` (bounded receipt wait, N+1 capture into
+   * `parked`, working/recovery copy cleanup, RAM cache clear, and store lock).
+   */
+  lockSession?(
+    owner: LastOwner | null,
+    onWaiting?: () => void,
+    options?: LockOptions,
+  ): Promise<LockOutcome>
+  /**
+   * Locks the durable store of the account that goes away (after parking any
+   * N+1 working copies and deleting plaintext working/recovery copies). Runs
+   * after `forgetLocks` and before `closeNow` so open editors can still flush
+   * their capture save; returning `false` aborts the sign-out before tabs close.
+   */
+  lockStore?(owner: LastOwner | null, options?: LockOptions): Promise<LockOutcome>
 }
 
 /** the account a working-copy path belongs to; null outside the root */
@@ -66,13 +109,27 @@ export function workingCopyOwner(
   return { deploymentId, userId }
 }
 
+/** `deploymentId/accountId`: one account's boundary key */
+function ownerKey(owner: LastOwner): string {
+  return `${owner.deploymentId}/${owner.accountId}`
+}
+
 export class AccountBoundary {
   private readonly deps: AccountBoundaryDeps
   /** `deploymentId/accountId` whose boundary is enforced; null = not yet, or signed out */
   private enforced: string | null = null
   /** the last live owner `enforce` saw (the account an account switch leaves) */
   private lastOwner: LastOwner | null = null
-  private running: Promise<unknown> | null = null
+  /** the drain of `enforce` runs in progress (one at a time); null = idle */
+  private running: Promise<void> | null = null
+  /** the owner whose run the drain is in right now; null = between runs */
+  private current: LastOwner | null = null
+  /**
+   * The distinct owners status pushes asked for while a run was in progress,
+   * oldest first. Each was live at its push (its store opened, its documents
+   * editable), so each gets its own run: the run after it locks it (d6-1).
+   */
+  private readonly queued: LastOwner[] = []
 
   constructor(deps: AccountBoundaryDeps) {
     this.deps = deps
@@ -95,24 +152,52 @@ export class AccountBoundary {
     }
   }
 
+  /** G5-11: computes what the sign-out prompt needs without changing anything. */
+  async planSignOut(owner?: LastOwner | null): Promise<SignOutPlan> {
+    const target = owner ?? this.deps.sessionOwner?.() ?? this.lastOwner
+    if (this.deps.planSignOut) return this.deps.planSignOut(target)
+    return { count: 0, waiting: 0, keystoreLocked: false, ramOnly: 0 }
+  }
+
+  /** G5-11: locks the session of `owner` without throwing or asking "discard". */
+  async lockSession(owner: LastOwner | null, onWaiting?: () => void): Promise<void> {
+    await this.lock(owner, undefined, onWaiting)
+  }
+
   /**
    * Before an explicit Sign out: every document that is a working copy (of any
    * account) gets its close prompt, one at a time, and only when all of them
    * went ahead are the documents closed. False when the user cancelled a
-   * prompt: the sign-out does not go ahead and no document was closed.
+   * prompt or when parking N+1 failed: the sign-out does not go ahead and no
+   * document was closed.
    */
-  async beforeSignOut(): Promise<boolean> {
+  async beforeSignOut(options?: { confirmed?: boolean; prompt?: boolean }): Promise<boolean> {
     await this.running?.catch(() => undefined)
+    const owner = this.deps.sessionOwner?.() ?? this.lastOwner
+    if (this.deps.planSignOut) {
+      const plan = await this.deps.planSignOut(owner)
+      if (plan.count > 0 || plan.ramOnly > 0) {
+        if (options?.confirmed === true) {
+          // already confirmed by the renderer prompt
+        } else if (this.deps.confirmSignOut) {
+          if (!(await this.deps.confirmSignOut(owner, { ...options, plan }))) return false
+        } else {
+          return false
+        }
+      }
+    } else if (this.deps.confirmSignOut && !(await this.deps.confirmSignOut(owner, options))) {
+      return false
+    }
     this.deps.closeConflictPrompt()
     const paths = this.pathsWhere(this.anyAccount)
     for (const path of paths) if (!(await this.deps.confirmClose(path))) return false
-    // a prompt may have taken a while: close what still shows a working copy
-    for (const path of this.pathsWhere(this.anyAccount)) this.deps.closeNow(path)
     this.deps.forgetLocks(this.anyAccount)
-    // the account is about to leave: its durable store is locked and wiped with
-    // its documents (the sign-out did go ahead)
-    const owner = this.deps.sessionOwner?.() ?? this.lastOwner
-    await this.wipe(owner)
+    // the account is about to leave: capture N+1 from open tabs and lock its
+    // durable store before the tabs close
+    if (!(await this.lock(owner, options)).ok) return false
+    // a prompt or capture may have taken a while: close what still shows a working copy
+    for (const path of this.pathsWhere(this.anyAccount)) this.deps.closeNow(path)
+    this.lastOwner = null
     return true
   }
 
@@ -121,57 +206,115 @@ export class AccountBoundary {
     this.enforced = null
     this.forgetWhere(this.anyAccount)
     this.deps.forgetLocks(this.anyAccount)
-    // idempotent with beforeSignOut: whatever owner is left loses its store
+    // idempotent with beforeSignOut: whatever owner is left locks its store
     const owner = this.lastOwner
     this.lastOwner = null
-    if (owner) void this.wipe(owner)
+    if (owner) void this.lock(owner)
   }
 
   /**
    * A live session of `owner` (every signed-in status push): once per account,
    * the documents of any other account are closed and their AI history is
-   * deleted. When a prompt was cancelled the boundary stays unenforced, so the
-   * next status push asks again; a run in progress is not started twice.
+   * deleted. The account that went away is always locked (no prompt can keep
+   * it open: the switch already happened). When a close prompt was cancelled
+   * the boundary stays unenforced, so the next status push asks again. Runs
+   * never overlap: a push that arrives while one runs is queued (unless it
+   * names the same owner as the run or push before it) and every queued owner
+   * runs in order right after it, without waiting for another push, so an
+   * owner that was live only between two pushes is still locked by the next
+   * run; the call resolves once the drain that covers it has finished.
    */
   async enforce(owner: LastOwner): Promise<void> {
-    const key = `${owner.deploymentId}/${owner.accountId}`
-    if (this.enforced === key || this.running) return
-    const previous = this.lastOwner
-    this.lastOwner = owner
-    const run = (async () => {
-      const foreign = this.notOwnedBy(owner)
-      if (this.deps.openPaths().some(foreign)) this.deps.closeConflictPrompt()
-      // the locks of the account that went away go first: they are panel state,
-      // so they must not wait on a save prompt, and a renderer re-read on the
-      // account change already sees them gone (F4 residual). They go even when a
-      // prompt is cancelled: they are not this account's copies to explain.
-      this.deps.forgetLocks(foreign)
-      if (previous && `${previous.deploymentId}/${previous.accountId}` !== key) {
-        // the switched-out account's durable store goes with its documents
-        await this.wipe(previous)
-      }
-      const closed = await this.closeWhere(foreign)
-      this.forgetWhere(foreign)
-      if (closed) this.enforced = key
-    })()
-    this.running = run
+    const last = this.queued[this.queued.length - 1] ?? this.current
+    if (!last || ownerKey(last) !== ownerKey(owner)) this.queued.push(owner)
+    if (!this.running) this.running = this.drain()
+    await this.running
+  }
+
+  /** runs the queued owners one after another, oldest first, until none is left */
+  private async drain(): Promise<void> {
     try {
-      await run
+      let next = this.queued.shift()
+      while (next) {
+        this.current = next
+        try {
+          await this.enforceOnce(next)
+        } catch (error) {
+          // a newer owner still gets its run; the last one reports its failure
+          if (this.queued.length === 0) throw error
+        } finally {
+          this.current = null
+        }
+        next = this.queued.shift()
+      }
     } finally {
-      if (this.running === run) this.running = null
+      // cleared in the same step that saw nothing queued, so a later push
+      // always starts a new drain instead of joining one that has ended
+      this.running = null
     }
   }
 
+  private async enforceOnce(owner: LastOwner): Promise<void> {
+    const key = ownerKey(owner)
+    if (this.enforced === key) return
+    const previous = this.lastOwner
+    this.lastOwner = owner
+    const foreign = this.notOwnedBy(owner)
+    if (this.deps.openPaths().some(foreign)) this.deps.closeConflictPrompt()
+    // the locks of the account that went away go first: they are panel state,
+    // so they must not wait on a save prompt, and a renderer re-read on the
+    // account change already sees them gone (F4 residual). They go even when a
+    // prompt is cancelled: they are not this account's copies to explain.
+    this.deps.forgetLocks(foreign)
+    if (previous && ownerKey(previous) !== key) {
+      // the other account is already live, so there is nothing left to cancel:
+      // the switched-out account is locked exactly as on a confirmed sign-out
+      // (N+1 parked, plaintext copies wiped, store locked). The plan is read
+      // first, while the RAM-only content it counts still exists.
+      const plan = this.deps.planSignOut
+        ? await this.deps.planSignOut(previous).catch(() => null)
+        : null
+      // d5-1: the lock's own result counts what it could not keep (a refused
+      // park); RAM-only content is counted by the plan
+      const locked = await this.lock(previous, { switch: true })
+      const ramOnly = plan?.ramOnly ?? 0
+      // only lost content is worth a notice, and it comes after the lock so a
+      // user who has not read it yet never keeps the old plaintext on disk
+      if (ramOnly > 0 || locked.lost > 0) {
+        const lostPlan: SignOutPlan = plan
+          ? { ...plan, ramOnly: ramOnly + locked.lost }
+          : { count: locked.lost, waiting: 0, keystoreLocked: false, ramOnly: locked.lost }
+        try {
+          this.deps.noticeSwitchLoss?.(previous, lostPlan)
+        } catch {
+          // a notice that cannot be shown changes nothing about the lock
+        }
+      }
+    }
+    const closed = await this.closeWhere(foreign)
+    this.forgetWhere(foreign)
+    if (closed) this.enforced = key
+  }
+
   /**
-   * Lock and wipe one account's durable store. Best effort by design: the
-   * records are encrypted, they belong to an account that is leaving, and a
-   * wipe that fails must never keep the documents of that account open.
+   * Lock one account's durable store (and park any N+1 working copies). `ok` is
+   * false only when `lockSession` / `lockStore` explicitly signals an abort (e.g.
+   * park failure on explicit sign-out so plaintext working copies are not deleted);
+   * `lost` counts the documents a switch could not keep.
    */
-  private async wipe(owner: LastOwner | null): Promise<void> {
+  private async lock(
+    owner: LastOwner | null,
+    options?: LockOptions,
+    onWaiting?: () => void,
+  ): Promise<{ ok: boolean; lost: number }> {
     try {
-      await this.deps.wipeStore?.(owner)
+      const res = this.deps.lockSession
+        ? await this.deps.lockSession(owner, onWaiting, options)
+        : await this.deps.lockStore?.(owner, options)
+      if (res && typeof res === 'object') return { ok: res.ok, lost: res.lost ?? 0 }
+      return { ok: res !== false, lost: 0 }
     } catch {
-      // the next sign-in opens a fresh scope anyway
+      return { ok: true, lost: 0 }
     }
   }
 

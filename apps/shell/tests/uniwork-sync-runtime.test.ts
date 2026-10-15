@@ -128,6 +128,7 @@ function harness(
         }
       },
       forget: () => undefined,
+      lock: async () => undefined,
     },
     targets: {
       orgs: () => options.orgs ?? ['org_a'],
@@ -422,6 +423,7 @@ describe('the feed runtime', () => {
             : open
         },
         forget: () => undefined,
+        lock: async () => undefined,
       },
       targets: { orgs: () => ['org_a'], workspaces: async () => ['ws_1'] },
       capability: async () => ({
@@ -765,6 +767,7 @@ describe('G506-be-3: only a failed feed round trip reports the queue offline', (
             : open
         },
         forget: () => undefined,
+        lock: async () => undefined,
       },
       targets: { orgs: () => orgs, workspaces: async () => ['ws_1'] },
       capability: async () => ({
