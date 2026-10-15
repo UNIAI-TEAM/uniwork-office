@@ -275,6 +275,76 @@ describe('uniwork-panel shared helper (RF1-14, RF1-19)', () => {
       expect(announced).toBe('[aiRunStopped]')
     })
 
+    it('does not double terminal punctuation (. ! ? 。 ！ ？) when joining parts in vi, en and zh (RF3-4)', () => {
+      const stoppedErrorChip: ResultChipOutput = {
+        ...resultChip({
+          provider: 'uniwork',
+          stopped: true,
+          error: { code: 'unavailable', message: 'down' },
+        }),
+        labelKey: 'aiResultError',
+      }
+      const entries: UniworkPanelEntryLike[] = [
+        { role: 'user', text: 'Q' },
+        { role: 'assistant', text: '', streaming: false, resultChip: stoppedErrorChip },
+      ]
+
+      const viStrings: Record<string, string> = {
+        aiResultError: 'Đã dừng',
+        aiErrUnavailable:
+          'UniWork AI tạm thời không phản hồi. Tài liệu và nút Lưu vẫn dùng bình thường.',
+        aiRunStopped: 'Đã dừng theo yêu cầu của bạn.',
+      }
+      expect(
+        panelLiveAnnouncement({
+          entries,
+          busy: false,
+          translate: (k) => viStrings[k] ?? k,
+        }),
+      ).toBe(
+        'Đã dừng. UniWork AI tạm thời không phản hồi. Tài liệu và nút Lưu vẫn dùng bình thường. Đã dừng theo yêu cầu của bạn.',
+      )
+
+      const enBangStrings: Record<string, string> = {
+        aiResultError: 'Stopped!',
+        aiErrUnavailable: 'Is UniWork AI reachable?',
+        aiRunStopped: 'Stopped at your request.',
+      }
+      expect(
+        panelLiveAnnouncement({
+          entries,
+          busy: false,
+          translate: (k) => enBangStrings[k] ?? k,
+        }),
+      ).toBe('Stopped! Is UniWork AI reachable? Stopped at your request.')
+
+      const zhStrings: Record<string, string> = {
+        aiResultError: '已停止！',
+        aiErrUnavailable: 'UniWork AI 暂时无响应。文档和保存按钮仍可正常使用。',
+        aiRunStopped: '已按你的要求停止。',
+      }
+      expect(
+        panelLiveAnnouncement({
+          entries,
+          busy: false,
+          translate: (k) => zhStrings[k] ?? k,
+        }),
+      ).toBe('已停止！ UniWork AI 暂时无响应。文档和保存按钮仍可正常使用。 已按你的要求停止。')
+
+      const zhQuestionStrings: Record<string, string> = {
+        aiResultError: '为什么停止？',
+        aiErrUnavailable: '服务暂不可用。',
+        aiRunStopped: '已停止。',
+      }
+      expect(
+        panelLiveAnnouncement({
+          entries,
+          busy: false,
+          translate: (k) => zhQuestionStrings[k] ?? k,
+        }),
+      ).toBe('为什么停止？ 服务暂不可用。 已停止。')
+    })
+
     it('returns empty string on completion when provider is not UniWork (no resultChip)', () => {
       const announced = panelLiveAnnouncement({
         entries: [
