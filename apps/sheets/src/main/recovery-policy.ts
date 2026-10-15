@@ -2,7 +2,7 @@ import { unlinkSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
-import { RecoveryClearEpochs } from '@genoffice/electron-utils/recovery-copy'
+import { RecoveryClearEpochs } from '@genoffice/electron-utils/recovery-epochs'
 
 /**
  * The current xlsx patcher materializes worksheet XML as JavaScript strings.
