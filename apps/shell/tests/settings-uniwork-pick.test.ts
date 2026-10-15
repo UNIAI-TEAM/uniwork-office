@@ -17,7 +17,7 @@ describe('Settings window UniWork AI pick wiring', () => {
     expect(src.match(/getAiSettings\?\.\(SETTINGS_PICK\)/g)).toHaveLength(2)
     // the model pane adds the model the user chose; the media pane saves the plain option
     expect(src).toMatch(
-      /saveOptions = modelPick \? \{ \.\.\.SETTINGS_PICK, modelPick \} : SETTINGS_PICK/,
+      /saveOptions = picks\.length \? \{ \.\.\.SETTINGS_PICK, modelPicks: picks \} : SETTINGS_PICK/,
     )
     expect(src.match(/setAiSettings\?\.\(settings, saveOptions\)/g)).toHaveLength(1)
     expect(src.match(/setAiSettings\?\.\(settings, SETTINGS_PICK\)/g)).toHaveLength(1)
@@ -34,6 +34,9 @@ describe('Settings window UniWork AI pick wiring', () => {
     )
     expect(src).toMatch(
       /\.\.\.\(options\?\.modelPick \? \{ modelPick: options\.modelPick \} : \{\}\)/,
+    )
+    expect(src).toMatch(
+      /\.\.\.\(options\?\.modelPicks\?\.length \? \{ modelPicks: options\.modelPicks \} : \{\}\)/,
     )
     expect(src).toMatch(
       /'ai:set-settings',\s*settings,\s*Object\.keys\(sent\)\.length > 0 \? sent : undefined/,

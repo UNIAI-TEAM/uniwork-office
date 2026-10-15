@@ -176,6 +176,8 @@ export interface AiModelPick {
  */
 export interface AiSettingsSaveOptions {
   readonly modelPick?: AiModelPick | undefined
+  /** several picks in one save (the Settings pane keeps one per provider); main takes at most one per provider */
+  readonly modelPicks?: readonly AiModelPick[] | undefined
 }
 
 export interface AiSettings {

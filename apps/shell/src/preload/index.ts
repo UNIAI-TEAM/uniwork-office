@@ -790,6 +790,7 @@ const homeApi: HomeApi = {
     const sent = {
       ...(options?.includeUniworkPick ? { includeUniworkPick: true } : {}),
       ...(options?.modelPick ? { modelPick: options.modelPick } : {}),
+      ...(options?.modelPicks?.length ? { modelPicks: options.modelPicks } : {}),
     }
     await ipcRenderer.invoke(
       'ai:set-settings',

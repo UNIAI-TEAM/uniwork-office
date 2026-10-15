@@ -1690,6 +1690,64 @@ describe('UniworkKeysHost + docs-main BYOK proxy integration (G6-05k F2)', () =>
     expect(readStoredSettings().providers.anthropic?.model).toBe(slotModel)
   })
 
+  it('one Save records a pick for each org-served provider; at most one per provider, malformed entries dropped', async () => {
+    const fetchMock: FetchLike = vi.fn(async (url) => {
+      if (url === R1_URL) {
+        return jsonResponse(
+          r1Body([orgItem('anthropic', { model: 'claude-opus-4-7' }), orgItem('openai')]),
+        )
+      }
+      if (url.endsWith('/models')) return jsonResponse({ data: [] })
+      throw new Error(`unexpected URL: ${url}`)
+    })
+    globalThis.fetch = fetchMock as typeof globalThis.fetch
+    writeFileSync(
+      join(dirs.userData, 'ai-settings.json'),
+      JSON.stringify({
+        provider: 'anthropic',
+        providers: { anthropic: { apiKey: '', model: '' }, openai: { apiKey: '', model: '' } },
+      }),
+    )
+    const host = createUniworkKeysHost({
+      profile: () => PROFILE,
+      orgId: () => ORG_1,
+      authorized: async (call) => call(TOKEN_1),
+      fetch: fetchMock,
+    })
+    setUniworkKeysHost(host)
+    await host.list()
+    const loaded = await getSettings()
+
+    // A then B, one Save: both are recorded (a later entry for the same provider replaces the earlier)
+    await setSettings(loaded, {
+      modelPicks: [
+        { provider: 'anthropic', model: 'claude-haiku-4-5' },
+        { provider: 'openai', model: 'gpt-5.4-mini' },
+        { provider: 'anthropic', model: 'claude-sonnet-5' },
+        { provider: 'anthropic', model: 7 },
+        { provider: 'nope', model: 'x' },
+        'openai',
+        null,
+      ],
+    })
+    const after = await getSettings()
+    expect(after.modelSources?.anthropic?.chosen).toBe('claude-sonnet-5')
+    expect(after.modelSources?.openai?.chosen).toBe('gpt-5.4-mini')
+
+    // the chip's single marker still works beside the list
+    await setSettings(loaded, {
+      ...pickMarker('anthropic', 'claude-haiku-4-5'),
+      modelPicks: [{ provider: 'openai', model: 'gpt-5.4' }],
+    })
+    const again = await getSettings()
+    expect(again.modelSources?.anthropic?.chosen).toBe('claude-haiku-4-5')
+    expect(again.modelSources?.openai?.chosen).toBe('gpt-5.4')
+
+    // a list that is not an array, or a provider without an org source, records nothing
+    await setSettings(loaded, { modelPicks: { provider: 'anthropic', model: 'x' } })
+    expect((await getSettings()).modelSources?.anthropic?.chosen).toBe('claude-haiku-4-5')
+  })
+
   it('ignores a pick that does not belong to an org-served provider or is malformed', async () => {
     const fetchMock: FetchLike = vi.fn(async (url) => {
       if (url === R1_URL)

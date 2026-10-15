@@ -422,7 +422,8 @@ function AiModelPane({
     {},
   )
   /** the model the user chose in this form and has not saved yet; main records a pick only from it */
-  const [modelPick, setModelPick] = useState<AiModelPick | null>(null)
+  // the model picked per provider since the last load or save: one Save sends them all
+  const [modelPicks, setModelPicks] = useState<Partial<Record<AiProviderId, string>>>({})
   /** edits made in this form (the key fields of an open local-key row excluded) */
   const editsRef = useRef(0)
   /** per provider: the form's state when its local-key row opened, so Cancel can undo only its own edits */
@@ -475,7 +476,7 @@ function AiModelPane({
         setSaved(false)
         setLocalKeyRows({})
         localKeyOpenRef.current = {}
-        setModelPick(null)
+        setModelPicks({})
         setSettings(s)
         const codex = s.providers.codex
         if (codex) {
@@ -635,7 +636,10 @@ function AiModelPane({
         ? { ...settings.modelSources, [provider]: { ...source, chosen: patch.model } }
         : settings.modelSources
     setSettings({ ...settings, providers, ...(modelSources ? { modelSources } : {}) })
-    if (patch.model !== undefined) setModelPick({ provider, model: patch.model })
+    if (patch.model !== undefined) {
+      const model = patch.model
+      setModelPicks((picks) => ({ ...picks, [provider]: model }))
+    }
     // typing in the key fields of the open local-key row is what Cancel takes back
     touch(!(useLocalKey && ('apiKey' in patch || 'baseUrl' in patch)))
   }
@@ -675,11 +679,14 @@ function AiModelPane({
     setSaveError(null)
     // Every slot goes out as loaded plus this form's edits: an org-served provider's slot has no
     // key from main, and a key or base URL kept on this computer is never rewritten here.
-    const saveOptions = modelPick ? { ...SETTINGS_PICK, modelPick } : SETTINGS_PICK
+    const picks: AiModelPick[] = (Object.entries(modelPicks) as [AiProviderId, string][]).map(
+      ([pickProvider, model]) => ({ provider: pickProvider, model }),
+    )
+    const saveOptions = picks.length ? { ...SETTINGS_PICK, modelPicks: picks } : SETTINGS_PICK
     window.aiOffice
       .setAiSettings?.(settings, saveOptions)
       .then(() => {
-        setModelPick(null)
+        setModelPicks({})
         setDirty(false)
         setSaved(true)
         window.dispatchEvent(new Event('uniwork:credit-refresh'))

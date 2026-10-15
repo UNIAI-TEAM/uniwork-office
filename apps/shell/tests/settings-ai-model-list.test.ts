@@ -220,7 +220,7 @@ describe('Settings › AI model: org-managed provider row (G6-05k)', () => {
     // the dropdown pick is the explicit pick signal main records
     expect(setAiSettingsMock.mock.calls[0][1]).toEqual({
       includeUniworkPick: true,
-      modelPick: { provider: 'anthropic', model: 'claude-opus-5' },
+      modelPicks: [{ provider: 'anthropic', model: 'claude-opus-5' }],
     })
     return setAiSettingsMock.mock.calls[0][0]
   }
@@ -448,5 +448,50 @@ describe('Settings › AI model: org-managed provider row (G6-05k)', () => {
     await openAiPane()
     expect(host.querySelector('[data-org-key-row]')).toBeNull()
     expect(host.querySelector<HTMLInputElement>('#set-ai-key')?.value).toBe('sk-ant-x')
+  })
+
+  it('picks for two org-served providers before one Save are all sent in that save', async () => {
+    const settings = stored('claude-sonnet-5', {
+      chosen: 'claude-sonnet-5',
+      origin: 'org',
+      listed: CATALOG,
+    })
+    settings.providers.anthropic = { apiKey: '', model: 'claude-sonnet-5' }
+    settings.providers.openai = { apiKey: '', model: 'gpt-a' }
+    settings.modelSources = {
+      ...settings.modelSources,
+      openai: { chosen: 'gpt-a', origin: 'org', listed: ['gpt-a', 'gpt-b'] },
+    }
+    installApi(settings)
+    const catalog = window.aiOffice.getAiProviders!()
+    window.aiOffice.getAiProviders = () => [
+      ...catalog,
+      { ...catalog[0], id: 'openai', label: 'OpenAI', models: ['gpt-a', 'gpt-b'] },
+    ]
+    await openAiPane()
+
+    const choose = async (label: string, option: string) => {
+      await click(host.querySelector<HTMLButtonElement>(`.gs-dd-btn[aria-label="${label}"]`)!)
+      const target = Array.from(
+        host.querySelectorAll<HTMLButtonElement>('.gs-dd-pop [role="option"]'),
+      ).find((opt) => (opt.getAttribute('aria-label') ?? opt.textContent) === option)!
+      await click(target)
+    }
+    // A, then B on another provider, then one Save
+    await choose('Model', 'claude-opus-5')
+    await choose('Provider', 'OpenAI')
+    await choose('Model', 'gpt-b')
+    await click(host.querySelector<HTMLButtonElement>('button.set-btn.primary')!)
+
+    const setAiSettingsMock = vi.mocked(window.aiOffice.setAiSettings)
+    expect(setAiSettingsMock).toHaveBeenCalledTimes(1)
+    const options = setAiSettingsMock.mock.calls[0][1]
+    expect(options?.modelPicks).toHaveLength(2)
+    expect(options?.modelPicks).toEqual(
+      expect.arrayContaining([
+        { provider: 'anthropic', model: 'claude-opus-5' },
+        { provider: 'openai', model: 'gpt-b' },
+      ]),
+    )
   })
 })
