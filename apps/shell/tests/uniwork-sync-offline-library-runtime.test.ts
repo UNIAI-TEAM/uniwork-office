@@ -502,6 +502,68 @@ describe('R5BE-1b an archived pinned document reaches the library (handleArchive
     expect(reads).not.toHaveBeenCalled()
   })
 
+  describe('R6BE-1 the feed archived flag reaches the library only for pinned documents', () => {
+    const ids = ['doc_1', 'doc_2', 'doc_3', 'doc_4', 'doc_5']
+    const snapshot = {
+      phase: 'snapshot',
+      rows: ids.map((document_id) => ({ document_id, revision: '1', current_version: 1 })),
+      next_cursor: 'c1',
+    }
+
+    it('a committed feed page of 5 rows (archived:false, none pinned) calls noteArchived 0 times', async () => {
+      const h = harness({
+        feed: new FakeFeedClient([
+          snapshot,
+          {
+            phase: 'feed',
+            rows: ids.map((document_id) => ({
+              document_id,
+              revision: '1',
+              current_version: 1,
+              archived: false,
+            })),
+            next_cursor: 'f1',
+          },
+        ]),
+        onFeedGone: wiringFeedGone,
+      })
+      const noted = vi.spyOn(h.runtime.library!, 'noteArchived')
+      await h.runtime.tick()
+      await h.runtime.tick()
+      await new Promise((resolve) => setTimeout(resolve, 20))
+      expect(noted).not.toHaveBeenCalled()
+    })
+
+    it('an archived:true row of a pinned doc is handed over once; unpinned rows of the same page (true or false) are not', async () => {
+      const h = harness({
+        feed: new FakeFeedClient([
+          snapshot,
+          {
+            phase: 'feed',
+            rows: ids.map((document_id, index) => ({
+              document_id,
+              revision: '1',
+              current_version: 1,
+              archived: index < 3,
+            })),
+            next_cursor: 'f1',
+          },
+        ]),
+        onFeedGone: wiringFeedGone,
+      })
+      addDoc(h, 'doc_1', 1)
+      await h.runtime.library!.pin({ documentId: 'doc_1', orgId: ORG, workspaceId: WS })
+      const noted = vi.spyOn(h.runtime.library!, 'noteArchived')
+      await h.runtime.tick()
+      await h.runtime.tick()
+      await vi.waitFor(async () => {
+        expect(await h.runtime.library!.row('doc_1')).toMatchObject({ archived: true })
+      })
+      expect(noted).toHaveBeenCalledTimes(1)
+      expect(noted).toHaveBeenCalledWith('doc_1', true)
+    })
+  })
+
   it('the feed-gone re-check (refresh) of a closed pinned doc whose head is archived -> archived, opens until lease end, then locked', async () => {
     const h = harness({ feed: feedDropping(), onFeedGone: wiringFeedGone })
     const draftsKept = await pinnedNeverOpened(h)

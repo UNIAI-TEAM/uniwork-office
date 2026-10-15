@@ -578,7 +578,8 @@ export class SyncRuntime {
 
   /**
    * R5BE-1b: every row of a committed page that carries the feed's archived
-   * flag reaches the library (which ignores a document it has not pinned). An
+   * flag and is pinned reaches the library (R6BE-1: one index read per page,
+   * nothing for a document that is not in the library). An
    * archive does not bump the revision, so the page's own rows are read, not
    * only the ones the cache applied. Dropped once the pass that built the
    * consumer is no longer current.
@@ -592,9 +593,16 @@ export class SyncRuntime {
       async applyPage(changes) {
         const commit = await cache.applyPage(changes)
         if (commit.kind === 'ok') {
-          for (const change of changes) {
-            if (change.archived === undefined || !live()) continue
-            void library.noteArchived(change.documentId, change.archived).catch(() => undefined)
+          const flagged = changes.filter((change) => change.archived !== undefined)
+          if (flagged.length > 0) {
+            // R6BE-1: one index read per page; only a pinned document is handed over
+            const pinned = await library.pinnedIds().catch(() => new Set<string>())
+            for (const change of flagged) {
+              if (!pinned.has(change.documentId) || !live()) continue
+              void library
+                .noteArchived(change.documentId, change.archived === true)
+                .catch(() => undefined)
+            }
           }
         }
         return commit

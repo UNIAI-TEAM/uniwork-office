@@ -1131,6 +1131,13 @@ export class OfflineLibraryManager {
     return index.kind === 'ok' && index.index.pins.includes(documentId)
   }
 
+  /** every document in the library, one index read (R6BE-1: the feed's archived filter) */
+  async pinnedIds(): Promise<ReadonlySet<string>> {
+    if (!this.checkBoundary()) return new Set()
+    const index = await this.options.store.readIndex()
+    return new Set(index.kind === 'ok' ? index.index.pins : [])
+  }
+
   async row(documentId: string): Promise<PinRow | null> {
     if (!this.checkBoundary()) return null
     const read = await this.options.store.getPin(documentId)
