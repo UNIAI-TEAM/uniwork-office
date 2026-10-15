@@ -651,6 +651,8 @@ export class UniworkDocsService {
    * the close prompt of that document's tab.
    */
   private conflictPrompt: ConflictSession | null = null
+  /** path key -> in-flight S5 reload draft flush waiter (intercepts onUserSave so the flush never uploads) */
+  private readonly draftFlushWaiters = new Map<string, (wrote: boolean) => void>()
   /**
    * S18: documents whose binding title this service just changed itself, keyed
    * by the revision its own rename produced. A `document.updated` from the feed
@@ -1943,6 +1945,13 @@ export class UniworkDocsService {
     this.lastUserSave.set(doc.path, ++this.saveCounter)
     // the module just wrote what its editor held
     this.editorDirty.delete(doc.path)
+    const flushKey = pathKey(doc.path)
+    const flush = this.draftFlushWaiters.get(flushKey)
+    if (flush) {
+      this.draftFlushWaiters.delete(flushKey)
+      flush(true)
+      return
+    }
     // the sweep still owns this copy's pre-store intent: nothing is sent, and
     // a binding write here would drop the intent (the open retries the sweep)
     if (this.awaitingMigration(doc)) {
@@ -3579,6 +3588,42 @@ export class UniworkDocsService {
     return session.draftBlock ?? 'ok'
   }
 
+  /**
+   * Flushes an open dirty module to `path` and awaits its `onUserSave` hook
+   * before `drafts.keep` reads the working copy, without starting a save upload.
+   */
+  private flushModuleForDraft(open: ConflictSession, path: string): Promise<boolean> {
+    const key = pathKey(path)
+    this.draftFlushWaiters.get(key)?.(false)
+    return new Promise<boolean>((resolveFlush) => {
+      let settled = false
+      const finish = (wrote: boolean) => {
+        if (settled) return
+        settled = true
+        clearTimeout(timer)
+        open.controller.signal.removeEventListener('abort', onAbort)
+        if (this.draftFlushWaiters.get(key) === finish) {
+          this.draftFlushWaiters.delete(key)
+        }
+        resolveFlush(wrote)
+      }
+      const onAbort = () => finish(false)
+      const timer = setTimeout(() => finish(false), CLOSE_SAVE_WAIT_MS)
+      ;(timer as { unref?: () => void }).unref?.()
+      open.controller.signal.addEventListener('abort', onAbort, { once: true })
+      this.draftFlushWaiters.set(key, finish)
+      let requested: boolean
+      try {
+        requested = this.deps.requestModuleSave(path, () => finish(false))
+      } catch {
+        requested = false
+      }
+      if (!requested) {
+        finish(false)
+      }
+    })
+  }
+
   private async reloadInConflict(
     open: ConflictSession,
     chosen: BoundDocument,
@@ -3591,6 +3636,26 @@ export class UniworkDocsService {
     if (action.keep === 'draft') {
       if (currentView.keepDraft !== 'ok') {
         return { kind: 'view', view: currentView }
+      }
+      if (action.stopAi) this.deps.stopAiRun?.(chosen.path)
+      const editor = await this.editorState(chosen.path)
+      if (editor.dirty === true || this.editorDirty.has(chosen.path)) {
+        if (!(await this.flushModuleForDraft(open, chosen.path))) {
+          if (open.controller.signal.aborted) return { kind: 'closed' }
+          return {
+            kind: 'view',
+            view: await this.buildConflictView(open, {
+              fetchServer: false,
+              notice: open.locked ? null : 'reload_failed',
+            }),
+          }
+        }
+        if (open.controller.signal.aborted) return { kind: 'closed' }
+        if (open.locked) {
+          return { kind: 'view', view: await this.buildConflictView(open, { fetchServer: false }) }
+        }
+        chosen = await this.refreshDirty(chosen)
+        open.doc = chosen
       }
       let localBytes: Uint8Array
       try {
@@ -3621,8 +3686,9 @@ export class UniworkDocsService {
         open.draftBlock = kept
         return { kind: 'view', view: await this.buildConflictView(open, { fetchServer: false }) }
       }
+    } else if (action.stopAi) {
+      this.deps.stopAiRun?.(chosen.path)
     }
-    if (action.stopAi) this.deps.stopAiRun?.(chosen.path)
     try {
       const done = await this.replaceWithLatest(chosen)
       if (open.remoteNotice) {
@@ -3854,6 +3920,9 @@ export class UniworkDocsService {
     delete next.error
     delete next.serverRevision
     delete next.serverVersion
+    // reloading the tab discards any pre-reload editor edits (and outdates an in-flight poll pass)
+    this.lastUserSave.set(doc.path, ++this.saveCounter)
+    this.editorDirty.delete(doc.path)
     const done = await this.coordinator.commitState(doc, next)
     // the bar belonged to the replaced base: the copy is at the head now
     this.remoteBars.delete(pathKey(doc.path))

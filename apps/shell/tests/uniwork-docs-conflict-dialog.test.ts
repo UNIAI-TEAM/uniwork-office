@@ -197,6 +197,7 @@ function setup(
     budgetBytes?: number
     keystoreLocked?: boolean
     aiRunning?: boolean
+    editorDirty?: boolean
   } = {},
 ) {
   const statuses: UniworkDocStatus[] = []
@@ -206,6 +207,7 @@ function setup(
   let capabilityOffline = false
   let keystoreLocked = opts.keystoreLocked ?? false
   let aiRunning = opts.aiRunning ?? false
+  let editorDirty: boolean | null = opts.editorDirty ?? null
   const safeStorage: LockableSafeStorage = createLockableSafeStorage()
   const layer: StoreLayer = createStoreLayer({
     root: join(dir, 'uniwork-sync', 'store'),
@@ -245,6 +247,7 @@ function setup(
     isPathOpen: vi.fn(() => false),
     requestModuleSave: vi.fn(() => false),
     reloadPath: vi.fn(),
+    editorStateOf: vi.fn(async () => ({ dirty: editorDirty, aiRunning, aiEpoch: 0 })),
     activePath: () => undefined,
     ui,
     pushStatus: (s: UniworkDocStatus) => statuses.push(s),
@@ -289,6 +292,9 @@ function setup(
     },
     setAiRunning: (v: boolean) => {
       aiRunning = v
+    },
+    setEditorDirty: (v: boolean | null) => {
+      editorDirty = v
     },
   }
 }
@@ -815,5 +821,116 @@ describe('G5-09 desktop conflict dialog S5 session (main)', () => {
     expect(await resolvePromise).toMatchObject({ state: 'conflict' })
     expect(ctx.views).toEqual([])
     expect(ctx.closedSessions).toEqual([])
+  })
+
+  it('BE-02/BE-302: reload keep=draft awaits the dirty module flush before keeping the draft or replacing the copy, without uploading', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const path = await openAndConflict(ctx, server)
+
+    // The user typed in the editor after the conflict appeared without pressing Save:
+    // the file on disk still holds 'mine v4', while the editor holds newer bytes.
+    ctx.setEditorDirty(true)
+    const events: string[] = []
+    const origFetch = server.fetch.getMockImplementation()!
+    server.fetch.mockImplementation(async (url: string, init: RequestInit) => {
+      const u = new URL(url)
+      if (u.pathname === `/api/v1/documents/${DOC}/download`) {
+        events.push(`download:${readFileSync(path, 'utf8')}`)
+      }
+      return origFetch(url, init)
+    })
+    vi.mocked(ctx.deps.reloadPath).mockImplementation(() => {
+      events.push(`reloadPath:${readFileSync(path, 'utf8')}`)
+    })
+    vi.mocked(ctx.deps.requestModuleSave).mockImplementation((targetPath: string) => {
+      events.push('flush:start')
+      setTimeout(() => {
+        writeFileSync(targetPath, 'mine v4 + unsaved editor keystrokes')
+        events.push('flush:written')
+        ctx.setEditorDirty(false)
+        ctx.service.onUserSave(targetPath)
+      }, 15)
+      return true
+    })
+
+    const resolvePromise = ctx.service.resolveConflict(path)
+    await vi.waitFor(() => expect(ctx.views).toHaveLength(1))
+    const view = ctx.views[0]!
+    const uploadsBefore = server.calls.filter((c) => c.path.endsWith('/uploads')).length
+    const commitsBefore = server.calls.filter((c) => c.path.endsWith('/versions/commit')).length
+
+    const reply = await ctx.service.conflictAct(view.sessionId, {
+      kind: 'reload',
+      keep: 'draft',
+      stopAi: false,
+    })
+    expect(reply).toEqual({ kind: 'closed' })
+    expect(await resolvePromise).toMatchObject({ state: 'saved' })
+
+    // Ordering proof: the module flush completed and wrote the editor bytes
+    // before replaceWithLatest downloaded the server head or reloaded the tab,
+    // and onUserSave did not start an upload.
+    expect(events).toEqual([
+      'flush:start',
+      'flush:written',
+      'download:mine v4 + unsaved editor keystrokes',
+      'reloadPath:server v4',
+    ])
+    expect(server.calls.filter((c) => c.path.endsWith('/uploads')).length).toBe(uploadsBefore)
+    expect(server.calls.filter((c) => c.path.endsWith('/versions/commit')).length).toBe(
+      commitsBefore,
+    )
+    expect(readFileSync(path, 'utf8')).toBe('server v4')
+
+    const drafts = await keptDrafts(ctx, path)
+    expect(drafts).toHaveLength(1)
+    expect(new TextDecoder().decode(drafts[0]!.snapshot)).toBe(
+      'mine v4 + unsaved editor keystrokes',
+    )
+  })
+
+  it('BE-02/BE-302: reload keep=draft refuses with reload_failed when a dirty module does not write; keep=discard stays as-is without flushing', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const path = await openAndConflict(ctx, server)
+
+    // Poll-marked dirty editor whose module Save reports onNotWritten -> refused with reload_failed, no stale draft kept
+    ctx.service.noteEditorDirty(path, true)
+    vi.mocked(ctx.deps.requestModuleSave).mockImplementation(
+      (_targetPath: string, onNotWritten?: () => void) => {
+        setTimeout(() => onNotWritten?.(), 0)
+        return true
+      },
+    )
+
+    const resolvePromise = ctx.service.resolveConflict(path)
+    await vi.waitFor(() => expect(ctx.views).toHaveLength(1))
+    const view = ctx.views[0]!
+
+    const failedDraftReply = await ctx.service.conflictAct(view.sessionId, {
+      kind: 'reload',
+      keep: 'draft',
+      stopAi: false,
+    })
+    expect(failedDraftReply).toMatchObject({
+      kind: 'view',
+      view: { notice: 'reload_failed' },
+    })
+    expect(readFileSync(path, 'utf8')).toBe('mine v4')
+    expect(await keptDrafts(ctx, path)).toHaveLength(0)
+
+    // keep=discard stays as-is: does not ask the module to save and replaces the copy with the server head
+    vi.mocked(ctx.deps.requestModuleSave).mockClear()
+    const discardReply = await ctx.service.conflictAct(view.sessionId, {
+      kind: 'reload',
+      keep: 'discard',
+      stopAi: false,
+    })
+    expect(discardReply).toEqual({ kind: 'closed' })
+    expect(await resolvePromise).toMatchObject({ state: 'saved' })
+    expect(ctx.deps.requestModuleSave).not.toHaveBeenCalled()
+    expect(readFileSync(path, 'utf8')).toBe('server v4')
+    expect(await keptDrafts(ctx, path)).toHaveLength(0)
   })
 })
