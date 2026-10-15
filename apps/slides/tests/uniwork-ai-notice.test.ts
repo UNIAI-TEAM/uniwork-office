@@ -5,7 +5,7 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AgentStreamNotice } from '@genoffice/agent-core'
-import { aiUniworkText } from '@genoffice/ui'
+import { aiUniworkText, clearUniworkAcks } from '@genoffice/ui'
 
 const harness = vi.hoisted(() => ({
   events: null as null | {
@@ -84,28 +84,41 @@ async function startRun(provider: AiSettings['provider'] = 'anthropic'): Promise
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
-  act(() =>
-    root.render(
-      createElement(LocaleProvider, {
-        initial: 'vi',
-        children: createElement(AiPanel, {
-          slides: [],
-          current: 0,
-          selectedIds: [],
-          images: new Map(),
-          applySlide: () => {},
-          applyDeck: () => {},
-          fitWidthPx: 960,
-          settings: { ...settings, provider },
-          open: true,
-          onExpand: () => {},
-          onCollapse: () => {},
-          preset: { text: 'tighten it', nonce: 1, autoRun: true },
+  const render = (preset?: { text: string; nonce: number; autoRun: boolean }) =>
+    act(() =>
+      root.render(
+        createElement(LocaleProvider, {
+          initial: 'vi',
+          children: createElement(AiPanel, {
+            slides: [],
+            current: 0,
+            selectedIds: [],
+            images: new Map(),
+            applySlide: () => {},
+            applyDeck: () => {},
+            fitWidthPx: 960,
+            settings: { ...settings, provider },
+            open: true,
+            onExpand: () => {},
+            onCollapse: () => {},
+            preset,
+          }),
         }),
-      }),
-    ),
-  )
+      ),
+    )
+  const preset = { text: 'tighten it', nonce: 1, autoRun: true }
   mounted.push({ root, container })
+  if (provider === 'uniwork') {
+    // a preset is refused until the UniWork disclosure is acknowledged (S8): mount, acknowledge
+    // the way a user does, then fire the preset
+    render()
+    await flush()
+    act(() => {
+      container.querySelector<HTMLButtonElement>('[role="region"] button')!.click()
+    })
+    await flush()
+  }
+  render(preset)
   await flush()
   expect(harness.run).toHaveBeenCalled()
   return container
@@ -143,6 +156,8 @@ beforeEach(() => {
 
 afterEach(() => {
   setModuleLang('zh')
+  // the in-memory empty-account ack must not leak into the next test
+  clearUniworkAcks()
   for (const { root, container } of mounted.splice(0)) {
     act(() => root.unmount())
     container.remove()
