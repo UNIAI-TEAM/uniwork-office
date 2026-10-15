@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   createSyncCenterController,
+  createWiredSyncCenter,
   registerSyncCenterIpc,
 } from '../src/main/uniwork-sync/sync-center'
 import {
@@ -117,6 +118,7 @@ function createHarness(
       return doc ? { intent: doc.record, payload: doc.payload } : null
     },
     async put(documentKey, intent, payload) {
+      writes.push(`${intent.intentId}:${intent.state}`)
       if (options.refuseNewIntent && intent.intentId.startsWith('office-intent-')) {
         return { kind: 'store_full' }
       }
@@ -138,6 +140,8 @@ function createHarness(
 
   let seq = 0
   let idSeq = 0
+  /** every write the intent store was asked for, as `intentId:state` */
+  const writes: string[] = []
   const published: IntentRecordV2[] = []
   const lookupCommit = vi.fn(async () => ({
     outcome: 'committed' as const,
@@ -308,6 +312,7 @@ function createHarness(
     draftStore,
     dispatcher,
     published,
+    writes,
     clipboardWrites,
     openedDocs,
     openedDrafts,
@@ -325,6 +330,51 @@ function createHarness(
     },
   }
 }
+
+describe('G5-10 wired Sync Center facts: header account', () => {
+  const wired = (status: Record<string, unknown>) =>
+    createWiredSyncCenter({
+      ipcMain: { handle: () => undefined },
+      userDataDir: '/tmp/uw',
+      service: {
+        store: { root: '/tmp/uw/store', readLastOwner: () => null },
+        currentLocks: () => [],
+        syncCenterEngine: async () => ({ kind: 'unavailable' as const }),
+      },
+      store: { access: { scope: () => ({ deploymentId: 'dep-1', accountId: 'acc-1' }) } },
+      accountStatus: () => ({ loggedIn: true, state: 'signed-in', ...status }),
+      capabilityRead: async () => ({ kind: 'ok', capabilities: { sync_write: true } }),
+      tickRuntime: async () => undefined,
+      openPath: () => true,
+      isPathOpen: () => false,
+      defaultSaveDir: () => '/tmp',
+      writeClipboard: () => undefined,
+      pickSaveDialog: async () => null,
+      pushChanged: () => undefined,
+    } as never)
+
+  it('maps the header account from the profile (display name, email)', async () => {
+    const { controller } = wired({
+      email: 'old@example.test',
+      profile: { accountId: 'acc-1', email: 'minh@example.test', displayName: '  Minh Trần ' },
+      org: { id: 'org-1', name: 'VietAnts', slug: 'vietants', role: 'member' },
+    })
+    const snap = await controller.getSnapshot()
+    expect(snap.header.account).toEqual({ name: 'Minh Trần', email: 'minh@example.test' })
+    expect(snap.header.org).toEqual({ id: 'org-1', name: 'VietAnts' })
+  })
+
+  it('falls back to the email local part when the profile has no display name, and to nothing without an identity', async () => {
+    const mail = await wired({
+      email: 'lan.nguyen@example.test',
+      profile: { accountId: 'acc-1', email: '', displayName: '' },
+    }).controller.getSnapshot()
+    expect(mail.header.account).toEqual({ name: 'lan.nguyen', email: 'lan.nguyen@example.test' })
+
+    const none = await wired({}).controller.getSnapshot()
+    expect(none.header.account).toBeUndefined()
+  })
+})
 
 describe('G5-10 Sync Center actions and change notifications', () => {
   it('syncNow runs sync when online and refuses with offline when disconnected', async () => {
@@ -564,6 +614,9 @@ describe('G5-10 Sync Center actions and change notifications', () => {
     expect(next.documentId).toBe(old.documentId)
     expect(next.orgId).toBe(old.orgId)
     expect(Array.from(h.docs.get('doc-1')!.payload)).toEqual([4, 5, 6])
+    // one durable write replaces the old intent with the new one: the new intent is never
+    // preceded by a store state in which the old one is cancelled and no new one exists
+    expect(h.writes).toEqual(['office-intent-new-1:queued'])
     // no draft is kept: nothing was discarded
     expect(await h.draftStore.list('doc-1')).toHaveLength(0)
   })
@@ -586,13 +639,27 @@ describe('G5-10 Sync Center actions and change notifications', () => {
     expect(await h.controller.saveAgain('')).toEqual({ ok: false, code: 'not_found' })
   })
 
-  it('saveAgain reports store_full when the store takes no new intent', async () => {
-    const doc = makeQueueDoc({ key: 'doc-1', state: 'failed' })
+  it('saveAgain reports store_full when the store takes no new intent and keeps the old failed intent', async () => {
+    const payload = new Uint8Array([7, 7, 7])
+    const doc = withRecord(makeQueueDoc({ key: 'doc-1', state: 'failed', payload }), {
+      lastError: 'quota_exceeded',
+    })
+    const old = { ...doc.record }
     const h = createHarness({ initialDocs: [doc], refuseNewIntent: true })
-    expect(await h.controller.saveAgain(doc.record.intentId)).toEqual({
+    expect(await h.controller.saveAgain(old.intentId)).toEqual({
       ok: false,
       code: 'store_full',
     })
+    // the queued save is not lost: the stored record is the old one, still failed, same bytes
+    const kept = h.docs.get('doc-1')!
+    expect(kept.record).toEqual(old)
+    expect(kept.record.state).toBe('failed')
+    expect(Array.from(kept.payload)).toEqual([7, 7, 7])
+    // no cancelled/superseded or new-intent status was announced
+    expect(h.published).toEqual([])
+    // and the row can still be saved again once there is room
+    const snap = await h.controller.getSnapshot()
+    expect(snap.tabs.attention.map((r) => [r.id, r.state])).toEqual([[old.intentId, 'failed']])
   })
 
   it('subscribe pushes a debounced fresh snapshot on state changes', async () => {

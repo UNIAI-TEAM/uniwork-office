@@ -472,6 +472,10 @@ describe('G5-10 buildSyncCenterSnapshot — blocked reasons follow the spine con
     expect(blockedRow(lastError)?.blockedReason).toBe(reason)
   })
 
+  it('maps a recorded document_archived error (server code of G5-08s, not a UniworkDocErrorCode yet) to document_archived', () => {
+    expect(blockedRow('document_archived' as never)?.blockedReason).toBe('document_archived')
+  })
+
   it('maps an unrecognised queue error to permission_revoked, never to a retired name', () => {
     expect(blockedRow('other_window')?.blockedReason).toBe('permission_revoked')
     expect(blockedRow(undefined)?.blockedReason).toBe('permission_revoked')
