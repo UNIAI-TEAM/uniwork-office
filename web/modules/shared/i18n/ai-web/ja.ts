@@ -42,6 +42,8 @@ export const ja = {
     'UniWork が AI プロバイダーに接続できませんでした。しばらくしてからお試しください。',
   aiWebStateCloudTitle: 'クラウドツールを利用できません',
   aiWebStateCloudBody: 'この UniWork AI ツールはまだサーバーで設定されていません。',
+  aiWebStateOutageTitle: 'UniWork が一時的に利用できません',
+  aiWebStateOutageBody: '現在 UniWork に接続できません。しばらくしてからお試しください。',
   aiWebStateSessionTitle: 'セッションの有効期限が切れました',
   aiWebStateSessionBody: '続行するには UniWork からドキュメントを開き直してください。',
   aiWebStateRefusedTitle: 'リクエストが拒否されました',

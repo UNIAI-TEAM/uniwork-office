@@ -8,7 +8,9 @@ import type { AiSettings, UniworkCloudState } from '@genoffice/ai-provider/brows
 import {
   aiNoticeKind,
   aiNoticeKindForCloud,
+  aiEffectiveModel,
   aiNoticeText,
+  isOrgServedReady,
   uniAiOpenRouterKey,
 } from '@genoffice/ai-provider/browser'
 
@@ -16,6 +18,8 @@ import {
 export function aiSettingsReady(settings: AiSettings): boolean {
   const provider = settings.provider
   if (provider === 'codex') return true
+  // a key saved on UniWork serves the provider: main routes the call, the slot holds no key
+  if (isOrgServedReady(settings, provider)) return true
   if (provider === 'genspark' || provider === 'openrouter') {
     return Boolean(uniAiOpenRouterKey(settings))
   }
@@ -25,6 +29,20 @@ export function aiSettingsReady(settings: AiSettings): boolean {
   // Custom OpenAI-compatible endpoints may omit a key when baseUrl is set.
   if (provider === 'custom' && cfg.baseUrl?.trim() && cfg.model?.trim()) return true
   return false
+}
+
+/**
+ * What a My AI turn goes out with: the active provider, the model main will serve (a key saved on
+ * UniWork serves its own, not the slot's) and whether the provider can send at all. The usage
+ * record carries `model`, so it must not read the slot of an org-served provider.
+ */
+export function myAiTurnTarget(settings: AiSettings): {
+  provider: AiSettings['provider']
+  model: string
+  ready: boolean
+} {
+  const provider = settings.provider
+  return { provider, model: aiEffectiveModel(settings, provider), ready: aiSettingsReady(settings) }
 }
 
 /** Match main-process errNoApiKey (any locale), the product notices and common English fallbacks. */

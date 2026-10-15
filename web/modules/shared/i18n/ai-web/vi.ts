@@ -41,6 +41,8 @@ export const vi = {
     'UniWork không kết nối được tới nhà cung cấp AI. Hãy thử lại sau ít phút.',
   aiWebStateCloudTitle: 'Công cụ đám mây chưa sẵn sàng',
   aiWebStateCloudBody: 'Công cụ UniWork AI này chưa được cấu hình trên máy chủ.',
+  aiWebStateOutageTitle: 'UniWork tạm thời chưa dùng được',
+  aiWebStateOutageBody: 'Hiện chưa kết nối được tới UniWork. Hãy thử lại sau ít phút.',
   aiWebStateSessionTitle: 'Phiên đã hết hạn',
   aiWebStateSessionBody: 'Hãy mở lại tài liệu từ UniWork để tiếp tục.',
   aiWebStateRefusedTitle: 'Yêu cầu bị từ chối',

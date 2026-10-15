@@ -39,7 +39,10 @@ import { createSafeStorageKeyProvider } from '../uniwork-sync/keys'
 import {
   DOC_INDEX_REGISTRATION,
   FEED_CURSORS_REGISTRATION,
+  LEASE_STORE_REGISTRATION,
   SyncRuntime,
+  createLeaseClient,
+  type LeaseClient,
   type SyncRuntimeTargets,
 } from '../uniwork-sync/runtime'
 import { createSyncStoreAccess, type SyncStoreAccess } from '../uniwork-sync/session-store'
@@ -363,6 +366,7 @@ function createSyncStoreLayer(root: string): StoreLayer {
   layer.register(PAUSE_STORE_REGISTRATION)
   layer.register(FEED_CURSORS_REGISTRATION)
   layer.register(DOC_INDEX_REGISTRATION)
+  layer.register(LEASE_STORE_REGISTRATION)
   return layer
 }
 
@@ -429,6 +433,7 @@ export function createSyncRuntime(
   let account = ''
   let docs: UniworkDocsClient | null = null
   let feed: FeedClient | null = null
+  let lease: LeaseClient | null = null
   const clock = { now: () => seam.now?.() ?? Date.now() }
   let capability: CapabilityCache = new CapabilityCache({
     fetch: () => Promise.resolve({ status: 0, body: undefined }),
@@ -438,6 +443,7 @@ export function createSyncRuntime(
     docs: UniworkDocsClient
     feed: FeedClient
     capability: CapabilityCache
+    lease: LeaseClient
   } | null => {
     const profile = uniworkDeploymentProfile()
     if (!profile) return null
@@ -454,6 +460,8 @@ export function createSyncRuntime(
       }
       docs = createUniworkDocsClient(options)
       feed = createFeedClient(options)
+      // G5-08c: the offline lease client rides the same authenticated profile
+      lease = createLeaseClient(options)
       capability = new CapabilityCache({
         fetch: createCapabilityFetch(options),
         clock,
@@ -464,7 +472,7 @@ export function createSyncRuntime(
       account = token
       capability.clear()
     }
-    return docs && feed ? { docs, feed, capability } : null
+    return docs && feed && lease ? { docs, feed, capability, lease } : null
   }
   const targets: SyncRuntimeTargets = {
     // G8-16 S16: the chosen org of the live session only. The feed never
@@ -509,6 +517,10 @@ export function createSyncRuntime(
       return found.capability.get(orgId)
     },
     client: () => clients()?.feed ?? null,
+    lease: {
+      client: () => clients()?.lease ?? null,
+      session: () => uniworkSessionIdentity()?.deviceSessionId ?? null,
+    },
     keepDraft: (documentId) => service.hasLocalDraft(documentId),
     clock: { now: () => Date.now() },
     // the same poll drives the durable save queue: dispatch the pending intents
@@ -744,6 +756,9 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     // is locked and wiped with its documents; the feed and the save queue stop
     // first so no in-flight consumer or dispatch writes into a wiped scope
     wipeStore: async (owner) => {
+      // G5-08c: the leases lock at the account boundary itself (sign-out at
+      // once; a switch never locks the incoming account), not on stop()
+      runtime.leases.lockBoundary(owner)
       runtime.stop()
       // await the queue teardown BEFORE the wipe: the in-flight poll/dispatch
       // must unwind (and release its locks) before the scope is wiped, so no

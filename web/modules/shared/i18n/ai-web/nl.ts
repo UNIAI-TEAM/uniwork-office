@@ -42,6 +42,8 @@ export const nl = {
   aiWebStateUnreachableBody: 'UniWork kon de AI-aanbieder niet bereiken. Probeer het zo opnieuw.',
   aiWebStateCloudTitle: 'Cloudtool niet beschikbaar',
   aiWebStateCloudBody: 'Deze UniWork AI-tool is nog niet ingesteld op de server.',
+  aiWebStateOutageTitle: 'UniWork tijdelijk niet beschikbaar',
+  aiWebStateOutageBody: 'UniWork is nu niet bereikbaar. Probeer het zo opnieuw.',
   aiWebStateSessionTitle: 'Sessie verlopen',
   aiWebStateSessionBody: 'Open het document opnieuw vanuit UniWork om verder te gaan.',
   aiWebStateRefusedTitle: 'Verzoek geweigerd',
