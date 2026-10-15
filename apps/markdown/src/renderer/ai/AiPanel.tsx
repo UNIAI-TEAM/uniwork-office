@@ -239,6 +239,7 @@ export function AiPanel({
   onQueueConsume,
   readOnly = false,
   open,
+  onExpand,
 }: {
   deps: MarkdownAiDeps
   filePath: string | null
@@ -255,6 +256,8 @@ export function AiPanel({
   readOnly?: boolean
   /** false while the dock is collapsed (the panel stays mounted); reopening re-reads the cloud plan */
   open?: boolean
+  /** expand the dock: a send refused while collapsed opens it so the reason can be shown */
+  onExpand?: () => void
 }): ReactElement {
   const { lang, t } = useI18n()
   // a picked UniWork AI that is not offered (or any provider still missing a model) keeps every
@@ -1034,6 +1037,12 @@ export function AiPanel({
       : null,
   )
   uniworkGate.setPanelBlocked(isUniwork && !uniworkDisclosureAcked)
+  // a refusal while collapsed expands the panel; once open it announces and focuses the disclosure
+  const panelOpen = open !== false
+  uniworkGate.setPanelOpen(panelOpen, onExpand)
+  useEffect(() => {
+    if (panelOpen) uniworkGate.flushPendingRefusal()
+  }, [panelOpen, uniworkGate])
 
   const lastEntry = chat.at(-1)
   const panelLiveAnnouncement =

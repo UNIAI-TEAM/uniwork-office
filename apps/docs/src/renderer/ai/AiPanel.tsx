@@ -1504,6 +1504,11 @@ export function AiPanel({
       : null,
   )
   uniworkGate.setPanelBlocked(isUniwork && !uniworkDisclosureAcked)
+  // a refusal while collapsed expands the panel; once open it announces and focuses the disclosure
+  uniworkGate.setPanelOpen(open, onExpand)
+  useEffect(() => {
+    if (open) uniworkGate.flushPendingRefusal()
+  }, [open, uniworkGate])
 
   const focusFirstAiChange = () => {
     let targetPos: number | null = null

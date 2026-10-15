@@ -155,6 +155,7 @@ export function AiPanel({
   onRunDone,
   onClearSelection,
   open = true,
+  onExpand,
   readOnly = false,
 }: {
   api: PdfAppDeps
@@ -169,6 +170,8 @@ export function AiPanel({
   onClearSelection?: () => void
   /** false keeps the instance mounted (chat state) but skips panel render work */
   open?: boolean
+  /** expand the dock: a send refused while collapsed opens it so the reason can be shown */
+  onExpand?: () => void
   /** a view-only document: the assistant reads and answers, it never edits */
   readOnly?: boolean
 }): ReactElement | null {
@@ -771,6 +774,11 @@ export function AiPanel({
       : null,
   )
   uniworkGate.setPanelBlocked(isUniwork && !uniworkDisclosureAcked)
+  // a refusal while collapsed expands the panel; once open it announces and focuses the disclosure
+  uniworkGate.setPanelOpen(open, onExpand)
+  useEffect(() => {
+    if (open) uniworkGate.flushPendingRefusal()
+  }, [open, uniworkGate])
 
   const lastEntry = chat.at(-1)
   const panelLiveAnnouncement =

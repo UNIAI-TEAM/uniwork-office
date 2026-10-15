@@ -587,6 +587,11 @@ export function AiChatPanel({
       : null,
   )
   uniworkGate.setPanelBlocked(isUniwork && !uniworkDisclosureAcked)
+  // a refusal while collapsed expands the panel; once open it announces and focuses the disclosure
+  uniworkGate.setPanelOpen(isOpen, onExpand)
+  useEffect(() => {
+    if (isOpen) uniworkGate.flushPendingRefusal()
+  }, [isOpen, uniworkGate])
 
   if (!isOpen) {
     // the sidebar setting is off: nothing to show until an explicit AI action opens the panel

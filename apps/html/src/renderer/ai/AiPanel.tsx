@@ -341,6 +341,8 @@ export function AiPanel({
   onQueueConsume,
   readOnly = false,
   onCollapse,
+  open = true,
+  onExpand,
 }: {
   deps: HtmlAiDeps
   filePath: string | null
@@ -355,6 +357,10 @@ export function AiPanel({
   /** a view-only UniWork document: the assistant reads and answers, it never edits */
   readOnly?: boolean
   onCollapse: () => void
+  /** false while the dock is collapsed (the panel stays mounted, hidden) */
+  open?: boolean
+  /** expand the dock: a send refused while collapsed opens it so the reason can be shown */
+  onExpand?: () => void
 }): ReactElement {
   const { lang, t } = useI18n()
   // a picked UniWork AI that is not offered (or any provider still missing a model) keeps every
@@ -1318,6 +1324,11 @@ export function AiPanel({
       : null,
   )
   uniworkGate.setPanelBlocked(isUniwork && !uniworkDisclosureAcked)
+  // a refusal while collapsed expands the panel; once open it announces and focuses the disclosure
+  uniworkGate.setPanelOpen(open, onExpand)
+  useEffect(() => {
+    if (open) uniworkGate.flushPendingRefusal()
+  }, [open, uniworkGate])
 
   const docEmpty = chat.length === 0 && isDocEmpty(deps.access.getText())
 

@@ -318,7 +318,8 @@ describe('slides panel send entry with an unavailable UniWork AI pick', () => {
     const spoken = [...container!.querySelectorAll('[aria-live="polite"]')].map(
       (n) => n.textContent,
     )
-    expect(spoken).toContain(aiUniworkText('en', 'aiUniworkSendNeedsAck'))
+    // no LocaleProvider here: the panel speaks the default zh
+    expect(spoken).toContain(aiUniworkText('zh', 'aiUniworkSendNeedsAck'))
     expect(panel.expand).toHaveBeenCalledTimes(1)
     expect(harness.runs).toEqual(['rewrite it'])
   })

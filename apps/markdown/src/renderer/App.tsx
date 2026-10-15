@@ -1311,6 +1311,7 @@ export default function App() {
                 onQueueConsume={queueConsume}
                 readOnly={uniwork.readOnly}
                 open={aiOpen}
+                onExpand={() => setAiOpen(true)}
               />
             )}
           </div>

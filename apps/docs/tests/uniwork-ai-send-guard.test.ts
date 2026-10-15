@@ -312,7 +312,8 @@ describe('docs panel send entry with an unavailable UniWork AI pick', () => {
     expect(region).not.toBeNull()
     expect(document.activeElement).toBe(region)
     const spoken = [...container!.querySelectorAll('.ai-uniwork-sr-only')].map((n) => n.textContent)
-    expect(spoken).toContain(aiUniworkText('en', 'aiUniworkSendNeedsAck'))
+    // no LocaleProvider here: the panel speaks the default zh
+    expect(spoken).toContain(aiUniworkText('zh', 'aiUniworkSendNeedsAck'))
     expect(panel.expand).toHaveBeenCalledTimes(1)
     expect(harness.runs).toEqual(['rewrite it'])
   })

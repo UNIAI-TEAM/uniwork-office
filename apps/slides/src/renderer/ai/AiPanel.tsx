@@ -2222,6 +2222,8 @@ export function AiPanel({
   const isUniwork = settings.provider === 'uniwork'
   const [cloudSnapshot, setCloudSnapshot] = useState<UniworkCloudStatusSnapshot | null>(null)
   const [composerAnnouncement, setComposerAnnouncement] = useState('')
+  const [refusalAnnouncement, setRefusalAnnouncement] = useState('')
+  const pendingRefusalRef = useRef(false)
   const disclosureRegionRef = useRef<HTMLElement | null>(null)
   useEffect(() => {
     const bridge = readUniworkCloudStatus()
@@ -2260,11 +2262,29 @@ export function AiPanel({
     if (!uniworkSendBlockedRef.current) return false
     // a composer note alone only keeps Send off (as in the composer); the disclosure also speaks
     if (disclosureUnacked) {
+      if (!open) {
+        // collapsed to the rail: nothing to speak to or focus yet, so expand and replay once open
+        pendingRefusalRef.current = true
+        onExpand?.()
+        return true
+      }
       setComposerAnnouncement(aiUniworkText(lang, 'aiUniworkSendNeedsAck'))
       disclosureRegionRef.current?.focus()
     }
     return true
   }
+  // a refusal that arrived while collapsed: announce through the dedicated region (the panel
+  // region below yields to the run transcript) and focus the disclosure now that it is mounted
+  useEffect(() => {
+    if (!pendingRefusalRef.current || !open) return
+    pendingRefusalRef.current = false
+    if (!disclosureUnacked) return
+    setRefusalAnnouncement(aiUniworkText(lang, 'aiUniworkSendNeedsAck'))
+    disclosureRegionRef.current?.focus()
+  }, [open, disclosureUnacked, lang])
+  useEffect(() => {
+    if (!disclosureUnacked) setRefusalAnnouncement('')
+  }, [disclosureUnacked])
 
   // collapsed: rail only — after all hooks, so the instance and its state survive
   if (!open) {
@@ -2364,6 +2384,9 @@ export function AiPanel({
       {/* Single panel-level polite live region: announces transport notices while running and the finished answer once when it ends */}
       <div className="ai-sr-status" aria-live="polite" aria-atomic="true">
         {panelLiveAnnouncement}
+      </div>
+      <div className="ai-sr-status" aria-live="polite" aria-atomic="true">
+        {refusalAnnouncement}
       </div>
 
       <div
