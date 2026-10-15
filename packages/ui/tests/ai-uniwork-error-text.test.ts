@@ -44,6 +44,21 @@ describe('uniworkErrorKeyOfText', () => {
     }
   })
 
+  // RF6-3 guard: the action is read back from the localized text, so a text must stay one string
+  // that no other key shares and that carries no {param} the transport would have to fill in
+  it('every error text is unique within its language and carries no {param}', () => {
+    for (const lang of LANGS) {
+      const table = aiUniworkStrings[lang] as Record<string, string>
+      const seen = new Map<string, string>()
+      for (const key of ERROR_KEYS) {
+        const text = table[key]!.trim()
+        expect(text.includes('{'), `${lang}/${key} has a {param}`).toBe(false)
+        expect(seen.get(text), `${lang}/${key} repeats ${seen.get(text)}`).toBeUndefined()
+        seen.set(text, key)
+      }
+    }
+  })
+
   it('ignores surrounding space and returns null for text it did not write', () => {
     expect(uniworkErrorKeyOfText(`  ${aiUniworkText('vi', 'aiErrCredits')}\n`)).toBe('aiErrCredits')
     expect(uniworkErrorKeyOfText('Request failed with status 500')).toBeNull()

@@ -247,4 +247,31 @@ describe('UniWork AI chip wiring (html panel)', () => {
     )
     expect((window as any).htmlApi.openAiModelSettings).toHaveBeenCalled()
   })
+
+  it('RF6-2: a failed send shows one Retry: the undelivered message keeps its button, the error turn drops the labelled one', async () => {
+    await uniworkTurn()
+    await failWith('cloud_unavailable', 'aiErrUnavailable')
+    // the failed send marks the user message undelivered and offers its own Retry
+    const undelivered = root_().querySelector('.ai-msg-undelivered')
+    expect(undelivered, 'the message is marked undelivered').not.toBeNull()
+    expect(undelivered!.querySelector('.ai-retry-btn')).not.toBeNull()
+    // so the error turn must not add a second control for the same resend
+    expect(root_().querySelector('.ai-error-action button')).toBeNull()
+    expect(
+      [...root_().querySelectorAll('button')].filter(
+        (b) => b.textContent === ui('aiRunRetry') || b.classList.contains('ai-retry-btn'),
+      ),
+    ).toHaveLength(1)
+  })
+
+  it('RF6-2: the other labelled actions of an undelivered turn stay', async () => {
+    await uniworkTurn()
+    await failWith('credits_exhausted', 'aiErrCredits')
+    expect(root_().querySelector('.ai-msg-undelivered')).not.toBeNull()
+    expect(
+      [...root_().querySelectorAll<HTMLButtonElement>('.ai-error-action button')].map(
+        (b) => b.textContent,
+      ),
+    ).toEqual([ui('aiRunChooseOther')])
+  })
 })
