@@ -178,4 +178,14 @@ describe('uniwork-sync lease client (G5-08c)', () => {
       LeaseClientError,
     )
   })
+
+  it('R1BE-9: a numeric revision is kept as its exact decimal string, small or above 2^53', () => {
+    const body = (revision: string) =>
+      JSON.stringify({ ...SAMPLE_SDO, revision: 0 }).replace('"revision":0', `"revision":${revision}`)
+    expect(parseLeaseSDO(body('42')).revision).toBe('42')
+    expect(parseLeaseSDO(body('9007199254740995')).revision).toBe('9007199254740995')
+    expect(parseLeaseSDO(body('9223372036854775807')).revision).toBe('9223372036854775807')
+    // a string revision stays as sent
+    expect(parseLeaseSDO(JSON.stringify(SAMPLE_SDO)).revision).toBe('9007199254740995')
+  })
 })
