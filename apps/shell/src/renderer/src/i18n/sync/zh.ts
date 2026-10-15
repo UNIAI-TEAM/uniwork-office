@@ -259,8 +259,7 @@ export const zh = {
   uwConflictSaveCopyFailed: '无法创建副本。你的更改仍然安全；请重试。',
   uwConflictSaveCopyNoSeat:
     '无法创建副本，因为你不是此文档所在工作区的成员。你的更改仍然安全；你可以下载自己的版本。',
-  uwConflictSaveCopyFolderRefused:
-    '你无法在此文件夹中创建文档。请改为下载你的版本。',
+  uwConflictSaveCopyFolderRefused: '你无法在此文件夹中创建文档。请改为下载你的版本。',
   uwConflictDownloadDone:
     '你的版本已保存到此电脑：{file}。此文档未改变；你仍可选择重新加载或覆盖。',
   uwConflictDownloadFailedDesktop: '无法保存文件。你的更改仍然安全；请重试。',

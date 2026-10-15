@@ -251,8 +251,7 @@ export const zhTW = {
   uwConflictSaveCopyFailed: '無法建立副本。你的變更仍然安全；請重試。',
   uwConflictSaveCopyNoSeat:
     '無法建立副本，因為你不是此文件所在工作區的成員。你的變更仍然安全；你可以下載自己的版本。',
-  uwConflictSaveCopyFolderRefused:
-    '你無法在此資料夾中建立文件。請改為下載你的版本。',
+  uwConflictSaveCopyFolderRefused: '你無法在此資料夾中建立文件。請改為下載你的版本。',
   uwConflictDownloadDone:
     '你的版本已儲存到這台電腦：{file}。此文件未改變；你仍可選擇重新載入或覆寫。',
   uwConflictDownloadFailedDesktop: '無法儲存檔案。你的變更仍然安全；請重試。',

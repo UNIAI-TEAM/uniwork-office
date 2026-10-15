@@ -303,7 +303,10 @@ describe('uniwork-conflict-model (G5-09 S5 desktop)', () => {
   it('BE-12-304: save_copy_folder_refused is a Download step with its own reason line and the download-mine primary', () => {
     const view = makeView({ notice: 'save_copy_folder_refused' })
     expect(isSaveCopyDownloadStep(view)).toBe(true)
-    expect(resolveConflictNotice(view)).toEqual({ key: 'uwConflictSaveCopyFolderRefused', args: {} })
+    expect(resolveConflictNotice(view)).toEqual({
+      key: 'uwConflictSaveCopyFolderRefused',
+      args: {},
+    })
     let state = createInitialConflictState(view)
     state = applyConflictStep1Click(state, view, 'save-copy')
     expect(buildConfirmPayload(state, view)).toEqual({ kind: 'download-mine', stopAi: false })
