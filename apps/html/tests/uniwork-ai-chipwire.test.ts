@@ -235,8 +235,13 @@ describe('UniWork AI chip wiring (html panel)', () => {
     harness.loop.busy = false
     // the model picker of this harness never reads a model: clear its hint like the send-guard tests
     act(() => setAiModelNeedHint(null))
-    // a failed send keeps one Retry, on the undelivered message (RF6-2); it resends the turn
-    await act(async () => root_().querySelector<HTMLButtonElement>('.ai-retry-btn')!.click())
+    // a UniWork error turn has one Retry, the labelled S9 action (F12); it resends the turn
+    expect(root_().querySelector('.ai-retry-btn')).toBeNull()
+    await act(async () =>
+      root_()
+        .querySelector<HTMLButtonElement>('.ai-error-action button[data-action="retry"]')!
+        .click(),
+    )
     await new Promise((r) => setTimeout(r, 50))
     expect(run).toHaveBeenCalledTimes(1)
     await failWith('credits_exhausted', 'aiErrCredits')
@@ -246,35 +251,37 @@ describe('UniWork AI chip wiring (html panel)', () => {
     expect((window as any).htmlApi.openAiModelSettings).toHaveBeenCalled()
   })
 
-  it('RF6-2: a failed send shows one Retry: the undelivered message keeps its button, the error turn drops the labelled one', async () => {
-    await uniworkTurn()
-    await failWith('cloud_unavailable', 'aiErrUnavailable')
-    // the failed send marks the user message undelivered and offers its own Retry
-    const undelivered = root_().querySelector('.ai-msg-undelivered')
-    expect(undelivered, 'the message is marked undelivered').not.toBeNull()
-    expect(undelivered!.querySelector('.ai-retry-btn')).not.toBeNull()
-    // the turn still announces and shows the line, as for every other error
-    expect(root_().querySelector('.ai-sr-status')?.textContent).toBe(
-      `${ui('aiResultError')}. ${ui('aiErrUnavailable')}`,
-    )
-    expect(visibleErrorText()).toBe(ui('aiErrUnavailable'))
-    // so the error turn must not add a second control for the same resend
-    expect(root_().querySelector('.ai-error-action button')).toBeNull()
-    expect(
-      [...root_().querySelectorAll('button')].filter(
-        (b) => b.textContent === ui('aiRunRetry') || b.classList.contains('ai-retry-btn'),
-      ),
-    ).toHaveLength(1)
-  })
+  // F12 (visual r2): the "not sent" bubble's own Retry sat next to the labelled S9 action on every UniWork
+  // error. An S9 error turn has ONE action by code (EXPERIENCE S9): Retry only where the table allows it.
+  const retryButtons = () => [
+    ...root_().querySelectorAll<HTMLButtonElement>(
+      '.ai-retry-btn, .ai-error-action button[data-action="retry"]',
+    ),
+  ]
 
-  it('RF6-2: the other labelled actions of an undelivered turn stay', async () => {
-    await uniworkTurn()
-    await failWith('credits_exhausted', 'aiErrCredits')
-    expect(root_().querySelector('.ai-msg-undelivered')).not.toBeNull()
-    expect(
-      [...root_().querySelectorAll<HTMLButtonElement>('.ai-error-action button')].map(
-        (b) => b.textContent,
-      ),
-    ).toEqual([ui('aiRunChooseOther')])
+  it.each([
+    ['a retry-allowed code', 'aiErrUnavailable', 1],
+    ['the generic error', 'aiErrGeneric', 0],
+    ['offline', 'aiErrOffline', 0],
+    ['revoked', 'aiErrRevoked', 0],
+    ['credits exhausted', 'aiErrCredits', 0],
+  ] as const)(
+    'F12: a UniWork error turn for %s has exactly the S9 Retry count and no bubble Retry',
+    async (_name, errKey, retries) => {
+      await uniworkTurn()
+      await failWith('x', errKey)
+      expect(root_().querySelector('.ai-retry-btn'), 'no Retry on the user bubble').toBeNull()
+      expect(retryButtons()).toHaveLength(retries)
+      if (retries) {
+        expect(root_().querySelector('.ai-error-action button')?.textContent).toBe(ui('aiRunRetry'))
+      }
+    },
+  )
+
+  it('F12: a failure that is not a UniWork error (own key) keeps the bubble Retry', async () => {
+    await started()
+    await failRaw('upstream said no')
+    expect(root_().querySelector('.ai-error-action')).toBeNull()
+    expect(root_().querySelectorAll('.ai-msg-undelivered .ai-retry-btn')).toHaveLength(1)
   })
 })

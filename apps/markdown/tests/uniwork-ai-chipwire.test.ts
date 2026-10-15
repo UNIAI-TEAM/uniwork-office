@@ -227,4 +227,38 @@ describe('UniWork AI chip wiring (markdown panel)', () => {
     expect(paragraph.textContent!.startsWith(ui('aiResultAnswer'))).toBe(true)
     expect(paragraph.textContent).toContain('Câu trả lời ngắn.')
   })
+
+  // F12 (visual r2): the "not sent" bubble's own Retry sat next to the labelled S9 action on every UniWork
+  // error. An S9 error turn has ONE action by code (EXPERIENCE S9): Retry only where the table allows it.
+  const retryButtons = () => [
+    ...root_().querySelectorAll<HTMLButtonElement>(
+      '.ai-retry-btn, .ai-error-action button[data-action="retry"]',
+    ),
+  ]
+
+  it.each([
+    ['a retry-allowed code', 'aiErrUnavailable', 1],
+    ['the generic error', 'aiErrGeneric', 0],
+    ['offline', 'aiErrOffline', 0],
+    ['revoked', 'aiErrRevoked', 0],
+    ['credits exhausted', 'aiErrCredits', 0],
+  ] as const)(
+    'F12: a UniWork error turn for %s has exactly the S9 Retry count and no bubble Retry',
+    async (_name, errKey, retries) => {
+      await uniworkTurn()
+      await failWith('x', errKey)
+      expect(root_().querySelector('.ai-retry-btn'), 'no Retry on the user bubble').toBeNull()
+      expect(retryButtons()).toHaveLength(retries)
+      if (retries) {
+        expect(root_().querySelector('.ai-error-action button')?.textContent).toBe(ui('aiRunRetry'))
+      }
+    },
+  )
+
+  it('F12: a failure that is not a UniWork error (own key) keeps the bubble Retry', async () => {
+    await started()
+    await failRaw('upstream said no')
+    expect(root_().querySelector('.ai-error-action')).toBeNull()
+    expect(root_().querySelectorAll('.ai-msg-undelivered .ai-retry-btn')).toHaveLength(1)
+  })
 })
