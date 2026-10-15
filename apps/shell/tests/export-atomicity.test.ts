@@ -81,25 +81,15 @@ describe('atomic export destinations', () => {
 
   it('publishes Shell PDF conversions through a temporary file', () => {
     const source = read('apps/shell/src/main/index.ts')
-    const docx = section(
+    const flow = section(
       source,
-      'async function exportPdfAsDocxLocal',
-      'async function exportPdfAsPptxLocal',
-    )
-    const pptx = section(
-      source,
-      'async function exportPdfAsPptxLocal',
-      'async function exportPdfAsXlsxLocal',
-    )
-    const xlsx = section(
-      source,
-      'async function exportPdfAsXlsxLocal',
-      'ipcMain.handle(PDF_CHANNELS.convertOffice',
+      'async function convertPdfToOffice',
+      'async function exportActivePdfAsOffice',
     )
 
-    expect(docx).toContain('await atomicWriteFile(picked.filePath, result.docx)')
-    expect(pptx).toContain('await atomicWriteFile(picked.filePath, result.pptx)')
-    expect(xlsx).toContain('await atomicWriteFile(picked.filePath, result.xlsx)')
-    expect(`${docx}${pptx}${xlsx}`).not.toMatch(/writeFileSync\(picked\.filePath/)
+    expect(flow).toContain('await atomicWriteFile(target, result.docx)')
+    expect(flow).toContain('await atomicWriteFile(target, result.pptx)')
+    expect(flow).toContain('await atomicWriteFile(target, result.xlsx)')
+    expect(flow).not.toMatch(/writeFile(?:Sync)?\(target/)
   })
 })

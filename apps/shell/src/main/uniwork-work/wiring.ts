@@ -95,6 +95,9 @@ export function registerUniworkWork(ipcMain: IpcMain, deps: UniworkWorkDeps): vo
   handle(C.myTasks, (ws) => api().myTasks(str(ws)))
   handle(C.taskStatuses, (ws) => api().taskStatuses(str(ws)))
   handle(C.setTaskStatus, (taskId, status) => api().setTaskStatus(str(taskId), str(status)))
+  handle(C.markNotificationsRead, (ids) =>
+    api().markNotificationsRead(Array.isArray(ids) ? ids.map(str) : []),
+  )
   handle(C.createTask, (input) => api().createTask(input as WorkCreateTaskInput))
   handle(C.calendarEvents, (input) =>
     api().calendarEvents(input as { workspaceId: string; from: string; to: string }),

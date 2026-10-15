@@ -6,7 +6,6 @@ import {
   startUniworkDocumentsStub,
   type UniworkDocumentsStub,
 } from './fixtures/uniwork-documents-stub'
-import { STUB_HOME_COUNTS } from './fixtures/uniwork-work-stub'
 import {
   NO_KEYRING_SKIP,
   accountButton,
@@ -16,14 +15,14 @@ import {
 } from './fixtures/uniwork-signin-steps'
 
 /**
- * Workbench smoke against the local UniWork stub: signed in, the Overview
- * shows the five stat tiles from GET /home and a recent UniWork document
- * opens in its editor.
+ * Workbench smoke against the local UniWork stub: signed in, the first tab is
+ * the Desk, its five sections render and a recent UniWork document listed
+ * under In progress opens in its editor.
  */
 
 const ROOT = resolve(__dirname, '..')
 
-test.describe.serial('Workbench Overview', () => {
+test.describe.serial('Workbench Desk', () => {
   let stub: UniworkDocumentsStub
   let userDataDir = ''
   let keyring = true
@@ -33,7 +32,7 @@ test.describe.serial('Workbench Overview', () => {
     stub = await startUniworkDocumentsStub()
     const first = await launchShell({
       onboardingSeen: true,
-      videoDir: 'workbench-overview-setup',
+      videoDir: 'workbench-desk-setup',
       env: shellEnv(stub),
     })
     userDataDir = first.userDataDir
@@ -41,7 +40,7 @@ test.describe.serial('Workbench Overview', () => {
       keyring = await hasOsKeyring(first)
       if (keyring) await signIn(first, stub)
     } finally {
-      await closeAndSaveVideo(first, 'workbench-overview-setup')
+      await closeAndSaveVideo(first, 'workbench-desk-setup')
     }
   })
 
@@ -53,7 +52,7 @@ test.describe.serial('Workbench Overview', () => {
     test.skip(!keyring, NO_KEYRING_SKIP)
   })
 
-  test('Overview shows the five stat tiles and opens a recent document', async () => {
+  test('Desk shows its five sections and opens an in-progress document', async () => {
     test.setTimeout(150_000)
     stub.addDocument({
       filename: 'weekly-plan.docx',
@@ -62,7 +61,7 @@ test.describe.serial('Workbench Overview', () => {
     const launched = await launchShell({
       userDataDir,
       onboardingSeen: true,
-      videoDir: 'workbench-overview',
+      videoDir: 'workbench-desk',
       env: shellEnv(stub),
     })
     try {
@@ -72,24 +71,22 @@ test.describe.serial('Workbench Overview', () => {
       })
       await shell.locator('.nav-item', { hasText: 'Workbench' }).click()
 
-      const tiles = shell.locator('.wb-ov-stat')
-      await expect(tiles).toHaveCount(5, { timeout: 30_000 })
-      const expected = [
-        STUB_HOME_COUNTS.open,
-        STUB_HOME_COUNTS.overdue,
-        STUB_HOME_COUNTS.due_today,
-        STUB_HOME_COUNTS.meetings_today,
-        STUB_HOME_COUNTS.unread,
-      ]
-      for (const [i, count] of expected.entries()) {
-        await expect(tiles.nth(i)).toContainText(String(count))
+      await expect(shell.locator('.wb-tab').first()).toContainText('Desk')
+      const desk = shell.locator('.wb-desk')
+      await expect(desk.getByRole('button', { name: 'PDF → Word' })).toBeVisible({
+        timeout: 30_000,
+      })
+      for (const title of ['Needs you', 'In progress', 'Frequent forms', 'Today']) {
+        await expect(desk.getByRole('heading', { name: title, exact: true })).toBeVisible()
       }
 
-      await shell.locator('.wb-ov-recent', { hasText: 'weekly-plan.docx' }).click()
+      await desk
+        .locator('.wb-desk-row-title', { hasText: 'weekly-plan.docx' })
+        .click({ timeout: 30_000 })
       const editor = await waitForPageWithUrl(launched.app, '://docs/')
       await editor.locator('.doc-page').first().waitFor({ timeout: 30_000 })
     } finally {
-      await closeAndSaveVideo(launched, 'workbench-overview')
+      await closeAndSaveVideo(launched, 'workbench-desk')
     }
   })
 })
