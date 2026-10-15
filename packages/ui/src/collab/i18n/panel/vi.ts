@@ -34,7 +34,7 @@ export const vi = {
 
   // thread, actions, history
   collabResolved: 'Đã giải quyết',
-  collabResolve: 'Đánh dấu đã giải quyết',
+  collabResolve: 'Giải quyết',
   collabReopen: 'Mở lại',
   collabReply: 'Trả lời',
   collabReplyCount: 'Trả lời: {count}',

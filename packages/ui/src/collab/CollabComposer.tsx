@@ -175,7 +175,7 @@ export function CollabComposer(props: CollabComposerProps) {
   const base = initialBody ?? ''
   const body = mentionDocToBody(doc)
   const dirty = body.trim() !== '' && body !== base
-  const isRoot = mode === 'root' || mode === 'discussion'
+  const isDiscussion = mode === 'discussion'
 
   function update(next: MentionDoc) {
     setDoc(next)
@@ -214,7 +214,10 @@ export function CollabComposer(props: CollabComposerProps) {
       await onSubmit(sent)
       clearDraft(storeKey)
       setAiActive(false)
-      if (mode !== 'edit') setDoc({ text: '', ranges: [] })
+      if (mode !== 'edit') {
+        setDoc({ text: '', ranges: [] })
+        if (taRef.current?.isConnected) taRef.current.focus()
+      }
     } catch (e) {
       const err = toCollabError(e)
       // a deleted target is reported by the host next to the thread, not as a send failure
@@ -235,8 +238,12 @@ export function CollabComposer(props: CollabComposerProps) {
 
   function discard() {
     clearDraft(storeKey)
+    setDoc(mentionDocFromBody(base))
+    setAiActive(false)
+    setSendError(false)
     setConfirmOpen(false)
     onCancel()
+    if (isDiscussion && taRef.current?.isConnected) taRef.current.focus()
   }
 
   function onKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
@@ -265,8 +272,15 @@ export function CollabComposer(props: CollabComposerProps) {
         return
       }
     } else if (e.key === 'Escape') {
-      // an empty root composer has nothing to cancel: Esc falls through so the host closes its panel
-      if (isRoot && !dirty) return
+      // an empty persistent discussion composer has nothing to cancel: Esc falls through so the host closes its panel
+      if (isDiscussion && !dirty) return
+      // an empty new-thread composer cancels itself but leaves the Esc unconsumed, so a host that closes
+      // its pane on a non-prevented Esc (Slides) still sees it; a dirty one keeps the Discard dialog
+      if (mode === 'root' && !dirty) {
+        // an unedited non-empty draft (AI initialBody) is not dirty but must stay untouched: fall through
+        if (body.trim() === '') requestCancel()
+        return
+      }
       e.preventDefault()
       e.stopPropagation()
       requestCancel()
@@ -357,7 +371,7 @@ export function CollabComposer(props: CollabComposerProps) {
         <span className="collab-composer-hint" id={hintId}>
           {format(strings.collabSendHint, { shortcut })}
         </span>
-        {isRoot && body.trim() === '' ? null : (
+        {isDiscussion && body.trim() === '' ? null : (
           <button type="button" className="collab-composer-btn" onClick={requestCancel}>
             {strings.collabCancel}
           </button>
@@ -390,7 +404,10 @@ export function CollabComposer(props: CollabComposerProps) {
         ? createPortal(
             <DiscardDialog
               strings={strings}
-              onKeep={() => setConfirmOpen(false)}
+              onKeep={() => {
+                setConfirmOpen(false)
+                taRef.current?.focus()
+              }}
               onDiscard={discard}
             />,
             document.body,
@@ -425,8 +442,7 @@ function DiscardDialog({
 }): ReactNode {
   const id = useId()
   const keepRef = useRef<HTMLButtonElement>(null)
-  // declared before the focus effect: it must remember the control that had focus
-  const modal = useModalKeys(onKeep, { restoreFocus: true })
+  const modal = useModalKeys(onKeep)
   useEffect(() => keepRef.current?.focus(), [])
   return (
     <div

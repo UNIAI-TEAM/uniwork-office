@@ -280,17 +280,55 @@ describe('draft', () => {
   })
 })
 
-describe('root composer: Esc and Cancel when empty (W11F)', () => {
-  it.each(['root', 'discussion'] as const)(
-    '%s: Esc in an empty composer is left to the host (not consumed, nothing cancelled)',
-    (mode) => {
-      const m = render({ mode })
-      const ev = key('Escape')
-      expect(ev.defaultPrevented).toBe(false)
-      expect(m.onCancel).not.toHaveBeenCalled()
-      expect(dialog()).toBeNull()
-    },
-  )
+describe('root vs discussion composer: Esc and Cancel when empty (V14-01 / V15-02)', () => {
+  it('discussion: Esc in an empty composer is left to the host (not consumed, nothing cancelled)', () => {
+    const m = render({ mode: 'discussion' })
+    const ev = key('Escape')
+    expect(ev.defaultPrevented).toBe(false)
+    expect(m.onCancel).not.toHaveBeenCalled()
+    expect(dialog()).toBeNull()
+  })
+
+  it('root: Esc in an empty new-thread composer cancels at once and still reaches the host unconsumed', () => {
+    const m = render({ mode: 'root' })
+    const hostEsc = vi.fn()
+    host.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !e.defaultPrevented) hostEsc()
+    })
+    const ev = key('Escape')
+    expect(ev.defaultPrevented).toBe(false)
+    expect(hostEsc).toHaveBeenCalledTimes(1)
+    expect(m.onCancel).toHaveBeenCalledTimes(1)
+    expect(dialog()).toBeNull()
+  })
+
+  it('root: Esc on an unedited, non-empty initialBody draft neither cancels nor is consumed (untouched, host decides)', () => {
+    const m = render({ mode: 'root', initialBody: 'Suggested comment text.' })
+    const hostEsc = vi.fn()
+    host.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !e.defaultPrevented) hostEsc()
+    })
+    const ev = key('Escape')
+    expect(ev.defaultPrevented).toBe(false)
+    expect(hostEsc).toHaveBeenCalledTimes(1)
+    expect(m.onCancel).not.toHaveBeenCalled()
+    expect(dialog()).toBeNull()
+    expect(ta().value).toBe('Suggested comment text.')
+  })
+
+  it('root: Esc with text asks to discard and the host does not act on it (consumed)', () => {
+    const m = render({ mode: 'root' })
+    const hostEsc = vi.fn()
+    host.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !e.defaultPrevented) hostEsc()
+    })
+    type('draft')
+    const ev = key('Escape')
+    expect(ev.defaultPrevented).toBe(true)
+    expect(hostEsc).not.toHaveBeenCalled()
+    expect(dialog()).not.toBeNull()
+    expect(m.onCancel).not.toHaveBeenCalled()
+  })
 
   it.each(['root', 'discussion'] as const)(
     '%s: Esc with text still asks before discarding, and is consumed',
@@ -320,22 +358,28 @@ describe('root composer: Esc and Cancel when empty (W11F)', () => {
     expect(m.onCancel).toHaveBeenCalledTimes(1)
   })
 
-  it.each(['root', 'discussion'] as const)(
-    '%s: Cancel is not offered while empty, and appears once there is text',
+  it('discussion: Cancel is not offered while empty, and appears once there is text', () => {
+    render({ mode: 'discussion' })
+    expect(buttons().some((b) => b.textContent === 'Cancel')).toBe(false)
+    type('x')
+    expect(buttons().some((b) => b.textContent === 'Cancel')).toBe(true)
+    type('')
+    expect(buttons().some((b) => b.textContent === 'Cancel')).toBe(false)
+  })
+
+  it.each(['root', 'reply', 'edit'] as const)(
+    '%s keeps secondary Cancel while empty and cancels at once on click',
     (mode) => {
-      render({ mode })
-      expect(buttons().some((b) => b.textContent === 'Cancel')).toBe(false)
-      type('x')
-      expect(buttons().some((b) => b.textContent === 'Cancel')).toBe(true)
-      type('')
-      expect(buttons().some((b) => b.textContent === 'Cancel')).toBe(false)
+      const m = render({ mode, initialBody: mode === 'edit' ? 'same' : undefined })
+      const cancelBtn = buttonByText('Cancel')
+      expect(cancelBtn).toBeTruthy()
+      expect(cancelBtn.classList.contains('collab-composer-btn')).toBe(true)
+      expect(cancelBtn.classList.contains('collab-composer-btn-send')).toBe(false)
+      act(() => cancelBtn.click())
+      expect(m.onCancel).toHaveBeenCalledTimes(1)
+      expect(dialog()).toBeNull()
     },
   )
-
-  it.each(['reply', 'edit'] as const)('%s keeps Cancel while empty', (mode) => {
-    render({ mode, initialBody: mode === 'edit' ? 'same' : undefined })
-    expect(buttons().some((b) => b.textContent === 'Cancel')).toBe(true)
-  })
 })
 
 describe('Esc and cancel', () => {
@@ -396,6 +440,17 @@ describe('Esc and cancel', () => {
     )
     expect(m.onCancel).toHaveBeenCalledTimes(1)
     expect(loadDraft(DRAFT_KEY)).toBeNull()
+  })
+
+  it('Discard on a persistent composer (discussion) clears the text box and keeps focus in the textarea instead of BODY', () => {
+    render({ mode: 'discussion' })
+    type('draft post')
+    act(() => buttonByText('Cancel').click())
+    act(() =>
+      [...dialog()!.querySelectorAll('button')].find((b) => b.textContent === 'Discard')!.click(),
+    )
+    expect(ta().value).toBe('')
+    expect(document.activeElement).toBe(ta())
   })
 
   it('the Cancel button follows the same rule', () => {
@@ -793,5 +848,21 @@ describe('styles', () => {
     expect(coarse).toContain('@media (pointer: coarse)')
     expect(coarse).toMatch(/\.collab-mention-option[^}]*min-height:\s*44px/s)
     expect(coarse).toMatch(/\.collab-composer-btn[^}]*min-height:\s*44px/s)
+  })
+
+  it('keeps the composer action row on one line at 300px by shrinking the hint with ellipsis (V14-05)', () => {
+    const actions = /\.collab-composer-actions\s*\{([^}]*)\}/s.exec(css)?.[1] ?? ''
+    expect(actions).toMatch(/flex-wrap:\s*nowrap/)
+    expect(actions).not.toMatch(/flex-wrap:\s*wrap/)
+    const hint = /\.collab-composer-hint\s*\{([^}]*)\}/s.exec(css)?.[1] ?? ''
+    expect(hint).toMatch(/min-width:\s*0/)
+    expect(hint).toMatch(/overflow:\s*hidden/)
+    expect(hint).toMatch(/text-overflow:\s*ellipsis/)
+    expect(hint).toMatch(/white-space:\s*nowrap/)
+    const btn = /\.collab-composer-btn\s*\{([^}]*)\}/s.exec(css)?.[1] ?? ''
+    expect(btn).toMatch(/flex:\s*none/)
+    expect(btn).toMatch(/white-space:\s*nowrap/)
+    const panelCss = readFileSync(resolve(import.meta.dirname, '../src/collab/collab.css'), 'utf8')
+    expect(panelCss).toMatch(/\.collab-comp-slot\s*>\s*\.collab-composer\s*\{[^}]*padding:\s*0/s)
   })
 })
