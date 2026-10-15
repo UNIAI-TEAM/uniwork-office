@@ -43,6 +43,12 @@ describe('G8-18 mention access styles', () => {
     expect(rule(selector), selector).not.toBe('')
   })
 
+  it('the panel title, a programmatic focus target, shows the collab focus ring (V10 F3)', () => {
+    const focusRule = /\.collab-title:focus\s*\{([^}]*)\}/s.exec(panelCss)?.[1] ?? ''
+    expect(focusRule).toMatch(/outline:\s*2px solid var\(--accent/)
+    expect(focusRule).not.toMatch(/outline:\s*none/)
+  })
+
   it('the dialog is a fixed, centred modal over a scrim, like the discard dialog', () => {
     const backdrop = /\.collab-mention-warn-backdrop\s*\{([^}]*)\}/s.exec(css)?.[1] ?? ''
     expect(backdrop).toMatch(/position:\s*fixed/)

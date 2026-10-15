@@ -186,6 +186,20 @@ export function CollabComposer(props: CollabComposerProps) {
   useEffect(() => {
     if (autoFocus) taRef.current?.focus()
   }, [autoFocus])
+  // after a failed send the warn dialog is gone and the focused button with it: put focus back on the
+  // composer (the error line sits right under it) instead of letting it drop to BODY
+  const refocusAfterFailRef = useRef(false)
+  useEffect(() => {
+    if (!refocusAfterFailRef.current || warnState !== null || pending) return
+    refocusAfterFailRef.current = false
+    const active = document.activeElement
+    if (
+      (!active || active === document.body || !active.isConnected) &&
+      taRef.current?.isConnected
+    ) {
+      taRef.current.focus()
+    }
+  }, [warnState, pending, sendError])
   useLayoutEffect(() => {
     const at = pendingCaret.current
     if (at !== null && taRef.current) {
@@ -276,6 +290,8 @@ export function CollabComposer(props: CollabComposerProps) {
         setSendErrorText(sharedNames.length > 0 ? msg : null)
         setSendError(true)
         announce(msg)
+        // the warn dialog is unmounted by now; the effect below restores focus once that commit is in
+        refocusAfterFailRef.current = true
       }
     } finally {
       sendingRef.current = false

@@ -1052,6 +1052,8 @@ describe('G8-18 mention people without access (chip badge + pre-send warning sta
       dialogBtn('Share view access, then send')!.click()
     })
     expect(dialog()).toBeNull()
+    // the dialog is gone: focus must land on the composer, not on BODY (V10 F1)
+    expect(document.activeElement).toBe(ta())
     expect(ta().value).toBe('Nhờ @Minh Anh ')
     expect(host.querySelector('.collab-composer-error')?.textContent).toBe(
       "Shared view access with Minh Anh, but couldn't send the comment. Your text is still in the box — try sending again.",
