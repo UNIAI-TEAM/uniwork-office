@@ -300,7 +300,11 @@ function asSignOutPromptRequest(raw: unknown): SignOutPromptRequest | null {
   if (!raw || typeof raw !== 'object') return null
   const r = raw as Partial<SignOutPromptRequest>
   if (typeof r.requestId !== 'string' || !r.requestId) return null
-  return { requestId: r.requestId, plan: asSignOutPlan(r.plan) }
+  const plan = asSignOutPlan(r.plan)
+  // `mode` must cross: without it the renderer shows the account-switch notice as the confirm
+  return r.mode === 'confirm' || r.mode === 'notice'
+    ? { requestId: r.requestId, plan, mode: r.mode }
+    : { requestId: r.requestId, plan }
 }
 
 /** a renamed push from main: a document id and its new title only */
