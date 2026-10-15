@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { setAiModelNeedHint } from '@genoffice/ui'
+import { clearUniworkAcks, setAiModelNeedHint } from '@genoffice/ui'
 import { AiChatPanel, type AiChatMessage } from '../src/renderer/ai/AiChatPanel'
 import { LocaleProvider } from '../src/renderer/i18n/locale'
 
@@ -33,6 +33,8 @@ describe('sheets panel send entry and queue submit with model-need hint (RF3-3)'
     root = null
     container = null
     act(() => setAiModelNeedHint(null))
+    // the in-memory empty-account ack must not leak into the next test
+    clearUniworkAcks()
     vi.unstubAllGlobals()
   })
 
@@ -242,6 +244,85 @@ describe('sheets panel send entry and queue submit with model-need hint (RF3-3)'
       await new Promise((resolve) => setTimeout(resolve, 900))
     })
     expect(runs).toEqual(['queued follow-up'])
+  })
+
+  it('retry of an undelivered message with UniWork AI picked and the disclosure unacknowledged sends nothing, focuses the disclosure, and goes through after the ack (core4b)', async () => {
+    const sent: string[] = []
+    vi.stubGlobal(
+      'desktopApi',
+      new Proxy(
+        {},
+        {
+          get: (_t, prop: string) =>
+            prop === 'getAiSettings'
+              ? () => Promise.resolve({ provider: 'uniwork', providers: {} })
+              : /^on[A-Z]/.test(prop)
+                ? () => () => {}
+                : () => Promise.resolve(undefined),
+        },
+      ),
+    )
+    container = document.createElement('div')
+    document.body.appendChild(container)
+    root = createRoot(container)
+    const chat: AiChatMessage[] = [
+      { role: 'user', text: 'first turn', tools: [], undelivered: true },
+    ]
+    act(() =>
+      root!.render(
+        createElement(
+          LocaleProvider,
+          { initial: 'en', children: null },
+          createElement(AiChatPanel, {
+            isOpen: true,
+            hasContent: true,
+            chat,
+            attachments: [],
+            attachNotice: null,
+            onPickAttachments: () => {},
+            onAddAttachmentPaths: () => {},
+            onAddPastedImage: () => {},
+            onRemoveAttachment: () => {},
+            prompt: '',
+            preview: null,
+            aiBusy: false,
+            onPromptChange: () => {},
+            onSend: (text) => {
+              if (text) sent.push(text)
+              return true
+            },
+            onStop: () => {},
+            onNewChat: () => {},
+            onUndo: () => {},
+            scopeRange: null,
+            scopeColumns: null,
+            scopeLocked: false,
+            onScopeDismiss: () => {},
+            onCitation: () => {},
+            onExpand: () => {},
+            onCollapse: () => {},
+          }),
+        ),
+      ),
+    )
+    await flush()
+    await flush()
+
+    const region = container.querySelector<HTMLElement>('[role="region"]')
+    expect(region).not.toBeNull()
+    act(() => {
+      container!.querySelector<HTMLButtonElement>('.ai-retry-btn')!.click()
+    })
+    expect(sent).toEqual([])
+    expect(document.activeElement).toBe(region)
+
+    act(() => {
+      region!.querySelector<HTMLButtonElement>('button')!.click()
+    })
+    act(() => {
+      container!.querySelector<HTMLButtonElement>('.ai-retry-btn')!.click()
+    })
+    expect(sent).toEqual(['first turn'])
   })
 
   it('App.tsx handleSend returns false while needModelHint is set (App.tsx cannot be mounted in jsdom)', () => {

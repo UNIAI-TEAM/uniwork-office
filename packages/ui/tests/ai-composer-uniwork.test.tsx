@@ -10,8 +10,10 @@ import {
   UniworkDisclosure,
   ack,
   clearUniworkAcks,
+  createUniworkSendGate,
   isAcked,
   type UniworkAckKey,
+  type UniworkSendGate,
 } from '../src/ai-uniwork-composer'
 import { aiUniworkText } from '../src/strings-ai-uniwork'
 
@@ -603,6 +605,61 @@ describe('AiComposer — send-blocked report and shared unscoped ack (RF4-1, RF4
     expect(seen.at(-1)).toBe(false)
     expect(localStorage.getItem('uniwork.office.ai.disclosure.ack.v1')).toBeNull()
     expect(isAcked(unscoped)).toBe(false)
+  })
+})
+
+describe('AiComposer — shared send gate for preset, retry and continue entries (core4b)', () => {
+  const scoped: UniworkAckKey = { account: 'acc-1', org: 'org-1', document: 'doc-42' }
+
+  function Harness({ gate, announce }: { gate: UniworkSendGate; announce: (t: string) => void }) {
+    return createElement(AiComposer, {
+      ...baseProps({ value: 'Hello' }),
+      uniwork: {
+        active: true,
+        provider: 'uniwork',
+        lang: 'vi',
+        onAnnounce: announce,
+        onSendBlockedChange: gate.onSendBlockedChange,
+        registerBlockedHandler: gate.registerBlockedHandler,
+        disclosure: { ackKey: scoped, orgName: 'Acme Corp', variant: 'document' },
+      },
+    })
+  }
+
+  function mountGate(): { gate: UniworkSendGate; announced: string[] } {
+    const announced: string[] = []
+    const gate = createUniworkSendGate()
+    act(() => {
+      root.render(createElement(Harness, { gate, announce: (t: string) => announced.push(t) }))
+    })
+    return { gate, announced }
+  }
+
+  it('isBlocked follows the disclosure and refuse is a no-op once acked', () => {
+    const { gate, announced } = mountGate()
+    expect(gate.isBlocked()).toBe(true)
+    act(() => {
+      host.querySelector<HTMLButtonElement>('[role="region"] button')!.click()
+    })
+    expect(gate.isBlocked()).toBe(false)
+    announced.length = 0
+    expect(gate.refuse()).toBe(false)
+    expect(announced).toEqual([])
+  })
+
+  it('refuse while unacked returns true, announces the needs-ack line and focuses the region', () => {
+    const { gate, announced } = mountGate()
+    const region = host.querySelector<HTMLElement>('[role="region"]')!
+    expect(gate.refuse()).toBe(true)
+    expect(announced).toContain(aiUniworkText('vi', 'aiUniworkSendNeedsAck'))
+    expect(document.activeElement).toBe(region)
+  })
+
+  it('refuse after unmount is a no-op and never reports blocked (no stale handler)', () => {
+    const { gate } = mountGate()
+    act(() => root.render(createElement('div')))
+    expect(gate.isBlocked()).toBe(false)
+    expect(gate.refuse()).toBe(false)
   })
 })
 

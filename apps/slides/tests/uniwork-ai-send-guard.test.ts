@@ -5,7 +5,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { setUniworkAiAvailable } from '@genoffice/ai-provider'
-import { setAiModelNeedHint } from '@genoffice/ui'
+import { clearUniworkAcks, setAiModelNeedHint } from '@genoffice/ui'
 import { AI_PROVIDERS, type AiSettings } from '../src/shared/ipc'
 
 const harness = vi.hoisted(() => ({
@@ -116,6 +116,8 @@ describe('slides panel send entry with an unavailable UniWork AI pick', () => {
     harness.runs.length = 0
     harness.finishRun = null
     act(() => setAiModelNeedHint(null))
+    // the in-memory empty-account ack must not leak into the next test
+    clearUniworkAcks()
     setUniworkAiAvailable(false)
     delete (window as any).slidesApi
     delete (window as any).desktop
@@ -186,6 +188,30 @@ describe('slides panel send entry with an unavailable UniWork AI pick', () => {
         )
         await flush()
       },
+      /** a fresh preset (a new nonce) with UniWork AI still picked */
+      firePreset: async (nonce: number) => {
+        const picked = settingsFor('uniwork')
+        act(() =>
+          root!.render(
+            createElement(AiPanel, {
+              slides: [],
+              current: 0,
+              selectedIds: [],
+              images: new Map(),
+              applySlide: () => {},
+              applyDeck: () => {},
+              fitWidthPx: 960,
+              settings: picked,
+              open: true,
+              onExpand: () => {},
+              onCollapse: () => {},
+              preset: { text: 'rewrite it', autoRun: true, nonce },
+            }),
+          ),
+        )
+        await flush()
+        await flush()
+      },
     }
   }
 
@@ -244,5 +270,27 @@ describe('slides panel send entry with an unavailable UniWork AI pick', () => {
       await new Promise((resolve) => setTimeout(resolve, 900))
     })
     expect(harness.runs).toEqual(['rewrite it', 'queued follow-up'])
+  })
+
+  it('a preset with UniWork AI picked and the disclosure unacknowledged sends nothing, moves focus to the disclosure, and runs after the ack (core4b)', async () => {
+    const panel = await mountThenPreset('anthropic')
+    expect(harness.runs).toEqual(['rewrite it'])
+    act(() => harness.finishRun?.())
+    await flush()
+    setUniworkAiAvailable(true)
+    await panel.pick('uniwork')
+    act(() => setAiModelNeedHint(null))
+
+    await panel.firePreset(2)
+    const region = container!.querySelector<HTMLElement>('[role="region"]')
+    expect(region).not.toBeNull()
+    expect(harness.runs).toEqual(['rewrite it'])
+    expect(document.activeElement).toBe(region)
+
+    act(() => {
+      region!.querySelector<HTMLButtonElement>('button')!.click()
+    })
+    await panel.firePreset(3)
+    expect(harness.runs).toEqual(['rewrite it', 'rewrite it'])
   })
 })

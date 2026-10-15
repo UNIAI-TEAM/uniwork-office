@@ -5,7 +5,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { setUniworkAiAvailable } from '@genoffice/ai-provider'
-import { setAiModelNeedHint } from '@genoffice/ui'
+import { clearUniworkAcks, setAiModelNeedHint } from '@genoffice/ui'
 import { LocaleProvider } from '../src/renderer/i18n/locale'
 import { defaultAiSettings } from '@genoffice/ai-provider'
 
@@ -85,6 +85,8 @@ describe('pdf panel send entry with an unavailable UniWork AI pick', () => {
     harness.runs.length = 0
     harness.finishRun = null
     act(() => setAiModelNeedHint(null))
+    // the in-memory empty-account ack must not leak into the next test
+    clearUniworkAcks()
     setUniworkAiAvailable(false)
     delete (window as any).pdfApi
   })
@@ -143,6 +145,12 @@ describe('pdf panel send entry with an unavailable UniWork AI pick', () => {
     await flush()
     await flush()
     return {
+      /** a fresh ribbon preset (a new nonce) */
+      firePreset: async (nonce: number) => {
+        render(nonce)
+        await flush()
+        await flush()
+      },
       /** the user picks `next` in the model picker: the saved settings change and the panel is told */
       pick: async (next: 'uniwork' | 'openai') => {
         settings.provider = next
@@ -207,5 +215,27 @@ describe('pdf panel send entry with an unavailable UniWork AI pick', () => {
       await new Promise((resolve) => setTimeout(resolve, 900))
     })
     expect(harness.runs).toEqual(['rewrite it', 'queued follow-up'])
+  })
+
+  it('a preset with UniWork AI picked and the disclosure unacknowledged sends nothing, moves focus to the disclosure, and runs after the ack (core4b)', async () => {
+    const panel = await mountThenPreset('openai')
+    expect(harness.runs).toEqual(['rewrite it'])
+    act(() => harness.finishRun?.())
+    await flush()
+    setUniworkAiAvailable(true)
+    await panel.pick('uniwork')
+    act(() => setAiModelNeedHint(null))
+
+    await panel.firePreset(2)
+    const region = container!.querySelector<HTMLElement>('[role="region"]')
+    expect(region).not.toBeNull()
+    expect(harness.runs).toEqual(['rewrite it'])
+    expect(document.activeElement).toBe(region)
+
+    act(() => {
+      region!.querySelector<HTMLButtonElement>('button')!.click()
+    })
+    await panel.firePreset(3)
+    expect(harness.runs).toEqual(['rewrite it', 'rewrite it'])
   })
 })

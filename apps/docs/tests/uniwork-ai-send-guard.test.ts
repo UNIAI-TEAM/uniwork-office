@@ -7,7 +7,7 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { Editor } from '@tiptap/core'
 import { setUniworkAiAvailable } from '@genoffice/ai-provider'
-import { setAiModelNeedHint } from '@genoffice/ui'
+import { clearUniworkAcks, setAiModelNeedHint } from '@genoffice/ui'
 import { editorExtensions } from '../src/renderer/editor/extensions'
 import { AI_PROVIDERS, type AiSettings } from '../src/shared/ipc'
 
@@ -101,6 +101,8 @@ describe('docs panel send entry with an unavailable UniWork AI pick', () => {
     harness.runs.length = 0
     harness.finishRun = null
     act(() => setAiModelNeedHint(null))
+    // the in-memory empty-account ack must not leak into the next test
+    clearUniworkAcks()
     setUniworkAiAvailable(false)
     delete (window as any).desktop
   })
@@ -161,7 +163,7 @@ describe('docs panel send entry with an unavailable UniWork AI pick', () => {
     await flush()
     return {
       /** the user picks `next` in the model picker: the panel gets new settings */
-      pick: async (next: AiSettings['provider']) => {
+      pick: async (next: AiSettings['provider'], nonce = 1) => {
         const picked = settingsFor(next)
         act(() =>
           root!.render(
@@ -170,10 +172,26 @@ describe('docs panel send entry with an unavailable UniWork AI pick', () => {
               blocks: [],
               settings: picked,
               open: true,
-              preset: { text: 'rewrite it', autoRun: true, nonce: 1 },
+              preset: { text: 'rewrite it', autoRun: true, nonce },
             } as never),
           ),
         )
+        await flush()
+      },
+      /** a fresh ribbon preset (a new nonce) with `provider` still picked */
+      firePreset: async (nonce: number) => {
+        act(() =>
+          root!.render(
+            createElement(AiPanel, {
+              editor: editor!,
+              blocks: [],
+              settings: settingsFor('uniwork'),
+              open: true,
+              preset: { text: 'rewrite it', autoRun: true, nonce },
+            } as never),
+          ),
+        )
+        await flush()
         await flush()
       },
     }
@@ -234,5 +252,27 @@ describe('docs panel send entry with an unavailable UniWork AI pick', () => {
       await new Promise((resolve) => setTimeout(resolve, 900))
     })
     expect(harness.runs).toEqual(['rewrite it', 'queued follow-up'])
+  })
+
+  it('a preset with UniWork AI picked and the disclosure unacknowledged sends nothing, moves focus to the disclosure, and runs after the ack (core4b)', async () => {
+    const panel = await mountThenPreset('anthropic')
+    expect(harness.runs).toEqual(['rewrite it'])
+    act(() => harness.finishRun?.())
+    await flush()
+    setUniworkAiAvailable(true)
+    await panel.pick('uniwork')
+    act(() => setAiModelNeedHint(null))
+
+    await panel.firePreset(2)
+    const region = container!.querySelector<HTMLElement>('[role="region"]')
+    expect(region).not.toBeNull()
+    expect(harness.runs).toEqual(['rewrite it'])
+    expect(document.activeElement).toBe(region)
+
+    act(() => {
+      region!.querySelector<HTMLButtonElement>('button')!.click()
+    })
+    await panel.firePreset(3)
+    expect(harness.runs).toEqual(['rewrite it', 'rewrite it'])
   })
 })
