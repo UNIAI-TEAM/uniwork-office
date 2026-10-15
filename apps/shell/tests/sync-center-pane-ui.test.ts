@@ -17,12 +17,14 @@ import { LocaleProvider } from '../src/renderer/src/locale'
 import { SyncCenterPane } from '../src/renderer/src/SyncCenterPane'
 import { syncStrings } from '../src/renderer/src/i18n/strings-sync'
 import { uniworkDocumentStrings } from '../src/renderer/src/i18n/strings-uniwork-documents'
+import { workbenchStrings } from '../src/renderer/src/i18n/strings-workbench'
 
 const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 actEnvironment.IS_REACT_ACT_ENVIRONMENT = true
 
 const vi_ = { ...syncStrings.vi, ...uniworkDocumentStrings.vi } as Record<string, string>
 const en_ = { ...syncStrings.en, ...uniworkDocumentStrings.en } as Record<string, string>
+const wbLoading = (workbenchStrings.vi as Record<string, string>).wbLoading!
 const fill = (s: string, params: Record<string, string | number>) =>
   s.replace(/\{(\w+)\}/g, (_, k: string) => String(params[k] ?? `{${k}}`))
 
@@ -603,5 +605,332 @@ describe('SyncCenterPane', () => {
     expect(items).toEqual([vi_.uwActCopySupport, vi_.uwActDownloadMine, vi_.uwActDiscardSave])
     await click(host.querySelectorAll<HTMLElement>('[role="menuitem"]')[0]!)
     expect(api.copySupportCode).toHaveBeenCalledWith('stuck')
+  })
+})
+
+/** a call that stays pending until the test settles it */
+function deferred() {
+  let settle!: (r: SyncCenterActionResult) => void
+  const promise = new Promise<SyncCenterActionResult>((resolve) => (settle = resolve))
+  return { promise, settle }
+}
+
+function stubNarrow() {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      constructor(private cb: ResizeObserverCallback) {}
+      observe(el: Element) {
+        this.cb(
+          [{ target: el, contentRect: { width: 500 } } as unknown as ResizeObserverEntry],
+          this as unknown as ResizeObserver,
+        )
+      }
+      unobserve() {}
+      disconnect() {}
+    },
+  )
+}
+
+const withAttention = (...rows: SyncCenterRow[]) =>
+  snapshot({ tabs: { attention: rows, pending: [], recent: [] } })
+
+const stuckRow = () =>
+  row('stuck', 'reconciling_stuck', { reconcileAttempts: 4, supportCode: 'SUP-1' })
+
+describe('SyncCenterPane live announcements (FE-1, FE-5, FE-6, FE-9)', () => {
+  it('a new last-sync time alone is not announced again; a status change is read once', async () => {
+    const api = fakeApi(snapshot())
+    await render(api)
+    const line = () => host.querySelector('.sc-status-line')!.textContent
+    const before = line()
+    const later = snapshot()
+    later.header = { ...later.header, lastSyncAt: '2026-10-15T09:45:00.000Z' }
+    await act(async () => api.push(later))
+    expect(line()).not.toBe(before)
+    expect(status().textContent).toBe('')
+
+    const off = snapshot()
+    off.header = { ...off.header, online: false, status: 'offline' }
+    await act(async () => api.push(off))
+    expect(status().textContent).toContain(vi_.uwSyncOffline!.split('{')[0]!.trim())
+  })
+
+  it('a row the user did not act on that changes state is read once, politely', async () => {
+    const api = fakeApi(snapshot())
+    await render(api)
+    const next = snapshot()
+    next.tabs.pending = [row('q', 'failed', { failedReason: 'quota' })]
+    await act(async () => api.push(next))
+    expect(status().textContent).toBe(
+      fill(vi_.uwSyncRowAnnounce!, { doc: 'Tài liệu q', state: vi_.uwBadgeFailed! }),
+    )
+  })
+
+  it('copy support leaves the row unmarked: its next real change is announced', async () => {
+    const api = fakeApi(snapshot())
+    await render(api)
+    await click(button(vi_.uwActCopySupport!, rowEl('stuck')))
+    await act(async () =>
+      api.push(
+        withAttention(
+          row('stuck', 'failed', { failedReason: 'quota' }),
+          row('draft', 'kept_draft'),
+        ),
+      ),
+    )
+    expect(status().textContent).toBe(
+      fill(vi_.uwSyncRowAnnounce!, { doc: 'Tài liệu stuck', state: vi_.uwBadgeFailed! }),
+    )
+  })
+
+  it('a failed call leaves the row unmarked: its next real change is announced', async () => {
+    const api = fakeApi(snapshot())
+    api.recheck.mockResolvedValueOnce({ ok: false, code: 'store_full' })
+    await render(api)
+    await click(button(vi_.uwActRecheck!, rowEl('stuck')))
+    await act(async () =>
+      api.push(
+        withAttention(
+          row('stuck', 'failed', { failedReason: 'quota' }),
+          row('draft', 'kept_draft'),
+        ),
+      ),
+    )
+    expect(status().textContent).toBe(
+      fill(vi_.uwSyncRowAnnounce!, { doc: 'Tài liệu stuck', state: vi_.uwBadgeFailed! }),
+    )
+  })
+
+  it('an ok state change is the user own: not announced, and the mark ends with the next snapshot', async () => {
+    const api = fakeApi(snapshot())
+    await render(api)
+    await click(button(vi_.uwActRecheck!, rowEl('stuck')))
+    await act(async () =>
+      api.push(
+        withAttention(
+          row('stuck', 'failed', { failedReason: 'quota' }),
+          row('draft', 'kept_draft'),
+        ),
+      ),
+    )
+    expect(status().textContent).toBe('')
+    await act(async () =>
+      api.push(
+        withAttention(
+          row('stuck', 'blocked', { blockedReason: 'session_expired' }),
+          row('draft', 'kept_draft'),
+        ),
+      ),
+    )
+    expect(status().textContent).toBe(
+      fill(vi_.uwSyncRowAnnounce!, { doc: 'Tài liệu stuck', state: vi_.uwBadgeBlocked! }),
+    )
+  })
+
+  it('the same refusal twice in a row is announced twice', async () => {
+    const api = fakeApi(withAttention(row('bad', 'failed', { failedReason: 'quota' })))
+    api.saveAgain.mockResolvedValue({ ok: false, code: 'store_full' })
+    await render(api)
+    await click(button(vi_.uwActSaveAgain!, rowEl('bad')))
+    const first = status().firstElementChild
+    expect(first).not.toBeNull()
+    const text = status().textContent
+    expect(text).toContain(vi_.uwQueueFull)
+    await click(button(vi_.uwActSaveAgain!, rowEl('bad')))
+    expect(status().textContent).toBe(text)
+    expect(status().firstElementChild).not.toBe(first)
+  })
+})
+
+describe('SyncCenterPane open confirm (FE-2, FE-4, FE-9)', () => {
+  it('a pushed snapshot that drops the confirmed action closes the confirm; nothing runs', async () => {
+    const api = fakeApi(snapshot())
+    await render(api)
+    await click(button(vi_.uwActDiscardDraft!, rowEl('draft')))
+    expect(rowEl('draft').textContent).toContain(vi_.uwDiscardDraftConfirm)
+    await act(async () =>
+      api.push(
+        withAttention(stuckRow(), row('draft', 'uploading', { progress: { done: 1, total: 2 } })),
+      ),
+    )
+    expect(host.textContent).not.toContain(vi_.uwDiscardDraftConfirm)
+    expect(api.discardDraft).not.toHaveBeenCalled()
+  })
+
+  it('a confirm for a row that left and came back does not reappear', async () => {
+    const api = fakeApi(snapshot())
+    await render(api)
+    await click(button(vi_.uwActDiscardDraft!, rowEl('draft')))
+    await act(async () => api.push(withAttention(stuckRow())))
+    expect(document.activeElement).toBe(panel())
+    await act(async () => api.push(snapshot()))
+    expect(host.textContent).not.toContain(vi_.uwDiscardDraftConfirm)
+    expect(api.discardDraft).not.toHaveBeenCalled()
+  })
+
+  it('an unrelated push keeps the confirm the user is reading', async () => {
+    const api = fakeApi(snapshot())
+    await render(api)
+    await click(button(vi_.uwActDiscardDraft!, rowEl('draft')))
+    const later = snapshot()
+    later.header = { ...later.header, lastSyncAt: '2026-10-15T09:45:00.000Z' }
+    await act(async () => api.push(later))
+    expect(rowEl('draft').textContent).toContain(vi_.uwDiscardDraftConfirm)
+    expect(document.activeElement).toBe(button(vi_.uwActBack!, rowEl('draft')))
+  })
+
+  it('Go pressed again while the call runs does not call twice or close the confirm early', async () => {
+    const api = fakeApi(snapshot())
+    const pending = deferred()
+    api.discardDraft.mockImplementationOnce(() => pending.promise)
+    await render(api)
+    await click(button(vi_.uwActDiscardDraft!, rowEl('draft')))
+    const go = button(vi_.uwActDiscard!, rowEl('draft'))
+    await click(go)
+    await click(go)
+    expect(api.discardDraft).toHaveBeenCalledTimes(1)
+    expect(go.getAttribute('aria-disabled')).toBe('true')
+    expect(rowEl('draft').textContent).toContain(vi_.uwDiscardDraftConfirm)
+    await act(async () => pending.settle({ ok: true }))
+    await flush()
+    expect(rowEl('draft').textContent).not.toContain(vi_.uwDiscardDraftConfirm)
+  })
+
+  it('a call that settles does not close the confirm another row opened meanwhile', async () => {
+    const api = fakeApi(snapshot())
+    const pending = deferred()
+    api.discardDraft.mockImplementationOnce(() => pending.promise)
+    await render(api)
+    await click(button(vi_.uwActDiscardDraft!, rowEl('draft')))
+    await click(button(vi_.uwActDiscard!, rowEl('draft')))
+    await click(button(vi_.uwActDiscardSave!, rowEl('stuck')))
+    expect(rowEl('stuck').textContent).toContain(vi_.uwStuckDiscardConfirm)
+    const back = button(vi_.uwActBack!, rowEl('stuck'))
+    expect(document.activeElement).toBe(back)
+    await act(async () => pending.settle({ ok: true }))
+    await flush()
+    expect(rowEl('stuck').textContent).toContain(vi_.uwStuckDiscardConfirm)
+    expect(document.activeElement).toBe(back)
+  })
+
+  it('Escape closes the confirm without reaching the Settings dialog; focus returns to the trigger', async () => {
+    const outer = vi.fn()
+    document.body.addEventListener('keydown', outer)
+    try {
+      await render(fakeApi(snapshot()))
+      const trigger = button(vi_.uwActDiscardDraft!, rowEl('draft'))
+      trigger.focus()
+      await click(trigger)
+      const back = button(vi_.uwActBack!, rowEl('draft'))
+      expect(document.activeElement).toBe(back)
+      await key(back, 'Escape')
+      expect(outer).not.toHaveBeenCalled()
+      expect(rowEl('draft').textContent).not.toContain(vi_.uwDiscardDraftConfirm)
+      expect(document.activeElement).toBe(button(vi_.uwActDiscardDraft!, rowEl('draft')))
+    } finally {
+      document.body.removeEventListener('keydown', outer)
+    }
+  })
+
+  it('narrow: Back returns focus to the "…" trigger the confirm came from', async () => {
+    stubNarrow()
+    await render(fakeApi(snapshot()))
+    const label = fill(vi_.uwSyncMoreActions!, { doc: 'Tài liệu stuck' })
+    await click(button(label, rowEl('stuck')))
+    const items = Array.from(host.querySelectorAll<HTMLElement>('[role="menuitem"]'))
+    await click(items.find((el) => el.textContent === vi_.uwActDiscardSave)!)
+    expect(rowEl('stuck').textContent).toContain(vi_.uwStuckDiscardConfirm)
+    await click(button(vi_.uwActBack!, rowEl('stuck')))
+    expect(document.activeElement).toBe(button(label, rowEl('stuck')))
+    expect(document.activeElement?.getAttribute('aria-haspopup')).toBe('menu')
+  })
+
+  it('switching tabs closes the open confirm; it is not there when the tab comes back', async () => {
+    const api = fakeApi(snapshot())
+    await render(api)
+    await click(button(vi_.uwActDiscardDraft!, rowEl('draft')))
+    await click(tabs()[1]!)
+    expect(host.textContent).not.toContain(vi_.uwDiscardDraftConfirm)
+    await click(tabs()[0]!)
+    expect(host.textContent).not.toContain(vi_.uwDiscardDraftConfirm)
+    expect(api.discardDraft).not.toHaveBeenCalled()
+  })
+})
+
+describe('SyncCenterPane per-row busy (FE-3)', () => {
+  it('while Lưu lại runs, the row other actions are aria-disabled and do nothing', async () => {
+    const api = fakeApi(withAttention(row('bad', 'failed', { failedReason: 'quota' })))
+    const pending = deferred()
+    api.saveAgain.mockImplementationOnce(() => pending.promise)
+    await render(api)
+    await click(button(vi_.uwActSaveAgain!, rowEl('bad')))
+    expect(api.saveAgain).toHaveBeenCalledTimes(1)
+    const cancel = button(vi_.uwQueueCancel!, rowEl('bad'))
+    expect(cancel.getAttribute('aria-disabled')).toBe('true')
+    await click(cancel)
+    expect(rowEl('bad').textContent).not.toContain(vi_.uwQueueCancelConfirm)
+    expect(api.cancelSave).not.toHaveBeenCalled()
+    await act(async () => pending.settle({ ok: true }))
+    await flush()
+    expect(button(vi_.uwQueueCancel!, rowEl('bad')).getAttribute('aria-disabled')).toBeNull()
+    await click(button(vi_.uwQueueCancel!, rowEl('bad')))
+    expect(rowEl('bad').textContent).toContain(vi_.uwQueueCancelConfirm)
+  })
+
+  it('another row is not held back by a busy row', async () => {
+    const api = fakeApi(snapshot())
+    const pending = deferred()
+    api.recheck.mockImplementationOnce(() => pending.promise)
+    await render(api)
+    await click(button(vi_.uwActRecheck!, rowEl('stuck')))
+    expect(button(vi_.uwActDiscardSave!, rowEl('stuck')).getAttribute('aria-disabled')).toBe('true')
+    expect(button(vi_.uwActOpenDraft!, rowEl('draft')).getAttribute('aria-disabled')).toBeNull()
+    await click(button(vi_.uwActOpenDraft!, rowEl('draft')))
+    expect(api.openDraft).toHaveBeenCalledWith('draft')
+    await act(async () => pending.settle({ ok: true }))
+  })
+})
+
+describe('SyncCenterPane foreign account and loading (FE-8, FE-11)', () => {
+  const SECRET = 'Báo cáo mật của tài khoản khác'
+  const foreign = () => row('f', 'blocked', { blockedReason: 'foreign_account', title: SECRET })
+
+  it('a blocked foreign_account row shows no title anywhere and no document button', async () => {
+    await render(fakeApi(withAttention(foreign())))
+    expect(host.querySelector('.sc-doc-btn')).toBeNull()
+    expect(host.innerHTML).not.toContain(SECRET)
+    expect(rowEl('f').getAttribute('aria-label')).toBe(
+      fill(vi_.uwSyncRowAnnounce!, { doc: vi_.uwLockForeignTitle!, state: vi_.uwBadgeLocked! }),
+    )
+  })
+
+  it('a row that becomes foreign_account loses its title from the page and the live text', async () => {
+    const api = fakeApi(
+      withAttention(row('f', 'blocked', { blockedReason: 'session_expired', title: SECRET })),
+    )
+    await render(api)
+    expect(rowEl('f').getAttribute('aria-label')).toContain(SECRET)
+    await act(async () => api.push(withAttention(foreign())))
+    expect(status().textContent).toBe(
+      fill(vi_.uwSyncRowAnnounce!, { doc: vi_.uwLockForeignTitle!, state: vi_.uwBadgeLocked! }),
+    )
+    expect(host.innerHTML).not.toContain(SECRET)
+    expect(host.querySelector('.sc-doc-btn')).toBeNull()
+  })
+
+  it('narrow: a foreign_account row has no "…" menu and still no title', async () => {
+    stubNarrow()
+    await render(fakeApi(withAttention(foreign())))
+    expect(host.querySelector('[aria-haspopup="menu"]')).toBeNull()
+    expect(host.innerHTML).not.toContain(SECRET)
+  })
+
+  it('the loading skeleton has accessible loading text', async () => {
+    await render(fakeApi(null))
+    const skeleton = host.querySelector('.sc-skeleton')!
+    expect(skeleton.getAttribute('aria-busy')).toBe('true')
+    expect(wbLoading).not.toBe('')
+    expect(skeleton.querySelector('.uw-sr-only')?.textContent).toBe(wbLoading)
   })
 })
