@@ -40,6 +40,8 @@ export const he = {
   aiWebStateUnreachableBody: 'UniWork לא הצליח להגיע לספק ה-AI. נסה שוב בעוד רגע.',
   aiWebStateCloudTitle: 'כלי הענן אינו זמין',
   aiWebStateCloudBody: 'כלי UniWork AI זה עדיין לא הוגדר בשרת.',
+  aiWebStateOutageTitle: 'UniWork אינו זמין זמנית',
+  aiWebStateOutageBody: 'לא ניתן להגיע ל-UniWork כרגע. נסה שוב בעוד רגע.',
   aiWebStateSessionTitle: 'פג תוקף ההפעלה',
   aiWebStateSessionBody: 'פתח שוב את המסמך מ-UniWork כדי להמשיך.',
   aiWebStateRefusedTitle: 'הבקשה נדחתה',

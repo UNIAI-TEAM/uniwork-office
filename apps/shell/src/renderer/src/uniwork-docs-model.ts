@@ -373,6 +373,16 @@ export function remoteBarModelOf(
   status: UniworkDocStatus,
   who: { author?: string; time?: string } = {},
 ): RemoteBarModel | null {
+  // G5-08c: a lock while open outranks every new-version notice; the spine names no action for it
+  if (status.lockWhileOpen) {
+    return {
+      tone: 'error',
+      regionKey: 'uwLockRegion',
+      messageKey: status.lockWhileOpen.mode === 'ram' ? 'uwLockWhileOpenRam' : 'uwLockWhileOpen',
+      params: {},
+      actions: [],
+    }
+  }
   const bar = status.remote
   if (!bar) return null
   switch (bar.kind) {

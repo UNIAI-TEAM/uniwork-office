@@ -40,6 +40,8 @@ export const hi = {
   aiWebStateUnreachableBody: 'UniWork AI प्रदाता तक नहीं पहुँच सका। थोड़ी देर में फिर कोशिश करें।',
   aiWebStateCloudTitle: 'क्लाउड टूल उपलब्ध नहीं',
   aiWebStateCloudBody: 'यह UniWork AI टूल अभी सर्वर पर सेट नहीं है।',
+  aiWebStateOutageTitle: 'UniWork अस्थायी रूप से उपलब्ध नहीं',
+  aiWebStateOutageBody: 'अभी UniWork तक नहीं पहुँचा जा सका। थोड़ी देर में फिर कोशिश करें।',
   aiWebStateSessionTitle: 'सत्र समाप्त',
   aiWebStateSessionBody: 'जारी रखने के लिए UniWork से दस्तावेज़ फिर से खोलें।',
   aiWebStateRefusedTitle: 'अनुरोध अस्वीकृत',

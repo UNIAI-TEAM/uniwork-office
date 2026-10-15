@@ -49,7 +49,7 @@ import {
 } from './my-ai-router'
 import { streamMyAiReply } from './my-ai-stream'
 import {
-  aiSettingsReady,
+  myAiTurnTarget,
   openAiSettingsLabel,
   looksLikeMissingAiActivation,
   softAiActivationMessage,
@@ -595,10 +595,9 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
     if (!api.getAiSettings) return { ok: false, error: 'AI unavailable' }
     const settings = await api.getAiSettings()
 
-    const provider = settings.provider
-    const model = settings.providers?.[provider]?.model
+    const { provider, model, ready } = myAiTurnTarget(settings)
 
-    if (!aiSettingsReady(settings)) {
+    if (!ready) {
       return activationFailure(opts.messageId, showBubble)
     }
 

@@ -37,17 +37,30 @@ export async function deliverUrl(
 }
 
 /**
- * Chromium creates the safeStorage (os_crypt) key at startup but commits it to
- * `Local State` only ~10 s later. A second instance started before that (the
- * callback handoff shares this userData) finds no key on disk, makes its own
- * and writes it when it quits. The running app keeps encrypting with its own
- * key and only rewrites `Local State` on its next commit or a graceful quit;
- * if a slow close ends in the SIGKILL fallback first, the next launch cannot
- * decrypt the credential (seen as keyring-unavailable, flaky under load).
- * Waiting for the first commit puts the app's key on disk before any second
- * process starts, so every later write carries the same key.
+ * On Windows (DPAPI), Chromium creates the safeStorage (os_crypt) key at
+ * startup and commits it as `encrypted_key` in `Local State` ~10 s later. A
+ * second instance started before that (the callback handoff shares this
+ * userData) finds no key on disk, makes its own and writes it when it quits.
+ * The running app keeps encrypting with its own key and only rewrites
+ * `Local State` on its next commit or a graceful quit; if a slow close ends in
+ * the SIGKILL fallback first, the next launch cannot decrypt the credential
+ * (seen as keyring-unavailable, flaky under load). Waiting for the first
+ * commit puts the app's key on disk before any second process starts, so every
+ * later write carries the same key.
+ *
+ * On macOS (Keychain) and on Linux with a Secret Service backend
+ * (`gnome_libsecret` / `kwallet` — anything other than `basic_text`), Chromium
+ * stores the os_crypt key in the OS keyring rather than writing `encrypted_key`
+ * to `Local State`, so this disk wait is skipped there.
  */
 export async function waitForSafeStorageKeyOnDisk(launched: LaunchedApp): Promise<void> {
+  if (process.platform === 'darwin') return
+  if (process.platform === 'linux') {
+    const backend = await launched.app.evaluate(({ safeStorage }) =>
+      safeStorage.getSelectedStorageBackend(),
+    )
+    if (backend !== 'basic_text') return
+  }
   const localState = join(launched.userDataDir, 'Local State')
   await expect
     .poll(
@@ -58,13 +71,27 @@ export async function waitForSafeStorageKeyOnDisk(launched: LaunchedApp): Promis
     .toBe(true)
 }
 
-export async function signIn(launched: LaunchedApp, stub: UniworkAuthStub): Promise<void> {
+/**
+ * `inMemoryStore`: the shell runs with UNIWORK_AUTH_E2E_PLAIN_STORE (no keyring needed), so no
+ * safeStorage key is written to disk and there is nothing to wait for.
+ */
+export async function signIn(
+  launched: LaunchedApp,
+  stub: UniworkAuthStub,
+  options: { inMemoryStore?: boolean } = {},
+): Promise<void> {
   const { page } = launched
   await expect(accountButton(page)).toHaveAttribute('data-state', 'signed-out')
   await accountButton(page).click()
   await expect(accountButton(page)).toHaveAttribute('data-state', 'signing-in')
   await expect.poll(() => stub.lastAttempt()?.state ?? '').not.toBe('')
-  if (process.platform !== 'darwin') await waitForSafeStorageKeyOnDisk(launched)
+  // FE-302: every platform but macOS goes through the wait and the helper's own
+  // backend check decides - Windows (DPAPI) waits for `Local State`, a Linux
+  // Secret Service returns early, Linux `basic_text` keeps the original wait.
+  // The in-memory seam writes no safeStorage key, so it skips the wait outright.
+  if (process.platform !== 'darwin' && !options.inMemoryStore) {
+    await waitForSafeStorageKeyOnDisk(launched)
+  }
   const url = stub.approve()
   await deliverUrl(launched, shellEnv(stub), url)
   await expect(accountButton(page)).toHaveAttribute('data-state', 'signed-in', { timeout: 30_000 })

@@ -18,7 +18,12 @@ end); `apps/shell/tests/release-config.test.ts` covers it.
 
 The version is `<apps/shell/package.json version>-<channel>.<n>`, for example `0.11.0-dev.1`.
 
-- **Release (published):** the release owner pushes a tag `v<version>`, e.g. `v0.11.0-dev.1` or
+- **Release from the Actions tab (published):** run the workflow by hand on `main` with
+  `channel` and `publish` on (the default). The run takes the next free `<n>` for the base
+  version and channel (highest existing `v<base>-<channel>.<n>` tag + 1, or 1), builds every
+  platform, and the `publish` job creates that tag on the run's commit with the pre-release
+  below. A run with `publish` on from any other branch fails in `meta`.
+- **Release by tag (published):** the release owner pushes a tag `v<version>`, e.g. `v0.11.0-dev.1` or
   `v0.11.0-beta.2`, on a commit that is on `main`. Nobody else pushes release tags. The
   workflow checks that the tag's base version equals `apps/shell/package.json`, that the
   channel is `dev` or `beta` and that the tagged commit is an ancestor of `main`, builds
@@ -26,7 +31,7 @@ The version is `<apps/shell/package.json version>-<channel>.<n>`, for example `0
   draft, because the server downloads the installer without credentials) with the installers
   and their `SHA256SUMS-<platform>.txt`.
 - **Test build (not published):** run the workflow by hand (`workflow_dispatch`, input
-  `channel`). The version becomes `<base>-<channel>.<run number>`; the installers stay
+  `channel`) with `publish` off, from any branch. The version becomes `<base>-<channel>.<run number>`; the installers stay
   workflow artifacts for 14 days and no tag or release is created.
 
 Bump `apps/shell/package.json` first when the base version changes; `<n>` counts builds of
@@ -37,7 +42,9 @@ one base version per channel.
 "Only the release owner pushes tags" is a convention until the repository enforces it.
 Repository admins should add a tag ruleset for `v*-dev.*` and `v*-beta.*` (create / update /
 delete restricted to the release owners), or a `release` environment with required reviewers
-for the publish job. The workflow keeps the write token small either way: the build jobs and
+for the publish job. Anyone with write access can start the dispatch release; a tag ruleset
+also binds the `publish` job's `GITHUB_TOKEN`, so add GitHub Actions to its bypass list or
+use the environment instead. The workflow keeps the write token small either way: the build jobs and
 the `urls` job (which runs `installer-urls.mjs`) are read-only, and the `publish` job checks
 out no code; it only downloads the built files and runs `gh release create` / `upload`.
 

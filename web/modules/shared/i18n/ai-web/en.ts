@@ -40,6 +40,8 @@ export const en = {
   aiWebStateUnreachableBody: 'UniWork could not reach the AI provider. Try again in a moment.',
   aiWebStateCloudTitle: 'Cloud tool unavailable',
   aiWebStateCloudBody: 'This UniWork AI tool is not set up on the server yet.',
+  aiWebStateOutageTitle: 'UniWork is temporarily unavailable',
+  aiWebStateOutageBody: 'UniWork could not be reached right now. Try again in a moment.',
   aiWebStateSessionTitle: 'Session expired',
   aiWebStateSessionBody: 'Reopen the document from UniWork to continue.',
   aiWebStateRefusedTitle: 'Request refused',

@@ -4,7 +4,6 @@ import { VIEW_IMAGE_CHANNEL } from '../shared/ipc'
 import type { AiPanelPrefs } from '@genoffice/ui'
 import type {
   AiChatRequest,
-  AiSettings,
   AiStreamChunk,
   AiStreamRequest,
   DesktopApi,
@@ -198,7 +197,7 @@ const api: DesktopApi = {
     return () => ipcRenderer.removeListener(VIEW_IMAGE_CHANNEL, listener)
   },
   getAiSettings: () => ipcRenderer.invoke('ai:get-settings'),
-  setAiSettings: (settings: AiSettings) => ipcRenderer.invoke('ai:set-settings', settings),
+  setAiSettings: (settings, options) => ipcRenderer.invoke('ai:set-settings', settings, options),
   onAiSettingsChanged: (handler) => {
     const listener = () => handler()
     ipcRenderer.on('ai:settings-changed', listener)

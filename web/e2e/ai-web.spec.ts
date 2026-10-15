@@ -74,6 +74,8 @@ const panel = (frame: Frame) => frame.locator('.ai-panel-header')
 async function ask(frame: Frame, text: string) {
   const box = frame.locator('.ai-input-box textarea').first()
   await expect(box).toBeVisible({ timeout: 30_000 })
+  await expect(box).toBeEnabled()
+  await expect(frame.locator('.ai-msg-streaming')).toHaveCount(0, { timeout: 30_000 })
   await box.fill(text)
   await box.press('Enter')
 }
@@ -163,7 +165,8 @@ for (const module of ['docs', 'markdown'] as const) {
               status: s.status,
               ...(s.status === 429 ? {} : { code: s.code }),
               ...('retryAfter' in s ? { retryAfter: s.retryAfter } : {}),
-              path: '/byok/',
+              // the chat call only: the background /byok/<p>/models listing would eat a one-shot rule
+              path: '/chat/completions',
             },
           ],
         })
@@ -209,8 +212,10 @@ for (const module of ['docs', 'markdown'] as const) {
       )
       expect(r.method).toBe('error')
       await expect(frame.locator('.ow-ai-state[data-ai-state="cloud_unavailable"]')).toBeVisible()
-      // the next AI call gets a 401: the frame refreshes its token (host token.refresh) and retries once
-      await fake(request, { unauthorizedOnce: true })
+      // the next chat call gets a 401: the frame refreshes its token (host token.refresh) and retries once.
+      // Aimed at the chat only: the background /byok/<p>/models listing and cloud status reads would
+      // eat an unscoped one-shot and the chat would then go out once, with the new token
+      await fake(request, { unauthorizedOnce: { path: '/chat/completions' } })
       await ask(frame, 'Say hello')
       await expect(frame.locator('.ai-msg-assistant').last()).toContainText(REPLY, {
         timeout: 60_000,

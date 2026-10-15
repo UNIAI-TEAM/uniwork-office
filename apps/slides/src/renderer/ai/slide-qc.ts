@@ -11,6 +11,7 @@ import {
   type AgentTransport,
 } from '@genoffice/agent-core'
 import {
+  aiEffectiveModel,
   getProviderAdapter,
   modelLacksVision,
   type AiSettings,
@@ -52,11 +53,12 @@ export const QC_MAX_PAGES = 20
 
 /** Unknown providers are treated as text-only: omitting an image is safer than a user-visible 400. */
 export function settingsSupportVision(
-  settings: Pick<AiSettings, 'provider' | 'providers'>,
+  settings: Pick<AiSettings, 'provider' | 'providers' | 'modelSources'>,
 ): boolean {
   try {
     if (!getProviderAdapter(settings.provider).capabilities.vision) return false
-    return !modelLacksVision(settings.providers?.[settings.provider]?.model ?? '')
+    // the model main will use: for a provider served by a key on UniWork that is the source's, not the slot's
+    return !modelLacksVision(aiEffectiveModel(settings, settings.provider))
   } catch {
     return false
   }

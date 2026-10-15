@@ -7,6 +7,7 @@ import type {
   AiSearchProviderId,
   AiSearchProviderMeta,
   AiSettings,
+  AiSettingsSaveOptions,
   AiStreamChunk,
   AiStreamRequest,
   AiTestFailureKind,
@@ -15,6 +16,20 @@ import type {
   UniworkCloudStatus,
 } from '@genoffice/ai-provider'
 import type { UpdateChannel, UpdateUiState } from './update-api'
+import type {
+  UniworkConflictAction,
+  UniworkConflictReply,
+  UniworkConflictView,
+} from './uniwork-conflict'
+
+export type {
+  UniworkConflictAction,
+  UniworkConflictIntentBlock,
+  UniworkConflictKeepDraft,
+  UniworkConflictNotice,
+  UniworkConflictReply,
+  UniworkConflictView,
+} from './uniwork-conflict'
 
 /** Legal files shipped beside the app and opened from Settings > About. */
 /** The Settings window shows and saves the account's UniWork AI pick; My AI, email and one-click never pass this. */
@@ -338,6 +353,24 @@ export type UniworkRemoteBar =
 /** the S6 bar's actions: hide, hide until a newer revision, retry a clean reload, or the conflict flow */
 export type UniworkRemoteAction = 'later' | 'close' | 'retry' | 'reload' | 'reload-now'
 
+/**
+ * G5-08c, S11 Lock-while-open bar: the document was open and dirty when its lock happened. The
+ * buffer stays on screen read-only; `store` = the unsent changes were kept in the encrypted store
+ * (`uwLockWhileOpen`), `ram` = the store could not take them, so they exist only in this window
+ * (`uwLockWhileOpenRam`). `reason` is the lock's cause (EXPERIENCE State Patterns > blocked reasons).
+ */
+export interface UniworkLockWhileOpen {
+  mode: 'store' | 'ram'
+  reason:
+    | 'lease_expired'
+    | 'clock_rollback'
+    | 'permission_revoked'
+    | 'document_deleted'
+    | 'keystore_locked'
+    | 'store_full'
+    | 'signed_out'
+}
+
 export interface UniworkDocStatus {
   path: string
   documentId: string
@@ -357,6 +390,8 @@ export interface UniworkDocStatus {
   lastSavedAt?: string
   /** S6 (G5-03a): the new-version bar of this document; absent = none */
   remote?: UniworkRemoteBar
+  /** G5-08c: a lock happened while this document was open (outranks `remote`); absent = none */
+  lockWhileOpen?: UniworkLockWhileOpen
 }
 
 export type UniworkConflictChoice = 'overwrite' | 'save-local-copy' | 'open-latest' | 'later'
@@ -771,7 +806,10 @@ export interface HomeApi {
   /** AI settings (userData/ai-settings.json, shared by every editor) */
   getAiSettings(options?: AiSettingsPickOptions): Promise<AiSettings>
   /** persist AI settings; every renderer gets ai:settings-changed and re-reads */
-  setAiSettings(settings: AiSettings, options?: AiSettingsPickOptions): Promise<void>
+  setAiSettings(
+    settings: AiSettings,
+    options?: AiSettingsPickOptions & AiSettingsSaveOptions,
+  ): Promise<void>
   /** ai-settings.json was rewritten by any renderer (composer model chip, another window) */
   onAiSettingsChanged(handler: () => void): () => void
   /** provider catalog with each fixed endpoint's default base URL (empty for UniAI/custom) */
@@ -856,6 +894,15 @@ export interface HomeApi {
   onUniworkDocStatus(cb: (status: UniworkDocStatus) => void): () => void
   uniworkSave(path: string): Promise<UniworkDocStatus | null>
   uniworkResolveConflict(path: string): Promise<UniworkDocStatus | null>
+  /** G5-09: main pushes the conflict dialog view when S5 opens or updates in place */
+  onUniworkConflict(cb: (view: UniworkConflictView) => void): () => void
+  /** G5-09: main ended the open S5 session itself (tab/language switch, document closed) */
+  onUniworkConflictClosed(cb: (sessionId: string) => void): () => void
+  /** G5-09: answer the open conflict dialog session */
+  uniworkConflictAct(
+    sessionId: string,
+    action: UniworkConflictAction,
+  ): Promise<UniworkConflictReply>
   /**
    * S6 (G5-03a): one action of the new-version bar (`later`, `close`, `retry`
    * or the two reloads); resolves to the status after the action.
@@ -1412,6 +1459,12 @@ export const UNIWORK_DOC_CHANNELS = {
   docStatusEvent: 'uniwork-doc:status-event',
   save: 'uniwork-doc:save',
   resolveConflict: 'uniwork-doc:resolve-conflict',
+  /** main -> shell renderer: open or update the S5 conflict dialog (G5-09) */
+  conflictOpen: 'uniwork-doc:conflict-open',
+  /** main -> shell renderer: main ended the open S5 session itself (G5-09) */
+  conflictClosed: 'uniwork-doc:conflict-closed',
+  /** invoke(sessionId, action) -> UniworkConflictReply (G5-09) */
+  conflictAct: 'uniwork-doc:conflict-act',
   /** invoke(path, action) -> the S6 bar action (later/close/retry/reload/reload-now) */
   remoteAction: 'uniwork-doc:remote-action',
   /** invoke(heightPx) -> the S6 bar's height under the tab strip (active view inset) */

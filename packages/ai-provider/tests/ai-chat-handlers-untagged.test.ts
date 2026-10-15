@@ -12,7 +12,7 @@ const ROOT = resolve(__dirname, '../../..')
 const DOCS_MAIN = 'apps/docs/src/main/docs-main.ts'
 const SHEETS_MAIN = 'apps/sheets/src/main/sheets-main.ts'
 const SLIDES_AI = 'apps/slides/src/main/ai-ipc.ts'
-const CHAT_CONFIG_OF = /const chatConfigOf = \(/
+const CHAT_CONFIG_OF = /const chatConfigOf = async \(/
 
 function handlerBody(file: string, start: RegExp, end = '\n  })\n'): string {
   const text = readFileSync(resolve(ROOT, file), 'utf8')
