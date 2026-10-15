@@ -674,6 +674,77 @@ describe('keystore locked: replacing the saved sign-in', () => {
       ctx.manager.cancelLogin()
       expect(snapshot(data.dir)).toEqual(before)
       expect(readFileSync(data.session)).toEqual(data.unreadable)
+      // the file is still unreadable: back to keystore-locked, not signed-out,
+      // and the Retry already failed, so the way out stays offered
+      expect(ctx.manager.status()).toMatchObject({
+        state: 'keystore-locked',
+        error: 'keystore_locked',
+        canReplaceLockedSignIn: true,
+      })
+      expect(ctx.statuses.map((st) => st.state)).not.toContain('signed-out')
+      expect(ctx.events.at(-1)).toEqual({ phase: 'error', error: 'cancelled' })
+      // a plain sign-in is still refused; the offer can be taken again
+      expect(await ctx.manager.login()).toBe(false)
+      expect(ctx.transport.start).toHaveBeenCalledTimes(1)
+      expect(await ctx.manager.replaceLockedSignIn()).toBe(true)
+      expect(ctx.transport.start).toHaveBeenCalledTimes(2)
+      expect(readFileSync(data.session)).toEqual(data.unreadable)
+    } finally {
+      rmSync(data.dir, { recursive: true, force: true })
+    }
+  })
+
+  it('an expired replacing sign-in goes back to keystore-locked with the offer kept', async () => {
+    const data = lockedUserData()
+    try {
+      const ctx = setup({ credentials: data.store })
+      await ctx.manager.restore()
+      await ctx.manager.retry()
+      const before = snapshot(data.dir)
+      expect(await ctx.manager.replaceLockedSignIn()).toBe(true)
+      await vi.advanceTimersByTimeAsync(601_000)
+      expect(ctx.events.at(-1)).toEqual({ phase: 'error', error: 'login_timeout' })
+      expect(ctx.manager.status()).toMatchObject({
+        state: 'keystore-locked',
+        canReplaceLockedSignIn: true,
+      })
+      expect(await ctx.manager.login()).toBe(false)
+      expect(snapshot(data.dir)).toEqual(before)
+    } finally {
+      rmSync(data.dir, { recursive: true, force: true })
+    }
+  })
+
+  it('a replacing sign-in that fails never clears the saved sign-in (even a revoked device)', async () => {
+    const data = lockedUserData()
+    try {
+      const ctx = setup({ credentials: data.store })
+      await ctx.manager.restore()
+      await ctx.manager.retry()
+      const before = snapshot(data.dir)
+      // the start request fails
+      ctx.transport.start.mockImplementationOnce(fail('network'))
+      expect(await ctx.manager.replaceLockedSignIn()).toBe(false)
+      expect(ctx.events.at(-1)).toEqual({ phase: 'error', error: 'network' })
+      expect(ctx.manager.status()).toMatchObject({
+        state: 'keystore-locked',
+        canReplaceLockedSignIn: true,
+      })
+      // the exchange fails with a verdict whose usual handling clears credentials
+      ctx.transport.exchange.mockImplementationOnce(fail('device_revoked'))
+      expect(await ctx.manager.replaceLockedSignIn()).toBe(true)
+      const startArgs = ctx.transport.start.mock.calls.at(-1)?.[0] as { state: string }
+      await ctx.manager.completeCallback(
+        `uniwork-office://auth/callback?code=c1&state=${encodeURIComponent(startArgs.state)}`,
+      )
+      expect(ctx.events.at(-1)).toEqual({ phase: 'error', error: 'device_revoked' })
+      expect(ctx.manager.status()).toMatchObject({
+        state: 'keystore-locked',
+        canReplaceLockedSignIn: true,
+      })
+      expect(await ctx.manager.login()).toBe(false)
+      expect(snapshot(data.dir)).toEqual(before)
+      expect(readFileSync(data.session)).toEqual(data.unreadable)
     } finally {
       rmSync(data.dir, { recursive: true, force: true })
     }
