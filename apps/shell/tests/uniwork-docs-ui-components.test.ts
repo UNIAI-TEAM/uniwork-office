@@ -99,6 +99,7 @@ function makeApi() {
     }),
     uniworkSave: vi.fn(async (): Promise<UniworkDocStatus | null> => null),
     uniworkResolveConflict: vi.fn(async (): Promise<UniworkDocStatus | null> => null),
+    onUniworkQueuePopover: vi.fn(() => () => undefined),
     onUniworkLaunch: vi.fn((cb: (e: UniworkLaunchEvent) => void) => {
       pushLaunch = cb
       return () => {
@@ -510,11 +511,12 @@ describe('status chip', () => {
     expect(buttonByText('Sign in')).toBeUndefined()
   })
 
-  it('View only and Saved have no button; Blocked names the reason', async () => {
+  it('View only has no button; a full store is Blocked with its reason, in the tooltip node', async () => {
+    const label = () => chip().querySelector<HTMLElement>('.uw-pill-label')!
     await mount(
       createElement(UniworkStatusChip, { status: status({ access: 'view' }), onStatus: vi.fn() }),
     )
-    expect(chip().textContent).toBe('View only')
+    expect(label().textContent).toBe('View only')
     expect(chip().querySelector('button')).toBeNull()
     await mount(
       createElement(UniworkStatusChip, {
@@ -522,8 +524,16 @@ describe('status chip', () => {
         onStatus: vi.fn(),
       }),
     )
-    expect(chip().textContent).toBe('Blocked: storage full')
-    expect(chip().getAttribute('title')).toContain('Your UniWork storage is full.')
+    expect(label().textContent).toBe('Blocked: storage full')
+    // a blocked save opens the queue popover from its one button
+    expect(chip().querySelector('button')!.textContent).toBe('View queue')
+    // the explanation is the tooltip node, not a title attribute
+    expect(chip().hasAttribute('title')).toBe(false)
+    const tip = host.querySelector<HTMLElement>(
+      `#${chip().querySelector('button')!.getAttribute('aria-describedby')}`,
+    )!
+    expect(tip.getAttribute('role')).toBe('tooltip')
+    expect(tip.textContent).toContain('Your UniWork storage is full.')
   })
 
   it('is a labelled group, so a screen reader knows what the status belongs to', async () => {
@@ -534,11 +544,12 @@ describe('status chip', () => {
     expect(chip().getAttribute('aria-label')).toBe('UniWork save status')
   })
 
-  it('announces its text as a status region', async () => {
+  it('the label is not a status region: the window live host says each change once', async () => {
     await mount(
       createElement(UniworkStatusChip, { status: status({ state: 'saving' }), onStatus: vi.fn() }),
     )
-    expect(chip().querySelector('[role="status"]')!.textContent).toBe('Saving…')
+    expect(chip().querySelector('[role="status"], [role="alert"], [aria-live]')).toBeNull()
+    expect(chip().querySelector('.uw-pill-label')!.textContent).toBe('Saving…')
   })
 })
 
@@ -562,7 +573,7 @@ describe('chip truncation and hover text', () => {
 
   for (const locale of ['en', 'vi'] as const) {
     for (const [name, partial] of STATES) {
-      it(`${locale}: ${name} shows its label, truncates it, and carries the full text as title`, async () => {
+      it(`${locale}: ${name} shows its label, truncates it, and carries the full text in the tooltip node`, async () => {
         account = 'session-expired'
         await mount(
           createElement(UniworkStatusChip, { status: status(partial), onStatus: vi.fn() }),
@@ -571,10 +582,16 @@ describe('chip truncation and hover text', () => {
         const label = labelOf()
         expect(label.textContent!.trim().length).toBeGreaterThan(0)
         expect(label.classList.contains('uw-pill-label')).toBe(true)
-        // the full label leads the hover text, followed by the explanation
-        const title = pillOf().getAttribute('title')!
-        expect(title.startsWith(`${label.textContent}\n`)).toBe(true)
-        expect(title.length).toBeGreaterThan(label.textContent!.length + 1)
+        // no title attribute: the full label leads the tooltip node (hover and focus), then the explanation
+        expect(pillOf().hasAttribute('title')).toBe(false)
+        const tip = pillOf().querySelector<HTMLElement>('[role="tooltip"]')!
+        expect(tip.id).toBeTruthy()
+        expect(tip.textContent!.startsWith(label.textContent!)).toBe(true)
+        expect(tip.textContent!.length).toBeGreaterThan(label.textContent!.length + 1)
+        // exactly one element reads it: the button, or the group when there is none
+        const describedBy = host.querySelectorAll(`[aria-describedby="${tip.id}"]`)
+        expect(describedBy).toHaveLength(1)
+        expect(describedBy[0]!.tagName).toBe(pillOf().querySelector('button') ? 'BUTTON' : 'DIV')
         // the label is the only thing that gives way, never a button
         for (const button of pillOf().querySelectorAll('button')) {
           expect(button.closest('.uw-pill-status')).toBeNull()

@@ -453,6 +453,7 @@ body.overlay-title-bar .tab-bar-drag-spacer {
 }
 
 .uw-pill {
+  position: relative;
   box-sizing: border-box;
   display: inline-flex;
   align-items: center;
@@ -505,6 +506,12 @@ body.overlay-title-bar .tab-bar-drag-spacer {
   color: var(--success);
 }
 
+.uw-pill[data-tone='info'] {
+  border-color: var(--info);
+  background: var(--info-bg);
+  color: var(--info);
+}
+
 .uw-pill[data-tone='warn'] {
   border-color: var(--warning-border);
   background: var(--warning-bg);
@@ -519,6 +526,7 @@ body.overlay-title-bar .tab-bar-drag-spacer {
 
 .uw-pill-action,
 .uw-pill-close {
+  position: relative;
   box-sizing: border-box;
   flex: 0 0 auto;
   height: 22px;
@@ -556,20 +564,104 @@ body.overlay-title-bar .tab-bar-drag-spacer {
   margin-left: -4px;
 }
 
-.uw-pill-action:hover:not(:disabled),
+.uw-pill-action:hover:not([aria-disabled='true']),
 .uw-pill-close:hover {
   background: var(--hover);
 }
 
-.uw-pill-action:disabled {
+/* busy: the button stays in the tab order (aria-disabled, never disabled) so focus is not dropped */
+.uw-pill-action[aria-disabled='true'] {
   cursor: default;
   opacity: 0.6;
 }
 
 .uw-pill-action:focus-visible,
-.uw-pill-close:focus-visible {
+.uw-pill-close:focus-visible,
+.uw-pill:focus-visible {
   outline: 2px solid var(--color-border-brand);
   outline-offset: 1px;
+}
+
+/* a 22px button gets a 24px hit area (WCAG 2.5.8) without growing the 28px pill */
+.uw-pill-action::before,
+.uw-pill-close::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+}
+
+/* the one description of the pill: shown on hover and on focus, read through aria-describedby */
+.uw-pill-tip {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: min(320px, 90vw);
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow-menu);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.45;
+  text-align: start;
+  white-space: normal;
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.12s ease,
+    visibility 0.12s;
+}
+
+.uw-pill:hover > .uw-pill-tip,
+.uw-pill:focus-within > .uw-pill-tip,
+.uw-pill:focus > .uw-pill-tip {
+  visibility: visible;
+  opacity: 1;
+}
+
+/* Esc dismisses it without moving focus (WCAG 1.4.13) until the pointer or focus leaves */
+.uw-pill[data-tip-dismissed] > .uw-pill-tip {
+  visibility: hidden;
+  opacity: 0;
+}
+
+.uw-pill-tip-label {
+  display: block;
+  margin-bottom: 2px;
+  font-weight: 600;
+}
+
+/* touch: the holder is the whole 40px bar so a finger on the pill's edge still lands on its button;
+   it stays no-drag (base rule), and nothing extends past the bar */
+@media (pointer: coarse) {
+  .uw-chrome {
+    align-self: stretch;
+    height: 40px;
+  }
+
+  /* bar 40 = pill 28 + 6 + 6, button 22 centred in the pill: 9px to the bar edge */
+  .uw-pill-action::before,
+  .uw-pill-close::before {
+    top: -9px;
+    bottom: -9px;
+  }
+
+  /* Action and Close sit 4px apart: each reaches away from the other, so they never overlap */
+  .uw-pill-action::before {
+    left: -8px;
+    right: -1px;
+  }
+
+  .uw-pill-close::before {
+    left: -1px;
+    right: -8px;
+  }
 }
 
 .uw-spinner {
@@ -606,6 +698,10 @@ body.overlay-title-bar .tab-bar-drag-spacer {
 
 .uw-tab-marker[data-tone='ok'] {
   background: var(--success);
+}
+
+.uw-tab-marker[data-tone='info'] {
+  background: var(--info);
 }
 
 .uw-tab-marker[data-tone='warn'] {

@@ -1,0 +1,340 @@
+// @vitest-environment jsdom
+import { act, createElement } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { LocaleProvider } from '../src/renderer/src/locale'
+import { UniworkStatusChip } from '../src/renderer/src/UniworkChrome'
+import { UniworkLiveHost, resetLiveForTests } from '../src/renderer/src/uniwork-live'
+import { en } from '../src/renderer/src/i18n/sync/en'
+import type {
+  AccountState,
+  HomeApi,
+  UniworkDocStatus,
+  UniworkQueuePopoverRequest,
+} from '../src/shared/home-api'
+
+;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+
+const PATH = '/work/uniwork-documents/d1/Plan.docx'
+
+function status(over: Partial<UniworkDocStatus> = {}): UniworkDocStatus {
+  return {
+    path: PATH,
+    documentId: 'd1',
+    workspaceId: 'w1',
+    title: 'Plan',
+    format: 'docx',
+    access: 'edit',
+    state: 'saved',
+    ...over,
+  }
+}
+
+let host: HTMLDivElement
+let root: Root
+let account: AccountState
+let pushPopover: ((request: UniworkQueuePopoverRequest) => void) | null
+let api: ReturnType<typeof makeApi>
+let focusActive: ReturnType<typeof vi.fn>
+
+function makeApi() {
+  const fns = {
+    accountStatus: vi.fn(async () => ({ loggedIn: account === 'signed-in', state: account })),
+    onAccountStatus: vi.fn(() => () => undefined),
+    onAccountLogin: vi.fn(() => () => undefined),
+    accountLogin: vi.fn(async () => true),
+    uniworkSave: vi.fn(async (): Promise<UniworkDocStatus | null> => null),
+    uniworkResolveConflict: vi.fn(async (): Promise<UniworkDocStatus | null> => null),
+    uniworkRemoteAction: vi.fn(async (): Promise<UniworkDocStatus | null> => null),
+    onUniworkQueuePopover: vi.fn((cb: (request: UniworkQueuePopoverRequest) => void) => {
+      pushPopover = cb
+      return () => {
+        if (pushPopover === cb) pushPopover = null
+      }
+    }),
+  }
+  window.aiOffice = fns as unknown as HomeApi
+  return fns
+}
+
+function Pill({ s, onStatus = () => undefined }: { s: UniworkDocStatus; onStatus?: () => void }) {
+  return createElement(
+    LocaleProvider,
+    { initial: 'en' },
+    createElement(UniworkLiveHost),
+    createElement('div', { id: 'editor-stand-in', tabIndex: -1 }),
+    createElement(UniworkStatusChip, { key: s.path, status: s, onStatus }),
+  )
+}
+
+async function flush(): Promise<void> {
+  await act(async () => {
+    for (let i = 0; i < 6; i++) await Promise.resolve()
+  })
+}
+
+async function mount(s: UniworkDocStatus, onStatus?: () => void): Promise<void> {
+  await act(async () => {
+    root.render(createElement(Pill, { s, onStatus }))
+  })
+  await flush()
+}
+
+async function click(el: Element | null | undefined): Promise<void> {
+  expect(el, 'element to click').toBeTruthy()
+  await act(async () => {
+    ;(el as HTMLElement).click()
+  })
+  await flush()
+}
+
+const pill = () => host.querySelector<HTMLElement>('.uw-pill')!
+const button = () => pill().querySelector<HTMLButtonElement>('.uw-pill-action')
+const polite = () => document.querySelector('#uw-live-host [role=status]')?.textContent ?? ''
+const assertive = () => document.querySelector('#uw-live-host [role=alert]')?.textContent ?? ''
+const popover = () => document.querySelector<HTMLElement>('[role="dialog"]')
+
+beforeEach(() => {
+  localStorage.setItem('uniwork-ui-lang', 'en')
+  resetLiveForTests()
+  host = document.createElement('div')
+  document.body.append(host)
+  root = createRoot(host)
+  account = 'signed-in'
+  pushPopover = null
+  api = makeApi()
+  focusActive = vi.fn()
+  ;(window as unknown as { aiOfficeTabs?: unknown }).aiOfficeTabs = { focusActive }
+  delete (window as unknown as { uniworkSyncCenter?: unknown }).uniworkSyncCenter
+})
+
+afterEach(() => {
+  act(() => root.unmount())
+  resetLiveForTests()
+  document.body.innerHTML = ''
+})
+
+describe('Save pill reads once (T3)', () => {
+  it('the label is plain text: no role, no aria-live, no title anywhere in the pill', async () => {
+    await mount(status({ state: 'queued' }))
+    const label = pill().querySelector<HTMLElement>('.uw-pill-label')!
+    expect(label.textContent).toBe(en.uwChipQueued)
+    for (let el: HTMLElement | null = label; el && el !== pill(); el = el.parentElement) {
+      expect(el.hasAttribute('role'), el.className).toBe(false)
+      expect(el.hasAttribute('aria-live'), el.className).toBe(false)
+    }
+    expect(pill().querySelector('[role="status"], [role="alert"], [aria-live]')).toBeNull()
+    expect(pill().hasAttribute('title')).toBe(false)
+    expect(pill().querySelector('[title]')).toBeNull()
+  })
+
+  it('is a labelled group', async () => {
+    await mount(status({ state: 'queued' }))
+    expect(pill().getAttribute('role')).toBe('group')
+    expect(pill().getAttribute('aria-label')).toBe('UniWork save status')
+  })
+
+  it('with a button, only the button points at the tooltip node', async () => {
+    await mount(status({ state: 'queued' }))
+    const described = Array.from(host.querySelectorAll('[aria-describedby]'))
+    expect(described).toEqual([button()])
+    expect(pill().hasAttribute('aria-describedby')).toBe(false)
+    const tip = document.getElementById(button()!.getAttribute('aria-describedby')!)!
+    expect(tip.getAttribute('role')).toBe('tooltip')
+    expect(pill().contains(tip)).toBe(true)
+    expect(tip.textContent).toContain('queued')
+  })
+
+  it('without a button the group itself is focusable and described (still one reading)', async () => {
+    await mount(status({ state: 'dirty' }))
+    expect(button()).toBeNull()
+    expect(pill().getAttribute('tabindex')).toBe('0')
+    const tip = document.getElementById(pill().getAttribute('aria-describedby')!)!
+    expect(tip.getAttribute('role')).toBe('tooltip')
+    expect(host.querySelectorAll('[aria-describedby]')).toHaveLength(1)
+  })
+
+  it('with a button the group is only a programmatic focus target', async () => {
+    await mount(status({ state: 'queued' }))
+    expect(pill().getAttribute('tabindex')).toBe('-1')
+  })
+})
+
+describe('Save pill announces each change once (T4)', () => {
+  it('says nothing on the first render', async () => {
+    await mount(status({ state: 'dirty' }))
+    expect(polite()).toBe('')
+    expect(assertive()).toBe('')
+  })
+
+  it('a change of the active document writes exactly one polite sentence', async () => {
+    await mount(status({ state: 'dirty' }))
+    await mount(status({ state: 'saving' }))
+    expect(polite()).toBe('Plan: Saving…')
+    expect(assertive()).toBe('')
+    // the same pill model again is not a change
+    resetLiveForTests()
+    await mount(status({ state: 'saving', lastSavedAt: '2026-03-02T08:30:00Z' }))
+    expect(polite()).toBe('')
+    expect(assertive()).toBe('')
+  })
+
+  it('blocked, failed and conflict go to the assertive node only', async () => {
+    await mount(status({ state: 'saving' }))
+    await mount(status({ state: 'blocked', error: 'quota_exceeded' }))
+    expect(assertive()).toBe('Plan: Blocked: storage full')
+    expect(polite()).toBe('')
+    resetLiveForTests()
+    await mount(status({ state: 'failed', error: 'server_error' }))
+    expect(assertive()).toBe(`Plan: ${document.querySelector('.uw-pill-label')!.textContent}`)
+    expect(polite()).toBe('')
+    resetLiveForTests()
+    await mount(status({ state: 'conflict' }))
+    expect(assertive()).toBe('Plan: Version conflict')
+    expect(polite()).toBe('')
+  })
+
+  it('a tab switch (another path, same position) writes nothing', async () => {
+    await mount(status({ state: 'dirty' }))
+    await mount(
+      status({
+        path: '/work/uniwork-documents/d2/Other.docx',
+        documentId: 'd2',
+        title: 'Other',
+        state: 'saving',
+      }),
+    )
+    expect(polite()).toBe('')
+    expect(assertive()).toBe('')
+    // and a change on the new active document is announced with its own title
+    await mount(
+      status({
+        path: '/work/uniwork-documents/d2/Other.docx',
+        documentId: 'd2',
+        title: 'Other',
+        state: 'saved',
+      }),
+    )
+    expect(polite()).toBe('Other: Saved to UniWork')
+  })
+})
+
+describe('Save pill button state (T5)', () => {
+  it('a busy button is aria-disabled, not disabled, keeps focus and ignores a second click', async () => {
+    let release: (value: UniworkDocStatus | null) => void = () => undefined
+    api.uniworkSave.mockImplementationOnce(
+      () => new Promise<UniworkDocStatus | null>((resolve) => (release = resolve)),
+    )
+    const onStatus = vi.fn()
+    await mount(status({ state: 'offline', error: 'network' }), onStatus)
+    const btn = button()!
+    btn.focus()
+    expect(document.activeElement).toBe(btn)
+    await click(btn)
+    expect(btn.getAttribute('aria-disabled')).toBe('true')
+    expect(btn.disabled).toBe(false)
+    expect(document.activeElement).toBe(btn)
+    await click(btn)
+    expect(api.uniworkSave).toHaveBeenCalledTimes(1)
+    await act(async () => release(status({ state: 'saved' })))
+    await flush()
+    expect(onStatus).toHaveBeenCalledWith(status({ state: 'saved' }))
+    expect(button()!.hasAttribute('aria-disabled')).toBe(false)
+  })
+
+  it('focus moves to the pill group, never to <body>, when the next status removes the button', async () => {
+    await mount(status({ state: 'queued' }))
+    button()!.focus()
+    expect(document.activeElement).toBe(button())
+    await mount(status({ state: 'saved' }))
+    expect(button()).toBeNull()
+    expect(document.activeElement).not.toBe(document.body)
+    expect(document.activeElement).toBe(pill())
+  })
+
+  it('focus elsewhere is left alone when the button goes away', async () => {
+    await mount(status({ state: 'queued' }))
+    const stand = document.getElementById('editor-stand-in')!
+    stand.focus()
+    await mount(status({ state: 'saved' }))
+    expect(document.activeElement).toBe(stand)
+  })
+})
+
+describe('Ctrl/Cmd+S and the queue popover (T8)', () => {
+  it('the main push for the active path opens the popover with the blocked-save line, no save call', async () => {
+    await mount(status({ state: 'queued' }))
+    expect(popover()).toBeNull()
+    await act(async () => pushPopover!({ path: PATH }))
+    await flush()
+    const dialog = popover()!
+    expect(dialog).not.toBeNull()
+    expect(dialog.textContent).toContain(en.uwQueueBlockedSave)
+    expect(polite()).toBe(en.uwQueueBlockedSave)
+    expect(api.uniworkSave).not.toHaveBeenCalled()
+    expect(api.uniworkResolveConflict).not.toHaveBeenCalled()
+  })
+
+  it('a push for another path (a background tab) opens nothing', async () => {
+    await mount(status({ state: 'queued' }))
+    await act(async () => pushPopover!({ path: '/work/uniwork-documents/d9/Else.docx' }))
+    await flush()
+    expect(popover()).toBeNull()
+  })
+
+  it('a conflict opens the resolve choice instead of a popover', async () => {
+    await mount(status({ state: 'conflict' }))
+    await act(async () => pushPopover!({ path: PATH }))
+    await flush()
+    expect(api.uniworkResolveConflict).toHaveBeenCalledWith(PATH)
+    expect(popover()).toBeNull()
+    expect(api.uniworkSave).not.toHaveBeenCalled()
+  })
+
+  it('Esc after a Ctrl/Cmd+S opening hands focus back to the editor view', async () => {
+    await mount(status({ state: 'queued' }))
+    await act(async () => pushPopover!({ path: PATH }))
+    await flush()
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    })
+    expect(popover()).toBeNull()
+    expect(focusActive).toHaveBeenCalledTimes(1)
+  })
+
+  it('View queue opens the popover, a second click closes it, Esc returns focus to the button', async () => {
+    await mount(status({ state: 'queued' }))
+    await click(button())
+    expect(popover()).not.toBeNull()
+    await click(button())
+    expect(popover()).toBeNull()
+    await click(button())
+    expect(popover()).not.toBeNull()
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    })
+    expect(popover()).toBeNull()
+    expect(document.activeElement).toBe(button())
+    expect(focusActive).not.toHaveBeenCalled()
+  })
+
+  it('Details on a failed save opens the popover too', async () => {
+    await mount(status({ state: 'failed', error: 'server_error' }))
+    await click(button())
+    expect(popover()).not.toBeNull()
+  })
+
+  it('the popover goes away with the status that made it', async () => {
+    await mount(status({ state: 'queued' }))
+    await click(button())
+    await mount(status({ state: 'saved' }))
+    expect(popover()).toBeNull()
+  })
+
+  it('stop the subscription when the pill goes away', async () => {
+    await mount(status({ state: 'queued' }))
+    expect(pushPopover).not.toBeNull()
+    act(() => root.render(createElement('div')))
+    expect(pushPopover).toBeNull()
+  })
+})
