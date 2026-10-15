@@ -742,6 +742,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     accountStatus: () => uniworkAccount().status(),
     capabilityRead: (orgId) => runtime.capabilityRead(orgId),
     feedVerdict: () => runtime.feedVerdict(),
+    resetFeedResync: () => runtime.resetFeedResync(),
     leaseState: (documentId) => runtime.leases.effectiveState(documentId),
     tickRuntime: () => runtime.tick(),
     openPath: (path) => (wiring.refuseLockedPath(path) ? false : wiring.openPath(path)),

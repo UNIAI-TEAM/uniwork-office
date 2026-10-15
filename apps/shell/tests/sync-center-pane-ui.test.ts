@@ -543,6 +543,19 @@ describe('SyncCenterPane', () => {
     )
   })
 
+  it('W10: a stopped feed (resyncFailed) keeps Đồng bộ ngay usable while the header says offline', async () => {
+    const s = snapshot()
+    s.header = { ...s.header, online: false, resyncFailed: true, status: 'offline' }
+    const api = fakeApi(s)
+    await render(api)
+    const now = button(vi_.uwSyncNow!)
+    expect(now.getAttribute('aria-disabled')).toBeNull()
+    expect(now.getAttribute('aria-describedby')).toBeNull()
+    expect(host.textContent).not.toContain(vi_.uwSyncNowOffline!)
+    await click(now)
+    expect(api.syncNow).toHaveBeenCalledTimes(1)
+  })
+
   it('other organization line and status changes are announced', async () => {
     const api = fakeApi(snapshot())
     await render(api)

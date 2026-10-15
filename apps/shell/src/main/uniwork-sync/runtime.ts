@@ -420,6 +420,16 @@ export class SyncRuntime {
     return { ...this.lastFeedVerdict }
   }
 
+  /**
+   * G5-10: the user's "Đồng bộ ngay" after the feed stopped on refused resyncs:
+   * every feed consumer forgets its refusal count and backoff, so the next pass
+   * tries the resync again (a stopped feed waits for this click or a restart).
+   */
+  resetFeedResync(): void {
+    for (const consumer of this.running.values()) consumer.resetResyncRefusals()
+    this.lastFeedVerdict = { ...this.lastFeedVerdict, resyncFailed: false }
+  }
+
   /** the pass's verdict: the save queue's onPoll first, then the listeners */
   private async reportPoll(online: boolean | undefined): Promise<void> {
     await this.options.onPoll?.(online)

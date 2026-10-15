@@ -471,6 +471,10 @@ export interface SyncCenterControllerDeps {
   /** a fresh unique id for the intent `saveAgain` mints (defaults to a random UUID) */
   newId?(): string
   syncNow(): Promise<void>
+  /** the feed stopped on refused resyncs (header 7): "Đồng bộ ngay" must still try, even offline */
+  isResyncFailed?(): boolean
+  /** forget the feed's refused resyncs and backoff before that retry pass */
+  resetFeedResync?(): void
   setSendingPaused?(paused: boolean): Promise<boolean>
   writeClipboard(text: string): void
   openDocument(documentId: string, path?: string): Promise<boolean>
@@ -653,10 +657,16 @@ export function createSyncCenterController(deps: SyncCenterControllerDeps): Sync
     getSnapshot,
 
     async syncNow(): Promise<SyncCenterActionResult> {
-      if (!deps.isOnline()) return { ok: false, code: 'offline' }
+      // a feed stopped on refused resyncs is only restarted by this click, so it is never
+      // refused as offline up front: the pass really tries, and a device that is truly
+      // offline fails it and gets the normal offline answer below
+      const retryingFeed = deps.isResyncFailed?.() === true
+      if (!retryingFeed && !deps.isOnline()) return { ok: false, code: 'offline' }
       try {
+        if (retryingFeed) deps.resetFeedResync?.()
         await deps.syncNow()
         notifyChanged()
+        if (retryingFeed && !deps.isOnline()) return { ok: false, code: 'offline' }
         return { ok: true }
       } catch {
         return { ok: false, code: 'other' }
@@ -1054,6 +1064,8 @@ export interface WiredSyncCenterDeps {
   }>
   /** the feed runtime's last pass verdict (resynced / resync refused past the cap) */
   feedVerdict(): SyncFeedVerdict
+  /** the runtime forgets its feeds' refused resyncs and backoff (the retry of header 7) */
+  resetFeedResync?(): void
   /**
    * G5-08c: the lease manager's effective state of a document (RES-3). Only its
    * `expired` and `clock_rollback` states are read, as a blocked row's reason.
@@ -1159,6 +1171,8 @@ export function createWiredSyncCenter(deps: WiredSyncCenterDeps): WiredSyncCente
 
   const controller = createSyncCenterController({
     isOnline: () => online,
+    isResyncFailed: () => deps.feedVerdict().resyncFailed,
+    resetFeedResync: () => deps.resetFeedResync?.(),
     getFacts: async (): Promise<SyncCenterFacts> => {
       const status = deps.accountStatus()
       const storeNewer = deps.service.currentLocks().some((lock) => lock.reason === STORE_NEWER)
@@ -1426,7 +1440,8 @@ export function createWiredSyncCenter(deps: WiredSyncCenterDeps): WiredSyncCente
     syncNow: async () => {
       await deps.tickRuntime()
       await deps.service.pollSaveQueue()
-      lastSyncAt = new Date(now()).toISOString()
+      // the pass's own verdict may have gone offline: no "synced" time for a pass that failed
+      if (online) lastSyncAt = new Date(now()).toISOString()
     },
 
     setSendingPaused: async (paused) => {

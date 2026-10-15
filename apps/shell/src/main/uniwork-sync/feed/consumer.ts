@@ -116,6 +116,12 @@ export class FeedConsumer {
     return this.resyncRefusals
   }
   private retryAt = 0
+
+  /** the user asked to sync again: forget the refused resyncs and their backoff */
+  resetResyncRefusals(): void {
+    this.resyncRefusals = 0
+    this.retryAt = 0
+  }
   private loggedPhases = new Set<string>()
   private cancelled = false
 

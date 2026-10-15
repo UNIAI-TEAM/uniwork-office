@@ -103,6 +103,9 @@ function wired(
     docs?: DocSpec[]
     locks?: Array<{ reason: 'store_newer' | 'keystore_locked' }>
     feed?: () => SyncFeedVerdict
+    /** the runtime pass "Đồng bộ ngay" runs (default: nothing) */
+    tick?: () => Promise<void>
+    resetFeed?: () => void
     status?: Record<string, unknown>
     usage?: { bytes: number; budgetBytes: number }
     /** the lease manager's effective state per document id (RES-3) */
@@ -273,7 +276,8 @@ function wired(
         }
       : {}),
     feedVerdict: options.feed ?? (() => ({ resynced: false, resyncFailed: false })),
-    tickRuntime: async () => undefined,
+    tickRuntime: options.tick ?? (async () => undefined),
+    ...(options.resetFeed ? { resetFeedResync: options.resetFeed } : {}),
     openPath: (path) => {
       opened.push(path)
       openPaths.add(path)
@@ -695,5 +699,71 @@ describe('BE-2n-3: no verdict yet is not a synced time', () => {
     const after = (await h.controller.getSnapshot()).header
     expect(after.lastSyncAt).toBeUndefined()
     expect(after.status).toBe('online')
+  })
+})
+
+describe('W10: "Đồng bộ ngay" restarts a feed stopped on refused resyncs, even offline', () => {
+  /** a real SyncRuntime driven past the refusal cap, wired to the center like production */
+  async function stoppedFeed(pages?: () => FeedPage | Error) {
+    const rt = runtimeHarness(pages ? { pages } : {})
+    const tick = vi.fn(() => rt.runtime.tick())
+    const h = wired({
+      feed: () => rt.runtime.feedVerdict(),
+      tick,
+      resetFeed: () => rt.runtime.resetFeedResync(),
+    })
+    rt.runtime.onPollVerdict((online) => void h.notePoll(online))
+    await rt.runtime.tick()
+    rt.expire = true
+    for (let i = 0; i < FEED_RESYNC_FAILED_AFTER; i += 1) {
+      rt.clock.ms += 2 * 60 * 60_000
+      await rt.runtime.tick()
+    }
+    await vi.waitFor(async () =>
+      expect((await h.controller.getSnapshot()).header.online).toBe(false),
+    )
+    const stopped = (await h.controller.getSnapshot()).header
+    // the refused resyncs are reported as offline (deferred to G5-13), and the flag is still set
+    expect(stopped.resyncFailed).toBe(true)
+    tick.mockClear()
+    return { rt, h, tick }
+  }
+
+  it('does not refuse as offline: it resets the refusal and backoff and runs a pass that recovers', async () => {
+    const { rt, h, tick } = await stoppedFeed()
+    // the server answers again, but the consumer is still inside its backoff window
+    rt.expire = false
+    expect(await h.controller.syncNow()).toEqual({ ok: true })
+    expect(tick).toHaveBeenCalledTimes(1)
+    const after = (await h.controller.getSnapshot()).header
+    expect(rt.runtime.feedVerdict().resyncFailed).toBe(false)
+    expect(after.online).toBe(true)
+    expect(after.resyncFailed).toBe(false)
+    expect(after.status).toBe('online')
+  })
+
+  it('a device that is really offline still gets the normal offline answer and line', async () => {
+    let down = false
+    const { rt, h, tick } = await stoppedFeed(() =>
+      down
+        ? new FeedError({ kind: 'other', error: new UniworkDocError('network') })
+        : (undefined as never),
+    )
+    rt.expire = false
+    down = true
+    expect(await h.controller.syncNow()).toEqual({ ok: false, code: 'offline' })
+    expect(tick).toHaveBeenCalledTimes(1)
+    const after = (await h.controller.getSnapshot()).header
+    expect(after.status).toBe('offline')
+    expect(after.resyncFailed).toBe(false)
+    // no resync is stuck any more, so the next click on plain offline is refused up front
+    tick.mockClear()
+    expect(await h.controller.syncNow()).toEqual({ ok: false, code: 'offline' })
+    expect(tick).not.toHaveBeenCalled()
+  })
+
+  it('wiring.ts hands the runtime reset to the sync center', () => {
+    const source = readFileSync(join(__dirname, '..', 'src/main/uniwork-docs/wiring.ts'), 'utf8')
+    expect(source).toContain('resetFeedResync: () => runtime.resetFeedResync(),')
   })
 })

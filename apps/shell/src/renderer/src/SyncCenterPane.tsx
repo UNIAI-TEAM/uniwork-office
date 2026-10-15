@@ -381,7 +381,8 @@ export function SyncCenterPane({
 
   const syncNow = () => {
     if (!api || !header) return
-    if (!header.online) {
+    // a feed stopped on refused resyncs is restarted by this click, offline or not
+    if (!header.online && !header.resyncFailed) {
       setLive(t('uwSyncNowOffline'))
       return
     }
@@ -456,7 +457,8 @@ export function SyncCenterPane({
 
   const busyRows = busyRowIds(busy)
   const signedOut = status === 'signed_out'
-  const offline = header ? !header.online : false
+  // "Đồng bộ ngay" is the only way out of a stopped feed (header 7), so it never reads as offline then
+  const offline = header ? !header.online && !header.resyncFailed : false
   const nowReason = `${base}-now-reason`
 
   const renderActions = (r: SyncCenterRow, view: SyncRowView) => {
