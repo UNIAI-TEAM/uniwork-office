@@ -76,6 +76,26 @@ export interface PanelNote {
 }
 
 /**
+ * The tool calls the server dropped in a turn, read back from the panel notes the notice wrote
+ * (`dropped` notes carry the reason, the module and the tool name), in the shape `resultChip`
+ * takes: the notes themselves are never the chip's input (RF1-13), the dropped calls are.
+ */
+export function droppedCallsOfNotes(
+  notes: readonly PanelNote[] | undefined,
+): Array<{ name: string; reason: DroppedToolReason; module?: string }> {
+  const calls: Array<{ name: string; reason: DroppedToolReason; module?: string }> = []
+  for (const note of notes ?? []) {
+    if (note.kind !== 'dropped' || !note.reason) continue
+    calls.push({
+      name: note.toolName ?? '',
+      reason: note.reason,
+      ...(note.module ? { module: note.module } : {}),
+    })
+  }
+  return calls
+}
+
+/**
  * A turn whose notes are the whole answer: a restarted conversation (the question was not sent) and
  * UniWork AI being off. Neither is a failure, so the panel shows no error, no empty-reply line and no Retry.
  */

@@ -21,6 +21,7 @@ export type { AiRunPayload, AiRunState, AiRunTracker, AiRunTrackerOptions } from
 export {
   classifyDroppedToolReason,
   createTextNoticeSurface,
+  droppedCallsOfNotes,
   endsQuietly,
   noticePatch,
   noticeToPanelNote,
@@ -85,7 +86,9 @@ export {
   isTurnEnded,
   panelLiveAnnouncement,
   resolveEntryResultChip,
+  singleShortcutHint,
   turnEnded,
+  uniworkErrorLineText,
 } from './uniwork-panel'
 export type {
   EntryResultChipView,

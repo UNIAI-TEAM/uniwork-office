@@ -33,7 +33,7 @@ export type ResultChipErrorAction =
   'ask-again' | 'choose-provider' | 'sign-in' | 'retry' | 'open-in-app'
 
 export type ResultChipErrorActionKey =
-  'aiRunAskAgain' | 'aiRunChooseOther' | 'acctSignInAgain' | 'aiRunOpenInApp'
+  'aiRunAskAgain' | 'aiRunChooseOther' | 'acctSignInAgain' | 'aiRunOpenInApp' | 'aiRunRetry'
 
 export interface ResultChipToolExecution {
   readonly name: string
@@ -233,7 +233,7 @@ export function classifyS9Error(
     return {
       key: 'aiErrRateLimitedNoWait',
       action: 'retry',
-      actionKey: null,
+      actionKey: 'aiRunRetry',
     }
   }
   if (
@@ -252,7 +252,7 @@ export function classifyS9Error(
     return {
       key: 'aiErrUnavailable',
       action: 'retry',
-      actionKey: null,
+      actionKey: 'aiRunRetry',
     }
   }
   if (
@@ -264,7 +264,7 @@ export function classifyS9Error(
     return {
       key: 'aiErrDisconnected',
       action: 'retry',
-      actionKey: null,
+      actionKey: 'aiRunRetry',
     }
   }
   if (lower === 'offline' || code === 'aiErrOffline') {

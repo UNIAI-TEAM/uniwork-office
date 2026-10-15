@@ -172,10 +172,42 @@ export function panelLiveAnnouncement(input: PanelLiveAnnouncementInput): string
     // label, then the error line, then the stopped line: what the visible turn shows, never the body
     const parts: string[] = []
     if (rawChip.labelKey !== null) parts.push(translate(rawChip.labelKey))
+    // the dropped-call reason is the visible line of an "unsupported" chip (S9 table)
+    if (rawChip.reasonKey) parts.push(translate(rawChip.reasonKey, rawChip.reasonParams))
     if (rawChip.errorLine?.key)
       parts.push(translate(rawChip.errorLine.key, rawChip.errorLine.params))
     if (rawChip.stoppedKey !== null) parts.push(translate(rawChip.stoppedKey))
     return joinAnnouncementParts(parts)
   }
   return ''
+}
+
+/**
+ * The visible error line of a turn. An `error` chip already reads "Lỗi" / "Error", so its line is
+ * the bare message; under any other chip (an edited turn that then failed) or none, `withPrefix`
+ * adds the panel's own "Error: …" wording.
+ */
+export function uniworkErrorLineText(
+  chip: ResultChipOutput | null | undefined,
+  errorText: string,
+  withPrefix: (errorText: string) => string,
+): string {
+  return chip?.chip === 'error' ? errorText : withPrefix(errorText)
+}
+
+function isMacPlatform(): boolean {
+  const g = globalThis as { navigator?: { platform?: string } }
+  return /mac/i.test(g.navigator?.platform ?? '')
+}
+
+/**
+ * One shortcut instead of the dictionary's "Ctrl/⌘+Z" pair. The i18n layer rewrites "⌘" to "Ctrl"
+ * off the Mac, which leaves "Ctrl/Ctrl+Z" (and "Strg/Ctrl+Z"): keep the first, locale-named key.
+ * On a Mac the text is untouched by i18n, so the pair becomes "⌘Z".
+ */
+export function singleShortcutHint(text: string, isMac: boolean = isMacPlatform()): string {
+  return text.replace(/\p{L}+\/(?:⌘|\p{L}+)\+([A-Za-z0-9])/gu, (match, key: string) => {
+    const left = match.slice(0, match.indexOf('/'))
+    return isMac ? `⌘${key}` : `${left}+${key}`
+  })
 }
