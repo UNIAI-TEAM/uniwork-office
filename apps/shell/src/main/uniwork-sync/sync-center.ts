@@ -1042,6 +1042,11 @@ export interface WiredSyncCenterDeps {
   }>
   /** the feed runtime's last pass verdict (resynced / resync refused past the cap) */
   feedVerdict(): SyncFeedVerdict
+  /**
+   * G5-08c: the lease manager's effective state of a document (RES-3). Only its
+   * `expired` and `clock_rollback` states are read, as a blocked row's reason.
+   */
+  leaseState?(documentId: string): Promise<{ state: string }>
   tickRuntime(): Promise<void>
   openPath(path: string): boolean
   isPathOpen(path: string): boolean
@@ -1126,6 +1131,20 @@ export function createWiredSyncCenter(deps: WiredSyncCenterDeps): WiredSyncCente
     return { engine, dirs, scope }
   }
 
+  /*
+   * RES-3: the reason of a blocked intent the queue filed without a known cause, from the
+   * G5-08c lease state (expired / clock rollback). It only names the cause of a row the
+   * queue already blocked: a lease never blocks, unblocks or re-states a row here (UNI-1645).
+   */
+  const leaseBlockedReason = async (
+    documentId: string,
+  ): Promise<SyncCenterBlockedReason | undefined> => {
+    const lease = await deps.leaseState?.(documentId).catch(() => null)
+    if (lease?.state === 'expired') return 'lease_expired'
+    if (lease?.state === 'clock_rollback') return 'clock_rollback'
+    return undefined
+  }
+
   const controller = createSyncCenterController({
     isOnline: () => online,
     getFacts: async (): Promise<SyncCenterFacts> => {
@@ -1208,6 +1227,10 @@ export function createWiredSyncCenter(deps: WiredSyncCenterDeps): WiredSyncCente
           length: 0,
         })
         if (stored) {
+          const leaseReason =
+            stored.intent.state === 'blocked' && !mapBlockedReason(stored.intent.lastError)
+              ? await leaseBlockedReason(binding.documentId)
+              : undefined
           intents.push({
             id: stored.intent.intentId,
             documentKey: key,
@@ -1218,6 +1241,7 @@ export function createWiredSyncCenter(deps: WiredSyncCenterDeps): WiredSyncCente
             ext: binding.format,
             record: stored.intent,
             canEdit,
+            ...(leaseReason ? { blockedReason: leaseReason } : {}),
             ...(binding.serverVersion !== undefined
               ? { conflict: { version: binding.serverVersion } }
               : {}),

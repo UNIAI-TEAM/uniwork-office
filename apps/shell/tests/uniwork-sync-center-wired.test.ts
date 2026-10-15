@@ -104,6 +104,9 @@ function wired(
     feed?: () => SyncFeedVerdict
     status?: Record<string, unknown>
     usage?: { bytes: number; budgetBytes: number }
+    /** the lease manager's effective state per document id (RES-3) */
+    lease?: (documentId: string) => string
+    offlineLibrary?: boolean
   } = {},
 ) {
   const storeRoot = join(base, 'store')
@@ -254,8 +257,15 @@ function wired(
       }) as never,
     capabilityRead: async () => ({
       kind: 'ok',
-      capabilities: { sync_write: true, sync_feed: true },
+      capabilities: {
+        sync_write: true,
+        sync_feed: true,
+        ...(options.offlineLibrary === undefined ? {} : { offline_library: options.offlineLibrary }),
+      },
     }),
+    ...(options.lease
+      ? { leaseState: async (documentId: string) => ({ state: options.lease!(documentId) }) as never }
+      : {}),
     feedVerdict: options.feed ?? (() => ({ resynced: false, resyncFailed: false })),
     tickRuntime: async () => undefined,
     openPath: (path) => {
@@ -521,6 +531,54 @@ describe('BE-5 / BE-6 on the wired path', () => {
     const h = wired({ docs: [{ key: 'doc-1', state: 'blocked', lastError: 'forbidden' }] })
     const row = (await h.controller.getSnapshot()).tabs.attention[0]!
     expect(row.blockedReason).toBe('permission_revoked')
+  })
+})
+
+describe('RES-3: the lease manager produces lease_expired / clock_rollback on the wired path', () => {
+  it('a blocked intent whose lease expired reads lease_expired, libraryOff only when offline_library is off', async () => {
+    const lease = (id: string) => (id === 'doc-1' ? 'expired' : 'valid')
+    const on = wired({ docs: [{ key: 'doc-1', state: 'blocked' }], lease })
+    const row = (await on.controller.getSnapshot()).tabs.attention[0]!
+    expect(row.blockedReason).toBe('lease_expired')
+    expect(row.libraryOff).toBeUndefined()
+    const off = wired({ docs: [{ key: 'doc-1', state: 'blocked' }], lease, offlineLibrary: false })
+    const offRow = (await off.controller.getSnapshot()).tabs.attention[0]!
+    expect(offRow.blockedReason).toBe('lease_expired')
+    expect(offRow.libraryOff).toBe(true)
+  })
+
+  it('a blocked intent behind a clock rollback reads clock_rollback (never libraryOff)', async () => {
+    const h = wired({
+      docs: [{ key: 'doc-1', state: 'blocked' }],
+      lease: () => 'clock_rollback',
+      offlineLibrary: false,
+    })
+    const row = (await h.controller.getSnapshot()).tabs.attention[0]!
+    expect(row.blockedReason).toBe('clock_rollback')
+    expect(row.libraryOff).toBeUndefined()
+  })
+
+  it("the queue's own known cause wins, a usable lease adds nothing, and a lease never changes the row state", async () => {
+    const h = wired({
+      docs: [
+        { key: 'doc-1', state: 'blocked', lastError: 'forbidden' },
+        { key: 'doc-2', state: 'blocked' },
+        { key: 'doc-3', state: 'queued' },
+      ],
+      lease: (id) => (id === 'doc-2' ? 'valid' : 'expired'),
+    })
+    const snap = await h.controller.getSnapshot()
+    const rows = [...snap.tabs.attention, ...snap.tabs.pending]
+    expect(rows.find((r) => r.documentId === 'doc-1')!.blockedReason).toBe('permission_revoked')
+    expect(rows.find((r) => r.documentId === 'doc-2')!.blockedReason).toBeUndefined()
+    const queued = rows.find((r) => r.documentId === 'doc-3')!
+    expect(queued.state).toBe('queued')
+    expect(queued.blockedReason).toBeUndefined()
+  })
+
+  it('wiring.ts hands the runtime lease manager to the sync center', () => {
+    const source = readFileSync(join(__dirname, '..', 'src/main/uniwork-docs/wiring.ts'), 'utf8')
+    expect(source).toContain('leaseState: (documentId) => runtime.leases.effectiveState(documentId),')
   })
 })
 
