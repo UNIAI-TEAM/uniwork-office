@@ -253,6 +253,8 @@ export function UniworkStatusChip({
   const lastPendingNext = useRef(Boolean(status.pendingNext))
   const labelRef = useRef(label)
   labelRef.current = label
+  const popoverRef = useRef(popover)
+  popoverRef.current = popover
   useEffect(() => {
     const pendingNextArrived = !lastPendingNext.current && Boolean(status.pendingNext)
     lastPendingNext.current = Boolean(status.pendingNext)
@@ -261,8 +263,9 @@ export function UniworkStatusChip({
     lastSignature.current = signature
     if (lastPath !== status.path) return
     // a newer version waiting behind the same save only comes from Ctrl/Cmd+S, which main follows
-    // with the queue popover: its line 1 is the one sentence of that press
-    if (pendingNextArrived && lastState === status.state) return
+    // with the queue popover: its line 1 is the one sentence of that press. A popover the pill
+    // already opened stays as it is and says nothing again, so then the pill says it.
+    if (pendingNextArrived && lastState === status.state && popoverRef.current !== 'pill') return
     announce(t('uwSyncRowAnnounce', { doc: status.title, state: labelRef.current }), {
       assertive: isUrgent(status, model.labelKey),
     })
@@ -295,8 +298,9 @@ export function UniworkStatusChip({
         .finally(() => setBusy(false))
       return
     }
-    // a status that settled in between (no waiting save any more) has nothing to say
-    if (isQueuePopoverState(current)) setPopover('ctrl-s')
+    // a status that settled in between (no waiting save any more) has nothing to say; a popover
+    // the pill opened stays the pill's (Esc goes back to the pill button)
+    if (isQueuePopoverState(current)) setPopover((open) => open ?? 'ctrl-s')
     // only a new request counts, not a changed onStatus
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ctrlS])

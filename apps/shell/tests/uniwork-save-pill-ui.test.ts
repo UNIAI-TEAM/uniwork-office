@@ -425,6 +425,70 @@ describe('Ctrl/Cmd+S and the queue popover (T8)', () => {
     expect(assertive()).toBe('')
   })
 
+  /** every text written to the polite node while `run` runs */
+  async function politeWritesDuring(run: () => Promise<void>): Promise<string[]> {
+    const node = document.querySelector('#uw-live-host [role=status]')!
+    const writes: string[] = []
+    const observer = new MutationObserver((records) => {
+      for (const record of records) {
+        for (const added of Array.from(record.addedNodes)) writes.push(added.textContent ?? '')
+      }
+    })
+    observer.observe(node, { childList: true })
+    await run()
+    await flush()
+    observer.disconnect()
+    return writes
+  }
+
+  it('RFE6u2-01: Ctrl/Cmd+S with the popover already open from the pill says one sentence and keeps the pill as opener', async () => {
+    await mount(status({ state: 'queued' }))
+    await click(button())
+    expect(popover()).not.toBeNull()
+    const writes = await politeWritesDuring(async () => {
+      await mount(status({ state: 'queued', pendingNext: true }))
+      await act(async () => pushPopover!({ path: PATH }))
+    })
+    // the open popover does not speak again: the pill's sentence is the one for this press
+    expect(writes).toEqual([`Plan: ${en.uwChipQueuedNewer}`])
+    expect(assertive()).toBe('')
+    expect(popover()).not.toBeNull()
+    expect(button()!.getAttribute('aria-expanded')).toBe('true')
+    // still the pill's popover: Esc goes back to the pill button, not the editor
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    })
+    expect(popover()).toBeNull()
+    expect(document.activeElement).toBe(button())
+    expect(focusActive).not.toHaveBeenCalled()
+  })
+
+  it('RFE6u2-01: the same when the request comes before the status', async () => {
+    await mount(status({ state: 'queued' }))
+    await click(button())
+    const writes = await politeWritesDuring(async () => {
+      await act(async () => pushPopover!({ path: PATH }))
+      await flush()
+      await mount(status({ state: 'queued', pendingNext: true }))
+    })
+    expect(writes).toEqual([`Plan: ${en.uwChipQueuedNewer}`])
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    })
+    expect(document.activeElement).toBe(button())
+    expect(focusActive).not.toHaveBeenCalled()
+  })
+
+  it('RFE6u2-01: a closed popover and the request before the status: still only the popover line', async () => {
+    await mount(status({ state: 'queued' }))
+    const writes = await politeWritesDuring(async () => {
+      await act(async () => pushPopover!({ path: PATH }))
+      await flush()
+      await mount(status({ state: 'queued', pendingNext: true }))
+    })
+    expect(writes).toEqual([en.uwQueueBlockedSave])
+  })
+
   it('RFE6u-03: other queued changes are still announced by the pill', async () => {
     await mount(status({ state: 'queued', pendingNext: true }))
     await mount(status({ state: 'paused_user', pendingNext: true }))
