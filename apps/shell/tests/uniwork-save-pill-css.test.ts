@@ -227,3 +227,32 @@ describe('V6u2-02: the focus chip reads in two lines inside the 40px strip', () 
     expect(rule('.uw-pill-focus-tip-text')).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(/i)
   })
 })
+
+describe('U-1: the pill is a flex item of the tab bar, never laid over a tab', () => {
+  it('the bar is a flex row; the strip scrolls and gives way, the holder is in the same row', () => {
+    expect(rule('.tab-bar')).toMatch(/display: flex/)
+    const strip = rule('.tab-strip')
+    expect(strip).toMatch(/flex: 1 1 auto/)
+    expect(strip).toMatch(/min-width: 0/)
+    expect(strip).toMatch(/overflow-x: auto/)
+    const holder = rule('.uw-chrome')
+    expect(holder).toMatch(/flex: 0 0 auto/)
+    expect(holder).not.toMatch(/position: (absolute|fixed)/)
+  })
+
+  it('neither the holder nor the pill is taken out of the flow (only the focus chip is absolute)', () => {
+    expect(rule('.uw-pill')).toMatch(/position: relative/)
+    expect(rule('.uw-pill')).not.toMatch(/position: (absolute|fixed)/)
+    expect(rule('.uw-pill')).toMatch(/flex: 0 1 auto/)
+  })
+
+  it('the narrow variant drops the gap the hidden label would leave', () => {
+    expect(rule(".uw-pill[data-variant='compact'] > .uw-pill-status")).toMatch(/gap: 0/)
+  })
+
+  it('theme tokens only in the new rule', () => {
+    expect(rule(".uw-pill[data-variant='compact'] > .uw-pill-status")).not.toMatch(
+      /#[0-9a-f]{3,8}\b|rgba?\(/i,
+    )
+  })
+})
