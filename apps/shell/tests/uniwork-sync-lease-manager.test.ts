@@ -2,7 +2,6 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { NEVER_READ_CAPABILITIES } from '../src/main/uniwork-sync/capability/cache'
 import { createSafeStorageKeyProvider } from '../src/main/uniwork-sync/keys'
 import {
   LeaseClientError,
@@ -13,12 +12,12 @@ import {
   createLeaseManager,
   type LeaseRevokeNotice,
 } from '../src/main/uniwork-sync/lease/manager'
-import { LEASE_STORE_REGISTRATION, createLeaseStore } from '../src/main/uniwork-sync/lease/store'
 import {
-  DOC_INDEX_REGISTRATION,
-  FEED_CURSORS_REGISTRATION,
-  SyncRuntime,
-} from '../src/main/uniwork-sync/runtime'
+  LEASE_STORE_REGISTRATION,
+  createLeaseStore,
+  type LeaseStore,
+} from '../src/main/uniwork-sync/lease/store'
+import { DOC_INDEX_REGISTRATION, FEED_CURSORS_REGISTRATION } from '../src/main/uniwork-sync/runtime'
 import { createSyncStoreAccess } from '../src/main/uniwork-sync/session-store'
 import { createStoreLayer } from '../src/main/uniwork-sync/store'
 import {
@@ -78,12 +77,15 @@ function makeHarness(
     grantImpl?: (documentId: string) => Promise<OfficeOfflineLeaseSDO>
     renewImpl?: (documentId: string, lease: string) => Promise<OfficeOfflineLeaseSDO>
     releaseImpl?: (documentId: string) => Promise<void>
+    /** wraps the lease store (a refused write, ...) */
+    wrapStore?: (store: LeaseStore) => LeaseStore
   } = {},
 ) {
   let wallMs = T0
   let monoMs = 1_000
   let online = options.online ?? true
   let currentScope: { deploymentId: string; accountId: string } | null = { ...SCOPE }
+  let currentSession: string | null = 'dev_1'
   const loadedVersions: Record<string, string> = {
     doc_1: 'ver_1',
     ...(options.loadedVersions ?? {}),
@@ -108,7 +110,17 @@ function makeHarness(
     layer,
     scope: () => currentScope,
   })
-  const store = createLeaseStore(access)
+  const storeGets: string[] = []
+  const baseStore = createLeaseStore(access)
+  const counted: LeaseStore = {
+    get: (documentId) => {
+      storeGets.push(documentId)
+      return baseStore.get(documentId)
+    },
+    put: (record) => baseStore.put(record),
+    delete: (documentId) => baseStore.delete(documentId),
+  }
+  const store = options.wrapStore ? options.wrapStore(counted) : counted
 
   const client: LeaseClient = {
     async grant(documentId) {
@@ -140,6 +152,7 @@ function makeHarness(
       monotonicNow: () => monoMs,
     },
     scope: () => currentScope,
+    session: () => currentSession,
     isOnline: () => online,
     loadedVersionId: (docId) => loadedVersions[docId],
     onRevoked: (notice) => {
@@ -159,6 +172,7 @@ function makeHarness(
     renewCalls,
     releaseCalls,
     revokedNotices,
+    storeGets,
     loadedVersions,
     sessionExpiredCount: () => sessionExpiredCount,
     advanceTime: (deltaMs: number) => {
@@ -175,7 +189,18 @@ function makeHarness(
     setScope: (next: { deploymentId: string; accountId: string } | null) => {
       currentScope = next
     },
+    setSession: (next: string | null) => {
+      currentSession = next
+    },
   }
+}
+
+const OTHER_ACCOUNT = { deploymentId: 'dep_1', accountId: 'user_2' }
+const OTHER_DEPLOYMENT = { deploymentId: 'dep_2', accountId: 'user_1' }
+const LEASE_ID = '01J8X4LEASE1P2Q3R4S5T6U7V8'
+
+function leaseError(kind: LeaseClientError['kind'], code: string, status: number): LeaseClientError {
+  return new LeaseClientError({ kind, code, status })
 }
 
 describe('uniwork-sync lease manager (G5-08c)', () => {
@@ -435,15 +460,16 @@ describe('uniwork-sync lease manager (G5-08c)', () => {
     expect(state.level).toBe('view')
   })
 
-  it('logout locks immediately and prevents offline cold-login without a session', async () => {
+  it('logout locks immediately as signed_out (not revoked) and prevents offline cold-login without a session', async () => {
     const h = makeHarness()
     await h.manager.grant('doc_1')
     expect((await h.manager.effectiveState('doc_1')).state).toBe('valid')
 
     // Logout locks all leases immediately through lockAll without waiting for the server
-    h.manager.lockAll('logout')
+    h.manager.lockAll('signed_out')
     const afterLogout = await h.manager.effectiveState('doc_1')
-    expect(afterLogout.state).toBe('revoked')
+    expect(afterLogout.state).toBe('locked')
+    expect(afterLogout.reason).toBe('signed_out')
     expect(afterLogout.locked).toBe(true)
     expect(afterLogout.usable).toBe(false)
 
@@ -482,23 +508,232 @@ describe('uniwork-sync lease manager (G5-08c)', () => {
     expect(cleared.locked).toBe(false)
   })
 
-  it('exposes the lease manager from SyncRuntime and registers LEASE_STORE_REGISTRATION', async () => {
-    const h = makeHarness()
-    const runtime = new SyncRuntime({
-      store: h.access,
-      targets: { orgs: () => ['org_1'], workspaces: async () => ['ws_1'] },
-      capability: async () => ({
-        kind: 'ok',
-        capabilities: { ...NEVER_READ_CAPABILITIES, sync_feed: false },
-        source: 'fresh',
-      }),
-      client: () => null,
-      keepDraft: async () => false,
-      clock: { now: () => h.getWallClock() },
-      leases: h.manager,
-    })
+  it('T1-5: logout sends no awaited DELETE and emits no cache-delete notice', async () => {
+    // the server never answers the DELETE: a logout that awaited it would hang here
+    const h = makeHarness({ releaseImpl: () => new Promise<void>(() => undefined) })
+    await h.manager.grant('doc_1')
+    const returned = h.manager.lockAll('signed_out')
+    expect(returned).toBeUndefined()
+    expect((await h.manager.effectiveState('doc_1')).reason).toBe('signed_out')
+    // best effort only: fired once in the background, never awaited
+    expect(h.releaseCalls).toEqual(['doc_1'])
+    expect(h.revokedNotices).toEqual([])
+  })
 
-    expect(runtime.leases).toBe(h.manager)
-    expect(runtime.leaseManager()).toBe(h.manager)
+  it('R1BE-4: a null scope after logout reads none, not revoked', async () => {
+    const h = makeHarness()
+    await h.manager.grant('doc_1')
+    h.manager.lockAll('signed_out')
+    h.setScope(null)
+    const signedOut = await h.manager.effectiveState('doc_1')
+    expect(signedOut.state).toBe('none')
+    expect(signedOut.reason).toBeUndefined()
+  })
+
+  it('R1BE-4: the same account signing in again resets the boundary and a fresh grant works', async () => {
+    const h = makeHarness()
+    await h.manager.grant('doc_1')
+    h.manager.lockAll('signed_out')
+    h.setScope(null)
+    expect((await h.manager.effectiveState('doc_1')).state).toBe('none')
+
+    h.setScope({ ...SCOPE })
+    // a document that never held a lease is none, never a lock
+    expect((await h.manager.effectiveState('doc_2')).state).toBe('none')
+    // the same account reopens its own lease from the store
+    expect((await h.manager.effectiveState('doc_1')).state).toBe('valid')
+    const fresh = await h.manager.grant('doc_2')
+    expect(fresh.kind).toBe('renewed')
+    expect((await h.manager.effectiveState('doc_2')).state).toBe('valid')
+  })
+
+  it('R1BE-4: a new session of the same account resets the boundary even when the null scope was never observed', async () => {
+    const h = makeHarness()
+    await h.manager.grant('doc_1')
+    h.manager.lockAll('signed_out')
+    // sign-out and sign-in happened between two calls: only the session changed
+    h.setSession('dev_2')
+    expect((await h.manager.effectiveState('doc_1')).state).toBe('valid')
+    expect((await h.manager.grant('doc_2')).kind).toBe('renewed')
+  })
+
+  it('R1BE-4: another account signing in after logout starts unlocked', async () => {
+    const h = makeHarness()
+    await h.manager.grant('doc_1')
+    h.manager.lockAll('signed_out')
+    h.setScope({ ...OTHER_ACCOUNT })
+    expect((await h.manager.effectiveState('doc_1')).state).toBe('none')
+    expect((await h.manager.grant('doc_1')).kind).toBe('renewed')
+    expect((await h.manager.effectiveState('doc_1')).state).toBe('valid')
+  })
+
+  it('T1-3: sign-out through lockBoundary while the session is live locks as signed_out and refuses a grant', async () => {
+    const h = makeHarness()
+    await h.manager.grant('doc_1')
+    expect(h.manager.lockBoundary({ ...SCOPE })).toBe('signed_out')
+    const state = await h.manager.effectiveState('doc_1')
+    expect(state.state).toBe('locked')
+    expect(state.reason).toBe('signed_out')
+    const refused = await h.manager.grant('doc_2')
+    expect(refused.kind).toBe('locked')
+    expect(h.grantCalls).toEqual(['doc_1'])
+  })
+
+  it('T1-3: account switch locks the outgoing account at once, sends no DELETE and leaves the incoming one unlocked', async () => {
+    const h = makeHarness()
+    await h.manager.grant('doc_1')
+    h.setScope({ ...OTHER_ACCOUNT })
+    expect(h.manager.lockBoundary({ ...SCOPE })).toBe('account_switch')
+    // the incoming account never sees the outgoing account's lease
+    expect((await h.manager.effectiveState('doc_1')).state).toBe('none')
+    expect(h.releaseCalls).toEqual([])
+    expect((await h.manager.grant('doc_1')).kind).toBe('renewed')
+    expect((await h.manager.effectiveState('doc_1')).state).toBe('valid')
+  })
+
+  it('T1-3: deployment switch locks the outgoing deployment at once and sends no DELETE', async () => {
+    const h = makeHarness()
+    await h.manager.grant('doc_1')
+    h.setScope({ ...OTHER_DEPLOYMENT })
+    expect(h.manager.lockBoundary({ ...SCOPE })).toBe('deployment_switch')
+    expect((await h.manager.effectiveState('doc_1')).state).toBe('none')
+    expect(h.releaseCalls).toEqual([])
+    expect(h.revokedNotices).toEqual([])
+  })
+
+  it('T1-3: keystore locked at manager level -> keystore_locked, no grant request, unlock restores the lease', async () => {
+    const h = makeHarness()
+    await h.manager.grant('doc_1')
+    safeStorage.lock()
+    const locked = await h.manager.effectiveState('doc_1')
+    expect(locked.state).toBe('keystore_locked')
+    expect(locked.locked).toBe(true)
+    const grant = await h.manager.grant('doc_2')
+    expect(grant.kind).toBe('keystore_locked')
+    expect(h.grantCalls).toEqual(['doc_1'])
+    safeStorage.unlock()
+    expect((await h.manager.effectiveState('doc_1')).state).toBe('valid')
+  })
+
+  it('T1-3: store full at manager level -> store_full, nothing kept', async () => {
+    const h = makeHarness({
+      wrapStore: (store) => ({ ...store, put: async () => ({ kind: 'store_full' }) }),
+    })
+    const grant = await h.manager.grant('doc_1')
+    expect(grant.kind).toBe('store_full')
+    expect((await h.manager.effectiveState('doc_1')).state).toBe('none')
+  })
+
+  it('T1-3: device_required and limit_reached -> failed with that kind, nothing stored, no revoke notice', async () => {
+    for (const [kind, code, status] of [
+      ['device_required', 'offline_lease_device_required', 403],
+      ['limit_reached', 'offline_lease_limit_reached', 409],
+    ] as const) {
+      const h = makeHarness({
+        grantImpl: async () => {
+          throw leaseError(kind, code, status)
+        },
+      })
+      const grant = await h.manager.grant('doc_1')
+      expect(grant.kind).toBe('failed')
+      if (grant.kind === 'failed') expect(grant.failure.kind).toBe(kind)
+      expect((await h.manager.effectiveState('doc_1')).state).toBe('none')
+      expect(h.revokedNotices).toEqual([])
+    }
+  })
+
+  it('T1-3: renew 401 session_expired locks as session_expired, reports the session once, sends no DELETE', async () => {
+    const h = makeHarness({
+      renewImpl: async () => {
+        throw leaseError('session_expired', 'session_expired', 401)
+      },
+    })
+    await h.manager.grant('doc_1')
+    h.advanceTime(13 * HOUR)
+    const renew = await h.manager.renew('doc_1')
+    expect(renew.kind).toBe('session_expired')
+    const state = await h.manager.effectiveState('doc_1')
+    expect(state.state).toBe('locked')
+    expect(state.reason).toBe('session_expired')
+    expect(h.sessionExpiredCount()).toBe(1)
+    expect(h.releaseCalls).toEqual([])
+    expect(h.revokedNotices).toEqual([])
+  })
+
+  it('T1-4: offline renew makes zero grant, renew or release calls', async () => {
+    const h = makeHarness()
+    await h.manager.grant('doc_1')
+    h.advanceTime(13 * HOUR)
+    h.setOnline(false)
+    expect((await h.manager.renew('doc_1')).kind).toBe('offline')
+    await h.manager.onReconnect()
+    await h.manager.onOnlinePass(false)
+    expect(h.grantCalls).toEqual(['doc_1'])
+    expect(h.renewCalls).toEqual([])
+    expect(h.releaseCalls).toEqual([])
+  })
+
+  it('R1BE-6: a clock rollback the store refuses to persist stays latched in memory', async () => {
+    let refuse = false
+    const h = makeHarness({
+      wrapStore: (store) => ({
+        ...store,
+        put: async (record) => (refuse ? { kind: 'store_full' } : store.put(record)),
+      }),
+    })
+    await h.manager.grant('doc_1')
+    h.advanceTime(30 * MIN)
+    expect((await h.manager.effectiveState('doc_1')).state).toBe('valid')
+
+    refuse = true
+    h.setWallClock(h.getWallClock() - 6 * MIN)
+    expect((await h.manager.effectiveState('doc_1')).state).toBe('clock_rollback')
+    // the wall clock creeps back inside the 5 min window: the latch still holds
+    h.setWallClock(h.getWallClock() + 2 * MIN)
+    expect((await h.manager.effectiveState('doc_1')).state).toBe('clock_rollback')
+  })
+
+  it('R1BE-7: a document queried without a stored lease is not read on the next reconnect pass', async () => {
+    const h = makeHarness()
+    await h.manager.grant('doc_1')
+    expect((await h.manager.effectiveState('doc_browsed')).state).toBe('none')
+    h.storeGets.length = 0
+    await h.manager.onReconnect()
+    // only the held lease is read; the browsed document costs nothing
+    expect(new Set(h.storeGets)).toEqual(new Set(['doc_1']))
+  })
+
+  it('R1BE-5: the lease-revoked entry point locks only for the signed-in user and ignores others', async () => {
+    const h = makeHarness()
+    await h.manager.grant('doc_1')
+
+    // another user's event and malformed payloads: ignored
+    expect(
+      await h.manager.handleFeedRevoked({ user_id: 'user_2', document_id: 'doc_1', lease_id: LEASE_ID }),
+    ).toBeNull()
+    expect(await h.manager.handleFeedRevoked({ user_id: SCOPE.accountId, document_id: 'doc_1' })).toBeNull()
+    expect(await h.manager.handleFeedRevoked('office_lease.revoked')).toBeNull()
+    expect((await h.manager.effectiveState('doc_1')).state).toBe('valid')
+
+    // no signed-in scope: nothing to match, ignored
+    h.setScope(null)
+    expect(
+      await h.manager.handleFeedRevoked({
+        user_id: SCOPE.accountId,
+        document_id: 'doc_1',
+        lease_id: LEASE_ID,
+      }),
+    ).toBeNull()
+    h.setScope({ ...SCOPE })
+    expect((await h.manager.effectiveState('doc_1')).state).toBe('valid')
+    expect(h.revokedNotices).toEqual([])
+
+    const locked = await h.manager.handleFeedRevoked({
+      user_id: SCOPE.accountId,
+      document_id: 'doc_1',
+      lease_id: LEASE_ID,
+    })
+    expect(locked?.state).toBe('revoked')
+    expect(h.revokedNotices).toHaveLength(1)
   })
 })

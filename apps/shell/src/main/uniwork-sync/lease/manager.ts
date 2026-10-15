@@ -1,4 +1,5 @@
 import type { StoreScope } from '../keys'
+import { ID } from '../feed/http'
 import {
   advanceWallClock,
   anchorLeaseReceipt,
@@ -41,10 +42,14 @@ import type { LeaseStore } from './store'
  * - Feed event `office_lease.revoked` (ids only: `user_id`, `document_id`,
  *   `lease_id`) -> lock at once (row 16, §6.2.2) and mark committed cache for
  *   deletion while keeping drafts.
- * - 401/403 session -> lock at once.
- * - Logout / account switch / deployment switch -> `lockAll(reason)` locks all
- *   leases at once without waiting for the server; no offline cold-login
- *   (no session -> no usable lease).
+ * - 401/403 session -> lock at once (`locked`, reason `session_expired`).
+ * - The account boundary (`lockBoundary`): sign-out locks every lease at once
+ *   as `signed_out` without waiting for the server (a best-effort DELETE is
+ *   fired, never awaited); an account or deployment switch drops the outgoing
+ *   scope's state and never locks the incoming one. An org change is not a
+ *   boundary: it never reaches the lease manager. A scope that returns (the
+ *   same account signing in again, which is a new session) starts unlocked.
+ *   No offline cold-login: no session -> no usable lease (`none`).
  */
 
 export type LeaseEffectiveStateKind =
@@ -53,16 +58,29 @@ export type LeaseEffectiveStateKind =
   | 'expired'
   | 'clock_rollback'
   | 'revoked'
+  /** a boundary lock of the whole session: the reason says which */
+  | 'locked'
   | 'keystore_locked'
+  | 'keyring_unavailable'
   | 'none'
 
 export type LeaseLockReason =
-  | 'logout'
+  | 'signed_out'
   | 'account_switch'
   | 'deployment_switch'
   | 'session_expired'
   | 'keystore_locked'
+
+export type LeaseStateReason =
+  | 'lease_expired'
+  | 'clock_rollback'
+  | 'keystore_locked'
+  | 'keyring_unavailable'
   | 'revoked'
+  | 'signed_out'
+  | 'account_switch'
+  | 'deployment_switch'
+  | 'session_expired'
 
 export interface LeaseEffectiveState {
   state: LeaseEffectiveStateKind
@@ -70,7 +88,7 @@ export interface LeaseEffectiveState {
   level: LeaseLevel | null
   locked: boolean
   usable: boolean
-  reason?: 'lease_expired' | 'clock_rollback' | 'keystore_locked' | 'revoked'
+  reason?: LeaseStateReason
   needs_refresh?: boolean
   record?: LeaseRecord
   remainingMs?: number
@@ -109,7 +127,12 @@ export type LeaseRenewResult =
   | { kind: 'archived'; record: LeaseRecord; state: LeaseEffectiveState }
   | { kind: 'capability_off'; state: LeaseEffectiveState }
   | { kind: 'revoked'; state: LeaseEffectiveState }
+  /** a boundary lock (signed_out, ...) refuses grants and renewals */
+  | { kind: 'locked'; state: LeaseEffectiveState }
   | { kind: 'keystore_locked'; state: LeaseEffectiveState }
+  | { kind: 'keyring_unavailable'; state: LeaseEffectiveState }
+  /** the server granted, but the store could not keep it: nothing is kept */
+  | { kind: 'store_full'; state: LeaseEffectiveState }
   | { kind: 'session_expired'; state: LeaseEffectiveState }
   | { kind: 'none'; state: LeaseEffectiveState }
   | { kind: 'failed'; failure: LeaseFailure; state: LeaseEffectiveState }
@@ -119,17 +142,60 @@ export interface LeaseManagerOptions {
   client: () => LeaseClient | null
   clock: LeaseClockSource
   scope: () => StoreScope | null
+  /**
+   * The live session of the scope (the device session id). A new sign-in of
+   * the same account is a new session, so the boundary resets even when the
+   * signed-out gap between the two was never observed.
+   */
+  session?: () => string | null
   isOnline?: () => boolean
   loadedVersionId?: (documentId: string) => string | null | undefined
   onRevoked?: (notice: LeaseRevokeNotice) => void
   onSessionExpired?: () => void
 }
 
+/** the boundary locks that refuse a grant or renewal until the scope changes */
+const BOUNDARY_LOCKS: ReadonlySet<LeaseLockReason> = new Set([
+  'signed_out',
+  'account_switch',
+  'deployment_switch',
+])
+
+/**
+ * Which boundary `owner` (the scope that is leaving) crosses, given the scope
+ * signed in now: none left (or the same one, mid sign-out) is a sign-out.
+ */
+export function boundaryLockReason(
+  owner: StoreScope | null,
+  current: StoreScope | null,
+): LeaseLockReason {
+  if (!owner || !current) return 'signed_out'
+  if (owner.deploymentId !== current.deploymentId) return 'deployment_switch'
+  if (owner.accountId !== current.accountId) return 'account_switch'
+  return 'signed_out'
+}
+
+/**
+ * The `office_lease.revoked` payload (ids only), or null when it is not one.
+ * Nothing in the shell produces it yet: the server sends it on the user-scope
+ * outbox/realtime channel, which the desktop has no client for (R1BE-5, open
+ * Advisor decision). Until then a revoke lands through the renew 403.
+ */
+export function parseLeaseRevokedEvent(payload: unknown): LeaseRevokedEventPayload | null {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null
+  const row = payload as Record<string, unknown>
+  const { user_id, document_id, lease_id } = row
+  if (typeof user_id !== 'string' || !ID.test(user_id)) return null
+  if (typeof document_id !== 'string' || !ID.test(document_id)) return null
+  if (typeof lease_id !== 'string' || !ID.test(lease_id)) return null
+  return { user_id, document_id, lease_id }
+}
+
 function makeState(
   state: LeaseEffectiveStateKind,
   extra: {
     level?: LeaseLevel | null
-    reason?: 'lease_expired' | 'clock_rollback' | 'keystore_locked' | 'revoked'
+    reason?: LeaseStateReason
     needs_refresh?: boolean
     record?: LeaseRecord
     remainingMs?: number
@@ -140,7 +206,9 @@ function makeState(
     state === 'expired' ||
     state === 'clock_rollback' ||
     state === 'revoked' ||
-    state === 'keystore_locked'
+    state === 'locked' ||
+    state === 'keystore_locked' ||
+    state === 'keyring_unavailable'
   return {
     state,
     kind: state,
@@ -154,17 +222,49 @@ function makeState(
   }
 }
 
+/** a store outcome that is not a record: the state it means, or null */
+function unavailableState(result: { kind: string }): LeaseEffectiveState | null {
+  if (result.kind === 'keystore_locked') {
+    return makeState('keystore_locked', { reason: 'keystore_locked' })
+  }
+  if (result.kind === 'keyring_unavailable') {
+    return makeState('keyring_unavailable', { reason: 'keyring_unavailable' })
+  }
+  if (result.kind === 'no_session') return makeState('none')
+  return null
+}
+
+/** the same, as the result of a grant or renewal */
+function unavailableResult(result: { kind: string }): LeaseRenewResult | null {
+  const state = unavailableState(result)
+  if (!state) return null
+  if (state.state === 'keystore_locked') return { kind: 'keystore_locked', state }
+  if (state.state === 'keyring_unavailable') return { kind: 'keyring_unavailable', state }
+  return { kind: 'none', state }
+}
+
 export class LeaseManager {
   private readonly options: LeaseManagerOptions
+  /** documents that hold a stored lease: the only ones a renewal pass reads */
   private readonly trackedDocs = new Set<string>()
   /** Documents whose monotonic receipt anchor was captured in this process run */
   private readonly inProcessAnchored = new Set<string>()
   private readonly needsRefreshDocs = new Set<string>()
   private readonly revokedDocs = new Map<string, { leaseId?: string; userId?: string }>()
+  /**
+   * The clock verdicts of this run, kept even when the store refuses to
+   * persist them: a detected rollback stays latched and the highest wall clock
+   * seen never moves back until an online server-time check re-anchors it.
+   */
+  private readonly rollbackLatched = new Set<string>()
+  private readonly wallSeen = new Map<string, number>()
   private readonly revokeListeners = new Set<(notice: LeaseRevokeNotice) => void>()
   private globalLockReason: LeaseLockReason | null = null
-  private lastScopeToken: string | null = null
-  private wasOnline = false
+  /** `deployment/account#session` last seen; undefined = never looked */
+  private lastBoundaryToken: string | null | undefined = undefined
+  /** `deployment/account` of the last signed-in scope (survives a signed-out gap) */
+  private lastStoreToken: string | null = null
+  /** bumped by every lock and boundary change: an answer from before it is dropped */
   private generation = 0
 
   constructor(options: LeaseManagerOptions) {
@@ -183,25 +283,36 @@ export class LeaseManager {
     return scope ? `${scope.deploymentId}/${scope.accountId}` : null
   }
 
+  /**
+   * Sign-out, a new sign-in (a new session, even of the same account), an
+   * account or deployment switch: every in-memory verdict of the previous
+   * boundary - a lock, a revoke, a clock anchor - is dropped. What a lease says
+   * from then on comes from the store of the scope signed in now.
+   */
   private checkScopeBoundary(): StoreScope | null {
     const scope = this.options.scope()
-    const token = this.scopeToken(scope)
-    if (this.lastScopeToken !== null && token !== this.lastScopeToken) {
-      // Account or deployment switched or signed out: lock previous scope's in-memory state immediately
+    const storeToken = this.scopeToken(scope)
+    const token = storeToken === null ? null : `${storeToken}#${this.options.session?.() ?? ''}`
+    if (this.lastBoundaryToken !== undefined && token !== this.lastBoundaryToken) {
       this.generation += 1
+      this.globalLockReason = null
       this.inProcessAnchored.clear()
       this.needsRefreshDocs.clear()
-      if (token !== null) {
-        // Switched to a new account/deployment
-        this.globalLockReason = null
-        this.revokedDocs.clear()
-        this.trackedDocs.clear()
-      }
+      this.revokedDocs.clear()
+      this.rollbackLatched.clear()
+      this.wallSeen.clear()
+      // the same account after a signed-out gap keeps its tracked leases
+      if (storeToken !== null && storeToken !== this.lastStoreToken) this.trackedDocs.clear()
     }
-    if (token !== null) {
-      this.lastScopeToken = token
-    }
+    this.lastBoundaryToken = token
+    if (storeToken !== null) this.lastStoreToken = storeToken
     return scope
+  }
+
+  /** the boundary lock that refuses grants and renewals, if one holds */
+  private boundaryLockState(): LeaseEffectiveState | null {
+    if (this.globalLockReason === null || !BOUNDARY_LOCKS.has(this.globalLockReason)) return null
+    return makeState('locked', { reason: this.globalLockReason })
   }
 
   private isOnlineNow(): boolean {
@@ -251,19 +362,18 @@ export class LeaseManager {
   }
 
   async effectiveState(documentId: string): Promise<LeaseEffectiveState> {
-    this.trackedDocs.add(documentId)
     const scope = this.checkScopeBoundary()
+
+    // No offline cold-login: no session -> no usable lease
+    if (!scope) {
+      return makeState('none')
+    }
 
     if (this.globalLockReason === 'keystore_locked') {
       return makeState('keystore_locked', { reason: 'keystore_locked' })
     }
     if (this.globalLockReason !== null) {
-      return makeState('revoked', { reason: 'revoked' })
-    }
-
-    // No offline cold-login: no session -> no usable lease
-    if (!scope) {
-      return makeState('none')
+      return makeState('locked', { reason: this.globalLockReason })
     }
 
     if (this.revokedDocs.has(documentId)) {
@@ -271,30 +381,44 @@ export class LeaseManager {
     }
 
     const read = await this.options.store.get(documentId)
-    if (read.kind === 'keystore_locked') {
-      return makeState('keystore_locked', { reason: 'keystore_locked' })
-    }
-    if (read.kind === 'missing' || read.kind === 'refused') {
+    const unavailable = unavailableState(read)
+    if (unavailable) return unavailable
+    if (read.kind !== 'ok') {
+      // no lease held: nothing for a renewal pass to read
+      this.trackedDocs.delete(documentId)
       return makeState('none')
     }
 
     let record = read.record
     if (record.revoked === true) {
+      this.trackedDocs.delete(documentId)
       this.revokedDocs.set(documentId, { leaseId: record.lease_id, userId: record.user_id })
       return makeState('revoked', { reason: 'revoked', record })
     }
+    this.trackedDocs.add(documentId)
 
     const wallNow = this.options.clock.wallNow()
     const monoNow = this.options.clock.monotonicNow()
     const sameProcess = this.inProcessAnchored.has(documentId)
 
+    // what this run already saw, even if the store refused to keep it
+    const seen = this.wallSeen.get(documentId)
+    if (seen !== undefined && seen > record.max_wall_clock_seen) {
+      record = { ...record, max_wall_clock_seen: seen }
+    }
+    if (this.rollbackLatched.has(documentId)) {
+      record = { ...record, clock_rollback: true }
+    }
+
     const wallStep = advanceWallClock(record, wallNow)
     if (wallStep.changed) {
       record = wallStep.record
+      // remembered first: a write the store refuses must not unlatch it
+      this.wallSeen.set(documentId, record.max_wall_clock_seen)
+      if (record.clock_rollback === true) this.rollbackLatched.add(documentId)
       const saved = await this.options.store.put(record)
-      if (saved.kind === 'keystore_locked') {
-        return makeState('keystore_locked', { reason: 'keystore_locked' })
-      }
+      const unavailableSave = unavailableState(saved)
+      if (unavailableSave) return unavailableSave
     }
 
     const evalResult = evaluateLeaseClock(record, {
@@ -334,11 +458,12 @@ export class LeaseManager {
   }
 
   async grant(documentId: string): Promise<LeaseRenewResult> {
-    this.trackedDocs.add(documentId)
     const scope = this.checkScopeBoundary()
     if (!scope) {
       return { kind: 'none', state: await this.effectiveState(documentId) }
     }
+    const locked = this.boundaryLockState()
+    if (locked) return { kind: 'locked', state: locked }
     if (!this.isOnlineNow()) {
       return { kind: 'offline', state: await this.effectiveState(documentId) }
     }
@@ -346,24 +471,24 @@ export class LeaseManager {
     if (!client) {
       return { kind: 'offline', state: await this.effectiveState(documentId) }
     }
+    const generation = this.generation
 
     const existingRead = await this.options.store.get(documentId)
-    if (existingRead.kind === 'keystore_locked') {
-      const state = makeState('keystore_locked', { reason: 'keystore_locked' })
-      return { kind: 'keystore_locked', state }
-    }
+    const unavailable = unavailableResult(existingRead)
+    if (unavailable) return unavailable
     const previousMaxWall =
       existingRead.kind === 'ok' ? existingRead.record.max_wall_clock_seen : undefined
 
     try {
       const sdo = await client.grant(documentId)
-      return this.applyGrantedOrRenewedSdo(documentId, scope, sdo, previousMaxWall)
+      return this.applyGrantedOrRenewedSdo(documentId, scope, generation, sdo, previousMaxWall)
     } catch (error) {
       return this.handleClientError(
         documentId,
         error,
         existingRead.kind === 'ok' ? existingRead.record : undefined,
         false,
+        generation,
       )
     }
   }
@@ -372,18 +497,19 @@ export class LeaseManager {
     documentId: string,
     options: { force?: boolean; loadedVersionId?: string } = {},
   ): Promise<LeaseRenewResult> {
-    this.trackedDocs.add(documentId)
     const scope = this.checkScopeBoundary()
     if (!scope) {
       return { kind: 'none', state: await this.effectiveState(documentId) }
     }
+    const locked = this.boundaryLockState()
+    if (locked) return { kind: 'locked', state: locked }
+    const generation = this.generation
 
     const existingRead = await this.options.store.get(documentId)
-    if (existingRead.kind === 'keystore_locked') {
-      const state = makeState('keystore_locked', { reason: 'keystore_locked' })
-      return { kind: 'keystore_locked', state }
-    }
+    const unavailable = unavailableResult(existingRead)
+    if (unavailable) return unavailable
     if (existingRead.kind !== 'ok') {
+      this.trackedDocs.delete(documentId)
       return { kind: 'none', state: await this.effectiveState(documentId) }
     }
     const current = existingRead.record
@@ -391,6 +517,7 @@ export class LeaseManager {
       const state = await this.effectiveState(documentId)
       return { kind: 'revoked', state }
     }
+    this.trackedDocs.add(documentId)
     if (current.archived === true) {
       const state = await this.effectiveState(documentId)
       return { kind: 'archived', record: current, state }
@@ -420,26 +547,34 @@ export class LeaseManager {
       return this.applyGrantedOrRenewedSdo(
         documentId,
         scope,
+        generation,
         sdo,
         current.max_wall_clock_seen,
         options.loadedVersionId ?? this.options.loadedVersionId?.(documentId) ?? current.version_id,
         current,
       )
     } catch (error) {
-      return this.handleClientError(documentId, error, current, true)
+      return this.handleClientError(documentId, error, current, true, generation)
     }
+  }
+
+  /** an answer that arrived after a lock or a boundary change is dropped */
+  private async staleResult(documentId: string): Promise<LeaseRenewResult> {
+    const state = await this.effectiveState(documentId)
+    return state.state === 'locked' ? { kind: 'locked', state } : { kind: 'none', state }
   }
 
   private async applyGrantedOrRenewedSdo(
     documentId: string,
     scope: StoreScope,
+    generation: number,
     sdo: OfficeOfflineLeaseSDO,
     previousMaxWallClock?: number,
     loadedVersionId?: string,
     previousRecord?: LeaseRecord,
   ): Promise<LeaseRenewResult> {
-    this.revokedDocs.delete(documentId)
-    this.globalLockReason = null
+    // a sign-out while the request was in flight: its answer must not unlock
+    if (generation !== this.generation) return this.staleResult(documentId)
 
     const expectedVersionId =
       loadedVersionId ?? this.options.loadedVersionId?.(documentId) ?? sdo.version_id
@@ -459,9 +594,10 @@ export class LeaseManager {
     )
 
     const written = await this.options.store.put(record)
-    if (written.kind === 'keystore_locked') {
-      const state = makeState('keystore_locked', { reason: 'keystore_locked' })
-      return { kind: 'keystore_locked', state }
+    const unavailable = unavailableResult(written)
+    if (unavailable) return unavailable
+    if (written.kind === 'store_full') {
+      return { kind: 'store_full', state: await this.effectiveState(documentId) }
     }
     if (written.kind !== 'ok') {
       return {
@@ -470,8 +606,16 @@ export class LeaseManager {
         state: await this.effectiveState(documentId),
       }
     }
+    if (generation !== this.generation) return this.staleResult(documentId)
 
+    this.revokedDocs.delete(documentId)
+    // a successful server round trip ends a session_expired lock
+    if (this.globalLockReason === 'session_expired') this.globalLockReason = null
+    this.trackedDocs.add(documentId)
     this.inProcessAnchored.add(documentId)
+    // freshly anchored to the server: the run's clock verdicts start over
+    this.rollbackLatched.delete(documentId)
+    this.wallSeen.delete(documentId)
 
     if (versionMismatch) {
       this.needsRefreshDocs.add(documentId)
@@ -497,11 +641,14 @@ export class LeaseManager {
     error: unknown,
     currentRecord: LeaseRecord | undefined,
     allowSingleRegrant: boolean,
+    generation: number,
   ): Promise<LeaseRenewResult> {
     const failure: LeaseFailure =
       error instanceof LeaseClientError
         ? error.failure
         : { kind: 'server_error', code: 'server_error' }
+
+    if (generation !== this.generation) return this.staleResult(documentId)
 
     if (failure.kind === 'offline') {
       return { kind: 'offline', state: await this.effectiveState(documentId) }
@@ -525,13 +672,14 @@ export class LeaseManager {
           return this.applyGrantedOrRenewedSdo(
             documentId,
             scope,
+            generation,
             regrantedSdo,
             currentRecord?.max_wall_clock_seen,
             this.options.loadedVersionId?.(documentId) ?? currentRecord?.version_id,
             currentRecord,
           )
         } catch (regrantError) {
-          return this.handleClientError(documentId, regrantError, currentRecord, false)
+          return this.handleClientError(documentId, regrantError, currentRecord, false, generation)
         }
       }
     }
@@ -585,13 +733,15 @@ export class LeaseManager {
       currentRecord?: LeaseRecord
     },
   ): Promise<void> {
-    this.trackedDocs.add(documentId)
+    this.trackedDocs.delete(documentId)
     this.needsRefreshDocs.delete(documentId)
     this.revokedDocs.set(documentId, { leaseId: info.leaseId, userId: info.userId })
 
-    const existing =
-      info.currentRecord ??
-      ((await this.options.store.get(documentId)) as { kind: string; record?: LeaseRecord }).record
+    let existing = info.currentRecord
+    if (!existing) {
+      const read = await this.options.store.get(documentId)
+      if (read.kind === 'ok') existing = read.record
+    }
     if (existing) {
       await this.options.store.put({
         ...existing,
@@ -610,28 +760,35 @@ export class LeaseManager {
   }
 
   /**
-   * Handles feed / outbox event `office_lease.revoked` (payload carries ids only:
-   * `user_id`, `document_id`, `lease_id`). Locks the document's lease at once
-   * and emits the committed-cache deletion notice (drafts kept).
+   * The one entry point for the `office_lease.revoked` event (payload carries
+   * ids only: `user_id`, `document_id`, `lease_id`; DOC-005 row 16 / §6.2.2).
+   * Locks the document's lease at once and emits the committed-cache deletion
+   * notice (drafts kept). Only an event for the signed-in user is applied;
+   * another user's, one without a session, or a malformed payload is ignored
+   * (null).
+   *
+   * Gap (R1BE-5): no producer calls this yet. The server publishes the event on
+   * the user-scope outbox/realtime channel, and the desktop shell has no client
+   * for it (the document feed carries document changes only). Until that
+   * client exists, a revoke reaches the app on the next online renewal
+   * (403 `offline_lease_revoked`, rows 4/15).
    */
-  async handleFeedRevoked(payload: LeaseRevokedEventPayload): Promise<LeaseEffectiveState> {
+  async handleFeedRevoked(payload: unknown): Promise<LeaseEffectiveState | null> {
+    const event = parseLeaseRevokedEvent(payload)
+    if (!event) return null
     const scope = this.checkScopeBoundary()
-    if (scope && payload.user_id !== scope.accountId) {
-      return this.effectiveState(payload.document_id)
-    }
-    const existingRead = await this.options.store.get(payload.document_id)
+    if (!scope || event.user_id !== scope.accountId) return null
+    const existingRead = await this.options.store.get(event.document_id)
     const currentRecord = existingRead.kind === 'ok' ? existingRead.record : undefined
-    if (currentRecord && currentRecord.user_id !== payload.user_id) {
-      return this.effectiveState(payload.document_id)
-    }
+    if (currentRecord && currentRecord.user_id !== event.user_id) return null
 
-    await this.markDocumentRevoked(payload.document_id, {
-      leaseId: payload.lease_id,
-      userId: payload.user_id,
+    await this.markDocumentRevoked(event.document_id, {
+      leaseId: event.lease_id,
+      userId: event.user_id,
       reason: 'office_lease.revoked',
       currentRecord,
     })
-    return this.effectiveState(payload.document_id)
+    return this.effectiveState(event.document_id)
   }
 
   /**
@@ -648,56 +805,52 @@ export class LeaseManager {
     }
     const updated = applyOnlineServerTimeCheck(read.record, serverTime, this.options.clock)
     const written = await this.options.store.put(updated)
-    if (written.kind === 'keystore_locked') {
-      return makeState('keystore_locked', { reason: 'keystore_locked' })
-    }
+    const unavailable = unavailableState(written)
+    if (unavailable) return unavailable
+    this.rollbackLatched.delete(documentId)
+    this.wallSeen.delete(documentId)
     this.inProcessAnchored.add(documentId)
     return this.effectiveState(documentId)
   }
 
   /**
-   * Startup pass: when online, renews any tracked/supplied leases that have
+   * Startup pass: when online, renews any held/supplied leases that have
    * < 50 % of their TTL remaining.
    */
   async onStartup(documentIds?: Iterable<string>): Promise<Map<string, LeaseRenewResult>> {
-    this.wasOnline = this.isOnlineNow()
     return this.renewDueLeases(documentIds)
   }
 
   /**
-   * Reconnect pass: when online, renews any tracked/supplied leases that have
+   * Reconnect pass: when online, renews any held/supplied leases that have
    * < 50 % of their TTL remaining.
    */
   async onReconnect(documentIds?: Iterable<string>): Promise<Map<string, LeaseRenewResult>> {
-    this.wasOnline = this.isOnlineNow()
     return this.renewDueLeases(documentIds)
   }
 
   /**
-   * Called by `SyncRuntime` on poll passes: runs startup/reconnect renewal
-   * when online connectivity is first established or restored.
+   * Called by `SyncRuntime` after every poll pass with the pass's
+   * connectivity verdict: each online pass (the sign-in pass, every interval
+   * tick, the first one after a reconnect) renews the held leases that are
+   * due; a lease that is not due costs a store read and no request. An offline
+   * pass, or one with no verdict, sends nothing at all.
    */
   async onOnlinePass(online: boolean | undefined): Promise<void> {
-    if (online === undefined) return
-    const previouslyOnline = this.wasOnline
-    this.wasOnline = online
-    if (online && !previouslyOnline) {
-      await this.renewDueLeases()
-    }
+    if (online !== true) return
+    await this.renewDueLeases()
   }
 
   private async renewDueLeases(
     documentIds?: Iterable<string>,
   ): Promise<Map<string, LeaseRenewResult>> {
     const results = new Map<string, LeaseRenewResult>()
-    if (!this.isOnlineNow()) return results
+    this.checkScopeBoundary()
+    if (!this.isOnlineNow() || this.boundaryLockState()) return results
 
     const ids = new Set<string>(this.trackedDocs)
     if (documentIds) {
-      for (const id of documentIds) {
-        ids.add(id)
-        this.trackedDocs.add(id)
-      }
+      for (const id of documentIds) ids.add(id)
     }
 
     const gen = this.generation
@@ -714,6 +867,8 @@ export class LeaseManager {
     this.inProcessAnchored.delete(documentId)
     this.needsRefreshDocs.delete(documentId)
     this.revokedDocs.delete(documentId)
+    this.rollbackLatched.delete(documentId)
+    this.wallSeen.delete(documentId)
     await this.options.store.delete(documentId)
     if (this.isOnlineNow()) {
       const client = this.options.client()
@@ -724,31 +879,47 @@ export class LeaseManager {
   }
 
   /**
-   * Locks every lease at once synchronously without waiting for the server
-   * (logout, account switch, deployment switch, session expiry, or session lock).
+   * Locks every lease of the current session at once, synchronously, without
+   * waiting for the server (sign-out, session expiry, a session lock). Only a
+   * sign-out fires a best-effort DELETE per held lease, in the background and
+   * never awaited; nothing is revoked and no cache-deletion notice is emitted.
+   * The lock lasts until the session changes (a new sign-in starts unlocked).
    */
-  lockAll(reason: LeaseLockReason = 'logout'): void {
+  lockAll(reason: LeaseLockReason = 'signed_out'): void {
+    this.checkScopeBoundary()
+    const docs = [...this.trackedDocs]
+    const client = reason === 'signed_out' && this.isOnlineNow() ? this.options.client() : null
     this.generation += 1
     this.globalLockReason = reason
     this.inProcessAnchored.clear()
     this.needsRefreshDocs.clear()
-    if (reason !== 'keystore_locked') {
-      const docs = [...this.trackedDocs]
+    if (client) {
       for (const docId of docs) {
-        this.revokedDocs.set(docId, {})
-      }
-      // Best-effort server release in background if a client is available
-      const client = this.options.client()
-      if (client && this.isOnlineNow()) {
-        for (const docId of docs) {
-          void client.release(docId).catch(() => undefined)
-        }
+        void client.release(docId).catch(() => undefined)
       }
     }
   }
 
+  /**
+   * The account boundary (sign-out, account switch, deployment switch).
+   * `owner` is the scope that is leaving. A sign-out (no scope left, or the
+   * same one still signed in while it signs out) locks every lease at once as
+   * `signed_out`. A switch drops the outgoing scope's state - its leases are
+   * never served to the incoming scope - and neither locks the incoming one
+   * nor sends a DELETE with its token. Returns the boundary crossed.
+   */
+  lockBoundary(owner: StoreScope | null): LeaseLockReason {
+    const reason = boundaryLockReason(owner, this.options.scope())
+    if (reason === 'signed_out') {
+      this.lockAll('signed_out')
+    } else {
+      this.checkScopeBoundary()
+    }
+    return reason
+  }
+
   logout(): void {
-    this.lockAll('logout')
+    this.lockAll('signed_out')
   }
 }
 
