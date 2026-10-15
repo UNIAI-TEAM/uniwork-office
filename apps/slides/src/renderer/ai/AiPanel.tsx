@@ -467,6 +467,9 @@ export function AiPanel({
   // no key or no known model (web): send stays off and the hint says why, as in AiComposer
   const needModelHint = useAiModelNeedHint()
   const needModelAction = useAiModelNeedAction()
+  // the panel's own composer gates Send on the UniWork disclosure (set below, once the ack hook
+  // has run); the queue must honour the same gate or a held message goes out before the ack
+  const disclosureUnackedRef = useRef(false)
   const [busy, setBusy] = useState(false)
   /** messages queued while a reply runs; the pump re-runs them through runWith on settle */
   const msgQueue = useChatRunQueue<{
@@ -477,6 +480,7 @@ export function AiPanel({
     submit: (text, meta) => {
       // the QC pass edits the deck with busy=false: refuse and let the pump retry
       if (needModelHint !== null || qcRunningRef.current || runStartingRef.current) return false
+      if (disclosureUnackedRef.current) return false
       const loop = loopRef.current
       if (!loop || loop.busy) return false
       return runWith(text, text, { attachments: meta.attachments, scope: meta.scope })
@@ -2246,6 +2250,7 @@ export function AiPanel({
     : null
   const { acked: disclosureAcked } = useUniworkDisclosureAck(ackKey)
   const disclosureUnacked = isUniwork && !disclosureAcked
+  disclosureUnackedRef.current = disclosureUnacked
 
   // collapsed: rail only — after all hooks, so the instance and its state survive
   if (!open) {

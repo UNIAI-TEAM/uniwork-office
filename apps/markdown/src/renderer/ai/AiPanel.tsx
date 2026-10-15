@@ -10,7 +10,7 @@ import {
   type AiModelPickerBridge,
   UniAiMark,
 } from '@genoffice/ui'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import '@genoffice/ui/ai-uniwork-composer.css'
 import type { PointerEvent as ReactPointerEvent, ReactElement, ReactNode } from 'react'
 import {
@@ -258,6 +258,12 @@ export function AiPanel({
   // a picked UniWork AI that is not offered (or any provider still missing a model) keeps every
   // send entry closed - presets, retry, continue and queue runs included - the hint says why
   const needModelHint = useAiModelNeedHint()
+  // the composer reports whether the UniWork disclosure still blocks Send; the queue must honour
+  // the same gate, or a held message reaches UniWork AI before the user has acknowledged it
+  const uniworkSendBlockedRef = useRef(false)
+  const onUniworkSendBlockedChange = useCallback((blocked: boolean) => {
+    uniworkSendBlockedRef.current = blocked
+  }, [])
   const readOnlyRef = useRef(readOnly)
   readOnlyRef.current = readOnly
   const [chat, setChat] = useState<ChatEntry[]>([])
@@ -292,6 +298,8 @@ export function AiPanel({
     submit: (text) => {
       const loop = loopRef.current
       if (needModelHint !== null || !loop || loop.busy) return false
+      // held until the user acknowledges the UniWork disclosure, as Send is
+      if (uniworkSendBlockedRef.current) return false
       // undefined retryOf = a new turn: the queue batch's own display text means
       // no selection quote is captured (the fork's edit-fence send signature)
       return send(text, text)
@@ -1487,6 +1495,7 @@ export function AiPanel({
                   onSignIn: () => void readUniworkCloudStatus()?.signIn?.(),
                   onChooseProvider: () => void window.markdownApi?.openAiModelSettings?.(),
                   onAnnounce: setComposerAnnouncement,
+                  onSendBlockedChange: onUniworkSendBlockedChange,
                   disclosure: {
                     orgName: cloudSnapshot?.orgName ?? undefined,
                     ackKey: {

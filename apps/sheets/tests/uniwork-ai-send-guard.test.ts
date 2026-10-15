@@ -236,7 +236,7 @@ describe('sheets panel send entry and queue submit with model-need hint (RF3-3)'
     expect(container.querySelector('.ai-queue-strip')).not.toBeNull()
 
     act(() => {
-      container.querySelector<HTMLButtonElement>('[role="region"] button')!.click()
+      container!.querySelector<HTMLButtonElement>('[role="region"] button')!.click()
     })
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 900))

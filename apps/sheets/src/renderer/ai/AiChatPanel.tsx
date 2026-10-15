@@ -7,7 +7,7 @@ import {
   UniAiMark,
   composerNoteFor,
 } from '@genoffice/ui'
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import '@genoffice/ui/ai-uniwork-composer.css'
 import {
   AiComposer,
@@ -356,11 +356,19 @@ export function AiChatPanel({
 }): React.JSX.Element {
   const { t, lang } = useI18n()
   const needModelHint = useAiModelNeedHint()
+  // the composer reports whether the UniWork disclosure still blocks Send; the queue must honour
+  // the same gate, or a held message reaches UniWork AI before the user has acknowledged it
+  const uniworkSendBlockedRef = useRef(false)
+  const onUniworkSendBlockedChange = useCallback((blocked: boolean) => {
+    uniworkSendBlockedRef.current = blocked
+  }, [])
   /** messages queued while a reply runs; the pump re-sends them through onSend on settle */
   const msgQueue = useChatRunQueue<readonly AttachmentMeta[]>({
     busy: aiBusy,
     submit: (text, atts) => {
       if (needModelHint !== null) return false
+      // held until the user acknowledges the UniWork disclosure, as Send is
+      if (uniworkSendBlockedRef.current) return false
       return onSendQueued?.(text, atts) ?? false
     },
   })
@@ -1118,6 +1126,7 @@ export function AiChatPanel({
                   onSignIn: () => void readUniworkCloudStatus()?.signIn?.(),
                   onChooseProvider: () => void window.desktopApi?.openAiSettings?.(),
                   onAnnounce: setComposerAnnouncement,
+                  onSendBlockedChange: onUniworkSendBlockedChange,
                   disclosure: {
                     orgName: cloudSnapshot?.orgName ?? undefined,
                     ackKey: {

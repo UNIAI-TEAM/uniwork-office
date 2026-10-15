@@ -14,7 +14,7 @@ import {
   type AiTokenUsageView,
   useChatRunQueue,
 } from '@genoffice/ui'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import '@genoffice/ui/ai-uniwork-composer.css'
 import type { Editor } from '@tiptap/core'
 import type { Block } from '@genoffice/docx-engine'
@@ -465,6 +465,12 @@ export function AiPanel({
   // a picked UniWork AI that is not offered (or any provider still missing a model) keeps every
   // send entry closed - presets, retry, continue and queue runs included - the hint says why
   const needModelHint = useAiModelNeedHint()
+  // the composer reports whether the UniWork disclosure still blocks Send; the queue must honour
+  // the same gate, or a held message reaches UniWork AI before the user has acknowledged it
+  const uniworkSendBlockedRef = useRef(false)
+  const onUniworkSendBlockedChange = useCallback((blocked: boolean) => {
+    uniworkSendBlockedRef.current = blocked
+  }, [])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   /** messages queued while a reply runs; the pump re-runs them through runWith on settle */
@@ -476,6 +482,8 @@ export function AiPanel({
     submit: (text, meta) => {
       const loop = loopRef.current
       if (needModelHint !== null || !loop || loop.busy || pendingSendRef.current) return false
+      // held until the user acknowledges the UniWork disclosure, as Send is
+      if (uniworkSendBlockedRef.current) return false
       return runWith(text, text, meta.attachments, meta.scope)
     },
   })
@@ -2101,6 +2109,7 @@ export function AiPanel({
                   onSignIn: () => void readUniworkCloudStatus()?.signIn?.(),
                   onChooseProvider: () => void window.desktop?.openAiModelSettings?.(),
                   onAnnounce: setComposerAnnouncement,
+                  onSendBlockedChange: onUniworkSendBlockedChange,
                   disclosure: {
                     orgName: cloudSnapshot?.orgName ?? undefined,
                     ackKey: {
