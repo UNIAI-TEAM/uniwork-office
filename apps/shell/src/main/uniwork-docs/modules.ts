@@ -50,11 +50,13 @@ export interface UniworkModuleSeam {
    */
   setClearRecovery?(clear: (path: string) => void): void
   /**
-   * G5-11 be-2: registers the docs originals-archive cleaner so sign-out drops
-   * the archived plaintext of the account's working copies (the archive is
-   * content-addressed, so the module hashes the bytes the shell still holds).
+   * G5-11 be-2 / d1-3: registers the docs originals-archive cleaner so sign-out
+   * drops the archived plaintext of the account's working copies (both by
+   * open-time `baseChecksum` and by current-bytes hash).
    */
-  setClearOriginals?(clear: (paths: string[]) => void): void
+  setClearOriginals?(
+    clear: (entries: ReadonlyArray<string | { path: string; baseChecksum?: string }>) => void,
+  ): void
   onUserSave(path: string): void
   /**
    * G5-04g: true when the path's folder declares a store this build does not
@@ -134,7 +136,7 @@ export function installUniworkModuleSeams(
     clearDocsRecoveryCopy(path)
     clearWorkbookRecovery(path)
   })
-  seam?.setClearOriginals?.((paths: string[]) => clearDocsOriginalsFor(paths))
+  seam?.setClearOriginals?.((entries) => clearDocsOriginalsFor(entries))
   const author = commentAuthor ?? (() => NEUTRAL_COMMENT_AUTHOR)
   const policy = seam
     ? {

@@ -854,30 +854,64 @@ describe('G5-11 sign-out lock-and-keep, N+1 park, and restoreParked', () => {
     expect(ctx.service.isLocked(residual)).toBe(true)
   })
 
-  it('10. be-1: a capture that never writes keeps the working copy, lists the doc, and leaves no other plaintext', async () => {
+  it('10. d1-1: a capture that never writes parks a newer recovery copy (or deletes base-only), leaves no plaintext under userData, and account B cannot open it', async () => {
+    const marker = 'MARKER-REC-9a2b'
     const path = seedWorkingCopy({ bytes: 'v3 base', baseBytes: 'v3 base', state: 'saved' })
+    const docsRecoveryDir = join(dir, 'docs-autosave')
+    mkdirSync(docsRecoveryDir, { recursive: true })
+    const recovery = join(
+      docsRecoveryDir,
+      `${createHash('sha1').update(path).digest('hex').slice(0, 16)}.docx`,
+    )
+    // recovery copy is written after the base file so its mtime is newer
+    await new Promise((r) => setTimeout(r, 15))
+    writeFileSync(recovery, `v4 recovery ${marker}`)
+
+    // Second doc: capture never writes and there is no recovery copy (base only)
+    const DOC_BASE = '01J8X4DOCBASEONLY0000001'
+    const pathBase = seedWorkingCopy({
+      docId: DOC_BASE,
+      name: 'Base.docx',
+      bytes: 'v3 base only',
+      baseBytes: 'v3 base only',
+      state: 'saved',
+    })
+
     const ctx = setup({
-      openPaths: [path],
+      openPaths: [path, pathBase],
       // a busy / hung renderer: the capture is accepted and never writes a byte
       requestModuleSave: vi.fn(() => true),
     })
     ctx.service.noteEditorDirty(path, true)
+    ctx.service.noteEditorDirty(pathBase, true)
 
     const plan = await ctx.service.signOutPlan()
-    expect(plan.count).toBe(1)
+    expect(plan.count).toBe(2)
 
     const res = await ctx.service.lockSession(ownerA)
-    expect(res).toEqual({ ok: true, captureFailed: [DOC] })
-    // nothing may be deleted after a capture that never landed
-    expect(existsSync(path)).toBe(true)
-    expect(readFileSync(path, 'utf8')).toBe('v3 base')
-    expect(existsSync(join(docDir(), BINDING_FILE))).toBe(true)
-    // nothing was parked; the doc's bytes exist nowhere else under userData
+    expect(res.ok).toBe(true)
+    expect(res.captureFailed.sort()).toEqual([DOC, DOC_BASE].sort())
+
+    // Both folders and recovery copy are gone
+    expect(existsSync(docDir(DOC))).toBe(false)
+    expect(existsSync(docDir(DOC_BASE))).toBe(false)
+    expect(existsSync(recovery)).toBe(false)
+    // Marker from recovery bytes is in no plaintext file under temp userData
+    expect(filesContaining(dir, marker)).toEqual([])
+    expect(filesContaining(dir, 'v3 base only')).toEqual([])
+
+    // Parked record for DOC holds the recovery bytes; DOC_BASE (base-only) was not parked
     const reopen = await ctx.layer.open(ownerA)
     if (reopen.kind !== 'ok') throw new Error(reopen.kind)
     const parked = createParkedStore(reopen.store.records(PARKED_STORE_REGISTRATION.name))
-    expect(await parked.list()).toEqual([])
-    expect(filesContaining(dir, 'v3 base')).toEqual([path])
+    expect(await parked.list()).toEqual([DOC])
+    const taken = await parked.take(DOC)
+    expect(new TextDecoder().decode(taken?.bytes)).toBe(`v4 recovery ${marker}`)
+
+    // Account B signs in: opening A's former path is not found / refused (no plaintext rendered)
+    ctx.setAccount('acc_2')
+    expect(existsSync(path)).toBe(false)
+    expect(ctx.service.store.lookup(path)).toBeNull()
   })
 
   it('11. be-6/be-8: recovery copies go under the module naming, including a path whose folder is already gone', async () => {
@@ -1009,7 +1043,7 @@ describe('G5-11 sign-out lock-and-keep, N+1 park, and restoreParked', () => {
     await new Promise((resolve) => setTimeout(resolve, 20))
     expect(fetchMock.mock.calls.length).toBe(callsAtSignOut)
 
-    // row 10: no intent was minted during or after the sign-out
+    // row 10: no intent minted during or after the sign-out
     expect(
       readdirSync(intentDir)
         .filter((f) => f.endsWith('.rec'))
@@ -1039,16 +1073,42 @@ describe('G5-11 sign-out lock-and-keep, N+1 park, and restoreParked', () => {
     expect(filesContaining(dir, marker)).toEqual([])
   })
 
-  it('16. be-2: sign-out hands the deleted working copies to the module originals clearer', async () => {
-    const path = seedWorkingCopy({ bytes: 'v3 base', baseBytes: 'v3 base', state: 'saved' })
+  it('16. be-2 / d1-3: sign-out hands the deleted working copies and their baseChecksum to the module originals clearer', async () => {
+    const path = seedWorkingCopy({ bytes: 'v4 edited', baseBytes: 'v3 base', state: 'dirty' })
     const ctx = setup({ openPaths: [path] })
     const clearOriginals = vi.fn()
     ctx.service.setClearOriginals(clearOriginals)
 
     expect(await ctx.service.lockSession(ownerA)).toEqual({ ok: true, captureFailed: [] })
-    // the module hashes the bytes just before they are deleted: the path is
-    // handed over while the working copy still exists
-    expect(clearOriginals).toHaveBeenCalledWith([path])
+    expect(clearOriginals).toHaveBeenCalledWith([{ path, baseChecksum: hex(enc('v3 base')) }])
     expect(existsSync(path)).toBe(false)
+  })
+
+  it('17. d1-6: a dirty binding whose working copy is missing (crash between binding and file write) is not counted as unsaved by planSignOut', async () => {
+    const path = seedWorkingCopy({ bytes: 'v5 n+1', baseBytes: 'v3 base', state: 'dirty' })
+    rmSync(path, { force: true })
+    const ctx = setup({ openPaths: [] })
+
+    const plan = await ctx.service.planSignOut(ownerA)
+    expect(plan.count).toBe(0)
+  })
+
+  it('18. d1-5: refusedParkedKeys drops the refusal when newerStoreIn(dir) turns false', async () => {
+    const path = seedWorkingCopy({ bytes: 'v5 n+1', baseBytes: 'v3 base', state: 'dirty' })
+    const ctx = setup({ openPaths: [path] })
+    expect(await ctx.service.lockSession(ownerA)).toEqual({ ok: true, captureFailed: [] })
+    expect(existsSync(path)).toBe(false)
+
+    // Seed a newer-store binding in the target folder so restoreParked refuses it
+    mkdirSync(docDir(), { recursive: true })
+    writeFileSync(join(docDir(), BINDING_FILE), JSON.stringify({ schema: 3 }))
+    await ctx.service.restoreParked(ownerA)
+    expect(existsSync(path)).toBe(false)
+
+    // Replace the newer-store folder with an empty/readable state within the same process
+    rmSync(docDir(), { recursive: true, force: true })
+    await ctx.service.restoreParked(ownerA)
+    expect(existsSync(path)).toBe(true)
+    expect(readFileSync(path, 'utf8')).toBe('v5 n+1')
   })
 })

@@ -1583,6 +1583,7 @@ export class UniworkDocsService {
    * not re-read a record that cannot be restored in this build.
    */
   private readonly refusedParkedKeys = new Set<string>()
+  private readonly refusedParkedFolderKeys = new Set<string>()
   /** paths armed for a one-shot capture save (G5-11 D3) */
   private readonly armedCaptures = new Map<string, () => void>()
 
@@ -1722,13 +1723,16 @@ export class UniworkDocsService {
         waitingDocs.add(key)
         unsavedDocs.add(key)
       }
-      let diskDirty = KEEP_LOCAL_STATES.has(binding.state)
-      if (!diskDirty && this.store.exists(path)) {
-        try {
-          const diskHash = sha256Hex(new Uint8Array(readFileSync(path)))
-          if (diskHash !== binding.baseChecksum) diskDirty = true
-        } catch {
-          // ignore unreadable working copy
+      let diskDirty = false
+      if (this.store.exists(path)) {
+        diskDirty = KEEP_LOCAL_STATES.has(binding.state)
+        if (!diskDirty) {
+          try {
+            const diskHash = sha256Hex(new Uint8Array(readFileSync(path)))
+            if (diskHash !== binding.baseChecksum) diskDirty = true
+          } catch {
+            // ignore unreadable working copy
+          }
         }
       }
       let edDirty = this.editorDirty.has(path) || this.editorDirty.has(pathKey(path))
@@ -1871,12 +1875,13 @@ export class UniworkDocsService {
     // Step 2: capture N+1 from open editors and park dirty / queued working copies
     const parkFailedDirs = new Set<string>()
     /**
-     * G5-11 be-1: dirs whose editor bytes never reached the disk. Nothing was
-     * captured, so nothing is parked - and step 4 must not delete a folder
-     * whose copy only lives in a closed editor's RAM: it stays as the owner's
-     * own folder (locked by the S11 signed_out reason) and reopens for them.
+     * G5-11 d1-1: document keys whose editor capture never landed on disk.
+     * When the capture did not land, we park the newest bytes available (the
+     * module's recovery copy if newer than disk, else disk bytes if different
+     * from baseChecksum) and delete the folder + recovery copies so NO plaintext
+     * of the account survives under userData.
      */
-    const captureFailedDirs = new Set<string>()
+    const captureFailedKeys = new Set<string>()
     let parked: ParkedStore | null = null
     if (!keystoreLocked && open.kind === 'ok' && intents) {
       parked = createParkedStore(open.records(PARKED_STORE_REGISTRATION.name))
@@ -1893,8 +1898,10 @@ export class UniworkDocsService {
           if (st.dirty === true) edDirty = true
         }
         const captureNeeded = isOpen && edDirty
+        let beforeHash: string | null = null
+        let captureLanded = false
         if (captureNeeded) {
-          const beforeHash = this.store.exists(path)
+          beforeHash = this.store.exists(path)
             ? sha256Hex(new Uint8Array(readFileSync(path)))
             : null
           await new Promise<void>((resolveCapture) => {
@@ -1905,7 +1912,10 @@ export class UniworkDocsService {
               this.armedCaptures.delete(pathKey(path))
               resolveCapture()
             }
-            this.armCapture(path, finish)
+            this.armCapture(path, () => {
+              captureLanded = true
+              finish()
+            })
             const started = this.deps.requestModuleSave(path, finish, 'capture')
             if (!started) {
               finish()
@@ -1915,6 +1925,7 @@ export class UniworkDocsService {
               ? sha256Hex(new Uint8Array(readFileSync(path)))
               : null
             if (afterHash !== beforeHash || !this.armedCaptures.has(pathKey(path))) {
+              captureLanded = true
               finish()
               return
             }
@@ -1923,25 +1934,62 @@ export class UniworkDocsService {
                 ? sha256Hex(new Uint8Array(readFileSync(path)))
                 : null
               if (nextHash !== beforeHash || !this.armedCaptures.has(pathKey(path))) {
+                captureLanded = true
                 finish()
               }
             })
             void this.sleepMs(5_000).then(finish)
           })
+          if (!captureLanded && this.store.exists(path)) {
+            const endHash = sha256Hex(new Uint8Array(readFileSync(path)))
+            if (endHash !== beforeHash) captureLanded = true
+          }
+          if (!captureLanded || !this.store.exists(path)) {
+            captureFailedKeys.add(key)
+          }
         }
-        if (!this.store.exists(path)) {
-          // the module never wrote (or the file is gone): the editor's bytes are
-          // only in its RAM, so the folder is kept rather than deleted
-          if (captureNeeded) captureFailedDirs.add(dir)
+        const diskExists = this.store.exists(path)
+        let diskMtimeMs: number | null = null
+        let diskBytes: Uint8Array | null = null
+        let diskHash: string | null = null
+        if (diskExists) {
+          try {
+            diskMtimeMs = statSync(path).mtimeMs
+            diskBytes = new Uint8Array(readFileSync(path))
+            diskHash = sha256Hex(diskBytes)
+          } catch {
+            // unreadable working copy
+          }
+        }
+        if (captureNeeded && !captureLanded) {
+          // d1-1: capture did not land; park the newest bytes available (recovery copy if newer than disk, else disk if != baseChecksum)
+          const recoveryBytes = this.findNewestRecoveryBytes(path, diskMtimeMs)
+          const candidateBytes =
+            recoveryBytes ?? (diskBytes && diskHash !== binding.baseChecksum ? diskBytes : null)
+          if (candidateBytes) {
+            const parkRes = await parked.park({
+              documentKey: key,
+              binding: {
+                ...binding,
+                state: 'dirty',
+                minStoreLevel: APP_STORE_LEVEL,
+                minAppVersion: this.buildVersion(),
+              },
+              bytes: candidateBytes,
+              parkedAt: this.nowIso(),
+            })
+            if (parkRes !== 'ok') {
+              parkFailedDirs.add(dir)
+            }
+          }
           continue
         }
-        const bytes = new Uint8Array(readFileSync(path))
-        const diskHash = sha256Hex(bytes)
+        if (!diskBytes || diskHash === null) continue
         const stored = await intents.read(key, {
           orgId: binding.orgId,
           workspaceId: binding.workspaceId,
           baseVersion: binding.baseVersion,
-          length: bytes.byteLength,
+          length: diskBytes.byteLength,
         })
         const hasActiveIntent = stored !== null && !isTerminalQueueState(stored.intent.state)
         const needsPark =
@@ -1957,16 +2005,32 @@ export class UniworkDocsService {
               minStoreLevel: APP_STORE_LEVEL,
               minAppVersion: this.buildVersion(),
             },
-            bytes,
+            bytes: diskBytes,
             parkedAt: this.nowIso(),
           })
           if (parkRes !== 'ok') {
             parkFailedDirs.add(dir)
           }
         } else if (captureNeeded) {
-          // the disk still holds the base bytes: the capture did not land, and
-          // there is nothing to park. The folder stays (be-1).
-          captureFailedDirs.add(dir)
+          // the disk still holds only the base bytes: the capture did not land
+          captureFailedKeys.add(key)
+          const recoveryBytes = this.findNewestRecoveryBytes(path, diskMtimeMs)
+          if (recoveryBytes) {
+            const parkRes = await parked.park({
+              documentKey: key,
+              binding: {
+                ...binding,
+                state: 'dirty',
+                minStoreLevel: APP_STORE_LEVEL,
+                minAppVersion: this.buildVersion(),
+              },
+              bytes: recoveryBytes,
+              parkedAt: this.nowIso(),
+            })
+            if (parkRes !== 'ok') {
+              parkFailedDirs.add(dir)
+            }
+          }
         }
       }
     }
@@ -1987,29 +2051,37 @@ export class UniworkDocsService {
     }
 
     // Step 4: delete the plaintext working copies whose bytes were captured or
-    // parked, and every docs/sheets recovery copy of the owner's paths. A doc
-    // whose capture or park failed keeps its folder (be-1): its bytes were
-    // never captured, so nothing may be deleted for it.
+    // parked, and every docs/sheets recovery copy of the owner's paths. Only a
+    // dir whose park was refused (parkFailedDirs) or declares a newer store stays.
     const keptDirs = new Set<string>()
     const deletedPaths = new Set<string>()
+    const originalsTargets = new Map<string, { path: string; baseChecksum?: string }>()
     for (const dir of scopeWorkingCopyDirs(this.store.root, target)) {
-      if (this.store.newerStoreIn(dir) || parkFailedDirs.has(dir) || captureFailedDirs.has(dir)) {
+      if (this.store.newerStoreIn(dir) || parkFailedDirs.has(dir)) {
         keptDirs.add(dir)
         continue
       }
       const binding = await this.store.readDir(dir)
       const filename = binding?.filename ?? documentNameIn(dir)
-      deletedPaths.add(join(dir, filename))
+      const fullPath = join(dir, filename)
+      deletedPaths.add(fullPath)
+      originalsTargets.set(fullPath, {
+        path: fullPath,
+        ...(binding?.baseChecksum ? { baseChecksum: binding.baseChecksum } : {}),
+      })
     }
     // be-8: recovery copies of a path whose folder is already gone have no
     // folder left to walk; the parked records and the owner's still-open paths
     // are the only names that can still find them
-    for (const path of await this.sweepRecoveryPaths(target, parked)) deletedPaths.add(path)
+    for (const path of await this.sweepRecoveryPaths(target, parked)) {
+      deletedPaths.add(path)
+      if (!originalsTargets.has(path)) originalsTargets.set(path, { path })
+    }
     for (const path of deletedPaths) this.deleteRecoveryCopies(path)
-    // be-2: the docs originals archive is keyed by the sha256 of the archived
-    // bytes, so it is cleared while the working copies still exist
+    // be-2 / d1-3: the docs originals archive is keyed by the sha256 of the
+    // open-time bytes (baseChecksum) or current bytes, cleared before rmSync
     try {
-      this.clearOriginalsFn?.([...deletedPaths])
+      this.clearOriginalsFn?.([...originalsTargets.values()])
     } catch {
       // the archive is module state; a failure never blocks the lock
     }
@@ -2053,13 +2125,17 @@ export class UniworkDocsService {
     })
     this.syncOpen = null
     this.storeOpenKind = 'unknown'
+    const captureFailed = [...captureFailedKeys]
     if (announcedWaiting) {
-      this.deps.pushSignOutProgress?.({ phase: 'done' })
+      this.deps.pushSignOutProgress?.({
+        phase: 'done',
+        ...(captureFailed.length > 0 ? { captureFailed: captureFailed.length } : {}),
+      })
     }
 
     return {
       ok: parkFailedDirs.size === 0,
-      captureFailed: [...captureFailedDirs].map((dir) => basename(dir)),
+      captureFailed,
     }
   }
 
@@ -2069,15 +2145,18 @@ export class UniworkDocsService {
     this.clearRecoveryFn = clear
   }
 
-  private clearOriginalsFn: ((paths: string[]) => void) | null = null
+  private clearOriginalsFn:
+    ((entries: Array<string | { path: string; baseChecksum?: string }>) => void) | null = null
 
   /**
-   * G5-11 be-2: the docs originals archive (`userData/originals/<sha256>.docx`)
+   * G5-11 be-2 / d1-3: the docs originals archive (`userData/originals/<sha256>.docx`)
    * is kept for plain local files only; sign-out clears the copies archived for
-   * the owner's working copies, by the hash of the bytes that are about to be
-   * deleted (the module seam owns the archive).
+   * the owner's working copies, by the open-time `baseChecksum` and the hash of
+   * the bytes that are about to be deleted (the module seam owns the archive).
    */
-  setClearOriginals(clear: (paths: string[]) => void): void {
+  setClearOriginals(
+    clear: (entries: Array<string | { path: string; baseChecksum?: string }>) => void,
+  ): void {
     this.clearOriginalsFn = clear
   }
 
@@ -2118,6 +2197,43 @@ export class UniworkDocsService {
       }
     }
     return paths
+  }
+
+  /**
+   * G5-11 d1-1: returns the module crash-recovery copy's bytes for `filePath`
+   * when one exists under the same naming `deleteRecoveryCopies` uses and is
+   * newer than `diskMtimeMs` (or when the disk file is missing).
+   */
+  private findNewestRecoveryBytes(filePath: string, diskMtimeMs: number | null): Uint8Array | null {
+    const docsDir = join(this.deps.userDataDir, 'docs-autosave')
+    const sheetsDir = join(this.deps.userDataDir, 'sheets-autosave')
+    const spellings = new Set([
+      filePath,
+      resolve(filePath),
+      pathKey(filePath),
+      pathKey(resolve(filePath)),
+    ])
+    let bestBytes: Uint8Array | null = null
+    let bestMtime = diskMtimeMs ?? -Infinity
+    for (const spelling of spellings) {
+      const shortHash = createHash('sha1').update(spelling).digest('hex').slice(0, 16)
+      for (const target of [
+        join(docsDir, `${shortHash}.docx`),
+        join(sheetsDir, `${shortHash}.xlsx`),
+      ]) {
+        try {
+          if (!existsSync(target)) continue
+          const st = statSync(target)
+          if (diskMtimeMs === null || st.mtimeMs > bestMtime) {
+            bestBytes = new Uint8Array(readFileSync(target))
+            bestMtime = st.mtimeMs
+          }
+        } catch {
+          // ignore unreadable recovery copy
+        }
+      }
+    }
+    return bestBytes
   }
 
   /**
@@ -2191,15 +2307,20 @@ export class UniworkDocsService {
     const keys = await parked.list()
     for (const key of keys) {
       const refusal = `${target.deploymentId}/${target.accountId}/${key}`
+      const dir = this.store.dirFor(target.deploymentId, target.accountId, key)
+      // d1-5: drop folder-level refusal when `newerStoreIn(dir)` turns false
+      if (this.store.newerStoreIn(dir)) {
+        this.refusedParkedKeys.add(refusal)
+        this.refusedParkedFolderKeys.add(refusal)
+        continue
+      }
+      if (this.refusedParkedFolderKeys.delete(refusal)) {
+        this.refusedParkedKeys.delete(refusal)
+      }
       if (this.refusedParkedKeys.has(refusal)) continue
       const copy = await parked.take(key)
       if (!copy) continue
       if ((copy.binding.minStoreLevel ?? APP_STORE_LEVEL) > APP_STORE_LEVEL) {
-        this.refusedParkedKeys.add(refusal)
-        continue
-      }
-      const dir = this.store.dirFor(target.deploymentId, target.accountId, copy.documentKey)
-      if (this.store.newerStoreIn(dir)) {
         this.refusedParkedKeys.add(refusal)
         continue
       }

@@ -3285,14 +3285,26 @@ async function archiveOriginal(filePath: string, hash: string, size: number): Pr
 }
 
 /**
- * G5-11 be-2: sign-out drops the archived originals of the owner's working
- * copies (the shell hands the paths just before it deletes them). The archive
- * is content-addressed, so each path is hashed exactly as `archiveOriginal`
- * hashed it and only the copy of those bytes can be named.
+ * G5-11 be-2 / d1-3: sign-out drops the archived originals of the owner's
+ * working copies (the shell hands the paths and their open-time `baseChecksum`
+ * just before it deletes them). The archive is content-addressed by the bytes
+ * at open time (`baseChecksum`) as well as any current on-disk bytes.
  */
-export function clearDocsOriginalsFor(paths: string[]): void {
+export function clearDocsOriginalsFor(
+  entries: ReadonlyArray<string | { path: string; baseChecksum?: string }>,
+): void {
   const dir = userDataPath('originals')
-  for (const filePath of paths) {
+  for (const entry of entries) {
+    const filePath = typeof entry === 'string' ? entry : entry.path
+    const baseChecksum = typeof entry === 'string' ? undefined : entry.baseChecksum
+    if (baseChecksum) {
+      try {
+        const baseTarget = join(dir, `${baseChecksum}.docx`)
+        if (existsSync(baseTarget)) unlinkSync(baseTarget)
+      } catch {
+        // ignore missing or unreadable archive
+      }
+    }
     try {
       const target = join(dir, `${sha256Hex(readFileSync(filePath))}.docx`)
       if (existsSync(target)) unlinkSync(target)

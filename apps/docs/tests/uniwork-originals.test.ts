@@ -129,20 +129,24 @@ describe('the docs originals archive at the UniWork boundary (G5-11 be-2)', () =
     expect(existsSync(join(originalsDir(), `${sha256('local docx bytes')}.docx`))).toBe(true)
   })
 
-  it('clearDocsOriginalsFor removes the archived copy of the bytes on disk, and only those', () => {
+  it('clearDocsOriginalsFor removes the archived copy of the open-time baseChecksum and the bytes on disk, and only those (d1-3)', () => {
     const path = join(userData.dir, 'uniwork-documents', 'default', 'acc_1', 'doc_1', 'Plan.docx')
     mkdirSync(join(userData.dir, 'uniwork-documents', 'default', 'acc_1', 'doc_1'), {
       recursive: true,
     })
+    // archive written at open for v3, file later edited and saved as v4
     writeFileSync(path, 'v4 n+1 bytes')
     mkdirSync(originalsDir(), { recursive: true })
-    const mine = join(originalsDir(), `${sha256('v4 n+1 bytes')}.docx`)
+    const v3Archive = join(originalsDir(), `${sha256('v3 base bytes')}.docx`)
+    const v4Archive = join(originalsDir(), `${sha256('v4 n+1 bytes')}.docx`)
     const other = join(originalsDir(), `${sha256('someone elses file')}.docx`)
-    writeFileSync(mine, 'v4 n+1 bytes')
+    writeFileSync(v3Archive, 'v3 base bytes')
+    writeFileSync(v4Archive, 'v4 n+1 bytes')
     writeFileSync(other, 'someone elses file')
 
-    clearDocsOriginalsFor([path])
-    expect(existsSync(mine)).toBe(false)
+    clearDocsOriginalsFor([{ path, baseChecksum: sha256('v3 base bytes') }])
+    expect(existsSync(v3Archive)).toBe(false)
+    expect(existsSync(v4Archive)).toBe(false)
     expect(existsSync(other)).toBe(true)
   })
 })
