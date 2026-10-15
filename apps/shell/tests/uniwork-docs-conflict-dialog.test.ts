@@ -63,7 +63,8 @@ type Fault = {
     | 'copyUpload'
     | 'copyCommit'
     | 'archive'
-  kind: 'network' | number
+  /** 'lost' (copyCommit only): the server applies the commit, the answer never arrives */
+  kind: 'network' | 'lost' | number
   code?: string
   fields?: Record<string, unknown>
 }
@@ -87,7 +88,13 @@ function fakeServer(
       bytes: Uint8Array | null
       archived: boolean
       staged: Map<string, Uint8Array>
+      /** commit keys the server applied, with their stored answer (idempotent replay) */
+      applied: Map<string, Response>
     },
+    /** BE-12F-01: what the next lookups of the copy's commit answer (default: derived) */
+    copyLookupScript: [] as Array<
+      'in_flight' | 'not_committed' | 'unknown' | 'committed' | 'network'
+    >,
   }
   const calls: Call[] = []
   const faults: Fault[] = []
@@ -235,6 +242,7 @@ function fakeServer(
         bytes: state.bytes,
         archived: false,
         staged: new Map(),
+        applied: new Map(),
       }
       return json(201, { document: copyJson() })
     }
@@ -253,6 +261,21 @@ function fakeServer(
         claim_expires_at: '2026-10-10T00:00:00Z',
       })
     }
+    if (
+      u.pathname === `/api/v1/documents/${COPY}/versions/commit` &&
+      (init.method ?? 'GET') === 'GET'
+    ) {
+      // BE-12F-01: the commit-intent lookup of the copy
+      const copy = state.copy!
+      const scripted = state.copyLookupScript.shift()
+      const outcome = scripted ?? (copy.applied.has(key) ? 'committed' : 'not_committed')
+      if (outcome === 'network') throw new TypeError('fetch failed')
+      if (outcome === 'unknown') return error(410, 'commit_intent_unknown')
+      if (outcome === 'committed') {
+        return json(200, { outcome, version_id: 'ver_copy_2', version: 2, revision: '2' })
+      }
+      return json(200, { outcome })
+    }
     if (u.pathname === `/api/v1/documents/${COPY}/versions/commit`) {
       const body = JSON.parse(String(init.body)) as { upload_id: string; base_revision: string }
       calls.at(-1)!.body = body
@@ -260,13 +283,19 @@ function fakeServer(
       if (fault?.kind === 'network') throw new TypeError('fetch failed')
       if (typeof fault?.kind === 'number') return error(fault.kind, fault.code ?? 'x', fault.fields)
       const copy = state.copy!
+      // the same key replays the stored answer, like the real server
+      const replay = copy.applied.get(key)
+      if (replay) {
+        if (fault?.kind === 'lost') throw new TypeError('fetch failed')
+        return replay.clone()
+      }
       if (body.base_revision !== String(copy.revision))
         return error(409, 'document_version_conflict')
       const bytes = copy.staged.get(body.upload_id)
       if (!bytes) return error(409, 'document_upload_invalid')
       copy.revision += 1
       copy.bytes = bytes
-      return json(200, {
+      const answer = json(200, {
         document: copyJson(),
         version: {
           id: 'ver_copy_2',
@@ -277,11 +306,17 @@ function fakeServer(
           size_bytes: bytes.byteLength,
         },
       })
+      copy.applied.set(key, answer.clone())
+      if (fault?.kind === 'lost') throw new TypeError('fetch failed')
+      return answer
     }
     if (u.pathname === `/api/v1/documents/${COPY}/archive` && init.method === 'POST') {
       const fault = take('archive')
       if (fault?.kind === 'network') throw new TypeError('fetch failed')
       if (typeof fault?.kind === 'number') return error(fault.kind, fault.code ?? 'x', fault.fields)
+      // BE-12F-03: like the server's pristineCopyCleanup, only a copy still at version 1 can be
+      // archived by its creator with edit access; once the person's bytes landed it is refused
+      if (state.copy!.revision > 1) return error(403, 'forbidden')
       state.copy!.archived = true
       return json(200, { document: { ...copyJson(), archived_at: '2026-10-10T10:05:00Z' } })
     }
@@ -1552,6 +1587,139 @@ describe('G5-12 Save as a copy (main)', () => {
     expect((reply as { view: UniworkConflictView }).view.notice).toBeNull()
     expect(callsTo(server, '/copies')).toHaveLength(0)
     await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
+  })
+
+  it('BE-12F-01: a commit that landed but lost its answer twice is found by the lookup: the copy is kept, no archive request, done notice', async () => {
+    const server = fakeServer()
+    server.faults.push({ route: 'copyCommit', kind: 'lost' }, { route: 'copyCommit', kind: 'lost' })
+    const ctx = setup(server)
+    const path = await openAndConflict(ctx, server)
+    const intentBefore = await storedIntent(ctx, path)
+    const { flow, view } = await openDialog(ctx, path)
+
+    const reply = await ctx.service.conflictAct(view.sessionId, {
+      kind: 'save-copy',
+      stopAi: false,
+    })
+
+    expect(reply).toMatchObject({
+      kind: 'view',
+      view: { notice: 'save_copy_done', noticeArg: 'Q4 plan (my version).docx' },
+    })
+    expect(callsTo(server, `${COPY}/archive`)).toHaveLength(0)
+    expect(server.state.copy!.archived).toBe(false)
+    expect(new TextDecoder().decode(server.state.copy!.bytes!)).toBe('mine v4')
+    // the lookup asked for the commit's own key (the one the two commits used)
+    const commitKeys = callsTo(server, `${COPY}/versions/commit`)
+      .filter((c) => c.method === 'POST')
+      .map((c) => c.headers['idempotency-key'])
+    const lookups = callsTo(server, `${COPY}/versions/commit`).filter((c) => c.method === 'GET')
+    expect(commitKeys).toHaveLength(2)
+    expect(lookups).toHaveLength(1)
+    expect(lookups[0]!.headers['idempotency-key']).toBe(commitKeys[0])
+    expect(await storedIntent(ctx, path)).toEqual(intentBefore)
+    await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
+    expect(await flow).toMatchObject({ state: 'conflict' })
+  })
+
+  it('BE-12F-01: an in-flight commit gets one bounded wait, then the lookup is asked again (committed -> kept, done)', async () => {
+    const server = fakeServer()
+    server.faults.push({ route: 'copyCommit', kind: 'lost' }, { route: 'copyCommit', kind: 'lost' })
+    server.state.copyLookupScript.push('in_flight', 'committed')
+    const ctx = setup(server)
+    const path = await openAndConflict(ctx, server)
+    const { view } = await openDialog(ctx, path)
+    const sleep = vi.spyOn(ctx.deps, 'sleep')
+
+    const reply = await ctx.service.conflictAct(view.sessionId, {
+      kind: 'save-copy',
+      stopAi: false,
+    })
+
+    expect(reply).toMatchObject({ kind: 'view', view: { notice: 'save_copy_done' } })
+    expect(
+      callsTo(server, `${COPY}/versions/commit`).filter((c) => c.method === 'GET'),
+    ).toHaveLength(2)
+    expect(sleep).toHaveBeenCalledTimes(1)
+    expect(callsTo(server, `${COPY}/archive`)).toHaveLength(0)
+    await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
+  })
+
+  it('BE-12F-01: still in flight after the wait -> no archive (it could land any moment), logged, never reported done', async () => {
+    const server = fakeServer()
+    server.faults.push({ route: 'copyCommit', kind: 'lost' }, { route: 'copyCommit', kind: 'lost' })
+    server.state.copyLookupScript.push('in_flight', 'in_flight')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const ctx = setup(server)
+    const path = await openAndConflict(ctx, server)
+    const { view } = await openDialog(ctx, path)
+
+    const reply = await ctx.service.conflictAct(view.sessionId, {
+      kind: 'save-copy',
+      stopAi: false,
+    })
+
+    expect(reply).toMatchObject({ kind: 'view', view: { notice: 'save_copy_failed' } })
+    expect(callsTo(server, `${COPY}/archive`)).toHaveLength(0)
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining(COPY))
+    warn.mockRestore()
+    await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
+  })
+
+  it('BE-12F-01: not_committed / unknown / an unreachable lookup still archive the pristine copy', async () => {
+    for (const outcome of ['not_committed', 'unknown', 'network'] as const) {
+      const server = fakeServer()
+      server.faults.push(
+        { route: 'copyCommit', kind: 503, code: 'unavailable' },
+        { route: 'copyCommit', kind: 503, code: 'unavailable' },
+      )
+      server.state.copyLookupScript.push(outcome)
+      const ctx = setup(server)
+      const path = await openAndConflict(ctx, server)
+      const { view } = await openDialog(ctx, path)
+
+      const reply = await ctx.service.conflictAct(view.sessionId, {
+        kind: 'save-copy',
+        stopAi: false,
+      })
+
+      expect(reply).toMatchObject({ kind: 'view', view: { notice: 'save_copy_failed' } })
+      expect(callsTo(server, `${COPY}/archive`)).toHaveLength(1)
+      expect(server.state.copy!.archived).toBe(true)
+      await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
+    }
+  })
+
+  it('BE-12F-02: an account switch between the upload and the commit sends nothing under the new account (no lookup, no archive) and logs the switch', async () => {
+    const server = fakeServer()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const ctx = setup(server)
+    const path = await openAndConflict(ctx, server)
+    const { view } = await openDialog(ctx, path)
+    const origFetch = server.fetch.getMockImplementation()!
+    server.fetch.mockImplementation(async (url: string, init: RequestInit) => {
+      const response = await origFetch(url, init)
+      // the other account signs in right after the copy's upload answered
+      if (new URL(url).pathname.endsWith(`${COPY}/uploads`)) {
+        ctx.deps.identity = () => ({
+          accountId: 'acc_2',
+          deviceSessionId: 'dev_2',
+          deploymentId: 'default',
+        })
+      }
+      return response
+    })
+    await ctx.service.conflictAct(view.sessionId, { kind: 'save-copy', stopAi: false })
+
+    // upload happened under acc_1, then nothing at all reached the copy
+    expect(callsTo(server, `${COPY}/archive`)).toHaveLength(0)
+    expect(callsTo(server, `${COPY}/versions/commit`)).toHaveLength(0)
+    // the copy saw exactly its upload (under the first account), nothing after the switch
+    expect(server.calls.filter((c) => c.path.includes(COPY))).toHaveLength(1)
+    expect(server.state.copy!.archived).toBe(false)
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(new RegExp(`${COPY}.*account`)))
+    warn.mockRestore()
+    ctx.service.closeConflictPrompt()
   })
 
   it('abort-safety: the dialog closed while the copy exists archives it, logs it and shows no notice', async () => {

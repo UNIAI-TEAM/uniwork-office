@@ -600,6 +600,9 @@ interface ConflictSession {
   finish: () => void
 }
 
+/** BE-12F-01: the one wait before the copy's commit lookup is asked again */
+const COPY_LOOKUP_WAIT_MS = 1500
+
 export class UniworkDocsService {
   readonly store: BindingStore
   readonly coordinator: SaveCoordinator
@@ -3860,6 +3863,9 @@ export class UniworkDocsService {
 
     // step 2: the local bytes become version 2 of the copy; one retry, same keys
     const commitKey = this.newIdempotencyKey()
+    // BE-12F-02: the account that made the copy; the cleanup below only talks to the server
+    // while it is still signed in (the new account has no access to this copy)
+    const owner = this.deps.identity()
     let committed = false
     for (let attempt = 0; attempt < 2 && !committed && !aborted(); attempt += 1) {
       try {
@@ -3890,6 +3896,32 @@ export class UniworkDocsService {
         if (error instanceof UniworkDocError && error.code === 'not_signed_in') break
       }
     }
+    if (!committed) {
+      const current = this.deps.identity()
+      if (
+        !owner ||
+        !current ||
+        current.accountId !== owner.accountId ||
+        current.deploymentId !== owner.deploymentId
+      ) {
+        // BE-12F-02: nothing is sent under the other account; say what was left behind
+        console.warn(
+          `uniwork docs: save-copy: copy ${copyId} of account ${owner?.accountId ?? 'unknown'} was left behind after an account switch`,
+        )
+        return aborted() ? { kind: 'closed' } : failed()
+      }
+      // BE-12F-01: "no answer" is not "not committed": the commit may have landed with its
+      // answer lost, and the server refuses to archive a copy that already holds version 2
+      const verdict = await this.lookupCopyCommit(copyId, commitKey)
+      if (verdict === 'committed') {
+        committed = true
+      } else if (verdict === 'in_flight') {
+        console.warn(
+          `uniwork docs: save-copy: copy ${copyId} is still being saved by the server; it was not archived`,
+        )
+        return aborted() ? { kind: 'closed' } : failed()
+      }
+    }
     if (committed) {
       if (aborted()) {
         console.warn(`uniwork docs: save-copy: the dialog closed after copy ${copyId} was saved`)
@@ -3918,6 +3950,34 @@ export class UniworkDocsService {
       return { kind: 'closed' }
     }
     return failed()
+  }
+
+  /**
+   * BE-12F-01: what became of the copy's step-2 commit, asked by its own key.
+   * `in_flight` gets one bounded wait and a second look; a lookup that cannot
+   * be answered (network, malformed) is `not_committed`, so the caller falls
+   * back to the cleanup it would have done without it.
+   */
+  private async lookupCopyCommit(
+    copyId: string,
+    commitKey: string,
+  ): Promise<'committed' | 'not_committed' | 'in_flight'> {
+    for (let look = 0; look < 2; look += 1) {
+      let outcome: string
+      try {
+        outcome = (await this.api().lookupCommit({ documentId: copyId, idempotencyKey: commitKey }))
+          .outcome
+      } catch {
+        return 'not_committed'
+      }
+      if (outcome === 'committed') return 'committed'
+      if (outcome !== 'in_flight') return 'not_committed'
+      if (look === 0)
+        await (this.deps.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms))))(
+          COPY_LOOKUP_WAIT_MS,
+        )
+    }
+    return 'in_flight'
   }
 
   /**
