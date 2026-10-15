@@ -83,6 +83,7 @@ export const zh = {
   aiUniworkLocalFileRestart: '本地文件会在你的组织下开始新对话，不会保留其他文件的对话轮次。',
   // S9 cells summary and S10 web workbook size limit
   aiResultCellsMeta: '已写入 {written} 个单元格（{range}）· 覆盖已有单元格 {overwritten} 个',
+  aiResultCellsMetaNoOverwrite: '已写入 {written} 个单元格（{range}）',
   aiErrWorkbookTooLarge: '此工作簿太大，无法在网页上使用 AI。请在 UniWork Office 应用中打开。',
   // S7 composer notice keys (not_entitled, credits_exhausted)
   not_entitled:

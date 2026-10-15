@@ -94,6 +94,7 @@ export const id = {
     'File lokal memulai percakapan baru di bawah organisasi Anda dan tidak menyimpan giliran dari file lain.',
   // S9 cells summary and S10 web workbook size limit
   aiResultCellsMeta: 'Sel ditulis: {written} ({range}) · Sel yang ada ditimpa: {overwritten}',
+  aiResultCellsMetaNoOverwrite: 'Sel ditulis: {written} ({range})',
   aiErrWorkbookTooLarge:
     'Buku kerja ini terlalu besar untuk AI di web. Buka di aplikasi UniWork Office.',
   // S7 composer notice keys (not_entitled, credits_exhausted)

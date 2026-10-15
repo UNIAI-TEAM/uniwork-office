@@ -79,6 +79,7 @@ export const zhTW = {
   aiUniworkLocalFileRestart: '本機檔案會在你的組織下開始新對話，不會保留其他檔案的對話輪次。',
   // S9 cells summary and S10 web workbook size limit
   aiResultCellsMeta: '已寫入 {written} 個儲存格（{range}）· 覆寫既有儲存格 {overwritten} 個',
+  aiResultCellsMetaNoOverwrite: '已寫入 {written} 個儲存格（{range}）',
   aiErrWorkbookTooLarge: '此活頁簿太大，無法在網頁上使用 AI。請在 UniWork Office 應用程式中開啟。',
   // S7 composer notice keys (not_entitled, credits_exhausted)
   not_entitled:

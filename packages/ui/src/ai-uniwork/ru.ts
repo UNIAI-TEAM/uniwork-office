@@ -92,6 +92,7 @@ export const ru = {
   // S9 cells summary and S10 web workbook size limit
   aiResultCellsMeta:
     'Записано ячеек: {written} ({range}) · Перезаписано существующих ячеек: {overwritten}',
+  aiResultCellsMetaNoOverwrite: 'Записано ячеек: {written} ({range})',
   aiErrWorkbookTooLarge:
     'Эта книга слишком велика для ИИ в веб-версии. Откройте её в приложении UniWork Office.',
   // S7 composer notice keys (not_entitled, credits_exhausted)

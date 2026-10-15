@@ -88,6 +88,7 @@ export const vi = {
     'Tệp trên máy bắt đầu cuộc trò chuyện mới theo tổ chức của bạn và không giữ các lượt từ tệp khác.',
   // S9 cells summary and S10 web workbook size limit
   aiResultCellsMeta: 'Đã ghi {written} ô ({range}) · {overwritten} ô có sẵn bị ghi đè',
+  aiResultCellsMetaNoOverwrite: 'Đã ghi {written} ô ({range})',
   aiErrWorkbookTooLarge:
     'Bảng tính này quá lớn để AI xử lý trên web. Mở bằng ứng dụng UniWork Office.',
   // S7 composer notice keys (not_entitled, credits_exhausted)

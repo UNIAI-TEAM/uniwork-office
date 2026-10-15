@@ -97,6 +97,7 @@ export const it = {
   // S9 cells summary and S10 web workbook size limit
   aiResultCellsMeta:
     'Celle scritte: {written} ({range}) · Celle esistenti sovrascritte: {overwritten}',
+  aiResultCellsMetaNoOverwrite: 'Celle scritte: {written} ({range})',
   aiErrWorkbookTooLarge:
     'Questa cartella di lavoro è troppo grande per l’IA sul web. Aprila nell’app UniWork Office.',
   // S7 composer notice keys (not_entitled, credits_exhausted)

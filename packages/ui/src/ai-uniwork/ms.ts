@@ -98,6 +98,7 @@ export const ms = {
   // S9 cells summary and S10 web workbook size limit
   aiResultCellsMeta:
     'Sel ditulis: {written} ({range}) · Sel sedia ada ditulis ganti: {overwritten}',
+  aiResultCellsMetaNoOverwrite: 'Sel ditulis: {written} ({range})',
   aiErrWorkbookTooLarge:
     'Buku kerja ini terlalu besar untuk AI di web. Buka dalam apl UniWork Office.',
   // S7 composer notice keys (not_entitled, credits_exhausted)

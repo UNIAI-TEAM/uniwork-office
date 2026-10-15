@@ -98,6 +98,7 @@ export const nl = {
   // S9 cells summary and S10 web workbook size limit
   aiResultCellsMeta:
     'Geschreven cellen: {written} ({range}) · Overschreven bestaande cellen: {overwritten}',
+  aiResultCellsMetaNoOverwrite: 'Geschreven cellen: {written} ({range})',
   aiErrWorkbookTooLarge:
     'Deze werkmap is te groot voor AI op het web. Open hem in de UniWork Office-app.',
   // S7 composer notice keys (not_entitled, credits_exhausted)

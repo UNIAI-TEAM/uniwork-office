@@ -100,6 +100,7 @@ export const fr = {
   // S9 cells summary and S10 web workbook size limit
   aiResultCellsMeta:
     'Cellules écrites : {written} ({range}) · Cellules existantes remplacées : {overwritten}',
+  aiResultCellsMetaNoOverwrite: 'Cellules écrites : {written} ({range})',
   aiErrWorkbookTooLarge:
     'Ce classeur est trop volumineux pour l’IA sur le web. Ouvrez-le dans l’application UniWork Office.',
   // S7 composer notice keys (not_entitled, credits_exhausted)

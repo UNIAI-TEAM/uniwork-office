@@ -88,6 +88,7 @@ export const hi = {
     'स्थानीय फ़ाइलें आपके संगठन के अंतर्गत एक नई बातचीत शुरू करती हैं और अन्य फ़ाइलों के संवाद नहीं रखतीं।',
   // S9 cells summary and S10 web workbook size limit
   aiResultCellsMeta: 'लिखी गई सेल: {written} ({range}) · ओवरराइट हुई मौजूदा सेल: {overwritten}',
+  aiResultCellsMetaNoOverwrite: 'लिखी गई सेल: {written} ({range})',
   aiErrWorkbookTooLarge:
     'यह वर्कबुक वेब पर AI के लिए बहुत बड़ी है। इसे UniWork Office ऐप में खोलें।',
   // S7 composer notice keys (not_entitled, credits_exhausted)

@@ -83,6 +83,7 @@ export const he = {
     'קבצים מקומיים מתחילים שיחה חדשה תחת הארגון שלך ואינם שומרים סבבים מקבצים אחרים.',
   // S9 cells summary and S10 web workbook size limit
   aiResultCellsMeta: 'תאים שנכתבו: {written} ({range}) · תאים קיימים שנדרסו: {overwritten}',
+  aiResultCellsMetaNoOverwrite: 'תאים שנכתבו: {written} ({range})',
   aiErrWorkbookTooLarge:
     'חוברת העבודה הזו גדולה מדי ל-AI באינטרנט. פתח אותה באפליקציית UniWork Office.',
   // S7 composer notice keys (not_entitled, credits_exhausted)

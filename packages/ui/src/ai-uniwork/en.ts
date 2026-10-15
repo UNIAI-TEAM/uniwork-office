@@ -87,6 +87,7 @@ export const en = {
   // S9 cells summary and S10 web workbook size limit
   aiResultCellsMeta:
     'Cells written: {written} ({range}) · Existing cells overwritten: {overwritten}',
+  aiResultCellsMetaNoOverwrite: 'Cells written: {written} ({range})',
   aiErrWorkbookTooLarge:
     'This workbook is too large for AI on the web. Open it in the UniWork Office app.',
   // S7 composer notice keys (not_entitled, credits_exhausted)

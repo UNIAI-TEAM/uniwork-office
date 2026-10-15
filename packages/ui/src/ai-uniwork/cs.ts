@@ -91,6 +91,7 @@ export const cs = {
   // S9 cells summary and S10 web workbook size limit
   aiResultCellsMeta:
     'Zapsané buňky: {written} ({range}) · Přepsané existující buňky: {overwritten}',
+  aiResultCellsMetaNoOverwrite: 'Zapsané buňky: {written} ({range})',
   aiErrWorkbookTooLarge:
     'Tento sešit je pro AI na webu příliš velký. Otevřete ho v aplikaci UniWork Office.',
   // S7 composer notice keys (not_entitled, credits_exhausted)

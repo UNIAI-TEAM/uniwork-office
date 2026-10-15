@@ -86,6 +86,7 @@ export const th = {
     'ไฟล์ในเครื่องจะเริ่มการสนทนาใหม่ภายใต้องค์กรของคุณ และไม่เก็บรอบการสนทนาจากไฟล์อื่น',
   // S9 cells summary and S10 web workbook size limit
   aiResultCellsMeta: 'เซลล์ที่เขียน: {written} ({range}) · เซลล์เดิมที่ถูกเขียนทับ: {overwritten}',
+  aiResultCellsMetaNoOverwrite: 'เซลล์ที่เขียน: {written} ({range})',
   aiErrWorkbookTooLarge: 'เวิร์กบุ๊กนี้ใหญ่เกินไปสำหรับ AI บนเว็บ เปิดในแอป UniWork Office',
   // S7 composer notice keys (not_entitled, credits_exhausted)
   not_entitled:

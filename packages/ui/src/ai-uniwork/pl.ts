@@ -91,6 +91,7 @@ export const pl = {
   // S9 cells summary and S10 web workbook size limit
   aiResultCellsMeta:
     'Zapisane komórki: {written} ({range}) · Nadpisane istniejące komórki: {overwritten}',
+  aiResultCellsMetaNoOverwrite: 'Zapisane komórki: {written} ({range})',
   aiErrWorkbookTooLarge:
     'Ten skoroszyt jest za duży dla AI w przeglądarce. Otwórz go w aplikacji UniWork Office.',
   // S7 composer notice keys (not_entitled, credits_exhausted)

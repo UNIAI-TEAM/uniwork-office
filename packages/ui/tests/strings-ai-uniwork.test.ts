@@ -172,6 +172,25 @@ describe('ai-uniwork string shards', () => {
     ).toBe('Cells written: 4 (A1:B2) · Existing cells overwritten: 2')
   })
 
+  it('aiResultCellsMetaNoOverwrite: the written-cells line without the overwritten count, in every locale', () => {
+    expect(
+      aiUniworkText('en', 'aiResultCellsMetaNoOverwrite', { written: 4, range: 'A1:B2' }),
+    ).toBe('Cells written: 4 (A1:B2)')
+    expect(
+      aiUniworkText('vi', 'aiResultCellsMetaNoOverwrite', { written: 4, range: 'A1:B2' }),
+    ).toBe('Đã ghi 4 ô (A1:B2)')
+    for (const lang of LANGS) {
+      const params = { written: 4, range: 'A1:B2' }
+      const line = aiUniworkText(lang, 'aiResultCellsMetaNoOverwrite', params)
+      expect(line, lang).not.toMatch(/[{}]/)
+      expect(line, lang).toContain('4')
+      expect(line, lang).toContain('A1:B2')
+      // the leading part of the full line, minus the overwritten half: same wording, no invented count
+      const full = aiUniworkText(lang, 'aiResultCellsMeta', { ...params, overwritten: 2 })
+      expect(full.startsWith(line), lang).toBe(true)
+    }
+  })
+
   it('includes the G6-05u cloud, account, local-file restart, sheet meta, web 413 and composer notice keys in all locales (C6, RF1-18)', () => {
     expect(aiUniworkText('en', 'acctSignIn')).toBe('Sign in')
     expect(aiUniworkText('vi', 'acctSignIn')).toBe('Đăng nhập')

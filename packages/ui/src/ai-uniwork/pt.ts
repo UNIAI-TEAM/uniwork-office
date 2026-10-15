@@ -94,6 +94,7 @@ export const pt = {
   // S9 cells summary and S10 web workbook size limit
   aiResultCellsMeta:
     'Células gravadas: {written} ({range}) · Células existentes substituídas: {overwritten}',
+  aiResultCellsMetaNoOverwrite: 'Células gravadas: {written} ({range})',
   aiErrWorkbookTooLarge:
     'Esta pasta de trabalho é grande demais para a IA na web. Abra-a no app UniWork Office.',
   // S7 composer notice keys (not_entitled, credits_exhausted)

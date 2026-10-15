@@ -90,6 +90,7 @@ export const ja = {
     'ローカルファイルは組織の下で新しい会話を開始し、他のファイルのやり取りは引き継ぎません。',
   // S9 cells summary and S10 web workbook size limit
   aiResultCellsMeta: '書き込んだセル: {written}（{range}）· 上書きした既存セル: {overwritten}',
+  aiResultCellsMetaNoOverwrite: '書き込んだセル: {written}（{range}）',
   aiErrWorkbookTooLarge:
     'このブックは大きすぎるため、Web 版では AI を使えません。UniWork Office アプリで開いてください。',
   // S7 composer notice keys (not_entitled, credits_exhausted)

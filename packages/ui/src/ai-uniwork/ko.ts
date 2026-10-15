@@ -87,6 +87,7 @@ export const ko = {
     '로컬 파일은 조직에서 새 대화를 시작하며 다른 파일의 대화 기록을 유지하지 않습니다.',
   // S9 cells summary and S10 web workbook size limit
   aiResultCellsMeta: '기록한 셀: {written}({range}) · 덮어쓴 기존 셀: {overwritten}',
+  aiResultCellsMetaNoOverwrite: '기록한 셀: {written}({range})',
   aiErrWorkbookTooLarge:
     '이 통합 문서는 너무 커서 웹에서 AI를 사용할 수 없습니다. UniWork Office 앱에서 여세요.',
   // S7 composer notice keys (not_entitled, credits_exhausted)

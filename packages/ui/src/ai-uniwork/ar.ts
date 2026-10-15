@@ -86,6 +86,7 @@ export const ar = {
   // S9 cells summary and S10 web workbook size limit
   aiResultCellsMeta:
     'الخلايا المكتوبة: {written} ({range}) · الخلايا الموجودة التي تمت الكتابة فوقها: {overwritten}',
+  aiResultCellsMetaNoOverwrite: 'الخلايا المكتوبة: {written} ({range})',
   aiErrWorkbookTooLarge:
     'هذا المصنف كبير جدًا على الذكاء الاصطناعي على الويب. افتحه في تطبيق UniWork Office.',
   // S7 composer notice keys (not_entitled, credits_exhausted)
