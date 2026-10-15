@@ -410,8 +410,9 @@ describe('G5-06u T9: branches and BE review r1 fixes', () => {
     seams(ctx).queueInFlight.add(keyOf(path))
     // the dispatcher rewrites the binding after save() classified the copy
     // (here: while the store is opened for the intent read)
-    const deps = (ctx.service.coordinator as unknown as { deps: { intents: () => Promise<unknown> } })
-      .deps
+    const deps = (
+      ctx.service.coordinator as unknown as { deps: { intents: () => Promise<unknown> } }
+    ).deps
     const intentsOf = deps.intents
     deps.intents = async () => {
       rewriteBinding(path, { state: 'queued' })
@@ -428,8 +429,9 @@ describe('G5-06u T9: branches and BE review r1 fixes', () => {
     const server = fakeServer({ bytes: enc('v3') })
     const { ctx, path } = await parkedIntent(server)
     // the queue moves the binding (paused_user -> queued) after classify read it
-    const deps = (ctx.service.coordinator as unknown as { deps: { intents: () => Promise<unknown> } })
-      .deps
+    const deps = (
+      ctx.service.coordinator as unknown as { deps: { intents: () => Promise<unknown> } }
+    ).deps
     const intentsOf = deps.intents
     deps.intents = async () => {
       rewriteBinding(path, { state: 'queued' })
