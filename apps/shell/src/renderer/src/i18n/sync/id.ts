@@ -282,6 +282,14 @@ export const id = {
   uwConflictSaveCopyDone:
     'Versi Anda disimpan sebagai dokumen baru: {title}. Dokumen ini tidak berubah; Anda masih bisa memuat ulang atau menimpa.',
   uwConflictSaveCopyFailed: 'Tidak dapat membuat salinan. Perubahan Anda tetap aman; coba lagi.',
+  uwConflictSaveCopyNoSeat:
+    'Tidak dapat membuat salinan karena Anda bukan anggota ruang kerja tempat dokumen ini berada. Perubahan Anda tetap aman; Anda bisa mengunduh versi Anda.',
+  uwConflictSaveCopyFolderRefused:
+    'Anda tidak dapat membuat dokumen di folder ini. Unduh versi Anda sebagai gantinya.',
+  uwConflictDownloadDone:
+    'Versi Anda disimpan di komputer ini: {file}. Dokumen ini tidak berubah; Anda masih bisa memuat ulang atau menimpa.',
+  uwConflictDownloadFailedDesktop:
+    'Tidak dapat menyimpan file. Perubahan Anda tetap aman; coba lagi.',
   uwConflictSaveCopyOffline:
     'Anda sedang offline. Membuat salinan memerlukan koneksi; perubahan Anda tetap disimpan.',
   uwConflictReloadFailed:
