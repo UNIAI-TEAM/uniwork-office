@@ -1514,6 +1514,62 @@ describe('G5-11 sign-out lock-and-keep, N+1 park, and restoreParked', () => {
     expect(noticeSwitchLoss).toHaveBeenCalledWith(ownerA, expect.objectContaining({ ramOnly: 1 }))
   })
 
+  it('28. d1-3: a plan of another scope does not clobber the RAM-only keys of the scope that locks next', async () => {
+    const path = seedWorkingCopy({ bytes: 'A unsaved d1-3', baseBytes: 'v3 base' })
+    const pathB = seedWorkingCopy({
+      docId: '01J8X4DOCBBBBBBBBBBBBBBBBB',
+      accountId: 'acc_2',
+      bytes: 'B unsaved d1-3',
+      baseBytes: 'v3 base',
+    })
+    const ctx = setup({ closeNow: true })
+    const noticeSwitchLoss = vi.fn()
+    const boundary = new AccountBoundary({
+      root: join(dir, 'uniwork-documents'),
+      openPaths: () => [...ctx.openSet],
+      closeDocument: async (p) => ctx.openSet.delete(p),
+      confirmClose: async () => true,
+      closeNow: (p) => ctx.openSet.delete(p),
+      aiHistoryPaths: () => [],
+      forgetAiHistory: () => undefined,
+      forgetLocks: () => undefined,
+      closeConflictPrompt: () => undefined,
+      planSignOut: async (target) => {
+        const plan = await ctx.service.signOutPlan(target)
+        // another account's plan lands after A's and before A locks
+        if (target?.accountId === 'acc_1') {
+          await ctx.service.signOutPlan({ deploymentId: 'default', accountId: 'acc_2' })
+        }
+        return plan
+      },
+      noticeSwitchLoss,
+      lockSession: async (target, onWaiting, options) => {
+        const res = await ctx.service.lockSession(target, onWaiting, options)
+        return { ok: res.ok, lost: res.lost?.length ?? 0 }
+      },
+    })
+    await boundary.enforce(ownerA)
+    ctx.setAccount('acc_2')
+    ctx.service.noteSessionIdentity()
+    // the plan of each scope sees a locked keychain (RAM-only) while the lock's
+    // own check does not, and A's own store cannot open: A's document is in both
+    // counts unless the lock consumes the plan of its own scope
+    vi.spyOn(
+      ctx.service as unknown as { intentAccess: () => Promise<unknown> },
+      'intentAccess',
+    ).mockResolvedValue({ kind: 'keystore_locked' })
+    vi.spyOn(ctx.syncStore as Required<typeof ctx.syncStore>, 'openScope').mockResolvedValue({
+      kind: 'no_session',
+    })
+    await boundary.enforce({ deploymentId: 'default', accountId: 'acc_2' })
+
+    // A's own copy goes and B's stays; each account's document is counted once
+    expect(existsSync(path)).toBe(false)
+    expect(existsSync(pathB)).toBe(true)
+    expect(noticeSwitchLoss).toHaveBeenCalledTimes(1)
+    expect(noticeSwitchLoss).toHaveBeenCalledWith(ownerA, expect.objectContaining({ ramOnly: 1 }))
+  })
+
   it('21. d2-3: findNewestRecoveryBytes picks the newest candidate by mtime when the disk file is missing', async () => {
     const path = seedWorkingCopy({ bytes: 'v3 base', baseBytes: 'v3 base', state: 'saved' })
     // Working copy file is missing on disk while binding and recovery candidates exist
