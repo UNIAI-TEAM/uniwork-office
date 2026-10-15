@@ -1583,6 +1583,13 @@ export default function App() {
     // the Save click on that offer: the normal first-save dialog, pre-filled with the name
     onSaveOffer: (name) => void doSave('save', name || undefined),
     clearHighlights: () => editorRef.current?.clearHighlights(),
+    runHistory: {
+      get activeRunId() {
+        return editorRef.current?.runHistory.activeRunId ?? null
+      },
+      begin: (runId) => editorRef.current?.runHistory.begin(runId),
+      end: (runId, mutated) => editorRef.current?.runHistory.end(runId, mutated),
+    },
     onBriefConfirmed: (brief) => {
       briefRef.current = brief
     },

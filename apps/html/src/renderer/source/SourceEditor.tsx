@@ -9,8 +9,10 @@ import {
 import { Compartment, EditorState, type Extension } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { redo, redoDepth, undo, undoDepth } from '@codemirror/commands'
+import type { RunHistoryGroup } from '@genoffice/agent-core'
 import { External, buildExtensions } from './cm-setup'
 import { addAiRanges, clearAiRanges } from './cm-highlight'
+import { beginRunEffect, endRunEffect, openRunId, runEditAnnotations } from './cm-run-history'
 import { cmFindTarget } from './find-target'
 import { useI18n } from '../i18n/locale'
 import type { FindTarget } from '@genoffice/ui'
@@ -40,6 +42,11 @@ export interface SourceEditorHandle {
   canUndo(): boolean
   canRedo(): boolean
   focus(): void
+  /**
+   * the editor-side undo group of an AI run (bind to the loop's onRunStart / onRunEnd): while it is
+   * open, the AI edits applied through applyPatches / replaceDoc (highlighted ones) are ONE undo step
+   */
+  readonly runHistory: RunHistoryGroup
   /** adapter for the find/replace panel; null until the editor is mounted */
   findTarget(): FindTarget | null
 }
@@ -210,7 +217,7 @@ export const SourceEditor = forwardRef<SourceEditorHandle, Props>(function Sourc
       const len = view.state.doc.length
       view.dispatch({
         changes: { from: 0, to: len, insert: text },
-        annotations: [External.of(true)],
+        annotations: [External.of(true), ...(highlight ? runEditAnnotations(view.state) : [])],
         effects: highlight
           ? [clearAiRanges.of(null), addAiRanges.of([[0, text.length]])]
           : [clearAiRanges.of(null)],
@@ -228,7 +235,7 @@ export const SourceEditor = forwardRef<SourceEditorHandle, Props>(function Sourc
       }
       view.dispatch({
         changes: sorted.map((p) => ({ from: p.from, to: p.to, insert: p.text })),
-        annotations: [External.of(true)],
+        annotations: [External.of(true), ...(highlight ? runEditAnnotations(view.state) : [])],
         effects: highlight ? [addAiRanges.of(ranges)] : [],
       })
       return ranges
@@ -265,6 +272,16 @@ export const SourceEditor = forwardRef<SourceEditorHandle, Props>(function Sourc
     canUndo: () => (viewRef.current ? undoDepth(viewRef.current.state) > 0 : false),
     canRedo: () => (viewRef.current ? redoDepth(viewRef.current.state) > 0 : false),
     focus: () => viewRef.current?.focus(),
+    runHistory: {
+      get activeRunId() {
+        return viewRef.current ? openRunId(viewRef.current.state) : null
+      },
+      begin: (runId) => viewRef.current?.dispatch(beginRunEffect(runId)),
+      end: (runId) => {
+        const view = viewRef.current
+        if (view && openRunId(view.state) === runId) view.dispatch(endRunEffect())
+      },
+    },
     findTarget: () => findTargetRef.current,
   }))
 

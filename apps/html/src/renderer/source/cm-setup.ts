@@ -26,6 +26,7 @@ import { html } from '@codemirror/lang-html'
 import { tags } from '@lezer/highlight'
 import { aiHighlight } from './cm-highlight'
 import { findHighlight } from './cm-find'
+import { joinRunEdits, runHistoryExtension } from './cm-run-history'
 
 /** Marks transactions that replace the document from outside the editor (load, patches) */
 export const External = Annotation.define<boolean>()
@@ -80,7 +81,8 @@ export function buildExtensions(onDocChanged: (view: EditorView) => void): Exten
     lineNumbers(),
     highlightActiveLineGutter(),
     highlightSpecialChars(),
-    history(),
+    history({ joinToEvent: joinRunEdits }),
+    runHistoryExtension,
     foldGutter(),
     drawSelection(),
     dropCursor(),

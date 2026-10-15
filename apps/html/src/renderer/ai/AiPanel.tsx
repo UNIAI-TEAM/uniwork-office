@@ -24,6 +24,8 @@ import {
   singleShortcutHint,
   type PanelNote,
   composeSkills,
+  runHistoryEvents,
+  type RunHistoryGroup,
 } from '@genoffice/agent-core'
 import type { AgentImage } from '@genoffice/agent-core'
 import type { AiSettings } from '@genoffice/ai-provider'
@@ -316,6 +318,11 @@ export interface HtmlAiDeps {
   /** the user chose Save on the offer card: run the first-save flow with this name */
   onSaveOffer(name: string): void
   clearHighlights(): void
+  /**
+   * the editor's undo group: the panel opens it when a run starts and closes it when the run ends,
+   * so every edit of the run is ONE undo step (absent: each edit is its own step, as before)
+   */
+  runHistory?: RunHistoryGroup
   /** [label](htmlnav://sid/N) citation clicked */
   navigateTo(sid: number): void
   /** the user confirmed a brief on the card; the app pins it into the next generated document */
@@ -797,6 +804,14 @@ export function AiPanel({
       captureSnapshot: () => depsRef.current.getSnapshot(),
       systemSuffix: () => aiLangDirective(langRef.current),
       events: {
+        // every edit of a run is ONE undo step of the source editor (the group closes at run end)
+        ...runHistoryEvents({
+          get activeRunId() {
+            return depsRef.current.runHistory?.activeRunId ?? null
+          },
+          begin: (runId) => depsRef.current.runHistory?.begin(runId),
+          end: (runId, mutated) => depsRef.current.runHistory?.end(runId, mutated),
+        } satisfies RunHistoryGroup),
         onText: (text) => patchLast({ text, waitLine: undefined }),
         // transport notices (UniWork AI); langRef: the loop is created once, `lang` would go stale
         onNotice: (notice) => {
