@@ -1,0 +1,320 @@
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import type { UniworkDocStatus } from '../../shared/home-api'
+import {
+  asSyncCenterSnapshot,
+  type SyncCenterActionResult,
+  type SyncCenterRow,
+} from '../../shared/sync-center'
+import { useI18n, type StringKey } from './locale'
+import {
+  QUEUE_DRAFT_CAP,
+  findQueueRow,
+  formatQueueTime,
+  isQueuePopoverState,
+  queuePopoverModelOf,
+  type PopoverAction,
+  type PopoverActionId,
+  type PopoverLine,
+  type QueuePopoverOpener,
+} from './queue-popover-model'
+import { announce } from './uniwork-live'
+import './queue-popover.css'
+
+/**
+ * Queue popover (S4): what the save pill's "View queue" / "Details" button, a blocked reason's
+ * button, or Ctrl/Cmd+S on a document with a waiting save opens. A non-modal dialog under the pill:
+ * no focus trap, no inert, Esc or a click outside closes it. Rows and the cancel / save-again calls
+ * come from the sync center (`window.uniworkSyncCenter`); without it the popover still opens and
+ * only offers "Open sync center".
+ */
+
+export interface UniworkQueuePopoverProps {
+  status: UniworkDocStatus
+  opener: QueuePopoverOpener
+  /** the pill group: the popover sits below it, and focus returns here when the opener button is gone */
+  anchorEl: HTMLElement | null
+  /** the pill button that opened it (null when Ctrl/Cmd+S did); a click on it is the parent's toggle */
+  openerEl: HTMLElement | null
+  onClose: () => void
+  /** the blocked reason's sign-in buttons */
+  onSignIn: () => void
+  /** Esc / close after a Ctrl/Cmd+S opening hands focus back to the editor */
+  onFocusEditor?: () => void
+}
+
+type CloseKind = 'esc' | 'state' | 'outside' | 'action'
+
+/** the sync-center row of one document, kept current by the pushed snapshots */
+function useQueueRow(documentId: string): { row: SyncCenterRow | undefined; settled: boolean } {
+  const [row, setRow] = useState<SyncCenterRow | undefined>(undefined)
+  const [settled, setSettled] = useState(() => !window.uniworkSyncCenter)
+  useEffect(() => {
+    const api = window.uniworkSyncCenter
+    if (!api) {
+      setRow(undefined)
+      setSettled(true)
+      return
+    }
+    let live = true
+    const take = (value: unknown) => {
+      if (live) setRow(findQueueRow(asSyncCenterSnapshot(value), documentId))
+    }
+    void api
+      .getSnapshot()
+      .then(take)
+      .catch(() => undefined)
+      .finally(() => {
+        if (live) setSettled(true)
+      })
+    const unsubscribe = api.subscribe(take)
+    return () => {
+      live = false
+      unsubscribe()
+    }
+  }, [documentId])
+  return { row, settled }
+}
+
+function actionErrorKey(result: Extract<SyncCenterActionResult, { ok: false }>): StringKey {
+  if (result.code === 'draft_cap') return 'uwConflictDraftCapReached'
+  if (result.code === 'store_full') return 'uwQueueFull'
+  return 'uwSyncActionFailed'
+}
+
+export function UniworkQueuePopover({
+  status,
+  opener,
+  anchorEl,
+  openerEl,
+  onClose,
+  onSignIn,
+  onFocusEditor,
+}: UniworkQueuePopoverProps) {
+  const { t, dateLocale } = useI18n()
+  const { row, settled } = useQueueRow(status.documentId)
+  const model = queuePopoverModelOf(status, row, opener)
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const closedRef = useRef(false)
+  const mountedRef = useRef(true)
+  const announcedRef = useRef(false)
+  const [confirming, setConfirming] = useState(false)
+  const [busy, setBusy] = useState<string | null>(null)
+  const [error, setError] = useState<StringKey | null>(null)
+  const [place, setPlace] = useState<{ top: number; right: number } | null>(null)
+  const lineId = useId()
+  const confirmId = useId()
+
+  const lineText = useCallback(
+    (line: PopoverLine): string =>
+      t(line.key, {
+        time: line.time === undefined ? '—' : formatQueueTime(line.time, dateLocale),
+        base: line.base ?? '—',
+        reason: line.reasonKey ? t(line.reasonKey) : '',
+        cap: QUEUE_DRAFT_CAP,
+      }),
+    [t, dateLocale],
+  )
+  const line1Text = lineText(model.line1)
+
+  // keep the newest callbacks reachable from the long-lived listeners
+  const live = useRef({ onClose, onFocusEditor, openerEl, anchorEl, opener })
+  useLayoutEffect(() => {
+    live.current = { onClose, onFocusEditor, openerEl, anchorEl, opener }
+  })
+
+  const close = useCallback((kind: CloseKind) => {
+    if (closedRef.current) return
+    closedRef.current = true
+    const cur = live.current
+    const inside = dialogRef.current?.contains(document.activeElement) ?? false
+    if (kind === 'esc' || (kind === 'state' && inside)) {
+      if (kind === 'esc' && cur.opener === 'ctrl-s') {
+        cur.onFocusEditor?.()
+      } else {
+        const target = cur.openerEl?.isConnected ? cur.openerEl : cur.anchorEl
+        target?.focus()
+      }
+    }
+    cur.onClose()
+  }, [])
+
+  useEffect(() => {
+    mountedRef.current = true
+    dialogRef.current?.focus()
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
+
+  // line 1 goes to the window's polite node once, when the row lookup has settled
+  useEffect(() => {
+    if (!settled || announcedRef.current) return
+    announcedRef.current = true
+    announce(line1Text)
+  }, [settled, line1Text])
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') close('esc')
+    }
+    const onPointerDown = (event: Event) => {
+      const target = event.target as Node | null
+      if (!target) return
+      if (dialogRef.current?.contains(target)) return
+      if (live.current.openerEl?.contains(target)) return
+      close('outside')
+    }
+    document.addEventListener('keydown', onKey)
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.removeEventListener('pointerdown', onPointerDown)
+    }
+  }, [close])
+
+  // the save settled, or another document became the active one
+  const stillShown = isQueuePopoverState(status)
+  useEffect(() => {
+    if (!stillShown) close('state')
+  }, [stillShown, close])
+  const pathRef = useRef(status.path)
+  useEffect(() => {
+    if (pathRef.current !== status.path) close('outside')
+  }, [status.path, close])
+
+  useLayoutEffect(() => {
+    const measure = () => {
+      const rect = live.current.anchorEl?.getBoundingClientRect()
+      if (!rect) return setPlace(null)
+      setPlace({ top: rect.bottom + 4, right: Math.max(0, window.innerWidth - rect.right) })
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [anchorEl])
+
+  const wasConfirming = useRef(false)
+  useEffect(() => {
+    const root = dialogRef.current
+    if (confirming) {
+      root?.querySelector<HTMLElement>('[data-popover-back]')?.focus()
+    } else if (wasConfirming.current) {
+      root?.querySelector<HTMLElement>('[data-popover-action="cancel"]')?.focus()
+    }
+    wasConfirming.current = confirming
+  }, [confirming])
+
+  /** run a sync-center call; a refusal says why (assertive) and keeps the popover as it was */
+  const call = async (name: string, run: () => Promise<SyncCenterActionResult>) => {
+    if (busy !== null) return
+    setBusy(name)
+    setError(null)
+    let result: SyncCenterActionResult
+    try {
+      result = await run()
+    } catch {
+      result = { ok: false, code: 'other' }
+    }
+    if (!mountedRef.current) return
+    setBusy(null)
+    if (result.ok) {
+      if (name === 'cancel') announce(t('uwQueueCancelled'))
+      close('action')
+      return
+    }
+    const key = actionErrorKey(result)
+    setError(key)
+    announce(t(key, { cap: QUEUE_DRAFT_CAP }), { assertive: true })
+  }
+
+  const runAction = (id: PopoverActionId) => {
+    const api = window.uniworkSyncCenter
+    switch (id) {
+      case 'sign-in':
+      case 'sign-in-again':
+        onSignIn()
+        close('action')
+        return
+      case 'recheck':
+        if (api && row) void call(id, () => api.recheck(row.id))
+        return
+      case 'save-again':
+        if (api && row) void call(id, () => api.saveAgain(row.id))
+        return
+      case 'cancel':
+        if (busy === null) setConfirming(true)
+        return
+      case 'open-center':
+        window.dispatchEvent(
+          new CustomEvent('uniwork:open-settings', { detail: { section: 'sync' } }),
+        )
+        close('action')
+        return
+    }
+  }
+
+  const goCancel = () => {
+    const api = window.uniworkSyncCenter
+    if (api && row) void call('cancel', () => api.cancelSave(row.id))
+  }
+
+  const actionButton = (action: PopoverAction) => (
+    <button
+      key={action.id}
+      type="button"
+      className="uw-queue-pop-btn"
+      data-popover-action={action.id}
+      aria-disabled={busy === action.id ? 'true' : undefined}
+      onClick={() => runAction(action.id)}
+    >
+      {t(action.labelKey)}
+    </button>
+  )
+
+  return (
+    <div
+      ref={dialogRef}
+      className="uw-queue-pop"
+      role="dialog"
+      tabIndex={-1}
+      aria-labelledby={lineId}
+      style={place ? { top: place.top, right: place.right } : undefined}
+    >
+      <p id={lineId} className="uw-queue-pop-line">
+        {line1Text}
+      </p>
+      {model.line2 && <p className="uw-queue-pop-line uw-queue-pop-sub">{lineText(model.line2)}</p>}
+      {model.line3 && <p className="uw-queue-pop-line uw-queue-pop-sub">{lineText(model.line3)}</p>}
+      {error && <p className="uw-queue-pop-error">{t(error, { cap: QUEUE_DRAFT_CAP })}</p>}
+      {confirming ? (
+        <>
+          <p id={confirmId} className="uw-queue-pop-line">
+            {t('uwQueueCancelConfirm')}
+          </p>
+          <div className="uw-queue-pop-actions">
+            <button
+              type="button"
+              className="uw-queue-pop-btn uw-queue-pop-danger"
+              aria-describedby={confirmId}
+              aria-disabled={busy === 'cancel' ? 'true' : undefined}
+              onClick={goCancel}
+            >
+              {t('uwQueueCancelGo')}
+            </button>
+            <button
+              type="button"
+              className="uw-queue-pop-btn"
+              data-popover-back=""
+              aria-describedby={confirmId}
+              onClick={() => setConfirming(false)}
+            >
+              {t('uwActBack')}
+            </button>
+          </div>
+        </>
+      ) : (
+        <div className="uw-queue-pop-actions">{model.actions.map(actionButton)}</div>
+      )}
+    </div>
+  )
+}
