@@ -605,6 +605,12 @@ interface ConflictSession {
   draftId: string
   path: string
   doc: BoundDocument
+  /**
+   * G5-11 d5-2: the account whose copy this dialog is about, fixed when it
+   * opens. Its drafts are probed in and kept into that account's store only,
+   * never whichever account is live by the time an await returns.
+   */
+  owner: LastOwner
   controller: AbortController
   fromClose: boolean
   onNotWritten?: () => void
@@ -1880,15 +1886,15 @@ export class UniworkDocsService {
   ): Promise<SignOutLockResult> {
     const target = owner ?? this.liveIdentity() ?? this.lastOwner
     if (!target) return { ok: true, captureFailed: [] }
+    // d5-1: an account switch is already effective, so a refused park cannot
+    // abort it; an explicit sign-out keeps the folder and aborts instead
+    const switching = options?.switch === true
     const scopeToken = `${target.deploymentId}/${target.accountId}`
     const keystoreLocked = this.storeLocked()
 
     // Step 1: stop runtime, block new commits, bounded receipt wait (30s)
     this.deps.stopRuntime?.()
     if (this.queueSession) {
-    // d5-1: an account switch is already effective, so a refused park cannot
-    // abort it; an explicit sign-out keeps the folder and aborts instead
-    const switching = options?.switch === true
       this.stoppingQueueSessions.add(this.queueSession.id)
     }
     const dirs = scopeWorkingCopyDirs(this.store.root, target)
@@ -1985,6 +1991,7 @@ export class UniworkDocsService {
      * of the account survives under userData.
      */
     const captureFailedKeys = new Set<string>()
+    const lostKeys = new Set<string>()
     let parked: ParkedStore | null = null
     if (!keystoreLocked && open.kind === 'ok' && intents) {
       const store = createParkedStore(open.records(PARKED_STORE_REGISTRATION.name))
@@ -2039,7 +2046,6 @@ export class UniworkDocsService {
       for (const dir of dirs) {
         if (this.store.newerStoreIn(dir)) continue
         const binding = await this.store.readDir(dir)
-    const lostKeys = new Set<string>()
         if (!binding) continue
         const key = basename(dir)
         const path = join(dir, binding.filename)
@@ -2251,13 +2257,13 @@ export class UniworkDocsService {
     return {
       ok: parkFailedDirs.size === 0,
       captureFailed,
+      ...(lostKeys.size > 0 ? { lost: [...lostKeys] } : {}),
     }
   }
 
   private clearRecoveryFn: ((path: string) => void) | null = null
 
   setClearRecovery(clear: (path: string) => void): void {
-      ...(lostKeys.size > 0 ? { lost: [...lostKeys] } : {}),
     this.clearRecoveryFn = clear
   }
 
@@ -4185,6 +4191,7 @@ export class UniworkDocsService {
       draftId: `conflict-draft-${randomUUID()}`,
       path: doc.path,
       doc,
+      owner: { deploymentId: doc.deploymentId, accountId: doc.userId },
       controller,
       fromClose: !!opts.fromClose,
       onNotWritten: opts.onNotWritten,
@@ -4428,7 +4435,7 @@ export class UniworkDocsService {
     doc: BoundDocument,
   ): Promise<UniworkConflictKeepDraft> {
     if (this.storeLocked()) return 'keystore_locked'
-    const access = await this.queueEngine().catch(() => ({ kind: 'unavailable' as const }))
+    const access = await this.draftsOf(session.owner)
     if (access.kind === 'keystore_locked') return 'keystore_locked'
     if (access.kind !== 'ok') return session.draftBlock ?? 'ok'
     const existing = await access.drafts.list(doc.key)
@@ -4451,6 +4458,30 @@ export class UniworkDocsService {
       }
     }
     return session.draftBlock ?? 'ok'
+  }
+
+  /**
+   * G5-11 d5-2: the drafts store of `owner`. While `owner` is the live session
+   * this is the queue engine's own (the coordinator keeps drafts there too);
+   * after an account switch it is `owner`'s own store through `openStoreOf`,
+   * never the store of the account that is live now.
+   */
+  private async draftsOf(
+    owner: LastOwner,
+  ): Promise<
+    { kind: 'ok'; drafts: DraftStore } | { kind: 'keystore_locked' } | { kind: 'unavailable' }
+  > {
+    const live = this.deps.syncStore?.scope()
+    if (live && live.deploymentId === owner.deploymentId && live.accountId === owner.accountId) {
+      const access = await this.queueEngine().catch(() => ({ kind: 'unavailable' as const }))
+      if (access.kind === 'ok') return { kind: 'ok', drafts: access.drafts }
+      return access.kind === 'keystore_locked' ? access : { kind: 'unavailable' }
+    }
+    const open = await this.openStoreOf(owner).catch(() => ({ kind: 'unavailable' as const }))
+    if (open.kind === 'ok') {
+      return { kind: 'ok', drafts: createDraftStore(open.records(DRAFTS_STORE_REGISTRATION.name)) }
+    }
+    return open.kind === 'keystore_locked' ? { kind: 'keystore_locked' } : { kind: 'unavailable' }
   }
 
   /**
@@ -4531,7 +4562,15 @@ export class UniworkDocsService {
           view: await this.buildConflictView(open, { fetchServer: false, notice: 'reload_failed' }),
         }
       }
-      const access = await this.queueEngine().catch(() => ({ kind: 'unavailable' as const }))
+      const access = await this.draftsOf(open.owner)
+      // d5-2: an account switch (or a lock) inside the awaits above ends the
+      // dialog; the bytes of this account's copy are never kept anywhere else
+      if (open.controller.signal.aborted) return { kind: 'closed' }
+      if (!this.ownsLocally(chosen)) {
+        open.controller.abort()
+        open.finish()
+        return { kind: 'closed' }
+      }
       if (access.kind === 'keystore_locked') {
         open.draftBlock = 'keystore_locked'
         return { kind: 'view', view: await this.buildConflictView(open, { fetchServer: false }) }
