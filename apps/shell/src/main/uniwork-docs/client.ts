@@ -593,12 +593,9 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
           const declared = header === null ? NaN : Number(header)
           if (declared > MAX_DOWNLOAD_BYTES) throw new UniworkDocError('too_large')
           const totalBytes = Number.isSafeInteger(declared) && declared >= 0 ? declared : null
-          if (!response.body) {
-            const bytes = new Uint8Array(await response.arrayBuffer())
-            if (bytes.byteLength > MAX_DOWNLOAD_BYTES) throw new UniworkDocError('too_large')
-            onProgress?.({ receivedBytes: bytes.byteLength, totalBytes })
-            return { bytes }
-          }
+          // R5BE-8: a 200 with no readable body is refused, never buffered
+          // whole (the cap could only be checked after the bytes were in memory)
+          if (!response.body) throw new UniworkDocError('malformed_response')
           const reader = response.body.getReader()
           // send() detaches the caller's abort once the server answered: the
           // body read listens to it itself, so a cancel ends the stream too

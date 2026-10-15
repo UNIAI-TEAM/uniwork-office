@@ -500,3 +500,62 @@ describe('uniwork-docs downloadStream (additive, same route and 256 MiB cap)', (
     expect(fetch.mock.calls[0]![0]).toBe(`${ORIGIN}/api/v1/documents/${DOC}/download?version=2`)
   })
 })
+
+describe('R5BE-8 / R5BE-14 downloadStream: a 200 with no readable body never buffers unbounded', () => {
+  const ORIGIN_8 = 'https://uniwork.example'
+  const DOC_8 = 'doc_1'
+
+  /** a 200 answer whose `body` is null; `arrayBuffer` records whether it was read */
+  function bodiless(headers: Record<string, string> = {}) {
+    const arrayBuffer = vi.fn(async () => new ArrayBuffer(512 * 1024 * 1024))
+    const response = {
+      ok: true,
+      status: 200,
+      redirected: false,
+      url: '',
+      headers: new Headers(headers),
+      body: null,
+      arrayBuffer,
+      json: async () => undefined,
+    } as unknown as Response
+    return { response, arrayBuffer }
+  }
+
+  const client8 = (fetch: FetchLike) =>
+    createUniworkDocsClient({
+      apiOrigin: ORIGIN_8,
+      authorized: (call) => call('tok'),
+      isSignedIn: () => true,
+      fetch,
+    })
+
+  async function codeOf8(promise: Promise<unknown>): Promise<string> {
+    try {
+      await promise
+    } catch (error) {
+      return error instanceof UniworkDocError ? error.code : `other:${String(error)}`
+    }
+    return 'resolved'
+  }
+
+  it('null body + a declared size over the cap -> too_large, the body is never read', async () => {
+    const { response, arrayBuffer } = bodiless({ 'Content-Length': String(256 * 1024 * 1024 + 1) })
+    const code = await codeOf8(client8(async () => response).downloadStream(DOC_8, 1))
+    expect(code).toBe('too_large')
+    expect(arrayBuffer).not.toHaveBeenCalled()
+  })
+
+  it('null body + no Content-Length -> refused (malformed_response), the body is never buffered', async () => {
+    const { response, arrayBuffer } = bodiless()
+    const code = await codeOf8(client8(async () => response).downloadStream(DOC_8, 1))
+    expect(code).toBe('malformed_response')
+    expect(arrayBuffer).not.toHaveBeenCalled()
+  })
+
+  it('null body + a declared size under the cap -> refused too, never buffered', async () => {
+    const { response, arrayBuffer } = bodiless({ 'Content-Length': '35' })
+    const code = await codeOf8(client8(async () => response).downloadStream(DOC_8, 1))
+    expect(code).toBe('malformed_response')
+    expect(arrayBuffer).not.toHaveBeenCalled()
+  })
+})
