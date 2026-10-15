@@ -396,7 +396,8 @@ export function useAccount(options?: { ownsSignOutPrompt?: boolean }): AccountCo
   const signIn = () => launchLogin(() => window.aiOffice.accountLogin())
 
   const askReplaceLockedSignIn = () => {
-    if (canReplaceLockedSignIn) setReplacePromptOpen(true)
+    // a Retry in flight may still withdraw the offer: wait for it to settle
+    if (canReplaceLockedSignIn && !retrying.current) setReplacePromptOpen(true)
   }
 
   const cancelReplaceLockedSignIn = () => setReplacePromptOpen(false)
@@ -533,6 +534,9 @@ export function useAccount(options?: { ownsSignOutPrompt?: boolean }): AccountCo
     // one restore at a time: a second click before the busy state renders must not start another
     if (retrying.current) return
     retrying.current = true
+    // a failure line from an earlier attempt (a sign-in that timed out) describes
+    // that attempt, not this Retry
+    setLocalError(null)
     setBusy('retrying')
     // an absent accountRetry (older main) resolves at once, so the busy state never sticks
     void Promise.resolve(window.aiOffice.accountRetry?.())

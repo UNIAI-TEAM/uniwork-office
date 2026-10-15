@@ -214,20 +214,27 @@ export function SignOutPrompt({
 export function ReplaceSignInPrompt({
   account,
   returnFocusRef,
+  onConfirm,
 }: {
   account: AccountController
   returnFocusRef: RefObject<HTMLElement | null>
+  /** called when the user confirms, just before the replacing sign-in starts */
+  onConfirm?: () => void
 }) {
   const open = Boolean(account.replaceLockedPrompt)
-  return open ? <ReplaceSignInDialog account={account} returnFocusRef={returnFocusRef} /> : null
+  return open ? (
+    <ReplaceSignInDialog account={account} returnFocusRef={returnFocusRef} onConfirm={onConfirm} />
+  ) : null
 }
 
 function ReplaceSignInDialog({
   account,
   returnFocusRef,
+  onConfirm,
 }: {
   account: AccountController
   returnFocusRef: RefObject<HTMLElement | null>
+  onConfirm?: () => void
 }) {
   const { t } = useI18n()
   const cancelBtnRef = useRef<HTMLButtonElement>(null)
@@ -273,7 +280,10 @@ function ReplaceSignInDialog({
         <button
           type="button"
           className="set-btn"
-          onClick={() => account.confirmReplaceLockedSignIn?.()}
+          onClick={() => {
+            onConfirm?.()
+            account.confirmReplaceLockedSignIn?.()
+          }}
         >
           {t('acctReplaceGo')}
         </button>
