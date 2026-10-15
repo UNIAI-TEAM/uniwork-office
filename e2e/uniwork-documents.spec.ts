@@ -5,9 +5,14 @@ import { existsSync } from 'node:fs'
 import { appendFile, copyFile, mkdtemp, readdir, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
-// The product's store codec and drafts payload decoder (`no Electron` in their
-// import chain): the kept-draft reader must decode the REAL record shape
-// instead of re-implementing it.
+// The product's store codec, intent decoder and drafts payload decoder (`no Electron`
+// in their import chain): the store readers must decode the REAL record shapes
+// instead of re-implementing them.
+import {
+  createIntentStore,
+  INTENT_STORE_REGISTRATION,
+  type PendingIntentRecord,
+} from '../apps/shell/src/main/uniwork-sync/intent-store'
 import { keyFilePath } from '../apps/shell/src/main/uniwork-sync/keys'
 import { createDraftStore, type KeptDraft } from '../apps/shell/src/main/uniwork-sync/queue/drafts'
 import { recordPath, type StoreRecords } from '../apps/shell/src/main/uniwork-sync/store'
@@ -549,6 +554,52 @@ test.describe.serial('UniWork documents', () => {
     return createDraftStore(records).list(docId)
   }
 
+  /**
+   * Decrypts the durable pending-intent record (`uniwork-sync/store/.../intents/<sha256(docId)>.rec`).
+   * The frame is parsed by the product codec (`store/codec.ts`) and the
+   * plaintext goes through the product intent store decoder (`intent-store.ts`)
+   * behind its store interface, with the record key unwrapped via Electron
+   * `safeStorage.decryptString`.
+   */
+  async function readPendingIntent(
+    launched: LaunchedApp,
+    docId: string,
+  ): Promise<PendingIntentRecord | null> {
+    const root = join(launched.userDataDir, 'uniwork-sync')
+    const recPath = recordPath(
+      join(root, 'store'),
+      storeScope,
+      INTENT_STORE_REGISTRATION.name,
+      docId,
+    )
+    if (!existsSync(recPath)) return null
+    let rawFrame: Buffer
+    try {
+      rawFrame = await readFile(recPath)
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null
+      throw error
+    }
+    const wrapped = await readFile(keyFilePath(join(root, 'keys'), storeScope))
+    const rawKeyB64 = await launched.app.evaluate(
+      ({ safeStorage }, b64) => safeStorage.decryptString(Buffer.from(b64, 'base64')),
+      wrapped.toString('base64'),
+    )
+    const key = Buffer.from(rawKeyB64, 'base64')
+    const frame = readRecordFrame(rawFrame)
+    if (!frame) throw new Error(`pending-intent record is not a UWS1 frame: ${recPath}`)
+    const value = openRecord(key, frame)
+    if (!value) {
+      throw new Error(`pending-intent record did not decrypt with the store key: ${recPath}`)
+    }
+    const records: StoreRecords = {
+      write: async () => ({ kind: 'refused' }),
+      read: async () => ({ kind: 'ok', value }),
+      delete: async () => ({ kind: 'ok' }),
+    }
+    return (await createIntentStore(records).get(docId))?.intent ?? null
+  }
+
   test('d. conflict: 409 keeps the local edit and the base, Save refuses, S5 Overwrite commits on the new base', async () => {
     test.setTimeout(180_000)
     await withApp('uniwork-docs-conflict', async (ctx) => {
@@ -838,7 +889,8 @@ test.describe.serial('UniWork documents', () => {
 
       // the intent was persisted with its key before the network was used
       const path = (await activeStatus(shell))!.path
-      const intent = (await binding(path)).pendingIntent as { idempotencyKey: string }
+      const intent = (await readPendingIntent(launched, doc.id))!
+      expect(intent).not.toBeNull()
       expect(intent.idempotencyKey).toMatch(/^office-key-/)
       expect(stub.uploads(doc.id)).toHaveLength(1)
       expect(stub.commits(doc.id)).toEqual([expect.objectContaining({ status: 'dropped' })])
@@ -855,7 +907,7 @@ test.describe.serial('UniWork documents', () => {
         expect(call.idempotencyKey).toBe(intent.idempotencyKey)
       }
       expect(stub.state(doc.id).revision).toBe('42')
-      expect(await binding(path)).not.toHaveProperty('pendingIntent')
+      await expect.poll(() => readPendingIntent(launched, doc.id)).toBeNull()
       await expect(label(shell)).toHaveText('Saved to UniWork')
     })
   })
@@ -1293,8 +1345,9 @@ test.describe.serial('UniWork documents', () => {
         stub.failNextCommit('before')
         await save()
         await expectState(ctx.shell, 'offline')
-        const path = (await activeStatus(ctx.shell))!.path
-        const intent = (await binding(path)).pendingIntent as { idempotencyKey: string }
+        const intent = (await readPendingIntent(ctx.launched, doc.id))!
+        expect(intent).not.toBeNull()
+        expect(intent.idempotencyKey).toMatch(/^office-key-/)
 
         await chip(ctx.shell).getByRole('button', { name: 'Retry' }).click()
         try {
@@ -1314,6 +1367,7 @@ test.describe.serial('UniWork documents', () => {
         ])
         expect(stub.state(doc.id).revision).toBe('42')
         expect(await driver.carriesEdit(stub.state(doc.id).bytes)).toBe(true)
+        await expect.poll(() => readPendingIntent(ctx.launched, doc.id)).toBeNull()
       })
     })
   }
