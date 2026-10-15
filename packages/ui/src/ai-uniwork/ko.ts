@@ -34,6 +34,7 @@ export const ko = {
   aiRunRunning: '실행 중… 중지하려면 중지 또는 Esc를 누르세요.',
   aiRunStopped:
     '중지했습니다. 이미 적용된 변경 사항(있는 경우)은 문서에 남아 있으며 실행 취소할 수 있습니다.',
+  aiRunRetry: '다시 시도',
   aiRunAskAgain: '다시 질문',
   aiRunChooseOther: '다른 제공자 선택',
   aiRunOpenInApp: '앱에서 열기',

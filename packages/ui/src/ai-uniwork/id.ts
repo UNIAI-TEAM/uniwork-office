@@ -37,6 +37,7 @@ export const id = {
   aiRunRunning: 'Berjalan… Tekan Hentikan atau Esc untuk berhenti.',
   aiRunStopped:
     'Dihentikan. Perubahan yang sudah diterapkan tetap ada di dokumen dan dapat diurungkan.',
+  aiRunRetry: 'Coba lagi',
   aiRunAskAgain: 'Tanya lagi',
   aiRunChooseOther: 'Pilih penyedia lain',
   aiRunOpenInApp: 'Buka di aplikasi',

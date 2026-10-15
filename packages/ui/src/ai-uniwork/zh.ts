@@ -37,6 +37,7 @@ export const zh = {
   aiRunSend: '发送',
   aiRunRunning: '正在运行… 按“停止”或 Esc 停止。',
   aiRunStopped: '已停止。已应用的更改（如有）仍在文档中，可以撤销。',
+  aiRunRetry: '重试',
   aiRunAskAgain: '继续提问',
   aiRunChooseOther: '选择其他服务商',
   aiRunOpenInApp: '在应用中打开',

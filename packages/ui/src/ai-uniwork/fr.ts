@@ -38,6 +38,7 @@ export const fr = {
   aiRunRunning: 'En cours… Appuyez sur Arrêter ou Échap pour arrêter.',
   aiRunStopped:
     'Arrêté. Les modifications déjà appliquées restent dans le document et peuvent être annulées.',
+  aiRunRetry: 'Réessayer',
   aiRunAskAgain: 'Redemander',
   aiRunChooseOther: 'Choisir un autre fournisseur',
   aiRunOpenInApp: 'Ouvrir dans l’application',

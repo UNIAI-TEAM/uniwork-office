@@ -36,6 +36,7 @@ export const ru = {
   aiRunSend: 'Отправить',
   aiRunRunning: 'Выполняется… Нажмите «Стоп» или Esc, чтобы остановить.',
   aiRunStopped: 'Остановлено. Уже применённые изменения остаются в документе, их можно отменить.',
+  aiRunRetry: 'Повторить',
   aiRunAskAgain: 'Спросить снова',
   aiRunChooseOther: 'Выбрать другого провайдера',
   aiRunOpenInApp: 'Открыть в приложении',

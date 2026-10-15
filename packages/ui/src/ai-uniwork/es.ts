@@ -36,6 +36,7 @@ export const es = {
   aiRunSend: 'Enviar',
   aiRunRunning: 'En ejecución… Pulsa Detener o Esc para detener.',
   aiRunStopped: 'Detenido. Los cambios ya aplicados siguen en el documento y se pueden deshacer.',
+  aiRunRetry: 'Reintentar',
   aiRunAskAgain: 'Volver a preguntar',
   aiRunChooseOther: 'Elegir otro proveedor',
   aiRunOpenInApp: 'Abrir en la aplicación',

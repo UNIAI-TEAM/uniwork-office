@@ -35,6 +35,7 @@ export const pt = {
   aiRunSend: 'Enviar',
   aiRunRunning: 'Em execução… Pressione Parar ou Esc para parar.',
   aiRunStopped: 'Parado. As alterações já aplicadas continuam no documento e podem ser desfeitas.',
+  aiRunRetry: 'Tentar novamente',
   aiRunAskAgain: 'Perguntar novamente',
   aiRunChooseOther: 'Escolher outro provedor',
   aiRunOpenInApp: 'Abrir no app',

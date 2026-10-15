@@ -35,6 +35,7 @@ export const cs = {
   aiRunSend: 'Odeslat',
   aiRunRunning: 'Probíhá… Zastavíte tlačítkem Zastavit nebo klávesou Esc.',
   aiRunStopped: 'Zastaveno. Již použité změny zůstávají v dokumentu a lze je vrátit zpět.',
+  aiRunRetry: 'Zkusit znovu',
   aiRunAskAgain: 'Zeptat se znovu',
   aiRunChooseOther: 'Vybrat jiného poskytovatele',
   aiRunOpenInApp: 'Otevřít v aplikaci',

@@ -33,6 +33,7 @@ export const hi = {
   aiRunSend: 'भेजें',
   aiRunRunning: 'चल रहा है… रोकने के लिए रोकें या Esc दबाएँ।',
   aiRunStopped: 'रोक दिया गया। पहले से लागू बदलाव दस्तावेज़ में रहेंगे और पूर्ववत किए जा सकते हैं।',
+  aiRunRetry: 'फिर से कोशिश करें',
   aiRunAskAgain: 'फिर से पूछें',
   aiRunChooseOther: 'दूसरा प्रदाता चुनें',
   aiRunOpenInApp: 'ऐप में खोलें',

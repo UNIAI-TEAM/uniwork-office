@@ -35,6 +35,7 @@ export const pl = {
   aiRunSend: 'Wyślij',
   aiRunRunning: 'Trwa… Naciśnij Zatrzymaj lub Esc, aby zatrzymać.',
   aiRunStopped: 'Zatrzymano. Zastosowane już zmiany pozostają w dokumencie i można je cofnąć.',
+  aiRunRetry: 'Spróbuj ponownie',
   aiRunAskAgain: 'Zapytaj ponownie',
   aiRunChooseOther: 'Wybierz innego dostawcę',
   aiRunOpenInApp: 'Otwórz w aplikacji',

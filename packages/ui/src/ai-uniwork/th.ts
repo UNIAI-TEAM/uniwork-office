@@ -34,6 +34,7 @@ export const th = {
   aiRunSend: 'ส่ง',
   aiRunRunning: 'กำลังทำงาน… กดหยุดหรือ Esc เพื่อหยุด',
   aiRunStopped: 'หยุดแล้ว การเปลี่ยนแปลงที่นำไปใช้แล้ว (ถ้ามี) ยังอยู่ในเอกสารและเลิกทำได้',
+  aiRunRetry: 'ลองอีกครั้ง',
   aiRunAskAgain: 'ถามต่อ',
   aiRunChooseOther: 'เลือกผู้ให้บริการอื่น',
   aiRunOpenInApp: 'เปิดในแอป',

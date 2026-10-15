@@ -38,6 +38,7 @@ export const ms = {
   aiRunRunning: 'Sedang berjalan… Tekan Henti atau Esc untuk berhenti.',
   aiRunStopped:
     'Dihentikan. Sebarang perubahan yang telah digunakan kekal dalam dokumen dan boleh dibuat asal.',
+  aiRunRetry: 'Cuba lagi',
   aiRunAskAgain: 'Tanya lagi',
   aiRunChooseOther: 'Pilih penyedia lain',
   aiRunOpenInApp: 'Buka dalam apl',

@@ -33,6 +33,7 @@ export const ar = {
   aiRunSend: 'إرسال',
   aiRunRunning: 'قيد التشغيل… اضغط إيقاف أو Esc للإيقاف.',
   aiRunStopped: 'تم الإيقاف. تبقى أي تغييرات مطبّقة بالفعل في المستند ويمكن التراجع عنها.',
+  aiRunRetry: 'إعادة المحاولة',
   aiRunAskAgain: 'السؤال مجددًا',
   aiRunChooseOther: 'اختيار مزود آخر',
   aiRunOpenInApp: 'الفتح في التطبيق',

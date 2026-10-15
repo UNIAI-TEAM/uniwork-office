@@ -33,6 +33,7 @@ export const zhTW = {
   aiRunSend: '傳送',
   aiRunRunning: '正在執行… 按「停止」或 Esc 停止。',
   aiRunStopped: '已停止。已套用的變更（如有）仍在文件中，可以復原。',
+  aiRunRetry: '重試',
   aiRunAskAgain: '繼續提問',
   aiRunChooseOther: '選擇其他服務商',
   aiRunOpenInApp: '在應用程式中開啟',

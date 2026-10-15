@@ -33,6 +33,7 @@ export const en = {
   aiRunSend: 'Send',
   aiRunRunning: 'Running… Press Stop or Esc to stop.',
   aiRunStopped: 'Stopped. Any changes already applied stay in the document and can be undone.',
+  aiRunRetry: 'Retry',
   aiRunAskAgain: 'Ask again',
   aiRunChooseOther: 'Choose another provider',
   aiRunOpenInApp: 'Open in the app',

@@ -36,6 +36,7 @@ export const it = {
   aiRunRunning: 'In esecuzione… Premi Interrompi o Esc per fermare.',
   aiRunStopped:
     'Interrotto. Le modifiche già applicate restano nel documento e possono essere annullate.',
+  aiRunRetry: 'Riprova',
   aiRunAskAgain: 'Chiedi di nuovo',
   aiRunChooseOther: 'Scegli un altro provider',
   aiRunOpenInApp: 'Apri nell’app',

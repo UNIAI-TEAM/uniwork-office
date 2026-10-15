@@ -38,6 +38,7 @@ export const nl = {
   aiRunRunning: 'Bezig… Druk op Stoppen of Esc om te stoppen.',
   aiRunStopped:
     'Gestopt. Al toegepaste wijzigingen blijven in het document en kunnen ongedaan worden gemaakt.',
+  aiRunRetry: 'Opnieuw proberen',
   aiRunAskAgain: 'Opnieuw vragen',
   aiRunChooseOther: 'Andere provider kiezen',
   aiRunOpenInApp: 'Openen in de app',

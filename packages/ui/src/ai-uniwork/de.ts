@@ -39,6 +39,7 @@ export const de = {
   aiRunRunning: 'Läuft… Drücken Sie Stoppen oder Esc zum Anhalten.',
   aiRunStopped:
     'Gestoppt. Bereits angewendete Änderungen bleiben im Dokument und lassen sich rückgängig machen.',
+  aiRunRetry: 'Erneut versuchen',
   aiRunAskAgain: 'Erneut fragen',
   aiRunChooseOther: 'Anderen Anbieter wählen',
   aiRunOpenInApp: 'In der App öffnen',

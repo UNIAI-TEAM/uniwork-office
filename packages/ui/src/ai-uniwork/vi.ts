@@ -34,6 +34,7 @@ export const vi = {
   aiRunSend: 'Gửi',
   aiRunRunning: 'Đang chạy… Bấm Dừng hoặc Esc để dừng.',
   aiRunStopped: 'Đã dừng. Thay đổi đã áp dụng (nếu có) vẫn trong tài liệu và hoàn tác được.',
+  aiRunRetry: 'Thử lại',
   aiRunAskAgain: 'Hỏi tiếp',
   aiRunChooseOther: 'Chọn nhà cung cấp khác',
   aiRunOpenInApp: 'Mở bằng ứng dụng',

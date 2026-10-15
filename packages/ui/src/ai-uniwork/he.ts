@@ -33,6 +33,7 @@ export const he = {
   aiRunSend: 'שליחה',
   aiRunRunning: 'פועל… לחץ על עצירה או Esc כדי לעצור.',
   aiRunStopped: 'נעצר. שינויים שכבר הוחלו נשארים במסמך וניתן לבטל אותם.',
+  aiRunRetry: 'נסה שוב',
   aiRunAskAgain: 'שאל שוב',
   aiRunChooseOther: 'בחירת ספק אחר',
   aiRunOpenInApp: 'פתיחה באפליקציה',

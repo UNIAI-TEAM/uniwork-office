@@ -35,6 +35,7 @@ export const ja = {
   aiRunRunning: '実行中… 停止するには「停止」または Esc を押してください。',
   aiRunStopped:
     '停止しました。すでに適用された変更（ある場合）はドキュメントに残り、元に戻せます。',
+  aiRunRetry: '再試行',
   aiRunAskAgain: 'もう一度質問',
   aiRunChooseOther: '別のプロバイダーを選択',
   aiRunOpenInApp: 'アプリで開く',
