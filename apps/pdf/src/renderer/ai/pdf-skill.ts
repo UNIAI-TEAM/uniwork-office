@@ -151,6 +151,8 @@ export function createPdfSkill(deps: PdfAiDeps): AgentSkill {
       return hidden.size === 0 ? AGENT_TOOLS : AGENT_TOOLS.filter((t) => !hidden.has(t.name))
     },
     buildContext: () => {
+      // one buildContext per loop.run: the image URLs of the previous request stop being insertable
+      deps.imageUrls?.beginRun()
       const parts = [
         `Current document: "${deps.fileName()}", ${deps.pageCount()} pages; the user is viewing page ${deps.currentPage()}.`,
       ]

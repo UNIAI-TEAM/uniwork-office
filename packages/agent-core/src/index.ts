@@ -53,6 +53,12 @@ export type {
   ResultChipTone,
   ResultChipToolExecution,
 } from './result-chip'
+export { IMAGE_URL_REFUSAL, createImageUrlRegistry } from './image-url-registry'
+export type {
+  ImageUrlRegistry,
+  ImageUrlRegistryOptions,
+  ImageUrlSource,
+} from './image-url-registry'
 export { composeSkills } from './skill'
 export type { AgentSkill, ExecutedToolCall } from './skill'
 export {

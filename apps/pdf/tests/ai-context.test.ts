@@ -16,6 +16,8 @@ function makeDeps(over: Partial<PdfAiDeps> = {}): PdfAiDeps {
       annotationSummary: () => '',
       metadata: () => ({}),
       outline: () => null,
+      // optional host dep: absent here (the proxy would answer an unknown prop with a throwing function)
+      imageUrls: undefined,
       ...over,
     } as Record<string, unknown>,
     {

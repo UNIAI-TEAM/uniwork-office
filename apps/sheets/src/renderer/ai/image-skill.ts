@@ -1,4 +1,4 @@
-import type { AgentSkill } from '@genoffice/agent-core'
+import type { AgentSkill, ImageUrlRegistry } from '@genoffice/agent-core'
 import { t } from '../i18n/locale'
 
 /**
@@ -32,6 +32,8 @@ ${PLACEMENT_PROMPT}`
 export function createImageSkill(
   imageGen: () => boolean = () => true,
   imageSearch: () => boolean = () => true,
+  /** image URLs this run may insert (reset at every run); add_image checks them in tools.ts */
+  imageUrls?: ImageUrlRegistry,
 ): AgentSkill {
   const allTools = [
     {
@@ -71,6 +73,11 @@ export function createImageSkill(
   ]
   return {
     id: 'images',
+    // one buildContext per loop.run: the image URLs of the previous request stop being insertable
+    buildContext: () => {
+      imageUrls?.beginRun()
+      return ''
+    },
     get systemPrompt() {
       if (!imageSearch()) return imageGen() ? IMAGES_SYSTEM_PROMPT_GEN_ONLY : ''
       return imageGen() ? IMAGES_SYSTEM_PROMPT : IMAGES_SYSTEM_PROMPT_NO_GEN
@@ -101,6 +108,7 @@ export function createImageSkill(
             summary: t('aiToolImageSearch'),
           }
         }
+        for (const image of result.images) imageUrls?.register(image.imageUrl, 'image_search')
         const lines = result.images.map(
           (image, index) =>
             `${index + 1}. ${image.title || '(untitled)'} [${image.width ?? '?'}x${image.height ?? '?'}]\n   ${image.imageUrl}`,
@@ -128,6 +136,7 @@ export function createImageSkill(
             summary: t('aiToolGenImage'),
           }
         }
+        imageUrls?.register(result.url, 'generate_image')
         return {
           output: `Image generated: ${result.url}\nInsert it with propose_operations {op:"add_image", path:"${result.url}", ...}.`,
           mutated: false,
