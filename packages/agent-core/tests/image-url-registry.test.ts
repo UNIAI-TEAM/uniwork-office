@@ -44,6 +44,39 @@ describe('image URL registry', () => {
     }
   })
 
+  it.each([
+    ['case change in the path', 'https://example.com/A.png'],
+    ['case change in the scheme', 'HTTPS://example.com/a.png'],
+    ['trailing slash', 'https://example.com/a.png/'],
+    ['fragment', 'https://example.com/a.png#frag'],
+    ['extra query', 'https://example.com/a.png?q=1'],
+    ['whitespace inside', 'https://example.com/a .png'],
+    ['newline inside', 'https://example.com/a\n.png'],
+    ['percent-encoded variant', 'https://example.com/%61.png'],
+  ])('refuses a URL differing only by %s unless registered exactly', (_label, variant) => {
+    const reg = createImageUrlRegistry(enforcing)
+    reg.register('https://example.com/a.png', 'image_search')
+    expect(reg.isAllowed(variant)).toBe(false)
+    expect(reg.check(variant)).toBe(IMAGE_URL_REFUSAL)
+    reg.register(variant, 'image_search')
+    expect(reg.check(variant)).toBeNull()
+  })
+
+  it('refuses a data: URL with a different payload, mime type, case or inner whitespace', () => {
+    const reg = createImageUrlRegistry(enforcing)
+    reg.register('data:image/png;base64,AAAA', 'generate_image')
+    for (const variant of [
+      'data:image/png;base64,AAAB',
+      'data:image/jpeg;base64,AAAA',
+      'data:image/png;base64, AAAA',
+      'data:image/png;base64,AA AA',
+      'DATA:image/png;base64,AAAA',
+    ]) {
+      expect(reg.check(variant), variant).toBe(IMAGE_URL_REFUSAL)
+    }
+    expect(reg.check('data:image/png;base64,AAAA')).toBeNull()
+  })
+
   it('trims whitespace around the candidate and around the registered URL', () => {
     const reg = createImageUrlRegistry(enforcing)
     reg.register('  https://example.com/a.png \n', 'image_search')
