@@ -33,6 +33,7 @@ import {
   type IntentTraceLine,
 } from '../src/main/uniwork-sync/test-hooks/trace'
 import { createLockableSafeStorage } from '../src/main/uniwork-sync/test-kit/compliance'
+import { SIGN_OUT_RECEIPT_WAIT_MS } from '../src/shared/home-api'
 
 const ALLOWED_TRACE_KEYS = new Set([
   'ts',
@@ -56,6 +57,20 @@ const CANARY_SECRETS = {
 }
 
 let tempDir: string
+
+/** Fork main 0a622efed apps/shell/src/main/uniwork-sync/queue/limits.ts, verbatim. */
+const FORK_MAIN_QUEUE_LIMITS = {
+  draftsPerDocument: 3,
+  stuckAfterMs: 3_600_000,
+  recheckMs: 900_000,
+  heartbeatMs: 5_000,
+  goneMs: 15_000,
+  retryAfterClampMs: 300_000,
+  backoffBaseMs: 1_000,
+  backoffMaxMs: 300_000,
+  concurrency: 2,
+  signOutReceiptWaitMs: SIGN_OUT_RECEIPT_WAIT_MS,
+}
 
 beforeEach(() => {
   tempDir = mkdtempSync(join(tmpdir(), 'uw-sync-hooks-'))
@@ -499,5 +514,31 @@ describe('UNI-1380 G7-03a test-only sync trace + queue timer hooks', () => {
     fx.advance(200)
     await fx.dispatcher.tick([fx.queueDoc])
     expect(fx.queueDoc.record.state).toBe('committed')
+  })
+
+  it('is inert without the env: the effective queue limits are fork main G5-11 defaults', () => {
+    const forkMainDefaults = { ...FORK_MAIN_QUEUE_LIMITS }
+
+    // 1. Env unset (beforeEach): the effective table is G5-11's, key for key
+    expect({ ...QUEUE_LIMITS }).toEqual(forkMainDefaults)
+    expect(Object.keys(QUEUE_LIMITS).sort()).toEqual(Object.keys(forkMainDefaults).sort())
+
+    // 2. Valid override values without the UNIWORK_SYNC_TRACE_FILE gate change nothing
+    process.env.UNIWORK_SYNC_TEST_STUCK_AFTER_MS = '1200'
+    process.env.UNIWORK_SYNC_TEST_RECHECK_MS = '400'
+    expect({ ...QUEUE_LIMITS }).toEqual(forkMainDefaults)
+
+    // 3. Nor does a packaged build with the gate and the overrides set
+    process.env.UNIWORK_SYNC_TRACE_FILE = join(tempDir, 'limits-inert.jsonl')
+    setTestPackagedOverride(true)
+    expect({ ...QUEUE_LIMITS }).toEqual(forkMainDefaults)
+
+    // 4. Control: with the gate on and unpackaged the two timers do move, and nothing else does
+    setTestPackagedOverride(undefined)
+    expect({ ...QUEUE_LIMITS }).toEqual({
+      ...forkMainDefaults,
+      stuckAfterMs: 1_200,
+      recheckMs: 400,
+    })
   })
 })
