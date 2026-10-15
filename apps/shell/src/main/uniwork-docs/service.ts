@@ -59,6 +59,7 @@ import {
 import { type FetchLike, type UniworkDocsClient, createUniworkDocsClient } from './client'
 import { UniworkDocError } from './errors'
 import {
+  copyTitleFor,
   formatForMime,
   formatForName,
   hasReplacementChar,
@@ -67,6 +68,7 @@ import {
 } from './formats'
 import { pathKey } from '../../shared/path-key'
 import { LaunchController } from './launch'
+import { tUniworkDocs } from './strings'
 import type { CommentsContextResult } from '@genoffice/electron-utils/comments-ipc'
 import { actionFlags, type DocumentDetail, type LaunchDescriptor } from './parse'
 import {
@@ -250,6 +252,8 @@ export interface UniworkDocsServiceDeps {
   isAiRunning?(path: string): boolean
   /** G5-09 S5: stops the AI turn running in the editor showing `path` */
   stopAiRun?(path: string): void
+  /** G5-12: the app's UI language, for the title of a saved copy (absent = en) */
+  lang?(): string
   /** G5-09 S5: seam for G5-05 offline head availability (default false until G5-05 lands) */
   hasOfflineHead?(documentId: string, revision?: string): boolean
   /**
@@ -3415,18 +3419,7 @@ export class UniworkDocsService {
       return { kind: 'view', view: currentView }
     }
     if (action.kind === 'save-copy') {
-      if (!currentView.canEdit) {
-        return { kind: 'view', view: { ...currentView, notice: null, noticeArg: null } }
-      }
-      if (action.stopAi) this.deps.stopAiRun?.(chosen.path)
-      return {
-        kind: 'view',
-        view: await this.buildConflictView(open, {
-          fetchServer: false,
-          notice: 'save_copy_failed',
-          noticeArg: null,
-        }),
-      }
+      return this.saveCopyInConflict(open, chosen, action, currentView)
     }
     if (action.kind === 'reload') {
       return this.reloadInConflict(open, chosen, action, currentView)
@@ -3731,6 +3724,167 @@ export class UniworkDocsService {
     open.controller.abort()
     open.finish()
     return { kind: 'closed' }
+  }
+
+  /**
+   * G5-12 S5 "Save as a copy": the user's local version becomes a new document
+   * and the conflicted one is left exactly as it is (binding, intent, editor).
+   * Online only, edit access only; two steps, nothing queued:
+   *   1. flush the module's unsaved bytes (the non-uploading flush Reload
+   *      keep=draft uses), then POST /documents/{id}/copies (the copy starts as
+   *      the server's head bytes, version 1);
+   *   2. upload the local bytes and commit them as version 2 of the copy, retried
+   *      once. A copy that never got step 2 holds the SERVER's content, so it is
+   *      archived (best effort, logged when that fails) and never reported done.
+   * A dialog closed mid-flight shows no notice, but the copy it left is archived
+   * and logged, never kept silently.
+   */
+  private async saveCopyInConflict(
+    open: ConflictSession,
+    chosen: BoundDocument,
+    action: Extract<UniworkConflictAction, { kind: 'save-copy' }>,
+    currentView: UniworkConflictView,
+  ): Promise<UniworkConflictReply> {
+    if (!currentView.canEdit) {
+      return { kind: 'view', view: { ...currentView, notice: null, noticeArg: null } }
+    }
+    if (!currentView.online) {
+      return { kind: 'view', view: currentView }
+    }
+    if (action.stopAi) this.deps.stopAiRun?.(chosen.path)
+    const aborted = () => open.controller.signal.aborted
+    const failed = async (): Promise<UniworkConflictReply> => ({
+      kind: 'view',
+      view: await this.buildConflictView(open, {
+        fetchServer: false,
+        notice: open.locked ? null : 'save_copy_failed',
+      }),
+    })
+    const lockOn = (error: unknown) => {
+      if (!(error instanceof UniworkDocError)) return
+      if (error.code === 'permission_revoked' || error.code === 'forbidden') {
+        open.locked = 'revoked'
+        open.knownCanEdit = false
+      } else if (
+        error.code === 'document_deleted' ||
+        error.code === 'deleted' ||
+        error.code === 'not_found'
+      ) {
+        open.locked = 'deleted'
+        open.knownCanEdit = false
+      }
+    }
+
+    const editor = await this.editorState(chosen.path)
+    if (editor.dirty === true || this.editorDirty.has(chosen.path)) {
+      if (!(await this.flushModuleForDraft(open, chosen.path))) {
+        return aborted() ? { kind: 'closed' } : failed()
+      }
+      if (aborted()) return { kind: 'closed' }
+      if (open.locked) {
+        return { kind: 'view', view: await this.buildConflictView(open, { fetchServer: false }) }
+      }
+      chosen = await this.refreshDirty(chosen)
+      open.doc = chosen
+    }
+    let localBytes: Uint8Array
+    try {
+      localBytes = new Uint8Array(await readFile(chosen.path))
+    } catch {
+      return failed()
+    }
+
+    const api = this.api()
+    const documentId = chosen.binding.documentId
+    const title = copyTitleFor(
+      chosen.binding.title,
+      tUniworkDocs(this.deps.lang?.() ?? 'en', 'copyMyVersion'),
+      chosen.binding.format,
+    )
+    let parentId: string | null
+    try {
+      // the copy is filed next to its source (a fresh read: the source may have moved)
+      parentId = (await api.getDocument(documentId)).parentId ?? null
+    } catch (error) {
+      lockOn(error)
+      return aborted() ? { kind: 'closed' } : failed()
+    }
+    if (aborted()) return { kind: 'closed' }
+    let created: { summary: UniworkDocSummary; revision: string }
+    try {
+      created = await api.copyDocument({
+        documentId,
+        title,
+        parentId,
+        idempotencyKey: this.newIdempotencyKey(),
+      })
+    } catch {
+      // any refusal of the copy itself (owner_requires_copy, a 403 for a non-member of the
+      // workspace, a 5xx) is "couldn't create the copy": the source's access was just read above
+      return aborted() ? { kind: 'closed' } : failed()
+    }
+    const copyId = created.summary.id
+
+    // step 2: the local bytes become version 2 of the copy; one retry, same keys
+    const commitKey = this.newIdempotencyKey()
+    let committed = false
+    for (let attempt = 0; attempt < 2 && !committed && !aborted(); attempt += 1) {
+      try {
+        const upload = await api.upload({
+          documentId: copyId,
+          bytes: localBytes,
+          filename: chosen.binding.filename,
+          format: chosen.binding.format,
+          idempotencyKey: commitKey,
+        })
+        if (upload.checksumSha256 !== sha256Hex(localBytes)) {
+          throw new UniworkDocError('malformed_response', {
+            serverCode: 'upload_checksum_mismatch',
+          })
+        }
+        // an account switch during the upload must not commit this copy under the other account
+        if (!this.liveIdentity() || !this.ownsLocally(chosen)) {
+          throw new UniworkDocError('not_signed_in')
+        }
+        await api.commit({
+          documentId: copyId,
+          uploadId: upload.uploadId,
+          baseRevision: created.revision,
+          idempotencyKey: commitKey,
+        })
+        committed = true
+      } catch (error) {
+        if (error instanceof UniworkDocError && error.code === 'not_signed_in') break
+      }
+    }
+    if (committed) {
+      if (aborted()) {
+        console.warn(`uniwork docs: save-copy: the dialog closed after copy ${copyId} was saved`)
+        return { kind: 'closed' }
+      }
+      return {
+        kind: 'view',
+        view: await this.buildConflictView(open, {
+          fetchServer: false,
+          notice: 'save_copy_done',
+          noticeArg: created.summary.title || title,
+        }),
+      }
+    }
+    // never leave the server's bytes behind as "your version"
+    try {
+      await api.archive(copyId, this.newIdempotencyKey())
+    } catch (error) {
+      console.warn(
+        `uniwork docs: save-copy: copy ${copyId} was not completed and could not be archived`,
+        error instanceof UniworkDocError ? error.code : 'unknown',
+      )
+    }
+    if (aborted()) {
+      console.warn(`uniwork docs: save-copy: the dialog closed before copy ${copyId} was complete`)
+      return { kind: 'closed' }
+    }
+    return failed()
   }
 
   private async overwriteInConflict(

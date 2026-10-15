@@ -128,6 +128,18 @@ export interface UniworkDocsClient {
     revision: string
     title: string
   }): Promise<{ summary: UniworkDocSummary; revision: string }>
+  /**
+   * G5-12: `POST /documents/{id}/copies` - a standalone copy that keeps the
+   * source's ACL and provenance. `consent: "copy"` is the only accepted value
+   * (an explicit choice). The answer is the new document and its revision
+   * (the copy's version 1), the base of the commit that follows.
+   */
+  copyDocument(input: {
+    documentId: string
+    title: string
+    parentId: string | null
+    idempotencyKey: string
+  }): Promise<{ summary: UniworkDocSummary; revision: string }>
   /** archive a document (S18); there is no hard-delete route */
   archive(documentId: string, idempotencyKey: string): Promise<UniworkDocSummary>
   /** restore an archived document (S18) */
@@ -464,6 +476,22 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
         method: 'PATCH',
         route: `/documents/${id(input.documentId)}`,
         json: { revision: input.revision, title: input.title },
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
+      return { summary: parseDocumentSummary(raw), revision: documentRevisionOf(raw) }
+    },
+
+    async copyDocument(input) {
+      const raw = await send({
+        method: 'POST',
+        route: `/documents/${id(input.documentId)}/copies`,
+        json: {
+          consent: 'copy',
+          title: input.title,
+          ...(input.parentId ? { parent_id: input.parentId } : {}),
+        },
+        idempotencyKey: input.idempotencyKey,
         timeoutMs: metadataTimeout,
         read: json,
       })
