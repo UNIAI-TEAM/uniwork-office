@@ -64,6 +64,24 @@ describe('docs AI change marker (track changes off)', () => {
     expect(undoDepth(editor.state)).toBe(depth)
   })
 
+  it('an autosave leaves the marker and the Accept button where they are', async () => {
+    const { editor, container } = await runBoldTwo()
+    const depth = undoDepth(editor.state)
+    // saveOnce passes `auto` in the pre-save event detail
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('ai-docs-commit-tables', { detail: { auto: true } }))
+    })
+    expect(markedBlocks(editor)).toEqual([0, 1])
+    expect(container.querySelector('.ai-accept-changes')).not.toBeNull()
+    expect(undoDepth(editor.state)).toBe(depth)
+    // the user's own Save is what clears it
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('ai-docs-commit-tables', { detail: { auto: false } }))
+    })
+    expect(markedBlocks(editor)).toEqual([])
+    expect(container.querySelector('.ai-accept-changes')).toBeNull()
+  })
+
   it('the next run marks only what that run edited', async () => {
     const { editor } = await runBoldTwo()
     await h!.send('and the third')
