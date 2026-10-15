@@ -283,19 +283,22 @@ describe('UniWork AI choice per account (desktop)', () => {
     expect((await getSettings(HOME)).provider).toBe('anthropic')
   })
 
-  it('ai:chat and the settings test with provider uniwork run the file provider, never ask a key for uniwork', async () => {
+  it('ai:chat and the settings test with provider uniwork refuse with ai_disabled and never call the file provider', async () => {
     fakeAccounts()
     await setSettings(picked('anthropic'))
     await setSettings(picked('uniwork'))
-    // an editor's settings copy carries the overlay; a one-click action sends it as is
+    // an editor's settings copy carries the overlay; a one-shot caller with `uniwork` is refused
+    // instead of silently switching to the file's BYOK provider
     const request = { settings: picked('uniwork'), system: 's', user: 'u' }
-    const chat = (await handlers.get('ai:chat')!(from(EDITOR), request)) as { ok: boolean }
-    expect(chat.ok).toBe(true)
-    expect(chatForProvider).toHaveBeenCalledTimes(1)
-    expect((chatForProvider.mock.calls[0] as unknown[])[0]).toBe('anthropic')
+    const chat = (await handlers.get('ai:chat')!(from(EDITOR), request)) as {
+      ok: boolean
+      uniworkCode?: string
+    }
+    expect(chat).toMatchObject({ ok: false, uniworkCode: 'ai_disabled' })
+    expect(chatForProvider).toHaveBeenCalledTimes(0)
     const test = (await handlers.get('ai:settings-test')!(from(HOME), request)) as { ok: boolean }
-    expect(test.ok).toBe(true)
-    expect((testChatConnection.mock.calls[0] as unknown[])[0]).toBe('anthropic')
+    expect(test.ok).toBe(false)
+    expect(testChatConnection).toHaveBeenCalledTimes(0)
   })
 
   it('a Settings save from the home window (same BYOK provider) keeps the pick', async () => {
