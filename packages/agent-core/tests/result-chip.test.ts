@@ -303,7 +303,8 @@ describe('resultChip deterministic priority table', () => {
       expect(res.chip).toBe('error')
       expect(res.errorLine?.key, `code=${code}`).toBe('aiErrUnavailable')
       expect(res.errorLine?.action, `code=${code}`).toBe('retry')
-      expect(res.errorLine?.actionKey, `code=${code}`).toBeNull()
+      // the labelled "Thử lại" / "Retry" button of the S9 table (chipwire F1)
+      expect(res.errorLine?.actionKey, `code=${code}`).toBe('aiRunRetry')
     }
 
     for (const code of ['office_capability_off', 'format_off', 'format-off', 'capability_off']) {

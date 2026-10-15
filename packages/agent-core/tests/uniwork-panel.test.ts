@@ -5,6 +5,8 @@ import {
   panelLiveAnnouncement,
   resolveEntryResultChip,
   resultChip,
+  singleShortcutHint,
+  uniworkErrorLineText,
   type ResultChipOutput,
   type UniworkPanelEntryLike,
 } from '../src/index.js'
@@ -359,6 +361,70 @@ describe('uniwork-panel shared helper (RF1-14, RF1-19)', () => {
         },
       })
       expect(announced).toBe('')
+    })
+  })
+
+  describe('the announcement says what the visible turn says (chipwire F2, F3)', () => {
+    const tail = (chip: ResultChipOutput) =>
+      panelLiveAnnouncement({
+        entries: [
+          { role: 'user', text: 'Q' },
+          { role: 'assistant', text: 'body', streaming: false, resultChip: chip },
+        ],
+        busy: false,
+        translate: mockTranslate,
+      })
+
+    it('a specific error key (the key of the visible line) is announced, never the generic line', () => {
+      for (const key of ['aiErrCredits', 'aiErrSession', 'aiErrUnavailable', 'aiErrRunLimit']) {
+        expect(tail(resultChip({ provider: 'uniwork', error: key }))).toBe(
+          `[aiResultError]. [${key}]`,
+        )
+      }
+    })
+
+    it('an unsupported chip announces its reason after the label', () => {
+      const viewOnly = resultChip({
+        provider: 'uniwork',
+        droppedToolCalls: [{ name: 'insert_content', reason: 'view_only' }],
+      })
+      expect(tail(viewOnly)).toBe('[aiResultUnsupported]. [aiErrViewOnlyEdit]')
+      const unsupported = resultChip({
+        provider: 'uniwork',
+        droppedToolCalls: [{ name: 'cloud_search', reason: 'not_allowlisted', module: 'Docs' }],
+      })
+      expect(tail(unsupported)).toBe('[aiResultUnsupported]. [aiErrUnsupported:module=Docs]')
+    })
+  })
+
+  describe('uniworkErrorLineText (chipwire F11)', () => {
+    const prefix = (e: string) => `Lỗi: ${e}`
+    it('an error chip already says Error: the line is the bare message', () => {
+      const chip = resultChip({ provider: 'uniwork', error: 'aiErrCredits' })
+      expect(uniworkErrorLineText(chip, 'Hết tín dụng', prefix)).toBe('Hết tín dụng')
+    })
+    it('any other chip (edited then failed) or no chip keeps the prefix', () => {
+      const edited = resultChip({ provider: 'uniwork', mutated: true, error: 'aiErrCredits' })
+      expect(uniworkErrorLineText(edited, 'Hết tín dụng', prefix)).toBe('Lỗi: Hết tín dụng')
+      expect(uniworkErrorLineText(null, 'boom', prefix)).toBe('Lỗi: boom')
+    })
+  })
+
+  describe('singleShortcutHint (chipwire F5)', () => {
+    it('non-Mac: one Ctrl shortcut, in the language of the Ctrl key, from the rewritten text', () => {
+      expect(singleShortcutHint('Chưa lưu — hoàn tác bằng Ctrl/Ctrl+Z hoặc bấm Lưu.', false)).toBe(
+        'Chưa lưu — hoàn tác bằng Ctrl+Z hoặc bấm Lưu.',
+      )
+      expect(singleShortcutHint('mit Strg/Ctrl+Z rückgängig', false)).toBe('mit Strg+Z rückgängig')
+    })
+    it('Mac: ⌘Z from the dictionary notation', () => {
+      expect(singleShortcutHint('undo with Ctrl/⌘+Z, or press Save', true)).toBe(
+        'undo with ⌘Z, or press Save',
+      )
+    })
+    it('leaves a text without the dual form alone', () => {
+      expect(singleShortcutHint('Press Save', false)).toBe('Press Save')
+      expect(singleShortcutHint('Ctrl+Enter sends', false)).toBe('Ctrl+Enter sends')
     })
   })
 })
