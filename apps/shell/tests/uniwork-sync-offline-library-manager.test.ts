@@ -507,3 +507,89 @@ describe('G5-05 refresh: update-available', () => {
     expect(h.storeFiles()).toEqual([])
   })
 })
+
+/** a gate the fake download waits on before chunk `at` (a slow transfer) */
+function slowDownload(h: Harness, documentId: string, at = 2) {
+  let release!: () => void
+  const gate = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  let reached!: () => void
+  const waiting = new Promise<void>((resolve) => {
+    reached = resolve
+  })
+  h.docs.beforeChunk = async (id, index) => {
+    if (id !== documentId || index !== at) return
+    reached()
+    await gate
+  }
+  return { release, waiting }
+}
+
+describe('T5-1 caps hold under concurrent pins (check + reserve + index-add are one step)', () => {
+  it('199 pins + two concurrent pins -> exactly one refused offline_cap_reached, nothing downloaded for it', async () => {
+    const h = createHarness()
+    await seedPins(h, 199, 1024)
+    addDoc(h, 'doc_a', 1)
+    addDoc(h, 'doc_b', 1)
+    const results = await Promise.all([pinDoc(h, 'doc_a'), pinDoc(h, 'doc_b')])
+    expect(results.filter((result) => result.kind === 'refused')).toEqual([
+      { kind: 'refused', code: 'offline_cap_reached' },
+    ])
+    expect(results.filter((result) => result.kind === 'pinned')).toHaveLength(1)
+    expect(await h.manager.quota()).toMatchObject({ pins: 200, maxPins: 200 })
+    // only the taken pin was downloaded; the refused one left no row
+    expect(h.docs.downloads).toHaveLength(1)
+    const loser = results[0].kind === 'refused' ? 'doc_a' : 'doc_b'
+    expect(h.docs.downloads[0]).not.toContain(loser)
+    expect(await h.manager.row(loser)).toBeNull()
+    expect(h.storeFiles()).not.toContain(recordFile(pinKey(loser)))
+  })
+
+  it('two concurrent pins that fit alone but cross 2 GiB together -> one refused', async () => {
+    const h = createHarness()
+    // 2 GiB minus 12 KiB declared: each 8 KiB pin fits alone, both together do not
+    await seedPins(h, 7, 256 * MiB)
+    expect((await h.store.putPin(seedRow('seed_7', 256 * MiB - 12288))).kind).toBe('ok')
+    await h.store.writeIndex({
+      pins: Array.from({ length: 8 }, (_, index) => `seed_${index}`),
+      cleanup: {},
+    })
+    addDoc(h, 'doc_a', 1, 8192)
+    addDoc(h, 'doc_b', 1, 8192)
+    const results = await Promise.all([pinDoc(h, 'doc_a'), pinDoc(h, 'doc_b')])
+    expect(results.filter((result) => result.kind === 'refused')).toEqual([
+      { kind: 'refused', code: 'offline_cap_reached' },
+    ])
+    expect(h.docs.downloads).toHaveLength(1)
+    const quota = await h.manager.quota()
+    expect(quota).toMatchObject({ pins: 9, maxBytes: 2 * GiB })
+    expect((quota as { usedBytes: number }).usedBytes).toBeLessThanOrEqual(2 * GiB)
+  })
+
+  it('a pin whose lease is refused after the reservation releases it', async () => {
+    const h = createHarness()
+    await seedPins(h, 199, 1024)
+    addDoc(h, 'doc_a', 1)
+    addDoc(h, 'doc_b', 1)
+    h.leases.grantResult = 'revoked'
+    expect(await pinDoc(h, 'doc_a')).toEqual({ kind: 'refused', code: 'revoked' })
+    expect(await h.manager.quota()).toMatchObject({ pins: 199 })
+    expect(await h.manager.row('doc_a')).toBeNull()
+    h.leases.grantResult = 'renewed'
+    expect(rowOf(await pinDoc(h, 'doc_b')).state).toBe('ready')
+  })
+
+  it('a cancelled first download releases its bytes from the quota', async () => {
+    const h = createHarness()
+    addDoc(h, 'doc_1', 1, 8192)
+    const slow = slowDownload(h, 'doc_1')
+    const pinning = pinDoc(h)
+    await slow.waiting
+    expect(await h.manager.quota()).toMatchObject({ usedBytes: 8192, pins: 1 })
+    expect(h.manager.cancel('doc_1')).toBe(true)
+    slow.release()
+    expect(rowOf(await pinning).state).toBe('interrupted')
+    expect(await h.manager.quota()).toMatchObject({ usedBytes: 0, pins: 1 })
+  })
+})

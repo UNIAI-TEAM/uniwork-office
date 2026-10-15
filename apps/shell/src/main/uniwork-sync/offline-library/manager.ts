@@ -393,9 +393,20 @@ export class OfflineLibraryManager {
     await job.done.catch(() => undefined)
   }
 
-  /** bytes the quota counts for a row: its committed copy or the snapshot it asked for */
+  /**
+   * Bytes the quota counts for a row: its committed copy, or the snapshot it
+   * asked for while that is still on its way (waiting or downloading). A first
+   * download that failed or was cancelled holds nothing, so it reserves
+   * nothing; a retry checks the quota again.
+   */
   private reserved(record: PinRecord): number {
-    return Math.max(record.bytes, record.manifest ? manifestBytes(record.manifest) : 0)
+    const asking =
+      record.staging !== null ||
+      record.state === 'waiting-network' ||
+      record.state === 'downloading' ||
+      record.state === 'verifying'
+    if (!asking || !record.manifest) return record.bytes
+    return Math.max(record.bytes, manifestBytes(record.manifest))
   }
 
   private async usedBytes(index: LibraryIndex, except?: string): Promise<number | Unavailable> {
@@ -407,6 +418,52 @@ export class OfflineLibraryManager {
       if (read.kind === 'ok') used += this.reserved(read.record)
     }
     return used
+  }
+
+  /**
+   * T5-1: the cap check, the row write and the index entry are one step under
+   * the index lock, so concurrent pins of different documents can never pass
+   * the 200-pin or the 2 GiB check together. Null = reserved.
+   */
+  private async reserve(record: PinRecord): Promise<LibraryRefusal | null> {
+    const documentId = record.documentId
+    const outcome = await this.withIndex(async (index) => {
+      const listed = index.pins.includes(documentId)
+      const refuse = (code: LibraryRefusalCode) => ({ write: false, value: refused(code) })
+      if (!listed && index.pins.length >= this.limits.maxPins) return refuse('offline_cap_reached')
+      const asked = this.reserved(record)
+      if (asked > 0) {
+        const used = await this.usedBytes(index, documentId)
+        if (typeof used !== 'number') return refuse(used.kind)
+        if (used + asked > this.limits.maxBytes) return refuse('offline_cap_reached')
+      }
+      const written = await this.options.store.putPin(record)
+      if (written.kind !== 'ok') {
+        return refuse(
+          isUnavailable(written)
+            ? written.kind
+            : written.kind === 'store_full'
+              ? 'store_full'
+              : 'invalid',
+        )
+      }
+      if (!listed) index.pins.push(documentId)
+      return { write: !listed, value: null }
+    })
+    if (outcome === null) return null
+    if ('code' in outcome) return outcome
+    // the index write failed after the row was written: the row goes again
+    await this.options.store.deletePin(documentId)
+    return refused(isUnavailable(outcome) ? outcome.kind : 'invalid')
+  }
+
+  /** a reservation whose pin did not go ahead (lease refused): row and index entry go */
+  private async releaseReservation(documentId: string): Promise<void> {
+    await this.withIndex(async (index) => {
+      index.pins = index.pins.filter((id) => id !== documentId)
+      return { write: true, value: undefined }
+    })
+    await this.options.store.deletePin(documentId)
   }
 
   private async ensureLease(documentId: string): Promise<LibraryRefusal | null> {
@@ -711,13 +768,6 @@ export class OfflineLibraryManager {
       if (detail) {
         manifest = this.manifestOf(detail)
         if (largestFileBytes(manifest) > this.limits.maxFileBytes) return refused('too_large')
-        const used = await this.usedBytes(index.index)
-        if (typeof used !== 'number') return refused(used.kind)
-        if (used + manifestBytes(manifest) > this.limits.maxBytes) {
-          return refused('offline_cap_reached')
-        }
-        const lease = await this.ensureLease(documentId)
-        if (lease) return lease
       }
 
       const record: PinRecord = {
@@ -725,26 +775,15 @@ export class OfflineLibraryManager {
         manifest,
         archived: detail?.archivedAt != null,
       }
-      const written = await this.options.store.putPin(record)
-      if (written.kind !== 'ok') {
-        return refused(
-          isUnavailable(written)
-            ? written.kind
-            : written.kind === 'store_full'
-              ? 'store_full'
-              : 'invalid',
-        )
-      }
-      const listed = await this.withIndex(async (current) => {
-        if (current.pins.includes(documentId)) return { write: false, value: true }
-        current.pins.push(documentId)
-        return { write: true, value: true }
-      })
-      if (listed !== true) {
-        await this.options.store.deletePin(documentId)
-        return refused(
-          isUnavailable(listed as { kind: string }) ? (listed as Unavailable).kind : 'invalid',
-        )
+      // the quota is checked and the pin reserved in one step (T5-1)
+      const reservation = await this.reserve(record)
+      if (reservation) return reservation
+      if (manifest) {
+        const lease = await this.ensureLease(documentId)
+        if (lease) {
+          await this.releaseReservation(documentId)
+          return lease
+        }
       }
       this.changed(documentId)
       if (!manifest) return { kind: 'pinned', row: await this.view(record) }
