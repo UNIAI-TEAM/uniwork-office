@@ -459,6 +459,13 @@ export interface SyncCenterControllerDeps {
   getFacts(): Promise<SyncCenterFacts>
   findDoc(rowId: string): Promise<ResolvedQueueDocEntry | null>
   dispatcher(): Promise<QueueDispatcher | null>
+  /**
+   * "Kiểm tra lại" on a BLOCKED row: the access re-probe of that one intent,
+   * right now (a document read, or a real capability read of the intent's own
+   * org lane), so the row leaves `blocked` only for a condition that really
+   * lifted. `false` = the re-probe could not run (no live session or store).
+   */
+  recheckBlocked(doc: QueueDoc): Promise<boolean>
   drafts(): Promise<DraftStore | null>
   /**
    * "Hủy lần lưu…" through the same service path the save pill uses. `documentClosed`
@@ -747,6 +754,17 @@ export function createSyncCenterController(deps: SyncCenterControllerDeps): Sync
       if (!deps.isOnline()) return { ok: false, code: 'offline' }
       const dispatcher = await deps.dispatcher()
       if (!dispatcher) return { ok: false, code: 'other' }
+
+      // a BLOCKED row is re-checked by the ACCESS re-probe, never by the commit
+      // lookup: only the condition itself - the document, or the org lane's
+      // capability - may lift the block, and a condition that still stands
+      // leaves the record exactly where it was (no attempt, no new key). The
+      // lookup stays the reconciling rows' action.
+      if (entry.doc.record.state === 'blocked') {
+        if (!(await deps.recheckBlocked(entry.doc))) return { ok: false, code: 'other' }
+        notifyChanged()
+        return { ok: true }
+      }
 
       const now = deps.now?.() ?? Date.now()
       await dispatcher.recheck(entry.doc, now)
@@ -1044,6 +1062,11 @@ export interface WiredSyncCenterService {
   resumeSending(): Promise<void>
   /** the save pill's "Hủy lần lưu": `closed` = no tab holds it (its snapshot is kept) */
   cancelSave(path: string, closed: boolean): Promise<void>
+  /**
+   * "Kiểm tra lại" on a blocked row: the access re-probe of F1 for that one
+   * intent, now; `false` when the live session's queue cannot be reached.
+   */
+  recheckBlockedSave(path: string): Promise<boolean>
   openDocument(documentId: string): Promise<{ ok: boolean }>
 }
 
@@ -1396,6 +1419,8 @@ export function createWiredSyncCenter(deps: WiredSyncCenterDeps): WiredSyncCente
       const engine = await deps.service.syncCenterEngine()
       return engine.kind === 'ok' ? engine.dispatcher : null
     },
+
+    recheckBlocked: (doc) => deps.service.recheckBlockedSave(doc.path),
 
     drafts: async () => {
       const engine = await deps.service.syncCenterEngine()

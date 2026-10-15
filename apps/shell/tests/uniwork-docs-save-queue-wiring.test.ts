@@ -216,6 +216,8 @@ interface Ctx {
   signOut: () => void
   signInAs: (id: string) => void
   setCapabilityOffline: (value: boolean) => void
+  /** true = the capability read answers `session_expired` (the session is still gone) */
+  setCapabilityExpired: (value: boolean) => void
   /** move the service clock (the blocked re-probe's backoff is wall-clock) */
   advanceClock: (ms: number) => void
 }
@@ -235,6 +237,8 @@ function setup(
   let account: string | null = opts.account === undefined ? 'acc_1' : opts.account
   /** true = the capability read fails (the lane is offline for the next save) */
   let capabilityOffline = false
+  /** true = the capability read answers the session is gone (still `session_expired`) */
+  let capabilityExpired = false
   let clock = Date.now()
   const safeStorage: LockableSafeStorage = createLockableSafeStorage()
   const layer: StoreLayer = createStoreLayer({
@@ -280,6 +284,13 @@ function setup(
     capability: {
       get: async (orgId: string) => {
         if (capabilityOffline) throw new Error('offline')
+        if (capabilityExpired) {
+          return {
+            kind: 'session_expired' as const,
+            capabilities: { sync_write: true },
+            source: 'fresh' as const,
+          }
+        }
         const syncWrite = opts.capability?.[orgId] ?? true
         return {
           kind: 'ok' as const,
@@ -306,6 +317,9 @@ function setup(
     },
     setCapabilityOffline: (value: boolean) => {
       capabilityOffline = value
+    },
+    setCapabilityExpired: (value: boolean) => {
+      capabilityExpired = value
     },
     advanceClock: (ms: number) => {
       clock += ms
@@ -804,6 +818,165 @@ describe('G5-06 W4b save queue wiring', () => {
         lastError: 'session_expired',
       })
       expect(commits(server)).toHaveLength(before)
+    })
+
+    describe('OQ-F12b: "Kiểm tra lại" on a blocked row re-probes access instead of looking the commit up', () => {
+      it('a condition that still stands leaves the row blocked: no lookup, no new attempt', async () => {
+        const server = fakeServer({ bytes: enc('v3') })
+        const ctx = setup(server)
+        const path = await blockedSave(ctx, server, {
+          route: 'commit',
+          kind: 403,
+          code: 'forbidden',
+        })
+        const blocked = await storedIntent(ctx, path)
+        expect(blocked?.intent).toMatchObject({ state: 'blocked', lastError: 'permission_revoked' })
+        // the access check still reports view-only: the click proves the block
+        // and answers a refusal - nothing about the record may move
+        server.state.myLevel = 'view'
+        const before = { lookups: lookups(server).length, commits: commits(server).length }
+        expect(await ctx.service.recheckBlockedSave(path)).toBe(true)
+        expect((await storedIntent(ctx, path))?.intent).toMatchObject({
+          state: 'blocked',
+          lastError: 'permission_revoked',
+          attempt: blocked!.intent.attempt,
+        })
+        expect(lookups(server)).toHaveLength(before.lookups)
+        expect(commits(server)).toHaveLength(before.commits)
+      })
+
+      it('a session that is still expired keeps the block, without a lookup', async () => {
+        const server = fakeServer({ bytes: enc('v3') })
+        const ctx = setup(server)
+        const path = await blockedSave(ctx, server, { route: 'commit', kind: 401 })
+        const blocked = await storedIntent(ctx, path)
+        expect(blocked?.intent).toMatchObject({ state: 'blocked', lastError: 'session_expired' })
+        // the forced capability read answers the same 401: the block stands
+        ctx.setCapabilityExpired(true)
+        const before = { lookups: lookups(server).length, commits: commits(server).length }
+        expect(await ctx.service.recheckBlockedSave(path)).toBe(true)
+        expect((await storedIntent(ctx, path))?.intent).toMatchObject({
+          state: 'blocked',
+          lastError: 'session_expired',
+          attempt: blocked!.intent.attempt,
+        })
+        expect(lookups(server)).toHaveLength(before.lookups)
+        expect(commits(server)).toHaveLength(before.commits)
+      })
+
+      it.each(['session_expired', 'member_deactivated', 'organization_suspended'] as const)(
+        'the %s condition lifted: the row goes back to queued and the SAME intent commits',
+        async (code) => {
+          const fault: Fault =
+            code === 'session_expired'
+              ? { route: 'commit', kind: 401 }
+              : { route: 'commit', kind: 403, code }
+          const server = fakeServer({ bytes: enc('v3') })
+          const ctx = setup(server)
+          const path = await blockedSave(ctx, server, fault)
+          const blocked = await storedIntent(ctx, path)
+          expect(blocked?.intent).toMatchObject({ state: 'blocked', lastError: code })
+          // no clock advance: the click re-probes NOW, not at the poll's backoff
+          expect(await ctx.service.recheckBlockedSave(path)).toBe(true)
+          await vi.waitFor(async () =>
+            expect(await ctx.service.docStatus(path)).toMatchObject({ state: 'saved' }),
+          )
+          expect(await storedIntent(ctx, path)).toBeNull()
+          expect(committedKeys(server)).toEqual([
+            blocked!.intent.idempotencyKey,
+            blocked!.intent.idempotencyKey,
+          ])
+        },
+      )
+
+      it('permission back: the probe lifts the block right away and the SAME intent commits', async () => {
+        const server = fakeServer({ bytes: enc('v3') })
+        const ctx = setup(server)
+        const path = await blockedSave(ctx, server, {
+          route: 'commit',
+          kind: 403,
+          code: 'forbidden',
+        })
+        const blocked = await storedIntent(ctx, path)
+        expect(blocked?.intent).toMatchObject({ state: 'blocked', lastError: 'permission_revoked' })
+        expect(ctx.service.isReadOnly(path)).toBe(true)
+        server.state.myLevel = 'edit'
+        expect(await ctx.service.recheckBlockedSave(path)).toBe(true)
+        await vi.waitFor(async () =>
+          expect(await ctx.service.docStatus(path)).toMatchObject({ state: 'saved' }),
+        )
+        expect(await storedIntent(ctx, path)).toBeNull()
+        expect(committedKeys(server)).toEqual([
+          blocked!.intent.idempotencyKey,
+          blocked!.intent.idempotencyKey,
+        ])
+        // the lock verdict the refusal put up is spent with the block
+        expect(ctx.service.isReadOnly(path)).toBe(false)
+      })
+
+      it('a document still in the trash keeps the block; restored, the SAME intent commits', async () => {
+        const server = fakeServer({ bytes: enc('v3') })
+        const ctx = setup(server)
+        const path = await blockedSave(ctx, server, {
+          route: 'commit',
+          kind: 410,
+          code: 'document_deleted',
+        })
+        const blocked = await storedIntent(ctx, path)
+        expect(blocked?.intent).toMatchObject({ state: 'blocked', lastError: 'document_deleted' })
+        // archived: the metadata read answers, and still refuses the write
+        server.state.archivedAt = '2026-10-01T00:00:00.000Z'
+        const before = commits(server).length
+        expect(await ctx.service.recheckBlockedSave(path)).toBe(true)
+        expect((await storedIntent(ctx, path))?.intent).toMatchObject({
+          state: 'blocked',
+          lastError: 'document_deleted',
+        })
+        expect(commits(server)).toHaveLength(before)
+        // restored: the click lifts the block and the normal path commits it
+        server.state.archivedAt = null
+        expect(await ctx.service.recheckBlockedSave(path)).toBe(true)
+        await vi.waitFor(async () =>
+          expect(await ctx.service.docStatus(path)).toMatchObject({ state: 'saved' }),
+        )
+        expect(await storedIntent(ctx, path)).toBeNull()
+        expect(committedKeys(server)).toEqual([
+          blocked!.intent.idempotencyKey,
+          blocked!.intent.idempotencyKey,
+        ])
+      })
+
+      it('refuses a row that is not blocked, so the reconciling lookup path stands', async () => {
+        const server = fakeServer({ bytes: enc('v3') })
+        const ctx = setup(server)
+        const path = await openDoc(ctx)
+        writeFileSync(path, 'v4')
+        // parked offline, never committed: a queued intent, not a blocked one
+        ctx.setCapabilityOffline(true)
+        await ctx.service.save(path)
+        ctx.setCapabilityOffline(false)
+        expect((await storedIntent(ctx, path))?.intent.state).toBe('paused_offline')
+        expect(await ctx.service.recheckBlockedSave(path)).toBe(false)
+        expect((await storedIntent(ctx, path))?.intent.state).toBe('paused_offline')
+      })
+
+      it("never re-probes another account's blocked row", async () => {
+        const server = fakeServer({ bytes: enc('v3') })
+        const ctx = setup(server)
+        const path = await blockedSave(ctx, server, { route: 'commit', kind: 401 })
+        expect((await storedIntent(ctx, path, 'acc_1'))?.intent.state).toBe('blocked')
+        ctx.signOut()
+        await ctx.service.teardownSaveQueue()
+        ctx.signInAs('acc_2')
+        const before = commits(server).length
+        // B's click on A's row must not probe, lift or send anything
+        expect(await ctx.service.recheckBlockedSave(path)).toBe(false)
+        expect((await storedIntent(ctx, path, 'acc_1'))?.intent).toMatchObject({
+          state: 'blocked',
+          lastError: 'session_expired',
+        })
+        expect(commits(server)).toHaveLength(before)
+      })
     })
   })
 
