@@ -1880,6 +1880,11 @@ const EMIT_FIXTURE = {
     "    inputSchema: buildSchema('unresolvable'),",
     '  },',
     '  {',
+    "    name: 'computed_description',",
+    "    description: `ops: ${opNames().join(', ')}`,",
+    "    inputSchema: { type: 'object', properties: { ops: { type: 'array' } } },",
+    '  },',
+    '  {',
     "    name: 'schemaless',",
     "    description: 'a tool with no inputSchema',",
     '  },',
@@ -1931,7 +1936,7 @@ describe('--emit-schemas', () => {
       version: 1,
       rev: sha,
       mechanicalBlockSha256: sha256(result.text),
-      counts: { docs: 3, sheets: 1, slides: 0, pdf: 0, markdown: 0, html: 0, 'agent-core': 1 },
+      counts: { docs: 4, sheets: 1, slides: 0, pdf: 0, markdown: 0, html: 0, 'agent-core': 1 },
     })
 
     // the shape holdout-backend.mjs reads: per module, `{ type: 'function', function: { name, description, parameters } }`
@@ -1967,6 +1972,18 @@ describe('--emit-schemas', () => {
         source: 'packages/agent-core/src/shared-tools.ts',
         schemaComplete: true,
         inputSchemaSha256: hashOf({ type: 'object', properties: { question: { type: 'string' } } }),
+      },
+      {
+        module: 'docs',
+        name: 'computed_description',
+        host: 'renderer',
+        source: 'apps/docs/src/renderer/ai/tools.ts',
+        schemaComplete: false,
+        reason: 'description:identifier:opNames',
+        description: null,
+        // the schema resolved, only the description needs product code: kept for a consumer that supplies its own
+        inputSchema: { type: 'object', properties: { ops: { type: 'array' } } },
+        inputSchemaSha256: hashOf({ type: 'object', properties: { ops: { type: 'array' } } }),
       },
       {
         module: 'docs',
