@@ -353,6 +353,24 @@ export type UniworkRemoteBar =
 /** the S6 bar's actions: hide, hide until a newer revision, retry a clean reload, or the conflict flow */
 export type UniworkRemoteAction = 'later' | 'close' | 'retry' | 'reload' | 'reload-now'
 
+/**
+ * G5-08c, S11 Lock-while-open bar: the document was open and dirty when its lock happened. The
+ * buffer stays on screen read-only; `store` = the unsent changes were kept in the encrypted store
+ * (`uwLockWhileOpen`), `ram` = the store could not take them, so they exist only in this window
+ * (`uwLockWhileOpenRam`). `reason` is the lock's cause (EXPERIENCE State Patterns > blocked reasons).
+ */
+export interface UniworkLockWhileOpen {
+  mode: 'store' | 'ram'
+  reason:
+    | 'lease_expired'
+    | 'clock_rollback'
+    | 'permission_revoked'
+    | 'document_deleted'
+    | 'keystore_locked'
+    | 'store_full'
+    | 'signed_out'
+}
+
 export interface UniworkDocStatus {
   path: string
   documentId: string
@@ -367,6 +385,8 @@ export interface UniworkDocStatus {
   lastSavedAt?: string
   /** S6 (G5-03a): the new-version bar of this document; absent = none */
   remote?: UniworkRemoteBar
+  /** G5-08c: a lock happened while this document was open (outranks `remote`); absent = none */
+  lockWhileOpen?: UniworkLockWhileOpen
 }
 
 export type UniworkConflictChoice = 'overwrite' | 'save-local-copy' | 'open-latest' | 'later'

@@ -344,6 +344,7 @@ export function DiscussionToggle({ status }: { status: UniworkDocStatus }) {
 
 /** one signature per bar state: a newer revision (another version) is a different bar */
 function remoteSignature(status: UniworkDocStatus | null): string | null {
+  if (status?.lockWhileOpen) return JSON.stringify(status.lockWhileOpen)
   return status?.remote ? JSON.stringify(status.remote) : null
 }
 
@@ -353,6 +354,8 @@ function remoteSignature(status: UniworkDocStatus | null): string | null {
  * higher version is a new one. Every other kind is its whole state.
  */
 function remoteNoticeKey(status: UniworkDocStatus | null): string | null {
+  // a lock while open is its mode: the sentence changes with it, not with the lock's reason
+  if (status?.lockWhileOpen) return `lock-while-open\n${status.lockWhileOpen.mode}`
   const remote = status?.remote
   if (!remote) return null
   if (remote.kind === 'newer-dirty' || remote.kind === 'newer-ai') return `newer\n${remote.version}`
@@ -525,7 +528,7 @@ export function UniworkRemoteBar({
           aria-label={t(model.regionKey)}
           aria-busy={busy ? 'true' : undefined}
           data-tone={model.tone}
-          data-kind={status?.remote?.kind}
+          data-kind={status?.lockWhileOpen ? 'lock-while-open' : status?.remote?.kind}
           onMouseEnter={() => setHovered(true)}
           onMouseLeave={() => setHovered(false)}
           onFocus={() => setFocused(true)}
@@ -544,33 +547,35 @@ export function UniworkRemoteBar({
               </p>
             )}
           </div>
-          <div className="uw-remote-actions">
-            {model.actions.map((action) => {
-              const blocked = Boolean(action.disabledReasonKey)
-              return (
-                <button
-                  key={action.kind}
-                  type="button"
-                  className="uw-remote-action"
-                  data-action={action.kind}
-                  aria-disabled={blocked || busy ? 'true' : undefined}
-                  aria-describedby={
-                    action.disabledReasonKey
-                      ? action.disabledReasonKey === model.messageKey
-                        ? messageId
-                        : reasonId
-                      : undefined
-                  }
-                  onClick={() => {
-                    if (blocked || busy) return
-                    act(action.kind)
-                  }}
-                >
-                  {t(action.labelKey)}
-                </button>
-              )
-            })}
-          </div>
+          {model.actions.length > 0 && (
+            <div className="uw-remote-actions">
+              {model.actions.map((action) => {
+                const blocked = Boolean(action.disabledReasonKey)
+                return (
+                  <button
+                    key={action.kind}
+                    type="button"
+                    className="uw-remote-action"
+                    data-action={action.kind}
+                    aria-disabled={blocked || busy ? 'true' : undefined}
+                    aria-describedby={
+                      action.disabledReasonKey
+                        ? action.disabledReasonKey === model.messageKey
+                          ? messageId
+                          : reasonId
+                        : undefined
+                    }
+                    onClick={() => {
+                      if (blocked || busy) return
+                      act(action.kind)
+                    }}
+                  >
+                    {t(action.labelKey)}
+                  </button>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
       {/* window-level live nodes: always in the DOM so a screen reader picks the change up */}
