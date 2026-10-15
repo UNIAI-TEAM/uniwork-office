@@ -12,7 +12,10 @@
   right: 0;
   z-index: 30;
   display: flex;
-  /* the dialog's own margin-left is its x: the component right-aligns it to the pill (8px gutters) */
+  /* the dialog's own margin-left is its x, by the physical box in every document direction: the band
+   * lays out left-to-right (the dialog carries the document's dir for its text), and the component
+   * puts the dialog's right edge (ltr) or left edge (rtl) on the pill's, inside the 8px gutters */
+  direction: ltr;
   justify-content: flex-start;
   padding: 6px 0 8px;
   border-bottom: 1px solid var(--border);

@@ -20,6 +20,7 @@ import {
   findQueueRow,
   formatQueueTime,
   isQueuePopoverState,
+  docDirOf,
   popoverLeftOf,
   queuePopoverModelOf,
   type PopoverAction,
@@ -135,6 +136,8 @@ export function UniworkQueuePopover({
   const [scrolls, setScrolls] = useState(false)
   // the dialog's left edge in the band's unscaled px; null until it is first placed (before paint)
   const [left, setLeft] = useState<number | null>(null)
+  // the document's direction, read when the dialog is placed (it changes with the UI language)
+  const [dir, setDir] = useState<'ltr' | 'rtl'>(() => docDirOf())
   const lineId = useId()
   const confirmId = useId()
 
@@ -164,22 +167,31 @@ export function UniworkQueuePopover({
     if (!dialog || !band) return
     const scale = uiScaleOf(dialog)
     const bandWidth = band.getBoundingClientRect().width
+    const direction = docDirOf()
+    const pillRect = live.current.anchorEl?.getBoundingClientRect()
     const next = popoverLeftOf({
-      pillRight: (live.current.anchorEl?.getBoundingClientRect().right ?? Number.NaN) / scale,
+      dir: direction,
+      pillRight: (pillRect?.right ?? Number.NaN) / scale,
+      pillLeft: (pillRect?.left ?? Number.NaN) / scale,
       width: dialog.getBoundingClientRect().width / scale,
       windowWidth: (bandWidth > 0 ? bandWidth : window.innerWidth) / scale,
     })
     setLeft((prev) => (prev === next ? prev : next))
+    setDir((prev) => (prev === direction ? prev : direction))
   }, [])
   // after every render: the pill may have moved since (a variant, a tab, a longer line)
   useLayoutEffect(place)
   useEffect(() => {
     window.addEventListener('resize', place)
+    // a switch of the UI language flips <html dir> while the dialog may stay open
+    const direction = typeof MutationObserver !== 'undefined' ? new MutationObserver(place) : null
+    direction?.observe(document.documentElement, { attributes: true, attributeFilter: ['dir'] })
     const sized = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(place) : null
     if (anchorEl) sized?.observe(anchorEl)
     if (dialogRef.current) sized?.observe(dialogRef.current)
     return () => {
       window.removeEventListener('resize', place)
+      direction?.disconnect()
       sized?.disconnect()
     }
   }, [place, anchorEl])
@@ -388,6 +400,8 @@ export function UniworkQueuePopover({
         role="dialog"
         tabIndex={-1}
         aria-labelledby={lineId}
+        // the band is left-to-right (physical x); the dialog's own text keeps the document direction
+        dir={dir}
         style={left === null ? undefined : { marginLeft: `${left}px` }}
       >
         <div

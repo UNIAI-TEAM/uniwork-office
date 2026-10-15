@@ -222,15 +222,23 @@ export const POPOVER_GUTTER_PX = 8
 /** the dialog's width when it cannot be measured (`.uw-queue-pop` in queue-popover.css) */
 const POPOVER_WIDTH_PX = 360
 
+/** the document's direction right now (`<html dir>` follows the UI language: rtl for ar and he) */
+export function docDirOf(): 'ltr' | 'rtl' {
+  return typeof document !== 'undefined' && document.documentElement.dir === 'rtl' ? 'rtl' : 'ltr'
+}
+
 /**
- * Where the dialog's left edge goes, in the unscaled CSS px it lays out in: right-aligned to the
- * pill's right edge, then kept inside the window by the gutter on both sides. A pill near the left
- * edge leaves the dialog at the left gutter (it then ends right of the pill's edge); a pill at the
- * window's edge leaves its right edge at the right gutter. A measure that is not a number takes
- * the right gutter (where the dialog sat before it followed the pill).
+ * Where the dialog's left edge goes, in the unscaled CSS px it lays out in, by the physical box
+ * whatever the document direction: left-to-right it is right-aligned to the pill's right edge; right-to-left
+ * (ar, he) the pill sits at the window's left and the dialog's LEFT edge is the pill's left edge, so it
+ * opens toward the window centre either way. Then it is kept inside the window by the gutter on both
+ * sides. A measure that is not a number takes the side the pill is on (right gutter left-to-right,
+ * left gutter right-to-left): inside the window, never NaN.
  */
 export function popoverLeftOf(input: {
   pillRight: number
+  pillLeft?: number
+  dir?: 'ltr' | 'rtl'
   width: number
   windowWidth: number
 }): number {
@@ -241,6 +249,15 @@ export function popoverLeftOf(input: {
       ? input.width
       : Math.min(POPOVER_WIDTH_PX, Math.max(0, windowWidth - 2 * gutter))
   const max = Math.max(gutter, windowWidth - gutter - width)
-  const wanted = Number.isFinite(input.pillRight) ? input.pillRight - width : max
+  const rtl = input.dir === 'rtl'
+  const edge = rtl ? input.pillLeft : input.pillRight
+  const wanted =
+    typeof edge === 'number' && Number.isFinite(edge)
+      ? rtl
+        ? edge
+        : edge - width
+      : rtl
+        ? gutter
+        : max
   return Math.min(max, Math.max(gutter, wanted))
 }
