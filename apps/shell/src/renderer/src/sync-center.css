@@ -296,11 +296,25 @@
 
 .sc-act-wrap {
   display: inline-block;
+  max-width: calc(100% - 6px);
   margin: 0 0 4px 6px;
 }
 
 .sc-act {
-  min-height: 24px;
+  min-height: 28px;
+}
+
+/*
+ * VIS-2n: the widest label ("Tải bản của tôi về máy") wraps inside the fixed actions
+ * column instead of overrunning the table edge; column widths stay as they are (VIS-6)
+ */
+.sc .set-btn.sc-act {
+  box-sizing: border-box;
+  max-width: 100%;
+  height: auto;
+  padding-block: 4px;
+  white-space: normal;
+  text-align: center;
 }
 
 .sc-act-danger {

@@ -988,6 +988,19 @@ describe('SyncCenterPane visual review fixes (VIS-1..VIS-8)', () => {
     expect(css).toContain('.sc .set-btn.sc-act-danger:focus-visible')
   })
 
+  it('VIS-2n: a long action wraps inside the fixed actions column instead of overrunning it', () => {
+    // `.set-btn` is nowrap at a fixed 28px: the row action rule must outrank it to wrap
+    const act = ruleBody('.sc .set-btn.sc-act')
+    expect(act).toContain('white-space: normal')
+    expect(act).toContain('max-width: 100%')
+    expect(act).toContain('height: auto')
+    expect(ruleBody('.sc-act-wrap')).toContain('max-width: calc(100% - 6px)')
+    expect(ruleBody('.sc-act')).toContain('min-height: 28px')
+    // VIS-6: the column widths themselves do not move
+    expect(ruleBody('.sc-col-actions')).toContain('width: 25%')
+    expect(ruleBody('.sc-col-state')).toContain('width: 148px')
+  })
+
   it('VIS-2 and VIS-6: fixed column widths, a status column that holds a pill, doc wider than details', () => {
     expect(ruleBody('.sc-table')).toContain('table-layout: fixed')
     expect(ruleBody('.sc-col-state')).toMatch(/width: 1[4-9]\d+px/)
