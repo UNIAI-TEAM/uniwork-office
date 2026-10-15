@@ -320,6 +320,135 @@ describe('V6u2-01: the focus chip is bounded by the room left of the pill', () =
   })
 })
 
+describe('RFE6u3-01: the focus-chip measurement attaches on focus and detaches on blur and unmount', () => {
+  interface FakeObserver {
+    callback: () => void
+    observed: Element[]
+    disconnects: number
+  }
+  let observers: FakeObserver[]
+  let hadObserver: boolean
+  let previousObserver: unknown
+  let addSpy: ReturnType<typeof vi.spyOn>
+  let removeSpy: ReturnType<typeof vi.spyOn>
+
+  const resizeCalls = (spy: ReturnType<typeof vi.spyOn>) =>
+    spy.mock.calls.filter((call) => call[0] === 'resize')
+  const liveObservers = () => observers.filter((o) => o.disconnects === 0)
+
+  beforeEach(() => {
+    observers = []
+    hadObserver = 'ResizeObserver' in window
+    previousObserver = (window as unknown as { ResizeObserver?: unknown }).ResizeObserver
+    ;(window as unknown as { ResizeObserver: unknown }).ResizeObserver = class {
+      private readonly record: FakeObserver
+      constructor(callback: () => void) {
+        this.record = { callback, observed: [], disconnects: 0 }
+        observers.push(this.record)
+      }
+      observe(target: Element): void {
+        this.record.observed.push(target)
+      }
+      unobserve(): void {}
+      disconnect(): void {
+        this.record.disconnects += 1
+      }
+    }
+  })
+
+  afterEach(() => {
+    addSpy?.mockRestore()
+    removeSpy?.mockRestore()
+    if (hadObserver) {
+      ;(window as unknown as { ResizeObserver: unknown }).ResizeObserver = previousObserver
+    } else {
+      delete (window as unknown as { ResizeObserver?: unknown }).ResizeObserver
+    }
+  })
+
+  /** spies go on after the mount so only the focus-driven calls are counted */
+  async function mountQueued(): Promise<void> {
+    await mount(status({ state: 'queued' }))
+    addSpy = vi.spyOn(window, 'addEventListener')
+    removeSpy = vi.spyOn(window, 'removeEventListener')
+  }
+
+  it('nothing is attached before the pill has the focus', async () => {
+    await mountQueued()
+    expect(resizeCalls(addSpy)).toHaveLength(0)
+    expect(observers).toHaveLength(0)
+  })
+
+  it('focus attaches one resize listener and one observer on the pill', async () => {
+    await mountQueued()
+    act(() => button()!.focus())
+    expect(resizeCalls(addSpy)).toHaveLength(1)
+    expect(observers).toHaveLength(1)
+    expect(observers[0].observed).toEqual([pill()])
+    expect(observers[0].disconnects).toBe(0)
+    expect(resizeCalls(removeSpy)).toHaveLength(0)
+  })
+
+  it('moving the focus inside the pill neither detaches nor attaches again', async () => {
+    await mountQueued()
+    act(() => pill().focus())
+    act(() => button()!.focus())
+    expect(resizeCalls(addSpy)).toHaveLength(1)
+    expect(resizeCalls(removeSpy)).toHaveLength(0)
+    expect(observers).toHaveLength(1)
+    expect(liveObservers()).toHaveLength(1)
+  })
+
+  it('blur detaches the same listener and disconnects the observer', async () => {
+    await mountQueued()
+    act(() => button()!.focus())
+    const attached = resizeCalls(addSpy)[0][1]
+    act(() => (document.getElementById('editor-stand-in') as HTMLElement).focus())
+    const detached = resizeCalls(removeSpy)
+    expect(detached).toHaveLength(1)
+    expect(detached[0][1]).toBe(attached)
+    expect(observers[0].disconnects).toBe(1)
+    expect(liveObservers()).toHaveLength(0)
+  })
+
+  it('a resize or an observer callback after the blur measures nothing', async () => {
+    await mountQueued()
+    act(() => button()!.focus())
+    act(() => (document.getElementById('editor-stand-in') as HTMLElement).focus())
+    const measured = vi.fn(() => ({ left: 300 }) as DOMRect)
+    pill().getBoundingClientRect = measured
+    act(() => {
+      window.dispatchEvent(new Event('resize'))
+    })
+    expect(measured).not.toHaveBeenCalled()
+  })
+
+  it('unmounting while focused removes the listener and disconnects the observer', async () => {
+    await mountQueued()
+    act(() => button()!.focus())
+    const attached = resizeCalls(addSpy)[0][1]
+    await act(async () => {
+      root.render(createElement('div'))
+    })
+    const detached = resizeCalls(removeSpy)
+    expect(detached).toHaveLength(1)
+    expect(detached[0][1]).toBe(attached)
+    expect(observers[0].disconnects).toBe(1)
+    expect(liveObservers()).toHaveLength(0)
+  })
+
+  it('focus again after a blur attaches a fresh pair (no leak across cycles)', async () => {
+    await mountQueued()
+    act(() => button()!.focus())
+    act(() => (document.getElementById('editor-stand-in') as HTMLElement).focus())
+    act(() => button()!.focus())
+    expect(resizeCalls(addSpy)).toHaveLength(2)
+    expect(resizeCalls(removeSpy)).toHaveLength(1)
+    expect(observers).toHaveLength(2)
+    expect(liveObservers()).toHaveLength(1)
+  })
+})
+
 describe('Save pill announces each change once (T4)', () => {
   it('says nothing on the first render', async () => {
     await mount(status({ state: 'dirty' }))

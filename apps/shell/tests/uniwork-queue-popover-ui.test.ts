@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { act, createElement, useRef, useState } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -7,7 +9,11 @@ import { en } from '../src/renderer/src/i18n/sync/en'
 import { en as enDocs } from '../src/renderer/src/i18n/uniwork-documents/en'
 import { UniworkLiveHost, resetLiveForTests } from '../src/renderer/src/uniwork-live'
 import { UniworkQueuePopover } from '../src/renderer/src/UniworkQueuePopover'
-import { setTopInsetPart } from '../src/renderer/src/uniwork-top-inset'
+import {
+  TOP_INSET_MAX,
+  setTopInsetPart,
+  topInsetTotal,
+} from '../src/renderer/src/uniwork-top-inset'
 import {
   failedReasonKeyOf,
   findQueueRow,
@@ -738,6 +744,161 @@ describe('UniworkQueuePopover (S4)', () => {
       await mount(makeStatus({ state: 'saved' }))
       expect(dialog()).toBeNull()
       expect(lastInset()).toBe(0)
+    })
+
+    describe('RBE6u2-03: the band never asks for more than main will give', () => {
+      const room = () =>
+        document
+          .querySelector<HTMLElement>('[data-uw-queue-band]')!
+          .style.getPropertyValue('--uw-queue-room')
+      const measured = (height: number) =>
+        rectSpy.mockImplementation(function (this: HTMLElement) {
+          const h = this.hasAttribute('data-uw-queue-band') ? height : 0
+          return {
+            x: 0,
+            y: 0,
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: h,
+            width: 0,
+            height: h,
+          } as DOMRect
+        })
+      const body = () => document.querySelector<HTMLElement>('.uw-queue-pop-body')
+      let scrollSpy: ReturnType<typeof vi.spyOn>
+      let clientSpy: ReturnType<typeof vi.spyOn>
+
+      afterEach(() => {
+        scrollSpy?.mockRestore()
+        clientSpy?.mockRestore()
+        document.documentElement.style.removeProperty('--ui-scale')
+      })
+
+      it('mirrors the main-process clamp', () => {
+        expect(TOP_INSET_MAX).toBe(400)
+      })
+
+      it('a popover taller than the room publishes at most 400 and the dialog gets the room', async () => {
+        measured(520)
+        await mount(makeStatus())
+        expect(room()).toBe('400px')
+        expect(setBarInset.mock.calls.every((call) => (call[0] as number) <= 400)).toBe(true)
+        expect(lastInset()).toBe(400)
+      })
+
+      it('with the S6 bar present the room shrinks by the bar height', async () => {
+        setTopInsetPart('bar', 36)
+        measured(520)
+        await mount(makeStatus())
+        expect(room()).toBe('364px')
+        expect(lastInset()).toBe(400)
+        expect(setBarInset.mock.calls.every((call) => (call[0] as number) <= 400)).toBe(true)
+        // the bar growing while the popover is open shrinks the room and keeps the total in range
+        setTopInsetPart('bar', 100)
+        await act(async () => {})
+        expect(room()).toBe('300px')
+        expect(topInsetTotal()).toBeLessThanOrEqual(400)
+        expect(lastInset()).toBeLessThanOrEqual(400)
+      })
+
+      it('a popover that fits is published as measured', async () => {
+        measured(120)
+        await mount(makeStatus())
+        expect(room()).toBe('400px')
+        expect(lastInset()).toBe(120)
+      })
+
+      it('the cap is in unscaled px: a zoomed interface measures window px', async () => {
+        document.documentElement.style.setProperty('--ui-scale', '2')
+        measured(1000)
+        await mount(makeStatus())
+        expect(room()).toBe('400px')
+        expect(lastInset()).toBe(400)
+        measured(700)
+        await act(async () => {
+          document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+        })
+        await mount(makeStatus())
+        expect(lastInset()).toBe(350)
+      })
+
+      it('the text scrolls inside the dialog; the action row stays outside the scroll area', async () => {
+        await mount(makeStatus())
+        const scroller = body()!
+        expect(scroller).not.toBeNull()
+        expect(dialog()!.contains(scroller)).toBe(true)
+        expect(scroller.textContent).toContain('version 7')
+        const actions = dialog()!.querySelector('.uw-queue-pop-actions')!
+        expect(scroller.contains(actions)).toBe(false)
+        expect(actions.querySelectorAll('button').length).toBeGreaterThan(0)
+        // the cancel confirmation sentence scrolls with the text; its buttons stay put
+        await act(async () => {
+          buttonByText('Cancel save…')!.click()
+        })
+        expect(body()!.textContent).toContain(en.uwQueueCancelConfirm)
+        expect(body()!.contains(dialog()!.querySelector('.uw-queue-pop-actions button'))).toBe(
+          false,
+        )
+      })
+
+      it('an overflowing body is a keyboard stop; one that fits is not', async () => {
+        await mount(makeStatus())
+        expect(body()!.hasAttribute('tabindex')).toBe(false)
+        await act(async () => {
+          document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+        })
+        scrollSpy = vi
+          .spyOn(HTMLElement.prototype, 'scrollHeight', 'get')
+          .mockImplementation(() => 500)
+        clientSpy = vi
+          .spyOn(HTMLElement.prototype, 'clientHeight', 'get')
+          .mockImplementation(() => 200)
+        await mount(makeStatus())
+        expect(body()!.getAttribute('tabindex')).toBe('0')
+        expect(body()!.getAttribute('role')).toBe('group')
+        expect(body()!.getAttribute('aria-labelledby')).toBe(
+          dialog()!.getAttribute('aria-labelledby'),
+        )
+      })
+
+      describe('queue-popover.css', () => {
+        const css = readFileSync(
+          resolve(__dirname, '../src/renderer/src/queue-popover.css'),
+          'utf8',
+        ).replace(new RegExp(String.fromCharCode(13), 'g'), '')
+        const rule = (selector: string): string => {
+          const start = css.indexOf(`${String.fromCharCode(10)}${selector} {`)
+          expect(start, selector).toBeGreaterThanOrEqual(0)
+          const open = css.indexOf('{', start)
+          return css.slice(open + 1, css.indexOf('}', open))
+        }
+
+        it('the dialog is capped by the room minus the band chrome', () => {
+          expect(rule('.uw-queue-pop')).toMatch(
+            /max-height: calc\(var\(--uw-queue-room, \d+px\) - 15px\)/,
+          )
+          // padding 6 + 8 and the 1px border make the 15px
+          expect(rule('.uw-queue-band')).toMatch(/padding: 6px 12px 8px/)
+          expect(rule('.uw-queue-band')).toMatch(/border-bottom: 1px solid/)
+          expect(rule('.uw-queue-band')).toMatch(/overflow: hidden/)
+        })
+
+        it('the body scrolls, the action row never shrinks, the focus ring shows', () => {
+          expect(rule('.uw-queue-pop-body')).toMatch(/overflow-y: auto/)
+          expect(rule('.uw-queue-pop-body')).toMatch(/min-height: 0/)
+          expect(rule('.uw-queue-pop-actions')).toMatch(/flex-shrink: 0/)
+          expect(rule('.uw-queue-pop-body:focus-visible')).toMatch(
+            /outline: 2px solid var\(--color-border-brand\)/,
+          )
+        })
+
+        it('theme tokens only', () => {
+          expect(rule('.uw-queue-pop-body') + rule('.uw-queue-pop-body:focus-visible')).not.toMatch(
+            /#[0-9a-f]{3,8}|rgba?\(/i,
+          )
+        })
+      })
     })
 
     describe('V6u-03: the editor moves once on open, once on close', () => {
