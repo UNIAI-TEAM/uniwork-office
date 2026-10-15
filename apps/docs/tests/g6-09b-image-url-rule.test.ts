@@ -153,7 +153,20 @@ describe('docs image URL rule under UniWork AI', () => {
     const skill = createDocsSkill(
       () => editor,
       () => NUM_IDS,
-      ...Array<undefined>(13),
+      // getTrack .. getProtection are not needed here
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
       imageUrls,
     )
     imageUrls.register(FOUND, 'image_search')

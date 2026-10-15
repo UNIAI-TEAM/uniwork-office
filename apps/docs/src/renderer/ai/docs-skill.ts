@@ -1,5 +1,5 @@
 import type { Editor } from '@tiptap/core'
-import type { AgentSkill } from '@genoffice/agent-core'
+import type { AgentSkill, ImageUrlRegistry } from '@genoffice/agent-core'
 import {
   AGENT_SYSTEM_PROMPT,
   buildDocContext,
@@ -208,6 +208,8 @@ export function createDocsSkill(
   getAsk?: () => AskClarification | undefined,
   /** live predicate: the Word protection of the open document (re-read every request, so unprotecting restores the tools) */
   getProtection?: () => AiDocProtection,
+  /** image URLs this run may insert (reset at every run); refuses unregistered ones while its enforce predicate holds */
+  imageUrls?: ImageUrlRegistry,
 ): AgentSkill {
   // Selection frozen per run: tools act on the range the prompt described,
   // not on wherever the user's live selection has wandered mid-run. The doc
@@ -256,6 +258,8 @@ export function createDocsSkill(
       )
     },
     buildContext: () => {
+      // one buildContext per loop.run: the image URLs of the previous request stop being insertable
+      imageUrls?.beginRun()
       const editor = getEditor()
       markDocSeen(editor) // the context the model receives is the freshness baseline for index-addressed writes
       frozen = { scope: getSelectionScope(editor), doc: editor.state.doc }
@@ -288,6 +292,7 @@ export function createDocsSkill(
                 getExtras?.(),
                 getNotes?.(),
                 getAsk?.(),
+                imageUrls,
               ),
   }
 }
