@@ -1550,10 +1550,10 @@ describe('G5-12 Save as a copy (main)', () => {
     await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
   })
 
-  it('BE-12-201: only workspace_seat_required is no_seat; forbidden, any other 403, a deactivated member / suspended org, 5xx and network errors stay save_copy_failed', async () => {
+  it('BE-12-201 / BE-12-304: workspace_seat_required is no_seat, forbidden (the parent folder gate) is folder_refused; any other 403, a deactivated member / suspended org, 5xx and network errors stay save_copy_failed', async () => {
     const cases: Array<[Fault, string]> = [
       [{ route: 'copy', kind: 403, code: 'workspace_seat_required' }, 'save_copy_no_seat'],
-      [{ route: 'copy', kind: 403, code: 'forbidden' }, 'save_copy_failed'],
+      [{ route: 'copy', kind: 403, code: 'forbidden' }, 'save_copy_folder_refused'],
       [{ route: 'copy', kind: 403, code: 'permission_revoked' }, 'save_copy_failed'],
       [{ route: 'copy', kind: 403, code: 'some_other_refusal' }, 'save_copy_failed'],
       [{ route: 'copy', kind: 403, code: 'member_deactivated' }, 'save_copy_failed'],
@@ -1576,7 +1576,7 @@ describe('G5-12 Save as a copy (main)', () => {
     }
   })
 
-  it('BE-12-201: a member whose copy is refused by the parent folder gate (403 forbidden) is told the copy failed, never that they have no seat', async () => {
+  it('BE-12-304: a member whose copy is refused by the parent folder gate (403 forbidden) gets the folder reason and the Download step, never the no-seat claim or "try again"', async () => {
     const server = fakeServer()
     // the source sits in a folder the caller cannot edit: the server's parent gate answers 403
     server.state.parentId = FOLDER
@@ -1593,10 +1593,11 @@ describe('G5-12 Save as a copy (main)', () => {
     expect(callsTo(server, `${DOC}/copies`)).toMatchObject([{ body: { parent_id: FOLDER } }])
     expect(reply).toMatchObject({
       kind: 'view',
-      view: { notice: 'save_copy_failed', locked: 'none', canEdit: true },
+      view: { notice: 'save_copy_folder_refused', noticeArg: null, locked: 'none', canEdit: true },
     })
     expect(callsTo(server, `${COPY}/uploads`)).toHaveLength(0)
     expect(callsTo(server, `${COPY}/archive`)).toHaveLength(0)
+
     await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
   })
 
@@ -1972,6 +1973,36 @@ describe('G5-12 W-F2 "Download my version" (main)', () => {
       kind: 'view',
       view: { notice: 'save_copy_no_seat', noticeArg: null, locked: 'none', canEdit: true },
     })
+    expect(server.calls).toHaveLength(callsBefore)
+    await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
+  })
+
+  it('BE-12-304: after the folder refusal Download my version works like the no-seat step: the picked path gets the local bytes, a cancelled OS dialog keeps the folder notice', async () => {
+    const server = fakeServer()
+    server.state.parentId = FOLDER
+    server.faults.push({ route: 'copy', kind: 403, code: 'forbidden' })
+    const ctx = setup(server)
+    const path = await openAndConflict(ctx, server)
+    const { view } = await openDialog(ctx, path)
+    const first = await ctx.service.conflictAct(view.sessionId, {
+      kind: 'save-copy',
+      stopAi: false,
+    })
+    expect(first).toMatchObject({ kind: 'view', view: { notice: 'save_copy_folder_refused' } })
+    const callsBefore = server.calls.length
+
+    pick(ctx).mockResolvedValue(null)
+    expect(await download(ctx, view.sessionId)).toMatchObject({
+      kind: 'view',
+      view: { notice: 'save_copy_folder_refused', noticeArg: null, locked: 'none', canEdit: true },
+    })
+    expect(server.calls).toHaveLength(callsBefore)
+
+    const target = join(outDir(), 'folder-refused.docx')
+    pick(ctx).mockResolvedValue(target)
+    const done = await download(ctx, view.sessionId)
+    expect(done).toMatchObject({ kind: 'view', view: { notice: 'download_done' } })
+    expect(readFileSync(target).length).toBeGreaterThan(0)
     expect(server.calls).toHaveLength(callsBefore)
     await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
   })

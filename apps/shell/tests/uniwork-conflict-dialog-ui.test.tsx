@@ -840,6 +840,50 @@ describe('UniworkConflictDialog UI (G5-09 S5 desktop)', () => {
       ])
     })
 
+    it('BE-12-304: a save_copy_folder_refused reply keeps step 2 with the folder reason, Download my version as the primary; Back clears the notice and starts step 1 clean', async () => {
+      const dialog = await openStep2()
+      nextReply = { kind: 'view', view: makeView({ notice: 'save_copy_folder_refused' }) }
+      await act(async () => {
+        ;(
+          dialog.querySelector('[data-conflict-action="save-copy-go"]') as HTMLButtonElement
+        ).click()
+      })
+      expect(dialog.querySelectorAll('[role="alert"]')).toHaveLength(1)
+      expect((dialog.querySelector('[role="alert"]') as HTMLElement).textContent).toBe(
+        en.uwConflictSaveCopyFolderRefused,
+      )
+      expect(en.uwConflictSaveCopyFolderRefused).toBe(
+        'You can’t create documents in this folder. Download your version instead.',
+      )
+      expect((dialog.querySelector('h2') as HTMLElement).textContent).toBe(en.uwActDownloadMine)
+      expect(dialog.querySelector('[data-conflict-action="save-copy-go"]')).toBeNull()
+      const primary = dialog.querySelector('[data-conflict-action="download-go"]') as HTMLElement
+      expect(primary.textContent).toBe(en.uwActDownloadMine)
+      expect(dialog.querySelector('[data-conflict-action="back"]')).not.toBeNull()
+
+      // the primary sends the same download-mine action as after a no-seat refusal
+      actCalls.length = 0
+      await act(async () => {
+        primary.click()
+      })
+      expect(actCalls).toEqual([
+        { sessionId: 'sess-ui-1', action: { kind: 'download-mine', stopAi: false } },
+      ])
+
+      // Back: step 1 without the reason, and a re-entered Save as a copy starts clean
+      await act(async () => {
+        ;(dialog.querySelector('[data-conflict-action="back"]') as HTMLButtonElement).click()
+      })
+      expect(dialog.querySelector('[data-conflict-action="reload"]')).not.toBeNull()
+      expect(dialog.querySelector('[data-conflict-action="download-go"]')).toBeNull()
+      expect(dialog.querySelector('[role="alert"]')?.textContent ?? '').toBe('')
+      await act(async () => {
+        ;(dialog.querySelector('[data-conflict-action="save-copy"]') as HTMLButtonElement).click()
+      })
+      expect(dialog.querySelector('[data-conflict-action="save-copy-go"]')).not.toBeNull()
+      expect(dialog.querySelector('[role="alert"]')?.textContent ?? '').toBe('')
+    })
+
     it('FE-12-22: Back from the Download step after a download_failed reply also returns to step 1 without the notice, and re-entering Save as a copy shows the create-copy step', async () => {
       const dialog = await openStep2()
       nextReply = { kind: 'view', view: makeView({ notice: 'save_copy_no_seat' }) }
@@ -1101,6 +1145,9 @@ describe('UniworkConflictDialog UI (G5-09 S5 desktop)', () => {
       )
       expect(viStrings.uwConflictDownloadFailedDesktop).toBe(
         'Chưa lưu được tệp. Thay đổi của bạn vẫn an toàn; hãy thử lại.',
+      )
+      expect(viStrings.uwConflictSaveCopyFolderRefused).toBe(
+        'Bạn không thể tạo tài liệu trong thư mục này. Hãy tải bản của bạn về máy.',
       )
       expect(en.uwConflictSaveCopyNoSeat).toContain('not a member of the workspace')
       const dialog = await openStep2()
