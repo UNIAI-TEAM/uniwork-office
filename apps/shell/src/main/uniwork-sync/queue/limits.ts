@@ -1,3 +1,5 @@
+import { readTestQueueLimit } from '../test-hooks/limits'
+
 /**
  * The signed numbers of the durable save queue (OQ-UX2, signed U-15
  * 2026-10-12; EXPERIENCE.md › numbers :1077-1093). One table for the whole
@@ -9,9 +11,13 @@ export const QUEUE_LIMITS = {
   /** kept drafts per document; the next one is refused `drafts_full` */
   draftsPerDocument: 3,
   /** a `reconciling` intent older than this without a verdict is `reconciling-stuck` (1 h) */
-  stuckAfterMs: 3_600_000,
+  get stuckAfterMs(): number {
+    return readTestQueueLimit('UNIWORK_SYNC_TEST_STUCK_AFTER_MS', 3_600_000)
+  },
   /** how often a `reconciling-stuck` row checks again (15 min) */
-  recheckMs: 900_000,
+  get recheckMs(): number {
+    return readTestQueueLimit('UNIWORK_SYNC_TEST_RECHECK_MS', 900_000)
+  },
   /** document lock heartbeat (S1 second-window bar) */
   heartbeatMs: 5_000,
   /** a lock without a heartbeat for this long is gone (3 missed beats) */
