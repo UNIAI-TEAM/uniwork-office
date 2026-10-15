@@ -448,3 +448,63 @@ describe('discarding the assets one AI run created (Roll back)', () => {
     ).resolves.toMatchObject({ deleted: [] })
   })
 })
+
+describe('first save of an untitled document (ask before writing, G6-09 W8)', () => {
+  const save = (contents: FakeWebContents, request: Record<string, unknown>) =>
+    handlers.get(MARKDOWN_CHANNELS.save)?.(
+      { sender: contents },
+      { text: '# Draft', imageSources: [], ...request },
+    ) as Promise<{ ok: boolean; canceled?: boolean; path?: string }>
+
+  async function targetIn(directory: string, name: string): Promise<string> {
+    return join(directory, name)
+  }
+
+  it('an AI-suggested name only fills the Save dialog: nothing is written until it is confirmed', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'markdown-first-save-'))
+    temporaryDirectories.push(directory)
+    const view = createMarkdownView(null)
+    const contents = view.webContents as unknown as FakeWebContents
+    showSaveDialogWithMemory.mockResolvedValue({ canceled: true })
+
+    const result = await save(contents, { mode: 'save', suggestedName: 'Quarterly plan' })
+
+    expect(result).toMatchObject({ ok: true, canceled: true })
+    expect(showSaveDialogWithMemory).toHaveBeenCalledTimes(1)
+    const options = showSaveDialogWithMemory.mock.calls[0]![2] as { defaultPath: string }
+    expect(options.defaultPath.endsWith('Quarterly plan.md')).toBe(true)
+    // nothing landed in the default save folder under the suggested name
+    expect(existsSync(options.defaultPath)).toBe(false)
+
+    const target = await targetIn(directory, 'Quarterly plan.md')
+    showSaveDialogWithMemory.mockResolvedValue({ canceled: false, filePath: target })
+    const confirmed = await save(contents, { mode: 'save', suggestedName: 'Quarterly plan' })
+    expect(confirmed).toMatchObject({ ok: true, path: target })
+    expect(await readFile(target, 'utf8')).toBe('# Draft')
+  })
+
+  it('Ctrl+S on an untitled document still opens the dialog with the untitled name', async () => {
+    const view = createMarkdownView(null)
+    const contents = view.webContents as unknown as FakeWebContents
+    showSaveDialogWithMemory.mockResolvedValue({ canceled: true })
+
+    await save(contents, { mode: 'save' })
+
+    expect(showSaveDialogWithMemory).toHaveBeenCalledTimes(1)
+    const options = showSaveDialogWithMemory.mock.calls[0]![2] as { defaultPath: string }
+    expect(options.defaultPath).toMatch(/\.md$/)
+    expect(options.defaultPath).not.toContain('Quarterly')
+  })
+
+  it('a titled document still saves in place with no dialog, whatever name is passed', async () => {
+    const documentPath = await createDocument()
+    const view = createMarkdownView(documentPath)
+    const contents = view.webContents as unknown as FakeWebContents
+
+    const result = await save(contents, { mode: 'save', suggestedName: 'Ignored' })
+
+    expect(result).toMatchObject({ ok: true, path: documentPath })
+    expect(showSaveDialogWithMemory).not.toHaveBeenCalled()
+    expect(await readFile(documentPath, 'utf8')).toBe('# Draft')
+  })
+})
