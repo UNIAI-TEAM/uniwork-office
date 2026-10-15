@@ -40,6 +40,8 @@ export const id = {
   aiWebStateUnreachableBody: 'UniWork tidak dapat menjangkau penyedia AI. Coba lagi sebentar lagi.',
   aiWebStateCloudTitle: 'Alat cloud tidak tersedia',
   aiWebStateCloudBody: 'Alat UniWork AI ini belum disiapkan di server.',
+  aiWebStateOutageTitle: 'UniWork sementara tidak tersedia',
+  aiWebStateOutageBody: 'UniWork tidak dapat dijangkau saat ini. Coba lagi sebentar lagi.',
   aiWebStateSessionTitle: 'Sesi kedaluwarsa',
   aiWebStateSessionBody: 'Buka kembali dokumen dari UniWork untuk melanjutkan.',
   aiWebStateRefusedTitle: 'Permintaan ditolak',

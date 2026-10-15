@@ -395,14 +395,23 @@ describe('proxy transport (ai-provider wire format -> BYOK routes)', () => {
     })
   })
 
-  it('a 503 without a JSON error body (gateway page, empty body) is the typed cloud_unavailable state', async () => {
+  it('a 503 without a JSON error body (gateway page, empty body) is the typed cloud_outage state', async () => {
     let answer = new Response('<html>502 Bad Gateway</html>', { status: 503 })
     const proxied = createProxyFetch({ base: BASE, fetch: vi.fn(async () => answer) })
     await expect(proxied(`${p}/openai/chat/completions`, { body: '{}' })).rejects.toMatchObject({
-      code: 'cloud_unavailable',
+      code: 'cloud_outage',
       status: 503,
     })
     answer = new Response('', { status: 503 })
+    await expect(proxied(`${p}/openai/chat/completions`, { body: '{}' })).rejects.toMatchObject({
+      code: 'cloud_outage',
+    })
+    // the outage text asks for a retry, it never says the tool is not set up on the server
+    const text = describeAiError(new AiWebError({ code: 'cloud_outage', status: 503 }), 'X')
+    expect(text).toMatch(/try again/i)
+    expect(text).not.toMatch(/not set up/i)
+    // a coded 503 keeps its own state
+    answer = jsonResponse(503, { error: { code: 'cloud_unavailable' } })
     await expect(proxied(`${p}/openai/chat/completions`, { body: '{}' })).rejects.toMatchObject({
       code: 'cloud_unavailable',
     })
@@ -998,6 +1007,7 @@ describe('in-frame UI', () => {
       'rate_limited',
       'provider_unreachable',
       'cloud_unavailable',
+      'cloud_outage',
       'unauthorized',
       'base_url_refused',
       'provider_not_supported',

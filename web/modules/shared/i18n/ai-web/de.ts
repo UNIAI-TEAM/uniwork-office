@@ -43,6 +43,8 @@ export const de = {
     'UniWork konnte den KI-Anbieter nicht erreichen. Versuchen Sie es gleich noch einmal.',
   aiWebStateCloudTitle: 'Cloud-Tool nicht verfügbar',
   aiWebStateCloudBody: 'Dieses UniWork-KI-Tool ist auf dem Server noch nicht eingerichtet.',
+  aiWebStateOutageTitle: 'UniWork vorübergehend nicht verfügbar',
+  aiWebStateOutageBody: 'UniWork ist gerade nicht erreichbar. Versuchen Sie es gleich noch einmal.',
   aiWebStateSessionTitle: 'Sitzung abgelaufen',
   aiWebStateSessionBody: 'Öffnen Sie das Dokument erneut aus UniWork, um fortzufahren.',
   aiWebStateRefusedTitle: 'Anfrage abgelehnt',

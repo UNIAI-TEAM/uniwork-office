@@ -17,6 +17,7 @@
  * | 429  | (none; `retry-after` forwarded)            | rate_limited           |
  * | 502  | provider_unreachable                       | provider_unreachable   |
  * | 503  | cloud_unavailable                          | cloud_unavailable      |
+ * | 503  | (no JSON error body: gateway page, empty)  | cloud_outage           |
  * | else |                                            | unknown                |
  *
  * The status decides; the body's `code` only refines a 400 (and is kept in `serverCode`).
@@ -40,6 +41,8 @@ export type AiWebErrorCode =
   | 'rate_limited'
   | 'provider_unreachable'
   | 'cloud_unavailable'
+  /** a 503 with no JSON error body (a gateway page while the UniWork API is down): retry, not "not set up" */
+  | 'cloud_outage'
   | 'unauthorized'
   | 'provider_not_supported'
   | 'base_url_refused'
@@ -56,6 +59,7 @@ export const AI_WEB_ERROR_CODES: readonly AiWebErrorCode[] = [
   'rate_limited',
   'provider_unreachable',
   'cloud_unavailable',
+  'cloud_outage',
   'unauthorized',
   'provider_not_supported',
   'base_url_refused',
@@ -146,13 +150,18 @@ export const errorBodyFields = proxyErrorBodyFields
 export async function aiErrorFromResponse(res: Response): Promise<AiWebError> {
   let serverCode: string | undefined
   let message: string | undefined
+  let hasJsonError = false
   try {
-    ;({ code: serverCode, message } = errorBodyFields(await res.json()))
+    const body: unknown = await res.json()
+    ;({ code: serverCode, message } = errorBodyFields(body))
+    hasJsonError = !!body && typeof body === 'object' && ('error' in body || 'code' in body)
   } catch {
     // not JSON (a provider 429 page, a proxy error): the status alone decides
   }
   return new AiWebError({
-    code: aiErrorCodeFor(res.status, serverCode),
+    // only a 503 with no JSON error body is an outage; a coded or JSON 503 keeps cloud_unavailable
+    code:
+      res.status === 503 && !hasJsonError ? 'cloud_outage' : aiErrorCodeFor(res.status, serverCode),
     status: res.status,
     ...(message ? { message } : {}),
     ...(serverCode ? { serverCode } : {}),

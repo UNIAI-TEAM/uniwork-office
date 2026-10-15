@@ -42,6 +42,9 @@ export const es = {
     'UniWork no pudo contactar con el proveedor de IA. Inténtalo de nuevo en un momento.',
   aiWebStateCloudTitle: 'Herramienta en la nube no disponible',
   aiWebStateCloudBody: 'Esta herramienta de UniWork AI aún no está configurada en el servidor.',
+  aiWebStateOutageTitle: 'UniWork no disponible temporalmente',
+  aiWebStateOutageBody:
+    'No se puede acceder a UniWork en este momento. Inténtalo de nuevo en un momento.',
   aiWebStateSessionTitle: 'Sesión caducada',
   aiWebStateSessionBody: 'Vuelve a abrir el documento desde UniWork para continuar.',
   aiWebStateRefusedTitle: 'Solicitud rechazada',

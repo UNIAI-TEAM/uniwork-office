@@ -36,6 +36,8 @@ export const zh = {
   aiWebStateUnreachableBody: 'UniWork 无法连接到 AI 服务商。请稍后重试。',
   aiWebStateCloudTitle: '云工具不可用',
   aiWebStateCloudBody: '服务器尚未配置此 UniWork AI 工具。',
+  aiWebStateOutageTitle: 'UniWork 暂时不可用',
+  aiWebStateOutageBody: '暂时无法连接到 UniWork。请稍后重试。',
   aiWebStateSessionTitle: '会话已过期',
   aiWebStateSessionBody: '请从 UniWork 重新打开文档以继续。',
   aiWebStateRefusedTitle: '请求被拒绝',
