@@ -62,10 +62,15 @@ body.overlay-title-bar .tab-bar-drag-spacer {
 
 /* Windows/Linux caption buttons are drawn over the strip's right end
    (titleBarOverlay); the Window Controls Overlay env vars give their width,
-   and resolve to 0 where the overlay is absent */
+   and resolve to 0 where the overlay is absent. 100vw and the env() lengths
+   are window px, which the frame's zoom would multiply again (a 138px caption
+   reserved 172px at 125%): divided by the scale they are the caption's width
+   in the frame's CSS px (G5-06u-TS) */
 .tab-bar-caption-spacer {
   flex-shrink: 0;
-  width: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw));
+  width: calc(
+    (100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw)) / var(--ui-scale, 1)
+  );
 }
 
 .tab-app-menu-btn {
