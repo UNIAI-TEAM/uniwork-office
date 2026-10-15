@@ -4,7 +4,6 @@
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AgentStreamNotice } from '@genoffice/agent-core'
 import { aiUniworkText, clearUniworkAcks } from '@genoffice/ui'
 
 const harness = vi.hoisted(() => ({
@@ -60,7 +59,7 @@ vi.mock('react-konva', () => {
 })
 
 import { AiPanel } from '../src/renderer/ai/AiPanel'
-import { getLang, LocaleProvider, setModuleLang, t } from '../src/renderer/i18n/locale'
+import { getLang, LocaleProvider, setModuleLang } from '../src/renderer/i18n/locale'
 import { AI_PROVIDERS, type AiSettings } from '../src/shared/ipc'
 
 const settings: AiSettings = {
@@ -123,10 +122,6 @@ async function startRun(provider: AiSettings['provider'] = 'anthropic'): Promise
   expect(harness.run).toHaveBeenCalled()
   return container
 }
-
-const notify = (notice: AgentStreamNotice) => act(() => harness.events!.onNotice?.(notice))
-const notices = (c: HTMLElement) =>
-  [...c.querySelectorAll('.ai-msg-notice')].map((n) => n.textContent)
 
 beforeAll(() => {
   Element.prototype.scrollTo ??= () => {}

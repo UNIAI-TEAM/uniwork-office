@@ -14,11 +14,13 @@ import '@genoffice/ui/ai-uniwork-composer.css'
 import type { PointerEvent as ReactPointerEvent, ReactElement, ReactNode } from 'react'
 import {
   AgentLoop,
+  droppedCallsOfNotes,
   endsQuietly,
   getEntryResultChipView,
   isTurnEnded,
   noticePatch,
   panelLiveAnnouncement as computePanelLiveAnnouncement,
+  singleShortcutHint,
   type PanelNote,
   composeSkills,
 } from '@genoffice/agent-core'
@@ -38,6 +40,7 @@ function readUniworkCloudStatus(): UniworkCloudStatusBridge | undefined {
 }
 import {
   AiComposer,
+  AiErrorAction,
   AiQueueStrip,
   AI_QUEUE_LABELS,
   AiScopeQuote,
@@ -45,6 +48,7 @@ import {
   AiUsageChip,
   addTokenUsage,
   Markdown,
+  uniworkErrorForChip,
   useChatRunQueue,
   useUniworkDisclosureAck,
   useUniworkSendGate,
@@ -1348,9 +1352,10 @@ export function AiPanel({
                   hasStreamedText: lastEntry.streamedText ?? Boolean(lastEntry.text?.trim()),
                   clarifyAsked: receipts.some((r) => Boolean(r.qa)),
                   notes: lastEntry.notes,
+                  droppedToolCalls: droppedCallsOfNotes(lastEntry.notes),
                   toolExecutions: lastEntry.tools,
                   isError: Boolean(lastEntry.isError),
-                  error: lastEntry.isError ? lastEntry.text : null,
+                  error: lastEntry.isError ? uniworkErrorForChip(lastEntry.text) : null,
                 }
               : null,
         })
@@ -1554,9 +1559,10 @@ export function AiPanel({
               hasStreamedText: entry.streamedText ?? Boolean(entry.text?.trim()),
               clarifyAsked: receipts.some((r) => Boolean(r.qa)),
               notes: entry.notes,
+              droppedToolCalls: droppedCallsOfNotes(entry.notes),
               toolExecutions: entry.tools,
               isError: Boolean(entry.isError),
-              error: entry.isError ? entry.text : null,
+              error: entry.isError ? uniworkErrorForChip(entry.text) : null,
             },
           )
           const chip = chipView?.chip ?? null
@@ -1565,6 +1571,16 @@ export function AiPanel({
           // a stop before the first token leaves only the stop filler as body: the stopped line replaces it
           const bodyText =
             stoppedText && entry.stopped && entry.streamedText === false ? '' : entry.text
+          // the chip is the first word of the answer paragraph, in the same node as the text
+          const chipLead =
+            chip && chipLabel ? (
+              <>
+                <span className="ai-result-chip" data-chip={chip.chip} data-tone={chip.tone}>
+                  {chipLabel}
+                </span>
+                {bodyText ? <span className="ai-result-chip-sep">: </span> : null}
+              </>
+            ) : undefined
           return (
             <div
               key={i}
@@ -1587,19 +1603,13 @@ export function AiPanel({
               ) : (
                 (bodyText || chip) && (
                   <div className="ai-msg-answer" dir="auto">
-                    {chip && chipLabel && (
-                      <>
-                        <span
-                          className="ai-result-chip"
-                          data-chip={chip.chip}
-                          data-tone={chip.tone}
-                        >
-                          {chipLabel}
-                        </span>
-                        {bodyText ? <span className="ai-result-chip-sep">: </span> : null}
-                      </>
+                    {(bodyText || chipLead) && (
+                      <Markdown
+                        text={bodyText ? aiNoticeBody(bodyText) : ''}
+                        nav={docNav}
+                        lead={chipLead}
+                      />
                     )}
-                    {bodyText && <Markdown text={aiNoticeBody(bodyText)} nav={docNav} />}
                   </div>
                 )
               )}
@@ -1616,10 +1626,19 @@ export function AiPanel({
                     {aiUniworkText(lang, 'aiResultViewChanges')}
                   </button>
                   <span className="ai-result-edited-hint">
-                    {aiUniworkText(lang, 'aiResultEditedHint')}
+                    {singleShortcutHint(aiUniworkText(lang, 'aiResultEditedHint'))}
                   </span>
                 </div>
               )}
+              <AiErrorAction
+                chip={chip}
+                lang={lang}
+                waiting={Boolean(entry.waitLine)}
+                onRetry={isLast && !busy && runInstructionRef.current ? retry : undefined}
+                onChooseProvider={() => void window.htmlApi?.openAiModelSettings?.()}
+                onSignIn={() => void readUniworkCloudStatus()?.signIn?.()}
+                onAskAgain={isLast && !busy ? () => inputRef.current?.focus() : undefined}
+              />
               {stoppedText && (
                 <div className="ai-run-stopped" dir="auto">
                   {stoppedText}

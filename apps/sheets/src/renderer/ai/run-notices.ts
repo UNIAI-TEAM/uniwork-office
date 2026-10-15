@@ -1,6 +1,7 @@
 import {
   COMPLETED_VIA_TOOLS_TEXT,
   createTextNoticeSurface,
+  droppedCallsOfNotes,
   noticePatch,
   type AgentStreamNotice,
   type NoticeTranslate,
@@ -51,6 +52,8 @@ export interface RunNotices {
   announcement(): string
   /** the notes are the whole answer (restarted, or UniWork AI off) */
   quiet(): boolean
+  /** the calls the server dropped in this run, for the result chip (the message text only carries their lines) */
+  droppedCalls(): ReturnType<typeof droppedCallsOfNotes>
   /** the run ended: `display` is the message text (notes above the answer), `persisted` the bare answer */
   finish(done: RunFinish): { display: string; persisted: string }
   /** a new run starts */
@@ -93,6 +96,7 @@ export function createRunNotices(): RunNotices {
       return surface.reset()
     },
     quiet: () => surface.quiet(),
+    droppedCalls: () => droppedCallsOfNotes(surface.getNotes?.()),
     finish({ text, cancelled, turnLimit, truncated, toolSummaries, mutated, copy }) {
       // a cancelled run keeps the "stopped" notice: earlier narration or tool summaries would make an
       // aborted run read as completed

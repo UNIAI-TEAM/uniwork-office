@@ -1,19 +1,14 @@
 // UniWork AI result chip wiring in the markdown panel (G6-05u visual r1 F1, F2, F3, F6, F11): an error turn offers
 // its labelled action, the announcement is the line on screen, dropped calls read Chưa hỗ trợ, and the
 // chip opens the answer paragraph. Same harness as uniwork-ai-notice.test.ts.
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { act, createElement } from 'react'
 import { aiUniworkText } from '@genoffice/ui'
-import type { AgentStreamNotice } from '@genoffice/agent-core'
 import { createRoot, type Root } from 'react-dom/client'
 import { Editor } from '@tiptap/core'
 import { buildExtensions } from '../src/renderer/editor/extensions'
-import { LocaleProvider, t } from '../src/renderer/i18n/locale'
+import { LocaleProvider } from '../src/renderer/i18n/locale'
 import { usableAiSettings } from './helpers/ai-settings'
-// the stylesheet is only loaded as text so jsdom can compute the rendered style (vitest stubs css imports)
-const appStyles = readFileSync(resolve(__dirname, '../src/renderer/styles.css'), 'utf8')
 
 // the loop is replaced by a harness that hands over its events and never finishes on its own
 const harness = vi.hoisted(() => ({ events: null as any, loop: null as any }))
@@ -128,8 +123,6 @@ describe('UniWork AI chip wiring (markdown panel)', () => {
   const L = 'en' as const
   const ui = (key: Parameters<typeof aiUniworkText>[1], params?: Record<string, string | number>) =>
     aiUniworkText(L, key, params)
-  const notices = () => [...container!.querySelectorAll('.ai-msg-notice')].map((n) => n.textContent)
-  const notify = (notice: AgentStreamNotice) => act(async () => harness.events.onNotice(notice))
 
   /** mount, let the preset start its turn, return once the loop has handed over its events */
   async function started() {

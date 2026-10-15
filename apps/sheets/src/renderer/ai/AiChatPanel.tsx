@@ -11,6 +11,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import '@genoffice/ui/ai-uniwork-composer.css'
 import {
   AiComposer,
+  AiErrorAction,
   AiQueueStrip,
   AI_QUEUE_LABELS,
   AiScopeQuote,
@@ -18,6 +19,7 @@ import {
   AiUsageChip,
   type AiScopeQuoteData,
   type AiTokenUsageView,
+  uniworkErrorForChip,
   useAiModelNeedHint,
   useChatRunQueue,
   useUniworkDisclosureAck,
@@ -28,6 +30,7 @@ import { aiNoticeBody, aiNoticeKind } from '@genoffice/ai-provider/browser'
 import {
   getEntryResultChipView,
   panelLiveAnnouncement as computePanelLiveAnnouncement,
+  singleShortcutHint,
 } from '@genoffice/agent-core'
 import type {
   UniworkCloudStatusBridge,
@@ -250,6 +253,14 @@ export interface AiChatMessage {
   readonly status?: string | undefined
   /** tokens the provider billed for this reply, summed across its turns (absent when unreported) */
   readonly usage?: AiTokenUsageView | undefined
+  /** UniWork AI: the calls the server dropped in this run (`not_allowlisted`, `view_only`), for the result chip */
+  readonly droppedToolCalls?:
+    | readonly {
+        readonly name: string
+        readonly reason: 'view_only' | 'not_allowlisted'
+        readonly module?: string | undefined
+      }[]
+    | undefined
 }
 
 const MODEL_BRIDGE: AiModelPickerBridge = {
@@ -678,8 +689,9 @@ export function AiChatPanel({
                     summary: tool.summary,
                     isError: Boolean(tool.isError),
                   })),
+                  droppedToolCalls: lastEntry.droppedToolCalls,
                   isError: Boolean(lastEntry.isError),
-                  error: lastEntry.isError ? lastEntry.text : null,
+                  error: lastEntry.isError ? uniworkErrorForChip(lastEntry.text) : null,
                 }
               : null,
         })
@@ -810,12 +822,28 @@ export function AiChatPanel({
                 summary: tool.summary,
                 isError: Boolean(tool.isError),
               })),
+              droppedToolCalls: entry.droppedToolCalls,
               isError: Boolean(entry.isError),
-              error: entry.isError ? entry.text : null,
+              error: entry.isError ? uniworkErrorForChip(entry.text) : null,
             },
           )
           const chip = chipView?.chip ?? null
           const chipLabel = chipView?.labelText ?? null
+          // the chip is the first word of the answer paragraph, in the same node as the text
+          const chipLead =
+            chip && chipLabel ? (
+              <>
+                <span className="ai-result-chip" data-chip={chip.chip} data-tone={chip.tone}>
+                  {chipLabel}
+                </span>
+                {entry.text ? <span className="ai-result-chip-sep">: </span> : null}
+              </>
+            ) : undefined
+          // Retry resends the question this reply answered, like the "not sent" retry on its message
+          let askedIndex = index - 1
+          while (askedIndex >= 0 && chat[askedIndex]!.role !== 'user') askedIndex--
+          const asked = askedIndex >= 0 ? chat[askedIndex] : undefined
+          const isLast = index === chat.length - 1
           return (
             <div
               key={index}
@@ -865,19 +893,13 @@ export function AiChatPanel({
                   )}
                   {entry.text || chip ? (
                     <div className="ai-msg-answer" dir="auto">
-                      {chip && chipLabel && (
-                        <>
-                          <span
-                            className="ai-result-chip"
-                            data-chip={chip.chip}
-                            data-tone={chip.tone}
-                          >
-                            {chipLabel}
-                          </span>
-                          {entry.text ? <span className="ai-result-chip-sep">: </span> : null}
-                        </>
+                      {(entry.text || chipLead) && (
+                        <Markdown
+                          text={entry.text ? aiNoticeBody(entry.text) : ''}
+                          nav={citationNav}
+                          lead={chipLead}
+                        />
                       )}
-                      {entry.text && <Markdown text={aiNoticeBody(entry.text)} nav={citationNav} />}
                     </div>
                   ) : (
                     entry.streaming && (
@@ -888,6 +910,21 @@ export function AiChatPanel({
                       </span>
                     )
                   )}
+                  <AiErrorAction
+                    chip={chip}
+                    lang={lang}
+                    onRetry={
+                      isLast && !aiBusy && asked
+                        ? () => {
+                            if (uniworkGate.refuse()) return
+                            onSend(asked.text, asked.attachments ?? [], askedIndex)
+                          }
+                        : undefined
+                    }
+                    onChooseProvider={() => void window.desktopApi?.openAiSettings?.()}
+                    onSignIn={() => void readUniworkCloudStatus()?.signIn?.()}
+                    onAskAgain={isLast && !aiBusy ? () => inputRef.current?.focus() : undefined}
+                  />
                   {chip?.chip === 'edited' && (
                     <>
                       {chip.meta?.cellsMetaParams && (
@@ -917,7 +954,7 @@ export function AiChatPanel({
                           {aiUniworkText(lang, 'aiResultViewChanges')}
                         </button>
                         <span className="ai-result-edited-hint">
-                          {aiUniworkText(lang, 'aiResultEditedHint')}
+                          {singleShortcutHint(aiUniworkText(lang, 'aiResultEditedHint'))}
                         </span>
                       </div>
                     </>

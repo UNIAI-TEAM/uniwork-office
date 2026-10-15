@@ -482,7 +482,10 @@ describe('a refused UniWork AI question (too long, rejected): no Retry, the ques
       expect(container.textContent).toContain(
         tr('aiResultCellsMeta', { written: 12, range: 'Sheet1!B4:C9', overwritten: 4 }),
       )
-      expect(container.textContent).toContain(tr('aiResultEditedHint'))
+      // one platform shortcut (chipwire F5), not the dictionary's Ctrl/⌘ pair
+      expect(container.textContent).toContain(
+        'Chưa lưu — hoàn tác bằng Ctrl+Z hoặc bấm Lưu khi đã ổn.',
+      )
       const viewChangesBtn = container.querySelector<HTMLButtonElement>('.ai-result-view-changes')
       expect(viewChangesBtn?.textContent).toBe(tr('aiResultViewChanges'))
       act(() => viewChangesBtn?.click())

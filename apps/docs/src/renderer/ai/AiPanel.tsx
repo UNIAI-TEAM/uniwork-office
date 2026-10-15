@@ -23,12 +23,15 @@ import type { Block } from '@genoffice/docx-engine'
 import {
   AgentLoop,
   composeSkills,
+  droppedCallsOfNotes,
   endsQuietly,
   getEntryResultChipView,
   isTurnEnded,
   noticePatch,
   panelLiveAnnouncement as computePanelLiveAnnouncement,
+  singleShortcutHint,
   streamText,
+  uniworkErrorLineText,
   type AgentImage,
   type PanelNote,
   type MindMapTreeNode,
@@ -89,7 +92,7 @@ import { createFilesSkill } from './files-skill'
 import { boundChatHistory } from './chat-retention'
 import { createElectronTransport } from './transport'
 import { useI18n, t as tModule, aiLangDirective, getLang, type StringKey } from '../i18n/locale'
-import { Markdown, useAiModelNeedHint } from '@genoffice/ui'
+import { AiErrorAction, Markdown, uniworkErrorForChip, useAiModelNeedHint } from '@genoffice/ui'
 import { AiComposer, AiScopeQuote, AiTypingIndicator, type AiScopeQuoteData } from '@genoffice/ui'
 import sendEnterOn from '../assets/send-enter-on.png'
 import sendEnterOff from '../assets/send-enter-off.png'
@@ -1559,8 +1562,9 @@ export function AiPanel({
                   hasStreamedText: lastEntry.streamedText ?? Boolean(lastEntry.text?.trim()),
                   clarifyAsked: Boolean(lastEntry.clarifyReceipts?.length),
                   notes: lastEntry.notes,
+                  droppedToolCalls: droppedCallsOfNotes(lastEntry.notes),
                   toolExecutions: lastEntry.tools,
-                  error: lastEntry.error ?? null,
+                  error: uniworkErrorForChip(lastEntry.error),
                 }
               : null,
         })
@@ -1733,8 +1737,9 @@ export function AiPanel({
               hasStreamedText: entry.streamedText ?? Boolean(entry.text?.trim()),
               clarifyAsked: Boolean(entry.clarifyReceipts?.length),
               notes: entry.notes,
+              droppedToolCalls: droppedCallsOfNotes(entry.notes),
               toolExecutions: entry.tools,
-              error: entry.error ?? null,
+              error: uniworkErrorForChip(entry.error),
             },
           )
           const chip = chipView?.chip ?? null
@@ -1743,6 +1748,16 @@ export function AiPanel({
           // a stop before the first token leaves only the stop filler as body: the stopped line replaces it
           const bodyText =
             stoppedText && entry.stopped && entry.streamedText === false ? '' : entry.text
+          // the chip is the first word of the answer paragraph, in the same node as the text
+          const chipLead =
+            chip && chipLabel ? (
+              <>
+                <span className="ai-result-chip" data-chip={chip.chip} data-tone={chip.tone}>
+                  {chipLabel}
+                </span>
+                {bodyText ? <span className="ai-result-chip-sep">: </span> : null}
+              </>
+            ) : undefined
           return (
             <div
               key={i}
@@ -1770,15 +1785,9 @@ export function AiPanel({
                 </span>
               ) : entry.role === 'assistant' ? (
                 <div className="ai-msg-answer" dir="auto">
-                  {chip && chipLabel && (
-                    <>
-                      <span className="ai-result-chip" data-chip={chip.chip} data-tone={chip.tone}>
-                        {chipLabel}
-                      </span>
-                      {bodyText ? <span className="ai-result-chip-sep">: </span> : null}
-                    </>
+                  {(bodyText || chipLead) && (
+                    <Markdown text={bodyText || ''} nav={docNav} lead={chipLead} />
                   )}
-                  {bodyText && <Markdown text={bodyText} nav={docNav} />}
                 </div>
               ) : (
                 <span dir="auto">{entry.text}</span>
@@ -1798,7 +1807,7 @@ export function AiPanel({
                     {aiUniworkText(lang, 'aiResultViewChanges')}
                   </button>
                   <span className="ai-result-edited-hint">
-                    {aiUniworkText(lang, 'aiResultEditedHint')}
+                    {singleShortcutHint(aiUniworkText(lang, 'aiResultEditedHint'))}
                   </span>
                 </div>
               )}
@@ -1833,8 +1842,23 @@ export function AiPanel({
                   // "nothing to chat with" is a setup / plan state: a plain notice, not a red error
                   <div className="ai-msg-notice">{aiNoticeBody(entry.error)}</div>
                 ) : (
-                  <div className="ai-msg-error">{t('aiErrorPrefix', { error: entry.error })}</div>
+                  <div className="ai-msg-error">
+                    {uniworkErrorLineText(chip, entry.error, (error) =>
+                      t('aiErrorPrefix', { error }),
+                    )}
+                  </div>
                 ))}
+              {entry.error && (
+                <AiErrorAction
+                  chip={chip}
+                  lang={lang}
+                  waiting={Boolean(entry.waitLine)}
+                  onRetry={isLast && !busy && lastInstructionRef.current ? retry : undefined}
+                  onChooseProvider={() => void window.desktop?.openAiModelSettings?.()}
+                  onSignIn={() => void readUniworkCloudStatus()?.signIn?.()}
+                  onAskAgain={isLast && !busy ? () => inputRef.current?.focus() : undefined}
+                />
+              )}
               {cap('billing') && entry.error && aiNoticeKind(entry.error) && (
                 <div className="ai-msg-actions">
                   <button
@@ -1881,7 +1905,9 @@ export function AiPanel({
                     !busy &&
                     lastInstructionRef.current &&
                     !aiNoticeKind(entry.error) &&
-                    !isUniworkQuestionRefusal(entry.error) && (
+                    !isUniworkQuestionRefusal(entry.error) &&
+                    // the labelled "Thử lại" under the error line is the retry of an error turn
+                    chip?.errorLine?.action !== 'retry' && (
                       <button
                         className="ai-msg-tool-btn"
                         onClick={retry}

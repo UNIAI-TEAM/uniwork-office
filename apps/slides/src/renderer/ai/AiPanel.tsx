@@ -19,12 +19,15 @@ import '@genoffice/ui/ai-uniwork-composer.css'
 import {
   AgentLoop,
   composeSkills,
+  droppedCallsOfNotes,
   IPC_STREAM_SILENCE_TIMEOUT_MS,
   endsQuietly,
   getEntryResultChipView,
   isTurnEnded,
   noticePatch,
   panelLiveAnnouncement as computePanelLiveAnnouncement,
+  singleShortcutHint,
+  uniworkErrorLineText,
   type AgentImage,
   type PanelNote,
   type ToolDisplay,
@@ -86,6 +89,7 @@ import {
 } from './slide-qc'
 import { useI18n, t as tGlobal, aiLangDirective, getLang, type TFunc } from '../i18n/locale'
 import {
+  AiErrorAction,
   AiQueueStrip,
   AI_QUEUE_LABELS,
   AiScopeQuote,
@@ -94,6 +98,7 @@ import {
   useAiModelNeedAction,
   useAiModelNeedHint,
   addTokenUsage,
+  uniworkErrorForChip,
   useAiPanelPrefs,
   useChatRunQueue,
   type AiScopeQuoteData,
@@ -2317,8 +2322,9 @@ export function AiPanel({
                   hasStreamedText: lastEntry.streamedText ?? Boolean(lastEntry.text?.trim()),
                   clarifyAsked: clarifyAnswers.some((c) => c.afterIdx === chat.length - 1),
                   notes: lastEntry.notes,
+                  droppedToolCalls: droppedCallsOfNotes(lastEntry.notes),
                   toolExecutions: lastEntry.tools,
-                  error: lastEntry.error ?? null,
+                  error: uniworkErrorForChip(lastEntry.error),
                 }
               : null,
         })
@@ -2511,8 +2517,9 @@ export function AiPanel({
               hasStreamedText: entry.streamedText ?? Boolean(entry.text?.trim()),
               clarifyAsked: clarifyAnswers.some((c) => c.afterIdx === i),
               notes: entry.notes,
+              droppedToolCalls: droppedCallsOfNotes(entry.notes),
               toolExecutions: entry.tools,
-              error: entry.error ?? null,
+              error: uniworkErrorForChip(entry.error),
             },
           )
           const chip = chipView?.chip ?? null
@@ -2521,6 +2528,16 @@ export function AiPanel({
           // a stop before the first token leaves only the stop filler as body: the stopped line replaces it
           const bodyText =
             stoppedText && entry.stopped && entry.streamedText === false ? '' : entry.text
+          // the chip is the first word of the answer paragraph, in the same node as the text
+          const chipLead =
+            chip && chipLabel ? (
+              <>
+                <span className="ai-result-chip" data-chip={chip.chip} data-tone={chip.tone}>
+                  {chipLabel}
+                </span>
+                {bodyText ? <span className="ai-result-chip-sep">: </span> : null}
+              </>
+            ) : undefined
           return (
             <div
               key={i}
@@ -2548,15 +2565,7 @@ export function AiPanel({
                 </span>
               ) : entry.role === 'assistant' ? (
                 <div className="ai-msg-answer" dir="auto">
-                  {chip && chipLabel && (
-                    <>
-                      <span className="ai-result-chip" data-chip={chip.chip} data-tone={chip.tone}>
-                        {chipLabel}
-                      </span>
-                      {bodyText ? <span className="ai-result-chip-sep">: </span> : null}
-                    </>
-                  )}
-                  {bodyText && <Markdown text={bodyText} />}
+                  {(bodyText || chipLead) && <Markdown text={bodyText || ''} lead={chipLead} />}
                 </div>
               ) : (
                 <span dir="auto">{entry.text}</span>
@@ -2576,7 +2585,7 @@ export function AiPanel({
                     {aiUniworkText(lang, 'aiResultViewChanges')}
                   </button>
                   <span className="ai-result-edited-hint">
-                    {aiUniworkText(lang, 'aiResultEditedHint')}
+                    {singleShortcutHint(aiUniworkText(lang, 'aiResultEditedHint'))}
                   </span>
                 </div>
               )}
@@ -2592,9 +2601,26 @@ export function AiPanel({
                   <div className="ai-msg-notice">{aiNoticeBody(entry.error)}</div>
                 ) : (
                   <div className="ai-msg-error">
-                    {cap('errorLabel') ? t('aiMsgError', { error: entry.error }) : entry.error}
+                    {cap('errorLabel')
+                      ? uniworkErrorLineText(chip, entry.error, (error) =>
+                          t('aiMsgError', { error }),
+                        )
+                      : entry.error}
                   </div>
                 ))}
+              {entry.error && (
+                <AiErrorAction
+                  chip={chip}
+                  lang={lang}
+                  waiting={Boolean(entry.waitLine)}
+                  onRetry={isLast && !busy && lastInstructionRef.current ? retry : undefined}
+                  onChooseProvider={() =>
+                    void window.slidesApi.openAiModelSettings().catch(() => {})
+                  }
+                  onSignIn={() => void readUniworkCloudStatus()?.signIn?.()}
+                  onAskAgain={isLast && !busy ? () => inputRef.current?.focus() : undefined}
+                />
+              )}
               {entry.deckProgress && <DeckProgressCard progress={entry.deckProgress} />}
               {showToolbar && (
                 <div className="ai-msg-toolbar">
@@ -2632,7 +2658,9 @@ export function AiPanel({
                     !busy &&
                     lastInstructionRef.current &&
                     !aiNoticeKind(entry.error) &&
-                    !isUniworkQuestionRefusal(entry.error) && (
+                    !isUniworkQuestionRefusal(entry.error) &&
+                    // the labelled "Thử lại" under the error line is the retry of an error turn
+                    chip?.errorLine?.action !== 'retry' && (
                       <button
                         className="ai-msg-tool-btn"
                         onClick={retry}

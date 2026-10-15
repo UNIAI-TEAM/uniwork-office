@@ -9,7 +9,7 @@ import { AI_RUN_IDLE_GRACE_MS } from '@genoffice/agent-core'
 import { aiUniworkText } from '@genoffice/ui'
 import { editorExtensions } from '../src/renderer/editor/extensions'
 import { AiPanel } from '../src/renderer/ai/AiPanel'
-import { getLang, LocaleProvider, setModuleLang, t } from '../src/renderer/i18n/locale'
+import { getLang, LocaleProvider, setModuleLang } from '../src/renderer/i18n/locale'
 import { AI_PROVIDERS, type AiSettings } from '../src/shared/ipc'
 
 const settings: AiSettings = {
@@ -113,10 +113,6 @@ describe('UniWork AI chip wiring (docs panel)', () => {
     setModuleLang('zh')
   })
 
-  const notices = () => [...container!.querySelectorAll('.ai-msg-notice')].map((n) => n.textContent)
-  const stopButton = () =>
-    container!.querySelector<HTMLButtonElement>(`button[aria-label="${t('aiStop')}"]`)
-
   const root_ = () => container!
   const MODULE = 'Docs'
   const uniworkTurn = async (): Promise<void> => {
@@ -219,31 +215,34 @@ describe('UniWork AI chip wiring (docs panel)', () => {
     expect(paragraph.textContent).toContain('Câu trả lời ngắn.')
   })
 
-  it('F1: Thử lại sends the turn again, Chọn nhà cung cấp khác opens the model settings, Hỏi tiếp returns to the composer', async () => {
-    const openSettings = vi.fn(async () => {})
-    ;(window as any).desktop.openAiModelSettings = openSettings
+  const clickAction = () =>
+    act(async () => root_().querySelector<HTMLButtonElement>('.ai-error-action button')!.click())
+
+  it('F1: Thử lại sends the turn again', async () => {
     await uniworkTurn()
     await ackIfAsked()
     await failWith('cloud_unavailable', 'aiErrUnavailable')
     const before = requestId
-    await act(async () =>
-      root_().querySelector<HTMLButtonElement>('.ai-error-action button')!.click(),
-    )
+    await clickAction()
     for (let i = 0; i < 6 && requestId === before; i++) await flush()
     expect(requestId, 'the retried turn started').not.toBe(before)
     await finish()
+  })
 
+  it('F1: Chọn nhà cung cấp khác opens the model settings', async () => {
+    const openSettings = vi.fn(async () => {})
+    ;(window as any).desktop.openAiModelSettings = openSettings
+    await uniworkTurn()
     await failWith('credits_exhausted', 'aiErrCredits')
-    await act(async () =>
-      root_().querySelector<HTMLButtonElement>('.ai-error-action button')!.click(),
-    )
+    await clickAction()
     expect(openSettings).toHaveBeenCalledTimes(1)
+  })
 
+  it('F1: Hỏi tiếp returns to the composer for the next question', async () => {
+    await uniworkTurn()
     await failWith('run_limit_reached', 'aiErrRunLimit')
     ;(document.activeElement as HTMLElement | null)?.blur()
-    await act(async () =>
-      root_().querySelector<HTMLButtonElement>('.ai-error-action button')!.click(),
-    )
+    await clickAction()
     expect(document.activeElement).toBe(root_().querySelector('textarea'))
   })
 })

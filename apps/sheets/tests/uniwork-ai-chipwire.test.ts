@@ -127,6 +127,9 @@ describe('UniWork AI chip wiring (sheets panel)', () => {
 
   it('F1: Thử lại sends the question again, Chọn nhà cung cấp khác opens the model settings', async () => {
     const c = await mount(errorTurn(ui('aiErrUnavailable')))
+    // a send entry refuses until the UniWork disclosure is acknowledged (S8)
+    const ack = c.querySelector<HTMLButtonElement>('[role="region"] button')
+    if (ack) await act(async () => ack.click())
     await act(async () => c.querySelector<HTMLButtonElement>('.ai-error-action button')!.click())
     expect(onSend).toHaveBeenCalledWith('sum column B', [], 0)
     act(() => root!.unmount())
@@ -187,7 +190,9 @@ describe('UniWork AI chip wiring (sheets panel)', () => {
       {
         role: 'assistant',
         text: 'Đã cập nhật 12 ô.',
-        tools: [{ name: 'propose_operations', summary: 'Wrote 12 cells in Sheet1!B4:C9' }],
+        tools: [
+          { name: 'propose_operations', summary: 'Wrote 12 cells in Sheet1!B4:C9', isError: false },
+        ],
         streaming: false,
         autoApplied: { opCount: 12, undoSteps: 1 },
       },

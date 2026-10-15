@@ -8660,8 +8660,9 @@ body.docs-crop-active
   font-weight: 600;
   padding: 2px 7px;
   border-radius: 4px;
-  margin-bottom: 4px;
-  margin-right: 6px;
+  /* the chip is the first word of the answer paragraph, not a row of its own */
+  margin-inline-end: 2px;
+  vertical-align: baseline;
   background: var(--color-bg-subtle);
   color: var(--text);
   border: 1px solid var(--border);

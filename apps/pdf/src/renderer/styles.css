@@ -3744,7 +3744,9 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
   display: inline-flex;
   align-items: center;
   padding: 2px 8px;
-  margin-bottom: 6px;
+  /* the chip is the first word of the answer paragraph, not a row of its own */
+  margin-inline-end: 2px;
+  vertical-align: baseline;
   border-radius: 999px;
   font-size: 12px;
   font-weight: 500;

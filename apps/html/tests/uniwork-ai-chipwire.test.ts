@@ -1,17 +1,12 @@
 // UniWork AI result chip wiring in the html panel (G6-05u visual r1 F1, F2, F3, F6, F11): an error turn offers
 // its labelled action, the announcement is the line on screen, dropped calls read Chưa hỗ trợ, and the
 // chip opens the answer paragraph. Same harness as uniwork-ai-notice.test.ts.
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, createElement } from 'react'
-import { aiUniworkText } from '@genoffice/ui'
-import type { AgentStreamNotice } from '@genoffice/agent-core'
+import { aiUniworkText, setAiModelNeedHint } from '@genoffice/ui'
 import { createRoot, type Root } from 'react-dom/client'
 import { buildParseMap } from '../src/renderer/document/parse-map'
 import { usableAiSettings } from './helpers/ai-settings'
-// the stylesheet is only loaded as text so jsdom can compute the rendered style (vitest stubs css imports)
-const appStyles = readFileSync(resolve(__dirname, '../src/renderer/styles.css'), 'utf8')
 
 // the loop is replaced by a harness that hands over its events and never finishes on its own
 const harness = vi.hoisted(() => ({ events: null as any, loop: null as any }))
@@ -34,7 +29,7 @@ vi.mock('@genoffice/agent-core', async (orig) => {
 })
 
 import { AiPanel, type HtmlAiDeps } from '../src/renderer/ai/AiPanel'
-import { LocaleProvider, t } from '../src/renderer/i18n/locale'
+import { LocaleProvider } from '../src/renderer/i18n/locale'
 
 const flush = async (): Promise<void> => {
   await act(async () => {
@@ -128,8 +123,6 @@ describe('UniWork AI chip wiring (html panel)', () => {
   const L = 'en' as const
   const ui = (key: Parameters<typeof aiUniworkText>[1], params?: Record<string, string | number>) =>
     aiUniworkText(L, key, params)
-  const notices = () => [...container!.querySelectorAll('.ai-msg-notice')].map((n) => n.textContent)
-  const notify = (notice: AgentStreamNotice) => act(async () => harness.events.onNotice(notice))
 
   /** mount, let the preset start its turn, return once the loop has handed over its events */
   async function started() {
@@ -236,11 +229,17 @@ describe('UniWork AI chip wiring (html panel)', () => {
     const ackBtn = container!.querySelector<HTMLButtonElement>('[role="region"] button')
     if (ackBtn) await act(async () => ackBtn.click())
     await flush()
-    const run = vi.spyOn(harness.loop, 'run')
     await failWith('cloud_unavailable', 'aiErrUnavailable')
+    // the panel may have rebuilt its loop for the UniWork pick: spy on the one it holds now
+    const run = vi.spyOn(Object.getPrototypeOf(harness.loop), 'run')
+    // the fake loop never finishes on its own: after an error the real one is idle again
+    harness.loop.busy = false
+    // the model picker of this harness never reads a model: clear its hint like the send-guard tests
+    act(() => setAiModelNeedHint(null))
     await act(async () =>
       root_().querySelector<HTMLButtonElement>('.ai-error-action button')!.click(),
     )
+    await new Promise((r) => setTimeout(r, 50))
     expect(run).toHaveBeenCalledTimes(1)
     await failWith('credits_exhausted', 'aiErrCredits')
     await act(async () =>

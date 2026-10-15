@@ -1544,6 +1544,8 @@ export function App({
               text: shown,
               isError: false,
               status: runNoticesRef.current.announcement(),
+              // the chip reads the calls the server dropped, the text only carries their lines
+              droppedToolCalls: runNoticesRef.current.droppedCalls(),
             }))
         },
         onTurnReset: () => {
