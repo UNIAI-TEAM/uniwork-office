@@ -73,11 +73,13 @@ export interface Binding {
   level?: UniworkDocLevel
 }
 
-export type UniworkDocLevel = 'view' | 'edit' | 'manage'
+export type UniworkDocLevel = 'view' | 'comment' | 'edit' | 'manage'
 
 /** a server `my_level` this build knows, else undefined */
 export function docLevelOf(value: unknown): UniworkDocLevel | undefined {
-  return value === 'view' || value === 'edit' || value === 'manage' ? value : undefined
+  return value === 'view' || value === 'comment' || value === 'edit' || value === 'manage'
+    ? value
+    : undefined
 }
 
 export interface BoundDocument {

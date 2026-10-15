@@ -181,13 +181,14 @@ export function ServerCommentsPane({ server, slides, inFile, onCollapse }: Serve
   const create: CollabActions['create'] = async (body, p) => {
     const b = baseRef.current
     const before = new Set([...b.threads, ...b.resolved].map((th) => th.id))
-    await b.actions.create(body, p)
-    if (!p?.anchor) return
+    const created = await b.actions.create(body, p)
+    if (!p?.anchor) return created
     const active = document.activeElement
     if (!active || active === document.body || paneRef.current?.contains(active)) {
       paneRef.current?.querySelector<HTMLElement>('.collab-title')?.focus()
       setSent(before)
     }
+    return created
   }
   const ctl = { ...baseCtl, actions: { ...baseCtl.actions, create } }
 

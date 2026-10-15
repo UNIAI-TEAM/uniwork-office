@@ -216,6 +216,24 @@ describe('createFrameCommentsApi: the desktop shape over the frame protocol', ()
   })
 })
 
+describe('DOC5-W04: the comment level through the frame bridge', () => {
+  it('context() answers the comment level instead of dropping it', async () => {
+    const p = framePort({ level: 'comment' })
+    p.mock.init()
+    const api = createFrameCommentsApi(p.port, { version: createFrameDocVersion() })
+    const reply = (await api.context({ path: '' })) as { ok: true; value: { level?: string } }
+    expect(reply.value.level).toBe('comment')
+  })
+
+  it('an unknown level is still dropped, never mapped upward', async () => {
+    const p = framePort({ level: 'owner' as never })
+    p.mock.init()
+    const api = createFrameCommentsApi(p.port, { version: createFrameDocVersion() })
+    const reply = (await api.context({ path: '' })) as { ok: true; value: object }
+    expect(reply.value).not.toHaveProperty('level')
+  })
+})
+
 describe('G8-18 mention access through the frame bridge (F1)', () => {
   const searchRows = { candidates: [{ user_id: 'u1', display_name: 'Ann', can_view: false }] }
 

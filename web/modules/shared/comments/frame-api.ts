@@ -69,7 +69,7 @@ export type FrameCommentsApi = UniworkCommentsApi & FrameCommentsExtras & { noEd
 export type CommentsSession = PortSession & { commentsLevel?: CommentsLevel }
 
 function isLevel(value: unknown): value is NonNullable<CommentsContextResult['level']> {
-  return value === 'view' || value === 'edit' || value === 'manage'
+  return value === 'view' || value === 'comment' || value === 'edit' || value === 'manage'
 }
 
 async function envelope<T>(run: () => Promise<T>): Promise<CommentsReply<T>> {

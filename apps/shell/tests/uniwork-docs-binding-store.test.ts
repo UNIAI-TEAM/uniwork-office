@@ -7,6 +7,7 @@ import {
   BindingStore,
   bindingKindAt,
   bindingKindOf,
+  docLevelOf,
   parseBinding,
 } from '../src/main/uniwork-docs/binding-store'
 
@@ -320,6 +321,15 @@ describe('parseBinding + write (what this build stamps)', () => {
     expect(raw).not.toHaveProperty('pendingIntent')
     // and it reads back exactly as it was written
     expect(parseBinding(raw)).toMatchObject({ schema: 2, minStoreLevel: 2 })
+  })
+
+  it('DOC5-W04: the comment level is kept in binding.json; an unknown level is dropped', () => {
+    const raw = (level: unknown) => ({ ...schema2, level })
+    expect(parseBinding(raw('comment'))?.level).toBe('comment')
+    expect(parseBinding(raw('manage'))?.level).toBe('manage')
+    expect(docLevelOf('comment')).toBe('comment')
+    expect(docLevelOf('owner')).toBeUndefined()
+    expect(parseBinding(raw('owner'))).not.toHaveProperty('level')
   })
 
   it('a malformed raw value never parses, whatever the schema claims', () => {

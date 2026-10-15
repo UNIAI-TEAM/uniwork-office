@@ -10,7 +10,7 @@
 import type { ReactElement, ReactNode } from 'react'
 import type { Lang } from '@genoffice/i18n'
 
-export type CollabLevel = 'view' | 'edit' | 'manage'
+export type CollabLevel = 'view' | 'comment' | 'edit' | 'manage'
 export type CollabKind = 'comment' | 'discussion'
 
 export interface CollabAnchor {
@@ -35,7 +35,14 @@ export interface CollabComment {
   updated_at?: string | undefined
   display_name?: string | undefined
   avatar_url?: string | undefined
+  mentions_without_access?: CollabMentionWithoutAccess[] | undefined
   [k: string]: unknown
+}
+
+export interface CollabMentionWithoutAccess {
+  user_id: string
+  display_name?: string
+  can_share: boolean
 }
 
 export interface CollabMention {
@@ -65,6 +72,7 @@ export interface CollabCandidate {
   display_name: string
   avatar_url?: string | undefined
   email?: string | undefined
+  can_view?: boolean | undefined
 }
 
 export interface CollabAnchorUpdate {
@@ -98,7 +106,13 @@ export interface CollabSource {
   resolve(p: { comment_id: string }): Promise<{ comment: CollabComment }>
   reopen(p: { comment_id: string }): Promise<{ comment: CollabComment }>
   revisions(p: { comment_id: string }): Promise<{ revisions: CollabRevision[] }>
-  searchMentions(p: { q: string; limit?: number }): Promise<{ candidates: CollabCandidate[] }>
+  searchMentions(p: {
+    q: string
+    limit?: number
+    include?: 'no_access'
+  }): Promise<{ candidates: CollabCandidate[] }>
+  canListMembers?: boolean
+  shareView?(p: { user_id: string }): Promise<{ ok: true }>
   anchors?(p: { version_id: string; anchors: CollabAnchorUpdate[] }): Promise<CollabAnchorsResult>
 }
 
@@ -117,6 +131,9 @@ export interface CollabHostState {
   myUserId?: string | undefined
   lang: Lang
   platform: 'mac' | 'other'
+  capabilities?: { commentsShareView?: boolean }
+  commentsShareView?: boolean
+  canListMembers?: boolean
 }
 
 export type CollabReply<T> =
@@ -171,7 +188,10 @@ export interface UniworkCommentsLike {
     path: string
     q: string
     limit?: number
+    include?: 'no_access'
   }): Promise<CollabReply<{ candidates: CollabCandidate[] }>>
+  shareView?(input: { path: string; userId: string }): Promise<CollabReply<{ ok: true }>>
+  canListMembers?: boolean
 }
 
 export function createUniworkCommentsSource(
@@ -197,7 +217,17 @@ export const COLLAB_LIVE_REGION_ID: string
 export function announcePolite(text: string, doc?: Document): void
 
 export type CollabStrings = Readonly<Record<string, string>>
-export type CollabAllStrings = Readonly<Record<string, string>>
+/** the post-send notice keys the panel requires (G8-18) */
+export interface CollabPostSendStrings {
+  collabPostSendNoAccess: string
+  collabPostSendShareAction: string
+  collabPostSendNoRetroNote: string
+  collabMentionMixedUnshareable: string
+  collabSharingView: string
+  collabShareViewFailed: string
+  collabDismissNotice: string
+}
+export type CollabAllStrings = Readonly<Record<string, string>> & CollabPostSendStrings
 export function collabStrings(lang: Lang): CollabAllStrings
 
 export type CollabLoadState = 'loading' | 'ready' | 'loadError' | 'noAccess'
@@ -265,7 +295,7 @@ export function CollabComposer(
 
 export interface CollabPanelProps {
   controller: CollabController
-  strings: CollabStrings
+  strings: CollabStrings & CollabPostSendStrings
   onClose?: (() => void) | undefined
   renderComposer?: ((slot: CollabComposerSlot) => ReactNode) | undefined
   inFile?: CollabInFileSlot | undefined

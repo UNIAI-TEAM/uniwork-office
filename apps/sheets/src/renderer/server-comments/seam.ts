@@ -19,7 +19,7 @@ export interface ServerCommentsContext {
   documentId: string
   /** null: the open version is unknown (no new root comment can be anchored) */
   versionId: string | null
-  level?: 'view' | 'edit' | 'manage'
+  level?: 'view' | 'comment' | 'edit' | 'manage'
   myUserId?: string
   /** web frame only (the frame comments API sets it): no desktop poll, the frame reloads on `comments.changed` */
   frame?: true

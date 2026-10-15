@@ -4,7 +4,7 @@
  * answers at once instead of waiting out the reveal timeout. Desktop has no `noEditor`.
  */
 import { describe, expect, it, vi } from 'vitest'
-import { resolveServerMode } from '../src/renderer/server-comments/mode'
+import { readContext, resolveServerMode } from '../src/renderer/server-comments/mode'
 import type { ServerCommentsApi } from '../src/renderer/server-comments/seam'
 
 const withHook = (context: unknown) => {
@@ -44,6 +44,15 @@ describe('resolveServerMode tells the frame when there is no editor owner', () =
     const { api, noEditor } = withHook({ ok: true, value: { documentId: 'd1', versionId: 'v1' } })
     expect(await resolveServerMode(api, '')).not.toBeNull()
     expect(noEditor).not.toHaveBeenCalled()
+  })
+
+  it('DOC5-W04: the comment level reaches the mode; an unknown level is dropped, never raised', async () => {
+    expect(readContext({ documentId: 'd1', versionId: 'v1', level: 'comment' })?.level).toBe(
+      'comment',
+    )
+    expect(readContext({ documentId: 'd1', versionId: 'v1', level: 'owner' })).not.toHaveProperty(
+      'level',
+    )
   })
 
   it('desktop (no noEditor member) is unchanged', async () => {

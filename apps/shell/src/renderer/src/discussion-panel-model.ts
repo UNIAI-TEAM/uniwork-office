@@ -65,6 +65,7 @@ export interface DiscussionTarget {
 /** S12 level table input: `view` reads, anything that can edit writes; manage-like words map to manage */
 export function collabLevelOf(access: string): CollabLevel {
   if (access === 'view') return 'view'
+  if (access === 'comment') return 'comment'
   if (access === 'manage' || access === 'owner') return 'manage'
   return 'edit'
 }
@@ -79,7 +80,11 @@ export function discussionTargetOf(
   bridge: UniworkDiscussionApi | null,
 ): DiscussionTarget | null {
   if (!status || !signedIn || !bridge) return null
-  return { path: status.path, documentId: status.documentId, level: collabLevelOf(status.access) }
+  return {
+    path: status.path,
+    documentId: status.documentId,
+    level: status.commentsLevel ?? collabLevelOf(status.access),
+  }
 }
 
 /* ---- the kit's CollabSource over the bridge ---- */
