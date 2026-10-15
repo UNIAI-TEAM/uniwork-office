@@ -558,6 +558,11 @@ export class SyncRuntime {
   private async reportGone(documentId: string, live: () => boolean): Promise<void> {
     const gone = this.options.onFeedGone
     if (!gone) return
+    // T5-3: a pinned document is reported too, open or closed: the owner hands it to the library
+    if (await this.library?.isPinned(documentId).catch(() => false)) {
+      if (live()) gone(documentId)
+      return
+    }
     try {
       if (!(await this.options.isOpenBound?.(documentId))) return
     } catch {

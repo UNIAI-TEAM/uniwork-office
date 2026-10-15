@@ -1110,6 +1110,13 @@ export class OfflineLibraryManager {
     }
   }
 
+  /** the document is in the library (any row state); the feed-gone filter reads it (T5-3) */
+  async isPinned(documentId: string): Promise<boolean> {
+    if (!this.checkBoundary()) return false
+    const index = await this.options.store.readIndex()
+    return index.kind === 'ok' && index.index.pins.includes(documentId)
+  }
+
   async row(documentId: string): Promise<PinRow | null> {
     if (!this.checkBoundary()) return null
     const read = await this.options.store.getPin(documentId)

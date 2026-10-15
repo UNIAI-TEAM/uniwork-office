@@ -514,7 +514,7 @@ export function createSyncRuntime(
       return (await found.docs.listWorkspaces(orgId)).map((workspace) => workspace.id)
     },
   }
-  return new SyncRuntime({
+  const runtime: SyncRuntime = new SyncRuntime({
     store: syncStoreFor().access,
     // S18: a change the feed applies for a bound document re-reads its metadata,
     // so a rename on the web reaches the open desktop copy
@@ -529,6 +529,9 @@ export function createSyncRuntime(
     isOpenBound: (documentId) => service.isOpenBound(documentId),
     onFeedGone: (documentId) => {
       void service.noteFeedGone(documentId).catch(() => undefined)
+      // T5-3: a pinned document, closed too, is classified by the library
+      // (403/404 -> revoked, 410 -> deleted)
+      void runtime.library?.refresh(documentId).catch(() => undefined)
     },
     targets,
     capability: async (orgId) => {
@@ -574,6 +577,7 @@ export function createSyncRuntime(
     },
     log: (message) => console.warn(message),
   })
+  return runtime
 }
 
 /** Registers the IPC handlers (safe before app ready: nothing touches the account yet). */

@@ -20,10 +20,14 @@ import {
   OFFLINE_LIBRARY_STORE_REGISTRATION,
   SyncRuntime,
 } from '../src/main/uniwork-sync/runtime'
+import { INTENT_STORE_REGISTRATION } from '../src/main/uniwork-sync/intent-store'
+import { DRAFTS_STORE_REGISTRATION } from '../src/main/uniwork-sync/queue/drafts'
 import { createSyncStoreAccess } from '../src/main/uniwork-sync/session-store'
 import { createStoreLayer } from '../src/main/uniwork-sync/store'
 import { createLockableSafeStorage } from '../src/main/uniwork-sync/test-kit/compliance'
-import { ORG, WS, addDoc, createFakeDocs } from './uniwork-sync-offline-library-fakes'
+import { UniworkDocError } from '../src/main/uniwork-docs/errors'
+import { cursorInvalid, FakeFeedClient } from './fixtures/fake-feed'
+import { ORG, WS, addDoc, createFakeDocs, plaintext } from './uniwork-sync-offline-library-fakes'
 
 /**
  * G5-05 through the production wiring: the runtime builds the library on its
@@ -73,7 +77,14 @@ const filesUnder = (root: string): string[] => {
   }
 }
 
-function harness() {
+interface HarnessOptions {
+  feed?: FeedClient
+  /** the wiring's onFeedGone (uniwork-docs/wiring.ts), handed the runtime it belongs to */
+  onFeedGone?(runtime: SyncRuntime, documentId: string): void
+  isOpenBound?(documentId: string): boolean
+}
+
+function harness(options: HarnessOptions = {}) {
   const wallMs = T0
   let revokeRenew = false
   const safeStorage = createLockableSafeStorage()
@@ -86,6 +97,8 @@ function harness() {
   syncLayer.register(FEED_CURSORS_REGISTRATION)
   syncLayer.register(DOC_INDEX_REGISTRATION)
   syncLayer.register(LEASE_STORE_REGISTRATION)
+  syncLayer.register(INTENT_STORE_REGISTRATION)
+  syncLayer.register(DRAFTS_STORE_REGISTRATION)
   const libraryLayer = createStoreLayer({
     root: join(base, 'library', 'store'),
     keys: createSafeStorageKeyProvider({ safeStorage, dir: join(base, 'library', 'keys') }),
@@ -124,11 +137,15 @@ function harness() {
   }
   const docs = createFakeDocs()
   let docsOnline = true
-  const runtime = new SyncRuntime({
+  const runtime: SyncRuntime = new SyncRuntime({
     store,
     targets: { orgs: () => [ORG], workspaces: async () => [WS] },
     capability: async () => capability,
-    client: () => feed,
+    client: () => options.feed ?? feed,
+    isOpenBound: (documentId) => options.isOpenBound?.(documentId) ?? false,
+    ...(options.onFeedGone
+      ? { onFeedGone: (documentId: string) => options.onFeedGone?.(runtime, documentId) }
+      : {}),
     keepDraft: async () => false,
     clock: { now: () => wallMs },
     schedule: () => () => undefined,
@@ -141,6 +158,7 @@ function harness() {
   })
   return {
     runtime,
+    syncLayer,
     docs,
     capability,
     libraryRoot: join(base, 'library', 'store'),
@@ -218,5 +236,91 @@ describe('G5-05 offline library inside the sync runtime (production wiring)', ()
     expect(
       await h.runtime.library!.pin({ documentId: 'doc_1', orgId: ORG, workspaceId: WS }),
     ).toEqual({ kind: 'refused', code: 'capability_off' })
+  })
+})
+
+describe('T5-3 a feed delete/revoke of a CLOSED pinned document reaches the library', () => {
+  /** the feed lists the document, then a resync no longer does (the drop is reported) */
+  const droppingFeed = () =>
+    new FakeFeedClient([
+      {
+        phase: 'snapshot',
+        rows: [{ document_id: 'doc_1', revision: '1', current_version: 1 }],
+        next_cursor: 'c1',
+      },
+      cursorInvalid(),
+      { phase: 'snapshot', rows: [], next_cursor: 'c2' },
+    ])
+
+  /** the production wiring's onFeedGone: the service for an open copy, plus the library */
+  const wiringOnFeedGone = (runtime: SyncRuntime, documentId: string) => {
+    void runtime.library?.refresh(documentId).catch(() => undefined)
+  }
+
+  async function pinnedClosed(h: ReturnType<typeof harness>) {
+    addDoc(h, 'doc_1', 1)
+    await h.runtime.library!.pin({ documentId: 'doc_1', orgId: ORG, workspaceId: WS })
+    expect(await h.runtime.library!.row('doc_1')).toMatchObject({ readyVersion: 1 })
+    // a draft and an intent of the document in the sync store (never the library's)
+    const opened = await h.syncLayer.open(SCOPE)
+    if (opened.kind !== 'ok') throw new Error('sync store did not open')
+    const records = opened.store.records
+    await records(INTENT_STORE_REGISTRATION.name).write('doc_1', plaintext('intent', 64))
+    await records(DRAFTS_STORE_REGISTRATION.name).write('doc_1/1', plaintext('draft', 64))
+    return records
+  }
+
+  async function draftsKept(records: Awaited<ReturnType<typeof pinnedClosed>>) {
+    expect((await records(INTENT_STORE_REGISTRATION.name).read('doc_1')).kind).toBe('ok')
+    expect((await records(DRAFTS_STORE_REGISTRATION.name).read('doc_1/1')).kind).toBe('ok')
+  }
+
+  it('closed pinned doc + feed delete -> row deleted and its file gone from the store root listing', async () => {
+    const h = harness({ feed: droppingFeed(), onFeedGone: wiringOnFeedGone })
+    const records = await pinnedClosed(h)
+    const before = filesUnder(h.libraryRoot).length
+    expect(before).toBeGreaterThan(2)
+    h.docs.docs.get('doc_1')!.error = new UniworkDocError('document_deleted', { status: 410 })
+    await h.runtime.tick()
+    await h.runtime.tick()
+    await vi.waitFor(async () => {
+      expect(await h.runtime.library!.row('doc_1')).toMatchObject({ state: 'deleted', bytes: 0 })
+    })
+    // only the pin row and the index remain under the library root
+    expect(filesUnder(h.libraryRoot)).toHaveLength(2)
+    expect(await h.runtime.library!.openCached('doc_1')).toEqual({
+      kind: 'refused',
+      code: 'deleted',
+    })
+    await draftsKept(records)
+  })
+
+  it('closed pinned doc + feed revoke -> row revoked and its bytes gone', async () => {
+    const h = harness({ feed: droppingFeed(), onFeedGone: wiringOnFeedGone })
+    const records = await pinnedClosed(h)
+    h.docs.docs.get('doc_1')!.error = new UniworkDocError('permission_revoked', { status: 403 })
+    await h.runtime.tick()
+    await h.runtime.tick()
+    await vi.waitFor(async () => {
+      expect(await h.runtime.library!.row('doc_1')).toMatchObject({ state: 'revoked', bytes: 0 })
+    })
+    expect(filesUnder(h.libraryRoot)).toHaveLength(2)
+    expect(await h.runtime.library!.openCached('doc_1')).toEqual({
+      kind: 'refused',
+      code: 'revoked',
+    })
+    await draftsKept(records)
+  })
+
+  it('a dropped id that is neither pinned nor open bound is still not reported', async () => {
+    const gone: string[] = []
+    const h = harness({
+      feed: droppingFeed(),
+      onFeedGone: (_runtime, documentId) => gone.push(documentId),
+    })
+    await h.runtime.tick()
+    await h.runtime.tick()
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(gone).toEqual([])
   })
 })
