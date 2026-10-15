@@ -14,7 +14,11 @@ import { safeExternalUrl } from '@genoffice/electron-utils'
 import { getUiLang } from '@genoffice/i18n'
 import { HOME_CHANNELS, type AccountEntitlements, type AccountStatus } from '../../shared/home-api'
 import { readAppSettings, writeAppSetting } from '../app-settings'
-import { createCredentialStore } from './credentials'
+import {
+  createCredentialStore,
+  createMemoryCredentialStore,
+  type CredentialStore,
+} from './credentials'
 import {
   callbackSchemeForChannel,
   isLoopbackHost,
@@ -208,6 +212,20 @@ export async function connectUniworkServer(
     : { ok: false, error: 'refused' }
 }
 
+/**
+ * The credential store of this run: the keyring-backed file store, except for
+ * one E2E seam. The CI machines that run the Electron e2e have no Secret
+ * Service, so without it no spec could ever sign in there; the seam keeps the
+ * session in memory only (nothing is written, a restart forgets it) and exists
+ * in unpackaged builds only, like UNIWORK_AUTH_E2E_NO_BROWSER above.
+ */
+export function accountCredentialStore(): CredentialStore {
+  if (!app.isPackaged && process.env.UNIWORK_AUTH_E2E_PLAIN_STORE === '1') {
+    return createMemoryCredentialStore()
+  }
+  return createCredentialStore({ userDataDir: app.getPath('userData'), safeStorage })
+}
+
 /** The process-wide manager; created on first use, which is after app ready. */
 export function uniworkAccount(): AccountManager {
   if (manager) return manager
@@ -216,7 +234,7 @@ export function uniworkAccount(): AccountManager {
   const created = new AccountManager({
     resolveProfile: () => resolveDeploymentProfile(resolveOptions()),
     createTransport: (profile) => createUniworkTransport(profile),
-    credentials: createCredentialStore({ userDataDir: app.getPath('userData'), safeStorage }),
+    credentials: accountCredentialStore(),
     openBrowser: openAuthorizationUrl,
     // G8-16 S16: the remembered organization is per account + machine, so a
     // choice made by one account is never read back for another on this install
