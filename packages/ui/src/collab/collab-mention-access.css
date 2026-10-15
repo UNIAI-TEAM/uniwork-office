@@ -1,0 +1,227 @@
+/* G8-18 mention access: the "Can't view" badge (picker rows + composer chips), the pre-send warning
+ * dialog, the post-send notice and the spinner. Chrome tokens only (tokens.css, light + dark); the
+ * dialog reuses the "Discard the draft?" shell metrics so both modals look the same. */
+
+/* ---------- badge ---------- */
+
+.collab-mention-no-access {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  margin-inline-start: auto;
+  padding: 1px 8px;
+  border: 1px solid var(--warning-border);
+  border-radius: 999px;
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  font-size: var(--text-caption);
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.collab-mention-lock {
+  flex: none;
+}
+
+/* a row that cannot view stays pickable: the badge is the only cue besides the text */
+.collab-mention-option[data-no-access='true'] .collab-mention-name {
+  color: var(--text);
+}
+
+/* ---------- composer: chips under the box + the mirror mark of a no-access mention ---------- */
+
+.collab-composer-mark--no-access {
+  background: var(--warning-bg);
+  box-shadow: inset 0 -2px 0 var(--warning-border);
+}
+
+.collab-composer-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  margin: 6px 0 0;
+}
+
+.collab-mention-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-width: 0;
+  color: var(--text);
+  font-size: var(--text-caption);
+}
+
+.collab-mention-chip-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.collab-mention-chip .collab-mention-no-access {
+  margin-inline-start: 0;
+}
+
+/* ---------- pre-send dialog (rendered into document.body) ---------- */
+
+.collab-mention-warn-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: var(--color-dialog-scrim);
+}
+
+.collab-mention-warn-backdrop:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.collab-mention-warn {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 448px;
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-12);
+  background: var(--surface);
+  box-shadow: var(--shadow-modal-strong);
+  color: var(--text);
+  font-size: var(--text-small);
+}
+
+.collab-mention-warn-title {
+  margin: 0;
+  padding: 16px 16px 4px;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.collab-mention-warn-body {
+  padding: 8px 16px 14px;
+  overflow-wrap: anywhere;
+}
+
+.collab-mention-warn-text {
+  margin: 0;
+  color: var(--text);
+}
+
+.collab-mention-warn-sub {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+}
+
+.collab-mention-warn-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 16px 16px;
+}
+
+.collab-mention-warn-actions .collab-composer-btn {
+  white-space: normal;
+  text-align: start;
+}
+
+/* ---------- spinner (sharing in progress) ---------- */
+
+.collab-spinner {
+  display: inline-block;
+  box-sizing: border-box;
+  width: 12px;
+  height: 12px;
+  margin-inline-end: 6px;
+  vertical-align: -2px;
+  border: 2px solid currentColor;
+  border-inline-end-color: transparent;
+  border-radius: 50%;
+  animation: collab-spin 0.8s linear infinite;
+}
+
+@keyframes collab-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .collab-spinner {
+    animation-duration: 3s;
+  }
+}
+
+/* ---------- post-send notice (under the comment that was just sent) ---------- */
+
+.collab-post-send-notice {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 8px 36px 8px 10px;
+  border: 1px solid var(--warning-border);
+  border-radius: var(--radius-6);
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  font-size: var(--text-caption);
+  line-height: 1.45;
+}
+
+.collab-post-send-text,
+.collab-post-send-sub,
+.collab-post-send-error,
+.collab-post-send-retro {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.collab-post-send-error {
+  color: var(--danger-text);
+  font-weight: 500;
+}
+
+.collab-post-send-retro {
+  color: var(--text-secondary);
+}
+
+.collab-post-send-share {
+  background: var(--surface);
+}
+
+.collab-post-send-share:focus-visible,
+.collab-post-send-close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.collab-post-send-close {
+  position: absolute;
+  top: 4px;
+  inset-inline-end: 4px;
+  width: 24px;
+  height: 24px;
+}
+
+@media (pointer: coarse) {
+  .collab-post-send-close {
+    width: 44px;
+    height: 44px;
+    top: 0;
+    inset-inline-end: 0;
+  }
+
+  .collab-post-send-notice {
+    padding-inline-end: 48px;
+  }
+}

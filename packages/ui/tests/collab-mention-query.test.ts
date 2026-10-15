@@ -204,7 +204,7 @@ describe('mention ranges (the composer shows @Name, the stored body keeps the to
     expect(mentionDocToBody(out.doc)).toBe(`${tok}  tail ${tok}`)
   })
 
-  it('preserves canView and canShare on picked mentions across edits, while pasted tokens omit them (G8-18)', () => {
+  it('preserves canView on picked mentions across edits, while pasted tokens omit them (G8-18)', () => {
     const base = mentionDocFromBody('@mi')
     const trig = findMentionTrigger(base.text, 3)!
     const picked = pickMention(base, trig, 3, {
@@ -212,13 +212,11 @@ describe('mention ranges (the composer shows @Name, the stored body keeps the to
       label: 'Minh Anh',
       raw: tok,
       canView: false,
-      canShare: true,
     })
     expect(picked.doc.ranges[0]).toMatchObject({
       id: AN,
       label: 'Minh Anh',
       canView: false,
-      canShare: true,
     })
     const editedPrefix = applyMentionEdit(picked.doc, 'Nhờ @Minh Anh ').doc
     const edited = applyMentionEdit(editedPrefix, 'Nhờ @Minh Anh xem').doc
@@ -226,10 +224,11 @@ describe('mention ranges (the composer shows @Name, the stored body keeps the to
       start: 4,
       end: 13,
       canView: false,
-      canShare: true,
     })
     const fromBody = mentionDocFromBody(`Nhờ ${tok} xem`)
     expect(fromBody.ranges[0]?.canView).toBeUndefined()
+    // per-person can_share is a post-send fact: a range never carries it (F5)
+    expect(picked.doc.ranges[0]).not.toHaveProperty('canShare')
   })
 })
 

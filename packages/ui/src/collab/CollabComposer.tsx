@@ -34,8 +34,16 @@ import {
 } from './MentionPicker'
 import { buildMentionToken } from './body'
 import {
+  MentionAccessDialog,
+  type MentionAccessPerson,
+  type MentionAccessState,
+  type MentionAccessStrings,
+} from './MentionAccessDialog'
+import { NoAccessBadge } from './NoAccessBadge'
+import {
   type MentionDoc,
   applyMentionEdit,
+  canShareView,
   findMentionTrigger,
   formatMentionNames,
   mentionDocFromBody,
@@ -47,7 +55,7 @@ import { toCollabError, type CollabHostState, type CollabSource } from './types'
 export type CollabComposerMode = 'root' | 'reply' | 'edit' | 'discussion'
 
 /** the catalogue keys the composer reads (Composer section of the spine) plus the picker's */
-export interface CollabComposerStrings extends CollabPickerStrings {
+export interface CollabComposerStrings extends CollabPickerStrings, MentionAccessStrings {
   collabComposerComment: string
   collabComposerReply: string
   collabComposerDiscussion: string
@@ -66,23 +74,6 @@ export interface CollabComposerStrings extends CollabPickerStrings {
   collabDiscard: string
   collabKeepWriting: string
   collabAiDraftLabel: string
-  collabMentionWarnTitle: string
-  /** `{names}` */
-  collabMentionWarnBody: string
-  collabShareViewThenSend: string
-  collabSendWithoutNotify: string
-  /** `{names}` */
-  collabMentionAskManager: string
-  /** `{unshareable}` */
-  collabMentionMixedUnshareable: string
-  collabSharingView: string
-  /** `{failedNames}` */
-  collabShareViewFailed: string
-  /** `{sharedNames}`, `{failedNames}` */
-  collabShareViewPartial: string
-  collabSendComment: string
-  /** `{failedNames}` */
-  collabRetryShareFor: string
   /** `{sharedNames}` */
   collabSendFailedAfterShare: string
 }
@@ -111,19 +102,6 @@ export interface CollabComposerProps {
   /** focus the box on mount (when the user just opened this composer) */
   autoFocus?: boolean
   className?: string
-}
-
-interface WarnPerson {
-  id: string
-  label: string
-  canShare: boolean
-}
-
-interface WarnModalState {
-  people: WarnPerson[]
-  sharing: boolean
-  sharedIds: string[]
-  failedIds: string[]
 }
 
 export function CollabComposer(props: CollabComposerProps) {
@@ -182,7 +160,7 @@ export function CollabComposer(props: CollabComposerProps) {
   const [sendError, setSendError] = useState(false)
   const [sendErrorText, setSendErrorText] = useState<string | null>(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
-  const [warnState, setWarnState] = useState<WarnModalState | null>(null)
+  const [warnState, setWarnState] = useState<MentionAccessState | null>(null)
 
   const warnOpen = warnState !== null
   const found = findMentionTrigger(text, caret)
@@ -238,18 +216,12 @@ export function CollabComposer(props: CollabComposerProps) {
     const at = taRef.current?.selectionStart ?? caret
     const t = findMentionTrigger(text, at)
     if (!t) return
-    const {
-      user_id: id,
-      display_name: label,
-      can_view: canView,
-      can_share: canShare,
-    } = row.candidate
+    const { user_id: id, display_name: label, can_view: canView } = row.candidate
     const out = pickMention(doc, t, at, {
       id,
       label,
       raw: buildMentionToken(id, label),
       ...(canView !== undefined ? { canView } : {}),
-      ...(canShare !== undefined ? { canShare } : {}),
     })
     pendingCaret.current = out.caret
     setCaret(out.caret)
@@ -258,23 +230,17 @@ export function CollabComposer(props: CollabComposerProps) {
   }
 
   const sendBlocked = pending || disabledReason !== undefined || body.trim() === ''
-  const hasShareCap =
-    (host.capabilities?.commentsShareView ?? host.commentsShareView) === true &&
-    typeof source.shareView === 'function'
+  const hasShareCap = canShareView(host, source)
 
-  function collectUnsharedNoAccess(): WarnPerson[] {
+  function collectUnsharedNoAccess(): MentionAccessPerson[] {
     const seen = new Set<string>()
-    const out: WarnPerson[] = []
+    const out: MentionAccessPerson[] = []
     for (const r of doc.ranges) {
       if (r.canView !== false) continue
       if (sharedUserIdsRef.current.has(r.id) || skippedUserIdsRef.current.has(r.id)) continue
       if (seen.has(r.id)) continue
       seen.add(r.id)
-      out.push({
-        id: r.id,
-        label: r.label,
-        canShare: hasShareCap && r.canShare !== false,
-      })
+      out.push({ id: r.id, label: r.label })
     }
     return out
   }
@@ -350,9 +316,7 @@ export function CollabComposer(props: CollabComposerProps) {
       for (const uid of newlyShared) sharedUserIdsRef.current.add(uid)
       setDoc((prev) => ({
         ...prev,
-        ranges: prev.ranges.map((r) =>
-          newlyShared.includes(r.id) ? { ...r, canView: true } : r,
-        ),
+        ranges: prev.ranges.map((r) => (newlyShared.includes(r.id) ? { ...r, canView: true } : r)),
       }))
     }
     const allSharedNames = warnState.people
@@ -381,7 +345,7 @@ export function CollabComposer(props: CollabComposerProps) {
     }
   }
 
-  function sendWithoutNotifyFromWarn() {
+  function sendNowFromWarn() {
     if (!warnState || warnState.sharing) return
     const sharedNames = warnState.people
       .filter((p) => warnState.sharedIds.includes(p.id))
@@ -545,25 +509,7 @@ export function CollabComposer(props: CollabComposerProps) {
               data-no-access="true"
             >
               <span className="collab-mention-chip-name">@{r.label}</span>
-              <span className="collab-mention-no-access" data-no-access="true">
-                <svg
-                  className="collab-mention-lock"
-                  width="12"
-                  height="12"
-                  viewBox="0 0 12 12"
-                  aria-hidden="true"
-                >
-                  <path
-                    d="M3.5 5V3.8a2.5 2.5 0 0 1 5 0V5M2.5 5h7v5.5h-7V5Z"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.2"
-                  />
-                </svg>
-                <span className="collab-mention-no-access-text">
-                  {strings.collabMentionNoAccessBadge}
-                </span>
-              </span>
+              <NoAccessBadge label={strings.collabMentionNoAccessBadge} />
             </span>
           ))}
         </div>
@@ -611,10 +557,12 @@ export function CollabComposer(props: CollabComposerProps) {
         ? createPortal(
             <MentionAccessDialog
               state={warnState}
+              canShare={hasShareCap}
               lang={host.lang}
               strings={strings}
+              announce={announce}
               onShare={(ids) => void runShare(ids)}
-              onSendWithoutNotify={sendWithoutNotifyFromWarn}
+              onSendNow={sendNowFromWarn}
               onCancel={cancelWarn}
             />,
             document.body,
@@ -656,228 +604,6 @@ function mirrorParts(doc: MentionDoc): ReactNode[] {
   }
   parts.push(doc.text.slice(at) + '\n')
   return parts
-}
-
-/** G8-18 pre-send warning dialog when mentioned people cannot view the document */
-function MentionAccessDialog({
-  state,
-  lang,
-  strings,
-  onShare,
-  onSendWithoutNotify,
-  onCancel,
-}: {
-  state: WarnModalState
-  lang: string
-  strings: CollabComposerStrings
-  onShare(targetIds: string[]): void
-  onSendWithoutNotify(): void
-  onCancel(): void
-}): ReactNode {
-  const id = useId()
-  const primaryRef = useRef<HTMLButtonElement>(null)
-  const modal = useModalKeys(() => {
-    if (!state.sharing) onCancel()
-  })
-  useEffect(() => primaryRef.current?.focus(), [])
-
-  const shareable = state.people.filter((p) => p.canShare)
-  const unshareable = state.people.filter((p) => !p.canShare)
-  const sharedPeople = state.people.filter((p) => state.sharedIds.includes(p.id))
-  const failedPeople = state.people.filter((p) => state.failedIds.includes(p.id))
-
-  const allNames = formatMentionNames(
-    state.people.map((p) => p.label),
-    lang,
-  )
-  const shareableNames = formatMentionNames(
-    shareable.map((p) => p.label),
-    lang,
-  )
-  const unshareableNames = formatMentionNames(
-    unshareable.map((p) => p.label),
-    lang,
-  )
-  const sharedNames = formatMentionNames(
-    sharedPeople.map((p) => p.label),
-    lang,
-  )
-  const failedNames = formatMentionNames(
-    failedPeople.map((p) => p.label),
-    lang,
-  )
-
-  const hasFailed = state.failedIds.length > 0
-  const isPartial = hasFailed && state.sharedIds.length > 0
-  const isAllFailed = hasFailed && state.sharedIds.length === 0
-
-  return (
-    <div
-      className="collab-mention-warn-backdrop"
-      ref={modal.ref}
-      onKeyDown={modal.onKeyDown}
-      tabIndex={-1}
-    >
-      <div
-        className="collab-mention-warn"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={`${id}-title`}
-        aria-describedby={`${id}-body`}
-      >
-        <h3 className="collab-mention-warn-title" id={`${id}-title`}>
-          {strings.collabMentionWarnTitle}
-        </h3>
-        <div className="collab-mention-warn-body" id={`${id}-body`}>
-          {isPartial ? (
-            <p className="collab-mention-warn-text">
-              {format(strings.collabShareViewPartial, { sharedNames, failedNames })}
-            </p>
-          ) : isAllFailed ? (
-            <p className="collab-mention-warn-text">
-              {format(strings.collabShareViewFailed, { failedNames })}
-            </p>
-          ) : (
-            <>
-              <p className="collab-mention-warn-text">
-                {format(strings.collabMentionWarnBody, { names: allNames })}
-              </p>
-              {shareable.length === 0 ? (
-                <p className="collab-mention-warn-sub">
-                  {format(strings.collabMentionAskManager, { names: allNames })}
-                </p>
-              ) : unshareable.length > 0 ? (
-                <p className="collab-mention-warn-sub">
-                  {format(strings.collabMentionMixedUnshareable, {
-                    unshareable: unshareableNames,
-                    shareable: shareableNames,
-                  })}
-                </p>
-              ) : null}
-            </>
-          )}
-        </div>
-        <div className="collab-mention-warn-actions">
-          {isPartial ? (
-            <>
-              <button
-                type="button"
-                ref={primaryRef}
-                className="collab-composer-btn collab-composer-send"
-                aria-disabled={state.sharing || undefined}
-                onClick={() => {
-                  if (!state.sharing) onSendWithoutNotify()
-                }}
-              >
-                {state.sharing ? (
-                  <>
-                    <span className="collab-spinner" aria-hidden="true" />
-                    {strings.collabSharingView}
-                  </>
-                ) : (
-                  strings.collabSendComment
-                )}
-              </button>
-              <button
-                type="button"
-                className="collab-composer-btn"
-                aria-disabled={state.sharing || undefined}
-                onClick={() => {
-                  if (!state.sharing) onShare(failedPeople.map((p) => p.id))
-                }}
-              >
-                {format(strings.collabRetryShareFor, { failedNames })}
-              </button>
-            </>
-          ) : isAllFailed ? (
-            <>
-              <button
-                type="button"
-                ref={primaryRef}
-                className="collab-composer-btn collab-composer-send"
-                aria-disabled={state.sharing || undefined}
-                onClick={() => {
-                  if (!state.sharing) onShare(failedPeople.map((p) => p.id))
-                }}
-              >
-                {state.sharing ? (
-                  <>
-                    <span className="collab-spinner" aria-hidden="true" />
-                    {strings.collabSharingView}
-                  </>
-                ) : (
-                  strings.collabRetry
-                )}
-              </button>
-              <button
-                type="button"
-                className="collab-composer-btn"
-                aria-disabled={state.sharing || undefined}
-                onClick={() => {
-                  if (!state.sharing) onSendWithoutNotify()
-                }}
-              >
-                {strings.collabSendWithoutNotify}
-              </button>
-            </>
-          ) : shareable.length > 0 ? (
-            <>
-              <button
-                type="button"
-                ref={primaryRef}
-                className="collab-composer-btn collab-composer-send"
-                aria-disabled={state.sharing || undefined}
-                onClick={() => {
-                  if (!state.sharing) onShare(shareable.map((p) => p.id))
-                }}
-              >
-                {state.sharing ? (
-                  <>
-                    <span className="collab-spinner" aria-hidden="true" />
-                    {strings.collabSharingView}
-                  </>
-                ) : (
-                  strings.collabShareViewThenSend
-                )}
-              </button>
-              <button
-                type="button"
-                className="collab-composer-btn"
-                aria-disabled={state.sharing || undefined}
-                onClick={() => {
-                  if (!state.sharing) onSendWithoutNotify()
-                }}
-              >
-                {strings.collabSendWithoutNotify}
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              ref={primaryRef}
-              className="collab-composer-btn collab-composer-send"
-              aria-disabled={state.sharing || undefined}
-              onClick={() => {
-                if (!state.sharing) onSendWithoutNotify()
-              }}
-            >
-              {strings.collabSendWithoutNotify}
-            </button>
-          )}
-          <button
-            type="button"
-            className="collab-composer-btn"
-            aria-disabled={state.sharing || undefined}
-            onClick={() => {
-              if (!state.sharing) onCancel()
-            }}
-          >
-            {strings.collabCancel}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
 }
 
 /** "Discard the draft?" — a modal question; "Keep writing" has the focus */

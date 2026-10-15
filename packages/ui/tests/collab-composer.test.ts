@@ -805,9 +805,7 @@ describe('G8-18 mention people without access (chip badge + pre-send warning sta
 
   it('shows lock icon + collabMentionNoAccessBadge on a picked chip with can_view=false', async () => {
     const source = Object.assign(
-      fakeSource([
-        { ...candidate(ULID_A, 'Minh Anh'), can_view: false, can_share: true },
-      ]),
+      fakeSource([{ ...candidate(ULID_A, 'Minh Anh'), can_view: false }]),
       { canListMembers: true },
     )
     render({ source })
@@ -823,25 +821,24 @@ describe('G8-18 mention people without access (chip badge + pre-send warning sta
     expect(chip.querySelector('svg.collab-mention-lock')).not.toBeNull()
     expect(chip.textContent).toContain('@Minh Anh')
     expect(chip.textContent).toContain("Can't view")
-    expect(
-      host.querySelector('.collab-composer-mirror mark')?.getAttribute('data-no-access'),
-    ).toBe('true')
+    expect(host.querySelector('.collab-composer-mirror mark')?.getAttribute('data-no-access')).toBe(
+      'true',
+    )
   })
 
   it('warns before send when can_share=true and shares view access sequentially before sending', async () => {
     let resolveShareA!: (v: { ok: true }) => void
-    const shareView = vi.fn(
-      (p: { user_id: string }) =>
-        p.user_id === ULID_A
-          ? new Promise<{ ok: true }>((r) => {
-              resolveShareA = r
-            })
-          : Promise.resolve({ ok: true as const }),
+    const shareView = vi.fn((p: { user_id: string }) =>
+      p.user_id === ULID_A
+        ? new Promise<{ ok: true }>((r) => {
+            resolveShareA = r
+          })
+        : Promise.resolve({ ok: true as const }),
     )
     const source = Object.assign(
       fakeSource([
-        { ...candidate(ULID_A, 'Minh Anh'), can_view: false, can_share: true },
-        { ...candidate(ULID_B, 'Mai Hương'), can_view: false, can_share: true },
+        { ...candidate(ULID_A, 'Minh Anh'), can_view: false },
+        { ...candidate(ULID_B, 'Mai Hương'), can_view: false },
       ]),
       { canListMembers: true, shareView },
     )
@@ -882,63 +879,77 @@ describe('G8-18 mention people without access (chip badge + pre-send warning sta
     expect(dialog()).toBeNull()
   })
 
-  it('shows collabMentionAskManager and hides share button when commentsShareView capability is absent or can_share=false', async () => {
+  it.each([
+    ['the source has no shareView (the host did not grant commentsShareView)', {}, false],
+    ['the host switches the capability off', { capabilities: { commentsShareView: false } }, true],
+  ])(
+    'shows collabMentionAskManager and no share button when %s',
+    async (_name, hostOver, withShare) => {
+      const shareView = vi.fn(async () => ({ ok: true as const }))
+      const source = Object.assign(
+        fakeSource([{ ...candidate(ULID_A, 'Minh Anh'), can_view: false }]),
+        { canListMembers: true, ...(withShare ? { shareView } : {}) },
+      )
+      const m = render({ host: makeHost(hostOver), source })
+      await openPicker()
+      key('Enter')
+      await act(async () => {
+        sendKeys()
+      })
+      expect(dialog()!.textContent).toContain(
+        'Ask someone who manages this document to share view access with Minh Anh.',
+      )
+      expect(dialogBtn('Share view access, then send')).toBeUndefined()
+      await act(async () => {
+        dialogBtn('Send without notifying')!.click()
+      })
+      expect(shareView).not.toHaveBeenCalled()
+      expect(m.onSubmit).toHaveBeenCalledTimes(1)
+    },
+  )
+
+  it('F5: a share-capable source offers the share for every no-access mention, without a per-candidate can_share', async () => {
     const shareView = vi.fn(async () => ({ ok: true as const }))
     const source = Object.assign(
-      fakeSource([{ ...candidate(ULID_A, 'Minh Anh'), can_view: false, can_share: false }]),
+      fakeSource([{ ...candidate(ULID_A, 'Minh Anh'), can_view: false }]),
       { canListMembers: true, shareView },
     )
-    const m = render({
-      host: makeHost({ capabilities: { commentsShareView: true } }),
-      source,
-    })
+    render({ source })
     await openPicker()
     key('Enter')
     await act(async () => {
       sendKeys()
     })
-    expect(dialog()!.textContent).toContain(
-      'Ask someone who manages this document to share view access with Minh Anh.',
-    )
-    expect(dialogBtn('Share view access, then send')).toBeUndefined()
-    await act(async () => {
-      dialogBtn('Send without notifying')!.click()
-    })
-    expect(shareView).not.toHaveBeenCalled()
-    expect(m.onSubmit).toHaveBeenCalledTimes(1)
+    expect(dialogBtn('Share view access, then send')).toBeDefined()
+    expect(dialog()!.textContent).not.toContain('Ask someone who manages')
   })
 
-  it('shows collabMentionMixedUnshareable when some mentions are shareable and others are not, sharing only with shareable', async () => {
-    const shareView = vi.fn(async () => ({ ok: true as const }))
+  it('F7: focus returns to the primary button and the live region says the new state after a failed share', async () => {
+    const shareView = vi.fn(async () => {
+      throw { code: 'network' }
+    })
     const source = Object.assign(
-      fakeSource([
-        { ...candidate(ULID_A, 'Minh Anh'), can_view: false, can_share: true },
-        { ...candidate(ULID_B, 'Mai Hương'), can_view: false, can_share: false },
-      ]),
+      fakeSource([{ ...candidate(ULID_A, 'Minh Anh'), can_view: false }]),
       { canListMembers: true, shareView },
     )
-    const m = render({
-      host: makeHost({ capabilities: { commentsShareView: true } }),
-      source,
-    })
-    await openPicker('Nhờ @m')
-    key('Enter')
-    await openPicker(`${ta().value}@m`)
-    key('ArrowDown')
+    const m = render({ source })
+    await openPicker()
     key('Enter')
     await act(async () => {
       sendKeys()
     })
-    expect(dialog()!.textContent).toContain(
-      "Minh Anh and Mai Hương can't view this document, so they won't be notified.",
-    )
-    expect(dialog()!.textContent).toContain("Can't share with Mai Hương; they won't be notified.")
+    const first = dialogBtn('Share view access, then send')!
+    expect(document.activeElement).toBe(first)
     await act(async () => {
-      dialogBtn('Share view access, then send')!.click()
+      first.click()
     })
-    expect(shareView).toHaveBeenCalledTimes(1)
-    expect(shareView).toHaveBeenCalledWith({ user_id: ULID_A })
-    expect(m.onSubmit).toHaveBeenCalledTimes(1)
+    expect(m.announce).toHaveBeenCalledWith('Sharing view access…')
+    expect(m.announce).toHaveBeenCalledWith(
+      "Couldn't share view access with Minh Anh. You can try again or send without notifying.",
+    )
+    const retry = dialogBtn('Try again')!
+    expect(document.activeElement).toBe(retry)
+    expect(retry.classList.contains('collab-composer-send')).toBe(true)
   })
 
   it('handles full share failure (collabShareViewFailed + collabRetry) and partial share success (collabShareViewPartial + collabRetryShareFor / collabSendComment)', async () => {
@@ -950,9 +961,9 @@ describe('G8-18 mention people without access (chip badge + pre-send warning sta
     })
     const source = Object.assign(
       fakeSource([
-        { ...candidate(ULID_A, 'Minh Anh'), can_view: false, can_share: true },
-        { ...candidate(ULID_B, 'Mai Hương'), can_view: false, can_share: true },
-        { ...candidate(ULID_C, 'Lê Cường'), can_view: false, can_share: true },
+        { ...candidate(ULID_A, 'Minh Anh'), can_view: false },
+        { ...candidate(ULID_B, 'Mai Hương'), can_view: false },
+        { ...candidate(ULID_C, 'Lê Cường'), can_view: false },
       ]),
       { canListMembers: true, shareView },
     )
@@ -1024,7 +1035,7 @@ describe('G8-18 mention people without access (chip badge + pre-send warning sta
       if (submitCalls === 1) throw { code: 'internal' }
     })
     const source = Object.assign(
-      fakeSource([{ ...candidate(ULID_A, 'Minh Anh'), can_view: false, can_share: true }]),
+      fakeSource([{ ...candidate(ULID_A, 'Minh Anh'), can_view: false }]),
       { canListMembers: true, shareView },
     )
     render({

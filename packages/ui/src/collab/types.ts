@@ -82,8 +82,6 @@ export interface CollabCandidate {
   email?: string
   /** G8-18: false when returned by `include: 'no_access'` and the candidate cannot view the document */
   can_view?: boolean
-  /** G8-18: whether the caller may grant View access to this candidate (defaults to true when omitted) */
-  can_share?: boolean
 }
 
 /** the error every source call rejects with: `code` = protocol error code, `detailsCode` = `details.code` */
@@ -209,7 +207,12 @@ export interface CollabHostState {
   capabilities?: {
     commentsShareView?: boolean
   }
-  /** G8-18: convenience alias for `capabilities.commentsShareView` */
+  /**
+   * G8-18: convenience alias for `capabilities.commentsShareView`, the caller-level "may share" flag.
+   * A source with `shareView` is enough on its own (the web frame defines it only with the effective
+   * capability); a flag set to `false` turns it off. Per-person `can_share` exists only after a send
+   * (`mentions_without_access`).
+   */
   commentsShareView?: boolean
   /** G8-18: true when the caller may list workspace members (`include: 'no_access'`) */
   canListMembers?: boolean

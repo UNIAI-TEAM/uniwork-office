@@ -8,6 +8,7 @@
 import { format } from '@genoffice/i18n'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { MENTION_DEBOUNCE_MS, MENTION_MAX_ROWS } from './mention-query'
+import { NoAccessBadge } from './NoAccessBadge'
 import type { CollabCandidate, CollabSource } from './types'
 
 /** the S14 keys plus the shared Retry */
@@ -189,7 +190,7 @@ export interface MentionPickerProps {
   /** the visible result count line (`collabMentionCount`), when there is one */
   footer?: string
   /** `collabMentionNoAccessBadge` shown with a lock icon on candidates with `can_view === false` (G8-18) */
-  noAccessBadge?: string
+  noAccessBadge: string
 }
 
 export function MentionPicker({
@@ -234,27 +235,7 @@ export function MentionPicker({
                       <span className="collab-mention-email">{row.candidate.email}</span>
                     ) : null}
                   </span>
-                  {noAccess ? (
-                    <span className="collab-mention-no-access" data-no-access="true">
-                      <svg
-                        className="collab-mention-lock"
-                        width="12"
-                        height="12"
-                        viewBox="0 0 12 12"
-                        aria-hidden="true"
-                      >
-                        <path
-                          d="M3.5 5V3.8a2.5 2.5 0 0 1 5 0V5M2.5 5h7v5.5h-7V5Z"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.2"
-                        />
-                      </svg>
-                      <span className="collab-mention-no-access-text">
-                        {noAccessBadge ?? "Can't view"}
-                      </span>
-                    </span>
-                  ) : null}
+                  {noAccess ? <NoAccessBadge label={noAccessBadge} /> : null}
                 </>
               ) : (
                 <span className="collab-mention-text">{row.text}</span>

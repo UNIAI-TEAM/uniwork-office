@@ -64,8 +64,6 @@ export interface MentionRange {
   raw: string
   /** G8-18: false when picked from the picker with `can_view: false`; undefined when typed or pasted */
   canView?: boolean
-  /** G8-18: whether the caller may grant View access to this candidate when `canView === false` */
-  canShare?: boolean
 }
 
 export interface MentionDoc {
@@ -86,6 +84,19 @@ export function formatMentionNames(names: readonly string[], lang: string): stri
   } catch {
     return new Intl.ListFormat('en', { style: 'long', type: 'conjunction' }).format(names)
   }
+}
+
+/**
+ * G8-18: whether this caller may offer "Share view access": the source can send it (the web frame
+ * defines `shareView` only with the effective `commentsShareView` capability) and the host did not
+ * switch the capability off. A per-person `can_share` is only ever read from a post-send result.
+ */
+export function canShareView(
+  host: { capabilities?: { commentsShareView?: boolean }; commentsShareView?: boolean },
+  source: { shareView?: unknown },
+): boolean {
+  const flag = host.capabilities?.commentsShareView ?? host.commentsShareView
+  return typeof source.shareView === 'function' && flag !== false
 }
 
 /** The displayed form of a stored body: top-level mention tokens become `@Name` + a range. */
@@ -230,7 +241,7 @@ export function pickMention(
   doc: MentionDoc,
   trigger: MentionTrigger,
   caret: number,
-  who: { id: string; label: string; raw: string; canView?: boolean; canShare?: boolean },
+  who: { id: string; label: string; raw: string; canView?: boolean },
 ): { doc: MentionDoc; caret: number } {
   const shown = displayOf(who.label)
   const out = insertMention(doc.text, trigger, caret, shown)
@@ -242,7 +253,6 @@ export function pickMention(
     label: who.label,
     raw: who.raw,
     ...(who.canView !== undefined ? { canView: who.canView } : {}),
-    ...(who.canShare !== undefined ? { canShare: who.canShare } : {}),
   }
   return {
     doc: { text: out.text, ranges: [...kept, range].sort((a, b) => a.start - b.start) },
