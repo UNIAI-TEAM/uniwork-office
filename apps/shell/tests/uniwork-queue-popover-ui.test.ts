@@ -14,6 +14,7 @@ import {
   formatQueueTime,
   isQueuePopoverState,
   queuePopoverModelOf,
+  QUEUE_BAND_SETTLE_MS,
 } from '../src/renderer/src/queue-popover-model'
 import type { UniworkDocStatus } from '../src/shared/home-api'
 import type {
@@ -737,6 +738,79 @@ describe('UniworkQueuePopover (S4)', () => {
       await mount(makeStatus({ state: 'saved' }))
       expect(dialog()).toBeNull()
       expect(lastInset()).toBe(0)
+    })
+
+    describe('V6u-03: the editor moves once on open, once on close', () => {
+      let resolveSnapshot: (value: SyncCenterSnapshot) => void
+      const insets = () => setBarInset.mock.calls.map((call) => call[0] as number)
+      /** the distinct totals main was asked for, in order (a resend of the same total moves nothing) */
+      const moves = () => insets().filter((v, i, all) => i === 0 || v !== all[i - 1])
+
+      beforeEach(() => {
+        // the band is taller while it shows the 2-line no-row sentence than with the row's 1-line one
+        rectSpy.mockImplementation(function (this: HTMLElement) {
+          if (!this.hasAttribute('data-uw-queue-band')) return { height: 0 } as DOMRect
+          const height = this.textContent?.includes('version 7') ? 98 : 117
+          return {
+            x: 0,
+            y: 0,
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: height,
+            width: 0,
+            height,
+          } as DOMRect
+        })
+        api.getSnapshot = vi.fn(
+          () =>
+            new Promise<SyncCenterSnapshot>((resolve) => {
+              resolveSnapshot = resolve
+            }),
+        ) as typeof api.getSnapshot
+      })
+
+      it('holds the band height until the sync-center row has arrived', async () => {
+        await mount(makeStatus())
+        expect(dialog()).not.toBeNull()
+        // nothing reserved yet: the fallback sentence's height is never sent
+        expect(insets().filter((v) => v > 0)).toEqual([])
+        await act(async () => {
+          resolveSnapshot(makeSnapshot([makeRow()]))
+        })
+        await act(async () => {})
+        expect(moves().filter((v) => v > 0)).toEqual([98])
+        await act(async () => {
+          document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+        })
+        expect(moves().filter((v) => v > 0)).toEqual([98])
+        expect(lastInset()).toBe(0)
+      })
+
+      it('a lookup that never answers is capped: the band is reserved after the cap', async () => {
+        vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+        try {
+          await mount(makeStatus())
+          expect(insets().filter((v) => v > 0)).toEqual([])
+          await act(async () => {
+            vi.advanceTimersByTime(QUEUE_BAND_SETTLE_MS)
+          })
+          expect(moves().filter((v) => v > 0)).toEqual([117])
+          expect(QUEUE_BAND_SETTLE_MS).toBeGreaterThan(0)
+          expect(QUEUE_BAND_SETTLE_MS).toBeLessThanOrEqual(500)
+        } finally {
+          vi.useRealTimers()
+        }
+      })
+
+      it('a failed lookup reserves the band at once (no row to wait for)', async () => {
+        api.getSnapshot = vi.fn(async () => {
+          throw new Error('gone')
+        }) as typeof api.getSnapshot
+        await mount(makeStatus())
+        await act(async () => {})
+        expect(moves().filter((v) => v > 0)).toEqual([117])
+      })
     })
   })
 })

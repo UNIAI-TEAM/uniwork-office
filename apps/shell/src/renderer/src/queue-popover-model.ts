@@ -221,5 +221,11 @@ export function formatQueueTime(value: string, locale: string, now = new Date())
   return formatSaveTime(value, locale, now)
 }
 
+/**
+ * how long the popover waits for the sync-center row before its band joins the top inset: the row
+ * changes line 1 (and so the band height), and the editor view should move once, not twice
+ */
+export const QUEUE_BAND_SETTLE_MS = 300
+
 /** kept drafts per document (OQ-UX2, U-15): the `{cap}` of `uwConflictDraftCapReached` */
 export const QUEUE_DRAFT_CAP = 3

@@ -7,6 +7,7 @@ import {
 } from '../../shared/sync-center'
 import { useI18n, type StringKey } from './locale'
 import {
+  QUEUE_BAND_SETTLE_MS,
   QUEUE_DRAFT_CAP,
   findQueueRow,
   formatQueueTime,
@@ -200,10 +201,20 @@ export function UniworkQueuePopover({
     if (pathRef.current !== status.path) close('outside')
   }, [status.path, close])
 
+  // the row decides line 1 and so the band height: wait for it (or the cap) before the band joins
+  // the top inset, so the editor view moves once on open instead of once per line-1 variant
+  const [capped, setCapped] = useState(false)
+  useEffect(() => {
+    if (settled) return
+    const timer = setTimeout(() => setCapped(true), QUEUE_BAND_SETTLE_MS)
+    return () => clearTimeout(timer)
+  }, [settled])
+  const bandReady = settled || capped
+
   // the band's height joins the top inset while it is open; closing gives the editor the room back
   useLayoutEffect(() => {
     const band = bandRef.current
-    if (!band) return
+    if (!band || !bandReady) return
     const measure = () => setTopInsetPart('popover', unscaledHeightOf(band))
     measure()
     let observer: ResizeObserver | undefined
@@ -211,11 +222,9 @@ export function UniworkQueuePopover({
       observer = new ResizeObserver(measure)
       observer.observe(band)
     }
-    return () => {
-      observer?.disconnect()
-      setTopInsetPart('popover', 0)
-    }
-  }, [])
+    return () => observer?.disconnect()
+  }, [bandReady])
+  useLayoutEffect(() => () => setTopInsetPart('popover', 0), [])
 
   const wasConfirming = useRef(false)
   useEffect(() => {
