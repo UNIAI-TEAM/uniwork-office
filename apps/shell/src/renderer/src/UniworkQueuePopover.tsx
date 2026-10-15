@@ -20,6 +20,7 @@ import {
   findQueueRow,
   formatQueueTime,
   isQueuePopoverState,
+  popoverLeftOf,
   queuePopoverModelOf,
   type PopoverAction,
   type PopoverActionId,
@@ -30,6 +31,7 @@ import { announce } from './uniwork-live'
 import {
   popoverRoomOf,
   setTopInsetPart,
+  uiScaleOf,
   unscaledHeightOf,
   useTopInsetPart,
 } from './uniwork-top-inset'
@@ -131,6 +133,8 @@ export function UniworkQueuePopover({
   // and a taller text scrolls inside the dialog (the action row stays outside the scroll area)
   const room = popoverRoomOf(barPx)
   const [scrolls, setScrolls] = useState(false)
+  // the dialog's left edge in the band's unscaled px; null until it is first placed (before paint)
+  const [left, setLeft] = useState<number | null>(null)
   const lineId = useId()
   const confirmId = useId()
 
@@ -151,6 +155,34 @@ export function UniworkQueuePopover({
   useLayoutEffect(() => {
     live.current = { onClose, onFocusEditor, openerEl, anchorEl, opener, confirming }
   })
+
+  // the dialog's x follows the pill: right-aligned to its right edge, inside the window. The band spans
+  // the window, the rects are window px and the band lays out in unscaled px (interface scale)
+  const place = useCallback(() => {
+    const dialog = dialogRef.current
+    const band = bandRef.current
+    if (!dialog || !band) return
+    const scale = uiScaleOf(dialog)
+    const bandWidth = band.getBoundingClientRect().width
+    const next = popoverLeftOf({
+      pillRight: (live.current.anchorEl?.getBoundingClientRect().right ?? Number.NaN) / scale,
+      width: dialog.getBoundingClientRect().width / scale,
+      windowWidth: (bandWidth > 0 ? bandWidth : window.innerWidth) / scale,
+    })
+    setLeft((prev) => (prev === next ? prev : next))
+  }, [])
+  // after every render: the pill may have moved since (a variant, a tab, a longer line)
+  useLayoutEffect(place)
+  useEffect(() => {
+    window.addEventListener('resize', place)
+    const sized = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(place) : null
+    if (anchorEl) sized?.observe(anchorEl)
+    if (dialogRef.current) sized?.observe(dialogRef.current)
+    return () => {
+      window.removeEventListener('resize', place)
+      sized?.disconnect()
+    }
+  }, [place, anchorEl])
 
   const close = useCallback((kind: CloseKind) => {
     if (closedRef.current) return
@@ -356,6 +388,7 @@ export function UniworkQueuePopover({
         role="dialog"
         tabIndex={-1}
         aria-labelledby={lineId}
+        style={left === null ? undefined : { marginLeft: `${left}px` }}
       >
         <div
           ref={bodyRef}

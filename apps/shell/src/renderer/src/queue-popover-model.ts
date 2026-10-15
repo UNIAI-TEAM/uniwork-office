@@ -215,3 +215,32 @@ export const QUEUE_BAND_SETTLE_MS = 300
 
 /** kept drafts per document (OQ-UX2, U-15): the `{cap}` of `uwConflictDraftCapReached` */
 export const QUEUE_DRAFT_CAP = 3
+
+/** the dialog keeps this far from the window's left and right edges (contract §3) */
+export const POPOVER_GUTTER_PX = 8
+
+/** the dialog's width when it cannot be measured (`.uw-queue-pop` in queue-popover.css) */
+const POPOVER_WIDTH_PX = 360
+
+/**
+ * Where the dialog's left edge goes, in the unscaled CSS px it lays out in: right-aligned to the
+ * pill's right edge, then kept inside the window by the gutter on both sides. A pill near the left
+ * edge leaves the dialog at the left gutter (it then ends right of the pill's edge); a pill at the
+ * window's edge leaves its right edge at the right gutter. A measure that is not a number takes
+ * the right gutter (where the dialog sat before it followed the pill).
+ */
+export function popoverLeftOf(input: {
+  pillRight: number
+  width: number
+  windowWidth: number
+}): number {
+  const gutter = POPOVER_GUTTER_PX
+  const windowWidth = Number.isFinite(input.windowWidth) ? input.windowWidth : 0
+  const width =
+    Number.isFinite(input.width) && input.width > 0
+      ? input.width
+      : Math.min(POPOVER_WIDTH_PX, Math.max(0, windowWidth - 2 * gutter))
+  const max = Math.max(gutter, windowWidth - gutter - width)
+  const wanted = Number.isFinite(input.pillRight) ? input.pillRight - width : max
+  return Math.min(max, Math.max(gutter, wanted))
+}

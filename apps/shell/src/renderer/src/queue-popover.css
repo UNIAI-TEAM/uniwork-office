@@ -3,7 +3,7 @@
 /* The band right under the tab strip (and under the S6 bar: the component adds its height to
  * `top`). The editor view covers everything below the strip except the top inset, so the
  * band's height joins that inset while the popover is open and the dialog is drawn inside it,
- * at the pill's end of the window. */
+ * under the pill (the band reserves height only; the dialog's x follows the pill). */
 .uw-queue-band {
   box-sizing: border-box;
   position: fixed;
@@ -12,8 +12,9 @@
   right: 0;
   z-index: 30;
   display: flex;
-  justify-content: flex-end;
-  padding: 6px 12px 8px;
+  /* the dialog's own margin-left is its x: the component right-aligns it to the pill (8px gutters) */
+  justify-content: flex-start;
+  padding: 6px 0 8px;
   border-bottom: 1px solid var(--border);
   background: var(--surface-subtle);
   /* never taller than the room main gives (--uw-queue-room: 400px top-inset cap minus the S6 bar) */
@@ -27,7 +28,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  width: min(360px, calc(100vw - 24px));
+  width: min(360px, calc(var(--ui-vw, 1vw) * 100 - 16px));
   /* the band's own padding (6 + 8) and border (1) are the 15px: the dialog scrolls inside the rest */
   max-height: calc(var(--uw-queue-room, 400px) - 15px);
   padding: 12px;

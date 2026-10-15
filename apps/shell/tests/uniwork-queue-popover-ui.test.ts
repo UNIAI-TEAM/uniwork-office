@@ -1037,8 +1037,8 @@ describe('UniworkQueuePopover (S4)', () => {
           expect(rule('.uw-queue-pop')).toMatch(
             /max-height: calc\(var\(--uw-queue-room, \d+px\) - 15px\)/,
           )
-          // padding 6 + 8 and the 1px border make the 15px
-          expect(rule('.uw-queue-band')).toMatch(/padding: 6px 12px 8px/)
+          // padding 6 + 8 (vertical only since U-2: the dialog's margin is its x) and the 1px border make the 15px
+          expect(rule('.uw-queue-band')).toMatch(/padding: 6px 0 8px/)
           expect(rule('.uw-queue-band')).toMatch(/border-bottom: 1px solid/)
           expect(rule('.uw-queue-band')).toMatch(/overflow: hidden/)
         })
