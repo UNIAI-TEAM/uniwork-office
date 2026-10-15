@@ -2273,8 +2273,9 @@ export function AiPanel({
     }
     return true
   }
-  // a refusal that arrived while collapsed: announce through the dedicated region (the panel
-  // region below yields to the run transcript) and focus the disclosure now that it is mounted
+  // a refusal that arrived while collapsed: speak it through the one panel live region (it wins
+  // over the run transcript until the disclosure is acknowledged) and focus the disclosure now
+  // that it is mounted
   useEffect(() => {
     if (!pendingRefusalRef.current || !open) return
     pendingRefusalRef.current = false
@@ -2383,10 +2384,7 @@ export function AiPanel({
 
       {/* Single panel-level polite live region: announces transport notices while running and the finished answer once when it ends */}
       <div className="ai-sr-status" aria-live="polite" aria-atomic="true">
-        {panelLiveAnnouncement}
-      </div>
-      <div className="ai-sr-status" aria-live="polite" aria-atomic="true">
-        {refusalAnnouncement}
+        {refusalAnnouncement || panelLiveAnnouncement}
       </div>
 
       <div
