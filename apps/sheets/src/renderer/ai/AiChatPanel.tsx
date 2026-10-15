@@ -254,7 +254,7 @@ export interface AiChatMessage {
 
 const MODEL_BRIDGE: AiModelPickerBridge = {
   getSettings: () => window.desktopApi.getAiSettings(),
-  setSettings: (settings) => window.desktopApi.setAiSettings(settings),
+  setSettings: (settings, options) => window.desktopApi.setAiSettings(settings, options),
   onSettingsChanged: (handler) => window.desktopApi.onAiSettingsChanged(handler),
   gskLoggedIn: () => window.desktopApi.aiGskStatus().then((s) => !!s?.loggedIn),
   openModelSettings: () => window.desktopApi.openAiModelSettings().catch(() => {}),

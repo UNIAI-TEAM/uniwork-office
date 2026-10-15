@@ -33,10 +33,15 @@ import type {
   AiMediaProviderId,
   AiMediaProviderMeta,
   AiMediaSettings,
+  AiModelPick,
+  AiModelSource,
+  AiProviderConfig,
+  AiProviderId,
   AiSearchProviderMeta,
   AiSearchSettings,
   AiSettings,
 } from '@genoffice/ai-provider'
+import { AI_MODEL_PICKER_STRINGS } from '../../../../../packages/ui/src/strings-ai-model-picker'
 import { useI18n } from './locale'
 import type { StringKey, TFunc } from './locale'
 import type { AiCatalogEntry, DocTheme, UiTheme } from '../../shared/home-api'
@@ -367,17 +372,37 @@ function foldModels(providerId: string, models: string[]) {
     )
 }
 
+/**
+ * The ids the Model dropdown offers: the provider's live list (the one the composer chip reads)
+ * with the saved pick on top, else the catalog. A provider whose catalog is already live (Codex,
+ * a custom endpoint) keeps it; no list, an empty one or a failed listing leaves the catalog.
+ */
+function paneModelIds(
+  catalogModels: readonly string[],
+  source: AiModelSource | undefined,
+  liveCatalog: boolean,
+  selected: string,
+): readonly string[] {
+  const live = liveCatalog || source?.listState === 'error' ? [] : (source?.listed ?? [])
+  if (live.length === 0) return catalogModels
+  const pick = selected.trim()
+  return pick ? [pick, ...live.filter((id) => id !== pick)] : live
+}
+
 /** AI model pane: provider / model / key / base URL, saved to userData/ai-settings.json */
 function AiModelPane({
   t,
   cloud,
+  serverUrl,
   onDirtyChange,
 }: {
   t: TFunc
   cloud: UniworkCloudStatus | null
+  serverUrl?: string
   onDirtyChange?: (dirty: boolean) => void
 }) {
-  const { dateLocale } = useI18n()
+  const { lang, dateLocale } = useI18n()
+  const pickerStrings = AI_MODEL_PICKER_STRINGS[lang] ?? AI_MODEL_PICKER_STRINGS.en
   const [catalog, setCatalog] = useState<AiCatalogEntry[]>(
     () => window.aiOffice.getAiProviders?.() ?? [],
   )
@@ -391,6 +416,24 @@ function AiModelPane({
   const [hubChecking, setHubChecking] = useState(false)
   /** free-typed value of the output-cap field; committed (and clamped) on blur */
   const [maxTokensDraft, setMaxTokensDraft] = useState<string | null>(null)
+  /**
+   * Providers served by a key on UniWork whose row the user opened for a key on this computer:
+   * the value is the slot as it was when the row opened, so Cancel restores it untouched.
+   */
+  const [localKeyRows, setLocalKeyRows] = useState<Partial<Record<AiProviderId, AiProviderConfig>>>(
+    {},
+  )
+  /** the model the user chose in this form and has not saved yet; main records a pick only from it */
+  // the model picked per provider since the last load or save: one Save sends them all
+  const [modelPicks, setModelPicks] = useState<Partial<Record<AiProviderId, string>>>({})
+  /** edits made in this form (the key fields of an open local-key row excluded) */
+  const editsRef = useRef(0)
+  /** per provider: the form's state when its local-key row opened, so Cancel can undo only its own edits */
+  const localKeyOpenRef = useRef<Partial<Record<AiProviderId, { dirty: boolean; edits: number }>>>(
+    {},
+  )
+  /** the control that takes focus once the local-key row opened or closed (the pressed button is gone) */
+  const [focusRequest, setFocusRequest] = useState<'key' | 'use-local' | null>(null)
 
   const refreshCodexModels = useCallback(async (cliPath = '', selectedModel = '') => {
     if (!window.aiOffice.getCodexModels) return
@@ -413,6 +456,15 @@ function AiModelPane({
   dirtyRef.current = dirty
   useEffect(() => onDirtyChange?.(dirty), [dirty, onDirtyChange])
   useEffect(() => () => onDirtyChange?.(false), [onDirtyChange])
+  // the pressed button unmounts with its row: hand focus to the control that took its place
+  useEffect(() => {
+    if (!focusRequest) return
+    const target = document.querySelector<HTMLElement>(
+      focusRequest === 'key' ? '#set-ai-key' : '[data-org-key-use-local]',
+    )
+    target?.focus()
+    setFocusRequest(null)
+  }, [focusRequest, localKeyRows])
   /** bumped on every outside reload so a connection test that was still running reports nothing */
   const testSeqRef = useRef(0)
   useEffect(() => {
@@ -424,6 +476,9 @@ function AiModelPane({
         setTesting(false)
         setTestResult(null)
         setSaved(false)
+        setLocalKeyRows({})
+        localKeyOpenRef.current = {}
+        setModelPicks({})
         setSettings(s)
         const codex = s.providers.codex
         if (codex) {
@@ -433,6 +488,7 @@ function AiModelPane({
           s.providers.genspark?.apiKey?.trim() || s.providers.openrouter?.apiKey?.trim() || ''
         if (
           (s.provider === 'openrouter' || s.provider === 'genspark') &&
+          s.modelSources?.[s.provider]?.origin !== 'org' &&
           hubKey &&
           window.aiOffice.probeOpenRouterKey
         ) {
@@ -467,7 +523,10 @@ function AiModelPane({
   // stays a no-op while any other provider is selected — a local server saved
   // months ago is never contacted while Genspark is in use.
   const endpointProvider = catalog.find(
-    (entry) => entry.id === settings?.provider && entry.needsBaseUrl,
+    (entry) =>
+      entry.id === settings?.provider &&
+      entry.needsBaseUrl &&
+      settings?.modelSources?.[entry.id]?.origin !== 'org',
   )?.id
   const endpointConfig = settings ? settings.providers[settings.provider] : undefined
   const endpointBaseUrl = (endpointConfig?.baseUrl ?? '').trim()
@@ -532,6 +591,12 @@ function AiModelPane({
         : [{ ...UNIWORK_PROVIDER_META, defaultBaseUrl: '' }, ...catalog]
       : catalog
   const meta = providerCatalog.find((c) => c.id === provider)
+  const source = settings.modelSources?.[provider]
+  // a row served by a key on UniWork; it turns into the normal key fields while the user types a key
+  // for this computer instead (the local key then wins in main)
+  const isOrgServed = source?.origin === 'org'
+  const useLocalKey = isOrgServed && localKeyRows[provider] !== undefined
+  const isOrgKey = isOrgServed && !useLocalKey
   const config = settings.providers[provider] ?? {
     apiKey: '',
     model: meta?.defaultModel ?? '',
@@ -542,8 +607,23 @@ function AiModelPane({
   const isCodex = provider === 'codex'
   const isOpenRouter = provider === 'openrouter'
   const isTokenHub = isGenspark || isOpenRouter
+  // an org-served row shows the model main resolved (modelSources[id].chosen), never a copy of it in
+  // the local slot
+  const effectiveModel =
+    (isOrgServed ? source?.chosen?.trim() || config.model : config.model) ||
+    meta?.defaultModel ||
+    ''
+  const modelIds = paneModelIds(
+    meta?.models ?? [],
+    source,
+    (isCodex || !!meta?.needsBaseUrl) && !isOrgKey,
+    // the effective model, as the field shows it: never off-list when the live list lacks the default
+    effectiveModel,
+  )
+  const orgKeyManageUrl = `${(serverUrl || 'https://uniworkos.com').replace(/\/+$/, '')}/settings/ai`
 
-  const touch = () => {
+  const touch = (countsAsEdit = true) => {
+    if (countsAsEdit) editsRef.current += 1
     setDirty(true)
     setSaved(false)
     setSaveError(null)
@@ -551,15 +631,46 @@ function AiModelPane({
     setHubStatus(null)
   }
   const updateConfig = (patch: Partial<typeof config>) => {
+    if (isOrgKey && ('apiKey' in patch || 'baseUrl' in patch)) return
+    // only this provider's slot changes; an org row keeps whatever key/base URL it was loaded with
     const nextSlot = { ...config, ...patch }
     const providers = { ...settings.providers, [provider]: nextSlot }
     // UniAI and OpenRouter share one Token Hub key — mirror apiKey only.
-    if (isTokenHub && patch.apiKey !== undefined) {
+    if (!isOrgKey && isTokenHub && patch.apiKey !== undefined) {
       const other = provider === 'genspark' ? 'openrouter' : 'genspark'
       providers[other] = { ...settings.providers[other], apiKey: nextSlot.apiKey }
     }
-    setSettings({ ...settings, providers })
-    touch()
+    // the row reads the org model from modelSources: a pick shows there too until the next reload
+    const modelSources =
+      isOrgServed && patch.model !== undefined && source
+        ? { ...settings.modelSources, [provider]: { ...source, chosen: patch.model } }
+        : settings.modelSources
+    setSettings({ ...settings, providers, ...(modelSources ? { modelSources } : {}) })
+    if (patch.model !== undefined) {
+      const model = patch.model
+      setModelPicks((picks) => ({ ...picks, [provider]: model }))
+    }
+    // typing in the key fields of the open local-key row is what Cancel takes back
+    touch(!(useLocalKey && ('apiKey' in patch || 'baseUrl' in patch)))
+  }
+  const openLocalKey = () => {
+    localKeyOpenRef.current[provider] = { dirty, edits: editsRef.current }
+    setLocalKeyRows((rows) => ({ ...rows, [provider]: { ...config } }))
+    setFocusRequest('key')
+  }
+  const cancelLocalKey = () => {
+    const slot = localKeyRows[provider]
+    if (slot) setSettings({ ...settings, providers: { ...settings.providers, [provider]: slot } })
+    setLocalKeyRows((rows) => {
+      const rest = { ...rows }
+      delete rest[provider]
+      return rest
+    })
+    // nothing else changed since the row opened: the form is as clean as it was, Save goes off again
+    const opened = localKeyOpenRef.current[provider]
+    if (opened && !opened.dirty && editsRef.current === opened.edits) setDirty(false)
+    delete localKeyOpenRef.current[provider]
+    setFocusRequest('use-local')
   }
   /** Commit the output-cap input: clamp what was typed and drop a no-op edit */
   const commitMaxTokens = () => {
@@ -576,13 +687,20 @@ function AiModelPane({
   }
   const save = () => {
     setSaveError(null)
+    // Every slot goes out as loaded plus this form's edits: an org-served provider's slot has no
+    // key from main, and a key or base URL kept on this computer is never rewritten here.
+    const picks: AiModelPick[] = (Object.entries(modelPicks) as [AiProviderId, string][]).map(
+      ([pickProvider, model]) => ({ provider: pickProvider, model }),
+    )
+    const saveOptions = picks.length ? { ...SETTINGS_PICK, modelPicks: picks } : SETTINGS_PICK
     window.aiOffice
-      .setAiSettings?.(settings, SETTINGS_PICK)
+      .setAiSettings?.(settings, saveOptions)
       .then(() => {
+        setModelPicks({})
         setDirty(false)
         setSaved(true)
         window.dispatchEvent(new Event('uniwork:credit-refresh'))
-        if (isTokenHub && config.apiKey) void checkOpenRouterHub(config.apiKey)
+        if (!isOrgKey && isTokenHub && config.apiKey) void checkOpenRouterHub(config.apiKey)
       })
       .catch((error) => {
         setSaved(false)
@@ -603,7 +721,7 @@ function AiModelPane({
         if (r?.ok && isCodex) {
           void refreshCodexModels(config.cliPath ?? '', config.model).catch(() => undefined)
         }
-        if (r?.ok && isTokenHub && config.apiKey) {
+        if (r?.ok && !isOrgKey && isTokenHub && config.apiKey) {
           void checkOpenRouterHub(config.apiKey)
         }
       })
@@ -702,7 +820,9 @@ function AiModelPane({
             ? t('setAiGensparkHint')
             : isCodex
               ? t('setAiCodexHint')
-              : t('setAiByokNote')}
+              : isOrgKey
+                ? pickerStrings.orgKeyChatHint
+                : t('setAiByokNote')}
       </div>
       {!isUniwork && (
         <>
@@ -712,12 +832,12 @@ function AiModelPane({
                 {t('setAiModelId')}
               </label>
             </div>
-            {meta && meta.models.length > 0 ? (
+            {meta && modelIds.length > 0 ? (
               <Dropdown
                 className="set-dd"
-                value={config.model || meta.defaultModel}
+                value={effectiveModel}
                 ariaLabel={t('setAiModelId')}
-                options={meta.models.map((m) => ({ value: m, label: m }))}
+                options={modelIds.map((m) => ({ value: m, label: m }))}
                 onPick={(m) => updateConfig({ model: m })}
               />
             ) : (
@@ -725,7 +845,7 @@ function AiModelPane({
                 id="set-ai-model"
                 className="set-input"
                 type="text"
-                value={config.model}
+                value={effectiveModel}
                 placeholder="model-id"
                 spellCheck={false}
                 onChange={(e) => updateConfig({ model: e.target.value })}
@@ -757,8 +877,68 @@ function AiModelPane({
                 }}
               />
             </div>
+          ) : isOrgKey ? (
+            <>
+              <div className="set-field" data-org-key-row={provider}>
+                <div className="set-field-text">
+                  <div className="set-field-stack">
+                    <div className="set-org-key-head">
+                      <div className="set-field-label">{t('setAiApiKey')}</div>
+                      <span
+                        className="set-org-key-tag"
+                        data-org-key-tag=""
+                        title={pickerStrings.orgKeyNote}
+                        data-tip={pickerStrings.orgKeyNote}
+                      >
+                        {pickerStrings.orgKeyTag}
+                      </span>
+                    </div>
+                    <div className="set-field-desc" data-org-key-note="">
+                      {pickerStrings.orgKeyNote}
+                    </div>
+                  </div>
+                </div>
+                <div className="set-org-key-actions" data-org-key-local-action={provider}>
+                  <button
+                    type="button"
+                    className="set-btn"
+                    data-org-key-use-local=""
+                    onClick={openLocalKey}
+                  >
+                    {pickerStrings.orgKeyUseLocal}
+                  </button>
+                  <button
+                    type="button"
+                    className="set-btn"
+                    data-org-key-manage=""
+                    onClick={() =>
+                      void window.open(orgKeyManageUrl, '_blank', 'noopener,noreferrer')
+                    }
+                  >
+                    {pickerStrings.orgKeyManage}
+                  </button>
+                </div>
+              </div>
+            </>
           ) : (
             <>
+              {useLocalKey && (
+                <div className="set-field" data-org-key-local-row={provider}>
+                  <div className="set-field-text">
+                    <div className="set-field-stack">
+                      <div className="set-field-label">{pickerStrings.orgKeyUseLocal}</div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="set-btn"
+                    data-org-key-use-local-cancel=""
+                    onClick={cancelLocalKey}
+                  >
+                    {pickerStrings.orgKeyUseLocalCancel}
+                  </button>
+                </div>
+              )}
               <div className="set-field">
                 <div className="set-field-text">
                   <div className="set-field-stack">
@@ -852,7 +1032,7 @@ function AiModelPane({
           />
         </div>
       )}
-      {isTokenHub ? (
+      {isTokenHub && !isOrgKey ? (
         <div className="set-field">
           <div className="set-field-text">
             <div className="set-field-stack">
@@ -1857,7 +2037,12 @@ export function SettingsModal({
               </>
             )}
             {section === 'aiModel' && (
-              <AiModelPane t={t} cloud={cloud} onDirtyChange={onPaneDirty} />
+              <AiModelPane
+                t={t}
+                cloud={cloud}
+                serverUrl={account?.status?.serverUrl}
+                onDirtyChange={onPaneDirty}
+              />
             )}
             {section === 'aiMedia' && (
               <AiMediaPane

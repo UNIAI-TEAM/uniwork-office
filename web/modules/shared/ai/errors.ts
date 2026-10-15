@@ -17,12 +17,17 @@
  * | 429  | (none; `retry-after` forwarded)            | rate_limited           |
  * | 502  | provider_unreachable                       | provider_unreachable   |
  * | 503  | cloud_unavailable                          | cloud_unavailable      |
+ * | 503  | (no JSON error body: gateway page, empty)  | cloud_outage           |
  * | else |                                            | unknown                |
  *
  * The status decides; the body's `code` only refines a 400 (and is kept in `serverCode`).
  */
 
 import { UniworkError, uniworkErrorKey } from '../../../../packages/ai-provider/src/uniwork/errors'
+import {
+  isProxyContractStatus,
+  proxyErrorBodyFields,
+} from '../../../../packages/ai-provider/src/proxy-url'
 import {
   aiUniworkStrings,
   type AiUniworkStringKey,
@@ -36,6 +41,8 @@ export type AiWebErrorCode =
   | 'rate_limited'
   | 'provider_unreachable'
   | 'cloud_unavailable'
+  /** a 503 with no JSON error body (a gateway page while the UniWork API is down): retry, not "not set up" */
+  | 'cloud_outage'
   | 'unauthorized'
   | 'provider_not_supported'
   | 'base_url_refused'
@@ -52,6 +59,7 @@ export const AI_WEB_ERROR_CODES: readonly AiWebErrorCode[] = [
   'rate_limited',
   'provider_unreachable',
   'cloud_unavailable',
+  'cloud_outage',
   'unauthorized',
   'provider_not_supported',
   'base_url_refused',
@@ -133,34 +141,27 @@ export function retryAfterSeconds(value: string | null, now = Date.now()): numbe
 }
 
 /**
- * `code` / `message` of a server error body. The UniWork API wraps them as `{ "error": { code,
- * message } }` (sdo.NewErrorSDO); the flat `{ code, message }` shape is read too, so a typed state
- * never depends on which of the two a route answers.
+ * `code` / `message` of a server error body (`{ "error": { code, message } }` or the flat shape);
+ * the shared reader of the BYOK proxy (packages/ai-provider/src/proxy-url.ts).
  */
-export function errorBodyFields(body: unknown): { code?: string; message?: string } {
-  const read = (v: unknown): { code?: string; message?: string } => {
-    if (!v || typeof v !== 'object') return {}
-    const { code, message } = v as { code?: unknown; message?: unknown }
-    return {
-      ...(typeof code === 'string' ? { code } : {}),
-      ...(typeof message === 'string' ? { message } : {}),
-    }
-  }
-  const wrapped = read((body as { error?: unknown } | null | undefined)?.error)
-  return wrapped.code !== undefined ? wrapped : read(body)
-}
+export const errorBodyFields = proxyErrorBodyFields
 
 /** read a failed response once into an AiWebError (the body is consumed) */
 export async function aiErrorFromResponse(res: Response): Promise<AiWebError> {
   let serverCode: string | undefined
   let message: string | undefined
+  let hasJsonError = false
   try {
-    ;({ code: serverCode, message } = errorBodyFields(await res.json()))
+    const body: unknown = await res.json()
+    ;({ code: serverCode, message } = errorBodyFields(body))
+    hasJsonError = !!body && typeof body === 'object' && ('error' in body || 'code' in body)
   } catch {
     // not JSON (a provider 429 page, a proxy error): the status alone decides
   }
   return new AiWebError({
-    code: aiErrorCodeFor(res.status, serverCode),
+    // only a 503 with no JSON error body is an outage; a coded or JSON 503 keeps cloud_unavailable
+    code:
+      res.status === 503 && !hasJsonError ? 'cloud_outage' : aiErrorCodeFor(res.status, serverCode),
     status: res.status,
     ...(message ? { message } : {}),
     ...(serverCode ? { serverCode } : {}),
@@ -192,9 +193,7 @@ export function rawFailureAsTyped(err: unknown): AiWebError | undefined {
  * Statuses the BYOK proxy answers itself (contract errors). A provider's own 400/422 (bad model,
  * output cap) is passed to ai-provider unchanged: its output-cap fallback reads that body.
  */
-export function isContractFailure(status: number): boolean {
-  return status in BY_STATUS
-}
+export const isContractFailure = isProxyContractStatus
 
 // ------------------------------------------------------------------ UniWork AI (G6-05)
 

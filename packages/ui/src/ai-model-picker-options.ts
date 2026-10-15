@@ -5,6 +5,7 @@ import {
   selectedProvider,
   uniAiOpenRouterKey,
   uniworkAiAvailable,
+  type AiModelSource,
   type AiProviderId,
   type AiSettings,
 } from '@genoffice/ai-provider/browser'
@@ -13,7 +14,14 @@ export interface AiModelPickerGroup {
   readonly id: AiProviderId
   readonly label: string
   readonly models: readonly string[]
+  /** text of the row for an empty model id: the group label, or the model UniWork AI serves once known */
+  readonly rowLabel: string
+  /** the host's listing state for this group (absent = ok or not asked): the catalog is shown meanwhile */
+  readonly listState?: 'loading' | 'error' | undefined
 }
+
+/** live ids shown per group; the rest is reachable through Manage models (Q-M4) */
+export const AI_MODEL_PICKER_LIVE_CAP = 25
 
 export interface AiModelPickerSelection {
   readonly provider: AiProviderId
@@ -21,11 +29,43 @@ export interface AiModelPickerSelection {
 }
 
 /**
+ * Rows of one group, in order: the model chosen in Settings (and the one the host selected, when
+ * it differs), then the provider's live list (catalog ids it confirms first, the rest A to Z,
+ * capped), else the hard-coded catalog. The catalog is only the fallback: no list, an empty list
+ * or a failed listing. A chosen id the live list lacks is still shown.
+ */
+function groupModels(
+  catalog: readonly string[],
+  stored: string,
+  source: AiModelSource | undefined,
+): readonly string[] {
+  const chosen = source?.chosen?.trim() ?? ''
+  const head = [...new Set([chosen || stored, stored].filter((id) => id !== ''))]
+  const live =
+    source && source.listState !== 'error'
+      ? [
+          ...new Set((source.listed ?? []).map((id) => (typeof id === 'string' ? id.trim() : ''))),
+        ].filter((id) => id !== '')
+      : []
+  if (live.length === 0) {
+    // today's list: an off-catalog pick (typed in Settings) goes first
+    const first = head.filter((id) => !catalog.includes(id))
+    return first.length > 0 ? [...first, ...catalog] : catalog
+  }
+  const known = new Set(catalog)
+  const confirmed = catalog.filter((id) => live.includes(id))
+  const others = live.filter((id) => !known.has(id)).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+  const listed = [...confirmed, ...others].filter((id) => !head.includes(id))
+  return [...head, ...listed.slice(0, AI_MODEL_PICKER_LIVE_CAP)]
+}
+
+/**
  * Providers the composer chip may switch to: UniAI once its Token Hub key is
  * set (or while a cloud sign-in is reported), every
  * other vendor once its settings pass the same usability test the chat path
- * applies (`isProviderUsable`), so picking a row never lands on a 401. A model
- * typed into the settings page that is not in the catalog is listed first.
+ * applies (`isProviderUsable`), so picking a row never lands on a 401. The rows
+ * come from the host's model sources (`groupModels`); sources of providers that
+ * are not usable or not in the catalog of providers are ignored.
  */
 export function aiModelPickerGroups(
   settings: AiSettings,
@@ -44,9 +84,18 @@ export function aiModelPickerGroups(
           ? Boolean(stored || config?.cliPath?.trim())
           : isProviderUsable(settings, meta.id)
     if (!usable) continue
-    const models = stored && !meta.models.includes(stored) ? [stored, ...meta.models] : meta.models
+    const source = settings.modelSources?.[meta.id]
+    const models = groupModels(meta.models, stored, source)
+    // UniWork AI has no model ids: its one row is the served model (or its label)
     if (models.length === 0 && !meta.needsCliPath && meta.id !== 'uniwork') continue
-    groups.push({ id: meta.id, label: meta.label, models })
+    const served = meta.id === 'uniwork' ? (settings.uniworkModel?.trim() ?? '') : ''
+    groups.push({
+      id: meta.id,
+      label: meta.label,
+      models,
+      rowLabel: served || meta.label,
+      ...(source?.listState ? { listState: source.listState } : {}),
+    })
   }
   return groups
 }

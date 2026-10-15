@@ -418,7 +418,7 @@ function clampPanelWidth(w: number): number {
 
 const MODEL_BRIDGE: AiModelPickerBridge = {
   getSettings: () => window.slidesApi.getAiSettings(),
-  setSettings: (settings) => window.slidesApi.setAiSettings(settings),
+  setSettings: (settings, options) => window.slidesApi.setAiSettings(settings, options),
   onSettingsChanged: (handler) => window.slidesApi.onAiSettingsChanged(handler),
   gskLoggedIn: () => window.slidesApi.aiGskStatus().then((s) => !!s?.loggedIn),
   openModelSettings: () => window.slidesApi.openAiModelSettings().catch(() => {}),

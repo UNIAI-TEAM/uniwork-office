@@ -798,10 +798,15 @@ const homeApi: HomeApi = {
     )) as AiSettings
   },
   async setAiSettings(settings, options) {
+    const sent = {
+      ...(options?.includeUniworkPick ? { includeUniworkPick: true } : {}),
+      ...(options?.modelPick ? { modelPick: options.modelPick } : {}),
+      ...(options?.modelPicks?.length ? { modelPicks: options.modelPicks } : {}),
+    }
     await ipcRenderer.invoke(
       'ai:set-settings',
       settings,
-      options?.includeUniworkPick ? { includeUniworkPick: true } : undefined,
+      Object.keys(sent).length > 0 ? sent : undefined,
     )
   },
   getAiProviders() {

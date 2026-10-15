@@ -16,6 +16,7 @@ import type { CatalogEntry as FontCatalogEntry } from '@genoffice/electron-utils
 import type { LayoutSkeleton } from '../renderer/ai/layout-skeleton'
 import type {
   AiSettings,
+  AiSettingsSaveOptions,
   AiStreamChunk,
   AiStreamRequest,
   GenSparkAccountStatus,
@@ -1722,7 +1723,7 @@ export interface SlidesApi {
   /** The file was renamed externally (shell Home list rename) — pushes the new path, the renderer updates the title bar */
   onRenamed: (handler: (newPath: string) => void) => () => void
   getAiSettings: () => Promise<AiSettings>
-  setAiSettings: (settings: AiSettings) => Promise<void>
+  setAiSettings: (settings: AiSettings, options?: AiSettingsSaveOptions) => Promise<void>
   /** ai-settings.json was rewritten by any renderer; re-read it */
   onAiSettingsChanged: (handler: () => void) => () => void
   /** shell only: switch to Home and open Settings › AI Model (rejects in standalone) */

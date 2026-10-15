@@ -136,7 +136,8 @@ const api: MarkdownApi = {
     return () => ipcRenderer.removeListener('app:chrome-pressed', listener)
   },
   getAiSettings: () => ipcRenderer.invoke(AI_CHANNELS.getSettings),
-  setAiSettings: (settings) => ipcRenderer.invoke(AI_CHANNELS.setSettings, settings),
+  setAiSettings: (settings, options) =>
+    ipcRenderer.invoke(AI_CHANNELS.setSettings, settings, options),
   onAiSettingsChanged: (handler) => {
     const listener = () => handler()
     ipcRenderer.on(AI_CHANNELS.settingsChanged, listener)

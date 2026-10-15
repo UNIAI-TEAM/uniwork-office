@@ -12,7 +12,7 @@
  *     byok/{provider}/messages         POST           Anthropic Messages wire format
  *     byok/{provider}/generate         POST           { model, stream, request: <Gemini body> }
  *     byok/{provider}/models           GET            the provider's own JSON
- *     cloud                            GET            { enabled, reason?, tools, credits }
+ *     cloud                            GET            { enabled, reason?, tools, credits, uniwork_model? }
  *     cloud/search                     POST           { query, kind, max_results } -> { results, answer? }
  *     cloud/images                     POST           { prompt, aspect_ratio?, ... } -> { images, model }
  *     cloud/media/analyze              POST           { requirements, media: [...] } -> { text }
@@ -82,6 +82,8 @@ export interface AiCloudStatus {
     remaining: number | null
     period_end: string | null
   }
+  /** the model UniWork AI serves (server policy); "" = unknown (an older server omits it) */
+  uniwork_model: string
 }
 
 export interface AiMedia {
@@ -191,6 +193,7 @@ export function readCloudStatus(raw: unknown): AiCloudStatus {
       remaining: typeof credits.remaining === 'number' ? credits.remaining : null,
       period_end: typeof credits.period_end === 'string' ? credits.period_end : null,
     },
+    uniwork_model: typeof r.uniwork_model === 'string' ? r.uniwork_model.trim() : '',
   }
 }
 

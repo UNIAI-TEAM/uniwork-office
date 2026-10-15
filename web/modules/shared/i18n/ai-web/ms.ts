@@ -41,6 +41,8 @@ export const ms = {
     'UniWork tidak dapat menghubungi pembekal AI. Cuba lagi sebentar nanti.',
   aiWebStateCloudTitle: 'Alat awan tidak tersedia',
   aiWebStateCloudBody: 'Alat UniWork AI ini belum disediakan pada pelayan.',
+  aiWebStateOutageTitle: 'UniWork tidak tersedia buat sementara',
+  aiWebStateOutageBody: 'UniWork tidak dapat dihubungi sekarang. Cuba lagi sebentar nanti.',
   aiWebStateSessionTitle: 'Sesi tamat tempoh',
   aiWebStateSessionBody: 'Buka semula dokumen daripada UniWork untuk meneruskan.',
   aiWebStateRefusedTitle: 'Permintaan ditolak',

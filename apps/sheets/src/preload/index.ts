@@ -512,8 +512,8 @@ const desktopApi: DesktopApi = {
     if (!isRecord(result)) throw new Error('Invalid AI settings response.')
     return result as unknown as AiSettings
   },
-  async setAiSettings(settings) {
-    await ipcRenderer.invoke(IPC_CHANNELS.aiSetSettings, settings)
+  async setAiSettings(settings, options) {
+    await ipcRenderer.invoke(IPC_CHANNELS.aiSetSettings, settings, options)
   },
   onAiSettingsChanged(handler) {
     const listener = () => handler()

@@ -255,6 +255,17 @@ describe('cloud status mapping', () => {
     expect(() => parseCloudStatus({ tools: {} })).toThrow(UniworkCloudError)
   })
 
+  it('reads the model UniWork AI serves (uniwork_model); absent, blank or old servers read as empty', () => {
+    expect(
+      parseCloudStatus({ ...STATUS_BODY, uniwork_model: ' claude-opus-5 ' }).uniworkModel,
+    ).toBe('claude-opus-5')
+    expect(parseCloudStatus(STATUS_BODY).uniworkModel).toBe('')
+    expect(parseCloudStatus({ ...STATUS_BODY, uniwork_model: '' }).uniworkModel).toBe('')
+    expect(parseCloudStatus({ ...STATUS_BODY, uniwork_model: null }).uniworkModel).toBe('')
+    expect(() => parseCloudStatus({ ...STATUS_BODY, uniwork_model: 7 })).not.toThrow()
+    expect(parseCloudStatus({ ...STATUS_BODY, uniwork_model: 7 }).uniworkModel).toBe('')
+  })
+
   it('ready / credits-exhausted / unavailable / not-entitled', () => {
     const ready = statusFromServer(parseCloudStatus(STATUS_BODY), account)
     expect(ready).toMatchObject({
@@ -352,5 +363,76 @@ describe('UniworkCloudController', () => {
     await controller.refresh()
     const payload = JSON.stringify(published)
     expect(payload).not.toMatch(/at_secret|Bearer|access_?token/i)
+  })
+
+  describe('the model UniWork AI serves', () => {
+    const WITH_MODEL = { ...STATUS_BODY, uniwork_model: 'claude-opus-5' }
+
+    it('is empty before any read and after the first answer carries it', async () => {
+      const { controller } = setup(signedIn, async () => parseCloudStatus(WITH_MODEL))
+      expect(controller.uniworkModel()).toBe('')
+      await controller.refresh()
+      expect(controller.uniworkModel()).toBe('claude-opus-5')
+    })
+
+    it('an old server without the field leaves it empty', async () => {
+      const { controller } = setup(signedIn, async () => parseCloudStatus(STATUS_BODY))
+      await controller.refresh()
+      expect(controller.uniworkModel()).toBe('')
+    })
+
+    it('is cleared on sign-out', async () => {
+      const { controller, setView } = setup(signedIn, async () => parseCloudStatus(WITH_MODEL))
+      await controller.refresh()
+      setView({ signedIn: false, orgId: null })
+      await controller.refresh()
+      expect(controller.uniworkModel()).toBe('')
+    })
+
+    it('is cleared at once on an organization switch, before the new org answers', async () => {
+      let release!: () => void
+      const gate = new Promise<void>((resolve) => (release = resolve))
+      let calls = 0
+      const { controller, setView } = setup(signedIn, async () => {
+        if (++calls === 1) return parseCloudStatus(WITH_MODEL)
+        await gate
+        return parseCloudStatus({ ...STATUS_BODY, uniwork_model: 'gpt-4o' })
+      })
+      await controller.refresh()
+      setView({ signedIn: true, orgId: 'org_2' })
+      const next = controller.refresh()
+      expect(controller.uniworkModel()).toBe('')
+      release()
+      await next
+      expect(controller.uniworkModel()).toBe('gpt-4o')
+    })
+
+    it('survives a passing outage for the same org and a credits-exhausted verdict', async () => {
+      let fail = false
+      const { controller } = setup(signedIn, async () => {
+        if (fail) throw new UniworkCloudError('network')
+        return parseCloudStatus(WITH_MODEL)
+      })
+      await controller.refresh()
+      fail = true
+      await controller.refresh()
+      expect(controller.uniworkModel()).toBe('claude-opus-5')
+      await controller
+        .transport()
+        .generateImage({ prompt: 'p' })
+        .catch(() => undefined)
+      expect(controller.uniworkModel()).toBe('claude-opus-5')
+    })
+
+    it('is cleared when the plan no longer includes UniWork AI', async () => {
+      let off = false
+      const { controller } = setup(signedIn, async () =>
+        off ? parseCloudStatus({ enabled: false }) : parseCloudStatus(WITH_MODEL),
+      )
+      await controller.refresh()
+      off = true
+      await controller.refresh()
+      expect(controller.uniworkModel()).toBe('')
+    })
   })
 })

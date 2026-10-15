@@ -424,7 +424,7 @@ interface AiPanelProps {
 
 const MODEL_BRIDGE: AiModelPickerBridge = {
   getSettings: () => window.desktop.getAiSettings(),
-  setSettings: (settings) => window.desktop.setAiSettings(settings),
+  setSettings: (settings, options) => window.desktop.setAiSettings(settings, options),
   onSettingsChanged: (handler) => window.desktop.onAiSettingsChanged(handler),
   gskLoggedIn: () => window.desktop.aiGskStatus().then((s) => !!s?.loggedIn),
   openModelSettings: () => window.desktop.openAiModelSettings().catch(() => {}),

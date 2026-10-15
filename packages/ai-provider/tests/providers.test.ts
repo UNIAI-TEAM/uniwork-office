@@ -9,6 +9,7 @@ import {
   cloudToolsEnabled,
   defaultAiSettings,
   maxOutputTokensOf,
+  providerNeed,
   resolveAiSettings,
   selectedProvider,
   setUniworkAiAvailable,
@@ -418,6 +419,47 @@ describe('selectedProvider / isProviderUsable', () => {
     settings.provider = 'genspark'
     expect(selectedProvider(settings)).toBe('genspark')
     expect(isProviderUsable(settings, 'genspark')).toBe(true)
+  })
+
+  it('treats origin: org on modelSources as configured without a local key or base URL, leaving absent/local unchanged', () => {
+    const settings = defaultAiSettings()
+    settings.provider = 'openai'
+    expect(settings.providers.openai.apiKey).toBe('')
+    expect(providerNeed(settings, 'openai')).toBe('key')
+    expect(isProviderUsable(settings, 'openai')).toBe(false)
+
+    // origin absent or 'local' still requires a local key
+    settings.modelSources = {
+      openai: { chosen: 'gpt-5.6-sol' },
+      anthropic: { chosen: 'claude-sonnet-5', origin: 'local' },
+    }
+    expect(providerNeed(settings, 'openai')).toBe('key')
+    expect(isProviderUsable(settings, 'openai')).toBe(false)
+    expect(providerNeed(settings, 'anthropic')).toBe('key')
+    expect(isProviderUsable(settings, 'anthropic')).toBe(false)
+
+    // origin: 'org' is usable without copying any key_hint into providers[id].apiKey
+    settings.modelSources = {
+      openai: { chosen: 'gpt-5.6-sol', origin: 'org' },
+    }
+    expect(settings.providers.openai.apiKey).toBe('')
+    expect(providerNeed(settings, 'openai')).toBeNull()
+    expect(isProviderUsable(settings, 'openai')).toBe(true)
+
+    // custom with origin: 'org' needs no local baseUrl or apiKey once a model is chosen
+    settings.modelSources = {
+      custom: { chosen: '', origin: 'org' },
+    }
+    expect(providerNeed(settings, 'custom')).toBe('model')
+    expect(isProviderUsable(settings, 'custom')).toBe(false)
+
+    settings.modelSources = {
+      custom: { chosen: 'org-hosted-model', origin: 'org' },
+    }
+    expect(settings.providers.custom.apiKey).toBe('')
+    expect(settings.providers.custom.baseUrl).toBe('')
+    expect(providerNeed(settings, 'custom')).toBeNull()
+    expect(isProviderUsable(settings, 'custom')).toBe(true)
   })
 })
 

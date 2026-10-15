@@ -1,6 +1,10 @@
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { Lang } from '@genoffice/i18n'
-import type { AiSettings } from '@genoffice/ai-provider/browser'
+import type {
+  AiProviderId,
+  AiSettings,
+  AiSettingsSaveOptions,
+} from '@genoffice/ai-provider/browser'
 import {
   aiModelPickerGroups,
   aiModelPickerNeed,
@@ -42,7 +46,8 @@ export interface AiModelPickerCloudStatus {
 /** Each app's preload exposes these under its own namespace; the panel adapts them. */
 export interface AiModelPickerBridge {
   readonly getSettings: () => Promise<AiSettings>
-  readonly setSettings: (settings: AiSettings) => Promise<void>
+  /** `options.modelPick` names the model the user chose; main records a pick only from that */
+  readonly setSettings: (settings: AiSettings, options?: AiSettingsSaveOptions) => Promise<void>
   /** fires after any renderer (this one, another tab, the shell settings page) saved ai-settings.json */
   readonly onSettingsChanged?: ((handler: () => void) => () => void) | undefined
   readonly gskLoggedIn?: (() => Promise<boolean>) | undefined
@@ -127,6 +132,25 @@ function restoreChipFocusUnlessMoved(
   }
 }
 
+const ORG_NOTE_SEEN_PREFIX = 'uniwork.ai.orgKeyNoteSeen.'
+
+/** whether this machine already showed the first-use privacy note of a key-on-UniWork provider */
+function readOrgNoteSeen(provider: string): boolean {
+  try {
+    return window.localStorage.getItem(ORG_NOTE_SEEN_PREFIX + provider) === '1'
+  } catch {
+    return false
+  }
+}
+
+function writeOrgNoteSeen(provider: string): void {
+  try {
+    window.localStorage.setItem(ORG_NOTE_SEEN_PREFIX + provider, '1')
+  } catch {
+    // storage blocked: the in-memory set of the picker still keeps it quiet until the next start
+  }
+}
+
 /**
  * Composer footer chip showing the active provider + model; the popover lists
  * every usable provider's models for a one-click switch (saved globally, the
@@ -146,6 +170,11 @@ export function AiModelPicker({
   const [cloudStatus, setCloudStatus] = useState<AiModelPickerCloudStatus | null>(null)
   const [open, setOpen] = useState(false)
   const [focusKey, setFocusKey] = useState<string | null>(null)
+  // providers whose first-use note was shown once (open + close); persisted per provider, and kept
+  // here too so a blocked store still stops the re-announcing while the window lives
+  const [seenOrgNotes, setSeenOrgNotes] = useState<ReadonlySet<string>>(() => new Set())
+  const shownOrgNotesRef = useRef<Set<string>>(new Set())
+  const orgDescId = useId()
   const [popStyle, setPopStyle] = useState<React.CSSProperties>({})
   const chipRef = useRef<HTMLButtonElement | null>(null)
   const popRef = useRef<HTMLDivElement | null>(null)
@@ -159,7 +188,7 @@ export function AiModelPicker({
   const groupHeadId = (groupId: string): string => `${baseId}-group-${groupId}`
 
   // tests render panels without a preload bridge: a throwing getter must not take the panel down
-  const refresh = useCallback(() => {
+  const refreshSettings = useCallback(() => {
     const b = bridgeRef.current
     Promise.resolve()
       .then(() => b.getSettings())
@@ -167,6 +196,13 @@ export function AiModelPicker({
     Promise.resolve()
       .then(() => b.gskLoggedIn?.() ?? false)
       .then(setLoggedIn, () => {})
+  }, [])
+
+  // mount, window focus and settings changes also re-read the cloud status; opening the popover
+  // does not (the status has its own change feed, and credits are not re-fetched per open)
+  const refresh = useCallback(() => {
+    const b = bridgeRef.current
+    refreshSettings()
     if (b.requireModel === true) {
       setCloudStatus(null)
       return
@@ -183,7 +219,7 @@ export function AiModelPicker({
     } else if (rawCloud !== undefined) {
       setCloudStatus(rawCloud)
     }
-  }, [])
+  }, [refreshSettings])
 
   useEffect(() => {
     refresh()
@@ -241,7 +277,27 @@ export function AiModelPicker({
       ),
     [groups],
   )
-  const current = settings ? aiModelPickerSelection(settings) : null
+  const isOrgGroup = (id: string) => settings?.modelSources?.[id as AiProviderId]?.origin === 'org'
+  const hasOrgGroup = groups.some((g) => isOrgGroup(g.id))
+  const noteDue = (id: string) => isOrgGroup(id) && !seenOrgNotes.has(id) && !readOrgNoteSeen(id)
+  const orgNoteDue = groups.some((g) => noteDue(g.id))
+  // what the listbox's quiet notes say, read out once through a live region beside the listbox
+  const listNote = [
+    ...[...new Set(groups.map((g) => g.listState))].map((state) =>
+      state === 'loading' ? strings.modelsLoading : state ? strings.modelsUnavailable : '',
+    ),
+    orgNoteDue ? strings.orgKeyNote : '',
+  ]
+    .filter(Boolean)
+    .join('. ')
+  const rawCurrent = settings ? aiModelPickerSelection(settings) : null
+  // an org-served provider's model is what main resolved (modelSources[id].chosen); the local slot
+  // never carries a copy of it
+  const orgChosen = rawCurrent ? (settings?.modelSources?.[rawCurrent.provider]?.chosen ?? '') : ''
+  const current: AiModelPickerSelection | null =
+    rawCurrent && isOrgGroup(rawCurrent.provider) && orgChosen.trim()
+      ? { provider: rawCurrent.provider, model: orgChosen.trim() }
+      : rawCurrent
   const currentUsable = groups.some((g) => g.id === current?.provider)
   const selectedKey = current ? `${current.provider}:${current.model}` : null
   const hasOptionKey = (k: string | null): boolean =>
@@ -289,10 +345,35 @@ export function AiModelPicker({
     return () => setAiModelNeedHint(null)
   }, [needHint, openSettings, openSettingsOnce])
 
+  // the live region mounts empty with the popover; the note is written into it afterwards so
+  // screen readers announce it as a change
+  const [shownNote, setShownNote] = useState('')
+  useEffect(() => {
+    setShownNote(open ? listNote : '')
+  }, [open, listNote])
+
+  // the first-use note counts as read once it was on screen and the popover closed again
+  const shownIds = groups
+    .filter((g) => noteDue(g.id))
+    .map((g) => g.id)
+    .join('\n')
+  useEffect(() => {
+    if (open) {
+      for (const id of shownIds ? shownIds.split('\n') : []) shownOrgNotesRef.current.add(id)
+      return
+    }
+    const shown = [...shownOrgNotesRef.current]
+    if (shown.length === 0) return
+    shownOrgNotesRef.current.clear()
+    for (const id of shown) writeOrgNoteSeen(id)
+    setSeenOrgNotes((prev) => new Set([...prev, ...shown]))
+  }, [open, shownIds])
+
   const toggle = () => {
-    // a key list that failed to load is tried again when the chip is opened (and on focus)
-    if (!open && settings?.credentialsUnavailable) refresh()
+    // every open re-reads the settings (host data: Settings pick, live lists, served model); a host
+    // answers from its cache and announces a newer listing through onSettingsChanged
     if (!open) {
+      refreshSettings()
       const rect = chipRef.current?.getBoundingClientRect()
       const zoom = effectiveZoom(chipRef.current)
       // the composer sits at the panel bottom: open upwards, pinned to the chip;
@@ -314,9 +395,23 @@ export function AiModelPicker({
     setOpen(false)
     setFocusKey(null)
     if (settings) {
-      const next = withAiModelSelection(settings, sel)
+      const picked = withAiModelSelection(settings, sel)
+      const source = settings.modelSources?.[sel.provider]
+      // the chip reads an org-served provider's model from its source: show the pick there too
+      const next: AiSettings =
+        source?.origin === 'org'
+          ? {
+              ...picked,
+              modelSources: {
+                ...settings.modelSources,
+                [sel.provider]: { ...source, chosen: sel.model },
+              },
+            }
+          : picked
       setSettings(next)
-      void bridge.setSettings(next).catch(() => {})
+      void bridge
+        .setSettings(next, { modelPick: { provider: sel.provider, model: sel.model } })
+        .catch(() => {})
     }
     restoreChipFocusUnlessMoved(chipRef.current, pop)
   }
@@ -513,12 +608,48 @@ export function AiModelPicker({
           >
             {groups.map((g) => {
               const headId = groupHeadId(g.id)
+              const isOrg = isOrgGroup(g.id)
               return (
-                <div key={g.id} className="ai-model-group" role="group" aria-labelledby={headId}>
+                <div
+                  key={g.id}
+                  className="ai-model-group"
+                  role="group"
+                  aria-labelledby={headId}
+                  data-origin={isOrg ? 'org' : undefined}
+                >
                   <div id={headId} className="ai-model-group-head">
                     <ProviderLogo id={g.id} />
                     <span>{g.label}</span>
+                    {isOrg && (
+                      <span
+                        data-org-key-tag=""
+                        title={strings.orgKeyNote}
+                        data-tip={strings.orgKeyNote}
+                        className="ai-model-org-tag"
+                      >
+                        {strings.orgKeyTag}
+                      </span>
+                    )}
                   </div>
+                  {isOrg && noteDue(g.id) && (
+                    <div
+                      className="ai-model-group-head ai-model-org-note"
+                      role="presentation"
+                      aria-hidden
+                      data-org-key-note=""
+                    >
+                      {strings.orgKeyNote}
+                    </div>
+                  )}
+                  {g.listState && (
+                    // plain text for sighted users; screen readers get it from the live region
+                    // outside the listbox, since a listbox may only own options and groups
+                    <div className="ai-model-group-head" role="presentation" aria-hidden>
+                      {g.listState === 'loading'
+                        ? strings.modelsLoading
+                        : strings.modelsUnavailable}
+                    </div>
+                  )}
                   {(g.models.length > 0 ? g.models : ['']).map((m) => {
                     const optionKey = `${g.id}:${m}`
                     const selected = current?.provider === g.id && current.model === m
@@ -530,13 +661,15 @@ export function AiModelPicker({
                         role="option"
                         tabIndex={optionKey === activeKey ? 0 : -1}
                         aria-selected={selected}
-                        aria-describedby={isUniworkWithCredits ? creditsDescId : undefined}
+                        aria-describedby={
+                          isUniworkWithCredits ? creditsDescId : isOrg ? orgDescId : undefined
+                        }
                         className={`ai-model-item${selected ? ' selected' : ''}${isUniworkWithCredits ? ' ai-model-item-with-sub' : ''}`}
                         onFocus={() => setFocusKey(optionKey)}
                         onClick={() => pick({ provider: g.id, model: m })}
                       >
                         <span className="ai-model-item-body">
-                          <span className="ai-model-item-text">{m || g.label}</span>
+                          <span className="ai-model-item-text">{m || g.rowLabel}</span>
                           {isUniworkWithCredits && (
                             <span className="ai-model-item-sub" aria-hidden="true">
                               {creditsVisibleText}
@@ -596,8 +729,34 @@ export function AiModelPicker({
           )}
         </div>
       )}
+      {open && (
+        // mounted only while the popover is open, so a closed picker adds no second live region
+        // to the panel; the note lands one commit after the empty region (shownNote)
+        <div aria-live="polite" style={VISUALLY_HIDDEN}>
+          {shownNote}
+        </div>
+      )}
+      {open && hasOrgGroup && (
+        // what an option of a key-on-UniWork group is described by: where its prompt goes
+        <div hidden id={orgDescId}>
+          {strings.orgKeyTag}. {strings.orgKeyNote}
+        </div>
+      )}
     </div>
   )
+}
+
+/** screen-reader-only: the box stays in the layout flow but takes no space and shows nothing */
+const VISUALLY_HIDDEN: React.CSSProperties = {
+  position: 'absolute',
+  width: 1,
+  height: 1,
+  margin: -1,
+  padding: 0,
+  overflow: 'hidden',
+  clip: 'rect(0 0 0 0)',
+  whiteSpace: 'nowrap',
+  border: 0,
 }
 
 function effectiveZoom(el: HTMLElement | null): number {
