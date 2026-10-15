@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { act, createElement, useState } from 'react'
+import { act, createElement, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -16,7 +16,8 @@ import type {
   SignOutPromptRequest,
 } from '../src/shared/home-api'
 import { AccountEntry } from '../src/renderer/src/AccountEntry'
-import { useAccount } from '../src/renderer/src/account-model'
+import { SignOutPrompt } from '../src/renderer/src/SignOutPrompt'
+import { useAccount, type AccountController } from '../src/renderer/src/account-model'
 import { LocaleProvider } from '../src/renderer/src/locale'
 import type { Lang } from '../src/renderer/src/locale'
 import type { SettingsSectionId } from '../src/renderer/src/SettingsModal'
@@ -674,5 +675,149 @@ describe('Settings → Account sign-out prompt (S3)', () => {
     })
     await flush()
     expect(button(en.acctSignOut)?.disabled).toBe(false)
+  })
+
+  it('SignOutPrompt standalone: Quay lại and Escape return focus to returnFocusRef, confirm does not, no answer/logout sent twice', async () => {
+    const cancelSpy = vi.fn()
+    const confirmSpy = vi.fn()
+    const parentKeyDown = vi.fn()
+    let setPromptState!: (plan: SignOutPlan | null) => void
+    let setBusyState!: (busy: boolean) => void
+
+    function StandaloneHarness() {
+      const [plan, setPlan] = useState<SignOutPlan | null>(null)
+      const [isBusy, setIsBusy] = useState(false)
+      setPromptState = setPlan
+      setBusyState = setIsBusy
+      const extBtnRef = useRef<HTMLButtonElement>(null)
+      const fakeAccount: AccountController = {
+        status: statusFor('signed-in'),
+        view: 'signed-in',
+        error: null,
+        loginError: null,
+        callbackNotice: false,
+        loginUrl: null,
+        urlCopied: false,
+        busy: isBusy ? 'signing-out' : null,
+        orgSwitchFailed: false,
+        connectError: null,
+        signOutPrompt: plan,
+        signOutWaiting: isBusy,
+        signIn: () => undefined,
+        cancelSignIn: () => undefined,
+        openLoginUrl: () => undefined,
+        copyLoginUrl: () => undefined,
+        signOut: () => undefined,
+        confirmSignOut: () => {
+          confirmSpy()
+          setPlan(null)
+        },
+        cancelSignOut: () => {
+          cancelSpy()
+          setPlan(null)
+        },
+        retry: () => undefined,
+        selectOrg: () => undefined,
+        connectServer: () => undefined,
+        refresh: () => undefined,
+      }
+      return createElement(
+        LocaleProvider,
+        { initial: 'vi' },
+        createElement(
+          'div',
+          { onKeyDown: parentKeyDown },
+          createElement(
+            'button',
+            { ref: extBtnRef, type: 'button', className: 'ext-trigger' },
+            'Sign out',
+          ),
+          createElement('button', { type: 'button', className: 'other-focus' }, 'Other'),
+          createElement(SignOutPrompt, { account: fakeAccount, returnFocusRef: extBtnRef }),
+        ),
+      )
+    }
+
+    await act(async () => {
+      root.render(createElement(StandaloneHarness))
+    })
+    await flush()
+
+    const extBtn = host.querySelector<HTMLButtonElement>('.ext-trigger')!
+    const otherBtn = host.querySelector<HTMLButtonElement>('.other-focus')!
+    const standaloneDialog = () => host.querySelector<HTMLElement>('[role="alertdialog"]')
+    const standaloneBtn = (label: string) =>
+      Array.from(host.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] button')).find(
+        (b) => b.textContent === label,
+      )
+
+    expect(standaloneDialog()).toBeNull()
+
+    // 1. Open prompt -> Quay lại focused; clicking Quay lại cancels once and returns focus to extBtn
+    await act(async () => {
+      setPromptState({ count: 2, waiting: 0, keystoreLocked: false, ramOnly: 0 })
+    })
+    await flush()
+    expect(standaloneDialog()).not.toBeNull()
+    expect(document.activeElement).toBe(standaloneBtn(syncVi.uwActBack))
+
+    await click(standaloneBtn(syncVi.uwActBack))
+    expect(cancelSpy).toHaveBeenCalledTimes(1)
+    expect(confirmSpy).not.toHaveBeenCalled()
+    expect(standaloneDialog()).toBeNull()
+    expect(document.activeElement).toBe(extBtn)
+
+    // 2. Re-open -> Escape on alertdialog cancels once, stops propagation, and returns focus to extBtn
+    await act(async () => {
+      setPromptState({ count: 2, waiting: 0, keystoreLocked: false, ramOnly: 0 })
+    })
+    await flush()
+    expect(document.activeElement).toBe(standaloneBtn(syncVi.uwActBack))
+
+    await act(async () => {
+      document.activeElement!.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+      )
+    })
+    await flush()
+    expect(cancelSpy).toHaveBeenCalledTimes(2)
+    expect(parentKeyDown).not.toHaveBeenCalled()
+    expect(standaloneDialog()).toBeNull()
+    expect(document.activeElement).toBe(extBtn)
+
+    // 3. Re-open while busy -> Quay lại, Escape, and Đăng xuất are guarded (no duplicate cancel/confirm)
+    await act(async () => {
+      setPromptState({ count: 1, waiting: 1, keystoreLocked: true, ramOnly: 1 })
+      setBusyState(true)
+    })
+    await flush()
+    const goBusy = standaloneBtn(syncVi.uwSignOutGo)!
+    expect(goBusy.classList.contains('danger')).toBe(true)
+    expect(goBusy.getAttribute('aria-disabled')).toBe('true')
+    expect(goBusy.getAttribute('aria-busy')).toBe('true')
+
+    await click(standaloneBtn(syncVi.uwActBack))
+    await click(goBusy)
+    await act(async () => {
+      standaloneDialog()!.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+      )
+    })
+    await flush()
+    expect(cancelSpy).toHaveBeenCalledTimes(2)
+    expect(confirmSpy).not.toHaveBeenCalled()
+    expect(standaloneDialog()).not.toBeNull()
+
+    // 4. Clear busy and confirm -> calls confirmSignOut once and does NOT return focus to extBtn
+    await act(async () => {
+      setBusyState(false)
+    })
+    await flush()
+    otherBtn.focus()
+    await click(standaloneBtn(syncVi.uwSignOutGo))
+    expect(confirmSpy).toHaveBeenCalledTimes(1)
+    expect(cancelSpy).toHaveBeenCalledTimes(2)
+    expect(standaloneDialog()).toBeNull()
+    expect(document.activeElement).not.toBe(extBtn)
   })
 })

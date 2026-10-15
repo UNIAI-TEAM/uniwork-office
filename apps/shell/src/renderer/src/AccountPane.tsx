@@ -1,7 +1,8 @@
 import { Dropdown } from '@genoffice/ui'
-import { useLayoutEffect, useRef, type ReactNode } from 'react'
+import { useRef, type ReactNode } from 'react'
 import { OrgChoiceStep } from './OrgChoiceStep'
 import { ServerConnect } from './ServerConnect'
+import { SignOutPrompt } from './SignOutPrompt'
 import { useI18n } from './locale'
 import type { StringKey } from './locale'
 import {
@@ -9,7 +10,6 @@ import {
   errorKeyFor,
   initialsOf,
   showsProfile,
-  signOutIsKeystoreVariant,
   type AccountController,
   type AccountView,
 } from './account-model'
@@ -75,25 +75,7 @@ export function AccountPane({ account }: { account: AccountController }) {
   const { t } = useI18n()
   const { status, view, error, busy } = account
   const signOutPrompt = account.signOutPrompt ?? null
-  const signOutWaiting = Boolean(account.signOutWaiting)
-  const signOutBusy = signOutWaiting || busy === 'signing-out'
   const signOutBtnRef = useRef<HTMLButtonElement>(null)
-  const backBtnRef = useRef<HTMLButtonElement>(null)
-  const promptWasOpen = useRef(false)
-  const confirmingSignOut = useRef(false)
-
-  useLayoutEffect(() => {
-    if (signOutPrompt) {
-      promptWasOpen.current = true
-      confirmingSignOut.current = false
-      backBtnRef.current?.focus()
-    } else if (promptWasOpen.current) {
-      promptWasOpen.current = false
-      const shouldRestore = !confirmingSignOut.current
-      confirmingSignOut.current = false
-      if (shouldRestore) signOutBtnRef.current?.focus()
-    }
-  }, [signOutPrompt])
 
   const profile = status?.profile
   const email = profile?.email || status?.email || ''
@@ -214,8 +196,6 @@ export function AccountPane({ account }: { account: AccountController }) {
       break
     // not-configured / loading: nothing the user can press here
   }
-
-  const keystoreVariant = signOutPrompt ? signOutIsKeystoreVariant(signOutPrompt) : false
 
   return (
     <section className="acct-pane" aria-labelledby="acct-pane-title" data-state={view}>
@@ -340,55 +320,7 @@ export function AccountPane({ account }: { account: AccountController }) {
         />
       )}
 
-      {signOutPrompt && (
-        <div
-          className="set-intg-confirm acct-signout-confirm"
-          role="alertdialog"
-          aria-labelledby="acct-signout-title"
-          aria-describedby="acct-signout-body"
-        >
-          <div className="set-field-stack">
-            <div className="set-field-label" id="acct-signout-title">
-              {t('uwSignOutTitle')}
-            </div>
-            <div className="set-field-desc" id="acct-signout-body">
-              {keystoreVariant
-                ? t('uwSignOutKeystore')
-                : t('uwSignOutBody', { count: signOutPrompt.count })}
-            </div>
-            <div className="set-field-desc acct-signout-wait" role="status" aria-live="polite">
-              {signOutWaiting ? t('uwSignOutWaiting') : null}
-            </div>
-          </div>
-          <div className="set-btn-row">
-            <button
-              ref={backBtnRef}
-              type="button"
-              className="set-btn primary"
-              autoFocus
-              onClick={() => {
-                if (signOutBusy) return
-                account.cancelSignOut?.()
-              }}
-            >
-              {t('uwActBack')}
-            </button>
-            <button
-              type="button"
-              className={`set-btn${keystoreVariant ? ' danger' : ''}`}
-              aria-disabled={signOutBusy ? true : undefined}
-              aria-busy={signOutBusy ? true : undefined}
-              onClick={() => {
-                if (signOutBusy) return
-                confirmingSignOut.current = true
-                ;(account.confirmSignOut ?? account.signOut)()
-              }}
-            >
-              {t('uwSignOutGo')}
-            </button>
-          </div>
-        </div>
-      )}
+      <SignOutPrompt account={account} returnFocusRef={signOutBtnRef} />
 
       {/* the organization step and the sign-out prompt each carry their own Sign out */}
       {actions && !signOutPrompt && !(withProfile && orgChoice.needed && !orgChoice.loadError) && (
