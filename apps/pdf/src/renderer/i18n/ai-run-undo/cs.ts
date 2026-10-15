@@ -6,4 +6,6 @@ export const cs = {
   aiRunUndoLater:
     'Po tomto běhu následovaly další změny. Nejprve je vraťte zpět a pak vraťte tento běh.',
   aiRunUndoBusy: 'Dostupné, až asistent skončí.',
+  aiEditsPaused:
+    'Asistent upravuje tento dokument. Vaše úpravy jsou pozastaveny; pro pokračování asistenta zastavte.',
 } satisfies Record<keyof typeof zh, string>

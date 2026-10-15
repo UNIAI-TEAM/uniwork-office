@@ -21,6 +21,14 @@ export function nameCandidateFromInserts(inserts: readonly NamingInsert[]): stri
 }
 
 /**
+ * The file name a save gives the blank: the name the card offered when there was one (what the
+ * user was shown is what the file gets, even if inserts changed since), else the inserted text.
+ */
+export function saveNameFor(offered: string | null, inserts: readonly NamingInsert[]): string {
+  return offered || nameCandidateFromInserts(inserts)
+}
+
+/**
  * Which documents the ask-before-saving card applies to after an AI run (G6-09 W8): only a
  * shell-created blank the user has not named, never a PDF the user merely opened or a view-only
  * one. Returns the name to offer ('' = none derivable), or null for no card.

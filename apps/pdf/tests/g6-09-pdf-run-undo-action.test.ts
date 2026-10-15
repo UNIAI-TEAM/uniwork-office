@@ -13,6 +13,7 @@ describe('pdf run undo pieces', () => {
 
   beforeAll(() => {
     ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+    ;(window as any).pdfApi = { onLanguageChanged: () => () => {} }
   })
   afterEach(() => {
     if (root) act(() => root!.unmount())

@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react'
+import { useId, type ReactElement } from 'react'
 import { useI18n } from '../i18n/locale'
 import type { RunUndoState } from './edit-history'
 
@@ -10,11 +10,11 @@ import type { RunUndoState } from './edit-history'
  * control. After the run is undone only a quiet note stays; a run no step holds shows nothing.
  */
 export function RunUndoAction({
-  runId,
   state,
   busy,
   onUndo,
 }: {
+  /** the run this belongs to (the caller keys on it; the note id comes from useId) */
   runId: string
   state: RunUndoState
   /** the assistant is running again: the document is still changing under this run */
@@ -22,6 +22,7 @@ export function RunUndoAction({
   onUndo: () => void
 }): ReactElement | null {
   const { t } = useI18n()
+  const noteId = useId()
   if (state === 'none') return null
   if (state === 'undone') {
     return (
@@ -33,7 +34,6 @@ export function RunUndoAction({
     )
   }
   const blocked = busy || state === 'later'
-  const noteId = `ai-run-undo-note-${runId.replace(/[^\w-]/g, '')}`
   return (
     <div className="ai-run-undo">
       <button

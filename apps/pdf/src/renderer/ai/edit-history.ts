@@ -38,6 +38,8 @@ export class EditHistory<S extends object> {
   /** snapshot -> run whose undo it is; carried across undo/redo so the run stays addressable */
   private readonly marks = new WeakMap<S, string>()
   private run: { id: string; base: S; voided: boolean } | null = null
+  /** how many AI tool calls are executing right now; their writes are the run's own */
+  private aiDepth = 0
   private readonly limit: number
 
   constructor(
@@ -69,6 +71,52 @@ export class EditHistory<S extends object> {
 
   get canRedo(): boolean {
     return this.redoList.length > 0 && this.run === null
+  }
+
+  /** an AI run is open: hand edits are paused (the notice the UI shows) */
+  get runOpen(): boolean {
+    return this.run !== null
+  }
+
+  /**
+   * May a hand edit go ahead? Not while a run is open, unless the caller is one of the run's
+   * own tools (asAi): a hand edit folded into the run's single entry would be thrown away by
+   * "Undo this run" without a trace.
+   */
+  mayEdit(): boolean {
+    return this.run === null || this.aiDepth > 0
+  }
+
+  /** run an AI tool call: its edits count as the run's until a returned promise settles */
+  asAi<T>(fn: () => T): T {
+    this.aiDepth++
+    let result: T
+    try {
+      result = fn()
+    } catch (error) {
+      this.aiDepth--
+      throw error
+    }
+    if (result instanceof Promise) {
+      return result.finally(() => {
+        this.aiDepth--
+      }) as T
+    }
+    this.aiDepth--
+    return result
+  }
+
+  /** the tool api of the AI panel with every function run as the AI; other values pass through */
+  scopeApi<A extends object>(api: A): A {
+    const scoped: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(api)) {
+      scoped[key] =
+        typeof value === 'function'
+          ? (...args: unknown[]) =>
+              this.asAi(() => (value as (...a: unknown[]) => unknown)(...args))
+          : value
+    }
+    return scoped as A
   }
 
   /** the document is about to change: remember how it is now (ignored inside an AI run) */

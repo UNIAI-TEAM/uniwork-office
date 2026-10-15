@@ -176,8 +176,7 @@ describe('pdf edit history: hand edits are paused while a run is open (RFB-2)', 
   /** App.tsx applyEditOps: a hand edit asks the history first, the run's own tools go through asAi */
   function guarded(initial: string[] = []) {
     const w = world(initial)
-    return {
-      ...w,
+    return Object.assign(Object.create(w) as typeof w, {
       /** a move / annotate / delete by hand: refused while a run is open */
       handEdit(item: string): boolean {
         if (!w.history.mayEdit()) return false
@@ -188,7 +187,7 @@ describe('pdf edit history: hand edits are paused while a run is open (RFB-2)', 
       aiEdit(item: string) {
         w.history.asAi(() => w.edit(item))
       },
-    }
+    })
   }
 
   it('refuses a hand edit during a run and the run entry still restores the exact pre-run document', () => {

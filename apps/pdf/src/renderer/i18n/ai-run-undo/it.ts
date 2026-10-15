@@ -6,4 +6,6 @@ export const it = {
   aiRunUndoLater:
     'Dopo questa esecuzione ci sono altre modifiche. Annullale prima, poi annulla l’esecuzione.',
   aiRunUndoBusy: 'Disponibile quando l’assistente ha finito.',
+  aiEditsPaused:
+    "L'assistente sta modificando questo documento. Le tue modifiche sono in pausa; ferma l'assistente per continuare.",
 } satisfies Record<keyof typeof zh, string>

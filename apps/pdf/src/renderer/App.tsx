@@ -7,7 +7,7 @@ import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist/legacy/build/pdf.mj
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url'
 import { AiPanel } from './ai/AiPanel'
-import { aiRunSaveOffer, nameCandidateFromInserts } from './ai-save-offer'
+import { aiRunSaveOffer, nameCandidateFromInserts, saveNameFor } from './ai-save-offer'
 import { AiAskPopover, type AskAnchorRect } from './AiAskPopover'
 import { AppOnlyNote } from './AppOnlyNote'
 import { narrowPane, widthFitScale } from './fit-scale'
@@ -233,6 +233,7 @@ import { planEditOps, reduceBucket } from './edit-ops'
 import type { Bucket, Op, OpContext, PlanResult } from './edit-ops'
 import { rectsNear } from './edit-state'
 import { EditHistory, sameEditSnapshot, type RunUndoDeps } from './ai/edit-history'
+import { EditsPausedNotice } from './ai/EditsPausedNotice'
 import type {
   StampConfig,
   SavedMarkupAnnot,
@@ -908,6 +909,8 @@ export default function App() {
     onChange: () => setHistoryTick((n) => n + 1),
   })
   const history = historyRef.current
+  // the name the ask-before-save card showed, applied by the save that follows its Save click
+  const offeredNameRef = useRef<string | null>(null)
   const [pwInput, setPwInput] = useState('')
   const [pwWrong, setPwWrong] = useState(false)
   const [extractDlg, setExtractDlg] = useState(false)
@@ -2043,6 +2046,16 @@ export default function App() {
         failures: [
           { index: structuralIndex, op: ops[structuralIndex]!, error: t('redactStructureBlocked') },
         ],
+      }
+    }
+    // Hand edits are paused while an AI run is open (the run is one undo entry; the notice says
+    // why); the run's own tools reach this path inside history.asAi
+    if (!history.mayEdit()) {
+      return {
+        ops: [],
+        records: [],
+        touched: new Set(),
+        failures: ops.length > 0 ? [{ index: 0, op: ops[0]!, error: t('aiEditsPaused') }] : [],
       }
     }
     const plan = planEditOps(ops, editOpContext(), newId)
@@ -3917,7 +3930,7 @@ export default function App() {
       // carrying its untitled name takes its file name from the topmost text this
       // save inserted; the main process no-ops for every other file, so
       // user-chosen names are never touched.
-      const nameCandidate = nameCandidateFromInserts(textInserts)
+      const nameCandidate = saveNameFor(offeredNameRef.current, textInserts)
       if (nameCandidate && cap('autoRename')) {
         try {
           const renamed = await window.pdfApi.autoRename(filePath, nameCandidate)
@@ -5805,7 +5818,7 @@ export default function App() {
     return `The document has ${bits.join(' and ')}; use read_annotations to read them.`
   }
 
-  const aiApi: PdfAppDeps = {
+  const aiApi: PdfAppDeps = history.scopeApi<PdfAppDeps>({
     ...aiRunUndo,
     doc: () => doc,
     fileName: () => fileName,
@@ -6062,7 +6075,7 @@ export default function App() {
     splitPdf: splitPdfToFolder,
     splitPages: splitPagesToFile,
     mergePages: mergePagesToFile,
-  }
+  })
 
   /**
    * After an AI run that mutated a shell-created blank still carrying its untitled name, the AI
@@ -6083,10 +6096,14 @@ export default function App() {
    * the save's auto-rename then derives the file name from the inserted text, the name the
    * card showed.
    */
-  const saveAfterAiOffer = () => {
+  const saveAfterAiOffer = (offeredName: string) => {
     // A file we created ourselves is safe to keep autosaving from here on
     savedOnceRef.current = true
-    void save('user')
+    // The card's name is the name the file gets, even if inserts changed since it was shown
+    offeredNameRef.current = offeredName || null
+    void save('user').finally(() => {
+      offeredNameRef.current = null
+    })
   }
 
   /** Internal destination of a Link annotation → jump to that page */
@@ -9284,6 +9301,7 @@ export default function App() {
                 </button>
               </div>
             )}
+            <EditsPausedNotice active={history.runOpen} />
             {notice && (
               <div className="pdf-toast pdf-toast-notice" role="status">
                 <span>{notice}</span>

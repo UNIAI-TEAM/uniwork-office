@@ -6,4 +6,6 @@ export const ja = {
   aiRunUndoLater:
     'この実行のあとに別の変更があります。先にそれらを元に戻してから、この実行を元に戻してください。',
   aiRunUndoBusy: 'アシスタントの処理が終わると使えます。',
+  aiEditsPaused:
+    'アシスタントがこのドキュメントを編集中です。あなたの編集は一時停止されています。続けるにはアシスタントを停止してください。',
 } satisfies Record<keyof typeof zh, string>
