@@ -181,6 +181,58 @@ describe('Save pill reads once (T3)', () => {
   })
 })
 
+describe('V6u-01: keyboard focus shows the description inside the strip', () => {
+  const focusTip = () => pill().querySelector<HTMLElement>('.uw-pill-focus-tip')
+
+  it('the pill carries a visible, aria-hidden copy of the description after its button', async () => {
+    await mount(status({ state: 'queued' }))
+    const tip = focusTip()
+    expect(tip, 'in-strip description').not.toBeNull()
+    const described = document.getElementById(button()!.getAttribute('aria-describedby')!)!
+    expect(tip!.textContent).toBe(described.textContent)
+    // read once: the visible copy is hidden from screen readers and referenced by nothing
+    expect(tip!.getAttribute('aria-hidden')).toBe('true')
+    expect(tip!.hasAttribute('id')).toBe(false)
+    expect(tip!.hasAttribute('role')).toBe(false)
+    expect(tip!.hasAttribute('title')).toBe(false)
+    expect(Array.from(host.querySelectorAll('[aria-describedby]'))).toEqual([button()])
+    // after the button, so `.uw-pill-action:focus-visible ~ .uw-pill-focus-tip` reaches it
+    expect(button()!.compareDocumentPosition(tip!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    // a child of the pill (drawn in the strip next to it), not a node below the strip
+    expect(tip!.parentElement).toBe(pill())
+  })
+
+  it('a pill without a button shows the same copy when the group has the focus', async () => {
+    await mount(status({ state: 'dirty' }))
+    const described = document.getElementById(pill().getAttribute('aria-describedby')!)!
+    expect(focusTip()!.textContent).toBe(described.textContent)
+    expect(focusTip()!.getAttribute('aria-hidden')).toBe('true')
+  })
+
+  it('Esc hides it without moving focus; focusing the pill again brings it back', async () => {
+    await mount(status({ state: 'queued' }))
+    act(() => button()!.focus())
+    expect(pill().hasAttribute('data-tip-off')).toBe(false)
+    await act(async () => {
+      button()!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    })
+    expect(pill().hasAttribute('data-tip-off')).toBe(true)
+    expect(document.activeElement).toBe(button())
+    act(() => (document.getElementById('editor-stand-in') as HTMLElement).focus())
+    act(() => button()!.focus())
+    expect(pill().hasAttribute('data-tip-off')).toBe(false)
+  })
+
+  it('pointer use hides it (a click is not keyboard focus)', async () => {
+    await mount(status({ state: 'queued' }))
+    act(() => button()!.focus())
+    await act(async () => {
+      button()!.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+    })
+    expect(pill().hasAttribute('data-tip-off')).toBe(true)
+  })
+})
+
 describe('Save pill announces each change once (T4)', () => {
   it('says nothing on the first render', async () => {
     await mount(status({ state: 'dirty' }))

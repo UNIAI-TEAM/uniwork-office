@@ -134,3 +134,46 @@ describe('Save pill tones and buttons', () => {
     expect(media('prefers-reduced-motion: reduce')).toMatch(/\.uw-spinner \{\s*animation: none/)
   })
 })
+
+describe('V6u-01: the in-strip description on keyboard focus', () => {
+  it('is hidden by default and drawn inside the 40px strip, left of the pill, over the tabs', () => {
+    const tip = rule('.uw-pill-focus-tip')
+    expect(tip).toMatch(/display: none/)
+    expect(tip).toMatch(/position: absolute/)
+    // to the left of the pill, vertically centred on it: never below the strip
+    expect(tip).toMatch(/right: calc\(100% \+ \d+px\)/)
+    expect(tip).toMatch(/top: 50%/)
+    expect(tip).toMatch(/transform: translateY\(-50%\)/)
+    expect(tip).not.toMatch(/top: calc\(100%/)
+    expect(px(/height: (\d+px)/.exec(tip)?.[1])).toBeLessThanOrEqual(28)
+    // one line, ellipsis when long; it overlays (no layout shift) and never takes a click
+    expect(tip).toMatch(/white-space: nowrap/)
+    expect(tip).toMatch(/overflow: hidden/)
+    expect(tip).toMatch(/text-overflow: ellipsis/)
+    expect(tip).toMatch(/pointer-events: none/)
+    expect(tip).toMatch(/z-index: \d+/)
+  })
+
+  it('theme tokens only (light + dark come from tokens.css)', () => {
+    const tip = rule('.uw-pill-focus-tip')
+    expect(tip).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(/i)
+    expect(tip).toMatch(/background: var\(--surface\)/)
+    expect(tip).toMatch(/color: var\(--text\)/)
+    expect(tip).toMatch(/border: 1px solid var\(--border\)/)
+  })
+
+  it('shows only on :focus-visible of the button or the button-less pill, and Esc / pointer hide it', () => {
+    const shown = rule(
+      '.uw-pill:focus-visible > .uw-pill-focus-tip,\n.uw-pill-action:focus-visible ~ .uw-pill-focus-tip',
+    )
+    expect(shown).toMatch(/display: block/)
+    const showAt = css.indexOf('.uw-pill:focus-visible > .uw-pill-focus-tip')
+    const off = rule('.uw-pill[data-tip-off] > .uw-pill-focus-tip')
+    expect(off).toMatch(/display: none/)
+    // same specificity: the off rule must come later to win
+    expect(css.indexOf('.uw-pill[data-tip-off] > .uw-pill-focus-tip')).toBeGreaterThan(showAt)
+    // never on plain :focus or :hover (hover keeps the native title)
+    expect(css).not.toMatch(/:hover[^{]*\.uw-pill-focus-tip/)
+    expect(css).not.toMatch(/:focus(?!-visible)[^{]*\.uw-pill-focus-tip/)
+  })
+})

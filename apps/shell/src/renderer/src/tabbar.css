@@ -582,6 +582,44 @@ body.overlay-title-bar .tab-bar-drag-spacer {
   outline-offset: 1px;
 }
 
+/* keyboard focus has no native title tooltip: the description shows on one line inside the strip,
+   left of the pill and over the tab titles (absolute: the tabs never move). Below the strip the
+   editor view would cover it. Hover keeps the native title. */
+.uw-pill-focus-tip {
+  display: none;
+  position: absolute;
+  right: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 5;
+  box-sizing: border-box;
+  height: 28px;
+  max-width: min(480px, calc(var(--ui-vw) * 40));
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  box-shadow: var(--shadow-btn-hover);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 26px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+.uw-pill:focus-visible > .uw-pill-focus-tip,
+.uw-pill-action:focus-visible ~ .uw-pill-focus-tip {
+  display: block;
+}
+
+/* Esc or a pointer press hides it until the pill is focused again */
+.uw-pill[data-tip-off] > .uw-pill-focus-tip {
+  display: none;
+}
+
 /* a 22px button gets a 24px hit area (WCAG 2.5.8) without growing the 28px pill */
 .uw-pill-action::before,
 .uw-pill-close::before {

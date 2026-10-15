@@ -205,8 +205,11 @@ function isUrgent(status: UniworkDocStatus, labelKey: StringKey): boolean {
  *
  * One reading channel: the label is plain text; the explanation is a visually hidden node that the
  * button, or the pill itself when it has no button, points at through aria-describedby (read
- * once: aria-describedby wins over title). Sighted users get the native title tooltip, which
- * Electron draws above the editor view (shell DOM below the 40px strip would be covered by it).
+ * once: aria-describedby wins over title). Sighted users get the native title tooltip on hover,
+ * which Electron draws above the editor view (shell DOM below the 40px strip would be covered by
+ * it). Chromium shows no title on keyboard focus, so a focus-visible pill also shows the sentence
+ * on one line inside the strip, over the tab titles left of it (aria-hidden: it is the
+ * description again); Esc or pointer use hides it until the pill is focused again.
  * A change of the pill is said once through the window live host. The
  * queue states open the queue popover (S4); so does Ctrl/Cmd+S on a waiting save (main pushes
  * the request, the chip of the active document opens it).
@@ -224,6 +227,7 @@ export function UniworkStatusChip({
   const [busy, setBusy] = useState(false)
   const [popover, setPopover] = useState<QueuePopoverOpener | null>(null)
   const [ctrlS, setCtrlS] = useState(0)
+  const [tipOff, setTipOff] = useState(false)
   const groupRef = useRef<HTMLDivElement>(null)
   const buttonRef = useRef<HTMLButtonElement | null>(null)
   const accountOk = account.view === 'signed-in' || account.view === 'refreshing'
@@ -341,6 +345,12 @@ export function UniworkStatusChip({
         tabIndex={describedHere ? 0 : -1}
         title={describedHere ? title : undefined}
         aria-describedby={describedHere ? tipId : undefined}
+        data-tip-off={tipOff ? '' : undefined}
+        onFocus={() => setTipOff(false)}
+        onPointerDown={() => setTipOff(true)}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') setTipOff(true)
+        }}
       >
         <span id={tipId} className="uw-sr-only">
           {tip}
@@ -371,6 +381,9 @@ export function UniworkStatusChip({
             {t(action.labelKey)}
           </button>
         )}
+        <span className="uw-pill-focus-tip" aria-hidden="true">
+          {tip}
+        </span>
       </div>
       {popover && (
         <UniworkQueuePopover
