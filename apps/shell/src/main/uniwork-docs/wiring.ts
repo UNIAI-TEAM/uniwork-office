@@ -546,6 +546,9 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     ui: conflictUi(wiring),
     pushStatus: (status) => push(UNIWORK_DOC_CHANNELS.docStatusEvent, status),
     pushQueuePopover: (request) => push(UNIWORK_DOC_CHANNELS.queuePopover, request),
+    // G5-06u RBE6u-03: a path open as a tab of the shell window (the target
+    // discussionTarget already resolves); a detached editor window is not one
+    isShellTab: (path) => (wiring.discussionTarget ? wiring.discussionTarget(path) !== null : true),
     pushConflict: (view) => push(UNIWORK_DOC_CHANNELS.conflictOpen, view),
     pushConflictClosed: (sessionId) => push(UNIWORK_DOC_CHANNELS.conflictClosed, { sessionId }),
     isAiRunning: (path) => wiring.isAiRunning?.(path) === true,
