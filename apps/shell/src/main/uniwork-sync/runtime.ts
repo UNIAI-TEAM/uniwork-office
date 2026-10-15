@@ -297,7 +297,7 @@ export interface SyncRuntimeOptions {
 export interface SyncRuntimeLeaseOptions {
   client(): LeaseClient | null
   /** the live session id of the scope (the device session) */
-  session?(): string | null
+  session(): string | null
   /** test seam: the monotonic clock (default `performance.now()`) */
   monotonicNow?(): number
   /** revoke marks the committed cache for deletion (drafts kept) - W2/G5-05 */
@@ -328,7 +328,7 @@ export class SyncRuntime {
         monotonicNow: () => lease?.monotonicNow?.() ?? Math.trunc(performance.now()),
       },
       scope: () => options.store.scope(),
-      ...(lease?.session ? { session: () => lease.session?.() ?? null } : {}),
+      session: () => lease?.session() ?? null,
       isOnline: () => this.online !== false,
       ...(lease?.onRevoked ? { onRevoked: (notice) => lease.onRevoked?.(notice) } : {}),
       ...(options.onSessionExpired ? { onSessionExpired: options.onSessionExpired } : {}),

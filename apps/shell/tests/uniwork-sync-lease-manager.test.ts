@@ -479,6 +479,7 @@ describe('uniwork-sync lease manager (G5-08c)', () => {
       client: () => null,
       clock: { wallNow: () => T0, monotonicNow: () => 1_000 },
       scope: () => null,
+      session: () => null,
       isOnline: () => false,
     })
     const coldState = await coldManager.effectiveState('doc_1')
@@ -735,5 +736,44 @@ describe('uniwork-sync lease manager (G5-08c)', () => {
     })
     expect(locked?.state).toBe('revoked')
     expect(h.revokedNotices).toHaveLength(1)
+  })
+
+  it('R2BE-4: an event for another lease than the held one is ignored; the matching one revokes', async () => {
+    const h = makeHarness()
+    await h.manager.grant('doc_1')
+
+    // the document was re-granted since: a late event names the older lease
+    expect(
+      await h.manager.handleFeedRevoked({
+        user_id: SCOPE.accountId,
+        document_id: 'doc_1',
+        lease_id: '01J8X4OLDLEASE0000000000AA',
+      }),
+    ).toBeNull()
+    const stillValid = await h.manager.effectiveState('doc_1')
+    expect(stillValid.state).toBe('valid')
+    expect(stillValid.usable).toBe(true)
+    expect(h.revokedNotices).toEqual([])
+
+    const revoked = await h.manager.handleFeedRevoked({
+      user_id: SCOPE.accountId,
+      document_id: 'doc_1',
+      lease_id: LEASE_ID,
+    })
+    expect(revoked?.state).toBe('revoked')
+    expect(h.revokedNotices).toHaveLength(1)
+    expect(h.revokedNotices[0]?.leaseId).toBe(LEASE_ID)
+  })
+
+  it('R2BE-4: an event for a document that holds no lease still locks it and emits the notice', async () => {
+    const h = makeHarness()
+    const revoked = await h.manager.handleFeedRevoked({
+      user_id: SCOPE.accountId,
+      document_id: 'doc_9',
+      lease_id: LEASE_ID,
+    })
+    expect(revoked?.state).toBe('revoked')
+    expect(h.revokedNotices).toHaveLength(1)
+    expect(h.revokedNotices[0]?.documentId).toBe('doc_9')
   })
 })

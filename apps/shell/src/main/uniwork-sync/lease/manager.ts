@@ -69,7 +69,6 @@ export type LeaseLockReason =
   | 'account_switch'
   | 'deployment_switch'
   | 'session_expired'
-  | 'keystore_locked'
 
 export type LeaseStateReason =
   | 'lease_expired'
@@ -145,9 +144,11 @@ export interface LeaseManagerOptions {
   /**
    * The live session of the scope (the device session id). A new sign-in of
    * the same account is a new session, so the boundary resets even when the
-   * signed-out gap between the two was never observed.
+   * signed-out gap between the two was never observed. Required: without it
+   * nothing tells such a sign-in from a lock taken while the scope is live
+   * (R2BE-1).
    */
-  session?: () => string | null
+  session: () => string | null
   isOnline?: () => boolean
   loadedVersionId?: (documentId: string) => string | null | undefined
   onRevoked?: (notice: LeaseRevokeNotice) => void
@@ -292,7 +293,7 @@ export class LeaseManager {
   private checkScopeBoundary(): StoreScope | null {
     const scope = this.options.scope()
     const storeToken = this.scopeToken(scope)
-    const token = storeToken === null ? null : `${storeToken}#${this.options.session?.() ?? ''}`
+    const token = storeToken === null ? null : `${storeToken}#${this.options.session() ?? ''}`
     if (this.lastBoundaryToken !== undefined && token !== this.lastBoundaryToken) {
       this.generation += 1
       this.globalLockReason = null
@@ -369,9 +370,6 @@ export class LeaseManager {
       return makeState('none')
     }
 
-    if (this.globalLockReason === 'keystore_locked') {
-      return makeState('keystore_locked', { reason: 'keystore_locked' })
-    }
     if (this.globalLockReason !== null) {
       return makeState('locked', { reason: this.globalLockReason })
     }
@@ -763,9 +761,10 @@ export class LeaseManager {
    * The one entry point for the `office_lease.revoked` event (payload carries
    * ids only: `user_id`, `document_id`, `lease_id`; DOC-005 row 16 / §6.2.2).
    * Locks the document's lease at once and emits the committed-cache deletion
-   * notice (drafts kept). Only an event for the signed-in user is applied;
-   * another user's, one without a session, or a malformed payload is ignored
-   * (null).
+   * notice (drafts kept). Only an event for the signed-in user is applied, and
+   * only when no lease is held for the document or the held one is the lease
+   * named; another user's, one without a session, one naming a lease other
+   * than the held one, or a malformed payload is ignored (null).
    *
    * Gap (R1BE-5): no producer calls this yet. The server publishes the event on
    * the user-scope outbox/realtime channel, and the desktop shell has no client
@@ -781,6 +780,9 @@ export class LeaseManager {
     const existingRead = await this.options.store.get(event.document_id)
     const currentRecord = existingRead.kind === 'ok' ? existingRead.record : undefined
     if (currentRecord && currentRecord.user_id !== event.user_id) return null
+    // a late event for an older lease: the lease held now is a newer grant the
+    // server still considers live (R2BE-4); the next online pass settles it
+    if (currentRecord && currentRecord.lease_id !== event.lease_id) return null
 
     await this.markDocumentRevoked(event.document_id, {
       leaseId: event.lease_id,
