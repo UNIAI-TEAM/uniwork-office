@@ -551,9 +551,12 @@ const coordinatorDeps = (ctx: Ctx) => (ctx.service.coordinator as unknown as Coo
 
 /**
  * holds the inline upload of the first save on the wire: the path stays in the
- * coordinator's `saving` set (with its intent stored) until `release()`
+ * coordinator's `saving` set (with its intent stored) until `release()`.
+ * `verdict` answers the held upload instead of the fake server - a Response is
+ * the server's refusal, a throw is the wire failing - so the running save ends
+ * in a deterministic failure (RBE6u4-01)
  */
-function holdUploads(server: ReturnType<typeof fakeServer>) {
+function holdUploads(server: ReturnType<typeof fakeServer>, verdict?: () => Response) {
   const original = server.fetch.getMockImplementation()
   if (!original) throw new Error('fake server has no implementation')
   let release: () => void = () => undefined
@@ -571,6 +574,7 @@ function holdUploads(server: ReturnType<typeof fakeServer>) {
       reached.uploads += 1
       markReached()
       await gate
+      if (verdict) return verdict()
     }
     return original(url, init)
   })
@@ -578,8 +582,12 @@ function holdUploads(server: ReturnType<typeof fakeServer>) {
 }
 
 /** starts an inline save of 'v4' and waits until its upload is in flight */
-async function inlineSaveInFlight(ctx: Ctx, server: ReturnType<typeof fakeServer>) {
-  const hold = holdUploads(server)
+async function inlineSaveInFlight(
+  ctx: Ctx,
+  server: ReturnType<typeof fakeServer>,
+  verdict?: () => Response,
+) {
+  const hold = holdUploads(server, verdict)
   const path = await openDoc(ctx)
   writeFileSync(path, 'v4')
   const first = ctx.service.save(path)
@@ -845,5 +853,100 @@ describe('G5-06u T9: RBE6u3-01 the intent read lands after the running save sett
     expect(ctx.service.coordinator.hasPendingNext(path)).toBe(false)
     expect(ctx.statuses.some((s) => s.pendingNext)).toBe(false)
     expect(sent(server)).toHaveLength(2)
+  })
+})
+
+/** the server's error envelope; the fake server's own `error` helper is private */
+const refusal = (status: number, code: string) =>
+  new Response(JSON.stringify({ error: { code, message: 'x' } }), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  })
+
+describe('G5-06u T9: RBE6u4-01 the intent read lands after the running save failed', () => {
+  it('a terminally refused first save and a newer copy: one push, pendingNext, nothing written by the press', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const { path, first, release, reached } = await inlineSaveInFlight(ctx, server, () =>
+      refusal(403, 'forbidden'),
+    )
+    writeFileSync(path, 'v5')
+    const press = holdNextIntentsRead(ctx)
+    ctx.statuses.length = 0
+    // the coordinator's own call, so the press itself can be awaited
+    const pressed = ctx.service.coordinator.save(path, { userSave: true })
+    await press.parked
+    release()
+    await first
+    // the refusal dropped the record and cleared pendingNext while the base
+    // stayed where the press found it: the settle failed, it did not commit
+    expect(await storedIntent(ctx, path)).toBeNull()
+    expect(ctx.service.coordinator.hasPendingNext(path)).toBe(false)
+    expect(binding(path)).toMatchObject({ state: 'blocked', error: 'permission_revoked' })
+    press.release()
+    await pressed
+    // the copy is an unsent N+1 relative to the failed attempt: one push
+    expect(ctx.popovers).toEqual([{ path }])
+    expect(ctx.service.coordinator.hasPendingNext(path)).toBe(true)
+    expect(ctx.statuses.at(-1)).toMatchObject({ path, pendingNext: true })
+    // read only: no second upload, no second intent, the copy stays as it was
+    expect(reached.uploads).toBe(1)
+    expect(await storedIntent(ctx, path)).toBeNull()
+    expect(readFileSync(path, 'utf8')).toBe('v5')
+  })
+
+  it('a first save that fails on the wire (network / timeout): the live intent routes the press, one push', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const { path, first, release, reached } = await inlineSaveInFlight(ctx, server, () => {
+      throw new TypeError('fetch failed')
+    })
+    const before = recordFacts((await storedIntent(ctx, path))?.intent as unknown as IntentRecordV2)
+    writeFileSync(path, 'v5')
+    const press = holdNextIntentsRead(ctx)
+    ctx.statuses.length = 0
+    // the coordinator's own call, so the press itself can be awaited
+    const pressed = ctx.service.coordinator.save(path, { userSave: true })
+    await press.parked
+    release()
+    await first
+    // a lost upload answer is never called failed: the record stays, the base
+    // does not move - so the press's own intent read still finds it
+    expect(binding(path)).toMatchObject({ state: 'offline', error: 'network' })
+    press.release()
+    await pressed
+    expect(ctx.popovers).toEqual([{ path }])
+    expect(ctx.service.coordinator.hasPendingNext(path)).toBe(true)
+    // read only: no second upload, the record is still the first save's own
+    expect(reached.uploads).toBe(1)
+    const after = recordFacts((await storedIntent(ctx, path))?.intent as unknown as IntentRecordV2)
+    expect(after).toEqual(before)
+    expect(readFileSync(path, 'utf8')).toBe('v5')
+  })
+
+  it('a terminally refused first save and a copy back at the base: no push, no pendingNext', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const { path, first, release, reached } = await inlineSaveInFlight(ctx, server, () =>
+      refusal(403, 'forbidden'),
+    )
+    // the user undid the edits back to the saved base while v4 was uploading
+    writeFileSync(path, 'v3')
+    const press = holdNextIntentsRead(ctx)
+    ctx.statuses.length = 0
+    // the coordinator's own call, so the press itself can be awaited
+    const pressed = ctx.service.coordinator.save(path, { userSave: true })
+    await press.parked
+    release()
+    await first
+    expect(await storedIntent(ctx, path)).toBeNull()
+    press.release()
+    await pressed
+    // a clean copy has nothing to mark: the failed attempt alone is no push
+    expect(ctx.popovers).toEqual([])
+    expect(ctx.service.coordinator.hasPendingNext(path)).toBe(false)
+    expect(ctx.statuses.some((s) => s.pendingNext)).toBe(false)
+    expect(reached.uploads).toBe(1)
+    expect(await storedIntent(ctx, path)).toBeNull()
   })
 })
