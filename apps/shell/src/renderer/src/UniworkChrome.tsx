@@ -1,4 +1,13 @@
-import { useCallback, useEffect, useId, useRef, useState, type CSSProperties } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type RefObject,
+} from 'react'
 import type { TabSummary } from '../../shared/tabs-api'
 import type { UniworkDocStatus } from '../../shared/home-api'
 import { asSyncCenterSnapshot } from '../../shared/sync-center'
@@ -37,6 +46,13 @@ import {
   type QueuePopoverOpener,
 } from './queue-popover-model'
 import { announce } from './uniwork-live'
+import {
+  measurePillFit,
+  nextPillVariantOf,
+  shortLabelOf,
+  type PillVariant,
+  type PillWidths,
+} from './uniwork-pill-fit'
 import { setTopInsetPart, uiScaleOf } from './uniwork-top-inset'
 import type { SyncCenterRow } from '../../shared/sync-center'
 
@@ -197,6 +213,87 @@ function useQueueRowOf(status: UniworkDocStatus): SyncCenterRow | undefined {
   return row
 }
 
+/**
+ * Which variant of the pill the tab bar has room for (U-1). The pill is drawn in its full form,
+ * measured against the room the strip can spare, and stepped down (short label, then dot + action)
+ * until it fits; a variant already measured is not drawn again to find out. It measures again when
+ * the label or the interface scale changes, on a window resize, when the bar or the holder changes
+ * size, and when a tab opens or closes. A host with no layout to measure keeps the full pill.
+ * The effect runs before paint, so the steps are never seen.
+ */
+function usePillFit(
+  groupRef: RefObject<HTMLDivElement | null>,
+  key: string,
+  hasShort: boolean,
+): PillVariant {
+  const [variant, setVariant] = useState<PillVariant>('full')
+  // bumped by whatever changes the room (a resize, a tab, the holder's size): measure again
+  const [pass, setPass] = useState(0)
+  const widths = useRef<PillWidths>({})
+  const lastKey = useRef('')
+
+  useLayoutEffect(() => {
+    const el = groupRef.current
+    if (!el) return
+    const measuredKey = `${key}
+${uiScaleOf(el)}`
+    if (lastKey.current !== measuredKey) {
+      // another label (or scale): the widths measured so far describe something else
+      lastKey.current = measuredKey
+      widths.current = {}
+      if (variant !== 'full') {
+        setVariant('full')
+        return
+      }
+    }
+    const fit = measurePillFit(el)
+    if (!fit) {
+      widths.current = {}
+      if (variant !== 'full') setVariant('full')
+      return
+    }
+    widths.current[variant] = fit.natural
+    const next = nextPillVariantOf(fit.budget, widths.current, { short: hasShort })
+    if (next !== variant) setVariant(next)
+  }, [groupRef, key, variant, hasShort, pass])
+
+  useEffect(() => {
+    const el = groupRef.current
+    const chrome = el?.parentElement
+    const bar = chrome?.parentElement
+    const strip = bar
+      ? (Array.from(bar.children).find((child) => child.classList.contains('tab-strip')) ?? null)
+      : null
+    // no tab strip beside the holder (a chip shown elsewhere): there is no room to share
+    if (!strip) return undefined
+    const again = () => setPass((n) => n + 1)
+    window.addEventListener('resize', again)
+    // a tab opening or closing changes the floor the strip keeps
+    const tabs = typeof MutationObserver !== 'undefined' ? new MutationObserver(again) : null
+    tabs?.observe(strip, { childList: true })
+    // the holder changing size (the Discussion toggle or a notice coming and going) moves the budget;
+    // answered in the next frame so a size change caused by this very step is not reported in the same one
+    let frame = 0
+    let sizes: ResizeObserver | undefined
+    if (typeof ResizeObserver !== 'undefined' && bar && chrome) {
+      sizes = new ResizeObserver(() => {
+        cancelAnimationFrame(frame)
+        frame = requestAnimationFrame(again)
+      })
+      sizes.observe(bar)
+      sizes.observe(chrome)
+    }
+    return () => {
+      window.removeEventListener('resize', again)
+      tabs?.disconnect()
+      sizes?.disconnect()
+      cancelAnimationFrame(frame)
+    }
+  }, [groupRef])
+
+  return variant
+}
+
 /** the states whose arrival is said to a screen reader at once (EXPERIENCE: blocked, failed, conflict) */
 function isUrgent(status: UniworkDocStatus, labelKey: StringKey): boolean {
   return status.state === 'failed' || labelKey === 'uwChipBlocked' || labelKey === 'uwChipConflict'
@@ -242,6 +339,13 @@ export function UniworkStatusChip({
   const model = chipModelOf(status, { needsSignIn: !accountOk, queuedAt, failedReasonKey })
   const { label, tip, title } = chipCopy(model, t, dateLocale)
   const action = model.action
+  const shortLabel = shortLabelOf(label)
+  const variant = usePillFit(
+    groupRef,
+    `${label}
+${action ? t(action.labelKey) : ''}`,
+    shortLabel !== label,
+  )
 
   // the button never leaves while focus is on it without the pill taking the focus first (a
   // callback ref runs before the node is removed; focus dropped to <body> would lose the place)
@@ -373,6 +477,7 @@ export function UniworkStatusChip({
         aria-label={t('uwChipAria')}
         data-tone={model.tone}
         data-state={status.state}
+        data-variant={variant}
         tabIndex={describedHere ? 0 : -1}
         title={describedHere ? title : undefined}
         aria-describedby={describedHere ? tipId : undefined}
@@ -403,7 +508,15 @@ export function UniworkStatusChip({
           ) : (
             <span className="uw-pill-dot" aria-hidden="true" />
           )}
-          <span className="uw-pill-label">{label}</span>
+          {variant === 'full' ? (
+            <span className="uw-pill-label">{label}</span>
+          ) : (
+            // fewer words drawn, the same sentence read: the hidden text is the whole label
+            <span className="uw-pill-label">
+              <span className="uw-sr-only">{label}</span>
+              {variant === 'short' && <span aria-hidden="true">{shortLabel}</span>}
+            </span>
+          )}
         </span>
         {action && (
           <button

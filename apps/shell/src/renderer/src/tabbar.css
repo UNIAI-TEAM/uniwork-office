@@ -483,6 +483,12 @@ body.overlay-title-bar .tab-bar-drag-spacer {
   min-width: 0;
 }
 
+/* narrow tab bar (see uniwork-pill-fit.ts): the label is drawn short, or not at all; the dot (or spinner)
+   then sits next to the button with the pill's own gap, the full text stays in the hidden label */
+.uw-pill[data-variant='compact'] > .uw-pill-status {
+  gap: 0;
+}
+
 .uw-pill-label {
   min-width: 0;
   overflow: hidden;
