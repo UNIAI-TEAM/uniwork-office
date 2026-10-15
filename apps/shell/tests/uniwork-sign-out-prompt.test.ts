@@ -1004,4 +1004,88 @@ describe('Settings → Account sign-out prompt (S3)', () => {
     expect(standaloneDialog()).toBeNull()
     expect(document.activeElement).not.toBe(extBtn)
   })
+
+  it('Q2 = a: a switch notice shows what was lost with one acknowledge button, no cancel (vi + en), answers once and returns focus', async () => {
+    for (const [lang, sync, acct] of [
+      ['vi', syncVi, vi_],
+      ['en', syncEn, en],
+    ] as const) {
+      // Settings closed: the notice brings Settings › Account up by itself
+      await render(statusFor('signed-in'), { lang, open: false })
+      await act(async () => {
+        api.pushPrompt({
+          requestId: `notice-${lang}`,
+          plan: { count: 1, waiting: 0, keystoreLocked: true, ramOnly: 2 },
+          mode: 'notice',
+        })
+      })
+      await flush()
+
+      const dialog = promptDialog()!
+      expect(dialog).not.toBeNull()
+      expect(dialog.getAttribute('aria-labelledby')).toBeTruthy()
+      expect(dialog.textContent).toContain(sync.uwSwitchLostTitle)
+      expect(dialog.textContent).toContain(sync.uwSwitchLostBody.replace('{count}', '2'))
+      const buttons = Array.from(dialog.querySelectorAll('button'))
+      expect(buttons.map((b) => b.textContent)).toEqual([sync.uwSwitchLostOk])
+      expect(promptButton(sync.uwActBack)).toBeUndefined()
+      expect(promptButton(sync.uwSignOutGo)).toBeUndefined()
+      expect(document.activeElement).toBe(promptButton(sync.uwSwitchLostOk))
+      expect(pane()?.textContent ?? '').not.toMatch(/\b(uw|acct)[A-Z]\w+/)
+
+      await click(promptButton(sync.uwSwitchLostOk))
+      expect(api.answerSignOutPrompt).toHaveBeenCalledTimes(1)
+      expect(api.answerSignOutPrompt).toHaveBeenCalledWith(`notice-${lang}`, true)
+      expect(api.accountLogout).not.toHaveBeenCalled()
+      expect(promptDialog()).toBeNull()
+      expect(document.activeElement).toBe(button(acct.acctSignOut))
+
+      // a second click path (Escape) has nothing left to answer
+      await act(async () => {
+        document.activeElement!.dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+        )
+      })
+      await flush()
+      expect(api.answerSignOutPrompt).toHaveBeenCalledTimes(1)
+      act(() => root.unmount())
+      root = createRoot(host)
+    }
+  })
+
+  it('Q2 = a: Escape acknowledges the notice once; a notice leaves an open sign-out prompt alone', async () => {
+    await render(statusFor('signed-in'), { lang: 'vi', open: false })
+    await act(async () => {
+      api.pushPrompt({
+        requestId: 'req-confirm',
+        plan: { count: 1, waiting: 0, keystoreLocked: false, ramOnly: 0 },
+      })
+    })
+    await flush()
+    await act(async () => {
+      api.pushPrompt({
+        requestId: 'req-notice',
+        plan: { count: 0, waiting: 0, keystoreLocked: true, ramOnly: 1 },
+        mode: 'notice',
+      })
+    })
+    await flush()
+    // the confirm prompt is not answered by the notice and stays on top
+    expect(api.answerSignOutPrompt).not.toHaveBeenCalled()
+    expect(promptButton(syncVi.uwActBack)).toBeDefined()
+    await click(promptButton(syncVi.uwActBack))
+    expect(api.answerSignOutPrompt).toHaveBeenCalledWith('req-confirm', false)
+
+    // now the notice shows; Escape acknowledges it exactly once
+    expect(promptDialog()?.textContent).toContain(syncVi.uwSwitchLostTitle)
+    await act(async () => {
+      promptDialog()!.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+      )
+    })
+    await flush()
+    expect(api.answerSignOutPrompt).toHaveBeenCalledTimes(2)
+    expect(api.answerSignOutPrompt).toHaveBeenLastCalledWith('req-notice', true)
+    expect(promptDialog()).toBeNull()
+  })
 })

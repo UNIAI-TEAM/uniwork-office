@@ -125,6 +125,10 @@ export const id = {
   uwSignOutWaiting: 'Menyelesaikan penyimpanan yang sedang berjalan sebelum keluar…',
   uwSignOutCaptureFailed:
     'Beberapa perubahan yang belum disimpan tidak sempat ditangkap tepat waktu; versi tersimpan atau simpan otomatis terbaru tetap disimpan untuk akun Anda.',
+  uwSwitchLostTitle: 'Sebagian perubahan yang belum disimpan dari akun sebelumnya hilang',
+  uwSwitchLostBody:
+    'Akun lain masuk di komputer ini, jadi akun sebelumnya dikunci. Dokumen yang perubahan belum disimpannya hanya ada di jendela yang terbuka dan tidak dapat dipertahankan: {count}. Semua yang lain tetap terkunci di komputer ini untuk akun tersebut.',
+  uwSwitchLostOk: 'Mengerti',
 
   // S2 sync center
   uwSyncTitle: 'Pusat sinkronisasi',

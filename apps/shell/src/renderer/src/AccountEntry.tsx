@@ -92,7 +92,7 @@ export function AccountEntry({
   // signed in to several organizations and none chosen yet, or a main-initiated
   // sign-out prompt needs an answer: bring up Settings › Account
   const choiceNeeded = withProfile && orgChoiceOf(status).needed
-  const signOutPromptNeeded = Boolean(account.signOutPrompt)
+  const signOutPromptNeeded = Boolean(account.signOutPrompt || account.signOutNotice)
   useEffect(() => {
     if ((choiceNeeded || signOutPromptNeeded) && !settingsOpen) onOpenSettings('account')
     // reacts to the step appearing only, not to Settings being closed again

@@ -124,6 +124,10 @@ export const ja = {
   uwSignOutWaiting: 'ログアウトする前に進行中の保存を完了しています…',
   uwSignOutCaptureFailed:
     '一部の未保存の変更を時間内に取得できませんでした。最新の保存済みまたは自動保存版がアカウント用に保持されます。',
+  uwSwitchLostTitle: '前のアカウントの未保存の変更の一部が失われました',
+  uwSwitchLostBody:
+    '別のアカウントがこのコンピューターにサインインしたため、前のアカウントはロックされました。未保存の変更が開いているウィンドウにしかなく、保持できなかったドキュメント: {count}。それ以外はすべて、そのアカウント用にこのコンピューターでロックされたまま保持されます。',
+  uwSwitchLostOk: 'OK',
 
   // S2 sync center
   uwSyncTitle: '同期センター',

@@ -330,3 +330,85 @@ describe('a sign-in that changes the account', () => {
     expect(h.deps.closeDocument).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('an account switch that is already effective (Q2 = a)', () => {
+  type Owner = { accountId: string; deploymentId: string }
+  const switching = (plan: { count: number; ramOnly: number }) => {
+    const h = harness([aSheet], [aSheet], new Set(), [], ownerA)
+    const order: string[] = []
+    const lockStore = h.deps.lockStore.getMockImplementation()!
+    const deps = {
+      ...h.deps,
+      lockStore: vi.fn(async (owner: Owner | null) => {
+        order.push('lock')
+        await lockStore(owner)
+      }),
+      planSignOut: vi.fn(async () => ({
+        count: plan.count,
+        waiting: 0,
+        keystoreLocked: plan.ramOnly > 0,
+        ramOnly: plan.ramOnly,
+      })),
+      // the user would press Back (or never answer): it must not matter any more
+      confirmSignOut: vi.fn(async () => false),
+      noticeSwitchLoss: vi.fn((_owner: Owner, _plan: unknown) => {
+        order.push('notice')
+      }),
+    }
+    return { ...h, deps, order, boundary: new AccountBoundary(deps) }
+  }
+
+  it('locks the account it leaves even when a prompt would be cancelled, and closes its tabs', async () => {
+    const h = switching({ count: 1, ramOnly: 0 })
+    await h.boundary.enforce(ownerA)
+    await h.boundary.enforce(ownerB)
+    expect(h.deps.confirmSignOut).not.toHaveBeenCalled()
+    expect(h.locked).toEqual([ownerA])
+    expect(h.closed).toEqual([aSheet])
+    expect(h.forgotten).toEqual([aSheet])
+    // the boundary is enforced: the next status push changes nothing
+    await h.boundary.enforce(ownerB)
+    expect(h.locked).toEqual([ownerA])
+  })
+
+  it('sends no prompt and no notice when nothing RAM-only was lost', async () => {
+    const h = switching({ count: 2, ramOnly: 0 })
+    await h.boundary.enforce(ownerA)
+    await h.boundary.enforce(ownerB)
+    expect(h.deps.noticeSwitchLoss).not.toHaveBeenCalled()
+    expect(h.deps.confirmSignOut).not.toHaveBeenCalled()
+  })
+
+  it('sends exactly one notice when RAM-only content was lost, after the lock', async () => {
+    const h = switching({ count: 1, ramOnly: 2 })
+    await h.boundary.enforce(ownerA)
+    await h.boundary.enforce(ownerB)
+    expect(h.deps.noticeSwitchLoss).toHaveBeenCalledTimes(1)
+    expect(h.deps.noticeSwitchLoss).toHaveBeenCalledWith(
+      ownerA,
+      expect.objectContaining({ ramOnly: 2 }),
+    )
+    expect(h.order).toEqual(['lock', 'notice'])
+    expect(h.deps.confirmSignOut).not.toHaveBeenCalled()
+  })
+
+  it('a notice that throws does not undo the lock or stop the tabs closing', async () => {
+    const h = switching({ count: 0, ramOnly: 1 })
+    h.deps.noticeSwitchLoss.mockImplementation(() => {
+      throw new Error('no window')
+    })
+    await h.boundary.enforce(ownerA)
+    await h.boundary.enforce(ownerB)
+    expect(h.locked).toEqual([ownerA])
+    expect(h.closed).toEqual([aSheet])
+  })
+
+  it('an explicit Sign out still asks, and a cancel there changes nothing', async () => {
+    const h = switching({ count: 1, ramOnly: 0 })
+    await h.boundary.enforce(ownerA)
+    expect(await h.boundary.beforeSignOut()).toBe(false)
+    expect(h.deps.confirmSignOut).toHaveBeenCalledTimes(1)
+    expect(h.locked).toEqual([])
+    expect(h.closed).toEqual([])
+  })
+})

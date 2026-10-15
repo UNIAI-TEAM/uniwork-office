@@ -129,6 +129,10 @@ export const fr = {
   uwSignOutWaiting: 'Finalisation de l’enregistrement en cours avant la déconnexion…',
   uwSignOutCaptureFailed:
     'Certaines modifications non enregistrées n’ont pas pu être capturées à temps ; la version enregistrée ou enregistrée automatiquement la plus récente est conservée pour votre compte.',
+  uwSwitchLostTitle: 'Des modifications non enregistrées du compte précédent ont été perdues',
+  uwSwitchLostBody:
+    'Un autre compte s’est connecté sur cet ordinateur, le compte précédent a donc été verrouillé. Documents dont les modifications non enregistrées n’existaient que dans des fenêtres ouvertes et n’ont pas pu être conservées : {count}. Tout le reste reste verrouillé sur cet ordinateur pour ce compte.',
+  uwSwitchLostOk: 'OK',
 
   // S2 sync center
   uwSyncTitle: 'Centre de synchronisation',

@@ -1758,8 +1758,8 @@ export function SettingsModal({
     if (target) setSection(target.section)
   }, [target])
   useEffect(() => {
-    if (account?.signOutPrompt) setSection('account')
-  }, [account?.signOutPrompt])
+    if (account?.signOutPrompt || account?.signOutNotice) setSection('account')
+  }, [account?.signOutPrompt, account?.signOutNotice])
   // the AI panes report unsaved edits; leaving them (close, other section) asks first
   const paneDirtyRef = useRef(false)
   const onPaneDirty = useCallback((dirty: boolean) => {
@@ -1773,6 +1773,7 @@ export function SettingsModal({
   const requestClose = () =>
     guardLeave(() => {
       if (account?.signOutPrompt) account.cancelSignOut?.()
+      if (account?.signOutNotice) account.acknowledgeSignOutNotice?.()
       onClose()
     })
   const goToSection = (id: SectionId) => {
@@ -1894,6 +1895,7 @@ export function SettingsModal({
   escapeRef.current = () => {
     if (leaveAction) setLeaveAction(null)
     else if (account?.signOutPrompt) account.cancelSignOut?.()
+    else if (account?.signOutNotice) account.acknowledgeSignOutNotice?.()
     else requestClose()
   }
   useEffect(() => {

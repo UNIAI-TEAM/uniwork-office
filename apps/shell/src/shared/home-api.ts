@@ -419,12 +419,17 @@ export interface SignOutProgress {
 export const SIGN_OUT_RECEIPT_WAIT_MS = 30_000
 
 /**
- * D5: main-initiated sign-out confirmation (account switch / deployment switch)
- * pushed to the shell renderer; answered through `signOutPromptAnswer`.
+ * D5: main-initiated sign-out confirmation (deployment switch) pushed to the
+ * shell renderer; answered through `signOutPromptAnswer`. `mode: 'notice'`
+ * (Q2 = a) is sent after an account switch already locked the previous
+ * account and RAM-only content of it was lost: the renderer only reports
+ * that, with one acknowledge button, and main does not wait for the answer.
  */
 export interface SignOutPromptRequest {
   requestId: string
   plan: SignOutPlan
+  /** absent = 'confirm' (sign out or go back) */
+  mode?: 'confirm' | 'notice'
 }
 
 export interface SignOutPromptAnswer {

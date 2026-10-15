@@ -124,6 +124,10 @@ export const zh = {
   uwSignOutWaiting: '正在完成发送中的保存，然后退出登录…',
   uwSignOutCaptureFailed:
     '部分未保存的更改未能及时捕获；已为你的账号保留最近的已保存或自动保存版本。',
+  uwSwitchLostTitle: '上一个账号的部分未保存更改已丢失',
+  uwSwitchLostBody:
+    '另一个账号已在这台电脑上登录，因此上一个账号已被锁定。未保存的更改只存在于打开的窗口中、无法保留的文档：{count}。其他内容仍为该账号锁定保存在这台电脑上。',
+  uwSwitchLostOk: '知道了',
 
   // S2 sync center
   uwSyncTitle: '同步中心',

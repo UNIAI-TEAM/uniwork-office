@@ -1183,6 +1183,95 @@ describe('G5-11 sign-out lock-and-keep, N+1 park, and restoreParked', () => {
     expect(ctx.service.isLocked(path)).toBe(false)
   })
 
+  it('22. Q2 = a: B is already live, a cancelled switch prompt cannot keep A open: A is locked, parked and closed, with no new intent', async () => {
+    const path = seedWorkingCopy({ bytes: 'v5 n+1 of A', baseBytes: 'v3 base', state: 'dirty' })
+    const ctx = setup({ openPaths: [path] })
+    // a queued intent of A whose ciphertext must not change and must not multiply
+    const opened = await ctx.layer.open(ownerA)
+    if (opened.kind !== 'ok') throw new Error(opened.kind)
+    const payload = enc('v4 queued')
+    await createIntentStore(opened.store.records(INTENT_STORE_REGISTRATION.name)).put(
+      DOC,
+      {
+        v: 2,
+        intentId: 'int_switch',
+        idempotencyKey: 'idem_switch',
+        documentId: DOC,
+        orgId: 'org_a',
+        workspaceId: 'ws_1',
+        baseRevision: '41',
+        baseVersion: 3,
+        checksum: hex(payload),
+        length: payload.byteLength,
+        generation: 1,
+        state: 'queued',
+        attempt: 0,
+        createdAt: '2026-04-17T00:00:00.000Z',
+        updatedAt: '2026-04-17T00:00:00.000Z',
+      },
+      payload,
+    )
+    const intentDir = join(dir, 'uniwork-sync', 'store', 'default', 'acc_1', 'intents')
+    const recFiles = readdirSync(intentDir)
+      .filter((f) => f.endsWith('.rec'))
+      .sort()
+    // A's live handle, opened before the switch
+    const handle = await ctx.service.openSyncStore()
+    if (handle.kind !== 'ok') throw new Error(handle.kind)
+    const records = handle.records(INTENT_STORE_REGISTRATION.name)
+
+    const confirmSignOut = vi.fn(async () => false)
+    const noticeSwitchLoss = vi.fn()
+    const boundary = new AccountBoundary({
+      root: join(dir, 'uniwork-documents'),
+      openPaths: () => [...ctx.openSet],
+      closeDocument: async (p) => {
+        ctx.openSet.delete(p)
+        return true
+      },
+      confirmClose: async () => true,
+      closeNow: (p) => ctx.openSet.delete(p),
+      aiHistoryPaths: () => [],
+      forgetAiHistory: () => undefined,
+      forgetLocks: () => undefined,
+      closeConflictPrompt: () => undefined,
+      planSignOut: (owner) => ctx.service.signOutPlan(owner),
+      confirmSignOut,
+      noticeSwitchLoss,
+      lockSession: async (owner) => (await ctx.service.lockSession(owner)).ok,
+    })
+    await boundary.enforce(ownerA)
+
+    // B signs in: the wiring notes the identity before the boundary runs
+    ctx.setAccount('acc_2')
+    ctx.service.noteSessionIdentity()
+    await boundary.enforce({ deploymentId: 'default', accountId: 'acc_2' })
+
+    expect(confirmSignOut).not.toHaveBeenCalled()
+    // nothing was RAM-only (the keychain is open): no notice either
+    expect(noticeSwitchLoss).not.toHaveBeenCalled()
+    // A's scope is locked: the handle from before the switch reads interrupted
+    expect(await records.read(DOC)).toEqual({ kind: 'interrupted' })
+    // A's plaintext folder is gone and its tab closed
+    expect(existsSync(docDir())).toBe(false)
+    expect(ctx.openSet.has(path)).toBe(false)
+    // the N+1 bytes are in A's parked store
+    const reopen = await ctx.layer.open(ownerA)
+    if (reopen.kind !== 'ok') throw new Error(reopen.kind)
+    const parked = createParkedStore(reopen.store.records(PARKED_STORE_REGISTRATION.name))
+    expect(await parked.list()).toEqual([DOC])
+    // and never in the store of B, the account that is live now
+    const live = await ctx.syncStore.open()
+    if (live.kind !== 'ok') throw new Error(live.kind)
+    expect(await createParkedStore(live.records(PARKED_STORE_REGISTRATION.name)).list()).toEqual([])
+    // no new intent was minted
+    expect(
+      readdirSync(intentDir)
+        .filter((f) => f.endsWith('.rec'))
+        .sort(),
+    ).toEqual(recFiles)
+  })
+
   it('21. d2-3: findNewestRecoveryBytes picks the newest candidate by mtime when the disk file is missing', async () => {
     const path = seedWorkingCopy({ bytes: 'v3 base', baseBytes: 'v3 base', state: 'saved' })
     // Working copy file is missing on disk while binding and recovery candidates exist

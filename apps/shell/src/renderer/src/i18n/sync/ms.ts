@@ -128,6 +128,10 @@ export const ms = {
   uwSignOutWaiting: 'Menyelesaikan simpanan yang sedang berjalan sebelum log keluar…',
   uwSignOutCaptureFailed:
     'Sesetengah perubahan yang belum disimpan tidak dapat ditangkap tepat pada masanya; versi simpanan atau autosimpan terkini disimpan untuk akaun anda.',
+  uwSwitchLostTitle: 'Sebahagian perubahan yang belum disimpan bagi akaun sebelumnya telah hilang',
+  uwSwitchLostBody:
+    'Akaun lain telah log masuk pada komputer ini, jadi akaun sebelumnya telah dikunci. Dokumen yang perubahan belum disimpannya hanya wujud dalam tetingkap terbuka dan tidak dapat disimpan: {count}. Semua yang lain kekal dikunci pada komputer ini untuk akaun tersebut.',
+  uwSwitchLostOk: 'Faham',
 
   // S2 sync center
   uwSyncTitle: 'Pusat penyegerakan',

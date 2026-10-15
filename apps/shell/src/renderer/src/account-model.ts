@@ -142,6 +142,11 @@ export interface AccountController {
   connectError: ServerConnectError | null
   /** S3 sign-out confirmation plan when a prompt is open */
   signOutPrompt?: SignOutPlan | null
+  /**
+   * Q2 = a: after an account switch locked the previous account, the plan of
+   * what RAM-only content of it was lost (one acknowledge button, no cancel)
+   */
+  signOutNotice?: SignOutPlan | null
   /** true while main is waiting for an in-flight save before finishing sign-out */
   signOutWaiting?: boolean
   /** d1-2: true after a sign-out whose done event reported captureFailed > 0 */
@@ -153,6 +158,8 @@ export interface AccountController {
   signOut(): void
   confirmSignOut?(): void
   cancelSignOut?(): void
+  /** closes the switch notice and answers its request once */
+  acknowledgeSignOutNotice?(): void
   retry(): void
   selectOrg(orgId: string): void
   /** connect to the server at a typed address; main validates it and saves the profile */
@@ -178,6 +185,7 @@ export function useAccount(options?: { ownsSignOutPrompt?: boolean }): AccountCo
   const [connectError, setConnectError] = useState<ServerConnectError | null>(null)
   const [callbackNotice, setCallbackNotice] = useState(false)
   const [signOutPrompt, setSignOutPrompt] = useState<SignOutPlan | null>(null)
+  const [signOutNotice, setSignOutNotice] = useState<SignOutPlan | null>(null)
   const [signOutWaiting, setSignOutWaiting] = useState(false)
   const [signOutCaptureFailed, setSignOutCaptureFailed] = useState(false)
   const noticeTimer = useRef<number | null>(null)
@@ -193,6 +201,7 @@ export function useAccount(options?: { ownsSignOutPrompt?: boolean }): AccountCo
   const logoutInFlight = useRef(false)
   const waitingForDone = useRef(false)
   const promptReqId = useRef<string | null>(null)
+  const noticeReqId = useRef<string | null>(null)
 
   const clearWaitTimer = useCallback(() => {
     if (waitTimer.current !== null) {
@@ -288,6 +297,15 @@ export function useAccount(options?: { ownsSignOutPrompt?: boolean }): AccountCo
       : undefined
     const offPrompt = ownsSignOutPrompt
       ? window.aiOffice.onSignOutPrompt?.((req) => {
+          if (req.mode === 'notice') {
+            // the switch already happened: nothing to confirm, and an open
+            // sign-out prompt of this account is left as it is
+            const earlier = noticeReqId.current
+            noticeReqId.current = req.requestId
+            if (earlier !== null) void window.aiOffice.answerSignOutPrompt?.(earlier, true)
+            setSignOutNotice(req.plan)
+            return
+          }
           if (promptReqId.current !== null) {
             const stale = promptReqId.current
             promptReqId.current = null
@@ -460,6 +478,13 @@ export function useAccount(options?: { ownsSignOutPrompt?: boolean }): AccountCo
     setSignOutWaiting(false)
   }
 
+  const acknowledgeSignOutNotice = () => {
+    const reqId = noticeReqId.current
+    noticeReqId.current = null
+    if (reqId !== null) void window.aiOffice.answerSignOutPrompt?.(reqId, true)
+    setSignOutNotice(null)
+  }
+
   const retry = () => {
     // one restore at a time: a second click before the busy state renders must not start another
     if (retrying.current) return
@@ -515,6 +540,7 @@ export function useAccount(options?: { ownsSignOutPrompt?: boolean }): AccountCo
     orgSwitchFailed,
     connectError,
     signOutPrompt,
+    signOutNotice,
     signOutWaiting,
     signOutCaptureFailed,
     signIn,
@@ -524,6 +550,7 @@ export function useAccount(options?: { ownsSignOutPrompt?: boolean }): AccountCo
     signOut,
     confirmSignOut,
     cancelSignOut,
+    acknowledgeSignOutNotice,
     retry,
     selectOrg,
     connectServer,

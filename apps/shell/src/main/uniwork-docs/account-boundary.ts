@@ -49,11 +49,20 @@ export interface AccountBoundaryDeps {
   /**
    * Optional sign-out confirmation check (G5-11): runs before any document tab
    * or conflict prompt is closed. False = the user cancelled the sign-out.
+   * Only asked before the account goes away (Sign out, a deployment switch that
+   * signs out first); an account switch that is already effective never asks.
    */
   confirmSignOut?(
     owner: LastOwner | null,
     options?: { confirmed?: boolean; prompt?: boolean; plan?: SignOutPlan },
   ): Promise<boolean>
+  /**
+   * G5-11 (Q2 = a): an account switch that is already effective always locks
+   * the account it leaves; when RAM-only content of that account was lost
+   * (`plan.ramOnly > 0`) the user is told so afterwards. Fire-and-forget: the
+   * lock never waits on this notice.
+   */
+  noticeSwitchLoss?(owner: LastOwner, plan: SignOutPlan): void
   /**
    * G5-11: locks the session of `owner` (bounded receipt wait, N+1 capture into
    * `parked`, working/recovery copy cleanup, RAM cache clear, and store lock).
@@ -176,8 +185,10 @@ export class AccountBoundary {
   /**
    * A live session of `owner` (every signed-in status push): once per account,
    * the documents of any other account are closed and their AI history is
-   * deleted. When a prompt was cancelled the boundary stays unenforced, so the
-   * next status push asks again; a run in progress is not started twice.
+   * deleted. The account that went away is always locked (no prompt can keep
+   * it open: the switch already happened). When a close prompt was cancelled
+   * the boundary stays unenforced, so the next status push asks again; a run
+   * in progress is not started twice.
    */
   async enforce(owner: LastOwner): Promise<void> {
     const key = `${owner.deploymentId}/${owner.accountId}`
@@ -193,18 +204,23 @@ export class AccountBoundary {
       // prompt is cancelled: they are not this account's copies to explain.
       this.deps.forgetLocks(foreign)
       if (previous && `${previous.deploymentId}/${previous.accountId}` !== key) {
-        if (this.deps.planSignOut && this.deps.confirmSignOut) {
-          const plan = await this.deps.planSignOut(previous)
-          if (
-            (plan.count > 0 || plan.ramOnly > 0) &&
-            !(await this.deps.confirmSignOut(previous, { prompt: true, plan }))
-          ) {
-            this.lastOwner = previous
-            return
+        // the other account is already live, so there is nothing left to cancel:
+        // the switched-out account is locked exactly as on a confirmed sign-out
+        // (N+1 parked, plaintext copies wiped, store locked). The plan is read
+        // first, while the RAM-only content it counts still exists.
+        const plan = this.deps.planSignOut
+          ? await this.deps.planSignOut(previous).catch(() => null)
+          : null
+        await this.lock(previous)
+        // only lost content is worth a notice, and it comes after the lock so a
+        // user who has not read it yet never keeps the old plaintext on disk
+        if (plan && plan.ramOnly > 0) {
+          try {
+            this.deps.noticeSwitchLoss?.(previous, plan)
+          } catch {
+            // a notice that cannot be shown changes nothing about the lock
           }
         }
-        // the switched-out account's durable store is locked with its documents
-        await this.lock(previous)
       }
       const closed = await this.closeWhere(foreign)
       this.forgetWhere(foreign)

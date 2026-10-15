@@ -515,6 +515,31 @@ async function promptSignOutFallback(
   return response === 0
 }
 
+/**
+ * Q2 = a: the native notice after an account switch lost RAM-only content of
+ * the previous account (no shell renderer to show it). One button; the lock
+ * already happened, so nothing waits on it.
+ */
+async function noticeSwitchLossFallback(
+  wiring: UniworkDocsWiring,
+  plan: SignOutPlan,
+): Promise<void> {
+  const lang = wiring.lang()
+  const options: Electron.MessageBoxOptions = {
+    type: 'warning',
+    title: tUniworkDocs(lang, 'switchLostTitle'),
+    message: tUniworkDocs(lang, 'switchLostTitle'),
+    detail: tUniworkDocs(lang, 'switchLostBody', { count: plan.ramOnly }),
+    buttons: [tUniworkDocs(lang, 'switchLostOk')],
+    defaultId: 0,
+    cancelId: 0,
+    noLink: true,
+  }
+  const parent = wiring.shellWindow()
+  if (parent) await dialog.showMessageBox(parent, options)
+  else await dialog.showMessageBox(options)
+}
+
 /** Registers the IPC handlers (safe before app ready: nothing touches the account yet). */
 export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): UniworkDocsHandle {
   const push = (channel: string, payload: unknown) => {
@@ -779,6 +804,18 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
         })
       }
       return promptSignOutFallback(wiring, plan)
+    },
+    // Q2 = a: the switch already locked the previous account; this only tells
+    // the user what RAM-only content was lost. Its answer is never awaited (and
+    // never resolves a pending confirm: its requestId is not the pending one).
+    noticeSwitchLoss: (_owner, plan) => {
+      const wc = wiring.shellContents()
+      if (wc && !wc.isDestroyed()) {
+        const req: SignOutPromptRequest = { requestId: randomUUID(), plan, mode: 'notice' }
+        wc.send(UNIWORK_DOC_CHANNELS.signOutPrompt, req)
+        return
+      }
+      void noticeSwitchLossFallback(wiring, plan).catch(() => undefined)
     },
     // G5-11: the outgoing account's durable store is locked (never wiped) after
     // waiting for any in-flight save, capturing N+1 editor/disk working copies

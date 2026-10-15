@@ -128,6 +128,11 @@ export const de = {
   uwSignOutWaiting: 'Laufendes Speichern wird vor dem Abmelden abgeschlossen…',
   uwSignOutCaptureFailed:
     'Einige ungespeicherte Änderungen konnten nicht rechtzeitig erfasst werden; die zuletzt gespeicherte oder automatisch gespeicherte Version bleibt für dein Konto erhalten.',
+  uwSwitchLostTitle:
+    'Einige nicht gespeicherte Änderungen des vorherigen Kontos sind verloren gegangen',
+  uwSwitchLostBody:
+    'Auf diesem Computer hat sich ein anderes Konto angemeldet, daher wurde das vorherige Konto gesperrt. Dokumente, deren nicht gespeicherte Änderungen nur in geöffneten Fenstern existierten und nicht behalten werden konnten: {count}. Alles andere bleibt für dieses Konto gesperrt auf diesem Computer.',
+  uwSwitchLostOk: 'OK',
 
   // S2 sync center
   uwSyncTitle: 'Synchronisierungscenter',
