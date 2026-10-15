@@ -31,7 +31,7 @@ import type { WebContents } from 'electron'
 import { execFile } from 'node:child_process'
 import { readFile, writeFile, rm, stat, mkdir, open } from 'node:fs/promises'
 import { createHash, randomUUID } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
 import { cleanupExpiredGeneratedPages } from './generated-page-temp'
 import { exportSlidesPdf } from './pdf-export'
@@ -154,6 +154,8 @@ export { applySessionTxn } from '../session'
 let pendingOpenPath: string | null = null
 /** tab mode: each view queues its own path; the renderer consumes it after mounting */
 const pendingByWc = new Map<number, string>()
+/** peer client ids evicted from a shared session by queueSlidesForView, re-attached once the reloaded view re-opens from disk */
+const reattachPeersByWc = new Map<number, number[]>()
 
 export interface SlidesAiPresetPayload {
   text: string
@@ -257,6 +259,12 @@ function trackSlidesWebContents(wc: WebContents): void {
     else untitledRecovery.delete(wc.id)
     sessions.delete(wc.id)
     pendingByWc.delete(wc.id)
+    reattachPeersByWc.delete(wc.id)
+    for (const [ownerId, peers] of reattachPeersByWc) {
+      const filtered = peers.filter((id) => id !== wc.id)
+      if (filtered.length > 0) reattachPeersByWc.set(ownerId, filtered)
+      else reattachPeersByWc.delete(ownerId)
+    }
     forgetClient(wc.id)
     closeSaveWaiters.get(wc.id)?.(false)
     closeSaveWaiters.delete(wc.id)
@@ -398,6 +406,19 @@ const autosaveBackoff = new Map<string, number>()
 const AUTOSAVE_BACKOFF_TICKS = 10
 let autosaveRunning = false
 
+/** Bumped by every clear so an in-flight 30s autosave tick that started before the clear cannot leave a stale recovery copy behind */
+const recoveryClearEpochs = new Map<string, number>()
+
+function clearRecoveryCopy(filePath: string): void {
+  recoveryClearEpochs.set(filePath, (recoveryClearEpochs.get(filePath) ?? 0) + 1)
+  autosaveBackoff.delete(filePath)
+  try {
+    rmSync(autosavePathFor(filePath), { force: true })
+  } catch {
+    /* nothing to clean */
+  }
+}
+
 /**
  * Recovery drafts for never-saved decks (wcId → visible path in <Documents>/UniWork Office):
  * the sha1-keyed recovery copy needs session.path, so before the first save a freeze or
@@ -409,6 +430,25 @@ function dropUntitledRecovery(wcId: number): void {
   const draft = untitledRecovery.get(wcId)
   if (draft) void rm(draft, { force: true }).catch(() => {})
   untitledRecovery.delete(wcId)
+}
+
+/** Queue a deck this tab's next consume-pending-open opens from disk without a recovery prompt (shell reload routing). */
+export function queueSlidesForView(contents: WebContents, path: string): void {
+  clearRecoveryCopy(path)
+  dropUntitledRecovery(contents.id)
+  const wanted = resolve(path)
+  const old = sessions.get(contents.id)
+  sessions.delete(contents.id)
+  const peers: number[] = []
+  for (const [id, existing] of sessions) {
+    if (existing === old || (existing.path && resolve(existing.path) === wanted)) {
+      sessions.delete(id)
+      peers.push(id)
+    }
+  }
+  if (peers.length > 0) reattachPeersByWc.set(contents.id, peers)
+  else reattachPeersByWc.delete(contents.id)
+  pendingByWc.set(contents.id, path)
 }
 
 setInterval(() => {
@@ -437,9 +477,14 @@ setInterval(() => {
         autosaveBackoff.set(backoffKey, skip - 1)
         continue
       }
+      const epoch = recoveryClearEpochs.get(backoffKey) ?? 0
       try {
         await mkdir(dirname(target), { recursive: true })
         await savePptxToFile(session.opened, target)
+        if ((recoveryClearEpochs.get(backoffKey) ?? 0) !== epoch) {
+          await rm(target, { force: true }).catch(() => {})
+          continue
+        }
         autosaveBackoff.delete(backoffKey)
       } catch (error) {
         autosaveBackoff.set(backoffKey, AUTOSAVE_BACKOFF_TICKS)
@@ -1009,6 +1054,7 @@ export function registerSlidesIpc(): void {
       const dropQueued = () => {
         if (pendingByWc.get(e.sender.id) === queued) pendingByWc.delete(e.sender.id)
         if (pendingOpenPath === queued) pendingOpenPath = null
+        reattachPeersByWc.delete(e.sender.id)
       }
       // A CFB file (legacy .ppt / encrypted, possibly misnamed .pptx) can never
       // parse: tell the user and drop it, or every relaunch restores a blank tab
@@ -1022,8 +1068,17 @@ export function registerSlidesIpc(): void {
         return null
       }
       // Clear the queue only after a successful open: keep it on parse failure or a mid-flight renderer reload, so a remount can retry
+      const peers = reattachPeersByWc.get(e.sender.id)
       const result = await openAndBuild(e.sender, queued, fitWidthPx)
       dropQueued()
+      const fresh = sessions.get(e.sender.id)
+      if (result && fresh && peers?.length) {
+        for (const peerId of peers) {
+          if (!sessions.has(peerId)) sessions.set(peerId, fresh)
+        }
+        scheduleHistoryNotify(fresh)
+        scheduleDeckBroadcast(fresh)
+      }
       return result
     }
     // No queued path but the main process already has a session (remount after an HMR full

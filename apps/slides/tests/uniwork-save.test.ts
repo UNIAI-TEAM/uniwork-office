@@ -70,6 +70,7 @@ vi.mock('../src/main/shaped-metrics', () => ({
 
 import { createBlankPptx, openPptx } from '@genoffice/pptx-engine'
 import {
+  queueSlidesForView,
   registerSlidesIpc,
   saveSessionDeckTo,
   setSlidesUserSaveHook,
@@ -335,5 +336,68 @@ describe('crash-recovery copy', () => {
     expect(copies.length).toBe(1)
     expect(readFileSync(deckPath, 'utf8')).toBe(ORIGINAL)
     expect(hook).not.toHaveBeenCalled()
+  })
+})
+
+describe('queueSlidesForView and slides:consume-pending-open reload routing', () => {
+  it('re-opens the queued deck from disk instead of returning the stale in-memory session', async () => {
+    writeFileSync(deckPath, await createBlankPptx())
+    await call('slides:add-blank-slide', { sourceIndex: 0, before: false, fitWidthPx: FIT })
+    expect(session.opened.deck.slides).toHaveLength(2)
+
+    // Write a newer crash-recovery copy first: queueSlidesForView must clear it so
+    // maybeRecoverBytes does not prompt Restore/Discard on S5 "Reload latest".
+    vi.advanceTimersByTime(30_000)
+    const dir = join(env.dir, 'slides-autosave')
+    for (let i = 0; i < 100; i++) {
+      await new Promise((r) => setTimeout(r, 50))
+      const copies = existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith('.pptx')) : []
+      if (copies.length && statSync(join(dir, copies[0]!)).size > 0) break
+    }
+
+    queueSlidesForView({ id: WC } as never, deckPath)
+    expect(sessions.get(WC)).toBeUndefined()
+
+    const r = (await call('slides:consume-pending-open', FIT)) as {
+      path: string
+      slides: unknown[]
+    } | null
+    expect(r?.path).toBe(deckPath)
+    expect(r?.slides).toHaveLength(1)
+    expect(sessions.get(WC)?.opened.deck.slides).toHaveLength(1)
+  })
+
+  it('refreshes aliased peer windows on the same path instead of reusing their stale session', async () => {
+    const PEER_WC = 2
+    writeFileSync(deckPath, await createBlankPptx())
+    await call('slides:add-blank-slide', { sourceIndex: 0, before: false, fitWidthPx: FIT })
+    expect(session.opened.deck.slides).toHaveLength(2)
+    sessions.set(PEER_WC, session)
+
+    queueSlidesForView({ id: WC } as never, deckPath)
+    expect(sessions.get(WC)).toBeUndefined()
+    expect(sessions.get(PEER_WC)).toBeUndefined()
+
+    const r = (await call('slides:consume-pending-open', FIT)) as {
+      path: string
+      slides: unknown[]
+    } | null
+    expect(r?.slides).toHaveLength(1)
+    expect(sessions.get(WC)?.opened.deck.slides).toHaveLength(1)
+    expect(sessions.get(PEER_WC)).toBe(sessions.get(WC))
+  })
+
+  it('restores the in-memory session when reloading without queueSlidesForView (freeze recovery)', async () => {
+    writeFileSync(deckPath, await createBlankPptx())
+    await call('slides:add-blank-slide', { sourceIndex: 0, before: false, fitWidthPx: FIT })
+    expect(session.opened.deck.slides).toHaveLength(2)
+
+    const r = (await call('slides:consume-pending-open', FIT)) as {
+      path: string
+      slides: unknown[]
+    } | null
+    expect(r?.path).toBe(deckPath)
+    expect(r?.slides).toHaveLength(2)
+    expect(sessions.get(WC)).toBe(session)
   })
 })
