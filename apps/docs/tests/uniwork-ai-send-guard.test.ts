@@ -179,14 +179,14 @@ describe('docs panel send entry with an unavailable UniWork AI pick', () => {
         await flush()
       },
       /** a fresh ribbon preset (a new nonce) with `provider` still picked */
-      firePreset: async (nonce: number) => {
+      firePreset: async (nonce: number, open = true) => {
         act(() =>
           root!.render(
             createElement(AiPanel, {
               editor: editor!,
               blocks: [],
               settings: settingsFor('uniwork'),
-              open: true,
+              open,
               preset: { text: 'rewrite it', autoRun: true, nonce },
             } as never),
           ),
@@ -274,5 +274,18 @@ describe('docs panel send entry with an unavailable UniWork AI pick', () => {
     })
     await panel.firePreset(3)
     expect(harness.runs).toEqual(['rewrite it', 'rewrite it'])
+  })
+
+  it('a preset that fires while the panel is collapsed to its rail is refused too: the gate does not need the composer mounted (core4b)', async () => {
+    const panel = await mountThenPreset('anthropic')
+    act(() => harness.finishRun?.())
+    await flush()
+    setUniworkAiAvailable(true)
+    await panel.pick('uniwork')
+    act(() => setAiModelNeedHint(null))
+
+    await panel.firePreset(2, false)
+    expect(container!.querySelector('[role="region"]')).toBeNull()
+    expect(harness.runs).toEqual(['rewrite it'])
   })
 })

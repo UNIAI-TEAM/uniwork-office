@@ -325,6 +325,18 @@ describe('sheets panel send entry and queue submit with model-need hint (RF3-3)'
     expect(sent).toEqual(['first turn'])
   })
 
+  it('ExcelShell routes every AI entry (Send, retry, presets, ribbon runs, selection ask) through one UniWork gate (core4b, pinned from source: ExcelShell cannot be mounted in jsdom)', () => {
+    const here = dirname(fileURLToPath(import.meta.url))
+    const shell = readFileSync(join(here, '../src/renderer/ExcelShell.tsx'), 'utf8')
+    expect(shell).toContain('const uniworkSendGate = useUniworkSendGate()')
+    expect(shell).toMatch(
+      /const onSend: typeof onSendRaw = [^{]*\{\s*if \(uniworkSendGate\.refuse\(\)\) return\s*onSendRaw\(/,
+    )
+    expect(shell).toContain('sendGate={uniworkSendGate}')
+    // no entry calls the raw prop around the gate
+    expect(shell.match(/onSendRaw\(/g)).toHaveLength(1)
+  })
+
   it('App.tsx handleSend returns false while needModelHint is set (App.tsx cannot be mounted in jsdom)', () => {
     const app = readFileSync(
       join(dirname(fileURLToPath(import.meta.url)), '../src/renderer/App.tsx'),

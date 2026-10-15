@@ -5,7 +5,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { setUniworkAiAvailable } from '@genoffice/ai-provider'
-import { clearUniworkAcks, setAiModelNeedHint } from '@genoffice/ui'
+import { ack, clearUniworkAcks, setAiModelNeedHint } from '@genoffice/ui'
 import { AI_PROVIDERS, type AiSettings } from '../src/shared/ipc'
 
 const harness = vi.hoisted(() => ({
@@ -121,6 +121,7 @@ describe('slides panel send entry with an unavailable UniWork AI pick', () => {
     setUniworkAiAvailable(false)
     delete (window as any).slidesApi
     delete (window as any).desktop
+    delete (window as any).uniworkCloudStatus
   })
 
   async function mountThenPreset(provider: AiSettings['provider']) {
@@ -292,5 +293,50 @@ describe('slides panel send entry with an unavailable UniWork AI pick', () => {
     })
     await panel.firePreset(3)
     expect(harness.runs).toEqual(['rewrite it', 'rewrite it'])
+  })
+
+  it('a queued item also waits for a UniWork composer note, as Send does, and sends once it clears (core4b)', async () => {
+    const snapshot = (state: string) => ({
+      state,
+      signedIn: state !== 'signed-out',
+      accountId: 'acc-1',
+      orgId: 'org-1',
+      orgName: 'Acme',
+    })
+    let push: ((snap: unknown) => void) | null = null
+    ;(window as any).uniworkCloudStatus = {
+      get: vi.fn(async () => snapshot('signed-out')),
+      onChange: (handler: (snap: unknown) => void) => {
+        push = handler
+        return () => {}
+      },
+      signIn: vi.fn(),
+    }
+    // the disclosure is acknowledged: only the composer note stands in the way
+    ack({ account: 'acc-1', org: 'org-1', document: 'local' })
+
+    const panel = await mountThenPreset('anthropic')
+    expect(harness.runs).toEqual(['rewrite it'])
+    enqueueInComposer(container!, 'queued follow-up')
+
+    act(() => setAiModelNeedHint('Choose a model to send'))
+    act(() => harness.finishRun?.())
+    await flush()
+    setUniworkAiAvailable(true)
+    await panel.pick('uniwork')
+    act(() => setAiModelNeedHint(null))
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 900))
+    })
+
+    expect(container!.querySelector('[role="region"]')).toBeNull()
+    expect(harness.runs).toEqual(['rewrite it'])
+    expect(container!.querySelector('.ai-queue-strip')).not.toBeNull()
+
+    act(() => push?.(snapshot('ready')))
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 900))
+    })
+    expect(harness.runs).toEqual(['rewrite it', 'queued follow-up'])
   })
 })
