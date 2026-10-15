@@ -46,9 +46,13 @@ const KNOWN_KEY_ERROR_CODES: ReadonlySet<string> = new Set<UniworkKeyErrorCode>(
   'unknown',
 ])
 
-/** the server's 503 codes for "saved keys cannot be used right now" (credential store, session check) */
+/**
+ * the server's 503 codes for "saved keys cannot be used right now" (credential store, session
+ * check, no BYOK service on this server); a 503 without any code (gateway page) reads the same
+ */
 const KEYS_UNAVAILABLE_CODES: ReadonlySet<string> = new Set([
   'ai_credentials_unavailable',
+  'ai_byok_not_configured',
   'unavailable',
 ])
 
@@ -308,7 +312,7 @@ function keyErrorCodeForStatus(status: number, serverCode?: string): UniworkKeyE
     case 502:
       return 'provider_unreachable'
     case 503:
-      return 'cloud_unavailable'
+      return 'keys_unavailable'
     default:
       return 'unknown'
   }

@@ -388,6 +388,27 @@ describe('proxy transport (ai-provider wire format -> BYOK routes)', () => {
     await expect(proxied(`${p}/openai/chat/completions`, { body: '{}' })).rejects.toMatchObject({
       code: 'cloud_unavailable',
     })
+    // the server without a BYOK service answers its own 503 code
+    answer = jsonResponse(503, { error: { code: 'ai_byok_not_configured' } })
+    await expect(proxied(`${p}/openai/chat/completions`, { body: '{}' })).rejects.toMatchObject({
+      code: 'cloud_unavailable',
+    })
+  })
+
+  it('a 503 without a JSON error body (gateway page, empty body) is the typed cloud_unavailable state', async () => {
+    let answer = new Response('<html>502 Bad Gateway</html>', { status: 503 })
+    const proxied = createProxyFetch({ base: BASE, fetch: vi.fn(async () => answer) })
+    await expect(proxied(`${p}/openai/chat/completions`, { body: '{}' })).rejects.toMatchObject({
+      code: 'cloud_unavailable',
+      status: 503,
+    })
+    answer = new Response('', { status: 503 })
+    await expect(proxied(`${p}/openai/chat/completions`, { body: '{}' })).rejects.toMatchObject({
+      code: 'cloud_unavailable',
+    })
+    // a vendor's JSON 503 still passes through
+    answer = jsonResponse(503, { error: { type: 'overloaded_error', message: 'busy' } })
+    expect((await proxied(`${p}/openai/chat/completions`, { body: '{}' })).status).toBe(503)
   })
 
   it('refuses a proxy URL that leaves the byok mount after normalisation', () => {

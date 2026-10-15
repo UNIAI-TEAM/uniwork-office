@@ -146,33 +146,46 @@ export async function isProxy404(res: Response): Promise<boolean> {
 
 /**
  * Codes the UniWork server itself answers 402 / 503 with. The proxy passes a vendor's own 402
- * (an exhausted vendor balance) and 503 (overloaded) through with the vendor's status, so those
- * two statuses are a proxy answer only when the body carries one of these codes.
+ * (an exhausted vendor balance) and 503 (overloaded) through with the vendor's status, so a JSON
+ * body with those statuses is a proxy answer only when it carries one of these codes.
  */
 const PROXY_402_503_CODES = new Set([
   'credits_exhausted',
   'cloud_unavailable',
   'ai_credentials_unavailable',
+  'ai_byok_not_configured',
   'unavailable',
 ])
 
-async function bodyCode(res: Response): Promise<string | undefined> {
+/**
+ * The `code` of a JSON error body: `null` when the body is not a JSON object that carries an
+ * `error` or a `code` (an HTML gateway page, an empty body, a bare string), `undefined` for a JSON
+ * error without a code (a vendor's own error object).
+ */
+async function jsonErrorCode(res: Response): Promise<string | undefined | null> {
+  let body: unknown
   try {
-    return proxyErrorBodyFields(await res.clone().json()).code
+    body = await res.clone().json()
   } catch {
-    return undefined
+    return null
   }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return null
+  if (!('error' in body) && !('code' in body)) return null
+  return proxyErrorBodyFields(body).code
 }
 
 /**
  * A contract failure the proxy answered itself. A 404 counts only with `credential_missing`, a 402
- * or 503 only with a UniWork code; a provider's own 404 / 402 / 503 passes through to ai-provider.
+ * only with a UniWork code, a 503 with a UniWork code or without any JSON error body (a gateway
+ * or load-balancer page while the UniWork API is down: vendors always answer JSON); a provider's
+ * own 404 / 402 / JSON 503 passes through to ai-provider.
  */
 export async function proxyAnswered(res: Response): Promise<boolean> {
   if (!isProxyContractStatus(res.status)) return false
   if (res.status === 404) return isProxy404(res)
   if (res.status === 402 || res.status === 503) {
-    const code = await bodyCode(res)
+    const code = await jsonErrorCode(res)
+    if (code === null) return res.status === 503
     return code !== undefined && PROXY_402_503_CODES.has(code)
   }
   return true

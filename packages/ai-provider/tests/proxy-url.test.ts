@@ -152,16 +152,29 @@ describe('toProxyRequest (ai-provider wire format -> BYOK proxy routes)', () => 
     expect(await proxyAnswered(vendor402)).toBe(false)
     const vendor503 = jsonResponse(503, { error: { type: 'overloaded_error', message: 'busy' } })
     expect(await proxyAnswered(vendor503)).toBe(false)
-    const htmlGateway = new Response('<html>busy</html>', { status: 503 })
-    expect(await proxyAnswered(htmlGateway)).toBe(false)
+    // a vendor 503 without a code stays a vendor answer in every JSON shape
+    expect(await proxyAnswered(jsonResponse(503, { error: 'busy' }))).toBe(false)
+    expect(await proxyAnswered(jsonResponse(503, { error: { message: 'busy' } }))).toBe(false)
+    // a 402 needs a UniWork code even without a JSON body
+    expect(await proxyAnswered(new Response('<html>pay</html>', { status: 402 }))).toBe(false)
 
     for (const [status, code] of [
       [402, 'credits_exhausted'],
       [503, 'cloud_unavailable'],
       [503, 'ai_credentials_unavailable'],
       [503, 'unavailable'],
+      [503, 'ai_byok_not_configured'],
     ] as const) {
       expect(await proxyAnswered(jsonResponse(status, { error: { code } })), code).toBe(true)
     }
+  })
+
+  it('counts a 503 with no JSON error body (gateway page, empty body) as a UniWork answer', async () => {
+    const htmlGateway = new Response('<html>busy</html>', { status: 503 })
+    expect(await proxyAnswered(htmlGateway)).toBe(true)
+    expect(await proxyAnswered(new Response('', { status: 503 }))).toBe(true)
+    expect(await proxyAnswered(new Response('"busy"', { status: 503 }))).toBe(true)
+    expect(await proxyAnswered(jsonResponse(503, {}))).toBe(true)
+    expect(await proxyAnswered(jsonResponse(503, ['busy']))).toBe(true)
   })
 })

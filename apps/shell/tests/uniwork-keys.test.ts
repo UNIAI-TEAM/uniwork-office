@@ -95,6 +95,7 @@ import {
   MODEL_LIST_TTL_MS,
   UniworkKeyError,
   createUniworkKeysHost,
+  keyErrorFromResponse,
   parseCredentialsResponse,
   type UniworkKeysHost,
 } from '../src/main/uniwork-auth/keys'
@@ -1270,6 +1271,27 @@ describe('UniworkKeysHost + docs-main BYOK proxy integration (G6-05k F2)', () =>
     expect((refused as UniworkKeyError).describe('vi')).toContain(
       'Chưa dùng được khóa trên UniWork',
     )
+
+    // the code alone says "keys unavailable", whatever status carries it
+    const byCode = await keyErrorFromResponse(
+      jsonResponse({ error: { code: 'ai_byok_not_configured' } }, 500),
+    )
+    expect(byCode.code).toBe('keys_unavailable')
+
+    // the server without a BYOK service, a gateway page and an empty body are the same state
+    for (const refusal of [
+      () => jsonResponse({ error: { code: 'ai_byok_not_configured' } }, 503),
+      () => new Response('<html>502 Bad Gateway</html>', { status: 503 }),
+      () => new Response('', { status: 503 }),
+    ]) {
+      answer = refusal
+      const err = await proxied(`${BYOK_URL}/openai/chat/completions`, post).catch((e) => e)
+      expect(err).toBeInstanceOf(UniworkKeyError)
+      expect((err as UniworkKeyError).code).toBe('keys_unavailable')
+    }
+    // a vendor's JSON 503 still passes through
+    answer = () => jsonResponse({ error: { type: 'overloaded_error', message: 'busy' } }, 503)
+    expect((await proxied(`${BYOK_URL}/openai/chat/completions`, post)).status).toBe(503)
   })
 
   it('ai:chat and ai:settings-test use the org key through the proxy for an org-only provider', async () => {
