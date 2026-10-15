@@ -28,6 +28,36 @@ export function registerPrivilegedSchemes(): void {
   ])
 }
 
+/**
+ * Policy of the preview document, the desktop twin of the web preview's own policy
+ * (web/docs/build/modules.ts, html `documents`): the page's scripts, styles and pictures run
+ * and load as before, but nothing talks to the network (connect-src), nothing embeds another
+ * page (frame-src), no form leaves the preview. No 'self': relative assets arrive through
+ * html-asset://, the one extra source the web side does not need.
+ */
+export const PREVIEW_CONTENT_SECURITY_POLICY = [
+  "default-src 'none'",
+  "script-src 'unsafe-inline' 'unsafe-eval' https: html-asset:",
+  "style-src 'unsafe-inline' https: html-asset:",
+  'img-src data: blob: https: html-asset:',
+  'font-src data: https: html-asset:',
+  'media-src data: blob: https: html-asset:',
+  "connect-src 'none'",
+  "frame-src 'none'",
+  "worker-src 'none'",
+  "object-src 'none'",
+  'base-uri https: html-asset:',
+  "form-action 'none'",
+].join('; ')
+
+function previewHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  return {
+    ...extra,
+    'Cache-Control': 'no-store',
+    'Content-Security-Policy': PREVIEW_CONTENT_SECURITY_POLICY,
+  }
+}
+
 export function registerPreviewProtocol(
   resolve: (webContentsId: number) => { text: string; baseHref: string | null } | null,
 ): void {
@@ -36,13 +66,13 @@ export function registerPreviewProtocol(
     try {
       host = new URL(request.url).host
     } catch {
-      return new Response(null, { status: 400 })
+      return new Response(null, { status: 400, headers: previewHeaders() })
     }
     const match = /^view-(\d+)$/.exec(host)
     const entry = match ? resolve(Number(match[1])) : null
-    if (!entry) return new Response(null, { status: 404 })
+    if (!entry) return new Response(null, { status: 404, headers: previewHeaders() })
     return new Response(buildPreviewDocument(entry.text, entry.baseHref), {
-      headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' },
+      headers: previewHeaders({ 'Content-Type': 'text/html; charset=utf-8' }),
     })
   })
 }
