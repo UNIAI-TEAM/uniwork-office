@@ -154,6 +154,17 @@ function mapQueueStateToRowState(
 }
 
 /**
+ * The header account of a status: the profile's display name, else the local part of
+ * the email (the same fallback as the account pane's `displayNameOf`); none without an identity.
+ */
+export function accountInfoOf(status: AccountStatus): SyncCenterAccountInfo | undefined {
+  const email = status.profile?.email || status.email || ''
+  const name = status.profile?.displayName?.trim() || (email.split('@')[0] ?? '')
+  if (!name && !email) return undefined
+  return { name: name || email, ...(email ? { email } : {}) }
+}
+
+/**
  * A blocked intent's reason in the spine's vocabulary. `explicit` (a fact the
  * caller derived: `document_archived`, `lease_expired`, `foreign_account`, ...)
  * wins; otherwise the queue's `lastError` decides. Anything else the queue
@@ -181,6 +192,9 @@ export function mapBlockedReason(
     case 'store_full':
       return 'store_full'
     default:
+      // the server's archived refusal (G5-08s) is not a `UniworkDocErrorCode` yet; a record
+      // keeps any error string, so it is read here, not by a queue transition
+      if ((error as string | undefined) === 'document_archived') return 'document_archived'
       return 'permission_revoked'
   }
 }
@@ -774,34 +788,29 @@ export function createSyncCenterController(deps: SyncCenterControllerDeps): Sync
       const dispatcher = await deps.dispatcher()
       if (!dispatcher) return { ok: false, code: 'other' }
 
-      const now = deps.now?.() ?? Date.now()
-      const old: IntentRecordV2 = { ...entry.doc.record }
-      // the old intent is superseded BEFORE a new one exists (spine: Superseded)
-      const superseded = await dispatcher.supersede(entry.doc, now)
-      if (superseded !== 'cancelled') {
-        entry.doc.record = old
-        return { ok: false, code: 'busy' }
-      }
-
+      // the old intent is superseded only together with the durable write of the new one
+      // (spine: Superseded); a refusal leaves the old intent, and so the queued save, as it was
+      const old = entry.doc.record
       const id = (deps.newId ?? randomUUID)()
-      const minted = await dispatcher.mint({
-        key: entry.doc.key,
-        intentId: `office-intent-${id}`,
-        idempotencyKey: `office-key-${id}`,
-        documentId: old.documentId,
-        orgId: old.orgId,
-        workspaceId: old.workspaceId,
-        baseRevision: old.baseRevision,
-        baseVersion: old.baseVersion,
-        checksum: old.checksum,
-        length: old.length,
-      })
-      const next: QueueDoc = { ...entry.doc, record: minted }
-      await dispatcher.enqueue(next)
-      // `enqueue` swallows a refused write: a store that still holds the cancelled
-      // record did not take the new intent
-      if ((await dispatcher.readState(next)) === 'cancelled')
-        return { ok: false, code: 'store_full' }
+      const replaced = await dispatcher.replace(
+        entry.doc,
+        {
+          intentId: `office-intent-${id}`,
+          idempotencyKey: `office-key-${id}`,
+          documentId: old.documentId,
+          orgId: old.orgId,
+          workspaceId: old.workspaceId,
+          baseRevision: old.baseRevision,
+          baseVersion: old.baseVersion,
+          checksum: old.checksum,
+          length: old.length,
+        },
+        deps.now?.() ?? Date.now(),
+      )
+      if (replaced.kind === 'busy') return { ok: false, code: 'busy' }
+      if (replaced.kind === 'refused') {
+        return { ok: false, code: replaced.reason === 'store_full' ? 'store_full' : 'other' }
+      }
       notifyChanged()
       return { ok: true }
     },
@@ -1004,12 +1013,7 @@ export function createWiredSyncCenter(deps: WiredSyncCenterDeps): {
             ? 'signed_in'
             : 'signed_out'
 
-      const account = status.account
-        ? {
-            name: status.account.displayName || status.account.email,
-            ...(status.account.email ? { email: status.account.email } : {}),
-          }
-        : undefined
+      const account = accountInfoOf(status)
       const org = status.org ? { id: status.org.id, name: status.org.name } : undefined
 
       if (sessionState === 'signed_out') {

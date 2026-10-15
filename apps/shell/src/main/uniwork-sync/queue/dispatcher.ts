@@ -245,6 +245,53 @@ export class QueueDispatcher {
   }
 
   /**
+   * "Luu lai" on a failed intent: the old intent is superseded and a new one
+   * minted from the same snapshot, in ONE store write. The document key holds a
+   * single record, so writing the new intent over it is the supersede; nothing
+   * is written until the machine has agreed to supersede the old intent, and a
+   * refused write (the budget, a locked keychain) leaves the old intent exactly
+   * as it was - the queued save is never lost. Only after the write landed are
+   * the old intent's `cancelled` (reason `superseded`) and the new intent's
+   * state published. The caller's `doc` is not touched.
+   */
+  async replace(
+    doc: QueueDoc,
+    intent: MintedIntent,
+    now = this.deps.clock(),
+  ): Promise<
+    | { kind: 'ok'; doc: QueueDoc }
+    | { kind: 'busy' }
+    | { kind: 'refused'; reason: 'store_full' | 'keystore_locked' | 'unavailable' }
+  > {
+    const access = await this.deps.intents()
+    if (access.kind !== 'ok') {
+      return {
+        kind: 'refused',
+        reason: access.kind === 'keystore_locked' ? 'keystore_locked' : 'unavailable',
+      }
+    }
+    const superseded = transition(doc.record, { type: 'supersede' }, await this.context(now)).record
+    if (superseded?.state !== 'cancelled') return { kind: 'busy' }
+    const minted = await this.mint({ ...intent, key: doc.key })
+    const written = await access.intents.put(doc.key, minted, doc.payload)
+    if (written.kind !== 'ok') {
+      return {
+        kind: 'refused',
+        reason:
+          written.kind === 'store_full'
+            ? 'store_full'
+            : written.kind === 'keystore_locked'
+              ? 'keystore_locked'
+              : 'unavailable',
+      }
+    }
+    this.otherWindow.delete(doc.key)
+    this.deps.publish(superseded)
+    this.deps.publish(minted)
+    return { kind: 'ok', doc: { ...doc, record: minted } }
+  }
+
+  /**
    * One poll pass: for each org lane read the org's capability once and settle
    * or advance every pending document of that lane.
    */
