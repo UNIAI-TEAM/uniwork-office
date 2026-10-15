@@ -16,7 +16,6 @@ import type { LeaseRecord } from './record'
 
 export const CLOCK_ROLLBACK_MAX_DRIFT_MS = 5 * 60 * 1000
 export const LEASE_EXPIRING_SOON_MS = 4 * 60 * 60 * 1000
-export const LEASE_MAX_TTL_MS = 24 * 60 * 60 * 1000
 export const LEASE_RENEW_THRESHOLD_RATIO = 0.5
 
 export interface LeaseClockSource {
