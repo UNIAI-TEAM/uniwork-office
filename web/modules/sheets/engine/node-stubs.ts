@@ -24,6 +24,7 @@ export const rename = (): never => unavailable('fs.rename')
 export const rm = (): never => unavailable('fs.rm')
 export const stat = (): never => unavailable('fs.stat')
 export const unlink = (): never => unavailable('fs.unlink')
+export const unlinkSync = (): never => unavailable('fs.unlinkSync')
 export const tmpdir = (): never => unavailable('os.tmpdir')
 export const basename = (path: string): string => path.split('/').pop() ?? path
 export const dirname = (path: string): string => path.split('/').slice(0, -1).join('/') || '/'
