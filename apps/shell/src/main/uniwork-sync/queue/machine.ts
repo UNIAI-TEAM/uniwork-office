@@ -16,9 +16,12 @@ import {
  *
  * Event vocabulary (fixed by the G5-06 contract): `save | dispatch | uploaded |
  * committed | commitFailed | lookup | pause | resume | capability | online |
- * cancel | discard | supersede | tombstone | tick`. The contract gives no
- * separate event for each in-flight step, so `uploaded` advances the phase
- * boundary it reports: validating -> uploading, then uploading -> committing.
+ * cancel | discard | supersede | tombstone | tick`; G5-11f adds `unblock`, the
+ * one way a `blocked` intent returns to the queue when its condition lifts (a
+ * block is never retried on its own, and `abandon` stays the user's way out).
+ * The contract gives no separate event for each in-flight step, so `uploaded`
+ * advances the phase boundary it reports: validating -> uploading, then
+ * uploading -> committing.
  *
  * Terminal states are `committed` and `cancelled`; `blocked`, `failed` and
  * `conflict` wait for the user (or the server) and are never moved by a
@@ -68,6 +71,7 @@ export type QueueEvent =
   | { type: 'discard' }
   | { type: 'supersede' }
   | { type: 'abandon' }
+  | { type: 'unblock'; reason: BlockedReason }
   | { type: 'tombstone' }
   | { type: 'tick'; now: number }
 
@@ -121,8 +125,21 @@ export function nextRetryAt(
 
 const iso = (now: number): string => new Date(now).toISOString()
 
+/**
+ * The conditions a commit failure can park an intent on, one per EXPERIENCE ›
+ * "Lý do bị chặn" row the queue can produce. Each has its own lift (`unblock`),
+ * so a session that comes back never wakes an intent the document itself kept
+ * blocked, and the other way round.
+ */
+export type BlockedReason =
+  | 'session_expired'
+  | 'permission_revoked'
+  | 'member_deactivated'
+  | 'organization_suspended'
+  | 'document_deleted'
+
 /** the reason a commit failure parks the intent, by server/client code */
-const BLOCKED_REASONS: Record<string, UniworkDocErrorCode> = {
+const BLOCKED_REASONS: Record<string, BlockedReason> = {
   session_expired: 'session_expired',
   not_signed_in: 'session_expired',
   wrong_deployment: 'session_expired',
@@ -218,6 +235,16 @@ function enterStuck(record: IntentRecordV2, ctx: QueueContext): IntentRecordV2 {
     reconcileSince: record.reconcileSince ?? iso(ctx.now),
     retryAt: recheckStamp(ctx),
   })
+}
+
+/**
+ * Where an unblocked intent waits: the queue, unless the user's own pause or a
+ * known-offline pass still says otherwise (the same wake a `capability` or
+ * `online` flip uses).
+ */
+function waitingState(ctx: QueueContext): QueueState {
+  if (ctx.pausedUser === true) return 'paused_user'
+  return ctx.online === false ? 'paused_offline' : 'queued'
 }
 
 function createFromSave(
@@ -618,6 +645,25 @@ export function transition(
       return {
         record: withState(record, ctx, 'cancelled', {
           cancelReason: 'user',
+          retryAt: undefined,
+          reconcileSince: undefined,
+        }),
+        effects: [],
+      }
+
+    case 'unblock':
+      // the condition the record waits on lifted: the same intent - id,
+      // snapshot, generation and base untouched - goes back to the waiting
+      // queue and commits through the normal path. Only the reason the record
+      // is actually blocked on moves: a lift of another condition, a record
+      // that is not blocked (a second lift included), and a record nobody named
+      // are all no-ops.
+      if (record.state !== 'blocked' || record.lastError !== event.reason) {
+        return { record, effects: [] }
+      }
+      return {
+        record: withState(record, ctx, waitingState(ctx), {
+          lastError: undefined,
           retryAt: undefined,
           reconcileSince: undefined,
         }),

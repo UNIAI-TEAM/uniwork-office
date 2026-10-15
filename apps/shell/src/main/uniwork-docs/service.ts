@@ -303,7 +303,7 @@ export interface UniworkDocsServiceDeps {
    * save queue's lane verdicts. Absent = writes allowed (tests that never read
    * a capability); the production wiring passes the runtime's cache.
    */
-  capability?: { get(orgId: string): Promise<QueueCapabilityRead> }
+  capability?: { get(orgId: string, options?: { force?: boolean }): Promise<QueueCapabilityRead> }
   /** a working copy refused by the newer-store guard (S11 lock panel) */
   pushLock?(lock: UniworkDocLock): void
   /**
@@ -526,6 +526,9 @@ function refusalVerdict(code: UniworkDocErrorCode | undefined): 'revoked' | 'del
   if (code === 'document_deleted') return 'deleted'
   return null
 }
+
+/** the first wait before a blocked intent's document is re-probed; doubles to recheckMs */
+const BLOCKED_PROBE_BASE_MS = 60_000
 
 /** no revision of this app's own has been seen for a document yet */
 const NO_ECHO: ReadonlySet<string> = new Set()
@@ -1332,9 +1335,9 @@ export class UniworkDocsService {
         lookupCommit: (input) => this.api().lookupCommit(input),
       },
       capability: {
-        get: (orgId) =>
+        get: (orgId, options) =>
           this.deps.capability
-            ? this.deps.capability.get(orgId)
+            ? this.deps.capability.get(orgId, options)
             : Promise.resolve({
                 kind: 'ok',
                 capabilities: { sync_write: true },
@@ -1418,6 +1421,12 @@ export class UniworkDocsService {
     }
   }
 
+  /** the queue's last connectivity verdict; false keeps the blocked re-probe home */
+  private queueOnline: boolean | undefined = undefined
+  /** when a blocked intent's document may be re-probed next, by document key */
+  private readonly blockedProbeAt = new Map<string, number>()
+  /** how many re-probes one blocked intent already spent (the backoff's exponent) */
+  private readonly blockedProbeCount = new Map<string, number>()
   private readonly pendingApplyRecords = new Set<Promise<void>>()
 
   /**
@@ -1610,10 +1619,82 @@ export class UniworkDocsService {
     // its dispatch never race a Save of the same intent (G506-be-1, d1-3)
     for (const doc of docs) this.queueInFlight.add(doc.key)
     try {
+      await this.reprobeBlockedDocs(
+        access.dispatcher,
+        docs,
+        this.deps.now ? this.deps.now() : Date.now(),
+      )
       await access.dispatcher.tick(docs)
       await access.dispatcher.dispatchAll(docs)
     } finally {
       for (const doc of docs) this.queueInFlight.delete(doc.key)
+    }
+  }
+
+  /**
+   * A blocked intent whose condition only the document itself can prove
+   * (`permission_revoked`, `document_deleted`): one bounded metadata re-probe
+   * per intent, spaced by a backoff, so the SAME intent goes back to the queue
+   * once the document answers for writing again. This is the runtime's access
+   * check: a document listed by the feed only proves the account may READ it (a
+   * listed row is not evidence that writing returned), while a document read
+   * reports the level itself - and, for a block earned by an archived/deleted
+   * document, whether the document is still in the trash. The pass only runs
+   * with a live session and store, and an offline verdict keeps every probe
+   * home, so a probe never leaves the account, deployment or org of the intent.
+   */
+  private async reprobeBlockedDocs(
+    dispatcher: QueueDispatcher,
+    docs: QueueDoc[],
+    now: number,
+  ): Promise<void> {
+    if (this.queueOnline === false) return
+    // one probe state per blocked intent: a key that is no longer blocked (it
+    // committed, was cancelled, or was abandoned) forgets its backoff
+    const blocked = new Set<string>()
+    for (const doc of docs) {
+      if (doc.record.state === 'blocked') blocked.add(doc.key)
+    }
+    for (const key of [...this.blockedProbeAt.keys()]) {
+      if (blocked.has(key)) continue
+      this.blockedProbeAt.delete(key)
+      this.blockedProbeCount.delete(key)
+    }
+    for (const doc of docs) {
+      const reason = doc.record.state === 'blocked' ? doc.record.lastError : undefined
+      if (reason !== 'permission_revoked' && reason !== 'document_deleted') continue
+      const due = this.blockedProbeAt.get(doc.key)
+      if (due !== undefined && now < due) continue
+      let flags: { canEdit: boolean; archived: boolean } | null = null
+      try {
+        const detail = await this.api().getDocument(doc.record.documentId)
+        flags = actionFlags(detail.myLevel, detail.archivedAt)
+      } catch {
+        // still refused (403/404/410) or unreachable: the block stays, and the
+        // next probe waits longer
+      }
+      // a deleted/archived block lifts only when the document is out of the
+      // trash too: an archived document keeps refusing the write, so waking the
+      // intent would only earn the same block again
+      const forWriting =
+        flags !== null && flags.canEdit && (reason === 'permission_revoked' || !flags.archived)
+      if (forWriting) {
+        const states = await dispatcher.unblock([doc], reason, now)
+        if (states[0] !== undefined && states[0] !== 'blocked') {
+          this.blockedProbeAt.delete(doc.key)
+          this.blockedProbeCount.delete(doc.key)
+          // the server lets this copy be edited again: the session's lock verdict
+          // on it is spent, exactly as the reopen path spends it
+          this.clearRemoteLock(doc.record.documentId, doc.path)
+          continue
+        }
+      }
+      const count = (this.blockedProbeCount.get(doc.key) ?? 0) + 1
+      this.blockedProbeCount.set(doc.key, count)
+      this.blockedProbeAt.set(
+        doc.key,
+        now + Math.min(QUEUE_LIMITS.recheckMs, BLOCKED_PROBE_BASE_MS * 2 ** (count - 1)),
+      )
     }
   }
 
@@ -1625,6 +1706,9 @@ export class UniworkDocsService {
    * is left alone - nothing may move without being persisted.
    */
   async setQueueOnline(online: boolean): Promise<void> {
+    // remembered for the blocked re-probe: a pass that reported offline never
+    // sends an access check either
+    this.queueOnline = online
     const access = await this.queueEngine()
     if (access.kind !== 'ok') return
     if (!this.isQueueSessionCurrent(access)) return

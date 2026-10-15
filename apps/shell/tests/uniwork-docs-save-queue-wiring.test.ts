@@ -67,6 +67,8 @@ function fakeServer(initial: { bytes: Uint8Array; myLevel?: string }) {
     version: 3,
     bytes: initial.bytes,
     myLevel: initial.myLevel ?? 'edit',
+    /** a document in the trash; the write refuses until it is restored */
+    archivedAt: null as string | null,
     title: 'Q4 plan.docx',
   }
   const calls: Call[] = []
@@ -84,6 +86,7 @@ function fakeServer(initial: { bytes: Uint8Array; myLevel?: string }) {
     revision: String(state.revision),
     current_version: state.version,
     my_level: state.myLevel,
+    archived_at: state.archivedAt,
     file: {
       file_id: 'f',
       version_id: `v${state.version}`,
@@ -213,6 +216,8 @@ interface Ctx {
   signOut: () => void
   signInAs: (id: string) => void
   setCapabilityOffline: (value: boolean) => void
+  /** move the service clock (the blocked re-probe's backoff is wall-clock) */
+  advanceClock: (ms: number) => void
 }
 
 function setup(
@@ -230,6 +235,7 @@ function setup(
   let account: string | null = opts.account === undefined ? 'acc_1' : opts.account
   /** true = the capability read fails (the lane is offline for the next save) */
   let capabilityOffline = false
+  let clock = Date.now()
   const safeStorage: LockableSafeStorage = createLockableSafeStorage()
   const layer: StoreLayer = createStoreLayer({
     root: join(dir, 'uniwork-sync', 'store'),
@@ -253,6 +259,7 @@ function setup(
     userDataDir: dir,
     syncStore,
     appVersion: () => '0.0.0',
+    now: () => clock,
     profile: () => profile,
     identity: () =>
       account ? { accountId: account, deviceSessionId: 'dev_1', deploymentId: 'default' } : null,
@@ -299,6 +306,9 @@ function setup(
     },
     setCapabilityOffline: (value: boolean) => {
       capabilityOffline = value
+    },
+    advanceClock: (ms: number) => {
+      clock += ms
     },
   }
 }
@@ -633,6 +643,168 @@ describe('G5-06 W4b save queue wiring', () => {
     })
     expect(uploads(server)).toHaveLength(0)
     expect(commits(server)).toHaveLength(0)
+  })
+
+  describe('G5-11f OQ-F12: a blocked intent goes back to queued when its condition lifts', () => {
+    /** an intent parked offline, then dispatched into `blocked` by one server fault */
+    const blockedSave = async (
+      ctx: Ctx,
+      server: ReturnType<typeof fakeServer>,
+      fault: Fault,
+    ): Promise<string> => {
+      const path = await openDoc(ctx)
+      writeFileSync(path, 'v4')
+      ctx.setCapabilityOffline(true)
+      await ctx.service.save(path)
+      ctx.setCapabilityOffline(false)
+      server.faults.push(fault)
+      await ctx.service.pollSaveQueue()
+      return path
+    }
+    const committedKeys = (server: ReturnType<typeof fakeServer>) =>
+      commits(server).map((call) => call.headers['idempotency-key'])
+
+    it('a session signed in again lifts a session_expired block and commits the SAME intent', async () => {
+      const server = fakeServer({ bytes: enc('v3') })
+      const ctx = setup(server)
+      const path = await blockedSave(ctx, server, { route: 'commit', kind: 401 })
+      const blocked = await storedIntent(ctx, path)
+      expect(blocked?.intent).toMatchObject({ state: 'blocked', lastError: 'session_expired' })
+      expect(commits(server)).toHaveLength(1)
+      // the same account and deployment answers again: the pass reads the
+      // capability, lifts the block and re-sends the SAME idempotency key
+      await ctx.service.pollSaveQueue()
+      await vi.waitFor(async () =>
+        expect(await ctx.service.docStatus(path)).toMatchObject({ state: 'saved' }),
+      )
+      expect(await storedIntent(ctx, path)).toBeNull()
+      expect(committedKeys(server)).toEqual([
+        blocked!.intent.idempotencyKey,
+        blocked!.intent.idempotencyKey,
+      ])
+    })
+
+    it.each(['member_deactivated', 'organization_suspended'] as const)(
+      'the org/member active again lifts a %s block',
+      async (code) => {
+        const server = fakeServer({ bytes: enc('v3') })
+        const ctx = setup(server)
+        const path = await blockedSave(ctx, server, { route: 'commit', kind: 403, code })
+        const blocked = await storedIntent(ctx, path)
+        expect(blocked?.intent).toMatchObject({ state: 'blocked', lastError: code })
+        await ctx.service.pollSaveQueue()
+        await vi.waitFor(async () =>
+          expect(await ctx.service.docStatus(path)).toMatchObject({ state: 'saved' }),
+        )
+        expect(await storedIntent(ctx, path)).toBeNull()
+        expect(committedKeys(server)).toEqual([
+          blocked!.intent.idempotencyKey,
+          blocked!.intent.idempotencyKey,
+        ])
+      },
+    )
+
+    it('the document answering for writing again lifts a permission_revoked block', async () => {
+      const server = fakeServer({ bytes: enc('v3') })
+      const ctx = setup(server)
+      const path = await blockedSave(ctx, server, { route: 'commit', kind: 403, code: 'forbidden' })
+      const blocked = await storedIntent(ctx, path)
+      expect(blocked?.intent).toMatchObject({ state: 'blocked', lastError: 'permission_revoked' })
+      expect(ctx.service.isReadOnly(path)).toBe(true)
+      // the access check still reports view-only: the block stands and no
+      // request is sent (only the metadata read the probe makes)
+      server.state.myLevel = 'view'
+      const attempts = commits(server).length
+      await ctx.service.pollSaveQueue()
+      expect((await storedIntent(ctx, path))?.intent.state).toBe('blocked')
+      expect(commits(server)).toHaveLength(attempts)
+      // edit access is back and the probe's wait has passed: the SAME intent
+      // goes back to the queue, commits, and its read-only lock is spent
+      server.state.myLevel = 'edit'
+      ctx.advanceClock(60_000)
+      await ctx.service.pollSaveQueue()
+      await vi.waitFor(async () =>
+        expect(await ctx.service.docStatus(path)).toMatchObject({ state: 'saved' }),
+      )
+      expect(await storedIntent(ctx, path)).toBeNull()
+      expect(ctx.service.isReadOnly(path)).toBe(false)
+      expect(committedKeys(server)).toEqual([
+        blocked!.intent.idempotencyKey,
+        blocked!.intent.idempotencyKey,
+      ])
+    })
+
+    it('a restored document lifts a document_deleted block; an archived one keeps it', async () => {
+      const server = fakeServer({ bytes: enc('v3') })
+      const ctx = setup(server)
+      const path = await blockedSave(ctx, server, {
+        route: 'commit',
+        kind: 410,
+        code: 'document_deleted',
+      })
+      const blocked = await storedIntent(ctx, path)
+      expect(blocked?.intent).toMatchObject({ state: 'blocked', lastError: 'document_deleted' })
+      // still in the trash, and not the capability's to lift: a fresh capability
+      // answer leaves the block exactly where it is
+      server.state.archivedAt = '2026-10-01T00:00:00.000Z'
+      const attempts = commits(server).length
+      await ctx.service.pollSaveQueue()
+      expect((await storedIntent(ctx, path))?.intent.state).toBe('blocked')
+      expect(commits(server)).toHaveLength(attempts)
+      // restored: the SAME intent goes back to the queue and commits
+      server.state.archivedAt = null
+      ctx.advanceClock(60_000)
+      await ctx.service.pollSaveQueue()
+      await vi.waitFor(async () =>
+        expect(await ctx.service.docStatus(path)).toMatchObject({ state: 'saved' }),
+      )
+      expect(await storedIntent(ctx, path)).toBeNull()
+      expect(committedKeys(server)).toEqual([
+        blocked!.intent.idempotencyKey,
+        blocked!.intent.idempotencyKey,
+      ])
+    })
+
+    it('a 403 document_archived parks the intent as a document_deleted block, never a failure', async () => {
+      const server = fakeServer({ bytes: enc('v3') })
+      const ctx = setup(server)
+      const path = await blockedSave(ctx, server, {
+        route: 'commit',
+        kind: 403,
+        code: 'document_archived',
+      })
+      const blocked = await storedIntent(ctx, path)
+      expect(blocked?.intent).toMatchObject({ state: 'blocked', lastError: 'document_deleted' })
+      // the archive is lifted: the block lifts and the same intent commits
+      await ctx.service.pollSaveQueue()
+      await vi.waitFor(async () =>
+        expect(await ctx.service.docStatus(path)).toMatchObject({ state: 'saved' }),
+      )
+      expect(await storedIntent(ctx, path)).toBeNull()
+      expect(committedKeys(server)).toEqual([
+        blocked!.intent.idempotencyKey,
+        blocked!.intent.idempotencyKey,
+      ])
+    })
+
+    it("never lifts a block of another account's intent", async () => {
+      const server = fakeServer({ bytes: enc('v3') })
+      const ctx = setup(server)
+      const path = await blockedSave(ctx, server, { route: 'commit', kind: 401 })
+      expect((await storedIntent(ctx, path, 'acc_1'))?.intent.state).toBe('blocked')
+      // account A signs out and B signs in on the same machine: B's pass never
+      // touches A's record, and no request is sent for it
+      ctx.signOut()
+      await ctx.service.teardownSaveQueue()
+      ctx.signInAs('acc_2')
+      const before = commits(server).length
+      await ctx.service.pollSaveQueue()
+      expect((await storedIntent(ctx, path, 'acc_1'))?.intent).toMatchObject({
+        state: 'blocked',
+        lastError: 'session_expired',
+      })
+      expect(commits(server)).toHaveLength(before)
+    })
   })
 
   it('G506-be-1: an inline 409 conflict leaves the record non-dispatchable (poll sends nothing)', async () => {
