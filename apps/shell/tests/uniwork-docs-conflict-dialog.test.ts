@@ -49,8 +49,20 @@ interface Call {
   body?: unknown
 }
 
+const COPY = '01J8X4CPY0N1P2Q3R4S5T6U7'
+const FOLDER = '01J8X4FLD0N1P2Q3R4S5T6U7'
+
 type Fault = {
-  route: 'upload' | 'commit' | 'lookup' | 'detail' | 'download'
+  route:
+    | 'upload'
+    | 'commit'
+    | 'lookup'
+    | 'detail'
+    | 'download'
+    | 'copy'
+    | 'copyUpload'
+    | 'copyCommit'
+    | 'archive'
   kind: 'network' | number
   code?: string
   fields?: Record<string, unknown>
@@ -66,6 +78,16 @@ function fakeServer(
     myLevel: initial.myLevel ?? 'edit',
     title: initial.title ?? 'Q4 plan.docx',
     updatedAt: '2026-10-10T10:00:00Z',
+    // G5-12: the source's parent folder (null = root) and the copy the fake made, if any
+    parentId: null as string | null,
+    copy: null as null | {
+      title: string
+      parentId: string | null
+      revision: number
+      bytes: Uint8Array | null
+      archived: boolean
+      staged: Map<string, Uint8Array>
+    },
   }
   const calls: Call[] = []
   const faults: Fault[] = []
@@ -79,6 +101,7 @@ function fakeServer(
     workspace_id: 'ws_1',
     title: state.title,
     kind: 'file',
+    parent_id: state.parentId,
     revision: String(state.revision),
     current_version: state.version,
     my_level: state.myLevel,
@@ -91,6 +114,27 @@ function fakeServer(
       mime_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       size_bytes: state.bytes.byteLength,
       checksum_sha256: hex(state.bytes),
+    },
+  })
+  const copyJson = () => ({
+    id: COPY,
+    organization_id: 'org_a',
+    workspace_id: 'ws_1',
+    title: state.copy!.title,
+    kind: 'file',
+    parent_id: state.copy!.parentId,
+    revision: String(state.copy!.revision),
+    current_version: state.copy!.revision,
+    my_level: 'edit',
+    updated_at: state.updatedAt,
+    file: {
+      file_id: 'fc',
+      version_id: `cv${state.copy!.revision}`,
+      version: state.copy!.revision,
+      filename: state.copy!.title,
+      mime_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      size_bytes: state.copy!.bytes?.byteLength ?? 0,
+      checksum_sha256: hex(state.copy!.bytes ?? new Uint8Array()),
     },
   })
   const json = (status: number, body: unknown) =>
@@ -177,6 +221,70 @@ function fakeServer(
       }
       return json(200, result)
     }
+    if (u.pathname === `/api/v1/documents/${DOC}/copies` && init.method === 'POST') {
+      const body = JSON.parse(String(init.body)) as { title: string; parent_id?: string | null }
+      calls.at(-1)!.body = body
+      const fault = take('copy')
+      if (fault?.kind === 'network') throw new TypeError('fetch failed')
+      if (typeof fault?.kind === 'number') return error(fault.kind, fault.code ?? 'x', fault.fields)
+      // the copy starts as the source's head bytes (version 1, revision 1)
+      state.copy = {
+        title: body.title,
+        parentId: body.parent_id ?? null,
+        revision: 1,
+        bytes: state.bytes,
+        archived: false,
+        staged: new Map(),
+      }
+      return json(201, { document: copyJson() })
+    }
+    if (u.pathname === `/api/v1/documents/${COPY}/uploads`) {
+      const file = (init.body as FormData).get('file') as Blob
+      const bytes = new Uint8Array(await file.arrayBuffer())
+      const fault = take('copyUpload')
+      if (fault?.kind === 'network') throw new TypeError('fetch failed')
+      if (typeof fault?.kind === 'number') return error(fault.kind, fault.code ?? 'x', fault.fields)
+      state.copy!.staged.set(`up_copy_${state.copy!.staged.size + 1}`, bytes)
+      const id = `up_copy_${state.copy!.staged.size}`
+      return json(201, {
+        upload_id: id,
+        checksum_sha256: hex(bytes),
+        size_bytes: bytes.byteLength,
+        claim_expires_at: '2026-10-10T00:00:00Z',
+      })
+    }
+    if (u.pathname === `/api/v1/documents/${COPY}/versions/commit`) {
+      const body = JSON.parse(String(init.body)) as { upload_id: string; base_revision: string }
+      calls.at(-1)!.body = body
+      const fault = take('copyCommit')
+      if (fault?.kind === 'network') throw new TypeError('fetch failed')
+      if (typeof fault?.kind === 'number') return error(fault.kind, fault.code ?? 'x', fault.fields)
+      const copy = state.copy!
+      if (body.base_revision !== String(copy.revision))
+        return error(409, 'document_version_conflict')
+      const bytes = copy.staged.get(body.upload_id)
+      if (!bytes) return error(409, 'document_upload_invalid')
+      copy.revision += 1
+      copy.bytes = bytes
+      return json(200, {
+        document: copyJson(),
+        version: {
+          id: 'ver_copy_2',
+          document_id: COPY,
+          version: 2,
+          kind: 'file',
+          checksum_sha256: hex(bytes),
+          size_bytes: bytes.byteLength,
+        },
+      })
+    }
+    if (u.pathname === `/api/v1/documents/${COPY}/archive` && init.method === 'POST') {
+      const fault = take('archive')
+      if (fault?.kind === 'network') throw new TypeError('fetch failed')
+      if (typeof fault?.kind === 'number') return error(fault.kind, fault.code ?? 'x', fault.fields)
+      state.copy!.archived = true
+      return json(200, { document: { ...copyJson(), archived_at: '2026-10-10T10:05:00Z' } })
+    }
     return error(404, 'not_found')
   })
 
@@ -199,6 +307,7 @@ function setup(
     keystoreLocked?: boolean
     aiRunning?: boolean
     editorDirty?: boolean
+    lang?: string
   } = {},
 ) {
   const statuses: UniworkDocStatus[] = []
@@ -250,6 +359,7 @@ function setup(
     reloadPath: vi.fn(),
     editorStateOf: vi.fn(async () => ({ dirty: editorDirty, aiRunning, aiEpoch: 0 })),
     activePath: () => undefined,
+    lang: () => opts.lang ?? 'en',
     ui,
     pushStatus: (s: UniworkDocStatus) => statuses.push(s),
     pushConflict: (v: UniworkConflictView) => views.push(v),
@@ -424,12 +534,12 @@ describe('G5-09 desktop conflict dialog S5 session (main)', () => {
     expect(await storedIntent(ctx, path)).toBeNull()
   })
 
-  it('AC5: lost edit (!canEdit) refuses overwrite and save-copy; save-copy when canEdit replies save_copy_failed (pending G5-12)', async () => {
+  it('AC5: lost edit (!canEdit) refuses overwrite and save-copy (no copy is created); save-copy when canEdit runs the G5-12 flow', async () => {
     const server = fakeServer()
     const ctx = setup(server)
     const path = await openAndConflict(ctx, server)
 
-    // First verify save-copy when canEdit=true returns view with save_copy_failed
+    // First verify save-copy when canEdit=true creates the copy (G5-12)
     const firstResolve = ctx.service.resolveConflict(path)
     await vi.waitFor(() => expect(ctx.views).toHaveLength(1))
     const v1 = ctx.views[0]!
@@ -439,10 +549,11 @@ describe('G5-09 desktop conflict dialog S5 session (main)', () => {
     })
     expect(copyReply).toMatchObject({
       kind: 'view',
-      view: { notice: 'save_copy_failed' },
+      view: { notice: 'save_copy_done' },
     })
     await ctx.service.conflictAct(v1.sessionId, { kind: 'cancel' })
     await firstResolve
+    const copiesBefore = server.calls.filter((c) => c.path.endsWith('/copies')).length
 
     // Now downgrade server ACL to view
     server.state.myLevel = 'view'
@@ -467,6 +578,7 @@ describe('G5-09 desktop conflict dialog S5 session (main)', () => {
       kind: 'view',
       view: { canEdit: false, notice: null },
     })
+    expect(server.calls.filter((c) => c.path.endsWith('/copies'))).toHaveLength(copiesBefore)
     await ctx.service.conflictAct(v2.sessionId, { kind: 'cancel' })
     await secondResolve
   })
@@ -1160,5 +1272,287 @@ describe('G5-09 desktop conflict dialog S5 session (main)', () => {
       expect(ctx.deps.reloadPath).not.toHaveBeenCalled()
       expect(await keptDrafts(ctx, path)).toHaveLength(1)
     })
+  })
+})
+
+describe('G5-12 Save as a copy (main)', () => {
+  async function openDialog(ctx: ReturnType<typeof setup>, path: string) {
+    const flow = ctx.service.resolveConflict(path)
+    await vi.waitFor(() => expect(ctx.views).toHaveLength(1))
+    return { flow, view: ctx.views[0]! }
+  }
+  const callsTo = (server: ReturnType<typeof fakeServer>, suffix: string) =>
+    server.calls.filter((c) => c.path.endsWith(suffix))
+
+  it('AC1: creates the copy with the source parent + a per-action key, commits the LOCAL bytes as version 2 of the copy, and leaves the source, its intent and the dialog alone', async () => {
+    const server = fakeServer()
+    server.state.parentId = FOLDER
+    const ctx = setup(server)
+    const path = await openAndConflict(ctx, server)
+    const intentBefore = await storedIntent(ctx, path)
+    expect(intentBefore).not.toBeNull()
+    const { flow, view } = await openDialog(ctx, path)
+    // the source's own sub-routes (uploads, commit, ...): the copy request is the one allowed call
+    const sourceCalls = () =>
+      server.calls.filter(
+        (c) => c.path.includes(`/documents/${DOC}/`) && !c.path.endsWith('/copies'),
+      )
+    const sourceCallsBefore = sourceCalls()
+
+    const reply = await ctx.service.conflictAct(view.sessionId, {
+      kind: 'save-copy',
+      stopAi: false,
+    })
+
+    expect(reply).toMatchObject({
+      kind: 'view',
+      view: { notice: 'save_copy_done', noticeArg: 'Q4 plan (my version).docx', canEdit: true },
+    })
+    const [copy] = callsTo(server, '/copies')
+    expect(copy).toMatchObject({ method: 'POST', body: { consent: 'copy', parent_id: FOLDER } })
+    expect(copy!.body).toMatchObject({ title: 'Q4 plan (my version).docx' })
+    expect(copy!.headers['idempotency-key']).toBeTruthy()
+    // the copy's version 2 carries the local bytes, based on the copy's version 1
+    expect(new TextDecoder().decode(server.state.copy!.bytes!)).toBe('mine v4')
+    expect(callsTo(server, `${COPY}/versions/commit`)[0]!.body).toMatchObject({
+      base_revision: '1',
+    })
+    // the source document: no upload, no commit, still in conflict, same intent, same local file
+    expect(sourceCalls()).toEqual(sourceCallsBefore)
+    expect(binding(path)).toMatchObject({ state: 'conflict', documentId: DOC })
+    expect(await storedIntent(ctx, path)).toEqual(intentBefore)
+    expect(readFileSync(path, 'utf8')).toBe('mine v4')
+    expect(ctx.deps.reloadPath).not.toHaveBeenCalled()
+    // the dialog stays open: nothing closed it
+    expect(ctx.closedSessions).toEqual([])
+    await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
+    expect(await flow).toMatchObject({ state: 'conflict' })
+  })
+
+  it('AC1: a source at the root sends no parent_id; the title follows the app language (vi)', async () => {
+    const server = fakeServer({ bytes: enc('v3'), title: 'Kế hoạch' })
+    const ctx = setup(server, { lang: 'vi' })
+    const path = await openAndConflict(ctx, server)
+    const { view } = await openDialog(ctx, path)
+
+    const reply = await ctx.service.conflictAct(view.sessionId, {
+      kind: 'save-copy',
+      stopAi: false,
+    })
+
+    expect(reply).toMatchObject({
+      kind: 'view',
+      view: { notice: 'save_copy_done', noticeArg: 'Kế hoạch (bản của tôi)' },
+    })
+    expect((callsTo(server, '/copies')[0]!.body as Record<string, unknown>).parent_id).toBeFalsy()
+    await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
+  })
+
+  it('AC1: a dirty module is flushed first (no upload of the source), and the flushed bytes are what the copy gets', async () => {
+    const server = fakeServer()
+    const ctx = setup(server, { editorDirty: true })
+    const path = await openAndConflict(ctx, server)
+    const { view } = await openDialog(ctx, path)
+    vi.mocked(ctx.deps.requestModuleSave).mockImplementation((targetPath: string) => {
+      setTimeout(() => {
+        writeFileSync(targetPath, 'mine v4 + unsaved keystrokes')
+        ctx.setEditorDirty(false)
+        ctx.service.onUserSave(targetPath)
+      }, 10)
+      return true
+    })
+    const uploadsBefore = callsTo(server, `${DOC}/uploads`).length
+
+    const reply = await ctx.service.conflictAct(view.sessionId, {
+      kind: 'save-copy',
+      stopAi: false,
+    })
+
+    expect(reply).toMatchObject({ kind: 'view', view: { notice: 'save_copy_done' } })
+    expect(new TextDecoder().decode(server.state.copy!.bytes!)).toBe('mine v4 + unsaved keystrokes')
+    expect(callsTo(server, `${DOC}/uploads`)).toHaveLength(uploadsBefore)
+    await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
+  })
+
+  it('AC1: stopAi stops the AI turn first', async () => {
+    const server = fakeServer()
+    const ctx = setup(server, { aiRunning: true })
+    const path = await openAndConflict(ctx, server)
+    const { view } = await openDialog(ctx, path)
+    expect(view.aiRunning).toBe(true)
+
+    await ctx.service.conflictAct(view.sessionId, { kind: 'save-copy', stopAi: true })
+
+    expect(ctx.stopAiRun).toHaveBeenCalledWith(path)
+    await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
+  })
+
+  it('AC1: OS-illegal characters in the title become _ and the name keeps its extension', async () => {
+    const server = fakeServer({ bytes: enc('v3'), title: 'a:b*c?"d<e>f|g\\h/i.docx' })
+    const ctx = setup(server)
+    const path = await openAndConflict(ctx, server)
+    const { view } = await openDialog(ctx, path)
+
+    await ctx.service.conflictAct(view.sessionId, { kind: 'save-copy', stopAi: false })
+
+    expect((callsTo(server, '/copies')[0]!.body as { title: string }).title).toBe(
+      'a_b_c__d_e_f_g_h_i (my version).docx',
+    )
+    await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
+  })
+
+  it('AC4: one failed commit is retried once in the same action and the copy is kept', async () => {
+    const server = fakeServer()
+    server.faults.push({ route: 'copyCommit', kind: 503, code: 'unavailable' })
+    const ctx = setup(server)
+    const path = await openAndConflict(ctx, server)
+    const { view } = await openDialog(ctx, path)
+
+    const reply = await ctx.service.conflictAct(view.sessionId, {
+      kind: 'save-copy',
+      stopAi: false,
+    })
+
+    expect(reply).toMatchObject({ kind: 'view', view: { notice: 'save_copy_done' } })
+    expect(callsTo(server, `${COPY}/versions/commit`)).toHaveLength(2)
+    expect(server.state.copy!.archived).toBe(false)
+    expect(new TextDecoder().decode(server.state.copy!.bytes!)).toBe('mine v4')
+    await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
+  })
+
+  it('AC4: a commit that fails twice archives the copy (never server bytes as "your version"), replies save_copy_failed and leaves the source and its intent untouched', async () => {
+    const server = fakeServer()
+    server.faults.push(
+      { route: 'copyCommit', kind: 503, code: 'unavailable' },
+      { route: 'copyCommit', kind: 503, code: 'unavailable' },
+    )
+    const ctx = setup(server)
+    const path = await openAndConflict(ctx, server)
+    const intentBefore = await storedIntent(ctx, path)
+    const { flow, view } = await openDialog(ctx, path)
+
+    const reply = await ctx.service.conflictAct(view.sessionId, {
+      kind: 'save-copy',
+      stopAi: false,
+    })
+
+    expect(reply).toMatchObject({
+      kind: 'view',
+      view: { notice: 'save_copy_failed', noticeArg: null },
+    })
+    expect(callsTo(server, `${COPY}/archive`)).toHaveLength(1)
+    expect(server.state.copy!.archived).toBe(true)
+    expect(binding(path)).toMatchObject({ state: 'conflict' })
+    expect(await storedIntent(ctx, path)).toEqual(intentBefore)
+    expect(readFileSync(path, 'utf8')).toBe('mine v4')
+    await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
+    expect(await flow).toMatchObject({ state: 'conflict' })
+  })
+
+  it('AC4: a failed upload also archives the copy; when the archive fails too it is logged and the copy is never reported as done', async () => {
+    const server = fakeServer()
+    server.faults.push(
+      { route: 'copyUpload', kind: 'network' },
+      { route: 'copyUpload', kind: 'network' },
+      { route: 'archive', kind: 500, code: 'x' },
+    )
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const ctx = setup(server)
+    const path = await openAndConflict(ctx, server)
+    const { view } = await openDialog(ctx, path)
+
+    const reply = await ctx.service.conflictAct(view.sessionId, {
+      kind: 'save-copy',
+      stopAi: false,
+    })
+
+    expect(reply).toMatchObject({ kind: 'view', view: { notice: 'save_copy_failed' } })
+    expect(callsTo(server, `${COPY}/archive`)).toHaveLength(1)
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining(COPY), expect.anything())
+    warn.mockRestore()
+    await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
+  })
+
+  it('AC4: a refused copy request (step 1) replies save_copy_failed and uploads nothing', async () => {
+    const server = fakeServer()
+    server.faults.push({ route: 'copy', kind: 409, code: 'owner_requires_copy' })
+    const ctx = setup(server)
+    const path = await openAndConflict(ctx, server)
+    const { view } = await openDialog(ctx, path)
+
+    const reply = await ctx.service.conflictAct(view.sessionId, {
+      kind: 'save-copy',
+      stopAi: false,
+    })
+
+    expect(reply).toMatchObject({ kind: 'view', view: { notice: 'save_copy_failed' } })
+    expect(callsTo(server, `${COPY}/uploads`)).toHaveLength(0)
+    expect(callsTo(server, `${COPY}/archive`)).toHaveLength(0)
+    await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
+  })
+
+  it('AC4: a 403 from the copy route (not a member of the source workspace) replies save_copy_failed without locking the dialog', async () => {
+    const server = fakeServer()
+    server.faults.push({ route: 'copy', kind: 403, code: 'forbidden' })
+    const ctx = setup(server)
+    const path = await openAndConflict(ctx, server)
+    const { view } = await openDialog(ctx, path)
+
+    const reply = await ctx.service.conflictAct(view.sessionId, {
+      kind: 'save-copy',
+      stopAi: false,
+    })
+
+    expect(reply).toMatchObject({
+      kind: 'view',
+      view: { notice: 'save_copy_failed', locked: 'none', canEdit: true },
+    })
+    expect(callsTo(server, `${COPY}/archive`)).toHaveLength(0)
+    await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
+  })
+
+  it('AC3: offline refuses the action before any request (no copy is created)', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const path = await openAndConflict(ctx, server)
+    const { view } = await openDialog(ctx, path)
+    ctx.setCapabilityOffline(true)
+
+    const reply = await ctx.service.conflictAct(view.sessionId, {
+      kind: 'save-copy',
+      stopAi: false,
+    })
+
+    expect(reply).toMatchObject({ kind: 'view', view: { online: false } })
+    expect((reply as { view: UniworkConflictView }).view.notice).toBeNull()
+    expect(callsTo(server, '/copies')).toHaveLength(0)
+    await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
+  })
+
+  it('abort-safety: the dialog closed while the copy exists archives it, logs it and shows no notice', async () => {
+    const server = fakeServer()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const ctx = setup(server)
+    const path = await openAndConflict(ctx, server)
+    const { flow, view } = await openDialog(ctx, path)
+    const origFetch = server.fetch.getMockImplementation()!
+    server.fetch.mockImplementation(async (url: string, init: RequestInit) => {
+      const response = await origFetch(url, init)
+      // "Decide later" lands right after the copy was created
+      if (new URL(url).pathname.endsWith('/copies')) ctx.service.closeConflictPrompt()
+      return response
+    })
+
+    const reply = await ctx.service.conflictAct(view.sessionId, {
+      kind: 'save-copy',
+      stopAi: false,
+    })
+
+    expect(reply).toEqual({ kind: 'closed' })
+    expect(await flow).toMatchObject({ state: 'conflict' })
+    expect(callsTo(server, `${COPY}/archive`)).toHaveLength(1)
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining(COPY))
+    expect(binding(path)).toMatchObject({ state: 'conflict' })
+    warn.mockRestore()
   })
 })

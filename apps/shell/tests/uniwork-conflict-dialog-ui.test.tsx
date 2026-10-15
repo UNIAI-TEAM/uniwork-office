@@ -634,6 +634,56 @@ describe('UniworkConflictDialog UI (G5-09 S5 desktop)', () => {
     expect(document.activeElement).toBe(document.getElementById('opener-trigger'))
   })
 
+  it('G5-12 AC3: with an AI turn running, Save as a copy asks to stop it first and sends save-copy with stopAi: true', async () => {
+    await act(async () => {
+      pushConflict?.(makeView({ aiRunning: true }))
+    })
+    const dialog = document.querySelector('[role="alertdialog"]') as HTMLElement
+    await act(async () => {
+      ;(dialog.querySelector('[data-conflict-action="save-copy"]') as HTMLButtonElement).click()
+    })
+    expect(dialog.textContent).toContain(en.uwRemoteStopAiConfirm)
+    expect(dialog.querySelector('[data-conflict-action="save-copy-go"]')).toBeNull()
+    await act(async () => {
+      ;(dialog.querySelector('[data-conflict-action="stop-ai-go"]') as HTMLButtonElement).click()
+    })
+    nextReply = { kind: 'view', view: makeView({ aiRunning: false }) }
+    await act(async () => {
+      ;(dialog.querySelector('[data-conflict-action="save-copy-go"]') as HTMLButtonElement).click()
+    })
+    expect(actCalls).toEqual([
+      { sessionId: 'sess-ui-1', action: { kind: 'save-copy', stopAi: true } },
+    ])
+  })
+
+  it('G5-12 AC1: a save_copy_done reply returns to step 1 with the copy title in the alert and keeps Reload / Overwrite available', async () => {
+    await act(async () => {
+      pushConflict?.(makeView())
+    })
+    const dialog = document.querySelector('[role="alertdialog"]') as HTMLElement
+    await act(async () => {
+      ;(dialog.querySelector('[data-conflict-action="save-copy"]') as HTMLButtonElement).click()
+    })
+    nextReply = {
+      kind: 'view',
+      view: makeView({ notice: 'save_copy_done', noticeArg: 'Contract (my version).docx' }),
+    }
+    await act(async () => {
+      ;(dialog.querySelector('[data-conflict-action="save-copy-go"]') as HTMLButtonElement).click()
+    })
+    expect(actCalls).toEqual([
+      { sessionId: 'sess-ui-1', action: { kind: 'save-copy', stopAi: false } },
+    ])
+    expect(dialog.querySelector('[data-conflict-action="save-copy-go"]')).toBeNull()
+    const alertEl = dialog.querySelector('[role="alert"]') as HTMLElement
+    expect(alertEl.textContent).toContain('Contract (my version).docx')
+    expect(alertEl.className).toContain('uw-conflict-alert--ok')
+    for (const id of ['reload', 'overwrite', 'save-copy']) {
+      const btn = dialog.querySelector(`[data-conflict-action="${id}"]`) as HTMLButtonElement
+      expect(btn.getAttribute('aria-disabled')).not.toBe('true')
+    }
+  })
+
   it('FE-02: onUniworkConflictClosed ignores other sessionIds, clears view + removes inert + restores focus on matching sessionId, and unsubscribes on unmount', async () => {
     expect(pushConflictClosed).toBeTypeOf('function')
 
