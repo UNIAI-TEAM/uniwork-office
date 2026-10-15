@@ -345,8 +345,8 @@ export function uniworkAiBinding(
   return { documentId: doc.binding.documentId, orgId: doc.binding.orgId }
 }
 
-/** encrypted bytes the account's sync store (intents, cursors, index) may keep */
-export const SYNC_STORE_BUDGET_BYTES = 256 * 1024 * 1024
+/** encrypted bytes the account's sync store (queue + drafts, not the offline library) may keep: 1 GiB (OQ-UX2) */
+export const SYNC_STORE_BUDGET_BYTES = 1024 * 1024 * 1024
 
 /**
  * The durable sync store of the session. One key provider (keys wrapped by
