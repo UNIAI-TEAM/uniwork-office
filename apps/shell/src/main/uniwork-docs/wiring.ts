@@ -816,9 +816,8 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
       stopFeed()
       let captureFailed = 0
       try {
-        const res = await service.lockSession(owner, () =>
-          push(UNIWORK_DOC_CHANNELS.signOutProgress, { phase: 'waiting' }),
-        )
+        // the service itself pushes the one `waiting` through pushSignOutProgress
+        const res = await service.lockSession(owner)
         captureFailed = res.captureFailed.length
         return res.ok
       } finally {

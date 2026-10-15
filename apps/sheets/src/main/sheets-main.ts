@@ -171,7 +171,11 @@ import { atomicWriteFile } from './atomic-write'
 import { closeGuardDecision, ShutdownLatch } from './close-guard'
 import { SaveEditsTransferStore } from './save-edits-transfer'
 import { exportPdf, printWorkbook } from './pdf-export'
-import { allowsAutomaticWorkbookRecovery } from './recovery-policy'
+import {
+  allowsAutomaticWorkbookRecovery,
+  clearRecoveryFile,
+  writeRecoveryFile,
+} from './recovery-policy'
 import {
   setSystemShortDate,
   shortDatePatternForSystemLocale,
@@ -1929,11 +1933,7 @@ export function recoveryCopyMtime(filePath: string): number | null {
 }
 
 export function clearWorkbookRecovery(filePath: string): void {
-  try {
-    unlinkSync(recoveryPathFor(filePath))
-  } catch {
-    /* nothing to clean */
-  }
+  clearRecoveryFile(filePath, recoveryPathFor(filePath))
 }
 
 // An unsaved new workbook has no file for pendingRecoveryFor to compare
@@ -3546,8 +3546,11 @@ export function registerSheetsIpc(): void {
         ? (session.restoreTarget ?? session.path)
         : session.path
     try {
-      await mkdir(recoveryDir(), { recursive: true })
-      await writeWorkbookTo(entry.client, session, request, recoveryPathFor(recoveryKey))
+      const target = recoveryPathFor(recoveryKey)
+      const kept = await writeRecoveryFile(recoveryKey, target, () =>
+        writeWorkbookTo(entry.client, session, request, target),
+      )
+      if (!kept) return { ok: false }
       if (session.unsavedNew) rememberUnsavedNewRecovery(recoveryKey)
       return { ok: true }
     } catch (error) {

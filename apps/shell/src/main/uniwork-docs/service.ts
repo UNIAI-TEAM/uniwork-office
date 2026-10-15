@@ -1768,7 +1768,7 @@ export class UniworkDocsService {
    *    (skipped when `keystoreLocked`).
    * 3. Close every open view of `owner`'s working copies with no prompt, forget AI
    *    history and locks.
-   * 4. Delete the plaintext working copies and docs/sheets recovery copies of
+   * 4. Delete the plaintext working copies and docs/sheets/slides recovery copies of
    *    `owner`, and its archived docs originals, only for docs whose step 2
    *    capture/park succeeded (or after the keystore confirmation); a doc whose
    *    capture never landed keeps its folder and is reported in `captureFailed`.
@@ -1823,9 +1823,7 @@ export class UniworkDocsService {
       }
     }
 
-    let announcedWaiting = false
     if (savingPromises.length > 0 || hasInFlightRecord) {
-      announcedWaiting = true
       onWaiting?.()
       this.deps.pushSignOutProgress?.({ phase: 'waiting' })
       if (savingPromises.length > 0) {
@@ -2051,7 +2049,7 @@ export class UniworkDocsService {
     }
 
     // Step 4: delete the plaintext working copies whose bytes were captured or
-    // parked, and every docs/sheets recovery copy of the owner's paths. Only a
+    // parked, and every docs/sheets/slides recovery copy of the owner's paths. Only a
     // dir whose park was refused (parkFailedDirs) or declares a newer store stays.
     const keptDirs = new Set<string>()
     const deletedPaths = new Set<string>()
@@ -2126,12 +2124,8 @@ export class UniworkDocsService {
     this.syncOpen = null
     this.storeOpenKind = 'unknown'
     const captureFailed = [...captureFailedKeys]
-    if (announcedWaiting) {
-      this.deps.pushSignOutProgress?.({
-        phase: 'done',
-        ...(captureFailed.length > 0 ? { captureFailed: captureFailed.length } : {}),
-      })
-    }
+    // The single `done` of a sign-out is pushed by the caller's finally (the
+    // wiring's lockStore), so it also fires when this method throws.
 
     return {
       ok: parkFailedDirs.size === 0,
@@ -2205,32 +2199,19 @@ export class UniworkDocsService {
    * newer than `diskMtimeMs` (or when the disk file is missing).
    */
   private findNewestRecoveryBytes(filePath: string, diskMtimeMs: number | null): Uint8Array | null {
-    const docsDir = join(this.deps.userDataDir, 'docs-autosave')
-    const sheetsDir = join(this.deps.userDataDir, 'sheets-autosave')
-    const spellings = new Set([
-      filePath,
-      resolve(filePath),
-      pathKey(filePath),
-      pathKey(resolve(filePath)),
-    ])
     let bestBytes: Uint8Array | null = null
+    // d2-3: with no disk file every candidate competes on mtime alone
     let bestMtime = diskMtimeMs ?? -Infinity
-    for (const spelling of spellings) {
-      const shortHash = createHash('sha1').update(spelling).digest('hex').slice(0, 16)
-      for (const target of [
-        join(docsDir, `${shortHash}.docx`),
-        join(sheetsDir, `${shortHash}.xlsx`),
-      ]) {
-        try {
-          if (!existsSync(target)) continue
-          const st = statSync(target)
-          if (diskMtimeMs === null || st.mtimeMs > bestMtime) {
-            bestBytes = new Uint8Array(readFileSync(target))
-            bestMtime = st.mtimeMs
-          }
-        } catch {
-          // ignore unreadable recovery copy
+    for (const target of this.recoveryCopyPaths(filePath)) {
+      try {
+        if (!existsSync(target)) continue
+        const st = statSync(target)
+        if (st.mtimeMs > bestMtime) {
+          bestBytes = new Uint8Array(readFileSync(target))
+          bestMtime = st.mtimeMs
         }
+      } catch {
+        // ignore unreadable recovery copy
       }
     }
     return bestBytes
@@ -2239,11 +2220,38 @@ export class UniworkDocsService {
   /**
    * G5-11 be-6: the crash-recovery copies of one working copy. The modules name
    * them `sha1(<the path they were given>).slice(0, 16)` with their own
-   * extension (`docs-autosave/*.docx`, `sheets-autosave/*.xlsx`), so only those
-   * two spellings exist. The path is hashed as given, as resolved, and through
-   * the shared `pathKey` normalizer, so a separator or drive-letter spelling
-   * difference does not leave a copy behind. The registered module clearer is
-   * the load-bearing path (it also bumps the stale-recovery epoch).
+   * extension (`docs-autosave/*.docx`, `sheets-autosave/*.xlsx`, and d2-1
+   * `slides-autosave/*.pptx`, which a build before the slides bound-path gate
+   * still wrote). The path is hashed as given, as resolved, and through the
+   * shared `pathKey` normalizer, so a separator or drive-letter spelling
+   * difference does not leave a copy behind.
+   */
+  private recoveryCopyPaths(filePath: string): string[] {
+    const dirs: Array<[string, string]> = [
+      ['docs-autosave', 'docx'],
+      ['sheets-autosave', 'xlsx'],
+      ['slides-autosave', 'pptx'],
+    ]
+    const spellings = new Set([
+      filePath,
+      resolve(filePath),
+      pathKey(filePath),
+      pathKey(resolve(filePath)),
+    ])
+    const out: string[] = []
+    for (const spelling of spellings) {
+      const shortHash = createHash('sha1').update(spelling).digest('hex').slice(0, 16)
+      for (const [sub, ext] of dirs) {
+        out.push(join(this.deps.userDataDir, sub, `${shortHash}.${ext}`))
+      }
+    }
+    return out
+  }
+
+  /**
+   * Deletes every crash-recovery copy of one working copy (`recoveryCopyPaths`).
+   * The registered module clearer is the load-bearing path (it also bumps the
+   * stale-recovery epoch).
    */
   private deleteRecoveryCopies(filePath: string): void {
     try {
@@ -2251,25 +2259,11 @@ export class UniworkDocsService {
     } catch {
       // ignore when Electron app path is not initialized in unit tests
     }
-    const docsDir = join(this.deps.userDataDir, 'docs-autosave')
-    const sheetsDir = join(this.deps.userDataDir, 'sheets-autosave')
-    const spellings = new Set([
-      filePath,
-      resolve(filePath),
-      pathKey(filePath),
-      pathKey(resolve(filePath)),
-    ])
-    for (const spelling of spellings) {
-      const shortHash = createHash('sha1').update(spelling).digest('hex').slice(0, 16)
-      for (const target of [
-        join(docsDir, `${shortHash}.docx`),
-        join(sheetsDir, `${shortHash}.xlsx`),
-      ]) {
-        try {
-          if (existsSync(target)) unlinkSync(target)
-        } catch {
-          // ignore
-        }
+    for (const target of this.recoveryCopyPaths(filePath)) {
+      try {
+        if (existsSync(target)) unlinkSync(target)
+      } catch {
+        // ignore
       }
     }
   }
@@ -2442,11 +2436,17 @@ export class UniworkDocsService {
       this.recordPathLock(path, 'keystore_locked')
       return true
     }
-    if (
-      !this.deps.identity() &&
-      !this.storeLocked() &&
-      this.store.classify(path).kind === 'bound'
-    ) {
+    if (!this.deps.identity()) {
+      if (!this.storeLocked() && this.store.classify(path).kind === 'bound') {
+        this.recordPathLock(path, 'signed_out')
+        return true
+      }
+      return false
+    }
+    // d2-2: a folder a sign-out kept (park refused, newer store) stays locked
+    // for every other live identity; only its own account reopens it
+    const found = this.store.classify(path)
+    if (found.kind === 'bound' && this.lockedForOtherIdentity(found.doc)) {
       this.recordPathLock(path, 'signed_out')
       return true
     }
@@ -2619,10 +2619,20 @@ export class UniworkDocsService {
 
   private isSignedOutLocked(path: string, doc: BoundDocument): boolean {
     if (this.locks.get(pathKey(path))?.reason === 'signed_out') return true
+    if (this.lockedForOtherIdentity(doc)) return true
     return (
       !this.deps.identity() &&
       !this.storeLocked() &&
       this.lockedScopes.has(`${doc.deploymentId}/${doc.userId}`)
+    )
+  }
+
+  /** d2-2: a signed-out account's copy while a different identity is live */
+  private lockedForOtherIdentity(doc: BoundDocument): boolean {
+    return (
+      !!this.deps.identity() &&
+      this.lockedScopes.has(`${doc.deploymentId}/${doc.userId}`) &&
+      !this.owns(doc)
     )
   }
 

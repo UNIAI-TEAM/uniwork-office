@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import {
   existsSync,
   mkdirSync,
@@ -342,18 +343,31 @@ describe('slides:save-as and MCP save UniWork seam', () => {
 })
 
 describe('crash-recovery copy', () => {
-  it('still writes the userData recovery copy of a bound dirty deck, with no hook', async () => {
+  it('a dirty bound deck writes no autosave copy', async () => {
+    const localPath = join(env.dir, `local-${Math.random().toString(36).slice(2)}.pptx`)
+    writeFileSync(localPath, ORIGINAL)
+    const localSession: Session = {
+      path: localPath,
+      fitWidthPx: FIT,
+      undoStack: [],
+      redoStack: [],
+      opened: await openPptx(await createBlankPptx()),
+      metaDirty: true,
+    }
     bindPolicy({ bound: [deckPath] })
     session.metaDirty = true
+    sessions.set(WC + 1, localSession)
     vi.advanceTimersByTime(30_000)
     const dir = join(env.dir, 'slides-autosave')
-    let copies: string[] = []
-    for (let i = 0; i < 100 && copies.length === 0; i++) {
+    const localCopy = `${createHash('sha1').update(localPath).digest('hex').slice(0, 16)}.pptx`
+    const boundCopy = `${createHash('sha1').update(deckPath).digest('hex').slice(0, 16)}.pptx`
+    for (let i = 0; i < 100; i++) {
       await new Promise((r) => setTimeout(r, 50))
-      copies = existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith('.pptx')) : []
-      if (copies.length && statSync(join(dir, copies[0]!)).size === 0) copies = []
+      if (existsSync(join(dir, localCopy)) && statSync(join(dir, localCopy)).size > 0) break
     }
-    expect(copies.length).toBe(1)
+    const copies = existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith('.pptx')) : []
+    expect(copies).toEqual([localCopy])
+    expect(existsSync(join(dir, boundCopy))).toBe(false)
     expect(readFileSync(deckPath, 'utf8')).toBe(ORIGINAL)
     expect(hook).not.toHaveBeenCalled()
   })
