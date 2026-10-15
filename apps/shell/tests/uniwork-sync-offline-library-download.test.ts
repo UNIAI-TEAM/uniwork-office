@@ -559,3 +559,114 @@ describe('R5BE-8 / R5BE-14 downloadStream: a 200 with no readable body never buf
     expect(arrayBuffer).not.toHaveBeenCalled()
   })
 })
+
+describe('R5BE-9 downloadStream: an idle deadline that resets on every chunk (overall ceiling kept)', () => {
+  const ORIGIN_9 = 'https://uniwork.example'
+  const DOC_9 = 'doc_1'
+  const MiB = 1024 * 1024
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+  /**
+   * A 200 whose body yields `count` chunks, `gapMs` apart; `stallAfter` chunks
+   * in, it stops delivering. Like undici, the request's abort errors the body.
+   */
+  function pacedFetch(options: {
+    chunk: Uint8Array
+    count: number
+    gapMs: number
+    stallAfter?: number
+    headers?: Record<string, string>
+  }): FetchLike {
+    return async (_input, init) => {
+      let sent = 0
+      let abort: (() => void) | null = null
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          abort = () => controller.error(new DOMException('aborted', 'AbortError'))
+          init.signal?.addEventListener('abort', () => abort?.(), { once: true })
+        },
+        async pull(controller) {
+          if (options.stallAfter !== undefined && sent >= options.stallAfter) {
+            await new Promise(() => undefined)
+          }
+          if (sent >= options.count) {
+            controller.close()
+            return
+          }
+          await sleep(options.gapMs)
+          sent += 1
+          controller.enqueue(options.chunk)
+        },
+      })
+      return new Response(body, { status: 200, headers: options.headers ?? {} })
+    }
+  }
+
+  const client9 = (fetch: FetchLike, extra: { streamCeilingMs?: number } = {}) =>
+    createUniworkDocsClient({
+      apiOrigin: ORIGIN_9,
+      authorized: (call) => call('tok'),
+      isSignedIn: () => true,
+      fetch,
+      transferTimeoutMs: 60,
+      ...extra,
+    })
+
+  async function codeOf9(promise: Promise<unknown>): Promise<string> {
+    try {
+      await promise
+    } catch (error) {
+      return error instanceof UniworkDocError ? error.code : `other:${String(error)}`
+    }
+    return 'resolved'
+  }
+
+  it('a 256 MiB body delivered over longer than the old deadline completes', async () => {
+    // 16 chunks x 16 MiB = the 256 MiB cap, 25 ms apart: ~400 ms against a 60 ms deadline
+    const chunk = new Uint8Array(16 * MiB)
+    const fetch = pacedFetch({
+      chunk,
+      count: 16,
+      gapMs: 25,
+      headers: { 'Content-Length': String(256 * MiB) },
+    })
+    const started = Date.now()
+    const result = await client9(fetch).downloadStream(DOC_9, 1)
+    expect(Date.now() - started).toBeGreaterThan(60 * 3)
+    expect(result.bytes.byteLength).toBe(256 * MiB)
+  })
+
+  it('a stalled stream still times out (no chunk for the idle deadline)', async () => {
+    const fetch = pacedFetch({ chunk: new Uint8Array(1024), count: 10, gapMs: 5, stallAfter: 2 })
+    expect(await codeOf9(client9(fetch).downloadStream(DOC_9, 1))).toBe('timeout')
+  })
+
+  it('a stalled stream ends the library download interrupted, nothing ready, no staging left', async () => {
+    const fetch = pacedFetch({ chunk: new Uint8Array(1024), count: 4, gapMs: 5, stallAfter: 1 })
+    const real = client9(fetch)
+    let h: Harness | null = null
+    h = createHarness({
+      docs: () => ({
+        getDocument: (documentId) => h!.docs.getDocument(documentId),
+        downloadStream: (documentId, version, options) =>
+          real.downloadStream(documentId, version, options),
+      }),
+    })
+    addDoc(h, 'doc_1', 1, 4096)
+    const row = rowOf(await pinDoc(h))
+    expect(row).toMatchObject({ state: 'interrupted', readyVersion: null, bytes: 0 })
+    // only the row and the index are on disk: no staging blob
+    expect(h.storeFiles()).toEqual([recordFile('index'), recordFile('pin/doc_1')].sort())
+  })
+
+  it('the overall ceiling still ends a stream that keeps trickling', async () => {
+    const fetch = pacedFetch({ chunk: new Uint8Array(16), count: 1000, gapMs: 10 })
+    const code = await codeOf9(client9(fetch, { streamCeilingMs: 150 }).downloadStream(DOC_9, 1))
+    expect(code).toBe('timeout')
+  })
+
+  it('download() keeps the whole-exchange deadline', async () => {
+    const fetch = pacedFetch({ chunk: new Uint8Array(1024), count: 8, gapMs: 25 })
+    expect(await codeOf9(client9(fetch).download(DOC_9, 1))).toBe('timeout')
+  })
+})
