@@ -17,6 +17,8 @@ import { keyFilePath } from '../apps/shell/src/main/uniwork-sync/keys'
 import { createDraftStore, type KeptDraft } from '../apps/shell/src/main/uniwork-sync/queue/drafts'
 import { recordPath, type StoreRecords } from '../apps/shell/src/main/uniwork-sync/store'
 import { openRecord, readRecordFrame } from '../apps/shell/src/main/uniwork-sync/store/codec'
+// the en shard of the conflict dialog strings (FE-12-03): an alert check follows the copy
+import { en as syncEn } from '../apps/shell/src/renderer/src/i18n/sync/en'
 import {
   closeAndSaveVideo,
   launchShell,
@@ -924,9 +926,7 @@ test.describe.serial('UniWork documents', () => {
         await dialog.getByRole('button', { name: 'Create copy', exact: true }).click()
 
         // the reason is shown, the primary is now Download my version, Back stays
-        await expect(dialog.getByRole('alert')).toContainText(
-          'Couldn’t create the copy because you’re not a member of the workspace this document is in.',
-        )
+        await expect(dialog.getByRole('alert')).toHaveText(syncEn.uwConflictSaveCopyNoSeat)
         await expect(dialog.getByRole('button', { name: 'Create copy', exact: true })).toBeHidden()
         const download = dialog.getByRole('button', { name: 'Download my version', exact: true })
         await expect(download).toBeVisible()
@@ -934,8 +934,8 @@ test.describe.serial('UniWork documents', () => {
         await shell.screenshot({ path: screenshotPath('uniwork-docs-conflict-no-seat') })
 
         await download.click()
-        await expect(dialog.getByRole('alert')).toContainText(
-          'Your version was saved to this computer: picked name.docx.',
+        await expect(dialog.getByRole('alert')).toHaveText(
+          syncEn.uwConflictDownloadDone.replace('{file}', 'picked name.docx'),
         )
         // back on step 1; the picked file holds the LOCAL bytes; the suggestion was the copy name
         await expect(
@@ -978,8 +978,8 @@ test.describe.serial('UniWork documents', () => {
       stub.failNextCommit('after', 2)
       await dialog.getByRole('button', { name: 'Create copy', exact: true }).click()
 
-      await expect(dialog.getByRole('alert')).toContainText(
-        'Your version was saved as a new document: conflict-copy-lost (my version).docx.',
+      await expect(dialog.getByRole('alert')).toHaveText(
+        syncEn.uwConflictSaveCopyDone.replace('{title}', 'conflict-copy-lost (my version).docx'),
       )
       const copies = stub.copiesOf(doc.id)
       expect(copies).toHaveLength(1)
