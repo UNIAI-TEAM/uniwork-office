@@ -117,8 +117,11 @@ export {
   aiUniworkStrings,
   aiUniworkText,
   isUniworkQuestionRefusal,
+  uniworkErrorForChip,
+  uniworkErrorKeyOfText,
   type AiUniworkStringKey,
 } from './strings-ai-uniwork'
+export { AiErrorAction, type AiErrorActionProps } from './AiErrorAction'
 export { ImageViewer, type ImageViewerLabels } from './image-viewer'
 export { trapTab, useModalKeys } from './modal-keys'
 export {
