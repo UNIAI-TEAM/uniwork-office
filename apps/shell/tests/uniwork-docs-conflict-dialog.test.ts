@@ -11,6 +11,7 @@ import type {
 } from '../src/shared/home-api'
 import type { DeploymentProfile } from '../src/main/uniwork-auth/deployment'
 import {
+  CLOSE_SAVE_WAIT_MS,
   UniworkDocsService,
   type ConflictUi,
   type UnsavedCloseChoice,
@@ -932,5 +933,232 @@ describe('G5-09 desktop conflict dialog S5 session (main)', () => {
     expect(ctx.deps.requestModuleSave).not.toHaveBeenCalled()
     expect(readFileSync(path, 'utf8')).toBe('server v4')
     expect(await keptDrafts(ctx, path)).toHaveLength(0)
+  })
+
+  describe('W17: hardened keep-draft flush (BE-401/402/403)', () => {
+    type Internals = {
+      draftFlushWaiters: Map<string, unknown>
+      store: { lookup(path: string): unknown }
+      openConflictSession(doc: unknown, opts: unknown): Promise<unknown>
+      queueEngine(): Promise<{
+        kind: string
+        drafts: { keep: (...args: unknown[]) => Promise<string> }
+      }>
+    }
+    const internals = (ctx: ReturnType<typeof setup>) => ctx.service as unknown as Internals
+    const commits = (server: ReturnType<typeof fakeServer>) =>
+      server.calls.filter((c) => c.path.endsWith('/versions/commit') && c.method === 'POST').length
+
+    /** S6 origin: a bound copy that reads ready (binding not in conflict) with unsaved editor bytes */
+    async function openNewerDirty(
+      ctx: ReturnType<typeof setup>,
+      server: ReturnType<typeof fakeServer>,
+    ) {
+      const opened = await ctx.service.openDocument(DOC)
+      if (!opened.ok) throw new Error(`open failed: ${opened.error}`)
+      const path = opened.value.path
+      server.state.revision = 45
+      server.state.version = 4
+      server.state.bytes = enc('server v4')
+      ctx.setEditorDirty(true)
+      ctx.service.noteEditorDirty(path, true)
+      const flow = internals(ctx).openConflictSession(internals(ctx).store.lookup(path), {
+        remoteNotice: { documentId: DOC, revision: '45', version: 4, versionId: 'v4' },
+      })
+      await vi.waitFor(() => expect(ctx.views).toHaveLength(1))
+      return { path, flow, view: ctx.views[0]! }
+    }
+
+    it('BE-402: the flush times out when the module never answers -> reload_failed, no upload, waiter cleared, a late hook takes the normal path', async () => {
+      const server = fakeServer()
+      const ctx = setup(server)
+      const { path, view } = await openNewerDirty(ctx, server)
+      vi.mocked(ctx.deps.requestModuleSave).mockImplementation(() => true)
+      const before = commits(server)
+
+      // hold back only the flush's own 30 s timer and fire it by hand; every other timer stays real
+      const realSetTimeout = globalThis.setTimeout
+      let fireFlushTimeout: (() => void) | undefined
+      const timers = vi.spyOn(globalThis, 'setTimeout').mockImplementation(((
+        fn: () => void,
+        ms?: number,
+        ...rest: unknown[]
+      ) => {
+        if (ms === CLOSE_SAVE_WAIT_MS) {
+          fireFlushTimeout = fn
+          const inert = realSetTimeout(() => undefined, 60_000)
+          inert.unref()
+          return inert
+        }
+        return realSetTimeout(fn, ms, ...rest)
+      }) as unknown as typeof setTimeout)
+      try {
+        const act = ctx.service.conflictAct(view.sessionId, {
+          kind: 'reload',
+          keep: 'draft',
+          stopAi: false,
+        })
+        await vi.waitFor(() => expect(fireFlushTimeout).toBeDefined())
+        fireFlushTimeout!()
+        expect(await act).toMatchObject({ kind: 'view', view: { notice: 'reload_failed' } })
+      } finally {
+        timers.mockRestore()
+      }
+      expect(internals(ctx).draftFlushWaiters.size).toBe(0)
+      expect(commits(server)).toBe(before)
+      expect(await keptDrafts(ctx, path)).toHaveLength(0)
+      expect(ctx.deps.reloadPath).not.toHaveBeenCalled()
+
+      // the module answers after the refusal: no waiter is left, so this is a normal Save
+      writeFileSync(path, 'late save bytes')
+      ctx.service.onUserSave(path)
+      await vi.waitFor(() => expect(commits(server)).toBe(before + 1))
+    })
+
+    it('BE-402: Cancel while the flush waits -> closed, no draft kept, no reload, waiter cleared', async () => {
+      const server = fakeServer()
+      const ctx = setup(server)
+      const path = await openAndConflict(ctx, server)
+      ctx.setEditorDirty(true)
+      vi.mocked(ctx.deps.requestModuleSave).mockImplementation(() => true)
+
+      const resolvePromise = ctx.service.resolveConflict(path)
+      await vi.waitFor(() => expect(ctx.views).toHaveLength(1))
+      const act = ctx.service.conflictAct(ctx.views[0]!.sessionId, {
+        kind: 'reload',
+        keep: 'draft',
+        stopAi: false,
+      })
+      await vi.waitFor(() => expect(internals(ctx).draftFlushWaiters.size).toBe(1))
+      ctx.service.closeConflictPrompt()
+
+      expect(await act).toEqual({ kind: 'closed' })
+      expect(await resolvePromise).toMatchObject({ state: 'conflict' })
+      expect(internals(ctx).draftFlushWaiters.size).toBe(0)
+      expect(await keptDrafts(ctx, path)).toHaveLength(0)
+      expect(ctx.deps.reloadPath).not.toHaveBeenCalled()
+      expect(readFileSync(path, 'utf8')).toBe('mine v4')
+    })
+
+    it('BE-402: S6 newer-dirty origin: flush ok keeps the editor bytes as the draft and reloads the server head', async () => {
+      const server = fakeServer()
+      const ctx = setup(server)
+      const { path, flow, view } = await openNewerDirty(ctx, server)
+      const before = commits(server)
+      vi.mocked(ctx.deps.requestModuleSave).mockImplementation((targetPath: string) => {
+        setTimeout(() => {
+          writeFileSync(targetPath, 'editor bytes from the S6 copy')
+          ctx.setEditorDirty(false)
+          ctx.service.onUserSave(targetPath)
+        }, 10)
+        return true
+      })
+
+      expect(
+        await ctx.service.conflictAct(view.sessionId, {
+          kind: 'reload',
+          keep: 'draft',
+          stopAi: false,
+        }),
+      ).toEqual({ kind: 'closed' })
+      await flow
+      expect(commits(server)).toBe(before)
+      expect(readFileSync(path, 'utf8')).toBe('server v4')
+      const drafts = await keptDrafts(ctx, path)
+      expect(drafts).toHaveLength(1)
+      expect(new TextDecoder().decode(drafts[0]!.snapshot)).toBe('editor bytes from the S6 copy')
+    })
+
+    it('BE-401: a user Save consumed as the flush leaves the chip honest when the dialog ends right after (no "saved" for an un-uploaded copy)', async () => {
+      const server = fakeServer()
+      const ctx = setup(server)
+      const { path, flow, view } = await openNewerDirty(ctx, server)
+      expect(binding(path)).toMatchObject({ state: 'ready' })
+      vi.mocked(ctx.deps.requestModuleSave).mockImplementation((targetPath: string) => {
+        setTimeout(() => {
+          // the user's own Ctrl+S lands in the flush window: the same hook the flush waits on
+          writeFileSync(targetPath, 'user saved while the dialog was open')
+          ctx.setEditorDirty(false)
+          ctx.service.onUserSave(targetPath)
+          ctx.service.closeConflictPrompt()
+        }, 10)
+        return true
+      })
+
+      expect(
+        await ctx.service.conflictAct(view.sessionId, {
+          kind: 'reload',
+          keep: 'draft',
+          stopAi: false,
+        }),
+      ).toEqual({ kind: 'closed' })
+      await flow
+      // the bytes differ from the base and nothing was uploaded: the binding says so
+      await vi.waitFor(() => expect(binding(path)).toMatchObject({ state: 'dirty' }))
+      expect(await ctx.service.docStatus(path)).toMatchObject({ state: 'dirty' })
+      expect(readFileSync(path, 'utf8')).toBe('user saved while the dialog was open')
+      expect(ctx.deps.reloadPath).not.toHaveBeenCalled()
+    })
+
+    it('BE-401: the waiter is one-shot: a second hook for the same path after the flush runs the normal save', async () => {
+      const server = fakeServer()
+      const ctx = setup(server)
+      const { flow, view } = await openNewerDirty(ctx, server)
+      const before = commits(server)
+      let hooks = 0
+      vi.mocked(ctx.deps.requestModuleSave).mockImplementation((targetPath: string) => {
+        setTimeout(() => {
+          writeFileSync(targetPath, 'flushed bytes')
+          ctx.setEditorDirty(false)
+          ctx.service.onUserSave(targetPath)
+          hooks += 1
+          // a second Save of the same path (user pressed Ctrl+S too): it is not the flush
+          ctx.service.onUserSave(targetPath)
+          hooks += 1
+        }, 10)
+        return true
+      })
+      await ctx.service.conflictAct(view.sessionId, {
+        kind: 'reload',
+        keep: 'draft',
+        stopAi: false,
+      })
+      await flow
+      expect(hooks).toBe(2)
+      await vi.waitFor(() => expect(commits(server)).toBeGreaterThan(before))
+    })
+
+    it('BE-403: a dialog aborted while drafts.keep runs does not reload the tab; the kept draft stays', async () => {
+      const server = fakeServer()
+      const ctx = setup(server)
+      const path = await openAndConflict(ctx, server)
+      writeFileSync(path, 'mine, to keep')
+      const resolvePromise = ctx.service.resolveConflict(path)
+      await vi.waitFor(() => expect(ctx.views).toHaveLength(1))
+      const engine = internals(ctx)
+      const realQueueEngine = engine.queueEngine.bind(engine)
+      vi.spyOn(engine, 'queueEngine').mockImplementation(async () => {
+        const access = await realQueueEngine()
+        const keep = access.drafts.keep.bind(access.drafts)
+        access.drafts.keep = async (...args: unknown[]) => {
+          const kept = await keep(...args)
+          ctx.service.closeConflictPrompt()
+          return kept
+        }
+        return access
+      })
+
+      expect(
+        await ctx.service.conflictAct(ctx.views[0]!.sessionId, {
+          kind: 'reload',
+          keep: 'draft',
+          stopAi: false,
+        }),
+      ).toEqual({ kind: 'closed' })
+      expect(await resolvePromise).toMatchObject({ state: 'conflict' })
+      expect(readFileSync(path, 'utf8')).toBe('mine, to keep')
+      expect(ctx.deps.reloadPath).not.toHaveBeenCalled()
+      expect(await keptDrafts(ctx, path)).toHaveLength(1)
+    })
   })
 })

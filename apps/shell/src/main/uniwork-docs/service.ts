@@ -1950,6 +1950,11 @@ export class UniworkDocsService {
     if (flush) {
       this.draftFlushWaiters.delete(flushKey)
       flush(true)
+      // The hook may be the user's own Save landing in the flush window: it is
+      // consumed here (the flush never uploads), so nothing else will hash the
+      // file. Re-decide dirty from the file vs base now, so a copy that was
+      // never uploaded cannot read saved whatever the dialog does next.
+      void this.refreshDirty(doc).catch(() => undefined)
       return
     }
     // the sweep still owns this copy's pre-store intent: nothing is sent, and
@@ -3686,6 +3691,8 @@ export class UniworkDocsService {
         open.draftBlock = kept
         return { kind: 'view', view: await this.buildConflictView(open, { fetchServer: false }) }
       }
+      // the dialog ended while the draft was being kept: the draft stays, the tab is not reloaded
+      if (open.controller.signal.aborted) return { kind: 'closed' }
     } else if (action.stopAi) {
       this.deps.stopAiRun?.(chosen.path)
     }
