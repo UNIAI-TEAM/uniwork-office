@@ -41,6 +41,12 @@ export const STARTUP_GATE_DEADLINE_MS = 4_000
 export class AccountManager extends SessionCore {
   private readonly attempts: LoginAttemptStore
   private attemptTimer: ReturnType<typeof setTimeout> | null = null
+  /**
+   * The live attempt was started by replaceLockedSignIn(): until it is redeemed
+   * the undecryptable saved sign-in is still on disk, so any other ending goes
+   * back to keystore-locked (offer kept), never to signed-out.
+   */
+  private replacingLocked = false
 
   constructor(deps: AccountManagerDeps) {
     super(deps)
@@ -154,6 +160,9 @@ export class AccountManager extends SessionCore {
     this.clearAttemptTimer()
     this.clearRefreshTimer()
     this.clearRecoveryTimer()
+    // another server: a Retry against it has not failed yet
+    this.lockedRetryFailed = false
+    this.replacingLocked = false
     this.profile = next
     this.transport = this.deps.createTransport(next)
     // A link may move the address silently, but never the sign-in: the
@@ -189,12 +198,45 @@ export class AccountManager extends SessionCore {
       this.emitLogin({ phase: 'error', error: 'keyring_unavailable' })
       return false
     }
-    // a locked keystore cannot be written: refuse before opening a browser, so
-    // the redeemed code never overwrites the saved credential
-    if (this.state === 'keystore-locked' && !this.deps.credentials.canStore()) {
+    // a saved sign-in this computer cannot open is never replaced by a plain
+    // sign-in: Retry comes first, and only replaceLockedSignIn() (after a failed
+    // Retry, confirmed by the user) may overwrite it
+    if (this.state === 'keystore-locked') {
       this.emitLogin({ phase: 'error', error: 'keystore_locked' })
       return false
     }
+    return this.startLogin(false)
+  }
+
+  /**
+   * The way out of keystore-locked: a fresh browser sign-in whose credential
+   * replaces the saved one this computer cannot open. Only after a Retry found
+   * it still unreadable (the renderer asks the user first; main enforces the
+   * order). Only the credential file is replaced, and only once the new
+   * sign-in is redeemed: a cancelled or failed attempt leaves it as it was.
+   * The sync store, queue and drafts are not touched; they stay locked under
+   * their own per-account key until that keystore opens again.
+   */
+  async replaceLockedSignIn(): Promise<boolean> {
+    if (this.state !== 'keystore-locked' || !this.lockedRetryFailed) return false
+    if (!this.ensureProfile()) {
+      this.emitLogin({ phase: 'error', error: 'not_configured' })
+      return false
+    }
+    // a keychain that cannot even wrap a new credential (really locked): the
+    // redeemed code would orphan a device, so no browser opens
+    if (!this.deps.credentials.canStore()) {
+      this.emitLogin({ phase: 'error', error: 'keystore_locked' })
+      return false
+    }
+    return this.startLogin(true)
+  }
+
+  /**
+   * Opens a new browser sign-in attempt (the state checks are the caller's);
+   * `replacing` marks one started by replaceLockedSignIn().
+   */
+  private async startLogin(replacing: boolean): Promise<boolean> {
     const profile = this.profile as DeploymentProfile
     // a click while the browser sign-in is open (the chip and the account
     // entry still offer Sign in) re-opens that page: a new attempt would turn
@@ -204,6 +246,7 @@ export class AccountManager extends SessionCore {
     const transport = this.transport as UniworkTransport
     const generation = ++this.generation
     this.clearAttemptTimer()
+    this.replacingLocked = replacing
     const attempt = this.attempts.begin({
       clientId: profile.clientId,
       deploymentId: profile.deploymentId,
@@ -227,7 +270,7 @@ export class AccountManager extends SessionCore {
     } catch (error) {
       if (generation !== this.generation) return false
       this.attempts.cancel()
-      this.failLogin(this.applyFailure(error, 'sign-in'))
+      this.failLogin(this.signInFailure(error))
       return false
     }
     if (generation !== this.generation) return false
@@ -284,7 +327,8 @@ export class AccountManager extends SessionCore {
     if (!this.attempts.cancel() && this.state !== 'signing-in') return
     this.generation++
     this.clearAttemptTimer()
-    this.setState('signed-out')
+    if (this.replacingLocked) this.backToLocked()
+    else this.setState('signed-out')
     this.emitLogin({ phase: 'error', error: 'cancelled' })
   }
 
@@ -328,7 +372,7 @@ export class AccountManager extends SessionCore {
         redirectUri: claimed.redirectUri,
       })
     } catch (error) {
-      if (generation === this.generation) this.failLogin(this.applyFailure(error, 'sign-in'))
+      if (generation === this.generation) this.failLogin(this.signInFailure(error))
       return
     }
     if (generation !== this.generation) return
@@ -346,6 +390,8 @@ export class AccountManager extends SessionCore {
       this.failLogin(this.state === 'keystore-locked' ? 'keystore_locked' : 'keyring_unavailable')
       return
     }
+    // the new credential replaced the saved one: nothing locked is left behind
+    this.replacingLocked = false
     this.resetSession()
     this.adoptSession(credential, session)
     await this.loadAccount(generation).catch((error) => {
@@ -357,11 +403,15 @@ export class AccountManager extends SessionCore {
   }
 
   async retry(): Promise<AccountStatus> {
-    if (
-      this.state === 'not-configured' ||
-      this.state === 'keyring-unavailable' ||
-      this.state === 'keystore-locked'
-    )
+    if (this.state === 'keystore-locked') {
+      const status = await this.restore()
+      if (this.state !== 'keystore-locked' || this.lockedRetryFailed) return status
+      // still unreadable after a Retry: a fresh sign-in may now replace it
+      this.lockedRetryFailed = true
+      this.setState(this.state, this.error)
+      return this.status()
+    }
+    if (this.state === 'not-configured' || this.state === 'keyring-unavailable')
       return this.restore()
     if (this.state !== 'server-unreachable' && this.state !== 'signed-in') return this.status()
     if (!this.session) {
@@ -446,6 +496,7 @@ export class AccountManager extends SessionCore {
     this.clearAttemptTimer()
     const live = this.session
     const transport = this.transport
+    this.replacingLocked = false
     this.resetSession()
     this.deps.credentials.clear()
     this.setState('signed-out')
@@ -658,8 +709,36 @@ export class AccountManager extends SessionCore {
 
   /** the failure state is already applied unless the attempt was still pending */
   private failLogin(error: AccountErrorCode): void {
-    if (this.state === 'signing-in') this.setState('signed-out', error)
+    if (this.replacingLocked) this.backToLocked()
+    else if (this.state === 'signing-in') this.setState('signed-out', error)
     this.emitLogin({ phase: 'error', error })
+  }
+
+  /**
+   * A failed sign-in step. A replacing attempt never applies the failure: the
+   * outcome table could clear credentials (a revoked device), which would
+   * delete the saved sign-in it was only meant to replace once redeemed.
+   */
+  private signInFailure(error: unknown): AccountErrorCode {
+    if (!this.replacingLocked) return this.applyFailure(error, 'sign-in')
+    this.markHandled(error)
+    if (error instanceof CredentialStoreError) {
+      return error.code === 'keyring_unavailable' ? 'keyring_unavailable' : 'keystore_locked'
+    }
+    if (!(error instanceof TransportError)) return 'server_error'
+    return classifyTransportFailure(error.code, 'sign-in', error.fromServer).error
+  }
+
+  /**
+   * A replacing attempt ended without a new sign-in: the undecryptable saved
+   * sign-in is still on disk, so the account is keystore-locked again, with
+   * the way out still offered (the Retry already failed).
+   */
+  private backToLocked(): void {
+    this.replacingLocked = false
+    this.resetSession()
+    this.lockedRetryFailed = true
+    this.setState('keystore-locked', 'keystore_locked')
   }
 
   private expireAttempt(attemptId: string): void {

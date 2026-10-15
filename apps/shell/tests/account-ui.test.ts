@@ -101,6 +101,7 @@ function makeApi(initial: AccountStatus) {
     accountLogin: vi.fn(async () => true),
     accountCancelLogin: vi.fn(async () => undefined),
     accountRetry: vi.fn(async () => statusFor('signed-in')),
+    accountReplaceLockedSignIn: vi.fn(async () => true),
     accountSetServer: vi.fn(async (_address: string): Promise<AccountSetServerResult> => ({
       ok: true,
       status: statusFor('signed-out'),
@@ -643,6 +644,258 @@ describe('Settings → Account pane', () => {
       await click(retry)
       expect(api.accountRetry).toHaveBeenCalledTimes(1)
     }
+  })
+
+  it('keystore locked: only after a failed Retry is "Sign in again" offered, second to Retry', async () => {
+    await render(statusFor('keystore-locked', { error: 'keystore_locked' }), { open: true })
+    expect(button(en.acctSignInAgain)).toBeUndefined()
+    api.accountRetry.mockImplementationOnce(async () =>
+      statusFor('keystore-locked', { error: 'keystore_locked', canReplaceLockedSignIn: true }),
+    )
+    await click(button(en.acctRetry))
+    expect(api.accountRetry).toHaveBeenCalledTimes(1)
+    // the state's own actions row (the server row above has its own footer)
+    const footer = Array.from(
+      Array.from(host.querySelectorAll('.acct-pane > .set-pane-footer.acct-actions'))
+        .at(-1)!
+        .querySelectorAll('button'),
+    )
+    expect(footer.map((b) => b.textContent)).toEqual([en.acctRetry, en.acctSignInAgain])
+    // Retry stays the primary action; the way out is secondary
+    expect(footer[0]!.classList.contains('primary')).toBe(true)
+    expect(footer[1]!.classList.contains('primary')).toBe(false)
+    expect(api.accountLogin).not.toHaveBeenCalled()
+    expect(api.accountReplaceLockedSignIn).not.toHaveBeenCalled()
+    expectNoRawKeys()
+  })
+
+  it('keystore locked: "Sign in again" asks first; Cancel and Escape change nothing, confirm replaces once', async () => {
+    await render(
+      statusFor('keystore-locked', { error: 'keystore_locked', canReplaceLockedSignIn: true }),
+      { open: true },
+    )
+    const dialog = () => host.querySelector<HTMLElement>('.acct-pane [role="alertdialog"]')
+    const opener = button(en.acctSignInAgain)!
+    opener.focus()
+    await click(opener)
+    expect(dialog()).not.toBeNull()
+    expect(dialog()!.textContent).toContain(en.acctReplaceTitle)
+    expect(dialog()!.textContent).toContain(en.acctReplaceBody)
+    // queued offline edits are said to stay, and the saved sign-in to be replaced
+    expect(en.acctReplaceBody).toMatch(/replaces/)
+    expect(en.acctReplaceBody).toMatch(/nothing is deleted/)
+    // Cancel is focused on open, and the footer actions hide behind the prompt
+    expect(document.activeElement?.textContent).toBe(en.acctCancel)
+    expect(button(en.acctRetry)).toBeUndefined()
+
+    // Escape = cancel: closed, nothing sent, focus back on the opener
+    await act(async () => {
+      dialog()!.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+      )
+    })
+    await flush()
+    expect(dialog()).toBeNull()
+    expect(document.activeElement).toBe(button(en.acctSignInAgain))
+
+    // Cancel: the same
+    await click(button(en.acctSignInAgain))
+    await click(button(en.acctCancel))
+    expect(dialog()).toBeNull()
+    expect(api.accountReplaceLockedSignIn).not.toHaveBeenCalled()
+    expect(api.accountLogin).not.toHaveBeenCalled()
+    expect(pane()?.dataset.state).toBe('keystore-locked')
+
+    // confirm: one replacing sign-in, never the plain sign-in
+    await click(button(en.acctSignInAgain))
+    await click(button(en.acctReplaceGo))
+    expect(api.accountReplaceLockedSignIn).toHaveBeenCalledTimes(1)
+    expect(api.accountLogin).not.toHaveBeenCalled()
+    expect(dialog()).toBeNull()
+  })
+
+  it('keystore locked: the replace prompt closes when main withdraws the offer', async () => {
+    await render(
+      statusFor('keystore-locked', { error: 'keystore_locked', canReplaceLockedSignIn: true }),
+      { open: true },
+    )
+    await click(button(en.acctSignInAgain))
+    expect(host.querySelector('.acct-pane [role="alertdialog"]')).not.toBeNull()
+    await act(async () => api.push(statusFor('signed-in')))
+    await flush()
+    expect(host.querySelector('.acct-pane [role="alertdialog"]')).toBeNull()
+    await act(async () =>
+      api.push(
+        statusFor('keystore-locked', { error: 'keystore_locked', canReplaceLockedSignIn: true }),
+      ),
+    )
+    await flush()
+    // it does not come back on its own
+    expect(host.querySelector('.acct-pane [role="alertdialog"]')).toBeNull()
+  })
+
+  describe('keystore locked: after a replacing sign-in that does not finish', () => {
+    const LOCKED_OFFER = () =>
+      statusFor('keystore-locked', { error: 'keystore_locked', canReplaceLockedSignIn: true })
+    const LOCKED_PLAIN = () => statusFor('keystore-locked', { error: 'keystore_locked' })
+    const footerText = () =>
+      Array.from(
+        Array.from(host.querySelectorAll('.acct-pane > .set-pane-footer.acct-actions'))
+          .at(-1)!
+          .querySelectorAll('button'),
+      ).map((b) => b.textContent)
+
+    /** confirm the replace prompt, the attempt runs in the browser, then fails the way main reports it */
+    async function confirmThenFail(
+      error: AccountErrorCode,
+      back: () => AccountStatus = LOCKED_OFFER,
+    ) {
+      await click(button(en.acctSignInAgain))
+      await click(button(en.acctReplaceGo))
+      expect(api.accountReplaceLockedSignIn).toHaveBeenCalledTimes(1)
+      // main: signing-in while the browser is open, then back to locked, then the login event
+      await act(async () => api.push(statusFor('signing-in')))
+      await flush()
+      expect(button(en.acctCancel)).toBeDefined()
+      await act(async () => api.push(back()))
+      await act(async () => api.login({ phase: 'error', error }))
+      await flush()
+    }
+
+    it('a failure line is the short second line under the locked text, and a new Retry clears it (fe-d1-1)', async () => {
+      await render(LOCKED_OFFER(), { open: true })
+      await confirmThenFail('login_timeout')
+      const text = pane()?.textContent ?? ''
+      // the locked text stays; the failure is only a short line under it
+      expect(text).toContain(sync.uwLockKeystoreTitle)
+      expect(text).toContain(sync.uwLockKeystore)
+      expect(pane()?.querySelector('.acct-notice-error')?.textContent).toBe(en.acctErrLoginTimeout)
+      // a Retry is a new attempt: the old line must not stay under its result
+      let finish!: (s: AccountStatus) => void
+      api.accountRetry.mockImplementationOnce(
+        () => new Promise<AccountStatus>((res) => (finish = res)),
+      )
+      await click(button(en.acctRetry))
+      expect(pane()?.querySelector('.acct-notice-error')).toBeNull()
+      await act(async () => finish(LOCKED_OFFER()))
+      await flush()
+      expect(pane()?.querySelector('.acct-notice-error')).toBeNull()
+      expect(pane()?.textContent).toContain(sync.uwLockKeystoreTitle)
+    })
+
+    it('a cancelled attempt leaves only the locked text (fe-d1-1)', async () => {
+      await render(LOCKED_OFFER(), { open: true })
+      await confirmThenFail('cancelled')
+      expect(pane()?.dataset.state).toBe('keystore-locked')
+      expect(pane()?.textContent).toContain(sync.uwLockKeystore)
+      expect(pane()?.querySelector('.acct-notice-error')).toBeNull()
+    })
+
+    it('"Sign in again" is aria-disabled while a Retry is in flight and does nothing (fe-d1-2)', async () => {
+      await render(LOCKED_OFFER(), { open: true })
+      let finish!: (s: AccountStatus) => void
+      api.accountRetry.mockImplementationOnce(
+        () => new Promise<AccountStatus>((res) => (finish = res)),
+      )
+      expect(button(en.acctSignInAgain)!.hasAttribute('aria-disabled')).toBe(false)
+      await click(button(en.acctRetry))
+      const again = button(en.acctSignInAgain)!
+      // aria-disabled like Retry (never `disabled`: that would drop keyboard focus)
+      expect(again.disabled).toBe(false)
+      expect(again.getAttribute('aria-disabled')).toBe('true')
+      await click(again)
+      expect(host.querySelector('.acct-pane [role="alertdialog"]')).toBeNull()
+      expect(footerText()).toEqual([en.acctRetrying, en.acctSignInAgain])
+      // settled: the offer is still there and works again
+      await act(async () => finish(LOCKED_OFFER()))
+      await flush()
+      expect(button(en.acctSignInAgain)!.hasAttribute('aria-disabled')).toBe(false)
+      await click(button(en.acctSignInAgain))
+      expect(host.querySelector('.acct-pane [role="alertdialog"]')).not.toBeNull()
+    })
+
+    it('focus lands on "Sign in again" after confirm and a failed attempt, in either order of events (L-1)', async () => {
+      await render(LOCKED_OFFER(), { open: true })
+      button(en.acctSignInAgain)!.focus()
+      await confirmThenFail('login_timeout')
+      expect(footerText()).toEqual([en.acctRetry, en.acctSignInAgain])
+      expect(document.activeElement).toBe(button(en.acctSignInAgain))
+      expect(document.activeElement).not.toBe(document.body)
+    })
+
+    it('focus lands on "Sign in again" when the attempt fails before main ever reports signing-in (L-1)', async () => {
+      await render(LOCKED_OFFER(), { open: true })
+      await click(button(en.acctSignInAgain))
+      let fail!: (launched: boolean) => void
+      api.accountReplaceLockedSignIn.mockImplementationOnce(
+        () => new Promise<boolean>((res) => (fail = res)),
+      )
+      await click(button(en.acctReplaceGo))
+      // the footer is rebuilt and then something else takes the focus away
+      ;(document.activeElement as HTMLElement | null)?.blur()
+      await act(async () => fail(false))
+      await flush()
+      expect(document.activeElement).toBe(button(en.acctSignInAgain))
+    })
+
+    it('focus falls back to Retry when the offer is gone after the failed attempt (L-1)', async () => {
+      await render(LOCKED_OFFER(), { open: true })
+      await confirmThenFail('network', LOCKED_PLAIN)
+      expect(footerText()).toEqual([en.acctRetry])
+      expect(document.activeElement).toBe(button(en.acctRetry))
+    })
+
+    it('focus the user moved elsewhere is not taken back (L-1)', async () => {
+      await render(LOCKED_OFFER(), { open: true })
+      await click(button(en.acctSignInAgain))
+      await click(button(en.acctReplaceGo))
+      await act(async () => api.push(statusFor('signing-in')))
+      await flush()
+      const cancel = button(en.acctCancel)!
+      cancel.focus()
+      await act(async () => api.push(LOCKED_OFFER()))
+      await flush()
+      // Cancel is gone with the signing-in footer; nothing may steal a live focus meanwhile
+      const other = document.createElement('button')
+      document.body.append(other)
+      other.focus()
+      await act(async () => api.push(LOCKED_OFFER()))
+      await flush()
+      expect(document.activeElement).toBe(other)
+      other.remove()
+    })
+
+    it('the failure line sits in one polite live region, never a second alert (L-2)', async () => {
+      await render(LOCKED_OFFER(), { open: true })
+      // the region exists, empty, before anything fails: a later line is announced
+      const live = () => pane()!.querySelector<HTMLElement>('.acct-notice-live')
+      expect(live()).not.toBeNull()
+      expect(live()!.getAttribute('role')).toBe('status')
+      expect(live()!.textContent).toBe('')
+      await confirmThenFail('login_timeout')
+      expect(live()!.textContent).toBe(en.acctErrLoginTimeout)
+      const line = pane()!.querySelector<HTMLElement>('.acct-notice-error')!
+      expect(live()!.contains(line)).toBe(true)
+      expect(line.hasAttribute('role')).toBe(false)
+      // one live region carries the text; the error line is not a nested alert/status of its own
+      expect(pane()!.querySelectorAll('.acct-notice [role="status"]').length).toBe(1)
+      expect(line.querySelector('[role],[aria-live]')).toBeNull()
+    })
+  })
+
+  it('keystore locked in Vietnamese: the replace prompt reads in Vietnamese', async () => {
+    await render(
+      statusFor('keystore-locked', { error: 'keystore_locked', canReplaceLockedSignIn: true }),
+      { open: true, lang: 'vi' },
+    )
+    expect(button(vi_.acctRetry)).toBeDefined()
+    await click(button(vi_.acctSignInAgain))
+    const text = host.querySelector('.acct-pane [role="alertdialog"]')?.textContent ?? ''
+    expect(text).toContain(vi_.acctReplaceTitle)
+    expect(text).toContain(vi_.acctReplaceBody)
+    expect(button(vi_.acctCancel)).toBeDefined()
+    expect(button(vi_.acctReplaceGo)).toBeDefined()
+    expectNoRawKeys()
   })
 
   it('keystore locked in Vietnamese reads from the sync shard, offers Thử lại and never reads as signed in', async () => {

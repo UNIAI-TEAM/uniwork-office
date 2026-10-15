@@ -81,6 +81,10 @@ export const pl = {
   acctErrKeyringUnavailable: 'Bezpieczny magazyn na tym komputerze jest niedostępny.',
   acctErrKeystoreLocked:
     'Pęk kluczy na tym komputerze jest zablokowany. Odblokuj go i spróbuj ponownie.',
+  acctReplaceTitle: 'Zastąpić zapisane logowanie na tym komputerze?',
+  acctReplaceBody:
+    'Ten komputer nie może otworzyć zapisanego logowania. Ponowne zalogowanie je zastąpi. Zmiany offline czekające na synchronizację pozostają na tym komputerze, zablokowane; nic nie zostanie usunięte.',
+  acctReplaceGo: 'Zaloguj się ponownie',
   acctErrServerError: 'W UniWork wystąpił problem. Spróbuj ponownie później.',
   acctErrMalformedResponse: 'UniWork wysłał nieoczekiwaną odpowiedź. Spróbuj ponownie później.',
   wbLoadFailedTitle: 'Nie udało się wczytać zapisanych danych',

@@ -73,6 +73,10 @@ export const zhTW = {
   acctErrNotConfigured: '此應用程式未連結至 UniWork 伺服器。',
   acctErrKeyringUnavailable: '此電腦上的安全儲存空間無法使用。',
   acctErrKeystoreLocked: '此電腦的鑰匙圈已鎖定。請解鎖後再試一次。',
+  acctReplaceTitle: '要取代這部電腦上儲存的登入資訊嗎？',
+  acctReplaceBody:
+    '這部電腦無法開啟儲存的登入資訊。重新登入將取代它。等待同步的離線編輯會保留在這部電腦上，維持鎖定，不會被刪除。',
+  acctReplaceGo: '重新登入',
   acctErrServerError: 'UniWork 發生問題，請稍後再試。',
   acctErrMalformedResponse: 'UniWork 傳回了非預期的回應，請稍後再試。',
   wbLoadFailedTitle: '無法載入你儲存的資料',
