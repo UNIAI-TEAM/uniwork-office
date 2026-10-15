@@ -396,3 +396,55 @@ describe('Save As source pending ownership', () => {
     expect(existsSync(join(targetDirectory, 'assets', 'pending.png'))).toBe(false)
   })
 })
+
+describe('discarding the assets one AI run created (Roll back)', () => {
+  it('removes only the named pending assets: a user-inserted one and a saved one survive', async () => {
+    const documentPath = await createDocument()
+    const directory = dirname(documentPath)
+    const saved = await writeImageIntoOwnedAssets(
+      documentPath,
+      'saved.png',
+      Buffer.from('saved image'),
+    )
+    await reconcileOwnedAssets(documentPath, [saved])
+    const userInserted = await writeImageIntoOwnedAssets(
+      documentPath,
+      'mine.png',
+      Buffer.from('user image'),
+    )
+    const aiMade = await writeImageIntoOwnedAssets(
+      documentPath,
+      'image.png',
+      Buffer.from('ai image'),
+    )
+    const view = createMarkdownView(documentPath)
+    const contents = view.webContents as unknown as FakeWebContents
+
+    // the renderer names the run's asset, and also (wrongly or late) a saved one and a stray name
+    const result = await handlers.get(MARKDOWN_CHANNELS.discardPendingAssets)?.(
+      { sender: contents },
+      ['image.png', 'saved.png', '../escape.png', 'nope.png'],
+    )
+
+    expect(result).toMatchObject({ deleted: ['image.png'] })
+    expect(existsSync(join(directory, aiMade))).toBe(false)
+    expect(existsSync(join(directory, userInserted))).toBe(true)
+    expect(existsSync(join(directory, saved))).toBe(true)
+    expect(await readOwnedAssetManifest(documentPath)).toMatchObject({
+      files: [{ name: 'mine.png' }, { name: 'saved.png' }],
+      documents: { 'note.md': ['saved.png'] },
+      pending: { 'note.md': ['mine.png'] },
+    })
+  })
+
+  it('does nothing for a window without a document path or a malformed argument', async () => {
+    const view = createMarkdownView(null)
+    const contents = view.webContents as unknown as FakeWebContents
+    await expect(
+      handlers.get(MARKDOWN_CHANNELS.discardPendingAssets)?.({ sender: contents }, ['a.png']),
+    ).resolves.toMatchObject({ deleted: [] })
+    await expect(
+      handlers.get(MARKDOWN_CHANNELS.discardPendingAssets)?.({ sender: contents }, 'a.png'),
+    ).resolves.toMatchObject({ deleted: [] })
+  })
+})
