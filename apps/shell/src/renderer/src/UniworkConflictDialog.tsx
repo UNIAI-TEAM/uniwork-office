@@ -17,6 +17,7 @@ import {
   getActionFailureNotice,
   getReloadStepModel,
   getStep1Model,
+  isSaveCopyDownloadStep,
   resolveConflictNotice,
   type ConflictDialogState,
   type ConflictStep1ActionId,
@@ -344,6 +345,7 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
   const resolvedNotice = resolveConflictNotice(view)
   const noticeText = resolvedNotice ? fmt(t(resolvedNotice.key), resolvedNotice.args) : ''
 
+  const saveCopyDownload = isSaveCopyDownloadStep(view)
   const step1Model = getStep1Model(view, { canViewDiff: Boolean(onViewDiff) })
   const reloadModel = getReloadStepModel(state, view)
 
@@ -526,7 +528,9 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
             id={alertId}
             role="alert"
             className={`uw-conflict-alert${
-              view.notice === 'save_copy_done' ? ' uw-conflict-alert--ok' : ''
+              view.notice === 'save_copy_done' || view.notice === 'download_done'
+                ? ' uw-conflict-alert--ok'
+                : ''
             }`}
           >
             {alertClearing ? '' : noticeText}
@@ -652,11 +656,11 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
             <button
               type="button"
               className="uw-conflict-btn uw-conflict-btn--primary"
-              data-conflict-action="save-copy-go"
+              data-conflict-action={saveCopyDownload ? 'download-go' : 'save-copy-go'}
               aria-disabled={busy ? 'true' : undefined}
               onClick={handleConfirmStep2}
             >
-              {t('uwConflictSaveCopyGo')}
+              {saveCopyDownload ? t('uwActDownloadMine') : t('uwConflictSaveCopyGo')}
             </button>
             <button
               type="button"

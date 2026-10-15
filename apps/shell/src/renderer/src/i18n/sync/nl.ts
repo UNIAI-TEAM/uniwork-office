@@ -275,6 +275,12 @@ export const nl = {
     'Je versie is opgeslagen als nieuw document: {title}. Dit document is niet gewijzigd; je kunt nog steeds opnieuw laden of overschrijven.',
   uwConflictSaveCopyFailed:
     'Kan de kopie niet maken. Je wijzigingen zijn nog veilig; probeer het opnieuw.',
+  uwConflictSaveCopyNoSeat:
+    'Kan de kopie niet maken omdat je geen lid bent van de werkruimte waarin dit document staat. Je wijzigingen zijn nog veilig; je kunt je versie downloaden.',
+  uwConflictDownloadDone:
+    'Je versie is op deze computer opgeslagen: {file}. Dit document is niet gewijzigd; je kunt nog steeds opnieuw laden of overschrijven.',
+  uwConflictDownloadFailedDesktop:
+    'Kan het bestand niet opslaan. Je wijzigingen zijn nog veilig; probeer het opnieuw.',
   uwConflictSaveCopyOffline:
     'Je bent offline. Voor een kopie is een verbinding nodig; je wijzigingen blijven bewaard.',
   uwConflictReloadFailed:

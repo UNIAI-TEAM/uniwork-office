@@ -269,6 +269,12 @@ export const ko = {
     '내 버전을 새 문서로 저장했습니다: {title}. 이 문서는 바뀌지 않았으며, 여전히 다시 불러오거나 덮어쓸 수 있습니다.',
   uwConflictSaveCopyFailed:
     '사본을 만들지 못했습니다. 변경 사항은 여전히 안전합니다. 다시 시도하세요.',
+  uwConflictSaveCopyNoSeat:
+    '이 문서가 있는 작업 공간의 구성원이 아니어서 사본을 만들지 못했습니다. 변경 사항은 여전히 안전합니다. 내 버전을 다운로드할 수 있습니다.',
+  uwConflictDownloadDone:
+    '내 버전을 이 컴퓨터에 저장했습니다: {file}. 이 문서는 바뀌지 않았으며, 여전히 다시 불러오거나 덮어쓸 수 있습니다.',
+  uwConflictDownloadFailedDesktop:
+    '파일을 저장하지 못했습니다. 변경 사항은 여전히 안전합니다. 다시 시도하세요.',
   uwConflictSaveCopyOffline:
     '오프라인 상태입니다. 사본을 만들려면 연결이 필요하며, 변경 사항은 보관됩니다.',
   uwConflictReloadFailed:

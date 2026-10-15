@@ -263,6 +263,11 @@ export const vi = {
   uwConflictSaveCopyDone:
     'Đã lưu bản của bạn thành tài liệu mới: {title}. Tài liệu này chưa đổi; bạn vẫn chọn được Tải lại hoặc Ghi đè.',
   uwConflictSaveCopyFailed: 'Chưa tạo được bản sao. Thay đổi của bạn vẫn an toàn; hãy thử lại.',
+  uwConflictSaveCopyNoSeat:
+    'Không tạo được bản sao vì bạn không phải thành viên của không gian làm việc chứa tài liệu này. Thay đổi của bạn vẫn an toàn; bạn có thể tải bản của mình về máy.',
+  uwConflictDownloadDone:
+    'Đã lưu bản của bạn vào máy: {file}. Tài liệu này chưa đổi; bạn vẫn chọn được Tải lại hoặc Ghi đè.',
+  uwConflictDownloadFailedDesktop: 'Chưa lưu được tệp. Thay đổi của bạn vẫn an toàn; hãy thử lại.',
   uwConflictSaveCopyOffline:
     'Không có mạng. Tạo bản sao cần kết nối; thay đổi của bạn vẫn được giữ.',
   uwConflictReloadFailed:

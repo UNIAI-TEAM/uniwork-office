@@ -1,5 +1,5 @@
 import { readFileSync, statSync } from 'node:fs'
-import { readFile, rename, stat } from 'node:fs/promises'
+import { readFile, rename, stat, writeFile } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type {
@@ -254,6 +254,11 @@ export interface UniworkDocsServiceDeps {
   stopAiRun?(path: string): void
   /** G5-12: the app's UI language, for the title of a saved copy (absent = en) */
   lang?(): string
+  /**
+   * G5-12: the native save dialog of "Download my version" (Electron-free seam),
+   * suggesting `defaultName`. Null when the person cancelled.
+   */
+  pickDownloadPath?(defaultName: string): Promise<string | null>
   /** G5-09 S5: seam for G5-05 offline head availability (default false until G5-05 lands) */
   hasOfflineHead?(documentId: string, revision?: string): boolean
   /**
@@ -584,6 +589,12 @@ interface ConflictSession {
   serverOnline: boolean
   locked?: 'revoked' | 'deleted'
   draftBlock?: UniworkConflictKeepDraft
+  /**
+   * G5-12: the notice that put the dialog on the "Download my version" step 2
+   * (no_seat, or download_failed after a failed write); a cancelled OS dialog
+   * answers with it again so the alert does not change
+   */
+  downloadNotice?: 'save_copy_no_seat' | 'download_failed'
   opened: boolean
   done: Promise<UniworkDocStatus | null>
   finish: () => void
@@ -3421,6 +3432,9 @@ export class UniworkDocsService {
     if (action.kind === 'save-copy') {
       return this.saveCopyInConflict(open, chosen, action, currentView)
     }
+    if (action.kind === 'download-mine') {
+      return this.downloadMineInConflict(open, chosen, action)
+    }
     if (action.kind === 'reload') {
       return this.reloadInConflict(open, chosen, action, currentView)
     }
@@ -3818,10 +3832,29 @@ export class UniworkDocsService {
         parentId,
         idempotencyKey: this.newIdempotencyKey(),
       })
-    } catch {
-      // any refusal of the copy itself (owner_requires_copy, a 403 for a non-member of the
-      // workspace, a 5xx) is "couldn't create the copy": the source's access was just read above
-      return aborted() ? { kind: 'closed' } : failed()
+    } catch (error) {
+      if (aborted()) return { kind: 'closed' }
+      // a 403 on the copy while the source was just readable and editable: the person is not a
+      // member of the source's workspace, so no copy can be made for them. Their version is
+      // still local; the dialog offers "Download my version" (a deactivated member or a
+      // suspended organization has its own error code and stays a plain failure)
+      if (
+        error instanceof UniworkDocError &&
+        error.status === 403 &&
+        (error.code === 'forbidden' || error.code === 'permission_revoked')
+      ) {
+        open.downloadNotice = 'save_copy_no_seat'
+        return {
+          kind: 'view',
+          view: await this.buildConflictView(open, {
+            fetchServer: false,
+            notice: 'save_copy_no_seat',
+          }),
+        }
+      }
+      // any other refusal of the copy itself (owner_requires_copy, a 5xx) is "couldn't create
+      // the copy"
+      return failed()
     }
     const copyId = created.summary.id
 
@@ -3885,6 +3918,84 @@ export class UniworkDocsService {
       return { kind: 'closed' }
     }
     return failed()
+  }
+
+  /**
+   * G5-12 "Download my version" (the step-2 button once Save as a copy was
+   * refused with no seat): the local version goes to a file the person picks,
+   * so no edit is lost. Local only: no server call, no intent, no change to
+   * the source, its binding or the editor beyond the same non-uploading flush
+   * a kept draft uses. A cancelled OS dialog changes nothing (the notice that
+   * opened this step is answered again); a write error stays on step 2.
+   */
+  private async downloadMineInConflict(
+    open: ConflictSession,
+    chosen: BoundDocument,
+    action: Extract<UniworkConflictAction, { kind: 'download-mine' }>,
+  ): Promise<UniworkConflictReply> {
+    if (action.stopAi) this.deps.stopAiRun?.(chosen.path)
+    const aborted = () => open.controller.signal.aborted
+    const stay = async (
+      notice: 'save_copy_no_seat' | 'download_failed',
+    ): Promise<UniworkConflictReply> => {
+      open.downloadNotice = notice
+      return {
+        kind: 'view',
+        view: await this.buildConflictView(open, { fetchServer: false, notice }),
+      }
+    }
+    const failed = () => (aborted() ? { kind: 'closed' as const } : stay('download_failed'))
+
+    const editor = await this.editorState(chosen.path)
+    if (editor.dirty === true || this.editorDirty.has(chosen.path)) {
+      if (!(await this.flushModuleForDraft(open, chosen.path))) return failed()
+      if (aborted()) return { kind: 'closed' }
+      if (open.locked) {
+        return { kind: 'view', view: await this.buildConflictView(open, { fetchServer: false }) }
+      }
+      chosen = await this.refreshDirty(chosen)
+      open.doc = chosen
+    }
+    let localBytes: Uint8Array
+    try {
+      localBytes = new Uint8Array(await readFile(chosen.path))
+    } catch {
+      return failed()
+    }
+
+    const format = chosen.binding.format
+    let defaultName = copyTitleFor(
+      chosen.binding.title,
+      tUniworkDocs(this.deps.lang?.() ?? 'en', 'copyMyVersion'),
+      format,
+    )
+    if (formatForName(defaultName) !== format) defaultName = `${defaultName}.${format}`
+    let target: string | null
+    try {
+      target = (await this.deps.pickDownloadPath?.(defaultName)) ?? null
+    } catch {
+      return failed()
+    }
+    if (aborted()) return { kind: 'closed' }
+    if (!target) {
+      // the person cancelled the OS dialog: nothing changed
+      return stay(open.downloadNotice ?? 'save_copy_no_seat')
+    }
+    try {
+      await writeFile(target, localBytes)
+    } catch {
+      return failed()
+    }
+    if (aborted()) return { kind: 'closed' }
+    open.downloadNotice = undefined
+    return {
+      kind: 'view',
+      view: await this.buildConflictView(open, {
+        fetchServer: false,
+        notice: 'download_done',
+        noticeArg: basename(target),
+      }),
+    }
   }
 
   private async overwriteInConflict(

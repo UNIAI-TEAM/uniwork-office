@@ -265,6 +265,12 @@ export const en = {
   uwConflictSaveCopyDone:
     'Your version was saved as a new document: {title}. This document hasn’t changed; you can still reload or overwrite.',
   uwConflictSaveCopyFailed: 'Couldn’t create the copy. Your changes are still safe; try again.',
+  uwConflictSaveCopyNoSeat:
+    'Couldn’t create the copy because you’re not a member of the workspace this document is in. Your changes are still safe; you can download your version.',
+  uwConflictDownloadDone:
+    'Your version was saved to this computer: {file}. This document hasn’t changed; you can still reload or overwrite.',
+  uwConflictDownloadFailedDesktop:
+    'Couldn’t save the file. Your changes are still safe; try again.',
   uwConflictSaveCopyOffline:
     'You’re offline. Creating a copy needs a connection; your changes are kept.',
   uwConflictReloadFailed:

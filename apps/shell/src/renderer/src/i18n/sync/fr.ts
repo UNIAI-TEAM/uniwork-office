@@ -283,6 +283,12 @@ export const fr = {
     'Votre version a été enregistrée comme nouveau document : {title}. Ce document n’a pas changé ; vous pouvez toujours recharger ou écraser.',
   uwConflictSaveCopyFailed:
     'Impossible de créer la copie. Vos modifications sont toujours en sécurité ; réessayez.',
+  uwConflictSaveCopyNoSeat:
+    'Impossible de créer la copie, car vous n’êtes pas membre de l’espace de travail qui contient ce document. Vos modifications sont toujours en sécurité ; vous pouvez télécharger votre version.',
+  uwConflictDownloadDone:
+    'Votre version a été enregistrée sur cet ordinateur : {file}. Ce document n’a pas changé ; vous pouvez toujours recharger ou écraser.',
+  uwConflictDownloadFailedDesktop:
+    'Impossible d’enregistrer le fichier. Vos modifications sont toujours en sécurité ; réessayez.',
   uwConflictSaveCopyOffline:
     'Vous êtes hors ligne. Créer une copie nécessite une connexion ; vos modifications sont conservées.',
   uwConflictReloadFailed:

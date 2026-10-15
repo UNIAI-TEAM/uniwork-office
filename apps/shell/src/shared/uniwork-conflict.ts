@@ -11,7 +11,16 @@ export type UniworkConflictKeepDraft = 'ok' | 'drafts_full' | 'store_full' | 'ke
 
 /** one line in the dialog's alert region (`role=alert`), null = none */
 export type UniworkConflictNotice =
-  'head_moved' | 'reload_failed' | 'overwrite_failed' | 'save_copy_done' | 'save_copy_failed'
+  | 'head_moved'
+  | 'reload_failed'
+  | 'overwrite_failed'
+  | 'save_copy_done'
+  | 'save_copy_failed'
+  /** G5-12: the copy was refused because the person is not a member of the source's workspace */
+  | 'save_copy_no_seat'
+  /** G5-12: "Download my version" wrote the file (noticeArg = its name) */
+  | 'download_done'
+  | 'download_failed'
 
 export interface UniworkConflictView {
   /** a fresh id per opened dialog; every answer echoes it */
@@ -35,7 +44,10 @@ export interface UniworkConflictView {
   /** in-place lock while open: lost read access / deleted → body + Close only */
   locked: 'none' | 'revoked' | 'deleted'
   notice: UniworkConflictNotice | null
-  /** head version for uwConflictHeadMoved {n}, or the copy title for uwConflictSaveCopyDone {title} */
+  /**
+   * head version for uwConflictHeadMoved {n}, the copy title for uwConflictSaveCopyDone {title},
+   * or the saved file name for uwConflictDownloadDone {file}
+   */
   noticeArg: string | null
 }
 
@@ -44,6 +56,8 @@ export type UniworkConflictAction =
   | { kind: 'reload'; keep: 'draft' | 'discard'; stopAi: boolean }
   | { kind: 'overwrite'; stopAi: boolean }
   | { kind: 'save-copy'; stopAi: boolean }
+  /** G5-12: the no-seat fallback of Save as a copy - the local version to a file the person picks */
+  | { kind: 'download-mine'; stopAi: boolean }
 
 /**
  * main's answer: 'closed' = the dialog is over (status is the document now);

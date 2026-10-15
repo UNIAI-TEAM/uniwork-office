@@ -1,5 +1,6 @@
 import { app, BrowserWindow, dialog, safeStorage, type IpcMain, type WebContents } from 'electron'
-import { basename, join } from 'node:path'
+import { basename, extname, join } from 'node:path'
+import { showSaveDialogWithMemory } from '@genoffice/electron-utils'
 import { COMMENTS_CHANNELS } from '@genoffice/electron-utils/comments-ipc'
 import {
   UNIWORK_DOC_CHANNELS,
@@ -198,6 +199,32 @@ async function pickUploadFile(
     : await dialog.showOpenDialog(options)
   const path = picked.canceled ? undefined : picked.filePaths[0]
   return path ? { path, name: basename(path) } : null
+}
+
+/**
+ * G5-12 "Download my version": the native save dialog over the shell window.
+ * The suggested name is the copy name (`{name} (my version).docx`); a cancelled
+ * dialog is null.
+ */
+async function pickDownloadPath(
+  wiring: UniworkDocsWiring,
+  defaultName: string,
+): Promise<string | null> {
+  const picked = await showSaveDialogWithMemory(
+    dialog,
+    wiring.shellWindow(),
+    {
+      defaultPath: defaultName,
+      filters: [
+        {
+          name: tUniworkDocs(wiring.lang(), 'uploadPickDocuments'),
+          extensions: [extname(defaultName).slice(1) || '*'],
+        },
+      ],
+    },
+    wiring.defaultSaveDir(),
+  )
+  return picked.canceled || !picked.filePath ? null : picked.filePath
 }
 
 function conflictUi(wiring: UniworkDocsWiring): ConflictUi {
@@ -539,6 +566,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     isPackaged: wiring.isPackaged,
     // S18: main owns the native dialog (Electron); the service stays Electron-free
     pickUploadFile: () => pickUploadFile(wiring),
+    pickDownloadPath: (defaultName) => pickDownloadPath(wiring, defaultName),
     pushUploadProgress: (event) => push(UNIWORK_DOC_CHANNELS.uploadProgress, event),
     pushDocRenamed: (event) => push(UNIWORK_DOC_CHANNELS.docRenamed, event),
     notifyPathRenamed: (oldPath, newPath) => wiring.notifyPathRenamed(oldPath, newPath),

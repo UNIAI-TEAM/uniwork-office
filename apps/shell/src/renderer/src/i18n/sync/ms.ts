@@ -279,6 +279,12 @@ export const ms = {
     'Versi anda disimpan sebagai dokumen baharu: {title}. Dokumen ini tidak berubah; anda masih boleh memuat semula atau menulis ganti.',
   uwConflictSaveCopyFailed:
     'Tidak dapat mencipta salinan. Perubahan anda masih selamat; cuba lagi.',
+  uwConflictSaveCopyNoSeat:
+    'Tidak dapat mencipta salinan kerana anda bukan ahli ruang kerja yang mengandungi dokumen ini. Perubahan anda masih selamat; anda boleh memuat turun versi anda.',
+  uwConflictDownloadDone:
+    'Versi anda disimpan pada komputer ini: {file}. Dokumen ini tidak berubah; anda masih boleh memuat semula atau menulis ganti.',
+  uwConflictDownloadFailedDesktop:
+    'Tidak dapat menyimpan fail. Perubahan anda masih selamat; cuba lagi.',
   uwConflictSaveCopyOffline:
     'Anda di luar talian. Mencipta salinan memerlukan sambungan; perubahan anda disimpan.',
   uwConflictReloadFailed:
