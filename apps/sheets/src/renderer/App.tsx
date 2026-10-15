@@ -205,6 +205,7 @@ import {
 } from './ai/selection-scope'
 import { isSelectionDrag, type Point, type SelectionAskAnchor } from './ai/selection-ask'
 import { createAiDocument } from './ai/create-document'
+import { attachRunFootprint, createRunWriteLedger } from './ai/apply-footprint'
 import { createWorkbookSkill } from './ai/workbook-skill'
 import { findWorkbookCells, selectWorkbookRange } from './ai/workbook-search'
 import { traceWorkbookDependents, traceWorkbookPrecedents } from './ai/formula-audit'
@@ -1473,6 +1474,8 @@ export function App({
   const aiApplyPromisesRef = useRef<Promise<boolean>[]>([])
   /** true once any tool of the run mutated the workbook */
   const runMutatedRef = useRef(false)
+  /** cells and ranges the in-flight run wrote: the footprint shown on its message (reset per run) */
+  const runWriteLedgerRef = useRef(createRunWriteLedger())
   /** UniWork AI notices of the run (a Retry-After wait, a restart, a boundary, dropped calls, off) folded into
    * the one text of the assistant message (the chat message here has no note fields), plus the run's
    * last streamed text for the fallback reply */
@@ -1573,6 +1576,7 @@ export function App({
         },
         onToolExecuted: ({ call, execution }) => {
           if (execution.mutated) runMutatedRef.current = true
+          attachRunFootprint(runWriteLedgerRef.current, execution, patchLastAssistant)
           const input = safeJsonInput(call.input)
           const output = execution.output
             ? execution.output.slice(0, PERSIST_TOOL_FIELD_MAX)
@@ -1713,6 +1717,7 @@ export function App({
     runNoticesRef.current.clear()
     runQuestionRef.current = instruction
     runMutatedRef.current = false
+    runWriteLedgerRef.current.reset()
     setAiBusy(true)
     if (cap('statusEcho')) setMessage(t('appAiThinking'))
     appendChat({ role: 'assistant', text: '', tools: [], streaming: true })

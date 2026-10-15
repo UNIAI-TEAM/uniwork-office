@@ -6,7 +6,8 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { defaultAiSettings } from '@genoffice/ai-provider'
 import { AiChatPanel, type AiChatMessage } from '../src/renderer/ai/AiChatPanel'
-import { LocaleProvider, type Lang } from '../src/renderer/i18n/locale'
+import type { Lang } from '@genoffice/i18n'
+import { LocaleProvider } from '../src/renderer/i18n/locale'
 
 function bridgeProxy(): Record<string, ReturnType<typeof vi.fn>> {
   const stubs: Record<string, ReturnType<typeof vi.fn>> = {}
