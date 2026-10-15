@@ -2,6 +2,12 @@
  * --accent / --accent-soft come from each app's styles.css, with the shared brand token as a fallback. */
 
 .collab-body {
+  --collab-mention-bg: var(--accent-soft, var(--bg-hover-subtle));
+  --collab-mention-fg: color-mix(
+    in srgb,
+    var(--accent, var(--color-brand-secondary)) 75%,
+    var(--text)
+  );
   min-width: 0;
   font-size: 13px;
   line-height: 1.5;
@@ -48,8 +54,8 @@
   display: inline;
   padding: 0 4px;
   border-radius: var(--radius-6);
-  background: var(--accent-soft, var(--bg-hover-subtle));
-  color: var(--accent, var(--color-brand-secondary));
+  background: var(--collab-mention-bg);
+  color: var(--collab-mention-fg);
   font-weight: 500;
   /* the chip may break across lines for a long name */
   box-decoration-break: clone;
