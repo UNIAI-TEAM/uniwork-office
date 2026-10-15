@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { act } from 'react'
+import type { Lang } from '@genoffice/i18n'
 import { createAiSideState, sidePartOf } from '../src/renderer/ai/run-snapshot'
 import { t } from '../src/renderer/i18n/locale'
 import { fixture } from './helpers/g6-12-side-fixture'
@@ -25,7 +26,7 @@ afterEach(() => {
   h = null
 })
 
-async function mountWired() {
+async function mountWired(lang?: Lang) {
   const f = fixture()
   const sideState = createAiSideState(
     {
@@ -43,6 +44,7 @@ async function mountWired() {
     hfAccess: f.access.hf,
     pageSetupAccess: f.access.pageSetup,
     docExtras: f.access.extras,
+    lang,
   })
   return f
 }
@@ -90,6 +92,19 @@ describe('Roll back after a mid-run Save (docs)', () => {
       t('aiRollbackKept', {
         parts: [t('aiSidePartHeaderFooter'), t('aiSidePartWatermark')].join(t('aiSidePartSep')),
       }),
+    )
+  })
+
+  it('renders the notice and the parts list in the interface language', async () => {
+    const f = await mountWired('vi')
+    await h!.send('add a header, bold the title, then a watermark')
+    await h!.toolTurn([HEADER, BOLD])
+    await save(f)
+    await h!.toolTurn([WATERMARK])
+    await h!.textTurn('Done.')
+    await rollBack()
+    expect(notice()!.textContent).toBe(
+      'Đã khôi phục nội dung. Tài liệu đã được lưu trong lúc AI trả lời nên không khôi phục được các phần sau: đầu trang và chân trang, hình mờ',
     )
   })
 

@@ -6,6 +6,8 @@ import { createRoot, type Root } from 'react-dom/client'
 import { Editor } from '@tiptap/core'
 import { editorExtensions } from '../../src/renderer/editor/extensions'
 import { AiPanel } from '../../src/renderer/ai/AiPanel'
+import type { Lang } from '@genoffice/i18n'
+import { LocaleProvider } from '../../src/renderer/i18n/locale'
 import { AI_PROVIDERS, type AiSettings } from '../../src/shared/ipc'
 
 type AiPanelProps = Parameters<typeof AiPanel>[0]
@@ -52,6 +54,8 @@ export interface DocsAiHarness {
   toolTurn(calls: Array<{ name: string; input: Record<string, unknown> }>): Promise<void>
   /** play a final text turn: the run ends */
   textTurn(text: string): Promise<void>
+  /** play a turn that fails: the run ends with this error */
+  errorTurn(message: string): Promise<void>
   /** send a message from the composer: the run starts */
   send(text: string): Promise<void>
   /** the Stop button of the composer */
@@ -64,7 +68,7 @@ let callSeq = 0
 /** mount the panel; `extra` props go straight to AiPanel */
 export async function mountDocsAiPanel(
   texts: string[],
-  extra: { filePath?: string | null } & Partial<
+  extra: { filePath?: string | null; lang?: Lang } & Partial<
     Pick<
       AiPanelProps,
       'sideState' | 'commentsAccess' | 'hfAccess' | 'pageSetupAccess' | 'docExtras'
@@ -94,15 +98,18 @@ export async function mountDocsAiPanel(
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root: Root = createRoot(container)
-  const element = (): ReactElement =>
-    createElement(AiPanel, {
+  const { lang, ...panelExtra } = extra
+  const element = (): ReactElement => {
+    const panel = createElement(AiPanel, {
       editor,
       blocks: [],
       settings: harnessSettings,
       open: true,
-      ...extra,
+      ...panelExtra,
       filePath: extra.filePath === undefined ? '/docs/a.docx' : extra.filePath,
     })
+    return lang ? createElement(LocaleProvider, { initial: lang }, panel) : panel
+  }
   act(() => root.render(element()))
   await settle()
   const emit = async (chunk: Record<string, unknown>) => {
@@ -128,6 +135,10 @@ export async function mountDocsAiPanel(
     async textTurn(text) {
       await emit({ type: 'delta', text })
       await emit({ type: 'done' })
+      await settle()
+    },
+    async errorTurn(message) {
+      await emit({ type: 'error', error: message })
       await settle()
     },
     async send(text) {

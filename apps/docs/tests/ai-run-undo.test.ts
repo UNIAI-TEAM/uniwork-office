@@ -108,3 +108,63 @@ describe('one undo step per AI run (docs)', () => {
     expect(editor.isEditable).toBe(true)
   })
 })
+
+describe('undo and redo during an open run (docs)', () => {
+  it('the toolbar Undo and Redo commands do nothing while the run is open', async () => {
+    h = await mountDocsAiPanel(TEXTS)
+    const { editor } = h
+    // an edit of the user's own, so there is an older step an undo could reach
+    editor.commands.insertContentAt(editor.state.doc.content.size - 1, ' typed')
+    const typed = content(editor)
+    const depthBefore = undoDepth(editor.state)
+    await h.send('format it')
+    await h.toolTurn([font([0], { bold: true })])
+    const midRun = content(editor)
+    expect(midRun).not.toEqual(typed)
+
+    // the commands the ribbon, menu and shortcuts run
+    editor.chain().undo().run()
+    expect(content(editor)).toEqual(midRun)
+    editor.chain().redo().run()
+    expect(content(editor)).toEqual(midRun)
+
+    await h.toolTurn([font([1], { italic: true })])
+    await h.textTurn('Done.')
+    // the whole run is still one step on top of the user's: one undo goes back to their edit
+    expect(undoDepth(editor.state)).toBe(depthBefore + 1)
+    expect(run(editor, undo)).toBe(true)
+    expect(content(editor)).toEqual(typed)
+  })
+
+  it('undo works again once the run ends', async () => {
+    h = await mountDocsAiPanel(TEXTS)
+    const { editor } = h
+    await h.send('bold it')
+    await h.toolTurn([font([0], { bold: true })])
+    await h.textTurn('Done.')
+    expect(editor.can().undo()).toBe(true)
+    expect(editor.chain().undo().run()).toBe(true)
+  })
+})
+
+describe('a run that ends in an error (docs)', () => {
+  it('is one undo step, and the document is editable again', async () => {
+    h = await mountDocsAiPanel(TEXTS)
+    const { editor } = h
+    const before = content(editor)
+    const depthBefore = undoDepth(editor.state)
+    await h.send('format it')
+    await h.toolTurn([font([0], { bold: true }), font([1], { italic: true })])
+    expect(editor.isEditable).toBe(false)
+    // the next model turn fails
+    await h.errorTurn('provider unavailable')
+    expect(editor.isEditable).toBe(true)
+    expect(content(editor)).not.toEqual(before)
+    expect(undoDepth(editor.state)).toBe(depthBefore + 1)
+    expect(run(editor, undo)).toBe(true)
+    expect(content(editor)).toEqual(before)
+    // and the user's next edit is its own step
+    editor.commands.insertContentAt(editor.state.doc.content.size - 1, ' typed')
+    expect(undoDepth(editor.state)).toBe(1)
+  })
+})
