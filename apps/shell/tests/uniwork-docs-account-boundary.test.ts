@@ -545,6 +545,39 @@ describe('an account switch that is already effective (Q2 = a)', () => {
     expect(h.locked).toEqual([ownerA, ownerB])
   })
 
+  it('d1-2: a run nobody awaits is no unhandled rejection, and an awaiting enforce still rejects', async () => {
+    // a caller that awaits its run still receives that run's failure
+    const awaited = switching({ count: 0, ramOnly: 0 })
+    await awaited.boundary.enforce(ownerA)
+    awaited.deps.closeDocument.mockRejectedValueOnce(new Error('close failed'))
+    await expect(awaited.boundary.enforce(ownerB)).rejects.toThrow('close failed')
+
+    // a run whose push promise nobody awaits (the drain never reached the
+    // enforce's `await run.done`) still has an observer on its own promise
+    const seen: unknown[] = []
+    const onUnhandled = (reason: unknown): void => {
+      seen.push(reason)
+    }
+    process.on('unhandledRejection', onUnhandled)
+    try {
+      const h = switching({ count: 0, ramOnly: 0 })
+      const internals = h.boundary as unknown as {
+        queued: Array<{ settle: { reject(error: unknown): void } }>
+        drain(): Promise<void>
+      }
+      vi.spyOn(internals, 'drain').mockImplementationOnce(() => {
+        throw new Error('no drain')
+      })
+      const lost = h.boundary.enforce(ownerB)
+      void lost.catch(() => undefined)
+      internals.queued[0].settle.reject(new Error('lock failed'))
+      await new Promise((resolve) => setImmediate(resolve))
+      expect(seen).toEqual([])
+    } finally {
+      process.off('unhandledRejection', onUnhandled)
+    }
+  })
+
   it('d7-1: a non-adjacent repeat of an owner locks each account exactly once (every run locks the owner before it)', async () => {
     const ownerX = { accountId: 'acc_x', deploymentId: 'default' }
     const h = switching({ count: 0, ramOnly: 0 })
