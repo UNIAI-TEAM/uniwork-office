@@ -387,6 +387,22 @@ export interface UniworkDocStatus {
   remote?: UniworkRemoteBar
   /** G5-08c: a lock happened while this document was open (outranks `remote`); absent = none */
   lockWhileOpen?: UniworkLockWhileOpen
+  /**
+   * G5-06u: the save waits for an AI run to finish ('ai-long' = long enough to
+   * offer Stop). Type only for now: main never sets it yet (the desktop AI-run
+   * owner wires it); absent = no wait.
+   */
+  saveWait?: 'ai' | 'ai-long'
+}
+
+/**
+ * G5-06u: main asks the shell renderer to open the queue popover of `path`
+ * (Ctrl/Cmd+S on a document that already has a pending save, or a save the
+ * store refused). The renderer ignores a request for a path that is not the
+ * active tab.
+ */
+export interface UniworkQueuePopoverRequest {
+  path: string
 }
 
 export type UniworkConflictChoice = 'overwrite' | 'save-local-copy' | 'open-latest' | 'later'
@@ -887,6 +903,8 @@ export interface HomeApi {
   uniworkDocStatus(path: string): Promise<UniworkDocStatus | null>
   uniworkActiveDocStatus(): Promise<UniworkDocStatus | null>
   onUniworkDocStatus(cb: (status: UniworkDocStatus) => void): () => void
+  /** G5-06u: main asks for the queue popover of a path (Ctrl/Cmd+S with a pending save) */
+  onUniworkQueuePopover(cb: (request: UniworkQueuePopoverRequest) => void): () => void
   uniworkSave(path: string): Promise<UniworkDocStatus | null>
   uniworkResolveConflict(path: string): Promise<UniworkDocStatus | null>
   /** G5-09: main pushes the conflict dialog view when S5 opens or updates in place */
@@ -1452,6 +1470,8 @@ export const UNIWORK_DOC_CHANNELS = {
   docStatus: 'uniwork-doc:status',
   activeDocStatus: 'uniwork-doc:active-status',
   docStatusEvent: 'uniwork-doc:status-event',
+  /** main -> shell renderer: open the queue popover of { path } (G5-06u) */
+  queuePopover: 'uniwork-doc:queue-popover',
   save: 'uniwork-doc:save',
   resolveConflict: 'uniwork-doc:resolve-conflict',
   /** main -> shell renderer: open or update the S5 conflict dialog (G5-09) */

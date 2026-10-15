@@ -21,6 +21,7 @@ import type {
   UniworkDocStatus,
   UniworkLaunchEvent,
   UniworkLockReason,
+  UniworkQueuePopoverRequest,
   UniworkRemoteAction,
   UniworkRemoteBar,
   UniworkResult,
@@ -241,6 +242,8 @@ export interface UniworkDocsServiceDeps {
   notifyTitleRenamed?(path: string, title: string): void
   ui: ConflictUi
   pushStatus(status: UniworkDocStatus): void
+  /** G5-06u: ask the shell renderer to open the queue popover of a path */
+  pushQueuePopover?(request: UniworkQueuePopoverRequest): void
   pushLaunch(event: UniworkLaunchEvent): void
   /** G5-09 S5: pushes the current conflict dialog view to the shell renderer */
   pushConflict?(view: UniworkConflictView): void
@@ -718,6 +721,7 @@ export class UniworkDocsService {
       ownsBinding: (doc) => this.owns(doc),
       intents: () => this.intentAccess(),
       publish: (status) => this.publish(status),
+      requestQueuePopover: (path) => this.deps.pushQueuePopover?.({ path }),
       onSaved: (doc, versionId) => this.deps.notifySaved?.(doc.path, versionId),
       capability: {
         get: (orgId) =>
@@ -1964,7 +1968,9 @@ export class UniworkDocsService {
       this.refuseMigration(doc)
       return
     }
-    void this.coordinator.save(path)
+    // G5-06u: the user's own Save: a pending intent is not replayed and no
+    // second one is minted; the coordinator asks for the queue popover instead
+    void this.coordinator.save(path, { userSave: true })
   }
 
   // ---- renderer API ----------------------------------------------------------

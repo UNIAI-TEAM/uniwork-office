@@ -97,6 +97,12 @@ export interface TabsApi {
    * triggers; the shell's own popovers subscribe so a title-bar drag — which
    * produces no DOM event — still dismisses them */
   onChromePressed(handler: () => void): () => void
+  /**
+   * fire-and-forget: hand keyboard focus back to the active tab's view (or the
+   * shell page on Home). A shell popover opened for the editor (the queue
+   * popover after Ctrl/Cmd+S) returns focus to the document with this.
+   */
+  focusActive(): void
 }
 
 export const TABS_CHANNELS = {
@@ -117,4 +123,5 @@ export const TABS_CHANNELS = {
   reorder: 'tabs:reorder',
   changed: 'tabs:changed',
   chromePressed: 'tabs:chrome-pressed',
+  focusActive: 'tabs:focus-active',
 } as const

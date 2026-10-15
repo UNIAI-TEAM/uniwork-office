@@ -5529,6 +5529,13 @@ function activeHtmlTarget() {
 
 function registerTabsIpc(): void {
   ipcMain.on(TABS_CHANNELS.chromePressed, (event) => broadcastChromePressed(event.sender))
+  // G5-06u: a shell popover opened for the editor gives focus back to it; only
+  // the shell page of the tabbed window may ask
+  ipcMain.on(TABS_CHANNELS.focusActive, (event) => {
+    if (shellWindow && !shellWindow.isDestroyed() && event.sender === shellWindow.webContents) {
+      tabManager?.focusActiveView()
+    }
+  })
   ipcMain.handle(TABS_CHANNELS.list, () => tabManager?.list() ?? [])
   ipcMain.handle(TABS_CHANNELS.activate, (_event, id: unknown) => {
     if (typeof id !== 'string' || !id) return

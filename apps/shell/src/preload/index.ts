@@ -59,6 +59,7 @@ import type {
   UniworkDocStatus,
   UniworkDocSummary,
   UniworkLaunchEvent,
+  UniworkQueuePopoverRequest,
   UniworkRemoteBar,
   UniworkRemoteAction,
   UniworkResult,
@@ -1085,6 +1086,14 @@ const homeApi: HomeApi = {
     ipcRenderer.on(UNIWORK_DOC_CHANNELS.docStatusEvent, listener)
     return () => ipcRenderer.removeListener(UNIWORK_DOC_CHANNELS.docStatusEvent, listener)
   },
+  onUniworkQueuePopover(cb) {
+    const listener = (_event: IpcRendererEvent, raw: unknown) => {
+      const path = raw && typeof raw === 'object' ? (raw as { path?: unknown }).path : undefined
+      if (typeof path === 'string' && path) cb({ path } satisfies UniworkQueuePopoverRequest)
+    }
+    ipcRenderer.on(UNIWORK_DOC_CHANNELS.queuePopover, listener)
+    return () => ipcRenderer.removeListener(UNIWORK_DOC_CHANNELS.queuePopover, listener)
+  },
   async uniworkSave(path) {
     return asUniworkStatus(await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.save, path))
   },
@@ -1300,6 +1309,9 @@ const tabsApi: TabsApi = {
   },
   notifyChromePressed() {
     ipcRenderer.send(TABS_CHANNELS.chromePressed)
+  },
+  focusActive() {
+    ipcRenderer.send(TABS_CHANNELS.focusActive)
   },
   onChromePressed(handler) {
     const listener = () => handler()

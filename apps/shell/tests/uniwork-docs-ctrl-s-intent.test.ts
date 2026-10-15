@@ -1,0 +1,363 @@
+import { createHash } from 'node:crypto'
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { basename, dirname, join } from 'node:path'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { UniworkDocStatus, UniworkQueuePopoverRequest } from '../src/shared/home-api'
+import type { DeploymentProfile } from '../src/main/uniwork-auth/deployment'
+import {
+  UniworkDocsService,
+  type ConflictUi,
+  type UnsavedCloseChoice,
+} from '../src/main/uniwork-docs/service'
+import { BINDING_FILE } from '../src/main/uniwork-docs/binding-store'
+import { INTENT_STORE_REGISTRATION, createIntentStore } from '../src/main/uniwork-sync/intent-store'
+import { DRAFTS_STORE_REGISTRATION } from '../src/main/uniwork-sync/queue/drafts'
+import { PAUSE_STORE_REGISTRATION } from '../src/main/uniwork-sync/queue/pause'
+import type { IntentRecordV2, QueueState } from '../src/main/uniwork-sync/queue/record'
+import { createSafeStorageKeyProvider } from '../src/main/uniwork-sync/keys'
+import { createSyncStoreAccess } from '../src/main/uniwork-sync/session-store'
+import { createStoreLayer, type StoreLayer } from '../src/main/uniwork-sync/store'
+import { createLockableSafeStorage } from '../src/main/uniwork-sync/test-kit/compliance'
+
+/**
+ * G5-06u T9 (contract §1.3, §4; AC G5-A05): Ctrl/Cmd+S on a document that
+ * already has a pending save intent never mints a second intent, never sends
+ * the newer bytes (N+1 is not sent with N) and never replays a paused intent
+ * inline. It marks the unsent N+1 (`pendingNext`), publishes the status and
+ * asks the shell renderer to open the queue popover once. A dirty copy without
+ * an intent still mints one, as before.
+ */
+
+const TOKEN = 'secret-access-token-0123456789'
+const ORIGIN = 'https://uniwork.example'
+const profile: DeploymentProfile = {
+  deploymentId: 'default',
+  apiOrigin: ORIGIN,
+  clientId: 'uniwork-office',
+  channel: 'stable',
+}
+const DOC = '01J8X4DOC0N1P2Q3R4S5T6U7'
+const enc = (text: string) => new TextEncoder().encode(text)
+const hex = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex')
+
+interface Call {
+  method: string
+  path: string
+}
+
+/** a small UniWork server: detail, download, idempotent upload + commit */
+function fakeServer(initial: { bytes: Uint8Array }) {
+  const state = { revision: 41, version: 3, bytes: initial.bytes, title: 'Q4 plan.docx' }
+  const calls: Call[] = []
+  const uploads = new Map<string, { id: string; checksum: string; bytes: Uint8Array }>()
+  let seq = 0
+  const docJson = () => ({
+    id: DOC,
+    organization_id: 'org_a',
+    workspace_id: 'ws_1',
+    title: state.title,
+    kind: 'file',
+    revision: String(state.revision),
+    current_version: state.version,
+    my_level: 'edit',
+    file: {
+      file_id: 'f',
+      version_id: `v${state.version}`,
+      version: state.version,
+      filename: state.title,
+      mime_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      size_bytes: state.bytes.byteLength,
+      checksum_sha256: hex(state.bytes),
+    },
+  })
+  const json = (status: number, body: unknown) =>
+    new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+  const error = (status: number, code: string, fields?: Record<string, unknown>) =>
+    json(status, { error: { code, message: 'x', ...(fields ? { fields } : {}) } })
+
+  const fetch = vi.fn(async (url: string, init: RequestInit): Promise<Response> => {
+    const u = new URL(url)
+    const method = init.method ?? 'GET'
+    calls.push({ method, path: u.pathname })
+    const headers = Object.fromEntries(
+      Object.entries((init.headers ?? {}) as Record<string, string>).map(([k, v]) => [
+        k.toLowerCase(),
+        v,
+      ]),
+    )
+    const key = headers['idempotency-key'] ?? ''
+    if (u.pathname === `/api/v1/documents/${DOC}` && method === 'GET') {
+      return json(200, { document: docJson() })
+    }
+    if (u.pathname === `/api/v1/documents/${DOC}/download`) {
+      return new Response(state.bytes as BodyInit, { status: 200 })
+    }
+    if (u.pathname === `/api/v1/documents/${DOC}/uploads`) {
+      const file = (init.body as FormData).get('file') as Blob
+      const bytes = new Uint8Array(await file.arrayBuffer())
+      const upload = uploads.get(key) ?? { id: `up_${++seq}`, checksum: hex(bytes), bytes }
+      uploads.set(key, upload)
+      return json(201, {
+        upload_id: upload.id,
+        checksum_sha256: upload.checksum,
+        size_bytes: bytes.byteLength,
+        claim_expires_at: '2026-10-10T00:00:00Z',
+      })
+    }
+    if (u.pathname === `/api/v1/documents/${DOC}/versions/commit` && method === 'POST') {
+      const body = JSON.parse(String(init.body)) as { upload_id: string; base_revision: string }
+      if (body.base_revision !== String(state.revision)) {
+        return error(409, 'document_version_conflict', {
+          current_revision: String(state.revision),
+        })
+      }
+      const upload = [...uploads.values()].find((x) => x.id === body.upload_id)
+      if (!upload) return error(409, 'document_upload_invalid')
+      state.revision += 1
+      state.version += 1
+      state.bytes = upload.bytes
+      return json(200, {
+        document: docJson(),
+        version: {
+          id: `ver_${state.version}`,
+          document_id: DOC,
+          version: state.version,
+          kind: 'file',
+          checksum_sha256: upload.checksum,
+          size_bytes: upload.bytes.byteLength,
+        },
+      })
+    }
+    return error(404, 'not_found')
+  })
+  return { state, calls, fetch }
+}
+
+let dir: string
+beforeEach(() => {
+  dir = mkdtempSync(join(tmpdir(), 'uw-ctrl-s-intent-'))
+})
+afterEach(async () => {
+  await new Promise((resolve) => setTimeout(resolve, 25))
+  await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })
+})
+
+function setup(
+  server: ReturnType<typeof fakeServer>,
+  opts: { capability?: Record<string, boolean>; budgetBytes?: number } = {},
+) {
+  const statuses: UniworkDocStatus[] = []
+  const popovers: UniworkQueuePopoverRequest[] = []
+  const safeStorage = createLockableSafeStorage()
+  const layer: StoreLayer = createStoreLayer({
+    root: join(dir, 'uniwork-sync', 'store'),
+    keys: createSafeStorageKeyProvider({ safeStorage, dir: join(dir, 'uniwork-sync', 'keys') }),
+    budgetBytes: opts.budgetBytes ?? 1 << 20,
+    clock: () => 1_700_000_000_000,
+  })
+  layer.register(INTENT_STORE_REGISTRATION)
+  layer.register(DRAFTS_STORE_REGISTRATION)
+  layer.register(PAUSE_STORE_REGISTRATION)
+  const syncStore = createSyncStoreAccess({
+    layer,
+    scope: () => ({ deploymentId: 'default', accountId: 'acc_1' }),
+  })
+  const ui: ConflictUi = {
+    chooseUnsavedClose: vi.fn(async () => 'cancel' as UnsavedCloseChoice),
+  }
+  const service = new UniworkDocsService({
+    userDataDir: dir,
+    syncStore,
+    appVersion: () => '0.0.0',
+    profile: () => profile,
+    identity: () => ({ accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' }),
+    selectedOrg: () => ({ id: 'org_a', slug: 'acme' }),
+    authorized: <T>(call: (token: string) => Promise<T>) => call(TOKEN),
+    fetch: server.fetch,
+    openPath: vi.fn(() => true),
+    isPathOpen: vi.fn(() => false),
+    requestModuleSave: vi.fn(() => false),
+    reloadPath: vi.fn(),
+    activePath: () => undefined,
+    ui,
+    pushStatus: (s: UniworkDocStatus) => statuses.push(s),
+    pushConflict: vi.fn(),
+    pushQueuePopover: (request: UniworkQueuePopoverRequest) => popovers.push(request),
+    pushLaunch: vi.fn(),
+    reveal: vi.fn(),
+    sleep: async () => undefined,
+    capability: {
+      get: async (orgId: string) => ({
+        kind: 'ok' as const,
+        capabilities: { sync_write: opts.capability?.[orgId] ?? true },
+        source: 'fresh' as const,
+      }),
+    },
+  })
+  return { service, statuses, popovers, layer, safeStorage }
+}
+
+type Ctx = ReturnType<typeof setup>
+
+async function openDoc(ctx: Ctx): Promise<string> {
+  const opened = await ctx.service.openDocument(DOC)
+  if (!opened.ok) throw new Error(opened.error)
+  return opened.value.path
+}
+
+const binding = (path: string) => JSON.parse(readFileSync(join(path, '..', BINDING_FILE), 'utf8'))
+const sent = (server: ReturnType<typeof fakeServer>) =>
+  server.calls.filter(
+    (c) =>
+      c.path.endsWith('/uploads') || (c.path.endsWith('/versions/commit') && c.method === 'POST'),
+  )
+
+async function intents(ctx: Ctx) {
+  const opened = await ctx.layer.open({ deploymentId: 'default', accountId: 'acc_1' })
+  if (opened.kind !== 'ok') throw new Error(opened.kind)
+  return createIntentStore(opened.store.records(INTENT_STORE_REGISTRATION.name))
+}
+
+async function storedIntent(ctx: Ctx, path: string) {
+  return (await intents(ctx)).get(basename(dirname(path)))
+}
+
+/** rewrites the stored record's state (a record the queue left at rest) */
+async function setStoredState(ctx: Ctx, path: string, state: QueueState): Promise<void> {
+  const store = await intents(ctx)
+  const key = basename(dirname(path))
+  const stored = await store.get(key)
+  if (!stored) throw new Error('no stored intent')
+  const record = { ...(stored.intent as unknown as IntentRecordV2), state }
+  expect((await store.put(key, record, stored.payload)).kind).toBe('ok')
+}
+
+/** a parked (paused_user) intent holding the v4 bytes; the user then edits on to v5 */
+async function parkedIntent(server: ReturnType<typeof fakeServer>) {
+  const ctx = setup(server)
+  const path = await openDoc(ctx)
+  await ctx.service.pauseSending()
+  writeFileSync(path, 'v4')
+  await ctx.service.save(path)
+  expect(binding(path)).toMatchObject({ state: 'paused_user' })
+  return { ctx, path }
+}
+
+/** the Ctrl/Cmd+S hook the module fires after it wrote the working copy */
+async function userSave(ctx: Ctx, path: string): Promise<void> {
+  ctx.service.onUserSave(path)
+  await ctx.service.coordinator.settled(path)
+  // let any fire-and-forget publish land
+  await new Promise((resolve) => setTimeout(resolve, 10))
+}
+
+async function expectNoSecondIntent(
+  ctx: Ctx,
+  path: string,
+  server: ReturnType<typeof fakeServer>,
+  before: { intentId: string; idempotencyKey: string; generation: number; state: QueueState },
+): Promise<void> {
+  // nothing reached the server: N+1 is not sent with N, N is not replayed
+  expect(sent(server)).toHaveLength(0)
+  // the same record, same key, same bytes (v4): no second intent was minted
+  const after = await storedIntent(ctx, path)
+  const record = after?.intent as unknown as IntentRecordV2
+  expect(record).toMatchObject(before)
+  expect(new TextDecoder().decode(after?.payload)).toBe('v4')
+  // the unsent N+1 is marked and published; the renderer is asked once
+  expect(ctx.service.coordinator.hasPendingNext(path)).toBe(true)
+  expect(ctx.statuses.at(-1)).toMatchObject({ path, pendingNext: true })
+  expect(ctx.popovers).toEqual([{ path }])
+}
+
+function recordFacts(record: IntentRecordV2) {
+  return {
+    intentId: record.intentId,
+    idempotencyKey: record.idempotencyKey,
+    generation: record.generation,
+    state: record.state,
+  }
+}
+
+describe('G5-06u T9: Ctrl/Cmd+S with a pending intent opens the queue popover', () => {
+  it.each<QueueState>(['paused_user', 'queued', 'failed'])(
+    'a stored %s intent: no save, no new intent, pendingNext, one popover push',
+    async (state) => {
+      const server = fakeServer({ bytes: enc('v3') })
+      const { ctx, path } = await parkedIntent(server)
+      if (state !== 'paused_user') await setStoredState(ctx, path, state)
+      const before = recordFacts(
+        (await storedIntent(ctx, path))?.intent as unknown as IntentRecordV2,
+      )
+      expect(before.state).toBe(state)
+      writeFileSync(path, 'v5')
+      ctx.statuses.length = 0
+      await userSave(ctx, path)
+      await expectNoSecondIntent(ctx, path, server, before)
+    },
+  )
+
+  it('a paused_admin intent (sync_write off) is not replayed inline', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server, { capability: { org_a: false } })
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    await ctx.service.save(path)
+    expect(binding(path)).toMatchObject({ state: 'paused_admin' })
+    const before = recordFacts((await storedIntent(ctx, path))?.intent as unknown as IntentRecordV2)
+    writeFileSync(path, 'v5')
+    ctx.statuses.length = 0
+    await userSave(ctx, path)
+    await expectNoSecondIntent(ctx, path, server, before)
+  })
+
+  it('a conflict copy: no save, one popover push (the renderer opens S5)', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    // another device committed meanwhile: the inline save lands in conflict
+    server.state.revision = 50
+    writeFileSync(path, 'v4')
+    await ctx.service.save(path)
+    expect(binding(path)).toMatchObject({ state: 'conflict' })
+    const before = sent(server).length
+    writeFileSync(path, 'v5')
+    await userSave(ctx, path)
+    expect(sent(server)).toHaveLength(before)
+    expect(ctx.popovers).toEqual([{ path }])
+  })
+
+  it('a dirty copy without an intent still mints one and saves; no popover', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    await userSave(ctx, path)
+    expect(sent(server).length).toBeGreaterThan(0)
+    expect(binding(path)).toMatchObject({ state: 'saved' })
+    expect(ctx.popovers).toEqual([])
+    expect(ctx.service.coordinator.hasPendingNext(path)).toBe(false)
+  })
+
+  it('a refused save (store_full, no intent) also asks for the popover', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server, { budgetBytes: 64 })
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4 '.repeat(200))
+    await userSave(ctx, path)
+    expect(binding(path)).toMatchObject({ state: 'error', error: 'store_full' })
+    expect(sent(server)).toHaveLength(0)
+    expect(ctx.popovers).toEqual([{ path }])
+  })
+
+  it('the Retry path (service.save) still replays the pending intent and never pushes', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const { ctx, path } = await parkedIntent(server)
+    await setStoredState(ctx, path, 'failed')
+    await ctx.service.save(path)
+    expect(sent(server).length).toBeGreaterThan(0)
+    expect(ctx.popovers).toEqual([])
+  })
+})

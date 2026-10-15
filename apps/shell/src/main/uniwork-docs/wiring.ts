@@ -545,6 +545,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     notifyTitleRenamed: (path, title) => wiring.notifyTitleRenamed?.(path, title),
     ui: conflictUi(wiring),
     pushStatus: (status) => push(UNIWORK_DOC_CHANNELS.docStatusEvent, status),
+    pushQueuePopover: (request) => push(UNIWORK_DOC_CHANNELS.queuePopover, request),
     pushConflict: (view) => push(UNIWORK_DOC_CHANNELS.conflictOpen, view),
     pushConflictClosed: (sessionId) => push(UNIWORK_DOC_CHANNELS.conflictClosed, { sessionId }),
     isAiRunning: (path) => wiring.isAiRunning?.(path) === true,

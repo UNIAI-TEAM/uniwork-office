@@ -119,6 +119,11 @@ export interface SaveCoordinatorDeps {
   /** status push for every state change */
   publish(status: UniworkDocStatus): void
   /**
+   * G5-06u: the user's Ctrl/Cmd+S met a document with a pending save (or a
+   * refused one): ask the shell renderer to open the queue popover of `path`.
+   */
+  requestQueuePopover?(path: string): void
+  /**
    * G8-12: a Save of `doc` settled with a commit and the binding now names the
    * server version `versionId` (the comments anchor base). Never called for a
    * failed, conflicted or no-op Save.
@@ -265,8 +270,16 @@ export class SaveCoordinator {
   /**
    * The UniWork step of one explicit Save of `path`. Resolves with the
    * document after the attempt (null for an unbound path); never throws.
+   *
+   * `userSave`: the user's own Ctrl/Cmd+S (G5-06u). A pending intent is then
+   * never replayed inline and no second one is minted: the working copy's N+1
+   * is only marked (`pendingNext`), the status published and the queue popover
+   * requested. Other callers (Retry, the close guard) keep the inline replay.
    */
-  async save(path: string, options?: { forceOffline?: boolean }): Promise<BoundDocument | null> {
+  async save(
+    path: string,
+    options?: { forceOffline?: boolean; userSave?: boolean },
+  ): Promise<BoundDocument | null> {
     // G5-04g defence in depth: a working copy whose folder declares a store this
     // build does not read never reaches the intent, the upload or the commit,
     // even if a module somehow has it open.
@@ -279,9 +292,11 @@ export class SaveCoordinator {
     if (this.saving.has(doc.path)) return doc
     const b = doc.binding
     if (b.access === 'view') return doc
-    if (b.state === 'conflict') return doc
+    if (b.state === 'conflict') return this.requestPopover(doc, options)
     // permission and existence refusals stay until the document is opened again
-    if (b.state === 'blocked' && b.error !== 'quota_exceeded') return doc
+    if (b.state === 'blocked' && b.error !== 'quota_exceeded') {
+      return this.requestPopover(doc, options)
+    }
     this.saving.add(doc.path)
     const attempt = this.run(doc, options).catch(() =>
       this.commitState(doc, { ...doc.binding, state: 'error', error: 'server_error' }),
@@ -295,9 +310,26 @@ export class SaveCoordinator {
     }
   }
 
+  /** a user Save that changes nothing asks for the queue popover instead (G5-06u) */
+  private requestPopover(
+    doc: BoundDocument,
+    options: { userSave?: boolean } | undefined,
+    pendingNext = false,
+  ): BoundDocument {
+    if (!options?.userSave) return doc
+    if (pendingNext) {
+      // the working copy moved past the pending intent: an unsent N+1, shown
+      // on the chip before the popover opens
+      this.pendingNext.add(doc.path)
+      this.publish(doc)
+    }
+    this.deps.requestQueuePopover?.(doc.path)
+    return doc
+  }
+
   private async run(
     doc: BoundDocument,
-    options?: { forceOffline?: boolean },
+    options?: { forceOffline?: boolean; userSave?: boolean },
   ): Promise<BoundDocument> {
     const { store } = this.deps
     let bytes: Uint8Array
@@ -316,13 +348,14 @@ export class SaveCoordinator {
       // a locked keychain (or a session without a store) refuses the save: no
       // intent, no request, no other save path
       const error = access.kind === 'keystore_locked' ? 'keystore_locked' : 'server_error'
-      return this.commitState(doc, { ...doc.binding, state: 'error', error })
+      const refused = await this.commitState(doc, { ...doc.binding, state: 'error', error })
+      return error === 'keystore_locked' ? this.requestPopover(refused, options) : refused
     }
     // the queue dispatcher is running this same key right now: the inline
     // pipeline must not start a second writer of the one intent. The dispatcher
     // owns the record and the chip, so this returns the document untouched
     // (G506-be-1)
-    if (this.dispatcherActive(doc.key)) return doc
+    if (this.dispatcherActive(doc.key)) return this.requestPopover(doc, options, true)
     const { intents } = access
     const facts = factsOf(doc, bytes.byteLength)
 
@@ -363,7 +396,12 @@ export class SaveCoordinator {
       minted.state = state
       const written = await intents.put(doc.key, minted, bytes)
       if (written.kind === 'store_full') {
-        return this.commitState(doc, { ...doc.binding, state: 'error', error: 'store_full' })
+        const refused = await this.commitState(doc, {
+          ...doc.binding,
+          state: 'error',
+          error: 'store_full',
+        })
+        return this.requestPopover(refused, options)
       }
       if (written.kind === 'interrupted') {
         // the account boundary wiped the scope under this save
@@ -383,6 +421,11 @@ export class SaveCoordinator {
         this.pendingNext.delete(doc.path)
         return this.commitState(doc, { ...doc.binding, state, error: errorForState(state) })
       }
+    } else if (options?.userSave) {
+      // G5-06u: the user's Ctrl/Cmd+S with an intent pending: never a second
+      // intent and no inline replay (a paused_user / paused_admin intent stays
+      // paused); the N+1 is marked and the queue popover tells the user why
+      return this.requestPopover(doc, options, true)
     } else {
       // an intent is already pending: never a second one. The status says so
       // (pendingNext = an unsent N+1) and the SAME record and key are replayed
