@@ -142,6 +142,16 @@ describe('ai-uniwork string shards', () => {
     },
   )
 
+  it('RF4-3: zh, zh-TW and ja spoken credits read naturally, without a slash a screen reader would voice', () => {
+    const params = { remaining: 12, limit: 50 }
+    for (const lang of ['zh', 'zh-TW', 'ja'] as const) {
+      expect(table(lang).aiUniworkCreditsAria).not.toContain('/')
+    }
+    expect(aiUniworkText('zh', 'aiUniworkCreditsAria', params)).toBe('共 50，剩余 12 额度')
+    expect(aiUniworkText('zh-TW', 'aiUniworkCreditsAria', params)).toBe('共 50，剩餘 12 額度')
+    expect(aiUniworkText('ja', 'aiUniworkCreditsAria', params)).toBe('50 クレジット中、残り 12')
+  })
+
   it('RF3-2: pins the catalogue vi/en spoken credits strings', () => {
     const params = { remaining: 12, limit: 50 }
     expect(aiUniworkText('en', 'aiUniworkCreditsAria', params)).toBe('12 of 50 credits left')

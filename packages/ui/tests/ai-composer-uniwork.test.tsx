@@ -6,7 +6,13 @@ import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { aiNoticeText, composerNoteFor, type ComposerNote } from '@genoffice/ai-provider'
 import { AiComposer, type AiComposerProps } from '../src/AiComposer'
-import { ack, clearUniworkAcks, isAcked, type UniworkAckKey } from '../src/ai-uniwork-composer'
+import {
+  UniworkDisclosure,
+  ack,
+  clearUniworkAcks,
+  isAcked,
+  type UniworkAckKey,
+} from '../src/ai-uniwork-composer'
 import { aiUniworkText } from '../src/strings-ai-uniwork'
 
 let host: HTMLDivElement
@@ -497,6 +503,106 @@ describe('AiComposer — disclosure ack with an unscoped key (RF3-1)', () => {
     renderUnscoped({ account: 'acc-1', org: '', document: 'doc-42' })
     expect(host.querySelector('[role="region"]')).not.toBeNull()
     expect(sendBtn().getAttribute('aria-disabled')).toBe('true')
+  })
+})
+
+describe('AiComposer — send-blocked report and shared unscoped ack (RF4-1, RF4-2)', () => {
+  const unscoped: UniworkAckKey = { account: '', org: '', document: 'doc-42' }
+  const scoped: UniworkAckKey = { account: 'acc-1', org: 'org-1', document: 'doc-42' }
+
+  function renderWith(
+    key: UniworkAckKey,
+    onSendBlockedChange: (blocked: boolean) => void,
+    extra: { active?: boolean; renderInline?: boolean } = {},
+  ) {
+    renderComposer({
+      lang: 'vi',
+      value: 'Hello',
+      uniwork: {
+        active: extra.active ?? true,
+        provider: extra.active === false ? 'openai' : 'uniwork',
+        onSendBlockedChange,
+        disclosure: {
+          ackKey: key,
+          orgName: 'Acme Corp',
+          variant: 'document',
+          ...(extra.renderInline === undefined ? {} : { renderInline: extra.renderInline }),
+        },
+      },
+    })
+  }
+
+  it('RF4-1: reports blocked while the disclosure is unacked and unblocked after the ack', () => {
+    const seen: boolean[] = []
+    renderWith(scoped, (b) => seen.push(b))
+    expect(seen.at(-1)).toBe(true)
+    act(() => {
+      host.querySelector<HTMLButtonElement>('[role="region"] button')!.click()
+    })
+    expect(seen.at(-1)).toBe(false)
+  })
+
+  it('RF4-1: an empty account reports unblocked after its in-memory ack', () => {
+    const seen: boolean[] = []
+    renderWith(unscoped, (b) => seen.push(b))
+    expect(seen.at(-1)).toBe(true)
+    act(() => {
+      host.querySelector<HTMLButtonElement>('[role="region"] button')!.click()
+    })
+    expect(seen.at(-1)).toBe(false)
+  })
+
+  it('RF4-1: an already acked key, or another provider, never reports blocked', () => {
+    ack(scoped)
+    const seen: boolean[] = []
+    renderWith(scoped, (b) => seen.push(b))
+    expect(seen.at(-1)).toBe(false)
+    clearUniworkAcks()
+    const other: boolean[] = []
+    renderWith(scoped, (b) => other.push(b), { active: false })
+    expect(other.at(-1)).toBe(false)
+  })
+
+  it('RF4-1: a blocked composer reports unblocked when it unmounts, so a stale flag cannot hold a queue', () => {
+    const seen: boolean[] = []
+    renderWith(scoped, (b) => seen.push(b))
+    expect(seen.at(-1)).toBe(true)
+    act(() => root.render(createElement('div')))
+    expect(seen.at(-1)).toBe(false)
+  })
+
+  it('RF4-2: with renderInline false an external region and the composer agree on the empty-account ack', () => {
+    const seen: boolean[] = []
+    const regionRef = { current: null as HTMLElement | null }
+    act(() => {
+      root.render(
+        createElement(
+          'div',
+          null,
+          createElement(AiComposer, {
+            ...baseProps({ value: 'Hello' }),
+            uniwork: {
+              active: true,
+              provider: 'uniwork',
+              onSendBlockedChange: (b: boolean) => seen.push(b),
+              disclosure: { ackKey: unscoped, variant: 'document', renderInline: false },
+            },
+          }),
+          createElement(UniworkDisclosure, { ackKey: unscoped, variant: 'document', regionRef }),
+        ),
+      )
+    })
+    const sendBtn = () => host.querySelector<HTMLButtonElement>('.ai-send-btn')!
+    expect(host.querySelector('[role="region"]')).not.toBeNull()
+    expect(sendBtn().getAttribute('aria-disabled')).toBe('true')
+    act(() => {
+      host.querySelector<HTMLButtonElement>('[role="region"] button')!.click()
+    })
+    expect(host.querySelector('[role="region"]')).toBeNull()
+    expect(sendBtn().getAttribute('aria-disabled')).toBeNull()
+    expect(seen.at(-1)).toBe(false)
+    expect(localStorage.getItem('uniwork.office.ai.disclosure.ack.v1')).toBeNull()
+    expect(isAcked(unscoped)).toBe(false)
   })
 })
 
