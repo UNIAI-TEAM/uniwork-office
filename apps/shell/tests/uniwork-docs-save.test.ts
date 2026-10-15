@@ -718,7 +718,7 @@ describe('save pipeline', () => {
     expect(ctx.deps.reloadPath).toHaveBeenCalledWith(path)
   })
 
-  it('save-local-copy reports save_copy_failed until G5-10 and the document stays in conflict', async () => {
+  it('save-copy against a server that refuses the copy request replies save_copy_failed and the document stays in conflict', async () => {
     const server = fakeServer({ bytes: enc('v3') })
     const ctx = setup(server)
     const path = await openDoc(ctx)
@@ -731,6 +731,7 @@ describe('save pipeline', () => {
       kind: 'save-copy',
       stopAi: false,
     })
+    // this fake has no copy route (404): the copy is refused, nothing is reported as done
     expect(reply).toEqual({
       kind: 'view',
       view: expect.objectContaining({ notice: 'save_copy_failed' }),

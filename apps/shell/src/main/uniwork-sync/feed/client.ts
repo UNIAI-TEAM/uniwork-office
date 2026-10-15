@@ -27,6 +27,11 @@ export interface FeedChange {
   revision: string
   currentVersion: number
   versionId: string | null
+  /**
+   * R5BE-1b: a feed (G5-01b) upsert's `archived` flag. An archive does not
+   * bump the revision; absent on a snapshot row, which carries no flag.
+   */
+  archived?: boolean
 }
 
 export interface FeedPage {
@@ -96,7 +101,9 @@ function parseChange(raw: unknown): FeedChange {
 function parseFeedChange(raw: unknown): FeedChange | null {
   if (!raw || typeof raw !== 'object') malformed()
   if ((raw as Record<string, unknown>).change_kind !== FEED_CHANGE_UPSERT) return null
-  return parseChange(raw)
+  const change = parseChange(raw)
+  const archived = (raw as Record<string, unknown>).archived
+  return typeof archived === 'boolean' ? { ...change, archived } : change
 }
 
 export function parseFeedPage(text: string): FeedPage {

@@ -33,6 +33,7 @@ export const ar = {
   aiRunSend: 'إرسال',
   aiRunRunning: 'قيد التشغيل… اضغط إيقاف أو Esc للإيقاف.',
   aiRunStopped: 'تم الإيقاف. تبقى أي تغييرات مطبّقة بالفعل في المستند ويمكن التراجع عنها.',
+  aiRunRetry: 'إعادة المحاولة',
   aiRunAskAgain: 'السؤال مجددًا',
   aiRunChooseOther: 'اختيار مزود آخر',
   aiRunOpenInApp: 'الفتح في التطبيق',
@@ -48,6 +49,8 @@ export const ar = {
   aiErrRateLimited: 'أنت ترسل بسرعة كبيرة. أعد المحاولة بعد {seconds} ث.',
   aiErrRateLimitedNoWait: 'أنت ترسل بسرعة كبيرة. أعد المحاولة بعد بضع دقائق.',
   aiErrUnavailable: 'لا يستجيب UniWork AI حاليًا. لا يزال مستندك وزر الحفظ يعملان.',
+  aiErrGeneric:
+    'واجه UniWork AI مشكلة غير متوقعة، لذلك توقف هذا التشغيل. لا يزال مستندك وزر الحفظ يعملان.',
   aiErrDisconnected:
     'انقطع الاتصال، لذا توقف هذا التشغيل. تبقى أي تغييرات مطبّقة بالفعل في المستند ويمكن التراجع عنها.',
   aiErrOffline: 'أنت غير متصل. لا يعمل UniWork AI دون اتصال ولا توضع الطلبات في قائمة الانتظار.',
@@ -63,4 +66,33 @@ export const ar = {
     'طلبك طويل جدًا على UniWork AI. اختصره إلى أقل من 8000 حرف ثم أرسله مرة أخرى.',
   aiErrQuestionRejected: 'تعذّر على UniWork AI قبول هذا الطلب. عدّله ثم أرسله مرة أخرى.',
   aiUniworkImagesNotSent: 'لا تُرسل الصور إلى UniWork AI؛ أُرسل النص فقط.',
+  // Cloud state, credits and account actions (shared with picker footer and composer note)
+  cloudStateReady: 'متاح',
+  cloudStateNotEntitled: 'غير مضمّن في خطتك',
+  cloudStateExhausted: 'نفدت أرصدة الذكاء الاصطناعي',
+  cloudStateUnavailable: 'غير متاح',
+  cloudStateSignedOut: 'غير مسجّل الدخول',
+  cloudStateInactive: 'الاشتراك غير نشط',
+  cloudCredits: 'أرصدة الذكاء الاصطناعي',
+  cloudCreditsLeft: 'متبقٍ {remaining} / {limit}',
+  cloudCreditsUnlimited: 'غير محدود',
+  cloudCreditsRenews: 'يتجدد في {date}',
+  cloudInactiveBody:
+    'اشتراك UniWork الخاص بمؤسستك غير نشط، لذا تم إيقاف الذكاء الاصطناعي السحابي مؤقتًا. اطلب من المسؤول تجديده؛ ستستمر مزوّداتك الخاصة أدناه في العمل.',
+  acctSignIn: 'تسجيل الدخول',
+  acctSignInAgain: 'تسجيل الدخول مرة أخرى',
+  // S8/S10 local-file conversation restart notice (G05BE-6)
+  aiUniworkLocalFileRestart:
+    'تبدأ الملفات المحلية محادثة جديدة ضمن مؤسستك ولا تحتفظ بالأدوار السابقة من الملفات الأخرى.',
+  // S9 cells summary and S10 web workbook size limit
+  aiResultCellsMeta:
+    'الخلايا المكتوبة: {written} ({range}) · الخلايا الموجودة التي تمت الكتابة فوقها: {overwritten}',
+  aiResultCellsMetaNoOverwrite: 'الخلايا المكتوبة: {written} ({range})',
+  aiErrWorkbookTooLarge:
+    'هذا المصنف كبير جدًا على الذكاء الاصطناعي على الويب. افتحه في تطبيق UniWork Office.',
+  // S7 composer notice keys (not_entitled, credits_exhausted)
+  not_entitled:
+    'خطة مؤسستك لا تتضمن UniWork AI. اسأل مسؤول المؤسسة عن الخطة، أو أضف مفتاح الذكاء الاصطناعي الخاص بك في الإعدادات > نموذج الذكاء الاصطناعي.',
+  credits_exhausted:
+    'استنفدت مؤسستك جميع أرصدة الذكاء الاصطناعي لهذه الفترة. اطلب من مسؤول المؤسسة إضافة أرصدة، أو أضف مفتاح الذكاء الاصطناعي الخاص بك في الإعدادات > نموذج الذكاء الاصطناعي.',
 } satisfies Record<keyof typeof zh, string>

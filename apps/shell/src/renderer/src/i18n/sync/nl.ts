@@ -38,6 +38,7 @@ export const nl = {
   uwQueueCancel: 'Opslaan annuleren…',
   uwQueueCancelConfirm:
     'Opslag in de wachtrij annuleren? Je wijzigingen blijven op deze computer; het document op UniWork verandert niet.',
+  uwQueueCancelGo: 'Opslaan annuleren',
   uwQueueCancelled: 'Opslag in wachtrij geannuleerd. Je wijzigingen blijven op deze computer.',
 
   // {reason} fragments of the blocked/failed rows (the existing uwReason* keys stay in the uniwork-documents shard)
@@ -123,12 +124,21 @@ export const nl = {
     'De sleutelhanger van de computer is vergrendeld, dus niet-opgeslagen wijzigingen bestaan alleen in geopende vensters. Nu afmelden verwijdert ze; wat al versleuteld bewaard is, blijft. Ontgrendel eerst de computer om ze te houden.',
   uwSignOutGo: 'Afmelden',
   uwSignOutWaiting: 'Lopende opslag wordt afgerond voordat je wordt afgemeld…',
+  uwSignOutCaptureFailed:
+    'Sommige niet-opgeslagen wijzigingen konden niet op tijd worden vastgelegd; de laatst opgeslagen of automatisch opgeslagen versie blijft bewaard voor je account.',
+  uwSwitchLostTitle:
+    'Sommige niet-opgeslagen wijzigingen van het vorige account zijn verloren gegaan',
+  uwSwitchLostBody:
+    'Er is een ander account aangemeld op deze computer, dus het vorige account is vergrendeld. Documenten waarvan de niet-opgeslagen wijzigingen niet bewaard konden worden: {count}. Al het andere blijft voor dat account vergrendeld op deze computer.',
+  uwSwitchLostOk: 'OK',
 
   // S2 sync center
   uwSyncTitle: 'Synchronisatiecentrum',
   uwSyncOpenFromSettings: 'Synchronisatiecentrum',
   uwSyncOnline: 'Verbonden met UniWork · gesynchroniseerd {time}',
   uwSyncOffline: 'Offline · laatst gesynchroniseerd {time}',
+  uwSyncOnlineNoTime: 'Verbonden met UniWork',
+  uwSyncOfflineNoTime: 'Offline',
   uwSyncPaused: 'Verzenden gepauzeerd — nieuwe opslagen wachten',
   uwSyncAdminPaused: 'Je beheerder heeft verzenden gepauzeerd. Opslagen blijven op deze computer.',
   uwSyncFeedOff:
@@ -160,6 +170,7 @@ export const nl = {
   uwSyncEmptyQueue: 'Er wacht niets op opslaan.',
   uwSyncEmptyAttention: 'Niets vraagt aandacht.',
   uwSyncEmptyRecent: 'Geen recente opslagen.',
+  uwSyncActionFailed: 'Dat is niet gelukt. Er is niets verwijderd; probeer het opnieuw.',
   uwSyncRowAnnounce: '{doc}: {state}',
 
   // S3 offline library
@@ -275,6 +286,14 @@ export const nl = {
     'Je versie is opgeslagen als nieuw document: {title}. Dit document is niet gewijzigd; je kunt nog steeds opnieuw laden of overschrijven.',
   uwConflictSaveCopyFailed:
     'Kan de kopie niet maken. Je wijzigingen zijn nog veilig; probeer het opnieuw.',
+  uwConflictSaveCopyNoSeat:
+    'Kan de kopie niet maken omdat je geen lid bent van de werkruimte waarin dit document staat. Je wijzigingen zijn nog veilig; je kunt je versie downloaden.',
+  uwConflictSaveCopyFolderRefused:
+    'Je kunt in deze map geen documenten maken. Download in plaats daarvan je versie.',
+  uwConflictDownloadDone:
+    'Je versie is op deze computer opgeslagen: {file}. Dit document is niet gewijzigd; je kunt nog steeds opnieuw laden of overschrijven.',
+  uwConflictDownloadFailedDesktop:
+    'Kan het bestand niet opslaan. Je wijzigingen zijn nog veilig; probeer het opnieuw.',
   uwConflictSaveCopyOffline:
     'Je bent offline. Voor een kopie is een verbinding nodig; je wijzigingen blijven bewaard.',
   uwConflictReloadFailed:

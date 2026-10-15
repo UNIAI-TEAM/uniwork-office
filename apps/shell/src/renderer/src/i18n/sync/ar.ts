@@ -35,6 +35,7 @@ export const ar = {
   uwQueueCancel: 'إلغاء الحفظ…',
   uwQueueCancelConfirm:
     'هل تريد إلغاء الحفظ في قائمة الانتظار؟ تبقى تغييراتك على هذا الكمبيوتر؛ ولا يتغير المستند على UniWork.',
+  uwQueueCancelGo: 'إلغاء الحفظ',
   uwQueueCancelled: 'تم إلغاء الحفظ في قائمة الانتظار. تبقى تغييراتك على هذا الكمبيوتر.',
 
   // {reason} fragments of the blocked/failed rows (the existing uwReason* keys stay in the uniwork-documents shard)
@@ -119,12 +120,20 @@ export const ar = {
     'سلسلة مفاتيح الكمبيوتر مقفلة، لذا توجد التغييرات غير المحفوظة في النوافذ المفتوحة فقط. تسجيل الخروج الآن يتجاهلها؛ ويبقى ما حُفظ مشفّرًا بالفعل. للاحتفاظ بها، افتح قفل الكمبيوتر أولًا.',
   uwSignOutGo: 'تسجيل الخروج',
   uwSignOutWaiting: 'جارٍ إنهاء الحفظ الجاري قبل تسجيل الخروج…',
+  uwSignOutCaptureFailed:
+    'تعذّر التقاط بعض التغييرات غير المحفوظة في الوقت المناسب؛ تم الاحتفاظ بأحدث نسخة محفوظة أو محفوظة تلقائيًا لحسابك.',
+  uwSwitchLostTitle: 'فُقدت بعض التغييرات غير المحفوظة للحساب السابق',
+  uwSwitchLostBody:
+    'سجّل حساب آخر الدخول على هذا الكمبيوتر، لذلك تم قفل الحساب السابق. المستندات التي تعذّر الاحتفاظ بتغييراتها غير المحفوظة: {count}. يبقى كل شيء آخر مقفلًا على هذا الكمبيوتر لذلك الحساب.',
+  uwSwitchLostOk: 'حسنًا',
 
   // S2 sync center
   uwSyncTitle: 'مركز المزامنة',
   uwSyncOpenFromSettings: 'مركز المزامنة',
   uwSyncOnline: 'متصل بـ UniWork · تمت المزامنة {time}',
   uwSyncOffline: 'غير متصل · آخر مزامنة {time}',
+  uwSyncOnlineNoTime: 'متصل بـ UniWork',
+  uwSyncOfflineNoTime: 'غير متصل',
   uwSyncPaused: 'الإرسال متوقف مؤقتًا — ستنتظر عمليات الحفظ الجديدة',
   uwSyncAdminPaused: 'أوقف المسؤول الإرسال مؤقتًا. تبقى عمليات الحفظ على هذا الكمبيوتر.',
   uwSyncFeedOff:
@@ -155,6 +164,7 @@ export const ar = {
   uwSyncEmptyQueue: 'لا يوجد ما ينتظر الحفظ.',
   uwSyncEmptyAttention: 'لا شيء يحتاج إلى معالجة.',
   uwSyncEmptyRecent: 'لا توجد عمليات حفظ حديثة.',
+  uwSyncActionFailed: 'تعذّر تنفيذ الإجراء. لم يُحذف أي شيء؛ حاول مرة أخرى.',
   uwSyncRowAnnounce: '{doc}: {state}',
 
   // S3 offline library
@@ -259,6 +269,12 @@ export const ar = {
   uwConflictSaveCopyDone:
     'حُفظت نسختك كمستند جديد: {title}. لم يتغير هذا المستند؛ لا يزال بإمكانك إعادة التحميل أو الاستبدال.',
   uwConflictSaveCopyFailed: 'تعذّر إنشاء النسخة. لا تزال تغييراتك آمنة؛ حاول مرة أخرى.',
+  uwConflictSaveCopyNoSeat:
+    'تعذّر إنشاء النسخة لأنك لست عضوًا في مساحة العمل التي يوجد فيها هذا المستند. لا تزال تغييراتك آمنة؛ يمكنك تنزيل نسختك.',
+  uwConflictSaveCopyFolderRefused: 'لا يمكنك إنشاء مستندات في هذا المجلد. نزّل نسختك بدلًا من ذلك.',
+  uwConflictDownloadDone:
+    'حُفظت نسختك على هذا الكمبيوتر: {file}. لم يتغير هذا المستند؛ لا يزال بإمكانك إعادة التحميل أو الاستبدال.',
+  uwConflictDownloadFailedDesktop: 'تعذّر حفظ الملف. لا تزال تغييراتك آمنة؛ حاول مرة أخرى.',
   uwConflictSaveCopyOffline: 'أنت غير متصل. يحتاج إنشاء نسخة إلى اتصال؛ ويتم الاحتفاظ بتغييراتك.',
   uwConflictReloadFailed: 'تعذّر تحميل أحدث إصدار. لم يتغير مستندك؛ حاول مرة أخرى.',
   uwConflictOverwriteFailed: 'تعذّر الاستبدال حتى الآن. لم يتغير مستندك؛ حاول مرة أخرى.',

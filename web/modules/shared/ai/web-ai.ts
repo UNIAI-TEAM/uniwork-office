@@ -140,7 +140,7 @@ function readChoice(key: string): AiChoice {
       }
       return {
         // only a provider the web can run: the value comes from localStorage and ends up in a URL
-        // (`uniwork` has a fixed route; settings() still drops it while the grant is off)
+        // (`uniwork` has a fixed route; settings() keeps it selected while the grant is off, and Send is blocked)
         ...(typeof raw.provider === 'string' &&
         (WEB_PROVIDER_IDS.has(raw.provider) || raw.provider === UNIWORK_PROVIDER_ID)
           ? { provider: raw.provider }
@@ -184,6 +184,17 @@ export interface WebAiState {
   cloud: AiCloudStatus | null
 }
 
+/**
+ * Identity tuple for the web frame's UniWork AI disclosure acknowledgement store
+ * (`{ account, org, document }`) and the `{org}` display name.
+ */
+export interface WebUniworkAiIdentity {
+  account: string
+  org: string
+  orgName: string
+  document: string
+}
+
 /** one frame's AI session; null-safe: `active()` is false whenever AI is off */
 export interface WebAi {
   active(): Promise<boolean>
@@ -197,6 +208,8 @@ export interface WebAi {
   openSettings(): Promise<void>
   /** the typed failure -> its card + its text */
   fail(err: unknown, provider?: string): string
+  /** UniWork AI disclosure identity and org display name for this frame session; null before init */
+  uniworkIdentity(): WebUniworkAiIdentity | null
 }
 
 const EMPTY: WebAiState = { credentials: { items: [], providers: [] }, cloud: null }
@@ -265,7 +278,14 @@ export function createWebAi(opts: {
   let cloudRead = false
   /** UniWork AI turned off by the server after the grant was minted (capability / format off) */
   let uniworkOff = false
-  let frameSession: { documentId: string; module?: OfficeModule } | null = null
+  let frameSession: {
+    documentId: string
+    module?: OfficeModule
+    workspaceId?: string
+    orgId?: string
+    account?: string
+    orgName?: string
+  } | null = null
   /**
    * provider -> what its own `/models` route listed: the ids (kept while a refresh runs or fails), the
    * key stamp and time of the last good answer, and the time of the last failure (the list is never
@@ -326,8 +346,22 @@ export function createWebAi(opts: {
         granted?.imageGeneration === true
       cloudRead = cloudWanted || uniworkGranted
       const sessionModule = (session as { module?: OfficeModule }).module
+      const workspaceId = (session as { workspaceId?: string }).workspaceId?.trim()
+      const orgId = (session as { orgId?: string }).orgId?.trim()
+      const orgName = (session as { orgName?: string }).orgName?.trim()
+      const account =
+        session.user?.id?.trim() ||
+        session.recovery?.scope?.split(':')[0]?.trim() ||
+        session.user?.displayName?.trim()
       const module = opts.module ?? sessionModule
-      frameSession = { documentId: session.documentId, ...(module ? { module } : {}) }
+      frameSession = {
+        documentId: session.documentId,
+        ...(module ? { module } : {}),
+        ...(workspaceId ? { workspaceId } : {}),
+        ...(orgId ? { orgId } : {}),
+        ...(account ? { account } : {}),
+        ...(orgName ? { orgName } : {}),
+      }
       clientRef = createAiWebClient({
         documentId: session.documentId,
         apiBase: session.apiBase,
@@ -355,7 +389,10 @@ export function createWebAi(opts: {
         cloudRead ? client.cloudStatus().catch(() => null) : Promise.resolve(null),
       ])
       const changed =
-        everLoaded && credentialSignature(credentials) !== credentialSignature(state.credentials)
+        (everLoaded &&
+          credentialSignature(credentials) !== credentialSignature(state.credentials)) ||
+        (cloud?.org_id ?? '') !== (state.cloud?.org_id ?? '') ||
+        (cloud?.org_name ?? '') !== (state.cloud?.org_name ?? '')
       state = { credentials, cloud }
       loadedAt = now()
       everLoaded = true
@@ -599,8 +636,12 @@ export function createWebAi(opts: {
       winner && usable.includes(winner)
         ? winner
         : (serverDefault?.provider ?? usable[0] ?? undefined)
+    // a picked UniWork AI stays selected while it is unavailable (grant off, or the server turned
+    // it off): the picker shows the unavailable state, Send is blocked and a send answers as off,
+    // never a request to the viewer's BYOK provider they did not pick; only a newer server default
+    // (a model set in UniWork Settings after the pick) replaces it
     const provider = (
-      choice.provider === UNIWORK_PROVIDER_ID && uniworkOn && localWins
+      choice.provider === UNIWORK_PROVIDER_ID && localWins
         ? UNIWORK_PROVIDER_ID
         : (keyed ?? (uniworkOn ? UNIWORK_PROVIDER_ID : (picked ?? fallback ?? 'openai')))
     ) as AiProviderId
@@ -828,6 +869,26 @@ export function createWebAi(opts: {
     streams,
     openSettings,
     fail,
+    uniworkIdentity: () => {
+      if (!frameSession) return null
+      // InitPayload (web/docs/protocol/types.ts, frozen X-02) does not define dedicated orgId /
+      // orgName fields, so org_id / org_name come from GET .../ai/cloud when cloudWanted is true or
+      // from optional host session extensions; when neither is available, org scopes to the document
+      // and orgName falls back to 'UniWork' (never a raw document UUID).
+      const org =
+        state.cloud?.org_id?.trim() ||
+        frameSession.orgId ||
+        frameSession.workspaceId ||
+        frameSession.documentId
+      const orgName = state.cloud?.org_name?.trim() || frameSession.orgName || 'UniWork'
+      const account = frameSession.account || 'web'
+      return {
+        account,
+        org,
+        orgName,
+        document: frameSession.documentId,
+      }
+    },
   }
 }
 

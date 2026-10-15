@@ -36,6 +36,7 @@ export const pl = {
   uwQueueCancel: 'Anuluj zapis…',
   uwQueueCancelConfirm:
     'Anulować zapis w kolejce? Zmiany pozostają na tym komputerze; dokument w UniWork się nie zmieni.',
+  uwQueueCancelGo: 'Anuluj zapis',
   uwQueueCancelled: 'Anulowano zapis w kolejce. Zmiany pozostają na tym komputerze.',
 
   // {reason} fragments of the blocked/failed rows (the existing uwReason* keys stay in the uniwork-documents shard)
@@ -120,12 +121,20 @@ export const pl = {
     'Pęk kluczy komputera jest zablokowany, więc niezapisane zmiany istnieją tylko w otwartych oknach. Wylogowanie teraz je odrzuci; to, co już zachowano w postaci zaszyfrowanej, pozostanie. Aby je zachować, najpierw odblokuj komputer.',
   uwSignOutGo: 'Wyloguj się',
   uwSignOutWaiting: 'Kończenie trwającego zapisu przed wylogowaniem…',
+  uwSignOutCaptureFailed:
+    'Niektórych niezapisanych zmian nie udało się przechwycić na czas; dla Twojego konta zachowano najnowszą zapisaną lub automatycznie zapisaną wersję.',
+  uwSwitchLostTitle: 'Część niezapisanych zmian poprzedniego konta została utracona',
+  uwSwitchLostBody:
+    'Na tym komputerze zalogowało się inne konto, więc poprzednie konto zostało zablokowane. Dokumenty, których niezapisanych zmian nie udało się zachować: {count}. Wszystko inne pozostaje zablokowane na tym komputerze dla tamtego konta.',
+  uwSwitchLostOk: 'OK',
 
   // S2 sync center
   uwSyncTitle: 'Centrum synchronizacji',
   uwSyncOpenFromSettings: 'Centrum synchronizacji',
   uwSyncOnline: 'Połączono z UniWork · zsynchronizowano {time}',
   uwSyncOffline: 'Offline · ostatnia synchronizacja {time}',
+  uwSyncOnlineNoTime: 'Połączono z UniWork',
+  uwSyncOfflineNoTime: 'Offline',
   uwSyncPaused: 'Wysyłanie wstrzymane — nowe zapisy poczekają',
   uwSyncAdminPaused: 'Administrator wstrzymał wysyłanie. Zapisy pozostają na tym komputerze.',
   uwSyncFeedOff:
@@ -157,6 +166,7 @@ export const pl = {
   uwSyncEmptyQueue: 'Nic nie czeka na zapis.',
   uwSyncEmptyAttention: 'Nic nie wymaga uwagi.',
   uwSyncEmptyRecent: 'Brak ostatnich zapisów.',
+  uwSyncActionFailed: 'Nie udało się. Nic nie zostało usunięte; spróbuj ponownie.',
   uwSyncRowAnnounce: '{doc}: {state}',
 
   // S3 offline library
@@ -274,6 +284,14 @@ export const pl = {
     'Twoja wersja została zapisana jako nowy dokument: {title}. Ten dokument się nie zmienił; nadal możesz wczytać ponownie lub zastąpić.',
   uwConflictSaveCopyFailed:
     'Nie udało się utworzyć kopii. Zmiany są nadal bezpieczne; spróbuj ponownie.',
+  uwConflictSaveCopyNoSeat:
+    'Nie udało się utworzyć kopii, ponieważ nie jesteś członkiem przestrzeni roboczej, w której znajduje się ten dokument. Zmiany są nadal bezpieczne; możesz pobrać swoją wersję.',
+  uwConflictSaveCopyFolderRefused:
+    'Nie możesz tworzyć dokumentów w tym folderze. Pobierz zamiast tego swoją wersję.',
+  uwConflictDownloadDone:
+    'Twoja wersja została zapisana na tym komputerze: {file}. Ten dokument się nie zmienił; nadal możesz wczytać ponownie lub zastąpić.',
+  uwConflictDownloadFailedDesktop:
+    'Nie udało się zapisać pliku. Zmiany są nadal bezpieczne; spróbuj ponownie.',
   uwConflictSaveCopyOffline:
     'Jesteś offline. Utworzenie kopii wymaga połączenia; zmiany zostają zachowane.',
   uwConflictReloadFailed:

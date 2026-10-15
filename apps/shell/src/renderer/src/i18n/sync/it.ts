@@ -40,6 +40,7 @@ export const it = {
   uwQueueCancel: 'Annulla salvataggio…',
   uwQueueCancelConfirm:
     'Annullare il salvataggio in coda? Le modifiche restano su questo computer; il documento su UniWork non cambia.',
+  uwQueueCancelGo: 'Annulla salvataggio',
   uwQueueCancelled: 'Salvataggio in coda annullato. Le modifiche restano su questo computer.',
 
   // {reason} fragments of the blocked/failed rows (the existing uwReason* keys stay in the uniwork-documents shard)
@@ -125,12 +126,20 @@ export const it = {
     'Il portachiavi del computer è bloccato, quindi le modifiche non salvate esistono solo nelle finestre aperte. Uscire ora le elimina; ciò che è già conservato cifrato resta. Per mantenerle, sblocca prima il computer.',
   uwSignOutGo: 'Esci',
   uwSignOutWaiting: 'Completamento del salvataggio in corso prima di uscire…',
+  uwSignOutCaptureFailed:
+    'Alcune modifiche non salvate non sono state acquisite in tempo; la versione salvata o salvata automaticamente più recente viene conservata per il tuo account.',
+  uwSwitchLostTitle: 'Alcune modifiche non salvate dell’account precedente sono andate perse',
+  uwSwitchLostBody:
+    'Un altro account ha effettuato l’accesso su questo computer, quindi l’account precedente è stato bloccato. Documenti le cui modifiche non salvate non è stato possibile conservare: {count}. Tutto il resto rimane bloccato su questo computer per quell’account.',
+  uwSwitchLostOk: 'OK',
 
   // S2 sync center
   uwSyncTitle: 'Centro di sincronizzazione',
   uwSyncOpenFromSettings: 'Centro di sincronizzazione',
   uwSyncOnline: 'Connesso a UniWork · sincronizzato {time}',
   uwSyncOffline: 'Offline · ultima sincronizzazione {time}',
+  uwSyncOnlineNoTime: 'Connesso a UniWork',
+  uwSyncOfflineNoTime: 'Offline',
   uwSyncPaused: 'Invio in pausa — i nuovi salvataggi resteranno in attesa',
   uwSyncAdminPaused:
     'L’amministratore ha messo in pausa l’invio. I salvataggi restano su questo computer.',
@@ -162,6 +171,7 @@ export const it = {
   uwSyncEmptyQueue: 'Nessun salvataggio in attesa.',
   uwSyncEmptyAttention: 'Niente da gestire.',
   uwSyncEmptyRecent: 'Nessun salvataggio recente.',
+  uwSyncActionFailed: 'Operazione non riuscita. Non è stato eliminato nulla; riprova.',
   uwSyncRowAnnounce: '{doc}: {state}',
 
   // S3 offline library
@@ -279,6 +289,14 @@ export const it = {
     'La tua versione è stata salvata come nuovo documento: {title}. Questo documento non è cambiato; puoi ancora ricaricare o sovrascrivere.',
   uwConflictSaveCopyFailed:
     'Impossibile creare la copia. Le modifiche sono ancora al sicuro; riprova.',
+  uwConflictSaveCopyNoSeat:
+    'Impossibile creare la copia perché non sei membro dello spazio di lavoro in cui si trova questo documento. Le modifiche sono ancora al sicuro; puoi scaricare la tua versione.',
+  uwConflictSaveCopyFolderRefused:
+    'Non puoi creare documenti in questa cartella. Scarica invece la tua versione.',
+  uwConflictDownloadDone:
+    'La tua versione è stata salvata su questo computer: {file}. Questo documento non è cambiato; puoi ancora ricaricare o sovrascrivere.',
+  uwConflictDownloadFailedDesktop:
+    'Impossibile salvare il file. Le modifiche sono ancora al sicuro; riprova.',
   uwConflictSaveCopyOffline:
     'Sei offline. Per creare una copia serve una connessione; le modifiche vengono conservate.',
   uwConflictReloadFailed:

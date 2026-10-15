@@ -133,6 +133,41 @@ describe('ai-uniwork string shards', () => {
     }
   })
 
+  it.each([...LANGS])(
+    'RF3-2: locale %s keeps the r2 catalogue spoken credits wording (not the visible line)',
+    (lang) => {
+      const aria = table(lang).aiUniworkCreditsAria
+      expect(aria).not.toBe(table(lang).cloudCreditsLeft)
+      expect(placeholdersOf(aria)).toBe(placeholdersOf(table(lang).cloudCreditsLeft))
+    },
+  )
+
+  it('RF4-3: zh, zh-TW and ja spoken credits read naturally, without a slash a screen reader would voice', () => {
+    const params = { remaining: 12, limit: 50 }
+    for (const lang of ['zh', 'zh-TW', 'ja'] as const) {
+      expect(table(lang).aiUniworkCreditsAria).not.toContain('/')
+    }
+    expect(aiUniworkText('zh', 'aiUniworkCreditsAria', params)).toBe('共 50，剩余 12 额度')
+    expect(aiUniworkText('zh-TW', 'aiUniworkCreditsAria', params)).toBe('共 50，剩餘 12 額度')
+    expect(aiUniworkText('ja', 'aiUniworkCreditsAria', params)).toBe('50 クレジット中、残り 12')
+  })
+
+  it('RF3-2: pins the catalogue vi/en spoken credits strings', () => {
+    const params = { remaining: 12, limit: 50 }
+    expect(aiUniworkText('en', 'aiUniworkCreditsAria', params)).toBe('12 of 50 credits left')
+    expect(aiUniworkText('vi', 'aiUniworkCreditsAria', params)).toBe('Còn 12 trên 50 tín dụng')
+  })
+
+  it.each([...LANGS])(
+    'RF2-3: locale %s has a generic S9 error line that is not the unavailable text',
+    (lang) => {
+      const generic = table(lang).aiErrGeneric
+      expect(generic?.trim().length).toBeGreaterThan(0)
+      expect(generic).not.toBe(table(lang).aiErrUnavailable)
+      expect(placeholdersOf(generic!)).toBe('')
+    },
+  )
+
   it('fills the placeholders through aiUniworkText', () => {
     expect(aiUniworkText('en', 'aiUniworkCreditsAria', { remaining: 12, limit: 50 })).toBe(
       '12 of 50 credits left',
@@ -140,6 +175,82 @@ describe('ai-uniwork string shards', () => {
     expect(aiUniworkText('vi', 'aiErrRateLimited', { seconds: 30 })).toBe(
       'Bạn đang gửi quá nhanh. Thử lại sau 30 giây.',
     )
+    expect(aiUniworkText('en', 'cloudCreditsLeft', { remaining: 10, limit: 100 })).toBe(
+      '10 / 100 left',
+    )
+    expect(aiUniworkText('en', 'cloudCreditsRenews', { date: '2026-11-01' })).toBe(
+      'Renews 2026-11-01',
+    )
+    expect(
+      aiUniworkText('en', 'aiResultCellsMeta', {
+        written: 4,
+        range: 'A1:B2',
+        overwritten: 2,
+      }),
+    ).toBe('Cells written: 4 (A1:B2) · Existing cells overwritten: 2')
+  })
+
+  it('aiResultCellsMetaNoOverwrite: the written-cells line without the overwritten count, in every locale', () => {
+    expect(
+      aiUniworkText('en', 'aiResultCellsMetaNoOverwrite', { written: 4, range: 'A1:B2' }),
+    ).toBe('Cells written: 4 (A1:B2)')
+    expect(
+      aiUniworkText('vi', 'aiResultCellsMetaNoOverwrite', { written: 4, range: 'A1:B2' }),
+    ).toBe('Đã ghi 4 ô (A1:B2)')
+    for (const lang of LANGS) {
+      const params = { written: 4, range: 'A1:B2' }
+      const line = aiUniworkText(lang, 'aiResultCellsMetaNoOverwrite', params)
+      expect(line, lang).not.toMatch(/[{}]/)
+      expect(line, lang).toContain('4')
+      expect(line, lang).toContain('A1:B2')
+      // the leading part of the full line, minus the overwritten half: same wording, no invented count
+      const full = aiUniworkText(lang, 'aiResultCellsMeta', { ...params, overwritten: 2 })
+      expect(full.startsWith(line), lang).toBe(true)
+    }
+  })
+
+  it('includes the G6-05u cloud, account, local-file restart, sheet meta, web 413 and composer notice keys in all locales (C6, RF1-18)', () => {
+    expect(aiUniworkText('en', 'acctSignIn')).toBe('Sign in')
+    expect(aiUniworkText('vi', 'acctSignIn')).toBe('Đăng nhập')
+    expect(aiUniworkText('en', 'acctSignInAgain')).toBe('Sign in again')
+    expect(aiUniworkText('vi', 'acctSignInAgain')).toBe('Đăng nhập lại')
+    expect(aiUniworkText('en', 'cloudStateReady')).toBe('Available')
+    expect(aiUniworkText('vi', 'cloudStateReady')).toBe('Sẵn sàng')
+    expect(aiUniworkText('en', 'cloudInactiveBody')).toContain('subscription is not active')
+    expect(aiUniworkText('vi', 'cloudInactiveBody')).toContain('không hoạt động')
+    expect(aiUniworkText('en', 'aiUniworkLocalFileRestart')).toContain(
+      'Local files start a new conversation',
+    )
+    expect(aiUniworkText('vi', 'aiUniworkLocalFileRestart')).toContain(
+      'Tệp trên máy bắt đầu cuộc trò chuyện mới',
+    )
+    expect(aiUniworkText('en', 'aiErrWorkbookTooLarge')).toContain('workbook is too large')
+    expect(aiUniworkText('vi', 'aiErrWorkbookTooLarge')).toContain('Bảng tính này quá lớn')
+
+    // RF1-18: not_entitled and credits_exhausted composer note keys in all 19 locales
+    expect(aiUniworkText('en', 'not_entitled' as never)).toContain(
+      'plan does not include UniWork AI',
+    )
+    expect(aiUniworkText('vi', 'not_entitled' as never)).toContain(
+      'Gói của tổ chức bạn chưa bao gồm UniWork AI',
+    )
+    expect(aiUniworkText('en', 'credits_exhausted' as never)).toContain(
+      'used all its AI credits for this period',
+    )
+    expect(aiUniworkText('vi', 'credits_exhausted' as never)).toContain(
+      'đã dùng hết tín dụng AI trong kỳ này',
+    )
+    for (const lang of LANGS) {
+      const t = table(lang)
+      expect(t.not_entitled?.trim().length, `${lang} not_entitled`).toBeGreaterThan(0)
+      expect(t.credits_exhausted?.trim().length, `${lang} credits_exhausted`).toBeGreaterThan(0)
+      if (lang !== 'en') {
+        expect(t.not_entitled, `${lang} not_entitled localized`).not.toBe(table('en').not_entitled)
+        expect(t.credits_exhausted, `${lang} credits_exhausted localized`).not.toBe(
+          table('en').credits_exhausted,
+        )
+      }
+    }
   })
 })
 

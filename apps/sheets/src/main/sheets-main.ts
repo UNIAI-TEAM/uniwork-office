@@ -72,7 +72,10 @@ import {
   writeJsonAtomic,
   newerCopyMtime,
 } from '@genoffice/electron-utils'
-import { answerUniworkAiFlagOff } from '@genoffice/electron-utils/uniwork-ai-flag'
+import {
+  answerUniworkAiFlagOff,
+  answerUniworkCloudStatusOff,
+} from '@genoffice/electron-utils/uniwork-ai-flag'
 import { createI18n, getUiLang, type Lang, normalizeLang, setUiLang } from '@genoffice/i18n'
 import { ProjectStore } from '@genoffice/project-store'
 
@@ -171,7 +174,11 @@ import { atomicWriteFile } from './atomic-write'
 import { closeGuardDecision, ShutdownLatch } from './close-guard'
 import { SaveEditsTransferStore } from './save-edits-transfer'
 import { exportPdf, printWorkbook } from './pdf-export'
-import { allowsAutomaticWorkbookRecovery } from './recovery-policy'
+import {
+  allowsAutomaticWorkbookRecovery,
+  clearRecoveryFile,
+  writeRecoveryFile,
+} from './recovery-policy'
 import {
   setSystemShortDate,
   shortDatePatternForSystemLocale,
@@ -1928,12 +1935,8 @@ export function recoveryCopyMtime(filePath: string): number | null {
   return newerCopyMtime(recoveryPathFor(filePath), filePath)
 }
 
-function clearWorkbookRecovery(filePath: string): void {
-  try {
-    unlinkSync(recoveryPathFor(filePath))
-  } catch {
-    /* nothing to clean */
-  }
+export function clearWorkbookRecovery(filePath: string): void {
+  clearRecoveryFile(filePath, recoveryPathFor(filePath))
 }
 
 // An unsaved new workbook has no file for pendingRecoveryFor to compare
@@ -3546,8 +3549,11 @@ export function registerSheetsIpc(): void {
         ? (session.restoreTarget ?? session.path)
         : session.path
     try {
-      await mkdir(recoveryDir(), { recursive: true })
-      await writeWorkbookTo(entry.client, session, request, recoveryPathFor(recoveryKey))
+      const target = recoveryPathFor(recoveryKey)
+      const kept = await writeRecoveryFile(recoveryKey, target, () =>
+        writeWorkbookTo(entry.client, session, request, target),
+      )
+      if (!kept) return { ok: false }
       if (session.unsavedNew) rememberUnsavedNewRecovery(recoveryKey)
       return { ok: true }
     } catch (error) {
@@ -3738,7 +3744,8 @@ export function registerSheetsAiIpc(): void {
     const stored = readJson<Partial<AiSettings> & LegacyAiSettings>(SETTINGS_PATH(), {})
     const settings = resolveAiSettings(stored, defaultAiSettings())
     // the stored provider stays selected even while its config is incomplete (the picker and
-    // Settings show what is missing); only an unknown id degrades to genspark
+    // Settings show what is missing); only an unknown id degrades to genspark. A saved `uniwork`
+    // stays `uniwork` (never UniAI): a send with it ends in the ai_disabled error below
     settings.provider = selectedProvider(settings)
     return settings
   })
@@ -4775,6 +4782,7 @@ async function applyMainProcessProxy(): Promise<void> {
 export function startSheetsStandalone(): void {
   // no shell here: answer the renderer's UniWork AI flag pull with "off" instead of an unregistered channel
   answerUniworkAiFlagOff(ipcMain)
+  answerUniworkCloudStatusOff(ipcMain)
   registerRendererScheme()
   installNavigationGuard(app)
   installContextMenu(app, () => contextMenuLabels(getUiLang()))

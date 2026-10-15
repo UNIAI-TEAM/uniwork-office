@@ -250,6 +250,7 @@ describe('UniWork AI notices are announced through a separate status node (G05FE
       const user: AiChatMessage = { role: 'user', text: 'sum it', tools: [] }
       const streaming: AiChatMessage = { role: 'assistant', text: '', tools: [], streaming: true }
       render([user, streaming])
+      expect(container.querySelector('.ai-chat')?.getAttribute('aria-busy')).toBe('true')
       const live = container.querySelector('.ai-sr-status')
       expect(live, 'status node before any notice').not.toBeNull()
       expect(live!.getAttribute('aria-live')).toBe('polite')
@@ -266,7 +267,7 @@ describe('UniWork AI notices are announced through a separate status node (G05FE
       expect(live!.textContent).toBe('')
     })
 
-    it('the AI panel adds no role=status node: a workbook with it mounted keeps exactly one, the workbook status', () => {
+    it('the AI panel adds no role=status node: its one polite node is the aria-live region, so the workbook status stays the only role=status (RF2-7)', () => {
       vi.stubGlobal(
         'desktopApi',
         new Proxy(
@@ -293,12 +294,8 @@ describe('UniWork AI notices are announced through a separate status node (G05FE
       ])
       expect(container.querySelector('.ai-sr-status')!.textContent).toBe('Try again in 30 s.')
       expect(container.querySelectorAll('[role="status"]')).toHaveLength(0)
-      // ExcelShell (which mounts this panel under cap('ai')) owns the one status node of the workbook
-      const shell = readFileSync(
-        join(dirname(fileURLToPath(import.meta.url)), '../src/renderer/ExcelShell.tsx'),
-        'utf8',
-      )
-      expect(shell).toMatch(/className="workbook-status"\s+role="status"/)
+      // the one polite node of the panel is the live region itself, not a role=status node
+      expect(container.querySelectorAll('[aria-live]')).toHaveLength(1)
     })
   })
 })
@@ -405,6 +402,225 @@ describe('a refused UniWork AI question (too long, rejected): no Retry, the ques
     it('another failure shows Retry (control)', () => {
       const c = mount(markRunFailed([user, streaming], 'server fell over'))
       expect(c.querySelector('.ai-retry-btn')).not.toBeNull()
+    })
+
+    it('renders result chip as first words of answer node, cellsMeta, Xem thay đổi, and announces finished answer once for UniWork AI', async () => {
+      vi.stubGlobal(
+        'desktopApi',
+        new Proxy(
+          {},
+          {
+            get: (_t, prop: string) =>
+              prop === 'getAiSettings'
+                ? () => Promise.resolve({ provider: 'uniwork', providers: {} })
+                : /^on[A-Z]/.test(prop)
+                  ? () => () => {}
+                  : () => Promise.resolve(undefined),
+          },
+        ),
+      )
+      container = document.createElement('div')
+      document.body.appendChild(container)
+      root = createRoot(container)
+      const onCitation = vi.fn()
+      const editedEntry: AiChatMessage = {
+        role: 'assistant',
+        text: 'Đã cập nhật 12 ô tại Sheet1!B4:C9.',
+        tools: [
+          {
+            name: 'propose_operations',
+            summary: 'Wrote 12 cells in Sheet1!B4:C9 (4 overwritten)',
+            isError: false,
+          },
+        ],
+        streaming: false,
+        autoApplied: { opCount: 12, undoSteps: 1 },
+      }
+      await act(async () => {
+        root!.render(
+          createElement(
+            LocaleProvider,
+            { initial: 'vi', children: null },
+            createElement(AiChatPanel, {
+              isOpen: true,
+              hasContent: true,
+              chat: [user, editedEntry],
+              attachments: [],
+              attachNotice: null,
+              onPickAttachments: () => {},
+              onAddAttachmentPaths: () => {},
+              onAddPastedImage: () => {},
+              onRemoveAttachment: () => {},
+              prompt: '',
+              preview: null,
+              aiBusy: false,
+              onPromptChange: () => {},
+              onSend: () => {},
+              onStop: () => {},
+              onNewChat: () => {},
+              onUndo: () => {},
+              scopeRange: null,
+              scopeColumns: null,
+              scopeLocked: false,
+              onScopeDismiss: () => {},
+              onCitation,
+              onExpand: () => {},
+              onCollapse: () => {},
+            }),
+          ),
+        )
+        await Promise.resolve()
+      })
+      const chatEl = container.querySelector('.ai-chat')
+      expect(chatEl?.hasAttribute('aria-live')).toBe(false)
+      expect(chatEl?.hasAttribute('aria-busy')).toBe(false)
+      const chipEl = container.querySelector('.ai-result-chip')
+      expect(chipEl).not.toBeNull()
+      expect(chipEl?.textContent).toBe(tr('aiResultEdited'))
+      const answerNode = chipEl?.parentElement
+      expect(answerNode?.textContent?.startsWith(`${tr('aiResultEdited')}:`)).toBe(true)
+      expect(container.textContent).toContain(
+        tr('aiResultCellsMeta', { written: 12, range: 'Sheet1!B4:C9', overwritten: 4 }),
+      )
+      // one platform shortcut (chipwire F5), not the dictionary's Ctrl/⌘ pair
+      expect(container.textContent).toContain(
+        'Chưa lưu — hoàn tác bằng Ctrl+Z hoặc bấm Lưu khi đã ổn.',
+      )
+      const viewChangesBtn = container.querySelector<HTMLButtonElement>('.ai-result-view-changes')
+      expect(viewChangesBtn?.textContent).toBe(tr('aiResultViewChanges'))
+      act(() => viewChangesBtn?.click())
+      expect(onCitation).toHaveBeenCalled()
+      const live = container.querySelector('.ai-sr-status')
+      expect(container.querySelectorAll('[aria-live]')).toHaveLength(1)
+      expect(live?.textContent).toBe(tr('aiResultEdited'))
+      expect(live?.textContent).not.toContain('Đã cập nhật 12 ô tại Sheet1!B4:C9.')
+    })
+
+    it('an edit whose overwritten count is unknown shows only the written cells and range, never "0 overwritten" (RF2-10)', async () => {
+      vi.stubGlobal(
+        'desktopApi',
+        new Proxy(
+          {},
+          {
+            get: (_t, prop: string) =>
+              prop === 'getAiSettings'
+                ? () => Promise.resolve({ provider: 'uniwork', providers: {} })
+                : /^on[A-Z]/.test(prop)
+                  ? () => () => {}
+                  : () => Promise.resolve(undefined),
+          },
+        ),
+      )
+      container = document.createElement('div')
+      document.body.appendChild(container)
+      root = createRoot(container)
+      const editedEntry: AiChatMessage = {
+        role: 'assistant',
+        text: 'Đã cập nhật 12 ô tại Sheet1!B4:C9.',
+        tools: [
+          { name: 'propose_operations', summary: 'Wrote 12 cells in Sheet1!B4:C9', isError: false },
+        ],
+        streaming: false,
+        autoApplied: { opCount: 12, undoSteps: 1 },
+      }
+      await act(async () => {
+        root!.render(
+          createElement(
+            LocaleProvider,
+            { initial: 'vi', children: null },
+            createElement(AiChatPanel, {
+              isOpen: true,
+              hasContent: true,
+              chat: [user, editedEntry],
+              attachments: [],
+              attachNotice: null,
+              onPickAttachments: () => {},
+              onAddAttachmentPaths: () => {},
+              onAddPastedImage: () => {},
+              onRemoveAttachment: () => {},
+              prompt: '',
+              preview: null,
+              aiBusy: false,
+              onPromptChange: () => {},
+              onSend: () => {},
+              onStop: () => {},
+              onNewChat: () => {},
+              onUndo: () => {},
+              scopeRange: null,
+              scopeColumns: null,
+              scopeLocked: false,
+              onScopeDismiss: () => {},
+              onCitation: () => {},
+              onExpand: () => {},
+              onCollapse: () => {},
+            }),
+          ),
+        )
+        await Promise.resolve()
+      })
+      const meta = container.querySelector('.ai-result-meta')
+      expect(meta?.textContent).toBe(
+        tr('aiResultCellsMetaNoOverwrite', { written: 12, range: 'Sheet1!B4:C9' }),
+      )
+      expect(meta?.textContent).toContain('Sheet1!B4:C9')
+      expect(meta?.textContent).not.toMatch(/overwritten|ghi đè/i)
+    })
+
+    it('clicking Stop returns keyboard focus to the composer textarea (RF1-12, RF1-23b)', () => {
+      vi.stubGlobal(
+        'desktopApi',
+        new Proxy(
+          {},
+          {
+            get: (_t, prop: string) =>
+              /^on[A-Z]/.test(prop) ? () => () => {} : () => Promise.resolve(undefined),
+          },
+        ),
+      )
+      container = document.createElement('div')
+      document.body.appendChild(container)
+      root = createRoot(container)
+      const onStop = vi.fn()
+      act(() =>
+        root!.render(
+          createElement(
+            LocaleProvider,
+            { initial: 'vi', children: null },
+            createElement(AiChatPanel, {
+              isOpen: true,
+              hasContent: true,
+              chat: [user, streaming],
+              attachments: [],
+              attachNotice: null,
+              onPickAttachments: () => {},
+              onAddAttachmentPaths: () => {},
+              onAddPastedImage: () => {},
+              onRemoveAttachment: () => {},
+              prompt: '',
+              preview: null,
+              aiBusy: true,
+              onPromptChange: () => {},
+              onSend: () => {},
+              onStop,
+              onNewChat: () => {},
+              onUndo: () => {},
+              scopeRange: null,
+              scopeColumns: null,
+              scopeLocked: false,
+              onScopeDismiss: () => {},
+              onCitation: () => {},
+              onExpand: () => {},
+              onCollapse: () => {},
+            }),
+          ),
+        ),
+      )
+      const stopBtn = container.querySelector<HTMLButtonElement>('.ai-stop-btn')
+      expect(stopBtn).not.toBeNull()
+      stopBtn!.focus()
+      act(() => stopBtn!.click())
+      expect(onStop).toHaveBeenCalledTimes(1)
+      expect(document.activeElement).toBe(container.querySelector('textarea'))
     })
   })
 })

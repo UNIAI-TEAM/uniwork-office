@@ -21,10 +21,12 @@ import {
   DEFAULT_MAX_OUTPUT_TOKENS,
   MAX_MAX_OUTPUT_TOKENS,
   MIN_MAX_OUTPUT_TOKENS,
+  UNIWORK_PROVIDER_META,
   clampMaxOutputTokens,
   offeredMediaProviders,
   setMediaProviderChoice,
   shownMediaProvider,
+  uniworkAiAvailable,
   updateMediaProviderConfig,
 } from '@genoffice/ai-provider/browser'
 import type {
@@ -60,6 +62,7 @@ import {
 } from './UniworkCloudPane'
 import type { UniworkCloudStatus } from '@genoffice/ai-provider/browser'
 import { IntegrationsPane, skillUpdateDue } from './IntegrationsPane'
+import { SyncCenterPane } from './SyncCenterPane'
 import './settings.css'
 
 // ── Settings modal (opened from the sidebar Settings entry) ─
@@ -175,12 +178,22 @@ function CustomFontSizeInput({
 }
 
 export type SettingsSectionId =
-  'account' | 'aiModel' | 'aiMedia' | 'uniai' | 'general' | 'backup' | 'integrations' | 'about'
+  | 'account'
+  | 'aiModel'
+  | 'aiMedia'
+  | 'uniai'
+  | 'general'
+  | 'backup'
+  | 'integrations'
+  | 'about'
+  // G5-10: Settings › Sync center (S2)
+  | 'sync'
 
 export type SectionId = SettingsSectionId
 
 const SECTIONS: readonly { id: SectionId; labelKey: StringKey }[] = [
   { id: 'account', labelKey: 'setSecAccount' },
+  { id: 'sync', labelKey: 'uwSyncTitle' },
   { id: 'aiModel', labelKey: 'setSecAiModel' },
   { id: 'aiMedia', labelKey: 'setSecAiMedia' },
   // shortcut: UniAI pane hidden for now (pane code kept); re-add this entry to show it again
@@ -277,6 +290,19 @@ function SectionIcon({ id }: { id: SectionId }) {
         />
         <path
           d="M8 7.5v4M6.5 10 8 11.5 9.5 10"
+          stroke="currentColor"
+          strokeWidth="1.3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    )
+  }
+  if (id === 'sync') {
+    return (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path
+          d="M13 6.5A5 5 0 0 0 3.6 5M3 9.5A5 5 0 0 0 12.4 11M3.5 2.5V5h2.5M12.5 13.5V11H10"
           stroke="currentColor"
           strokeWidth="1.3"
           strokeLinecap="round"
@@ -578,7 +604,17 @@ function AiModelPane({
 
   if (!settings) return <PaneSkeleton title={t('setSecAiModel')} />
   const provider = settings.provider
-  const meta = catalog.find((c) => c.id === provider)
+  // UniWork AI runs on the organization's plan: no key, model or endpoint to set or test.
+  // The preload builds its catalog in its own realm (where setUniworkAiAvailable never runs),
+  // so fold UNIWORK_PROVIDER_META in when the entry is offered here or already picked.
+  const isUniwork = provider === 'uniwork'
+  const providerCatalog =
+    (isUniwork || uniworkAiAvailable()) && !catalog.some((c) => c.id === 'uniwork')
+      ? catalog[0]?.id === 'genspark'
+        ? [catalog[0], { ...UNIWORK_PROVIDER_META, defaultBaseUrl: '' }, ...catalog.slice(1)]
+        : [{ ...UNIWORK_PROVIDER_META, defaultBaseUrl: '' }, ...catalog]
+      : catalog
+  const meta = providerCatalog.find((c) => c.id === provider)
   const source = settings.modelSources?.[provider]
   // a row served by a key on UniWork; it turns into the normal key fields while the user types a key
   // for this computer instead (the local key then wins in main)
@@ -594,8 +630,6 @@ function AiModelPane({
   const isGenspark = provider === 'genspark'
   const isCodex = provider === 'codex'
   const isOpenRouter = provider === 'openrouter'
-  // UniWork AI runs on the organization's plan: no key, model or endpoint to set or test
-  const isUniwork = provider === 'uniwork'
   const isTokenHub = isGenspark || isOpenRouter
   // an org-served row shows the model main resolved (modelSources[id].chosen), never a copy of it in
   // the local slot
@@ -790,7 +824,7 @@ function AiModelPane({
           className="set-dd"
           value={provider}
           ariaLabel={t('setAiProvider')}
-          options={catalog.map((c) => ({
+          options={providerCatalog.map((c) => ({
             value: c.id,
             label: c.label,
             render: (
@@ -1757,6 +1791,9 @@ export function SettingsModal({
   useEffect(() => {
     if (target) setSection(target.section)
   }, [target])
+  useEffect(() => {
+    if (account?.signOutPrompt || account?.signOutNotice) setSection('account')
+  }, [account?.signOutPrompt, account?.signOutNotice])
   // the AI panes report unsaved edits; leaving them (close, other section) asks first
   const paneDirtyRef = useRef(false)
   const onPaneDirty = useCallback((dirty: boolean) => {
@@ -1767,7 +1804,13 @@ export function SettingsModal({
     if (paneDirtyRef.current) setLeaveAction(() => action)
     else action()
   }
-  const requestClose = () => guardLeave(onClose)
+  const requestClose = () =>
+    guardLeave(() => {
+      // same order as Escape: a queued notice stays until no prompt is open
+      if (account?.signOutPrompt) account.cancelSignOut?.()
+      else if (account?.signOutNotice) account.acknowledgeSignOutNotice?.()
+      onClose()
+    })
   const goToSection = (id: SectionId) => {
     if (id !== section) guardLeave(() => setSection(id))
   }
@@ -1855,11 +1898,14 @@ export function SettingsModal({
     return () => off?.()
   }, [])
 
-  // modal focus: start on the current section, Tab cycles inside, closing hands focus back
+  // modal focus: start on the current section (unless an in-pane alertdialog already claimed focus),
+  // Tab cycles inside, closing hands focus back
   const dialogRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
-    dialogRef.current?.querySelector<HTMLElement>('.set-nav-item.active')?.focus()
+    if (!dialogRef.current?.querySelector('[role="alertdialog"]')) {
+      dialogRef.current?.querySelector<HTMLElement>('.set-nav-item.active')?.focus()
+    }
     return () => opener?.focus()
   }, [])
   const trapTab = (e: ReactKeyboardEvent) => {
@@ -1883,6 +1929,8 @@ export function SettingsModal({
   const escapeRef = useRef<() => void>(() => undefined)
   escapeRef.current = () => {
     if (leaveAction) setLeaveAction(null)
+    else if (account?.signOutPrompt) account.cancelSignOut?.()
+    else if (account?.signOutNotice) account.acknowledgeSignOutNotice?.()
     else requestClose()
   }
   useEffect(() => {
@@ -2024,7 +2072,19 @@ export function SettingsModal({
                 <h3 className="set-pane-title">{t('setSecAccount')}</h3>
                 {account && <AccountPane account={account} />}
                 {loggedIn && <UniworkCloudAccountRows status={cloud} />}
+                {loggedIn && (
+                  <button type="button" className="sc-link" onClick={() => goToSection('sync')}>
+                    {t('uwSyncOpenFromSettings')}
+                  </button>
+                )}
               </>
+            )}
+            {section === 'sync' && (
+              <SyncCenterPane
+                onSignIn={signIn}
+                onSignOut={account?.signOut}
+                onSwitchAccount={() => goToSection('account')}
+              />
             )}
             {section === 'aiModel' && (
               <AiModelPane

@@ -121,6 +121,29 @@ describe('uniworkSaveDecision (main)', () => {
     expect(uniworkDocState(VIEW)).toEqual({ bound: true, readOnly: true })
     expect(uniworkDocState(LOCAL)).toEqual({ bound: false, readOnly: false })
   })
+
+  it('writes a bound editable file on capture without firing the user-save hook, and still refuses read-only', () => {
+    installPolicy()
+    const hook = vi.fn()
+    const writeBound = vi.fn()
+    const writeView = vi.fn()
+    setUniworkUserSaveHook(hook)
+    expect(simulateSave('capture', BOUND, writeBound)).toEqual({ write: true, fireHook: false })
+    expect(writeBound).toHaveBeenCalledWith(BOUND)
+    expect(simulateSave('capture', VIEW, writeView)).toEqual({
+      write: false,
+      fireHook: false,
+      reason: 'uniwork-read-only',
+    })
+    expect(writeView).not.toHaveBeenCalled()
+    setUniworkDocumentPolicy({
+      isBound: (p) => p === BOUND,
+      isReadOnly: () => false,
+      consumeCapture: (p) => p === BOUND,
+    })
+    expect(simulateSave('user', BOUND, writeBound)).toEqual({ write: true, fireHook: false })
+    expect(hook).not.toHaveBeenCalled()
+  })
 })
 
 describe('renderer save gate', () => {

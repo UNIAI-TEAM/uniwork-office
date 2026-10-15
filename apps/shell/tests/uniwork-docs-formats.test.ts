@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  copyTitleFor,
   hasReplacementChar,
   sanitizeFilename,
   workingCopyName,
@@ -77,5 +78,30 @@ describe('workingCopyName', () => {
     const nfd = 'Tri\u0300nh chie\u0302\u0301u'
     expect(sanitizeFilename(nfd, 'pptx')).toBe(`${nfd}.pptx`)
     expect(sanitizeFilename('Trình chiếu', 'pptx')).toBe('Trình chiếu.pptx')
+  })
+})
+
+describe('copyTitleFor (G5-12, BE-12F-04)', () => {
+  it('keeps the format extension last and cuts a 600-rune title to the 500-rune server cap', () => {
+    const title = copyTitleFor(`${'x'.repeat(600)}.docx`, '(my version)', 'docx')
+    expect(Array.from(title)).toHaveLength(500)
+    expect(title.endsWith(' (my version).docx')).toBe(true)
+  })
+
+  it('counts runes, not UTF-16 units: an astral-plane title is cut on a code point boundary', () => {
+    const title = copyTitleFor('😀'.repeat(600), '(my version)', 'docx')
+    expect(Array.from(title)).toHaveLength(500)
+    expect(title.endsWith(' (my version)')).toBe(true)
+    expect(title).not.toMatch(/[\ud800-\udbff](?![\udc00-\udfff])/)
+  })
+
+  it('replaces a lone surrogate with _ instead of passing it to the server', () => {
+    const lone = `a${String.fromCharCode(0xd83d)}b`
+    expect(copyTitleFor(`${lone}.docx`, '(my version)', 'docx')).toBe('a_b (my version).docx')
+  })
+
+  it('adds the suffix to a title without the extension and ignores another format extension', () => {
+    expect(copyTitleFor('Plan', '(my version)', 'docx')).toBe('Plan (my version)')
+    expect(copyTitleFor('Plan.xlsx', '(my version)', 'docx')).toBe('Plan.xlsx (my version)')
   })
 })

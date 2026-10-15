@@ -55,6 +55,18 @@ describe('composer footer: model picker and usage chip', () => {
     expect(footerUsage).toMatch(/text-overflow:\s*ellipsis/)
   })
 
+  // F8 (visual r1): at the 360 px panel with the usage chip + Track changes, the floor of 88px cut
+  // "UniWork AI" to "Uni…". The floor now fits the provider name (logo + 10 characters + caret);
+  // the usage chip, which already yields (ellipsis + title), absorbs the squeeze instead.
+  it('keeps the floor wide enough for the "UniWork AI" label next to the usage chip (F8)', () => {
+    const picker = rule(src('ai-model-picker.css'), '.ai-model-picker')
+    const chip = rule(src('ai-model-picker.css'), '.ai-model-chip')
+    expect(Number(/min-width:\s*(\d+)px/.exec(picker)?.[1])).toBeGreaterThanOrEqual(116)
+    expect(Number(/min-width:\s*(\d+)px/.exec(chip)?.[1])).toBeGreaterThanOrEqual(116)
+    // no raw colors sneak in with the change
+    expect(picker + chip).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgb\(/)
+  })
+
   it('exposes the full model name on the chip via title, data-tip, and aria-label (N1)', async () => {
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
     const host = document.createElement('div')

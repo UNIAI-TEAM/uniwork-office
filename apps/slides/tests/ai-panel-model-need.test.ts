@@ -116,6 +116,18 @@ describe('AiPanel model need (slides)', () => {
     expect(need.nextElementSibling).toBe(footer)
   })
 
+  it('the hint is the one status line of the idle composer and is not repeated in the panel live region (C2-2)', () => {
+    const container = mount()
+    act(() => setAiModelNeedHint(HINT))
+    const statuses = container.querySelectorAll('[role="status"]:not(.ai-typing)')
+    expect(statuses).toHaveLength(1)
+    expect(statuses[0]).toBe(container.querySelector('.ai-input-need'))
+    // the thread's polite node (S9) is a plain aria-live region and never carries the hint
+    const live = container.querySelector('.ai-sr-status')
+    expect(live?.getAttribute('aria-live')).toBe('polite')
+    expect(live?.textContent).not.toContain(HINT)
+  })
+
   it('the hint opens the AI settings when the host offers that action', () => {
     const container = mount()
     const open = vi.fn()

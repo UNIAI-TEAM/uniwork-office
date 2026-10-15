@@ -37,6 +37,7 @@ export const hi = {
   uwQueueCancel: 'सहेजना रद्द करें…',
   uwQueueCancelConfirm:
     'कतार में रखी सहेज रद्द करें? आपके बदलाव इस कंप्यूटर पर रहेंगे; UniWork पर दस्तावेज़ नहीं बदलेगा।',
+  uwQueueCancelGo: 'सहेजना रद्द करें',
   uwQueueCancelled: 'कतार की सहेज रद्द कर दी गई। आपके बदलाव इस कंप्यूटर पर रहेंगे।',
 
   // {reason} fragments of the blocked/failed rows (the existing uwReason* keys stay in the uniwork-documents shard)
@@ -121,12 +122,20 @@ export const hi = {
     'कंप्यूटर का कीचेन लॉक है, इसलिए बिना सहेजे बदलाव केवल खुली विंडो में हैं। अभी साइन आउट करने पर वे हट जाएँगे; जो पहले से एन्क्रिप्ट करके रखा गया है वह बना रहेगा। उन्हें रखने के लिए पहले कंप्यूटर अनलॉक करें।',
   uwSignOutGo: 'साइन आउट करें',
   uwSignOutWaiting: 'साइन आउट से पहले चल रही सहेज पूरी की जा रही है…',
+  uwSignOutCaptureFailed:
+    'कुछ असहेजे बदलाव समय पर कैप्चर नहीं हो सके; आपके खाते के लिए सबसे हाल का सहेजा गया या ऑटोसेव किया गया संस्करण रखा गया है।',
+  uwSwitchLostTitle: 'पिछले खाते के कुछ असहेजे बदलाव खो गए',
+  uwSwitchLostBody:
+    'इस कंप्यूटर पर किसी दूसरे खाते ने साइन इन किया, इसलिए पिछला खाता लॉक कर दिया गया। वे दस्तावेज़ जिनके असहेजे बदलाव रखे नहीं जा सके: {count}। बाकी सब कुछ उस खाते के लिए इस कंप्यूटर पर लॉक रहता है।',
+  uwSwitchLostOk: 'ठीक है',
 
   // S2 sync center
   uwSyncTitle: 'सिंक केंद्र',
   uwSyncOpenFromSettings: 'सिंक केंद्र',
   uwSyncOnline: 'UniWork से कनेक्टेड · {time} पर सिंक हुआ',
   uwSyncOffline: 'ऑफ़लाइन · पिछला सिंक {time}',
+  uwSyncOnlineNoTime: 'UniWork से कनेक्टेड',
+  uwSyncOfflineNoTime: 'ऑफ़लाइन',
   uwSyncPaused: 'भेजना रुका है — नई सहेजें प्रतीक्षा करेंगी',
   uwSyncAdminPaused: 'आपके व्यवस्थापक ने भेजना रोका है। सहेजें इस कंप्यूटर पर रखी गई हैं।',
   uwSyncFeedOff: 'नए संस्करण की सूचनाएँ रुकी हैं। सहेजते समय UniWork अब भी टकराव जाँचता है।',
@@ -156,6 +165,7 @@ export const hi = {
   uwSyncEmptyQueue: 'सहेजने के लिए कुछ भी प्रतीक्षा में नहीं है।',
   uwSyncEmptyAttention: 'किसी चीज़ पर ध्यान देने की ज़रूरत नहीं है।',
   uwSyncEmptyRecent: 'हाल की कोई सहेज नहीं।',
+  uwSyncActionFailed: 'यह नहीं हो सका। कुछ भी हटाया नहीं गया; फिर से कोशिश करें।',
   uwSyncRowAnnounce: '{doc}: {state}',
 
   // S3 offline library
@@ -268,6 +278,14 @@ export const hi = {
   uwConflictSaveCopyDone:
     'आपका संस्करण नए दस्तावेज़ के रूप में सहेजा गया: {title}। यह दस्तावेज़ नहीं बदला; आप अब भी फिर से लोड या अधिलेखित कर सकते हैं।',
   uwConflictSaveCopyFailed: 'प्रति नहीं बन सकी। आपके बदलाव अब भी सुरक्षित हैं; फिर से कोशिश करें।',
+  uwConflictSaveCopyNoSeat:
+    'प्रति नहीं बन सकी, क्योंकि आप उस कार्यक्षेत्र के सदस्य नहीं हैं जिसमें यह दस्तावेज़ है। आपके बदलाव अब भी सुरक्षित हैं; आप अपना संस्करण डाउनलोड कर सकते हैं।',
+  uwConflictSaveCopyFolderRefused:
+    'आप इस फ़ोल्डर में दस्तावेज़ नहीं बना सकते। इसके बजाय अपना संस्करण डाउनलोड करें।',
+  uwConflictDownloadDone:
+    'आपका संस्करण इस कंप्यूटर में सहेजा गया: {file}। यह दस्तावेज़ नहीं बदला; आप अब भी फिर से लोड या ओवरराइट कर सकते हैं।',
+  uwConflictDownloadFailedDesktop:
+    'फ़ाइल सहेजी नहीं जा सकी। आपके बदलाव अब भी सुरक्षित हैं; फिर से कोशिश करें।',
   uwConflictSaveCopyOffline:
     'आप ऑफ़लाइन हैं। प्रति बनाने के लिए कनेक्शन चाहिए; आपके बदलाव रखे गए हैं।',
   uwConflictReloadFailed:

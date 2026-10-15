@@ -24,6 +24,7 @@
     "./image-viewer.css": "./src/image-viewer.css",
     "./fonts/*": "./src/fonts/*",
     "./ai-model-picker.css": "./src/ai-model-picker.css",
+    "./ai-uniwork-composer.css": "./src/ai-uniwork-composer/ai-uniwork-composer.css",
     "./collab": "./src/collab/index.ts",
     "./collab.css": "./src/collab/collab.css"
   },

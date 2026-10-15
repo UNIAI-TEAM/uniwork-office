@@ -110,7 +110,18 @@ export class FeedConsumer {
   private readonly key: string
   private running: Promise<FeedSyncResult> | null = null
   private resyncRefusals = 0
+
+  /** consecutive full resyncs the server refused (410 again); 0 after one succeeds */
+  get resyncRefusalCount(): number {
+    return this.resyncRefusals
+  }
   private retryAt = 0
+
+  /** the user asked to sync again: forget the refused resyncs and their backoff */
+  resetResyncRefusals(): void {
+    this.resyncRefusals = 0
+    this.retryAt = 0
+  }
   private loggedPhases = new Set<string>()
   private cancelled = false
 

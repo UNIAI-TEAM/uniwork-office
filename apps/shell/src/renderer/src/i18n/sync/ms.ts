@@ -41,6 +41,7 @@ export const ms = {
   uwQueueCancel: 'Batalkan simpanan…',
   uwQueueCancelConfirm:
     'Batalkan simpanan dalam baris gilir? Perubahan anda kekal pada komputer ini; dokumen di UniWork tidak berubah.',
+  uwQueueCancelGo: 'Batalkan simpanan',
   uwQueueCancelled:
     'Simpanan dalam baris gilir dibatalkan. Perubahan anda kekal pada komputer ini.',
 
@@ -126,12 +127,20 @@ export const ms = {
     'Rantai kunci komputer dikunci, jadi perubahan yang belum disimpan hanya wujud dalam tetingkap yang terbuka. Log keluar sekarang akan membuangnya; apa-apa yang sudah disimpan secara tersulit kekal. Untuk menyimpannya, buka kunci komputer dahulu.',
   uwSignOutGo: 'Log keluar',
   uwSignOutWaiting: 'Menyelesaikan simpanan yang sedang berjalan sebelum log keluar…',
+  uwSignOutCaptureFailed:
+    'Sesetengah perubahan yang belum disimpan tidak dapat ditangkap tepat pada masanya; versi simpanan atau autosimpan terkini disimpan untuk akaun anda.',
+  uwSwitchLostTitle: 'Sebahagian perubahan yang belum disimpan bagi akaun sebelumnya telah hilang',
+  uwSwitchLostBody:
+    'Akaun lain telah log masuk pada komputer ini, jadi akaun sebelumnya telah dikunci. Dokumen yang perubahan belum disimpannya tidak dapat dikekalkan: {count}. Semua yang lain kekal dikunci pada komputer ini untuk akaun tersebut.',
+  uwSwitchLostOk: 'Faham',
 
   // S2 sync center
   uwSyncTitle: 'Pusat penyegerakan',
   uwSyncOpenFromSettings: 'Pusat penyegerakan',
   uwSyncOnline: 'Disambungkan ke UniWork · disegerakkan {time}',
   uwSyncOffline: 'Luar talian · kali terakhir disegerakkan {time}',
+  uwSyncOnlineNoTime: 'Disambungkan ke UniWork',
+  uwSyncOfflineNoTime: 'Luar talian',
   uwSyncPaused: 'Penghantaran dijeda — simpanan baharu akan menunggu',
   uwSyncAdminPaused:
     'Pentadbir anda telah menjeda penghantaran. Simpanan disimpan pada komputer ini.',
@@ -164,6 +173,7 @@ export const ms = {
   uwSyncEmptyQueue: 'Tiada apa-apa yang menunggu untuk disimpan.',
   uwSyncEmptyAttention: 'Tiada apa-apa yang perlu diberi perhatian.',
   uwSyncEmptyRecent: 'Tiada simpanan terkini.',
+  uwSyncActionFailed: 'Tidak berjaya. Tiada apa-apa dipadam; cuba lagi.',
   uwSyncRowAnnounce: '{doc}: {state}',
 
   // S3 offline library
@@ -279,6 +289,14 @@ export const ms = {
     'Versi anda disimpan sebagai dokumen baharu: {title}. Dokumen ini tidak berubah; anda masih boleh memuat semula atau menulis ganti.',
   uwConflictSaveCopyFailed:
     'Tidak dapat mencipta salinan. Perubahan anda masih selamat; cuba lagi.',
+  uwConflictSaveCopyNoSeat:
+    'Tidak dapat mencipta salinan kerana anda bukan ahli ruang kerja yang mengandungi dokumen ini. Perubahan anda masih selamat; anda boleh memuat turun versi anda.',
+  uwConflictSaveCopyFolderRefused:
+    'Anda tidak boleh mencipta dokumen dalam folder ini. Sila muat turun versi anda sebagai gantinya.',
+  uwConflictDownloadDone:
+    'Versi anda disimpan pada komputer ini: {file}. Dokumen ini tidak berubah; anda masih boleh memuat semula atau menulis ganti.',
+  uwConflictDownloadFailedDesktop:
+    'Tidak dapat menyimpan fail. Perubahan anda masih selamat; cuba lagi.',
   uwConflictSaveCopyOffline:
     'Anda di luar talian. Mencipta salinan memerlukan sambungan; perubahan anda disimpan.',
   uwConflictReloadFailed:

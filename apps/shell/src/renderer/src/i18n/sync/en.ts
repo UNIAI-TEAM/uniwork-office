@@ -35,6 +35,7 @@ export const en = {
   uwQueueCancel: 'Cancel save…',
   uwQueueCancelConfirm:
     'Cancel the queued save? Your changes stay on this computer; the document on UniWork doesn’t change.',
+  uwQueueCancelGo: 'Cancel save',
   uwQueueCancelled: 'Queued save cancelled. Your changes stay on this computer.',
 
   // {reason} fragments of the blocked/failed rows (the existing uwReason* keys stay in the uniwork-documents shard)
@@ -119,12 +120,20 @@ export const en = {
     'The computer’s keychain is locked, so unsaved changes exist only in open windows. Signing out now discards them; anything already kept encrypted stays. To keep them, unlock the computer first.',
   uwSignOutGo: 'Sign out',
   uwSignOutWaiting: 'Finishing the save in progress before signing out…',
+  uwSignOutCaptureFailed:
+    'Some unsaved changes could not be captured in time; the most recent saved or autosaved version is kept for your account.',
+  uwSwitchLostTitle: 'Some unsaved changes of the previous account were lost',
+  uwSwitchLostBody:
+    'Another account signed in on this computer, so the previous account was locked. Documents whose unsaved changes could not be kept: {count}. Everything else stays locked on this computer for that account.',
+  uwSwitchLostOk: 'OK',
 
   // S2 sync center
   uwSyncTitle: 'Sync center',
   uwSyncOpenFromSettings: 'Sync center',
   uwSyncOnline: 'Connected to UniWork · synced {time}',
   uwSyncOffline: 'Offline · last synced {time}',
+  uwSyncOnlineNoTime: 'Connected to UniWork',
+  uwSyncOfflineNoTime: 'Offline',
   uwSyncPaused: 'Sending paused — new saves will wait',
   uwSyncAdminPaused: 'Your admin has paused sending. Saves are kept on this computer.',
   uwSyncFeedOff:
@@ -155,6 +164,7 @@ export const en = {
   uwSyncEmptyQueue: 'Nothing is waiting to save.',
   uwSyncEmptyAttention: 'Nothing needs attention.',
   uwSyncEmptyRecent: 'No recent saves.',
+  uwSyncActionFailed: 'That didn’t work. Nothing was deleted; try again.',
   uwSyncRowAnnounce: '{doc}: {state}',
 
   // S3 offline library
@@ -265,6 +275,14 @@ export const en = {
   uwConflictSaveCopyDone:
     'Your version was saved as a new document: {title}. This document hasn’t changed; you can still reload or overwrite.',
   uwConflictSaveCopyFailed: 'Couldn’t create the copy. Your changes are still safe; try again.',
+  uwConflictSaveCopyNoSeat:
+    'Couldn’t create the copy because you’re not a member of the workspace this document is in. Your changes are still safe; you can download your version.',
+  uwConflictSaveCopyFolderRefused:
+    'You can’t create documents in this folder. Download your version instead.',
+  uwConflictDownloadDone:
+    'Your version was saved to this computer: {file}. This document hasn’t changed; you can still reload or overwrite.',
+  uwConflictDownloadFailedDesktop:
+    'Couldn’t save the file. Your changes are still safe; try again.',
   uwConflictSaveCopyOffline:
     'You’re offline. Creating a copy needs a connection; your changes are kept.',
   uwConflictReloadFailed:

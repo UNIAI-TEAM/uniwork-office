@@ -23,6 +23,11 @@ export interface UniworkDocumentPolicy {
    * neutral constant). Absent = neutral constant; never the OS account name.
    */
   commentAuthor?(path: string): string
+  /**
+   * G5-11: consumes a one-shot capture request for `path` so a main-triggered
+   * save writes the working copy to disk without firing the user-save hook.
+   */
+  consumeCapture?(path: string): boolean
 }
 
 let policy: UniworkDocumentPolicy | null = null
@@ -115,10 +120,11 @@ export function notifyUniworkUserSave(path: string): void {
  * Who asked for a pdf:save. `user` = an explicit Save (toolbar, ⌘S, menu Save,
  * close-guard Save); `auto` = the renderer's autosave tick / blur; `internal` =
  * a flush the app does on its own before another operation (page tools,
- * exports). Absent (older renderer, Save As) behaves like today and never
- * fires the user-save hook.
+ * exports); `capture` = sign-out working-copy flush to disk without firing
+ * the user-save hook. Absent (older renderer, Save As) behaves like today and
+ * never fires the user-save hook.
  */
-export type UniworkSaveOrigin = 'user' | 'auto' | 'internal'
+export type UniworkSaveOrigin = 'user' | 'auto' | 'internal' | 'capture'
 
 export interface UniworkSaveInput {
   origin: UniworkSaveOrigin | undefined
@@ -141,9 +147,22 @@ export interface UniworkSaveDecision {
   reason?: string
 }
 
+function consumeCaptureFor(path: string | null | undefined): boolean {
+  if (!path || !policy?.consumeCapture) return false
+  try {
+    return policy.consumeCapture(path) === true
+  } catch {
+    return false
+  }
+}
+
 /** Pure save policy for one pdf:save request; with no policy installed it is a pass-through. */
 export function uniworkSaveDecision(input: UniworkSaveInput): UniworkSaveDecision {
   const { origin, currentPath, targetPath, saveAs } = input
+  const effectiveOrigin: UniworkSaveOrigin | undefined =
+    (origin === 'user' || origin === 'internal') && consumeCaptureFor(targetPath)
+      ? 'capture'
+      : origin
   const sameFile = uniworkSamePath(currentPath, targetPath)
   if (uniworkIsReadOnly(targetPath)) {
     return {
@@ -153,7 +172,7 @@ export function uniworkSaveDecision(input: UniworkSaveInput): UniworkSaveDecisio
       reason: PDF_UNIWORK_VIEW_ONLY,
     }
   }
-  if (origin === 'auto' && uniworkIsBound(targetPath)) {
+  if (effectiveOrigin === 'auto' && uniworkIsBound(targetPath)) {
     return {
       write: false,
       fireHook: false,
@@ -164,11 +183,15 @@ export function uniworkSaveDecision(input: UniworkSaveInput): UniworkSaveDecisio
   // A Save As that picks the open file itself is an explicit Save of it (the
   // renderer sends no origin on that path); onto any other file it is a copy.
   const explicitInPlace =
-    sameFile && (saveAs ? origin === undefined || origin === 'user' : origin === 'user')
+    sameFile &&
+    (saveAs
+      ? effectiveOrigin === undefined || effectiveOrigin === 'user'
+      : effectiveOrigin === 'user')
+  const captureInPlace = sameFile && !saveAs && effectiveOrigin === 'capture'
   return {
     write: true,
     fireHook: explicitInPlace,
-    forceWrite: explicitInPlace && uniworkIsBound(currentPath),
+    forceWrite: (explicitInPlace || captureInPlace) && uniworkIsBound(currentPath),
   }
 }
 

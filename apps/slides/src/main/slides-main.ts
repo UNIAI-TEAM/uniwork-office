@@ -58,7 +58,11 @@ import {
   readBodyCapped,
   newerCopyMtime,
 } from '@genoffice/electron-utils'
-import { answerUniworkAiFlagOff } from '@genoffice/electron-utils/uniwork-ai-flag'
+import { isDraftPreviewPath } from '@genoffice/electron-utils/draft-preview'
+import {
+  answerUniworkAiFlagOff,
+  answerUniworkCloudStatusOff,
+} from '@genoffice/electron-utils/uniwork-ai-flag'
 import { buildPagePptx, parsePageSpec } from '@genoffice/pipelines/slides'
 import { sniffImageMime } from './media-mime'
 import { canWriteElementClipboardImage, writeElementClipboardImage } from './element-clipboard'
@@ -357,6 +361,8 @@ export function readSlidesRecentFiles(): string[] {
 async function pushRecent(path: string): Promise<void> {
   // A headless export is not a document the user opened.
   if (isHeadlessMode()) return
+  // A kept-draft preview is a temporary decrypted copy, not a file the user opened.
+  if (isDraftPreviewPath(app.getPath('userData'), path)) return
   const cur = await readRecent()
   const next = [path, ...cur.filter((p) => p !== path)].slice(0, 10)
   try {
@@ -465,6 +471,9 @@ setInterval(() => {
       if (seen.has(session)) continue
       seen.add(session)
       if (session.masterEdit || !sessionDirty(session)) continue
+      // G5-11: a bound UniWork working copy keeps no plaintext copy under
+      // userData (sign-out deletes the account's folder; a copy here would outlive it)
+      if (session.path && uniworkIsBound(session.path)) continue
       let target: string
       if (session.path) {
         target = autosavePathFor(session.path)
@@ -2105,6 +2114,7 @@ async function applyMainProcessProxy(): Promise<void> {
 export function startSlidesStandalone(): void {
   // no shell here: answer the renderer's UniWork AI flag pull with "off" instead of an unregistered channel
   answerUniworkAiFlagOff(ipcMain)
+  answerUniworkCloudStatusOff(ipcMain)
   registerRendererScheme()
   installNavigationGuard(app)
   installContextMenu(app, () => contextMenuLabels(getUiLang()))

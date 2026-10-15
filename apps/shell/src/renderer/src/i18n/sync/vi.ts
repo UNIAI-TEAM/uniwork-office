@@ -34,6 +34,7 @@ export const vi = {
   uwQueueCancel: 'Hủy lần lưu…',
   uwQueueCancelConfirm:
     'Hủy lần lưu đang chờ? Thay đổi vẫn ở trên máy này; tài liệu trên UniWork không đổi.',
+  uwQueueCancelGo: 'Hủy lần lưu',
   uwQueueCancelled: 'Đã hủy lần lưu đang chờ. Thay đổi vẫn ở trên máy này.',
 
   // {reason} fragments of the blocked/failed rows (the existing uwReason* keys stay in the uniwork-documents shard)
@@ -118,12 +119,20 @@ export const vi = {
     'Kho khóa của máy đang khóa nên thay đổi chưa lưu chỉ còn trong cửa sổ đang mở. Đăng xuất bây giờ sẽ bỏ các thay đổi đó; những gì đã được giữ mã hóa vẫn còn. Muốn giữ chúng, hãy mở khóa máy trước.',
   uwSignOutGo: 'Đăng xuất',
   uwSignOutWaiting: 'Đang hoàn tất lần lưu đang gửi trước khi đăng xuất…',
+  uwSignOutCaptureFailed:
+    'Một số thay đổi chưa lưu kịp; bản lưu hoặc tự lưu gần nhất được giữ cho tài khoản của bạn.',
+  uwSwitchLostTitle: 'Một số thay đổi chưa lưu của tài khoản trước đã mất',
+  uwSwitchLostBody:
+    'Một tài khoản khác đã đăng nhập trên máy này nên tài khoản trước đã được khóa. Tài liệu có thay đổi chưa lưu không giữ lại được: {count}. Mọi thứ khác vẫn được giữ khóa trên máy này cho tài khoản đó.',
+  uwSwitchLostOk: 'Đã hiểu',
 
   // S2 sync center
   uwSyncTitle: 'Trung tâm đồng bộ',
   uwSyncOpenFromSettings: 'Trung tâm đồng bộ',
   uwSyncOnline: 'Đã kết nối UniWork · đồng bộ lúc {time}',
   uwSyncOffline: 'Không có mạng · lần đồng bộ cuối {time}',
+  uwSyncOnlineNoTime: 'Đã kết nối UniWork',
+  uwSyncOfflineNoTime: 'Không có mạng',
   uwSyncPaused: 'Đã tạm dừng gửi — lần lưu mới sẽ chờ',
   uwSyncAdminPaused: 'Quản trị viên đang tạm dừng việc gửi. Các lần lưu được giữ trên máy này.',
   uwSyncFeedOff:
@@ -154,6 +163,7 @@ export const vi = {
   uwSyncEmptyQueue: 'Không có lần lưu nào đang chờ.',
   uwSyncEmptyAttention: 'Không có gì cần xử lý.',
   uwSyncEmptyRecent: 'Chưa có lần lưu nào gần đây.',
+  uwSyncActionFailed: 'Chưa thực hiện được. Không có gì bị xóa; hãy thử lại.',
   uwSyncRowAnnounce: '{doc}: {state}',
 
   // S3 offline library
@@ -263,6 +273,13 @@ export const vi = {
   uwConflictSaveCopyDone:
     'Đã lưu bản của bạn thành tài liệu mới: {title}. Tài liệu này chưa đổi; bạn vẫn chọn được Tải lại hoặc Ghi đè.',
   uwConflictSaveCopyFailed: 'Chưa tạo được bản sao. Thay đổi của bạn vẫn an toàn; hãy thử lại.',
+  uwConflictSaveCopyNoSeat:
+    'Không tạo được bản sao vì bạn không phải thành viên của không gian làm việc chứa tài liệu này. Thay đổi của bạn vẫn an toàn; bạn có thể tải bản của mình về máy.',
+  uwConflictSaveCopyFolderRefused:
+    'Bạn không thể tạo tài liệu trong thư mục này. Hãy tải bản của bạn về máy.',
+  uwConflictDownloadDone:
+    'Đã lưu bản của bạn vào máy: {file}. Tài liệu này chưa đổi; bạn vẫn chọn được Tải lại hoặc Ghi đè.',
+  uwConflictDownloadFailedDesktop: 'Chưa lưu được tệp. Thay đổi của bạn vẫn an toàn; hãy thử lại.',
   uwConflictSaveCopyOffline:
     'Không có mạng. Tạo bản sao cần kết nối; thay đổi của bạn vẫn được giữ.',
   uwConflictReloadFailed:

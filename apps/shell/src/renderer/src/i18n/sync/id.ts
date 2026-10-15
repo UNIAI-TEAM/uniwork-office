@@ -39,6 +39,7 @@ export const id = {
   uwQueueCancel: 'Batalkan penyimpanan…',
   uwQueueCancelConfirm:
     'Batalkan penyimpanan dalam antrean? Perubahan Anda tetap di komputer ini; dokumen di UniWork tidak berubah.',
+  uwQueueCancelGo: 'Batalkan simpan',
   uwQueueCancelled: 'Penyimpanan dalam antrean dibatalkan. Perubahan Anda tetap di komputer ini.',
 
   // {reason} fragments of the blocked/failed rows (the existing uwReason* keys stay in the uniwork-documents shard)
@@ -123,12 +124,20 @@ export const id = {
     'Rantai kunci komputer terkunci, jadi perubahan yang belum disimpan hanya ada di jendela yang terbuka. Keluar sekarang akan membuangnya; yang sudah disimpan terenkripsi tetap ada. Untuk menyimpannya, buka kunci komputer terlebih dahulu.',
   uwSignOutGo: 'Keluar',
   uwSignOutWaiting: 'Menyelesaikan penyimpanan yang sedang berjalan sebelum keluar…',
+  uwSignOutCaptureFailed:
+    'Beberapa perubahan yang belum disimpan tidak sempat ditangkap tepat waktu; versi tersimpan atau simpan otomatis terbaru tetap disimpan untuk akun Anda.',
+  uwSwitchLostTitle: 'Sebagian perubahan yang belum disimpan dari akun sebelumnya hilang',
+  uwSwitchLostBody:
+    'Akun lain masuk di komputer ini, jadi akun sebelumnya dikunci. Dokumen yang perubahan belum disimpannya tidak dapat dipertahankan: {count}. Semua yang lain tetap terkunci di komputer ini untuk akun tersebut.',
+  uwSwitchLostOk: 'Mengerti',
 
   // S2 sync center
   uwSyncTitle: 'Pusat sinkronisasi',
   uwSyncOpenFromSettings: 'Pusat sinkronisasi',
   uwSyncOnline: 'Terhubung ke UniWork · disinkronkan {time}',
   uwSyncOffline: 'Offline · terakhir disinkronkan {time}',
+  uwSyncOnlineNoTime: 'Terhubung ke UniWork',
+  uwSyncOfflineNoTime: 'Offline',
   uwSyncPaused: 'Pengiriman dijeda — penyimpanan baru akan menunggu',
   uwSyncAdminPaused: 'Admin Anda menjeda pengiriman. Simpanan tetap ada di komputer ini.',
   uwSyncFeedOff:
@@ -159,6 +168,7 @@ export const id = {
   uwSyncEmptyQueue: 'Tidak ada yang menunggu disimpan.',
   uwSyncEmptyAttention: 'Tidak ada yang perlu ditindaklanjuti.',
   uwSyncEmptyRecent: 'Tidak ada penyimpanan terbaru.',
+  uwSyncActionFailed: 'Tidak berhasil. Tidak ada yang dihapus; coba lagi.',
   uwSyncRowAnnounce: '{doc}: {state}',
 
   // S3 offline library
@@ -272,6 +282,14 @@ export const id = {
   uwConflictSaveCopyDone:
     'Versi Anda disimpan sebagai dokumen baru: {title}. Dokumen ini tidak berubah; Anda masih bisa memuat ulang atau menimpa.',
   uwConflictSaveCopyFailed: 'Tidak dapat membuat salinan. Perubahan Anda tetap aman; coba lagi.',
+  uwConflictSaveCopyNoSeat:
+    'Tidak dapat membuat salinan karena Anda bukan anggota ruang kerja tempat dokumen ini berada. Perubahan Anda tetap aman; Anda bisa mengunduh versi Anda.',
+  uwConflictSaveCopyFolderRefused:
+    'Anda tidak dapat membuat dokumen di folder ini. Unduh versi Anda sebagai gantinya.',
+  uwConflictDownloadDone:
+    'Versi Anda disimpan di komputer ini: {file}. Dokumen ini tidak berubah; Anda masih bisa memuat ulang atau menimpa.',
+  uwConflictDownloadFailedDesktop:
+    'Tidak dapat menyimpan file. Perubahan Anda tetap aman; coba lagi.',
   uwConflictSaveCopyOffline:
     'Anda sedang offline. Membuat salinan memerlukan koneksi; perubahan Anda tetap disimpan.',
   uwConflictReloadFailed:

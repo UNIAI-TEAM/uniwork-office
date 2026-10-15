@@ -31,6 +31,7 @@ export const zhTW = {
   uwQueueOpenCenter: '開啟同步中心',
   uwQueueCancel: '取消儲存…',
   uwQueueCancelConfirm: '取消佇列中的儲存？你的變更仍保留在這台電腦上；UniWork 上的文件不會改變。',
+  uwQueueCancelGo: '取消儲存',
   uwQueueCancelled: '已取消佇列中的儲存。你的變更仍保留在這台電腦上。',
 
   // {reason} fragments of the blocked/failed rows (the existing uwReason* keys stay in the uniwork-documents shard)
@@ -114,12 +115,20 @@ export const zhTW = {
     '這台電腦的鑰匙圈已鎖定，因此未儲存的變更只存在於開啟的視窗中。現在登出會捨棄這些變更；已加密保留的內容仍會保留。要保留它們，請先解鎖電腦。',
   uwSignOutGo: '登出',
   uwSignOutWaiting: '正在完成傳送中的儲存，然後登出…',
+  uwSignOutCaptureFailed:
+    '部分未儲存的變更未能及時擷取；已為你的帳號保留最近的已儲存或自動儲存版本。',
+  uwSwitchLostTitle: '上一個帳號的部分未儲存變更已遺失',
+  uwSwitchLostBody:
+    '另一個帳號已在這台電腦上登入，因此上一個帳號已被鎖定。未儲存的變更無法保留的文件：{count}。其他內容仍為該帳號鎖定保存在這台電腦上。',
+  uwSwitchLostOk: '知道了',
 
   // S2 sync center
   uwSyncTitle: '同步中心',
   uwSyncOpenFromSettings: '同步中心',
   uwSyncOnline: '已連線 UniWork · 同步於 {time}',
   uwSyncOffline: '離線 · 上次同步於 {time}',
+  uwSyncOnlineNoTime: '已連線 UniWork',
+  uwSyncOfflineNoTime: '離線',
   uwSyncPaused: '傳送已暫停 — 新的儲存會等待',
   uwSyncAdminPaused: '管理員已暫停傳送。儲存內容保留在這台電腦上。',
   uwSyncFeedOff: '新版本通知已暫停。你儲存時 UniWork 仍會檢查衝突。',
@@ -148,6 +157,7 @@ export const zhTW = {
   uwSyncEmptyQueue: '沒有等待儲存的內容。',
   uwSyncEmptyAttention: '沒有需要處理的內容。',
   uwSyncEmptyRecent: '最近沒有儲存。',
+  uwSyncActionFailed: '未能完成。沒有刪除任何內容，請再試一次。',
   uwSyncRowAnnounce: '{doc}：{state}',
 
   // S3 offline library
@@ -245,6 +255,12 @@ export const zhTW = {
   uwConflictSaveCopyDone:
     '你的版本已另存為新文件：{title}。此文件未改變；你仍可選擇重新載入或覆寫。',
   uwConflictSaveCopyFailed: '無法建立副本。你的變更仍然安全；請重試。',
+  uwConflictSaveCopyNoSeat:
+    '無法建立副本，因為你不是此文件所在工作區的成員。你的變更仍然安全；你可以下載自己的版本。',
+  uwConflictSaveCopyFolderRefused: '你無法在此資料夾中建立文件。請改為下載你的版本。',
+  uwConflictDownloadDone:
+    '你的版本已儲存到這台電腦：{file}。此文件未改變；你仍可選擇重新載入或覆寫。',
+  uwConflictDownloadFailedDesktop: '無法儲存檔案。你的變更仍然安全；請重試。',
   uwConflictSaveCopyOffline: '離線中。建立副本需要網路連線；你的變更會保留。',
   uwConflictReloadFailed: '無法載入最新版本。你的文件沒有改變；請重試。',
   uwConflictOverwriteFailed: '暫時無法覆寫。你的文件沒有改變；請重試。',

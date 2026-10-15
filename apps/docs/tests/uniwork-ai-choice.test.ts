@@ -18,14 +18,16 @@ const { handlers, dirs } = vi.hoisted(() => ({
 vi.mock('@genoffice/ai-search', () => ({}))
 
 // the one-shot chat and the settings test never reach a network: the provider they pick is the point
-const { chatForProvider, testChatConnection } = vi.hoisted(() => ({
+const { chatForProvider, testChatConnection, streamForProvider } = vi.hoisted(() => ({
   chatForProvider: vi.fn(async () => ({ ok: true as const, text: 'hi' })),
   testChatConnection: vi.fn(async () => ({ ok: true as const })),
+  streamForProvider: vi.fn(async () => undefined),
 }))
 vi.mock('@genoffice/ai-provider', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@genoffice/ai-provider')>()),
   chatForProvider,
   testChatConnection,
+  streamForProvider,
 }))
 
 vi.mock('electron', () => ({
@@ -130,6 +132,7 @@ describe('UniWork AI choice per account (desktop)', () => {
     setUniworkAiEditorSender(null)
     chatForProvider.mockClear()
     testChatConnection.mockClear()
+    streamForProvider.mockClear()
   })
   afterAll(() => rmSync(dirs.userData, { recursive: true, force: true }))
 
@@ -164,29 +167,52 @@ describe('UniWork AI choice per account (desktop)', () => {
     expect(accounts.choice.get('a-2')).toBe(false)
   })
 
-  it('while UniWork AI is unavailable the choice falls back like selectedProvider (genspark) and survives', async () => {
+  it('while UniWork AI is unavailable the choice stays uniwork (no silent switch to UniAI) and survives', async () => {
     fakeAccounts()
     await setSettings(picked('uniwork'))
     setUniworkAiAvailable(false)
-    expect((await getSettings()).provider).toBe('genspark')
+    expect((await getSettings()).provider).toBe('uniwork')
     setUniworkAiAvailable(true)
     expect((await getSettings()).provider).toBe('uniwork')
   })
 
-  it('a save while UniWork AI is hidden (the degraded genspark) keeps the stored pick', async () => {
+  it('a save while UniWork AI is hidden keeps the stored pick and the BYOK provider underneath', async () => {
     const accounts = fakeAccounts()
     await setSettings(picked('anthropic'))
     await setSettings(picked('uniwork'))
-    const before = accounts.writes.length
     setUniworkAiAvailable(false)
-    // the renderer saves what it was handed while hidden (e.g. after a BYOK key edit)
-    await setSettings(picked('genspark'))
+    // the renderer still holds `uniwork` while hidden and saves it back (e.g. after a BYOK key edit)
+    await setSettings(picked('uniwork'))
     setUniworkAiAvailable(true)
     expect((await getSettings()).provider).toBe('uniwork')
     expect(accounts.choice.get('a-1')).toBe(true)
-    expect(accounts.writes.slice(before)).toEqual([])
-    // the file keeps the BYOK provider underneath, not the degraded fallback the renderer held
     expect(file().provider).toBe('anthropic')
+  })
+
+  it('a Send with uniwork selected and UniWork AI unavailable makes no request to any provider', async () => {
+    fakeAccounts()
+    await setSettings(picked('anthropic'))
+    await setSettings(picked('uniwork'))
+    setUniworkAiAvailable(false)
+    const settings = await getSettings()
+    expect(settings.provider).toBe('uniwork')
+    const chunks: Array<{ type: string; uniworkCode?: string }> = []
+    const event = {
+      sender: {
+        id: EDITOR,
+        isDestroyed: () => false,
+        send: (_c: string, chunk: never) => chunks.push(chunk),
+      },
+    }
+    await handlers.get('ai:stream')!(event, {
+      requestId: 'r-1',
+      settings,
+      system: 's',
+      messages: [{ role: 'user', content: 'hi' }],
+    })
+    expect(chunks.map((c) => [c.type, c.uniworkCode])).toEqual([['error', 'ai_disabled']])
+    expect(streamForProvider).not.toHaveBeenCalled()
+    expect(chatForProvider).not.toHaveBeenCalled()
   })
 
   it('a save while hidden still takes the key edits, and without a pick the renderer provider is saved as is', async () => {
@@ -195,7 +221,7 @@ describe('UniWork AI choice per account (desktop)', () => {
     await setSettings(picked('uniwork'))
     setUniworkAiAvailable(false)
     await setSettings({
-      ...picked('genspark'),
+      ...picked('uniwork'),
       providers: { anthropic: { apiKey: 'sk-hidden', model: 'claude-test' } },
     } as unknown as AiSettings)
     expect(file().provider).toBe('anthropic')
@@ -212,7 +238,7 @@ describe('UniWork AI choice per account (desktop)', () => {
     await setSettings(picked('anthropic'))
     await setSettings(picked('uniwork'))
     setUniworkAiAvailable(false)
-    // the pane shows the degraded genspark; picking openai is a real choice, not the fallback
+    // the pane still shows UniWork AI (unavailable); picking openai is a real choice
     await setSettings(picked('openai'))
     expect(file().provider).toBe('openai')
     expect(accounts.choice.get('a-1')).toBe(false)
@@ -220,14 +246,14 @@ describe('UniWork AI choice per account (desktop)', () => {
     expect((await getSettings()).provider).toBe('openai')
   })
 
-  it('saving the degraded provider back while hidden (pick on) still keeps the file provider and the pick', async () => {
+  it('choosing UniAI while UniWork AI is hidden (pick on) is a real choice: it is written and clears the pick', async () => {
     const accounts = fakeAccounts()
     await setSettings(picked('anthropic'))
     await setSettings(picked('uniwork'))
     setUniworkAiAvailable(false)
     await setSettings(picked('genspark'))
-    expect(file().provider).toBe('anthropic')
-    expect(accounts.choice.get('a-1')).toBe(true)
+    expect(file().provider).toBe('genspark')
+    expect(accounts.choice.get('a-1')).toBe(false)
   })
 
   it('BYOK edits made while UniWork AI is chosen still reach ai-settings.json', async () => {
@@ -257,19 +283,22 @@ describe('UniWork AI choice per account (desktop)', () => {
     expect((await getSettings(HOME)).provider).toBe('anthropic')
   })
 
-  it('ai:chat and the settings test with provider uniwork run the file provider, never ask a key for uniwork', async () => {
+  it('ai:chat and the settings test with provider uniwork refuse with ai_disabled and never call the file provider', async () => {
     fakeAccounts()
     await setSettings(picked('anthropic'))
     await setSettings(picked('uniwork'))
-    // an editor's settings copy carries the overlay; a one-click action sends it as is
+    // an editor's settings copy carries the overlay; a one-shot caller with `uniwork` is refused
+    // instead of silently switching to the file's BYOK provider
     const request = { settings: picked('uniwork'), system: 's', user: 'u' }
-    const chat = (await handlers.get('ai:chat')!(from(EDITOR), request)) as { ok: boolean }
-    expect(chat.ok).toBe(true)
-    expect(chatForProvider).toHaveBeenCalledTimes(1)
-    expect((chatForProvider.mock.calls[0] as unknown[])[0]).toBe('anthropic')
+    const chat = (await handlers.get('ai:chat')!(from(EDITOR), request)) as {
+      ok: boolean
+      uniworkCode?: string
+    }
+    expect(chat).toMatchObject({ ok: false, uniworkCode: 'ai_disabled' })
+    expect(chatForProvider).toHaveBeenCalledTimes(0)
     const test = (await handlers.get('ai:settings-test')!(from(HOME), request)) as { ok: boolean }
-    expect(test.ok).toBe(true)
-    expect((testChatConnection.mock.calls[0] as unknown[])[0]).toBe('anthropic')
+    expect(test.ok).toBe(false)
+    expect(testChatConnection).toHaveBeenCalledTimes(0)
   })
 
   it('a Settings save from the home window (same BYOK provider) keeps the pick', async () => {
@@ -308,12 +337,12 @@ describe('UniWork AI choice per account (desktop)', () => {
     expect((await getSettings(EDITOR)).provider).toBe('uniwork')
   })
 
-  it('the Settings read follows the availability flag: hidden entry, degraded provider; the pick stays', async () => {
+  it('the Settings read keeps uniwork while the entry is hidden (no degraded provider); the pick stays', async () => {
     fakeAccounts()
     await setSettings(picked('anthropic'))
     await setSettings(picked('uniwork'))
     setUniworkAiAvailable(false)
-    expect((await getSettings(HOME, true)).provider).toBe('genspark')
+    expect((await getSettings(HOME, true)).provider).toBe('uniwork')
     setUniworkAiAvailable(true)
     expect((await getSettings(HOME, true)).provider).toBe('uniwork')
   })

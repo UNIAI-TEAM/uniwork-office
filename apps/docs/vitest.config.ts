@@ -42,6 +42,9 @@ export default defineConfig({
       '@genoffice/electron-utils/uniwork-ai-flag': local(
         '../../packages/electron-utils/src/uniwork-ai-flag.ts',
       ),
+      '@genoffice/electron-utils/draft-preview': local(
+        '../../packages/electron-utils/src/draft-preview.ts',
+      ),
       '@genoffice/electron-utils/ai-run': local('../../packages/electron-utils/src/ai-run.ts'),
       '@genoffice/electron-utils/drop-open': local(
         '../../packages/electron-utils/src/drop-open.ts',
@@ -60,6 +63,9 @@ export default defineConfig({
       '@genoffice/ai-provider/proxy-url': local('../../packages/ai-provider/src/proxy-url.ts'),
       '@genoffice/ai-provider': local('../../packages/ai-provider/src/index.ts'),
       '@genoffice/i18n': local('../../packages/i18n/src/index.ts'),
+      '@genoffice/ui/ai-uniwork-composer.css': local(
+        '../../packages/ui/src/ai-uniwork-composer/ai-uniwork-composer.css',
+      ),
       '@genoffice/ui/collab.css': local('../../packages/ui/src/collab/collab.css'),
       '@genoffice/ui/collab': local('../../packages/ui/src/collab/index.ts'),
       '@genoffice/ui': local('../../packages/ui/src/index.ts'),

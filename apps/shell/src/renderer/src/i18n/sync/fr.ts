@@ -41,6 +41,7 @@ export const fr = {
   uwQueueCancel: 'Annuler l’enregistrement…',
   uwQueueCancelConfirm:
     'Annuler l’enregistrement en file d’attente ? Vos modifications restent sur cet ordinateur ; le document sur UniWork ne change pas.',
+  uwQueueCancelGo: 'Annuler l’enregistrement',
   uwQueueCancelled:
     'Enregistrement en file d’attente annulé. Vos modifications restent sur cet ordinateur.',
 
@@ -127,12 +128,20 @@ export const fr = {
     'Le trousseau de l’ordinateur est verrouillé, les modifications non enregistrées n’existent donc que dans les fenêtres ouvertes. Vous déconnecter maintenant les supprime ; ce qui est déjà conservé chiffré reste. Pour les garder, déverrouillez d’abord l’ordinateur.',
   uwSignOutGo: 'Se déconnecter',
   uwSignOutWaiting: 'Finalisation de l’enregistrement en cours avant la déconnexion…',
+  uwSignOutCaptureFailed:
+    'Certaines modifications non enregistrées n’ont pas pu être capturées à temps ; la version enregistrée ou enregistrée automatiquement la plus récente est conservée pour votre compte.',
+  uwSwitchLostTitle: 'Des modifications non enregistrées du compte précédent ont été perdues',
+  uwSwitchLostBody:
+    'Un autre compte s’est connecté sur cet ordinateur, le compte précédent a donc été verrouillé. Documents dont les modifications non enregistrées n’ont pas pu être conservées : {count}. Tout le reste reste verrouillé sur cet ordinateur pour ce compte.',
+  uwSwitchLostOk: 'OK',
 
   // S2 sync center
   uwSyncTitle: 'Centre de synchronisation',
   uwSyncOpenFromSettings: 'Centre de synchronisation',
   uwSyncOnline: 'Connecté à UniWork · synchronisé {time}',
   uwSyncOffline: 'Hors ligne · dernière synchronisation {time}',
+  uwSyncOnlineNoTime: 'Connecté à UniWork',
+  uwSyncOfflineNoTime: 'Hors ligne',
   uwSyncPaused: 'Envoi suspendu — les nouveaux enregistrements attendront',
   uwSyncAdminPaused:
     'Votre administrateur a suspendu l’envoi. Les enregistrements sont conservés sur cet ordinateur.',
@@ -166,6 +175,7 @@ export const fr = {
   uwSyncEmptyQueue: 'Aucun enregistrement en attente.',
   uwSyncEmptyAttention: 'Rien à traiter.',
   uwSyncEmptyRecent: 'Aucun enregistrement récent.',
+  uwSyncActionFailed: 'L’action n’a pas abouti. Rien n’a été supprimé ; réessayez.',
   uwSyncRowAnnounce: '{doc} : {state}',
 
   // S3 offline library
@@ -283,6 +293,14 @@ export const fr = {
     'Votre version a été enregistrée comme nouveau document : {title}. Ce document n’a pas changé ; vous pouvez toujours recharger ou écraser.',
   uwConflictSaveCopyFailed:
     'Impossible de créer la copie. Vos modifications sont toujours en sécurité ; réessayez.',
+  uwConflictSaveCopyNoSeat:
+    'Impossible de créer la copie, car vous n’êtes pas membre de l’espace de travail qui contient ce document. Vos modifications sont toujours en sécurité ; vous pouvez télécharger votre version.',
+  uwConflictSaveCopyFolderRefused:
+    'Vous ne pouvez pas créer de documents dans ce dossier. Téléchargez plutôt votre version.',
+  uwConflictDownloadDone:
+    'Votre version a été enregistrée sur cet ordinateur : {file}. Ce document n’a pas changé ; vous pouvez toujours recharger ou écraser.',
+  uwConflictDownloadFailedDesktop:
+    'Impossible d’enregistrer le fichier. Vos modifications sont toujours en sécurité ; réessayez.',
   uwConflictSaveCopyOffline:
     'Vous êtes hors ligne. Créer une copie nécessite une connexion ; vos modifications sont conservées.',
   uwConflictReloadFailed:

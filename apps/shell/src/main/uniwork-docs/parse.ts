@@ -23,6 +23,8 @@ export interface DocumentDetail {
   myLevel: string | null
   /** `archived_at`: present while the document sits in the trash */
   archivedAt: string | null
+  /** G5-12: the folder or page holding the document; null = at the root, absent = not sent */
+  parentId?: string | null
   file: {
     filename: string
     mimeType: string
@@ -228,6 +230,11 @@ export function parseDetail(raw: unknown): DocumentDetail {
     currentVersion: nonNegInt(doc.current_version),
     myLevel,
     archivedAt: typeof doc.archived_at === 'string' && doc.archived_at ? doc.archived_at : null,
+    ...(typeof doc.parent_id === 'string' && doc.parent_id.length > 0 && doc.parent_id.length <= 128
+      ? { parentId: doc.parent_id }
+      : doc.parent_id === null
+        ? { parentId: null }
+        : {}),
     file: {
       filename: str(file.filename),
       mimeType: typeof file.mime_type === 'string' ? file.mime_type : '',

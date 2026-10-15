@@ -41,6 +41,7 @@ export const de = {
   uwQueueCancel: 'Speichern abbrechen…',
   uwQueueCancelConfirm:
     'Eingereihtes Speichern abbrechen? Ihre Änderungen bleiben auf diesem Computer; das Dokument in UniWork ändert sich nicht.',
+  uwQueueCancelGo: 'Speichern abbrechen',
   uwQueueCancelled:
     'Eingereihtes Speichern abgebrochen. Ihre Änderungen bleiben auf diesem Computer.',
 
@@ -126,12 +127,21 @@ export const de = {
     'Der Schlüsselbund des Computers ist gesperrt, daher gibt es ungespeicherte Änderungen nur in geöffneten Fenstern. Wenn Sie sich jetzt abmelden, werden sie verworfen; bereits verschlüsselt Behaltenes bleibt. Entsperren Sie zuerst den Computer, um sie zu behalten.',
   uwSignOutGo: 'Abmelden',
   uwSignOutWaiting: 'Laufendes Speichern wird vor dem Abmelden abgeschlossen…',
+  uwSignOutCaptureFailed:
+    'Einige ungespeicherte Änderungen konnten nicht rechtzeitig erfasst werden; die zuletzt gespeicherte oder automatisch gespeicherte Version bleibt für dein Konto erhalten.',
+  uwSwitchLostTitle:
+    'Einige nicht gespeicherte Änderungen des vorherigen Kontos sind verloren gegangen',
+  uwSwitchLostBody:
+    'Auf diesem Computer hat sich ein anderes Konto angemeldet, daher wurde das vorherige Konto gesperrt. Dokumente, deren nicht gespeicherte Änderungen nicht behalten werden konnten: {count}. Alles andere bleibt für dieses Konto gesperrt auf diesem Computer.',
+  uwSwitchLostOk: 'OK',
 
   // S2 sync center
   uwSyncTitle: 'Synchronisierungscenter',
   uwSyncOpenFromSettings: 'Synchronisierungscenter',
   uwSyncOnline: 'Mit UniWork verbunden · synchronisiert {time}',
   uwSyncOffline: 'Offline · zuletzt synchronisiert {time}',
+  uwSyncOnlineNoTime: 'Mit UniWork verbunden',
+  uwSyncOfflineNoTime: 'Offline',
   uwSyncPaused: 'Senden pausiert – neue Speicherstände warten',
   uwSyncAdminPaused:
     'Ihr Administrator hat das Senden pausiert. Speicherstände bleiben auf diesem Computer.',
@@ -165,6 +175,7 @@ export const de = {
   uwSyncEmptyQueue: 'Nichts wartet auf das Speichern.',
   uwSyncEmptyAttention: 'Nichts erfordert Aufmerksamkeit.',
   uwSyncEmptyRecent: 'Keine kürzlichen Speicherstände.',
+  uwSyncActionFailed: 'Das hat nicht geklappt. Nichts wurde gelöscht; versuchen Sie es erneut.',
   uwSyncRowAnnounce: '{doc}: {state}',
 
   // S3 offline library
@@ -282,6 +293,14 @@ export const de = {
     'Ihre Version wurde als neues Dokument gespeichert: {title}. Dieses Dokument ist unverändert; Sie können weiterhin neu laden oder überschreiben.',
   uwConflictSaveCopyFailed:
     'Die Kopie konnte nicht erstellt werden. Ihre Änderungen sind weiterhin sicher; versuchen Sie es erneut.',
+  uwConflictSaveCopyNoSeat:
+    'Die Kopie konnte nicht erstellt werden, weil Sie kein Mitglied des Arbeitsbereichs sind, in dem sich dieses Dokument befindet. Ihre Änderungen sind weiterhin sicher; Sie können Ihre Version herunterladen.',
+  uwConflictSaveCopyFolderRefused:
+    'Sie können in diesem Ordner keine Dokumente erstellen. Laden Sie stattdessen Ihre Version herunter.',
+  uwConflictDownloadDone:
+    'Ihre Version wurde auf diesem Computer gespeichert: {file}. Dieses Dokument ist unverändert; Sie können weiterhin neu laden oder überschreiben.',
+  uwConflictDownloadFailedDesktop:
+    'Die Datei konnte nicht gespeichert werden. Ihre Änderungen sind weiterhin sicher; versuchen Sie es erneut.',
   uwConflictSaveCopyOffline:
     'Sie sind offline. Zum Erstellen einer Kopie ist eine Verbindung nötig; Ihre Änderungen bleiben erhalten.',
   uwConflictReloadFailed:

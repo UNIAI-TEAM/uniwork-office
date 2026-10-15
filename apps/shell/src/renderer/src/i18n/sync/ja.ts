@@ -38,6 +38,7 @@ export const ja = {
   uwQueueCancel: '保存をキャンセル…',
   uwQueueCancelConfirm:
     'キュー内の保存をキャンセルしますか？変更はこのコンピューターに残り、UniWork のドキュメントは変わりません。',
+  uwQueueCancelGo: '保存を取り消す',
   uwQueueCancelled: 'キュー内の保存をキャンセルしました。変更はこのコンピューターに残っています。',
 
   // {reason} fragments of the blocked/failed rows (the existing uwReason* keys stay in the uniwork-documents shard)
@@ -122,12 +123,20 @@ export const ja = {
     'コンピューターのキーチェーンがロックされているため、未保存の変更は開いているウィンドウにしかありません。今ログアウトするとそれらは破棄されます。すでに暗号化して保持されたものは残ります。残すには、先にコンピューターのロックを解除してください。',
   uwSignOutGo: 'ログアウト',
   uwSignOutWaiting: 'ログアウトする前に進行中の保存を完了しています…',
+  uwSignOutCaptureFailed:
+    '一部の未保存の変更を時間内に取得できませんでした。最新の保存済みまたは自動保存版がアカウント用に保持されます。',
+  uwSwitchLostTitle: '前のアカウントの未保存の変更の一部が失われました',
+  uwSwitchLostBody:
+    '別のアカウントがこのコンピューターにサインインしたため、前のアカウントはロックされました。未保存の変更を保持できなかったドキュメント: {count}。それ以外はすべて、そのアカウント用にこのコンピューターでロックされたまま保持されます。',
+  uwSwitchLostOk: 'OK',
 
   // S2 sync center
   uwSyncTitle: '同期センター',
   uwSyncOpenFromSettings: '同期センター',
   uwSyncOnline: 'UniWork に接続済み · {time} に同期',
   uwSyncOffline: 'オフライン · 最終同期 {time}',
+  uwSyncOnlineNoTime: 'UniWork に接続済み',
+  uwSyncOfflineNoTime: 'オフライン',
   uwSyncPaused: '送信を一時停止中 — 新しい保存は待機します',
   uwSyncAdminPaused:
     '管理者が送信を一時停止しています。保存内容はこのコンピューターに保持されます。',
@@ -161,6 +170,7 @@ export const ja = {
   uwSyncEmptyQueue: '保存待ちのものはありません。',
   uwSyncEmptyAttention: '対応が必要なものはありません。',
   uwSyncEmptyRecent: '最近の保存はありません。',
+  uwSyncActionFailed: '完了できませんでした。何も削除されていません。もう一度お試しください。',
   uwSyncRowAnnounce: '{doc}：{state}',
 
   // S3 offline library
@@ -277,6 +287,14 @@ export const ja = {
     'あなたのバージョンを新しいドキュメントとして保存しました：{title}。このドキュメントは変わっていません。再読み込みまたは上書きを選ぶこともできます。',
   uwConflictSaveCopyFailed:
     'コピーを作成できませんでした。変更は引き続き安全です。もう一度お試しください。',
+  uwConflictSaveCopyNoSeat:
+    'このドキュメントがあるワークスペースのメンバーではないため、コピーを作成できませんでした。変更は引き続き安全です。自分のバージョンをダウンロードできます。',
+  uwConflictSaveCopyFolderRefused:
+    'このフォルダーにはドキュメントを作成できません。代わりに自分のバージョンをダウンロードしてください。',
+  uwConflictDownloadDone:
+    'あなたのバージョンをこのコンピューターに保存しました：{file}。このドキュメントは変わっていません。再読み込みまたは上書きを選ぶこともできます。',
+  uwConflictDownloadFailedDesktop:
+    'ファイルを保存できませんでした。変更は引き続き安全です。もう一度お試しください。',
   uwConflictSaveCopyOffline: 'オフラインです。コピーの作成には接続が必要です。変更は保持されます。',
   uwConflictReloadFailed:
     '最新バージョンを読み込めませんでした。ドキュメントは変わっていません。もう一度お試しください。',

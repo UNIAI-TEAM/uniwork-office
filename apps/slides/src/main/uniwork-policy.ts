@@ -28,6 +28,11 @@ export interface UniworkDocumentPolicy {
    * neutral constant). Absent = neutral constant; never the OS account name.
    */
   commentAuthor?(path: string): string
+  /**
+   * G5-11: consumes a one-shot capture request for `path` so a main-triggered
+   * save writes the working copy to disk without firing the user-save hook.
+   */
+  consumeCapture?(path: string): boolean
 }
 
 let policy: UniworkDocumentPolicy | null = null
@@ -132,14 +137,16 @@ export function notifyUniworkUserSave(path: string): void {
 
 /**
  * Who started a save. `'auto'` is the AutoSave timer / blur tick and the silent
- * close-guard save of an AutoSave-on deck; everything else (button, menu,
- * shortcut, close-guard "Save") is `'user'`. A missing value reads as `'user'`,
- * which keeps every existing caller on today's path.
+ * close-guard save of an AutoSave-on deck; `'capture'` is a sign-out working-copy
+ * flush; everything else (button, menu, shortcut, close-guard "Save") is `'user'`.
+ * A missing value reads as `'user'`, which keeps every existing caller on today's path.
  */
-export type UniworkSaveOrigin = 'user' | 'auto'
+export type UniworkSaveOrigin = 'user' | 'auto' | 'capture'
 
 export function parseUniworkSaveOrigin(value: unknown): UniworkSaveOrigin {
-  return value === 'auto' ? 'auto' : 'user'
+  if (value === 'auto') return 'auto'
+  if (value === 'capture') return 'capture'
+  return 'user'
 }
 
 export interface UniworkSaveInput {
@@ -157,6 +164,15 @@ export interface UniworkSaveDecision {
   fireHook: boolean
 }
 
+function consumeCaptureFor(path: string | null | undefined): boolean {
+  if (!path || !policy?.consumeCapture) return false
+  try {
+    return policy.consumeCapture(path) === true
+  } catch {
+    return false
+  }
+}
+
 /**
  * Pure save gate (no Electron): a read-only UniWork path is never written; an
  * AutoSave pass never writes a bound path (UniWork only takes explicit saves);
@@ -165,13 +181,15 @@ export interface UniworkSaveDecision {
  * hook (null outside the shell) is the only difference.
  */
 export function uniworkSaveDecision(input: UniworkSaveInput): UniworkSaveDecision {
+  const effectiveOrigin: UniworkSaveOrigin =
+    input.origin === 'user' && consumeCaptureFor(input.targetPath) ? 'capture' : input.origin
   if (uniworkIsReadOnly(input.targetPath)) return { write: false, fireHook: false }
-  if (input.origin === 'auto' && uniworkIsBound(input.targetPath)) {
+  if (effectiveOrigin === 'auto' && uniworkIsBound(input.targetPath)) {
     return { write: false, fireHook: false }
   }
   const fireHook =
     input.kind !== 'mcp' &&
-    input.origin === 'user' &&
+    effectiveOrigin === 'user' &&
     uniworkSamePath(input.currentPath, input.targetPath)
   return { write: true, fireHook }
 }

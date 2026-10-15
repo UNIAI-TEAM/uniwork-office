@@ -1,19 +1,27 @@
 import {
   aiUniworkText,
+  composerNoteFor,
   isUniworkQuestionRefusal,
   aiPanelWidthAtPointer,
   AiPanelSideButton,
   AiModelPicker,
   useCloudSignedIn,
+  useAiModelNeedHint,
   type AiModelPickerBridge,
   UniAiMark,
 } from '@genoffice/ui'
 import { useEffect, useRef, useState } from 'react'
+import '@genoffice/ui/ai-uniwork-composer.css'
 import type { PointerEvent as ReactPointerEvent, ReactElement, ReactNode } from 'react'
 import {
   AgentLoop,
+  droppedCallsOfNotes,
   endsQuietly,
+  getEntryResultChipView,
+  isTurnEnded,
   noticePatch,
+  panelLiveAnnouncement as computePanelLiveAnnouncement,
+  singleShortcutHint,
   type MindMapTreeNode,
   type PanelNote,
   composeSkills,
@@ -25,8 +33,13 @@ import {
   imageGenerationAvailable,
   type AiSettings,
 } from '@genoffice/ai-provider/browser'
+import type {
+  UniworkCloudStatusBridge,
+  UniworkCloudStatusSnapshot,
+} from '@genoffice/electron-utils/uniwork-ai-flag'
 import {
   AiComposer,
+  AiErrorAction,
   AiQueueStrip,
   AI_QUEUE_LABELS,
   AiScopeQuote,
@@ -34,7 +47,11 @@ import {
   AiUsageChip,
   addTokenUsage,
   Markdown,
+  uniworkErrorForChip,
+  uniworkErrorKeyOfText,
   useChatRunQueue,
+  useUniworkDisclosureAck,
+  useUniworkSendGate,
   type AiScopeQuoteData,
   type AiTokenUsageView,
 } from '@genoffice/ui'
@@ -82,9 +99,13 @@ import {
 } from './edit-queue'
 import { DOC_NAV_SCHEME, navigateToBlock, parseDocNavHref } from './doc-nav'
 
+function readUniworkCloudStatus(): UniworkCloudStatusBridge | undefined {
+  return (window as Window & { uniworkCloudStatus?: UniworkCloudStatusBridge }).uniworkCloudStatus
+}
+
 // Word-parity count (docs word-count.ts): Asian chars one by one + non-Asian words
 const ASIAN_RE =
-  /[ᄀ-ᇿ⺀-⿟、-〿぀-ヿ㄀-ㄯ㄰-㆏㇀-ㇿ㐀-䶿一-鿿가-힯豈-﫿！-｠￠-￦]|[\uD840-\uD87F][\uDC00-\uDFFF]/g
+  /[ᄀ-ᇿ⺀-⿟、-\u303f぀-ヿ㄀-ㄯ㄰-㆏㇀-ㇿ㐀-䶿一-鿿가-힯豈-﫿！-｠￠-￦]|[\uD840-\uD87F][\uDC00-\uDFFF]/g
 const NON_ASIAN_WORD_RE = /[A-Za-z0-9À-ɏ]+(?:['-][A-Za-z0-9À-ɏ]+)*/g
 
 function countWords(text: string): number {
@@ -129,6 +150,12 @@ interface ChatEntry {
   text: string
   streaming?: boolean
   isError?: boolean
+  /** the user stopped the turn before it finished */
+  stopped?: boolean | undefined
+  /** the turn streamed real text before it ended (a stop filler is not text) */
+  streamedText?: boolean | undefined
+  /** at least one tool mutated the document in this turn */
+  mutated?: boolean | undefined
   /** UniWork AI: the transport is waiting out a Retry-After; the run goes on, Stop is the only action */
   waitLine?: string | undefined
   /** UniWork AI: restarted conversation / provider boundary / dropped call, shown above the answer */
@@ -190,11 +217,14 @@ export interface MarkdownAiDeps {
 }
 
 const MODEL_BRIDGE: AiModelPickerBridge = {
-  getSettings: () => window.markdownApi.getAiSettings(),
-  setSettings: (settings, options) => window.markdownApi.setAiSettings(settings, options),
-  onSettingsChanged: (handler) => window.markdownApi.onAiSettingsChanged(handler),
-  gskLoggedIn: () => window.markdownApi.aiGskStatus().then((s) => !!s?.loggedIn),
-  openModelSettings: () => window.markdownApi.openAiModelSettings().catch(() => {}),
+  getSettings: () => window.markdownApi?.getAiSettings?.() ?? Promise.resolve({} as AiSettings),
+  setSettings: (settings, options) =>
+    window.markdownApi?.setAiSettings?.(settings, options) ?? Promise.resolve({} as AiSettings),
+  onSettingsChanged: (handler) => window.markdownApi?.onAiSettingsChanged?.(handler) ?? (() => {}),
+  gskLoggedIn: () =>
+    (window.markdownApi?.aiGskStatus?.() ?? Promise.resolve(null)).then((s) => !!s?.loggedIn),
+  openModelSettings: () =>
+    (window.markdownApi?.openAiModelSettings?.() ?? Promise.resolve()).catch(() => {}),
   // web frames: no key or no model keeps send off with a hint (see AiModelPicker)
   get requireModel() {
     return platform() === 'web'
@@ -214,6 +244,7 @@ export function AiPanel({
   onQueueConsume,
   readOnly = false,
   open,
+  onExpand,
 }: {
   deps: MarkdownAiDeps
   filePath: string | null
@@ -230,8 +261,16 @@ export function AiPanel({
   readOnly?: boolean
   /** false while the dock is collapsed (the panel stays mounted); reopening re-reads the cloud plan */
   open?: boolean
+  /** expand the dock: a send refused while collapsed opens it so the reason can be shown */
+  onExpand?: () => void
 }): ReactElement {
   const { lang, t } = useI18n()
+  // a picked UniWork AI that is not offered (or any provider still missing a model) keeps every
+  // send entry closed - presets, retry, continue and queue runs included - the hint says why
+  const needModelHint = useAiModelNeedHint()
+  // the UniWork disclosure gate of every send entry: the composer feeds it, the queue pump asks it
+  // silently, and presets, retry and continue refuse through the send entry (announce + focus)
+  const uniworkGate = useUniworkSendGate()
   const readOnlyRef = useRef(readOnly)
   readOnlyRef.current = readOnly
   const [chat, setChat] = useState<ChatEntry[]>([])
@@ -265,11 +304,12 @@ export function AiPanel({
     busy,
     submit: (text) => {
       const loop = loopRef.current
-      if (!loop || loop.busy) return false
+      if (needModelHint !== null || !loop || loop.busy) return false
+      // held until the user acknowledges the UniWork disclosure, as Send is
+      if (uniworkGate.isBlocked()) return false
       // undefined retryOf = a new turn: the queue batch's own display text means
       // no selection quote is captured (the fork's edit-fence send signature)
-      send(text, text)
-      return true
+      return send(text, text)
     },
   })
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null)
@@ -570,6 +610,9 @@ export function AiPanel({
             : base
           patchLast((last) => ({
             streaming: false,
+            stopped: cancelled,
+            streamedText: Boolean(text?.trim()),
+            mutated: runMutatedRef.current,
             waitLine: undefined,
             // a restarted conversation or UniWork AI being off ends the turn on purpose: the note is the whole reply
             text:
@@ -727,10 +770,12 @@ export function AiPanel({
     displayText?: string,
     retryOf?: Pick<ChatEntry, 'scope' | 'fence'>,
     queueFence?: FenceRange[],
-  ): void => {
+  ): boolean => {
     const instruction = text.trim()
     const loop = loopRef.current
-    if (!instruction || !loop || loop.busy) return
+    if (needModelHint !== null || !instruction || !loop || loop.busy) return false
+    // presets, retry and continue refuse like Send until the UniWork disclosure is acknowledged
+    if (uniworkGate.refuse()) return false
     stickToBottomRef.current = true
     runInstructionRef.current = instruction
     runDisplayRef.current = displayText ?? instruction
@@ -772,7 +817,9 @@ export function AiPanel({
     persistMessage('user', displayText ?? instruction, undefined, scope)
     void (async () => {
       try {
-        settingsRef.current = await window.markdownApi.getAiSettings()
+        const s = await window.markdownApi?.getAiSettings?.()
+        if (s) settingsRef.current = s
+        setProvider(s?.provider ?? settingsRef.current?.provider)
         if (!mountedRef.current) return
         await loop.run(instruction)
       } catch (err) {
@@ -787,11 +834,13 @@ export function AiPanel({
         setBusy(false)
       }
     })()
+    return true
   }
 
   const stop = (): void => {
     dismissClarify()
     loopRef.current?.cancel()
+    inputRef.current?.focus()
   }
 
   /** Enter while a reply runs: the draft joins the queue above the composer */
@@ -802,12 +851,13 @@ export function AiPanel({
     setPrompt('')
   }
 
-  const retry = (): void =>
+  const retry = (): void => {
     send(
       runInstructionRef.current,
       runDisplayRef.current,
       chat.findLast((entry) => entry.role === 'user') ?? {},
     )
+  }
 
   // keep the scope chip & queue rows in sync with the editor selection/content
   useEffect(() => {
@@ -929,6 +979,104 @@ export function AiPanel({
   const resizeCleanupRef = useRef<(() => void) | null>(null)
   useEffect(() => () => resizeCleanupRef.current?.(), [])
 
+  const [provider, setProvider] = useState<string | undefined>(undefined)
+  useEffect(() => {
+    let alive = true
+    const sync = () => {
+      void window.markdownApi
+        ?.getAiSettings?.()
+        ?.then((s) => {
+          if (!alive) return
+          settingsRef.current = s
+          setProvider(s?.provider)
+        })
+        .catch(() => {})
+    }
+    sync()
+    const off = window.markdownApi?.onAiSettingsChanged?.(sync)
+    window.addEventListener('focus', sync)
+    return () => {
+      alive = false
+      off?.()
+      window.removeEventListener('focus', sync)
+    }
+  }, [open])
+
+  const isUniwork = provider === 'uniwork'
+
+  const [cloudSnapshot, setCloudSnapshot] = useState<UniworkCloudStatusSnapshot | null>(null)
+  const [composerAnnouncement, setComposerAnnouncement] = useState('')
+  // the model picker's list note, written into the panel's own polite node (never a node of the
+  // picker's); it stands while the announcement it was written over is the current one
+  const [pickerNote, setPickerNote] = useState<{ text: string; over: string } | null>(null)
+  useEffect(() => {
+    const bridge = readUniworkCloudStatus()
+    if (!bridge) return
+    let cancelled = false
+    void bridge
+      .get()
+      .then((snap) => {
+        if (!cancelled) setCloudSnapshot(snap)
+      })
+      .catch(() => {})
+    const off = bridge.onChange?.((snap) => {
+      if (!cancelled) setCloudSnapshot(snap)
+    })
+    return () => {
+      cancelled = true
+      off?.()
+    }
+  }, [open])
+
+  const composerNoteState = composerNoteFor({
+    provider: provider ?? settingsRef.current?.provider ?? undefined,
+    cloudState: cloudSnapshot?.state ?? null,
+    signedOut: cloudSnapshot ? !cloudSnapshot.signedIn : undefined,
+  })
+  // the disclosure gate must not depend on the composer being mounted (collapsed rail): the panel
+  // reads the same ack key itself, so a ribbon action that fires while collapsed is refused too
+  const { acked: uniworkDisclosureAcked } = useUniworkDisclosureAck(
+    isUniwork
+      ? {
+          account: cloudSnapshot?.accountId ?? '',
+          org: cloudSnapshot?.orgId ?? '',
+          document: filePath ?? 'local',
+        }
+      : null,
+  )
+  uniworkGate.setPanelBlocked(isUniwork && !uniworkDisclosureAcked)
+  // a refusal while collapsed expands the panel; once open it announces and focuses the disclosure
+  const panelOpen = open !== false
+  uniworkGate.setPanelOpen(panelOpen, onExpand)
+  useEffect(() => {
+    if (panelOpen) uniworkGate.flushPendingRefusal()
+  }, [panelOpen, uniworkGate])
+
+  const lastEntry = chat.at(-1)
+  const panelLiveAnnouncement =
+    chat.length > 0 || busy
+      ? computePanelLiveAnnouncement({
+          entries: chat,
+          busy,
+          translate: (key, vars) => aiUniworkText(lang, key, vars),
+          lastEntryChipInput:
+            lastEntry && lastEntry.role === 'assistant'
+              ? {
+                  provider: provider ?? settingsRef.current?.provider ?? null,
+                  mutated: Boolean(lastEntry.mutated),
+                  stopped: Boolean(lastEntry.stopped),
+                  hasStreamedText: lastEntry.streamedText ?? Boolean(lastEntry.text?.trim()),
+                  clarifyAsked: chat.some((c) => Boolean(c.clarifyReceipts?.length)),
+                  notes: lastEntry.notes,
+                  droppedToolCalls: droppedCallsOfNotes(lastEntry.notes),
+                  toolExecutions: lastEntry.tools,
+                  isError: Boolean(lastEntry.isError),
+                  error: lastEntry.isError ? uniworkErrorForChip(lastEntry.text) : null,
+                }
+              : null,
+        })
+      : composerAnnouncement
+
   /** Drag the inner panel edge to resize from the selected window side. */
   const startResize = (e: ReactPointerEvent<HTMLDivElement>): void => {
     e.preventDefault()
@@ -963,6 +1111,10 @@ export function AiPanel({
     resizer.setPointerCapture(e.pointerId)
   }
 
+  const liveText =
+    pickerNote && pickerNote.over === panelLiveAnnouncement
+      ? pickerNote.text
+      : panelLiveAnnouncement
   return (
     <aside
       ref={asideRef}
@@ -1025,7 +1177,15 @@ export function AiPanel({
         </div>
       </header>
 
-      <div className="ai-chat" ref={chatRef} onScroll={onChatScroll}>
+      <div className="ai-sr-status" aria-live="polite" aria-atomic="true">
+        {liveText}
+      </div>
+      <div
+        className="ai-chat"
+        ref={chatRef}
+        aria-busy={busy ? 'true' : undefined}
+        onScroll={onChatScroll}
+      >
         {chat.length === 0 && (
           <div className="ai-chat-empty">
             <div className="ai-chat-empty-title">{t('aiEmptyTitle')}</div>
@@ -1063,6 +1223,13 @@ export function AiPanel({
         )}
         {chat.map((entry, i) => {
           if (entry.role === 'user') {
+            // a UniWork error turn carries its own labelled S9 action (Retry only where the table allows
+            // it), so the "not sent" bubble adds no Retry of its own; failures of other providers keep it
+            const next = chat[i + 1]
+            const uniworkErrorFollows =
+              next?.role === 'assistant' &&
+              Boolean(next.isError) &&
+              uniworkErrorKeyOfText(next.text) !== null
             return (
               <div key={i} className="ai-msg ai-msg-user">
                 {entry.scope && <AiScopeQuote scope={entry.scope} />}
@@ -1080,7 +1247,7 @@ export function AiPanel({
                 {entry.undelivered && (
                   <div className="ai-msg-undelivered">
                     {t('aiUndelivered')}
-                    {canRetryEntry(entry, busy) && (
+                    {canRetryEntry(entry, busy) && !uniworkErrorFollows && (
                       <button
                         className="ai-retry-btn"
                         onClick={() => send(entry.text, undefined, entry)}
@@ -1094,39 +1261,114 @@ export function AiPanel({
             )
           }
           const hasTools = (entry.tools?.length ?? 0) > 0
-          if (!entry.text && !entry.streaming && !hasTools && !entry.notes?.length) return null
+          if (
+            !entry.text &&
+            !entry.streaming &&
+            !hasTools &&
+            !entry.notes?.length &&
+            !entry.stopped &&
+            !entry.mutated
+          )
+            return null
           const isLast = i === chat.length - 1
           // Action row appears once per completed reply: on the turn's final segment only
           // (mid-turn segments have a following assistant entry; the live turn ends when !busy)
-          const nextEntry = chat[i + 1]
-          const turnEnded = nextEntry ? nextEntry.role === 'user' : !busy
+          const turnEnded = isTurnEnded(chat, i, busy)
           const showToolbar = !entry.streaming && turnEnded && !!entry.text && !entry.isError
+          const chipView = getEntryResultChipView(
+            chat,
+            i,
+            busy,
+            (key, vars) => aiUniworkText(lang, key, vars),
+            {
+              provider: provider ?? settingsRef.current?.provider ?? null,
+              mutated: Boolean(entry.mutated),
+              stopped: Boolean(entry.stopped),
+              hasStreamedText: entry.streamedText ?? Boolean(entry.text?.trim()),
+              clarifyAsked: chat.some((c) => Boolean(c.clarifyReceipts?.length)),
+              notes: entry.notes,
+              droppedToolCalls: droppedCallsOfNotes(entry.notes),
+              toolExecutions: entry.tools,
+              isError: Boolean(entry.isError),
+              error: entry.isError ? uniworkErrorForChip(entry.text) : null,
+            },
+          )
+          const chip = chipView?.chip ?? null
+          const chipLabel = chipView?.labelText ?? null
+          const stoppedText = chipView?.stoppedText ?? null
+          // a stop before the first token leaves only the stop filler as body: the stopped line replaces it
+          const bodyText =
+            stoppedText && entry.stopped && entry.streamedText === false ? '' : entry.text
+          // the chip is the first word of the answer paragraph, in the same node as the text
+          const chipLead =
+            chip && chipLabel ? (
+              <>
+                <span className="ai-result-chip" data-chip={chip.chip} data-tone={chip.tone}>
+                  {chipLabel}
+                </span>
+                {bodyText ? <span className="ai-result-chip-sep">: </span> : null}
+              </>
+            ) : undefined
           return (
             <div
               key={i}
               className={`ai-msg ai-msg-assistant${entry.isError && !aiNoticeKind(entry.text) ? ' ai-msg-error' : ''}${entry.streaming ? ' ai-msg-streaming' : ''}`}
             >
-              {/* one persistent, empty-until-needed live region: a node that mounts with its text is often not announced */}
-              {
-                <div className="ai-msg-live" aria-live="polite">
-                  {entry.notes?.map((note, k) => (
-                    <div key={`un${k}`} className="ai-msg-notice">
-                      {note.text}
-                    </div>
-                  ))}
-                  {entry.waitLine && <div className="ai-msg-notice">{entry.waitLine}</div>}
-                </div>
-              }
+              <div className="ai-msg-live">
+                {entry.notes?.map((note, k) => (
+                  <div key={`un${k}`} className="ai-msg-notice">
+                    {note.text}
+                  </div>
+                ))}
+                {entry.waitLine && <div className="ai-msg-notice">{entry.waitLine}</div>}
+              </div>
               {!entry.text && entry.streaming ? (
                 <span className="ai-typing-row">
                   <AiTypingIndicator label={hasTools ? t('aiWorking') : t('aiThinking')} />
                 </span>
               ) : (
-                entry.text && (
-                  <div dir="auto">
-                    <Markdown text={aiNoticeBody(entry.text)} nav={docNav} />
+                (bodyText || chip) && (
+                  <div className="ai-msg-answer" dir="auto">
+                    {(bodyText || chipLead) && (
+                      <Markdown
+                        text={bodyText ? aiNoticeBody(bodyText) : ''}
+                        nav={docNav}
+                        lead={chipLead}
+                      />
+                    )}
+                    {chip?.chip === 'edited' && (
+                      <div className="ai-result-actions">
+                        <button
+                          type="button"
+                          className="ai-result-view-changes"
+                          onClick={() => {
+                            const ed = depsRef.current.getEditor()
+                            if (ed) navigateToBlock(ed, 0)
+                          }}
+                        >
+                          {aiUniworkText(lang, 'aiResultViewChanges')}
+                        </button>
+                        <span className="ai-result-edited-hint">
+                          {singleShortcutHint(aiUniworkText(lang, 'aiResultEditedHint'))}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )
+              )}
+              <AiErrorAction
+                chip={chip}
+                lang={lang}
+                waiting={Boolean(entry.waitLine)}
+                onRetry={isLast && !busy && runInstructionRef.current ? retry : undefined}
+                onChooseProvider={() => void window.markdownApi?.openAiModelSettings?.()}
+                onSignIn={() => void readUniworkCloudStatus()?.signIn?.()}
+                onAskAgain={isLast && !busy ? () => inputRef.current?.focus() : undefined}
+              />
+              {stoppedText && (
+                <div className="ai-run-stopped" dir="auto">
+                  {stoppedText}
+                </div>
               )}
               {hasTools && <ToolChipList tools={entry.tools!} />}
               {entry.usage && (
@@ -1242,7 +1484,7 @@ export function AiPanel({
         </div>
       )}
       <div className="ai-composer" style={activeClarify ? { display: 'none' } : undefined}>
-        {readOnly && (
+        {readOnly && !isUniwork && (
           <div className="ai-readonly-notice" role="note">
             {t('aiViewOnlyNotice')}
           </div>
@@ -1298,6 +1540,31 @@ export function AiPanel({
           queuePlaceholder={AI_QUEUE_LABELS[lang].queuePlaceholder}
           value={prompt}
           busy={busy}
+          lang={lang}
+          viewOnly={isUniwork && readOnly ? true : undefined}
+          uniwork={
+            isUniwork
+              ? {
+                  provider: provider ?? 'uniwork',
+                  lang,
+                  note: composerNoteState,
+                  onSignIn: () => void readUniworkCloudStatus()?.signIn?.(),
+                  onChooseProvider: () => void window.markdownApi?.openAiModelSettings?.(),
+                  onAnnounce: setComposerAnnouncement,
+                  onSendBlockedChange: uniworkGate.onSendBlockedChange,
+                  registerBlockedHandler: uniworkGate.registerBlockedHandler,
+                  disclosure: {
+                    orgName: cloudSnapshot?.orgName ?? undefined,
+                    ackKey: {
+                      account: cloudSnapshot?.accountId ?? '',
+                      org: cloudSnapshot?.orgId ?? '',
+                      document: filePath ?? 'local',
+                    },
+                    variant: filePath ? 'document' : 'local',
+                  },
+                }
+              : undefined
+          }
           header={
             hasScopeSelection && (
               <div className="ai-scope-row">
@@ -1343,7 +1610,11 @@ export function AiPanel({
           iconOnly
           footerStart={
             <>
-              <AiModelPicker bridge={MODEL_BRIDGE} lang={lang} />
+              <AiModelPicker
+                bridge={MODEL_BRIDGE}
+                lang={lang}
+                onAnnounce={(text) => setPickerNote({ text, over: panelLiveAnnouncement })}
+              />
               {sessionUsage && <AiUsageChip usage={sessionUsage} session lang={lang} />}
             </>
           }

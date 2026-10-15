@@ -35,6 +35,7 @@ export const ko = {
   uwQueueCancel: '저장 취소…',
   uwQueueCancelConfirm:
     '대기 중인 저장을 취소할까요? 변경 사항은 이 컴퓨터에 남고 UniWork의 문서는 바뀌지 않습니다.',
+  uwQueueCancelGo: '저장 취소',
   uwQueueCancelled: '대기 중인 저장을 취소했습니다. 변경 사항은 이 컴퓨터에 남아 있습니다.',
 
   // {reason} fragments of the blocked/failed rows (the existing uwReason* keys stay in the uniwork-documents shard)
@@ -119,12 +120,20 @@ export const ko = {
     '컴퓨터의 키체인이 잠겨 있어 저장하지 않은 변경 사항은 열린 창에만 있습니다. 지금 로그아웃하면 해당 변경 사항이 삭제되며, 이미 암호화되어 보관된 내용은 남습니다. 보관하려면 먼저 컴퓨터 잠금을 해제하세요.',
   uwSignOutGo: '로그아웃',
   uwSignOutWaiting: '로그아웃하기 전에 진행 중인 저장을 마치는 중…',
+  uwSignOutCaptureFailed:
+    '일부 저장되지 않은 변경 사항을 제때 캡처하지 못했습니다. 계정에 대해 가장 최근의 저장 또는 자동 저장 버전이 유지됩니다.',
+  uwSwitchLostTitle: '이전 계정의 저장하지 않은 변경 사항 일부가 손실되었습니다',
+  uwSwitchLostBody:
+    '다른 계정이 이 컴퓨터에 로그인하여 이전 계정이 잠겼습니다. 저장하지 않은 변경 사항을 보존할 수 없었던 문서: {count}. 그 밖의 모든 항목은 해당 계정을 위해 이 컴퓨터에 잠긴 상태로 유지됩니다.',
+  uwSwitchLostOk: '확인',
 
   // S2 sync center
   uwSyncTitle: '동기화 센터',
   uwSyncOpenFromSettings: '동기화 센터',
   uwSyncOnline: 'UniWork에 연결됨 · {time} 동기화',
   uwSyncOffline: '오프라인 · 마지막 동기화 {time}',
+  uwSyncOnlineNoTime: 'UniWork에 연결됨',
+  uwSyncOfflineNoTime: '오프라인',
   uwSyncPaused: '전송 일시 중지됨 — 새 저장은 대기합니다',
   uwSyncAdminPaused: '관리자가 전송을 일시 중지했습니다. 저장 내용은 이 컴퓨터에 보관됩니다.',
   uwSyncFeedOff:
@@ -155,6 +164,7 @@ export const ko = {
   uwSyncEmptyQueue: '저장 대기 중인 항목이 없습니다.',
   uwSyncEmptyAttention: '조치가 필요한 항목이 없습니다.',
   uwSyncEmptyRecent: '최근 저장이 없습니다.',
+  uwSyncActionFailed: '완료하지 못했습니다. 삭제된 것은 없습니다. 다시 시도하세요.',
   uwSyncRowAnnounce: '{doc}: {state}',
 
   // S3 offline library
@@ -269,6 +279,14 @@ export const ko = {
     '내 버전을 새 문서로 저장했습니다: {title}. 이 문서는 바뀌지 않았으며, 여전히 다시 불러오거나 덮어쓸 수 있습니다.',
   uwConflictSaveCopyFailed:
     '사본을 만들지 못했습니다. 변경 사항은 여전히 안전합니다. 다시 시도하세요.',
+  uwConflictSaveCopyNoSeat:
+    '이 문서가 있는 작업 공간의 구성원이 아니어서 사본을 만들지 못했습니다. 변경 사항은 여전히 안전합니다. 내 버전을 다운로드할 수 있습니다.',
+  uwConflictSaveCopyFolderRefused:
+    '이 폴더에는 문서를 만들 수 없습니다. 대신 내 버전을 다운로드하세요.',
+  uwConflictDownloadDone:
+    '내 버전을 이 컴퓨터에 저장했습니다: {file}. 이 문서는 바뀌지 않았으며, 여전히 다시 불러오거나 덮어쓸 수 있습니다.',
+  uwConflictDownloadFailedDesktop:
+    '파일을 저장하지 못했습니다. 변경 사항은 여전히 안전합니다. 다시 시도하세요.',
   uwConflictSaveCopyOffline:
     '오프라인 상태입니다. 사본을 만들려면 연결이 필요하며, 변경 사항은 보관됩니다.',
   uwConflictReloadFailed:

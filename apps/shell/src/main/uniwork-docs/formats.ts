@@ -52,6 +52,9 @@ const RESERVED_WINDOWS_NAMES = /^(con|prn|aux|nul|com[\d¹²³]|lpt[\d¹²³])$/
 // A surrogate unit with no partner: the file system turns it into U+FFFD, so it
 // is replaced up front and the tab title matches the file on disk.
 const LONE_SURROGATE = /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/g
+/** the most runes the server accepts in a document title */
+const MAX_TITLE_RUNES = 500
+
 // U+FFFD marks bytes some earlier hop failed to decode as UTF-8; it is never a
 // real character of a name, so it is replaced like the reserved characters.
 // C0 controls and DEL, then the characters Windows reserves in a file name.
@@ -83,6 +86,24 @@ export function sanitizeFilename(name: string, format: UniworkDocFormat): string
   const stem = base.split('.', 1)[0]?.trim() ?? ''
   if (!base || RESERVED_WINDOWS_NAMES.test(stem)) base = base ? `_${base}` : 'document'
   return `${base}.${format}`
+}
+
+/**
+ * G5-12: the title of "Save as a copy" - `{name} {suffix}` with the format's
+ * extension kept last (`Plan.docx` -> `Plan (my version).docx`; a title that
+ * carries no extension just gets the suffix). Characters an OS refuses in a
+ * file name become `_` (U-01 #25) so the title stays a safe file name in the
+ * working copy and in any export; the name is cut to the server's 500 runes.
+ */
+export function copyTitleFor(title: string, suffix: string, format: UniworkDocFormat): string {
+  const trimmed = title.replace(LONE_SURROGATE, '_').trim()
+  const ext = formatForName(trimmed) === format ? extname(trimmed) : ''
+  const stem = trimmed.slice(0, trimmed.length - ext.length).trim()
+  const safe = (text: string) => text.replace(UNSAFE_FILENAME_CHAR, '_')
+  const tail = ` ${suffix}${ext}`
+  const room = Math.max(1, MAX_TITLE_RUNES - Array.from(safe(tail)).length)
+  const head = Array.from(safe(stem)).slice(0, room).join('').trimEnd()
+  return `${head}${safe(tail)}`.trim()
 }
 
 /** the text carries U+FFFD: it was decoded from bytes that were not UTF-8 */

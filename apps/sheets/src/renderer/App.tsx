@@ -75,6 +75,7 @@ import {
   isUniworkQuestionRefusal,
   useAutoSavePref,
   useCloudSignedIn,
+  useAiModelNeedHint,
   addTokenUsage,
   type AiTokenUsageView,
   type AiScopeQuoteData,
@@ -1107,6 +1108,9 @@ export function App({
   const { loggedInRef: gskLoggedInRef, refresh: refreshGskStatus } = useCloudSignedIn(() =>
     window.desktopApi?.aiGskStatus(),
   )
+  // a picked UniWork AI that is not offered (or any provider still missing a model) keeps every
+  // send entry closed - presets, retry, queue and selection ask included - the hint says why
+  const needModelHint = useAiModelNeedHint()
   const [aiBusy, setAiBusy] = useState(false)
   /** ask_clarification card waiting for the user; its resolver unblocks the tool */
   const [aiClarify, setAiClarify] = useState<readonly ClarifyQuestion[] | null>(null)
@@ -1540,6 +1544,8 @@ export function App({
               text: shown,
               isError: false,
               status: runNoticesRef.current.announcement(),
+              // the chip reads the calls the server dropped, the text only carries their lines
+              droppedToolCalls: runNoticesRef.current.droppedCalls(),
             }))
         },
         onTurnReset: () => {
@@ -3531,9 +3537,9 @@ export function App({
     overrideInstruction?: string,
     overrideAttachments?: readonly AttachmentMeta[],
     retryIndex?: number,
-  ): void {
+  ): boolean {
     const instruction = (overrideInstruction ?? prompt).trim()
-    if (!instruction || aiBusy) return
+    if (needModelHint !== null || !instruction || aiBusy) return false
     runToolsRef.current = []
     runUsageRef.current = undefined
     // The message consumes the composer attachments: they ride along (echoed on the
@@ -3582,12 +3588,13 @@ export function App({
     // (kept for offline use and for the fixed micro-DSL it still supports).
     if (agentConfigured) {
       runAgent(instruction, sentAtts)
-      return
+      return true
     }
     const outcome = runDeterministicPlan(instruction)
     setMessage(outcome.text)
     appendChat({ role: 'assistant', text: outcome.text, tools: [], isError: outcome.isError })
     persistChatMessage('assistant', outcome.text)
+    return true
   }
 
   /// AI edits on imported workbooks preview against the live sheet, then

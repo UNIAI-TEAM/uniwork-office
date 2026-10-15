@@ -13,16 +13,25 @@ import {
   addTokenUsage,
   type AiTokenUsageView,
   useChatRunQueue,
+  useUniworkDisclosureAck,
+  useUniworkSendGate,
 } from '@genoffice/ui'
 import { useEffect, useRef, useState } from 'react'
+import '@genoffice/ui/ai-uniwork-composer.css'
 import type { Editor } from '@tiptap/core'
 import type { Block } from '@genoffice/docx-engine'
 import {
   AgentLoop,
   composeSkills,
+  droppedCallsOfNotes,
   endsQuietly,
+  getEntryResultChipView,
+  isTurnEnded,
   noticePatch,
+  panelLiveAnnouncement as computePanelLiveAnnouncement,
+  singleShortcutHint,
   streamText,
+  uniworkErrorLineText,
   type AgentImage,
   type PanelNote,
   type MindMapTreeNode,
@@ -30,6 +39,7 @@ import {
 import {
   aiNoticeBody,
   aiNoticeKind,
+  composerNoteFor,
   imageGenerationAvailable,
   mediaAnalysisAvailable,
 } from '@genoffice/ai-provider/browser'
@@ -53,7 +63,8 @@ import {
 } from './tools'
 import type { AiPageSetupAccess } from './page-setup'
 import type { AiNotesAccess } from './note-ops'
-import { createDocsSkill } from './docs-skill'
+import { createDocsSkill, type AiDocProtection } from './docs-skill'
+import { aiTrackFor, aiTracksChanges } from './track-policy'
 import { MindMapCard } from './MindMapCard'
 import {
   buildDocWriterRequest,
@@ -82,7 +93,7 @@ import { createFilesSkill } from './files-skill'
 import { boundChatHistory } from './chat-retention'
 import { createElectronTransport } from './transport'
 import { useI18n, t as tModule, aiLangDirective, getLang, type StringKey } from '../i18n/locale'
-import { Markdown } from '@genoffice/ui'
+import { AiErrorAction, Markdown, uniworkErrorForChip, useAiModelNeedHint } from '@genoffice/ui'
 import { AiComposer, AiScopeQuote, AiTypingIndicator, type AiScopeQuoteData } from '@genoffice/ui'
 import sendEnterOn from '../assets/send-enter-on.png'
 import sendEnterOff from '../assets/send-enter-off.png'
@@ -135,6 +146,9 @@ interface ChatEntry {
   error?: string
   streaming?: boolean
   turnLimit?: boolean
+  stopped?: boolean
+  /** the turn streamed real text before it ended (a stop filler is not text) */
+  streamedText?: boolean | undefined
   /** tool executions performed during this assistant turn */
   tools?: ToolActivity[]
   /** interactive mind map from generate_mindmap's side-channel display (session-only;
@@ -154,6 +168,38 @@ interface ChatEntry {
   notes?: PanelNote[] | undefined
   /** tokens the provider billed for this reply, summed across its turns (absent when unreported) */
   usage?: AiTokenUsageView
+}
+
+interface UniworkCloudSnapshotLike {
+  state:
+    | 'signed-out'
+    | 'not-entitled'
+    | 'subscription-inactive'
+    | 'credits-exhausted'
+    | 'unavailable'
+    | 'ready'
+  signedIn: boolean
+  enabled: boolean
+  reason?: string | null
+  cloudUnavailable?: boolean
+  accountId?: string | null
+  orgId?: string | null
+  orgName?: string | null
+}
+
+interface UniworkCloudBridgeLike {
+  get(): Promise<UniworkCloudSnapshotLike | null>
+  onChange?(handler: (status: UniworkCloudSnapshotLike | null) => void): () => void
+  openAccountSettings?(): Promise<void>
+  signIn?(): Promise<void>
+}
+
+export function readUniworkCloudStatus(
+  bridge: UniworkCloudBridgeLike | undefined = (
+    window as unknown as { uniworkCloudStatus?: UniworkCloudBridgeLike }
+  ).uniworkCloudStatus,
+): UniworkCloudBridgeLike | undefined {
+  return bridge
 }
 
 /** longest selection excerpt echoed on a user bubble */
@@ -376,6 +422,8 @@ interface AiPanelProps {
   readOnly?: boolean
   /** UniWork working copy: tools that write outside the document are hidden (C-BOUND) */
   bound?: boolean
+  /** Word protection of the open document: the docs skill hides/refuses the tools it forbids (live) */
+  protection?: AiDocProtection
   /** App state beside the PM doc that a run's Roll back restores with it */
   sideState?: AiSideState
 }
@@ -417,11 +465,18 @@ export function AiPanel({
   notesAccess,
   readOnly = false,
   bound = false,
+  protection = 'none',
   sideState,
 }: AiPanelProps) {
   const { t, lang } = useI18n()
   // Panel chrome follows the UI language; message text follows its own content (dir=auto below)
   const isRtl = lang === 'ar' || lang === 'he'
+  // a picked UniWork AI that is not offered (or any provider still missing a model) keeps every
+  // send entry closed - presets, retry, continue and queue runs included - the hint says why
+  const needModelHint = useAiModelNeedHint()
+  // the UniWork disclosure gate of every send entry: the composer feeds it, the queue pump asks it
+  // silently, and presets, retry and continue refuse through the send entry (announce + focus)
+  const uniworkGate = useUniworkSendGate()
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   /** messages queued while a reply runs; the pump re-runs them through runWith on settle */
@@ -432,9 +487,10 @@ export function AiPanel({
     busy,
     submit: (text, meta) => {
       const loop = loopRef.current
-      if (!loop || loop.busy || pendingSendRef.current) return false
-      runWith(text, text, meta.attachments, meta.scope)
-      return true
+      if (needModelHint !== null || !loop || loop.busy || pendingSendRef.current) return false
+      // held until the user acknowledges the UniWork disclosure, as Send is
+      if (uniworkGate.isBlocked()) return false
+      return runWith(text, text, meta.attachments, meta.scope)
     },
   })
   /** Wall-clock start of the current run, drives the elapsed badge */
@@ -608,6 +664,8 @@ export function AiPanel({
   readOnlyRef.current = readOnly
   const boundRef = useRef(bound)
   boundRef.current = bound
+  const protectionRef = useRef(protection)
+  protectionRef.current = protection
   const sideStateRef = useRef(sideState)
   sideStateRef.current = sideState
   const trackChangesRef = useRef(trackChanges)
@@ -864,6 +922,8 @@ export function AiPanel({
       bullet: findNumId(blocksRef.current, 'bullet') ?? numIdFallbackRef.current?.bullet ?? null,
       ordered: findNumId(blocksRef.current, 'ordered') ?? numIdFallbackRef.current?.ordered ?? null,
     })
+    // tracked-changes protection forces the recorder on, whatever the panel toggle says
+    const tracks = () => aiTracksChanges(trackChangesRef.current, protectionRef.current)
     loopRef.current = new AgentLoop<AiRunSnapshot>({
       transport: transportRef.current,
       systemSuffix: aiLangDirective,
@@ -871,7 +931,7 @@ export function AiPanel({
         createDocsSkill(
           () => editorRef.current,
           numIds,
-          () => (trackChangesRef.current ? { author: AI_REVISION_AUTHOR } : undefined),
+          () => aiTrackFor(trackChangesRef.current, protectionRef.current, AI_REVISION_AUTHOR),
           () => commentsAccessRef.current,
           () => hfAccessRef.current,
           () => imageGenerationAvailable(settingsRef.current, gskLoggedInRef.current),
@@ -885,6 +945,7 @@ export function AiPanel({
           () => readOnlyRef.current,
           () => boundRef.current,
           () => askClarification,
+          () => protectionRef.current,
         ),
         createFilesSkill(availableAttachments),
       ]),
@@ -921,7 +982,7 @@ export function AiPanel({
           if (execution.mutated) {
             // tracking off: accept immediately (same tick, so the yellow never paints);
             // tracking on: revisions stay pending, handled in the Review tab
-            if (!trackChangesRef.current) clearAiHighlights(true)
+            if (!tracks()) clearAiHighlights(true)
           }
           // mind maps ride the UI-only display side channel onto the message
           const display = execution.display
@@ -978,6 +1039,8 @@ export function AiPanel({
             streaming: false,
             waitLine: undefined,
             turnLimit,
+            stopped: cancelled,
+            streamedText: Boolean(text?.trim()),
             // a restarted conversation or UniWork AI being off ends the turn on purpose: the note is the whole reply
             text:
               finalText ||
@@ -1145,9 +1208,12 @@ export function AiPanel({
     attachmentsOverride?: AttachmentMeta[],
     /** null = a retry that had no scope; undefined = capture the live selection */
     retryScope?: AiScopeQuoteData | null,
-  ) => {
+  ): boolean => {
     const loop = loopRef.current
-    if (!instruction || !loop || loop.busy || pendingSendRef.current) return
+    if (needModelHint !== null || !instruction || !loop || loop.busy || pendingSendRef.current)
+      return false
+    // presets, retry and continue refuse like Send until the UniWork disclosure is acknowledged
+    if (uniworkGate.refuse()) return false
     setInput('')
     // The message consumes the composer attachments: they ride along (echoed on the
     // bubble, images multimodal, files via the files skill) and the composer clears.
@@ -1222,12 +1288,14 @@ export function AiPanel({
         }
         return loop.run(instruction, images)
       })
+    return true
   }
 
   const cancel = () => {
     if (pendingSendRef.current) pendingSendRef.current.aborted = true
     dismissClarify()
     loopRef.current?.cancel()
+    inputRef.current?.focus()
   }
 
   /** submit every still-anchored queued edit as one batch run */
@@ -1410,6 +1478,70 @@ export function AiPanel({
     resizer.setPointerCapture(e.pointerId)
   }
 
+  const isUniwork = settings.provider === 'uniwork'
+  const [cloudSnapshot, setCloudSnapshot] = useState<UniworkCloudSnapshotLike | null>(null)
+  const [composerAnnouncement, setComposerAnnouncement] = useState('')
+  // the model picker's list note, written into the panel's own polite node (never a node of the
+  // picker's); it stands while the announcement it was written over is the current one
+  const [pickerNote, setPickerNote] = useState<{ text: string; over: string } | null>(null)
+  useEffect(() => {
+    const bridge = readUniworkCloudStatus()
+    if (!bridge) return
+    let cancelled = false
+    void bridge
+      .get()
+      .then((snap) => {
+        if (!cancelled) setCloudSnapshot(snap)
+      })
+      .catch(() => {})
+    const off = bridge.onChange?.((snap) => {
+      if (!cancelled) setCloudSnapshot(snap)
+    })
+    return () => {
+      cancelled = true
+      off?.()
+    }
+  }, [])
+  const composerNoteState = composerNoteFor({
+    provider: settings.provider,
+    cloudState: cloudSnapshot?.state ?? null,
+    signedOut: cloudSnapshot ? !cloudSnapshot.signedIn : undefined,
+  })
+  // the disclosure gate must not depend on the composer being mounted (collapsed rail): the panel
+  // reads the same ack key itself, so a ribbon action that fires while collapsed is refused too
+  const { acked: uniworkDisclosureAcked } = useUniworkDisclosureAck(
+    isUniwork
+      ? {
+          account: cloudSnapshot?.accountId ?? '',
+          org: cloudSnapshot?.orgId ?? '',
+          document: filePath ?? 'local',
+        }
+      : null,
+  )
+  uniworkGate.setPanelBlocked(isUniwork && !uniworkDisclosureAcked)
+  // a refusal while collapsed expands the panel; once open it announces and focuses the disclosure
+  uniworkGate.setPanelOpen(open, onExpand)
+  useEffect(() => {
+    if (open) uniworkGate.flushPendingRefusal()
+  }, [open, uniworkGate])
+
+  const focusFirstAiChange = () => {
+    let targetPos: number | null = null
+    editor.state.doc.descendants((node, pos) => {
+      if (targetPos !== null) return false
+      if (node.attrs?.aiChanged) {
+        targetPos = pos
+        return false
+      }
+      return true
+    })
+    if (targetPos !== null) {
+      editor.commands.focus(targetPos + 1)
+    } else {
+      editor.commands.focus()
+    }
+  }
+
   // collapsed: rail only — after all hooks, so the instance and its state survive
   if (!open) {
     // the sidebar setting is off: nothing to show until an explicit AI action opens the panel
@@ -1426,6 +1558,34 @@ export function AiPanel({
     )
   }
 
+  const lastEntry = chat[chat.length - 1]
+  const panelLiveAnnouncement =
+    chat.length > 0 || busy
+      ? computePanelLiveAnnouncement({
+          entries: chat,
+          busy,
+          translate: (key, vars) => aiUniworkText(lang, key, vars),
+          lastEntryChipInput:
+            lastEntry && lastEntry.role === 'assistant'
+              ? {
+                  provider: settings.provider,
+                  mutated: Boolean(lastEntry.snapshot),
+                  stopped: Boolean(lastEntry.stopped),
+                  hasStreamedText: lastEntry.streamedText ?? Boolean(lastEntry.text?.trim()),
+                  clarifyAsked: Boolean(lastEntry.clarifyReceipts?.length),
+                  notes: lastEntry.notes,
+                  droppedToolCalls: droppedCallsOfNotes(lastEntry.notes),
+                  toolExecutions: lastEntry.tools,
+                  error: uniworkErrorForChip(lastEntry.error),
+                }
+              : null,
+        })
+      : composerAnnouncement
+
+  const liveText =
+    pickerNote && pickerNote.over === panelLiveAnnouncement
+      ? pickerNote.text
+      : panelLiveAnnouncement
   return (
     <aside
       ref={asideRef}
@@ -1494,7 +1654,17 @@ export function AiPanel({
         </div>
       </div>
 
-      <div ref={logRef} className="ai-chat" onScroll={onLogScroll}>
+      {/* Single panel-level polite live region: announces transport notices while running and the finished answer once when it ends */}
+      <div className="ai-sr-status" aria-live="polite" aria-atomic="true">
+        {liveText}
+      </div>
+
+      <div
+        ref={logRef}
+        className="ai-chat"
+        aria-busy={busy ? 'true' : undefined}
+        onScroll={onLogScroll}
+      >
         {/* past conversation (read-only transcript, not fed to the model), shown continuously with the current turn */}
         {historicChat.length > 0 && (
           <>
@@ -1555,21 +1725,55 @@ export function AiPanel({
             !entry.streaming &&
             !entry.error &&
             !entry.notes?.length &&
-            !entry.tools?.length
+            !entry.tools?.length &&
+            !entry.stopped &&
+            !entry.snapshot
           ) {
             return null
           }
           const isLast = i === chat.length - 1
           // Action row appears once per completed reply: on the turn's final segment only
           // (mid-turn segments have a following assistant entry; the live turn ends when !busy)
-          const nextEntry = chat[i + 1]
-          const turnEnded = nextEntry ? nextEntry.role === 'user' : !busy
+          const turnEnded = isTurnEnded(chat, i, busy)
           const showToolbar =
             entry.role === 'assistant' &&
             !entry.streaming &&
             turnEnded &&
             // edits-only turns have no text but still carry the rollback point
             !!(entry.text || entry.error || entry.snapshot)
+          const chipView = getEntryResultChipView(
+            chat,
+            i,
+            busy,
+            (key, vars) => aiUniworkText(lang, key, vars),
+            {
+              provider: settings.provider,
+              mutated: Boolean(entry.snapshot),
+              stopped: Boolean(entry.stopped),
+              hasStreamedText: entry.streamedText ?? Boolean(entry.text?.trim()),
+              clarifyAsked: Boolean(entry.clarifyReceipts?.length),
+              notes: entry.notes,
+              droppedToolCalls: droppedCallsOfNotes(entry.notes),
+              toolExecutions: entry.tools,
+              error: uniworkErrorForChip(entry.error),
+            },
+          )
+          const chip = chipView?.chip ?? null
+          const chipLabel = chipView?.labelText ?? null
+          const stoppedText = chipView?.stoppedText ?? null
+          // a stop before the first token leaves only the stop filler as body: the stopped line replaces it
+          const bodyText =
+            stoppedText && entry.stopped && entry.streamedText === false ? '' : entry.text
+          // the chip is the first word of the answer paragraph, in the same node as the text
+          const chipLead =
+            chip && chipLabel ? (
+              <>
+                <span className="ai-result-chip" data-chip={chip.chip} data-tone={chip.tone}>
+                  {chipLabel}
+                </span>
+                {bodyText ? <span className="ai-result-chip-sep">: </span> : null}
+              </>
+            ) : undefined
           return (
             <div
               key={i}
@@ -1579,9 +1783,8 @@ export function AiPanel({
               {entry.role === 'user' && entry.attachments && entry.attachments.length > 0 && (
                 <SentAttachments atts={entry.attachments} previews={attachmentPreviews} />
               )}
-              {/* one persistent, empty-until-needed live region: a node that mounts with its text is often not announced */}
-              {entry.role === 'assistant' && (
-                <div className="ai-msg-live" aria-live="polite">
+              {entry.role === 'assistant' && Boolean(entry.notes?.length || entry.waitLine) && (
+                <div className="ai-msg-live">
                   {entry.notes?.map((note, k) => (
                     <div key={`un${k}`} className="ai-msg-notice">
                       {note.text}
@@ -1597,11 +1800,32 @@ export function AiPanel({
                   />
                 </span>
               ) : entry.role === 'assistant' ? (
-                <div dir="auto">
-                  <Markdown text={entry.text} nav={docNav} />
+                <div className="ai-msg-answer" dir="auto">
+                  {(bodyText || chipLead) && (
+                    <Markdown text={bodyText || ''} nav={docNav} lead={chipLead} />
+                  )}
                 </div>
               ) : (
                 <span dir="auto">{entry.text}</span>
+              )}
+              {stoppedText && (
+                <div className="ai-run-stopped" dir="auto">
+                  {stoppedText}
+                </div>
+              )}
+              {chip?.chip === 'edited' && (
+                <div className="ai-result-actions">
+                  <button
+                    type="button"
+                    className="ai-result-view-changes"
+                    onClick={focusFirstAiChange}
+                  >
+                    {aiUniworkText(lang, 'aiResultViewChanges')}
+                  </button>
+                  <span className="ai-result-edited-hint">
+                    {singleShortcutHint(aiUniworkText(lang, 'aiResultEditedHint'))}
+                  </span>
+                </div>
               )}
               {entry.role === 'assistant' && entry.usage && (
                 <div className="ai-message-usage">
@@ -1632,12 +1856,25 @@ export function AiPanel({
               {entry.error &&
                 (aiNoticeKind(entry.error) ? (
                   // "nothing to chat with" is a setup / plan state: a plain notice, not a red error
-                  <div className="ai-msg-notice" role="status">
-                    {aiNoticeBody(entry.error)}
-                  </div>
+                  <div className="ai-msg-notice">{aiNoticeBody(entry.error)}</div>
                 ) : (
-                  <div className="ai-msg-error">{t('aiErrorPrefix', { error: entry.error })}</div>
+                  <div className="ai-msg-error">
+                    {uniworkErrorLineText(chip, entry.error, (error) =>
+                      t('aiErrorPrefix', { error }),
+                    )}
+                  </div>
                 ))}
+              {entry.error && (
+                <AiErrorAction
+                  chip={chip}
+                  lang={lang}
+                  waiting={Boolean(entry.waitLine)}
+                  onRetry={isLast && !busy && lastInstructionRef.current ? retry : undefined}
+                  onChooseProvider={() => void window.desktop?.openAiModelSettings?.()}
+                  onSignIn={() => void readUniworkCloudStatus()?.signIn?.()}
+                  onAskAgain={isLast && !busy ? () => inputRef.current?.focus() : undefined}
+                />
+              )}
               {cap('billing') && entry.error && aiNoticeKind(entry.error) && (
                 <div className="ai-msg-actions">
                   <button
@@ -1684,7 +1921,9 @@ export function AiPanel({
                     !busy &&
                     lastInstructionRef.current &&
                     !aiNoticeKind(entry.error) &&
-                    !isUniworkQuestionRefusal(entry.error) && (
+                    !isUniworkQuestionRefusal(entry.error) &&
+                    // the labelled "Thử lại" under the error line is the retry of an error turn
+                    chip?.errorLine?.action !== 'retry' && (
                       <button
                         className="ai-msg-tool-btn"
                         onClick={retry}
@@ -1748,10 +1987,8 @@ export function AiPanel({
         </div>
       )}
       <div className="ai-composer" style={activeClarify ? { display: 'none' } : undefined}>
-        {readOnly && (
-          <div className="ai-readonly-notice" role="status">
-            {t('aiViewOnlyNotice')}
-          </div>
+        {readOnly && !isUniwork && (
+          <div className="ai-readonly-notice">{t('aiViewOnlyNotice')}</div>
         )}
         {attachNotice && <div className="ai-attach-notice">{attachNotice}</div>}
         {activePartial && (
@@ -1921,9 +2158,38 @@ export function AiPanel({
           onSend={run}
           onStop={cancel}
           onPasteFiles={(files) => void onPasteFiles(files)}
+          lang={lang}
+          viewOnly={isUniwork && readOnly ? true : undefined}
+          uniwork={
+            isUniwork
+              ? {
+                  provider: settings.provider,
+                  lang,
+                  note: composerNoteState,
+                  onSignIn: () => void readUniworkCloudStatus()?.signIn?.(),
+                  onChooseProvider: () => void window.desktop?.openAiModelSettings?.(),
+                  onAnnounce: setComposerAnnouncement,
+                  onSendBlockedChange: uniworkGate.onSendBlockedChange,
+                  registerBlockedHandler: uniworkGate.registerBlockedHandler,
+                  disclosure: {
+                    orgName: cloudSnapshot?.orgName ?? undefined,
+                    ackKey: {
+                      account: cloudSnapshot?.accountId ?? '',
+                      org: cloudSnapshot?.orgId ?? '',
+                      document: filePath ?? 'local',
+                    },
+                    variant: filePath ? 'document' : 'local',
+                  },
+                }
+              : undefined
+          }
           footerStart={
             <>
-              <AiModelPicker bridge={MODEL_BRIDGE} lang={lang} />
+              <AiModelPicker
+                bridge={MODEL_BRIDGE}
+                lang={lang}
+                onAnnounce={(text) => setPickerNote({ text, over: panelLiveAnnouncement })}
+              />
               {sessionUsage && <AiUsageChip usage={sessionUsage} session lang={lang} />}
               <button
                 className="ai-attach-btn"

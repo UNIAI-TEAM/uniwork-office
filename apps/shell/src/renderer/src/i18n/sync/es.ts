@@ -37,6 +37,7 @@ export const es = {
   uwQueueCancel: 'Cancelar guardado…',
   uwQueueCancelConfirm:
     '¿Cancelar el guardado en cola? Tus cambios siguen en este equipo; el documento en UniWork no cambia.',
+  uwQueueCancelGo: 'Cancelar guardado',
   uwQueueCancelled: 'Guardado en cola cancelado. Tus cambios siguen en este equipo.',
 
   // {reason} fragments of the blocked/failed rows (the existing uwReason* keys stay in the uniwork-documents shard)
@@ -122,12 +123,20 @@ export const es = {
     'El llavero del equipo está bloqueado, así que los cambios sin guardar solo existen en las ventanas abiertas. Si cierras sesión ahora, se descartarán; lo que ya se guardó cifrado se mantiene. Para conservarlos, desbloquea primero el equipo.',
   uwSignOutGo: 'Cerrar sesión',
   uwSignOutWaiting: 'Terminando el guardado en curso antes de cerrar sesión…',
+  uwSignOutCaptureFailed:
+    'Algunos cambios sin guardar no pudieron capturarse a tiempo; se conserva la versión guardada o guardada automáticamente más reciente para tu cuenta.',
+  uwSwitchLostTitle: 'Se perdieron algunos cambios sin guardar de la cuenta anterior',
+  uwSwitchLostBody:
+    'Otra cuenta inició sesión en este equipo, así que la cuenta anterior se bloqueó. Documentos cuyos cambios sin guardar no se pudieron conservar: {count}. Todo lo demás sigue bloqueado en este equipo para esa cuenta.',
+  uwSwitchLostOk: 'Entendido',
 
   // S2 sync center
   uwSyncTitle: 'Centro de sincronización',
   uwSyncOpenFromSettings: 'Centro de sincronización',
   uwSyncOnline: 'Conectado a UniWork · sincronizado {time}',
   uwSyncOffline: 'Sin conexión · última sincronización {time}',
+  uwSyncOnlineNoTime: 'Conectado a UniWork',
+  uwSyncOfflineNoTime: 'Sin conexión',
   uwSyncPaused: 'Envío en pausa: los nuevos guardados esperarán',
   uwSyncAdminPaused:
     'Tu administrador ha pausado el envío. Los guardados se conservan en este equipo.',
@@ -159,6 +168,7 @@ export const es = {
   uwSyncEmptyQueue: 'No hay nada pendiente de guardar.',
   uwSyncEmptyAttention: 'Nada requiere atención.',
   uwSyncEmptyRecent: 'No hay guardados recientes.',
+  uwSyncActionFailed: 'No se pudo completar. No se eliminó nada; inténtalo de nuevo.',
   uwSyncRowAnnounce: '{doc}: {state}',
 
   // S3 offline library
@@ -276,6 +286,14 @@ export const es = {
     'Tu versión se guardó como documento nuevo: {title}. Este documento no ha cambiado; aún puedes recargar o sobrescribir.',
   uwConflictSaveCopyFailed:
     'No se pudo crear la copia. Tus cambios siguen a salvo; vuelve a intentarlo.',
+  uwConflictSaveCopyNoSeat:
+    'No se pudo crear la copia porque no eres miembro del espacio de trabajo en el que está este documento. Tus cambios siguen a salvo; puedes descargar tu versión.',
+  uwConflictSaveCopyFolderRefused:
+    'No puedes crear documentos en esta carpeta. Descarga tu versión en su lugar.',
+  uwConflictDownloadDone:
+    'Tu versión se guardó en este equipo: {file}. Este documento no ha cambiado; aún puedes recargar o sobrescribir.',
+  uwConflictDownloadFailedDesktop:
+    'No se pudo guardar el archivo. Tus cambios siguen a salvo; vuelve a intentarlo.',
   uwConflictSaveCopyOffline:
     'No tienes conexión. Para crear una copia se necesita conexión; tus cambios se conservan.',
   uwConflictReloadFailed:

@@ -16,7 +16,10 @@ import type {
 } from '@genoffice/ai-provider/browser'
 import type { AiStreamChunk, AiStreamRequest } from '@genoffice/ai-provider'
 import { installDropOpenBridge } from '@genoffice/electron-utils/drop-open'
-import { installUniworkAiFlagBridge } from '@genoffice/electron-utils/uniwork-ai-flag-bridge'
+import {
+  installUniworkAiFlagBridge,
+  installUniworkCloudStatusBridge,
+} from '@genoffice/electron-utils/uniwork-ai-flag-bridge'
 import { installUniworkDiscussionBridge } from '@genoffice/electron-utils/discussion-bridge'
 import type { UpdateUiState } from '../shared/update-api'
 import { normalizeAiPanelPrefs } from '@genoffice/ui/ai-panel-prefs'
@@ -67,6 +70,9 @@ import type {
   UniworkUploadDocInput,
   UniworkUploadProgress,
   UniworkWorkspaceRef,
+  SignOutPlan,
+  SignOutProgress,
+  SignOutPromptRequest,
 } from '../shared/home-api'
 import { HOME_CHANNELS, PROJECT_CHANNELS, UNIWORK_DOC_CHANNELS } from '../shared/home-api'
 import { INTEGRATIONS_CHANNELS } from '../shared/integrations-api'
@@ -87,6 +93,8 @@ import type {
   WorkTask,
   WorkTaskStatus,
 } from '../shared/uniwork-work-api'
+import { asSyncCenterSnapshot, UNIWORK_SYNC_CENTER_CHANNELS } from '../shared/sync-center'
+import type { SyncCenterActionResult, UniworkSyncCenterApi } from '../shared/sync-center'
 import { createLaunchReplay } from './launch-replay'
 
 // subscribed at preload time: a cold-start launch event can arrive before the
@@ -129,6 +137,20 @@ ipcRenderer.on(UNIWORK_DOC_CHANNELS.uploadProgress, (_event: IpcRendererEvent, r
   const event = asUploadProgress(raw)
   if (!event) return
   for (const cb of [...uploadProgressSubscribers]) cb(event)
+})
+// G5-11: sign-out progress (`waiting` while an in-flight save settles, `done` after)
+const signOutProgressSubscribers = new Set<(event: SignOutProgress) => void>()
+ipcRenderer.on(UNIWORK_DOC_CHANNELS.signOutProgress, (_event: IpcRendererEvent, raw: unknown) => {
+  const event = asSignOutProgress(raw)
+  if (!event) return
+  for (const cb of [...signOutProgressSubscribers]) cb(event)
+})
+// G5-11 D5: main-initiated sign-out prompt (account switch / deployment switch)
+const signOutPromptSubscribers = new Set<(request: SignOutPromptRequest) => void>()
+ipcRenderer.on(UNIWORK_DOC_CHANNELS.signOutPrompt, (_event: IpcRendererEvent, raw: unknown) => {
+  const request = asSignOutPromptRequest(raw)
+  if (!request) return
+  for (const cb of [...signOutPromptSubscribers]) cb(request)
 })
 
 const UI_LANGUAGES: readonly UiLanguage[] = [
@@ -241,13 +263,53 @@ function asUniworkLock(result: unknown): UniworkDocLock | null {
   if (!result || typeof result !== 'object') return null
   const r = result as Partial<UniworkDocLock>
   if (typeof r.path !== 'string' || !r.path) return null
-  if (r.reason !== 'store_newer' && r.reason !== 'keystore_locked') return null
+  if (r.reason !== 'store_newer' && r.reason !== 'keystore_locked' && r.reason !== 'signed_out') {
+    return null
+  }
   return { path: r.path, reason: r.reason, name: typeof r.name === 'string' ? r.name : '' }
 }
 
 function asUniworkLocks(result: unknown): UniworkDocLock[] {
   if (!Array.isArray(result)) return []
   return result.map(asUniworkLock).filter((lock): lock is UniworkDocLock => lock !== null)
+}
+
+function asSignOutPlan(raw: unknown): SignOutPlan {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Partial<SignOutPlan>
+  const nonNegInt = (v: unknown): number =>
+    typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.floor(v) : 0
+  return {
+    count: nonNegInt(r.count),
+    waiting: nonNegInt(r.waiting),
+    keystoreLocked: r.keystoreLocked === true,
+    ramOnly: nonNegInt(r.ramOnly),
+  }
+}
+
+function asSignOutProgress(raw: unknown): SignOutProgress | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Partial<SignOutProgress>
+  const phase = r.phase
+  if (phase !== 'waiting' && phase !== 'done') return null
+  const captureFailed =
+    phase === 'done' &&
+    typeof r.captureFailed === 'number' &&
+    Number.isFinite(r.captureFailed) &&
+    r.captureFailed > 0
+      ? Math.floor(r.captureFailed)
+      : undefined
+  return captureFailed !== undefined ? { phase, captureFailed } : { phase }
+}
+
+function asSignOutPromptRequest(raw: unknown): SignOutPromptRequest | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Partial<SignOutPromptRequest>
+  if (typeof r.requestId !== 'string' || !r.requestId) return null
+  const plan = asSignOutPlan(r.plan)
+  // `mode` must cross: without it the renderer shows the account-switch notice as the confirm
+  return r.mode === 'confirm' || r.mode === 'notice'
+    ? { requestId: r.requestId, plan, mode: r.mode }
+    : { requestId: r.requestId, plan }
 }
 
 /** a renamed push from main: a document id and its new title only */
@@ -590,7 +652,14 @@ const homeApi: HomeApi = {
   async openLoginUrl() {
     await ipcRenderer.invoke(HOME_CHANNELS.accountLoginOpenUrl)
   },
-  async accountLogout() {
+  async accountLogout(options) {
+    if (options !== undefined) {
+      await ipcRenderer.invoke(
+        HOME_CHANNELS.accountLogout,
+        options?.confirmed === true ? { confirmed: true } : { confirmed: false },
+      )
+      return
+    }
     await ipcRenderer.invoke(HOME_CHANNELS.accountLogout)
   },
   onAccountStatus(handler) {
@@ -832,8 +901,13 @@ const homeApi: HomeApi = {
   getAiProviders() {
     return AI_PROVIDERS.map((meta) => {
       let defaultBaseUrl = ''
-      // genspark routes by model and custom has no default — both stay ''
-      if (meta.id !== 'genspark' && !meta.needsBaseUrl && !meta.needsCliPath) {
+      // genspark routes by model, uniwork rides the session adapter, custom has no default — all stay ''
+      if (
+        meta.id !== 'genspark' &&
+        meta.id !== 'uniwork' &&
+        !meta.needsBaseUrl &&
+        !meta.needsCliPath
+      ) {
         defaultBaseUrl = getProviderAdapter(meta.id).resolveEndpoint({
           apiKey: '',
           model: meta.defaultModel,
@@ -1144,6 +1218,28 @@ const homeApi: HomeApi = {
   async dismissUniworkLock(path) {
     await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.dismissLock, path)
   },
+  async signOutPlan() {
+    return asSignOutPlan(await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.signOutPlan))
+  },
+  onSignOutProgress(cb) {
+    signOutProgressSubscribers.add(cb)
+    return () => {
+      signOutProgressSubscribers.delete(cb)
+    }
+  },
+  onSignOutPrompt(cb) {
+    signOutPromptSubscribers.add(cb)
+    return () => {
+      signOutPromptSubscribers.delete(cb)
+    }
+  },
+  async answerSignOutPrompt(requestId, confirmed) {
+    if (typeof requestId !== 'string' || !requestId) return
+    await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.signOutPromptAnswer, {
+      requestId,
+      confirmed: confirmed === true,
+    })
+  },
 }
 
 // Mirror the cloud status into this preload's seam, so getAiMediaProviders()
@@ -1161,6 +1257,7 @@ void ipcRenderer
 contextBridge.exposeInMainWorld('aiOffice', homeApi)
 // window.uniworkAiFlag: the home renderer's provider list mirrors the shell's UniWork AI flag
 installUniworkAiFlagBridge()
+installUniworkCloudStatusBridge()
 
 const projectApi: ProjectHomeApi = {
   async listProjects() {
@@ -1373,3 +1470,97 @@ installDropOpenBridge()
 // UniWork comments client through its own bridge (main checks the sender is
 // this shell and the path an open, bound tab of its window)
 installUniworkDiscussionBridge()
+
+function asSyncCenterActionResult(result: unknown): SyncCenterActionResult {
+  if (
+    result &&
+    typeof result === 'object' &&
+    typeof (result as { ok?: unknown }).ok === 'boolean'
+  ) {
+    return result as SyncCenterActionResult
+  }
+  return { ok: false, code: 'other' }
+}
+
+const syncCenterApi: UniworkSyncCenterApi = {
+  async getSnapshot() {
+    const snapshot = asSyncCenterSnapshot(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.snapshot),
+    )
+    if (!snapshot) throw new Error('uniwork sync center: malformed snapshot')
+    return snapshot
+  },
+  async syncNow() {
+    return asSyncCenterActionResult(await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.syncNow))
+  },
+  async setSendingPaused(paused) {
+    return asSyncCenterActionResult(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.setSendingPaused, paused === true),
+    )
+  },
+  async sendNow(rowId) {
+    return asSyncCenterActionResult(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.sendNow, rowId),
+    )
+  },
+  async cancelSave(rowId) {
+    return asSyncCenterActionResult(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.cancelSave, rowId),
+    )
+  },
+  async recheck(rowId) {
+    return asSyncCenterActionResult(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.recheck, rowId),
+    )
+  },
+  async copySupportCode(rowId) {
+    return asSyncCenterActionResult(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.copySupportCode, rowId),
+    )
+  },
+  async discardSave(rowId) {
+    return asSyncCenterActionResult(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.discardSave, rowId),
+    )
+  },
+  async openDocument(rowId) {
+    return asSyncCenterActionResult(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.openDocument, rowId),
+    )
+  },
+  async openDraft(rowId) {
+    return asSyncCenterActionResult(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.openDraft, rowId),
+    )
+  },
+  async discardDraft(rowId) {
+    return asSyncCenterActionResult(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.discardDraft, rowId),
+    )
+  },
+  async saveAgain(rowId) {
+    return asSyncCenterActionResult(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.saveAgain, rowId),
+    )
+  },
+  async saveMyCopy(rowId) {
+    return asSyncCenterActionResult(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.saveMyCopy, rowId),
+    )
+  },
+  async retryStore() {
+    return asSyncCenterActionResult(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.retryStore),
+    )
+  },
+  subscribe(cb) {
+    const listener = (_event: IpcRendererEvent, value: unknown) => {
+      const snapshot = asSyncCenterSnapshot(value)
+      if (snapshot) cb(snapshot)
+    }
+    ipcRenderer.on(UNIWORK_SYNC_CENTER_CHANNELS.changedEvent, listener)
+    return () => ipcRenderer.removeListener(UNIWORK_SYNC_CENTER_CHANNELS.changedEvent, listener)
+  },
+}
+
+contextBridge.exposeInMainWorld('uniworkSyncCenter', syncCenterApi)

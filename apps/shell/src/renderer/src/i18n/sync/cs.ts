@@ -35,6 +35,7 @@ export const cs = {
   uwQueueCancel: 'Zrušit uložení…',
   uwQueueCancelConfirm:
     'Zrušit uložení ve frontě? Změny zůstanou v tomto počítači; dokument v UniWork se nezmění.',
+  uwQueueCancelGo: 'Zrušit uložení',
   uwQueueCancelled: 'Uložení ve frontě bylo zrušeno. Změny zůstávají v tomto počítači.',
 
   // {reason} fragments of the blocked/failed rows (the existing uwReason* keys stay in the uniwork-documents shard)
@@ -119,12 +120,20 @@ export const cs = {
     'Klíčenka počítače je zamčená, takže neuložené změny existují jen v otevřených oknech. Odhlášením teď je zahodíte; co už je uchováno šifrovaně, zůstane. Chcete-li je zachovat, nejprve odemkněte počítač.',
   uwSignOutGo: 'Odhlásit se',
   uwSignOutWaiting: 'Dokončování probíhajícího uložení před odhlášením…',
+  uwSignOutCaptureFailed:
+    'Některé neuložené změny se nepodařilo včas zachytit; pro váš účet je ponechána poslední uložená nebo automaticky uložená verze.',
+  uwSwitchLostTitle: 'Některé neuložené změny předchozího účtu byly ztraceny',
+  uwSwitchLostBody:
+    'Na tomto počítači se přihlásil jiný účet, takže předchozí účet byl uzamčen. Dokumenty, jejichž neuložené změny nešlo zachovat: {count}. Vše ostatní zůstává pro tento účet na tomto počítači uzamčeno.',
+  uwSwitchLostOk: 'Rozumím',
 
   // S2 sync center
   uwSyncTitle: 'Centrum synchronizace',
   uwSyncOpenFromSettings: 'Centrum synchronizace',
   uwSyncOnline: 'Připojeno k UniWork · synchronizováno {time}',
   uwSyncOffline: 'Offline · naposledy synchronizováno {time}',
+  uwSyncOnlineNoTime: 'Připojeno k UniWork',
+  uwSyncOfflineNoTime: 'Offline',
   uwSyncPaused: 'Odesílání pozastaveno — nová uložení počkají',
   uwSyncAdminPaused: 'Správce pozastavil odesílání. Uložení zůstávají v tomto počítači.',
   uwSyncFeedOff:
@@ -155,6 +164,7 @@ export const cs = {
   uwSyncEmptyQueue: 'Nic nečeká na uložení.',
   uwSyncEmptyAttention: 'Nic nevyžaduje pozornost.',
   uwSyncEmptyRecent: 'Žádná nedávná uložení.',
+  uwSyncActionFailed: 'Nepodařilo se to. Nic nebylo smazáno; zkuste to znovu.',
   uwSyncRowAnnounce: '{doc}: {state}',
 
   // S3 offline library
@@ -268,6 +278,14 @@ export const cs = {
     'Vaše verze byla uložena jako nový dokument: {title}. Tento dokument se nezměnil; stále můžete znovu načíst nebo přepsat.',
   uwConflictSaveCopyFailed:
     'Kopii se nepodařilo vytvořit. Vaše změny jsou stále v bezpečí; zkuste to znovu.',
+  uwConflictSaveCopyNoSeat:
+    'Kopii se nepodařilo vytvořit, protože nejste členem pracovního prostoru, ve kterém je tento dokument. Vaše změny jsou stále v bezpečí; svou verzi si můžete stáhnout.',
+  uwConflictSaveCopyFolderRefused:
+    'V této složce nemůžete vytvářet dokumenty. Stáhněte si místo toho svou verzi.',
+  uwConflictDownloadDone:
+    'Vaše verze byla uložena do tohoto počítače: {file}. Tento dokument se nezměnil; stále můžete znovu načíst nebo přepsat.',
+  uwConflictDownloadFailedDesktop:
+    'Soubor se nepodařilo uložit. Vaše změny jsou stále v bezpečí; zkuste to znovu.',
   uwConflictSaveCopyOffline:
     'Jste offline. Vytvoření kopie vyžaduje připojení; vaše změny zůstávají.',
   uwConflictReloadFailed:

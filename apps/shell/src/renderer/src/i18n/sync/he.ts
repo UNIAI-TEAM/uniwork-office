@@ -34,6 +34,7 @@ export const he = {
   uwQueueCancel: 'ביטול השמירה…',
   uwQueueCancelConfirm:
     'לבטל את השמירה שבתור? השינויים שלך נשארים במחשב הזה; המסמך ב-UniWork לא משתנה.',
+  uwQueueCancelGo: 'ביטול השמירה',
   uwQueueCancelled: 'השמירה שבתור בוטלה. השינויים שלך נשארים במחשב הזה.',
 
   // {reason} fragments of the blocked/failed rows (the existing uwReason* keys stay in the uniwork-documents shard)
@@ -118,12 +119,20 @@ export const he = {
     'מחזיק המפתחות של המחשב נעול, ולכן שינויים שלא נשמרו קיימים רק בחלונות פתוחים. התנתקות עכשיו תמחק אותם; מה שכבר נשמר מוצפן נשאר. כדי לשמור אותם, בטל קודם את נעילת המחשב.',
   uwSignOutGo: 'התנתקות',
   uwSignOutWaiting: 'מסיים את השמירה המתבצעת לפני ההתנתקות…',
+  uwSignOutCaptureFailed:
+    'לא ניתן היה ללכוד חלק מהשינויים שלא נשמרו בזמן; הגרסה האחרונה שנשמרה או נשמרה אוטומטית נשמרת עבור חשבונך.',
+  uwSwitchLostTitle: 'חלק מהשינויים שלא נשמרו בחשבון הקודם אבדו',
+  uwSwitchLostBody:
+    'חשבון אחר נכנס במחשב הזה, ולכן החשבון הקודם ננעל. מסמכים שלא ניתן היה לשמור את השינויים שלא נשמרו בהם: {count}. כל השאר נשאר נעול במחשב הזה עבור החשבון ההוא.',
+  uwSwitchLostOk: 'הבנתי',
 
   // S2 sync center
   uwSyncTitle: 'מרכז הסנכרון',
   uwSyncOpenFromSettings: 'מרכז הסנכרון',
   uwSyncOnline: 'מחובר ל-UniWork · סונכרן {time}',
   uwSyncOffline: 'לא מקוון · סונכרן לאחרונה {time}',
+  uwSyncOnlineNoTime: 'מחובר ל-UniWork',
+  uwSyncOfflineNoTime: 'לא מקוון',
   uwSyncPaused: 'השליחה מושהית — שמירות חדשות ימתינו',
   uwSyncAdminPaused: 'מנהל המערכת השהה את השליחה. השמירות נשארות במחשב הזה.',
   uwSyncFeedOff: 'ההתראות על גרסאות חדשות מושהות. UniWork עדיין בודק התנגשויות כשאתה שומר.',
@@ -153,6 +162,7 @@ export const he = {
   uwSyncEmptyQueue: 'אין שום דבר שממתין לשמירה.',
   uwSyncEmptyAttention: 'אין שום דבר שדורש טיפול.',
   uwSyncEmptyRecent: 'אין שמירות אחרונות.',
+  uwSyncActionFailed: 'הפעולה לא הצליחה. שום דבר לא נמחק; נסו שוב.',
   uwSyncRowAnnounce: '{doc}: {state}',
 
   // S3 offline library
@@ -254,6 +264,14 @@ export const he = {
   uwConflictSaveCopyDone:
     'הגרסה שלך נשמרה כמסמך חדש: {title}. המסמך הזה לא השתנה; עדיין אפשר לטעון מחדש או לדרוס.',
   uwConflictSaveCopyFailed: 'לא ניתן היה ליצור את העותק. השינויים שלך עדיין בטוחים; נסה שוב.',
+  uwConflictSaveCopyNoSeat:
+    'לא ניתן היה ליצור את העותק כי אינך חבר במרחב העבודה שבו נמצא המסמך הזה. השינויים שלך עדיין בטוחים; אפשר להוריד את הגרסה שלך.',
+  uwConflictSaveCopyFolderRefused:
+    'אי אפשר ליצור מסמכים בתיקייה הזו. אפשר להוריד את הגרסה שלך במקום זאת.',
+  uwConflictDownloadDone:
+    'הגרסה שלך נשמרה במחשב הזה: {file}. המסמך הזה לא השתנה; עדיין אפשר לטעון מחדש או לדרוס.',
+  uwConflictDownloadFailedDesktop:
+    'לא ניתן היה לשמור את הקובץ. השינויים שלך עדיין בטוחים; נסה שוב.',
   uwConflictSaveCopyOffline: 'אתה במצב לא מקוון. יצירת עותק דורשת חיבור; השינויים שלך נשמרים.',
   uwConflictReloadFailed: 'לא ניתן היה לטעון את הגרסה האחרונה. המסמך שלך לא השתנה; נסה שוב.',
   uwConflictOverwriteFailed: 'לא ניתן היה לדרוס עדיין. המסמך שלך לא השתנה; נסה שוב.',

@@ -201,7 +201,7 @@ describe('view-only notice copy', () => {
 })
 
 describe('AiPanel on a view-only copy', () => {
-  async function mountPanel(readOnly: boolean, queued: boolean) {
+  async function mountPanel(readOnly: boolean, queued: boolean, provider?: string) {
     // jsdom has no scrollTo on elements; the test environment's localStorage has no methods
     Element.prototype.scrollTo = () => {}
     vi.stubGlobal('localStorage', {
@@ -210,6 +210,12 @@ describe('AiPanel on a view-only copy', () => {
       removeItem: () => {},
     })
     stubHtmlApi()
+    if (provider) {
+      ;(window as any).htmlApi.getAiSettings = vi.fn(async () => ({
+        ...usableAiSettings(),
+        provider,
+      }))
+    }
     const deps = {
       access: fakeAccess().access,
       getSnapshot: () => ({}),
@@ -252,10 +258,15 @@ describe('AiPanel on a view-only copy', () => {
     return container
   }
 
-  it('shows the notice and no edit queue', async () => {
+  it('shows the notice and no edit queue for BYOK, and viewOnly sub-line for UniWork AI', async () => {
     const c = await mountPanel(true, true)
     expect(c.querySelector('.ai-readonly-notice')?.textContent).toBe(strings.en.aiViewOnlyNotice)
+    expect(c.querySelector('.ai-uniwork-view-only')).toBeNull()
     expect(c.querySelector('.ai-queue')).toBeNull()
+
+    const cu = await mountPanel(true, true, 'uniwork')
+    expect(cu.querySelector('.ai-readonly-notice')).toBeNull()
+    expect(cu.querySelector('.ai-uniwork-view-only')?.textContent).toBeTruthy()
   })
 
   it('shows no notice and keeps the edit queue on an editable copy', async () => {

@@ -38,6 +38,7 @@ export const nl = {
   aiRunRunning: 'Bezig… Druk op Stoppen of Esc om te stoppen.',
   aiRunStopped:
     'Gestopt. Al toegepaste wijzigingen blijven in het document en kunnen ongedaan worden gemaakt.',
+  aiRunRetry: 'Opnieuw proberen',
   aiRunAskAgain: 'Opnieuw vragen',
   aiRunChooseOther: 'Andere provider kiezen',
   aiRunOpenInApp: 'Openen in de app',
@@ -54,6 +55,8 @@ export const nl = {
   aiErrRateLimited: 'Je verzendt te snel. Probeer het over {seconds} s opnieuw.',
   aiErrRateLimitedNoWait: 'Je verzendt te snel. Probeer het over een paar minuten opnieuw.',
   aiErrUnavailable: 'UniWork AI reageert nu niet. Je document en Opslaan werken nog steeds.',
+  aiErrGeneric:
+    'UniWork AI kreeg een onverwacht probleem, dus deze run is gestopt. Je document en Opslaan werken nog steeds.',
   aiErrDisconnected:
     'De verbinding is weggevallen, dus deze run is gestopt. Al toegepaste wijzigingen blijven in het document en kunnen ongedaan worden gemaakt.',
   aiErrOffline:
@@ -75,4 +78,33 @@ export const nl = {
     'UniWork AI kon dit verzoek niet accepteren. Pas het aan en verstuur het opnieuw.',
   aiUniworkImagesNotSent:
     'Afbeeldingen worden niet naar UniWork AI gestuurd; alleen je tekst is verstuurd.',
+  // Cloud state, credits and account actions (shared with picker footer and composer note)
+  cloudStateReady: 'Beschikbaar',
+  cloudStateNotEntitled: 'Niet in je abonnement',
+  cloudStateExhausted: 'AI-tegoed op',
+  cloudStateUnavailable: 'Niet beschikbaar',
+  cloudStateSignedOut: 'Niet aangemeld',
+  cloudStateInactive: 'Abonnement inactief',
+  cloudCredits: 'AI-tegoed',
+  cloudCreditsLeft: '{remaining} / {limit} over',
+  cloudCreditsUnlimited: 'Onbeperkt',
+  cloudCreditsRenews: 'Vernieuwt op {date}',
+  cloudInactiveBody:
+    'Het UniWork-abonnement van je organisatie is niet actief, dus cloud-AI is gepauzeerd. Vraag een beheerder het te verlengen; je eigen providers hieronder blijven werken.',
+  acctSignIn: 'Inloggen',
+  acctSignInAgain: 'Opnieuw inloggen',
+  // S8/S10 local-file conversation restart notice (G05BE-6)
+  aiUniworkLocalFileRestart:
+    'Lokale bestanden starten een nieuw gesprek binnen je organisatie en bewaren geen beurten uit andere bestanden.',
+  // S9 cells summary and S10 web workbook size limit
+  aiResultCellsMeta:
+    'Geschreven cellen: {written} ({range}) · Overschreven bestaande cellen: {overwritten}',
+  aiResultCellsMetaNoOverwrite: 'Geschreven cellen: {written} ({range})',
+  aiErrWorkbookTooLarge:
+    'Deze werkmap is te groot voor AI op het web. Open hem in de UniWork Office-app.',
+  // S7 composer notice keys (not_entitled, credits_exhausted)
+  not_entitled:
+    'Het abonnement van je organisatie bevat geen UniWork AI. Vraag een organisatiebeheerder naar het abonnement of voeg je eigen AI-sleutel toe via Instellingen > AI-model.',
+  credits_exhausted:
+    'Je organisatie heeft alle AI-credits voor deze periode verbruikt. Vraag een organisatiebeheerder om credits toe te voegen of voeg je eigen AI-sleutel toe via Instellingen > AI-model.',
 } satisfies Record<keyof typeof zh, string>

@@ -28,17 +28,19 @@ import {
 
 /**
  * The compliance contract every registered store has to hold: a sign-out or
- * account switch locks the open handles and wipes the scope's plaintext, a
- * record of any level outside this build's window is refused (and kept), the
- * per-account budget is accounted in encrypted bytes, and a write in flight at
- * sign-out resolves interrupted with nothing readable left behind.
+ * account switch locks the open handles, drops RAM key material and keeps only
+ * ciphertext on disk so a same-account reopen reads every record back; another
+ * scope's handle cannot read the locked scope; a record of any level outside
+ * this build's window is refused (and kept); the per-account budget is
+ * accounted in encrypted bytes; and a write in flight at sign-out resolves
+ * interrupted while reopen reads the last durable record, never a torn one.
  *
  * A store's test calls runStoreCompliance(name, makeStore) once. makeStore
  * builds a layer over `env.root` with `env.budgetBytes`, a wrapped key provider
  * over `env.safeStorage` and `env.keyDir`, registers the store and returns it
  * opened for `env.scope`. It is called again (with the same env) to re-open the
- * scope after a wipe; each call must build a fresh layer so the reopen
- * simulates a restart.
+ * scope after a lock; each call must build a fresh layer so the reopen
+ * simulates a subsequent sign-in or restart.
  */
 
 export interface LockableSafeStorage extends SafeStorageLike {
@@ -196,23 +198,28 @@ export function runStoreCompliance(
       expect(filesContaining(env.root, marker)).toEqual([])
     })
 
-    it('a sign-out locks every handle and wipes the scope', async () => {
+    it('a sign-out locks every handle and keeps only ciphertext; same-account reopen reads every record', async () => {
       const env = envFor(roomy)
       const subject = await makeStore(env)
-      const marker = randomBytes(24)
-      expect(await subject.records.write('k1', marker)).toEqual({ kind: 'ok' })
-      await subject.layer.lockAndWipe(subject.scope)
+      const marker1 = randomBytes(24)
+      const marker2 = randomBytes(24)
+      expect(await subject.records.write('k1', marker1)).toEqual({ kind: 'ok' })
+      expect(await subject.records.write('k2', marker2)).toEqual({ kind: 'ok' })
+      await subject.layer.lock(subject.scope)
       expect(await subject.records.read('k1')).toEqual({ kind: 'interrupted' })
-      expect(await subject.records.write('k2', marker)).toEqual({ kind: 'interrupted' })
-      expect((await subject.layer.usage(subject.scope)).bytes).toBe(0)
-      expect(scopeFiles(env)).toEqual([])
-      expect(filesContaining(env.root, marker)).toEqual([])
-      // signing back in opens an empty scope
+      expect(await subject.records.write('k3', marker1)).toEqual({ kind: 'interrupted' })
+      expect(await subject.records.delete('k1')).toEqual({ kind: 'interrupted' })
+      expect((await subject.layer.usage(subject.scope)).bytes).toBeGreaterThan(0)
+      expect(scopeFiles(env).length).toBeGreaterThan(0)
+      expect(filesContaining(env.root, marker1)).toEqual([])
+      expect(filesContaining(env.root, marker2)).toEqual([])
+      // signing back into the same account reopens and reads every record
       const reopened = await makeStore(env)
-      expect(await reopened.records.read('k1')).toEqual({ kind: 'missing' })
+      expect(await readValue(reopened.records, 'k1')).toEqual(marker1)
+      expect(await readValue(reopened.records, 'k2')).toEqual(marker2)
     })
 
-    it('an account switch locks only the switched-out scope', async () => {
+    it("an account switch locks only the switched-out scope; the other scope's handle cannot read it", async () => {
       const env = envFor(roomy)
       const subject = await makeStore(env)
       const otherScope = { ...subject.scope, accountId: 'compliance-other-account' }
@@ -223,11 +230,37 @@ export function runStoreCompliance(
       const theirs = randomBytes(24)
       expect(await subject.records.write('mine', mine)).toEqual({ kind: 'ok' })
       expect(await other.write('theirs', theirs)).toEqual({ kind: 'ok' })
-      await subject.layer.lockAndWipe(subject.scope)
+      await subject.layer.lock(subject.scope)
       expect(await subject.records.read('mine')).toEqual({ kind: 'interrupted' })
+      expect((await subject.layer.usage(subject.scope)).bytes).toBeGreaterThan(0)
+      // the other scope has no record under 'mine', and cannot decrypt A's ciphertext with B's key
+      expect(await other.read('mine')).toEqual({ kind: 'missing' })
+      const myFile = recordPath(env.root, subject.scope, subject.registration.name, 'mine')
+      const theirCopyOfMine = recordPath(env.root, otherScope, subject.registration.name, 'mine')
+      writeFileSync(theirCopyOfMine, readFileSync(myFile))
+      expect(await other.read('mine')).toEqual({ kind: 'corrupt' })
+      rmSync(theirCopyOfMine, { force: true })
       // the other account keeps its state and its live handle
       expect(await readValue(other, 'theirs')).toEqual(theirs)
       expect((await subject.layer.usage(otherScope)).bytes).toBeGreaterThan(0)
+    })
+
+    it('after lock the RAM key is gone: a dead handle reads interrupted even with the keyring unlocked', async () => {
+      const env = envFor(roomy)
+      const subject = await makeStore(env)
+      const marker = randomBytes(24)
+      expect(await subject.records.write('k1', marker)).toEqual({ kind: 'ok' })
+      await subject.layer.lock(subject.scope)
+      // keyring stays unlocked, but the old handle is dead and its RAM key is gone
+      expect(await subject.records.read('k1')).toEqual({ kind: 'interrupted' })
+      expect(await subject.records.write('k1', marker)).toEqual({ kind: 'interrupted' })
+      expect(await subject.records.delete('k1')).toEqual({ kind: 'interrupted' })
+      // locking the keyring after layer.lock proves no unwrapped key remained cached in RAM
+      env.safeStorage.lock()
+      expect(await subject.layer.open(subject.scope)).toEqual({ kind: 'keystore_locked' })
+      env.safeStorage.unlock()
+      const reopened = await makeStore(env)
+      expect(await readValue(reopened.records, 'k1')).toEqual(marker)
     })
 
     it('refuses a record that requires a newer store level and keeps it', async () => {
@@ -278,17 +311,19 @@ export function runStoreCompliance(
       expect((await subject.layer.usage(subject.scope)).bytes).toBeLessThanOrEqual(budget)
     })
 
-    it('a write in flight at sign-out resolves interrupted and leaves nothing readable', async () => {
+    it('a write in flight at sign-out resolves interrupted; reopen reads the last durable record, never the torn one', async () => {
       const env = envFor(roomy)
       const subject = await makeStore(env)
-      const marker = randomBytes(24)
-      const pending = subject.records.write('inflight', marker)
-      await subject.layer.lockAndWipe(subject.scope)
+      const durable = randomBytes(24)
+      const torn = randomBytes(24)
+      expect(await subject.records.write('inflight', durable)).toEqual({ kind: 'ok' })
+      const pending = subject.records.write('inflight', torn)
+      await subject.layer.lock(subject.scope)
       expect(await pending).toEqual({ kind: 'interrupted' })
-      expect(scopeFiles(env)).toEqual([])
-      expect(filesContaining(env.root, marker)).toEqual([])
+      expect(filesContaining(env.root, durable)).toEqual([])
+      expect(filesContaining(env.root, torn)).toEqual([])
       const reopened = await makeStore(env)
-      expect(await reopened.records.read('inflight')).toEqual({ kind: 'missing' })
+      expect(await readValue(reopened.records, 'inflight')).toEqual(durable)
     })
   })
 }
