@@ -1005,6 +1005,7 @@ export function AiPanel({
     const access: DeckAccess = {
       readOnly: () => readOnlyRef.current,
       uniworkBound: () => uniworkBoundRef.current,
+      uniworkAi: () => settingsRef.current.provider === 'uniwork',
       getSlides: () => slidesRef.current,
       getCurrent: () => currentRef.current,
       // A queue run names its targets explicitly; whatever is selected on the

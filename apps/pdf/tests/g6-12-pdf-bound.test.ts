@@ -13,6 +13,7 @@ function makeDeps(bound: boolean, over: Record<string, unknown> = {}): PdfAiDeps
     readOnly: () => false,
     imageGenAvailable: () => true,
     uniworkBound: () => bound,
+    uniworkAi: () => false,
     ...over,
   }
   return new Proxy(target, {
