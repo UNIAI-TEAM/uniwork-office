@@ -95,6 +95,7 @@ import { showToast } from './components/toast-bus'
 import { cap } from './capabilities'
 import { isEncryptedPackage } from './encrypted-package'
 import { buildStandaloneHtml } from './html-export'
+import { sameDocIgnoringAiMarks } from './editor/ai-marker'
 import { aiPanelInitiallyOpen } from '@genoffice/ui'
 import { isNarrowViewport } from './narrow-viewport'
 
@@ -1032,7 +1033,8 @@ async function saveOnce(
       return false
     }
     // flush pending in-place table cell / textbox edits into the PM doc first
-    window.dispatchEvent(new Event('ai-docs-commit-tables'))
+    // `auto` tells the AI panel an autosave must not clear its change marker
+    window.dispatchEvent(new CustomEvent('ai-docs-commit-tables', { detail: { auto } }))
     // identity snapshot: detects edits that arrive while the save is in flight
     const fontSettingsVersion = ctx.fontSettingsVersionRef?.current
     const docSnapshot = editor.state.doc
@@ -1143,7 +1145,8 @@ async function saveOnce(
     const rebasedPm = blocksToPmDoc(reparsed.blocks, readSections(reparsed), pmDocOptions(reparsed))
     let unchanged = false
     try {
-      unchanged = editor.state.doc.eq(editor.schema.nodeFromJSON(rebasedPm))
+      // the AI marker is not file content: a marked doc is still the saved doc
+      unchanged = sameDocIgnoringAiMarks(editor.state.doc, editor.schema.nodeFromJSON(rebasedPm))
     } catch {
       /* unrepresentable → rewrite */
     }

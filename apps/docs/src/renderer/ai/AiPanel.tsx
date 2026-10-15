@@ -95,6 +95,7 @@ import { currentDocGeneration } from '../file-actions'
 import { createFilesSkill } from './files-skill'
 import { boundChatHistory } from './chat-retention'
 import { createElectronTransport } from './transport'
+import { docHasAiMarks } from '../editor/ai-marker'
 import { useI18n, t as tModule, aiLangDirective, getLang, type StringKey } from '../i18n/locale'
 import { AiErrorAction, Markdown, uniworkErrorForChip, useAiModelNeedHint } from '@genoffice/ui'
 import { AiComposer, AiScopeQuote, AiTypingIndicator, type AiScopeQuoteData } from '@genoffice/ui'
@@ -1486,7 +1487,7 @@ export function AiPanel({
   // a Save accepts the marker: saveOnce fires this right before it snapshots the document, so
   // the cleared marker is part of what it compares against the reloaded file (history survives)
   useEffect(() => {
-    const onSave = () => {
+    const onSave = (e: Event) => {
       // what the run changed beside the text is written now: Roll back cannot take it back
       const side = sideStateRef.current
       if (side?.changedParts) {
@@ -1499,7 +1500,10 @@ export function AiPanel({
           k.base = null
         }
       }
-      clearAiHighlights()
+      // only the user's own Save accepts the marker; an autosave leaves it on screen (the saved
+      // bytes never carry it, and the post-save reload ignores it)
+      if ((e as CustomEvent<{ auto?: boolean } | undefined>).detail?.auto !== true)
+        clearAiHighlights()
     }
     window.addEventListener('ai-docs-commit-tables', onSave)
     return () => window.removeEventListener('ai-docs-commit-tables', onSave)
@@ -1625,15 +1629,7 @@ export function AiPanel({
   }, [open, uniworkGate])
 
   /** some block still carries the AI marker (read per render; the scope tick follows doc updates) */
-  const hasAiMarks = (): boolean => {
-    let found = false
-    editor.state.doc.descendants((node) => {
-      if (found) return false
-      if (node.attrs?.aiChanged) found = true
-      return !found
-    })
-    return found
-  }
+  const hasAiMarks = (): boolean => docHasAiMarks(editor.state.doc)
 
   const focusFirstAiChange = () => {
     let targetPos: number | null = null

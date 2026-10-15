@@ -79,6 +79,10 @@ describe('docs AI change marker (track changes off)', () => {
       window.dispatchEvent(new CustomEvent('ai-docs-commit-tables', { detail: { auto: false } }))
     })
     expect(markedBlocks(editor)).toEqual([])
+    // the panel re-reads the doc on the next animation frame
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    })
     expect(container.querySelector('.ai-accept-changes')).toBeNull()
   })
 
