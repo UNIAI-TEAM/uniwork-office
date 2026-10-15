@@ -35,6 +35,8 @@ import {
   chipModelOf,
   focusTipRoomOf,
   launchNoticeOf,
+  miniGlyphOf,
+  type MiniGlyph,
   pathKey,
   remoteBarModelOf,
   type ChipActionKind,
@@ -82,6 +84,79 @@ function Spinner() {
         strokeLinecap="round"
       />
     </svg>
+  )
+}
+
+/** the dot of the mini pill: a shape per state, so the state is never told by colour alone */
+function MiniGlyphIcon({ glyph }: { glyph: MiniGlyph }) {
+  const draw = (children: ReactNode) => (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {children}
+    </svg>
+  )
+  let icon: ReactNode
+  switch (glyph) {
+    case 'check':
+      icon = draw(<path d="M3.5 8.5l3 3 6-7" />)
+      break
+    case 'clock':
+      icon = draw(
+        <>
+          <circle cx="8" cy="8" r="5.5" />
+          <path d="M8 5v3.2l2 1.3" />
+        </>,
+      )
+      break
+    case 'pause':
+      icon = draw(<path d="M6 4.5v7M10 4.5v7" />)
+      break
+    case 'alert':
+      icon = draw(
+        <>
+          <circle cx="8" cy="8" r="6" />
+          <path d="M8 4.8v3.8M8 11.2h.01" />
+        </>,
+      )
+      break
+    case 'warn':
+      icon = draw(<path d="M8 2.8l6 10.4H2zM8 6.6v3M8 11.5h.01" />)
+      break
+    case 'lock':
+      icon = draw(
+        <>
+          <rect x="3.5" y="7" width="9" height="6.5" rx="1.5" />
+          <path d="M5.5 7V5.5a2.5 2.5 0 015 0V7" />
+        </>,
+      )
+      break
+    case 'offline':
+      icon = draw(
+        <>
+          <circle cx="8" cy="8" r="6" />
+          <path d="M3.8 3.8l8.4 8.4" />
+        </>,
+      )
+      break
+    case 'busy':
+      icon = <Spinner />
+      break
+    default:
+      icon = draw(<circle cx="8" cy="8" r="4.5" />)
+  }
+  return (
+    <span className="uw-pill-mini-glyph" data-glyph={glyph} aria-hidden="true">
+      {icon}
+    </span>
   )
 }
 
@@ -249,7 +324,7 @@ function usePillFit(
   key: string,
   hasShort: boolean,
 ): PillVariant {
-  const { setIconOnly: publish } = useContext(ToggleFitContext)
+  const { iconOnly: drawnIconOnly, setIconOnly: publish } = useContext(ToggleFitContext)
   const [variant, setVariant] = useState<PillVariant>('full')
   const [iconToggle, setIconToggle] = useState(false)
   // bumped by whatever changes the room (a resize, a tab, the holder's size): measure again
@@ -295,7 +370,8 @@ ${uiScaleOf(el)}`
     })
     if (next.variant !== variant) setVariant(next.variant)
     if (next.iconToggle !== iconToggle) setIconToggle(next.iconToggle)
-  }, [groupRef, key, variant, iconToggle, hasShort, pass])
+    // drawnIconOnly: the toggle took its new form (the sibling re-rendered), measure it as drawn
+  }, [groupRef, key, variant, iconToggle, drawnIconOnly, hasShort, pass])
 
   // the toggle (a sibling) reads it; it goes back to its full form with this pill
   useLayoutEffect(() => {
@@ -388,6 +464,7 @@ export function UniworkStatusChip({
   const { label, tip, title } = chipCopy(model, t, dateLocale)
   const action = model.action
   const shortLabel = shortLabelOf(label)
+  const glyph = miniGlyphOf(model, status.state)
   const variant = usePillFit(
     groupRef,
     `${label}
@@ -550,39 +627,72 @@ ${action ? t(action.labelKey) : ''}`,
         <span id={tipId} className="uw-sr-only">
           {tip}
         </span>
-        <span className="uw-pill-status">
-          {model.tone === 'busy' ? (
-            <Spinner />
+        {variant === 'mini' ? (
+          // the dot alone (the strip is below its floor even with the narrowest pill): with a button
+          // the dot IS the button, named by the full label and the action; without one it is a plain dot
+          action ? (
+            <button
+              ref={setButton}
+              type="button"
+              className="uw-pill-mini"
+              aria-label={`${label}. ${t(action.labelKey)}`}
+              aria-disabled={busy ? 'true' : undefined}
+              aria-describedby={tipId}
+              title={title}
+              aria-expanded={
+                action.kind === 'view-queue' || action.kind === 'details'
+                  ? popover !== null
+                  : undefined
+              }
+              onClick={() => run(action.kind)}
+            >
+              <MiniGlyphIcon glyph={glyph} />
+            </button>
           ) : (
-            <span className="uw-pill-dot" aria-hidden="true" />
-          )}
-          {variant === 'full' ? (
-            <span className="uw-pill-label">{label}</span>
-          ) : (
-            // fewer words drawn, the same sentence read: the hidden text is the whole label
-            <span className="uw-pill-label">
-              <span className="uw-sr-only">{label}</span>
-              {variant === 'short' && <span aria-hidden="true">{shortLabel}</span>}
+            <span className="uw-pill-status">
+              <MiniGlyphIcon glyph={glyph} />
+              <span className="uw-pill-label">
+                <span className="uw-sr-only">{label}</span>
+              </span>
             </span>
-          )}
-        </span>
-        {action && (
-          <button
-            ref={setButton}
-            type="button"
-            className="uw-pill-action"
-            aria-disabled={busy ? 'true' : undefined}
-            aria-describedby={tipId}
-            title={title}
-            aria-expanded={
-              action.kind === 'view-queue' || action.kind === 'details'
-                ? popover !== null
-                : undefined
-            }
-            onClick={() => run(action.kind)}
-          >
-            {t(action.labelKey)}
-          </button>
+          )
+        ) : (
+          <>
+            <span className="uw-pill-status">
+              {model.tone === 'busy' ? (
+                <Spinner />
+              ) : (
+                <span className="uw-pill-dot" aria-hidden="true" />
+              )}
+              {variant === 'full' ? (
+                <span className="uw-pill-label">{label}</span>
+              ) : (
+                // fewer words drawn, the same sentence read: the hidden text is the whole label
+                <span className="uw-pill-label">
+                  <span className="uw-sr-only">{label}</span>
+                  {variant === 'short' && <span aria-hidden="true">{shortLabel}</span>}
+                </span>
+              )}
+            </span>
+            {action && (
+              <button
+                ref={setButton}
+                type="button"
+                className="uw-pill-action"
+                aria-disabled={busy ? 'true' : undefined}
+                aria-describedby={tipId}
+                title={title}
+                aria-expanded={
+                  action.kind === 'view-queue' || action.kind === 'details'
+                    ? popover !== null
+                    : undefined
+                }
+                onClick={() => run(action.kind)}
+              >
+                {t(action.labelKey)}
+              </button>
+            )}
+          </>
         )}
         <span className="uw-pill-focus-tip" aria-hidden="true">
           <span className="uw-pill-focus-tip-text">{tip}</span>

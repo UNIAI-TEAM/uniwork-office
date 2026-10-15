@@ -4,12 +4,13 @@ import { uiScaleOf } from './uniwork-top-inset'
  * How much of the tab bar the Save pill may take (U-1). The pill sits in the strip's flex row, in
  * the holder `.uw-chrome` right of the scrolling tab strip, so it can never be drawn over a tab;
  * what it could do (a 310px label) was starve the strip down to one tab. The pill therefore
- * degrades by the room it has, in three steps: the full label, the label's short form, then the
- * dot (or spinner) with the action button. The full sentence stays in the title, the visually
+ * degrades by the room it has, in four steps: the full label, the label's short form, the
+ * dot (or spinner) with the action button, then (only when even that leaves the strip below its
+ * floor) the dot alone, which is the button itself. The full sentence stays in the title, the visually
  * hidden description and the label's hidden text, whatever is drawn.
  */
 
-export type PillVariant = 'full' | 'short' | 'compact'
+export type PillVariant = 'full' | 'short' | 'compact' | 'mini'
 
 /** the natural width of each variant of one label, as measured (a variant not tried yet is absent) */
 export type PillWidths = Partial<Record<PillVariant, number>>
@@ -111,11 +112,13 @@ export interface PillFitStep {
  * The next step of the holder: which pill variant, and whether the Discussion toggle goes icon-only.
  * When even the icon + action pill does not fit the strip's floor, the toggle is the next thing to
  * give: its label is hidden (name and tooltip stay) and the room goes back to the strip, the pill
- * staying compact. The decision is made on the budget the holder would have with the toggle drawn
- * FULL (an icon-only toggle is measured, then its saving is taken back out), and compared with the
- * compact pill's own width: the same inputs give the same answer whichever form is drawn, so a
- * boundary cannot flip back and forth. With the full width of the toggle not known yet (it is
- * drawn icon-only from the start) the toggle is first drawn full and measured.
+ * staying compact. When the compact pill still does not fit with the toggle icon-only (or with no
+ * toggle to give), the pill itself becomes the dot alone (`mini`), the last step. Every threshold
+ * is read off the budget the holder would have with the toggle drawn FULL (an icon-only toggle is
+ * measured, then its saving is taken back out) against the compact pill's own width: the same
+ * inputs give the same answer whichever form is drawn, so a boundary cannot flip back and forth.
+ * With the full width of the toggle not known yet (it is drawn icon-only from the start) the toggle
+ * is first drawn full and measured; with its icon width not known yet it is first drawn icon-only.
  */
 export function pillFitStepOf(input: PillFitStepInput): PillFitStep {
   const { toggle, toggleWidths, widths, hasShort } = input
@@ -127,13 +130,17 @@ export function pillFitStepOf(input: PillFitStepInput): PillFitStep {
   }
   const variant = nextPillVariantOf(budget, widths, { short: hasShort })
   const compact = widths.compact
-  const gives =
-    toggle !== null &&
-    toggleWidths.full !== undefined &&
-    variant === 'compact' &&
-    compact !== undefined &&
-    budget < compact
-  return { variant, iconToggle: gives }
+  if (variant !== 'compact' || compact === undefined || budget >= compact) {
+    return { variant, iconToggle: false }
+  }
+  // the compact pill is the narrowest it can be and the strip is still below its floor
+  if (toggle === null) return { variant: 'mini', iconToggle: false }
+  const { full, icon } = toggleWidths
+  if (full === undefined) return { variant: 'compact', iconToggle: false }
+  if (icon === undefined) return { variant: 'compact', iconToggle: true }
+  return budget + (full - icon) < compact
+    ? { variant: 'mini', iconToggle: true }
+    : { variant: 'compact', iconToggle: true }
 }
 
 export interface BarLayoutInput {

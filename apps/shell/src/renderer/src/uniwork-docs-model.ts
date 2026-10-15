@@ -381,6 +381,38 @@ export function chipModelOf(
   }
 }
 
+/** the shape of the mini pill's dot (FXT6u): one per tone at least, so colour is never the only cue */
+export type MiniGlyph =
+  'check' | 'clock' | 'pause' | 'alert' | 'warn' | 'busy' | 'ring' | 'lock' | 'offline'
+
+/**
+ * The shape the dot alone (the mini pill, see uniwork-pill-fit.ts) wears: a check (saved), a clock
+ * (queued), pause bars (paused), a circled exclamation (failed / blocked / error / signed out), a
+ * triangle (conflict, reconciling, remote newer), the spinner (saving), a ring (unsaved edits), a
+ * lock (view only) and a slashed circle (offline).
+ */
+export function miniGlyphOf(model: ChipModel, state: UniworkSaveState): MiniGlyph {
+  switch (model.tone) {
+    case 'ok':
+      return 'check'
+    case 'busy':
+      return 'busy'
+    case 'error':
+      return 'alert'
+    case 'warn':
+      return 'warn'
+    case 'info':
+      return state === 'paused_user' ? 'pause' : 'clock'
+    default:
+      if (model.labelKey === 'uwChipPausedAdmin') return 'pause'
+      if (model.labelKey === 'uwChipViewOnly') return 'lock'
+      if (model.labelKey === 'uwChipOffline' || model.labelKey === 'uwChipUnreachable') {
+        return 'offline'
+      }
+      return 'ring'
+  }
+}
+
 /** tooltips whose {time} is the waiting save: without a known time they read an em dash, not a hole */
 const QUEUED_TIME_TIPS: ReadonlySet<StringKey> = new Set([
   'uwTipQueued',

@@ -489,6 +489,42 @@ body.overlay-title-bar .tab-bar-drag-spacer {
   gap: 0;
 }
 
+/* mini (the last step of uniwork-pill-fit.ts): the dot alone, a circle the height of the pill. With a
+   button the dot is the button; the shape inside it (check, clock, ...) tells the state, not the
+   colour alone */
+.uw-pill[data-variant='mini'] {
+  width: 28px;
+  padding: 0;
+  gap: 0;
+  justify-content: center;
+}
+
+.uw-pill[data-variant='mini'] > .uw-pill-status {
+  gap: 0;
+}
+
+.uw-pill-mini {
+  position: relative;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.uw-pill-mini-glyph {
+  display: grid;
+  place-items: center;
+  line-height: 0;
+}
+
 .uw-pill-label {
   min-width: 0;
   overflow: hidden;
@@ -571,6 +607,7 @@ body.overlay-title-bar .tab-bar-drag-spacer {
 }
 
 .uw-pill-action:hover:not([aria-disabled='true']),
+.uw-pill-mini:hover:not([aria-disabled='true']),
 .uw-pill-close:hover {
   background: var(--hover);
 }
@@ -581,7 +618,13 @@ body.overlay-title-bar .tab-bar-drag-spacer {
   opacity: 0.6;
 }
 
+.uw-pill-mini[aria-disabled='true'] {
+  cursor: default;
+  opacity: 0.6;
+}
+
 .uw-pill-action:focus-visible,
+.uw-pill-mini:focus-visible,
 .uw-pill-close:focus-visible,
 .uw-pill:focus-visible {
   outline: 2px solid var(--color-border-brand);
@@ -635,6 +678,12 @@ body.overlay-title-bar .tab-bar-drag-spacer {
   align-items: center;
 }
 
+/* the dot of the mini pill carries the keyboard focus: same chip (before the off rule below, same specificity) */
+.uw-pill-mini:focus-visible ~ .uw-pill-focus-tip {
+  display: flex;
+  align-items: center;
+}
+
 /* Esc or a pointer press hides it until the pill is focused again; so does too little room */
 .uw-pill[data-tip-off] > .uw-pill-focus-tip,
 .uw-pill[data-tip-room='none'] > .uw-pill-focus-tip {
@@ -647,6 +696,13 @@ body.overlay-title-bar .tab-bar-drag-spacer {
   content: '';
   position: absolute;
   inset: -1px;
+}
+
+/* the 26px dot of the mini pill is already past 24px; the hit area is the dot's own box */
+.uw-pill-mini::before {
+  content: '';
+  position: absolute;
+  inset: 0;
 }
 
 /* touch: the holder is the whole 40px bar so a finger on the pill's edge still lands on its button;
@@ -673,6 +729,24 @@ body.overlay-title-bar .tab-bar-drag-spacer {
   .uw-pill-close::before {
     left: -1px;
     right: -8px;
+  }
+
+  /* the dot of the mini pill: the pill widens to 44px and the hit area reaches 44px tall (26px dot +
+     9px above and below, as the Discussion toggle does); sideways it stays inside the 44px pill (-1px
+     is its border), so it never reaches the strip or the toggle */
+  .uw-pill[data-variant='mini'] {
+    width: 44px;
+  }
+
+  .uw-pill-mini {
+    width: 42px;
+  }
+
+  .uw-pill-mini::before {
+    top: -9px;
+    bottom: -9px;
+    left: -1px;
+    right: -1px;
   }
 }
 
