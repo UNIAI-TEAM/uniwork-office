@@ -46,6 +46,10 @@ import {
 } from '../uniwork-sync/runtime'
 import { createSyncStoreAccess, type SyncStoreAccess } from '../uniwork-sync/session-store'
 import { createStoreLayer, type StoreLayer } from '../uniwork-sync/store'
+import {
+  OFFLINE_LIBRARY_LAYER_BUDGET_BYTES,
+  OFFLINE_LIBRARY_STORE_REGISTRATION,
+} from '../uniwork-sync/offline-library'
 import { createFeedClient, type FeedClient } from '../uniwork-sync/feed/client'
 import { createCapabilityFetch } from '../uniwork-sync/capability/client'
 import {
@@ -338,6 +342,31 @@ function syncStoreFor(): { layer: StoreLayer; access: SyncStoreAccess } {
 }
 
 /**
+ * G5-05: the offline library's own encrypted layer under
+ * `userData/uniwork-sync/library/` - its own root, safeStorage-wrapped key per
+ * scope and budget, so pinned bytes never count against the sync store budget
+ * (lead decision on W5 "A"). Wiped at the account boundary beside the sync
+ * scope. Residual: moves into G5-11's SYNC_STORE_REGISTRATIONS when it lands.
+ */
+const libraryLayers = new Map<string, StoreLayer>()
+
+function libraryLayerFor(): StoreLayer {
+  const root = join(app.getPath('userData'), 'uniwork-sync', 'library')
+  let layer = libraryLayers.get(root)
+  if (!layer) {
+    layer = createStoreLayer({
+      root: join(root, 'store'),
+      keys: createSafeStorageKeyProvider({ safeStorage, dir: join(root, 'keys') }),
+      budgetBytes: OFFLINE_LIBRARY_LAYER_BUDGET_BYTES,
+      clock: () => Date.now(),
+    })
+    layer.register(OFFLINE_LIBRARY_STORE_REGISTRATION)
+    libraryLayers.set(root, layer)
+  }
+  return layer
+}
+
+/**
  * Test seams of the feed runtime: the HTTP round trip of the capability and
  * feed clients, and the clock their caches read. Production leaves both out.
  */
@@ -432,7 +461,7 @@ export function createSyncRuntime(
       return (await found.docs.listWorkspaces(orgId)).map((workspace) => workspace.id)
     },
   }
-  return new SyncRuntime({
+  const runtime: SyncRuntime = new SyncRuntime({
     store: syncStoreFor().access,
     // S18: a change the feed applies for a bound document re-reads its metadata,
     // so a rename on the web reaches the open desktop copy
@@ -447,6 +476,9 @@ export function createSyncRuntime(
     isOpenBound: (documentId) => service.isOpenBound(documentId),
     onFeedGone: (documentId) => {
       void service.noteFeedGone(documentId).catch(() => undefined)
+      // T5-3: a pinned document, closed too, is classified by the library
+      // (403/404 -> revoked, 410 -> deleted)
+      void runtime.library?.refresh(documentId).catch(() => undefined)
     },
     targets,
     capability: async (orgId) => {
@@ -464,6 +496,11 @@ export function createSyncRuntime(
     lease: {
       client: () => clients()?.lease ?? null,
       session: () => uniworkSessionIdentity()?.deviceSessionId ?? null,
+    },
+    library: {
+      layer: libraryLayerFor(),
+      docs: () => clients()?.docs ?? null,
+      hasLocalWork: (documentId) => service.hasLocalDraft(documentId),
     },
     keepDraft: (documentId) => service.hasLocalDraft(documentId),
     clock: { now: () => Date.now() },
@@ -487,6 +524,7 @@ export function createSyncRuntime(
     },
     log: (message) => console.warn(message),
   })
+  return runtime
 }
 
 /** Registers the IPC handlers (safe before app ready: nothing touches the account yet). */
@@ -715,6 +753,8 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
       // G5-08c: the leases lock at the account boundary itself (sign-out at
       // once; a switch never locks the incoming account), not on stop()
       runtime.leases.lockBoundary(owner)
+      // G5-05: every library download stops before the scope is wiped
+      runtime.library?.lockBoundary()
       runtime.stop()
       // await the queue teardown BEFORE the wipe: the in-flight poll/dispatch
       // must unwind (and release its locks) before the scope is wiped, so no
@@ -724,6 +764,11 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
       const store = syncStoreFor()
       store.access.forget()
       await store.layer.lockAndWipe({
+        deploymentId: owner.deploymentId,
+        accountId: owner.accountId,
+      })
+      // G5-05 OQ-UX11 (a): the pinned copies go at sign-out, beside the sync scope
+      await libraryLayerFor().lockAndWipe({
         deploymentId: owner.deploymentId,
         accountId: owner.accountId,
       })

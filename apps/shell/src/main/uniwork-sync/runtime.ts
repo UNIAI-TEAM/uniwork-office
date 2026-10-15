@@ -12,9 +12,23 @@ import {
   type LeaseClient,
   type LeaseRevokeNotice,
 } from './lease'
+import {
+  OFFLINE_LIBRARY_STORE_REGISTRATION,
+  OfflineLibraryManager,
+  createOfflineLibraryManager,
+  createOfflineLibraryStore,
+  type FetchAssetPort,
+  type LibraryDocsPort,
+} from './offline-library'
 import type { SyncStoreAccess } from './session-store'
 import { APP_STORE_LEVEL } from './store-level'
-import type { StoreReadResult, StoreRecords, StoreRegistration, StoreWriteResult } from './store'
+import type {
+  StoreLayer,
+  StoreReadResult,
+  StoreRecords,
+  StoreRegistration,
+  StoreWriteResult,
+} from './store'
 
 export {
   LEASE_STORE_REGISTRATION,
@@ -25,6 +39,8 @@ export {
   type LeaseClient,
   type LeaseRevokeNotice,
 }
+// G5-05 (residual: moves into G5-11's SYNC_STORE_REGISTRATIONS when it lands)
+export { OFFLINE_LIBRARY_STORE_REGISTRATION, OfflineLibraryManager }
 
 /**
  * The change-feed runtime of the signed-in account. For every (org, workspace)
@@ -294,6 +310,8 @@ export interface SyncRuntimeOptions {
    * Without it the manager has no client: every grant or renewal is offline.
    */
   lease?: SyncRuntimeLeaseOptions
+  /** G5-05: the offline library's own store layer and documents client; absent = no library */
+  library?: SyncRuntimeLibraryOptions
   intervalMs?: number
   /** test seam: schedule `run` on the interval, return the cancel */
   schedule?(run: () => void): () => void
@@ -310,9 +328,20 @@ export interface SyncRuntimeLeaseOptions {
   onRevoked?(notice: LeaseRevokeNotice): void
 }
 
+export interface SyncRuntimeLibraryOptions {
+  /** the library's own encrypted layer (not the sync layer: its bytes are not budgeted there) */
+  layer: StoreLayer
+  docs(): LibraryDocsPort | null
+  /** true while the document has drafts or intents (unpin confirms first) */
+  hasLocalWork(documentId: string): Promise<boolean>
+  fetchAsset?: FetchAssetPort
+}
+
 export class SyncRuntime {
   /** G5-08c: the offline lease manager of the signed-in session (the only one) */
   readonly leases: LeaseManager
+  /** G5-05: the offline library of the signed-in session, null when not wired */
+  readonly library: OfflineLibraryManager | null
   private readonly options: SyncRuntimeOptions
   private readonly running = new Map<string, FeedConsumer>()
   private readonly capabilities = new Map<string, OfficeCapabilities>()
@@ -343,6 +372,31 @@ export class SyncRuntime {
       ...(lease?.onRevoked ? { onRevoked: (notice) => lease.onRevoked?.(notice) } : {}),
       ...(options.onSessionExpired ? { onSessionExpired: options.onSessionExpired } : {}),
     })
+    this.library = options.library ? this.createLibrary(options.library) : null
+  }
+
+  /** G5-05: one library per runtime, on the lease manager of the same session */
+  private createLibrary(library: SyncRuntimeLibraryOptions): OfflineLibraryManager {
+    const manager = createOfflineLibraryManager({
+      store: createOfflineLibraryStore({
+        layer: library.layer,
+        scope: () => this.options.store.scope(),
+      }),
+      scope: () => this.options.store.scope(),
+      session: () => this.options.lease?.session() ?? null,
+      docs: () => library.docs(),
+      ...(library.fetchAsset ? { fetchAsset: library.fetchAsset } : {}),
+      leases: this.leases,
+      capability: async (orgId) => (await this.capabilityRead(orgId)).capabilities.offline_library,
+      hasLocalWork: (documentId) => library.hasLocalWork(documentId),
+      isOnline: () => this.online !== false,
+      clock: this.options.clock,
+    })
+    // a revoke (renew lost permission, feed revoke) deletes the committed cache
+    this.leases.onRevoked((notice) => {
+      void manager.handleLeaseRevoked(notice).catch(() => undefined)
+    })
+    return manager
   }
 
   /** starts the interval and runs one pass now (sign-in, app ready) */
@@ -526,6 +580,8 @@ export class SyncRuntime {
     // pass renews the held leases that are due, an offline one sends nothing
     if (verdict !== undefined) this.online = verdict
     await this.leases.onOnlinePass(verdict).catch(() => undefined)
+    // G5-05: a reached server downloads the pins that waited for the network
+    if (verdict === true && current()) await this.library?.onReconnect().catch(() => undefined)
   }
 
   private consumerFor(
@@ -571,6 +627,11 @@ export class SyncRuntime {
   private async reportGone(documentId: string, live: () => boolean): Promise<void> {
     const gone = this.options.onFeedGone
     if (!gone) return
+    // T5-3: a pinned document is reported too, open or closed: the owner hands it to the library
+    if (await this.library?.isPinned(documentId).catch(() => false)) {
+      if (live()) gone(documentId)
+      return
+    }
     try {
       if (!(await this.options.isOpenBound?.(documentId))) return
     } catch {
@@ -580,12 +641,49 @@ export class SyncRuntime {
   }
 
   /**
+   * R5BE-1b: every row of a committed page that carries the feed's archived
+   * flag and is pinned reaches the library (R6BE-1: one index read per page,
+   * nothing for a document that is not in the library). An
+   * archive does not bump the revision, so the page's own rows are read, not
+   * only the ones the cache applied. Dropped once the pass that built the
+   * consumer is no longer current.
+   */
+  private archivingCache(cache: DocCache): DocCache {
+    const library = this.library
+    if (!library) return cache
+    const generation = this.generation
+    const live = () => this.generation === generation
+    return {
+      async applyPage(changes) {
+        const commit = await cache.applyPage(changes)
+        if (commit.kind === 'ok') {
+          const flagged = changes.filter((change) => change.archived !== undefined)
+          if (flagged.length > 0) {
+            // R6BE-1: one index read per page; only a pinned document is handed over
+            const pinned = await library.pinnedIds().catch(() => new Set<string>())
+            for (const change of flagged) {
+              if (!pinned.has(change.documentId) || !live()) continue
+              void library
+                .noteArchived(change.documentId, change.archived === true)
+                .catch(() => undefined)
+            }
+          }
+        }
+        return commit
+      },
+      reconcile: (ids, options) => cache.reconcile(ids, options),
+    }
+  }
+
+  /**
    * The doc cache, plus the S18 change notice: every page the cache committed is
    * handed to `onFeedChange` once, after the commit, so a rename on the web
    * reaches an open desktop working copy. A page the cache refused announces
    * nothing (it is replayed on the next tick).
    */
   private announcingCache(cache: DocCache): DocCache {
+    // R5BE-1b: the archived flags of a committed page reach the library too
+    cache = this.archivingCache(cache)
     const notify = this.options.onFeedChange
     if (!notify) return cache
     return {
