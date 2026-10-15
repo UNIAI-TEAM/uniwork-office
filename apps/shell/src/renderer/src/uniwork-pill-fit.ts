@@ -84,6 +84,58 @@ export function nextPillVariantOf(
   return 'compact'
 }
 
+/** the Discussion toggle's width in each of its two forms, as measured (a form not drawn yet is absent) */
+export interface ToggleWidths {
+  full?: number
+  icon?: number
+}
+
+export interface PillFitStepInput {
+  /** the pill's budget as measured with the toggle drawn the way it is now */
+  budget: number
+  /** the toggle as drawn now; null when the holder has none (nothing to give up, no icon form) */
+  toggle: { width: number; iconOnly: boolean } | null
+  /** both forms measured so far, this measure included */
+  toggleWidths: ToggleWidths
+  widths: PillWidths
+  hasShort: boolean
+}
+
+export interface PillFitStep {
+  variant: PillVariant
+  /** the Discussion toggle gives up its label (icon only) */
+  iconToggle: boolean
+}
+
+/**
+ * The next step of the holder: which pill variant, and whether the Discussion toggle goes icon-only.
+ * When even the icon + action pill does not fit the strip's floor, the toggle is the next thing to
+ * give: its label is hidden (name and tooltip stay) and the room goes back to the strip, the pill
+ * staying compact. The decision is made on the budget the holder would have with the toggle drawn
+ * FULL (an icon-only toggle is measured, then its saving is taken back out), and compared with the
+ * compact pill's own width: the same inputs give the same answer whichever form is drawn, so a
+ * boundary cannot flip back and forth. With the full width of the toggle not known yet (it is
+ * drawn icon-only from the start) the toggle is first drawn full and measured.
+ */
+export function pillFitStepOf(input: PillFitStepInput): PillFitStep {
+  const { toggle, toggleWidths, widths, hasShort } = input
+  let budget = input.budget
+  if (toggle?.iconOnly) {
+    const full = toggleWidths.full
+    if (full === undefined) return { variant: 'compact', iconToggle: false }
+    budget -= full - toggle.width
+  }
+  const variant = nextPillVariantOf(budget, widths, { short: hasShort })
+  const compact = widths.compact
+  const gives =
+    toggle !== null &&
+    toggleWidths.full !== undefined &&
+    variant === 'compact' &&
+    compact !== undefined &&
+    budget < compact
+  return { variant, iconToggle: gives }
+}
+
 export interface BarLayoutInput {
   barWidth: number
   /** fixed items left of the strip (drag spacer, menu button) */
@@ -99,12 +151,16 @@ export interface BarLayoutInput {
   newButton: number
   /** the rest of the holder besides the pill (the Discussion toggle and the gap) */
   toggle: number
+  /** the toggle's width without its label; absent: the holder has no toggle to shrink */
+  toggleIcon?: number
   pill: PillWidths
   hasShort: boolean
 }
 
 export interface BarLayout {
   variant: PillVariant
+  /** the Discussion toggle is drawn icon-only */
+  iconToggle: boolean
   strip: { left: number; right: number }
   chrome: { left: number; right: number }
 }
@@ -118,14 +174,24 @@ export function barLayoutOf(input: BarLayoutInput): BarLayout {
   const shared = input.barWidth - input.left - input.right - input.margins
   const floor = stripFloorOf(input)
   const budget = pillBudgetOf({ shared, floor, others: input.toggle })
-  const variant = nextPillVariantOf(budget, input.pill, { short: input.hasShort })
-  const chromeWidth = input.toggle + (input.pill[variant] ?? 0)
+  const hasToggle = input.toggleIcon !== undefined && input.toggle > 0
+  const step = pillFitStepOf({
+    budget,
+    toggle: hasToggle ? { width: input.toggle, iconOnly: false } : null,
+    toggleWidths: { full: input.toggle, icon: input.toggleIcon },
+    widths: input.pill,
+    hasShort: input.hasShort,
+  })
+  const { variant, iconToggle } = step
+  const chromeWidth =
+    (iconToggle ? (input.toggleIcon ?? 0) : input.toggle) + (input.pill[variant] ?? 0)
   const stripWidth = Math.max(0, shared - chromeWidth)
   const stripRight = input.left + stripWidth
   // the holder's left margin is 6 of the margins
   const chromeLeft = stripRight + 6
   return {
     variant,
+    iconToggle,
     strip: { left: input.left, right: stripRight },
     chrome: { left: chromeLeft, right: chromeLeft + chromeWidth },
   }
@@ -140,7 +206,11 @@ function px(value: string | undefined): number {
  * Read the pill's room off the real bar: the budget it may take and its own natural width in
  * window px. Null when there is nothing to measure (no strip, or no layout at all).
  */
-export function measurePillFit(group: HTMLElement): { budget: number; natural: number } | null {
+export function measurePillFit(group: HTMLElement): {
+  budget: number
+  natural: number
+  toggle: { width: number; iconOnly: boolean } | null
+} | null {
   const chrome = group.parentElement
   const bar = chrome?.parentElement
   if (!chrome || !bar) return null
@@ -181,5 +251,14 @@ export function measurePillFit(group: HTMLElement): { budget: number; natural: n
   // the label is the part that gives way (it ellipsizes): its hidden overflow is width the pill wants
   const label = group.querySelector<HTMLElement>('.uw-pill-label')
   const clipped = label ? Math.max(0, label.scrollWidth - label.clientWidth) : 0
-  return { budget, natural: pillWidth + clipped }
+  // the Discussion toggle sits beside the pill in the holder: its drawn width and form
+  const toggleEl = Array.from(chrome.children).find((child) =>
+    child.classList.contains('uw-discussion-toggle'),
+  )
+  const toggleWidth = toggleEl?.getBoundingClientRect().width ?? 0
+  const toggle =
+    toggleEl && toggleWidth > 0
+      ? { width: toggleWidth, iconOnly: toggleEl.getAttribute('data-icon-only') === 'true' }
+      : null
+  return { budget, natural: pillWidth + clipped, toggle }
 }

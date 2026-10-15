@@ -1,11 +1,15 @@
 import {
+  createContext,
   useCallback,
+  useContext,
   useEffect,
   useId,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
+  type ReactNode,
   type RefObject,
 } from 'react'
 import type { TabSummary } from '../../shared/tabs-api'
@@ -48,10 +52,11 @@ import {
 import { announce } from './uniwork-live'
 import {
   measurePillFit,
-  nextPillVariantOf,
+  pillFitStepOf,
   shortLabelOf,
   type PillVariant,
   type PillWidths,
+  type ToggleWidths,
 } from './uniwork-pill-fit'
 import { setTopInsetPart, uiScaleOf } from './uniwork-top-inset'
 import type { SyncCenterRow } from '../../shared/sync-center'
@@ -214,22 +219,43 @@ function useQueueRowOf(status: UniworkDocStatus): SyncCenterRow | undefined {
 }
 
 /**
- * Which variant of the pill the tab bar has room for (U-1). The pill is drawn in its full form,
- * measured against the room the strip can spare, and stepped down (short label, then dot + action)
- * until it fits; a variant already measured is not drawn again to find out. It measures again when
- * the label or the interface scale changes, on a window resize, when the bar or the holder changes
- * size, and when a tab opens or closes. A host with no layout to measure keeps the full pill.
- * The effect runs before paint, so the steps are never seen.
+ * Whether the Discussion toggle beside the pill is icon-only. The pill's fit decides it (the toggle
+ * is the next thing to give when even the compact pill leaves the strip below its floor), the
+ * toggle, a sibling in the holder, reads it. Without a scope around the holder the toggle stays full.
+ */
+const ToggleFitContext = createContext<{
+  iconOnly: boolean
+  setIconOnly: (value: boolean) => void
+}>({ iconOnly: false, setIconOnly: () => undefined })
+
+/** the holder's scope: the pill's fit writes whether the toggle is icon-only, the toggle reads it */
+export function PillFitScope({ children }: { children: ReactNode }) {
+  const [iconOnly, setIconOnly] = useState(false)
+  const value = useMemo(() => ({ iconOnly, setIconOnly }), [iconOnly])
+  return <ToggleFitContext.Provider value={value}>{children}</ToggleFitContext.Provider>
+}
+
+/**
+ * Which variant of the pill the tab bar has room for (U-1), and whether the Discussion toggle beside
+ * it gives up its label. The pill is drawn in its full form, measured against the room the strip can
+ * spare, and stepped down (short label, then dot + action, then an icon-only toggle) until it fits;
+ * a variant already measured is not drawn again to find out. It measures again when the label or the
+ * interface scale changes, on a window resize, when the bar or the holder changes size, and when a
+ * tab opens or closes or the holder gains or loses a part. A host with no layout to measure keeps the
+ * full pill. The effect runs before paint, so the steps are never seen.
  */
 function usePillFit(
   groupRef: RefObject<HTMLDivElement | null>,
   key: string,
   hasShort: boolean,
 ): PillVariant {
+  const { setIconOnly: publish } = useContext(ToggleFitContext)
   const [variant, setVariant] = useState<PillVariant>('full')
+  const [iconToggle, setIconToggle] = useState(false)
   // bumped by whatever changes the room (a resize, a tab, the holder's size): measure again
   const [pass, setPass] = useState(0)
   const widths = useRef<PillWidths>({})
+  const toggleWidths = useRef<ToggleWidths>({})
   const lastKey = useRef('')
 
   useLayoutEffect(() => {
@@ -241,21 +267,41 @@ ${uiScaleOf(el)}`
       // another label (or scale): the widths measured so far describe something else
       lastKey.current = measuredKey
       widths.current = {}
-      if (variant !== 'full') {
+      toggleWidths.current = {}
+      if (variant !== 'full' || iconToggle) {
         setVariant('full')
+        setIconToggle(false)
         return
       }
     }
     const fit = measurePillFit(el)
     if (!fit) {
       widths.current = {}
+      toggleWidths.current = {}
       if (variant !== 'full') setVariant('full')
+      if (iconToggle) setIconToggle(false)
       return
     }
     widths.current[variant] = fit.natural
-    const next = nextPillVariantOf(fit.budget, widths.current, { short: hasShort })
-    if (next !== variant) setVariant(next)
-  }, [groupRef, key, variant, hasShort, pass])
+    // the toggle as it is drawn right now (the DOM is the truth, the state may be one commit ahead)
+    if (fit.toggle) toggleWidths.current[fit.toggle.iconOnly ? 'icon' : 'full'] = fit.toggle.width
+    else toggleWidths.current = {}
+    const next = pillFitStepOf({
+      budget: fit.budget,
+      toggle: fit.toggle,
+      toggleWidths: toggleWidths.current,
+      widths: widths.current,
+      hasShort,
+    })
+    if (next.variant !== variant) setVariant(next.variant)
+    if (next.iconToggle !== iconToggle) setIconToggle(next.iconToggle)
+  }, [groupRef, key, variant, iconToggle, hasShort, pass])
+
+  // the toggle (a sibling) reads it; it goes back to its full form with this pill
+  useLayoutEffect(() => {
+    publish(iconToggle)
+  }, [iconToggle, publish])
+  useLayoutEffect(() => () => publish(false), [publish])
 
   useEffect(() => {
     const el = groupRef.current
@@ -268,9 +314,11 @@ ${uiScaleOf(el)}`
     if (!strip) return undefined
     const again = () => setPass((n) => n + 1)
     window.addEventListener('resize', again)
-    // a tab opening or closing changes the floor the strip keeps
+    // a tab opening or closing changes the floor the strip keeps; the Discussion toggle or a
+    // notice joining the holder changes what is left for the pill
     const tabs = typeof MutationObserver !== 'undefined' ? new MutationObserver(again) : null
     tabs?.observe(strip, { childList: true })
+    if (chrome) tabs?.observe(chrome, { childList: true })
     // the holder changing size (the Discussion toggle or a notice coming and going) moves the budget;
     // answered in the next frame so a size change caused by this very step is not reported in the same one
     let frame = 0
@@ -661,6 +709,7 @@ export function DiscussionToggle({ status }: { status: UniworkDocStatus }) {
   const { lang } = useI18n()
   const account = useAccount()
   const open = useDiscussionOpen()
+  const { iconOnly } = useContext(ToggleFitContext)
   const bridge = discussionBridge()
   if (!discussionTargetOf(status, showsProfile(account.view, account.status), bridge)) return null
   const label = collabStrings(lang).collabDiscussion
@@ -669,6 +718,10 @@ export function DiscussionToggle({ status }: { status: UniworkDocStatus }) {
       type="button"
       id={DISCUSSION_TOGGLE_ID}
       className="uw-discussion-toggle"
+      // the same name and tooltip whether or not the label is drawn (icon-only at the narrowest
+      // widths, see usePillFit): the label stays in the button as visually hidden text
+      title={label}
+      data-icon-only={iconOnly ? 'true' : undefined}
       aria-expanded={open}
       aria-controls={open ? DISCUSSION_PANEL_ID : undefined}
       data-open={open ? 'true' : undefined}
