@@ -815,10 +815,11 @@ describe('UniworkQueuePopover (S4)', () => {
         await mount(makeStatus())
         expect(room()).toBe('400px')
         expect(lastInset()).toBe(400)
+      })
+
+      it('a zoomed band that fits is published unscaled', async () => {
+        document.documentElement.style.setProperty('--ui-scale', '2')
         measured(700)
-        await act(async () => {
-          document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
-        })
         await mount(makeStatus())
         expect(lastInset()).toBe(350)
       })
@@ -842,12 +843,13 @@ describe('UniworkQueuePopover (S4)', () => {
         )
       })
 
-      it('an overflowing body is a keyboard stop; one that fits is not', async () => {
+      it('a body that fits is not a keyboard stop', async () => {
         await mount(makeStatus())
         expect(body()!.hasAttribute('tabindex')).toBe(false)
-        await act(async () => {
-          document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
-        })
+        expect(body()!.hasAttribute('role')).toBe(false)
+      })
+
+      it('an overflowing body is a keyboard stop, named by line 1', async () => {
         scrollSpy = vi
           .spyOn(HTMLElement.prototype, 'scrollHeight', 'get')
           .mockImplementation(() => 500)
@@ -895,7 +897,7 @@ describe('UniworkQueuePopover (S4)', () => {
 
         it('theme tokens only', () => {
           expect(rule('.uw-queue-pop-body') + rule('.uw-queue-pop-body:focus-visible')).not.toMatch(
-            /#[0-9a-f]{3,8}|rgba?\(/i,
+            /#[0-9a-f]{3,8}|rgba?\(/i,
           )
         })
       })

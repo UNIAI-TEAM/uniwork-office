@@ -16,6 +16,9 @@
   padding: 6px 12px 8px;
   border-bottom: 1px solid var(--border);
   background: var(--surface-subtle);
+  /* never taller than the room main gives (--uw-queue-room: 400px top-inset cap minus the S6 bar) */
+  max-height: var(--uw-queue-room, 400px);
+  overflow: hidden;
   -webkit-app-region: no-drag;
 }
 
@@ -25,6 +28,8 @@
   flex-direction: column;
   gap: 6px;
   width: min(360px, calc(100vw - 24px));
+  /* the band's own padding (6 + 8) and border (1) are the 15px: the dialog scrolls inside the rest */
+  max-height: calc(var(--uw-queue-room, 400px) - 15px);
   padding: 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -34,6 +39,24 @@
   font-size: 13px;
   line-height: 1.45;
   -webkit-app-region: no-drag;
+}
+
+/* the text scrolls; the action row below it never does, so the buttons stay reachable */
+.uw-queue-pop-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.uw-queue-pop-body:focus {
+  outline: none;
+}
+
+.uw-queue-pop-body:focus-visible {
+  outline: 2px solid var(--color-border-brand);
+  outline-offset: -2px;
 }
 
 .uw-queue-pop:focus {
@@ -64,6 +87,7 @@
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 4px;
+  flex-shrink: 0;
 }
 
 .uw-queue-pop-btn {

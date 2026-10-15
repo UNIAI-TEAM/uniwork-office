@@ -11,6 +11,13 @@ import { useSyncExternalStore } from 'react'
 
 export type TopInsetPart = 'bar' | 'popover'
 
+/**
+ * The most main accepts as the top inset (unscaled CSS px; `TOP_INSET_MAX` in
+ * `main/tab-manager.ts`, which clamps anything above). The renderer never asks for more: a band
+ * that main would clamp has its lower part drawn under the editor view.
+ */
+export const TOP_INSET_MAX = 400
+
 const parts: Record<TopInsetPart, number> = { bar: 0, popover: 0 }
 const listeners = new Set<() => void>()
 
@@ -22,9 +29,14 @@ function send(total: number): void {
   }
 }
 
-/** the total main is asked for: the bar first, the popover band right below it */
+/** the total main is asked for: the bar first, the popover band right below it, never past the cap */
 export function topInsetTotal(): number {
-  return parts.bar + parts.popover
+  return Math.min(TOP_INSET_MAX, parts.bar + parts.popover)
+}
+
+/** the height the popover band may take: what the S6 bar leaves of the cap */
+export function popoverRoomOf(barPx: number): number {
+  return Math.max(0, TOP_INSET_MAX - (Number.isFinite(barPx) ? Math.max(0, barPx) : 0))
 }
 
 export function topInsetPart(part: TopInsetPart): number {

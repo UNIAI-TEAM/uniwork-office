@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react'
 import type { UniworkDocStatus } from '../../shared/home-api'
 import {
   asSyncCenterSnapshot,
@@ -19,7 +27,12 @@ import {
   type QueuePopoverOpener,
 } from './queue-popover-model'
 import { announce } from './uniwork-live'
-import { setTopInsetPart, unscaledHeightOf, useTopInsetPart } from './uniwork-top-inset'
+import {
+  popoverRoomOf,
+  setTopInsetPart,
+  unscaledHeightOf,
+  useTopInsetPart,
+} from './uniwork-top-inset'
 import './queue-popover.css'
 
 /**
@@ -112,7 +125,12 @@ export function UniworkQueuePopover({
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<StringKey | null>(null)
   const bandRef = useRef<HTMLDivElement>(null)
+  const bodyRef = useRef<HTMLDivElement>(null)
   const barPx = useTopInsetPart('bar')
+  // the band never asks for more than main will give: the bar plus the band stay within the cap,
+  // and a taller text scrolls inside the dialog (the action row stays outside the scroll area)
+  const room = popoverRoomOf(barPx)
+  const [scrolls, setScrolls] = useState(false)
   const lineId = useId()
   const confirmId = useId()
 
@@ -210,12 +228,20 @@ export function UniworkQueuePopover({
     return () => clearTimeout(timer)
   }, [settled])
   const bandReady = settled || capped
+  const roomRef = useRef(room)
+  useLayoutEffect(() => {
+    roomRef.current = room
+  })
 
   // the band's height joins the top inset while it is open; closing gives the editor the room back
   useLayoutEffect(() => {
     const band = bandRef.current
     if (!band || !bandReady) return
-    const measure = () => setTopInsetPart('popover', unscaledHeightOf(band))
+    const measure = () => {
+      setTopInsetPart('popover', Math.min(unscaledHeightOf(band), roomRef.current))
+      const body = bodyRef.current
+      setScrolls(body ? body.scrollHeight > body.clientHeight : false)
+    }
     measure()
     let observer: ResizeObserver | undefined
     if (typeof ResizeObserver !== 'undefined') {
@@ -224,6 +250,12 @@ export function UniworkQueuePopover({
     }
     return () => observer?.disconnect()
   }, [bandReady])
+  // the bar growing or shrinking moves the cap: measure again against the new room
+  useLayoutEffect(() => {
+    const band = bandRef.current
+    if (!band || !bandReady) return
+    setTopInsetPart('popover', Math.min(unscaledHeightOf(band), room))
+  }, [bandReady, room])
   useLayoutEffect(() => () => setTopInsetPart('popover', 0), [])
 
   const wasConfirming = useRef(false)
@@ -309,7 +341,12 @@ export function UniworkQueuePopover({
       ref={bandRef}
       className="uw-queue-band"
       data-uw-queue-band=""
-      style={{ top: `calc(var(--tab-bar-height, 40px) + ${barPx}px)` }}
+      style={
+        {
+          top: `calc(var(--tab-bar-height, 40px) + ${barPx}px)`,
+          '--uw-queue-room': `${room}px`,
+        } as CSSProperties
+      }
     >
       <div
         ref={dialogRef}
@@ -318,42 +355,49 @@ export function UniworkQueuePopover({
         tabIndex={-1}
         aria-labelledby={lineId}
       >
-        <p id={lineId} className="uw-queue-pop-line">
-          {line1Text}
-        </p>
-        {model.line2 && (
-          <p className="uw-queue-pop-line uw-queue-pop-sub">{lineText(model.line2)}</p>
-        )}
-        {model.line3 && (
-          <p className="uw-queue-pop-line uw-queue-pop-sub">{lineText(model.line3)}</p>
-        )}
-        {error && <p className="uw-queue-pop-error">{t(error, { cap: QUEUE_DRAFT_CAP })}</p>}
-        {confirming ? (
-          <>
+        <div
+          ref={bodyRef}
+          className="uw-queue-pop-body"
+          // a body that scrolls is a keyboard stop (arrow keys scroll it); one that fits is not
+          {...(scrolls ? { role: 'group', tabIndex: 0, 'aria-labelledby': lineId } : {})}
+        >
+          <p id={lineId} className="uw-queue-pop-line">
+            {line1Text}
+          </p>
+          {model.line2 && (
+            <p className="uw-queue-pop-line uw-queue-pop-sub">{lineText(model.line2)}</p>
+          )}
+          {model.line3 && (
+            <p className="uw-queue-pop-line uw-queue-pop-sub">{lineText(model.line3)}</p>
+          )}
+          {error && <p className="uw-queue-pop-error">{t(error, { cap: QUEUE_DRAFT_CAP })}</p>}
+          {confirming && (
             <p id={confirmId} className="uw-queue-pop-line">
               {t('uwQueueCancelConfirm')}
             </p>
-            <div className="uw-queue-pop-actions">
-              <button
-                type="button"
-                className="uw-queue-pop-btn uw-queue-pop-danger"
-                aria-describedby={confirmId}
-                aria-disabled={busy === 'cancel' ? 'true' : undefined}
-                onClick={goCancel}
-              >
-                {t('uwQueueCancelGo')}
-              </button>
-              <button
-                type="button"
-                className="uw-queue-pop-btn"
-                data-popover-back=""
-                aria-describedby={confirmId}
-                onClick={() => setConfirming(false)}
-              >
-                {t('uwActBack')}
-              </button>
-            </div>
-          </>
+          )}
+        </div>
+        {confirming ? (
+          <div className="uw-queue-pop-actions">
+            <button
+              type="button"
+              className="uw-queue-pop-btn uw-queue-pop-danger"
+              aria-describedby={confirmId}
+              aria-disabled={busy === 'cancel' ? 'true' : undefined}
+              onClick={goCancel}
+            >
+              {t('uwQueueCancelGo')}
+            </button>
+            <button
+              type="button"
+              className="uw-queue-pop-btn"
+              data-popover-back=""
+              aria-describedby={confirmId}
+              onClick={() => setConfirming(false)}
+            >
+              {t('uwActBack')}
+            </button>
+          </div>
         ) : (
           <div className="uw-queue-pop-actions">{model.actions.map(actionButton)}</div>
         )}
