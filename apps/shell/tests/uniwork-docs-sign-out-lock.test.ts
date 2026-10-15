@@ -66,8 +66,10 @@ beforeEach(() => {
 afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
 const ownerA = { deploymentId: 'default', accountId: 'acc_1' }
-const docDir = (docId = DOC) => join(dir, 'uniwork-documents', 'default', 'acc_1', docId)
-const docPath = (docId = DOC, name = 'Plan.docx') => join(docDir(docId), name)
+const docDir = (docId = DOC, accountId = 'acc_1') =>
+  join(dir, 'uniwork-documents', 'default', accountId, docId)
+const docPath = (docId = DOC, name = 'Plan.docx', accountId = 'acc_1') =>
+  join(docDir(docId, accountId), name)
 
 function seedWorkingCopy(
   opts: {
@@ -77,6 +79,8 @@ function seedWorkingCopy(
     bytes?: string
     baseBytes?: string
     state?: Binding['state']
+    /** the account whose working copy this is (default acc_1) */
+    accountId?: string
   } = {},
 ): string {
   const docId = opts.docId ?? DOC
@@ -84,8 +88,8 @@ function seedWorkingCopy(
   const format = opts.format ?? 'docx'
   const bytes = opts.bytes ?? 'v3 base'
   const baseBytes = opts.baseBytes ?? 'v3 base'
-  const folder = docDir(docId)
-  const file = docPath(docId, name)
+  const folder = docDir(docId, opts.accountId)
+  const file = docPath(docId, name, opts.accountId)
   mkdirSync(folder, { recursive: true })
   writeFileSync(file, bytes)
   const binding: Binding = {
@@ -1357,6 +1361,117 @@ describe('G5-11 sign-out lock-and-keep, N+1 park, and restoreParked', () => {
     expect(await boundary.beforeSignOut({ confirmed: true })).toBe(false)
     expect(ctx.openSet.has(path)).toBe(true)
     expect(readFileSync(path, 'utf8')).toBe('x'.repeat(2048))
+  })
+
+  it('25. d6-1: B signs in and C signs in while an earlier lock runs: B, live in between with a dirty copy, is parked into its own store, its folder goes and its copies stay locked under C', async () => {
+    const markerA = 'MARKER-A-d6-1-5c2e'
+    const markerB = 'MARKER-B-d6-1-9f41'
+    const DOC_B = '01J8X4DOCBBBBBBBBBBBBBBBBB'
+    seedWorkingCopy({ bytes: `A unsaved ${markerA}`, baseBytes: 'v3 base', state: 'dirty' })
+    const pathB = seedWorkingCopy({
+      docId: DOC_B,
+      accountId: 'acc_2',
+      bytes: `B unsaved ${markerB}`,
+      baseBytes: 'v3 base',
+      state: 'dirty',
+    })
+    const ctx = setup({ account: 'acc_0', closeNow: true })
+    const owner = (accountId: string) => ({ deploymentId: 'default', accountId })
+    const lockedFor: string[] = []
+    let releaseX: () => void = () => undefined
+    const boundary = new AccountBoundary({
+      root: join(dir, 'uniwork-documents'),
+      openPaths: () => [...ctx.openSet],
+      closeDocument: async (p) => ctx.openSet.delete(p),
+      confirmClose: async () => true,
+      closeNow: (p) => ctx.openSet.delete(p),
+      aiHistoryPaths: () => [],
+      forgetAiHistory: () => undefined,
+      forgetLocks: () => undefined,
+      closeConflictPrompt: () => undefined,
+      planSignOut: (o) => ctx.service.signOutPlan(o),
+      lockSession: async (o, onWaiting, options) => {
+        lockedFor.push(o?.accountId ?? 'none')
+        // the lock of the account before A is held while B and C sign in
+        if (o?.accountId === 'acc_0') await new Promise<void>((r) => (releaseX = r))
+        const res = await ctx.service.lockSession(o, onWaiting, options)
+        return { ok: res.ok, lost: res.lost?.length ?? 0 }
+      },
+    })
+    const signIn = (accountId: string): Promise<void> => {
+      ctx.setAccount(accountId)
+      ctx.service.noteSessionIdentity()
+      return boundary.enforce(owner(accountId))
+    }
+    await signIn('acc_0')
+    const toA = signIn('acc_1')
+    await vi.waitFor(() => expect(lockedFor).toEqual(['acc_0']))
+    const toB = signIn('acc_2')
+    const toC = signIn('acc_3')
+    releaseX()
+    await Promise.all([toA, toB, toC])
+
+    // every account that was live is locked, in order
+    expect(lockedFor).toEqual(['acc_0', 'acc_1', 'acc_2'])
+    // no plaintext of A or B is left
+    expect(existsSync(docDir())).toBe(false)
+    expect(existsSync(docDir(DOC_B, 'acc_2'))).toBe(false)
+    expect(filesContaining(join(dir, 'uniwork-documents'), markerA)).toEqual([])
+    expect(filesContaining(join(dir, 'uniwork-documents'), markerB)).toEqual([])
+    // B's N+1 is parked into B's own store, A's into A's, nothing into C's
+    const parkedOf = async (accountId: string) => {
+      const opened = await ctx.layer.open(owner(accountId))
+      if (opened.kind !== 'ok') throw new Error(opened.kind)
+      return createParkedStore(opened.store.records(PARKED_STORE_REGISTRATION.name)).list()
+    }
+    expect(await parkedOf('acc_1')).toEqual([DOC])
+    expect(await parkedOf('acc_2')).toEqual([DOC_B])
+    expect(await parkedOf('acc_3')).toEqual([])
+    // a copy of B that reappears is locked for C (B's scope is in the locked set)
+    seedWorkingCopy({ docId: DOC_B, accountId: 'acc_2', bytes: 'stale', baseBytes: 'v3 base' })
+    expect(ctx.service.isLocked(pathB)).toBe(true)
+  })
+
+  it("26. d6-2: a switch where A's own store cannot open still removes A's dirty copy and counts it in the one notice", async () => {
+    const marker = 'MARKER-SWITCH-d6-2-0d7a'
+    const path = seedWorkingCopy({ bytes: `A unsaved ${marker}`, baseBytes: 'v3 base' })
+    const clean = seedWorkingCopy({ docId: '01J8X4DOCCLEANCLEANCLEANCL' })
+    const ctx = setup({ closeNow: true })
+    const noticeSwitchLoss = vi.fn()
+    const boundary = new AccountBoundary({
+      root: join(dir, 'uniwork-documents'),
+      openPaths: () => [...ctx.openSet],
+      closeDocument: async (p) => ctx.openSet.delete(p),
+      confirmClose: async () => true,
+      closeNow: (p) => ctx.openSet.delete(p),
+      aiHistoryPaths: () => [],
+      forgetAiHistory: () => undefined,
+      forgetLocks: () => undefined,
+      closeConflictPrompt: () => undefined,
+      planSignOut: (owner) => ctx.service.signOutPlan(owner),
+      noticeSwitchLoss,
+      lockSession: async (owner, onWaiting, options) => {
+        const res = await ctx.service.lockSession(owner, onWaiting, options)
+        return { ok: res.ok, lost: res.lost?.length ?? 0 }
+      },
+    })
+    await boundary.enforce(ownerA)
+    ctx.setAccount('acc_2')
+    ctx.service.noteSessionIdentity()
+    // A's epoch moved meanwhile: its own store answers no_session
+    vi.spyOn(ctx.syncStore as Required<typeof ctx.syncStore>, 'openScope').mockResolvedValue({
+      kind: 'no_session',
+    })
+    await boundary.enforce({ deploymentId: 'default', accountId: 'acc_2' })
+
+    // the folders still go (no plaintext of A is left) ...
+    expect(existsSync(docDir())).toBe(false)
+    expect(existsSync(clean)).toBe(false)
+    expect(filesContaining(dir, marker)).toEqual([])
+    expect(existsSync(path)).toBe(false)
+    // ... and the dirty one is told as lost, the clean one is not counted
+    expect(noticeSwitchLoss).toHaveBeenCalledTimes(1)
+    expect(noticeSwitchLoss).toHaveBeenCalledWith(ownerA, expect.objectContaining({ ramOnly: 1 }))
   })
 
   it('21. d2-3: findNewestRecoveryBytes picks the newest candidate by mtime when the disk file is missing', async () => {

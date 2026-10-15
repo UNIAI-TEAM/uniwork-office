@@ -484,6 +484,83 @@ describe('G5-06 W4b save queue wiring', () => {
     expect(Buffer.from(kept[0]!.snapshot)).toEqual(Buffer.from(enc('v4')))
   })
 
+  describe("G5-11 d6-3: a switch during cancel/discard keeps nothing in the next account's drafts", () => {
+    /** the drafts the store of `account` keeps for the document at `path` */
+    const draftsOf = async (ctx: Ctx, path: string, account: string) => {
+      const opened = await ctx.layer.open({ deploymentId: 'default', accountId: account })
+      if (opened.kind !== 'ok') throw new Error(opened.kind)
+      return createDraftStore(opened.store.records(DRAFTS_STORE_REGISTRATION.name)).list(
+        basename(dirname(path)),
+      )
+    }
+    const pendingSave = async (server: ReturnType<typeof fakeServer>, ctx: Ctx) => {
+      const path = await openDoc(ctx)
+      writeFileSync(path, 'v4 of acc_1')
+      server.faults.push({ route: 'upload', kind: 'network' })
+      await ctx.service.save(path)
+      expect(await storedIntent(ctx, path)).not.toBeNull()
+      return path
+    }
+    type Coordinated = { coordinator: SaveCoordinator }
+    /** "Bỏ lần lưu..." only applies to a stuck reconcile: move A's intent there */
+    const markStuck = async (ctx: Ctx, path: string) => {
+      const opened = await ctx.layer.open({ deploymentId: 'default', accountId: 'acc_1' })
+      if (opened.kind !== 'ok') throw new Error(opened.kind)
+      const intents = createIntentStore(opened.store.records(INTENT_STORE_REGISTRATION.name))
+      const key = basename(dirname(path))
+      const stored = await intents.read(key, {
+        orgId: 'org_a',
+        workspaceId: 'ws_1',
+        baseVersion: 3,
+        length: 0,
+      })
+      if (!stored) throw new Error('no intent')
+      await intents.put(key, { ...stored.intent, state: 'reconciling-stuck' }, stored.payload)
+    }
+
+    it('cancel on a closed tab: B signs in right after the intent was read', async () => {
+      const server = fakeServer({ bytes: enc('v3') })
+      const ctx = setup(server)
+      const path = await pendingSave(server, ctx)
+      const service = ctx.service as unknown as {
+        queueDocFromStore(doc: unknown): Promise<unknown>
+      }
+      const read = service.queueDocFromStore.bind(ctx.service)
+      vi.spyOn(service, 'queueDocFromStore').mockImplementation(async (doc) => {
+        const found = await read(doc)
+        ctx.signInAs('acc_2')
+        return found
+      })
+      await ctx.service.cancelSave(path, true)
+      expect(await draftsOf(ctx, path, 'acc_2')).toEqual([])
+      // A's intent is left exactly as it was, in A's own store
+      expect(await storedIntent(ctx, path)).not.toBeNull()
+    })
+
+    it.each(['cancel', 'discard'] as const)(
+      '%s: B signs in after the ownership check, before the queue engine is reached',
+      async (action) => {
+        const server = fakeServer({ bytes: enc('v3') })
+        const ctx = setup(server)
+        const path = await pendingSave(server, ctx)
+        if (action === 'discard') await markStuck(ctx, path)
+        const { coordinator } = ctx.service as unknown as Coordinated
+        const original = coordinator[action].bind(coordinator) as (
+          ...args: unknown[]
+        ) => Promise<void>
+        vi.spyOn(coordinator, action).mockImplementation(async (...args: unknown[]) => {
+          ctx.signInAs('acc_2')
+          await original(...args)
+        })
+        if (action === 'cancel') await ctx.service.cancelSave(path, true)
+        else await ctx.service.discardSave(path)
+        expect(coordinator[action]).toHaveBeenCalledTimes(1)
+        expect(await draftsOf(ctx, path, 'acc_2')).toEqual([])
+        expect(await storedIntent(ctx, path)).not.toBeNull()
+      },
+    )
+  })
+
   it('Overwrite supersedes the pending intent before the new one', async () => {
     const server = fakeServer({ bytes: enc('v3') })
     const ctx = setup(server)

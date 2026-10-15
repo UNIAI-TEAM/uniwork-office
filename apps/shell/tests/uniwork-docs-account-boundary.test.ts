@@ -469,6 +469,43 @@ describe('an account switch that is already effective (Q2 = a)', () => {
     expect(h.locked).toEqual([ownerA, ownerB])
   })
 
+  it('d6-1: B and C both push while the lock of the account before A runs: B, live in between, is still locked (by C), in order, one run at a time', async () => {
+    const ownerX = { accountId: 'acc_x', deploymentId: 'default' }
+    const ownerC = { accountId: 'acc_c', deploymentId: 'default' }
+    const h = switching({ count: 0, ramOnly: 0 })
+    let active = 0
+    let maxActive = 0
+    let releaseX: () => void = () => undefined
+    h.deps.lockStore.mockImplementation(async (owner: Owner | null) => {
+      active += 1
+      maxActive = Math.max(maxActive, active)
+      h.locked.push(owner)
+      if (owner?.accountId === 'acc_x') {
+        await new Promise<void>((resolve) => {
+          releaseX = resolve
+        })
+      }
+      active -= 1
+    })
+    await h.boundary.enforce(ownerX)
+    const toA = h.boundary.enforce(ownerA)
+    await vi.waitFor(() => expect(h.locked).toEqual([ownerX]))
+    // B signs in and C signs in before A's run has locked X: B is queued, never run yet
+    const toB = h.boundary.enforce(ownerB)
+    const toBAgain = h.boundary.enforce(ownerB)
+    const toC = h.boundary.enforce(ownerC)
+    await Promise.resolve()
+    expect(h.locked).toEqual([ownerX])
+    releaseX()
+    await Promise.all([toA, toB, toBAgain, toC])
+    // A is locked by B's run and B by C's run: nobody who was live is skipped,
+    // and the repeated push of B adds no run of its own
+    expect(h.locked).toEqual([ownerX, ownerA, ownerB])
+    expect(maxActive).toBe(1)
+    await h.boundary.enforce(ownerC)
+    expect(h.locked).toEqual([ownerX, ownerA, ownerB])
+  })
+
   it('an explicit Sign out still asks, and a cancel there changes nothing', async () => {
     const h = switching({ count: 1, ramOnly: 0 })
     await h.boundary.enforce(ownerA)

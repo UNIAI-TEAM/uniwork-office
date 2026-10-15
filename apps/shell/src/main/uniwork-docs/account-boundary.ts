@@ -109,6 +109,11 @@ export function workingCopyOwner(
   return { deploymentId, userId }
 }
 
+/** `deploymentId/accountId`: one account's boundary key */
+function ownerKey(owner: LastOwner): string {
+  return `${owner.deploymentId}/${owner.accountId}`
+}
+
 export class AccountBoundary {
   private readonly deps: AccountBoundaryDeps
   /** `deploymentId/accountId` whose boundary is enforced; null = not yet, or signed out */
@@ -117,8 +122,14 @@ export class AccountBoundary {
   private lastOwner: LastOwner | null = null
   /** the drain of `enforce` runs in progress (one at a time); null = idle */
   private running: Promise<void> | null = null
-  /** the newest owner a status push asked for while a run was in progress */
-  private pending: LastOwner | null = null
+  /** the owner whose run the drain is in right now; null = between runs */
+  private current: LastOwner | null = null
+  /**
+   * The distinct owners status pushes asked for while a run was in progress,
+   * oldest first. Each was live at its push (its store opened, its documents
+   * editable), so each gets its own run: the run after it locks it (d6-1).
+   */
+  private readonly queued: LastOwner[] = []
 
   constructor(deps: AccountBoundaryDeps) {
     this.deps = deps
@@ -207,38 +218,44 @@ export class AccountBoundary {
    * deleted. The account that went away is always locked (no prompt can keep
    * it open: the switch already happened). When a close prompt was cancelled
    * the boundary stays unenforced, so the next status push asks again. Runs
-   * never overlap: a push that arrives while one runs is remembered (only the
-   * newest owner) and runs right after it, without waiting for another push;
-   * the call resolves once the run that covers it has finished.
+   * never overlap: a push that arrives while one runs is queued (unless it
+   * names the same owner as the run or push before it) and every queued owner
+   * runs in order right after it, without waiting for another push, so an
+   * owner that was live only between two pushes is still locked by the next
+   * run; the call resolves once the drain that covers it has finished.
    */
   async enforce(owner: LastOwner): Promise<void> {
-    this.pending = owner
+    const last = this.queued[this.queued.length - 1] ?? this.current
+    if (!last || ownerKey(last) !== ownerKey(owner)) this.queued.push(owner)
     if (!this.running) this.running = this.drain()
     await this.running
   }
 
-  /** runs the pending owners one after another until none is left */
+  /** runs the queued owners one after another, oldest first, until none is left */
   private async drain(): Promise<void> {
     try {
-      while (this.pending) {
-        const next = this.pending
-        this.pending = null
+      let next = this.queued.shift()
+      while (next) {
+        this.current = next
         try {
           await this.enforceOnce(next)
         } catch (error) {
           // a newer owner still gets its run; the last one reports its failure
-          if (!this.pending) throw error
+          if (this.queued.length === 0) throw error
+        } finally {
+          this.current = null
         }
+        next = this.queued.shift()
       }
     } finally {
-      // cleared in the same step that saw nothing pending, so a later push
+      // cleared in the same step that saw nothing queued, so a later push
       // always starts a new drain instead of joining one that has ended
       this.running = null
     }
   }
 
   private async enforceOnce(owner: LastOwner): Promise<void> {
-    const key = `${owner.deploymentId}/${owner.accountId}`
+    const key = ownerKey(owner)
     if (this.enforced === key) return
     const previous = this.lastOwner
     this.lastOwner = owner
@@ -249,7 +266,7 @@ export class AccountBoundary {
     // account change already sees them gone (F4 residual). They go even when a
     // prompt is cancelled: they are not this account's copies to explain.
     this.deps.forgetLocks(foreign)
-    if (previous && `${previous.deploymentId}/${previous.accountId}` !== key) {
+    if (previous && ownerKey(previous) !== key) {
       // the other account is already live, so there is nothing left to cancel:
       // the switched-out account is locked exactly as on a confirmed sign-out
       // (N+1 parked, plaintext copies wiped, store locked). The plan is read

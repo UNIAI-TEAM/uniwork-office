@@ -799,10 +799,13 @@ export class UniworkDocsService {
           await (await this.queueEngineOrNull())?.pause()
         },
         resume: async (docs) => (await this.queueEngineOrNull())?.resume(docs) ?? [],
+        // d6-3: a cancel/discard keeps the snapshot as a draft in the engine's
+        // own store, so only the engine of the account the copy belongs to may
+        // run it (a switch can land between the intent read and here)
         cancel: async (doc, options) =>
-          (await this.queueEngineOrNull())?.cancel(doc, options) ?? doc.record.state,
+          (await this.queueEngineFor(doc.path))?.cancel(doc, options) ?? doc.record.state,
         discard: async (doc, options) =>
-          (await this.queueEngineOrNull())?.discard(doc, options) ?? doc.record.state,
+          (await this.queueEngineFor(doc.path))?.discard(doc, options) ?? doc.record.state,
         supersede: async (doc) => {
           const engine = await this.queueEngineOrNull()
           const st = (await engine?.supersede(doc)) ?? doc.record.state
@@ -1351,6 +1354,23 @@ export class UniworkDocsService {
   }
 
   /**
+   * The queue engine of the live session only when the working copy at `path`
+   * belongs to that session's account; null otherwise (never throws). Its
+   * drafts store is that account's, so nothing of one account is kept in the
+   * store of another.
+   */
+  private async queueEngineFor(path: string): Promise<SaveQueueEngine | null> {
+    try {
+      const access = await this.queueEngine()
+      if (access.kind !== 'ok') return null
+      const [deploymentId = '', accountId = ''] = access.token.split('/')
+      return this.pathBelongsTo({ deploymentId, accountId }, path) ? access.dispatcher : null
+    } catch {
+      return null
+    }
+  }
+
+  /**
    * The queue engine for the coordinator's injected dispatcher: it throws when
    * the store cannot be reached, which the front treats like any other queue
    * failure (the intent stays, nothing is sent).
@@ -1604,7 +1624,8 @@ export class UniworkDocsService {
     const doc = typeof path === 'string' ? this.store.lookup(path) : null
     if (!doc || !this.ownsLocally(doc)) return
     const queueDoc = await this.queueDocFromStore(doc)
-    if (!queueDoc) return
+    // d6-3: an account switch may have landed during the intent read
+    if (!queueDoc || !this.ownsLocally(doc)) return
     await this.coordinator.cancel(queueDoc, {
       documentClosed: closed,
       title: doc.binding.title,
@@ -1627,7 +1648,8 @@ export class UniworkDocsService {
     const doc = typeof path === 'string' ? this.store.lookup(path) : null
     if (!doc || !this.ownsLocally(doc)) return
     const queueDoc = await this.queueDocFromStore(doc)
-    if (!queueDoc) return
+    // d6-3: an account switch may have landed during the intent read
+    if (!queueDoc || !this.ownsLocally(doc)) return
     await this.coordinator.discard(queueDoc, { title: doc.binding.title })
   }
 
@@ -2162,6 +2184,35 @@ export class UniworkDocsService {
             await parkRefused(dir, key, binding, recoveryBytes, [])
           }
         }
+      }
+    }
+
+    // d6-2: on a switch whose leaving account's own store could not open (its
+    // epoch moved, its key cannot be produced) nothing could be parked, yet the
+    // folders still go below: every dirty or keep-local copy is lost and is
+    // counted, so the notice tells it. A locked keychain of the live session is
+    // already counted by the plan as RAM-only content.
+    if (switching && !parked && !keystoreLocked) {
+      for (const dir of dirs) {
+        if (this.store.newerStoreIn(dir)) continue
+        const binding = await this.store.readDir(dir)
+        if (!binding) continue
+        const path = join(dir, binding.filename)
+        let dirty =
+          KEEP_LOCAL_STATES.has(binding.state) ||
+          this.editorDirty.has(path) ||
+          this.editorDirty.has(pathKey(path))
+        if (!dirty && this.store.exists(path)) {
+          try {
+            dirty = sha256Hex(new Uint8Array(readFileSync(path))) !== binding.baseChecksum
+          } catch {
+            // an unreadable copy has no bytes to keep
+          }
+        }
+        if (!dirty && this.deps.isPathOpen(path) && this.deps.editorStateOf) {
+          dirty = (await this.editorState(path)).dirty === true
+        }
+        if (dirty) lostKeys.add(basename(dir))
       }
     }
 
