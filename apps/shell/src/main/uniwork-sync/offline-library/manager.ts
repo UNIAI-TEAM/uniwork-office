@@ -900,7 +900,7 @@ export class OfflineLibraryManager {
       if (isUnavailable(read)) return refused(read.kind)
       if (read.kind !== 'ok') return refused('not_pinned')
       let record = read.record
-      if (record.state === 'revoked' || record.state === 'deleted') return refused(record.state)
+      const gone = record.state === 'revoked' || record.state === 'deleted'
       // OQ-UX11 (a): kept copies stay, but nothing is refreshed or renewed
       if (!(await this.options.capability(record.scope.orgId))) return refused('capability_off')
       const docs = this.online()
@@ -920,6 +920,17 @@ export class OfflineLibraryManager {
         return refused('offline')
       }
       const manifest = this.manifestOf(detail)
+      if (gone) {
+        // T5-5 (EXPERIENCE "restored"): the server answers for the document
+        // again, so the pin waits for the network (or downloads now). The old
+        // lease was revoked with it: it is dropped so a fresh one is granted.
+        const lease = await this.options.leases.effectiveState(documentId)
+        if (lease.state === 'revoked') {
+          await this.options.leases.release(documentId).catch(() => undefined)
+        }
+        record = { ...withoutCopy(record), state: 'waiting-network' }
+        delete record.failure
+      }
       const newer = !record.readyManifest || !sameSnapshot(record.readyManifest, manifest)
       const sameAsked = record.manifest !== null && sameSnapshot(record.manifest, manifest)
       // a kept update stays kept only for the same snapshot; a newer one is offered again
@@ -950,7 +961,13 @@ export class OfflineLibraryManager {
       // the 2 GiB check and the downloading row are one step (T5-1)
       const begun = await this.beginDownload(record, manifest, { quota: true })
       if (begun.kind === 'over_quota') {
-        await this.put({ ...record, manifest: read.record.manifest })
+        // T5-5: a pin with no copy is recorded as refused, so an online pass
+        // does not retry it every time; "Thử lại" checks the quota again
+        await this.put(
+          record.readyGeneration === null
+            ? { ...record, state: 'interrupted', failure: 'offline_cap_reached' }
+            : { ...record, manifest: read.record.manifest },
+        )
         return refused('offline_cap_reached')
       }
       if (begun.kind === 'started') return begun

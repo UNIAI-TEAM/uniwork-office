@@ -315,10 +315,13 @@ describe('G5-05 deleted -> cache + assets gone, drafts kept', () => {
 
   it('handleDeleted (feed) keeps the row as deleted until unpinned', async () => {
     const h = createHarness()
-    addDoc(h, 'doc_1', 1)
+    const doc = addDoc(h, 'doc_1', 1)
     rowOf(await pinDoc(h))
     expect(await h.manager.handleDeleted('doc_1')).toMatchObject({ state: 'deleted', bytes: 0 })
-    expect(await h.manager.refresh('doc_1')).toEqual({ kind: 'refused', code: 'deleted' })
+    // still deleted on the server (a readable one is restored, T5-5)
+    doc.error = new UniworkDocError('deleted')
+    expect(await h.manager.refresh('doc_1')).toMatchObject({ row: { state: 'deleted' } })
+    expect(await h.manager.openCached('doc_1')).toEqual({ kind: 'refused', code: 'deleted' })
     expect(await h.manager.unpin('doc_1')).toEqual({ kind: 'unpinned', deferred: false })
   })
 })
@@ -694,5 +697,76 @@ describe('T5-4 the lease revoke notice honours its reason', () => {
         bytes: 0,
       })
     }
+  })
+})
+
+describe('T5-5 restore and a quota refusal at reconnect', () => {
+  it('a deleted row that is readable again is restored: waiting-network, then downloads', async () => {
+    const h = createHarness()
+    const doc = addDoc(h, 'doc_1', 1)
+    rowOf(await pinDoc(h))
+    doc.error = new UniworkDocError('deleted')
+    expect(await h.manager.refresh('doc_1')).toMatchObject({ row: { state: 'deleted' } })
+    // still gone: the row stays deleted
+    expect(await h.manager.refresh('doc_1')).toMatchObject({ row: { state: 'deleted' } })
+    delete doc.error
+    expect(await h.manager.refresh('doc_1')).toMatchObject({
+      kind: 'ok',
+      row: { state: 'waiting-network' },
+    })
+    expect((await h.manager.onReconnect()).get('doc_1')).toMatchObject({
+      row: { state: 'ready', readyVersion: 1 },
+    })
+    expect(bytesOf(await h.manager.openCached('doc_1'))?.equals(Buffer.from(doc.bytes))).toBe(true)
+  })
+
+  it('a revoked row whose access is back downloads again ("Tải ngay"), with a fresh lease', async () => {
+    const h = createHarness()
+    const doc = addDoc(h, 'doc_1', 1)
+    rowOf(await pinDoc(h))
+    h.leases.states.set('doc_1', leaseState('revoked', null))
+    await h.manager.handleLeaseRevoked({
+      documentId: 'doc_1',
+      reason: 'permission_revoked',
+      deleteCommittedCache: true,
+      keepDrafts: true,
+    })
+    expect(await h.manager.row('doc_1')).toMatchObject({ state: 'revoked' })
+    expect(await h.manager.downloadNow('doc_1')).toMatchObject({
+      kind: 'ok',
+      row: { state: 'ready', readyVersion: 1 },
+    })
+    expect(h.leases.releases).toContain('doc_1')
+    expect(h.leases.grants).toEqual(['doc_1', 'doc_1'])
+    expect(bytesOf(await h.manager.openCached('doc_1'))?.equals(Buffer.from(doc.bytes))).toBe(true)
+  })
+
+  it('a waiting-network pin over the quota at reconnect is refused offline_cap_reached and not retried every pass', async () => {
+    const h = createHarness()
+    addDoc(h, 'doc_1', 1, 8192)
+    h.online.on = false
+    expect(rowOf(await pinDoc(h)).state).toBe('waiting-network')
+    // the library filled up while it waited (2 GiB declared by 8 other pins)
+    for (let index = 0; index < 8; index += 1) {
+      const held = { ...seedRow(`seed_${index}`, 256 * MiB), state: 'ready' as const }
+      expect((await h.store.putPin({ ...held, bytes: 256 * MiB })).kind).toBe('ok')
+    }
+    await h.store.writeIndex({
+      pins: ['doc_1', ...Array.from({ length: 8 }, (_, index) => `seed_${index}`)],
+      cleanup: {},
+    })
+    h.online.on = true
+    const first = await h.manager.onReconnect()
+    expect(first.get('doc_1')).toEqual({ kind: 'refused', code: 'offline_cap_reached' })
+    expect(await h.manager.row('doc_1')).toMatchObject({
+      state: 'interrupted',
+      failure: 'offline_cap_reached',
+    })
+    expect(h.docs.downloads).toEqual([])
+    // the next pass does not try it again
+    expect((await h.manager.onReconnect()).has('doc_1')).toBe(false)
+    // room made: "Thử lại" downloads it
+    expect(await h.manager.unpin('seed_0')).toMatchObject({ kind: 'unpinned' })
+    expect(await h.manager.downloadNow('doc_1')).toMatchObject({ row: { state: 'ready' } })
   })
 })
