@@ -40,6 +40,7 @@ export const it = {
   uwQueueCancel: 'Annulla salvataggio…',
   uwQueueCancelConfirm:
     'Annullare il salvataggio in coda? Le modifiche restano su questo computer; il documento su UniWork non cambia.',
+  uwQueueCancelGo: 'Annulla salvataggio',
   uwQueueCancelled: 'Salvataggio in coda annullato. Le modifiche restano su questo computer.',
 
   // {reason} fragments of the blocked/failed rows (the existing uwReason* keys stay in the uniwork-documents shard)
@@ -162,6 +163,7 @@ export const it = {
   uwSyncEmptyQueue: 'Nessun salvataggio in attesa.',
   uwSyncEmptyAttention: 'Niente da gestire.',
   uwSyncEmptyRecent: 'Nessun salvataggio recente.',
+  uwSyncActionFailed: 'Operazione non riuscita. Non è stato eliminato nulla; riprova.',
   uwSyncRowAnnounce: '{doc}: {state}',
 
   // S3 offline library

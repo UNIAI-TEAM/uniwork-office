@@ -35,6 +35,7 @@ export const cs = {
   uwQueueCancel: 'Zrušit uložení…',
   uwQueueCancelConfirm:
     'Zrušit uložení ve frontě? Změny zůstanou v tomto počítači; dokument v UniWork se nezmění.',
+  uwQueueCancelGo: 'Zrušit uložení',
   uwQueueCancelled: 'Uložení ve frontě bylo zrušeno. Změny zůstávají v tomto počítači.',
 
   // {reason} fragments of the blocked/failed rows (the existing uwReason* keys stay in the uniwork-documents shard)
@@ -155,6 +156,7 @@ export const cs = {
   uwSyncEmptyQueue: 'Nic nečeká na uložení.',
   uwSyncEmptyAttention: 'Nic nevyžaduje pozornost.',
   uwSyncEmptyRecent: 'Žádná nedávná uložení.',
+  uwSyncActionFailed: 'Nepodařilo se to. Nic nebylo smazáno; zkuste to znovu.',
   uwSyncRowAnnounce: '{doc}: {state}',
 
   // S3 offline library

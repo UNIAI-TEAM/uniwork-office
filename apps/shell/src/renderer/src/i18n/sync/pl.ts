@@ -36,6 +36,7 @@ export const pl = {
   uwQueueCancel: 'Anuluj zapis…',
   uwQueueCancelConfirm:
     'Anulować zapis w kolejce? Zmiany pozostają na tym komputerze; dokument w UniWork się nie zmieni.',
+  uwQueueCancelGo: 'Anuluj zapis',
   uwQueueCancelled: 'Anulowano zapis w kolejce. Zmiany pozostają na tym komputerze.',
 
   // {reason} fragments of the blocked/failed rows (the existing uwReason* keys stay in the uniwork-documents shard)
@@ -157,6 +158,7 @@ export const pl = {
   uwSyncEmptyQueue: 'Nic nie czeka na zapis.',
   uwSyncEmptyAttention: 'Nic nie wymaga uwagi.',
   uwSyncEmptyRecent: 'Brak ostatnich zapisów.',
+  uwSyncActionFailed: 'Nie udało się. Nic nie zostało usunięte; spróbuj ponownie.',
   uwSyncRowAnnounce: '{doc}: {state}',
 
   // S3 offline library
