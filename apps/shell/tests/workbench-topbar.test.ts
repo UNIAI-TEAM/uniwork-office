@@ -76,16 +76,23 @@ describe('WorkbenchTopBar', () => {
     )
   })
 
-  it('breadcrumb: workspace chip with its initial, "/", the title, then the role chip', async () => {
+  it('page head: the title, then the workspace chip with its initial, then the role chip', async () => {
     const p = props()
     await mount(p)
+    const header = host.querySelector('header.wb-topbar')!
+    expect(header.firstElementChild?.tagName).toBe('H1')
     const ws = host.querySelector('.wb-crumb-ws')!
+    expect(header.children[1]).toBe(ws)
     expect(ws.querySelector('.wb-crumb-mark')?.textContent).toBe('S')
     expect(ws.querySelector('.wb-crumb-name')?.textContent).toBe('Sales')
     expect(ws.querySelector('.wb-crumb-caret')?.classList.contains('is-muted')).toBe(false)
+    // the chevron is a drawn glyph, not a ▾ character
+    expect(ws.querySelector('.wb-crumb-caret svg')).not.toBeNull()
+    expect(host.textContent).not.toContain('▾')
+    expect(host.querySelector('.wb-crumb-sep')).toBeNull()
     expect(ws.querySelector(':scope > select[aria-label="Workspace"]')).not.toBeNull()
-    expect(host.querySelector('.wb-crumb-sep')?.textContent).toBe('/')
     const role = host.querySelector('.wb-crumb-role')!
+    expect(header.children[2]).toBe(role)
     expect(role.querySelector('.wb-crumb-name')?.textContent).toBe(p.practice.labelEn)
     expect(role.querySelector(':scope > select[aria-label="Role"]')).not.toBeNull()
     // the chips' visible text is decorative: the select carries the name and value
@@ -124,35 +131,39 @@ describe('WorkbenchTopBar', () => {
     expect(p.onSwitchPractice).toHaveBeenCalledWith('sales')
   })
 
-  it('signed out: no workspace chip and no separator, only the role chip', async () => {
+  it('signed out: no workspace chip, only the role chip', async () => {
     await mount(props({ workspaces: [], workspaceId: null }))
     expect(host.querySelector('select[aria-label="Workspace"]')).toBeNull()
     expect(host.querySelector('.wb-crumb-ws')).toBeNull()
-    expect(host.querySelector('.wb-crumb-sep')).toBeNull()
     expect(host.querySelector('.wb-crumb-role select[aria-label="Role"]')).not.toBeNull()
   })
 
-  it('+ New lists New task and the file types, and runs the chosen one', async () => {
+  it('New lists New task and the file types in the shared menu, and runs the chosen one', async () => {
     const p = props()
     await mount(p)
-    expect(button('+ New')!.className).toBe('wb-btn wb-btn-primary')
+    const newBtn = button('New')!
+    expect(newBtn.className).toBe('wb-btn wb-btn-primary')
+    // a plus and a chevron drawn as glyphs around the label, no "+" character
+    expect(newBtn.querySelectorAll('svg')).toHaveLength(2)
     expect(host.querySelector('[role="menu"]')).toBeNull()
-    act(() => button('+ New')!.click())
-    expect(host.querySelector('[role="menu"]')).not.toBeNull()
+    act(() => newBtn.click())
+    const menu = host.querySelector('[role="menu"]')!
+    expect(menu.className).toContain('wb-menu')
+    expect(document.activeElement?.textContent).toBe('New task')
     act(() => button('New document')!.click())
     expect(p.newItems[0]!.action).toHaveBeenCalledTimes(1)
     expect(host.querySelector('[role="menu"]')).toBeNull()
-    act(() => button('+ New')!.click())
+    act(() => newBtn.click())
     act(() => button('New task')!.click())
     expect(p.onNewTask).toHaveBeenCalledTimes(1)
   })
 
-  it('Refresh is an icon button named for screen readers and asks the page to reload', async () => {
+  it('Refresh is a bordered icon button named for screen readers and asks the page to reload', async () => {
     const p = props()
     await mount(p)
     const refresh = host.querySelector<HTMLButtonElement>('button[aria-label="Refresh"]')!
     expect(refresh.title).toBe('Refresh')
-    expect(refresh.className).toBe('wb-btn wb-btn-ghost wb-btn-icon')
+    expect(refresh.className).toBe('wb-btn wb-btn-secondary wb-btn-icon')
     expect(refresh.textContent).toBe('')
     act(() => refresh.click())
     expect(p.onRefresh).toHaveBeenCalledTimes(1)

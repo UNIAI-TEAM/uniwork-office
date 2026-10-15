@@ -23,9 +23,9 @@ describe('Workbench surfaces (redesign spec 2.2, 2.4, 5)', () => {
     expect(recased).toEqual([])
   })
 
-  it('recent-document meta is caption size (12px, spec 2.3)', () => {
+  it("a Desk document row's reason line is caption size (12px, spec 2.3)", () => {
     const sizes = workbenchRules()
-      .filter((r) => r.selector === '.wb-ov-recent-meta')
+      .filter((r) => r.selector === '.wb-desk-reason')
       .flatMap((r) => [...r.body.matchAll(/font-size:\s*([^;]+);/g)].map((m) => m[1]))
     expect(sizes).toEqual(['12px'])
   })
@@ -59,13 +59,13 @@ describe('Workbench surfaces (redesign spec 2.2, 2.4, 5)', () => {
     expect(src).not.toContain('wb-panel')
   })
 
-  it('pillar and module tabs use the Workbench buttons (the skill-confirm modal keeps .btn)', () => {
+  it('pillar and module tabs use the Workbench buttons, the skill confirm too (WbConfirm)', () => {
     const panes = readFileSync(join(SRC, 'WorkbenchModulePanes.tsx'), 'utf8')
     const notes = readFileSync(join(SRC, 'NotesPane.tsx'), 'utf8')
     const home = readFileSync(join(SRC, 'PracticeHome.tsx'), 'utf8')
     expect(panes).not.toMatch(/className="btn /)
     expect(notes).not.toMatch(/className="btn /)
-    expect(home.match(/className="btn /g)).toHaveLength(2)
+    expect(home).not.toMatch(/className="btn /)
     expect(home).not.toContain('wb-chip"')
   })
 })

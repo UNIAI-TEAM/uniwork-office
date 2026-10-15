@@ -8,10 +8,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkbenchModuleId } from '@uniwork/practice-core'
 
 const store = vi.hoisted(() => new Map<string, string>())
+const setRaw = vi.hoisted(() => vi.fn())
 vi.mock('../src/renderer/src/workbench-store-client', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../src/renderer/src/workbench-store-client')>()),
   wbStoreGetRaw: (key: string) => store.get(key) ?? null,
   wbStoreSetRaw: (key: string, value: string) => {
+    setRaw(key, value)
     store.set(key, value)
   },
   wbStoreRemove: (key: string) => {
@@ -22,25 +24,53 @@ vi.mock('../src/renderer/src/workbench-store-client', async (importOriginal) => 
     return raw === undefined ? fallback : (JSON.parse(raw) as T)
   },
   wbStoreWrite: (key: string, value: unknown) => {
+    setRaw(key, value)
     store.set(key, JSON.stringify(value))
   },
 }))
 
+import type { HomeApi } from '../src/shared/home-api'
+import type { UniworkWorkApi } from '../src/shared/uniwork-work-api'
 import { LocaleProvider } from '../src/renderer/src/locale'
+import { WbToastHost, createWbToasts } from '../src/renderer/src/WbToastHost'
 import { WorkbenchModulePane } from '../src/renderer/src/WorkbenchModulePanes'
-import { createStickyNote, writeForms } from '../src/renderer/src/workbench-pins'
+import { NOTE_WRITE_DELAY_MS } from '../src/renderer/src/NotesPane'
+import { editedWhen } from '../src/renderer/src/work-home'
+import {
+  createStickyNote,
+  readForms,
+  readStickyNotes,
+  writeForms,
+  writeStickyNotes,
+} from '../src/renderer/src/workbench-pins'
 
 const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 actEnvironment.IS_REACT_ACT_ENVIRONMENT = true
 
 let host: HTMLDivElement
 let root: Root
+let api: Record<string, ReturnType<typeof vi.fn>>
+// one toast store per test, kept across re-renders as PracticeHome keeps it across tab switches
+let toasts: ReturnType<typeof createWbToasts>
 
 beforeEach(() => {
   store.clear()
+  toasts = createWbToasts()
   host = document.createElement('div')
   document.body.append(host)
   root = createRoot(host)
+  api = {
+    newDoc: vi.fn(async () => undefined),
+    openPath: vi.fn(async () => undefined),
+    pickAttachments: vi.fn(async () => ({
+      accepted: [{ path: '/t/leave.docx', name: 'leave.docx', ext: '.docx' }],
+      rejected: [],
+    })),
+  }
+  window.aiOffice = api as unknown as HomeApi
+  window.uniworkWork = {
+    myProfile: vi.fn(async () => ({ ok: false, error: 'signed-out' })),
+  } as unknown as UniworkWorkApi
 })
 
 afterEach(() => {
@@ -48,81 +78,537 @@ afterEach(() => {
   host.remove()
 })
 
-async function mount(moduleId: WorkbenchModuleId, packId: string | null = null) {
+async function flush(): Promise<void> {
+  await act(async () => {
+    for (let i = 0; i < 6; i++) await Promise.resolve()
+  })
+}
+
+async function mount(
+  moduleId: WorkbenchModuleId,
+  over: { packId?: string | null; selectedPackId?: string | null } = {},
+) {
   await act(async () => {
     root.render(
       createElement(
         LocaleProvider,
         { initial: 'en' },
-        createElement(WorkbenchModulePane, {
-          moduleId,
-          practiceId: 'sales',
-          vi: false,
-          packId,
-          workspace: null,
-          workspaceError: null,
-          onReload: () => undefined,
-        }),
+        createElement(
+          WbToastHost,
+          { toasts },
+          createElement(WorkbenchModulePane, {
+            moduleId,
+            practiceId: 'sales',
+            vi: false,
+            packId: over.packId ?? null,
+            selectedPackId: over.selectedPackId ?? null,
+            packs: [{ id: 'p1', title: 'Q4 launch' }],
+            workspace: null,
+            workspaceError: null,
+            onReload: () => undefined,
+          }),
+        ),
       ),
     )
   })
 }
 
-describe('Forms tab (redesign spec 4.6)', () => {
-  it('one add row, a one-line hint, the empty state panel and no pill button', async () => {
+const button = (text: string) =>
+  Array.from(host.querySelectorAll<HTMLButtonElement>('button')).find((b) => b.textContent === text)
+const click = async (el: HTMLElement | null | undefined) => {
+  await act(async () => el!.click())
+  await flush()
+}
+const type = async (el: HTMLInputElement | HTMLTextAreaElement, value: string) => {
+  const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement : HTMLInputElement
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(proto.prototype, 'value')!.set!.call(el, value)
+    el.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+}
+const rowTitles = () =>
+  Array.from(host.querySelectorAll('.wb-forms-row .wb-forms-name')).map((n) => n.textContent)
+const openMenu = async (title: string) =>
+  click(host.querySelector<HTMLButtonElement>(`button[aria-label="More actions: ${title}"]`))
+const menuItem = (text: string) =>
+  Array.from(host.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')).find(
+    (b) => b.textContent === text,
+  )
+
+describe('Forms tab (redesign spec 4.4)', () => {
+  it('toolbar: the count, the local tag and a secondary Add a form; empty: the state panel', async () => {
     await mount('forms')
-    expect(host.querySelector('.wb-forms-hint')).not.toBeNull()
-    const add = host.querySelector('.wb-forms-add')!
-    expect(
-      Array.from(add.querySelectorAll('input')).map((i) => i.getAttribute('aria-label')),
-    ).toEqual(['Form title', 'Note (optional)'])
-    expect(add.querySelector('.wb-btn-secondary')?.textContent).toBe('Upload template file…')
-    expect(add.querySelector('.wb-btn-primary')?.textContent).toBe('Add to library')
-    expect(host.querySelector('.btn')).toBeNull()
-    expect(host.querySelector('.wb-state')?.textContent).toContain('No forms yet.')
+    expect(host.querySelector('.wb-toolbar-text')?.textContent).toBe('Forms: 0')
+    expect(host.querySelector('.wb-toolbar .wb-local-tag')).not.toBeNull()
+    const add = host.querySelector<HTMLButtonElement>('.wb-toolbar-actions button')!
+    expect(add.className).toBe('wb-btn wb-btn-secondary')
+    expect(add.textContent).toBe('Add a form')
+    expect(add.getAttribute('aria-expanded')).toBe('false')
+    expect(host.querySelector('form')).toBeNull()
+    expect(host.querySelector('.wb-state')?.textContent).toContain('No forms yet')
   })
 
-  it('a saved form is a list row; with no pack the hint shows beside the locked Draft, outside the hover-only actions', async () => {
+  it('Add a form opens the New form card: a real form, three fields, Add locked without a name', async () => {
+    await mount('forms')
+    await click(button('Add a form'))
+    const form = host.querySelector<HTMLFormElement>('form.wb-forms-new')!
+    expect(form.querySelector('h3')?.textContent).toBe('New form')
+    expect(Array.from(form.querySelectorAll('.wb-field-label')).map((l) => l.textContent)).toEqual([
+      'Form title *',
+      'Note (optional)',
+      'Template file',
+    ])
+    const submit = form.querySelector<HTMLButtonElement>('button[type="submit"]')!
+    expect(submit.textContent).toBe('Add to library')
+    expect(submit.disabled).toBe(true)
+    expect(
+      Array.from(form.querySelectorAll('.wb-forms-new-actions button')).map((b) => b.textContent),
+    ).toEqual(['Cancel', 'Add to library'])
+    // the title input has the focus, and Enter from the note field submits the form
+    const [title, note] = Array.from(form.querySelectorAll<HTMLInputElement>('input'))
+    expect(document.activeElement).toBe(title)
+    await type(title!, 'Leave request')
+    await type(note!, 'HR 2026')
+    expect(submit.disabled).toBe(false)
+    await act(async () => form.requestSubmit())
+    expect(host.querySelector('form.wb-forms-new')).toBeNull()
+    expect(rowTitles()).toEqual(['Leave request'])
+    expect(readForms('sales')[0]).toMatchObject({ title: 'Leave request', note: 'HR 2026' })
+  })
+
+  it('the template file row: upload names the form, then Change file', async () => {
+    await mount('forms')
+    await click(button('Add a form'))
+    await click(button('Upload template file…'))
+    expect(host.querySelector('.wb-forms-file-name')?.textContent).toBe('leave.docx')
+    expect(button('Change file')).toBeDefined()
+    expect(host.querySelector<HTMLInputElement>('form input')!.value).toBe('leave')
+  })
+
+  it('one banner with the pack chip; no per-row lock line; Draft is never locked (default pack)', async () => {
+    writeForms('sales', [{ id: 'f1', title: 'Leave request', note: 'HR' }])
+    await mount('forms', { packId: 'p-default' })
+    const banner = host.querySelector('.wb-forms-banner')!
+    expect(banner.textContent).toContain('Drafts from forms go to')
+    expect(banner.querySelector('select')?.getAttribute('aria-label')).toBe('Pack to draft into')
+    expect(banner.querySelector('.wb-crumb-name')?.textContent).toBe('Default project')
+    expect(banner.textContent).toContain('With no pack selected, they go to the Default project')
+    expect(host.querySelector('.wb-forms-locked')).toBeNull()
+    const draft = button('Draft')!
+    expect(draft.className).toBe('wb-btn wb-btn-secondary wb-btn-sm')
+    expect(draft.disabled).toBe(false)
+    await click(draft)
+    expect(api.newDoc).toHaveBeenCalledWith(expect.objectContaining({ projectId: 'p-default' }))
+    expect(readForms('sales')[0]!.linkedProjectId).toBe('p-default')
+  })
+
+  it('the banner names the default project only while no pack is selected', async () => {
+    writeForms('sales', [{ id: 'f1', title: 'Leave request' }])
+    await mount('forms', { packId: 'p1', selectedPackId: 'p1' })
+    const banner = host.querySelector('.wb-forms-banner')!
+    expect(banner.querySelector('.wb-crumb-name')?.textContent).toBe('Q4 launch')
+    expect(banner.textContent).not.toContain('With no pack selected')
+  })
+
+  it('a Draft that fails says so in an alert toast, and Retry drafts again', async () => {
+    writeForms('sales', [{ id: 'f1', title: 'Leave request' }])
+    api.newDoc!.mockRejectedValueOnce(new Error('disk full'))
+    await mount('forms', { packId: 'p1' })
+    await click(button('Draft'))
+    const toast = host.querySelector('.wb-toast')!
+    expect(toast.getAttribute('role')).toBe('alert')
+    expect(toast.textContent).toContain('Couldn’t draft from “Leave request”. disk full')
+    // a failed draft links nothing
+    expect(readForms('sales')[0]!.linkedProjectId).toBeUndefined()
+    await click(Array.from(toast.querySelectorAll('button')).find((b) => b.textContent === 'Retry'))
+    expect(api.newDoc).toHaveBeenCalledTimes(2)
+    expect(readForms('sales')[0]!.linkedProjectId).toBe('p1')
+  })
+
+  it('Draft with no pack at all still drafts, as a plain new document', async () => {
+    writeForms('sales', [{ id: 'f1', title: 'Leave request' }])
+    await mount('forms')
+    // no default project either: the banner says where a draft really goes
+    const banner = host.querySelector('.wb-forms-banner')!
+    expect(banner.querySelector('.wb-crumb-name')?.textContent).toBe('No pack selected')
+    expect(banner.textContent).toContain('With no pack selected, a draft is a document of its own')
+    expect(banner.textContent).not.toContain('Default project')
+    await click(button('Draft'))
+    expect(api.newDoc).toHaveBeenCalledWith(expect.objectContaining({ projectId: undefined }))
+  })
+
+  it('a row: badge, name and note, template file, Draft, then the more menu', async () => {
+    writeForms('sales', [
+      {
+        id: 'f1',
+        title: 'Leave request',
+        note: 'HR',
+        filePath: '/t/leave.docx',
+        fileName: 'leave.docx',
+        fileExt: '.docx',
+      },
+    ])
+    await mount('forms')
+    const row = host.querySelector('.wb-forms-list > li.wb-row.wb-forms-row')!
+    expect(Array.from(row.children).map((c) => c.className || c.tagName)).toEqual([
+      'IMG',
+      'wb-forms-text',
+      'wb-forms-file-cell',
+      'wb-btn wb-btn-secondary wb-btn-sm',
+      'wb-row-actions',
+    ])
+    expect(row.querySelector('.wb-forms-text')?.textContent).toBe('Leave requestHR')
+    expect(row.querySelector('.wb-forms-file-cell')?.textContent).toBe('leave.docx')
+    await openMenu('Leave request')
+    expect(
+      Array.from(host.querySelectorAll('[role="menuitem"]')).map((b) => b.textContent),
+    ).toEqual(['Open the source template', 'Edit name and note', 'Remove from library'])
+    await click(menuItem('Open the source template'))
+    expect(api.openPath).toHaveBeenCalledWith('/t/leave.docx')
+  })
+
+  it('Edit name and note opens the card filled in, and saving updates the row', async () => {
     writeForms('sales', [{ id: 'f1', title: 'Leave request', note: 'HR' }])
     await mount('forms')
-    const row = host.querySelector('.wb-block > li.wb-row')!
-    expect(row.querySelector('.wb-forms-text')?.textContent).toBe('Leave requestHR')
-    expect(row.querySelector(':scope > .wb-forms-locked')?.textContent).toBe(
-      'Select a Knowledge pack before drafting.',
-    )
-    expect(row.querySelector('.wb-row-actions .wb-forms-locked')).toBeNull()
-    expect(row.querySelector<HTMLButtonElement>('button[aria-label="Draft"]')!.disabled).toBe(true)
+    await openMenu('Leave request')
+    await click(menuItem('Edit name and note'))
+    const form = host.querySelector<HTMLFormElement>('form.wb-forms-new')!
+    expect(form.querySelector('h3')?.textContent).toBe('Edit form')
+    const [title] = Array.from(form.querySelectorAll<HTMLInputElement>('input'))
+    expect(title!.value).toBe('Leave request')
+    await type(title!, 'Annual leave')
+    await act(async () => form.requestSubmit())
+    expect(rowTitles()).toEqual(['Annual leave'])
+    expect(readForms('sales')).toHaveLength(1)
   })
 
-  it('with a pack selected, Draft is enabled and the hint is gone', async () => {
-    writeForms('sales', [{ id: 'f1', title: 'Leave request' }])
-    await mount('forms', 'p1')
-    expect(host.querySelector('.wb-forms-locked')).toBeNull()
-    expect(host.querySelector<HTMLButtonElement>('button[aria-label="Draft"]')!.disabled).toBe(
-      false,
-    )
+  it('Remove from library: gone at once, a toast with Undo puts it back where it was', async () => {
+    writeForms('sales', [
+      { id: 'a', title: 'A' },
+      { id: 'b', title: 'B' },
+      { id: 'c', title: 'C' },
+    ])
+    await mount('forms')
+    await openMenu('B')
+    await click(menuItem('Remove from library'))
+    expect(rowTitles()).toEqual(['A', 'C'])
+    expect(readForms('sales').map((f) => f.id)).toEqual(['a', 'c'])
+    expect(document.activeElement).toBe(host.querySelector('.wb-forms-list'))
+    const toast = host.querySelector('.wb-toast')!
+    expect(toast.textContent).toContain('Deleted “B”')
+    await click(Array.from(toast.querySelectorAll('button')).find((b) => b.textContent === 'Undo'))
+    expect(rowTitles()).toEqual(['A', 'B', 'C'])
+    expect(readForms('sales').map((f) => f.id)).toEqual(['a', 'b', 'c'])
+    expect(host.querySelector('.wb-toast')).toBeNull()
+  })
+
+  it('Undo after leaving the tab and coming back shows the form, and the next save keeps it', async () => {
+    writeForms('sales', [
+      { id: 'a', title: 'A' },
+      { id: 'b', title: 'B' },
+    ])
+    await mount('forms')
+    await openMenu('B')
+    await click(menuItem('Remove from library'))
+    await mount('notes')
+    await mount('forms')
+    expect(rowTitles()).toEqual(['A'])
+    const toast = host.querySelector('.wb-toast')!
+    await click(Array.from(toast.querySelectorAll('button')).find((b) => b.textContent === 'Undo'))
+    expect(rowTitles()).toEqual(['A', 'B'])
+    await openMenu('A')
+    await click(menuItem('Edit name and note'))
+    await type(host.querySelector<HTMLInputElement>('form input')!, 'A2')
+    await act(async () => host.querySelector('form')!.requestSubmit())
+    expect(readForms('sales').map((f) => f.title)).toEqual(['A2', 'B'])
   })
 })
 
-describe('Notes tab (redesign spec 4.7)', () => {
-  it('empty: the state panel and a primary Add note button', async () => {
+describe('Notes tab (redesign spec 4.5)', () => {
+  const composer = () => host.querySelector<HTMLTextAreaElement>('.wb-notes-composer textarea')!
+  const save = () => button('Save note')!
+  const key = (init: KeyboardEventInit) =>
+    act(async () => {
+      composer().dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true, ...init }),
+      )
+    })
+
+  it('toolbar count and local tag; the composer card with a locked Save note; the empty panel', async () => {
     await mount('notes')
-    expect(host.querySelector('.wb-notes-add .wb-btn-primary')?.textContent).toBe('Add note')
-    expect(host.querySelector('.wb-state')?.textContent).toContain('No notes yet.')
+    expect(host.querySelector('.wb-toolbar-text')?.textContent).toBe('Notes: 0')
+    expect(host.querySelector('.wb-toolbar .wb-local-tag')).not.toBeNull()
+    expect(composer().getAttribute('aria-label')).toBe('New note')
+    expect(host.querySelector('.wb-notes-composer-foot')?.textContent).toMatch(/↵ to save/)
+    expect(save().className).toBe('wb-btn wb-btn-primary wb-btn-sm')
+    expect(save().disabled).toBe(true)
+    expect(host.querySelector('.wb-state')?.textContent).toContain('No notes yet')
   })
 
-  it('a note is a list row with an edited caption; delete is a row action', async () => {
+  it('Ctrl/Cmd+Enter saves; Enter alone does not (it is a new line)', async () => {
+    await mount('notes')
+    await type(composer(), 'Call the notary')
+    expect(save().disabled).toBe(false)
+    await key({})
+    expect(readStickyNotes('sales')).toHaveLength(0)
+    await key({ ctrlKey: true })
+    expect(readStickyNotes('sales').map((n) => n.body)).toEqual(['Call the notary'])
+    expect(composer().value).toBe('')
+    await type(composer(), 'Book the room')
+    await key({ metaKey: true })
+    expect(readStickyNotes('sales')).toHaveLength(2)
+  })
+
+  it('⌘/Ctrl+Enter while an IME is composing does not save: the word is still being typed', async () => {
+    await mount('notes')
+    await type(composer(), 'gọi lại anh Tuấn')
+    await act(async () => {
+      const e = new KeyboardEvent('keydown', {
+        key: 'Enter',
+        ctrlKey: true,
+        bubbles: true,
+        cancelable: true,
+      })
+      Object.defineProperty(e, 'isComposing', { value: true })
+      composer().dispatchEvent(e)
+    })
+    expect(readStickyNotes('sales')).toHaveLength(0)
+    expect(composer().value).toBe('gọi lại anh Tuấn')
+  })
+
+  it('a clicked Save note keeps the focus in the composer, not <body>', async () => {
+    await mount('notes')
+    await type(composer(), 'Call the notary')
+    save().focus()
+    await click(save())
+    expect(readStickyNotes('sales')).toHaveLength(1)
+    expect(document.activeElement).toBe(composer())
+  })
+
+  it('half-written composer text survives a tab switch; saving it clears it', async () => {
+    await mount('notes')
+    await type(composer(), 'Line one\nline two')
+    await mount('forms')
+    await mount('notes')
+    expect(composer().value).toBe('Line one\nline two')
+    await key({ ctrlKey: true })
+    expect(readStickyNotes('sales').map((n) => n.body)).toEqual(['Line one\nline two'])
+    await mount('forms')
+    await mount('notes')
+    expect(composer().value).toBe('')
+  })
+
+  it('a copy the clipboard refuses says so in an alert toast; each card button names its note', async () => {
+    createStickyNote('sales', 'Call the notary')
+    const writeText = vi.fn(async () => {
+      throw new Error('denied')
+    })
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    await mount('notes')
+    const copy = host.querySelector<HTMLButtonElement>('.wb-note button[aria-label="Copy"]')!
+    const body = host.querySelector<HTMLTextAreaElement>('.wb-note textarea')!
+    expect(copy.getAttribute('aria-describedby')).toBe(body.id)
+    expect(body.getAttribute('aria-label')).toBe('Note 1')
+    await click(copy)
+    const toast = host.querySelector('.wb-toast')!
+    expect(toast.getAttribute('role')).toBe('alert')
+    expect(toast.textContent).toContain('Couldn’t copy the note')
+  })
+
+  it('a note is a card in the wall, edited in place and saved as you type', async () => {
     createStickyNote('sales', 'Call the notary')
     await mount('notes')
-    const row = host.querySelector('.wb-block > li.wb-row.wb-notes-card')!
-    expect(row.querySelector('textarea')?.value).toBe('Call the notary')
-    expect(row.querySelector('.wb-notes-edited')?.textContent).toMatch(/^Edited /)
-    await act(async () =>
-      row
-        .querySelector<HTMLButtonElement>('.wb-row-actions button[aria-label="Delete note"]')!
-        .click(),
+    const card = host.querySelector('.wb-notes-wall > li.wb-block.wb-note')!
+    const body = card.querySelector('textarea')!
+    expect(body.value).toBe('Call the notary')
+    expect(card.querySelector('.wb-note-foot .wb-row-sub')?.textContent).toMatch(
+      /^Edited \d\d:\d\d$/,
     )
-    expect(host.querySelector('.wb-notes-card')).toBeNull()
-    expect(host.querySelector('.wb-state')?.textContent).toContain('No notes yet.')
+    expect(
+      Array.from(card.querySelectorAll('.wb-note-actions button')).map((b) =>
+        b.getAttribute('aria-label'),
+      ),
+    ).toEqual(['Copy', 'Delete note'])
+    // each note its own name for a screen reader's field list
+    expect(body.getAttribute('aria-label')).toBe('Note 1')
+    await type(body, 'Call the notary at 4')
+    await act(async () => body.dispatchEvent(new FocusEvent('focusout', { bubbles: true })))
+    expect(readStickyNotes('sales')[0]!.body).toBe('Call the notary at 4')
+  })
+
+  it('typing writes the store once per pause, and at once on blur and on leaving the tab', async () => {
+    vi.useFakeTimers()
+    try {
+      createStickyNote('sales', 'Draft')
+      await mount('notes')
+      const notesWrites = () => setRaw.mock.calls.filter(([k]) => /stick/i.test(String(k))).length
+      const body = () => host.querySelector<HTMLTextAreaElement>('.wb-note textarea')!
+      setRaw.mockClear()
+      await type(body(), 'Draft 1')
+      await type(body(), 'Draft 12')
+      await type(body(), 'Draft 123')
+      // shown at once, nothing written yet
+      expect(body().value).toBe('Draft 123')
+      expect(notesWrites()).toBe(0)
+      await act(async () => vi.advanceTimersByTime(NOTE_WRITE_DELAY_MS))
+      expect(notesWrites()).toBe(1)
+      expect(readStickyNotes('sales')[0]!.body).toBe('Draft 123')
+
+      await type(body(), 'Draft 1234')
+      await act(async () => body().dispatchEvent(new FocusEvent('focusout', { bubbles: true })))
+      expect(notesWrites()).toBe(2)
+      expect(readStickyNotes('sales')[0]!.body).toBe('Draft 1234')
+
+      // leaving the tab before the pause ends still keeps the text
+      await type(body(), 'Draft 12345')
+      await mount('forms')
+      expect(readStickyNotes('sales')[0]!.body).toBe('Draft 12345')
+      expect(notesWrites()).toBe(3)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('Delete: gone at once, Undo in the toast puts it back where it was', async () => {
+    createStickyNote('sales', 'A')
+    createStickyNote('sales', 'B')
+    createStickyNote('sales', 'C')
+    const order = readStickyNotes('sales').map((n) => n.body)
+    writeStickyNotes('sales', readStickyNotes('sales'))
+    await mount('notes')
+    const bodies = () =>
+      Array.from(host.querySelectorAll<HTMLTextAreaElement>('.wb-note textarea')).map(
+        (t) => t.value,
+      )
+    expect(bodies()).toEqual(order)
+    const middle = host.querySelectorAll('.wb-note')[1]!
+    await click(middle.querySelector<HTMLButtonElement>('button[aria-label="Delete note"]'))
+    expect(bodies()).toEqual([order[0], order[2]])
+    expect(readStickyNotes('sales')).toHaveLength(2)
+    expect(document.activeElement).toBe(host.querySelector('.wb-notes-wall'))
+    const toast = host.querySelector('.wb-toast')!
+    expect(toast.textContent).toContain('Note deleted')
+    await click(Array.from(toast.querySelectorAll('button')).find((b) => b.textContent === 'Undo'))
+    expect(bodies()).toEqual(order)
+    expect(readStickyNotes('sales').map((n) => n.body)).toEqual(order)
+  })
+
+  const bodies = () =>
+    Array.from(host.querySelectorAll<HTMLTextAreaElement>('.wb-note textarea')).map((t) => t.value)
+  const cmdZ = (target: Element) =>
+    act(async () => {
+      target.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true }),
+      )
+    })
+
+  it('⌘/Ctrl+Z off the text fields runs the newest Undo still shown; in a note it is the text’s own', async () => {
+    createStickyNote('sales', 'A')
+    createStickyNote('sales', 'B')
+    createStickyNote('sales', 'C')
+    await mount('notes')
+    const del = (i: number) =>
+      click(
+        host.querySelectorAll<HTMLButtonElement>('.wb-note button[aria-label="Delete note"]')[i],
+      )
+    await del(0)
+    await del(0)
+    expect(bodies()).toEqual(['A'])
+    // the Undo toasts never run out: a keyboard user may take as long as they like
+    await act(async () => toasts.show({ message: { text: 'Copied' } }))
+    // in a note's textarea the shortcut is the browser's text undo
+    await cmdZ(host.querySelector('.wb-note textarea')!)
+    expect(bodies()).toEqual(['A'])
+    // on the wall: the newest delete (B) comes back first, then C
+    await cmdZ(host.querySelector('.wb-notes-wall')!)
+    expect(bodies()).toEqual(['B', 'A'])
+    await cmdZ(host.querySelector('.wb-notes-wall')!)
+    expect(bodies()).toEqual(['C', 'B', 'A'])
+    expect(host.querySelectorAll('.wb-toast')).toHaveLength(1)
+    // nothing left to undo: the key does nothing
+    await cmdZ(host.querySelector('.wb-notes-wall')!)
+    expect(bodies()).toEqual(['C', 'B', 'A'])
+  })
+
+  it('Undo writes a note’s pending typing first, then puts the deleted note back', async () => {
+    createStickyNote('sales', 'A')
+    createStickyNote('sales', 'B')
+    await mount('notes')
+    await click(host.querySelector<HTMLButtonElement>('.wb-note button[aria-label="Delete note"]'))
+    const left = host.querySelector<HTMLTextAreaElement>('.wb-note textarea')!
+    await type(left, 'A typed')
+    // the toast's Undo runs while the typing is still pending (no blur in between)
+    const undo = Array.from(host.querySelectorAll<HTMLButtonElement>('.wb-toast button')).find(
+      (b) => b.textContent === 'Undo',
+    )!
+    await act(async () => undo.click())
+    expect(bodies()).toEqual(['B', 'A typed'])
+    expect(readStickyNotes('sales').map((n) => n.body)).toEqual(['B', 'A typed'])
+  })
+
+  it('Undo after leaving the tab and coming back shows the note, and the next edit keeps it', async () => {
+    createStickyNote('sales', 'A')
+    createStickyNote('sales', 'B')
+    await mount('notes')
+    await click(host.querySelector<HTMLButtonElement>('.wb-note button[aria-label="Delete note"]'))
+    expect(bodies()).toEqual(['A'])
+    await mount('forms')
+    await mount('notes')
+    const toast = host.querySelector('.wb-toast')!
+    await click(Array.from(toast.querySelectorAll('button')).find((b) => b.textContent === 'Undo'))
+    expect(bodies()).toEqual(['B', 'A'])
+    const second = host.querySelectorAll<HTMLTextAreaElement>('.wb-note textarea')[1]!
+    await type(second, 'A!')
+    await act(async () => second.dispatchEvent(new FocusEvent('focusout', { bubbles: true })))
+    expect(readStickyNotes('sales').map((n) => n.body)).toEqual(['B', 'A!'])
+  })
+
+  it('a note written elsewhere appears while Notes is open; the note being typed in keeps its text', async () => {
+    createStickyNote('sales', 'Mine')
+    await mount('notes')
+    const mine = host.querySelector<HTMLTextAreaElement>('.wb-note textarea')!
+    mine.focus()
+    await type(mine, 'Mine, typing')
+    const id = readStickyNotes('sales')[0]!.id
+    await act(async () => {
+      // an agent write that also carries an older copy of the note being typed in
+      createStickyNote('sales', 'From the agent')
+      writeStickyNotes(
+        'sales',
+        readStickyNotes('sales').map((n) => (n.id === id ? { ...n, body: 'Mine' } : n)),
+      )
+    })
+    expect(bodies()).toEqual(['From the agent', 'Mine, typing'])
+    expect(document.activeElement).toBe(mine)
+  })
+})
+
+describe('editedWhen (the shared relative edit time)', () => {
+  const now = new Date(2026, 9, 15, 14, 0)
+  it('today: the time; yesterday: a word; older: day and month', () => {
+    expect(editedWhen(new Date(2026, 9, 15, 10, 42).toISOString(), 'vi', now)).toEqual({
+      key: 'wbEditedAt',
+      params: { time: '10:42' },
+    })
+    expect(editedWhen(new Date(2026, 9, 14, 23, 59).toISOString(), 'vi', now)).toEqual({
+      key: 'wbEditedYesterday',
+    })
+    expect(editedWhen(new Date(2026, 9, 13, 9, 0).toISOString(), 'vi', now)).toEqual({
+      key: 'wbEditedOn',
+      params: { date: '13/10' },
+    })
+    // the locale's order: month first in English
+    expect(editedWhen(new Date(2026, 9, 13, 9, 0).toISOString(), 'en-US', now).params).toEqual({
+      date: '10/13',
+    })
+  })
+
+  it('another year shows its year; an unreadable time is a dash, never a crash', () => {
+    expect(editedWhen(new Date(2025, 9, 13, 9, 0).toISOString(), 'vi', now)).toEqual({
+      key: 'wbEditedOn',
+      params: { date: '13/10/2025' },
+    })
+    expect(editedWhen('', 'vi', now)).toEqual({ key: 'wbEditedOn', params: { date: '—' } })
+    expect(editedWhen('not a date', 'en-US', now).params).toEqual({ date: '—' })
   })
 })

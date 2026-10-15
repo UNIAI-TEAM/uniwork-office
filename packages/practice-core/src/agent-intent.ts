@@ -89,7 +89,16 @@ const PILLARS: readonly PracticePillarId[] = ['knowledge', 'materials', 'skills'
 const MODULE_KEYWORDS: readonly { id: WorkbenchModuleId; keys: readonly string[] }[] = [
   {
     id: 'desk',
-    keys: ['tổng quan', 'overview', 'my space', 'không gian', 'myspace', 'desk', 'bàn cá nhân'],
+    keys: [
+      'mặt bàn',
+      'tổng quan',
+      'overview',
+      'my space',
+      'không gian',
+      'myspace',
+      'desk',
+      'bàn cá nhân',
+    ],
   },
   { id: 'calendar', keys: ['lịch', 'calendar', 'hẹn', 'deadline', 'cuộc họp'] },
   { id: 'tasks', keys: ['công việc', 'tasks', 'todo', 'việc cần', 'to-do', 'task'] },

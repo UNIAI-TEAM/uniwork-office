@@ -71,6 +71,7 @@ export interface AttachmentImageResult {
 }
 import type { AiPanelPrefs } from '@genoffice/ui/ai-panel-prefs'
 import type { FileExcerpt } from './file-excerpt'
+import type { DocumentTabKind } from './tabs-api'
 
 /** UI language; kept self-contained here (mirrors Lang in @genoffice/i18n) */
 
@@ -539,6 +540,42 @@ export interface AiConnectionTestResult {
   errorKind?: AiTestFailureKind
 }
 
+/** Desk "In progress": an open tab with unsaved changes, or a crash copy newer than its recent file */
+export interface DeskDraft {
+  kind: 'unsaved' | 'recovery'
+  title: string
+  app: DocumentTabKind
+  /** absent for an untitled unsaved tab */
+  filePath?: string
+  /** the tab to switch to ('unsaved' only; 'detached:<n>' for a detached window) */
+  tabId?: string
+  /** when the crash copy was written ('recovery' only) */
+  modifiedMs?: number
+}
+
+export type DeskToolId =
+  'pdf-to-docx' | 'pdf-to-xlsx' | 'pdf-to-pptx' | 'export-pdf' | 'merge-pdf' | 'split-pdf'
+
+/** what Export PDF takes: the inputs headlessModuleFor (electron-utils) routes to an editor */
+export const DESK_EXPORTABLE = /\.(docx|xlsx|xlsm|xls|csv|tsv|pptx|md|markdown|html|htm)$/i
+
+export interface DeskToolRequest {
+  tool: DeskToolId
+  /** absolute paths (a drop); absent = main asks with a file picker */
+  inputs?: string[]
+  /** split-pdf: pages per part, 1-999 (default 1) */
+  splitEvery?: number
+}
+
+export type DeskToolResult =
+  | { ok: true; outputs: string[] }
+  | { ok: false; canceled: true }
+  | {
+      ok: false
+      error:
+        'busy' | 'bad-input' | 'not-found' | 'same-path' | 'target-open' | 'encrypted' | 'failed'
+    }
+
 export interface HomeApi {
   /** unified recents across document types, newest first (paged) */
   recents(query?: RecentQuery): Promise<RecentPage>
@@ -604,6 +641,10 @@ export interface HomeApi {
   unstarPaths(paths: string[]): Promise<void>
   /** reveal the file in Finder / Explorer */
   revealPath(path: string): Promise<void>
+  /** Desk: open tabs with unsaved changes, then crash copies newer than a recent file that is not open */
+  listDrafts(): Promise<DeskDraft[]>
+  /** Desk tools: one conversion; pickers and save dialogs happen in main */
+  runDeskTool(req: DeskToolRequest): Promise<DeskToolResult>
   /** rename the file on disk (same directory) and update the recent list */
   renameFile(path: string, newName: string): Promise<RenameResult>
   /** copy the file next to itself (localized "copy" suffix before .ext) and record it as recent */
@@ -1274,6 +1315,8 @@ export const HOME_CHANNELS = {
   newPdf: 'home:new-pdf',
   removeRecent: 'home:remove-recent',
   revealPath: 'home:reveal-path',
+  listDrafts: 'home:list-drafts',
+  runDeskTool: 'home:run-desk-tool',
   renameFile: 'home:rename-file',
   duplicateFile: 'home:duplicate-file',
   deleteFiles: 'home:delete-files',

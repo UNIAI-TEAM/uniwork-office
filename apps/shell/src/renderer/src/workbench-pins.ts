@@ -190,11 +190,21 @@ export function readStickyNotes(_practiceId: PracticeId): WbStickyNote[] {
   }
 }
 
+/** Fired on window after every notes / forms write, so a mounted pane re-reads storage. */
+export const WB_NOTES_CHANGED = 'wb-notes-changed'
+export const WB_FORMS_CHANGED = 'wb-forms-changed'
+
+// the keys are device-wide (practiceId is unused), so the signal is too
+const notifyChanged = (event: string) => {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(event))
+}
+
 export function writeStickyNotes(_practiceId: PracticeId, items: WbStickyNote[]): void {
   writeJson(
     STICKIES_KEY,
     items.map((n) => normalizeStickyNote(n)),
   )
+  notifyChanged(WB_NOTES_CHANGED)
 }
 
 export function createStickyNote(
@@ -267,4 +277,5 @@ export function readForms(_practiceId: PracticeId): WbFormItem[] {
 
 export function writeForms(_practiceId: PracticeId, items: WbFormItem[]): void {
   writeJson(FORMS_KEY, items)
+  notifyChanged(WB_FORMS_CHANGED)
 }
