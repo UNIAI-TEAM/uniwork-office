@@ -64,6 +64,7 @@ import {
 import type { AiPageSetupAccess } from './page-setup'
 import type { AiNotesAccess } from './note-ops'
 import { createDocsSkill, type AiDocProtection } from './docs-skill'
+import { aiTrackFor, aiTracksChanges } from './track-policy'
 import { MindMapCard } from './MindMapCard'
 import {
   buildDocWriterRequest,
@@ -922,8 +923,7 @@ export function AiPanel({
       ordered: findNumId(blocksRef.current, 'ordered') ?? numIdFallbackRef.current?.ordered ?? null,
     })
     // tracked-changes protection forces the recorder on, whatever the panel toggle says
-    const aiTracksChanges = () =>
-      trackChangesRef.current || protectionRef.current === 'trackedChanges'
+    const tracks = () => aiTracksChanges(trackChangesRef.current, protectionRef.current)
     loopRef.current = new AgentLoop<AiRunSnapshot>({
       transport: transportRef.current,
       systemSuffix: aiLangDirective,
@@ -931,7 +931,7 @@ export function AiPanel({
         createDocsSkill(
           () => editorRef.current,
           numIds,
-          () => (aiTracksChanges() ? { author: AI_REVISION_AUTHOR } : undefined),
+          () => aiTrackFor(trackChangesRef.current, protectionRef.current, AI_REVISION_AUTHOR),
           () => commentsAccessRef.current,
           () => hfAccessRef.current,
           () => imageGenerationAvailable(settingsRef.current, gskLoggedInRef.current),
@@ -982,7 +982,7 @@ export function AiPanel({
           if (execution.mutated) {
             // tracking off: accept immediately (same tick, so the yellow never paints);
             // tracking on: revisions stay pending, handled in the Review tab
-            if (!aiTracksChanges()) clearAiHighlights(true)
+            if (!tracks()) clearAiHighlights(true)
           }
           // mind maps ride the UI-only display side channel onto the message
           const display = execution.display

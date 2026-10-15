@@ -82,6 +82,9 @@ export function aiProtectionOf(
   if (writeLocked) return 'readOnly'
   if (!protection?.enforced) return 'none'
   switch (protection.edit) {
+    case 'none':
+      // "no editing restriction": the app keeps the document editable, so the AI may edit too
+      return 'none'
     case 'comments':
     case 'forms':
     case 'trackedChanges':
@@ -94,8 +97,40 @@ export function aiProtectionOf(
 
 /** a comments-only document still lets the agent leave comments */
 const COMMENT_ONLY_TOOLS: ReadonlySet<string> = new Set(['add_comment', 'reply_comment'])
-/** tracked-changes protection: Word locks accept/reject while it is on */
-const TRACKED_HIDDEN_TOOLS: ReadonlySet<string> = new Set(['accept_changes', 'reject_changes'])
+/**
+ * Tracked-changes protection: Word locks accept/reject while it is on, and the
+ * AI may only use write tools that record a tracked revision. These write tools
+ * take no `track` (side state, notes, charts, pictures, floating objects), so
+ * they would land untracked: hidden and refused, the same safe reading as a
+ * locked body. Comment tools stay (a comment is not a revision; Word allows them).
+ */
+const TRACKED_HIDDEN_TOOLS: ReadonlySet<string> = new Set([
+  'accept_changes',
+  'reject_changes',
+  'set_header_footer',
+  'set_page_setup',
+  'insert_section_break',
+  'define_style',
+  'set_watermark',
+  'insert_footnote',
+  'insert_endnote',
+  'edit_note',
+  'delete_note',
+  'insert_chart',
+  'edit_chart',
+  'insert_text_box',
+  'insert_image',
+  'insert_picture',
+  'generate_image',
+])
+
+/** the protection in plain words, for the text the model reads */
+const PROTECTION_WORDS: Record<Exclude<AiDocProtection, 'none'>, string> = {
+  readOnly: 'read only',
+  forms: 'forms only',
+  comments: 'comments only',
+  trackedChanges: 'tracked changes',
+}
 
 /** whether the protection forbids this tool */
 function protectionBlocks(kind: AiDocProtection, tool: string): boolean {
@@ -113,12 +148,12 @@ const PROTECTION_NOTES: Record<Exclude<AiDocProtection, 'none'>, string> = {
   comments:
     '\n\nNote: this document is protected so that only comments are allowed. You can read it and add or reply to comments, but you must not change its text: no editing tool is available, so tell the user it is protected instead of attempting it.',
   trackedChanges:
-    '\n\nNote: this document is protected so that every change must be tracked. Your edits are recorded as tracked changes; you cannot accept or reject changes, leave that to the user.',
+    '\n\nNote: this document is protected so that every change must be tracked. Your edits are recorded as tracked changes; you cannot accept or reject changes, and the tools that cannot record a tracked change (headers and footers, page setup, section breaks, styles, watermarks, notes, charts, pictures, text boxes) are not available, so tell the user instead of attempting them.',
 }
 
 function refuseProtected(tool: string, kind: AiDocProtection): ToolExecution {
   return {
-    output: `${tool} is unavailable: this document is protected (${kind}) and the protection does not allow it.`,
+    output: `${tool} is unavailable: this document is protected (${kind === 'none' ? 'no restriction' : PROTECTION_WORDS[kind]}) and the protection does not allow it.`,
     isError: true,
     mutated: false,
     summary: tool.replace(/[_-]+/g, ' '),
