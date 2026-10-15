@@ -28,6 +28,11 @@ export interface UniworkDocumentPolicy {
    * neutral constant). Absent = neutral constant; never the OS account name.
    */
   commentAuthor?(path: string): string
+  /**
+   * G5-11: consumes a one-shot capture request for `path` so a main-triggered
+   * save writes the working copy to disk without firing the user-save hook.
+   */
+  consumeCapture?(path: string): boolean
 }
 
 let policy: UniworkDocumentPolicy | null = null
@@ -135,9 +140,10 @@ export function notifyUniworkUserSave(path: string): void {
  * close-guard Save) onto the document's own path. `auto`: the module's file
  * autosave or another silent in-place save. `save-as` / `save-new` / `mcp`:
  * writes that land on a path chosen by a dialog, the default folder or an
- * MCP caller.
+ * MCP caller. `capture`: sign-out working-copy flush to disk without firing
+ * the user-save hook.
  */
-export type UniworkSaveOrigin = 'user' | 'auto' | 'save-as' | 'save-new' | 'mcp'
+export type UniworkSaveOrigin = 'user' | 'auto' | 'save-as' | 'save-new' | 'mcp' | 'capture'
 
 export interface UniworkSaveDecision {
   /** false: refuse the save, no bytes written */
@@ -145,6 +151,15 @@ export interface UniworkSaveDecision {
   /** true: call notifyUniworkUserSave(targetPath) once the write succeeded */
   fireHook: boolean
   reason?: 'uniwork-read-only' | 'uniwork-bound'
+}
+
+function consumeCaptureFor(path: string | null | undefined): boolean {
+  if (!path || !policy?.consumeCapture) return false
+  try {
+    return policy.consumeCapture(path) === true
+  } catch {
+    return false
+  }
 }
 
 /**
@@ -157,13 +172,15 @@ export function uniworkSaveDecision(
   origin: UniworkSaveOrigin,
   targetPath: string | null | undefined,
 ): UniworkSaveDecision {
+  const effectiveOrigin: UniworkSaveOrigin =
+    origin === 'user' && consumeCaptureFor(targetPath) ? 'capture' : origin
   if (uniworkIsReadOnly(targetPath)) {
     return { write: false, fireHook: false, reason: 'uniwork-read-only' }
   }
-  if (origin === 'auto' && uniworkIsBound(targetPath)) {
+  if (effectiveOrigin === 'auto' && uniworkIsBound(targetPath)) {
     return { write: false, fireHook: false, reason: 'uniwork-bound' }
   }
-  return { write: true, fireHook: origin === 'user' }
+  return { write: true, fireHook: effectiveOrigin === 'user' }
 }
 
 /** What the renderer needs to know about its document (disable autosave / editing). */

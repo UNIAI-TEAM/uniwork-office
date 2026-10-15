@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type {
-  AccountErrorCode,
-  AccountSetServerResult,
-  AccountProfile,
-  AccountState,
-  AccountStatus,
+import {
+  SIGN_OUT_RECEIPT_WAIT_MS,
+  type AccountErrorCode,
+  type AccountSetServerResult,
+  type AccountProfile,
+  type AccountState,
+  type AccountStatus,
+  type SignOutPlan,
 } from '../../shared/home-api'
 import type { StringKey } from './locale'
 
@@ -106,6 +108,32 @@ export function initialsOf(profile: AccountProfile | undefined, email = ''): str
   return mail ? (Array.from(mail)[0] ?? '?').toUpperCase() : '?'
 }
 
+/** whether signing out needs confirmation (S3): unsent saves or RAM-only working copies */
+export function signOutNeedsPrompt(plan: SignOutPlan): boolean {
+  return plan.count > 0 || plan.ramOnly > 0
+}
+
+/** whether the sign-out prompt shows the keychain warning variant (danger button + uwSignOutKeystore) */
+export function signOutIsKeystoreVariant(plan: SignOutPlan): boolean {
+  return plan.keystoreLocked && plan.ramOnly > 0
+}
+
+/** two switch notices shown as one: what was lost across both accounts */
+function addNoticePlans(a: SignOutPlan, b: SignOutPlan): SignOutPlan {
+  return {
+    count: a.count + b.count,
+    waiting: a.waiting + b.waiting,
+    keystoreLocked: a.keystoreLocked || b.keystoreLocked,
+    ramOnly: a.ramOnly + b.ramOnly,
+  }
+}
+
+/**
+ * FE d1-n1 / d2-2: safety ceiling (SIGN_OUT_RECEIPT_WAIT_MS + 10_000) so a missing
+ * `done` push after confirming sign-out never leaves the renderer stuck waiting.
+ */
+export const SIGN_OUT_WAIT_SAFETY_MS = SIGN_OUT_RECEIPT_WAIT_MS + 10_000
+
 export interface AccountController {
   status: AccountStatus | null
   view: AccountView
@@ -122,11 +150,26 @@ export interface AccountController {
   orgSwitchFailed: boolean
   /** the last typed server address failed (null once one is accepted) */
   connectError: ServerConnectError | null
+  /** S3 sign-out confirmation plan when a prompt is open */
+  signOutPrompt?: SignOutPlan | null
+  /**
+   * Q2 = a: after an account switch locked the previous account, the plan of
+   * what RAM-only content of it was lost (one acknowledge button, no cancel)
+   */
+  signOutNotice?: SignOutPlan | null
+  /** true while main is waiting for an in-flight save before finishing sign-out */
+  signOutWaiting?: boolean
+  /** d1-2: true after a sign-out whose done event reported captureFailed > 0 */
+  signOutCaptureFailed?: boolean
   signIn(): void
   cancelSignIn(): void
   openLoginUrl(): void
   copyLoginUrl(): void
   signOut(): void
+  confirmSignOut?(): void
+  cancelSignOut?(): void
+  /** closes the switch notice and answers its request once */
+  acknowledgeSignOutNotice?(): void
   retry(): void
   selectOrg(orgId: string): void
   /** connect to the server at a typed address; main validates it and saves the profile */
@@ -139,7 +182,8 @@ export interface AccountController {
  * Account state for the sidebar entry and Settings → Account. Main pushes every
  * state change (onAccountStatus); the initial value comes from accountStatus().
  */
-export function useAccount(): AccountController {
+export function useAccount(options?: { ownsSignOutPrompt?: boolean }): AccountController {
+  const ownsSignOutPrompt = options?.ownsSignOutPrompt ?? false
   const [status, setStatus] = useState<AccountStatus | null>(null)
   // click → accountLogin() resolved: main has not reported signing-in yet
   const [launching, setLaunching] = useState(false)
@@ -150,6 +194,10 @@ export function useAccount(): AccountController {
   const [orgSwitchFailed, setOrgSwitchFailed] = useState(false)
   const [connectError, setConnectError] = useState<ServerConnectError | null>(null)
   const [callbackNotice, setCallbackNotice] = useState(false)
+  const [signOutPrompt, setSignOutPrompt] = useState<SignOutPlan | null>(null)
+  const [signOutNotice, setSignOutNotice] = useState<SignOutPlan | null>(null)
+  const [signOutWaiting, setSignOutWaiting] = useState(false)
+  const [signOutCaptureFailed, setSignOutCaptureFailed] = useState(false)
   const noticeTimer = useRef<number | null>(null)
   // bumped on sign-out so an in-flight status read (which can still report
   // signed-in) is discarded instead of resurrecting the profile
@@ -157,7 +205,21 @@ export function useAccount(): AccountController {
   // set when main reported why the current sign-in failed (more specific than `launch`)
   const loginErrorSeen = useRef(false)
   const copiedTimer = useRef<number | null>(null)
+  const waitTimer = useRef<number | null>(null)
   const retrying = useRef(false)
+  const signingOut = useRef(false)
+  const logoutInFlight = useRef(false)
+  const waitingForDone = useRef(false)
+  const promptReqId = useRef<string | null>(null)
+  // every switch notice not acknowledged yet: one acknowledge answers them all
+  const noticeReqIds = useRef<string[]>([])
+
+  const clearWaitTimer = useCallback(() => {
+    if (waitTimer.current !== null) {
+      window.clearTimeout(waitTimer.current)
+      waitTimer.current = null
+    }
+  }, [])
 
   const apply = useCallback((next: AccountStatus) => {
     setStatus(next)
@@ -166,7 +228,10 @@ export function useAccount(): AccountController {
       setLoginUrl(null)
       setCallbackNotice(false)
     }
-    if (state === 'signed-in' || state === 'refreshing') setLocalError(null)
+    if (state === 'signed-in' || state === 'refreshing') {
+      setLocalError(null)
+      setSignOutCaptureFailed(false)
+    }
   }, [])
 
   const refresh = useCallback(() => {
@@ -178,6 +243,23 @@ export function useAccount(): AccountController {
       })
       .catch(() => undefined)
   }, [apply])
+
+  const startWaitTimer = useCallback(() => {
+    clearWaitTimer()
+    waitTimer.current = window.setTimeout(() => {
+      waitTimer.current = null
+      waitingForDone.current = false
+      setSignOutWaiting(false)
+      // FE d2-1: when renderer-initiated accountLogout() is still in flight, only clear
+      // the waiting UI; leave busy/signingOut/signOutPrompt/refresh to runLogout's finally.
+      if (!logoutInFlight.current) {
+        signingOut.current = false
+        setBusy(null)
+        setSignOutPrompt(null)
+        refresh()
+      }
+    }, SIGN_OUT_WAIT_SAFETY_MS)
+  }, [clearWaitTimer, refresh])
 
   useEffect(() => {
     refresh()
@@ -203,13 +285,65 @@ export function useAccount(): AccountController {
         setLocalError(ev.error ?? 'server_error')
       }
     })
+    const offProgress = ownsSignOutPrompt
+      ? window.aiOffice.onSignOutProgress?.((p) => {
+          if (p.phase === 'waiting') {
+            waitingForDone.current = true
+            setSignOutWaiting(true)
+            startWaitTimer()
+          } else if (p.phase === 'done') {
+            clearWaitTimer()
+            waitingForDone.current = false
+            setSignOutWaiting(false)
+            setSignOutPrompt(null)
+            setSignOutCaptureFailed((p.captureFailed ?? 0) > 0)
+            // FE d1-n2: keep busy/signingOut while a renderer-initiated accountLogout() is still in flight
+            if (!logoutInFlight.current) {
+              signingOut.current = false
+              setBusy(null)
+              refresh()
+            }
+          }
+        })
+      : undefined
+    const offPrompt = ownsSignOutPrompt
+      ? window.aiOffice.onSignOutPrompt?.((req) => {
+          if (req.mode === 'notice') {
+            // the switch already happened: nothing to confirm, and an open
+            // sign-out prompt of this account is left as it is. A notice that
+            // arrives before the last one is acknowledged adds to it, so no
+            // account's loss goes unreported.
+            noticeReqIds.current.push(req.requestId)
+            setSignOutNotice((open) => (open ? addNoticePlans(open, req.plan) : req.plan))
+            return
+          }
+          if (promptReqId.current !== null) {
+            const stale = promptReqId.current
+            promptReqId.current = null
+            void window.aiOffice.answerSignOutPrompt?.(stale, false)
+          }
+          clearWaitTimer()
+          promptReqId.current = req.requestId
+          waitingForDone.current = false
+          setSignOutWaiting(false)
+          setSignOutPrompt(req.plan)
+        })
+      : undefined
     return () => {
       offStatus?.()
       offLogin?.()
+      offProgress?.()
+      offPrompt?.()
+      if (promptReqId.current !== null) {
+        const stale = promptReqId.current
+        promptReqId.current = null
+        void window.aiOffice.answerSignOutPrompt?.(stale, false)
+      }
+      clearWaitTimer()
       if (copiedTimer.current !== null) window.clearTimeout(copiedTimer.current)
       if (noticeTimer.current !== null) window.clearTimeout(noticeTimer.current)
     }
-  }, [apply, refresh])
+  }, [apply, clearWaitTimer, ownsSignOutPrompt, refresh, startWaitTimer])
 
   const mainState = status ? viewOf(status) : null
   const view: AccountView =
@@ -221,6 +355,7 @@ export function useAccount(): AccountController {
 
   const signIn = () => {
     setLocalError(null)
+    setSignOutCaptureFailed(false)
     setCallbackNotice(false)
     setLoginUrl(null)
     setUrlCopied(false)
@@ -264,18 +399,101 @@ export function useAccount(): AccountController {
       .catch(() => undefined)
   }
 
-  const signOut = () => {
+  const runLogout = () => {
+    if (signingOut.current) return
+    signingOut.current = true
+    logoutInFlight.current = true
     seq.current++
     setBusy('signing-out')
     void window.aiOffice
-      .accountLogout()
+      .accountLogout({ confirmed: true })
       .catch(() => undefined)
       .finally(() => {
+        clearWaitTimer()
+        logoutInFlight.current = false
+        waitingForDone.current = false
+        signingOut.current = false
+        setSignOutWaiting(false)
+        setSignOutPrompt(null)
         setBusy(null)
         setLocalError(null)
         // main pushes the new state too; this covers a push that raced the logout
         refresh()
       })
+  }
+
+  const signOut = () => {
+    if (signingOut.current) return
+    const planFn = window.aiOffice.signOutPlan
+    if (!planFn) {
+      runLogout()
+      return
+    }
+    void planFn()
+      .then((plan) => {
+        if (!plan || !signOutNeedsPrompt(plan)) {
+          runLogout()
+          return
+        }
+        if (promptReqId.current !== null) {
+          const stale = promptReqId.current
+          promptReqId.current = null
+          void window.aiOffice.answerSignOutPrompt?.(stale, false)
+        }
+        waitingForDone.current = false
+        setSignOutWaiting(false)
+        setSignOutPrompt(plan)
+      })
+      .catch(() => {
+        runLogout()
+      })
+  }
+
+  const confirmSignOut = () => {
+    if (signingOut.current || signOutWaiting) return
+    if (promptReqId.current !== null) {
+      const reqId = promptReqId.current
+      promptReqId.current = null
+      signingOut.current = true
+      setBusy('signing-out')
+      if ((signOutPrompt?.waiting ?? 0) > 0) {
+        waitingForDone.current = true
+        setSignOutWaiting(true)
+        startWaitTimer()
+      }
+      void Promise.resolve(window.aiOffice.answerSignOutPrompt?.(reqId, true))
+        .catch(() => undefined)
+        .finally(() => {
+          if (waitingForDone.current) return
+          clearWaitTimer()
+          signingOut.current = false
+          setBusy(null)
+          setSignOutWaiting(false)
+          setSignOutPrompt(null)
+        })
+      return
+    }
+    runLogout()
+  }
+
+  const cancelSignOut = () => {
+    if (signingOut.current || signOutWaiting) return
+    if (promptReqId.current !== null) {
+      const reqId = promptReqId.current
+      promptReqId.current = null
+      void window.aiOffice.answerSignOutPrompt?.(reqId, false)
+    }
+    clearWaitTimer()
+    waitingForDone.current = false
+    setSignOutPrompt(null)
+    setSignOutWaiting(false)
+  }
+
+  const acknowledgeSignOutNotice = () => {
+    const reqIds = noticeReqIds.current
+    noticeReqIds.current = []
+    for (const reqId of reqIds) void window.aiOffice.answerSignOutPrompt?.(reqId, true)
+    setSignOutNotice(null)
   }
 
   const retry = () => {
@@ -332,11 +550,18 @@ export function useAccount(): AccountController {
     busy,
     orgSwitchFailed,
     connectError,
+    signOutPrompt,
+    signOutNotice,
+    signOutWaiting,
+    signOutCaptureFailed,
     signIn,
     cancelSignIn,
     openLoginUrl: () => void window.aiOffice.openLoginUrl?.(),
     copyLoginUrl,
     signOut,
+    confirmSignOut,
+    cancelSignOut,
+    acknowledgeSignOutNotice,
     retry,
     selectOrg,
     connectServer,

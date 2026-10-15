@@ -1,7 +1,8 @@
 import { Dropdown } from '@genoffice/ui'
-import type { ReactNode } from 'react'
+import { useRef, type ReactNode } from 'react'
 import { OrgChoiceStep } from './OrgChoiceStep'
 import { ServerConnect } from './ServerConnect'
+import { SignOutPrompt } from './SignOutPrompt'
 import { useI18n } from './locale'
 import type { StringKey } from './locale'
 import {
@@ -73,6 +74,9 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 export function AccountPane({ account }: { account: AccountController }) {
   const { t } = useI18n()
   const { status, view, error, busy } = account
+  const signOutPrompt = account.signOutPrompt ?? null
+  const signOutBtnRef = useRef<HTMLButtonElement>(null)
+
   const profile = status?.profile
   const email = profile?.email || status?.email || ''
   const name = displayNameOf(status)
@@ -92,6 +96,7 @@ export function AccountPane({ account }: { account: AccountController }) {
 
   const signOutBtn = (
     <button
+      ref={signOutBtnRef}
       type="button"
       className="set-btn danger"
       disabled={busy === 'signing-out'}
@@ -234,6 +239,14 @@ export function AccountPane({ account }: { account: AccountController }) {
         </div>
       )}
 
+      {account.signOutCaptureFailed && (
+        <div className="acct-notice info" role="status" aria-live="polite">
+          <div className="acct-notice-text">
+            <div className="acct-notice-body">{t('uwSignOutCaptureFailed')}</div>
+          </div>
+        </div>
+      )}
+
       {withProfile && orgChoice.loadError && (
         <div className="acct-notice warn uw-org-error" role="alert">
           <div className="acct-notice-text">
@@ -242,7 +255,7 @@ export function AccountPane({ account }: { account: AccountController }) {
           {retryBtn}
         </div>
       )}
-      {withProfile && !orgChoice.loadError && orgChoice.needed && (
+      {withProfile && !orgChoice.loadError && orgChoice.needed && !signOutPrompt && (
         <OrgChoiceStep
           orgs={orgChoice.rows}
           rememberedGone={orgChoice.rememberedGone}
@@ -306,8 +319,11 @@ export function AccountPane({ account }: { account: AccountController }) {
           unreachableServer={unreachable ? server : null}
         />
       )}
-      {/* the organization step carries its own Sign out */}
-      {actions && !(withProfile && orgChoice.needed && !orgChoice.loadError) && (
+
+      <SignOutPrompt account={account} returnFocusRef={signOutBtnRef} />
+
+      {/* the organization step and the sign-out prompt each carry their own Sign out */}
+      {actions && !signOutPrompt && !(withProfile && orgChoice.needed && !orgChoice.loadError) && (
         <div className="set-pane-footer acct-actions">{actions}</div>
       )}
     </section>
