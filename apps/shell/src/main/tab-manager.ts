@@ -15,7 +15,6 @@ import {
   markDocsNewBlank,
   queueDocsAiContent,
   queueDocsAiPreset,
-  queueDocsForView,
   requestDocsClose,
   setActiveDocsResolver,
   teardownDocsRenderer,
@@ -34,7 +33,6 @@ import {
 } from '../../../html/src/main/html-main'
 import {
   createPdfView,
-  clearPdfDirty,
   pdfIsDirty,
   queuePdfAiPreset,
   requestPdfClose,
@@ -54,7 +52,6 @@ import {
 import {
   createSlidesView,
   queueSlidesAiPreset,
-  queueSlidesForView,
   type SlidesAiPresetPayload,
   requestSlidesClose,
   setActiveSlidesWebContents,
@@ -66,6 +63,7 @@ import { clampDiscussionPanelWidth } from '@genoffice/electron-utils/comments-ip
 import { aiEpochOf, clearAiRun, isAiRunning, type EditorState } from './ai-run-registry'
 import { isCloseTabChord } from './close-tab-chord'
 import { blankRetiredPage } from './retire-page'
+import { reloadViewFromDisk } from './reload-view'
 
 /** a tab lifted out of the strip with its live view: what "Open in New Window",
  *  tear-off and dock hand back and forth between the shell and a detached window */
@@ -659,14 +657,7 @@ export class TabManager {
     const tab = this.tabs.find((t) => t.id === id)
     const wc = tab?.view?.webContents
     if (!wc || wc.isDestroyed()) return
-    if (tab.kind === 'pdf') clearPdfDirty(wc.id)
-    // docs, sheets, and slides renderers get their file only through a one-shot
-    // queue, which the first open consumed: without it the reloaded tab loses
-    // its path (docs/sheets) or falls back to the stale in-memory session (slides)
-    if (tab.kind === 'docs' && tab.filePath) queueDocsForView(wc, tab.filePath)
-    if (tab.kind === 'sheets' && tab.filePath) queueWorkbookForView(wc, tab.filePath)
-    if (tab.kind === 'slides' && tab.filePath) queueSlidesForView(wc, tab.filePath)
-    wc.reload()
+    reloadViewFromDisk(wc, tab.kind, tab.filePath)
   }
 
   openMarkdownTab(openPath?: string): string {
