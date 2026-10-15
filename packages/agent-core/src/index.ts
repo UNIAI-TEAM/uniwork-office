@@ -69,10 +69,13 @@ export {
 export type {
   AgentLoopEvents,
   AgentLoopOptions,
+  AgentRunEnd,
   AgentRunResult,
   CompactionOptions,
   ToolExecutedEvent,
 } from './loop'
+export { createFakeRunHistoryGroup, runHistoryEvents } from './run-history'
+export type { RunHistoryGroup } from './run-history'
 export {
   createIpcTransport,
   desktopAiRun,

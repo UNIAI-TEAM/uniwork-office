@@ -48,8 +48,25 @@ export interface AgentLoopEvents<TSnapshot> {
   onTurnReset?(): void
   /** tokens the provider billed for the turn that just streamed (per model call; compaction summary turns are not reported) */
   onUsage?(usage: AgentTokenUsage): void
+  /** a run starts: fires once per run(), before the first captureSnapshot / model request */
+  onRunStart?(runId: string): void
+  /** the run is over: fires exactly once per onRunStart, after the last tool ran and before onDone/onError;
+   *  also on abort, error, turn limit and a thrown transport; mutated = some tool of THIS run mutated the artifact
+   *  (or was cut off by a stop: its effect is unknown, an empty undo group is the cheaper mistake) */
+  onRunEnd?(runId: string, end: AgentRunEnd): void
   onDone?(result: AgentRunResult): void
   onError?(error: string): void
+}
+
+export interface AgentRunEnd {
+  mutated: boolean
+  outcome: 'done' | 'error' | 'aborted'
+}
+
+/** run ids are unique across every loop in the process (several editors may share one window) */
+let runSeq = 0
+function nextRunId(): string {
+  return `run-${++runSeq}-${Math.random().toString(36).slice(2, 8)}`
 }
 
 /** Context compaction config (budget tracked in UTF-8 bytes rather than message count) */
@@ -482,6 +499,8 @@ export class AgentLoop<TSnapshot = unknown> {
   /** Finalizing turn after hitting the turn limit: no tools, let the model answer from what it has read */
   private finalizing = false
   private mutationSeen = false
+  /** a stop cut a tool off this run: its effect is unknown, so the run counts as mutated for onRunEnd */
+  private toolCutOff = false
   private inputParseFails = 0
   /** signature (text + tool calls) of the previous turn, for the identical-turn guard */
   private lastTurnSig = ''
@@ -506,6 +525,8 @@ export class AgentLoop<TSnapshot = unknown> {
   private generation = 0
   /** per-run abort: aborted on cancel(); long tools (e.g. generate_deck) use it to break internal loops */
   private abortController: AbortController | null = null
+  /** id of the open run (onRunStart fired, onRunEnd not yet); null when idle */
+  private runId: string | null = null
 
   constructor(options: AgentLoopOptions<TSnapshot>) {
     this.options = options
@@ -591,6 +612,7 @@ export class AgentLoop<TSnapshot = unknown> {
     this.turns = 0
     this.finalizing = false
     this.mutationSeen = false
+    this.toolCutOff = false
     this.inputParseFails = 0
     this.lastTurnSig = ''
     this.identicalTurns = 0
@@ -598,6 +620,7 @@ export class AgentLoop<TSnapshot = unknown> {
     this.executedCalls = []
     this.verifyRetryUsed = false
     this.abortController = new AbortController()
+    this.openRun()
     // buildContext and formatUserMessage are consumer-supplied and run before any
     // turn exists, so a throw here would escape run() with `running` still true:
     // the guard at the top then drops every later message silently, cancel()
@@ -633,6 +656,7 @@ export class AgentLoop<TSnapshot = unknown> {
     if (generation !== this.generation) return // reset during compaction
     if (this.cancelled) {
       this.running = false
+      this.closeRun('aborted')
       this.options.events?.onDone?.({ text: '', cancelled: true, turnLimit: false })
       return
     }
@@ -828,6 +852,7 @@ export class AgentLoop<TSnapshot = unknown> {
       } else {
         this.rollbackFailedRun()
       }
+      this.closeRun('aborted')
       this.options.events?.onDone?.({
         text: this.turnText,
         cancelled: true,
@@ -850,6 +875,34 @@ export class AgentLoop<TSnapshot = unknown> {
     this.cancelled = false
     this.history = []
     this.runUserMsg = null
+    // no onDone/onError follows a reset, but an editor history group must not stay open
+    this.closeRun('aborted')
+  }
+
+  private openRun(): void {
+    const runId = nextRunId()
+    this.runId = runId
+    try {
+      this.options.events?.onRunStart?.(runId)
+    } catch (err) {
+      // an editor history hook must never stop the run it brackets
+      console.warn('[agent-loop] onRunStart listener threw', err)
+    }
+  }
+
+  /** Close the open run (no-op when none is open) so every onRunStart gets exactly one onRunEnd. */
+  private closeRun(outcome: AgentRunEnd['outcome']): void {
+    const runId = this.runId
+    if (runId === null) return
+    this.runId = null
+    try {
+      this.options.events?.onRunEnd?.(runId, {
+        mutated: this.mutationSeen || this.toolCutOff,
+        outcome,
+      })
+    } catch (err) {
+      console.warn('[agent-loop] onRunEnd listener threw', err)
+    }
   }
 
   private dropTurnLimitNote(): void {
@@ -885,6 +938,7 @@ export class AgentLoop<TSnapshot = unknown> {
     this.handle = null
     this.running = false
     this.rollbackFailedRun()
+    this.closeRun('error')
     try {
       this.options.events?.onError?.(message)
     } catch {
@@ -1063,6 +1117,7 @@ export class AgentLoop<TSnapshot = unknown> {
             }
             this.running = false
             this.rollbackFailedRun()
+            this.closeRun('error')
             this.options.events?.onError?.(error)
           },
         },
@@ -1072,6 +1127,7 @@ export class AgentLoop<TSnapshot = unknown> {
       // before any callback runs: this keeps the run from staying busy forever.
       this.running = false
       this.rollbackFailedRun()
+      this.closeRun('error')
       this.options.events?.onError?.(err instanceof Error ? err.message : String(err))
     }
   }
@@ -1126,6 +1182,7 @@ export class AgentLoop<TSnapshot = unknown> {
       this.running = false
       this.runUserMsg = null
       this.mergeRunUsage()
+      this.closeRun(this.cancelled ? 'aborted' : 'done')
       events?.onDone?.({
         text: this.turnText,
         cancelled: this.cancelled,
@@ -1227,6 +1284,7 @@ export class AgentLoop<TSnapshot = unknown> {
           summary: call.name,
         }
         this.executedCalls.push({ name: call.name, ok: false })
+        this.toolCutOff = true
         results.push({ id: call.id, name: call.name, output: aborted.output, isError: true })
         events?.onToolExecuted?.({ call, execution: aborted })
         continue
@@ -1258,6 +1316,7 @@ export class AgentLoop<TSnapshot = unknown> {
     if (this.cancelled) {
       this.running = false
       this.runUserMsg = null
+      this.closeRun('aborted')
       events?.onDone?.({ text: this.turnText, cancelled: true, turnLimit: false })
       return
     }
@@ -1266,6 +1325,7 @@ export class AgentLoop<TSnapshot = unknown> {
     if (this.inputParseFails >= MAX_INPUT_PARSE_RETRIES) {
       this.running = false
       this.rollbackFailedRun()
+      this.closeRun('error')
       events?.onError?.(
         `Tool input was unusable (unparseable, truncated or missing required arguments) ${MAX_INPUT_PARSE_RETRIES} times in a row; retries stopped, please send the request again`,
       )
@@ -1279,6 +1339,7 @@ export class AgentLoop<TSnapshot = unknown> {
     if (this.allErrorTurns >= MAX_ALL_ERROR_TURNS) {
       this.running = false
       this.rollbackFailedRun()
+      this.closeRun('error')
       events?.onError?.(
         `Every tool call failed for ${MAX_ALL_ERROR_TURNS} turns in a row; the run was stopped. Please send the request again`,
       )
@@ -1299,6 +1360,7 @@ export class AgentLoop<TSnapshot = unknown> {
       if (++this.identicalTurns >= MAX_IDENTICAL_TURNS) {
         this.running = false
         this.rollbackFailedRun()
+        this.closeRun('error')
         events?.onError?.(
           'The model kept repeating the exact same turn without making progress; the run was stopped. Please send the request again',
         )
