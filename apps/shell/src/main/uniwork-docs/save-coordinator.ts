@@ -289,7 +289,9 @@ export class SaveCoordinator {
     if (found.kind === 'newer') return null
     if (found.kind !== 'bound') return null
     const doc = found.doc
-    if (this.saving.has(doc.path)) return doc
+    if (this.saving.has(doc.path)) {
+      return options?.userSave ? this.requestPopoverWhileSaving(doc, options) : doc
+    }
     const b = doc.binding
     if (b.access === 'view') return doc
     if (b.state === 'conflict') return this.requestPopover(doc, options)
@@ -337,6 +339,33 @@ export class SaveCoordinator {
     }
     this.deps.requestQueuePopover?.(doc.path)
     return doc
+  }
+
+  /**
+   * The user's Ctrl/Cmd+S while an inline save of the same path is in flight
+   * (RBE6u2-01). With a pending intent stored this is the same request as the
+   * stored-intent branch of `run`: a read only (the running writer owns the
+   * record and is never disturbed, nothing is minted or replayed), the N+1
+   * marked only when the copy moved past the intent, one popover push. With no
+   * intent yet (the first save is still reading or minting), or when the intent
+   * store cannot be read, the early return stays: no push, nothing changed.
+   */
+  private async requestPopoverWhileSaving(
+    doc: BoundDocument,
+    options: { userSave?: boolean },
+  ): Promise<BoundDocument> {
+    let moved: boolean
+    try {
+      const bytes = await this.readBytes(doc.path)
+      const access = await this.deps.intents()
+      if (access.kind !== 'ok') return doc
+      const stored = await access.intents.read(doc.key, factsOf(doc, bytes.byteLength))
+      if (!stored || isTerminalQueueState(stored.intent.state)) return doc
+      moved = stored.intent.checksum !== sha256Hex(bytes)
+    } catch {
+      return doc
+    }
+    return this.requestPopover(doc, options, moved)
   }
 
   private async run(
