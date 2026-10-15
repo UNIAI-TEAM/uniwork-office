@@ -87,6 +87,8 @@ const panel = (frame: Frame) => frame.locator('.ai-panel-header')
 async function ask(frame: Frame, text: string) {
   const box = frame.locator('.ai-input-box textarea').first()
   await expect(box).toBeVisible({ timeout: 30_000 })
+  await expect(box).toBeEnabled()
+  await expect(frame.locator('.ai-msg-streaming')).toHaveCount(0, { timeout: 30_000 })
   await box.fill(text)
   await box.press('Enter')
 }
@@ -317,7 +319,7 @@ test.describe('sheets: web AI', () => {
             status: s.status,
             ...(s.status === 429 ? {} : { code: s.code }),
             ...('retryAfter' in s ? { retryAfter: s.retryAfter } : {}),
-            path: '/byok/',
+            path: '/chat/completions',
           },
         ],
       })
@@ -396,9 +398,10 @@ test.describe('sheets: web AI', () => {
         })
         await page.screenshot({ path: screenshotPath('ai', `sheets-panel-${theme}-${lang}`) })
         await fake(request, {
-          fail: [{ status: 402, code: 'credits_exhausted', path: '/byok/' }],
+          fail: [{ status: 402, code: 'credits_exhausted', path: '/chat/completions' }],
         })
         await ask(frame, 'Again')
+        await expect(frame.locator('.ai-msg-user').last()).toContainText('Again')
         await expect(frame.locator('.ai-msg-assistant').last()).toContainText(
           lang === 'vi' ? 'Đã hết tín dụng AI' : 'AI credits used up',
           { timeout: 30_000 },

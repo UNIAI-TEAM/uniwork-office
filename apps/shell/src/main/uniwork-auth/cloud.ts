@@ -56,6 +56,8 @@ export interface CloudServerStatus {
   reason?: string
   tools: Record<UniworkCloudTool, boolean>
   credits: UniworkCloudCredits | null
+  /** the model UniWork AI serves (server policy), '' when the server does not say (older servers) */
+  uniworkModel?: string
 }
 
 export interface UniworkCloudClient extends UniworkCloudTransport {
@@ -150,7 +152,9 @@ export function parseCloudStatus(raw: unknown): CloudServerStatus {
     }
   }
   const reason = optStr(raw.reason)
-  return { enabled: raw.enabled, ...(reason ? { reason } : {}), tools, credits }
+  // display text only: a wrongly typed value reads as "unknown" rather than failing the whole status
+  const uniworkModel = typeof raw.uniwork_model === 'string' ? raw.uniwork_model.trim() : ''
+  return { enabled: raw.enabled, ...(reason ? { reason } : {}), tools, credits, uniworkModel }
 }
 
 function parseMediaList(raw: unknown): UniworkCloudMedia[] {
@@ -434,6 +438,8 @@ export class UniworkCloudController {
   private current: UniworkCloudStatus = UNIWORK_CLOUD_SIGNED_OUT
   /** the org the current status belongs to */
   private currentOrg: string | null = null
+  /** the model UniWork AI serves for the current org; '' = unknown (reset with the account / org / plan) */
+  private model = ''
   private generation = 0
   private inFlight: { key: string; run: Promise<UniworkCloudStatus> } | null = null
   private retryTimer: ReturnType<typeof setTimeout> | null = null
@@ -482,9 +488,16 @@ export class UniworkCloudController {
     return this.current
   }
 
-  private set(next: UniworkCloudStatus, orgId: string | null): void {
+  /** the model UniWork AI serves for the signed-in organization; '' while unknown or signed out */
+  uniworkModel(): string {
+    return this.model
+  }
+
+  private set(next: UniworkCloudStatus, orgId: string | null, model = ''): void {
     this.current = next
     this.currentOrg = orgId
+    // only an enabled plan serves a model; every other status (signed out, not entitled…) clears it
+    this.model = next.enabled ? model : ''
     this.deps.publish(next)
   }
 
@@ -500,9 +513,12 @@ export class UniworkCloudController {
       this.generation++
       this.inFlight = null
       this.clearRetry()
+      this.model = ''
       if (this.current.state !== 'signed-out') this.set(UNIWORK_CLOUD_SIGNED_OUT, null)
       return Promise.resolve(this.current)
     }
+    // another organization's model is not this one's: drop it until the new answer lands
+    if (this.currentOrg !== account.orgId) this.model = ''
     const key = account.orgId
     if (!options.fresh && this.inFlight?.key === key) return this.inFlight.run
     const generation = ++this.generation
@@ -516,8 +532,11 @@ export class UniworkCloudController {
   private async read(account: CloudAccountView, generation: number): Promise<UniworkCloudStatus> {
     let next: UniworkCloudStatus
     let answered = false
+    let model = ''
     try {
-      next = statusFromServer(await this.deps.client.status(), account)
+      const server = await this.deps.client.status()
+      next = statusFromServer(server, account)
+      model = server.uniworkModel ?? ''
       answered = true
     } catch (error) {
       if (generation !== this.generation) return this.current
@@ -547,7 +566,7 @@ export class UniworkCloudController {
     // its own; a failure that left a status keeps its pending retry
     if (answered && next.state === 'unavailable') this.scheduleRetry()
     else if (answered || next.state !== 'unavailable') this.clearRetry()
-    this.set(next, account.orgId)
+    this.set(next, account.orgId, model)
     return next
   }
 
@@ -557,7 +576,7 @@ export class UniworkCloudController {
     const orgId = this.currentOrg
     if (error.code === 'credits_exhausted' && this.current.enabled) {
       const credits = this.current.credits ? { ...this.current.credits, remaining: 0 } : null
-      this.set({ ...this.current, state: 'credits-exhausted', credits }, orgId)
+      this.set({ ...this.current, state: 'credits-exhausted', credits }, orgId, this.model)
     } else if (error.code === 'entitlement_required') {
       this.set({ ...UNIWORK_CLOUD_SIGNED_OUT, state: 'not-entitled' }, orgId)
     } else if (error.code === 'subscription_inactive') {

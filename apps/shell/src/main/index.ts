@@ -107,6 +107,7 @@ import {
   uniworkSessionIdentity,
   authorizedRequest,
   uniworkAccount,
+  uniworkCloud,
   uniworkDeploymentProfile,
 } from './uniwork-auth'
 import { createUniworkDocs, type UniworkDocsHandle } from './uniwork-docs/wiring'
@@ -6772,7 +6773,11 @@ app.whenReady().then(async () => {
       binding: (path) => uniworkDocsHandle.aiBinding(path),
       capability: (orgId) => uniworkDocsHandle.capabilityRead(orgId),
     })
-    setUniworkAiHost({ stream: (call) => uniworkAi.run(call) })
+    setUniworkAiHost({
+      stream: (call) => uniworkAi.run(call),
+      // the model the server's policy serves, from the cloud status the controller keeps per org
+      uniworkModel: () => uniworkCloud().uniworkModel(),
+    })
   }
   authCallbacks.start(routeAuthCallback)
   // UniWork document launch links (held since startup) route from here on

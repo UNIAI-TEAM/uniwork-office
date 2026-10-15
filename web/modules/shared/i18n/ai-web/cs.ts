@@ -41,6 +41,8 @@ export const cs = {
     'UniWork se nepodařilo spojit s poskytovatelem AI. Zkuste to za chvíli.',
   aiWebStateCloudTitle: 'Cloudový nástroj není k dispozici',
   aiWebStateCloudBody: 'Tento nástroj UniWork AI zatím není na serveru nastaven.',
+  aiWebStateOutageTitle: 'UniWork je dočasně nedostupný',
+  aiWebStateOutageBody: 'UniWork je teď nedostupný. Zkuste to za chvíli.',
   aiWebStateSessionTitle: 'Relace vypršela',
   aiWebStateSessionBody: 'Pokračujte opětovným otevřením dokumentu z UniWork.',
   aiWebStateRefusedTitle: 'Požadavek odmítnut',

@@ -71,7 +71,15 @@ export async function waitForSafeStorageKeyOnDisk(launched: LaunchedApp): Promis
     .toBe(true)
 }
 
-export async function signIn(launched: LaunchedApp, stub: UniworkAuthStub): Promise<void> {
+/**
+ * `inMemoryStore`: the shell runs with UNIWORK_AUTH_E2E_PLAIN_STORE (no keyring needed), so no
+ * safeStorage key is written to disk and there is nothing to wait for.
+ */
+export async function signIn(
+  launched: LaunchedApp,
+  stub: UniworkAuthStub,
+  options: { inMemoryStore?: boolean } = {},
+): Promise<void> {
   const { page } = launched
   await expect(accountButton(page)).toHaveAttribute('data-state', 'signed-out')
   await accountButton(page).click()
@@ -80,7 +88,10 @@ export async function signIn(launched: LaunchedApp, stub: UniworkAuthStub): Prom
   // FE-302: every platform but macOS goes through the wait and the helper's own
   // backend check decides - Windows (DPAPI) waits for `Local State`, a Linux
   // Secret Service returns early, Linux `basic_text` keeps the original wait.
-  if (process.platform !== 'darwin') await waitForSafeStorageKeyOnDisk(launched)
+  // The in-memory seam writes no safeStorage key, so it skips the wait outright.
+  if (process.platform !== 'darwin' && !options.inMemoryStore) {
+    await waitForSafeStorageKeyOnDisk(launched)
+  }
   const url = stub.approve()
   await deliverUrl(launched, shellEnv(stub), url)
   await expect(accountButton(page)).toHaveAttribute('data-state', 'signed-in', { timeout: 30_000 })

@@ -20,7 +20,10 @@
 //
 // Test control (web/e2e, Node side): POST /__fake-ai/reset, POST /__fake-ai/control
 //   { fail?: [{ status, code?, retryAfter?, path? }]   next matching AI request answers this error
-//     unauthorizedOnce?: true                          next AI request answers 401 (token refresh)
+//     unauthorizedOnce?: true | { path: string }       next AI request answers 401 (token refresh); with a
+//                                                      path, the next request whose route tail includes it
+//                                                      (aim it at '/chat/completions': a background
+//                                                      /byok/<p>/models or cloud read would eat it)
 //     cloud?: { enabled?, reason?, tools?, credits? }  GET cloud state
 //     reply?: string                                   the model's streamed answer
 //     toolCalls?: [{ name, input }]                    scripted tool calls (openai-compatible stream):
@@ -92,7 +95,7 @@ function freshState() {
   return {
     credentials: new Map(),
     fail: [],
-    unauthorizedOnce: false,
+    unauthorizedOnce: null,
     reply: 'Hello from the UniWork AI proxy.',
     toolCalls: [],
     cloud: {
@@ -390,7 +393,11 @@ export async function handleFakeAiControl(req, res, pathname) {
   if (pathname === '/__fake-ai/control') {
     const body = await readBody(req)
     if (Array.isArray(body.fail)) state.fail.push(...body.fail)
-    if (body.unauthorizedOnce) state.unauthorizedOnce = true
+    if (body.unauthorizedOnce) {
+      const path =
+        typeof body.unauthorizedOnce === 'object' ? body.unauthorizedOnce.path : undefined
+      state.unauthorizedOnce = { path: typeof path === 'string' ? path : '' }
+    }
     if (typeof body.reply === 'string') state.reply = body.reply
     if (Array.isArray(body.toolCalls)) state.toolCalls.push(...body.toolCalls)
     if (body.cloud)
@@ -432,8 +439,8 @@ export async function handleFakeAi(req, res, pathname) {
     fail(res, 400, 'cookie_refused', 'frame requests must not carry cookies')
     return true
   }
-  if (state.unauthorizedOnce) {
-    state.unauthorizedOnce = false
+  if (state.unauthorizedOnce && tail.includes(state.unauthorizedOnce.path)) {
+    state.unauthorizedOnce = null
     fail(res, 401, 'unauthorized')
     return true
   }

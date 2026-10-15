@@ -32,7 +32,6 @@ import type {
   AddTableOp,
   HeaderFooterOp,
   SetLinkOp,
-  AiSettings,
   CopyElementsOp,
   PasteElementsOp,
   DuplicateElementsOp,
@@ -403,7 +402,7 @@ const api: SlidesApi = {
     return () => ipcRenderer.removeListener('slides:renamed', listener)
   },
   getAiSettings: () => ipcRenderer.invoke('ai:get-settings'),
-  setAiSettings: (settings: AiSettings) => ipcRenderer.invoke('ai:set-settings', settings),
+  setAiSettings: (settings, options) => ipcRenderer.invoke('ai:set-settings', settings, options),
   onAiSettingsChanged: (handler: () => void) => {
     const listener = () => handler()
     ipcRenderer.on('ai:settings-changed', listener)

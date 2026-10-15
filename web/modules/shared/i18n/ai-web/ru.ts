@@ -41,6 +41,8 @@ export const ru = {
     'UniWork не удалось связаться с провайдером ИИ. Повторите попытку чуть позже.',
   aiWebStateCloudTitle: 'Облачный инструмент недоступен',
   aiWebStateCloudBody: 'Этот инструмент UniWork AI ещё не настроен на сервере.',
+  aiWebStateOutageTitle: 'UniWork временно недоступен',
+  aiWebStateOutageBody: 'Сейчас не удаётся связаться с UniWork. Повторите попытку чуть позже.',
   aiWebStateSessionTitle: 'Сеанс истёк',
   aiWebStateSessionBody: 'Чтобы продолжить, откройте документ заново из UniWork.',
   aiWebStateRefusedTitle: 'Запрос отклонён',

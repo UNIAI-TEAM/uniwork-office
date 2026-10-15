@@ -40,6 +40,8 @@ export const ko = {
   aiWebStateUnreachableBody: 'UniWork가 AI 공급자에 연결하지 못했습니다. 잠시 후 다시 시도하세요.',
   aiWebStateCloudTitle: '클라우드 도구 사용 불가',
   aiWebStateCloudBody: '이 UniWork AI 도구는 아직 서버에 설정되지 않았습니다.',
+  aiWebStateOutageTitle: 'UniWork를 일시적으로 사용할 수 없음',
+  aiWebStateOutageBody: '지금은 UniWork에 연결할 수 없습니다. 잠시 후 다시 시도하세요.',
   aiWebStateSessionTitle: '세션 만료',
   aiWebStateSessionBody: '계속하려면 UniWork에서 문서를 다시 여세요.',
   aiWebStateRefusedTitle: '요청 거부됨',
