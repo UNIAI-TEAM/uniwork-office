@@ -341,4 +341,56 @@ describe('createSyncStoreAccess', () => {
     expect((await access.open()).kind).toBe('ok')
     expect(await outgoing.read('doc_1')).toEqual({ kind: 'interrupted' })
   })
+
+  it("openScope opens the leaving account's own store while another account is live, and never caches it (G5-11 F7)", async () => {
+    const { layer } = make()
+    let account = 'acc_1'
+    const access = createSyncStoreAccess({
+      layer,
+      scope: () => ({ deploymentId: 'dep_1', accountId: account }),
+    })
+    const a = { deploymentId: 'dep_1', accountId: 'acc_1' }
+    const first = await access.open()
+    if (first.kind !== 'ok') throw new Error(first.kind)
+    expect(
+      await first.records(INTENT_STORE_REGISTRATION.name).write('doc_a', Buffer.from('a')),
+    ).toEqual({ kind: 'ok' })
+
+    // B is live now: openScope(A) reads A's records, open() still serves B
+    account = 'acc_2'
+    const left = await access.openScope!(a)
+    if (left.kind !== 'ok') throw new Error(left.kind)
+    const leftRecords = left.records(INTENT_STORE_REGISTRATION.name)
+    expect((await leftRecords.read('doc_a')).kind).toBe('ok')
+    const live = await access.open()
+    if (live.kind !== 'ok') throw new Error(live.kind)
+    expect((await live.records(INTENT_STORE_REGISTRATION.name).read('doc_a')).kind).toBe('missing')
+
+    // locking A interrupts the one-off handle and leaves B's handle alone
+    await access.lock(a)
+    expect(await leftRecords.read('doc_a')).toEqual({ kind: 'interrupted' })
+    expect((await access.open()).kind).toBe('ok')
+  })
+
+  it('openScope discards a one-off open that a lock of its scope overtook', async () => {
+    const { layer } = make()
+    let release: (() => void) | null = null
+    const gated: StoreLayer = {
+      ...layer,
+      open: async (scope) => {
+        if (scope.accountId === 'acc_1') await new Promise<void>((r) => (release = r))
+        return layer.open(scope)
+      },
+    }
+    const access = createSyncStoreAccess({
+      layer: gated,
+      scope: () => ({ deploymentId: 'dep_1', accountId: 'acc_2' }),
+    })
+    const a = { deploymentId: 'dep_1', accountId: 'acc_1' }
+    const pending = access.openScope!(a)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await access.lock(a)
+    release?.()
+    expect((await pending).kind).toBe('no_session')
+  })
 })

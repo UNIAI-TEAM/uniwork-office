@@ -48,6 +48,15 @@ export interface SyncStoreAccess {
   /** the scope of the live session, or null when it cannot be named */
   scope(): StoreScope | null
   open(): Promise<SyncStoreOpen>
+  /**
+   * Opens the store of `scope`, which need not be the live session's: an
+   * account switch locks the account it leaves after the next account is
+   * already live, and that lock must park into the leaving account's own
+   * store. The live scope goes through `open`; any other scope gets a one-off
+   * handle that is never cached or shared, and that a `lock` of its scope
+   * started in the meantime discards.
+   */
+  openScope?(scope: StoreScope): Promise<SyncStoreOpen>
   /** the opened handle is dead (the account boundary wiped the scope) */
   forget(): void
   /** forget the cached handle and lock the scope being left (ciphertext stays) */
@@ -148,6 +157,18 @@ export function createSyncStoreAccess(options: {
       // concurrent calls of this scope share one open; a failed open is not
       // remembered, so the next call retries (a lock is transient)
       return openToken(scope, tokenOf(scope))
+    },
+    openScope(scope) {
+      const token = tokenOf(scope)
+      if (currentToken() === token) return openToken(scope, token)
+      const started = epochOf(token)
+      const copy: StoreScope = { deploymentId: scope.deploymentId, accountId: scope.accountId }
+      return options.layer.open(copy).then((result): SyncStoreOpen => {
+        if (result.kind !== 'ok') return result
+        if (started !== epochOf(token)) return { kind: 'no_session' }
+        const store = result.store
+        return { kind: 'ok', records: (name: string) => store.records(name) }
+      })
     },
     forget() {
       dropHandle()

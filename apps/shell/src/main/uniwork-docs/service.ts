@@ -1085,6 +1085,26 @@ export class UniworkDocsService {
   }
 
   /**
+   * The store of `owner`, the account a lock is for. While `owner` is the live
+   * session this is `openSyncStore`; after an account switch the next account
+   * is already live, and the leaving account's intents and N+1 must be read
+   * from and parked into its own store, never the live one (a one-off handle).
+   */
+  private openStoreOf(owner: LastOwner): Promise<SyncStoreOpen> {
+    const sync = this.deps.syncStore
+    const live = sync?.scope()
+    if (
+      !sync ||
+      !live ||
+      (live.deploymentId === owner.deploymentId && live.accountId === owner.accountId)
+    ) {
+      return this.openSyncStore()
+    }
+    if (!sync.openScope) return Promise.resolve({ kind: 'no_session' })
+    return sync.openScope({ deploymentId: owner.deploymentId, accountId: owner.accountId })
+  }
+
+  /**
    * The schema 1 -> 2 sweep (the pre-store plaintext intent moves into the
    * durable store), once per scope and process: the first open after sign-in
    * (or after the keychain unlocks) runs it, every later open skips it. A
@@ -1863,7 +1883,7 @@ export class UniworkDocsService {
     if (this.queuePass) savingPromises.push(this.queuePass.catch(() => undefined))
     let hasInFlightRecord = false
     const open = !keystoreLocked
-      ? await this.openSyncStore()
+      ? await this.openStoreOf(target)
       : ({ kind: 'keystore_locked' } as const)
     const intents =
       open.kind === 'ok' ? createIntentStore(open.records(INTENT_STORE_REGISTRATION.name)) : null
