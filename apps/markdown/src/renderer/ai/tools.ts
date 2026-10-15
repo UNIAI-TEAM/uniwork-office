@@ -382,7 +382,7 @@ function textImageRefusal(
     try {
       srcs.push(...imageSrcsOf(parseMarkdownToNodes(editor, markdown)))
     } catch {
-      // unparseable text is reported by the write itself
+      // callers pass the text that lands; text that does not parse never lands and the write reports it
     }
   }
   const remote = srcs.filter((src) => REMOTE_IMAGE_SRC.test(src.trim()))
@@ -577,9 +577,6 @@ async function writeDocument(
       t('aiToolWriteDocFailed'),
     )
   }
-  // the writer is a separate model call: its markdown gets the same image URL rule as an apply_ops insert
-  const imageRefusal = textImageRefusal(editor, [result.markdown], [], imageUrls)
-  if (imageRefusal) return fail(imageRefusal, t('aiToolWriteDocFailed'))
   // a kept partial whose tail no longer parses lands what the user saw rendered
   let parses: boolean
   try {
@@ -588,6 +585,10 @@ async function writeDocument(
     parses = false
   }
   const markdown = !parses && result.truncated && rendered ? rendered : result.markdown
+  // the writer is a separate model call: the markdown that actually lands (the final text, or the
+  // rendered prefix) gets the same image URL rule as an apply_ops insert
+  const imageRefusal = textImageRefusal(editor, [markdown], [], imageUrls)
+  if (imageRefusal) return fail(imageRefusal, t('aiToolWriteDocFailed'))
   // an explicit rewrite replaces everything; text the user typed into a formerly blank
   // document while the draft streamed is kept, the content goes into the draft's slot
   const op: MdOp =
