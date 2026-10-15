@@ -138,7 +138,8 @@ describe('AiModelPicker S7 — row UniWork AI & credits sub-line', () => {
     const subLine = uniworkOpt.querySelector<HTMLElement>('.ai-model-item-sub')
     expect(subLine).not.toBeNull()
     expect(subLine!.getAttribute('aria-hidden')).toBe('true')
-    expect(subLine!.textContent).toBe('Còn 8200 / 10000')
+    // F10: the numbers use the UI language's digit grouping
+    expect(subLine!.textContent).toBe('Còn 8.200 / 10.000')
 
     // Screen-reader description via aria-describedby uses aiUniworkCreditsAria, not live region,
     // and is rendered outside role="listbox" (RF1-21)
@@ -148,12 +149,79 @@ describe('AiModelPicker S7 — row UniWork AI & credits sub-line', () => {
     expect(descEl).not.toBeNull()
     expect(getListbox()!.contains(descEl)).toBe(false)
     expect(descEl!.textContent).toBe(
-      aiUniworkText('vi', 'aiUniworkCreditsAria', { remaining: 8200, limit: 10000 }),
+      aiUniworkText('vi', 'aiUniworkCreditsAria', { remaining: '8.200', limit: '10.000' }),
     )
     expect(descEl!.getAttribute('aria-live')).toBeNull()
     expect(descEl!.getAttribute('role')).toBeNull()
     // RF3-2: the spoken text is the catalogue wording; the visible "/" line stays aria-hidden
-    expect(descEl!.textContent).toBe('Còn 8200 trên 10000 tín dụng')
+    expect(descEl!.textContent).toBe('Còn 8.200 trên 10.000 tín dụng')
+  })
+
+  it('F10: credits are grouped by the UI language in the visible line and the spoken text (en: 380,000 / 500,000; vi: 380.000 / 500.000)', async () => {
+    setUniworkAiAvailable(true)
+    const getCloudStatus = async (): Promise<CloudStatusMock> => ({
+      state: 'ready',
+      signedIn: true,
+      hasCompletedRead: true,
+      credits: { remaining: 380000, limit: 500000 },
+    })
+    for (const [lang, visible, spoken] of [
+      ['en', '380,000 / 500,000 left', '380,000 of 500,000 credits left'],
+      ['vi', 'Còn 380.000 / 500.000', 'Còn 380.000 trên 500.000 tín dụng'],
+    ] as const) {
+      const { getChip, getOptions } = await mountPicker({ getCloudStatus }, lang)
+      await openPopup(getChip())
+      const opt = getOptions()[0]!
+      expect(opt.querySelector('.ai-model-item-sub')!.textContent).toBe(visible)
+      expect(document.getElementById(opt.getAttribute('aria-describedby')!)!.textContent).toBe(
+        spoken,
+      )
+      act(() => root.unmount())
+      root = createRoot(host)
+    }
+  })
+
+  it('F4: opening the picker moves focus onto the selected option; Esc closes and returns focus to the chip', async () => {
+    setUniworkAiAvailable(true)
+    const { getChip, getOptions } = await mountPicker(
+      {
+        getCloudStatus: async () => ({
+          state: 'ready',
+          signedIn: true,
+          hasCompletedRead: true,
+          credits: { remaining: 10, limit: 20 },
+        }),
+      },
+      'en',
+    )
+    await openPopup(getChip())
+    const options = getOptions()
+    expect(options[0]!.getAttribute('aria-selected')).toBe('true')
+    expect(document.activeElement).toBe(options[0])
+    pressKey(document.activeElement!, 'Escape')
+    expect(host.querySelector('.ai-model-pop')).toBeNull()
+    expect(document.activeElement).toBe(getChip())
+  })
+
+  it('F4: ArrowDown / ArrowUp on the opener open the picker and enter the list; a click opening it also lands in the list', async () => {
+    setUniworkAiAvailable(true)
+    const settings = buildSettings({ provider: 'anthropic' })
+    const { getChip, getOptions } = await mountPicker({}, 'en', settings)
+    const chip = getChip()
+    act(() => chip.focus())
+    pressKey(chip, 'ArrowDown')
+    await act(async () => {})
+    const options = getOptions()
+    expect(options.length).toBeGreaterThan(1)
+    const selected = options.find((o) => o.getAttribute('aria-selected') === 'true') ?? options[0]!
+    expect(document.activeElement).toBe(selected)
+    pressKey(document.activeElement!, 'Escape')
+    expect(document.activeElement).toBe(getChip())
+    // ArrowUp also opens it
+    pressKey(getChip(), 'ArrowUp')
+    await act(async () => {})
+    expect(host.querySelector('.ai-model-pop')).not.toBeNull()
+    expect(getOptions().some((o) => o === document.activeElement)).toBe(true)
   })
 
   it.each([
