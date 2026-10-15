@@ -29,6 +29,7 @@ import {
   isTurnEnded,
   noticePatch,
   panelLiveAnnouncement as computePanelLiveAnnouncement,
+  runHistoryEvents,
   singleShortcutHint,
   streamText,
   uniworkErrorLineText,
@@ -84,6 +85,7 @@ import {
   type DocsEditQueueItem,
 } from './edit-queue'
 import { setInactiveSelectionShown } from '../editor/inactive-selection'
+import { createDocsRunHistoryGroup, type DocsRunHistoryGroup } from '../editor/ai-run-history'
 import { applyRevisionsBy } from '../editor/revisions'
 import { DOCS_CONTINUE_INSTRUCTION } from './continuation'
 import { waitForFullContent } from '../phased-content'
@@ -910,6 +912,15 @@ export function AiPanel({
     decidePartial(false)
   }
 
+  /** folds a run's document changes into one undo step (the loop's run hooks drive it) */
+  const runHistoryRef = useRef<DocsRunHistoryGroup | null>(null)
+  if (!runHistoryRef.current) runHistoryRef.current = createDocsRunHistoryGroup()
+  useEffect(() => {
+    const group = runHistoryRef.current!
+    group.attach(editor)
+    return () => group.attach(null)
+  }, [editor])
+
   const loopRef = useRef<AgentLoop<AiRunSnapshot> | null>(null)
   if (!loopRef.current) {
     const numIds = (): NumIds => ({
@@ -942,6 +953,7 @@ export function AiPanel({
       ]),
       captureSnapshot: () => captureRunSnapshot(editorRef.current, sideStateRef.current),
       events: {
+        ...runHistoryEvents(runHistoryRef.current),
         onText: (text) => patchLastAssistant({ text, waitLine: undefined }),
         // module-level getLang: the loop is created once, the component's lang would go stale
         onNotice: (notice) => {
