@@ -65,7 +65,7 @@ describe('AI agent on a protected Word document', () => {
       for (const n of [...EDIT_TOOLS, ...COMMENT_TOOLS, ...REVIEW_TOOLS]) {
         expect(names(skill)).not.toContain(n)
       }
-      expect(skill.systemPrompt).toContain('protected')
+      expect(skill.systemPrompt).toContain('this document is protected')
       const exec = await skill.executeTool({
         id: 't1',
         name: 'insert_content',
@@ -123,7 +123,7 @@ describe('AI agent on a protected Word document', () => {
     )
     expect(names(skill)).toContain('insert_content')
     expect(names(skill)).toContain('accept_changes')
-    expect(skill.systemPrompt).not.toContain('protected')
+    expect(skill.systemPrompt).not.toContain('this document is protected')
     kind = 'comments'
     expect(names(skill)).not.toContain('insert_content')
     editor.destroy()

@@ -64,6 +64,67 @@ function refuseBound(tool: string): ToolExecution {
   }
 }
 
+/**
+ * The Word protection the AI must honour, read live from the open document
+ * (document data, so BYOK and UniWork AI see the same thing):
+ * - readOnly / forms: the body is locked (forms only lets people tick the form's own checkboxes)
+ * - comments: the body is locked, comments may be added and replied to
+ * - trackedChanges: editing stays but every change is recorded and revisions cannot be accepted or rejected
+ * A password-to-modify lock that is not unlocked counts as readOnly.
+ */
+export type AiDocProtection = 'none' | 'readOnly' | 'comments' | 'forms' | 'trackedChanges'
+
+/** the one AI protection kind for the document's w:documentProtection + w:writeProtection state */
+export function aiProtectionOf(
+  protection: { edit: string; enforced: boolean } | null,
+  writeLocked: boolean,
+): AiDocProtection {
+  if (writeLocked) return 'readOnly'
+  if (!protection?.enforced) return 'none'
+  switch (protection.edit) {
+    case 'comments':
+    case 'forms':
+    case 'trackedChanges':
+      return protection.edit
+    default:
+      // readOnly, or a kind this build does not know: the safe reading forbids every write
+      return 'readOnly'
+  }
+}
+
+/** a comments-only document still lets the agent leave comments */
+const COMMENT_ONLY_TOOLS: ReadonlySet<string> = new Set(['add_comment', 'reply_comment'])
+/** tracked-changes protection: Word locks accept/reject while it is on */
+const TRACKED_HIDDEN_TOOLS: ReadonlySet<string> = new Set(['accept_changes', 'reject_changes'])
+
+/** whether the protection forbids this tool */
+function protectionBlocks(kind: AiDocProtection, tool: string): boolean {
+  if (kind === 'none') return false
+  if (kind === 'trackedChanges') return TRACKED_HIDDEN_TOOLS.has(tool)
+  if (READ_ONLY_TOOLS.has(tool)) return false
+  return !(kind === 'comments' && COMMENT_ONLY_TOOLS.has(tool))
+}
+
+const PROTECTION_NOTES: Record<Exclude<AiDocProtection, 'none'>, string> = {
+  readOnly:
+    '\n\nNote: this document is protected against editing. You can read it and answer questions about it, but you must not change it or add comments: no editing tool is available, so tell the user it is protected instead of attempting it.',
+  forms:
+    '\n\nNote: this document is protected for filling in forms only. You can read it, but you must not change its text or add comments: no editing tool is available, so tell the user it is protected instead of attempting it.',
+  comments:
+    '\n\nNote: this document is protected so that only comments are allowed. You can read it and add or reply to comments, but you must not change its text: no editing tool is available, so tell the user it is protected instead of attempting it.',
+  trackedChanges:
+    '\n\nNote: this document is protected so that every change must be tracked. Your edits are recorded as tracked changes; you cannot accept or reject changes, leave that to the user.',
+}
+
+function refuseProtected(tool: string, kind: AiDocProtection): ToolExecution {
+  return {
+    output: `${tool} is unavailable: this document is protected (${kind}) and the protection does not allow it.`,
+    isError: true,
+    mutated: false,
+    summary: tool.replace(/[_-]+/g, ' '),
+  }
+}
+
 const VIEW_ONLY_NOTE =
   '\n\nNote: this document is view-only. You can read it and answer questions about it, but you must not change it: no editing tool is available, so tell the user it cannot be edited instead of attempting it.'
 
@@ -110,6 +171,8 @@ export function createDocsSkill(
   isBound?: () => boolean,
   /** the panel's questionnaire card behind ask_clarification; none hides the tool */
   getAsk?: () => AskClarification | undefined,
+  /** live predicate: the Word protection of the open document (re-read every request, so unprotecting restores the tools) */
+  getProtection?: () => AiDocProtection,
 ): AgentSkill {
   // Selection frozen per run: tools act on the range the prompt described,
   // not on wherever the user's live selection has wandered mid-run. The doc
@@ -126,11 +189,21 @@ export function createDocsSkill(
     [...mediaToolsOff()]
       .map((name) => (name === 'generate_image' ? IMAGE_GEN_OFF_NOTE : MEDIA_ANALYSIS_OFF_NOTE))
       .join('')
+  const protectionKind = (): AiDocProtection => getProtection?.() ?? 'none'
+  const protectionNote = (): string => {
+    const kind = protectionKind()
+    return kind === 'none' ? '' : PROTECTION_NOTES[kind]
+  }
   return {
     id: 'docx',
     // live: the predicate is re-read before every model request
     get systemPrompt() {
-      return AGENT_SYSTEM_PROMPT + mediaOffNote() + (isReadOnly?.() ? VIEW_ONLY_NOTE : '')
+      return (
+        AGENT_SYSTEM_PROMPT +
+        mediaOffNote() +
+        (isReadOnly?.() ? VIEW_ONLY_NOTE : '') +
+        protectionNote()
+      )
     },
     get tools() {
       const hidden = mediaToolsOff()
@@ -138,9 +211,13 @@ export function createDocsSkill(
       if (isBound?.() === true) for (const tool of BOUND_HIDDEN_TOOLS) hidden.add(tool)
       if (!getAsk?.()) hidden.add('ask_clarification')
       const readOnly = isReadOnly?.() === true
-      if (!readOnly && hidden.size === 0) return AGENT_TOOLS
+      const protection = protectionKind()
+      if (!readOnly && protection === 'none' && hidden.size === 0) return AGENT_TOOLS
       return AGENT_TOOLS.filter(
-        (t) => !hidden.has(t.name) && (!readOnly || READ_ONLY_TOOLS.has(t.name)),
+        (t) =>
+          !hidden.has(t.name) &&
+          (!readOnly || READ_ONLY_TOOLS.has(t.name)) &&
+          !protectionBlocks(protection, t.name),
       )
     },
     buildContext: () => {
@@ -158,22 +235,24 @@ export function createDocsSkill(
     executeTool: (call, signal) =>
       isReadOnly?.() && !READ_ONLY_TOOLS.has(call.name)
         ? refuseViewOnly(call.name)
-        : isBound?.() && BOUND_HIDDEN_TOOLS.has(call.name)
-          ? refuseBound(call.name)
-          : executeTool(
-              getEditor(),
-              call,
-              getNumIds(),
-              getTrack?.(),
-              signal,
-              frozen,
-              getComments?.(),
-              getHf?.(),
-              getWriter?.(),
-              getPageSetup?.(),
-              getExtras?.(),
-              getNotes?.(),
-              getAsk?.(),
-            ),
+        : protectionBlocks(protectionKind(), call.name)
+          ? refuseProtected(call.name, protectionKind())
+          : isBound?.() && BOUND_HIDDEN_TOOLS.has(call.name)
+            ? refuseBound(call.name)
+            : executeTool(
+                getEditor(),
+                call,
+                getNumIds(),
+                getTrack?.(),
+                signal,
+                frozen,
+                getComments?.(),
+                getHf?.(),
+                getWriter?.(),
+                getPageSetup?.(),
+                getExtras?.(),
+                getNotes?.(),
+                getAsk?.(),
+              ),
   }
 }

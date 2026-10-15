@@ -63,7 +63,7 @@ import {
 } from './tools'
 import type { AiPageSetupAccess } from './page-setup'
 import type { AiNotesAccess } from './note-ops'
-import { createDocsSkill } from './docs-skill'
+import { createDocsSkill, type AiDocProtection } from './docs-skill'
 import { MindMapCard } from './MindMapCard'
 import {
   buildDocWriterRequest,
@@ -421,6 +421,8 @@ interface AiPanelProps {
   readOnly?: boolean
   /** UniWork working copy: tools that write outside the document are hidden (C-BOUND) */
   bound?: boolean
+  /** Word protection of the open document: the docs skill hides/refuses the tools it forbids (live) */
+  protection?: AiDocProtection
   /** App state beside the PM doc that a run's Roll back restores with it */
   sideState?: AiSideState
 }
@@ -462,6 +464,7 @@ export function AiPanel({
   notesAccess,
   readOnly = false,
   bound = false,
+  protection = 'none',
   sideState,
 }: AiPanelProps) {
   const { t, lang } = useI18n()
@@ -660,6 +663,8 @@ export function AiPanel({
   readOnlyRef.current = readOnly
   const boundRef = useRef(bound)
   boundRef.current = bound
+  const protectionRef = useRef(protection)
+  protectionRef.current = protection
   const sideStateRef = useRef(sideState)
   sideStateRef.current = sideState
   const trackChangesRef = useRef(trackChanges)
@@ -916,6 +921,9 @@ export function AiPanel({
       bullet: findNumId(blocksRef.current, 'bullet') ?? numIdFallbackRef.current?.bullet ?? null,
       ordered: findNumId(blocksRef.current, 'ordered') ?? numIdFallbackRef.current?.ordered ?? null,
     })
+    // tracked-changes protection forces the recorder on, whatever the panel toggle says
+    const aiTracksChanges = () =>
+      trackChangesRef.current || protectionRef.current === 'trackedChanges'
     loopRef.current = new AgentLoop<AiRunSnapshot>({
       transport: transportRef.current,
       systemSuffix: aiLangDirective,
@@ -923,7 +931,7 @@ export function AiPanel({
         createDocsSkill(
           () => editorRef.current,
           numIds,
-          () => (trackChangesRef.current ? { author: AI_REVISION_AUTHOR } : undefined),
+          () => (aiTracksChanges() ? { author: AI_REVISION_AUTHOR } : undefined),
           () => commentsAccessRef.current,
           () => hfAccessRef.current,
           () => imageGenerationAvailable(settingsRef.current, gskLoggedInRef.current),
@@ -937,6 +945,7 @@ export function AiPanel({
           () => readOnlyRef.current,
           () => boundRef.current,
           () => askClarification,
+          () => protectionRef.current,
         ),
         createFilesSkill(availableAttachments),
       ]),
@@ -973,7 +982,7 @@ export function AiPanel({
           if (execution.mutated) {
             // tracking off: accept immediately (same tick, so the yellow never paints);
             // tracking on: revisions stay pending, handled in the Review tab
-            if (!trackChangesRef.current) clearAiHighlights(true)
+            if (!aiTracksChanges()) clearAiHighlights(true)
           }
           // mind maps ride the UI-only display side channel onto the message
           const display = execution.display
