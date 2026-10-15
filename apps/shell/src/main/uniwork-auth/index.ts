@@ -40,12 +40,8 @@ import {
   type UniworkAiScopeDeps,
   type UniworkAiStreams,
 } from './ai-chat'
-import {
-  createUniworkKeysHost,
-  type LocalModelChoice,
-  type ModelPickStore,
-  type UniworkKeysHost,
-} from './keys'
+import { createUniworkKeysHost, type UniworkKeysHost } from './keys'
+import { appSettingsModelPicks, refreshAfterDeviceRevoked } from './keys-wiring'
 import type { CapabilityRead } from '../uniwork-sync/capability/cache'
 import { AccountManager } from './manager'
 import { TransportError, createUniworkTransport } from './transport'
@@ -342,39 +338,10 @@ export function uniworkKeys(): UniworkKeysHost {
     },
     // the server said the device is revoked: the account's own refresh gets the same answer and
     // runs the shell's signed-out flow (status push, documents, UniWork AI turns)
-    onDeviceRevoked: () => void account.refresh().catch(() => undefined),
+    onDeviceRevoked: refreshAfterDeviceRevoked(account),
   })
   ;(globalThis as Record<symbol, unknown>)[UNIWORK_KEYS_HOST_SYMBOL] = keys
   return keys
-}
-
-/** app-settings key of the desktop model picks for models served by keys saved on UniWork */
-const MODEL_PICKS_SETTING = 'uniworkAiModelPicks'
-
-/**
- * The desktop model pick per account + organization (contract §6.1), in app-settings.json beside
- * the remembered organization: never in ai-settings.json, never a key.
- */
-function appSettingsModelPicks(path: () => string): ModelPickStore {
-  const readAll = (): Record<string, Partial<Record<string, LocalModelChoice>>> => {
-    const raw = readAppSettings(path())[MODEL_PICKS_SETTING]
-    return raw && typeof raw === 'object' && !Array.isArray(raw)
-      ? (raw as Record<string, Partial<Record<string, LocalModelChoice>>>)
-      : {}
-  }
-  return {
-    read: (scope) => {
-      const picks = readAll()[scope]
-      return picks && typeof picks === 'object' ? picks : {}
-    },
-    write: (scope, provider, choice) => {
-      const all = readAll()
-      writeAppSetting(path(), MODEL_PICKS_SETTING, {
-        ...all,
-        [scope]: { ...all[scope], [provider]: choice },
-      })
-    },
-  }
 }
 
 export function startUniworkKeys(): UniworkKeysHost {

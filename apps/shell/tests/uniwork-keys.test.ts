@@ -90,7 +90,9 @@ import type { DeploymentProfile } from '../src/main/uniwork-auth/deployment'
 import { TransportError, type FetchLike } from '../src/main/uniwork-auth/transport'
 import { listProviderModels } from '@genoffice/ai-provider/provider-models'
 import {
+  CREDENTIALS_RETRY_MAX_MS,
   CREDENTIALS_RETRY_MS,
+  CREDENTIALS_TIMEOUT_MS,
   CREDENTIALS_TTL_MS,
   MODEL_LIST_TTL_MS,
   UniworkKeyError,
@@ -1743,6 +1745,79 @@ describe('UniworkKeysHost + docs-main BYOK proxy integration (G6-05k F2)', () =>
 
   // ---- fx2: R1 backoff, custom slot, picks per account, timeout (G05KSH-16..19) ----
 
+  it('a re-sign-in after device_revoked reads R1 at once, a same-session read stays quiet', async () => {
+    let clock = 5_000_000
+    let session: string | null = 'default/acc_1/dev_1'
+    let r1Calls = 0
+    let revoke = true
+    const fetchMock: FetchLike = vi.fn(async (url) => {
+      if (url === R1_URL) {
+        r1Calls++
+        return revoke
+          ? jsonResponse({ error: { code: 'device_revoked' } }, 401)
+          : jsonResponse(r1Body([orgItem('openai')]))
+      }
+      if (url.endsWith('/models')) return jsonResponse({ data: [] })
+      throw new Error(`unexpected URL: ${url}`)
+    })
+    const host = createUniworkKeysHost({
+      profile: () => (session ? PROFILE : null),
+      orgId: () => (session ? ORG_1 : null),
+      sessionKey: () => session,
+      authorized: async (call) => call(TOKEN_1),
+      fetch: fetchMock,
+      now: () => clock,
+    })
+    await host.list()
+    expect(r1Calls).toBe(1)
+    // the shell signs out (the account's own refresh got device_revoked too) ...
+    session = null
+    clock += 3_000
+    await host.list()
+    // ... and the user signs in again inside the 30 s window: a new device session is not held back
+    revoke = false
+    session = 'default/acc_1/dev_2'
+    clock += 3_000
+    await host.list()
+    expect(r1Calls).toBe(2)
+    expect(host.hasOrgSource('openai')).toBe(true)
+  })
+
+  it('a server 401 unauthorized on R1 ends the source once per window, not once per read', async () => {
+    let clock = 6_000_000
+    let r1Calls = 0
+    const fetchMock: FetchLike = vi.fn(async (url) => {
+      if (url === R1_URL) {
+        r1Calls++
+        return jsonResponse({ error: { code: 'unauthorized' } }, 401)
+      }
+      throw new Error(`unexpected URL: ${url}`)
+    })
+    // the shell's authorized(): one refresh + retry on `unauthorized`
+    const authorized = async <T>(call: (token: string) => Promise<T>): Promise<T> => {
+      try {
+        return await call(TOKEN_1)
+      } catch (err) {
+        if (!(err instanceof TransportError) || err.code !== 'unauthorized') throw err
+      }
+      return call(TOKEN_2)
+    }
+    const host = createUniworkKeysHost({
+      profile: () => PROFILE,
+      orgId: () => ORG_1,
+      authorized,
+      fetch: fetchMock,
+      now: () => clock,
+    })
+    await host.list()
+    expect(r1Calls).toBe(2) // the request and its one retry after the refresh
+    for (let i = 0; i < 10; i++) await host.list()
+    expect(r1Calls).toBe(2)
+    clock += CREDENTIALS_RETRY_MS + 1
+    await host.list()
+    expect(r1Calls).toBe(4)
+  })
+
   it('keeps a keyless custom endpoint typed on this computer when an org custom key exists', async () => {
     const fetchMock: FetchLike = vi.fn(async (url) => {
       if (url === R1_URL) {
@@ -1786,4 +1861,120 @@ describe('UniworkKeysHost + docs-main BYOK proxy integration (G6-05k F2)', () =>
     expect((await getSettings()).modelSources?.custom?.origin).toBeUndefined()
   })
 
+  it('keeps model picks apart per account and per organization', async () => {
+    let account = 'acc_1'
+    let org = ORG_1
+    const fetchMock: FetchLike = vi.fn(async (url) => {
+      if (url.endsWith('/ai/credentials')) {
+        return jsonResponse(r1Body([orgItem('anthropic', { model: 'claude-opus-4-7' })]))
+      }
+      if (url.endsWith('/models')) return jsonResponse({ data: [] })
+      throw new Error(`unexpected URL: ${url}`)
+    })
+    const host = createUniworkKeysHost({
+      profile: () => PROFILE,
+      orgId: () => org,
+      sessionKey: () => `default/${account}/dev_1`,
+      accountKey: () => `default/${account}`,
+      authorized: async (call) => call(TOKEN_1),
+      fetch: fetchMock,
+    })
+    const chosen = async () => {
+      await host.list({ force: true })
+      return host.chosenModelFor('anthropic')
+    }
+    expect(await chosen()).toBe('claude-opus-4-7')
+    host.recordModelPick('anthropic', 'claude-haiku-4-5')
+    expect(await chosen()).toBe('claude-haiku-4-5')
+
+    // another organization of the same account, another account in the same organization
+    org = ORG_2
+    expect(await chosen()).toBe('claude-opus-4-7')
+    host.recordModelPick('anthropic', 'claude-sonnet-5')
+    org = ORG_1
+    account = 'acc_2'
+    expect(await chosen()).toBe('claude-opus-4-7')
+
+    // each scope gets its own pick back
+    account = 'acc_1'
+    expect(await chosen()).toBe('claude-haiku-4-5')
+    org = ORG_2
+    expect(await chosen()).toBe('claude-sonnet-5')
+  })
+
+  it('caps a huge Retry-After on R1 at five minutes', async () => {
+    let clock = 7_000_000
+    let r1Calls = 0
+    const fetchMock: FetchLike = vi.fn(async (url) => {
+      if (url === R1_URL) {
+        r1Calls++
+        return jsonResponse({ error: { code: 'ai_rate_limited' } }, 429, { 'Retry-After': '99999' })
+      }
+      throw new Error(`unexpected URL: ${url}`)
+    })
+    const host = createUniworkKeysHost({
+      profile: () => PROFILE,
+      orgId: () => ORG_1,
+      authorized: async (call) => call(TOKEN_1),
+      fetch: fetchMock,
+      now: () => clock,
+    })
+    await host.list()
+    expect(r1Calls).toBe(1)
+    clock += CREDENTIALS_RETRY_MAX_MS - 1_000
+    await host.list()
+    expect(r1Calls).toBe(1)
+    clock += 2_000
+    await host.list()
+    expect(r1Calls).toBe(2)
+  })
+
+  it('times R1 out after 5 s through the request signal and backs off', async () => {
+    vi.useFakeTimers()
+    try {
+      let clock = 8_000_000
+      let r1Calls = 0
+      let aborted = false
+      // a server that never answers but honours the abort signal, like fetch does
+      const fetchMock: FetchLike = vi.fn(
+        (url, init) =>
+          new Promise<Response>((_resolve, reject) => {
+            if (url !== R1_URL) return reject(new Error(`unexpected URL: ${url}`))
+            r1Calls++
+            init?.signal?.addEventListener('abort', () => {
+              aborted = true
+              reject(new DOMException('The operation was aborted.', 'AbortError'))
+            })
+          }),
+      )
+      const host = createUniworkKeysHost({
+        profile: () => PROFILE,
+        orgId: () => ORG_1,
+        authorized: async (call) => call(TOKEN_1),
+        fetch: fetchMock,
+        now: () => clock,
+      })
+      let settled = false
+      void host.list().then(() => {
+        settled = true
+      })
+      await vi.advanceTimersByTimeAsync(CREDENTIALS_TIMEOUT_MS - 1)
+      expect(settled).toBe(false)
+      expect(aborted).toBe(false)
+      await vi.advanceTimersByTimeAsync(2)
+      expect(aborted).toBe(true)
+      expect(settled).toBe(true)
+      // the failure is a transient one: one request per backoff window
+      clock += 1_000
+      await host.list()
+      expect(r1Calls).toBe(1)
+      clock += CREDENTIALS_RETRY_MS
+      void host.list()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(r1Calls).toBe(2)
+      await vi.advanceTimersByTimeAsync(CREDENTIALS_TIMEOUT_MS + 1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })

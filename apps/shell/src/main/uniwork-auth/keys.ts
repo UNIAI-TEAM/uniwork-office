@@ -60,6 +60,9 @@ export const CREDENTIALS_TIMEOUT_MS = 5_000
  */
 export const CREDENTIALS_RETRY_MS = 30_000
 
+/** A longer `Retry-After` is not obeyed beyond this: a misconfigured edge must not silence R1 for hours. */
+export const CREDENTIALS_RETRY_MAX_MS = 5 * 60_000
+
 const ORG_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/
 
 export interface LocalModelChoice {
@@ -147,6 +150,8 @@ export function createUniworkKeysHost(deps: UniworkKeysHostDeps): UniworkKeysHos
   let r1InFlight: Promise<UniworkCredentialsResponse> | null = null
   /** no R1 request before this time (failure backoff); 0 = none */
   let r1RetryAt = 0
+  /** the owner the backoff belongs to: a new session or organization reads R1 at once */
+  let r1RetryOwner = ''
   const r5Cache = new Map<string, R5Entry>()
   const activeStreams = new Map<AbortController, { onAbort?: () => void }>()
   const memoryPicks = new Map<string, Partial<Record<string, LocalModelChoice>>>()
@@ -213,7 +218,9 @@ export function createUniworkKeysHost(deps: UniworkKeysHostDeps): UniworkKeysHos
     r1EverLoaded = false
     r1InFlight = null
     // a revoked device gets the same answer until the shell signs out: no R1 per settings read
+    // (for this owner only: a re-sign-in has another session key and is not held back)
     r1RetryAt = reason === 'device-revoked' ? now() + CREDENTIALS_RETRY_MS : 0
+    r1RetryOwner = reason === 'device-revoked' ? lastOwnerKey || r1RetryOwner : ''
     r5Cache.clear()
     abortAllStreams()
     if (hadSources) notifyChanged()
@@ -272,18 +279,35 @@ export function createUniworkKeysHost(deps: UniworkKeysHostDeps): UniworkKeysHos
     r1LoadedAt = now()
     r1EverLoaded = true
     r1RetryAt = 0
+    r1RetryOwner = ''
     if (prevSig !== credentialSignature(next)) notifyChanged()
     return next
   }
 
-  /** keep the last good list (no notify) and wait before the next R1 request */
+  /** keep the last good list (no notify) and wait before the next R1 request for this owner */
   function backOff(retryAfterSeconds?: number): UniworkCredentialsResponse {
     const wait =
       retryAfterSeconds !== undefined
-        ? Math.max(retryAfterSeconds * 1_000, CREDENTIALS_TTL_MS)
+        ? Math.min(
+            Math.max(retryAfterSeconds * 1_000, CREDENTIALS_TTL_MS),
+            CREDENTIALS_RETRY_MAX_MS,
+          )
         : CREDENTIALS_RETRY_MS
     r1RetryAt = now() + wait
+    r1RetryOwner = lastOwnerKey
     return r1State
+  }
+
+  /**
+   * The session ended (revoked device, reused refresh, a 401 from the UniWork server): drop the
+   * source, and keep R1 quiet for this owner for one window so a server that keeps answering 401
+   * does not cost an R1 + refresh per settings read. A new session or organization is not held back.
+   */
+  function endSession(err: TransportError): void {
+    const revoked = err.code === 'device_revoked'
+    clear(revoked ? 'device-revoked' : 'sign-out')
+    if (!revoked) backOff()
+    lastOwnerKey = ''
   }
 
   async function list(options?: { force?: boolean }): Promise<UniworkCredentialsResponse> {
@@ -292,7 +316,7 @@ export function createUniworkKeysHost(deps: UniworkKeysHostDeps): UniworkKeysHos
     if (!online()) return r1State
     const force = options?.force === true
     if (!force) {
-      if (now() < r1RetryAt) return r1State
+      if (now() < r1RetryAt && r1RetryOwner === target.ownerKey) return r1State
       if (r1EverLoaded && now() - r1LoadedAt < CREDENTIALS_TTL_MS) return r1State
       if (r1InFlight) return r1InFlight
     }
@@ -300,9 +324,14 @@ export function createUniworkKeysHost(deps: UniworkKeysHostDeps): UniworkKeysHos
     const runOwner = target.ownerKey
     const url = `${target.aiBase}/credentials`
     const stale = () => runGen !== generation || runOwner !== lastOwnerKey
+    // one timer per attempt (a retry after the token refresh starts its own), all cleared at the end;
+    // a plain timer rather than AbortSignal.timeout so the tests' fake timers drive it
+    const timers: ReturnType<typeof setTimeout>[] = []
     const run = (async (): Promise<UniworkCredentialsResponse> => {
       try {
         const res = await runAuthorized(async (token) => {
+          const timeout = new AbortController()
+          timers.push(setTimeout(() => timeout.abort(), CREDENTIALS_TIMEOUT_MS))
           const response = await getFetch()(url, {
             method: 'GET',
             headers: {
@@ -310,7 +339,7 @@ export function createUniworkKeysHost(deps: UniworkKeysHostDeps): UniworkKeysHos
               Authorization: `Bearer ${token}`,
             },
             redirect: 'error',
-            signal: AbortSignal.timeout(CREDENTIALS_TIMEOUT_MS),
+            signal: timeout.signal,
           })
           if (response.status === 401) {
             return inspect401AndThrow(response)
@@ -333,12 +362,13 @@ export function createUniworkKeysHost(deps: UniworkKeysHostDeps): UniworkKeysHos
       } catch (err) {
         if (stale()) return r1State
         if (err instanceof TransportError && endsSession(err)) {
-          clear(err.code === 'device_revoked' ? 'device-revoked' : 'sign-out')
-          lastOwnerKey = ''
+          endSession(err)
           return EMPTY_CREDENTIALS
         }
         // offline, timed out, a gateway's 401 or an unreadable body: transient
         return backOff()
+      } finally {
+        for (const timer of timers) clearTimeout(timer)
       }
     })()
     r1InFlight = run
@@ -478,10 +508,7 @@ export function createUniworkKeysHost(deps: UniworkKeysHostDeps): UniworkKeysHos
         return res
       } catch (err) {
         if (err instanceof TransportError) {
-          if (endsSession(err)) {
-            clear(err.code === 'device_revoked' ? 'device-revoked' : 'sign-out')
-            lastOwnerKey = ''
-          }
+          if (endsSession(err)) endSession(err)
           // a 401 that did not come from the UniWork server (gateway, captive portal) ends only this call
           if (endsSession(err) || err.code === 'unauthorized') {
             throw new UniworkKeyError({
