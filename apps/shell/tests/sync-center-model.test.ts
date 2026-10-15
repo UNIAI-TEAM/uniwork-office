@@ -307,6 +307,56 @@ describe('blocked reasons (Lý do bị chặn, 13 reasons)', () => {
     }
   })
 
+  it('Bỏ nháp… on a blocked row needs the in-row confirm, for the four access-lost reasons only', () => {
+    for (const reason of [
+      'permission_revoked',
+      'document_deleted',
+      'document_archived',
+      'member_deactivated',
+    ]) {
+      const discard = blocked(reason).actions.find((a) => a.id === 'discardDraft')
+      expect(discard, reason).toMatchObject({
+        labelKey: 'uwActDiscardDraft',
+        confirm: { sentenceKey: 'uwDiscardDraftConfirm', goKey: 'uwActDiscard' },
+      })
+    }
+    for (const reason of Object.keys(BLOCKED_REASONS)) {
+      if (
+        [
+          'permission_revoked',
+          'document_deleted',
+          'document_archived',
+          'member_deactivated',
+        ].includes(reason)
+      ) {
+        continue
+      }
+      expect(
+        blocked(reason).actions.map((a) => a.id),
+        reason,
+      ).not.toContain('discardDraft')
+    }
+  })
+
+  it('lease_expired with the offline library off has no Kết nối lại; other rows keep theirs', () => {
+    const lease = (over: Partial<SyncCenterRow>) =>
+      rowView(row('blocked', { blockedReason: 'lease_expired', ...over }), ctx)
+    expect(lease({ libraryOff: true }).actions).toEqual([])
+    expect(lease({ libraryOff: true }).badge).toEqual({ tone: 'error', key: 'uwBadgeReconnect' })
+    expect(lease({ libraryOff: true }).sub).toMatchObject({
+      key: 'uwRowBlocked',
+      keyParams: { reason: 'uwReasonLease' },
+    })
+    expect(lease({ libraryOff: false }).actions.map((a) => a.id)).toEqual(['reconnect'])
+    expect(lease({}).actions.map((a) => a.id)).toEqual(['reconnect'])
+    // libraryOff is about lease_expired only
+    const clock = rowView(
+      row('blocked', { blockedReason: 'clock_rollback', libraryOff: true }),
+      ctx,
+    )
+    expect(clock.actions.map((a) => a.id)).toEqual(['reconnect'])
+  })
+
   it('never names the document of another account', () => {
     expect(blocked('foreign_account').hideTitle).toBe(true)
     expect(blocked('foreign_account').opens).toBeNull()

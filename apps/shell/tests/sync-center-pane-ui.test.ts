@@ -93,6 +93,7 @@ function fakeApi(initial: SyncCenterSnapshot | null): Fake {
     openDocument: vi.fn(ok),
     openDraft: vi.fn(ok),
     discardDraft: vi.fn(ok),
+    saveAgain: vi.fn(ok),
     saveMyCopy: vi.fn(ok),
     retryStore: vi.fn(ok),
     subscribe: vi.fn((cb: (s: SyncCenterSnapshot) => void) => {
@@ -416,6 +417,53 @@ describe('SyncCenterPane', () => {
     expect(api.discardDraft).not.toHaveBeenCalled()
     await click(button(vi_.uwActDiscard!, rowEl('draft')))
     expect(api.discardDraft).toHaveBeenCalledWith('draft')
+  })
+
+  it('failed row: Lưu lại calls saveAgain (not recheck) and a refusal is announced', async () => {
+    const s = snapshot()
+    s.tabs.attention = [row('bad', 'failed', { failedReason: 'quota' })]
+    const api = fakeApi(s)
+    await render(api)
+    await click(button(vi_.uwActSaveAgain!, rowEl('bad')))
+    expect(api.saveAgain).toHaveBeenCalledTimes(1)
+    expect(api.saveAgain).toHaveBeenCalledWith('bad')
+    expect(api.recheck).not.toHaveBeenCalled()
+
+    api.saveAgain.mockResolvedValueOnce({ ok: false, code: 'store_full' })
+    await click(button(vi_.uwActSaveAgain!, rowEl('bad')))
+    expect(api.saveAgain).toHaveBeenCalledTimes(2)
+    expect(status().textContent).toBe(
+      fill(vi_.uwSyncRowAnnounce!, { doc: 'Tài liệu bad', state: vi_.uwQueueFull! }),
+    )
+  })
+
+  it('blocked row: Bỏ nháp… confirms first, then calls discardDraft with the row id', async () => {
+    const s = snapshot()
+    s.tabs.attention = [row('gone', 'blocked', { blockedReason: 'document_deleted' })]
+    const api = fakeApi(s)
+    await render(api)
+    await click(button(vi_.uwActDiscardDraft!, rowEl('gone')))
+    expect(rowEl('gone').textContent).toContain(vi_.uwDiscardDraftConfirm)
+    expect(api.discardDraft).not.toHaveBeenCalled()
+    await click(button(vi_.uwActDiscard!, rowEl('gone')))
+    expect(api.discardDraft).toHaveBeenCalledTimes(1)
+    expect(api.discardDraft).toHaveBeenCalledWith('gone')
+  })
+
+  it('lease_expired row: Kết nối lại only while the offline library is on', async () => {
+    const s = snapshot()
+    s.tabs.attention = [
+      row('lease', 'blocked', { blockedReason: 'lease_expired' }),
+      row('lib', 'blocked', { blockedReason: 'lease_expired', libraryOff: true }),
+    ]
+    await render(fakeApi(s))
+    const actionsOf = (id: string) =>
+      buttons(rowEl(id).querySelector('.sc-actions')!).map((b) => b.textContent?.trim())
+    expect(actionsOf('lease')).toEqual([vi_.uwActReconnect])
+    expect(actionsOf('lib')).toEqual([])
+    expect(rowEl('lib').textContent).toContain(
+      fill(vi_.uwRowBlocked!, { reason: vi_.uwReasonLease! }),
+    )
   })
 
   it('signed out: the count only, no document titles, Đăng nhập', async () => {
