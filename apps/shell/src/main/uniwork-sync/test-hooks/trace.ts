@@ -160,9 +160,15 @@ export type CoordinatorTraceEvent =
   | { type: 'settled'; now: Date }
   | { type: 'failed'; error: UniworkDocError; to: string; now: Date }
 
-/** The coordinator's own end state (a binding state) as a queue state for the trace. */
+/**
+ * The coordinator's own end state (a binding state) as a queue state for the trace.
+ * `signed-out` is what `applyFailure` writes for `session_expired` / `not_signed_in` /
+ * `wrong_deployment`; the queue machine parks the same three codes as `blocked`
+ * (`BLOCKED_REASONS`), so that is what the trace says, never `failed`.
+ */
 function traceStateOf(state: string): QueueState {
   if (isQueueState(state)) return state
+  if (state === 'signed-out') return 'blocked'
   return state === 'offline' ? 'paused_offline' : 'failed'
 }
 

@@ -408,6 +408,41 @@ describe('UNI-1380 G7-03a test-only sync trace + queue timer hooks', () => {
     expect(ended.binding.state).toBe('blocked')
   })
 
+  it.each(['session_expired', 'not_signed_in'] as const)(
+    'traces the coordinator ending signed-out on %s as blocked with that code, never failed',
+    async (code) => {
+      const traceFile = join(tempDir, 'trace', `coordinator-${code}.jsonl`)
+      process.env.UNIWORK_SYNC_TRACE_FILE = traceFile
+
+      const fx = await buildFixture()
+      fx.serverState.commitError = new UniworkDocError(code, { status: 401 })
+      const ended = await fx.coordinator.save(fx.docPath)
+
+      // the binding really ended signed-out: the trace maps it, it does not rename the failure
+      expect(ended.binding.state).toBe('signed-out')
+      const lines = readTraceLines(traceFile)
+      assertOnlyAllowedKeys(lines)
+      expect(lines.map((l) => l.to)).not.toContain('failed')
+      const last = lines[lines.length - 1]
+      expect(last?.from).toBe('queued')
+      expect(last?.to).toBe('blocked')
+      expect(last?.code).toBe(code)
+      expect(last?.httpStatus).toBe(401)
+    },
+  )
+
+  it('writes no coordinator trace for a signed-out failure without UNIWORK_SYNC_TRACE_FILE', async () => {
+    const traceFile = join(tempDir, 'trace', 'coordinator-gated.jsonl')
+    delete process.env.UNIWORK_SYNC_TRACE_FILE
+
+    const fx = await buildFixture()
+    fx.serverState.commitError = new UniworkDocError('session_expired', { status: 401 })
+    const ended = await fx.coordinator.save(fx.docPath)
+
+    expect(ended.binding.state).toBe('signed-out')
+    expect(existsSync(traceFile)).toBe(false)
+  })
+
   it('honours stuckAfterMs and recheckMs overrides only with UNIWORK_SYNC_TRACE_FILE set and unpackaged; ignores invalid values', async () => {
     // 1. Defaults when unset
     expect(QUEUE_LIMITS.stuckAfterMs).toBe(3_600_000)
