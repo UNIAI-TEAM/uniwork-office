@@ -3,6 +3,7 @@ import type { Editor } from '@tiptap/core'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 import type { Transaction } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
+import { isHistoryTransaction } from '@tiptap/pm/history'
 import { AddMarkStep, RemoveMarkStep } from '@tiptap/pm/transform'
 import { OP_META, blockIndexRange, blockRange, type OpMeta } from './ops'
 
@@ -66,6 +67,13 @@ export const AiHighlight = Extension.create({
           apply(tr, set) {
             if (tr.getMeta('aiHighlightClear')) return DecorationSet.empty
             let next = set.map(tr.mapping, tr.doc)
+            // an undo / redo puts the text it touches back: the wash over it must not stay behind
+            // (a style-only change keeps its text, so mapping alone would leave the wash on it)
+            if (isHistoryTransaction(tr) && tr.docChanged) {
+              for (const range of changedRanges(tr)) {
+                next = next.remove(next.find(range.from, range.to, (spec) => spec !== null))
+              }
+            }
             const meta = tr.getMeta(OP_META) as OpMeta | undefined
             const add =
               meta?.source === 'ai' && !meta.rollback && tr.docChanged ? changedRanges(tr) : []

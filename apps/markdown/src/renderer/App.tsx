@@ -40,6 +40,7 @@ import { readSourceText, writeSourceText, type SourceTextFormat } from '../share
 import { PlainTextEditor, type PlainTextEditorHandle } from './source/PlainTextEditor'
 import { buildExtensions } from './editor/extensions'
 import { tiptapFindTarget } from './editor/findTarget'
+import { runHistoryOf, setRunFrontmatterSink } from './editor/aiRunHistory'
 import { syncEditorEditable } from './editor/editable-sync'
 import { collectOutline, type OutlineItem } from './editor/outline'
 import { rewriteRawHtmlImages } from './editor/rawHtml'
@@ -1164,14 +1165,32 @@ export default function App() {
     setAiPreset((prev) => ({ text, nonce: (prev?.nonce ?? 0) + 1 }))
   }, [])
 
+  // Ctrl/Cmd+Z / redo of an AI run (or a failed batch) also moves the properties block the run
+  // changed: the run's undo step carries it (editor/aiRunHistory.ts)
+  useEffect(() => {
+    if (!editor) return
+    setRunFrontmatterSink(editor, (raw) => {
+      envelopeRef.current.frontmatter = raw
+      const inner = frontmatterInner(raw)
+      setFmText(inner)
+      setFmOpen(inner !== '')
+      markDirty()
+    })
+    return () => setRunFrontmatterSink(editor, null)
+  }, [editor, markDirty])
+
   const aiDeps: MarkdownAiDeps = {
     getEditor: () => editorRef.current,
     // envelopeRef, not fmText state: a write-then-read within one AI run must
     // see the new value before React commits
     getFrontmatter: () => frontmatterInner(envelopeRef.current.frontmatter),
     setFrontmatter: (inner) => {
+      const before = envelopeRef.current.frontmatter
       onFrontmatterChange(inner)
       setFmOpen(inner.trim() !== '')
+      // inside an AI run the change joins the run's one undo step
+      if (editorRef.current)
+        runHistoryOf(editorRef.current).recordFrontmatter(before, envelopeRef.current.frontmatter)
     },
     // snapshots carry body + the raw frontmatter block (structured, no
     // file-text round-trip) so a rollback also reverts set_frontmatter and

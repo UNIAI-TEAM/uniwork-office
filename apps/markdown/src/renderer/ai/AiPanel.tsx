@@ -26,7 +26,9 @@ import {
   type MindMapTreeNode,
   type PanelNote,
   composeSkills,
+  runHistoryEvents,
   streamText,
+  type RunHistoryGroup,
 } from '@genoffice/agent-core'
 import {
   aiNoticeBody,
@@ -63,6 +65,7 @@ import sendEnterOn from '../assets/send-enter-on.png'
 import sendEnterOff from '../assets/send-enter-off.png'
 import sendStop from '../assets/send-stop.png'
 import { clearAiHighlights } from '../editor/aiHighlight'
+import { onRunHistoryChange, runHistoryOf } from '../editor/aiRunHistory'
 import { setInactiveSelectionShown } from '../editor/inactiveSelection'
 import { queueAnchorRange } from '../editor/aiQueueAnchors'
 import {
@@ -207,6 +210,8 @@ interface Snapshot {
   doc: DocSnapshot
   /** file names of the pictures the run saved beside the document (live: later tools of the same run append) */
   assets: string[]
+  /** the loop run that took it, so an undo of that run can retire its Roll back entry */
+  runId: string | null
 }
 
 /** Ribbon preset instruction; a new nonce triggers one auto-send */
@@ -391,6 +396,13 @@ export function AiPanel({
   const [saveOffer, setSaveOffer] = useState<{ name: string } | null>(null)
   /** pictures the in-flight run saved; the run's snapshot keeps this same array so Roll back can name them */
   const runAssetsRef = useRef<string[]>([])
+  /** id of the in-flight loop run (the editor's undo step of that run carries it) */
+  const runIdRef = useRef<string | null>(null)
+  /** pictures each run saved, by run id: an undo of the run drops them like Roll back */
+  const runAssetsByIdRef = useRef(new Map<string, string[]>())
+  /** runs whose pictures an undo discarded: their redo would bring back dead image links */
+  const discardedRunsRef = useRef(new Set<string>())
+  const undoWatchRef = useRef<{ editor: Editor; stop: () => void } | null>(null)
   /** tool activity of the whole run, for transcript persistence */
   const runToolsRef = useRef<ToolActivity[]>([])
   /** tokens billed so far in the in-flight run (summed across turns) */
@@ -531,6 +543,55 @@ export function AiPanel({
     [],
   )
 
+  /** discard the pending pictures a Roll back or an undo of a run drops (desktop; main keeps what is saved) */
+  const discardPictures = (names: Iterable<string>): void => {
+    const list = [...new Set(names)]
+    if (list.length > 0) void window.markdownApi?.discardPendingAssets?.(list)?.catch(() => {})
+  }
+  /** the editor-side undo group of a loop run, resolved at call time (the loop is built once) */
+  const runGroup: RunHistoryGroup = {
+    get activeRunId() {
+      const ed = depsRef.current.getEditor()
+      return ed ? runHistoryOf(ed).activeRunId : null
+    },
+    begin: (runId) => {
+      runIdRef.current = runId
+      runAssetsByIdRef.current.set(runId, runAssetsRef.current)
+      const ed = depsRef.current.getEditor()
+      if (!ed) return
+      watchUndo(ed)
+      runHistoryOf(ed).begin(runId)
+    },
+    end: (runId, mutated) => {
+      const ed = depsRef.current.getEditor()
+      if (ed) runHistoryOf(ed).end(runId, mutated)
+    },
+  }
+  /**
+   * Ctrl/Cmd+Z of a run's step (anywhere in the app) drops the pictures that run saved, exactly
+   * like Roll back; its Roll back entry goes with it. A redo of such a run is refused: the files
+   * are gone, and the markup would point at nothing.
+   */
+  function watchUndo(editor: Editor): void {
+    if (undoWatchRef.current?.editor === editor) return
+    undoWatchRef.current?.stop()
+    const stopListening = onRunHistoryChange(editor, ({ runId, direction }) => {
+      if (direction !== 'undo') return
+      const names = runAssetsByIdRef.current.get(runId) ?? []
+      if (names.length > 0) discardedRunsRef.current.add(runId)
+      discardPictures(names)
+      setSnapshots((prev) => prev.filter((s) => s.runId !== runId))
+    })
+    runHistoryOf(editor).refuseRedo((runId) => discardedRunsRef.current.has(runId))
+    undoWatchRef.current = {
+      editor,
+      stop: () => {
+        stopListening()
+        if (!editor.isDestroyed) runHistoryOf(editor).refuseRedo(null)
+      },
+    }
+  }
+
   // The loop is built once; every mutable value goes through a ref getter
   const loopRef = useRef<AgentLoop<DocSnapshot> | null>(null)
   if (!loopRef.current) {
@@ -558,6 +619,8 @@ export function AiPanel({
       captureSnapshot: () => depsRef.current.getSnapshot(),
       systemSuffix: () => aiLangDirective(langRef.current),
       events: {
+        // every edit of a run is ONE undo step of the editor (the group closes at run end)
+        ...runHistoryEvents(runGroup),
         onText: (text) => patchLast({ text, waitLine: undefined }),
         // transport notices (UniWork AI); langRef: the loop is created once, `lang` would go stale
         onNotice: (notice) => {
@@ -592,9 +655,16 @@ export function AiPanel({
               minute: '2-digit',
             })
             setSnapshots((prev) =>
-              [...prev, { label, time, doc: snapshotBefore, assets: runAssetsRef.current }].slice(
-                -MAX_SNAPSHOTS,
-              ),
+              [
+                ...prev,
+                {
+                  label,
+                  time,
+                  doc: snapshotBefore,
+                  assets: runAssetsRef.current,
+                  runId: runIdRef.current,
+                },
+              ].slice(-MAX_SNAPSHOTS),
             )
           }
           // mind maps ride the UI-only display side channel onto the message
@@ -701,6 +771,8 @@ export function AiPanel({
       clarifyResolverRef.current?.({ answers: '', cancelled: true })
       clarifyResolverRef.current = null
       loopRef.current?.cancel()
+      undoWatchRef.current?.stop()
+      undoWatchRef.current = null
       const editor = depsRef.current.getEditor()
       if (editor) {
         clearAiHighlights(editor)
@@ -998,8 +1070,7 @@ export function AiPanel({
     // in it. Only files a run saved are named, so a picture the user added or one already saved
     // with the document is never touched; the main process drops what is still pending.
     const from = snapshots.indexOf(snapshot)
-    const names = new Set((from < 0 ? [snapshot] : snapshots.slice(from)).flatMap((s) => s.assets))
-    if (names.size > 0) void window.markdownApi?.discardPendingAssets?.([...names])?.catch(() => {})
+    discardPictures((from < 0 ? [snapshot] : snapshots.slice(from)).flatMap((s) => s.assets))
     setSnapshots((prev) => prev.filter((s) => s !== snapshot))
   }
 
