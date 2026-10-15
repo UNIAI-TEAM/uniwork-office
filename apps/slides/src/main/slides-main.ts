@@ -426,6 +426,9 @@ setInterval(() => {
       if (seen.has(session)) continue
       seen.add(session)
       if (session.masterEdit || !sessionDirty(session)) continue
+      // G5-11: a bound UniWork working copy keeps no plaintext copy under
+      // userData (sign-out deletes the account's folder; a copy here would outlive it)
+      if (session.path && uniworkIsBound(session.path)) continue
       let target: string
       if (session.path) {
         target = autosavePathFor(session.path)

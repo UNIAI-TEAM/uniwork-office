@@ -6,6 +6,7 @@ import {
   readFileSync,
   readdirSync,
   rmSync,
+  utimesSync,
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -72,7 +73,7 @@ function seedWorkingCopy(
   opts: {
     docId?: string
     name?: string
-    format?: 'docx' | 'xlsx'
+    format?: 'docx' | 'xlsx' | 'pptx'
     bytes?: string
     baseBytes?: string
     state?: Binding['state']
@@ -1110,5 +1111,79 @@ describe('G5-11 sign-out lock-and-keep, N+1 park, and restoreParked', () => {
     await ctx.service.restoreParked(ownerA)
     expect(existsSync(path)).toBe(true)
     expect(readFileSync(path, 'utf8')).toBe('v5 n+1')
+  })
+
+  it("19. d2-1: a pre-existing slides autosave copy of the owner's deck is gone after sign-out", async () => {
+    const marker = 'MARKER-SLIDES-d2-1-8c4e'
+    const path = seedWorkingCopy({
+      name: 'Deck.pptx',
+      format: 'pptx',
+      bytes: 'v3 base deck',
+      baseBytes: 'v3 base deck',
+      state: 'saved',
+    })
+    const slidesRecoveryDir = join(dir, 'slides-autosave')
+    mkdirSync(slidesRecoveryDir, { recursive: true })
+    const slidesRecovery = join(
+      slidesRecoveryDir,
+      `${createHash('sha1').update(path).digest('hex').slice(0, 16)}.pptx`,
+    )
+    await new Promise((r) => setTimeout(r, 15))
+    writeFileSync(slidesRecovery, `v4 slides recovery ${marker}`)
+
+    const ctx = setup({
+      openPaths: [path],
+      requestModuleSave: vi.fn(() => true),
+    })
+    ctx.service.noteEditorDirty(path, true)
+
+    const res = await ctx.service.lockSession(ownerA)
+    expect(res).toEqual({ ok: true, captureFailed: [DOC] })
+
+    // Neither the working-copy folder nor the slides-autosave recovery copy survives
+    expect(existsSync(docDir(DOC))).toBe(false)
+    expect(existsSync(slidesRecovery)).toBe(false)
+    expect(filesContaining(dir, marker)).toEqual([])
+
+    // The newer slides recovery copy was parked encrypted before deletion
+    const reopen = await ctx.layer.open(ownerA)
+    if (reopen.kind !== 'ok') throw new Error(reopen.kind)
+    const parked = createParkedStore(reopen.store.records(PARKED_STORE_REGISTRATION.name))
+    const taken = await parked.take(DOC)
+    expect(new TextDecoder().decode(taken?.bytes)).toBe(`v4 slides recovery ${marker}`)
+  })
+
+  it('21. d2-3: findNewestRecoveryBytes picks the newest candidate by mtime when the disk file is missing', async () => {
+    const path = seedWorkingCopy({ bytes: 'v3 base', baseBytes: 'v3 base', state: 'saved' })
+    // Working copy file is missing on disk while binding and recovery candidates exist
+    rmSync(path, { force: true })
+
+    const shortHash = createHash('sha1').update(path).digest('hex').slice(0, 16)
+    const docsDir = join(dir, 'docs-autosave')
+    const sheetsDir = join(dir, 'sheets-autosave')
+    mkdirSync(docsDir, { recursive: true })
+    mkdirSync(sheetsDir, { recursive: true })
+    const docsCandidate = join(docsDir, `${shortHash}.docx`)
+    const sheetsCandidate = join(sheetsDir, `${shortHash}.xlsx`)
+    writeFileSync(docsCandidate, 'newest docx candidate')
+    writeFileSync(sheetsCandidate, 'older sheets candidate')
+    // Make the first iterated candidate (docs) newer than the second (sheets)
+    utimesSync(docsCandidate, new Date(2_000_000_000_000), new Date(2_000_000_000_000))
+    utimesSync(sheetsCandidate, new Date(1_500_000_000_000), new Date(1_500_000_000_000))
+
+    const ctx = setup({
+      openPaths: [path],
+      requestModuleSave: vi.fn(() => true),
+    })
+    ctx.service.noteEditorDirty(path, true)
+
+    const res = await ctx.service.lockSession(ownerA)
+    expect(res).toEqual({ ok: true, captureFailed: [DOC] })
+
+    const reopen = await ctx.layer.open(ownerA)
+    if (reopen.kind !== 'ok') throw new Error(reopen.kind)
+    const parked = createParkedStore(reopen.store.records(PARKED_STORE_REGISTRATION.name))
+    const taken = await parked.take(DOC)
+    expect(new TextDecoder().decode(taken?.bytes)).toBe('newest docx candidate')
   })
 })
