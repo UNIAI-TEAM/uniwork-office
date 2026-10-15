@@ -68,4 +68,23 @@ export const ar = {
   collabAiDraftLabel: 'مسودة مقترحة من UniWork AI. راجعها ثم أرسلها.',
   collabInFileSection: 'التعليقات في الملف',
   collabInFileHint: 'محفوظة في الملف وللقراءة فقط: لا يمكنك التعديل أو الرد هنا.',
+  collabMentionWarnTitle: 'الأشخاص المشار إليهم لا يمكنهم عرض هذا المستند',
+  collabMentionWarnBody: 'لا يمكن لـ {names} عرض هذا المستند، لذلك لن يتم إشعارهم.',
+  collabShareViewThenSend: 'مشاركة صلاحية العرض ثم الإرسال',
+  collabSendWithoutNotify: 'الإرسال دون إشعار',
+  collabMentionAskManager: 'اطلب من شخص يدير هذا المستند مشاركة صلاحية العرض مع {names}.',
+  collabMentionMixedUnshareable: 'لا يمكن المشاركة مع {unshareable}؛ لن يتم إشعارهم.',
+  collabSharingView: 'جارٍ مشاركة صلاحية العرض…',
+  collabShareViewFailed:
+    'تعذّرت مشاركة صلاحية العرض مع {failedNames}. يمكنك المحاولة مرة أخرى أو الإرسال دون إشعار.',
+  collabShareViewPartial:
+    'تمت مشاركة صلاحية العرض مع {sharedNames}. تعذّرت المشاركة مع {failedNames} (لن يتم إشعارهم).',
+  collabSendComment: 'إرسال التعليق',
+  collabRetryShareFor: 'المحاولة مرة أخرى لـ {failedNames}',
+  collabSendFailedAfterShare:
+    'تمت مشاركة صلاحية العرض مع {sharedNames}، لكن تعذّر إرسال التعليق. ما زال نصك في المربع — حاول الإرسال مرة أخرى.',
+  collabPostSendNoAccess: 'لا يمكن لـ {names} عرض هذا المستند، لذلك لم يتم إشعارهم.',
+  collabPostSendShareAction: 'مشاركة صلاحية العرض',
+  collabPostSendNoRetroNote:
+    'المشاركة الآن لن ترسل إشعارًا بهذا التعليق؛ أشر إليهم في تعليق جديد لإشعارهم.',
 } satisfies Record<keyof typeof zh, string>

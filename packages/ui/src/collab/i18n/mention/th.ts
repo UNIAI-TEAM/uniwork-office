@@ -7,4 +7,5 @@ export const th = {
   collabMentionNoMatch: 'ไม่มีผู้ที่เข้าถึงเอกสารนี้ได้ตรงกับ “{query}”',
   collabMentionNoCandidates: 'ยังไม่มีคนอื่นที่เข้าถึงเอกสารนี้ได้',
   collabMentionError: 'โหลดรายชื่อบุคคลไม่สำเร็จ',
+  collabMentionNoAccessBadge: 'ยังดูไม่ได้',
 } satisfies Record<keyof typeof zh, string>

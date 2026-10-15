@@ -72,4 +72,24 @@ export const es = {
   collabInFileSection: 'Comentarios en el archivo',
   collabInFileHint:
     'Guardados en el archivo y de solo lectura: aquí no puedes editar ni responder.',
+  collabMentionWarnTitle: 'Las personas mencionadas no pueden ver este documento',
+  collabMentionWarnBody: '{names} no pueden ver este documento, por lo que no recibirán notificación.',
+  collabShareViewThenSend: 'Compartir acceso de lectura y enviar',
+  collabSendWithoutNotify: 'Enviar sin notificar',
+  collabMentionAskManager:
+    'Pide a alguien que administre este documento que comparta acceso de lectura con {names}.',
+  collabMentionMixedUnshareable: 'No se puede compartir con {unshareable}; no recibirán notificación.',
+  collabSharingView: 'Compartiendo acceso de lectura…',
+  collabShareViewFailed:
+    'No se pudo compartir el acceso de lectura con {failedNames}. Puedes intentarlo de nuevo o enviar sin notificar.',
+  collabShareViewPartial:
+    'Se compartió el acceso de lectura con {sharedNames}. No se pudo compartir con {failedNames} (no recibirán notificación).',
+  collabSendComment: 'Enviar comentario',
+  collabRetryShareFor: 'Reintentar para {failedNames}',
+  collabSendFailedAfterShare:
+    'Se compartió el acceso de lectura con {sharedNames}, pero no se pudo enviar el comentario. Tu texto sigue en el cuadro — intenta enviarlo de nuevo.',
+  collabPostSendNoAccess: '{names} no pueden ver este documento, por lo que no se les notificó.',
+  collabPostSendShareAction: 'Compartir acceso de lectura',
+  collabPostSendNoRetroNote:
+    'Compartir ahora no les notificará sobre este comentario; menciónalos en un comentario nuevo para notificarles.',
 } satisfies Record<keyof typeof zh, string>

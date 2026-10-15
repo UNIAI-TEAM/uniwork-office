@@ -71,4 +71,27 @@ export const ru = {
   collabInFileSection: 'Комментарии в файле',
   collabInFileHint:
     'Сохранены в файле и доступны только для чтения: здесь их нельзя изменить или ответить на них.',
+  collabMentionWarnTitle: 'Упомянутые пользователи не могут просматривать этот документ',
+  collabMentionWarnBody:
+    '{names} не могут просматривать этот документ, поэтому они не получат уведомление.',
+  collabShareViewThenSend: 'Предоставить доступ для просмотра и отправить',
+  collabSendWithoutNotify: 'Отправить без уведомления',
+  collabMentionAskManager:
+    'Попросите того, кто управляет этим документом, предоставить доступ для просмотра {names}.',
+  collabMentionMixedUnshareable:
+    'Невозможно предоставить доступ {unshareable}; они не получат уведомление.',
+  collabSharingView: 'Предоставление доступа для просмотра…',
+  collabShareViewFailed:
+    'Не удалось предоставить доступ для просмотра {failedNames}. Повторите попытку или отправьте без уведомления.',
+  collabShareViewPartial:
+    'Доступ для просмотра предоставлен {sharedNames}. Не удалось предоставить доступ {failedNames} (уведомление не будет отправлено).',
+  collabSendComment: 'Отправить комментарий',
+  collabRetryShareFor: 'Повторить для {failedNames}',
+  collabSendFailedAfterShare:
+    'Доступ для просмотра предоставлен {sharedNames}, но отправить комментарий не удалось. Текст сохранён в поле — попробуйте отправить ещё раз.',
+  collabPostSendNoAccess:
+    '{names} не могут просматривать этот документ, поэтому уведомление не было отправлено.',
+  collabPostSendShareAction: 'Предоставить доступ для просмотра',
+  collabPostSendNoRetroNote:
+    'Предоставление доступа сейчас не отправит уведомление об этом комментарии; упомяните их в новом комментарии, чтобы уведомить.',
 } satisfies Record<keyof typeof zh, string>

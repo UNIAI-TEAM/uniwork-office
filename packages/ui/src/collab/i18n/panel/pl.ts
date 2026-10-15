@@ -71,4 +71,27 @@ export const pl = {
     'Wersja robocza zaproponowana przez UniWork AI. Przejrzyj ją, a potem wyślij.',
   collabInFileSection: 'Komentarze w pliku',
   collabInFileHint: 'Zapisane w pliku, tylko do odczytu: nie możesz tu edytować ani odpowiadać.',
+  collabMentionWarnTitle: 'Wspomniane osoby nie mogą wyświetlić tego dokumentu',
+  collabMentionWarnBody:
+    '{names} nie mogą wyświetlić tego dokumentu, więc nie otrzymają powiadomienia.',
+  collabShareViewThenSend: 'Udostępnij podgląd i wyślij',
+  collabSendWithoutNotify: 'Wyślij bez powiadamiania',
+  collabMentionAskManager:
+    'Poproś osobę zarządzającą tym dokumentem o udostępnienie podglądu dla {names}.',
+  collabMentionMixedUnshareable:
+    'Nie można udostępnić dla {unshareable}; te osoby nie otrzymają powiadomienia.',
+  collabSharingView: 'Udostępnianie podglądu…',
+  collabShareViewFailed:
+    'Nie udało się udostępnić podglądu dla {failedNames}. Możesz spróbować ponownie lub wysłać bez powiadamiania.',
+  collabShareViewPartial:
+    'Udostępniono podgląd dla {sharedNames}. Nie udało się udostępnić dla {failedNames} (nie otrzymają powiadomienia).',
+  collabSendComment: 'Wyślij komentarz',
+  collabRetryShareFor: 'Spróbuj ponownie dla {failedNames}',
+  collabSendFailedAfterShare:
+    'Udostępniono podgląd dla {sharedNames}, ale nie udało się wysłać komentarza. Twój tekst nadal jest w polu — spróbuj wysłać ponownie.',
+  collabPostSendNoAccess:
+    '{names} nie mogą wyświetlić tego dokumentu, więc nie otrzymali powiadomienia.',
+  collabPostSendShareAction: 'Udostępnij podgląd',
+  collabPostSendNoRetroNote:
+    'Udostępnienie teraz nie wyśle powiadomienia o tym komentarzu; wspomnij o nich w nowym komentarzu, aby ich powiadomić.',
 } satisfies Record<keyof typeof zh, string>

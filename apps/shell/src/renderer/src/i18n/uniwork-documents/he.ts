@@ -121,6 +121,7 @@ export const he = {
   uwDocInfoByAt: '{name}, {time}',
   uwDocInfoVersionBy: '{version} · {name}',
   uwAccessView: 'צפייה',
+  uwAccessComment: 'תגובה',
   uwAccessEdit: 'עריכה',
   uwAccessManage: 'ניהול',
   uwRoleOwner: 'בעלים',

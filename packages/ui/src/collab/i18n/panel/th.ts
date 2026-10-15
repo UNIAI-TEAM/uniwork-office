@@ -66,4 +66,22 @@ export const th = {
   collabAiDraftLabel: 'ฉบับร่างที่ UniWork AI แนะนำ ตรวจดูแล้วจึงส่ง',
   collabInFileSection: 'ความคิดเห็นในไฟล์',
   collabInFileHint: 'บันทึกไว้ในไฟล์และอ่านได้อย่างเดียว: แก้ไขหรือตอบกลับที่นี่ไม่ได้',
+  collabMentionWarnTitle: 'ผู้ที่ถูกกล่าวถึงยังดูเอกสารนี้ไม่ได้',
+  collabMentionWarnBody: '{names} ยังดูเอกสารนี้ไม่ได้ จึงจะไม่ได้รับการแจ้งเตือน',
+  collabShareViewThenSend: 'แชร์สิทธิ์ดูแล้วส่ง',
+  collabSendWithoutNotify: 'ส่งโดยไม่แจ้งเตือน',
+  collabMentionAskManager: 'โปรดขอให้ผู้จัดการเอกสารนี้แชร์สิทธิ์ดูให้กับ {names}',
+  collabMentionMixedUnshareable: 'ไม่สามารถแชร์กับ {unshareable} ได้ และพวกเขาจะไม่ได้รับการแจ้งเตือน',
+  collabSharingView: 'กำลังแชร์สิทธิ์ดู…',
+  collabShareViewFailed: 'แชร์สิทธิ์ดูให้กับ {failedNames} ไม่สำเร็จ คุณสามารถลองใหม่หรือส่งโดยไม่แจ้งเตือนได้',
+  collabShareViewPartial:
+    'แชร์สิทธิ์ดูให้กับ {sharedNames} แล้ว แต่แชร์ให้กับ {failedNames} ไม่สำเร็จ (จะไม่ได้รับการแจ้งเตือน)',
+  collabSendComment: 'ส่งความคิดเห็น',
+  collabRetryShareFor: 'ลองใหม่สำหรับ {failedNames}',
+  collabSendFailedAfterShare:
+    'แชร์สิทธิ์ดูให้กับ {sharedNames} แล้ว แต่ส่งความคิดเห็นไม่สำเร็จ ข้อความยังอยู่ในกล่อง — ลองส่งอีกครั้ง',
+  collabPostSendNoAccess: '{names} ยังดูเอกสารนี้ไม่ได้ จึงไม่ได้รับการแจ้งเตือน',
+  collabPostSendShareAction: 'แชร์สิทธิ์ดู',
+  collabPostSendNoRetroNote:
+    'การแชร์ตอนนี้จะไม่ส่งการแจ้งเตือนย้อนหลังสำหรับความคิดเห็นนี้ โปรดกล่าวถึงพวกเขาในความคิดเห็นใหม่หากต้องการแจ้งเตือน',
 } satisfies Record<keyof typeof zh, string>

@@ -66,4 +66,22 @@ export const zhTW = {
   collabAiDraftLabel: '這是 UniWork AI 建議的草稿。請檢查後再傳送。',
   collabInFileSection: '檔案中的留言',
   collabInFileHint: '已儲存在檔案中，僅供檢視：無法在此編輯或回覆。',
+  collabMentionWarnTitle: '被提及的人無權檢視此文件',
+  collabMentionWarnBody: '{names}無法檢視此文件，因此不會收到通知。',
+  collabShareViewThenSend: '共用檢視權限並傳送',
+  collabSendWithoutNotify: '直接傳送，不通知',
+  collabMentionAskManager: '請讓管理此文件的人與{names}共用檢視權限。',
+  collabMentionMixedUnshareable: '無法與{unshareable}共用；他們不會收到通知。',
+  collabSharingView: '正在共用檢視權限…',
+  collabShareViewFailed: '無法與{failedNames}共用檢視權限。你可以重試，或直接傳送而不通知。',
+  collabShareViewPartial:
+    '已與{sharedNames}共用檢視權限。無法與{failedNames}共用（他們不會收到通知）。',
+  collabSendComment: '傳送留言',
+  collabRetryShareFor: '為{failedNames}重試',
+  collabSendFailedAfterShare:
+    '已與{sharedNames}共用檢視權限，但無法傳送留言。你的內容仍保留在輸入框中——請嘗試重新傳送。',
+  collabPostSendNoAccess: '{names}無法檢視此文件，因此未收到通知。',
+  collabPostSendShareAction: '共用檢視權限',
+  collabPostSendNoRetroNote:
+    '現在共用不會補發上面這則留言的通知；如需通知他們，請在新留言中再次提及。',
 } satisfies Record<keyof typeof zh, string>

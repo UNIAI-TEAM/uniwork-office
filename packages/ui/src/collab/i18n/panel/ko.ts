@@ -70,4 +70,23 @@ export const ko = {
   collabInFileSection: '파일 속 댓글',
   collabInFileHint:
     '파일에 저장된 읽기 전용 댓글입니다. 여기서는 수정하거나 답글을 달 수 없습니다.',
+  collabMentionWarnTitle: '멘션한 사람에게 문서 보기 권한이 없습니다',
+  collabMentionWarnBody: '{names} 님은 이 문서를 볼 수 없어 알림을 받지 못합니다.',
+  collabShareViewThenSend: '보기 권한을 공유한 후 보내기',
+  collabSendWithoutNotify: '알림 없이 보내기',
+  collabMentionAskManager: '이 문서 관리자에게 {names} 님에게 보기 권한을 공유해 달라고 요청하세요.',
+  collabMentionMixedUnshareable: '{unshareable} 님에게는 공유할 수 없으며 알림이 전송되지 않습니다.',
+  collabSharingView: '보기 권한 공유 중…',
+  collabShareViewFailed:
+    '{failedNames} 님에게 보기 권한을 공유하지 못했습니다. 다시 시도하거나 알림 없이 보낼 수 있습니다.',
+  collabShareViewPartial:
+    '{sharedNames} 님에게 보기 권한을 공유했습니다. {failedNames} 님에게는 공유하지 못했습니다(알림이 전송되지 않음).',
+  collabSendComment: '댓글 보내기',
+  collabRetryShareFor: '{failedNames} 다시 시도',
+  collabSendFailedAfterShare:
+    '{sharedNames} 님에게 보기 권한을 공유했지만 댓글을 보내지 못했습니다. 작성한 내용은 입력란에 남아 있으니 다시 보내 보세요.',
+  collabPostSendNoAccess: '{names} 님은 이 문서를 볼 수 없어 알림을 받지 못했습니다.',
+  collabPostSendShareAction: '보기 권한 공유',
+  collabPostSendNoRetroNote:
+    '지금 공유해도 이 댓글에 대한 알림은 전송되지 않습니다. 알림을 보내려면 새 댓글에서 다시 멘션하세요.',
 } satisfies Record<keyof typeof zh, string>

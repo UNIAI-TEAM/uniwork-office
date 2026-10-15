@@ -69,4 +69,25 @@ export const id = {
   collabInFileSection: 'Komentar di dalam file',
   collabInFileHint:
     'Tersimpan di dalam file dan hanya bisa dibaca: Anda tidak dapat mengedit atau membalas di sini.',
+  collabMentionWarnTitle: 'Orang yang disebut tidak dapat melihat dokumen ini',
+  collabMentionWarnBody: '{names} tidak dapat melihat dokumen ini, sehingga tidak akan diberi tahu.',
+  collabShareViewThenSend: 'Bagikan akses lihat, lalu kirim',
+  collabSendWithoutNotify: 'Kirim tanpa memberi tahu',
+  collabMentionAskManager:
+    'Minta seseorang yang mengelola dokumen ini untuk membagikan akses lihat kepada {names}.',
+  collabMentionMixedUnshareable:
+    'Tidak dapat membagikan kepada {unshareable}; mereka tidak akan diberi tahu.',
+  collabSharingView: 'Membagikan akses lihat…',
+  collabShareViewFailed:
+    'Tidak dapat membagikan akses lihat kepada {failedNames}. Anda dapat mencoba lagi atau mengirim tanpa memberi tahu.',
+  collabShareViewPartial:
+    'Akses lihat dibagikan kepada {sharedNames}. Tidak dapat membagikan kepada {failedNames} (mereka tidak akan diberi tahu).',
+  collabSendComment: 'Kirim komentar',
+  collabRetryShareFor: 'Coba lagi untuk {failedNames}',
+  collabSendFailedAfterShare:
+    'Akses lihat telah dibagikan kepada {sharedNames}, tetapi komentar gagal dikirim. Teks Anda masih ada di kotak — coba kirim lagi.',
+  collabPostSendNoAccess: '{names} tidak dapat melihat dokumen ini, sehingga tidak diberi tahu.',
+  collabPostSendShareAction: 'Bagikan akses lihat',
+  collabPostSendNoRetroNote:
+    'Membagikan sekarang tidak akan memberi tahu mereka tentang komentar ini; sebut mereka di komentar baru untuk memberi tahu.',
 } satisfies Record<keyof typeof zh, string>

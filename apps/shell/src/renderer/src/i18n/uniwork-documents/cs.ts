@@ -123,6 +123,7 @@ export const cs = {
   uwDocInfoByAt: '{name}, {time}',
   uwDocInfoVersionBy: '{version} · {name}',
   uwAccessView: 'Zobrazení',
+  uwAccessComment: 'Komentáře',
   uwAccessEdit: 'Úpravy',
   uwAccessManage: 'Správa',
   uwRoleOwner: 'Vlastník',

@@ -68,4 +68,23 @@ export const he = {
   collabAiDraftLabel: 'טיוטה שהוצעה על ידי UniWork AI. עיין בה ואז שלח.',
   collabInFileSection: 'תגובות בקובץ',
   collabInFileHint: 'שמורות בקובץ וניתנות לקריאה בלבד: אי אפשר לערוך או להשיב כאן.',
+  collabMentionWarnTitle: 'לאנשים שהוזכרו אין הרשאה לצפות במסמך הזה',
+  collabMentionWarnBody: '{names} לא יכולים לצפות במסמך הזה, ולכן לא יקבלו התראה.',
+  collabShareViewThenSend: 'שיתוף הרשאת צפייה ואז שליחה',
+  collabSendWithoutNotify: 'שליחה בלי להתריע',
+  collabMentionAskManager: 'בקשו ממי שמנהל את המסמך הזה לשתף הרשאת צפייה עם {names}.',
+  collabMentionMixedUnshareable: 'לא ניתן לשתף עם {unshareable}; הם לא יקבלו התראה.',
+  collabSharingView: 'משתף הרשאת צפייה…',
+  collabShareViewFailed:
+    'לא ניתן לשתף הרשאת צפייה עם {failedNames}. אפשר לנסות שוב או לשלוח בלי להתריע.',
+  collabShareViewPartial:
+    'הרשאת צפייה שותפה עם {sharedNames}. לא ניתן לשתף עם {failedNames} (הם לא יקבלו התראה).',
+  collabSendComment: 'שליחת תגובה',
+  collabRetryShareFor: 'ניסיון חוזר עבור {failedNames}',
+  collabSendFailedAfterShare:
+    'הרשאת צפייה שותפה עם {sharedNames}, אך לא ניתן היה לשלוח את התגובה. הטקסט שלך עדיין בתיבה — נסה לשלוח שוב.',
+  collabPostSendNoAccess: '{names} לא יכולים לצפות במסמך הזה, ולכן לא קיבלו התראה.',
+  collabPostSendShareAction: 'שיתוף הרשאת צפייה',
+  collabPostSendNoRetroNote:
+    'שיתוף כעת לא ישלח להם התראה על התגובה הזו; הזכירו אותם בתגובה חדשה כדי להתריע.',
 } satisfies Record<keyof typeof zh, string>

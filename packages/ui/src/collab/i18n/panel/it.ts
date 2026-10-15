@@ -72,4 +72,27 @@ export const it = {
   collabAiDraftLabel: 'Bozza suggerita da UniWork AI. Controllala, poi invia.',
   collabInFileSection: 'Commenti nel file',
   collabInFileHint: 'Salvati nel file e in sola lettura: qui non puoi modificarli né rispondere.',
+  collabMentionWarnTitle: 'Le persone menzionate non possono visualizzare questo documento',
+  collabMentionWarnBody:
+    '{names} non possono visualizzare questo documento, quindi non riceveranno alcuna notifica.',
+  collabShareViewThenSend: 'Condividi l’accesso in visualizzazione e invia',
+  collabSendWithoutNotify: 'Invia senza notificare',
+  collabMentionAskManager:
+    'Chiedi a chi gestisce questo documento di condividere l’accesso in visualizzazione con {names}.',
+  collabMentionMixedUnshareable:
+    'Impossibile condividere con {unshareable}; non riceveranno alcuna notifica.',
+  collabSharingView: 'Condivisione dell’accesso in visualizzazione…',
+  collabShareViewFailed:
+    'Impossibile condividere l’accesso in visualizzazione con {failedNames}. Puoi riprovare o inviare senza notificare.',
+  collabShareViewPartial:
+    'Accesso in visualizzazione condiviso con {sharedNames}. Impossibile condividere con {failedNames} (non riceveranno notifica).',
+  collabSendComment: 'Invia commento',
+  collabRetryShareFor: 'Riprova per {failedNames}',
+  collabSendFailedAfterShare:
+    'Accesso in visualizzazione condiviso con {sharedNames}, ma non è stato possibile inviare il commento. Il testo è ancora nella casella — riprova a inviare.',
+  collabPostSendNoAccess:
+    '{names} non possono visualizzare questo documento, quindi non hanno ricevuto notifica.',
+  collabPostSendShareAction: 'Condividi accesso in visualizzazione',
+  collabPostSendNoRetroNote:
+    'Condividere ora non invierà una notifica per questo commento; menzionali in un nuovo commento per avvisarli.',
 } satisfies Record<keyof typeof zh, string>

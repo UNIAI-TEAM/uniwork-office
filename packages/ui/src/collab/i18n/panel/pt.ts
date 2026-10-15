@@ -70,4 +70,27 @@ export const pt = {
   collabAiDraftLabel: 'Rascunho sugerido pelo UniWork AI. Revise e depois envie.',
   collabInFileSection: 'Comentários no arquivo',
   collabInFileHint: 'Salvos no arquivo e somente leitura: você não pode editar nem responder aqui.',
+  collabMentionWarnTitle: 'As pessoas mencionadas não podem visualizar este documento',
+  collabMentionWarnBody:
+    '{names} não podem visualizar este documento, por isso não serão notificadas.',
+  collabShareViewThenSend: 'Compartilhar acesso de visualização e enviar',
+  collabSendWithoutNotify: 'Enviar sem notificar',
+  collabMentionAskManager:
+    'Peça a alguém que gerencie este documento para compartilhar o acesso de visualização com {names}.',
+  collabMentionMixedUnshareable:
+    'Não é possível compartilhar com {unshareable}; essas pessoas não serão notificadas.',
+  collabSharingView: 'Compartilhando acesso de visualização…',
+  collabShareViewFailed:
+    'Não foi possível compartilhar o acesso de visualização com {failedNames}. Você pode tentar novamente ou enviar sem notificar.',
+  collabShareViewPartial:
+    'Acesso de visualização compartilhado com {sharedNames}. Não foi possível compartilhar com {failedNames} (não serão notificadas).',
+  collabSendComment: 'Enviar comentário',
+  collabRetryShareFor: 'Tentar novamente para {failedNames}',
+  collabSendFailedAfterShare:
+    'Acesso de visualização compartilhado com {sharedNames}, mas não foi possível enviar o comentário. Seu texto continua na caixa — tente enviar novamente.',
+  collabPostSendNoAccess:
+    '{names} não podem visualizar este documento, por isso não foram notificadas.',
+  collabPostSendShareAction: 'Compartilhar acesso de visualização',
+  collabPostSendNoRetroNote:
+    'Compartilhar agora não enviará notificação sobre este comentário; mencione-as em um novo comentário para notificar.',
 } satisfies Record<keyof typeof zh, string>
