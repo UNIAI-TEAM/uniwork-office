@@ -360,6 +360,8 @@ function setup(
     editorStateOf: vi.fn(async () => ({ dirty: editorDirty, aiRunning, aiEpoch: 0 })),
     activePath: () => undefined,
     lang: () => opts.lang ?? 'en',
+    // G5-12 W-F2: the OS save dialog (null = the person cancelled)
+    pickDownloadPath: vi.fn(async (_defaultName: string) => null as string | null),
     ui,
     pushStatus: (s: UniworkDocStatus) => statuses.push(s),
     pushConflict: (v: UniworkConflictView) => views.push(v),
@@ -1491,7 +1493,7 @@ describe('G5-12 Save as a copy (main)', () => {
     await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
   })
 
-  it('AC4: a 403 from the copy route (not a member of the source workspace) replies save_copy_failed without locking the dialog', async () => {
+  it('W-F2: a 403 from the copy route (not a member of the source workspace) replies save_copy_no_seat without locking the dialog', async () => {
     const server = fakeServer()
     server.faults.push({ route: 'copy', kind: 403, code: 'forbidden' })
     const ctx = setup(server)
@@ -1505,10 +1507,33 @@ describe('G5-12 Save as a copy (main)', () => {
 
     expect(reply).toMatchObject({
       kind: 'view',
-      view: { notice: 'save_copy_failed', locked: 'none', canEdit: true },
+      view: { notice: 'save_copy_no_seat', noticeArg: null, locked: 'none', canEdit: true },
     })
     expect(callsTo(server, `${COPY}/archive`)).toHaveLength(0)
     await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
+  })
+
+  it('W-F2: any plain 403 is no_seat; a deactivated member / suspended org, 5xx and network errors stay save_copy_failed', async () => {
+    const cases: Array<[Fault, string]> = [
+      [{ route: 'copy', kind: 403, code: 'some_other_refusal' }, 'save_copy_no_seat'],
+      [{ route: 'copy', kind: 403, code: 'member_deactivated' }, 'save_copy_failed'],
+      [{ route: 'copy', kind: 403, code: 'organization_suspended' }, 'save_copy_failed'],
+      [{ route: 'copy', kind: 500, code: 'x' }, 'save_copy_failed'],
+      [{ route: 'copy', kind: 'network' }, 'save_copy_failed'],
+    ]
+    for (const [fault, notice] of cases) {
+      const server = fakeServer()
+      server.faults.push(fault)
+      const ctx = setup(server)
+      const path = await openAndConflict(ctx, server)
+      const { view } = await openDialog(ctx, path)
+      const reply = await ctx.service.conflictAct(view.sessionId, {
+        kind: 'save-copy',
+        stopAi: false,
+      })
+      expect(reply).toMatchObject({ kind: 'view', view: { notice, locked: 'none' } })
+      await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
+    }
   })
 
   it('AC3: offline refuses the action before any request (no copy is created)', async () => {
@@ -1554,5 +1579,201 @@ describe('G5-12 Save as a copy (main)', () => {
     expect(warn).toHaveBeenCalledWith(expect.stringContaining(COPY))
     expect(binding(path)).toMatchObject({ state: 'conflict' })
     warn.mockRestore()
+  })
+})
+
+describe('G5-12 W-F2 "Download my version" (main)', () => {
+  async function openDialog(ctx: ReturnType<typeof setup>, path: string) {
+    const flow = ctx.service.resolveConflict(path)
+    await vi.waitFor(() => expect(ctx.views).toHaveLength(1))
+    return { flow, view: ctx.views[0]! }
+  }
+  const pick = (ctx: ReturnType<typeof setup>) => vi.mocked(ctx.deps.pickDownloadPath)
+  const download = (ctx: ReturnType<typeof setup>, sessionId: string, stopAi = false) =>
+    ctx.service.conflictAct(sessionId, { kind: 'download-mine', stopAi })
+  const outDir = () => mkdtempSync(join(tmpdir(), 'uw-dl-'))
+
+  it('saves the LOCAL bytes to the picked path under the default name, goes back with download_done, and touches neither the server nor the source', async () => {
+    const server = fakeServer({ bytes: enc('v3'), title: 'Q4 plan.docx' })
+    const ctx = setup(server)
+    const path = await openAndConflict(ctx, server)
+    const intentBefore = await storedIntent(ctx, path)
+    const { flow, view } = await openDialog(ctx, path)
+    const target = join(outDir(), 'Q4 plan (my version).docx')
+    pick(ctx).mockResolvedValue(target)
+    const callsBefore = server.calls.length
+
+    const reply = await download(ctx, view.sessionId)
+
+    expect(pick(ctx)).toHaveBeenCalledWith('Q4 plan (my version).docx')
+    expect(reply).toMatchObject({
+      kind: 'view',
+      view: { notice: 'download_done', noticeArg: 'Q4 plan (my version).docx', canEdit: true },
+    })
+    expect(readFileSync(target, 'utf8')).toBe('mine v4')
+    // no server call, no intent, the binding / local file / editor are as they were
+    expect(server.calls).toHaveLength(callsBefore)
+    expect(binding(path)).toMatchObject({ state: 'conflict', documentId: DOC })
+    expect(await storedIntent(ctx, path)).toEqual(intentBefore)
+    expect(readFileSync(path, 'utf8')).toBe('mine v4')
+    expect(ctx.deps.reloadPath).not.toHaveBeenCalled()
+    expect(ctx.closedSessions).toEqual([])
+    await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
+    expect(await flow).toMatchObject({ state: 'conflict' })
+  })
+
+  it('the file name noticeArg is the picked file (not the suggestion) and a title without an extension gets the format extension', async () => {
+    const server = fakeServer({ bytes: enc('v3'), title: 'a:b*c' })
+    const ctx = setup(server, { lang: 'vi' })
+    const path = await openAndConflict(ctx, server)
+    const { view } = await openDialog(ctx, path)
+    const target = join(outDir(), 'my own name.docx')
+    pick(ctx).mockResolvedValue(target)
+
+    const reply = await download(ctx, view.sessionId)
+
+    expect(pick(ctx)).toHaveBeenCalledWith('a_b_c (bản của tôi).docx')
+    expect(reply).toMatchObject({
+      kind: 'view',
+      view: { notice: 'download_done', noticeArg: 'my own name.docx' },
+    })
+    await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
+  })
+
+  it('a dirty module is flushed first (no upload) and the flushed bytes are what is written', async () => {
+    const server = fakeServer()
+    const ctx = setup(server, { editorDirty: true })
+    const path = await openAndConflict(ctx, server)
+    const { view } = await openDialog(ctx, path)
+    vi.mocked(ctx.deps.requestModuleSave).mockImplementation((targetPath: string) => {
+      setTimeout(() => {
+        writeFileSync(targetPath, 'mine v4 + unsaved keystrokes')
+        ctx.setEditorDirty(false)
+        ctx.service.onUserSave(targetPath)
+      }, 10)
+      return true
+    })
+    const target = join(outDir(), 'out.docx')
+    pick(ctx).mockResolvedValue(target)
+    const uploadsBefore = server.calls.filter((c) => c.path.endsWith(`${DOC}/uploads`)).length
+
+    const reply = await download(ctx, view.sessionId)
+
+    expect(reply).toMatchObject({ kind: 'view', view: { notice: 'download_done' } })
+    expect(readFileSync(target, 'utf8')).toBe('mine v4 + unsaved keystrokes')
+    expect(server.calls.filter((c) => c.path.endsWith(`${DOC}/uploads`))).toHaveLength(
+      uploadsBefore,
+    )
+    await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
+  })
+
+  it('a failed flush writes nothing and stays on step 2 with download_failed', async () => {
+    const server = fakeServer()
+    const ctx = setup(server, { editorDirty: true })
+    const path = await openAndConflict(ctx, server)
+    const { view } = await openDialog(ctx, path)
+    vi.mocked(ctx.deps.requestModuleSave).mockImplementation(() => false)
+    const target = join(outDir(), 'out.docx')
+    pick(ctx).mockResolvedValue(target)
+
+    const reply = await download(ctx, view.sessionId)
+
+    expect(reply).toMatchObject({ kind: 'view', view: { notice: 'download_failed' } })
+    expect(pick(ctx)).not.toHaveBeenCalled()
+    await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
+  })
+
+  it('the person cancelling the OS dialog changes nothing: the step-2 notice that opened it stays, nothing is written', async () => {
+    const server = fakeServer()
+    server.faults.push({ route: 'copy', kind: 403, code: 'forbidden' })
+    const ctx = setup(server)
+    const path = await openAndConflict(ctx, server)
+    const { view } = await openDialog(ctx, path)
+    const first = await ctx.service.conflictAct(view.sessionId, {
+      kind: 'save-copy',
+      stopAi: false,
+    })
+    expect(first).toMatchObject({ kind: 'view', view: { notice: 'save_copy_no_seat' } })
+    const callsBefore = server.calls.length
+    pick(ctx).mockResolvedValue(null)
+
+    const reply = await download(ctx, view.sessionId)
+
+    expect(pick(ctx)).toHaveBeenCalledTimes(1)
+    expect(reply).toMatchObject({
+      kind: 'view',
+      view: { notice: 'save_copy_no_seat', noticeArg: null, locked: 'none', canEdit: true },
+    })
+    expect(server.calls).toHaveLength(callsBefore)
+    await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
+  })
+
+  it('a write error stays on step 2 with download_failed (and a cancel after it keeps download_failed); the source is untouched', async () => {
+    const server = fakeServer()
+    server.faults.push({ route: 'copy', kind: 403, code: 'forbidden' })
+    const ctx = setup(server)
+    const path = await openAndConflict(ctx, server)
+    const intentBefore = await storedIntent(ctx, path)
+    const { flow, view } = await openDialog(ctx, path)
+    await ctx.service.conflictAct(view.sessionId, { kind: 'save-copy', stopAi: false })
+    // a folder that does not exist: the write fails
+    pick(ctx).mockResolvedValue(join(outDir(), 'missing-folder', 'out.docx'))
+
+    const reply = await download(ctx, view.sessionId)
+
+    expect(reply).toMatchObject({
+      kind: 'view',
+      view: { notice: 'download_failed', noticeArg: null, locked: 'none' },
+    })
+    pick(ctx).mockResolvedValue(null)
+    expect(await download(ctx, view.sessionId)).toMatchObject({
+      kind: 'view',
+      view: { notice: 'download_failed' },
+    })
+    expect(binding(path)).toMatchObject({ state: 'conflict' })
+    expect(await storedIntent(ctx, path)).toEqual(intentBefore)
+    expect(readFileSync(path, 'utf8')).toBe('mine v4')
+    await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
+    expect(await flow).toMatchObject({ state: 'conflict' })
+  })
+
+  it('works offline (it is local) and stopAi stops the AI turn first', async () => {
+    const server = fakeServer()
+    const ctx = setup(server, { aiRunning: true })
+    const path = await openAndConflict(ctx, server)
+    const { view } = await openDialog(ctx, path)
+    ctx.setCapabilityOffline(true)
+    const target = join(outDir(), 'offline.docx')
+    pick(ctx).mockResolvedValue(target)
+    const callsBefore = server.calls.length
+
+    const reply = await download(ctx, view.sessionId, true)
+
+    expect(ctx.stopAiRun).toHaveBeenCalledWith(path)
+    expect(reply).toMatchObject({
+      kind: 'view',
+      view: { online: false, notice: 'download_done' },
+    })
+    expect(readFileSync(target, 'utf8')).toBe('mine v4')
+    expect(server.calls).toHaveLength(callsBefore)
+    await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
+  })
+
+  it('a dialog closed while the OS dialog is open writes nothing and shows no notice', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const path = await openAndConflict(ctx, server)
+    const { flow, view } = await openDialog(ctx, path)
+    const target = join(outDir(), 'late.docx')
+    pick(ctx).mockImplementation(async () => {
+      ctx.service.closeConflictPrompt()
+      return target
+    })
+
+    const reply = await download(ctx, view.sessionId)
+
+    expect(reply).toEqual({ kind: 'closed' })
+    expect(await flow).toMatchObject({ state: 'conflict' })
+    expect(() => readFileSync(target)).toThrow()
   })
 })
