@@ -6,6 +6,7 @@ import {
   aiNoticeKindForCloud,
   aiNoticeTagged,
   aiNoticeText,
+  composerNoteFor,
   noModelMessage,
   noModelMessageFor,
   type AiNoticeKind,
@@ -100,4 +101,167 @@ describe('ai notices', () => {
   })
 
   afterEach(() => setUniworkCloudStatus(null))
+})
+
+describe('composerNoteFor (G6-05u S7/S11)', () => {
+  it('returns null when UniWork AI is not selected', () => {
+    expect(
+      composerNoteFor({
+        uniworkSelected: false,
+        cloudState: 'signed-out',
+        capabilityOn: false,
+      }),
+    ).toBeNull()
+    expect(
+      composerNoteFor({
+        provider: 'openai',
+        cloudState: 'credits-exhausted',
+      }),
+    ).toBeNull()
+  })
+
+  it('returns null when UniWork AI is ready and enabled', () => {
+    expect(
+      composerNoteFor({
+        uniworkSelected: true,
+        signedOut: false,
+        cloudState: 'ready',
+        capabilityOn: true,
+        formatOn: true,
+        toolsChat: true,
+      }),
+    ).toBeNull()
+  })
+
+  it('maps each single condition to its note kind, key and action', () => {
+    expect(composerNoteFor({ uniworkSelected: true, cloudState: 'signed-out' })).toEqual({
+      kind: 'signed-out',
+      key: 'aiUniworkSignedOut',
+      action: 'sign-in',
+    })
+    expect(
+      composerNoteFor({ uniworkSelected: true, signedOut: true, cloudState: 'ready' }),
+    ).toEqual({
+      kind: 'signed-out',
+      key: 'aiUniworkSignedOut',
+      action: 'sign-in',
+    })
+    expect(
+      composerNoteFor({ uniworkSelected: true, cloudState: 'ready', capabilityOn: false }),
+    ).toEqual({
+      kind: 'off',
+      key: 'aiUniworkOff',
+      action: 'choose-provider',
+    })
+    expect(
+      composerNoteFor({ uniworkSelected: true, cloudState: 'ready', formatOn: false }),
+    ).toEqual({
+      kind: 'off',
+      key: 'aiUniworkOff',
+      action: 'choose-provider',
+    })
+    expect(
+      composerNoteFor({ uniworkSelected: true, cloudState: 'ready', toolsChat: false }),
+    ).toEqual({
+      kind: 'off',
+      key: 'aiUniworkOff',
+      action: 'choose-provider',
+    })
+    expect(composerNoteFor({ uniworkSelected: true, cloudState: 'ready', off: true })).toEqual({
+      kind: 'off',
+      key: 'aiUniworkOff',
+      action: 'choose-provider',
+    })
+    expect(composerNoteFor({ uniworkSelected: true, cloudState: 'not-entitled' })).toEqual({
+      kind: 'not-entitled',
+      key: 'not_entitled',
+      action: 'choose-provider',
+    })
+    expect(composerNoteFor({ uniworkSelected: true, cloudState: 'subscription-inactive' })).toEqual(
+      {
+        kind: 'subscription-inactive',
+        key: 'cloudInactiveBody',
+        action: 'choose-provider',
+      },
+    )
+    expect(composerNoteFor({ uniworkSelected: true, cloudState: 'credits-exhausted' })).toEqual({
+      kind: 'credits-exhausted',
+      key: 'credits_exhausted',
+      action: 'choose-provider',
+    })
+    expect(composerNoteFor({ uniworkSelected: true, cloudState: 'unavailable' })).toEqual({
+      kind: 'unavailable',
+      key: 'aiErrUnavailable',
+      action: 'choose-provider',
+    })
+  })
+
+  it('enforces priority: signed-out > off > not-entitled > subscription-inactive > credits-exhausted > unavailable', () => {
+    expect(
+      composerNoteFor({
+        uniworkSelected: true,
+        signedOut: true,
+        cloudState: 'credits-exhausted',
+        capabilityOn: false,
+        off: true,
+      })?.kind,
+    ).toBe('signed-out')
+
+    expect(
+      composerNoteFor({
+        uniworkSelected: true,
+        signedOut: false,
+        cloudState: 'not-entitled',
+        capabilityOn: false,
+      })?.kind,
+    ).toBe('off')
+
+    expect(
+      composerNoteFor({
+        uniworkSelected: true,
+        signedOut: false,
+        cloudState: 'subscription-inactive',
+        formatOn: false,
+      })?.kind,
+    ).toBe('off')
+
+    expect(
+      composerNoteFor({
+        uniworkSelected: true,
+        signedOut: false,
+        cloudState: 'credits-exhausted',
+        toolsChat: false,
+      })?.kind,
+    ).toBe('off')
+
+    expect(
+      composerNoteFor({
+        uniworkSelected: true,
+        signedOut: false,
+        cloudState: 'unavailable',
+        off: true,
+      })?.kind,
+    ).toBe('off')
+  })
+
+  it('viewOnly never suppresses or replaces the composer note', () => {
+    expect(
+      composerNoteFor({
+        uniworkSelected: true,
+        cloudState: 'credits-exhausted',
+        viewOnly: true,
+      }),
+    ).toEqual({
+      kind: 'credits-exhausted',
+      key: 'credits_exhausted',
+      action: 'choose-provider',
+    })
+    expect(
+      composerNoteFor({
+        uniworkSelected: true,
+        cloudState: 'ready',
+        viewOnly: true,
+      }),
+    ).toBeNull()
+  })
 })

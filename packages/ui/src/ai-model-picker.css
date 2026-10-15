@@ -3,9 +3,10 @@
 
 .ai-model-picker {
   display: inline-flex;
-  /* shrinks ahead of the usage chip while the footer has room, then holds ~8-10 chars of the label */
+  /* shrinks ahead of the usage chip while the footer has room, then holds the whole "UniWork AI"
+     label (logo + 10 characters + caret); the footer usage chip yields below that floor */
   flex-shrink: 1000;
-  min-width: 88px;
+  min-width: 116px;
 }
 
 .ai-model-chip {
@@ -13,11 +14,12 @@
   align-items: center;
   gap: 5px;
   height: 24px;
+  min-height: 24px;
   max-width: min(200px, 100%);
   padding: 0 7px 0 6px;
-  /* yields to its footer neighbours (usage chip, attach, track changes, send): the label
-     ellipsizes instead of painting over them, keeping ~8-10 characters readable */
-  min-width: 88px;
+  /* yields to its footer neighbours (usage chip, attach, track changes, send): a long model name
+     ellipsizes instead of painting over them, but the provider name "UniWork AI" stays readable */
+  min-width: 116px;
   border: 1px solid transparent;
   border-radius: var(--radius-30);
   background: none;
@@ -139,6 +141,7 @@
   align-items: center;
   gap: 8px;
   width: 100%;
+  min-height: 24px;
   padding: 5px 8px 5px 28px;
   border: none;
   border-radius: var(--radius-6);
@@ -150,22 +153,59 @@
   cursor: pointer;
 }
 
-.ai-model-item:hover,
-.ai-model-item:focus-visible {
+.ai-model-item:hover {
   background: var(--hover);
-  outline: none;
 }
 
 .ai-model-item.selected {
   background: var(--accent-soft);
 }
 
-.ai-model-item-text {
+.ai-model-item:focus-visible,
+.ai-model-item.selected:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.ai-model-item-body {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+}
+
+.ai-model-item-text {
+  width: 100%;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.ai-model-item-sub {
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--text-secondary);
+  white-space: normal;
+  word-break: break-word;
+}
+
+.ai-model-item.selected .ai-model-item-sub {
+  color: var(--text);
+}
+
+.ai-model-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .ai-model-manage {
@@ -175,6 +215,64 @@
   border-top: 1px solid var(--border-subtle);
   border-radius: 0 0 var(--radius-6) var(--radius-6);
   color: var(--text-secondary);
+}
+
+.ai-model-footer {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+  padding: 6px 8px 4px;
+  border-top: 1px solid var(--border-subtle);
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.ai-model-footer-text {
+  flex: 1;
+  min-width: 0;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.ai-model-footer-action {
+  flex-shrink: 0;
+  min-height: 24px;
+  min-width: 24px;
+  padding: 2px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-6);
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.ai-model-footer-action:hover {
+  background: var(--hover);
+}
+
+.ai-model-footer-action:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (pointer: coarse) {
+  .ai-model-chip,
+  .ai-model-item,
+  .ai-model-footer-action {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .ai-model-chip {
+    height: auto;
+  }
 }
 
 /* a disabled Send button (nothing typed, or "Choose a model to send"): its brand art is a pale

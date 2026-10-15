@@ -50,7 +50,11 @@ interface Mounted {
   open: () => Promise<void>
 }
 
-async function mount(first: AiSettings, lang: 'en' | 'vi' = 'en'): Promise<Mounted> {
+async function mount(
+  first: AiSettings,
+  lang: 'en' | 'vi' = 'en',
+  onAnnounce?: (text: string) => void,
+): Promise<Mounted> {
   let current = first
   let reads = 0
   const handlers = new Set<() => void>()
@@ -63,7 +67,7 @@ async function mount(first: AiSettings, lang: 'en' | 'vi' = 'en'): Promise<Mount
     },
   }
   await act(async () => {
-    root.render(createElement(AiModelPicker, { bridge, lang }))
+    root.render(createElement(AiModelPicker, { bridge, lang, onAnnounce }))
   })
   await act(async () => {})
   return {
@@ -177,36 +181,48 @@ describe('list state note', () => {
     expect(rows()).toEqual(['claude-chosen', ...anthropicModels])
   })
 
-  it('announces the note through one polite live region outside the listbox', async () => {
+  it('writes the note through onAnnounce and mounts no live region of its own (RF6-1)', async () => {
+    const announce = vi.fn()
+    const m = await mount(
+      anthropic({ anthropic: { chosen: 'claude-chosen', listState: 'loading' } }),
+      'en',
+      announce,
+    )
+    expect(host.querySelector('[aria-live]')).toBeNull()
+    await m.open()
+    expect(announce).toHaveBeenLastCalledWith(AI_MODEL_PICKER_STRINGS.en.modelsLoading)
+    // the Floor: fixed live nodes only, never one mounted at runtime; the panel owns the node
+    expect(host.querySelector('[aria-live], [role=status], [role=alert]')).toBeNull()
+  })
+
+  it('announces the failure the same way, and nothing when the list is fine', async () => {
+    const failed = vi.fn()
+    const f = await mount(
+      anthropic({ anthropic: { chosen: 'claude-chosen', listState: 'error' } }),
+      'en',
+      failed,
+    )
+    await f.open()
+    expect(failed).toHaveBeenLastCalledWith(AI_MODEL_PICKER_STRINGS.en.modelsUnavailable)
+    act(() => root.unmount())
+    root = createRoot(host)
+    const fine = vi.fn()
+    const m = await mount(
+      anthropic({ anthropic: { chosen: 'claude-chosen', listed: ['a'] } }),
+      'en',
+      fine,
+    )
+    await m.open()
+    expect(fine.mock.calls.filter(([text]) => text !== '')).toEqual([])
+    expect(host.querySelector('[aria-live]')).toBeNull()
+  })
+
+  it('announces nothing without the prop (no region of its own either)', async () => {
     const m = await mount(
       anthropic({ anthropic: { chosen: 'claude-chosen', listState: 'loading' } }),
     )
     await m.open()
-    const regions = host.querySelectorAll('[aria-live]')
-    expect(regions).toHaveLength(1)
-    const region = regions[0]!
-    expect(region.getAttribute('aria-live')).toBe('polite')
-    expect(region.textContent).toBe(AI_MODEL_PICKER_STRINGS.en.modelsLoading)
-    expect(region.closest('[role=listbox]')).toBeNull()
-    // a listbox owns options and groups only: no live region or status inside it
-    expect(
-      host.querySelector('[role=listbox] [aria-live], [role=listbox] [role=status]'),
-    ).toBeNull()
-  })
-
-  it('announces the failure the same way, and nothing when the list is fine', async () => {
-    const failed = await mount(
-      anthropic({ anthropic: { chosen: 'claude-chosen', listState: 'error' } }),
-    )
-    await failed.open()
-    expect(host.querySelector('[aria-live]')!.textContent).toBe(
-      AI_MODEL_PICKER_STRINGS.en.modelsUnavailable,
-    )
-    act(() => root.unmount())
-    root = createRoot(host)
-    const fine = await mount(anthropic({ anthropic: { chosen: 'claude-chosen', listed: ['a'] } }))
-    await fine.open()
-    expect(host.querySelector('[aria-live]')?.textContent ?? '').toBe('')
+    expect(host.querySelector('[aria-live]')).toBeNull()
   })
 
   it('says nothing when the list is fine or not asked', async () => {
@@ -291,7 +307,8 @@ describe('org-origin key source (G6-05k)', () => {
   it.each(['en', 'vi'] as const)(
     'renders the org key tag, tooltip, and first-use privacy note in %s',
     async (lang) => {
-      const m = await mount(orgAnthropic('org'), lang)
+      const announce = vi.fn()
+      const m = await mount(orgAnthropic('org'), lang, announce)
       expect(host.querySelector('.ai-model-chip-text')!.textContent).toBe('claude-org-chosen')
       await m.open()
       const tag = host.querySelector('[data-org-key-tag]') as HTMLElement | null
@@ -303,12 +320,8 @@ describe('org-origin key source (G6-05k)', () => {
       const note = host.querySelector('[data-org-key-note]') as HTMLElement | null
       expect(note).not.toBeNull()
       expect(note!.textContent).toBe(AI_MODEL_PICKER_STRINGS[lang].orgKeyNote)
-      expect(host.querySelector('[aria-live]')!.textContent).toBe(
-        AI_MODEL_PICKER_STRINGS[lang].orgKeyNote,
-      )
-      expect(
-        host.querySelector('[role=listbox] [aria-live], [role=listbox] [role=status]'),
-      ).toBeNull()
+      expect(announce).toHaveBeenLastCalledWith(AI_MODEL_PICKER_STRINGS[lang].orgKeyNote)
+      expect(host.querySelector('[aria-live], [role=status]')).toBeNull()
 
       // after picking a model in the org group, the first-use note is dismissed while the tag stays
       await act(async () => {

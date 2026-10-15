@@ -35,6 +35,7 @@ export const cs = {
   aiRunSend: 'Odeslat',
   aiRunRunning: 'Probíhá… Zastavíte tlačítkem Zastavit nebo klávesou Esc.',
   aiRunStopped: 'Zastaveno. Již použité změny zůstávají v dokumentu a lze je vrátit zpět.',
+  aiRunRetry: 'Zkusit znovu',
   aiRunAskAgain: 'Zeptat se znovu',
   aiRunChooseOther: 'Vybrat jiného poskytovatele',
   aiRunOpenInApp: 'Otevřít v aplikaci',
@@ -50,6 +51,8 @@ export const cs = {
   aiErrRateLimited: 'Odesíláte příliš rychle. Zkuste to znovu za {seconds} s.',
   aiErrRateLimitedNoWait: 'Odesíláte příliš rychle. Zkuste to znovu za několik minut.',
   aiErrUnavailable: 'UniWork AI teď neodpovídá. Dokument i Uložit dál fungují.',
+  aiErrGeneric:
+    'UniWork AI narazil na neočekávaný problém, a proto byl tento běh zastaven. Dokument i Uložit dál fungují.',
   aiErrDisconnected:
     'Připojení se přerušilo, takže se tento běh zastavil. Již použité změny zůstávají v dokumentu a lze je vrátit zpět.',
   aiErrOffline: 'Jste offline. UniWork AI offline nefunguje a požadavky se neřadí do fronty.',
@@ -68,4 +71,33 @@ export const cs = {
     'Požadavek je pro UniWork AI příliš dlouhý. Zkraťte ho pod 8 000 znaků a odešlete znovu.',
   aiErrQuestionRejected: 'UniWork AI tento požadavek nemůže přijmout. Upravte ho a odešlete znovu.',
   aiUniworkImagesNotSent: 'Obrázky se do UniWork AI neodesílají; odeslal se jen text.',
+  // Cloud state, credits and account actions (shared with picker footer and composer note)
+  cloudStateReady: 'K dispozici',
+  cloudStateNotEntitled: 'Není ve vašem tarifu',
+  cloudStateExhausted: 'Kredity AI vyčerpány',
+  cloudStateUnavailable: 'Nedostupné',
+  cloudStateSignedOut: 'Nepřihlášeno',
+  cloudStateInactive: 'Předplatné není aktivní',
+  cloudCredits: 'Kredity AI',
+  cloudCreditsLeft: 'Zbývá {remaining} / {limit}',
+  cloudCreditsUnlimited: 'Neomezeně',
+  cloudCreditsRenews: 'Obnoví se {date}',
+  cloudInactiveBody:
+    'Předplatné UniWork vaší organizace není aktivní, proto je cloudová AI pozastavena. Požádejte správce o obnovení; vaši vlastní poskytovatelé níže fungují dál.',
+  acctSignIn: 'Přihlásit se',
+  acctSignInAgain: 'Přihlásit se znovu',
+  // S8/S10 local-file conversation restart notice (G05BE-6)
+  aiUniworkLocalFileRestart:
+    'Místní soubory zahajují novou konverzaci v rámci vaší organizace a neuchovávají kola z jiných souborů.',
+  // S9 cells summary and S10 web workbook size limit
+  aiResultCellsMeta:
+    'Zapsané buňky: {written} ({range}) · Přepsané existující buňky: {overwritten}',
+  aiResultCellsMetaNoOverwrite: 'Zapsané buňky: {written} ({range})',
+  aiErrWorkbookTooLarge:
+    'Tento sešit je pro AI na webu příliš velký. Otevřete ho v aplikaci UniWork Office.',
+  // S7 composer notice keys (not_entitled, credits_exhausted)
+  not_entitled:
+    'Tarif vaší organizace nezahrnuje UniWork AI. Informujte se u správce organizace ohledně tarifu, nebo přidejte vlastní klíč AI v Nastavení > Model AI.',
+  credits_exhausted:
+    'Vaše organizace vyčerpala všechny své kredity AI pro toto období. Požádejte správce organizace o doplnění kreditů, nebo přidejte vlastní klíč AI v Nastavení > Model AI.',
 } satisfies Record<keyof typeof zh, string>

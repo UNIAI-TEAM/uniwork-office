@@ -3,7 +3,7 @@ import type { zh } from './zh'
 export const zhTW = {
   // S7 provider row, picker footer and composer notes
   aiUniworkProvider: 'UniWork AI',
-  aiUniworkCreditsAria: '剩餘 {remaining} / {limit} 額度',
+  aiUniworkCreditsAria: '共 {limit}，剩餘 {remaining} 額度',
   aiUniworkFooterSignIn: '登入 UniWork 以使用 UniWork AI',
   aiUniworkSignedOut: '你已登出 UniWork。請選擇其他服務商或重新登入。',
   aiUniworkOff: '此文件已關閉 UniWork AI。請選擇其他服務商。',
@@ -33,6 +33,7 @@ export const zhTW = {
   aiRunSend: '傳送',
   aiRunRunning: '正在執行… 按「停止」或 Esc 停止。',
   aiRunStopped: '已停止。已套用的變更（如有）仍在文件中，可以復原。',
+  aiRunRetry: '重試',
   aiRunAskAgain: '繼續提問',
   aiRunChooseOther: '選擇其他服務商',
   aiRunOpenInApp: '在應用程式中開啟',
@@ -47,6 +48,7 @@ export const zhTW = {
   aiErrRateLimited: '你傳送得太快了。請在 {seconds} 秒後重試。',
   aiErrRateLimitedNoWait: '你傳送得太快了。請幾分鐘後重試。',
   aiErrUnavailable: 'UniWork AI 暫時沒有回應。你的文件和「儲存」仍可正常使用。',
+  aiErrGeneric: 'UniWork AI 遇到意外問題，本次執行已停止。你的文件和「儲存」仍可正常使用。',
   aiErrDisconnected: '連線中斷，本次執行已停止。已套用的變更（如有）仍在文件中，可以復原。',
   aiErrOffline: '你已離線。UniWork AI 無法離線執行，請求也不會排隊。',
   aiErrSession: '你的 UniWork 登入已過期，本次執行已停止。請重新登入以繼續。',
@@ -59,4 +61,30 @@ export const zhTW = {
   aiErrQuestionTooLong: '你的要求對 UniWork AI 來說太長了。請縮短到 8,000 個字元以內再傳送。',
   aiErrQuestionRejected: 'UniWork AI 無法接受此要求。請修改後再傳送。',
   aiUniworkImagesNotSent: '圖片不會傳送給 UniWork AI，只傳送了你的文字。',
+  // Cloud state, credits and account actions (shared with picker footer and composer note)
+  cloudStateReady: '可用',
+  cloudStateNotEntitled: '方案未包含此功能',
+  cloudStateExhausted: 'AI 額度已用完',
+  cloudStateUnavailable: '暫時無法使用',
+  cloudStateSignedOut: '尚未登入',
+  cloudStateInactive: '訂閱未生效',
+  cloudCredits: 'AI 額度',
+  cloudCreditsLeft: '剩餘 {remaining} / {limit}',
+  cloudCreditsUnlimited: '不限量',
+  cloudCreditsRenews: '{date} 重置',
+  cloudInactiveBody:
+    '你所在組織的 UniWork 訂閱未生效，雲端 AI 已暫停。請聯絡管理員續訂；下方自己的服務商不受影響。',
+  acctSignIn: '登入',
+  acctSignInAgain: '重新登入',
+  // S8/S10 local-file conversation restart notice (G05BE-6)
+  aiUniworkLocalFileRestart: '本機檔案會在你的組織下開始新對話，不會保留其他檔案的對話輪次。',
+  // S9 cells summary and S10 web workbook size limit
+  aiResultCellsMeta: '已寫入 {written} 個儲存格（{range}）· 覆寫既有儲存格 {overwritten} 個',
+  aiResultCellsMetaNoOverwrite: '已寫入 {written} 個儲存格（{range}）',
+  aiErrWorkbookTooLarge: '此活頁簿太大，無法在網頁上使用 AI。請在 UniWork Office 應用程式中開啟。',
+  // S7 composer notice keys (not_entitled, credits_exhausted)
+  not_entitled:
+    '你所在組織的方案不包含 UniWork AI。請聯絡組織管理員了解方案，或在「設定 > AI 模型」中新增你自己的 AI 金鑰。',
+  credits_exhausted:
+    '你所在組織本週期的 AI 額度已用完。請聯絡組織管理員補充額度，或在「設定 > AI 模型」中新增你自己的 AI 金鑰。',
 } satisfies Record<keyof typeof zh, string>

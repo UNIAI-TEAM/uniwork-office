@@ -4465,8 +4465,10 @@ function registerHomeIpc(): void {
   // UniWork account (desktop PKCE sign-in): the manager in ./uniwork-auth owns
   // tokens and state; the renderer only gets AccountStatus pushes.
   configureUniworkAccount({ settingsPath: APP_SETTINGS_PATH })
-  registerAccountIpc(ipcMain, () =>
-    shellWindow && !shellWindow.isDestroyed() ? shellWindow.webContents : null,
+  registerAccountIpc(
+    ipcMain,
+    () => (shellWindow && !shellWindow.isDestroyed() ? shellWindow.webContents : null),
+    () => tabManager?.openHomeTab(),
   )
   // UniWork documents (open from UniWork, launch links, Save to UniWork); logic in ./uniwork-docs
   uniworkDocs = createUniworkDocs(ipcMain, uniworkDocsWiring())

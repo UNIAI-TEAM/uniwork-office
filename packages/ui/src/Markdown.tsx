@@ -197,10 +197,25 @@ function parseBlocks(text: string): MdBlock[] {
   return blocks
 }
 
-export function Markdown({ text, nav }: { text: string; nav?: MarkdownNav }): React.JSX.Element {
+/**
+ * `lead` opens the first paragraph (the result chip is the first word of the answer, in the same
+ * node as the text); when the first block is not a plain paragraph it gets a paragraph of its own.
+ */
+export function Markdown({
+  text,
+  nav,
+  lead,
+}: {
+  text: string
+  nav?: MarkdownNav
+  lead?: ReactNode
+}): React.JSX.Element {
+  const blocks = parseBlocks(text)
+  const leadsFirstBlock = lead != null && blocks[0]?.kind === 'p'
   return (
     <div className="ai-md">
-      {parseBlocks(text).map((b, i) => {
+      {lead != null && !leadsFirstBlock && <p>{lead}</p>}
+      {blocks.map((b, i) => {
         if (b.kind === 'h') {
           return (
             <p key={i} className="ai-md-h">
@@ -251,6 +266,7 @@ export function Markdown({ text, nav }: { text: string; nav?: MarkdownNav }): Re
         }
         return (
           <p key={i}>
+            {i === 0 && leadsFirstBlock && <>{lead} </>}
             {b.lines.map((ln, j) => (
               <Fragment key={j}>
                 {j > 0 && <br />}

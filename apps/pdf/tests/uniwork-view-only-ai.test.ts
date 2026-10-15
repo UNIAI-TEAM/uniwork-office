@@ -102,13 +102,33 @@ describe('assistant panel notice', () => {
     }
   }
 
-  it('shows the reason above the composer only when view-only', () => {
+  async function renderWithProvider(readOnly: boolean, provider: string) {
+    ;(window as any).pdfApi = {
+      getAiSettings: async () => ({ provider, providers: {} }),
+      setAiPanelPrefs: () => {},
+      gskStatus: async () => ({ loggedIn: false }),
+      onLanguageChanged: () => () => {},
+    }
+    const res = render(readOnly)
+    await act(async () => {
+      await Promise.resolve()
+    })
+    return res
+  }
+
+  it('shows the reason above the composer only when view-only for BYOK, and sub-line under composer for UniWork AI', async () => {
     const view = render(true)
     expect(view.container.querySelector('.ai-readonly-notice')).not.toBeNull()
+    expect(view.container.querySelector('.ai-uniwork-view-only')).toBeNull()
     view.cleanup()
     const edit = render(false)
     expect(edit.container.querySelector('.ai-readonly-notice')).toBeNull()
     edit.cleanup()
+    const uniworkView = await renderWithProvider(true, 'uniwork')
+    expect(uniworkView.container.querySelector('.ai-readonly-notice')).toBeNull()
+    expect(uniworkView.container.querySelector('.ai-uniwork-view-only')?.textContent).toBeTruthy()
+    uniworkView.cleanup()
+    delete (window as any).pdfApi
   })
 })
 

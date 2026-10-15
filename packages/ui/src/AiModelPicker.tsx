@@ -15,7 +15,33 @@ import {
 import { setAiModelNeedHint } from './ai-model-need'
 import { ProviderLogo } from './provider-logos'
 import { useDismissablePopover } from './popover-dismiss'
-import { AI_MODEL_PICKER_STRINGS } from './strings-ai-model-picker'
+import { AI_MODEL_PICKER_STRINGS, type AiModelPickerStrings } from './strings-ai-model-picker'
+import { aiUniworkStrings, aiUniworkText } from './strings-ai-uniwork'
+
+export type AiModelPickerCloudState =
+  | 'ready'
+  | 'not-entitled'
+  | 'subscription-inactive'
+  | 'credits-exhausted'
+  | 'unavailable'
+  | 'signed-out'
+
+export interface AiModelPickerCloudCredits {
+  readonly remaining: number | null
+  readonly limit: number | null
+  readonly periodEnd?: string | null | undefined
+  readonly periodEndsAt?: string | null | undefined
+}
+
+export interface AiModelPickerCloudStatus {
+  readonly state: AiModelPickerCloudState
+  readonly signedIn?: boolean | undefined
+  readonly enabled?: boolean | undefined
+  readonly hasCompletedRead?: boolean | undefined
+  readonly cloudUnavailable?: boolean | undefined
+  readonly reason?: string | null | undefined
+  readonly credits?: AiModelPickerCloudCredits | null | undefined
+}
 
 /** Each app's preload exposes these under its own namespace; the panel adapts them. */
 export interface AiModelPickerBridge {
@@ -27,11 +53,92 @@ export interface AiModelPickerBridge {
   readonly gskLoggedIn?: (() => Promise<boolean>) | undefined
   /** shell: switch to Home and open Settings › AI Model */
   readonly openModelSettings?: (() => Promise<void> | void) | undefined
+  /** shell: switch to Home and open Settings › Account */
+  readonly openAccountSettings?: (() => Promise<void> | void) | undefined
+  /** shell: trigger or open UniWork sign-in */
+  readonly signIn?: (() => Promise<void> | void) | undefined
+  /** desktop: read current UniWork cloud status (falls back to window.uniworkCloudStatus.get) */
+  readonly getCloudStatus?:
+    (() => Promise<AiModelPickerCloudStatus | null> | AiModelPickerCloudStatus | null) | undefined
+  /** alias for getCloudStatus */
+  readonly cloudStatus?:
+    | (() => Promise<AiModelPickerCloudStatus | null> | AiModelPickerCloudStatus | null)
+    | AiModelPickerCloudStatus
+    | null
+    | undefined
+  /** desktop: subscribe to UniWork cloud status updates (falls back to window.uniworkCloudStatus.onChange) */
+  readonly onCloudStatusChanged?:
+    ((handler: (status: AiModelPickerCloudStatus | null) => void) => () => void) | undefined
   /**
    * web frames: while the chip reads "Choose model" (no key, or a key without a known model) the
    * composer's send stays off with a hint saying which; other hosts leave it undefined
    */
   readonly requireModel?: boolean | undefined
+}
+
+interface WindowCloudStatusBridge {
+  readonly get?: () => Promise<AiModelPickerCloudStatus | null> | AiModelPickerCloudStatus | null
+  readonly onChange?: (cb: (status: AiModelPickerCloudStatus | null) => void) => () => void
+  readonly onChanged?: (cb: (status: AiModelPickerCloudStatus | null) => void) => () => void
+  readonly openAccountSettings?: () => Promise<void> | void
+  readonly signIn?: () => Promise<void> | void
+}
+
+function getWindowCloudStatusBridge(): WindowCloudStatusBridge | undefined {
+  if (typeof window === 'undefined') return undefined
+  return (window as unknown as { uniworkCloudStatus?: WindowCloudStatusBridge }).uniworkCloudStatus
+}
+
+type CloudStringKey =
+  | 'cloudStateNotEntitled'
+  | 'cloudStateInactive'
+  | 'cloudStateExhausted'
+  | 'cloudStateUnavailable'
+  | 'cloudCreditsLeft'
+  | 'cloudCreditsUnlimited'
+  | 'acctSignIn'
+
+function pickerCloudText(
+  lang: Lang,
+  strings: AiModelPickerStrings,
+  key: CloudStringKey,
+  params?: Record<string, string | number>,
+): string {
+  const shardTable = (aiUniworkStrings[lang] ?? aiUniworkStrings.en) as Record<
+    string,
+    string | undefined
+  >
+  const template = shardTable[key] ?? strings[key]
+  if (!params) return template
+  return template.replace(/\{([a-zA-Z0-9]+)\}/g, (match, token: string) =>
+    token in params ? String(params[token]) : match,
+  )
+}
+
+/** credits grouped by the UI language (vi 380.000, en 380,000); a runtime without that locale prints plain digits */
+function formatCreditCount(lang: Lang, value: number): string {
+  try {
+    return new Intl.NumberFormat(lang).format(value)
+  } catch {
+    return String(value)
+  }
+}
+
+function restoreChipFocusUnlessMoved(
+  chip: HTMLButtonElement | null,
+  pop: HTMLDivElement | null,
+): void {
+  if (!chip || typeof document === 'undefined') return
+  const active = document.activeElement
+  const stayedInPicker =
+    !active ||
+    active === document.body ||
+    active === document.documentElement ||
+    chip.contains(active) ||
+    Boolean(pop?.contains(active))
+  if (stayedInPicker) {
+    chip.focus()
+  }
 }
 
 const ORG_NOTE_SEEN_PREFIX = 'uniwork.ai.orgKeyNoteSeen.'
@@ -62,14 +169,22 @@ function writeOrgNoteSeen(provider: string): void {
 export function AiModelPicker({
   bridge,
   lang,
+  onAnnounce,
 }: {
   readonly bridge: AiModelPickerBridge
   readonly lang: Lang
+  /**
+   * The host panel's fixed polite live node: the list note is written into it after the popover
+   * opens. The picker mounts no live region of its own, so without this prop it announces nothing.
+   */
+  readonly onAnnounce?: ((text: string) => void) | undefined
 }): React.JSX.Element | null {
   const strings = AI_MODEL_PICKER_STRINGS[lang] ?? AI_MODEL_PICKER_STRINGS.en
   const [settings, setSettings] = useState<AiSettings | null>(null)
   const [loggedIn, setLoggedIn] = useState(false)
+  const [cloudStatus, setCloudStatus] = useState<AiModelPickerCloudStatus | null>(null)
   const [open, setOpen] = useState(false)
+  const [focusKey, setFocusKey] = useState<string | null>(null)
   // providers whose first-use note was shown once (open + close); persisted per provider, and kept
   // here too so a blocked store still stops the re-announcing while the window lives
   const [seenOrgNotes, setSeenOrgNotes] = useState<ReadonlySet<string>>(() => new Set())
@@ -78,40 +193,104 @@ export function AiModelPicker({
   const [popStyle, setPopStyle] = useState<React.CSSProperties>({})
   const chipRef = useRef<HTMLButtonElement | null>(null)
   const popRef = useRef<HTMLDivElement | null>(null)
+  const listRef = useRef<HTMLDivElement | null>(null)
+  const bridgeRef = useRef(bridge)
+  bridgeRef.current = bridge
+
+  const baseId = useId()
+  const listId = `${baseId}-listbox`
+  const creditsDescId = `${baseId}-uniwork-credits`
+  const groupHeadId = (groupId: string): string => `${baseId}-group-${groupId}`
 
   // tests render panels without a preload bridge: a throwing getter must not take the panel down
-  const refresh = useCallback(() => {
+  const refreshSettings = useCallback(() => {
+    const b = bridgeRef.current
     Promise.resolve()
-      .then(() => bridge.getSettings())
+      .then(() => b.getSettings())
       .then(setSettings, () => {})
     Promise.resolve()
-      .then(() => bridge.gskLoggedIn?.() ?? false)
+      .then(() => b.gskLoggedIn?.() ?? false)
       .then(setLoggedIn, () => {})
-  }, [bridge])
+  }, [])
+
+  // mount, window focus and settings changes also re-read the cloud status; opening the popover
+  // does not (the status has its own change feed, and credits are not re-fetched per open)
+  const refresh = useCallback(() => {
+    const b = bridgeRef.current
+    refreshSettings()
+    if (b.requireModel === true) {
+      setCloudStatus(null)
+      return
+    }
+    const winCloud = getWindowCloudStatusBridge()
+    const rawCloud = b.getCloudStatus ?? b.cloudStatus ?? winCloud?.get
+    if (typeof rawCloud === 'function') {
+      Promise.resolve()
+        .then(() => rawCloud())
+        .then(
+          (next) => setCloudStatus(next ?? null),
+          () => {},
+        )
+    } else if (rawCloud !== undefined) {
+      setCloudStatus(rawCloud)
+    }
+  }, [refreshSettings])
 
   useEffect(() => {
     refresh()
     window.addEventListener('focus', refresh)
-    let off: (() => void) | undefined
+    const b = bridgeRef.current
+    let offSettings: (() => void) | undefined
     try {
-      off = bridge.onSettingsChanged?.(refresh)
+      offSettings = b.onSettingsChanged?.(refresh)
     } catch {
-      off = undefined
+      offSettings = undefined
+    }
+    let offCloud: (() => void) | undefined
+    if (b.requireModel !== true) {
+      const winCloud = getWindowCloudStatusBridge()
+      const sub = b.onCloudStatusChanged ?? winCloud?.onChange ?? winCloud?.onChanged
+      try {
+        offCloud = sub?.((next) => setCloudStatus(next ?? null))
+      } catch {
+        offCloud = undefined
+      }
     }
     return () => {
       window.removeEventListener('focus', refresh)
-      off?.()
+      offSettings?.()
+      offCloud?.()
     }
-  }, [bridge, refresh])
+  }, [refresh, bridge.requireModel])
 
-  const close = useCallback(() => setOpen(false), [])
+  const close = useCallback(() => {
+    setOpen(false)
+    setFocusKey(null)
+  }, [])
   useDismissablePopover(open, close, {
     inside: () => [chipRef.current, popRef.current],
   })
 
-  const groups = useMemo(
-    () => (settings ? aiModelPickerGroups(settings, loggedIn) : []),
-    [settings, loggedIn],
+  const hideUniworkByCloudStatus =
+    bridge.requireModel !== true &&
+    cloudStatus !== null &&
+    cloudStatus.hasCompletedRead !== false &&
+    (cloudStatus.state !== 'ready' || cloudStatus.enabled === false)
+
+  const groups = useMemo(() => {
+    const raw = settings ? aiModelPickerGroups(settings, loggedIn) : []
+    return hideUniworkByCloudStatus ? raw.filter((g) => g.id !== 'uniwork') : raw
+  }, [settings, loggedIn, hideUniworkByCloudStatus])
+  const flatOptions = useMemo(
+    () =>
+      groups.flatMap((g) =>
+        (g.models.length > 0 ? g.models : ['']).map((m) => ({
+          provider: g.id,
+          model: m,
+          key: `${g.id}:${m}`,
+        })),
+      ),
+    [groups],
   )
   const isOrgGroup = (id: string) => settings?.modelSources?.[id as AiProviderId]?.origin === 'org'
   const hasOrgGroup = groups.some((g) => isOrgGroup(g.id))
@@ -135,6 +314,15 @@ export function AiModelPicker({
       ? { provider: rawCurrent.provider, model: orgChosen.trim() }
       : rawCurrent
   const currentUsable = groups.some((g) => g.id === current?.provider)
+  const selectedKey = current ? `${current.provider}:${current.model}` : null
+  const hasOptionKey = (k: string | null): boolean =>
+    k !== null && flatOptions.some((o) => o.key === k)
+  const activeKey = hasOptionKey(focusKey)
+    ? focusKey!
+    : hasOptionKey(selectedKey)
+      ? selectedKey!
+      : (flatOptions[0]?.key ?? null)
+
   // the wanted provider is read raw (a key list that failed to load masks nothing here)
   const wanted = settings?.provider
   const wantedConfig = wanted ? settings?.providers?.[wanted] : undefined
@@ -144,13 +332,17 @@ export function AiModelPicker({
   // on every host: a chosen vendor is never swapped for UniAI, so the chip and the request agree.
   // Web frames apply it to UniAI too (nothing usable at all). A key list that failed to load says
   // nothing about keys: no hint, send stays on, the server decides
-  const need = settings ? aiModelPickerNeed(settings) : null
+  const need = settings
+    ? current?.provider === 'uniwork' && !currentUsable
+      ? 'model'
+      : aiModelPickerNeed(settings)
+    : null
   const needHint =
     settings !== null && !currentUsable && settings.credentialsUnavailable !== true
       ? need === 'base-url'
         ? strings.needBaseUrl
         : bridge.requireModel === true
-          ? hasKey
+          ? hasKey || current?.provider === 'uniwork'
             ? strings.needModel
             : strings.needKey
           : need === 'model'
@@ -167,6 +359,14 @@ export function AiModelPicker({
     setAiModelNeedHint(needHint, openSettings ? openSettingsOnce : null)
     return () => setAiModelNeedHint(null)
   }, [needHint, openSettings, openSettingsOnce])
+
+  // the note goes into the host panel's fixed polite node once the popover is open (Accessibility
+  // Floor: live nodes exist from load and are never mounted at runtime)
+  const onAnnounceRef = useRef(onAnnounce)
+  onAnnounceRef.current = onAnnounce
+  useEffect(() => {
+    if (open && listNote) onAnnounceRef.current?.(listNote)
+  }, [open, listNote])
 
   // the first-use note counts as read once it was on screen and the popover closed again
   const shownIds = groups
@@ -189,7 +389,7 @@ export function AiModelPicker({
     // every open re-reads the settings (host data: Settings pick, live lists, served model); a host
     // answers from its cache and announces a newer listing through onSettingsChanged
     if (!open) {
-      refresh()
+      refreshSettings()
       const rect = chipRef.current?.getBoundingClientRect()
       const zoom = effectiveZoom(chipRef.current)
       // the composer sits at the panel bottom: open upwards, pinned to the chip;
@@ -201,35 +401,202 @@ export function AiModelPicker({
           maxHeight: Math.min(420, (window.innerHeight * 0.7) / zoom),
         })
       }
+      setFocusKey(null)
     }
     setOpen((v) => !v)
   }
 
+  // opening moves focus into the list, onto the selected (else first) option, so arrows work at once.
+  // Once per open: later settings refreshes must not pull focus back. A host that has no option at
+  // the open edge (the read an open triggers is what finds the model) gets it when the first one
+  // arrives, unless focus went elsewhere meanwhile
+  const focusedThisOpenRef = useRef(false)
+  const hasOptions = flatOptions.length > 0
+  useEffect(() => {
+    if (!open) {
+      focusedThisOpenRef.current = false
+      return
+    }
+    if (focusedThisOpenRef.current || !hasOptions) return
+    const active = document.activeElement
+    const stayed =
+      !active ||
+      active === document.body ||
+      Boolean(chipRef.current?.contains(active)) ||
+      Boolean(popRef.current?.contains(active))
+    if (!stayed) return
+    const option = listRef.current?.querySelector<HTMLButtonElement>(
+      '[role="option"][tabindex="0"]',
+    )
+    if (!option) return
+    option.focus()
+    focusedThisOpenRef.current = true
+  }, [open, hasOptions])
+
+  const onChipKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+    e.preventDefault()
+    e.stopPropagation()
+    if (open) {
+      listRef.current?.querySelector<HTMLButtonElement>('[role="option"][tabindex="0"]')?.focus()
+    } else {
+      toggle()
+    }
+  }
+
   const pick = (sel: AiModelPickerSelection) => {
+    const pop = popRef.current
     setOpen(false)
-    if (!settings) return
-    const picked = withAiModelSelection(settings, sel)
-    const source = settings.modelSources?.[sel.provider]
-    // the chip reads an org-served provider's model from its source: show the pick there too
-    const next: AiSettings =
-      source?.origin === 'org'
-        ? {
-            ...picked,
-            modelSources: {
-              ...settings.modelSources,
-              [sel.provider]: { ...source, chosen: sel.model },
-            },
-          }
-        : picked
-    setSettings(next)
-    void bridge
-      .setSettings(next, { modelPick: { provider: sel.provider, model: sel.model } })
-      .catch(() => {})
+    setFocusKey(null)
+    if (settings) {
+      const picked = withAiModelSelection(settings, sel)
+      const source = settings.modelSources?.[sel.provider]
+      // the chip reads an org-served provider's model from its source: show the pick there too
+      const next: AiSettings =
+        source?.origin === 'org'
+          ? {
+              ...picked,
+              modelSources: {
+                ...settings.modelSources,
+                [sel.provider]: { ...source, chosen: sel.model },
+              },
+            }
+          : picked
+      setSettings(next)
+      void bridge
+        .setSettings(next, { modelPick: { provider: sel.provider, model: sel.model } })
+        .catch(() => {})
+    }
+    restoreChipFocusUnlessMoved(chipRef.current, pop)
   }
 
   const manage = () => {
+    const pop = popRef.current
     setOpen(false)
+    setFocusKey(null)
     void bridge.openModelSettings?.()
+    restoreChipFocusUnlessMoved(chipRef.current, pop)
+  }
+
+  const onListKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (flatOptions.length === 0) return
+    const currentIdx = Math.max(
+      0,
+      flatOptions.findIndex((o) => o.key === activeKey),
+    )
+    let nextIdx: number
+    if (e.key === 'ArrowDown') {
+      nextIdx = Math.min(flatOptions.length - 1, currentIdx + 1)
+    } else if (e.key === 'ArrowUp') {
+      nextIdx = Math.max(0, currentIdx - 1)
+    } else if (e.key === 'Home') {
+      nextIdx = 0
+    } else if (e.key === 'End') {
+      nextIdx = flatOptions.length - 1
+    } else {
+      return
+    }
+    e.preventDefault()
+    e.stopPropagation()
+    const target = flatOptions[nextIdx]
+    if (!target) return
+    setFocusKey(target.key)
+    const buttons = listRef.current?.querySelectorAll<HTMLButtonElement>('[role="option"]')
+    buttons?.[nextIdx]?.focus()
+  }
+
+  const desktopCredits =
+    bridge.requireModel !== true && cloudStatus?.credits ? cloudStatus.credits : null
+  const creditsVisibleText = desktopCredits
+    ? desktopCredits.limit === null
+      ? pickerCloudText(lang, strings, 'cloudCreditsUnlimited')
+      : desktopCredits.remaining !== null
+        ? pickerCloudText(lang, strings, 'cloudCreditsLeft', {
+            remaining: formatCreditCount(lang, desktopCredits.remaining),
+            limit: formatCreditCount(lang, desktopCredits.limit),
+          })
+        : null
+    : null
+  const creditsAriaText = desktopCredits
+    ? desktopCredits.limit === null
+      ? pickerCloudText(lang, strings, 'cloudCreditsUnlimited')
+      : desktopCredits.remaining !== null
+        ? aiUniworkText(lang, 'aiUniworkCreditsAria', {
+            remaining: formatCreditCount(lang, desktopCredits.remaining),
+            limit: formatCreditCount(lang, desktopCredits.limit),
+          })
+        : null
+    : null
+  const hasUniworkWithCredits =
+    groups.some((g) => g.id === 'uniwork') &&
+    creditsVisibleText !== null &&
+    creditsAriaText !== null
+
+  const footerInfo = useMemo(() => {
+    if (bridge.requireModel === true || !cloudStatus || cloudStatus.hasCompletedRead === false) {
+      return null
+    }
+    switch (cloudStatus.state) {
+      case 'signed-out':
+        return {
+          text: aiUniworkText(lang, 'aiUniworkFooterSignIn'),
+          actionLabel: pickerCloudText(lang, strings, 'acctSignIn'),
+          kind: 'sign-in' as const,
+        }
+      case 'not-entitled':
+        return {
+          text: pickerCloudText(lang, strings, 'cloudStateNotEntitled'),
+          actionLabel: aiUniworkText(lang, 'aiUniworkDetails'),
+          kind: 'details' as const,
+        }
+      case 'subscription-inactive':
+        return {
+          text: pickerCloudText(lang, strings, 'cloudStateInactive'),
+          actionLabel: aiUniworkText(lang, 'aiUniworkDetails'),
+          kind: 'details' as const,
+        }
+      case 'credits-exhausted':
+        return {
+          text: pickerCloudText(lang, strings, 'cloudStateExhausted'),
+          actionLabel: aiUniworkText(lang, 'aiUniworkDetails'),
+          kind: 'details' as const,
+        }
+      case 'unavailable':
+        if (cloudStatus.cloudUnavailable === true || cloudStatus.reason === 'cloud_unavailable') {
+          return {
+            text: pickerCloudText(lang, strings, 'cloudStateUnavailable'),
+            actionLabel: aiUniworkText(lang, 'aiUniworkDetails'),
+            kind: 'details' as const,
+          }
+        }
+        return null
+      case 'ready':
+      default:
+        return null
+    }
+  }, [bridge.requireModel, cloudStatus, lang, strings])
+
+  const onFooterAction = () => {
+    const pop = popRef.current
+    setOpen(false)
+    setFocusKey(null)
+    const winCloud = getWindowCloudStatusBridge()
+    if (footerInfo?.kind === 'sign-in') {
+      void (
+        bridge.signIn ??
+        winCloud?.signIn ??
+        bridge.openAccountSettings ??
+        winCloud?.openAccountSettings ??
+        bridge.openModelSettings
+      )?.()
+    } else {
+      void (
+        bridge.openAccountSettings ??
+        winCloud?.openAccountSettings ??
+        bridge.openModelSettings
+      )?.()
+    }
+    restoreChipFocusUnlessMoved(chipRef.current, pop)
   }
 
   if (!settings) return null
@@ -244,8 +611,10 @@ export function AiModelPicker({
       className="ai-model-picker"
       onKeyDown={(e) => {
         if (e.key === 'Escape' && open) {
+          e.preventDefault()
           e.stopPropagation()
           setOpen(false)
+          setFocusKey(null)
           chipRef.current?.focus()
         }
       }}
@@ -255,8 +624,10 @@ export function AiModelPicker({
         type="button"
         className={`ai-model-chip${open ? ' open' : ''}`}
         onClick={toggle}
+        onKeyDown={onChipKeyDown}
         aria-haspopup="listbox"
         aria-expanded={open}
+        aria-controls={open ? listId : undefined}
         title={chipLabel}
         data-tip={chipLabel}
         aria-label={chipLabel}
@@ -278,16 +649,30 @@ export function AiModelPicker({
         <div
           ref={popRef}
           className="ai-model-pop"
-          role="listbox"
-          aria-label={strings.title}
+          role="group"
+          aria-label={strings.choose}
           style={popStyle}
         >
-          <div className="ai-model-pop-list">
+          <div
+            ref={listRef}
+            id={listId}
+            className="ai-model-pop-list"
+            role="listbox"
+            aria-label={strings.title}
+            onKeyDown={onListKeyDown}
+          >
             {groups.map((g) => {
+              const headId = groupHeadId(g.id)
               const isOrg = isOrgGroup(g.id)
               return (
-                <div key={g.id} className="ai-model-group" data-origin={isOrg ? 'org' : undefined}>
-                  <div className="ai-model-group-head">
+                <div
+                  key={g.id}
+                  className="ai-model-group"
+                  role="group"
+                  aria-labelledby={headId}
+                  data-origin={isOrg ? 'org' : undefined}
+                >
+                  <div id={headId} className="ai-model-group-head">
                     <ProviderLogo id={g.id} />
                     <span>{g.label}</span>
                     {isOrg && (
@@ -321,18 +706,31 @@ export function AiModelPicker({
                     </div>
                   )}
                   {(g.models.length > 0 ? g.models : ['']).map((m) => {
+                    const optionKey = `${g.id}:${m}`
                     const selected = current?.provider === g.id && current.model === m
+                    const isUniworkWithCredits = g.id === 'uniwork' && hasUniworkWithCredits
                     return (
                       <button
-                        key={`${g.id}:${m}`}
+                        key={optionKey}
                         type="button"
                         role="option"
+                        tabIndex={optionKey === activeKey ? 0 : -1}
                         aria-selected={selected}
-                        aria-describedby={isOrg ? orgDescId : undefined}
-                        className={`ai-model-item${selected ? ' selected' : ''}`}
+                        aria-describedby={
+                          isUniworkWithCredits ? creditsDescId : isOrg ? orgDescId : undefined
+                        }
+                        className={`ai-model-item${selected ? ' selected' : ''}${isUniworkWithCredits ? ' ai-model-item-with-sub' : ''}`}
+                        onFocus={() => setFocusKey(optionKey)}
                         onClick={() => pick({ provider: g.id, model: m })}
                       >
-                        <span className="ai-model-item-text">{m || g.rowLabel}</span>
+                        <span className="ai-model-item-body">
+                          <span className="ai-model-item-text">{m || g.rowLabel}</span>
+                          {isUniworkWithCredits && (
+                            <span className="ai-model-item-sub" aria-hidden="true">
+                              {creditsVisibleText}
+                            </span>
+                          )}
+                        </span>
                         {selected && (
                           <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden>
                             <path
@@ -352,6 +750,11 @@ export function AiModelPicker({
               )
             })}
           </div>
+          {hasUniworkWithCredits && (
+            <span id={creditsDescId} className="ai-model-sr-only">
+              {creditsAriaText}
+            </span>
+          )}
           {bridge.openModelSettings && (
             <button type="button" className="ai-model-item ai-model-manage" onClick={manage}>
               <svg
@@ -366,16 +769,21 @@ export function AiModelPicker({
                 aria-hidden
               >
                 <circle cx="12" cy="12" r="3" />
-                <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
+                <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0-4h-.1a1.7 1.7 0 0 0-1.5 1z" />
               </svg>
               <span className="ai-model-item-text">{strings.manage}</span>
             </button>
           )}
+          {footerInfo && (
+            <div className="ai-model-footer">
+              <span className="ai-model-footer-text">{footerInfo.text}</span>
+              <button type="button" className="ai-model-footer-action" onClick={onFooterAction}>
+                {footerInfo.actionLabel}
+              </button>
+            </div>
+          )}
         </div>
       )}
-      <div aria-live="polite" style={VISUALLY_HIDDEN}>
-        {open ? listNote : ''}
-      </div>
       {open && hasOrgGroup && (
         // what an option of a key-on-UniWork group is described by: where its prompt goes
         <div hidden id={orgDescId}>
@@ -384,19 +792,6 @@ export function AiModelPicker({
       )}
     </div>
   )
-}
-
-/** screen-reader-only: the box stays in the layout flow but takes no space and shows nothing */
-const VISUALLY_HIDDEN: React.CSSProperties = {
-  position: 'absolute',
-  width: 1,
-  height: 1,
-  margin: -1,
-  padding: 0,
-  overflow: 'hidden',
-  clip: 'rect(0 0 0 0)',
-  whiteSpace: 'nowrap',
-  border: 0,
 }
 
 function effectiveZoom(el: HTMLElement | null): number {
