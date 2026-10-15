@@ -125,6 +125,8 @@ export const vi = {
   uwSyncOpenFromSettings: 'Trung tâm đồng bộ',
   uwSyncOnline: 'Đã kết nối UniWork · đồng bộ lúc {time}',
   uwSyncOffline: 'Không có mạng · lần đồng bộ cuối {time}',
+  uwSyncOnlineNoTime: 'Đã kết nối UniWork',
+  uwSyncOfflineNoTime: 'Không có mạng',
   uwSyncPaused: 'Đã tạm dừng gửi — lần lưu mới sẽ chờ',
   uwSyncAdminPaused: 'Quản trị viên đang tạm dừng việc gửi. Các lần lưu được giữ trên máy này.',
   uwSyncFeedOff:

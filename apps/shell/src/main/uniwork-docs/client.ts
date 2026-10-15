@@ -49,6 +49,13 @@ export type FetchLike = (input: string, init: RequestInit) => Promise<Response>
 
 export const METADATA_TIMEOUT_MS = 30_000
 export const TRANSFER_TIMEOUT_MS = 120_000
+/**
+ * R5BE-9: the overall ceiling of one streamed download. Its deadline is an
+ * idle one (TRANSFER_TIMEOUT_MS with no chunk), so a slow link that keeps
+ * delivering finishes; this bounds a body that trickles for ever (256 MiB in
+ * an hour is ~75 KB/s on average).
+ */
+export const STREAM_CEILING_MS = 60 * 60_000
 /** the server stages at most 50 MiB per upload; a download far past that is refused */
 const MAX_DOWNLOAD_BYTES = 256 * 1024 * 1024
 /**
@@ -70,10 +77,20 @@ export interface UniworkDocsClientOptions {
   fetch?: FetchLike
   metadataTimeoutMs?: number
   transferTimeoutMs?: number
+  /** R5BE-9: test seam for STREAM_CEILING_MS */
+  streamCeilingMs?: number
 }
 
 export interface DownloadResult {
   bytes: Uint8Array
+}
+
+/** G5-05: what a streamed download reports and how it is cancelled */
+export interface DownloadStreamOptions {
+  /** aborts the request, and the body read once the server answered */
+  signal?: AbortSignal
+  /** after every received chunk; `totalBytes` is the Content-Length when sent */
+  onProgress?(progress: { receivedBytes: number; totalBytes: number | null }): void
 }
 
 export interface UniworkDocsClient {
@@ -144,6 +161,16 @@ export interface UniworkDocsClient {
   }): Promise<OrgMemberPage>
   getDocument(documentId: string): Promise<DocumentDetail>
   download(documentId: string, version?: number): Promise<DownloadResult>
+  /**
+   * G5-05: the same download read chunk by chunk, with progress and cancel.
+   * Same route and the same 256 MiB cap, checked from Content-Length and again
+   * while the body streams. A cancel or a broken body is `network`.
+   */
+  downloadStream(
+    documentId: string,
+    version: number | undefined,
+    options?: DownloadStreamOptions,
+  ): Promise<DownloadResult>
   upload(input: {
     documentId: string
     bytes: Uint8Array
@@ -213,7 +240,13 @@ export interface UniworkCall<T> {
   /** the caller's abort (S18 upload cancel): aborts the request like a timeout */
   signal?: AbortSignal
   timeoutMs: number
-  read(response: Response): Promise<T>
+  /**
+   * R5BE-9: `timeoutMs` is an idle deadline instead of a whole-exchange one -
+   * it starts again every time `read` reports progress - and `ceilingMs`
+   * bounds the whole exchange. Only the streamed download sets it.
+   */
+  idle?: { ceilingMs: number }
+  read(response: Response, progress?: () => void): Promise<T>
 }
 
 /** the hardened request every UniWork client in main goes through (see the header) */
@@ -239,10 +272,18 @@ export function createUniworkSend(
         if (call.idempotencyKey) headers['Idempotency-Key'] = call.idempotencyKey
         const controller = new AbortController()
         let timedOut = false
-        const timer = setTimeout(() => {
+        const expire = () => {
           timedOut = true
           controller.abort()
-        }, call.timeoutMs)
+        }
+        let timer = setTimeout(expire, call.timeoutMs)
+        const ceiling = call.idle ? setTimeout(expire, call.idle.ceilingMs) : undefined
+        // R5BE-9: a chunk arrived - the idle deadline starts again
+        const progress = () => {
+          if (!call.idle || timedOut) return
+          clearTimeout(timer)
+          timer = setTimeout(expire, call.timeoutMs)
+        }
         // the caller's own abort rides the same controller as the deadline: one
         // signal ends the request, whatever started it. Once D answers an
         // accepted 2xx the bridge is detached (below), so a Cancel that lands
@@ -297,7 +338,7 @@ export function createUniworkSend(
                 )
           }
           try {
-            return await call.read(response)
+            return await call.read(response, progress)
           } catch (error) {
             if (timedOut) throw new UniworkDocError('timeout')
             throw error instanceof UniworkDocError
@@ -306,6 +347,7 @@ export function createUniworkSend(
           }
         } finally {
           clearTimeout(timer)
+          clearTimeout(ceiling)
           call.signal?.removeEventListener('abort', abortFromCaller)
         }
       })
@@ -318,6 +360,7 @@ export function createUniworkSend(
 export function createUniworkDocsClient(options: UniworkDocsClientOptions): UniworkDocsClient {
   const metadataTimeout = options.metadataTimeoutMs ?? METADATA_TIMEOUT_MS
   const transferTimeout = options.transferTimeoutMs ?? TRANSFER_TIMEOUT_MS
+  const streamCeiling = options.streamCeilingMs ?? STREAM_CEILING_MS
   const send = createUniworkSend(options)
   const json = (response: Response): Promise<unknown> => response.json()
 
@@ -555,6 +598,67 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
           if (length > MAX_DOWNLOAD_BYTES) throw new UniworkDocError('too_large')
           const bytes = new Uint8Array(await response.arrayBuffer())
           if (bytes.byteLength > MAX_DOWNLOAD_BYTES) throw new UniworkDocError('too_large')
+          return { bytes }
+        },
+      })
+    },
+
+    async downloadStream(documentId, version, streamOptions = {}) {
+      const query = new URLSearchParams()
+      if (version !== undefined && version > 0) query.set('version', String(Math.floor(version)))
+      const { signal, onProgress } = streamOptions
+      return send({
+        method: 'GET',
+        route: `/documents/${id(documentId)}/download`,
+        query,
+        // R5BE-9: no chunk for transferTimeout ends it, not the whole transfer
+        timeoutMs: transferTimeout,
+        idle: { ceilingMs: streamCeiling },
+        ...(signal ? { signal } : {}),
+        async read(response, progress) {
+          const header = response.headers.get('Content-Length')
+          const declared = header === null ? NaN : Number(header)
+          if (declared > MAX_DOWNLOAD_BYTES) throw new UniworkDocError('too_large')
+          const totalBytes = Number.isSafeInteger(declared) && declared >= 0 ? declared : null
+          // R5BE-8: a 200 with no readable body is refused, never buffered
+          // whole (the cap could only be checked after the bytes were in memory)
+          if (!response.body) throw new UniworkDocError('malformed_response')
+          const reader = response.body.getReader()
+          // send() detaches the caller's abort once the server answered: the
+          // body read listens to it itself, so a cancel ends the stream too
+          const stop = () => void reader.cancel().catch(() => undefined)
+          signal?.addEventListener('abort', stop, { once: true })
+          const chunks: Uint8Array[] = []
+          let receivedBytes = 0
+          try {
+            for (;;) {
+              if (signal?.aborted) throw new UniworkDocError('network')
+              let step: ReadableStreamReadResult<Uint8Array>
+              try {
+                step = await reader.read()
+              } catch {
+                throw new UniworkDocError('network')
+              }
+              if (signal?.aborted) throw new UniworkDocError('network')
+              if (step.done) break
+              receivedBytes += step.value.byteLength
+              if (receivedBytes > MAX_DOWNLOAD_BYTES) {
+                stop()
+                throw new UniworkDocError('too_large')
+              }
+              chunks.push(step.value)
+              progress?.()
+              onProgress?.({ receivedBytes, totalBytes })
+            }
+          } finally {
+            signal?.removeEventListener('abort', stop)
+          }
+          const bytes = new Uint8Array(receivedBytes)
+          let offset = 0
+          for (const chunk of chunks) {
+            bytes.set(chunk, offset)
+            offset += chunk.byteLength
+          }
           return { bytes }
         },
       })

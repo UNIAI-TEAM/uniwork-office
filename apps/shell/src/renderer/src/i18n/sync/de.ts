@@ -133,6 +133,8 @@ export const de = {
   uwSyncOpenFromSettings: 'Synchronisierungscenter',
   uwSyncOnline: 'Mit UniWork verbunden · synchronisiert {time}',
   uwSyncOffline: 'Offline · zuletzt synchronisiert {time}',
+  uwSyncOnlineNoTime: 'Mit UniWork verbunden',
+  uwSyncOfflineNoTime: 'Offline',
   uwSyncPaused: 'Senden pausiert – neue Speicherstände warten',
   uwSyncAdminPaused:
     'Ihr Administrator hat das Senden pausiert. Speicherstände bleiben auf diesem Computer.',

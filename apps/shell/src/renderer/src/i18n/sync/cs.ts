@@ -126,6 +126,8 @@ export const cs = {
   uwSyncOpenFromSettings: 'Centrum synchronizace',
   uwSyncOnline: 'Připojeno k UniWork · synchronizováno {time}',
   uwSyncOffline: 'Offline · naposledy synchronizováno {time}',
+  uwSyncOnlineNoTime: 'Připojeno k UniWork',
+  uwSyncOfflineNoTime: 'Offline',
   uwSyncPaused: 'Odesílání pozastaveno — nová uložení počkají',
   uwSyncAdminPaused: 'Správce pozastavil odesílání. Uložení zůstávají v tomto počítači.',
   uwSyncFeedOff:

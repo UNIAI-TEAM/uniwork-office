@@ -268,6 +268,8 @@ describe('feed client', () => {
         revision: '9007199254740993',
         currentVersion: 7,
         versionId: 'v7',
+        // R5BE-1b: a feed upsert's archived flag is carried (the library reads it)
+        archived: false,
       },
     ])
   })

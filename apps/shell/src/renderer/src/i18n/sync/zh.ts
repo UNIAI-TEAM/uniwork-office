@@ -129,6 +129,8 @@ export const zh = {
   uwSyncOpenFromSettings: '同步中心',
   uwSyncOnline: '已连接 UniWork · 同步于 {time}',
   uwSyncOffline: '离线 · 上次同步于 {time}',
+  uwSyncOnlineNoTime: '已连接 UniWork',
+  uwSyncOfflineNoTime: '离线',
   uwSyncPaused: '发送已暂停 — 新的保存会等待',
   uwSyncAdminPaused: '管理员已暂停发送。保存内容保留在这台电脑上。',
   uwSyncFeedOff: '新版本通知已暂停。你保存时 UniWork 仍会检查冲突。',

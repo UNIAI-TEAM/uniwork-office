@@ -7,7 +7,11 @@ import {
   type QueueEvent,
 } from '../src/main/uniwork-sync/queue/machine'
 import { QUEUE_LIMITS } from '../src/main/uniwork-sync/queue/limits'
-import type { IntentRecordV2, QueueState } from '../src/main/uniwork-sync/queue/record'
+import {
+  QUEUE_STATES,
+  type IntentRecordV2,
+  type QueueState,
+} from '../src/main/uniwork-sync/queue/record'
 
 /**
  * The G5-06 queue machine, one case per rule of the stage spec (EXPERIENCE ›
@@ -362,6 +366,29 @@ describe('uniwork save queue machine', () => {
     for (const state of ['committing', 'reconciling', 'reconciling-stuck', 'uploading'] as const) {
       const out = transition(record({ state }), { type: 'supersede' }, ctx())
       expect(out.record?.state).toBe(state)
+    }
+  })
+
+  it('abandon ("Bỏ nháp…" on a blocked row) → cancelled (cancelReason user), no draft effect; refused from every other state', () => {
+    for (const lastError of [
+      'permission_revoked',
+      'document_deleted',
+      'member_deactivated',
+      'organization_suspended',
+      'session_expired',
+    ] as const) {
+      const out = transition(record({ state: 'blocked', lastError }), { type: 'abandon' }, ctx())
+      expect(out.record?.state, lastError).toBe('cancelled')
+      expect(out.record?.cancelReason, lastError).toBe('user')
+      expect(out.record?.intentId, lastError).toBe('intent_1')
+      expect(out.effects, lastError).toEqual([])
+    }
+    for (const state of QUEUE_STATES) {
+      if (state === 'blocked') continue
+      const before = record({ state })
+      const out = transition(before, { type: 'abandon' }, ctx())
+      expect(out.record, state).toEqual(before)
+      expect(out.effects, state).toEqual([])
     }
   })
 

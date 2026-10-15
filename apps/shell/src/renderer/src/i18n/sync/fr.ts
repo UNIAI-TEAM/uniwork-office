@@ -134,6 +134,8 @@ export const fr = {
   uwSyncOpenFromSettings: 'Centre de synchronisation',
   uwSyncOnline: 'Connecté à UniWork · synchronisé {time}',
   uwSyncOffline: 'Hors ligne · dernière synchronisation {time}',
+  uwSyncOnlineNoTime: 'Connecté à UniWork',
+  uwSyncOfflineNoTime: 'Hors ligne',
   uwSyncPaused: 'Envoi suspendu — les nouveaux enregistrements attendront',
   uwSyncAdminPaused:
     'Votre administrateur a suspendu l’envoi. Les enregistrements sont conservés sur cet ordinateur.',

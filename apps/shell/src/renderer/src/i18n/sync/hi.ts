@@ -128,6 +128,8 @@ export const hi = {
   uwSyncOpenFromSettings: 'सिंक केंद्र',
   uwSyncOnline: 'UniWork से कनेक्टेड · {time} पर सिंक हुआ',
   uwSyncOffline: 'ऑफ़लाइन · पिछला सिंक {time}',
+  uwSyncOnlineNoTime: 'UniWork से कनेक्टेड',
+  uwSyncOfflineNoTime: 'ऑफ़लाइन',
   uwSyncPaused: 'भेजना रुका है — नई सहेजें प्रतीक्षा करेंगी',
   uwSyncAdminPaused: 'आपके व्यवस्थापक ने भेजना रोका है। सहेजें इस कंप्यूटर पर रखी गई हैं।',
   uwSyncFeedOff: 'नए संस्करण की सूचनाएँ रुकी हैं। सहेजते समय UniWork अब भी टकराव जाँचता है।',

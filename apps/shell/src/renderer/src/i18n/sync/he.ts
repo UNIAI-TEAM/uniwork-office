@@ -125,6 +125,8 @@ export const he = {
   uwSyncOpenFromSettings: 'מרכז הסנכרון',
   uwSyncOnline: 'מחובר ל-UniWork · סונכרן {time}',
   uwSyncOffline: 'לא מקוון · סונכרן לאחרונה {time}',
+  uwSyncOnlineNoTime: 'מחובר ל-UniWork',
+  uwSyncOfflineNoTime: 'לא מקוון',
   uwSyncPaused: 'השליחה מושהית — שמירות חדשות ימתינו',
   uwSyncAdminPaused: 'מנהל המערכת השהה את השליחה. השמירות נשארות במחשב הזה.',
   uwSyncFeedOff: 'ההתראות על גרסאות חדשות מושהות. UniWork עדיין בודק התנגשויות כשאתה שומר.',

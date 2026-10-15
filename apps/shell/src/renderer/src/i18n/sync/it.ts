@@ -132,6 +132,8 @@ export const it = {
   uwSyncOpenFromSettings: 'Centro di sincronizzazione',
   uwSyncOnline: 'Connesso a UniWork · sincronizzato {time}',
   uwSyncOffline: 'Offline · ultima sincronizzazione {time}',
+  uwSyncOnlineNoTime: 'Connesso a UniWork',
+  uwSyncOfflineNoTime: 'Offline',
   uwSyncPaused: 'Invio in pausa — i nuovi salvataggi resteranno in attesa',
   uwSyncAdminPaused:
     'L’amministratore ha messo in pausa l’invio. I salvataggi restano su questo computer.',
