@@ -263,7 +263,7 @@ describe('markdown AI run undo and the images the run saved', () => {
   it('a run without pictures: undo and redo leave the store alone', async () => {
     const panel = await mount()
     await panel.run([
-      { name: 'edit_document', input: { operations: [{ op: 'insertText', after: 0, text: 'x' }] } },
+      { name: 'apply_ops', input: { ops: [{ op: 'insertContent', after: 0, markdown: 'x' }] } },
     ])
     act(() => {
       editor!.commands.undo()
@@ -274,9 +274,11 @@ describe('markdown AI run undo and the images the run saved', () => {
   })
 
   const userEdit = (): ScriptedCall => ({ name: '__user_edit', input: {} })
+  /** after a hand edit the edit guard refuses index-based writes until the model reads the document again */
+  const refresh = (): ScriptedCall => ({ name: 'get_document_context', input: {} })
   const insertText = (text: string): ScriptedCall => ({
-    name: 'edit_document',
-    input: { operations: [{ op: 'insertText', after: 0, text }] },
+    name: 'apply_ops',
+    input: { ops: [{ op: 'insertContent', after: 0, markdown: text }] },
   })
   const undo = async (): Promise<void> => {
     act(() => {
@@ -311,7 +313,7 @@ describe('markdown AI run undo and the images the run saved', () => {
 
   it('a picture in the first piece of a split run survives the undo of a later piece', async () => {
     const panel = await mount()
-    await panel.run([insertImage(), userEdit(), insertText('later')])
+    await panel.run([insertImage(), userEdit(), refresh(), insertText('later')])
     expect(imageCount()).toBe(1)
 
     await undo() // the later AI piece
@@ -332,7 +334,7 @@ describe('markdown AI run undo and the images the run saved', () => {
 
   it('a picture in a later piece: undoing that piece keeps the file for the redo', async () => {
     const panel = await mount()
-    await panel.run([insertText('first'), userEdit(), insertImage()])
+    await panel.run([insertText('first'), userEdit(), refresh(), insertImage()])
     expect(imageCount()).toBe(1)
 
     await undo() // the later piece holds the picture, but the run is not undone
