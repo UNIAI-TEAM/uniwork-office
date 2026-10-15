@@ -23,6 +23,13 @@ export type LockCopy =
       actionKey: 'uwActRetry'
       action: 'retry'
     }
+  | {
+      titleKey: 'uwLockSignedOutTitle'
+      bodyKey: 'uwLockSignedOut'
+      /** opens sign-in / Account settings so the user can sign in with the same account */
+      actionKey: 'uwActSignIn'
+      action: 'sign-in'
+    }
 
 const COPY: Record<UniworkLockReason, LockCopy> = {
   store_newer: {
@@ -36,6 +43,12 @@ const COPY: Record<UniworkLockReason, LockCopy> = {
     bodyKey: 'uwLockKeystore',
     actionKey: 'uwActRetry',
     action: 'retry',
+  },
+  signed_out: {
+    titleKey: 'uwLockSignedOutTitle',
+    bodyKey: 'uwLockSignedOut',
+    actionKey: 'uwActSignIn',
+    action: 'sign-in',
   },
 }
 
