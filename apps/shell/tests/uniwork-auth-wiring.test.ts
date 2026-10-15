@@ -1,14 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const electron = vi.hoisted(() => ({
+  userData: '/user-data',
   app: {
     isPackaged: false,
     getVersion: () => '0.0.0',
     getAppPath: () => '/app',
-    getPath: () => '/user-data',
+    getPath: () => electron.userData,
     setAsDefaultProtocolClient: vi.fn(),
   },
   shell: { openExternal: vi.fn(async () => undefined) },
@@ -20,7 +21,12 @@ const electron = vi.hoisted(() => ({
 }))
 vi.mock('electron', () => electron)
 
-import { deviceInfo, openAuthorizationUrl, registerAuthProtocols } from '../src/main/uniwork-auth'
+import {
+  accountCredentialStore,
+  deviceInfo,
+  openAuthorizationUrl,
+  registerAuthProtocols,
+} from '../src/main/uniwork-auth'
 import {
   CredentialStoreError,
   createCredentialStore,
@@ -77,6 +83,55 @@ describe('authorization URL gate', () => {
     electron.app.isPackaged = true
     await openAuthorizationUrl('https://uniwork.example/a', stable)
     expect(electron.shell.openExternal).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('credential store E2E seam', () => {
+  const credential: StoredCredential = {
+    deploymentId: 'default',
+    apiOrigin: 'https://uniwork.example',
+    clientId: 'uniwork-office',
+    accountId: 'acc_1',
+    deviceSessionId: 'dev_1',
+    sessionId: 'sess_1',
+    refreshToken: 'rt_seam_secret_value',
+    refreshExpiresAt: 1_900_000_000_000,
+  }
+  let dir = ''
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'uniwork-store-seam-'))
+    electron.userData = dir
+  })
+  afterEach(() => {
+    electron.userData = '/user-data'
+    rmSync(dir, { recursive: true, force: true })
+  })
+  const onDisk = () => existsSync(join(dir, 'uniwork-auth'))
+
+  it('keeps the session in memory only when unpackaged and the env is set', () => {
+    vi.stubEnv('UNIWORK_AUTH_E2E_PLAIN_STORE', '1')
+    const store = accountCredentialStore()
+    store.save(credential)
+    expect(store.load()).toEqual(credential)
+    expect(onDisk()).toBe(false)
+    // a restart (a new store) forgets it
+    expect(accountCredentialStore().load()).toBeNull()
+    store.clear()
+    expect(store.load()).toBeNull()
+  })
+
+  it('uses the real keyring-backed store without the env', () => {
+    const store = accountCredentialStore()
+    store.save(credential)
+    expect(onDisk()).toBe(true)
+    expect(accountCredentialStore().load()).toEqual(credential)
+  })
+
+  it('ignores the env in a packaged build', () => {
+    vi.stubEnv('UNIWORK_AUTH_E2E_PLAIN_STORE', '1')
+    electron.app.isPackaged = true
+    accountCredentialStore().save(credential)
+    expect(onDisk()).toBe(true)
   })
 })
 

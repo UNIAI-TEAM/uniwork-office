@@ -456,7 +456,12 @@ export function providerNeed(settings: AiSettings, id: AiProviderId): ProviderNe
   if (!meta) return 'key'
   if (meta.needsCliPath) return null
   const config = settings.providers?.[id]
-  if (!config?.model?.trim()) return 'model'
+  const source = settings.modelSources?.[id]
+  const model = config?.model?.trim() || (source?.origin === 'org' ? source.chosen?.trim() : '')
+  if (!model) return 'model'
+  // A key saved on UniWork (`origin: 'org'`) authenticates and resolves its base URL through the
+  // UniWork proxy, without storing a key or placeholder in ai-settings.json.
+  if (source?.origin === 'org') return null
   if (meta.needsBaseUrl) {
     // Custom OpenAI-compatible endpoints (Ollama, LM Studio, vLLM) accept
     // anonymous requests: base URL + model suffice, the key stays optional.
@@ -471,6 +476,15 @@ export function isProviderUsable(settings: AiSettings, id: AiProviderId): boolea
 }
 
 /**
+ * True when a key saved on UniWork serves `id` (the host resolved an `origin: 'org'` source) and a
+ * model is known, so a call can go out although the slot holds no key. main's ai:chat / ai:stream
+ * route such a provider through the UniWork proxy, so My AI and the agents treat it as ready.
+ */
+export function isOrgServedReady(settings: AiSettings, id: AiProviderId): boolean {
+  return settings.modelSources?.[id]?.origin === 'org' && providerNeed(settings, id) === null
+}
+
+/**
  * The provider the user chose. It is never swapped for another when its config
  * is incomplete: Settings and every module picker keep showing it with a
  * needs-key / choose-model state (`providerNeed`), so a half-filled setup never
@@ -480,6 +494,21 @@ export function isProviderUsable(settings: AiSettings, id: AiProviderId): boolea
 export function selectedProvider(settings: AiSettings): AiProviderId {
   const provider = settings.provider
   return AI_PROVIDERS.some((m) => m.id === provider) ? provider : 'genspark'
+}
+
+/**
+ * The model a call for `provider` will use: the source's `chosen` (what the host resolved, e.g. a
+ * model served by a key saved on UniWork) before the slot's own model. For an org-served provider
+ * the slot holds the stored default, not the model main uses, so readers of "the current model"
+ * (vision checks, usage records) go through this instead of `providers[id].model`.
+ */
+export function aiEffectiveModel(
+  settings: Pick<AiSettings, 'providers' | 'modelSources'>,
+  provider: AiProviderId,
+): string {
+  return (
+    settings.modelSources?.[provider]?.chosen?.trim() || settings.providers?.[provider]?.model || ''
+  )
 }
 
 /** Only the provider key slots are read, so loosely typed (schema-parsed) settings fit too. */

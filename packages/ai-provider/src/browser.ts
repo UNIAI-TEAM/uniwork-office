@@ -3,6 +3,9 @@ export type {
   AiProviderConfig,
   AiProviderId,
   AiProviderMeta,
+  AiModelPick,
+  AiModelSource,
+  AiSettingsSaveOptions,
   AiSettings,
   CodexModelCatalog,
 } from './types'
@@ -14,10 +17,13 @@ export {
   MAX_MAX_OUTPUT_TOKENS,
   MIN_MAX_OUTPUT_TOKENS,
   clampMaxOutputTokens,
+  aiEffectiveModel,
+  isOrgServedReady,
   isProviderUsable,
   providerNeed,
   selectedProvider,
   uniAiOpenRouterKey,
+  type ProviderNeed,
 } from './providers'
 export { getProviderAdapter, modelLacksVision } from './registry'
 export {

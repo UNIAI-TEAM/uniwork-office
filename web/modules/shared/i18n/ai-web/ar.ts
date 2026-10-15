@@ -40,6 +40,8 @@ export const ar = {
   aiWebStateUnreachableBody: 'تعذّر على UniWork الوصول إلى مزوّد الذكاء الاصطناعي. حاول بعد قليل.',
   aiWebStateCloudTitle: 'الأداة السحابية غير متاحة',
   aiWebStateCloudBody: 'لم يتم إعداد أداة UniWork AI هذه على الخادم بعد.',
+  aiWebStateOutageTitle: 'UniWork غير متاح مؤقتًا',
+  aiWebStateOutageBody: 'تعذّر الوصول إلى UniWork الآن. حاول بعد قليل.',
   aiWebStateSessionTitle: 'انتهت الجلسة',
   aiWebStateSessionBody: 'أعد فتح المستند من UniWork للمتابعة.',
   aiWebStateRefusedTitle: 'رُفض الطلب',

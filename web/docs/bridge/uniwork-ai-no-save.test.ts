@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 // G6-A03 (owned by the fork, web side): a UniWork AI turn that edits sends no save, no save-as and no
 // upload request from the frame. The host fake counts every frame protocol request, the fetch fake
-// every HTTP request: the only thing a UniWork AI turn sends is the chat completion on its own route.
+// every HTTP request: the only things a UniWork AI turn sends are the chat completion on its own
+// route and a read-only GET of the cloud status.
 // The adapter is slice A: its `streamUniwork` is replaced by one that posts through the transport the
 // frame hands it, then reports an editing tool call the way the real adapter does. The tool call is
 // applied to the module's document (the real Markdown web API, so an edit marks the document dirty
@@ -116,11 +117,15 @@ describe('a UniWork AI turn never saves (G6-A03, web)', () => {
     // the run state report is the one event family a turn may add (the idle waits out its grace)
     expect(aiRun.length).toBeGreaterThan(0)
     expect(aiRun.every((r) => r.state === 'running' || r.state === 'idle')).toBe(true)
-    // the frame's only HTTP request is the chat completion on the UniWork AI route
-    expect(urls).toHaveLength(1)
-    expect(urls[0]!.method).toBe('POST')
-    expect(urls[0]!.url).toMatch(
-      /\/office-frame\/documents\/doc-1\/ai\/uniwork\/chat\/completions$/,
+    // the frame's HTTP requests: the chat completion on the UniWork AI route, plus the one read-only
+    // GET of the cloud status (the grant of the AI tools), each named by method and exact path. A
+    // read is not a save; any other request (another URL, any non-GET, a save / upload / commit)
+    // still fails here.
+    const docRoute = '/api/v1/office-frame/documents/doc-1'
+    const asRoute = (u: { url: string; method: string }) =>
+      `${u.method} ${new URL(u.url, 'http://localhost').pathname}`
+    expect(urls.map(asRoute).sort()).toEqual(
+      [`GET ${docRoute}/ai/cloud`, `POST ${docRoute}/ai/uniwork/chat/completions`].sort(),
     )
   })
 })

@@ -7,6 +7,7 @@ import type {
   AiSearchProviderId,
   AiSearchProviderMeta,
   AiSettings,
+  AiSettingsSaveOptions,
   AiStreamChunk,
   AiStreamRequest,
   AiTestFailureKind,
@@ -804,7 +805,10 @@ export interface HomeApi {
   /** AI settings (userData/ai-settings.json, shared by every editor) */
   getAiSettings(options?: AiSettingsPickOptions): Promise<AiSettings>
   /** persist AI settings; every renderer gets ai:settings-changed and re-reads */
-  setAiSettings(settings: AiSettings, options?: AiSettingsPickOptions): Promise<void>
+  setAiSettings(
+    settings: AiSettings,
+    options?: AiSettingsPickOptions & AiSettingsSaveOptions,
+  ): Promise<void>
   /** ai-settings.json was rewritten by any renderer (composer model chip, another window) */
   onAiSettingsChanged(handler: () => void): () => void
   /** provider catalog with each fixed endpoint's default base URL (empty for UniAI/custom) */

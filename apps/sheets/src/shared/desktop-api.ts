@@ -31,6 +31,7 @@ import type {
   AiChatRequest,
   AiChatResponse,
   AiSettings,
+  AiSettingsSaveOptions,
   AiStreamChunk,
   AiStreamRequest,
   GenSparkAccountStatus,
@@ -3009,7 +3010,7 @@ export interface DesktopApi {
   /// Absent outside the shell, where the author never changes.
   onCommentAuthorChanged?(handler: () => void): () => void
   getAiSettings(): Promise<AiSettings>
-  setAiSettings(settings: AiSettings): Promise<void>
+  setAiSettings(settings: AiSettings, options?: AiSettingsSaveOptions): Promise<void>
   /// ai-settings.json was rewritten by any renderer; re-read it
   onAiSettingsChanged(handler: () => void): () => void
   /// shell only: switch to Home and open Settings › AI Model (rejects in standalone)

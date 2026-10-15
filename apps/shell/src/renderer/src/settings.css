@@ -276,6 +276,39 @@
   overflow-wrap: anywhere;
 }
 
+/* API key row of a provider served by a key saved on UniWork: the tag shares the label line (the
+ * same pill as the composer chip's .ai-model-org-tag) and never wraps or shrinks, so the note keeps
+ * the remaining width; the two actions sit together, wrapping below each other in a narrow pane */
+.set-org-key-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.set-org-key-tag {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-6);
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.set-org-key-actions {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  max-width: 60%;
+}
+
 /* stacked label + secondary description (analytics toggle row) */
 .set-field-stack {
   display: flex;
