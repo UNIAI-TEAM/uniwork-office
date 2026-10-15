@@ -188,7 +188,10 @@ describe('U-1: the tab bar at 800, 890, 1024 and 1280 with one to three document
     const floor = stripFloorOf({ ...BAR, docTabs: 2 })
     expect(l.strip.right - l.strip.left).toBeGreaterThanOrEqual(floor)
     // the old layout: full pill, strip left with what the holder did not take
-    const old = layout(890, 2, { pill: { full: 309, short: 309, compact: 309 }, hasShort: false })
+    const old = layout(890, 2, {
+      pill: { full: 309, short: 309, compact: 309, mini: 309 },
+      hasShort: false,
+    })
     expect(old.strip.right - old.strip.left).toBeLessThan(floor)
   })
 
@@ -286,7 +289,7 @@ describe('U-1: at the numbers measured in the real shell, no tab rect reaches th
       ...REAL,
       docTabs: 2,
       toggle: 0,
-      pill: { full: 314, short: 314, compact: 314 },
+      pill: { full: 314, short: 314, compact: 314, mini: 314 },
       hasShort: false,
     })
     expect(old.chrome.right).toBe(800 - 160 - 16)
@@ -330,7 +333,7 @@ describe('U-1: at the numbers measured in the real shell, no tab rect reaches th
       ...REAL,
       docTabs: 2,
       toggle: 0,
-      pill: { full: 134, short: 134, compact: 30 },
+      pill: { full: 134, short: 134, compact: 30, mini: 28 },
       hasShort: false,
     })
     expect(l.variant).toBe('full')

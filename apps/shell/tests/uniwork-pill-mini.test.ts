@@ -140,9 +140,8 @@ describe('FXT6u: the mini pill stylesheet', () => {
   })
 
   it('hover and keyboard focus use tokens; the focus ring is the pill one and shows the description chip', () => {
-    expect(rule(".uw-pill-mini:hover:not([aria-disabled='true'])")).toMatch(
-      /background: var\(--hover\)/,
-    )
+    const hover = css.slice(css.indexOf(".uw-pill-mini:hover:not([aria-disabled='true'])"))
+    expect(hover.slice(0, hover.indexOf('}'))).toMatch(/background: var\(--hover\)/)
     expect(css).toMatch(/\.uw-pill-mini:focus-visible,/)
     expect(css).toMatch(/\.uw-pill-mini:focus-visible ~ \.uw-pill-focus-tip/)
     // the ring is the one of the other pill controls
