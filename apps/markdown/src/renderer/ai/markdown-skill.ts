@@ -1,4 +1,4 @@
-import type { AgentSkill, AgentToolDef } from '@genoffice/agent-core'
+import type { AgentSkill, AgentToolDef, ImageUrlRegistry } from '@genoffice/agent-core'
 import type { Editor } from '@tiptap/core'
 import { cap } from '../capabilities'
 import type { AiDocWriter } from './doc-writer'
@@ -111,6 +111,8 @@ export function createMarkdownSkill(
   isReadOnly?: () => boolean,
   /** the panel's questionnaire card behind ask_clarification; none hides the tool */
   getAsk?: () => AskClarification | undefined,
+  /** image URLs this run may insert (reset at every run); refuses unregistered ones while its enforce predicate holds */
+  imageUrls?: ImageUrlRegistry,
 ): AgentSkill {
   /** ask_clarification only exists while a panel hosts its card; it never edits, so view-only keeps it */
   const withAsk = (tools: AgentToolDef[], readOnly: boolean): AgentToolDef[] =>
@@ -146,6 +148,8 @@ export function createMarkdownSkill(
       )
     },
     buildContext: () => {
+      // one buildContext per loop.run: the image URLs of the previous request stop being insertable
+      imageUrls?.beginRun()
       const editor = getEditor()
       if (!editor) return ''
       markDocSeen(editor)
@@ -166,7 +170,7 @@ export function createMarkdownSkill(
       if (!editor) {
         return { output: 'editor not ready', isError: true, summary: call.name }
       }
-      return executeTool(editor, call, signal, fm, getWriter?.(), getAsk?.())
+      return executeTool(editor, call, signal, fm, getWriter?.(), getAsk?.(), imageUrls)
     },
   }
 }

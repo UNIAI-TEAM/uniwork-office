@@ -23,6 +23,7 @@ import type {
   UniworkDocStatus,
   UniworkLaunchEvent,
   UniworkLockReason,
+  UniworkQueuePopoverRequest,
   UniworkRemoteAction,
   UniworkRemoteBar,
   UniworkResult,
@@ -272,6 +273,14 @@ export interface UniworkDocsServiceDeps {
   notifyTitleRenamed?(path: string, title: string): void
   ui: ConflictUi
   pushStatus(status: UniworkDocStatus): void
+  /** G5-06u: ask the shell renderer to open the queue popover of a path */
+  pushQueuePopover?(request: UniworkQueuePopoverRequest): void
+  /**
+   * G5-06u: whether `path` is a tab of the shell window (the only window with
+   * a pill and a queue popover). False for a detached editor window, whose
+   * Ctrl/Cmd+S keeps the inline replay. Absent = every path is a shell tab.
+   */
+  isShellTab?(path: string): boolean
   pushLaunch(event: UniworkLaunchEvent): void
   /** G5-11: sign-out progress push (`waiting` | `done`) */
   pushSignOutProgress?(event: SignOutProgress): void
@@ -689,6 +698,15 @@ export class UniworkDocsService {
   private syncOpen: Promise<SyncStoreOpen> | null = null
   /** the outcome of the last store open; 'unknown' until it is asked for */
   private storeOpenKind: SyncStoreOpen['kind'] | 'unknown' = 'unknown'
+  /**
+   * d7-2/d1-3: per scope token, the document keys the last `planSignOut` of that
+   * scope counted as RAM-only. The switch notice sums that count with the lock's
+   * own lost documents, so the lock of the scope leaves these keys out: a
+   * document is counted once. A re-plan replaces the scope's entry and the lock
+   * drops it, so an interleaved plan of another scope cannot clobber it and the
+   * map never holds more than one entry per scope.
+   */
+  private readonly plannedRamOnly = new Map<string, Set<string>>()
   /** scopes whose schema 1 -> 2 sweep has finished in this process */
   private readonly migratedScopes = new Set<string>()
   /**
@@ -791,6 +809,7 @@ export class UniworkDocsService {
       ownsBinding: (doc) => this.owns(doc),
       intents: () => this.intentAccess(),
       publish: (status) => this.publish(status),
+      requestQueuePopover: (path) => this.deps.pushQueuePopover?.({ path }),
       onSaved: (doc, versionId) => this.deps.notifySaved?.(doc.path, versionId),
       capability: {
         get: (orgId) =>
@@ -1490,6 +1509,9 @@ export class UniworkDocsService {
     }
     // a real record change ends the window-local read-only status
     this.otherWindowStatus.delete(doc.path)
+    // a spent record (committed / cancelled) leaves no intent for an N+1 to
+    // wait behind (RBE6u-02)
+    if (isTerminalQueueState(record.state)) this.coordinator.clearPendingNext(doc.path)
     if (record.state === 'committed') {
       await this.settleFromRecord(doc, record)
       return
@@ -1530,6 +1552,8 @@ export class UniworkDocsService {
     delete next.error
     delete next.serverRevision
     delete next.serverVersion
+    // the intent landed: nothing newer waits behind it (RBE6u-02)
+    this.coordinator.clearPendingNext(doc.path)
     const done = await this.coordinator.commitState(doc, next)
     // G8-12: a queue-settled Save (dispatched, or found committed by a lookup
     // at rest) tells the editor's comment panel its new version, exactly as
@@ -1988,6 +2012,11 @@ export class UniworkDocsService {
       }
     }
 
+    // d1-3: the entry belongs to this scope alone, and a re-plan replaces it
+    // (an empty plan drops it) so a scope that is never locked cannot grow it
+    const planToken = `${target.deploymentId}/${target.accountId}`
+    if (storeLockedNow) this.plannedRamOnly.set(planToken, ramOnlyDocs)
+    else this.plannedRamOnly.delete(planToken)
     return {
       count: unsavedDocs.size,
       waiting: waitingDocs.size,
@@ -2029,6 +2058,11 @@ export class UniworkDocsService {
     const switching = options?.switch === true
     const scopeToken = `${target.deploymentId}/${target.accountId}`
     const keystoreLocked = this.storeLocked()
+    // d7-2/d1-3: what the plan of THIS scope just counted as RAM-only is not
+    // counted again as lost; the entry is consumed here, so a plan of another
+    // scope (or a later lock) can never reuse it
+    const planned = this.plannedRamOnly.get(scopeToken)
+    this.plannedRamOnly.delete(scopeToken)
 
     // Step 1: stop runtime, block new commits, bounded receipt wait (30s)
     this.deps.stopRuntime?.()
@@ -2085,7 +2119,13 @@ export class UniworkDocsService {
       await Promise.all([...this.pendingApplyRecords])
     }
 
-    // Mark the queue session dead so any late HTTP response writes nothing
+    // Mark the queue session dead so any late HTTP response writes nothing.
+    // Deliberately AFTER the bounded wait above (unlike teardownSaveQueue, which
+    // marks dead first): a pass that answers inside the wait must still record
+    // its receipt so the document settles as committed instead of reconciling
+    // (sign-out-lock tests 5/5b). New commits are already blocked by
+    // stoppingQueueSessions, and the store lock below is last, so a late write
+    // reads `interrupted`.
     this.stopQueue()
 
     // Transition any record still in validating | uploading | committing to reconciling
@@ -2418,6 +2458,7 @@ export class UniworkDocsService {
     this.syncOpen = null
     this.storeOpenKind = 'unknown'
     const captureFailed = [...captureFailedKeys]
+    if (planned) for (const key of planned) lostKeys.delete(key)
     // The single `done` of a sign-out is pushed by the caller's finally (the
     // wiring's lockStore), so it also fires when this method throws.
 
@@ -2588,7 +2629,11 @@ export class UniworkDocsService {
     ) {
       return
     }
-    this.lockedScopes.delete(`${target.deploymentId}/${target.accountId}`)
+    const scopeToken = `${target.deploymentId}/${target.accountId}`
+    this.lockedScopes.delete(scopeToken)
+    // d1-3: a plan of a scope that is live again is stale; it must not suppress
+    // the lost count of that scope's next lock
+    this.plannedRamOnly.delete(scopeToken)
     this.clearSignedOutLocks()
     const open = await this.openSyncStore()
     if (open.kind !== 'ok') return
@@ -2997,7 +3042,11 @@ export class UniworkDocsService {
       this.refuseMigration(doc)
       return
     }
-    void this.coordinator.save(path)
+    // G5-06u: the user's own Save: a pending intent is not replayed and no
+    // second one is minted; the coordinator asks for the queue popover instead.
+    // Only a shell tab has the pill and popover: a detached editor window keeps
+    // the inline replay, so its Ctrl/Cmd+S is never a silent no-op (RBE6u-03)
+    void this.coordinator.save(path, { userSave: this.deps.isShellTab?.(path) ?? true })
   }
 
   // ---- renderer API ----------------------------------------------------------

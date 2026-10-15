@@ -78,6 +78,10 @@ export const id = {
   acctErrNotConfigured: 'Aplikasi ini belum terhubung ke server UniWork.',
   acctErrKeyringUnavailable: 'Penyimpanan aman di komputer ini tidak tersedia.',
   acctErrKeystoreLocked: 'Keychain di komputer ini terkunci. Buka kuncinya, lalu coba lagi.',
+  acctReplaceTitle: 'Ganti info masuk yang tersimpan di komputer ini?',
+  acctReplaceBody:
+    'Komputer ini tidak dapat membuka info masuk yang tersimpan. Masuk lagi akan menggantinya. Suntingan offline yang menunggu sinkronisasi tetap ada di komputer ini dalam keadaan terkunci; tidak ada yang dihapus.',
+  acctReplaceGo: 'Masuk lagi',
   acctErrServerError: 'UniWork mengalami masalah. Silakan coba lagi nanti.',
   acctErrMalformedResponse: 'UniWork mengirim respons yang tidak terduga. Silakan coba lagi nanti.',
   wbLoadFailedTitle: 'Data tersimpan Anda tidak dapat dimuat',

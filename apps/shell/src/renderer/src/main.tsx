@@ -13,10 +13,13 @@ import './tabbar.css'
 import './discussion.css'
 import { installScreenTips } from '@genoffice/ui'
 import { mirrorUniworkAiFlag } from '@genoffice/ai-provider/browser'
+import { UniworkLiveHost, ensureLiveHost } from './uniwork-live'
 
 installScreenTips()
 // this renderer's own provider list shows the UniWork AI entry only while the shell offers it
 mirrorUniworkAiFlag()
+// the window's two live regions (polite + assertive) exist from the start, as body-level nodes
+ensureLiveHost()
 
 // macOS shell window is created with vibrancy; a transparent body lets the
 // editor views' translucent regions (e.g. slides thumbnail pane) show it
@@ -45,6 +48,7 @@ void Promise.all([
   })
   createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
+      <UniworkLiveHost />
       <LocaleProvider initial={lang}>
         <AppFrame initialOnboardingSeen={onboardingSeen} />
       </LocaleProvider>

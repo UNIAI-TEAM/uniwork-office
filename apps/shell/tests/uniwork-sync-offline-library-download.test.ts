@@ -12,6 +12,7 @@ import {
 import { recordFileName } from '../src/main/uniwork-sync/store'
 import {
   ORG,
+  ROOT,
   SCOPE,
   WS,
   addDoc,
@@ -364,6 +365,38 @@ describe('G5-05 download: sign-out during download', () => {
       kind: 'refused',
       code: 'not_pinned',
     })
+  })
+
+  it('d6-5: an unwinding download never re-creates the wiped scope folder', async () => {
+    const h = createHarness()
+    addDoc(h, 'doc_1', 1)
+    const scopeDir = `${ROOT}/${SCOPE.deploymentId}/${SCOPE.accountId}`
+    // the layer copies the fake fs at construction, so a spy installed on
+    // `h.fs.mkdir` afterwards never sees the layer's calls: the scope folder on
+    // the fake disk is the observable (a `mkdir` of it would re-create it)
+    const scopeExists = async (): Promise<boolean> => {
+      try {
+        await h.fs.list(scopeDir)
+        return true
+      } catch {
+        return false
+      }
+    }
+    const staging = recordFileName(blobKey('doc_1', '00000001', 'main'))
+    let wiped: Promise<void> | null = null
+    h.fs.failWrite = (path) => {
+      if (path.includes(staging) && !wiped) {
+        // beforeSignOut: the session is still A's while the boundary locks and wipes
+        h.manager.lockBoundary()
+        wiped = h.layer.lockAndWipe(SCOPE)
+      }
+      return false
+    }
+    rowOf(await pinDoc(h))
+    await wiped
+    // the boundary moved: no delete of the unwinding job re-opens (and re-creates) the scope
+    expect(await scopeExists()).toBe(false)
+    expect(h.storeFiles()).toEqual([])
   })
 
   it('sign-out while the verified bytes are being staged -> never committed', async () => {

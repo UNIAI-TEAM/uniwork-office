@@ -694,6 +694,10 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     notifyTitleRenamed: (path, title) => wiring.notifyTitleRenamed?.(path, title),
     ui: conflictUi(wiring),
     pushStatus: (status) => push(UNIWORK_DOC_CHANNELS.docStatusEvent, status),
+    pushQueuePopover: (request) => push(UNIWORK_DOC_CHANNELS.queuePopover, request),
+    // G5-06u RBE6u-03: a path open as a tab of the shell window (the target
+    // discussionTarget already resolves); a detached editor window is not one
+    isShellTab: (path) => (wiring.discussionTarget ? wiring.discussionTarget(path) !== null : true),
     pushSignOutProgress: (event: SignOutProgress) =>
       push(UNIWORK_DOC_CHANNELS.signOutProgress, event),
     pushConflict: (view) => push(UNIWORK_DOC_CHANNELS.conflictOpen, view),

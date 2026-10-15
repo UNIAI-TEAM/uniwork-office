@@ -1530,13 +1530,16 @@ describe('the S6 bar inset moves the active editor view down (G5-03a)', () => {
     expect(view.setBounds).toHaveBeenLastCalledWith(withInset(0))
   })
 
-  it('clamps the inset to 0..200 and rounds to an integer', () => {
+  it('clamps the inset to 0..400 and rounds to an integer', () => {
     manager.openDocsTab()
     const view = lastCreatedView(createDocsView)
     manager.setTopInset(-20)
     expect(view.setBounds).toHaveBeenLastCalledWith(withInset(0))
+    // the S6 bar plus an open queue popover passes 200 (G5-06u)
+    manager.setTopInset(260)
+    expect(view.setBounds).toHaveBeenLastCalledWith(withInset(260))
     manager.setTopInset(9999)
-    expect(view.setBounds).toHaveBeenLastCalledWith(withInset(200))
+    expect(view.setBounds).toHaveBeenLastCalledWith(withInset(400))
     manager.setTopInset(42.6)
     expect(view.setBounds).toHaveBeenLastCalledWith(withInset(43))
     // a non-finite height moves nothing

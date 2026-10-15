@@ -387,6 +387,22 @@ export interface UniworkDocStatus {
   remote?: UniworkRemoteBar
   /** G5-08c: a lock happened while this document was open (outranks `remote`); absent = none */
   lockWhileOpen?: UniworkLockWhileOpen
+  /**
+   * G5-06u: the save waits for an AI run to finish ('ai-long' = long enough to
+   * offer Stop). Type only for now: main never sets it yet (the desktop AI-run
+   * owner wires it); absent = no wait.
+   */
+  saveWait?: 'ai' | 'ai-long'
+}
+
+/**
+ * G5-06u: main asks the shell renderer to open the queue popover of `path`
+ * (Ctrl/Cmd+S on a document that already has a pending save, or a save the
+ * store refused). The renderer ignores a request for a path that is not the
+ * active tab.
+ */
+export interface UniworkQueuePopoverRequest {
+  path: string
 }
 
 export type UniworkConflictChoice = 'overwrite' | 'save-local-copy' | 'open-latest' | 'later'
@@ -767,6 +783,13 @@ export interface HomeApi {
   accountCancelLogin(): Promise<void>
   /** retry after server-unreachable (refresh + profile reload); resolves with the new status */
   accountRetry(): Promise<AccountStatus>
+  /**
+   * keystore-locked after a failed Retry: start a fresh browser sign-in that
+   * replaces the saved sign-in this computer cannot open (queued offline edits
+   * stay locked and kept). Refused by main in any other state; resolves like
+   * accountLogin (whether the browser launched).
+   */
+  accountReplaceLockedSignIn?(): Promise<boolean>
   /** connect to the server at this address (validated, saved as the profile); the status after */
   accountSetServer(address: string): Promise<AccountSetServerResult>
   /** choose the active organization (persists uniworkOrgId, reloads entitlements) */
@@ -930,6 +953,8 @@ export interface HomeApi {
   uniworkDocStatus(path: string): Promise<UniworkDocStatus | null>
   uniworkActiveDocStatus(): Promise<UniworkDocStatus | null>
   onUniworkDocStatus(cb: (status: UniworkDocStatus) => void): () => void
+  /** G5-06u: main asks for the queue popover of a path (Ctrl/Cmd+S with a pending save) */
+  onUniworkQueuePopover(cb: (request: UniworkQueuePopoverRequest) => void): () => void
   uniworkSave(path: string): Promise<UniworkDocStatus | null>
   uniworkResolveConflict(path: string): Promise<UniworkDocStatus | null>
   /** G5-09: main pushes the conflict dialog view when S5 opens or updates in place */
@@ -1128,6 +1153,12 @@ export interface AccountStatus {
    * keeps its own state and error.
    */
   orgsError?: AccountErrorCode
+  /**
+   * keystore-locked only: a Retry already found the saved sign-in still
+   * unreadable, so main now accepts accountReplaceLockedSignIn (a fresh
+   * sign-in that replaces it). Absent in every other state.
+   */
+  canReplaceLockedSignIn?: boolean
   error?: AccountErrorCode
 }
 
@@ -1420,6 +1451,7 @@ export const HOME_CHANNELS = {
   accountStatusEvent: 'home:account-status-event',
   accountCancelLogin: 'home:account-cancel-login',
   accountRetry: 'home:account-retry',
+  accountReplaceLockedSignIn: 'home:account-replace-locked-sign-in',
   accountSetServer: 'home:account-set-server',
   accountSelectOrg: 'home:account-select-org',
   /** UniWork cloud AI status (token-free UniworkCloudStatus); refresh re-reads credits */
@@ -1503,6 +1535,8 @@ export const UNIWORK_DOC_CHANNELS = {
   docStatus: 'uniwork-doc:status',
   activeDocStatus: 'uniwork-doc:active-status',
   docStatusEvent: 'uniwork-doc:status-event',
+  /** main -> shell renderer: open the queue popover of { path } (G5-06u) */
+  queuePopover: 'uniwork-doc:queue-popover',
   save: 'uniwork-doc:save',
   resolveConflict: 'uniwork-doc:resolve-conflict',
   /** main -> shell renderer: open or update the S5 conflict dialog (G5-09) */

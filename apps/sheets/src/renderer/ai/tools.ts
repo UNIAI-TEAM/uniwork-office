@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { AgentToolCall, AgentToolDef } from '@genoffice/agent-core'
+import type { AgentToolCall, AgentToolDef, ImageUrlRegistry } from '@genoffice/agent-core'
 import {
   copyTargetBounds,
   describeOperationErrors,
@@ -293,6 +293,9 @@ export interface SheetsSkillDeps {
   isUniworkBound?(): boolean
   /** chat attachments the user gave this conversation (sent + composer) */
   getAttachments?(): readonly AttachmentMeta[]
+  /** image URLs this run may insert (image_search / generate_image results); refuses unregistered
+   * URL sources of add_image while its enforce predicate holds (UniWork AI); absent = no rule */
+  imageUrls?: ImageUrlRegistry
   /** ask_clarification card in the AI panel; resolves with the answers, or
    * cancelled when the user skips, stops the run or starts a new chat */
   askClarification?(questions: ClarifyQuestion[]): Promise<{ answers: string; cancelled?: boolean }>
@@ -824,6 +827,21 @@ export function refusedLocalImagePaths(
     refused.push(op.path)
   }
   return refused
+}
+
+/** The first add_image URL source this run's image_search / generate_image did not return, as the
+ * refusal for the model; null when every URL source is registered, or the rule is off (BYOK).
+ * Local paths are not URL sources: the bound local-path rule above keeps governing them. */
+export function refusedImageUrl(
+  operations: readonly WorkbookOperation[],
+  deps: Pick<SheetsSkillDeps, 'imageUrls'>,
+): string | null {
+  for (const op of operations) {
+    if (op.op !== 'add_image' || !NON_LOCAL_IMAGE_SOURCE.test(op.path)) continue
+    const refusal = deps.imageUrls?.check(op.path)
+    if (refusal) return refusal
+  }
+  return null
 }
 
 /** Optional sheetId input shared by the read tools: validated against the
@@ -2252,6 +2270,13 @@ export function executeWorkbookTool(
           `Rejected — none of the ${operations.length} operation(s) were applied: this workbook is a UniWork document, ` +
             `so add_image cannot read local files by path (${refusedImages.join(', ')}). ` +
             'Use an image URL from image_search / generate_image, or ask the user to attach the image to the chat and pass its attachment path.',
+        )
+      }
+      const refusedUrl = refusedImageUrl(operations, deps)
+      if (refusedUrl) {
+        return fail(
+          t('aiToolPropose'),
+          `Rejected — none of the ${operations.length} operation(s) were applied: ${refusedUrl}`,
         )
       }
       const outcome = deps.proposeOperations(operations, summaryInput.trim())

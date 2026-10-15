@@ -22,6 +22,24 @@
   cursor: pointer;
 }
 
+/* icon only (the tab bar has no room for the label, see usePillFit): the label stays in the button as
+   visually hidden text, so the name is the same; the tooltip is the button's title */
+.uw-discussion-toggle[data-icon-only='true'] {
+  padding: 0 8px;
+}
+
+.uw-discussion-toggle[data-icon-only='true'] .uw-discussion-toggle-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* the pill stays inside the 40 px tab strip; the 44 px target is this invisible extension */
 .uw-discussion-toggle::after {
   content: '';

@@ -19,6 +19,7 @@ function makeDeps(readOnly: boolean): PdfAiDeps {
     readOnly: () => readOnly,
     imageGenAvailable: () => true,
     uniworkBound: () => false,
+    uniworkAi: () => false,
   }
   return new Proxy(target, {
     get(t, prop: string) {

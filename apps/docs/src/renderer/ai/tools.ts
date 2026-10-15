@@ -1,7 +1,7 @@
 import type { Editor } from '@tiptap/core'
 import type { Mark, Node as ProseMirrorNode } from '@tiptap/pm/model'
 import type { ChartDisplay, CommentInfo, NewChart, NoteInfo } from '@genoffice/docx-engine'
-import type { ToolDisplay } from '@genoffice/agent-core'
+import type { ImageUrlRegistry, ToolDisplay } from '@genoffice/agent-core'
 import type { AgentToolCall, AgentToolDef, CreateDocumentType } from '../../shared/ipc'
 import { t } from '../i18n/locale'
 import { MIND_MAP_LIMITS, MIND_MAP_TOOL, parseMindMapTree } from './mind-map'
@@ -931,6 +931,7 @@ async function executeAsyncTool(
   editor: Editor,
   call: AgentToolCall,
   signal?: AbortSignal,
+  imageUrls?: ImageUrlRegistry,
 ): Promise<ToolExecution> {
   switch (call.name) {
     case 'web_search': {
@@ -966,6 +967,7 @@ async function executeAsyncTool(
           `image search failed (service error, not an empty result — you may retry): ${r.error ?? 'unknown error'}`,
         )
       }
+      for (const im of r.images) imageUrls?.register(im.imageUrl, 'image_search')
       const lines = r.images.map(
         (im, i) =>
           `${i + 1}. ${im.title || '(untitled)'} [${im.width ?? '?'}x${im.height ?? '?'}]\n   ${im.imageUrl}`,
@@ -1009,10 +1011,12 @@ async function executeAsyncTool(
       return { output: text, mutated: false, summary: t('aiSumAnalyzeMediaDone') }
     }
     case 'insert_picture':
-      return insertPicture(editor, call, signal)
+      return insertPicture(editor, call, signal, imageUrls)
     case 'insert_image': {
       const url = String(call.input.url ?? '')
       if (!/^https?:\/\//.test(url)) return fail(t('aiSumInsertImage'), 'invalid url')
+      const refusal = imageUrls?.check(url)
+      if (refusal) return fail(t('aiSumInsertImage'), refusal)
       return insertImageFromUrl(editor, url, Number(call.input.maxWidthPx) || 480, signal, {
         failLabel: t('aiSumInsertImage'),
         doneLabel: t('aiSumInsertWebImage'),
@@ -1032,6 +1036,7 @@ async function executeAsyncTool(
       if (!generated.url) {
         return fail(t('aiSumGenerateImage'), generated.error ?? 'image generation failed')
       }
+      imageUrls?.register(generated.url, 'generate_image')
       return insertImageFromUrl(
         editor,
         generated.url,
@@ -1103,12 +1108,15 @@ async function setPictureWatermark(
   call: AgentToolCall,
   signal: AbortSignal | undefined,
   extras: AiDocExtras | undefined,
+  imageUrls?: ImageUrlRegistry,
 ): Promise<ToolExecution> {
   const summary = t('aiSumSetWatermark')
   if (!extras?.watermark) return fail(summary, 'the watermark is not available here')
   const url = String(call.input.image).trim()
   if (!/^https?:\/\/|^data:image\//.test(url))
     return fail(summary, 'image must be an http(s) or data: image URL')
+  const refusal = imageUrls?.check(url)
+  if (refusal) return fail(summary, refusal)
   const fetched = url.startsWith('data:')
     ? { base64: url.slice(url.indexOf(',') + 1) }
     : await window.desktop.fetchImage(url)
@@ -1143,11 +1151,14 @@ async function insertPicture(
   editor: Editor,
   call: AgentToolCall,
   signal: AbortSignal | undefined,
+  imageUrls?: ImageUrlRegistry,
 ): Promise<ToolExecution> {
   const summary = t('aiSumInsertPicture')
   const url = String(call.input.url ?? '')
   if (!/^https?:\/\/|^data:image\//.test(url))
     return fail(summary, 'url must be an http(s) or data: image URL')
+  const refusal = imageUrls?.check(url)
+  if (refusal) return fail(summary, refusal)
   let float: FloatSpec | undefined
   if (call.input.float !== undefined) {
     const r = resolveFloat(call.input.float)
@@ -1317,6 +1328,8 @@ export function executeTool(
   notes?: AiNotesAccess,
   /** the panel's questionnaire card; without one ask_clarification reports it is unavailable */
   ask?: AskClarification,
+  /** image URLs this run may insert (image_search / generate_image results); absent = no rule */
+  imageUrls?: ImageUrlRegistry,
 ): ToolExecution | Promise<ToolExecution> {
   if (call.name === 'ask_clarification') return askClarification(call, ask)
   const scope = frozen && frozen.doc === editor.state.doc ? frozen.scope : null
@@ -1340,12 +1353,12 @@ export function executeTool(
     call.name === 'analyze_media' ||
     call.name === 'create_document'
   ) {
-    return executeAsyncTool(editor, call, signal)
+    return executeAsyncTool(editor, call, signal, imageUrls)
   }
   if (call.name === 'write_document')
     return writeDocument(editor, call, numIds, track, signal, writer)
   if (call.name === 'set_watermark' && typeof call.input.image === 'string')
-    return setPictureWatermark(call, signal, extras)
+    return setPictureWatermark(call, signal, extras, imageUrls)
   return settle(
     executeSyncTool(editor, call, numIds, track, scope, comments, hf, pageSetup, extras, notes),
   )
