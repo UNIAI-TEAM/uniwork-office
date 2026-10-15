@@ -4,7 +4,10 @@ import type { Lang } from '@genoffice/i18n'
 import type { AiStreamChunk } from '@genoffice/ai-provider'
 import type { ProjectApi } from '@genoffice/project-store'
 import { installAiRunBridge } from '@genoffice/electron-utils/ai-run-bridge'
-import { installUniworkAiFlagBridge } from '@genoffice/electron-utils/uniwork-ai-flag-bridge'
+import {
+  installUniworkAiFlagBridge,
+  installUniworkCloudStatusBridge,
+} from '@genoffice/electron-utils/uniwork-ai-flag-bridge'
 import { installUniworkCommentsBridge } from '@genoffice/electron-utils/comments-bridge'
 import { installDropOpenBridge } from '@genoffice/electron-utils/drop-open'
 import { AI_CHANNELS, MARKDOWN_CHANNELS } from '../shared/ipc'
@@ -175,3 +178,4 @@ installUniworkCommentsBridge()
 installAiRunBridge()
 // window.uniworkAiFlag: whether the shell offers UniWork AI (this renderer's provider list mirrors it)
 installUniworkAiFlagBridge()
+installUniworkCloudStatusBridge()

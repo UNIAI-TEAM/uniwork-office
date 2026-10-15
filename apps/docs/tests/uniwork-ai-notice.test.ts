@@ -115,7 +115,8 @@ describe('UniWork AI notices (docs panel)', () => {
   })
 
   const notices = () => [...container!.querySelectorAll('.ai-msg-notice')].map((n) => n.textContent)
-  const stopButton = () => container!.querySelector(`button[aria-label="${t('aiStop')}"]`)
+  const stopButton = () =>
+    container!.querySelector<HTMLButtonElement>(`button[aria-label="${t('aiStop')}"]`)
 
   it('waiting shows Stop only, no Retry', async () => {
     await emit({ type: 'notice', notice: { kind: 'rate-limit-wait', seconds: 120, attempt: 1 } })
@@ -177,21 +178,30 @@ describe('UniWork AI notices (docs panel)', () => {
   })
 
   it('one persistent aria-live region is mounted before the notice, and the note lands inside it', async () => {
-    const live = container!.querySelector('.ai-msg-assistant [aria-live="polite"]')
+    const chatEl = container!.querySelector('.ai-chat')
+    expect(chatEl?.hasAttribute('aria-live')).toBe(false)
+    expect(chatEl?.getAttribute('aria-busy')).toBe('true')
+    expect(container!.querySelector('.ai-msg-assistant [aria-live]')).toBeNull()
+    const live = container!.querySelector('.ai-sr-status')
     expect(live, 'live region before any notice').not.toBeNull()
+    expect(live!.getAttribute('aria-live')).toBe('polite')
     expect(live!.textContent).toBe('')
     // a plain aria-live container: role=status would collide with the app's own status nodes
     expect(live!.hasAttribute('role')).toBe(false)
     await emit({ type: 'notice', notice: { kind: 'rate-limit-wait', seconds: 30, attempt: 1 } })
-    // the same node (not a new one mounted with its text) now holds the note, and nothing else announces
-    expect(container!.querySelector('.ai-msg-assistant [aria-live="polite"]')).toBe(live)
+    // the same node (not a new one mounted with its text) now holds the note, and nothing else in .ai-chat announces
+    expect(container!.querySelector('.ai-sr-status')).toBe(live)
+    expect(container!.querySelectorAll('[aria-live]')).toHaveLength(1)
+    expect(container!.querySelectorAll('[role="status"]:not(.ai-typing)')).toHaveLength(0)
     expect(live!.textContent).toBe(ui('aiErrRateLimited', { seconds: 30 }))
     expect(container!.querySelectorAll('.ai-msg-notice [role="status"]')).toHaveLength(0)
-    expect(live!.querySelectorAll('.ai-msg-notice')).toHaveLength(1)
+    expect(container!.querySelectorAll('.ai-msg-notice')).toHaveLength(1)
     // a restart note joins the wait line in the same region
     await emit({ type: 'notice', notice: { kind: 'conversation-restarted' } })
     expect(live!.textContent).toContain(ui('aiConversationRestarted'))
     await emit({ type: 'done' })
+    expect(chatEl?.hasAttribute('aria-busy')).toBe(false)
+    expect(container!.querySelectorAll('[role="status"]')).toHaveLength(0)
   })
 
   it('a restarted conversation shows its note and not an empty-reply line', async () => {
@@ -294,5 +304,87 @@ describe('UniWork AI notices (docs panel)', () => {
       ui('aiErrUnsupported', { module: 'Docs' }),
     ])
     expect(container!.textContent).toContain('partial')
+  })
+
+  it('when UniWork AI is selected, renders result chip as first words of answer node and announces once in panel live region', async () => {
+    const uniworkSettings: AiSettings = {
+      ...settings,
+      provider: 'uniwork',
+    }
+    act(() =>
+      root!.render(
+        createElement(LocaleProvider, {
+          initial: 'vi',
+          children: createElement(AiPanel, {
+            editor: editor!,
+            blocks: [],
+            settings: uniworkSettings,
+            open: true,
+            filePath: '/docs/a.docx',
+            preset: { text: 'summarize it', nonce: 1, autoRun: true },
+          }),
+        }),
+      ),
+    )
+    const chatEl = container!.querySelector('.ai-chat')
+    expect(chatEl?.hasAttribute('aria-live')).toBe(false)
+    expect(chatEl?.getAttribute('aria-busy')).toBe('true')
+    await emit({ type: 'delta', text: 'Tóm tắt 3 ý chính.' })
+    await emit({ type: 'done' })
+    expect(chatEl?.hasAttribute('aria-busy')).toBe(false)
+    const chipEl = container!.querySelector('.ai-result-chip')
+    expect(chipEl).not.toBeNull()
+    expect(chipEl?.textContent).toBe(ui('aiResultAnswer'))
+    const answerNode = chipEl?.parentElement
+    expect(answerNode?.textContent?.startsWith(`${ui('aiResultAnswer')}:`)).toBe(true)
+    expect(answerNode?.textContent).toContain('Tóm tắt 3 ý chính.')
+    const live = container!.querySelector('.ai-sr-status')
+    expect(live?.textContent).toBe(ui('aiResultAnswer'))
+    expect(live?.textContent).not.toContain('Tóm tắt 3 ý chính.')
+  })
+
+  it('clicking Stop returns keyboard focus to the composer textarea (RF1-12, RF1-23b)', async () => {
+    const stop = stopButton()
+    expect(stop).not.toBeNull()
+    stop!.focus()
+    await act(async () => stop!.click())
+    expect(document.activeElement).toBe(container!.querySelector('textarea'))
+    await pastGrace()
+  })
+
+  it('Stop before the first token on UniWork AI: no Answer chip and exactly one stopped line (RF2-1)', async () => {
+    act(() =>
+      root!.render(
+        createElement(LocaleProvider, {
+          initial: 'vi',
+          children: createElement(AiPanel, {
+            editor: editor!,
+            blocks: [],
+            settings: { ...settings, provider: 'uniwork' },
+            open: true,
+            filePath: '/docs/a.docx',
+            preset: { text: 'summarize it', nonce: 1, autoRun: true },
+          }),
+        }),
+      ),
+    )
+    // the main process ends a cancelled stream with a done chunk
+    ;(window as any).desktop.aiStreamCancel = async () => {
+      listener?.({ requestId, type: 'done' })
+    }
+    const stop = stopButton()
+    expect(stop).not.toBeNull()
+    await act(async () => stop!.click())
+    await flush()
+    await pastGrace()
+    expect(container!.querySelector('.ai-result-chip')).toBeNull()
+    const stoppedLines = [...container!.querySelectorAll('.ai-msg-assistant *')].filter(
+      (el) => el.children.length === 0 && el.textContent === ui('aiRunStopped'),
+    )
+    expect(stoppedLines).toHaveLength(1)
+    expect(container!.querySelector('.ai-msg-answer')?.textContent ?? '').not.toContain(
+      t('aiStopped'),
+    )
+    expect(container!.querySelector('.ai-sr-status')?.textContent).toBe(ui('aiRunStopped'))
   })
 })

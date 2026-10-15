@@ -33,6 +33,7 @@ export const hi = {
   aiRunSend: 'भेजें',
   aiRunRunning: 'चल रहा है… रोकने के लिए रोकें या Esc दबाएँ।',
   aiRunStopped: 'रोक दिया गया। पहले से लागू बदलाव दस्तावेज़ में रहेंगे और पूर्ववत किए जा सकते हैं।',
+  aiRunRetry: 'फिर से कोशिश करें',
   aiRunAskAgain: 'फिर से पूछें',
   aiRunChooseOther: 'दूसरा प्रदाता चुनें',
   aiRunOpenInApp: 'ऐप में खोलें',
@@ -48,6 +49,8 @@ export const hi = {
   aiErrRateLimited: 'आप बहुत तेज़ी से भेज रहे हैं। {seconds} सेकंड बाद फिर से कोशिश करें।',
   aiErrRateLimitedNoWait: 'आप बहुत तेज़ी से भेज रहे हैं। कुछ मिनट बाद फिर से कोशिश करें।',
   aiErrUnavailable: 'UniWork AI अभी जवाब नहीं दे रहा। आपका दस्तावेज़ और सहेजें अब भी काम करते हैं।',
+  aiErrGeneric:
+    'UniWork AI में अप्रत्याशित समस्या आई, इसलिए यह रन रुक गया। आपका दस्तावेज़ और सहेजें अब भी काम करते हैं।',
   aiErrDisconnected:
     'कनेक्शन टूट गया, इसलिए यह रन रुक गया। पहले से लागू बदलाव दस्तावेज़ में रहेंगे और पूर्ववत किए जा सकते हैं।',
   aiErrOffline: 'आप ऑफ़लाइन हैं। UniWork AI ऑफ़लाइन नहीं चलता और अनुरोध कतार में नहीं रखे जाते।',
@@ -66,4 +69,32 @@ export const hi = {
     'आपका अनुरोध UniWork AI के लिए बहुत लंबा है। इसे 8,000 वर्णों से कम करके फिर भेजें।',
   aiErrQuestionRejected: 'UniWork AI यह अनुरोध स्वीकार नहीं कर सका। इसे बदलकर फिर भेजें।',
   aiUniworkImagesNotSent: 'छवियाँ UniWork AI को नहीं भेजी जातीं; केवल आपका टेक्स्ट भेजा गया।',
+  // Cloud state, credits and account actions (shared with picker footer and composer note)
+  cloudStateReady: 'उपलब्ध',
+  cloudStateNotEntitled: 'आपके प्लान में शामिल नहीं',
+  cloudStateExhausted: 'AI क्रेडिट खत्म',
+  cloudStateUnavailable: 'अभी उपलब्ध नहीं',
+  cloudStateSignedOut: 'साइन इन नहीं है',
+  cloudStateInactive: 'सदस्यता सक्रिय नहीं है',
+  cloudCredits: 'AI क्रेडिट',
+  cloudCreditsLeft: '{remaining} / {limit} शेष',
+  cloudCreditsUnlimited: 'असीमित',
+  cloudCreditsRenews: '{date} को रीन्यू',
+  cloudInactiveBody:
+    'आपके संगठन की UniWork सदस्यता सक्रिय नहीं है, इसलिए क्लाउड AI रुका हुआ है। किसी एडमिन से इसे नवीनीकृत करवाएँ; नीचे आपके अपने प्रदाता काम करते रहेंगे।',
+  acctSignIn: 'साइन इन करें',
+  acctSignInAgain: 'फिर से साइन इन करें',
+  // S8/S10 local-file conversation restart notice (G05BE-6)
+  aiUniworkLocalFileRestart:
+    'स्थानीय फ़ाइलें आपके संगठन के अंतर्गत एक नई बातचीत शुरू करती हैं और अन्य फ़ाइलों के संवाद नहीं रखतीं।',
+  // S9 cells summary and S10 web workbook size limit
+  aiResultCellsMeta: 'लिखी गई सेल: {written} ({range}) · ओवरराइट हुई मौजूदा सेल: {overwritten}',
+  aiResultCellsMetaNoOverwrite: 'लिखी गई सेल: {written} ({range})',
+  aiErrWorkbookTooLarge:
+    'यह वर्कबुक वेब पर AI के लिए बहुत बड़ी है। इसे UniWork Office ऐप में खोलें।',
+  // S7 composer notice keys (not_entitled, credits_exhausted)
+  not_entitled:
+    'आपके संगठन के प्लान में UniWork AI शामिल नहीं है। प्लान के बारे में संगठन व्यवस्थापक से पूछें, या सेटिंग्स > AI मॉडल में अपनी खुद की AI कुंजी जोड़ें।',
+  credits_exhausted:
+    'आपके संगठन ने इस अवधि के सभी AI क्रेडिट उपयोग कर लिए हैं। संगठन व्यवस्थापक से क्रेडिट जोड़ने के लिए कहें, या सेटिंग्स > AI मॉडल में अपनी खुद की AI कुंजी जोड़ें।',
 } satisfies Record<keyof typeof zh, string>

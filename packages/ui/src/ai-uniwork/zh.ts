@@ -7,7 +7,7 @@
 export const zh = {
   // S7 provider row, picker footer and composer notes
   aiUniworkProvider: 'UniWork AI',
-  aiUniworkCreditsAria: '剩余 {remaining} / {limit} 额度',
+  aiUniworkCreditsAria: '共 {limit}，剩余 {remaining} 额度',
   aiUniworkFooterSignIn: '登录 UniWork 以使用 UniWork AI',
   aiUniworkSignedOut: '你已退出 UniWork。请选择其他服务商或重新登录。',
   aiUniworkOff: '此文档已关闭 UniWork AI。请选择其他服务商。',
@@ -37,6 +37,7 @@ export const zh = {
   aiRunSend: '发送',
   aiRunRunning: '正在运行… 按“停止”或 Esc 停止。',
   aiRunStopped: '已停止。已应用的更改（如有）仍在文档中，可以撤销。',
+  aiRunRetry: '重试',
   aiRunAskAgain: '继续提问',
   aiRunChooseOther: '选择其他服务商',
   aiRunOpenInApp: '在应用中打开',
@@ -51,6 +52,7 @@ export const zh = {
   aiErrRateLimited: '你发送得太快了。请在 {seconds} 秒后重试。',
   aiErrRateLimitedNoWait: '你发送得太快了。请几分钟后重试。',
   aiErrUnavailable: 'UniWork AI 暂时没有响应。你的文档和“保存”仍可正常使用。',
+  aiErrGeneric: 'UniWork AI 遇到意外问题，本次运行已停止。你的文档和“保存”仍可正常使用。',
   aiErrDisconnected: '连接中断，本次运行已停止。已应用的更改（如有）仍在文档中，可以撤销。',
   aiErrOffline: '你已离线。UniWork AI 无法离线运行，请求也不会排队。',
   aiErrSession: '你的 UniWork 登录已过期，本次运行已停止。请重新登录以继续。',
@@ -63,4 +65,30 @@ export const zh = {
   aiErrQuestionTooLong: '你的请求对 UniWork AI 来说太长了。请缩短到 8,000 个字符以内后再发送。',
   aiErrQuestionRejected: 'UniWork AI 无法接受此请求。请修改后再发送。',
   aiUniworkImagesNotSent: '图片不会发送给 UniWork AI，只发送了你的文字。',
+  // Cloud state, credits and account actions (shared with picker footer and composer note)
+  cloudStateReady: '可用',
+  cloudStateNotEntitled: '套餐不含此功能',
+  cloudStateExhausted: 'AI 额度已用完',
+  cloudStateUnavailable: '暂不可用',
+  cloudStateSignedOut: '未登录',
+  cloudStateInactive: '订阅未生效',
+  cloudCredits: 'AI 额度',
+  cloudCreditsLeft: '剩余 {remaining} / {limit}',
+  cloudCreditsUnlimited: '不限量',
+  cloudCreditsRenews: '{date} 重置',
+  cloudInactiveBody:
+    '你所在组织的 UniWork 订阅未生效，云端 AI 已暂停。请联系管理员续订；下方自己的服务商不受影响。',
+  acctSignIn: '登录',
+  acctSignInAgain: '重新登录',
+  // S8/S10 local-file conversation restart notice (G05BE-6)
+  aiUniworkLocalFileRestart: '本地文件会在你的组织下开始新对话，不会保留其他文件的对话轮次。',
+  // S9 cells summary and S10 web workbook size limit
+  aiResultCellsMeta: '已写入 {written} 个单元格（{range}）· 覆盖已有单元格 {overwritten} 个',
+  aiResultCellsMetaNoOverwrite: '已写入 {written} 个单元格（{range}）',
+  aiErrWorkbookTooLarge: '此工作簿太大，无法在网页上使用 AI。请在 UniWork Office 应用中打开。',
+  // S7 composer notice keys (not_entitled, credits_exhausted)
+  not_entitled:
+    '你所在组织的套餐不包含 UniWork AI。请联系组织管理员了解套餐，或在“设置 > AI 模型”中添加你自己的 AI 密钥。',
+  credits_exhausted:
+    '你所在组织本周期的 AI 额度已用完。请联系组织管理员补充额度，或在“设置 > AI 模型”中添加你自己的 AI 密钥。',
 }

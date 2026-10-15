@@ -15,9 +15,12 @@ import { AI_MODEL_PICKER_STRINGS } from '../src/strings-ai-model-picker'
 
 const en = AI_MODEL_PICKER_STRINGS.en
 
+// what the host panel's polite node would be told: every call, in order
+const announce = vi.fn<(text: string) => void>()
 let host: HTMLDivElement
 let root: ReturnType<typeof createRoot>
 beforeEach(() => {
+  announce.mockClear()
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   window.localStorage.clear()
   host = document.createElement('div')
@@ -55,10 +58,14 @@ function localSettings(): AiSettings {
   return { ...settings, uniAiAvailable: false }
 }
 
-async function mount(settings: AiSettings, setSettings = vi.fn(async () => {})) {
+async function mount(
+  settings: AiSettings,
+  setSettings = vi.fn(async () => {}),
+  onAnnounce: (text: string) => void = announce,
+) {
   const bridge: AiModelPickerBridge = { getSettings: async () => settings, setSettings }
   await act(async () => {
-    root.render(createElement(AiModelPicker, { bridge, lang: 'en' }))
+    root.render(createElement(AiModelPicker, { bridge, lang: 'en', onAnnounce }))
   })
   await act(async () => {})
   return { setSettings }
@@ -71,7 +78,8 @@ async function toggle(): Promise<void> {
   })
   await act(async () => {})
 }
-const liveText = () => host.querySelector('[aria-live]')!.textContent
+const liveText = () => announce.mock.calls.at(-1)?.[0] ?? ''
+const noOwnRegion = () => expect(host.querySelector('[aria-live], [role=status]')).toBeNull()
 const noteEl = () => host.querySelector('[data-org-key-note]')
 
 describe('first-use note of a key on UniWork', () => {
@@ -80,10 +88,12 @@ describe('first-use note of a key on UniWork', () => {
     await toggle()
     expect(noteEl()?.textContent).toBe(en.orgKeyNote)
     expect(liveText()).toBe(en.orgKeyNote)
+    noOwnRegion()
     await toggle() // closed with no pick
     await toggle()
     expect(noteEl()).toBeNull()
-    expect(liveText()).not.toContain(en.orgKeyNote)
+    expect(announce.mock.calls.filter(([text]) => text === en.orgKeyNote)).toHaveLength(1)
+    noOwnRegion()
     // the tag stays: only the note was the first-use part
     expect(host.querySelector('[data-org-key-tag]')?.textContent).toBe(en.orgKeyTag)
   })
@@ -94,10 +104,11 @@ describe('first-use note of a key on UniWork', () => {
     await toggle()
     act(() => root.unmount())
     root = createRoot(host)
+    announce.mockClear()
     await mount(orgSettings())
     await toggle()
     expect(noteEl()).toBeNull()
-    expect(liveText()).toBe('')
+    expect(announce.mock.calls.filter(([text]) => text !== '')).toEqual([])
     expect(window.localStorage.getItem('uniwork.ai.orgKeyNoteSeen.anthropic')).toBe('1')
   })
 

@@ -36,6 +36,7 @@ export const ru = {
   aiRunSend: 'Отправить',
   aiRunRunning: 'Выполняется… Нажмите «Стоп» или Esc, чтобы остановить.',
   aiRunStopped: 'Остановлено. Уже применённые изменения остаются в документе, их можно отменить.',
+  aiRunRetry: 'Повторить',
   aiRunAskAgain: 'Спросить снова',
   aiRunChooseOther: 'Выбрать другого провайдера',
   aiRunOpenInApp: 'Открыть в приложении',
@@ -51,6 +52,8 @@ export const ru = {
   aiErrRateLimited: 'Вы отправляете слишком быстро. Повторите через {seconds} с.',
   aiErrRateLimitedNoWait: 'Вы отправляете слишком быстро. Повторите через несколько минут.',
   aiErrUnavailable: 'UniWork AI сейчас не отвечает. Документ и «Сохранить» по-прежнему работают.',
+  aiErrGeneric:
+    'UniWork AI столкнулся с непредвиденной проблемой, поэтому этот запуск остановлен. Документ и «Сохранить» по-прежнему работают.',
   aiErrDisconnected:
     'Соединение прервалось, поэтому запуск остановлен. Уже применённые изменения остаются в документе, их можно отменить.',
   aiErrOffline:
@@ -69,4 +72,33 @@ export const ru = {
     'Запрос слишком длинный для UniWork AI. Сократите его до 8 000 символов и отправьте снова.',
   aiErrQuestionRejected: 'UniWork AI не может принять этот запрос. Измените его и отправьте снова.',
   aiUniworkImagesNotSent: 'Изображения не отправляются в UniWork AI; отправлен только ваш текст.',
+  // Cloud state, credits and account actions (shared with picker footer and composer note)
+  cloudStateReady: 'Доступен',
+  cloudStateNotEntitled: 'Не входит в ваш тариф',
+  cloudStateExhausted: 'Кредиты ИИ закончились',
+  cloudStateUnavailable: 'Недоступен',
+  cloudStateSignedOut: 'Вход не выполнен',
+  cloudStateInactive: 'Подписка неактивна',
+  cloudCredits: 'Кредиты ИИ',
+  cloudCreditsLeft: 'Осталось {remaining} / {limit}',
+  cloudCreditsUnlimited: 'Без ограничений',
+  cloudCreditsRenews: 'Обновится {date}',
+  cloudInactiveBody:
+    'Подписка UniWork вашей организации неактивна, поэтому облачный ИИ приостановлен. Попросите администратора продлить её; ваши собственные провайдеры ниже продолжают работать.',
+  acctSignIn: 'Войти',
+  acctSignInAgain: 'Войти снова',
+  // S8/S10 local-file conversation restart notice (G05BE-6)
+  aiUniworkLocalFileRestart:
+    'Локальные файлы начинают новый диалог в вашей организации и не сохраняют реплики из других файлов.',
+  // S9 cells summary and S10 web workbook size limit
+  aiResultCellsMeta:
+    'Записано ячеек: {written} ({range}) · Перезаписано существующих ячеек: {overwritten}',
+  aiResultCellsMetaNoOverwrite: 'Записано ячеек: {written} ({range})',
+  aiErrWorkbookTooLarge:
+    'Эта книга слишком велика для ИИ в веб-версии. Откройте её в приложении UniWork Office.',
+  // S7 composer notice keys (not_entitled, credits_exhausted)
+  not_entitled:
+    'Тариф вашей организации не включает UniWork AI. Обратитесь к администратору организации по поводу тарифа или добавьте собственный ключ ИИ в меню Настройки > Модель ИИ.',
+  credits_exhausted:
+    'Ваша организация израсходовала все кредиты ИИ за этот период. Попросите администратора организации пополнить кредиты или добавьте собственный ключ ИИ в меню Настройки > Модель ИИ.',
 } satisfies Record<keyof typeof zh, string>

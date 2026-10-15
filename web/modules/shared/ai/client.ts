@@ -70,6 +70,10 @@ export interface AiCloudTools {
 export interface AiCloudStatus {
   enabled: boolean
   reason?: string
+  /** optional organization id from GET cloud (used for UniWork AI disclosure ack identity) */
+  org_id?: string
+  /** optional organization display name from GET cloud (used for {org} in UniWork AI disclosure) */
+  org_name?: string
   tools: AiCloudTools
   credits: {
     unit: string
@@ -179,6 +183,8 @@ export function readCloudStatus(raw: unknown): AiCloudStatus {
   return {
     enabled: r.enabled === true,
     ...(typeof r.reason === 'string' && r.reason ? { reason: r.reason } : {}),
+    ...(typeof r.org_id === 'string' && r.org_id ? { org_id: r.org_id } : {}),
+    ...(typeof r.org_name === 'string' && r.org_name ? { org_name: r.org_name } : {}),
     tools: { ...EMPTY_TOOLS, ...(r.tools ?? {}) },
     credits: {
       unit: typeof credits.unit === 'string' ? credits.unit : 'ai.tokens',

@@ -34,6 +34,7 @@ export const vi = {
   aiRunSend: 'Gửi',
   aiRunRunning: 'Đang chạy… Bấm Dừng hoặc Esc để dừng.',
   aiRunStopped: 'Đã dừng. Thay đổi đã áp dụng (nếu có) vẫn trong tài liệu và hoàn tác được.',
+  aiRunRetry: 'Thử lại',
   aiRunAskAgain: 'Hỏi tiếp',
   aiRunChooseOther: 'Chọn nhà cung cấp khác',
   aiRunOpenInApp: 'Mở bằng ứng dụng',
@@ -50,6 +51,8 @@ export const vi = {
   aiErrRateLimited: 'Bạn đang gửi quá nhanh. Thử lại sau {seconds} giây.',
   aiErrRateLimitedNoWait: 'Bạn đang gửi quá nhanh. Hãy thử lại sau ít phút.',
   aiErrUnavailable: 'UniWork AI tạm thời không phản hồi. Tài liệu và nút Lưu vẫn dùng bình thường.',
+  aiErrGeneric:
+    'UniWork AI gặp sự cố ngoài dự kiến nên lượt này đã dừng. Tài liệu và nút Lưu vẫn dùng bình thường.',
   aiErrDisconnected:
     'Mất kết nối giữa chừng nên lượt này đã dừng. Thay đổi đã áp dụng (nếu có) vẫn trong tài liệu và hoàn tác được.',
   aiErrOffline: 'Không có mạng. UniWork AI không chạy khi offline và yêu cầu không được xếp hàng.',
@@ -66,4 +69,32 @@ export const vi = {
   aiErrQuestionTooLong: 'Yêu cầu quá dài với UniWork AI. Hãy rút gọn dưới 8.000 ký tự rồi gửi lại.',
   aiErrQuestionRejected: 'UniWork AI không nhận được yêu cầu này. Hãy sửa lại yêu cầu rồi gửi lại.',
   aiUniworkImagesNotSent: 'UniWork AI không nhận ảnh; chỉ phần chữ đã được gửi.',
+  // Cloud state, credits and account actions (shared with picker footer and composer note)
+  cloudStateReady: 'Sẵn sàng',
+  cloudStateNotEntitled: 'Gói hiện tại chưa bao gồm',
+  cloudStateExhausted: 'Đã hết tín dụng AI',
+  cloudStateUnavailable: 'Tạm thời không dùng được',
+  cloudStateSignedOut: 'Chưa đăng nhập',
+  cloudStateInactive: 'Gói đăng ký không hoạt động',
+  cloudCredits: 'Tín dụng AI',
+  cloudCreditsLeft: 'Còn {remaining} / {limit}',
+  cloudCreditsUnlimited: 'Không giới hạn',
+  cloudCreditsRenews: 'Làm mới vào {date}',
+  cloudInactiveBody:
+    'Gói đăng ký UniWork của tổ chức bạn không hoạt động nên AI đám mây đang tạm dừng. Hãy nhờ quản trị viên gia hạn; nhà cung cấp riêng bên dưới vẫn hoạt động.',
+  acctSignIn: 'Đăng nhập',
+  acctSignInAgain: 'Đăng nhập lại',
+  // S8/S10 local-file conversation restart notice (G05BE-6)
+  aiUniworkLocalFileRestart:
+    'Tệp trên máy bắt đầu cuộc trò chuyện mới theo tổ chức của bạn và không giữ các lượt từ tệp khác.',
+  // S9 cells summary and S10 web workbook size limit
+  aiResultCellsMeta: 'Đã ghi {written} ô ({range}) · {overwritten} ô có sẵn bị ghi đè',
+  aiResultCellsMetaNoOverwrite: 'Đã ghi {written} ô ({range})',
+  aiErrWorkbookTooLarge:
+    'Bảng tính này quá lớn để AI xử lý trên web. Mở bằng ứng dụng UniWork Office.',
+  // S7 composer notice keys (not_entitled, credits_exhausted)
+  not_entitled:
+    'Gói của tổ chức bạn chưa bao gồm UniWork AI. Hãy liên hệ quản trị viên tổ chức về gói, hoặc thêm khóa AI của riêng bạn trong Cài đặt > Mô hình AI.',
+  credits_exhausted:
+    'Tổ chức của bạn đã dùng hết tín dụng AI trong kỳ này. Hãy nhờ quản trị viên tổ chức bổ sung, hoặc thêm khóa AI của riêng bạn trong Cài đặt > Mô hình AI.',
 } satisfies Record<keyof typeof zh, string>
