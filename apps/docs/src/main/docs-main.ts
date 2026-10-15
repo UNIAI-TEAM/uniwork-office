@@ -3862,7 +3862,7 @@ function wantsUniworkPick(options: unknown): boolean {
   )
 }
 
-/** the provider ai-settings.json holds (never `uniwork`: the pick lives in the account store) */
+/** the non-`uniwork` provider ai-settings.json holds for ai:set-settings (normal saves put the `uniwork` pick in the account store; a hand-edited `uniwork` in the file stays `uniwork` on read per no-silent-fallback, while writes keep a non-`uniwork` slot in the file) */
 function fileAiProvider(): AiProviderId {
   const provider = resolveAiSettings(
     readJson<Partial<AiSettings> & LegacyAiSettings>(SETTINGS_PATH(), {}),
@@ -4183,7 +4183,11 @@ export function registerAiIpc(): void {
 
   // one-shot chat; `errorKind` says why a failure failed for the settings test (other callers ignore it).
   // `error` is a product message in the UI language; the provider's raw text is `rawError` and goes to the log
-  type AiChatOutcome = AiChatResponse & { errorKind?: AiTestFailureKind; rawError?: string }
+  type AiChatOutcome = AiChatResponse & {
+    errorKind?: AiTestFailureKind
+    rawError?: string
+    uniworkCode?: string
+  }
   const failedChat = (failure: AiChatFailure): AiChatOutcome => {
     console.warn('[ai] chat failed:', failure.raw)
     return {
@@ -4201,9 +4205,16 @@ export function registerAiIpc(): void {
     // the renderer's settings copy verbatim
     const settings = sanitizeAiSettings(request.settings)
     if (!settings) return { ok: false, error: 'invalid AI settings payload', errorKind: 'failed' }
-    // UniWork AI runs only as an editor panel's agent turn: a one-shot caller holding an editor's
-    // settings copy gets the file's BYOK/UniAI provider instead of a key request for `uniwork`
-    if (settings.provider === 'uniwork') settings.provider = fileAiProvider()
+    // UniWork AI runs only as an editor panel's agent turn: a one-shot caller with `uniwork` gets
+    // a typed refusal instead of silently calling another provider
+    if (settings.provider === 'uniwork') {
+      return {
+        ok: false,
+        error: 'UniWork AI is not available here.',
+        errorKind: 'unavailable',
+        uniworkCode: 'ai_disabled',
+      }
+    }
     const provider = settings.provider
     const config = withUniAiOpenRouterAuth(settings, provider, settings.providers?.[provider])
     if (!config || (provider !== 'codex' && !config.apiKey)) {
