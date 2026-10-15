@@ -132,4 +132,25 @@ describe('UniWork chip Retry / conflict overwrite run the owning module Save', (
     expect(source).not.toMatch(/target\.webContents\.send\('menu:command', 'save'\)/)
     expect(source).toMatch(/sheetsMenuChannel: SHEETS_IPC_CHANNELS\.menuAction/)
   })
+
+  it('capture mode flushes pdf with { explicit: false } and invokes armCapture before triggering module saves', () => {
+    for (const kind of ['docs', 'sheets', 'slides', 'markdown', 'html', 'pdf'] as TabKind[]) {
+      const armCapture = vi.fn()
+      const wc = { isDestroyed: () => false, send: vi.fn() } as unknown as WebContents
+      const deps = {
+        targetForPath: vi.fn(() => ({ kind, webContents: wc })),
+        sheetsMenuChannel: 'menu:action',
+        requestMarkdownSave: vi.fn().mockResolvedValue(true),
+        requestHtmlSave: vi.fn().mockResolvedValue(true),
+        flushPdfSave: vi.fn().mockResolvedValue(true),
+        armCapture,
+      }
+      const save = createModuleSaveRequester(deps)
+      expect(save('/w/a', undefined, 'capture')).toBe(true)
+      expect(armCapture).toHaveBeenCalledWith('/w/a')
+      if (kind === 'pdf') {
+        expect(deps.flushPdfSave).toHaveBeenCalledWith(wc, { explicit: false })
+      }
+    }
+  })
 })

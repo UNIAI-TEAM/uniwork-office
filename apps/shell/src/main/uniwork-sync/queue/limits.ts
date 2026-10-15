@@ -1,3 +1,4 @@
+import { SIGN_OUT_RECEIPT_WAIT_MS } from '../../../shared/home-api'
 import { readTestQueueLimit } from '../test-hooks/limits'
 
 /**
@@ -30,6 +31,9 @@ export const QUEUE_LIMITS = {
   backoffMaxMs: 300_000,
   /** documents dispatched at once */
   concurrency: 2,
+  /** bounded wait for an in-flight upload/commit receipt at sign-out (G5-11 D4) */
+  signOutReceiptWaitMs: SIGN_OUT_RECEIPT_WAIT_MS,
 } as const
 
+export { SIGN_OUT_RECEIPT_WAIT_MS }
 export type QueueLimits = typeof QUEUE_LIMITS
