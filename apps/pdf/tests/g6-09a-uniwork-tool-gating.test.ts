@@ -120,3 +120,100 @@ describe('pdf file-level tools on a UniWork-bound document', () => {
     expect(skill.systemPrompt).not.toContain('file-level page tools are unavailable')
   })
 })
+
+// RFA-1 (FE review r1): the hidden set must also be refused at execution time (a hallucinated,
+// stale-history or injected call). The strict Proxy throws on any dep the refusal does not need,
+// so a call that slips past the refusal fails the test instead of running.
+describe('pdf executeTool refuses what `tools` hides', () => {
+  const call = (name: string) => ({ id: 'c1', name, input: {} })
+  const refused = async (deps: PdfAiDeps, name: string) => {
+    const res = await createPdfSkill(deps).executeTool(call(name))
+    expect(res.isError, name).toBe(true)
+    expect(res.mutated, name).toBeFalsy()
+    expect(res.output, name).toContain(`${name} is unavailable`)
+  }
+
+  it('refuses the eight file-level tools and create_document on a bound document', async () => {
+    const deps = makeDeps({ uniworkBound: () => true })
+    for (const n of [...FILE_LEVEL, 'create_document']) await refused(deps, n)
+  })
+
+  it('refuses text edits under UniWork AI with pdfTextEdit off', async () => {
+    const deps = makeDeps({
+      uniworkAi: () => true,
+      capability: (k: string) => k !== 'pdfTextEdit',
+    })
+    for (const n of TEXT_EDIT) await refused(deps, n)
+  })
+
+  it('refuses image edits under UniWork AI with pdfImageEdit off', async () => {
+    const deps = makeDeps({
+      uniworkAi: () => true,
+      capability: (k: string) => k !== 'pdfImageEdit',
+    })
+    for (const n of IMAGE_EDIT) await refused(deps, n)
+  })
+
+  it('refuses generate_image when the image model is off', async () => {
+    await refused(makeDeps({ imageGenAvailable: () => false }), 'generate_image')
+  })
+
+  it('does not refuse for BYOK on a plain file (capability off, not bound)', async () => {
+    const deps = makeDeps({ uniworkAi: () => false, capability: () => false })
+    // goes on to the real executor, which needs deps the strict proxy does not provide
+    for (const n of ['edit_text', 'split_pdf']) {
+      let out = ''
+      try {
+        out = (await createPdfSkill(deps).executeTool(call(n))).output
+      } catch (err) {
+        out = String(err)
+      }
+      expect(out, n).not.toContain(`${n} is unavailable`)
+    }
+  })
+
+  it('follows bound live', async () => {
+    let bound = true
+    const skill = createPdfSkill(makeDeps({ uniworkBound: () => bound }))
+    expect((await skill.executeTool(call('split_pdf'))).output).toContain('is unavailable')
+    bound = false
+    let out = ''
+    try {
+      out = (await skill.executeTool(call('split_pdf'))).output
+    } catch (err) {
+      out = String(err)
+    }
+    expect(out).not.toContain('split_pdf is unavailable')
+  })
+})
+
+// RFA-2: with the capability-hidden edit tools gone the model must not promise those edits.
+describe('pdf system prompt notes capability-hidden edit tools', () => {
+  it('names the text-edit tools when pdfTextEdit is off under UniWork AI', () => {
+    const p = createPdfSkill(
+      makeDeps({ uniworkAi: () => true, capability: (k: string) => k !== 'pdfTextEdit' }),
+    ).systemPrompt
+    expect(p).toContain('text-editing tools are unavailable')
+    expect(p).not.toContain('image-editing tools are unavailable')
+  })
+
+  it('names the image-edit tools when pdfImageEdit is off under UniWork AI', () => {
+    const p = createPdfSkill(
+      makeDeps({ uniworkAi: () => true, capability: (k: string) => k !== 'pdfImageEdit' }),
+    ).systemPrompt
+    expect(p).toContain('image-editing tools are unavailable')
+    expect(p).not.toContain('text-editing tools are unavailable')
+  })
+
+  it('stays silent for BYOK or when the capabilities are on, live', () => {
+    let uniwork = true
+    let on = true
+    const skill = createPdfSkill(makeDeps({ uniworkAi: () => uniwork, capability: () => on }))
+    expect(skill.systemPrompt).not.toContain('tools are unavailable')
+    on = false
+    expect(skill.systemPrompt).toContain('text-editing tools are unavailable')
+    expect(skill.systemPrompt).toContain('image-editing tools are unavailable')
+    uniwork = false
+    expect(skill.systemPrompt).not.toContain('editing tools are unavailable')
+  })
+})

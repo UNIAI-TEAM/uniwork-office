@@ -67,3 +67,67 @@ describe('slides tools under UniWork AI', () => {
     expect(got).not.toContain('insert_web_image')
   })
 })
+
+// RFA-1 (FE review r1): a tool the live `tools` getter hides must also be refused when the
+// model calls it anyway (stale history, a provider switch mid-chat, an injected call).
+describe('slides executeTool refuses what `tools` hides', () => {
+  function spy(extra: Record<string, unknown>) {
+    const touched: string[] = []
+    const access = mkAccess({
+      getSlides: () => {
+        touched.push('getSlides')
+        return []
+      },
+      ...extra,
+    })
+    return { access, touched }
+  }
+  const call = (name: string) => ({ id: 'c1', name, input: {} })
+
+  it('refuses each UniWork-hidden tool under UniWork AI and touches nothing', async () => {
+    for (const name of UNIWORK_HIDDEN) {
+      const { access, touched } = spy({ uniworkAi: () => true })
+      const res = await createSlidesSkill(access).executeTool(call(name))
+      expect(res.isError, name).toBe(true)
+      expect(res.mutated, name).toBeFalsy()
+      expect(res.output, name).toContain(`${name} is unavailable`)
+      expect(touched, name).toEqual([])
+    }
+  })
+
+  it('refuses a media tool the media hides take away', async () => {
+    const { access, touched } = spy({ imageGenAvailable: () => false })
+    const res = await createSlidesSkill(access).executeTool(call('generate_image'))
+    expect(res.isError).toBe(true)
+    expect(res.output).toContain('generate_image is unavailable')
+    expect(touched).toEqual([])
+  })
+
+  it('does not refuse for a BYOK turn (the tool runs its own path)', async () => {
+    const { access, touched } = spy({ uniworkAi: () => false })
+    await createSlidesSkill(access).executeTool(call('generate_deck'))
+    expect(touched).toContain('getSlides')
+  })
+
+  it('follows the predicate live', async () => {
+    let uniwork = true
+    const { access } = spy({ uniworkAi: () => uniwork })
+    const skill = createSlidesSkill(access)
+    expect((await skill.executeTool(call('insert_web_image'))).output).toContain('is unavailable')
+    uniwork = false
+    expect((await skill.executeTool(call('insert_web_image'))).output).not.toContain(
+      'insert_web_image is unavailable',
+    )
+  })
+})
+
+// RFA-4: the media-off note must not send the model to a tool UniWork AI hides.
+describe('slides media-off note under UniWork AI', () => {
+  it('drops the insert_web_image suggestion when the provider is UniWork AI', () => {
+    const off = { imageGenAvailable: () => false }
+    const uni = createSlidesSkill(mkAccess({ ...off, uniworkAi: () => true })).systemPrompt
+    expect(uni).not.toContain('image_search + insert_web_image')
+    const byok = createSlidesSkill(mkAccess({ ...off, uniworkAi: () => false })).systemPrompt
+    expect(byok).toContain('image_search + insert_web_image')
+  })
+})
