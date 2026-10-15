@@ -487,6 +487,21 @@ export function selectedProvider(settings: AiSettings): AiProviderId {
   return AI_PROVIDERS.some((m) => m.id === provider) ? provider : 'genspark'
 }
 
+/**
+ * The model a call for `provider` will use: the source's `chosen` (what the host resolved, e.g. a
+ * model served by a key saved on UniWork) before the slot's own model. For an org-served provider
+ * the slot holds the stored default, not the model main uses, so readers of "the current model"
+ * (vision checks, usage records) go through this instead of `providers[id].model`.
+ */
+export function aiEffectiveModel(
+  settings: Pick<AiSettings, 'providers' | 'modelSources'>,
+  provider: AiProviderId,
+): string {
+  return (
+    settings.modelSources?.[provider]?.chosen?.trim() || settings.providers?.[provider]?.model || ''
+  )
+}
+
 /** Only the provider key slots are read, so loosely typed (schema-parsed) settings fit too. */
 type UniAiKeySource = {
   providers?: Partial<Record<string, { apiKey?: string | undefined } | undefined>> | undefined

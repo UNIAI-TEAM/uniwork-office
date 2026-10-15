@@ -33,6 +33,7 @@ export {
   clampMaxOutputTokens,
   cloudToolsEnabled,
   defaultAiSettings,
+  aiEffectiveModel,
   isProviderUsable,
   maxOutputTokensOf,
   providerNeed,

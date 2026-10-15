@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent, ReactElement, ReactNode } from 'react'
 import { getPractice, type PracticeId, type WorkbenchModuleId } from '@uniwork/practice-core'
+import { aiEffectiveModel } from '@genoffice/ai-provider/browser'
 import { AiTypingIndicator, IconSend, IconStop, UniAiMark } from '@genoffice/ui'
 import { applyAgentIntent, undoAgentAddItem } from './agent-intent-apply'
 import { emitAgentIntentNavigate } from './agent-intent-bus'
@@ -596,7 +597,8 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
     const settings = await api.getAiSettings()
 
     const provider = settings.provider
-    const model = settings.providers?.[provider]?.model
+    // the model main will use (a key saved on UniWork serves its own, not the slot's)
+    const model = aiEffectiveModel(settings, provider)
 
     if (!aiSettingsReady(settings)) {
       return activationFailure(opts.messageId, showBubble)
