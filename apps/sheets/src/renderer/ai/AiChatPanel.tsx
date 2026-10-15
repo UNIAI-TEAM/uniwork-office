@@ -852,7 +852,16 @@ export function AiChatPanel({
                     <>
                       {chip.meta?.cellsMetaParams && (
                         <div className="ai-result-meta">
-                          {aiUniworkText(lang, 'aiResultCellsMeta', chip.meta.cellsMetaParams)}
+                          {chip.meta.cellsMetaParams.overwritten === null
+                            ? // the tool did not report an overwritten count: unknown is not zero
+                              aiUniworkText(lang, 'aiResultCellsMetaNoOverwrite', {
+                                written: chip.meta.cellsMetaParams.written,
+                                range: chip.meta.cellsMetaParams.range,
+                              })
+                            : aiUniworkText(lang, 'aiResultCellsMeta', {
+                                ...chip.meta.cellsMetaParams,
+                                overwritten: chip.meta.cellsMetaParams.overwritten,
+                              })}
                         </div>
                       )}
                       <div className="ai-result-actions">

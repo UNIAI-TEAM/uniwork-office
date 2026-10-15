@@ -493,6 +493,76 @@ describe('a refused UniWork AI question (too long, rejected): no Retry, the ques
       expect(live?.textContent).not.toContain('Đã cập nhật 12 ô tại Sheet1!B4:C9.')
     })
 
+    it('an edit whose overwritten count is unknown shows only the written cells and range, never "0 overwritten" (RF2-10)', async () => {
+      vi.stubGlobal(
+        'desktopApi',
+        new Proxy(
+          {},
+          {
+            get: (_t, prop: string) =>
+              prop === 'getAiSettings'
+                ? () => Promise.resolve({ provider: 'uniwork', providers: {} })
+                : /^on[A-Z]/.test(prop)
+                  ? () => () => {}
+                  : () => Promise.resolve(undefined),
+          },
+        ),
+      )
+      container = document.createElement('div')
+      document.body.appendChild(container)
+      root = createRoot(container)
+      const editedEntry: AiChatMessage = {
+        role: 'assistant',
+        text: 'Đã cập nhật 12 ô tại Sheet1!B4:C9.',
+        tools: [
+          { name: 'propose_operations', summary: 'Wrote 12 cells in Sheet1!B4:C9', isError: false },
+        ],
+        streaming: false,
+        autoApplied: { opCount: 12, undoSteps: 1 },
+      }
+      await act(async () => {
+        root!.render(
+          createElement(
+            LocaleProvider,
+            { initial: 'vi', children: null },
+            createElement(AiChatPanel, {
+              isOpen: true,
+              hasContent: true,
+              chat: [user, editedEntry],
+              attachments: [],
+              attachNotice: null,
+              onPickAttachments: () => {},
+              onAddAttachmentPaths: () => {},
+              onAddPastedImage: () => {},
+              onRemoveAttachment: () => {},
+              prompt: '',
+              preview: null,
+              aiBusy: false,
+              onPromptChange: () => {},
+              onSend: () => {},
+              onStop: () => {},
+              onNewChat: () => {},
+              onUndo: () => {},
+              scopeRange: null,
+              scopeColumns: null,
+              scopeLocked: false,
+              onScopeDismiss: () => {},
+              onCitation: () => {},
+              onExpand: () => {},
+              onCollapse: () => {},
+            }),
+          ),
+        )
+        await Promise.resolve()
+      })
+      const meta = container.querySelector('.ai-result-meta')
+      expect(meta?.textContent).toBe(
+        tr('aiResultCellsMetaNoOverwrite', { written: 12, range: 'Sheet1!B4:C9' }),
+      )
+      expect(meta?.textContent).toContain('Sheet1!B4:C9')
+      expect(meta?.textContent).not.toMatch(/overwritten|ghi đè/i)
+    })
+
     it('clicking Stop returns keyboard focus to the composer textarea (RF1-12, RF1-23b)', () => {
       vi.stubGlobal(
         'desktopApi',
