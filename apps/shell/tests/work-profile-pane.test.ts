@@ -4,6 +4,8 @@
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { UniworkWorkspaceRef } from '../src/shared/home-api'
 import type { UniworkWorkResult, WorkPerson } from '../src/shared/uniwork-work-api'
@@ -48,6 +50,7 @@ async function mount(workspace: UniworkWorkspaceRef = WS): Promise<void> {
           workspace,
           workspaceError: null,
           onReload: () => undefined,
+          head: { title: 'Profile', summary: 'Your UniWork profile · read-only' },
         }),
       ),
     )
@@ -103,14 +106,65 @@ describe('Profile tab', () => {
     expect(host.textContent).toContain('Lan Nguyen')
   })
 
-  it('a card: initial tile, name, job title as caption, fields in a grid, a secondary web button', async () => {
+  it('toolbar: the read-only summary and a secondary Edit on the web with the external glyph', async () => {
     await mount()
-    expect(host.querySelector('section.wb-block.wb-profile-card')).not.toBeNull()
-    expect(host.querySelector('.wb-profile-avatar')?.textContent).toBe('L')
-    expect(host.querySelector('.wb-profile-name')?.textContent).toBe('Lan Nguyen')
-    expect(host.querySelector('.wb-profile-title')?.textContent).toBe('Sales lead')
-    expect(host.querySelector('dl.wb-profile')?.textContent).not.toContain('Job title')
-    expect(buttonByText('Edit on the web')!.className).toBe('wb-btn wb-btn-secondary')
+    expect(host.querySelector('.wb-toolbar-text')?.textContent).toBe(
+      'Your UniWork profile · read-only',
+    )
+    const edit = host.querySelector<HTMLButtonElement>('.wb-toolbar-actions button')!
+    expect(edit.textContent).toBe('Edit on the web')
+    expect(edit.className).toBe('wb-btn wb-btn-secondary')
+    expect(edit.querySelector('svg.wb-glyph')).not.toBeNull()
+  })
+
+  it('two cards: identity (round avatar, name heading, title, email) and work details as a dl', async () => {
+    await mount()
+    const grid = host.querySelector('.wb-profile-grid')!
+    const [id, work] = Array.from(grid.querySelectorAll(':scope > section.wb-block'))
+    expect(id!.getAttribute('aria-label')).toBe('Identity')
+    const avatar = id!.querySelector('.wb-profile-avatar')!
+    expect(avatar.textContent).toBe('L')
+    expect(avatar.getAttribute('aria-hidden')).toBe('true')
+    expect(id!.querySelector('h3.wb-profile-name')?.textContent).toBe('Lan Nguyen')
+    expect(id!.querySelector('.wb-profile-title')?.textContent).toBe('Sales lead')
+    expect(id!.textContent).toContain('lan@example.test')
+
+    expect(work!.querySelector('h3')?.textContent).toBe('Work details')
+    const dl = work!.querySelector('dl.wb-profile')!
+    expect(Array.from(dl.querySelectorAll('dt')).map((d) => d.textContent)).toEqual([
+      'Department',
+      'Manager',
+      'Email',
+      'Time zone',
+    ])
+    const dd = Array.from(dl.querySelectorAll('dd'))
+    expect(dd.map((d) => d.textContent)).toEqual([
+      'Commercial',
+      'MMinh Tran',
+      'lan@example.test',
+      'Asia/Ho_Chi_Minh',
+    ])
+    // the manager gets a small avatar of the same round kind
+    expect(dd[1]!.querySelector('.wb-profile-avatar.is-small')?.textContent).toBe('M')
+    expect(dl.textContent).not.toContain('Job title')
+    expect(work!.querySelector('.wb-profile-foot')?.textContent).toBe(
+      'UniAI uses these details to prefill the documents it drafts for you.',
+    )
+  })
+
+  it('the avatar is round and 64px; the small one 24px', () => {
+    const css = readFileSync(join(__dirname, '../src/renderer/src/home.css'), 'utf8')
+    const rule = (sel: string) => css.split(`\n${sel} {`)[1]?.split('\n}')[0] ?? ''
+    expect(rule('.wb-profile-avatar')).toMatch(/width: 64px;[\s\S]*border-radius: 50%;/)
+    expect(rule('.wb-profile-avatar.is-small')).toMatch(/width: 24px;/)
+    expect(rule('.wb-profile-grid')).toMatch(/grid-template-columns: 340px minmax\(0, 1fr\);/)
+  })
+
+  it('loading: the card-shaped skeleton under the toolbar', async () => {
+    api.myProfile.mockReturnValueOnce(new Promise(() => undefined))
+    await mount({ ...WS, orgId: 'o-loading' })
+    expect(host.querySelector('.wb-toolbar')).not.toBeNull()
+    expect(host.querySelector('.wb-work-skeleton.is-card .wb-skel-avatar')).not.toBeNull()
   })
 
   it('a Vietnamese name shows the given-name initial', async () => {

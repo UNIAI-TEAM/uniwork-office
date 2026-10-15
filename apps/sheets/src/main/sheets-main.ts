@@ -70,6 +70,7 @@ import {
   registerRendererScheme,
   rendererUrl,
   writeJsonAtomic,
+  newerCopyMtime,
 } from '@genoffice/electron-utils'
 import {
   answerUniworkAiFlagOff,
@@ -1925,6 +1926,11 @@ const recoveryDir = () => userDataPath('sheets-autosave')
 const recoveryPathFor = (filePath: string) =>
   join(recoveryDir(), `${createHash('sha1').update(filePath).digest('hex').slice(0, 16)}.xlsx`)
 
+/** mtime of a crash copy newer than `filePath`, or null; read-only (the shell's Desk lists it, opening offers the restore) */
+export function recoveryCopyMtime(filePath: string): number | null {
+  return newerCopyMtime(recoveryPathFor(filePath), filePath)
+}
+
 function clearWorkbookRecovery(filePath: string): void {
   try {
     unlinkSync(recoveryPathFor(filePath))
@@ -2727,6 +2733,8 @@ export function registerSheetsIpc(): void {
       path,
       event.sender,
       dialogParent(event),
+      // an export window must never ask about, or discard, crash recovery (it exports the saved file)
+      { skipRecoveryPrompt: headlessExportWaiters.has(event.sender.id) },
     )
     // G5-04g: a locked working copy was refused on the original path; no
     // session was derived and nothing opened

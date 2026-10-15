@@ -56,6 +56,7 @@ import {
   rendererUrl,
   MAX_REMOTE_IMAGE_BYTES,
   readBodyCapped,
+  newerCopyMtime,
 } from '@genoffice/electron-utils'
 import {
   answerUniworkAiFlagOff,
@@ -390,6 +391,11 @@ const autosaveDir = () => join(app.getPath('userData'), 'slides-autosave')
 const autosavePathFor = (filePath: string) =>
   join(autosaveDir(), `${createHash('sha1').update(filePath).digest('hex').slice(0, 16)}.pptx`)
 
+/** mtime of a crash copy newer than `filePath`, or null; read-only (the shell's Desk lists it, opening offers the restore) */
+export function recoveryCopyMtime(filePath: string): number | null {
+  return newerCopyMtime(autosavePathFor(filePath), filePath)
+}
+
 /**
  * Ticks to skip after a failed recovery copy, per deck. Retrying every 30s just
  * repeats an expensive failure, but disabling the safety net for the rest of the
@@ -717,10 +723,11 @@ async function openAndBuild(
   const raw = await readFile(path)
   // a 0-byte .pptx is an empty deck, not a corrupt one: open the blank template
   // under the file's own path so Save writes back to it
-  const { bytes, recovered } = await maybeRecoverBytes(
-    path,
-    raw.length === 0 ? await createBlankPptx() : new Uint8Array(raw),
-  )
+  const original = raw.length === 0 ? await createBlankPptx() : new Uint8Array(raw)
+  // an export window must never ask about, or discard, crash recovery (it exports the saved file)
+  const { bytes, recovered } = headlessExportWaiters.has(wc.id)
+    ? { bytes: original, recovered: false }
+    : await maybeRecoverBytes(path, original)
   await shapedMetricsReady() // Lay out only after complex-script shaped metrics are ready, avoiding an init race falling back to estimation
   const opened = await openPptx(bytes)
   adoptEmbeddedFonts(opened)
