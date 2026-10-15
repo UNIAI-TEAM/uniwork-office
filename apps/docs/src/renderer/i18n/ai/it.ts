@@ -85,6 +85,8 @@ export const it = {
   aiRegenerateTitle: 'Rigenera',
   aiSnapshotsTitle: 'Snapshot delle versioni',
   aiRollback: 'Ripristina',
+  aiAcceptMarked: 'Accetta',
+  aiAcceptMarkedTitle: 'Mantieni le modifiche dell’IA e rimuovi l’evidenziazione',
   aiScopeSelected: '{count} paragrafo/i selezionato/i',
   aiScopeEmptyDoc: 'Documento vuoto',
   aiScopeCursor: 'Al cursore',

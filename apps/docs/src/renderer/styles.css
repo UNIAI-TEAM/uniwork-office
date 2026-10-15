@@ -7461,10 +7461,13 @@ body.docs-crop-active
   pointer-events: none !important;
 }
 
-/* AI diff highlight */
-.doc-page .ai-changed {
-  background: var(--ai-highlight);
-  box-shadow: -3px 0 0 var(--ai-highlight-border);
+/* AI diff highlight: a screen affordance only (kept until Accept or Save), so print and
+   PDF export (printToPDF of the live canvas) never paint it */
+@media screen {
+  .doc-page .ai-changed {
+    background: var(--ai-highlight);
+    box-shadow: -3px 0 0 var(--ai-highlight-border);
+  }
 }
 
 /* ================= start screen ================= */

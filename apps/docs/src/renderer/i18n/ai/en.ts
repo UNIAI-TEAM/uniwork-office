@@ -82,6 +82,8 @@ export const en = {
   aiRegenerateTitle: 'Regenerate',
   aiSnapshotsTitle: 'Snapshots',
   aiRollback: 'Roll back',
+  aiAcceptMarked: 'Accept',
+  aiAcceptMarkedTitle: 'Keep the AI edits and remove their highlight',
   aiScopeSelected: 'Selected {count} paragraph(s)',
   aiScopeEmptyDoc: 'Blank document',
   aiScopeCursor: 'At cursor',

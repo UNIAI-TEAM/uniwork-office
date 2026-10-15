@@ -84,6 +84,8 @@ export const pt = {
   aiRegenerateTitle: 'Gerar novamente',
   aiSnapshotsTitle: 'Instantâneos de versão',
   aiRollback: 'Reverter',
+  aiAcceptMarked: 'Aceitar',
+  aiAcceptMarkedTitle: 'Manter as alterações da IA e remover o destaque',
   aiScopeSelected: '{count} parágrafo(s) selecionado(s)',
   aiScopeEmptyDoc: 'Documento em branco',
   aiScopeCursor: 'No cursor',

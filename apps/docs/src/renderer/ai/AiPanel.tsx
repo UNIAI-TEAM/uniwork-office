@@ -675,18 +675,18 @@ export function AiPanel({
   const notesAccessRef = useRef(notesAccess)
   notesAccessRef.current = notesAccess
 
-  /** drop every aiChanged flag; silent = skip undo history (auto-accept path) */
-  const clearAiHighlights = (silent = false) => {
+  /** drop every aiChanged flag (the marker is a screen affordance, not content: never an undo step) */
+  const clearAiHighlights = () => {
     const view = editorRef.current.view
     let tr = view.state.tr
     let touched = false
-    view.state.doc.forEach((node, offset) => {
+    view.state.doc.descendants((node, pos) => {
       if (node.attrs.aiChanged) {
-        tr = tr.setNodeMarkup(offset, undefined, { ...node.attrs, aiChanged: false })
+        tr = tr.setNodeMarkup(pos, undefined, { ...node.attrs, aiChanged: false })
         touched = true
       }
     })
-    if (silent) tr = tr.setMeta('addToHistory', false)
+    tr = tr.setMeta('addToHistory', false)
     if (touched) {
       view.dispatch(tr)
       // AI-pipeline housekeeping, not a user edit: keep the freshness baseline current
@@ -970,11 +970,8 @@ export function AiPanel({
         onToolExecuted: ({ call, execution, snapshotBefore }) => {
           // The run's first pre-edit state wins so one roll-back undoes the whole run
           if (snapshotBefore && !runSnapshotRef.current) runSnapshotRef.current = snapshotBefore
-          if (execution.mutated) {
-            // tracking off: accept immediately (same tick, so the yellow never paints);
-            // tracking on: revisions stay pending, handled in the Review tab
-            if (!trackChangesRef.current) clearAiHighlights(true)
-          }
+          // tracking off: the edited blocks keep the AI marker until the user Accepts or Saves;
+          // tracking on: revisions stay pending, handled in the Review tab
           // mind maps ride the UI-only display side channel onto the message
           const display = execution.display
           const mindmap = display?.kind === 'mindmap' ? display.tree : undefined
@@ -1413,6 +1410,14 @@ export function AiPanel({
     clearAiHighlights()
   }
 
+  // a Save accepts the marker: saveOnce fires this right before it snapshots the document, so
+  // the cleared marker is part of what it compares against the reloaded file (history survives)
+  useEffect(() => {
+    const onSave = () => clearAiHighlights()
+    window.addEventListener('ai-docs-commit-tables', onSave)
+    return () => window.removeEventListener('ai-docs-commit-tables', onSave)
+  }, [])
+
   const toggleTrackChanges = () => {
     const next = !trackChanges
     setTrackChanges(next)
@@ -1516,6 +1521,17 @@ export function AiPanel({
     if (open) uniworkGate.flushPendingRefusal()
   }, [open, uniworkGate])
 
+  /** some block still carries the AI marker (read per render; the scope tick follows doc updates) */
+  const hasAiMarks = (): boolean => {
+    let found = false
+    editor.state.doc.descendants((node) => {
+      if (found) return false
+      if (node.attrs?.aiChanged) found = true
+      return !found
+    })
+    return found
+  }
+
   const focusFirstAiChange = () => {
     let targetPos: number | null = null
     editor.state.doc.descendants((node, pos) => {
@@ -1550,6 +1566,15 @@ export function AiPanel({
   }
 
   const lastEntry = chat[chat.length - 1]
+  // Accept sits under the latest turn that edited the document, while a marker is left
+  let lastEditIdx = -1
+  for (let k = chat.length - 1; k >= 0; k--) {
+    if (chat[k]!.snapshot) {
+      lastEditIdx = k
+      break
+    }
+  }
+  const acceptAt = !busy && lastEditIdx >= 0 && hasAiMarks() ? lastEditIdx : -1
   const panelLiveAnnouncement =
     chat.length > 0 || busy
       ? computePanelLiveAnnouncement({
@@ -1804,7 +1829,7 @@ export function AiPanel({
                   {stoppedText}
                 </div>
               )}
-              {chip?.chip === 'edited' && (
+              {(chip?.chip === 'edited' || i === acceptAt) && (
                 <div className="ai-result-actions">
                   <button
                     type="button"
@@ -1813,9 +1838,24 @@ export function AiPanel({
                   >
                     {aiUniworkText(lang, 'aiResultViewChanges')}
                   </button>
-                  <span className="ai-result-edited-hint">
-                    {singleShortcutHint(aiUniworkText(lang, 'aiResultEditedHint'))}
-                  </span>
+                  {i === acceptAt && (
+                    <button
+                      type="button"
+                      className="ai-result-view-changes ai-accept-changes"
+                      data-tip={t('aiAcceptMarkedTitle')}
+                      onClick={() => {
+                        clearAiHighlights()
+                        setScopeTick((n) => n + 1)
+                      }}
+                    >
+                      {t('aiAcceptMarked')}
+                    </button>
+                  )}
+                  {chip?.chip === 'edited' && (
+                    <span className="ai-result-edited-hint">
+                      {singleShortcutHint(aiUniworkText(lang, 'aiResultEditedHint'))}
+                    </span>
+                  )}
                 </div>
               )}
               {entry.role === 'assistant' && entry.usage && (

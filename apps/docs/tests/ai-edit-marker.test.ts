@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { act } from 'react'
 import { Editor } from '@tiptap/core'
+import JSZip from 'jszip'
 import { undoDepth } from '@tiptap/pm/history'
 import { parseDocx, saveDocx } from '@genoffice/docx-engine'
 import { buildDocx } from '../../../packages/docx-engine/tests/helpers/build-docx'
@@ -82,6 +83,15 @@ describe('the marker is never document data', () => {
   const BODY =
     '<w:p><w:r><w:t>first block</w:t></w:r></w:p><w:p><w:r><w:t>second block</w:t></w:r></w:p>'
 
+  async function zipParts(bytes: Uint8Array): Promise<Record<string, string>> {
+    const zip = await JSZip.loadAsync(bytes)
+    const out: Record<string, string> = {}
+    for (const name of Object.keys(zip.files).sort()) {
+      out[name] = Buffer.from(await zip.files[name]!.async('uint8array')).toString('base64')
+    }
+    return out
+  }
+
   function withoutMarker(node: PmNode): PmNode {
     const attrs =
       node.attrs && 'aiChanged' in node.attrs ? { ...node.attrs, aiChanged: false } : node.attrs
@@ -115,7 +125,8 @@ describe('the marker is never document data', () => {
         parsed,
         pmDocToSavePlan(withoutMarker(marked), parsed.blocks).saveBlocks,
       )
-      expect(Buffer.from(a).equals(Buffer.from(b))).toBe(true)
+      // every part byte-equal (the zip container itself stamps the write time on each entry)
+      expect(await zipParts(a)).toEqual(await zipParts(b))
     } finally {
       editor.destroy()
     }

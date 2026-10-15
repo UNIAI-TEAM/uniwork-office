@@ -81,6 +81,8 @@ export const ar = {
   aiRegenerateTitle: 'إعادة الإنشاء',
   aiSnapshotsTitle: 'لقطات الإصدارات',
   aiRollback: 'استرجاع',
+  aiAcceptMarked: 'قبول',
+  aiAcceptMarkedTitle: 'الاحتفاظ بتعديلات الذكاء الاصطناعي وإزالة التمييز',
   aiScopeSelected: 'تم تحديد {count} فقرة',
   aiScopeEmptyDoc: 'مستند فارغ',
   aiScopeCursor: 'عند المؤشر',

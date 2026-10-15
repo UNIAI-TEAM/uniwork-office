@@ -81,6 +81,8 @@ export const vi = {
   aiRegenerateTitle: 'Tạo lại',
   aiSnapshotsTitle: 'Bản chụp nhanh',
   aiRollback: 'Khôi phục',
+  aiAcceptMarked: 'Chấp nhận',
+  aiAcceptMarkedTitle: 'Giữ các thay đổi của AI và bỏ phần tô sáng',
   aiScopeSelected: 'Đã chọn {count} đoạn',
   aiScopeEmptyDoc: 'Tài liệu trống',
   aiScopeCursor: 'Tại vị trí con trỏ',

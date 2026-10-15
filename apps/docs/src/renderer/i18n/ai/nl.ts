@@ -84,6 +84,8 @@ export const nl = {
   aiRegenerateTitle: 'Opnieuw genereren',
   aiSnapshotsTitle: 'Versiesnapshots',
   aiRollback: 'Terugdraaien',
+  aiAcceptMarked: 'Accepteren',
+  aiAcceptMarkedTitle: 'AI-wijzigingen behouden en de markering verwijderen',
   aiScopeSelected: "{count} alinea('s) geselecteerd",
   aiScopeEmptyDoc: 'Leeg document',
   aiScopeCursor: 'Bij de cursor',

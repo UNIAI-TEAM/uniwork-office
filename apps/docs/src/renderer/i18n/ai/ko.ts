@@ -82,6 +82,8 @@ export const ko = {
   aiRegenerateTitle: '다시 생성',
   aiSnapshotsTitle: '버전 스냅샷',
   aiRollback: '롤백',
+  aiAcceptMarked: '수락',
+  aiAcceptMarkedTitle: 'AI 변경 내용을 유지하고 강조 표시를 지웁니다',
   aiScopeSelected: '{count}개 단락 선택됨',
   aiScopeEmptyDoc: '빈 문서',
   aiScopeCursor: '커서 위치',

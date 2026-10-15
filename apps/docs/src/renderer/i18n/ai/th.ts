@@ -81,6 +81,8 @@ export const th = {
   aiRegenerateTitle: 'สร้างใหม่',
   aiSnapshotsTitle: 'สแนปช็อตของเวอร์ชัน',
   aiRollback: 'ย้อนกลับ',
+  aiAcceptMarked: 'ยอมรับ',
+  aiAcceptMarkedTitle: 'เก็บการแก้ไขของ AI และเอาไฮไลต์ออก',
   aiScopeSelected: 'เลือก {count} ย่อหน้า',
   aiScopeEmptyDoc: 'เอกสารเปล่า',
   aiScopeCursor: 'ที่ตำแหน่งเคอร์เซอร์',

@@ -81,6 +81,8 @@ export const zhTW = {
   aiRegenerateTitle: '重新產生',
   aiSnapshotsTitle: '版本快照',
   aiRollback: '還原',
+  aiAcceptMarked: '接受',
+  aiAcceptMarkedTitle: '保留 AI 的修改並移除醒目提示',
   aiScopeSelected: '已選取 {count} 段',
   aiScopeEmptyDoc: '空白文件',
   aiScopeCursor: '在游標處',

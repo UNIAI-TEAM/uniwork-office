@@ -85,6 +85,8 @@ export const fr = {
   aiRegenerateTitle: 'Régénérer',
   aiSnapshotsTitle: 'Instantanés de version',
   aiRollback: 'Restaurer',
+  aiAcceptMarked: 'Accepter',
+  aiAcceptMarkedTitle: 'Conserver les modifications de l’IA et retirer le surlignage',
   aiScopeSelected: '{count} paragraphe(s) sélectionné(s)',
   aiScopeEmptyDoc: 'Document vide',
   aiScopeCursor: 'Au curseur',
