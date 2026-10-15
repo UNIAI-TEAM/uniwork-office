@@ -126,6 +126,12 @@ export const it = {
     'Il portachiavi del computer è bloccato, quindi le modifiche non salvate esistono solo nelle finestre aperte. Uscire ora le elimina; ciò che è già conservato cifrato resta. Per mantenerle, sblocca prima il computer.',
   uwSignOutGo: 'Esci',
   uwSignOutWaiting: 'Completamento del salvataggio in corso prima di uscire…',
+  uwSignOutCaptureFailed:
+    'Alcune modifiche non salvate non sono state acquisite in tempo; la versione salvata o salvata automaticamente più recente viene conservata per il tuo account.',
+  uwSwitchLostTitle: 'Alcune modifiche non salvate dell’account precedente sono andate perse',
+  uwSwitchLostBody:
+    'Un altro account ha effettuato l’accesso su questo computer, quindi l’account precedente è stato bloccato. Documenti le cui modifiche non salvate non è stato possibile conservare: {count}. Tutto il resto rimane bloccato su questo computer per quell’account.',
+  uwSwitchLostOk: 'OK',
 
   // S2 sync center
   uwSyncTitle: 'Centro di sincronizzazione',

@@ -1,4 +1,6 @@
 import {
+  clearDocsOriginalsFor,
+  clearDocsRecoveryCopy,
   setDocsUserSaveHook,
   setUniworkDocumentPolicy as setDocsUniworkPolicy,
 } from '../../../../docs/src/main/docs-main'
@@ -15,6 +17,7 @@ import {
   setUniworkDocumentPolicy as setPdfUniworkPolicy,
 } from '../../../../pdf/src/main/pdf-main'
 import {
+  clearWorkbookRecovery,
   setSheetsUserSaveHook,
   setUniworkDocumentPolicy as setSheetsUniworkPolicy,
 } from '../../../../sheets/src/main/sheets-main'
@@ -22,6 +25,8 @@ import {
   setSlidesUserSaveHook,
   setUniworkDocumentPolicy as setSlidesUniworkPolicy,
 } from '../../../../slides/src/main/slides-main'
+
+export { clearDocsRecoveryCopy, clearWorkbookRecovery }
 
 /** what the six editor mains need from the UniWork documents service */
 export interface UniworkModuleSeam {
@@ -33,6 +38,25 @@ export interface UniworkModuleSeam {
    * (older tests) reads as not locked.
    */
   isLocked?(path: string): boolean
+  /**
+   * G5-11: consumes a one-shot capture request for `path` so a main-triggered
+   * save writes the working copy to disk without firing the user-save hook.
+   */
+  consumeCapture?(path: string): boolean
+  /**
+   * G5-11: registers the docs/sheets crash-recovery cleaner so sign-out can
+   * bump recovery epochs and delete recovery files without service.ts importing
+   * the Electron-bound module mains.
+   */
+  setClearRecovery?(clear: (path: string) => void): void
+  /**
+   * G5-11 be-2 / d1-3: registers the docs originals-archive cleaner so sign-out
+   * drops the archived plaintext of the account's working copies (both by
+   * open-time `baseChecksum` and by current-bytes hash).
+   */
+  setClearOriginals?(
+    clear: (entries: ReadonlyArray<string | { path: string; baseChecksum?: string }>) => void,
+  ): void
   onUserSave(path: string): void
   /**
    * G5-04g: true when the path's folder declares a store this build does not
@@ -108,6 +132,11 @@ export function installUniworkModuleSeams(
   seam: UniworkModuleSeam | null,
   commentAuthor: CommentAuthorResolver | null = null,
 ): void {
+  seam?.setClearRecovery?.((path: string) => {
+    clearDocsRecoveryCopy(path)
+    clearWorkbookRecovery(path)
+  })
+  seam?.setClearOriginals?.((entries) => clearDocsOriginalsFor(entries))
   const author = commentAuthor ?? (() => NEUTRAL_COMMENT_AUTHOR)
   const policy = seam
     ? {
@@ -116,6 +145,7 @@ export function installUniworkModuleSeams(
         // G5-03a: an S6 lock (revoked / deleted while open) refuses export,
         // Save As and print-to-PDF in every module
         isLocked: (path: string) => seam.isLocked?.(path) === true,
+        consumeCapture: (path: string) => seam.consumeCapture?.(path) === true,
         refuseOpen: (path: string) => seam.refuseLockedPath(path),
         commentAuthor: (path: string) => author(path),
       }

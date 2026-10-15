@@ -154,6 +154,20 @@ describe('uniworkSaveDecision (main workbook:save gate)', () => {
     })
     expect(decide({ origin: 'auto' }).write).toBe(true)
   })
+
+  it('capture origin writes a bound editable workbook without firing the user-save hook, and refuses read-only', () => {
+    expect(decide({ origin: 'capture' })).toEqual({ write: true, fireHook: false })
+    expect(decide({ origin: 'capture', documentPath: VIEW, targetPath: VIEW })).toEqual({
+      write: false,
+      fireHook: false,
+    })
+    setUniworkDocumentPolicy({
+      isBound: (path) => path === DOC,
+      isReadOnly: () => false,
+      consumeCapture: (path) => path === DOC,
+    })
+    expect(decide({ origin: 'user' })).toEqual({ write: true, fireHook: false })
+  })
 })
 
 describe('null policy = unchanged', () => {
@@ -169,6 +183,7 @@ describe('uniworkRequestOrigin', () => {
   it('keeps an explicit origin as sent', () => {
     expect(uniworkRequestOrigin({ origin: 'auto', quiet: false })).toBe('auto')
     expect(uniworkRequestOrigin({ origin: 'user', quiet: true })).toBe('user')
+    expect(uniworkRequestOrigin({ origin: 'capture', quiet: false })).toBe('capture')
   })
 
   it('reads a request without one by its quiet flag, so a missing origin cannot write a bound document', () => {

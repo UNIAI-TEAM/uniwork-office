@@ -7,6 +7,7 @@ import type {
   UniworkDocStatus,
   UniworkDocSummary,
   UniworkLaunchEvent,
+  UniworkLockReason,
   UniworkRemoteAction,
   UniworkResult,
   UniworkSaveState,
@@ -82,14 +83,7 @@ export const UNIWORK_STATE_KEYS: Record<UniworkSaveState, StringKey> = {
   failed: 'uwChipError',
 }
 
-/**
- * A reason the document layer reports beyond the HTTP-level codes: the keychain
- * holding the sync store's key is locked (session state `keystore-locked`).
- * Deferred (G504-fe-2): the document status badge for it (`uwBadgeKeystore`, and
- * `uwBadgeBlocked` for store_full, EXPERIENCE l.212) goes with the S4 queue rows;
- * the tab chip reads `blockedReasonKey`, the account entry already shows the badge.
- */
-export type UniworkLockReason = 'keystore_locked'
+export type { UniworkLockReason }
 
 /** short reason shown after "Blocked:" */
 export function blockedReasonKey(
@@ -98,6 +92,10 @@ export function blockedReasonKey(
   switch (error) {
     case 'keystore_locked':
       return 'uwReasonKeystore'
+    case 'signed_out':
+      return 'uwReasonSignedOut'
+    case 'store_newer':
+      return 'uwReasonStoreNewer'
     case 'store_full':
       return 'uwReasonStoreFull'
     case 'session_expired':

@@ -71,6 +71,9 @@ import type {
   UniworkUploadDocInput,
   UniworkUploadProgress,
   UniworkWorkspaceRef,
+  SignOutPlan,
+  SignOutProgress,
+  SignOutPromptRequest,
 } from '../shared/home-api'
 import { HOME_CHANNELS, PROJECT_CHANNELS, UNIWORK_DOC_CHANNELS } from '../shared/home-api'
 import { INTEGRATIONS_CHANNELS } from '../shared/integrations-api'
@@ -135,6 +138,20 @@ ipcRenderer.on(UNIWORK_DOC_CHANNELS.uploadProgress, (_event: IpcRendererEvent, r
   const event = asUploadProgress(raw)
   if (!event) return
   for (const cb of [...uploadProgressSubscribers]) cb(event)
+})
+// G5-11: sign-out progress (`waiting` while an in-flight save settles, `done` after)
+const signOutProgressSubscribers = new Set<(event: SignOutProgress) => void>()
+ipcRenderer.on(UNIWORK_DOC_CHANNELS.signOutProgress, (_event: IpcRendererEvent, raw: unknown) => {
+  const event = asSignOutProgress(raw)
+  if (!event) return
+  for (const cb of [...signOutProgressSubscribers]) cb(event)
+})
+// G5-11 D5: main-initiated sign-out prompt (account switch / deployment switch)
+const signOutPromptSubscribers = new Set<(request: SignOutPromptRequest) => void>()
+ipcRenderer.on(UNIWORK_DOC_CHANNELS.signOutPrompt, (_event: IpcRendererEvent, raw: unknown) => {
+  const request = asSignOutPromptRequest(raw)
+  if (!request) return
+  for (const cb of [...signOutPromptSubscribers]) cb(request)
 })
 
 const UI_LANGUAGES: readonly UiLanguage[] = [
@@ -247,13 +264,53 @@ function asUniworkLock(result: unknown): UniworkDocLock | null {
   if (!result || typeof result !== 'object') return null
   const r = result as Partial<UniworkDocLock>
   if (typeof r.path !== 'string' || !r.path) return null
-  if (r.reason !== 'store_newer' && r.reason !== 'keystore_locked') return null
+  if (r.reason !== 'store_newer' && r.reason !== 'keystore_locked' && r.reason !== 'signed_out') {
+    return null
+  }
   return { path: r.path, reason: r.reason, name: typeof r.name === 'string' ? r.name : '' }
 }
 
 function asUniworkLocks(result: unknown): UniworkDocLock[] {
   if (!Array.isArray(result)) return []
   return result.map(asUniworkLock).filter((lock): lock is UniworkDocLock => lock !== null)
+}
+
+function asSignOutPlan(raw: unknown): SignOutPlan {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Partial<SignOutPlan>
+  const nonNegInt = (v: unknown): number =>
+    typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.floor(v) : 0
+  return {
+    count: nonNegInt(r.count),
+    waiting: nonNegInt(r.waiting),
+    keystoreLocked: r.keystoreLocked === true,
+    ramOnly: nonNegInt(r.ramOnly),
+  }
+}
+
+function asSignOutProgress(raw: unknown): SignOutProgress | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Partial<SignOutProgress>
+  const phase = r.phase
+  if (phase !== 'waiting' && phase !== 'done') return null
+  const captureFailed =
+    phase === 'done' &&
+    typeof r.captureFailed === 'number' &&
+    Number.isFinite(r.captureFailed) &&
+    r.captureFailed > 0
+      ? Math.floor(r.captureFailed)
+      : undefined
+  return captureFailed !== undefined ? { phase, captureFailed } : { phase }
+}
+
+function asSignOutPromptRequest(raw: unknown): SignOutPromptRequest | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Partial<SignOutPromptRequest>
+  if (typeof r.requestId !== 'string' || !r.requestId) return null
+  const plan = asSignOutPlan(r.plan)
+  // `mode` must cross: without it the renderer shows the account-switch notice as the confirm
+  return r.mode === 'confirm' || r.mode === 'notice'
+    ? { requestId: r.requestId, plan, mode: r.mode }
+    : { requestId: r.requestId, plan }
 }
 
 /** a renamed push from main: a document id and its new title only */
@@ -596,7 +653,14 @@ const homeApi: HomeApi = {
   async openLoginUrl() {
     await ipcRenderer.invoke(HOME_CHANNELS.accountLoginOpenUrl)
   },
-  async accountLogout() {
+  async accountLogout(options) {
+    if (options !== undefined) {
+      await ipcRenderer.invoke(
+        HOME_CHANNELS.accountLogout,
+        options?.confirmed === true ? { confirmed: true } : { confirmed: false },
+      )
+      return
+    }
     await ipcRenderer.invoke(HOME_CHANNELS.accountLogout)
   },
   onAccountStatus(handler) {
@@ -1162,6 +1226,28 @@ const homeApi: HomeApi = {
   },
   async dismissUniworkLock(path) {
     await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.dismissLock, path)
+  },
+  async signOutPlan() {
+    return asSignOutPlan(await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.signOutPlan))
+  },
+  onSignOutProgress(cb) {
+    signOutProgressSubscribers.add(cb)
+    return () => {
+      signOutProgressSubscribers.delete(cb)
+    }
+  },
+  onSignOutPrompt(cb) {
+    signOutPromptSubscribers.add(cb)
+    return () => {
+      signOutPromptSubscribers.delete(cb)
+    }
+  },
+  async answerSignOutPrompt(requestId, confirmed) {
+    if (typeof requestId !== 'string' || !requestId) return
+    await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.signOutPromptAnswer, {
+      requestId,
+      confirmed: confirmed === true,
+    })
   },
 }
 
