@@ -50,6 +50,7 @@ const STATES: Record<AiWebErrorCode, StateText> = {
   rate_limited: { title: 'aiWebStateRateTitle', body: 'aiWebStateRateBody' },
   provider_unreachable: { title: 'aiWebStateUnreachableTitle', body: 'aiWebStateUnreachableBody' },
   cloud_unavailable: { title: 'aiWebStateCloudTitle', body: 'aiWebStateCloudBody' },
+  cloud_outage: { title: 'aiWebStateOutageTitle', body: 'aiWebStateOutageBody' },
   unauthorized: { title: 'aiWebStateSessionTitle', body: 'aiWebStateSessionBody', warn: true },
   provider_not_supported: {
     title: 'aiWebStateRefusedTitle',

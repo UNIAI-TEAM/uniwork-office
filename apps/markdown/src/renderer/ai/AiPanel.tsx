@@ -191,7 +191,7 @@ export interface MarkdownAiDeps {
 
 const MODEL_BRIDGE: AiModelPickerBridge = {
   getSettings: () => window.markdownApi.getAiSettings(),
-  setSettings: (settings) => window.markdownApi.setAiSettings(settings),
+  setSettings: (settings, options) => window.markdownApi.setAiSettings(settings, options),
   onSettingsChanged: (handler) => window.markdownApi.onAiSettingsChanged(handler),
   gskLoggedIn: () => window.markdownApi.aiGskStatus().then((s) => !!s?.loggedIn),
   openModelSettings: () => window.markdownApi.openAiModelSettings().catch(() => {}),

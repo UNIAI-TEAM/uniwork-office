@@ -244,3 +244,23 @@ export function createCredentialStore(options: {
     },
   }
 }
+
+/**
+ * E2E-only stand-in for the keyring-backed store: the credential lives in this
+ * process's memory and is never written anywhere (no file, no plaintext
+ * backend), so a restart forgets the session. See `accountCredentialStore`.
+ */
+export function createMemoryCredentialStore(): CredentialStore {
+  let held: StoredCredential | null = null
+  return {
+    load: () => (held ? structuredClone(held) : null),
+    save(credential) {
+      if (!isStoredCredential(credential)) throw new CredentialStoreError('io')
+      held = structuredClone(credential)
+    },
+    clear() {
+      held = null
+    },
+    canStore: () => true,
+  }
+}

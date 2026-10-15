@@ -38,6 +38,8 @@ export const zhTW = {
   aiWebStateUnreachableBody: 'UniWork 無法連線到 AI 服務商。請稍後再試。',
   aiWebStateCloudTitle: '雲端工具無法使用',
   aiWebStateCloudBody: '伺服器尚未設定此 UniWork AI 工具。',
+  aiWebStateOutageTitle: 'UniWork 暫時無法使用',
+  aiWebStateOutageBody: '目前無法連線到 UniWork。請稍後再試。',
   aiWebStateSessionTitle: '工作階段已過期',
   aiWebStateSessionBody: '請從 UniWork 重新開啟文件以繼續。',
   aiWebStateRefusedTitle: '請求遭拒',

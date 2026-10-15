@@ -40,6 +40,8 @@ export const th = {
   aiWebStateUnreachableBody: 'UniWork เชื่อมต่อผู้ให้บริการ AI ไม่ได้ โปรดลองอีกครั้งในอีกสักครู่',
   aiWebStateCloudTitle: 'เครื่องมือคลาวด์ใช้งานไม่ได้',
   aiWebStateCloudBody: 'เครื่องมือ UniWork AI นี้ยังไม่ได้ตั้งค่าบนเซิร์ฟเวอร์',
+  aiWebStateOutageTitle: 'UniWork ใช้งานไม่ได้ชั่วคราว',
+  aiWebStateOutageBody: 'ตอนนี้เชื่อมต่อ UniWork ไม่ได้ โปรดลองอีกครั้งในอีกสักครู่',
   aiWebStateSessionTitle: 'เซสชันหมดอายุ',
   aiWebStateSessionBody: 'เปิดเอกสารอีกครั้งจาก UniWork เพื่อดำเนินการต่อ',
   aiWebStateRefusedTitle: 'คำขอถูกปฏิเสธ',
