@@ -73,6 +73,7 @@ const createDocsView = vi.fn(() => makeFakeView())
 const docsQueryDirty = vi.fn(() => Promise.resolve(false))
 const docsQueryEditorDirty = vi.fn((): Promise<boolean | null> => Promise.resolve(false))
 const markDocsNewBlank = vi.fn()
+const queueDocsForView = vi.fn()
 const requestDocsClose = vi.fn(() => Promise.resolve(true))
 const setActiveDocsResolver = vi.fn()
 const teardownDocsRenderer = vi.fn()
@@ -82,6 +83,7 @@ vi.mock('../../docs/src/main/docs-main', () => ({
   docsQueryDirty: (...args: unknown[]) => docsQueryDirty(...(args as [])),
   docsQueryEditorDirty: (...args: unknown[]) => docsQueryEditorDirty(...(args as [])),
   markDocsNewBlank: (...args: unknown[]) => markDocsNewBlank(...args),
+  queueDocsForView: (...args: unknown[]) => queueDocsForView(...args),
   requestDocsClose: (...args: unknown[]) => requestDocsClose(...(args as [])),
   setActiveDocsResolver: (...args: unknown[]) => setActiveDocsResolver(...args),
   teardownDocsRenderer: (...args: unknown[]) => teardownDocsRenderer(...args),
@@ -1049,6 +1051,25 @@ describe('file path bookkeeping', () => {
     manager.reloadTab(id)
     expect(clearPdfDirty).toHaveBeenCalledWith(view.webContents.id)
     expect(view.webContents.reload).toHaveBeenCalledTimes(1)
+  })
+
+  it('reloading a docs tab queues its document again (the reloaded renderer opens it)', () => {
+    const id = manager.openDocsTab('/tmp/report.docx')
+    const view = lastCreatedView(createDocsView)
+    queueDocsForView.mockClear()
+    manager.reloadTab(id)
+    expect(queueDocsForView).toHaveBeenCalledWith(view.webContents, '/tmp/report.docx')
+    expect(queueDocsForView.mock.invocationCallOrder[0]).toBeLessThan(
+      view.webContents.reload.mock.invocationCallOrder[0]!,
+    )
+    expect(view.webContents.reload).toHaveBeenCalledTimes(1)
+  })
+
+  it('reloading an untitled docs tab queues nothing', () => {
+    const id = manager.openDocsTab()
+    queueDocsForView.mockClear()
+    manager.reloadTab(id)
+    expect(queueDocsForView).not.toHaveBeenCalled()
   })
 
   it('reloading a sheets tab queues its workbook again (the reloaded renderer opens it)', () => {

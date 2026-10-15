@@ -15,6 +15,7 @@ import {
   markDocsNewBlank,
   queueDocsAiContent,
   queueDocsAiPreset,
+  queueDocsForView,
   requestDocsClose,
   setActiveDocsResolver,
   teardownDocsRenderer,
@@ -658,8 +659,9 @@ export class TabManager {
     const wc = tab?.view?.webContents
     if (!wc || wc.isDestroyed()) return
     if (tab.kind === 'pdf') clearPdfDirty(wc.id)
-    // a sheets renderer gets its file only through the one-shot queue, which
-    // the first open consumed: without it the reloaded tab waits forever
+    // docs and sheets renderers get their file only through a one-shot queue,
+    // which the first open consumed: without it the reloaded tab loses its path
+    if (tab.kind === 'docs' && tab.filePath) queueDocsForView(wc, tab.filePath)
     if (tab.kind === 'sheets' && tab.filePath) queueWorkbookForView(wc, tab.filePath)
     wc.reload()
   }
