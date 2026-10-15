@@ -34,6 +34,7 @@ export const he = {
   uwQueueCancel: 'ביטול השמירה…',
   uwQueueCancelConfirm:
     'לבטל את השמירה שבתור? השינויים שלך נשארים במחשב הזה; המסמך ב-UniWork לא משתנה.',
+  uwQueueCancelGo: 'ביטול השמירה',
   uwQueueCancelled: 'השמירה שבתור בוטלה. השינויים שלך נשארים במחשב הזה.',
 
   // {reason} fragments of the blocked/failed rows (the existing uwReason* keys stay in the uniwork-documents shard)
@@ -153,6 +154,7 @@ export const he = {
   uwSyncEmptyQueue: 'אין שום דבר שממתין לשמירה.',
   uwSyncEmptyAttention: 'אין שום דבר שדורש טיפול.',
   uwSyncEmptyRecent: 'אין שמירות אחרונות.',
+  uwSyncActionFailed: 'הפעולה לא הצליחה. שום דבר לא נמחק; נסו שוב.',
   uwSyncRowAnnounce: '{doc}: {state}',
 
   // S3 offline library
