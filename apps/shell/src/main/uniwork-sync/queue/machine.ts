@@ -67,6 +67,7 @@ export type QueueEvent =
   | { type: 'cancel' }
   | { type: 'discard' }
   | { type: 'supersede' }
+  | { type: 'abandon' }
   | { type: 'tombstone' }
   | { type: 'tick'; now: number }
 
@@ -604,6 +605,19 @@ export function transition(
       return {
         record: withState(record, ctx, 'cancelled', {
           cancelReason: 'superseded',
+          retryAt: undefined,
+          reconcileSince: undefined,
+        }),
+        effects: [],
+      }
+
+    case 'abandon':
+      // "Bo nhap..." on a blocked row: the user drops the snapshot of an intent
+      // the server will not take; nothing else ever cancels a blocked intent
+      if (record.state !== 'blocked') return { record, effects: [] }
+      return {
+        record: withState(record, ctx, 'cancelled', {
+          cancelReason: 'user',
           retryAt: undefined,
           reconcileSince: undefined,
         }),

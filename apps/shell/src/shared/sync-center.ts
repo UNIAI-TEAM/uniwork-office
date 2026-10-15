@@ -19,6 +19,7 @@ export const UNIWORK_SYNC_CENTER_CHANNELS = {
   openDocument: 'uniwork-sync-center:open-document',
   openDraft: 'uniwork-sync-center:open-draft',
   discardDraft: 'uniwork-sync-center:discard-draft',
+  saveAgain: 'uniwork-sync-center:save-again',
   saveMyCopy: 'uniwork-sync-center:save-my-copy',
   retryStore: 'uniwork-sync-center:retry-store',
   changedEvent: 'uniwork-sync-center:changed',
@@ -109,15 +110,38 @@ export type SyncCenterRowState =
   | (typeof SYNC_CENTER_PENDING_STATES)[number]
   | (typeof SYNC_CENTER_RECENT_STATES)[number]
 
-export type SyncCenterBlockedReason =
-  | 'locked_other'
-  | 'locked_expired'
-  | 'revoked'
-  | 'read_only'
-  | 'archived'
-  | 'removed'
-  | 'moved'
-  | 'parent_gone'
+/**
+ * The 13 blocked reasons of EXPERIENCE.md › "Lý do bị chặn" (pill, S2 rows, S3,
+ * S11). `keyring_unavailable` is not one: that machine never has a session.
+ */
+export const SYNC_CENTER_BLOCKED_REASONS = [
+  'session_expired',
+  'signed_out',
+  'foreign_account',
+  'permission_revoked',
+  'document_deleted',
+  'document_archived',
+  'organization_suspended',
+  'member_deactivated',
+  'lease_expired',
+  'keystore_locked',
+  'clock_rollback',
+  'store_full',
+  'store_newer',
+] as const
+
+export type SyncCenterBlockedReason = (typeof SYNC_CENTER_BLOCKED_REASONS)[number]
+
+/**
+ * Blocked reasons whose row offers "Bỏ nháp…": the user may discard the local
+ * snapshot of an intent the server will not take (access or document lost).
+ */
+export const SYNC_CENTER_DISCARDABLE_BLOCKED_REASONS: readonly SyncCenterBlockedReason[] = [
+  'permission_revoked',
+  'document_deleted',
+  'document_archived',
+  'member_deactivated',
+]
 
 export type SyncCenterFailedReason = 'quota' | 'too_large' | 'other'
 
@@ -140,6 +164,12 @@ export interface SyncCenterRow {
   ext: string
   state: SyncCenterRowState
   blockedReason?: SyncCenterBlockedReason
+  /**
+   * True when `blockedReason === 'lease_expired'` and the org capability
+   * `offline_library` is off: the lease cannot be renewed until it is back on,
+   * so the row offers "Mở trung tâm đồng bộ" instead of "Kết nối lại".
+   */
+  libraryOff?: boolean
   failedReason?: SyncCenterFailedReason
   progress?: SyncCenterRowProgress
   /** ISO-8601 timestamp when this save intent / draft / commit was recorded. */
@@ -154,9 +184,9 @@ export interface SyncCenterRow {
   conflict?: SyncCenterConflictInfo
   /** Committed server version number when `state === 'committed'`. */
   committedVersion?: number
-  /** Target workspace name when `state === 'moved'` or `blockedReason === 'moved'`. */
+  /** Target workspace name when `state === 'moved'`. */
   workspaceName?: string
-  /** Lock holder display name when `blockedReason === 'locked_other'`. */
+  /** Display name of the user holding the document lock. */
   lockedBy?: string
   /** Diagnostic support code for `reconciling_stuck` rows. */
   supportCode?: string
@@ -195,16 +225,9 @@ export interface SyncCenterSnapshot {
 }
 
 export type SyncCenterActionErrorCode =
-  | 'draft_cap'
-  | 'store_full'
-  | 'offline'
-  | 'not_found'
-  | 'busy'
-  | 'other'
+  'draft_cap' | 'store_full' | 'offline' | 'not_found' | 'busy' | 'other'
 
-export type SyncCenterActionResult =
-  | { ok: true }
-  | { ok: false; code: SyncCenterActionErrorCode }
+export type SyncCenterActionResult = { ok: true } | { ok: false; code: SyncCenterActionErrorCode }
 
 export interface UniworkSyncCenterApi {
   /** Read the current Sync Center snapshot. */
@@ -236,8 +259,22 @@ export interface UniworkSyncCenterApi {
   openDocument(rowId: string): Promise<SyncCenterActionResult>
   /** Open a kept draft in read-only mode (`Mở nháp`). */
   openDraft(rowId: string): Promise<SyncCenterActionResult>
-  /** Permanently remove a kept draft (`Bỏ nháp…`). */
+  /**
+   * Permanently remove a kept draft (`Bỏ nháp…`). Also works on a `blocked` intent row whose
+   * reason is `permission_revoked`, `document_deleted`, `document_archived` or
+   * `member_deactivated` (the user-confirmed way out; a block never deletes the snapshot by
+   * itself): the intent is cancelled and its snapshot dropped without keeping a draft. Any
+   * other blocked reason, or a non-blocked intent row, refuses with `'busy'`.
+   */
   discardDraft(rowId: string): Promise<SyncCenterActionResult>
+  /**
+   * `Lưu lại` on a `failed` row: the old intent is superseded (`cancelled`, reason
+   * `superseded`), then a new intent is minted from the same snapshot and enqueued.
+   * Refuses with `'not_found'` for an unknown row, `'busy'` when the row is not `failed` (or the old
+   * intent cannot be superseded), and `'store_full'` when the store will not take the new intent.
+   * While offline the new intent parks `paused_offline`; it is not refused.
+   */
+  saveAgain(rowId: string): Promise<SyncCenterActionResult>
   /**
    * Export the user's local payload via the OS save dialog with default filename
    * `{title} (bản của tôi).{ext}` (`Tải bản của tôi về máy`). Only allowed when `canEdit` is true.

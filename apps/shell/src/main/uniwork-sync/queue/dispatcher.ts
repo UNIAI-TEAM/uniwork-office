@@ -499,6 +499,18 @@ export class QueueDispatcher {
     return result.record?.state ?? doc.record.state
   }
 
+  /**
+   * "Bo nhap..." on a BLOCKED intent (access or document lost): the user drops
+   * the snapshot. A block never does this by itself; any other state refuses
+   * and leaves the stored record untouched.
+   */
+  async abandonBlocked(doc: QueueDoc, now = this.deps.clock()): Promise<QueueState> {
+    const result = await this.apply(doc, { type: 'abandon' }, now)
+    if (result.record?.state !== 'cancelled') return doc.record.state
+    await this.forget(doc)
+    return 'cancelled'
+  }
+
   /** the document is gone (tombstone): stop replay, keep the snapshot */
   async tombstone(doc: QueueDoc, now = this.deps.clock()): Promise<QueueState> {
     const result = await this.apply(doc, { type: 'tombstone' }, now)

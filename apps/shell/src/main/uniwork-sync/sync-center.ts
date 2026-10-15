@@ -1,7 +1,9 @@
+import { randomUUID } from 'node:crypto'
 import { chmod, mkdir, writeFile } from 'node:fs/promises'
 import { basename, extname, join } from 'node:path'
 import {
   SYNC_CENTER_ATTENTION_STATES,
+  SYNC_CENTER_DISCARDABLE_BLOCKED_REASONS,
   SYNC_CENTER_PENDING_STATES,
   UNIWORK_SYNC_CENTER_CHANNELS,
   type SyncCenterAccountInfo,
@@ -99,6 +101,11 @@ export interface SyncCenterFacts {
   feedOff?: boolean
   /** Condition 9: Just completed a full resync (`'resynced'`). */
   resynced?: boolean
+  /**
+   * The org capability `offline_library`; `false` marks a `lease_expired` row `libraryOff`.
+   * Unknown (`undefined`) is treated as on.
+   */
+  offlineLibrary?: boolean
   lastSyncAt?: string
   account?: SyncCenterAccountInfo
   org?: SyncCenterOrgInfo
@@ -146,25 +153,35 @@ function mapQueueStateToRowState(
   }
 }
 
-function mapBlockedReason(
+/**
+ * A blocked intent's reason in the spine's vocabulary. `explicit` (a fact the
+ * caller derived: `document_archived`, `lease_expired`, `foreign_account`, ...)
+ * wins; otherwise the queue's `lastError` decides. Anything else the queue
+ * parks as `blocked` is access this account no longer has (`permission_revoked`).
+ */
+export function mapBlockedReason(
   error: UniworkDocErrorCode | undefined,
   explicit?: SyncCenterBlockedReason,
 ): SyncCenterBlockedReason {
   if (explicit) return explicit
   switch (error) {
-    case 'other_window':
-      return 'locked_other'
+    case 'session_expired':
+    case 'not_signed_in':
+    case 'wrong_deployment':
+      return 'session_expired'
     case 'document_deleted':
     case 'deleted':
-      return 'removed'
-    case 'permission_revoked':
-    case 'forbidden':
-    case 'not_found':
+      return 'document_deleted'
     case 'member_deactivated':
+      return 'member_deactivated'
     case 'organization_suspended':
-      return 'revoked'
+      return 'organization_suspended'
+    case 'keystore_locked':
+      return 'keystore_locked'
+    case 'store_full':
+      return 'store_full'
     default:
-      return 'revoked'
+      return 'permission_revoked'
   }
 }
 
@@ -176,6 +193,17 @@ function mapFailedReason(
   if (error === 'quota_exceeded') return 'quota'
   if (error === 'too_large') return 'too_large'
   return 'other'
+}
+
+function blockedFields(
+  item: SyncCenterIntentFact,
+  offlineLibrary: boolean | undefined,
+): Pick<SyncCenterRow, 'blockedReason' | 'libraryOff'> {
+  const blockedReason = mapBlockedReason(item.record.lastError, item.blockedReason)
+  return {
+    blockedReason,
+    ...(blockedReason === 'lease_expired' && offlineLibrary === false ? { libraryOff: true } : {}),
+  }
 }
 
 export function formatSupportCode(record: IntentRecordV2): string {
@@ -296,9 +324,7 @@ export function buildSyncCenterSnapshot(facts: SyncCenterFacts): SyncCenterSnaps
       ...(item.progress ? { progress: item.progress } : {}),
       ...(item.conflict ? { conflict: item.conflict } : {}),
       ...(item.lockedBy ? { lockedBy: item.lockedBy } : {}),
-      ...(rowState === 'blocked'
-        ? { blockedReason: mapBlockedReason(item.record.lastError, item.blockedReason) }
-        : {}),
+      ...(rowState === 'blocked' ? blockedFields(item, facts.offlineLibrary) : {}),
       ...(rowState === 'failed'
         ? { failedReason: mapFailedReason(item.record.lastError, item.failedReason) }
         : {}),
@@ -333,7 +359,7 @@ export function buildSyncCenterSnapshot(facts: SyncCenterFacts): SyncCenterSnaps
       ext: item.ext,
       state: 'kept_draft',
       savedAt: item.draft.createdAt,
-       ...(item.draft.snapshot ? { sizeBytes: item.draft.snapshot.byteLength } : {}),
+      ...(item.draft.snapshot ? { sizeBytes: item.draft.snapshot.byteLength } : {}),
       canEdit: item.canEdit,
       ...(item.revoked !== undefined ? { revoked: item.revoked } : {}),
       draftId: item.draft.id,
@@ -389,6 +415,8 @@ export interface SyncCenterControllerDeps {
   dispatcher(): Promise<QueueDispatcher | null>
   drafts(): Promise<DraftStore | null>
   listQueueDocs(): Promise<QueueDoc[]>
+  /** a fresh unique id for the intent `saveAgain` mints (defaults to a random UUID) */
+  newId?(): string
   syncNow(): Promise<void>
   setSendingPaused?(paused: boolean): Promise<boolean>
   writeClipboard(text: string): void
@@ -517,6 +545,35 @@ export function createSyncCenterController(deps: SyncCenterControllerDeps): Sync
     }
   }
 
+  /**
+   * "Bỏ nháp…" on a blocked intent row (access or document lost): the intent is
+   * cancelled and its snapshot dropped. Only the reasons the spine gives that
+   * action to; a block never discards anything by itself.
+   */
+  const discardBlockedIntent = async (rowId: string): Promise<SyncCenterActionResult> => {
+    const entry = await deps.findDoc(rowId)
+    if (!entry) return { ok: false, code: 'not_found' }
+    if (entry.doc.record.state !== 'blocked') return { ok: false, code: 'busy' }
+    const facts = await deps.getFacts()
+    const fact = (facts.intents ?? []).find(
+      (item) => item.record.intentId === entry.doc.record.intentId,
+    )
+    const reason = mapBlockedReason(entry.doc.record.lastError, fact?.blockedReason)
+    if (!SYNC_CENTER_DISCARDABLE_BLOCKED_REASONS.includes(reason)) {
+      return { ok: false, code: 'busy' }
+    }
+    const dispatcher = await deps.dispatcher()
+    if (!dispatcher) return { ok: false, code: 'other' }
+    const prevRecord: IntentRecordV2 = { ...entry.doc.record }
+    const state = await dispatcher.abandonBlocked(entry.doc, deps.now?.() ?? Date.now())
+    if (state !== 'cancelled') {
+      entry.doc.record = prevRecord
+      return { ok: false, code: 'busy' }
+    }
+    notifyChanged()
+    return { ok: true }
+  }
+
   return {
     getSnapshot,
 
@@ -565,7 +622,11 @@ export function createSyncCenterController(deps: SyncCenterControllerDeps): Sync
       const now = deps.now?.() ?? Date.now()
       // Allow immediate send even if parked in paused_user or waiting for retryAt backoff
       if (entry.doc.record.state === 'paused_user') {
-        entry.doc.record = { ...entry.doc.record, state: 'queued', updatedAt: new Date(now).toISOString() }
+        entry.doc.record = {
+          ...entry.doc.record,
+          state: 'queued',
+          updatedAt: new Date(now).toISOString(),
+        }
       }
       if (entry.doc.record.retryAt !== undefined) {
         const next = { ...entry.doc.record }
@@ -669,10 +730,9 @@ export function createSyncCenterController(deps: SyncCenterControllerDeps): Sync
         return opened ? { ok: true } : { ok: false, code: 'other' }
       }
       const facts = await deps.getFacts()
-      const row = [
-        ...facts.intents ?? [],
-        ...facts.recentCommits ?? [],
-      ].find((item) => item.id === rowId || item.documentId === rowId || item.documentKey === rowId)
+      const row = [...(facts.intents ?? []), ...(facts.recentCommits ?? [])].find(
+        (item) => item.id === rowId || item.documentId === rowId || item.documentKey === rowId,
+      )
       const docId = row?.documentId ?? row?.documentKey
       if (!docId) return { ok: false, code: 'not_found' }
       const opened = await deps.openDocument(docId)
@@ -698,10 +758,50 @@ export function createSyncCenterController(deps: SyncCenterControllerDeps): Sync
     async discardDraft(rowId: string): Promise<SyncCenterActionResult> {
       if (typeof rowId !== 'string' || !rowId) return { ok: false, code: 'not_found' }
       const resolved = await resolveDraftRow(rowId)
-      if (!resolved) return { ok: false, code: 'not_found' }
+      if (!resolved) return discardBlockedIntent(rowId)
       const draftStore = await deps.drafts()
       if (!draftStore) return { ok: false, code: 'other' }
       await draftStore.remove(resolved.documentKey, resolved.draftId)
+      notifyChanged()
+      return { ok: true }
+    },
+
+    async saveAgain(rowId: string): Promise<SyncCenterActionResult> {
+      if (typeof rowId !== 'string' || !rowId) return { ok: false, code: 'not_found' }
+      const entry = await deps.findDoc(rowId)
+      if (!entry) return { ok: false, code: 'not_found' }
+      if (entry.doc.record.state !== 'failed') return { ok: false, code: 'busy' }
+      const dispatcher = await deps.dispatcher()
+      if (!dispatcher) return { ok: false, code: 'other' }
+
+      const now = deps.now?.() ?? Date.now()
+      const old: IntentRecordV2 = { ...entry.doc.record }
+      // the old intent is superseded BEFORE a new one exists (spine: Superseded)
+      const superseded = await dispatcher.supersede(entry.doc, now)
+      if (superseded !== 'cancelled') {
+        entry.doc.record = old
+        return { ok: false, code: 'busy' }
+      }
+
+      const id = (deps.newId ?? randomUUID)()
+      const minted = await dispatcher.mint({
+        key: entry.doc.key,
+        intentId: `office-intent-${id}`,
+        idempotencyKey: `office-key-${id}`,
+        documentId: old.documentId,
+        orgId: old.orgId,
+        workspaceId: old.workspaceId,
+        baseRevision: old.baseRevision,
+        baseVersion: old.baseVersion,
+        checksum: old.checksum,
+        length: old.length,
+      })
+      const next: QueueDoc = { ...entry.doc, record: minted }
+      await dispatcher.enqueue(next)
+      // `enqueue` swallows a refused write: a store that still holds the cancelled
+      // record did not take the new intent
+      if ((await dispatcher.readState(next)) === 'cancelled')
+        return { ok: false, code: 'store_full' }
       notifyChanged()
       return { ok: true }
     },
@@ -815,6 +915,9 @@ export function registerSyncCenterIpc(
   ipcMain.handle(UNIWORK_SYNC_CENTER_CHANNELS.discardDraft, (_event, rowId: unknown) =>
     controller.discardDraft(typeof rowId === 'string' ? rowId : ''),
   )
+  ipcMain.handle(UNIWORK_SYNC_CENTER_CHANNELS.saveAgain, (_event, rowId: unknown) =>
+    controller.saveAgain(typeof rowId === 'string' ? rowId : ''),
+  )
   ipcMain.handle(UNIWORK_SYNC_CENTER_CHANNELS.saveMyCopy, (_event, rowId: unknown) =>
     controller.saveMyCopy(typeof rowId === 'string' ? rowId : ''),
   )
@@ -853,9 +956,10 @@ export interface WiredSyncCenterDeps {
   service: WiredSyncCenterService
   store: { layer: StoreLayer; access: SyncStoreAccess }
   accountStatus(): AccountStatus
-  capabilityRead(
-    orgId: string,
-  ): Promise<{ kind: string; capabilities: { sync_write: boolean; sync_feed?: boolean } }>
+  capabilityRead(orgId: string): Promise<{
+    kind: string
+    capabilities: { sync_write: boolean; sync_feed?: boolean; offline_library?: boolean }
+  }>
   tickRuntime(): Promise<void>
   openPath(path: string): boolean
   isPathOpen(path: string): boolean
@@ -947,6 +1051,7 @@ export function createWiredSyncCenter(deps: WiredSyncCenterDeps): {
       const cap = org?.id ? await deps.capabilityRead(org.id).catch(() => null) : null
       const adminPaused = cap ? cap.capabilities.sync_write === false : false
       const feedOff = cap ? cap.capabilities.sync_feed === false : false
+      const offlineLibrary = cap ? cap.capabilities.offline_library !== false : undefined
 
       const intents: SyncCenterIntentFact[] = []
       const drafts: SyncCenterDraftFact[] = []
@@ -1020,6 +1125,7 @@ export function createWiredSyncCenter(deps: WiredSyncCenterDeps): {
         paused,
         adminPaused,
         feedOff,
+        ...(offlineLibrary === undefined ? {} : { offlineLibrary }),
         ...(lastSyncAt ? { lastSyncAt } : {}),
         ...(account ? { account } : {}),
         ...(org ? { org } : {}),
@@ -1171,4 +1277,3 @@ export function createWiredSyncCenter(deps: WiredSyncCenterDeps): {
     },
   }
 }
-

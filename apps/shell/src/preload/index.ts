@@ -1342,14 +1342,10 @@ function asSyncCenterActionResult(result: unknown): SyncCenterActionResult {
 
 const syncCenterApi: UniworkSyncCenterApi = {
   async getSnapshot() {
-    return (await ipcRenderer.invoke(
-      UNIWORK_SYNC_CENTER_CHANNELS.snapshot,
-    )) as SyncCenterSnapshot
+    return (await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.snapshot)) as SyncCenterSnapshot
   },
   async syncNow() {
-    return asSyncCenterActionResult(
-      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.syncNow),
-    )
+    return asSyncCenterActionResult(await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.syncNow))
   },
   async setSendingPaused(paused) {
     return asSyncCenterActionResult(
@@ -1396,6 +1392,11 @@ const syncCenterApi: UniworkSyncCenterApi = {
       await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.discardDraft, rowId),
     )
   },
+  async saveAgain(rowId) {
+    return asSyncCenterActionResult(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.saveAgain, rowId),
+    )
+  },
   async saveMyCopy(rowId) {
     return asSyncCenterActionResult(
       await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.saveMyCopy, rowId),
@@ -1416,4 +1417,3 @@ const syncCenterApi: UniworkSyncCenterApi = {
 }
 
 contextBridge.exposeInMainWorld('uniworkSyncCenter', syncCenterApi)
-
