@@ -146,7 +146,11 @@ afterEach(async () => {
 
 function setup(
   server: ReturnType<typeof fakeServer>,
-  opts: { capability?: Record<string, boolean>; budgetBytes?: number } = {},
+  opts: {
+    capability?: Record<string, boolean>
+    budgetBytes?: number
+    isShellTab?: (path: string) => boolean
+  } = {},
 ) {
   const statuses: UniworkDocStatus[] = []
   const popovers: UniworkQueuePopoverRequest[] = []
@@ -185,6 +189,7 @@ function setup(
     pushStatus: (s: UniworkDocStatus) => statuses.push(s),
     pushConflict: vi.fn(),
     pushQueuePopover: (request: UniworkQueuePopoverRequest) => popovers.push(request),
+    ...(opts.isShellTab ? { isShellTab: opts.isShellTab } : {}),
     pushLaunch: vi.fn(),
     reveal: vi.fn(),
     sleep: async () => undefined,
@@ -359,5 +364,174 @@ describe('G5-06u T9: Ctrl/Cmd+S with a pending intent opens the queue popover', 
     await ctx.service.save(path)
     expect(sent(server).length).toBeGreaterThan(0)
     expect(ctx.popovers).toEqual([])
+  })
+})
+
+/** the private seams the queue poll drives (dispatcher in flight, a record change) */
+interface QueueSeams {
+  queueInFlight: Set<string>
+  applyRecord(record: IntentRecordV2): Promise<void>
+}
+const seams = (ctx: Ctx) => ctx.service as unknown as QueueSeams
+const keyOf = (path: string) => basename(dirname(path))
+
+/** rewrites binding.json the way another writer (the dispatcher's commitState) would */
+function rewriteBinding(path: string, patch: Record<string, unknown>): void {
+  const file = join(path, '..', BINDING_FILE)
+  writeFileSync(file, JSON.stringify({ ...JSON.parse(readFileSync(file, 'utf8')), ...patch }))
+}
+
+describe('G5-06u T9: branches and BE review r1 fixes', () => {
+  it('the dispatcher runs the key: no save, no new intent, pendingNext for a newer copy, one push', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const { ctx, path } = await parkedIntent(server)
+    const before = recordFacts((await storedIntent(ctx, path))?.intent as unknown as IntentRecordV2)
+    seams(ctx).queueInFlight.add(keyOf(path))
+    writeFileSync(path, 'v5')
+    ctx.statuses.length = 0
+    await userSave(ctx, path)
+    await expectNoSecondIntent(ctx, path, server, before)
+  })
+
+  it('the dispatcher runs the key and the copy has no new edits: no pendingNext, one push', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const { ctx, path } = await parkedIntent(server)
+    seams(ctx).queueInFlight.add(keyOf(path))
+    await userSave(ctx, path)
+    expect(sent(server)).toHaveLength(0)
+    expect(ctx.service.coordinator.hasPendingNext(path)).toBe(false)
+    expect(ctx.statuses.some((s) => s.pendingNext)).toBe(false)
+    expect(ctx.popovers).toEqual([{ path }])
+  })
+
+  it('RBE6u-01: the status published for the popover is the binding as it is now, not the stale read', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const { ctx, path } = await parkedIntent(server)
+    seams(ctx).queueInFlight.add(keyOf(path))
+    // the dispatcher rewrites the binding after save() classified the copy
+    // (here: while the store is opened for the intent read)
+    const deps = (ctx.service.coordinator as unknown as { deps: { intents: () => Promise<unknown> } })
+      .deps
+    const intentsOf = deps.intents
+    deps.intents = async () => {
+      rewriteBinding(path, { state: 'queued' })
+      return intentsOf()
+    }
+    writeFileSync(path, 'v5')
+    ctx.statuses.length = 0
+    await userSave(ctx, path)
+    expect(ctx.statuses.at(-1)).toMatchObject({ path, state: 'queued', pendingNext: true })
+    expect(ctx.popovers).toEqual([{ path }])
+  })
+
+  it('RBE6u-01: the stored-intent branch also publishes the binding as it is now', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const { ctx, path } = await parkedIntent(server)
+    // the queue moves the binding (paused_user -> queued) after classify read it
+    const deps = (ctx.service.coordinator as unknown as { deps: { intents: () => Promise<unknown> } })
+      .deps
+    const intentsOf = deps.intents
+    deps.intents = async () => {
+      rewriteBinding(path, { state: 'queued' })
+      return intentsOf()
+    }
+    writeFileSync(path, 'v5')
+    ctx.statuses.length = 0
+    await userSave(ctx, path)
+    expect(sent(server)).toHaveLength(0)
+    expect(ctx.statuses.at(-1)).toMatchObject({ path, state: 'queued', pendingNext: true })
+    expect(ctx.popovers).toEqual([{ path }])
+  })
+
+  it('RBE6u-02: Ctrl/S on a paused intent without new edits sets no pendingNext', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const { ctx, path } = await parkedIntent(server)
+    ctx.statuses.length = 0
+    await userSave(ctx, path)
+    expect(sent(server)).toHaveLength(0)
+    expect(ctx.service.coordinator.hasPendingNext(path)).toBe(false)
+    expect(ctx.statuses.some((s) => s.pendingNext)).toBe(false)
+    expect(ctx.popovers).toEqual([{ path }])
+  })
+
+  it('RBE6u-02: a dispatcher commit of the intent clears pendingNext', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const { ctx, path } = await parkedIntent(server)
+    writeFileSync(path, 'v5')
+    await userSave(ctx, path)
+    expect(ctx.service.coordinator.hasPendingNext(path)).toBe(true)
+    const record = (await storedIntent(ctx, path))?.intent as unknown as IntentRecordV2
+    ctx.statuses.length = 0
+    await seams(ctx).applyRecord({
+      ...record,
+      state: 'committed',
+      receipt: { revision: '42', version: 4, versionId: 'ver_4' },
+    } as IntentRecordV2)
+    expect(ctx.service.coordinator.hasPendingNext(path)).toBe(false)
+    expect(binding(path)).toMatchObject({ state: 'dirty', baseRevision: '42' })
+    expect(ctx.statuses.at(-1)?.pendingNext).toBeUndefined()
+  })
+
+  it('RBE6u-02: a cancelled record clears pendingNext', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const { ctx, path } = await parkedIntent(server)
+    writeFileSync(path, 'v5')
+    await userSave(ctx, path)
+    expect(ctx.service.coordinator.hasPendingNext(path)).toBe(true)
+    const record = (await storedIntent(ctx, path))?.intent as unknown as IntentRecordV2
+    await seams(ctx).applyRecord({ ...record, state: 'cancelled' })
+    expect(ctx.service.coordinator.hasPendingNext(path)).toBe(false)
+  })
+
+  it('RBE6u-03: a path that is not a shell tab (detached window) keeps the inline replay, no push', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server, { isShellTab: () => false })
+    const path = await openDoc(ctx)
+    await ctx.service.pauseSending()
+    writeFileSync(path, 'v4')
+    await ctx.service.save(path)
+    await setStoredState(ctx, path, 'failed')
+    await userSave(ctx, path)
+    expect(sent(server).length).toBeGreaterThan(0)
+    expect(ctx.popovers).toEqual([])
+  })
+
+  it('a shell tab path (predicate true) gets the popover, no replay', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server, { isShellTab: () => true })
+    const path = await openDoc(ctx)
+    await ctx.service.pauseSending()
+    writeFileSync(path, 'v4')
+    await ctx.service.save(path)
+    await setStoredState(ctx, path, 'failed')
+    await userSave(ctx, path)
+    expect(sent(server)).toHaveLength(0)
+    expect(ctx.popovers).toEqual([{ path }])
+  })
+
+  it('a locked keystore refuses the save and asks for the popover once', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    ctx.safeStorage.lock()
+    await userSave(ctx, path)
+    expect(binding(path)).toMatchObject({ state: 'error', error: 'keystore_locked' })
+    expect(sent(server)).toHaveLength(0)
+    expect(ctx.service.coordinator.hasPendingNext(path)).toBe(false)
+    expect(ctx.popovers).toEqual([{ path }])
+  })
+
+  it('a blocked (permission_revoked) copy: no save, no pendingNext, one push', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    rewriteBinding(path, { state: 'blocked', error: 'permission_revoked' })
+    writeFileSync(path, 'v4')
+    await userSave(ctx, path)
+    expect(sent(server)).toHaveLength(0)
+    expect(ctx.service.coordinator.hasPendingNext(path)).toBe(false)
+    expect(binding(path)).toMatchObject({ state: 'blocked', error: 'permission_revoked' })
+    expect(ctx.popovers).toEqual([{ path }])
   })
 })
