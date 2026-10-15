@@ -72,7 +72,10 @@ import {
   writeJsonAtomic,
   newerCopyMtime,
 } from '@genoffice/electron-utils'
-import { answerUniworkAiFlagOff } from '@genoffice/electron-utils/uniwork-ai-flag'
+import {
+  answerUniworkAiFlagOff,
+  answerUniworkCloudStatusOff,
+} from '@genoffice/electron-utils/uniwork-ai-flag'
 import { createI18n, getUiLang, type Lang, normalizeLang, setUiLang } from '@genoffice/i18n'
 import { ProjectStore } from '@genoffice/project-store'
 
@@ -3741,7 +3744,8 @@ export function registerSheetsAiIpc(): void {
     const stored = readJson<Partial<AiSettings> & LegacyAiSettings>(SETTINGS_PATH(), {})
     const settings = resolveAiSettings(stored, defaultAiSettings())
     // the stored provider stays selected even while its config is incomplete (the picker and
-    // Settings show what is missing); only an unknown id degrades to genspark
+    // Settings show what is missing); only an unknown id degrades to genspark. A saved `uniwork`
+    // stays `uniwork` (never UniAI): a send with it ends in the ai_disabled error below
     settings.provider = selectedProvider(settings)
     return settings
   })
@@ -4778,6 +4782,7 @@ async function applyMainProcessProxy(): Promise<void> {
 export function startSheetsStandalone(): void {
   // no shell here: answer the renderer's UniWork AI flag pull with "off" instead of an unregistered channel
   answerUniworkAiFlagOff(ipcMain)
+  answerUniworkCloudStatusOff(ipcMain)
   registerRendererScheme()
   installNavigationGuard(app)
   installContextMenu(app, () => contextMenuLabels(getUiLang()))

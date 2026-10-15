@@ -7572,6 +7572,7 @@ export default function App() {
               filePath={filePath}
               preset={aiPreset}
               open={!aiDock.collapsed}
+              onExpand={aiDock.open}
               onCollapse={aiDock.collapse}
               readOnly={readOnly}
               onRunDone={() => void autoSaveAfterAiRun()}

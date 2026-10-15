@@ -3,7 +3,7 @@ import type { zh } from './zh'
 export const ja = {
   // S7 provider row, picker footer and composer notes
   aiUniworkProvider: 'UniWork AI',
-  aiUniworkCreditsAria: 'クレジット残り {remaining} / {limit}',
+  aiUniworkCreditsAria: '{limit} クレジット中、残り {remaining}',
   aiUniworkFooterSignIn: 'UniWork AI を使うには UniWork にログインしてください',
   aiUniworkSignedOut:
     'UniWork からログアウトしています。別のプロバイダーを選ぶか、再ログインしてください。',
@@ -35,6 +35,7 @@ export const ja = {
   aiRunRunning: '実行中… 停止するには「停止」または Esc を押してください。',
   aiRunStopped:
     '停止しました。すでに適用された変更（ある場合）はドキュメントに残り、元に戻せます。',
+  aiRunRetry: '再試行',
   aiRunAskAgain: 'もう一度質問',
   aiRunChooseOther: '別のプロバイダーを選択',
   aiRunOpenInApp: 'アプリで開く',
@@ -50,6 +51,8 @@ export const ja = {
   aiErrRateLimited: '送信が速すぎます。{seconds} 秒後にもう一度お試しください。',
   aiErrRateLimitedNoWait: '送信が速すぎます。数分後にもう一度お試しください。',
   aiErrUnavailable: 'UniWork AI は現在応答していません。ドキュメントと「保存」は引き続き使えます。',
+  aiErrGeneric:
+    'UniWork AI で予期しない問題が発生したため、この実行を停止しました。ドキュメントと「保存」は引き続き使えます。',
   aiErrDisconnected:
     '接続が切れたため、この実行は停止しました。すでに適用された変更（ある場合）はドキュメントに残り、元に戻せます。',
   aiErrOffline:
@@ -68,4 +71,32 @@ export const ja = {
   aiErrQuestionRejected:
     'UniWork AI はこのリクエストを受け付けられませんでした。内容を変更してから送信してください。',
   aiUniworkImagesNotSent: '画像は UniWork AI に送信されません。テキストのみ送信しました。',
+  // Cloud state, credits and account actions (shared with picker footer and composer note)
+  cloudStateReady: '利用可能',
+  cloudStateNotEntitled: 'プランに含まれていません',
+  cloudStateExhausted: 'AI クレジットを使い切りました',
+  cloudStateUnavailable: '現在利用できません',
+  cloudStateSignedOut: 'サインインしていません',
+  cloudStateInactive: 'サブスクリプション無効',
+  cloudCredits: 'AI クレジット',
+  cloudCreditsLeft: '残り {remaining} / {limit}',
+  cloudCreditsUnlimited: '無制限',
+  cloudCreditsRenews: '{date} にリセット',
+  cloudInactiveBody:
+    '組織の UniWork サブスクリプションが有効でないため、クラウド AI は停止中です。管理者に更新を依頼してください。下の独自プロバイダーは引き続き使えます。',
+  acctSignIn: 'サインイン',
+  acctSignInAgain: '再度サインイン',
+  // S8/S10 local-file conversation restart notice (G05BE-6)
+  aiUniworkLocalFileRestart:
+    'ローカルファイルは組織の下で新しい会話を開始し、他のファイルのやり取りは引き継ぎません。',
+  // S9 cells summary and S10 web workbook size limit
+  aiResultCellsMeta: '書き込んだセル: {written}（{range}）· 上書きした既存セル: {overwritten}',
+  aiResultCellsMetaNoOverwrite: '書き込んだセル: {written}（{range}）',
+  aiErrWorkbookTooLarge:
+    'このブックは大きすぎるため、Web 版では AI を使えません。UniWork Office アプリで開いてください。',
+  // S7 composer notice keys (not_entitled, credits_exhausted)
+  not_entitled:
+    '組織のプランに UniWork AI が含まれていません。プランについて組織の管理者に確認するか、「設定 > AI モデル」でご自身の AI キーを追加してください。',
+  credits_exhausted:
+    '組織の今期の AI クレジットをすべて使い切りました。組織の管理者にクレジットの追加を依頼するか、「設定 > AI モデル」でご自身の AI キーを追加してください。',
 } satisfies Record<keyof typeof zh, string>

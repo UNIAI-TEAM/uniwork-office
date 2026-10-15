@@ -14,6 +14,7 @@ import {
   errorBodyFields,
   rawFailureAsTyped,
   retryAfterSeconds,
+  uniworkFailureKey,
 } from './errors'
 import { aiNoticeBody, aiNoticeKind } from '../../../../packages/ai-provider/src/ai-notice'
 import {
@@ -2787,10 +2788,11 @@ describe('UniWork AI on the web (G6-05)', () => {
       expect(s.providers.openai.apiKey).toBe('…abcd')
     })
 
-    it('without the uniworkAi grant there is no UniWork AI entry, and a stored choice of it is ignored', async () => {
+    it('without the uniworkAi grant there is no UniWork AI entry, and a stored choice of it stays selected (no silent switch to a BYOK provider)', async () => {
+      // the pick is newer than the server's model stamp, so only availability could move it
       localStorage.setItem(
         'uniwork.office.web.ai.choice',
-        JSON.stringify({ provider: 'uniwork', models: {} }),
+        JSON.stringify({ provider: 'uniwork', providerAt: AFTER_STAMPS, models: {} }),
       )
       const { fetch } = recorder((c) =>
         c.url.endsWith('/credentials')
@@ -2805,8 +2807,10 @@ describe('UniWork AI on the web (G6-05)', () => {
         now: () => 0,
       })
       const s = await ai.settings()
-      expect(s.provider).toBe('openai')
+      // the picker shows the unavailable state and Send is blocked; a send ends in a notice, no request
+      expect(s.provider).toBe('uniwork')
       expect(s.providers.uniwork?.apiKey ?? '').toBe('')
+      expect(s.providers.openai.apiKey).toBe('…abcd')
     })
 
     it('the scope carries the document and the module of the session as the format token', async () => {
@@ -2866,9 +2870,78 @@ describe('UniWork AI on the web (G6-05)', () => {
       expect(document.querySelector('.ow-ai-state')).toBeNull()
       const s = await ai.settings()
       expect(s.providers.uniwork?.apiKey ?? '').toBe('')
-      expect(s.provider).toBe('openai')
+      // the viewer's pick stays (unavailable state, Send blocked) instead of turning into their BYOK provider
+      expect(s.provider).toBe('uniwork')
+      expect(s.providers.openai.apiKey).toBe('…abcd')
       expect(chunks.at(-1)!.type).toBe('done')
       expect(chunks.some((c) => c.type === 'error')).toBe(false)
+    })
+
+    it('maps payload_too_large, mid-run office_capability_off, and unknown keys in uniworkFailureKey (G6-05u, C10, RF1-7)', () => {
+      expect(uniworkFailureKey({ code: 'payload_too_large' })).toBe('aiErrWorkbookTooLarge')
+      expect(uniworkFailureKey({ code: 'office_capability_off' })).toBe('aiUniworkOff')
+      expect(uniworkFailureKey({ code: 'office_capability_off', runId: 'run-1' })).toBe(
+        'aiErrCapabilityOff',
+      )
+      expect(uniworkFailureKey({ code: 'access_revoked' })).toBe('aiErrRevoked')
+      expect(
+        uniworkFailureKey({ code: 'future_unmapped_code' }, () => 'aiErrNotInDictionary'),
+      ).toBe('aiErrUnavailable')
+    })
+
+    it('exposes uniworkIdentity from session and GET cloud org_id / org_name, and falls back orgName to UniWork instead of raw documentId (RF1-17)', async () => {
+      const { fetch } = recorder(() =>
+        jsonResponse(200, {
+          ...CLOUD,
+          org_id: 'org-cloud-1',
+          org_name: 'UniWork Org',
+        }),
+      )
+      const ai = createWebAi({
+        port: {
+          whenInitialized: async () => ({
+            documentId: 'doc-42',
+            workspaceId: 'ws-1',
+            apiBase: 'https://app.test/api/v1',
+            capabilities: { ai: true, uniworkAi: true, webSearch: true },
+            user: { id: 'user-7', displayName: 'Alice' },
+          }),
+          ...tokens(),
+        },
+        capabilities: { ai: true, uniworkAi: true, webSearch: true },
+        fetch,
+        origin: ORIGIN,
+      })
+      await ai.state(true)
+      expect(ai.uniworkIdentity()).toEqual({
+        account: 'user-7',
+        org: 'org-cloud-1',
+        orgName: 'UniWork Org',
+        document: 'doc-42',
+      })
+
+      // UniWork-only frame without cloud tools does not fetch GET /cloud; orgName must not fall back to raw documentId
+      const uniworkOnly = createWebAi({
+        port: {
+          whenInitialized: async () => ({
+            documentId: 'doc-raw-uuid-99',
+            apiBase: 'https://app.test/api/v1',
+            capabilities: { ai: false, uniworkAi: true },
+            user: { id: 'user-9', displayName: 'Bob' },
+          }),
+          ...tokens(),
+        },
+        capabilities: { ai: false, uniworkAi: true },
+        fetch,
+        origin: ORIGIN,
+      })
+      await uniworkOnly.active()
+      expect(uniworkOnly.uniworkIdentity()).toEqual({
+        account: 'user-9',
+        org: 'doc-raw-uuid-99',
+        orgName: 'UniWork',
+        document: 'doc-raw-uuid-99',
+      })
     })
   })
 })

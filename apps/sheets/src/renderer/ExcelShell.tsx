@@ -11,6 +11,7 @@ import {
   rememberAiPanelOpen,
   UniAiMark,
   useAiSidebarEnabled,
+  useUniworkSendGate,
   type AiTokenUsageView,
 } from '@genoffice/ui'
 
@@ -517,7 +518,7 @@ export function ExcelShell({
   onClosePrint,
   onPromptChange,
   aiPreset = null,
-  onSend,
+  onSend: onSendRaw,
   onStop,
   onNewChat,
   onUndo,
@@ -603,6 +604,13 @@ export function ExcelShell({
   // every time the dock opens, so a plan changed while it was collapsed shows
   const onAiPanelOpenRef = useRef(onAiPanelOpen)
   onAiPanelOpenRef.current = onAiPanelOpen
+  // every AI entry of the shell (panel Send, retry, presets, ribbon runs, the selection ask) goes
+  // through this one gate; the AI panel feeds it the UniWork disclosure state
+  const uniworkSendGate = useUniworkSendGate()
+  const onSend: typeof onSendRaw = (instruction, attachments, retryIndex) => {
+    if (uniworkSendGate.refuse()) return
+    onSendRaw(instruction, attachments, retryIndex)
+  }
   useEffect(() => {
     if (isCopilotOpen) onAiPanelOpenRef.current?.()
   }, [isCopilotOpen])
@@ -1063,6 +1071,7 @@ export function ExcelShell({
             sessionUsage={sessionUsage}
             onPromptChange={onPromptChange}
             onSend={onSend}
+            sendGate={uniworkSendGate}
             onSendQueued={(text, atts) => {
               if (aiBusy) return false
               onSend(text, atts)

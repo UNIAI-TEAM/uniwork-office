@@ -4,6 +4,7 @@ import {
   providerNeed,
   selectedProvider,
   uniAiOpenRouterKey,
+  uniworkAiAvailable,
   type AiModelSource,
   type AiProviderId,
   type AiSettings,
@@ -105,7 +106,7 @@ export function aiModelPickerGroups(
  * selection silently turning into UniAI.
  */
 export function aiModelPickerSelection(settings: AiSettings): AiModelPickerSelection {
-  const provider = selectedProvider(settings)
+  const provider = settings.provider === 'uniwork' ? 'uniwork' : selectedProvider(settings)
   const meta = AI_PROVIDERS.find((m) => m.id === provider)
   const model = settings.providers?.[provider]?.model?.trim() || meta?.defaultModel || ''
   return { provider, model }
@@ -115,9 +116,13 @@ export function aiModelPickerSelection(settings: AiSettings): AiModelPickerSelec
  * What the chosen vendor still lacks before a request can go out: 'model' (no model
  * id), 'base-url' (a custom endpoint without its server URL; its key is optional) or
  * 'key' (no API key). null for a usable selection and for UniAI, whose access is the
- * cloud account.
+ * cloud account. When `uniwork` is selected while unavailable, returns 'model' so the
+ * composer shows "Choose model" + needModel hint instead of silently falling back to UniAI.
  */
 export function aiModelPickerNeed(settings: AiSettings): 'key' | 'model' | 'base-url' | null {
+  if (settings.provider === 'uniwork') {
+    return uniworkAiAvailable() ? null : 'model'
+  }
   return providerNeed(settings, selectedProvider(settings))
 }
 

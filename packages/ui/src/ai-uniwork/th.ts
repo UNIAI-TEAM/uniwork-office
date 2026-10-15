@@ -34,6 +34,7 @@ export const th = {
   aiRunSend: 'ส่ง',
   aiRunRunning: 'กำลังทำงาน… กดหยุดหรือ Esc เพื่อหยุด',
   aiRunStopped: 'หยุดแล้ว การเปลี่ยนแปลงที่นำไปใช้แล้ว (ถ้ามี) ยังอยู่ในเอกสารและเลิกทำได้',
+  aiRunRetry: 'ลองอีกครั้ง',
   aiRunAskAgain: 'ถามต่อ',
   aiRunChooseOther: 'เลือกผู้ให้บริการอื่น',
   aiRunOpenInApp: 'เปิดในแอป',
@@ -49,6 +50,8 @@ export const th = {
   aiErrRateLimited: 'คุณส่งเร็วเกินไป ลองอีกครั้งใน {seconds} วินาที',
   aiErrRateLimitedNoWait: 'คุณส่งเร็วเกินไป ลองอีกครั้งในอีกไม่กี่นาที',
   aiErrUnavailable: 'UniWork AI ไม่ตอบสนองในขณะนี้ เอกสารและการบันทึกยังใช้งานได้ตามปกติ',
+  aiErrGeneric:
+    'UniWork AI พบปัญหาที่ไม่คาดคิด การทำงานครั้งนี้จึงหยุดลง เอกสารและการบันทึกยังใช้งานได้ตามปกติ',
   aiErrDisconnected:
     'การเชื่อมต่อขาดหาย การทำงานครั้งนี้จึงหยุด การเปลี่ยนแปลงที่นำไปใช้แล้ว (ถ้ามี) ยังอยู่ในเอกสารและเลิกทำได้',
   aiErrOffline: 'คุณออฟไลน์อยู่ UniWork AI ไม่ทำงานแบบออฟไลน์และคำขอจะไม่ถูกเข้าคิว',
@@ -64,4 +67,31 @@ export const th = {
     'คำขอยาวเกินไปสำหรับ UniWork AI โปรดย่อให้ต่ำกว่า 8,000 อักขระแล้วส่งอีกครั้ง',
   aiErrQuestionRejected: 'UniWork AI รับคำขอนี้ไม่ได้ โปรดแก้ไขคำขอแล้วส่งอีกครั้ง',
   aiUniworkImagesNotSent: 'ระบบไม่ส่งรูปภาพไปยัง UniWork AI ส่งเฉพาะข้อความของคุณเท่านั้น',
+  // Cloud state, credits and account actions (shared with picker footer and composer note)
+  cloudStateReady: 'พร้อมใช้งาน',
+  cloudStateNotEntitled: 'ไม่รวมในแพ็กเกจของคุณ',
+  cloudStateExhausted: 'เครดิต AI หมดแล้ว',
+  cloudStateUnavailable: 'ใช้งานไม่ได้ในขณะนี้',
+  cloudStateSignedOut: 'ยังไม่ได้ลงชื่อเข้าใช้',
+  cloudStateInactive: 'การสมัครสมาชิกไม่ใช้งาน',
+  cloudCredits: 'เครดิต AI',
+  cloudCreditsLeft: 'เหลือ {remaining} / {limit}',
+  cloudCreditsUnlimited: 'ไม่จำกัด',
+  cloudCreditsRenews: 'รีเซ็ตวันที่ {date}',
+  cloudInactiveBody:
+    'การสมัครสมาชิก UniWork ขององค์กรไม่ได้ใช้งานอยู่ AI บนคลาวด์จึงหยุดชั่วคราว โปรดให้ผู้ดูแลต่ออายุ ผู้ให้บริการของคุณเองด้านล่างยังใช้งานได้ตามปกติ',
+  acctSignIn: 'เข้าสู่ระบบ',
+  acctSignInAgain: 'เข้าสู่ระบบอีกครั้ง',
+  // S8/S10 local-file conversation restart notice (G05BE-6)
+  aiUniworkLocalFileRestart:
+    'ไฟล์ในเครื่องจะเริ่มการสนทนาใหม่ภายใต้องค์กรของคุณ และไม่เก็บรอบการสนทนาจากไฟล์อื่น',
+  // S9 cells summary and S10 web workbook size limit
+  aiResultCellsMeta: 'เซลล์ที่เขียน: {written} ({range}) · เซลล์เดิมที่ถูกเขียนทับ: {overwritten}',
+  aiResultCellsMetaNoOverwrite: 'เซลล์ที่เขียน: {written} ({range})',
+  aiErrWorkbookTooLarge: 'เวิร์กบุ๊กนี้ใหญ่เกินไปสำหรับ AI บนเว็บ เปิดในแอป UniWork Office',
+  // S7 composer notice keys (not_entitled, credits_exhausted)
+  not_entitled:
+    'แผนขององค์กรคุณไม่รวม UniWork AI โปรดสอบถามผู้ดูแลองค์กรเกี่ยวกับแผน หรือเพิ่มคีย์ AI ของคุณเองใน การตั้งค่า > โมเดล AI',
+  credits_exhausted:
+    'องค์กรของคุณใช้เครดิต AI ของรอบนี้หมดแล้ว โปรดให้ผู้ดูแลองค์กรเติมเครดิต หรือเพิ่มคีย์ AI ของคุณเองใน การตั้งค่า > โมเดล AI',
 } satisfies Record<keyof typeof zh, string>

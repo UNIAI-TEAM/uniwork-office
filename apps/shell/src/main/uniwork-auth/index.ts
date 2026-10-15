@@ -1,4 +1,13 @@
-import { app, net, safeStorage, shell, type IpcMain, type WebContents } from 'electron'
+import {
+  app,
+  BrowserWindow,
+  net,
+  safeStorage,
+  shell,
+  webContents,
+  type IpcMain,
+  type WebContents,
+} from 'electron'
 import {
   onUniworkCloudStatus,
   setUniworkAiAvailable,
@@ -11,9 +20,11 @@ import {
   uniworkConversations,
 } from '@genoffice/ai-provider'
 import { safeExternalUrl } from '@genoffice/electron-utils'
+import type { UniworkCloudStatusSnapshot } from '@genoffice/electron-utils/uniwork-ai-flag'
 import { getUiLang } from '@genoffice/i18n'
 import { HOME_CHANNELS, type AccountEntitlements, type AccountStatus } from '../../shared/home-api'
 import { readAppSettings, writeAppSetting } from '../app-settings'
+import { broadcastUniworkCloudStatus, registerUniworkCloudStatusIpc } from '../uniwork-cloud-status'
 import {
   createCredentialStore,
   createMemoryCredentialStore,
@@ -249,6 +260,7 @@ export function uniworkAccount(): AccountManager {
   created.onStatus((status) => {
     keys?.onAccountStatus(status)
     push?.(HOME_CHANNELS.accountStatusEvent, status)
+    notifyCloudStatusSnapshot()
   })
   created.onLoginEvent((event) => push?.(HOME_CHANNELS.accountLoginEvent, event))
   created.onEntitlementsChanged((current) => {
@@ -302,6 +314,47 @@ function cloudAccountView(): CloudAccountView {
 }
 
 /**
+ * Token-free snapshot for editor preloads (`window.uniworkCloudStatus`); null
+ * until the cloud controller has completed its first read.
+ */
+export function currentUniworkCloudStatusSnapshot(): UniworkCloudStatusSnapshot | null {
+  if (!cloud || !cloud.hasCompletedRead()) return null
+  const cloudStatus = cloud.status()
+  const accountStatus = manager?.status()
+  const identity = manager?.sessionIdentity() ?? null
+  const signedIn = Boolean(accountStatus?.loggedIn && cloudStatus.state !== 'signed-out')
+  const reason = cloud.unavailableReason()
+  const cloudUnavailable = cloudStatus.state === 'unavailable' && reason === 'cloud_unavailable'
+  const accountId = signedIn
+    ? (accountStatus?.profile?.accountId ?? identity?.accountId ?? null)
+    : null
+  const orgId = signedIn ? (accountStatus?.org?.id ?? null) : null
+  const orgName = signedIn ? (accountStatus?.org?.name ?? null) : null
+  return {
+    state: cloudStatus.state,
+    signedIn,
+    enabled: cloudStatus.enabled,
+    credits: cloudStatus.credits,
+    reason,
+    cloudUnavailable,
+    accountId,
+    orgId,
+    orgName,
+  }
+}
+
+function notifyCloudStatusSnapshot(): void {
+  const snapshot = currentUniworkCloudStatusSnapshot()
+  if (typeof webContents?.getAllWebContents !== 'function') return
+  try {
+    const targets = webContents.getAllWebContents()
+    broadcastUniworkCloudStatus(snapshot, targets)
+  } catch (error) {
+    console.warn('[uniwork-auth] cloud status broadcast failed:', error)
+  }
+}
+
+/**
  * The process-wide UniWork cloud controller: calls go out from main with the
  * account's bearer token; every status it publishes is token-free and lands
  * in this process's ai-provider seam (the editors' main code) and in the
@@ -324,6 +377,7 @@ export function uniworkCloud(): UniworkCloudController {
     publish: (status) => {
       setUniworkCloudStatus(status)
       push?.(HOME_CHANNELS.uniworkCloudStatusEvent, status)
+      notifyCloudStatusSnapshot()
     },
   })
   return cloud
@@ -383,7 +437,10 @@ export function startUniworkCloud(): void {
   // a cloud tool or an AI panel that finds the cloud off re-reads it first (the plan may have changed since)
   setUniworkCloudRefresher(() => controller.refresh())
   onAccountEntitlementsChanged(() => void controller.refresh().catch(() => undefined))
-  void controller.refresh().catch(() => undefined)
+  void controller
+    .refresh()
+    .then(() => notifyCloudStatusSnapshot())
+    .catch(() => undefined)
 }
 
 /**
@@ -559,7 +616,9 @@ export function stopUniworkAccount(): void {
   keys = null
   ;(globalThis as Record<symbol, unknown>)[UNIWORK_KEYS_HOST_SYMBOL] = null
   cloud?.dispose()
+  cloud = null
   manager?.dispose()
+  manager = null
 }
 
 /**
@@ -570,6 +629,7 @@ export function stopUniworkAccount(): void {
 export function registerAccountIpc(
   ipcMain: IpcMain,
   shellContents: () => WebContents | null,
+  openHomeTab?: () => void,
 ): void {
   const subscribers = new Set<WebContents>()
   push = (channel, payload) => {
@@ -624,6 +684,36 @@ export function registerAccountIpc(
   ipcMain.handle(HOME_CHANNELS.accountSelectOrg, (event, orgId: unknown) => {
     const current = account(event.sender)
     return typeof orgId === 'string' ? current.selectOrg(orgId) : current.status()
+  })
+
+  const openShellAccountSettings = () => {
+    const shellWc = shellContents()
+    if (!shellWc || shellWc.isDestroyed()) return
+    const win = BrowserWindow.fromWebContents(shellWc)
+    if (win && !win.isDestroyed()) {
+      if (win.isMinimized()) win.restore()
+      win.show()
+      win.focus()
+    }
+    openHomeTab?.()
+    shellWc.send(HOME_CHANNELS.openSettings, { section: 'account' })
+    shellWc.send(HOME_CHANNELS.openSettingsEvent, 'account')
+  }
+
+  registerUniworkCloudStatusIpc(ipcMain, {
+    get: () => {
+      uniworkCloud()
+      return currentUniworkCloudStatusSnapshot()
+    },
+    openAccountSettings: () => openShellAccountSettings(),
+    signIn: async () => {
+      const current = uniworkAccount()
+      if (current.status().state === 'not-configured' || !current.deploymentProfile()) {
+        openShellAccountSettings()
+        return
+      }
+      await current.login()
+    },
   })
 }
 

@@ -37,6 +37,7 @@ export const id = {
   aiRunRunning: 'Berjalan… Tekan Hentikan atau Esc untuk berhenti.',
   aiRunStopped:
     'Dihentikan. Perubahan yang sudah diterapkan tetap ada di dokumen dan dapat diurungkan.',
+  aiRunRetry: 'Coba lagi',
   aiRunAskAgain: 'Tanya lagi',
   aiRunChooseOther: 'Pilih penyedia lain',
   aiRunOpenInApp: 'Buka di aplikasi',
@@ -52,6 +53,8 @@ export const id = {
   aiErrRateLimited: 'Anda mengirim terlalu cepat. Coba lagi dalam {seconds} dtk.',
   aiErrRateLimitedNoWait: 'Anda mengirim terlalu cepat. Coba lagi dalam beberapa menit.',
   aiErrUnavailable: 'UniWork AI sedang tidak merespons. Dokumen Anda dan Simpan tetap berfungsi.',
+  aiErrGeneric:
+    'UniWork AI mengalami masalah tak terduga, jadi proses ini dihentikan. Dokumen Anda dan Simpan tetap berfungsi.',
   aiErrDisconnected:
     'Koneksi terputus, jadi proses ini dihentikan. Perubahan yang sudah diterapkan tetap ada di dokumen dan dapat diurungkan.',
   aiErrOffline:
@@ -72,4 +75,32 @@ export const id = {
   aiErrQuestionRejected:
     'UniWork AI tidak dapat menerima permintaan ini. Ubah permintaannya, lalu kirim lagi.',
   aiUniworkImagesNotSent: 'Gambar tidak dikirim ke UniWork AI; hanya teks Anda yang dikirim.',
+  // Cloud state, credits and account actions (shared with picker footer and composer note)
+  cloudStateReady: 'Tersedia',
+  cloudStateNotEntitled: 'Tidak termasuk dalam paket Anda',
+  cloudStateExhausted: 'Kredit AI habis',
+  cloudStateUnavailable: 'Tidak tersedia',
+  cloudStateSignedOut: 'Belum masuk',
+  cloudStateInactive: 'Langganan tidak aktif',
+  cloudCredits: 'Kredit AI',
+  cloudCreditsLeft: 'Sisa {remaining} / {limit}',
+  cloudCreditsUnlimited: 'Tanpa batas',
+  cloudCreditsRenews: 'Diperbarui {date}',
+  cloudInactiveBody:
+    'Langganan UniWork organisasi Anda tidak aktif, sehingga AI cloud dijeda. Minta admin untuk memperpanjangnya; penyedia Anda sendiri di bawah tetap berfungsi.',
+  acctSignIn: 'Masuk',
+  acctSignInAgain: 'Masuk lagi',
+  // S8/S10 local-file conversation restart notice (G05BE-6)
+  aiUniworkLocalFileRestart:
+    'File lokal memulai percakapan baru di bawah organisasi Anda dan tidak menyimpan giliran dari file lain.',
+  // S9 cells summary and S10 web workbook size limit
+  aiResultCellsMeta: 'Sel ditulis: {written} ({range}) · Sel yang ada ditimpa: {overwritten}',
+  aiResultCellsMetaNoOverwrite: 'Sel ditulis: {written} ({range})',
+  aiErrWorkbookTooLarge:
+    'Buku kerja ini terlalu besar untuk AI di web. Buka di aplikasi UniWork Office.',
+  // S7 composer notice keys (not_entitled, credits_exhausted)
+  not_entitled:
+    'Paket organisasi Anda tidak mencakup UniWork AI. Tanyakan kepada admin organisasi tentang paket tersebut, atau tambahkan kunci AI Anda sendiri di Pengaturan > Model AI.',
+  credits_exhausted:
+    'Organisasi Anda telah menggunakan semua kredit AI untuk periode ini. Minta admin organisasi untuk menambahkan kredit, atau tambahkan kunci AI Anda sendiri di Pengaturan > Model AI.',
 } satisfies Record<keyof typeof zh, string>

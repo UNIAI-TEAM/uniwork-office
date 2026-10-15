@@ -390,7 +390,10 @@ export function uniworkAiAvailable(): boolean {
  * `tools.chat`, the `ai_uniwork` capability and the module format; web: the
  * `uniworkAi` grant). It adds or removes the entry in AI_PROVIDERS in place,
  * right after UniAI, so every list built from it shows or hides the entry;
- * while hidden, selectedProvider() falls back from a saved `uniwork` choice.
+ * a saved `uniwork` choice stays on `uniwork` (picker, `selectedProvider()`,
+ * every main-process get-settings) and shows the S7 unavailable state with Send
+ * blocked, instead of falling back to UniAI: a silent switch would send the
+ * document to a provider the user did not pick.
  */
 export function setUniworkAiAvailable(available: boolean): void {
   uniworkAvailable = available
@@ -488,11 +491,14 @@ export function isOrgServedReady(settings: AiSettings, id: AiProviderId): boolea
  * The provider the user chose. It is never swapped for another when its config
  * is incomplete: Settings and every module picker keep showing it with a
  * needs-key / choose-model state (`providerNeed`), so a half-filled setup never
- * silently turns into a UniAI request. Only an id this build does not know
- * (a hand-edited file) degrades to genspark, the default of a fresh install.
+ * silently turns into a UniAI request. `uniwork` is a known id even while the
+ * host does not offer it (not listed in AI_PROVIDERS): it stays selected and the
+ * unavailable state blocks Send. Only an id this build does not know (a
+ * hand-edited file) degrades to genspark, the default of a fresh install.
  */
 export function selectedProvider(settings: AiSettings): AiProviderId {
   const provider = settings.provider
+  if (provider === 'uniwork') return provider
   return AI_PROVIDERS.some((m) => m.id === provider) ? provider : 'genspark'
 }
 

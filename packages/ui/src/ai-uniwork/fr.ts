@@ -38,6 +38,7 @@ export const fr = {
   aiRunRunning: 'En cours… Appuyez sur Arrêter ou Échap pour arrêter.',
   aiRunStopped:
     'Arrêté. Les modifications déjà appliquées restent dans le document et peuvent être annulées.',
+  aiRunRetry: 'Réessayer',
   aiRunAskAgain: 'Redemander',
   aiRunChooseOther: 'Choisir un autre fournisseur',
   aiRunOpenInApp: 'Ouvrir dans l’application',
@@ -56,6 +57,8 @@ export const fr = {
   aiErrRateLimitedNoWait: 'Vous envoyez trop vite. Réessayez dans quelques minutes.',
   aiErrUnavailable:
     'UniWork AI ne répond pas pour le moment. Votre document et Enregistrer fonctionnent toujours.',
+  aiErrGeneric:
+    'UniWork AI a rencontré un problème inattendu, cette exécution s’est donc arrêtée. Votre document et Enregistrer fonctionnent toujours.',
   aiErrDisconnected:
     'La connexion a été interrompue, cette exécution s’est donc arrêtée. Les modifications déjà appliquées restent dans le document et peuvent être annulées.',
   aiErrOffline:
@@ -77,4 +80,33 @@ export const fr = {
     'UniWork AI n’a pas pu accepter cette demande. Modifiez-la, puis renvoyez-la.',
   aiUniworkImagesNotSent:
     'Les images ne sont pas envoyées à UniWork AI ; seul votre texte a été envoyé.',
+  // Cloud state, credits and account actions (shared with picker footer and composer note)
+  cloudStateReady: 'Disponible',
+  cloudStateNotEntitled: 'Non inclus dans votre offre',
+  cloudStateExhausted: 'Crédits IA épuisés',
+  cloudStateUnavailable: 'Indisponible',
+  cloudStateSignedOut: 'Non connecté',
+  cloudStateInactive: 'Abonnement inactif',
+  cloudCredits: 'Crédits IA',
+  cloudCreditsLeft: '{remaining} / {limit} restants',
+  cloudCreditsUnlimited: 'Illimité',
+  cloudCreditsRenews: 'Renouvellement le {date}',
+  cloudInactiveBody:
+    'L’abonnement UniWork de votre organisation n’est pas actif : l’IA cloud est suspendue. Demandez à un administrateur de le renouveler ; vos propres fournisseurs ci-dessous continuent de fonctionner.',
+  acctSignIn: 'Se connecter',
+  acctSignInAgain: 'Se reconnecter',
+  // S8/S10 local-file conversation restart notice (G05BE-6)
+  aiUniworkLocalFileRestart:
+    'Les fichiers locaux démarrent une nouvelle conversation au sein de votre organisation et ne conservent pas les échanges des autres fichiers.',
+  // S9 cells summary and S10 web workbook size limit
+  aiResultCellsMeta:
+    'Cellules écrites : {written} ({range}) · Cellules existantes remplacées : {overwritten}',
+  aiResultCellsMetaNoOverwrite: 'Cellules écrites : {written} ({range})',
+  aiErrWorkbookTooLarge:
+    'Ce classeur est trop volumineux pour l’IA sur le web. Ouvrez-le dans l’application UniWork Office.',
+  // S7 composer notice keys (not_entitled, credits_exhausted)
+  not_entitled:
+    'L’offre de votre organisation n’inclut pas UniWork AI. Renseignez-vous auprès d’un administrateur de l’organisation ou ajoutez votre propre clé IA dans Paramètres > Modèle IA.',
+  credits_exhausted:
+    'Votre organisation a utilisé tous ses crédits IA pour cette période. Demandez à un administrateur de l’organisation d’ajouter des crédits ou ajoutez votre propre clé IA dans Paramètres > Modèle IA.',
 } satisfies Record<keyof typeof zh, string>

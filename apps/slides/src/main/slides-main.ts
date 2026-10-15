@@ -59,7 +59,10 @@ import {
   newerCopyMtime,
 } from '@genoffice/electron-utils'
 import { isDraftPreviewPath } from '@genoffice/electron-utils/draft-preview'
-import { answerUniworkAiFlagOff } from '@genoffice/electron-utils/uniwork-ai-flag'
+import {
+  answerUniworkAiFlagOff,
+  answerUniworkCloudStatusOff,
+} from '@genoffice/electron-utils/uniwork-ai-flag'
 import { buildPagePptx, parsePageSpec } from '@genoffice/pipelines/slides'
 import { sniffImageMime } from './media-mime'
 import { canWriteElementClipboardImage, writeElementClipboardImage } from './element-clipboard'
@@ -2111,6 +2114,7 @@ async function applyMainProcessProxy(): Promise<void> {
 export function startSlidesStandalone(): void {
   // no shell here: answer the renderer's UniWork AI flag pull with "off" instead of an unregistered channel
   answerUniworkAiFlagOff(ipcMain)
+  answerUniworkCloudStatusOff(ipcMain)
   registerRendererScheme()
   installNavigationGuard(app)
   installContextMenu(app, () => contextMenuLabels(getUiLang()))

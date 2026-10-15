@@ -35,6 +35,7 @@ export const pl = {
   aiRunSend: 'Wyślij',
   aiRunRunning: 'Trwa… Naciśnij Zatrzymaj lub Esc, aby zatrzymać.',
   aiRunStopped: 'Zatrzymano. Zastosowane już zmiany pozostają w dokumencie i można je cofnąć.',
+  aiRunRetry: 'Spróbuj ponownie',
   aiRunAskAgain: 'Zapytaj ponownie',
   aiRunChooseOther: 'Wybierz innego dostawcę',
   aiRunOpenInApp: 'Otwórz w aplikacji',
@@ -51,6 +52,8 @@ export const pl = {
   aiErrRateLimited: 'Wysyłasz zbyt szybko. Spróbuj ponownie za {seconds} s.',
   aiErrRateLimitedNoWait: 'Wysyłasz zbyt szybko. Spróbuj ponownie za kilka minut.',
   aiErrUnavailable: 'UniWork AI w tej chwili nie odpowiada. Dokument i Zapisz nadal działają.',
+  aiErrGeneric:
+    'UniWork AI napotkał nieoczekiwany problem, więc to uruchomienie zostało zatrzymane. Dokument i Zapisz nadal działają.',
   aiErrDisconnected:
     'Połączenie zostało przerwane, więc to uruchomienie zatrzymano. Zastosowane już zmiany pozostają w dokumencie i można je cofnąć.',
   aiErrOffline: 'Jesteś offline. UniWork AI nie działa offline, a prośby nie są kolejkowane.',
@@ -68,4 +71,33 @@ export const pl = {
     'Prośba jest za długa dla UniWork AI. Skróć ją do mniej niż 8000 znaków i wyślij ponownie.',
   aiErrQuestionRejected: 'UniWork AI nie może przyjąć tej prośby. Zmień ją i wyślij ponownie.',
   aiUniworkImagesNotSent: 'Obrazy nie są wysyłane do UniWork AI; wysłano tylko tekst.',
+  // Cloud state, credits and account actions (shared with picker footer and composer note)
+  cloudStateReady: 'Dostępna',
+  cloudStateNotEntitled: 'Nie ma w Twoim planie',
+  cloudStateExhausted: 'Brak kredytów AI',
+  cloudStateUnavailable: 'Niedostępna',
+  cloudStateSignedOut: 'Niezalogowano',
+  cloudStateInactive: 'Subskrypcja nieaktywna',
+  cloudCredits: 'Kredyty AI',
+  cloudCreditsLeft: 'Pozostało {remaining} / {limit}',
+  cloudCreditsUnlimited: 'Bez limitu',
+  cloudCreditsRenews: 'Odnowienie {date}',
+  cloudInactiveBody:
+    'Subskrypcja UniWork Twojej organizacji jest nieaktywna, więc chmurowa AI jest wstrzymana. Poproś administratora o jej odnowienie; Twoi własni dostawcy poniżej nadal działają.',
+  acctSignIn: 'Zaloguj się',
+  acctSignInAgain: 'Zaloguj się ponownie',
+  // S8/S10 local-file conversation restart notice (G05BE-6)
+  aiUniworkLocalFileRestart:
+    'Pliki lokalne rozpoczynają nową rozmowę w ramach Twojej organizacji i nie zachowują tur z innych plików.',
+  // S9 cells summary and S10 web workbook size limit
+  aiResultCellsMeta:
+    'Zapisane komórki: {written} ({range}) · Nadpisane istniejące komórki: {overwritten}',
+  aiResultCellsMetaNoOverwrite: 'Zapisane komórki: {written} ({range})',
+  aiErrWorkbookTooLarge:
+    'Ten skoroszyt jest za duży dla AI w przeglądarce. Otwórz go w aplikacji UniWork Office.',
+  // S7 composer notice keys (not_entitled, credits_exhausted)
+  not_entitled:
+    'Plan Twojej organizacji nie obejmuje UniWork AI. Zapytaj administratora organizacji o plan lub dodaj własny klucz AI w Ustawienia > Model AI.',
+  credits_exhausted:
+    'Twoja organizacja wykorzystała wszystkie kredyty AI w tym okresie. Poproś administratora organizacji o doładowanie kredytów lub dodaj własny klucz AI w Ustawienia > Model AI.',
 } satisfies Record<keyof typeof zh, string>

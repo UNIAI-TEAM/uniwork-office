@@ -94,7 +94,10 @@ import {
   newerCopyMtime,
 } from '@genoffice/electron-utils'
 import { isDraftPreviewPath } from '@genoffice/electron-utils/draft-preview'
-import { answerUniworkAiFlagOff } from '@genoffice/electron-utils/uniwork-ai-flag'
+import {
+  answerUniworkAiFlagOff,
+  answerUniworkCloudStatusOff,
+} from '@genoffice/electron-utils/uniwork-ai-flag'
 import { configureMetricsCache, familyVerticalMetrics } from '@genoffice/font-metrics'
 import { createI18n, getUiLang, normalizeLang, setUiLang } from '@genoffice/i18n'
 import { ProjectStore, type PracticeId } from '@genoffice/project-store'
@@ -3961,7 +3964,7 @@ function modelPicksOf(options: unknown): AiModelPick[] {
   return [...byProvider.values()]
 }
 
-/** the provider ai-settings.json holds (never `uniwork`: the pick lives in the account store) */
+/** the non-`uniwork` provider ai-settings.json holds for ai:set-settings (normal saves put the `uniwork` pick in the account store; a hand-edited `uniwork` in the file stays `uniwork` on read per no-silent-fallback, while writes keep a non-`uniwork` slot in the file) */
 function fileAiProvider(): AiProviderId {
   const provider = resolveAiSettings(
     readJson<Partial<AiSettings> & LegacyAiSettings>(SETTINGS_PATH(), {}),
@@ -4071,7 +4074,8 @@ export function registerAiIpc(): void {
     // the stored provider stays selected even while its config is incomplete (the picker and
     // Settings show what is missing); only an unknown id degrades to genspark
     // the account's UniWork AI pick overlays the file's BYOK provider; while the entry is not
-    // offered, selectedProvider degrades it (the pick itself stays stored for when it returns)
+    // offered it stays `uniwork` (no silent switch to UniAI): the panel shows the unavailable
+    // state and Send is blocked until it returns
     if ((isUniworkAiEditor(event) || wantsUniworkPick(options)) && uniworkAiChoiceStore?.read())
       settings.provider = 'uniwork'
     settings.provider = selectedProvider(settings)
@@ -4110,21 +4114,10 @@ export function registerAiIpc(): void {
       return
     }
     if (sanitized.provider === 'uniwork') {
-      // saved per account, never in the file: the file keeps the BYOK provider it had
+      // saved per account, never in the file: the file keeps the BYOK provider it had; while the
+      // entry is hidden the renderer still holds `uniwork` and saves it back, which keeps the pick
       uniworkAiChoiceStore?.write(true)
       sanitized.provider = fileAiProvider()
-    } else if (!uniworkAiAvailable()) {
-      // while UniWork AI is hidden the renderer only had the degraded provider to save back: that
-      // is no choice against the account's pick, which stays stored for when the entry returns,
-      // and the BYOK provider underneath stays the file's (key and model edits still go through);
-      // any other provider is a real choice: it is written and the pick is cleared
-      if (uniworkAiChoiceStore?.read()) {
-        if (sanitized.provider === selectedProvider({ ...sanitized, provider: 'uniwork' })) {
-          sanitized.provider = fileAiProvider()
-        } else {
-          uniworkAiChoiceStore.write(false)
-        }
-      }
     } else if (
       // a window without the pick (home: My AI) clears it only by changing the provider; an editor
       // tab and the Settings window both saw the pick, so any provider they save is the choice
@@ -4401,7 +4394,11 @@ export function registerAiIpc(): void {
 
   // one-shot chat; `errorKind` says why a failure failed for the settings test (other callers ignore it).
   // `error` is a product message in the UI language; the provider's raw text is `rawError` and goes to the log
-  type AiChatOutcome = AiChatResponse & { errorKind?: AiTestFailureKind; rawError?: string }
+  type AiChatOutcome = AiChatResponse & {
+    errorKind?: AiTestFailureKind
+    rawError?: string
+    uniworkCode?: string
+  }
   const failedChat = (failure: AiChatFailure): AiChatOutcome => {
     console.warn('[ai] chat failed:', failure.raw)
     return {
@@ -4421,9 +4418,16 @@ export function registerAiIpc(): void {
     // the renderer's settings copy verbatim
     const settings = sanitizeAiSettings(request.settings)
     if (!settings) return { ok: false, error: 'invalid AI settings payload', errorKind: 'failed' }
-    // UniWork AI runs only as an editor panel's agent turn: a one-shot caller holding an editor's
-    // settings copy gets the file's BYOK/UniAI provider instead of a key request for `uniwork`
-    if (settings.provider === 'uniwork') settings.provider = fileAiProvider()
+    // UniWork AI runs only as an editor panel's agent turn: a one-shot caller with `uniwork` gets
+    // a typed refusal instead of silently calling another provider
+    if (settings.provider === 'uniwork') {
+      return {
+        ok: false,
+        error: 'UniWork AI is not available here.',
+        errorKind: 'unavailable',
+        uniworkCode: 'ai_disabled',
+      }
+    }
     const provider = settings.provider
     // the same route as ai:stream: a key saved on UniWork serves one-shot calls too
     const route = await aiRouteOf(settings, provider)
@@ -6724,6 +6728,7 @@ export function hasDocsWindow(): boolean {
 export function startDocsStandalone(): void {
   // no shell here: answer the renderer's UniWork AI flag pull with "off" instead of an unregistered channel
   answerUniworkAiFlagOff(ipcMain)
+  answerUniworkCloudStatusOff(ipcMain)
   registerRendererScheme()
   installNavigationGuard(app)
   installContextMenu(app, () => contextMenuLabels(getUiLang()))

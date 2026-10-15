@@ -104,3 +104,100 @@ export function noModelMessageFor(
 export function noModelMessage(lang: string, fallback: string): string {
   return noModelMessageFor(lang, getUniworkCloudStatus().state, fallback)
 }
+
+/**
+ * Priority-ordered composer note kinds when UniWork AI is selected (EXPERIENCE › Composer note):
+ * signed-out > capability/format off > not-entitled > subscription-inactive > credits-exhausted > unavailable.
+ */
+export type ComposerNoteKind =
+  | 'signed-out'
+  | 'off'
+  | 'not-entitled'
+  | 'subscription-inactive'
+  | 'credits-exhausted'
+  | 'unavailable'
+
+export type ComposerNoteKey =
+  | 'aiUniworkSignedOut'
+  | 'aiUniworkOff'
+  | 'not_entitled'
+  | 'cloudInactiveBody'
+  | 'credits_exhausted'
+  | 'aiErrUnavailable'
+
+export type ComposerNoteAction = 'sign-in' | 'choose-provider'
+
+export interface ComposerNoteInput {
+  /** Whether UniWork AI (`uniwork`) is the currently selected provider */
+  readonly uniworkSelected?: boolean | undefined
+  /** Optional provider id; treated as selected when `'uniwork'` and `uniworkSelected` is omitted */
+  readonly provider?: string | undefined
+  /** Current UniWork cloud state */
+  readonly cloudState?: UniworkCloudState | null | undefined
+  /** Explicit signed-out override (for tie resolution tests or pre-cloud-read session state) */
+  readonly signedOut?: boolean | undefined
+  /** Organization capability `ai_uniwork` enabled (default true) */
+  readonly capabilityOn?: boolean | undefined
+  /** Open document format in `ai_uniwork_formats` (default true) */
+  readonly formatOn?: boolean | undefined
+  /** `tools.chat` flag from `GET /orgs/{orgID}/ai/cloud` (default true) */
+  readonly toolsChat?: boolean | undefined
+  /** Explicit capability/format off override */
+  readonly off?: boolean | undefined
+  /** Explicit not-entitled override (for priority tie resolution) */
+  readonly notEntitled?: boolean | undefined
+  /** Explicit subscription-inactive override (for priority tie resolution) */
+  readonly subscriptionInactive?: boolean | undefined
+  /** Explicit credits-exhausted override (for priority tie resolution) */
+  readonly creditsExhausted?: boolean | undefined
+  /** Explicit unavailable override (for priority tie resolution) */
+  readonly unavailable?: boolean | undefined
+  /** View-only document mode (renders a separate sub-line under the composer; never suppresses the note) */
+  readonly viewOnly?: boolean | undefined
+  /** UI locale (`'vi'`, `'en'`, …) */
+  readonly locale?: string | undefined
+}
+
+export interface ComposerNote {
+  readonly kind: ComposerNoteKind
+  readonly key: ComposerNoteKey
+  readonly action: ComposerNoteAction
+  readonly text?: string | undefined
+}
+
+/**
+ * Resolves the single composer note shown above the composer when UniWork AI is selected.
+ * Returns `null` when UniWork AI is not selected or is ready with capability and format enabled.
+ */
+export function composerNoteFor(input: ComposerNoteInput): ComposerNote | null {
+  const selected = input.uniworkSelected ?? input.provider === 'uniwork'
+  if (!selected) return null
+  if (input.signedOut === true || input.cloudState === 'signed-out') {
+    return { kind: 'signed-out', key: 'aiUniworkSignedOut', action: 'sign-in' }
+  }
+  if (
+    input.off === true ||
+    input.capabilityOn === false ||
+    input.formatOn === false ||
+    input.toolsChat === false
+  ) {
+    return { kind: 'off', key: 'aiUniworkOff', action: 'choose-provider' }
+  }
+  if (input.notEntitled === true || input.cloudState === 'not-entitled') {
+    return { kind: 'not-entitled', key: 'not_entitled', action: 'choose-provider' }
+  }
+  if (input.subscriptionInactive === true || input.cloudState === 'subscription-inactive') {
+    return {
+      kind: 'subscription-inactive',
+      key: 'cloudInactiveBody',
+      action: 'choose-provider',
+    }
+  }
+  if (input.creditsExhausted === true || input.cloudState === 'credits-exhausted') {
+    return { kind: 'credits-exhausted', key: 'credits_exhausted', action: 'choose-provider' }
+  }
+  if (input.unavailable === true || input.cloudState === 'unavailable') {
+    return { kind: 'unavailable', key: 'aiErrUnavailable', action: 'choose-provider' }
+  }
+  return null
+}

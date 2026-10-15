@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { createTextNoticeSurface, endsQuietly, noticePatch, type NoticeKey } from '../src'
+import {
+  createTextNoticeSurface,
+  droppedCallsOfNotes,
+  endsQuietly,
+  noticePatch,
+  type NoticeKey,
+} from '../src'
 
 // the panels translate with aiUniworkText; a keyed echo is enough to pin the mapping
 const tr = (key: NoticeKey, params?: Record<string, string | number>) =>
@@ -58,6 +64,22 @@ describe('noticePatch', () => {
       'Sheets',
     )
     expect(again).toBeNull()
+
+    // RF1-13: unknown, undefined, or non-wire 'readonly' reasons are ignored rather than mapped to not_allowlisted or view_only
+    const unknownReasons = noticePatch(
+      {},
+      {
+        kind: 'dropped-tool-calls',
+        calls: [
+          { index: 0, name: 'x', reason: 'readonly' as never },
+          { index: 1, name: 'y', reason: 'unknown_reason' as never },
+          { index: 2, name: 'z', reason: undefined as never },
+        ],
+      },
+      tr,
+      'Sheets',
+    )
+    expect(unknownReasons).toBeNull()
   })
 
   it('uniwork-off is a plain note; step and unknown kinds are ignored', () => {
@@ -108,5 +130,38 @@ describe('createTextNoticeSurface (single-text chat messages)', () => {
     surface.clear()
     expect(surface.restarted()).toBe(false)
     expect(surface.compose('done')).toBe('done')
+  })
+})
+
+describe('droppedCallsOfNotes (chipwire F3)', () => {
+  it('turns the dropped notes of a turn into the calls resultChip reads, in note order', () => {
+    const view = noticePatch(
+      {},
+      {
+        kind: 'dropped-tool-calls',
+        calls: [{ index: 0, name: 'insert_content', reason: 'view_only' }],
+      },
+      tr,
+      'Docs',
+    )
+    const both = noticePatch(
+      { notes: view!.notes! },
+      {
+        kind: 'dropped-tool-calls',
+        calls: [{ index: 1, name: 'cloud_search', reason: 'not_allowlisted' }],
+      },
+      tr,
+      'Docs',
+    )
+    expect(droppedCallsOfNotes(both!.notes)).toEqual([
+      { name: 'insert_content', reason: 'view_only', module: 'Docs' },
+      { name: 'cloud_search', reason: 'not_allowlisted', module: 'Docs' },
+    ])
+  })
+
+  it('ignores notes that are not dropped calls and tolerates no notes', () => {
+    const restarted = noticePatch({}, { kind: 'conversation-restarted' }, tr, 'Docs')
+    expect(droppedCallsOfNotes(restarted!.notes)).toEqual([])
+    expect(droppedCallsOfNotes(undefined)).toEqual([])
   })
 })
