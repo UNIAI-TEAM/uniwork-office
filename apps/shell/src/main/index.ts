@@ -31,6 +31,7 @@ import type { MenuItemConstructorOptions, NativeImage, WebContents } from 'elect
 import { atomicCopyFile, atomicWriteFile } from './atomic-write'
 import { tabStripOverlay } from './title-bar-overlay'
 import { legalDocPath, openLegalDoc, type LegalDocEnv } from './legal-docs'
+import { isDraftPreviewPath } from './uniwork-sync/sync-center'
 import { applyUiScaleTo, applyUiScaleToAll, onUiScaleChanged, readUiScale } from './ui-scale'
 import { uiScaleMenuItems, withViewMenu } from './ui-scale-menu'
 import menuDocxIcon1x from './assets/menu-docx.png?asset'
@@ -141,7 +142,7 @@ import {
   readStarredFiles,
   readStarredGroupMap,
   readStarredGroups,
-  recordRecentFile,
+  recordRecentFile as recordRecentFileRaw,
   removeRecentFiles,
   removeStarredFiles,
   replaceRecentFile,
@@ -4112,6 +4113,12 @@ function openGeneratedDocument(filePath: string): boolean {
     }
   }
   return openDocumentPath(filePath)
+}
+
+/** G5-10: a read-only draft preview (a temp copy under userData) is not a recent file */
+function recordRecentFile(filePath: string): void {
+  if (isDraftPreviewPath(app.getPath('userData'), filePath)) return
+  recordRecentFileRaw(filePath)
 }
 
 function routeDocumentPath(filePath: string): boolean {

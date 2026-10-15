@@ -38,6 +38,7 @@ export const ja = {
   uwQueueCancel: '保存をキャンセル…',
   uwQueueCancelConfirm:
     'キュー内の保存をキャンセルしますか？変更はこのコンピューターに残り、UniWork のドキュメントは変わりません。',
+  uwQueueCancelGo: '保存を取り消す',
   uwQueueCancelled: 'キュー内の保存をキャンセルしました。変更はこのコンピューターに残っています。',
 
   // {reason} fragments of the blocked/failed rows (the existing uwReason* keys stay in the uniwork-documents shard)
@@ -134,6 +135,8 @@ export const ja = {
   uwSyncOpenFromSettings: '同期センター',
   uwSyncOnline: 'UniWork に接続済み · {time} に同期',
   uwSyncOffline: 'オフライン · 最終同期 {time}',
+  uwSyncOnlineNoTime: 'UniWork に接続済み',
+  uwSyncOfflineNoTime: 'オフライン',
   uwSyncPaused: '送信を一時停止中 — 新しい保存は待機します',
   uwSyncAdminPaused:
     '管理者が送信を一時停止しています。保存内容はこのコンピューターに保持されます。',
@@ -167,6 +170,7 @@ export const ja = {
   uwSyncEmptyQueue: '保存待ちのものはありません。',
   uwSyncEmptyAttention: '対応が必要なものはありません。',
   uwSyncEmptyRecent: '最近の保存はありません。',
+  uwSyncActionFailed: '完了できませんでした。何も削除されていません。もう一度お試しください。',
   uwSyncRowAnnounce: '{doc}：{state}',
 
   // S3 offline library

@@ -37,6 +37,7 @@ export const hi = {
   uwQueueCancel: 'सहेजना रद्द करें…',
   uwQueueCancelConfirm:
     'कतार में रखी सहेज रद्द करें? आपके बदलाव इस कंप्यूटर पर रहेंगे; UniWork पर दस्तावेज़ नहीं बदलेगा।',
+  uwQueueCancelGo: 'सहेजना रद्द करें',
   uwQueueCancelled: 'कतार की सहेज रद्द कर दी गई। आपके बदलाव इस कंप्यूटर पर रहेंगे।',
 
   // {reason} fragments of the blocked/failed rows (the existing uwReason* keys stay in the uniwork-documents shard)
@@ -133,6 +134,8 @@ export const hi = {
   uwSyncOpenFromSettings: 'सिंक केंद्र',
   uwSyncOnline: 'UniWork से कनेक्टेड · {time} पर सिंक हुआ',
   uwSyncOffline: 'ऑफ़लाइन · पिछला सिंक {time}',
+  uwSyncOnlineNoTime: 'UniWork से कनेक्टेड',
+  uwSyncOfflineNoTime: 'ऑफ़लाइन',
   uwSyncPaused: 'भेजना रुका है — नई सहेजें प्रतीक्षा करेंगी',
   uwSyncAdminPaused: 'आपके व्यवस्थापक ने भेजना रोका है। सहेजें इस कंप्यूटर पर रखी गई हैं।',
   uwSyncFeedOff: 'नए संस्करण की सूचनाएँ रुकी हैं। सहेजते समय UniWork अब भी टकराव जाँचता है।',
@@ -162,6 +165,7 @@ export const hi = {
   uwSyncEmptyQueue: 'सहेजने के लिए कुछ भी प्रतीक्षा में नहीं है।',
   uwSyncEmptyAttention: 'किसी चीज़ पर ध्यान देने की ज़रूरत नहीं है।',
   uwSyncEmptyRecent: 'हाल की कोई सहेज नहीं।',
+  uwSyncActionFailed: 'यह नहीं हो सका। कुछ भी हटाया नहीं गया; फिर से कोशिश करें।',
   uwSyncRowAnnounce: '{doc}: {state}',
 
   // S3 offline library

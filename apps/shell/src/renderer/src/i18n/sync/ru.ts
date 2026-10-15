@@ -37,6 +37,7 @@ export const ru = {
   uwQueueCancel: 'Отменить сохранение…',
   uwQueueCancelConfirm:
     'Отменить сохранение в очереди? Изменения останутся на этом компьютере; документ в UniWork не изменится.',
+  uwQueueCancelGo: 'Отменить сохранение',
   uwQueueCancelled: 'Сохранение в очереди отменено. Изменения остаются на этом компьютере.',
 
   // {reason} fragments of the blocked/failed rows (the existing uwReason* keys stay in the uniwork-documents shard)
@@ -133,6 +134,8 @@ export const ru = {
   uwSyncOpenFromSettings: 'Центр синхронизации',
   uwSyncOnline: 'Подключено к UniWork · синхронизировано {time}',
   uwSyncOffline: 'Нет сети · последняя синхронизация {time}',
+  uwSyncOnlineNoTime: 'Подключено к UniWork',
+  uwSyncOfflineNoTime: 'Нет сети',
   uwSyncPaused: 'Отправка приостановлена — новые сохранения будут ждать',
   uwSyncAdminPaused: 'Администратор приостановил отправку. Сохранения хранятся на этом компьютере.',
   uwSyncFeedOff:
@@ -163,6 +166,7 @@ export const ru = {
   uwSyncEmptyQueue: 'Нет ожидающих сохранений.',
   uwSyncEmptyAttention: 'Ничего не требует внимания.',
   uwSyncEmptyRecent: 'Нет недавних сохранений.',
+  uwSyncActionFailed: 'Не удалось выполнить. Ничего не удалено; попробуйте ещё раз.',
   uwSyncRowAnnounce: '{doc}: {state}',
 
   // S3 offline library

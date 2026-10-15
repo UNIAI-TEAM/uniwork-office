@@ -34,6 +34,7 @@ export const vi = {
   uwQueueCancel: 'Hủy lần lưu…',
   uwQueueCancelConfirm:
     'Hủy lần lưu đang chờ? Thay đổi vẫn ở trên máy này; tài liệu trên UniWork không đổi.',
+  uwQueueCancelGo: 'Hủy lần lưu',
   uwQueueCancelled: 'Đã hủy lần lưu đang chờ. Thay đổi vẫn ở trên máy này.',
 
   // {reason} fragments of the blocked/failed rows (the existing uwReason* keys stay in the uniwork-documents shard)
@@ -130,6 +131,8 @@ export const vi = {
   uwSyncOpenFromSettings: 'Trung tâm đồng bộ',
   uwSyncOnline: 'Đã kết nối UniWork · đồng bộ lúc {time}',
   uwSyncOffline: 'Không có mạng · lần đồng bộ cuối {time}',
+  uwSyncOnlineNoTime: 'Đã kết nối UniWork',
+  uwSyncOfflineNoTime: 'Không có mạng',
   uwSyncPaused: 'Đã tạm dừng gửi — lần lưu mới sẽ chờ',
   uwSyncAdminPaused: 'Quản trị viên đang tạm dừng việc gửi. Các lần lưu được giữ trên máy này.',
   uwSyncFeedOff:
@@ -160,6 +163,7 @@ export const vi = {
   uwSyncEmptyQueue: 'Không có lần lưu nào đang chờ.',
   uwSyncEmptyAttention: 'Không có gì cần xử lý.',
   uwSyncEmptyRecent: 'Chưa có lần lưu nào gần đây.',
+  uwSyncActionFailed: 'Chưa thực hiện được. Không có gì bị xóa; hãy thử lại.',
   uwSyncRowAnnounce: '{doc}: {state}',
 
   // S3 offline library

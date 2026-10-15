@@ -41,6 +41,7 @@ export const ms = {
   uwQueueCancel: 'Batalkan simpanan…',
   uwQueueCancelConfirm:
     'Batalkan simpanan dalam baris gilir? Perubahan anda kekal pada komputer ini; dokumen di UniWork tidak berubah.',
+  uwQueueCancelGo: 'Batalkan simpanan',
   uwQueueCancelled:
     'Simpanan dalam baris gilir dibatalkan. Perubahan anda kekal pada komputer ini.',
 
@@ -138,6 +139,8 @@ export const ms = {
   uwSyncOpenFromSettings: 'Pusat penyegerakan',
   uwSyncOnline: 'Disambungkan ke UniWork · disegerakkan {time}',
   uwSyncOffline: 'Luar talian · kali terakhir disegerakkan {time}',
+  uwSyncOnlineNoTime: 'Disambungkan ke UniWork',
+  uwSyncOfflineNoTime: 'Luar talian',
   uwSyncPaused: 'Penghantaran dijeda — simpanan baharu akan menunggu',
   uwSyncAdminPaused:
     'Pentadbir anda telah menjeda penghantaran. Simpanan disimpan pada komputer ini.',
@@ -170,6 +173,7 @@ export const ms = {
   uwSyncEmptyQueue: 'Tiada apa-apa yang menunggu untuk disimpan.',
   uwSyncEmptyAttention: 'Tiada apa-apa yang perlu diberi perhatian.',
   uwSyncEmptyRecent: 'Tiada simpanan terkini.',
+  uwSyncActionFailed: 'Tidak berjaya. Tiada apa-apa dipadam; cuba lagi.',
   uwSyncRowAnnounce: '{doc}: {state}',
 
   // S3 offline library

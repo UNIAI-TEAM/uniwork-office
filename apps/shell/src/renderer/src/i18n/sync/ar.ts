@@ -35,6 +35,7 @@ export const ar = {
   uwQueueCancel: 'إلغاء الحفظ…',
   uwQueueCancelConfirm:
     'هل تريد إلغاء الحفظ في قائمة الانتظار؟ تبقى تغييراتك على هذا الكمبيوتر؛ ولا يتغير المستند على UniWork.',
+  uwQueueCancelGo: 'إلغاء الحفظ',
   uwQueueCancelled: 'تم إلغاء الحفظ في قائمة الانتظار. تبقى تغييراتك على هذا الكمبيوتر.',
 
   // {reason} fragments of the blocked/failed rows (the existing uwReason* keys stay in the uniwork-documents shard)
@@ -131,6 +132,8 @@ export const ar = {
   uwSyncOpenFromSettings: 'مركز المزامنة',
   uwSyncOnline: 'متصل بـ UniWork · تمت المزامنة {time}',
   uwSyncOffline: 'غير متصل · آخر مزامنة {time}',
+  uwSyncOnlineNoTime: 'متصل بـ UniWork',
+  uwSyncOfflineNoTime: 'غير متصل',
   uwSyncPaused: 'الإرسال متوقف مؤقتًا — ستنتظر عمليات الحفظ الجديدة',
   uwSyncAdminPaused: 'أوقف المسؤول الإرسال مؤقتًا. تبقى عمليات الحفظ على هذا الكمبيوتر.',
   uwSyncFeedOff:
@@ -161,6 +164,7 @@ export const ar = {
   uwSyncEmptyQueue: 'لا يوجد ما ينتظر الحفظ.',
   uwSyncEmptyAttention: 'لا شيء يحتاج إلى معالجة.',
   uwSyncEmptyRecent: 'لا توجد عمليات حفظ حديثة.',
+  uwSyncActionFailed: 'تعذّر تنفيذ الإجراء. لم يُحذف أي شيء؛ حاول مرة أخرى.',
   uwSyncRowAnnounce: '{doc}: {state}',
 
   // S3 offline library

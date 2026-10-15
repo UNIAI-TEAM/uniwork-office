@@ -41,6 +41,7 @@ export const de = {
   uwQueueCancel: 'Speichern abbrechen…',
   uwQueueCancelConfirm:
     'Eingereihtes Speichern abbrechen? Ihre Änderungen bleiben auf diesem Computer; das Dokument in UniWork ändert sich nicht.',
+  uwQueueCancelGo: 'Speichern abbrechen',
   uwQueueCancelled:
     'Eingereihtes Speichern abgebrochen. Ihre Änderungen bleiben auf diesem Computer.',
 
@@ -139,6 +140,8 @@ export const de = {
   uwSyncOpenFromSettings: 'Synchronisierungscenter',
   uwSyncOnline: 'Mit UniWork verbunden · synchronisiert {time}',
   uwSyncOffline: 'Offline · zuletzt synchronisiert {time}',
+  uwSyncOnlineNoTime: 'Mit UniWork verbunden',
+  uwSyncOfflineNoTime: 'Offline',
   uwSyncPaused: 'Senden pausiert – neue Speicherstände warten',
   uwSyncAdminPaused:
     'Ihr Administrator hat das Senden pausiert. Speicherstände bleiben auf diesem Computer.',
@@ -172,6 +175,7 @@ export const de = {
   uwSyncEmptyQueue: 'Nichts wartet auf das Speichern.',
   uwSyncEmptyAttention: 'Nichts erfordert Aufmerksamkeit.',
   uwSyncEmptyRecent: 'Keine kürzlichen Speicherstände.',
+  uwSyncActionFailed: 'Das hat nicht geklappt. Nichts wurde gelöscht; versuchen Sie es erneut.',
   uwSyncRowAnnounce: '{doc}: {state}',
 
   // S3 offline library
