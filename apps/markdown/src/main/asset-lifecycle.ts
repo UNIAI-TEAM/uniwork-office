@@ -1139,6 +1139,23 @@ export async function discardPendingOwnedAssets(documentPath: string): Promise<R
 }
 
 /**
+ * The user rolled back an AI run: drop the pending files that run saved, by name. Only names that
+ * are still pending for this document go; a file the user inserted or one already saved with the
+ * document is not in `names` or no longer pending, so it stays. Anything that is not a plain file
+ * name is ignored.
+ */
+export async function discardPendingOwnedAssetNames(
+  documentPath: string,
+  names: readonly string[],
+): Promise<ReconcileResult> {
+  const plain = names.filter(
+    (name) => name !== '' && name === basename(name) && !name.includes('\0'),
+  )
+  if (plain.length === 0) return { deleted: [], preserved: [], errors: [] }
+  return resolvePendingOwnedAssets(documentPath, plain)
+}
+
+/**
  * Save As moved the editing session to a new path. Resolve only pending files
  * that existed when Save As started; later insertions remain undoable.
  */

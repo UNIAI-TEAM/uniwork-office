@@ -50,6 +50,7 @@ import { printMarkdownPdf } from './print-pdf'
 import { atomicWriteFile } from './atomic-write'
 import {
   copyImageIntoOwnedAssets,
+  discardPendingOwnedAssetNames,
   discardPendingOwnedAssets,
   extractMarkdownImageSources,
   isInDocDir,
@@ -962,6 +963,19 @@ function registerMarkdownIpc(): void {
       return writeImageIntoOwnedAssets(docPath, `image.${ext}`, Buffer.from(data.base64, 'base64'))
     },
   )
+
+  ipcMain.handle(MARKDOWN_CHANNELS.discardPendingAssets, async (e, names: unknown) => {
+    const docPath = savePathByWc.get(e.sender.id)
+    const list = Array.isArray(names)
+      ? names.filter((name): name is string => typeof name === 'string')
+      : []
+    if (!docPath) return { deleted: [], preserved: [], errors: [] }
+    const result = await discardPendingOwnedAssetNames(docPath, list)
+    if (result.errors.length > 0) {
+      console.warn('[markdown] AI run asset discard incomplete:', result.errors)
+    }
+    return result
+  })
 
   // markdown-owned (like docs:ai-generate-image): the shared ai:* handlers are
   // shell-registered, but image generation is gated per app

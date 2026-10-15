@@ -116,6 +116,16 @@ const PANEL_WIDTH_KEY = 'markdown-ai-panel-width'
 const PANEL_WIDTH_DEFAULT = 360
 const PANEL_WIDTH_MIN = 280
 const MAX_SNAPSHOTS = 20
+
+/** `assets/pic%201.png` → `pic 1.png`: the owned-asset name the main process tracks */
+function assetFileName(rel: string): string {
+  const last = rel.slice(rel.lastIndexOf('/') + 1)
+  try {
+    return decodeURIComponent(last)
+  } catch {
+    return last
+  }
+}
 const TOOL_OUTPUT_MAX_CHARS = 2000
 /** progress chip refresh while a write streams */
 const CHIP_UPDATE_MS = 400
@@ -194,6 +204,8 @@ interface Snapshot {
   label: string
   time: string
   doc: DocSnapshot
+  /** file names of the pictures the run saved beside the document (live: later tools of the same run append) */
+  assets: string[]
 }
 
 /** Ribbon preset instruction; a new nonce triggers one auto-send */
@@ -369,6 +381,8 @@ export function AiPanel({
     })
   }
   const runMutatedRef = useRef(false)
+  /** pictures the in-flight run saved; the run's snapshot keeps this same array so Roll back can name them */
+  const runAssetsRef = useRef<string[]>([])
   /** tool activity of the whole run, for transcript persistence */
   const runToolsRef = useRef<ToolActivity[]>([])
   /** tokens billed so far in the in-flight run (summed across turns) */
@@ -529,6 +543,7 @@ export function AiPanel({
           }),
           () => readOnlyRef.current,
           () => askClarification,
+          (rel) => runAssetsRef.current.push(assetFileName(rel)),
         ),
         createSearchSkill(),
       ]),
@@ -569,7 +584,9 @@ export function AiPanel({
               minute: '2-digit',
             })
             setSnapshots((prev) =>
-              [...prev, { label, time, doc: snapshotBefore }].slice(-MAX_SNAPSHOTS),
+              [...prev, { label, time, doc: snapshotBefore, assets: runAssetsRef.current }].slice(
+                -MAX_SNAPSHOTS,
+              ),
             )
           }
           // mind maps ride the UI-only display side channel onto the message
@@ -780,6 +797,7 @@ export function AiPanel({
     runInstructionRef.current = instruction
     runDisplayRef.current = displayText ?? instruction
     runMutatedRef.current = false
+    runAssetsRef.current = []
     runToolsRef.current = []
     runUsageRef.current = undefined
     // a queue batch carries its own display text: no selection quote
@@ -965,6 +983,12 @@ export function AiPanel({
   const rollback = (snapshot: Snapshot): void => {
     if (busy) return
     depsRef.current.restoreSnapshot(snapshot.doc)
+    // the document is back to before this run (and every later one): their pictures are no longer
+    // in it. Only files a run saved are named, so a picture the user added or one already saved
+    // with the document is never touched; the main process drops what is still pending.
+    const from = snapshots.indexOf(snapshot)
+    const names = new Set((from < 0 ? [snapshot] : snapshots.slice(from)).flatMap((s) => s.assets))
+    if (names.size > 0) void window.markdownApi?.discardPendingAssets?.([...names])?.catch(() => {})
     setSnapshots((prev) => prev.filter((s) => s !== snapshot))
   }
 

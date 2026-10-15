@@ -31,6 +31,7 @@ export const MARKDOWN_CHANNELS = {
   fileRenamed: 'markdown:file-renamed',
   pickImage: 'markdown:pick-image',
   saveImage: 'markdown:save-image',
+  discardPendingAssets: 'markdown:discard-pending-assets',
   readImage: 'markdown:read-image',
   saveImageAs: 'markdown:save-image-as',
   getImageHost: 'markdown:get-image-host',
@@ -306,6 +307,13 @@ export interface MarkdownApi {
    * document; returns the relative path to author, or null when untitled.
    */
   saveImage(data: { base64: string; ext: string }): Promise<string | null>
+  /**
+   * Roll back of an AI run: delete the still-pending `assets/` files the run saved, by file name
+   * (never a path). Saved or user-inserted files are left alone. Desktop only.
+   */
+  discardPendingAssets?(
+    names: string[],
+  ): Promise<{ deleted: string[]; preserved: string[]; errors: string[] }>
   /**
    * The configured image host (genoffice#388), or null when none was ever
    * saved. Pasted/dropped images upload here first and fall back to the
