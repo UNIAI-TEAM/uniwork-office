@@ -1885,6 +1885,20 @@ const EMIT_FIXTURE = {
     "    inputSchema: { type: 'object', properties: { ops: { type: 'array' } } },",
     '  },',
     '  {',
+    "    name: 'concat_tool',",
+    "    description: 'first part. ' +",
+    "      'second part.',",
+    '    inputSchema: {',
+    "      type: 'object',",
+    "      properties: { q: { type: 'string', description: 'long ' + 'text' } },",
+    '    },',
+    '  },',
+    '  {',
+    "    name: 'operator_tool',",
+    "    description: 'x' || 'y',",
+    "    inputSchema: { type: 'object', properties: { n: { type: 'number' } } },",
+    '  },',
+    '  {',
     "    name: 'schemaless',",
     "    description: 'a tool with no inputSchema',",
     '  },',
@@ -1936,11 +1950,16 @@ describe('--emit-schemas', () => {
       version: 1,
       rev: sha,
       mechanicalBlockSha256: sha256(result.text),
-      counts: { docs: 4, sheets: 1, slides: 0, pdf: 0, markdown: 0, html: 0, 'agent-core': 1 },
+      counts: { docs: 6, sheets: 1, slides: 0, pdf: 0, markdown: 0, html: 0, 'agent-core': 1 },
     })
 
     // the shape holdout-backend.mjs reads: per module, `{ type: 'function', function: { name, description, parameters } }`
-    assert.deepEqual(file.docs, [
+    assert.deepEqual(
+      file.docs.map((t) => t.function.name),
+      ['concat_tool', 'literal_tool'],
+    )
+    assert.deepEqual(
+      file.docs.find((t) => t.function.name === 'literal_tool'),
       {
         type: 'function',
         function: {
@@ -1949,9 +1968,14 @@ describe('--emit-schemas', () => {
           parameters: LITERAL_SCHEMA,
         },
       },
-    ])
+    )
     // source key order is kept (`zeta` before `alpha`), not sorted
-    assert.deepEqual(Object.keys(file.docs[0].function.parameters.properties), ['zeta', 'alpha'])
+    assert.deepEqual(
+      Object.keys(
+        file.docs.find((t) => t.function.name === 'literal_tool').function.parameters.properties,
+      ),
+      ['zeta', 'alpha'],
+    )
     assert.deepEqual(file.sheets, [
       {
         type: 'function',
@@ -1964,6 +1988,20 @@ describe('--emit-schemas', () => {
     ])
     for (const module of ['slides', 'pdf', 'markdown', 'html']) assert.deepEqual(file[module], [])
 
+    const CONCAT_FULL = {
+      type: 'object',
+      properties: { q: { type: 'string', description: 'long text' } },
+    }
+    // the table hashes what the default evaluator reads: it stops a property value at a `+`
+    const CONCAT_TABLE = {
+      type: 'object',
+      properties: { q: { type: 'string', description: 'long ' } },
+    }
+    const askSchema = { type: 'object', properties: { question: { type: 'string' } } }
+    const opsSchema = { type: 'object', properties: { ops: { type: 'array' } } }
+    const rangeSchema = { type: 'object', properties: { range: { type: 'string' } } }
+    const nSchema = { type: 'object', properties: { n: { type: 'number' } } }
+    const DOCS_SRC = 'apps/docs/src/renderer/ai/tools.ts'
     assert.deepEqual(file.catalogue, [
       {
         module: 'agent-core',
@@ -1971,47 +2009,74 @@ describe('--emit-schemas', () => {
         host: 'agent-core',
         source: 'packages/agent-core/src/shared-tools.ts',
         schemaComplete: true,
-        inputSchemaSha256: hashOf({ type: 'object', properties: { question: { type: 'string' } } }),
+        inputSchemaSha256: hashOf(askSchema),
+        tableHash: hashOf(askSchema),
       },
       {
         module: 'docs',
         name: 'computed_description',
         host: 'renderer',
-        source: 'apps/docs/src/renderer/ai/tools.ts',
+        source: DOCS_SRC,
         schemaComplete: false,
         reason: 'description:identifier:opNames',
         description: null,
         // the schema resolved, only the description needs product code: kept for a consumer that supplies its own
-        inputSchema: { type: 'object', properties: { ops: { type: 'array' } } },
-        inputSchemaSha256: hashOf({ type: 'object', properties: { ops: { type: 'array' } } }),
+        inputSchema: opsSchema,
+        inputSchemaSha256: hashOf(opsSchema),
+        tableHash: hashOf(opsSchema),
+      },
+      {
+        module: 'docs',
+        name: 'concat_tool',
+        host: 'renderer',
+        source: DOCS_SRC,
+        schemaComplete: true,
+        inputSchemaSha256: hashOf(CONCAT_FULL),
+        tableHash: hashOf(CONCAT_TABLE),
       },
       {
         module: 'docs',
         name: 'literal_tool',
         host: 'renderer',
-        source: 'apps/docs/src/renderer/ai/tools.ts',
+        source: DOCS_SRC,
         schemaComplete: true,
         inputSchemaSha256: hashOf(LITERAL_SCHEMA),
+        tableHash: hashOf(LITERAL_SCHEMA),
+      },
+      {
+        // `'x' || 'y'` is an operator the evaluator does not fold: listed, never cut at the operator
+        module: 'docs',
+        name: 'operator_tool',
+        host: 'renderer',
+        source: DOCS_SRC,
+        schemaComplete: false,
+        reason: 'description:operator:||',
+        description: null,
+        inputSchema: nSchema,
+        inputSchemaSha256: hashOf(nSchema),
+        tableHash: hashOf(nSchema),
       },
       {
         module: 'docs',
         name: 'schemaless',
         host: 'renderer',
-        source: 'apps/docs/src/renderer/ai/tools.ts',
+        source: DOCS_SRC,
         schemaComplete: false,
         reason: 'missing',
         description: 'a tool with no inputSchema',
         inputSchemaSha256: null,
+        tableHash: 'unresolved:missing',
       },
       {
         module: 'docs',
         name: 'unresolvable',
         host: 'renderer',
-        source: 'apps/docs/src/renderer/ai/tools.ts',
+        source: DOCS_SRC,
         schemaComplete: false,
         reason: 'identifier:buildSchema',
         description: 'built by a call',
         inputSchemaSha256: null,
+        tableHash: 'unresolved:identifier:buildSchema',
       },
       {
         module: 'sheets',
@@ -2019,9 +2084,14 @@ describe('--emit-schemas', () => {
         host: 'renderer',
         source: 'apps/sheets/src/renderer/ai/tools.ts',
         schemaComplete: true,
-        inputSchemaSha256: hashOf({ type: 'object', properties: { range: { type: 'string' } } }),
+        inputSchemaSha256: hashOf(rangeSchema),
+        tableHash: hashOf(rangeSchema),
       },
     ])
+    // `first part. ` + `second part.` is one description, not its first operand
+    const concat = file.docs.find((t) => t.function.name === 'concat_tool')
+    assert.equal(concat.function.description, 'first part. second part.')
+    assert.deepEqual(concat.function.parameters, CONCAT_FULL)
   })
 
   it('is deterministic: two runs write byte-identical files', () => {
