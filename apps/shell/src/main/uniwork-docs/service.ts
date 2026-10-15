@@ -1,7 +1,7 @@
 import { readFileSync, statSync } from 'node:fs'
-import { copyFile, readFile, rename, stat } from 'node:fs/promises'
+import { readFile, rename, stat } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
-import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type {
   RecentUniworkSource,
   UniworkConflictChoice,
@@ -30,6 +30,14 @@ import type {
   UniworkUploadProgress,
   UniworkWorkspaceRef,
 } from '../../shared/home-api'
+import type {
+  UniworkConflictAction,
+  UniworkConflictIntentBlock,
+  UniworkConflictKeepDraft,
+  UniworkConflictNotice,
+  UniworkConflictReply,
+  UniworkConflictView,
+} from '../../shared/uniwork-conflict'
 import {
   callbackSchemeForChannel,
   type DeploymentChannel,
@@ -61,7 +69,14 @@ import { pathKey } from '../../shared/path-key'
 import { LaunchController } from './launch'
 import type { CommentsContextResult } from '@genoffice/electron-utils/comments-ipc'
 import { actionFlags, type DocumentDetail, type LaunchDescriptor } from './parse'
-import { SaveCoordinator, toStatus, type IntentAccess } from './save-coordinator'
+import {
+  QUEUE_LIMITS,
+  SaveCoordinator,
+  toStatus,
+  type IntentAccess,
+  queueChipState,
+  type SaveQueueEngine,
+} from './save-coordinator'
 import type { SyncStoreAccess, SyncStoreOpen } from '../uniwork-sync/session-store'
 import {
   createIntentStore,
@@ -91,7 +106,6 @@ import { compareRevision } from '../uniwork-sync/feed/revision'
 import type { FeedChange } from '../uniwork-sync/feed/client'
 import { decideRemote, type RemoteLocal, type RemoteNotice } from './remote-newer'
 import type { StoreRecords } from '../uniwork-sync/store'
-import { queueChipState, type SaveQueueEngine } from './save-coordinator'
 
 /**
  * UniWork documents in the shell main process: the picker reads, the open
@@ -126,17 +140,17 @@ export interface SessionIdentity {
   deploymentId: string
 }
 
-/** the native conflict choice (rule 3); the strings live with the dialog */
+/** the close prompt and legacy conflict seams */
 export interface ConflictUi {
-  /** `signal` closes the dialog as "Decide later" */
-  chooseConflict(title: string, signal?: AbortSignal): Promise<UniworkConflictChoice>
-  /** `signal` closes the dialog as Cancel */
-  confirmDiscard(title: string, signal?: AbortSignal): Promise<boolean>
-  /** Save As for "Save a copy on this computer" (default `<stem> (my copy).<ext>`); null when cancelled */
-  pickCopyPath(stem: string, format: UniworkDocFormat): Promise<string | null>
-  showOpenLatestFailed(): void
-  /** the "Save a copy on this computer" file could not be written */
-  showCopyFailed(): void
+  /** `signal` closes the dialog as "Decide later" (legacy native conflict dialog; unused by S5) */
+  chooseConflict?(title: string, signal?: AbortSignal): Promise<UniworkConflictChoice>
+  /** `signal` closes the dialog as Cancel (legacy native discard dialog; unused by S5) */
+  confirmDiscard?(title: string, signal?: AbortSignal): Promise<boolean>
+  /** Save As for "Save a copy on this computer" (legacy; unused by S5) */
+  pickCopyPath?(stem: string, format: UniworkDocFormat): Promise<string | null>
+  showOpenLatestFailed?(): void
+  /** the "Save a copy on this computer" file could not be written (legacy; unused by S5) */
+  showCopyFailed?(): void
   /** closing a document whose local changes are not in UniWork yet; `reason` is the binding's error */
   chooseUnsavedClose(
     title: string,
@@ -159,6 +173,8 @@ export interface UniworkDocsServiceDeps {
    * touch one).
    */
   syncStore?: SyncStoreAccess
+  /** G5-09 S5: non-mutating account store usage for the drafts budget probe */
+  storeUsage?(): Promise<{ bytes: number; budgetBytes: number } | null>
   /** this build's version, stamped into every binding as `min_app_version` (display only) */
   appVersion?: () => string
   profile(): DeploymentProfile | null
@@ -226,6 +242,16 @@ export interface UniworkDocsServiceDeps {
   ui: ConflictUi
   pushStatus(status: UniworkDocStatus): void
   pushLaunch(event: UniworkLaunchEvent): void
+  /** G5-09 S5: pushes the current conflict dialog view to the shell renderer */
+  pushConflict?(view: UniworkConflictView): void
+  /** G5-09 S5: main ended the open conflict dialog session itself */
+  pushConflictClosed?(sessionId: string): void
+  /** G5-09 S5: whether an AI turn is running in the editor showing `path` */
+  isAiRunning?(path: string): boolean
+  /** G5-09 S5: stops the AI turn running in the editor showing `path` */
+  stopAiRun?(path: string): void
+  /** G5-09 S5: seam for G5-05 offline head availability (default false until G5-05 lands) */
+  hasOfflineHead?(documentId: string, revision?: string): boolean
   /**
    * The org capability cache (the same one the sync runtime reads), for the
    * save queue's lane verdicts. Absent = writes allowed (tests that never read
@@ -537,6 +563,28 @@ function queueBindingPatch(record: IntentRecordV2): Partial<Binding> | null {
   return patched
 }
 
+interface ConflictSession {
+  sessionId: string
+  draftId: string
+  path: string
+  doc: BoundDocument
+  controller: AbortController
+  fromClose: boolean
+  onNotWritten?: () => void
+  remoteNotice?: RemoteNotice
+  knownServerRevision: string | null
+  knownServerVersion: number | null
+  knownServerSavedAt: string | null
+  knownServerBy: string | null
+  knownCanEdit: boolean | null
+  serverOnline: boolean
+  locked?: 'revoked' | 'deleted'
+  draftBlock?: UniworkConflictKeepDraft
+  opened: boolean
+  done: Promise<UniworkDocStatus | null>
+  finish: () => void
+}
+
 export class UniworkDocsService {
   readonly store: BindingStore
   readonly coordinator: SaveCoordinator
@@ -599,15 +647,12 @@ export class UniworkDocsService {
   /** the poll pass in flight right now, awaited by teardownSaveQueue (G506-be-4) */
   private queuePass: Promise<void> | null = null
   /**
-   * The one conflict dialog open (native dialogs are window-wide, not per
-   * tab). `fromClose` = opened by the close prompt of that document's tab.
+   * The one conflict dialog open (G5-09 S5 session). `fromClose` = opened by
+   * the close prompt of that document's tab.
    */
-  private conflictPrompt: {
-    path: string
-    controller: AbortController
-    fromClose: boolean
-    done: Promise<unknown>
-  } | null = null
+  private conflictPrompt: ConflictSession | null = null
+  /** path key -> in-flight S5 reload draft flush waiter (intercepts onUserSave so the flush never uploads) */
+  private readonly draftFlushWaiters = new Map<string, (wrote: boolean) => void>()
   /**
    * S18: documents whose binding title this service just changed itself, keyed
    * by the revision its own rename produced. A `document.updated` from the feed
@@ -771,6 +816,30 @@ export class UniworkDocsService {
     const full = this.withRemote(this.present(status))
     this.deps.pushStatus(full)
     for (const listener of [...this.statusListeners]) listener(full)
+    const open = this.conflictPrompt
+    if (open && !open.controller.signal.aborted && samePath(open.path, full.path)) {
+      if (full.state === 'blocked') {
+        const locked: 'revoked' | 'deleted' | undefined =
+          full.error === 'permission_revoked' || full.error === 'forbidden'
+            ? 'revoked'
+            : full.error === 'document_deleted' ||
+                full.error === 'deleted' ||
+                full.error === 'not_found'
+              ? 'deleted'
+              : undefined
+        if (locked && open.locked !== locked) {
+          open.locked = locked
+          open.knownCanEdit = false
+          void this.buildConflictView(open, { fetchServer: false })
+            .then((view) => {
+              if (this.conflictPrompt === open && !open.controller.signal.aborted) {
+                this.deps.pushConflict?.(view)
+              }
+            })
+            .catch(() => undefined)
+        }
+      }
+    }
   }
 
   /**
@@ -1457,6 +1526,9 @@ export class UniworkDocsService {
 
   /** "Hủy lần lưu" of one document; `closed` = its tab is closed -> kept draft */
   async cancelSave(path: string, closed = false): Promise<void> {
+    if (closed && this.conflictPrompt && samePath(this.conflictPrompt.path, path)) {
+      this.endConflictByMain(this.conflictPrompt)
+    }
     const doc = typeof path === 'string' ? this.store.lookup(path) : null
     if (!doc || !this.ownsLocally(doc)) return
     const queueDoc = await this.queueDocFromStore(doc)
@@ -1587,6 +1659,7 @@ export class UniworkDocsService {
 
   /** forget the stored intent of `doc` (a new base made it invalid) */
   private async dropIntent(doc: BoundDocument): Promise<void> {
+    this.coordinator.clearPendingNext(doc.path)
     const access = await this.intentAccess()
     if (access.kind === 'ok') await access.intents.delete(doc.key)
   }
@@ -1877,6 +1950,18 @@ export class UniworkDocsService {
     this.lastUserSave.set(doc.path, ++this.saveCounter)
     // the module just wrote what its editor held
     this.editorDirty.delete(doc.path)
+    const flushKey = pathKey(doc.path)
+    const flush = this.draftFlushWaiters.get(flushKey)
+    if (flush) {
+      this.draftFlushWaiters.delete(flushKey)
+      flush(true)
+      // The hook may be the user's own Save landing in the flush window: it is
+      // consumed here (the flush never uploads), so nothing else will hash the
+      // file. Re-decide dirty from the file vs base now, so a copy that was
+      // never uploaded cannot read saved whatever the dialog does next.
+      void this.refreshDirty(doc).catch(() => undefined)
+      return
+    }
     // the sweep still owns this copy's pre-store intent: nothing is sent, and
     // a binding write here would drop the intent (the open retries the sweep)
     if (this.awaitingMigration(doc)) {
@@ -2388,6 +2473,16 @@ export class UniworkDocsService {
         versionId: change.versionId,
       }).catch(() => undefined)
     }
+    const open = this.conflictPrompt
+    if (open && !open.controller.signal.aborted && open.doc.binding.documentId === documentId) {
+      void this.buildConflictView(open, { fetchServer: true })
+        .then((view) => {
+          if (this.conflictPrompt === open && !open.controller.signal.aborted) {
+            this.deps.pushConflict?.(view)
+          }
+        })
+        .catch(() => undefined)
+    }
   }
 
   /**
@@ -2762,7 +2857,7 @@ export class UniworkDocsService {
   }
 
   /**
-   * "Tải lại bản mới nhất…": the existing conflict dialog, opened from the bar.
+   * "Tải lại bản mới nhất…": the S5 conflict dialog, opened from the S6 bar.
    * One dialog at a time, exactly as the chip's conflict flow: a dialog for
    * another document closes as "Decide later" first. While the AI turn is still
    * running the action is inert (D3: no stop channel yet, the renderer shows it
@@ -2775,52 +2870,7 @@ export class UniworkDocsService {
       const editor = await this.editorState(doc.path)
       if (editor.aiRunning) return this.statusOf(doc)
     }
-    const open = this.conflictPrompt
-    if (open) {
-      open.controller.abort()
-      await open.done
-    }
-    const controller = new AbortController()
-    const done = this.runRemoteReload(doc, notice, controller.signal)
-    const prompt = { path: doc.path, controller, fromClose: false, done }
-    this.conflictPrompt = prompt
-    try {
-      return await done
-    } finally {
-      if (this.conflictPrompt === prompt) this.conflictPrompt = null
-    }
-  }
-
-  private async runRemoteReload(
-    doc: BoundDocument,
-    notice: RemoteNotice,
-    signal: AbortSignal,
-  ): Promise<UniworkDocStatus | null> {
-    const choice = signal.aborted
-      ? 'later'
-      : await this.deps.ui.chooseConflict(doc.binding.title, signal)
-    if (signal.aborted || choice === 'later') return this.currentStatus(doc)
-    const chosen = this.sameLiveDoc(doc)
-    if (!chosen) return this.currentStatus(doc)
-    if (choice === 'open-latest') {
-      const confirmed = await this.deps.ui.confirmDiscard(chosen.binding.title, signal)
-      if (!confirmed || signal.aborted) return this.currentStatus(chosen)
-      try {
-        const done = await this.replaceWithLatest(chosen)
-        this.remoteBars.set(pathKey(done.path), { kind: 'updated', version: notice.version })
-        this.remoteNotices.set(pathKey(done.path), notice)
-        return this.statusOf(done)
-      } catch {
-        this.deps.ui.showOpenLatestFailed()
-        return this.currentStatus(chosen)
-      }
-    }
-    if (choice === 'overwrite') return this.overwrite(chosen)
-    if (choice === 'save-local-copy') {
-      await this.copyAside(chosen)
-      return this.currentStatus(chosen)
-    }
-    return this.currentStatus(doc)
+    return this.openConflictSession(doc, { remoteNotice: notice })
   }
 
   /**
@@ -3063,25 +3113,6 @@ export class UniworkDocsService {
       : null
   }
 
-  /** "Save a copy on this computer": a plain file beside the working copy */
-  private async copyAside(doc: BoundDocument): Promise<void> {
-    const b = doc.binding
-    const titleExt = extname(b.title)
-    const stem = (titleExt ? b.title.slice(0, -titleExt.length) : b.title) || 'document'
-    const target = await this.deps.ui.pickCopyPath(stem, b.format)
-    // a plain local file; the document itself keeps its state. A target inside
-    // the working-copy folders would not be one (or is the copy itself)
-    if (target) {
-      const copied =
-        !this.store.isInside(target) &&
-        (await copyFile(doc.path, target).then(
-          () => true,
-          () => false,
-        ))
-      if (!copied) this.deps.ui.showCopyFailed()
-    }
-  }
-
   // ---- close guard (A1.4) ----------------------------------------------------
 
   /** synchronous pre-check for the close guards: an editable copy of ours */
@@ -3146,7 +3177,12 @@ export class UniworkDocsService {
             ? 'blocked'
             : 'unsent'
       const choice = await this.deps.ui.chooseUnsavedClose(b.title, kind, b.error)
-      if (choice === 'close') return true
+      if (choice === 'close') {
+        if (this.conflictPrompt && samePath(this.conflictPrompt.path, path)) {
+          this.endConflictByMain(this.conflictPrompt)
+        }
+        return true
+      }
       if (kind === 'unsent' && choice === 'save') return this.saveForClose(path)
       if (kind === 'conflict' && choice === 'resolve') {
         const outcome = await this.resolveForClose(path)
@@ -3264,20 +3300,71 @@ export class UniworkDocsService {
     const doc = typeof path === 'string' ? this.store.lookup(path) : null
     if (!doc || !this.ownsLocally(doc)) return null
     if (doc.binding.state !== 'conflict') return this.statusOf(doc)
+    return this.openConflictSession(doc, {
+      fromClose: opts.fromClose,
+      onNotWritten,
+    })
+  }
+
+  private async openConflictSession(
+    doc: BoundDocument,
+    opts: {
+      fromClose?: boolean
+      onNotWritten?: () => void
+      remoteNotice?: RemoteNotice
+    } = {},
+  ): Promise<UniworkDocStatus | null> {
     const open = this.conflictPrompt
     if (open && samePath(open.path, doc.path)) return this.statusOf(doc)
     if (open) {
-      open.controller.abort()
+      this.endConflictByMain(open)
       await open.done
     }
     const controller = new AbortController()
-    const done = this.runConflict(doc, controller.signal, onNotWritten)
-    const prompt = { path: doc.path, controller, fromClose: !!opts.fromClose, done }
+    let finish: () => void = () => undefined
+    const done = new Promise<UniworkDocStatus | null>((resolveDone) => {
+      finish = () => resolveDone(this.currentStatus(doc))
+    })
+    const prompt: ConflictSession = {
+      sessionId: randomUUID(),
+      draftId: `conflict-draft-${randomUUID()}`,
+      path: doc.path,
+      doc,
+      controller,
+      fromClose: !!opts.fromClose,
+      onNotWritten: opts.onNotWritten,
+      remoteNotice: opts.remoteNotice,
+      knownServerRevision: opts.remoteNotice?.revision ?? doc.binding.serverRevision ?? null,
+      knownServerVersion: opts.remoteNotice?.version ?? doc.binding.serverVersion ?? null,
+      knownServerSavedAt: null,
+      knownServerBy: null,
+      knownCanEdit: doc.binding.access === 'edit' ? true : false,
+      serverOnline: true,
+      opened: false,
+      done,
+      finish,
+    }
     this.conflictPrompt = prompt
     try {
+      const view = await this.buildConflictView(prompt, { fetchServer: true })
+      if (this.conflictPrompt === prompt && !controller.signal.aborted) {
+        prompt.opened = true
+        this.deps.pushConflict?.(view)
+      }
       return await done
     } finally {
       if (this.conflictPrompt === prompt) this.conflictPrompt = null
+    }
+  }
+
+  /** G5-09 S5: main ended the open conflict session itself -> abort and push close */
+  private endConflictByMain(open: ConflictSession): void {
+    if (this.conflictPrompt === open) this.conflictPrompt = null
+    if (open.controller.signal.aborted) return
+    open.controller.abort()
+    open.finish()
+    if (open.opened) {
+      this.deps.pushConflictClosed?.(open.sessionId)
     }
   }
 
@@ -3288,42 +3375,486 @@ export class UniworkDocsService {
    */
   noteActivePath(path: string | undefined): void {
     const open = this.conflictPrompt
-    if (open && !open.fromClose && !(path && samePath(open.path, path))) open.controller.abort()
+    if (open && !open.fromClose && !(path && samePath(open.path, path))) {
+      this.endConflictByMain(open)
+    }
   }
 
   /** closes an open conflict dialog as "Decide later" (its text is in the old UI language) */
   closeConflictPrompt(): void {
-    this.conflictPrompt?.controller.abort()
+    const open = this.conflictPrompt
+    if (open) {
+      this.endConflictByMain(open)
+    }
   }
 
-  private async runConflict(
-    doc: BoundDocument,
-    signal: AbortSignal,
-    onNotWritten?: () => void,
-  ): Promise<UniworkDocStatus | null> {
-    const choice = signal.aborted
-      ? 'later'
-      : await this.deps.ui.chooseConflict(doc.binding.title, signal)
-    if (signal.aborted || choice === 'later') return this.currentStatus(doc)
-    const chosen = this.stillInConflict(doc)
-    if (!chosen) return this.currentStatus(doc)
-    if (choice === 'overwrite') return this.overwrite(chosen, onNotWritten)
-    if (choice === 'save-local-copy') {
-      await this.copyAside(chosen)
-      return this.currentStatus(chosen)
+  /** G5-09 S5: answer the open conflict dialog session */
+  async conflictAct(
+    sessionId: string,
+    action: UniworkConflictAction,
+  ): Promise<UniworkConflictReply> {
+    const open = this.conflictPrompt
+    if (!open || open.sessionId !== sessionId || open.controller.signal.aborted) {
+      return { kind: 'closed' }
     }
-    if (choice === 'open-latest') {
-      const confirmed = await this.deps.ui.confirmDiscard(chosen.binding.title, signal)
-      const latest = confirmed && !signal.aborted ? this.stillInConflict(chosen) : null
-      if (!latest) return this.currentStatus(chosen)
-      try {
-        return this.statusOf(await this.replaceWithLatest(latest))
-      } catch {
-        this.deps.ui.showOpenLatestFailed()
-        return this.currentStatus(latest)
+    if (!action || typeof action !== 'object' || typeof action.kind !== 'string') {
+      return { kind: 'view', view: await this.buildConflictView(open, { fetchServer: false }) }
+    }
+    if (action.kind === 'cancel') {
+      open.controller.abort()
+      open.finish()
+      return { kind: 'closed' }
+    }
+    if (open.locked) {
+      return { kind: 'view', view: await this.buildConflictView(open, { fetchServer: false }) }
+    }
+    const chosen = open.remoteNotice ? this.sameLiveDoc(open.doc) : this.stillInConflict(open.doc)
+    if (!chosen) {
+      open.controller.abort()
+      open.finish()
+      return { kind: 'closed' }
+    }
+    open.doc = chosen
+    const currentView = await this.buildConflictView(open, { fetchServer: false })
+    if (currentView.intent !== 'none') {
+      return { kind: 'view', view: currentView }
+    }
+    if (action.kind === 'save-copy') {
+      if (!currentView.canEdit) {
+        return { kind: 'view', view: { ...currentView, notice: null, noticeArg: null } }
+      }
+      if (action.stopAi) this.deps.stopAiRun?.(chosen.path)
+      return {
+        kind: 'view',
+        view: await this.buildConflictView(open, {
+          fetchServer: false,
+          notice: 'save_copy_failed',
+          noticeArg: null,
+        }),
       }
     }
-    return this.currentStatus(doc)
+    if (action.kind === 'reload') {
+      return this.reloadInConflict(open, chosen, action, currentView)
+    }
+    if (action.kind === 'overwrite') {
+      return this.overwriteInConflict(open, chosen, action, currentView)
+    }
+    return { kind: 'view', view: currentView }
+  }
+
+  private async buildConflictView(
+    session: ConflictSession,
+    opts: {
+      fetchServer: boolean
+      notice?: UniworkConflictNotice | null
+      noticeArg?: string | null
+    },
+  ): Promise<UniworkConflictView> {
+    const fresh = this.store.lookup(session.path)
+    if (fresh) session.doc = fresh
+    const b = session.doc.binding
+    if (b.serverRevision) session.knownServerRevision = b.serverRevision
+    if (b.state === 'blocked' && (b.error === 'permission_revoked' || b.error === 'forbidden')) {
+      session.locked = 'revoked'
+      session.knownCanEdit = false
+    } else if (
+      b.state === 'blocked' &&
+      (b.error === 'document_deleted' || b.error === 'deleted' || b.error === 'not_found')
+    ) {
+      session.locked = 'deleted'
+      session.knownCanEdit = false
+    }
+
+    if (opts.fetchServer && !session.locked) {
+      if (this.liveIdentity()) {
+        try {
+          const api = this.api()
+          const detail = await api.getDocument(b.documentId)
+          const props =
+            typeof api.documentProperties === 'function'
+              ? await api.documentProperties(b.documentId).catch(() => null)
+              : null
+          session.knownServerRevision = detail.revision
+          session.knownServerVersion = detail.file.version
+          session.knownServerSavedAt = props?.updatedAt ?? null
+          session.knownServerBy = null
+          session.knownCanEdit = detail.myLevel === 'edit' || detail.myLevel === 'manage'
+          session.serverOnline = true
+        } catch (error) {
+          if (error instanceof UniworkDocError) {
+            if (error.code === 'permission_revoked' || error.code === 'forbidden') {
+              session.locked = 'revoked'
+              session.knownCanEdit = false
+            } else if (
+              error.code === 'document_deleted' ||
+              error.code === 'deleted' ||
+              error.code === 'not_found'
+            ) {
+              session.locked = 'deleted'
+              session.knownCanEdit = false
+            } else if (error.code === 'network') {
+              session.serverOnline = false
+            }
+          } else {
+            session.serverOnline = false
+          }
+        }
+      } else {
+        session.serverOnline = false
+      }
+    }
+
+    let online = session.serverOnline && !!this.liveIdentity()
+    if (this.deps.capability && b.orgId) {
+      try {
+        await this.deps.capability.get(b.orgId)
+      } catch {
+        online = false
+      }
+    }
+
+    let intent: UniworkConflictIntentBlock = 'none'
+    const access = await this.intentAccess()
+    if (access.kind === 'ok') {
+      const stored = await access.intents.read(session.doc.key, {
+        orgId: b.orgId,
+        workspaceId: b.workspaceId,
+        baseVersion: b.baseVersion,
+        length: 0,
+      })
+      const st = stored?.intent.state
+      if (st === 'committing' || st === 'reconciling' || st === 'reconciling-stuck') {
+        intent = st
+      }
+    }
+    if (intent === 'none' && this.coordinator.isSaving(session.path)) {
+      intent = 'committing'
+    }
+
+    const keepDraft = await this.probeKeepDraft(session, session.doc)
+    const moduleKind: UniworkConflictView['module'] =
+      b.format === 'docx'
+        ? 'docs'
+        : b.format === 'xlsx'
+          ? 'sheets'
+          : b.format === 'pptx'
+            ? 'slides'
+            : 'other'
+    const canEdit = session.locked ? false : (session.knownCanEdit ?? b.access === 'edit')
+
+    return {
+      sessionId: session.sessionId,
+      path: session.path,
+      documentId: b.documentId,
+      title: b.title,
+      module: moduleKind,
+      mine: { baseVersion: b.baseVersion ?? null },
+      server: {
+        version: session.knownServerVersion,
+        savedAt: session.knownServerSavedAt,
+        by: session.knownServerBy,
+      },
+      canEdit,
+      online,
+      headOffline:
+        this.deps.hasOfflineHead?.(b.documentId, session.knownServerRevision ?? undefined) === true,
+      intent,
+      keepDraft,
+      draftCap: QUEUE_LIMITS.draftsPerDocument,
+      aiRunning: this.deps.isAiRunning?.(session.path) === true,
+      locked: session.locked ?? 'none',
+      notice: opts.notice ?? null,
+      noticeArg: opts.noticeArg ?? null,
+    }
+  }
+
+  private async probeKeepDraft(
+    session: ConflictSession,
+    doc: BoundDocument,
+  ): Promise<UniworkConflictKeepDraft> {
+    if (this.storeLocked()) return 'keystore_locked'
+    const access = await this.queueEngine().catch(() => ({ kind: 'unavailable' as const }))
+    if (access.kind === 'keystore_locked') return 'keystore_locked'
+    if (access.kind !== 'ok') return session.draftBlock ?? 'ok'
+    const existing = await access.drafts.list(doc.key)
+    const others = existing.filter((d) => d.id !== session.draftId)
+    if (others.length >= QUEUE_LIMITS.draftsPerDocument) return 'drafts_full'
+    if (this.deps.storeUsage) {
+      const usage = await this.deps.storeUsage().catch(() => null)
+      if (usage) {
+        let fileBytes: number
+        try {
+          fileBytes = (await stat(doc.path)).size
+        } catch {
+          fileBytes = 0
+        }
+        const overhead =
+          (existing.length === 0 ? 220 : 120) + Buffer.byteLength(doc.binding.title, 'utf8')
+        if (usage.bytes + fileBytes + overhead > usage.budgetBytes) {
+          return 'store_full'
+        }
+      }
+    }
+    return session.draftBlock ?? 'ok'
+  }
+
+  /**
+   * Flushes an open dirty module to `path` and awaits its `onUserSave` hook
+   * before `drafts.keep` reads the working copy, without starting a save upload.
+   */
+  private flushModuleForDraft(open: ConflictSession, path: string): Promise<boolean> {
+    const key = pathKey(path)
+    this.draftFlushWaiters.get(key)?.(false)
+    return new Promise<boolean>((resolveFlush) => {
+      let settled = false
+      const finish = (wrote: boolean) => {
+        if (settled) return
+        settled = true
+        clearTimeout(timer)
+        open.controller.signal.removeEventListener('abort', onAbort)
+        if (this.draftFlushWaiters.get(key) === finish) {
+          this.draftFlushWaiters.delete(key)
+        }
+        resolveFlush(wrote)
+      }
+      const onAbort = () => finish(false)
+      const timer = setTimeout(() => finish(false), CLOSE_SAVE_WAIT_MS)
+      ;(timer as { unref?: () => void }).unref?.()
+      open.controller.signal.addEventListener('abort', onAbort, { once: true })
+      this.draftFlushWaiters.set(key, finish)
+      let requested: boolean
+      try {
+        requested = this.deps.requestModuleSave(path, () => finish(false))
+      } catch {
+        requested = false
+      }
+      if (!requested) {
+        finish(false)
+      }
+    })
+  }
+
+  private async reloadInConflict(
+    open: ConflictSession,
+    chosen: BoundDocument,
+    action: Extract<UniworkConflictAction, { kind: 'reload' }>,
+    currentView: UniworkConflictView,
+  ): Promise<UniworkConflictReply> {
+    if (!currentView.online && !currentView.headOffline) {
+      return { kind: 'view', view: currentView }
+    }
+    if (action.keep === 'draft') {
+      if (currentView.keepDraft !== 'ok') {
+        return { kind: 'view', view: currentView }
+      }
+      if (action.stopAi) this.deps.stopAiRun?.(chosen.path)
+      const editor = await this.editorState(chosen.path)
+      if (editor.dirty === true || this.editorDirty.has(chosen.path)) {
+        if (!(await this.flushModuleForDraft(open, chosen.path))) {
+          if (open.controller.signal.aborted) return { kind: 'closed' }
+          return {
+            kind: 'view',
+            view: await this.buildConflictView(open, {
+              fetchServer: false,
+              notice: open.locked ? null : 'reload_failed',
+            }),
+          }
+        }
+        if (open.controller.signal.aborted) return { kind: 'closed' }
+        if (open.locked) {
+          return { kind: 'view', view: await this.buildConflictView(open, { fetchServer: false }) }
+        }
+        chosen = await this.refreshDirty(chosen)
+        open.doc = chosen
+      }
+      let localBytes: Uint8Array
+      try {
+        localBytes = new Uint8Array(await readFile(chosen.path))
+      } catch {
+        return {
+          kind: 'view',
+          view: await this.buildConflictView(open, { fetchServer: false, notice: 'reload_failed' }),
+        }
+      }
+      const access = await this.queueEngine().catch(() => ({ kind: 'unavailable' as const }))
+      if (access.kind === 'keystore_locked') {
+        open.draftBlock = 'keystore_locked'
+        return { kind: 'view', view: await this.buildConflictView(open, { fetchServer: false }) }
+      }
+      if (access.kind !== 'ok') {
+        return {
+          kind: 'view',
+          view: await this.buildConflictView(open, { fetchServer: false, notice: 'reload_failed' }),
+        }
+      }
+      const kept = await access.drafts.keep(chosen.key, localBytes, {
+        id: open.draftId,
+        createdAt: new Date(this.deps.now?.() ?? Date.now()).toISOString(),
+        title: chosen.binding.title,
+      })
+      if (kept !== 'ok') {
+        open.draftBlock = kept
+        return { kind: 'view', view: await this.buildConflictView(open, { fetchServer: false }) }
+      }
+      // the dialog ended while the draft was being kept: the draft stays, the tab is not reloaded
+      if (open.controller.signal.aborted) return { kind: 'closed' }
+    } else if (action.stopAi) {
+      this.deps.stopAiRun?.(chosen.path)
+    }
+    try {
+      const done = await this.replaceWithLatest(chosen)
+      if (open.remoteNotice) {
+        this.remoteBars.set(pathKey(done.path), {
+          kind: 'updated',
+          version: open.remoteNotice.version,
+        })
+        this.remoteNotices.set(pathKey(done.path), open.remoteNotice)
+        this.publish(toStatus(done))
+      }
+    } catch (error) {
+      if (error instanceof UniworkDocError) {
+        if (error.code === 'permission_revoked' || error.code === 'forbidden') {
+          open.locked = 'revoked'
+          open.knownCanEdit = false
+        } else if (
+          error.code === 'document_deleted' ||
+          error.code === 'deleted' ||
+          error.code === 'not_found'
+        ) {
+          open.locked = 'deleted'
+          open.knownCanEdit = false
+        }
+      }
+      return {
+        kind: 'view',
+        view: await this.buildConflictView(open, {
+          fetchServer: false,
+          notice: open.locked ? null : 'reload_failed',
+        }),
+      }
+    }
+    open.controller.abort()
+    open.finish()
+    return { kind: 'closed' }
+  }
+
+  private async overwriteInConflict(
+    open: ConflictSession,
+    chosen: BoundDocument,
+    action: Extract<UniworkConflictAction, { kind: 'overwrite' }>,
+    currentView: UniworkConflictView,
+  ): Promise<UniworkConflictReply> {
+    if (!currentView.canEdit) {
+      return { kind: 'view', view: { ...currentView, notice: null, noticeArg: null } }
+    }
+    let serverRevision = open.knownServerRevision ?? chosen.binding.serverRevision ?? null
+    if (!serverRevision && currentView.online) {
+      try {
+        const api = this.api()
+        const detail = await api.getDocument(chosen.binding.documentId)
+        const props =
+          typeof api.documentProperties === 'function'
+            ? await api.documentProperties(chosen.binding.documentId).catch(() => null)
+            : null
+        serverRevision = detail.revision
+        open.knownServerRevision = detail.revision
+        open.knownServerVersion = detail.file.version
+        open.knownServerSavedAt = props?.updatedAt ?? open.knownServerSavedAt
+      } catch (error) {
+        if (error instanceof UniworkDocError) {
+          if (error.code === 'permission_revoked' || error.code === 'forbidden') {
+            open.locked = 'revoked'
+            open.knownCanEdit = false
+          } else if (
+            error.code === 'document_deleted' ||
+            error.code === 'deleted' ||
+            error.code === 'not_found'
+          ) {
+            open.locked = 'deleted'
+            open.knownCanEdit = false
+          }
+        }
+        return {
+          kind: 'view',
+          view: await this.buildConflictView(open, {
+            fetchServer: false,
+            notice: open.locked ? null : 'overwrite_failed',
+          }),
+        }
+      }
+    }
+    if (!serverRevision) {
+      return {
+        kind: 'view',
+        view: await this.buildConflictView(open, {
+          fetchServer: false,
+          notice: 'overwrite_failed',
+        }),
+      }
+    }
+    if (action.stopAi) this.deps.stopAiRun?.(chosen.path)
+    const next: Binding = {
+      ...chosen.binding,
+      baseRevision: serverRevision,
+      // the server's bytes are unknown here: the next Save always uploads.
+      // baseVersionId stays: it names the version these bytes were based on (baseVersion is
+      // unchanged too), so comments anchored against it remain valid until a Save moves the base
+      baseChecksum: '',
+      state: 'dirty',
+    }
+    delete next.error
+    delete next.serverRevision
+    delete next.serverVersion
+    // "Ghi đè": the old intent is superseded BEFORE a new one is minted, so the
+    // user's snapshot is spent (superseded), never replayed against the new base
+    await this.supersedePending(chosen)
+    // the old base's intent is invalid on the server's revision
+    await this.dropIntent(chosen)
+    const ready = await this.coordinator.commitState(chosen, next)
+    if (!currentView.online) {
+      await this.coordinator.save(ready.path, { forceOffline: true })
+      open.controller.abort()
+      open.finish()
+      return { kind: 'closed' }
+    }
+    if (this.deps.requestModuleSave(ready.path, open.onNotWritten)) {
+      open.controller.abort()
+      open.finish()
+      return { kind: 'closed' }
+    }
+    const saved = await this.coordinator.save(ready.path)
+    const after = this.store.lookup(ready.path) ?? saved ?? ready
+    if (after.binding.state === 'conflict') {
+      open.doc = after
+      if (after.binding.serverRevision) open.knownServerRevision = after.binding.serverRevision
+      const refreshed = await this.buildConflictView(open, {
+        fetchServer: true,
+        notice: 'head_moved',
+      })
+      return {
+        kind: 'view',
+        view: {
+          ...refreshed,
+          notice: 'head_moved',
+          noticeArg: open.knownServerVersion !== null ? String(open.knownServerVersion) : null,
+        },
+      }
+    }
+    if (after.binding.state === 'blocked' && open.locked) {
+      return { kind: 'view', view: await this.buildConflictView(open, { fetchServer: false }) }
+    }
+    if (after.binding.state === 'error' || after.binding.state === 'failed') {
+      return {
+        kind: 'view',
+        view: await this.buildConflictView(open, {
+          fetchServer: false,
+          notice: 'overwrite_failed',
+        }),
+      }
+    }
+    open.controller.abort()
+    open.finish()
+    return { kind: 'closed' }
   }
 
   /** the binding at `doc.path` now, if it is still that document and still in conflict */
@@ -3376,43 +3907,6 @@ export class UniworkDocsService {
 
   // ---- flows -----------------------------------------------------------------
 
-  /** "Save my version as the newest version": a new intent on the server's revision */
-  private async overwrite(
-    doc: BoundDocument,
-    onNotWritten?: () => void,
-  ): Promise<UniworkDocStatus | null> {
-    let serverRevision = doc.binding.serverRevision
-    if (!serverRevision) {
-      try {
-        serverRevision = (await this.api().getDocument(doc.binding.documentId)).revision
-      } catch (error) {
-        const code = error instanceof UniworkDocError ? error.code : 'server_error'
-        await this.coordinator.commitState(doc, { ...doc.binding, error: code })
-        return this.statusOf(doc)
-      }
-    }
-    const next: Binding = {
-      ...doc.binding,
-      baseRevision: serverRevision,
-      // the server's bytes are unknown here: the next Save always uploads.
-      // baseVersionId stays: it names the version these bytes were based on (baseVersion is
-      // unchanged too), so comments anchored against it remain valid until a Save moves the base
-      baseChecksum: '',
-      state: 'dirty',
-    }
-    delete next.error
-    delete next.serverRevision
-    // "Ghi đè": the old intent is superseded BEFORE a new one is minted, so the
-    // user's snapshot is spent (superseded), never replayed against the new base
-    await this.supersedePending(doc)
-    // the old base's intent is invalid on the server's revision
-    await this.dropIntent(doc)
-    const ready = await this.coordinator.commitState(doc, next)
-    if (this.deps.requestModuleSave(ready.path, onNotWritten)) return this.statusOf(ready)
-    const saved = await this.coordinator.save(ready.path)
-    return saved ? this.statusOf(saved) : this.statusOf(ready)
-  }
-
   /** "Discard my changes and open the latest": download, replace, reload the tab */
   private async replaceWithLatest(doc: BoundDocument): Promise<BoundDocument> {
     const { detail, bytes } = await this.fetchLatest(doc.binding.documentId)
@@ -3438,6 +3932,9 @@ export class UniworkDocsService {
     delete next.error
     delete next.serverRevision
     delete next.serverVersion
+    // reloading the tab discards any pre-reload editor edits (and outdates an in-flight poll pass)
+    this.lastUserSave.set(doc.path, ++this.saveCounter)
+    this.editorDirty.delete(doc.path)
     const done = await this.coordinator.commitState(doc, next)
     // the bar belonged to the replaced base: the copy is at the head now
     this.remoteBars.delete(pathKey(doc.path))
