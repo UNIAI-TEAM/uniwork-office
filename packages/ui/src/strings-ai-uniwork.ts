@@ -1,4 +1,5 @@
 import { createI18n, defineStrings, type Lang, type Params } from '@genoffice/i18n'
+import type { ResultChipErrorKey } from '@genoffice/agent-core'
 import { zh } from './ai-uniwork/zh'
 import { en } from './ai-uniwork/en'
 import { ja } from './ai-uniwork/ja'
@@ -50,7 +51,7 @@ export type AiUniworkStringKey = keyof (typeof aiUniworkStrings)['zh']
 
 const translate = createI18n(aiUniworkStrings)
 
-// params fill the {org}, {remaining}, {limit}, {seconds}, {module} and {provider} slots
+// params fill the {org}, {remaining}, {limit}, {date}, {written}, {range}, {overwritten}, {seconds}, {module} and {provider} slots
 export function aiUniworkText(lang: Lang, key: AiUniworkStringKey, params?: Params): string {
   return translate(lang, key, params)
 }
@@ -71,4 +72,48 @@ const refusalMessages = new Set(
 export function isUniworkQuestionRefusal(message: string | null | undefined): boolean {
   const text = message?.trim()
   return !!text && refusalMessages.has(text)
+}
+
+/** the S9 error keys a turn's error text can be (the keys `uniworkErrorKey` and `classifyS9Error` agree on) */
+const ERROR_TEXT_KEYS = [
+  'aiErrRunLimit',
+  'aiErrCredits',
+  'aiErrEntitlement',
+  'aiErrCapabilityOff',
+  'aiErrSession',
+  'aiErrRateLimitedNoWait',
+  'aiErrUnavailable',
+  'aiErrDisconnected',
+  'aiErrOffline',
+  'aiErrRevoked',
+  'aiErrDowngraded',
+  'aiConversationRestarted',
+  'aiErrWorkbookTooLarge',
+  'aiErrQuestionTooLong',
+  'aiErrQuestionRejected',
+  'aiErrGeneric',
+] as const satisfies readonly ResultChipErrorKey[]
+
+const errorKeyByText = new Map<string, ResultChipErrorKey>(
+  Object.values(aiUniworkStrings).flatMap((table) =>
+    ERROR_TEXT_KEYS.map((key) => [table[key].trim(), key] as const),
+  ),
+)
+
+/**
+ * The S9 error key a chat entry's error text was written from, in any UI language, or null for
+ * text UniWork AI did not write. A failed turn keeps only the localized text the transport chose
+ * by the server's code (the code is gone by the time the panel stores the entry), so the result
+ * chip reads the key back from the text to pick its action and its announcement.
+ */
+export function uniworkErrorKeyOfText(
+  message: string | null | undefined,
+): ResultChipErrorKey | null {
+  const text = message?.trim()
+  return text ? (errorKeyByText.get(text) ?? null) : null
+}
+
+/** what a panel hands `resultChip` as `error`: the key when the text is ours, else the text, else null */
+export function uniworkErrorForChip(message: string | null | undefined): string | null {
+  return uniworkErrorKeyOfText(message) ?? (message?.trim() ? message : null)
 }

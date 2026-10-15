@@ -33,6 +33,7 @@ export const he = {
   aiRunSend: 'שליחה',
   aiRunRunning: 'פועל… לחץ על עצירה או Esc כדי לעצור.',
   aiRunStopped: 'נעצר. שינויים שכבר הוחלו נשארים במסמך וניתן לבטל אותם.',
+  aiRunRetry: 'נסה שוב',
   aiRunAskAgain: 'שאל שוב',
   aiRunChooseOther: 'בחירת ספק אחר',
   aiRunOpenInApp: 'פתיחה באפליקציה',
@@ -48,6 +49,8 @@ export const he = {
   aiErrRateLimited: 'אתה שולח מהר מדי. נסה שוב בעוד {seconds} שנ׳.',
   aiErrRateLimitedNoWait: 'אתה שולח מהר מדי. נסה שוב בעוד כמה דקות.',
   aiErrUnavailable: 'UniWork AI לא מגיב כרגע. המסמך שלך והשמירה עדיין עובדים.',
+  aiErrGeneric:
+    'UniWork AI נתקל בבעיה בלתי צפויה, ולכן ההרצה הזו נעצרה. המסמך שלך והשמירה עדיין עובדים.',
   aiErrDisconnected:
     'החיבור נותק ולכן ההרצה נעצרה. שינויים שכבר הוחלו נשארים במסמך וניתן לבטל אותם.',
   aiErrOffline: 'אתה במצב לא מקוון. UniWork AI לא פועל במצב לא מקוון ובקשות לא נכנסות לתור.',
@@ -61,4 +64,32 @@ export const he = {
   aiErrQuestionTooLong: 'הבקשה ארוכה מדי עבור UniWork AI. קצר אותה לפחות מ-8,000 תווים ושלח שוב.',
   aiErrQuestionRejected: 'UniWork AI לא יכול לקבל את הבקשה הזו. שנה אותה ושלח שוב.',
   aiUniworkImagesNotSent: 'תמונות לא נשלחות ל-UniWork AI; נשלח רק הטקסט שלך.',
+  // Cloud state, credits and account actions (shared with picker footer and composer note)
+  cloudStateReady: 'זמין',
+  cloudStateNotEntitled: 'לא כלול בתוכנית שלך',
+  cloudStateExhausted: 'נגמרו קרדיטי ה-AI',
+  cloudStateUnavailable: 'לא זמין',
+  cloudStateSignedOut: 'לא מחובר',
+  cloudStateInactive: 'המנוי אינו פעיל',
+  cloudCredits: 'קרדיטי AI',
+  cloudCreditsLeft: 'נותרו {remaining} / {limit}',
+  cloudCreditsUnlimited: 'ללא הגבלה',
+  cloudCreditsRenews: 'יתחדש ב-{date}',
+  cloudInactiveBody:
+    'מנוי UniWork של הארגון שלך אינו פעיל, ולכן ה-AI בענן מושהה. בקש ממנהל לחדש אותו; הספקים שלך למטה ממשיכים לעבוד.',
+  acctSignIn: 'כניסה',
+  acctSignInAgain: 'כניסה מחדש',
+  // S8/S10 local-file conversation restart notice (G05BE-6)
+  aiUniworkLocalFileRestart:
+    'קבצים מקומיים מתחילים שיחה חדשה תחת הארגון שלך ואינם שומרים סבבים מקבצים אחרים.',
+  // S9 cells summary and S10 web workbook size limit
+  aiResultCellsMeta: 'תאים שנכתבו: {written} ({range}) · תאים קיימים שנדרסו: {overwritten}',
+  aiResultCellsMetaNoOverwrite: 'תאים שנכתבו: {written} ({range})',
+  aiErrWorkbookTooLarge:
+    'חוברת העבודה הזו גדולה מדי ל-AI באינטרנט. פתח אותה באפליקציית UniWork Office.',
+  // S7 composer notice keys (not_entitled, credits_exhausted)
+  not_entitled:
+    'התוכנית של הארגון שלך אינה כוללת את UniWork AI. פנה למנהל הארגון לגבי התוכנית, או הוסף מפתח AI משלך בהגדרות > מודל AI.',
+  credits_exhausted:
+    'הארגון שלך ניצל את כל קרדיטי ה-AI לתקופה זו. בקש ממנהל הארגון להוסיף קרדיטים, או הוסף מפתח AI משלך בהגדרות > מודל AI.',
 } satisfies Record<keyof typeof zh, string>

@@ -221,11 +221,14 @@ export function asUniworkFailure(err: unknown): UniworkFailure | undefined {
 
 /**
  * The S9/S10 string of a failed UniWork AI turn: the adapter's `uniworkErrorKey` (web host), except
- * that "off" before any run is the entry's own note (`aiUniworkOff`), and a key U-02 has no string
- * for yet (the web 413 `aiErrWorkbookTooLarge`) reads as `aiErrUnavailable`.
+ * that "off" before any run is the entry's own note (`aiUniworkOff`), falling back to
+ * `aiErrUnavailable` if the key is not in `aiUniworkStrings`.
  */
-export function uniworkFailureKey(failure: UniworkFailure): AiUniworkStringKey {
+export function uniworkFailureKey(
+  failure: UniworkFailure,
+  resolveErrorKey: (code: string, host: 'desktop' | 'web') => string = uniworkErrorKey,
+): AiUniworkStringKey {
   if (failure.code === 'office_capability_off' && !failure.runId) return 'aiUniworkOff'
-  const key = uniworkErrorKey(failure.code, 'web')
+  const key = resolveErrorKey(failure.code, 'web')
   return key in aiUniworkStrings.zh ? (key as AiUniworkStringKey) : 'aiErrUnavailable'
 }

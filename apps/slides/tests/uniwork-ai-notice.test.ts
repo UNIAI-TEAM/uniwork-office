@@ -5,7 +5,7 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AgentStreamNotice } from '@genoffice/agent-core'
-import { aiUniworkText } from '@genoffice/ui'
+import { aiUniworkText, clearUniworkAcks } from '@genoffice/ui'
 
 const harness = vi.hoisted(() => ({
   events: null as null | {
@@ -80,32 +80,45 @@ const flush = () =>
 const ui = (key: Parameters<typeof aiUniworkText>[1], params?: Record<string, string | number>) =>
   aiUniworkText(getLang(), key, params)
 
-async function startRun(): Promise<HTMLElement> {
+async function startRun(provider: AiSettings['provider'] = 'anthropic'): Promise<HTMLElement> {
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
-  act(() =>
-    root.render(
-      createElement(LocaleProvider, {
-        initial: 'vi',
-        children: createElement(AiPanel, {
-          slides: [],
-          current: 0,
-          selectedIds: [],
-          images: new Map(),
-          applySlide: () => {},
-          applyDeck: () => {},
-          fitWidthPx: 960,
-          settings,
-          open: true,
-          onExpand: () => {},
-          onCollapse: () => {},
-          preset: { text: 'tighten it', nonce: 1, autoRun: true },
+  const render = (preset?: { text: string; nonce: number; autoRun: boolean }) =>
+    act(() =>
+      root.render(
+        createElement(LocaleProvider, {
+          initial: 'vi',
+          children: createElement(AiPanel, {
+            slides: [],
+            current: 0,
+            selectedIds: [],
+            images: new Map(),
+            applySlide: () => {},
+            applyDeck: () => {},
+            fitWidthPx: 960,
+            settings: { ...settings, provider },
+            open: true,
+            onExpand: () => {},
+            onCollapse: () => {},
+            preset,
+          }),
         }),
-      }),
-    ),
-  )
+      ),
+    )
+  const preset = { text: 'tighten it', nonce: 1, autoRun: true }
   mounted.push({ root, container })
+  if (provider === 'uniwork') {
+    // a preset is refused until the UniWork disclosure is acknowledged (S8): mount, acknowledge
+    // the way a user does, then fire the preset
+    render()
+    await flush()
+    act(() => {
+      container.querySelector<HTMLButtonElement>('[role="region"] button')!.click()
+    })
+    await flush()
+  }
+  render(preset)
   await flush()
   expect(harness.run).toHaveBeenCalled()
   return container
@@ -143,6 +156,8 @@ beforeEach(() => {
 
 afterEach(() => {
   setModuleLang('zh')
+  // the in-memory empty-account ack must not leak into the next test
+  clearUniworkAcks()
   for (const { root, container } of mounted.splice(0)) {
     act(() => root.unmount())
     container.remove()
@@ -195,17 +210,24 @@ describe('UniWork AI notices (slides panel)', () => {
 
   it('one persistent aria-live region is mounted before the notice, and the note lands inside it', async () => {
     const c = await startRun()
-    const live = c.querySelector('.ai-msg-assistant [aria-live="polite"]')
+    const chatEl = c.querySelector('.ai-chat')
+    expect(chatEl?.hasAttribute('aria-live')).toBe(false)
+    expect(chatEl?.getAttribute('aria-busy')).toBe('true')
+    expect(c.querySelector('.ai-msg-assistant [aria-live]')).toBeNull()
+    const live = c.querySelector('.ai-sr-status')
     expect(live, 'live region before any notice').not.toBeNull()
+    expect(live!.getAttribute('aria-live')).toBe('polite')
     expect(live!.textContent).toBe('')
     // a plain aria-live container: role=status would collide with the app's own status nodes
     expect(live!.hasAttribute('role')).toBe(false)
     await notify({ kind: 'rate-limit-wait', seconds: 30, attempt: 1 })
-    // the same node (not a new one mounted with its text) now holds the note, and nothing else announces
-    expect(c.querySelector('.ai-msg-assistant [aria-live="polite"]')).toBe(live)
+    // the same node (not a new one mounted with its text) now holds the note, and nothing else in .ai-chat announces
+    expect(c.querySelector('.ai-sr-status')).toBe(live)
+    expect(c.querySelectorAll('[aria-live]')).toHaveLength(1)
+    expect(c.querySelectorAll('[role="status"]:not(.ai-typing)')).toHaveLength(0)
     expect(live!.textContent).toBe(ui('aiErrRateLimited', { seconds: 30 }))
     expect(c.querySelectorAll('.ai-msg-notice [role="status"]')).toHaveLength(0)
-    expect(live!.querySelectorAll('.ai-msg-notice')).toHaveLength(1)
+    expect(c.querySelectorAll('.ai-msg-notice')).toHaveLength(1)
     // a restart note joins the wait line in the same region
     await notify({ kind: 'conversation-restarted' })
     expect(live!.textContent).toContain(ui('aiConversationRestarted'))
@@ -218,6 +240,7 @@ describe('UniWork AI notices (slides panel)', () => {
       harness.events!.onDone?.({ text: '', cancelled: false, turnLimit: false }),
     )
     await flush()
+    expect(c.querySelectorAll('[role="status"]')).toHaveLength(0)
     expect(notices(c)).toEqual([ui('aiConversationRestarted')])
     expect(c.textContent).not.toContain(t('aiNoResponse'))
     // the turn ended quietly: no error line, no Retry, and the question is back in the composer
@@ -277,5 +300,53 @@ describe('UniWork AI notices (slides panel)', () => {
       ui('aiErrViewOnlyEdit'),
       ui('aiErrUnsupported', { module: 'Slides' }),
     ])
+  })
+
+  it('when UniWork AI is selected, renders result chip as first words of answer node and announces once in panel live node', async () => {
+    const c = await startRun('uniwork')
+    const chatEl = c.querySelector('.ai-chat')
+    expect(chatEl?.hasAttribute('aria-live')).toBe(false)
+    expect(chatEl?.getAttribute('aria-busy')).toBe('true')
+    await act(async () => harness.events!.onText?.('Bố cục trang 1 đã gọn hơn.'))
+    await act(async () =>
+      harness.events!.onDone?.({
+        text: 'Bố cục trang 1 đã gọn hơn.',
+        cancelled: false,
+        turnLimit: false,
+      }),
+    )
+    await flush()
+    expect(chatEl?.hasAttribute('aria-busy')).toBe(false)
+    const chipEl = c.querySelector('.ai-result-chip')
+    expect(chipEl).not.toBeNull()
+    expect(chipEl?.textContent).toBe(ui('aiResultAnswer'))
+    const answerNode = chipEl?.parentElement
+    expect(answerNode?.textContent?.startsWith(`${ui('aiResultAnswer')}:`)).toBe(true)
+    const live = c.querySelector('.ai-sr-status')
+    expect(live?.textContent).toBe(ui('aiResultAnswer'))
+    expect(live?.textContent).not.toContain('Bố cục trang 1 đã gọn hơn.')
+  })
+
+  it('Stop before the first token on UniWork AI: no Answer chip and exactly one stopped line (RF2-1)', async () => {
+    const c = await startRun('uniwork')
+    await act(async () => harness.events!.onDone?.({ text: '', cancelled: true, turnLimit: false }))
+    await flush()
+    expect(c.querySelector('.ai-result-chip')).toBeNull()
+    const stoppedLines = [...c.querySelectorAll('.ai-msg-assistant *')].filter(
+      (el) => el.children.length === 0 && el.textContent === ui('aiRunStopped'),
+    )
+    expect(stoppedLines).toHaveLength(1)
+    expect(c.querySelector('.ai-msg-answer')?.textContent ?? '').not.toContain(t('aiStoppedNote'))
+    expect(c.querySelector('.ai-sr-status')?.textContent).toBe(ui('aiRunStopped'))
+  })
+
+  it('clicking Stop returns keyboard focus to the composer textarea (RF1-12, RF1-23b)', async () => {
+    const c = await startRun()
+    const stopBtn = c.querySelector<HTMLButtonElement>(`button[aria-label="${t('aiStop')}"]`)
+    expect(stopBtn).not.toBeNull()
+    stopBtn!.focus()
+    await act(async () => stopBtn!.click())
+    await flush()
+    expect(document.activeElement).toBe(c.querySelector('textarea'))
   })
 })

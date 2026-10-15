@@ -117,8 +117,11 @@ export {
   aiUniworkStrings,
   aiUniworkText,
   isUniworkQuestionRefusal,
+  uniworkErrorForChip,
+  uniworkErrorKeyOfText,
   type AiUniworkStringKey,
 } from './strings-ai-uniwork'
+export { AiErrorAction, type AiErrorActionProps } from './AiErrorAction'
 export { ImageViewer, type ImageViewerLabels } from './image-viewer'
 export { trapTab, useModalKeys } from './modal-keys'
 export {
@@ -162,3 +165,41 @@ export {
 export { ProviderLogo } from './provider-logos'
 export { useRedactLabelField } from './use-redact-label'
 export type { RedactLabelField } from './use-redact-label'
+export { type AiComposerProps } from './AiComposer'
+export {
+  UNIWORK_ACK_STORAGE_KEY,
+  UniworkComposerNote,
+  UniworkDisclosure,
+  UniworkDisclosureShort,
+  ack,
+  clearUniworkAcks,
+  createUniworkSendGate,
+  isAcked,
+  isComposerPopupOpen,
+  resolveComposerNoteText,
+  serializeUniworkAckKey,
+  subscribeUniworkAck,
+  useUniworkDisclosureAck,
+  useUniworkSendGate,
+  type AiComposerUniworkDisclosureConfig,
+  type AiComposerUniworkProps,
+  type UniworkAckKey,
+  type UniworkComposerNoteProps,
+  type UniworkDisclosureProps,
+  type UniworkDisclosureShortProps,
+  type UniworkDisclosureVariant,
+  type UniworkSendGate,
+} from './ai-uniwork-composer'
+export {
+  composerNoteFor,
+  type ComposerNote,
+  type ComposerNoteAction,
+  type ComposerNoteInput,
+  type ComposerNoteKey,
+  type ComposerNoteKind,
+} from '@genoffice/ai-provider/browser'
+export type {
+  AiModelPickerCloudCredits,
+  AiModelPickerCloudState,
+  AiModelPickerCloudStatus,
+} from './AiModelPicker'

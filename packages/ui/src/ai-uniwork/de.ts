@@ -39,6 +39,7 @@ export const de = {
   aiRunRunning: 'Läuft… Drücken Sie Stoppen oder Esc zum Anhalten.',
   aiRunStopped:
     'Gestoppt. Bereits angewendete Änderungen bleiben im Dokument und lassen sich rückgängig machen.',
+  aiRunRetry: 'Erneut versuchen',
   aiRunAskAgain: 'Erneut fragen',
   aiRunChooseOther: 'Anderen Anbieter wählen',
   aiRunOpenInApp: 'In der App öffnen',
@@ -57,6 +58,8 @@ export const de = {
   aiErrRateLimitedNoWait: 'Sie senden zu schnell. Versuchen Sie es in ein paar Minuten erneut.',
   aiErrUnavailable:
     'UniWork AI antwortet gerade nicht. Ihr Dokument und Speichern funktionieren weiterhin.',
+  aiErrGeneric:
+    'UniWork AI ist auf ein unerwartetes Problem gestoßen, daher wurde dieser Durchlauf beendet. Ihr Dokument und Speichern funktionieren weiterhin.',
   aiErrDisconnected:
     'Die Verbindung wurde unterbrochen, daher wurde dieser Lauf gestoppt. Bereits angewendete Änderungen bleiben im Dokument und lassen sich rückgängig machen.',
   aiErrOffline:
@@ -79,4 +82,33 @@ export const de = {
     'UniWork AI konnte diese Anfrage nicht annehmen. Ändern Sie sie und senden Sie sie erneut.',
   aiUniworkImagesNotSent:
     'Bilder werden nicht an UniWork AI gesendet; nur Ihr Text wurde gesendet.',
+  // Cloud state, credits and account actions (shared with picker footer and composer note)
+  cloudStateReady: 'Verfügbar',
+  cloudStateNotEntitled: 'Nicht in Ihrem Tarif',
+  cloudStateExhausted: 'KI-Guthaben aufgebraucht',
+  cloudStateUnavailable: 'Nicht verfügbar',
+  cloudStateSignedOut: 'Nicht angemeldet',
+  cloudStateInactive: 'Abonnement inaktiv',
+  cloudCredits: 'KI-Guthaben',
+  cloudCreditsLeft: '{remaining} / {limit} übrig',
+  cloudCreditsUnlimited: 'Unbegrenzt',
+  cloudCreditsRenews: 'Erneuert am {date}',
+  cloudInactiveBody:
+    'Das UniWork-Abonnement Ihrer Organisation ist nicht aktiv, daher ist die Cloud-KI pausiert. Bitten Sie einen Administrator um die Verlängerung; Ihre eigenen Anbieter unten funktionieren weiter.',
+  acctSignIn: 'Anmelden',
+  acctSignInAgain: 'Erneut anmelden',
+  // S8/S10 local-file conversation restart notice (G05BE-6)
+  aiUniworkLocalFileRestart:
+    'Lokale Dateien starten eine neue Unterhaltung in Ihrer Organisation und übernehmen keine Runden aus anderen Dateien.',
+  // S9 cells summary and S10 web workbook size limit
+  aiResultCellsMeta:
+    'Geschriebene Zellen: {written} ({range}) · Überschriebene vorhandene Zellen: {overwritten}',
+  aiResultCellsMetaNoOverwrite: 'Geschriebene Zellen: {written} ({range})',
+  aiErrWorkbookTooLarge:
+    'Diese Arbeitsmappe ist für die KI im Web zu groß. Öffnen Sie sie in der UniWork Office-App.',
+  // S7 composer notice keys (not_entitled, credits_exhausted)
+  not_entitled:
+    'Der Tarif Ihrer Organisation umfasst UniWork AI nicht. Wenden Sie sich wegen des Tarifs an einen Organisationsadministrator oder fügen Sie unter Einstellungen > KI-Modell Ihren eigenen KI-Schlüssel hinzu.',
+  credits_exhausted:
+    'Ihre Organisation hat ihr gesamtes KI-Guthaben für diesen Zeitraum verbraucht. Bitten Sie einen Organisationsadministrator, Guthaben nachzuladen, oder fügen Sie unter Einstellungen > KI-Modell Ihren eigenen KI-Schlüssel hinzu.',
 } satisfies Record<keyof typeof zh, string>

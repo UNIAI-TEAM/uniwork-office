@@ -21,10 +21,12 @@ import {
   DEFAULT_MAX_OUTPUT_TOKENS,
   MAX_MAX_OUTPUT_TOKENS,
   MIN_MAX_OUTPUT_TOKENS,
+  UNIWORK_PROVIDER_META,
   clampMaxOutputTokens,
   offeredMediaProviders,
   setMediaProviderChoice,
   shownMediaProvider,
+  uniworkAiAvailable,
   updateMediaProviderConfig,
 } from '@genoffice/ai-provider/browser'
 import type {
@@ -602,7 +604,17 @@ function AiModelPane({
 
   if (!settings) return <PaneSkeleton title={t('setSecAiModel')} />
   const provider = settings.provider
-  const meta = catalog.find((c) => c.id === provider)
+  // UniWork AI runs on the organization's plan: no key, model or endpoint to set or test.
+  // The preload builds its catalog in its own realm (where setUniworkAiAvailable never runs),
+  // so fold UNIWORK_PROVIDER_META in when the entry is offered here or already picked.
+  const isUniwork = provider === 'uniwork'
+  const providerCatalog =
+    (isUniwork || uniworkAiAvailable()) && !catalog.some((c) => c.id === 'uniwork')
+      ? catalog[0]?.id === 'genspark'
+        ? [catalog[0], { ...UNIWORK_PROVIDER_META, defaultBaseUrl: '' }, ...catalog.slice(1)]
+        : [{ ...UNIWORK_PROVIDER_META, defaultBaseUrl: '' }, ...catalog]
+      : catalog
+  const meta = providerCatalog.find((c) => c.id === provider)
   const source = settings.modelSources?.[provider]
   // a row served by a key on UniWork; it turns into the normal key fields while the user types a key
   // for this computer instead (the local key then wins in main)
@@ -618,8 +630,6 @@ function AiModelPane({
   const isGenspark = provider === 'genspark'
   const isCodex = provider === 'codex'
   const isOpenRouter = provider === 'openrouter'
-  // UniWork AI runs on the organization's plan: no key, model or endpoint to set or test
-  const isUniwork = provider === 'uniwork'
   const isTokenHub = isGenspark || isOpenRouter
   // an org-served row shows the model main resolved (modelSources[id].chosen), never a copy of it in
   // the local slot
@@ -814,7 +824,7 @@ function AiModelPane({
           className="set-dd"
           value={provider}
           ariaLabel={t('setAiProvider')}
-          options={catalog.map((c) => ({
+          options={providerCatalog.map((c) => ({
             value: c.id,
             label: c.label,
             render: (

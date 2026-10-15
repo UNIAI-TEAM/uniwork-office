@@ -38,6 +38,7 @@ export const ms = {
   aiRunRunning: 'Sedang berjalan… Tekan Henti atau Esc untuk berhenti.',
   aiRunStopped:
     'Dihentikan. Sebarang perubahan yang telah digunakan kekal dalam dokumen dan boleh dibuat asal.',
+  aiRunRetry: 'Cuba lagi',
   aiRunAskAgain: 'Tanya lagi',
   aiRunChooseOther: 'Pilih penyedia lain',
   aiRunOpenInApp: 'Buka dalam apl',
@@ -55,6 +56,8 @@ export const ms = {
   aiErrRateLimitedNoWait: 'Anda menghantar terlalu pantas. Cuba lagi dalam beberapa minit.',
   aiErrUnavailable:
     'UniWork AI tidak bertindak balas sekarang. Dokumen anda dan Simpan masih berfungsi.',
+  aiErrGeneric:
+    'UniWork AI menghadapi masalah yang tidak dijangka, jadi larian ini dihentikan. Dokumen anda dan Simpan masih berfungsi.',
   aiErrDisconnected:
     'Sambungan terputus, jadi larian ini dihentikan. Sebarang perubahan yang telah digunakan kekal dalam dokumen dan boleh dibuat asal.',
   aiErrOffline:
@@ -75,4 +78,33 @@ export const ms = {
   aiErrQuestionRejected:
     'UniWork AI tidak dapat menerima permintaan ini. Ubah permintaan itu, kemudian hantar semula.',
   aiUniworkImagesNotSent: 'Imej tidak dihantar kepada UniWork AI; hanya teks anda dihantar.',
+  // Cloud state, credits and account actions (shared with picker footer and composer note)
+  cloudStateReady: 'Tersedia',
+  cloudStateNotEntitled: 'Tiada dalam pelan anda',
+  cloudStateExhausted: 'Kredit AI habis',
+  cloudStateUnavailable: 'Tidak tersedia',
+  cloudStateSignedOut: 'Belum log masuk',
+  cloudStateInactive: 'Langganan tidak aktif',
+  cloudCredits: 'Kredit AI',
+  cloudCreditsLeft: 'Baki {remaining} / {limit}',
+  cloudCreditsUnlimited: 'Tanpa had',
+  cloudCreditsRenews: 'Diperbaharui {date}',
+  cloudInactiveBody:
+    'Langganan UniWork organisasi anda tidak aktif, jadi AI awan dijeda. Minta pentadbir memperbaharuinya; pembekal anda sendiri di bawah terus berfungsi.',
+  acctSignIn: 'Log masuk',
+  acctSignInAgain: 'Log masuk semula',
+  // S8/S10 local-file conversation restart notice (G05BE-6)
+  aiUniworkLocalFileRestart:
+    'Fail setempat memulakan perbualan baharu di bawah organisasi anda dan tidak menyimpan giliran daripada fail lain.',
+  // S9 cells summary and S10 web workbook size limit
+  aiResultCellsMeta:
+    'Sel ditulis: {written} ({range}) · Sel sedia ada ditulis ganti: {overwritten}',
+  aiResultCellsMetaNoOverwrite: 'Sel ditulis: {written} ({range})',
+  aiErrWorkbookTooLarge:
+    'Buku kerja ini terlalu besar untuk AI di web. Buka dalam apl UniWork Office.',
+  // S7 composer notice keys (not_entitled, credits_exhausted)
+  not_entitled:
+    'Pelan organisasi anda tidak termasuk UniWork AI. Tanya pentadbir organisasi tentang pelan tersebut, atau tambah kunci AI anda sendiri dalam Tetapan > Model AI.',
+  credits_exhausted:
+    'Organisasi anda telah menggunakan semua kredit AI untuk tempoh ini. Minta pentadbir organisasi menambah kredit, atau tambah kunci AI anda sendiri dalam Tetapan > Model AI.',
 } satisfies Record<keyof typeof zh, string>
