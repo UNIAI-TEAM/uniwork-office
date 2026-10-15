@@ -126,6 +126,8 @@ export const de = {
     'Der Schlüsselbund des Computers ist gesperrt, daher gibt es ungespeicherte Änderungen nur in geöffneten Fenstern. Wenn Sie sich jetzt abmelden, werden sie verworfen; bereits verschlüsselt Behaltenes bleibt. Entsperren Sie zuerst den Computer, um sie zu behalten.',
   uwSignOutGo: 'Abmelden',
   uwSignOutWaiting: 'Laufendes Speichern wird vor dem Abmelden abgeschlossen…',
+  uwSignOutCaptureFailed:
+    'Einige ungespeicherte Änderungen konnten nicht rechtzeitig erfasst werden; die zuletzt automatisch gespeicherte Version bleibt für dein Konto erhalten.',
 
   // S2 sync center
   uwSyncTitle: 'Synchronisierungscenter',

@@ -117,6 +117,12 @@ export function signOutIsKeystoreVariant(plan: SignOutPlan): boolean {
   return plan.keystoreLocked && plan.ramOnly > 0
 }
 
+/**
+ * FE d1-n1: safety ceiling (SIGN_OUT_RECEIPT_WAIT_MS + 10_000) so a missing
+ * `done` push after confirming sign-out never leaves the renderer stuck waiting.
+ */
+export const SIGN_OUT_WAIT_SAFETY_MS = 30_000 + 10_000
+
 export interface AccountController {
   status: AccountStatus | null
   view: AccountView
@@ -137,6 +143,8 @@ export interface AccountController {
   signOutPrompt?: SignOutPlan | null
   /** true while main is waiting for an in-flight save before finishing sign-out */
   signOutWaiting?: boolean
+  /** d1-2: true after a sign-out whose done event reported captureFailed > 0 */
+  signOutCaptureFailed?: boolean
   signIn(): void
   cancelSignIn(): void
   openLoginUrl(): void
@@ -170,6 +178,7 @@ export function useAccount(options?: { ownsSignOutPrompt?: boolean }): AccountCo
   const [callbackNotice, setCallbackNotice] = useState(false)
   const [signOutPrompt, setSignOutPrompt] = useState<SignOutPlan | null>(null)
   const [signOutWaiting, setSignOutWaiting] = useState(false)
+  const [signOutCaptureFailed, setSignOutCaptureFailed] = useState(false)
   const noticeTimer = useRef<number | null>(null)
   // bumped on sign-out so an in-flight status read (which can still report
   // signed-in) is discarded instead of resurrecting the profile
@@ -177,10 +186,19 @@ export function useAccount(options?: { ownsSignOutPrompt?: boolean }): AccountCo
   // set when main reported why the current sign-in failed (more specific than `launch`)
   const loginErrorSeen = useRef(false)
   const copiedTimer = useRef<number | null>(null)
+  const waitTimer = useRef<number | null>(null)
   const retrying = useRef(false)
   const signingOut = useRef(false)
+  const logoutInFlight = useRef(false)
   const waitingForDone = useRef(false)
   const promptReqId = useRef<string | null>(null)
+
+  const clearWaitTimer = useCallback(() => {
+    if (waitTimer.current !== null) {
+      window.clearTimeout(waitTimer.current)
+      waitTimer.current = null
+    }
+  }, [])
 
   const apply = useCallback((next: AccountStatus) => {
     setStatus(next)
@@ -189,7 +207,10 @@ export function useAccount(options?: { ownsSignOutPrompt?: boolean }): AccountCo
       setLoginUrl(null)
       setCallbackNotice(false)
     }
-    if (state === 'signed-in' || state === 'refreshing') setLocalError(null)
+    if (state === 'signed-in' || state === 'refreshing') {
+      setLocalError(null)
+      setSignOutCaptureFailed(false)
+    }
   }, [])
 
   const refresh = useCallback(() => {
@@ -201,6 +222,19 @@ export function useAccount(options?: { ownsSignOutPrompt?: boolean }): AccountCo
       })
       .catch(() => undefined)
   }, [apply])
+
+  const startWaitTimer = useCallback(() => {
+    clearWaitTimer()
+    waitTimer.current = window.setTimeout(() => {
+      waitTimer.current = null
+      waitingForDone.current = false
+      signingOut.current = false
+      setBusy(null)
+      setSignOutWaiting(false)
+      setSignOutPrompt(null)
+      refresh()
+    }, SIGN_OUT_WAIT_SAFETY_MS)
+  }, [clearWaitTimer, refresh])
 
   useEffect(() => {
     refresh()
@@ -231,13 +265,19 @@ export function useAccount(options?: { ownsSignOutPrompt?: boolean }): AccountCo
           if (p.phase === 'waiting') {
             waitingForDone.current = true
             setSignOutWaiting(true)
+            startWaitTimer()
           } else if (p.phase === 'done') {
+            clearWaitTimer()
             waitingForDone.current = false
-            signingOut.current = false
-            setBusy(null)
             setSignOutWaiting(false)
             setSignOutPrompt(null)
-            refresh()
+            setSignOutCaptureFailed((p.captureFailed ?? 0) > 0)
+            // FE d1-n2: keep busy/signingOut while a renderer-initiated accountLogout() is still in flight
+            if (!logoutInFlight.current) {
+              signingOut.current = false
+              setBusy(null)
+              refresh()
+            }
           }
         })
       : undefined
@@ -248,6 +288,7 @@ export function useAccount(options?: { ownsSignOutPrompt?: boolean }): AccountCo
             promptReqId.current = null
             void window.aiOffice.answerSignOutPrompt?.(stale, false)
           }
+          clearWaitTimer()
           promptReqId.current = req.requestId
           waitingForDone.current = false
           setSignOutWaiting(false)
@@ -264,10 +305,11 @@ export function useAccount(options?: { ownsSignOutPrompt?: boolean }): AccountCo
         promptReqId.current = null
         void window.aiOffice.answerSignOutPrompt?.(stale, false)
       }
+      clearWaitTimer()
       if (copiedTimer.current !== null) window.clearTimeout(copiedTimer.current)
       if (noticeTimer.current !== null) window.clearTimeout(noticeTimer.current)
     }
-  }, [apply, ownsSignOutPrompt, refresh])
+  }, [apply, clearWaitTimer, ownsSignOutPrompt, refresh, startWaitTimer])
 
   const mainState = status ? viewOf(status) : null
   const view: AccountView =
@@ -279,6 +321,7 @@ export function useAccount(options?: { ownsSignOutPrompt?: boolean }): AccountCo
 
   const signIn = () => {
     setLocalError(null)
+    setSignOutCaptureFailed(false)
     setCallbackNotice(false)
     setLoginUrl(null)
     setUrlCopied(false)
@@ -325,12 +368,15 @@ export function useAccount(options?: { ownsSignOutPrompt?: boolean }): AccountCo
   const runLogout = () => {
     if (signingOut.current) return
     signingOut.current = true
+    logoutInFlight.current = true
     seq.current++
     setBusy('signing-out')
     void window.aiOffice
       .accountLogout({ confirmed: true })
       .catch(() => undefined)
       .finally(() => {
+        clearWaitTimer()
+        logoutInFlight.current = false
         waitingForDone.current = false
         signingOut.current = false
         setSignOutWaiting(false)
@@ -379,11 +425,13 @@ export function useAccount(options?: { ownsSignOutPrompt?: boolean }): AccountCo
       if ((signOutPrompt?.waiting ?? 0) > 0) {
         waitingForDone.current = true
         setSignOutWaiting(true)
+        startWaitTimer()
       }
       void Promise.resolve(window.aiOffice.answerSignOutPrompt?.(reqId, true))
         .catch(() => undefined)
         .finally(() => {
           if (waitingForDone.current) return
+          clearWaitTimer()
           signingOut.current = false
           setBusy(null)
           setSignOutWaiting(false)
@@ -401,6 +449,7 @@ export function useAccount(options?: { ownsSignOutPrompt?: boolean }): AccountCo
       promptReqId.current = null
       void window.aiOffice.answerSignOutPrompt?.(reqId, false)
     }
+    clearWaitTimer()
     waitingForDone.current = false
     setSignOutPrompt(null)
     setSignOutWaiting(false)
@@ -462,6 +511,7 @@ export function useAccount(options?: { ownsSignOutPrompt?: boolean }): AccountCo
     connectError,
     signOutPrompt,
     signOutWaiting,
+    signOutCaptureFailed,
     signIn,
     cancelSignIn,
     openLoginUrl: () => void window.aiOffice.openLoginUrl?.(),

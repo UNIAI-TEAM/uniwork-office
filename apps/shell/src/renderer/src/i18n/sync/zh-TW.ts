@@ -114,6 +114,7 @@ export const zhTW = {
     '這台電腦的鑰匙圈已鎖定，因此未儲存的變更只存在於開啟的視窗中。現在登出會捨棄這些變更；已加密保留的內容仍會保留。要保留它們，請先解鎖電腦。',
   uwSignOutGo: '登出',
   uwSignOutWaiting: '正在完成傳送中的儲存，然後登出…',
+  uwSignOutCaptureFailed: '部分未儲存的變更未能及時擷取；已為你的帳號保留最近的自動儲存版本。',
 
   // S2 sync center
   uwSyncTitle: '同步中心',

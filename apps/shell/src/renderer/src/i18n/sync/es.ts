@@ -122,6 +122,8 @@ export const es = {
     'El llavero del equipo está bloqueado, así que los cambios sin guardar solo existen en las ventanas abiertas. Si cierras sesión ahora, se descartarán; lo que ya se guardó cifrado se mantiene. Para conservarlos, desbloquea primero el equipo.',
   uwSignOutGo: 'Cerrar sesión',
   uwSignOutWaiting: 'Terminando el guardado en curso antes de cerrar sesión…',
+  uwSignOutCaptureFailed:
+    'Algunos cambios sin guardar no pudieron capturarse a tiempo; se conserva la última versión guardada automáticamente para tu cuenta.',
 
   // S2 sync center
   uwSyncTitle: 'Centro de sincronización',

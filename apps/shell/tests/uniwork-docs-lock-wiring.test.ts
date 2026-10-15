@@ -190,7 +190,7 @@ async function setup(
       shellContents: () => wc as never,
       openPath,
       refuseLockedPath: (path: string) => handle.service.refuseLockedPath(path),
-      isPathOpen: () => false,
+      isPathOpen: (path: string) => (overrides.openPaths?.() ?? []).includes(path),
       requestModuleSave: () => false,
       reloadPath: () => undefined,
       activePath: () => undefined,
@@ -485,5 +485,40 @@ describe('the account boundary at the production wiring (G511-be-3)', () => {
     expect(sent.filter((m) => m.channel === UNIWORK_DOC_CHANNELS.signOutPrompt)).toEqual([])
     // the outgoing account's AI history went with its views
     expect(forgetAiHistory).toHaveBeenCalledWith([docPath()])
+  })
+
+  it('lockStore pushes phase:done with captureFailed count when capture fails (d1-2)', async () => {
+    seedReadable()
+    const { handle, sent } = await setup(
+      vi.fn(() => true),
+      {
+        openPaths: () => [docPath()],
+      },
+    )
+    handle.service.noteEditorDirty(docPath(), true)
+
+    expect(await handle.boundary.beforeSignOut({ confirmed: true })).toBe(true)
+
+    expect(sent.filter((m) => m.channel === UNIWORK_DOC_CHANNELS.signOutProgress)).toEqual([
+      {
+        channel: UNIWORK_DOC_CHANNELS.signOutProgress,
+        payload: { phase: 'done', captureFailed: 1 },
+      },
+    ])
+  })
+
+  it('lockStore pushes phase:done in a finally block even if lockSession throws (FE d1-n1)', async () => {
+    seedReadable()
+    const { handle, sent } = await setup()
+    vi.spyOn(handle.service, 'lockSession').mockRejectedValueOnce(new Error('syncStore boom'))
+
+    await handle.boundary.beforeSignOut({ confirmed: true })
+
+    expect(sent.filter((m) => m.channel === UNIWORK_DOC_CHANNELS.signOutProgress)).toEqual([
+      {
+        channel: UNIWORK_DOC_CHANNELS.signOutProgress,
+        payload: { phase: 'done' },
+      },
+    ])
   })
 })

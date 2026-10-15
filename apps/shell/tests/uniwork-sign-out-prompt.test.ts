@@ -570,4 +570,109 @@ describe('Settings → Account sign-out prompt (S3)', () => {
     expect(api.answerSignOutPrompt).toHaveBeenCalledTimes(1)
     expect(api.answerSignOutPrompt).toHaveBeenCalledWith('req-close', false)
   })
+
+  it('d1-2: shows polite uwSignOutCaptureFailed notice in Account pane only when done has captureFailed > 0', async () => {
+    await render(statusFor('signed-in'), {
+      lang: 'en',
+      plan: { count: 1, waiting: 0, keystoreLocked: false, ramOnly: 0 },
+    })
+    await click(button(en.acctSignOut))
+    await click(promptButton(syncEn.uwSignOutGo))
+    // done with captureFailed = 0 or absent shows no notice
+    api.accountStatus.mockResolvedValue(statusFor('signed-out'))
+    await act(async () => {
+      api.pushProgress({ phase: 'done' })
+      api.pushStatus(statusFor('signed-out'))
+    })
+    await flush()
+    const expectedEn =
+      'Some unsaved changes could not be captured in time; the last autosaved version is kept for your account.'
+    expect(pane()?.textContent ?? '').not.toContain(expectedEn)
+
+    // Sign in again and sign out with captureFailed: 2
+    api.accountStatus.mockResolvedValue(statusFor('signed-in'))
+    await act(async () => {
+      api.pushStatus(statusFor('signed-in'))
+    })
+    await flush()
+    await click(button(en.acctSignOut))
+    api.accountStatus.mockResolvedValue(statusFor('signed-out'))
+    await click(promptButton(syncEn.uwSignOutGo))
+    await act(async () => {
+      api.pushProgress({ phase: 'done', captureFailed: 2 } as SignOutProgress)
+      api.pushStatus(statusFor('signed-out'))
+    })
+    await flush()
+    const statusNodes = Array.from(host.querySelectorAll<HTMLElement>('.acct-pane [role="status"]'))
+    expect(statusNodes.some((n) => n.textContent?.includes(expectedEn))).toBe(true)
+  })
+
+  it('FE d1-n1: clears waiting and busy and refreshes if no done arrives within SIGN_OUT_RECEIPT_WAIT_MS + 10 s after confirm', async () => {
+    vi.useFakeTimers()
+    try {
+      await render(statusFor('signed-in'), { lang: 'vi', open: false })
+      await act(async () => {
+        api.pushPrompt({
+          requestId: 'req-stuck',
+          plan: { count: 2, waiting: 1, keystoreLocked: false, ramOnly: 0 },
+        })
+      })
+      await flush()
+
+      const goBtn = promptButton(syncVi.uwSignOutGo)!
+      await act(async () => {
+        goBtn.click()
+      })
+      await flush()
+      expect(promptDialog()).not.toBeNull()
+      expect(promptButton(syncVi.uwSignOutGo)?.getAttribute('aria-disabled')).toBe('true')
+      const statusCallsBefore = api.accountStatus.mock.calls.length
+
+      // Advance past SIGN_OUT_RECEIPT_WAIT_MS (30s) + 10s
+      await act(async () => {
+        vi.advanceTimersByTime(40_000)
+      })
+      await flush()
+
+      expect(promptDialog()).toBeNull()
+      expect(api.accountStatus.mock.calls.length).toBeGreaterThan(statusCallsBefore)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('FE d1-n2: done arriving while renderer-initiated accountLogout() is still in flight keeps busy/signingOut until accountLogout settles', async () => {
+    await render(statusFor('signed-in'), {
+      lang: 'en',
+      plan: { count: 0, waiting: 0, keystoreLocked: false, ramOnly: 0 },
+    })
+    let finishLogout!: () => void
+    api.accountLogout.mockImplementationOnce(
+      () =>
+        new Promise<void>((res) => {
+          finishLogout = res
+        }),
+    )
+
+    await click(button(en.acctSignOut))
+    expect(api.accountLogout).toHaveBeenCalledTimes(1)
+    expect(button(en.acctSigningOut)?.disabled).toBe(true)
+
+    // 'done' arrives while accountLogout is still pending
+    await act(async () => {
+      api.pushProgress({ phase: 'done' })
+    })
+    await flush()
+
+    // Button must still be signing-out / disabled, and clicking it must not start a second accountLogout
+    const btnDuring = button(en.acctSigningOut)
+    expect(btnDuring).toBeDefined()
+    expect(btnDuring?.disabled).toBe(true)
+
+    await act(async () => {
+      finishLogout()
+    })
+    await flush()
+    expect(button(en.acctSignOut)?.disabled).toBe(false)
+  })
 })

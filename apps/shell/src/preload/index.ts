@@ -279,9 +279,17 @@ function asSignOutPlan(raw: unknown): SignOutPlan {
 
 function asSignOutProgress(raw: unknown): SignOutProgress | null {
   if (!raw || typeof raw !== 'object') return null
-  const phase = (raw as Partial<SignOutProgress>).phase
+  const r = raw as Partial<SignOutProgress>
+  const phase = r.phase
   if (phase !== 'waiting' && phase !== 'done') return null
-  return { phase }
+  const captureFailed =
+    phase === 'done' &&
+    typeof r.captureFailed === 'number' &&
+    Number.isFinite(r.captureFailed) &&
+    r.captureFailed > 0
+      ? Math.floor(r.captureFailed)
+      : undefined
+  return captureFailed !== undefined ? { phase, captureFailed } : { phase }
 }
 
 function asSignOutPromptRequest(raw: unknown): SignOutPromptRequest | null {

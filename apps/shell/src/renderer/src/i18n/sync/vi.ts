@@ -118,6 +118,8 @@ export const vi = {
     'Kho khóa của máy đang khóa nên thay đổi chưa lưu chỉ còn trong cửa sổ đang mở. Đăng xuất bây giờ sẽ bỏ các thay đổi đó; những gì đã được giữ mã hóa vẫn còn. Muốn giữ chúng, hãy mở khóa máy trước.',
   uwSignOutGo: 'Đăng xuất',
   uwSignOutWaiting: 'Đang hoàn tất lần lưu đang gửi trước khi đăng xuất…',
+  uwSignOutCaptureFailed:
+    'Một số thay đổi chưa lưu kịp; bản tự lưu gần nhất được giữ cho tài khoản của bạn.',
 
   // S2 sync center
   uwSyncTitle: 'Trung tâm đồng bộ',

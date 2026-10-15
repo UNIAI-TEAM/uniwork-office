@@ -123,6 +123,8 @@ export const nl = {
     'De sleutelhanger van de computer is vergrendeld, dus niet-opgeslagen wijzigingen bestaan alleen in geopende vensters. Nu afmelden verwijdert ze; wat al versleuteld bewaard is, blijft. Ontgrendel eerst de computer om ze te houden.',
   uwSignOutGo: 'Afmelden',
   uwSignOutWaiting: 'Lopende opslag wordt afgerond voordat je wordt afgemeld…',
+  uwSignOutCaptureFailed:
+    'Sommige niet-opgeslagen wijzigingen konden niet op tijd worden vastgelegd; de laatst automatisch opgeslagen versie blijft bewaard voor je account.',
 
   // S2 sync center
   uwSyncTitle: 'Synchronisatiecentrum',

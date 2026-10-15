@@ -119,6 +119,8 @@ export const en = {
     'The computer’s keychain is locked, so unsaved changes exist only in open windows. Signing out now discards them; anything already kept encrypted stays. To keep them, unlock the computer first.',
   uwSignOutGo: 'Sign out',
   uwSignOutWaiting: 'Finishing the save in progress before signing out…',
+  uwSignOutCaptureFailed:
+    'Some unsaved changes could not be captured in time; the last autosaved version is kept for your account.',
 
   // S2 sync center
   uwSyncTitle: 'Sync center',

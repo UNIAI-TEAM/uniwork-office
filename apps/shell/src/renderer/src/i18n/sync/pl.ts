@@ -120,6 +120,8 @@ export const pl = {
     'Pęk kluczy komputera jest zablokowany, więc niezapisane zmiany istnieją tylko w otwartych oknach. Wylogowanie teraz je odrzuci; to, co już zachowano w postaci zaszyfrowanej, pozostanie. Aby je zachować, najpierw odblokuj komputer.',
   uwSignOutGo: 'Wyloguj się',
   uwSignOutWaiting: 'Kończenie trwającego zapisu przed wylogowaniem…',
+  uwSignOutCaptureFailed:
+    'Niektórych niezapisanych zmian nie udało się przechwycić na czas; dla Twojego konta zachowano ostatnią automatycznie zapisaną wersję.',
 
   // S2 sync center
   uwSyncTitle: 'Centrum synchronizacji',

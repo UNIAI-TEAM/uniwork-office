@@ -259,6 +259,14 @@ export function AccountPane({ account }: { account: AccountController }) {
         </div>
       )}
 
+      {account.signOutCaptureFailed && (
+        <div className="acct-notice info" role="status" aria-live="polite">
+          <div className="acct-notice-text">
+            <div className="acct-notice-body">{t('uwSignOutCaptureFailed')}</div>
+          </div>
+        </div>
+      )}
+
       {withProfile && orgChoice.loadError && (
         <div className="acct-notice warn uw-org-error" role="alert">
           <div className="acct-notice-text">

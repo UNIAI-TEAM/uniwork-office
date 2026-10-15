@@ -814,11 +814,19 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     // into `parked`, and deleting plaintext working + recovery copies.
     lockStore: async (owner) => {
       stopFeed()
-      const res = await service.lockSession(owner, () =>
-        push(UNIWORK_DOC_CHANNELS.signOutProgress, { phase: 'waiting' }),
-      )
-      push(UNIWORK_DOC_CHANNELS.signOutProgress, { phase: 'done' })
-      return res.ok
+      let captureFailed = 0
+      try {
+        const res = await service.lockSession(owner, () =>
+          push(UNIWORK_DOC_CHANNELS.signOutProgress, { phase: 'waiting' }),
+        )
+        captureFailed = res.captureFailed.length
+        return res.ok
+      } finally {
+        push(UNIWORK_DOC_CHANNELS.signOutProgress, {
+          phase: 'done',
+          ...(captureFailed > 0 ? { captureFailed } : {}),
+        })
+      }
     },
   })
   setUniworkSignOutHooks({

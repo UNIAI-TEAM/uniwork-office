@@ -375,6 +375,8 @@ export interface SignOutPlan {
 
 export interface SignOutProgress {
   phase: 'waiting' | 'done'
+  /** d1-2: count of dirty documents whose capture timed out at sign-out */
+  captureFailed?: number
 }
 
 /**

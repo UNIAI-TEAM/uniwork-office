@@ -124,6 +124,8 @@ export const pt = {
     'O chaveiro do computador está bloqueado, então as alterações não salvas existem apenas nas janelas abertas. Sair agora as descarta; o que já está guardado criptografado permanece. Para mantê-las, desbloqueie o computador primeiro.',
   uwSignOutGo: 'Sair',
   uwSignOutWaiting: 'Concluindo o salvamento em andamento antes de sair…',
+  uwSignOutCaptureFailed:
+    'Algumas alterações não salvas não puderam ser capturadas a tempo; a última versão salva automaticamente é mantida para sua conta.',
 
   // S2 sync center
   uwSyncTitle: 'Central de sincronização',

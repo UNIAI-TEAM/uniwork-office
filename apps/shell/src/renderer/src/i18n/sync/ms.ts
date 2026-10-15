@@ -126,6 +126,8 @@ export const ms = {
     'Rantai kunci komputer dikunci, jadi perubahan yang belum disimpan hanya wujud dalam tetingkap yang terbuka. Log keluar sekarang akan membuangnya; apa-apa yang sudah disimpan secara tersulit kekal. Untuk menyimpannya, buka kunci komputer dahulu.',
   uwSignOutGo: 'Log keluar',
   uwSignOutWaiting: 'Menyelesaikan simpanan yang sedang berjalan sebelum log keluar…',
+  uwSignOutCaptureFailed:
+    'Sesetengah perubahan yang belum disimpan tidak dapat ditangkap tepat pada masanya; versi autosimpan terakhir disimpan untuk akaun anda.',
 
   // S2 sync center
   uwSyncTitle: 'Pusat penyegerakan',

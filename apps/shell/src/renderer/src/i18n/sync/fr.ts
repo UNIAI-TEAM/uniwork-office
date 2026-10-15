@@ -127,6 +127,8 @@ export const fr = {
     'Le trousseau de l’ordinateur est verrouillé, les modifications non enregistrées n’existent donc que dans les fenêtres ouvertes. Vous déconnecter maintenant les supprime ; ce qui est déjà conservé chiffré reste. Pour les garder, déverrouillez d’abord l’ordinateur.',
   uwSignOutGo: 'Se déconnecter',
   uwSignOutWaiting: 'Finalisation de l’enregistrement en cours avant la déconnexion…',
+  uwSignOutCaptureFailed:
+    'Certaines modifications non enregistrées n’ont pas pu être capturées à temps ; la dernière version enregistrée automatiquement est conservée pour votre compte.',
 
   // S2 sync center
   uwSyncTitle: 'Centre de synchronisation',
