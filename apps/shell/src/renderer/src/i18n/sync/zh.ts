@@ -122,7 +122,8 @@ export const zh = {
     '这台电脑的钥匙串已锁定，因此未保存的更改只存在于打开的窗口中。现在退出登录会丢弃这些更改；已加密保留的内容仍会保留。要保留它们，请先解锁电脑。',
   uwSignOutGo: '退出登录',
   uwSignOutWaiting: '正在完成发送中的保存，然后退出登录…',
-  uwSignOutCaptureFailed: '部分未保存的更改未能及时捕获；已为你的账号保留最近的自动保存版本。',
+  uwSignOutCaptureFailed:
+    '部分未保存的更改未能及时捕获；已为你的账号保留最近的已保存或自动保存版本。',
 
   // S2 sync center
   uwSyncTitle: '同步中心',

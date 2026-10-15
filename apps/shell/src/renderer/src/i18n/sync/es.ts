@@ -123,7 +123,7 @@ export const es = {
   uwSignOutGo: 'Cerrar sesión',
   uwSignOutWaiting: 'Terminando el guardado en curso antes de cerrar sesión…',
   uwSignOutCaptureFailed:
-    'Algunos cambios sin guardar no pudieron capturarse a tiempo; se conserva la última versión guardada automáticamente para tu cuenta.',
+    'Algunos cambios sin guardar no pudieron capturarse a tiempo; se conserva la versión guardada o guardada automáticamente más reciente para tu cuenta.',
 
   // S2 sync center
   uwSyncTitle: 'Centro de sincronización',

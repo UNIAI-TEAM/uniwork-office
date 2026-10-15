@@ -119,7 +119,7 @@ export const vi = {
   uwSignOutGo: 'Đăng xuất',
   uwSignOutWaiting: 'Đang hoàn tất lần lưu đang gửi trước khi đăng xuất…',
   uwSignOutCaptureFailed:
-    'Một số thay đổi chưa lưu kịp; bản tự lưu gần nhất được giữ cho tài khoản của bạn.',
+    'Một số thay đổi chưa lưu kịp; bản lưu hoặc tự lưu gần nhất được giữ cho tài khoản của bạn.',
 
   // S2 sync center
   uwSyncTitle: 'Trung tâm đồng bộ',

@@ -120,7 +120,7 @@ export const en = {
   uwSignOutGo: 'Sign out',
   uwSignOutWaiting: 'Finishing the save in progress before signing out…',
   uwSignOutCaptureFailed:
-    'Some unsaved changes could not be captured in time; the last autosaved version is kept for your account.',
+    'Some unsaved changes could not be captured in time; the most recent saved or autosaved version is kept for your account.',
 
   // S2 sync center
   uwSyncTitle: 'Sync center',

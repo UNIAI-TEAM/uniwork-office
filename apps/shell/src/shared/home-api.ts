@@ -380,6 +380,9 @@ export interface SignOutProgress {
   captureFailed?: number
 }
 
+/** bounded wait for an in-flight upload/commit receipt at sign-out (G5-11 D4) */
+export const SIGN_OUT_RECEIPT_WAIT_MS = 30_000
+
 /**
  * D5: main-initiated sign-out confirmation (account switch / deployment switch)
  * pushed to the shell renderer; answered through `signOutPromptAnswer`.

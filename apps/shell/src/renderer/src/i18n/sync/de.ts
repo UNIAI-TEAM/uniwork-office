@@ -127,7 +127,7 @@ export const de = {
   uwSignOutGo: 'Abmelden',
   uwSignOutWaiting: 'Laufendes Speichern wird vor dem Abmelden abgeschlossen…',
   uwSignOutCaptureFailed:
-    'Einige ungespeicherte Änderungen konnten nicht rechtzeitig erfasst werden; die zuletzt automatisch gespeicherte Version bleibt für dein Konto erhalten.',
+    'Einige ungespeicherte Änderungen konnten nicht rechtzeitig erfasst werden; die zuletzt gespeicherte oder automatisch gespeicherte Version bleibt für dein Konto erhalten.',
 
   // S2 sync center
   uwSyncTitle: 'Synchronisierungscenter',

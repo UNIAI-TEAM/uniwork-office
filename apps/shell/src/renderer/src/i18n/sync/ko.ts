@@ -120,7 +120,7 @@ export const ko = {
   uwSignOutGo: '로그아웃',
   uwSignOutWaiting: '로그아웃하기 전에 진행 중인 저장을 마치는 중…',
   uwSignOutCaptureFailed:
-    '일부 저장되지 않은 변경 사항을 제때 캡처하지 못했습니다. 계정에 대해 마지막 자동 저장 버전이 유지됩니다.',
+    '일부 저장되지 않은 변경 사항을 제때 캡처하지 못했습니다. 계정에 대해 가장 최근의 저장 또는 자동 저장 버전이 유지됩니다.',
 
   // S2 sync center
   uwSyncTitle: '동기화 센터',

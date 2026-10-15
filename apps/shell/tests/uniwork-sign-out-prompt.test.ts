@@ -5,19 +5,25 @@ import { act, createElement, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type {
-  AccountLoginEvent,
-  AccountSetServerResult,
-  AccountState,
-  AccountStatus,
-  HomeApi,
-  SignOutPlan,
-  SignOutProgress,
-  SignOutPromptRequest,
+import {
+  SIGN_OUT_RECEIPT_WAIT_MS,
+  type AccountLoginEvent,
+  type AccountSetServerResult,
+  type AccountState,
+  type AccountStatus,
+  type HomeApi,
+  type SignOutPlan,
+  type SignOutProgress,
+  type SignOutPromptRequest,
 } from '../src/shared/home-api'
+import { QUEUE_LIMITS } from '../src/main/uniwork-sync/queue/limits'
 import { AccountEntry } from '../src/renderer/src/AccountEntry'
 import { SignOutPrompt } from '../src/renderer/src/SignOutPrompt'
-import { useAccount, type AccountController } from '../src/renderer/src/account-model'
+import {
+  SIGN_OUT_WAIT_SAFETY_MS,
+  useAccount,
+  type AccountController,
+} from '../src/renderer/src/account-model'
 import { LocaleProvider } from '../src/renderer/src/locale'
 import type { Lang } from '../src/renderer/src/locale'
 import type { SettingsSectionId } from '../src/renderer/src/SettingsModal'
@@ -587,7 +593,11 @@ describe('Settings → Account sign-out prompt (S3)', () => {
     })
     await flush()
     const expectedEn =
-      'Some unsaved changes could not be captured in time; the last autosaved version is kept for your account.'
+      'Some unsaved changes could not be captured in time; the most recent saved or autosaved version is kept for your account.'
+    expect(syncEn.uwSignOutCaptureFailed).toBe(expectedEn)
+    expect(syncVi.uwSignOutCaptureFailed).toBe(
+      'Một số thay đổi chưa lưu kịp; bản lưu hoặc tự lưu gần nhất được giữ cho tài khoản của bạn.',
+    )
     expect(pane()?.textContent ?? '').not.toContain(expectedEn)
 
     // Sign in again and sign out with captureFailed: 2
@@ -669,12 +679,186 @@ describe('Settings → Account sign-out prompt (S3)', () => {
     const btnDuring = button(en.acctSigningOut)
     expect(btnDuring).toBeDefined()
     expect(btnDuring?.disabled).toBe(true)
+    await act(async () => {
+      btnDuring?.click()
+    })
+    expect(api.accountLogout).toHaveBeenCalledTimes(1)
 
     await act(async () => {
       finishLogout()
     })
     await flush()
     expect(button(en.acctSignOut)?.disabled).toBe(false)
+  })
+
+  it('FE d2-1: safety timer firing while renderer-initiated accountLogout is pending only clears waiting UI; button stays aria-disabled and click does not call accountLogout twice', async () => {
+    vi.useFakeTimers()
+    try {
+      await render(statusFor('signed-in'), {
+        lang: 'vi',
+        plan: { count: 1, waiting: 1, keystoreLocked: false, ramOnly: 0 },
+      })
+      let finishLogout!: () => void
+      api.accountLogout.mockImplementationOnce(
+        () =>
+          new Promise<void>((res) => {
+            finishLogout = res
+          }),
+      )
+
+      await click(button(vi_.acctSignOut))
+      const goBtn = promptButton(syncVi.uwSignOutGo)!
+      await act(async () => {
+        goBtn.click()
+        api.pushProgress({ phase: 'waiting' })
+      })
+      await flush()
+
+      expect(api.accountLogout).toHaveBeenCalledTimes(1)
+      expect(
+        promptDialog()?.querySelector('[role="status"][aria-live="polite"]')?.textContent,
+      ).toBe(syncVi.uwSignOutWaiting)
+      expect(promptButton(syncVi.uwSignOutGo)?.getAttribute('aria-disabled')).toBe('true')
+
+      // Timer fires after 40s while accountLogout is still pending
+      await act(async () => {
+        vi.advanceTimersByTime(40_000)
+      })
+      await flush()
+
+      // Waiting line is cleared, but prompt and busy/signingOut remain until runLogout's finally
+      expect(
+        promptDialog()?.querySelector('[role="status"][aria-live="polite"]')?.textContent,
+      ).toBe('')
+      const stillBusyGo = promptButton(syncVi.uwSignOutGo)
+      expect(stillBusyGo).toBeDefined()
+      expect(stillBusyGo?.getAttribute('aria-disabled')).toBe('true')
+
+      // Clicking while still pending does not invoke a second accountLogout
+      await act(async () => {
+        stillBusyGo?.click()
+      })
+      expect(api.accountLogout).toHaveBeenCalledTimes(1)
+
+      // Finishing accountLogout closes the prompt and settles busy
+      await act(async () => {
+        finishLogout()
+      })
+      await flush()
+      expect(promptDialog()).toBeNull()
+      expect(SIGN_OUT_RECEIPT_WAIT_MS).toBe(30_000)
+      expect(QUEUE_LIMITS.signOutReceiptWaitMs).toBe(SIGN_OUT_RECEIPT_WAIT_MS)
+      expect(SIGN_OUT_WAIT_SAFETY_MS).toBe(SIGN_OUT_RECEIPT_WAIT_MS + 10_000)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('FE d2-4: done before 40 s cancels the safety timer (no late refresh or prompt clobber); cancel and unmount clear it; captureFailed notice clears on sign-in', async () => {
+    vi.useFakeTimers()
+    try {
+      await render(statusFor('signed-in'), {
+        lang: 'en',
+        plan: { count: 2, waiting: 1, keystoreLocked: false, ramOnly: 0 },
+      })
+
+      // 1. done before 40 s cancels the timer (no late refresh / prompt clobber)
+      await act(async () => {
+        api.pushPrompt({
+          requestId: 'req-done-early',
+          plan: { count: 2, waiting: 1, keystoreLocked: false, ramOnly: 0 },
+        })
+      })
+      await flush()
+      await click(promptButton(syncEn.uwSignOutGo))
+      expect(promptButton(syncEn.uwSignOutGo)?.getAttribute('aria-disabled')).toBe('true')
+
+      api.accountStatus.mockResolvedValue(statusFor('signed-out'))
+      await act(async () => {
+        vi.advanceTimersByTime(10_000)
+        api.pushProgress({ phase: 'done', captureFailed: 1 })
+      })
+      await flush()
+      expect(promptDialog()).toBeNull()
+
+      // Notice is shown after captureFailed: 1
+      const expectedEn =
+        'Some unsaved changes could not be captured in time; the most recent saved or autosaved version is kept for your account.'
+      expect(pane()?.textContent ?? '').toContain(expectedEn)
+
+      // Open a new prompt before the 40s mark and advance past 40s -> neither clobbered nor refreshed
+      await act(async () => {
+        api.pushPrompt({
+          requestId: 'req-after-done',
+          plan: { count: 3, waiting: 0, keystoreLocked: false, ramOnly: 0 },
+        })
+      })
+      await flush()
+      expect(promptDialog()).not.toBeNull()
+      const statusCallsAfterDone = api.accountStatus.mock.calls.length
+
+      await act(async () => {
+        vi.advanceTimersByTime(35_000)
+      })
+      await flush()
+      expect(promptDialog()).not.toBeNull()
+      expect(api.accountStatus.mock.calls.length).toBe(statusCallsAfterDone)
+
+      // 2. Cancel clears the safety timer
+      await act(async () => {
+        api.pushProgress({ phase: 'waiting' })
+      })
+      await flush()
+      // Unblock waiting via a fresh prompt or cancel after waiting reset:
+      await act(async () => {
+        api.pushPrompt({
+          requestId: 'req-cancel-clear',
+          plan: { count: 2, waiting: 0, keystoreLocked: false, ramOnly: 0 },
+        })
+      })
+      await flush()
+      await click(promptButton(syncEn.uwActBack))
+      expect(promptDialog()).toBeNull()
+      const statusCallsAfterCancel = api.accountStatus.mock.calls.length
+
+      await act(async () => {
+        vi.advanceTimersByTime(40_000)
+      })
+      await flush()
+      expect(api.accountStatus.mock.calls.length).toBe(statusCallsAfterCancel)
+
+      // 3. Notice clears on sign-in (clicking Sign in when signed-out)
+      expect(pane()?.textContent ?? '').toContain(expectedEn)
+
+      let finishLogin!: (v: boolean) => void
+      api.accountLogin.mockImplementationOnce(
+        () =>
+          new Promise<boolean>((res) => {
+            finishLogin = res
+          }),
+      )
+      await click(button(en.acctSignIn))
+      expect(pane()?.textContent ?? '').not.toContain(expectedEn)
+      await act(async () => {
+        finishLogin(true)
+      })
+      await flush()
+
+      // 4. Unmount clears the safety timer
+      await act(async () => {
+        api.pushProgress({ phase: 'waiting' })
+      })
+      await flush()
+      const statusCallsBeforeUnmount = api.accountStatus.mock.calls.length
+      act(() => root.unmount())
+      await act(async () => {
+        vi.advanceTimersByTime(40_000)
+      })
+      await flush()
+      expect(api.accountStatus.mock.calls.length).toBe(statusCallsBeforeUnmount)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('SignOutPrompt standalone: Quay lại and Escape return focus to returnFocusRef, confirm does not, no answer/logout sent twice', async () => {

@@ -128,7 +128,7 @@ export const fr = {
   uwSignOutGo: 'Se déconnecter',
   uwSignOutWaiting: 'Finalisation de l’enregistrement en cours avant la déconnexion…',
   uwSignOutCaptureFailed:
-    'Certaines modifications non enregistrées n’ont pas pu être capturées à temps ; la dernière version enregistrée automatiquement est conservée pour votre compte.',
+    'Certaines modifications non enregistrées n’ont pas pu être capturées à temps ; la version enregistrée ou enregistrée automatiquement la plus récente est conservée pour votre compte.',
 
   // S2 sync center
   uwSyncTitle: 'Centre de synchronisation',

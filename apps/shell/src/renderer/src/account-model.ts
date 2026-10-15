@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type {
-  AccountErrorCode,
-  AccountSetServerResult,
-  AccountProfile,
-  AccountState,
-  AccountStatus,
-  SignOutPlan,
+import {
+  SIGN_OUT_RECEIPT_WAIT_MS,
+  type AccountErrorCode,
+  type AccountSetServerResult,
+  type AccountProfile,
+  type AccountState,
+  type AccountStatus,
+  type SignOutPlan,
 } from '../../shared/home-api'
 import type { StringKey } from './locale'
 
@@ -118,10 +119,10 @@ export function signOutIsKeystoreVariant(plan: SignOutPlan): boolean {
 }
 
 /**
- * FE d1-n1: safety ceiling (SIGN_OUT_RECEIPT_WAIT_MS + 10_000) so a missing
+ * FE d1-n1 / d2-2: safety ceiling (SIGN_OUT_RECEIPT_WAIT_MS + 10_000) so a missing
  * `done` push after confirming sign-out never leaves the renderer stuck waiting.
  */
-export const SIGN_OUT_WAIT_SAFETY_MS = 30_000 + 10_000
+export const SIGN_OUT_WAIT_SAFETY_MS = SIGN_OUT_RECEIPT_WAIT_MS + 10_000
 
 export interface AccountController {
   status: AccountStatus | null
@@ -228,11 +229,15 @@ export function useAccount(options?: { ownsSignOutPrompt?: boolean }): AccountCo
     waitTimer.current = window.setTimeout(() => {
       waitTimer.current = null
       waitingForDone.current = false
-      signingOut.current = false
-      setBusy(null)
       setSignOutWaiting(false)
-      setSignOutPrompt(null)
-      refresh()
+      // FE d2-1: when renderer-initiated accountLogout() is still in flight, only clear
+      // the waiting UI; leave busy/signingOut/signOutPrompt/refresh to runLogout's finally.
+      if (!logoutInFlight.current) {
+        signingOut.current = false
+        setBusy(null)
+        setSignOutPrompt(null)
+        refresh()
+      }
     }, SIGN_OUT_WAIT_SAFETY_MS)
   }, [clearWaitTimer, refresh])
 

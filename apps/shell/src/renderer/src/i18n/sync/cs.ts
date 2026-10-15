@@ -120,7 +120,7 @@ export const cs = {
   uwSignOutGo: 'Odhlásit se',
   uwSignOutWaiting: 'Dokončování probíhajícího uložení před odhlášením…',
   uwSignOutCaptureFailed:
-    'Některé neuložené změny se nepodařilo včas zachytit; pro váš účet je ponechána poslední automaticky uložená verze.',
+    'Některé neuložené změny se nepodařilo včas zachytit; pro váš účet je ponechána poslední uložená nebo automaticky uložená verze.',
 
   // S2 sync center
   uwSyncTitle: 'Centrum synchronizace',

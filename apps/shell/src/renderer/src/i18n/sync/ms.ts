@@ -127,7 +127,7 @@ export const ms = {
   uwSignOutGo: 'Log keluar',
   uwSignOutWaiting: 'Menyelesaikan simpanan yang sedang berjalan sebelum log keluar…',
   uwSignOutCaptureFailed:
-    'Sesetengah perubahan yang belum disimpan tidak dapat ditangkap tepat pada masanya; versi autosimpan terakhir disimpan untuk akaun anda.',
+    'Sesetengah perubahan yang belum disimpan tidak dapat ditangkap tepat pada masanya; versi simpanan atau autosimpan terkini disimpan untuk akaun anda.',
 
   // S2 sync center
   uwSyncTitle: 'Pusat penyegerakan',

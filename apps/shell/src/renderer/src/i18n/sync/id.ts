@@ -124,7 +124,7 @@ export const id = {
   uwSignOutGo: 'Keluar',
   uwSignOutWaiting: 'Menyelesaikan penyimpanan yang sedang berjalan sebelum keluar…',
   uwSignOutCaptureFailed:
-    'Beberapa perubahan yang belum disimpan tidak sempat ditangkap tepat waktu; versi simpan otomatis terakhir tetap disimpan untuk akun Anda.',
+    'Beberapa perubahan yang belum disimpan tidak sempat ditangkap tepat waktu; versi tersimpan atau simpan otomatis terbaru tetap disimpan untuk akun Anda.',
 
   // S2 sync center
   uwSyncTitle: 'Pusat sinkronisasi',

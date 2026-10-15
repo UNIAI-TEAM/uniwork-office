@@ -123,7 +123,7 @@ export const ja = {
   uwSignOutGo: 'ログアウト',
   uwSignOutWaiting: 'ログアウトする前に進行中の保存を完了しています…',
   uwSignOutCaptureFailed:
-    '一部の未保存の変更を時間内に取得できませんでした。最新の自動保存版がアカウント用に保持されます。',
+    '一部の未保存の変更を時間内に取得できませんでした。最新の保存済みまたは自動保存版がアカウント用に保持されます。',
 
   // S2 sync center
   uwSyncTitle: '同期センター',

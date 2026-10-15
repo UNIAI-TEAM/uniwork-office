@@ -125,7 +125,7 @@ export const pt = {
   uwSignOutGo: 'Sair',
   uwSignOutWaiting: 'Concluindo o salvamento em andamento antes de sair…',
   uwSignOutCaptureFailed:
-    'Algumas alterações não salvas não puderam ser capturadas a tempo; a última versão salva automaticamente é mantida para sua conta.',
+    'Algumas alterações não salvas não puderam ser capturadas a tempo; a versão salva ou salva automaticamente mais recente é mantida para sua conta.',
 
   // S2 sync center
   uwSyncTitle: 'Central de sincronização',

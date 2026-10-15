@@ -126,7 +126,7 @@ export const it = {
   uwSignOutGo: 'Esci',
   uwSignOutWaiting: 'Completamento del salvataggio in corso prima di uscire…',
   uwSignOutCaptureFailed:
-    'Alcune modifiche non salvate non sono state acquisite in tempo; l’ultima versione salvata automaticamente viene conservata per il tuo account.',
+    'Alcune modifiche non salvate non sono state acquisite in tempo; la versione salvata o salvata automaticamente più recente viene conservata per il tuo account.',
 
   // S2 sync center
   uwSyncTitle: 'Centro di sincronizzazione',
