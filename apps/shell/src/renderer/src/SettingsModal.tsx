@@ -31,6 +31,7 @@ import type {
   AiMediaProviderId,
   AiMediaProviderMeta,
   AiMediaSettings,
+  AiModelPick,
   AiModelSource,
   AiProviderConfig,
   AiProviderId,
@@ -420,6 +421,16 @@ function AiModelPane({
   const [localKeyRows, setLocalKeyRows] = useState<Partial<Record<AiProviderId, AiProviderConfig>>>(
     {},
   )
+  /** the model the user chose in this form and has not saved yet; main records a pick only from it */
+  const [modelPick, setModelPick] = useState<AiModelPick | null>(null)
+  /** edits made in this form (the key fields of an open local-key row excluded) */
+  const editsRef = useRef(0)
+  /** per provider: the form's state when its local-key row opened, so Cancel can undo only its own edits */
+  const localKeyOpenRef = useRef<Partial<Record<AiProviderId, { dirty: boolean; edits: number }>>>(
+    {},
+  )
+  /** the control that takes focus once the local-key row opened or closed (the pressed button is gone) */
+  const [focusRequest, setFocusRequest] = useState<'key' | 'use-local' | null>(null)
 
   const refreshCodexModels = useCallback(async (cliPath = '', selectedModel = '') => {
     if (!window.aiOffice.getCodexModels) return
@@ -442,6 +453,15 @@ function AiModelPane({
   dirtyRef.current = dirty
   useEffect(() => onDirtyChange?.(dirty), [dirty, onDirtyChange])
   useEffect(() => () => onDirtyChange?.(false), [onDirtyChange])
+  // the pressed button unmounts with its row: hand focus to the control that took its place
+  useEffect(() => {
+    if (!focusRequest) return
+    const target = document.querySelector<HTMLElement>(
+      focusRequest === 'key' ? '#set-ai-key' : '[data-org-key-use-local]',
+    )
+    target?.focus()
+    setFocusRequest(null)
+  }, [focusRequest, localKeyRows])
   /** bumped on every outside reload so a connection test that was still running reports nothing */
   const testSeqRef = useRef(0)
   useEffect(() => {
@@ -454,6 +474,8 @@ function AiModelPane({
         setTestResult(null)
         setSaved(false)
         setLocalKeyRows({})
+        localKeyOpenRef.current = {}
+        setModelPick(null)
         setSettings(s)
         const codex = s.providers.codex
         if (codex) {
@@ -589,7 +611,8 @@ function AiModelPane({
   )
   const orgKeyManageUrl = `${(serverUrl || 'https://uniworkos.com').replace(/\/+$/, '')}/settings/ai`
 
-  const touch = () => {
+  const touch = (countsAsEdit = true) => {
+    if (countsAsEdit) editsRef.current += 1
     setDirty(true)
     setSaved(false)
     setSaveError(null)
@@ -612,10 +635,14 @@ function AiModelPane({
         ? { ...settings.modelSources, [provider]: { ...source, chosen: patch.model } }
         : settings.modelSources
     setSettings({ ...settings, providers, ...(modelSources ? { modelSources } : {}) })
-    touch()
+    if (patch.model !== undefined) setModelPick({ provider, model: patch.model })
+    // typing in the key fields of the open local-key row is what Cancel takes back
+    touch(!(useLocalKey && ('apiKey' in patch || 'baseUrl' in patch)))
   }
   const openLocalKey = () => {
+    localKeyOpenRef.current[provider] = { dirty, edits: editsRef.current }
     setLocalKeyRows((rows) => ({ ...rows, [provider]: { ...config } }))
+    setFocusRequest('key')
   }
   const cancelLocalKey = () => {
     const slot = localKeyRows[provider]
@@ -625,6 +652,11 @@ function AiModelPane({
       delete rest[provider]
       return rest
     })
+    // nothing else changed since the row opened: the form is as clean as it was, Save goes off again
+    const opened = localKeyOpenRef.current[provider]
+    if (opened && !opened.dirty && editsRef.current === opened.edits) setDirty(false)
+    delete localKeyOpenRef.current[provider]
+    setFocusRequest('use-local')
   }
   /** Commit the output-cap input: clamp what was typed and drop a no-op edit */
   const commitMaxTokens = () => {
@@ -643,9 +675,11 @@ function AiModelPane({
     setSaveError(null)
     // Every slot goes out as loaded plus this form's edits: an org-served provider's slot has no
     // key from main, and a key or base URL kept on this computer is never rewritten here.
+    const saveOptions = modelPick ? { ...SETTINGS_PICK, modelPick } : SETTINGS_PICK
     window.aiOffice
-      .setAiSettings?.(settings, SETTINGS_PICK)
+      .setAiSettings?.(settings, saveOptions)
       .then(() => {
+        setModelPick(null)
         setDirty(false)
         setSaved(true)
         window.dispatchEvent(new Event('uniwork:credit-refresh'))

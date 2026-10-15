@@ -2,6 +2,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import {
   AI_PROVIDERS,
   setPrimaryFetch,
+  type AiModelPick,
   type AiModelSource,
   type AiProviderConfig,
   type AiProviderId,
@@ -176,15 +177,19 @@ export function runOnRoute<T>(
 
 /**
  * `ai:set-settings` for org-served providers (an org key, no local key in the stored slot): the
- * stored slot (key, base URL, model) is kept as it is unless the payload carries a non-empty key
- * for it (the user typed a key on this computer: it is saved and wins). A model the payload
- * changed for such a provider is the user's pick on this computer and goes to the keys host with
- * a timestamp, never into ai-settings.json.
+ * stored slot (key, base URL, model) is kept as it is unless the payload fills it on this computer
+ * (a non-empty key, or a `custom` endpoint with its own base URL: it is saved and wins). The renderer writing
+ * `providers[id].model` changes nothing here: the stored slot is always restored. The user's pick
+ * of a model is only what `modelPick` says (the chip and the Settings model field send it; a plain
+ * echo of the loaded settings sends none), including the default or the stored slot's model. It
+ * goes to the keys host with a timestamp, never into ai-settings.json. There is no fallback that
+ * infers a pick from a changed model: every picking caller sends the marker.
  */
 export function keepOrgServedSlots(
   payload: AiSettings,
   stored: AiSettings,
   host: UniworkKeysHost | null,
+  modelPick?: AiModelPick | null,
 ): void {
   if (!host) return
   for (const meta of AI_PROVIDERS) {
@@ -192,12 +197,11 @@ export function keepOrgServedSlots(
     if (!host.hasOrgSource(id)) continue
     const storedSlot = stored.providers[id]
     if (localSlotClaimed(id, storedSlot, host.byokBaseUrl(id))) continue
+    // a slot the user filled on this computer (a key, or a custom endpoint with its own address) is
+    // saved whole and wins from then on, exactly as the route decides it
     const incoming = payload.providers[id]
-    if (incoming?.apiKey?.trim()) continue
-    const pickedModel = incoming?.model?.trim() ?? ''
-    if (pickedModel && pickedModel !== (storedSlot?.model ?? '').trim()) {
-      host.recordModelPick(id, pickedModel)
-    }
+    if (localSlotClaimed(id, incoming, host.byokBaseUrl(id))) continue
+    if (modelPick?.provider === id) host.recordModelPick(id, modelPick.model)
     if (storedSlot) payload.providers[id] = storedSlot
     else delete payload.providers[id]
   }

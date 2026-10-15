@@ -187,10 +187,17 @@ function createSender() {
 const getSettings = (): Promise<AiSettings> =>
   Promise.resolve(handlers.get('ai:get-settings')!({ sender: { id: 101 } })) as Promise<AiSettings>
 
-const setSettings = (settings: AiSettings): Promise<void> =>
+const setSettings = (settings: AiSettings, options?: unknown): Promise<void> =>
   Promise.resolve(
-    handlers.get('ai:set-settings')!({ sender: { id: 101 } }, settings),
+    handlers.get('ai:set-settings')!({ sender: { id: 101 } }, settings, options),
   ) as Promise<void>
+
+/** the chip / Settings save for a model pick: the whole settings with the model, plus the marker */
+const withModel = (settings: AiSettings, provider: 'anthropic', model: string): AiSettings => ({
+  ...settings,
+  providers: { ...settings.providers, [provider]: { ...settings.providers[provider], model } },
+})
+const pickMarker = (provider: string, model: string) => ({ modelPick: { provider, model } })
 
 const readStoredSettings = (): {
   providers: Record<string, { apiKey?: string; model?: string; baseUrl?: string }>
@@ -419,13 +426,16 @@ describe('UniworkKeysHost + docs-main BYOK proxy integration (G6-05k F2)', () =>
     expect(before.modelSources?.anthropic?.chosen).toBe('claude-sonnet-4-6')
 
     // the chip pick saves the settings with the new model (withAiModelSelection)
-    await setSettings({
-      ...before,
-      providers: {
-        ...before.providers,
-        anthropic: { ...before.providers.anthropic, model: 'claude-haiku-4-5' },
+    await setSettings(
+      {
+        ...before,
+        providers: {
+          ...before.providers,
+          anthropic: { ...before.providers.anthropic, model: 'claude-haiku-4-5' },
+        },
       },
-    })
+      pickMarker('anthropic', 'claude-haiku-4-5'),
+    )
     const settings = await getSettings()
     expect(settings.modelSources?.anthropic?.origin).toBe('org')
     expect(settings.modelSources?.anthropic?.chosen).toBe('claude-haiku-4-5')
@@ -1358,13 +1368,16 @@ describe('UniworkKeysHost + docs-main BYOK proxy integration (G6-05k F2)', () =>
 
     // a pick on this computer (now) is newer than the server's
     const current = await getSettings()
-    await setSettings({
-      ...current,
-      providers: {
-        ...current.providers,
-        anthropic: { ...current.providers.anthropic, model: 'claude-haiku-4-5' },
+    await setSettings(
+      {
+        ...current,
+        providers: {
+          ...current.providers,
+          anthropic: { ...current.providers.anthropic, model: 'claude-haiku-4-5' },
+        },
       },
-    })
+      pickMarker('anthropic', 'claude-haiku-4-5'),
+    )
     expect((await getSettings()).modelSources?.anthropic?.chosen).toBe('claude-haiku-4-5')
     expect(readStoredSettings().providers.anthropic?.model).toBe(
       afterSave.providers.anthropic?.model,
@@ -1592,4 +1605,163 @@ describe('UniworkKeysHost + docs-main BYOK proxy integration (G6-05k F2)', () =>
     expect(r1Calls).toBe(callsAfterRevoke)
     expect(revoked).toBe(1)
   })
+
+  // ---- fx2: explicit pick marker (G05KSH-13, G05KFE-14) ----
+
+  it('records exactly the picked model: the default, A then the default, never a plain echo', async () => {
+    const fetchMock: FetchLike = vi.fn(async (url) => {
+      if (url === R1_URL) {
+        return jsonResponse(
+          r1Body([orgItem('anthropic', { model: 'claude-opus-4-7' }), orgItem('openai')]),
+        )
+      }
+      if (url.endsWith('/models')) return jsonResponse({ data: [] })
+      throw new Error(`unexpected URL: ${url}`)
+    })
+    globalThis.fetch = fetchMock as typeof globalThis.fetch
+    writeFileSync(
+      join(dirs.userData, 'ai-settings.json'),
+      JSON.stringify({
+        provider: 'anthropic',
+        providers: { anthropic: { apiKey: '', model: '' } },
+      }),
+    )
+    const host = createUniworkKeysHost({
+      profile: () => PROFILE,
+      orgId: () => ORG_1,
+      authorized: async (call) => call(TOKEN_1),
+      fetch: fetchMock,
+    })
+    setUniworkKeysHost(host)
+    await host.list()
+
+    const loaded = await getSettings()
+    // the stored slot holds the provider default (blank slot filled), the server row another model
+    const slotModel = loaded.providers.anthropic.model
+    expect(slotModel).not.toBe('')
+    expect(slotModel).not.toBe('claude-opus-4-7')
+    expect(loaded.modelSources?.anthropic?.chosen).toBe('claude-opus-4-7')
+
+    // a plain echo of the loaded settings records nothing
+    await setSettings(loaded)
+    await setSettings(loaded, { includeUniworkPick: true })
+    expect((await getSettings()).modelSources?.anthropic?.chosen).toBe('claude-opus-4-7')
+
+    // picking the model the stored slot already holds is a pick (the old diff could not see it)
+    await setSettings(withModel(loaded, 'anthropic', slotModel), pickMarker('anthropic', slotModel))
+    expect((await getSettings()).modelSources?.anthropic?.chosen).toBe(slotModel)
+
+    // pick A, then the default again: the default wins, not the earlier A
+    await setSettings(
+      withModel(loaded, 'anthropic', 'claude-haiku-4-5'),
+      pickMarker('anthropic', 'claude-haiku-4-5'),
+    )
+    expect((await getSettings()).modelSources?.anthropic?.chosen).toBe('claude-haiku-4-5')
+    await setSettings(withModel(loaded, 'anthropic', slotModel), pickMarker('anthropic', slotModel))
+    expect((await getSettings()).modelSources?.anthropic?.chosen).toBe(slotModel)
+
+    // a renderer writing providers[id].model without the marker changes nothing, and the file keeps its slot
+    await setSettings(withModel(loaded, 'anthropic', 'claude-haiku-4-5'))
+    expect((await getSettings()).modelSources?.anthropic?.chosen).toBe(slotModel)
+    expect(readStoredSettings().providers.anthropic?.model).toBe(slotModel)
+  })
+
+  it('ignores a pick that does not belong to an org-served provider or is malformed', async () => {
+    const fetchMock: FetchLike = vi.fn(async (url) => {
+      if (url === R1_URL)
+        return jsonResponse(r1Body([orgItem('anthropic', { model: 'claude-opus-4-7' })]))
+      if (url.endsWith('/models')) return jsonResponse({ data: [] })
+      throw new Error(`unexpected URL: ${url}`)
+    })
+    globalThis.fetch = fetchMock as typeof globalThis.fetch
+    writeFileSync(
+      join(dirs.userData, 'ai-settings.json'),
+      JSON.stringify({
+        provider: 'anthropic',
+        providers: { anthropic: { apiKey: '', model: '' } },
+      }),
+    )
+    const host = createUniworkKeysHost({
+      profile: () => PROFILE,
+      orgId: () => ORG_1,
+      authorized: async (call) => call(TOKEN_1),
+      fetch: fetchMock,
+    })
+    setUniworkKeysHost(host)
+    await host.list()
+    const loaded = await getSettings()
+    const bad: unknown[] = [
+      pickMarker('openai', 'gpt-5.4'), // no org source for openai
+      pickMarker('nope', 'x'),
+      pickMarker('anthropic', '   '),
+      { modelPick: { provider: 'anthropic', model: 7 } },
+      { modelPick: 'anthropic' },
+      { modelPick: null },
+      pickMarker('anthropic', 'm'.repeat(201)),
+    ]
+    for (const options of bad)
+      await setSettings(withModel(loaded, 'anthropic', 'claude-haiku-4-5'), options)
+    expect((await getSettings()).modelSources?.anthropic?.chosen).toBe('claude-opus-4-7')
+    expect(host.chosenModelFor('openai')).not.toBe('gpt-5.4')
+
+    // a key typed for the provider wins over the marker: the key is saved, nothing is recorded
+    await setSettings(
+      {
+        ...loaded,
+        providers: {
+          ...loaded.providers,
+          anthropic: { apiKey: 'sk-ant-typed', model: 'claude-sonnet-5' },
+        },
+      },
+      pickMarker('anthropic', 'claude-haiku-4-5'),
+    )
+    expect(readStoredSettings().providers.anthropic?.apiKey).toBe('sk-ant-typed')
+    expect(host.chosenModelFor('anthropic')).toBe('claude-opus-4-7')
+  })
+
+  // ---- fx2: R1 backoff, custom slot, picks per account, timeout (G05KSH-16..19) ----
+
+  it('keeps a keyless custom endpoint typed on this computer when an org custom key exists', async () => {
+    const fetchMock: FetchLike = vi.fn(async (url) => {
+      if (url === R1_URL) {
+        return jsonResponse(r1Body([orgItem('custom', { base_url: 'https://llm.example/v1' })]))
+      }
+      if (url.endsWith('/models')) return jsonResponse({ data: [] })
+      throw new Error(`unexpected URL: ${url}`)
+    })
+    globalThis.fetch = fetchMock as typeof globalThis.fetch
+    writeFileSync(
+      join(dirs.userData, 'ai-settings.json'),
+      JSON.stringify({
+        provider: 'custom',
+        providers: { custom: { apiKey: '', model: 'my-model' } },
+      }),
+    )
+    const host = createUniworkKeysHost({
+      profile: () => PROFILE,
+      orgId: () => ORG_1,
+      authorized: async (call) => call(TOKEN_1),
+      fetch: fetchMock,
+    })
+    setUniworkKeysHost(host)
+    await host.list()
+    const loaded = await getSettings()
+    expect(loaded.modelSources?.custom?.origin).toBe('org')
+
+    // an echo keeps the stored slot (no endpoint appears)
+    await setSettings(loaded)
+    expect(readStoredSettings().providers.custom?.baseUrl ?? '').toBe('')
+
+    // a local endpoint typed without a key is saved and wins from then on
+    await setSettings({
+      ...loaded,
+      providers: {
+        ...loaded.providers,
+        custom: { apiKey: '', model: 'my-model', baseUrl: 'http://127.0.0.1:1234/v1' },
+      },
+    })
+    expect(readStoredSettings().providers.custom?.baseUrl).toBe('http://127.0.0.1:1234/v1')
+    expect((await getSettings()).modelSources?.custom?.origin).toBeUndefined()
+  })
+
 })

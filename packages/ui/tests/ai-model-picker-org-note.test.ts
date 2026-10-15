@@ -173,6 +173,9 @@ describe('the org model comes from modelSources', () => {
     expect(sent.providers.anthropic.model).toBe('claude-sonnet-5')
     expect(sent.providers.anthropic.apiKey).toBe('')
     expect(sent.modelSources?.anthropic?.chosen).toBe('claude-sonnet-5')
+    expect(setSettings.mock.calls[0]![1]).toEqual({
+      modelPick: { provider: 'anthropic', model: 'claude-sonnet-5' },
+    })
   })
 })
 

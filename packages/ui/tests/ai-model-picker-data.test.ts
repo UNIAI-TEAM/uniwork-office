@@ -13,6 +13,7 @@ import {
   defaultAiSettings,
   setUniworkAiAvailable,
   type AiSettings,
+  type AiSettingsSaveOptions,
 } from '@genoffice/ai-provider'
 import { AiModelPicker, type AiModelPickerBridge } from '../src/AiModelPicker'
 import { AI_MODEL_PICKER_STRINGS } from '../src/strings-ai-model-picker'
@@ -144,9 +145,14 @@ describe('the chip reads the host data', () => {
       ;(host.querySelectorAll('.ai-model-item')[1] as HTMLButtonElement).click()
     })
     expect(setSettings).toHaveBeenCalledTimes(1)
-    const [saved] = setSettings.mock.calls[0] as unknown as [AiSettings]
+    const [saved, options] = setSettings.mock.calls[0] as unknown as [
+      AiSettings,
+      AiSettingsSaveOptions,
+    ]
     expect(saved.provider).toBe('anthropic')
     expect(saved.providers.anthropic.model).toBe('live-a')
+    // the pick says so explicitly: main records a model pick from this marker only
+    expect(options).toEqual({ modelPick: { provider: 'anthropic', model: 'live-a' } })
   })
 })
 

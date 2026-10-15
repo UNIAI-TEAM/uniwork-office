@@ -3,6 +3,7 @@ import type { HeadlessExportTarget } from '@genoffice/electron-utils/headless-ex
 import type { Lang } from '@genoffice/i18n'
 import type {
   AiSettings,
+  AiSettingsSaveOptions,
   AiStreamChunk,
   AiStreamRequest,
   GenSparkAccountStatus,
@@ -316,7 +317,7 @@ export interface HtmlApi {
    *  clicks produce no DOM event here) — dismiss open popovers */
   onChromePressed(handler: () => void): () => void
   getAiSettings(): Promise<AiSettings>
-  setAiSettings(settings: AiSettings): Promise<void>
+  setAiSettings(settings: AiSettings, options?: AiSettingsSaveOptions): Promise<void>
   /** ai-settings.json was rewritten by any renderer; re-read it */
   onAiSettingsChanged(handler: () => void): () => void
   /** shell only: switch to Home and open Settings › AI Model (rejects in standalone) */

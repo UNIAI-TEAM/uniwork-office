@@ -108,7 +108,7 @@ interface PendingConfirm {
 
 const MODEL_BRIDGE: AiModelPickerBridge = {
   getSettings: () => window.pdfApi.getAiSettings(),
-  setSettings: (settings) => window.pdfApi.setAiSettings(settings),
+  setSettings: (settings, options) => window.pdfApi.setAiSettings(settings, options),
   onSettingsChanged: (handler) => window.pdfApi.onAiSettingsChanged(handler),
   gskLoggedIn: () => window.pdfApi.gskStatus().then((s) => !!s?.loggedIn),
   openModelSettings: () => window.pdfApi.openAiModelSettings().catch(() => {}),

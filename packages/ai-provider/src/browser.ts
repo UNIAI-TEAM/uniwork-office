@@ -3,7 +3,9 @@ export type {
   AiProviderConfig,
   AiProviderId,
   AiProviderMeta,
+  AiModelPick,
   AiModelSource,
+  AiSettingsSaveOptions,
   AiSettings,
   CodexModelCatalog,
 } from './types'

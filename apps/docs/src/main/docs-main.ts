@@ -137,6 +137,7 @@ import {
   type AiChatFailure,
   type AiChatRequest,
   type AiChatResponse,
+  type AiModelPick,
   type AiModelSource,
   type AiProviderConfig,
   type AiProviderId,
@@ -3874,6 +3875,21 @@ function wantsUniworkPick(options: unknown): boolean {
   )
 }
 
+const MAX_PICKED_MODEL_LENGTH = 200
+
+/** the model the renderer says the user chose (`ai:set-settings` options); anything malformed is none */
+function modelPickOf(options: unknown): AiModelPick | null {
+  const pick = (options as { modelPick?: unknown } | null | undefined)?.modelPick
+  if (!pick || typeof pick !== 'object') return null
+  const { provider, model } = pick as { provider?: unknown; model?: unknown }
+  if (typeof provider !== 'string' || typeof model !== 'string') return null
+  const picked = model.trim()
+  // keepOrgServedSlots only honors a provider that has an org source, so the id needs no catalog check
+  return picked && picked.length <= MAX_PICKED_MODEL_LENGTH
+    ? { provider: provider as AiProviderId, model: picked }
+    : null
+}
+
 /** the provider ai-settings.json holds (never `uniwork`: the pick lives in the account store) */
 function fileAiProvider(): AiProviderId {
   const provider = resolveAiSettings(
@@ -3898,8 +3914,9 @@ const providerModelCache = new ProviderModelCache()
  * live list. The list never blocks the read: a first call answers `loading` and starts the
  * listing, which announces itself through `ai:settings-changed` when it lands.
  * When signed into UniWork, a key saved on UniWork serves (`origin: 'org'`) every provider whose
- * slot in ai-settings.json has no key of its own; its model is `chosen` there, never written into
- * `settings.providers` (a Settings save would persist it as a local pick).
+ * slot in ai-settings.json has no key of its own; its model is `chosen` there, never copied into
+ * `settings.providers`. A renderer may write a pick into `providers[id].model` in memory, but a save
+ * restores the stored slot (keepOrgServedSlots) and records only the `modelPick` it was sent.
  */
 function modelSourcesOf(settings: AiSettings): Partial<Record<AiProviderId, AiModelSource>> {
   const sources: Partial<Record<AiProviderId, AiModelSource>> = {}
@@ -4055,6 +4072,7 @@ export function registerAiIpc(): void {
         defaultAiSettings(),
       ),
       getUniworkKeysHost(),
+      modelPickOf(options),
     )
     writeJsonAtomic(SETTINGS_PATH(), sanitized)
     broadcastAiSettingsChanged()

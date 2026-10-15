@@ -217,6 +217,11 @@ describe('Settings › AI model: org-managed provider row (G6-05k)', () => {
     await click(saveBtn)
     const setAiSettingsMock = vi.mocked(window.aiOffice.setAiSettings)
     expect(setAiSettingsMock).toHaveBeenCalledTimes(1)
+    // the dropdown pick is the explicit pick signal main records
+    expect(setAiSettingsMock.mock.calls[0][1]).toEqual({
+      includeUniworkPick: true,
+      modelPick: { provider: 'anthropic', model: 'claude-opus-5' },
+    })
     return setAiSettingsMock.mock.calls[0][0]
   }
 
@@ -288,6 +293,10 @@ describe('Settings › AI model: org-managed provider row (G6-05k)', () => {
     const sent = vi.mocked(window.aiOffice.setAiSettings).mock.calls[0][0]
     expect(sent.providers.anthropic.model).toBe('')
     expect(sent.providers.anthropic.apiKey).toBe('')
+    // no model was chosen: the save carries no pick marker
+    expect(vi.mocked(window.aiOffice.setAiSettings).mock.calls[0][1]).toEqual({
+      includeUniworkPick: true,
+    })
   })
 
   it('"use a key on this computer" opens the normal key and base URL fields; a typed key is sent on save', async () => {
@@ -318,14 +327,17 @@ describe('Settings › AI model: org-managed provider row (G6-05k)', () => {
     expect(sent.providers.anthropic.apiKey).toBe('sk-ant-new-local')
   })
 
-  it('cancel on the local key fields restores the read-only org row and drops the typed key', async () => {
+  it('cancel on the local key fields restores the read-only org row, drops the typed key and leaves a clean form clean', async () => {
     installApi(
       stored('claude-sonnet-5', { chosen: 'claude-sonnet-5', origin: 'org', listed: CATALOG }),
     )
     await openAiPane()
+    const saveBtn = () => host.querySelector<HTMLButtonElement>('button.set-btn.primary')!
+    expect(saveBtn().disabled).toBe(true)
     await click(host.querySelector<HTMLButtonElement>('[data-org-key-use-local]')!)
     const key = host.querySelector<HTMLInputElement>('#set-ai-key')!
     await act(async () => setNativeValue(key, 'sk-ant-typed'))
+    expect(saveBtn().disabled).toBe(false)
     const cancel = host.querySelector<HTMLButtonElement>('[data-org-key-use-local-cancel]')!
     expect(cancel.textContent).toBe('Back to the key on UniWork')
     await click(cancel)
@@ -333,10 +345,51 @@ describe('Settings › AI model: org-managed provider row (G6-05k)', () => {
     expect(host.querySelector('#set-ai-key')).toBeNull()
     expect(host.querySelector('[data-org-key-row]')).not.toBeNull()
     expect(host.querySelector('[data-org-key-use-local]')).not.toBeNull()
-    // a later save still carries the slot as it was loaded, not the typed text
-    await click(host.querySelector<HTMLButtonElement>('button.set-btn.primary')!)
-    const sent = vi.mocked(window.aiOffice.setAiSettings).mock.calls[0]?.[0]
-    if (sent) expect(sent.providers.anthropic.apiKey).not.toBe('sk-ant-typed')
+    // nothing else changed: Save is off again and no save can carry the typed text
+    expect(saveBtn().disabled).toBe(true)
+    await click(saveBtn())
+    expect(window.aiOffice.setAiSettings).not.toHaveBeenCalled()
+  })
+
+  it('cancel keeps the form dirty when something else changed, and the save carries the slot as loaded', async () => {
+    const settings = stored('claude-sonnet-5', {
+      chosen: 'claude-sonnet-5',
+      origin: 'org',
+      listed: CATALOG,
+    })
+    // main gives an org-served slot no key
+    settings.providers.anthropic.apiKey = ''
+    installApi(settings)
+    await openAiPane()
+    // an unrelated edit first (output cap), then the local key row opens, a key is typed, Cancel
+    const cap = host.querySelector<HTMLInputElement>('#set-ai-max-tokens')!
+    await act(async () => {
+      setNativeValue(cap, '8192')
+      cap.dispatchEvent(new FocusEvent('focusout', { bubbles: true }))
+    })
+    await click(host.querySelector<HTMLButtonElement>('[data-org-key-use-local]')!)
+    await act(async () =>
+      setNativeValue(host.querySelector<HTMLInputElement>('#set-ai-key')!, 'sk-ant-typed'),
+    )
+    await click(host.querySelector<HTMLButtonElement>('[data-org-key-use-local-cancel]')!)
+
+    const saveBtn = host.querySelector<HTMLButtonElement>('button.set-btn.primary')!
+    expect(saveBtn.disabled).toBe(false)
+    await click(saveBtn)
+    const sent = vi.mocked(window.aiOffice.setAiSettings).mock.calls[0][0]
+    expect(sent.maxOutputTokens).toBe(8192)
+    expect(sent.providers.anthropic.apiKey).toBe('')
+  })
+
+  it('moves focus to the key field when the local key row opens and back to its button on cancel', async () => {
+    installApi(
+      stored('claude-sonnet-5', { chosen: 'claude-sonnet-5', origin: 'org', listed: CATALOG }),
+    )
+    await openAiPane()
+    await click(host.querySelector<HTMLButtonElement>('[data-org-key-use-local]')!)
+    expect(document.activeElement).toBe(host.querySelector('#set-ai-key'))
+    await click(host.querySelector<HTMLButtonElement>('[data-org-key-use-local-cancel]')!)
+    expect(document.activeElement).toBe(host.querySelector('[data-org-key-use-local]'))
   })
 
   it.each([

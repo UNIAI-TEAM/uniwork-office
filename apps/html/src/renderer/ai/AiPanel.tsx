@@ -298,7 +298,7 @@ const DRAFT_PREVIEW_MS = 400
 
 const MODEL_BRIDGE: AiModelPickerBridge = {
   getSettings: () => window.htmlApi.getAiSettings(),
-  setSettings: (settings) => window.htmlApi.setAiSettings(settings),
+  setSettings: (settings, options) => window.htmlApi.setAiSettings(settings, options),
   onSettingsChanged: (handler) => window.htmlApi.onAiSettingsChanged(handler),
   gskLoggedIn: () => window.htmlApi.aiGskStatus().then((s) => !!s?.loggedIn),
   openModelSettings: () => window.htmlApi.openAiModelSettings().catch(() => {}),

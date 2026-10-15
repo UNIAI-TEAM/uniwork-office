@@ -163,6 +163,21 @@ export interface AiModelSource {
   readonly origin?: 'local' | 'org' | undefined
 }
 
+/** the model the user picked for one provider (chip or Settings), sent beside `ai:set-settings` */
+export interface AiModelPick {
+  readonly provider: AiProviderId
+  readonly model: string
+}
+
+/**
+ * What a renderer may say beside the settings it saves (`ai:set-settings` second argument).
+ * `modelPick` is the one signal that a model was chosen: a plain echo of the loaded settings
+ * carries none, so a provider served by a key saved on UniWork records no pick from it.
+ */
+export interface AiSettingsSaveOptions {
+  readonly modelPick?: AiModelPick | undefined
+}
+
 export interface AiSettings {
   provider: AiProviderId
   providers: Record<AiProviderId, AiProviderConfig>
