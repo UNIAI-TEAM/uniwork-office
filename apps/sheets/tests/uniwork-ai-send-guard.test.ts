@@ -9,7 +9,12 @@ import { fileURLToPath } from 'node:url'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { clearUniworkAcks, setAiModelNeedHint } from '@genoffice/ui'
+import {
+  aiUniworkText,
+  clearUniworkAcks,
+  createUniworkSendGate,
+  setAiModelNeedHint,
+} from '@genoffice/ui'
 import { AiChatPanel, type AiChatMessage } from '../src/renderer/ai/AiChatPanel'
 import { LocaleProvider } from '../src/renderer/i18n/locale'
 
@@ -323,6 +328,90 @@ describe('sheets panel send entry and queue submit with model-need hint (RF3-3)'
       container!.querySelector<HTMLButtonElement>('.ai-retry-btn')!.click()
     })
     expect(sent).toEqual(['first turn'])
+  })
+
+  it('an AI entry that fires while the panel is collapsed expands it, then announces the needs-ack line and focuses the disclosure; nothing is sent (RF5-1)', async () => {
+    const sent: string[] = []
+    const expand = vi.fn()
+    // the shell owns the gate and hands it down; its onSend wrapper refuses through it
+    const gate = createUniworkSendGate()
+    vi.stubGlobal(
+      'desktopApi',
+      new Proxy(
+        {},
+        {
+          get: (_t, prop: string) =>
+            prop === 'getAiSettings'
+              ? () => Promise.resolve({ provider: 'uniwork', providers: {} })
+              : /^on[A-Z]/.test(prop)
+                ? () => () => {}
+                : () => Promise.resolve(undefined),
+        },
+      ),
+    )
+    container = document.createElement('div')
+    document.body.appendChild(container)
+    root = createRoot(container)
+    const render = (isOpen: boolean) =>
+      act(() =>
+        root!.render(
+          createElement(
+            LocaleProvider,
+            { initial: 'en', children: null },
+            createElement(AiChatPanel, {
+              isOpen,
+              sendGate: gate,
+              hasContent: true,
+              chat: [],
+              attachments: [],
+              attachNotice: null,
+              onPickAttachments: () => {},
+              onAddAttachmentPaths: () => {},
+              onAddPastedImage: () => {},
+              onRemoveAttachment: () => {},
+              prompt: '',
+              preview: null,
+              aiBusy: false,
+              onPromptChange: () => {},
+              onSend: (text) => {
+                if (text) sent.push(text)
+                return true
+              },
+              onStop: () => {},
+              onNewChat: () => {},
+              onUndo: () => {},
+              scopeRange: null,
+              scopeColumns: null,
+              scopeLocked: false,
+              onScopeDismiss: () => {},
+              onCitation: () => {},
+              onExpand: expand,
+              onCollapse: () => {},
+            }),
+          ),
+        ),
+      )
+    render(true)
+    await flush()
+    await flush()
+    render(false)
+    await flush()
+
+    // a ribbon run or preset while collapsed: the shell wrapper asks the gate first
+    expect(gate.refuse()).toBe(true)
+    expect(expand).toHaveBeenCalledTimes(1)
+    expect(sent).toEqual([])
+
+    render(true)
+    await flush()
+    await flush()
+    const region = container.querySelector<HTMLElement>('[role="region"]')
+    expect(region).not.toBeNull()
+    expect(document.activeElement).toBe(region)
+    const spoken = [...container.querySelectorAll('.ai-uniwork-sr-only')].map((n) => n.textContent)
+    expect(spoken).toContain(aiUniworkText('en', 'aiUniworkSendNeedsAck'))
+    expect(expand).toHaveBeenCalledTimes(1)
+    expect(sent).toEqual([])
   })
 
   it('ExcelShell routes every AI entry (Send, retry, presets, ribbon runs, selection ask) through one UniWork gate (core4b, pinned from source: ExcelShell cannot be mounted in jsdom)', () => {

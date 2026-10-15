@@ -6,7 +6,7 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { Editor } from '@tiptap/core'
 import { setUniworkAiAvailable } from '@genoffice/ai-provider'
-import { clearUniworkAcks, setAiModelNeedHint } from '@genoffice/ui'
+import { aiUniworkText, clearUniworkAcks, setAiModelNeedHint } from '@genoffice/ui'
 import { buildExtensions } from '../src/renderer/editor/extensions'
 import { LocaleProvider } from '../src/renderer/i18n/locale'
 import { usableAiSettings } from './helpers/ai-settings'
@@ -142,6 +142,8 @@ describe('markdown panel send entry with an unavailable UniWork AI pick', () => 
     container = document.createElement('div')
     document.body.appendChild(container)
     root = createRoot(container)
+    let open = true
+    const expand = vi.fn()
     const render = (nonce: number | null) =>
       act(() =>
         root!.render(
@@ -152,6 +154,8 @@ describe('markdown panel send entry with an unavailable UniWork AI pick', () => 
               deps,
               filePath: '/docs/a.md',
               onCollapse: () => {},
+              open,
+              onExpand: expand,
               ...(nonce === null ? {} : { preset: { text: 'rewrite it', nonce } }),
             }),
           ),
@@ -164,8 +168,10 @@ describe('markdown panel send entry with an unavailable UniWork AI pick', () => 
     await flush()
     await flush()
     return {
-      /** a fresh ribbon preset (a new nonce) */
-      firePreset: async (nonce: number) => {
+      expand,
+      /** a fresh ribbon preset (a new nonce); `nextOpen` false fires it while the panel is collapsed */
+      firePreset: async (nonce: number, nextOpen = true) => {
+        open = nextOpen
         render(nonce)
         await flush()
         await flush()
@@ -256,5 +262,28 @@ describe('markdown panel send entry with an unavailable UniWork AI pick', () => 
     })
     await panel.firePreset(3)
     expect(harness.runs).toEqual(['rewrite it', 'rewrite it'])
+  })
+
+  it('a preset that fires while collapsed expands the panel, then announces the needs-ack line and focuses the disclosure; nothing is sent (RF5-1)', async () => {
+    const panel = await mountThenPreset('openai')
+    act(() => harness.finishRun?.())
+    await flush()
+    setUniworkAiAvailable(true)
+    await panel.pick('uniwork')
+    act(() => setAiModelNeedHint(null))
+
+    await panel.firePreset(2, false)
+    expect(panel.expand).toHaveBeenCalledTimes(1)
+    expect(harness.runs).toEqual(['rewrite it'])
+
+    // the host expands the panel in response: the reason is spoken and the disclosure is focused
+    await panel.firePreset(2, true)
+    const region = container!.querySelector<HTMLElement>('[role="region"]')
+    expect(region).not.toBeNull()
+    expect(document.activeElement).toBe(region)
+    const spoken = [...container!.querySelectorAll('.ai-uniwork-sr-only')].map((n) => n.textContent)
+    expect(spoken).toContain(aiUniworkText('en', 'aiUniworkSendNeedsAck'))
+    expect(panel.expand).toHaveBeenCalledTimes(1)
+    expect(harness.runs).toEqual(['rewrite it'])
   })
 })

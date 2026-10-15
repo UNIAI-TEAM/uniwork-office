@@ -663,6 +663,71 @@ describe('AiComposer — shared send gate for preset, retry and continue entries
   })
 })
 
+describe('createUniworkSendGate — refusal while the panel is collapsed (RF5-1)', () => {
+  it('a collapsed refusal expands the panel and stays refused; the handler waits for the expand', () => {
+    const gate = createUniworkSendGate()
+    const expand = vi.fn()
+    const handler = vi.fn()
+    gate.registerBlockedHandler(handler)
+    gate.setPanelBlocked(true)
+    gate.setPanelOpen(false, expand)
+
+    expect(gate.refuse()).toBe(true)
+    expect(expand).toHaveBeenCalledTimes(1)
+    // hidden or unmounted: announcing and focusing now would reach nobody
+    expect(handler).not.toHaveBeenCalled()
+  })
+
+  it('once the panel is open the pending refusal announces and focuses exactly once', () => {
+    const gate = createUniworkSendGate()
+    const handler = vi.fn()
+    gate.setPanelBlocked(true)
+    gate.setPanelOpen(false, vi.fn())
+    gate.refuse()
+
+    // expand: the composer mounts and registers, then the panel reports itself open
+    gate.registerBlockedHandler(handler)
+    gate.setPanelOpen(true)
+    gate.flushPendingRefusal()
+    expect(handler).toHaveBeenCalledTimes(1)
+    gate.flushPendingRefusal()
+    expect(handler).toHaveBeenCalledTimes(1)
+  })
+
+  it('an ack before the panel opens drops the pending refusal', () => {
+    const gate = createUniworkSendGate()
+    const handler = vi.fn()
+    gate.setPanelBlocked(true)
+    gate.setPanelOpen(false, vi.fn())
+    gate.refuse()
+    gate.setPanelBlocked(false)
+    gate.registerBlockedHandler(handler)
+    gate.setPanelOpen(true)
+    gate.flushPendingRefusal()
+    expect(handler).not.toHaveBeenCalled()
+  })
+
+  it('an open panel refuses through the handler directly and never expands', () => {
+    const gate = createUniworkSendGate()
+    const expand = vi.fn()
+    const handler = vi.fn()
+    gate.registerBlockedHandler(handler)
+    gate.setPanelBlocked(true)
+    gate.setPanelOpen(true, expand)
+    expect(gate.refuse()).toBe(true)
+    expect(handler).toHaveBeenCalledTimes(1)
+    expect(expand).not.toHaveBeenCalled()
+  })
+
+  it('an unblocked collapsed gate refuses nothing and expands nothing', () => {
+    const gate = createUniworkSendGate()
+    const expand = vi.fn()
+    gate.setPanelOpen(false, expand)
+    expect(gate.refuse()).toBe(false)
+    expect(expand).not.toHaveBeenCalled()
+  })
+})
+
 describe('AiComposer — Send/Stop labels, polite live announcements, Escape guard & coarse pointer (S9)', () => {
   const ackKey: UniworkAckKey = { account: 'u1', org: 'o1', document: 'd1' }
 

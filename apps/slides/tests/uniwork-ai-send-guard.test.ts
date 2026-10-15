@@ -5,7 +5,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { setUniworkAiAvailable } from '@genoffice/ai-provider'
-import { ack, clearUniworkAcks, setAiModelNeedHint } from '@genoffice/ui'
+import { ack, aiUniworkText, clearUniworkAcks, setAiModelNeedHint } from '@genoffice/ui'
 import { AI_PROVIDERS, type AiSettings } from '../src/shared/ipc'
 
 const harness = vi.hoisted(() => ({
@@ -140,6 +140,7 @@ describe('slides panel send entry with an unavailable UniWork AI pick', () => {
     container = document.createElement('div')
     document.body.appendChild(container)
     root = createRoot(container)
+    const view = { open: true, expand: vi.fn() }
     const render = (nonce: number | null) =>
       act(() =>
         root!.render(
@@ -152,8 +153,8 @@ describe('slides panel send entry with an unavailable UniWork AI pick', () => {
             applyDeck: () => {},
             fitWidthPx: 960,
             settings,
-            open: true,
-            onExpand: () => {},
+            open: view.open,
+            onExpand: view.expand,
             onCollapse: () => {},
             ...(nonce === null ? {} : { preset: { text: 'rewrite it', autoRun: true, nonce } }),
           }),
@@ -166,6 +167,7 @@ describe('slides panel send entry with an unavailable UniWork AI pick', () => {
     await flush()
     await flush()
     return {
+      expand: view.expand,
       /** the user picks `next` in the model picker: the panel gets new settings */
       pick: async (next: AiSettings['provider']) => {
         const picked = settingsFor(next)
@@ -180,8 +182,8 @@ describe('slides panel send entry with an unavailable UniWork AI pick', () => {
               applyDeck: () => {},
               fitWidthPx: 960,
               settings: picked,
-              open: true,
-              onExpand: () => {},
+              open: view.open,
+              onExpand: view.expand,
               onCollapse: () => {},
               preset: { text: 'rewrite it', autoRun: true, nonce: 1 },
             }),
@@ -190,7 +192,8 @@ describe('slides panel send entry with an unavailable UniWork AI pick', () => {
         await flush()
       },
       /** a fresh preset (a new nonce) with UniWork AI still picked */
-      firePreset: async (nonce: number) => {
+      firePreset: async (nonce: number, nextOpen = true) => {
+        view.open = nextOpen
         const picked = settingsFor('uniwork')
         act(() =>
           root!.render(
@@ -203,8 +206,8 @@ describe('slides panel send entry with an unavailable UniWork AI pick', () => {
               applyDeck: () => {},
               fitWidthPx: 960,
               settings: picked,
-              open: true,
-              onExpand: () => {},
+              open: view.open,
+              onExpand: view.expand,
               onCollapse: () => {},
               preset: { text: 'rewrite it', autoRun: true, nonce },
             }),
@@ -293,6 +296,31 @@ describe('slides panel send entry with an unavailable UniWork AI pick', () => {
     })
     await panel.firePreset(3)
     expect(harness.runs).toEqual(['rewrite it', 'rewrite it'])
+  })
+
+  it('a preset that fires while collapsed expands the panel, then announces the needs-ack line and focuses the disclosure; nothing is sent (RF5-1)', async () => {
+    const panel = await mountThenPreset('anthropic')
+    act(() => harness.finishRun?.())
+    await flush()
+    setUniworkAiAvailable(true)
+    await panel.pick('uniwork')
+    act(() => setAiModelNeedHint(null))
+
+    await panel.firePreset(2, false)
+    expect(panel.expand).toHaveBeenCalledTimes(1)
+    expect(harness.runs).toEqual(['rewrite it'])
+
+    // the host expands the panel in response: the reason is spoken and the disclosure is focused
+    await panel.firePreset(2, true)
+    const region = container!.querySelector<HTMLElement>('[role="region"]')
+    expect(region).not.toBeNull()
+    expect(document.activeElement).toBe(region)
+    const spoken = [...container!.querySelectorAll('[aria-live="polite"]')].map(
+      (n) => n.textContent,
+    )
+    expect(spoken).toContain(aiUniworkText('en', 'aiUniworkSendNeedsAck'))
+    expect(panel.expand).toHaveBeenCalledTimes(1)
+    expect(harness.runs).toEqual(['rewrite it'])
   })
 
   it('a queued item also waits for a UniWork composer note, as Send does, and sends once it clears (core4b)', async () => {

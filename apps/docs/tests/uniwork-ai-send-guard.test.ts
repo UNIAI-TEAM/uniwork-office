@@ -7,7 +7,7 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { Editor } from '@tiptap/core'
 import { setUniworkAiAvailable } from '@genoffice/ai-provider'
-import { clearUniworkAcks, setAiModelNeedHint } from '@genoffice/ui'
+import { aiUniworkText, clearUniworkAcks, setAiModelNeedHint } from '@genoffice/ui'
 import { editorExtensions } from '../src/renderer/editor/extensions'
 import { AI_PROVIDERS, type AiSettings } from '../src/shared/ipc'
 
@@ -127,6 +127,7 @@ describe('docs panel send entry with an unavailable UniWork AI pick', () => {
     document.body.appendChild(container)
     root = createRoot(container)
     const settings = settingsFor(provider)
+    const expand = vi.fn()
     // the model chip (and so the need hint) reads the saved settings through the preload bridge
     const stubs: Record<string, unknown> = { capabilities: { platform: 'desktop' } }
     ;(window as any).desktop = new Proxy(stubs, {
@@ -151,6 +152,7 @@ describe('docs panel send entry with an unavailable UniWork AI pick', () => {
             blocks: [],
             settings,
             open: true,
+            onExpand: expand,
             ...(nonce === null ? {} : { preset: { text: 'rewrite it', autoRun: true, nonce } }),
           } as never),
         ),
@@ -162,6 +164,7 @@ describe('docs panel send entry with an unavailable UniWork AI pick', () => {
     await flush()
     await flush()
     return {
+      expand,
       /** the user picks `next` in the model picker: the panel gets new settings */
       pick: async (next: AiSettings['provider'], nonce = 1) => {
         const picked = settingsFor(next)
@@ -172,6 +175,7 @@ describe('docs panel send entry with an unavailable UniWork AI pick', () => {
               blocks: [],
               settings: picked,
               open: true,
+              onExpand: expand,
               preset: { text: 'rewrite it', autoRun: true, nonce },
             } as never),
           ),
@@ -187,6 +191,7 @@ describe('docs panel send entry with an unavailable UniWork AI pick', () => {
               blocks: [],
               settings: settingsFor('uniwork'),
               open,
+              onExpand: expand,
               preset: { text: 'rewrite it', autoRun: true, nonce },
             } as never),
           ),
@@ -286,6 +291,29 @@ describe('docs panel send entry with an unavailable UniWork AI pick', () => {
 
     await panel.firePreset(2, false)
     expect(container!.querySelector('[role="region"]')).toBeNull()
+    expect(harness.runs).toEqual(['rewrite it'])
+  })
+
+  it('a preset that fires while collapsed expands the panel, then announces the needs-ack line and focuses the disclosure; nothing is sent (RF5-1)', async () => {
+    const panel = await mountThenPreset('anthropic')
+    act(() => harness.finishRun?.())
+    await flush()
+    setUniworkAiAvailable(true)
+    await panel.pick('uniwork')
+    act(() => setAiModelNeedHint(null))
+
+    await panel.firePreset(2, false)
+    expect(panel.expand).toHaveBeenCalledTimes(1)
+    expect(harness.runs).toEqual(['rewrite it'])
+
+    // the host expands the panel in response: the reason is spoken and the disclosure is focused
+    await panel.firePreset(2, true)
+    const region = container!.querySelector<HTMLElement>('[role="region"]')
+    expect(region).not.toBeNull()
+    expect(document.activeElement).toBe(region)
+    const spoken = [...container!.querySelectorAll('.ai-uniwork-sr-only')].map((n) => n.textContent)
+    expect(spoken).toContain(aiUniworkText('en', 'aiUniworkSendNeedsAck'))
+    expect(panel.expand).toHaveBeenCalledTimes(1)
     expect(harness.runs).toEqual(['rewrite it'])
   })
 })
