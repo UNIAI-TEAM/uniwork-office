@@ -5,9 +5,10 @@ import { uiScaleOf } from './uniwork-top-inset'
  * the holder `.uw-chrome` right of the scrolling tab strip, so it can never be drawn over a tab;
  * what it could do (a 310px label) was starve the strip down to one tab. The pill therefore
  * degrades by the room it has, in four steps: the full label, the label's short form, the
- * dot (or spinner) with the action button, then (only when even that leaves the strip below its
- * floor) the dot alone, which is the button itself. The full sentence stays in the title, the visually
- * hidden description and the label's hidden text, whatever is drawn.
+ * dot (or spinner) with the action button, then the dot alone, which is the button itself. The
+ * dot alone is the last step and has a looser floor than the others: it is only taken when the strip
+ * cannot show the last tab's label either (`miniSlackOf`). The full sentence stays in the title, the
+ * visually hidden description and the label's hidden text, whatever is drawn.
  */
 
 export type PillVariant = 'full' | 'short' | 'compact' | 'mini'
@@ -24,6 +25,10 @@ const TAB_MIN_FALLBACK_PX = 104
 const STRIP_PADDING_FALLBACK_PX = 20
 /** `.tab-new-btn` margin-left when it is not computed */
 const NEW_BUTTON_GAP_FALLBACK_PX = 4
+/** a document tab's title starts this far into the tab (padding, icon, gap) when it is not measured */
+const TAB_LABEL_START_FALLBACK_PX = 36
+/** a document tab's title is this wide at the tab's minimum width when it is not measured */
+const TAB_LABEL_MIN_FALLBACK_PX = 36
 
 /**
  * The text before the first separator the catalogue puts between a state and what follows it
@@ -55,13 +60,42 @@ export function stripFloorOf(input: StripFloorInput): number {
   return input.home + tabs * input.tabMin + input.padding + input.newButton
 }
 
+/** where a document tab's title starts and how wide it is at the tab's minimum width */
+export interface TabLabelInput {
+  /** from the tab's leading edge to the title's start (padding, icon, gap) */
+  labelStart: number
+  /** the title's width at the tab's minimum width: the smallest label the tab shows */
+  labelMin: number
+}
+
 /**
- * The width the pill may take: what the strip and the holder share, less the floor of the strip,
- * less the rest of the holder (the Discussion toggle, the launch notice and the gaps). Never negative.
+ * How much of the strip's floor the dot-only step does not need. The floor keeps three whole tabs
+ * and the "+" so that a pill beside a strip never costs a tab; the dot alone is the step that
+ * gives up on part of that. The last tab only needs its label start and a minimum readable label
+ * (not the close button and the padding after it), and the "+" and the end padding may scroll out
+ * of the strip. So the mini step is taken only when the strip is shorter than the floor by more
+ * than this. The other steps keep the full floor. No tab, nothing to loosen.
  */
-export function pillBudgetOf(input: { shared: number; floor: number; others: number }): number {
+export function miniSlackOf(input: StripFloorInput & TabLabelInput): number {
+  if (!(input.docTabs > 0)) return 0
+  const pastLabel = Math.max(0, input.tabMin - input.labelStart - input.labelMin)
+  return pastLabel + input.newButton + input.padding / 2
+}
+
+/**
+ * What the strip and the holder share, less the floor of the strip, less the rest of the holder
+ * (the Discussion toggle, the launch notice and the gaps): the room the pill has, negative by how
+ * far the strip is below its floor without any pill at all. The steps are decided on this, not on
+ * the clamped budget: the dot-only step has a slack, and a clamp would hide how much of it is used.
+ */
+export function pillRoomOf(input: { shared: number; floor: number; others: number }): number {
   const room = input.shared - input.floor - input.others
-  return Number.isFinite(room) && room > 0 ? room : 0
+  return Number.isFinite(room) ? room : 0
+}
+
+/** The width the pill may take: the room, never negative. */
+export function pillBudgetOf(input: { shared: number; floor: number; others: number }): number {
+  return Math.max(0, pillRoomOf(input))
 }
 
 /**
@@ -92,7 +126,7 @@ export interface ToggleWidths {
 }
 
 export interface PillFitStepInput {
-  /** the pill's budget as measured with the toggle drawn the way it is now */
+  /** the pill's room (`pillRoomOf`, may be negative) as measured with the toggle drawn the way it is now */
   budget: number
   /** the toggle as drawn now; null when the holder has none (nothing to give up, no icon form) */
   toggle: { width: number; iconOnly: boolean } | null
@@ -100,6 +134,8 @@ export interface PillFitStepInput {
   toggleWidths: ToggleWidths
   widths: PillWidths
   hasShort: boolean
+  /** room the dot-only step may count on beyond the budget (`miniSlackOf`); absent: none */
+  miniSlack?: number
 }
 
 export interface PillFitStep {
@@ -113,15 +149,18 @@ export interface PillFitStep {
  * When even the icon + action pill does not fit the strip's floor, the toggle is the next thing to
  * give: its label is hidden (name and tooltip stay) and the room goes back to the strip, the pill
  * staying compact. When the compact pill still does not fit with the toggle icon-only (or with no
- * toggle to give), the pill itself becomes the dot alone (`mini`), the last step. Every threshold
- * is read off the budget the holder would have with the toggle drawn FULL (an icon-only toggle is
- * measured, then its saving is taken back out) against the compact pill's own width: the same
+ * toggle to give), even with the slack the last tab can do without (`miniSlack`), the pill itself
+ * becomes the dot alone (`mini`), the last step. Only that step has the slack; the toggle and the
+ * wider steps keep the full floor. Every threshold is read off the room the holder would have with
+ * the toggle drawn FULL (an icon-only toggle is measured, then its saving is taken back out)
+ * against the compact pill's own width: the same
  * inputs give the same answer whichever form is drawn, so a boundary cannot flip back and forth.
  * With the full width of the toggle not known yet (it is drawn icon-only from the start) the toggle
  * is first drawn full and measured; with its icon width not known yet it is first drawn icon-only.
  */
 export function pillFitStepOf(input: PillFitStepInput): PillFitStep {
   const { toggle, toggleWidths, widths, hasShort } = input
+  const slack = Math.max(0, input.miniSlack ?? 0)
   let budget = input.budget
   if (toggle?.iconOnly) {
     const full = toggleWidths.full
@@ -134,11 +173,15 @@ export function pillFitStepOf(input: PillFitStepInput): PillFitStep {
     return { variant, iconToggle: false }
   }
   // the compact pill is the narrowest it can be and the strip is still below its floor
-  if (toggle === null) return { variant: 'mini', iconToggle: false }
+  if (toggle === null) {
+    return budget + slack < compact
+      ? { variant: 'mini', iconToggle: false }
+      : { variant: 'compact', iconToggle: false }
+  }
   const { full, icon } = toggleWidths
   if (full === undefined) return { variant: 'compact', iconToggle: false }
   if (icon === undefined) return { variant: 'compact', iconToggle: true }
-  return budget + (full - icon) < compact
+  return budget + slack + (full - icon) < compact
     ? { variant: 'mini', iconToggle: true }
     : { variant: 'compact', iconToggle: true }
 }
@@ -160,6 +203,9 @@ export interface BarLayoutInput {
   toggle: number
   /** the toggle's width without its label; absent: the holder has no toggle to shrink */
   toggleIcon?: number
+  /** the first tab's title start and minimum width; absent: the stylesheet's 36 and 36 */
+  labelStart?: number
+  labelMin?: number
   pill: PillWidths
   hasShort: boolean
 }
@@ -180,7 +226,7 @@ export interface BarLayout {
 export function barLayoutOf(input: BarLayoutInput): BarLayout {
   const shared = input.barWidth - input.left - input.right - input.margins
   const floor = stripFloorOf(input)
-  const budget = pillBudgetOf({ shared, floor, others: input.toggle })
+  const budget = pillRoomOf({ shared, floor, others: input.toggle })
   const hasToggle = input.toggleIcon !== undefined && input.toggle > 0
   const step = pillFitStepOf({
     budget,
@@ -188,6 +234,11 @@ export function barLayoutOf(input: BarLayoutInput): BarLayout {
     toggleWidths: { full: input.toggle, icon: input.toggleIcon },
     widths: input.pill,
     hasShort: input.hasShort,
+    miniSlack: miniSlackOf({
+      ...input,
+      labelStart: input.labelStart ?? TAB_LABEL_START_FALLBACK_PX,
+      labelMin: input.labelMin ?? TAB_LABEL_MIN_FALLBACK_PX,
+    }),
   })
   const { variant, iconToggle } = step
   const chromeWidth =
@@ -217,6 +268,7 @@ export function measurePillFit(group: HTMLElement): {
   budget: number
   natural: number
   toggle: { width: number; iconOnly: boolean } | null
+  miniSlack: number
 } | null {
   const chrome = group.parentElement
   const bar = chrome?.parentElement
@@ -238,7 +290,7 @@ export function measurePillFit(group: HTMLElement): {
   const newButton = strip.querySelector('.tab-new-btn')
   const newStyle = newButton ? getComputedStyle(newButton) : undefined
   const tabMin = firstDoc ? px(getComputedStyle(firstDoc).minWidth) : Number.NaN
-  const floor = stripFloorOf({
+  const floorInput: StripFloorInput = {
     home,
     tabMin: (Number.isFinite(tabMin) ? tabMin : TAB_MIN_FALLBACK_PX) * scale,
     docTabs: docTabs.length,
@@ -249,8 +301,10 @@ export function measurePillFit(group: HTMLElement): {
         ? px(newStyle?.marginLeft)
         : NEW_BUTTON_GAP_FALLBACK_PX) *
         scale,
-  })
-  const budget = pillBudgetOf({
+  }
+  const floor = stripFloorOf(floorInput)
+  const miniSlack = miniSlackOf({ ...floorInput, ...labelOf(firstDoc, floorInput.tabMin, scale) })
+  const budget = pillRoomOf({
     shared: stripWidth + chromeWidth,
     floor,
     others: chromeWidth - pillWidth,
@@ -267,5 +321,29 @@ export function measurePillFit(group: HTMLElement): {
     toggleEl && toggleWidth > 0
       ? { width: toggleWidth, iconOnly: toggleEl.getAttribute('data-icon-only') === 'true' }
       : null
-  return { budget, natural: pillWidth + clipped, toggle }
+  return { budget, natural: pillWidth + clipped, toggle, miniSlack }
+}
+
+/**
+ * Where the first document tab's title starts and how wide it is at the tab's minimum width, read
+ * off the DOM by the page's direction (the title starts on the right in right-to-left). The width at
+ * the minimum is what the tab leaves after the start and after the title (the close button and the
+ * padding), since the title is the part that flexes. A tab with no title yet (the rename input) or
+ * no layout has the stylesheet's constants.
+ */
+function labelOf(tab: Element | null, tabMin: number, scale: number): TabLabelInput {
+  const fallback = {
+    labelStart: TAB_LABEL_START_FALLBACK_PX * scale,
+    labelMin: TAB_LABEL_MIN_FALLBACK_PX * scale,
+  }
+  const title = tab?.querySelector('.tab-title')
+  if (!tab || !title) return fallback
+  const tabRect = tab.getBoundingClientRect()
+  const titleRect = title.getBoundingClientRect()
+  if (!(tabRect.width > 0) || !(titleRect.width > 0)) return fallback
+  const rtl = typeof document !== 'undefined' && document.documentElement.dir === 'rtl'
+  const start = rtl ? tabRect.right - titleRect.right : titleRect.left - tabRect.left
+  const tail = rtl ? titleRect.left - tabRect.left : tabRect.right - titleRect.right
+  if (!(start >= 0) || !(tail >= 0)) return fallback
+  return { labelStart: start, labelMin: Math.max(0, tabMin - start - tail) }
 }

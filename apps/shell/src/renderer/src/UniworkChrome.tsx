@@ -367,6 +367,7 @@ ${uiScaleOf(el)}`
       toggleWidths: toggleWidths.current,
       widths: widths.current,
       hasShort,
+      miniSlack: fit.miniSlack,
     })
     if (next.variant !== variant) setVariant(next.variant)
     if (next.iconToggle !== iconToggle) setIconToggle(next.iconToggle)
@@ -448,6 +449,9 @@ export function UniworkStatusChip({
   const { t, dateLocale } = useI18n()
   const account = useAccount()
   const tipId = useId()
+  // the dot alone is named by these two hidden texts (aria-labelledby): the full label, then the action
+  const nameId = useId()
+  const actionNameId = useId()
   const [busy, setBusy] = useState(false)
   const [popover, setPopover] = useState<QueuePopoverOpener | null>(null)
   const [ctrlS, setCtrlS] = useState(0)
@@ -473,12 +477,29 @@ ${action ? t(action.labelKey) : ''}`,
   )
 
   // the button never leaves while focus is on it without the pill taking the focus first (a
-  // callback ref runs before the node is removed; focus dropped to <body> would lose the place)
+  // callback ref runs before the node is removed; focus dropped to <body> would lose the place).
+  // A step that replaces the button (compact <-> the dot) gives the focus to the new one right
+  // after the commit, below. The button is also state, so the queue popover's opener is the node
+  // that is drawn now, not the one of the render before it.
+  const [buttonEl, setButtonEl] = useState<HTMLButtonElement | null>(null)
+  const focusFollows = useRef(false)
   const setButton = useCallback((el: HTMLButtonElement | null) => {
     const previous = buttonRef.current
     buttonRef.current = el
-    if (!el && previous && document.activeElement === previous) groupRef.current?.focus()
+    setButtonEl(el)
+    if (!el && previous && document.activeElement === previous) {
+      focusFollows.current = true
+      groupRef.current?.focus()
+    }
   }, [])
+  // after the commit that swapped the button (the refs are set before this runs): the focus the old
+  // button had goes to the new one. Only that commit counts; a button that comes later (a waiting
+  // save after a settled one) never takes a focus the user has put elsewhere.
+  useLayoutEffect(() => {
+    if (!focusFollows.current) return
+    focusFollows.current = false
+    buttonRef.current?.focus()
+  })
 
   // one sentence per change of this document's pill, none when the pill first shows (a tab
   // switch mounts another chip: the chip is keyed by path)
@@ -635,7 +656,7 @@ ${action ? t(action.labelKey) : ''}`,
               ref={setButton}
               type="button"
               className="uw-pill-mini"
-              aria-label={`${label}. ${t(action.labelKey)}`}
+              aria-labelledby={`${nameId} ${actionNameId}`}
               aria-disabled={busy ? 'true' : undefined}
               aria-describedby={tipId}
               title={title}
@@ -647,6 +668,12 @@ ${action ? t(action.labelKey) : ''}`,
               onClick={() => run(action.kind)}
             >
               <MiniGlyphIcon glyph={glyph} />
+              <span id={nameId} className="uw-sr-only">
+                {label}
+              </span>
+              <span id={actionNameId} className="uw-sr-only">
+                {t(action.labelKey)}
+              </span>
             </button>
           ) : (
             <span className="uw-pill-status">
@@ -703,7 +730,7 @@ ${action ? t(action.labelKey) : ''}`,
           status={status}
           opener={popover}
           anchorEl={groupRef.current}
-          openerEl={popover === 'pill' ? buttonRef.current : null}
+          openerEl={popover === 'pill' ? buttonEl : null}
           onClose={() => setPopover(null)}
           onSignIn={() => account.signIn()}
           onFocusEditor={() => window.aiOfficeTabs?.focusActive()}

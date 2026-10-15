@@ -758,7 +758,7 @@ describe('FXT6u2: the mini step needs the last tab only up to its readable label
     })
 
     it('the slack never moves the icon-only toggle or the wider steps (they keep the current floor)', () => {
-      for (let budget = 111 - DELTA - 1; budget <= 450; budget++) {
+      for (let budget = 111 - DELTA; budget <= 450; budget++) {
         // above the mini range the answer is the one without any slack
         expect(step(budget), `budget ${budget}`).toEqual(step(budget, { miniSlack: 0 }))
       }
