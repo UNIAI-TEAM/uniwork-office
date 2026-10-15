@@ -168,6 +168,77 @@ describe('markdown AI run: one undo step', () => {
     expect(text(editor)).toBe(before)
   })
 
+  it('a user edit as the LAST thing before the run ends leaves no empty marker step', () => {
+    const editor = createEditor(START)
+    const before = text(editor)
+    const events: Array<[string, string]> = []
+    onRunHistoryChange(editor, (e) => events.push([e.runId, e.direction]))
+    const group = runHistoryOf(editor)
+    group.begin('run-last')
+    ai(editor, { op: 'replaceText', target: { start: 0 }, find: 'one', replace: 'ONE' })
+    editor.commands.setTextSelection(editor.state.doc.content.size - 1)
+    editor.commands.insertContent('!')
+    group.end('run-last', true)
+    // the AI group and the user's keystroke: the end marker is no step of its own
+    expect(depth(editor)).toBe(2)
+
+    // the first Ctrl+Z takes back what the user typed, not an invisible marker
+    editor.commands.undo()
+    expect(text(editor)).not.toContain('!')
+    expect(text(editor)).toContain('ONE')
+    expect(events).toEqual([])
+    // the second one undoes the run
+    editor.commands.undo()
+    expect(text(editor)).toBe(before)
+    expect(events).toEqual([['run-last', 'undo']])
+    editor.commands.redo()
+    expect(text(editor)).toContain('ONE')
+    expect(events).toEqual([
+      ['run-last', 'undo'],
+      ['run-last', 'redo'],
+    ])
+  })
+
+  it('undoing a later piece of a split run is not the run being undone; the first piece is', () => {
+    const editor = createEditor(START)
+    const before = text(editor)
+    const events: Array<[string, string]> = []
+    onRunHistoryChange(editor, (e) => events.push([e.runId, e.direction]))
+    const group = runHistoryOf(editor)
+    group.begin('run-split')
+    ai(editor, { op: 'replaceText', target: { start: 0 }, find: 'one', replace: 'ONE' })
+    editor.commands.setTextSelection(editor.state.doc.content.size - 1)
+    editor.commands.insertContent('!')
+    ai(editor, { op: 'replaceText', target: { start: 1 }, find: 'two', replace: 'TWO' })
+    ai(editor, { op: 'replaceText', target: { start: 2 }, find: 'three', replace: 'THREE' })
+    group.end('run-split', true)
+    expect(depth(editor)).toBe(3)
+
+    editor.commands.undo() // the later AI piece
+    expect(text(editor)).toContain('two')
+    expect(text(editor)).not.toContain('TWO')
+    expect(events).toEqual([])
+    editor.commands.undo() // the user's keystroke
+    expect(events).toEqual([])
+    editor.commands.undo() // the first AI piece: the run is gone
+    expect(text(editor)).toBe(before)
+    expect(events).toEqual([['run-split', 'undo']])
+  })
+
+  it('a run that starts with a properties change reports its undo from that first step', () => {
+    const editor = createEditor(START)
+    const events: Array<[string, string]> = []
+    onRunHistoryChange(editor, (e) => events.push([e.runId, e.direction]))
+    const group = runHistoryOf(editor)
+    group.begin('run-fm-first')
+    group.recordFrontmatter('', '---\ntags: a\n---\n')
+    ai(editor, { op: 'replaceText', target: { start: 0 }, find: 'one', replace: 'ONE' })
+    group.end('run-fm-first', true)
+    expect(depth(editor)).toBe(1)
+    editor.commands.undo()
+    expect(events).toEqual([['run-fm-first', 'undo']])
+  })
+
   it('the AI wash follows the undo: nothing stays highlighted over reverted text', () => {
     const editor = createEditor(START)
     const group = runHistoryOf(editor)

@@ -26,6 +26,8 @@ const harness = vi.hoisted(() => ({
   /** one script per run: the tool calls the fake model makes */
   scripts: [] as Array<Array<{ name: string; input: Record<string, unknown> }>>,
   runs: 0,
+  /** what a script entry named `__user_edit` does: the user types into the editor mid-run */
+  userEdit: null as null | (() => void),
 }))
 vi.mock('@genoffice/agent-core', async (orig) => {
   const real = (await orig()) as Record<string, unknown>
@@ -50,6 +52,10 @@ vi.mock('@genoffice/agent-core', async (orig) => {
       const script = harness.scripts.shift() ?? []
       let first = true
       for (const [index, call] of script.entries()) {
+        if (call.name === '__user_edit') {
+          harness.userEdit?.()
+          continue
+        }
         const full = { id: `c${index}`, ...call }
         this.events?.onToolStart?.(full)
         const execution = (await this.skill?.executeTool(full)) as { mutated?: boolean }
@@ -99,6 +105,7 @@ describe('markdown AI run undo and the images the run saved', () => {
     container = null
     editor = null
     harness.scripts.length = 0
+    harness.userEdit = null
     vi.unstubAllGlobals()
   })
 
@@ -140,6 +147,12 @@ describe('markdown AI run undo and the images the run saved', () => {
       }),
       content: '<p>Saved document</p>',
     })
+    harness.userEdit = () => {
+      act(() => {
+        editor!.commands.setTextSelection(editor!.state.doc.content.size - 1)
+        editor!.commands.insertContent('!')
+      })
+    }
     const restored: unknown[] = []
     const deps = {
       getEditor: () => editor,
@@ -258,5 +271,85 @@ describe('markdown AI run undo and the images the run saved', () => {
     })
     await flush()
     expect(panel.store.discarded).toEqual([])
+  })
+
+  const userEdit = (): ScriptedCall => ({ name: '__user_edit', input: {} })
+  const insertText = (text: string): ScriptedCall => ({
+    name: 'edit_document',
+    input: { operations: [{ op: 'insertText', after: 0, text }] },
+  })
+  const undo = async (): Promise<void> => {
+    act(() => {
+      editor!.commands.undo()
+    })
+    await flush()
+  }
+  const redo = async (): Promise<void> => {
+    act(() => {
+      editor!.commands.redo()
+    })
+    await flush()
+  }
+
+  it('the user typing as the last thing of a run: the first Ctrl+Z is theirs and the picture stays', async () => {
+    const panel = await mount()
+    await panel.run([insertImage(), userEdit()])
+    expect(imageCount()).toBe(1)
+    expect(editor!.getText()).toContain('!')
+
+    await undo()
+    expect(editor!.getText()).not.toContain('!')
+    expect(imageCount()).toBe(1)
+    expect(panel.store.discarded).toEqual([])
+    expect(panel.rollbackButtons()).toHaveLength(1)
+
+    await undo()
+    expect(imageCount()).toBe(0)
+    expect(panel.store.discarded).toEqual([['image-1.png']])
+    expect(panel.rollbackButtons()).toHaveLength(0)
+  })
+
+  it('a picture in the first piece of a split run survives the undo of a later piece', async () => {
+    const panel = await mount()
+    await panel.run([insertImage(), userEdit(), insertText('later')])
+    expect(imageCount()).toBe(1)
+
+    await undo() // the later AI piece
+    expect(editor!.getText()).not.toContain('later')
+    expect(imageCount()).toBe(1)
+    expect(panel.store.discarded).toEqual([])
+    expect(panel.rollbackButtons()).toHaveLength(1)
+
+    await undo() // the user's keystroke
+    expect(imageCount()).toBe(1)
+    expect(panel.store.discarded).toEqual([])
+
+    await undo() // the first piece holds the picture: now it goes
+    expect(imageCount()).toBe(0)
+    expect(panel.store.discarded).toEqual([['image-1.png']])
+    expect(panel.rollbackButtons()).toHaveLength(0)
+  })
+
+  it('a picture in a later piece: undoing that piece keeps the file for the redo', async () => {
+    const panel = await mount()
+    await panel.run([insertText('first'), userEdit(), insertImage()])
+    expect(imageCount()).toBe(1)
+
+    await undo() // the later piece holds the picture, but the run is not undone
+    expect(imageCount()).toBe(0)
+    expect(panel.store.discarded).toEqual([])
+    await redo()
+    expect(imageCount()).toBe(1)
+    expect(panel.store.discarded).toEqual([])
+  })
+
+  it('the AI marker stays after the run ends and goes when the next run starts', async () => {
+    const panel = await mount()
+    await panel.run([insertText('marked')])
+    expect(editor!.view.dom.querySelectorAll('.ai-changed').length).toBeGreaterThan(0)
+
+    // a read-only run: starting it retires the previous run's marker
+    await panel.run([])
+    expect(editor!.view.dom.querySelectorAll('.ai-changed')).toHaveLength(0)
   })
 })
