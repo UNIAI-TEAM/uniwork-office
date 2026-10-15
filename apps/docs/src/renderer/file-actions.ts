@@ -708,6 +708,17 @@ function deriveAutoFileName(editor: Editor): string | null {
 }
 
 /**
+ * The name a never-saved document's first save writes under (the first heading while it is
+ * still "Untitled", else its current name); null once the document has a file. The AI panel's
+ * ask-before-saving card shows it and the Save it hands back passes it on, so both agree.
+ */
+export function firstSaveName(ctx: FileActionContext): string | null {
+  const { doc, editor } = ctx
+  if (!doc || !editor || doc.filePath) return null
+  return (doc.fileName === t('appUntitledDocx') ? deriveAutoFileName(editor) : null) ?? doc.fileName
+}
+
+/**
  * Serialize the current editor/document state to .docx bytes — the shared
  * serialization half of save(); no dialogs, no state changes. Also used for
  * crash-recovery copies.

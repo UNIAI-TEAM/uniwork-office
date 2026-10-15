@@ -98,6 +98,13 @@ import { createElectronTransport } from './transport'
 import { useI18n, t as tModule, aiLangDirective, getLang, type StringKey } from '../i18n/locale'
 import { AiErrorAction, Markdown, uniworkErrorForChip, useAiModelNeedHint } from '@genoffice/ui'
 import { AiComposer, AiScopeQuote, AiTypingIndicator, type AiScopeQuoteData } from '@genoffice/ui'
+import { AiSaveDraftCard } from '@genoffice/ui'
+import {
+  AI_RUN_DONE_EVENT,
+  AI_SAVE_OFFER_EVENT,
+  type AiRunDoneDetail,
+  type AiSaveOfferDetail,
+} from './save-offer'
 import sendEnterOn from '../assets/send-enter-on.png'
 import sendEnterOff from '../assets/send-enter-off.png'
 import sendStop from '../assets/send-stop.png'
@@ -509,6 +516,8 @@ export function AiPanel({
   /** a send waiting on a phased open's tail; Stop / New chat abort it before it runs */
   const pendingSendRef = useRef<{ aborted: boolean } | null>(null)
   const [chat, setChat] = useState<ChatEntry[]>([])
+  /** the ask-before-saving card of the last run (a never-saved document it changed); one per run */
+  const [saveOffer, setSaveOffer] = useState<{ name: string } | null>(null)
   /** latest chat for listeners registered once (the pre-save hook reads its rollback points) */
   const chatRef = useRef(chat)
   chatRef.current = chat
@@ -806,6 +815,11 @@ export function AiPanel({
       })
   }, [filePath])
 
+  // the document got a file (Ctrl+S, Save As): the ask card has nothing left to ask
+  useEffect(() => {
+    if (filePath) setSaveOffer(null)
+  }, [filePath])
+
   // answered receipts belong to the document they were given for: drop them when another
   // one opens (an untitled document getting its first path is the same document)
   const receiptPathRef = useRef(filePath)
@@ -1090,9 +1104,13 @@ export function AiPanel({
             snapshot: runSnapshotRef.current ?? undefined,
           }))
           setBusy(false)
-          // App listens: a run that generated content into a never-saved document
-          // triggers a silent first save with a content-derived file name
-          window.dispatchEvent(new Event('ai-docs-run-done'))
+          // App listens: a run that changed a never-saved document gets the ask card (offerSave);
+          // nothing is written before the user's Save
+          const detail: AiRunDoneDetail = {
+            mutated: runSnapshotRef.current !== null,
+            offerSave: (name) => setSaveOffer({ name }),
+          }
+          window.dispatchEvent(new CustomEvent(AI_RUN_DONE_EVENT, { detail }))
           // persist outside the updater (a double-invoked updater would write history twice); tools stores the whole run's full activity.
           // Edits-only runs (tools ran, no text) persist too, or the whole turn vanishes from the restored transcript
           if (!cancelled && (finalText || runToolsRef.current.length > 0)) {
@@ -1282,6 +1300,8 @@ export function AiPanel({
     runToolsRef.current = []
     runSnapshotRef.current = null
     runUsageRef.current = undefined
+    // a new run replaces an unanswered ask card
+    setSaveOffer(null)
     stickToBottomRef.current = true
     setChat((prev) =>
       boundChatHistory([
@@ -1395,6 +1415,7 @@ export function AiPanel({
     loopRef.current?.reset()
     setBusy(false)
     setChat([])
+    setSaveOffer(null)
     // Restored history is painted above the live turn: without this the
     // previous conversation survives "New chat" on screen (#195).
     setHistoricChat([])
@@ -2093,6 +2114,18 @@ export function AiPanel({
             </div>
           )
         })}
+        {saveOffer && !busy && (
+          <AiSaveDraftCard
+            lang={lang}
+            name={saveOffer.name}
+            onSave={() => {
+              setSaveOffer(null)
+              const detail: AiSaveOfferDetail = { name: saveOffer.name }
+              window.dispatchEvent(new CustomEvent(AI_SAVE_OFFER_EVENT, { detail }))
+            }}
+            onLater={() => setSaveOffer(null)}
+          />
+        )}
       </div>
 
       {activeClarify && (

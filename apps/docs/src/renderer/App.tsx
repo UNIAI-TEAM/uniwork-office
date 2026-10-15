@@ -103,6 +103,12 @@ import { ZoteroDocumentController } from './zotero/controller'
 import { AiPanel, AI_REVISION_AUTHOR } from './ai/AiPanel'
 import type { AiCommentsAccess, AiDocExtras, AiHeaderFooterAccess } from './ai/tools'
 import { createAiSideState, type AiSideSlice, type AiSideState } from './ai/run-snapshot'
+import {
+  AI_RUN_DONE_EVENT,
+  AI_SAVE_OFFER_EVENT,
+  type AiRunDoneDetail,
+  type AiSaveOfferDetail,
+} from './ai/save-offer'
 import type { AiStyleInfo } from './ai/style-ops'
 import { applyResolvedPageSetup, describeSection, type AiPageSetupAccess } from './ai/page-setup'
 import { patchPendingSectPr, sectionIndexAtBlock } from './ai/pending-sections'
@@ -403,6 +409,7 @@ import {
   exportPdf as exportPdfImpl,
   exportHtml as exportHtmlImpl,
   exportImages as exportImagesImpl,
+  firstSaveName,
   loadFile as loadFileImpl,
   newFile as newFileImpl,
   printDoc as printDocImpl,
@@ -2411,11 +2418,12 @@ export function App() {
     }
   }
 
-  const save = useCallback((saveAs: boolean, auto = false) => {
+  /** newDocName: the first-save name the AI ask card showed (a never-saved document only) */
+  const save = useCallback((saveAs: boolean, auto = false, newDocName?: string) => {
     // UniWork seam: no autosave onto a UniWork document, no in-place Save of a view-only one
     const state = uniworkStateFor(uniworkRef.current, fileCtxRef.current.doc?.filePath)
     if (!uniworkAllowsSave(state, saveAs, auto)) return Promise.resolve(false)
-    return saveImpl(fileCtxRef.current, saveAs, auto)
+    return saveImpl(fileCtxRef.current, saveAs, auto, newDocName)
   }, [])
 
   // inserting a section break needs one save for the new section to take effect; the
@@ -5402,20 +5410,28 @@ export function App() {
     }
   }, [tornDown, autoSaveActive, doc, editor, save])
 
-  // After an AI run finishes on a never-saved document, silently save it once: the
-  // first save derives the file name from the first heading (see deriveAutoFileName
-  // in file-actions), which also renames the shell tab — mirrors slides, where AI
-  // generation names and persists the draft deck.
+  // After an AI run changed a never-saved document, the panel asks before saving (an AI run
+  // writes nothing by itself): App offers the name the first save would use (the first heading,
+  // see firstSaveName), and the card's Save runs that normal first save under the shown name.
   useEffect(() => {
-    const handler = () => {
+    const onRunDone = (e: Event) => {
+      const detail = (e as CustomEvent<AiRunDoneDetail>).detail
       const cur = fileCtxRef.current
-      if (!cur.doc || cur.doc.filePath || !anyDirtyRef.current) return
-      if (editor?.view.composing) return
-      void save(false, true)
+      if (!detail?.mutated || !cur.doc || cur.doc.filePath || !anyDirtyRef.current) return
+      detail.offerSave(firstSaveName(cur) ?? '')
     }
-    window.addEventListener('ai-docs-run-done', handler)
-    return () => window.removeEventListener('ai-docs-run-done', handler)
-  }, [editor, save])
+    const onSaveOffer = (e: Event) => {
+      const name = (e as CustomEvent<AiSaveOfferDetail>).detail?.name
+      if (fileCtxRef.current.doc?.filePath) return
+      void save(false, false, name || undefined)
+    }
+    window.addEventListener(AI_RUN_DONE_EVENT, onRunDone)
+    window.addEventListener(AI_SAVE_OFFER_EVENT, onSaveOffer)
+    return () => {
+      window.removeEventListener(AI_RUN_DONE_EVENT, onRunDone)
+      window.removeEventListener(AI_SAVE_OFFER_EVENT, onSaveOffer)
+    }
+  }, [save])
 
   useEffect(() => {
     // editing shortcuts only fire when focus is in an editor surface (main

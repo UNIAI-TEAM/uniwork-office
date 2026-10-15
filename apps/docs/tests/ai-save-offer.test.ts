@@ -94,7 +94,13 @@ describe('docs: ask before saving an untitled document after an AI run', () => {
     await editRun()
     await h.send('and again')
     expect(card(), 'the card goes when the next run starts').toBeNull()
-    await h.toolTurn([BOLD])
+    // a change of its own (bold again would change nothing)
+    await h.toolTurn([
+      {
+        name: 'apply_ops',
+        input: { ops: [{ op: 'setFont', target: { blockIndexes: [1] }, italic: true }] },
+      },
+    ])
     await h.textTurn('Done.')
     expect(h.container.querySelectorAll('.ai-save-draft')).toHaveLength(1)
   })
