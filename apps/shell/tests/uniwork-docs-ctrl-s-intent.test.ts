@@ -574,6 +574,12 @@ async function inlineSaveInFlight(ctx: Ctx, server: ReturnType<typeof fakeServer
   return { path, first, ...hold }
 }
 
+/**
+ * runs the pending microtasks (a rejected or refused intent read has no I/O
+ * left after the stub was called, only its own continuation)
+ */
+const flushMicrotasks = () => new Promise<void>((resolve) => setImmediate(resolve))
+
 const unavailableAccess: Array<[string, () => Promise<unknown>]> = [
   ['not ready (unavailable)', async () => ({ kind: 'unavailable' })],
   [
@@ -683,7 +689,9 @@ describe('G5-06u T9: RBE6u2 fix round', () => {
     const first = ctx.service.save(path)
     await vi.waitFor(() => expect(ctx.service.coordinator.isSaving(path)).toBe(true))
     ctx.service.onUserSave(path)
-    await new Promise((resolve) => setTimeout(resolve, 20))
+    // the second press reached the stubbed intents() (call 1 is the first save's)
+    await vi.waitFor(() => expect(calls).toBeGreaterThan(1))
+    await flushMicrotasks()
     expect(ctx.popovers).toEqual([])
     open()
     await first
@@ -713,10 +721,17 @@ describe('G5-06u T9: RBE6u2 fix round', () => {
       const server = fakeServer({ bytes: enc('v3') })
       const ctx = setup(server)
       const { path, first, release, reached } = await inlineSaveInFlight(ctx, server)
-      coordinatorDeps(ctx).intents = access
+      // the stub counts its calls: the first save already passed intents(), so
+      // any call is the second press reaching the branch under test
+      let reachedByPress = 0
+      coordinatorDeps(ctx).intents = async () => {
+        reachedByPress += 1
+        return access()
+      }
       writeFileSync(path, 'v5')
       ctx.service.onUserSave(path)
-      await new Promise((resolve) => setTimeout(resolve, 20))
+      await vi.waitFor(() => expect(reachedByPress).toBe(1))
+      await flushMicrotasks()
       expect(ctx.popovers).toEqual([])
       expect(ctx.service.coordinator.hasPendingNext(path)).toBe(false)
       expect(reached.uploads).toBe(1)
@@ -725,4 +740,80 @@ describe('G5-06u T9: RBE6u2 fix round', () => {
       expect(binding(path)).toMatchObject({ state: 'dirty' })
     },
   )
+})
+
+/**
+ * holds the NEXT intents() call (the second press's own read) until
+ * `release()`: the press has read the working copy and is parked just before
+ * its intent read, so the running save can settle underneath it
+ */
+function holdNextIntentsRead(ctx: Ctx) {
+  const deps = coordinatorDeps(ctx)
+  const original = deps.intents
+  let release: () => void = () => undefined
+  const gate = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  const state = { parked: false }
+  let armed = true
+  deps.intents = async () => {
+    if (armed) {
+      armed = false
+      state.parked = true
+      await gate
+    }
+    return original()
+  }
+  return { release, state }
+}
+
+describe('G5-06u T9: RBE6u3-01 the intent read lands after the running save settled', () => {
+  it('a still-dirty copy: one push, pendingNext, nothing written by the press', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const { path, first, release, reached } = await inlineSaveInFlight(ctx, server)
+    writeFileSync(path, 'v5')
+    const press = holdNextIntentsRead(ctx)
+    ctx.statuses.length = 0
+    // the coordinator's own call, so the press itself can be awaited
+    const pressed = ctx.service.coordinator.save(path, { userSave: true })
+    await vi.waitFor(() => expect(press.state.parked).toBe(true))
+    // the running save settles (record deleted, pendingNext cleared) before
+    // the press's intent read resolves
+    release()
+    await first
+    expect(await storedIntent(ctx, path)).toBeNull()
+    expect(ctx.service.coordinator.hasPendingNext(path)).toBe(false)
+    expect(binding(path)).toMatchObject({ state: 'dirty' })
+    press.release()
+    await pressed
+    expect(ctx.popovers).toEqual([{ path }])
+    expect(ctx.service.coordinator.hasPendingNext(path)).toBe(true)
+    expect(ctx.statuses.at(-1)).toMatchObject({ path, pendingNext: true })
+    // read only: no second upload, no second intent, the copy stays dirty
+    expect(reached.uploads).toBe(1)
+    expect(await storedIntent(ctx, path)).toBeNull()
+    expect(binding(path)).toMatchObject({ state: 'dirty' })
+    expect(sent(server)).toHaveLength(2)
+  })
+
+  it('a clean copy (no new edits): the early return stays, no push, no pendingNext', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const { path, first, release } = await inlineSaveInFlight(ctx, server)
+    const press = holdNextIntentsRead(ctx)
+    ctx.statuses.length = 0
+    // the coordinator's own call, so the press itself can be awaited
+    const pressed = ctx.service.coordinator.save(path, { userSave: true })
+    await vi.waitFor(() => expect(press.state.parked).toBe(true))
+    release()
+    await first
+    expect(binding(path)).toMatchObject({ state: 'saved' })
+    press.release()
+    await pressed
+    expect(ctx.popovers).toEqual([])
+    expect(ctx.service.coordinator.hasPendingNext(path)).toBe(false)
+    expect(ctx.statuses.some((s) => s.pendingNext)).toBe(false)
+    expect(sent(server)).toHaveLength(2)
+  })
 })
