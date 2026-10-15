@@ -158,32 +158,27 @@ describe('pdf executeTool refuses what `tools` hides', () => {
     await refused(makeDeps({ imageGenAvailable: () => false }), 'generate_image')
   })
 
-  it('does not refuse for BYOK on a plain file (capability off, not bound)', async () => {
-    const deps = makeDeps({ uniworkAi: () => false, capability: () => false })
-    // goes on to the real executor, which needs deps the strict proxy does not provide
-    for (const n of ['edit_text', 'split_pdf']) {
-      let out = ''
-      try {
-        out = (await createPdfSkill(deps).executeTool(call(n))).output
-      } catch (err) {
-        out = String(err)
-      }
-      expect(out, n).not.toContain(`${n} is unavailable`)
+  // the real executor needs deps the strict proxy does not provide: it may throw, but never refuse
+  const outputOrError = async (skill: ReturnType<typeof createPdfSkill>, name: string) => {
+    try {
+      return (await skill.executeTool(call(name))).output
+    } catch (err) {
+      return String(err)
     }
+  }
+
+  it('does not refuse for BYOK on a plain file (capability off, not bound)', async () => {
+    const skill = createPdfSkill(makeDeps({ uniworkAi: () => false, capability: () => false }))
+    for (const n of ['edit_text', 'split_pdf'])
+      expect(await outputOrError(skill, n), n).not.toContain(`${n} is unavailable`)
   })
 
   it('follows bound live', async () => {
     let bound = true
     const skill = createPdfSkill(makeDeps({ uniworkBound: () => bound }))
-    expect((await skill.executeTool(call('split_pdf'))).output).toContain('is unavailable')
+    expect(await outputOrError(skill, 'split_pdf')).toContain('split_pdf is unavailable')
     bound = false
-    let out = ''
-    try {
-      out = (await skill.executeTool(call('split_pdf'))).output
-    } catch (err) {
-      out = String(err)
-    }
-    expect(out).not.toContain('split_pdf is unavailable')
+    expect(await outputOrError(skill, 'split_pdf')).not.toContain('split_pdf is unavailable')
   })
 })
 

@@ -196,8 +196,13 @@ export function createPdfSkill(deps: PdfAiDeps): AgentSkill {
       }
       // defense in depth: a hidden tool the model calls anyway (stale history, provider switch, injected call) never runs
       if (hiddenTools(deps).has(call.name)) {
+        const boundWrite =
+          deps.uniworkBound?.() &&
+          (call.name === 'create_document' || FILE_LEVEL_TOOLS.includes(call.name))
         return {
-          output: `${call.name} is unavailable here. Do not call it again; use the tools you were offered instead.`,
+          output: boundWrite
+            ? `${call.name} is unavailable here: this is a UniWork document, so the AI cannot write files outside it or rewrite it on the server. Use the pending edit tools instead.`
+            : `${call.name} is unavailable here. Do not call it again; use the tools you were offered instead.`,
           isError: true,
           mutated: false,
           summary: call.name,
