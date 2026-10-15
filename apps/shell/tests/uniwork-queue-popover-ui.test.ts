@@ -22,9 +22,13 @@ import {
   queuePopoverModelOf,
   QUEUE_BAND_SETTLE_MS,
 } from '../src/renderer/src/queue-popover-model'
+import { BLOCKED_REASONS, blockedCopy } from '../src/renderer/src/sync-center-model'
+import { blockedReasonKey, chipModelOf } from '../src/renderer/src/uniwork-docs-model'
 import type { UniworkDocStatus } from '../src/shared/home-api'
+import { SYNC_CENTER_BLOCKED_REASONS } from '../src/shared/sync-center'
 import type {
   SyncCenterActionResult,
+  SyncCenterBlockedReason,
   SyncCenterRow,
   SyncCenterSnapshot,
   UniworkSyncCenterApi,
@@ -85,6 +89,76 @@ describe('queue popover model (S4)', () => {
     expect(findQueueRow(makeSnapshot([pending]), 'doc-1')?.id).toBe('p')
     expect(findQueueRow(makeSnapshot([pending]), 'other')).toBeUndefined()
     expect(findQueueRow(null, 'doc-1')).toBeUndefined()
+  })
+
+  describe('RFE6u4-01: one blocked-reason copy, the sync center own (blockedCopy)', () => {
+    const reasons = Object.keys(BLOCKED_REASONS) as SyncCenterBlockedReason[]
+
+    it('knows every reason main knows', () => {
+      expect(reasons.length).toBeGreaterThan(0)
+      expect([...reasons].sort()).toEqual([...SYNC_CENTER_BLOCKED_REASONS].sort())
+    })
+
+    it('line 3 of a blocked save is blockedCopy(reason).reasonKey for every reason', () => {
+      for (const reason of reasons) {
+        const model = queuePopoverModelOf(
+          makeStatus({ state: 'blocked', error: 'session_expired' }),
+          makeRow({ state: 'blocked', blockedReason: reason }),
+          'pill',
+        )
+        expect(model.line3, reason).toMatchObject({
+          key: 'uwRowBlocked',
+          reasonKey: blockedCopy(reason).reasonKey,
+        })
+      }
+    })
+
+    it('a reason main does not know reads the sync center fallback, like its rows', () => {
+      const model = queuePopoverModelOf(
+        makeStatus({ state: 'blocked', error: 'session_expired' }),
+        makeRow({ state: 'blocked', blockedReason: 'from_the_future' as SyncCenterBlockedReason }),
+        'pill',
+      )
+      expect(model.line3?.reasonKey).toBe(blockedCopy('from_the_future').reasonKey)
+      expect(model.line3?.reasonKey).toBe('uwReasonOther')
+    })
+
+    it('without a row reason the status error code still decides (unchanged)', () => {
+      for (const error of ['session_expired', 'not_signed_in', 'keystore_locked'] as const) {
+        const model = queuePopoverModelOf(makeStatus({ state: 'blocked', error }), undefined, 'pill')
+        const reason = error === 'not_signed_in' ? 'signed_out' : error
+        expect(model.line3?.reasonKey, error).toBe(blockedCopy(reason).reasonKey)
+      }
+      const other = queuePopoverModelOf(
+        makeStatus({ state: 'blocked', error: 'network' }),
+        undefined,
+        'pill',
+      )
+      expect(other.line3?.reasonKey).toBe(blockedReasonKey('network'))
+    })
+
+    it('a store refusal reads blockedCopy too, and the pill chip says the same word', () => {
+      const keystore = queuePopoverModelOf(
+        makeStatus({ state: 'error', error: 'keystore_locked' }),
+        undefined,
+        'ctrl-s',
+      )
+      expect(keystore.line1.reasonKey).toBe(blockedCopy('keystore_locked').reasonKey)
+      for (const error of ['keystore_locked', 'store_full', 'session_expired'] as const) {
+        const chip = chipModelOf(makeStatus({ state: 'blocked', error }))
+        expect(chip.reasonKey, error).toBe(blockedCopy(error).reasonKey)
+      }
+    })
+
+    it('the model keeps no reason-copy table of its own', () => {
+      const source = readFileSync(
+        resolve(__dirname, '../src/renderer/src/queue-popover-model.ts'),
+        'utf8',
+      )
+      expect(source).not.toMatch(/BLOCKED_REASON_KEY/)
+      expect(source).not.toMatch(/second lander deletes this map/)
+      expect(source).toMatch(/blockedCopy/)
+    })
   })
 
   it('knows which statuses show the popover', () => {
@@ -862,6 +936,85 @@ describe('UniworkQueuePopover (S4)', () => {
         expect(body()!.getAttribute('aria-labelledby')).toBe(
           dialog()!.getAttribute('aria-labelledby'),
         )
+      })
+
+      describe('RFE6u4-02: the body shrinking at the cap updates the keyboard stop', () => {
+        type FakeObserver = { callback: () => void; observed: Element[] }
+        let observers: FakeObserver[]
+        let hadObserver: boolean
+        let previousObserver: unknown
+        let bodyScroll = 500
+
+        beforeEach(() => {
+          observers = []
+          bodyScroll = 500
+          hadObserver = 'ResizeObserver' in window
+          previousObserver = (window as unknown as { ResizeObserver?: unknown }).ResizeObserver
+          ;(window as unknown as { ResizeObserver: unknown }).ResizeObserver = class {
+            private readonly record: FakeObserver
+            constructor(callback: () => void) {
+              this.record = { callback, observed: [] }
+              observers.push(this.record)
+            }
+            observe(target: Element): void {
+              this.record.observed.push(target)
+            }
+            unobserve(): void {}
+            disconnect(): void {}
+          }
+          scrollSpy = vi
+            .spyOn(HTMLElement.prototype, 'scrollHeight', 'get')
+            .mockImplementation(() => bodyScroll)
+          clientSpy = vi
+            .spyOn(HTMLElement.prototype, 'clientHeight', 'get')
+            .mockImplementation(() => 200)
+        })
+
+        afterEach(() => {
+          if (hadObserver) {
+            ;(window as unknown as { ResizeObserver: unknown }).ResizeObserver = previousObserver
+          } else {
+            delete (window as unknown as { ResizeObserver?: unknown }).ResizeObserver
+          }
+        })
+
+        /** what the browser does when an observed element changed size */
+        const fireFor = (target: Element) => {
+          for (const record of observers) {
+            if (record.observed.includes(target)) record.callback()
+          }
+        }
+
+        it('observes the band and the scrolling body', async () => {
+          measured(520)
+          await mount(makeStatus())
+          const band = document.querySelector<HTMLElement>('[data-uw-queue-band]')!
+          const observed = observers.flatMap((record) => record.observed)
+          expect(observed).toContain(band)
+          expect(observed).toContain(body()!)
+        })
+
+        it('the body fitting again at an unchanged band height drops the tab stop', async () => {
+          // the band sits at its cap: its own height never changes again
+          measured(520)
+          await mount(makeStatus())
+          expect(body()!.getAttribute('tabindex')).toBe('0')
+          bodyScroll = 200
+          await act(async () => fireFor(body()!))
+          expect(body()!.hasAttribute('tabindex')).toBe(false)
+          expect(body()!.hasAttribute('role')).toBe(false)
+          expect(lastInset()).toBe(400)
+        })
+
+        it('the body overflowing again makes it a tab stop again', async () => {
+          bodyScroll = 200
+          measured(520)
+          await mount(makeStatus())
+          expect(body()!.hasAttribute('tabindex')).toBe(false)
+          bodyScroll = 600
+          await act(async () => fireFor(body()!))
+          expect(body()!.getAttribute('tabindex')).toBe('0')
+        })
       })
 
       describe('queue-popover.css', () => {
