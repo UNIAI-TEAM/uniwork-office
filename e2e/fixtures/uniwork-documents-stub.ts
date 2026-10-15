@@ -9,6 +9,8 @@
  *   GET  /documents/{id}/download[?version=N]      (bytes)
  *   POST /documents/{id}/uploads                   (multipart `file`, Idempotency-Key)
  *   POST /documents/{id}/versions/commit           ({upload_id, base_revision}, same key)
+ *   POST /documents/{id}/copies                    ({consent:"copy", title, parent_id}, Idempotency-Key)
+ *   POST /documents/{id}/archive                   (the only way a document leaves the lists)
  *   POST /office/sessions/exchange                 (single-use ticket, device match)
  *   GET  /workspaces/{ws}/home                     (uniwork-work-stub.ts)
  *
@@ -72,6 +74,21 @@ interface StubDocument {
   revision: number
   versions: StubVersion[]
   updatedAt: string
+  /** G5-12: the folder or page holding the document (null = root) */
+  parentId: string | null
+  /** G5-12: the source of a copy made through `/copies` */
+  copiedFrom?: string
+  /** G5-12: set by `/archive` */
+  archivedAt?: string
+}
+
+/** G5-12: one copy the stub made */
+export interface StubCopyState {
+  id: string
+  title: string
+  parentId: string | null
+  archived: boolean
+  state: StubDocumentState
 }
 
 export interface StubDocumentState {
@@ -111,6 +128,13 @@ export interface UniworkDocumentsStub extends UniworkAuthStub {
    * the response is lost).
    */
   failNextCommit(mode?: CommitDrop): void
+  /**
+   * The next `count` commits on a document made through `/copies` answer a 5xx
+   * (G5-12: the copy's step 2 fails and the app archives the copy).
+   */
+  failCopyCommits(count: number): void
+  /** the copies made from a document, oldest first */
+  copiesOf(sourceId: string): StubCopyState[]
   /** every documents-route request so far, oldest first */
   calls(): StubCall[]
   uploads(documentId?: string): StubCall[]
@@ -188,6 +212,8 @@ export async function startUniworkDocumentsStub(): Promise<UniworkDocumentsStub>
   const commitByKey = new Map<string, StoredCommit>()
   const calls: StubCall[] = []
   let dropNextCommit: CommitDrop | null = null
+  let copyCommitFailures = 0
+  const copyByKey = new Map<string, string>()
 
   const latest = (doc: StubDocument): StubVersion => doc.versions[doc.versions.length - 1]!
 
@@ -217,6 +243,8 @@ export async function startUniworkDocumentsStub(): Promise<UniworkDocumentsStub>
     kind: 'file',
     title: doc.title,
     visibility: 'workspace',
+    parent_id: doc.parentId,
+    ...(doc.archivedAt ? { archived_at: doc.archivedAt } : {}),
     revision: String(doc.revision),
     current_version: latest(doc).version,
     position: 0,
@@ -287,7 +315,9 @@ export async function startUniworkDocumentsStub(): Promise<UniworkDocumentsStub>
       const limit = Math.max(1, Math.min(100, Number(url.searchParams.get('limit')) || 50))
       const offset = Number(url.searchParams.get('cursor')) || 0
       const rows = [...documents.values()]
-        .filter((d) => d.workspaceId === m![1] && d.title.toLowerCase().includes(query))
+        .filter(
+          (d) => d.workspaceId === m![1] && !d.archivedAt && d.title.toLowerCase().includes(query),
+        )
         .reverse()
       const page = rows.slice(offset, offset + limit)
       log(ctx, { status: 200 })
@@ -298,7 +328,9 @@ export async function startUniworkDocumentsStub(): Promise<UniworkDocumentsStub>
       return true
     }
 
-    m = /^\/documents\/([^/]+)(\/download|\/uploads|\/versions\/commit)?$/.exec(route)
+    m = /^\/documents\/([^/]+)(\/download|\/uploads|\/versions\/commit|\/copies|\/archive)?$/.exec(
+      route,
+    )
     if (m) {
       const doc = documents.get(m[1]!)
       const tail = m[2] ?? ''
@@ -325,6 +357,74 @@ export async function startUniworkDocumentsStub(): Promise<UniworkDocumentsStub>
         }
         log(ctx, { status: 200 })
         bytesResponse(res, doc, version)
+        return true
+      }
+
+      if (method === 'POST' && tail === '/copies') {
+        const raw = await ctx.readBody()
+        let body: { consent?: unknown; title?: unknown; parent_id?: unknown } = {}
+        try {
+          body = JSON.parse(raw.toString('utf8')) as typeof body
+        } catch {
+          body = {}
+        }
+        const base: Omit<StubCall, 'method' | 'route' | 'status'> = {
+          ...(idempotencyKey ? { idempotencyKey } : {}),
+        }
+        if (!doc) {
+          log(ctx, { ...base, status: 404 })
+          ctx.send(404, envelope('not_found'))
+          return true
+        }
+        if (doc.myLevel !== 'edit' && doc.myLevel !== 'manage') {
+          log(ctx, { ...base, status: 403 })
+          ctx.send(403, envelope('forbidden'))
+          return true
+        }
+        if (body.consent !== 'copy') {
+          log(ctx, { ...base, status: 409 })
+          ctx.send(409, envelope('copy_consent_required'))
+          return true
+        }
+        if (!idempotencyKey) {
+          log(ctx, { ...base, status: 400 })
+          ctx.send(400, envelope('invalid_request'))
+          return true
+        }
+        const known = documents.get(copyByKey.get(`${doc.id}:${idempotencyKey}`) ?? '')
+        const title =
+          typeof body.title === 'string' && body.title ? body.title : `${doc.title} (copy)`
+        const copy: StubDocument = known ?? {
+          id: ulid('doc'),
+          workspaceId: doc.workspaceId,
+          title,
+          filename: title,
+          myLevel: doc.myLevel,
+          // the copy starts as the source's head bytes: version 1, revision 1
+          revision: 1,
+          versions: [
+            { version: 1, revision: 1, bytes: latest(doc).bytes, checksum: latest(doc).checksum },
+          ],
+          updatedAt: new Date().toISOString(),
+          parentId: typeof body.parent_id === 'string' ? body.parent_id : null,
+          copiedFrom: doc.id,
+        }
+        documents.set(copy.id, copy)
+        copyByKey.set(`${doc.id}:${idempotencyKey}`, copy.id)
+        log(ctx, { ...base, status: 201 })
+        ctx.send(201, { document: documentDto(copy) })
+        return true
+      }
+
+      if (method === 'POST' && tail === '/archive') {
+        if (!doc) {
+          log(ctx, { status: 404 })
+          ctx.send(404, envelope('not_found'))
+          return true
+        }
+        doc.archivedAt ??= new Date().toISOString()
+        log(ctx, { ...(idempotencyKey ? { idempotencyKey } : {}), status: 200 })
+        ctx.send(200, { document: documentDto(doc) })
         return true
       }
 
@@ -398,6 +498,12 @@ export async function startUniworkDocumentsStub(): Promise<UniworkDocumentsStub>
         if (!doc) {
           log(ctx, { ...base, status: 404 })
           ctx.send(404, envelope('not_found'))
+          return true
+        }
+        if (doc.copiedFrom && copyCommitFailures > 0) {
+          copyCommitFailures -= 1
+          log(ctx, { ...base, status: 503 })
+          ctx.send(503, envelope('unavailable'))
           return true
         }
         const upload = typeof body.upload_id === 'string' ? uploads.get(body.upload_id) : undefined
@@ -561,6 +667,7 @@ export async function startUniworkDocumentsStub(): Promise<UniworkDocumentsStub>
         revision: 41,
         versions: [{ version: 3, revision: 41, bytes: init.bytes, checksum: sha256(init.bytes) }],
         updatedAt: '2026-10-08T09:00:00Z',
+        parentId: null,
       }
       documents.set(id, doc)
       return stateOf(doc)
@@ -585,6 +692,19 @@ export async function startUniworkDocumentsStub(): Promise<UniworkDocumentsStub>
     failNextCommit(mode = 'before') {
       dropNextCommit = mode
     },
+    failCopyCommits(count) {
+      copyCommitFailures = count
+    },
+    copiesOf: (sourceId) =>
+      [...documents.values()]
+        .filter((d) => d.copiedFrom === sourceId)
+        .map((d) => ({
+          id: d.id,
+          title: d.title,
+          parentId: d.parentId,
+          archived: !!d.archivedAt,
+          state: stateOf(d),
+        })),
     calls: () => [...calls],
     uploads: (documentId) =>
       calls.filter(
