@@ -345,11 +345,84 @@ function fenceVerify(editor: Editor): OpsContext['verify'] {
   return (before, after) => fenceViolation(before, after, spans)
 }
 
-function applyOps(editor: Editor, input: unknown, fm?: FrontmatterAccess): ToolExecution {
+// ── image URL rule for text that lands as markdown (UniWork AI only; BYOK registry never refuses) ──
+
+/** a remote or inline image source; local md-asset / relative paths are not subject to the rule */
+const REMOTE_IMAGE_SRC = /^(?:https?:|data:|\/\/)/i
+
+function imageSrcsOf(nodes: Iterable<PmNode>): string[] {
+  const srcs: string[] = []
+  const visit = (node: PmNode) => {
+    if (node.type.name === 'image' && typeof node.attrs.src === 'string') srcs.push(node.attrs.src)
+  }
+  for (const node of nodes) {
+    visit(node)
+    node.descendants((child) => {
+      visit(child)
+    })
+  }
+  return srcs
+}
+
+/**
+ * Refusal for markdown the model wants to land when it adds an image reference (`![a](u)`,
+ * `![a][id]` + `[id]: u`, raw `<img src>`, an insertImage op) to a remote or data URL this run's
+ * image_search / generate_image never returned. Images the document already holds are kept.
+ * The text is parsed exactly as it will land, so every spelling is judged by its resulting image.
+ */
+function textImageRefusal(
+  editor: Editor,
+  markdowns: readonly string[],
+  extraSrcs: readonly string[],
+  imageUrls: ImageUrlRegistry | undefined,
+): string | null {
+  if (!imageUrls) return null
+  const srcs = [...extraSrcs]
+  for (const markdown of markdowns) {
+    try {
+      srcs.push(...imageSrcsOf(parseMarkdownToNodes(editor, markdown)))
+    } catch {
+      // unparseable text is reported by the write itself
+    }
+  }
+  const remote = srcs.filter((src) => REMOTE_IMAGE_SRC.test(src.trim()))
+  if (remote.length === 0) return null
+  const existing = new Set(imageSrcsOf([editor.state.doc]).map((src) => src.trim()))
+  for (const src of remote) {
+    if (existing.has(src.trim())) continue
+    const refusal = imageUrls.check(src)
+    if (refusal) {
+      const shown = src.length > 200 ? `${src.slice(0, 200)}…` : src
+      return `${refusal} The document was not changed. Not accepted: ${shown}`
+    }
+  }
+  return null
+}
+
+/** the markdown text and image sources an ops batch would land */
+function opsLandingImages(ops: readonly MdOp[]): { markdowns: string[]; srcs: string[] } {
+  const markdowns: string[] = []
+  const srcs: string[] = []
+  for (const op of ops) {
+    if (op.op === 'insertContent' || op.op === 'replaceBlocks') markdowns.push(op.markdown)
+    else if (op.op === 'insertImage') srcs.push(op.src)
+  }
+  return { markdowns, srcs }
+}
+
+function applyOps(
+  editor: Editor,
+  input: unknown,
+  fm?: FrontmatterAccess,
+  imageUrls?: ImageUrlRegistry,
+): ToolExecution {
   const label = t('aiToolApplyOps')
   const parsed = validateOps(input)
   if ('error' in parsed) return fail(parsed.error, label)
   if (usesBlockIndexes(parsed.ops) && editedExternally(editor)) return fail(STALE_DOC_ERROR, label)
+  const landing = opsLandingImages(parsed.ops)
+  const imageRefusal = textImageRefusal(editor, landing.markdowns, landing.srcs, imageUrls)
+  if (imageRefusal) return fail(imageRefusal, label)
   // the properties block sits outside every selection
   if (hasEditFence(editor) && parsed.ops.some((op) => op.op === 'setFrontmatter'))
     return fail(FENCE_REFUSAL, label)
@@ -456,6 +529,7 @@ async function writeDocument(
   call: AgentToolCall,
   signal: AbortSignal | undefined,
   writer: AiDocWriter | undefined,
+  imageUrls?: ImageUrlRegistry,
 ): Promise<ToolExecution> {
   const label = t('aiToolWriteDoc')
   const plan = String(call.input.plan ?? '').trim()
@@ -503,6 +577,9 @@ async function writeDocument(
       t('aiToolWriteDocFailed'),
     )
   }
+  // the writer is a separate model call: its markdown gets the same image URL rule as an apply_ops insert
+  const imageRefusal = textImageRefusal(editor, [result.markdown], [], imageUrls)
+  if (imageRefusal) return fail(imageRefusal, t('aiToolWriteDocFailed'))
   // a kept partial whose tail no longer parses lands what the user saw rendered
   let parses: boolean
   try {
@@ -605,7 +682,7 @@ export function executeTool(
 
   switch (call.name) {
     case 'write_document':
-      return writeDocument(editor, call, signal, writer)
+      return writeDocument(editor, call, signal, writer, imageUrls)
 
     case 'read_frontmatter': {
       if (!fm) return fail('frontmatter is not available', t('aiToolReadFm'))
@@ -650,7 +727,7 @@ export function executeTool(
     }
 
     case 'apply_ops':
-      return applyOps(editor, call.input.ops, fm)
+      return applyOps(editor, call.input.ops, fm, imageUrls)
 
     case 'image_search': {
       const query = String(call.input.query ?? '').trim()
