@@ -159,7 +159,6 @@ function classifyOpenRefusal(err: unknown): {
   const msg = describe(err)
   if (
     code === 'engine_out_of_memory' ||
-    code === 'engine_crashed' ||
     /out of memory|memory allocation of \d+ bytes failed|Cannot allocate Wasm memory|Array buffer allocation failed/i.test(
       msg,
     )
@@ -462,7 +461,7 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
           dirty = false
           port.setDirty(false)
           port.reportError(fatalError, true)
-          if (err && typeof err === 'object') {
+          if (err && typeof err === 'object' && !('code' in err)) {
             Object.assign(err, { code: 'too_large' })
           }
         }

@@ -838,6 +838,7 @@ describe('too large and open refusal (SIZE-F1)', () => {
       // Rust std::alloc::default_alloc_error_hook (library/std/src/alloc.rs)
       'Rust alloc error without "out of memory" suffix',
       () => new Error('memory allocation of 67108864 bytes failed'),
+      'too_large',
     ],
     [
       // Rust alloc error wrapped by EngineCrashedError (web/modules/sheets/engine/host.ts:41-52)
@@ -849,28 +850,23 @@ describe('too large and open refusal (SIZE-F1)', () => {
           ),
           { code: 'engine_crashed' },
         ),
-    ],
-    [
-      // Unrecovered EngineCrashedError during open (wasm-transport.ts:177-196 rethrows after recover())
-      'unrecovered engine_crashed during open',
-      () =>
-        Object.assign(new Error('engine_crashed: the workbook engine stopped (unreachable)'), {
-          code: 'engine_crashed',
-        }),
+      'engine_crashed',
     ],
     [
       // V8 WebAssembly memory instantiate/grow failure (v8/src/wasm/wasm-js.cc)
       'V8 Cannot allocate Wasm memory',
       () => new RangeError('Cannot allocate Wasm memory'),
+      'too_large',
     ],
     [
       // V8 ArrayBuffer allocation failure (v8/src/builtins/builtins-arraybuffer.cc)
       'V8 Array buffer allocation failed',
       () => new RangeError('Array buffer allocation failed'),
+      'too_large',
     ],
   ])(
-    'classifies real OOM / unrecovered crash form (%s) as engine_out_of_memory + fatal too_large (d2-3)',
-    async (_label, makeError) => {
+    'classifies real OOM form (%s) as engine_out_of_memory + fatal too_large without overwriting an existing err.code (d2-3, d3-1)',
+    async (_label, makeError, expectedCode) => {
       const fake = fakeTransport()
       const transport: SheetsEngineTransport = {
         ...fake.transport,
@@ -882,7 +878,7 @@ describe('too large and open refusal (SIZE-F1)', () => {
       t.mock.init({ documentId: t.file.fileId, capabilities: ALL_GRANTS })
       await flush()
       const err = await t.desktop.selectWorkbook().catch((e: unknown) => e)
-      expect((err as { code?: string }).code).toBe('too_large')
+      expect((err as { code?: string }).code).toBe(expectedCode)
       expect(t.mock.openRefused).toEqual([
         {
           reason: 'engine_out_of_memory',
@@ -894,6 +890,28 @@ describe('too large and open refusal (SIZE-F1)', () => {
       expect(fatal[0]!.fatal).toBe(true)
     },
   )
+
+  it('does not classify bare engine_crashed "(unreachable)" with no memory text as open_refused and preserves its own code (d3-1)', async () => {
+    const fake = fakeTransport()
+    const transport: SheetsEngineTransport = {
+      ...fake.transport,
+      async open() {
+        throw Object.assign(
+          new Error('engine_crashed: the workbook engine stopped (unreachable)'),
+          {
+            code: 'engine_crashed',
+          },
+        )
+      },
+    }
+    const t = setup({ transport })
+    t.mock.init({ documentId: t.file.fileId, capabilities: ALL_GRANTS })
+    await flush()
+    const err = await t.desktop.selectWorkbook().catch((e: unknown) => e)
+    expect((err as { code?: string }).code).toBe('engine_crashed')
+    expect(t.mock.openRefused).toEqual([])
+    expect(t.mock.errors).toEqual([])
+  })
 
   it('treats zip "cannot be inflated" as a corrupt file (not open_refused) and keeps declared/total uncompressed size gates as too_large_to_open (d2-4)', async () => {
     const fake = fakeTransport()
