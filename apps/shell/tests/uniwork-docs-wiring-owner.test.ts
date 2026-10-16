@@ -18,6 +18,7 @@ let identity: { accountId: string; deviceSessionId: string; deploymentId: string
 let statusNow: AccountStatus = { loggedIn: false, state: 'signed-out' }
 /** every `/api/v1/...` path the runtime's HTTP round trip asked for */
 let fetched: string[] = []
+let fetchedCalls: { url: string; path: string; headers: Record<string, string> }[] = []
 
 vi.mock('electron', () => ({
   app: { getPath: () => dir },
@@ -53,10 +54,20 @@ beforeEach(() => {
   identity = null
   statusNow = { loggedIn: false, state: 'signed-out' }
   fetched = []
+  fetchedCalls = []
   // the runtime's HTTP round trip: record the path, answer a capability that
   // turns the feed off so no workspace or feed read follows
-  vi.stubGlobal('fetch', (input: RequestInfo | URL) => {
-    fetched.push(new URL(String(input)).pathname)
+  vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input)
+    const path = new URL(url).pathname
+    const headers = Object.fromEntries(
+      Object.entries((init?.headers ?? {}) as Record<string, string>).map(([k, v]) => [
+        k.toLowerCase(),
+        v,
+      ]),
+    )
+    fetched.push(path)
+    fetchedCalls.push({ url, path, headers })
     return Promise.resolve(
       new Response(
         JSON.stringify({
@@ -238,11 +249,20 @@ describe('G8-16 S16: the feed starts only for the chosen org (F-1)', () => {
   it('a two-org account fetches nothing before the choice, then only the chosen org', async () => {
     await handle()
     identity = { accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' }
-    // signed in with the picker up: the feed must not start at all
+    // signed in with the picker up: the feed must not start at all; only the
+    // public deployment config GET /api/v1/config may run (no org id, no token)
     statusNow = { loggedIn: true, state: 'signed-in', needsOrgChoice: true, orgs: ORGS }
     statusListener?.(statusNow)
     await new Promise((resolve) => setTimeout(resolve, 20))
-    expect(fetched).toEqual([])
+    expect(fetched.filter((path) => path !== '/api/v1/config')).toEqual([])
+    for (const call of fetchedCalls) {
+      expect(call.path).toBe('/api/v1/config')
+      expect(call.url).not.toContain('org_a')
+      expect(call.url).not.toContain('org_b')
+      expect(call.headers.authorization).toBeUndefined()
+      expect(JSON.stringify(call.headers)).not.toContain('fake-token')
+      expect(JSON.stringify(call.headers)).not.toContain('org_')
+    }
 
     // the choice's own status push starts the feed for that org alone
     statusNow = {
