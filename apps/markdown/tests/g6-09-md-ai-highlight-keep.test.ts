@@ -36,6 +36,50 @@ function markedEditor(): Editor {
 }
 const marks = (editor: Editor): number => editor.view.dom.querySelectorAll('.ai-changed').length
 
+describe('the AI marker through undo and redo', () => {
+  it('redo of a run shows its marker again; undo takes it away', () => {
+    const editor = markedEditor()
+    expect(marks(editor)).toBeGreaterThan(0)
+    expect(editor.commands.undo()).toBe(true)
+    expect(marks(editor)).toBe(0)
+    expect(editor.commands.redo()).toBe(true)
+    expect(editor.getText()).toContain('ONE')
+    expect(marks(editor)).toBeGreaterThan(0)
+    expect(editor.view.dom.querySelector('.ai-changed')?.textContent).toBe('ONE')
+  })
+
+  it('redo of a run that inserted a block marks that block (the undo deleted it with its marker)', () => {
+    const editor = markedEditor()
+    runOps(editor, [{ op: 'insertContent', after: 1, markdown: 'three' }], { source: 'ai' })
+    const marked = [...editor.view.dom.querySelectorAll('.ai-changed')].map((n) => n.textContent)
+    expect(marked).toContain('three')
+    editor.commands.undo()
+    expect([...editor.view.dom.querySelectorAll('.ai-changed')].map((n) => n.textContent)).toEqual([
+      'ONE',
+    ])
+    editor.commands.redo()
+    expect([...editor.view.dom.querySelectorAll('.ai-changed')].map((n) => n.textContent)).toEqual(
+      marked,
+    )
+  })
+
+  it('a hand edit after the undo ends the redo: nothing is marked that the AI did not write', () => {
+    const editor = markedEditor()
+    editor.commands.undo()
+    editor.commands.insertContentAt(editor.state.doc.content.size, '<p>mine</p>')
+    expect(editor.commands.redo()).toBe(false)
+    expect(marks(editor)).toBe(0)
+  })
+
+  it('a user Save between undo and redo: the redone run is not marked again', () => {
+    const editor = markedEditor()
+    editor.commands.undo()
+    clearAiHighlightsOnSave(editor, undefined)
+    editor.commands.redo()
+    expect(marks(editor)).toBe(0)
+  })
+})
+
 describe('the AI marker after a run', () => {
   it('an autosave keeps it, the user Save clears it', () => {
     const editor = markedEditor()

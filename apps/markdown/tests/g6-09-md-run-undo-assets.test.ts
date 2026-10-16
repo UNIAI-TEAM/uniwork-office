@@ -113,7 +113,13 @@ describe('markdown AI run undo and the images the run saved', () => {
     Element.prototype.scrollTo = () => {}
     vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {}, removeItem: () => {} })
     // the fake asset store: every save is a new pending file; discard records what it was asked for
-    const store = { saved: [] as string[], discarded: [] as string[][] }
+    const store = {
+      saved: [] as string[],
+      discarded: [] as string[][],
+      restored: [] as Array<Array<{ name: string; base64: string }>>,
+      /** a restore the main process could not do (file name taken, document moved) */
+      restoreFails: false,
+    }
     const stubs: Record<string, unknown> = {
       fetchImage: vi.fn(async () => ({ base64: PNG_BASE64, mime: 'image/png' })),
       saveImage: vi.fn(async () => {
@@ -124,6 +130,11 @@ describe('markdown AI run undo and the images the run saved', () => {
       discardPendingAssets: vi.fn(async (names: string[]) => {
         store.discarded.push([...names])
         return { deleted: names, preserved: [], errors: [] }
+      }),
+      restorePendingAssets: vi.fn(async (files: Array<{ name: string; base64: string }>) => {
+        if (store.restoreFails) return { restored: [], errors: files.map((f) => f.name) }
+        store.restored.push(files.map((f) => ({ ...f })))
+        return { restored: files.map((f) => f.name), errors: [] }
       }),
       getAiSettings: vi.fn(async () => ({ ...usableAiSettings(), provider: 'openai' })),
     }
@@ -245,19 +256,40 @@ describe('markdown AI run undo and the images the run saved', () => {
     expect(panel.rollbackButtons()).toHaveLength(1)
   })
 
-  it('refuses the redo of a run whose pictures were discarded', async () => {
+  it('redo of a run whose picture was discarded puts the same file back first, then re-applies the run', async () => {
     const panel = await mount()
     await panel.run([insertImage()])
     act(() => {
       editor!.commands.undo()
     })
     await flush()
+    expect(imageCount()).toBe(0)
     act(() => {
       editor!.commands.redo()
     })
     await flush()
+    await flush()
+    // the very bytes the run downloaded, under the very name the markup points at
+    expect(panel.store.restored).toEqual([[{ name: 'image-1.png', base64: PNG_BASE64 }]])
+    expect(imageCount()).toBe(1)
+    // the redone run is undoable again and drops the file again
+    await undoRun()
     expect(imageCount()).toBe(0)
-    expect(panel.store.discarded).toEqual([['image-1.png']])
+    expect(panel.store.discarded).toEqual([['image-1.png'], ['image-1.png']])
+  })
+
+  it('a redo whose file cannot be restored stays refused: never a broken image link', async () => {
+    const panel = await mount()
+    await panel.run([insertImage()])
+    await undoRun()
+    panel.store.restoreFails = true
+    act(() => {
+      editor!.commands.redo()
+    })
+    await flush()
+    await flush()
+    expect(imageCount()).toBe(0)
+    expect(editor!.getText()).toBe('Saved document')
   })
 
   it('a run without pictures: undo and redo leave the store alone', async () => {
@@ -280,6 +312,12 @@ describe('markdown AI run undo and the images the run saved', () => {
     name: 'apply_ops',
     input: { ops: [{ op: 'insertContent', after: 0, markdown: text }] },
   })
+  const undoRun = async (): Promise<void> => {
+    act(() => {
+      editor!.commands.undo()
+    })
+    await flush()
+  }
   const undo = async (): Promise<void> => {
     act(() => {
       editor!.commands.undo()
