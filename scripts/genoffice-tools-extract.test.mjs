@@ -2531,4 +2531,38 @@ describe('parameterised recursive arrow (G6-09d)', () => {
     assert.equal(entry('value_sentinel').schemaComplete, true)
     assert.equal(entry('value_sentinel').offered, true)
   })
+
+  it('bounds total arrow applications on exponential fan-out like tree(18) (RBD9-3)', () => {
+    const { dir, sha } = fixture({
+      'packages/agent-core/src/types.ts': AGENT_TOOL_DEF_FIXTURE,
+      'apps/docs/src/renderer/ai/tools.ts': [
+        "import type { AgentToolDef } from '@genoffice/agent-core'",
+        '',
+        'const tree = (n: number) => ({',
+        "  type: 'object',",
+        '  properties: {',
+        '    a: n > 0 ? tree(n - 1) : 0,',
+        '    b: n > 0 ? tree(n - 1) : 0,',
+        '  },',
+        '})',
+        '',
+        'export const TOOLS: AgentToolDef[] = [',
+        "  { name: 'fan_out', description: 'x', inputSchema: tree(18) },",
+        ']',
+        '',
+      ].join('\n'),
+    })
+    const started = Date.now()
+    const res = extract({ repo: dir, rev: sha })
+    const file = build(dir, sha)
+    const elapsed = Date.now() - started
+    const row = res.rows.find((r) => r.tool === 'fan_out')
+    const entry = file.catalogue.find((e) => e.module === 'docs' && e.name === 'fan_out')
+
+    assert.equal(row.hash, 'unresolved:recursion')
+    assert.equal(entry.schemaComplete, false)
+    assert.equal(entry.offered, false)
+    assert.equal(entry.reason, 'recursion')
+    assert.ok(elapsed < 2000, `expected tree(18) extraction under 2000ms, took ${elapsed}ms`)
+  })
 })
