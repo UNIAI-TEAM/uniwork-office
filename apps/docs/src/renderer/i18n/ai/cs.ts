@@ -78,7 +78,7 @@ export const cs = {
   aiWorkedStepsOne: 'Hotovo · {n} krok',
   aiWorkedStepsFew: 'Hotovo · {n} kroky',
   aiEditsPaused:
-    'Asistent upravuje tento dokument. Vaše úpravy jsou pozastaveny; pro pokračování asistenta zastavte.',
+    'Asistent pracuje na tomto dokumentu. Vaše úpravy jsou pozastaveny; pro pokračování asistenta zastavte.',
   aiGroupWorking: 'Pracuje…',
   aiWorking: 'Pracuje',
   aiErrorPrefix: 'Chyba: {error}',

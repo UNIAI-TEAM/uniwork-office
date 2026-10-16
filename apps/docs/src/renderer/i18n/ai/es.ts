@@ -79,7 +79,7 @@ export const es = {
   aiWorkedStepsOne: 'Completado · {n} paso',
   aiWorkedStepsFew: 'Completado · {n} pasos',
   aiEditsPaused:
-    'El asistente está editando este documento. Tus ediciones están en pausa; detén al asistente para continuar.',
+    'El asistente está trabajando en este documento. Tus ediciones están en pausa; detén al asistente para continuar.',
   aiGroupWorking: 'En curso…',
   aiWorking: 'Procesando',
   aiErrorPrefix: 'Error: {error}',

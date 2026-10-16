@@ -78,7 +78,7 @@ export const pl = {
   aiWorkedStepsOne: 'Ukończono · {n} krok',
   aiWorkedStepsFew: 'Ukończono · {n} kroki',
   aiEditsPaused:
-    'Asystent edytuje ten dokument. Twoje zmiany są wstrzymane; zatrzymaj asystenta, aby kontynuować.',
+    'Asystent pracuje nad tym dokumentem. Twoje zmiany są wstrzymane; zatrzymaj asystenta, aby kontynuować.',
   aiGroupWorking: 'W toku…',
   aiWorking: 'Przetwarzanie',
   aiErrorPrefix: 'Błąd: {error}',

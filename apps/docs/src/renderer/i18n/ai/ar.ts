@@ -75,7 +75,7 @@ export const ar = {
   aiWorkedSteps: 'اكتمل · {n} خطوات',
   aiWorkedStepsOne: 'اكتمل · خطوة واحدة',
   aiWorkedStepsFew: 'اكتمل · {n} خطوات',
-  aiEditsPaused: 'المساعد يحرّر هذا المستند. تعديلاتك متوقفة مؤقتًا؛ أوقف المساعد للمتابعة.',
+  aiEditsPaused: 'المساعد يعمل على هذا المستند. تعديلاتك متوقفة مؤقتًا؛ أوقف المساعد للمتابعة.',
   aiGroupWorking: 'جارٍ العمل…',
   aiWorking: 'جارٍ المعالجة',
   aiErrorPrefix: 'خطأ: {error}',

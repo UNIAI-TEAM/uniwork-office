@@ -79,7 +79,7 @@ export const nl = {
   aiWorkedStepsOne: 'Klaar · {n} stap',
   aiWorkedStepsFew: 'Klaar · {n} stappen',
   aiEditsPaused:
-    'De assistent bewerkt dit document. Je bewerkingen zijn gepauzeerd; stop de assistent om door te gaan.',
+    'De assistent werkt aan dit document. Je bewerkingen zijn gepauzeerd; stop de assistent om door te gaan.',
   aiGroupWorking: 'Bezig…',
   aiWorking: 'Bezig met verwerken',
   aiErrorPrefix: 'Fout: {error}',

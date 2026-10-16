@@ -78,7 +78,7 @@ export const id = {
   aiWorkedStepsOne: 'Selesai · {n} langkah',
   aiWorkedStepsFew: 'Selesai · {n} langkah',
   aiEditsPaused:
-    'Asisten sedang mengedit dokumen ini. Suntingan Anda dijeda; hentikan asisten untuk melanjutkan.',
+    'Asisten sedang mengerjakan dokumen ini. Suntingan Anda dijeda; hentikan asisten untuk melanjutkan.',
   aiGroupWorking: 'Sedang bekerja…',
   aiWorking: 'Memproses',
   aiErrorPrefix: 'Kesalahan: {error}',

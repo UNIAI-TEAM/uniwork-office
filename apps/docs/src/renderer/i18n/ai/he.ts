@@ -75,7 +75,7 @@ export const he = {
   aiWorkedSteps: 'הושלם · {n} שלבים',
   aiWorkedStepsOne: 'הושלם · שלב אחד',
   aiWorkedStepsFew: 'הושלם · {n} שלבים',
-  aiEditsPaused: 'העוזר עורך את המסמך הזה. העריכות שלך מושהות; עצור את העוזר כדי להמשיך.',
+  aiEditsPaused: 'העוזר עובד על המסמך הזה. העריכות שלך מושהות; עצור את העוזר כדי להמשיך.',
   aiGroupWorking: 'בעבודה…',
   aiWorking: 'מעבד',
   aiErrorPrefix: 'שגיאה: {error}',

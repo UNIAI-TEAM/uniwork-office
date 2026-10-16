@@ -77,7 +77,7 @@ export const en = {
   aiWorkedStepsOne: 'Worked · {n} step',
   aiWorkedStepsFew: 'Worked · {n} steps',
   aiEditsPaused:
-    'The assistant is editing this document. Your edits are paused; stop the assistant to continue.',
+    'The assistant is working on this document. Your edits are paused; stop the assistant to continue.',
   aiGroupWorking: 'Working…',
   aiWorking: 'Working',
   aiErrorPrefix: 'Error: {error}',

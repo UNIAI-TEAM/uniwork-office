@@ -77,7 +77,7 @@ export const ja = {
   aiWorkedStepsOne: '完了 · {n} ステップ',
   aiWorkedStepsFew: '完了 · {n} ステップ',
   aiEditsPaused:
-    'アシスタントがこのドキュメントを編集中です。あなたの編集は一時停止されています。続けるにはアシスタントを停止してください。',
+    'アシスタントがこのドキュメントを処理中です。あなたの編集は一時停止されています。続けるにはアシスタントを停止してください。',
   aiGroupWorking: '処理中…',
   aiWorking: '処理中',
   aiErrorPrefix: 'エラー: {error}',

@@ -74,7 +74,7 @@ export const zh = {
   aiWorkedSteps: '已完成 · {n} 个步骤',
   aiWorkedStepsOne: '已完成 · {n} 个步骤',
   aiWorkedStepsFew: '已完成 · {n} 个步骤',
-  aiEditsPaused: 'AI 助手正在编辑此文档，您的编辑已暂停；停止助手后即可继续。',
+  aiEditsPaused: 'AI 助手正在处理此文档，您的编辑已暂停；停止助手后即可继续。',
   aiGroupWorking: '处理中…',
   aiWorking: '继续处理中',
   aiErrorPrefix: '出错: {error}',

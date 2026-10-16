@@ -78,7 +78,7 @@ export const ms = {
   aiWorkedStepsOne: 'Selesai · {n} langkah',
   aiWorkedStepsFew: 'Selesai · {n} langkah',
   aiEditsPaused:
-    'Pembantu sedang mengedit dokumen ini. Suntingan anda dijeda; hentikan pembantu untuk meneruskan.',
+    'Pembantu sedang mengerjakan dokumen ini. Suntingan anda dijeda; hentikan pembantu untuk meneruskan.',
   aiGroupWorking: 'Sedang berjalan…',
   aiWorking: 'Sedang memproses',
   aiErrorPrefix: 'Ralat: {error}',
