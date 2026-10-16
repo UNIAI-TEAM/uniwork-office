@@ -150,6 +150,7 @@ export interface UniworkDocsClient {
   moveDocument(input: {
     documentId: string
     parentId: string | null
+    idempotencyKey: string
   }): Promise<{ summary: UniworkDocSummary; renamedTo: string | null }>
   /** create a blank document (S18); `format` must have a blank generator */
   createBlank(input: {
@@ -586,6 +587,7 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
             // `parent_id` is always sent: null IS the root, while the absent
             // field would leave the document where it is
             json: { parent_id: target, revision: ref.revision },
+            idempotencyKey: input.idempotencyKey,
             timeoutMs: metadataTimeout,
             read: json,
           })

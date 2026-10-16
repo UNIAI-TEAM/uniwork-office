@@ -528,6 +528,12 @@ function actionErrorOf(error: unknown, nameField: boolean): UniworkDocActionErro
     if (code === 'name_empty' || code === 'name_too_long' || code === 'upload_cancelled') {
       return code
     }
+    // B-R1-03 / B-R1-09: `folder_name_taken` stays off UniworkDocErrorCode;
+    // create/rename (`nameField: true`) report `folder_name_taken` for the name
+    // field, while a move exhausting "(n)" names reports `move_name_taken`
+    if (error.serverCode === 'folder_name_taken') {
+      return nameField ? 'folder_name_taken' : 'move_name_taken'
+    }
     if (nameField && error.status === 400 && error.serverCode === 'invalid_request') {
       return 'name_too_long'
     }
@@ -696,10 +702,11 @@ interface ConflictSession {
   knownServerSavedAt: string | null
   knownServerBy: string | null
   /**
-   * FD-11: the folder the source document sits in, as the view's own server
-   * read answered it; absent while no read has answered. Carried to the
-   * conflict view so the Save-as-a-copy Location starts there.
+   * FD-11: the workspace and folder the source document sits in, as the view's
+   * own server read answered them; absent while no read has answered. Carried
+   * to the conflict view so the Save-as-a-copy Location starts there.
    */
+  knownServerWorkspaceId?: string
   knownServerParentId?: string | null
   knownCanEdit: boolean | null
   serverOnline: boolean
@@ -3382,6 +3389,7 @@ export class UniworkDocsService {
       const moved = await this.api().moveDocument({
         documentId,
         parentId: typeof input.parentId === 'string' && input.parentId ? input.parentId : null,
+        idempotencyKey: this.newIdempotencyKey(),
       })
       // FD-11: the entry left one folder's rows and joined another's (both are
       // in the same workspace, which is all the push names)
@@ -4774,8 +4782,9 @@ export class UniworkDocsService {
           session.knownServerVersion = detail.file.version
           session.knownServerSavedAt = props?.updatedAt ?? null
           session.knownServerBy = null
-          // FD-11: `parent_id` absent means the server did not say, so the
-          // remembered one (or nothing) stands rather than a guessed root
+          // FD-11 / B-R1-05: the fresh read's workspace and parent, so a web-side
+          // workspace move is reflected in the Location tree
+          if (detail.workspaceId) session.knownServerWorkspaceId = detail.workspaceId
           if (detail.parentId !== undefined) session.knownServerParentId = detail.parentId
           session.knownCanEdit = detail.myLevel === 'edit' || detail.myLevel === 'manage'
           session.serverOnline = true
@@ -4840,6 +4849,7 @@ export class UniworkDocsService {
             ? 'slides'
             : 'other'
     const canEdit = session.locked ? false : (session.knownCanEdit ?? b.access === 'edit')
+    const viewWorkspaceId = session.knownServerWorkspaceId ?? b.workspaceId
 
     return {
       sessionId: session.sessionId,
@@ -4848,7 +4858,7 @@ export class UniworkDocsService {
       title: b.title,
       // FD-11: where the source sits, so the Save-as-a-copy Location can start
       // there (absent parent = no read answered it yet)
-      ...(b.workspaceId ? { workspaceId: b.workspaceId } : {}),
+      ...(viewWorkspaceId ? { workspaceId: viewWorkspaceId } : {}),
       ...(session.knownServerParentId === undefined
         ? {}
         : { parentId: session.knownServerParentId }),
@@ -5157,12 +5167,22 @@ export class UniworkDocsService {
       // the read is what proves the copy route is still open to this caller,
       // and its answer is used when no folder was chosen.
       const source = await api.getDocument(documentId)
+      if (aborted()) return { kind: 'closed' }
+      if (action.targetFolder && action.targetFolder.workspaceId !== source.workspaceId) {
+        open.downloadNotice = 'save_copy_folder_refused'
+        return {
+          kind: 'view',
+          view: await this.buildConflictView(open, {
+            fetchServer: false,
+            notice: 'save_copy_folder_refused',
+          }),
+        }
+      }
       parentId = action.targetFolder ? action.targetFolder.folderId : (source.parentId ?? null)
     } catch (error) {
       lockOn(error)
       return aborted() ? { kind: 'closed' } : failed()
     }
-    if (aborted()) return { kind: 'closed' }
     let created: { summary: UniworkDocSummary; revision: string }
     try {
       created = await api.copyDocument({

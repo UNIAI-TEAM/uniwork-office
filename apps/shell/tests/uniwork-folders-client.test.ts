@@ -348,7 +348,11 @@ describe('moving a document', () => {
     })
     const api = client(fetch)
 
-    const moved = await api.moveDocument({ documentId: DOC, parentId: 'fold_1' })
+    const moved = await api.moveDocument({
+      documentId: DOC,
+      parentId: 'fold_1',
+      idempotencyKey: 'move_k1',
+    })
     expect(moved.renamedTo).toBeNull()
     expect(moved.summary).toMatchObject({ id: DOC, parentId: 'fold_1' })
     expect(fetch.mock.calls.map(([url, init]) => [url, init.method])).toEqual([
@@ -359,6 +363,9 @@ describe('moving a document', () => {
       parent_id: 'fold_1',
       revision: '41',
     })
+    expect((fetch.mock.calls[1]![1].headers as Record<string, string>)['Idempotency-Key']).toBe(
+      'move_k1',
+    )
   })
 
   it('moves a folder to the root and reports the title the server gave it', async () => {
@@ -370,7 +377,11 @@ describe('moving a document', () => {
     })
     const api = client(fetch)
 
-    const moved = await api.moveDocument({ documentId: DOC, parentId: null })
+    const moved = await api.moveDocument({
+      documentId: DOC,
+      parentId: null,
+      idempotencyKey: 'move_k2',
+    })
     expect(moved.renamedTo).toBe('Contracts (2)')
     expect(JSON.parse(String(fetch.mock.calls[1]![1].body))).toEqual({
       parent_id: null,
@@ -378,7 +389,7 @@ describe('moving a document', () => {
     })
   })
 
-  it('re-reads the revision and retries once after a revision_conflict', async () => {
+  it('re-reads the revision and retries once after a revision_conflict with the same Idempotency-Key', async () => {
     let moves = 0
     const fetch = vi.fn<FetchLike>(async (_url, init) => {
       if (init.method === 'GET') {
@@ -390,12 +401,22 @@ describe('moving a document', () => {
     })
     const api = client(fetch)
 
-    const moved = await api.moveDocument({ documentId: DOC, parentId: 'fold_1' })
+    const moved = await api.moveDocument({
+      documentId: DOC,
+      parentId: 'fold_1',
+      idempotencyKey: 'move_retry_k',
+    })
     expect(moved.summary.parentId).toBe('fold_1')
     expect(JSON.parse(String(fetch.mock.calls[3]![1].body))).toEqual({
       parent_id: 'fold_1',
       revision: '43',
     })
+    expect((fetch.mock.calls[1]![1].headers as Record<string, string>)['Idempotency-Key']).toBe(
+      'move_retry_k',
+    )
+    expect((fetch.mock.calls[3]![1].headers as Record<string, string>)['Idempotency-Key']).toBe(
+      'move_retry_k',
+    )
   })
 
   it('gives up after one retry, and never retries a refusal that is not a conflict', async () => {
@@ -406,7 +427,13 @@ describe('moving a document', () => {
       return envelope(409, 'revision_conflict', { current_revision: '43' })
     })
     expect(
-      await codeOf(client(alwaysConflicting).moveDocument({ documentId: DOC, parentId: null })),
+      await codeOf(
+        client(alwaysConflicting).moveDocument({
+          documentId: DOC,
+          parentId: null,
+          idempotencyKey: 'k_conf',
+        }),
+      ),
     ).toBe('conflict')
     expect(moves).toBe(2)
 
@@ -416,9 +443,15 @@ describe('moving a document', () => {
       refused += 1
       return envelope(422, 'document_cycle')
     })
-    expect(await codeOf(client(cycle).moveDocument({ documentId: DOC, parentId: 'fold_1' }))).toBe(
-      'document_cycle',
-    )
+    expect(
+      await codeOf(
+        client(cycle).moveDocument({
+          documentId: DOC,
+          parentId: 'fold_1',
+          idempotencyKey: 'k_cyc',
+        }),
+      ),
+    ).toBe('document_cycle')
     expect(refused).toBe(1)
   })
 })
@@ -427,9 +460,8 @@ describe('moving a document', () => {
 // 409/422 used to fall through to server_error, which the renderer can only
 // show as a generic failure.
 describe('the folder refusals', () => {
-  it('maps every code to itself, never server_error', async () => {
+  it('maps every code to itself, and preserves folder_name_taken on serverCode', async () => {
     const cases: Array<[number, string, string]> = [
-      [409, 'folder_name_taken', 'folder_name_taken'],
       [422, 'document_cycle', 'document_cycle'],
       [422, 'document_parent_kind', 'document_parent_kind'],
     ]
@@ -441,9 +473,20 @@ describe('the folder refusals', () => {
         ),
       ).toBe(expected)
     }
+    // B-R1-09: folder_name_taken is not cast into UniworkDocErrorCode; it stays
+    // server_error on code with serverCode: 'folder_name_taken' for actionErrorOf
+    const taken = client(async () => envelope(409, 'folder_name_taken'))
+    let caught: unknown
+    try {
+      await taken.createFolder({ workspaceId: WS, parentId: null, title: 'x', idempotencyKey: 'k' })
+    } catch (error) {
+      caught = error
+    }
+    expect(caught).toBeInstanceOf(UniworkDocError)
+    expect(caught).toMatchObject({ code: 'server_error', serverCode: 'folder_name_taken' })
   })
 
-  it('carries the depth cap of a too-deep tree, from a number or a string, else 20', async () => {
+  it('carries the depth cap 20 on a too-deep tree refusal', async () => {
     const depthOf = async (fields?: Record<string, unknown>): Promise<unknown> => {
       const api = client(async () =>
         json(422, {
@@ -457,11 +500,9 @@ describe('the folder refusals', () => {
         return error instanceof UniworkDocError ? error.maxDepth : `other:${String(error)}`
       }
     }
-    expect(await depthOf({ max: 7 })).toBe(7)
-    expect(await depthOf({ max: '12' })).toBe(12)
-    // a malformed or absent cap is never guessed from: the server's own default
-    expect(await depthOf({ max: 0 })).toBe(20)
-    expect(await depthOf({ max: 'many' })).toBe(20)
+    // B-R1-08: the D server emits no fields on errDocumentTooDeep; maxDepth is
+    // always the app's documented 20 constant
     expect(await depthOf()).toBe(20)
+    expect(await depthOf({ max: 0 })).toBe(20)
   })
 })

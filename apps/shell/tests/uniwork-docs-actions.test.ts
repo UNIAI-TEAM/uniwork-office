@@ -326,6 +326,7 @@ function fakeServer(
       // the fake trusts its own caller's body, like every other route here
       const body: { parent_id: string | null; revision: string } = JSON.parse(String(init.body))
       call.body = body
+      if (options.folderNameTaken) return envelope(409, 'folder_name_taken')
       const title = id === DOC ? state.title : (state.documents.get(id)?.title ?? 'new.docx')
       // a name already taken in the target folder is auto-renamed by the server
       const renamed = options.moveRenames ? `${title} (2)` : title
@@ -817,30 +818,36 @@ describe('folders', () => {
 
   // FD-11: only folders collide on a name, so the server's 409 stays a field
   // error the renderer shows under the name (never a generic server_error)
-  it('answers a taken folder name as a field error', async () => {
+  it('answers a taken folder name as a field error on create, and as move_name_taken on move (B-R1-03)', async () => {
     const server = fakeServer({ folderNameTaken: true })
     const ctx = setup(server)
     expect(
       await ctx.service.createFolder({ workspaceId: WS, parentId: 'fold_1', title: 'Contracts' }),
     ).toEqual({ ok: false, error: 'folder_name_taken' })
+    expect(await ctx.service.moveDocument({ documentId: DOC, parentId: 'fold_1' })).toEqual({
+      ok: false,
+      error: 'move_name_taken',
+    })
   })
 
-  // FD-11: the tree's depth cap rides the failure, so the renderer can name it
-  it("carries the server's depth cap on a too-deep refusal, else the default 20", async () => {
-    const named = setup(fakeServer({ deepMax: 7 }))
-    expect(
-      await named.service.createFolder({ workspaceId: WS, parentId: 'fold_1', title: 'Deep' }),
-    ).toEqual({ ok: false, error: 'document_too_deep', max: 7 })
-
+  // FD-11 / B-R1-08: the tree's depth cap (20) rides the failure
+  it('carries the depth cap 20 on a too-deep refusal', async () => {
     const unnamed = setup(fakeServer({ deepMax: null }))
     expect(
       await unnamed.service.createFolder({ workspaceId: WS, parentId: 'fold_1', title: 'Deep' }),
     ).toEqual({ ok: false, error: 'document_too_deep', max: 20 })
+  })
 
-    const asText = setup(fakeServer({ deepMax: '12' }))
-    expect(
-      await asText.service.createFolder({ workspaceId: WS, parentId: 'fold_1', title: 'Deep' }),
-    ).toEqual({ ok: false, error: 'document_too_deep', max: 12 })
+  // B-R1-07: service.moveDocument mints an Idempotency-Key and passes it to the move POST
+  it('sends an Idempotency-Key header on moveDocument', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const moved = await ctx.service.moveDocument({ documentId: DOC, parentId: 'fold_1' })
+    expect(moved.ok).toBe(true)
+    const post = server.calls.find(
+      (c) => c.method === 'POST' && c.path === `/api/v1/documents/${DOC}/move`,
+    )!
+    expect(post.idempotencyKey).toBeTruthy()
   })
 
   // FD11-B-R1-06 / B-R1-01: service-level tests driving listChildren and

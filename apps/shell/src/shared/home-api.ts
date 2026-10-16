@@ -369,14 +369,15 @@ export interface UniworkDocProperties {
  */
 export type UniworkDocNameError = 'name_empty' | 'name_too_long' | 'folder_name_taken'
 /**
- * What a create/rename/archive/upload call may fail with. `name_empty` /
- * `name_too_long` / `folder_name_taken` are field errors and `upload_cancelled`
- * is an upload the person aborted; none of them is part of
+ * What a create/rename/archive/upload/move call may fail with. `name_empty` /
+ * `name_too_long` / `folder_name_taken` are field errors, `move_name_taken` is
+ * a move whose destination exhausted all "(n)" auto-renames (FD11-B-R1-03), and
+ * `upload_cancelled` is an upload the person aborted; none of them is part of
  * `UniworkDocErrorCode`, because that union is switched on exhaustively by the
- * renderer's error copy table (a cancelled upload is not an error to show at
- * all).
+ * renderer's error copy table.
  */
-export type UniworkDocActionError = UniworkDocErrorCode | UniworkDocNameError | 'upload_cancelled'
+export type UniworkDocActionError =
+  UniworkDocErrorCode | UniworkDocNameError | 'move_name_taken' | 'upload_cancelled'
 export type UniworkDocActionResult<T> =
   | { ok: true; value: T }
   | {
