@@ -2,7 +2,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react'
 import type { UniworkWorkspaceRef } from '../../shared/home-api'
-import { useI18n } from './locale'
+import { useI18n, type StringKey } from './locale'
 import {
   DOC_NAME_ERROR_KEYS,
   NEW_DOC_FORMATS,
@@ -51,7 +51,7 @@ export interface UploadProgress {
  * focus goes back to whatever opened it. Keys never reach the library dialog
  * underneath (it would close on the same Escape).
  */
-function ActionModal({
+export function ActionModal({
   labelledBy,
   className,
   onCancel,
@@ -206,12 +206,21 @@ function useFolders(
   return folders
 }
 
-function FieldError({ id, error }: { id: string; error: DocNameError | null }) {
+export function FieldError({
+  id,
+  error,
+  keys = DOC_NAME_ERROR_KEYS,
+}: {
+  id: string
+  error: DocNameError | null
+  /** the copy per error (a folder name has its own 255 wording) */
+  keys?: Record<DocNameError, StringKey>
+}) {
   const { t } = useI18n()
   // always in the DOM so aria-describedby points at something stable
   return (
     <p className="uw-act-error" id={id} role={error ? 'alert' : undefined}>
-      {error ? t(DOC_NAME_ERROR_KEYS[error]) : ''}
+      {error ? t(keys[error]) : ''}
     </p>
   )
 }
@@ -499,7 +508,7 @@ const MENU_EDGE = 8
  * scrollable list or clipped dialog can cut it off. It drops below the button
  * and flips upward when the room below is smaller than it is (and larger above).
  */
-function placeMenu(button: HTMLElement, menu: HTMLElement) {
+export function placeMenu(button: HTMLElement, menu: HTMLElement) {
   const anchor = button.getBoundingClientRect()
   const { width, height } = menu.getBoundingClientRect()
   const below = window.innerHeight - anchor.bottom - MENU_GAP - MENU_EDGE
@@ -676,6 +685,8 @@ export function RenameField({
   onSave,
   onCancel,
   onEdit,
+  errorKeys,
+  nameLabel,
 }: {
   initial: string
   label: string
@@ -684,6 +695,10 @@ export function RenameField({
   onSave: (value: string) => void
   onCancel: () => void
   onEdit: () => void
+  /** FD-11: a folder's own error copy */
+  errorKeys?: Record<DocNameError, StringKey>
+  /** FD-11: the field's name ("Folder name"); default "Name" */
+  nameLabel?: string
 }) {
   const { t } = useI18n()
   const id = useId()
@@ -700,7 +715,7 @@ export function RenameField({
         className="uw-act-input uw-rename-input"
         type="text"
         value={value}
-        aria-label={`${t('uwDocName')} · ${label}`}
+        aria-label={`${nameLabel ?? t('uwDocName')} · ${label}`}
         aria-invalid={error !== null}
         aria-describedby={`${id}-error`}
         aria-busy={busy || undefined}
@@ -723,7 +738,7 @@ export function RenameField({
           }
         }}
       />
-      <FieldError id={`${id}-error`} error={error} />
+      <FieldError id={`${id}-error`} error={error} keys={errorKeys} />
     </span>
   )
 }
@@ -732,14 +747,29 @@ export function RenameField({
  * Failure note near the foot of the library (an action did not apply): icon,
  * the message, and a dismiss button; it also clears itself after a while.
  */
-export function ActionToast({ message, onDone }: { message: string; onDone: () => void }) {
+export function ActionToast({
+  message,
+  onDone,
+  tone = 'error',
+}: {
+  message: string
+  onDone: () => void
+  /**
+   * FD-11 'ok': a done note (moved, created). It has no live role: the caller
+   * says it once through the shell's uniwork-live region instead.
+   */
+  tone?: 'error' | 'ok'
+}) {
   const { t } = useI18n()
   useEffect(() => {
     const timer = window.setTimeout(onDone, 6000)
     return () => window.clearTimeout(timer)
   }, [message, onDone])
   return (
-    <div className="uw-act-toast" role="alert">
+    <div
+      className={`uw-act-toast${tone === 'ok' ? ' ok' : ''}`}
+      role={tone === 'ok' ? undefined : 'alert'}
+    >
       <svg
         className="uw-act-toast-icon"
         width="16"
