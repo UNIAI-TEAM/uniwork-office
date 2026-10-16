@@ -299,7 +299,7 @@
   color: var(--accent);
 }
 
-.uwf-path {
+.uw-pick-row-meta.uwf-path {
   overflow: hidden;
   color: var(--text-secondary);
   text-overflow: ellipsis;

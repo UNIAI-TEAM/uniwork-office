@@ -859,7 +859,7 @@ describe('UniworkBrowser: folder actions (S3)', () => {
     expect($('.uw-act-toast')?.textContent).toBeTruthy()
   })
 
-  it('V1-2, V1-2b: picker disabled-reason (.uwf-reason) and search path (.uwf-path) use semantic tokens with >= 4.5:1 contrast in light and dark', () => {
+  it('V1-2, V1-2b, R5-FE-2: picker disabled-reason (.uwf-reason) and search path (.uwf-path) use semantic tokens with >= 4.5:1 contrast in light, dark, and system-dark', () => {
     const foldersCss = readFileSync(
       join(__dirname, '../src/renderer/src/uniwork-folders/uniwork-folders.css'),
       'utf8',
@@ -870,7 +870,6 @@ describe('UniworkBrowser: folder actions (S3)', () => {
       css.match(new RegExp(`${sel.replace(/[.]/g, '\\.')}\\s*\\{([^}]*)\\}`))?.[1] ?? ''
 
     expect(rule(foldersCss, '.uwf-reason')).toMatch(/color:\s*var\(--text-secondary\)/)
-    expect(rule(foldersCss, '.uwf-path')).toMatch(/color:\s*var\(--text-secondary\)/)
 
     const tokenValue = (block: string, name: string) =>
       block.match(new RegExp(`${name}:\\s*(#[0-9a-fA-F]{3,6})`))?.[1] ?? ''
@@ -896,6 +895,9 @@ describe('UniworkBrowser: folder actions (S3)', () => {
       tokensCss.indexOf("\n[data-theme='dark']"),
       tokensCss.indexOf('\n@media (prefers-color-scheme: dark)'),
     )
+    const systemDarkTokens = tokensCss.slice(
+      tokensCss.indexOf('\n@media (prefers-color-scheme: dark)'),
+    )
     const lightHome = homeCss.slice(
       homeCss.indexOf('\n:root {'),
       homeCss.indexOf("\n[data-theme='dark']"),
@@ -903,6 +905,10 @@ describe('UniworkBrowser: folder actions (S3)', () => {
     const darkHome = homeCss.slice(
       homeCss.indexOf("\n[data-theme='dark']"),
       homeCss.indexOf('\n@media (prefers-color-scheme: dark)'),
+    )
+    const systemDarkHome = homeCss.slice(
+      homeCss.indexOf('\n@media (prefers-color-scheme: dark)'),
+      homeCss.indexOf('\n* {'),
     )
 
     // Light theme: --text-secondary on --accent-soft (selected row), --hover (active search row), --surface
@@ -916,6 +922,58 @@ describe('UniworkBrowser: folder actions (S3)', () => {
     expect(ratio(darkFg, tokenValue(darkHome, '--accent-soft'))).toBeGreaterThanOrEqual(4.5)
     expect(ratio(darkFg, tokenValue(darkTokens, '--hover'))).toBeGreaterThanOrEqual(4.5)
     expect(ratio(darkFg, tokenValue(darkTokens, '--surface'))).toBeGreaterThanOrEqual(4.5)
+
+    // System-dark fallback (@media (prefers-color-scheme: dark) :root:not([data-theme='light'])) (R5-FE-2)
+    expect(systemDarkTokens).toContain(":root:not([data-theme='light'])")
+    const systemDarkFg = tokenValue(systemDarkTokens, '--text-secondary')
+    expect(ratio(systemDarkFg, tokenValue(systemDarkHome, '--accent-soft'))).toBeGreaterThanOrEqual(
+      4.5,
+    )
+    expect(ratio(systemDarkFg, tokenValue(systemDarkTokens, '--hover'))).toBeGreaterThanOrEqual(4.5)
+    expect(ratio(systemDarkFg, tokenValue(systemDarkTokens, '--surface'))).toBeGreaterThanOrEqual(
+      4.5,
+    )
+  })
+
+  it('V2-1: search hit path (.uwf-path) wins the CSS cascade over .uw-pick-row-meta in real bundle order', async () => {
+    const mainTsx = readFileSync(join(__dirname, '../src/renderer/src/main.tsx'), 'utf8')
+    const foldersCss = readFileSync(
+      join(__dirname, '../src/renderer/src/uniwork-folders/uniwork-folders.css'),
+      'utf8',
+    )
+    const homeCss = readFileSync(join(__dirname, '../src/renderer/src/home.css'), 'utf8')
+
+    // In main.tsx, ./AppFrame (which imports UniworkBrowser -> uniwork-folders.css) is imported
+    // before ./home.css, so uniwork-folders.css precedes home.css in the bundled stylesheet.
+    expect(mainTsx.indexOf("from './AppFrame'")).toBeLessThan(
+      mainTsx.indexOf("import './home.css'"),
+    )
+    // Strip @position-try at-rule (CSS Anchor Positioning) which jsdom's cssom parser does not recognize
+    const bundleCss = `${foldersCss}\n${homeCss.replace(/@position-try[^{]*\{[^}]*\}/g, '')}`
+
+    await render()
+    const regularMeta = $<HTMLElement>('.uw-pick-row-meta:not(.uwf-path)')!
+    expect(regularMeta).toBeTruthy()
+
+    // Trigger search so BrowserContents renders <span class="uw-pick-row-meta uwf-path">
+    await type($<HTMLInputElement>('.uwf-own-search')!, 'bud')
+    const pathEl = $<HTMLElement>('.uwf-path')!
+    expect(pathEl).toBeTruthy()
+    expect(pathEl.classList.contains('uw-pick-row-meta')).toBe(true)
+
+    const styleEl = document.createElement('style')
+    styleEl.textContent = bundleCss
+    document.head.appendChild(styleEl)
+    try {
+      expect(window.getComputedStyle(pathEl).getPropertyValue('color').trim()).toBe(
+        'var(--text-secondary)',
+      )
+      expect(window.getComputedStyle(regularMeta).getPropertyValue('color').trim()).toBe(
+        'var(--text-muted)',
+      )
+    } finally {
+      styleEl.remove()
+    }
   })
 
   it('V1-3: own create-folder expands the parent tree row (open folder and row-menu target alike), while web-side tree-changed does not force-expand', async () => {
