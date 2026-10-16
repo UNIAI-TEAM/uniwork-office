@@ -2,9 +2,10 @@ import { test, expect, type Locator, type Page } from '@playwright/test'
 import JSZip from 'jszip'
 import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
-import { readFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { en as syncEn } from '../apps/shell/src/renderer/src/i18n/sync/en'
+import { en as uniworkDocsEn } from '../apps/shell/src/renderer/src/i18n/uniwork-documents/en'
 import { en as uniworkFoldersEn } from '../apps/shell/src/renderer/src/i18n/uniwork-folders/en'
 import {
   closeAndSaveVideo,
@@ -28,9 +29,10 @@ import {
 
 /**
  * FD-11 UniWork folders end to end: folder creation, live tree/contents refresh
- * on web-side moves and archives via the change feed, 3-level breadcrumb
- * navigation, title search with ancestor paths and kind filtering, and conflict
- * Save-as-a-copy into a chosen folder.
+ * on web-side moves, archives, and restores via the change feed, 3-level
+ * breadcrumb navigation, title search with ancestor paths and kind filtering,
+ * conflict Save-as-a-copy into a chosen folder, and New document + Upload into
+ * a chosen folder via the Location picker.
  *
  * The account is signed in once in `beforeAll`; each scenario launches a fresh
  * shell on the shared `userDataDir`.
@@ -351,7 +353,22 @@ test.describe.serial('UniWork folders (FD-11)', () => {
       await expect(
         dialog.getByRole('status').filter({ hasText: uniworkFoldersEn.ufFolderGone }),
       ).toBeVisible()
+      await expect(contents.getByRole('option', { name: /^Vanishing Leaf/ })).toBeHidden()
+      await expect.poll(() => treeChildrenOf(tree, 'Source Hub')).toEqual([])
       await shell.screenshot({ path: screenshotPath('uniwork-folders-feed-fallback') })
+
+      // Restore `Vanishing Leaf` on the web and advance the feed: it reappears in `Source Hub`
+      // contents and in the folder tree without closing or reloading the dialog
+      stub.webRestore(vanishingLeaf.id)
+      await triggerFeedTick(shell)
+
+      await expect(contents.getByRole('option', { name: /^Vanishing Leaf/ })).toBeVisible({
+        timeout: 15_000,
+      })
+      await expandTreeFolder(tree, 'Source Hub')
+      await expect.poll(() => treeChildrenOf(tree, 'Source Hub')).toEqual(['Vanishing Leaf'])
+      await expect(tree.getByRole('treeitem', { name: 'Vanishing Leaf' })).toBeVisible()
+      await shell.screenshot({ path: screenshotPath('uniwork-folders-feed-restored') })
     })
   })
 
@@ -597,6 +614,154 @@ test.describe.serial('UniWork folders (FD-11)', () => {
 
       await conflictDialog.getByRole('button', { name: 'Close', exact: true }).click()
       await expect(conflictDialog).toBeHidden()
+    })
+  })
+
+  // f ───────────────────────────────────────────────────────────────────────
+  test('f. new document and upload with the Location picker land in the chosen folder in the stub and in folder contents', async () => {
+    test.setTimeout(180_000)
+    stub.addFolder({ title: 'Start Folder' })
+    const chosenFolder = stub.addFolder({ title: 'Chosen Target' })
+    const fixtureBytes = await docxBytes()
+    const uploadFixturePath = join(userDataDir, 'uploaded-handbook.docx')
+    await writeFile(uploadFixturePath, fixtureBytes)
+
+    await withApp('uniwork-folders-new-upload', async ({ launched, shell }) => {
+      // 1. Open `Start Folder`, then create a New document into `Chosen Target` via Location picker
+      const dialog = await openUniworkFolderBrowser(shell)
+      const tree = dialog.getByRole('tree', { name: uniworkFoldersEn.ufTreeLabel })
+      const contents = dialog.getByRole('listbox', { name: uniworkFoldersEn.ufContentsLabel })
+      const crumbs = dialog.getByRole('navigation', { name: uniworkFoldersEn.ufBreadcrumb })
+
+      await contents.getByRole('option', { name: /^Start Folder/ }).dblclick()
+      await expect(crumbs.getByText('Start Folder', { exact: true })).toHaveAttribute(
+        'aria-current',
+        'page',
+      )
+
+      await dialog.getByRole('button', { name: uniworkDocsEn.uwDocNew, exact: true }).click()
+      const newDialog = shell.getByRole('dialog', { name: uniworkDocsEn.uwDocNew })
+      await expect(newDialog).toBeVisible()
+      await newDialog
+        .getByRole('textbox', { name: uniworkDocsEn.uwDocName })
+        .fill('new-in-chosen-folder')
+
+      // Default Location is the open folder (`UniWork › Start Folder`)
+      const newLocBtn = newDialog.getByRole('button', {
+        name: `${uniworkFoldersEn.ufLocation}: UniWork › Start Folder`,
+      })
+      await expect(newLocBtn).toBeVisible()
+      await newLocBtn.click()
+
+      // Pick `Chosen Target` in the `Choose a location` modal tree picker
+      const picker = shell.getByRole('dialog', { name: uniworkFoldersEn.ufChooseLocation })
+      await expect(picker).toBeVisible()
+      await picker
+        .getByRole('tree', { name: uniworkFoldersEn.ufTreeLabel })
+        .getByRole('treeitem', { name: 'Chosen Target' })
+        .click()
+      await picker.getByRole('button', { name: uniworkFoldersEn.ufChoose, exact: true }).click()
+      await expect(picker).toBeHidden()
+
+      await expect(
+        newDialog.getByRole('button', {
+          name: `${uniworkFoldersEn.ufLocation}: UniWork › Chosen Target`,
+        }),
+      ).toBeVisible()
+
+      await newDialog.getByRole('button', { name: uniworkDocsEn.uwDocCreate, exact: true }).click()
+      await expect(dialog).toBeHidden({ timeout: 30_000 })
+
+      // Stub holds `new-in-chosen-folder.docx` with `parentId: chosenFolder.id`
+      const createdDoc = stub.documents().find((d) => d.title === 'new-in-chosen-folder.docx')
+      expect(createdDoc).toBeDefined()
+      expect(createdDoc).toMatchObject({
+        title: 'new-in-chosen-folder.docx',
+        parentId: chosenFolder.id,
+      })
+
+      // Return to Home, reopen the folder browser, and verify `Chosen Target` lists the new document
+      await shell.locator('.tab-item.tab-home').click()
+      await openUniworkFolderBrowser(shell)
+      await contents.getByRole('option', { name: /^Chosen Target/ }).dblclick()
+      await expect(crumbs.getByText('Chosen Target', { exact: true })).toHaveAttribute(
+        'aria-current',
+        'page',
+      )
+      await expect(
+        contents.getByRole('option', { name: /^new-in-chosen-folder\.docx/ }),
+      ).toBeVisible()
+
+      // 2. Navigate to `Start Folder`, then Upload `uploaded-handbook.docx` into `Chosen Target`
+      await tree.getByRole('treeitem', { name: 'Start Folder' }).click()
+      await expect(crumbs.getByText('Start Folder', { exact: true })).toHaveAttribute(
+        'aria-current',
+        'page',
+      )
+
+      await launched.app.evaluate(({ dialog: electronDialog }, filePath) => {
+        electronDialog.showOpenDialog = (async () => ({
+          canceled: false,
+          filePaths: [filePath],
+        })) as typeof electronDialog.showOpenDialog
+      }, uploadFixturePath)
+
+      await dialog.getByRole('button', { name: uniworkDocsEn.uwDocUpload, exact: true }).click()
+      const uploadDialog = shell.getByRole('dialog', { name: uniworkDocsEn.uwDocUpload })
+      await expect(uploadDialog).toBeVisible()
+
+      await uploadDialog
+        .getByRole('button', { name: uniworkDocsEn.uwDocUploadPick, exact: true })
+        .click()
+      await expect(uploadDialog.locator('.uw-act-file-name')).toHaveText('uploaded-handbook.docx')
+
+      const uploadLocBtn = uploadDialog.getByRole('button', {
+        name: `${uniworkFoldersEn.ufLocation}: UniWork › Start Folder`,
+      })
+      await expect(uploadLocBtn).toBeVisible()
+      await uploadLocBtn.click()
+
+      await expect(picker).toBeVisible()
+      await picker
+        .getByRole('tree', { name: uniworkFoldersEn.ufTreeLabel })
+        .getByRole('treeitem', { name: 'Chosen Target' })
+        .click()
+      await picker.getByRole('button', { name: uniworkFoldersEn.ufChoose, exact: true }).click()
+      await expect(picker).toBeHidden()
+
+      await expect(
+        uploadDialog.getByRole('button', {
+          name: `${uniworkFoldersEn.ufLocation}: UniWork › Chosen Target`,
+        }),
+      ).toBeVisible()
+
+      await uploadDialog
+        .getByRole('button', { name: uniworkDocsEn.uwDocUpload, exact: true })
+        .click()
+      await expect(dialog).toBeHidden({ timeout: 30_000 })
+
+      // Stub holds `uploaded-handbook.docx` with `parentId: chosenFolder.id` and matching checksum
+      const uploadedDoc = stub.documents().find((d) => d.title === 'uploaded-handbook.docx')
+      expect(uploadedDoc).toBeDefined()
+      expect(uploadedDoc).toMatchObject({
+        title: 'uploaded-handbook.docx',
+        parentId: chosenFolder.id,
+        checksum: sha256(fixtureBytes),
+      })
+
+      // Return to Home, reopen the folder browser, and verify `Chosen Target` lists both documents
+      await shell.locator('.tab-item.tab-home').click()
+      await openUniworkFolderBrowser(shell)
+      await contents.getByRole('option', { name: /^Chosen Target/ }).dblclick()
+      await expect(crumbs.getByText('Chosen Target', { exact: true })).toHaveAttribute(
+        'aria-current',
+        'page',
+      )
+      await expect(
+        contents.getByRole('option', { name: /^new-in-chosen-folder\.docx/ }),
+      ).toBeVisible()
+      await expect(contents.getByRole('option', { name: /^uploaded-handbook\.docx/ })).toBeVisible()
+      await shell.screenshot({ path: screenshotPath('uniwork-folders-new-upload') })
     })
   })
 })
