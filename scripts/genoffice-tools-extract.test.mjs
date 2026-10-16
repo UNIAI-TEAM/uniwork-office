@@ -2565,4 +2565,41 @@ describe('parameterised recursive arrow (G6-09d)', () => {
     assert.equal(entry.reason, 'recursion')
     assert.ok(elapsed < 2000, `expected tree(18) extraction under 2000ms, took ${elapsed}ms`)
   })
+
+  it('folds only const arrow declarations and refuses let/var arrows including reassigned let pick (RBD9-4)', () => {
+    const { dir, sha } = fixture({
+      'packages/agent-core/src/types.ts': AGENT_TOOL_DEF_FIXTURE,
+      'apps/docs/src/renderer/ai/tools.ts': [
+        "import type { AgentToolDef } from '@genoffice/agent-core'",
+        '',
+        'let pick = (n: number) => ({',
+        "  type: 'object',",
+        "  properties: { first: { type: 'number', description: `n=${n}` } },",
+        '})',
+        'pick = (n: number) => ({',
+        "  type: 'object',",
+        "  properties: { second: { type: 'number', description: `n=${n}` } },",
+        '})',
+        'var legacy = (n: number) => ({',
+        "  type: 'object',",
+        "  properties: { third: { type: 'number', description: `n=${n}` } },",
+        '})',
+        '',
+        'export const TOOLS: AgentToolDef[] = [',
+        "  { name: 'reassigned_let', description: 'x', inputSchema: pick(2) },",
+        "  { name: 'var_arrow', description: 'x', inputSchema: legacy(2) },",
+        ']',
+        '',
+      ].join('\n'),
+    })
+    const res = extract({ repo: dir, rev: sha })
+    const file = build(dir, sha)
+    for (const name of ['reassigned_let', 'var_arrow']) {
+      const row = res.rows.find((r) => r.tool === name)
+      const entry = file.catalogue.find((e) => e.module === 'docs' && e.name === name)
+      assert.match(row.hash, /^unresolved:/)
+      assert.equal(entry.schemaComplete, false)
+      assert.equal(entry.offered, false)
+    }
+  })
 })
