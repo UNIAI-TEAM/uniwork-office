@@ -18,10 +18,22 @@ afterEach(() => {
 })
 
 const notice = () => h!.container.querySelector('.ai-edits-paused')
+/**
+ * The event reaches the page's listeners up to the panel's (registered at mount) and stops
+ * there: ProseMirror's own mousedown handling reads the layout under the pointer, which jsdom
+ * does not have.
+ */
 const attempt = async (event: Event) => {
-  await act(async () => {
-    h!.editor.view.dom.dispatchEvent(event)
-  })
+  const dom = h!.editor.view.dom
+  const stop = (e: Event) => e.stopImmediatePropagation()
+  dom.addEventListener(event.type, stop, true)
+  try {
+    await act(async () => {
+      dom.dispatchEvent(event)
+    })
+  } finally {
+    dom.removeEventListener(event.type, stop, true)
+  }
 }
 
 describe('edits paused during an AI run (docs)', () => {

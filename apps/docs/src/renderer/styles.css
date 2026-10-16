@@ -8707,6 +8707,21 @@ body.docs-crop-active
 .ai-result-edited-hint {
   font-size: 11px;
   color: var(--text-dim);
+  /* no one-word last line in the 360 px panel (the vi copy left "ổn." alone) */
+  text-wrap: pretty;
+}
+
+/* why the page ignores clicks and keys while an AI run holds it (shown after an attempt) */
+.ai-edits-paused {
+  margin: 0 12px 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--warning-border);
+  border-radius: 6px;
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  font-size: 12px;
+  line-height: 1.4;
+  text-wrap: pretty;
 }
 
 /* the one stopped line of a UniWork AI turn the user stopped (aiRunStopped) */

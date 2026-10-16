@@ -499,6 +499,11 @@ export function AiPanel({
   const uniworkGate = useUniworkSendGate()
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
+  /** the user clicked or typed into the page the open run holds: say why nothing happens */
+  const [editsPaused, setEditsPaused] = useState(false)
+  useEffect(() => {
+    if (!busy) setEditsPaused(false)
+  }, [busy])
   /** messages queued while a reply runs; the pump re-runs them through runWith on settle */
   const msgQueue = useChatRunQueue<{
     attachments: AttachmentMeta[]
@@ -963,7 +968,10 @@ export function AiPanel({
 
   /** folds a run's document changes into one undo step (the loop's run hooks drive it) */
   const runHistoryRef = useRef<DocsRunHistoryGroup | null>(null)
-  if (!runHistoryRef.current) runHistoryRef.current = createDocsRunHistoryGroup()
+  if (!runHistoryRef.current)
+    runHistoryRef.current = createDocsRunHistoryGroup({
+      onBlockedInput: () => setEditsPaused(true),
+    })
   useEffect(() => {
     const group = runHistoryRef.current!
     group.attach(editor)
@@ -2172,6 +2180,11 @@ export function AiPanel({
                 {t('aiPartialAdopt')}
               </button>
             </div>
+          </div>
+        )}
+        {busy && editsPaused && (
+          <div className="ai-edits-paused" role="status">
+            {t('aiEditsPaused')}
           </div>
         )}
         <EditQueueCard

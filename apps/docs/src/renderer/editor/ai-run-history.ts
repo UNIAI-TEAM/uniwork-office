@@ -6,6 +6,11 @@ import { editableIntent } from './editable-intent'
 
 export const AI_RUN_HISTORY_KEY = new PluginKey('aiRunHistory')
 
+/** page events that mean the user tried to edit */
+const ATTEMPT_EVENTS = ['mousedown', 'keydown', 'beforeinput', 'paste', 'drop'] as const
+/** keys that are not an edit attempt on their own */
+const MODIFIER_KEYS = new Set(['Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'Escape', 'Tab'])
+
 export interface DocsRunHistoryGroup extends RunHistoryGroup {
   /** the editor whose history the group folds (null detaches; the panel re-attaches on a new editor) */
   attach(editor: Editor | null): void
@@ -28,7 +33,12 @@ function recordsHistory(tr: Transaction): boolean {
  * cut tool did nothing). Changes outside the history (the write_document draft, the AI marker)
  * stay outside it.
  */
-export function createDocsRunHistoryGroup(): DocsRunHistoryGroup {
+export function createDocsRunHistoryGroup(
+  options: {
+    /** the user clicked or typed into the page while the run held it (the panel says why) */
+    onBlockedInput?: () => void
+  } = {},
+): DocsRunHistoryGroup {
   let editor: Editor | null = null
   let active: string | null = null
   /** the next recorded change of the run opens its event */
@@ -44,6 +54,20 @@ export function createDocsRunHistoryGroup(): DocsRunHistoryGroup {
     key: AI_RUN_HISTORY_KEY,
     props: {
       editable: () => active === null,
+    },
+    // native capture listeners, not handleDOMEvents: another plugin claiming a mousedown would
+    // hide it from this one, and nothing here may change how the event is handled
+    view(view) {
+      const onAttempt = (event: Event) => {
+        if (event instanceof KeyboardEvent && MODIFIER_KEYS.has(event.key)) return
+        if (active !== null) options.onBlockedInput?.()
+      }
+      for (const type of ATTEMPT_EVENTS) view.dom.addEventListener(type, onAttempt, true)
+      return {
+        destroy: () => {
+          for (const type of ATTEMPT_EVENTS) view.dom.removeEventListener(type, onAttempt, true)
+        },
+      }
     },
     filterTransaction(tr) {
       // an Undo/Redo command (ribbon, menu) during the run would pop the run's own event or an
