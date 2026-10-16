@@ -155,14 +155,17 @@ describe('the S18 action IPC', () => {
     expect(options.filters!.some((filter) => filter.extensions.includes('*'))).toBe(false)
   })
 
-  // R1-1: the native filter is a hint, not a contract - a typed path reaches
-  // the picker with any name. The picker drops a file the formats table cannot
-  // resolve (null, like a cancel) so the dialog never starts an upload whose
-  // document could not be opened afterwards; a resolvable pick still passes.
-  it('drops a pick the formats table cannot resolve, and keeps the others', async () => {
+  // N-2a: a typed path outside the native filter is still returned to the
+  // renderer so uploadDocument stays the single refusal authority and the
+  // dialog can surface unsupported_format at the file field instead of
+  // silently behaving like a cancel.
+  it('passes a picked path through to the renderer regardless of extension', async () => {
     const { handlers } = await setup()
     dialogs.result = { canceled: false, filePaths: [join(dir, 'photo.png')] }
-    expect(await handlers.get(UNIWORK_DOC_CHANNELS.pickUploadFile)!(null)).toBeNull()
+    expect(await handlers.get(UNIWORK_DOC_CHANNELS.pickUploadFile)!(null)).toEqual({
+      path: join(dir, 'photo.png'),
+      name: 'photo.png',
+    })
 
     dialogs.result = { canceled: false, filePaths: [join(dir, 'Q3 report.docx')] }
     expect(await handlers.get(UNIWORK_DOC_CHANNELS.pickUploadFile)!(null)).toEqual({

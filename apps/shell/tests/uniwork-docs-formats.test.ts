@@ -17,17 +17,31 @@ import {
  */
 describe('the upload format table', () => {
   const INTENDED = ['docx', 'xlsx', 'pptx', 'pdf', 'md', 'markdown', 'html', 'htm']
+  const EXPECTED_FORMAT: Record<(typeof INTENDED)[number], string> = {
+    docx: 'docx',
+    xlsx: 'xlsx',
+    pptx: 'pptx',
+    pdf: 'pdf',
+    md: 'md',
+    markdown: 'md',
+    html: 'html',
+    htm: 'html',
+  }
 
   it('offers exactly the eight extensions UniWork Office opens', () => {
     expect(UPLOAD_EXTENSIONS).toEqual(INTENDED)
   })
 
-  it('resolves every offered extension, and no other', () => {
+  it('resolves every offered extension to its canonical format, and no other', () => {
     for (const ext of INTENDED) {
-      expect(formatForName(`plan.${ext}`), ext).not.toBeNull()
+      expect(formatForName(`plan.${ext}`), ext).toBe(EXPECTED_FORMAT[ext])
     }
+    expect(formatForName('plan.markdown')).toBe('md')
+    expect(formatForName('plan.htm')).toBe('html')
     expect(formatForName('plan.png')).toBeNull()
     expect(formatForName('plan')).toBeNull()
+    expect(formatForName('photo.constructor')).toBeNull()
+    expect(formatForName('photo.__proto__')).toBeNull()
   })
 
   it('resolves the extensions case-insensitively, as the file system does', () => {

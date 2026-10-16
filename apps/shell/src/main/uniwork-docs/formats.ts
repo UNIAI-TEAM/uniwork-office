@@ -38,7 +38,7 @@ const BY_MIME: Record<string, UniworkDocFormat> = Object.fromEntries(
 
 export function formatForName(name: string): UniworkDocFormat | null {
   const ext = extname(name.trim()).slice(1).toLowerCase()
-  return BY_EXTENSION[ext] ?? null
+  return Object.hasOwn(BY_EXTENSION, ext) ? BY_EXTENSION[ext] : null
 }
 
 export function formatForMime(mime: string): UniworkDocFormat | null {

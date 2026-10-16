@@ -8,6 +8,7 @@ import {
   truncateSync,
   writeFileSync,
 } from 'node:fs'
+import { readFile, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -62,6 +63,9 @@ vi.mock('node:fs/promises', async (importOriginal) => {
       if (statGate.held) await statGate.held
       return actual.stat(...args)
     }),
+    readFile: vi.fn(async (...args: Parameters<typeof actual.readFile>) =>
+      actual.readFile(...args),
+    ),
   }
 })
 
@@ -708,16 +712,21 @@ describe('upload a file', () => {
     expect(server.calls.some((c) => c.method === 'DELETE')).toBe(false)
   })
 
-  // R1-1 / R1-2: the upload IPC carries a renderer-supplied path, so the native
-  // filter is not a contract. A basename the formats table does not resolve
-  // (photo.png here) must be refused with the existing unsupported_format
-  // error before the file is read and before any POST: otherwise the created
-  // document could never be opened again.
-  it('refuses a basename outside the formats table before any read or POST', async () => {
+  // R1-1 / R1-2 / N-1 / N-3: the upload IPC carries a renderer-supplied path, so
+  // the native filter is not a contract. A basename the formats table does not
+  // resolve (photo.png, a nonexistent missing.png, or a prototype key like
+  // photo.constructor) must be refused with unsupported_format before stat,
+  // readFile and any POST: otherwise the created document could never be opened.
+  it('refuses a basename outside the formats table before any stat, read or POST', async () => {
     const server = fakeServer()
     const ctx = setup(server)
     const photo = join(dir, 'photo.png')
     writeFileSync(photo, 'not a document')
+    const proto = join(dir, 'photo.constructor')
+    writeFileSync(proto, 'not a document')
+    vi.mocked(stat).mockClear()
+    vi.mocked(readFile).mockClear()
+
     const result = await ctx.service.uploadDocument({
       workspaceId: WS,
       folderId: null,
@@ -725,6 +734,28 @@ describe('upload a file', () => {
       uploadId: 'up-png',
     })
     expect(result).toEqual({ ok: false, error: 'unsupported_format' })
+    expect(vi.mocked(stat)).toHaveBeenCalledTimes(0)
+    expect(vi.mocked(readFile)).toHaveBeenCalledTimes(0)
+
+    const missing = await ctx.service.uploadDocument({
+      workspaceId: WS,
+      folderId: null,
+      path: join(dir, 'missing.png'),
+      uploadId: 'up-missing-png',
+    })
+    expect(missing).toEqual({ ok: false, error: 'unsupported_format' })
+    expect(vi.mocked(stat)).toHaveBeenCalledTimes(0)
+    expect(vi.mocked(readFile)).toHaveBeenCalledTimes(0)
+
+    const protoResult = await ctx.service.uploadDocument({
+      workspaceId: WS,
+      folderId: null,
+      path: proto,
+      uploadId: 'up-constructor',
+    })
+    expect(protoResult).toEqual({ ok: false, error: 'unsupported_format' })
+    expect(vi.mocked(stat)).toHaveBeenCalledTimes(0)
+    expect(vi.mocked(readFile)).toHaveBeenCalledTimes(0)
     expect(server.calls).toHaveLength(0)
     expect(ctx.progress).toHaveLength(0)
   })

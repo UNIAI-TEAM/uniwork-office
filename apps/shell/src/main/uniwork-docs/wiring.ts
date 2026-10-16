@@ -69,7 +69,7 @@ import {
   type UnsavedCloseChoice,
   type UnsavedCloseKind,
 } from './service'
-import { UPLOAD_EXTENSIONS, formatForName } from './formats'
+import { UPLOAD_EXTENSIONS } from './formats'
 import { tUniworkDocs } from './strings'
 import { UNIWORK_SYNC_CENTER_CHANNELS } from '../../shared/sync-center'
 import { createWiredSyncCenter } from '../uniwork-sync/sync-center'
@@ -210,13 +210,7 @@ async function pickUploadFile(
     : await dialog.showOpenDialog(options)
   const path = picked.canceled ? undefined : picked.filePaths[0]
   if (!path) return null
-  const name = basename(path)
-  // R1-1: the filter is a hint, not a contract - a typed path can carry any
-  // extension. Drop a pick the formats table does not resolve (same null as a
-  // cancel) so the dialog cannot start an upload the service would refuse
-  // anyway; the service keeps the same check for a direct IPC call.
-  if (!formatForName(name)) return null
-  return { path, name }
+  return { path, name: basename(path) }
 }
 
 /**
