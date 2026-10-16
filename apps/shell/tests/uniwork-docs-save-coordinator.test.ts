@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { UniworkDocStatus } from '../src/shared/home-api'
 import type { Binding, BoundDocument } from '../src/main/uniwork-docs/binding-store'
-import { SaveCoordinator } from '../src/main/uniwork-docs/save-coordinator'
+import { SaveCoordinator, toStatus } from '../src/main/uniwork-docs/save-coordinator'
 import { UniworkDocError } from '../src/main/uniwork-docs/errors'
 import { sha256Hex } from '../src/main/uniwork-docs/formats'
 import type { CommitLookup } from '../src/main/uniwork-docs/parse'
@@ -1493,5 +1493,37 @@ describe('G5-06 W4a save queue (fakes)', () => {
       records: opened.store.records(INTENT_STORE_REGISTRATION.name),
     }
     return subject
+  })
+})
+
+describe('DOC5-W04: toStatus carries the server level', () => {
+  const doc = (level?: Binding['level']): BoundDocument => ({
+    path: '/wc/Plan.docx',
+    dir: '/wc',
+    deploymentId: 'default',
+    userId: 'acc_1',
+    key: 'doc_1',
+    binding: {
+      schema: 2,
+      documentId: 'd_1',
+      workspaceId: 'ws_1',
+      orgId: 'org_1',
+      title: 'Plan.docx',
+      filename: 'Plan.docx',
+      format: 'docx',
+      access: 'view',
+      baseRevision: '1',
+      baseVersion: 1,
+      baseChecksum: sha256Hex(new Uint8Array()),
+      state: 'saved',
+      minStoreLevel: 2,
+      minAppVersion: '0.0.0',
+      ...(level ? { level } : {}),
+    },
+  })
+
+  it('a comment level is on the status next to access view; no level adds no field', () => {
+    expect(toStatus(doc('comment'))).toMatchObject({ access: 'view', commentsLevel: 'comment' })
+    expect(toStatus(doc())).not.toHaveProperty('commentsLevel')
   })
 })

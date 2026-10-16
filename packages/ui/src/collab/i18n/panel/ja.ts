@@ -69,4 +69,25 @@ export const ja = {
   collabAiDraftLabel: 'UniWork AI が提案した下書きです。確認してから送信してください。',
   collabInFileSection: 'ファイル内のコメント',
   collabInFileHint: 'ファイルに保存された閲覧専用のコメントです。ここでは編集や返信はできません。',
+  collabMentionWarnTitle: 'メンションされたユーザーには閲覧権限がありません',
+  collabMentionWarnBody: '{names} はこのドキュメントを閲覧できないため、通知されません。',
+  collabShareViewThenSend: '閲覧権限を共有して送信',
+  collabSendWithoutNotify: '通知せずに送信',
+  collabMentionAskManager:
+    'このドキュメントの管理者に、{names} への閲覧権限の共有を依頼してください。',
+  collabMentionMixedUnshareable: '{unshareable} とは共有できません（通知されません）。',
+  collabSharingView: '閲覧権限を共有中…',
+  collabShareViewFailed:
+    '{failedNames} と閲覧権限を共有できませんでした。再試行するか、通知せずに送信できます。',
+  collabShareViewPartial:
+    '{sharedNames} と閲覧権限を共有しました。{failedNames} とは共有できませんでした（通知されません）。',
+  collabSendComment: 'コメントを送信',
+  collabRetryShareFor: '{failedNames} に対して再試行',
+  collabSendFailedAfterShare:
+    '{sharedNames} と閲覧権限を共有しましたが、コメントを送信できませんでした。入力した内容は残っています — もう一度送信してください。',
+  collabPostSendNoAccess: '{names} はこのドキュメントを閲覧できないため、通知されませんでした。',
+  collabPostSendShareAction: '閲覧権限を共有',
+  collabPostSendNoRetroNote:
+    'いま共有してもこのコメントの通知は送られません。通知するには新しいコメントでメンションしてください。',
+  collabDismissNotice: '閉じる',
 } satisfies Record<keyof typeof zh, string>

@@ -132,6 +132,7 @@ export const fr = {
   uwDocInfoByAt: '{name}, {time}',
   uwDocInfoVersionBy: '{version} · {name}',
   uwAccessView: 'Lecture',
+  uwAccessComment: 'Commentaire',
   uwAccessEdit: 'Modification',
   uwAccessManage: 'Gestion',
   uwRoleOwner: 'Propriétaire',

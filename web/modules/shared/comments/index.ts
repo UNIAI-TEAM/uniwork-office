@@ -3,8 +3,11 @@ export {
   createFrameCommentsApi,
   installFrameComments,
   type FrameCommentsClient,
+  type FrameCommentsExtras,
   type FrameCommentsHooks,
+  type FrameMentionsSearchInput,
 } from './frame-api'
+export { frameMentionAccess, type FrameMentionAccess } from './mention-access'
 export {
   createFrameDocVersion,
   frameDocVersion,

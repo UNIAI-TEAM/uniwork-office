@@ -7,4 +7,5 @@ export const cs = {
   collabMentionNoMatch: 'K „{query}“ neodpovídá nikdo, kdo má k tomuto dokumentu přístup.',
   collabMentionNoCandidates: 'K tomuto dokumentu zatím nemá přístup nikdo další.',
   collabMentionError: 'Seznam osob se nepodařilo načíst.',
+  collabMentionNoAccessBadge: 'Nemůže zobrazit',
 } satisfies Record<keyof typeof zh, string>

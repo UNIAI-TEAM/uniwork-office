@@ -11,10 +11,15 @@ import {
   type FrameRequests,
 } from '../../../docs/protocol/types'
 import type { FramePort } from '../../../docs/bridge/frame-port'
+import type { FrameMentionAccess } from '../comments/mention-access'
 
 export type DiscussionRequestPort = Pick<FramePort, 'request'>
 
-export function createFrameDiscussionSource(port: DiscussionRequestPort): CollabSource {
+export function createFrameDiscussionSource(
+  port: DiscussionRequestPort,
+  /** G8-18: from `frameMentionAccess(session)`; absent = no share action, no `include` */
+  mention?: FrameMentionAccess,
+): CollabSource {
   async function call<K extends FrameRequestType>(
     type: K,
     payload: FrameRequests[K]['payload'],
@@ -43,5 +48,9 @@ export function createFrameDiscussionSource(port: DiscussionRequestPort): Collab
     reopen: (p) => call('comments.reopen', p),
     revisions: (p) => call('comments.revisions', p),
     searchMentions: (p) => call('mentions.search', p),
+    ...(mention ? { canListMembers: mention.canListMembers } : {}),
+    ...(mention?.commentsShareView
+      ? { shareView: (p: { user_id: string }) => call('comments.shareView', p) }
+      : {}),
   } as CollabSource
 }

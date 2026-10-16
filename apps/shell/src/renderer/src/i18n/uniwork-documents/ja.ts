@@ -127,6 +127,7 @@ export const ja = {
   uwDocInfoByAt: '{name}、{time}',
   uwDocInfoVersionBy: '{version} · {name}',
   uwAccessView: '閲覧',
+  uwAccessComment: 'コメント',
   uwAccessEdit: '編集',
   uwAccessManage: '管理',
   uwRoleOwner: 'オーナー',

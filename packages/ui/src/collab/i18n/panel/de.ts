@@ -72,4 +72,28 @@ export const de = {
   collabInFileSection: 'Kommentare in der Datei',
   collabInFileHint:
     'In der Datei gespeichert und schreibgeschützt: Hier können Sie nicht bearbeiten oder antworten.',
+  collabMentionWarnTitle: 'Erwähnte Personen können dieses Dokument nicht ansehen',
+  collabMentionWarnBody:
+    '{names} können dieses Dokument nicht ansehen und werden daher nicht benachrichtigt.',
+  collabShareViewThenSend: 'Lesezugriff teilen und senden',
+  collabSendWithoutNotify: 'Ohne Benachrichtigung senden',
+  collabMentionAskManager:
+    'Bitten Sie jemanden, der dieses Dokument verwaltet, Lesezugriff mit {names} zu teilen.',
+  collabMentionMixedUnshareable:
+    'Teilen mit {unshareable} nicht möglich; sie werden nicht benachrichtigt.',
+  collabSharingView: 'Lesezugriff wird geteilt…',
+  collabShareViewFailed:
+    'Lesezugriff konnte nicht mit {failedNames} geteilt werden. Sie können es erneut versuchen oder ohne Benachrichtigung senden.',
+  collabShareViewPartial:
+    'Lesezugriff mit {sharedNames} geteilt. Teilen mit {failedNames} fehlgeschlagen (keine Benachrichtigung).',
+  collabSendComment: 'Kommentar senden',
+  collabRetryShareFor: 'Erneut versuchen für {failedNames}',
+  collabSendFailedAfterShare:
+    'Lesezugriff mit {sharedNames} geteilt, aber der Kommentar konnte nicht gesendet werden. Ihr Text steht noch im Feld — versuchen Sie es erneut.',
+  collabPostSendNoAccess:
+    '{names} können dieses Dokument nicht ansehen und wurden daher nicht benachrichtigt.',
+  collabPostSendShareAction: 'Lesezugriff teilen',
+  collabPostSendNoRetroNote:
+    'Wenn Sie jetzt teilen, werden sie über diesen Kommentar nicht benachrichtigt; erwähnen Sie sie in einem neuen Kommentar.',
+  collabDismissNotice: 'Schließen',
 } satisfies Record<keyof typeof zh, string>
