@@ -129,4 +129,12 @@ export const ja = {
   uwReasonArchived: 'ドキュメントはアーカイブ済み',
   uwReasonSuspended: '組織が停止中',
   uwReasonDeactivated: 'この組織であなたのアカウントは無効化されています',
+
+  webSizeWarnChip: '上限 {max} に近づいています（現在 {size}）。',
+  webSaveBlockTitle: 'UniWork に保存できませんでした',
+  webSaveBlockBody:
+    'このドキュメントは {max} を超えています。変更内容はここに残っています。自分のコピーをパソコンにダウンロードしてから、画像サイズを縮小するかドキュメントを分割してください。',
+  webSaveBlockDownload: '自分のコピーをダウンロード',
+  uwConflictTooLargeWithLimit:
+    'あなたのバージョンは {max} を超えています（現在 {size}）。「自分のコピーをダウンロード」を選択するか、このダイアログを閉じてファイルサイズを縮小してください。',
 } satisfies Record<keyof typeof zh, string>
