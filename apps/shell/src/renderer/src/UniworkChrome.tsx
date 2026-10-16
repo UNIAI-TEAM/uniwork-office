@@ -396,6 +396,9 @@ ${uiScaleOf(el)}`
     const tabs = typeof MutationObserver !== 'undefined' ? new MutationObserver(again) : null
     tabs?.observe(strip, { childList: true })
     if (chrome) tabs?.observe(chrome, { childList: true })
+    // the strip changing form (G5-06u-TS) moves Home's width and the tabs' minimum without a
+    // child coming or going, and maybe without the bar changing size
+    if (bar) tabs?.observe(bar, { attributes: true, attributeFilter: ['data-strip'] })
     // the holder changing size (the Discussion toggle or a notice coming and going) moves the budget;
     // answered in the next frame so a size change caused by this very step is not reported in the same one
     let frame = 0

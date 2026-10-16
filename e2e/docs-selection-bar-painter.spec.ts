@@ -111,6 +111,32 @@ async function wordCenter(editor: Page, word: string): Promise<{ x: number; y: n
   }, word)
 }
 
+/** document position under a client point, the way ProseMirror resolves a click */
+async function hitPos(editor: Page, at: { x: number; y: number }): Promise<number> {
+  return editor.evaluate(({ x, y }) => {
+    const ed = (window as unknown as AidocsWindow).__aidocs!.editor as any
+    const hit = ed.view.posAtCoords({ left: x, top: y })
+    if (!hit) throw new Error(`no document position at ${x},${y}`)
+    return hit.pos as number
+  }, at)
+}
+
+/**
+ * Focus the editor without moving its selection and let ProseMirror's focus
+ * handler finish: it re-checks the DOM selection from a 20 ms timer, and a
+ * timer registered right after it with the same delay runs after it.
+ */
+async function focusEditor(editor: Page): Promise<void> {
+  await editor.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        const ed = (window as unknown as AidocsWindow).__aidocs!.editor as any
+        if (!ed.view.hasFocus()) ed.view.focus()
+        setTimeout(resolve, 20)
+      }),
+  )
+}
+
 test.describe('docs selection bar and format painter', () => {
   let dir: string
   let docPath: string
@@ -213,13 +239,30 @@ test.describe('docs selection bar and format painter', () => {
       await setBold(editor, 'beta')
       expect(await boldText(editor)).toEqual(['beta'])
       const painter = editor.getByRole('button', { name: /^Format Painter/ })
-      // ProseMirror syncs a pointer-placed caret on a deferred selectionchange;
-      // wait for it so the next chord reads the clicked position
+      // Click a word and wait for the editor to hold the caret AT that word.
+      // Two ProseMirror details make a bare "selection is empty" poll flaky:
+      // - clicking a blurred editor runs the view's focus handler, whose 20 ms
+      //   timer copies the stale state selection back over the DOM selection
+      //   unless the native click's selectionchange was already read, so the
+      //   click is lost (the selection stays 'beta' from setBold, or the
+      //   caret stays on the previous word) on a loaded runner. focusEditor
+      //   takes that focus transition (and its timer) before the click.
+      // - the old poll accepted any collapsed selection, i.e. a stale caret
+      //   too; the wait below is for the exact clicked position instead.
       const clickWord = async (word: string) => {
         const c = await wordCenter(editor, word)
+        await focusEditor(editor)
+        const pos = await hitPos(editor, c)
         await editor.mouse.click(c.x, c.y)
-        await expect.poll(async () => (await selection(editor)).text).toBe('')
-        await editor.waitForTimeout(50)
+        await editor.waitForFunction(
+          (want) => {
+            const ed = (window as unknown as AidocsWindow).__aidocs!.editor as any
+            const s = ed.state.selection
+            return s.empty && s.from === want
+          },
+          pos,
+          { polling: 'raf' },
+        )
       }
 
       // single click: one stroke, on the word (with its trailing space), not the sentence

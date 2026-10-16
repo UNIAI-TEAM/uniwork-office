@@ -2433,7 +2433,7 @@ export function AiPanel({
                     }
                   >
                     <span className="ai-track-dot" aria-hidden />
-                    {t('aiTrackChanges')}
+                    <span className="ai-track-label">{t('aiTrackChanges')}</span>
                   </button>
                   {trackForced && (
                     <span id="ai-track-forced-reason" className="ai-sr-status">
