@@ -373,6 +373,7 @@ describe('uniwork save queue machine', () => {
     for (const lastError of [
       'permission_revoked',
       'document_deleted',
+      'document_archived',
       'member_deactivated',
       'organization_suspended',
       'session_expired',
@@ -409,6 +410,24 @@ describe('uniwork save queue machine', () => {
     ).toBe('committed')
   })
 
+  it('OQ-F12 Q1=b: a commit refused for an archived document parks document_archived, never document_deleted', () => {
+    const archived = transition(
+      record({ state: 'uploading' }),
+      { type: 'commitFailed', error: 'document_archived' },
+      ctx(),
+    )
+    expect(archived.record?.state).toBe('blocked')
+    expect(archived.record?.lastError).toBe('document_archived')
+    // the tombstone keeps its own reason: archiving is reversible, deleting is not
+    expect(
+      transition(archived.record, { type: 'unblock', reason: 'document_deleted' }, ctx()).record,
+    ).toEqual(archived.record)
+    expect(
+      transition(archived.record, { type: 'unblock', reason: 'document_archived' }, ctx()).record
+        ?.state,
+    ).toBe('queued')
+  })
+
   it('unblock lifts exactly the reason the record waits on, back to queued with the SAME intent', () => {
     for (const reason of [
       'session_expired',
@@ -416,6 +435,7 @@ describe('uniwork save queue machine', () => {
       'member_deactivated',
       'organization_suspended',
       'document_deleted',
+      'document_archived',
     ] as const) {
       const out = transition(
         record({ state: 'blocked', lastError: reason, generation: 3, attempt: 2 }),

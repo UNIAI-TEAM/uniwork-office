@@ -779,7 +779,7 @@ describe('G5-06 W4b save queue wiring', () => {
       ])
     })
 
-    it('a 403 document_archived parks the intent as a document_deleted block, never a failure', async () => {
+    it('a 403 document_archived parks the intent as an archived block - never a failure, never deleted', async () => {
       const server = fakeServer({ bytes: enc('v3') })
       const ctx = setup(server)
       const path = await blockedSave(ctx, server, {
@@ -788,8 +788,15 @@ describe('G5-06 W4b save queue wiring', () => {
         code: 'document_archived',
       })
       const blocked = await storedIntent(ctx, path)
-      expect(blocked?.intent).toMatchObject({ state: 'blocked', lastError: 'document_deleted' })
-      // the archive is lifted: the block lifts and the same intent commits
+      // Q1=b: the archive is not the trash - the record and the binding say
+      // archived (the chip is patched asynchronously), and the local copy is
+      // not parked as a deleted document
+      expect(blocked?.intent).toMatchObject({ state: 'blocked', lastError: 'document_archived' })
+      await vi.waitFor(() =>
+        expect(binding(path)).toMatchObject({ state: 'blocked', error: 'document_archived' }),
+      )
+      expect(ctx.service.isReadOnly(path)).toBe(false)
+      // the document is out of the archive: the block lifts and the same intent commits
       await ctx.service.pollSaveQueue()
       await vi.waitFor(async () =>
         expect(await ctx.service.docStatus(path)).toMatchObject({ state: 'saved' }),
@@ -946,6 +953,60 @@ describe('G5-06 W4b save queue wiring', () => {
         ])
       })
 
+      it('the archive is not the trash: a document_deleted block keeps its deleted reason', async () => {
+        const server = fakeServer({ bytes: enc('v3') })
+        const ctx = setup(server)
+        const path = await blockedSave(ctx, server, {
+          route: 'commit',
+          kind: 410,
+          code: 'document_deleted',
+        })
+        expect((await storedIntent(ctx, path))?.intent).toMatchObject({
+          state: 'blocked',
+          lastError: 'document_deleted',
+        })
+        // the deleted block keeps the deleted reason on the chip too (patched
+        // asynchronously by the record's own publish)
+        await vi.waitFor(() =>
+          expect(binding(path)).toMatchObject({ state: 'blocked', error: 'document_deleted' }),
+        )
+      })
+
+      it('an archived block stays archived on a probe that still sees the archive, and lifts on the unarchive', async () => {
+        const server = fakeServer({ bytes: enc('v3') })
+        const ctx = setup(server)
+        const path = await blockedSave(ctx, server, {
+          route: 'commit',
+          kind: 403,
+          code: 'document_archived',
+        })
+        const blocked = await storedIntent(ctx, path)
+        expect(blocked?.intent).toMatchObject({ state: 'blocked', lastError: 'document_archived' })
+        // still in the archive: the click answers the archive, not a deletion -
+        // the read sees the document and keeps the block exactly where it was
+        server.state.archivedAt = '2026-10-01T00:00:00.000Z'
+        const before = { commits: commits(server).length, lookups: lookups(server).length }
+        expect(await ctx.service.recheckBlockedSave(path)).toBe(true)
+        expect((await storedIntent(ctx, path))?.intent).toMatchObject({
+          state: 'blocked',
+          lastError: 'document_archived',
+          attempt: blocked!.intent.attempt,
+        })
+        expect(commits(server)).toHaveLength(before.commits)
+        expect(lookups(server)).toHaveLength(before.lookups)
+        // out of the archive: the click lifts the block and the same intent commits
+        server.state.archivedAt = null
+        expect(await ctx.service.recheckBlockedSave(path)).toBe(true)
+        await vi.waitFor(async () =>
+          expect(await ctx.service.docStatus(path)).toMatchObject({ state: 'saved' }),
+        )
+        expect(await storedIntent(ctx, path)).toBeNull()
+        expect(committedKeys(server)).toEqual([
+          blocked!.intent.idempotencyKey,
+          blocked!.intent.idempotencyKey,
+        ])
+      })
+
       it('refuses a row that is not blocked, so the reconciling lookup path stands', async () => {
         const server = fakeServer({ bytes: enc('v3') })
         const ctx = setup(server)
@@ -959,7 +1020,6 @@ describe('G5-06 W4b save queue wiring', () => {
         expect(await ctx.service.recheckBlockedSave(path)).toBe(false)
         expect((await storedIntent(ctx, path))?.intent.state).toBe('paused_offline')
       })
-
       it("never re-probes another account's blocked row", async () => {
         const server = fakeServer({ bytes: enc('v3') })
         const ctx = setup(server)

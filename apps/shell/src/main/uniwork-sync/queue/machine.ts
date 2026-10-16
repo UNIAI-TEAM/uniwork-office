@@ -137,6 +137,7 @@ export type BlockedReason =
   | 'member_deactivated'
   | 'organization_suspended'
   | 'document_deleted'
+  | 'document_archived'
 
 /** the reason a commit failure parks the intent, by server/client code */
 const BLOCKED_REASONS: Record<string, BlockedReason> = {
@@ -149,6 +150,9 @@ const BLOCKED_REASONS: Record<string, BlockedReason> = {
   organization_suspended: 'organization_suspended',
   document_deleted: 'document_deleted',
   deleted: 'document_deleted',
+  // an archived document is not a deleted one: the write is refused while it
+  // sits in the archive, and putting it back is its own lift
+  document_archived: 'document_archived',
   // a 404 with the UniWork envelope is access this account no longer has
   not_found: 'permission_revoked',
 }

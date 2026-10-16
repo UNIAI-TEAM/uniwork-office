@@ -126,13 +126,16 @@ export function errorFromResponse(
   // never deleted; only a real tombstone ends a document.
   if (serverCode === 'office_capability_off') return new UniworkDocError('capability_off', at)
   if (serverCode === 'commit_intent_unknown') return new UniworkDocError('intent_unknown', at)
-  // a document in the trash - or, once G5-07 splits the refusal out of the
-  // generic 403, in the archive - answers every write refusal with its own
-  // code: the intent is parked `blocked` (document_deleted, which a restore
-  // lifts) instead of ending as a terminal refusal the queue would drop. Both
-  // the code of today's server and the split one are accepted
-  if (serverCode === 'document_deleted' || serverCode === 'document_archived') {
+  // a document in the trash answers every write refusal with its own code: the
+  // intent is parked `blocked` (a restore is what lifts it) instead of ending as
+  // a terminal refusal the queue would drop. A document in the archive is not a
+  // deleted one - the archive is reversible, and telling the user it was deleted
+  // would be a false fact - so it gets its own code and its own block
+  if (serverCode === 'document_deleted') {
     return new UniworkDocError('document_deleted', at)
+  }
+  if (serverCode === 'document_archived') {
+    return new UniworkDocError('document_archived', at)
   }
   if (serverCode === 'forbidden') return new UniworkDocError('permission_revoked', at)
   if (serverCode === 'member_deactivated') return new UniworkDocError('member_deactivated', at)

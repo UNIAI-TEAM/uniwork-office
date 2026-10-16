@@ -174,12 +174,14 @@ export function accountInfoOf(status: AccountStatus): SyncCenterAccountInfo | un
 
 /**
  * A blocked intent's reason in the spine's vocabulary. `explicit` (a fact the
- * caller derived: `document_archived`, `lease_expired`, `foreign_account`, ...)
- * wins; otherwise the queue's `lastError` decides. Only the codes the queue
- * machine files as lost access (`forbidden`, `not_found`, `permission_revoked`)
- * read `permission_revoked`; an absent or unknown error has no reason at all
+ * caller derived: `lease_expired`, `foreign_account`, ...) wins; otherwise the
+ * queue's `lastError` decides. Only the codes the queue machine files as lost
+ * access (`forbidden`, `not_found`, `permission_revoked`) read
+ * `permission_revoked`; an absent or unknown error has no reason at all
  * (undefined), which the row renders read-only ("Kiểm tra lại" only): a cause
- * nobody knows must never offer the destructive "Bỏ nháp…".
+ * nobody knows must never offer the destructive "Bỏ nháp…". A document in the
+ * archive keeps its own reason (`document_archived`), never the deleted one:
+ * archiving is reversible, and the row's way out is the unarchive.
  */
 export function mapBlockedReason(
   error: UniworkDocErrorCode | undefined,
@@ -198,6 +200,8 @@ export function mapBlockedReason(
     case 'document_deleted':
     case 'deleted':
       return 'document_deleted'
+    case 'document_archived':
+      return 'document_archived'
     case 'member_deactivated':
       return 'member_deactivated'
     case 'organization_suspended':
@@ -207,9 +211,6 @@ export function mapBlockedReason(
     case 'store_full':
       return 'store_full'
     default:
-      // the server's archived refusal (G5-08s) is not a `UniworkDocErrorCode` yet; a record
-      // keeps any error string, so it is read here, not by a queue transition
-      if ((error as string | undefined) === 'document_archived') return 'document_archived'
       return undefined
   }
 }

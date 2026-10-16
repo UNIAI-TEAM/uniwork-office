@@ -543,6 +543,22 @@ function refusalVerdict(code: UniworkDocErrorCode | undefined): 'revoked' | 'del
 /** the first wait before a blocked intent's document is re-probed; doubles to recheckMs */
 const BLOCKED_PROBE_BASE_MS = 60_000
 
+/**
+ * The blocked reasons only the document itself can prove: a metadata read is
+ * what answers whether writing is allowed again - and, for a document in the
+ * trash or the archive, whether it is out of there too. The capability reasons
+ * are proved by the intent's own org lane instead, never by a document read.
+ */
+function isDocumentProbeReason(
+  reason: UniworkDocErrorCode | undefined,
+): reason is 'permission_revoked' | 'document_deleted' | 'document_archived' {
+  return (
+    reason === 'permission_revoked' ||
+    reason === 'document_deleted' ||
+    reason === 'document_archived'
+  )
+}
+
 /** no revision of this app's own has been seen for a document yet */
 const NO_ECHO: ReadonlySet<string> = new Set()
 
@@ -1661,15 +1677,16 @@ export class UniworkDocsService {
 
   /**
    * A blocked intent whose condition only the document itself can prove
-   * (`permission_revoked`, `document_deleted`): one bounded metadata re-probe
-   * per intent, spaced by a backoff, so the SAME intent goes back to the queue
-   * once the document answers for writing again. This is the runtime's access
-   * check: a document listed by the feed only proves the account may READ it (a
-   * listed row is not evidence that writing returned), while a document read
-   * reports the level itself - and, for a block earned by an archived/deleted
-   * document, whether the document is still in the trash. The pass only runs
-   * with a live session and store, and an offline verdict keeps every probe
-   * home, so a probe never leaves the account, deployment or org of the intent.
+   * (`permission_revoked`, `document_deleted`, `document_archived`): one bounded
+   * metadata re-probe per intent, spaced by a backoff, so the SAME intent goes
+   * back to the queue once the document answers for writing again. This is the
+   * runtime's access check: a document listed by the feed only proves the
+   * account may READ it (a listed row is not evidence that writing returned),
+   * while a document read reports the level itself - and, for a block earned by
+   * an archived/deleted document, whether the document is still in the
+   * trash/archive. The pass only runs with a live session and store, and an
+   * offline verdict keeps every probe home, so a probe never leaves the account,
+   * deployment or org of the intent.
    */
   private async reprobeBlockedDocs(
     dispatcher: QueueDispatcher,
@@ -1690,7 +1707,7 @@ export class UniworkDocsService {
     }
     for (const doc of docs) {
       const reason = doc.record.state === 'blocked' ? doc.record.lastError : undefined
-      if (reason !== 'permission_revoked' && reason !== 'document_deleted') continue
+      if (!isDocumentProbeReason(reason)) continue
       const due = this.blockedProbeAt.get(doc.key)
       if (due !== undefined && now < due) continue
       // the pass backs off a probe that did not lift; a refusal and a lift are
@@ -1712,11 +1729,12 @@ export class UniworkDocsService {
   /**
    * One blocked intent's document re-probe: a single metadata read, the only
    * answer that proves write access came back. A refused/unreachable read
-   * leaves the block alone, and a deleted/archived block lifts only when the
-   * document is out of the trash too - an archived document keeps refusing the
-   * write, so waking the intent would only earn the same block again. Returns
-   * the state the record was left in, so both callers (the poll's bounded pass
-   * and "Kiểm tra lại") read a refusal and a lift apart.
+   * leaves the block alone, and a block earned by an archived or deleted
+   * document lifts only when the document is out of the trash/archive too - an
+   * archived document keeps refusing the write, so waking the intent would only
+   * earn the same block again. Returns the state the record was left in, so
+   * both callers (the poll's bounded pass and "Kiểm tra lại") read a refusal and
+   * a lift apart.
    */
   private async probeBlockedDoc(
     dispatcher: QueueDispatcher,
@@ -1724,7 +1742,7 @@ export class UniworkDocsService {
     now: number,
   ): Promise<QueueState> {
     const reason = doc.record.lastError
-    if (reason !== 'permission_revoked' && reason !== 'document_deleted') return doc.record.state
+    if (!isDocumentProbeReason(reason)) return doc.record.state
     let flags: { canEdit: boolean; archived: boolean } | null = null
     try {
       const detail = await this.api().getDocument(doc.record.documentId)
@@ -1732,6 +1750,8 @@ export class UniworkDocsService {
     } catch {
       // still refused (403/404/410) or unreachable: the block stays
     }
+    // a document still in the trash or the archive cannot be written: the
+    // block lifts only once the read sees it active and writable again
     const forWriting =
       flags !== null && flags.canEdit && (reason === 'permission_revoked' || !flags.archived)
     if (!forWriting) return doc.record.state
@@ -1823,14 +1843,14 @@ export class UniworkDocsService {
   /**
    * "Kiểm tra lại" on a BLOCKED row: the same access re-probe the poll runs
    * (F1), now and for this one intent instead of at the next backoff. The
-   * document reasons (`permission_revoked`, `document_deleted`) are proven by
-   * the document read; the capability reasons (`session_expired`,
-   * `member_deactivated`, `organization_suspended`) by a real read of the
-   * intent's own org lane, which the normal pass forces for a lane holding one
-   * of them. Only a condition that really lifted moves the record - the commit
-   * lookup, which can wake a blocked intent without proving anything, stays the
-   * reconciling rows' action. `false` = the re-probe could not run at all (no
-   * live session, no store, nothing blocked at this path).
+   * document reasons (`permission_revoked`, `document_deleted`,
+   * `document_archived`) are proven by the document read; the capability reasons
+   * (`session_expired`, `member_deactivated`, `organization_suspended`) by a
+   * real read of the intent's own org lane, which the normal pass forces for a
+   * lane holding one of them. Only a condition that really lifted moves the
+   * record - the commit lookup, which can wake a blocked intent without proving
+   * anything, stays the reconciling rows' action. `false` = the re-probe could
+   * not run at all (no live session, no store, nothing blocked at this path).
    */
   async recheckBlockedSave(path: string): Promise<boolean> {
     const doc = typeof path === 'string' ? this.store.lookup(path) : null
@@ -1841,7 +1861,7 @@ export class UniworkDocsService {
     if (access.kind !== 'ok' || !this.isQueueSessionCurrent(access)) return false
     const now = this.deps.now ? this.deps.now() : Date.now()
     const reason = queueDoc.record.lastError
-    if (reason === 'permission_revoked' || reason === 'document_deleted') {
+    if (isDocumentProbeReason(reason)) {
       // the document itself proves this block: one read, right now
       if ((await this.probeBlockedDoc(access.dispatcher, queueDoc, now)) === 'blocked') return true
     } else if (
