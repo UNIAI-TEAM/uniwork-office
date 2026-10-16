@@ -565,6 +565,16 @@ export function UniworkStatusChip({
     if (!blockLatchRef.current.open) return
     blockLatchRef.current.open = false
     setBlockTick((n) => n + 1)
+    if (popoverRef.current) {
+      const popEl = document.querySelector<HTMLElement>('.uw-queue-pop')
+      const target = popEl?.isConnected
+        ? popEl
+        : buttonRef.current?.isConnected
+          ? buttonRef.current
+          : groupRef.current
+      target?.focus()
+      return
+    }
     window.aiOfficeTabs?.focusActive()
   }, [])
 

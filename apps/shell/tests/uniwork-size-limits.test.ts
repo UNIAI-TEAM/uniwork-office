@@ -1955,6 +1955,85 @@ describe('SIZE-F1 desktop document size limits', () => {
       expect(focusActive).toHaveBeenCalledTimes(3)
     })
 
+    it('returns focus to the open queue popover or pill button instead of the editor when closing the save-block dialog while the popover is open (SIZE-v1-7)', async () => {
+      const saveLocal = vi.fn(async () => true)
+      const focusActive = vi.fn()
+      window.aiOffice = {
+        accountStatus: async () => ({ loggedIn: true, state: 'signed-in' }),
+        onAccountStatus: () => () => undefined,
+        onUniworkQueuePopover: () => () => undefined,
+        uniworkSaveLocalCopy: saveLocal,
+        uniworkSetBarInset: async () => undefined,
+      } as never
+      window.aiOfficeTabs = { focusActive } as never
+
+      const base: UniworkDocStatus = {
+        path: '/tmp/Report.docx',
+        documentId: DOC_ID,
+        workspaceId: WS_ID,
+        title: 'Report.docx',
+        format: 'docx',
+        access: 'edit',
+        state: 'failed',
+        error: 'too_large',
+        sizeBytes: 220_000_000,
+        maxBytes: 209_715_200,
+      }
+
+      // 1. Mount failed pill and open the queue popover via the pill's "Chi tiết" button
+      await render(createElement(UniworkStatusChip, { status: base, onStatus: () => undefined }))
+      const pillBtn = buttonWith('Chi tiết')
+      await act(async () => {
+        pillBtn.click()
+      })
+      const pop = document.querySelector<HTMLElement>('.uw-queue-pop')
+      expect(pop).not.toBeNull()
+      expect(document.activeElement).toBe(pop)
+
+      // 2. Over-cap prompt arrives (seq 1) while the queue popover is open: dialog takes focus
+      await render(
+        createElement(UniworkStatusChip, {
+          status: { ...base, saveTooLargePrompt: true, saveTooLargePromptSeq: 1 },
+          onStatus: () => undefined,
+        }),
+      )
+      expect(container.querySelector('.uw-save-block-modal')).not.toBeNull()
+      expect(document.activeElement).toBe(buttonWith('Lưu bản sao về máy'))
+
+      // 3. First Escape closes the save-block dialog and returns focus to the open popover (NOT the editor)
+      await act(async () => {
+        container
+          .querySelector('.uw-save-block-modal')!
+          .dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+      })
+      expect(container.querySelector('.uw-save-block-modal')).toBeNull()
+      expect(document.querySelector('.uw-queue-pop')).not.toBeNull()
+      expect(focusActive).not.toHaveBeenCalled()
+      expect(document.activeElement).toBe(document.querySelector('.uw-queue-pop'))
+
+      // 4. Re-open save-block dialog (seq 2) while popover is still open, then click "Đóng"
+      await render(
+        createElement(UniworkStatusChip, {
+          status: { ...base, saveTooLargePrompt: true, saveTooLargePromptSeq: 2 },
+          onStatus: () => undefined,
+        }),
+      )
+      await act(async () => {
+        buttonWith('Đóng').click()
+      })
+      expect(container.querySelector('.uw-save-block-modal')).toBeNull()
+      expect(document.querySelector('.uw-queue-pop')).not.toBeNull()
+      expect(focusActive).not.toHaveBeenCalled()
+      expect(document.activeElement).toBe(document.querySelector('.uw-queue-pop'))
+
+      // 5. Second Escape now closes the queue popover and returns focus to the pill's "Chi tiết" button
+      await act(async () => {
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+      })
+      expect(document.querySelector('.uw-queue-pop')).toBeNull()
+      expect(document.activeElement).toBe(pillBtn)
+    })
+
     it('gives the size-warn chip dismiss button a distinct aria-label and announces the warning via the live host (d2-11)', async () => {
       window.aiOffice = {
         accountStatus: async () => ({ loggedIn: true, state: 'signed-in' }),
