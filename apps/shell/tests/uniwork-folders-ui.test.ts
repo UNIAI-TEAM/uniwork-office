@@ -1,6 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
@@ -855,5 +857,123 @@ describe('UniworkBrowser: folder actions (S3)', () => {
     )
     await click(picker.querySelector('.btn-primary'))
     expect($('.uw-act-toast')?.textContent).toBeTruthy()
+  })
+
+  it('V1-2, V1-2b: picker disabled-reason (.uwf-reason) and search path (.uwf-path) use semantic tokens with >= 4.5:1 contrast in light and dark', () => {
+    const foldersCss = readFileSync(
+      join(__dirname, '../src/renderer/src/uniwork-folders/uniwork-folders.css'),
+      'utf8',
+    )
+    const tokensCss = readFileSync(join(__dirname, '../../../packages/ui/src/tokens.css'), 'utf8')
+    const homeCss = readFileSync(join(__dirname, '../src/renderer/src/home.css'), 'utf8')
+    const rule = (css: string, sel: string) =>
+      css.match(new RegExp(`${sel.replace(/[.]/g, '\\.')}\\s*\\{([^}]*)\\}`))?.[1] ?? ''
+
+    expect(rule(foldersCss, '.uwf-reason')).toMatch(/color:\s*var\(--text-secondary\)/)
+    expect(rule(foldersCss, '.uwf-path')).toMatch(/color:\s*var\(--text-secondary\)/)
+
+    const tokenValue = (block: string, name: string) =>
+      block.match(new RegExp(`${name}:\\s*(#[0-9a-fA-F]{3,6})`))?.[1] ?? ''
+    const expandHex = (h: string) =>
+      h.length === 4 ? `#${h[1]}${h[1]}${h[2]}${h[2]}${h[3]}${h[3]}` : h
+    const lum = (hex: string) => {
+      const full = expandHex(hex)
+      const [r, g, b] = [1, 3, 5].map((i) => parseInt(full.slice(i, i + 2), 16) / 255)
+      const f = (c: number) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4))
+      return 0.2126 * f(r!) + 0.7152 * f(g!) + 0.0722 * f(b!)
+    }
+    const ratio = (fg: string, bg: string) => {
+      const l1 = lum(fg)
+      const l2 = lum(bg)
+      return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05)
+    }
+
+    const lightTokens = tokensCss.slice(
+      tokensCss.indexOf('\n:root {'),
+      tokensCss.indexOf("\n[data-theme='dark']"),
+    )
+    const darkTokens = tokensCss.slice(
+      tokensCss.indexOf("\n[data-theme='dark']"),
+      tokensCss.indexOf('\n@media (prefers-color-scheme: dark)'),
+    )
+    const lightHome = homeCss.slice(
+      homeCss.indexOf('\n:root {'),
+      homeCss.indexOf("\n[data-theme='dark']"),
+    )
+    const darkHome = homeCss.slice(
+      homeCss.indexOf("\n[data-theme='dark']"),
+      homeCss.indexOf('\n@media (prefers-color-scheme: dark)'),
+    )
+
+    // Light theme: --text-secondary on --accent-soft (selected row), --hover (active search row), --surface
+    const lightFg = tokenValue(lightTokens, '--text-secondary')
+    expect(ratio(lightFg, tokenValue(lightHome, '--accent-soft'))).toBeGreaterThanOrEqual(4.5)
+    expect(ratio(lightFg, tokenValue(lightTokens, '--hover'))).toBeGreaterThanOrEqual(4.5)
+    expect(ratio(lightFg, tokenValue(lightTokens, '--surface'))).toBeGreaterThanOrEqual(4.5)
+
+    // Dark theme: --text-secondary on --accent-soft (selected row), --hover (active search row), --surface
+    const darkFg = tokenValue(darkTokens, '--text-secondary')
+    expect(ratio(darkFg, tokenValue(darkHome, '--accent-soft'))).toBeGreaterThanOrEqual(4.5)
+    expect(ratio(darkFg, tokenValue(darkTokens, '--hover'))).toBeGreaterThanOrEqual(4.5)
+    expect(ratio(darkFg, tokenValue(darkTokens, '--surface'))).toBeGreaterThanOrEqual(4.5)
+  })
+
+  it('V1-3: own create-folder expands the parent tree row (open folder and row-menu target alike), while web-side tree-changed does not force-expand', async () => {
+    tree = [folder('a', 'Alpha'), folder('b', 'Beta')]
+    await render()
+    // 1. Web-side change adds a child under collapsed Beta -> Beta stays collapsed
+    tree = [folder('a', 'Alpha'), folder('b', 'Beta', [folder('b1', 'WebChild')])]
+    await act(async () => api.pushTreeChanged({ workspaceId: 'w1' }))
+    await flush()
+    expect(treeItem('Beta').getAttribute('aria-expanded')).toBe('false')
+    expect(treeItem('WebChild')).toBeUndefined()
+
+    // 2. Open Alpha (currently a leaf, not in expanded set) and create a folder via header "New folder"
+    await click(treeItem('Alpha'))
+    api.uniworkCreateFolder.mockImplementationOnce(
+      async (i: { parentId: string | null; title: string }) => {
+        tree = [
+          folder('a', 'Alpha', [folder('a-new', i.title)]),
+          folder('b', 'Beta', [folder('b1', 'WebChild')]),
+        ]
+        children.a = [asFolder('a-new', i.title, 'a'), ...children.a!]
+        return ok(asFolder('a-new', i.title, i.parentId))
+      },
+    )
+    await click($('.uwf-new-folder'))
+    await type($<HTMLInputElement>('.modal.uw-act input')!, 'Q4 Specs')
+    await click($('.modal.uw-act button[type="submit"]'))
+    expect(treeItem('Alpha').getAttribute('aria-expanded')).toBe('true')
+    expect(treeItem('Q4 Specs')).toBeTruthy()
+    // Beta (untouched by own create) is still collapsed
+    expect(treeItem('Beta').getAttribute('aria-expanded')).toBe('false')
+
+    // 3. Tree row menu "New subfolder" on collapsed Beta -> expands Beta so the new subfolder is visible
+    await key(treeItem('Beta'), 'F10', { shiftKey: true })
+    await click($('[data-folder-action="new"]'))
+    api.uniworkCreateFolder.mockImplementationOnce(
+      async (i: { parentId: string | null; title: string }) => {
+        tree = [
+          folder('a', 'Alpha', [folder('a-new', 'Q4 Specs')]),
+          folder('b', 'Beta', [folder('b1', 'WebChild'), folder('b-sub', i.title)]),
+        ]
+        return ok(asFolder('b-sub', i.title, i.parentId))
+      },
+    )
+    await type($<HTMLInputElement>('.modal.uw-act input')!, 'Sub One')
+    await click($('.modal.uw-act button[type="submit"]'))
+    expect(treeItem('Beta').getAttribute('aria-expanded')).toBe('true')
+    expect(treeItem('Sub One')).toBeTruthy()
+  })
+
+  it('V1-5: prevents text selection on folder contents rows and empty state after double-clicking into an empty folder', () => {
+    const foldersCss = readFileSync(
+      join(__dirname, '../src/renderer/src/uniwork-folders/uniwork-folders.css'),
+      'utf8',
+    )
+    const rule = (sel: string) =>
+      foldersCss.match(new RegExp(`${sel.replace(/[.]/g, '\\.')}\\s*\\{([^}]*)\\}`))?.[1] ?? ''
+    expect(rule('.uwf-row')).toMatch(/user-select:\s*none/)
+    expect(rule('.uwf-list .uw-pick-state')).toMatch(/user-select:\s*none/)
   })
 })

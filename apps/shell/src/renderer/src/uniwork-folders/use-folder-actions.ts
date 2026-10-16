@@ -28,11 +28,14 @@ export interface MoveRequest extends MovingItem {
 export function useFolderActions({
   workspaceId,
   onChanged,
+  onCreated,
   notify,
 }: {
   workspaceId: string
   /** re-read tree + open folder after an own action */
   onChanged: () => void
+  /** expand the parent folder row after an own create-folder succeeds (V1-3) */
+  onCreated?: (parentId: string | null) => void
   /** show a toast (`ok` = done note, `error` = refusal) */
   notify: (message: string, tone: 'ok' | 'error') => void
 }) {
@@ -64,6 +67,7 @@ export function useFolderActions({
       return { ok: false, field }
     }
     setNameDialog(null)
+    onCreated?.(parentId)
     announce(t('ufFolderCreated', { name: result.value.title || name }))
     onChanged()
     return { ok: true }

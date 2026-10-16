@@ -17,6 +17,7 @@ import {
   buildFolderIndex,
   createRequestGate,
   expandKeysFor,
+  expandParentAndAncestorsFor,
   folderPath,
   liveFallback,
   type FolderIndex,
@@ -355,6 +356,12 @@ export function useFolderBrowser(workspaceId: string, initialFolderId: string | 
     }
   }, [workspaceId, refresh])
 
+  const expandParent = useCallback((parentId: string | null) => {
+    setExpanded(
+      (prev) => new Set([...prev, ...expandParentAndAncestorsFor(indexRef.current, parentId)]),
+    )
+  }, [])
+
   return {
     tree,
     index,
@@ -365,6 +372,7 @@ export function useFolderBrowser(workspaceId: string, initialFolderId: string | 
     results,
     expanded,
     setExpanded,
+    expandParent,
     gone,
     dismissGone: () => setGone(false),
     openFolder,

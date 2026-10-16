@@ -82,6 +82,13 @@ export function expandKeysFor(index: FolderIndex, id: string | null): string[] {
   ]
 }
 
+/** the tree keys to expand so a child inside `parentId` (null = root) is visible */
+export function expandParentAndAncestorsFor(index: FolderIndex, parentId: string | null): string[] {
+  if (parentId === null) return [ROOT_KEY]
+  const path = folderPath(index, parentId)
+  return path.length > 0 ? [ROOT_KEY, ...path.map((p) => p.id)] : [ROOT_KEY, parentId]
+}
+
 // ── Tree rows ───────────────────────────────────────────
 
 export interface TreeRow {

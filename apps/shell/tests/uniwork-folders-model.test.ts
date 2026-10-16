@@ -9,6 +9,7 @@ import {
   contentsView,
   createRequestGate,
   expandKeysFor,
+  expandParentAndAncestorsFor,
   folderActionFailure,
   folderPath,
   liveFallback,
@@ -88,6 +89,14 @@ describe('folder index and paths', () => {
     const index = buildFolderIndex(TREE)
     expect(expandKeysFor(index, 'a1x')).toEqual([ROOT_KEY, 'a', 'a1'])
     expect(expandKeysFor(index, null)).toEqual([ROOT_KEY])
+  })
+
+  it('V1-3: expands a parent folder and all its ancestors so a newly created child under it is visible', () => {
+    const index = buildFolderIndex(TREE)
+    expect(expandParentAndAncestorsFor(index, 'a1')).toEqual([ROOT_KEY, 'a', 'a1'])
+    expect(expandParentAndAncestorsFor(index, 'a')).toEqual([ROOT_KEY, 'a'])
+    expect(expandParentAndAncestorsFor(index, null)).toEqual([ROOT_KEY])
+    expect(expandParentAndAncestorsFor(index, 'unknown')).toEqual([ROOT_KEY, 'unknown'])
   })
 })
 

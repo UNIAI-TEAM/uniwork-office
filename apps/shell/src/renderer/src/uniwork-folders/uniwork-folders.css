@@ -174,7 +174,7 @@
 }
 
 .uwf-reason {
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: 12px;
   font-weight: 400;
 }
@@ -283,6 +283,11 @@
 
 .uwf-row {
   min-height: 32px;
+  user-select: none;
+}
+
+.uwf-list .uw-pick-state {
+  user-select: none;
 }
 
 .uwf-row-icon {
@@ -296,6 +301,7 @@
 
 .uwf-path {
   overflow: hidden;
+  color: var(--text-secondary);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -455,6 +461,10 @@
 .uwf-location-btn[aria-disabled='true'] {
   color: var(--text-muted);
   cursor: default;
+}
+
+.uwf-location-btn > svg {
+  flex: 0 0 auto;
 }
 
 .uwf-location-path {

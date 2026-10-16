@@ -90,6 +90,7 @@ export function UniworkBrowser({
   const actions = useFolderActions({
     workspaceId,
     onChanged: browser.refresh,
+    onCreated: browser.expandParent,
     notify: (message, tone) => setToast({ message, tone }),
   })
   const query = (hostQuery ?? ownDraft).trim()
