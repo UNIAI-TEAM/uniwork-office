@@ -563,6 +563,9 @@ export function AiPanel({
   const [trackChanges, setTrackChanges] = useState(
     () => localStorage.getItem(TRACK_CHANGES_KEY) === '1',
   )
+  // the forced Track pill's reason tip opens on hover or keyboard focus of the pill
+  const [trackTipHover, setTrackTipHover] = useState(false)
+  const [trackTipFocus, setTrackTipFocus] = useState(false)
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null)
   const [attachments, setAttachments] = useState<AttachmentMeta[]>([])
   const [attachNotice, setAttachNotice] = useState<string | null>(null)
@@ -2413,17 +2416,31 @@ export function AiPanel({
                 <img src={attachIcon} alt="" aria-hidden />
               </button>
               {!readOnly && (
-                // under tracked-changes protection the pill is on and fixed; the wrapper carries
-                // the reason tip because a disabled button gets no pointer events
+                // under tracked-changes protection the pill is on and locked: aria-disabled (not
+                // disabled) keeps it in the Tab order, and the reason is an in-panel tip that opens on
+                // hover and on keyboard focus (the global ScreenTip overflowed the panel)
                 <span
                   className={`ai-track-wrap${trackForced ? ' forced' : ''}`}
-                  data-tip={trackForced ? t('aiTrackForced') : undefined}
+                  onMouseEnter={trackForced ? () => setTrackTipHover(true) : undefined}
+                  onMouseLeave={trackForced ? () => setTrackTipHover(false) : undefined}
                 >
                   <button
-                    className={`ai-track-btn${trackShown ? ' on' : ''}`}
+                    className={`ai-track-btn${trackShown ? ' on' : ''}${trackForced ? ' locked' : ''}`}
                     onClick={toggleTrackChanges}
-                    disabled={trackForced}
+                    aria-disabled={trackForced ? true : undefined}
                     aria-describedby={trackForced ? 'ai-track-forced-reason' : undefined}
+                    onFocus={trackForced ? () => setTrackTipFocus(true) : undefined}
+                    onBlur={trackForced ? () => setTrackTipFocus(false) : undefined}
+                    onKeyDown={
+                      trackForced
+                        ? (e) => {
+                            if (e.key === 'Escape') {
+                              setTrackTipFocus(false)
+                              setTrackTipHover(false)
+                            }
+                          }
+                        : undefined
+                    }
                     data-tip={
                       trackForced
                         ? undefined
@@ -2432,11 +2449,29 @@ export function AiPanel({
                           : t('aiTrackOffTitle')
                     }
                   >
-                    <span className="ai-track-dot" aria-hidden />
+                    {trackForced ? (
+                      <svg
+                        className="ai-track-lock"
+                        width="10"
+                        height="10"
+                        viewBox="0 0 16 16"
+                        fill="currentColor"
+                        aria-hidden
+                      >
+                        <path d="M4 7V5a4 4 0 1 1 8 0v2h.5A1.5 1.5 0 0 1 14 8.5v5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 13.5v-5A1.5 1.5 0 0 1 3.5 7H4Zm1.5 0h5V5a2.5 2.5 0 0 0-5 0v2Z" />
+                      </svg>
+                    ) : (
+                      <span className="ai-track-dot" aria-hidden />
+                    )}
                     <span className="ai-track-label">{t('aiTrackChanges')}</span>
                   </button>
                   {trackForced && (
-                    <span id="ai-track-forced-reason" className="ai-sr-status">
+                    <span
+                      id="ai-track-forced-reason"
+                      className="ai-track-tip"
+                      role="tooltip"
+                      data-open={trackTipHover || trackTipFocus ? 'true' : 'false'}
+                    >
                       {t('aiTrackForced')}
                     </span>
                   )}
