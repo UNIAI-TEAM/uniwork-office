@@ -12,7 +12,6 @@ import type {
   UniworkDocAccess,
   UniworkDocActionError,
   UniworkDocActionResult,
-  UniworkDocFolderRef,
   UniworkDocErrorCode,
   UniworkDocFormat,
   UniworkDocListPage,
@@ -3293,14 +3292,6 @@ export class UniworkDocsService {
   }
 
   // ---- S18: create, rename, archive ------------------------------------------
-
-  /** the folders of one workspace, for the "Location" field of create/upload */
-  listFolders(workspaceId: string): Promise<UniworkResult<UniworkDocFolderRef[]>> {
-    return result(async () => {
-      if (typeof workspaceId !== 'string' || !workspaceId) throw new UniworkDocError('not_found')
-      return this.api().listFolders(workspaceId)
-    })
-  }
 
   /** FD-11: the workspace's whole folder tree, for the browser and the picker */
   folderTree(workspaceId: string): Promise<UniworkResult<UniworkFolderNode[]>> {

@@ -55,7 +55,6 @@ import type {
   UniworkCreateFolderInput,
   UniworkDocActionResult,
   UniworkDocErrorCode,
-  UniworkDocFolderRef,
   UniworkDocListPage,
   UniworkDocLock,
   UniworkDocProperties,
@@ -1161,11 +1160,6 @@ const homeApi: HomeApi = {
   async uniworkRestoreDocument(documentId: string) {
     return asUniworkActionResult<UniworkDocSummary>(
       await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.restoreDocument, documentId),
-    )
-  },
-  async uniworkListFolders(workspaceId: string) {
-    return asUniworkResult<UniworkDocFolderRef[]>(
-      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.listFolders, workspaceId),
     )
   },
   async uniworkFolderTree(workspaceId: string) {

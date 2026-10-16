@@ -414,13 +414,6 @@ export interface UniworkUploadDocInput {
   uploadId: string
 }
 
-/** one folder the "Location" field of the create/upload dialog offers */
-export interface UniworkDocFolderRef {
-  id: string
-  /** the folder's title (D `DocumentSummaryDTO.title`) */
-  title: string
-}
-
 /** upload progress: bytes sent of the total (0 when the total is not known yet) */
 export interface UniworkUploadProgress {
   /** the upload this event belongs to (the dialog's own `uploadId`) */
@@ -1055,8 +1048,6 @@ export interface HomeApi {
   uniworkArchiveDocument(documentId: string): Promise<UniworkDocActionResult<UniworkDocSummary>>
   /** S18: restore an archived document */
   uniworkRestoreDocument(documentId: string): Promise<UniworkDocActionResult<UniworkDocSummary>>
-  /** the folders of one workspace, for the create/upload "Location" field */
-  uniworkListFolders(workspaceId: string): Promise<UniworkResult<UniworkDocFolderRef[]>>
   /**
    * FD-11: the workspace's whole folder tree (`folders_only=true`), root nodes
    * first, to the server's depth 20.
@@ -1662,8 +1653,6 @@ export const UNIWORK_DOC_CHANNELS = {
   archiveDocument: 'uniwork-doc:archive-document',
   /** invoke(documentId) -> restore an archived document (S18) */
   restoreDocument: 'uniwork-doc:restore-document',
-  /** invoke(workspaceId) -> the workspace's folders (S18 location field) */
-  listFolders: 'uniwork-doc:list-folders',
   /** invoke(workspaceId) -> the workspace's folder tree, root nodes first (FD-11) */
   folderTree: 'uniwork-doc:folder-tree',
   /** invoke(q) -> one folder's contents: folders + files + pages (FD-11) */

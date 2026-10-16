@@ -107,7 +107,6 @@ describe('the S18 action IPC', () => {
       UNIWORK_DOC_CHANNELS.renameDocument,
       UNIWORK_DOC_CHANNELS.archiveDocument,
       UNIWORK_DOC_CHANNELS.restoreDocument,
-      UNIWORK_DOC_CHANNELS.listFolders,
     ]) {
       expect(handlers.has(channel)).toBe(true)
     }

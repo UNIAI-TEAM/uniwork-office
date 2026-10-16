@@ -832,12 +832,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   ipcMain.handle(UNIWORK_DOC_CHANNELS.restoreDocument, (_event, documentId: unknown) =>
     service.restoreDocument(documentId as string),
   )
-  ipcMain.handle(UNIWORK_DOC_CHANNELS.listFolders, (_event, workspaceId: unknown) =>
-    service.listFolders(workspaceId as string),
-  )
-  // FD-11: the folder-tree surface. `listFolders` above stays for compatibility
-  // until the renderer stops calling it (the FE worker removes that last caller
-  // and the flat route goes with it).
+  // FD-11: the folder-tree surface
   ipcMain.handle(UNIWORK_DOC_CHANNELS.folderTree, (_event, workspaceId: unknown) =>
     service.folderTree(workspaceId as string),
   )
