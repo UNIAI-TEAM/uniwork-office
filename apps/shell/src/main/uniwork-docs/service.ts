@@ -8,6 +8,7 @@ import type {
   SignOutProgress,
   UniworkConflictChoice,
   UniworkCreateDocInput,
+  UniworkCreateFolderInput,
   UniworkDocAccess,
   UniworkDocActionError,
   UniworkDocActionResult,
@@ -21,12 +22,19 @@ import type {
   UniworkDocRenamedEvent,
   UniworkDocSummary,
   UniworkDocStatus,
+  UniworkFolderChildren,
+  UniworkFolderNode,
+  UniworkFolderQuery,
   UniworkLaunchEvent,
   UniworkLockReason,
+  UniworkMoveDocumentInput,
+  UniworkMoveResult,
   UniworkQueuePopoverRequest,
   UniworkRemoteAction,
   UniworkRemoteBar,
   UniworkResult,
+  UniworkSearchPage,
+  UniworkSearchQuery,
   UniworkSharedPage,
   UniworkSharedQuery,
   UniworkUploadDocInput,
@@ -73,7 +81,7 @@ import { pathKey } from '../../shared/path-key'
 import { LaunchController } from './launch'
 import { tUniworkDocs } from './strings'
 import type { CommentsContextResult } from '@genoffice/electron-utils/comments-ipc'
-import { actionFlags, type DocumentDetail, type LaunchDescriptor } from './parse'
+import { actionFlags, type DocumentDetail, type DocumentRef, type LaunchDescriptor } from './parse'
 import {
   QUEUE_LIMITS,
   SaveCoordinator,
@@ -425,6 +433,13 @@ async function result<T>(run: () => Promise<T>): Promise<UniworkResult<T>> {
 const MAX_DOC_NAME_RUNES = 500
 
 /**
+ * FD-11: the longest FOLDER name D accepts. Folders are the only entries whose
+ * names must be unique among their siblings, and D caps them tighter than a
+ * document (255 runes).
+ */
+const MAX_FOLDER_NAME_RUNES = 255
+
+/**
  * D stages at most 50 MiB per upload part (`files/registry.go`), so a bigger
  * file is refused before it is read: main must not buffer a multi-GB pick only
  * to be told too_large. Exactly 50 MiB is still sent.
@@ -452,14 +467,17 @@ function cancelledUpload(): UniworkDocError {
 }
 
 /**
- * a trimmed document name of 1..500 runes; the empty and the too-long cases are
- * S18's field errors, not requests. A duplicate name is allowed (FD-D10 a), so
- * there is no uniqueness check here.
+ * a trimmed, NFC-normalized name of 1..`max` runes (the server trims and
+ * normalizes the same way, so the string the field shows is the one the server
+ * stored). `max` defaults to the widest document cap; FD-11 passes the folder
+ * cap for a folder. The empty and the too-long cases are field errors, not
+ * requests. A duplicate name is allowed for documents (FD-D10 a), so there is
+ * no uniqueness check here; only a folder collides, and the server says so.
  */
-function requireName(raw: string): string {
-  const name = typeof raw === 'string' ? raw.trim() : ''
+function requireName(raw: string, max = MAX_DOC_NAME_RUNES): string {
+  const name = typeof raw === 'string' ? raw.trim().normalize('NFC') : ''
   if (!name) throw new UniworkDocError('name_empty' as UniworkDocErrorCode)
-  if (Array.from(name).length > MAX_DOC_NAME_RUNES) {
+  if (Array.from(name).length > max) {
     throw new UniworkDocError('name_too_long' as UniworkDocErrorCode)
   }
   return name
@@ -481,7 +499,11 @@ async function actionResult<T>(
   try {
     return { ok: true, value: await run() }
   } catch (error) {
-    return { ok: false, error: actionErrorOf(error, options.nameField === true) }
+    const code = actionErrorOf(error, options.nameField === true)
+    // FD-11: a `document_too_deep` refusal names the server's own depth cap, so
+    // the renderer can show it instead of a hardcoded number
+    const max = error instanceof UniworkDocError ? error.maxDepth : undefined
+    return max === undefined ? { ok: false, error: code } : { ok: false, error: code, max }
   }
 }
 
@@ -3099,6 +3121,94 @@ export class UniworkDocsService {
     })
   }
 
+  /** FD-11: the workspace's whole folder tree, for the browser and the picker */
+  folderTree(workspaceId: string): Promise<UniworkResult<UniworkFolderNode[]>> {
+    return result(async () => {
+      if (typeof workspaceId !== 'string' || !workspaceId) throw new UniworkDocError('not_found')
+      return this.api().folderTree(workspaceId)
+    })
+  }
+
+  /**
+   * FD-11: one folder's contents (folders + files + pages, in the server's own
+   * order); `parentId: null` is the workspace root.
+   */
+  listChildren(q: UniworkFolderQuery): Promise<UniworkResult<UniworkFolderChildren>> {
+    return result(async () => {
+      if (!q || typeof q.workspaceId !== 'string' || !q.workspaceId) {
+        throw new UniworkDocError('not_found')
+      }
+      return this.api().listChildren({
+        workspaceId: q.workspaceId,
+        parentId: typeof q.parentId === 'string' && q.parentId ? q.parentId : null,
+        ...(typeof q.cursor === 'string' ? { cursor: q.cursor } : {}),
+        ...(typeof q.limit === 'number' ? { limit: q.limit } : {}),
+      })
+    })
+  }
+
+  /** FD-11: title search across a workspace; every hit carries its own path */
+  searchDocuments(q: UniworkSearchQuery): Promise<UniworkResult<UniworkSearchPage>> {
+    return result(async () => {
+      if (!q || typeof q.workspaceId !== 'string' || !q.workspaceId) {
+        throw new UniworkDocError('not_found')
+      }
+      return this.api().searchDocuments({
+        workspaceId: q.workspaceId,
+        query: typeof q.query === 'string' ? q.query : '',
+        kind: q.kind === 'folder' || q.kind === 'document' ? q.kind : 'all',
+        ...(typeof q.cursor === 'string' ? { cursor: q.cursor } : {}),
+        ...(typeof q.limit === 'number' ? { limit: q.limit } : {}),
+      })
+    })
+  }
+
+  /**
+   * FD-11: create one folder. The name follows the folder rule (trim + NFC,
+   * 1..255 runes, both field errors); a name already taken among its siblings
+   * is the server's 409 `folder_name_taken`, which the renderer also shows at
+   * the field - only folders collide.
+   */
+  createFolder(
+    input: UniworkCreateFolderInput,
+  ): Promise<UniworkDocActionResult<UniworkDocSummary>> {
+    return actionResult(
+      async () => {
+        if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+        const workspaceId = typeof input.workspaceId === 'string' ? input.workspaceId : ''
+        if (!workspaceId) throw new UniworkDocError('not_found')
+        const title = requireName(input.title, MAX_FOLDER_NAME_RUNES)
+        return this.api().createFolder({
+          workspaceId,
+          parentId: typeof input.parentId === 'string' && input.parentId ? input.parentId : null,
+          title,
+          idempotencyKey: this.newIdempotencyKey(),
+        })
+      },
+      { nameField: true },
+    )
+  }
+
+  /**
+   * FD-11: move a document or folder under another folder (null = the root).
+   * The client reads the current revision and retries the move once if the head
+   * moved in between; `renamedTo` carries the title the server gave the entry
+   * when a name collision made it rename itself ("Name (2)").
+   */
+  moveDocument(
+    input: UniworkMoveDocumentInput,
+  ): Promise<UniworkDocActionResult<UniworkMoveResult>> {
+    return actionResult(async () => {
+      if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+      const documentId = typeof input.documentId === 'string' ? input.documentId : ''
+      if (!documentId) throw new UniworkDocError('not_found')
+      return this.api().moveDocument({
+        documentId,
+        parentId: typeof input.parentId === 'string' && input.parentId ? input.parentId : null,
+      })
+    })
+  }
+
   /**
    * Create a blank document (docx/xlsx/pptx) in a workspace/folder. The name is
    * validated before any call (empty -> `name_empty`, over 500 runes ->
@@ -3230,13 +3340,18 @@ export class UniworkDocsService {
       async () => {
         if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
         if (typeof documentId !== 'string' || !documentId) throw new UniworkDocError('not_found')
-        const title = requireName(name)
-        const detail = await this.api().getDocument(documentId)
-        if (detail.myLevel !== 'edit' && detail.myLevel !== 'manage') {
+        // the empty name and the widest cap are refused without a request; the
+        // folder's own, tighter cap needs the document's kind, which the read
+        // below answers (FD-11)
+        const nameAtDocumentCap = requireName(name)
+        const ref = await this.api().documentRef(documentId)
+        const title =
+          ref.kind === 'folder' ? requireName(name, MAX_FOLDER_NAME_RUNES) : nameAtDocumentCap
+        if (ref.myLevel !== 'edit' && ref.myLevel !== 'manage') {
           throw new UniworkDocError('forbidden')
         }
-        if (title === detail.title) return this.summaryOf(detail)
-        const renamed = await this.api().rename({ documentId, revision: detail.revision, title })
+        if (title === ref.title) return this.summaryOf(ref)
+        const renamed = await this.api().rename({ documentId, revision: ref.revision, title })
         // this service's own rename: only the revision it produced is its echo,
         // so a genuine later change for another revision is still followed (R1-6)
         this.selfRenamed.set(documentId, renamed.revision)
@@ -3286,21 +3401,21 @@ export class UniworkDocsService {
 
   /**
    * The summary a rename/create answer already carries, without a second read.
-   * The flags come from the detail the call was gated on (a no-op rename of an
+   * The flags come from the ref the call was gated on (a no-op rename of an
    * archived manage-level document must not report `canManage:false,
-   * archived:false`), and the format from the file block first (R1-2).
+   * archived:false`), and the format from the row's own file block first
+   * (R1-2); FD-11 adds the entry's kind and where it sits.
    */
-  private summaryOf(detail: DocumentDetail): UniworkDocSummary {
+  private summaryOf(ref: DocumentRef): UniworkDocSummary {
     return {
-      id: detail.id,
-      workspaceId: detail.workspaceId,
-      title: detail.title,
-      format:
-        formatForMime(detail.file.mimeType) ??
-        formatForName(detail.file.filename) ??
-        formatForName(detail.title),
+      id: ref.id,
+      workspaceId: ref.workspaceId,
+      title: ref.title,
+      format: ref.format,
       updatedAt: '',
-      ...actionFlags(detail.myLevel, detail.archivedAt),
+      ...actionFlags(ref.myLevel, ref.archivedAt),
+      kind: ref.kind,
+      parentId: ref.parentId,
     }
   }
 

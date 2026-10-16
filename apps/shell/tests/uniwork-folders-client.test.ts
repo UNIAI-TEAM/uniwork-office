@@ -398,7 +398,7 @@ describe('moving a document', () => {
     })
   })
 
-  it('gives up after one retry', async () => {
+  it('gives up after one retry, and never retries a refusal that is not a conflict', async () => {
     let moves = 0
     const alwaysConflicting = vi.fn<FetchLike>(async (_url, init) => {
       if (init.method === 'GET') return json(200, ref())
@@ -409,5 +409,59 @@ describe('moving a document', () => {
       await codeOf(client(alwaysConflicting).moveDocument({ documentId: DOC, parentId: null })),
     ).toBe('conflict')
     expect(moves).toBe(2)
+
+    let refused = 0
+    const cycle = vi.fn<FetchLike>(async (_url, init) => {
+      if (init.method === 'GET') return json(200, ref({ kind: 'folder' }))
+      refused += 1
+      return envelope(422, 'document_cycle')
+    })
+    expect(await codeOf(client(cycle).moveDocument({ documentId: DOC, parentId: 'fold_1' }))).toBe(
+      'document_cycle',
+    )
+    expect(refused).toBe(1)
+  })
+})
+
+// FD-11: the four refusals the folder tree added. Each keeps its own code - a
+// 409/422 used to fall through to server_error, which the renderer can only
+// show as a generic failure.
+describe('the folder refusals', () => {
+  it('maps every code to itself, never server_error', async () => {
+    const cases: Array<[number, string, string]> = [
+      [409, 'folder_name_taken', 'folder_name_taken'],
+      [422, 'document_cycle', 'document_cycle'],
+      [422, 'document_parent_kind', 'document_parent_kind'],
+    ]
+    for (const [status, serverCode, expected] of cases) {
+      const api = client(async () => envelope(status, serverCode))
+      expect(
+        await codeOf(
+          api.createFolder({ workspaceId: WS, parentId: null, title: 'x', idempotencyKey: 'k' }),
+        ),
+      ).toBe(expected)
+    }
+  })
+
+  it('carries the depth cap of a too-deep tree, from a number or a string, else 20', async () => {
+    const depthOf = async (fields?: Record<string, unknown>): Promise<unknown> => {
+      const api = client(async () =>
+        json(422, {
+          error: { code: 'document_too_deep', message: 'x', ...(fields ? { fields } : {}) },
+        }),
+      )
+      try {
+        await api.createFolder({ workspaceId: WS, parentId: null, title: 'x', idempotencyKey: 'k' })
+        return 'resolved'
+      } catch (error) {
+        return error instanceof UniworkDocError ? error.maxDepth : `other:${String(error)}`
+      }
+    }
+    expect(await depthOf({ max: 7 })).toBe(7)
+    expect(await depthOf({ max: '12' })).toBe(12)
+    // a malformed or absent cap is never guessed from: the server's own default
+    expect(await depthOf({ max: 0 })).toBe(20)
+    expect(await depthOf({ max: 'many' })).toBe(20)
+    expect(await depthOf()).toBe(20)
   })
 })

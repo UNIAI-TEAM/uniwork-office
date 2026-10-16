@@ -15,6 +15,11 @@ export class UniworkDocError extends Error {
   readonly currentRevision?: string
   /** a `Retry-After` the server sent (ms), honoured by the queue's backoff */
   readonly retryAfterMs?: number
+  /**
+   * FD-11: the depth cap a `document_too_deep` answer carries (the envelope's
+   * `max`, else the server's own default), so the renderer can name it.
+   */
+  readonly maxDepth?: number
 
   constructor(
     code: UniworkDocErrorCode,
@@ -23,6 +28,7 @@ export class UniworkDocError extends Error {
       status?: number
       currentRevision?: string
       retryAfterMs?: number
+      maxDepth?: number
     } = {},
   ) {
     super(`uniwork document request failed: ${code}`)
@@ -32,7 +38,26 @@ export class UniworkDocError extends Error {
     this.status = extra.status
     this.currentRevision = extra.currentRevision
     this.retryAfterMs = extra.retryAfterMs
+    this.maxDepth = extra.maxDepth
   }
+}
+
+/** FD-11: how deep D lets the document tree go (its own documented cap) */
+export const DEFAULT_TREE_MAX_DEPTH = 20
+
+/**
+ * FD-11: the depth cap of a `document_too_deep` envelope - its `max` (a number
+ * or a decimal string) when the server named one, else D's own default. A
+ * malformed value is never guessed from.
+ */
+function maxDepthOf(envelope: { fields?: Record<string, unknown> } | null): number {
+  const fields = envelope?.fields ?? {}
+  for (const key of ['max', 'max_depth']) {
+    const value = fields[key]
+    if (typeof value === 'number' && Number.isSafeInteger(value) && value > 0) return value
+    if (typeof value === 'string' && /^\d+$/.test(value) && Number(value) > 0) return Number(value)
+  }
+  return DEFAULT_TREE_MAX_DEPTH
 }
 
 /**
@@ -120,6 +145,20 @@ export function errorFromResponse(
   if (serverCode === 'idempotency_in_flight') return new UniworkDocError('network', retried)
   if (serverCode === 'quota_exceeded') return new UniworkDocError('quota_exceeded', at)
   if (serverCode === 'engine_incompatible') return new UniworkDocError('engine_incompatible', at)
+  // FD-11: the folder tree's own refusals, each its own code - a 409/422 that
+  // fell through to `server_error` before. `folder_name_taken` is a name
+  // field error (only folders collide), and `document_too_deep` carries the
+  // server's depth cap.
+  if (serverCode === 'folder_name_taken') {
+    return new UniworkDocError('folder_name_taken' as UniworkDocErrorCode, at)
+  }
+  if (serverCode === 'document_too_deep') {
+    return new UniworkDocError('document_too_deep', { ...at, maxDepth: maxDepthOf(envelope) })
+  }
+  if (serverCode === 'document_cycle') return new UniworkDocError('document_cycle', at)
+  if (serverCode === 'document_parent_kind') {
+    return new UniworkDocError('document_parent_kind', at)
+  }
   // G5-06 (UNI-1352): the server's own verdicts, kept apart from the generic
   // forbidden/deleted a caller would otherwise act on. A capability kill
   // switch is a pause, not a permission denial; a swept intent is unknown,

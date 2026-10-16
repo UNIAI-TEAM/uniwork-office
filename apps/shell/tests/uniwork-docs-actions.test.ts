@@ -113,11 +113,21 @@ function fakeServer(
     uploadGate?: () => Promise<void>
     /** the "Location" field's folder pages, served in cursor order (R1-8) */
     folderPages?: Array<Array<{ id: string; title: string }>>
+    /** FD-11: the kind the document rows answer with (a folder has no file block in spirit) */
+    kind?: 'file' | 'folder' | 'page'
+    /** FD-11: D's 409 `folder_name_taken` on create/rename of a folder */
+    folderNameTaken?: boolean
+    /**
+     * FD-11: D's 422 `document_too_deep` on a folder create; a number/string is
+     * the envelope's `max`, null omits it (the app then uses the server default)
+     */
+    deepMax?: number | string | null
   } = {},
 ) {
   const state = {
     id: DOC,
     title: options.title ?? 'Q4 plan.docx',
+    kind: options.kind ?? 'file',
     myLevel: options.myLevel ?? 'manage',
     bytes: options.bytes ?? enc('v1 bytes'),
     archived: false,
@@ -133,7 +143,7 @@ function fakeServer(
     organization_id: 'org_a',
     workspace_id: WS,
     title: id === DOC ? state.title : (state.documents.get(id)?.title ?? 'new.docx'),
-    kind: 'file',
+    kind: state.kind,
     revision: String(state.revision),
     current_version: 1,
     ...(options.omitMyLevel ? {} : { my_level: state.myLevel }),
@@ -233,6 +243,35 @@ function fakeServer(
     }
     // folders
     if (u.pathname === `/api/v1/workspaces/${WS}/documents`) {
+      // FD-11: create one folder (or refuse it with the server's own code)
+      if (call.method === 'POST') {
+        const body = JSON.parse(String(init.body)) as {
+          kind?: string
+          title?: string
+          parent_id?: string
+        }
+        call.body = body
+        if (options.folderNameTaken) return envelope(409, 'folder_name_taken')
+        if (options.deepMax !== undefined) {
+          return json(422, {
+            error: {
+              code: 'document_too_deep',
+              message: 'x',
+              ...(options.deepMax === null ? {} : { fields: { max: options.deepMax } }),
+            },
+          })
+        }
+        const id = `fold_${++seq}`
+        state.documents.set(id, { title: body.title ?? 'folder', bytes: enc('') })
+        return json(201, {
+          document: {
+            ...docJson(id),
+            kind: 'folder',
+            title: body.title ?? 'folder',
+            parent_id: body.parent_id ?? null,
+          },
+        })
+      }
       if (options.folderPages) {
         // cursor `n` names page n; the page before the last one carries the next
         const page = Number(u.searchParams.get('cursor') ?? '0')
@@ -752,6 +791,75 @@ describe('folders', () => {
       server.calls.filter((c) => c.path === `/api/v1/workspaces/${WS}/documents`),
     ).toHaveLength(10)
   })
+
+  // FD-11: a folder is created with the folder kind, in the chosen folder, and
+  // follows the folder name rule (trim + NFC, 1..255 runes - tighter than the
+  // 500 a document name gets)
+  it('creates a folder in a folder with the folder name rule', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const created = await ctx.service.createFolder({
+      workspaceId: WS,
+      parentId: 'fold_1',
+      title: '  Contracts  ',
+    })
+    expect(created).toMatchObject({
+      ok: true,
+      value: { title: 'Contracts', kind: 'folder', parentId: 'fold_1' },
+    })
+    const post = server.calls.find(
+      (c) => c.method === 'POST' && c.path === `/api/v1/workspaces/${WS}/documents`,
+    )!
+    expect(post.body).toEqual({ kind: 'folder', title: 'Contracts', parent_id: 'fold_1' })
+    expect(post.idempotencyKey).toBeTruthy()
+  })
+
+  it('refuses an empty folder name and one over 255 runes before any request, and normalizes NFC', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    expect(
+      await ctx.service.createFolder({ workspaceId: WS, parentId: null, title: '  ' }),
+    ).toEqual({ ok: false, error: 'name_empty' })
+    expect(
+      await ctx.service.createFolder({ workspaceId: WS, parentId: null, title: 'a'.repeat(256) }),
+    ).toEqual({ ok: false, error: 'name_too_long' })
+    expect(server.calls).toHaveLength(0)
+    // 255 decomposed `é` (e + a combining accent) are 255 runes once normalized
+    const decomposed = 'e\u0301'.repeat(255)
+    expect(
+      await ctx.service.createFolder({ workspaceId: WS, parentId: null, title: decomposed }),
+    ).toMatchObject({ ok: true })
+    const post = server.calls.find((c) => c.method === 'POST')!
+    expect((post.body as { title: string }).title).toBe('é'.repeat(255))
+  })
+
+  // FD-11: only folders collide on a name, so the server's 409 stays a field
+  // error the renderer shows under the name (never a generic server_error)
+  it('answers a taken folder name as a field error', async () => {
+    const server = fakeServer({ folderNameTaken: true })
+    const ctx = setup(server)
+    expect(
+      await ctx.service.createFolder({ workspaceId: WS, parentId: 'fold_1', title: 'Contracts' }),
+    ).toEqual({ ok: false, error: 'folder_name_taken' })
+  })
+
+  // FD-11: the tree's depth cap rides the failure, so the renderer can name it
+  it("carries the server's depth cap on a too-deep refusal, else the default 20", async () => {
+    const named = setup(fakeServer({ deepMax: 7 }))
+    expect(
+      await named.service.createFolder({ workspaceId: WS, parentId: 'fold_1', title: 'Deep' }),
+    ).toEqual({ ok: false, error: 'document_too_deep', max: 7 })
+
+    const unnamed = setup(fakeServer({ deepMax: null }))
+    expect(
+      await unnamed.service.createFolder({ workspaceId: WS, parentId: 'fold_1', title: 'Deep' }),
+    ).toEqual({ ok: false, error: 'document_too_deep', max: 20 })
+
+    const asText = setup(fakeServer({ deepMax: '12' }))
+    expect(
+      await asText.service.createFolder({ workspaceId: WS, parentId: 'fold_1', title: 'Deep' }),
+    ).toEqual({ ok: false, error: 'document_too_deep', max: 12 })
+  })
 })
 
 describe('rename, archive and restore', () => {
@@ -807,6 +915,27 @@ describe('rename, archive and restore', () => {
     const ctx = setup(server)
     const result = await ctx.service.renameDocument(DOC, 'Other.docx')
     expect(result).toEqual({ ok: false, error: 'name_too_long' })
+  })
+
+  // FD-11: a folder's name cap is 255 runes, a page/file's 500. The tighter cap
+  // needs the document's own kind, so the read happens before the refusal.
+  it('caps a folder rename at 255 runes and leaves the 500 cap for a file', async () => {
+    const folderServer = fakeServer({ kind: 'folder' })
+    const folder = setup(folderServer)
+    expect(await folder.service.renameDocument(DOC, 'a'.repeat(256))).toEqual({
+      ok: false,
+      error: 'name_too_long',
+    })
+    expect(folderServer.calls.filter((c) => c.method === 'PATCH')).toHaveLength(0)
+    expect(folderServer.calls.filter((c) => c.method === 'GET')).toHaveLength(1)
+
+    const fileServer = fakeServer()
+    const file = setup(fileServer)
+    const long = `${'a'.repeat(252)}.docx`
+    expect(await file.service.renameDocument(DOC, long)).toMatchObject({ ok: true })
+    expect(fileServer.calls.find((c) => c.method === 'PATCH')!.body).toMatchObject({
+      title: long,
+    })
   })
 
   it('treats a server 409 on rename as an ordinary failure, not a name error', async () => {
