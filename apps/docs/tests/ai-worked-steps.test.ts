@@ -21,8 +21,8 @@ describe('Worked · N steps (docs)', () => {
   })
 
   it('Vietnamese has one form', () => {
-    expect(label('vi', 1)).toBe('Đã thực hiện · 1 bước')
-    expect(label('vi', 4)).toBe('Đã thực hiện · 4 bước')
+    expect(label('vi', 1)).toBe('Đã xử lý · 1 bước')
+    expect(label('vi', 4)).toBe('Đã xử lý · 4 bước')
   })
 
   it('languages with a singular use it for one step', () => {
