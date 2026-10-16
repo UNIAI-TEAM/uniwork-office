@@ -261,8 +261,9 @@ export class SaveCoordinator {
   private readonly warnedDocs = new Set<string>()
   /** Active warn-band payload for the currently executing save of `path`. */
   private readonly activeSizeWarns = new Map<string, { sizeBytes: number; maxBytes: number }>()
-  /** Paths whose current save just exceeded `maxBytes` and should trigger the save-block prompt. */
-  private readonly activeTooLargePrompt = new Set<string>()
+  /** Paths whose current save just exceeded `maxBytes` and the monotonic sequence id of that prompt. */
+  private readonly activeTooLargePrompt = new Map<string, number>()
+  private tooLargePromptSeq = 0
   private readonly now: () => Date
   private readonly uuid: () => string
   private readonly sleep: (ms: number) => Promise<void>
@@ -534,7 +535,8 @@ export class SaveCoordinator {
       }
       this.pendingNext.delete(doc.path)
       this.activeSizeWarns.delete(doc.path)
-      this.activeTooLargePrompt.add(doc.path)
+      this.tooLargePromptSeq += 1
+      this.activeTooLargePrompt.set(doc.path, this.tooLargePromptSeq)
       let failedDoc: BoundDocument
       try {
         failedDoc = await this.commitState(doc, {
@@ -1146,7 +1148,11 @@ export class SaveCoordinator {
     const status = toStatus(doc, this.pendingNext.has(doc.path))
     const sizeWarn = this.activeSizeWarns.get(doc.path)
     if (sizeWarn) status.sizeWarn = sizeWarn
-    if (this.activeTooLargePrompt.has(doc.path)) status.saveTooLargePrompt = true
+    const promptSeq = this.activeTooLargePrompt.get(doc.path)
+    if (promptSeq !== undefined) {
+      status.saveTooLargePrompt = true
+      status.saveTooLargePromptSeq = promptSeq
+    }
     this.deps.publish(status)
   }
 

@@ -494,16 +494,71 @@ ${action ? t(action.labelKey) : ''}`,
     shortLabel !== label,
   )
   const [warnDismissedFor, setWarnDismissedFor] = useState<string | null>(null)
-  const [blockDismissed, setBlockDismissed] = useState(false)
+  const [, setBlockTick] = useState(0)
+  const blockLatchRef = useRef<{
+    path: string
+    open: boolean
+    lastToken: string | null
+    wasPrompting: boolean
+    maxBytes?: number
+  }>({
+    path: '',
+    open: false,
+    lastToken: null,
+    wasPrompting: false,
+  })
   const [savingLocal, setSavingLocal] = useState(false)
   const blockTitleId = useId()
   const blockBodyId = useId()
 
-  // a new status carrying the prompt re-opens the dialog: the dismissal is per
-  // prompt, so a second over-cap save of the same document is shown again
-  useEffect(() => {
-    if (status.saveTooLargePrompt) setBlockDismissed(false)
-  }, [status])
+  // Latch the save-block dialog in the renderer (SIZE-fe-d2-2): open on the
+  // rising edge of a new prompt (keyed by monotonic saveTooLargePromptSeq, or
+  // size/rising-edge when seq is absent), keep open across status publishes
+  // that omit the one-shot flag, and close only on Close, a successful local
+  // copy, a document switch, or a later `saved` state.
+  const currentPath = pathKey(status.path)
+  const hasPrompt = Boolean(status.saveTooLargePrompt)
+  const hasExplicitSeq = typeof status.saveTooLargePromptSeq === 'number'
+  const promptToken = hasPrompt
+    ? `${currentPath}#${
+        hasExplicitSeq
+          ? `seq:${status.saveTooLargePromptSeq}`
+          : `size:${status.sizeBytes ?? 0}:${status.maxBytes ?? 0}`
+      }`
+    : null
+  if (blockLatchRef.current.path !== currentPath) {
+    blockLatchRef.current = {
+      path: currentPath,
+      open: false,
+      lastToken: null,
+      wasPrompting: false,
+      maxBytes: undefined,
+    }
+  }
+  if (status.state === 'saved') {
+    blockLatchRef.current.open = false
+    blockLatchRef.current.lastToken = null
+    blockLatchRef.current.wasPrompting = false
+  } else if (promptToken !== null) {
+    if (promptToken !== blockLatchRef.current.lastToken) {
+      blockLatchRef.current.lastToken = promptToken
+      blockLatchRef.current.open = true
+    }
+    blockLatchRef.current.wasPrompting = true
+  } else {
+    if (blockLatchRef.current.wasPrompting && blockLatchRef.current.lastToken?.includes('#size:')) {
+      blockLatchRef.current.lastToken = null
+    }
+    blockLatchRef.current.wasPrompting = false
+  }
+  if (maxBytes !== undefined) {
+    blockLatchRef.current.maxBytes = maxBytes
+  }
+  const closeSaveBlock = useCallback(() => {
+    if (!blockLatchRef.current.open) return
+    blockLatchRef.current.open = false
+    setBlockTick((n) => n + 1)
+  }, [])
 
   useEffect(() => {
     if (!status.sizeWarn && status.state === 'saved') {
@@ -511,11 +566,13 @@ ${action ? t(action.labelKey) : ''}`,
     }
   }, [status.path, status.sizeWarn, status.state])
 
-  const warnKey = status.sizeWarn ? `${pathKey(status.path)}:${status.sizeWarn.maxBytes}` : null
+  const warnKey = status.sizeWarn ? `${currentPath}:${status.sizeWarn.maxBytes}` : null
   const showSizeWarn = Boolean(status.sizeWarn && warnKey && warnDismissedFor !== warnKey)
   const sizeWarnText = showSizeWarn ? sizeWarnTextOf(status.sizeWarn, t, dateLocale) : null
-  const showSaveBlock = Boolean(status.saveTooLargePrompt && !blockDismissed)
-  const saveBlockCopy = showSaveBlock ? saveBlockCopyOf(maxBytes, t, dateLocale) : null
+  const showSaveBlock = blockLatchRef.current.open
+  const saveBlockCopy = showSaveBlock
+    ? saveBlockCopyOf(blockLatchRef.current.maxBytes, t, dateLocale)
+    : null
   const blockBandRef = useRef<HTMLDivElement>(null)
   const barPx = useTopInsetPart('bar')
   const popoverPx = useTopInsetPart('popover')
@@ -850,16 +907,12 @@ ${action ? t(action.labelKey) : ''}`,
             labelledBy={blockTitleId}
             describedBy={blockBodyId}
             className="uw-save-block-modal"
-            onCancel={() => setBlockDismissed(true)}
+            onCancel={closeSaveBlock}
           >
             <h3 id={blockTitleId}>{saveBlockCopy.title}</h3>
             <p id={blockBodyId}>{saveBlockCopy.body}</p>
             <div className="modal-buttons">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => setBlockDismissed(true)}
-              >
+              <button type="button" className="btn btn-secondary" onClick={closeSaveBlock}>
                 {saveBlockCopy.close}
               </button>
               <button
@@ -872,7 +925,7 @@ ${action ? t(action.labelKey) : ''}`,
                   setSavingLocal(true)
                   void saveLocalCopy(status.path)
                     .then((saved) => {
-                      if (saved) setBlockDismissed(true)
+                      if (saved) closeSaveBlock()
                     })
                     .catch(() => undefined)
                     .finally(() => setSavingLocal(false))
