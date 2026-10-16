@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import {
   discardPendingOwnedAssetNames,
   readOwnedAssetManifest,
+  renameOwnedAssetDocument,
   restoreOwnedAssetFiles,
   writeImageIntoOwnedAssets,
 } from '../src/main/asset-lifecycle'
@@ -100,6 +101,22 @@ describe('restoring the pictures of a redone AI run', () => {
     expect(existsSync(join(dir, 'assets', 'pic.png'))).toBe(false)
   })
 
+  it('still restores after a same-folder rename between the undo and the redo', async () => {
+    const dir = await tempDir()
+    const doc = join(dir, 'note.md')
+    const renamed = join(dir, 'note renamed.md')
+    await writeImageIntoOwnedAssets(doc, 'pic.png', Buffer.from('bytes-1'))
+    await discardPendingOwnedAssetNames(doc, ['pic.png'])
+    await renameOwnedAssetDocument(doc, renamed)
+
+    const result = await restoreOwnedAssetFiles(renamed, [
+      { name: 'pic.png', base64: b64('bytes-1') },
+    ])
+
+    expect(result).toEqual({ restored: ['pic.png'], errors: [] })
+    expect(existsSync(join(dir, 'assets', 'pic.png'))).toBe(true)
+  })
+
   it('refuses a file type an AI run cannot have saved, even when the name was discarded', async () => {
     const dir = await tempDir()
     const doc = join(dir, 'note.md')
@@ -137,7 +154,9 @@ describe('restoring the pictures of a redone AI run', () => {
     // the file vanishes outside the app; the manifest still owns the name with the old bytes
     await rm(asset)
 
-    const result = await restoreOwnedAssetFiles(doc, [{ name: 'pic.png', base64: b64('different') }])
+    const result = await restoreOwnedAssetFiles(doc, [
+      { name: 'pic.png', base64: b64('different') },
+    ])
 
     expect(result.restored).toEqual([])
     expect(result.errors).toHaveLength(1)
