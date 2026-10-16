@@ -12,9 +12,13 @@ import {
   type SignOutPromptRequest,
   type UniworkConflictAction,
   type UniworkCreateDocInput,
+  type UniworkCreateFolderInput,
   type UniworkDocListQuery,
   type UniworkDocLock,
+  type UniworkFolderQuery,
+  type UniworkMoveDocumentInput,
   type UniworkRemoteAction,
+  type UniworkSearchQuery,
   type UniworkUploadDocInput,
   type UniworkSharedQuery,
 } from '../../shared/home-api'
@@ -828,17 +832,24 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   ipcMain.handle(UNIWORK_DOC_CHANNELS.listFolders, (_event, workspaceId: unknown) =>
     service.listFolders(workspaceId as string),
   )
-  // FD-11: the folder-tree surface exists from this commit on so the renderer
-  // can be built against it in parallel. The client/service calls behind these
-  // channels land in the next commits; until then each answers a plain failure
-  // instead of leaving the channel unhandled (which would reject the invoke).
-  const folderTreePending = () =>
-    Promise.resolve({ ok: false as const, error: 'server_error' as const })
-  ipcMain.handle(UNIWORK_DOC_CHANNELS.folderTree, folderTreePending)
-  ipcMain.handle(UNIWORK_DOC_CHANNELS.listChildren, folderTreePending)
-  ipcMain.handle(UNIWORK_DOC_CHANNELS.searchDocuments, folderTreePending)
-  ipcMain.handle(UNIWORK_DOC_CHANNELS.createFolder, folderTreePending)
-  ipcMain.handle(UNIWORK_DOC_CHANNELS.moveDocument, folderTreePending)
+  // FD-11: the folder-tree surface. `listFolders` above stays for compatibility
+  // until the renderer stops calling it (the FE worker removes that last caller
+  // and the flat route goes with it).
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.folderTree, (_event, workspaceId: unknown) =>
+    service.folderTree(workspaceId as string),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.listChildren, (_event, q: unknown) =>
+    service.listChildren((q ?? {}) as UniworkFolderQuery),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.searchDocuments, (_event, q: unknown) =>
+    service.searchDocuments((q ?? {}) as UniworkSearchQuery),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.createFolder, (_event, input: unknown) =>
+    service.createFolder((input ?? {}) as UniworkCreateFolderInput),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.moveDocument, (_event, input: unknown) =>
+    service.moveDocument((input ?? {}) as UniworkMoveDocumentInput),
+  )
   ipcMain.handle(UNIWORK_DOC_CHANNELS.openDocument, (_event, documentId: unknown) =>
     service.openDocument(documentId as string),
   )

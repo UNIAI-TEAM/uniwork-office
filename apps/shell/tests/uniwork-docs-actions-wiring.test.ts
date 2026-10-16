@@ -31,7 +31,9 @@ vi.mock('electron', () => ({
 }))
 
 vi.mock('../src/main/uniwork-auth', () => ({
-  authorizedRequest: vi.fn(),
+  // the real module runs the caller's request with the live token; a call that
+  // reaches the network here must see the same
+  authorizedRequest: <T>(call: (token: string) => Promise<T>) => call('tok'),
   setUniworkSignOutHooks: vi.fn(),
   onUniworkAccountStatus: () => () => undefined,
   uniworkAccount: () => ({
@@ -56,7 +58,14 @@ afterEach(() => rmSync(dir, { recursive: true, force: true }))
 async function setup() {
   const { createUniworkDocs } = await import('../src/main/uniwork-docs/wiring')
   const handlers = new Map<string, (event: unknown, ...args: unknown[]) => unknown>()
-  const wc = { isDestroyed: () => false, isLoadingMainFrame: () => false, send: () => undefined }
+  const sent: Array<{ channel: string; payload: unknown }> = []
+  const wc = {
+    isDestroyed: () => false,
+    isLoadingMainFrame: () => false,
+    send: (channel: string, payload: unknown) => {
+      sent.push({ channel, payload })
+    },
+  }
   const notifyPathRenamed = vi.fn()
   const handle = createUniworkDocs(
     {
@@ -84,7 +93,7 @@ async function setup() {
       notifyPathRenamed,
     },
   )
-  return { handle, handlers, notifyPathRenamed }
+  return { handle, handlers, notifyPathRenamed, sent }
 }
 
 describe('the S18 action IPC', () => {
@@ -142,5 +151,81 @@ describe('the S18 action IPC', () => {
         format: 'docx',
       }),
     ).toEqual({ ok: false, error: 'not_signed_in' })
+  })
+
+  it('registers the FD-11 folder channels and answers them from the service', async () => {
+    const { handlers } = await setup()
+    for (const channel of [
+      UNIWORK_DOC_CHANNELS.folderTree,
+      UNIWORK_DOC_CHANNELS.listChildren,
+      UNIWORK_DOC_CHANNELS.searchDocuments,
+      UNIWORK_DOC_CHANNELS.createFolder,
+      UNIWORK_DOC_CHANNELS.moveDocument,
+    ]) {
+      expect(handlers.has(channel)).toBe(true)
+    }
+    // the tree-changed notice is a push, never an invoke handler
+    expect(handlers.has(UNIWORK_DOC_CHANNELS.treeChanged)).toBe(false)
+
+    // a malformed input still answers a result instead of throwing across IPC
+    expect(await handlers.get(UNIWORK_DOC_CHANNELS.folderTree)!(null, 7)).toEqual({
+      ok: false,
+      error: 'not_found',
+    })
+    expect(
+      await handlers.get(UNIWORK_DOC_CHANNELS.createFolder)!(null, {
+        workspaceId: 'ws_1',
+        parentId: null,
+        title: '  ',
+      }),
+    ).toEqual({ ok: false, error: 'name_empty' })
+  })
+
+  it('pushes the tree-changed event once an own folder action landed', async () => {
+    const { handlers, sent } = await setup()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init: RequestInit) => {
+        if (String(url).endsWith('/workspaces/ws_1/documents') && init.method === 'POST') {
+          return new Response(
+            JSON.stringify({
+              document: {
+                id: 'fold_9',
+                kind: 'folder',
+                workspace_id: 'ws_1',
+                title: 'Contracts',
+                revision: '1',
+                updated_at: '2026-10-16T09:00:00Z',
+                my_level: 'manage',
+              },
+            }),
+            { status: 201, headers: { 'Content-Type': 'application/json' } },
+          )
+        }
+        return new Response('{}', { status: 404 })
+      }),
+    )
+    try {
+      const created = await handlers.get(UNIWORK_DOC_CHANNELS.createFolder)!(null, {
+        workspaceId: 'ws_1',
+        parentId: null,
+        title: 'Contracts',
+      })
+      expect(created).toMatchObject({ ok: true, value: { id: 'fold_9', kind: 'folder' } })
+
+      // the push is coalesced, so it arrives a window after the action
+      await vi.waitFor(() =>
+        expect(sent.some((message) => message.channel === UNIWORK_DOC_CHANNELS.treeChanged)).toBe(
+          true,
+        ),
+      )
+      const treeChanged = sent.filter(
+        (message) => message.channel === UNIWORK_DOC_CHANNELS.treeChanged,
+      )
+      expect(treeChanged).toHaveLength(1)
+      expect(treeChanged[0]!.payload).toEqual({ workspaceId: 'ws_1' })
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 })
