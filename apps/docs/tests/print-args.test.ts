@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  htmlExportPath,
   pdfExportPath,
   printScaleOption,
   validPrintDim,
@@ -61,5 +62,21 @@ describe('pdfExportPath', () => {
     expect(pdfExportPath('/tmp/report')).toBe('/tmp/report.pdf')
     expect(pdfExportPath('/tmp/report.v2')).toBe('/tmp/report.v2.pdf')
     expect(pdfExportPath('/tmp/report.docx.bak')).toBe('/tmp/report.docx.bak.pdf')
+  })
+})
+
+describe('htmlExportPath', () => {
+  it('keeps the picked .html/.htm name (no .pdf suffix)', () => {
+    expect(htmlExportPath('/tmp/report.html')).toBe('/tmp/report.html')
+    expect(htmlExportPath('C:\\out\\Untitled.HTML')).toBe('C:\\out\\Untitled.HTML')
+    expect(htmlExportPath('/tmp/report.htm')).toBe('/tmp/report.htm')
+  })
+
+  it('swaps a typed .docx for .html and appends to anything else', () => {
+    expect(htmlExportPath('/tmp/report.docx')).toBe('/tmp/report.html')
+    expect(htmlExportPath('/tmp/report.DOCX')).toBe('/tmp/report.html')
+    expect(htmlExportPath('/tmp/report')).toBe('/tmp/report.html')
+    expect(htmlExportPath('/tmp/report.v2')).toBe('/tmp/report.v2.html')
+    expect(htmlExportPath('/tmp/report.pdf')).toBe('/tmp/report.pdf.html')
   })
 })
