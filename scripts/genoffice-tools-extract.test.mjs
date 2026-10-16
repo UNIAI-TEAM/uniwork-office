@@ -2504,4 +2504,31 @@ describe('parameterised recursive arrow (G6-09d)', () => {
     assert.match(rowHash('bad_branch'), /^unresolved:operator/)
     assert.equal(offeredTool('bad_branch'), undefined)
   })
+
+  it('does not treat a data object with __arrowFn: true as an arrow descriptor or crash on call (RBD9-2)', () => {
+    const { dir, sha } = fixture({
+      'packages/agent-core/src/types.ts': AGENT_TOOL_DEF_FIXTURE,
+      'apps/docs/src/renderer/ai/tools.ts': [
+        "import type { AgentToolDef } from '@genoffice/agent-core'",
+        '',
+        'export const TOOLS: AgentToolDef[] = [',
+        "  { name: 'called_sentinel', description: 'x', inputSchema: ({ __arrowFn: true })(5) },",
+        "  { name: 'value_sentinel', description: 'x', inputSchema: { type: 'object', __arrowFn: true } },",
+        ']',
+        '',
+      ].join('\n'),
+    })
+    const res = extract({ repo: dir, rev: sha })
+    const file = build(dir, sha)
+    const rowHash = (name) => res.rows.find((r) => r.tool === name).hash
+    const entry = (name) => file.catalogue.find((e) => e.module === 'docs' && e.name === name)
+
+    assert.equal(rowHash('called_sentinel'), 'unresolved:call:unknown')
+    assert.equal(entry('called_sentinel').schemaComplete, false)
+    assert.equal(entry('called_sentinel').offered, false)
+
+    assert.equal(rowHash('value_sentinel'), hashOf({ type: 'object', __arrowFn: true }))
+    assert.equal(entry('value_sentinel').schemaComplete, true)
+    assert.equal(entry('value_sentinel').offered, true)
+  })
 })
