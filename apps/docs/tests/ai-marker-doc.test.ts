@@ -4,7 +4,12 @@
 // The "any marker?" read is memoised per document so an idle panel render does not walk it.
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Editor } from '@tiptap/core'
-import { docHasAiMarks, sameDocIgnoringAiMarks } from '../src/renderer/editor/ai-marker'
+import {
+  carryAiMarks,
+  docHasAiMarks,
+  sameDocIgnoringAiMarks,
+} from '../src/renderer/editor/ai-marker'
+import type { PmNode } from '../src/renderer/editor/convert'
 import { createDocsEditor } from './helpers/docs-ai-run-harness'
 
 let editor: Editor | null = null
@@ -57,5 +62,45 @@ describe('docHasAiMarks', () => {
     expect(docHasAiMarks(doc)).toBe(true)
     expect(docHasAiMarks(doc)).toBe(true)
     expect(walk).toHaveBeenCalledTimes(1)
+  })
+})
+
+// G6-09 visual r1 F2: an autosave whose reload differs from the live doc (the written file gives
+// every block a fresh docxIndex anchor) rewrites the editor from the reloaded file. The marker is
+// not in the file, so the rewrite carries it over from the live doc: only a user Save or Accept
+// clears it.
+describe('carryAiMarks', () => {
+  /** the reloaded document as the save builds it: the same texts, anchors from the written file */
+  const reloaded = (texts: string[], firstIndex = 100): PmNode => ({
+    type: 'doc',
+    content: texts.map((text, i) => ({
+      type: 'docParagraph',
+      attrs: { docxIndex: firstIndex + i, aiChanged: false },
+      content: [{ type: 'text', text }],
+    })),
+  })
+  const marked = (doc: PmNode) =>
+    (doc.content ?? []).flatMap((n, i) => (n.attrs?.aiChanged ? [i] : []))
+
+  it('same blocks with new anchors: the marked blocks stay marked', () => {
+    editor = createDocsEditor(['one', 'two', 'three'])
+    mark(editor, [1, 2])
+    const next = carryAiMarks(editor.state.doc, reloaded(['one', 'two', 'three']))
+    expect(marked(next)).toEqual([1, 2])
+    // the anchors are the reloaded file's
+    expect(next.content?.[1]?.attrs?.docxIndex).toBe(101)
+  })
+
+  it('a reload with another block count: the marker follows the block text', () => {
+    editor = createDocsEditor(['one', 'two', 'three'])
+    mark(editor, [2])
+    const next = carryAiMarks(editor.state.doc, reloaded(['one', 'inserted', 'two', 'three']))
+    expect(marked(next)).toEqual([3])
+  })
+
+  it('no marker on the live doc: the reloaded doc is returned as it is', () => {
+    editor = createDocsEditor(['one', 'two'])
+    const doc = reloaded(['one', 'two'])
+    expect(carryAiMarks(editor.state.doc, doc)).toBe(doc)
   })
 })
