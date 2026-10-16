@@ -1192,14 +1192,16 @@ export async function discardPendingOwnedAssets(documentPath: string): Promise<R
  * The user rolled back an AI run: drop the pending files that run saved, by name. Only names that
  * are still pending for this document go; a file the user inserted or one already saved with the
  * document is not in `names` or no longer pending, so it stays. Anything that is not a plain file
- * name is ignored.
+ * name is ignored — including a leading-dot name, which `restoreOwnedAssetFiles` refuses, so a
+ * name a redo could never put back is never deleted by that same run's own roll back.
  */
 export async function discardPendingOwnedAssetNames(
   documentPath: string,
   names: readonly string[],
 ): Promise<ReconcileResult> {
   const plain = names.filter(
-    (name) => name !== '' && name === basename(name) && !name.includes('\0'),
+    (name) =>
+      name !== '' && name === basename(name) && !name.includes('\0') && !name.startsWith('.'),
   )
   if (plain.length === 0) return { deleted: [], preserved: [], errors: [] }
   return resolvePendingOwnedAssets(documentPath, plain)
