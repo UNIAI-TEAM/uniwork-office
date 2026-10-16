@@ -14,6 +14,32 @@ import {
  * and no all-files "*" an importer could inherit.
  */
 describe('the shared open-dialog extensions', () => {
+  // R1-4: at HEAD the file pinned only 16 entries, their uniqueness and the
+  // absence of "*" - and the hint assertion below compares the list against
+  // itself minus doc/ppt, so a member substitution or a reorder of doc/ppt was
+  // invisible. The exact ordered array is pinned here (a swap such as xlsm ->
+  // rtf, or moving ppt, fails).
+  it('is exactly these extensions, in this order', () => {
+    expect(OPEN_DIALOG_EXTENSIONS).toEqual([
+      'docx',
+      'doc',
+      'xlsx',
+      'xlsm',
+      'xls',
+      'csv',
+      'tsv',
+      'pptx',
+      'ppt',
+      'pdf',
+      'md',
+      'markdown',
+      'txt',
+      'json',
+      'html',
+      'htm',
+    ])
+  })
+
   it('lists each extension once, with no all-files entry', () => {
     expect(OPEN_DIALOG_EXTENSIONS).toHaveLength(16)
     expect(new Set(OPEN_DIALOG_EXTENSIONS).size).toBe(16)
