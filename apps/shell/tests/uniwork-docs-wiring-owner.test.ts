@@ -360,18 +360,23 @@ describe('G8-16 S16: the feed starts only for the chosen org (F-1)', () => {
     postGate = new Promise<void>((resolve) => {
       releasePost = resolve
     })
-    const secondCreate = created.service.createFolder({
-      workspaceId: 'ws_1',
-      parentId: null,
-      title: 'Switched org',
-    })
-    await onPostReached
-    statusNow = { ...statusNow, org: ORGS[1] }
-    statusListener?.(statusNow)
-    releasePost()
-    expect((await secondCreate).ok).toBe(true)
-    await new Promise((resolve) => setTimeout(resolve, TREE_CHANGED_WINDOW_MS + 50))
-    expect(treeChangedPushes).toEqual([])
+    vi.useFakeTimers()
+    try {
+      const secondCreate = created.service.createFolder({
+        workspaceId: 'ws_1',
+        parentId: null,
+        title: 'Switched org',
+      })
+      await onPostReached
+      statusNow = { ...statusNow, org: ORGS[1] }
+      statusListener?.(statusNow)
+      releasePost()
+      expect((await secondCreate).ok).toBe(true)
+      await vi.advanceTimersByTimeAsync(TREE_CHANGED_WINDOW_MS)
+      expect(treeChangedPushes).toEqual([])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('sign-out stops the feed', async () => {
