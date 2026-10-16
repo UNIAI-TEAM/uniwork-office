@@ -85,6 +85,8 @@ const theme = EditorView.theme({
 const shiftRedoKey = Prec.highest(
   EditorView.domEventHandlers({
     keydown(event, view) {
+      // an IME composition owns its keys (CodeMirror's own keymap skips them too)
+      if (event.isComposing || event.keyCode === 229 || view.composing) return false
       if (!(event.ctrlKey || event.metaKey) || event.altKey || !event.shiftKey) return false
       if (event.key.toLowerCase() !== 'z') return false
       event.preventDefault()
