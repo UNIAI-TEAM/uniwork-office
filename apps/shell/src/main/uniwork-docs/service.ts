@@ -37,6 +37,7 @@ import type {
   UniworkSearchQuery,
   UniworkSharedPage,
   UniworkSharedQuery,
+  UniworkTreeChangedEvent,
   UniworkUploadDocInput,
   UniworkUploadProgress,
   UniworkWorkspaceRef,
@@ -265,6 +266,14 @@ export interface UniworkDocsServiceDeps {
   pushUploadProgress?(event: UniworkUploadProgress): void
   /** S18: a document's title changed (renamed here, or renamed elsewhere) */
   pushDocRenamed?(event: UniworkDocRenamedEvent): void
+  /**
+   * FD-11: something in this workspace's document tree changed - one of this
+   * app's own folder actions (new, upload, create-folder, rename, move, copy),
+   * which the feed would otherwise only notice on its next page. Main
+   * coalesces the notices and pushes one per workspace per window; the event
+   * carries the workspace id only.
+   */
+  pushTreeChanged?(event: UniworkTreeChangedEvent): void
   /**
    * S18: the open tab/editor of a working copy must follow its new path (the
    * shell re-keys the tab and tells the editor, the desktop host's equivalent
@@ -3178,12 +3187,15 @@ export class UniworkDocsService {
         const workspaceId = typeof input.workspaceId === 'string' ? input.workspaceId : ''
         if (!workspaceId) throw new UniworkDocError('not_found')
         const title = requireName(input.title, MAX_FOLDER_NAME_RUNES)
-        return this.api().createFolder({
+        const created = await this.api().createFolder({
           workspaceId,
           parentId: typeof input.parentId === 'string' && input.parentId ? input.parentId : null,
           title,
           idempotencyKey: this.newIdempotencyKey(),
         })
+        // FD-11: the new folder is a row in its parent's tree and contents
+        this.deps.pushTreeChanged?.({ workspaceId: created.workspaceId })
+        return created
       },
       { nameField: true },
     )
@@ -3202,10 +3214,14 @@ export class UniworkDocsService {
       if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
       const documentId = typeof input.documentId === 'string' ? input.documentId : ''
       if (!documentId) throw new UniworkDocError('not_found')
-      return this.api().moveDocument({
+      const moved = await this.api().moveDocument({
         documentId,
         parentId: typeof input.parentId === 'string' && input.parentId ? input.parentId : null,
       })
+      // FD-11: the entry left one folder's rows and joined another's (both are
+      // in the same workspace, which is all the push names)
+      this.deps.pushTreeChanged?.({ workspaceId: moved.summary.workspaceId })
+      return moved
     })
   }
 
@@ -3222,13 +3238,16 @@ export class UniworkDocsService {
         if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
         const target = this.docTarget(input)
         const name = requireName(input.name)
-        return this.api().createBlank({
+        const created = await this.api().createBlank({
           workspaceId: target.workspaceId,
           format: input.format,
           title: name,
           parentId: target.folderId,
           idempotencyKey: this.newIdempotencyKey(),
         })
+        // FD-11: a new document changes the folder's contents for every view
+        this.deps.pushTreeChanged?.({ workspaceId: target.workspaceId })
+        return created
       },
       { nameField: true },
     )
@@ -3300,6 +3319,8 @@ export class UniworkDocsService {
             throw error
           })
         this.deps.pushUploadProgress?.({ uploadId, path: input.path, loaded: total, total })
+        // FD-11: the uploaded document is a new row in its folder
+        this.deps.pushTreeChanged?.({ workspaceId: target.workspaceId })
         return created
       } finally {
         // a newer upload with the same id (never minted twice) keeps its controller
@@ -3355,6 +3376,9 @@ export class UniworkDocsService {
         // this service's own rename: only the revision it produced is its echo,
         // so a genuine later change for another revision is still followed (R1-6)
         this.selfRenamed.set(documentId, renamed.revision)
+        // FD-11: the row's title changed for every view of the tree (not for a
+        // no-op rename, which returned above)
+        this.deps.pushTreeChanged?.({ workspaceId: renamed.summary.workspaceId })
         await this.afterLocalRename(documentId, renamed.summary.title)
         return renamed.summary
       },
@@ -5024,6 +5048,8 @@ export class UniworkDocsService {
       // the copy"
       return failed()
     }
+    // FD-11: the copy is a new row in the folder it landed in
+    this.deps.pushTreeChanged?.({ workspaceId: created.summary.workspaceId })
     const copyId = created.summary.id
 
     // step 2: the local bytes become version 2 of the copy; one retry, same keys

@@ -84,6 +84,8 @@ function harness(
     keepDraft?: (documentId: string) => Promise<boolean>
     /** S18: a page the doc cache committed (a renamed-elsewhere notice) */
     onFeedChange?: (change: Change) => void
+    /** FD-11: a committed page with rows for a workspace (the tree-changed notice) */
+    onWorkspaceChanged?: (workspaceId: string) => void
     /** wraps one registered store's records (a refused write, a torn commit, ...) */
     wrapRecords?: (name: string, records: StoreRecords) => StoreRecords
   } = {},
@@ -145,6 +147,7 @@ function harness(
     client: () => client,
     keepDraft: options.keepDraft ?? (async () => false),
     ...(options.onFeedChange ? { onFeedChange: options.onFeedChange } : {}),
+    ...(options.onWorkspaceChanged ? { onWorkspaceChanged: options.onWorkspaceChanged } : {}),
     clock,
     onSessionExpired: () => {
       expired += 1
@@ -234,6 +237,31 @@ describe('the feed runtime', () => {
     expect(await cursorOf(h, 'org_a', 'ws_2')).toBe('c1')
     // sync_feed off: no request, no cursor for that workspace
     expect(await cursorOf(h, 'org_b', 'ws_3')).toBeNull()
+  })
+
+  // FD-11: one tree-changed notice per workspace whose committed page carried a
+  // row, so an open browser re-reads its tree; an empty page changes nothing -
+  // a snapshot that lists nothing new is not a reason to re-read.
+  it('names a workspace whose page carried rows, once, and stays quiet for an empty page', async () => {
+    const changed: string[] = []
+    const h = harness({
+      orgs: ['org_a'],
+      workspaces: { org_a: ['ws_1', 'ws_2'] },
+      pages: ({ workspaceId }) =>
+        workspaceId === 'ws_2'
+          ? { ...PAGE, changes: [], nextCursor: 'c2' }
+          : { ...PAGE, changes: [change('doc_1')], nextCursor: 'c1' },
+      onWorkspaceChanged: (workspaceId) => changed.push(workspaceId),
+    })
+
+    await h.runtime.tick()
+    expect(changed).toEqual(['ws_1'])
+
+    // the next pass replays the page (its cursor did not move): a page that
+    // carried rows is announced again, so a stale view is never left behind
+    changed.length = 0
+    await h.runtime.tick()
+    expect(changed).toEqual(['ws_1'])
   })
 
   it('a crash mid-page keeps the cursor on the applied page; the replay is idempotent', async () => {

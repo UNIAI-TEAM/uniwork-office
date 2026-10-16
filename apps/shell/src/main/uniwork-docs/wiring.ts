@@ -70,6 +70,7 @@ import {
   type UnsavedCloseKind,
 } from './service'
 import { tUniworkDocs } from './strings'
+import { createTreeChangedCoalescer } from './tree-changed'
 import { UNIWORK_SYNC_CENTER_CHANNELS } from '../../shared/sync-center'
 import { createWiredSyncCenter } from '../uniwork-sync/sync-center'
 import { clipboard } from 'electron'
@@ -401,6 +402,11 @@ function libraryLayerFor(): StoreLayer {
 export interface SyncRuntimeSeam {
   fetch?: FetchLike
   now?(): number
+  /**
+   * FD-11: a committed feed page carried rows for this workspace, so its tree
+   * views are stale. The wiring hands this to the push coalescer.
+   */
+  treeChanged?(workspaceId: string): void
 }
 
 /**
@@ -498,6 +504,9 @@ export function createSyncRuntime(
     // G5-03a: the same change IS the S6 newer-version notice (head version +
     // version id), so one feed tick drives both
     onFeedChange: (change) => service.noteFeedChange(change.documentId, change.revision, change),
+    // FD-11: a committed page with rows makes that workspace's tree stale; the
+    // seam hands it to the coalescer the shell pushes through
+    ...(seam.treeChanged ? { onWorkspaceChanged: seam.treeChanged } : {}),
     // G5-03a: a full resync that no longer lists an open, bound document asks
     // the service to classify it (403/404 -> revoked, 410 -> deleted); the
     // runtime learns ids only, never paths
@@ -623,6 +632,15 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     if (wc && !wc.isDestroyed()) wc.send(channel, payload)
   }
   const syncStore = syncStoreFor().access
+  /**
+   * FD-11: the one tree-changed push of this process. A feed page (through the
+   * runtime) and this app's own folder actions (through the service) both report
+   * here; the coalescer turns a burst into at most one push per workspace per
+   * 500 ms. Only the workspace id leaves main.
+   */
+  const treeChanged = createTreeChangedCoalescer({
+    emit: (workspaceId) => push(UNIWORK_DOC_CHANNELS.treeChanged, { workspaceId }),
+  })
   // the service is built before the runtime, but its save queue reads the
   // runtime's capability cache: this holder breaks the cycle (the read happens
   // only after `createSyncRuntime` assigned it, below)
@@ -690,6 +708,9 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     pickDownloadPath: (defaultName) => pickDownloadPath(wiring, defaultName),
     pushUploadProgress: (event) => push(UNIWORK_DOC_CHANNELS.uploadProgress, event),
     pushDocRenamed: (event) => push(UNIWORK_DOC_CHANNELS.docRenamed, event),
+    // FD-11: this app's own folder/tree actions; the coalescer decides when the
+    // renderer actually hears about them
+    pushTreeChanged: (event) => treeChanged.notify(event.workspaceId),
     notifyPathRenamed: (oldPath, newPath) => wiring.notifyPathRenamed(oldPath, newPath),
     notifyTitleRenamed: (path, title) => wiring.notifyTitleRenamed?.(path, title),
     ui: conflictUi(wiring),
@@ -856,11 +877,16 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     pending.resolve(answer?.confirmed === true)
   })
   setUniworkCloseGuard(service)
-  const runtime = createSyncRuntime(service)
+  const runtime = createSyncRuntime(service, {
+    treeChanged: (workspaceId) => treeChanged.notify(workspaceId),
+  })
   seamRef.runtime = runtime
   /** stops the feed pass and remembers it, so the next status push restarts it */
   const stopFeed = (): void => {
     runtime.stop()
+    // FD-11: a window still pending belongs to the pass that just stopped (the
+    // account may be switching): it must not reach the renderer afterwards
+    treeChanged.cancel()
     feedRunning = false
   }
   // Sign out and a sign-in as someone else close the previous account's

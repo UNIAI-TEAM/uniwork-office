@@ -292,6 +292,13 @@ export interface SyncRuntimeOptions {
    */
   onFeedChange?(change: FeedChange): void
   /**
+   * FD-11: a committed feed page carried at least one row for this workspace,
+   * so its folder tree and open folder are stale and the owner must tell the
+   * renderer. One call per committed page, ids only - a title or a path never
+   * reaches the runtime; the owner coalesces the bursts.
+   */
+  onWorkspaceChanged?(workspaceId: string): void
+  /**
    * G5-03a: whether the id belongs to an open, bound working copy of the live
    * session. This is the only filter on the drop report - the runtime never
    * learns a local path or a binding.
@@ -597,17 +604,20 @@ export class SyncRuntime {
       scope,
       client,
       cursors: createStoreCursorStore(records(FEED_CURSORS_REGISTRATION.name)),
-      cache: this.announcingCache(
-        createStoreDocCache({
-          records: records(DOC_INDEX_REGISTRATION.name),
-          scope,
-          keepDraft: (documentId) => this.options.keepDraft(documentId),
-          // a resync dropped an id: report it only while this pass is current
-          // and the caller still calls it open (G5-03a)
-          onDropped: (documentId) => {
-            if (live()) void this.reportGone(documentId, live)
-          },
-        }),
+      cache: this.changedCache(
+        this.announcingCache(
+          createStoreDocCache({
+            records: records(DOC_INDEX_REGISTRATION.name),
+            scope,
+            keepDraft: (documentId) => this.options.keepDraft(documentId),
+            // a resync dropped an id: report it only while this pass is current
+            // and the caller still calls it open (G5-03a)
+            onDropped: (documentId) => {
+              if (live()) void this.reportGone(documentId, live)
+            },
+          }),
+        ),
+        scope.workspaceId,
       ),
       clock: this.options.clock,
       // the flags of the capability read of this pass (off -> no request)
@@ -698,6 +708,27 @@ export class SyncRuntime {
             if (change) notify(change)
           }
         }
+        return commit
+      },
+      reconcile: (ids, options) => cache.reconcile(ids, options),
+    }
+  }
+
+  /**
+   * FD-11: every page whose rows the cache committed makes this workspace's tree
+   * views stale, so the owner can ask the renderer to re-read. A refused page
+   * announces nothing - it is replayed on the next tick. One call per committed
+   * page that carried at least one row, whatever its kind: a removal row (an
+   * archiving on the web) moves an entry out of the tree exactly as an upsert
+   * moves one in.
+   */
+  private changedCache(cache: DocCache, workspaceId: string): DocCache {
+    const notify = this.options.onWorkspaceChanged
+    if (!notify) return cache
+    return {
+      async applyPage(changes) {
+        const commit = await cache.applyPage(changes)
+        if (commit.kind === 'ok' && changes.length > 0) notify(workspaceId)
         return commit
       },
       reconcile: (ids, options) => cache.reconcile(ids, options),

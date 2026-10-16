@@ -349,6 +349,8 @@ function setup(
   const statuses: UniworkDocStatus[] = []
   const views: UniworkConflictView[] = []
   const closedSessions: string[] = []
+  /** FD-11: the tree-changed notices main pushed while the test ran */
+  const treeChanged: Array<{ workspaceId: string }> = []
   let account: string | null = 'acc_1'
   let capabilityOffline = false
   let keystoreLocked = opts.keystoreLocked ?? false
@@ -398,6 +400,7 @@ function setup(
     lang: () => opts.lang ?? 'en',
     // G5-12 W-F2: the OS save dialog (null = the person cancelled)
     pickDownloadPath: vi.fn(async (_defaultName: string) => null as string | null),
+    pushTreeChanged: (event: { workspaceId: string }) => treeChanged.push(event),
     ui,
     pushStatus: (s: UniworkDocStatus) => statuses.push(s),
     pushConflict: (v: UniworkConflictView) => views.push(v),
@@ -429,6 +432,7 @@ function setup(
     statuses,
     views,
     closedSessions,
+    treeChanged,
     layer,
     safeStorage,
     stopAiRun,
@@ -1451,6 +1455,8 @@ describe('G5-12 Save as a copy (main)', () => {
       { method: 'POST', body: { parent_id: target } },
     ])
     expect(server.state.copy!.parentId).toBe(target)
+    // FD-11: other views of the workspace hear about the copy
+    expect(ctx.treeChanged).toEqual([{ workspaceId: 'ws_1' }])
     await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
   })
 

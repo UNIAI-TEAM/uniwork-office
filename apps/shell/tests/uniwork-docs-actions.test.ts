@@ -122,6 +122,8 @@ function fakeServer(
      * the envelope's `max`, null omits it (the app then uses the server default)
      */
     deepMax?: number | string | null
+    /** FD-11: a move whose target already holds the name renames the entry "Name (2)" */
+    moveRenames?: boolean
   } = {},
 ) {
   const state = {
@@ -319,6 +321,22 @@ function fakeServer(
       state.revision += 1
       return json(200, { document: docJson(DOC) })
     }
+    // FD-11: move a document or folder (the client reads its revision first)
+    const move = /^\/api\/v1\/documents\/([A-Za-z0-9_-]+)\/move$/.exec(u.pathname)
+    if (move) {
+      const id = move[1]!
+      // the fake trusts its own caller's body, like every other route here
+      const body: { parent_id: string | null; revision: string } = JSON.parse(String(init.body))
+      call.body = body
+      const title = id === DOC ? state.title : (state.documents.get(id)?.title ?? 'new.docx')
+      // a name already taken in the target folder is auto-renamed by the server
+      const renamed = options.moveRenames ? `${title} (2)` : title
+      if (id === DOC) state.title = renamed
+      state.revision += 1
+      return json(200, {
+        document: { ...docJson(id), title: renamed, parent_id: body.parent_id },
+      })
+    }
     // detail: any document the server holds. D's decideDocumentAccess hides an
     // archived row from anyone below manage (404), while a manager still reads
     // it with its archived_at.
@@ -385,6 +403,8 @@ function setup(server: ReturnType<typeof fakeServer>, options: { pathOpen?: bool
   const progress: Array<{ path: string; loaded: number; total: number }> = []
   const pathRenames: Array<{ oldPath: string; newPath: string }> = []
   const titleRenames: Array<{ path: string; title: string }> = []
+  /** FD-11: the tree-changed notices main pushed while the test ran */
+  const treeChanged: Array<{ workspaceId: string }> = []
   const uploadFile = join(dir, 'Q3 report.docx')
   writeFileSync(uploadFile, 'uploaded bytes')
   const ui: ConflictUi = {
@@ -414,6 +434,7 @@ function setup(server: ReturnType<typeof fakeServer>, options: { pathOpen?: bool
     pickUploadFile: async () => ({ path: uploadFile, name: basename(uploadFile) }),
     pushUploadProgress: (event) => progress.push(event),
     pushDocRenamed: (event) => renamed.push(event),
+    pushTreeChanged: (event) => treeChanged.push(event),
     notifyPathRenamed: (oldPath, newPath) => pathRenames.push({ oldPath, newPath }),
     notifyTitleRenamed: (path, title) => titleRenames.push({ path, title }),
     ui,
@@ -421,7 +442,16 @@ function setup(server: ReturnType<typeof fakeServer>, options: { pathOpen?: bool
     pushLaunch: () => undefined,
     reveal: () => undefined,
   })
-  return { service, statuses, renamed, progress, pathRenames, titleRenames, uploadFile }
+  return {
+    service,
+    statuses,
+    renamed,
+    progress,
+    pathRenames,
+    titleRenames,
+    uploadFile,
+    treeChanged,
+  }
 }
 
 const docDir = (documentId: string): string =>
@@ -1291,5 +1321,47 @@ describe('renamed elsewhere', () => {
     expect(ctx.titleRenames[0]).toEqual({ path: before, title: 'Renamed on web.docx' })
     expect(copiesIn(DOC)).toEqual(['Q4 plan.docx'])
     expect(ctx.pathRenames).toHaveLength(0)
+  })
+})
+
+// FD-11: a folder action the app makes itself must reach the other views of the
+// workspace without waiting for the 60 s feed - main pushes the workspace id,
+// coalesced (see the coalescer's own test).
+describe('the FD-11 tree-changed push', () => {
+  it('names the workspace after a new document, an upload, a folder, a rename and a move', async () => {
+    const server = fakeServer({ moveRenames: true })
+    const ctx = setup(server)
+    const ws = { workspaceId: WS }
+
+    await ctx.service.createDocument({
+      workspaceId: WS,
+      folderId: 'fold_1',
+      name: 'Plan.docx',
+      format: 'docx',
+    })
+    await ctx.service.uploadDocument({
+      workspaceId: WS,
+      folderId: null,
+      path: ctx.uploadFile,
+      uploadId: 'up_1',
+    })
+    await ctx.service.createFolder({ workspaceId: WS, parentId: null, title: 'Contracts' })
+    await ctx.service.renameDocument(DOC, 'Q4 plan v2.docx')
+    const moved = await ctx.service.moveDocument({ documentId: DOC, parentId: 'fold_1' })
+
+    expect(ctx.treeChanged).toEqual([ws, ws, ws, ws, ws])
+    // the move's own answer still reports the server's auto-rename
+    expect(moved).toMatchObject({ ok: true, value: { renamedTo: 'Q4 plan v2.docx (2)' } })
+  })
+
+  it('says nothing when an action wrote nothing', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+
+    // a rename to the title the document already has, and a folder name the
+    // service refuses itself: neither changed the tree
+    await ctx.service.renameDocument(DOC, 'Q4 plan.docx')
+    await ctx.service.createFolder({ workspaceId: WS, parentId: null, title: 'a'.repeat(256) })
+    expect(ctx.treeChanged).toEqual([])
   })
 })
