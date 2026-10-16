@@ -180,8 +180,12 @@ export interface SaveSizeGate {
     openLimits?: Partial<DocumentSizeLimits> | null,
   ): void
   /**
-   * Run after serializing the document and BEFORE `port.request('api.save' | 'api.saveAs')`:
-   *   - `'normal'`: re-arms `warnedNearLimit`, hides fallback warn chip, returns `{ allowed: true }`.
+   * Run after serializing the document and BEFORE `port.request('api.save' | 'api.saveAs')`
+   * (also feeds the lag detector's `knownBytes` so `lag_detected.bytes` tracks the last
+   * serialized size, §4.1.2):
+   *   - `'normal'`: hides the fallback warn chip, returns `{ allowed: true }`; the warn latch
+   *     re-arms only once `noteSaveSucceeded()` reports this save landed (§3.2.2: a later save
+   *     succeeds with `bytes < warn_bytes`, not a merely attempted one).
    *   - `'warn'`: if not latched, sets `warnedNearLimit = true`, emits `size_warning` before save,
    *     shows fallback warn chip when `sizeUi !== true`, and returns `{ allowed: true }`.
    *   - `'block'`: caches `lastBlockedBytes`, emits `save_blocked` INSTEAD of `api.save` / `api.saveAs`,
@@ -404,6 +408,7 @@ export function createSaveSizeGate(opts: SaveSizeGateOptions): SaveSizeGate {
       await syncSession()
       const currentLimits = activeLimits()
       const evaluation = evaluateSaveSize(data.byteLength, currentLimits)
+      // lag_detected.bytes follows the last serialized size (§4.1.2)
 
       if (evaluation.band === 'normal') {
         warnedNearLimit = false

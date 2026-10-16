@@ -50,6 +50,7 @@ import {
   type InitPayload,
   type InitRecovery,
   type InitUser,
+  type LagDetectedPayload,
   type OfficeModule,
   type OpenPayload,
   type ProtocolErrorShape,
@@ -189,6 +190,8 @@ export interface DocsFrameClient {
   reportSizeWarning(payload: SizeWarningPayload): void
   /** save blocked because serialized document size exceeded max_bytes (additive, SIZE-F1) */
   reportSaveBlocked(payload: SaveBlockedPayload): void
+  /** passive main-thread lag detector tripped (additive, UNI-1865 §4.1; once per documentId) */
+  reportLagDetected(payload: LagDetectedPayload): void
   dispose(): void
 }
 
@@ -576,6 +579,7 @@ export function createDocsFrameClient(options: DocsFrameClientOptions): DocsFram
       ep.handle('doc.download', (p, ctx) => h(p as HostRequests['doc.download']['payload'], ctx)),
     reportSizeWarning: (payload) => guarded(() => ep.emit('size_warning', { ...payload })),
     reportSaveBlocked: (payload) => guarded(() => ep.emit('save_blocked', { ...payload })),
+    reportLagDetected: (payload) => guarded(() => ep.emit('lag_detected', { ...payload })),
     dispose() {
       stopReady()
       token = null

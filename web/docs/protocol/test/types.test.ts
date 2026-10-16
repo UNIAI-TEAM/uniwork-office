@@ -368,6 +368,29 @@ describe('document size limits and events (SIZE-F1, additive)', () => {
     ).toBe(true)
   })
 
+  it('validates the lag_detected event payload (UNI-1865)', () => {
+    const lag = (payload: unknown) =>
+      parseEnvelope(env({ kind: 'event', type: 'lag_detected', payload }))
+    // both reasons, full and minimal shapes
+    expect(
+      lag({ reason: 'interactions', worst_ms: 480, count: 3, window_ms: 120_000, bytes: 4096 }).ok,
+    ).toBe(true)
+    expect(lag({ reason: 'longtask', worst_ms: 1200, count: 1, window_ms: 0 }).ok).toBe(true)
+    // a bad payload is rejected: reason enum, non-negative ints, window_ms 0 | 120000
+    expect(lag({ reason: 'scroll', worst_ms: 480, count: 3, window_ms: 120_000 }).ok).toBe(false)
+    expect(lag({ reason: 'longtask', worst_ms: -1, count: 1, window_ms: 0 }).ok).toBe(false)
+    expect(lag({ reason: 'interactions', worst_ms: 480, count: 0, window_ms: 120_000 }).ok).toBe(
+      false,
+    )
+    expect(lag({ reason: 'interactions', worst_ms: 480, count: 3, window_ms: 60_000 }).ok).toBe(
+      false,
+    )
+    expect(
+      lag({ reason: 'interactions', worst_ms: 480, count: 3, window_ms: 120_000, bytes: -5 }).ok,
+    ).toBe(false)
+    expect(lag('interactions')).toMatchObject({ ok: false, reason: 'malformed' })
+  })
+
   it('commentsErrorFromHttp copies fields.max_bytes into error.details.max_bytes on HTTP 413', () => {
     const err = commentsErrorFromHttp(413, {
       error: { code: 'payload_too_large', fields: { max_bytes: 52_428_800 } },

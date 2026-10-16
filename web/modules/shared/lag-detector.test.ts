@@ -435,6 +435,45 @@ describe('lag-detector protocol & unit behavior (UNI-1865)', () => {
     expect(fake.instances).toHaveLength(0)
     expect(emitted).toHaveLength(0)
   })
+
+  it('prefers port.reportLagDetected over port.emit and emits no raw postMessage fallback (d1-1)', () => {
+    const fake = makeFakeObserver()
+    const emit = vi.fn()
+    const reportLagDetected = vi.fn()
+    const parentPost = vi.spyOn(window.parent, 'postMessage')
+    const detector = createLagDetector({
+      observer: fake.Observer,
+      now: () => 0,
+      requestAnimationFrame: (cb) => {
+        cb(0)
+        return 1
+      },
+      port: { emit, reportLagDetected },
+    })
+
+    expect(reportLagDetected).toHaveBeenCalledTimes(1)
+    expect(reportLagDetected).toHaveBeenCalledWith({
+      reason: 'longtask',
+      worst_ms: 1_100,
+      count: 1,
+      window_ms: 0,
+      bytes: 2_048,
+    })
+    expect(emit).not.toHaveBeenCalled()
+    expect(parentPost).not.toHaveBeenCalled()
+  })
+
+    const emitted: LagDetectedPayload[] = []
+    const detector = createLagDetector({
+      observer: fake.Observer,
+      now: () => 0,
+      requestAnimationFrame: (cb) => {
+        cb(0)
+        return 1
+      },
+      onLagDetected: (p) => emitted.push(p),
+    })
+
 })
 
 describe('lag-detector module open-path wiring (docs, text, pdf, sheets, slides)', () => {

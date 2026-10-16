@@ -14,12 +14,7 @@
  * No-op when `PerformanceObserver` / entry types are unsupported, when `capabilities.desktopOpen`
  * is not `true`, or in the desktop app.
  */
-import {
-  PROTOCOL_NS,
-  PROTOCOL_VERSION,
-  type Capabilities,
-  type LagDetectedPayload,
-} from '../../docs/protocol/types'
+import type { Capabilities, LagDetectedPayload } from '../../docs/protocol/types'
 
 export const INTERACTION_THRESHOLD_MS = 300
 export const INTERACTION_WINDOW_MS = 120_000
@@ -102,6 +97,7 @@ export interface MarkDocumentLoadedCall {
 
 export interface LagDetector {
   markDocumentLoaded(documentId: string, bytes?: number): void
+   * `knownBytes` follows the last serialized save so `lag_detected.bytes` is never stale).
   bindPort(port: LagDetectorPort | null | undefined, capabilities?: Capabilities | null): void
   disconnect(): void
   readonly currentDocumentId: string | null
@@ -131,28 +127,6 @@ function isDiscreteEventEntry(entry: LagPerformanceEntry): boolean {
   if (typeof entry.interactionId === 'number' && entry.interactionId > 0) return true
   if (!entry.name) return true
   return DISCRETE_INTERACTION_EVENTS.has(entry.name)
-}
-
-let envelopeSeq = 0
-
-function postLagEventToParentWindow(payload: LagDetectedPayload): void {
-  if (typeof window === 'undefined' || !window.parent || window.parent === window) return
-  if (typeof location === 'undefined' || !/^https?:\/\//.test(location.origin)) return
-  try {
-    window.parent.postMessage(
-      {
-        ns: PROTOCOL_NS,
-        v: PROTOCOL_VERSION,
-        id: `lag_${++envelopeSeq}`,
-        kind: 'event',
-        type: 'lag_detected',
-        payload,
-      },
-      location.origin,
-    )
-  } catch {
-    // ignore cross-origin or detached window errors
-  }
 }
 
 export function createLagDetector(options: LagDetectorOptions = {}): LagDetector {
@@ -221,12 +195,14 @@ export function createLagDetector(options: LagDetectorOptions = {}): LagDetector
 
   function emitLagDetected(payload: LagDetectedPayload): void {
     options.onLagDetected?.(payload)
-    if (typeof port?.emit === 'function') {
-      port.emit('lag_detected', payload)
-    } else if (typeof port?.reportLagDetected === 'function') {
+    // reportLagDetected (guarded ep.emit on the real client) wins over the raw emit
+    // that only exists on test doubles; without a bound port the event drops:
+    // every markDocumentLoaded call site binds the port first, and a portless
+    // frame has no host to report to.
+    if (typeof port?.reportLagDetected === 'function') {
       port.reportLagDetected(payload)
-    } else {
-      postLagEventToParentWindow(payload)
+    } else if (typeof port?.emit === 'function') {
+      port.emit('lag_detected', payload)
     }
   }
 
@@ -509,3 +485,4 @@ export function markDocumentLoaded(documentId: string, bytes?: number): void {
   }
   sharedDetector.markDocumentLoaded(documentId, bytes)
 }
+/** `lag_detected.bytes` follows the last serialized save size (§4.1.2; called by the save gate) */

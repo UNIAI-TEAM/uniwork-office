@@ -1593,4 +1593,43 @@ describe('document size limits, size_warning, save_blocked, and doc.download (SI
       payload: { delivered: true },
     })
   })
+
+  it('emits lag_detected through the protocol endpoint (UNI-1865)', async () => {
+    const { client, frameWin } = setup()
+    await client.whenInitialized()
+
+    client.reportLagDetected({
+      reason: 'interactions',
+      worst_ms: 480,
+      count: 3,
+      window_ms: 120_000,
+      bytes: 68_157_440,
+    })
+    client.reportLagDetected({ reason: 'longtask', worst_ms: 1_200, count: 1, window_ms: 0 })
+    await flush()
+
+    const isLagEvent = (m: unknown): boolean =>
+      typeof m === 'object' && m !== null && 'type' in m && m.type === 'lag_detected'
+    const events = frameWin.sent.filter(isLagEvent)
+    expect(events).toEqual([
+      expect.objectContaining({
+        kind: 'event',
+        type: 'lag_detected',
+        payload: {
+          reason: 'interactions',
+          worst_ms: 480,
+          count: 3,
+          window_ms: 120_000,
+          bytes: 68_157_440,
+        },
+      }),
+      expect.objectContaining({
+        kind: 'event',
+        type: 'lag_detected',
+        payload: { reason: 'longtask', worst_ms: 1_200, count: 1, window_ms: 0 },
+      }),
+    ])
+    // both envelopes pass the receiving side's own validation
+    for (const m of events) expect(parseEnvelope(m).ok).toBe(true)
+  })
 })
