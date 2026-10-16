@@ -104,6 +104,7 @@ import {
   type EditQueueItem,
 } from './edit-queue'
 import { DOC_NAV_SCHEME, navigateToBlock, parseDocNavHref } from './doc-nav'
+import { workedStepsLabel } from './worked-steps-label'
 
 function readUniworkCloudStatus(): UniworkCloudStatusBridge | undefined {
   return (window as Window & { uniworkCloudStatus?: UniworkCloudStatusBridge }).uniworkCloudStatus
@@ -1896,7 +1897,7 @@ function ToolChipList({ tools }: { tools: ToolActivity[] }) {
 
   const anyRunning = tools.some((tool) => tool.running)
   const open = userOpen ?? anyRunning
-  const label = anyRunning ? tr('aiGroupWorking') : tr('aiWorkedSteps', { n: tools.length })
+  const label = anyRunning ? tr('aiGroupWorking') : workedStepsLabel(tr, tools.length)
 
   return (
     <div className="ai-work-group">
