@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createUniworkDocsClient, type FetchLike } from '../src/main/uniwork-docs/client'
 import { UniworkDocError } from '../src/main/uniwork-docs/errors'
+import { formatForMime } from '../src/main/uniwork-docs/formats'
 
 /**
  * FD-11 (UNI-1809): the folder-tree routes and their strict readers. The child
@@ -504,5 +505,11 @@ describe('the folder refusals', () => {
     // always the app's documented 20 constant
     expect(await depthOf()).toBe(20)
     expect(await depthOf({ max: 0 })).toBe(20)
+  })
+
+  it('F11-L5: formatForMime returns null for Object.prototype property names', () => {
+    expect(formatForMime('constructor')).toBeNull()
+    expect(formatForMime('__proto__')).toBeNull()
+    expect(formatForMime('toString')).toBeNull()
   })
 })

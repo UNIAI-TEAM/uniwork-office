@@ -35,11 +35,12 @@ const BY_MIME: Record<string, UniworkDocFormat> = Object.fromEntries(
 
 export function formatForName(name: string): UniworkDocFormat | null {
   const ext = extname(name.trim()).slice(1).toLowerCase()
-  return BY_EXTENSION[ext] ?? null
+  return Object.hasOwn(BY_EXTENSION, ext) ? (BY_EXTENSION[ext] ?? null) : null
 }
 
 export function formatForMime(mime: string): UniworkDocFormat | null {
-  return BY_MIME[mime.split(';', 1)[0]?.trim().toLowerCase() ?? ''] ?? null
+  const key = mime.split(';', 1)[0]?.trim().toLowerCase() ?? ''
+  return Object.hasOwn(BY_MIME, key) ? (BY_MIME[key] ?? null) : null
 }
 
 export function mimeForFormat(format: UniworkDocFormat): string {
