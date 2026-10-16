@@ -60,6 +60,7 @@ import {
   renameOwnedAssetDocument,
   resolveSafeRelativeImagePath,
   resolveSourcePendingAfterSaveAs,
+  restoreOwnedAssetFiles,
   rollbackPreparedSaveAsAssets,
   writeImageIntoOwnedAssets,
 } from './asset-lifecycle'
@@ -68,6 +69,7 @@ import { normalizeMarkdownTheme, type MarkdownTheme } from '../shared/markdown-t
 import { MARKDOWN_CHANNELS, MAX_PASTED_IMAGE_BYTES } from '../shared/ipc'
 import type { ImageHostConfig, WikiLinkResolveRequest, WikiLinkResolved } from '../shared/ipc'
 import { resolveWikiLinks } from './wiki-resolve'
+import { cleanDraftName } from '../shared/draft-name'
 import { rememberWikiFragment, takeWikiFragment } from './wiki-fragment'
 import { isImageHostUsable, normalizeImageHostConfig, uploadImageToHost } from './image-host'
 import {
@@ -673,10 +675,9 @@ async function resolveSaveTarget(
   if (mode === 'save' && current) return current
   // a name the AI panel suggested after a run only pre-fills the dialog below: an untitled
   // document is never written without the user seeing where it goes
-  const suggestedBase = suggestedName
-    ?.replace(/[/\\:*?"<>|]/g, '_')
-    .slice(0, 80)
-    .trim()
+  const suggestedBase = cleanDraftName(
+    suggestedName?.replace(/[/\\:*?"<>|]/g, '_').slice(0, 80) ?? '',
+  )
   const win =
     BrowserWindow.fromWebContents(e.sender) ?? BrowserWindow.getFocusedWindow() ?? undefined
   const defaultPath = current
@@ -966,6 +967,23 @@ function registerMarkdownIpc(): void {
     const result = await discardPendingOwnedAssetNames(docPath, list)
     if (result.errors.length > 0) {
       console.warn('[markdown] AI run asset discard incomplete:', result.errors)
+    }
+    return result
+  })
+
+  ipcMain.handle(MARKDOWN_CHANNELS.restorePendingAssets, async (e, files: unknown) => {
+    const docPath = savePathByWc.get(e.sender.id)
+    const list = (Array.isArray(files) ? files : []).filter(
+      (f): f is { name: string; base64: string } =>
+        !!f &&
+        typeof (f as { name?: unknown }).name === 'string' &&
+        typeof (f as { base64?: unknown }).base64 === 'string' &&
+        (f as { base64: string }).base64.length <= Math.ceil(MAX_PASTED_IMAGE_BYTES / 3) * 4,
+    )
+    if (!docPath) return { restored: [], errors: list.map((f) => f.name) }
+    const result = await restoreOwnedAssetFiles(docPath, list)
+    if (result.errors.length > 0) {
+      console.warn('[markdown] AI run asset restore incomplete:', result.errors)
     }
     return result
   })

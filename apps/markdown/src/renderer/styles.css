@@ -1370,7 +1370,11 @@ html.genoffice-popover-open .ribbon-tabs {
 }
 
 .ai-result-edited-hint {
+  flex: 1 1 160px;
+  min-width: 0;
   color: var(--color-text-tertiary);
+  /* a two-line hint splits evenly instead of leaving one word on its own line */
+  text-wrap: balance;
 }
 
 /* the one stopped line of a UniWork AI turn the user stopped (aiRunStopped) */

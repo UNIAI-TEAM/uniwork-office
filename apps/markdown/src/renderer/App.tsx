@@ -73,6 +73,7 @@ import type { ExportFormat, SaveMode, UniworkViewState } from '../shared/ipc'
 import type { AiSettings } from '@genoffice/ai-provider/browser'
 import { uiOp } from './editor/ops'
 import { cap, platform } from './capabilities'
+import { cleanDraftName } from '../shared/draft-name'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 type SaveState = 'idle' | 'saving' | 'saved' | 'failed'
@@ -139,8 +140,11 @@ export function deriveAutoFileName(editor: Editor): string {
     const node = doc.child(i)
     const text = node.textContent.replace(/\s+/g, ' ').trim()
     if (!text) continue
-    if (node.type.name === 'heading') return text.slice(0, 60)
-    return text.split(' ').slice(0, 8).join(' ').slice(0, 60)
+    const name =
+      node.type.name === 'heading'
+        ? text.slice(0, 60)
+        : text.split(' ').slice(0, 8).join(' ').slice(0, 60)
+    return cleanDraftName(name)
   }
   return ''
 }
