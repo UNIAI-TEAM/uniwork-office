@@ -483,8 +483,16 @@ const partialText = (v) =>
         : null
 const isU = (v) =>
   !!v && typeof v === 'object' && !Array.isArray(v) && typeof v.__unresolved === 'string'
-/** a parameterised local arrow held as its call target, never as a value */
-const isArrowFn = (v) => !!v && typeof v === 'object' && v.__arrowFn === true
+/** module-private brand for a parameterised local arrow held as its call target */
+const ARROW_FN = Symbol('arrowFn')
+const isArrowFn = (v) =>
+  !!v &&
+  typeof v === 'object' &&
+  v[ARROW_FN] === true &&
+  typeof v.name === 'string' &&
+  typeof v.param === 'string' &&
+  Array.isArray(v.tokens) &&
+  typeof v.bodyOpen === 'number'
 const isPlainObject = (v) =>
   !!v && typeof v === 'object' && !Array.isArray(v) && !isU(v) && !isArrowFn(v)
 
@@ -1362,7 +1370,7 @@ function readArrowFn(local) {
   idx += 1
   if (!(tokens[idx] && tokens[idx].value === '(')) return null
   if (!(tokens[idx + 1] && tokens[idx + 1].value === '{')) return null
-  return { __arrowFn: true, name: local.name, param: param.value, tokens, bodyOpen: idx + 1 }
+  return { [ARROW_FN]: true, name: local.name, param: param.value, tokens, bodyOpen: idx + 1 }
 }
 
 /** how often one parameterised arrow may be applied: a self-call must come down */
