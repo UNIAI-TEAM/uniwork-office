@@ -10,7 +10,6 @@ import {
   chmodSync,
   existsSync,
   linkSync,
-  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -351,6 +350,26 @@ describe('SIZE-F1 desktop document size limits', () => {
             }
             return new Response('{}', { status: 404 })
           }) as unknown as FetchLike,
+          syncStore: {
+            scope: () =>
+              currentIdentity
+                ? {
+                    deploymentId: currentIdentity.deploymentId,
+                    accountId: currentIdentity.accountId,
+                  }
+                : null,
+            open: async () => ({
+              kind: 'ok' as const,
+              records: () => ({
+                read: async () => ({ kind: 'missing' as const }),
+                write: async () => ({ kind: 'ok' as const }),
+                delete: async () => undefined,
+                listKeys: async () => [],
+              }),
+              lock: async () => undefined,
+            }),
+            lock: async () => undefined,
+          } as never,
           openPath: () => true,
           isPathOpen: () => false,
           requestModuleSave: () => false,
@@ -371,14 +390,15 @@ describe('SIZE-F1 desktop document size limits', () => {
         // 2. Upload observes the refreshed 1000-byte limit from session boot
         const candidatePath = join(tmp, 'Candidate.docx')
         writeFileSync(candidatePath, new Uint8Array(1200).fill(65))
-        const blockedUpload = await service.uploadDocument(candidatePath, {
-          orgId: 'org_a',
+        const blockedUpload = await service.uploadDocument({
           workspaceId: WS_ID,
-          title: 'Candidate.docx',
+          folderId: null,
+          path: candidatePath,
+          uploadId: 'up-candidate',
         })
         expect(blockedUpload).toEqual({
           ok: false,
-          code: 'too_large',
+          error: 'too_large',
           name: 'Candidate.docx',
           sizeBytes: 1200,
           maxBytes: 1000,
@@ -398,7 +418,7 @@ describe('SIZE-F1 desktop document size limits', () => {
 
         // 4. While org_b's refresh is still in flight, lockSession runs (account boundary):
         //    the cache resets and the stale in-flight read from before lockSession cannot commit
-        await service.lockSession('sign-out', {
+        await service.lockSession({
           deploymentId: 'default',
           accountId: 'acc_1',
         })
@@ -440,7 +460,7 @@ describe('SIZE-F1 desktop document size limits', () => {
         const workingPath = await service.store.writeWorkingCopy(docDir, 'Bound.docx', baseBytes)
         writeFileSync(workingPath, new Uint8Array(900).fill(66))
         const savedStatus = await service.save(workingPath)
-        expect(savedStatus?.binding).toMatchObject({
+        expect(savedStatus).toMatchObject({
           state: 'failed',
           error: 'too_large',
           sizeBytes: 900,
@@ -970,10 +990,12 @@ describe('SIZE-F1 desktop document size limits', () => {
       expect(h.stored.has(DOC_ID)).toBe(true)
 
       // 2. Non-user save with pending intent + working copy equal to base:
-      //    replays the pending intent normally without failing the unchanged base as too_large
+      //    replays and settles the pending intent without failing the unchanged base as too_large
       const replayed = await h.coordinator.save(h.docPath)
-      expect(replayed!.binding.state).toBe('saved')
+      expect(replayed!.binding.state).not.toBe('failed')
       expect(replayed!.binding.error).toBeUndefined()
+      expect(replayed!.binding.baseChecksum).toBe(sha256Hex(olderBytes))
+      expect(h.stored.has(DOC_ID)).toBe(false)
       expect(h.supersede).not.toHaveBeenCalled()
       expect(h.put).not.toHaveBeenCalled()
       expect(h.statuses.some((push) => push.error === 'too_large')).toBe(false)
@@ -1371,7 +1393,7 @@ describe('SIZE-F1 desktop document size limits', () => {
           maxBytes: 500,
           generation: 1,
         })
-        expect(parked!.payload).toEqual(bodyBytes)
+        expect(Array.from(parked!.payload)).toEqual(Array.from(bodyBytes))
 
         // Dispatcher poll does NOT auto-replay a failed record; dispatcher path on a queued
         // record hitting 413 is unchanged and parks failed/too_large with maxBytes too

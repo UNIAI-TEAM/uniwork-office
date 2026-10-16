@@ -174,7 +174,8 @@ export function createDocumentLimitsCache(deps: DocumentLimitsCacheDeps = {}): D
 
   return {
     async get(): Promise<DocumentLimits> {
-      return byOrigin.get(keyOf()) ?? refresh()
+      const key = keyOf()
+      return inFlight.get(key) ?? byOrigin.get(key) ?? refresh()
     },
     peek(): DocumentLimits {
       return byOrigin.get(keyOf()) ?? DEFAULT_DOCUMENT_LIMITS
