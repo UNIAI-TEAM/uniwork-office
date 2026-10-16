@@ -112,6 +112,8 @@ export const fr = {
   aiAttachTitle: 'Joindre des fichiers locaux (ou faites-les glisser sur le panneau)',
   aiRemoveAttachmentTitle: 'Supprimer la pièce jointe',
   aiTrackChanges: 'Suivi des modifications',
+  aiTrackForced:
+    'Ce document est protégé : le suivi des modifications reste activé, les modifications de l’IA sont donc enregistrées comme révisions.',
   aiTrackOnTitle:
     "Suivi des modifications activé : les modifications de contenu de l'IA sont marquées comme révisions (insertions soulignées, suppressions barrées) ; acceptez ou refusez dans Révision",
   aiTrackOffTitle:

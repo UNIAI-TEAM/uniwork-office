@@ -112,6 +112,8 @@ export const de = {
   aiAttachTitle: 'Lokale Dateien anhängen (oder auf den Bereich ziehen)',
   aiRemoveAttachmentTitle: 'Anlage entfernen',
   aiTrackChanges: 'Änderungen nachverfolgen',
+  aiTrackForced:
+    'Dieses Dokument ist geschützt: Die Nachverfolgung bleibt eingeschaltet, daher werden Änderungen der KI als Revisionen erfasst.',
   aiTrackOnTitle:
     'Änderungsnachverfolgung ein: KI-Inhaltsänderungen werden als Überarbeitungen markiert (Einfügungen unterstrichen, Löschungen durchgestrichen); unter „Überprüfen“ annehmen oder ablehnen',
   aiTrackOffTitle:

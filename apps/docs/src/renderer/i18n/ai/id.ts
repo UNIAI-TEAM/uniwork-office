@@ -110,6 +110,8 @@ export const id = {
   aiAttachTitle: 'Lampirkan file lokal (atau seret ke panel)',
   aiRemoveAttachmentTitle: 'Hapus lampiran',
   aiTrackChanges: 'Lacak perubahan',
+  aiTrackForced:
+    'Dokumen ini dilindungi: pelacakan perubahan harus tetap aktif, sehingga suntingan AI dicatat sebagai revisi.',
   aiTrackOnTitle:
     'Lacak perubahan aktif: perubahan konten AI ditandai sebagai revisi (sisipan digarisbawahi, penghapusan dicoret); terima atau tolak di Tinjau',
   aiTrackOffTitle:

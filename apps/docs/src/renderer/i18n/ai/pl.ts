@@ -110,6 +110,8 @@ export const pl = {
   aiAttachTitle: 'Załącz pliki lokalne (lub przeciągnij je na panel)',
   aiRemoveAttachmentTitle: 'Usuń załącznik',
   aiTrackChanges: 'Śledzenie zmian',
+  aiTrackForced:
+    'Ten dokument jest chroniony: śledzenie zmian musi pozostać włączone, więc zmiany AI są zapisywane jako poprawki.',
   aiTrackOnTitle:
     'Śledzenie zmian włączone: zmiany treści wprowadzane przez AI są oznaczane jako poprawki (wstawienia podkreślone, usunięcia przekreślone); zaakceptuj lub odrzuć je w sekcji Recenzja',
   aiTrackOffTitle:

@@ -106,6 +106,7 @@ export const zhTW = {
   aiAttachTitle: '新增本機檔案作為附件(也可拖曳到面板)',
   aiRemoveAttachmentTitle: '移除附件',
   aiTrackChanges: '追蹤修訂',
+  aiTrackForced: '此文件受「追蹤修訂」保護，追蹤修訂必須保持開啟，AI 的變更會記為修訂。',
   aiTrackOnTitle:
     '追蹤修訂已開啟:AI 內容變更標記為修訂(插入加底線/刪除加刪除線),可在校閱中接受或拒絕',
   aiTrackOffTitle: '追蹤修訂已關閉:AI 變更直接生效(仍可透過版本快照還原)',

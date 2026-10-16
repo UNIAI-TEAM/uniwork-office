@@ -111,6 +111,8 @@ export const es = {
   aiAttachTitle: 'Adjuntar archivos locales (o arrástralos al panel)',
   aiRemoveAttachmentTitle: 'Quitar dato adjunto',
   aiTrackChanges: 'Control de cambios',
+  aiTrackForced:
+    'Este documento está protegido: el control de cambios debe seguir activado, así que las ediciones de la IA se registran como revisiones.',
   aiTrackOnTitle:
     'Control de cambios activado: los cambios de contenido de la IA se marcan como revisiones (inserciones subrayadas, eliminaciones tachadas); acéptalas o recházalas en Revisar',
   aiTrackOffTitle:

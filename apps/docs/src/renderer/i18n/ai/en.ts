@@ -109,6 +109,8 @@ export const en = {
   aiAttachTitle: 'Attach local files (or drag them onto the panel)',
   aiRemoveAttachmentTitle: 'Remove attachment',
   aiTrackChanges: 'Track changes',
+  aiTrackForced:
+    'This document is protected: Track changes must stay on, so the AI’s edits are recorded as revisions.',
   aiTrackOnTitle:
     'Track changes on: AI content edits are marked as revisions (insertions underlined, deletions struck through); accept or reject in Review',
   aiTrackOffTitle:

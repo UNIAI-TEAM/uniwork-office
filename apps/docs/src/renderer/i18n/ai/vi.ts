@@ -108,6 +108,8 @@ export const vi = {
   aiAttachTitle: 'Đính kèm tệp cục bộ (hoặc kéo thả vào bảng điều khiển)',
   aiRemoveAttachmentTitle: 'Xóa tệp đính kèm',
   aiTrackChanges: 'Theo dõi thay đổi',
+  aiTrackForced:
+    'Tài liệu này được bảo vệ: phải luôn bật theo dõi thay đổi, nên các chỉnh sửa của AI được ghi lại dưới dạng bản sửa đổi.',
   aiTrackOnTitle:
     'Bật theo dõi thay đổi: Các nội dung AI chỉnh sửa được đánh dấu là bản sửa đổi (chèn có gạch chân, xóa có gạch ngang); chấp nhận hoặc từ chối trong mục Xem lại',
   aiTrackOffTitle:

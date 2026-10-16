@@ -110,6 +110,8 @@ export const ms = {
   aiAttachTitle: 'Lampirkan fail setempat (atau seret ke panel)',
   aiRemoveAttachmentTitle: 'Alih keluar lampiran',
   aiTrackChanges: 'Jejak perubahan',
+  aiTrackForced:
+    'Dokumen ini dilindungi: jejak perubahan mesti kekal hidup, jadi suntingan AI direkodkan sebagai semakan.',
   aiTrackOnTitle:
     'Jejak perubahan dihidupkan: suntingan kandungan AI ditandakan sebagai semakan (sisipan bergaris bawah, pemadaman bergaris batal); terima atau tolak dalam Semakan',
   aiTrackOffTitle:

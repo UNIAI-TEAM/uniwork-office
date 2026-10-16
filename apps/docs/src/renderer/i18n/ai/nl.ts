@@ -111,6 +111,8 @@ export const nl = {
   aiAttachTitle: 'Lokale bestanden bijvoegen (of sleep ze naar het paneel)',
   aiRemoveAttachmentTitle: 'Bijlage verwijderen',
   aiTrackChanges: 'Wijzigingen bijhouden',
+  aiTrackForced:
+    'Dit document is beveiligd: Wijzigingen bijhouden moet aan blijven, dus bewerkingen van de AI worden als revisies vastgelegd.',
   aiTrackOnTitle:
     'Wijzigingen bijhouden aan: AI-inhoudsbewerkingen worden gemarkeerd als revisies (invoegingen onderstreept, verwijderingen doorgehaald); accepteer of weiger ze in Controleren',
   aiTrackOffTitle:

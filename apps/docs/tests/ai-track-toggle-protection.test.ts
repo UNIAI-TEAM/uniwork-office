@@ -19,7 +19,7 @@ const dicts = strings as unknown as Record<string, Record<string, string>>
 describe('AI panel Track changes under tracked-changes protection', () => {
   it('shows as on and disabled, with a reason a screen reader reads', async () => {
     localStorage.clear()
-    h = await mountDocsAiPanel(['one'], { protection: 'trackedChanges' })
+    h = await mountDocsAiPanel(['one'], { protection: 'trackedChanges', lang: 'en' })
     const btn = pill(h.container)
     expect(btn.classList.contains('on')).toBe(true)
     expect(btn.disabled).toBe(true)
@@ -27,7 +27,8 @@ describe('AI panel Track changes under tracked-changes protection', () => {
     expect(reasonId).toBeTruthy()
     const reason = h.container.querySelector(`#${reasonId}`) as HTMLElement
     expect(reason.textContent).toBe(dicts.en!.aiTrackForced)
-    expect(btn.getAttribute('data-tip')).toBe(dicts.en!.aiTrackForced)
+    // the hover tip sits on the wrapper: a disabled button gets no pointer events
+    expect(btn.closest('.ai-track-wrap')?.getAttribute('data-tip')).toBe(dicts.en!.aiTrackForced)
   })
 
   it('a click does not turn tracking off or accept the AI revisions', async () => {

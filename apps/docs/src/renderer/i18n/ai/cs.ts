@@ -110,6 +110,8 @@ export const cs = {
   aiAttachTitle: 'Připojit místní soubory (nebo je přetáhněte na panel)',
   aiRemoveAttachmentTitle: 'Odebrat přílohu',
   aiTrackChanges: 'Sledování změn',
+  aiTrackForced:
+    'Tento dokument je chráněn: sledování změn musí zůstat zapnuté, proto se úpravy AI zaznamenávají jako revize.',
   aiTrackOnTitle:
     'Sledování změn zapnuto: úpravy obsahu od AI se označují jako revize (vložení podtržené, odstranění přeškrtnuté); přijměte nebo odmítněte v části Revize',
   aiTrackOffTitle:

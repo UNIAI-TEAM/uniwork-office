@@ -9318,6 +9318,17 @@ body.docs-crop-active
   transition: all var(--transition-fast);
 }
 
+/* tracked-changes protection: the pill is on and fixed; the wrapper takes the pointer so its tip shows */
+.ai-track-wrap {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.ai-track-wrap.forced .ai-track-btn {
+  pointer-events: none;
+  cursor: default;
+}
+
 .ai-track-btn:hover {
   background: var(--color-bg-subtle);
   color: var(--color-text-primary);

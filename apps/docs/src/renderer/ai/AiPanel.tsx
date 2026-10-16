@@ -68,7 +68,7 @@ import {
 import type { AiPageSetupAccess } from './page-setup'
 import type { AiNotesAccess } from './note-ops'
 import { createDocsSkill, type AiDocProtection } from './docs-skill'
-import { aiTrackFor } from './track-policy'
+import { aiTrackFor, aiTracksChanges } from './track-policy'
 import { MindMapCard } from './MindMapCard'
 import {
   buildDocWriterRequest,
@@ -1543,7 +1543,13 @@ export function AiPanel({
     return () => window.removeEventListener('ai-docs-commit-tables', onSave)
   }, [])
 
+  // tracked-changes protection forces tracking on: the pill shows it on and cannot switch it off
+  // (switching off accepts the AI's revisions, which would bypass the forced tracking)
+  const trackForced = protection === 'trackedChanges'
+  const trackShown = aiTracksChanges(trackChanges, protection)
+
   const toggleTrackChanges = () => {
+    if (trackForced) return
     const next = !trackChanges
     setTrackChanges(next)
     localStorage.setItem(TRACK_CHANGES_KEY, next ? '1' : '0')
@@ -2391,14 +2397,34 @@ export function AiPanel({
                 <img src={attachIcon} alt="" aria-hidden />
               </button>
               {!readOnly && (
-                <button
-                  className={`ai-track-btn${trackChanges ? ' on' : ''}`}
-                  onClick={toggleTrackChanges}
-                  data-tip={trackChanges ? t('aiTrackOnTitle') : t('aiTrackOffTitle')}
+                // under tracked-changes protection the pill is on and fixed; the wrapper carries
+                // the reason tip because a disabled button gets no pointer events
+                <span
+                  className={`ai-track-wrap${trackForced ? ' forced' : ''}`}
+                  data-tip={trackForced ? t('aiTrackForced') : undefined}
                 >
-                  <span className="ai-track-dot" aria-hidden />
-                  {t('aiTrackChanges')}
-                </button>
+                  <button
+                    className={`ai-track-btn${trackShown ? ' on' : ''}`}
+                    onClick={toggleTrackChanges}
+                    disabled={trackForced}
+                    aria-describedby={trackForced ? 'ai-track-forced-reason' : undefined}
+                    data-tip={
+                      trackForced
+                        ? undefined
+                        : trackShown
+                          ? t('aiTrackOnTitle')
+                          : t('aiTrackOffTitle')
+                    }
+                  >
+                    <span className="ai-track-dot" aria-hidden />
+                    {t('aiTrackChanges')}
+                  </button>
+                  {trackForced && (
+                    <span id="ai-track-forced-reason" className="ai-sr-status">
+                      {t('aiTrackForced')}
+                    </span>
+                  )}
+                </span>
               )}
             </>
           }

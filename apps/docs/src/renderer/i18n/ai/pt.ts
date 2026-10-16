@@ -111,6 +111,8 @@ export const pt = {
   aiAttachTitle: 'Anexar arquivos locais (ou arraste-os para o painel)',
   aiRemoveAttachmentTitle: 'Remover anexo',
   aiTrackChanges: 'Controlar alterações',
+  aiTrackForced:
+    'Este documento está protegido: o controlo de alterações tem de ficar ativo, por isso as edições da IA são registadas como revisões.',
   aiTrackOnTitle:
     'Controle de alterações ativado: as edições de conteúdo da IA são marcadas como revisões (inserções sublinhadas, exclusões tachadas); aceite ou rejeite em Revisão',
   aiTrackOffTitle:

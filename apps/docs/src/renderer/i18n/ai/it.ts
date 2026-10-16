@@ -112,6 +112,8 @@ export const it = {
   aiAttachTitle: 'Allega file locali (o trascinali sul pannello)',
   aiRemoveAttachmentTitle: 'Rimuovi allegato',
   aiTrackChanges: 'Revisioni',
+  aiTrackForced:
+    'Questo documento è protetto: le revisioni devono restare attive, quindi le modifiche dell’IA vengono registrate come revisioni.',
   aiTrackOnTitle:
     "Revisioni attivate: le modifiche ai contenuti dell'IA sono contrassegnate come revisioni (inserimenti sottolineati, eliminazioni barrate); accettale o rifiutale in Revisione",
   aiTrackOffTitle:

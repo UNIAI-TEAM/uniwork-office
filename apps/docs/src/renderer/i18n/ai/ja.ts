@@ -109,6 +109,8 @@ export const ja = {
   aiAttachTitle: 'ローカルファイルを添付(パネルへのドラッグ&ドロップも可)',
   aiRemoveAttachmentTitle: '添付ファイルを削除',
   aiTrackChanges: '変更履歴',
+  aiTrackForced:
+    'この文書は保護されています。変更履歴は常にオンで、AI の編集は変更履歴として記録されます。',
   aiTrackOnTitle:
     '変更履歴オン:AI による内容の変更は変更履歴として記録されます(挿入は下線、削除は取り消し線)。校閲で承諾または元に戻せます',
   aiTrackOffTitle:

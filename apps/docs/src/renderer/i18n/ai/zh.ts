@@ -105,6 +105,7 @@ export const zh = {
   aiAttachTitle: '添加本地文件作为附件(也可拖拽到面板)',
   aiRemoveAttachmentTitle: '移除附件',
   aiTrackChanges: '修订追踪',
+  aiTrackForced: '此文档受“修订追踪”保护，修订追踪必须保持开启，AI 的改动会记为修订。',
   aiTrackOnTitle: '修订追踪已开启:AI 内容改动标记为修订(插入下划线/删除划线),在审阅中接受或拒绝',
   aiTrackOffTitle: '修订追踪已关闭:AI 改动直接生效(仍可通过版本快照回滚)',
   aiTurnLimit: '（已达单次请求的工具调用轮数上限，以上是基于已完成步骤的回答，可能不完整。）',
