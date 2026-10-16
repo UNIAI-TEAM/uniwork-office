@@ -46,7 +46,6 @@ export const nl = {
   ufDisabledCurrent: 'Huidige locatie',
   ufDisabledInside: 'In de map die wordt verplaatst',
   ufDisabledDeep: 'Te diep',
-  ufHiddenItems: '{n} items die deze app niet kan openen zijn verborgen',
   ufTreeError: 'De mappen konden niet worden geladen.',
   ufActionsFor: 'Acties voor {name}',
 } satisfies Record<keyof typeof zh, string>

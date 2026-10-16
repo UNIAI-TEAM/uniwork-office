@@ -46,7 +46,6 @@ export const en = {
   ufDisabledCurrent: 'Current location',
   ufDisabledInside: 'Inside the folder being moved',
   ufDisabledDeep: 'Too deep',
-  ufHiddenItems: "{n} items this app can't open are hidden",
   ufTreeError: "Couldn't load the folders.",
   ufActionsFor: 'Actions for {name}',
 } satisfies Record<keyof typeof zh, string>

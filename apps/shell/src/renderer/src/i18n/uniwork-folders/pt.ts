@@ -46,7 +46,6 @@ export const pt = {
   ufDisabledCurrent: 'Local atual',
   ufDisabledInside: 'Dentro da pasta que está sendo movida',
   ufDisabledDeep: 'Profundo demais',
-  ufHiddenItems: '{n} itens que este aplicativo não abre estão ocultos',
   ufTreeError: 'Não foi possível carregar as pastas.',
   ufActionsFor: 'Ações para {name}',
 } satisfies Record<keyof typeof zh, string>

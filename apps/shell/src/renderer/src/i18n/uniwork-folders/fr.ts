@@ -46,7 +46,6 @@ export const fr = {
   ufDisabledCurrent: 'Emplacement actuel',
   ufDisabledInside: 'Dans le dossier déplacé',
   ufDisabledDeep: 'Trop profond',
-  ufHiddenItems: '{n} éléments que cette application ne peut pas ouvrir sont masqués',
   ufTreeError: 'Impossible de charger les dossiers.',
   ufActionsFor: 'Actions pour {name}',
 } satisfies Record<keyof typeof zh, string>

@@ -46,7 +46,6 @@ export const de = {
   ufDisabledCurrent: 'Aktueller Speicherort',
   ufDisabledInside: 'Im verschobenen Ordner',
   ufDisabledDeep: 'Zu tief',
-  ufHiddenItems: '{n} Elemente, die diese App nicht öffnen kann, sind ausgeblendet',
   ufTreeError: 'Die Ordner konnten nicht geladen werden.',
   ufActionsFor: 'Aktionen für {name}',
 } satisfies Record<keyof typeof zh, string>

@@ -19,6 +19,7 @@ import { LocaleProvider } from '../src/renderer/src/locale'
 import { UniworkBrowser } from '../src/renderer/src/uniwork-folders/UniworkBrowser'
 import { UniworkLiveHost, resetLiveForTests } from '../src/renderer/src/uniwork-live'
 import { uniworkFolderStrings } from '../src/renderer/src/i18n/strings-uniwork-folders'
+import { uniworkDocumentStrings } from '../src/renderer/src/i18n/strings-uniwork-documents'
 
 /**
  * FD-11 S1-S3: the UniWork browser against a typed fake of the folder IPC
@@ -31,6 +32,7 @@ const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONM
 actEnvironment.IS_REACT_ACT_ENVIRONMENT = true
 
 const en = uniworkFolderStrings.en
+const docEn = uniworkDocumentStrings.en
 
 function folder(id: string, title: string, children: UniworkFolderNode[] = []): UniworkFolderNode {
   return {
@@ -220,8 +222,8 @@ describe('UniworkBrowser: tree and contents (S1)', () => {
       expect.objectContaining({ workspaceId: 'w1', parentId: null }),
     )
     expect(optionTitles()).toEqual(['Alpha', 'Beta', 'Report.docx'])
-    // the page and the zip are hidden with one count line
-    expect($('.uwf-hidden')?.textContent).toBe(en.ufHiddenItems.replace('{n}', '2'))
+    // the page and the zip are hidden with one count line (F11-L2: shared uwPickHiddenFormats)
+    expect($('.uwf-hidden')?.textContent).toBe(docEn.uwPickHiddenFormats.replace('{count}', '2'))
   })
 
   it('opens a folder from the tree, shows its breadcrumb and goes back by it', async () => {

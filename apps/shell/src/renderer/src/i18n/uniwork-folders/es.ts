@@ -46,7 +46,6 @@ export const es = {
   ufDisabledCurrent: 'Ubicación actual',
   ufDisabledInside: 'Dentro de la carpeta que se mueve',
   ufDisabledDeep: 'Demasiado profundo',
-  ufHiddenItems: 'Se ocultan {n} elementos que esta aplicación no puede abrir',
   ufTreeError: 'No se pudieron cargar las carpetas.',
   ufActionsFor: 'Acciones para {name}',
 } satisfies Record<keyof typeof zh, string>

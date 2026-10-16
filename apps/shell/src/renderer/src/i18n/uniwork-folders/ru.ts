@@ -46,7 +46,6 @@ export const ru = {
   ufDisabledCurrent: 'Текущее расположение',
   ufDisabledInside: 'Внутри перемещаемой папки',
   ufDisabledDeep: 'Слишком глубоко',
-  ufHiddenItems: 'Скрыто элементов, которые это приложение не открывает: {n}',
   ufTreeError: 'Не удалось загрузить папки.',
   ufActionsFor: 'Действия для {name}',
 } satisfies Record<keyof typeof zh, string>

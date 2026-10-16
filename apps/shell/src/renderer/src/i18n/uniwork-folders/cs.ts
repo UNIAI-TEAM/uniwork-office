@@ -46,7 +46,6 @@ export const cs = {
   ufDisabledCurrent: 'Aktuální umístění',
   ufDisabledInside: 'Uvnitř přesouvané složky',
   ufDisabledDeep: 'Příliš hluboko',
-  ufHiddenItems: 'Skryté položky, které tato aplikace neotevře: {n}',
   ufTreeError: 'Složky se nepodařilo načíst.',
   ufActionsFor: 'Akce pro {name}',
 } satisfies Record<keyof typeof zh, string>

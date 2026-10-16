@@ -46,7 +46,6 @@ export const id = {
   ufDisabledCurrent: 'Lokasi saat ini',
   ufDisabledInside: 'Di dalam folder yang dipindahkan',
   ufDisabledDeep: 'Terlalu dalam',
-  ufHiddenItems: '{n} item yang tidak dapat dibuka aplikasi ini disembunyikan',
   ufTreeError: 'Tidak dapat memuat folder.',
   ufActionsFor: 'Tindakan untuk {name}',
 } satisfies Record<keyof typeof zh, string>

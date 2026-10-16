@@ -46,7 +46,6 @@ export const ja = {
   ufDisabledCurrent: '現在の場所',
   ufDisabledInside: '移動中のフォルダーの中',
   ufDisabledDeep: '階層が深すぎます',
-  ufHiddenItems: 'このアプリで開けない {n} 件の項目を非表示にしています',
   ufTreeError: 'フォルダーを読み込めませんでした。',
   ufActionsFor: '{name} の操作',
 } satisfies Record<keyof typeof zh, string>

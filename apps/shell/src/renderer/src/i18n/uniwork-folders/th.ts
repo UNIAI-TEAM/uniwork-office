@@ -46,7 +46,6 @@ export const th = {
   ufDisabledCurrent: 'ตำแหน่งปัจจุบัน',
   ufDisabledInside: 'อยู่ในโฟลเดอร์ที่กำลังย้าย',
   ufDisabledDeep: 'ลึกเกินไป',
-  ufHiddenItems: 'ซ่อน {n} รายการที่แอปนี้เปิดไม่ได้',
   ufTreeError: 'โหลดโฟลเดอร์ไม่ได้',
   ufActionsFor: 'การทำงานสำหรับ {name}',
 } satisfies Record<keyof typeof zh, string>

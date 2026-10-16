@@ -46,7 +46,6 @@ export const pl = {
   ufDisabledCurrent: 'Bieżąca lokalizacja',
   ufDisabledInside: 'Wewnątrz przenoszonego folderu',
   ufDisabledDeep: 'Za głęboko',
-  ufHiddenItems: 'Ukryto elementy, których ta aplikacja nie otwiera: {n}',
   ufTreeError: 'Nie udało się wczytać folderów.',
   ufActionsFor: 'Działania dla {name}',
 } satisfies Record<keyof typeof zh, string>

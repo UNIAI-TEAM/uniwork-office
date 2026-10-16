@@ -46,7 +46,6 @@ export const vi = {
   ufDisabledCurrent: 'Vị trí hiện tại',
   ufDisabledInside: 'Nằm trong thư mục đang chuyển',
   ufDisabledDeep: 'Quá sâu',
-  ufHiddenItems: 'Đã ẩn {n} mục ứng dụng này không mở được',
   ufTreeError: 'Không tải được cây thư mục.',
   ufActionsFor: 'Thao tác cho {name}',
 } satisfies Record<keyof typeof zh, string>

@@ -46,7 +46,6 @@ export const zhTW = {
   ufDisabledCurrent: '目前位置',
   ufDisabledInside: '位於正在移動的資料夾內',
   ufDisabledDeep: '層級過深',
-  ufHiddenItems: '已隱藏 {n} 個此應用程式無法開啟的項目',
   ufTreeError: '無法載入資料夾樹。',
   ufActionsFor: '{name} 的動作',
 } satisfies Record<keyof typeof zh, string>

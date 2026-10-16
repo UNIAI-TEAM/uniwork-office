@@ -46,7 +46,6 @@ export const he = {
   ufDisabledCurrent: 'המיקום הנוכחי',
   ufDisabledInside: 'בתוך התיקייה המועברת',
   ufDisabledDeep: 'עמוק מדי',
-  ufHiddenItems: 'הוסתרו {n} פריטים שהאפליקציה לא יכולה לפתוח',
   ufTreeError: 'לא ניתן לטעון את התיקיות.',
   ufActionsFor: 'פעולות עבור {name}',
 } satisfies Record<keyof typeof zh, string>

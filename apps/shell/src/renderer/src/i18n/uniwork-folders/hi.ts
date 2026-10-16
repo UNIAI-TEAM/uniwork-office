@@ -46,7 +46,6 @@ export const hi = {
   ufDisabledCurrent: 'वर्तमान स्थान',
   ufDisabledInside: 'ले जाए जा रहे फ़ोल्डर के अंदर',
   ufDisabledDeep: 'बहुत गहरा',
-  ufHiddenItems: 'इस ऐप में न खुलने वाले {n} आइटम छिपाए गए हैं',
   ufTreeError: 'फ़ोल्डर लोड नहीं हो सके।',
   ufActionsFor: '{name} के लिए कार्रवाइयाँ',
 } satisfies Record<keyof typeof zh, string>

@@ -46,7 +46,6 @@ export const ko = {
   ufDisabledCurrent: '현재 위치',
   ufDisabledInside: '이동 중인 폴더 안',
   ufDisabledDeep: '너무 깊음',
-  ufHiddenItems: '이 앱에서 열 수 없는 항목 {n}개를 숨겼습니다',
   ufTreeError: '폴더를 불러오지 못했습니다.',
   ufActionsFor: '{name} 작업',
 } satisfies Record<keyof typeof zh, string>

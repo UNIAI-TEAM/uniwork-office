@@ -45,7 +45,6 @@ export const zh = {
   ufDisabledCurrent: '当前位置',
   ufDisabledInside: '位于正在移动的文件夹内',
   ufDisabledDeep: '层级过深',
-  ufHiddenItems: '已隐藏 {n} 个此应用无法打开的项目',
   ufTreeError: '无法加载文件夹树。',
   ufActionsFor: '{name} 的操作',
 }

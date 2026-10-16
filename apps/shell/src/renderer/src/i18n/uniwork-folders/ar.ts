@@ -46,7 +46,6 @@ export const ar = {
   ufDisabledCurrent: 'الموقع الحالي',
   ufDisabledInside: 'داخل المجلد الذي يتم نقله',
   ufDisabledDeep: 'عميق جدًا',
-  ufHiddenItems: 'تم إخفاء {n} عنصر لا يمكن لهذا التطبيق فتحه',
   ufTreeError: 'تعذّر تحميل المجلدات.',
   ufActionsFor: 'إجراءات {name}',
 } satisfies Record<keyof typeof zh, string>

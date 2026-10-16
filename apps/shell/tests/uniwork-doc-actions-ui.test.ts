@@ -101,7 +101,6 @@ function makeApi(docs: LibraryDocRow[]) {
     ),
     uniworkArchiveDocument: vi.fn(async (_id: string) => ok({})),
     uniworkRestoreDocument: vi.fn(async (_id: string) => ok({})),
-    uniworkListFolders: vi.fn(async (_ws: string) => ok([{ id: 'f1', title: 'Contracts' }])),
     // FD-11: the Location picker reads the workspace's folder tree
     uniworkFolderTree: vi.fn(async (_ws: string) =>
       ok([{ id: 'f1', parentId: null, title: 'Contracts', position: 0, children: [] }]),
@@ -271,8 +270,6 @@ describe('S18 new document', () => {
     await click(buttonByText(picker as HTMLElement, folderEn.ufChoose))
     expect(host.querySelector('.uwf-picker')).toBeNull()
     expect(location.textContent).toContain('UniWork › Contracts')
-    // the flat folder list is not read any more
-    expect(api.uniworkListFolders).not.toHaveBeenCalled()
     await click(buttonByText(dialog, en.uwDocCreate))
     expect(api.uniworkCreateDocument).toHaveBeenCalledWith({
       workspaceId: 'w1',

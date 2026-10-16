@@ -46,7 +46,6 @@ export const ms = {
   ufDisabledCurrent: 'Lokasi semasa',
   ufDisabledInside: 'Di dalam folder yang sedang dialihkan',
   ufDisabledDeep: 'Terlalu dalam',
-  ufHiddenItems: '{n} item yang tidak boleh dibuka oleh apl ini disembunyikan',
   ufTreeError: 'Tidak dapat memuatkan folder.',
   ufActionsFor: 'Tindakan untuk {name}',
 } satisfies Record<keyof typeof zh, string>

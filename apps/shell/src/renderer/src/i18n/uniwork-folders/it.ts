@@ -46,7 +46,6 @@ export const it = {
   ufDisabledCurrent: 'Posizione attuale',
   ufDisabledInside: 'Dentro la cartella da spostare',
   ufDisabledDeep: 'Troppo in profondità',
-  ufHiddenItems: '{n} elementi che questa app non può aprire sono nascosti',
   ufTreeError: 'Impossibile caricare le cartelle.',
   ufActionsFor: 'Azioni per {name}',
 } satisfies Record<keyof typeof zh, string>

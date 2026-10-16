@@ -125,16 +125,37 @@ export function BrowserContents({
 
   const hiddenLine =
     hiddenCount > 0 ? (
-      <p className="uwf-hidden" role="note">
-        {t('ufHiddenItems', { n: hiddenCount })}
+      <p className="uwf-hidden" role="status">
+        {t('uwPickHiddenFormats', { count: hiddenCount })}
       </p>
     ) : null
+
+  const loadMoreBlock = (
+    <>
+      {list.moreError && (
+        <p className="uw-pick-more-error" role="alert">
+          {t(UNIWORK_ERROR_KEYS[list.moreError])}
+        </p>
+      )}
+      {list.nextCursor && (
+        <button
+          type="button"
+          className="btn btn-secondary uw-pick-more"
+          onClick={onLoadMore}
+          disabled={list.loadingMore}
+        >
+          {list.loadingMore ? t('uwPickLoadingMore') : t('uwPickLoadMore')}
+        </button>
+      )}
+    </>
+  )
 
   if (rows.length === 0) {
     return (
       <div className="uw-pick-state">
         <p className="uw-pick-state-title">{emptyText}</p>
         {hiddenLine}
+        {loadMoreBlock}
       </div>
     )
   }
@@ -206,21 +227,7 @@ export function BrowserContents({
         })}
       </ul>
       {hiddenLine}
-      {list.moreError && (
-        <p className="uw-pick-more-error" role="alert">
-          {t(UNIWORK_ERROR_KEYS[list.moreError])}
-        </p>
-      )}
-      {list.nextCursor && (
-        <button
-          type="button"
-          className="btn btn-secondary uw-pick-more"
-          onClick={onLoadMore}
-          disabled={list.loadingMore}
-        >
-          {list.loadingMore ? t('uwPickLoadingMore') : t('uwPickLoadMore')}
-        </button>
-      )}
+      {loadMoreBlock}
     </>
   )
 }
