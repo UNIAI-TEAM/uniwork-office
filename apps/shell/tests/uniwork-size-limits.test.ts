@@ -815,6 +815,8 @@ describe('SIZE-F1 desktop document size limits', () => {
         return true
       })
 
+      let lastUploadedChecksum = ''
+
       const deps: SaveCoordinatorDeps = {
         store: {
           classify: (path: string) =>
@@ -825,17 +827,20 @@ describe('SIZE-F1 desktop document size limits', () => {
           write: storeWrite,
         } as never,
         client: {
-          upload: async (input) => ({
-            uploadId: 'up_1',
-            checksumSha256: sha256Hex(input.bytes),
-            claimExpiresAt: null,
-          }),
+          upload: async (input) => {
+            lastUploadedChecksum = sha256Hex(input.bytes)
+            return {
+              uploadId: 'up_1',
+              checksumSha256: lastUploadedChecksum,
+              claimExpiresAt: null,
+            }
+          },
           commit: async (input) => ({
             documentId: input.documentId,
             revision: '11',
             versionId: 'v2',
             version: 2,
-            checksumSha256: sha256Hex(readFileSync(docPath)),
+            checksumSha256: lastUploadedChecksum || sha256Hex(readFileSync(docPath)),
             savedAt: ISO,
           }),
           getDocument: async () => {
@@ -927,6 +932,49 @@ describe('SIZE-F1 desktop document size limits', () => {
       // the working copy still holds the base bytes: nothing to send
       const status = await h.coordinator.save(h.docPath)
       expect(status!.binding.state).toBe('saved')
+      expect(h.put).not.toHaveBeenCalled()
+      expect(h.statuses.some((push) => push.error === 'too_large')).toBe(false)
+    })
+
+    it('never marks an unchanged copy failed as too_large when a pending intent exists under a lowered cap (d1-7)', async () => {
+      // Base is 7 bytes ('initial'), max_bytes is lowered to 3 bytes
+      const h = harness(parseDocumentLimits({ upload_max_bytes: 3, save_warn_ratio: 0.9 }))
+      const olderBytes = enc('older')
+      h.stored.set(DOC_ID, {
+        intent: {
+          v: 2,
+          intentId: 'old',
+          idempotencyKey: 'old_key',
+          documentId: DOC_ID,
+          orgId: ORG_ID,
+          workspaceId: WS_ID,
+          baseRevision: '10',
+          baseVersion: 1,
+          checksum: sha256Hex(olderBytes),
+          length: olderBytes.byteLength,
+          generation: 1,
+          state: 'queued',
+          attempt: 0,
+          createdAt: ISO,
+          updatedAt: ISO,
+        },
+        payload: olderBytes,
+      })
+
+      // 1. User save with pending intent + working copy equal to base:
+      //    must NOT fail as too_large or supersede the pending intent; runs pending userSave handling
+      const userStatus = await h.coordinator.save(h.docPath, { userSave: true })
+      expect(userStatus!.binding.error).not.toBe('too_large')
+      expect(h.supersede).not.toHaveBeenCalled()
+      expect(h.put).not.toHaveBeenCalled()
+      expect(h.stored.has(DOC_ID)).toBe(true)
+
+      // 2. Non-user save with pending intent + working copy equal to base:
+      //    replays the pending intent normally without failing the unchanged base as too_large
+      const replayed = await h.coordinator.save(h.docPath)
+      expect(replayed!.binding.state).toBe('saved')
+      expect(replayed!.binding.error).toBeUndefined()
+      expect(h.supersede).not.toHaveBeenCalled()
       expect(h.put).not.toHaveBeenCalled()
       expect(h.statuses.some((push) => push.error === 'too_large')).toBe(false)
     })

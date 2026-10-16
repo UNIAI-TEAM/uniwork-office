@@ -512,55 +512,60 @@ export class SaveCoordinator {
     // bytes identical to the base never touch the network, and an unchanged
     // copy over the cap is already on the server: the no-op verdict comes first
     // so a lowered limit never marks an unchanged document failed
-    if (!pending && checksum === doc.binding.baseChecksum) {
+    const unchangedFromBase = checksum === doc.binding.baseChecksum
+    if (!pending && unchangedFromBase) {
       return await this.commitState(doc, withoutError({ ...doc.binding, state: 'saved' }))
     }
 
-    const limits = await this.resolveLimits()
-    if (bytes.byteLength > limits.max_bytes) {
-      if (pending && !IN_FLIGHT_QUEUE_STATES.has(pending.intent.state)) {
-        await this.deps.dispatcher?.supersede({
-          key: doc.key,
-          path: doc.path,
-          filename: doc.binding.filename,
-          format: doc.binding.format,
-          orgId: doc.binding.orgId,
-          workspaceId: doc.binding.workspaceId,
-          baseVersion: doc.binding.baseVersion,
-          record: pending.intent,
-          payload: pending.payload,
-        })
-        await this.cleanupIntent(intents, doc, pending.intent)
+    if (!unchangedFromBase) {
+      const limits = await this.resolveLimits()
+      if (bytes.byteLength > limits.max_bytes) {
+        if (pending && !IN_FLIGHT_QUEUE_STATES.has(pending.intent.state)) {
+          await this.deps.dispatcher?.supersede({
+            key: doc.key,
+            path: doc.path,
+            filename: doc.binding.filename,
+            format: doc.binding.format,
+            orgId: doc.binding.orgId,
+            workspaceId: doc.binding.workspaceId,
+            baseVersion: doc.binding.baseVersion,
+            record: pending.intent,
+            payload: pending.payload,
+          })
+          await this.cleanupIntent(intents, doc, pending.intent)
+        }
+        this.pendingNext.delete(doc.path)
+        this.activeSizeWarns.delete(doc.path)
+        this.activeTooLargePrompt.add(doc.path)
+        let failedDoc: BoundDocument
+        try {
+          failedDoc = await this.commitState(doc, {
+            ...doc.binding,
+            state: 'failed',
+            error: 'too_large',
+            sizeBytes: bytes.byteLength,
+            maxBytes: limits.max_bytes,
+          })
+        } finally {
+          this.activeTooLargePrompt.delete(doc.path)
+        }
+        return failedDoc
       }
-      this.pendingNext.delete(doc.path)
-      this.activeSizeWarns.delete(doc.path)
-      this.activeTooLargePrompt.add(doc.path)
-      let failedDoc: BoundDocument
-      try {
-        failedDoc = await this.commitState(doc, {
-          ...doc.binding,
-          state: 'failed',
-          error: 'too_large',
-          sizeBytes: bytes.byteLength,
-          maxBytes: limits.max_bytes,
-        })
-      } finally {
-        this.activeTooLargePrompt.delete(doc.path)
-      }
-      return failedDoc
-    }
 
-    if (bytes.byteLength >= limits.warn_bytes) {
-      if (!this.warnedDocs.has(doc.key)) {
-        this.activeSizeWarns.set(doc.path, {
-          sizeBytes: bytes.byteLength,
-          maxBytes: limits.max_bytes,
-        })
+      if (bytes.byteLength >= limits.warn_bytes) {
+        if (!this.warnedDocs.has(doc.key)) {
+          this.activeSizeWarns.set(doc.path, {
+            sizeBytes: bytes.byteLength,
+            maxBytes: limits.max_bytes,
+          })
+        } else {
+          this.activeSizeWarns.delete(doc.path)
+        }
       } else {
+        this.warnedDocs.delete(doc.key)
         this.activeSizeWarns.delete(doc.path)
       }
     } else {
-      this.warnedDocs.delete(doc.key)
       this.activeSizeWarns.delete(doc.path)
     }
 
