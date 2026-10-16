@@ -215,6 +215,30 @@ export function pillFitStepOf(input: PillFitStepInput): PillFitStep {
     : { variant: 'compact', iconToggle: true }
 }
 
+/** the warn chip's cap in CSS px: a wide bar never gives the non-urgent size heads-up more than this */
+export const WARN_CHIP_MAX_PX = 240
+/** the warn chip shrinks and ellipsizes down to this minimum (CSS px) before the save pill steps down */
+export const WARN_CHIP_MIN_PX = 88
+
+/**
+ * The width (in unscaled CSS px) the `.uw-size-warn` chip may take beside the save pill:
+ * capped at `WARN_CHIP_MAX_PX` (240px), shrinking down to `WARN_CHIP_MIN_PX` (88px) to leave
+ * the save pill its chosen variant before the save pill ever steps down.
+ */
+export function warnChipMaxOf(input: {
+  /** room in window px shared by the save pill and the warn chip (excluding the gap between them) */
+  room: number
+  /** the save pill's width in window px for its chosen variant */
+  pillWidth: number
+  /** interface scale (`uiScaleOf`) */
+  scale?: number
+}): number {
+  const s = Number.isFinite(input.scale) && input.scale! > 0 ? input.scale! : 1
+  const spare = (input.room - input.pillWidth) / s
+  if (!Number.isFinite(spare)) return WARN_CHIP_MAX_PX
+  return Math.max(WARN_CHIP_MIN_PX, Math.min(WARN_CHIP_MAX_PX, Math.floor(spare)))
+}
+
 export interface BarLayoutInput {
   barWidth: number
   /** fixed items left of the strip (drag spacer, menu button) */
@@ -241,12 +265,20 @@ export interface BarLayoutInput {
   hasShort: boolean
   /** room the steps hold back for the tabs (`captionReserveOf`); absent: none */
   captionReserve?: number
+  /** natural width of `.uw-size-warn` (window px) when present; shrinks before the save pill steps down */
+  warnChip?: number
+  /** gap before `.uw-size-warn` (window px); defaults to `6 * scale` */
+  warnGap?: number
+  /** interface scale for `warnChip` bounds; defaults to 1 */
+  scale?: number
 }
 
 export interface BarLayout {
   variant: PillVariant
   /** the Discussion toggle is drawn icon-only */
   iconToggle: boolean
+  /** drawn width of `.uw-size-warn` (window px) when `warnChip` was given */
+  warnWidth?: number
   strip: { left: number; right: number }
   chrome: { left: number; right: number }
 }
@@ -259,7 +291,14 @@ export interface BarLayout {
 export function barLayoutOf(input: BarLayoutInput): BarLayout {
   const shared = input.barWidth - input.left - input.right - input.margins
   const floor = stripFloorOf(input)
-  const budget = pillRoomOf({ shared, floor, others: input.toggle }) - (input.captionReserve ?? 0)
+  const scale = input.scale ?? 1
+  const hasWarn = typeof input.warnChip === 'number' && input.warnChip > 0
+  const warnCap = hasWarn ? Math.min(input.warnChip!, WARN_CHIP_MAX_PX * scale) : 0
+  const warnMin = hasWarn ? Math.min(warnCap, WARN_CHIP_MIN_PX * scale) : 0
+  const warnGap = hasWarn ? (input.warnGap ?? 6 * scale) : 0
+  const budget =
+    pillRoomOf({ shared, floor, others: input.toggle + warnGap + warnMin }) -
+    (input.captionReserve ?? 0)
   const hasToggle = input.toggleIcon !== undefined && input.toggle > 0
   const step = pillFitStepOf({
     budget,
@@ -274,8 +313,18 @@ export function barLayoutOf(input: BarLayoutInput): BarLayout {
     }),
   })
   const { variant, iconToggle } = step
-  const chromeWidth =
-    (iconToggle ? (input.toggleIcon ?? 0) : input.toggle) + (input.pill[variant] ?? 0)
+  const toggleDrawn = iconToggle ? (input.toggleIcon ?? 0) : input.toggle
+  const pillDrawn = input.pill[variant] ?? 0
+  const warnRoom = hasWarn
+    ? pillRoomOf({ shared, floor, others: toggleDrawn + warnGap }) - (input.captionReserve ?? 0)
+    : 0
+  const warnWidth = hasWarn
+    ? Math.max(
+        warnMin,
+        Math.min(warnCap, warnChipMaxOf({ room: warnRoom, pillWidth: pillDrawn, scale }) * scale),
+      )
+    : 0
+  const chromeWidth = toggleDrawn + (hasWarn ? warnGap + warnWidth : 0) + pillDrawn
   const stripWidth = Math.max(0, shared - chromeWidth)
   const stripRight = input.left + stripWidth
   // the holder's left margin is 6 of the margins
@@ -283,6 +332,7 @@ export function barLayoutOf(input: BarLayoutInput): BarLayout {
   return {
     variant,
     iconToggle,
+    ...(hasWarn ? { warnWidth } : {}),
     strip: { left: input.left, right: stripRight },
     chrome: { left: chromeLeft, right: chromeLeft + chromeWidth },
   }
@@ -302,6 +352,8 @@ export function measurePillFit(group: HTMLElement): {
   natural: number
   toggle: { width: number; iconOnly: boolean } | null
   miniSlack: number
+  warnRoom: number | null
+  scale: number
 } | null {
   const chrome = group.parentElement
   const bar = chrome?.parentElement
@@ -352,12 +404,32 @@ export function measurePillFit(group: HTMLElement): {
     child.classList.contains('tab-bar-caption-spacer'),
   )
   const caption = spacer?.getBoundingClientRect().width ?? 0
-  const budget =
+  // `.uw-size-warn` yields to the save pill (SIZE-v1-4): reserve only its minimum (`WARN_CHIP_MIN_PX`)
+  // before stepping the save pill down, and give the warn chip whatever room the save pill leaves
+  const warnEl = Array.from(chrome.children).find((child) =>
+    child.classList.contains('uw-size-warn'),
+  ) as HTMLElement | undefined
+  const warnWidth = warnEl?.getBoundingClientRect().width ?? 0
+  const hasWarn = Boolean(warnEl && warnWidth > 0)
+  const warnLabel = warnEl?.querySelector<HTMLElement>('.uw-pill-label')
+  const warnClipped = warnLabel ? Math.max(0, warnLabel.scrollWidth - warnLabel.clientWidth) : 0
+  const warnNatural = warnWidth + warnClipped
+  const warnMin = hasWarn
+    ? Math.min(
+        WARN_CHIP_MAX_PX * scale,
+        warnNatural > 0
+          ? Math.min(warnNatural, WARN_CHIP_MIN_PX * scale)
+          : WARN_CHIP_MIN_PX * scale,
+      )
+    : 0
+  const othersWithoutWarn = Math.max(0, chromeWidth - pillWidth - (hasWarn ? warnWidth : 0))
+  const combinedRoom =
     pillRoomOf({
       shared: stripWidth + chromeWidth,
       floor,
-      others: chromeWidth - pillWidth,
+      others: othersWithoutWarn,
     }) - captionReserveOf(caption, scale)
+  const budget = combinedRoom - warnMin
   // the label is the part that gives way (it ellipsizes): its hidden overflow is width the pill wants
   const label = group.querySelector<HTMLElement>('.uw-pill-label')
   const clipped = label ? Math.max(0, label.scrollWidth - label.clientWidth) : 0
@@ -370,7 +442,14 @@ export function measurePillFit(group: HTMLElement): {
     toggleEl && toggleWidth > 0
       ? { width: toggleWidth, iconOnly: toggleEl.getAttribute('data-icon-only') === 'true' }
       : null
-  return { budget, natural: pillWidth + clipped, toggle, miniSlack }
+  return {
+    budget,
+    natural: pillWidth + clipped,
+    toggle,
+    miniSlack,
+    warnRoom: hasWarn ? combinedRoom : null,
+    scale,
+  }
 }
 
 /**

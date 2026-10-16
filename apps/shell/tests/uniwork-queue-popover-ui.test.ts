@@ -228,6 +228,33 @@ describe('queue popover model (S4)', () => {
     expect(blocked.line3).toMatchObject({ key: 'uwRowBlocked', reasonKey: 'uwReasonForbidden' })
   })
 
+  it('SIZE-v1-7b: line 3 of a blocked too_large save uses uwReasonTooLargeWithLimit when maxBytes is known, consistent with the pill', () => {
+    const withStatusLimit = makeStatus({
+      state: 'blocked',
+      error: 'too_large',
+      maxBytes: 1_048_576,
+    })
+    const withoutLimit = makeStatus({ state: 'blocked', error: 'too_large' })
+    const rowWithLimit = makeRow({ state: 'blocked', maxBytes: 1_048_576 })
+    const rowWithoutLimit = makeRow({ state: 'blocked' })
+
+    expect(chipModelOf(withStatusLimit).reasonKey).toBe('uwReasonTooLargeWithLimit')
+    expect(queuePopoverModelOf(withStatusLimit, rowWithoutLimit, 'pill').line3).toEqual({
+      key: 'uwRowBlocked',
+      reasonKey: 'uwReasonTooLargeWithLimit',
+      maxBytes: 1_048_576,
+    })
+    expect(queuePopoverModelOf(withoutLimit, rowWithLimit, 'pill').line3).toEqual({
+      key: 'uwRowBlocked',
+      reasonKey: 'uwReasonTooLargeWithLimit',
+      maxBytes: 1_048_576,
+    })
+    expect(queuePopoverModelOf(withoutLimit, rowWithoutLimit, 'pill').line3).toEqual({
+      key: 'uwRowBlocked',
+      reasonKey: 'uwReasonTooLarge',
+    })
+  })
+
   it('a store refusal reads as the reason alone (store_full: the full-store sentence)', () => {
     const keystore = queuePopoverModelOf(
       makeStatus({ state: 'error', error: 'keystore_locked' }),
@@ -1147,6 +1174,19 @@ describe('UniworkQueuePopover (S4)', () => {
         await act(async () => {})
         expect(moves().filter((v) => v > 0)).toEqual([117])
       })
+    })
+
+    it('SIZE-v1-7b: renders the with-limit reason on line 3 for a blocked too_large save when maxBytes is known', async () => {
+      snapshot = makeSnapshot([], [makeRow({ state: 'blocked', maxBytes: 1_048_576 })])
+      await mount(
+        makeStatus({
+          state: 'blocked',
+          error: 'too_large',
+          maxBytes: 1_048_576,
+        }),
+      )
+      expect(dialog()?.textContent).toContain('Can\u2019t save: over the 1 MB limit')
+      expect(dialog()?.textContent).not.toContain('Can\u2019t save: file too large')
     })
   })
 })

@@ -85,6 +85,14 @@ describe('Save pill hit areas (T10)', () => {
     const gap = px(/--uw-divider-gap: (\d+px)/.exec(rule('.tab-bar'))?.[1])
     expect(Math.abs(px(/right: (-?\d+px)/.exec(close)?.[1]))).toBeLessThan(gap)
   })
+
+  it('SIZE-v1-5: .uw-pill-close hit target is at least 24x24 px', () => {
+    const close = rule('.uw-pill-close')
+    expect(px(/width: (\d+px)/.exec(close)?.[1])).toBeGreaterThanOrEqual(24)
+    expect(px(/height: (\d+px)/.exec(close)?.[1])).toBeGreaterThanOrEqual(24)
+    expect(px(/min-width: (\d+px)/.exec(close)?.[1])).toBeGreaterThanOrEqual(24)
+    expect(px(/min-height: (\d+px)/.exec(close)?.[1])).toBeGreaterThanOrEqual(24)
+  })
 })
 
 describe('Save pill tones and buttons', () => {

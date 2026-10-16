@@ -3,6 +3,8 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   PILL_STRIP_TABS,
+  WARN_CHIP_MAX_PX,
+  WARN_CHIP_MIN_PX,
   barLayoutOf,
   captionReserveOf,
   miniSlackOf,
@@ -12,6 +14,7 @@ import {
   pillRoomOf,
   shortLabelOf,
   stripFloorOf,
+  warnChipMaxOf,
   type BarLayoutInput,
 } from '../src/renderer/src/uniwork-pill-fit'
 import { en } from '../src/renderer/src/i18n/sync/en'
@@ -1197,5 +1200,56 @@ describe('VTS1-01: the pill steps hold back the old caption over-reservation at 
         }
       }
     }
+  })
+})
+
+describe('SIZE-v1-4: the warn chip shrinks/caps in the pill-fit budget before the save pill degrades', () => {
+  it('warnChipMaxOf caps at 240px and shrinks down to WARN_CHIP_MIN_PX before the save pill steps down', () => {
+    expect(WARN_CHIP_MAX_PX).toBe(240)
+    expect(WARN_CHIP_MIN_PX).toBe(88)
+    expect(warnChipMaxOf({ room: 600, pillWidth: 150, scale: 1 })).toBe(240)
+    // vi-dark-s125 at 1280px: 402.5 win px shared by the 189 win px full pill and the warn chip -> 170 CSS px
+    expect(warnChipMaxOf({ room: 402.5, pillWidth: 189, scale: 1.25 })).toBe(170)
+    // tight room floors at WARN_CHIP_MIN_PX
+    expect(warnChipMaxOf({ room: 200, pillWidth: 180, scale: 1 })).toBe(WARN_CHIP_MIN_PX)
+    expect(warnChipMaxOf({ room: Number.NaN, pillWidth: 150, scale: 1 })).toBe(WARN_CHIP_MAX_PX)
+  })
+
+  it('1280px at 1.25 UI scale (vi-dark-s125): a 344px warn chip shrinks to fit and keeps the save pill in its full label', () => {
+    const S = 1.25
+    const CAPTION = 138
+    const base: BarLayoutInput = {
+      barWidth: 1280,
+      left: 40 * S,
+      right: 38 * S + CAPTION,
+      margins: 22 * S,
+      home: 144.8 * S,
+      tabMin: 104 * S,
+      docTabs: 1,
+      padding: 20 * S,
+      newButton: 32 * S,
+      toggle: 123,
+      toggleIcon: 39.1,
+      pill: { full: 189, compact: 41, mini: 35 },
+      hasShort: false,
+      captionReserve: captionReserveOf(CAPTION, S),
+      scale: S,
+    }
+    const withWarn = barLayoutOf({ ...base, warnChip: 344 })
+    expect(withWarn.variant).toBe('full')
+    expect(withWarn.warnWidth).toBeLessThanOrEqual(WARN_CHIP_MAX_PX * S)
+    expect(withWarn.warnWidth).toBeGreaterThanOrEqual(WARN_CHIP_MIN_PX * S)
+    const floor = stripFloorOf(base)
+    expect(withWarn.strip.right - withWarn.strip.left).toBeGreaterThanOrEqual(
+      floor + captionReserveOf(CAPTION, S),
+    )
+    expect(withWarn.strip.right).toBeLessThanOrEqual(withWarn.chrome.left)
+  })
+
+  it('tabbar.css caps .uw-size-warn at var(--uw-warn-max, 240px)', () => {
+    const css = readFileSync(resolve(__dirname, '../src/renderer/src/tabbar.css'), 'utf8')
+    const match = /\.uw-size-warn\s*\{([^}]*)\}/.exec(css)
+    expect(match).not.toBeNull()
+    expect(match![1]).toMatch(/max-width:\s*var\(--uw-warn-max,\s*240px\)/)
   })
 })
