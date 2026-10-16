@@ -70,4 +70,27 @@ export const ms = {
   collabInFileSection: 'Komen dalam fail',
   collabInFileHint:
     'Disimpan dalam fail dan baca sahaja: anda tidak boleh mengedit atau membalas di sini.',
+  collabMentionWarnTitle: 'Orang yang disebut tidak dapat melihat dokumen ini',
+  collabMentionWarnBody:
+    '{names} tidak dapat melihat dokumen ini, jadi mereka tidak akan dimaklumkan.',
+  collabShareViewThenSend: 'Kongsi akses lihat, kemudian hantar',
+  collabSendWithoutNotify: 'Hantar tanpa memaklumkan',
+  collabMentionAskManager:
+    'Minta seseorang yang mengurus dokumen ini untuk berkongsi akses lihat dengan {names}.',
+  collabMentionMixedUnshareable:
+    'Tidak dapat berkongsi dengan {unshareable}; mereka tidak akan dimaklumkan.',
+  collabSharingView: 'Sedang berkongsi akses lihat…',
+  collabShareViewFailed:
+    'Tidak dapat berkongsi akses lihat dengan {failedNames}. Anda boleh cuba lagi atau hantar tanpa memaklumkan.',
+  collabShareViewPartial:
+    'Akses lihat telah dikongsi dengan {sharedNames}. Tidak dapat berkongsi dengan {failedNames} (mereka tidak akan dimaklumkan).',
+  collabSendComment: 'Hantar komen',
+  collabRetryShareFor: 'Cuba lagi untuk {failedNames}',
+  collabSendFailedAfterShare:
+    'Akses lihat telah dikongsi dengan {sharedNames}, tetapi komen gagal dihantar. Teks anda masih ada dalam kotak — cuba hantar semula.',
+  collabPostSendNoAccess: '{names} tidak dapat melihat dokumen ini, jadi mereka tidak dimaklumkan.',
+  collabPostSendShareAction: 'Kongsi akses lihat',
+  collabPostSendNoRetroNote:
+    'Berkongsi sekarang tidak akan memaklumkan mereka tentang komen ini; sebut mereka dalam komen baharu untuk memaklumkan.',
+  collabDismissNotice: 'Tutup',
 } satisfies Record<keyof typeof zh, string>

@@ -787,6 +787,184 @@ describe('focus', () => {
   })
 })
 
+describe('DOC-05 comment level + G8-18 post-send inline notice', () => {
+  it('comment level: allows writing/replying and resolving own root thread, but hides resolve on someone else’s root thread even when author of a reply', async () => {
+    const src = fakeSource(
+      list([
+        cm({ id: 'mine-root', author_id: 'me' }),
+        cm({ id: 'other-root', author_id: 'other' }),
+        cm({ id: 'my-reply', parent_id: 'other-root', author_id: 'me' }),
+      ]),
+    )
+    await mount(src, host({ level: 'comment', myUserId: 'me' }))
+    expect(ctl.can.canWrite).toBe(true)
+    expect($('[data-thread-id="mine-root"] [data-resolve-for="mine-root"]')).not.toBeNull()
+    expect($('[data-thread-id="other-root"] [data-resolve-for="other-root"]')).toBeNull()
+  })
+
+  const WITHOUT_ACCESS = [
+    { user_id: 'u-a', display_name: 'Minh Anh', can_share: true },
+    { user_id: 'u-b', display_name: 'Mai Hương', can_share: false },
+  ]
+  const sentComment = (over = {}) =>
+    cm({ id: 'c-post', author_id: 'me', body: 'cc @Minh Anh @Mai Hương', ...over })
+
+  /** a Discussion panel; a send goes through the composer slot, the way a real composer submits */
+  async function mountDiscussion(src: FakeSource, h = host({ kind: 'discussion' })) {
+    await mount(src, h)
+    const slot = () => slots.find((s) => s.mode === 'discussion')!
+    const send = async (text = 'hello') => {
+      await act(async () => {
+        await slot().onSubmit(text)
+        await flush()
+      })
+    }
+    return { send }
+  }
+
+  it('F3: the notice comes from the controller write result, with no patched or inspected source', async () => {
+    const src = Object.assign(fakeSource(list([])), { shareView: vi.fn() })
+    const created = sentComment({ mentions_without_access: WITHOUT_ACCESS })
+    src.create.mockResolvedValue({ comment: created })
+    const originalCreate = src.create
+    const { send } = await mountDiscussion(src)
+    await send()
+    expect(src.create).toBe(originalCreate)
+    expect(Object.getOwnPropertySymbols(src)).toEqual([])
+    expect($('[data-post-send-for="c-post"]')).not.toBeNull()
+    // the controller hands the answer back to its caller
+    let returned: unknown
+    await act(async () => {
+      returned = await ctl.actions.create('again')
+    })
+    expect(returned).toMatchObject({ id: 'c-post' })
+  })
+
+  it('N2: the notice is announced once, through the shared live region and not as a live region itself', async () => {
+    vi.useFakeTimers()
+    const src = Object.assign(fakeSource(list([])), { shareView: vi.fn() })
+    src.create.mockResolvedValue({
+      comment: sentComment({ mentions_without_access: WITHOUT_ACCESS }),
+    })
+    const { send } = await mountDiscussion(src)
+    await send()
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100)
+    })
+    const notice = $('[data-post-send-for="c-post"]')!
+    expect(notice.getAttribute('role')).toBeNull()
+    expect(notice.getAttribute('aria-live')).toBeNull()
+    expect(notice.closest('[role="status"], [aria-live]')).toBeNull()
+    expect(document.getElementById(COLLAB_LIVE_REGION_ID)?.textContent).toBe(
+      "Minh Anh and Mai Hương can't view this document, so they weren't notified.",
+    )
+  })
+
+  it('renders the post-send notice for the sent comment and shares view access from it (G8-18)', async () => {
+    const shareView = vi.fn(async () => ({ ok: true as const }))
+    const src = Object.assign(fakeSource(list([])), { shareView })
+    src.create.mockResolvedValue({
+      comment: sentComment({ mentions_without_access: WITHOUT_ACCESS }),
+    })
+    src.list.mockResolvedValue(list([sentComment({ mentions_without_access: WITHOUT_ACCESS })]))
+    const { send } = await mountDiscussion(src)
+    await send()
+
+    const notice = $('[data-post-send-for="c-post"]')!
+    expect(notice).not.toBeNull()
+    expect(notice.textContent).toContain(
+      "Minh Anh and Mai Hương can't view this document, so they weren't notified.",
+    )
+    expect(notice.textContent).toContain("Can't share with Mai Hương; they won't be notified.")
+    expect(notice.textContent).toContain(
+      "Sharing now won't notify them about this comment; mention them in a new comment to notify.",
+    )
+    const shareBtn = notice.querySelector<HTMLButtonElement>('.collab-post-send-share')!
+    expect(shareBtn.textContent).toBe('Share view access')
+
+    await act(async () => {
+      shareBtn.click()
+      await flush()
+    })
+    expect(shareView).toHaveBeenCalledTimes(1)
+    expect(shareView).toHaveBeenCalledWith({ user_id: 'u-a' })
+    // u-a is shared; only u-b (not shareable) remains and the share button is gone
+    expect(notice.textContent).toContain(
+      "Mai Hương can't view this document, so they weren't notified.",
+    )
+    expect(notice.querySelector('.collab-post-send-share')).toBeNull()
+  })
+
+  it('F4: a comment that merely lists mentions_without_access (another author, a later load) shows no notice', async () => {
+    const src = Object.assign(
+      fakeSource(
+        list([cm({ id: 'theirs', author_id: 'other', mentions_without_access: WITHOUT_ACCESS })]),
+      ),
+      { shareView: vi.fn() },
+    )
+    await mountDiscussion(src)
+    expect($('.collab-post-send-notice')).toBeNull()
+  })
+
+  it('F4: the notice belongs to the last send only: the next send drops it, and × dismisses it', async () => {
+    const src = Object.assign(fakeSource(list([])), { shareView: vi.fn() })
+    src.create.mockResolvedValueOnce({
+      comment: sentComment({ mentions_without_access: WITHOUT_ACCESS }),
+    })
+    const { send } = await mountDiscussion(src)
+    await send('first')
+    expect($('.collab-post-send-notice')).not.toBeNull()
+
+    // dismiss: the × is a named button; focus moves to the panel title when it was inside the notice
+    const close = $<HTMLButtonElement>('.collab-post-send-close')!
+    expect(close.getAttribute('aria-label')).toBe('Dismiss')
+    act(() => close.focus())
+    await act(async () => {
+      close.click()
+      await flush()
+    })
+    expect($('.collab-post-send-notice')).toBeNull()
+    expect(document.activeElement).toBe($('h2.collab-title'))
+
+    // a new notice, then a send without unreachable mentions clears it
+    src.create.mockResolvedValueOnce({
+      comment: sentComment({ id: 'c-2', mentions_without_access: WITHOUT_ACCESS }),
+    })
+    await send('second')
+    expect($('[data-post-send-for="c-2"]')).not.toBeNull()
+    src.create.mockResolvedValueOnce({ comment: cm({ id: 'c-3', author_id: 'me' }) })
+    await send('third')
+    expect($('.collab-post-send-notice')).toBeNull()
+  })
+
+  it('F7: a failed share is said in the notice and announced; the people stay for another try', async () => {
+    const shareView = vi.fn(async () => {
+      throw err('network')
+    })
+    const src = Object.assign(fakeSource(list([])), { shareView })
+    src.create.mockResolvedValue({
+      comment: sentComment({
+        mentions_without_access: [{ user_id: 'u-a', display_name: 'Minh Anh', can_share: true }],
+      }),
+    })
+    const { send } = await mountDiscussion(src)
+    await send()
+    vi.useFakeTimers()
+    await act(async () => {
+      $<HTMLButtonElement>('.collab-post-send-share')!.click()
+      await flush()
+    })
+    const failure =
+      "Couldn't share view access with Minh Anh. You can try again or send without notifying."
+    expect($('.collab-post-send-error')?.textContent).toBe(failure)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100)
+    })
+    expect(document.getElementById(COLLAB_LIVE_REGION_ID)?.textContent).toBe(failure)
+    expect($('.collab-post-send-share')).not.toBeNull()
+  })
+})
+
 describe('collab.css', () => {
   it('tokens only (no raw colours in rules), 24px targets, 44px under a coarse pointer', async () => {
     const { readFileSync } = await import('node:fs')

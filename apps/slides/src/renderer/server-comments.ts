@@ -297,7 +297,9 @@ export async function loadCommentsContext(
   if (!isId(v.documentId)) return null
   if (v.versionId !== null && !isId(v.versionId)) return null
   const level =
-    v.level === 'view' || v.level === 'edit' || v.level === 'manage' ? v.level : undefined
+    v.level === 'view' || v.level === 'comment' || v.level === 'edit' || v.level === 'manage'
+      ? v.level
+      : undefined
   return {
     documentId: v.documentId,
     versionId: v.versionId,

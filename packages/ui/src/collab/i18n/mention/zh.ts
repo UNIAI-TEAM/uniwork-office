@@ -10,4 +10,5 @@ export const zh = {
   collabMentionNoMatch: '在有权查看此文档的人中，没有匹配“{query}”的人。',
   collabMentionNoCandidates: '还没有其他人可以查看此文档。',
   collabMentionError: '无法加载人员列表。',
+  collabMentionNoAccessBadge: '无法查看',
 }

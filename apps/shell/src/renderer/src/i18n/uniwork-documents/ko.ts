@@ -123,6 +123,7 @@ export const ko = {
   uwDocInfoByAt: '{name}, {time}',
   uwDocInfoVersionBy: '{version} · {name}',
   uwAccessView: '보기',
+  uwAccessComment: '댓글',
   uwAccessEdit: '편집',
   uwAccessManage: '관리',
   uwRoleOwner: '소유자',

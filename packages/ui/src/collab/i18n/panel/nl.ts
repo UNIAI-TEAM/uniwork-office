@@ -71,4 +71,27 @@ export const nl = {
   collabInFileSection: 'Opmerkingen in het bestand',
   collabInFileHint:
     'Opgeslagen in het bestand en alleen-lezen: je kunt hier niet bewerken of antwoorden.',
+  collabMentionWarnTitle: 'Vermelde personen kunnen dit document niet bekijken',
+  collabMentionWarnBody:
+    '{names} kunnen dit document niet bekijken en krijgen daarom geen melding.',
+  collabShareViewThenSend: 'Weergavetoegang delen en verzenden',
+  collabSendWithoutNotify: 'Verzenden zonder melding',
+  collabMentionAskManager:
+    'Vraag iemand die dit document beheert om weergavetoegang te delen met {names}.',
+  collabMentionMixedUnshareable: 'Kan niet delen met {unshareable}; zij krijgen geen melding.',
+  collabSharingView: 'Weergavetoegang delen…',
+  collabShareViewFailed:
+    'Kon weergavetoegang niet delen met {failedNames}. Je kunt het opnieuw proberen of verzenden zonder melding.',
+  collabShareViewPartial:
+    'Weergavetoegang gedeeld met {sharedNames}. Kon niet delen met {failedNames} (zij krijgen geen melding).',
+  collabSendComment: 'Opmerking verzenden',
+  collabRetryShareFor: 'Opnieuw proberen voor {failedNames}',
+  collabSendFailedAfterShare:
+    'Weergavetoegang gedeeld met {sharedNames}, maar de opmerking kon niet worden verzonden. Je tekst staat nog in het vak — probeer opnieuw te verzenden.',
+  collabPostSendNoAccess:
+    '{names} kunnen dit document niet bekijken en hebben daarom geen melding gekregen.',
+  collabPostSendShareAction: 'Weergavetoegang delen',
+  collabPostSendNoRetroNote:
+    'Nu delen stuurt geen melding over deze opmerking; vermeld hen in een nieuwe opmerking om een melding te sturen.',
+  collabDismissNotice: 'Sluiten',
 } satisfies Record<keyof typeof zh, string>

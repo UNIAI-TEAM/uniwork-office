@@ -118,6 +118,30 @@ describe('MentionPicker (presentational listbox)', () => {
     })
     expect(ev.defaultPrevented).toBe(true)
   })
+
+  it('shows the lock icon and collabMentionNoAccessBadge on candidates with can_view=false (G8-18)', () => {
+    render({
+      noAccessBadge: "Can't view",
+      rows: rowsOf(
+        {
+          kind: 'candidate',
+          key: 'a',
+          candidate: { ...candidate('a', 'Minh Anh'), can_view: true },
+        },
+        {
+          kind: 'candidate',
+          key: 'b',
+          candidate: { ...candidate('b', 'Mai Hương'), can_view: false },
+        },
+      ),
+    })
+    const [first, second] = [...host.querySelectorAll<HTMLElement>('[role=option]')]
+    expect(first!.querySelector('.collab-mention-no-access')).toBeNull()
+    const badge = second!.querySelector('.collab-mention-no-access')!
+    expect(badge).not.toBeNull()
+    expect(badge.querySelector('svg.collab-mention-lock')).not.toBeNull()
+    expect(badge.textContent).toContain("Can't view")
+  })
 })
 
 describe('nextSelectableIndex', () => {
@@ -142,23 +166,26 @@ describe('useMentionSearch', () => {
   let latest: Search
 
   function Probe(props: {
-    source: ReturnType<typeof fakeSource>
+    source: ReturnType<typeof fakeSource> & { canListMembers?: boolean }
     query: string | null
     announce?: (t: string) => void
+    canListMembers?: boolean
   }) {
     latest = useMentionSearch({
       source: props.source,
       query: props.query,
       strings: PICKER_STRINGS,
       announce: props.announce,
+      canListMembers: props.canListMembers,
     })
     return null
   }
   const mount = (
-    source: ReturnType<typeof fakeSource>,
+    source: ReturnType<typeof fakeSource> & { canListMembers?: boolean },
     query: string | null,
     announce?: (t: string) => void,
-  ) => act(() => root.render(createElement(Probe, { source, query, announce })))
+    canListMembers?: boolean,
+  ) => act(() => root.render(createElement(Probe, { source, query, announce, canListMembers })))
   const texts = () =>
     latest.rows.map((r) => (r.kind === 'candidate' ? r.candidate.display_name : r.text))
 
@@ -181,6 +208,19 @@ describe('useMentionSearch', () => {
     expect(source.searchMentions).toHaveBeenCalledTimes(1)
     expect(source.searchMentions).toHaveBeenCalledWith({ q: 'mi', limit: 20 })
     expect(texts()).toEqual(['Minh Anh'])
+  })
+
+  it('passes include: no_access only when the caller may list members (G8-18)', async () => {
+    const source = Object.assign(fakeSource([candidate('a', 'Minh Anh')]), {
+      canListMembers: true,
+    })
+    mount(source, 'mi')
+    await settle(act, 150)
+    expect(source.searchMentions).toHaveBeenCalledWith({
+      q: 'mi',
+      limit: 20,
+      include: 'no_access',
+    })
   })
 
   it('shows one unselectable searching row until the first answer', async () => {
