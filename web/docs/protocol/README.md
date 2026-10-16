@@ -84,6 +84,7 @@ gets no `init` within its retry budget (40 × 500 ms), or is opened top-level (`
 | `error`                         | event   | {error: ProtocolErrorShape, fatal}                                                      |
 | `cancel`                        | event   | {id} — abort a frame→host request                                                       |
 | `aiRun`                         | event   | {state: 'running' \| 'idle', run_id?} — an AI turn started / ended (additive, X-02)     |
+| `open_refused`                  | event   | {reason, bytes?, measure?} — the frame cannot show the document (additive, SIZE-F1)     |
 | `comments.*`, `mentions.search` | request | server comments (additive, G8-08, cap `comments`); see "Server comments" below          |
 
 `api.*`, `file.pick`, `image.fetch` and `convert.altChunkHtml` are proxied by the host's `api` handlers; a type
@@ -131,6 +132,13 @@ URL must widen `connect-src` in the CSP it serves (`csp.json`) for that origin.
 - `aiRun {state, run_id?}` (frame → host): `running` when an AI turn starts, exactly one `idle` on every end path
   (rules: UX spine EXPERIENCE.md › Foundation). A host treats the turn as idle when the frame unloads. A host before
   X-02 drops it silently.
+- `open_refused {reason, bytes?, measure?}` (frame → host, additive SIZE-F1): the module cannot show the document.
+  `reason` is `engine_out_of_memory` | `too_large_to_open` | `too_complex`; `bytes` is the stored size when known;
+  `measure` (`worksheet_xml_bytes` | `paragraphs` | `characters` | `zip_parts` | `cells`, `value`, optional `limit`)
+  names what tripped. At most once per documentId; Docs Read Mode is not a refusal. The frame then keeps a read-only
+  refused state for that document (never a blank editable one) and sends no `api.save` / `api.saveAs`; a host `open`
+  of another document resets it. A sheets out-of-memory also sends a fatal `error` (`too_large`), as the XML guard
+  does. A host before SIZE-F1 drops the event.
 - `uniworkAi`: UniWork AI in the AI panel. The frame claims it (`AI_FRAME_CAPABILITIES`) once the adapter exists
   (G6-05); until then it is `false` whatever the host grants.
 - `save` answers keep the existing codes and `SaveResult`; `PROTOCOL_VERSION` stays 1.

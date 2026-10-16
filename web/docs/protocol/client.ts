@@ -48,6 +48,7 @@ import {
   type InitUser,
   type OfficeModule,
   type OpenPayload,
+  type OpenRefusedPayload,
   type ProtocolErrorShape,
   type RemoteVersionPayload,
   type SavedPayload,
@@ -175,6 +176,8 @@ export interface DocsFrameClient {
   reportError(error: ProtocolErrorShape | unknown, fatal?: boolean): void
   /** an AI turn started / ended (additive, X-02); a host before X-02 drops it silently */
   reportAiRun(payload: AiRunPayload): void
+  /** open_refused (additive, SIZE-F1 §3.1a): the bridges send it at most once per documentId */
+  reportOpenRefused(payload: OpenRefusedPayload): void
   dispose(): void
 }
 
@@ -528,6 +531,7 @@ export function createDocsFrameClient(options: DocsFrameClientOptions): DocsFram
     // an empty run_id is omitted: the host validator (isNonEmptyStr) would reject the event
     reportAiRun: ({ state, run_id }) =>
       guarded(() => ep.emit('aiRun', run_id ? { state, run_id } : { state })),
+    reportOpenRefused: (payload) => guarded(() => ep.emit('open_refused', payload)),
     dispose() {
       stopReady()
       token = null

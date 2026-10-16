@@ -1281,6 +1281,8 @@ export interface FrameEvents {
   cancel: CancelPayload
   /** additive (X-02): an AI turn started / ended; hosts before X-02 have no listener */
   aiRun: AiRunPayload
+  /** additive (SIZE-F1, contract-size-frame §3.1a): the frame refused to open the document */
+  open_refused: OpenRefusedPayload
 }
 
 export type HostRequestType = keyof HostRequests
@@ -1358,6 +1360,7 @@ const FRAME_EVENTS: Record<FrameEventType, true> = {
   error: true,
   cancel: true,
   aiRun: true,
+  open_refused: true,
 }
 export const HOST_REQUEST_TYPES = Object.keys(HOST_REQUESTS) as readonly HostRequestType[]
 export const HOST_EVENT_TYPES = Object.keys(HOST_EVENTS) as readonly HostEventType[]
@@ -1740,6 +1743,7 @@ const PAYLOAD_VALIDATORS: Record<string, (x: unknown) => boolean> = {
   'event:error': (x) => isObj(x) && isProtocolErrorShape(x.error) && isBool(x.fatal),
   'event:aiRun': (x) =>
     isObj(x) && (x.state === 'running' || x.state === 'idle') && isOpt(x.run_id, isNonEmptyStr),
+  'event:open_refused': isOpenRefusedPayload,
   // successful responses
   'response:init': isInitAck,
   'response:open': (x) => isObj(x) && x.opened === true && isOpt(x.title, isStr),
@@ -1871,4 +1875,61 @@ export function isResponse(m: Envelope): m is ResponseEnvelope {
 }
 export function isEvent(m: Envelope): m is EventEnvelope {
   return m.kind === 'event'
+}
+
+// ---------------------------------------------------------------- open_refused (additive, SIZE-F1 §3.1a)
+
+export type OpenRefusedReason = 'engine_out_of_memory' | 'too_large_to_open' | 'too_complex'
+
+export const OPEN_REFUSED_REASONS: readonly OpenRefusedReason[] = [
+  'engine_out_of_memory',
+  'too_large_to_open',
+  'too_complex',
+]
+
+export const OPEN_REFUSED_MEASURE_KINDS = [
+  'worksheet_xml_bytes',
+  'paragraphs',
+  'characters',
+  'zip_parts',
+  'cells',
+] as const
+
+export type OpenRefusedMeasureKind = (typeof OPEN_REFUSED_MEASURE_KINDS)[number]
+
+/** Module-specific measure that tripped, when known (worksheet XML bytes, paragraph count, zip part count). */
+export interface OpenRefusedMeasure {
+  kind: OpenRefusedMeasureKind
+  value: number
+  limit?: number
+}
+
+/** The frame cannot show the document; sent at most once per documentId per session. */
+export interface OpenRefusedPayload {
+  reason: OpenRefusedReason
+  /** Stored size of the document in bytes, when known (file.size / bytes.byteLength). */
+  bytes?: number
+  measure?: OpenRefusedMeasure
+}
+
+const isOpenRefusedReason = isOneOf(OPEN_REFUSED_REASONS)
+const isOpenRefusedMeasureKind = isOneOf(OPEN_REFUSED_MEASURE_KINDS)
+
+export function isOpenRefusedMeasure(x: unknown): x is OpenRefusedMeasure {
+  return (
+    isObj(x) &&
+    isOpenRefusedMeasureKind(x.kind) &&
+    isFiniteNum(x.value) &&
+    x.value >= 0 &&
+    isOpt(x.limit, (y): y is number => isFiniteNum(y) && y > 0)
+  )
+}
+
+export function isOpenRefusedPayload(x: unknown): x is OpenRefusedPayload {
+  return (
+    isObj(x) &&
+    isOpenRefusedReason(x.reason) &&
+    isOpt(x.bytes, (y): y is number => isFiniteNum(y) && y >= 0) &&
+    isOpt(x.measure, isOpenRefusedMeasure)
+  )
 }
