@@ -73,6 +73,7 @@ import {
   type UnsavedCloseChoice,
   type UnsavedCloseKind,
 } from './service'
+import { UPLOAD_EXTENSIONS } from './formats'
 import { tUniworkDocs } from './strings'
 import { createTreeChangedCoalescer } from './tree-changed'
 import { UNIWORK_SYNC_CENTER_CHANNELS } from '../../shared/sync-center'
@@ -205,16 +206,16 @@ async function pickUploadFile(
     filters: [
       {
         name: tUniworkDocs(wiring.lang(), 'uploadPickDocuments'),
-        extensions: ['docx', 'xlsx', 'pptx', 'pdf', 'md', 'html'],
+        extensions: [...UPLOAD_EXTENSIONS],
       },
-      { name: tUniworkDocs(wiring.lang(), 'uploadPickAll'), extensions: ['*'] },
     ],
   }
   const picked = parent
     ? await dialog.showOpenDialog(parent, options)
     : await dialog.showOpenDialog(options)
   const path = picked.canceled ? undefined : picked.filePaths[0]
-  return path ? { path, name: basename(path) } : null
+  if (!path) return null
+  return { path, name: basename(path) }
 }
 
 /**

@@ -12,7 +12,11 @@ import type { TabSummary } from '../src/shared/tabs-api'
 import { LocaleProvider } from '../src/renderer/src/locale'
 import { TabBar } from '../src/renderer/src/TabBar'
 import { DiscussionPanel } from '../src/renderer/src/DiscussionPanel'
-import { setDiscussionOpen } from '../src/renderer/src/discussion-panel-model'
+import {
+  collabLevelOf,
+  discussionTargetOf,
+  setDiscussionOpen,
+} from '../src/renderer/src/discussion-panel-model'
 
 /**
  * G8-11 (UNI-1406): the shell's Discussion panel (S13) for every editor tab. The panel is shell
@@ -473,5 +477,24 @@ describe('refresh', () => {
       await vi.advanceTimersByTimeAsync(90_000)
     })
     expect(bridge.list.mock.calls.length).toBe(closed)
+  })
+})
+
+describe('DOC5-W04: the comment level reaches the Discussion panel', () => {
+  it('a comment-level status writes as comment, never as edit', () => {
+    const bridge = makeBridge()
+    expect(
+      discussionTargetOf(status(PATH_A, { access: 'view', commentsLevel: 'comment' }), true, bridge)
+        ?.level,
+    ).toBe('comment')
+    // no level known: the access word decides, as before
+    expect(discussionTargetOf(status(PATH_A, { access: 'view' }), true, bridge)?.level).toBe('view')
+    expect(discussionTargetOf(status(PATH_A, { access: 'edit' }), true, bridge)?.level).toBe('edit')
+    expect(collabLevelOf('comment')).toBe('comment')
+    // an unknown word never falls back upward
+    expect(collabLevelOf('admin')).toBe('view')
+    expect(collabLevelOf('')).toBe('view')
+    expect(collabLevelOf('edit')).toBe('edit')
+    expect(collabLevelOf('owner')).toBe('manage')
   })
 })

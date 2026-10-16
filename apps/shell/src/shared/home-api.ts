@@ -488,6 +488,11 @@ export interface UniworkDocStatus {
   title: string
   format: UniworkDocFormat
   access: UniworkDocAccess
+  /**
+   * DOC-05: the caller's server level when known (`comment` is below `edit`: `access` reads `view`
+   * for it). Only the Discussion panel reads it, so a comment-level caller can write there.
+   */
+  commentsLevel?: 'view' | 'comment' | 'edit' | 'manage'
   state: UniworkSaveState
   error?: UniworkDocErrorCode
   /** an unsent N+1 exists behind the pending intent (G5-06) */

@@ -74,6 +74,10 @@ export const ko = {
   aiStarterEventOutline: '행사 기획 개요 만들어 줘',
   aiThinking: '생각하는 중',
   aiWorkedSteps: '완료 · {n}단계',
+  aiWorkedStepsOne: '완료 · {n}단계',
+  aiWorkedStepsFew: '완료 · {n}단계',
+  aiEditsPaused:
+    '어시스턴트가 이 문서에서 작업 중입니다. 직접 편집이 일시 중지되었습니다. 계속하려면 어시스턴트를 중지하세요.',
   aiGroupWorking: '작업 중…',
   aiWorking: '처리 중',
   aiErrorPrefix: '오류: {error}',
@@ -82,6 +86,16 @@ export const ko = {
   aiRegenerateTitle: '다시 생성',
   aiSnapshotsTitle: '버전 스냅샷',
   aiRollback: '롤백',
+  aiAcceptMarked: '수락',
+  aiAcceptMarkedTitle: 'AI 변경 내용을 유지하고 강조 표시를 지웁니다',
+  aiRollbackKept:
+    '본문을 되돌렸습니다. 이 응답 중에 문서가 저장되어 다음 부분은 되돌릴 수 없습니다: {parts}',
+  aiSidePartComments: '메모',
+  aiSidePartHeaderFooter: '머리글과 바닥글',
+  aiSidePartStyles: '스타일',
+  aiSidePartPageSetup: '페이지 설정',
+  aiSidePartWatermark: '워터마크',
+  aiSidePartSep: ', ',
   aiScopeSelected: '{count}개 단락 선택됨',
   aiScopeEmptyDoc: '빈 문서',
   aiScopeCursor: '커서 위치',
@@ -95,6 +109,8 @@ export const ko = {
   aiAttachTitle: '로컬 파일을 첨부 (패널로 끌어다 놓아도 됩니다)',
   aiRemoveAttachmentTitle: '첨부 파일 제거',
   aiTrackChanges: '변경 내용 추적',
+  aiTrackForced:
+    '이 문서는 보호되어 있어 변경 내용 추적을 끌 수 없으며, AI의 편집은 수정 내용으로 기록됩니다.',
   aiTrackOnTitle:
     '변경 내용 추적 켜짐: AI의 내용 변경은 변경 내용으로 표시됩니다(삽입은 밑줄, 삭제는 취소선). 검토에서 적용하거나 거부하세요',
   aiTrackOffTitle: '변경 내용 추적 꺼짐: AI 변경 사항이 바로 적용됩니다(버전 스냅샷으로 롤백 가능)',

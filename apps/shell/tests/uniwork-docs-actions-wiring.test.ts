@@ -2,7 +2,9 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { OpenDialogOptions } from 'electron'
 import { UNIWORK_DOC_CHANNELS } from '../src/shared/home-api'
+import { UPLOAD_EXTENSIONS } from '../src/main/uniwork-docs/formats'
 
 /**
  * G8-17 S18: the shell's own IPC bridge for create / upload / rename / archive
@@ -15,11 +17,23 @@ import { UNIWORK_DOC_CHANNELS } from '../src/shared/home-api'
 let dir: string
 let identity: { accountId: string; deviceSessionId: string; deploymentId: string } | null = null
 
+/**
+ * the options of every showOpenDialog call (a parent-less call passes one
+ * argument), plus the result the next call answers (cancelled by default)
+ */
+const dialogs = vi.hoisted(() => ({
+  open: [] as unknown[],
+  result: { canceled: true, filePaths: [] as string[] },
+}))
+
 vi.mock('electron', () => ({
   app: { getPath: () => dir },
   BrowserWindow: { getFocusedWindow: () => null },
   dialog: {
-    showOpenDialog: vi.fn(async () => ({ canceled: true, filePaths: [] })),
+    showOpenDialog: vi.fn(async (...args: unknown[]) => {
+      dialogs.open.push(args.at(-1))
+      return dialogs.result
+    }),
     showMessageBox: vi.fn(async () => ({ response: 1 })),
     showSaveDialog: vi.fn(async () => ({ canceled: true })),
   },
@@ -52,6 +66,8 @@ vi.mock('../src/main/uniwork-auth', () => ({
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'uw-docs-actions-wiring-'))
   identity = { accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' }
+  dialogs.open.length = 0
+  dialogs.result = { canceled: true, filePaths: [] }
 })
 afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
@@ -131,6 +147,40 @@ describe('the S18 action IPC', () => {
   it('the upload dialog seam answers null when cancelled', async () => {
     const { handlers } = await setup()
     expect(await handlers.get(UNIWORK_DOC_CHANNELS.pickUploadFile)!(null)).toBeNull()
+  })
+
+  it('offers the formats UniWork Office opens, with no all-files filter', async () => {
+    const { handlers } = await setup()
+    expect(await handlers.get(UNIWORK_DOC_CHANNELS.pickUploadFile)!(null)).toBeNull()
+    const options = dialogs.open.at(-1) as OpenDialogOptions
+    // one "Documents" filter, whose extensions are the formats table's keys
+    expect(options.filters).toHaveLength(1)
+    expect(options.filters![0]!.name).toBe('Documents')
+    const extensions = options.filters![0]!.extensions
+    expect([...extensions].sort()).toEqual([...UPLOAD_EXTENSIONS].sort())
+    // the reported gap: the hardcoded list missed markdown and htm
+    expect(UPLOAD_EXTENSIONS).toEqual(expect.arrayContaining(['markdown', 'htm']))
+    // no "All files": an image picked by mistake would upload but never open here
+    expect(options.filters!.some((filter) => filter.extensions.includes('*'))).toBe(false)
+  })
+
+  // N-2a: a typed path outside the native filter is still returned to the
+  // renderer so uploadDocument stays the single refusal authority and the
+  // dialog can surface unsupported_format at the file field instead of
+  // silently behaving like a cancel.
+  it('passes a picked path through to the renderer regardless of extension', async () => {
+    const { handlers } = await setup()
+    dialogs.result = { canceled: false, filePaths: [join(dir, 'photo.png')] }
+    expect(await handlers.get(UNIWORK_DOC_CHANNELS.pickUploadFile)!(null)).toEqual({
+      path: join(dir, 'photo.png'),
+      name: 'photo.png',
+    })
+
+    dialogs.result = { canceled: false, filePaths: [join(dir, 'Q3 report.docx')] }
+    expect(await handlers.get(UNIWORK_DOC_CHANNELS.pickUploadFile)!(null)).toEqual({
+      path: join(dir, 'Q3 report.docx'),
+      name: 'Q3 report.docx',
+    })
   })
 
   it('refuses every action while signed out, before any request', async () => {

@@ -56,6 +56,8 @@ export const zh = {
 
   // S5 conflict dialog: step 1 extras, confirmation step and results
   uwConflictViewDiff: '查看差异',
+  uwConflictDiffPending: '正在比较…',
+  uwConflictDiffFailed: '暂时无法比较，请稍后再试。',
   uwConflictNoEdit: '你已无权编辑此文档。',
   uwConflictOverwriteTitle: '用你的版本覆盖？',
   uwConflictOverwriteConfirm:

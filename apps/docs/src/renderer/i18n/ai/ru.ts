@@ -75,6 +75,10 @@ export const ru = {
   aiStarterEventOutline: 'Составь план мероприятия',
   aiThinking: 'Думаю',
   aiWorkedSteps: 'Готово · {n} шагов',
+  aiWorkedStepsOne: 'Готово · {n} шаг',
+  aiWorkedStepsFew: 'Готово · {n} шага',
+  aiEditsPaused:
+    'Ассистент работает с этим документом. Ваши правки приостановлены; остановите ассистента, чтобы продолжить.',
   aiGroupWorking: 'Выполняется…',
   aiWorking: 'Обработка',
   aiErrorPrefix: 'Ошибка: {error}',
@@ -83,6 +87,16 @@ export const ru = {
   aiRegenerateTitle: 'Создать заново',
   aiSnapshotsTitle: 'Снимки версий',
   aiRollback: 'Откатить',
+  aiAcceptMarked: 'Принять',
+  aiAcceptMarkedTitle: 'Оставить изменения ИИ и убрать выделение',
+  aiRollbackKept:
+    'Текст восстановлен. Документ был сохранён во время этого ответа, поэтому эти части восстановить не удалось: {parts}',
+  aiSidePartComments: 'примечания',
+  aiSidePartHeaderFooter: 'колонтитулы',
+  aiSidePartStyles: 'стили',
+  aiSidePartPageSetup: 'параметры страницы',
+  aiSidePartWatermark: 'подложка',
+  aiSidePartSep: ', ',
   aiScopeSelected: 'Выделено абзацев: {count}',
   aiScopeEmptyDoc: 'Пустой документ',
   aiScopeCursor: 'У курсора',
@@ -96,6 +110,8 @@ export const ru = {
   aiAttachTitle: 'Прикрепить локальные файлы (или перетащите их на панель)',
   aiRemoveAttachmentTitle: 'Удалить вложение',
   aiTrackChanges: 'Запись исправлений',
+  aiTrackForced:
+    'Документ защищён: запись исправлений должна оставаться включённой, поэтому правки ИИ записываются как исправления.',
   aiTrackOnTitle:
     'Запись исправлений включена: изменения содержимого от ИИ помечаются как исправления (вставки подчеркнуты, удаления зачеркнуты); примите или отклоните их в разделе «Рецензирование»',
   aiTrackOffTitle:

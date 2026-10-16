@@ -70,6 +70,8 @@ export function buildPrintHtml(editorRoot: HTMLElement, title: string): string {
     bar.remove()
   // a rendered diagram block prints as its picture; an unrendered one keeps its source
   for (const block of clone.querySelectorAll('[data-diagram="rendered"] pre')) block.remove()
+  // the AI change marker is a screen-only wash over the live editor: it is not part of the page
+  for (const mark of clone.querySelectorAll('.ai-changed')) mark.replaceWith(...mark.childNodes)
   // HTML comments are invisible in rendered markdown: keep them off the page
   for (const comment of clone.querySelectorAll('.md-raw-html-comment')) comment.remove()
 

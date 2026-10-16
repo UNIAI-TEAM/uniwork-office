@@ -69,6 +69,8 @@ export const it = {
 
   // S5 conflict dialog: step 1 extras, confirmation step and results
   uwConflictViewDiff: 'Visualizza differenze',
+  uwConflictDiffPending: 'Confronto in corso…',
+  uwConflictDiffFailed: 'Impossibile confrontare le versioni in questo momento. Riprova più tardi.',
   uwConflictNoEdit: 'Non hai più l’accesso in modifica a questo documento.',
   uwConflictOverwriteTitle: 'Sovrascrivere con la tua versione?',
   uwConflictOverwriteConfirm:

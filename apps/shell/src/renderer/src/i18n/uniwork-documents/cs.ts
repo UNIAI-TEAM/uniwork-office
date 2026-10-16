@@ -26,7 +26,7 @@ export const cs = {
   uwPickNoResults: 'Žádné dokumenty neodpovídají hledání „{query}“.',
   uwPickNoWorkspaces: 'Zatím nemáte žádné pracovní prostory.',
   uwPickNoWorkspacesHint: 'Nejprve v UniWork vytvořte pracovní prostor nebo se k němu připojte.',
-  uwPickUnsupported: 'V UniWork Office nepodporováno',
+  uwPickHiddenFormats: 'Skryto, protože UniWork Office neumí otevřít jejich formát: {count}',
   uwPickOpening: 'Otevírání „{title}“…',
 
   uwErrNotSignedIn: 'Pro pokračování se přihlaste do UniWork.',
@@ -123,6 +123,7 @@ export const cs = {
   uwDocInfoByAt: '{name}, {time}',
   uwDocInfoVersionBy: '{version} · {name}',
   uwAccessView: 'Zobrazení',
+  uwAccessComment: 'Komentáře',
   uwAccessEdit: 'Úpravy',
   uwAccessManage: 'Správa',
   uwRoleOwner: 'Vlastník',

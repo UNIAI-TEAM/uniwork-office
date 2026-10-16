@@ -3,6 +3,7 @@ import {
   isUniworkQuestionRefusal,
   aiPanelWidthAtPointer,
   AiPanelSideButton,
+  AiSaveDraftCard,
   AiModelPicker,
   useAiModelNeedHint,
   type AiModelPickerBridge,
@@ -23,6 +24,8 @@ import {
   singleShortcutHint,
   type PanelNote,
   composeSkills,
+  runHistoryEvents,
+  type RunHistoryGroup,
 } from '@genoffice/agent-core'
 import type { AgentImage } from '@genoffice/agent-core'
 import type { AiSettings } from '@genoffice/ai-provider'
@@ -57,6 +60,7 @@ import {
   type AiTokenUsageView,
 } from '@genoffice/ui'
 import { aiLangDirective, t as tGlobal, useI18n } from '../i18n/locale'
+import { workedStepsLabel } from './worked-steps'
 import sendEnterOn from '../assets/send-enter-on.png'
 import sendEnterOff from '../assets/send-enter-off.png'
 import sendStop from '../assets/send-stop.png'
@@ -305,11 +309,19 @@ export interface HtmlAiDeps {
   access: HtmlDocAccess
   getSnapshot(): DocSnapshot
   restoreSnapshot(snapshot: DocSnapshot): void
-  /** the user sent a request (the text as shown in the bubble); names an untitled document */
-  onPrompt(text: string): void
-  /** fired when a run with at least one mutation finishes (auto-save hook) */
-  onRunDone(mutated: boolean): void
+  /**
+   * fired when a run finishes. Returns the file name to offer saving under when the run changed a
+   * never-saved page (the panel then asks, nothing is written), or null when no offer applies.
+   */
+  onRunDone(mutated: boolean): string | null
+  /** the user chose Save on the offer card: run the first-save flow with this name */
+  onSaveOffer(name: string): void
   clearHighlights(): void
+  /**
+   * the editor's undo group: the panel opens it when a run starts and closes it when the run ends,
+   * so every edit of the run is ONE undo step (absent: each edit is its own step, as before)
+   */
+  runHistory?: RunHistoryGroup
   /** [label](htmlnav://sid/N) citation clicked */
   navigateTo(sid: number): void
   /** the user confirmed a brief on the card; the app pins it into the next generated document */
@@ -589,6 +601,8 @@ export function AiPanel({
   /** sids the current turn may edit (Ask AI on an element, queue run); null = the whole page */
   const fenceRef = useRef<readonly number[] | null>(null)
   const runMutatedRef = useRef(false)
+  /** the ask-before-saving card of the last run; at most one, gone on the next send / New chat */
+  const [saveOffer, setSaveOffer] = useState<{ name: string } | null>(null)
   /** tool activity of the whole run, for transcript persistence */
   const runToolsRef = useRef<ToolActivity[]>([])
   /** tokens billed so far in the in-flight run (summed across turns) */
@@ -789,6 +803,14 @@ export function AiPanel({
       captureSnapshot: () => depsRef.current.getSnapshot(),
       systemSuffix: () => aiLangDirective(langRef.current),
       events: {
+        // every edit of a run is ONE undo step of the source editor (the group closes at run end)
+        ...runHistoryEvents({
+          get activeRunId() {
+            return depsRef.current.runHistory?.activeRunId ?? null
+          },
+          begin: (runId) => depsRef.current.runHistory?.begin(runId),
+          end: (runId, mutated) => depsRef.current.runHistory?.end(runId, mutated),
+        } satisfies RunHistoryGroup),
         onText: (text) => patchLast({ text, waitLine: undefined }),
         // transport notices (UniWork AI); langRef: the loop is created once, `lang` would go stale
         onNotice: (notice) => {
@@ -874,7 +896,9 @@ export function AiPanel({
           }))
           persistMessage('assistant', final, runToolsRef.current)
           depsRef.current.clearHighlights()
-          depsRef.current.onRunDone(runMutatedRef.current)
+          // an offer only for an unsaved page the run changed: one card, replacing any older one
+          const offer = depsRef.current.onRunDone(runMutatedRef.current)
+          setSaveOffer(typeof offer === 'string' ? { name: offer } : null)
           queueRunRef.current = false
           setBusy(false)
         },
@@ -1055,7 +1079,7 @@ export function AiPanel({
     const fence = sendFence(fenceSids)
     fenceRef.current = fence
     runMutatedRef.current = false
-    depsRef.current.onPrompt(displayText ?? instruction)
+    setSaveOffer(null)
     runToolsRef.current = []
     runUsageRef.current = undefined
     setChat((prev) => [
@@ -1412,6 +1436,7 @@ export function AiPanel({
                 stop()
                 loopRef.current?.reset()
                 setBusy(false)
+                setSaveOffer(null)
                 setChat([])
                 setReceipts([])
                 setAttachments([])
@@ -1723,6 +1748,18 @@ export function AiPanel({
             </div>
           )
         })}
+        {saveOffer && !busy && (
+          <AiSaveDraftCard
+            lang={lang}
+            name={saveOffer.name}
+            onSave={() => {
+              const { name } = saveOffer
+              setSaveOffer(null)
+              depsRef.current.onSaveOffer(name)
+            }}
+            onLater={() => setSaveOffer(null)}
+          />
+        )}
       </div>
 
       {snapshots.length > 0 && (
@@ -2024,7 +2061,7 @@ function StepIcon({ status }: { status: 'running' | 'done' | 'error' }) {
 /** Tool activity group (docs parity): auto-opens while tools run, auto-collapses into
  *  "Worked · N steps" when they finish; a manual toggle always wins */
 function ToolChipList({ tools }: { tools: ToolActivity[] }) {
-  const { t: tr } = useI18n()
+  const { lang, t: tr } = useI18n()
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
   const [userOpen, setUserOpen] = useState<boolean | null>(null)
 
@@ -2039,7 +2076,7 @@ function ToolChipList({ tools }: { tools: ToolActivity[] }) {
 
   const anyRunning = tools.some((tool) => tool.running)
   const open = userOpen ?? anyRunning
-  const label = anyRunning ? tr('aiGroupWorking') : tr('aiWorkedSteps', { n: tools.length })
+  const label = anyRunning ? tr('aiGroupWorking') : workedStepsLabel(tr, lang, tools.length)
 
   return (
     <div className="ai-work-group">

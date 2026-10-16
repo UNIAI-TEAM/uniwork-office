@@ -26,7 +26,7 @@ export const id = {
   uwPickNoResults: 'Tidak ada dokumen yang cocok dengan “{query}”.',
   uwPickNoWorkspaces: 'Anda belum memiliki ruang kerja.',
   uwPickNoWorkspacesHint: 'Buat atau gabung ke ruang kerja di UniWork terlebih dahulu.',
-  uwPickUnsupported: 'Tidak didukung di UniWork Office',
+  uwPickHiddenFormats: 'Disembunyikan karena UniWork Office tidak dapat membuka formatnya: {count}',
   uwPickOpening: 'Membuka “{title}”…',
 
   uwErrNotSignedIn: 'Masuk ke UniWork untuk melanjutkan.',
@@ -125,6 +125,7 @@ export const id = {
   uwDocInfoByAt: '{name}, {time}',
   uwDocInfoVersionBy: '{version} · {name}',
   uwAccessView: 'Lihat',
+  uwAccessComment: 'Komentar',
   uwAccessEdit: 'Edit',
   uwAccessManage: 'Kelola',
   uwRoleOwner: 'Pemilik',

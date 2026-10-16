@@ -26,7 +26,7 @@ export const ko = {
   uwPickNoResults: '“{query}”와(과) 일치하는 문서가 없습니다.',
   uwPickNoWorkspaces: '아직 워크스페이스가 없습니다.',
   uwPickNoWorkspacesHint: '먼저 UniWork에서 워크스페이스를 만들거나 참여하세요.',
-  uwPickUnsupported: 'UniWork Office에서 지원되지 않습니다',
+  uwPickHiddenFormats: 'UniWork Office에서 열 수 없는 형식이라 숨김: {count}',
   uwPickOpening: '“{title}” 여는 중…',
 
   uwErrNotSignedIn: '계속하려면 UniWork에 로그인하세요.',
@@ -123,6 +123,7 @@ export const ko = {
   uwDocInfoByAt: '{name}, {time}',
   uwDocInfoVersionBy: '{version} · {name}',
   uwAccessView: '보기',
+  uwAccessComment: '댓글',
   uwAccessEdit: '편집',
   uwAccessManage: '관리',
   uwRoleOwner: '소유자',

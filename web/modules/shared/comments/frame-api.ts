@@ -15,6 +15,7 @@ import {
   type CommentsReply,
   type CommentsRevealPayload,
   type CommentsSavedPayload,
+  type MentionsSearchInput,
   type UniworkCommentsApi,
 } from '../../../../packages/electron-utils/src/comments-ipc'
 import type { FramePort, PortSession } from '../../../docs/bridge/frame-port'
@@ -26,6 +27,7 @@ import {
   type FrameRequests,
 } from '../../../docs/protocol/types'
 import { frameDocVersion, type FrameDocVersion } from './doc-version'
+import { frameMentionAccess } from './mention-access'
 import { frameRevealRouter, type RevealPort } from './reveal-router'
 
 /** what the frame API needs from the frame client (the real client has it all) */
@@ -34,19 +36,40 @@ export type FrameCommentsClient = Pick<FramePort, 'whenInitialized' | 'request'>
 export interface FrameCommentsHooks {
   /** the open document's version tracker; default: the frame page's `frameDocVersion` */
   version?: FrameDocVersion
+  /**
+   * the initialized session: G8-18 reads the effective `commentsShareView` capability and the
+   * caller's level from it. Absent (unit tests, a client without `init` yet): no share action and
+   * no `include: 'no_access'`.
+   */
+  session?: CommentsSession
+}
+
+/** G8-18 additions to the mention search input: the desktop shape never carries `include` */
+export type FrameMentionsSearchInput = MentionsSearchInput & { include?: 'no_access' }
+
+/**
+ * G8-18 extras of the frame bridge: the editor's source adapter reads them off `window.uniworkComments`
+ * (`createUniworkCommentsSource`). `shareView` exists only with the effective `commentsShareView`
+ * capability, so the editor offers the action exactly when the host allows it.
+ */
+export interface FrameCommentsExtras {
+  /** true when `mentions.search` may ask for `include: 'no_access'` (see ./mention-access) */
+  canListMembers?: boolean
+  /** `comments.shareView`: grant `view` to a mentioned user (the host fixes the level) */
+  shareView?(input: { path?: string; userId: string }): Promise<CommentsReply<{ ok: true }>>
 }
 
 /**
  * what `installFrameComments` publishes: the comments API plus `noEditor`, which the editor calls
  * when it ends without a server mode (the reveal router then stops waiting for its owner)
  */
-export type FrameCommentsApi = UniworkCommentsApi & { noEditor(): void }
+export type FrameCommentsApi = UniworkCommentsApi & FrameCommentsExtras & { noEditor(): void }
 
 /** the `init` fields the API reads (the real client's FrameSession has them all) */
-type CommentsSession = PortSession & { commentsLevel?: CommentsLevel }
+export type CommentsSession = PortSession & { commentsLevel?: CommentsLevel }
 
 function isLevel(value: unknown): value is NonNullable<CommentsContextResult['level']> {
-  return value === 'view' || value === 'edit' || value === 'manage'
+  return value === 'view' || value === 'comment' || value === 'edit' || value === 'manage'
 }
 
 async function envelope<T>(run: () => Promise<T>): Promise<CommentsReply<T>> {
@@ -60,8 +83,9 @@ async function envelope<T>(run: () => Promise<T>): Promise<CommentsReply<T>> {
 export function createFrameCommentsApi(
   client: FrameCommentsClient,
   hooks: FrameCommentsHooks = {},
-): UniworkCommentsApi {
+): UniworkCommentsApi & FrameCommentsExtras {
   const version = hooks.version ?? frameDocVersion
+  const mention = hooks.session ? frameMentionAccess(hooks.session) : null
   const call = <K extends FrameRequestType>(
     type: K,
     payload: FrameRequests[K]['payload'],
@@ -99,8 +123,19 @@ export function createFrameCommentsApi(
           state: a.state,
         })),
       }),
-    searchMentions: ({ q, limit }) =>
-      call('mentions.search', { q, ...(limit !== undefined ? { limit } : {}) }),
+    searchMentions: ({ q, limit, include }: FrameMentionsSearchInput) =>
+      call('mentions.search', {
+        q,
+        ...(limit !== undefined ? { limit } : {}),
+        ...(include !== undefined ? { include } : {}),
+      }),
+    ...(mention ? { canListMembers: mention.canListMembers } : {}),
+    ...(mention?.commentsShareView
+      ? {
+          shareView: ({ userId }: { userId: string }) =>
+            call('comments.shareView', { user_id: userId }),
+        }
+      : {}),
     context: () =>
       envelope(async (): Promise<CommentsContextResult> => {
         const session = (await client.whenInitialized()) as CommentsSession
@@ -134,9 +169,9 @@ export async function installFrameComments(
   hooks: FrameCommentsHooks = {},
   target: Record<string, unknown> = globalThis as unknown as Record<string, unknown>,
 ): Promise<FrameCommentsApi | null> {
-  let session: PortSession
+  let session: CommentsSession
   try {
-    session = await client.whenInitialized()
+    session = (await client.whenInitialized()) as CommentsSession
   } catch {
     return null
   }
@@ -145,7 +180,10 @@ export async function installFrameComments(
   // waits for it instead of answering revealed:false for an id the editor owns; an editor that ends
   // without a server mode says so through `noEditor` and the wait is released (idempotent)
   const noEditor = frameRevealRouter(client).expectEditor()
-  const api: FrameCommentsApi = { ...createFrameCommentsApi(client, hooks), noEditor }
+  const api: FrameCommentsApi = {
+    ...createFrameCommentsApi(client, { session, ...hooks }),
+    noEditor,
+  }
   target[COMMENTS_BRIDGE_KEY] = api
   return api
 }

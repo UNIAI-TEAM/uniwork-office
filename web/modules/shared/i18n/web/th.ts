@@ -64,6 +64,8 @@ export const th = {
 
   // S5 conflict dialog: step 1 extras, confirmation step and results
   uwConflictViewDiff: 'ดูความแตกต่าง',
+  uwConflictDiffPending: 'กำลังเปรียบเทียบ…',
+  uwConflictDiffFailed: 'ตอนนี้ไม่สามารถเปรียบเทียบเวอร์ชันได้ โปรดลองอีกครั้งในภายหลัง',
   uwConflictNoEdit: 'คุณไม่มีสิทธิ์แก้ไขเอกสารนี้แล้ว',
   uwConflictOverwriteTitle: 'เขียนทับด้วยเวอร์ชันของคุณหรือไม่',
   uwConflictOverwriteConfirm:

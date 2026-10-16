@@ -173,6 +173,7 @@ export function toStatus(doc: BoundDocument, pendingNext = false): UniworkDocSta
     title: b.title,
     format: b.format,
     access: b.access,
+    ...(b.level ? { commentsLevel: b.level } : {}),
     state: b.state,
     ...(b.error ? { error: b.error } : {}),
     ...(b.lastSavedAt ? { lastSavedAt: b.lastSavedAt } : {}),
@@ -672,14 +673,28 @@ export class SaveCoordinator {
    * a later poll cannot replay a save the card says must stop). A record that
    * cannot be read or written is left as it is: nothing moves without being
    * persisted.
+   *
+   * Compare-then-put, like `cleanupIntent` and the dispatcher's `apply` guard
+   * (OQ-F12-be-d3-1): only the record this attempt's own intent still owns -
+   * same intentId AND generation - is settled. A newer intent (N+1) that took
+   * the document key meanwhile (a second window's save, or the dispatcher) is
+   * left exactly as it is: its own state is not this generation's to rewrite,
+   * and a settled N must never be written over it.
    */
   private async settleRecord(
     intents: IntentStore,
     doc: BoundDocument,
+    owner: IntentRecordV2,
     event: QueueEvent,
   ): Promise<void> {
     const stored = await intents.read(doc.key, factsOf(doc, 0))
-    if (!stored) return
+    if (
+      !stored ||
+      stored.intent.intentId !== owner.intentId ||
+      stored.intent.generation !== owner.generation
+    ) {
+      return
+    }
     const result = transition(stored.intent, event, { now: this.now().getTime() })
     if (!result.record || result.effects.some((effect) => effect.kind === 'cleanup')) {
       await this.cleanupIntent(intents, doc, stored.intent)
@@ -795,7 +810,10 @@ export class SaveCoordinator {
         // The intent is durable: the SAME record and key survive the conflict,
         // and the record itself ends `conflict` (never `queued`) so the next
         // poll never replays it (G506-be-1)
-        await this.settleRecord(intents, doc, { type: 'commitFailed', error: 'conflict' })
+        await this.settleRecord(intents, doc, intent, {
+          type: 'commitFailed',
+          error: 'conflict',
+        })
         return this.commitState(doc, {
           ...base,
           state: 'conflict',
@@ -830,8 +848,21 @@ export class SaveCoordinator {
       case 'quota_exceeded':
       case 'not_found':
       case 'document_deleted':
-      case 'document_archived':
       case 'deleted':
+        return this.commitState(doc, { ...base, state: 'blocked', error: error.code })
+      case 'document_archived':
+        // the archive is reversible, so this refusal is NOT terminal and the
+        // intent is kept (errors.ts:170-173). Unlike the codes above - whose
+        // record `cleanupIntent` has already dropped - this one is still stored,
+        // so it is parked in the SAME call the chip is parked with, exactly as
+        // the conflict branch does: a record left `queued` would show the sync
+        // center a pending row the pill already calls blocked, and the next poll
+        // would spend one more refused upload+commit on bytes the server has
+        // already refused (OQ-F12-be-d2-2)
+        await this.settleRecord(intents, doc, intent, {
+          type: 'commitFailed',
+          error: 'document_archived',
+        })
         return this.commitState(doc, { ...base, state: 'blocked', error: error.code })
       case 'session_expired':
       case 'not_signed_in':

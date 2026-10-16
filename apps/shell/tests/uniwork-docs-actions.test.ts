@@ -8,6 +8,7 @@ import {
   truncateSync,
   writeFileSync,
 } from 'node:fs'
+import { readFile, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -16,6 +17,7 @@ import type { DeploymentProfile } from '../src/main/uniwork-auth/deployment'
 import { UniworkDocsService, type ConflictUi } from '../src/main/uniwork-docs/service'
 import { BINDING_FILE, LAST_OWNER_FILE } from '../src/main/uniwork-docs/binding-store'
 import type { FetchLike } from '../src/main/uniwork-docs/client'
+import { UPLOAD_EXTENSIONS } from '../src/main/uniwork-docs/formats'
 
 /**
  * G8-17 S18: create a blank document, upload a file, rename, archive / restore
@@ -61,6 +63,9 @@ vi.mock('node:fs/promises', async (importOriginal) => {
       if (statGate.held) await statGate.held
       return actual.stat(...args)
     }),
+    readFile: vi.fn(async (...args: Parameters<typeof actual.readFile>) =>
+      actual.readFile(...args),
+    ),
   }
 })
 
@@ -626,7 +631,9 @@ describe('upload a file', () => {
   it('refuses a pick past the server 50 MiB stage limit without reading it', async () => {
     const server = fakeServer()
     const ctx = setup(server)
-    const huge = join(dir, 'huge.bin')
+    // the name must resolve in the formats table, or the upload is refused as
+    // unsupported_format even before the (unread) size check this test pins
+    const huge = join(dir, 'huge.docx')
     writeFileSync(huge, '')
     truncateSync(huge, 50 * 1024 * 1024 + 1)
     const result = await ctx.service.uploadDocument({
@@ -772,6 +779,77 @@ describe('upload a file', () => {
     // the document D created before the abort is real and was never deleted
     expect(server.state.documents.has('up_1')).toBe(true)
     expect(server.calls.some((c) => c.method === 'DELETE')).toBe(false)
+  })
+
+  // R1-1 / R1-2 / N-1 / N-3: the upload IPC carries a renderer-supplied path, so
+  // the native filter is not a contract. A basename the formats table does not
+  // resolve (photo.png, a nonexistent missing.png, or a prototype key like
+  // photo.constructor) must be refused with unsupported_format before stat,
+  // readFile and any POST: otherwise the created document could never be opened.
+  it('refuses a basename outside the formats table before any stat, read or POST', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const photo = join(dir, 'photo.png')
+    writeFileSync(photo, 'not a document')
+    const proto = join(dir, 'photo.constructor')
+    writeFileSync(proto, 'not a document')
+    vi.mocked(stat).mockClear()
+    vi.mocked(readFile).mockClear()
+
+    const result = await ctx.service.uploadDocument({
+      workspaceId: WS,
+      folderId: null,
+      path: photo,
+      uploadId: 'up-png',
+    })
+    expect(result).toEqual({ ok: false, error: 'unsupported_format' })
+    expect(vi.mocked(stat)).toHaveBeenCalledTimes(0)
+    expect(vi.mocked(readFile)).toHaveBeenCalledTimes(0)
+
+    const missing = await ctx.service.uploadDocument({
+      workspaceId: WS,
+      folderId: null,
+      path: join(dir, 'missing.png'),
+      uploadId: 'up-missing-png',
+    })
+    expect(missing).toEqual({ ok: false, error: 'unsupported_format' })
+    expect(vi.mocked(stat)).toHaveBeenCalledTimes(0)
+    expect(vi.mocked(readFile)).toHaveBeenCalledTimes(0)
+
+    const protoResult = await ctx.service.uploadDocument({
+      workspaceId: WS,
+      folderId: null,
+      path: proto,
+      uploadId: 'up-constructor',
+    })
+    expect(protoResult).toEqual({ ok: false, error: 'unsupported_format' })
+    expect(vi.mocked(stat)).toHaveBeenCalledTimes(0)
+    expect(vi.mocked(readFile)).toHaveBeenCalledTimes(0)
+    expect(server.calls).toHaveLength(0)
+    expect(ctx.progress).toHaveLength(0)
+  })
+
+  // R1-2: every extension the picker offers is one the service accepts, so the
+  // offer and the resolver cannot drift apart unnoticed.
+  it('uploads one document per extension the picker offers', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    for (const [index, ext] of UPLOAD_EXTENSIONS.entries()) {
+      const file = join(dir, `report ${index}.${ext}`)
+      writeFileSync(file, `bytes of ${ext}`)
+      const uploaded = await ctx.service.uploadDocument({
+        workspaceId: WS,
+        folderId: null,
+        path: file,
+        uploadId: `up-${ext}`,
+      })
+      expect(uploaded.ok, ext).toBe(true)
+    }
+    const posts = server.calls.filter((c) => c.path.endsWith('/documents/files'))
+    expect(posts).toHaveLength(UPLOAD_EXTENSIONS.length)
+    expect(ctx.progress.filter((event) => event.loaded === 0)).toHaveLength(
+      UPLOAD_EXTENSIONS.length,
+    )
   })
 })
 

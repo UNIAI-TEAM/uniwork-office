@@ -75,6 +75,10 @@ export const pl = {
   aiStarterEventOutline: 'Przygotuj konspekt planu wydarzenia',
   aiThinking: 'Myślę',
   aiWorkedSteps: 'Ukończono · {n} kroków',
+  aiWorkedStepsOne: 'Ukończono · {n} krok',
+  aiWorkedStepsFew: 'Ukończono · {n} kroki',
+  aiEditsPaused:
+    'Asystent pracuje nad tym dokumentem. Twoje zmiany są wstrzymane; zatrzymaj asystenta, aby kontynuować.',
   aiGroupWorking: 'W toku…',
   aiWorking: 'Przetwarzanie',
   aiErrorPrefix: 'Błąd: {error}',
@@ -83,6 +87,16 @@ export const pl = {
   aiRegenerateTitle: 'Wygeneruj ponownie',
   aiSnapshotsTitle: 'Migawki wersji',
   aiRollback: 'Przywróć',
+  aiAcceptMarked: 'Akceptuj',
+  aiAcceptMarkedTitle: 'Zachowaj zmiany AI i usuń wyróżnienie',
+  aiRollbackKept:
+    'Tekst został przywrócony. Dokument zapisano w trakcie tej odpowiedzi, więc tych części nie udało się przywrócić: {parts}',
+  aiSidePartComments: 'komentarze',
+  aiSidePartHeaderFooter: 'nagłówek i stopka',
+  aiSidePartStyles: 'style',
+  aiSidePartPageSetup: 'ustawienia strony',
+  aiSidePartWatermark: 'znak wodny',
+  aiSidePartSep: ', ',
   aiScopeSelected: 'Zaznaczono akapitów: {count}',
   aiScopeEmptyDoc: 'Pusty dokument',
   aiScopeCursor: 'Przy kursorze',
@@ -96,6 +110,8 @@ export const pl = {
   aiAttachTitle: 'Załącz pliki lokalne (lub przeciągnij je na panel)',
   aiRemoveAttachmentTitle: 'Usuń załącznik',
   aiTrackChanges: 'Śledzenie zmian',
+  aiTrackForced:
+    'Ten dokument jest chroniony: śledzenie zmian musi pozostać włączone, więc zmiany AI są zapisywane jako poprawki.',
   aiTrackOnTitle:
     'Śledzenie zmian włączone: zmiany treści wprowadzane przez AI są oznaczane jako poprawki (wstawienia podkreślone, usunięcia przekreślone); zaakceptuj lub odrzuć je w sekcji Recenzja',
   aiTrackOffTitle:

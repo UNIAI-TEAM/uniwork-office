@@ -368,7 +368,8 @@ export function SheetsServerComments(p: SheetsServerCommentsProps) {
   if (!panelOpen) return null
 
   const activeSheet = adapter.activeSheet?.()
-  const needsSave = !knownVersion && mode.level !== 'view'
+  // a view or comment caller cannot save the file, so a "save first" prompt would lead nowhere
+  const needsSave = !knownVersion && mode.level !== 'view' && mode.level !== 'comment'
   return (
     <div className="sheets-server-comments">
       <CollabPanel

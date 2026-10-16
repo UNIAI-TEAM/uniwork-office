@@ -17,8 +17,8 @@ type AppKey = keyof (typeof appStrings)['zh']
 
 const translate = createI18n(appStrings)
 
-export function text(key: AppKey): string {
-  return translate(webLanguage(), key)
+export function text(key: AppKey, params?: Record<string, string | number>): string {
+  return translate(webLanguage(), key, params)
 }
 
 export interface Choice<T extends string> {

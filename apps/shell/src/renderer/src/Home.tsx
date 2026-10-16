@@ -18,6 +18,7 @@ import type {
 import type { IntegrationsApi } from '../../shared/integrations-api'
 import type { UniworkWorkApi } from '../../shared/uniwork-work-api'
 import { markText } from '../../shared/text-marks'
+import { openLocalHint } from '../../shared/open-extensions'
 import { useDismissablePopover } from '@genoffice/ui'
 import { boxOf, clipBoxesOf, followMenuAnchor } from './folder-menu-anchor'
 import { fileCountLabel, visiblePageCount } from './counts'
@@ -68,10 +69,9 @@ const GREET_ASK_KEYS = [
 ] as const satisfies readonly StringKey[]
 
 /* Formats the open-local card advertises. Too long for the card at any window
-   width, so it ellipsizes and a hover ScreenTip carries the full list. Keep in
-   sync with the main-process open-dialog filter (OPEN_DIALOG_EXTENSIONS). */
-const OPEN_LOCAL_EXTENSIONS =
-  '.docx / .xlsx / .xlsm / .xls / .csv / .tsv / .pptx / .pdf / .md / .html'
+   width, so it ellipsizes and a hover ScreenTip carries the full list. Derived
+   from the main-process open-dialog filter so the two cannot drift apart. */
+const OPEN_LOCAL_EXTENSIONS = openLocalHint()
 
 /** drag payload of home file/folder rows (JSON array of absolute paths) */
 const DRAG_PATHS_MIME = 'application/x-genoffice-paths'

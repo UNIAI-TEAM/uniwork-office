@@ -3426,8 +3426,10 @@ export class UniworkDocsService {
   }
 
   /**
-   * Upload one local file as a UniWork document. Main stats the file first (a
-   * pick past the server's 50 MiB stage limit is refused unread with
+   * Upload one local file as a UniWork document. Main resolves the file name's
+   * extension first (`unsupported_format` before any read when the formats table
+   * does not know it - the picker's filter alone is not a contract), stats the
+   * file (a pick past the server's 50 MiB stage limit is refused unread with
    * `too_large`), reads the bytes and sends them as the multipart `file` part
    * while reporting progress; the title is the file name (the server's own
    * default). Nothing is written locally: the working copy is the download the
@@ -3446,6 +3448,12 @@ export class UniworkDocsService {
       if (typeof input.path !== 'string' || !input.path) throw new UniworkDocError('not_found')
       const filename = basename(input.path)
       if (!filename) throw new UniworkDocError('not_found')
+      // R1-1: the picker's native filter is not a contract - a typed path or a
+      // direct IPC call reaches here with any basename. A document whose
+      // extension the formats table does not resolve could never be opened
+      // afterwards (formatForName is the same authority the open flow uses), so
+      // it is refused before the stat, the read and the POST.
+      if (!formatForName(filename)) throw new UniworkDocError('unsupported_format')
       // the controller is registered before the first await: a Cancel that lands
       // while the file is still being stat'ed finds the upload and is never
       // dropped (R2-1)
@@ -5729,16 +5737,22 @@ export class UniworkDocsService {
           }
           // the document answers again (restored from the trash, a transient
           // 404): its local work can be saved once more. An archived document
-          // answers again only when THIS read proves the archive lifted - while
-          // it holds, the write is still refused and clearing the block would
-          // only earn it again (the rule the queue's blocked re-probe reads:
-          // probeBlockedDoc lifts an archived block only past `!archived`)
+          // answers again only when THIS read proves BOTH that the archive
+          // lifted AND that this copy may be edited (the same `canEdit` the
+          // queue's blocked re-probe reads: probeBlockedDoc lifts an archived
+          // block only for `flags.canEdit && !flags.archived`,
+          // service.ts:1760-1763; `access` folds in the view-ticket downgrade
+          // the probe has no copy of, so it is the stricter of the two) - while
+          // either holds, the write is still refused and clearing the block
+          // would only earn it again
           if (
             existing.state === 'blocked' &&
             (existing.error === 'not_found' ||
               existing.error === 'deleted' ||
               existing.error === 'document_deleted' ||
-              (existing.error === 'document_archived' && detail.archivedAt === null))
+              (existing.error === 'document_archived' &&
+                access === 'edit' &&
+                detail.archivedAt === null))
           ) {
             binding.state = localChecksum === existing.baseChecksum ? 'ready' : 'dirty'
             delete binding.error

@@ -60,6 +60,8 @@ export const ar = {
 
   // S5 conflict dialog: step 1 extras, confirmation step and results
   uwConflictViewDiff: 'عرض الاختلافات',
+  uwConflictDiffPending: 'جارٍ المقارنة…',
+  uwConflictDiffFailed: 'تعذّرت مقارنة النسختين الآن. حاول مرة أخرى لاحقًا.',
   uwConflictNoEdit: 'لم تعد لديك صلاحية تحرير هذا المستند.',
   uwConflictOverwriteTitle: 'هل تريد الاستبدال بنسختك؟',
   uwConflictOverwriteConfirm:

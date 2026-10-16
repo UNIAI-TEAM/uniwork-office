@@ -19,6 +19,8 @@ export const de = {
   exportHtmlEntry: 'Als Einzeldatei-HTML exportieren',
   previewLimitNote:
     'Diese Seite fragt Daten aus dem Netzwerk ab oder bettet andere Seiten ein; die Web-Vorschau blockiert das.',
+  previewLimitNoteApp:
+    'Diese Seite fragt Daten aus dem Netzwerk ab oder bettet andere Seiten ein; die Vorschau blockiert das.',
   useInAppMessage: 'Zum Verwenden dieser Funktion in der UniWork Office-App öffnen',
   openInApp: 'In der App öffnen',
   printFailed: 'Druck fehlgeschlagen: {error}',

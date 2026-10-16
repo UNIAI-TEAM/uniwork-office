@@ -31,8 +31,6 @@ import { inlineAssetsForPreview } from './preview-copy'
 export const HTML_WEB_CAPABILITIES = Object.freeze({
   // scripts run in the sandboxed preview.html (opaque origin, credentialless)
   htmlPreviewScripts: true,
-  // the preview's policy blocks fetch/XHR and nested frames (the renderer shows one note)
-  htmlPreviewNetwork: false,
   // visual edit writes the source: on with the host's `save` grant (./install.ts)
   htmlVisualEdit: false,
   // a chrome-free shell tab; the in-frame present mode stays

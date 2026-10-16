@@ -113,9 +113,10 @@ export interface SaveHtmlRequest {
   /** 'auto' = the AutoSave timer/blur save; absent = an explicit user save */
   origin?: 'user' | 'auto'
   /**
-   * Silent first save for an untitled document (AI auto-naming): saves to a
-   * unique path under Documents derived from this name, without a dialog.
-   * Ignored when the document already has a path.
+   * File name an untitled document's Save dialog starts with (the name the AI
+   * panel offered after a run); wins over `defaultName`. The dialog always
+   * opens; nothing is written before the user confirms. Ignored when the
+   * document already has a path.
    */
   suggestedName?: string
   /** Default file name offered by the save dialog of an untitled document */

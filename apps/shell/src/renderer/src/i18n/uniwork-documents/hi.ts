@@ -26,7 +26,7 @@ export const hi = {
   uwPickNoResults: '“{query}” से मेल खाने वाला कोई दस्तावेज़ नहीं है।',
   uwPickNoWorkspaces: 'आपके पास अभी कोई वर्कस्पेस नहीं है।',
   uwPickNoWorkspacesHint: 'पहले UniWork में एक वर्कस्पेस बनाएँ या उससे जुड़ें।',
-  uwPickUnsupported: 'UniWork Office में समर्थित नहीं',
+  uwPickHiddenFormats: 'छिपाए गए, क्योंकि UniWork Office इनका फ़ॉर्मैट नहीं खोल सकता: {count}',
   uwPickOpening: '“{title}” खोला जा रहा है…',
 
   uwErrNotSignedIn: 'जारी रखने के लिए UniWork में साइन इन करें।',
@@ -123,6 +123,7 @@ export const hi = {
   uwDocInfoByAt: '{name}, {time}',
   uwDocInfoVersionBy: '{version} · {name}',
   uwAccessView: 'देखें',
+  uwAccessComment: 'टिप्पणी करें',
   uwAccessEdit: 'संपादित करें',
   uwAccessManage: 'प्रबंधित करें',
   uwRoleOwner: 'स्वामी',

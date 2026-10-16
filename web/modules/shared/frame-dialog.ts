@@ -211,11 +211,14 @@ export function onFrameModal(listener: ModalListener): () => void {
   return () => modalListeners.delete(listener)
 }
 
-/** the rest of the frame leaves the tree while a dialog is open (screen-reader browse mode too) */
+/**
+ * the rest of the frame leaves the tree while a dialog is open (screen-reader browse mode too);
+ * the window's live nodes stay out of it, since an inert ancestor silences them
+ */
 function inertSiblings(mask: HTMLElement): () => void {
   const changed: Element[] = []
   for (const el of document.body.children) {
-    if (el === mask || el.hasAttribute('inert')) continue
+    if (el === mask || el.hasAttribute('inert') || el.classList.contains('uw-live')) continue
     el.setAttribute('inert', '')
     changed.push(el)
   }
@@ -227,6 +230,8 @@ function inertSiblings(mask: HTMLElement): () => void {
 export interface FrameDialogHandle<T extends string> {
   /** shows a step in the same card; resolves with the chosen id (Escape: `cancelId`) */
   step(step: FrameDialogStep<T>, opts?: { closeOnAnswer?: boolean }): Promise<T>
+  /** answers the shown step as if the user had picked `id` (a control the caller put in `content`) */
+  choose(id: T): void
   /** writes the dialog's own alert line (empty clears it) */
   setAlert(text: string): void
   /**
@@ -432,6 +437,9 @@ export function openFrameDialog<T extends string>(
         prior?.resolve(prior.step.cancelId)
         render(step)
       })
+    },
+    choose(choice) {
+      if (current) answer(choice)
     },
     setAlert(text) {
       alert.textContent = text

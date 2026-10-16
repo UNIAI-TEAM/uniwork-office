@@ -19,6 +19,8 @@ export const es = {
   exportHtmlEntry: 'Exportar como HTML de archivo único',
   previewLimitNote:
     'Esta página pide datos a la red o incrusta otras páginas, algo que la vista previa web bloquea.',
+  previewLimitNoteApp:
+    'Esta página pide datos a la red o incrusta otras páginas, algo que la vista previa bloquea.',
   useInAppMessage: 'Ábrelo en la aplicación UniWork Office para usar esta función',
   openInApp: 'Abrir en la aplicación',
   printFailed: 'Error al imprimir: {error}',

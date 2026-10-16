@@ -19,6 +19,8 @@ export const en = {
   exportHtmlEntry: 'Export HTML',
   previewLimitNote:
     'This page asks the network for data or embeds other pages, which the web preview blocks.',
+  previewLimitNoteApp:
+    'This page asks the network for data or embeds other pages, which the preview blocks.',
   useInAppMessage: 'Open in the UniWork Office app to use this feature',
   openInApp: 'Open in app',
   printFailed: 'Print failed: {error}',

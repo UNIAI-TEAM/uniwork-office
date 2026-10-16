@@ -19,6 +19,8 @@ export const nl = {
   exportHtmlEntry: 'Exporteren als één HTML-bestand',
   previewLimitNote:
     "Deze pagina vraagt gegevens op via het netwerk of sluit andere pagina's in; de webvoorbeeldweergave blokkeert dat.",
+  previewLimitNoteApp:
+    "Deze pagina vraagt gegevens op via het netwerk of sluit andere pagina's in; de voorbeeldweergave blokkeert dat.",
   useInAppMessage: 'Open in de UniWork Office-app om deze functie te gebruiken',
   openInApp: 'Openen in de app',
   printFailed: 'Afdrukken mislukt: {error}',

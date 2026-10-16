@@ -3,13 +3,18 @@
  * genoffice-tools-extract v1 — deterministic, read-only extractor for the
  * genoffice agent tool table (G6-01 / UNI-1363, lane g6-fork_tools).
  *
- *   node scripts/genoffice-tools-extract.mjs [--rev <git-rev>] [--repo <dir>]
+ *   node scripts/genoffice-tools-extract.mjs [--rev <git-rev>] [--repo <dir>] [--emit-schemas <out.json>]
  *
  * Defaults: --rev HEAD, --repo = the git toplevel of the current directory.
  * Every file is read through git (`git ls-tree`, `git show <rev>:<path>`) at the
  * given revision: nothing is checked out, no product code is executed, and the
  * process never touches the network. Exit 0 on success; non-zero with a message
  * on a bad rev or an unusable repo.
+ *
+ * `--emit-schemas <out.json>` (G6-09 W10, G7-12 residual R2) writes the resolved
+ * tool definitions as JSON instead of printing the table (stdout stays empty):
+ * the file the uniwork G7-12 holdout harness loads with `--tool-schemas`. See
+ * `buildSchemaFile` for the shape.
  *
  * Dependencies: none. The sources are parsed with the small literal evaluator in
  * this file (strings / numbers / objects / arrays / spreads / template
@@ -121,11 +126,13 @@
  */
 
 import { execFileSync } from 'node:child_process'
+import { writeFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { createHash } from 'node:crypto'
 import { posix } from 'node:path'
 
-const USAGE = 'usage: node scripts/genoffice-tools-extract.mjs [--rev <git-rev>] [--repo <dir>]'
+const USAGE =
+  'usage: node scripts/genoffice-tools-extract.mjs [--rev <git-rev>] [--repo <dir>] [--emit-schemas <out.json>]'
 
 /** module → the two source roots the table covers */
 const SCAN_ROOTS = [
@@ -438,6 +445,22 @@ function tokenize(src) {
 // ─────────────────────────── literal evaluator ───────────────────────────
 
 const U = (reason) => ({ __unresolved: reason })
+
+/**
+ * `--emit-schemas` only: where product code would have run, a description keeps its
+ * literal text and carries this marker (neutral, readable by a model). The U that
+ * results still says why it is unresolved.
+ */
+const RUNTIME_MARK = '[generated at runtime]'
+const partialU = (reason, partial) => ({ __unresolved: reason, partial })
+const partialText = (v) =>
+  typeof v === 'string'
+    ? v
+    : typeof v === 'number'
+      ? String(v)
+      : isU(v)
+        ? (v.partial ?? RUNTIME_MARK)
+        : null
 const isU = (v) =>
   !!v && typeof v === 'object' && !Array.isArray(v) && typeof v.__unresolved === 'string'
 const isPlainObject = (v) => !!v && typeof v === 'object' && !Array.isArray(v) && !isU(v)
@@ -479,7 +502,67 @@ function canonicalJson(value) {
 function parseExpression(tokens, i, scope, depth = 0) {
   if (depth > 24) return { value: U('recursion'), i }
   const primary = parsePrimary(tokens, i, scope, depth)
-  return parsePostfix(primary.value, tokens, primary.i, scope, depth)
+  const left = parsePostfix(primary.value, tokens, primary.i, scope, depth)
+  return scope.ctx && scope.ctx.strict ? parseAddition(left, tokens, scope, depth) : left
+}
+
+/**
+ * `a + b + c` for `--emit-schemas` only (`ctx.strict`). The table's evaluator stops
+ * a value at the `+` and skips the operator, which a hash may keep pinned but a
+ * description the model reads must not: a string concatenation is folded here,
+ * left to right, and an operand that is unresolved makes the sum unresolved.
+ */
+function parseAddition(left, tokens, scope, depth) {
+  let acc = left
+  for (;;) {
+    const op = tokens[acc.i]
+    if (!op || op.type !== 'punct' || op.value !== '+') return acc
+    const primary = parsePrimary(tokens, acc.i + 1, scope, depth)
+    const right = parsePostfix(primary.value, tokens, primary.i, scope, depth)
+    let value
+    if (isU(acc.value) || isU(right.value)) {
+      const reason = isU(acc.value) ? acc.value.__unresolved : right.value.__unresolved
+      const a = partialText(acc.value)
+      const b = partialText(right.value)
+      value = a === null || b === null ? U(reason) : partialU(reason, a + b)
+    } else if (
+      (typeof acc.value === 'string' || typeof acc.value === 'number') &&
+      (typeof right.value === 'string' || typeof right.value === 'number')
+    )
+      value =
+        typeof acc.value === 'number' && typeof right.value === 'number'
+          ? acc.value + right.value
+          : String(acc.value) + String(right.value)
+    else value = U('operator')
+    acc = { value, i: right.i }
+  }
+}
+
+/**
+ * `--emit-schemas` only: a property value or array element must be followed by its
+ * separator. Anything else is an operator the evaluator does not fold (`||`, `?`,
+ * `-`, ...); instead of cutting the value there and carrying on, the element is
+ * unresolved and the rest of it is skipped up to the next separator.
+ */
+function strictElement(tokens, r, closer, scope) {
+  const next = tokens[r.i]
+  if (!(scope.ctx && scope.ctx.strict) || !next || next.value === ',' || next.value === closer)
+    return r
+  let idx = r.i
+  let nest = 0
+  while (idx < tokens.length) {
+    const v = tokens[idx].value
+    if (tokens[idx].type === 'punct') {
+      if (v === '(' || v === '[' || v === '{') nest += 1
+      else if (v === ')' || v === ']' || v === '}') {
+        if (nest === 0) break
+        nest -= 1
+      } else if (v === ',' && nest === 0) break
+    }
+    idx += 1
+  }
+  const operator = next.type === 'punct' ? next.value : next.type
+  return { value: isU(r.value) ? r.value : U(`operator:${operator}`), i: idx }
 }
 
 function parsePrimary(tokens, i, scope, depth) {
@@ -620,6 +703,12 @@ function parseCall(callee, methodName, tokens, i, scope, depth) {
       idx += 1
       continue
     }
+    if (scope.ctx && scope.ctx.strict && startsArrow(tokens, idx)) {
+      // `.map((p) => p.label)`: the callback is applied by `applyCall`, not evaluated as an argument
+      args.push(U('function'))
+      idx = skipArgument(tokens, idx)
+      continue
+    }
     const r = parseExpression(tokens, idx, scope, depth + 1)
     args.push(r.value)
     idx = r.i
@@ -631,6 +720,34 @@ function parseCall(callee, methodName, tokens, i, scope, depth) {
     break
   }
   return { value: applyCall(callee, name, args, tokens, i, scope, depth), i: idx }
+}
+
+/** does an arrow function (`x => ...`, `(a, b) => ...`) start at token i? */
+function startsArrow(tokens, i) {
+  const tk = tokens[i]
+  if (!tk) return false
+  if (tk.type === 'ident') return !!tokens[i + 1] && tokens[i + 1].value === '=>'
+  if (tk.value !== '(') return false
+  const after = skipBalanced(tokens, i)
+  return !!tokens[after] && tokens[after].value === '=>'
+}
+
+/** index of the `,` or `)` that ends the call argument starting at token i */
+function skipArgument(tokens, i) {
+  let idx = i
+  let nest = 0
+  while (idx < tokens.length) {
+    const tk = tokens[idx]
+    if (tk.type === 'punct') {
+      if (tk.value === '(' || tk.value === '[' || tk.value === '{') nest += 1
+      else if (tk.value === ')' || tk.value === ']' || tk.value === '}') {
+        if (nest === 0) break
+        nest -= 1
+      } else if (tk.value === ',' && nest === 0) break
+    }
+    idx += 1
+  }
+  return idx
 }
 
 function applyCall(callee, name, args, tokens, openParen, scope, depth) {
@@ -754,7 +871,12 @@ function parseObject(tokens, i, scope, depth) {
     }
     const next = tokens[idx]
     if (next && next.value === ':') {
-      const val = parseExpression(tokens, idx + 1, scope, depth + 1)
+      const val = strictElement(
+        tokens,
+        parseExpression(tokens, idx + 1, scope, depth + 1),
+        '}',
+        scope,
+      )
       out[key] = val.value
       idx = val.i
       continue
@@ -821,7 +943,7 @@ function parseArray(tokens, i, scope, depth) {
       }
       continue
     }
-    const r = parseExpression(tokens, idx, scope, depth + 1)
+    const r = strictElement(tokens, parseExpression(tokens, idx, scope, depth + 1), ']', scope)
     out.push(r.value)
     idx = r.i
   }
@@ -830,6 +952,7 @@ function parseArray(tokens, i, scope, depth) {
 
 function parseTemplateToken(raw, scope, depth) {
   let out = ''
+  let reason = null
   let i = 1
   while (i < raw.length) {
     const c = raw[i]
@@ -844,7 +967,13 @@ function parseTemplateToken(raw, scope, depth) {
       const end = skipBraced(raw, i + 1)
       const inner = raw.slice(i + 2, end - 1)
       const value = parseSubExpression(inner, scope, depth + 1)
-      if (isU(value)) return { value, i: i }
+      if (isU(value)) {
+        if (!(scope.ctx && scope.ctx.strict)) return { value, i: i }
+        reason = reason || value.__unresolved
+        out += partialText(value)
+        i = end
+        continue
+      }
       out += String(value)
       i = end
       continue
@@ -852,7 +981,7 @@ function parseTemplateToken(raw, scope, depth) {
     out += c
     i += 1
   }
-  return { value: out, i: 0 }
+  return { value: reason ? partialU(reason, out) : out, i: 0 }
 }
 
 function parseSubExpression(text, scope, depth) {
@@ -1997,6 +2126,58 @@ function findToolObjectTokens(tokens) {
   return out
 }
 
+/** the tool object again under the strict rules of `--emit-schemas` (`ctx.strict`) */
+function strictValue(parse, tokens, objIdx, scope, ctx) {
+  ctx.strict = true
+  try {
+    return parse(tokens, objIdx, scope, 0).value
+  } finally {
+    ctx.strict = false
+  }
+}
+
+/**
+ * What `--emit-schemas` needs from one tool object read under the strict rules:
+ *   name / description    the strings; a description that needs product code is the
+ *                         literal text plus the runtime marker, `descriptionComplete`
+ *                         false and `descriptionReason` says why; null when nothing
+ *                         usable resolved
+ *   schema                the resolved inputSchema, or null with `reason` (the first
+ *                         unresolved node, or `missing`)
+ * Never part of the table text.
+ */
+function toolDetail(value) {
+  if (!isPlainObject(value)) {
+    return {
+      name: null,
+      description: null,
+      descriptionComplete: false,
+      descriptionReason: null,
+      schema: null,
+      reason: isU(value) ? value.__unresolved : 'object',
+    }
+  }
+  const description = value.description
+  let text = null
+  let descriptionReason = null
+  if (typeof description === 'string') text = description
+  else if (isU(description)) {
+    descriptionReason = description.__unresolved
+    if (typeof description.partial === 'string') text = description.partial
+  }
+  const hasSchema = Object.prototype.hasOwnProperty.call(value, 'inputSchema')
+  const schema = hasSchema ? value.inputSchema : undefined
+  const reason = !hasSchema ? 'missing' : isU(schema) ? schema.__unresolved : findUnresolved(schema)
+  return {
+    name: typeof value.name === 'string' ? value.name : null,
+    description: text,
+    descriptionComplete: descriptionReason === null && text !== null,
+    descriptionReason,
+    schema: reason ? null : schema,
+    reason,
+  }
+}
+
 export function extract({ repo, rev }) {
   const sha = git(repo, ['rev-parse', '--verify', `${rev}^{commit}`]).trim()
   const listing = git(repo, ['ls-tree', '-r', '--name-only', sha]).split('\n').filter(Boolean)
@@ -2109,6 +2290,7 @@ export function extract({ repo, rev }) {
           hash,
           write,
           source: analysis.path,
+          detail: toolDetail(strictValue(parseExpression, analysis.tokens, objIdx, scope, ctx)),
         })
       }
     }
@@ -2127,14 +2309,116 @@ export function extract({ repo, rev }) {
   return { sha, rows, text: `${lines.join('\n')}\n` }
 }
 
+// ───────────────────────────── schema file (--emit-schemas) ─────────────────────────────
+
+/** the modules the holdout harness maps, in the order the file lists them */
+const SCHEMA_MODULES = ['docs', 'sheets', 'slides', 'pdf', 'markdown', 'html']
+
+const canonicalSha256 = (schema) =>
+  createHash('sha256').update(canonicalJson(schema), 'utf8').digest('hex')
+
+/**
+ * The `--emit-schemas` document for one `extract()` result.
+ *
+ *   header      kind, version, the resolved rev, the sha256 of the mechanical block
+ *               (the default stdout text of the same run) and the row count per module
+ *   <module>    for each of docs/sheets/slides/pdf/markdown/html, the `offered` tools
+ *               (the schema resolved and there is a description), as `{ type:
+ *               'function', function: { name, description, parameters } }` with
+ *               `parameters` = the `inputSchema` in source key order. This is the
+ *               shape `holdout-backend.mjs` reads from a `--tool-schemas` file; it
+ *               sends these objects to the model as they are, so nothing else lives
+ *               in them.
+ *   catalogue   one entry per mechanical table row (agent-core rows included), table
+ *               order: module, name, host (`renderer` | `agent-core`), source,
+ *               schemaComplete (the inputSchema resolved whole), descriptionComplete,
+ *               offered, `reason` when either is incomplete, inputSchemaSha256
+ *               (sha256 of the schema this file embeds, canonical JSON) and tableHash
+ *               (the table's own cell: it can differ, because the table's evaluator
+ *               cuts a property value at a `+` that this file folds). A tool that is
+ *               not offered is listed here with its `description` and, when it
+ *               resolved, its `inputSchema`: never guessed, never silently dropped.
+ *
+ * A description the frame builds by calling product code (`opNames()`,
+ * `buildOpsGuide()`) is offered with the real inputSchema and the literal text of the
+ * description, the runtime marker standing where the code ran, and
+ * `descriptionComplete: false`: a consumer must report it as a reduced description.
+ * The schema itself is never partial.
+ *
+ * The file is read with stricter rules than the table (`ctx.strict`: `+` folded,
+ * any other operator makes the element unresolved), so a text the evaluator would
+ * have cut short is listed as incomplete instead of being offered truncated. The
+ * result is a pure function of the rev, so the same rev writes the same bytes.
+ */
+export function buildSchemaFile({ sha, rows, text }) {
+  const counts = {}
+  for (const module of SCHEMA_MODULES) counts[module] = 0
+  const file = { header: null }
+  for (const module of SCHEMA_MODULES) file[module] = []
+  const catalogue = []
+  for (const row of rows) {
+    counts[row.module] = (counts[row.module] ?? 0) + 1
+    // the table's evaluator can misread an object (see `strictValue`) and hand a row another tool's name:
+    // such a row is listed with that reason and carries nothing read from the object
+    const same = row.detail.name === row.tool
+    const detail = same
+      ? row.detail
+      : {
+          description: null,
+          descriptionComplete: false,
+          descriptionReason: null,
+          schema: null,
+          reason: `name:${row.detail.name}`,
+        }
+    const { description, schema } = detail
+    const schemaComplete = detail.reason === null
+    const offered = schemaComplete && description !== null
+    const entry = {
+      module: row.module,
+      name: row.tool,
+      host: row.source.startsWith('packages/agent-core/') ? 'agent-core' : 'renderer',
+      source: row.source,
+      schemaComplete,
+      descriptionComplete: detail.descriptionComplete,
+      offered,
+    }
+    const why =
+      detail.reason ?? (detail.descriptionReason ? `description:${detail.descriptionReason}` : null)
+    if (why !== null) entry.reason = why
+    if (offered) {
+      if (SCHEMA_MODULES.includes(row.module))
+        file[row.module].push({
+          type: 'function',
+          function: { name: row.tool, description, parameters: schema },
+        })
+    } else {
+      entry.description = description
+      if (schemaComplete) entry.inputSchema = schema
+    }
+    entry.inputSchemaSha256 = schemaComplete ? canonicalSha256(schema) : null
+    entry.tableHash = row.hash
+    catalogue.push(entry)
+  }
+  file.header = {
+    kind: 'genoffice-tool-schemas',
+    version: 1,
+    rev: sha,
+    mechanicalBlockSha256: createHash('sha256').update(text, 'utf8').digest('hex'),
+    counts,
+  }
+  file.catalogue = catalogue
+  return file
+}
+
 // ──────────────────────────────── CLI ────────────────────────────────
 
 function parseArgs(argv) {
-  const args = { rev: 'HEAD', repo: null }
+  const args = { rev: 'HEAD', repo: null, emitSchemas: null }
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i]
     if (a === '--rev') args.rev = argv[++i]
     else if (a === '--repo') args.repo = argv[++i]
+    else if (a === '--emit-schemas') args.emitSchemas = argv[++i]
     else if (a === '--help' || a === '-h') args.help = true
     else {
       process.stderr.write(`genoffice-tools-extract: unknown argument: ${a}\n${USAGE}\n`)
@@ -2170,6 +2454,15 @@ function main() {
       `genoffice-tools-extract: cannot read rev "${args.rev}" in ${repo}: ${message}\n`,
     )
     process.exit(1)
+  }
+  if (args.emitSchemas) {
+    const file = buildSchemaFile(result)
+    writeFileSync(args.emitSchemas, `${JSON.stringify(file, null, 2)}\n`)
+    const counts = Object.entries(file.header.counts)
+      .map(([module, n]) => `${module}=${n}`)
+      .join(' ')
+    process.stderr.write(`genoffice-tools-extract: wrote ${args.emitSchemas} (${counts})\n`)
+    return
   }
   process.stdout.write(result.text)
 }

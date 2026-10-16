@@ -26,7 +26,7 @@ export const he = {
   uwPickNoResults: 'אין מסמכים התואמים ל-“{query}”.',
   uwPickNoWorkspaces: 'עדיין אין לך מרחבי עבודה.',
   uwPickNoWorkspacesHint: 'צור או הצטרף למרחב עבודה ב-UniWork קודם.',
-  uwPickUnsupported: 'לא נתמך ב-UniWork Office',
+  uwPickHiddenFormats: 'מוסתרים כי UniWork Office לא יכול לפתוח את הפורמט שלהם: {count}',
   uwPickOpening: 'פותח את “{title}”…',
 
   uwErrNotSignedIn: 'יש להתחבר ל-UniWork כדי להמשיך.',
@@ -121,6 +121,7 @@ export const he = {
   uwDocInfoByAt: '{name}, {time}',
   uwDocInfoVersionBy: '{version} · {name}',
   uwAccessView: 'צפייה',
+  uwAccessComment: 'תגובה',
   uwAccessEdit: 'עריכה',
   uwAccessManage: 'ניהול',
   uwRoleOwner: 'בעלים',

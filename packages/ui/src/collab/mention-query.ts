@@ -62,6 +62,8 @@ export interface MentionRange {
   label: string
   /** `[@label](mention://member/<id>)` exactly as it goes into the body */
   raw: string
+  /** G8-18: false when picked from the picker with `can_view: false`; undefined when typed or pasted */
+  canView?: boolean
 }
 
 export interface MentionDoc {
@@ -72,6 +74,30 @@ export interface MentionDoc {
 }
 
 const displayOf = (label: string) => `@${label}`
+
+/** G8-18: full conjunction list of names in the UI locale (never truncated). */
+export function formatMentionNames(names: readonly string[], lang: string): string {
+  if (names.length === 0) return ''
+  if (names.length === 1) return names[0]!
+  try {
+    return new Intl.ListFormat(lang, { style: 'long', type: 'conjunction' }).format(names)
+  } catch {
+    return new Intl.ListFormat('en', { style: 'long', type: 'conjunction' }).format(names)
+  }
+}
+
+/**
+ * G8-18: whether this caller may offer "Share view access": the source can send it (the web frame
+ * defines `shareView` only with the effective `commentsShareView` capability) and the host did not
+ * switch the capability off. A per-person `can_share` is only ever read from a post-send result.
+ */
+export function canShareView(
+  host: { capabilities?: { commentsShareView?: boolean }; commentsShareView?: boolean },
+  source: { shareView?: unknown },
+): boolean {
+  const flag = host.capabilities?.commentsShareView ?? host.commentsShareView
+  return typeof source.shareView === 'function' && flag !== false
+}
 
 /** The displayed form of a stored body: top-level mention tokens become `@Name` + a range. */
 export function mentionDocFromBody(body: string): MentionDoc {
@@ -215,7 +241,7 @@ export function pickMention(
   doc: MentionDoc,
   trigger: MentionTrigger,
   caret: number,
-  who: { id: string; label: string; raw: string },
+  who: { id: string; label: string; raw: string; canView?: boolean },
 ): { doc: MentionDoc; caret: number } {
   const shown = displayOf(who.label)
   const out = insertMention(doc.text, trigger, caret, shown)
@@ -226,6 +252,7 @@ export function pickMention(
     id: who.id,
     label: who.label,
     raw: who.raw,
+    ...(who.canView !== undefined ? { canView: who.canView } : {}),
   }
   return {
     doc: { text: out.text, ranges: [...kept, range].sort((a, b) => a.start - b.start) },

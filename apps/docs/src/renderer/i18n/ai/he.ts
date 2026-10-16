@@ -73,6 +73,9 @@ export const he = {
   aiStarterEventOutline: 'הכן ראשי פרקים לתוכנית אירוע',
   aiThinking: 'חושב',
   aiWorkedSteps: 'הושלם · {n} שלבים',
+  aiWorkedStepsOne: 'הושלם · שלב אחד',
+  aiWorkedStepsFew: 'הושלם · {n} שלבים',
+  aiEditsPaused: 'העוזר עובד על המסמך הזה. העריכות שלך מושהות; עצור את העוזר כדי להמשיך.',
   aiGroupWorking: 'בעבודה…',
   aiWorking: 'מעבד',
   aiErrorPrefix: 'שגיאה: {error}',
@@ -81,6 +84,16 @@ export const he = {
   aiRegenerateTitle: 'יצירה מחדש',
   aiSnapshotsTitle: 'תמונות מצב של גרסאות',
   aiRollback: 'שחזור',
+  aiAcceptMarked: 'אישור',
+  aiAcceptMarkedTitle: 'לשמור את השינויים של ה-AI ולהסיר את ההדגשה',
+  aiRollbackKept:
+    'הטקסט שוחזר. המסמך נשמר במהלך התשובה הזו, ולכן לא ניתן היה לשחזר את החלקים האלה: {parts}',
+  aiSidePartComments: 'הערות',
+  aiSidePartHeaderFooter: 'כותרת עליונה ותחתונה',
+  aiSidePartStyles: 'סגנונות',
+  aiSidePartPageSetup: 'הגדרת עמוד',
+  aiSidePartWatermark: 'סימן מים',
+  aiSidePartSep: ', ',
   aiScopeSelected: 'נבחרו {count} פסקאות',
   aiScopeEmptyDoc: 'מסמך ריק',
   aiScopeCursor: 'במיקום הסמן',
@@ -94,6 +107,8 @@ export const he = {
   aiAttachTitle: 'צירוף קבצים מקומיים (אפשר גם לגרור אל החלונית)',
   aiRemoveAttachmentTitle: 'הסרת הקובץ המצורף',
   aiTrackChanges: 'מעקב אחר שינויים',
+  aiTrackForced:
+    'המסמך הזה מוגן: מעקב אחר שינויים חייב להישאר פעיל, ולכן עריכות ה-AI נרשמות כגרסאות מעקב.',
   aiTrackOnTitle:
     'מעקב אחר שינויים פועל: שינויי תוכן של ה-AI מסומנים כתיקונים (הוספות בקו תחתון, מחיקות בקו חוצה); קבלו או דחו בסקירה',
   aiTrackOffTitle:

@@ -95,6 +95,7 @@ import { showToast } from './components/toast-bus'
 import { cap } from './capabilities'
 import { isEncryptedPackage } from './encrypted-package'
 import { buildStandaloneHtml } from './html-export'
+import { carryAiMarks, sameDocIgnoringAiMarks } from './editor/ai-marker'
 import { aiPanelInitiallyOpen } from '@genoffice/ui'
 import { isNarrowViewport } from './narrow-viewport'
 
@@ -708,6 +709,17 @@ function deriveAutoFileName(editor: Editor): string | null {
 }
 
 /**
+ * The name a never-saved document's first save writes under (the first heading while it is
+ * still "Untitled", else its current name); null once the document has a file. The AI panel's
+ * ask-before-saving card shows it and the Save it hands back passes it on, so both agree.
+ */
+export function firstSaveName(ctx: FileActionContext): string | null {
+  const { doc, editor } = ctx
+  if (!doc || !editor || doc.filePath) return null
+  return (doc.fileName === t('appUntitledDocx') ? deriveAutoFileName(editor) : null) ?? doc.fileName
+}
+
+/**
  * Serialize the current editor/document state to .docx bytes — the shared
  * serialization half of save(); no dialogs, no state changes. Also used for
  * crash-recovery copies.
@@ -1021,7 +1033,8 @@ async function saveOnce(
       return false
     }
     // flush pending in-place table cell / textbox edits into the PM doc first
-    window.dispatchEvent(new Event('ai-docs-commit-tables'))
+    // `auto` tells the AI panel an autosave must not clear its change marker
+    window.dispatchEvent(new CustomEvent('ai-docs-commit-tables', { detail: { auto } }))
     // identity snapshot: detects edits that arrive while the save is in flight
     const fontSettingsVersion = ctx.fontSettingsVersionRef?.current
     const docSnapshot = editor.state.doc
@@ -1132,13 +1145,15 @@ async function saveOnce(
     const rebasedPm = blocksToPmDoc(reparsed.blocks, readSections(reparsed), pmDocOptions(reparsed))
     let unchanged = false
     try {
-      unchanged = editor.state.doc.eq(editor.schema.nodeFromJSON(rebasedPm))
+      // the AI marker is not file content: a marked doc is still the saved doc
+      unchanged = sameDocIgnoringAiMarks(editor.state.doc, editor.schema.nodeFromJSON(rebasedPm))
     } catch {
       /* unrepresentable → rewrite */
     }
     // Equal doc: skip the rewrite so undo history, caret and scroll survive.
     if (!unchanged) {
-      editor.commands.setContent(rebasedPm as never)
+      // an autosave keeps the AI marker on screen (a user Save cleared it before writing)
+      editor.commands.setContent(carryAiMarks(editor.state.doc, rebasedPm) as never)
       resetEditorHistory(editor)
       const chain = editor
         .chain()

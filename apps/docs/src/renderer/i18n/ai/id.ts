@@ -75,6 +75,10 @@ export const id = {
   aiStarterEventOutline: 'Buat kerangka rencana acara',
   aiThinking: 'Berpikir',
   aiWorkedSteps: 'Selesai · {n} langkah',
+  aiWorkedStepsOne: 'Selesai · {n} langkah',
+  aiWorkedStepsFew: 'Selesai · {n} langkah',
+  aiEditsPaused:
+    'Asisten sedang mengerjakan dokumen ini. Suntingan Anda dijeda; hentikan asisten untuk melanjutkan.',
   aiGroupWorking: 'Sedang bekerja…',
   aiWorking: 'Memproses',
   aiErrorPrefix: 'Kesalahan: {error}',
@@ -83,6 +87,16 @@ export const id = {
   aiRegenerateTitle: 'Buat ulang',
   aiSnapshotsTitle: 'Snapshot versi',
   aiRollback: 'Kembalikan',
+  aiAcceptMarked: 'Terima',
+  aiAcceptMarkedTitle: 'Simpan perubahan AI dan hapus sorotannya',
+  aiRollbackKept:
+    'Teks sudah dikembalikan. Dokumen disimpan selama balasan ini, jadi bagian berikut tidak dapat dikembalikan: {parts}',
+  aiSidePartComments: 'komentar',
+  aiSidePartHeaderFooter: 'header dan footer',
+  aiSidePartStyles: 'gaya',
+  aiSidePartPageSetup: 'pengaturan halaman',
+  aiSidePartWatermark: 'watermark',
+  aiSidePartSep: ', ',
   aiScopeSelected: '{count} paragraf dipilih',
   aiScopeEmptyDoc: 'Dokumen kosong',
   aiScopeCursor: 'Di posisi kursor',
@@ -96,6 +110,8 @@ export const id = {
   aiAttachTitle: 'Lampirkan file lokal (atau seret ke panel)',
   aiRemoveAttachmentTitle: 'Hapus lampiran',
   aiTrackChanges: 'Lacak perubahan',
+  aiTrackForced:
+    'Dokumen ini dilindungi: pelacakan perubahan harus tetap aktif, sehingga suntingan AI dicatat sebagai revisi.',
   aiTrackOnTitle:
     'Lacak perubahan aktif: perubahan konten AI ditandai sebagai revisi (sisipan digarisbawahi, penghapusan dicoret); terima atau tolak di Tinjau',
   aiTrackOffTitle:

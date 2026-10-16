@@ -449,7 +449,8 @@ export function ServerCommentsHost(p: ServerCommentsHostProps) {
   }
 
   const inFileCount = p.inFileComments.filter((c) => !c.parentId).length
-  const needsSave = !knownVersion && mode.level !== 'view'
+  // a view or comment caller cannot save the file, so a "save first" prompt would lead nowhere
+  const needsSave = !knownVersion && mode.level !== 'view' && mode.level !== 'comment'
   return (
     <div className="comments-pane docs-server-comments">
       <CollabPanel

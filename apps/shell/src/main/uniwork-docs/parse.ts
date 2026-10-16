@@ -238,12 +238,28 @@ function checksum(value: unknown): string {
   return hex
 }
 
+export type DocumentCommentsLevel = 'view' | 'comment' | 'edit' | 'manage'
+
+/**
+ * Maps a server `my_level` field to `commentsLevel` (G8-18 / DOC-05):
+ * `'view'`, `'comment'`, `'edit'`, and `'manage'` pass through; `null`,
+ * `undefined`, or `""` stay `null`; any unknown non-empty string downgrades to
+ * `'view'` (read-only, never more). A non-string value is `malformed_response`.
+ */
+export function commentsLevelOf(myLevel: unknown): DocumentCommentsLevel | null {
+  if (myLevel === undefined || myLevel === null || myLevel === '') return null
+  if (typeof myLevel !== 'string') bad()
+  if (myLevel === 'view' || myLevel === 'comment' || myLevel === 'edit' || myLevel === 'manage') {
+    return myLevel
+  }
+  return 'view'
+}
+
 export function parseDetail(raw: unknown): DocumentDetail {
   const doc = record(record(raw).document)
   if (doc.kind !== 'file') throw new UniworkDocError('unsupported_format')
   const file = record(doc.file)
-  const myLevel = doc.my_level
-  if (myLevel !== undefined && myLevel !== null && typeof myLevel !== 'string') bad()
+  const myLevel = commentsLevelOf(doc.my_level)
   // G8-12: optional - a missing or odd one only leaves the comments base unknown
   const versionId = file.version_id
   const knownVersionId =
@@ -255,7 +271,7 @@ export function parseDetail(raw: unknown): DocumentDetail {
     title: str(doc.title),
     revision: revision(doc.revision),
     currentVersion: nonNegInt(doc.current_version),
-    myLevel: typeof myLevel === 'string' ? myLevel : null,
+    myLevel,
     archivedAt: typeof doc.archived_at === 'string' && doc.archived_at ? doc.archived_at : null,
     ...(typeof doc.parent_id === 'string' && doc.parent_id.length > 0 && doc.parent_id.length <= 128
       ? { parentId: doc.parent_id }

@@ -26,7 +26,7 @@ export const de = {
   uwPickNoResults: 'Keine Dokumente gefunden für „{query}“.',
   uwPickNoWorkspaces: 'Sie haben noch keine Arbeitsbereiche.',
   uwPickNoWorkspacesHint: 'Erstellen oder treten Sie zuerst in UniWork einem Arbeitsbereich bei.',
-  uwPickUnsupported: 'In UniWork Office nicht unterstützt',
+  uwPickHiddenFormats: 'Ausgeblendet, weil UniWork Office ihr Format nicht öffnen kann: {count}',
   uwPickOpening: '„{title}“ wird geöffnet…',
 
   uwErrNotSignedIn: 'Melden Sie sich bei UniWork an, um fortzufahren.',
@@ -132,6 +132,7 @@ export const de = {
   uwDocInfoByAt: '{name}, {time}',
   uwDocInfoVersionBy: '{version} · {name}',
   uwAccessView: 'Ansehen',
+  uwAccessComment: 'Kommentieren',
   uwAccessEdit: 'Bearbeiten',
   uwAccessManage: 'Verwalten',
   uwRoleOwner: 'Eigentümer',

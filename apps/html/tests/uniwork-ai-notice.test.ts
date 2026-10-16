@@ -89,7 +89,6 @@ describe('UniWork AI notices (html panel)', () => {
     },
     getSnapshot: () => ({}),
     restoreSnapshot: () => {},
-    onPrompt: () => {},
     onRunDone: () => {},
     clearHighlights: () => {},
     navigateTo: () => {},

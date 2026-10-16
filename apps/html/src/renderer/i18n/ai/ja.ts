@@ -54,6 +54,8 @@ export const ja = {
   aiUndelivered: '送信できませんでした',
   aiUnknownError: 'AI リクエストに失敗しました。再試行してください',
   aiWorkedSteps: '完了 · {n} ステップ',
+  aiWorkedStepsOne: '完了 · {n} ステップ',
+  aiWorkedStepsFew: '完了 · {n} ステップ',
   aiWorking: '処理中',
   aiOpenAssistant: 'AI アシスタントを開く',
   aiToolOutline: 'ドキュメント構造を読み取り',

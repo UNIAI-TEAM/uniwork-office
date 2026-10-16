@@ -324,3 +324,15 @@
   color: var(--text-dim);
   background: var(--hover);
 }
+
+/* forced colors drop the accent fill: the selected option keeps a 2px Highlight border so it still
+ * reads as chosen; the border is always reserved (transparent) so the row does not shift */
+@media (forced-colors: active) {
+  .ai-model-item {
+    border: 2px solid transparent;
+  }
+
+  .ai-model-item.selected {
+    border-color: Highlight;
+  }
+}

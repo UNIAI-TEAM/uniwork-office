@@ -66,6 +66,8 @@ export const ko = {
 
   // S5 conflict dialog: step 1 extras, confirmation step and results
   uwConflictViewDiff: '차이 보기',
+  uwConflictDiffPending: '비교하는 중…',
+  uwConflictDiffFailed: '지금은 버전을 비교할 수 없습니다. 나중에 다시 시도하세요.',
   uwConflictNoEdit: '이 문서에 대한 편집 권한이 더 이상 없습니다.',
   uwConflictOverwriteTitle: '내 버전으로 덮어쓸까요?',
   uwConflictOverwriteConfirm:

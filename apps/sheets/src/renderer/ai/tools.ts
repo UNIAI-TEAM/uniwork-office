@@ -22,6 +22,7 @@ import type {
 } from '@genoffice/xlsx-gateway/domain/workbook.types'
 import type { AttachmentMeta } from '../../shared/desktop-api'
 import { cap } from '../capabilities'
+import { planWrite, type PlanWrite } from './apply-footprint'
 import { t } from '../i18n/locale'
 import { formatRangeAggregate, type RangeAggregate } from './aggregate'
 import type { CellRead } from './cell-read'
@@ -798,6 +799,8 @@ export interface ToolExecution {
   /** true when propose_operations auto-applied a batch of changes */
   mutated: boolean
   summary: string
+  /** propose_operations: the cells and ranges the applied batch wrote (the panel's run footprint) */
+  write?: PlanWrite
 }
 
 const fail = (summary: string, output: string): ToolExecution => ({
@@ -2297,6 +2300,7 @@ export function executeWorkbookTool(
           outcome.plan.formatChanges.length +
           outcome.plan.sheetRenames.length +
           outcome.plan.structuralChanges.length
+        const write = planWrite(outcome.plan, operations, deps.getActiveSheetInfo())
         const base = `Auto-applied ${opCount} change(s) (undo via the side panel [Undo] button or ⌘Z): ${formatPlanSummary(outcome.plan)}${warnings}`
         // Read-back after write (write → verify): formula cells fetch their
         // computed values after the async recalc, so the AI sees real results and
@@ -2319,7 +2323,7 @@ export function executeWorkbookTool(
           if (last !== first) formulaCells.push({ sheetId: op.sheetId, address: last })
         }
         if (formulaCells.length === 0) {
-          return { output: base, mutated: true, summary }
+          return { output: base, mutated: true, summary, write }
         }
         return (async (): Promise<ToolExecution> => {
           await new Promise((resolve) => setTimeout(resolve, FORMULA_RECALC_DELAY_MS))
@@ -2359,6 +2363,7 @@ export function executeWorkbookTool(
                 : ''),
             mutated: true,
             summary,
+            write,
           }
         })()
       }

@@ -77,6 +77,10 @@ export const fr = {
   aiStarterEventOutline: "Établir le plan d'un événement",
   aiThinking: 'Réflexion en cours',
   aiWorkedSteps: 'Terminé · {n} étapes',
+  aiWorkedStepsOne: 'Terminé · {n} étape',
+  aiWorkedStepsFew: 'Terminé · {n} étapes',
+  aiEditsPaused:
+    "L'assistant travaille sur ce document. Vos modifications sont suspendues ; arrêtez l'assistant pour continuer.",
   aiGroupWorking: 'En cours…',
   aiWorking: 'Traitement en cours',
   aiErrorPrefix: 'Erreur : {error}',
@@ -85,6 +89,16 @@ export const fr = {
   aiRegenerateTitle: 'Régénérer',
   aiSnapshotsTitle: 'Instantanés de version',
   aiRollback: 'Restaurer',
+  aiAcceptMarked: 'Accepter',
+  aiAcceptMarkedTitle: 'Conserver les modifications de l’IA et retirer le surlignage',
+  aiRollbackKept:
+    'Le texte a été rétabli. Le document a été enregistré pendant cette réponse, ces éléments n’ont donc pas pu être rétablis : {parts}',
+  aiSidePartComments: 'commentaires',
+  aiSidePartHeaderFooter: 'en-tête et pied de page',
+  aiSidePartStyles: 'styles',
+  aiSidePartPageSetup: 'mise en page',
+  aiSidePartWatermark: 'filigrane',
+  aiSidePartSep: ', ',
   aiScopeSelected: '{count} paragraphe(s) sélectionné(s)',
   aiScopeEmptyDoc: 'Document vide',
   aiScopeCursor: 'Au curseur',
@@ -98,6 +112,8 @@ export const fr = {
   aiAttachTitle: 'Joindre des fichiers locaux (ou faites-les glisser sur le panneau)',
   aiRemoveAttachmentTitle: 'Supprimer la pièce jointe',
   aiTrackChanges: 'Suivi des modifications',
+  aiTrackForced:
+    'Ce document est protégé : le suivi des modifications reste activé, les modifications de l’IA sont donc enregistrées comme révisions.',
   aiTrackOnTitle:
     "Suivi des modifications activé : les modifications de contenu de l'IA sont marquées comme révisions (insertions soulignées, suppressions barrées) ; acceptez ou refusez dans Révision",
   aiTrackOffTitle:

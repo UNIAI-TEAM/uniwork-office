@@ -54,6 +54,8 @@ export const vi = {
   aiUndelivered: 'Chưa được gửi',
   aiUnknownError: 'Yêu cầu AI thất bại, vui lòng thử lại',
   aiWorkedSteps: 'Đã xử lý · {n} bước',
+  aiWorkedStepsOne: 'Đã xử lý · {n} bước',
+  aiWorkedStepsFew: 'Đã xử lý · {n} bước',
   aiWorking: 'Đang xử lý',
   aiOpenAssistant: 'Mở trợ lý AI',
   aiToolOutline: 'Đọc dàn ý tài liệu',

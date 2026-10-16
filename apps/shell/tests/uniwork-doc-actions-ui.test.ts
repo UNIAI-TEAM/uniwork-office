@@ -429,6 +429,39 @@ describe('S18 upload', () => {
     await flush()
     expect(api.uniworkOpenDocument).toHaveBeenCalledWith('up1')
   })
+
+  it('shows unsupported_format at the file field with no generic toast, and uploads after picking a supported file', async () => {
+    await render([])
+    api.uniworkPickUploadFile.mockResolvedValueOnce({
+      path: '/home/me/notes.txt',
+      name: 'notes.txt',
+    })
+    api.uniworkUploadDocument.mockResolvedValueOnce(fail('unsupported_format'))
+
+    await click(buttonByText(host, en.uwDocUpload))
+    const dialog = modal()!
+    const pickBtn = buttonByText(dialog, en.uwDocUploadPick)
+    await click(pickBtn)
+    expect(dialog.querySelector('.uw-act-file-name')?.textContent).toBe('notes.txt')
+
+    await click(dialog.querySelector('.btn-primary')!)
+    const fieldError = dialog.querySelector('.uw-act-error')!
+    expect(fieldError.getAttribute('role')).toBe('alert')
+    expect(fieldError.textContent).toBe(en.uwErrUnsupportedFormat)
+    expect(pickBtn.getAttribute('aria-invalid')).toBe('true')
+    expect(document.activeElement).toBe(pickBtn)
+    expect(host.querySelector('.uw-act-toast')).toBeNull()
+    expect(api.uniworkOpenDocument).not.toHaveBeenCalled()
+
+    await click(pickBtn)
+    expect(dialog.querySelector('.uw-act-file-name')?.textContent).toBe('Q3.xlsx')
+    expect(fieldError.textContent).toBe('')
+    expect(pickBtn.getAttribute('aria-invalid')).toBeNull()
+
+    await click(dialog.querySelector('.btn-primary')!)
+    expect(modal()).toBeNull()
+    expect(api.uniworkOpenDocument).toHaveBeenCalledWith('up1')
+  })
 })
 
 describe('S18 row menu', () => {
@@ -682,16 +715,53 @@ describe('S18 archived row and archive confirm (FX4)', () => {
     const archived = rowOf('Old.docx')
     const meta = archived.querySelector('.uw-pick-row-meta')!.textContent!
     expect(meta).toContain(en.uwDocArchived)
-    expect(archived.textContent).not.toContain(en.uwPickUnsupported)
-    // a really unsupported format keeps its own reason
-    expect(rowOf('Notes.txt').textContent).toContain(en.uwPickUnsupported)
+    // an archived row is parked, not unsupported
+    expect(meta).not.toContain('Not supported')
+    // FD-14: a really unsupported format is not listed at all
+    expect(rowOf('Notes.txt')).toBeUndefined()
+  })
+
+  it('FD-14: an image row is absent and one muted line says how many were hidden', async () => {
+    await render([
+      row('a', 'Plan.docx'),
+      row('p1', 'Photo.png', { format: null }),
+      row('p2', 'Scan.jpg', { format: null }),
+      row('p3', 'Logo.svg', { format: null }),
+    ])
+    expect(rows().map((r) => r.querySelector('.uw-pick-row-title')!.textContent)).toEqual([
+      'Plan.docx',
+    ])
+    expect(rowOf('Photo.png')).toBeUndefined()
+    const hint = host.querySelector<HTMLElement>('.uw-pick-hidden')!
+    expect(hint.textContent).toBe(en.uwPickHiddenFormats.replace('{count}', '3'))
+    expect(host.querySelectorAll('.uw-pick-hidden')).toHaveLength(1)
+  })
+
+  it('FD-14: no hint when nothing was hidden', async () => {
+    await render([row('a', 'Plan.docx')])
+    expect(host.querySelector('.uw-pick-hidden')).toBeNull()
+  })
+
+  it('FD-14: when every row is hidden the empty state shows with the reason', async () => {
+    await render([row('p1', 'Photo.png', { format: null })])
+    expect(rows()).toHaveLength(0)
+    expect(host.textContent).toContain(en.uwPickEmpty)
+    expect(host.querySelector('.uw-pick-hidden')!.textContent).toBe(
+      en.uwPickHiddenFormats.replace('{count}', '1'),
+    )
+  })
+
+  it('FD-14: the hint is muted by a semantic token, not a raw colour', () => {
+    const css = readFileSync(join(__dirname, '../src/renderer/src/home.css'), 'utf8')
+    const block = css.match(/\.uw-pick-hidden\s*\{([^}]*)\}/)?.[1] ?? ''
+    expect(block).toMatch(/color:\s*var\(--text-muted\)/)
+    expect(block).not.toMatch(/#[0-9a-f]{3,8}\b|rgb\(/i)
   })
 
   it('V17-03: an archived row is not aria-disabled and Restore is reachable by keyboard', async () => {
     await render([archivedRow(), row('u', 'Notes.txt', { format: null })])
     const archived = rowOf('Old.docx')
     expect(archived.getAttribute('aria-disabled')).toBeNull()
-    expect(rowOf('Notes.txt').getAttribute('aria-disabled')).toBe('true')
     const button = menuButton(archived)!
     // in the tab order although the row is never the highlighted one
     expect(button.tabIndex).toBe(0)

@@ -34,6 +34,18 @@ const COMPOSER_KEYS = [
   'collabDiscard',
   'collabKeepWriting',
   'collabAiDraftLabel',
+  'collabMentionWarnTitle',
+  'collabMentionWarnBody',
+  'collabShareViewThenSend',
+  'collabSendWithoutNotify',
+  'collabMentionAskManager',
+  'collabMentionMixedUnshareable',
+  'collabSharingView',
+  'collabShareViewFailed',
+  'collabShareViewPartial',
+  'collabSendComment',
+  'collabRetryShareFor',
+  'collabSendFailedAfterShare',
 ] as const satisfies readonly (keyof CollabComposerStrings)[]
 
 const PICKER_KEYS = [
@@ -43,6 +55,7 @@ const PICKER_KEYS = [
   'collabMentionNoMatch',
   'collabMentionNoCandidates',
   'collabMentionError',
+  'collabMentionNoAccessBadge',
 ] as const satisfies readonly (keyof CollabPickerStrings)[]
 
 const ANCHOR_KEYS = [
@@ -82,6 +95,15 @@ describe('collabStrings glue', () => {
     expect(merged.collabReplyCount).toContain('{count}')
     expect(merged.collabMentionCount).toContain('{count}')
     expect(merged.collabMentionNoMatch).toContain('{query}')
+    expect(merged.collabMentionWarnBody).toContain('{names}')
+    expect(merged.collabMentionAskManager).toContain('{names}')
+    expect(merged.collabMentionMixedUnshareable).toContain('{unshareable}')
+    expect(merged.collabShareViewFailed).toContain('{failedNames}')
+    expect(merged.collabShareViewPartial).toContain('{sharedNames}')
+    expect(merged.collabShareViewPartial).toContain('{failedNames}')
+    expect(merged.collabRetryShareFor).toContain('{failedNames}')
+    expect(merged.collabSendFailedAfterShare).toContain('{sharedNames}')
+    expect(merged.collabPostSendNoAccess).toContain('{names}')
   })
 
   it('the panel and mention shards share no key, so the merge loses nothing', () => {

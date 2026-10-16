@@ -84,7 +84,6 @@ describe('UniWork AI chip wiring (html panel)', () => {
     },
     getSnapshot: () => ({}),
     restoreSnapshot: () => {},
-    onPrompt: () => {},
     onRunDone: () => {},
     clearHighlights: () => {},
     navigateTo: () => {},

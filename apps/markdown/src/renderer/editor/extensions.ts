@@ -11,6 +11,7 @@ import { ImageAwareLink, LocalImage } from './localImage'
 import { BlockDragHandle } from './blockDragHandle'
 import { BlockKeymap } from './blockKeymap'
 import { AiHighlight } from './aiHighlight'
+import { AiRunHistory } from './aiRunHistory'
 import { AiQueueAnchors } from './aiQueueAnchors'
 import { InactiveSelection } from './inactiveSelection'
 import { SearchHighlight } from './searchHighlight'
@@ -141,6 +142,7 @@ export function buildExtensions(options: BuildExtensionsOptions): AnyExtension[]
     BlockDragHandle,
     BlockKeymap,
     AiHighlight,
+    AiRunHistory,
     AiQueueAnchors,
     InactiveSelection,
     SearchHighlight,

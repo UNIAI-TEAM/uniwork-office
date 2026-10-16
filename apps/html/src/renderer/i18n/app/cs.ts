@@ -19,6 +19,8 @@ export const cs = {
   exportHtmlEntry: 'Exportovat jako samostatné HTML',
   previewLimitNote:
     'Tato stránka si vyžádá data ze sítě nebo vkládá jiné stránky, což webový náhled blokuje.',
+  previewLimitNoteApp:
+    'Tato stránka si vyžádá data ze sítě nebo vkládá jiné stránky, což náhled blokuje.',
   useInAppMessage: 'Otevřete v aplikaci UniWork Office, abyste mohli tuto funkci použít',
   openInApp: 'Otevřít v aplikaci',
   printFailed: 'Tisk se nezdařil: {error}',

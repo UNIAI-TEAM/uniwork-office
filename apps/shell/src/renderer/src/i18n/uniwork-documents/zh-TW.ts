@@ -26,7 +26,7 @@ export const zhTW = {
   uwPickNoResults: '沒有與“{query}”相符的文件。',
   uwPickNoWorkspaces: '你還沒有任何工作區。',
   uwPickNoWorkspacesHint: '請先在 UniWork 中建立或加入工作區。',
-  uwPickUnsupported: 'UniWork Office 不支援此類型',
+  uwPickHiddenFormats: '已隱藏（UniWork Office 無法開啟這些格式）：{count}',
   uwPickOpening: '正在開啟“{title}”…',
 
   uwErrNotSignedIn: '請先登入 UniWork 以繼續。',
@@ -121,6 +121,7 @@ export const zhTW = {
   uwDocInfoByAt: '{name}，{time}',
   uwDocInfoVersionBy: '{version} · {name}',
   uwAccessView: '檢視',
+  uwAccessComment: '評論',
   uwAccessEdit: '編輯',
   uwAccessManage: '管理',
   uwRoleOwner: '擁有者',

@@ -69,4 +69,25 @@ export const cs = {
   collabAiDraftLabel: 'Koncept navržený UniWork AI. Zkontrolujte ho a pak odešlete.',
   collabInFileSection: 'Komentáře v souboru',
   collabInFileHint: 'Uloženo v souboru, pouze pro čtení: zde nelze upravovat ani odpovídat.',
+  collabMentionWarnTitle: 'Zmínění lidé nemohou tento dokument zobrazit',
+  collabMentionWarnBody: '{names} nemohou tento dokument zobrazit, takže nedostanou upozornění.',
+  collabShareViewThenSend: 'Nasdílet oprávnění k zobrazení a odeslat',
+  collabSendWithoutNotify: 'Odeslat bez upozornění',
+  collabMentionAskManager:
+    'Požádejte někoho, kdo tento dokument spravuje, aby nasdílel oprávnění k zobrazení pro {names}.',
+  collabMentionMixedUnshareable: 'Nelze sdílet s {unshareable}; nedostanou upozornění.',
+  collabSharingView: 'Sdílení oprávnění k zobrazení…',
+  collabShareViewFailed:
+    'Oprávnění k zobrazení se nepodařilo nasdílet s {failedNames}. Můžete to zkusit znovu nebo odeslat bez upozornění.',
+  collabShareViewPartial:
+    'Oprávnění k zobrazení bylo nasdíleno s {sharedNames}. Nepodařilo se nasdílet s {failedNames} (nedostanou upozornění).',
+  collabSendComment: 'Odeslat komentář',
+  collabRetryShareFor: 'Zkusit znovu pro {failedNames}',
+  collabSendFailedAfterShare:
+    'Oprávnění k zobrazení bylo nasdíleno s {sharedNames}, ale komentář se nepodařilo odeslat. Váš text je stále v poli — zkuste to odeslat znovu.',
+  collabPostSendNoAccess: '{names} nemohou tento dokument zobrazit, takže nedostali upozornění.',
+  collabPostSendShareAction: 'Nasdílet oprávnění k zobrazení',
+  collabPostSendNoRetroNote:
+    'Sdílení nyní je na tento komentář neupozorní; zmiňte je v novém komentáři, pokud je chcete upozornit.',
+  collabDismissNotice: 'Zavřít',
 } satisfies Record<keyof typeof zh, string>

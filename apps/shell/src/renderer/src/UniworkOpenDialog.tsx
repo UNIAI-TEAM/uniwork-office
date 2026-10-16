@@ -30,7 +30,7 @@ import {
   isDocNameError,
   isDocTitleTooLong,
   initialPickerState,
-  isNavigable,
+  hiddenDocCount,
   isOpenable,
   pickerBodyOf,
   pickerReducer,
@@ -42,6 +42,7 @@ import {
   workspaceLabel,
   type DocNameError,
   type LibraryDocRow,
+  type PickerBody,
   type PickerState,
 } from './uniwork-docs-model'
 import { readActiveWorkspaceId, writeActiveWorkspaceId } from './active-workspace'
@@ -111,12 +112,24 @@ function fetchPage(s: PickerState, cursor?: string): Promise<UniworkResult<Uniwo
   )
 }
 
+/** the bodies that sit on a loaded list, where a count of hidden rows makes sense */
+const HIDDEN_HINT_BODIES: readonly PickerBody['kind'][] = [
+  'list',
+  'empty',
+  'shared-empty',
+  'no-results',
+]
+
+/** id of the muted "hidden because the format does not open" line the search box is described by */
+const HIDDEN_HINT_ID = 'uw-pick-hidden'
+
 /**
  * "Open from UniWork" picker: workspace selector, debounced search, a paged
  * document list. The search box owns focus (combobox pattern): arrow keys move
  * the highlighted row, Enter opens it, Escape closes. Documents UniWork Office
- * cannot open are listed disabled with a reason, never hidden, so paging and
- * the "why isn't my file here" question stay simple.
+ * cannot open are not listed: they are hidden and counted in one muted status
+ * line, and every body that can end up with hidden rows still offers Load more,
+ * so a later page that holds openable documents stays reachable.
  *
  * FD-11: the body is the UniWork browser - Recent and Shared with me stay as
  * views above the folder tree; choosing the root or a folder shows its
@@ -337,9 +350,9 @@ export function UniworkOpenDialog({
     return { workspaceId: s.workspaceId ?? s.workspaces.items[0]?.id ?? '', folderId: null }
   }
 
-  /** a name error stays at the field; anything else is a toast and nothing applies */
+  /** a name or format error stays at the field; anything else is a toast and nothing applies */
   const outcomeOf = (error: string): ActionOutcome => {
-    if (isDocNameError(error)) return { ok: false, error }
+    if (isDocNameError(error) || error === 'unsupported_format') return { ok: false, error }
     setToast(t('uwDocActionFailed'))
     return { ok: false, error: 'failed' }
   }
@@ -484,8 +497,10 @@ export function UniworkOpenDialog({
 
   const body = pickerBodyOf(state)
   const docs = visibleDocs(state)
+  const hiddenCount = hiddenDocCount(state)
   const activeIndex = docs.findIndex((d) => d.id === state.activeId)
   const optionId = (index: number) => `uw-doc-${index}`
+  const showHiddenHint = hiddenCount > 0 && HIDDEN_HINT_BODIES.includes(body.kind)
 
   useEffect(() => {
     if (activeIndex < 0) return
@@ -605,13 +620,20 @@ export function UniworkOpenDialog({
         return (
           <div className="uw-pick-state">
             <p className="uw-pick-state-title">{t('uwPickEmpty')}</p>
-            <p className="uw-pick-state-hint">{t('uwPickEmptyHint')}</p>
+            {/* rows hidden or pages not loaded yet: the count line / Load more explain it, "add documents" would not be true */}
+            {hiddenCount === 0 && !state.list.nextCursor && (
+              <p className="uw-pick-state-hint">{t('uwPickEmptyHint')}</p>
+            )}
+            {/* every loaded row may be one that cannot open: a later page can still hold some */}
+            {renderLoadMore()}
           </div>
         )
       case 'shared-empty':
         return (
           <div className="uw-pick-state">
             <p className="uw-pick-state-title">{t('uwLibSharedEmpty')}</p>
+            {/* same dead end as the workspace list: the first page may hold only rows that cannot open */}
+            {renderLoadMore()}
           </div>
         )
       case 'no-results':
@@ -646,14 +668,11 @@ export function UniworkOpenDialog({
                 const editing = renaming?.id === doc.id ? renaming : null
                 const active = doc.id === state.activeId
                 const archived = row.archived === true
-                const navigable = isNavigable(doc)
-                // an archived row is a supported document that is parked, not an unsupported one
+                // an archived row is a supported document that is parked; rows that cannot open are not listed
                 const updated = pickerRowMeta(doc, t, dateLocale)
                 const meta = archived
                   ? [t('uwDocArchived'), updated].filter(Boolean).join(' · ')
-                  : openable
-                    ? updated
-                    : t('uwPickUnsupported')
+                  : updated
                 // shared rows come from several workspaces: name the one each lives in
                 const where =
                   state.source === 'shared' ? (doc as SharedDocSummary).workspaceName?.trim() : ''
@@ -666,7 +685,7 @@ export function UniworkOpenDialog({
                       aria-disabled={archived ? undefined : !openable}
                       className={`uw-pick-row${active ? ' active' : ''}${openable ? '' : ' disabled'}${archived ? ' archived' : ''}${state.opening?.id === doc.id ? ' opening' : ''}`}
                       onMouseMove={() => {
-                        if (navigable && !active) dispatch({ type: 'set-active', id: doc.id })
+                        if (!active) dispatch({ type: 'set-active', id: doc.id })
                       }}
                       onClick={() => {
                         if (!editing) openDoc(doc.id)
@@ -756,6 +775,11 @@ export function UniworkOpenDialog({
   const pickBody = (
     <div className="uw-pick-body" aria-busy={body.kind === 'loading'}>
       {renderBody()}
+      {showHiddenHint && (
+        <p className="uw-pick-hidden" id={HIDDEN_HINT_ID} role="status">
+          {t('uwPickHiddenFormats', { count: hiddenCount })}
+        </p>
+      )}
     </div>
   )
   const views = (
@@ -851,6 +875,7 @@ export function UniworkOpenDialog({
             aria-activedescendant={
               !folderView && activeIndex >= 0 ? optionId(activeIndex) : undefined
             }
+            aria-describedby={!folderView && showHiddenHint ? HIDDEN_HINT_ID : undefined}
             placeholder={folderView ? t('ufSearchPh') : t('uwPickSearchPh')}
             value={draft}
             autoFocus

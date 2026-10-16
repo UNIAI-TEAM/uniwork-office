@@ -26,7 +26,7 @@ export const ar = {
   uwPickNoResults: 'لا توجد مستندات تطابق “{query}”.',
   uwPickNoWorkspaces: 'ليس لديك أي مساحات عمل بعد.',
   uwPickNoWorkspacesHint: 'أنشئ مساحة عمل في UniWork أو انضم إليها أولاً.',
-  uwPickUnsupported: 'غير مدعوم في UniWork Office',
+  uwPickHiddenFormats: 'مخفية لأن UniWork Office لا يستطيع فتح صيغتها: {count}',
   uwPickOpening: 'جارٍ فتح “{title}”…',
 
   uwErrNotSignedIn: 'سجّل الدخول إلى UniWork للمتابعة.',
@@ -121,6 +121,7 @@ export const ar = {
   uwDocInfoByAt: '{name}، {time}',
   uwDocInfoVersionBy: '{version} · {name}',
   uwAccessView: 'عرض',
+  uwAccessComment: 'تعليق',
   uwAccessEdit: 'تحرير',
   uwAccessManage: 'إدارة',
   uwRoleOwner: 'المالك',

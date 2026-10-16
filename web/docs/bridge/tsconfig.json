@@ -23,6 +23,8 @@
     "project-memory.ts",
     "webapi.test.ts",
     "notice.ts",
+    "conflict-diff.ts",
+    "conflict-diff.test.ts",
     "safe-api.ts",
     "capability-object.ts",
     "frame-boot.ts",

@@ -69,6 +69,8 @@ export const ms = {
 
   // S5 conflict dialog: step 1 extras, confirmation step and results
   uwConflictViewDiff: 'Lihat perbezaan',
+  uwConflictDiffPending: 'Sedang membandingkan…',
+  uwConflictDiffFailed: 'Versi tidak dapat dibandingkan sekarang. Cuba lagi nanti.',
   uwConflictNoEdit: 'Anda tidak lagi mempunyai akses suntingan kepada dokumen ini.',
   uwConflictOverwriteTitle: 'Tulis ganti dengan versi anda?',
   uwConflictOverwriteConfirm:

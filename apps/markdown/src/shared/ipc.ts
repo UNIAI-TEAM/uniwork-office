@@ -31,6 +31,8 @@ export const MARKDOWN_CHANNELS = {
   fileRenamed: 'markdown:file-renamed',
   pickImage: 'markdown:pick-image',
   saveImage: 'markdown:save-image',
+  discardPendingAssets: 'markdown:discard-pending-assets',
+  restorePendingAssets: 'markdown:restore-pending-assets',
   readImage: 'markdown:read-image',
   saveImageAs: 'markdown:save-image-as',
   getImageHost: 'markdown:get-image-host',
@@ -149,9 +151,9 @@ export interface SaveMarkdownRequest {
   /** 'auto' = the AutoSave timer/blur save; absent = an explicit user save */
   origin?: 'user' | 'auto'
   /**
-   * Silent first save for an untitled document (AI auto-naming): saves to a
-   * unique path under Documents derived from this name, without a dialog.
-   * Ignored when the document already has a path.
+   * File name an untitled document's Save dialog starts with (the name the AI
+   * panel offered after a run). The dialog always opens; nothing is written
+   * before the user confirms. Ignored when the document already has a path.
    */
   suggestedName?: string
 }
@@ -306,6 +308,22 @@ export interface MarkdownApi {
    * document; returns the relative path to author, or null when untitled.
    */
   saveImage(data: { base64: string; ext: string }): Promise<string | null>
+  /**
+   * Roll back of an AI run: delete the still-pending `assets/` files the run saved, by file name
+   * (never a path). Saved or user-inserted files are left alone. Desktop only.
+   */
+  discardPendingAssets?(
+    names: string[],
+  ): Promise<{ deleted: string[]; preserved: string[]; errors: string[] }>
+  /**
+   * Redo of an AI run whose pictures an undo discarded: write them back under the same names
+   * (pending again). Only names this window's own undo discarded (or the manifest still owns)
+   * and the picture types an AI run can save are accepted; the rest, like a name another file
+   * took, is reported in `errors`. Desktop only.
+   */
+  restorePendingAssets?(
+    files: Array<{ name: string; base64: string }>,
+  ): Promise<{ restored: string[]; errors: string[] }>
   /**
    * The configured image host (genoffice#388), or null when none was ever
    * saved. Pasted/dropped images upload here first and fall back to the

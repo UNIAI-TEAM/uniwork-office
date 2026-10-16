@@ -6,6 +6,7 @@ import { useI18n, type StringKey } from './locale'
 import {
   DOC_NAME_ERROR_KEYS,
   NEW_DOC_FORMATS,
+  UNIWORK_ERROR_KEYS,
   checkDocName,
   isDocTitleTooLong,
   nameWithExtension,
@@ -38,8 +39,11 @@ export interface DocTarget {
 /** FD-11: reads a workspace's folder tree for the Location picker */
 export type LoadFolderTree = (workspaceId: string) => Promise<UniworkResult<UniworkFolderNode[]>>
 
+/** errors a dialog field shows in place; every other failure is a toast */
+export type DocFieldError = DocNameError | 'unsupported_format'
+
 /** what an action answers: done, a field error shown in place, or anything else (toast) */
-export type ActionOutcome = { ok: true } | { ok: false; error: DocNameError | 'failed' }
+export type ActionOutcome = { ok: true } | { ok: false; error: DocFieldError | 'failed' }
 
 /** an upload under way: bytes sent of the total (total 0 = not known yet) */
 export interface UploadProgress {
@@ -226,15 +230,21 @@ export function FieldError({
   keys = DOC_NAME_ERROR_KEYS,
 }: {
   id: string
-  error: DocNameError | null
+  error: DocFieldError | null
   /** the copy per error (a folder name has its own 255 wording) */
   keys?: Record<DocNameError, StringKey>
 }) {
   const { t } = useI18n()
+  const key =
+    error === 'unsupported_format'
+      ? UNIWORK_ERROR_KEYS.unsupported_format
+      : error
+        ? keys[error]
+        : null
   // always in the DOM so aria-describedby points at something stable
   return (
     <p className="uw-act-error" id={id} role={error ? 'alert' : undefined}>
-      {error ? t(keys[error]) : ''}
+      {key ? t(key) : ''}
     </p>
   )
 }
@@ -261,7 +271,7 @@ export function NewDocDialog({
   const [name, setName] = useState('')
   const [format, setFormat] = useState<NewDocFormat>('docx')
   const [target, setTarget] = useState(initialTarget)
-  const [error, setError] = useState<DocNameError | null>(null)
+  const [error, setError] = useState<DocFieldError | null>(null)
   const [busy, setBusy] = useState(false)
   const nameRef = useRef<HTMLInputElement>(null)
 
@@ -394,7 +404,7 @@ export function UploadDocDialog({
   const id = useId()
   const [file, setFile] = useState<{ path: string; name: string } | null>(null)
   const [target, setTarget] = useState(initialTarget)
-  const [error, setError] = useState<DocNameError | null>(null)
+  const [error, setError] = useState<DocFieldError | null>(null)
   const [busy, setBusy] = useState(false)
   const pickRef = useRef<HTMLButtonElement>(null)
 

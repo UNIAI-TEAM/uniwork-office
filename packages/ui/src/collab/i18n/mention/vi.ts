@@ -7,4 +7,5 @@ export const vi = {
   collabMentionNoMatch: 'Không có ai khớp “{query}” trong số người xem được tài liệu này.',
   collabMentionNoCandidates: 'Chưa có ai khác xem được tài liệu này.',
   collabMentionError: 'Không tải được danh sách người.',
+  collabMentionNoAccessBadge: 'Chưa xem được',
 } satisfies Record<keyof typeof zh, string>
