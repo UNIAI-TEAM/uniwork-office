@@ -21,6 +21,8 @@ export const de = {
   ufMoved: 'Nach {folder} verschoben',
   ufMovedRenamed: 'Verschoben und umbenannt in {title}',
   ufNameTaken: 'Hier gibt es bereits einen Ordner mit diesem Namen. Wähle einen anderen Namen.',
+  ufMoveNameTaken:
+    'Am Zielort gibt es zu viele Ordner mit diesem Namen. Benennen Sie den Ordner zuerst um.',
   ufTooDeep: 'Der Dokumentbaum hat höchstens {max} Ebenen.',
   ufCycle: 'Ein Ordner kann nicht in sich selbst oder einen seiner Unterordner verschoben werden.',
   ufParentKind: 'Ein Ordner liegt im Stammverzeichnis oder in einem anderen Ordner.',
@@ -29,6 +31,7 @@ export const de = {
   ufEmptyFolder: 'Dieser Ordner ist leer',
   ufLocation: 'Speicherort',
   ufLocationRoot: 'UniWork (oberste Ebene)',
+  ufSameFolder: 'Gleicher Ordner wie das Original',
   ufChooseLocation: 'Speicherort wählen',
   ufChoose: 'Auswählen',
   ufSearchPh: 'In diesem Arbeitsbereich nach Namen suchen',

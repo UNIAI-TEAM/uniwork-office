@@ -21,6 +21,8 @@ export const id = {
   ufMoved: 'Dipindahkan ke {folder}',
   ufMovedRenamed: 'Dipindahkan dan diganti namanya menjadi {title}',
   ufNameTaken: 'Sudah ada folder dengan nama ini di sini. Pilih nama lain.',
+  ufMoveNameTaken:
+    'Terlalu banyak folder dengan nama ini di tujuan. Ganti nama folder terlebih dahulu.',
   ufTooDeep: 'Pohon dokumen paling dalam {max} tingkat.',
   ufCycle: 'Folder tidak dapat dipindahkan ke dirinya sendiri atau ke salah satu subfoldernya.',
   ufParentKind: 'Folder berada di root atau di dalam folder lain.',
@@ -29,6 +31,7 @@ export const id = {
   ufEmptyFolder: 'Folder ini kosong',
   ufLocation: 'Lokasi',
   ufLocationRoot: 'UniWork (tingkat teratas)',
+  ufSameFolder: 'Folder yang sama dengan aslinya',
   ufChooseLocation: 'Pilih lokasi',
   ufChoose: 'Pilih',
   ufSearchPh: 'Cari berdasarkan nama di ruang kerja ini',

@@ -11,19 +11,7 @@ import './uniwork-folders.css'
  * FD-11 S5: where Save a copy puts the copy. The view carries the source's
  * workspace and parent once main sends them (contract §3, W3); until then the
  * control is not shown and the copy lands next to the source, as before.
- */
-export type ConflictViewPlace = UniworkConflictView & {
-  workspaceId?: string
-  parentId?: string | null
-}
-
-/** the save-copy action's optional target (absent = the source's parent) */
-export interface CopyTargetFolder {
-  workspaceId: string
-  folderId: string | null
-}
-
-/**
+ *
  * The "Location" row of the Save-a-copy step: the chosen folder's path (by
  * default the source's own folder) and a button opening the folder picker.
  * Rendered inside the conflict dialog (not portalled), so the dialog's
@@ -36,7 +24,7 @@ export function ConflictCopyLocation({
   disabled,
   onChoose,
 }: {
-  view: ConflictViewPlace
+  view: UniworkConflictView
   /** null = not changed: the source's parent */
   chosen: PickedFolder | null
   disabled: boolean
@@ -45,6 +33,7 @@ export function ConflictCopyLocation({
   const { t } = useI18n()
   const id = useId()
   const [nodes, setNodes] = useState<UniworkFolderNode[] | null>(null)
+  const [treeFailed, setTreeFailed] = useState(false)
   const [picking, setPicking] = useState(false)
   const workspaceId = view.workspaceId
 
@@ -52,9 +41,15 @@ export function ConflictCopyLocation({
   useEffect(() => {
     if (!workspaceId) return
     let live = true
-    void loadFolderTree(workspaceId).then((result) => {
-      if (live && result.ok) setNodes(result.value)
-    })
+    setNodes(null)
+    setTreeFailed(false)
+    void loadFolderTree(workspaceId)
+      .catch(() => ({ ok: false as const, error: 'network' as const }))
+      .then((result) => {
+        if (!live) return
+        if (result.ok) setNodes(result.value)
+        else setTreeFailed(true)
+      })
     return () => {
       live = false
     }
@@ -62,17 +57,25 @@ export function ConflictCopyLocation({
 
   if (!workspaceId) return null
   const sourceParent = view.parentId ?? null
-  const path = chosen
-    ? chosen.path
-    : nodes
-      ? folderPath(buildFolderIndex(nodes), sourceParent)
-      : null
-  const label =
-    path === null
-      ? '…'
-      : path.length > 0
-        ? [t('ufRoot'), ...path.map((p) => p.title)].join(' › ')
+  let label: string
+  if (chosen) {
+    label =
+      chosen.path.length > 0
+        ? [t('ufRoot'), ...chosen.path.map((p) => p.title)].join(' › ')
         : t('ufLocationRoot')
+  } else if (view.parentId === null) {
+    label = t('ufLocationRoot')
+  } else if (view.parentId === undefined) {
+    label = t('ufSameFolder')
+  } else if (nodes !== null) {
+    const path = folderPath(buildFolderIndex(nodes), view.parentId)
+    label =
+      path.length > 0 ? [t('ufRoot'), ...path.map((p) => p.title)].join(' › ') : t('ufSameFolder')
+  } else if (treeFailed) {
+    label = t('ufSameFolder')
+  } else {
+    label = '…'
+  }
   return (
     <div className="uw-conflict-location">
       <span className="uw-conflict-location-label" id={`${id}-label`}>

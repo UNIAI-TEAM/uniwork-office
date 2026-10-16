@@ -724,4 +724,54 @@ describe('UniworkBrowser: folder actions (S3)', () => {
     await flush()
     expect($('[role="menu"]')).toBeNull()
   })
+
+  it('shows a toast when move exhausts "(n)" auto-renames (move_name_taken / folder_name_taken) (B-R1-03)', async () => {
+    await render()
+    await key(treeItem('Beta'), 'F10', { shiftKey: true })
+    await click($('[data-folder-action="move"]'))
+    const picker = $('.uwf-picker')!
+    const alpha = Array.from(picker.querySelectorAll<HTMLElement>('[role="treeitem"]')).find((el) =>
+      el.textContent?.includes('Alpha'),
+    )!
+    await click(alpha)
+    api.uniworkMoveDocument.mockResolvedValueOnce({
+      ok: false,
+      error: 'move_name_taken',
+    } as never)
+    await click(picker.querySelector('.btn-primary'))
+    expect($('.uw-act-toast')?.textContent).toContain(en.ufMoveNameTaken)
+  })
+
+  it('recovers from rejected IPC promises in create, rename, and move without sticking busy (R1-4)', async () => {
+    await render()
+    // 1. Rejected createFolder closes the dialog and shows an error toast
+    api.uniworkCreateFolder.mockImplementationOnce(() => Promise.reject(new Error('ipc crash')))
+    await click($('.uwf-new-folder'))
+    await type($<HTMLInputElement>('.modal.uw-act input')!, 'CrashFolder')
+    await click($('.modal.uw-act button[type="submit"]'))
+    expect($('.modal.uw-act')).toBeNull()
+    expect($('.uw-act-toast')?.textContent).toBeTruthy()
+
+    // 2. Rejected inline rename clears busy and shows an error toast
+    api.uniworkRenameDocument.mockImplementationOnce(() => Promise.reject(new Error('ipc crash')))
+    await key(treeItem('Beta'), 'F2')
+    const input = $<HTMLInputElement>('.uwf-tree .uw-rename-input')!
+    await type(input, 'BetaRenamed')
+    await key(input, 'Enter')
+    expect($('.uwf-tree .uw-rename-input')).toBeNull()
+
+    // 3. Rejected move shows an error toast
+    api.uniworkMoveDocument.mockImplementationOnce(() => Promise.reject(new Error('ipc crash')))
+    const row = $$('.uw-pick-item').find((el) => el.textContent?.includes('Report.docx'))!
+    await click(row.querySelector('[data-folder-menu-for]'))
+    await click($('[data-folder-action="move"]'))
+    const picker = $('.uwf-picker')!
+    await click(
+      Array.from(picker.querySelectorAll<HTMLElement>('[role="treeitem"]')).find((el) =>
+        el.textContent?.includes('Beta'),
+      ),
+    )
+    await click(picker.querySelector('.btn-primary'))
+    expect($('.uw-act-toast')?.textContent).toBeTruthy()
+  })
 })

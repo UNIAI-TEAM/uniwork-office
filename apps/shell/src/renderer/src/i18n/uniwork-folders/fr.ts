@@ -21,6 +21,8 @@ export const fr = {
   ufMoved: 'Déplacé vers {folder}',
   ufMovedRenamed: 'Déplacé et renommé en {title}',
   ufNameTaken: 'Un dossier portant ce nom existe déjà ici. Choisissez un autre nom.',
+  ufMoveNameTaken:
+    'Il y a trop de dossiers portant ce nom dans la destination. Renommez d?abord le dossier.',
   ufTooDeep: "L'arborescence compte au plus {max} niveaux.",
   ufCycle: 'Un dossier ne peut pas être déplacé dans lui-même ni dans un de ses sous-dossiers.',
   ufParentKind: 'Un dossier se trouve à la racine ou dans un autre dossier.',
@@ -29,6 +31,7 @@ export const fr = {
   ufEmptyFolder: 'Ce dossier est vide',
   ufLocation: 'Emplacement',
   ufLocationRoot: 'UniWork (racine)',
+  ufSameFolder: 'M?me dossier que l?original',
   ufChooseLocation: 'Choisir un emplacement',
   ufChoose: 'Choisir',
   ufSearchPh: 'Rechercher par nom dans cet espace de travail',

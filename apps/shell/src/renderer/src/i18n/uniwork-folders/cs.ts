@@ -21,6 +21,8 @@ export const cs = {
   ufMoved: 'Přesunuto do {folder}',
   ufMovedRenamed: 'Přesunuto a přejmenováno na {title}',
   ufNameTaken: 'Složka s tímto názvem tu už existuje. Zvolte jiný název.',
+  ufMoveNameTaken:
+    'V c?lov?m um?st?n? je p??li? mnoho slo?ek s t?mto n?zvem. Nejprve slo?ku p?ejmenujte.',
   ufTooDeep: 'Strom dokumentů má nejvýše {max} úrovní.',
   ufCycle: 'Složku nelze přesunout do sebe samé ani do některé z jejích podsložek.',
   ufParentKind: 'Složka je v kořeni nebo v jiné složce.',
@@ -29,6 +31,7 @@ export const cs = {
   ufEmptyFolder: 'Tato složka je prázdná',
   ufLocation: 'Umístění',
   ufLocationRoot: 'UniWork (nejvyšší úroveň)',
+  ufSameFolder: 'Stejn? slo?ka jako origin?l',
   ufChooseLocation: 'Vybrat umístění',
   ufChoose: 'Vybrat',
   ufSearchPh: 'Hledat podle názvu v tomto pracovním prostoru',

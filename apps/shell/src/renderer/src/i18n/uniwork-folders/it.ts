@@ -21,6 +21,8 @@ export const it = {
   ufMoved: 'Spostato in {folder}',
   ufMovedRenamed: 'Spostato e rinominato in {title}',
   ufNameTaken: 'Qui esiste già una cartella con questo nome. Scegli un altro nome.',
+  ufMoveNameTaken:
+    'Ci sono troppe cartelle con questo nome nella destinazione. Rinomina prima la cartella.',
   ufTooDeep: "L'albero dei documenti ha al massimo {max} livelli.",
   ufCycle: 'Una cartella non può essere spostata in sé stessa o in una delle sue sottocartelle.',
   ufParentKind: "Una cartella si trova nella radice o in un'altra cartella.",
@@ -29,6 +31,7 @@ export const it = {
   ufEmptyFolder: 'Questa cartella è vuota',
   ufLocation: 'Posizione',
   ufLocationRoot: 'UniWork (livello superiore)',
+  ufSameFolder: 'Stessa cartella dell?originale',
   ufChooseLocation: 'Scegli una posizione',
   ufChoose: 'Scegli',
   ufSearchPh: 'Cerca per nome in questo spazio di lavoro',

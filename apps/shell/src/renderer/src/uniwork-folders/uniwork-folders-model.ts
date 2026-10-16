@@ -373,7 +373,7 @@ export type FolderActionFailure =
 
 /** a folder action's refusal: at the name field, or one sentence for the toast */
 export function folderActionFailure(
-  error: UniworkDocActionError,
+  error: UniworkDocActionError | 'move_name_taken',
   max?: number,
 ): FolderActionFailure {
   switch (error) {
@@ -381,6 +381,8 @@ export function folderActionFailure(
     case 'name_too_long':
     case 'folder_name_taken':
       return { field: error }
+    case 'move_name_taken':
+      return { key: 'ufMoveNameTaken' }
     case 'document_too_deep':
       return { key: 'ufTooDeep', params: { max: max ?? FOLDER_MAX_DEPTH } }
     case 'document_cycle':

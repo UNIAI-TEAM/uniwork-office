@@ -21,6 +21,8 @@ export const es = {
   ufMoved: 'Movido a {folder}',
   ufMovedRenamed: 'Movido y renombrado como {title}',
   ufNameTaken: 'Ya hay una carpeta con este nombre aquí. Elige otro nombre.',
+  ufMoveNameTaken:
+    'Hay demasiadas carpetas con este nombre en el destino. Cambie primero el nombre de la carpeta.',
   ufTooDeep: 'El árbol de documentos tiene como máximo {max} niveles.',
   ufCycle: 'Una carpeta no se puede mover a sí misma ni a una de sus subcarpetas.',
   ufParentKind: 'Una carpeta está en la raíz o dentro de otra carpeta.',
@@ -29,6 +31,7 @@ export const es = {
   ufEmptyFolder: 'Esta carpeta está vacía',
   ufLocation: 'Ubicación',
   ufLocationRoot: 'UniWork (nivel superior)',
+  ufSameFolder: 'La misma carpeta que el original',
   ufChooseLocation: 'Elegir ubicación',
   ufChoose: 'Elegir',
   ufSearchPh: 'Buscar por nombre en este espacio de trabajo',

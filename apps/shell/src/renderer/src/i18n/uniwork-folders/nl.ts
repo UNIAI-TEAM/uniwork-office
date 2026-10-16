@@ -21,6 +21,8 @@ export const nl = {
   ufMoved: 'Verplaatst naar {folder}',
   ufMovedRenamed: 'Verplaatst en hernoemd naar {title}',
   ufNameTaken: 'Er staat hier al een map met deze naam. Kies een andere naam.',
+  ufMoveNameTaken:
+    'Er zijn te veel mappen met deze naam op de bestemming. Wijzig eerst de naam van de map.',
   ufTooDeep: 'De documentstructuur is maximaal {max} niveaus diep.',
   ufCycle: 'Een map kan niet naar zichzelf of naar een van zijn submappen worden verplaatst.',
   ufParentKind: 'Een map staat in de hoofdmap of in een andere map.',
@@ -29,6 +31,7 @@ export const nl = {
   ufEmptyFolder: 'Deze map is leeg',
   ufLocation: 'Locatie',
   ufLocationRoot: 'UniWork (hoogste niveau)',
+  ufSameFolder: 'Dezelfde map als het origineel',
   ufChooseLocation: 'Locatie kiezen',
   ufChoose: 'Kiezen',
   ufSearchPh: 'Zoeken op naam in deze werkruimte',

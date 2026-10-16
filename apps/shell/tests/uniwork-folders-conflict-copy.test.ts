@@ -173,4 +173,49 @@ describe('Save a copy: Location (S5)', () => {
     expect(onAct).not.toHaveBeenCalled()
     expect($('[data-conflict-action="save-copy-go"]')).not.toBeNull()
   })
+
+  it('shows "Same folder as the original" when parentId is undefined (offline/unknown parent) rather than top level (R1-3)', async () => {
+    await render(makeView({ workspaceId: 'w1' }))
+    await toSaveCopyStep()
+    expect($('[data-conflict-action="copy-location"]')!.textContent).toBe(en.ufSameFolder)
+    await click($('[data-conflict-action="save-copy-go"]'))
+    expect(onAct).toHaveBeenCalledWith('s1', { kind: 'save-copy', stopAi: false })
+  })
+
+  it('falls back to "Same folder as the original" instead of staying on "…" when loadFolderTree fails or rejects (R1-10)', async () => {
+    window.aiOffice!.uniworkFolderTree = vi.fn(async () => ({
+      ok: false as const,
+      error: 'network' as const,
+    }))
+    await render(makeView({ workspaceId: 'w1', parentId: 'a' }))
+    await toSaveCopyStep()
+    expect($('[data-conflict-action="copy-location"]')!.textContent).toBe(en.ufSameFolder)
+
+    window.aiOffice!.uniworkFolderTree = vi.fn(() => Promise.reject(new Error('ipc down')))
+    await render(makeView({ sessionId: 's2', workspaceId: 'w2', parentId: 'a' }))
+    await toSaveCopyStep()
+    expect($('[data-conflict-action="copy-location"]')!.textContent).toBe(en.ufSameFolder)
+  })
+
+  it('resets a chosen copyFolder when view.sessionId changes (R1-14)', async () => {
+    await render(makeView({ sessionId: 's1', workspaceId: 'w1', parentId: 'a' }))
+    await toSaveCopyStep()
+    await click($('[data-conflict-action="copy-location"]'))
+    const picker = $('.uwf-picker')!
+    const beta = Array.from(picker.querySelectorAll<HTMLElement>('[role="treeitem"]')).find((el) =>
+      el.textContent?.includes('Beta'),
+    )!
+    await click(beta)
+    await click(
+      Array.from(picker.querySelectorAll('button')).find((b) => b.textContent === en.ufChoose),
+    )
+    expect($('[data-conflict-action="copy-location"]')!.textContent).toBe('UniWork › Beta')
+
+    // A new conflict session arrives on the same mounted dialog instance
+    await render(makeView({ sessionId: 's2', workspaceId: 'w1', parentId: 'a' }))
+    await toSaveCopyStep()
+    expect($('[data-conflict-action="copy-location"]')!.textContent).toBe('UniWork › Alpha')
+    await click($('[data-conflict-action="save-copy-go"]'))
+    expect(onAct).toHaveBeenCalledWith('s2', { kind: 'save-copy', stopAi: false })
+  })
 })

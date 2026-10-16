@@ -342,6 +342,7 @@ describe('folder action failures', () => {
   it('keeps name errors at the field and maps the tree refusals to their copy', () => {
     expect(folderActionFailure('folder_name_taken')).toEqual({ field: 'folder_name_taken' })
     expect(folderActionFailure('name_too_long')).toEqual({ field: 'name_too_long' })
+    expect(folderActionFailure('move_name_taken')).toEqual({ key: 'ufMoveNameTaken' })
     expect(folderActionFailure('document_too_deep', 20)).toEqual({
       key: 'ufTooDeep',
       params: { max: 20 },

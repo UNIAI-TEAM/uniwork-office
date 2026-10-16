@@ -41,12 +41,16 @@ export function FolderNameDialog({
       return
     }
     setBusy(true)
-    void onSubmit(checked.name).then((outcome) => {
-      setBusy(false)
-      if (outcome.ok || !outcome.field) return
-      setError(outcome.field)
-      nameRef.current?.focus()
-    })
+    void onSubmit(checked.name)
+      .then((outcome) => {
+        setBusy(false)
+        if (outcome.ok || !outcome.field) return
+        setError(outcome.field)
+        nameRef.current?.focus()
+      })
+      .catch(() => {
+        setBusy(false)
+      })
   }
 
   return (

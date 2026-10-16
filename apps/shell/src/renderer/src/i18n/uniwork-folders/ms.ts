@@ -21,6 +21,8 @@ export const ms = {
   ufMoved: 'Dialihkan ke {folder}',
   ufMovedRenamed: 'Dialihkan dan dinamakan semula kepada {title}',
   ufNameTaken: 'Folder dengan nama ini sudah ada di sini. Pilih nama lain.',
+  ufMoveNameTaken:
+    'Terlalu banyak folder dengan nama ini di destinasi. Namakan semula folder dahulu.',
   ufTooDeep: 'Pepohon dokumen paling dalam {max} tahap.',
   ufCycle: 'Folder tidak boleh dialihkan ke dalam dirinya sendiri atau salah satu subfoldernya.',
   ufParentKind: 'Folder terletak di akar atau di dalam folder lain.',
@@ -29,6 +31,7 @@ export const ms = {
   ufEmptyFolder: 'Folder ini kosong',
   ufLocation: 'Lokasi',
   ufLocationRoot: 'UniWork (tahap teratas)',
+  ufSameFolder: 'Folder yang sama dengan asal',
   ufChooseLocation: 'Pilih lokasi',
   ufChoose: 'Pilih',
   ufSearchPh: 'Cari mengikut nama dalam ruang kerja ini',
