@@ -2879,9 +2879,13 @@ export class UniworkDocsService {
   noteSelectedOrg(orgId: string | null): void {
     const prevOrgId =
       this.sessionOrgId !== undefined ? this.sessionOrgId : (this.deps.selectedOrg()?.id ?? null)
-    this.sessionOrgId = orgId
-    if (prevOrgId !== orgId) {
-      this.sessionEpoch += 1
+    if (orgId !== null) {
+      this.sessionOrgId = orgId
+      if (prevOrgId !== null && prevOrgId !== orgId) {
+        this.sessionEpoch += 1
+      }
+    } else if (this.sessionOrgId === undefined) {
+      this.sessionOrgId = prevOrgId
     }
     if (this.orgMemberNamesOrg !== null && this.orgMemberNamesOrg !== orgId) {
       this.orgMemberNames = new Map()

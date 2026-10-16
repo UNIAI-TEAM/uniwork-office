@@ -1672,4 +1672,151 @@ describe('the FD-11 tree-changed push', () => {
     }
     expect(emitted).toEqual([{ workspaceId: WS }])
   })
+
+  it('R4-01: suppresses pushTreeChanged when the live identity drops or switches to another account while an own folder action is gated with the organization unchanged', async () => {
+    const server = fakeServer()
+    const origFetch = server.fetch
+    const ctx = setup(server)
+    const emitted: Array<{ workspaceId: string }> = []
+    const scheduled: Array<{ run: () => void; ms: number; cancelled: boolean }> = []
+    const coalescer = createTreeChangedCoalescer({
+      emit: (workspaceId) => emitted.push({ workspaceId }),
+      schedule: (run, ms) => {
+        const entry = { run, ms, cancelled: false }
+        scheduled.push(entry)
+        return () => {
+          entry.cancelled = true
+        }
+      },
+    })
+    ctx.setPushTreeChanged((event) => coalescer.notify(event.workspaceId))
+
+    let postReached!: () => void
+    let onPostReached = new Promise<void>((resolve) => {
+      postReached = resolve
+    })
+    let releasePost!: () => void
+    let postGate = new Promise<void>((resolve) => {
+      releasePost = resolve
+    })
+    server.fetch = (async (url: string, init: RequestInit) => {
+      if (
+        new URL(url).pathname === `/api/v1/workspaces/${WS}/documents` &&
+        init.method === 'POST'
+      ) {
+        postReached()
+        await postGate
+      }
+      return origFetch(url, init)
+    }) as typeof server.fetch
+
+    // Case 1: live identity drops to null while sessionEpoch / org stay unchanged
+    const firstCreate = ctx.service.createFolder({
+      workspaceId: WS,
+      parentId: null,
+      title: 'Dropped identity folder',
+    })
+    await onPostReached
+    ctx.setIdentity(null)
+    releasePost()
+    expect((await firstCreate).ok).toBe(true)
+
+    for (const timer of scheduled) {
+      if (!timer.cancelled) {
+        expect(timer.ms).toBe(TREE_CHANGED_WINDOW_MS)
+        timer.run()
+      }
+    }
+    expect(emitted).toEqual([])
+
+    // Case 2: live identity switches to another account while sessionEpoch / org stay unchanged
+    ctx.setIdentity({ accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' })
+    scheduled.length = 0
+    onPostReached = new Promise<void>((resolve) => {
+      postReached = resolve
+    })
+    postGate = new Promise<void>((resolve) => {
+      releasePost = resolve
+    })
+    const secondCreate = ctx.service.createFolder({
+      workspaceId: WS,
+      parentId: null,
+      title: 'Switched account folder',
+    })
+    await onPostReached
+    ctx.setIdentity({ accountId: 'acc_2', deviceSessionId: 'dev_2', deploymentId: 'default' })
+    releasePost()
+    expect((await secondCreate).ok).toBe(true)
+
+    for (const timer of scheduled) {
+      if (!timer.cancelled) {
+        expect(timer.ms).toBe(TREE_CHANGED_WINDOW_MS)
+        timer.run()
+      }
+    }
+    expect(emitted).toEqual([])
+  })
+
+  it('R4-02: still emits pushTreeChanged when noteSelectedOrg goes A -> null -> A during a transient org-less status push while an own folder action is gated', async () => {
+    const server = fakeServer()
+    const origFetch = server.fetch
+    const ctx = setup(server)
+    const emitted: Array<{ workspaceId: string }> = []
+    const scheduled: Array<{ run: () => void; ms: number; cancelled: boolean }> = []
+    const coalescer = createTreeChangedCoalescer({
+      emit: (workspaceId) => emitted.push({ workspaceId }),
+      schedule: (run, ms) => {
+        const entry = { run, ms, cancelled: false }
+        scheduled.push(entry)
+        return () => {
+          entry.cancelled = true
+        }
+      },
+    })
+    ctx.setPushTreeChanged((event) => coalescer.notify(event.workspaceId))
+
+    let postReached!: () => void
+    const onPostReached = new Promise<void>((resolve) => {
+      postReached = resolve
+    })
+    let releasePost!: () => void
+    const postGate = new Promise<void>((resolve) => {
+      releasePost = resolve
+    })
+    server.fetch = (async (url: string, init: RequestInit) => {
+      if (
+        new URL(url).pathname === `/api/v1/workspaces/${WS}/documents` &&
+        init.method === 'POST'
+      ) {
+        postReached()
+        await postGate
+      }
+      return origFetch(url, init)
+    }) as typeof server.fetch
+
+    const createPromise = ctx.service.createFolder({
+      workspaceId: WS,
+      parentId: null,
+      title: 'Transient org-less folder',
+    })
+    await onPostReached
+
+    // Transient /orgs failure reports null, then recovers with the same org_a
+    ctx.setSelectedOrg(null)
+    ctx.service.noteSelectedOrg(null)
+    ctx.setSelectedOrg({ id: 'org_a', slug: 'acme' })
+    ctx.service.noteSelectedOrg('org_a')
+
+    releasePost()
+    const created = await createPromise
+    expect(created.ok).toBe(true)
+
+    for (const timer of scheduled) {
+      if (!timer.cancelled) {
+        expect(timer.ms).toBe(TREE_CHANGED_WINDOW_MS)
+        timer.run()
+      }
+    }
+    expect(emitted).toEqual([{ workspaceId: WS }])
+  })
 })
