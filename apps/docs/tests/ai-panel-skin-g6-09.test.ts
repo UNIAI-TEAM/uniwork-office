@@ -46,12 +46,101 @@ describe('shared AI panel skin vs the G6-09 panel rules (docs)', () => {
   })
 
   it('the skin does not restyle the step-title / work-group-summary focus ring', () => {
-    expect(skinCss).not.toMatch(/ai-step-title|ai-work-group-summary/)
+    expect(skinCss).not.toMatch(
+      /ai-step-title[^{]*:focus-visible|ai-work-group-summary[^{]*:focus-visible/,
+    )
     expect(rule(appCss, '.ai-step-title.clickable:focus-visible')).toMatch(
       /outline:\s*2px solid var\(--color-border-brand\)/,
     )
     expect(rule(appCss, '.ai-work-group-summary:focus-visible')).toMatch(
       /outline:\s*2px solid var\(--color-border-brand\)/,
     )
+  })
+})
+
+/* ---- visual r4 S-1 / S-2: AA contrast of the work-group summary and the docs result chip ---- */
+const tokensCss = readFileSync(join(__dirname, '../../../packages/ui/src/tokens.css'), 'utf8')
+
+/** The declarations of the first block that starts with `header` in `css` (flat blocks only). */
+function block(css: string, header: string): string {
+  const start = css.indexOf(`\n${header} {`)
+  expect(start, `block ${header}`).toBeGreaterThanOrEqual(0)
+  return css.slice(start, css.indexOf('\n}', start))
+}
+
+function tokenValue(decls: string, name: string): string {
+  const m = decls.match(new RegExp(`${name}:\\s*(#[0-9a-fA-F]{6})\\s*;`))
+  expect(m, `token ${name}`).not.toBeNull()
+  return m![1]
+}
+
+function luminance(hex: string): number {
+  const n = parseInt(hex.slice(1), 16)
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => {
+    const c = v / 255
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+  })
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+
+function contrast(a: string, b: string): number {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x)
+  return (hi + 0.05) / (lo + 0.05)
+}
+
+/** The `var(--x)` a rule gives `color`, resolved against the light / dark token blocks. */
+function colorToken(decl: string): string {
+  const m = decl.match(/(?:^|[\s;{])color:\s*var\((--[\w-]+)\)/)
+  expect(m, 'color: var(--token)').not.toBeNull()
+  return m![1]
+}
+
+const light = { shared: block(tokensCss, ':root'), docs: block(appCss, ':root') }
+const dark = {
+  shared: block(tokensCss, "[data-theme='dark']"),
+  docs: block(appCss, "[data-theme='dark']"),
+}
+
+describe('AA contrast of the AI panel group summary and the docs result chip (visual r4 S-1 / S-2)', () => {
+  it('S-1: the skin gives the interactive work-group summary the secondary text token, hover goes primary', () => {
+    const summary = rule(skinCss, ':is(.ai-panel, .copilot) .ai-work-group-summary')
+    expect(colorToken(summary)).toBe('--color-text-secondary')
+    const hover = rule(skinCss, ':is(.ai-panel, .copilot) .ai-work-group-summary:hover')
+    expect(colorToken(hover)).toBe('--color-text-primary')
+  })
+
+  it('S-1: that token reads >= 4.5:1 on the page surface in light and in dark', () => {
+    const token = '--color-text-secondary'
+    const page = '--color-bg-page'
+    expect(
+      contrast(tokenValue(light.shared, token), tokenValue(light.shared, page)),
+    ).toBeGreaterThanOrEqual(4.5)
+    expect(
+      contrast(tokenValue(dark.shared, token), tokenValue(dark.shared, page)),
+    ).toBeGreaterThanOrEqual(4.5)
+  })
+
+  it('S-1: no app stylesheet re-sets the summary lighter than the skin at higher specificity', () => {
+    for (const app of ['docs', 'markdown', 'html', 'pdf', 'sheets', 'slides']) {
+      const css = readFileSync(join(__dirname, `../../${app}/src/renderer/styles.css`), 'utf8')
+      for (const m of css.matchAll(/([^{}]*\.ai-work-group-summary[^{}]*)\{([^}]*)\}/g)) {
+        if (/color-text-tertiary/.test(m[2])) {
+          // an app rule may keep the old tertiary colour only at (0,1,0): the skin (0,2,0) outranks it
+          expect(m[1].trim(), `${app} summary rule`).toBe('.ai-work-group-summary')
+        }
+      }
+    }
+  })
+
+  it('S-2: the docs "ok" result chip uses the darker existing green and reads >= 4.5:1 in light and dark', () => {
+    const chip = rule(appCss, ".ai-result-chip[data-tone='ok']")
+    expect(colorToken(chip)).toBe('--docs-ins-ink')
+    expect(chip).toMatch(/background:\s*var\(--docs-ok-bg\)/)
+    expect(
+      contrast(tokenValue(light.docs, '--docs-ins-ink'), tokenValue(light.docs, '--docs-ok-bg')),
+    ).toBeGreaterThanOrEqual(4.5)
+    expect(
+      contrast(tokenValue(dark.docs, '--docs-ins-ink'), tokenValue(dark.docs, '--docs-ok-bg')),
+    ).toBeGreaterThanOrEqual(4.5)
   })
 })
