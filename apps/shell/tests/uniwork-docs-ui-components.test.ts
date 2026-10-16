@@ -85,6 +85,9 @@ function makeApi() {
         doc('c', 'Sheet.xlsx', 'xlsx'),
       ]),
     ),
+    uniworkListSharedWithMe: vi.fn(async (): Promise<UniworkResult<UniworkDocListPage>> =>
+      page([]),
+    ),
     uniworkOpenDocument: vi.fn(async (): Promise<UniworkResult<{ path: string }>> => ({
       ok: true,
       value: { path: 'C:\\x' },
@@ -222,7 +225,7 @@ describe('picker dialog', () => {
     await click(cardButton())
   }
 
-  it('lists the workspace documents; unsupported ones are disabled with a reason', async () => {
+  it('lists the workspace documents; unsupported ones are hidden and counted', async () => {
     await openPicker()
     expect(api.uniworkListDocuments).toHaveBeenCalledWith({
       workspaceId: 'w1',
@@ -230,25 +233,26 @@ describe('picker dialog', () => {
       limit: 50,
     })
     expect(rows().map((r) => r.querySelector('.uw-pick-row-title')!.textContent)).toEqual([
-      'Photo.png',
       'Plan.docx',
       'Sheet.xlsx',
     ])
-    expect(rows()[0]!.getAttribute('aria-disabled')).toBe('true')
-    expect(rows()[0]!.textContent).toContain('Not supported in UniWork Office')
-    expect(rows()[1]!.getAttribute('aria-disabled')).toBe('false')
-    expect(rows()[1]!.textContent).toMatch(/Updated/)
+    expect(dialog()!.textContent).not.toContain('Photo.png')
+    expect(host.querySelector('.uw-pick-hidden')!.textContent).toBe(
+      'Hidden because UniWork Office cannot open their format: 1',
+    )
+    expect(rows()[0]!.getAttribute('aria-disabled')).toBe('false')
+    expect(rows()[0]!.textContent).toMatch(/Updated/)
     // the highlight starts on the first document that can be opened
-    expect(rows()[1]!.getAttribute('aria-selected')).toBe('true')
-    expect(search().getAttribute('aria-activedescendant')).toBe(rows()[1]!.id)
+    expect(rows()[0]!.getAttribute('aria-selected')).toBe('true')
+    expect(search().getAttribute('aria-activedescendant')).toBe(rows()[0]!.id)
   })
 
-  it('arrow keys move over openable rows and Enter opens the highlighted one, then closes', async () => {
+  it('arrow keys move over the listed rows and Enter opens the highlighted one, then closes', async () => {
     await openPicker()
     await key(search(), 'ArrowDown')
-    expect(rows()[2]!.getAttribute('aria-selected')).toBe('true')
-    await key(search(), 'ArrowUp')
     expect(rows()[1]!.getAttribute('aria-selected')).toBe('true')
+    await key(search(), 'ArrowUp')
+    expect(rows()[0]!.getAttribute('aria-selected')).toBe('true')
     await key(search(), 'Enter')
     expect(api.uniworkOpenDocument).toHaveBeenCalledWith('b')
     expect(dialog()).toBeNull()
@@ -281,8 +285,18 @@ describe('picker dialog', () => {
     expect(seen).toEqual([])
   })
 
-  it('clicking a disabled row opens nothing', async () => {
+  it('clicking a row that cannot open (an archived one) opens nothing', async () => {
+    api.uniworkListDocuments.mockResolvedValue(
+      page([
+        { ...doc('o', 'Old.docx', 'docx'), archived: true } as UniworkDocSummary,
+        doc('b', 'Plan.docx', 'docx'),
+      ]),
+    )
     await openPicker()
+    expect(rows().map((r) => r.querySelector('.uw-pick-row-title')!.textContent)).toEqual([
+      'Old.docx',
+      'Plan.docx',
+    ])
     await click(rows()[0])
     expect(api.uniworkOpenDocument).not.toHaveBeenCalled()
     expect(dialog()).not.toBeNull()
@@ -303,7 +317,7 @@ describe('picker dialog', () => {
       () => new Promise((resolve) => (finish = resolve)),
     )
     await openPicker()
-    await click(rows()[1])
+    await click(rows()[0])
     expect(host.querySelector('.uw-pick-progress')!.textContent).toContain('Opening “Plan.docx”…')
     await act(async () => finish({ ok: false, error: 'forbidden' }))
     await flush()
@@ -317,7 +331,7 @@ describe('picker dialog', () => {
   it('an expired session while opening offers Sign in', async () => {
     api.uniworkOpenDocument.mockResolvedValueOnce({ ok: false, error: 'session_expired' })
     await openPicker()
-    await click(rows()[1])
+    await click(rows()[0])
     const signIn = host.querySelector<HTMLButtonElement>('.uw-pick-open-error button')!
     expect(signIn.textContent).toBe('Sign in')
     await click(signIn)
@@ -418,7 +432,8 @@ describe('picker dialog', () => {
     expect(rows()).toHaveLength(0)
     await click(buttonByText('Retry'))
     expect(api.uniworkListDocuments).toHaveBeenCalledTimes(2)
-    expect(rows()).toHaveLength(3)
+    // the two openable rows; the Photo.png row is hidden (counted in the hint)
+    expect(rows()).toHaveLength(2)
   })
 
   it('Retry after the workspace list failed loads the workspaces again', async () => {
@@ -427,7 +442,7 @@ describe('picker dialog', () => {
     expect(host.querySelector('.uw-pick-ws')).toBeNull()
     await click(buttonByText('Retry'))
     expect(api.uniworkListWorkspaces).toHaveBeenCalledTimes(2)
-    expect(rows()).toHaveLength(3)
+    expect(rows()).toHaveLength(2)
   })
 
   it('a rejected IPC call is shown as a network failure, not an unhandled error', async () => {
@@ -449,6 +464,93 @@ describe('picker dialog', () => {
     const list = host.querySelector('#uw-pick-list')
     expect(list).not.toBeNull()
     expect(search().getAttribute('aria-controls')).toBe('uw-pick-list')
+  })
+
+  describe('FD-14: bodies where every loaded row is hidden but more pages exist', () => {
+    const picture = (id: string) => doc(id, `Pic ${id}.png`, null)
+    const hint = () => host.querySelector<HTMLElement>('.uw-pick-hidden')
+
+    const chooseShared = async () => {
+      const select = host.querySelector<HTMLSelectElement>('.uw-pick-ws')!
+      await act(async () => {
+        const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')!.set!
+        setter.call(select, '\u0000shared')
+        select.dispatchEvent(new Event('change', { bubbles: true }))
+      })
+      await flush()
+    }
+
+    it('FE14-R1-03: the workspace empty body offers Load more, and it loads the next page', async () => {
+      api.uniworkListDocuments
+        .mockResolvedValueOnce(page([picture('1'), picture('2')], 'cur-1'))
+        .mockResolvedValueOnce(page([doc('b', 'B.pdf', 'pdf')]))
+      await openPicker()
+      expect(rows()).toHaveLength(0)
+      expect(dialog()!.textContent).toContain('No documents in this workspace yet.')
+      await click(buttonByText('Load more'))
+      expect(api.uniworkListDocuments).toHaveBeenLastCalledWith({
+        workspaceId: 'w1',
+        query: undefined,
+        cursor: 'cur-1',
+        limit: 50,
+      })
+      expect(rows().map((r) => r.querySelector('.uw-pick-row-title')!.textContent)).toEqual([
+        'B.pdf',
+      ])
+      expect(buttonByText('Load more')).toBeUndefined()
+    })
+
+    it('FE14-R1-01/03: the shared empty body offers Load more, and it loads the next page', async () => {
+      api.uniworkListSharedWithMe
+        .mockResolvedValueOnce(page([picture('1')], 'sh-1'))
+        .mockResolvedValueOnce(page([doc('s', 'Shared.docx', 'docx')]))
+      await openPicker()
+      await chooseShared()
+      expect(rows()).toHaveLength(0)
+      expect(dialog()!.textContent).toContain('Nothing has been shared with you directly yet.')
+      expect(hint()!.textContent).toBe('Hidden because UniWork Office cannot open their format: 1')
+      await click(buttonByText('Load more'))
+      expect(api.uniworkListSharedWithMe).toHaveBeenLastCalledWith({ cursor: 'sh-1', limit: 50 })
+      expect(rows().map((r) => r.querySelector('.uw-pick-row-title')!.textContent)).toEqual([
+        'Shared.docx',
+      ])
+    })
+
+    it('FE14-R1-02: no "documents you add will show up" hint while rows are hidden or more pages exist', async () => {
+      // every loaded row hidden, no more pages: the count line explains the empty list
+      api.uniworkListDocuments.mockResolvedValueOnce(page([picture('1')]))
+      await openPicker()
+      expect(dialog()!.textContent).not.toContain('Documents you add in UniWork will show up here.')
+      expect(hint()).not.toBeNull()
+    })
+
+    it('FE14-R1-02: nothing hidden and nothing more to load keeps the plain empty hint', async () => {
+      api.uniworkListDocuments.mockResolvedValue(page([]))
+      await openPicker()
+      expect(dialog()!.textContent).toContain('Documents you add in UniWork will show up here.')
+    })
+
+    it('FE14-R1-02: a first page with no rows at all but a next cursor shows no empty hint', async () => {
+      api.uniworkListDocuments.mockResolvedValueOnce(page([], 'cur-1'))
+      await openPicker()
+      expect(dialog()!.textContent).not.toContain('Documents you add in UniWork will show up here.')
+      expect(buttonByText('Load more')).toBeTruthy()
+    })
+
+    it('FE14-R1-05: the count line is a polite status the search box is described by', async () => {
+      await openPicker()
+      const line = hint()!
+      expect(line.id).toBeTruthy()
+      expect(line.getAttribute('role')).toBe('status')
+      expect(search().getAttribute('aria-describedby')).toBe(line.id)
+    })
+
+    it('FE14-R1-05: with nothing hidden the search box has no description to point at', async () => {
+      api.uniworkListDocuments.mockResolvedValue(page([doc('b', 'B.pdf', 'pdf')]))
+      await openPicker()
+      expect(hint()).toBeNull()
+      expect(search().hasAttribute('aria-describedby')).toBe(false)
+    })
   })
 
   it('has labelled controls', async () => {
