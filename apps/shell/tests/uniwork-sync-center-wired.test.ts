@@ -75,6 +75,7 @@ interface DocSpec {
   key: string
   state?: IntentRecordV2['state']
   lastError?: string
+  maxBytes?: number
 }
 
 function record(key: string, spec: DocSpec): IntentRecordV2 {
@@ -95,6 +96,7 @@ function record(key: string, spec: DocSpec): IntentRecordV2 {
     createdAt: NOW_ISO,
     updatedAt: NOW_ISO,
     ...(spec.lastError ? { lastError: spec.lastError as IntentRecordV2['lastError'] } : {}),
+    ...(spec.maxBytes !== undefined ? { maxBytes: spec.maxBytes } : {}),
   }
 }
 
@@ -823,5 +825,29 @@ describe('W10: "Đồng bộ ngay" restarts a feed stopped on refused resyncs, e
   it('wiring.ts hands the runtime reset to the sync center', () => {
     const source = readFileSync(join(__dirname, '..', 'src/main/uniwork-docs/wiring.ts'), 'utf8')
     expect(source).toContain('resetFeedResync: () => runtime.resetFeedResync(),')
+  })
+})
+
+describe('SIZE-be-d1-8: wired Sync Center carries failedReason and maxBytes from a stored failed too_large record', () => {
+  it('maps a stored failed record with lastError too_large and maxBytes onto the attention row even when the binding carries no maxBytes', async () => {
+    const h = wired({
+      docs: [
+        {
+          key: 'doc-too-large',
+          state: 'failed',
+          lastError: 'too_large',
+          maxBytes: 209_715_200,
+        },
+      ],
+    })
+    const snapshot = await h.controller.getSnapshot()
+    const row = snapshot.tabs.attention.find((item) => item.documentKey === 'doc-too-large')
+    expect(row).toBeDefined()
+    expect(row).toMatchObject({
+      documentKey: 'doc-too-large',
+      state: 'failed',
+      failedReason: 'too_large',
+      maxBytes: 209_715_200,
+    })
   })
 })
