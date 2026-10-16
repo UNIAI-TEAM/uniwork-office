@@ -431,13 +431,6 @@ async function result<T>(run: () => Promise<T>): Promise<UniworkResult<T>> {
 /** the longest document name D accepts, counted in runes (code points) like D's own check */
 const MAX_DOC_NAME_RUNES = 500
 
-/**
- * D stages at most 50 MiB per upload part (`files/registry.go`), so a bigger
- * file is refused before it is read: main must not buffer a multi-GB pick only
- * to be told too_large. Exactly 50 MiB is still sent.
- */
-const MAX_UPLOAD_BYTES = 50 * 1024 * 1024
-
 /** the renderer's own id for one upload start; a Cancel names the upload through it */
 const MAX_UPLOAD_ID_LENGTH = 128
 
@@ -488,7 +481,17 @@ async function actionResult<T>(
   try {
     return { ok: true, value: await run() }
   } catch (error) {
-    return { ok: false, error: actionErrorOf(error, options.nameField === true) }
+    const code = actionErrorOf(error, options.nameField === true)
+    if (error instanceof UniworkDocError && code === 'too_large') {
+      return {
+        ok: false,
+        error: code,
+        ...(error.filename !== undefined ? { name: error.filename } : {}),
+        ...(error.sizeBytes !== undefined ? { sizeBytes: error.sizeBytes } : {}),
+        ...(error.maxBytes !== undefined ? { maxBytes: error.maxBytes } : {}),
+      }
+    }
+    return { ok: false, error: code }
   }
 }
 
@@ -3323,8 +3326,9 @@ export class UniworkDocsService {
    * Upload one local file as a UniWork document. Main resolves the file name's
    * extension first (`unsupported_format` before any read when the formats table
    * does not know it - the picker's filter alone is not a contract), stats the
-   * file (a pick past the server's 50 MiB stage limit is refused unread with
-   * `too_large`), reads the bytes and sends them as the multipart `file` part
+   * file (a pick past the configured `documents.limits.upload_max_bytes`, 200 MiB
+   * by default, is refused unread with `too_large`), reads the bytes and sends them
+   * as the multipart `file` part
    * while reporting progress; the title is the file name (the server's own
    * default). Nothing is written locally: the working copy is the download the
    * open flow makes from the created document.
@@ -3364,7 +3368,15 @@ export class UniworkDocsService {
         }
         // a Cancel during the stat: answer it before the read and the POST
         if (controller.signal.aborted) throw cancelledUpload()
-        if (size > MAX_UPLOAD_BYTES) throw new UniworkDocError('too_large')
+        const limits = await this.limitsCache.get()
+        if (controller.signal.aborted) throw cancelledUpload()
+        if (size > limits.max_bytes) {
+          throw new UniworkDocError('too_large', {
+            filename,
+            sizeBytes: size,
+            maxBytes: limits.max_bytes,
+          })
+        }
         let bytes: Uint8Array
         try {
           bytes = new Uint8Array(await readFile(input.path, { signal: controller.signal }))
@@ -3375,6 +3387,13 @@ export class UniworkDocsService {
         // the read can also resolve just as the abort lands: no POST then
         if (controller.signal.aborted) throw cancelledUpload()
         const total = bytes.byteLength
+        if (total > limits.max_bytes) {
+          throw new UniworkDocError('too_large', {
+            filename,
+            sizeBytes: total,
+            maxBytes: limits.max_bytes,
+          })
+        }
         this.deps.pushUploadProgress?.({ uploadId, path: input.path, loaded: 0, total })
         const created = await this.api()
           .createFile({
@@ -3390,6 +3409,15 @@ export class UniworkDocsService {
             // the person cancelled while the POST was in flight: that is the
             // answer, not the network failure the abort surfaced as
             if (controller.signal.aborted) throw cancelledUpload()
+            if (error instanceof UniworkDocError && error.code === 'too_large') {
+              throw new UniworkDocError('too_large', {
+                status: error.status,
+                serverCode: error.serverCode,
+                filename,
+                sizeBytes: error.sizeBytes ?? total,
+                maxBytes: error.maxBytes ?? limits.max_bytes,
+              })
+            }
             throw error
           })
         this.deps.pushUploadProgress?.({ uploadId, path: input.path, loaded: total, total })

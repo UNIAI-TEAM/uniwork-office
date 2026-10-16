@@ -290,7 +290,14 @@ export type UniworkDocNameError = 'name_empty' | 'name_too_long'
  */
 export type UniworkDocActionError = UniworkDocErrorCode | UniworkDocNameError | 'upload_cancelled'
 export type UniworkDocActionResult<T> =
-  { ok: true; value: T } | { ok: false; error: UniworkDocActionError }
+  | { ok: true; value: T }
+  | {
+      ok: false
+      error: UniworkDocActionError
+      name?: string
+      sizeBytes?: number
+      maxBytes?: number
+    }
 
 /** the formats the New document dialog offers (D accepts more; these three are the Office ones) */
 export type UniworkDocNewFormat = 'docx' | 'xlsx' | 'pptx'
@@ -386,6 +393,14 @@ export interface UniworkDocStatus {
   commentsLevel?: 'view' | 'comment' | 'edit' | 'manage'
   state: UniworkSaveState
   error?: UniworkDocErrorCode
+  /** Payload size in bytes when known (e.g. when `error === 'too_large'`). */
+  sizeBytes?: number
+  /** Server/configured maximum document size in bytes when `error === 'too_large'`. */
+  maxBytes?: number
+  /** Warn-band signal emitted once per bound document session when `warn_bytes <= sizeBytes <= max_bytes`. */
+  sizeWarn?: { sizeBytes: number; maxBytes: number }
+  /** True when a save just exceeded `max_bytes` and the over-cap save dialog should be offered. */
+  saveTooLargePrompt?: boolean
   /** an unsent N+1 exists behind the pending intent (G5-06) */
   pendingNext?: boolean
   lastSavedAt?: string
@@ -962,6 +977,8 @@ export interface HomeApi {
   /** G5-06u: main asks for the queue popover of a path (Ctrl/Cmd+S with a pending save) */
   onUniworkQueuePopover(cb: (request: UniworkQueuePopoverRequest) => void): () => void
   uniworkSave(path: string): Promise<UniworkDocStatus | null>
+  /** Save a local copy of the bound working copy at `path` to a user-chosen path ("Lưu bản sao về máy"). */
+  uniworkSaveLocalCopy?(path: string): Promise<boolean>
   uniworkResolveConflict(path: string): Promise<UniworkDocStatus | null>
   /** G5-09: main pushes the conflict dialog view when S5 opens or updates in place */
   onUniworkConflict(cb: (view: UniworkConflictView) => void): () => void
@@ -1572,6 +1589,8 @@ export const UNIWORK_DOC_CHANNELS = {
   signOutPrompt: 'uniwork-doc:sign-out-prompt',
   /** invoke({ requestId, confirmed }) -> answer the main-initiated sign-out prompt (G5-11 D5) */
   signOutPromptAnswer: 'uniwork-doc:sign-out-prompt-answer',
+  /** invoke(path) -> save the bound working copy to a user-chosen local path ("Lưu bản sao về máy") */
+  saveLocalCopy: 'uniwork-doc:save-local-copy',
 } as const
 
 export const PROJECT_CHANNELS = {

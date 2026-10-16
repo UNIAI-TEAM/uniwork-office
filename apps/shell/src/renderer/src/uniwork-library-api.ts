@@ -44,7 +44,15 @@ export function loadDocProperties(
  */
 export type DocActionError = UniworkDocErrorCode | DocNameError | 'upload_cancelled'
 
-export type DocActionResult<T> = { ok: true; value: T } | { ok: false; error: DocActionError }
+export type DocActionResult<T> =
+  | { ok: true; value: T }
+  | {
+      ok: false
+      error: DocActionError
+      name?: string
+      sizeBytes?: number
+      maxBytes?: number
+    }
 
 export interface CreateDocInput {
   workspaceId: string
@@ -81,6 +89,7 @@ interface ActionsBridge {
   uniworkUploadDocument?(input: UploadDocInput): Promise<DocActionResult<UniworkDocSummary>>
   uniworkCancelUploadDocument?(uploadId: string): Promise<void>
   onUniworkUploadProgress?(cb: (event: UploadProgressEvent) => void): () => void
+  uniworkSaveLocalCopy?(path: string): Promise<boolean>
   uniworkRenameDocument?(
     documentId: string,
     name: string,
@@ -143,4 +152,9 @@ export function listFolders(workspaceId: string): Promise<FolderChoice[]> {
 /** a document was renamed (here or elsewhere): main's push to the window */
 export function onDocRenamed(cb: (event: DocRenamedEvent) => void): () => void {
   return actions().onUniworkDocRenamed?.(cb) ?? (() => undefined)
+}
+
+/** SIZE-F1: save the bound document's working copy to a user-chosen local path */
+export function saveLocalCopy(path: string): Promise<boolean> {
+  return actions().uniworkSaveLocalCopy?.(path) ?? Promise.resolve(false)
 }
