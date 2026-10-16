@@ -603,20 +603,27 @@ export function AiPanel({
       return base64 ? [{ name, base64 }] : []
     })
     const restore = window.markdownApi?.restorePendingAssets
-    if (!restore || files.length === 0 || files.length < names.length) return
+    if (!restore || files.length === 0 || files.length < names.length) {
+      setRedoRefused(true)
+      return
+    }
     // the retry only runs while the history stands where the refused redo found it
     const depths = [undoDepth(editor.state), redoDepth(editor.state)]
     restoringRunsRef.current.add(runId)
     void Promise.resolve(restore(files))
       .then((result) => {
-        if (result.errors.length > 0 || result.restored.length < files.length) return
+        if (result.errors.length > 0 || result.restored.length < files.length) {
+          setRedoRefused(true)
+          return
+        }
+        setRedoRefused(false)
         discardedRunsRef.current.delete(runId)
         if (editor.isDestroyed) return
         if (undoDepth(editor.state) === depths[0] && redoDepth(editor.state) === depths[1]) {
           editor.commands.redo()
         }
       })
-      .catch(() => {})
+      .catch(() => setRedoRefused(true))
       .finally(() => restoringRunsRef.current.delete(runId))
   }
   /**
@@ -1171,6 +1178,11 @@ export function AiPanel({
   // the model picker's list note, written into the panel's own polite node (never a node of the
   // picker's); it stands while the announcement it was written over is the current one
   const [pickerNote, setPickerNote] = useState<{ text: string; over: string } | null>(null)
+  /** a redo was refused because the run's picture could not be put back: say why nothing happened */
+  const [redoRefused, setRedoRefused] = useState(false)
+  useEffect(() => {
+    if (busy) setRedoRefused(false)
+  }, [busy])
   useEffect(() => {
     const bridge = readUniworkCloudStatus()
     if (!bridge) return
@@ -1662,6 +1674,11 @@ export function AiPanel({
         {readOnly && !isUniwork && (
           <div className="ai-readonly-notice" role="note">
             {t('aiViewOnlyNotice')}
+          </div>
+        )}
+        {redoRefused && (
+          <div className="ai-redo-refused" role="status">
+            {t('aiRedoPictureLost')}
           </div>
         )}
         {activePartial && (

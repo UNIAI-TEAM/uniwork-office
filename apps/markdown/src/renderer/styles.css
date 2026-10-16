@@ -1300,6 +1300,19 @@ html.genoffice-popover-open .ribbon-tabs {
   line-height: 1.45;
 }
 
+/* a redo that stayed refused because the run's picture could not be put back (shown above the composer) */
+.ai-redo-refused {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--warning-border);
+  border-radius: 6px;
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  font-size: 12px;
+  line-height: 1.4;
+  text-wrap: pretty;
+}
+
 .ai-sr-status {
   position: absolute;
   width: 1px;
