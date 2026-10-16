@@ -1181,25 +1181,33 @@ export class UniworkDocsService {
   async saveLocalCopy(path: string): Promise<boolean> {
     if (typeof path !== 'string' || !path) return false
     const doc = this.store.lookup(path)
-    const sourcePath = doc ? doc.path : path
+    if (!doc || !this.ownsLocally(doc)) return false
     let localBytes: Uint8Array
     try {
-      localBytes = new Uint8Array(await readFile(sourcePath))
+      localBytes = new Uint8Array(await readFile(doc.path))
     } catch {
       return false
     }
-    const defaultName = doc ? doc.binding.filename : basename(sourcePath)
+    const defaultName = doc.binding.filename
     let target: string | null = null
     try {
       if (this.deps.pickDownloadPath) {
         target = await this.deps.pickDownloadPath(defaultName)
-      } else if (this.deps.ui?.pickCopyPath && doc) {
+      } else if (this.deps.ui?.pickCopyPath) {
         target = await this.deps.ui.pickCopyPath(doc.binding.title, doc.binding.format)
       }
     } catch {
       return false
     }
     if (!target) return false
+    const current = this.store.lookup(doc.path)
+    if (
+      !current ||
+      current.binding.documentId !== doc.binding.documentId ||
+      !this.ownsLocally(current)
+    ) {
+      return false
+    }
     try {
       await writeFile(target, localBytes)
       return true

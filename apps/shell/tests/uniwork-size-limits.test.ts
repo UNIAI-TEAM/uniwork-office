@@ -6,7 +6,18 @@
  * check and warn band in `SaveCoordinator.save` (§5.2 item 3), the `413`
  * `fields.max_bytes` carried into the queue record, and the signed copy (§6.2).
  */
-import { chmodSync, mkdtempSync, readFileSync, rmSync, truncateSync, writeFileSync } from 'node:fs'
+import {
+  chmodSync,
+  existsSync,
+  linkSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  truncateSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { act, createElement, type ReactElement } from 'react'
@@ -292,6 +303,115 @@ describe('SIZE-F1 desktop document size limits', () => {
       expect(
         requests.some((url) => url.endsWith(`/api/v1/workspaces/${WS_ID}/documents/files`)),
       ).toBe(true)
+    })
+
+    it('saveLocalCopy refuses an unbound or foreign-account path before any read or picker, and revalidates after the picker (d1-1)', async () => {
+      let currentIdentity: {
+        accountId: string
+        deviceSessionId: string
+        deploymentId: string
+      } | null = {
+        accountId: 'acc_1',
+        deviceSessionId: 'dev_1',
+        deploymentId: 'default',
+      }
+      let pickerImpl: (defaultName: string) => Promise<string | null> = async (name) =>
+        join(dir, `exported-${name}`)
+      const pickDownloadPath = vi.fn((defaultName: string) => pickerImpl(defaultName))
+
+      const service = new UniworkDocsService({
+        userDataDir: dir,
+        profile: () => ({
+          deploymentId: 'default',
+          apiOrigin: 'https://uniwork.example',
+          clientId: 'uniwork-office',
+          channel: 'stable',
+        }),
+        channel: () => 'stable',
+        applyProfile: async () => 'unchanged',
+        identity: () => currentIdentity,
+        selectedOrg: () => ({ id: ORG_ID, slug: 'acme' }),
+        authorized: <T>(call: (token: string) => Promise<T>) => call('tok'),
+        fetch: (async () => new Response('{}', { status: 404 })) as unknown as FetchLike,
+        openPath: () => true,
+        isPathOpen: () => false,
+        requestModuleSave: () => false,
+        reloadPath: () => undefined,
+        activePath: () => undefined,
+        pickDownloadPath,
+        ui: { chooseUnsavedClose: async () => 'cancel' },
+        pushStatus: () => undefined,
+        pushLaunch: () => undefined,
+        reveal: () => undefined,
+      })
+
+      // (a) an unbound readable file path: refused before reading or calling the picker
+      const plainPath = join(dir, 'secret-plain.docx')
+      writeFileSync(plainPath, enc('secret-local-file'))
+      expect(await service.saveLocalCopy(plainPath)).toBe(false)
+      expect(pickDownloadPath).not.toHaveBeenCalled()
+      expect(existsSync(join(dir, 'exported-secret-plain.docx'))).toBe(false)
+
+      const seedBound = async (
+        deploymentId: string,
+        accountId: string,
+        docId: string,
+        text: string,
+      ) => {
+        const docDir = service.store.dirFor(deploymentId, accountId, docId)
+        const bytes = enc(text)
+        await service.store.write(docDir, {
+          schema: 2,
+          documentId: docId,
+          orgId: ORG_ID,
+          workspaceId: WS_ID,
+          title: 'Report.docx',
+          filename: 'Report.docx',
+          format: 'docx',
+          access: 'edit',
+          baseRevision: '10',
+          baseVersion: 1,
+          baseChecksum: sha256Hex(bytes),
+          state: 'failed',
+          error: 'too_large',
+          minStoreLevel: 1,
+          minAppVersion: '0.0.0',
+        })
+        return await service.store.writeWorkingCopy(docDir, 'Report.docx', bytes)
+      }
+
+      // (b) a bound working copy belonging to another account or deployment: refused
+      const foreignAccountPath = await seedBound(
+        'default',
+        'acc_2',
+        'doc_foreign_acc',
+        'foreign-acc',
+      )
+      const foreignDepPath = await seedBound('other_dep', 'acc_1', 'doc_foreign_dep', 'foreign-dep')
+      expect(await service.saveLocalCopy(foreignAccountPath)).toBe(false)
+      expect(await service.saveLocalCopy(foreignDepPath)).toBe(false)
+      expect(pickDownloadPath).not.toHaveBeenCalled()
+
+      // (c) an owned bound working copy: exported byte-for-byte
+      const ownedPath = await seedBound('default', 'acc_1', DOC_ID, 'owned-working-copy')
+      const dest1 = join(dir, 'copy-owned.docx')
+      pickerImpl = async () => dest1
+      expect(await service.saveLocalCopy(ownedPath)).toBe(true)
+      expect(pickDownloadPath).toHaveBeenCalledTimes(1)
+      expect(readFileSync(dest1, 'utf8')).toBe('owned-working-copy')
+
+      // (d) ownership lost while the picker is open (account switch): refused after the picker returns
+      const dest2 = join(dir, 'copy-after-switch.docx')
+      pickerImpl = async () => {
+        currentIdentity = {
+          accountId: 'acc_2',
+          deviceSessionId: 'dev_2',
+          deploymentId: 'default',
+        }
+        return dest2
+      }
+      expect(await service.saveLocalCopy(ownedPath)).toBe(false)
+      expect(existsSync(dest2)).toBe(false)
     })
   })
 
