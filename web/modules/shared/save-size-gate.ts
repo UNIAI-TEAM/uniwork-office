@@ -26,6 +26,7 @@ import { openFrameDialog, type FrameDialogFrame, type FrameDialogHandle } from '
 import { webText } from './i18n/strings-web'
 import './remote-bar.css'
 import { ensureLiveNodes } from './remote-bar'
+import { noteSerializedBytes } from './lag-detector'
 
 export type SaveSizeBand = 'normal' | 'warn' | 'block'
 
@@ -416,6 +417,7 @@ export function createSaveSizeGate(opts: SaveSizeGateOptions): SaveSizeGate {
       const currentLimits = activeLimits()
       const evaluation = evaluateSaveSize(data.byteLength, currentLimits)
       // lag_detected.bytes follows the last serialized size (§4.1.2)
+      noteSerializedBytes(evaluation.bytes)
       lastCheck = evaluation
 
       if (evaluation.band === 'normal') {

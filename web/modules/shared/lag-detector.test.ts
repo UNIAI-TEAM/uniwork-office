@@ -466,6 +466,8 @@ describe('lag-detector protocol & unit behavior (UNI-1865)', () => {
     expect(parentPost).not.toHaveBeenCalled()
   })
 
+  it('noteBytes makes lag_detected.bytes follow the last serialized size (d1-10)', () => {
+    const fake = makeFakeObserver()
     const emitted: LagDetectedPayload[] = []
     const detector = createLagDetector({
       observer: fake.Observer,
@@ -479,6 +481,12 @@ describe('lag-detector protocol & unit behavior (UNI-1865)', () => {
 
     detector.markDocumentLoaded('doc-bytes', 1_000)
     // a save at 800 B, then edits serialized at 4_500 B: the event carries the last size
+    detector.noteBytes(800)
+    detector.noteBytes(4_500)
+    detector.noteBytes(-1) // invalid: ignored
+    fake.latest().push([{ entryType: 'longtask', startTime: 3_000, duration: 1_100 }])
+    expect(emitted[0]).toMatchObject({ bytes: 4_500 })
+  })
 })
 
 describe('lag-detector module open-path wiring (docs, text, pdf, sheets, slides)', () => {

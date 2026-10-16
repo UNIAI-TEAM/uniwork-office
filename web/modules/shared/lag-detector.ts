@@ -102,6 +102,7 @@ export interface LagDetector {
    * `knownBytes` follows the last serialized save so `lag_detected.bytes` is never stale).
    * Only updates while a document is the current one.
    */
+  noteBytes(bytes?: number): void
   bindPort(port: LagDetectorPort | null | undefined, capabilities?: Capabilities | null): void
   disconnect(): void
   readonly currentDocumentId: string | null
@@ -427,6 +428,7 @@ export function createLagDetector(options: LagDetectorOptions = {}): LagDetector
 
   return {
     markDocumentLoaded,
+    noteBytes(bytes) {
       if (!currentDocId) return
       if (typeof bytes === 'number' && Number.isFinite(bytes) && bytes >= 0) {
         knownBytes = Math.round(bytes)
@@ -514,4 +516,6 @@ export function documentMounted(): void {
 }
 
 /** `lag_detected.bytes` follows the last serialized save size (§4.1.2; called by the save gate) */
+export function noteSerializedBytes(bytes: number): void {
+  sharedDetector.noteBytes(bytes)
 }
