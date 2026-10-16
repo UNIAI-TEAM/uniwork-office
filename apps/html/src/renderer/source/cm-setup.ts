@@ -1,4 +1,4 @@
-import { Annotation, EditorState, type Extension } from '@codemirror/state'
+import { Annotation, EditorState, Prec, type Extension } from '@codemirror/state'
 import {
   EditorView,
   crosshairCursor,
@@ -11,7 +11,7 @@ import {
   lineNumbers,
   rectangularSelection,
 } from '@codemirror/view'
-import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
+import { defaultKeymap, history, historyKeymap, indentWithTab, redo } from '@codemirror/commands'
 import {
   HighlightStyle,
   bracketMatching,
@@ -76,6 +76,24 @@ const theme = EditorView.theme({
   '.cm-panels.cm-panels-top': { borderBottom: '1px solid var(--border)' },
 })
 
+/**
+ * Ctrl/Cmd+Shift+Z is redo on every platform and whatever the key event looks like. CodeMirror's
+ * keymap drops Shift for a letter key, so with Caps Lock on (or a synthetic event) the lowercase
+ * "z" matched Ctrl+Z and UNDID, emptying the source under an undone AI run; and the stock history
+ * keymap binds Ctrl-Shift-z on Linux only (Mac: Shift-Cmd-z), leaving Windows to the browser.
+ */
+const shiftRedoKey = Prec.highest(
+  EditorView.domEventHandlers({
+    keydown(event, view) {
+      if (!(event.ctrlKey || event.metaKey) || event.altKey || !event.shiftKey) return false
+      if (event.key.toLowerCase() !== 'z') return false
+      event.preventDefault()
+      redo(view)
+      return true
+    },
+  }),
+)
+
 export function buildExtensions(onDocChanged: (view: EditorView) => void): Extension {
   return [
     lineNumbers(),
@@ -83,6 +101,7 @@ export function buildExtensions(onDocChanged: (view: EditorView) => void): Exten
     highlightSpecialChars(),
     history({ joinToEvent: joinRunEdits }),
     runHistoryExtension,
+    shiftRedoKey,
     foldGutter(),
     drawSelection(),
     dropCursor(),
