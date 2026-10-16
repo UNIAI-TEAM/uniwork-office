@@ -569,6 +569,25 @@ export class SaveCoordinator {
       }
     } else {
       this.activeSizeWarns.delete(doc.path)
+      if (pending && !IN_FLIGHT_QUEUE_STATES.has(pending.intent.state)) {
+        const limits = await this.resolveLimits()
+        if (pending.payload.byteLength > limits.max_bytes) {
+          await this.deps.dispatcher?.supersede({
+            key: doc.key,
+            path: doc.path,
+            filename: doc.binding.filename,
+            format: doc.binding.format,
+            orgId: doc.binding.orgId,
+            workspaceId: doc.binding.workspaceId,
+            baseVersion: doc.binding.baseVersion,
+            record: pending.intent,
+            payload: pending.payload,
+          })
+          await this.cleanupIntent(intents, doc, pending.intent)
+          this.pendingNext.delete(doc.path)
+          return await this.commitState(doc, withoutError({ ...doc.binding, state: 'saved' }))
+        }
+      }
     }
 
     try {
