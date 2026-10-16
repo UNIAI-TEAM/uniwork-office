@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { redo, redoDepth, undo, undoDepth } from '@tiptap/pm/history'
 import type { Editor } from '@tiptap/core'
 import { mountDocsAiPanel, type DocsAiHarness } from './helpers/docs-ai-run-harness'
+import { setEditorEditable } from '../src/renderer/uniwork-doc-state'
 
 const font = (blocks: number[], field: Record<string, unknown>) => ({
   name: 'apply_ops',
@@ -106,6 +107,68 @@ describe('one undo step per AI run (docs)', () => {
     expect(editor.isEditable).toBe(false)
     await h.textTurn('Done.')
     expect(editor.isEditable).toBe(true)
+  })
+})
+
+describe('the document unlocks when the run ends, whatever re-rendered meanwhile (docs)', () => {
+  /**
+   * What @tiptap/react's useEditor does on every App render whose options changed (the App
+   * builds a fresh editorProps object each render): it re-applies the options with
+   * `editable: editor.isEditable`, which reads false while the run holds the view.
+   */
+  const appRerender = (editor: Editor) =>
+    editor.setOptions({ editorProps: {}, editable: editor.isEditable })
+
+  /** Ctrl+Z on the page the way a keyboard sends it */
+  const keyboardUndo = (editor: Editor) =>
+    editor.view.dom.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'z', code: 'KeyZ', ctrlKey: true, bubbles: true }),
+    )
+
+  it('an App render mid-run: editable after a mutating run, and Ctrl+Z undoes the run', async () => {
+    h = await mountDocsAiPanel(TEXTS)
+    const { editor } = h
+    const before = content(editor)
+    await h.send('format it')
+    await h.toolTurn([font([0], { bold: true })])
+    appRerender(editor)
+    await h.textTurn('Done.')
+    expect(editor.view.editable).toBe(true)
+    expect(editor.isEditable).toBe(true)
+    expect(editor.view.dom.getAttribute('contenteditable')).toBe('true')
+    keyboardUndo(editor)
+    expect(content(editor)).toEqual(before)
+  })
+
+  it('an App render during a read-only run: the document is editable after it', async () => {
+    h = await mountDocsAiPanel(TEXTS)
+    const { editor } = h
+    await h.send('what does it say?')
+    appRerender(editor)
+    await h.textTurn('It lists three blocks.')
+    expect(editor.isEditable).toBe(true)
+    expect(editor.view.dom.getAttribute('contenteditable')).toBe('true')
+  })
+
+  it('an App render before Stop: the document is editable after the stopped run', async () => {
+    h = await mountDocsAiPanel(TEXTS)
+    const { editor } = h
+    await h.send('format it')
+    await h.toolTurn([font([0], { bold: true })])
+    appRerender(editor)
+    await h.stop()
+    expect(editor.isEditable).toBe(true)
+  })
+
+  it('a document the App made read-only during the run stays read-only', async () => {
+    h = await mountDocsAiPanel(TEXTS)
+    const { editor } = h
+    await h.send('what does it say?')
+    // Read Mode / protection switched on while the run was open (the App's own switch)
+    setEditorEditable(editor, false)
+    appRerender(editor)
+    await h.textTurn('It lists three blocks.')
+    expect(editor.isEditable).toBe(false)
   })
 })
 
