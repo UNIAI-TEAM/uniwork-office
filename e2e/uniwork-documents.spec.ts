@@ -626,19 +626,33 @@ test.describe.serial('UniWork documents', () => {
       })
       expect(await binding(path)).not.toHaveProperty('pendingIntent')
 
-      // every further Save refuses without touching the network
+      // G5-06u: pressing Save in conflict state refuses to upload or commit and instead
+      // opens the in-app S5 conflict dialog (which reads GET /documents/:id metadata only)
+      await answerMessageBoxes(launched, [])
       const sent = stub.callCount()
+      const dialog = shell.getByRole('alertdialog')
       await saveShortcut(editor)
-      await sleep(2_000)
-      expect(stub.callCount()).toBe(sent)
+      await expect(dialog).toBeVisible()
+      const afterSaveCalls = stub.calls().slice(sent)
+      expect(afterSaveCalls.map((c) => `${c.method} ${c.route}`)).toEqual([
+        `GET /documents/${doc.id}`,
+        `GET /documents/${doc.id}`,
+      ])
+      expect(stub.commits(doc.id)).toHaveLength(1)
       await expectState(shell, 'conflict', 5_000)
+
+      // Dismiss the Ctrl/Cmd+S-opened dialog so we can also verify the chip's Resolve… button
+      await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+      await expect(dialog).toBeHidden()
+      await expect(chip(shell).getByRole('button', { name: 'Resolve…' })).not.toHaveAttribute(
+        'aria-disabled',
+        'true',
+      )
 
       // AC1 + AC2: Resolve… opens the in-app S5 alertdialog (never a native message box),
       // with Cancel focused by default and the Step-1 action buttons in spec order
-      await answerMessageBoxes(launched, [])
       await chip(shell).getByRole('button', { name: 'Resolve…' }).click()
 
-      const dialog = shell.getByRole('alertdialog')
       await expect(dialog).toBeVisible()
       await expect(
         dialog.getByRole('heading', { name: 'This document was changed elsewhere' }),

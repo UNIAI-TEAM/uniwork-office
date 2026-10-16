@@ -228,7 +228,7 @@ test.describe.serial('UniWork folders (FD-11)', () => {
 
       // Navigate into `Projects`
       await contents.getByRole('option', { name: /^Projects/ }).dblclick()
-      await expect(crumbs.getByRole('button', { name: 'Projects', exact: true })).toHaveAttribute(
+      await expect(crumbs.getByText('Projects', { exact: true })).toHaveAttribute(
         'aria-current',
         'page',
       )
@@ -293,7 +293,7 @@ test.describe.serial('UniWork folders (FD-11)', () => {
 
       // Open `Source Hub` and verify both the subfolder and document are listed
       await contents.getByRole('option', { name: /^Source Hub/ }).dblclick()
-      await expect(crumbs.getByRole('button', { name: 'Source Hub', exact: true })).toHaveAttribute(
+      await expect(crumbs.getByText('Source Hub', { exact: true })).toHaveAttribute(
         'aria-current',
         'page',
       )
@@ -324,7 +324,7 @@ test.describe.serial('UniWork folders (FD-11)', () => {
 
       // Selecting `Target Hub` in the tree shows the moved subfolder and document
       await tree.getByRole('treeitem', { name: 'Target Hub' }).click()
-      await expect(crumbs.getByRole('button', { name: 'Target Hub', exact: true })).toHaveAttribute(
+      await expect(crumbs.getByText('Target Hub', { exact: true })).toHaveAttribute(
         'aria-current',
         'page',
       )
@@ -334,15 +334,16 @@ test.describe.serial('UniWork folders (FD-11)', () => {
       // Navigate into `Source Hub` › `Vanishing Leaf`, then archive `Vanishing Leaf` on the web
       await tree.getByRole('treeitem', { name: 'Source Hub' }).click()
       await contents.getByRole('option', { name: /^Vanishing Leaf/ }).dblclick()
-      await expect(
-        crumbs.getByRole('button', { name: 'Vanishing Leaf', exact: true }),
-      ).toHaveAttribute('aria-current', 'page')
+      await expect(crumbs.getByText('Vanishing Leaf', { exact: true })).toHaveAttribute(
+        'aria-current',
+        'page',
+      )
 
       stub.webArchive(vanishingLeaf.id)
       await triggerFeedTick(shell)
 
       // The open folder falls back to its nearest live ancestor (`Source Hub`) with the status notice
-      await expect(crumbs.getByRole('button', { name: 'Source Hub', exact: true })).toHaveAttribute(
+      await expect(crumbs.getByText('Source Hub', { exact: true })).toHaveAttribute(
         'aria-current',
         'page',
         { timeout: 15_000 },
@@ -373,37 +374,40 @@ test.describe.serial('UniWork folders (FD-11)', () => {
 
       // Level 1: Platform
       await contents.getByRole('option', { name: /^Platform/ }).dblclick()
-      await expect(crumbs.getByRole('button', { name: 'Platform', exact: true })).toHaveAttribute(
+      await expect(crumbs.getByText('Platform', { exact: true })).toHaveAttribute(
         'aria-current',
         'page',
       )
 
       // Level 2: Storage
       await contents.getByRole('option', { name: /^Storage/ }).dblclick()
-      await expect(crumbs.getByRole('button', { name: 'Storage', exact: true })).toHaveAttribute(
+      await expect(crumbs.getByText('Storage', { exact: true })).toHaveAttribute(
         'aria-current',
         'page',
       )
 
       // Level 3: RFCs
       await contents.getByRole('option', { name: /^RFCs/ }).dblclick()
-      await expect(crumbs.getByRole('button', { name: 'RFCs', exact: true })).toHaveAttribute(
+      await expect(crumbs.getByText('RFCs', { exact: true })).toHaveAttribute(
         'aria-current',
         'page',
       )
       await expect(contents.getByRole('option', { name: /^rfc-folder-tree\.docx/ })).toBeVisible()
 
-      // Breadcrumb trail has UniWork › Platform › Storage › RFCs
+      // Breadcrumb trail has ancestor buttons UniWork › Platform › Storage and current page RFCs
       await expect(crumbs.getByRole('button')).toHaveText([
         uniworkFoldersEn.ufRoot,
         'Platform',
         'Storage',
-        'RFCs',
       ])
+      await expect(crumbs.getByText('RFCs', { exact: true })).toHaveAttribute(
+        'aria-current',
+        'page',
+      )
 
       // Click `Platform` in the breadcrumb to jump back to level 1
       await crumbs.getByRole('button', { name: 'Platform', exact: true }).click()
-      await expect(crumbs.getByRole('button', { name: 'Platform', exact: true })).toHaveAttribute(
+      await expect(crumbs.getByText('Platform', { exact: true })).toHaveAttribute(
         'aria-current',
         'page',
       )
@@ -411,9 +415,10 @@ test.describe.serial('UniWork folders (FD-11)', () => {
 
       // Click `UniWork` in the breadcrumb to return to the workspace root
       await crumbs.getByRole('button', { name: uniworkFoldersEn.ufRoot, exact: true }).click()
-      await expect(
-        crumbs.getByRole('button', { name: uniworkFoldersEn.ufRoot, exact: true }),
-      ).toHaveAttribute('aria-current', 'page')
+      await expect(crumbs.getByText(uniworkFoldersEn.ufRoot, { exact: true })).toHaveAttribute(
+        'aria-current',
+        'page',
+      )
       await expect(contents.getByRole('option', { name: /^Platform/ })).toBeVisible()
       await shell.screenshot({ path: screenshotPath('uniwork-folders-breadcrumbs') })
     })
@@ -449,7 +454,7 @@ test.describe.serial('UniWork folders (FD-11)', () => {
 
       // Open `Finance` before searching so we can verify `Escape` returns to `Finance`
       await contents.getByRole('option', { name: /^Finance/ }).dblclick()
-      await expect(crumbs.getByRole('button', { name: 'Finance', exact: true })).toHaveAttribute(
+      await expect(crumbs.getByText('Finance', { exact: true })).toHaveAttribute(
         'aria-current',
         'page',
       )
@@ -501,7 +506,7 @@ test.describe.serial('UniWork folders (FD-11)', () => {
       // Pressing Escape in the search box clears search and returns to `Finance`
       await searchBox.press('Escape')
       await expect(filterGroup).toBeHidden()
-      await expect(crumbs.getByRole('button', { name: 'Finance', exact: true })).toHaveAttribute(
+      await expect(crumbs.getByText('Finance', { exact: true })).toHaveAttribute(
         'aria-current',
         'page',
       )
