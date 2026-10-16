@@ -52,7 +52,9 @@ export interface AgentLoopEvents<TSnapshot> {
   onRunStart?(runId: string): void
   /** the run is over: fires exactly once per onRunStart, after the last tool ran and before onDone/onError;
    *  also on abort, error, turn limit and a thrown transport; mutated = some tool of THIS run mutated the artifact
-   *  (or was cut off by a stop: its effect is unknown, an empty undo group is the cheaper mistake) */
+   *  (or was cut off by a stop, or was still executing when the run was dropped: its effect is unknown, an
+   *  empty undo group is the cheaper mistake). A run started from inside this hook gets its onRunStart before
+   *  this run's terminal onDone/onError, so key UI on the hook order, not on onDone */
   onRunEnd?(runId: string, end: AgentRunEnd): void
   onDone?(result: AgentRunResult): void
   onError?(error: string): void
@@ -499,7 +501,8 @@ export class AgentLoop<TSnapshot = unknown> {
   /** Finalizing turn after hitting the turn limit: no tools, let the model answer from what it has read */
   private finalizing = false
   private mutationSeen = false
-  /** a stop cut a tool off this run: its effect is unknown, so the run counts as mutated for onRunEnd */
+  /** a tool of this run was cut off (a stop, or the run was dropped while the tool executed):
+   *  its effect is unknown, so the run counts as mutated for onRunEnd */
   private toolCutOff = false
   private inputParseFails = 0
   /** signature (text + tool calls) of the previous turn, for the identical-turn guard */
@@ -1263,6 +1266,11 @@ export class AgentLoop<TSnapshot = unknown> {
       executedInTurn = true
       events?.onToolStart?.(call)
       const snapshot = !this.mutationSeen ? captureSnapshot?.() : undefined
+      // Until it returns, this tool's effect is unknown. reset() lands right here
+      // (its generation bump discards the tool's own result below), and closing the
+      // run must still say may-have-mutated, or a half-applied edit is left with no
+      // undo entry. The tool's real result replaces this mark once it returns.
+      this.toolCutOff = true
       let raced: ToolExecution | typeof TOOL_ABORTED
       try {
         raced = await awaitToolOrAbort(
@@ -1277,6 +1285,8 @@ export class AgentLoop<TSnapshot = unknown> {
         }
       }
       if (generation !== this.generation) return // reset while a tool was running
+      // the tool returned: its effect is known again (a cut-off result re-marks it below)
+      if (raced !== TOOL_ABORTED) this.toolCutOff = false
       if (raced === TOOL_ABORTED) {
         const aborted: ToolExecution = {
           output: TOOL_ABORTED_OUTPUT,
