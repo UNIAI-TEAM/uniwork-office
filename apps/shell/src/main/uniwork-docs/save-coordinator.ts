@@ -530,7 +530,7 @@ export class SaveCoordinator {
           record: pending.intent,
           payload: pending.payload,
         })
-        await intents.delete(doc.key)
+        await this.cleanupIntent(intents, doc, pending.intent)
       }
       this.pendingNext.delete(doc.path)
       this.activeSizeWarns.delete(doc.path)
@@ -552,7 +552,6 @@ export class SaveCoordinator {
 
     if (bytes.byteLength >= limits.warn_bytes) {
       if (!this.warnedDocs.has(doc.key)) {
-        this.warnedDocs.add(doc.key)
         this.activeSizeWarns.set(doc.path, {
           sizeBytes: bytes.byteLength,
           maxBytes: limits.max_bytes,
@@ -596,6 +595,7 @@ export class SaveCoordinator {
         minted.state = state
         const written = await intents.put(doc.key, minted, bytes)
         if (written.kind === 'store_full') {
+          this.activeSizeWarns.delete(doc.path)
           const refused = await this.commitState(doc, {
             ...doc.binding,
             state: 'error',
@@ -605,6 +605,7 @@ export class SaveCoordinator {
         }
         if (written.kind === 'interrupted') {
           // the account boundary wiped the scope under this save
+          this.activeSizeWarns.delete(doc.path)
           return await this.commitState(doc, {
             ...doc.binding,
             state: 'signed-out',
@@ -612,6 +613,7 @@ export class SaveCoordinator {
           })
         }
         if (written.kind !== 'ok') {
+          this.activeSizeWarns.delete(doc.path)
           return await this.commitState(doc, {
             ...doc.binding,
             state: 'error',
@@ -646,6 +648,7 @@ export class SaveCoordinator {
         // the sweep still owns this copy: no rewrite, no request, nothing sent
         if (!(await store.write(doc.dir, binding))) return doc
       } catch {
+        this.activeSizeWarns.delete(doc.path)
         return await this.commitState(doc, {
           ...doc.binding,
           state: 'error',
@@ -1146,6 +1149,7 @@ export class SaveCoordinator {
       written = true
     }
     if (!written) {
+      this.activeSizeWarns.delete(doc.path)
       this.publish(doc)
       return doc
     }
@@ -1156,7 +1160,10 @@ export class SaveCoordinator {
   private publish(doc: BoundDocument): void {
     const status = toStatus(doc, this.pendingNext.has(doc.path))
     const sizeWarn = this.activeSizeWarns.get(doc.path)
-    if (sizeWarn) status.sizeWarn = sizeWarn
+    if (sizeWarn) {
+      status.sizeWarn = sizeWarn
+      this.warnedDocs.add(doc.key)
+    }
     if (this.activeTooLargePrompt.has(doc.path)) status.saveTooLargePrompt = true
     this.deps.publish(status)
   }

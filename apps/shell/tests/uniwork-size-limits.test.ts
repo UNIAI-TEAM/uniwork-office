@@ -760,7 +760,9 @@ describe('SIZE-F1 desktop document size limits', () => {
 
       /** the store's records, in the `{intent, payload}` shape `IntentStore.read` returns */
       const stored = new Map<string, { intent: IntentRecordV2; payload: Uint8Array }>()
+      let putResult: 'ok' | 'store_full' | 'interrupted' = 'ok'
       const put = vi.fn(async (key: string, intent: IntentRecordV2, payload: Uint8Array) => {
+        if (putResult !== 'ok') return { kind: putResult }
         stored.set(key, { intent, payload })
         return { kind: 'ok' as const }
       })
@@ -781,6 +783,14 @@ describe('SIZE-F1 desktop document size limits', () => {
       }
       const supersede = vi.fn(async () => 'cancelled' as const)
       const statuses: UniworkDocStatus[] = []
+      let allowStoreWrite = true
+      const storeWrite = vi.fn(async (writtenDir: string, next: Binding) => {
+        if (!allowStoreWrite) return false
+        for (const [path, doc] of docs) {
+          if (doc.dir === writtenDir) docs.set(path, { ...doc, binding: next })
+        }
+        return true
+      })
 
       const deps: SaveCoordinatorDeps = {
         store: {
@@ -789,12 +799,7 @@ describe('SIZE-F1 desktop document size limits', () => {
               ? { kind: 'bound' as const, doc: docs.get(path)! }
               : { kind: 'plain' as const },
           lookup: (path: string) => docs.get(path) ?? null,
-          write: async (writtenDir: string, next: Binding) => {
-            for (const [path, doc] of docs) {
-              if (doc.dir === writtenDir) docs.set(path, { ...doc, binding: next })
-            }
-            return true
-          },
+          write: storeWrite,
         } as never,
         client: {
           upload: async (input) => ({
@@ -832,6 +837,13 @@ describe('SIZE-F1 desktop document size limits', () => {
         supersede,
         statuses,
         stored,
+        storeWrite,
+        setPutResult: (next: 'ok' | 'store_full' | 'interrupted') => {
+          putResult = next
+        },
+        setAllowStoreWrite: (next: boolean) => {
+          allowStoreWrite = next
+        },
       }
     }
 
@@ -922,6 +934,115 @@ describe('SIZE-F1 desktop document size limits', () => {
       writeFileSync(h.docPath, new Uint8Array(920).fill(69))
       await h.coordinator.save(h.docPath)
       expect(warnPayloads()).toContainEqual({ sizeBytes: 920, maxBytes: 1000 })
+    })
+
+    it('does not consume the warn latch on an unpublished userSave or store refusal, and guards supersede cleanup by generation (d1-5)', async () => {
+      const h = harness(OVER)
+      const warnPayloads = (): Array<{ sizeBytes: number; maxBytes: number } | undefined> =>
+        h.statuses.filter((push) => push.sizeWarn).map((push) => push.sizeWarn)
+
+      // 1. A userSave with a pending intent whose checksum matches the working copy
+      //    returns through requestPopover without publishing a status: latch must NOT be consumed
+      const warnBytes1 = new Uint8Array(940).fill(70)
+      writeFileSync(h.docPath, warnBytes1)
+      h.stored.set(DOC_ID, {
+        intent: {
+          v: 2,
+          intentId: 'pend_1',
+          idempotencyKey: 'key_1',
+          documentId: DOC_ID,
+          orgId: ORG_ID,
+          workspaceId: WS_ID,
+          baseRevision: '10',
+          baseVersion: 1,
+          checksum: sha256Hex(warnBytes1),
+          length: warnBytes1.byteLength,
+          generation: 1,
+          state: 'paused_user',
+          attempt: 0,
+          createdAt: ISO,
+          updatedAt: ISO,
+        },
+        payload: warnBytes1,
+      })
+      await h.coordinator.save(h.docPath, { userSave: true })
+      expect(h.statuses).toHaveLength(0)
+
+      // 2. Clear the pending intent and simulate store_full on the next warn-band save:
+      //    error status is published without sizeWarn and latch is still NOT consumed
+      h.stored.delete(DOC_ID)
+      h.setPutResult('store_full')
+      await h.coordinator.save(h.docPath)
+      expect(warnPayloads()).toHaveLength(0)
+
+      // 3. Simulate store.write refusal (sweep holds the copy): no status published, latch NOT consumed
+      h.setPutResult('ok')
+      h.stored.delete(DOC_ID)
+      h.setAllowStoreWrite(false)
+      await h.coordinator.save(h.docPath)
+      expect(warnPayloads()).toHaveLength(0)
+
+      // 4. Now allow the save to proceed in the 90..100% band: sizeWarn IS published!
+      h.stored.delete(DOC_ID)
+      h.setAllowStoreWrite(true)
+      const warnBytes2 = new Uint8Array(955).fill(71)
+      writeFileSync(h.docPath, warnBytes2)
+      const saved = await h.coordinator.save(h.docPath)
+      expect(saved!.binding.state).toBe('saved')
+      expect(warnPayloads()).toContainEqual({ sizeBytes: 955, maxBytes: 1000 })
+
+      // 5. Over-cap supersede uses generation-checked cleanupIntent: if a newer generation
+      //    record is installed while supersede runs, cleanupIntent preserves the newer record
+      const olderPayload = enc('older-gen-2')
+      h.stored.set(DOC_ID, {
+        intent: {
+          v: 2,
+          intentId: 'old_gen_2',
+          idempotencyKey: 'key_gen_2',
+          documentId: DOC_ID,
+          orgId: ORG_ID,
+          workspaceId: WS_ID,
+          baseRevision: '10',
+          baseVersion: 1,
+          checksum: sha256Hex(olderPayload),
+          length: olderPayload.byteLength,
+          generation: 2,
+          state: 'queued',
+          attempt: 0,
+          createdAt: ISO,
+          updatedAt: ISO,
+        },
+        payload: olderPayload,
+      })
+      const newerPayload = enc('newer-gen-3')
+      h.supersede.mockImplementationOnce(async () => {
+        h.stored.set(DOC_ID, {
+          intent: {
+            v: 2,
+            intentId: 'new_gen_3',
+            idempotencyKey: 'key_gen_3',
+            documentId: DOC_ID,
+            orgId: ORG_ID,
+            workspaceId: WS_ID,
+            baseRevision: '10',
+            baseVersion: 1,
+            checksum: sha256Hex(newerPayload),
+            length: newerPayload.byteLength,
+            generation: 3,
+            state: 'queued',
+            attempt: 0,
+            createdAt: ISO,
+            updatedAt: ISO,
+          },
+          payload: newerPayload,
+        })
+        return 'cancelled' as const
+      })
+      writeFileSync(h.docPath, new Uint8Array(1050).fill(72))
+      await h.coordinator.save(h.docPath)
+      expect(h.supersede).toHaveBeenCalledTimes(1)
+      expect(h.stored.get(DOC_ID)?.intent.intentId).toBe('new_gen_3')
+      expect(h.stored.get(DOC_ID)?.intent.generation).toBe(3)
     })
   })
 
