@@ -64,10 +64,30 @@
  *   module:<spec>               an import specifier that does not resolve to a
  *                               file in the repo at this rev
  *   member:<name>               property access on a resolved value that lacks it
- *   call:<name>                 a method the evaluator does not implement
+ *   call:<name>                 a method the evaluator does not implement, or a
+ *                               parameterised local arrow called outside its
+ *                               bounded shape (see below)
  *   operator                    an operator outside the supported subset
  *   computed-key                a computed `[expr]` object key
  *   method                      an object method shorthand (`f() {}`)
+ *
+ * ── parameterised local arrows ───────────────────────────────────────────────
+ * A same-file `const f = (p) => ({ ... })` — one plain identifier parameter (a
+ * `: type` annotation is allowed), a parenthesised object-literal body — is
+ * folded at its call site when that call passes exactly one resolved integer
+ * argument inside ±32: `p` is bound to it, and inside the body the evaluator
+ * additionally folds integer `+`/`-`, one comparison (`>`, `<`, `>=`, `<=`,
+ * `===`, `==`, `!==`, `!=`) and a `cond ? a : b` that evaluates only the branch
+ * it takes — so the self-call sitting in the dead branch of a
+ * `depth > 0 ? ... : ...` base case cannot recurse.
+ * `apps/{docs,markdown}/src/renderer/ai/mind-map.ts` builds its tree schema that
+ * way from `MIND_MAP_LIMITS.maxDepth`, and no other tool does. Everything
+ * outside the rule is refused, never guessed: a declaration of another shape
+ * keeps its previous cell (`identifier:<inner>`), a self-call that does not come
+ * down is `recursion` (the arrow may be applied 32 times, the body of each
+ * application parsed with its own depth budget), and an argument that is not one
+ * resolved integer inside the bound is `call:<name>`. The extra folds are only
+ * reachable from an arrow body (`ctx.arrow`), so no other row can move.
  *
  * ── editor_write ─────────────────────────────────────────────────────────────
  * `yes` / `no` / `undeclared`, from declarations in the module's own sources
@@ -463,12 +483,16 @@ const partialText = (v) =>
         : null
 const isU = (v) =>
   !!v && typeof v === 'object' && !Array.isArray(v) && typeof v.__unresolved === 'string'
-const isPlainObject = (v) => !!v && typeof v === 'object' && !Array.isArray(v) && !isU(v)
+/** a parameterised local arrow held as its call target, never as a value */
+const isArrowFn = (v) => !!v && typeof v === 'object' && v.__arrowFn === true
+const isPlainObject = (v) =>
+  !!v && typeof v === 'object' && !Array.isArray(v) && !isU(v) && !isArrowFn(v)
 
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0)
 
 function findUnresolved(value) {
   if (isU(value)) return value.__unresolved
+  if (isArrowFn(value)) return `call:${value.name}`
   if (Array.isArray(value)) {
     for (const v of value) {
       const r = findUnresolved(v)
@@ -503,6 +527,7 @@ function parseExpression(tokens, i, scope, depth = 0) {
   if (depth > 24) return { value: U('recursion'), i }
   const primary = parsePrimary(tokens, i, scope, depth)
   const left = parsePostfix(primary.value, tokens, primary.i, scope, depth)
+  if (scope.ctx && scope.ctx.arrow) return parseArrowTail(left, tokens, scope, depth)
   return scope.ctx && scope.ctx.strict ? parseAddition(left, tokens, scope, depth) : left
 }
 
@@ -563,6 +588,116 @@ function strictElement(tokens, r, closer, scope) {
   }
   const operator = next.type === 'punct' ? next.value : next.type
   return { value: isU(r.value) ? r.value : U(`operator:${operator}`), i: idx }
+}
+
+/** comparison operators the arrow-body fold understands (numbers, strings, booleans) */
+const ARROW_COMPARE = {
+  '>': (a, b) => a > b,
+  '<': (a, b) => a < b,
+  '>=': (a, b) => a >= b,
+  '<=': (a, b) => a <= b,
+  '===': (a, b) => a === b,
+  '==': (a, b) => a === b,
+  '!==': (a, b) => a !== b,
+  '!=': (a, b) => a !== b,
+}
+
+/**
+ * The folds a parameterised arrow body needs (`scope.ctx.arrow`) and the table's
+ * evaluator deliberately does not have, so no other row can move: `+`/`-` on
+ * numbers, one comparison, and a `cond ? a : b` that evaluates only the branch it
+ * takes — the self-call in the dead branch of a base case must not recurse.
+ * Anything else is left to the caller, which reports it unresolved.
+ */
+function parseArrowTail(left, tokens, scope, depth) {
+  let cur = parseAddition(left, tokens, scope, depth)
+  for (;;) {
+    const op = tokens[cur.i]
+    if (!op || op.type !== 'punct' || op.value !== '-')
+      return parseArrowCompare(cur, tokens, scope, depth)
+    const primary = parsePrimary(tokens, cur.i + 1, scope, depth)
+    const right = parsePostfix(primary.value, tokens, primary.i, scope, depth)
+    if (typeof cur.value !== 'number' || typeof right.value !== 'number')
+      return { value: isU(cur.value) ? cur.value : U('operator'), i: cur.i }
+    cur = { value: cur.value - right.value, i: right.i }
+  }
+}
+
+function parseArrowCompare(cur, tokens, scope, depth) {
+  const op = tokens[cur.i]
+  if (!op || op.type !== 'punct' || !Object.prototype.hasOwnProperty.call(ARROW_COMPARE, op.value))
+    return parseArrowTernary(cur, tokens, scope, depth)
+  const primary = parsePrimary(tokens, cur.i + 1, scope, depth)
+  const right = parsePostfix(primary.value, tokens, primary.i, scope, depth)
+  const a = cur.value
+  const b = right.value
+  if (isU(a)) return parseArrowTernary({ value: a, i: cur.i }, tokens, scope, depth)
+  if (isU(b)) return parseArrowTernary({ value: b, i: cur.i }, tokens, scope, depth)
+  const kind = typeof a
+  if ((kind === 'number' || kind === 'string' || kind === 'boolean') && typeof b === kind)
+    // the comparison is the condition of the ternary that may follow it (`depth > 0 ? a : b`)
+    return parseArrowTernary(
+      { value: ARROW_COMPARE[op.value](a, b), i: right.i },
+      tokens,
+      scope,
+      depth,
+    )
+  return { value: U('operator'), i: cur.i }
+}
+
+function parseArrowTernary(cur, tokens, scope, depth) {
+  const q = tokens[cur.i]
+  if (!q || q.type !== 'punct' || q.value !== '?') return cur
+  if (typeof cur.value !== 'boolean') return { value: U('operator'), i: cur.i }
+  const colon = arrowTernaryColon(tokens, cur.i)
+  if (colon < 0) return { value: U('operator'), i: cur.i }
+  // the branch that is not taken is skipped structurally, never evaluated
+  const end = skipValueAt(tokens, colon + 1)
+  const branch = parseExpression(tokens, cur.value ? cur.i + 1 : colon + 1, scope, depth + 1)
+  return { value: branch.value, i: end }
+}
+
+/** index of the `:` matching the `?` at `qIdx`, nesting and nested ternaries counted */
+function arrowTernaryColon(tokens, qIdx) {
+  let nest = 0
+  let inner = 0
+  let idx = qIdx + 1
+  while (idx < tokens.length) {
+    const tk = tokens[idx]
+    if (tk.type === 'punct') {
+      const v = tk.value
+      if (v === '(' || v === '[' || v === '{') nest += 1
+      else if (v === ')' || v === ']' || v === '}') {
+        if (nest === 0) break
+        nest -= 1
+      } else if (nest === 0 && v === '?') inner += 1
+      else if (nest === 0 && v === ':') {
+        if (inner === 0) return idx
+        inner -= 1
+      }
+    }
+    idx += 1
+  }
+  return -1
+}
+
+/** index just past the value starting at `from`: the `,` or closing bracket at level 0 */
+function skipValueAt(tokens, from) {
+  let nest = 0
+  let idx = from
+  while (idx < tokens.length) {
+    const tk = tokens[idx]
+    if (tk.type === 'punct') {
+      const v = tk.value
+      if (v === '(' || v === '[' || v === '{') nest += 1
+      else if (v === ')' || v === ']' || v === '}') {
+        if (nest === 0) break
+        nest -= 1
+      } else if (v === ',' && nest === 0) break
+    }
+    idx += 1
+  }
+  return idx
 }
 
 function parsePrimary(tokens, i, scope, depth) {
@@ -684,6 +819,7 @@ function skipType(tokens, i) {
 
 function memberOf(value, key) {
   if (isU(value)) return value
+  if (isArrowFn(value)) return U(`member:${key}`)
   if (key === 'length' && (Array.isArray(value) || typeof value === 'string')) return value.length
   if (isPlainObject(value) && Object.prototype.hasOwnProperty.call(value, key)) return value[key]
   return U(`member:${key}`)
@@ -751,6 +887,7 @@ function skipArgument(tokens, i) {
 }
 
 function applyCall(callee, name, args, tokens, openParen, scope, depth) {
+  if (isArrowFn(callee)) return applyArrowFn(callee, args, scope)
   if (isU(callee)) return callee
   if (name === 'join') {
     if (!Array.isArray(callee)) return U('call:join')
@@ -997,6 +1134,13 @@ function resolveName(name, tokens, at, scope, depth) {
     return { value: scope.bindings.get(name), i: at + 1 }
   const local = scope.locals.get(name)
   if (local !== undefined) {
+    // a parameterised arrow is resolved only where it is called; used as a value it
+    // keeps the cell it had before (`identifier:<inner>`)
+    const next = tokens[at + 1]
+    if (next && next.type === 'punct' && next.value === '(') {
+      const fn = readArrowFn(local)
+      if (fn) return { value: fn, i: at + 1 }
+    }
     const r = parseExpression(local.tokens, local.index, scope, depth + 1)
     return { value: r.value, i: at + 1 }
   }
@@ -1156,6 +1300,71 @@ function scanFile(path, src, ctx) {
     }
   }
   return { path, src, tokens, locals, imports, exports, functions }
+}
+
+/**
+ * The bounded declaration shape the extractor folds at a call site:
+ * `const f = (p) => ({ ... })` — exactly one plain identifier parameter (a `: type`
+ * annotation after it is skipped), then a *parenthesised* object-literal body.
+ * Anything else returns null and the call keeps the cell it had before: two or
+ * more parameters, a default, a destructured parameter, a `=> {` block body (the
+ * brace is the block, not an object), or a body that is not an object literal.
+ */
+function readArrowFn(local) {
+  const tokens = local.tokens
+  let idx = local.index
+  if (!(tokens[idx] && tokens[idx].value === '(')) return null
+  idx += 1
+  const param = tokens[idx]
+  if (!param || param.type !== 'ident') return null
+  idx += 1
+  if (tokens[idx] && tokens[idx].value === ':') idx = skipType(tokens, idx + 1)
+  if (!(tokens[idx] && tokens[idx].value === ')')) return null
+  idx += 1
+  if (tokens[idx] && tokens[idx].value === ':') idx = skipType(tokens, idx + 1)
+  if (!(tokens[idx] && tokens[idx].value === '=>')) return null
+  idx += 1
+  if (!(tokens[idx] && tokens[idx].value === '(')) return null
+  if (!(tokens[idx + 1] && tokens[idx + 1].value === '{')) return null
+  return { __arrowFn: true, name: local.name, param: param.value, tokens, bodyOpen: idx + 1 }
+}
+
+/** how often one parameterised arrow may be applied: a self-call must come down */
+const MAX_ARROW_DEPTH = 32
+
+/**
+ * Applies a parameterised arrow to the one integer argument its call passed: bind
+ * the parameter and the arrow's own name (for the self-call), parse the body with
+ * a fresh depth budget — the arrow's recursion is bounded by `MAX_ARROW_DEPTH`,
+ * not by the global cap — and hand the object literal back. The `strict` and
+ * `arrow` flags live on the shared ctx and are restored, as `strictValue` does.
+ */
+function applyArrowFn(fn, args, scope) {
+  const ctx = scope.ctx
+  const used = ctx && ctx.arrow ? ctx.arrow.depth : 0
+  if (used >= MAX_ARROW_DEPTH) return U('recursion')
+  if (!ctx) return U(`call:${fn.name}`)
+  const arg = args.length === 1 ? args[0] : undefined
+  if (typeof arg !== 'number' || !Number.isInteger(arg) || Math.abs(arg) > MAX_ARROW_DEPTH)
+    return U(`call:${fn.name}`)
+  const bound = new Map(scope.bindings)
+  bound.set(fn.param, arg)
+  bound.set(fn.name, fn)
+  const prevStrict = ctx.strict
+  const prevArrow = ctx.arrow
+  ctx.strict = true
+  ctx.arrow = { depth: used + 1 }
+  let r
+  try {
+    r = parseExpression(fn.tokens, fn.bodyOpen, { ...scope, bindings: bound }, 0)
+  } finally {
+    ctx.strict = prevStrict
+    ctx.arrow = prevArrow
+  }
+  if (isU(r.value)) return r.value
+  if (!isPlainObject(r.value)) return U(`call:${fn.name}`)
+  const bad = findUnresolved(r.value)
+  return bad ? U(bad) : r.value
 }
 
 /** index just past a `<...>` group starting at openIdx (generic args / type params) */
