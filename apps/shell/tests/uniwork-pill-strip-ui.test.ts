@@ -1763,7 +1763,7 @@ describe('SIZE-v1-4: the warn chip shrinks via --uw-warn-max before the save pil
     expect(visibleLabel()).toBe('Có thay đổi chưa lưu')
     const warnMax = Number.parseFloat(warnChip!.style.getPropertyValue('--uw-warn-max'))
     expect(Number.isFinite(warnMax)).toBe(true)
-    expect(warnMax).toBeLessThanOrEqual(240)
+    expect(warnMax).toBeLessThanOrEqual(340)
     expect(warnMax).toBeGreaterThanOrEqual(88)
     expect(strip.getBoundingClientRect().right).toBeLessThanOrEqual(
       chrome.getBoundingClientRect().left,

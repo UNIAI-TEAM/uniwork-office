@@ -1204,10 +1204,10 @@ describe('VTS1-01: the pill steps hold back the old caption over-reservation at 
 })
 
 describe('SIZE-v1-4: the warn chip shrinks/caps in the pill-fit budget before the save pill degrades', () => {
-  it('warnChipMaxOf caps at 240px and shrinks down to WARN_CHIP_MIN_PX before the save pill steps down', () => {
-    expect(WARN_CHIP_MAX_PX).toBe(240)
+  it('warnChipMaxOf caps at 340px and shrinks down to WARN_CHIP_MIN_PX before the save pill steps down', () => {
+    expect(WARN_CHIP_MAX_PX).toBe(340)
     expect(WARN_CHIP_MIN_PX).toBe(88)
-    expect(warnChipMaxOf({ room: 600, pillWidth: 150, scale: 1 })).toBe(240)
+    expect(warnChipMaxOf({ room: 600, pillWidth: 150, scale: 1 })).toBe(340)
     // vi-dark-s125 at 1280px: 402.5 win px shared by the 189 win px full pill and the warn chip -> 170 CSS px
     expect(warnChipMaxOf({ room: 402.5, pillWidth: 189, scale: 1.25 })).toBe(170)
     // tight room floors at WARN_CHIP_MIN_PX
@@ -1246,10 +1246,10 @@ describe('SIZE-v1-4: the warn chip shrinks/caps in the pill-fit budget before th
     expect(withWarn.strip.right).toBeLessThanOrEqual(withWarn.chrome.left)
   })
 
-  it('tabbar.css caps .uw-size-warn at var(--uw-warn-max, 240px)', () => {
+  it('tabbar.css caps .uw-size-warn at var(--uw-warn-max, 340px)', () => {
     const css = readFileSync(resolve(__dirname, '../src/renderer/src/tabbar.css'), 'utf8')
     const match = /\.uw-size-warn\s*\{([^}]*)\}/.exec(css)
     expect(match).not.toBeNull()
-    expect(match![1]).toMatch(/max-width:\s*var\(--uw-warn-max,\s*240px\)/)
+    expect(match![1]).toMatch(/max-width:\s*var\(--uw-warn-max,\s*340px\)/)
   })
 })

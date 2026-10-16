@@ -216,13 +216,13 @@ export function pillFitStepOf(input: PillFitStepInput): PillFitStep {
 }
 
 /** the warn chip's cap in CSS px: a wide bar never gives the non-urgent size heads-up more than this */
-export const WARN_CHIP_MAX_PX = 240
+export const WARN_CHIP_MAX_PX = 340
 /** the warn chip shrinks and ellipsizes down to this minimum (CSS px) before the save pill steps down */
 export const WARN_CHIP_MIN_PX = 88
 
 /**
  * The width (in unscaled CSS px) the `.uw-size-warn` chip may take beside the save pill:
- * capped at `WARN_CHIP_MAX_PX` (240px), shrinking down to `WARN_CHIP_MIN_PX` (88px) to leave
+ * capped at `WARN_CHIP_MAX_PX` (340px), shrinking down to `WARN_CHIP_MIN_PX` (88px) to leave
  * the save pill its chosen variant before the save pill ever steps down.
  */
 export function warnChipMaxOf(input: {
