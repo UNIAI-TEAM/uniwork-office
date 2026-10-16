@@ -3291,8 +3291,10 @@ export class UniworkDocsService {
   }
 
   /**
-   * Upload one local file as a UniWork document. Main stats the file first (a
-   * pick past the server's 50 MiB stage limit is refused unread with
+   * Upload one local file as a UniWork document. Main resolves the file name's
+   * extension first (`unsupported_format` before any read when the formats table
+   * does not know it - the picker's filter alone is not a contract), stats the
+   * file (a pick past the server's 50 MiB stage limit is refused unread with
    * `too_large`), reads the bytes and sends them as the multipart `file` part
    * while reporting progress; the title is the file name (the server's own
    * default). Nothing is written locally: the working copy is the download the
@@ -3311,6 +3313,12 @@ export class UniworkDocsService {
       if (typeof input.path !== 'string' || !input.path) throw new UniworkDocError('not_found')
       const filename = basename(input.path)
       if (!filename) throw new UniworkDocError('not_found')
+      // R1-1: the picker's native filter is not a contract - a typed path or a
+      // direct IPC call reaches here with any basename. A document whose
+      // extension the formats table does not resolve could never be opened
+      // afterwards (formatForName is the same authority the open flow uses), so
+      // it is refused before the stat, the read and the POST.
+      if (!formatForName(filename)) throw new UniworkDocError('unsupported_format')
       // the controller is registered before the first await: a Cancel that lands
       // while the file is still being stat'ed finds the upload and is never
       // dropped (R2-1)

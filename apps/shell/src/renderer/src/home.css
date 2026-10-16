@@ -6270,6 +6270,13 @@ html[dir='rtl'] .quick-title-row {
   font-size: 12px;
 }
 
+.uw-pick-hidden {
+  margin: 10px 8px 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
 .uw-pick-skeleton {
   padding-top: 10px;
 }

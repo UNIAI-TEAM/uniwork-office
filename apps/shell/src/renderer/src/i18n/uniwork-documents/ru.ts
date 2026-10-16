@@ -27,7 +27,7 @@ export const ru = {
   uwPickNoWorkspaces: 'У вас пока нет рабочих пространств.',
   uwPickNoWorkspacesHint:
     'Сначала создайте рабочее пространство или присоединитесь к нему в UniWork.',
-  uwPickUnsupported: 'Не поддерживается в UniWork Office',
+  uwPickHiddenFormats: 'Скрыто, так как UniWork Office не открывает их формат: {count}',
   uwPickOpening: 'Открываем “{title}”…',
 
   uwErrNotSignedIn: 'Войдите в UniWork, чтобы продолжить.',

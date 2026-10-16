@@ -20,6 +20,9 @@ const BY_EXTENSION: Record<string, UniworkDocFormat> = {
   htm: 'html',
 }
 
+/** every extension the table resolves: the upload picker offers exactly these */
+export const UPLOAD_EXTENSIONS: readonly string[] = Object.keys(BY_EXTENSION)
+
 const MIME: Record<UniworkDocFormat, string> = {
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -35,7 +38,7 @@ const BY_MIME: Record<string, UniworkDocFormat> = Object.fromEntries(
 
 export function formatForName(name: string): UniworkDocFormat | null {
   const ext = extname(name.trim()).slice(1).toLowerCase()
-  return BY_EXTENSION[ext] ?? null
+  return Object.hasOwn(BY_EXTENSION, ext) ? BY_EXTENSION[ext] : null
 }
 
 export function formatForMime(mime: string): UniworkDocFormat | null {

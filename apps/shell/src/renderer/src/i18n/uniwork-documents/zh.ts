@@ -25,7 +25,7 @@ export const zh = {
   uwPickNoResults: '没有与“{query}”匹配的文档。',
   uwPickNoWorkspaces: '你还没有任何工作区。',
   uwPickNoWorkspacesHint: '请先在 UniWork 中创建或加入一个工作区。',
-  uwPickUnsupported: 'UniWork Office 不支持此类型',
+  uwPickHiddenFormats: '已隐藏（UniWork Office 无法打开这些格式）：{count}',
   uwPickOpening: '正在打开“{title}”…',
 
   uwErrNotSignedIn: '请先登录 UniWork。',

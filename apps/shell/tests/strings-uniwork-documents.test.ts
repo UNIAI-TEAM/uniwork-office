@@ -124,10 +124,30 @@ describe('uniwork documents string shards', () => {
     expect(uniworkDocumentStrings.vi.uwChipSaved).toBe('Đã lưu vào UniWork')
     expect(uniworkDocumentStrings.en.uwChipViewOnly).toBe('View only')
     expect(uniworkDocumentStrings.vi.uwChipViewOnly).toBe('Chỉ xem')
-    expect(uniworkDocumentStrings.en.uwPickUnsupported).toBe('Not supported in UniWork Office')
+    expect(uniworkDocumentStrings.en.uwPickHiddenFormats).toBe(
+      'Hidden because UniWork Office cannot open their format: {count}',
+    )
+    expect(uniworkDocumentStrings.vi.uwPickHiddenFormats).toBe(
+      'Đã ẩn vì UniWork Office chưa mở được định dạng: {count}',
+    )
     expect(uniworkDocumentStrings.en.uwErrTicketExpired).toBe(
       'This link expired. Open the document again from UniWork.',
     )
+  })
+
+  it('FD-14: the unsupported-row label is gone and the hidden-count line exists everywhere', () => {
+    expect(referenceKeys).not.toContain('uwPickUnsupported')
+    expect(referenceKeys).toContain('uwPickHiddenFormats')
+    for (const lang of LANGS) {
+      const line = table(lang).uwPickHiddenFormats!
+      expect(line).toContain('{count}')
+      expect(line).toContain('UniWork Office')
+      expect(table(lang)).not.toHaveProperty('uwPickUnsupported')
+    }
+    // a real translation, not an English copy
+    for (const lang of LANGS.filter((l) => l !== 'en')) {
+      expect(table(lang).uwPickHiddenFormats).not.toBe(table('en').uwPickHiddenFormats)
+    }
   })
 
   it.each([...LANGS])('locale %s has the S11 newer-store lock copy', (lang) => {
