@@ -129,7 +129,14 @@ export const SIZE_WARN_MARKER = 'size-warning'
 export interface SaveSizeGatePort {
   whenInitialized(): Promise<PortSession>
   request: FramePort['request']
-  emit?: FramePort['emit']
+  emit?: <K extends 'size_warning' | 'save_blocked'>(
+    type: K,
+    payload: K extends 'size_warning'
+      ? { bytes: number; max_bytes: number; warn_ratio: number }
+      : { bytes: number; max_bytes: number },
+  ) => void
+  reportSizeWarning?: FramePort['reportSizeWarning']
+  reportSaveBlocked?: FramePort['reportSaveBlocked']
   handleDownload?: FramePort['handleDownload']
   setDirty?: FramePort['setDirty']
 }
@@ -411,11 +418,13 @@ export function createSaveSizeGate(opts: SaveSizeGateOptions): SaveSizeGate {
       if (evaluation.band === 'warn') {
         if (!warnedNearLimit) {
           warnedNearLimit = true
-          port.emit?.('size_warning', {
+          const warnPayload = {
             bytes: evaluation.bytes,
             max_bytes: evaluation.maxBytes,
             warn_ratio: evaluation.warnRatio,
-          })
+          }
+          if (port.reportSizeWarning) port.reportSizeWarning(warnPayload)
+          else port.emit?.('size_warning', warnPayload)
           if (!hasHostSizeUi()) {
             showWarnChip(evaluation.bytes, currentLimits)
           }
@@ -426,10 +435,12 @@ export function createSaveSizeGate(opts: SaveSizeGateOptions): SaveSizeGate {
       // evaluation.band === 'block'
       const savedCopy = copyBuffer(data)
       blockedBytes = savedCopy
-      port.emit?.('save_blocked', {
+      const blockPayload = {
         bytes: evaluation.bytes,
         max_bytes: evaluation.maxBytes,
-      })
+      }
+      if (port.reportSaveBlocked) port.reportSaveBlocked(blockPayload)
+      else port.emit?.('save_blocked', blockPayload)
       port.setDirty?.(true, { force: true })
       if (opts.persistDraft) {
         try {
@@ -458,6 +469,10 @@ export function createSaveSizeGate(opts: SaveSizeGateOptions): SaveSizeGate {
 
     handleServerTooLarge(error, data) {
       const serverMax = error.details?.max_bytes
+      const hasExplicitLimit =
+        (typeof serverMax === 'number' && Number.isFinite(serverMax) && serverMax > 0) ||
+        limitsOverride !== null ||
+        session?.limits !== undefined
       if (typeof serverMax === 'number' && Number.isFinite(serverMax) && serverMax > 0) {
         const updated = resolveDocumentSizeLimits(
           { max_bytes: Math.floor(serverMax) },
@@ -473,15 +488,20 @@ export function createSaveSizeGate(opts: SaveSizeGateOptions): SaveSizeGate {
       const byteLength = data
         ? data.byteLength
         : (blockedBytes?.byteLength ?? currentLimits.max_bytes + 1)
-      port.emit?.('save_blocked', {
+      const blockPayload = {
         bytes: byteLength,
         max_bytes: currentLimits.max_bytes,
-      })
+      }
+      if (port.reportSaveBlocked) port.reportSaveBlocked(blockPayload)
+      else port.emit?.('save_blocked', blockPayload)
       port.setDirty?.(true, { force: true })
       if (!hasHostSizeUi()) {
         showBlockDialog(blockedBytes ?? new ArrayBuffer(0), currentLimits.max_bytes)
       }
       const locale = getLang()
+      if (!hasExplicitLimit) {
+        return webText(locale, 'webSaveTooLarge')
+      }
       const max = formatSizeMB(currentLimits.max_bytes, locale)
       return webText(locale, 'webSaveBlockBody', { max })
     },

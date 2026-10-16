@@ -83,6 +83,7 @@ import type { DraftHost, DraftRecovery } from '../../docs/bridge/draft-recovery'
 import { bridgeDraftRecovery, bridgeRecoveryGrant } from '../shared/recovery-prompt'
 import { createRemoteVersion, type RemoteVersion } from '../shared/remote-version'
 import { saveFailureText } from '../shared/save-failure'
+import { createSaveSizeGate } from '../shared/save-size-gate'
 import {
   conflictSaveResult,
   bridgeDownloadCap,
@@ -291,10 +292,24 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
     return path
   }
 
+  const sizeGate = createSaveSizeGate({
+    port,
+    getLiveBytes: async () => {
+      if (!doc) return null
+      const request = saveRequestProvider?.() ?? null
+      if (rendererDirty && request && owns(request.path)) {
+        return (await applyRequest(doc.bytes.slice(), request)).bytes
+      }
+      return doc.bytes
+    },
+    frame: { markerAttr: 'data-pdf-web' },
+  })
+
   async function openPayload(open: OpenPayload): Promise<string> {
     let bytes = await readSource(open.source)
     // another document: the pending version and the bar of the old one are gone
     if (doc && doc.file.fileId !== open.file.fileId) remote?.reset()
+    sizeGate.noteDocumentOpened(open.file.fileId, open.limits)
     // a new, still empty Documents file: start from the desktop's blank A4 page ("New PDF"),
     // which becomes the file's first version on the first save
     if (bytes.byteLength === 0) bytes = new Uint8Array(await (await deps.core()).blankPdfBuffer())
@@ -438,6 +453,8 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
         size: bytes.byteLength,
         maxBytes: downloadCap(),
       }),
+      sizeBytes: bytes.byteLength,
+      maxBytes: sizeGate.limits().max_bytes,
       markerAttr: 'data-pdf-web',
     })
     if (hostSave && doc) hostSave.answer = conflictSaveResult(outcome, { ...doc.file })
@@ -471,6 +488,11 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
 
   /** upload new bytes of the open document as its next version (If-Match = working copy etag) */
   async function putBytes(fileId: string, bytes: Uint8Array): Promise<{ ok: true } | Fail> {
+    const gate = await sizeGate.checkBeforeSave(bytes)
+    if (!gate.allowed) {
+      if (hostSave) hostSave.error = gate.error
+      return fail(gate.message)
+    }
     const etag = doc?.file.fileId === fileId ? doc.file.etag : undefined
     const data = copyBuffer(bytes)
     const res = await sendSave(() =>
@@ -485,6 +507,9 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
       return { ok: true }
     }
     if (hostSave) hostSave.error = res.error
+    if (res.error.code === 'too_large') {
+      return fail(sizeGate.handleServerTooLarge(res.error, bytes))
+    }
     remote?.saveFailed(res.error)
     if (res.error.code === 'conflict') {
       // the host's own `save` waits for the dialog's answer instead of an error event
@@ -539,6 +564,11 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
   ): Promise<SavePdfResult> {
     const pending = hostSaveAs
     pending?.started()
+    const gate = await sizeGate.checkBeforeSave(bytes)
+    if (!gate.allowed) {
+      pending?.settle({ ok: false, error: gate.error })
+      return fail(gate.message)
+    }
     const data = copyBuffer(bytes)
     const res = await sendSave(() =>
       port.request(
@@ -560,6 +590,9 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
     }
     // a cancelled host dialog wrote nothing: no error, like the desktop's cancelled dialog
     if (res.error.code === 'cancelled') return { ok: true }
+    if (res.error.code === 'too_large') {
+      return fail(sizeGate.handleServerTooLarge(res.error, bytes))
+    }
     remote?.saveFailed(res.error)
     return fail(saveFailureText(res.error, text))
   }

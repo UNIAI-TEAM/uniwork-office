@@ -37,6 +37,7 @@ import {
   type FrameDialogHandle,
 } from './frame-dialog'
 import { webText, type WebStringKey } from './i18n/strings-web'
+import { formatSizeMB } from './save-size-gate'
 
 /** the version on UniWork as far as the frame knows it */
 export interface ConflictHead {
@@ -121,6 +122,9 @@ export interface ConflictIo {
   markerAttr?: string
   maskClass?: string
   onChange?: () => void
+  /** SIZE-F1: byte size of the user's current version and active `limits.max_bytes` */
+  sizeBytes?: number
+  maxBytes?: number
 }
 
 export type ConflictOutcome =
@@ -317,13 +321,23 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
     })
   /** the code the host hears when the user closes after a failed Overwrite */
   let failure: ConflictOutcome | null = null
+  let activeMaxBytes = io.maxBytes
+  const sizeBytes = io.sizeBytes ?? io.download?.size
+  function tooLargeWithLimitAlert(limitBytes: number, actualBytes?: number): string {
+    const sz = actualBytes !== undefined && actualBytes > limitBytes ? actualBytes : limitBytes + 1
+    return t('uwConflictTooLargeWithLimit', {
+      size: formatSizeMB(sz, lang, { band: 'block', maxBytes: limitBytes }),
+      max: formatSizeMB(limitBytes, lang),
+    })
+  }
   /**
-   * the download is known to be refused: an Overwrite answered 413, or my version is already over
-   * the cap the host announced in `init` (equal to the cap is allowed)
+   * the download is known to be refused: an Overwrite answered 413 (without a document save limit),
+   * or my version is already over a distinct download cap the host announced in `init`
    */
   let tooLarge =
     io.download?.size !== undefined &&
     io.download.maxBytes !== undefined &&
+    (io.maxBytes === undefined || io.download.maxBytes !== io.maxBytes) &&
     io.download.size > io.download.maxBytes
   let alert = ''
   let focus: Id | typeof FOCUS_TITLE = 'cancel'
@@ -612,6 +626,11 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
       }
 
       if (choice === 'save-copy') {
+        if (sizeBytes !== undefined && activeMaxBytes !== undefined && sizeBytes > activeMaxBytes) {
+          alert = tooLargeWithLimitAlert(activeMaxBytes, sizeBytes)
+          focus = 'save-copy'
+          continue
+        }
         // the confirmation names the head's revision and author, like Overwrite
         await headRead
         let stepAlert = ''
@@ -629,12 +648,32 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
             alert = format(t('uwConflictSaveCopyDone'), { title: res.title })
             break
           }
+          if (res.error?.code === 'too_large') {
+            const errMax =
+              typeof res.error.details?.max_bytes === 'number' && res.error.details.max_bytes > 0
+                ? res.error.details.max_bytes
+                : activeMaxBytes
+            if (errMax !== undefined) {
+              activeMaxBytes = errMax
+              alert = tooLargeWithLimitAlert(errMax, sizeBytes)
+            } else {
+              tooLarge = true
+              alert = t('uwConflictTooLarge')
+            }
+            focus = 'save-copy'
+            break
+          }
           stepAlert = t('uwConflictSaveCopyFailed')
         }
         continue
       }
 
       if (choice === 'overwrite') {
+        if (sizeBytes !== undefined && activeMaxBytes !== undefined && sizeBytes > activeMaxBytes) {
+          alert = tooLargeWithLimitAlert(activeMaxBytes, sizeBytes)
+          focus = 'overwrite'
+          continue
+        }
         // the confirmation names the head's revision and author
         await headRead
         const confirmed = await overwriteStep()
@@ -670,8 +709,17 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
           continue
         }
         if (code === 'too_large') {
-          tooLarge = true
-          alert = t('uwConflictTooLarge')
+          const errMax =
+            typeof res.error.details?.max_bytes === 'number' && res.error.details.max_bytes > 0
+              ? res.error.details.max_bytes
+              : activeMaxBytes
+          if (errMax !== undefined) {
+            activeMaxBytes = errMax
+            alert = tooLargeWithLimitAlert(errMax, sizeBytes)
+          } else {
+            tooLarge = true
+            alert = t('uwConflictTooLarge')
+          }
           continue
         }
         if (code === 'forbidden') {

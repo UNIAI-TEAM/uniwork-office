@@ -87,6 +87,7 @@ import type { DraftHost, DraftRecovery } from './draft-recovery'
 import { bridgeDraftRecovery } from '../../modules/shared/recovery-prompt'
 import { saveFailureText } from '../../modules/shared/save-failure'
 import { createRemoteVersion, type RemoteVersion } from '../../modules/shared/remote-version'
+import { createSaveSizeGate } from '../../modules/shared/save-size-gate'
 import { projectApi } from './project-memory'
 import { mintDocHandoff, releaseDocHandoff } from './doc-handoff'
 import { frameDocVersion } from '../../modules/shared/comments/doc-version'
@@ -264,6 +265,7 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
     const data = await readSource(open.source)
     // another document: the pending version and the bar of the old one are gone
     if (current !== null && current !== open.file.fileId) remote?.reset()
+    sizeGate.noteDocumentOpened(open.file.fileId, open.limits)
     remember(open.file)
     return {
       path: pathFor(open.file),
@@ -491,6 +493,8 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
         size: data.byteLength,
         maxBytes: downloadCap(),
       }),
+      sizeBytes: data.byteLength,
+      maxBytes: sizeGate.limits().max_bytes,
       ...conflictFrame(),
     })
     const file = files.get(fileId)
@@ -567,6 +571,12 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       return null
     }
   }
+
+  const sizeGate = createSaveSizeGate({
+    port,
+    getLiveBytes: liveDocBytes,
+    frame: conflictFrame(),
+  })
 
   /**
    * Server-rendered PDF. A clean document exports its stored version by
@@ -719,6 +729,11 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       if (!fileId) return { ok: false, error: `not a UniWork document: ${basename(String(path))}` }
       // the editor is read-only here (uniworkState); this refuses a save that still gets through
       if (isViewOnly(fileId)) return { ok: false, error: READ_ONLY }
+      const gate = await sizeGate.checkBeforeSave(data)
+      if (!gate.allowed) {
+        if (hostSave) hostSave.error = gate.error
+        return { ok: false, error: gate.message }
+      }
       const etag = files.get(fileId)?.etag
       const payload = {
         fileId,
@@ -738,6 +753,9 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       }
       if (hostSave) hostSave.error = res.error
       const code = res.error.code
+      if (code === 'too_large') {
+        return { ok: false, error: sizeGate.handleServerTooLarge(res.error, data) }
+      }
       const shown = remote?.saveFailed(res.error) === true
       if (code === 'conflict') {
         // the host's own `save` waits for the dialog's answer instead of an error event
@@ -776,6 +794,11 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
         pending?.settle(failure('unsupported', READ_ONLY))
         return { ok: false, error: READ_ONLY }
       }
+      const gate = await sizeGate.checkBeforeSave(data)
+      if (!gate.allowed) {
+        pending?.settle({ ok: false, error: gate.error })
+        return { ok: false, error: gate.message }
+      }
       const sourceFileId = idFromPath(sourcePath)
       const payload = {
         name: withExt(pending?.name || defaultName || 'Untitled', '.docx'),
@@ -796,6 +819,9 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       pending?.settle(res)
       // cancelled dialog: {ok:false} without error, like the desktop
       if (res.error.code === 'cancelled') return { ok: false }
+      if (res.error.code === 'too_large') {
+        return { ok: false, error: sizeGate.handleServerTooLarge(res.error, data) }
+      }
       // the bar says it: a result without an error shows no toast (like a cancelled dialog)
       if (remote?.saveFailed(res.error)) return { ok: false }
       return { ok: false, error: saveFailureText(res.error, () => text('appWebSaveOffline')) }
@@ -809,6 +835,11 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       }
       const lock = lockedSave()
       if (lock && !lock.ok) return { ok: false, error: lock.error.message }
+      const gate = await sizeGate.checkBeforeSave(data)
+      if (!gate.allowed) {
+        if (hostSave) hostSave.error = gate.error
+        return { ok: false, error: gate.message }
+      }
       const payload = {
         name: withExt(defaultName || 'Untitled', '.docx'),
         data: copyBuffer(data),
@@ -822,6 +853,9 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       )
       if (!res.ok) {
         if (hostSave) hostSave.error = res.error
+        if (res.error.code === 'too_large') {
+          return { ok: false, error: sizeGate.handleServerTooLarge(res.error, data) }
+        }
         if (remote?.saveFailed(res.error)) return { ok: false }
         return { ok: false, error: saveFailureText(res.error, () => text('appWebSaveOffline')) }
       }

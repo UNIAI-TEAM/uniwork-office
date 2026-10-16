@@ -15,7 +15,9 @@ import {
   type OpenPayload,
   type RemoteVersionPayload,
   type ProtocolErrorCode,
+  type SaveBlockedPayload,
   type SavedPayload,
+  type SizeWarningPayload,
   type Theme,
 } from '../../protocol/types'
 import type { FramePort, PortRequestOptions, PortSession } from '../frame-port'
@@ -54,6 +56,8 @@ export function createMockPort(session: Partial<PortSession> = {}) {
   const titles: string[] = []
   const modals: boolean[] = []
   const saved: SavedPayload[] = []
+  const sizeWarnings: SizeWarningPayload[] = []
+  const saveBlocked: SaveBlockedPayload[] = []
   const errors: Array<{ error: unknown; fatal?: boolean }> = []
   const renameListeners: Array<(file: FileMeta) => void> = []
   const themeListeners: Array<(theme: Theme) => void> = []
@@ -159,6 +163,7 @@ export function createMockPort(session: Partial<PortSession> = {}) {
     handleSaveAs: (h) => ((handlers.saveAs = h as never), () => {}),
     handlePrint: (h) => ((handlers.print = h as never), () => {}),
     handleCloseCheck: (h) => ((handlers['doc.closeCheck'] = h as never), () => {}),
+    handleDownload: (h) => ((handlers['doc.download'] = h as never), () => {}),
     onFileRenamed: (l) => (renameListeners.push(l), () => {}),
     onRemoteVersion: (l) => (remoteListeners.push(l), () => {}),
     onBlocked: (l) => (blockedListeners.push(l), () => {}),
@@ -174,6 +179,8 @@ export function createMockPort(session: Partial<PortSession> = {}) {
     setTitle: (t) => titles.push(t),
     setModal: (open) => modals.push(open),
     reportSaved: (p) => saved.push(p),
+    reportSizeWarning: (p) => sizeWarnings.push(p),
+    reportSaveBlocked: (p) => saveBlocked.push(p),
     reportError: (error, fatal) => errors.push({ error, fatal }),
   }
 
@@ -226,6 +233,8 @@ export function createMockPort(session: Partial<PortSession> = {}) {
     titles,
     modals,
     saved,
+    sizeWarnings,
+    saveBlocked,
     errors,
   }
 }

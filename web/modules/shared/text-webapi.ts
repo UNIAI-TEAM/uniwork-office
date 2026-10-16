@@ -73,6 +73,7 @@ import {
 } from './reload-notice'
 import { createRemoteVersion, type RemoteVersion } from './remote-version'
 import { saveFailureText } from './save-failure'
+import { createSaveSizeGate } from './save-size-gate'
 import { decodeText, encodeText } from './text-codec'
 
 // ---------------------------------------------------------------- paths
@@ -277,10 +278,19 @@ export function createTextWebApi(
     return current ? (files.get(current) ?? null) : null
   }
 
+  const sizeGate = createSaveSizeGate({
+    port,
+    getLiveBytes: () => {
+      const live = textProvider?.()
+      return typeof live === 'string' ? encodeText(live) : null
+    },
+  })
+
   async function accept(open: OpenPayload): Promise<string> {
     const decoded = decodeText(await readSource(open.source))
     // another document: the pending version and the bar of the old one are gone
     if (current !== null && current !== open.file.fileId) remote?.reset()
+    sizeGate.noteDocumentOpened(open.file.fileId, open.limits)
     remember(open.file)
     // the page restarted for a clean new version: the info bar and the reading position come back
     const back = takeReload(
@@ -535,6 +545,12 @@ export function createTextWebApi(
   async function saveExisting(fileId: string, data: string): Promise<TextSaveResult> {
     const etag = files.get(fileId)?.etag
     const bytes = encodeText(data)
+    const gate = await sizeGate.checkBeforeSave(bytes)
+    if (!gate.allowed) {
+      saveFailed = true
+      hostSave?.settle({ ok: false, error: gate.error })
+      return { ok: false, error: gate.message }
+    }
     const res = await sendSave(() =>
       port.request(
         'api.save',
@@ -547,6 +563,11 @@ export function createTextWebApi(
       const path = landed(res, host === null)
       host?.settle(res)
       return { ok: true, path }
+    }
+    if (res.error.code === 'too_large') {
+      const msg = sizeGate.handleServerTooLarge(res.error, encodeText(data))
+      host?.settle(res)
+      return { ok: false, error: msg }
     }
     if (res.error.code === 'conflict') {
       // the host's own `save` waits for the dialog's answer instead of an error event
@@ -605,6 +626,8 @@ export function createTextWebApi(
         size: mine.byteLength,
         maxBytes: downloadCap(),
       }),
+      sizeBytes: mine.byteLength,
+      maxBytes: sizeGate.limits().max_bytes,
     })
     const file = (outcome.kind === 'reloaded' ? loaded : null) ?? files.get(fileId)
     if (host && file) host.settle(conflictSaveResult(outcome, file))
@@ -649,6 +672,13 @@ export function createTextWebApi(
         'Untitled',
     )
     const bytes = encodeText(request.text)
+    const host = pending ?? hostSave
+    const gate = await sizeGate.checkBeforeSave(bytes)
+    if (!gate.allowed) {
+      saveFailed = true
+      host?.settle({ ok: false, error: gate.error })
+      return { ok: false, error: gate.message }
+    }
     const res = await sendSave(() =>
       port.request(
         'api.saveAs',
@@ -661,7 +691,6 @@ export function createTextWebApi(
         { timeoutMs: silent ? TIMEOUTS.transfer : TIMEOUTS.dialog, transfer: [bytes] },
       ),
     )
-    const host = pending ?? hostSave
     if (res.ok) {
       const path = landed(res, host === null)
       texts.set(path, request.text)
@@ -671,6 +700,12 @@ export function createTextWebApi(
     host?.settle(res)
     // a cancelled host dialog: nothing saved, no error (like the desktop's dialog cancel)
     if (res.error.code === 'cancelled') return { ok: true, canceled: true }
+    if (res.error.code === 'too_large') {
+      return {
+        ok: false,
+        error: sizeGate.handleServerTooLarge(res.error, encodeText(request.text)),
+      }
+    }
     remote?.saveFailed(res.error)
     return { ok: false, error: saveFailureText(res.error, text) }
   }

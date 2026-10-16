@@ -64,6 +64,7 @@ import type { DraftHost, DraftRecovery } from '../../docs/bridge/draft-recovery'
 import { bridgeDraftRecovery } from '../shared/recovery-prompt'
 import { createRemoteVersion, type RemoteVersion, type SaveFailure } from '../shared/remote-version'
 import { saveFailureDetail } from '../shared/save-failure'
+import { createSaveSizeGate } from '../shared/save-size-gate'
 import {
   conflictSaveResult,
   bridgeDownloadCap,
@@ -338,6 +339,15 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
     return shown
   }
 
+  const sizeGate = createSaveSizeGate({
+    port,
+    getLiveBytes: () => {
+      const session = latest ? sessions.get(latest.sessionId) : undefined
+      return latest && session && session.fileId === current ? latest.data : null
+    },
+    frame: { markerAttr: 'data-sheets-web' },
+  })
+
   /** `offer`: false for the conflict "Reload latest" (the user just discarded the edits) */
   async function openPayload(payload: OpenPayload, offer = true): Promise<WorkbookFile> {
     const server = await readSource(payload.source)
@@ -372,6 +382,7 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
     }
     // another workbook: the pending version and the bar of the old one are gone
     if (current !== null && current !== payload.file.fileId) remote?.reset()
+    sizeGate.noteDocumentOpened(payload.file.fileId, payload.limits)
     remember(payload.file)
     sessions.set(opened.sessionId, { fileId: payload.file.fileId, name: payload.file.name })
     restored = draft !== null
@@ -608,6 +619,8 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
         size: data.byteLength,
         maxBytes: downloadCap(),
       }),
+      sizeBytes: data.byteLength,
+      maxBytes: sizeGate.limits().max_bytes,
       markerAttr: 'data-sheets-web',
     })
     const file = files.get(fileId)
@@ -626,9 +639,17 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
 
   /** api.save of the current file, conflicts resolved */
   async function saveInPlace(fileId: string, data: ArrayBuffer): Promise<Landed> {
+    const gate = await sizeGate.checkBeforeSave(data)
+    if (!gate.allowed) {
+      if (hostSave) hostSave.error = gate.error
+      throw new Error(gate.message)
+    }
     const res = await putSave(fileId, data)
     if (res.ok) return { file: res.file }
     if (hostSave) hostSave.error = res.error
+    if (res.error.code === 'too_large') {
+      throw new Error(sizeGate.handleServerTooLarge(res.error, data))
+    }
     if (res.error.code === 'conflict') {
       // the host's own `save` waits for the dialog's answer instead of an error event
       if (!hostSave) port.reportError(res.error, false)
@@ -669,6 +690,11 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
   ): Promise<Landed> {
     const pending = hostSaveAs
     pending?.started()
+    const gate = await sizeGate.checkBeforeSave(data)
+    if (!gate.allowed) {
+      pending?.settle({ ok: false, error: gate.error })
+      throw new Error(gate.message)
+    }
     const payload = {
       name: pending?.name ?? name,
       data: copyBuffer(data),
@@ -680,6 +706,9 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
     pending?.settle(res)
     if (res.ok) return { file: res.file }
     if (res.error.code === 'cancelled') return { canceled: true }
+    if (res.error.code === 'too_large') {
+      throw new Error(sizeGate.handleServerTooLarge(res.error, data))
+    }
     return failSave(res.error)
   }
 
