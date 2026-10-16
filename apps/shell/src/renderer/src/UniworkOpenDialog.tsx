@@ -51,7 +51,7 @@ import {
   archiveDocument,
   cancelUploadDocument,
   createDocument,
-  listFolders,
+  loadFolderTree,
   listSharedDocuments,
   loadDocProperties,
   onDocRenamed,
@@ -331,7 +331,8 @@ export function UniworkOpenDialog({
   const defaultTarget = (): DocTarget => {
     const s = stateRef.current
     if (folderView && s.workspaceId) {
-      return { workspaceId: s.workspaceId, folderId: browsed.current.folderId }
+      const { folderId, path } = browsed.current
+      return { workspaceId: s.workspaceId, folderId, folderPath: path }
     }
     return { workspaceId: s.workspaceId ?? s.workspaces.items[0]?.id ?? '', folderId: null }
   }
@@ -918,7 +919,7 @@ export function UniworkOpenDialog({
           <NewDocDialog
             workspaces={state.workspaces.items}
             initialTarget={defaultTarget()}
-            loadFolders={listFolders}
+            loadTree={loadFolderTree}
             onCreate={createDoc}
             onCancel={() => setForm(null)}
           />
@@ -927,7 +928,7 @@ export function UniworkOpenDialog({
           <UploadDocDialog
             workspaces={state.workspaces.items}
             initialTarget={defaultTarget()}
-            loadFolders={listFolders}
+            loadTree={loadFolderTree}
             pickFile={pickUploadFile}
             onUpload={uploadDoc}
             progress={upload}

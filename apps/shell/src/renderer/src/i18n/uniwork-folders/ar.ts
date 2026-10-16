@@ -30,6 +30,7 @@ export const ar = {
   ufLocation: 'الموقع',
   ufLocationRoot: 'UniWork (المستوى الأعلى)',
   ufChooseLocation: 'اختيار موقع',
+  ufChoose: 'اختيار',
   ufSearchPh: 'البحث بالاسم في مساحة العمل هذه',
   ufSearchKind: 'نوع النتائج',
   ufSearchAll: 'الكل',

@@ -30,6 +30,7 @@ export const cs = {
   ufLocation: 'Umístění',
   ufLocationRoot: 'UniWork (nejvyšší úroveň)',
   ufChooseLocation: 'Vybrat umístění',
+  ufChoose: 'Vybrat',
   ufSearchPh: 'Hledat podle názvu v tomto pracovním prostoru',
   ufSearchKind: 'Typ výsledků',
   ufSearchAll: 'Vše',

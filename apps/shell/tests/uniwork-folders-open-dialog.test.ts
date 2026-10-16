@@ -81,6 +81,7 @@ function makeApi() {
       }),
     ),
     uniworkOpenDocument: vi.fn(async () => ok({ path: '/cache/Inside.docx' })),
+    uniworkCreateDocument: vi.fn(async () => ok(entry('n1', 'New.docx'))),
     onUniworkDocRenamed: vi.fn(() => () => undefined),
     onUniworkUploadProgress: vi.fn(() => () => undefined),
     onUniworkTreeChanged: vi.fn(() => () => undefined),
@@ -210,6 +211,18 @@ describe('Open from UniWork as the browser', () => {
       )
     })
     expect(onClose).toHaveBeenCalled()
+  })
+
+  it('New document defaults to the folder open in the browser (S4)', async () => {
+    await click(treeItem('Alpha'))
+    await click(button('New document'))
+    const location = $<HTMLButtonElement>('.modal.uw-act .uwf-location-btn')!
+    expect(location.textContent).toContain('UniWork › Alpha')
+    // Recent: the top level, as before
+    await click(button('Cancel'))
+    await click(button(en.ufRecent))
+    await click(button('New document'))
+    expect($('.modal.uw-act .uwf-location-btn')!.textContent).toContain(en.ufLocationRoot)
   })
 
   it('a file in a folder opens through the existing open path', async () => {

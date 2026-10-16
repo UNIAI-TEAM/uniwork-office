@@ -30,6 +30,7 @@ export const nl = {
   ufLocation: 'Locatie',
   ufLocationRoot: 'UniWork (hoogste niveau)',
   ufChooseLocation: 'Locatie kiezen',
+  ufChoose: 'Kiezen',
   ufSearchPh: 'Zoeken op naam in deze werkruimte',
   ufSearchKind: 'Type resultaat',
   ufSearchAll: 'Alles',

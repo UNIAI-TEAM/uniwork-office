@@ -29,6 +29,7 @@ export const zh = {
   ufLocation: '位置',
   ufLocationRoot: 'UniWork（顶层）',
   ufChooseLocation: '选择位置',
+  ufChoose: '选择',
   ufSearchPh: '在工作区中按名称搜索',
   ufSearchKind: '结果类型',
   ufSearchAll: '全部',

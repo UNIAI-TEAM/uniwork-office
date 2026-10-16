@@ -30,6 +30,7 @@ export const th = {
   ufLocation: 'ตำแหน่ง',
   ufLocationRoot: 'UniWork (ระดับบนสุด)',
   ufChooseLocation: 'เลือกตำแหน่ง',
+  ufChoose: 'เลือก',
   ufSearchPh: 'ค้นหาตามชื่อในพื้นที่ทำงานนี้',
   ufSearchKind: 'ประเภทผลลัพธ์',
   ufSearchAll: 'ทั้งหมด',

@@ -30,6 +30,7 @@ export const ms = {
   ufLocation: 'Lokasi',
   ufLocationRoot: 'UniWork (tahap teratas)',
   ufChooseLocation: 'Pilih lokasi',
+  ufChoose: 'Pilih',
   ufSearchPh: 'Cari mengikut nama dalam ruang kerja ini',
   ufSearchKind: 'Jenis hasil',
   ufSearchAll: 'Semua',

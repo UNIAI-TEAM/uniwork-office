@@ -15,7 +15,6 @@ import type {
   UniworkSharedQuery,
   UniworkTreeChangedEvent,
 } from '../../shared/home-api'
-import type { FolderChoice } from './UniworkDocActions'
 import type { DocNameError, NewDocFormat } from './uniwork-docs-model'
 
 /**
@@ -102,7 +101,6 @@ interface ActionsBridge {
   ): Promise<DocActionResult<UniworkDocSummary>>
   uniworkArchiveDocument?(documentId: string): Promise<DocActionResult<unknown>>
   uniworkRestoreDocument?(documentId: string): Promise<DocActionResult<unknown>>
-  uniworkListFolders?(workspaceId: string): Promise<UniworkResult<FolderChoice[]>>
   uniworkFolderTree?(workspaceId: string): Promise<UniworkResult<UniworkFolderNode[]>>
   uniworkListChildren?(q: UniworkFolderQuery): Promise<UniworkResult<UniworkFolderChildren>>
   uniworkSearchDocuments?(q: UniworkSearchQuery): Promise<UniworkResult<UniworkSearchPage>>
@@ -152,13 +150,6 @@ export function archiveDocument(documentId: string): Promise<DocActionResult<unk
 
 export function restoreDocument(documentId: string): Promise<DocActionResult<unknown>> {
   return actions().uniworkRestoreDocument?.(documentId) ?? Promise.resolve(unavailable)
-}
-
-/** the workspace's folders for the location field; none when main cannot list them */
-export function listFolders(workspaceId: string): Promise<FolderChoice[]> {
-  const call = actions().uniworkListFolders?.(workspaceId)
-  if (!call) return Promise.resolve([])
-  return call.then((r) => (r.ok ? r.value : [])).catch(() => [])
 }
 
 // ── Folder tree (FD-11) ─────────────────────────────────

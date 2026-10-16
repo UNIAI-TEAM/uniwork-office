@@ -30,6 +30,7 @@ export const fr = {
   ufLocation: 'Emplacement',
   ufLocationRoot: 'UniWork (racine)',
   ufChooseLocation: 'Choisir un emplacement',
+  ufChoose: 'Choisir',
   ufSearchPh: 'Rechercher par nom dans cet espace de travail',
   ufSearchKind: 'Type de résultat',
   ufSearchAll: 'Tout',

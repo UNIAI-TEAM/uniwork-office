@@ -30,6 +30,7 @@ export const zhTW = {
   ufLocation: '位置',
   ufLocationRoot: 'UniWork（最上層）',
   ufChooseLocation: '選擇位置',
+  ufChoose: '選擇',
   ufSearchPh: '在工作區中依名稱搜尋',
   ufSearchKind: '結果類型',
   ufSearchAll: '全部',

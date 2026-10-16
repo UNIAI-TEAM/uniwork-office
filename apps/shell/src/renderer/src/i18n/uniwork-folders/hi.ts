@@ -30,6 +30,7 @@ export const hi = {
   ufLocation: 'स्थान',
   ufLocationRoot: 'UniWork (शीर्ष स्तर)',
   ufChooseLocation: 'स्थान चुनें',
+  ufChoose: 'चुनें',
   ufSearchPh: 'इस वर्कस्पेस में नाम से खोजें',
   ufSearchKind: 'परिणाम का प्रकार',
   ufSearchAll: 'सभी',

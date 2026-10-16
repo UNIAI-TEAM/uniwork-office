@@ -30,6 +30,7 @@ export const ja = {
   ufLocation: '場所',
   ufLocationRoot: 'UniWork（最上位）',
   ufChooseLocation: '場所を選択',
+  ufChoose: '選択',
   ufSearchPh: 'ワークスペース内を名前で検索',
   ufSearchKind: '結果の種類',
   ufSearchAll: 'すべて',

@@ -30,6 +30,7 @@ export const he = {
   ufLocation: 'מיקום',
   ufLocationRoot: 'UniWork (הרמה העליונה)',
   ufChooseLocation: 'בחירת מיקום',
+  ufChoose: 'בחירה',
   ufSearchPh: 'חיפוש לפי שם בסביבת העבודה הזו',
   ufSearchKind: 'סוג התוצאות',
   ufSearchAll: 'הכול',

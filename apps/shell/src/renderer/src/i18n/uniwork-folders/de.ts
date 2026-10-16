@@ -30,6 +30,7 @@ export const de = {
   ufLocation: 'Speicherort',
   ufLocationRoot: 'UniWork (oberste Ebene)',
   ufChooseLocation: 'Speicherort wählen',
+  ufChoose: 'Auswählen',
   ufSearchPh: 'In diesem Arbeitsbereich nach Namen suchen',
   ufSearchKind: 'Ergebnistyp',
   ufSearchAll: 'Alle',

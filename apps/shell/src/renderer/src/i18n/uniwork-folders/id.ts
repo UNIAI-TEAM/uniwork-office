@@ -30,6 +30,7 @@ export const id = {
   ufLocation: 'Lokasi',
   ufLocationRoot: 'UniWork (tingkat teratas)',
   ufChooseLocation: 'Pilih lokasi',
+  ufChoose: 'Pilih',
   ufSearchPh: 'Cari berdasarkan nama di ruang kerja ini',
   ufSearchKind: 'Jenis hasil',
   ufSearchAll: 'Semua',

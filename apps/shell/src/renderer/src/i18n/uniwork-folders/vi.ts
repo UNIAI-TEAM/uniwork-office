@@ -30,6 +30,7 @@ export const vi = {
   ufLocation: 'Vị trí',
   ufLocationRoot: 'UniWork (gốc)',
   ufChooseLocation: 'Chọn vị trí',
+  ufChoose: 'Chọn',
   ufSearchPh: 'Tìm theo tên trong không gian làm việc',
   ufSearchKind: 'Loại kết quả',
   ufSearchAll: 'Tất cả',

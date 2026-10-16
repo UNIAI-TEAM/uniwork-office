@@ -30,6 +30,7 @@ export const it = {
   ufLocation: 'Posizione',
   ufLocationRoot: 'UniWork (livello superiore)',
   ufChooseLocation: 'Scegli una posizione',
+  ufChoose: 'Scegli',
   ufSearchPh: 'Cerca per nome in questo spazio di lavoro',
   ufSearchKind: 'Tipo di risultato',
   ufSearchAll: 'Tutto',

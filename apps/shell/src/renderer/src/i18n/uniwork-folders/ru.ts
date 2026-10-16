@@ -30,6 +30,7 @@ export const ru = {
   ufLocation: 'Расположение',
   ufLocationRoot: 'UniWork (верхний уровень)',
   ufChooseLocation: 'Выбрать расположение',
+  ufChoose: 'Выбрать',
   ufSearchPh: 'Поиск по имени в этом рабочем пространстве',
   ufSearchKind: 'Тип результатов',
   ufSearchAll: 'Все',

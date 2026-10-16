@@ -30,6 +30,7 @@ export const ko = {
   ufLocation: '위치',
   ufLocationRoot: 'UniWork(최상위)',
   ufChooseLocation: '위치 선택',
+  ufChoose: '선택',
   ufSearchPh: '작업 공간에서 이름으로 검색',
   ufSearchKind: '결과 유형',
   ufSearchAll: '전체',
