@@ -14,6 +14,10 @@ export const hi = {
   webOk: 'ठीक है',
   webFatalTitle: 'प्रस्तुति नहीं खोली जा सकी',
   webFatalBody: 'UniWork से फ़ाइल लोड नहीं हो सकी। यह टैब बंद करें और फिर से प्रयास करें।',
+  webRefusedTooLarge: 'यह प्रस्तुति वेब पर खोलने के लिए बहुत बड़ी या बहुत जटिल है।',
+  webRefusedTooComplex:
+    'यह प्रस्तुति वेब पर खोलने के लिए बहुत जटिल है ({parts} भाग, सीमा {limit})।',
+  webRefusedOutOfMemory: 'यह प्रस्तुति बहुत बड़ी है और खोलते समय ब्राउज़र की मेमोरी समाप्त हो गई।',
   webNoHost: 'यह संपादक UniWork के अंदर चलता है। प्रस्तुति को UniWork से खोलें।',
   webLegacyPpt:
     'यह पुरानी .ppt फ़ाइल है और ब्राउज़र में नहीं खुल सकती। पहले इसे PowerPoint में .pptx के रूप में सहेजें।',

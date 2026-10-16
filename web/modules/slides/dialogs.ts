@@ -14,8 +14,8 @@ export type WebKey = keyof (typeof webStrings)['zh']
 
 const translate = createI18n(webStrings)
 
-export function text(key: WebKey): string {
-  return translate(webLanguage(), key)
+export function text(key: WebKey, params?: Record<string, string | number>): string {
+  return translate(webLanguage(), key, params)
 }
 
 const MARKER = 'data-slides-web'
@@ -76,11 +76,11 @@ export async function ask<T extends string>(opts: {
 const FATAL = 'fatal'
 
 /** blocking notice over the editor (no buttons: the host decides what happens next) */
-export function showFatal(body: WebKey): void {
+export function showFatal(body: WebKey, params?: Record<string, string | number>): void {
   hideFatal()
   showFrameNotice({
     title: text('webFatalTitle'),
-    body: text(body),
+    body: text(body, params),
     marker: FATAL,
     markerAttr: MARKER,
   })

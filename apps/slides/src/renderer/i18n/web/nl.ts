@@ -16,6 +16,11 @@ export const nl = {
   webFatalTitle: 'De presentatie kan niet worden geopend',
   webFatalBody:
     'Het bestand kan niet uit UniWork worden geladen. Sluit dit tabblad en probeer het opnieuw.',
+  webRefusedTooLarge: 'Deze presentatie is te groot of te complex om op het web te openen.',
+  webRefusedTooComplex:
+    'Deze presentatie is te complex om op het web te openen ({parts} onderdelen, limiet {limit}).',
+  webRefusedOutOfMemory:
+    'Deze presentatie is te groot en het browsergeheugen raakte vol tijdens het openen.',
   webNoHost: 'Deze editor draait binnen UniWork. Open de presentatie vanuit UniWork.',
   webLegacyPpt:
     'Dit is een ouder .ppt-bestand dat niet in de browser kan worden geopend. Sla het eerst op als .pptx in PowerPoint.',

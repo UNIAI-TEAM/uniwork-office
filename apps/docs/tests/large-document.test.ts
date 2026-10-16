@@ -81,6 +81,7 @@ describe('loadFile refuse tier (SIZE-F1)', () => {
       const { buildBlankDocx } = await import('@genoffice/docx-engine')
       const { loadFile } = await import('../src/renderer/file-actions')
       const { setDocBytesResolver } = await import('../src/renderer/doc-bytes')
+      const { setToastEmitter } = await import('../src/renderer/components/toast-bus')
 
       const blankBytes = await buildBlankDocx()
       const zip = await JSZip.loadAsync(blankBytes)
@@ -98,6 +99,8 @@ describe('loadFile refuse tier (SIZE-F1)', () => {
       setDocBytesResolver((url) => (url === dataUrl ? hugeBytes : undefined))
 
       const reported: unknown[] = []
+      const toasts: Array<{ text: string; kind: string }> = []
+      setToastEmitter((toast) => toasts.push(toast))
       const g = globalThis as unknown as {
         window?: Record<string, unknown>
         document?: Record<string, unknown>
@@ -294,11 +297,14 @@ describe('loadFile refuse tier (SIZE-F1)', () => {
         hash: 'h1',
       })
       setDocBytesResolver(null)
+      setToastEmitter(null)
       expect(outcome).toBe('refused')
       expect(docState).toBeNull()
       expect(readModeState).toBe(false)
       expect(editableState).toBe(false)
       expect(clearedCount).toBe(1)
+      // d2-5: no toast when the refused screen shows
+      expect(toasts).toEqual([])
       expect(refusedMessageState).toBeTruthy()
       expect(reported).toEqual([
         expect.objectContaining({
@@ -315,11 +321,14 @@ describe('loadFile refuse tier (SIZE-F1)', () => {
     },
   )
 
-  it('classifies corrupt zip inflate as failed (not refused) and keeps declared/total uncompressed size gates as too_large_to_open (d2-4)', async () => {
+  it('classifies corrupt zip inflate as failed (not refused) and localizes zip part-count refusal copy without toast (d2-4, d2-5)', async () => {
     const { loadFile } = await import('../src/renderer/file-actions')
     const { setDocBytesResolver } = await import('../src/renderer/doc-bytes')
+    const { setToastEmitter } = await import('../src/renderer/components/toast-bus')
+    const { setModuleLang, statusText, t } = await import('../src/renderer/i18n/locale')
 
     const reported: unknown[] = []
+    const toasts: Array<{ text: string; kind: string }> = []
     const g = globalThis as unknown as {
       window?: Record<string, unknown>
       document?: Record<string, unknown>
@@ -332,6 +341,8 @@ describe('loadFile refuse tier (SIZE-F1)', () => {
     }
     g.document = g.document ?? { activeElement: null, body: {} }
 
+    let refusedMessageState: unknown = ''
+    let statusState: unknown = ''
     const chainObj = {
       setMeta: () => chainObj,
       clearContent: () => chainObj,
@@ -358,8 +369,12 @@ describe('loadFile refuse tier (SIZE-F1)', () => {
       bumpPendingExportTick: () => {},
       printAutoOpenedPreviewRef: { current: false },
       setShowPrintDialog: () => {},
-      setStatus: () => {},
-      setRefusedMessage: () => {},
+      setStatus: (v: unknown) => {
+        statusState = v
+      },
+      setRefusedMessage: (v: unknown) => {
+        refusedMessageState = v
+      },
       setRecent: () => {},
       setShowAi: () => {},
       setDoc: () => {},
@@ -495,6 +510,34 @@ describe('loadFile refuse tier (SIZE-F1)', () => {
       }),
     ).toBe('failed')
     expect(reported).toEqual([])
+
+    // d2-5: zip part-count refusal -> localized copy, no raw "zip rejected:", no toast
+    toasts.length = 0
+    setToastEmitter((toast) => toasts.push(toast))
+    setModuleLang('vi')
+    setDocBytesResolver(() => {
+      throw new Error('zip rejected: 12000 parts exceeds the 10000 limit')
+    })
+    expect(
+      await loadFile(ctx as never, {
+        path: 'uniwork://files/f2/ManyParts.docx',
+        name: 'ManyParts.docx',
+        dataUrl: 'in-memory://parts',
+        hash: 'h-parts',
+      }),
+    ).toBe('refused')
+    expect(toasts).toEqual([])
+    expect(reported).toHaveLength(1)
+    expect(reported[0]).toMatchObject({
+      reason: 'too_complex',
+      measure: { kind: 'zip_parts', value: 12_000, limit: 10_000 },
+    })
+    const partsVi = statusText(refusedMessageState as never, t)
+    expect(partsVi).toContain('12000')
+    expect(partsVi).not.toMatch(/zip rejected:|parts exceeds/i)
+    expect(statusState).toEqual(refusedMessageState)
+
     setDocBytesResolver(null)
+    setToastEmitter(null)
   })
 })

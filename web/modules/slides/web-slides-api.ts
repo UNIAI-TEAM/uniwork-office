@@ -464,10 +464,13 @@ export function createWebSlidesApi(
 
   // ------------------------------------------------------------ open
 
-  function fatal(err: unknown, body: WebKey): void {
-    state.fatal = toProtocolError(err).toShape()
+  function fatal(err: unknown, body: WebKey, params?: Record<string, string | number>): void {
+    state.fatal = {
+      ...toProtocolError(err).toShape(),
+      message: text(body, params),
+    }
     port.reportError(err, true)
-    showFatal(body)
+    showFatal(body, params)
   }
 
   function classifySlidesOpenRefusal(err: unknown): {
@@ -558,7 +561,16 @@ export function createWebSlidesApi(
             ...(refusal.measure ? { measure: refusal.measure } : {}),
           })
         }
-        fatal(err, 'webFatalBody')
+        if (refusal.reason === 'too_complex' && refusal.measure?.limit !== undefined) {
+          fatal(err, 'webRefusedTooComplex', {
+            parts: refusal.measure.value,
+            limit: refusal.measure.limit,
+          })
+        } else if (refusal.reason === 'engine_out_of_memory') {
+          fatal(err, 'webRefusedOutOfMemory')
+        } else {
+          fatal(err, 'webRefusedTooLarge')
+        }
         return null
       }
       throw err

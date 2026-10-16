@@ -464,7 +464,6 @@ function refuseOpen(
   ctx.setCompareResult(null)
   ctx.setRefusedMessage?.(msg)
   ctx.setStatus(msg)
-  showToast(msg, 'error')
   return 'refused'
 }
 
@@ -644,12 +643,22 @@ export async function loadFile(
     const errMsg = err instanceof Error ? err.message : String(err)
     const refusal = isWebFrame() ? classifyOpenRefusal(errMsg) : null
     if (refusal) {
-      return refuseOpen(ctx, t('appOpenFailed', { error: errMsg }), {
+      const refusalMsg =
+        refusal.reason === 'too_complex' && refusal.measure
+          ? t('appDocTooComplexParts', {
+              name: result.name,
+              parts: refusal.measure.value,
+              limit: refusal.measure.limit,
+            })
+          : refusal.reason === 'engine_out_of_memory'
+            ? t('appDocOpenOutOfMemory', { name: result.name })
+            : t('appDocTooLargeUncompressed', { name: result.name })
+      return refuseOpen(ctx, refusalMsg, {
         path: result.path,
         reason: refusal.reason,
         bytes: loadedBytesLength,
         ...(refusal.measure ? { measure: refusal.measure } : {}),
-        message: errMsg,
+        message: refusalMsg,
       })
     }
     // visible failure: the status-bar line alone is easy to miss under the start screen

@@ -15,6 +15,11 @@ export const ms = {
   webOk: 'OK',
   webFatalTitle: 'Persembahan tidak dapat dibuka',
   webFatalBody: 'Fail tidak dapat dimuatkan daripada UniWork. Tutup tab ini dan cuba lagi.',
+  webRefusedTooLarge: 'Pembentangan ini terlalu besar atau terlalu kompleks untuk dibuka di web.',
+  webRefusedTooComplex:
+    'Pembentangan ini terlalu kompleks untuk dibuka di web ({parts} bahagian, had {limit}).',
+  webRefusedOutOfMemory:
+    'Pembentangan ini terlalu besar dan kehabisan memori pelayar semasa dibuka.',
   webNoHost: 'Editor ini berjalan di dalam UniWork. Buka persembahan daripada UniWork.',
   webLegacyPpt:
     'Ini fail .ppt lama dan tidak boleh dibuka dalam pelayar. Simpan sebagai .pptx dalam PowerPoint dahulu.',

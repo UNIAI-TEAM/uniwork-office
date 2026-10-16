@@ -14,6 +14,11 @@ export const en = {
   webOk: 'OK',
   webFatalTitle: 'The presentation could not be opened',
   webFatalBody: 'The file could not be loaded from UniWork. Close this tab and try again.',
+  webRefusedTooLarge: 'This presentation is too large or too complex to open on the web.',
+  webRefusedTooComplex:
+    'This presentation is too complex to open on the web ({parts} parts, limit {limit}).',
+  webRefusedOutOfMemory:
+    'This presentation is too large and ran out of browser memory while opening.',
   webNoHost: 'This editor runs inside UniWork. Open the presentation from UniWork.',
   webLegacyPpt:
     'This is a legacy .ppt file and cannot be opened in the browser. Save it as .pptx in PowerPoint first.',

@@ -46,6 +46,11 @@ export const th = {
   appOpenFailed: 'เปิดไม่สำเร็จ: {error}',
   appDocTooLargeBlocks:
     '{name}: เอกสารมีขนาดใหญ่เกินกว่าจะเปิดได้ ({blocks} ย่อหน้า, {chars} ตัวอักษร)',
+  appDocTooLargeUncompressed: '{name}: เอกสารมีขนาดใหญ่หรือซับซ้อนเกินกว่าจะเปิดบนเว็บได้',
+  appDocTooComplexParts:
+    '{name}: เอกสารซับซ้อนเกินกว่าจะเปิดบนเว็บได้ ({parts} ส่วน ขีดจำกัด {limit})',
+  appDocOpenOutOfMemory:
+    '{name}: เอกสารมีขนาดใหญ่เกินไปและหน่วยความจำของเบราว์เซอร์ไม่เพียงพอขณะเปิด',
   appDocLargeReadOnly: 'เอกสารขนาดใหญ่ ({blocks} ย่อหน้า): เปิดในโหมดอ่าน — กด Esc เพื่อแก้ไข',
   appDocLargeSpellOff:
     'เอกสารขนาดใหญ่ ({blocks} ย่อหน้า): ปิดการตรวจการสะกดขณะพิมพ์แล้ว — เปิดได้ที่ รีวิว › การสะกด',

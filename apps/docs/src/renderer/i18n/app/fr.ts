@@ -46,6 +46,12 @@ export const fr = {
   appOpenFailed: "Échec de l'ouverture : {error}",
   appDocTooLargeBlocks:
     '{name} : le document est trop volumineux pour être ouvert ({blocks} paragraphes, {chars} caractères)',
+  appDocTooLargeUncompressed:
+    '{name} : le document est trop volumineux ou trop complexe pour être ouvert sur le Web.',
+  appDocTooComplexParts:
+    '{name} : le document est trop complexe pour être ouvert sur le Web ({parts} parties, limite {limit}).',
+  appDocOpenOutOfMemory:
+    '{name} : le document est trop volumineux et la mémoire du navigateur a été épuisée lors de l’ouverture.',
   appDocLargeReadOnly:
     'Document volumineux ({blocks} paragraphes) : ouvert en mode lecture — appuyez sur Échap pour modifier',
   appDocLargeSpellOff:
