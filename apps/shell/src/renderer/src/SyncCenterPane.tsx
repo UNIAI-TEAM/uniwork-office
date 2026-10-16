@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import type { KeyboardEvent, ReactElement, RefObject } from 'react'
+import { formatSizeMB } from '../../shared/size-format'
 import type {
   SyncCenterActionResult,
   SyncCenterRow,
@@ -172,7 +173,11 @@ export function SyncCenterPane({
 
   const fmt = (line: SyncLine): string => {
     const params: Record<string, string | number> = { ...line.params }
-    for (const [k, v] of Object.entries(line.keyParams ?? {})) params[k] = t(v)
+    const nestedParams =
+      line.reasonMaxBytes !== undefined
+        ? { max: formatSizeMB(line.reasonMaxBytes, dateLocale, 'exact') }
+        : undefined
+    for (const [k, v] of Object.entries(line.keyParams ?? {})) params[k] = t(v, nestedParams)
     for (const [k, v] of Object.entries(line.timeParams ?? {}))
       params[k] = formatTime(v, dateLocale)
     for (const [k, v] of Object.entries(line.sizeParams ?? {}))
@@ -606,7 +611,11 @@ export function SyncCenterPane({
           {disclosure === 'guide' && <span className="sc-more-text">{t('uwTipReconciling')}</span>}
           {disclosure === 'details' && (
             <span className="sc-more-text">
-              {fmt({ key: 'uwTipFailed', keyParams: view.sub.keyParams })}
+              {fmt({
+                key: 'uwTipFailed',
+                keyParams: view.sub.keyParams,
+                reasonMaxBytes: view.sub.reasonMaxBytes,
+              })}
             </span>
           )}
         </td>

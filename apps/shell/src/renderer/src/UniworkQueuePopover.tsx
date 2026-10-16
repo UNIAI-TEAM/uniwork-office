@@ -8,6 +8,7 @@ import {
   type CSSProperties,
 } from 'react'
 import type { UniworkDocStatus } from '../../shared/home-api'
+import { formatSizeMB } from '../../shared/size-format'
 import {
   asSyncCenterSnapshot,
   type SyncCenterActionResult,
@@ -142,13 +143,18 @@ export function UniworkQueuePopover({
   const confirmId = useId()
 
   const lineText = useCallback(
-    (line: PopoverLine): string =>
-      t(line.key, {
+    (line: PopoverLine): string => {
+      const reasonParams =
+        line.maxBytes !== undefined
+          ? { max: formatSizeMB(line.maxBytes, dateLocale, 'exact') }
+          : undefined
+      return t(line.key, {
         time: line.time === undefined ? '—' : formatQueueTime(line.time, dateLocale),
         base: line.base ?? '—',
-        reason: line.reasonKey ? t(line.reasonKey) : '',
+        reason: line.reasonKey ? t(line.reasonKey, reasonParams) : '',
         cap: QUEUE_DRAFT_CAP,
-      }),
+      })
+    },
     [t, dateLocale],
   )
   const line1Text = lineText(model.line1)

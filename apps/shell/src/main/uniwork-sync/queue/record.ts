@@ -78,6 +78,8 @@ export interface IntentRecordV2 {
   reconcileSince?: string
   receipt?: IntentReceipt
   lastError?: UniworkDocErrorCode
+  /** Server/configured maximum document size in bytes when `lastError === 'too_large'`. */
+  maxBytes?: number
   /** why the intent ended in `cancelled` */
   cancelReason?: 'user' | 'superseded'
 }
@@ -203,6 +205,7 @@ function readV2(r: Record<string, unknown>): IntentRecordV2 | null {
     ...(r.reconcileSince === undefined ? {} : { reconcileSince: r.reconcileSince }),
     ...(receipt === undefined ? {} : { receipt }),
     ...(r.lastError === undefined ? {} : { lastError: r.lastError as UniworkDocErrorCode }),
+    ...(isCount(r.maxBytes, 1) ? { maxBytes: r.maxBytes } : {}),
     ...(r.cancelReason === undefined ? {} : { cancelReason: r.cancelReason }),
   }
 }

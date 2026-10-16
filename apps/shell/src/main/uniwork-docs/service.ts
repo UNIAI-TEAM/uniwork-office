@@ -641,12 +641,22 @@ function queueBindingPatch(record: IntentRecordV2): Partial<Binding> | null {
   else if (state === 'paused_offline') patched.error = 'network'
   else if (state === 'blocked') patched.error = error ?? 'server_error'
   else if (state === 'reconciling-stuck') patched.error = error ?? 'intent_unknown'
-  else if (state === 'failed') patched.error = error ?? 'server_error'
+  else if (state === 'failed') {
+    patched.error = error ?? 'server_error'
+    if (record.maxBytes !== undefined) {
+      patched.maxBytes = record.maxBytes
+      patched.sizeBytes = record.length
+    }
+  }
   // the waiting states carry no refusal: a block that lifted (the `unblock`
   // event: `blocked -> queued`, or `paused_user` while the user's own pause
   // holds it) must not keep the code it was parked with. The explicit
   // `undefined` overwrites the stale code in the merge; the store's JSON drops it
-  else if (state === 'queued' || state === 'paused_user') patched.error = undefined
+  else if (state === 'queued' || state === 'paused_user') {
+    patched.error = undefined
+    patched.maxBytes = undefined
+    patched.sizeBytes = undefined
+  }
   // G8-12: a refused permission is a fact about the caller's level, as on the inline path
   if (patched.error === 'permission_revoked' || patched.error === 'forbidden') {
     patched.level = 'view'

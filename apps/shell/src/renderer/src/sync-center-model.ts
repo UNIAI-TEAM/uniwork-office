@@ -56,6 +56,8 @@ export interface SyncLine {
   timeParams?: Record<string, string>
   /** bytes */
   sizeParams?: Record<string, number>
+  /** `{max}` in bytes when `keyParams.reason` is `uwReasonTooLargeWithLimit` */
+  reasonMaxBytes?: number
 }
 
 export interface SyncRowView {
@@ -241,6 +243,9 @@ const FAILED_REASON: Record<string, StringKey> = {
 }
 
 export function failedReasonKey(row: SyncCenterRow): StringKey {
+  if (row.failedReason === 'too_large' && row.maxBytes !== undefined) {
+    return 'uwReasonTooLargeWithLimit'
+  }
   return FAILED_REASON[row.failedReason ?? 'other'] ?? 'uwReasonOther'
 }
 
@@ -360,7 +365,13 @@ export function rowView(row: SyncCenterRow, ctx: { online: boolean }): SyncRowVi
       return {
         ...base,
         badge: { tone: 'error', key: 'uwBadgeFailed' },
-        sub: { key: 'uwRowFailed', keyParams: { reason: failedReasonKey(row) } },
+        sub: {
+          key: 'uwRowFailed',
+          keyParams: { reason: failedReasonKey(row) },
+          ...(row.failedReason === 'too_large' && row.maxBytes !== undefined
+            ? { reasonMaxBytes: row.maxBytes }
+            : {}),
+        },
         actions: [action('details'), action('saveAgain'), cancel],
       }
     case 'committed':
