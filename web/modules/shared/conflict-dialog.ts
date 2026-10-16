@@ -4,10 +4,12 @@
  * page sends (`save {reason}`). Each module only supplies its IO (`ConflictIo`) and maps the
  * outcome to its own save result; the host gets `conflictSaveResult()`.
  *
- * Step 1: the two-column table (your version / the version on UniWork, from both heads), then
- * Reload latest (primary), Overwrite… (danger, only with edit access), Cancel, the close X; first
- * focus Cancel. Overwrite… and Reload latest open their confirmation in the same card ("Back"
- * returns to step 1 and focuses the button that opened the step). Web Reload confirm: download my
+ * Step 1: the two-column table (your version / the version on UniWork, from both heads), "View
+ * differences" (only where the module supplies `viewDiff`: Docs), then Reload latest (primary),
+ * Save as a copy… (only with edit access and a `saveCopy` path), Overwrite… (danger, only with edit
+ * access), Cancel, the close X; first focus Cancel. Overwrite…, Save as a copy… and Reload latest
+ * open their confirmation in the same card ("Back" returns to step 1 and focuses the button that
+ * opened the step). Web Reload confirm: download my
  * version, then reload (only with the `download` capability and edit access) / discard changes and
  * reload / Back; after the host delivered the file the dialog asks the user to check it, never
  * reloading on its own.
@@ -51,6 +53,10 @@ export interface ConflictHead {
 export type OverwriteAttempt =
   { ok: true; versionId?: string; file?: FileMeta } | { ok: false; error: ProtocolErrorShape }
 
+/** what one Save-as-copy attempt answered; `title` is the new document's name (the Done line) */
+export type SaveCopyAttempt =
+  { ok: true; title: string } | { ok: false; error?: ProtocolErrorShape }
+
 export interface ConflictIo {
   /** the module's own wording (already translated): title, body and the three step-1 labels */
   title: string
@@ -66,6 +72,29 @@ export interface ConflictIo {
   overwrite(): Promise<OverwriteAttempt>
   /** replace the open document with the head; false when it could not be loaded */
   reload(): Promise<boolean>
+  /**
+   * Save as a copy (OQ-UX6; EXPERIENCE.md S5, step 2 "Save copy confirm"): the host owner
+   * implements this, the dialog only asks. Expected semantics:
+   * - creates a NEW document from my open bytes (the ones the Save that got the 409 holds), as its
+   *   first version, through the normal commit path; never the head's content shown as mine;
+   * - the copy keeps the source's owner, visibility and ACL (never wider), records provenance
+   *   (source, version, revision, checksum) and gets the server's default name "<name> (copy)";
+   * - this document stays open, unchanged, and no intent / save answer comes out of it: the dialog
+   *   goes back to step 1 and the user can still Reload or Overwrite;
+   * - resolves `{ok: true, title}` with the new document's name (the Done line quotes it);
+   *   `{ok: false}` for any refusal (`copy_consent_required`, `owner_requires_copy`, network):
+   *   the dialog shows the failed line, my changes are untouched.
+   * Offered only while `canEdit()`; offline the choice is aria-disabled. Set only by a host path
+   * that does all of the above; without it the choice is not offered.
+   */
+  saveCopy?(): Promise<SaveCopyAttempt>
+  /**
+   * "View differences" (OQ-UX9): builds the module's comparison of my version against the head
+   * (in the frame, from bytes the module already holds or reads; no host call). The dialog shows
+   * the returned content as its own step with Back, so it stays usable and the rest of the frame
+   * stays inert. Set by Docs only; every other module leaves it out and the link is not shown.
+   */
+  viewDiff?(): Promise<HTMLElement>
   /** the frame token still allows editing */
   canEdit(): boolean
   /** set only when the effective capabilities include `download` */
@@ -240,7 +269,7 @@ export function downloadVia(
 // ------------------------------------------------------------ the dialog
 
 type Step1 = 'reload' | 'overwrite' | 'cancel'
-type Id = Step1 | 'go' | 'back' | 'download' | 'discard' | 'close'
+type Id = Step1 | 'save-copy' | 'diff' | 'go' | 'back' | 'download' | 'discard' | 'close'
 
 const ORG_BLOCKED: Record<string, WebStringKey> = {
   organization_suspended: 'uwReasonSuspended',
@@ -275,6 +304,8 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
   let head: ConflictHead | null = null
   /** the table's box in step 1: refilled when the head arrives, without re-rendering the step */
   let tableBox: HTMLElement | null = null
+  /** the "View differences" link of step 1 (focus returns to it from the comparison) */
+  let diffEl: HTMLElement | null = null
   const headRead = io
     .readHead()
     .catch(() => null)
@@ -303,6 +334,7 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
     const why = online() ? null : t('uwConflictOfflineWeb')
     dialog.setChoiceDisabled('reload', why)
     dialog.setChoiceDisabled('overwrite', why)
+    dialog.setChoiceDisabled('save-copy', online() ? null : t('uwConflictSaveCopyOffline'))
   }
   window.addEventListener('online', applyOnline)
   window.addEventListener('offline', applyOnline)
@@ -361,6 +393,8 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
     tableBox = document.createElement('div')
     tableBox.append(table())
     content.append(tableBox)
+    diffEl = io.viewDiff ? diffLink() : null
+    if (diffEl) content.append(diffEl)
     const canEdit = io.canEdit()
     if (!canEdit) {
       const note = document.createElement('p')
@@ -378,6 +412,13 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
         ...(offline ? { disabled: true, reason: offlineWhy! } : {}),
       },
     ]
+    if (canEdit && io.saveCopy) {
+      choices.push({
+        id: 'save-copy',
+        label: t('uwConflictSaveCopy'),
+        ...(offline ? { disabled: true, reason: t('uwConflictSaveCopyOffline') } : {}),
+      })
+    }
     if (canEdit) {
       choices.push({
         id: 'overwrite',
@@ -397,9 +438,51 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
       focusId: focus === FOCUS_TITLE || choices.some((c) => c.id === focus) ? focus : 'cancel',
       alert,
     })
+    if (focus === 'diff') diffEl?.focus({ preventScroll: true })
     alert = ''
     return shown.finally(() => {
       onStep1 = false
+    })
+  }
+
+  /** "Xem khác biệt": a link-style button between the table and the actions, in DOM and Tab order */
+  function diffLink(): HTMLElement {
+    const b = document.createElement('button')
+    b.type = 'button'
+    b.className = 'ow-dlg-link'
+    b.dataset.choice = 'diff'
+    b.textContent = t('uwConflictViewDiff')
+    b.addEventListener('click', () => dialog.choose('diff'))
+    return b
+  }
+
+  function diffStep(view: HTMLElement): Promise<Id> {
+    return dialog.step({
+      title: t('uwConflictViewDiff'),
+      body: '',
+      content: view,
+      choices: [{ id: 'back', label: t('uwConflictBack') }],
+      cancelId: 'back',
+      closeId: 'cancel',
+      focusId: 'back',
+    })
+  }
+
+  function saveCopyStep(stepAlert = ''): Promise<Id> {
+    return dialog.step({
+      title: t('uwConflictSaveCopyTitle'),
+      body: format(t('uwConflictSaveCopyConfirm'), {
+        server: head?.revision ?? dash,
+        author: authorOf(head),
+      }),
+      choices: [
+        { id: 'go', label: t('uwConflictSaveCopyGo'), primary: true },
+        { id: 'back', label: t('uwConflictBack') },
+      ],
+      cancelId: 'back',
+      closeId: 'cancel',
+      focusId: 'back',
+      alert: stepAlert,
     })
   }
 
@@ -491,6 +574,41 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
       const choice = io.start === 'reload' ? 'reload' : await step1()
       focus = 'cancel'
       if (choice === 'cancel') return failure ?? { kind: 'cancelled' }
+
+      if (choice === 'diff') {
+        // the comparison is a step of the same card; a module that cannot build it stays on step 1
+        const view = await io.viewDiff!().catch((err: unknown) => {
+          console.warn('[office-web] building the comparison failed:', err)
+          return null
+        })
+        const left = view ? await diffStep(view) : 'back'
+        if (left === 'cancel') return failure ?? { kind: 'cancelled' }
+        focus = 'diff'
+        continue
+      }
+
+      if (choice === 'save-copy') {
+        // the confirmation names the head's revision and author, like Overwrite
+        await headRead
+        let stepAlert = ''
+        for (;;) {
+          const picked = await saveCopyStep(stepAlert)
+          stepAlert = ''
+          if (picked === 'cancel') return failure ?? { kind: 'cancelled' }
+          if (picked === 'back') {
+            focus = 'save-copy'
+            break
+          }
+          const res = await io.saveCopy!().catch((): SaveCopyAttempt => ({ ok: false }))
+          if (res.ok) {
+            // stay in the dialog: step 1 again, the Done line in its alert, nothing else changed
+            alert = format(t('uwConflictSaveCopyDone'), { title: res.title })
+            break
+          }
+          stepAlert = t('uwConflictSaveCopyFailed')
+        }
+        continue
+      }
 
       if (choice === 'overwrite') {
         // the confirmation names the head's revision and author

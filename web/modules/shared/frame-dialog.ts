@@ -230,6 +230,8 @@ function inertSiblings(mask: HTMLElement): () => void {
 export interface FrameDialogHandle<T extends string> {
   /** shows a step in the same card; resolves with the chosen id (Escape: `cancelId`) */
   step(step: FrameDialogStep<T>, opts?: { closeOnAnswer?: boolean }): Promise<T>
+  /** answers the shown step as if the user had picked `id` (a control the caller put in `content`) */
+  choose(id: T): void
   /** writes the dialog's own alert line (empty clears it) */
   setAlert(text: string): void
   /**
@@ -435,6 +437,9 @@ export function openFrameDialog<T extends string>(
         prior?.resolve(prior.step.cancelId)
         render(step)
       })
+    },
+    choose(choice) {
+      if (current) answer(choice)
     },
     setAlert(text) {
       alert.textContent = text

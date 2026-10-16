@@ -12,6 +12,7 @@ import {
   type ConflictIo,
   type ConflictOutcome,
   type OverwriteAttempt,
+  type SaveCopyAttempt,
 } from './conflict-dialog'
 import { onFrameModal } from './frame-dialog'
 import { webText, type WebStringKey } from './i18n/strings-web'
@@ -631,6 +632,152 @@ describe('Reload latest (web)', () => {
     await pick('reload')
     card().querySelector<HTMLButtonElement>('.ow-dlg-close')!.click()
     expect(await done).toEqual({ kind: 'cancelled' })
+  })
+})
+
+describe('Save as a copy… (S5-03)', () => {
+  const copy = () =>
+    vi.fn(async (): Promise<SaveCopyAttempt> => ({ ok: true, title: 'Notes (copy)' }))
+
+  it('sits between Reload latest and Overwrite… with edit access', async () => {
+    void runConflictDialog(io({ saveCopy: copy() }))
+    await shown()
+    expect(choices()).toEqual(['reload', 'save-copy', 'overwrite', 'cancel'])
+    expect(btn('save-copy').textContent).toBe(t('uwConflictSaveCopy'))
+    // DOM order = Tab order: Reload, copy, Overwrite
+    const ids = [...card().querySelectorAll<HTMLElement>('button')].map((b) => b.dataset.choice)
+    expect(ids.indexOf('reload')).toBeLessThan(ids.indexOf('save-copy'))
+    expect(ids.indexOf('save-copy')).toBeLessThan(ids.indexOf('overwrite'))
+  })
+
+  it('is not offered without edit access or without a host path that makes the copy', async () => {
+    void runConflictDialog(io({ saveCopy: copy(), canEdit: () => false }))
+    await shown()
+    expect(choices()).toEqual(['reload', 'cancel'])
+    document.body.replaceChildren()
+    void runConflictDialog(io())
+    await shown()
+    expect(choices()).toEqual(['reload', 'overwrite', 'cancel'])
+  })
+
+  it('offline: aria-disabled with its own reason, follows the network', async () => {
+    let up = false
+    void runConflictDialog(io({ saveCopy: copy(), online: () => up }))
+    await shown()
+    expect(btn('save-copy').getAttribute('aria-disabled')).toBe('true')
+    expect(
+      document.getElementById(btn('save-copy').getAttribute('aria-describedby')!)!.textContent,
+    ).toBe(t('uwConflictSaveCopyOffline'))
+    up = true
+    window.dispatchEvent(new Event('online'))
+    expect(btn('save-copy').hasAttribute('aria-disabled')).toBe(false)
+  })
+
+  it('opens its confirmation in the same card; Back returns to step 1 with the focus on it', async () => {
+    const saveCopy = copy()
+    void runConflictDialog(io({ saveCopy }))
+    await pick('save-copy')
+    expect(card().querySelector('.ow-dlg-title')!.textContent).toBe(t('uwConflictSaveCopyTitle'))
+    expect(card().textContent).toContain('Trần An')
+    expect(choices()).toEqual(['go', 'back'])
+    expect(document.activeElement).toBe(btn('back'))
+    btn('back').click()
+    await flush()
+    expect(choices()).toEqual(['reload', 'save-copy', 'overwrite', 'cancel'])
+    expect(document.activeElement).toBe(btn('save-copy'))
+    expect(saveCopy).not.toHaveBeenCalled()
+  })
+
+  it('Create copy: back to step 1 with the Done line, focus Cancel, no answer to the save', async () => {
+    const saveCopy = copy()
+    const settled = vi.fn()
+    void runConflictDialog(io({ saveCopy })).then(settled)
+    await pick('save-copy')
+    await pick('go')
+    expect(saveCopy).toHaveBeenCalledTimes(1)
+    expect(choices()).toEqual(['reload', 'save-copy', 'overwrite', 'cancel'])
+    expect(alertLine().textContent).toBe(t('uwConflictSaveCopyDone', { title: 'Notes (copy)' }))
+    expect(document.activeElement).toBe(btn('cancel'))
+    await flush()
+    expect(settled).not.toHaveBeenCalled()
+  })
+
+  it('a failed copy stays on the confirmation with the failure line', async () => {
+    const saveCopy = vi.fn(async (): Promise<SaveCopyAttempt> => ({ ok: false }))
+    const done = runConflictDialog(io({ saveCopy }))
+    await pick('save-copy')
+    await pick('go')
+    expect(choices()).toEqual(['go', 'back'])
+    expect(alertLine().textContent).toBe(t('uwConflictSaveCopyFailed'))
+    // closing from there is a plain cancel: the host's save stays unanswered by any new version
+    card().querySelector<HTMLButtonElement>('.ow-dlg-close')!.click()
+    expect(await done).toEqual({ kind: 'cancelled' })
+  })
+})
+
+describe('View differences (S5-04)', () => {
+  const view = (text = 'diff body') => {
+    const el = document.createElement('div')
+    el.className = 'the-diff'
+    el.textContent = text
+    return el
+  }
+
+  it('is a button between the table and Reload latest, in DOM order, when the module has a compare view', async () => {
+    void runConflictDialog(io({ viewDiff: async () => view() }))
+    await shown()
+    const diff = btn('diff')
+    expect(diff.textContent).toBe(t('uwConflictViewDiff'))
+    const follows = (a: Element, b: Element) =>
+      !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(follows(card().querySelector('table')!, diff)).toBe(true)
+    expect(follows(diff, btn('reload'))).toBe(true)
+  })
+
+  it('other modules leave it out', async () => {
+    void runConflictDialog(io())
+    await shown()
+    expect(document.querySelector('[data-choice="diff"]')).toBeNull()
+  })
+
+  it('opens the comparison as a step of the same card; Back returns to step 1 with the focus on the link', async () => {
+    const viewDiff = vi.fn(async () => view())
+    const done = vi.fn()
+    void runConflictDialog(io({ viewDiff })).then(done)
+    await pick('diff')
+    expect(viewDiff).toHaveBeenCalledTimes(1)
+    expect(document.querySelectorAll('[role="alertdialog"]')).toHaveLength(1)
+    expect(card().querySelector('.the-diff')!.textContent).toBe('diff body')
+    expect(card().querySelector('.ow-dlg-title')!.textContent).toBe(t('uwConflictViewDiff'))
+    expect(choices()).toEqual(['back'])
+    expect(document.activeElement).toBe(btn('back'))
+    btn('back').click()
+    await flush()
+    expect(choices()).toEqual(['diff', 'reload', 'overwrite', 'cancel'])
+    expect(document.activeElement).toBe(btn('diff'))
+    expect(done).not.toHaveBeenCalled()
+  })
+
+  it('the X on the comparison cancels the whole dialog', async () => {
+    const done = runConflictDialog(io({ viewDiff: async () => view() }))
+    await pick('diff')
+    card().querySelector<HTMLButtonElement>('.ow-dlg-close')!.click()
+    expect(await done).toEqual({ kind: 'cancelled' })
+  })
+
+  it('a compare view that throws leaves the dialog on step 1', async () => {
+    const done = vi.fn()
+    void runConflictDialog(
+      io({
+        viewDiff: async () => {
+          throw new Error('no panel')
+        },
+      }),
+    ).then(done)
+    await pick('diff')
+    await flush()
+    expect(choices()).toEqual(['diff', 'reload', 'overwrite', 'cancel'])
+    expect(done).not.toHaveBeenCalled()
   })
 })
 
