@@ -67,7 +67,9 @@ test.describe('html preview policy (desktop)', () => {
       // the document rendered and its inline script ran (default-src 'none' did not break it)
       await expect(frame.locator('#ran')).toHaveText('inline script ran')
       // Chromium reported the blocked requests as violations of the two directives
-      await expect(frame.locator('#violations li')).toContainText(['connect-src', 'frame-src'])
+      // (each on its own: the order the two events land in is not part of the contract)
+      await expect(frame.locator('#violations li', { hasText: 'connect-src' })).toHaveCount(1)
+      await expect(frame.locator('#violations li', { hasText: 'frame-src' })).toHaveCount(1)
       await editorPage.screenshot({ path: screenshotPath('html-preview-csp') })
       // and neither request ever left the page: the local server saw nothing
       await new Promise((resolve) => setTimeout(resolve, 500))
