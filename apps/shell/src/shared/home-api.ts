@@ -232,9 +232,8 @@ export interface UniworkDocSummary {
   /** the row is in the trash (`archived_at` present); it stays listed so it can be restored */
   archived?: boolean
   /**
-   * FD-11: what the row is. Absent on a row from a route the app reads as
-   * files only (`listDocuments`, shared-with-me), whose rows are all files
-   * anyway; `listChildren` and the title search carry it.
+   * FD-11: what the row is. Always present on `listChildren` and search rows;
+   * `'file'` on the library (`listDocuments`) and shared-with-me routes.
    */
   kind?: UniworkEntryKind
   /** FD-11: the folder/page holding the document; null = the workspace root */
