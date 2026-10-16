@@ -53,6 +53,7 @@ import {
   type SaveCoordinatorDeps,
 } from '../src/main/uniwork-docs/save-coordinator'
 import { UniworkDocsService } from '../src/main/uniwork-docs/service'
+import { QueueDispatcher } from '../src/main/uniwork-sync/queue/dispatcher'
 import { transition } from '../src/main/uniwork-sync/queue/machine'
 import { buildSyncCenterSnapshot, type SyncCenterFacts } from '../src/main/uniwork-sync/sync-center'
 import type { IntentRecordV2 } from '../src/main/uniwork-sync/queue/record'
@@ -759,6 +760,238 @@ describe('SIZE-F1 desktop document size limits', () => {
         reasonMaxBytes: 209_715_200,
       })
       expect(failedReasonKey({ ...row, maxBytes: undefined })).toBe('uwReasonTooLarge')
+    })
+
+    it('keeps the intent record and payload as failed/too_large on an inline 413, never auto-replays it, and guards against overwriting a newer generation (d1-2)', async () => {
+      const tmp = mkdtempSync(join(tmpdir(), 'uw-size-413-'))
+      try {
+        const docPath = join(tmp, 'Report.docx')
+        const baseBytes = enc('base')
+        const bodyBytes = enc('updated-payload-under-client-cap')
+        writeFileSync(docPath, bodyBytes)
+
+        const binding: Binding = {
+          schema: 2,
+          documentId: DOC_ID,
+          orgId: ORG_ID,
+          workspaceId: WS_ID,
+          title: 'Report.docx',
+          filename: 'Report.docx',
+          format: 'docx',
+          access: 'edit',
+          baseRevision: '10',
+          baseVersion: 1,
+          baseChecksum: sha256Hex(baseBytes),
+          state: 'saved',
+          minStoreLevel: 1,
+          minAppVersion: '0.0.0',
+        }
+        const docs = new Map<string, BoundDocument>([
+          [
+            docPath,
+            {
+              path: docPath,
+              dir: tmp,
+              deploymentId: 'default',
+              userId: 'acc_1',
+              key: DOC_ID,
+              binding,
+            },
+          ],
+        ])
+        const stored = new Map<string, { intent: IntentRecordV2; payload: Uint8Array }>()
+        const put = vi.fn(async (key: string, intent: IntentRecordV2, payload: Uint8Array) => {
+          stored.set(key, { intent, payload })
+          return { kind: 'ok' as const }
+        })
+        const remove = vi.fn(async (key: string) => {
+          stored.delete(key)
+        })
+        const intents: IntentStore = {
+          async get(key) {
+            return (stored.get(key) ?? null) as unknown as PendingIntentValue | null
+          },
+          async read(key) {
+            return stored.get(key) ?? null
+          },
+          put,
+          delete: remove,
+        }
+
+        let uploadCalls = 0
+        let uploadImpl: (input: { bytes: Uint8Array }) => Promise<{
+          uploadId: string
+          checksumSha256: string
+          claimExpiresAt: null
+        }> = async () => {
+          uploadCalls += 1
+          throw errorFromResponse(413, {
+            error: {
+              code: 'file_too_large',
+              message: 'tệp vượt quá dung lượng cho phép',
+              fields: { max_bytes: 500, size_bytes: bodyBytes.byteLength },
+            },
+          })
+        }
+
+        const coordinator = new SaveCoordinator({
+          store: {
+            classify: (path: string) =>
+              docs.has(path)
+                ? { kind: 'bound' as const, doc: docs.get(path)! }
+                : { kind: 'plain' as const },
+            lookup: (path: string) => docs.get(path) ?? null,
+            write: async (writtenDir: string, next: Binding) => {
+              for (const [path, doc] of docs) {
+                if (doc.dir === writtenDir) docs.set(path, { ...doc, binding: next })
+              }
+              return true
+            },
+          } as never,
+          client: {
+            upload: (input) => uploadImpl(input),
+            commit: async () => {
+              throw new UniworkDocError('server_error')
+            },
+            getDocument: async () => {
+              throw new UniworkDocError('not_found')
+            },
+          },
+          isSignedIn: () => true,
+          ownsBinding: () => true,
+          intents: async () => ({ kind: 'ok', intents }),
+          publish: () => undefined,
+          now: () => new Date(ISO),
+          uuid: () => 'u413',
+        })
+
+        const ended = await coordinator.save(docPath)
+        expect(ended!.binding).toMatchObject({
+          state: 'failed',
+          error: 'too_large',
+          sizeBytes: bodyBytes.byteLength,
+          maxBytes: 500,
+        })
+        expect(remove).not.toHaveBeenCalled()
+        const parked = stored.get(DOC_ID)
+        expect(parked).toBeDefined()
+        expect(parked!.intent).toMatchObject({
+          state: 'failed',
+          lastError: 'too_large',
+          maxBytes: 500,
+          generation: 1,
+        })
+        expect(parked!.payload).toEqual(bodyBytes)
+
+        // Dispatcher poll does NOT auto-replay a failed record; dispatcher path on a queued
+        // record hitting 413 is unchanged and parks failed/too_large with maxBytes too
+        const dispatcher = new QueueDispatcher({
+          intents: async () => ({ kind: 'ok', intents: intents as never }),
+          client: {
+            upload: (input: { bytes: Uint8Array }) => uploadImpl(input),
+            commit: async () => {
+              throw new UniworkDocError('server_error')
+            },
+            lookupCommit: async () => ({ outcome: 'not_committed' as const }),
+          },
+          capability: {
+            get: async () => ({ kind: 'ok', capabilities: { sync_write: true }, source: 'live' }),
+          },
+          lock: {
+            acquire: async () => ({ kind: 'held', generation: 1 }),
+            check: async () => true,
+            heartbeat: async () => true,
+            release: async () => undefined,
+          },
+          pause: {
+            isPaused: async () => false,
+            setPaused: async () => ({ kind: 'ok' as const }),
+          },
+          drafts: { keep: async () => 'ok' as const },
+          clock: () => Date.parse(ISO),
+          uuid: () => 'd413',
+          publish: () => undefined,
+        } as never)
+
+        uploadCalls = 0
+        const pollFailed = await dispatcher.dispatchAll([
+          {
+            key: DOC_ID,
+            path: docPath,
+            filename: 'Report.docx',
+            format: 'docx',
+            orgId: ORG_ID,
+            workspaceId: WS_ID,
+            baseVersion: 1,
+            record: parked!.intent,
+            payload: parked!.payload,
+          },
+        ])
+        expect(pollFailed.dispatched).toBe(0)
+        expect(uploadCalls).toBe(0)
+
+        const queuedRecord: IntentRecordV2 = {
+          ...parked!.intent,
+          state: 'queued',
+          lastError: undefined,
+          maxBytes: undefined,
+        }
+        stored.set(DOC_ID, { intent: queuedRecord, payload: bodyBytes })
+        const dispatched413 = await dispatcher.dispatchAll([
+          {
+            key: DOC_ID,
+            path: docPath,
+            filename: 'Report.docx',
+            format: 'docx',
+            orgId: ORG_ID,
+            workspaceId: WS_ID,
+            baseVersion: 1,
+            record: queuedRecord,
+            payload: bodyBytes,
+          },
+        ])
+        expect(dispatched413.outcomes.get(DOC_ID)).toBe('failed')
+        expect(stored.get(DOC_ID)?.intent).toMatchObject({
+          state: 'failed',
+          lastError: 'too_large',
+          maxBytes: 500,
+        })
+
+        // Generation guard (settleRecord): if a newer intent (generation 2) took the document
+        // key while the inline 413 was in flight, settleRecord leaves generation 2 untouched
+        stored.clear()
+        const newerIntent: IntentRecordV2 = {
+          v: 2,
+          intentId: 'office-intent-newer',
+          idempotencyKey: 'office-key-newer',
+          documentId: DOC_ID,
+          orgId: ORG_ID,
+          workspaceId: WS_ID,
+          baseRevision: '10',
+          baseVersion: 1,
+          checksum: sha256Hex(enc('newer')),
+          length: 5,
+          generation: 2,
+          state: 'queued',
+          attempt: 0,
+          createdAt: ISO,
+          updatedAt: ISO,
+        }
+        uploadImpl = async () => {
+          stored.set(DOC_ID, { intent: newerIntent, payload: enc('newer') })
+          throw errorFromResponse(413, {
+            error: {
+              code: 'file_too_large',
+              message: 'tệp vượt quá dung lượng cho phép',
+              fields: { max_bytes: 500 },
+            },
+          })
+        }
+        await coordinator.save(docPath)
+        expect(stored.get(DOC_ID)?.intent).toEqual(newerIntent)
+      } finally {
+        rmSync(tmp, { recursive: true, force: true })
+      }
     })
   })
 

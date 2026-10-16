@@ -914,7 +914,7 @@ export class SaveCoordinator {
     intents: IntentStore,
   ): Promise<BoundDocument> {
     const base = doc.binding
-    const dropped = isTerminalRefusal(error)
+    const dropped = isTerminalRefusal(error) && error.code !== 'too_large'
     if (dropped) {
       await this.cleanupIntent(intents, doc, intent)
       this.pendingNext.delete(doc.path)
@@ -961,6 +961,17 @@ export class SaveCoordinator {
         // the upload claim expired: look the intent up before touching bytes again
         return this.commitState(doc, { ...base, state: 'reconciling' })
       case 'too_large':
+        // SIZE-F1 §5.2 item 3 (d1-2): keep the intent and its payload as a
+        // durable `failed` record (`lastError: 'too_large'`, `maxBytes` when
+        // the server named one) under the same generation guard as conflict and
+        // document_archived (OQ-F12), so the payload stays untouched and no
+        // poll auto-replays it.
+        this.pendingNext.delete(doc.path)
+        await this.settleRecord(intents, doc, intent, {
+          type: 'commitFailed',
+          error: 'too_large',
+          ...(error.maxBytes !== undefined ? { maxBytes: error.maxBytes } : {}),
+        })
         return this.commitState(doc, {
           ...base,
           state: 'failed',
