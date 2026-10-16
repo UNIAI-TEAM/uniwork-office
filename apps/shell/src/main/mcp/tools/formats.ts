@@ -3,8 +3,9 @@
  * "which document formats each editor can open, save and export".
  *
  * The authority is the shell's own routing and each editor's Save-As dialog:
- *   - open routing:      apps/shell/src/main/index.ts  (routeDocumentPath,
- *                        UNSUPPORTED_DOC_RE) and the shared filter list
+ *   - open routing:      apps/shell/src/main/index.ts (routeDocumentPath), the
+ *                        extension predicates in apps/shell/src/main/app-routing.ts
+ *                        and the shared filter list
  *                        apps/shell/src/shared/open-extensions.ts
  *   - save/export filters: apps/docs|sheets|slides|markdown|html/src/main/*
  *
