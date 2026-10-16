@@ -211,11 +211,14 @@ export function onFrameModal(listener: ModalListener): () => void {
   return () => modalListeners.delete(listener)
 }
 
-/** the rest of the frame leaves the tree while a dialog is open (screen-reader browse mode too) */
+/**
+ * the rest of the frame leaves the tree while a dialog is open (screen-reader browse mode too);
+ * the window's live nodes stay out of it, since an inert ancestor silences them
+ */
 function inertSiblings(mask: HTMLElement): () => void {
   const changed: Element[] = []
   for (const el of document.body.children) {
-    if (el === mask || el.hasAttribute('inert')) continue
+    if (el === mask || el.hasAttribute('inert') || el.classList.contains('uw-live')) continue
     el.setAttribute('inert', '')
     changed.push(el)
   }
