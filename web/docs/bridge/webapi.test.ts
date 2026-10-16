@@ -260,18 +260,21 @@ describe('saveDocx', () => {
     )
     // the host learns that a frame modal is open (protocol `modal`)
     expect(mock.modals).toEqual([true])
-    // Tab cycles inside the dialog (reload, overwrite, the way out, then the close X), starting
-    // from Cancel: cancel -> X -> reload -> overwrite; Shift+Tab goes back
+    // Tab cycles inside the dialog (View differences, reload, overwrite, the way out, then the
+    // close X), starting from Cancel: cancel -> X -> diff -> reload -> overwrite; Shift+Tab goes back
     const tab = (shiftKey = false) =>
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey, bubbles: true }))
     tab()
     expect(document.activeElement).toBe(dlg.querySelector('.ow-dlg-close'))
+    tab()
+    expect(document.activeElement).toBe(btn('diff'))
     tab()
     expect(document.activeElement).toBe(btn('reload'))
     tab()
     expect(document.activeElement).toBe(btn('overwrite'))
     tab(true)
     expect(document.activeElement).toBe(btn('reload'))
+    tab(true)
     tab(true)
     tab(true)
     expect(document.activeElement).toBe(btn('cancel'))

@@ -69,6 +69,8 @@ export const ja = {
 
   // S5 conflict dialog: step 1 extras, confirmation step and results
   uwConflictViewDiff: '差分を表示',
+  uwConflictDiffPending: '比較しています…',
+  uwConflictDiffFailed: '今はバージョンを比較できません。後でもう一度お試しください。',
   uwConflictNoEdit: 'このドキュメントの編集権限がなくなりました。',
   uwConflictOverwriteTitle: 'あなたのバージョンで上書きしますか？',
   uwConflictOverwriteConfirm:

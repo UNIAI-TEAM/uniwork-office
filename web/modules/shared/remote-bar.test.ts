@@ -60,7 +60,8 @@ describe('createRemoteBar', () => {
     const b = createRemoteBar()
     b.show({ tone: 'info', region: 'remote', text: 'Updated.' })
     expect(document.querySelector('[role=status]')!.textContent).toBe('Updated.')
-    expect(document.querySelector('[role=alert]')).toBeNull()
+    // the assertive node is there from the start, and still empty
+    expect(document.querySelector('[role=alert]')!.textContent).toBe('')
     b.show({ tone: 'error', region: 'lock', text: 'No access.' })
     const alert = document.querySelector('[role=alert]')!
     expect(alert.textContent).toBe('No access.')
@@ -78,7 +79,7 @@ describe('createRemoteBar', () => {
     expect(document.querySelector('[role=status]')!.textContent).toBe(
       'A newer version is on UniWork.',
     )
-    expect(document.querySelector('[role=alert]')).toBeNull()
+    expect(document.querySelector('[role=alert]')!.textContent).toBe('')
     b.show({ tone: 'error', region: 'lock', text: 'No access.' })
     expect(document.querySelector('[role=alert]')!.textContent).toBe('No access.')
     // the warning did not leak into the assertive node
@@ -130,5 +131,35 @@ describe('createRemoteBar', () => {
     b.show({ tone: 'warn', region: 'remote', text: 'Newer.' })
     vi.advanceTimersByTime(60_000)
     expect(bar()).not.toBeNull()
+  })
+})
+
+describe('the window live nodes (UXF-10)', () => {
+  const pair = () => ({
+    status: document.querySelectorAll('.uw-live[role="status"]'),
+    alert: document.querySelectorAll('.uw-live[role="alert"]'),
+  })
+
+  it('exist right after frame init with no announcement: one empty pair', () => {
+    createRemoteBar()
+    expect(pair().status).toHaveLength(1)
+    expect(pair().alert).toHaveLength(1)
+    expect(pair().status[0]!.textContent).toBe('')
+    expect(pair().alert[0]!.textContent).toBe('')
+    expect(pair().status[0]!.getAttribute('aria-live')).toBe('polite')
+    expect(pair().alert[0]!.getAttribute('aria-live')).toBe('assertive')
+  })
+
+  it('stay one pair per frame: a second bar and every announcement reuse it', () => {
+    const first = createRemoteBar()
+    const second = createRemoteBar()
+    const before = [...document.querySelectorAll('.uw-live')]
+    first.show({ tone: 'info', region: 'remote', text: 'Updated.' })
+    second.show({ tone: 'error', region: 'lock', text: 'No access.' })
+    expect(pair().status).toHaveLength(1)
+    expect(pair().alert).toHaveLength(1)
+    expect([...document.querySelectorAll('.uw-live')]).toEqual(before)
+    expect(pair().status[0]!.textContent).toBe('Updated.')
+    expect(pair().alert[0]!.textContent).toBe('No access.')
   })
 })

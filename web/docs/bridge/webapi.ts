@@ -70,6 +70,7 @@ import {
 import { TIMEOUTS, errorCode, type FramePort } from './frame-port'
 import { ownHeadAfterUnknown } from './head-match'
 import { downloadBlob, printFrame } from './browser'
+import { buildDiff, diffFailure } from './conflict-diff'
 import { ask, conflictFrame, hideFatal, onModalChange, showFatal, text } from './notice'
 import {
   conflictSaveResult,
@@ -475,6 +476,17 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
         return true
       },
       canEdit: () => !isViewOnly(fileId),
+      // "View differences": my bytes against the head's, read now; the head is not adopted
+      // (no `remember`): the etag the next save uses stays the one the user is resolving
+      viewDiff: async () => {
+        try {
+          const head = await port.request('api.open', { fileId }, { timeoutMs: TIMEOUTS.transfer })
+          if (head?.file?.fileId !== fileId) throw new Error('the head could not be read')
+          return await buildDiff(data, await readSource(head.source), head.file.name)
+        } catch (err) {
+          return diffFailure(err)
+        }
+      },
       download: downloadVia(port, grants, () => data, {
         size: data.byteLength,
         maxBytes: downloadCap(),

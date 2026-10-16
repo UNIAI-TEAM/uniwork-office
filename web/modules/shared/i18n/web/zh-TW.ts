@@ -58,6 +58,8 @@ export const zhTW = {
 
   // S5 conflict dialog: step 1 extras, confirmation step and results
   uwConflictViewDiff: '檢視差異',
+  uwConflictDiffPending: '正在比較…',
+  uwConflictDiffFailed: '目前無法比較，請稍後再試。',
   uwConflictNoEdit: '你已無權編輯此文件。',
   uwConflictOverwriteTitle: '用你的版本覆寫？',
   uwConflictOverwriteConfirm:

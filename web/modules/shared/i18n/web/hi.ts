@@ -69,6 +69,8 @@ export const hi = {
 
   // S5 conflict dialog: step 1 extras, confirmation step and results
   uwConflictViewDiff: 'अंतर देखें',
+  uwConflictDiffPending: 'तुलना की जा रही है…',
+  uwConflictDiffFailed: 'अभी संस्करणों की तुलना नहीं हो सकी। बाद में फिर कोशिश करें।',
   uwConflictNoEdit: 'अब आपके पास इस दस्तावेज़ को संपादित करने की पहुँच नहीं है।',
   uwConflictOverwriteTitle: 'अपने संस्करण से अधिलेखित करें?',
   uwConflictOverwriteConfirm:
