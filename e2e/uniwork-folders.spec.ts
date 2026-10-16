@@ -333,6 +333,20 @@ test.describe.serial('UniWork folders (FD-11)', () => {
       await expect(contents.getByRole('option', { name: /^Moving Subfolder/ })).toBeVisible()
       await expect(contents.getByRole('option', { name: /^moving-roadmap\.docx/ })).toBeVisible()
 
+      // Rename `Moving Subfolder` on the web and advance the feed with `Target Hub` still open
+      stub.webRename(movingSub.id, 'Renamed Subfolder')
+      await triggerFeedTick(shell)
+
+      await expect(contents.getByRole('option')).toHaveText(
+        [/^Renamed Subfolder/, /^moving-roadmap\.docx/],
+        { timeout: 15_000 },
+      )
+      await expect(contents.getByRole('option', { name: /^Renamed Subfolder/ })).toBeVisible()
+      await expect(contents.getByRole('option', { name: /^Moving Subfolder/ })).toBeHidden()
+      await expect.poll(() => treeChildrenOf(tree, 'Target Hub')).toEqual(['Renamed Subfolder'])
+      await expect(tree.getByRole('treeitem', { name: 'Renamed Subfolder' })).toBeVisible()
+      await expect(tree.getByRole('treeitem', { name: 'Moving Subfolder' })).toBeHidden()
+
       // Navigate into `Source Hub` › `Vanishing Leaf`, then archive `Vanishing Leaf` on the web
       await tree.getByRole('treeitem', { name: 'Source Hub' }).click()
       await contents.getByRole('option', { name: /^Vanishing Leaf/ }).dblclick()
