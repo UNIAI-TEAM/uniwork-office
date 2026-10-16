@@ -3319,12 +3319,13 @@ export class UniworkDocsService {
       if (!q || typeof q.workspaceId !== 'string' || !q.workspaceId) {
         throw new UniworkDocError('not_found')
       }
-      return this.api().listChildren({
+      const page = await this.api().listChildren({
         workspaceId: q.workspaceId,
         parentId: typeof q.parentId === 'string' && q.parentId ? q.parentId : null,
         ...(typeof q.cursor === 'string' ? { cursor: q.cursor } : {}),
         ...(typeof q.limit === 'number' ? { limit: q.limit } : {}),
       })
+      return { items: page.documents, nextCursor: page.nextCursor }
     })
   }
 
@@ -3334,13 +3335,14 @@ export class UniworkDocsService {
       if (!q || typeof q.workspaceId !== 'string' || !q.workspaceId) {
         throw new UniworkDocError('not_found')
       }
-      return this.api().searchDocuments({
+      const page = await this.api().searchDocuments({
         workspaceId: q.workspaceId,
         query: typeof q.query === 'string' ? q.query : '',
         kind: q.kind === 'folder' || q.kind === 'document' ? q.kind : 'all',
         ...(typeof q.cursor === 'string' ? { cursor: q.cursor } : {}),
         ...(typeof q.limit === 'number' ? { limit: q.limit } : {}),
       })
+      return { items: page.documents, nextCursor: page.nextCursor }
     })
   }
 

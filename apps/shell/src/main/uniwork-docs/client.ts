@@ -3,6 +3,7 @@ import type {
   UniworkDocFormat,
   UniworkDocNewFormat,
   UniworkDocSummary,
+  UniworkFolderNode,
   UniworkWorkspaceRef,
 } from '../../shared/home-api'
 import { TransportError } from '../uniwork-auth/transport'

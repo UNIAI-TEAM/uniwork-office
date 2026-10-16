@@ -286,8 +286,18 @@ function fakeServer(
       }
       return json(200, {
         documents: [
-          { id: 'fold_1', kind: 'folder', title: 'Contracts' },
-          { id: 'doc_x', kind: 'file', title: 'ignored.docx' },
+          {
+            id: 'fold_1',
+            kind: 'folder',
+            title: 'Contracts',
+            updated_at: '2026-10-13T09:00:00Z',
+          },
+          {
+            id: 'doc_x',
+            kind: 'file',
+            title: 'ignored.docx',
+            updated_at: '2026-10-13T09:00:00Z',
+          },
         ],
         next_cursor: null,
       })
@@ -889,6 +899,66 @@ describe('folders', () => {
     expect(
       await asText.service.createFolder({ workspaceId: WS, parentId: 'fold_1', title: 'Deep' }),
     ).toEqual({ ok: false, error: 'document_too_deep', max: 12 })
+  })
+
+  // FD11-B-R1-06 / B-R1-01: service-level tests driving listChildren and
+  // searchDocuments through the fake server and asserting `{ items, nextCursor }`
+  it('lists root children with parent_id= and answers value.items', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const root = await ctx.service.listChildren({ workspaceId: WS, parentId: null })
+    expect(root.ok).toBe(true)
+    if (!root.ok) return
+    expect(root.value).toEqual({
+      items: [
+        {
+          id: 'fold_1',
+          kind: 'folder',
+          title: 'Contracts',
+          workspaceId: WS,
+          format: null,
+          updatedAt: '2026-10-13T09:00:00Z',
+          canEdit: false,
+          canManage: false,
+          archived: false,
+          parentId: null,
+        },
+        {
+          id: 'doc_x',
+          kind: 'file',
+          title: 'ignored.docx',
+          workspaceId: WS,
+          format: 'docx',
+          updatedAt: '2026-10-13T09:00:00Z',
+          canEdit: false,
+          canManage: false,
+          archived: false,
+          parentId: null,
+        },
+      ],
+      nextCursor: null,
+    })
+    const call = server.calls.find((c) => c.path === `/api/v1/workspaces/${WS}/documents`)!
+    expect(call.query).toContain('parent_id=')
+    expect(call.query).not.toContain('parent_id=null')
+  })
+
+  it('searches documents with match=title, maps unknown kind to all, and answers value.items', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const found = await ctx.service.searchDocuments({
+      workspaceId: WS,
+      query: 'Contracts',
+      kind: 'unknown' as 'all',
+    })
+    expect(found.ok).toBe(true)
+    if (!found.ok) return
+    expect(found.value.items.map((row) => row.id)).toEqual(['fold_1', 'doc_x'])
+    expect(found.value.nextCursor).toBeNull()
+    const call = server.calls.find((c) => c.path === `/api/v1/workspaces/${WS}/documents`)!
+    expect(call.query).toContain('match=title')
+    expect(call.query).toContain('q=Contracts')
+    expect(call.query).not.toContain('kind=')
   })
 })
 
