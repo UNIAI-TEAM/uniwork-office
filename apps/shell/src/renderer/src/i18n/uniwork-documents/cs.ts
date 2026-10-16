@@ -149,4 +149,13 @@ export const cs = {
   uwDocUploading: 'Nahrávání „{name}“…',
   uwDocLocationTop: 'Nejvyšší úroveň',
   uwDocArchived: 'Archivováno',
+  uwSizeWarnChip: 'Blíží se limitu {max} (aktuálně {size}).',
+  uwSaveBlockTitle: 'Nepodařilo se uložit do UniWork',
+  uwSaveBlockBody:
+    'Tento dokument překračuje {max}. Vaše změny jsou stále zde. Stáhněte si kopii do počítače a poté zmenšete obrázky nebo dokument rozdělte.',
+  uwSaveBlockSaveCopyLocal: 'Uložit kopii do počítače',
+  uwClose: 'Zavřít',
+  uwErrUploadTooLarge:
+    '{name} má {size}, což překračuje limit {max}. Zmenšete obrázky nebo soubor rozdělte a nahrajte jej znovu.',
+  uwReasonTooLargeWithLimit: 'přes limit {max}',
 } satisfies Record<keyof typeof zh, string>

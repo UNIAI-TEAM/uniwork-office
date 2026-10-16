@@ -151,4 +151,13 @@ export const id = {
   uwDocUploading: 'Mengunggah “{name}”…',
   uwDocLocationTop: 'Tingkat teratas',
   uwDocArchived: 'Diarsipkan',
+  uwSizeWarnChip: 'Mendekati batas {max} (saat ini {size}).',
+  uwSaveBlockTitle: 'Tidak dapat menyimpan ke UniWork',
+  uwSaveBlockBody:
+    'Dokumen ini melebihi {max}. Perubahan Anda masih ada di sini. Unduh salinan Anda ke komputer, lalu perkecil ukuran gambar atau bagi dokumen.',
+  uwSaveBlockSaveCopyLocal: 'Simpan salinan ke komputer',
+  uwClose: 'Tutup',
+  uwErrUploadTooLarge:
+    '{name} berukuran {size}, melebihi batas {max}. Perkecil ukuran gambar atau bagi file, lalu unggah lagi.',
+  uwReasonTooLargeWithLimit: 'melebihi batas {max}',
 } satisfies Record<keyof typeof zh, string>

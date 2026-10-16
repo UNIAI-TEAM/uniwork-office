@@ -149,4 +149,13 @@ export const ko = {
   uwDocUploading: '“{name}” 업로드 중…',
   uwDocLocationTop: '최상위',
   uwDocArchived: '보관됨',
+  uwSizeWarnChip: '{max} 한도에 가까워지고 있습니다(현재 {size}).',
+  uwSaveBlockTitle: 'UniWork에 저장하지 못했습니다',
+  uwSaveBlockBody:
+    '이 문서는 {max} 한도를 초과했습니다. 변경 내용은 여기에 남아 있습니다. 사본을 컴퓨터에 다운로드한 다음 이미지 크기를 줄이거나 문서를 분할하세요.',
+  uwSaveBlockSaveCopyLocal: '컴퓨터에 사본 저장',
+  uwClose: '닫기',
+  uwErrUploadTooLarge:
+    '{name}의 크기는 {size}로, {max} 한도를 초과했습니다. 이미지 크기를 줄이거나 파일을 분할한 후 다시 업로드하세요.',
+  uwReasonTooLargeWithLimit: '{max} 한도 초과',
 } satisfies Record<keyof typeof zh, string>

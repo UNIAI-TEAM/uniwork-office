@@ -158,4 +158,13 @@ export const de = {
   uwDocUploading: '„{name}“ wird hochgeladen…',
   uwDocLocationTop: 'Oberste Ebene',
   uwDocArchived: 'Archiviert',
+  uwSizeWarnChip: 'Nähert sich dem Limit von {max} (aktuell {size}).',
+  uwSaveBlockTitle: 'Konnte nicht in UniWork gespeichert werden',
+  uwSaveBlockBody:
+    'Dieses Dokument überschreitet {max}. Ihre Änderungen sind noch hier. Laden Sie Ihre Kopie auf Ihren Computer herunter und verkleinern Sie dann Bilder oder teilen Sie das Dokument auf.',
+  uwSaveBlockSaveCopyLocal: 'Kopie auf dem Computer speichern',
+  uwClose: 'Schließen',
+  uwErrUploadTooLarge:
+    '{name} ist {size} groß und überschreitet das Limit von {max}. Verkleinern Sie Bilder oder teilen Sie die Datei auf und laden Sie sie erneut hoch.',
+  uwReasonTooLargeWithLimit: 'über dem Limit von {max}',
 } satisfies Record<keyof typeof zh, string>

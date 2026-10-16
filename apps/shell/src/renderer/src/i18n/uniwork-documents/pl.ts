@@ -151,4 +151,13 @@ export const pl = {
   uwDocUploading: 'Przesyłanie „{name}”…',
   uwDocLocationTop: 'Najwyższy poziom',
   uwDocArchived: 'Zarchiwizowany',
+  uwSizeWarnChip: 'Zbliża się do limitu {max} (obecnie {size}).',
+  uwSaveBlockTitle: 'Nie udało się zapisać w UniWork',
+  uwSaveBlockBody:
+    'Ten dokument przekracza {max}. Twoje zmiany nadal tu są. Pobierz kopię na komputer, a następnie zmniejsz rozmiar obrazów lub podziel dokument.',
+  uwSaveBlockSaveCopyLocal: 'Zapisz kopię na komputerze',
+  uwClose: 'Zamknij',
+  uwErrUploadTooLarge:
+    'Plik {name} ma {size}, co przekracza limit {max}. Zmniejsz rozmiar obrazów lub podziel plik, a następnie prześlij go ponownie.',
+  uwReasonTooLargeWithLimit: 'powyżej limitu {max}',
 } satisfies Record<keyof typeof zh, string>

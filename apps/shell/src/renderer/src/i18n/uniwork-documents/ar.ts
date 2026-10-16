@@ -147,4 +147,13 @@ export const ar = {
   uwDocUploading: 'جارٍ رفع “{name}”…',
   uwDocLocationTop: 'المستوى الأعلى',
   uwDocArchived: 'مؤرشف',
+  uwSizeWarnChip: 'يقترب من الحد الأقصى {max} (حالياً {size}).',
+  uwSaveBlockTitle: 'تعذّر الحفظ في UniWork',
+  uwSaveBlockBody:
+    'يتجاوز هذا المستند {max}. لا تزال تغييراتك موجودة هنا. نزّل نسختك إلى الكمبيوتر ثم قلّل حجم الصور أو قسّم المستند.',
+  uwSaveBlockSaveCopyLocal: 'حفظ نسخة على الكمبيوتر',
+  uwClose: 'إغلاق',
+  uwErrUploadTooLarge:
+    'حجم {name} هو {size}، وهو يتجاوز الحد الأقصى {max}. قلّل حجم الصور أو قسّم الملف ثم ارفعه مرة أخرى.',
+  uwReasonTooLargeWithLimit: 'يتجاوز الحد {max}',
 } satisfies Record<keyof typeof zh, string>

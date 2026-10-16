@@ -147,4 +147,13 @@ export const he = {
   uwDocUploading: 'מעלה את “{name}”…',
   uwDocLocationTop: 'הרמה העליונה',
   uwDocArchived: 'בארכיון',
+  uwSizeWarnChip: 'מתקרב למגבלת {max} (כעת {size}).',
+  uwSaveBlockTitle: 'לא ניתן היה לשמור ב-UniWork',
+  uwSaveBlockBody:
+    'מסמך זה חורג מ-{max}. השינויים שלך עדיין כאן. הורד את העותק למחשב ולאחר מכן הקטן את גודל התמונות או פצל את המסמך.',
+  uwSaveBlockSaveCopyLocal: 'שמירת עותק במחשב',
+  uwClose: 'סגירה',
+  uwErrUploadTooLarge:
+    'גודלו של {name} הוא {size}, מעבר למגבלת {max}. הקטן את גודל התמונות או פצל את הקובץ והעלה שוב.',
+  uwReasonTooLargeWithLimit: 'מעבר למגבלת {max}',
 } satisfies Record<keyof typeof zh, string>
