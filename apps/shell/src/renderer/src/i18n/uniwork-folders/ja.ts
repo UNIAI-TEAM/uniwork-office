@@ -21,7 +21,8 @@ export const ja = {
   ufMoved: '{folder} に移動しました',
   ufMovedRenamed: '移動して {title} に名前を変更しました',
   ufNameTaken: 'この場所には同じ名前のフォルダーがあります。別の名前にしてください。',
-  ufMoveNameTaken: '???????????????????????????????????',
+  ufMoveNameTaken:
+    '移動先に同じ名前のフォルダーが多すぎます。先にフォルダーの名前を変更してください。',
   ufTooDeep: 'ドキュメントの階層は最大 {max} レベルです。',
   ufCycle: 'フォルダーをそれ自身やそのサブフォルダーに移動することはできません。',
   ufParentKind: 'フォルダーはルートか別のフォルダーの中にのみ置けます。',
@@ -30,7 +31,7 @@ export const ja = {
   ufEmptyFolder: 'このフォルダーは空です',
   ufLocation: '場所',
   ufLocationRoot: 'UniWork（最上位）',
-  ufSameFolder: '??????????????',
+  ufSameFolder: '元のファイルと同じフォルダー',
   ufChooseLocation: '場所を選択',
   ufChoose: '選択',
   ufSearchPh: 'ワークスペース内を名前で検索',

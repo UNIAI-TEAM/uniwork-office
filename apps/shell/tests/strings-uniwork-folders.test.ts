@@ -61,8 +61,12 @@ describe('uniwork folders string shards', () => {
     expect(vi.ufMoved).toBe('Đã chuyển tới {folder}')
     expect(vi.ufMovedRenamed).toBe('Đã chuyển và đổi tên thành {title}')
     expect(vi.ufNameTaken).toBe('Đã có thư mục tên này ở đây. Hãy đặt tên khác.')
+    expect(vi.ufMoveNameTaken).toBe(
+      'Thư mục đích đã có quá nhiều thư mục trùng tên. Hãy đổi tên trước khi chuyển.',
+    )
     expect(vi.ufFolderGone).toBe('Thư mục này không còn ở đây.')
     expect(vi.ufLocationRoot).toBe('UniWork (gốc)')
+    expect(vi.ufSameFolder).toBe('Cùng thư mục với bản gốc')
     expect(en.ufNameTaken).toBe('A folder with this name already exists here. Choose another name.')
     expect(en.ufTooDeep).toBe('The document tree is at most {max} levels deep.')
     expect(en.ufNoPermission).toBe("You don't have permission to change this folder.")
@@ -81,4 +85,14 @@ describe('uniwork folders string shards', () => {
     ]
     expect(referenceKeys.filter((k) => others.some((t) => k in t))).toEqual([])
   })
+
+  it.each([...LANGS])(
+    'locale %s has no replacement chars or ?-corrupted non-ASCII bytes (R2-1)',
+    (lang) => {
+      const corrupted = Object.entries(table(lang)).filter(([, v]) =>
+        /\uFFFD|\?{2,}|\p{L}\?\p{L}/u.test(v),
+      )
+      expect(corrupted).toEqual([])
+    },
+  )
 })

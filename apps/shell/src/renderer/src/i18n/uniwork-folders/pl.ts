@@ -22,7 +22,7 @@ export const pl = {
   ufMovedRenamed: 'Przeniesiono i zmieniono nazwę na {title}',
   ufNameTaken: 'Folder o tej nazwie już tu istnieje. Wybierz inną nazwę.',
   ufMoveNameTaken:
-    'W miejscu docelowym jest zbyt wiele folder?w o tej nazwie. Najpierw zmie? nazw? folderu.',
+    'W miejscu docelowym jest zbyt wiele folderów o tej nazwie. Najpierw zmień nazwę folderu.',
   ufTooDeep: 'Drzewo dokumentów ma maksymalnie {max} poziomów.',
   ufCycle: 'Folderu nie można przenieść do niego samego ani do jego podfolderu.',
   ufParentKind: 'Folder znajduje się w katalogu głównym lub w innym folderze.',
@@ -31,7 +31,7 @@ export const pl = {
   ufEmptyFolder: 'Ten folder jest pusty',
   ufLocation: 'Lokalizacja',
   ufLocationRoot: 'UniWork (najwyższy poziom)',
-  ufSameFolder: 'Ten sam folder co orygina?',
+  ufSameFolder: 'Ten sam folder co oryginał',
   ufChooseLocation: 'Wybierz lokalizację',
   ufChoose: 'Wybierz',
   ufSearchPh: 'Szukaj według nazwy w tym obszarze roboczym',

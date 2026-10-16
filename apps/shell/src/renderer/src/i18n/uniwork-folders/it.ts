@@ -31,7 +31,7 @@ export const it = {
   ufEmptyFolder: 'Questa cartella è vuota',
   ufLocation: 'Posizione',
   ufLocationRoot: 'UniWork (livello superiore)',
-  ufSameFolder: 'Stessa cartella dell?originale',
+  ufSameFolder: 'Stessa cartella dell’originale',
   ufChooseLocation: 'Scegli una posizione',
   ufChoose: 'Scegli',
   ufSearchPh: 'Cerca per nome in questo spazio di lavoro',
