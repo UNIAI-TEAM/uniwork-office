@@ -735,13 +735,14 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
     const gate = await sizeGate.checkBeforeSave(data)
     if (!gate.allowed) {
       if (hostSave) hostSave.error = gate.error
-      throw new Error(gate.message)
+      return { canceled: true }
     }
     const res = await putSave(fileId, data)
     if (res.ok) return { file: res.file }
     if (hostSave) hostSave.error = res.error
     if (res.error.code === 'too_large') {
-      throw new Error(sizeGate.handleServerTooLarge(res.error, data))
+      sizeGate.handleServerTooLarge(res.error, data)
+      return { canceled: true }
     }
     if (res.error.code === 'conflict') {
       // the host's own `save` waits for the dialog's answer instead of an error event
@@ -785,8 +786,9 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
     pending?.started()
     const gate = await sizeGate.checkBeforeSave(data)
     if (!gate.allowed) {
+      if (hostSave) hostSave.error = gate.error
       pending?.settle({ ok: false, error: gate.error })
-      throw new Error(gate.message)
+      return { canceled: true }
     }
     const payload = {
       name: pending?.name ?? name,
@@ -800,7 +802,9 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
     if (res.ok) return { file: res.file }
     if (res.error.code === 'cancelled') return { canceled: true }
     if (res.error.code === 'too_large') {
-      throw new Error(sizeGate.handleServerTooLarge(res.error, data))
+      if (hostSave) hostSave.error = res.error
+      sizeGate.handleServerTooLarge(res.error, data)
+      return { canceled: true }
     }
     return failSave(res.error)
   }

@@ -3723,6 +3723,10 @@ export default function App() {
   }
 
   const opFailed = (error: string) => {
+    if (!error) {
+      setSaveState('idle')
+      return
+    }
     const friendly = friendlySaveError(error)
     setSaveError(friendly)
     setSaveState('error')

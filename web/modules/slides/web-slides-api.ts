@@ -679,7 +679,8 @@ export function createWebSlidesApi(
 
   async function runRendererSave(): Promise<boolean> {
     if (closeSaveEvents.size === 0) {
-      const r = (await invoke('slides:save')) as { ok: boolean }
+      const r = (await invoke('slides:save')) as { ok: boolean; error?: string }
+      noteResult(r)
       return r.ok
     }
     return new Promise<boolean>((resolve) => {
@@ -752,6 +753,8 @@ export function createWebSlidesApi(
         ok: false,
         error: { code: 'busy' as const, message: 'a save-as is already running' },
       }
+    lastSaveError = null
+    state.lastFailure = null
     return new Promise<SaveResult>((resolve) => {
       const timer = setTimeout(() => {
         hostSaveAs = null
@@ -809,8 +812,8 @@ export function createWebSlidesApi(
 
   /** save / save-as results: remember the failure for the host request, keep the renderer shape */
   function noteResult(r: { ok: boolean; error?: string }): void {
-    if (!r.ok && r.error)
-      lastSaveError = state.lastFailure ?? { code: 'internal', message: r.error }
+    if (!r.ok && (r.error || state.lastFailure))
+      lastSaveError = state.lastFailure ?? { code: 'internal', message: r.error! }
   }
 
   // ------------------------------------------------------------ menu accelerators
@@ -1033,8 +1036,10 @@ export function createWebSlidesApi(
     onRenamed: (handler) => renamedEvents.add(handler),
     newBlank: engine('slides:new-blank'),
     save: async () => {
+      state.lastFailure = null
       const r = (await invoke('slides:save')) as { ok: boolean; error?: string }
       noteResult(r)
+      if (!r.ok && state.lastFailure?.code === 'too_large') return { ok: false }
       return r as Awaited<ReturnType<SlidesApi['save']>>
     },
     // the frame is the UniWork document: no desktop working-copy state. A frame without the
@@ -1042,6 +1047,7 @@ export function createWebSlidesApi(
     // notes editing surface), the same path as a view-only working copy on the desktop
     uniworkState: async () => ({ bound: false, readOnly: viewOnly() || state.fatal !== null }),
     saveAs: async (defaultName) => {
+      state.lastFailure = null
       const pending = hostSaveAs
       pending?.started()
       const r = (await invoke('slides:save-as', pending?.name || defaultName)) as {

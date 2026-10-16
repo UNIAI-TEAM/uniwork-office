@@ -152,3 +152,131 @@ test('fallback size gate (en) and sizeUi:true suppression', async ({ page }) => 
   await expect(frameHostUi.locator(BLOCK_DLG)).toHaveCount(0)
   await expect(frameHostUi.locator(WARN_CHIP)).toHaveCount(0)
 })
+
+const MODULE_CASES = [
+  { module: 'docs', open: undefined },
+  { module: 'sheets', open: undefined },
+  { module: 'slides', open: undefined },
+  { module: 'pdf', open: '/fixtures/pdf-form.pdf' },
+] as const
+
+async function triggerModuleSave(
+  page: Page,
+  frame: Awaited<ReturnType<typeof openModule>>,
+  module: (typeof MODULE_CASES)[number]['module'],
+): Promise<void> {
+  if (module === 'docs') {
+    const pm = frame.locator('.ProseMirror').first()
+    await expect(pm).toBeVisible({ timeout: 30_000 })
+    await pm.click()
+    await page.keyboard.press('Control+s')
+    return
+  }
+  if (module === 'sheets') {
+    const canvas = frame.locator('canvas[id^="univer-sheet-main-canvas"]').first()
+    await expect(canvas).toBeVisible({ timeout: 30_000 })
+    await canvas.click({ position: { x: 120, y: 60 } })
+    await page.keyboard.type('42')
+    await page.keyboard.press('Enter')
+    await page.keyboard.press('Control+s')
+    return
+  }
+  if (module === 'slides') {
+    const stage = frame.locator('.stage-wrap').first()
+    await expect(stage).toBeVisible({ timeout: 30_000 })
+    await stage.click({ position: { x: 80, y: 80 } })
+    await page.keyboard.press('Control+s')
+    return
+  }
+  const input = frame.locator('input.pdf-form-input[title="name"]').first()
+  await expect(input).toBeVisible({ timeout: 30_000 })
+  await input.fill('Size Gate Test')
+  await page.keyboard.press('Tab')
+  const saveBtn = frame.locator('.qa-btn').first()
+  await expect(saveBtn).toBeEnabled({ timeout: 10_000 })
+  await saveBtn.click()
+}
+
+const ERROR_TEXT_RE =
+  /Save failed|Lưu thất bại|Couldn.t save|Chưa lưu được|over \d+ MB|vượt \d+ MB|Save canceled|Đã hủy lưu|Canceled|Đã hủy/i
+
+for (const { module, open } of MODULE_CASES) {
+  test(`${module}: size-blocked save shows only the fallback dialog without sizeUi and shows nothing in-frame with sizeUi=1 (SIZE-v1-1)`, async ({
+    page,
+  }) => {
+    test.skip(!built(module), `no dist-web/${module} build: npm run build:web -- --module ${module}`)
+
+    // 1. sizeUi absent: only the fallback dialog (and its single live announcement), no .app-toast or status-bar error
+    const frameFallback = await openModule(page, module, {
+      ...(open ? { open } : {}),
+      lang: 'vi',
+      download: '1',
+      maxBytes: '64',
+      warnRatio: '0.5',
+    })
+    await triggerModuleSave(page, frameFallback, module)
+
+    const dlg = frameFallback.locator(BLOCK_DLG)
+    await expect(dlg).toBeVisible({ timeout: 15_000 })
+    expect((await gateHostState(page)).saveCalls).toBe(0)
+    expect(
+      (await gateHostState(page)).events.filter((e) => e.type === 'save_blocked'),
+    ).toHaveLength(1)
+
+    await expect(frameFallback.locator('.app-toast, .pdf-notice')).toHaveCount(0)
+    const fallbackStatusTexts = await frameFallback.evaluate(() =>
+      [
+        ...document.querySelectorAll(
+          '.status-msg, .status-bar, .statusbar, .status-save-error, [role="status"]',
+        ),
+      ]
+        .filter((el) => !el.closest('[data-office-web="save-blocked"]'))
+        .filter((el) => el.getAttribute('data-office-web') !== 'save-size-live')
+        .map((el) => (el.textContent ?? '').trim())
+        .filter(Boolean),
+    )
+    for (const t of fallbackStatusTexts) {
+      expect(t).not.toMatch(ERROR_TEXT_RE)
+    }
+
+    await dlg.locator('[data-choice="close"]').click()
+    await expect(dlg).toHaveCount(0)
+
+    // 2. sizeUi=1: emits save_blocked, sends zero api.save, and shows nothing in the frame
+    const frameHostUi = await openModule(page, module, {
+      ...(open ? { open } : {}),
+      lang: 'vi',
+      download: '1',
+      sizeUi: '1',
+      maxBytes: '64',
+      warnRatio: '0.5',
+    })
+    await triggerModuleSave(page, frameHostUi, module)
+
+    await expect
+      .poll(
+        async () =>
+          (await gateHostState(page)).events.filter((e) => e.type === 'save_blocked').length,
+        { timeout: 15_000 },
+      )
+      .toBe(1)
+    expect((await gateHostState(page)).saveCalls).toBe(0)
+    await expect(frameHostUi.locator(BLOCK_DLG)).toHaveCount(0)
+    await expect(frameHostUi.locator(WARN_CHIP)).toHaveCount(0)
+    await expect(frameHostUi.locator('.app-toast, .pdf-notice')).toHaveCount(0)
+
+    const hostUiStatusTexts = await frameHostUi.evaluate(() =>
+      [
+        ...document.querySelectorAll(
+          '.status-msg, .status-bar, .statusbar, .status-save-error, [role="status"], [aria-live]',
+        ),
+      ]
+        .map((el) => (el.textContent ?? '').trim())
+        .filter(Boolean),
+    )
+    for (const t of hostUiStatusTexts) {
+      expect(t).not.toMatch(ERROR_TEXT_RE)
+    }
+  })
+}
+

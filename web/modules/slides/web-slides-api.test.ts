@@ -1048,20 +1048,34 @@ describe('open_refused and zip part-count refusal (SIZE-F1)', () => {
 })
 
 describe('save size gate (SIZE-F1, UNI-1861)', () => {
-  it('blocks save and saveAs above limits.max_bytes without api.save / api.saveAs', async () => {
+  it('blocks save and saveAs above limits.max_bytes without api.save / api.saveAs and returns handled { ok: false }', async () => {
     // a serialized deck is a real pptx (~KB) — a 1-byte cap blocks any save
     const { mock, api } = await setup({ limits: { max_bytes: 1, warn_ratio: 0.5 } })
     await api.consumePendingOpen(FIT)
     await api.setNotes({ slideIndex: 0, text: 'mine' })
     await flush()
 
-    expect((await api.save()).ok).toBe(false)
+    expect(await api.save()).toEqual({ ok: false })
     expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(0)
     expect(mock.saveBlocked).toHaveLength(1)
 
-    // the block error propagates out of the slides:save-as handler (no catch there)
-    await expect(api.saveAs('Copy')).rejects.toThrow()
+    // saveAs resolves cleanly as handled cancellation ({ ok: false }) so renderer shows no toast
+    expect(await api.saveAs('Copy')).toEqual({ ok: false })
     expect(mock.calls.filter((c) => c.type === 'api.saveAs')).toHaveLength(0)
     expect(mock.saveBlocked).toHaveLength(2)
+
+    // Host-initiated save and saveAs still receive the protocol too_large error
+    const off = api.onMenuCommand((c) => {
+      if (c === 'save-as') void api.saveAs('Copy')
+    })
+    expect(await mock.host.save({ reason: 'user' })).toMatchObject({
+      ok: false,
+      error: { code: 'too_large' },
+    })
+    expect(await mock.host.saveAs({ name: 'Copy.pptx' })).toMatchObject({
+      ok: false,
+      error: { code: 'too_large' },
+    })
+    off()
   })
 })
