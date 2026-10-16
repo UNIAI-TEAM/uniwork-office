@@ -422,7 +422,11 @@ function classifyOpenRefusal(msg: string): {
       measure: { kind: 'zip_parts', value: Number(parts[1]), limit: Number(parts[2]) },
     }
   }
-  if (/out of memory|Array buffer allocation failed|Invalid string length/i.test(msg)) {
+  if (
+    /out of memory|Array buffer allocation failed|Invalid string length|Invalid array length|Invalid typed array length/i.test(
+      msg,
+    )
+  ) {
     return { reason: 'engine_out_of_memory' }
   }
   if (
@@ -698,7 +702,8 @@ export async function newFile(ctx: FileActionContext): Promise<boolean | undefin
   if (!ctx.editor) return
   if (
     isWebFrame() &&
-    (ctx.refusedMessage || (await window.desktop?.uniworkState?.(''))?.readOnly)
+    (ctx.refusedMessage ||
+      (!ctx.dirtyRef.current && (await window.desktop?.confirmDocumentReplace?.()) === false))
   ) {
     return false
   }
