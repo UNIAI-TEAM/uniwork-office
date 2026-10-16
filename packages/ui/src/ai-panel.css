@@ -98,6 +98,8 @@
   gap: 20px;
   scrollbar-width: thin;
   scrollbar-color: var(--border-strong) transparent;
+  /* a keyboard-focused row (its focus ring included) scrolls clear of the fade below */
+  scroll-padding-block: 20px;
   /* content dissolves into the header and the composer instead of meeting a hard rule */
   mask-image: linear-gradient(
     to bottom,

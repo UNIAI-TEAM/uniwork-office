@@ -9333,9 +9333,12 @@ body.docs-crop-active
 }
 
 /* tracked-changes protection: the pill is on and fixed; the wrapper takes the pointer so its tip shows */
+/* shrinkable on purpose: the shared panel skin ellipsizes the pill label so Send never leaves the box,
+   and that only works if this wrapper gives way with it */
 .ai-track-wrap {
   display: inline-flex;
-  flex-shrink: 0;
+  flex-shrink: 1;
+  min-width: 0;
 }
 
 .ai-track-wrap.forced .ai-track-btn {
