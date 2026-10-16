@@ -601,6 +601,12 @@ body.overlay-title-bar .tab-bar-drag-spacer {
   color: var(--warning-text);
 }
 
+/* the size warning yields to the save pill (see uniwork-pill-fit.ts): it caps at 240px and
+   shrinks down to its minimum (--uw-warn-max) before the save pill gives up its label */
+.uw-size-warn {
+  max-width: var(--uw-warn-max, 240px);
+}
+
 .uw-pill[data-tone='error'] {
   border-color: var(--danger-border);
   background: var(--danger-bg);

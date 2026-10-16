@@ -59,6 +59,7 @@ import {
   measurePillFit,
   pillFitStepOf,
   shortLabelOf,
+  warnChipMaxOf,
   type PillVariant,
   type PillWidths,
   type ToggleWidths,
@@ -332,10 +333,12 @@ function usePillFit(
   groupRef: RefObject<HTMLDivElement | null>,
   key: string,
   hasShort: boolean,
-): PillVariant {
+  hasWarn = false,
+): { variant: PillVariant; warnMax: number | null } {
   const { iconOnly: drawnIconOnly, setIconOnly: publish } = useContext(ToggleFitContext)
   const [variant, setVariant] = useState<PillVariant>('full')
   const [iconToggle, setIconToggle] = useState(false)
+  const [warnMax, setWarnMax] = useState<number | null>(null)
   // bumped by whatever changes the room (a resize, a tab, the holder's size): measure again
   const [pass, setPass] = useState(0)
   const widths = useRef<PillWidths>({})
@@ -364,6 +367,7 @@ ${uiScaleOf(el)}`
       toggleWidths.current = {}
       if (variant !== 'full') setVariant('full')
       if (iconToggle) setIconToggle(false)
+      if (warnMax !== null) setWarnMax(null)
       return
     }
     widths.current[variant] = fit.natural
@@ -380,8 +384,17 @@ ${uiScaleOf(el)}`
     })
     if (next.variant !== variant) setVariant(next.variant)
     if (next.iconToggle !== iconToggle) setIconToggle(next.iconToggle)
+    const nextWarnMax =
+      fit.warnRoom === null
+        ? null
+        : warnChipMaxOf({
+            room: fit.warnRoom,
+            pillWidth: widths.current[next.variant] ?? fit.natural,
+            scale: fit.scale,
+          })
+    if (nextWarnMax !== warnMax) setWarnMax(nextWarnMax)
     // drawnIconOnly: the toggle took its new form (the sibling re-rendered), measure it as drawn
-  }, [groupRef, key, variant, iconToggle, drawnIconOnly, hasShort, pass])
+  }, [groupRef, key, variant, iconToggle, drawnIconOnly, hasShort, hasWarn, warnMax, pass])
 
   // the toggle (a sibling) reads it; it goes back to its full form with this pill
   useLayoutEffect(() => {
@@ -428,7 +441,7 @@ ${uiScaleOf(el)}`
     }
   }, [groupRef])
 
-  return variant
+  return { variant, warnMax }
 }
 
 /** the states whose arrival is said to a screen reader at once (EXPERIENCE: blocked, failed, conflict) */
@@ -487,12 +500,6 @@ export function UniworkStatusChip({
   const action = model.action
   const shortLabel = shortLabelOf(label)
   const glyph = miniGlyphOf(model, status.state)
-  const variant = usePillFit(
-    groupRef,
-    `${label}
-${action ? t(action.labelKey) : ''}`,
-    shortLabel !== label,
-  )
   const [warnDismissedFor, setWarnDismissedFor] = useState<string | null>(null)
   const [, setBlockTick] = useState(0)
   const blockLatchRef = useRef<{
@@ -570,6 +577,13 @@ ${action ? t(action.labelKey) : ''}`,
   const warnKey = status.sizeWarn ? `${currentPath}:${status.sizeWarn.maxBytes}` : null
   const showSizeWarn = Boolean(status.sizeWarn && warnKey && warnDismissedFor !== warnKey)
   const sizeWarnText = showSizeWarn ? sizeWarnTextOf(status.sizeWarn, t, dateLocale) : null
+  const { variant, warnMax } = usePillFit(
+    groupRef,
+    `${label}
+${action ? t(action.labelKey) : ''}`,
+    shortLabel !== label,
+    Boolean(sizeWarnText && warnKey),
+  )
   const showSaveBlock = blockLatchRef.current.open
   const saveBlockCopy = showSaveBlock
     ? saveBlockCopyOf(blockLatchRef.current.maxBytes, t, dateLocale)
@@ -759,13 +773,20 @@ ${action ? t(action.labelKey) : ''}`,
   }, [focusWithin, measureTip])
   const tipStyle =
     tipRoom === null ? undefined : ({ '--uw-tip-room': `${tipRoom}px` } as CSSProperties)
+  const warnStyle =
+    warnMax === null ? undefined : ({ '--uw-warn-max': `${warnMax}px` } as CSSProperties)
 
   // the pill group is the keyboard stop only when it has no button to carry the description
   const describedHere = !action
   return (
     <>
       {sizeWarnText && warnKey && (
-        <div className="uw-pill uw-size-warn" data-tone="warn" title={sizeWarnText}>
+        <div
+          className="uw-pill uw-size-warn"
+          data-tone="warn"
+          title={sizeWarnText}
+          style={warnStyle}
+        >
           <span className="uw-pill-status">
             <span className="uw-pill-dot" aria-hidden="true" />
             <span className="uw-pill-label">{sizeWarnText}</span>
