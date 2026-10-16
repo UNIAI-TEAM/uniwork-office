@@ -59,3 +59,9 @@ describe('worked-steps label (F7)', () => {
     expect(workedStepsLabel(tFor('vi'), 1)).toBe('Đã xử lý · 1 bước')
   })
 })
+
+describe('edited-hint wrap (F11)', () => {
+  it('balances the grey "Not saved" hint so a narrow panel does not strand one word', () => {
+    expect(rule('.ai-result-edited-hint')).toMatch(/text-wrap:\s*balance/)
+  })
+})
