@@ -838,6 +838,14 @@ describe('SIZE-F1 desktop document size limits', () => {
       })
 
       let lastUploadedChecksum = ''
+      const upload = vi.fn(async (input: { bytes: Uint8Array }) => {
+        lastUploadedChecksum = sha256Hex(input.bytes)
+        return {
+          uploadId: 'up_1',
+          checksumSha256: lastUploadedChecksum,
+          claimExpiresAt: null,
+        }
+      })
 
       const deps: SaveCoordinatorDeps = {
         store: {
@@ -849,14 +857,7 @@ describe('SIZE-F1 desktop document size limits', () => {
           write: storeWrite,
         } as never,
         client: {
-          upload: async (input) => {
-            lastUploadedChecksum = sha256Hex(input.bytes)
-            return {
-              uploadId: 'up_1',
-              checksumSha256: lastUploadedChecksum,
-              claimExpiresAt: null,
-            }
-          },
+          upload,
           commit: async (input) => ({
             documentId: input.documentId,
             revision: '11',
@@ -885,6 +886,7 @@ describe('SIZE-F1 desktop document size limits', () => {
         put,
         remove,
         supersede,
+        upload,
         statuses,
         stored,
         storeWrite,
@@ -970,8 +972,8 @@ describe('SIZE-F1 desktop document size limits', () => {
     })
 
     it('never marks an unchanged copy failed as too_large when a pending intent exists under a lowered cap (d1-7)', async () => {
-      // Base is 7 bytes ('initial'), max_bytes is lowered to 3 bytes
-      const h = harness(parseDocumentLimits({ upload_max_bytes: 3, save_warn_ratio: 0.9 }))
+      // Base is 7 bytes ('initial'), max_bytes is lowered to 5 bytes while the pending payload is 5 bytes
+      const h = harness(parseDocumentLimits({ upload_max_bytes: 5, save_warn_ratio: 0.9 }))
       const olderBytes = enc('older')
       h.stored.set(DOC_ID, {
         intent: {
@@ -1003,14 +1005,52 @@ describe('SIZE-F1 desktop document size limits', () => {
       expect(h.stored.has(DOC_ID)).toBe(true)
 
       // 2. Non-user save with pending intent + working copy equal to base:
-      //    replays and settles the pending intent without failing the unchanged base as too_large
+      //    replays and settles the under-cap pending intent without failing the unchanged base as too_large
       const replayed = await h.coordinator.save(h.docPath)
+      expect(h.upload).toHaveBeenCalledTimes(1)
       expect(replayed!.binding.state).not.toBe('failed')
       expect(replayed!.binding.error).toBeUndefined()
       expect(replayed!.binding.baseChecksum).toBe(sha256Hex(olderBytes))
       expect(h.stored.has(DOC_ID)).toBe(false)
       expect(h.supersede).not.toHaveBeenCalled()
       expect(h.put).not.toHaveBeenCalled()
+      expect(h.statuses.some((push) => push.error === 'too_large')).toBe(false)
+    })
+
+    it('supersedes a non-in-flight over-cap pending intent and marks the binding saved when the working copy equals base (d2-2)', async () => {
+      // Base is 7 bytes ('initial'), queued intent payload is 5 bytes ('older'), max_bytes lowered to 3 bytes
+      const h = harness(parseDocumentLimits({ upload_max_bytes: 3, save_warn_ratio: 0.9 }))
+      const olderBytes = enc('older')
+      h.stored.set(DOC_ID, {
+        intent: {
+          v: 2,
+          intentId: 'old_over_cap',
+          idempotencyKey: 'old_over_cap_key',
+          documentId: DOC_ID,
+          orgId: ORG_ID,
+          workspaceId: WS_ID,
+          baseRevision: '10',
+          baseVersion: 1,
+          checksum: sha256Hex(olderBytes),
+          length: olderBytes.byteLength,
+          generation: 1,
+          state: 'queued',
+          attempt: 0,
+          createdAt: ISO,
+          updatedAt: ISO,
+        },
+        payload: olderBytes,
+      })
+
+      const settled = await h.coordinator.save(h.docPath)
+      expect(h.upload).not.toHaveBeenCalled()
+      expect(h.put).not.toHaveBeenCalled()
+      expect(h.supersede).toHaveBeenCalledTimes(1)
+      expect(h.remove).toHaveBeenCalledWith(DOC_ID)
+      expect(h.stored.has(DOC_ID)).toBe(false)
+      expect(settled!.binding.state).toBe('saved')
+      expect(settled!.binding.error).toBeUndefined()
+      expect(settled!.binding.baseChecksum).toBe(sha256Hex(enc('initial')))
       expect(h.statuses.some((push) => push.error === 'too_large')).toBe(false)
     })
 
