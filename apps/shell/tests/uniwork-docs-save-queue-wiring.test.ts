@@ -756,6 +756,16 @@ describe('G5-06 W4b save queue wiring', () => {
         (status) => status.path === path && status.state === 'queued',
       )
       expect(queued.map((status) => status.error)).toEqual(queued.map(() => undefined))
+      // and it is published BEFORE the receipt: the pre-commit chip the user
+      // reads is that clean queued status, never one that lands after `saved`
+      const firstQueued = ctx.statuses.findIndex(
+        (status) => status.path === path && status.state === 'queued',
+      )
+      const firstSaved = ctx.statuses.findIndex(
+        (status) => status.path === path && status.state === 'saved',
+      )
+      expect(firstQueued).toBeGreaterThanOrEqual(0)
+      expect(firstSaved).toBeGreaterThan(firstQueued)
     })
 
     it.each(['member_deactivated', 'organization_suspended'] as const)(
@@ -897,8 +907,9 @@ describe('G5-06 W4b save queue wiring', () => {
       const ctx = setup(server)
       const path = await openDoc(ctx)
       writeFileSync(path, 'v4')
-      // the inline Save meets the archive once: the commit is refused with the
-      // document's own code, and the server answers normally after
+      // the inline Save meets the archive: the commit is refused with the
+      // document's own code, and the document stays in the archive afterwards
+      server.state.archivedAt = '2026-10-01T00:00:00.000Z'
       server.faults.push({ route: 'commit', kind: 403, code: 'document_archived' })
       expect(await ctx.service.save(path)).toMatchObject({
         state: 'blocked',
@@ -909,23 +920,25 @@ describe('G5-06 W4b save queue wiring', () => {
       // sync-center row, the bounded probe and "Kiểm tra lại" exist for this copy
       const kept = await storedIntent(ctx, path)
       expect(kept, 'an archived refusal must keep its intent record').not.toBeNull()
-      // the inline path parks the CHIP; the record itself is still the minted
-      // one (no lastError yet) - the poll is what parks it blocked/archived
-      expect(kept?.intent).toMatchObject({ state: 'queued' })
-      // still archived: the poll's dispatch meets the refusal again and parks
-      // the record - the state a sync-center row and its probe are built from
-      server.faults.push({ route: 'commit', kind: 403, code: 'document_archived' })
+      // OQ-F12-be-d2-2: the refusal parks the RECORD in the same call as the
+      // chip, so the durable row reads blocked/document_archived at the refusal
+      // itself - never a queued pending row the pill already calls blocked
+      expect(kept?.intent).toMatchObject({ state: 'blocked', lastError: 'document_archived' })
+      expect(commits(server)).toHaveLength(1)
+      // and the next poll spends nothing on the bytes the server already
+      // refused: the record is blocked (not dispatchable), the probe still sees
+      // the archive, so no second upload or commit is sent
       await ctx.service.pollSaveQueue()
-      await vi.waitFor(async () =>
-        expect((await storedIntent(ctx, path))?.intent).toMatchObject({
-          state: 'blocked',
-          lastError: 'document_archived',
-        }),
-      )
+      expect((await storedIntent(ctx, path))?.intent).toMatchObject({
+        state: 'blocked',
+        lastError: 'document_archived',
+      })
+      expect(commits(server)).toHaveLength(1)
       expect((await storedIntent(ctx, path))?.intent.intentId).toBe(kept?.intent.intentId)
-      // out of the archive: the probe reads the document writable and active,
-      // lifts that SAME record back to the queue and it commits under the SAME
-      // idempotency key it was refused with
+      // out of the archive: the probe ("Kiểm tra lại") reads the document
+      // writable and active, lifts that SAME record back to the queue and it
+      // commits under the SAME idempotency key it was refused with
+      server.state.archivedAt = null
       expect(await ctx.service.recheckBlockedSave(path)).toBe(true)
       await vi.waitFor(async () =>
         expect(await ctx.service.docStatus(path)).toMatchObject({ state: 'saved' }),
@@ -934,11 +947,10 @@ describe('G5-06 W4b save queue wiring', () => {
       expect(committedKeys(server)).toEqual([
         kept!.intent.idempotencyKey,
         kept!.intent.idempotencyKey,
-        kept!.intent.idempotencyKey,
       ])
     })
 
-    it('a reopen clears an archived block only once the read proves the archive lifted', async () => {
+    it('a reopen clears an archived block only once the read proves the archive lifted AND edit access', async () => {
       const server = fakeServer({ bytes: enc('v3') })
       const ctx = setup(server)
       const path = await openDoc(ctx)
@@ -958,9 +970,19 @@ describe('G5-06 W4b save queue wiring', () => {
       await ctx.service.save(path)
       expect(commits(server)).toHaveLength(0)
       expect(binding(path)).toMatchObject({ state: 'blocked', error: 'document_archived' })
+      // out of the archive but the caller's level reads `view`: the write is
+      // still refused, so the block stays - the same `canEdit` fact the queue's
+      // probe reads (a view ticket / a dropped level is not a lift)
+      server.state.archivedAt = null
+      server.state.myLevel = 'view'
+      await openDoc(ctx)
+      expect(binding(path)).toMatchObject({ state: 'blocked', error: 'document_archived' })
+      await ctx.service.save(path)
+      expect(commits(server)).toHaveLength(0)
+      expect(binding(path)).toMatchObject({ state: 'blocked', error: 'document_archived' })
       // out of the archive: the read proves the archive lifted, the reopen clears
       // the block and the local work can be saved again
-      server.state.archivedAt = null
+      server.state.myLevel = 'edit'
       await openDoc(ctx)
       expect(binding(path)).toMatchObject({ state: 'dirty' })
       expect(binding(path).error).toBeUndefined()
