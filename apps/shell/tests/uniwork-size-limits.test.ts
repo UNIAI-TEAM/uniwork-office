@@ -6,7 +6,17 @@
  * check and warn band in `SaveCoordinator.save` (§5.2 item 3), the `413`
  * `fields.max_bytes` carried into the queue record, and the signed copy (§6.2).
  */
-import { chmodSync, mkdtempSync, readFileSync, rmSync, truncateSync, writeFileSync } from 'node:fs'
+import {
+  chmodSync,
+  existsSync,
+  linkSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  truncateSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Fragment, act, createElement, type ReactElement } from 'react'
@@ -42,6 +52,7 @@ import {
   type SaveCoordinatorDeps,
 } from '../src/main/uniwork-docs/save-coordinator'
 import { UniworkDocsService } from '../src/main/uniwork-docs/service'
+import { QueueDispatcher } from '../src/main/uniwork-sync/queue/dispatcher'
 import { transition } from '../src/main/uniwork-sync/queue/machine'
 import { buildSyncCenterSnapshot, type SyncCenterFacts } from '../src/main/uniwork-sync/sync-center'
 import type { IntentRecordV2 } from '../src/main/uniwork-sync/queue/record'
@@ -150,6 +161,29 @@ describe('SIZE-F1 desktop document size limits', () => {
       })
       // a non-config body is not a limits object
       expect(parseDocumentLimits('nope')).toEqual(DEFAULT_DOCUMENT_LIMITS)
+
+      // d1-6: fractional (0.5, 100.5), zero, or unsafe integer upload_max_bytes fall back
+      // to DEFAULT_DOCUMENT_LIMITS rather than flooring 0.5 to a zero cap
+      expect(
+        parseDocumentLimits({
+          documents: { limits: { upload_max_bytes: 0.5 } },
+        }),
+      ).toEqual(DEFAULT_DOCUMENT_LIMITS)
+      expect(
+        parseDocumentLimits({
+          documents: { limits: { upload_max_bytes: 100.5 } },
+        }),
+      ).toEqual(DEFAULT_DOCUMENT_LIMITS)
+      expect(
+        parseDocumentLimits({
+          documents: { limits: { upload_max_bytes: 0 } },
+        }),
+      ).toEqual(DEFAULT_DOCUMENT_LIMITS)
+      expect(
+        parseDocumentLimits({
+          documents: { limits: { upload_max_bytes: Number.MAX_SAFE_INTEGER + 1 } },
+        }),
+      ).toEqual(DEFAULT_DOCUMENT_LIMITS)
     })
 
     it('reads once per deployment origin, and again on a deployment switch', async () => {
@@ -205,6 +239,238 @@ describe('SIZE-F1 desktop document size limits', () => {
         warn_ratio: 0.8,
         warn_bytes: Math.floor(120 * MB_BYTES * 0.8),
       })
+    })
+
+    it('drops in-flight reads across reset() and origin switches so stale limits never commit (d1-4)', async () => {
+      let origin = 'https://a.uniwork.example'
+      const pending: Array<{
+        startedOrigin: string | null | undefined
+        resolve: (value: unknown) => void
+      }> = []
+      const cache = createDocumentLimitsCache({
+        origin: () => origin,
+        fetchLimits: (startedOrigin) =>
+          new Promise((resolve) => {
+            pending.push({ startedOrigin, resolve })
+          }),
+      })
+
+      // 1. Start a read before reset(), call reset(), then resolve the pre-reset read:
+      //    it must NOT commit into the cache nor satisfy a post-reset get()
+      const preResetPromise = cache.get()
+      expect(pending).toHaveLength(1)
+      cache.reset()
+
+      const postResetPromise = cache.get()
+      expect(pending).toHaveLength(2)
+
+      // Resolve the stale pre-reset read with 50 MiB
+      pending[0]!.resolve({
+        documents: { limits: { upload_max_bytes: 50 * MB_BYTES, save_warn_ratio: 0.8 } },
+      })
+      expect(await preResetPromise).toEqual(DEFAULT_DOCUMENT_LIMITS)
+      expect(cache.peek()).toEqual(DEFAULT_DOCUMENT_LIMITS)
+
+      // Resolve the post-reset read with 140 MiB: only this one commits
+      pending[1]!.resolve({
+        documents: { limits: { upload_max_bytes: 140 * MB_BYTES, save_warn_ratio: 0.8 } },
+      })
+      expect((await postResetPromise).max_bytes).toBe(140 * MB_BYTES)
+      expect(cache.peek().max_bytes).toBe(140 * MB_BYTES)
+
+      // 2. Origin switch while a read for origin A is in flight (including A -> B -> A):
+      cache.reset()
+      const inFlightA1 = cache.refresh()
+      expect(pending).toHaveLength(3)
+      expect(pending[2]!.startedOrigin).toBe('https://a.uniwork.example')
+
+      origin = 'https://b.uniwork.example'
+      const inFlightB = cache.get()
+      expect(pending).toHaveLength(4)
+      expect(pending[3]!.startedOrigin).toBe('https://b.uniwork.example')
+
+      // Switch back to A before A's first read settles; resolve A's first read: must not commit
+      origin = 'https://a.uniwork.example'
+      pending[2]!.resolve({
+        documents: { limits: { upload_max_bytes: 60 * MB_BYTES, save_warn_ratio: 0.75 } },
+      })
+      expect(await inFlightA1).toEqual(DEFAULT_DOCUMENT_LIMITS)
+      expect(cache.peek()).toEqual(DEFAULT_DOCUMENT_LIMITS)
+
+      // B's earlier read also cannot commit while active origin is A
+      pending[3]!.resolve({
+        documents: { limits: { upload_max_bytes: 80 * MB_BYTES, save_warn_ratio: 0.75 } },
+      })
+      expect(await inFlightB).toEqual(DEFAULT_DOCUMENT_LIMITS)
+      origin = 'https://b.uniwork.example'
+      expect(cache.peek()).toEqual(DEFAULT_DOCUMENT_LIMITS)
+    })
+
+    it('drives limits refresh/reset end to end through noteSessionIdentity, noteSelectedOrg, and lockSession (d1-9)', async () => {
+      const tmp = mkdtempSync(join(tmpdir(), 'uw-size-lifecycle-'))
+      try {
+        let currentIdentity: {
+          accountId: string
+          deviceSessionId: string
+          deploymentId: string
+        } | null = {
+          accountId: 'acc_1',
+          deviceSessionId: 'dev_1',
+          deploymentId: 'default',
+        }
+        let currentOrigin = 'https://a.uniwork.example'
+        let currentOrg: { id: string; slug: string } | null = { id: 'org_a', slug: 'acme' }
+
+        const configGraduates: Array<(maxBytes: number) => void> = []
+        let configCalls = 0
+
+        const service = new UniworkDocsService({
+          userDataDir: tmp,
+          profile: () => ({
+            deploymentId: currentIdentity?.deploymentId ?? 'default',
+            apiOrigin: currentOrigin,
+            clientId: 'uniwork-office',
+            channel: 'stable',
+          }),
+          channel: () => 'stable',
+          applyProfile: async () => 'unchanged',
+          identity: () => currentIdentity,
+          selectedOrg: () => currentOrg,
+          authorized: <T>(call: (token: string) => Promise<T>) => call('tok'),
+          fetch: (async (url: string) => {
+            if (url.endsWith('/api/v1/config')) {
+              configCalls += 1
+              const maxBytes = await new Promise<number>((resolve) => {
+                configGraduates.push(resolve)
+              })
+              return new Response(
+                JSON.stringify({
+                  documents: { limits: { upload_max_bytes: maxBytes, save_warn_ratio: 0.9 } },
+                }),
+                { status: 200, headers: { 'Content-Type': 'application/json' } },
+              )
+            }
+            return new Response('{}', { status: 404 })
+          }) as unknown as FetchLike,
+          syncStore: {
+            scope: () =>
+              currentIdentity
+                ? {
+                    deploymentId: currentIdentity.deploymentId,
+                    accountId: currentIdentity.accountId,
+                  }
+                : null,
+            open: async () => ({
+              kind: 'ok' as const,
+              records: () => ({
+                read: async () => ({ kind: 'missing' as const }),
+                write: async () => ({ kind: 'ok' as const }),
+                delete: async () => undefined,
+                listKeys: async () => [],
+              }),
+              lock: async () => undefined,
+            }),
+            lock: async () => undefined,
+          } as never,
+          openPath: () => true,
+          isPathOpen: () => false,
+          requestModuleSave: () => false,
+          reloadPath: () => undefined,
+          activePath: () => undefined,
+          ui: { chooseUnsavedClose: async () => 'cancel' },
+          pushStatus: () => undefined,
+          pushLaunch: () => undefined,
+          reveal: () => undefined,
+        })
+
+        // 1. Session boot via noteSessionIdentity triggers a refresh
+        service.noteSessionIdentity()
+        expect(configCalls).toBe(1)
+        configGraduates.shift()!(1000)
+        expect((await service.limitsCache.get()).max_bytes).toBe(1000)
+
+        // 2. Upload observes the refreshed 1000-byte limit from session boot
+        const candidatePath = join(tmp, 'Candidate.docx')
+        writeFileSync(candidatePath, new Uint8Array(1200).fill(65))
+        const blockedUpload = await service.uploadDocument({
+          workspaceId: WS_ID,
+          folderId: null,
+          path: candidatePath,
+          uploadId: 'up-candidate',
+        })
+        expect(blockedUpload).toEqual({
+          ok: false,
+          error: 'too_large',
+          name: 'Candidate.docx',
+          sizeBytes: 1200,
+          maxBytes: 1000,
+        })
+
+        // 3. noteSelectedOrg refreshes when the selected org changes, and ignores duplicate calls
+        service.noteSelectedOrg('org_a')
+        expect(configCalls).toBe(2)
+        configGraduates.shift()!(1500)
+        expect((await service.limitsCache.get()).max_bytes).toBe(1500)
+
+        service.noteSelectedOrg('org_a')
+        expect(configCalls).toBe(2)
+
+        service.noteSelectedOrg('org_b')
+        expect(configCalls).toBe(3)
+
+        // 4. While org_b's refresh is still in flight, lockSession runs (account boundary):
+        //    the cache resets and the stale in-flight read from before lockSession cannot commit
+        await service.lockSession({
+          deploymentId: 'default',
+          accountId: 'acc_1',
+        })
+        configGraduates.shift()!(500)
+        await new Promise((resolve) => setTimeout(resolve, 0))
+        expect(service.limitsCache.peek()).toEqual(DEFAULT_DOCUMENT_LIMITS)
+
+        // 5. Sign in to a new session/origin and verify save enforces the new session's limit
+        currentOrigin = 'https://b.uniwork.example'
+        currentIdentity = {
+          accountId: 'acc_2',
+          deviceSessionId: 'dev_2',
+          deploymentId: 'default',
+        }
+        currentOrg = { id: 'org_b', slug: 'beta' }
+        service.noteSessionIdentity()
+        expect(configCalls).toBe(4)
+        configGraduates.shift()!(800)
+        expect((await service.limitsCache.get()).max_bytes).toBe(800)
+
+        const docDir = service.store.dirFor('default', 'acc_2', DOC_ID)
+        const baseBytes = enc('small')
+        await service.store.write(docDir, {
+          schema: 2,
+          documentId: DOC_ID,
+          orgId: 'org_b',
+          workspaceId: WS_ID,
+          title: 'Bound.docx',
+          filename: 'Bound.docx',
+          format: 'docx',
+          access: 'edit',
+          baseRevision: '10',
+          baseVersion: 1,
+          baseChecksum: sha256Hex(baseBytes),
+          state: 'saved',
+          minStoreLevel: 1,
+          minAppVersion: '0.0.0',
+        })
+        const workingPath = await service.store.writeWorkingCopy(docDir, 'Bound.docx', baseBytes)
+        writeFileSync(workingPath, new Uint8Array(900).fill(66))
+        const savedStatus = await service.save(workingPath)
+        expect(savedStatus).toMatchObject({
+          state: 'failed',
+          error: 'too_large',
+          sizeBytes: 900,
+          maxBytes: 800,
+        })
+      } finally {
+        rmSync(tmp, { recursive: true, force: true })
+      }
     })
   })
 
@@ -295,6 +561,202 @@ describe('SIZE-F1 desktop document size limits', () => {
         requests.some((url) => url.endsWith(`/api/v1/workspaces/${WS_ID}/documents/files`)),
       ).toBe(true)
     })
+
+    it('saveLocalCopy refuses an unbound or foreign-account path before any read or picker, and revalidates after the picker (d1-1)', async () => {
+      let currentIdentity: {
+        accountId: string
+        deviceSessionId: string
+        deploymentId: string
+      } | null = {
+        accountId: 'acc_1',
+        deviceSessionId: 'dev_1',
+        deploymentId: 'default',
+      }
+      let pickerImpl: (defaultName: string) => Promise<string | null> = async (name) =>
+        join(dir, `exported-${name}`)
+      const pickDownloadPath = vi.fn((defaultName: string) => pickerImpl(defaultName))
+
+      const service = new UniworkDocsService({
+        userDataDir: dir,
+        profile: () => ({
+          deploymentId: 'default',
+          apiOrigin: 'https://uniwork.example',
+          clientId: 'uniwork-office',
+          channel: 'stable',
+        }),
+        channel: () => 'stable',
+        applyProfile: async () => 'unchanged',
+        identity: () => currentIdentity,
+        selectedOrg: () => ({ id: ORG_ID, slug: 'acme' }),
+        authorized: <T>(call: (token: string) => Promise<T>) => call('tok'),
+        fetch: (async () => new Response('{}', { status: 404 })) as unknown as FetchLike,
+        openPath: () => true,
+        isPathOpen: () => false,
+        requestModuleSave: () => false,
+        reloadPath: () => undefined,
+        activePath: () => undefined,
+        pickDownloadPath,
+        ui: { chooseUnsavedClose: async () => 'cancel' },
+        pushStatus: () => undefined,
+        pushLaunch: () => undefined,
+        reveal: () => undefined,
+      })
+
+      // (a) an unbound readable file path: refused before reading or calling the picker
+      const plainPath = join(dir, 'secret-plain.docx')
+      writeFileSync(plainPath, enc('secret-local-file'))
+      expect(await service.saveLocalCopy(plainPath)).toBe(false)
+      expect(pickDownloadPath).not.toHaveBeenCalled()
+      expect(existsSync(join(dir, 'exported-secret-plain.docx'))).toBe(false)
+
+      const seedBound = async (
+        deploymentId: string,
+        accountId: string,
+        docId: string,
+        text: string,
+      ) => {
+        const docDir = service.store.dirFor(deploymentId, accountId, docId)
+        const bytes = enc(text)
+        await service.store.write(docDir, {
+          schema: 2,
+          documentId: docId,
+          orgId: ORG_ID,
+          workspaceId: WS_ID,
+          title: 'Report.docx',
+          filename: 'Report.docx',
+          format: 'docx',
+          access: 'edit',
+          baseRevision: '10',
+          baseVersion: 1,
+          baseChecksum: sha256Hex(bytes),
+          state: 'failed',
+          error: 'too_large',
+          minStoreLevel: 1,
+          minAppVersion: '0.0.0',
+        })
+        return await service.store.writeWorkingCopy(docDir, 'Report.docx', bytes)
+      }
+
+      // (b) a bound working copy belonging to another account or deployment: refused
+      const foreignAccountPath = await seedBound(
+        'default',
+        'acc_2',
+        'doc_foreign_acc',
+        'foreign-acc',
+      )
+      const foreignDepPath = await seedBound('other_dep', 'acc_1', 'doc_foreign_dep', 'foreign-dep')
+      expect(await service.saveLocalCopy(foreignAccountPath)).toBe(false)
+      expect(await service.saveLocalCopy(foreignDepPath)).toBe(false)
+      expect(pickDownloadPath).not.toHaveBeenCalled()
+
+      // (c) an owned bound working copy: exported byte-for-byte
+      const ownedPath = await seedBound('default', 'acc_1', DOC_ID, 'owned-working-copy')
+      const dest1 = join(dir, 'copy-owned.docx')
+      pickerImpl = async () => dest1
+      expect(await service.saveLocalCopy(ownedPath)).toBe(true)
+      expect(pickDownloadPath).toHaveBeenCalledTimes(1)
+      expect(readFileSync(dest1, 'utf8')).toBe('owned-working-copy')
+
+      // (d) ownership lost while the picker is open (account switch): refused after the picker returns
+      const dest2 = join(dir, 'copy-after-switch.docx')
+      pickerImpl = async () => {
+        currentIdentity = {
+          accountId: 'acc_2',
+          deviceSessionId: 'dev_2',
+          deploymentId: 'default',
+        }
+        return dest2
+      }
+      expect(await service.saveLocalCopy(ownedPath)).toBe(false)
+      expect(existsSync(dest2)).toBe(false)
+    })
+
+    it('saveLocalCopy refuses a target identical to the working copy (path, realpath, dev+ino) and reads bytes after the picker returns (d1-3)', async () => {
+      let pickerImpl: () => Promise<string | null> = async () => null
+      const service = new UniworkDocsService({
+        userDataDir: dir,
+        profile: () => ({
+          deploymentId: 'default',
+          apiOrigin: 'https://uniwork.example',
+          clientId: 'uniwork-office',
+          channel: 'stable',
+        }),
+        channel: () => 'stable',
+        applyProfile: async () => 'unchanged',
+        identity: () => ({ accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' }),
+        selectedOrg: () => ({ id: ORG_ID, slug: 'acme' }),
+        authorized: <T>(call: (token: string) => Promise<T>) => call('tok'),
+        fetch: (async () => new Response('{}', { status: 404 })) as unknown as FetchLike,
+        openPath: () => true,
+        isPathOpen: () => false,
+        requestModuleSave: () => false,
+        reloadPath: () => undefined,
+        activePath: () => undefined,
+        pickDownloadPath: () => pickerImpl(),
+        ui: { chooseUnsavedClose: async () => 'cancel' },
+        pushStatus: () => undefined,
+        pushLaunch: () => undefined,
+        reveal: () => undefined,
+      })
+
+      const docDir = service.store.dirFor('default', 'acc_1', DOC_ID)
+      const initialBytes = enc('before-picker')
+      await service.store.write(docDir, {
+        schema: 2,
+        documentId: DOC_ID,
+        orgId: ORG_ID,
+        workspaceId: WS_ID,
+        title: 'Report.docx',
+        filename: 'Report.docx',
+        format: 'docx',
+        access: 'edit',
+        baseRevision: '10',
+        baseVersion: 1,
+        baseChecksum: sha256Hex(initialBytes),
+        state: 'failed',
+        error: 'too_large',
+        minStoreLevel: 1,
+        minAppVersion: '0.0.0',
+      })
+      const workingPath = await service.store.writeWorkingCopy(docDir, 'Report.docx', initialBytes)
+
+      // 1. Hold the picker open, rewrite the working copy with newer edits, then resolve the picker
+      //    with the working copy path itself: must refuse and preserve the newer edits on disk
+      pickerImpl = async () => {
+        writeFileSync(workingPath, enc('newer-edits-during-dialog'))
+        return workingPath
+      }
+      expect(await service.saveLocalCopy(workingPath)).toBe(false)
+      expect(readFileSync(workingPath, 'utf8')).toBe('newer-edits-during-dialog')
+
+      // 2. Symlink and hardlink aliases to the working copy are also refused without writing
+      const symlinkPath = join(dir, 'symlink-to-working.docx')
+      symlinkSync(workingPath, symlinkPath)
+      pickerImpl = async () => {
+        writeFileSync(workingPath, enc('edits-before-symlink-refusal'))
+        return symlinkPath
+      }
+      expect(await service.saveLocalCopy(workingPath)).toBe(false)
+      expect(readFileSync(workingPath, 'utf8')).toBe('edits-before-symlink-refusal')
+
+      const hardlinkPath = join(dir, 'hardlink-to-working.docx')
+      linkSync(workingPath, hardlinkPath)
+      pickerImpl = async () => {
+        writeFileSync(workingPath, enc('edits-before-hardlink-refusal'))
+        return hardlinkPath
+      }
+      expect(await service.saveLocalCopy(workingPath)).toBe(false)
+      expect(readFileSync(workingPath, 'utf8')).toBe('edits-before-hardlink-refusal')
+
+      // 3. A distinct destination reads the snapshot AFTER the picker returns (post-dialog edits)
+      const distinctDest = join(dir, 'distinct-export.docx')
+      pickerImpl = async () => {
+        writeFileSync(workingPath, enc('latest-bytes-at-picker-return'))
+        return distinctDest
+      }
+      expect(await service.saveLocalCopy(workingPath)).toBe(true)
+      expect(readFileSync(distinctDest, 'utf8')).toBe('latest-bytes-at-picker-return')
+    })
   })
 
   describe('3. pre-enqueue check and warn band (SaveCoordinator.save)', () => {
@@ -343,7 +805,9 @@ describe('SIZE-F1 desktop document size limits', () => {
 
       /** the store's records, in the `{intent, payload}` shape `IntentStore.read` returns */
       const stored = new Map<string, { intent: IntentRecordV2; payload: Uint8Array }>()
+      let putResult: 'ok' | 'store_full' | 'interrupted' = 'ok'
       const put = vi.fn(async (key: string, intent: IntentRecordV2, payload: Uint8Array) => {
+        if (putResult !== 'ok') return { kind: putResult }
         stored.set(key, { intent, payload })
         return { kind: 'ok' as const }
       })
@@ -364,6 +828,16 @@ describe('SIZE-F1 desktop document size limits', () => {
       }
       const supersede = vi.fn(async () => 'cancelled' as const)
       const statuses: UniworkDocStatus[] = []
+      let allowStoreWrite = true
+      const storeWrite = vi.fn(async (writtenDir: string, next: Binding) => {
+        if (!allowStoreWrite) return false
+        for (const [path, doc] of docs) {
+          if (doc.dir === writtenDir) docs.set(path, { ...doc, binding: next })
+        }
+        return true
+      })
+
+      let lastUploadedChecksum = ''
 
       const deps: SaveCoordinatorDeps = {
         store: {
@@ -372,25 +846,23 @@ describe('SIZE-F1 desktop document size limits', () => {
               ? { kind: 'bound' as const, doc: docs.get(path)! }
               : { kind: 'plain' as const },
           lookup: (path: string) => docs.get(path) ?? null,
-          write: async (writtenDir: string, next: Binding) => {
-            for (const [path, doc] of docs) {
-              if (doc.dir === writtenDir) docs.set(path, { ...doc, binding: next })
-            }
-            return true
-          },
+          write: storeWrite,
         } as never,
         client: {
-          upload: async (input) => ({
-            uploadId: 'up_1',
-            checksumSha256: sha256Hex(input.bytes),
-            claimExpiresAt: null,
-          }),
+          upload: async (input) => {
+            lastUploadedChecksum = sha256Hex(input.bytes)
+            return {
+              uploadId: 'up_1',
+              checksumSha256: lastUploadedChecksum,
+              claimExpiresAt: null,
+            }
+          },
           commit: async (input) => ({
             documentId: input.documentId,
             revision: '11',
             versionId: 'v2',
             version: 2,
-            checksumSha256: sha256Hex(readFileSync(docPath)),
+            checksumSha256: lastUploadedChecksum || sha256Hex(readFileSync(docPath)),
             savedAt: ISO,
           }),
           getDocument: async () => {
@@ -415,6 +887,13 @@ describe('SIZE-F1 desktop document size limits', () => {
         supersede,
         statuses,
         stored,
+        storeWrite,
+        setPutResult: (next: 'ok' | 'store_full' | 'interrupted') => {
+          putResult = next
+        },
+        setAllowStoreWrite: (next: boolean) => {
+          allowStoreWrite = next
+        },
       }
     }
 
@@ -490,6 +969,51 @@ describe('SIZE-F1 desktop document size limits', () => {
       expect(h.statuses.some((push) => push.error === 'too_large')).toBe(false)
     })
 
+    it('never marks an unchanged copy failed as too_large when a pending intent exists under a lowered cap (d1-7)', async () => {
+      // Base is 7 bytes ('initial'), max_bytes is lowered to 3 bytes
+      const h = harness(parseDocumentLimits({ upload_max_bytes: 3, save_warn_ratio: 0.9 }))
+      const olderBytes = enc('older')
+      h.stored.set(DOC_ID, {
+        intent: {
+          v: 2,
+          intentId: 'old',
+          idempotencyKey: 'old_key',
+          documentId: DOC_ID,
+          orgId: ORG_ID,
+          workspaceId: WS_ID,
+          baseRevision: '10',
+          baseVersion: 1,
+          checksum: sha256Hex(olderBytes),
+          length: olderBytes.byteLength,
+          generation: 1,
+          state: 'queued',
+          attempt: 0,
+          createdAt: ISO,
+          updatedAt: ISO,
+        },
+        payload: olderBytes,
+      })
+
+      // 1. User save with pending intent + working copy equal to base:
+      //    must NOT fail as too_large or supersede the pending intent; runs pending userSave handling
+      const userStatus = await h.coordinator.save(h.docPath, { userSave: true })
+      expect(userStatus!.binding.error).not.toBe('too_large')
+      expect(h.supersede).not.toHaveBeenCalled()
+      expect(h.put).not.toHaveBeenCalled()
+      expect(h.stored.has(DOC_ID)).toBe(true)
+
+      // 2. Non-user save with pending intent + working copy equal to base:
+      //    replays and settles the pending intent without failing the unchanged base as too_large
+      const replayed = await h.coordinator.save(h.docPath)
+      expect(replayed!.binding.state).not.toBe('failed')
+      expect(replayed!.binding.error).toBeUndefined()
+      expect(replayed!.binding.baseChecksum).toBe(sha256Hex(olderBytes))
+      expect(h.stored.has(DOC_ID)).toBe(false)
+      expect(h.supersede).not.toHaveBeenCalled()
+      expect(h.put).not.toHaveBeenCalled()
+      expect(h.statuses.some((push) => push.error === 'too_large')).toBe(false)
+    })
+
     it('warns once per bound session in the 90..100% band and still saves', async () => {
       const h = harness(OVER)
       /** the warn chip payload of every published status that carried one */
@@ -516,6 +1040,115 @@ describe('SIZE-F1 desktop document size limits', () => {
       writeFileSync(h.docPath, new Uint8Array(920).fill(69))
       await h.coordinator.save(h.docPath)
       expect(warnPayloads()).toContainEqual({ sizeBytes: 920, maxBytes: 1000 })
+    })
+
+    it('does not consume the warn latch on an unpublished userSave or store refusal, and guards supersede cleanup by generation (d1-5)', async () => {
+      const h = harness(OVER)
+      const warnPayloads = (): Array<{ sizeBytes: number; maxBytes: number } | undefined> =>
+        h.statuses.filter((push) => push.sizeWarn).map((push) => push.sizeWarn)
+
+      // 1. A userSave with a pending intent whose checksum matches the working copy
+      //    returns through requestPopover without publishing a status: latch must NOT be consumed
+      const warnBytes1 = new Uint8Array(940).fill(70)
+      writeFileSync(h.docPath, warnBytes1)
+      h.stored.set(DOC_ID, {
+        intent: {
+          v: 2,
+          intentId: 'pend_1',
+          idempotencyKey: 'key_1',
+          documentId: DOC_ID,
+          orgId: ORG_ID,
+          workspaceId: WS_ID,
+          baseRevision: '10',
+          baseVersion: 1,
+          checksum: sha256Hex(warnBytes1),
+          length: warnBytes1.byteLength,
+          generation: 1,
+          state: 'paused_user',
+          attempt: 0,
+          createdAt: ISO,
+          updatedAt: ISO,
+        },
+        payload: warnBytes1,
+      })
+      await h.coordinator.save(h.docPath, { userSave: true })
+      expect(h.statuses).toHaveLength(0)
+
+      // 2. Clear the pending intent and simulate store_full on the next warn-band save:
+      //    error status is published without sizeWarn and latch is still NOT consumed
+      h.stored.delete(DOC_ID)
+      h.setPutResult('store_full')
+      await h.coordinator.save(h.docPath)
+      expect(warnPayloads()).toHaveLength(0)
+
+      // 3. Simulate store.write refusal (sweep holds the copy): no status published, latch NOT consumed
+      h.setPutResult('ok')
+      h.stored.delete(DOC_ID)
+      h.setAllowStoreWrite(false)
+      await h.coordinator.save(h.docPath)
+      expect(warnPayloads()).toHaveLength(0)
+
+      // 4. Now allow the save to proceed in the 90..100% band: sizeWarn IS published!
+      h.stored.delete(DOC_ID)
+      h.setAllowStoreWrite(true)
+      const warnBytes2 = new Uint8Array(955).fill(71)
+      writeFileSync(h.docPath, warnBytes2)
+      const saved = await h.coordinator.save(h.docPath)
+      expect(saved!.binding.state).toBe('saved')
+      expect(warnPayloads()).toContainEqual({ sizeBytes: 955, maxBytes: 1000 })
+
+      // 5. Over-cap supersede uses generation-checked cleanupIntent: if a newer generation
+      //    record is installed while supersede runs, cleanupIntent preserves the newer record
+      const olderPayload = enc('older-gen-2')
+      h.stored.set(DOC_ID, {
+        intent: {
+          v: 2,
+          intentId: 'old_gen_2',
+          idempotencyKey: 'key_gen_2',
+          documentId: DOC_ID,
+          orgId: ORG_ID,
+          workspaceId: WS_ID,
+          baseRevision: '10',
+          baseVersion: 1,
+          checksum: sha256Hex(olderPayload),
+          length: olderPayload.byteLength,
+          generation: 2,
+          state: 'queued',
+          attempt: 0,
+          createdAt: ISO,
+          updatedAt: ISO,
+        },
+        payload: olderPayload,
+      })
+      const newerPayload = enc('newer-gen-3')
+      h.supersede.mockImplementationOnce(async () => {
+        h.stored.set(DOC_ID, {
+          intent: {
+            v: 2,
+            intentId: 'new_gen_3',
+            idempotencyKey: 'key_gen_3',
+            documentId: DOC_ID,
+            orgId: ORG_ID,
+            workspaceId: WS_ID,
+            baseRevision: '10',
+            baseVersion: 1,
+            checksum: sha256Hex(newerPayload),
+            length: newerPayload.byteLength,
+            generation: 3,
+            state: 'queued',
+            attempt: 0,
+            createdAt: ISO,
+            updatedAt: ISO,
+          },
+          payload: newerPayload,
+        })
+        return 'cancelled' as const
+      })
+      writeFileSync(h.docPath, new Uint8Array(1050).fill(72))
+      await h.coordinator.save(h.docPath)
+      expect(h.supersede).toHaveBeenCalledTimes(1)
+      expect(h.stored.get(DOC_ID)?.intent.intentId).toBe('new_gen_3')
+      expect(h.stored.get(DOC_ID)?.intent.generation).toBe(3)
     })
   })
 
@@ -652,6 +1285,238 @@ describe('SIZE-F1 desktop document size limits', () => {
         reasonMaxBytes: 209_715_200,
       })
       expect(failedReasonKey({ ...row, maxBytes: undefined })).toBe('uwReasonTooLarge')
+    })
+
+    it('keeps the intent record and payload as failed/too_large on an inline 413, never auto-replays it, and guards against overwriting a newer generation (d1-2)', async () => {
+      const tmp = mkdtempSync(join(tmpdir(), 'uw-size-413-'))
+      try {
+        const docPath = join(tmp, 'Report.docx')
+        const baseBytes = enc('base')
+        const bodyBytes = enc('updated-payload-under-client-cap')
+        writeFileSync(docPath, bodyBytes)
+
+        const binding: Binding = {
+          schema: 2,
+          documentId: DOC_ID,
+          orgId: ORG_ID,
+          workspaceId: WS_ID,
+          title: 'Report.docx',
+          filename: 'Report.docx',
+          format: 'docx',
+          access: 'edit',
+          baseRevision: '10',
+          baseVersion: 1,
+          baseChecksum: sha256Hex(baseBytes),
+          state: 'saved',
+          minStoreLevel: 1,
+          minAppVersion: '0.0.0',
+        }
+        const docs = new Map<string, BoundDocument>([
+          [
+            docPath,
+            {
+              path: docPath,
+              dir: tmp,
+              deploymentId: 'default',
+              userId: 'acc_1',
+              key: DOC_ID,
+              binding,
+            },
+          ],
+        ])
+        const stored = new Map<string, { intent: IntentRecordV2; payload: Uint8Array }>()
+        const put = vi.fn(async (key: string, intent: IntentRecordV2, payload: Uint8Array) => {
+          stored.set(key, { intent, payload })
+          return { kind: 'ok' as const }
+        })
+        const remove = vi.fn(async (key: string) => {
+          stored.delete(key)
+        })
+        const intents: IntentStore = {
+          async get(key) {
+            return (stored.get(key) ?? null) as unknown as PendingIntentValue | null
+          },
+          async read(key) {
+            return stored.get(key) ?? null
+          },
+          put,
+          delete: remove,
+        }
+
+        let uploadCalls = 0
+        let uploadImpl: (input: { bytes: Uint8Array }) => Promise<{
+          uploadId: string
+          checksumSha256: string
+          claimExpiresAt: null
+        }> = async () => {
+          uploadCalls += 1
+          throw errorFromResponse(413, {
+            error: {
+              code: 'file_too_large',
+              message: 'tệp vượt quá dung lượng cho phép',
+              fields: { max_bytes: 500, size_bytes: bodyBytes.byteLength },
+            },
+          })
+        }
+
+        const coordinator = new SaveCoordinator({
+          store: {
+            classify: (path: string) =>
+              docs.has(path)
+                ? { kind: 'bound' as const, doc: docs.get(path)! }
+                : { kind: 'plain' as const },
+            lookup: (path: string) => docs.get(path) ?? null,
+            write: async (writtenDir: string, next: Binding) => {
+              for (const [path, doc] of docs) {
+                if (doc.dir === writtenDir) docs.set(path, { ...doc, binding: next })
+              }
+              return true
+            },
+          } as never,
+          client: {
+            upload: (input) => uploadImpl(input),
+            commit: async () => {
+              throw new UniworkDocError('server_error')
+            },
+            getDocument: async () => {
+              throw new UniworkDocError('not_found')
+            },
+          },
+          isSignedIn: () => true,
+          ownsBinding: () => true,
+          intents: async () => ({ kind: 'ok', intents }),
+          publish: () => undefined,
+          now: () => new Date(ISO),
+          uuid: () => 'u413',
+        })
+
+        const ended = await coordinator.save(docPath)
+        expect(ended!.binding).toMatchObject({
+          state: 'failed',
+          error: 'too_large',
+          sizeBytes: bodyBytes.byteLength,
+          maxBytes: 500,
+        })
+        expect(remove).not.toHaveBeenCalled()
+        const parked = stored.get(DOC_ID)
+        expect(parked).toBeDefined()
+        expect(parked!.intent).toMatchObject({
+          state: 'failed',
+          lastError: 'too_large',
+          maxBytes: 500,
+          generation: 1,
+        })
+        expect(Array.from(parked!.payload)).toEqual(Array.from(bodyBytes))
+
+        // Dispatcher poll does NOT auto-replay a failed record; dispatcher path on a queued
+        // record hitting 413 is unchanged and parks failed/too_large with maxBytes too
+        const dispatcher = new QueueDispatcher({
+          intents: async () => ({ kind: 'ok', intents: intents as never }),
+          client: {
+            upload: (input: { bytes: Uint8Array }) => uploadImpl(input),
+            commit: async () => {
+              throw new UniworkDocError('server_error')
+            },
+            lookupCommit: async () => ({ outcome: 'not_committed' as const }),
+          },
+          capability: {
+            get: async () => ({ kind: 'ok', capabilities: { sync_write: true }, source: 'live' }),
+          },
+          lock: {
+            acquire: async () => ({ kind: 'held', generation: 1 }),
+            check: async () => true,
+            heartbeat: async () => true,
+            release: async () => undefined,
+          },
+          pause: {
+            isPaused: async () => false,
+            setPaused: async () => ({ kind: 'ok' as const }),
+          },
+          drafts: { keep: async () => 'ok' as const },
+          clock: () => Date.parse(ISO),
+          uuid: () => 'd413',
+          publish: () => undefined,
+        } as never)
+
+        uploadCalls = 0
+        const pollFailed = await dispatcher.dispatchAll([
+          {
+            key: DOC_ID,
+            path: docPath,
+            filename: 'Report.docx',
+            format: 'docx',
+            orgId: ORG_ID,
+            workspaceId: WS_ID,
+            baseVersion: 1,
+            record: parked!.intent,
+            payload: parked!.payload,
+          },
+        ])
+        expect(pollFailed.dispatched).toBe(0)
+        expect(uploadCalls).toBe(0)
+
+        const queuedRecord: IntentRecordV2 = {
+          ...parked!.intent,
+          state: 'queued',
+          lastError: undefined,
+          maxBytes: undefined,
+        }
+        stored.set(DOC_ID, { intent: queuedRecord, payload: bodyBytes })
+        const dispatched413 = await dispatcher.dispatchAll([
+          {
+            key: DOC_ID,
+            path: docPath,
+            filename: 'Report.docx',
+            format: 'docx',
+            orgId: ORG_ID,
+            workspaceId: WS_ID,
+            baseVersion: 1,
+            record: queuedRecord,
+            payload: bodyBytes,
+          },
+        ])
+        expect(dispatched413.outcomes.get(DOC_ID)).toBe('failed')
+        expect(stored.get(DOC_ID)?.intent).toMatchObject({
+          state: 'failed',
+          lastError: 'too_large',
+          maxBytes: 500,
+        })
+
+        // Generation guard (settleRecord): if a newer intent (generation 2) took the document
+        // key while the inline 413 was in flight, settleRecord leaves generation 2 untouched
+        stored.clear()
+        const newerIntent: IntentRecordV2 = {
+          v: 2,
+          intentId: 'office-intent-newer',
+          idempotencyKey: 'office-key-newer',
+          documentId: DOC_ID,
+          orgId: ORG_ID,
+          workspaceId: WS_ID,
+          baseRevision: '10',
+          baseVersion: 1,
+          checksum: sha256Hex(enc('newer')),
+          length: 5,
+          generation: 2,
+          state: 'queued',
+          attempt: 0,
+          createdAt: ISO,
+          updatedAt: ISO,
+        }
+        uploadImpl = async () => {
+          stored.set(DOC_ID, { intent: newerIntent, payload: enc('newer') })
+          throw errorFromResponse(413, {
+            error: {
+              code: 'file_too_large',
+              message: 'tệp vượt quá dung lượng cho phép',
+              fields: { max_bytes: 500 },
+            },
+          })
+        }
+        await coordinator.save(docPath)
+        expect(stored.get(DOC_ID)?.intent).toEqual(newerIntent)
+      } finally {
+        rmSync(tmp, { recursive: true, force: true })
+      }
     })
   })
 

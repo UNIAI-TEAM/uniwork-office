@@ -513,57 +513,61 @@ export class SaveCoordinator {
     // bytes identical to the base never touch the network, and an unchanged
     // copy over the cap is already on the server: the no-op verdict comes first
     // so a lowered limit never marks an unchanged document failed
-    if (!pending && checksum === doc.binding.baseChecksum) {
+    const unchangedFromBase = checksum === doc.binding.baseChecksum
+    if (!pending && unchangedFromBase) {
       return await this.commitState(doc, withoutError({ ...doc.binding, state: 'saved' }))
     }
 
-    const limits = await this.resolveLimits()
-    if (bytes.byteLength > limits.max_bytes) {
-      if (pending && !IN_FLIGHT_QUEUE_STATES.has(pending.intent.state)) {
-        await this.deps.dispatcher?.supersede({
-          key: doc.key,
-          path: doc.path,
-          filename: doc.binding.filename,
-          format: doc.binding.format,
-          orgId: doc.binding.orgId,
-          workspaceId: doc.binding.workspaceId,
-          baseVersion: doc.binding.baseVersion,
-          record: pending.intent,
-          payload: pending.payload,
-        })
-        await intents.delete(doc.key)
+    if (!unchangedFromBase) {
+      const limits = await this.resolveLimits()
+      if (bytes.byteLength > limits.max_bytes) {
+        if (pending && !IN_FLIGHT_QUEUE_STATES.has(pending.intent.state)) {
+          await this.deps.dispatcher?.supersede({
+            key: doc.key,
+            path: doc.path,
+            filename: doc.binding.filename,
+            format: doc.binding.format,
+            orgId: doc.binding.orgId,
+            workspaceId: doc.binding.workspaceId,
+            baseVersion: doc.binding.baseVersion,
+            record: pending.intent,
+            payload: pending.payload,
+          })
+          await this.cleanupIntent(intents, doc, pending.intent)
+        }
+        this.pendingNext.delete(doc.path)
+        this.activeSizeWarns.delete(doc.path)
+        this.tooLargePromptSeq += 1
+        this.activeTooLargePrompt.set(doc.path, this.tooLargePromptSeq)
+        let failedDoc: BoundDocument
+        try {
+          failedDoc = await this.commitState(doc, {
+            ...doc.binding,
+            state: 'failed',
+            error: 'too_large',
+            sizeBytes: bytes.byteLength,
+            maxBytes: limits.max_bytes,
+          })
+        } finally {
+          this.activeTooLargePrompt.delete(doc.path)
+        }
+        return failedDoc
       }
-      this.pendingNext.delete(doc.path)
-      this.activeSizeWarns.delete(doc.path)
-      this.tooLargePromptSeq += 1
-      this.activeTooLargePrompt.set(doc.path, this.tooLargePromptSeq)
-      let failedDoc: BoundDocument
-      try {
-        failedDoc = await this.commitState(doc, {
-          ...doc.binding,
-          state: 'failed',
-          error: 'too_large',
-          sizeBytes: bytes.byteLength,
-          maxBytes: limits.max_bytes,
-        })
-      } finally {
-        this.activeTooLargePrompt.delete(doc.path)
-      }
-      return failedDoc
-    }
 
-    if (bytes.byteLength >= limits.warn_bytes) {
-      if (!this.warnedDocs.has(doc.key)) {
-        this.warnedDocs.add(doc.key)
-        this.activeSizeWarns.set(doc.path, {
-          sizeBytes: bytes.byteLength,
-          maxBytes: limits.max_bytes,
-        })
+      if (bytes.byteLength >= limits.warn_bytes) {
+        if (!this.warnedDocs.has(doc.key)) {
+          this.activeSizeWarns.set(doc.path, {
+            sizeBytes: bytes.byteLength,
+            maxBytes: limits.max_bytes,
+          })
+        } else {
+          this.activeSizeWarns.delete(doc.path)
+        }
       } else {
+        this.warnedDocs.delete(doc.key)
         this.activeSizeWarns.delete(doc.path)
       }
     } else {
-      this.warnedDocs.delete(doc.key)
       this.activeSizeWarns.delete(doc.path)
     }
 
@@ -598,6 +602,7 @@ export class SaveCoordinator {
         minted.state = state
         const written = await intents.put(doc.key, minted, bytes)
         if (written.kind === 'store_full') {
+          this.activeSizeWarns.delete(doc.path)
           const refused = await this.commitState(doc, {
             ...doc.binding,
             state: 'error',
@@ -607,6 +612,7 @@ export class SaveCoordinator {
         }
         if (written.kind === 'interrupted') {
           // the account boundary wiped the scope under this save
+          this.activeSizeWarns.delete(doc.path)
           return await this.commitState(doc, {
             ...doc.binding,
             state: 'signed-out',
@@ -614,6 +620,7 @@ export class SaveCoordinator {
           })
         }
         if (written.kind !== 'ok') {
+          this.activeSizeWarns.delete(doc.path)
           return await this.commitState(doc, {
             ...doc.binding,
             state: 'error',
@@ -648,6 +655,7 @@ export class SaveCoordinator {
         // the sweep still owns this copy: no rewrite, no request, nothing sent
         if (!(await store.write(doc.dir, binding))) return doc
       } catch {
+        this.activeSizeWarns.delete(doc.path)
         return await this.commitState(doc, {
           ...doc.binding,
           state: 'error',
@@ -916,7 +924,7 @@ export class SaveCoordinator {
     intents: IntentStore,
   ): Promise<BoundDocument> {
     const base = doc.binding
-    const dropped = isTerminalRefusal(error)
+    const dropped = isTerminalRefusal(error) && error.code !== 'too_large'
     if (dropped) {
       await this.cleanupIntent(intents, doc, intent)
       this.pendingNext.delete(doc.path)
@@ -963,6 +971,17 @@ export class SaveCoordinator {
         // the upload claim expired: look the intent up before touching bytes again
         return this.commitState(doc, { ...base, state: 'reconciling' })
       case 'too_large':
+        // SIZE-F1 §5.2 item 3 (d1-2): keep the intent and its payload as a
+        // durable `failed` record (`lastError: 'too_large'`, `maxBytes` when
+        // the server named one) under the same generation guard as conflict and
+        // document_archived (OQ-F12), so the payload stays untouched and no
+        // poll auto-replays it.
+        this.pendingNext.delete(doc.path)
+        await this.settleRecord(intents, doc, intent, {
+          type: 'commitFailed',
+          error: 'too_large',
+          ...(error.maxBytes !== undefined ? { maxBytes: error.maxBytes } : {}),
+        })
         return this.commitState(doc, {
           ...base,
           state: 'failed',
@@ -1137,6 +1156,7 @@ export class SaveCoordinator {
       written = true
     }
     if (!written) {
+      this.activeSizeWarns.delete(doc.path)
       this.publish(doc)
       return doc
     }
@@ -1147,7 +1167,10 @@ export class SaveCoordinator {
   private publish(doc: BoundDocument): void {
     const status = toStatus(doc, this.pendingNext.has(doc.path))
     const sizeWarn = this.activeSizeWarns.get(doc.path)
-    if (sizeWarn) status.sizeWarn = sizeWarn
+    if (sizeWarn) {
+      status.sizeWarn = sizeWarn
+      this.warnedDocs.add(doc.key)
+    }
     const promptSeq = this.activeTooLargePrompt.get(doc.path)
     if (promptSeq !== undefined) {
       status.saveTooLargePrompt = true

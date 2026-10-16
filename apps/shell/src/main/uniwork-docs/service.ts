@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, rmSync, statSync, unlinkSync } from 'node:fs'
-import { readFile, rename, stat, writeFile } from 'node:fs/promises'
+import { readFile, realpath, rename, stat, writeFile } from 'node:fs/promises'
 import { createHash, randomUUID } from 'node:crypto'
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type {
@@ -732,6 +732,8 @@ export class UniworkDocsService {
   private orgMemberNames = new Map<string, string>()
   /** the org whose member names the map holds (null = nothing cached) */
   private orgMemberNamesOrg: string | null = null
+  /** the last organization id observed by `noteSelectedOrg` */
+  private notedOrgId: string | null = null
   /** the one in-flight members read per org, shared by concurrent panel opens */
   private orgMemberNamesInFlight: { orgId: string; promise: Promise<Map<string, string>> } | null =
     null
@@ -844,11 +846,13 @@ export class UniworkDocsService {
     this.lastOwner = this.store.readLastOwner()
     this.limitsCache = createDocumentLimitsCache({
       origin: () => this.deps.profile()?.apiOrigin ?? null,
-      fetchLimits: async () => {
+      fetchLimits: async (startedOrigin) => {
         if (this.deps.limits) return await this.deps.limits()
         // a session that is not signed in has no deployment to ask: the
         // defaults hold until one is, and `noteSessionIdentity` refreshes
         if (!this.deps.identity()) return null
+        const currentOrigin = this.deps.profile()?.apiOrigin?.trim().replace(/\/+$/, '') || null
+        if (startedOrigin !== currentOrigin) return null
         const client = this.api()
         return client.getDocumentLimits ? await client.getDocumentLimits() : null
       },
@@ -1166,6 +1170,7 @@ export class UniworkDocsService {
       // replace whatever the previous one published
       void this.limitsCache.refresh().catch(() => undefined)
     } else {
+      this.notedOrgId = null
       this.limitsCache.reset()
     }
     // a live session opens its store: the scope's migration and every later
@@ -1181,31 +1186,63 @@ export class UniworkDocsService {
   async saveLocalCopy(path: string): Promise<boolean> {
     if (typeof path !== 'string' || !path) return false
     const doc = this.store.lookup(path)
-    const sourcePath = doc ? doc.path : path
-    let localBytes: Uint8Array
-    try {
-      localBytes = new Uint8Array(await readFile(sourcePath))
-    } catch {
-      return false
-    }
-    const defaultName = doc ? doc.binding.filename : basename(sourcePath)
+    if (!doc || !this.ownsLocally(doc)) return false
+    const defaultName = doc.binding.filename
     let target: string | null = null
     try {
       if (this.deps.pickDownloadPath) {
         target = await this.deps.pickDownloadPath(defaultName)
-      } else if (this.deps.ui?.pickCopyPath && doc) {
+      } else if (this.deps.ui?.pickCopyPath) {
         target = await this.deps.ui.pickCopyPath(doc.binding.title, doc.binding.format)
       }
     } catch {
       return false
     }
     if (!target) return false
+    const current = this.store.lookup(doc.path)
+    if (
+      !current ||
+      current.binding.documentId !== doc.binding.documentId ||
+      !this.ownsLocally(current)
+    ) {
+      return false
+    }
+    if (await this.isSameWorkingCopy(current.path, target)) return false
     try {
+      const localBytes = new Uint8Array(await readFile(current.path))
       await writeFile(target, localBytes)
       return true
     } catch {
       return false
     }
+  }
+
+  /** true when `targetPath` points to the same file as `sourcePath` (resolved, realpath, or dev+ino) */
+  private async isSameWorkingCopy(sourcePath: string, targetPath: string): Promise<boolean> {
+    const resolvedSource = resolve(sourcePath)
+    const resolvedTarget = resolve(targetPath)
+    if (pathKey(resolvedSource) === pathKey(resolvedTarget)) return true
+    const [sourceStat, targetStat] = await Promise.all([
+      stat(resolvedSource).catch(() => null),
+      stat(resolvedTarget).catch(() => null),
+    ])
+    if (
+      sourceStat &&
+      targetStat &&
+      sourceStat.dev === targetStat.dev &&
+      sourceStat.ino === targetStat.ino &&
+      sourceStat.ino !== 0
+    ) {
+      return true
+    }
+    const realSource = await realpath(resolvedSource).catch(() => resolvedSource)
+    const realTarget = await realpath(resolvedTarget).catch(async () => {
+      const realParent = await realpath(dirname(resolvedTarget)).catch(() =>
+        dirname(resolvedTarget),
+      )
+      return join(realParent, basename(resolvedTarget))
+    })
+    return pathKey(realSource) === pathKey(realTarget)
   }
 
   /** this build's version, as stamped into bindings (display only, never a gate) */
@@ -2610,6 +2647,7 @@ export class UniworkDocsService {
     this.remoteReloads.clear()
     this.orgMemberNames.clear()
     this.orgMemberNamesOrg = null
+    this.notedOrgId = null
     this.orgMemberNamesInFlight = null
     this.migratedScopes.delete(scopeToken)
     this.limitsCache.reset()
@@ -2900,7 +2938,10 @@ export class UniworkDocsService {
    * renderer on the same status push; nothing else here caches a library).
    */
   noteSelectedOrg(orgId: string | null): void {
-    const changed = this.orgMemberNamesOrg !== orgId
+    const changed =
+      this.notedOrgId !== orgId ||
+      (this.orgMemberNamesOrg !== null && this.orgMemberNamesOrg !== orgId)
+    this.notedOrgId = orgId
     if (this.orgMemberNamesOrg !== null && this.orgMemberNamesOrg !== orgId) {
       this.orgMemberNames = new Map()
       this.orgMemberNamesOrg = null
