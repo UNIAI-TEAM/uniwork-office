@@ -760,7 +760,7 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       const gate = await sizeGate.checkBeforeSave(data)
       if (!gate.allowed) {
         if (hostSave) hostSave.error = gate.error
-        return { ok: false, error: gate.message }
+        return { ok: false, reason: 'external-modified' }
       }
       const etag = files.get(fileId)?.etag
       const payload = {
@@ -782,7 +782,8 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       if (hostSave) hostSave.error = res.error
       const code = res.error.code
       if (code === 'too_large') {
-        return { ok: false, error: sizeGate.handleServerTooLarge(res.error, data) }
+        sizeGate.handleServerTooLarge(res.error, data)
+        return { ok: false, reason: 'external-modified' }
       }
       const shown = remote?.saveFailed(res.error) === true
       if (code === 'conflict') {
@@ -825,7 +826,7 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       const gate = await sizeGate.checkBeforeSave(data)
       if (!gate.allowed) {
         pending?.settle({ ok: false, error: gate.error })
-        return { ok: false, error: gate.message }
+        return { ok: false }
       }
       const sourceFileId = idFromPath(sourcePath)
       const payload = {
@@ -848,7 +849,8 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       // cancelled dialog: {ok:false} without error, like the desktop
       if (res.error.code === 'cancelled') return { ok: false }
       if (res.error.code === 'too_large') {
-        return { ok: false, error: sizeGate.handleServerTooLarge(res.error, data) }
+        sizeGate.handleServerTooLarge(res.error, data)
+        return { ok: false }
       }
       // the bar says it: a result without an error shows no toast (like a cancelled dialog)
       if (remote?.saveFailed(res.error)) return { ok: false }
@@ -866,7 +868,7 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       const gate = await sizeGate.checkBeforeSave(data)
       if (!gate.allowed) {
         if (hostSave) hostSave.error = gate.error
-        return { ok: false, error: gate.message }
+        return { ok: false }
       }
       const payload = {
         name: withExt(defaultName || 'Untitled', '.docx'),
@@ -882,7 +884,8 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       if (!res.ok) {
         if (hostSave) hostSave.error = res.error
         if (res.error.code === 'too_large') {
-          return { ok: false, error: sizeGate.handleServerTooLarge(res.error, data) }
+          sizeGate.handleServerTooLarge(res.error, data)
+          return { ok: false }
         }
         if (remote?.saveFailed(res.error)) return { ok: false }
         return { ok: false, error: saveFailureText(res.error, () => text('appWebSaveOffline')) }

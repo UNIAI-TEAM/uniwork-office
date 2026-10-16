@@ -823,13 +823,22 @@ describe('pdfApi: save size gate (SIZE-F1, UNI-1861)', () => {
 
     // '%PDF-1.7 v1+m0' is 14 bytes > 12 B max_bytes -> blocked before api.save
     const res = await api.save(req(path))
-    expect(res.ok).toBe(false)
+    expect(res).toEqual({ ok: false, error: '' })
     expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(0)
     expect(mock.saveBlocked).toHaveLength(1)
 
     const resAs = await api.save(req(path, { targetPath: 'uniwork://save-as/Copy.pdf' }))
-    expect(resAs.ok).toBe(false)
+    expect(resAs).toEqual({ ok: false, error: '' })
     expect(mock.calls.filter((c) => c.type === 'api.saveAs')).toHaveLength(0)
     expect(mock.saveBlocked).toHaveLength(2)
+
+    // Host-initiated save settles with too_large error
+    api.onCloseSaveRequest(() => {
+      void api.save(req(path)).then((r) => api.sendCloseSaveResult(r.ok))
+    })
+    expect(await mock.host.save({ reason: 'user' })).toMatchObject({
+      ok: false,
+      error: { code: 'too_large' },
+    })
   })
 })

@@ -7733,7 +7733,7 @@ export function App() {
                     </span>
                   )
                 })()}
-              {status && (
+              {status && !refusedMessage && (
                 <span className="status-msg" title={statusText(status, t)}>
                   {' '}
                   — {statusText(status, t)}

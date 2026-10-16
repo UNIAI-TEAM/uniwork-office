@@ -217,6 +217,22 @@ describe('frameAsk', () => {
     expect(document.activeElement).toBe(opener)
   })
 
+  it('when opened with focus on body, Escape or Close returns focus to the module canvas/editor root', async () => {
+    for (const cls of ['stage-wrap', 'pdf-scroll']) {
+      document.body.innerHTML = ''
+      const root = document.createElement('div')
+      root.className = cls
+      document.body.append(root)
+      ;(document.activeElement as HTMLElement | null)?.blur?.()
+      expect(document.activeElement).toBe(document.body)
+
+      const done = conflict()
+      keydown('Escape')
+      expect(await done).toBe('cancel')
+      expect(document.activeElement).toBe(root)
+    }
+  })
+
   it('labels the dialog, carries the marker attribute and the extra lines', () => {
     const onChange = vi.fn()
     void frameAsk({

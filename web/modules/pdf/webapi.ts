@@ -497,7 +497,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
     const gate = await sizeGate.checkBeforeSave(bytes)
     if (!gate.allowed) {
       if (hostSave) hostSave.error = gate.error
-      return fail(gate.message)
+      return fail('')
     }
     const etag = doc?.file.fileId === fileId ? doc.file.etag : undefined
     const data = copyBuffer(bytes)
@@ -514,7 +514,8 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
     }
     if (hostSave) hostSave.error = res.error
     if (res.error.code === 'too_large') {
-      return fail(sizeGate.handleServerTooLarge(res.error, bytes))
+      sizeGate.handleServerTooLarge(res.error, bytes)
+      return fail('')
     }
     remote?.saveFailed(res.error)
     if (res.error.code === 'conflict') {
@@ -573,7 +574,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
     const gate = await sizeGate.checkBeforeSave(bytes)
     if (!gate.allowed) {
       pending?.settle({ ok: false, error: gate.error })
-      return fail(gate.message)
+      return fail('')
     }
     const data = copyBuffer(bytes)
     const res = await sendSave(() =>
@@ -598,7 +599,8 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
     // a cancelled host dialog wrote nothing: no error, like the desktop's cancelled dialog
     if (res.error.code === 'cancelled') return { ok: true }
     if (res.error.code === 'too_large') {
-      return fail(sizeGate.handleServerTooLarge(res.error, bytes))
+      sizeGate.handleServerTooLarge(res.error, bytes)
+      return fail('')
     }
     remote?.saveFailed(res.error)
     return fail(saveFailureText(res.error, text))

@@ -297,7 +297,7 @@ export function createWebHostIO(deps: WebHostDeps): HostIO {
     const gate = await sizeGate.checkBeforeSave(bytes)
     if (!gate.allowed) {
       deps.state.lastFailure = gate.error
-      throw new WebSaveError(gate.message, 'failed')
+      throw new WebSaveError(gate.message, 'cancelled')
     }
     const etag = deps.state.files.get(fileId)?.etag
     const payload = { fileId, data: copyBuffer(bytes), ...(etag ? { etag } : {}) }
@@ -313,7 +313,7 @@ export function createWebHostIO(deps: WebHostDeps): HostIO {
     }
     if (res.error.code === 'too_large') {
       deps.state.lastFailure = res.error
-      throw new WebSaveError(sizeGate.handleServerTooLarge(res.error, bytes), 'failed')
+      throw new WebSaveError(sizeGate.handleServerTooLarge(res.error, bytes), 'cancelled')
     }
     if (res.error.code !== 'conflict') {
       if (res.error.code === 'timeout' || res.error.code === 'network') {
@@ -390,7 +390,7 @@ export function createWebHostIO(deps: WebHostDeps): HostIO {
     const gate = await sizeGate.checkBeforeSave(bytes)
     if (!gate.allowed) {
       deps.state.lastFailure = gate.error
-      throw new WebSaveError(gate.message, 'failed')
+      return null
     }
     const payload = { name: pptxName(name), data: copyBuffer(bytes), ...extra }
     const res = await send('api.saveAs', () =>
@@ -403,7 +403,8 @@ export function createWebHostIO(deps: WebHostDeps): HostIO {
     if (res.error.code === 'cancelled') return null
     if (res.error.code === 'too_large') {
       deps.state.lastFailure = res.error
-      throw new WebSaveError(sizeGate.handleServerTooLarge(res.error, bytes), 'failed')
+      sizeGate.handleServerTooLarge(res.error, bytes)
+      return null
     }
     throw saveFailure(res)
   }

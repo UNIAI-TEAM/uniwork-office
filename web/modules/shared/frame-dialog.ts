@@ -461,7 +461,26 @@ export function openFrameDialog<T extends string>(
       restore()
       syncModal()
       frame.onChange?.()
-      if (returnTo?.isConnected) returnTo.focus({ preventScroll: true })
+      if (
+        returnTo?.isConnected &&
+        returnTo !== document.body &&
+        returnTo !== document.documentElement
+      ) {
+        returnTo.focus({ preventScroll: true })
+      }
+      if (
+        !document.activeElement ||
+        document.activeElement === document.body ||
+        document.activeElement === document.documentElement
+      ) {
+        const root = document.querySelector<HTMLElement>(
+          '.ProseMirror, .cm-content, .stage-wrap, .pdf-scroll, #univer-container',
+        )
+        if (root) {
+          if (root.tabIndex < 0 && !root.hasAttribute('tabindex')) root.tabIndex = -1
+          root.focus({ preventScroll: true })
+        }
+      }
     },
   }
   return handle

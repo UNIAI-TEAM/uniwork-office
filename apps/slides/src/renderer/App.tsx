@@ -4145,6 +4145,7 @@ export function App() {
                     <div
                       className={`stage-wrap${stageFitsViewport ? ' stage-fits-viewport' : ''}${brushMode ? ' format-brush-mode' : ''}`}
                       ref={stageWrapRef}
+                      tabIndex={-1}
                       onMouseDownCapture={() => {
                         // Focus leaves the rail so slide-level Delete/cut/copy stop applying
                         if (slideRailHasFocus()) (document.activeElement as HTMLElement).blur()

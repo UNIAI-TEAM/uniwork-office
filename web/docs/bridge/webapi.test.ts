@@ -450,9 +450,12 @@ describe('saveDocxAs / saveDocxNew', () => {
 
   it('saveDocxAs error / timeout', async () => {
     mock.override('api.saveAs', () => Promise.reject(protocolError('too_large', 'HTTP 413')))
+    expect(await api.saveDocxAs('Copy', buf([7]))).toEqual({ ok: false })
+    expect(document.querySelector('[data-office-web="save-blocked"]')).not.toBeNull()
+    mock.override('api.saveAs', () => Promise.reject(protocolError('internal', 'HTTP 500')))
     expect(await api.saveDocxAs('Copy', buf([7]))).toEqual({
       ok: false,
-      error: 'The document is too large to save.',
+      error: 'The document could not be saved. Try again.',
     })
     mock.override('api.saveAs', timeoutAfter)
     expect((await api.saveDocxAs('Copy', buf([7]))).ok).toBe(false)
@@ -1587,7 +1590,7 @@ describe('save size gate (SIZE-F1, UNI-1861)', () => {
 
     // 120 B > 100 B max_bytes: blocks before api.save, emits save_blocked, fallback dialog downloads
     const blocked = await api.saveDocx(doc.path, new Uint8Array(120).buffer)
-    expect(blocked.ok).toBe(false)
+    expect(blocked).toEqual({ ok: false, reason: 'external-modified' })
     expect(document.querySelector('[data-office-web="save-blocked"]')).not.toBeNull()
     expect(mock.saveBlocked).toEqual([{ bytes: 120, max_bytes: 100 }])
     expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(1)
@@ -1600,6 +1603,25 @@ describe('save size gate (SIZE-F1, UNI-1861)', () => {
     await vi.waitFor(() =>
       expect(mock.calls.filter((c) => c.type === 'api.download')).toHaveLength(1),
     )
+
+    // Save As and Save New also return handled { ok: false } without an error string
+    expect(await api.saveDocxAs('Copy.docx', new Uint8Array(120).buffer, doc.path)).toEqual({
+      ok: false,
+    })
+    expect(await api.saveDocxNew('New.docx', new Uint8Array(120).buffer)).toEqual({
+      ok: false,
+    })
+
+    // Host-initiated save settles with too_large error while renderer receives handled result
+    api.onCloseSaveRequest(() => {
+      void api
+        .saveDocx(doc.path, new Uint8Array(120).buffer)
+        .then((r) => api.reportCloseSaveResult(r.ok))
+    })
+    expect(await mock.host.save({ reason: 'user' })).toMatchObject({
+      ok: false,
+      error: { code: 'too_large' },
+    })
   })
 })
 

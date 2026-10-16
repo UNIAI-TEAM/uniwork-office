@@ -3723,6 +3723,10 @@ export default function App() {
   }
 
   const opFailed = (error: string) => {
+    if (!error) {
+      setSaveState('idle')
+      return
+    }
     const friendly = friendlySaveError(error)
     setSaveError(friendly)
     setSaveState('error')
@@ -7810,6 +7814,7 @@ export default function App() {
             <div
               ref={scrollRef}
               className={`pdf-scroll${drawTool ? ' pdf-drawing' : ''}${nightMode ? ' pdf-night' : ''}`}
+              tabIndex={-1}
               onScroll={() => {
                 handleScroll()
                 setSelPopup(null)

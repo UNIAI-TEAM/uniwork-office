@@ -70,6 +70,8 @@ test('docs frame emits open_refused for an over-tier document, mounts no blank U
 
   await expect(frame.getByTestId('docs-open-refused')).toBeVisible({ timeout: 30_000 })
   await expect(frame.locator('.ProseMirror[contenteditable="true"]')).toHaveCount(0)
+  // SIZE-v1-8b: the refused sentence must not repeat in the bottom-left status bar
+  await expect(frame.locator('.status-msg')).toHaveCount(0)
 
   const events = await hostEvents(page)
   const refused = events.filter((e) => e.type === 'open_refused')

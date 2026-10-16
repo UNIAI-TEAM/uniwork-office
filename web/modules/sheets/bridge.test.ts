@@ -1392,20 +1392,43 @@ describe('the comments version notifier (G8-12 §3.3)', () => {
 })
 
 describe('save size gate (SIZE-F1, UNI-1861)', () => {
-  it('blocks save and save-as above limits.max_bytes without api.save / api.saveAs', async () => {
+  it('blocks save and save-as above limits.max_bytes without api.save / api.saveAs and resolves canceled so the editor raises no error toast', async () => {
     const t = setup({ limits: { max_bytes: 64, warn_ratio: 0.5 } })
     const wb = await t.boot()
     // 'v1|0:0=<80 chars>' ≈ 90 bytes > 64 B max_bytes -> blocked before api.save
     await expect(
       t.desktop.saveWorkbookEdits(saveRequest(wb.sessionId, [[0, 0, 'x'.repeat(80)]])),
-    ).rejects.toThrow(/UniWork|1 MB|0 MB/)
+    ).resolves.toEqual({ canceled: true })
     expect(t.mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(0)
     expect(t.mock.saveBlocked).toHaveLength(1)
 
     await expect(
       t.desktop.saveWorkbookEdits(saveRequest(wb.sessionId, [[0, 0, 'x'.repeat(80)]], 'save-as')),
-    ).rejects.toThrow()
+    ).resolves.toEqual({ canceled: true })
     expect(t.mock.calls.filter((c) => c.type === 'api.saveAs')).toHaveLength(0)
     expect(t.mock.saveBlocked).toHaveLength(2)
+
+    // Host-initiated save and saveAs still receive the protocol too_large error
+    const offClose = t.desktop.onCloseSaveRequest(() => {
+      void t.desktop
+        .saveWorkbookEdits(saveRequest(wb.sessionId, [[0, 0, 'x'.repeat(80)]]))
+        .then((r) => t.desktop.reportCloseSaveResult(!r.canceled))
+    })
+    const offMenu = t.desktop.onMenuAction((a) => {
+      if (a === 'save-as')
+        void t.desktop.saveWorkbookEdits(
+          saveRequest(wb.sessionId, [[0, 0, 'x'.repeat(80)]], 'save-as'),
+        )
+    })
+    expect(await t.mock.host.save({ reason: 'user' })).toMatchObject({
+      ok: false,
+      error: { code: 'too_large' },
+    })
+    expect(await t.mock.host.saveAs({ name: 'Copy.xlsx' })).toMatchObject({
+      ok: false,
+      error: { code: 'too_large' },
+    })
+    offClose()
+    offMenu()
   })
 })
