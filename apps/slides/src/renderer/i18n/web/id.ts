@@ -15,6 +15,10 @@ export const id = {
   webOk: 'OK',
   webFatalTitle: 'Presentasi tidak dapat dibuka',
   webFatalBody: 'File tidak dapat dimuat dari UniWork. Tutup tab ini dan coba lagi.',
+  webRefusedTooLarge: 'Presentasi ini terlalu besar atau terlalu kompleks untuk dibuka di web.',
+  webRefusedTooComplex:
+    'Presentasi ini terlalu kompleks untuk dibuka di web ({parts} bagian, batas {limit}).',
+  webRefusedOutOfMemory: 'Presentasi ini terlalu besar dan kehabisan memori browser saat dibuka.',
   webNoHost: 'Editor ini berjalan di dalam UniWork. Buka presentasi dari UniWork.',
   webLegacyPpt:
     'Ini adalah file .ppt lama dan tidak dapat dibuka di browser. Simpan sebagai .pptx di PowerPoint terlebih dahulu.',

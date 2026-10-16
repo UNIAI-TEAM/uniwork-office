@@ -157,7 +157,13 @@ function classifyOpenRefusal(err: unknown): {
     }
   }
   const msg = describe(err)
-  if (code === 'engine_out_of_memory' || /out of memory/i.test(msg)) {
+  if (
+    code === 'engine_out_of_memory' ||
+    code === 'engine_crashed' ||
+    /out of memory|memory allocation of \d+ bytes failed|Cannot allocate Wasm memory|Array buffer allocation failed/i.test(
+      msg,
+    )
+  ) {
     return { reason: 'engine_out_of_memory' }
   }
   const zipParts = /(?:zip|xlsx) rejected:\s*(\d+)\s*parts exceeds the\s*(\d+)\s*limit/i.exec(msg)
@@ -174,7 +180,11 @@ function classifyOpenRefusal(err: unknown): {
   if (/Workbook contains too many ZIP entries/i.test(msg)) {
     return { reason: 'too_complex' }
   }
-  if (/(?:zip|xlsx) rejected:/i.test(msg)) {
+  if (
+    /(?:zip|xlsx) rejected:.*(?:declares\s+\d+\s+uncompressed bytes|total uncompressed size)/i.test(
+      msg,
+    )
+  ) {
     // declared / inflated size gates of the zip reader (no part count measure)
     return { reason: 'too_large_to_open' }
   }
@@ -452,7 +462,7 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
           dirty = false
           port.setDirty(false)
           port.reportError(fatalError, true)
-          if (err && typeof err === 'object' && !('code' in err)) {
+          if (err && typeof err === 'object') {
             Object.assign(err, { code: 'too_large' })
           }
         }

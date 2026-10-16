@@ -957,7 +957,7 @@ describe('new version on UniWork (doc.remoteVersion)', () => {
 })
 
 describe('open_refused and zip part-count refusal (SIZE-F1)', () => {
-  it('refuses a pptx exceeding the 10 000 zip-parts limit with open_refused + the fatal open error, blocks newBlank and saves, and resets on another documentId', async () => {
+  it('refuses a pptx exceeding the 10 000 zip-parts limit with open_refused + localized fatal copy, blocks newBlank and saves, and resets on another documentId (d2-5)', async () => {
     const zip = new JSZip()
     for (let i = 0; i < 10_001; i++) {
       zip.file(`p/${i}.xml`, '')
@@ -966,7 +966,11 @@ describe('open_refused and zip part-count refusal (SIZE-F1)', () => {
     const { mock, api } = await setup({ bytes: manyPartsBytes })
 
     expect(await api.consumePendingOpen(FIT)).toBeNull()
-    expect(document.querySelector('[data-slides-web="fatal"]')).not.toBeNull()
+    const fatalEl = document.querySelector('[data-slides-web="fatal"]')
+    expect(fatalEl).not.toBeNull()
+    expect(fatalEl?.textContent ?? '').toContain('10001')
+    expect(fatalEl?.textContent ?? '').toContain('10000')
+    expect(fatalEl?.textContent ?? '').not.toMatch(/pptx rejected:|zip rejected:/i)
     expect(mock.openRefused).toEqual([
       {
         reason: 'too_complex',
@@ -980,8 +984,14 @@ describe('open_refused and zip part-count refusal (SIZE-F1)', () => {
     ])
     expect(mock.errors.at(-1)).toMatchObject({ fatal: true })
     expect((await api.uniworkState()).readOnly).toBe(true)
-    await expect(api.newBlank(FIT)).rejects.toThrow(/10001 parts exceeds the 10000 limit/i)
-    expect(await api.save()).toMatchObject({ ok: false })
+    const blankErr = await api.newBlank(FIT).catch((e: unknown) => e)
+    expect(blankErr).toBeInstanceOf(Error)
+    expect((blankErr as Error).message).toContain('10001')
+    expect((blankErr as Error).message).not.toMatch(/pptx rejected:|zip rejected:/i)
+    const saveRes = (await api.save()) as { ok: boolean; error?: string }
+    expect(saveRes.ok).toBe(false)
+    expect(saveRes.error ?? '').toContain('10001')
+    expect(saveRes.error ?? '').not.toMatch(/pptx rejected:|zip rejected:/i)
     expect(await api.saveAs('Copy.pptx')).toMatchObject({ ok: false })
     expect(await mock.host.save({ reason: 'user' })).toMatchObject({ ok: false })
     expect(await mock.host.saveAs({ name: 'Copy.pptx' })).toMatchObject({ ok: false })
@@ -995,6 +1005,45 @@ describe('open_refused and zip part-count refusal (SIZE-F1)', () => {
     await flush()
     expect((await api.save()).ok).toBe(true)
     expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(1)
+  })
+
+  it('does not emit open_refused for a corrupt zip entry ("cannot be inflated") and keeps declared uncompressed size gate as too_large_to_open (d2-4, d2-5)', async () => {
+    const corruptZip = await JSZip.loadAsync(FIXTURE)
+    corruptZip.file('ppt/presentation.xml', 'x'.repeat(2_000), { compression: 'DEFLATE' })
+    const rawZip = await corruptZip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' })
+    const nameLen = rawZip[26]! | (rawZip[27]! << 8)
+    const extraLen = rawZip[28]! | (rawZip[29]! << 8)
+    const dataOffset = 30 + nameLen + extraLen
+    for (let i = 0; i < 16 && dataOffset + i < rawZip.length; i++) {
+      rawZip[dataOffset + i] = 0xff
+    }
+    const corrupt = await setup({ bytes: rawZip })
+    expect(await corrupt.api.consumePendingOpen(FIT)).toBeNull()
+    expect(corrupt.mock.openRefused).toEqual([])
+
+    const hugeHeaderZip = new Uint8Array(FIXTURE)
+    const view = new DataView(
+      hugeHeaderZip.buffer,
+      hugeHeaderZip.byteOffset,
+      hugeHeaderZip.byteLength,
+    )
+    for (let p = 0; p + 46 <= hugeHeaderZip.length; p++) {
+      if (view.getUint32(p, true) === 0x02014b50) {
+        view.setUint32(p + 24, 600 * 1024 * 1024, true)
+        break
+      }
+    }
+    const oversize = await setup({ bytes: hugeHeaderZip })
+    expect(await oversize.api.consumePendingOpen(FIT)).toBeNull()
+    expect(oversize.mock.openRefused).toEqual([
+      {
+        reason: 'too_large_to_open',
+        bytes: hugeHeaderZip.byteLength,
+      },
+    ])
+    const saveRes = (await oversize.api.save()) as { ok: boolean; error?: string }
+    expect(saveRes.ok).toBe(false)
+    expect(saveRes.error ?? '').not.toMatch(/pptx rejected:|zip rejected:/i)
   })
 })
 

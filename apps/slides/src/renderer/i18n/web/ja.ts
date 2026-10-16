@@ -14,6 +14,11 @@ export const ja = {
   webOk: 'OK',
   webFatalTitle: 'プレゼンテーションを開けませんでした',
   webFatalBody: 'UniWork からファイルを読み込めませんでした。このタブを閉じて再試行してください。',
+  webRefusedTooLarge: 'このプレゼンテーションは大きすぎるか複雑すぎるため、Web で開けません。',
+  webRefusedTooComplex:
+    'このプレゼンテーションは複雑すぎるため、Web で開けません（{parts} 個のパーツ、上限 {limit}）。',
+  webRefusedOutOfMemory:
+    'このプレゼンテーションは大きすぎるため、開く際にブラウザのメモリが不足しました。',
   webNoHost:
     'このエディターは UniWork 内で動作します。UniWork からプレゼンテーションを開いてください。',
   webLegacyPpt:

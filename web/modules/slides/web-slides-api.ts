@@ -464,10 +464,13 @@ export function createWebSlidesApi(
 
   // ------------------------------------------------------------ open
 
-  function fatal(err: unknown, body: WebKey): void {
-    state.fatal = toProtocolError(err).toShape()
+  function fatal(err: unknown, body: WebKey, params?: Record<string, string | number>): void {
+    state.fatal = {
+      ...toProtocolError(err).toShape(),
+      message: text(body, params),
+    }
     port.reportError(err, true)
-    showFatal(body)
+    showFatal(body, params)
   }
 
   function classifySlidesOpenRefusal(err: unknown): {
@@ -490,7 +493,11 @@ export function createWebSlidesApi(
         message,
       }
     }
-    if (/(?:zip|pptx) rejected:/i.test(message)) {
+    if (
+      /(?:zip|pptx) rejected:.*(?:declares\s+\d+\s+uncompressed bytes|total uncompressed size)/i.test(
+        message,
+      )
+    ) {
       return { reason: 'too_large_to_open', message }
     }
     if (/out of memory/i.test(message)) {
@@ -554,7 +561,16 @@ export function createWebSlidesApi(
             ...(refusal.measure ? { measure: refusal.measure } : {}),
           })
         }
-        fatal(err, 'webFatalBody')
+        if (refusal.reason === 'too_complex' && refusal.measure?.limit !== undefined) {
+          fatal(err, 'webRefusedTooComplex', {
+            parts: refusal.measure.value,
+            limit: refusal.measure.limit,
+          })
+        } else if (refusal.reason === 'engine_out_of_memory') {
+          fatal(err, 'webRefusedOutOfMemory')
+        } else {
+          fatal(err, 'webRefusedTooLarge')
+        }
         return null
       }
       throw err

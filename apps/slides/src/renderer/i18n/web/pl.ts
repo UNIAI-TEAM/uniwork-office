@@ -15,6 +15,12 @@ export const pl = {
   webOk: 'OK',
   webFatalTitle: 'Nie można otworzyć prezentacji',
   webFatalBody: 'Nie udało się wczytać pliku z UniWork. Zamknij tę kartę i spróbuj ponownie.',
+  webRefusedTooLarge:
+    'Ta prezentacja jest zbyt duża lub zbyt złożona, aby otworzyć ją w przeglądarce.',
+  webRefusedTooComplex:
+    'Ta prezentacja jest zbyt złożona, aby otworzyć ją w przeglądarce ({parts} części, limit {limit}).',
+  webRefusedOutOfMemory:
+    'Ta prezentacja jest zbyt duża i zabrakło pamięci przeglądarki podczas otwierania.',
   webNoHost: 'Ten edytor działa w UniWork. Otwórz prezentację z UniWork.',
   webLegacyPpt:
     'To starszy plik .ppt i nie można go otworzyć w przeglądarce. Najpierw zapisz go jako .pptx w programie PowerPoint.',

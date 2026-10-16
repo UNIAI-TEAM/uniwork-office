@@ -13,6 +13,9 @@ export const he = {
   webOk: 'אישור',
   webFatalTitle: 'לא ניתן לפתוח את המצגת',
   webFatalBody: 'לא ניתן לטעון את הקובץ מ-UniWork. סגור כרטיסייה זו ונסה שוב.',
+  webRefusedTooLarge: 'מצגת זו גדולה מדי או מורכבת מדי לפתיחה באינטרנט.',
+  webRefusedTooComplex: 'מצגת זו מורכבת מדי לפתיחה באינטרנט ({parts} חלקים, מגבלה {limit}).',
+  webRefusedOutOfMemory: 'מצגת זו גדולה מדי וזיכרון הדפדפן אזל בעת הפתיחה.',
   webNoHost: 'העורך הזה פועל בתוך UniWork. פתח את המצגת מ-UniWork.',
   webLegacyPpt:
     'זהו קובץ ‎.ppt ישן ולא ניתן לפתוח אותו בדפדפן. שמור אותו תחילה כ-‎.pptx ב-PowerPoint.',

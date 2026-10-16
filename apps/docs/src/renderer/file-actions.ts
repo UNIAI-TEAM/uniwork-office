@@ -78,7 +78,7 @@ import {
   type InkAnnotation,
   type InkTool,
 } from './editor/ink'
-import { t, getLang, type StatusLine } from './i18n/locale'
+import { t, getLang, statusText, type StatusLine } from './i18n/locale'
 import { isBlankDocument, parseHtmlFragment, replaceBlockRange } from './ai/protocol'
 import { carryDocSeen } from './ai/tools'
 import { isDocDirty, resetCrossDocEditState } from './doc-dirty'
@@ -116,6 +116,7 @@ export interface FileActionContext {
   printAutoOpenedPreviewRef: { current: boolean }
   setShowPrintDialog: (show: boolean) => void
   setStatus: (status: StatusLine) => void
+  refusedMessage?: StatusLine
   setRefusedMessage?: (msg: StatusLine) => void
   setRecent: (paths: string[]) => void
   setShowAi: (show: boolean) => void
@@ -421,14 +422,22 @@ function classifyOpenRefusal(msg: string): {
       measure: { kind: 'zip_parts', value: Number(parts[1]), limit: Number(parts[2]) },
     }
   }
-  if (/out of memory/i.test(msg)) return { reason: 'engine_out_of_memory' }
-  if (/(?:zip|docx) rejected:/i.test(msg)) return { reason: 'too_large_to_open' }
+  if (/out of memory|Array buffer allocation failed|Invalid string length/i.test(msg)) {
+    return { reason: 'engine_out_of_memory' }
+  }
+  if (
+    /(?:zip|docx) rejected:.*(?:declares\s+\d+\s+uncompressed bytes|total uncompressed size)/i.test(
+      msg,
+    )
+  ) {
+    return { reason: 'too_large_to_open' }
+  }
   return null
 }
 
 function refuseOpen(
   ctx: FileActionContext,
-  msg: string,
+  msg: StatusLine,
   report: Parameters<NonNullable<typeof window.desktop.reportOpenRefused>>[0],
 ): 'refused' {
   window.desktop?.reportOpenRefused?.(report)
@@ -458,7 +467,6 @@ function refuseOpen(
   ctx.setCompareResult(null)
   ctx.setRefusedMessage?.(msg)
   ctx.setStatus(msg)
-  showToast(msg, 'error')
   return 'refused'
 }
 
@@ -494,14 +502,18 @@ export async function loadFile(
     const tier = openTierFor(docWeight(parsed.blocks))
     if (tier === 'refuse') {
       const chars = docTextLength(parsed.blocks)
-      const msg = t('appDocTooLargeBlocks', {
-        name: result.name,
-        blocks: parsed.blocks.length,
-        chars,
-      })
+      const statusMsg: StatusLine = {
+        key: 'appDocTooLargeBlocks',
+        params: {
+          name: result.name,
+          blocks: parsed.blocks.length,
+          chars,
+        },
+      }
+      const msg = statusText(statusMsg, t)
       // the web frame keeps a read-only refused state and tells the host (open_refused)
       if (isWebFrame()) {
-        return refuseOpen(ctx, msg, {
+        return refuseOpen(ctx, statusMsg, {
           path: result.path,
           reason: 'too_large_to_open',
           bytes: loadedBytesLength,
@@ -509,7 +521,7 @@ export async function loadFile(
           message: msg,
         })
       }
-      ctx.setStatus(msg)
+      ctx.setStatus(statusMsg)
       showToast(msg, 'error')
       // like a parse failure: a tab with no document falls back to a blank one
       return 'failed'
@@ -638,12 +650,25 @@ export async function loadFile(
     const errMsg = err instanceof Error ? err.message : String(err)
     const refusal = isWebFrame() ? classifyOpenRefusal(errMsg) : null
     if (refusal) {
-      return refuseOpen(ctx, t('appOpenFailed', { error: errMsg }), {
+      const refusalMsg: StatusLine =
+        refusal.reason === 'too_complex' && refusal.measure
+          ? {
+              key: 'appDocTooComplexParts',
+              params: {
+                name: result.name,
+                parts: refusal.measure.value,
+                limit: refusal.measure.limit,
+              },
+            }
+          : refusal.reason === 'engine_out_of_memory'
+            ? { key: 'appDocOpenOutOfMemory', params: { name: result.name } }
+            : { key: 'appDocTooLargeUncompressed', params: { name: result.name } }
+      return refuseOpen(ctx, refusalMsg, {
         path: result.path,
         reason: refusal.reason,
         bytes: loadedBytesLength,
         ...(refusal.measure ? { measure: refusal.measure } : {}),
-        message: errMsg,
+        message: statusText(refusalMsg, t),
       })
     }
     // visible failure: the status-bar line alone is easy to miss under the start screen
@@ -671,6 +696,12 @@ async function blankDocxBytes(): Promise<Uint8Array> {
 /** new document from the built-in blank template (AI can then generate into it) */
 export async function newFile(ctx: FileActionContext): Promise<boolean | undefined> {
   if (!ctx.editor) return
+  if (
+    isWebFrame() &&
+    (ctx.refusedMessage || (await window.desktop?.uniworkState?.(''))?.readOnly)
+  ) {
+    return false
+  }
   const generation = ++openGeneration
   try {
     const bytes = await blankDocxBytes()

@@ -1650,6 +1650,8 @@ describe('open_refused and refuse-tier guard (SIZE-F1)', () => {
       error: { code: 'too_large' },
     })
     expect(mock.calls.filter((c) => c.type === 'api.save' || c.type === 'api.saveAs')).toEqual([])
+    // d2-7: while fatal is set, File > New is blocked (confirmDocumentReplace is false)
+    expect(await api.confirmDocumentReplace()).toBe(false)
 
     // Opening another documentId resets the fatal state and allows saving
     const secondMeta = mock.seed('Valid.docx', DOCX)
@@ -1662,6 +1664,7 @@ describe('open_refused and refuse-tier guard (SIZE-F1)', () => {
     expect(secondOpen.name).toBe('Valid.docx')
     expect(mock.openRefused).toHaveLength(1)
     expect((await api.uniworkState(secondOpen.path)).readOnly).toBe(false)
+    expect(await api.confirmDocumentReplace()).toBe(true)
     expect(await api.saveDocx(secondOpen.path, buf([7]), false)).toEqual({ ok: true })
   })
 })

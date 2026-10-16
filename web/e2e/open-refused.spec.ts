@@ -105,6 +105,8 @@ test('docs frame emits open_refused for an over-tier document, mounts no blank U
   )
   // still the refusal notice after the keystroke and the host save: no blank document appeared
   await expect(frame.getByTestId('docs-open-refused')).toBeVisible()
+  await expect(frame.locator('.start-refused-title')).toBeVisible()
+  await expect(frame.locator('.start-refused-body')).toContainText('over-tier-refuse.docx')
   await expect(frame.locator('.ProseMirror[contenteditable="true"]')).toHaveCount(0)
 
   expect(hostSave).toMatchObject({
@@ -152,4 +154,59 @@ test('docs frame opens a Read Mode tier document without open_refused and keeps 
 
   const events = await hostEvents(page)
   expect(events.filter((e) => e.type === 'open_refused')).toEqual([])
+})
+
+test('slides frame emits open_refused for a 10 001-part pptx with localized fatal copy and blocks saves (d2-5, d2-9)', async ({
+  page,
+}) => {
+  const zip = new JSZip()
+  for (let i = 0; i < 10_001; i += 1) {
+    zip.file(`p/${i}.xml`, '')
+  }
+  const fixture = await zip.generateAsync({
+    type: 'nodebuffer',
+    compression: 'DEFLATE',
+    compressionOptions: { level: 1 },
+  })
+
+  const urlPath = '/fixtures/too-many-parts.pptx'
+  await page.context().route(`**${urlPath}`, (route) =>
+    route.fulfill({
+      status: 200,
+      body: fixture,
+      headers: {
+        'content-type': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'cache-control': 'no-store',
+      },
+    }),
+  )
+
+  await page.goto(
+    `/test-host/?module=slides&lang=en&theme=light&open=${encodeURIComponent(urlPath)}`,
+  )
+  await expect(page.locator('#status')).toHaveText(/^initialised/, { timeout: 30_000 })
+  const frame = (await (await page.waitForSelector('#frame')).contentFrame())!
+
+  const fatalNotice = frame.locator('[data-slides-web="fatal"]')
+  await expect(fatalNotice).toBeVisible({ timeout: 30_000 })
+  await expect(fatalNotice).toContainText('10001')
+  await expect(fatalNotice).toContainText('10000')
+  await expect(fatalNotice).not.toContainText('pptx rejected:')
+
+  const events = await hostEvents(page)
+  const refused = events.filter((e) => e.type === 'open_refused')
+  expect(refused).toEqual([
+    {
+      type: 'open_refused',
+      payload: {
+        reason: 'too_complex',
+        bytes: fixture.byteLength,
+        measure: {
+          kind: 'zip_parts',
+          value: 10_001,
+          limit: 10_000,
+        },
+      },
+    },
+  ])
 })

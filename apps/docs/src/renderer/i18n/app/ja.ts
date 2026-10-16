@@ -47,6 +47,12 @@ export const ja = {
   appOpenedFile: '{name} を開きました',
   appOpenFailed: '開けませんでした: {error}',
   appDocTooLargeBlocks: '{name}: 文書が大きすぎて開けません（{blocks} 段落、{chars} 文字）',
+  appDocTooLargeUncompressed:
+    '{name}：ドキュメントが大きすぎるか複雑すぎるため、Web で開けません。',
+  appDocTooComplexParts:
+    '{name}：ドキュメントが複雑すぎるため、Web で開けません（{parts} 個のパーツ、上限 {limit}）。',
+  appDocOpenOutOfMemory:
+    '{name}：ドキュメントが大きすぎるため、開く際にブラウザのメモリが不足しました。',
   appDocLargeReadOnly:
     '大きな文書（{blocks} 段落）のため閲覧モードで開きました。Esc で編集できます',
   appDocLargeSpellOff:

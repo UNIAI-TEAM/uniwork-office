@@ -45,6 +45,10 @@ export const vi = {
   appOpenedFile: 'Đã mở {name}',
   appOpenFailed: 'Mở thất bại: {error}',
   appDocTooLargeBlocks: '{name}: tài liệu quá lớn không thể mở ({blocks} đoạn văn, {chars} ký tự)',
+  appDocTooLargeUncompressed: '{name}: tài liệu quá lớn hoặc quá phức tạp để mở trên web.',
+  appDocTooComplexParts:
+    '{name}: tài liệu quá phức tạp để mở trên web ({parts} phần, giới hạn {limit}).',
+  appDocOpenOutOfMemory: '{name}: tài liệu quá lớn, trình duyệt không đủ bộ nhớ để mở.',
   appDocLargeReadOnly:
     'Tài liệu lớn ({blocks} đoạn văn): đã mở ở chế độ chỉ đọc — nhấn Esc để chỉnh sửa',
   appDocLargeSpellOff:
