@@ -3802,6 +3802,11 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
   background: var(--color-bg-subtle);
 }
 
+.ai-result-view-changes:focus-visible {
+  outline: 2px solid var(--color-border-brand);
+  outline-offset: 1px;
+}
+
 .ai-result-edited-hint {
   color: var(--color-text-tertiary);
 }
@@ -3833,17 +3838,19 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
 }
 
 .ai-run-undo-btn:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px var(--pdf-focus-ring);
+  outline: 2px solid var(--color-border-brand);
+  outline-offset: 1px;
 }
 
+/* blocked: still focusable (the reason beside it is linked by aria-describedby) but visibly inert */
 .ai-run-undo-btn[aria-disabled='true'] {
-  color: var(--color-text-secondary);
+  background: var(--color-bg-subtle);
+  color: var(--color-text-tertiary);
   cursor: not-allowed;
 }
 
 .ai-run-undo-btn[aria-disabled='true']:hover {
-  background: var(--color-bg-page);
+  background: var(--color-bg-subtle);
 }
 
 .ai-run-undo-note {

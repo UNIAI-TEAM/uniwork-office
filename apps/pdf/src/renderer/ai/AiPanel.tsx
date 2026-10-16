@@ -66,6 +66,7 @@ import { useClarify } from './use-clarify'
 import { PDF_NAV_SCHEME, parsePdfNavHref } from './pdf-nav'
 import type { FileOpConfirm, PdfAiDeps, PdfAppDeps } from './tools'
 import { RunUndoAction } from './RunUndoAction'
+import { workedStepsLabel } from './worked-steps-label'
 
 function readUniworkCloudStatus(): UniworkCloudStatusBridge | undefined {
   return (window as Window & { uniworkCloudStatus?: UniworkCloudStatusBridge }).uniworkCloudStatus
@@ -1438,7 +1439,7 @@ function ToolChipList({ tools }: { tools: ToolActivity[] }) {
   }
 
   const open = userOpen ?? false
-  const label = tr('aiWorkedSteps', { n: tools.length })
+  const label = workedStepsLabel(tr, tools.length)
 
   return (
     <div className="ai-work-group">
