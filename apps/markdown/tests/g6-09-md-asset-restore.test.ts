@@ -1,13 +1,16 @@
 // @vitest-environment node
 // Redo of an AI run that saved a picture (G6-09 visual r1 F4): the file the undo discarded is put
 // back under the SAME name with the same bytes, so the redone markup never points at nothing.
+import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
+  ASSET_MANIFEST_FILENAME,
   discardPendingOwnedAssetNames,
+  discardPendingOwnedAssets,
   readOwnedAssetManifest,
   renameOwnedAssetDocument,
   restoreOwnedAssetFiles,
@@ -24,6 +27,7 @@ afterEach(async () => {
   await Promise.all(dirs.splice(0).map((d) => rm(d, { recursive: true, force: true })))
 })
 const b64 = (text: string): string => Buffer.from(text).toString('base64')
+const sha = (text: string): string => createHash('sha256').update(text).digest('hex')
 
 describe('restoring the pictures of a redone AI run', () => {
   it('discard then restore: same name, same bytes, pending again (so a later discard can drop it)', async () => {
@@ -160,6 +164,52 @@ describe('restoring the pictures of a redone AI run', () => {
 
     expect(result.restored).toEqual([])
     expect(result.errors).toHaveLength(1)
+    expect(existsSync(asset)).toBe(false)
+  })
+})
+
+// RBG-MDb-2: the restore refuses a leading-dot name, so a named discard must refuse it too.
+// Otherwise a name that can never come back is deleted for good by that very run's Roll back.
+describe('names a named discard refuses', () => {
+  it('refuses a leading-dot name the restore could never put back', async () => {
+    const dir = await tempDir()
+    const doc = join(dir, 'note.md')
+    const assetsDir = join(dir, 'assets')
+    const asset = join(assetsDir, '.hidden.png')
+    // No app path produces a dot-named asset (sanitizeAssetName strips the leading dot), so the
+    // manifest is written by hand: the guard is what keeps an imported or hand-edited one
+    // symmetric, and the file must survive rather than be dropped by the run that owns it.
+    await mkdir(assetsDir, { recursive: true })
+    await writeFile(asset, 'bytes-1')
+    await writeFile(
+      join(assetsDir, ASSET_MANIFEST_FILENAME),
+      `${JSON.stringify(
+        {
+          version: 1,
+          files: [{ name: '.hidden.png', sha256: sha('bytes-1') }],
+          documents: {},
+          pending: { 'note.md': ['.hidden.png'] },
+        },
+        null,
+        2,
+      )}\n`,
+    )
+
+    const discarded = await discardPendingOwnedAssetNames(doc, ['.hidden.png'])
+    const restored = await restoreOwnedAssetFiles(doc, [
+      { name: '.hidden.png', base64: b64('bytes-1') },
+    ])
+
+    expect(discarded).toMatchObject({ deleted: [], preserved: [], errors: [] })
+    expect(existsSync(asset)).toBe(true)
+    expect(await readOwnedAssetManifest(doc)).toMatchObject({
+      files: [{ name: '.hidden.png', sha256: sha('bytes-1') }],
+      pending: { 'note.md': ['.hidden.png'] },
+    })
+    expect(restored).toMatchObject({ restored: [] })
+    expect(restored.errors).toHaveLength(1)
+    // the document-wide discard still takes it, so the refused name cannot strand the file for good
+    expect((await discardPendingOwnedAssets(doc)).deleted).toEqual(['.hidden.png'])
     expect(existsSync(asset)).toBe(false)
   })
 })
