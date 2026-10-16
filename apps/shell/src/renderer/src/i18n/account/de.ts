@@ -85,6 +85,10 @@ export const de = {
   acctErrKeyringUnavailable: 'Der sichere Speicher auf diesem Computer ist nicht verfügbar.',
   acctErrKeystoreLocked:
     'Der Schlüsselbund dieses Computers ist gesperrt. Entsperren Sie ihn und versuchen Sie es erneut.',
+  acctReplaceTitle: 'Gespeicherte Anmeldung auf diesem Computer ersetzen?',
+  acctReplaceBody:
+    'Dieser Computer kann die gespeicherte Anmeldung nicht öffnen. Eine erneute Anmeldung ersetzt sie. Offline-Änderungen, die auf die Synchronisierung warten, bleiben gesperrt auf diesem Computer; nichts wird gelöscht.',
+  acctReplaceGo: 'Erneut anmelden',
   acctErrServerError:
     'Bei UniWork ist ein Problem aufgetreten. Bitte versuchen Sie es später erneut.',
   acctErrMalformedResponse:

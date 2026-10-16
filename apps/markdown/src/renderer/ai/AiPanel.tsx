@@ -16,6 +16,7 @@ import '@genoffice/ui/ai-uniwork-composer.css'
 import type { PointerEvent as ReactPointerEvent, ReactElement, ReactNode } from 'react'
 import {
   AgentLoop,
+  createImageUrlRegistry,
   droppedCallsOfNotes,
   endsQuietly,
   getEntryResultChipView,
@@ -667,6 +668,8 @@ export function AiPanel({
           }),
           () => readOnlyRef.current,
           () => askClarification,
+          // an image URL the AI inserts must come from this run's image_search / generate_image (UniWork AI turns only)
+          createImageUrlRegistry({ enforce: () => settingsRef.current?.provider === 'uniwork' }),
           rememberRunPicture,
         ),
         createSearchSkill(),

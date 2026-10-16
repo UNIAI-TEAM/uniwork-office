@@ -98,6 +98,10 @@ export function blockedReasonKey(
       return 'uwReasonStoreNewer'
     case 'store_full':
       return 'uwReasonStoreFull'
+    case 'session_expired':
+      return 'uwReasonSession'
+    case 'not_signed_in':
+      return 'uwReasonSignedOut'
     case 'forbidden':
     case 'permission_revoked':
       return 'uwReasonForbidden'
@@ -144,8 +148,13 @@ export function errorActionOf(error: UniworkDocErrorCode): ErrorAction {
 
 // ── Status chip ─────────────────────────────────────────
 
-export type ChipTone = 'ok' | 'neutral' | 'busy' | 'warn' | 'error'
-export type ChipActionKind = 'retry' | 'sign-in' | 'resolve' | 'reload'
+export type ChipTone = 'ok' | 'neutral' | 'info' | 'busy' | 'warn' | 'error'
+/**
+ * What the pill's one button does. `view-queue` / `details` open the queue popover (S4),
+ * `stop-ai` stops the AI run a save waits for; the rest keep their earlier meaning.
+ */
+export type ChipActionKind =
+  'retry' | 'sign-in' | 'resolve' | 'reload' | 'view-queue' | 'details' | 'stop-ai'
 
 export interface ChipModel {
   tone: ChipTone
@@ -190,22 +199,112 @@ function remoteNewerChip(status: UniworkDocStatus): boolean {
 }
 
 /**
- * The chip for a bound document. `needsSignIn` is the account state: when the
- * save state is signed-out and the account is signed in again, the way forward
- * is Retry, not another browser sign-in. `queuedAt` is when the waiting save was
- * made (the intent's creation time), filled into the queued tooltips.
+ * The save was refused before anything was queued (keychain locked, the account's store full):
+ * the pill reads like a blocked save with that reason (EXPERIENCE l.192), not "Couldn't save".
+ */
+function isStoreRefusal(status: UniworkDocStatus): boolean {
+  return (
+    status.state === 'error' &&
+    (status.error === 'keystore_locked' || status.error === 'store_full')
+  )
+}
+
+/**
+ * The button of a blocked pill: the sign-in reasons offer sign-in, every other reason opens
+ * the queue popover where the reason's own next step lives (G5-10 BLOCKED_REASONS actions).
+ */
+function blockedAction(error: UniworkDocErrorCode | undefined): ChipModel['action'] {
+  if (error === 'session_expired') return { kind: 'sign-in', labelKey: 'uwActSignInAgain' }
+  if (error === 'not_signed_in') return { kind: 'sign-in', labelKey: 'acctSignIn' }
+  return { kind: 'view-queue', labelKey: 'uwActViewQueue' }
+}
+
+const VIEW_QUEUE = { kind: 'view-queue', labelKey: 'uwActViewQueue' } as const
+
+/**
+ * The chip for a bound document: the Save pill (G5-06u, EXPERIENCE "Save pill (S1)"). First
+ * match wins, top to bottom: blocked (a store refusal too) > signed-out > failed > error >
+ * conflict > reconciling-stuck > reconciling > remote-newer > paused_admin > waiting for AI >
+ * saving > paused_user > queued > view-only > offline > dirty > saved.
  *
- * The queue states carry no action here: "View queue" (EXPERIENCE l.185-190, 195)
- * opens the Queue popover, which belongs to the Save pill component (G5-06u).
+ * `needsSignIn` is the account state: when the save state is signed-out and the account is
+ * signed in again, the way forward is Retry, not another browser sign-in. `queuedAt` is when
+ * the waiting save was made (the intent's creation time), filled into the queued tooltips.
+ * One button at most; the queue states and failures open the Queue popover (S4).
  */
 export function chipModelOf(
   status: UniworkDocStatus,
-  ctx: { needsSignIn: boolean; queuedAt?: string } = { needsSignIn: true },
+  ctx: { needsSignIn: boolean; queuedAt?: string; failedReasonKey?: StringKey } = {
+    needsSignIn: true,
+  },
 ): ChipModel {
   const { state, access, error } = status
+  // 1 blocked
+  if (state === 'blocked' || isStoreRefusal(status)) {
+    return {
+      tone: 'error',
+      labelKey: 'uwChipBlocked',
+      reasonKey: blockedReasonKey(error),
+      tipKey: 'uwTipBlocked',
+      errorKey: error ? UNIWORK_ERROR_KEYS[error] : undefined,
+      action: blockedAction(error),
+    }
+  }
+  switch (state) {
+    case 'signed-out': // 2
+      return {
+        tone: 'error',
+        labelKey: 'uwChipSignedOut',
+        tipKey: 'uwTipSignedOut',
+        action: ctx.needsSignIn
+          ? { kind: 'sign-in', labelKey: 'acctSignIn' }
+          : { kind: 'retry', labelKey: 'uwActRetry' },
+      }
+    case 'failed': // 3: no automatic retry; {reason} of the tooltip reuses the quota / too-large / other fragments
+      return {
+        tone: 'error',
+        labelKey: 'uwChipError',
+        // the sync-center row's reason when the shell has it (failedReasonKeyOf), the same one the
+        // queue popover shows; else the status' error code
+        reasonKey: ctx.failedReasonKey ?? blockedReasonKey(error),
+        tipKey: 'uwTipFailed',
+        action: { kind: 'details', labelKey: 'uwActDetails' },
+      }
+    case 'error': // 4
+      return {
+        tone: 'error',
+        labelKey: 'uwChipError',
+        tipKey: 'uwTipError',
+        errorKey: error ? UNIWORK_ERROR_KEYS[error] : undefined,
+        action: { kind: 'retry', labelKey: 'uwActRetry' },
+      }
+    case 'conflict': // 5
+      return {
+        tone: 'warn',
+        labelKey: 'uwChipConflict',
+        tipKey: 'uwTipConflict',
+        action: { kind: 'resolve', labelKey: 'uwActResolve' },
+      }
+    case 'reconciling-stuck': // 6: the tooltip stays the reconciling one (EXPERIENCE l.190)
+      return {
+        tone: 'warn',
+        labelKey: 'uwChipReconcileStuck',
+        tipKey: 'uwTipReconciling',
+        action: VIEW_QUEUE,
+      }
+    case 'reconciling': // 7
+      return {
+        tone: 'warn',
+        labelKey: 'uwChipReconciling',
+        tipKey: 'uwTipReconciling',
+        action: VIEW_QUEUE,
+      }
+    default:
+      break
+  }
+  // 8 remote-newer: the Reload of the bar is not available yet (a save in flight, a stuck one, an
+  // AI run): no button, the tooltip says why the document didn't reload
   if (remoteNewerChip(status)) {
-    // the Reload of the bar is not available yet (a save in flight, a stuck one, an AI run): no
-    // button here either, the tooltip says why the document didn't reload
     const reloadable = status.remote?.kind === 'newer-dirty' && !status.remote.wait
     return {
       tone: 'warn',
@@ -214,98 +313,110 @@ export function chipModelOf(
       action: reloadable ? { kind: 'reload', labelKey: 'uwActResolve' } : undefined,
     }
   }
+  // 9 paused_admin
+  if (state === 'paused_admin') {
+    return {
+      tone: 'neutral',
+      labelKey: 'uwChipPausedAdmin',
+      tipKey: 'uwTipPausedAdmin',
+      action: VIEW_QUEUE,
+    }
+  }
+  // 10 the save waits for an AI run to finish (type-only until the AI-run owner sets saveWait)
+  if (status.saveWait) {
+    const long = status.saveWait === 'ai-long'
+    return {
+      tone: 'busy',
+      labelKey: 'uwChipSaving',
+      tipKey: long ? 'uwTipWaitAiLong' : 'uwTipWaitAi',
+      action: long ? { kind: 'stop-ai', labelKey: 'uwActStopAi' } : undefined,
+    }
+  }
+  // 11 saving (a read-only document has no save of its own to show: it stays "View only", row 14)
+  if (state === 'saving' && access !== 'view') {
+    return { tone: 'busy', labelKey: 'uwChipSaving', tipKey: 'uwTipSaving' }
+  }
+  // 12 / 13 the save is stored and waits: same label, the tooltip says why it is not going out
+  if (state === 'paused_user' || state === 'queued' || state === 'paused_offline') {
+    return {
+      tone: 'info',
+      labelKey: status.pendingNext ? 'uwChipQueuedNewer' : 'uwChipQueued',
+      tipKey:
+        state === 'paused_user'
+          ? 'uwTipPausedUser'
+          : status.pendingNext
+            ? 'uwTipQueuedNewer'
+            : 'uwTipQueued',
+      action: VIEW_QUEUE,
+      savedAt: ctx.queuedAt,
+    }
+  }
+  // 14 view-only
   if (access === 'view' && QUIET_STATES.has(state)) {
     return { tone: 'neutral', labelKey: 'uwChipViewOnly', tipKey: 'uwTipViewOnly' }
   }
   switch (state) {
-    case 'ready':
-    case 'saved':
+    case 'offline': {
+      // 15 offline also covers a slow or failing server: only a network error means the
+      // computer is offline, so say so only then
+      const unreachable = isServerSideError(error)
+      return {
+        tone: 'neutral',
+        labelKey: unreachable ? 'uwChipUnreachable' : 'uwChipOffline',
+        tipKey: unreachable ? 'uwTipUnreachable' : 'uwTipOffline',
+        action: { kind: 'retry', labelKey: 'uwActRetry' },
+      }
+    }
+    case 'dirty': // 16
+      return { tone: 'neutral', labelKey: 'uwChipDirty', tipKey: 'uwTipDirty' }
+    default: // 17 ready / saved
       return {
         tone: 'ok',
         labelKey: UNIWORK_STATE_KEYS[state],
         tipKey: status.lastSavedAt ? 'uwTipSavedAt' : 'uwTipSaved',
         savedAt: status.lastSavedAt,
       }
-    case 'dirty':
-      return { tone: 'neutral', labelKey: 'uwChipDirty', tipKey: 'uwTipDirty' }
-    case 'saving':
-      return { tone: 'busy', labelKey: 'uwChipSaving', tipKey: 'uwTipSaving' }
-    case 'offline': {
-      // offline also covers a slow or failing server: only a network error means the
-      // computer is offline, so say so only then
-      const unreachable = isServerSideError(error)
-      return {
-        tone: 'warn',
-        labelKey: unreachable ? 'uwChipUnreachable' : 'uwChipOffline',
-        tipKey: unreachable ? 'uwTipUnreachable' : 'uwTipOffline',
-        action: { kind: 'retry', labelKey: 'uwActRetry' },
-      }
-    }
-    case 'signed-out':
-      return {
-        tone: 'warn',
-        labelKey: 'uwChipSignedOut',
-        tipKey: 'uwTipSignedOut',
-        action: ctx.needsSignIn
-          ? { kind: 'sign-in', labelKey: 'acctSignIn' }
-          : { kind: 'retry', labelKey: 'uwActRetry' },
-      }
-    case 'conflict':
-      return {
-        tone: 'warn',
-        labelKey: 'uwChipConflict',
-        tipKey: 'uwTipConflict',
-        action: { kind: 'resolve', labelKey: 'uwActResolve' },
-      }
-    case 'blocked':
-      return {
-        tone: 'error',
-        labelKey: 'uwChipBlocked',
-        reasonKey: blockedReasonKey(error),
-        tipKey: 'uwTipBlocked',
-        errorKey: error ? UNIWORK_ERROR_KEYS[error] : undefined,
-      }
-    case 'error':
-      return {
-        tone: 'error',
-        labelKey: 'uwChipError',
-        tipKey: 'uwTipError',
-        errorKey: error ? UNIWORK_ERROR_KEYS[error] : undefined,
-        action: { kind: 'retry', labelKey: 'uwActRetry' },
-      }
-    case 'queued':
-    case 'paused_offline':
-      return {
-        tone: 'neutral',
-        labelKey: status.pendingNext ? 'uwChipQueuedNewer' : UNIWORK_STATE_KEYS[state],
-        tipKey: status.pendingNext ? 'uwTipQueuedNewer' : 'uwTipQueued',
-        savedAt: ctx.queuedAt,
-      }
-    case 'paused_user':
-      // same label as queued; the tooltip says why it is not going out (EXPERIENCE l.187)
-      return {
-        tone: 'neutral',
-        labelKey: status.pendingNext ? 'uwChipQueuedNewer' : UNIWORK_STATE_KEYS[state],
-        tipKey: 'uwTipPausedUser',
-        savedAt: ctx.queuedAt,
-      }
-    case 'paused_admin':
-      return { tone: 'neutral', labelKey: 'uwChipPausedAdmin', tipKey: 'uwTipPausedAdmin' }
-    case 'reconciling':
-      return { tone: 'warn', labelKey: 'uwChipReconciling', tipKey: 'uwTipReconciling' }
-    case 'reconciling-stuck':
-      // the tooltip stays the reconciling one (EXPERIENCE l.190)
-      return { tone: 'warn', labelKey: 'uwChipReconcileStuck', tipKey: 'uwTipReconciling' }
-    case 'failed':
-      // no automatic retry; {reason} of the tooltip reuses the quota / too-large / other fragments (l.233)
-      return {
-        tone: 'error',
-        labelKey: 'uwChipError',
-        reasonKey: blockedReasonKey(error),
-        tipKey: 'uwTipFailed',
-      }
   }
 }
+
+/** the shape of the mini pill's dot (FXT6u): one per tone at least, so colour is never the only cue */
+export type MiniGlyph =
+  'check' | 'clock' | 'pause' | 'alert' | 'warn' | 'busy' | 'ring' | 'lock' | 'offline'
+
+/**
+ * The shape the dot alone (the mini pill, see uniwork-pill-fit.ts) wears: a check (saved), a clock
+ * (queued), pause bars (paused), a circled exclamation (failed / blocked / error / signed out), a
+ * triangle (conflict, reconciling, remote newer), the spinner (saving), a ring (unsaved edits), a
+ * lock (view only) and a slashed circle (offline).
+ */
+export function miniGlyphOf(model: ChipModel, state: UniworkSaveState): MiniGlyph {
+  switch (model.tone) {
+    case 'ok':
+      return 'check'
+    case 'busy':
+      return 'busy'
+    case 'error':
+      return 'alert'
+    case 'warn':
+      return 'warn'
+    case 'info':
+      return state === 'paused_user' ? 'pause' : 'clock'
+    default:
+      if (model.labelKey === 'uwChipPausedAdmin') return 'pause'
+      if (model.labelKey === 'uwChipViewOnly') return 'lock'
+      if (model.labelKey === 'uwChipOffline' || model.labelKey === 'uwChipUnreachable') {
+        return 'offline'
+      }
+      return 'ring'
+  }
+}
+
+/** tooltips whose {time} is the waiting save: without a known time they read an em dash, not a hole */
+const QUEUED_TIME_TIPS: ReadonlySet<StringKey> = new Set([
+  'uwTipQueued',
+  'uwTipQueuedNewer',
+  'uwTipPausedUser',
+])
 
 /**
  * the chip's visible label, its explanation and the hover text, translated. The
@@ -322,11 +433,30 @@ export function chipCopy(
     ? t(model.labelKey, { reason: t(model.reasonKey) })
     : t(model.labelKey)
   const tipParams: Record<string, string> = {}
-  if (model.savedAt) tipParams.time = formatWhen(model.savedAt, dateLocale, now)
+  if (model.savedAt) tipParams.time = formatSaveTime(model.savedAt, dateLocale, now)
+  else if (QUEUED_TIME_TIPS.has(model.tipKey)) tipParams.time = '—'
   if (model.reasonKey) tipParams.reason = t(model.reasonKey)
   const tip = t(model.tipKey, tipParams)
   const fullTip = model.errorKey ? `${t(model.errorKey)} ${tip}` : tip
   return { label, tip: fullTip, title: `${label}\n${fullTip}` }
+}
+
+/** the in-strip focus chip sits this far left of the pill (`right: calc(100% + 8px)` in tabbar.css) */
+const FOCUS_TIP_GAP_PX = 8
+/** and keeps this far from the window's left edge */
+const FOCUS_TIP_EDGE_PX = 8
+/** less room than this and the chip is not drawn (the description is still read and in the title) */
+export const FOCUS_TIP_MIN_PX = 80
+
+/**
+ * The width the focus chip may take left of the pill, in the unscaled CSS px it lays out in:
+ * the pill's left edge (window px, as measured) over the interface scale, minus the gap and the
+ * window gutter. Never negative.
+ */
+export function focusTipRoomOf(pillLeft: number, scale: number): number {
+  const s = Number.isFinite(scale) && scale > 0 ? scale : 1
+  const room = Math.floor(pillLeft / s - FOCUS_TIP_GAP_PX - FOCUS_TIP_EDGE_PX)
+  return Number.isFinite(room) && room > 0 ? room : 0
 }
 
 // ── New-version bar (S6) ────────────────────────────────
@@ -1013,6 +1143,23 @@ export function nameWithExtension(name: string, format: NewDocFormat): string {
 }
 
 // ── Time ────────────────────────────────────────────────
+
+/**
+ * a save's time as the pill and the queue popover both show it: time today, else date + time; a
+ * non-date label stays as given. One formatter, so the same saved-at time reads the same in both.
+ */
+export function formatSaveTime(value: string, locale: string, now: Date = new Date()): string {
+  if (!value) return '—'
+  const at = new Date(value)
+  if (Number.isNaN(at.getTime())) return value
+  const sameDay = at.toDateString() === now.toDateString()
+  return new Intl.DateTimeFormat(
+    locale,
+    sameDay
+      ? { hour: '2-digit', minute: '2-digit' }
+      : { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' },
+  ).format(at)
+}
 
 /** "10:42" for today, a medium date otherwise; '' when the server sent no usable time */
 export function formatWhen(iso: string, locale: string, now: Date = new Date()): string {

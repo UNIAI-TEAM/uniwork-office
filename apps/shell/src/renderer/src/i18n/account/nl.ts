@@ -79,6 +79,10 @@ export const nl = {
   acctErrKeyringUnavailable: 'Beveiligde opslag op deze computer is niet beschikbaar.',
   acctErrKeystoreLocked:
     'De sleutelhanger van deze computer is vergrendeld. Ontgrendel hem en probeer het opnieuw.',
+  acctReplaceTitle: 'Opgeslagen aanmelding op deze computer vervangen?',
+  acctReplaceBody:
+    'Deze computer kan de opgeslagen aanmelding niet openen. Opnieuw aanmelden vervangt deze. Offline bewerkingen die wachten op synchronisatie blijven vergrendeld op deze computer; er wordt niets verwijderd.',
+  acctReplaceGo: 'Opnieuw aanmelden',
   acctErrServerError: 'Er is een probleem opgetreden bij UniWork. Probeer het later opnieuw.',
   acctErrMalformedResponse: 'UniWork stuurde een onverwacht antwoord. Probeer het later opnieuw.',
   wbLoadFailedTitle: 'Je opgeslagen gegevens konden niet worden geladen',

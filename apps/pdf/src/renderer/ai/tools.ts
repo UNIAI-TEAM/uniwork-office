@@ -1,5 +1,10 @@
 import type { PDFDocumentProxy } from 'pdfjs-dist'
-import type { AgentToolCall, AgentToolDef, ToolExecution } from '@genoffice/agent-core'
+import type {
+  AgentToolCall,
+  AgentToolDef,
+  ImageUrlRegistry,
+  ToolExecution,
+} from '@genoffice/agent-core'
 import type { OutlineNode } from '../OutlinePanel'
 import type { PageEntry, SearchIndex } from '../search'
 import { searchInIndex } from '../search'
@@ -190,6 +195,12 @@ export interface PdfAiDeps {
   setStamps(cfg: StampConfig | null): void
   /** live predicate: the open PDF is a UniWork-bound copy (C-BOUND: no file written outside it); absent = plain local file */
   uniworkBound?(): boolean
+  /** live predicate: the active AI provider is UniWork AI (absent = BYOK); read before every model request */
+  uniworkAi?(): boolean
+  /** image URLs this run may insert (image_search / generate_image results); refuses unregistered ones under UniWork AI; absent = no rule */
+  imageUrls?: ImageUrlRegistry
+  /** live host capability reader for the edit tools (`cap()` in the renderer); absent = every capability on */
+  capability?(key: 'pdfTextEdit' | 'pdfImageEdit'): boolean
   /** Questionnaire card shown in the panel; the run blocks until the user answers, skips, stops or starts a new chat (cancelled) */
   askClarification?(
     questions: ClarifyQuestion[],
@@ -2844,6 +2855,7 @@ async function imageSearchTool(
       summary,
     )
   }
+  for (const im of r.images) deps.imageUrls?.register(im.imageUrl, 'image_search')
   const lines = r.images.map(
     (im, i) =>
       `${i + 1}. ${im.title || '(untitled)'} [${im.width ?? '?'}x${im.height ?? '?'}]\n   ${im.imageUrl}`,
@@ -2910,6 +2922,7 @@ async function generateImageTool(
     aspectRatio: input.aspect_ratio === undefined ? undefined : String(input.aspect_ratio),
   })
   if (!r.url) return err(`image generation failed: ${r.error ?? 'unknown error'}`, summary)
+  deps.imageUrls?.register(r.url, 'generate_image')
   return {
     output: `Generated image URL: ${r.url}\nInsert it into the document with insert_image.`,
     // returns a URL only; the open document is untouched until insert_image
@@ -2931,6 +2944,8 @@ async function insertImageTool(
   // file:// = a BYOK-generated image in the local store (the main process only resolves its own files)
   if (!/^(https?|file):\/\//.test(url))
     return err('invalid url; pass an imageUrl from image_search or generate_image', summary)
+  const refusal = deps.imageUrls?.check(url)
+  if (refusal) return err(refusal, summary)
   const geom = deps.pageGeom(r.origIdx)
   if (!geom) return err('Document not ready', summary)
   const size = geomDispSize(geom)
@@ -3118,6 +3133,8 @@ async function replaceImageTool(
   if (typeof ref === 'string') return err(ref, summary)
   const url = String(input.url ?? '')
   if (!/^https?:\/\//.test(url)) return err('url must be a direct http(s) image link', summary)
+  const refusal = deps.imageUrls?.check(url)
+  if (refusal) return err(refusal, summary)
   const fetched = await deps.fetchImage(url)
   if (signal?.aborted) return err('stopped by the user; nothing was changed', summary)
   if (!fetched)

@@ -80,6 +80,10 @@ export const ms = {
   acctErrNotConfigured: 'Apl ini tidak dipautkan kepada pelayan UniWork.',
   acctErrKeyringUnavailable: 'Storan selamat pada komputer ini tidak tersedia.',
   acctErrKeystoreLocked: 'Rantai kunci komputer ini dikunci. Buka kuncinya, kemudian cuba lagi.',
+  acctReplaceTitle: 'Gantikan log masuk yang disimpan pada komputer ini?',
+  acctReplaceBody:
+    'Komputer ini tidak dapat membuka log masuk yang disimpan. Log masuk semula akan menggantikannya. Suntingan luar talian yang menunggu penyegerakan kekal pada komputer ini dalam keadaan berkunci; tiada apa-apa dipadam.',
+  acctReplaceGo: 'Log masuk semula',
   acctErrServerError: 'UniWork menghadapi masalah. Sila cuba lagi kemudian.',
   acctErrMalformedResponse:
     'UniWork menghantar respons yang tidak dijangka. Sila cuba lagi kemudian.',

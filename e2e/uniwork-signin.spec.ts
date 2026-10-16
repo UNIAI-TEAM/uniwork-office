@@ -14,9 +14,11 @@ import {
 import {
   NO_KEYRING_SKIP,
   accountButton,
+  deliverUrl,
   hasOsKeyring,
   shellEnv,
   signIn,
+  waitForSafeStorageKeyOnDisk,
 } from './fixtures/uniwork-signin-steps'
 
 /**
@@ -166,8 +168,8 @@ test.describe('UniWork account sign-in', () => {
     }
   })
 
-  test('a stored sign-in this computer cannot decrypt shows a locked keystore with Retry only', async () => {
-    test.setTimeout(90_000)
+  test('a stored sign-in this computer cannot decrypt: Retry first, then Sign in again behind a confirm', async () => {
+    test.setTimeout(120_000)
     const stub = await startUniworkAuthStub()
     // bytes no key on this machine can open (e.g. written under an older OS key)
     const unreadable = randomBytes(256)
@@ -191,8 +193,8 @@ test.describe('UniWork account sign-in', () => {
       await accountButton(page).click()
       const pane = page.locator('.acct-pane')
       await expect(pane).toHaveAttribute('data-state', 'keystore-locked')
-      // signing in again is refused while locked (it would overwrite the saved
-      // sign-in), so Retry is the only action
+      // Retry comes first: before one has failed, there is no way to replace
+      // the saved sign-in
       await expect(pane.getByRole('button', { name: 'Sign in again' })).toHaveCount(0)
 
       // Retry reads the file again: still unreadable, and it is kept untouched
@@ -204,6 +206,38 @@ test.describe('UniWork account sign-in', () => {
       expect((await readFile(sessionFile(userDataDir))).equals(unreadable)).toBe(true)
       expect(stub.refreshCalls()).toBe(0)
       expect(stub.lastAttempt()).toBeFalsy()
+
+      // the failed Retry brings the way out, behind a confirmation
+      const signInAgain = pane.getByRole('button', { name: 'Sign in again' })
+      await expect(signInAgain).toBeVisible()
+      await signInAgain.click()
+      const confirm = pane.getByRole('alertdialog')
+      await expect(confirm).toContainText('Replace the saved sign-in on this computer?')
+      await expect(confirm.getByRole('button', { name: 'Cancel' })).toBeFocused()
+
+      // Escape and Cancel change nothing: same state, same bytes, no attempt
+      await page.keyboard.press('Escape')
+      await expect(confirm).toHaveCount(0)
+      await signInAgain.click()
+      await confirm.getByRole('button', { name: 'Cancel' }).click()
+      await expect(confirm).toHaveCount(0)
+      await expect(pane).toHaveAttribute('data-state', 'keystore-locked')
+      expect((await readFile(sessionFile(userDataDir))).equals(unreadable)).toBe(true)
+      expect(stub.lastAttempt()).toBeFalsy()
+
+      // confirm: a fresh sign-in starts; the saved file stays until it is redeemed
+      await signInAgain.click()
+      await confirm.getByRole('button', { name: 'Sign in again' }).click()
+      await expect(accountButton(page)).toHaveAttribute('data-state', 'signing-in')
+      await expect.poll(() => stub.lastAttempt()?.state ?? '').not.toBe('')
+      expect((await readFile(sessionFile(userDataDir))).equals(unreadable)).toBe(true)
+      if (process.platform !== 'darwin') await waitForSafeStorageKeyOnDisk(launched)
+      await deliverUrl(launched, shellEnv(stub), stub.approve())
+      await expect(accountButton(page)).toHaveAttribute('data-state', 'signed-in', {
+        timeout: 30_000,
+      })
+      // the new sign-in replaced the one this computer could not open
+      expect((await readFile(sessionFile(userDataDir))).equals(unreadable)).toBe(false)
     } finally {
       await closeAndSaveVideo(launched, 'uniwork-signin-keystore-locked')
       await stub.close()

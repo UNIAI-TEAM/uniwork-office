@@ -83,6 +83,10 @@ export const ja = {
   acctErrKeyringUnavailable: 'このコンピューターのセキュアストレージを利用できません。',
   acctErrKeystoreLocked:
     'このコンピューターのキーチェーンがロックされています。ロックを解除してからもう一度お試しください。',
+  acctReplaceTitle: 'このコンピューターに保存されたサインイン情報を置き換えますか？',
+  acctReplaceBody:
+    'このコンピューターは保存されたサインイン情報を開けません。もう一度サインインすると置き換えられます。同期待ちのオフライン編集はロックされたままこのコンピューターに残り、削除されません。',
+  acctReplaceGo: 'もう一度サインイン',
   acctErrServerError: 'UniWork で問題が発生しました。しばらくしてからもう一度お試しください。',
   acctErrMalformedResponse:
     'UniWork から予期しない応答がありました。しばらくしてからもう一度お試しください。',

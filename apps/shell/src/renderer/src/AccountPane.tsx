@@ -1,8 +1,8 @@
 import { Dropdown } from '@genoffice/ui'
-import { useRef, type ReactNode } from 'react'
+import { useLayoutEffect, useRef, type ReactNode } from 'react'
 import { OrgChoiceStep } from './OrgChoiceStep'
 import { ServerConnect } from './ServerConnect'
-import { SignOutPrompt } from './SignOutPrompt'
+import { ReplaceSignInPrompt, SignOutPrompt } from './SignOutPrompt'
 import { useI18n } from './locale'
 import type { StringKey } from './locale'
 import {
@@ -76,6 +76,27 @@ export function AccountPane({ account }: { account: AccountController }) {
   const { status, view, error, busy } = account
   const signOutPrompt = account.signOutPrompt ?? null
   const signOutBtnRef = useRef<HTMLButtonElement>(null)
+  const replaceBtnRef = useRef<HTMLButtonElement>(null)
+  const retryBtnRef = useRef<HTMLButtonElement>(null)
+  const replacePrompt = Boolean(account.replaceLockedPrompt)
+  // set when the user confirms the replacing sign-in: the footer is rebuilt while
+  // the attempt runs, so the prompt's own focus return can miss it (it lands on BODY)
+  const refocusFooter = useRef(false)
+
+  useLayoutEffect(() => {
+    if (!refocusFooter.current) return
+    if (view !== 'keystore-locked') {
+      // the attempt is still running in the browser; any other state ends the request
+      if (view !== 'signing-in') refocusFooter.current = false
+      return
+    }
+    if (replacePrompt) return
+    const active = document.activeElement
+    // focus somewhere real (the user's, or the prompt's own return) stays where it is
+    if (active && active !== document.body && active.isConnected) return
+    ;(replaceBtnRef.current ?? retryBtnRef.current)?.focus()
+    // every commit: the attempt can end in a render where none of the usual inputs changed
+  })
 
   const profile = status?.profile
   const email = profile?.email || status?.email || ''
@@ -185,10 +206,42 @@ export function AccountPane({ account }: { account: AccountController }) {
       )
       break
     case 'keystore-locked':
-      // Retry re-reads the stored sign-in once the keychain is unlocked; signing in
-      // again is refused while locked (it would overwrite the saved sign-in), so
-      // there is no second button
-      actions = retryBtn
+      // Retry re-reads the stored sign-in once the keychain is unlocked and stays
+      // first. Only after a Retry found it still unreadable does main allow a
+      // fresh sign-in that replaces it, behind a confirmation
+      actions = (
+        <>
+          <button
+            ref={retryBtnRef}
+            type="button"
+            className="set-btn primary"
+            aria-disabled={busy === 'retrying' ? true : undefined}
+            aria-busy={busy === 'retrying' ? true : undefined}
+            onClick={() => {
+              refocusFooter.current = false
+              account.retry()
+            }}
+          >
+            {busy === 'retrying' ? t('acctRetrying') : t('acctRetry')}
+          </button>
+          {account.canReplaceLockedSignIn && (
+            <button
+              ref={replaceBtnRef}
+              type="button"
+              className="set-btn"
+              aria-haspopup="dialog"
+              aria-disabled={busy === 'retrying' ? true : undefined}
+              onClick={() => {
+                if (busy === 'retrying') return
+                refocusFooter.current = false
+                account.askReplaceLockedSignIn?.()
+              }}
+            >
+              {t('acctSignInAgain')}
+            </button>
+          )}
+        </>
+      )
       break
     case 'signed-in':
     case 'refreshing':
@@ -234,7 +287,14 @@ export function AccountPane({ account }: { account: AccountController }) {
                 {t('acctCallbackMismatch')}
               </div>
             )}
-            {errorText && <div className="acct-notice-error">{errorText}</div>}
+            {view === 'keystore-locked' ? (
+              // always mounted, so a failure that arrives later is announced (politely)
+              <div className="acct-notice-live" role="status">
+                {errorText && <div className="acct-notice-error">{errorText}</div>}
+              </div>
+            ) : (
+              errorText && <div className="acct-notice-error">{errorText}</div>
+            )}
           </div>
         </div>
       )}
@@ -321,11 +381,21 @@ export function AccountPane({ account }: { account: AccountController }) {
       )}
 
       <SignOutPrompt account={account} returnFocusRef={signOutBtnRef} />
+      <ReplaceSignInPrompt
+        account={account}
+        returnFocusRef={replaceBtnRef}
+        onConfirm={() => {
+          refocusFooter.current = true
+        }}
+      />
 
       {/* the organization step and the sign-out prompt each carry their own Sign out */}
-      {actions && !signOutPrompt && !(withProfile && orgChoice.needed && !orgChoice.loadError) && (
-        <div className="set-pane-footer acct-actions">{actions}</div>
-      )}
+      {actions &&
+        !signOutPrompt &&
+        !replacePrompt &&
+        !(withProfile && orgChoice.needed && !orgChoice.loadError) && (
+          <div className="set-pane-footer acct-actions">{actions}</div>
+        )}
     </section>
   )
 }

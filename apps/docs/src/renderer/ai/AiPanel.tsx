@@ -23,6 +23,7 @@ import type { Block } from '@genoffice/docx-engine'
 import {
   AgentLoop,
   composeSkills,
+  createImageUrlRegistry,
   droppedCallsOfNotes,
   endsQuietly,
   getEntryResultChipView,
@@ -66,7 +67,8 @@ import {
 } from './tools'
 import type { AiPageSetupAccess } from './page-setup'
 import type { AiNotesAccess } from './note-ops'
-import { createDocsSkill } from './docs-skill'
+import { createDocsSkill, type AiDocProtection } from './docs-skill'
+import { aiTrackFor } from './track-policy'
 import { MindMapCard } from './MindMapCard'
 import {
   buildDocWriterRequest,
@@ -445,6 +447,8 @@ interface AiPanelProps {
   readOnly?: boolean
   /** UniWork working copy: tools that write outside the document are hidden (C-BOUND) */
   bound?: boolean
+  /** Word protection of the open document: the docs skill hides/refuses the tools it forbids (live) */
+  protection?: AiDocProtection
   /** App state beside the PM doc that a run's Roll back restores with it */
   sideState?: AiSideState
 }
@@ -486,6 +490,7 @@ export function AiPanel({
   notesAccess,
   readOnly = false,
   bound = false,
+  protection = 'none',
   sideState,
 }: AiPanelProps) {
   const { t, lang } = useI18n()
@@ -694,6 +699,8 @@ export function AiPanel({
   readOnlyRef.current = readOnly
   const boundRef = useRef(bound)
   boundRef.current = bound
+  const protectionRef = useRef(protection)
+  protectionRef.current = protection
   const sideStateRef = useRef(sideState)
   sideStateRef.current = sideState
   const trackChangesRef = useRef(trackChanges)
@@ -991,7 +998,7 @@ export function AiPanel({
         createDocsSkill(
           () => editorRef.current,
           numIds,
-          () => (trackChangesRef.current ? { author: AI_REVISION_AUTHOR } : undefined),
+          () => aiTrackFor(trackChangesRef.current, protectionRef.current, AI_REVISION_AUTHOR),
           () => commentsAccessRef.current,
           () => hfAccessRef.current,
           () => imageGenerationAvailable(settingsRef.current, gskLoggedInRef.current),
@@ -1005,6 +1012,16 @@ export function AiPanel({
           () => readOnlyRef.current,
           () => boundRef.current,
           () => askClarification,
+          () => protectionRef.current,
+          // an image URL the AI inserts must come from this run's image_search / generate_image or
+          // an image attached to its message (UniWork AI turns only; BYOK keeps today's rules)
+          createImageUrlRegistry({
+            enforce: () => settingsRef.current.provider === 'uniwork',
+            attachments: () =>
+              lastAttachmentsRef.current
+                .filter((a) => ATTACHMENT_IMAGE_EXTS.has(a.ext))
+                .map((a) => a.path),
+          }),
         ),
         createFilesSkill(availableAttachments),
       ]),

@@ -17,7 +17,9 @@ import {
   getActionFailureNotice,
   getReloadStepModel,
   getStep1Model,
+  isSaveCopyDownloadStep,
   resolveConflictNotice,
+  viewAfterConflictBack,
   type ConflictDialogState,
   type ConflictStep1ActionId,
 } from './uniwork-conflict-model'
@@ -149,7 +151,7 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
     if (!scrim || typeof document === 'undefined') return
     const newlyInerted: Element[] = []
     for (const child of Array.from(document.body.children)) {
-      if (child === scrim || child.contains(scrim)) continue
+      if (child === scrim || child.contains(scrim) || child.hasAttribute('data-uw-live')) continue
       if (!child.hasAttribute('inert')) {
         child.setAttribute('inert', '')
         newlyInerted.push(child)
@@ -326,6 +328,15 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
     setState((prev) => applyConflictStep1Click(prev, view, actionId))
   }
 
+  const handleSaveCopyBack = () => {
+    // FE-12-21: like the other step-2 controls, inert while a request is in flight, so a late
+    // reply cannot put the Download notice back on step 1
+    if (busyRef.current) return
+    const cleared = viewAfterConflictBack(state, view)
+    setState((s) => applyConflictBack(s))
+    if (cleared) onViewChange(cleared)
+  }
+
   const handleConfirmStep2 = () => {
     if (busyRef.current) return
     const payload = buildConfirmPayload(state, view)
@@ -344,6 +355,7 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
   const resolvedNotice = resolveConflictNotice(view)
   const noticeText = resolvedNotice ? fmt(t(resolvedNotice.key), resolvedNotice.args) : ''
 
+  const saveCopyDownload = isSaveCopyDownloadStep(view)
   const step1Model = getStep1Model(view, { canViewDiff: Boolean(onViewDiff) })
   const reloadModel = getReloadStepModel(state, view)
 
@@ -365,6 +377,11 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
       server: serverVerStr,
       author: serverAuthor,
     })
+  } else if (state.step === 'save-copy' && saveCopyDownload) {
+    // No seat / failed download: the alert carries the reason, so the heading names the
+    // primary action and no "create a new document" confirm body is shown.
+    headingText = t('uwActDownloadMine')
+    bodyText = ''
   } else if (state.step === 'save-copy') {
     headingText = t('uwConflictSaveCopyTitle')
     bodyText = fmt(t('uwConflictSaveCopyConfirm'), {
@@ -402,7 +419,7 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
         role="alertdialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        aria-describedby={bodyId}
+        aria-describedby={bodyText ? bodyId : undefined}
         onKeyDown={handleKeyDown}
         onBlur={clearInitialFocusMark}
         onPointerDown={clearInitialFocusMark}
@@ -411,9 +428,11 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
           <h2 ref={titleRef} id={titleId} className="uw-conflict-title" tabIndex={-1}>
             {headingText}
           </h2>
-          <p id={bodyId} className="uw-conflict-body">
-            {bodyText}
-          </p>
+          {bodyText && (
+            <p id={bodyId} className="uw-conflict-body">
+              {bodyText}
+            </p>
+          )}
 
           {state.step === 'step1' && (
             <>
@@ -526,7 +545,9 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
             id={alertId}
             role="alert"
             className={`uw-conflict-alert${
-              view.notice === 'save_copy_done' ? ' uw-conflict-alert--ok' : ''
+              view.notice === 'save_copy_done' || view.notice === 'download_done'
+                ? ' uw-conflict-alert--ok'
+                : ''
             }`}
           >
             {alertClearing ? '' : noticeText}
@@ -652,17 +673,18 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
             <button
               type="button"
               className="uw-conflict-btn uw-conflict-btn--primary"
-              data-conflict-action="save-copy-go"
+              data-conflict-action={saveCopyDownload ? 'download-go' : 'save-copy-go'}
               aria-disabled={busy ? 'true' : undefined}
               onClick={handleConfirmStep2}
             >
-              {t('uwConflictSaveCopyGo')}
+              {saveCopyDownload ? t('uwActDownloadMine') : t('uwConflictSaveCopyGo')}
             </button>
             <button
               type="button"
               className="uw-conflict-btn"
               data-conflict-action="back"
-              onClick={() => setState((s) => applyConflictBack(s))}
+              aria-disabled={busy ? 'true' : undefined}
+              onClick={handleSaveCopyBack}
             >
               {t('uwConflictBack')}
             </button>

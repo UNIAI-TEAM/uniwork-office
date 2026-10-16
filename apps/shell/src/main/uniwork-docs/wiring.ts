@@ -1,6 +1,7 @@
 import { app, BrowserWindow, dialog, safeStorage, type IpcMain, type WebContents } from 'electron'
 import { randomUUID } from 'node:crypto'
-import { basename, join } from 'node:path'
+import { basename, extname, join } from 'node:path'
+import { showSaveDialogWithMemory } from '@genoffice/electron-utils'
 import { COMMENTS_CHANNELS } from '@genoffice/electron-utils/comments-ipc'
 import {
   UNIWORK_DOC_CHANNELS,
@@ -209,6 +210,32 @@ async function pickUploadFile(
     : await dialog.showOpenDialog(options)
   const path = picked.canceled ? undefined : picked.filePaths[0]
   return path ? { path, name: basename(path) } : null
+}
+
+/**
+ * G5-12 "Download my version": the native save dialog over the shell window.
+ * The suggested name is the copy name (`{name} (my version).docx`); a cancelled
+ * dialog is null.
+ */
+async function pickDownloadPath(
+  wiring: UniworkDocsWiring,
+  defaultName: string,
+): Promise<string | null> {
+  const picked = await showSaveDialogWithMemory(
+    dialog,
+    wiring.shellWindow(),
+    {
+      defaultPath: defaultName,
+      filters: [
+        {
+          name: tUniworkDocs(wiring.lang(), 'uploadPickDocuments'),
+          extensions: [extname(defaultName).slice(1) || '*'],
+        },
+      ],
+    },
+    wiring.defaultSaveDir(),
+  )
+  return picked.canceled || !picked.filePath ? null : picked.filePath
 }
 
 function conflictUi(wiring: UniworkDocsWiring): ConflictUi {
@@ -660,18 +687,24 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     isPackaged: wiring.isPackaged,
     // S18: main owns the native dialog (Electron); the service stays Electron-free
     pickUploadFile: () => pickUploadFile(wiring),
+    pickDownloadPath: (defaultName) => pickDownloadPath(wiring, defaultName),
     pushUploadProgress: (event) => push(UNIWORK_DOC_CHANNELS.uploadProgress, event),
     pushDocRenamed: (event) => push(UNIWORK_DOC_CHANNELS.docRenamed, event),
     notifyPathRenamed: (oldPath, newPath) => wiring.notifyPathRenamed(oldPath, newPath),
     notifyTitleRenamed: (path, title) => wiring.notifyTitleRenamed?.(path, title),
     ui: conflictUi(wiring),
     pushStatus: (status) => push(UNIWORK_DOC_CHANNELS.docStatusEvent, status),
+    pushQueuePopover: (request) => push(UNIWORK_DOC_CHANNELS.queuePopover, request),
+    // G5-06u RBE6u-03: a path open as a tab of the shell window (the target
+    // discussionTarget already resolves); a detached editor window is not one
+    isShellTab: (path) => (wiring.discussionTarget ? wiring.discussionTarget(path) !== null : true),
     pushSignOutProgress: (event: SignOutProgress) =>
       push(UNIWORK_DOC_CHANNELS.signOutProgress, event),
     pushConflict: (view) => push(UNIWORK_DOC_CHANNELS.conflictOpen, view),
     pushConflictClosed: (sessionId) => push(UNIWORK_DOC_CHANNELS.conflictClosed, { sessionId }),
     isAiRunning: (path) => wiring.isAiRunning?.(path) === true,
     stopAiRun: (path) => wiring.stopAiRun?.(path),
+    lang: () => wiring.lang(),
     // the save queue's lane verdicts read the same per-org capability cache the
     // feed runtime does (see the SyncRuntimeSeam note), so `sync_write` is read
     // once per account and cleared on an account switch for both

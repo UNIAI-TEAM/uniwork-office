@@ -141,7 +141,12 @@ import {
   type TableDesignContext,
 } from './table-design-actions'
 
-import { AgentLoop, composeSkills, type AgentImage } from '@genoffice/agent-core'
+import {
+  AgentLoop,
+  composeSkills,
+  createImageUrlRegistry,
+  type AgentImage,
+} from '@genoffice/agent-core'
 import { createRunNotices } from './ai/run-notices'
 import { imageGenerationAvailable, type AiSettings } from '@genoffice/ai-provider/browser'
 import { agentConfigured } from './ai/agent-configured'
@@ -1153,6 +1158,19 @@ export function App({
       seen.has(a.path) ? false : (seen.add(a.path), true),
     )
   }
+  /** attachments of the message the running (or last) run was started with */
+  const runAttachmentsRef = useRef<readonly AttachmentMeta[]>([])
+  /** image URLs the AI may insert this run: image_search / generate_image results and the run's image
+   * attachments; UniWork AI turns refuse any other URL (BYOK keeps today's rules) */
+  const imageUrlsRef = useRef(
+    createImageUrlRegistry({
+      enforce: () => aiSettingsRef.current?.provider === 'uniwork',
+      attachments: () =>
+        runAttachmentsRef.current
+          .filter((a) => ATTACHMENT_IMAGE_EXTS.has(a.ext))
+          .map((a) => a.path),
+    }),
+  )
   /** Synchronous re-entrancy guard between runAgent trigger and loop.run
    * (loop.busy is still false while attachment images load asynchronously) */
   const runStartingRef = useRef(false)
@@ -1513,6 +1531,7 @@ export function App({
               cap('imageGeneration') &&
               imageGenerationAvailable(aiSettingsRef.current, gskLoggedInRef.current),
             () => cap('imageSearch'),
+            imageUrlsRef.current,
           ),
         ].map((skill) => restrictToReading(skill, () => aiViewOnlyRef.current)),
       ),
@@ -1716,6 +1735,7 @@ export function App({
     aiApplyPromisesRef.current = []
     runNoticesRef.current.clear()
     runQuestionRef.current = instruction
+    runAttachmentsRef.current = sentAttachments
     runMutatedRef.current = false
     runWriteLedgerRef.current.reset()
     setAiBusy(true)
@@ -1845,6 +1865,7 @@ export function App({
       createDocument: (request) => createAiDocument({ univerRef, lazyWorkbookRef }, request),
       isUniworkBound: () => aiUniworkBoundRef.current,
       getAttachments: availableAttachments,
+      imageUrls: imageUrlsRef.current,
       askClarification: (questions) =>
         new Promise((resolve) => {
           // a card still open from an earlier call is superseded, never left hanging
