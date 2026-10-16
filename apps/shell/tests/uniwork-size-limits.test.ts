@@ -9,7 +9,7 @@
 import { chmodSync, mkdtempSync, readFileSync, rmSync, truncateSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { act, createElement, type ReactElement } from 'react'
+import { Fragment, act, createElement, type ReactElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Lang } from '@genoffice/i18n'
@@ -58,6 +58,7 @@ import { failedReasonKey, rowView } from '../src/renderer/src/sync-center-model'
 import { UploadDocDialog } from '../src/renderer/src/UniworkDocActions'
 import { SyncCenterPane } from '../src/renderer/src/SyncCenterPane'
 import { UniworkStatusChip } from '../src/renderer/src/UniworkChrome'
+import { LIVE_HOST_ID, UniworkLiveHost, resetLiveForTests } from '../src/renderer/src/uniwork-live'
 import { setTopInsetPart } from '../src/renderer/src/uniwork-top-inset'
 import { LocaleProvider, type StringKey } from '../src/renderer/src/locale'
 import { vi as viDocs } from '../src/renderer/src/i18n/uniwork-documents/vi'
@@ -667,6 +668,7 @@ describe('SIZE-F1 desktop document size limits', () => {
     afterEach(() => {
       act(() => root.unmount())
       container.remove()
+      resetLiveForTests()
       setTopInsetPart('bar', 0)
       setTopInsetPart('popover', 0)
       setTopInsetPart('saveBlock', 0)
@@ -1025,6 +1027,56 @@ describe('SIZE-F1 desktop document size limits', () => {
       expect(focusActive).toHaveBeenCalledTimes(3)
     })
 
+    it('gives the size-warn chip dismiss button a distinct aria-label and announces the warning via the live host (d2-11)', async () => {
+      window.aiOffice = {
+        accountStatus: async () => ({ loggedIn: true, state: 'signed-in' }),
+        onAccountStatus: () => () => undefined,
+        onUniworkQueuePopover: () => () => undefined,
+      } as never
+
+      const warn = { sizeBytes: 185 * MB_BYTES + MB_BYTES / 2, maxBytes: 209_715_200 }
+      const base: UniworkDocStatus = {
+        path: '/tmp/Report.docx',
+        documentId: DOC_ID,
+        workspaceId: WS_ID,
+        title: 'Report.docx',
+        format: 'docx',
+        access: 'edit',
+        state: 'saved',
+      }
+
+      await render(
+        createElement(
+          Fragment,
+          null,
+          createElement(UniworkLiveHost),
+          createElement(UniworkStatusChip, {
+            status: { ...base, sizeWarn: warn },
+            onStatus: () => undefined,
+          }),
+        ),
+      )
+
+      const warnChip = container.querySelector('.uw-size-warn')
+      expect(warnChip).not.toBeNull()
+      // No mount-time role="status" on the newly inserted chip node
+      expect(warnChip?.querySelector('[role="status"]')).toBeNull()
+
+      // Dismiss button has a distinct aria-label naming what is being closed
+      const closeBtn = warnChip?.querySelector<HTMLButtonElement>('.uw-pill-close')
+      expect(closeBtn?.getAttribute('aria-label')).toBe(viDocs.uwSizeWarnDismiss)
+      expect(closeBtn?.getAttribute('aria-label')).not.toBe(viDocs.uwClose)
+
+      // Announced through the persistent #uw-live-host [role="status"] live region
+      const livePolite = document.querySelector(`#${LIVE_HOST_ID} [role="status"]`)
+      expect(livePolite?.textContent).toBe('Sắp chạm giới hạn 200 MB (đang 185,5 MB).')
+
+      await act(async () => {
+        closeBtn?.click()
+      })
+      expect(container.querySelector('.uw-size-warn')).toBeNull()
+    })
+
     it('renders the Sync Center failed row with and without a limit', async () => {
       const snapshot: SyncCenterSnapshot = {
         header: {
@@ -1102,6 +1154,7 @@ describe('SIZE-F1 desktop document size limits', () => {
     it('has the whole SIZE-F1 key set in zh/vi/en, with no internal code in the copy', () => {
       const keys = [
         'uwSizeWarnChip',
+        'uwSizeWarnDismiss',
         'uwSaveBlockTitle',
         'uwSaveBlockBody',
         'uwSaveBlockSaveCopyLocal',

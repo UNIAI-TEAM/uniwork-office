@@ -149,6 +149,7 @@ export const vi = {
   uwDocLocationTop: 'Cấp trên cùng',
   uwDocArchived: 'Đã lưu trữ',
   uwSizeWarnChip: 'Sắp chạm giới hạn {max} (đang {size}).',
+  uwSizeWarnDismiss: 'Đóng cảnh báo dung lượng',
   uwSaveBlockTitle: 'Chưa lưu được lên UniWork',
   uwSaveBlockBody:
     'Tài liệu đã vượt {max}. Thay đổi của bạn vẫn ở đây. Tải bản của bạn về máy rồi giảm dung lượng ảnh hoặc chia nhỏ tài liệu.',

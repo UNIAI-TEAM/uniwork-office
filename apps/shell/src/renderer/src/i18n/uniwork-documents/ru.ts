@@ -155,6 +155,7 @@ export const ru = {
   uwDocLocationTop: 'Верхний уровень',
   uwDocArchived: 'В архиве',
   uwSizeWarnChip: 'Приближается к лимиту {max} (сейчас {size}).',
+  uwSizeWarnDismiss: 'Закрыть предупреждение о размере',
   uwSaveBlockTitle: 'Не удалось сохранить в UniWork',
   uwSaveBlockBody:
     'Этот документ превышает {max}. Ваши изменения по-прежнему здесь. Скачайте копию на компьютер, а затем уменьшите размер изображений или разделите документ.',

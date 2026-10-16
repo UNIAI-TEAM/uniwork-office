@@ -150,6 +150,7 @@ export const cs = {
   uwDocLocationTop: 'Nejvyšší úroveň',
   uwDocArchived: 'Archivováno',
   uwSizeWarnChip: 'Blíží se limitu {max} (aktuálně {size}).',
+  uwSizeWarnDismiss: 'Zavřít upozornění na velikost',
   uwSaveBlockTitle: 'Nepodařilo se uložit do UniWork',
   uwSaveBlockBody:
     'Tento dokument překračuje {max}. Vaše změny jsou stále zde. Stáhněte si kopii do počítače a poté zmenšete obrázky nebo dokument rozdělte.',

@@ -152,6 +152,7 @@ export const id = {
   uwDocLocationTop: 'Tingkat teratas',
   uwDocArchived: 'Diarsipkan',
   uwSizeWarnChip: 'Mendekati batas {max} (saat ini {size}).',
+  uwSizeWarnDismiss: 'Tutup peringatan ukuran',
   uwSaveBlockTitle: 'Tidak dapat menyimpan ke UniWork',
   uwSaveBlockBody:
     'Dokumen ini melebihi {max}. Perubahan Anda masih ada di sini. Unduh salinan Anda ke komputer, lalu perkecil ukuran gambar atau bagi dokumen.',

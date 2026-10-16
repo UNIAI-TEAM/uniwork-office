@@ -661,6 +661,21 @@ ${action ? t(action.labelKey) : ''}`,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signature, status.pendingNext])
 
+  const sizeWarnTextRef = useRef(sizeWarnText)
+  sizeWarnTextRef.current = sizeWarnText
+  const lastAnnouncedWarnKeyRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!showSizeWarn || !warnKey) {
+      if (!warnKey) lastAnnouncedWarnKeyRef.current = null
+      return
+    }
+    if (lastAnnouncedWarnKeyRef.current === warnKey) return
+    lastAnnouncedWarnKeyRef.current = warnKey
+    if (sizeWarnTextRef.current) {
+      announce(sizeWarnTextRef.current)
+    }
+  }, [showSizeWarn, warnKey])
+
   // Ctrl/Cmd+S on a document with a waiting save: main asks for the popover (a conflict opens the
   // resolve choice instead). This chip only exists for the active tab, so another path is ignored.
   useEffect(
@@ -751,14 +766,14 @@ ${action ? t(action.labelKey) : ''}`,
     <>
       {sizeWarnText && warnKey && (
         <div className="uw-pill uw-size-warn" data-tone="warn" title={sizeWarnText}>
-          <span className="uw-pill-status" role="status">
+          <span className="uw-pill-status">
             <span className="uw-pill-dot" aria-hidden="true" />
             <span className="uw-pill-label">{sizeWarnText}</span>
           </span>
           <button
             type="button"
             className="uw-pill-close"
-            aria-label={t('uwClose')}
+            aria-label={t('uwSizeWarnDismiss')}
             onClick={() => setWarnDismissedFor(warnKey)}
           >
             <svg width="10" height="10" viewBox="0 0 14 14" aria-hidden="true">
