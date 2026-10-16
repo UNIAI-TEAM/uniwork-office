@@ -938,7 +938,7 @@ describe('G5-06 W4b save queue wiring', () => {
       ])
     })
 
-    it('a reopen clears an archived block only once the read proves the archive lifted', async () => {
+    it('a reopen clears an archived block only once the read proves the archive lifted AND edit access', async () => {
       const server = fakeServer({ bytes: enc('v3') })
       const ctx = setup(server)
       const path = await openDoc(ctx)
@@ -958,9 +958,19 @@ describe('G5-06 W4b save queue wiring', () => {
       await ctx.service.save(path)
       expect(commits(server)).toHaveLength(0)
       expect(binding(path)).toMatchObject({ state: 'blocked', error: 'document_archived' })
+      // out of the archive but the caller's level reads `view`: the write is
+      // still refused, so the block stays - the same `canEdit` fact the queue's
+      // probe reads (a view ticket / a dropped level is not a lift)
+      server.state.archivedAt = null
+      server.state.myLevel = 'view'
+      await openDoc(ctx)
+      expect(binding(path)).toMatchObject({ state: 'blocked', error: 'document_archived' })
+      await ctx.service.save(path)
+      expect(commits(server)).toHaveLength(0)
+      expect(binding(path)).toMatchObject({ state: 'blocked', error: 'document_archived' })
       // out of the archive: the read proves the archive lifted, the reopen clears
       // the block and the local work can be saved again
-      server.state.archivedAt = null
+      server.state.myLevel = 'edit'
       await openDoc(ctx)
       expect(binding(path)).toMatchObject({ state: 'dirty' })
       expect(binding(path).error).toBeUndefined()

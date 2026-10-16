@@ -5569,16 +5569,22 @@ export class UniworkDocsService {
           }
           // the document answers again (restored from the trash, a transient
           // 404): its local work can be saved once more. An archived document
-          // answers again only when THIS read proves the archive lifted - while
-          // it holds, the write is still refused and clearing the block would
-          // only earn it again (the rule the queue's blocked re-probe reads:
-          // probeBlockedDoc lifts an archived block only past `!archived`)
+          // answers again only when THIS read proves BOTH that the archive
+          // lifted AND that this copy may be edited (the same `canEdit` the
+          // queue's blocked re-probe reads: probeBlockedDoc lifts an archived
+          // block only for `flags.canEdit && !flags.archived`,
+          // service.ts:1760-1763; `access` folds in the view-ticket downgrade
+          // the probe has no copy of, so it is the stricter of the two) - while
+          // either holds, the write is still refused and clearing the block
+          // would only earn it again
           if (
             existing.state === 'blocked' &&
             (existing.error === 'not_found' ||
               existing.error === 'deleted' ||
               existing.error === 'document_deleted' ||
-              (existing.error === 'document_archived' && detail.archivedAt === null))
+              (existing.error === 'document_archived' &&
+                access === 'edit' &&
+                detail.archivedAt === null))
           ) {
             binding.state = localChecksum === existing.baseChecksum ? 'ready' : 'dirty'
             delete binding.error
