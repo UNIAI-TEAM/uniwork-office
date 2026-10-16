@@ -88,6 +88,8 @@
   --shadow-modal-strong: 0 20px 25px rgb(0 0 0 / 10%);
   --shadow-btn-hover: 0 2px 8px rgb(35 36 37 / 15%);
   --shadow-menu: 0 8px 24px rgb(0 0 0 / 18%);
+  /* AI panel composer: a contact shadow plus a soft lift, one light source from above */
+  --ai-composer-shadow: 0 1px 2px rgb(16 24 40 / 5%), 0 10px 28px -14px rgb(16 24 40 / 22%);
 
   /* AI panel (canonical names from the former per-app copies) */
   --gs-font-sans:
@@ -200,6 +202,7 @@
   --shadow-modal-strong: 0 20px 25px rgb(0 0 0 / 30%);
   --shadow-btn-hover: 0 2px 8px rgb(0 0 0 / 50%);
   --shadow-menu: 0 8px 24px rgb(0 0 0 / 55%);
+  --ai-composer-shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 10px 28px -14px rgb(0 0 0 / 70%);
 
   --color-btn-primary: #e4e4e4;
   --color-btn-primary-hover: #d0d0d0;
@@ -295,6 +298,7 @@
     --shadow-modal-strong: 0 20px 25px rgb(0 0 0 / 30%);
     --shadow-btn-hover: 0 2px 8px rgb(0 0 0 / 50%);
     --shadow-menu: 0 8px 24px rgb(0 0 0 / 55%);
+    --ai-composer-shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 10px 28px -14px rgb(0 0 0 / 70%);
 
     --color-btn-primary: #e4e4e4;
     --color-btn-primary-hover: #d0d0d0;

@@ -1,0 +1,416 @@
+/* AI panel skin, shared by all six editors. Each app keeps its structural
+ * panel rules in styles.css; this file is imported after them and owns the
+ * look: type, surfaces, motion and interaction states. Every rule is scoped to
+ * the panel root (.ai-panel in docs/slides, .copilot elsewhere) so it outranks
+ * the per-app copies without !important. Colors come from tokens.css and the
+ * app's own --accent only. */
+
+.ai-panel,
+.copilot {
+  /* the OS UI face (SF Pro / Segoe UI Variable) matches the ribbon and has real Vietnamese/CJK coverage */
+  --ai-font:
+    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI Variable Text',
+    'Segoe UI', 'Noto Sans', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --gs-font-sans: var(--ai-font);
+  --ai-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ai-ring: color-mix(in srgb, var(--accent) 22%, transparent);
+  --ai-accent-line: color-mix(in srgb, var(--accent) 45%, var(--color-border-default));
+
+  font-family: var(--ai-font);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* a faint wash of the app accent behind the header: depth without a gradient banner */
+:is(.ai-panel, .copilot:not(.collapsed)) {
+  background:
+    radial-gradient(
+        120% 200px at 50% -60px,
+        color-mix(in srgb, var(--accent) 7%, transparent),
+        transparent 72%
+      )
+      no-repeat,
+    var(--color-bg-page);
+}
+
+:is(.ai-panel, .copilot) ::selection {
+  background: color-mix(in srgb, var(--accent) 24%, transparent);
+}
+
+/* ---- header ---- */
+
+:is(.ai-panel, .copilot) .ai-panel-header {
+  min-height: 48px;
+  box-sizing: border-box;
+  padding-block: 8px;
+  padding-inline: 14px 8px;
+  border-bottom-color: transparent;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+:is(.ai-panel, .copilot) .ai-panel-title {
+  gap: 8px;
+}
+
+:is(.ai-panel, .copilot) .ai-panel-header-actions {
+  gap: 4px;
+}
+
+:is(.ai-panel, .copilot) .ai-header-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-8);
+  color: var(--color-text-tertiary);
+  transition:
+    background-color 160ms var(--ai-ease-out),
+    color 160ms var(--ai-ease-out),
+    transform 160ms var(--ai-ease-out);
+}
+
+:is(.ai-panel, .copilot) .ai-header-btn:hover {
+  background: var(--hover);
+  color: var(--color-text-primary);
+}
+
+:is(.ai-panel, .copilot) .ai-header-btn:active {
+  background: var(--pressed);
+  transform: scale(0.94);
+}
+
+:is(.ai-panel, .copilot)
+  :is(
+    .ai-header-btn,
+    .ai-starter,
+    .ai-quick-btn,
+    .ai-msg-tool-btn,
+    .ai-result-view-changes
+  ):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  box-shadow: 0 0 0 4px var(--ai-ring);
+}
+
+/* ---- conversation log ---- */
+
+:is(.ai-panel, .copilot) .ai-chat {
+  padding: 20px 16px 28px;
+  gap: 20px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+  /* content dissolves into the header and the composer instead of meeting a hard rule */
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    black 14px,
+    black calc(100% - 18px),
+    transparent
+  );
+}
+
+:is(.ai-panel, .copilot) .ai-msg {
+  font-size: 15px;
+  line-height: 1.62;
+  animation: ai-skin-rise 360ms var(--ai-ease-out) backwards;
+}
+
+/* user turn: a quiet bubble whose end corner points back at the composer */
+:is(.ai-panel, .copilot) .ai-msg-user {
+  max-width: 84%;
+  padding: 9px 14px;
+  border-radius: 18px;
+  border-end-end-radius: 6px;
+  background: var(--color-bg-subtle);
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+:is(.ai-panel, .copilot) .ai-msg-assistant {
+  text-wrap: pretty;
+}
+
+:is(.ai-panel, .copilot) .ai-history-sep {
+  gap: 12px;
+  height: 24px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-tertiary);
+}
+
+:is(.ai-panel, .copilot) .ai-history-sep::before,
+:is(.ai-panel, .copilot) .ai-history-sep::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--color-border-default);
+}
+
+/* reply actions: present but recessive until the reader reaches for them */
+:is(.ai-panel, .copilot) .ai-msg-toolbar {
+  gap: 2px;
+  margin-top: 6px;
+  margin-inline-start: -6px;
+  opacity: 0.7;
+  transition: opacity 200ms var(--ai-ease-out);
+}
+
+:is(.ai-panel, .copilot) .ai-msg:hover .ai-msg-toolbar,
+:is(.ai-panel, .copilot) .ai-msg-toolbar:focus-within {
+  opacity: 1;
+}
+
+:is(.ai-panel, .copilot) .ai-msg-tool-btn {
+  height: 28px;
+  min-width: 28px;
+  padding: 5px;
+  color: var(--color-text-tertiary);
+  transition:
+    background-color 160ms var(--ai-ease-out),
+    color 160ms var(--ai-ease-out),
+    transform 160ms var(--ai-ease-out);
+}
+
+:is(.ai-panel, .copilot) .ai-msg-tool-btn svg {
+  width: 17px;
+  height: 17px;
+}
+
+:is(.ai-panel, .copilot) .ai-msg-tool-btn:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--color-text-primary);
+}
+
+:is(.ai-panel, .copilot) .ai-msg-tool-btn:active:not(:disabled) {
+  filter: none;
+  transform: scale(0.92);
+}
+
+:is(.ai-panel, .copilot) .ai-result-chip {
+  padding: 2px 7px;
+  border-radius: var(--radius-6);
+  border-color: transparent;
+  font-size: 11.5px;
+  letter-spacing: 0.01em;
+}
+
+:is(.ai-panel, .copilot) .ai-result-view-changes {
+  padding: 4px 10px;
+  border-radius: var(--radius-8);
+  font-weight: 500;
+  transition:
+    background-color 160ms var(--ai-ease-out),
+    border-color 160ms var(--ai-ease-out);
+}
+
+:is(.ai-panel, .copilot) .ai-result-view-changes:hover {
+  border-color: var(--ai-accent-line);
+  background: color-mix(in srgb, var(--accent) 6%, var(--color-bg-page));
+}
+
+/* ---- empty state: sits just above the composer, where the eye already is ---- */
+
+:is(.ai-panel, .copilot) .ai-chat-empty {
+  margin-top: auto;
+  padding: 0 2px;
+  text-align: start;
+  animation: ai-skin-rise 480ms var(--ai-ease-out) backwards;
+}
+
+:is(.ai-panel, .copilot) .ai-chat-empty-title {
+  margin-bottom: 8px;
+  font-size: 21px;
+  font-weight: 600;
+  line-height: 1.22;
+  letter-spacing: -0.022em;
+  text-wrap: balance;
+}
+
+:is(.ai-panel, .copilot) .ai-chat-empty-body {
+  max-width: 36ch;
+  font-size: 13.5px;
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+:is(.ai-panel, .copilot) :is(.ai-starter-list, .ai-quick-actions) {
+  align-items: stretch;
+  gap: 6px;
+  margin-top: 20px;
+}
+
+:is(.ai-panel, .copilot) :is(.ai-starter, .ai-quick-btn) {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-block: 10px;
+  padding-inline: 12px 34px;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-12);
+  background: var(--color-bg-page);
+  font: inherit;
+  font-size: 13.5px;
+  line-height: 1.4;
+  text-align: start;
+  text-wrap: balance;
+  color: var(--color-text-primary);
+  animation: ai-skin-rise 420ms var(--ai-ease-out) backwards;
+  transition:
+    border-color 180ms var(--ai-ease-out),
+    background-color 180ms var(--ai-ease-out),
+    transform 180ms var(--ai-ease-out);
+}
+
+/* leading glyph: a reply arrow marks each row as a ready-made prompt */
+:is(.ai-panel, .copilot) :is(.ai-starter, .ai-quick-btn)::before {
+  content: '';
+  flex: none;
+  width: 16px;
+  height: 16px;
+  background: var(--color-text-tertiary);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 3v4.25A2.25 2.25 0 0 0 5.75 9.5h7'/%3E%3Cpath d='M10 6.5l3 3-3 3'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  transition: background-color 180ms var(--ai-ease-out);
+}
+
+:is(.ai-panel, .copilot) :is(.ai-starter, .ai-quick-btn):dir(rtl)::before {
+  transform: scaleX(-1);
+}
+
+:is(.ai-panel, .copilot) :is(.ai-starter, .ai-quick-btn):hover {
+  border-color: var(--ai-accent-line);
+  background: color-mix(in srgb, var(--accent) 5%, var(--color-bg-page));
+}
+
+:is(.ai-panel, .copilot) :is(.ai-starter, .ai-quick-btn):hover::before {
+  background: var(--accent);
+}
+
+:is(.ai-panel, .copilot) :is(.ai-starter, .ai-quick-btn):active {
+  filter: none;
+  transform: scale(0.985);
+}
+
+:is(.ai-panel, .copilot) :is(.ai-starter, .ai-quick-btn):nth-child(2) {
+  animation-delay: 50ms;
+}
+
+:is(.ai-panel, .copilot) :is(.ai-starter, .ai-quick-btn):nth-child(3) {
+  animation-delay: 100ms;
+}
+
+:is(.ai-panel, .copilot) :is(.ai-starter, .ai-quick-btn):nth-child(n + 4) {
+  animation-delay: 150ms;
+}
+
+/* sentence case, not a shouted caps eyebrow (html intent picker) */
+:is(.ai-panel, .copilot) .ai-intent-label {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* ---- composer ---- */
+
+:is(.ai-panel, .copilot) .ai-composer {
+  padding: 4px 12px 12px;
+  background: transparent;
+}
+
+:is(.ai-panel, .copilot) .ai-input-box {
+  border-radius: 18px;
+  box-shadow: var(--ai-composer-shadow);
+  transition:
+    border-color 200ms var(--ai-ease-out),
+    box-shadow 200ms var(--ai-ease-out);
+}
+
+:is(.ai-panel, .copilot) .ai-input-box:hover {
+  border-color: var(--border-hover);
+}
+
+:is(.ai-panel, .copilot) .ai-input-box:focus-within {
+  border-color: var(--ai-accent-line);
+  box-shadow:
+    0 0 0 3px var(--ai-ring),
+    var(--ai-composer-shadow);
+}
+
+:is(.ai-panel, .copilot) .ai-input-box textarea {
+  font-size: 15px;
+  line-height: 22px;
+  min-height: 44px;
+}
+
+/* Send never leaves the box: at narrow widths the track-changes label ellipsizes instead */
+:is(.ai-panel, .copilot) .ai-input-footer {
+  gap: 4px;
+  min-width: 0;
+  /* 8px + the model chip's own 6px lines its label up with the textarea text (14px) */
+  padding-inline: 8px;
+}
+
+:is(.ai-panel, .copilot) .ai-track-btn {
+  flex-shrink: 1;
+  min-width: 0;
+  padding: 0 8px;
+}
+
+:is(.ai-panel, .copilot) .ai-track-dot {
+  flex-shrink: 0;
+}
+
+:is(.ai-panel, .copilot) .ai-track-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:is(.ai-panel, .copilot) .ai-send-btn {
+  flex-shrink: 0;
+  transition:
+    filter 160ms var(--ai-ease-out),
+    transform 160ms var(--ai-ease-out);
+}
+
+:is(.ai-panel, .copilot) .ai-send-btn:active:not(:disabled) {
+  transform: scale(0.92);
+}
+
+/* ---- collapsed rail ---- */
+
+:is(.ai-rail, .expand-copilot) {
+  transition: background-color 180ms var(--ai-ease-out, ease);
+}
+
+:is(.ai-rail, .expand-copilot) svg {
+  transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+:is(.ai-rail, .expand-copilot):hover svg {
+  transform: scale(1.08);
+}
+
+:is(.ai-rail, .expand-copilot):active svg {
+  transform: scale(0.94);
+}
+
+:is(.ai-rail, .expand-copilot):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+@keyframes ai-skin-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(.ai-panel, .copilot) :is(.ai-msg, .ai-chat-empty, .ai-starter, .ai-quick-btn) {
+    animation: none;
+  }
+}
