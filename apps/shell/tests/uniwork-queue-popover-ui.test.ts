@@ -141,6 +141,22 @@ describe('queue popover model (S4)', () => {
       expect(other.line3?.reasonKey).toBe(blockedReasonKey('network'))
     })
 
+    it('an archived block without a row reads the archived reason, never the deleted copy', () => {
+      const model = queuePopoverModelOf(
+        makeStatus({ state: 'blocked', error: 'document_archived' }),
+        undefined,
+        'pill',
+      )
+      expect(model.line3).toMatchObject({
+        key: 'uwRowBlocked',
+        reasonKey: blockedCopy('document_archived').reasonKey,
+      })
+      expect(model.line3?.reasonKey).toBe('uwReasonArchived')
+      // the reason's own "Kiểm tra lại" needs the row id: without a row the
+      // popover only offers the sync center
+      expect(model.actions.map((action) => action.id)).toEqual(['open-center'])
+    })
+
     it('a store refusal reads blockedCopy too, and the pill chip says the same word', () => {
       const keystore = queuePopoverModelOf(
         makeStatus({ state: 'error', error: 'keystore_locked' }),

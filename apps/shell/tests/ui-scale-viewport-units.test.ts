@@ -51,6 +51,22 @@ describe('viewport tokens under the zoomed frame', () => {
     },
   )
 
+  it('G5-06u-TS (c): tabbar.css spends a raw vw only in the --ui-v* tokens or in a length divided by the scale', () => {
+    // comments are prose, not declarations
+    const css = src('tabbar.css').replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, ' '))
+    const unscaled = rawViewportUnits(css).filter(
+      (line) => !/\/\s*var\(--ui-scale,\s*1\)/.test(line),
+    )
+    expect(unscaled).toEqual([])
+  })
+
+  it('G5-06u-TS (c): the caption spacer is the caption width in CSS px of the zoomed frame', () => {
+    // 100vw and the env() lengths are window px that the frame's zoom multiplies again
+    expect(rule(src('tabbar.css'), '.tab-bar-caption-spacer')).toMatch(
+      /width:\s*calc\(\s*\(100vw\s*-\s*env\(titlebar-area-x,\s*0px\)\s*-\s*env\(titlebar-area-width,\s*100vw\)\)\s*\/\s*var\(--ui-scale,\s*1\)\s*\);/,
+    )
+  })
+
   it('V2: Home and the failed-gate frame fill the zoomed viewport minus the tab bar', () => {
     const css = src('home.css')
     for (const selector of ['.home', '.wb-gate-failed']) {

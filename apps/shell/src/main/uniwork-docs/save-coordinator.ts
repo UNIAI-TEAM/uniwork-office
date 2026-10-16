@@ -830,6 +830,7 @@ export class SaveCoordinator {
       case 'quota_exceeded':
       case 'not_found':
       case 'document_deleted':
+      case 'document_archived':
       case 'deleted':
         return this.commitState(doc, { ...base, state: 'blocked', error: error.code })
       case 'session_expired':

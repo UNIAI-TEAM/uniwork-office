@@ -187,12 +187,13 @@ export type UniworkDocErrorCode =
   | 'keystore_locked'
   | 'store_full'
   // G5-06 save queue: refused because sync_write is off / the server no longer
-  // knows the intent / the document was deleted or access was lost / the
-  // account or organization was suspended / the kept-draft or document cap was
-  // reached / another window holds the document lock
+  // knows the intent / the document was deleted or archived / access was lost /
+  // the account or organization was suspended / the kept-draft or document cap
+  // was reached / another window holds the document lock
   | 'capability_off'
   | 'intent_unknown'
   | 'document_deleted'
+  | 'document_archived'
   | 'permission_revoked'
   | 'member_deactivated'
   | 'organization_suspended'

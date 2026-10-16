@@ -2216,7 +2216,7 @@ export function AiPanel({
                   data-tip={trackChanges ? t('aiTrackOnTitle') : t('aiTrackOffTitle')}
                 >
                   <span className="ai-track-dot" aria-hidden />
-                  {t('aiTrackChanges')}
+                  <span className="ai-track-label">{t('aiTrackChanges')}</span>
                 </button>
               )}
             </>
