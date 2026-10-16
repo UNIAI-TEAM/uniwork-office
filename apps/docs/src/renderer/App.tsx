@@ -7572,7 +7572,8 @@ export function App() {
                     role="alert"
                     data-testid="docs-open-refused"
                   >
-                    {statusText(refusedMessage, t)}
+                    <h2 className="start-refused-title">{t('appWebFatalTitle')}</h2>
+                    <p className="start-refused-body">{statusText(refusedMessage, t)}</p>
                   </div>
                 ) : (
                   <div className="start-screen start-booting">{t('appStartOpening')}</div>

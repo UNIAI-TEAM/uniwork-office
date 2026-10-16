@@ -82,6 +82,7 @@ describe('loadFile refuse tier (SIZE-F1)', () => {
       const { loadFile } = await import('../src/renderer/file-actions')
       const { setDocBytesResolver } = await import('../src/renderer/doc-bytes')
       const { setToastEmitter } = await import('../src/renderer/components/toast-bus')
+      const { setModuleLang, statusText, t } = await import('../src/renderer/i18n/locale')
 
       const blankBytes = await buildBlankDocx()
       const zip = await JSZip.loadAsync(blankBytes)
@@ -305,7 +306,22 @@ describe('loadFile refuse tier (SIZE-F1)', () => {
       expect(clearedCount).toBe(1)
       // d2-5: no toast when the refused screen shows
       expect(toasts).toEqual([])
-      expect(refusedMessageState).toBeTruthy()
+      // d2-6: refusedMessage is stored as key+params (StatusMessage) so UI language switches re-render it
+      expect(refusedMessageState).toEqual({
+        key: 'appDocTooLargeBlocks',
+        params: {
+          name: 'Huge.docx',
+          blocks: 2_500,
+          chars: 26_250_000,
+        },
+      })
+      setModuleLang('vi')
+      const viRendered = statusText(refusedMessageState as never, t)
+      setModuleLang('en')
+      const enRendered = statusText(refusedMessageState as never, t)
+      expect(viRendered).not.toBe(enRendered)
+      expect(viRendered).toContain('Huge.docx')
+      expect(enRendered).toContain('Huge.docx')
       expect(reported).toEqual([
         expect.objectContaining({
           path: 'uniwork://files/f1/Huge.docx',
