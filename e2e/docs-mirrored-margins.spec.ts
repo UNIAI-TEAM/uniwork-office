@@ -161,9 +161,21 @@ test.describe('docs mirrored margins', () => {
         .locator('.doc-page')
         .first()
         .evaluate((el) => el.getBoundingClientRect().width / (el as HTMLElement).offsetWidth)
-      const alphaLeft = (await alpha.boundingBox())!.x
-      const betaLeft = (await beta.boundingBox())!.x
-      expect(betaLeft - alphaLeft).toBeCloseTo(-24 * zoom, 0)
+      // The --col-dx style lands before the browser has laid the translated
+      // block out, and the page re-renders while the layout settles, so a
+      // single pair of rect reads can still see both blocks at the same x
+      // (and a rect read off a detached node answers null). Poll the pair,
+      // re-resolving it each try; the expected offset is unchanged.
+      await expect
+        .poll(
+          async () => {
+            const a = await alpha.boundingBox().catch(() => null)
+            const b = await beta.boundingBox().catch(() => null)
+            return a && b ? b.x - a.x : Number.NaN
+          },
+          { message: 'even page block sits 24 css px left of the odd page block' },
+        )
+        .toBeCloseTo(-24 * zoom, 0)
 
       // header/footer strips sit on their page's own margin: 1.25in on page 1, 1in on page 2
       await expect
