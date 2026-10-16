@@ -152,6 +152,7 @@ describe('loadFile refuse tier (SIZE-F1)', () => {
         },
         view: { dom: { setAttribute: () => {}, removeAttribute: () => {} } },
       }
+      let statusState: unknown = ''
       const ctx = {
         editor: fakeEditor as never,
         doc: docState as never,
@@ -162,7 +163,9 @@ describe('loadFile refuse tier (SIZE-F1)', () => {
         bumpPendingExportTick: () => {},
         printAutoOpenedPreviewRef: { current: false },
         setShowPrintDialog: () => {},
-        setStatus: () => {},
+        setStatus: (v: unknown) => {
+          statusState = v
+        },
         setRefusedMessage: (v: unknown) => {
           refusedMessageState = v
         },
@@ -334,11 +337,34 @@ describe('loadFile refuse tier (SIZE-F1)', () => {
           },
         }),
       ])
-      // d2-7: newFile in the web frame while refused/fatal is a no-op and never mounts a blank Untitled.docx
+      // d2-7, d3-3: newFile in the web frame while refused or fatal is a no-op, but an ordinary
+      // view-only document (uniworkState.readOnly === true, confirmDocumentReplace() === true) still opens a blank Untitled.docx
       ;(ctx as Record<string, unknown>).refusedMessage = refusedMessageState
       expect(await newFile(ctx as never)).toBe(false)
       expect(docState).toBeNull()
       expect(refusedMessageState).toBeTruthy()
+
+      let fatalBridge = true
+      ;(g.window.desktop as Record<string, unknown>).uniworkState = async () => ({
+        bound: false,
+        readOnly: true,
+      })
+      ;(g.window.desktop as Record<string, unknown>).confirmDocumentReplace = async () =>
+        !fatalBridge
+      ;(ctx as Record<string, unknown>).refusedMessage = ''
+      expect(await newFile(ctx as never)).toBe(false)
+      expect(docState).toBeNull()
+
+      fatalBridge = false
+      ;(g as Record<string, unknown>).requestAnimationFrame ??= () => 0
+      ;(g as Record<string, unknown>).CSS ??= { escape: (s: string) => s }
+      Object.defineProperty(g, 'localStorage', {
+        configurable: true,
+        value: { getItem: () => null },
+      })
+      expect(await newFile(ctx as never)).toBe(true)
+      expect(docState).toMatchObject({ filePath: null, isBlank: true })
+      expect(statusState).toBe(t('appNewDocCreated'))
     },
   )
 

@@ -702,7 +702,8 @@ export async function newFile(ctx: FileActionContext): Promise<boolean | undefin
   if (!ctx.editor) return
   if (
     isWebFrame() &&
-    (ctx.refusedMessage || (await window.desktop?.uniworkState?.(''))?.readOnly)
+    (ctx.refusedMessage ||
+      (!ctx.dirtyRef.current && (await window.desktop?.confirmDocumentReplace?.()) === false))
   ) {
     return false
   }
