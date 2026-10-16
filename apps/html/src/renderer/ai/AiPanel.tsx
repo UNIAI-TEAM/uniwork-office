@@ -60,6 +60,7 @@ import {
   type AiTokenUsageView,
 } from '@genoffice/ui'
 import { aiLangDirective, t as tGlobal, useI18n } from '../i18n/locale'
+import { workedStepsLabel } from './worked-steps'
 import sendEnterOn from '../assets/send-enter-on.png'
 import sendEnterOff from '../assets/send-enter-off.png'
 import sendStop from '../assets/send-stop.png'
@@ -2063,7 +2064,7 @@ function StepIcon({ status }: { status: 'running' | 'done' | 'error' }) {
 /** Tool activity group (docs parity): auto-opens while tools run, auto-collapses into
  *  "Worked · N steps" when they finish; a manual toggle always wins */
 function ToolChipList({ tools }: { tools: ToolActivity[] }) {
-  const { t: tr } = useI18n()
+  const { lang, t: tr } = useI18n()
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
   const [userOpen, setUserOpen] = useState<boolean | null>(null)
 
@@ -2078,7 +2079,7 @@ function ToolChipList({ tools }: { tools: ToolActivity[] }) {
 
   const anyRunning = tools.some((tool) => tool.running)
   const open = userOpen ?? anyRunning
-  const label = anyRunning ? tr('aiGroupWorking') : tr('aiWorkedSteps', { n: tools.length })
+  const label = anyRunning ? tr('aiGroupWorking') : workedStepsLabel(tr, lang, tools.length)
 
   return (
     <div className="ai-work-group">
