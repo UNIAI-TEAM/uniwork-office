@@ -18,7 +18,10 @@ import { UniworkDocsService, type ConflictUi } from '../src/main/uniwork-docs/se
 import { BINDING_FILE, LAST_OWNER_FILE } from '../src/main/uniwork-docs/binding-store'
 import type { FetchLike } from '../src/main/uniwork-docs/client'
 import { UPLOAD_EXTENSIONS } from '../src/main/uniwork-docs/formats'
-import { createTreeChangedCoalescer } from '../src/main/uniwork-docs/tree-changed'
+import {
+  TREE_CHANGED_WINDOW_MS,
+  createTreeChangedCoalescer,
+} from '../src/main/uniwork-docs/tree-changed'
 
 /**
  * G8-17 S18: create a blank document, upload a file, rename, archive / restore
@@ -1540,10 +1543,12 @@ describe('the FD-11 tree-changed push', () => {
     expect(created.ok).toBe(true)
 
     for (const timer of scheduled) {
-      if (!timer.cancelled && timer.ms >= 500) timer.run()
+      if (!timer.cancelled) {
+        expect(timer.ms).toBe(TREE_CHANGED_WINDOW_MS)
+        timer.run()
+      }
     }
     expect(emitted).toEqual([])
-    expect(ctx.treeChanged).toEqual([])
   })
 
   it('FD11-C-R1-04: suppresses pushTreeChanged when an organization change occurs while an own folder action is gated', async () => {
@@ -1600,9 +1605,71 @@ describe('the FD-11 tree-changed push', () => {
     expect(created.ok).toBe(true)
 
     for (const timer of scheduled) {
-      if (!timer.cancelled && timer.ms >= 500) timer.run()
+      if (!timer.cancelled) {
+        expect(timer.ms).toBe(TREE_CHANGED_WINDOW_MS)
+        timer.run()
+      }
     }
     expect(emitted).toEqual([])
-    expect(ctx.treeChanged).toEqual([])
+  })
+
+  it('R3-05: still emits pushTreeChanged when the same organization is reported again while an own folder action is gated', async () => {
+    const server = fakeServer()
+    const origFetch = server.fetch
+    const ctx = setup(server)
+    const emitted: Array<{ workspaceId: string }> = []
+    const scheduled: Array<{ run: () => void; ms: number; cancelled: boolean }> = []
+    const coalescer = createTreeChangedCoalescer({
+      emit: (workspaceId) => emitted.push({ workspaceId }),
+      schedule: (run, ms) => {
+        const entry = { run, ms, cancelled: false }
+        scheduled.push(entry)
+        return () => {
+          entry.cancelled = true
+        }
+      },
+    })
+    ctx.setPushTreeChanged((event) => coalescer.notify(event.workspaceId))
+
+    let postReached!: () => void
+    const onPostReached = new Promise<void>((resolve) => {
+      postReached = resolve
+    })
+    let releasePost!: () => void
+    const postGate = new Promise<void>((resolve) => {
+      releasePost = resolve
+    })
+    server.fetch = (async (url: string, init: RequestInit) => {
+      if (
+        new URL(url).pathname === `/api/v1/workspaces/${WS}/documents` &&
+        init.method === 'POST'
+      ) {
+        postReached()
+        await postGate
+      }
+      return origFetch(url, init)
+    }) as typeof server.fetch
+
+    const createPromise = ctx.service.createFolder({
+      workspaceId: WS,
+      parentId: null,
+      title: 'Unchanged org folder',
+    })
+    await onPostReached
+
+    // A status push reporting the same organization (e.g. token refresh) must not suppress the push
+    ctx.service.noteSelectedOrg('org_a')
+
+    releasePost()
+    const created = await createPromise
+    expect(created.ok).toBe(true)
+
+    for (const timer of scheduled) {
+      if (!timer.cancelled) {
+        expect(timer.ms).toBe(TREE_CHANGED_WINDOW_MS)
+        timer.run()
+      }
+    }
+    expect(emitted).toEqual([{ workspaceId: WS }])
   })
 })
