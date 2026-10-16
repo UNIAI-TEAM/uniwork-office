@@ -59,6 +59,7 @@ let saveCalls = 0 // api.save requests received, failed ones included
 let failSaves = 0 // api.save calls still to refuse with a 500 (__host.failNextSave)
 const events = []
 const uploads = [] // api.images.upload requests: {fileId, name, mimeType, bytes}
+const downloads = [] // api.download requests: {bytes}
 const appOpens = [] // app.open requests: {feature}
 const resolves = [] // api.assets.resolve requests: {fileId, paths}
 const picks = [] // fileIds the next file.pick requests answer, in order
@@ -102,6 +103,7 @@ const handlers = {
       file: { ...f.meta },
       source: { kind: 'bytes', data: f.bytes.slice().buffer },
       ...(ASSETS ? { assets: ASSETS } : {}),
+      ...(LIMITS ? { limits: LIMITS } : {}),
     }
   },
   'api.save': ({ fileId, data, etag }) => {
@@ -141,6 +143,10 @@ const handlers = {
   'api.images.upload': ({ fileId, name, mimeType, data }) => {
     uploads.push({ fileId, name, mimeType, bytes: Array.from(new Uint8Array(data)) })
     return { imageId: `img-${uploads.length}`, url: `/e2e-assets/${name}` }
+  },
+  'api.download': ({ data }) => {
+    downloads.push({ bytes: Array.from(new Uint8Array(data)) })
+    return { delivered: true }
   },
   'app.open': (payload) => {
     appOpens.push({ feature: payload?.feature })
@@ -258,10 +264,20 @@ if (params.get('ai') === '1') {
 }
 if (params.get('pick') === '1') initPayload.capabilities.filePick = true
 if (params.get('images') === '1') initPayload.capabilities.images = true
+if (params.get('download') === '1') initPayload.capabilities.download = true
+if (params.get('sizeUi') === '1') initPayload.capabilities.sizeUi = true
 // both spellings: ?desktopopen=1 (the Docs/PDF specs) and ?desktopOpen=1 (the Markdown/HTML specs)
 if (params.get('desktopopen') === '1' || params.get('desktopOpen') === '1')
   initPayload.capabilities.desktopOpen = true
 const ASSETS = params.get('assets') ? JSON.parse(params.get('assets')) : null
+const MAX_BYTES =
+  Number(params.get('maxBytes')) > 0 ? Math.floor(Number(params.get('maxBytes'))) : null
+const WARN_RATIO =
+  Number(params.get('warnRatio')) > 0 && Number(params.get('warnRatio')) < 1
+    ? Number(params.get('warnRatio'))
+    : 0.9
+const LIMITS = MAX_BYTES !== null ? { max_bytes: MAX_BYTES, warn_ratio: WARN_RATIO } : null
+if (LIMITS) initPayload.limits = LIMITS
 
 const KEY_DB = 'uniwork-office-frame-drafts'
 const KEY_USER = 'test-user'
@@ -347,6 +363,7 @@ async function boot() {
     lastSaved: () => (lastSaved ? { ...lastSaved, bytes: Array.from(lastSaved.bytes) } : null),
     lastExport: () => lastExport,
     uploads: () => uploads.map((u) => ({ ...u })),
+    downloads: () => downloads.map((d) => ({ ...d })),
     appOpens: () => appOpens.map((a) => ({ ...a })),
     resolves: () => resolves.map((r) => ({ ...r })),
     events,

@@ -126,4 +126,12 @@ export const ko = {
   uwReasonArchived: '문서가 보관됨',
   uwReasonSuspended: '조직이 정지됨',
   uwReasonDeactivated: '이 조직에서 계정이 비활성화됨',
+
+  webSizeWarnChip: '{max} 한도에 근접했습니다(현재 {size}).',
+  webSaveBlockTitle: 'UniWork에 저장할 수 없습니다',
+  webSaveBlockBody:
+    '이 문서는 {max}를 초과했습니다. 변경 사항은 여기에 남아 있습니다. 사본을 컴퓨터에 다운로드한 다음 이미지 크기를 줄이거나 문서를 분할하세요.',
+  webSaveBlockDownload: '내 사본 다운로드',
+  uwConflictTooLargeWithLimit:
+    '내 버전이 {max}를 초과했습니다(현재 {size}). “내 사본 다운로드”를 선택하거나 이 대화상자를 닫아 파일 크기를 줄이세요.',
 } satisfies Record<keyof typeof zh, string>

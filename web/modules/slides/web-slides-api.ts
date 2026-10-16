@@ -70,6 +70,7 @@ import { idFromPath, pathFor } from '../../docs/bridge/webapi'
 import { bridgeDownloadCap, downloadVia, revisionOf } from '../shared/conflict-dialog'
 import { createRemoteVersion, type RemoteVersion } from '../shared/remote-version'
 import { bridgeDraftRecovery } from '../shared/recovery-prompt'
+import { createSaveSizeGate } from '../shared/save-size-gate'
 import { ask, hideFatal, showFatal, text, type WebKey } from './dialogs'
 import { createFullscreenControl } from './fullscreen-hint'
 import { exportPagesToPngs, printDocument, printHtml, slidesPdf, zipImages } from './exports'
@@ -383,11 +384,22 @@ export function createWebSlidesApi(
     return data ? new Uint8Array(data) : null
   }
 
+  const sizeGate = createSaveSizeGate({
+    port,
+    getLiveBytes: async () => {
+      const session = sessions.get(WEB_CLIENT_ID)
+      if (!session || session.masterEdit) return null
+      return savePptx(draftOpened(session.opened))
+    },
+    frame: { markerAttr: 'data-slides-web' },
+  })
+
   const host: HostIO = createWebHostIO({
     port,
     clientId: WEB_CLIENT_ID,
     state,
     capabilities: ctx.capabilities,
+    sizeGate,
     userName: () => userName,
     reload: async (fileId) => {
       const open = await port.request('api.open', { fileId }, { timeoutMs: TIMEOUTS.transfer })
@@ -464,6 +476,7 @@ export function createWebSlidesApi(
     const draft = withDraft ? await offerDraft(open.file) : null
     if (draft) bytes = draft
     state.remember(open.file)
+    sizeGate.noteDocumentOpened(open.file.fileId, open.limits)
     // another document: the pending version and the bar of the old one are gone
     if (current !== null && current !== open.file.fileId) remote?.reset()
     current = open.file.fileId

@@ -937,3 +937,44 @@ describe('markdownApi: new version on UniWork', () => {
     expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(1)
   })
 })
+
+describe('markdownApi: save size gate (SIZE-F1, UNI-1861)', () => {
+  it('warns at warn_ratio, blocks above limits.max_bytes, and serves doc.download from live text', async () => {
+    const { api, mock, file } = setup()
+    mock.override('api.open', () => ({
+      ...mock.openPayload(file.fileId),
+      limits: { max_bytes: 40, warn_ratio: 0.5 },
+    }))
+    await open(api)
+    api.provideText(() => '# Live markdown\n')
+
+    // 25 UTF-8 bytes >= 20 B warn threshold
+    const warnRes = await api.save({
+      text: '1234567890123456789012345',
+      imageSources: [],
+      mode: 'save',
+    })
+    expect(warnRes.ok).toBe(true)
+    expect(mock.sizeWarnings).toEqual([{ bytes: 25, max_bytes: 40, warn_ratio: 0.5 }])
+    expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(1)
+
+    // 50 UTF-8 bytes > 40 B max_bytes -> blocked before api.save
+    const blockedRes = await api.save({
+      text: 'x'.repeat(50),
+      imageSources: [],
+      mode: 'save',
+    })
+    expect(blockedRes.ok).toBe(false)
+    expect(document.querySelector('[data-office-web="save-blocked"]')).not.toBeNull()
+    expect(mock.saveBlocked).toEqual([{ bytes: 50, max_bytes: 40 }])
+    expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(1)
+    document
+      .querySelector<HTMLButtonElement>('[data-office-web="save-blocked"] [data-choice="close"]')!
+      .click()
+
+    // doc.download invokes getLiveBytes -> api.download
+    const dl = await mock.host['doc.download']({})
+    expect(dl).toEqual({ delivered: true })
+    expect(mock.calls.filter((c) => c.type === 'api.download')).toHaveLength(1)
+  })
+})

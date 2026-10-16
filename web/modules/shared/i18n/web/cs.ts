@@ -129,4 +129,12 @@ export const cs = {
   uwReasonArchived: 'dokument archivován',
   uwReasonSuspended: 'organizace pozastavena',
   uwReasonDeactivated: 'váš účet je v této organizaci deaktivován',
+
+  webSizeWarnChip: 'Blíží se limitu {max} (aktuálně {size}).',
+  webSaveBlockTitle: 'Nelze uložit do UniWork',
+  webSaveBlockBody:
+    'Tento dokument překračuje limit {max}. Vaše změny jsou stále zde. Stáhněte si kopii do počítače a poté zmenšete velikost obrázků nebo dokument rozdělte.',
+  webSaveBlockDownload: 'Stáhnout moji kopii',
+  uwConflictTooLargeWithLimit:
+    'Vaše verze překračuje limit {max} (aktuálně {size}). Zvolte „Stáhnout moji kopii“ nebo toto dialogové okno zavřete a zmenšete velikost souboru.',
 } satisfies Record<keyof typeof zh, string>

@@ -110,4 +110,12 @@ export const zh = {
   uwReasonArchived: '文档已归档',
   uwReasonSuspended: '组织已被暂停',
   uwReasonDeactivated: '你在此组织中的账号已被停用',
+
+  webSizeWarnChip: '即将达到 {max} 限制（当前 {size}）。',
+  webSaveBlockTitle: '无法保存到 UniWork',
+  webSaveBlockBody:
+    '此文档已超过 {max}。你的更改仍在当前页面。请先将副本下载到电脑，再压缩图片或拆分文档。',
+  webSaveBlockDownload: '下载我的副本',
+  uwConflictTooLargeWithLimit:
+    '你的版本已超过 {max}（当前 {size}）。请选择“下载我的副本”或关闭此对话框以减小文件大小。',
 }

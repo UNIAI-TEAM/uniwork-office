@@ -115,4 +115,12 @@ export const he = {
   uwReasonArchived: 'המסמך הועבר לארכיון',
   uwReasonSuspended: 'הארגון מושעה',
   uwReasonDeactivated: 'החשבון שלך מושבת בארגון הזה',
+
+  webSizeWarnChip: 'מתקרב למגבלת {max} (כעת {size}).',
+  webSaveBlockTitle: 'לא ניתן לשמור ב-UniWork',
+  webSaveBlockBody:
+    'מסמך זה חורג מ-{max}. השינויים שלך עדיין כאן. הורד את העותק שלך למחשב, ולאחר מכן הקטן את גודל התמונות או פצל את המסמך.',
+  webSaveBlockDownload: 'הורד את העותק שלי',
+  uwConflictTooLargeWithLimit:
+    'הגרסה שלך חורגת מ-{max} (כעת {size}). בחר "הורד את העותק שלי" או סגור חלון זה כדי להקטין את גודל הקובץ.',
 } satisfies Record<keyof typeof zh, string>

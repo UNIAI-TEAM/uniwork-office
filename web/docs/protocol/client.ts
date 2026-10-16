@@ -23,6 +23,7 @@ import {
 import {
   CAPABILITY_KEYS,
   COMMENTS_REVEAL_WAIT_MS,
+  DEFAULT_DOCUMENT_LIMITS,
   DEFAULT_OFFICE_MODULE,
   DocsProtocolError,
   PROTOCOL_VERSION,
@@ -30,13 +31,16 @@ import {
   errorFromHttpStatus,
   isCommentsLevel,
   isCommentsRequestType,
+  resolveDocumentSizeLimits,
   toProtocolError,
   type AiRunPayload,
   type ApiMode,
+  type ApiOpenResult,
   type Capabilities,
   type CommentsChangedPayload,
   type CommentsLevel,
   type DocBlockedPayload,
+  type DocumentSizeLimits,
   type FileMeta,
   type FrameRequestType,
   type FrameRequests,
@@ -50,7 +54,9 @@ import {
   type OpenPayload,
   type ProtocolErrorShape,
   type RemoteVersionPayload,
+  type SaveBlockedPayload,
   type SavedPayload,
+  type SizeWarningPayload,
   type Theme,
   type TokenPayload,
 } from './types'
@@ -106,6 +112,8 @@ export interface FrameSession {
   downloadMaxBytes?: number
   /** the comment panel's level hint (G8-08), if the host sent it; see `commentsAccess` */
   commentsLevel?: CommentsLevel
+  /** active document size limits (SIZE-F1): open.limits ?? init.limits ?? DEFAULT_DOCUMENT_LIMITS */
+  limits: DocumentSizeLimits
 }
 
 type HostRequestHandler<K extends keyof HostRequests> = (
@@ -175,6 +183,12 @@ export interface DocsFrameClient {
   reportError(error: ProtocolErrorShape | unknown, fatal?: boolean): void
   /** an AI turn started / ended (additive, X-02); a host before X-02 drops it silently */
   reportAiRun(payload: AiRunPayload): void
+  /** answer the host's `doc.download` request (additive, SIZE-F1) */
+  handleDownload(handler: HostRequestHandler<'doc.download'>): () => void
+  /** serialized document size reached warn threshold on save (additive, SIZE-F1) */
+  reportSizeWarning(payload: SizeWarningPayload): void
+  /** save blocked because serialized document size exceeded max_bytes (additive, SIZE-F1) */
+  reportSaveBlocked(payload: SaveBlockedPayload): void
   dispose(): void
 }
 
@@ -198,6 +212,9 @@ export function createDocsFrameClient(options: DocsFrameClientOptions): DocsFram
   let token: TokenPayload | null = null
   let refreshing: Promise<string> | null = null
   let session: FrameSession | null = null
+  let initLimits: DocumentSizeLimits = { ...DEFAULT_DOCUMENT_LIMITS }
+  let hasInitLimits = false
+  let hasExplicitDownloadMaxBytes = false
   let lastDirty: boolean | null = null
   let lastModal = false
 
@@ -268,6 +285,13 @@ export function createDocsFrameClient(options: DocsFrameClientOptions): DocsFram
     for (const k of CAPABILITY_KEYS) {
       capabilities[k] = p.capabilities[k] === true && options.capabilities[k] === true
     }
+    hasInitLimits = p.limits !== undefined
+    initLimits = resolveDocumentSizeLimits(p.limits)
+    const limits =
+      p.open?.limits !== undefined
+        ? resolveDocumentSizeLimits(p.open.limits, initLimits)
+        : { ...initLimits }
+    hasExplicitDownloadMaxBytes = p.downloadMaxBytes !== undefined
     const next: FrameSession = {
       module: ownModule,
       documentId: p.documentId,
@@ -277,6 +301,7 @@ export function createDocsFrameClient(options: DocsFrameClientOptions): DocsFram
       locale: p.locale,
       theme: p.theme,
       capabilities,
+      limits,
     }
     if (p.open) next.open = p.open
     if (p.user) {
@@ -286,6 +311,7 @@ export function createDocsFrameClient(options: DocsFrameClientOptions): DocsFram
     }
     if (p.recovery) next.recovery = { key: p.recovery.key, scope: p.recovery.scope }
     if (p.downloadMaxBytes !== undefined) next.downloadMaxBytes = p.downloadMaxBytes
+    else if (hasInitLimits || p.open?.limits !== undefined) next.downloadMaxBytes = limits.max_bytes
     // an unknown (future) or null level is treated as missing: the fallback rules apply
     if (isCommentsLevel(p.commentsLevel)) next.commentsLevel = p.commentsLevel
     // a repeated init (host re-handshake) updates the object callers already hold
@@ -379,7 +405,12 @@ export function createDocsFrameClient(options: DocsFrameClientOptions): DocsFram
   ): Promise<FrameRequests[K]['result']> {
     const s = await initialized
     if (!isCommentsRequestType(type)) {
-      return (await ep.request(type, payload, opts)) as FrameRequests[K]['result']
+      const result = (await ep.request(type, payload, opts)) as FrameRequests[K]['result']
+      if (type === 'api.open' && session && (result as ApiOpenResult)?.limits !== undefined) {
+        session.limits = resolveDocumentSizeLimits((result as ApiOpenResult).limits, initLimits)
+        if (!hasExplicitDownloadMaxBytes) session.downloadMaxBytes = session.limits.max_bytes
+      }
+      return result
     }
     // a host without `comments` gets no comment request at all (server mode stays hidden)
     if (s.capabilities.comments !== true) {
@@ -475,7 +506,20 @@ export function createDocsFrameClient(options: DocsFrameClientOptions): DocsFram
     refreshToken,
     request,
     fetchApi,
-    handleOpen: (h) => ep.handle('open', (p, ctx) => h(p as HostRequests['open']['payload'], ctx)),
+    handleOpen: (h) =>
+      ep.handle('open', (p, ctx) => {
+        const payload = p as HostRequests['open']['payload']
+        if (session) {
+          session.limits =
+            payload.limits !== undefined
+              ? resolveDocumentSizeLimits(payload.limits, initLimits)
+              : { ...initLimits }
+          if (!hasExplicitDownloadMaxBytes && (hasInitLimits || payload.limits !== undefined)) {
+            session.downloadMaxBytes = session.limits.max_bytes
+          }
+        }
+        return h(payload, ctx)
+      }),
     handleSave: (h) => ep.handle('save', (p, ctx) => h(p as HostRequests['save']['payload'], ctx)),
     handleSaveAs: (h) =>
       ep.handle('saveAs', (p, ctx) => h(p as HostRequests['saveAs']['payload'], ctx)),
@@ -528,6 +572,10 @@ export function createDocsFrameClient(options: DocsFrameClientOptions): DocsFram
     // an empty run_id is omitted: the host validator (isNonEmptyStr) would reject the event
     reportAiRun: ({ state, run_id }) =>
       guarded(() => ep.emit('aiRun', run_id ? { state, run_id } : { state })),
+    handleDownload: (h) =>
+      ep.handle('doc.download', (p, ctx) => h(p as HostRequests['doc.download']['payload'], ctx)),
+    reportSizeWarning: (payload) => guarded(() => ep.emit('size_warning', { ...payload })),
+    reportSaveBlocked: (payload) => guarded(() => ep.emit('save_blocked', { ...payload })),
     dispose() {
       stopReady()
       token = null

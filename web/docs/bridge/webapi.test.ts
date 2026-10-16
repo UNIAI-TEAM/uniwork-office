@@ -1546,3 +1546,40 @@ describe('the comments version notifier (G8-12 §3.3)', () => {
     }
   })
 })
+
+describe('save size gate (SIZE-F1, UNI-1861)', () => {
+  it('warns at warn_ratio and blocks above limits.max_bytes before any api.save request', async () => {
+    const meta = mock.seed('Report.docx', DOCX)
+    mock.init({
+      documentId: meta.fileId,
+      capabilities: { save: true, download: true },
+      open: {
+        ...mock.openPayload(meta.fileId),
+        limits: { max_bytes: 100, warn_ratio: 0.7 },
+      },
+    })
+    const doc = (await api.consumePendingOpenDocx()) as OpenFileResult
+
+    // 75 B >= 70 B warn threshold: emits size_warning once, renders fallback chip, still saves
+    expect(await api.saveDocx(doc.path, new Uint8Array(75).buffer)).toEqual({ ok: true })
+    expect(mock.sizeWarnings).toEqual([{ bytes: 75, max_bytes: 100, warn_ratio: 0.7 }])
+    expect(document.querySelector('[data-office-web="size-warning"]')).not.toBeNull()
+    expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(1)
+
+    // 120 B > 100 B max_bytes: blocks before api.save, emits save_blocked, fallback dialog downloads
+    const blocked = await api.saveDocx(doc.path, new Uint8Array(120).buffer)
+    expect(blocked.ok).toBe(false)
+    expect(document.querySelector('[data-office-web="save-blocked"]')).not.toBeNull()
+    expect(mock.saveBlocked).toEqual([{ bytes: 120, max_bytes: 100 }])
+    expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(1)
+
+    document
+      .querySelector<HTMLButtonElement>(
+        '[data-office-web="save-blocked"] [data-choice="download"]',
+      )!
+      .click()
+    await vi.waitFor(() =>
+      expect(mock.calls.filter((c) => c.type === 'api.download')).toHaveLength(1),
+    )
+  })
+})

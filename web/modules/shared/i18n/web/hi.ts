@@ -127,4 +127,12 @@ export const hi = {
   uwReasonArchived: 'दस्तावेज़ संग्रहित किया गया',
   uwReasonSuspended: 'संगठन निलंबित है',
   uwReasonDeactivated: 'इस संगठन में आपका खाता निष्क्रिय है',
+
+  webSizeWarnChip: '{max} की सीमा के करीब (वर्तमान में {size})।',
+  webSaveBlockTitle: 'UniWork में सहेजा नहीं जा सका',
+  webSaveBlockBody:
+    'यह दस्तावेज़ {max} से अधिक है। आपके बदलाव अभी भी यहाँ हैं। अपनी प्रति कंप्यूटर पर डाउनलोड करें, फिर छवियों का आकार कम करें या दस्तावेज़ को विभाजित करें।',
+  webSaveBlockDownload: 'मेरी प्रति डाउनलोड करें',
+  uwConflictTooLargeWithLimit:
+    'आपका संस्करण {max} से अधिक है (वर्तमान में {size})। फ़ाइल का आकार कम करने के लिए “मेरी प्रति डाउनलोड करें” चुनें या इस संवाद को बंद करें।',
 } satisfies Record<keyof typeof zh, string>

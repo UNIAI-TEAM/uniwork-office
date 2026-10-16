@@ -128,4 +128,12 @@ export const id = {
   uwReasonArchived: 'dokumen diarsipkan',
   uwReasonSuspended: 'organisasi ditangguhkan',
   uwReasonDeactivated: 'akun Anda dinonaktifkan di organisasi ini',
+
+  webSizeWarnChip: 'Mendekati batas {max} (saat ini {size}).',
+  webSaveBlockTitle: 'Tidak dapat menyimpan ke UniWork',
+  webSaveBlockBody:
+    'Dokumen ini melebihi {max}. Perubahan Anda masih ada di sini. Unduh salinan Anda ke komputer, lalu kurangi ukuran gambar atau bagi dokumen.',
+  webSaveBlockDownload: 'Unduh salinan saya',
+  uwConflictTooLargeWithLimit:
+    'Versi Anda melebihi {max} (saat ini {size}). Pilih “Unduh salinan saya” atau tutup dialog ini untuk mengurangi ukuran file.',
 } satisfies Record<keyof typeof zh, string>

@@ -130,4 +130,12 @@ export const ru = {
   uwReasonArchived: 'документ в архиве',
   uwReasonSuspended: 'организация приостановлена',
   uwReasonDeactivated: 'ваша учётная запись отключена в этой организации',
+
+  webSizeWarnChip: 'Приближается к лимиту {max} (сейчас {size}).',
+  webSaveBlockTitle: 'Не удалось сохранить в UniWork',
+  webSaveBlockBody:
+    'Этот документ превышает {max}. Ваши изменения сохранены здесь. Скачайте свою копию на компьютер, а затем уменьшите размер изображений или разделите документ.',
+  webSaveBlockDownload: 'Скачать мою копию',
+  uwConflictTooLargeWithLimit:
+    'Ваша версия превышает {max} (сейчас {size}). Выберите «Скачать мою копию» или закройте это окно, чтобы уменьшить размер файла.',
 } satisfies Record<keyof typeof zh, string>

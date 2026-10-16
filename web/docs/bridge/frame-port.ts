@@ -6,6 +6,7 @@
 import {
   toProtocolError,
   type Capabilities,
+  type DocumentSizeLimits,
   type FileMeta,
   type FrameRequestType,
   type FrameRequests,
@@ -17,7 +18,9 @@ import {
   type DocBlockedPayload,
   type ProtocolErrorShape,
   type RemoteVersionPayload,
+  type SaveBlockedPayload,
   type SavedPayload,
+  type SizeWarningPayload,
   type Theme,
 } from '../protocol/types'
 
@@ -44,6 +47,8 @@ export interface PortSession {
   downloadMaxBytes?: number
   /** `init.apiBase` (additive, C16: the frame-token AI routes live under it); absent in tests */
   apiBase?: string
+  /** `session.limits` (additive, SIZE-F1): active document size limits; absent in unit-test sessions */
+  limits?: DocumentSizeLimits
 }
 
 type HostHandler<K extends keyof HostRequests> = (
@@ -86,6 +91,12 @@ export interface FramePort {
    */
   getToken?(): Promise<string>
   refreshToken?(reason: 'expiring' | 'unauthorized'): Promise<string>
+  /** answer the host's `doc.download` request (SIZE-F1; optional for older clients and mocks) */
+  handleDownload?(handler: HostHandler<'doc.download'>): () => void
+  /** protocol `size_warning` event (SIZE-F1; optional for older clients and mocks) */
+  reportSizeWarning?(payload: SizeWarningPayload): void
+  /** protocol `save_blocked` event (SIZE-F1; optional for older clients and mocks) */
+  reportSaveBlocked?(payload: SaveBlockedPayload): void
 }
 
 export function errorCode(err: unknown): ProtocolErrorCode {
