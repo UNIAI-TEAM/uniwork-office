@@ -1355,6 +1355,7 @@ function scanFile(path, src, ctx) {
  * brace is the block, not an object), or a body that is not an object literal.
  */
 function readArrowFn(local) {
+  if (local.kind !== 'const') return null
   const tokens = local.tokens
   let idx = local.index
   if (!(tokens[idx] && tokens[idx].value === '(')) return null
@@ -1474,7 +1475,7 @@ function scanDeclaration(tokens, i) {
       else if (tk.value === '}' || tk.value === ')' || tk.value === ']' || tk.value === '>')
         depth -= 1
       else if (depth <= 0 && tk.value === '=') {
-        return { name: name.value, tokens, index: idx + 1 }
+        return { name: name.value, kind: tokens[i].value, tokens, index: idx + 1 }
       } else if (depth <= 0 && tk.value === ';') return null
     }
     idx += 1
