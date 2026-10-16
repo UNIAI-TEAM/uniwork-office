@@ -63,7 +63,13 @@ import {
   type PillWidths,
   type ToggleWidths,
 } from './uniwork-pill-fit'
-import { setTopInsetPart, uiScaleOf } from './uniwork-top-inset'
+import {
+  popoverRoomOf,
+  setTopInsetPart,
+  uiScaleOf,
+  unscaledHeightOf,
+  useTopInsetPart,
+} from './uniwork-top-inset'
 import type { SyncCenterRow } from '../../shared/sync-center'
 
 /**
@@ -510,6 +516,40 @@ ${action ? t(action.labelKey) : ''}`,
   const sizeWarnText = showSizeWarn ? sizeWarnTextOf(status.sizeWarn, t, dateLocale) : null
   const showSaveBlock = Boolean(status.saveTooLargePrompt && !blockDismissed)
   const saveBlockCopy = showSaveBlock ? saveBlockCopyOf(maxBytes, t, dateLocale) : null
+  const blockBandRef = useRef<HTMLDivElement>(null)
+  const barPx = useTopInsetPart('bar')
+  const popoverPx = useTopInsetPart('popover')
+  const blockAbovePx = barPx + popoverPx
+  const blockRoom = popoverRoomOf(blockAbovePx)
+  const blockRoomRef = useRef(blockRoom)
+  useLayoutEffect(() => {
+    blockRoomRef.current = blockRoom
+  })
+  useLayoutEffect(() => {
+    const band = blockBandRef.current
+    if (!showSaveBlock || !band) {
+      setTopInsetPart('saveBlock', 0)
+      return
+    }
+    const measure = () => {
+      setTopInsetPart('saveBlock', Math.min(unscaledHeightOf(band), blockRoomRef.current))
+    }
+    measure()
+    let observer: ResizeObserver | undefined
+    if (typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(measure)
+      observer.observe(band)
+    }
+    return () => {
+      observer?.disconnect()
+      setTopInsetPart('saveBlock', 0)
+    }
+  }, [showSaveBlock])
+  useLayoutEffect(() => {
+    const band = blockBandRef.current
+    if (!showSaveBlock || !band) return
+    setTopInsetPart('saveBlock', Math.min(unscaledHeightOf(band), blockRoom))
+  }, [showSaveBlock, blockRoom])
 
   // the button never leaves while focus is on it without the pill taking the focus first (a
   // callback ref runs before the node is removed; focus dropped to <body> would lose the place).
@@ -795,42 +835,54 @@ ${action ? t(action.labelKey) : ''}`,
         />
       )}
       {saveBlockCopy && (
-        <ActionModal
-          labelledBy={blockTitleId}
-          describedBy={blockBodyId}
-          className="uw-save-block-modal"
-          onCancel={() => setBlockDismissed(true)}
+        <div
+          ref={blockBandRef}
+          className="uw-save-block-band"
+          data-uw-save-block-band=""
+          style={
+            {
+              top: `calc(var(--tab-bar-height, 40px) + ${blockAbovePx}px)`,
+              '--uw-save-block-room': `${blockRoom}px`,
+            } as CSSProperties
+          }
         >
-          <h3 id={blockTitleId}>{saveBlockCopy.title}</h3>
-          <p id={blockBodyId}>{saveBlockCopy.body}</p>
-          <div className="modal-buttons">
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => setBlockDismissed(true)}
-            >
-              {saveBlockCopy.close}
-            </button>
-            <button
-              type="button"
-              className="btn btn-primary"
-              aria-disabled={savingLocal ? 'true' : undefined}
-              aria-busy={savingLocal ? 'true' : undefined}
-              onClick={() => {
-                if (savingLocal) return
-                setSavingLocal(true)
-                void saveLocalCopy(status.path)
-                  .then((saved) => {
-                    if (saved) setBlockDismissed(true)
-                  })
-                  .catch(() => undefined)
-                  .finally(() => setSavingLocal(false))
-              }}
-            >
-              {saveBlockCopy.saveLocal}
-            </button>
-          </div>
-        </ActionModal>
+          <ActionModal
+            labelledBy={blockTitleId}
+            describedBy={blockBodyId}
+            className="uw-save-block-modal"
+            onCancel={() => setBlockDismissed(true)}
+          >
+            <h3 id={blockTitleId}>{saveBlockCopy.title}</h3>
+            <p id={blockBodyId}>{saveBlockCopy.body}</p>
+            <div className="modal-buttons">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setBlockDismissed(true)}
+              >
+                {saveBlockCopy.close}
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                aria-disabled={savingLocal ? 'true' : undefined}
+                aria-busy={savingLocal ? 'true' : undefined}
+                onClick={() => {
+                  if (savingLocal) return
+                  setSavingLocal(true)
+                  void saveLocalCopy(status.path)
+                    .then((saved) => {
+                      if (saved) setBlockDismissed(true)
+                    })
+                    .catch(() => undefined)
+                    .finally(() => setSavingLocal(false))
+                }}
+              >
+                {saveBlockCopy.saveLocal}
+              </button>
+            </div>
+          </ActionModal>
+        </div>
       )}
     </>
   )

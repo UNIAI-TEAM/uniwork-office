@@ -58,6 +58,7 @@ import { failedReasonKey, rowView } from '../src/renderer/src/sync-center-model'
 import { UploadDocDialog } from '../src/renderer/src/UniworkDocActions'
 import { SyncCenterPane } from '../src/renderer/src/SyncCenterPane'
 import { UniworkStatusChip } from '../src/renderer/src/UniworkChrome'
+import { setTopInsetPart } from '../src/renderer/src/uniwork-top-inset'
 import { LocaleProvider, type StringKey } from '../src/renderer/src/locale'
 import { vi as viDocs } from '../src/renderer/src/i18n/uniwork-documents/vi'
 import { en as enDocs } from '../src/renderer/src/i18n/uniwork-documents/en'
@@ -655,6 +656,9 @@ describe('SIZE-F1 desktop document size limits', () => {
     afterEach(() => {
       act(() => root.unmount())
       container.remove()
+      setTopInsetPart('bar', 0)
+      setTopInsetPart('popover', 0)
+      setTopInsetPart('saveBlock', 0)
       vi.unstubAllGlobals()
     })
 
@@ -768,6 +772,67 @@ describe('SIZE-F1 desktop document size limits', () => {
         buttonWith('Lưu bản sao về máy').click()
       })
       expect(saveLocal).toHaveBeenCalledWith('/tmp/Report.docx')
+    })
+
+    it('reserves top-inset band height above the editor WebContentsView while the save-block dialog is open and releases it on close (d2-1)', async () => {
+      const setBarInset = vi.fn(async () => undefined)
+      window.aiOffice = {
+        accountStatus: async () => ({ loggedIn: true, state: 'signed-in' }),
+        onAccountStatus: () => () => undefined,
+        onUniworkQueuePopover: () => () => undefined,
+        uniworkSaveLocalCopy: async () => true,
+        uniworkSetBarInset: setBarInset,
+      } as never
+      const rectSpy = vi
+        .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+        .mockImplementation(function (this: HTMLElement) {
+          const height = this.hasAttribute('data-uw-save-block-band') ? 164 : 0
+          return {
+            x: 0,
+            y: 0,
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: height,
+            width: 0,
+            height,
+          } as DOMRect
+        })
+      try {
+        setTopInsetPart('bar', 36)
+        expect(setBarInset).toHaveBeenLastCalledWith(36)
+
+        const base: UniworkDocStatus = {
+          path: '/tmp/Report.docx',
+          documentId: DOC_ID,
+          workspaceId: WS_ID,
+          title: 'Report.docx',
+          format: 'docx',
+          access: 'edit',
+          state: 'failed',
+          error: 'too_large',
+          sizeBytes: 220_000_000,
+          maxBytes: 209_715_200,
+          saveTooLargePrompt: true,
+        }
+        await render(createElement(UniworkStatusChip, { status: base, onStatus: () => undefined }))
+
+        const band = container.querySelector<HTMLElement>('[data-uw-save-block-band]')
+        const modal = container.querySelector<HTMLElement>('.uw-save-block-modal')
+        expect(band).not.toBeNull()
+        expect(band?.contains(modal)).toBe(true)
+        expect(band?.style.top).toContain('36px')
+        expect(band?.style.getPropertyValue('--uw-save-block-room')).toBe('364px')
+        expect(setBarInset).toHaveBeenLastCalledWith(36 + 164)
+
+        await act(async () => {
+          buttonWith('Đóng').click()
+        })
+        expect(container.querySelector('[data-uw-save-block-band]')).toBeNull()
+        expect(setBarInset).toHaveBeenLastCalledWith(36)
+      } finally {
+        rectSpy.mockRestore()
+      }
     })
 
     it('renders the Sync Center failed row with and without a limit', async () => {
