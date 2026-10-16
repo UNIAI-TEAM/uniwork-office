@@ -26,6 +26,8 @@ import {
 import { LocaleProvider, setModuleLang } from './i18n/locale'
 import type { DocTheme, UiTheme } from '../shared/desktop-api'
 import './styles.css'
+// after styles.css: the shared AI panel skin overrides the per-app panel look
+import '@genoffice/ui/ai-panel.css'
 
 if (import.meta.hot) {
   import.meta.hot.on('vite:beforeUpdate', ({ updates }) => {

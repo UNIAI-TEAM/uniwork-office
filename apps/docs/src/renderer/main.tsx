@@ -16,6 +16,8 @@ import '@genoffice/ui/ai-panel-prefs.css'
 import '@genoffice/ui/ai-scope-quote.css'
 import '@genoffice/ui/image-viewer.css'
 import './styles.css'
+// after styles.css: the shared AI panel skin overrides the per-app panel look
+import '@genoffice/ui/ai-panel.css'
 import './fonts/fonts.css'
 import { applyAiPanelPrefs, installScreenTips } from '@genoffice/ui'
 import { mirrorUniworkAiFlag } from '@genoffice/ai-provider/browser'
