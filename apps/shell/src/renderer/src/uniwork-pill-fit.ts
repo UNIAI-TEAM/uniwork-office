@@ -109,6 +109,19 @@ export function pillRoomOf(input: { shared: number; floor: number; others: numbe
   return Number.isFinite(room) ? room : 0
 }
 
+/**
+ * The room the pill's steps hold back for the tabs at UI scale > 1 (VTS1-01, tabs win over pill
+ * text). Before the caption spacer fix (G5-06u-TS) the spacer reserved the caption x scale, caption
+ * x (scale - 1) window px too much; the fix gave that room back to the bar, and the fit spent it on a
+ * wider pill or toggle form, so the last tab lost width. The pill now takes the step it took with
+ * the old reservation and the room goes to the strip. The caption is the spacer's own width, which
+ * the steps do not move. Scale 1 (or no caption): nothing.
+ */
+export function captionReserveOf(caption: number, scale: number): number {
+  if (!(caption > 0) || !(scale > 1)) return 0
+  return caption * (scale - 1)
+}
+
 /** The width the pill may take: the room, never negative. */
 export function pillBudgetOf(input: { shared: number; floor: number; others: number }): number {
   return Math.max(0, pillRoomOf(input))
@@ -226,6 +239,8 @@ export interface BarLayoutInput {
   labelMin?: number
   pill: PillWidths
   hasShort: boolean
+  /** room the steps hold back for the tabs (`captionReserveOf`); absent: none */
+  captionReserve?: number
 }
 
 export interface BarLayout {
@@ -244,7 +259,7 @@ export interface BarLayout {
 export function barLayoutOf(input: BarLayoutInput): BarLayout {
   const shared = input.barWidth - input.left - input.right - input.margins
   const floor = stripFloorOf(input)
-  const budget = pillRoomOf({ shared, floor, others: input.toggle })
+  const budget = pillRoomOf({ shared, floor, others: input.toggle }) - (input.captionReserve ?? 0)
   const hasToggle = input.toggleIcon !== undefined && input.toggle > 0
   const step = pillFitStepOf({
     budget,
@@ -332,11 +347,17 @@ export function measurePillFit(group: HTMLElement): {
     ...floorInput,
     ...labelOf(lastCounted, tabMins[tabMins.length - 1] ?? floorInput.tabMin, scale),
   })
-  const budget = pillRoomOf({
-    shared: stripWidth + chromeWidth,
-    floor,
-    others: chromeWidth - pillWidth,
-  })
+  // TabBar's caption spacer (G5-06u-TS): its width is the caption's, whatever the pill does
+  const spacer = Array.from(bar.children).find((child) =>
+    child.classList.contains('tab-bar-caption-spacer'),
+  )
+  const caption = spacer?.getBoundingClientRect().width ?? 0
+  const budget =
+    pillRoomOf({
+      shared: stripWidth + chromeWidth,
+      floor,
+      others: chromeWidth - pillWidth,
+    }) - captionReserveOf(caption, scale)
   // the label is the part that gives way (it ellipsizes): its hidden overflow is width the pill wants
   const label = group.querySelector<HTMLElement>('.uw-pill-label')
   const clipped = label ? Math.max(0, label.scrollWidth - label.clientWidth) : 0
