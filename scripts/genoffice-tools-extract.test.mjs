@@ -2439,6 +2439,7 @@ describe('parameterised recursive arrow (G6-09d)', () => {
     for (const tool of ['no_args', 'string_arg', 'free_arg', 'huge_arg'])
       assert.equal(hash(tool), 'unresolved:call:flat')
     // two parameters / a block body are not the folded shape
-    for (const tool of ['two_params', 'block_body']) assert.match(hash(tool), /^unresolved:identifier:/)
+    for (const tool of ['two_params', 'block_body'])
+      assert.match(hash(tool), /^unresolved:identifier:/)
   })
 })
