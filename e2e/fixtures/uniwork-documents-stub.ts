@@ -5,6 +5,8 @@
  *
  *   GET  /orgs/{org}/workspaces
  *   GET  /workspaces/{ws}/documents[/recent]       (kind=file, q, cursor, limit)
+ *   POST /workspaces/{ws}/documents/files/blank    ({format, title, parent_id}, Idempotency-Key)
+ *   POST /workspaces/{ws}/documents/files          (multipart parent_id, title, file, Idempotency-Key)
  *   GET  /documents/{id}                           (detail with `file`)
  *   GET  /documents/{id}/download[?version=N]      (bytes)
  *   POST /documents/{id}/uploads                   (multipart `file`, Idempotency-Key)
@@ -25,7 +27,9 @@
  * lost commit response.
  */
 import { createHash, randomBytes } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import type { ServerResponse } from 'node:http'
+import { resolve } from 'node:path'
 import {
   STUB_ACCOUNT,
   STUB_CLIENT_ID,
@@ -118,6 +122,8 @@ export interface StubCopyState {
 
 export interface StubDocumentState {
   id: string
+  title: string
+  parentId: string | null
   revision: string
   version: number
   checksum: string
@@ -144,6 +150,7 @@ export interface UniworkDocumentsStub extends UniworkAuthStub {
   addDocument(init: StubDocumentInit): StubDocumentState
   addFolder(init: StubFolderInit): StubFolderState
   state(documentId: string): StubDocumentState
+  documents(workspaceId?: string): StubDocumentState[]
   folderState(folderId: string): StubFolderState
   folders(workspaceId?: string): StubFolderState[]
   /** enables `/orgs/{org}/office/capabilities` (`sync_feed: true`) and `/workspaces/{ws}/documents/changes` */
@@ -160,6 +167,8 @@ export interface UniworkDocumentsStub extends UniworkAuthStub {
   ): { id: string; title: string; parentId: string | null; revision: string }
   /** simulates archiving on the web and appends an archived upsert to the change feed */
   webArchive(id: string): { id: string; archived: boolean; revision: string }
+  /** simulates restoring an archived item on the web and appends an unarchived upsert to the change feed */
+  webRestore(id: string): { id: string; archived: boolean; revision: string }
   /** a save made elsewhere (the web editor): revision and version advance, bytes optionally change */
   bumpRevision(documentId: string, bytes?: Buffer): StubDocumentState
   /** the caller's access to a document, as the server reports it */
@@ -240,33 +249,61 @@ interface FeedEvent {
 const sha256 = (bytes: Buffer): string => createHash('sha256').update(bytes).digest('hex')
 const ulid = (prefix: string): string => `${prefix}_${randomBytes(9).toString('hex')}`
 
+let cachedBlankDocx: Buffer | null = null
+function blankDocxBytes(): Buffer {
+  if (!cachedBlankDocx) {
+    try {
+      cachedBlankDocx = readFileSync(resolve(__dirname, '../../fixtures/generated/simple.docx'))
+    } catch {
+      cachedBlankDocx = Buffer.alloc(0)
+    }
+  }
+  return cachedBlankDocx
+}
+
 function extensionOf(name: string): string {
   const dot = name.lastIndexOf('.')
   return dot < 0 ? '' : name.slice(dot + 1).toLowerCase()
 }
 
-/** the `file` part of a multipart/form-data body (binary safe) */
-function multipartFile(body: Buffer, contentType: string): Buffer | null {
+/** parses text fields and the `file` part of a multipart/form-data body (binary safe) */
+function multipartForm(
+  body: Buffer,
+  contentType: string,
+): { fields: Record<string, string>; file: { filename: string; bytes: Buffer } | null } | null {
   const boundary = /boundary=(?:"([^"]+)"|([^;]+))/i.exec(contentType)
   const marker = boundary ? Buffer.from(`--${boundary[1] ?? boundary[2]}`) : null
   if (!marker) return null
+  const fields: Record<string, string> = {}
+  let file: { filename: string; bytes: Buffer } | null = null
   let at = body.indexOf(marker)
   while (at >= 0) {
     const start = at + marker.length
     const next = body.indexOf(marker, start)
-    if (next < 0) return null
+    if (next < 0) break
     const part = body.subarray(start, next)
     const split = part.indexOf('\r\n\r\n')
     if (split >= 0) {
-      const head = part.subarray(0, split).toString('latin1')
-      if (/name="file"/i.test(head)) {
-        // content runs to the CRLF that precedes the next boundary
-        return Buffer.from(part.subarray(split + 4, part.length - 2))
+      const head = part.subarray(0, split).toString('utf8')
+      // content runs to the CRLF that precedes the next boundary
+      const content = Buffer.from(part.subarray(split + 4, part.length - 2))
+      const nameMatch = /name="([^"]+)"/i.exec(head)
+      const fieldName = nameMatch?.[1]
+      if (fieldName === 'file') {
+        const filenameMatch = /filename="([^"]*)"/i.exec(head)
+        file = { filename: filenameMatch?.[1] ?? '', bytes: content }
+      } else if (fieldName) {
+        fields[fieldName] = content.toString('utf8')
       }
     }
     at = next
   }
-  return null
+  return { fields, file }
+}
+
+/** the `file` part of a multipart/form-data body (binary safe) */
+function multipartFile(body: Buffer, contentType: string): Buffer | null {
+  return multipartForm(body, contentType)?.file?.bytes ?? null
 }
 
 export async function startUniworkDocumentsStub(
@@ -278,6 +315,8 @@ export async function startUniworkDocumentsStub(
   const uploadByKey = new Map<string, StoredUpload>()
   const commitByKey = new Map<string, StoredCommit>()
   const folderByKey = new Map<string, string>()
+  const blankByKey = new Map<string, string>()
+  const fileByKey = new Map<string, string>()
   const feedLog: FeedEvent[] = []
   let feedEnabled = Boolean(options.feed)
   const calls: StubCall[] = []
@@ -295,6 +334,8 @@ export async function startUniworkDocumentsStub(
 
   const stateOf = (doc: StubDocument): StubDocumentState => ({
     id: doc.id,
+    title: doc.title,
+    parentId: doc.parentId,
     revision: String(doc.revision),
     version: latest(doc).version,
     checksum: latest(doc).checksum,
@@ -649,6 +690,135 @@ export async function startUniworkDocumentsStub(
       if (idempotencyKey) folderByKey.set(`${wsId}:${idempotencyKey}`, folder.id)
       log(ctx, { ...base, status: 201 })
       ctx.send(201, { document: documentDto(folder) })
+      return true
+    }
+
+    m = /^\/workspaces\/([^/]+)\/documents\/files\/blank$/.exec(route)
+    if (m && method === 'POST') {
+      const wsId = m[1]!
+      const raw = await ctx.readBody()
+      let body: { format?: unknown; title?: unknown; parent_id?: unknown } = {}
+      try {
+        body = JSON.parse(raw.toString('utf8')) as typeof body
+      } catch {
+        body = {}
+      }
+      const base: Omit<StubCall, 'method' | 'route' | 'status'> = {
+        ...(idempotencyKey ? { idempotencyKey } : {}),
+      }
+      const format =
+        body.format === 'docx' || body.format === 'xlsx' || body.format === 'pptx'
+          ? body.format
+          : null
+      const title = typeof body.title === 'string' ? body.title.normalize('NFC').trim() : ''
+      if (!format || !title || title.length > 500 || !idempotencyKey) {
+        log(ctx, { ...base, status: 400 })
+        ctx.send(400, envelope('invalid_request'))
+        return true
+      }
+      const replayedId = blankByKey.get(`${wsId}:${idempotencyKey}`)
+      const replayed = replayedId ? documents.get(replayedId) : undefined
+      if (replayed) {
+        log(ctx, { ...base, status: 201 })
+        ctx.send(201, { document: documentDto(replayed) })
+        return true
+      }
+      const parentId =
+        typeof body.parent_id === 'string' && body.parent_id.length > 0 ? body.parent_id : null
+      if (parentId !== null) {
+        const parent = documents.get(parentId)
+        if (!parent || parent.workspaceId !== wsId || !isLiveInTree(parent)) {
+          log(ctx, { ...base, status: 404 })
+          ctx.send(404, envelope('not_found'))
+          return true
+        }
+        if (parent.kind !== 'folder') {
+          log(ctx, { ...base, status: 422 })
+          ctx.send(422, envelope('document_parent_kind'))
+          return true
+        }
+      }
+      const filename = title.toLowerCase().endsWith(`.${format}`) ? title : `${title}.${format}`
+      const bytes = format === 'docx' ? blankDocxBytes() : Buffer.alloc(0)
+      const doc: StubDocument = {
+        id: ulid('doc'),
+        workspaceId: wsId,
+        kind: 'file',
+        title,
+        filename,
+        myLevel: 'edit',
+        revision: 1,
+        position: 0,
+        versions: [{ version: 1, revision: 1, bytes, checksum: sha256(bytes) }],
+        updatedAt: new Date().toISOString(),
+        parentId,
+      }
+      documents.set(doc.id, doc)
+      recordFeedUpsert(doc)
+      blankByKey.set(`${wsId}:${idempotencyKey}`, doc.id)
+      log(ctx, { ...base, status: 201 })
+      ctx.send(201, { document: documentDto(doc) })
+      return true
+    }
+
+    m = /^\/workspaces\/([^/]+)\/documents\/files$/.exec(route)
+    if (m && method === 'POST') {
+      const wsId = m[1]!
+      const raw = await ctx.readBody()
+      const parsed = multipartForm(raw, String(req.headers['content-type'] ?? ''))
+      const file = parsed?.file ?? null
+      const base: Omit<StubCall, 'method' | 'route' | 'status'> = {
+        ...(idempotencyKey ? { idempotencyKey } : {}),
+        ...(file ? { checksum: sha256(file.bytes) } : {}),
+      }
+      const rawTitle = parsed?.fields.title ?? file?.filename ?? ''
+      const title = rawTitle.normalize('NFC').trim()
+      if (!file || !title || title.length > 500 || !idempotencyKey) {
+        log(ctx, { ...base, status: 400 })
+        ctx.send(400, envelope('invalid_request'))
+        return true
+      }
+      const replayedId = fileByKey.get(`${wsId}:${idempotencyKey}`)
+      const replayed = replayedId ? documents.get(replayedId) : undefined
+      if (replayed) {
+        log(ctx, { ...base, status: 201 })
+        ctx.send(201, { document: documentDto(replayed) })
+        return true
+      }
+      const rawParent = parsed?.fields.parent_id ?? ''
+      const parentId = rawParent.length > 0 ? rawParent : null
+      if (parentId !== null) {
+        const parent = documents.get(parentId)
+        if (!parent || parent.workspaceId !== wsId || !isLiveInTree(parent)) {
+          log(ctx, { ...base, status: 404 })
+          ctx.send(404, envelope('not_found'))
+          return true
+        }
+        if (parent.kind !== 'folder') {
+          log(ctx, { ...base, status: 422 })
+          ctx.send(422, envelope('document_parent_kind'))
+          return true
+        }
+      }
+      const filename = file.filename || title
+      const doc: StubDocument = {
+        id: ulid('doc'),
+        workspaceId: wsId,
+        kind: 'file',
+        title,
+        filename,
+        myLevel: 'edit',
+        revision: 1,
+        position: 0,
+        versions: [{ version: 1, revision: 1, bytes: file.bytes, checksum: sha256(file.bytes) }],
+        updatedAt: new Date().toISOString(),
+        parentId,
+      }
+      documents.set(doc.id, doc)
+      recordFeedUpsert(doc)
+      fileByKey.set(`${wsId}:${idempotencyKey}`, doc.id)
+      log(ctx, { ...base, status: 201 })
+      ctx.send(201, { document: documentDto(doc) })
       return true
     }
 
@@ -1259,6 +1429,10 @@ export async function startUniworkDocumentsStub(
       return folderStateOf(folder)
     },
     state: (documentId) => stateOf(need(documentId)),
+    documents: (workspaceId = STUB_WORKSPACE.id) =>
+      [...documents.values()]
+        .filter((d) => d.workspaceId === workspaceId && d.kind === 'file')
+        .map(stateOf),
     folderState: (folderId) => folderStateOf(need(folderId)),
     folders: (workspaceId = STUB_WORKSPACE.id) =>
       [...documents.values()]
@@ -1308,6 +1482,18 @@ export async function startUniworkDocumentsStub(
       return {
         id: doc.id,
         archived: true,
+        revision: String(doc.revision),
+      }
+    },
+    webRestore(id) {
+      const doc = need(id)
+      delete doc.archivedAt
+      doc.revision += 1
+      doc.updatedAt = new Date().toISOString()
+      recordFeedUpsert(doc)
+      return {
+        id: doc.id,
+        archived: false,
         revision: String(doc.revision),
       }
     },
