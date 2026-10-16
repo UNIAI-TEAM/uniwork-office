@@ -10,13 +10,15 @@ import {
   AiQueueStrip,
   AI_QUEUE_LABELS,
   AiUsageChip,
+  ack as ackUniworkDisclosure,
   addTokenUsage,
+  isAcked as isUniworkDisclosureAcked,
   type AiTokenUsageView,
   useChatRunQueue,
   useUniworkDisclosureAck,
   useUniworkSendGate,
 } from '@genoffice/ui'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import '@genoffice/ui/ai-uniwork-composer.css'
 import type { Editor } from '@tiptap/core'
 import type { Block } from '@genoffice/docx-engine'
@@ -1661,6 +1663,20 @@ export function AiPanel({
         }
       : null,
   )
+  // The ack key holds the document path, and an untitled document's first Save gives it one: the
+  // same document must not be asked again, so the ack of the untitled key moves to the new path
+  // (layout effect: the card never paints for the one render in between)
+  const ackPathRef = useRef(filePath)
+  useLayoutEffect(() => {
+    const previous = ackPathRef.current
+    ackPathRef.current = filePath
+    if (!isUniwork || previous || !filePath) return
+    const account = cloudSnapshot?.accountId ?? ''
+    const org = cloudSnapshot?.orgId ?? ''
+    if (isUniworkDisclosureAcked({ account, org, document: 'local' })) {
+      ackUniworkDisclosure({ account, org, document: filePath })
+    }
+  }, [filePath, isUniwork, cloudSnapshot])
   uniworkGate.setPanelBlocked(isUniwork && !uniworkDisclosureAcked)
   // a refusal while collapsed expands the panel; once open it announces and focuses the disclosure
   uniworkGate.setPanelOpen(open, onExpand)
