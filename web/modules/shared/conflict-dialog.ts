@@ -73,16 +73,28 @@ export interface ConflictIo {
   /** replace the open document with the head; false when it could not be loaded */
   reload(): Promise<boolean>
   /**
-   * Save as a copy (OQ-UX6): create a new document from the open bytes, leaving this document and
-   * its head untouched. Set only by a host path that does it (server copy with the source's owner
-   * and ACL); without it the choice is not offered. Offered only while `canEdit()`.
+   * Save as a copy (OQ-UX6; EXPERIENCE.md S5, step 2 "Save copy confirm"): the host owner
+   * implements this, the dialog only asks. Expected semantics:
+   * - creates a NEW document from my open bytes (the ones the Save that got the 409 holds), as its
+   *   first version, through the normal commit path; never the head's content shown as mine;
+   * - the copy keeps the source's owner, visibility and ACL (never wider), records provenance
+   *   (source, version, revision, checksum) and gets the server's default name "<name> (copy)";
+   * - this document stays open, unchanged, and no intent / save answer comes out of it: the dialog
+   *   goes back to step 1 and the user can still Reload or Overwrite;
+   * - resolves `{ok: true, title}` with the new document's name (the Done line quotes it);
+   *   `{ok: false}` for any refusal (`copy_consent_required`, `owner_requires_copy`, network):
+   *   the dialog shows the failed line, my changes are untouched.
+   * Offered only while `canEdit()`; offline the choice is aria-disabled. Set only by a host path
+   * that does all of the above; without it the choice is not offered.
    */
   saveCopy?(): Promise<SaveCopyAttempt>
   /**
-   * "View differences" (OQ-UX9): opens the module's compare view of my version against the head.
-   * Set by Docs only; every other module leaves it out and the link is not shown.
+   * "View differences" (OQ-UX9): builds the module's comparison of my version against the head
+   * (in the frame, from bytes the module already holds or reads; no host call). The dialog shows
+   * the returned content as its own step with Back, so it stays usable and the rest of the frame
+   * stays inert. Set by Docs only; every other module leaves it out and the link is not shown.
    */
-  viewDiff?(): void | Promise<void>
+  viewDiff?(): Promise<HTMLElement>
   /** the frame token still allows editing */
   canEdit(): boolean
   /** set only when the effective capabilities include `download` */
@@ -257,7 +269,7 @@ export function downloadVia(
 // ------------------------------------------------------------ the dialog
 
 type Step1 = 'reload' | 'overwrite' | 'cancel'
-type Id = Step1 | 'save-copy' | 'go' | 'back' | 'download' | 'discard' | 'close'
+type Id = Step1 | 'save-copy' | 'diff' | 'go' | 'back' | 'download' | 'discard' | 'close'
 
 const ORG_BLOCKED: Record<string, WebStringKey> = {
   organization_suspended: 'uwReasonSuspended',
@@ -292,6 +304,8 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
   let head: ConflictHead | null = null
   /** the table's box in step 1: refilled when the head arrives, without re-rendering the step */
   let tableBox: HTMLElement | null = null
+  /** the "View differences" link of step 1 (focus returns to it from the comparison) */
+  let diffEl: HTMLElement | null = null
   const headRead = io
     .readHead()
     .catch(() => null)
@@ -379,7 +393,8 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
     tableBox = document.createElement('div')
     tableBox.append(table())
     content.append(tableBox)
-    if (io.viewDiff) content.append(diffLink(io.viewDiff))
+    diffEl = io.viewDiff ? diffLink() : null
+    if (diffEl) content.append(diffEl)
     const canEdit = io.canEdit()
     if (!canEdit) {
       const note = document.createElement('p')
@@ -423,6 +438,7 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
       focusId: focus === FOCUS_TITLE || choices.some((c) => c.id === focus) ? focus : 'cancel',
       alert,
     })
+    if (focus === 'diff') diffEl?.focus({ preventScroll: true })
     alert = ''
     return shown.finally(() => {
       onStep1 = false
@@ -430,18 +446,26 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
   }
 
   /** "Xem khác biệt": a link-style button between the table and the actions, in DOM and Tab order */
-  function diffLink(open: NonNullable<ConflictIo['viewDiff']>): HTMLElement {
+  function diffLink(): HTMLElement {
     const b = document.createElement('button')
     b.type = 'button'
     b.className = 'ow-dlg-link'
     b.dataset.choice = 'diff'
     b.textContent = t('uwConflictViewDiff')
-    b.addEventListener('click', () => {
-      void Promise.resolve()
-        .then(open)
-        .catch((err: unknown) => console.warn('[office-web] opening the comparison failed:', err))
-    })
+    b.addEventListener('click', () => dialog.choose('diff'))
     return b
+  }
+
+  function diffStep(view: HTMLElement): Promise<Id> {
+    return dialog.step({
+      title: t('uwConflictViewDiff'),
+      body: '',
+      content: view,
+      choices: [{ id: 'back', label: t('uwConflictBack') }],
+      cancelId: 'back',
+      closeId: 'cancel',
+      focusId: 'back',
+    })
   }
 
   function saveCopyStep(stepAlert = ''): Promise<Id> {
@@ -550,6 +574,18 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
       const choice = io.start === 'reload' ? 'reload' : await step1()
       focus = 'cancel'
       if (choice === 'cancel') return failure ?? { kind: 'cancelled' }
+
+      if (choice === 'diff') {
+        // the comparison is a step of the same card; a module that cannot build it stays on step 1
+        const view = await io.viewDiff!().catch((err: unknown) => {
+          console.warn('[office-web] building the comparison failed:', err)
+          return null
+        })
+        const left = view ? await diffStep(view) : 'back'
+        if (left === 'cancel') return failure ?? { kind: 'cancelled' }
+        focus = 'diff'
+        continue
+      }
 
       if (choice === 'save-copy') {
         // the confirmation names the head's revision and author, like Overwrite

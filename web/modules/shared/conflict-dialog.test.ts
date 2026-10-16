@@ -716,9 +716,15 @@ describe('Save as a copy… (S5-03)', () => {
 })
 
 describe('View differences (S5-04)', () => {
+  const view = (text = 'diff body') => {
+    const el = document.createElement('div')
+    el.className = 'the-diff'
+    el.textContent = text
+    return el
+  }
+
   it('is a button between the table and Reload latest, in DOM order, when the module has a compare view', async () => {
-    const viewDiff = vi.fn()
-    void runConflictDialog(io({ viewDiff }))
+    void runConflictDialog(io({ viewDiff: async () => view() }))
     await shown()
     const diff = btn('diff')
     expect(diff.textContent).toBe(t('uwConflictViewDiff'))
@@ -726,11 +732,6 @@ describe('View differences (S5-04)', () => {
       !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
     expect(follows(card().querySelector('table')!, diff)).toBe(true)
     expect(follows(diff, btn('reload'))).toBe(true)
-    // it takes a Tab stop but is no step-1 answer: the dialog stays
-    diff.click()
-    await flush()
-    expect(viewDiff).toHaveBeenCalledTimes(1)
-    expect(btn('reload')).toBeTruthy()
   })
 
   it('other modules leave it out', async () => {
@@ -739,18 +740,44 @@ describe('View differences (S5-04)', () => {
     expect(document.querySelector('[data-choice="diff"]')).toBeNull()
   })
 
-  it('a compare view that throws does not close or break the dialog', async () => {
+  it('opens the comparison as a step of the same card; Back returns to step 1 with the focus on the link', async () => {
+    const viewDiff = vi.fn(async () => view())
+    const done = vi.fn()
+    void runConflictDialog(io({ viewDiff })).then(done)
+    await pick('diff')
+    expect(viewDiff).toHaveBeenCalledTimes(1)
+    expect(document.querySelectorAll('[role="alertdialog"]')).toHaveLength(1)
+    expect(card().querySelector('.the-diff')!.textContent).toBe('diff body')
+    expect(card().querySelector('.ow-dlg-title')!.textContent).toBe(t('uwConflictViewDiff'))
+    expect(choices()).toEqual(['back'])
+    expect(document.activeElement).toBe(btn('back'))
+    btn('back').click()
+    await flush()
+    expect(choices()).toEqual(['diff', 'reload', 'overwrite', 'cancel'])
+    expect(document.activeElement).toBe(btn('diff'))
+    expect(done).not.toHaveBeenCalled()
+  })
+
+  it('the X on the comparison cancels the whole dialog', async () => {
+    const done = runConflictDialog(io({ viewDiff: async () => view() }))
+    await pick('diff')
+    card().querySelector<HTMLButtonElement>('.ow-dlg-close')!.click()
+    expect(await done).toEqual({ kind: 'cancelled' })
+  })
+
+  it('a compare view that throws leaves the dialog on step 1', async () => {
+    const done = vi.fn()
     void runConflictDialog(
       io({
         viewDiff: async () => {
           throw new Error('no panel')
         },
       }),
-    )
-    await shown()
-    btn('diff').click()
+    ).then(done)
+    await pick('diff')
     await flush()
-    expect(choices()).toContain('reload')
+    expect(choices()).toEqual(['diff', 'reload', 'overwrite', 'cancel'])
+    expect(done).not.toHaveBeenCalled()
   })
 })
 

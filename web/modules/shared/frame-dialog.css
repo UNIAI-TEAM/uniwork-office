@@ -271,6 +271,49 @@
   border-radius: 4px;
 }
 
+/* the comparison step (Docs "View differences"): paragraph differences, mine struck / the head added */
+.ow-dlg-diff-meta,
+.ow-dlg-diff-same {
+  margin: 0;
+  font-size: var(--text-caption);
+  color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+
+.ow-dlg-diff-same {
+  padding: 4px 0;
+  text-align: center;
+}
+
+.ow-dlg-diff-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+  font-size: var(--text-caption);
+  overflow-wrap: anywhere;
+}
+
+.ow-dlg-diff-left,
+.ow-dlg-diff-right {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.ow-dlg-diff-left {
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  text-decoration: line-through;
+}
+
+.ow-dlg-diff-right {
+  border-color: var(--success-border);
+  background: var(--success-bg);
+  color: var(--text);
+}
+
 /* two-column comparison: your version | the version on UniWork */
 .ow-dlg-compare {
   width: 100%;
