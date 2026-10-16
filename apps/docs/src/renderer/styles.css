@@ -8731,6 +8731,20 @@ body.docs-crop-active
   color: var(--text-dim);
 }
 
+/* what Roll back kept after a mid-turn Save: the panel's warning look (as the edits-paused note),
+   so it is not read as the grey hint under it */
+.ai-run-stopped.ai-rollback-kept {
+  margin-top: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--warning-border);
+  border-radius: 6px;
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  font-size: 12px;
+  line-height: 1.4;
+  text-wrap: pretty;
+}
+
 .ai-msg-actions {
   margin-top: 8px;
   display: flex;
