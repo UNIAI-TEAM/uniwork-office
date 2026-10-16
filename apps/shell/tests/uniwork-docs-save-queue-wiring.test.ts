@@ -892,6 +892,52 @@ describe('G5-06 W4b save queue wiring', () => {
       ])
     })
 
+    it('an inline archived refusal keeps its intent, and the probe lifts that SAME record', async () => {
+      const server = fakeServer({ bytes: enc('v3') })
+      const ctx = setup(server)
+      const path = await openDoc(ctx)
+      writeFileSync(path, 'v4')
+      // the inline Save meets the archive once: the commit is refused with the
+      // document's own code, and the server answers normally after
+      server.faults.push({ route: 'commit', kind: 403, code: 'document_archived' })
+      expect(await ctx.service.save(path)).toMatchObject({
+        state: 'blocked',
+        error: 'document_archived',
+      })
+      // the lead's d1a-2 decision: the intent is KEPT, never dropped like the
+      // terminal document_deleted - the queue still owns the record, so a
+      // sync-center row, the bounded probe and "Kiểm tra lại" exist for this copy
+      const kept = await storedIntent(ctx, path)
+      expect(kept, 'an archived refusal must keep its intent record').not.toBeNull()
+      // the inline path parks the CHIP; the record itself is still the minted
+      // one (no lastError yet) - the poll is what parks it blocked/archived
+      expect(kept?.intent).toMatchObject({ state: 'queued' })
+      // still archived: the poll's dispatch meets the refusal again and parks
+      // the record - the state a sync-center row and its probe are built from
+      server.faults.push({ route: 'commit', kind: 403, code: 'document_archived' })
+      await ctx.service.pollSaveQueue()
+      await vi.waitFor(async () =>
+        expect((await storedIntent(ctx, path))?.intent).toMatchObject({
+          state: 'blocked',
+          lastError: 'document_archived',
+        }),
+      )
+      expect((await storedIntent(ctx, path))?.intent.intentId).toBe(kept?.intent.intentId)
+      // out of the archive: the probe reads the document writable and active,
+      // lifts that SAME record back to the queue and it commits under the SAME
+      // idempotency key it was refused with
+      expect(await ctx.service.recheckBlockedSave(path)).toBe(true)
+      await vi.waitFor(async () =>
+        expect(await ctx.service.docStatus(path)).toMatchObject({ state: 'saved' }),
+      )
+      expect(await storedIntent(ctx, path)).toBeNull()
+      expect(committedKeys(server)).toEqual([
+        kept!.intent.idempotencyKey,
+        kept!.intent.idempotencyKey,
+        kept!.intent.idempotencyKey,
+      ])
+    })
+
     it('a reopen clears an archived block only once the read proves the archive lifted', async () => {
       const server = fakeServer({ bytes: enc('v3') })
       const ctx = setup(server)
