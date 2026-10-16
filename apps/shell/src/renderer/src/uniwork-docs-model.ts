@@ -54,6 +54,9 @@ export const UNIWORK_ERROR_KEYS: Record<UniworkDocErrorCode, StringKey> = {
   capability_off: 'uwTipPausedAdmin',
   intent_unknown: 'uwChipReconcileStuck',
   document_deleted: 'uwErrDeleted',
+  // an archived document is not a deleted one: the archive is reversible, so the
+  // chip says archived (the same phrase the Sync Center row shows)
+  document_archived: 'uwReasonArchived',
   permission_revoked: 'uwErrForbidden',
   member_deactivated: 'uwLockDeactivated',
   organization_suspended: 'uwLockSuspended',
@@ -110,6 +113,8 @@ export function blockedReasonKey(
     case 'deleted':
     case 'document_deleted':
       return 'uwReasonDeleted'
+    case 'document_archived':
+      return 'uwReasonArchived'
     case 'organization_suspended':
       return 'uwReasonSuspended'
     case 'member_deactivated':

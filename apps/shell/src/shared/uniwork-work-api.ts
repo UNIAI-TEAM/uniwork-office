@@ -27,6 +27,7 @@ export function workErrorOfDocCode(code: UniworkDocErrorCode): UniworkWorkError 
     case 'member_deactivated':
     case 'organization_suspended':
     case 'document_deleted':
+    case 'document_archived':
       return 'forbidden'
     case 'network':
     case 'timeout':

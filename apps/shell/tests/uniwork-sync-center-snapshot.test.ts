@@ -466,6 +466,7 @@ describe('G5-10 buildSyncCenterSnapshot — blocked reasons follow the spine con
     ['not_found', 'permission_revoked'],
     ['document_deleted', 'document_deleted'],
     ['deleted', 'document_deleted'],
+    ['document_archived', 'document_archived'],
     ['organization_suspended', 'organization_suspended'],
     ['member_deactivated', 'member_deactivated'],
     ['keystore_locked', 'keystore_locked'],
@@ -474,8 +475,14 @@ describe('G5-10 buildSyncCenterSnapshot — blocked reasons follow the spine con
     expect(blockedRow(lastError)?.blockedReason).toBe(reason)
   })
 
-  it('maps a recorded document_archived error (server code of G5-08s, not a UniworkDocErrorCode yet) to document_archived', () => {
-    expect(blockedRow('document_archived' as never)?.blockedReason).toBe('document_archived')
+  it('Q1=b: an archived block reaches the archived row reason without a derived fact', () => {
+    // the record the queue filed as `document_archived` (its own code now, never
+    // the deleted one) is its own row reason: what the renderer turns into the
+    // archived copy - info badge, uwReasonArchived, "Bỏ nháp…" - is pinned in
+    // sync-center-model.test.ts
+    expect(blockedRow('document_archived')?.blockedReason).toBe('document_archived')
+    expect(isDiscardableBlockedReason('document_archived')).toBe(true)
+    expect(mapBlockedReason('document_deleted')).toBe('document_deleted')
   })
 
   it('BE-5: an absent or unrecognised queue error has no reason and is never discardable', () => {

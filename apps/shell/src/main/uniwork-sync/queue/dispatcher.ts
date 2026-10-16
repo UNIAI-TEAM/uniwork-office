@@ -5,6 +5,7 @@ import type { DocLock } from '../doc-lock'
 import { QUEUE_LIMITS, type QueueLimits } from './limits'
 import {
   transition,
+  type BlockedReason,
   type NewIntentInput,
   type QueueContext,
   type QueueEvent,
@@ -118,13 +119,27 @@ export type QueueCapabilityRead =
 /** the org's capability verdict for one lane, per pass */
 export type LaneVerdict = 'ok' | 'sync_write_off' | 'offline' | 'session_expired'
 
+/**
+ * The verdict plus whether a real answer was read this pass: a never-read or
+ * stale capability still allows a write, but only a fresh answer proves the
+ * session, the org and the member are all live right now - the proof a blocked
+ * intent needs before it may go back to the queue.
+ */
+interface LaneRead {
+  verdict: LaneVerdict
+  fresh: boolean
+}
+
 export interface QueueDispatcherDeps {
   /** the queue's intent store, or why it cannot be reached right now */
   intents(): Promise<
     { kind: 'ok'; intents: QueueIntents } | { kind: 'keystore_locked' } | { kind: 'unavailable' }
   >
   client: QueueClient
-  capability: { get(orgId: string): Promise<QueueCapabilityRead> }
+  capability: {
+    /** `force` asks the cache for a real read: a lift never acts on a cached answer */
+    get(orgId: string, options?: { force?: boolean }): Promise<QueueCapabilityRead>
+  }
   lock: DocLock
   /** the per-account "pause sending" flag (defaults to "not paused") */
   pause?: QueuePause
@@ -201,7 +216,7 @@ export class QueueDispatcher {
   async mint(intent: MintedIntent): Promise<IntentRecordV2> {
     const now = this.deps.clock()
     const context = await this.context(now)
-    const verdict = await this.readCapability(intent.orgId)
+    const { verdict } = await this.readCapability(intent.orgId)
     if (verdict === 'sync_write_off') context.syncWrite = false
     if (verdict === 'offline') context.online = false
     const result = transition(null, { type: 'save', intent: toNewIntent(intent) }, context)
@@ -224,7 +239,7 @@ export class QueueDispatcher {
       this.deps.publish(doc.record)
       return doc.record.state
     }
-    const verdict = await this.readCapability(doc.orgId)
+    const { verdict } = await this.readCapability(doc.orgId)
     const context: QueueContext = {
       now: this.deps.clock(),
       limits: this.limits,
@@ -320,7 +335,17 @@ export class QueueDispatcher {
     // caps documents in flight for the WHOLE dispatch, never per lane
     let inFlight = 0
     for (const [orgId, lane] of lanes) {
-      const verdict = await this.readCapability(orgId)
+      // a lane with an intent the capability answer could lift reads it for
+      // real: a cached answer may predate the refusal this pass has to undo
+      const lifting = lane.some((doc) => {
+        const error = doc.record.state === 'blocked' ? doc.record.lastError : undefined
+        return (
+          error === 'session_expired' ||
+          error === 'organization_suspended' ||
+          error === 'member_deactivated'
+        )
+      })
+      const { verdict, fresh } = await this.readCapability(orgId, lifting)
       if (verdict !== 'ok') {
         for (const doc of lane) {
           if (verdict === 'session_expired') {
@@ -335,6 +360,11 @@ export class QueueDispatcher {
         }
         continue
       }
+      // the lane answered: a blocked intent whose condition is exactly that -
+      // the session signs in again, the org or the member is active again -
+      // goes back to the queue BEFORE this pass picks documents up, so the same
+      // intent commits here, under the SAME capability read that lifted it
+      await this.liftCapabilityBlocks(lane, fresh, now)
       for (const doc of lane) {
         if (this.committing.has(doc.key)) {
           outcomes.set(doc.key, doc.record.state)
@@ -562,6 +592,31 @@ export class QueueDispatcher {
     return 'cancelled'
   }
 
+  /**
+   * A blocking condition lifted (see the service's triggers): the SAME intent -
+   * snapshot, generation and base untouched - goes back to the waiting queue and
+   * commits through the normal path. Only a record blocked on exactly `reason`
+   * moves, so a lift of one condition never wakes an intent another condition
+   * parked, and a second lift of the same one is a no-op. A record whose state
+   * is not `blocked`, or whose block nobody named, is left exactly as it was.
+   */
+  async unblock(
+    docs: QueueDoc[],
+    reason: BlockedReason,
+    now = this.deps.clock(),
+  ): Promise<QueueState[]> {
+    const states: QueueState[] = []
+    for (const doc of docs) {
+      if (doc.record.state !== 'blocked' || doc.record.lastError !== reason) {
+        states.push(doc.record.state)
+        continue
+      }
+      const result = await this.apply(doc, { type: 'unblock', reason }, now)
+      states.push(result.record?.state ?? doc.record.state)
+    }
+    return states
+  }
+
   /** the document is gone (tombstone): stop replay, keep the snapshot */
   async tombstone(doc: QueueDoc, now = this.deps.clock()): Promise<QueueState> {
     const result = await this.apply(doc, { type: 'tombstone' }, now)
@@ -689,7 +744,7 @@ export class QueueDispatcher {
       }
       // the capability can flip off mid-upload: while the record is still
       // `uploading` it parks `paused_admin` and never reaches the commit
-      if ((await this.readCapability(doc.orgId)) === 'sync_write_off') {
+      if ((await this.readCapability(doc.orgId)).verdict === 'sync_write_off') {
         await this.apply(doc, { type: 'capability', syncWrite: false }, now)
         return doc.record.state
       }
@@ -930,23 +985,44 @@ export class QueueDispatcher {
   }
 
   /**
-   * The org's verdict for one pass: a never-read capability allows the write, a
-   * known-off one parks the lane, and a stale read past its TTL (the server
-   * could not be reached) is `offline`, not an admin refusal.
+   * The lane's capability answered for this queue's own session: the account
+   * and deployment the records are bound to are signed in (a 401 answers
+   * `session_expired` instead), and a fresh answer also proves the organization
+   * and the member are active - the three things a `blocked` intent waits on
+   * here. `fresh` is the proof: a never-read or cached answer still allows a
+   * write, but a lift on one could dispatch against a session the server has
+   * already expired, so it lifts nothing. The same read that lifts is the read
+   * the pass then dispatches under.
    */
-  private async readCapability(orgId: string): Promise<LaneVerdict> {
-    if (!orgId) return 'ok'
+  private async liftCapabilityBlocks(lane: QueueDoc[], fresh: boolean, now: number): Promise<void> {
+    if (!fresh) return
+    await this.unblock(lane, 'session_expired', now)
+    await this.unblock(lane, 'organization_suspended', now)
+    await this.unblock(lane, 'member_deactivated', now)
+  }
+
+  /**
+   * The org's verdict for one pass: a never-read capability allows the write, a
+   * known-off capability parks the lane, and a stale read past its TTL (the
+   * server could not be reached) is `offline`, not an admin refusal. `force` is
+   * set for a lane that holds an intent one of these answers could lift: a
+   * cached answer may predate the refusal, so only a real one counts.
+   */
+  private async readCapability(orgId: string, force = false): Promise<LaneRead> {
+    if (!orgId) return { verdict: 'ok', fresh: false }
     let read: QueueCapabilityRead
     try {
-      read = await this.deps.capability.get(orgId)
+      read = force
+        ? await this.deps.capability.get(orgId, { force: true })
+        : await this.deps.capability.get(orgId)
     } catch {
       // a capability read that threw is a transient network failure
-      return 'offline'
+      return { verdict: 'offline', fresh: false }
     }
-    if (read.kind === 'session_expired') return 'session_expired'
-    if (read.source === 'default') return 'ok'
-    if (read.capabilities.sync_write) return 'ok'
-    return read.source === 'stale' ? 'offline' : 'sync_write_off'
+    if (read.kind === 'session_expired') return { verdict: 'session_expired', fresh: false }
+    if (read.source === 'default') return { verdict: 'ok', fresh: false }
+    if (read.capabilities.sync_write) return { verdict: 'ok', fresh: read.source === 'fresh' }
+    return { verdict: read.source === 'stale' ? 'offline' : 'sync_write_off', fresh: false }
   }
 
   private async userPaused(): Promise<boolean> {

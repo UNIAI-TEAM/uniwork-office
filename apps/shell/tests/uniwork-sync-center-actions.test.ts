@@ -101,6 +101,8 @@ function createHarness(
     blockedReasons?: Record<string, SyncCenterBlockedReason>
     /** the intent store refuses every record `saveAgain` mints (budget full) */
     refuseNewIntent?: boolean
+    /** the blocked row's access re-probe (the service seam); default: it ran, nothing lifted */
+    recheckBlocked?: (doc: QueueDoc, dispatcher: QueueDispatcher) => Promise<boolean>
   } = {},
 ) {
   let online = options.online ?? true
@@ -108,6 +110,8 @@ function createHarness(
   let storeError = false
   const cancelCalls: Array<{ key: string; documentClosed: boolean }> = []
   const discardedDrafts: string[] = []
+  /** every blocked row "Kiểm tra lại" re-probed through the service seam, by document key */
+  const recheckedBlocked: string[] = []
   const docs = new Map<string, QueueDoc>()
   for (const doc of options.initialDocs ?? []) {
     docs.set(doc.key, doc)
@@ -293,6 +297,10 @@ function createHarness(
       discardedDrafts.push(`${documentKey}:${draftId}`)
     },
     dispatcher: () => Promise.resolve(dispatcher),
+    recheckBlocked: async (doc) => {
+      recheckedBlocked.push(doc.key)
+      return options.recheckBlocked ? options.recheckBlocked(doc, dispatcher) : true
+    },
     drafts: () => Promise.resolve(draftStore),
     listQueueDocs: async () => [...docs.values()],
     newId: () => `new-${++idSeq}`,
@@ -333,6 +341,7 @@ function createHarness(
     draftStore,
     cancelCalls,
     discardedDrafts,
+    recheckedBlocked,
     dispatcher,
     published,
     writes,
@@ -496,6 +505,71 @@ describe('G5-10 Sync Center actions and change notifications', () => {
     expect(await h.controller.recheck(stuckDoc.record.intentId)).toEqual({ ok: true })
     expect(h.lookupCommit).toHaveBeenCalledTimes(1)
     expect(h.upload).not.toHaveBeenCalled()
+  })
+
+  it('OQ-F12b: recheck on a BLOCKED row runs the access re-probe, never the commit lookup', async () => {
+    const blockedDoc = withRecord(makeQueueDoc({ key: 'doc-1', state: 'blocked' }), {
+      lastError: 'permission_revoked',
+      attempt: 2,
+    })
+    const h = createHarness({ initialDocs: [blockedDoc] })
+
+    // the condition still stands: the click changes nothing at all
+    expect(await h.controller.recheck(blockedDoc.record.intentId)).toEqual({ ok: true })
+    expect(h.recheckedBlocked).toEqual(['doc-1'])
+    expect(h.lookupCommit).not.toHaveBeenCalled()
+    expect(h.docs.get('doc-1')?.record).toMatchObject({
+      state: 'blocked',
+      lastError: 'permission_revoked',
+      attempt: 2,
+    })
+    expect(h.upload).not.toHaveBeenCalled()
+    expect(h.commit).not.toHaveBeenCalled()
+  })
+
+  it('OQ-F12b: a blocked row whose condition lifted leaves blocked through the re-probe', async () => {
+    const blockedDoc = withRecord(makeQueueDoc({ key: 'doc-1', state: 'blocked' }), {
+      lastError: 'session_expired',
+    })
+    const h = createHarness({
+      initialDocs: [blockedDoc],
+      // the service's re-probe: the lane answers again, so the block lifts
+      recheckBlocked: async (doc, dispatcher) => {
+        await dispatcher.unblock([doc], 'session_expired', NOW_MS)
+        return true
+      },
+    })
+
+    expect(await h.controller.recheck(blockedDoc.record.intentId)).toEqual({ ok: true })
+    expect(h.docs.get('doc-1')?.record.state).toBe('queued')
+    expect(h.docs.get('doc-1')?.record.lastError).toBeUndefined()
+    expect(h.lookupCommit).not.toHaveBeenCalled()
+  })
+
+  it('OQ-F12b: a blocked row whose re-probe cannot run reports the failure', async () => {
+    const blockedDoc = withRecord(makeQueueDoc({ key: 'doc-1', state: 'blocked' }), {
+      lastError: 'document_deleted',
+    })
+    const h = createHarness({
+      initialDocs: [blockedDoc],
+      recheckBlocked: async () => false,
+    })
+
+    expect(await h.controller.recheck(blockedDoc.record.intentId)).toEqual({
+      ok: false,
+      code: 'other',
+    })
+    expect(h.lookupCommit).not.toHaveBeenCalled()
+  })
+
+  it('OQ-F12b: a reconciling row keeps the commit lookup and never the access re-probe', async () => {
+    for (const state of ['reconciling', 'reconciling-stuck'] as const) {
+      const stuckDoc = makeQueueDoc({ key: 'doc-stuck', state })
+      const h = createHarness({ initialDocs: [stuckDoc] })
+
+      expect(await h.controller.recheck(stuckDoc.record.intentId), state).toEqual({ ok: true })
+      expect(h.recheckedBlocked, state).toEqual([])
+    }
   })
 
   it('copySupportCode writes the stuck row support code to the clipboard', async () => {
