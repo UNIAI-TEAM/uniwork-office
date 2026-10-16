@@ -77,6 +77,10 @@ export const it = {
   aiStarterEventOutline: 'Prepara la scaletta di un evento',
   aiThinking: 'Riflessione in corso',
   aiWorkedSteps: 'Completato · {n} passaggi',
+  aiWorkedStepsOne: 'Completato · {n} passaggio',
+  aiWorkedStepsFew: 'Completato · {n} passaggi',
+  aiEditsPaused:
+    "L'assistente sta modificando questo documento. Le tue modifiche sono in pausa; ferma l'assistente per continuare.",
   aiGroupWorking: 'In corso…',
   aiWorking: 'Elaborazione in corso',
   aiErrorPrefix: 'Errore: {error}',

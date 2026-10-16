@@ -73,6 +73,10 @@ export const vi = {
   aiStarterEventOutline: 'Lập dàn ý kế hoạch sự kiện',
   aiThinking: 'Đang suy nghĩ',
   aiWorkedSteps: 'Đã thực hiện · {n} bước',
+  aiWorkedStepsOne: 'Đã thực hiện · {n} bước',
+  aiWorkedStepsFew: 'Đã thực hiện · {n} bước',
+  aiEditsPaused:
+    'Trợ lý đang chỉnh sửa tài liệu này. Bạn tạm thời không sửa được; hãy dừng trợ lý để tiếp tục.',
   aiGroupWorking: 'Đang xử lý…',
   aiWorking: 'Đang xử lý',
   aiErrorPrefix: 'Lỗi: {error}',

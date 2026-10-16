@@ -75,6 +75,10 @@ export const pl = {
   aiStarterEventOutline: 'Przygotuj konspekt planu wydarzenia',
   aiThinking: 'Myślę',
   aiWorkedSteps: 'Ukończono · {n} kroków',
+  aiWorkedStepsOne: 'Ukończono · {n} krok',
+  aiWorkedStepsFew: 'Ukończono · {n} kroki',
+  aiEditsPaused:
+    'Asystent edytuje ten dokument. Twoje zmiany są wstrzymane; zatrzymaj asystenta, aby kontynuować.',
   aiGroupWorking: 'W toku…',
   aiWorking: 'Przetwarzanie',
   aiErrorPrefix: 'Błąd: {error}',

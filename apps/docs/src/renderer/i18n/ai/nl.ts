@@ -76,6 +76,10 @@ export const nl = {
   aiStarterEventOutline: 'Maak een opzet voor een evenementenplan',
   aiThinking: 'Aan het denken',
   aiWorkedSteps: 'Klaar · {n} stappen',
+  aiWorkedStepsOne: 'Klaar · {n} stap',
+  aiWorkedStepsFew: 'Klaar · {n} stappen',
+  aiEditsPaused:
+    'De assistent bewerkt dit document. Je bewerkingen zijn gepauzeerd; stop de assistent om door te gaan.',
   aiGroupWorking: 'Bezig…',
   aiWorking: 'Bezig met verwerken',
   aiErrorPrefix: 'Fout: {error}',

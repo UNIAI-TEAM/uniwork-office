@@ -75,6 +75,10 @@ export const id = {
   aiStarterEventOutline: 'Buat kerangka rencana acara',
   aiThinking: 'Berpikir',
   aiWorkedSteps: 'Selesai · {n} langkah',
+  aiWorkedStepsOne: 'Selesai · {n} langkah',
+  aiWorkedStepsFew: 'Selesai · {n} langkah',
+  aiEditsPaused:
+    'Asisten sedang mengedit dokumen ini. Suntingan Anda dijeda; hentikan asisten untuk melanjutkan.',
   aiGroupWorking: 'Sedang bekerja…',
   aiWorking: 'Memproses',
   aiErrorPrefix: 'Kesalahan: {error}',

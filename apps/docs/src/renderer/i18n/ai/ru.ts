@@ -75,6 +75,10 @@ export const ru = {
   aiStarterEventOutline: 'Составь план мероприятия',
   aiThinking: 'Думаю',
   aiWorkedSteps: 'Готово · {n} шагов',
+  aiWorkedStepsOne: 'Готово · {n} шаг',
+  aiWorkedStepsFew: 'Готово · {n} шага',
+  aiEditsPaused:
+    'Ассистент редактирует этот документ. Ваши правки приостановлены; остановите ассистента, чтобы продолжить.',
   aiGroupWorking: 'Выполняется…',
   aiWorking: 'Обработка',
   aiErrorPrefix: 'Ошибка: {error}',

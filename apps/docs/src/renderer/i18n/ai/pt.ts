@@ -76,6 +76,10 @@ export const pt = {
   aiStarterEventOutline: 'Esboce um plano de evento',
   aiThinking: 'Pensando',
   aiWorkedSteps: 'Concluído · {n} etapas',
+  aiWorkedStepsOne: 'Concluído · {n} etapa',
+  aiWorkedStepsFew: 'Concluído · {n} etapas',
+  aiEditsPaused:
+    'O assistente está editando este documento. Suas edições estão pausadas; pare o assistente para continuar.',
   aiGroupWorking: 'Em andamento…',
   aiWorking: 'Processando',
   aiErrorPrefix: 'Erro: {error}',

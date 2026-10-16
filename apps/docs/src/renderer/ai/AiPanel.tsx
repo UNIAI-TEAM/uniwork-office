@@ -95,6 +95,7 @@ import { currentDocGeneration } from '../file-actions'
 import { createFilesSkill } from './files-skill'
 import { boundChatHistory } from './chat-retention'
 import { createElectronTransport } from './transport'
+import { workedStepsLabel } from './worked-steps'
 import { docHasAiMarks } from '../editor/ai-marker'
 import { useI18n, t as tModule, aiLangDirective, getLang, type StringKey } from '../i18n/locale'
 import { AiErrorAction, Markdown, uniworkErrorForChip, useAiModelNeedHint } from '@genoffice/ui'
@@ -2462,7 +2463,7 @@ function RollbackButton({ disabled, onClick }: { disabled: boolean; onClick: () 
  *  that auto-opens while tools run, auto-collapses into "Worked · N steps" when they finish,
  *  and a manual toggle that always wins. Rows inside are step rows with 1px connectors. */
 function ToolChipList({ tools }: { tools: ToolActivity[] }) {
-  const { t: tr } = useI18n()
+  const { t: tr, lang } = useI18n()
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
   const [userOpen, setUserOpen] = useState<boolean | null>(null)
 
@@ -2477,7 +2478,7 @@ function ToolChipList({ tools }: { tools: ToolActivity[] }) {
 
   const anyRunning = tools.some((tool) => tool.running)
   const open = userOpen ?? anyRunning
-  const label = anyRunning ? tr('aiGroupWorking') : tr('aiWorkedSteps', { n: tools.length })
+  const label = anyRunning ? tr('aiGroupWorking') : workedStepsLabel(tr, lang, tools.length)
 
   return (
     <div className="ai-work-group">

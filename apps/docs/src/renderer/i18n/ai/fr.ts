@@ -77,6 +77,10 @@ export const fr = {
   aiStarterEventOutline: "Établir le plan d'un événement",
   aiThinking: 'Réflexion en cours',
   aiWorkedSteps: 'Terminé · {n} étapes',
+  aiWorkedStepsOne: 'Terminé · {n} étape',
+  aiWorkedStepsFew: 'Terminé · {n} étapes',
+  aiEditsPaused:
+    "L'assistant modifie ce document. Vos modifications sont suspendues ; arrêtez l'assistant pour continuer.",
   aiGroupWorking: 'En cours…',
   aiWorking: 'Traitement en cours',
   aiErrorPrefix: 'Erreur : {error}',

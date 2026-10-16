@@ -73,6 +73,10 @@ export const th = {
   aiStarterEventOutline: 'ร่างโครงร่างแผนจัดกิจกรรม',
   aiThinking: 'กำลังคิด',
   aiWorkedSteps: 'เสร็จสิ้น · {n} ขั้นตอน',
+  aiWorkedStepsOne: 'เสร็จสิ้น · {n} ขั้นตอน',
+  aiWorkedStepsFew: 'เสร็จสิ้น · {n} ขั้นตอน',
+  aiEditsPaused:
+    'ผู้ช่วยกำลังแก้ไขเอกสารนี้ การแก้ไขของคุณถูกหยุดชั่วคราว หยุดผู้ช่วยเพื่อดำเนินการต่อ',
   aiGroupWorking: 'กำลังทำงาน…',
   aiWorking: 'กำลังดำเนินการ',
   aiErrorPrefix: 'ข้อผิดพลาด: {error}',

@@ -74,6 +74,10 @@ export const ja = {
   aiStarterEventOutline: 'イベント企画のアウトラインを作って',
   aiThinking: '考え中',
   aiWorkedSteps: '完了 · {n} ステップ',
+  aiWorkedStepsOne: '完了 · {n} ステップ',
+  aiWorkedStepsFew: '完了 · {n} ステップ',
+  aiEditsPaused:
+    'アシスタントがこのドキュメントを編集中です。あなたの編集は一時停止されています。続けるにはアシスタントを停止してください。',
   aiGroupWorking: '処理中…',
   aiWorking: '処理中',
   aiErrorPrefix: 'エラー: {error}',

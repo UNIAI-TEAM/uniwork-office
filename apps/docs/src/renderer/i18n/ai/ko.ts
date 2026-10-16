@@ -74,6 +74,10 @@ export const ko = {
   aiStarterEventOutline: '행사 기획 개요 만들어 줘',
   aiThinking: '생각하는 중',
   aiWorkedSteps: '완료 · {n}단계',
+  aiWorkedStepsOne: '완료 · {n}단계',
+  aiWorkedStepsFew: '완료 · {n}단계',
+  aiEditsPaused:
+    '어시스턴트가 이 문서를 편집하고 있습니다. 직접 편집이 일시 중지되었습니다. 계속하려면 어시스턴트를 중지하세요.',
   aiGroupWorking: '작업 중…',
   aiWorking: '처리 중',
   aiErrorPrefix: '오류: {error}',

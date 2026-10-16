@@ -75,6 +75,10 @@ export const cs = {
   aiStarterEventOutline: 'Sestavte osnovu plánu akce',
   aiThinking: 'Přemýšlí',
   aiWorkedSteps: 'Hotovo · {n} kroků',
+  aiWorkedStepsOne: 'Hotovo · {n} krok',
+  aiWorkedStepsFew: 'Hotovo · {n} kroky',
+  aiEditsPaused:
+    'Asistent upravuje tento dokument. Vaše úpravy jsou pozastaveny; pro pokračování asistenta zastavte.',
   aiGroupWorking: 'Pracuje…',
   aiWorking: 'Pracuje',
   aiErrorPrefix: 'Chyba: {error}',
