@@ -1593,6 +1593,9 @@ describe('document size limits, size_warning, save_blocked, and doc.download (SI
       type: 'doc.download',
       payload: { delivered: true },
     })
+  })
+})
+
 describe('open_refused (SIZE-F1, additive)', () => {
   const env = (payload: unknown) =>
     parseEnvelope({

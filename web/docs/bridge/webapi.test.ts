@@ -1581,6 +1581,9 @@ describe('save size gate (SIZE-F1, UNI-1861)', () => {
     await vi.waitFor(() =>
       expect(mock.calls.filter((c) => c.type === 'api.download')).toHaveLength(1),
     )
+  })
+})
+
 describe('open_refused and refuse-tier guard (SIZE-F1)', () => {
   it('reportOpenRefused emits one open_refused (no error event), marks uniworkState readOnly, blocks all saves, and resets on another documentId', async () => {
     const opened = await bootWith('Huge.docx')
