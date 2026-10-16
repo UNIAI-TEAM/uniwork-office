@@ -193,11 +193,20 @@ beforeEach(() => {
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
-  try {
-    window.localStorage.clear()
-  } catch {
-    // storage may be unavailable; the browser copes
+  // R1-7: Node 25's built-in localStorage shadows jsdom's without getItem/setItem
+  const map = new Map<string, string>()
+  const ls = {
+    getItem: (k: string) => map.get(k) ?? null,
+    setItem: (k: string, v: string) => void map.set(k, String(v)),
+    removeItem: (k: string) => void map.delete(k),
+    clear: () => map.clear(),
+    key: (i: number) => [...map.keys()][i] ?? null,
+    get length() {
+      return map.size
+    },
   }
+  Object.defineProperty(globalThis, 'localStorage', { value: ls, configurable: true })
+  Object.defineProperty(window, 'localStorage', { value: ls, configurable: true })
 })
 
 afterEach(async () => {
@@ -294,6 +303,36 @@ describe('UniworkBrowser: tree and contents (S1)', () => {
     })
     expect(window.localStorage.getItem('uniwork.folders.sort')).toBe('updated')
   })
+
+  it('loads more folder contents with cursor and drops a stale page after leaving the folder (R1-8)', async () => {
+    api.uniworkListChildren.mockImplementationOnce(async () =>
+      ok({ items: [entry('d1', 'Page1.docx')], nextCursor: 'cur-2' }),
+    )
+    await render()
+    expect(optionTitles()).toEqual(['Page1.docx'])
+    const more = $<HTMLButtonElement>('.uw-pick-more')!
+    expect(more).toBeTruthy()
+    api.uniworkListChildren.mockImplementationOnce(async (q: UniworkFolderQuery) => {
+      expect(q.cursor).toBe('cur-2')
+      return ok({ items: [entry('d2', 'Page2.docx')], nextCursor: 'cur-3' })
+    })
+    await click(more)
+    expect(optionTitles()).toEqual(['Page1.docx', 'Page2.docx'])
+
+    // start loading page 3, then switch folders before it arrives: the stale page is dropped
+    let releasePage3: (v: UniworkResult<UniworkFolderChildren>) => void = () => undefined
+    api.uniworkListChildren.mockImplementationOnce(
+      () => new Promise((resolve) => (releasePage3 = resolve)),
+    )
+    await click($<HTMLButtonElement>('.uw-pick-more'))
+    await click(treeItem('Beta'))
+    expect($('.uwf-crumb-current')?.textContent).toBe('Beta')
+    await act(async () =>
+      releasePage3(ok({ items: [entry('d3', 'StalePage3.docx')], nextCursor: null })),
+    )
+    await flush()
+    expect(optionTitles()).toEqual([])
+  })
 })
 
 describe('UniworkBrowser: freshness', () => {
@@ -346,6 +385,88 @@ describe('UniworkBrowser: freshness', () => {
     expect($('.uwf-crumb-current')?.textContent).toBe('UniWork')
     expect($('.uwf-notice')?.textContent).toBe(en.ufFolderGone)
   })
+
+  it('settles on a live ancestor when two levels vanish and the tree index is stale (R1-6)', async () => {
+    // tree read fails so index is empty; user browses r -> a -> b via folder rows
+    api.uniworkFolderTree.mockResolvedValue({ ok: false, error: 'network' })
+    children[''] = [asFolder('r', 'RootDir')]
+    children.r = [asFolder('a', 'Alpha', 'r'), entry('dr', 'Kept.docx', { parentId: 'r' })]
+    children.a = [asFolder('b', 'Beta', 'a')]
+    children.b = [entry('db', 'Leaf.docx', { parentId: 'b' })]
+    await render()
+    await act(async () => {
+      $$('[role="option"]')[0]!.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
+    })
+    await flush()
+    await act(async () => {
+      $$('[role="option"]')[0]!.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
+    })
+    await flush()
+    await act(async () => {
+      $$('[role="option"]')[0]!.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
+    })
+    await flush()
+    expect(optionTitles()).toEqual(['Leaf.docx'])
+
+    // both b and a vanish on the server while the tree index still lacks them
+    let calls = 0
+    api.uniworkListChildren.mockImplementation(async (q: UniworkFolderQuery) => {
+      if (++calls > 20) return { ok: false, error: 'server_error' }
+      if (q.parentId === 'b' || q.parentId === 'a') return { ok: false, error: 'not_found' }
+      return ok({ items: children[q.parentId ?? ''] ?? [], nextCursor: null })
+    })
+    await act(async () => api.pushTreeChanged({ workspaceId: 'w1' }))
+    await flush()
+    expect(optionTitles()).toEqual(['Alpha', 'Kept.docx'])
+    expect($('.uwf-notice')?.textContent).toBe(en.ufFolderGone)
+  })
+
+  it('soft refresh keeps loaded pages and focus, and does not drop an in-flight loadMore (R1-1)', async () => {
+    api.uniworkListChildren.mockImplementation(async (q: UniworkFolderQuery) => {
+      if (q.cursor === 'c2') {
+        return ok({ items: [entry('d2', 'Second.docx')], nextCursor: 'c3' })
+      }
+      return ok({ items: [entry('d1', 'First.docx')], nextCursor: 'c2' })
+    })
+    await render()
+    await click($<HTMLButtonElement>('.uw-pick-more'))
+    expect(optionTitles()).toEqual(['First.docx', 'Second.docx'])
+    const secondOpt = $$('[role="option"]').find((el) => el.textContent?.includes('Second.docx'))!
+    await click(secondOpt)
+    await act(async () => secondOpt.focus())
+    expect(document.activeElement).toBe(secondOpt)
+
+    // start an in-flight page 3 loadMore, then trigger a soft refresh before page 3 resolves
+    let releasePage3: (v: UniworkResult<UniworkFolderChildren>) => void = () => undefined
+    api.uniworkListChildren.mockImplementationOnce(
+      () => new Promise((resolve) => (releasePage3 = resolve)),
+    )
+    await click($<HTMLButtonElement>('.uw-pick-more'))
+    await act(async () => api.pushTreeChanged({ workspaceId: 'w1' }))
+    await flush()
+    // page 2 is still there and focus is preserved on the option element
+    expect(optionTitles()).toEqual(['First.docx', 'Second.docx'])
+    expect(document.activeElement).toBe(secondOpt)
+
+    // now the in-flight page 3 resolves: it was not dropped by the soft refresh
+    await act(async () =>
+      releasePage3(ok({ items: [entry('d3', 'Third.docx')], nextCursor: null })),
+    )
+    await flush()
+    expect(optionTitles()).toEqual(['First.docx', 'Second.docx', 'Third.docx'])
+  })
+
+  it('throttles rapid window focus refreshes (R1-1)', async () => {
+    await render()
+    const before = api.uniworkFolderTree.mock.calls.length
+    await act(async () => window.dispatchEvent(new Event('focus')))
+    await flush()
+    expect(api.uniworkFolderTree.mock.calls.length).toBe(before + 1)
+    // a second focus right away is throttled
+    await act(async () => window.dispatchEvent(new Event('focus')))
+    await flush()
+    expect(api.uniworkFolderTree.mock.calls.length).toBe(before + 1)
+  })
 })
 
 describe('UniworkBrowser: search (S2)', () => {
@@ -382,6 +503,51 @@ describe('UniworkBrowser: search (S2)', () => {
     await key(input, 'Escape')
     expect(input.value).toBe('')
     expect(optionTitles()).toEqual(['Alpha', 'Beta', 'Report.docx'])
+  })
+
+  it('ignores a stale search answer, paginates search hits, and keeps search off skeleton on soft refresh (R1-1, R1-8)', async () => {
+    await render()
+    const input = $<HTMLInputElement>('.uwf-own-search')!
+    let releaseFirst: (v: UniworkResult<UniworkFolderChildren>) => void = () => undefined
+    api.uniworkSearchDocuments.mockImplementationOnce(
+      () => new Promise((resolve) => (releaseFirst = resolve)),
+    )
+    await type(input, 'old')
+    api.uniworkSearchDocuments.mockImplementationOnce(async () =>
+      ok({ items: [entry('s1', 'Hit1.docx')], nextCursor: 'sc-2' }),
+    )
+    await type(input, 'new')
+    expect(optionTitles()).toEqual(['Hit1.docx'])
+
+    // late answer for 'old' is dropped
+    await act(async () =>
+      releaseFirst(ok({ items: [entry('s0', 'StaleHit.docx')], nextCursor: null })),
+    )
+    await flush()
+    expect(optionTitles()).toEqual(['Hit1.docx'])
+
+    // search pagination appends with cursor
+    api.uniworkSearchDocuments.mockImplementationOnce(async (q: UniworkSearchQuery) => {
+      expect(q.cursor).toBe('sc-2')
+      return ok({ items: [entry('s2', 'Hit2.docx')], nextCursor: 'sc-3' })
+    })
+    await click($<HTMLButtonElement>('.uw-pick-more'))
+    expect(optionTitles()).toEqual(['Hit1.docx', 'Hit2.docx'])
+
+    // soft refresh while searching does not reset to skeleton while waiting
+    let releaseRefreshSearch: (v: UniworkResult<UniworkFolderChildren>) => void = () => undefined
+    api.uniworkSearchDocuments.mockImplementationOnce(
+      () => new Promise((resolve) => (releaseRefreshSearch = resolve)),
+    )
+    await act(async () => api.pushTreeChanged({ workspaceId: 'w1' }))
+    await flush()
+    expect($('.uw-pick-skeleton')).toBeNull()
+    expect(optionTitles()).toEqual(['Hit1.docx', 'Hit2.docx'])
+    await act(async () =>
+      releaseRefreshSearch(ok({ items: [entry('s1', 'Hit1.docx')], nextCursor: 'sc-2' })),
+    )
+    await flush()
+    expect(optionTitles()).toEqual(['Hit1.docx', 'Hit2.docx'])
   })
 })
 

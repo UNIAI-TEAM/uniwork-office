@@ -24,6 +24,8 @@ import {
 
 /** contents page size: the server caps `limit` at 100 */
 export const BROWSER_PAGE_SIZE = 100
+/** minimum gap between window-focus refreshes (R1-1) */
+export const FOCUS_REFRESH_THROTTLE_MS = 1000
 
 export type SearchKind = 'all' | 'folder' | 'document'
 
@@ -82,9 +84,14 @@ export function useFolderBrowser(workspaceId: string, initialFolderId: string | 
   searchRef.current = search
   /** the open folder's root-first id path, kept across tree re-reads for the fallback */
   const openPath = useRef<string[]>([])
+  /** items appended by Load more after page 1, preserved across soft refreshes */
+  const extraContentsRef = useRef<UniworkDocSummary[]>([])
+  const extraResultsRef = useRef<UniworkDocSummary[]>([])
   const treeGate = useRef(createRequestGate())
   const contentsGate = useRef(createRequestGate())
+  const contentsMoreGate = useRef(createRequestGate())
   const searchGate = useRef(createRequestGate())
+  const searchMoreGate = useRef(createRequestGate())
   const mounted = useRef(true)
   useEffect(() => {
     mounted.current = true
@@ -112,11 +119,19 @@ export function useFolderBrowser(workspaceId: string, initialFolderId: string | 
       const known = folderPath(indexRef.current, target).map((p) => p.id)
       if (target === null) openPath.current = []
       else if (known.length > 0) openPath.current = known
-      else openPath.current = [...openPath.current.filter((id) => id !== target), target]
+      else {
+        const at = openPath.current.indexOf(target)
+        openPath.current =
+          at >= 0 ? openPath.current.slice(0, at + 1) : [...openPath.current, target]
+      }
       if (target !== null) {
         setExpanded((prev) => new Set([...prev, ...expandKeysFor(indexRef.current, target)]))
       }
-      if (!opts.soft) setContents(LOADING_LIST)
+      if (!opts.soft) {
+        contentsMoreGate.current.next()
+        extraContentsRef.current = []
+        setContents(LOADING_LIST)
+      }
       void readContents(target).then((result) => {
         if (!mounted.current || !contentsGate.current.isCurrent(request)) return
         if (!result.ok) {
@@ -128,14 +143,34 @@ export function useFolderBrowser(workspaceId: string, initialFolderId: string | 
             openFolder(parent, { keepNotice: true })
             return
           }
+          extraContentsRef.current = []
           setContents({ ...EMPTY_LIST, status: 'error', error: result.error })
           return
         }
-        setContents({
-          status: 'ready',
-          items: result.value.items,
-          nextCursor: result.value.nextCursor,
-          loadingMore: false,
+        setContents((now) => {
+          if (
+            opts.soft &&
+            extraContentsRef.current.length > 0 &&
+            result.value.nextCursor !== null
+          ) {
+            const page1Ids = new Set(result.value.items.map((i) => i.id))
+            const extra = extraContentsRef.current.filter((i) => !page1Ids.has(i.id))
+            extraContentsRef.current = extra
+            return {
+              status: 'ready',
+              items: [...result.value.items, ...extra],
+              nextCursor: now.nextCursor,
+              loadingMore: now.loadingMore,
+              moreError: now.moreError,
+            }
+          }
+          extraContentsRef.current = []
+          return {
+            status: 'ready',
+            items: result.value.items,
+            nextCursor: result.value.nextCursor,
+            loadingMore: opts.soft ? now.loadingMore : false,
+          }
         })
       })
     },
@@ -145,22 +180,77 @@ export function useFolderBrowser(workspaceId: string, initialFolderId: string | 
   const loadMore = useCallback(() => {
     const prev = contentsRef.current
     if (!prev.nextCursor || prev.loadingMore || prev.status !== 'ready') return
-    const request = contentsGate.current.next()
+    const request = contentsMoreGate.current.next()
     setContents({ ...prev, loadingMore: true, moreError: undefined })
     void readContents(folderRef.current, prev.nextCursor).then((result) => {
-      if (!mounted.current || !contentsGate.current.isCurrent(request)) return
-      setContents((now) =>
-        result.ok
-          ? {
-              ...now,
-              items: [...now.items, ...result.value.items],
-              nextCursor: result.value.nextCursor,
-              loadingMore: false,
-            }
-          : { ...now, loadingMore: false, moreError: result.error },
-      )
+      if (!mounted.current || !contentsMoreGate.current.isCurrent(request)) return
+      setContents((now) => {
+        if (!result.ok) return { ...now, loadingMore: false, moreError: result.error }
+        const existingIds = new Set(now.items.map((i) => i.id))
+        const added = result.value.items.filter((i) => !existingIds.has(i.id))
+        extraContentsRef.current = [...extraContentsRef.current, ...added]
+        return {
+          ...now,
+          items: [...now.items, ...added],
+          nextCursor: result.value.nextCursor,
+          loadingMore: false,
+        }
+      })
     })
   }, [readContents])
+
+  const runSearch = useCallback(
+    (query: string, kind: SearchKind, opts: { soft?: boolean } = {}) => {
+      const request = searchGate.current.next()
+      setSearch({ query, kind })
+      if (!opts.soft) {
+        searchMoreGate.current.next()
+        extraResultsRef.current = []
+      }
+      if (!query) {
+        extraResultsRef.current = []
+        setResults(EMPTY_LIST)
+        return
+      }
+      if (!opts.soft) setResults(LOADING_LIST)
+      void searchDocuments({ workspaceId, query, kind, limit: BROWSER_PAGE_SIZE }).then(
+        (result) => {
+          if (!mounted.current || !searchGate.current.isCurrent(request)) return
+          if (!result.ok) {
+            extraResultsRef.current = []
+            setResults({ ...EMPTY_LIST, status: 'error', error: result.error })
+            return
+          }
+          setResults((now) => {
+            if (
+              opts.soft &&
+              extraResultsRef.current.length > 0 &&
+              result.value.nextCursor !== null
+            ) {
+              const page1Ids = new Set(result.value.items.map((i) => i.id))
+              const extra = extraResultsRef.current.filter((i) => !page1Ids.has(i.id))
+              extraResultsRef.current = extra
+              return {
+                status: 'ready',
+                items: [...result.value.items, ...extra],
+                nextCursor: now.nextCursor,
+                loadingMore: now.loadingMore,
+                moreError: now.moreError,
+              }
+            }
+            extraResultsRef.current = []
+            return {
+              status: 'ready',
+              items: result.value.items,
+              nextCursor: result.value.nextCursor,
+              loadingMore: opts.soft ? now.loadingMore : false,
+            }
+          })
+        },
+      )
+    },
+    [workspaceId],
+  )
 
   /** re-read the tree, then the open folder (or its fallback when it vanished) */
   const refresh = useCallback(() => {
@@ -181,38 +271,11 @@ export function useFolderBrowser(workspaceId: string, initialFolderId: string | 
       if (fallback.gone) setGone(true)
       const target = fallback.gone ? fallback.folderId : folderRef.current
       openFolder(target, { keepNotice: true, soft: !fallback.gone })
-      if (searchRef.current.query) runSearch(searchRef.current.query, searchRef.current.kind)
-    })
-    // runSearch is stable for a workspace
-  }, [workspaceId, openFolder])
-
-  const runSearch = useCallback(
-    (query: string, kind: SearchKind) => {
-      const request = searchGate.current.next()
-      setSearch({ query, kind })
-      if (!query) {
-        setResults(EMPTY_LIST)
-        return
+      if (searchRef.current.query) {
+        runSearch(searchRef.current.query, searchRef.current.kind, { soft: true })
       }
-      setResults(LOADING_LIST)
-      void searchDocuments({ workspaceId, query, kind, limit: BROWSER_PAGE_SIZE }).then(
-        (result) => {
-          if (!mounted.current || !searchGate.current.isCurrent(request)) return
-          setResults(
-            result.ok
-              ? {
-                  status: 'ready',
-                  items: result.value.items,
-                  nextCursor: result.value.nextCursor,
-                  loadingMore: false,
-                }
-              : { ...EMPTY_LIST, status: 'error', error: result.error },
-          )
-        },
-      )
-    },
-    [workspaceId],
-  )
+    })
+  }, [workspaceId, openFolder, runSearch])
 
   const resultsRef = useRef(results)
   resultsRef.current = results
@@ -220,7 +283,7 @@ export function useFolderBrowser(workspaceId: string, initialFolderId: string | 
     const prev = resultsRef.current
     const { query, kind } = searchRef.current
     if (!query || !prev.nextCursor || prev.loadingMore || prev.status !== 'ready') return
-    const request = searchGate.current.next()
+    const request = searchMoreGate.current.next()
     setResults({ ...prev, loadingMore: true, moreError: undefined })
     void searchDocuments({
       workspaceId,
@@ -229,17 +292,19 @@ export function useFolderBrowser(workspaceId: string, initialFolderId: string | 
       cursor: prev.nextCursor,
       limit: BROWSER_PAGE_SIZE,
     }).then((result) => {
-      if (!mounted.current || !searchGate.current.isCurrent(request)) return
-      setResults((now) =>
-        result.ok
-          ? {
-              ...now,
-              items: [...now.items, ...result.value.items],
-              nextCursor: result.value.nextCursor,
-              loadingMore: false,
-            }
-          : { ...now, loadingMore: false, moreError: result.error },
-      )
+      if (!mounted.current || !searchMoreGate.current.isCurrent(request)) return
+      setResults((now) => {
+        if (!result.ok) return { ...now, loadingMore: false, moreError: result.error }
+        const existingIds = new Set(now.items.map((i) => i.id))
+        const added = result.value.items.filter((i) => !existingIds.has(i.id))
+        extraResultsRef.current = [...extraResultsRef.current, ...added]
+        return {
+          ...now,
+          items: [...now.items, ...added],
+          nextCursor: result.value.nextCursor,
+          loadingMore: false,
+        }
+      })
     })
   }, [workspaceId])
 
@@ -248,6 +313,8 @@ export function useFolderBrowser(workspaceId: string, initialFolderId: string | 
     setTree({ status: 'loading', nodes: [] })
     setExpanded(new Set([ROOT_KEY]))
     openPath.current = initialFolderId ? [initialFolderId] : []
+    extraContentsRef.current = []
+    extraResultsRef.current = []
     setGone(false)
     setSearch({ query: '', kind: 'all' })
     setResults(EMPTY_LIST)
@@ -257,10 +324,16 @@ export function useFolderBrowser(workspaceId: string, initialFolderId: string | 
 
   // the server's tree changed (feed page or an own action elsewhere), or the window came back
   useEffect(() => {
+    let lastFocusAt = 0
     const off = onTreeChanged((event) => {
       if (event.workspaceId === workspaceId) refresh()
     })
-    const onFocus = () => refresh()
+    const onFocus = () => {
+      const now = Date.now()
+      if (now - lastFocusAt < FOCUS_REFRESH_THROTTLE_MS) return
+      lastFocusAt = now
+      refresh()
+    }
     window.addEventListener('focus', onFocus)
     return () => {
       off()
