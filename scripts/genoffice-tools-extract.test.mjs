@@ -2602,4 +2602,42 @@ describe('parameterised recursive arrow (G6-09d)', () => {
       assert.equal(entry.offered, false)
     }
   })
+
+  it('evaluates arrow call arguments pass-independently so tableHash matches inputSchemaSha256 (RBD9-5)', () => {
+    const flatSchema = (n) => ({
+      type: 'object',
+      properties: { v: { type: 'number', description: `n=${n}` } },
+    })
+    const { dir, sha } = fixture({
+      'packages/agent-core/src/types.ts': AGENT_TOOL_DEF_FIXTURE,
+      'apps/docs/src/renderer/ai/tools.ts': [
+        "import type { AgentToolDef } from '@genoffice/agent-core'",
+        '',
+        'const flat = (n: number) => ({',
+        "  type: 'object',",
+        "  properties: { v: { type: 'number', description: `n=${n}` } },",
+        '})',
+        '',
+        'export const TOOLS: AgentToolDef[] = [',
+        "  { name: 'plus_arg', description: 'x', inputSchema: { type: 'object', ...flat(2 + 1) } },",
+        "  { name: 'minus_arg', description: 'x', inputSchema: { type: 'object', ...flat(4 - 1) } },",
+        ']',
+        '',
+      ].join('\n'),
+    })
+    const res = extract({ repo: dir, rev: sha })
+    const file = build(dir, sha)
+    const expectedHash = hashOf(flatSchema(3))
+    for (const name of ['plus_arg', 'minus_arg']) {
+      const row = res.rows.find((r) => r.tool === name)
+      const entry = file.catalogue.find((e) => e.module === 'docs' && e.name === name)
+      const tool = file.docs.find((t) => t.function.name === name)
+      assert.equal(entry.tableHash, entry.inputSchemaSha256)
+      assert.equal(row.hash, expectedHash)
+      assert.equal(entry.inputSchemaSha256, expectedHash)
+      assert.equal(entry.schemaComplete, true)
+      assert.equal(entry.offered, true)
+      assert.deepEqual(tool.function.parameters, flatSchema(3))
+    }
+  })
 })
