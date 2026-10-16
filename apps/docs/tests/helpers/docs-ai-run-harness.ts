@@ -71,7 +71,7 @@ export async function mountDocsAiPanel(
   extra: { filePath?: string | null; lang?: Lang } & Partial<
     Pick<
       AiPanelProps,
-      'sideState' | 'commentsAccess' | 'hfAccess' | 'pageSetupAccess' | 'docExtras'
+      'sideState' | 'commentsAccess' | 'hfAccess' | 'pageSetupAccess' | 'docExtras' | 'protection'
     >
   > = {},
 ): Promise<DocsAiHarness> {
