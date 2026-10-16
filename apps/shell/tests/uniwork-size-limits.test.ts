@@ -216,6 +216,217 @@ describe('SIZE-F1 desktop document size limits', () => {
         warn_bytes: Math.floor(120 * MB_BYTES * 0.8),
       })
     })
+
+    it('drops in-flight reads across reset() and origin switches so stale limits never commit (d1-4)', async () => {
+      let origin = 'https://a.uniwork.example'
+      const pending: Array<{
+        startedOrigin: string | null | undefined
+        resolve: (value: unknown) => void
+      }> = []
+      const cache = createDocumentLimitsCache({
+        origin: () => origin,
+        fetchLimits: (startedOrigin) =>
+          new Promise((resolve) => {
+            pending.push({ startedOrigin, resolve })
+          }),
+      })
+
+      // 1. Start a read before reset(), call reset(), then resolve the pre-reset read:
+      //    it must NOT commit into the cache nor satisfy a post-reset get()
+      const preResetPromise = cache.get()
+      expect(pending).toHaveLength(1)
+      cache.reset()
+
+      const postResetPromise = cache.get()
+      expect(pending).toHaveLength(2)
+
+      // Resolve the stale pre-reset read with 50 MiB
+      pending[0]!.resolve({
+        documents: { limits: { upload_max_bytes: 50 * MB_BYTES, save_warn_ratio: 0.8 } },
+      })
+      expect(await preResetPromise).toEqual(DEFAULT_DOCUMENT_LIMITS)
+      expect(cache.peek()).toEqual(DEFAULT_DOCUMENT_LIMITS)
+
+      // Resolve the post-reset read with 140 MiB: only this one commits
+      pending[1]!.resolve({
+        documents: { limits: { upload_max_bytes: 140 * MB_BYTES, save_warn_ratio: 0.8 } },
+      })
+      expect((await postResetPromise).max_bytes).toBe(140 * MB_BYTES)
+      expect(cache.peek().max_bytes).toBe(140 * MB_BYTES)
+
+      // 2. Origin switch while a read for origin A is in flight (including A -> B -> A):
+      cache.reset()
+      const inFlightA1 = cache.refresh()
+      expect(pending).toHaveLength(3)
+      expect(pending[2]!.startedOrigin).toBe('https://a.uniwork.example')
+
+      origin = 'https://b.uniwork.example'
+      const inFlightB = cache.get()
+      expect(pending).toHaveLength(4)
+      expect(pending[3]!.startedOrigin).toBe('https://b.uniwork.example')
+
+      // Switch back to A before A's first read settles; resolve A's first read: must not commit
+      origin = 'https://a.uniwork.example'
+      pending[2]!.resolve({
+        documents: { limits: { upload_max_bytes: 60 * MB_BYTES, save_warn_ratio: 0.75 } },
+      })
+      expect(await inFlightA1).toEqual(DEFAULT_DOCUMENT_LIMITS)
+      expect(cache.peek()).toEqual(DEFAULT_DOCUMENT_LIMITS)
+
+      // B's earlier read also cannot commit while active origin is A
+      pending[3]!.resolve({
+        documents: { limits: { upload_max_bytes: 80 * MB_BYTES, save_warn_ratio: 0.75 } },
+      })
+      expect(await inFlightB).toEqual(DEFAULT_DOCUMENT_LIMITS)
+      origin = 'https://b.uniwork.example'
+      expect(cache.peek()).toEqual(DEFAULT_DOCUMENT_LIMITS)
+    })
+
+    it('drives limits refresh/reset end to end through noteSessionIdentity, noteSelectedOrg, and lockSession (d1-9)', async () => {
+      const tmp = mkdtempSync(join(tmpdir(), 'uw-size-lifecycle-'))
+      try {
+        let currentIdentity: {
+          accountId: string
+          deviceSessionId: string
+          deploymentId: string
+        } | null = {
+          accountId: 'acc_1',
+          deviceSessionId: 'dev_1',
+          deploymentId: 'default',
+        }
+        let currentOrigin = 'https://a.uniwork.example'
+        let currentOrg: { id: string; slug: string } | null = { id: 'org_a', slug: 'acme' }
+
+        const configGraduates: Array<(maxBytes: number) => void> = []
+        let configCalls = 0
+
+        const service = new UniworkDocsService({
+          userDataDir: tmp,
+          profile: () => ({
+            deploymentId: currentIdentity?.deploymentId ?? 'default',
+            apiOrigin: currentOrigin,
+            clientId: 'uniwork-office',
+            channel: 'stable',
+          }),
+          channel: () => 'stable',
+          applyProfile: async () => 'unchanged',
+          identity: () => currentIdentity,
+          selectedOrg: () => currentOrg,
+          authorized: <T>(call: (token: string) => Promise<T>) => call('tok'),
+          fetch: (async (url: string) => {
+            if (url.endsWith('/api/v1/config')) {
+              configCalls += 1
+              const maxBytes = await new Promise<number>((resolve) => {
+                configGraduates.push(resolve)
+              })
+              return new Response(
+                JSON.stringify({
+                  documents: { limits: { upload_max_bytes: maxBytes, save_warn_ratio: 0.9 } },
+                }),
+                { status: 200, headers: { 'Content-Type': 'application/json' } },
+              )
+            }
+            return new Response('{}', { status: 404 })
+          }) as unknown as FetchLike,
+          openPath: () => true,
+          isPathOpen: () => false,
+          requestModuleSave: () => false,
+          reloadPath: () => undefined,
+          activePath: () => undefined,
+          ui: { chooseUnsavedClose: async () => 'cancel' },
+          pushStatus: () => undefined,
+          pushLaunch: () => undefined,
+          reveal: () => undefined,
+        })
+
+        // 1. Session boot via noteSessionIdentity triggers a refresh
+        service.noteSessionIdentity()
+        expect(configCalls).toBe(1)
+        configGraduates.shift()!(1000)
+        expect((await service.limitsCache.get()).max_bytes).toBe(1000)
+
+        // 2. Upload observes the refreshed 1000-byte limit from session boot
+        const candidatePath = join(tmp, 'Candidate.docx')
+        writeFileSync(candidatePath, new Uint8Array(1200).fill(65))
+        const blockedUpload = await service.uploadDocument(candidatePath, {
+          orgId: 'org_a',
+          workspaceId: WS_ID,
+          title: 'Candidate.docx',
+        })
+        expect(blockedUpload).toEqual({
+          ok: false,
+          code: 'too_large',
+          name: 'Candidate.docx',
+          sizeBytes: 1200,
+          maxBytes: 1000,
+        })
+
+        // 3. noteSelectedOrg refreshes when the selected org changes, and ignores duplicate calls
+        service.noteSelectedOrg('org_a')
+        expect(configCalls).toBe(2)
+        configGraduates.shift()!(1500)
+        expect((await service.limitsCache.get()).max_bytes).toBe(1500)
+
+        service.noteSelectedOrg('org_a')
+        expect(configCalls).toBe(2)
+
+        service.noteSelectedOrg('org_b')
+        expect(configCalls).toBe(3)
+
+        // 4. While org_b's refresh is still in flight, lockSession runs (account boundary):
+        //    the cache resets and the stale in-flight read from before lockSession cannot commit
+        await service.lockSession('sign-out', {
+          deploymentId: 'default',
+          accountId: 'acc_1',
+        })
+        configGraduates.shift()!(500)
+        await new Promise((resolve) => setTimeout(resolve, 0))
+        expect(service.limitsCache.peek()).toEqual(DEFAULT_DOCUMENT_LIMITS)
+
+        // 5. Sign in to a new session/origin and verify save enforces the new session's limit
+        currentOrigin = 'https://b.uniwork.example'
+        currentIdentity = {
+          accountId: 'acc_2',
+          deviceSessionId: 'dev_2',
+          deploymentId: 'default',
+        }
+        currentOrg = { id: 'org_b', slug: 'beta' }
+        service.noteSessionIdentity()
+        expect(configCalls).toBe(4)
+        configGraduates.shift()!(800)
+        expect((await service.limitsCache.get()).max_bytes).toBe(800)
+
+        const docDir = service.store.dirFor('default', 'acc_2', DOC_ID)
+        const baseBytes = enc('small')
+        await service.store.write(docDir, {
+          schema: 2,
+          documentId: DOC_ID,
+          orgId: 'org_b',
+          workspaceId: WS_ID,
+          title: 'Bound.docx',
+          filename: 'Bound.docx',
+          format: 'docx',
+          access: 'edit',
+          baseRevision: '10',
+          baseVersion: 1,
+          baseChecksum: sha256Hex(baseBytes),
+          state: 'saved',
+          minStoreLevel: 1,
+          minAppVersion: '0.0.0',
+        })
+        const workingPath = await service.store.writeWorkingCopy(docDir, 'Bound.docx', baseBytes)
+        writeFileSync(workingPath, new Uint8Array(900).fill(66))
+        const savedStatus = await service.save(workingPath)
+        expect(savedStatus?.binding).toMatchObject({
+          state: 'failed',
+          error: 'too_large',
+          sizeBytes: 900,
+          maxBytes: 800,
+        })
+      } finally {
+        rmSync(tmp, { recursive: true, force: true })
+      }
+    })
   })
 
   describe('2. pre-upload check (UniworkDocsService.uploadDocument)', () => {

@@ -732,6 +732,8 @@ export class UniworkDocsService {
   private orgMemberNames = new Map<string, string>()
   /** the org whose member names the map holds (null = nothing cached) */
   private orgMemberNamesOrg: string | null = null
+  /** the last organization id observed by `noteSelectedOrg` */
+  private notedOrgId: string | null = null
   /** the one in-flight members read per org, shared by concurrent panel opens */
   private orgMemberNamesInFlight: { orgId: string; promise: Promise<Map<string, string>> } | null =
     null
@@ -844,11 +846,13 @@ export class UniworkDocsService {
     this.lastOwner = this.store.readLastOwner()
     this.limitsCache = createDocumentLimitsCache({
       origin: () => this.deps.profile()?.apiOrigin ?? null,
-      fetchLimits: async () => {
+      fetchLimits: async (startedOrigin) => {
         if (this.deps.limits) return await this.deps.limits()
         // a session that is not signed in has no deployment to ask: the
         // defaults hold until one is, and `noteSessionIdentity` refreshes
         if (!this.deps.identity()) return null
+        const currentOrigin = this.deps.profile()?.apiOrigin?.trim().replace(/\/+$/, '') || null
+        if (startedOrigin !== currentOrigin) return null
         const client = this.api()
         return client.getDocumentLimits ? await client.getDocumentLimits() : null
       },
@@ -1166,6 +1170,7 @@ export class UniworkDocsService {
       // replace whatever the previous one published
       void this.limitsCache.refresh().catch(() => undefined)
     } else {
+      this.notedOrgId = null
       this.limitsCache.reset()
     }
     // a live session opens its store: the scope's migration and every later
@@ -2642,6 +2647,7 @@ export class UniworkDocsService {
     this.remoteReloads.clear()
     this.orgMemberNames.clear()
     this.orgMemberNamesOrg = null
+    this.notedOrgId = null
     this.orgMemberNamesInFlight = null
     this.migratedScopes.delete(scopeToken)
     this.limitsCache.reset()
@@ -2932,7 +2938,10 @@ export class UniworkDocsService {
    * renderer on the same status push; nothing else here caches a library).
    */
   noteSelectedOrg(orgId: string | null): void {
-    const changed = this.orgMemberNamesOrg !== orgId
+    const changed =
+      this.notedOrgId !== orgId ||
+      (this.orgMemberNamesOrg !== null && this.orgMemberNamesOrg !== orgId)
+    this.notedOrgId = orgId
     if (this.orgMemberNamesOrg !== null && this.orgMemberNamesOrg !== orgId) {
       this.orgMemberNames = new Map()
       this.orgMemberNamesOrg = null
