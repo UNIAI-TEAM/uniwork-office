@@ -14,6 +14,9 @@ import { FolderGlyph } from './UniworkFolderTree'
 import { isFolderEntry, shortPath } from './uniwork-folders-model'
 import type { ListState } from './use-folder-browser'
 
+/** id of the muted hidden-formats count line referenced by aria-describedby (R2-3) */
+export const BROWSER_HIDDEN_HINT_ID = 'uwf-hidden'
+
 /**
  * FD-11 S1/S2 right-hand list of the browser: the open folder's contents or
  * the title search's hits (listbox, one tab stop). Arrows / Home / End move,
@@ -125,7 +128,7 @@ export function BrowserContents({
 
   const hiddenLine =
     hiddenCount > 0 ? (
-      <p className="uwf-hidden" role="status">
+      <p className="uwf-hidden" id={BROWSER_HIDDEN_HINT_ID} role="status">
         {t('uwPickHiddenFormats', { count: hiddenCount })}
       </p>
     ) : null
@@ -166,6 +169,7 @@ export function BrowserContents({
         className="uw-pick-list uwf-contents"
         role="listbox"
         aria-label={t('ufContentsLabel')}
+        aria-describedby={hiddenCount > 0 ? BROWSER_HIDDEN_HINT_ID : undefined}
         ref={listRef}
       >
         {rows.map((doc) => {

@@ -373,7 +373,7 @@ export type FolderActionFailure =
 
 /** a folder action's refusal: at the name field, or one sentence for the toast */
 export function folderActionFailure(
-  error: UniworkDocActionError | 'move_name_taken',
+  error: UniworkDocActionError,
   max?: number,
 ): FolderActionFailure {
   switch (error) {

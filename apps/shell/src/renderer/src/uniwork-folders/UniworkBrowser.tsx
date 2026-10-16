@@ -5,7 +5,7 @@ import { useI18n } from '../locale'
 import { ActionToast } from '../UniworkDocActions'
 import { UNIWORK_ERROR_KEYS } from '../uniwork-docs-model'
 import { loadFolderTree } from '../uniwork-library-api'
-import { BrowserContents } from './BrowserContents'
+import { BROWSER_HIDDEN_HINT_ID, BrowserContents } from './BrowserContents'
 import { BrowserCrumbs } from './BrowserCrumbs'
 import type { FolderMenuItem } from './FolderMenu'
 import { FolderNameDialog } from './FolderNameDialog'
@@ -57,6 +57,7 @@ export function UniworkBrowser({
   onClearQuery,
   folderSelected = true,
   onSelectFolder,
+  onHiddenHintChange,
 }: {
   workspaceId: string
   variant: 'dialog' | 'pane'
@@ -76,6 +77,8 @@ export function UniworkBrowser({
   folderSelected?: boolean
   /** a tree row or breadcrumb was chosen (the host leaves its other view) */
   onSelectFolder?: () => void
+  /** whether the hidden-formats status line is shown in the folder/search view (R2-3) */
+  onHiddenHintChange?: (shown: boolean) => void
 }) {
   const { t, dateLocale } = useI18n()
   const uid = useId()
@@ -160,6 +163,13 @@ export function UniworkBrowser({
   const searching = query.length > 0
   const list = searching ? browser.results : browser.contents
   const view = contentsView(list.items, searching ? null : sort, dateLocale)
+  const showHiddenHint = !mainOverride && list.status === 'ready' && view.hiddenCount > 0
+
+  const onHiddenHintChangeRef = useRef(onHiddenHintChange)
+  onHiddenHintChangeRef.current = onHiddenHintChange
+  useEffect(() => {
+    onHiddenHintChangeRef.current?.(showHiddenHint)
+  }, [showHiddenHint])
 
   const renderTree = () => {
     const { tree } = browser
@@ -311,6 +321,7 @@ export function UniworkBrowser({
             className="uw-pick-search uwf-own-search"
             type="search"
             aria-label={t('uwPickSearch')}
+            aria-describedby={showHiddenHint ? BROWSER_HIDDEN_HINT_ID : undefined}
             placeholder={t('ufSearchPh')}
             value={ownDraft}
             spellCheck={false}

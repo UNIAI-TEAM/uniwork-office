@@ -557,6 +557,26 @@ describe('picker dialog', () => {
       expect(hint()).toBeNull()
       expect(search().hasAttribute('aria-describedby')).toBe(false)
     })
+
+    it('R2-3: in folder view the hidden-formats line has an id referenced by aria-describedby on the contents listbox and search box', async () => {
+      api.uniworkListChildren.mockResolvedValue({
+        ok: true,
+        value: {
+          items: [doc('p1', 'Pic.png', null), doc('b', 'Plan.docx', 'docx')],
+          nextCursor: null,
+        },
+      })
+      await openPicker()
+      const rootItem = host.querySelector<HTMLElement>('[role="treeitem"]')!
+      await click(rootItem)
+      const folderHint = host.querySelector<HTMLElement>('.uwf-hidden')!
+      expect(folderHint).toBeTruthy()
+      expect(folderHint.id).toBeTruthy()
+      expect(host.querySelector('[role="listbox"]')?.getAttribute('aria-describedby')).toBe(
+        folderHint.id,
+      )
+      expect(search().getAttribute('aria-describedby')).toBe(folderHint.id)
+    })
   })
 
   it('has labelled controls', async () => {

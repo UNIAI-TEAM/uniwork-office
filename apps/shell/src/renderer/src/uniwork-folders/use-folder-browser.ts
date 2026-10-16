@@ -84,9 +84,9 @@ export function useFolderBrowser(workspaceId: string, initialFolderId: string | 
   searchRef.current = search
   /** the open folder's root-first id path, kept across tree re-reads for the fallback */
   const openPath = useRef<string[]>([])
-  /** items appended by Load more after page 1, preserved across soft refreshes */
-  const extraContentsRef = useRef<UniworkDocSummary[]>([])
-  const extraResultsRef = useRef<UniworkDocSummary[]>([])
+  /** number of loaded pages (1 = first page, +1 per Load more), re-read across soft refreshes (R2-2) */
+  const loadedContentsPages = useRef(1)
+  const loadedResultsPages = useRef(1)
   const treeGate = useRef(createRequestGate())
   const contentsGate = useRef(createRequestGate())
   const contentsMoreGate = useRef(createRequestGate())
@@ -129,13 +129,14 @@ export function useFolderBrowser(workspaceId: string, initialFolderId: string | 
       }
       if (!opts.soft) {
         contentsMoreGate.current.next()
-        extraContentsRef.current = []
+        loadedContentsPages.current = 1
         setContents(LOADING_LIST)
       }
-      void readContents(target).then((result) => {
+      void (async () => {
+        const first = await readContents(target)
         if (!mounted.current || !contentsGate.current.isCurrent(request)) return
-        if (!result.ok) {
-          if (target !== null && isGone(result.error)) {
+        if (!first.ok) {
+          if (target !== null && isGone(first.error)) {
             // the open folder is not there for me any more: its nearest live ancestor
             const path = openPath.current
             const parent = path.length > 1 ? path[path.length - 2]! : null
@@ -143,36 +144,40 @@ export function useFolderBrowser(workspaceId: string, initialFolderId: string | 
             openFolder(parent, { keepNotice: true })
             return
           }
-          extraContentsRef.current = []
-          setContents({ ...EMPTY_LIST, status: 'error', error: result.error })
+          loadedContentsPages.current = 1
+          setContents({ ...EMPTY_LIST, status: 'error', error: first.error })
           return
         }
-        setContents((now) => {
-          if (
-            opts.soft &&
-            extraContentsRef.current.length > 0 &&
-            result.value.nextCursor !== null
-          ) {
-            const page1Ids = new Set(result.value.items.map((i) => i.id))
-            const extra = extraContentsRef.current.filter((i) => !page1Ids.has(i.id))
-            extraContentsRef.current = extra
-            return {
-              status: 'ready',
-              items: [...result.value.items, ...extra],
-              nextCursor: now.nextCursor,
-              loadingMore: now.loadingMore,
-              moreError: now.moreError,
+        const items = [...first.value.items]
+        const seen = new Set(items.map((i) => i.id))
+        let nextCursor = first.value.nextCursor
+        let pagesLoaded = 1
+        let moreError: UniworkDocErrorCode | undefined
+        while (opts.soft && pagesLoaded < loadedContentsPages.current && nextCursor !== null) {
+          const page = await readContents(target, nextCursor)
+          if (!mounted.current || !contentsGate.current.isCurrent(request)) return
+          if (!page.ok) {
+            moreError = page.error
+            break
+          }
+          for (const item of page.value.items) {
+            if (!seen.has(item.id)) {
+              seen.add(item.id)
+              items.push(item)
             }
           }
-          extraContentsRef.current = []
-          return {
-            status: 'ready',
-            items: result.value.items,
-            nextCursor: result.value.nextCursor,
-            loadingMore: opts.soft ? now.loadingMore : false,
-          }
-        })
-      })
+          nextCursor = page.value.nextCursor
+          pagesLoaded++
+        }
+        loadedContentsPages.current = pagesLoaded
+        setContents((now) => ({
+          status: 'ready',
+          items,
+          nextCursor,
+          loadingMore: opts.soft ? now.loadingMore : false,
+          moreError,
+        }))
+      })()
     },
     [readContents],
   )
@@ -184,11 +189,11 @@ export function useFolderBrowser(workspaceId: string, initialFolderId: string | 
     setContents({ ...prev, loadingMore: true, moreError: undefined })
     void readContents(folderRef.current, prev.nextCursor).then((result) => {
       if (!mounted.current || !contentsMoreGate.current.isCurrent(request)) return
+      if (result.ok) loadedContentsPages.current += 1
       setContents((now) => {
         if (!result.ok) return { ...now, loadingMore: false, moreError: result.error }
         const existingIds = new Set(now.items.map((i) => i.id))
         const added = result.value.items.filter((i) => !existingIds.has(i.id))
-        extraContentsRef.current = [...extraContentsRef.current, ...added]
         return {
           ...now,
           items: [...now.items, ...added],
@@ -205,49 +210,58 @@ export function useFolderBrowser(workspaceId: string, initialFolderId: string | 
       setSearch({ query, kind })
       if (!opts.soft) {
         searchMoreGate.current.next()
-        extraResultsRef.current = []
+        loadedResultsPages.current = 1
       }
       if (!query) {
-        extraResultsRef.current = []
+        loadedResultsPages.current = 1
         setResults(EMPTY_LIST)
         return
       }
       if (!opts.soft) setResults(LOADING_LIST)
-      void searchDocuments({ workspaceId, query, kind, limit: BROWSER_PAGE_SIZE }).then(
-        (result) => {
-          if (!mounted.current || !searchGate.current.isCurrent(request)) return
-          if (!result.ok) {
-            extraResultsRef.current = []
-            setResults({ ...EMPTY_LIST, status: 'error', error: result.error })
-            return
-          }
-          setResults((now) => {
-            if (
-              opts.soft &&
-              extraResultsRef.current.length > 0 &&
-              result.value.nextCursor !== null
-            ) {
-              const page1Ids = new Set(result.value.items.map((i) => i.id))
-              const extra = extraResultsRef.current.filter((i) => !page1Ids.has(i.id))
-              extraResultsRef.current = extra
-              return {
-                status: 'ready',
-                items: [...result.value.items, ...extra],
-                nextCursor: now.nextCursor,
-                loadingMore: now.loadingMore,
-                moreError: now.moreError,
-              }
-            }
-            extraResultsRef.current = []
-            return {
-              status: 'ready',
-              items: result.value.items,
-              nextCursor: result.value.nextCursor,
-              loadingMore: opts.soft ? now.loadingMore : false,
-            }
+      void (async () => {
+        const first = await searchDocuments({ workspaceId, query, kind, limit: BROWSER_PAGE_SIZE })
+        if (!mounted.current || !searchGate.current.isCurrent(request)) return
+        if (!first.ok) {
+          loadedResultsPages.current = 1
+          setResults({ ...EMPTY_LIST, status: 'error', error: first.error })
+          return
+        }
+        const items = [...first.value.items]
+        const seen = new Set(items.map((i) => i.id))
+        let nextCursor = first.value.nextCursor
+        let pagesLoaded = 1
+        let moreError: UniworkDocErrorCode | undefined
+        while (opts.soft && pagesLoaded < loadedResultsPages.current && nextCursor !== null) {
+          const page = await searchDocuments({
+            workspaceId,
+            query,
+            kind,
+            cursor: nextCursor,
+            limit: BROWSER_PAGE_SIZE,
           })
-        },
-      )
+          if (!mounted.current || !searchGate.current.isCurrent(request)) return
+          if (!page.ok) {
+            moreError = page.error
+            break
+          }
+          for (const item of page.value.items) {
+            if (!seen.has(item.id)) {
+              seen.add(item.id)
+              items.push(item)
+            }
+          }
+          nextCursor = page.value.nextCursor
+          pagesLoaded++
+        }
+        loadedResultsPages.current = pagesLoaded
+        setResults((now) => ({
+          status: 'ready',
+          items,
+          nextCursor,
+          loadingMore: opts.soft ? now.loadingMore : false,
+          moreError,
+        }))
+      })()
     },
     [workspaceId],
   )
@@ -293,11 +307,11 @@ export function useFolderBrowser(workspaceId: string, initialFolderId: string | 
       limit: BROWSER_PAGE_SIZE,
     }).then((result) => {
       if (!mounted.current || !searchMoreGate.current.isCurrent(request)) return
+      if (result.ok) loadedResultsPages.current += 1
       setResults((now) => {
         if (!result.ok) return { ...now, loadingMore: false, moreError: result.error }
         const existingIds = new Set(now.items.map((i) => i.id))
         const added = result.value.items.filter((i) => !existingIds.has(i.id))
-        extraResultsRef.current = [...extraResultsRef.current, ...added]
         return {
           ...now,
           items: [...now.items, ...added],
@@ -313,8 +327,8 @@ export function useFolderBrowser(workspaceId: string, initialFolderId: string | 
     setTree({ status: 'loading', nodes: [] })
     setExpanded(new Set([ROOT_KEY]))
     openPath.current = initialFolderId ? [initialFolderId] : []
-    extraContentsRef.current = []
-    extraResultsRef.current = []
+    loadedContentsPages.current = 1
+    loadedResultsPages.current = 1
     setGone(false)
     setSearch({ query: '', kind: 'all' })
     setResults(EMPTY_LIST)

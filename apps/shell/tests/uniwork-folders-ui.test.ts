@@ -232,7 +232,12 @@ describe('UniworkBrowser: tree and contents (S1)', () => {
     )
     expect(optionTitles()).toEqual(['Alpha', 'Beta', 'Report.docx'])
     // the page and the zip are hidden with one count line (F11-L2: shared uwPickHiddenFormats)
-    expect($('.uwf-hidden')?.textContent).toBe(docEn.uwPickHiddenFormats.replace('{count}', '2'))
+    const hiddenLine = $('.uwf-hidden')!
+    expect(hiddenLine.textContent).toBe(docEn.uwPickHiddenFormats.replace('{count}', '2'))
+    // R2-3: hidden-formats count line has an id referenced by aria-describedby on the contents listbox and search box
+    expect(hiddenLine.id).toBeTruthy()
+    expect($('[role="listbox"]')?.getAttribute('aria-describedby')).toBe(hiddenLine.id)
+    expect($('.uwf-own-search')?.getAttribute('aria-describedby')).toBe(hiddenLine.id)
   })
 
   it('opens a folder from the tree, shows its breadcrumb and goes back by it', async () => {
@@ -242,6 +247,9 @@ describe('UniworkBrowser: tree and contents (S1)', () => {
       expect.objectContaining({ parentId: 'a' }),
     )
     expect(optionTitles()).toEqual(['Contracts', 'Plan.docx'])
+    expect($('.uwf-hidden')).toBeNull()
+    expect($('[role="listbox"]')?.hasAttribute('aria-describedby')).toBe(false)
+    expect($('.uwf-own-search')?.hasAttribute('aria-describedby')).toBe(false)
     expect($('.uwf-crumb-current')?.textContent).toBe('Alpha')
     expect(treeItem('Alpha').getAttribute('aria-selected')).toBe('true')
     // double click on a folder row browses into it (3 levels)
@@ -456,6 +464,74 @@ describe('UniworkBrowser: freshness', () => {
     expect(optionTitles()).toEqual(['First.docx', 'Second.docx', 'Third.docx'])
   })
 
+  it('re-reads loaded extra pages on soft refresh so moved, deleted, or renamed page-2 items update while keeping scroll and focus (R2-2)', async () => {
+    let page2Items: UniworkDocSummary[] = [
+      asFolder('f2', 'SubTwo'),
+      entry('d2', 'Second.docx'),
+      entry('d3', 'Third.docx'),
+    ]
+    api.uniworkListChildren.mockImplementation(async (q: UniworkFolderQuery) => {
+      if (q.cursor === 'c2') {
+        return ok({ items: page2Items, nextCursor: null })
+      }
+      return ok({ items: [asFolder('b', 'Beta'), entry('d1', 'First.docx')], nextCursor: 'c2' })
+    })
+    await render()
+    await click($<HTMLButtonElement>('.uw-pick-more'))
+    expect(optionTitles()).toEqual(['Beta', 'SubTwo', 'First.docx', 'Second.docx', 'Third.docx'])
+
+    const listbox = $<HTMLElement>('[role="listbox"]')!
+    listbox.scrollTop = 64
+    const thirdOpt = $$('[role="option"]').find((el) => el.textContent?.includes('Third.docx'))!
+    await click(thirdOpt)
+    await act(async () => thirdOpt.focus())
+    expect(document.activeElement).toBe(thirdOpt)
+
+    // 1. Own action: move page-2 item Second.docx away to Beta
+    api.uniworkMoveDocument.mockImplementationOnce(async () => {
+      page2Items = page2Items.filter((i) => i.id !== 'd2')
+      return ok({
+        summary: entry('d2', 'Second.docx', { parentId: 'b' }),
+        renamedTo: null,
+      })
+    })
+    const secondRow = $$('.uw-pick-item').find((el) => el.textContent?.includes('Second.docx'))!
+    await click(secondRow.querySelector('[data-folder-menu-for]'))
+    await click($('[data-folder-action="move"]'))
+    const picker = $('.uwf-picker')!
+    const beta = Array.from(picker.querySelectorAll<HTMLElement>('[role="treeitem"]')).find((el) =>
+      el.textContent?.includes('Beta'),
+    )!
+    await click(beta)
+    await click(picker.querySelector('.btn-primary'))
+    expect(optionTitles()).toEqual(['Beta', 'SubTwo', 'First.docx', 'Third.docx'])
+    expect(listbox.scrollTop).toBe(64)
+
+    // 2. Own action: rename page-2 folder SubTwo -> SubTwoRenamed
+    api.uniworkRenameDocument.mockImplementationOnce(async (id: string, name: string) => {
+      page2Items = page2Items.map((i) => (i.id === id ? { ...i, title: name } : i))
+      return ok(asFolder(id, name))
+    })
+    const subTwoRow = $$('.uw-pick-item').find((el) => el.textContent?.includes('SubTwo'))!
+    await click(subTwoRow.querySelector('[data-folder-menu-for]'))
+    await click($('[data-folder-action="rename"]'))
+    await type($<HTMLInputElement>('.modal.uw-act input')!, 'SubTwoRenamed')
+    await click($('.modal.uw-act button[type="submit"]'))
+    expect(optionTitles()).toEqual(['Beta', 'SubTwoRenamed', 'First.docx', 'Third.docx'])
+    expect(listbox.scrollTop).toBe(64)
+
+    // 3. Tree-changed push: page-2 folder SubTwoRenamed is deleted and page-2 file Third.docx is renamed while focused
+    await click(thirdOpt)
+    await act(async () => thirdOpt.focus())
+    expect(document.activeElement).toBe(thirdOpt)
+    page2Items = [entry('d3', 'ThirdRenamed.docx')]
+    await act(async () => api.pushTreeChanged({ workspaceId: 'w1' }))
+    await flush()
+    expect(optionTitles()).toEqual(['Beta', 'First.docx', 'ThirdRenamed.docx'])
+    expect(listbox.scrollTop).toBe(64)
+    expect(document.activeElement).toBe(thirdOpt)
+  })
+
   it('throttles rapid window focus refreshes (R1-1)', async () => {
     await render()
     const before = api.uniworkFolderTree.mock.calls.length
@@ -529,25 +605,31 @@ describe('UniworkBrowser: search (S2)', () => {
     // search pagination appends with cursor
     api.uniworkSearchDocuments.mockImplementationOnce(async (q: UniworkSearchQuery) => {
       expect(q.cursor).toBe('sc-2')
-      return ok({ items: [entry('s2', 'Hit2.docx')], nextCursor: 'sc-3' })
+      return ok({
+        items: [entry('s2', 'Hit2.docx'), entry('s3', 'Hit3.docx')],
+        nextCursor: 'sc-3',
+      })
     })
     await click($<HTMLButtonElement>('.uw-pick-more'))
-    expect(optionTitles()).toEqual(['Hit1.docx', 'Hit2.docx'])
+    expect(optionTitles()).toEqual(['Hit1.docx', 'Hit2.docx', 'Hit3.docx'])
 
-    // soft refresh while searching does not reset to skeleton while waiting
+    // soft refresh while searching does not reset to skeleton while waiting, and re-reads page 2 (R2-2)
     let releaseRefreshSearch: (v: UniworkResult<UniworkFolderChildren>) => void = () => undefined
-    api.uniworkSearchDocuments.mockImplementationOnce(
-      () => new Promise((resolve) => (releaseRefreshSearch = resolve)),
-    )
+    api.uniworkSearchDocuments
+      .mockImplementationOnce(() => new Promise((resolve) => (releaseRefreshSearch = resolve)))
+      .mockImplementationOnce(async (q: UniworkSearchQuery) => {
+        expect(q.cursor).toBe('sc-2')
+        return ok({ items: [entry('s2', 'Hit2Renamed.docx')], nextCursor: null })
+      })
     await act(async () => api.pushTreeChanged({ workspaceId: 'w1' }))
     await flush()
     expect($('.uw-pick-skeleton')).toBeNull()
-    expect(optionTitles()).toEqual(['Hit1.docx', 'Hit2.docx'])
+    expect(optionTitles()).toEqual(['Hit1.docx', 'Hit2.docx', 'Hit3.docx'])
     await act(async () =>
       releaseRefreshSearch(ok({ items: [entry('s1', 'Hit1.docx')], nextCursor: 'sc-2' })),
     )
     await flush()
-    expect(optionTitles()).toEqual(['Hit1.docx', 'Hit2.docx'])
+    expect(optionTitles()).toEqual(['Hit1.docx', 'Hit2Renamed.docx'])
   })
 
   it('search chips radiogroup uses roving tabindex and arrow keys (R1-2)', async () => {

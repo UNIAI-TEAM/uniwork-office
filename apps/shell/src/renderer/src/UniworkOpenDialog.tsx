@@ -46,6 +46,7 @@ import {
   type PickerState,
 } from './uniwork-docs-model'
 import { readActiveWorkspaceId, writeActiveWorkspaceId } from './active-workspace'
+import { BROWSER_HIDDEN_HINT_ID } from './uniwork-folders/BrowserContents'
 import { UniworkBrowser } from './uniwork-folders/UniworkBrowser'
 import type { PathPart } from './uniwork-folders/uniwork-folders-model'
 import {
@@ -182,6 +183,7 @@ export function UniworkOpenDialog({
   const [view, setView] = useState<'recent' | 'folder'>('recent')
   /** the committed title search of the folder view (the recent list keeps state.query) */
   const [folderQuery, setFolderQuery] = useState('')
+  const [folderHiddenHint, setFolderHiddenHint] = useState(false)
   /** the folder open in the browser: New / Upload default to it */
   const browsed = useRef<{ folderId: string | null; path: PathPart[] }>({
     folderId: null,
@@ -875,7 +877,15 @@ export function UniworkOpenDialog({
             aria-activedescendant={
               !folderView && activeIndex >= 0 ? optionId(activeIndex) : undefined
             }
-            aria-describedby={!folderView && showHiddenHint ? HIDDEN_HINT_ID : undefined}
+            aria-describedby={
+              folderView
+                ? folderHiddenHint
+                  ? BROWSER_HIDDEN_HINT_ID
+                  : undefined
+                : showHiddenHint
+                  ? HIDDEN_HINT_ID
+                  : undefined
+            }
             placeholder={folderView ? t('ufSearchPh') : t('uwPickSearchPh')}
             value={draft}
             autoFocus
@@ -903,6 +913,7 @@ export function UniworkOpenDialog({
               }}
               folderSelected={folderView}
               onSelectFolder={() => switchView('folder')}
+              onHiddenHintChange={setFolderHiddenHint}
               sidebarTop={views}
               mainOverride={folderView ? undefined : pickBody}
             />
