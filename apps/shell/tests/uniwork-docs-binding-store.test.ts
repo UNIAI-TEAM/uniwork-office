@@ -6,7 +6,9 @@ import {
   BINDING_FILE,
   BindingStore,
   bindingKindAt,
+  bindingCanEdit,
   bindingKindOf,
+  docLevelOf,
   parseBinding,
 } from '../src/main/uniwork-docs/binding-store'
 
@@ -320,6 +322,28 @@ describe('parseBinding + write (what this build stamps)', () => {
     expect(raw).not.toHaveProperty('pendingIntent')
     // and it reads back exactly as it was written
     expect(parseBinding(raw)).toMatchObject({ schema: 2, minStoreLevel: 2 })
+  })
+
+  it('DOC5-W04: the comment level is kept in binding.json; an unknown level is dropped', () => {
+    const raw = (level: unknown) => ({ ...schema2, level })
+    expect(parseBinding(raw('comment'))?.level).toBe('comment')
+    expect(parseBinding(raw('manage'))?.level).toBe('manage')
+    expect(docLevelOf('comment')).toBe('comment')
+    expect(docLevelOf('owner')).toBeUndefined()
+    expect(parseBinding(raw('owner'))).not.toHaveProperty('level')
+  })
+
+  it('DOC5-W04: only an edit access with an edit-or-better (or unread) level counts as editable', () => {
+    const copy = (access: 'edit' | 'view', level?: string) =>
+      ({ access, ...(level ? { level } : {}) }) as Parameters<typeof bindingCanEdit>[0]
+    expect(bindingCanEdit(copy('edit'))).toBe(true)
+    expect(bindingCanEdit(copy('edit', 'edit'))).toBe(true)
+    expect(bindingCanEdit(copy('edit', 'manage'))).toBe(true)
+    // a level below edit never rides on a stale edit access, and an unknown word never raises it
+    expect(bindingCanEdit(copy('edit', 'view'))).toBe(false)
+    expect(bindingCanEdit(copy('edit', 'comment'))).toBe(false)
+    expect(bindingCanEdit(copy('edit', 'owner'))).toBe(false)
+    expect(bindingCanEdit(copy('view', 'manage'))).toBe(false)
   })
 
   it('a malformed raw value never parses, whatever the schema claims', () => {

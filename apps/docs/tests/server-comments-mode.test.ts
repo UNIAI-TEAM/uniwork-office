@@ -85,6 +85,13 @@ describe('resolveServerMode', () => {
       versionId: 'v1',
       level: 'view',
     })
+    // DOC5-W04: the comment level passes through; an unknown word is still dropped, never raised
+    expect(readContext({ documentId: 'd1', versionId: 'v1', level: 'comment' })?.level).toBe(
+      'comment',
+    )
+    expect(readContext({ documentId: 'd1', versionId: 'v1', level: 'owner' })).not.toHaveProperty(
+      'level',
+    )
     // the web frame marks its context; anything but `true` is ignored
     expect(readContext({ documentId: 'd1', versionId: null, frame: true })?.frame).toBe(true)
     expect(readContext({ documentId: 'd1', versionId: null, frame: 'yes' })).not.toHaveProperty(

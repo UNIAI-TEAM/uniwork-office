@@ -25,7 +25,9 @@ export function readContext(value: unknown): ServerCommentsContext | null {
   if (!isId(v.documentId)) return null
   if (v.versionId !== null && v.versionId !== undefined && !isId(v.versionId)) return null
   const level =
-    v.level === 'view' || v.level === 'edit' || v.level === 'manage' ? v.level : undefined
+    v.level === 'view' || v.level === 'comment' || v.level === 'edit' || v.level === 'manage'
+      ? v.level
+      : undefined
   return {
     documentId: v.documentId,
     versionId: isId(v.versionId) ? v.versionId : null,

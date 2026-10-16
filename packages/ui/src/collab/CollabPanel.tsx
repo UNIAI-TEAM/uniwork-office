@@ -22,11 +22,14 @@ import { announcePolite } from './live-region'
 import {
   CollabThread,
   defaultRenderAnchor,
+  defaultRenderBody,
   type CollabAnchorSlot,
   type CollabRenderAnchor,
   type CollabRenderBody,
   type CollabRenderComposer,
 } from './CollabThread'
+import { PostSendMentionNotice, type CollabPostSendStrings } from './PostSendMentionNotice'
+import type { CollabComment, CollabMention, CollabMentionWithoutAccess } from './types'
 import {
   collabInsertIndex,
   type CollabController,
@@ -42,7 +45,8 @@ export interface CollabInFileSlot {
 
 export interface CollabPanelProps {
   controller: CollabController
-  strings: CollabStrings
+  /** the panel catalogue; the post-send notice keys are required (G8-18) */
+  strings: CollabStrings & CollabPostSendStrings
   /** absent: no close button (e.g. a tab of a larger panel) */
   onClose?(): void
   /** optional ref to the host button that opened the panel; focused when Close is activated */
@@ -300,6 +304,61 @@ export function CollabPanel(p: CollabPanelProps) {
     if (id) focusedRef.current = { id, order: visibleIds }
   }
 
+  // G8-18: the notice of the LAST write only; the next send drops it, the user can dismiss it
+  const [postSend, setPostSend] = useState<{
+    commentId: string
+    items: readonly CollabMentionWithoutAccess[]
+  } | null>(null)
+
+  /** runs a write through the controller and keeps what the server answered about unreachable mentions */
+  async function tracked(run: () => Promise<CollabComment>): Promise<CollabComment> {
+    setPostSend(null)
+    const c = await run()
+    if (c?.id && c.mentions_without_access && c.mentions_without_access.length > 0) {
+      setPostSend({ commentId: c.id, items: c.mentions_without_access })
+    }
+    return c
+  }
+
+  function dismissPostSend(hadFocus: boolean) {
+    setPostSend(null)
+    // the notice held focus and is gone: the panel title is the stable place to land
+    if (hadFocus) titleRef.current?.focus()
+  }
+
+  const renderPostSend = (commentId: string, mentions: readonly CollabMention[]) =>
+    postSend && postSend.commentId === commentId ? (
+      <PostSendMentionNotice
+        commentId={commentId}
+        items={postSend.items}
+        mentions={mentions}
+        host={host}
+        source={ctl.source}
+        strings={strings}
+        onDismiss={dismissPostSend}
+      />
+    ) : null
+
+  const baseRenderBody: CollabRenderBody = p.renderBody ?? defaultRenderBody
+  const renderBodyWithNotice: CollabRenderBody = (c, mentions) => (
+    <>
+      {baseRenderBody(c, mentions)}
+      {renderPostSend(c.id, mentions)}
+    </>
+  )
+
+  const panelActions = {
+    ...ctl.actions,
+    create: (
+      bodyText: string,
+      createOpts?: { anchor?: CollabAnchorSlot['anchor']; base_version_id?: string },
+    ) => tracked(() => ctl.actions.create(bodyText, createOpts)),
+    reply: (threadId: string, bodyText: string) =>
+      tracked(() => ctl.actions.reply(threadId, bodyText)),
+    edit: (commentId: string, bodyText: string) =>
+      tracked(() => ctl.actions.edit(commentId, bodyText)),
+  }
+
   const renderThread = (t: CollabThreadView) => (
     <CollabThread
       key={t.id}
@@ -308,7 +367,7 @@ export function CollabPanel(p: CollabPanelProps) {
       source={ctl.source}
       strings={strings}
       can={ctl.can}
-      actions={ctl.actions}
+      actions={panelActions}
       mentions={ctl.mentions}
       expanded={ctl.isExpanded(t)}
       onToggleExpanded={ctl.toggleExpanded}
@@ -316,7 +375,7 @@ export function CollabPanel(p: CollabPanelProps) {
       statusLineId={lineKey ? statusId : undefined}
       conflict={ctl.conflict}
       adapter={ctl.adapter}
-      renderBody={p.renderBody}
+      renderBody={renderBodyWithNotice}
       renderAnchor={p.renderAnchor}
       renderComposer={p.renderComposer}
       formatTime={p.formatTime}
@@ -370,14 +429,8 @@ export function CollabPanel(p: CollabPanelProps) {
               }
               afterNewThreadRef.current = pendingSend
               try {
-                const res: unknown = await ctl.actions.create(body, nt)
-                if (typeof res === 'string') pendingSend.createdId = res
-                else if (res && typeof res === 'object') {
-                  const direct = (res as { id?: unknown }).id
-                  const nested = (res as { comment?: { id?: unknown } }).comment?.id
-                  if (typeof direct === 'string') pendingSend.createdId = direct
-                  else if (typeof nested === 'string') pendingSend.createdId = nested
-                }
+                const created = await panelActions.create(body, nt)
+                if (typeof created?.id === 'string') pendingSend.createdId = created.id
                 newThreadOpenerRef.current = null
               } catch (err) {
                 afterNewThreadRef.current = null
@@ -405,6 +458,14 @@ export function CollabPanel(p: CollabPanelProps) {
       newThreadItem,
     )
   }
+
+  const renderedCommentIds = new Set<string>()
+  for (const t of visible) {
+    renderedCommentIds.add(t.root.id)
+    for (const r of t.replies) renderedCommentIds.add(r.id)
+  }
+  // the sent comment may not be in the list yet (or is not shown): the notice still follows the send
+  const orphanPostSend = postSend && !renderedCommentIds.has(postSend.commentId) ? postSend : null
 
   let body: ReactNode
   if (ctl.state === 'loading') {
@@ -447,6 +508,7 @@ export function CollabPanel(p: CollabPanelProps) {
             {openItems}
           </ul>
         )}
+        {orphanPostSend ? renderPostSend(orphanPostSend.commentId, ctl.mentions) : null}
         {ctl.resolved.length > 0 && (
           <div className="collab-group">
             <button
@@ -573,7 +635,9 @@ export function CollabPanel(p: CollabPanelProps) {
               mode: 'discussion',
               draftKey: 'discussion',
               ...disabled,
-              onSubmit: (body) => ctl.actions.create(body),
+              onSubmit: async (bodyText) => {
+                await panelActions.create(bodyText)
+              },
               onCancel: () => {},
             })}
           </div>

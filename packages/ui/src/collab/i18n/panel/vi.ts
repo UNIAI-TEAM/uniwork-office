@@ -78,4 +78,27 @@ export const vi = {
   // comments stored in the file (read-only)
   collabInFileSection: 'Bình luận trong tệp',
   collabInFileHint: 'Lưu sẵn trong tệp và chỉ để xem: không sửa hay trả lời được ở đây.',
+
+  // mention access warning & post-send notice
+  collabMentionWarnTitle: 'Người được nhắc chưa có quyền xem',
+  collabMentionWarnBody: '{names} chưa xem được tài liệu này nên sẽ không nhận thông báo.',
+  collabShareViewThenSend: 'Chia sẻ quyền Xem rồi gửi',
+  collabSendWithoutNotify: 'Gửi, không thông báo',
+  collabMentionAskManager: 'Hãy nhờ người quản lý tài liệu chia sẻ quyền Xem cho {names}.',
+  collabMentionMixedUnshareable:
+    'Không thể chia sẻ cho {unshareable}; những người này sẽ không nhận thông báo.',
+  collabSharingView: 'Đang chia sẻ quyền Xem…',
+  collabShareViewFailed:
+    'Chưa chia sẻ được quyền Xem cho {failedNames}. Bạn có thể thử lại hoặc gửi mà không thông báo.',
+  collabShareViewPartial:
+    'Đã chia sẻ quyền Xem cho {sharedNames}. Chưa chia sẻ được cho {failedNames} (sẽ không nhận thông báo).',
+  collabSendComment: 'Gửi bình luận',
+  collabRetryShareFor: 'Thử lại cho {failedNames}',
+  collabSendFailedAfterShare:
+    'Đã chia sẻ quyền Xem cho {sharedNames} nhưng chưa gửi được bình luận. Nội dung vẫn còn trong ô soạn — hãy thử gửi lại.',
+  collabPostSendNoAccess: '{names} chưa xem được tài liệu này nên đã không nhận thông báo.',
+  collabPostSendShareAction: 'Chia sẻ quyền Xem',
+  collabPostSendNoRetroNote:
+    'Chia sẻ lúc này không gửi lại thông báo cho bình luận trên; hãy nhắc lại họ ở bình luận mới nếu cần.',
+  collabDismissNotice: 'Đóng thông báo',
 } satisfies Record<keyof typeof zh, string>

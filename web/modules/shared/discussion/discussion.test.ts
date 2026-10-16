@@ -126,7 +126,7 @@ describe('frame claim per module (D4)', () => {
       slides: false,
       pdf: false,
     })
-    expect(frameCommentsClaim(true)).toEqual({ comments: true })
+    expect(frameCommentsClaim(true)).toEqual({ comments: true, commentsShareView: true })
     expect(frameCommentsClaim(false)).toEqual({})
   })
 
@@ -296,6 +296,33 @@ describe('createFrameDiscussionSource', () => {
       ['comments.revisions', { comment_id: 'c' }],
       ['mentions.search', { q: 'an', limit: 5 }],
     ])
+  })
+
+  it('G8-18: carries include through, and shareView / canListMembers only from the mention access', async () => {
+    const p = discussionPort()
+    p.mock.init()
+    p.mock.override('mentions.search', () => ({ candidates: [] }))
+    p.mock.override('comments.shareView', () => ({ ok: true as const }))
+    const plain = createFrameDiscussionSource(p.port)
+    expect(plain.shareView).toBeUndefined()
+    expect(plain.canListMembers).toBeUndefined()
+    const granted = createFrameDiscussionSource(p.port, {
+      commentsShareView: true,
+      canListMembers: true,
+    })
+    expect(granted.canListMembers).toBe(true)
+    await granted.searchMentions({ q: 'an', limit: 20, include: 'no_access' })
+    await granted.shareView!({ user_id: 'u1' })
+    expect(p.mock.calls.map((c) => [c.type, c.payload])).toEqual([
+      ['mentions.search', { q: 'an', limit: 20, include: 'no_access' }],
+      ['comments.shareView', { user_id: 'u1' }],
+    ])
+    const denied = createFrameDiscussionSource(p.port, {
+      commentsShareView: false,
+      canListMembers: false,
+    })
+    expect(denied.shareView).toBeUndefined()
+    expect(denied.canListMembers).toBe(false)
   })
 
   it('maps protocol errors to the kit error (details.code first)', async () => {

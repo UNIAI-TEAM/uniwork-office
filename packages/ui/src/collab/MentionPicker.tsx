@@ -8,6 +8,7 @@
 import { format } from '@genoffice/i18n'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { MENTION_DEBOUNCE_MS, MENTION_MAX_ROWS } from './mention-query'
+import { NoAccessBadge } from './NoAccessBadge'
 import type { CollabCandidate, CollabSource } from './types'
 
 /** the S14 keys plus the shared Retry */
@@ -20,6 +21,7 @@ export interface CollabPickerStrings {
   collabMentionNoMatch: string
   collabMentionNoCandidates: string
   collabMentionError: string
+  collabMentionNoAccessBadge: string
   collabRetry: string
 }
 
@@ -73,10 +75,12 @@ export interface MentionSearch {
  * to `announce` once per answer.
  */
 export function useMentionSearch(opts: {
-  source: Pick<CollabSource, 'searchMentions'>
+  source: Pick<CollabSource, 'searchMentions' | 'canListMembers'>
   query: string | null
   strings: CollabPickerStrings
   announce?: (text: string) => void
+  /** G8-18: when true (or `source.canListMembers === true`), pass `include: 'no_access'` */
+  canListMembers?: boolean
 }): MentionSearch {
   const { query } = opts
   const [state, setState] = useState<SearchState>(INITIAL)
@@ -94,9 +98,14 @@ export function useMentionSearch(opts: {
     setState((s) => (s.status === 'searching' ? s : { ...s, status: 'searching' }))
     let alive = true
     const run = async () => {
-      const { source, strings, announce } = latest.current
+      const { source, strings, announce, canListMembers } = latest.current
+      const mayList = canListMembers ?? source.canListMembers
       try {
-        const res = await source.searchMentions({ q: query, limit: MENTION_MAX_ROWS })
+        const res = await source.searchMentions(
+          mayList
+            ? { q: query, limit: MENTION_MAX_ROWS, include: 'no_access' }
+            : { q: query, limit: MENTION_MAX_ROWS },
+        )
         if (!alive) return
         const candidates = res.candidates.slice(0, MENTION_MAX_ROWS)
         setState({ status: 'ready', candidates, forQuery: query })
@@ -180,6 +189,8 @@ export interface MentionPickerProps {
   onPick(row: MentionRow): void
   /** the visible result count line (`collabMentionCount`), when there is one */
   footer?: string
+  /** `collabMentionNoAccessBadge` shown with a lock icon on candidates with `can_view === false` (G8-18) */
+  noAccessBadge: string
 }
 
 export function MentionPicker({
@@ -189,6 +200,7 @@ export function MentionPicker({
   activeIndex,
   onPick,
   footer,
+  noAccessBadge,
 }: MentionPickerProps) {
   return (
     // mousedown must not move focus out of the textarea
@@ -196,6 +208,7 @@ export function MentionPicker({
       <ul role="listbox" id={listboxId} aria-label={label} className="collab-mention-list">
         {rows.map((row, i) => {
           const disabled = row.kind === 'message'
+          const noAccess = row.kind === 'candidate' && row.candidate.can_view === false
           return (
             <li
               key={row.key}
@@ -203,6 +216,7 @@ export function MentionPicker({
               role="option"
               aria-selected={i === activeIndex}
               aria-disabled={disabled ? true : undefined}
+              data-no-access={noAccess ? 'true' : undefined}
               className={`collab-mention-option collab-mention-${row.kind}`}
               onClick={disabled ? undefined : () => onPick(row)}
             >
@@ -221,6 +235,7 @@ export function MentionPicker({
                       <span className="collab-mention-email">{row.candidate.email}</span>
                     ) : null}
                   </span>
+                  {noAccess ? <NoAccessBadge label={noAccessBadge} /> : null}
                 </>
               ) : (
                 <span className="collab-mention-text">{row.text}</span>

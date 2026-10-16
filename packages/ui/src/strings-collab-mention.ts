@@ -50,7 +50,7 @@ export type CollabMentionStringKey = keyof (typeof collabMentionStrings)['zh']
 
 const translate = createI18n(collabMentionStrings)
 
-// params fill the {count} and {query} slots
+// params fill the {count} and {query} slots (collabMentionNoAccessBadge takes no params)
 export function collabMentionText(
   lang: Lang,
   key: CollabMentionStringKey,

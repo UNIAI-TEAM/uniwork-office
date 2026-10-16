@@ -173,6 +173,7 @@ export function toStatus(doc: BoundDocument, pendingNext = false): UniworkDocSta
     title: b.title,
     format: b.format,
     access: b.access,
+    ...(b.level ? { commentsLevel: b.level } : {}),
     state: b.state,
     ...(b.error ? { error: b.error } : {}),
     ...(b.lastSavedAt ? { lastSavedAt: b.lastSavedAt } : {}),

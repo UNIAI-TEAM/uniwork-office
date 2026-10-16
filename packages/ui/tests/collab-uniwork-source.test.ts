@@ -152,6 +152,27 @@ describe('createUniworkCommentsSource (§3.2)', () => {
       expect(toCollabError(await rejection(call))).toEqual({ code: 'internal' })
     }
   })
+
+  it('forwards include=no_access in searchMentions, canListMembers, and shareView when provided (G8-18)', async () => {
+    const { api, calls } = fakeApi()
+    const shareViewFn = vi.fn(() => ok({ ok: true as const }))
+    const apiWithShare: UniworkCommentsLike = {
+      ...api,
+      canListMembers: true,
+      shareView: shareViewFn,
+    }
+    const source = createUniworkCommentsSource(apiWithShare, PATH, 'comment')
+    expect(source.canListMembers).toBe(true)
+    await source.searchMentions({ q: 'an', limit: 20, include: 'no_access' })
+    expect(await source.shareView!({ user_id: 'u-99' })).toEqual({ ok: true })
+    expect(calls).toEqual([
+      {
+        method: 'searchMentions',
+        input: { path: PATH, q: 'an', limit: 20, include: 'no_access' },
+      },
+    ])
+    expect(shareViewFn).toHaveBeenCalledWith({ path: PATH, userId: 'u-99' })
+  })
 })
 
 describe('sendAnchorMap (§3.2)', () => {
