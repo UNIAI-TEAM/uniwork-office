@@ -506,3 +506,17 @@
     transition: none;
   }
 }
+
+/* S5: Save a copy's Location row inside the conflict dialog */
+.uw-conflict-location {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.uw-conflict-location-label {
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
