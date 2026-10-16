@@ -733,16 +733,16 @@ describe('view-only (no save grant)', () => {
   })
 })
 
-describe('too large (frame size gate)', () => {
-  it('the open fails with too_large and the host hears a fatal too_large (it opens G3)', async () => {
+describe('too large and open refusal (SIZE-F1)', () => {
+  it('the open fails with too_large and the host hears open_refused + fatal too_large; saves are refused', async () => {
     const fake = fakeTransport()
     const tooLarge = {
       ...fake.transport,
       open: async () => {
-        throw Object.assign(new Error('too_large: 42 MB of worksheet XML'), {
+        throw Object.assign(new Error('too_large: 513 MB of worksheet XML'), {
           code: 'too_large',
-          worksheetXmlBytes: 42 * 1048576,
-          limitBytes: 80 * 1048576,
+          worksheetXmlBytes: 513 * 1048576,
+          limitBytes: 512 * 1048576,
         })
       },
     }
@@ -751,13 +751,83 @@ describe('too large (frame size gate)', () => {
     await flush()
     const err = await t.desktop.selectWorkbook().catch((e: unknown) => e)
     expect((err as { code?: string }).code).toBe('too_large')
+    expect(t.mock.openRefused).toEqual([
+      {
+        reason: 'too_large_to_open',
+        bytes: 2,
+        measure: {
+          kind: 'worksheet_xml_bytes',
+          value: 513 * 1048576,
+          limit: 512 * 1048576,
+        },
+      },
+    ])
     const fatal = t.mock.errors.filter((e) => (e.error as { code?: string }).code === 'too_large')
     expect(fatal).toHaveLength(1)
     expect(fatal[0]!.fatal).toBe(true)
     // the sizes the host needs for its one-sentence reason (visual round 2, S-07)
     expect(fatal[0]!.error).toMatchObject({
-      details: { worksheetXmlBytes: 42 * 1048576, limitBytes: 80 * 1048576 },
+      details: { worksheetXmlBytes: 513 * 1048576, limitBytes: 512 * 1048576 },
     })
+    await expect(t.desktop.saveWorkbookEdits(saveRequest('s1', [[0, 0, 1]]))).rejects.toThrow(
+      /513 MB/,
+    )
+    expect(await t.desktop.writeWorkbookRecovery(saveRequest('s1', [[0, 0, 1]]))).toEqual({
+      ok: false,
+    })
+    expect(await t.mock.host.save({ reason: 'user' })).toMatchObject({
+      ok: false,
+      error: { code: 'too_large' },
+    })
+    expect(await t.mock.host.saveAs({ name: 'Copy.xlsx' })).toMatchObject({
+      ok: false,
+      error: { code: 'too_large' },
+    })
+    expect(t.mock.calls.filter((c) => c.type === 'api.save' || c.type === 'api.saveAs')).toEqual([])
+  })
+
+  it('engine out of memory emits one open_refused + fatal too_large, blocks saves, and resets when another documentId opens', async () => {
+    const fake = fakeTransport()
+    let failOom = true
+    const oomTransport: SheetsEngineTransport = {
+      ...fake.transport,
+      async open(input) {
+        if (failOom) {
+          throw new Error(
+            'open_workbook failed: memory allocation of 67108864 bytes failed (out of memory)',
+          )
+        }
+        return fake.transport.open(input)
+      },
+    }
+    const t = setup({ transport: oomTransport })
+    t.mock.init({ documentId: t.file.fileId, capabilities: ALL_GRANTS })
+    await flush()
+    const err = await t.desktop.selectWorkbook().catch((e: unknown) => e)
+    expect((err as { code?: string }).code).toBe('too_large')
+    expect(t.mock.openRefused).toEqual([
+      {
+        reason: 'engine_out_of_memory',
+        bytes: 2,
+      },
+    ])
+    const fatal = t.mock.errors.filter((e) => (e.error as { code?: string }).code === 'too_large')
+    expect(fatal).toHaveLength(1)
+    expect(fatal[0]!.fatal).toBe(true)
+    expect(await t.mock.host.save({ reason: 'user' })).toMatchObject({
+      ok: false,
+      error: { code: 'too_large' },
+    })
+    expect(t.mock.calls.filter((c) => c.type === 'api.save')).toEqual([])
+
+    // Opening another documentId resets the refused state and allows saving
+    failOom = false
+    const other = t.mock.seed('Small.xlsx', enc('small-v1'))
+    await t.mock.host.open(t.mock.openPayload(other.fileId))
+    const wb = await t.desktop.selectWorkbook()
+    expect(wb?.name).toBe('Small.xlsx')
+    await t.desktop.saveWorkbookEdits(saveRequest(wb!.sessionId, [[0, 0, 99]]))
+    expect(t.mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(1)
   })
 })
 

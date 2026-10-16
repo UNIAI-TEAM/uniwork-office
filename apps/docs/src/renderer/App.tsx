@@ -843,6 +843,7 @@ export function App() {
     null,
   )
   const [status, setStatus] = useState<StatusLine>('')
+  const [refusedMessage, setRefusedMessage] = useState<StatusLine>('')
   // A key + params line re-translates at render time, so only a ready
   // (already translated) string goes stale on a UI language switch.
   const clearStaleStatus = useCallback(
@@ -1944,7 +1945,7 @@ export function App() {
   // StreamingTailGuardExtension; saves wait for the full content).
   useEffect(() => {
     if (!editor) return
-    setEditorEditable(editor, !readMode && !isProtected)
+    setEditorEditable(editor, !readMode && !isProtected && !refusedMessage)
     scheduleUiRefresh()
     if (!readMode) return
     const onKey = (e: KeyboardEvent) => {
@@ -1952,7 +1953,7 @@ export function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [editor, readMode, isProtected, scheduleUiRefresh])
+  }, [editor, readMode, isProtected, refusedMessage, scheduleUiRefresh])
 
   // Track Changes: the recorder plugin reads its toggle from extension storage
   useEffect(() => {
@@ -2079,6 +2080,7 @@ export function App() {
     printAutoOpenedPreviewRef,
     setShowPrintDialog,
     setStatus,
+    setRefusedMessage,
     setRecent,
     setShowAi,
     setDoc,
@@ -7561,6 +7563,14 @@ export function App() {
                       )}
                     </div>
                   </div>
+                ) : refusedMessage ? (
+                  <div
+                    className="start-screen start-refused"
+                    role="alert"
+                    data-testid="docs-open-refused"
+                  >
+                    {statusText(refusedMessage, t)}
+                  </div>
                 ) : (
                   <div className="start-screen start-booting">{t('appStartOpening')}</div>
                 )}
@@ -7689,7 +7699,7 @@ export function App() {
                 </>
               )}
               {/* no document yet means the boot-time open is still running */}
-              {(!doc || docLoading) && (
+              {((!doc && !refusedMessage) || docLoading) && (
                 <span className="status-item status-loading" role="status">
                   {t('appStartOpening')}
                 </span>

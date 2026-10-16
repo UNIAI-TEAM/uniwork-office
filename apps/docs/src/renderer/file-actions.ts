@@ -57,7 +57,7 @@ import { hfSaveOptions } from './hf-sections'
 import { fetchDocBytes } from './doc-bytes'
 import { parseDocxOffThread } from './parse-off-thread'
 import { PHASED_APPEND } from './editor/streaming-tail-guard'
-import { docTextLength, docWeight, openTierFor } from './large-document'
+import { docTextLength, docWeight, openTierFor, refusalMeasureFor } from './large-document'
 import { blocksHaveRevisions } from './editor/revision-view'
 import { docStyleCss } from './doc-style-css'
 import { setNoteNumFmts } from './note-format'
@@ -116,6 +116,7 @@ export interface FileActionContext {
   printAutoOpenedPreviewRef: { current: boolean }
   setShowPrintDialog: (show: boolean) => void
   setStatus: (status: StatusLine) => void
+  setRefusedMessage?: (msg: StatusLine) => void
   setRecent: (paths: string[]) => void
   setShowAi: (show: boolean) => void
   setDoc: Dispatch<SetStateAction<DocState | null>>
@@ -327,11 +328,13 @@ function applyDocLayoutSettings(editor: Editor, parsed: ParsedDocFull): void {
 
 /**
  * 'ok' loaded; 'canceled' dialog dismissed / no editor; 'password' the password
- * prompt took over (App resumes via loadFile once decrypted); 'failed' parse or
- * load error — the boot path falls back to a blank document instead of leaving
- * the tab on "Opening…" forever.
+ * prompt took over (App resumes via loadFile once decrypted); 'refused' size,
+ * complexity, or OOM gate tripped — stays on a read-only refused state instead
+ * of mounting an editable blank fallback document; 'failed' parse or load error —
+ * the boot path falls back to a blank document instead of leaving the tab on
+ * "Opening…" forever.
  */
-export type LoadFileOutcome = 'ok' | 'canceled' | 'password' | 'failed' | 'superseded'
+export type LoadFileOutcome = 'ok' | 'canceled' | 'password' | 'refused' | 'failed' | 'superseded'
 
 /** appends a streamed tail chunk at the document end, outside undo history and the AI freshness baseline */
 export function appendStreamedNodes(editor: Editor, nodes: PmNode[]): void {
@@ -401,6 +404,64 @@ function focusDocumentStart(editor: Editor): void {
   attempt()
 }
 
+/** the web frame bridge installs `reportOpenRefused`; the desktop app has no host to tell */
+function isWebFrame(): boolean {
+  return typeof window.desktop?.reportOpenRefused === 'function'
+}
+
+/** size / complexity / out-of-memory failures of the open path that count as a refusal */
+function classifyOpenRefusal(msg: string): {
+  reason: 'too_large_to_open' | 'too_complex' | 'engine_out_of_memory'
+  measure?: { kind: 'zip_parts'; value: number; limit: number }
+} | null {
+  const parts = /(?:zip|docx) rejected:\s*(\d+)\s*parts exceeds the\s*(\d+)\s*limit/i.exec(msg)
+  if (parts) {
+    return {
+      reason: 'too_complex',
+      measure: { kind: 'zip_parts', value: Number(parts[1]), limit: Number(parts[2]) },
+    }
+  }
+  if (/out of memory/i.test(msg)) return { reason: 'engine_out_of_memory' }
+  if (/(?:zip|docx) rejected:/i.test(msg)) return { reason: 'too_large_to_open' }
+  return null
+}
+
+function refuseOpen(
+  ctx: FileActionContext,
+  msg: string,
+  report: Parameters<NonNullable<typeof window.desktop.reportOpenRefused>>[0],
+): 'refused' {
+  window.desktop?.reportOpenRefused?.(report)
+  cancelPhasedContent()
+  if (ctx.editor && !ctx.editor.isDestroyed) {
+    ctx.editor
+      .chain()
+      .setMeta('addToHistory', false)
+      .setMeta(TRACK_IGNORE, true)
+      .setMeta(TABLE_TRAILING_SKIP, true)
+      .setMeta(PHASED_APPEND, true)
+      .clearContent()
+      .run()
+    resetEditorHistory(ctx.editor)
+    ctx.editor.setEditable(false)
+  }
+  noteDocumentSwapped()
+  discardStalePasswordIntents()
+  resetCrossDocEditState(ctx)
+  ctx.dirtyRef.current = false
+  ctx.setDoc(null)
+  ctx.setReadMode(false)
+  ctx.setLargeDocSpellOff(false)
+  ctx.setShowComments(false)
+  ctx.setComments([])
+  ctx.setCommentsDirty(false)
+  ctx.setCompareResult(null)
+  ctx.setRefusedMessage?.(msg)
+  ctx.setStatus(msg)
+  showToast(msg, 'error')
+  return 'refused'
+}
+
 /** bumped when a document replacement starts; a slower one still parsing must not land */
 let openGeneration = 0
 
@@ -414,8 +475,10 @@ export async function loadFile(
     return 'password'
   }
   const generation = ++openGeneration
+  let loadedBytesLength = 0
   try {
     const bytes = await fetchDocBytes(result.dataUrl)
+    loadedBytesLength = bytes.byteLength
     // web: no decrypt engine here; say so instead of failing in the zip parser with a raw error
     if (!cap('docPassword') && isEncryptedPackage(bytes)) {
       ctx.promptAppOnlyEncrypted({ name: result.name })
@@ -430,11 +493,22 @@ export async function loadFile(
     if (generation !== openGeneration) return 'superseded'
     const tier = openTierFor(docWeight(parsed.blocks))
     if (tier === 'refuse') {
+      const chars = docTextLength(parsed.blocks)
       const msg = t('appDocTooLargeBlocks', {
         name: result.name,
         blocks: parsed.blocks.length,
-        chars: docTextLength(parsed.blocks),
+        chars,
       })
+      // the web frame keeps a read-only refused state and tells the host (open_refused)
+      if (isWebFrame()) {
+        return refuseOpen(ctx, msg, {
+          path: result.path,
+          reason: 'too_large_to_open',
+          bytes: loadedBytesLength,
+          measure: refusalMeasureFor(parsed.blocks),
+          message: msg,
+        })
+      }
       ctx.setStatus(msg)
       showToast(msg, 'error')
       // like a parse failure: a tab with no document falls back to a blank one
@@ -456,6 +530,7 @@ export async function loadFile(
     resetEditorHistory(ctx.editor)
     if (tier !== 'readOnly') focusDocumentStart(ctx.editor)
     noteDocumentSwapped()
+    ctx.setRefusedMessage?.('')
     ctx.setDoc({
       parsed,
       filePath: result.path,
@@ -560,6 +635,17 @@ export async function loadFile(
     return 'ok'
   } catch (err) {
     if (generation !== openGeneration) return 'superseded'
+    const errMsg = err instanceof Error ? err.message : String(err)
+    const refusal = isWebFrame() ? classifyOpenRefusal(errMsg) : null
+    if (refusal) {
+      return refuseOpen(ctx, t('appOpenFailed', { error: errMsg }), {
+        path: result.path,
+        reason: refusal.reason,
+        bytes: loadedBytesLength,
+        ...(refusal.measure ? { measure: refusal.measure } : {}),
+        message: errMsg,
+      })
+    }
     // visible failure: the status-bar line alone is easy to miss under the start screen
     ctx.setStatus(t('appOpenFailed', { error: String(err) }))
     showToast(t('appOpenFailed', { error: String(err) }), 'error')
@@ -606,6 +692,7 @@ export async function newFile(ctx: FileActionContext): Promise<boolean | undefin
     resetEditorHistory(ctx.editor)
     focusDocumentStart(ctx.editor)
     noteDocumentSwapped()
+    ctx.setRefusedMessage?.('')
     ctx.setDoc({ parsed, filePath: null, fileName: t('appUntitledDocx'), hash: '', isBlank: true })
     // a very large document opened in Read Mode must not leave it on for the new one
     ctx.setReadMode(false)

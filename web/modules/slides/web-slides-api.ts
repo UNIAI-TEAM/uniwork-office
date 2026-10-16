@@ -58,6 +58,8 @@ import {
   type FileMeta,
   type FileSource,
   type OpenPayload,
+  type OpenRefusedMeasure,
+  type OpenRefusedReason,
   type ProtocolErrorShape,
   type SaveResult,
 } from '../../docs/protocol/types'
@@ -200,6 +202,8 @@ export function createWebSlidesApi(
 ) {
   const port = ctx.client
   const state = createDocState()
+  /** documentIds already reported through `open_refused` */
+  const refusedIds = new Set<string>()
   const download = opts.download ?? downloadBlob
   const editorStartMs = opts.editorStartMs ?? TIMEOUTS.editorStart
 
@@ -348,11 +352,12 @@ export function createWebSlidesApi(
   let restoredDraft: ArrayBuffer | null = null
   const drafts = (opts.drafts ?? ((h) => bridgeDraftRecovery(port, 'slides', h)))({
     file: () => {
+      if (state.fatal !== null) return null
       const file = offering ?? (current !== null ? state.files.get(current) : undefined)
       return file && file.fileId === initDocumentId ? { etag: file.etag, name: file.name } : null
     },
     // a text box still in edit mode counts: its text is in the draft too (draftOpened)
-    isDirty: () => sessionIsDirty() || readPendingTextEdit() !== null,
+    isDirty: () => state.fatal === null && (sessionIsDirty() || readPendingTextEdit() !== null),
     bytes: async () => {
       const session = sessions.get(WEB_CLIENT_ID)
       // master view writes only its part back on save: no draft until it is closed
@@ -414,6 +419,17 @@ export function createWebSlidesApi(
 
   /** a session handler with IPC semantics: cloned in, cloned out, rejections for throws */
   async function invoke(channel: SessionChannel, ...args: unknown[]): Promise<any> {
+    if (state.fatal !== null) {
+      if (channel === 'slides:save' || channel === 'slides:save-as') {
+        return { ok: false, error: state.fatal.message || text('webFatalTitle') }
+      }
+      if (channel === 'slides:new-blank') {
+        throw new Error(state.fatal.message || text('webFatalTitle'))
+      }
+      if (!READ_ONLY_CHANNELS.has(channel)) {
+        return null
+      }
+    }
     if (viewOnly() && !READ_ONLY_CHANNELS.has(channel)) {
       return channel === 'slides:save' || channel === 'slides:save-as'
         ? { ok: false, error: text('webReadOnly') }
@@ -440,6 +456,35 @@ export function createWebSlidesApi(
     showFatal(body)
   }
 
+  function classifySlidesOpenRefusal(err: unknown): {
+    reason: OpenRefusedReason
+    measure?: OpenRefusedMeasure
+    message: string
+  } | null {
+    const message = err instanceof Error ? err.message : String(err)
+    const partsMatch = message.match(
+      /(?:zip|pptx) rejected:\s*(\d+)\s*parts exceeds the\s*(\d+)\s*limit/i,
+    )
+    if (partsMatch) {
+      return {
+        reason: 'too_complex',
+        measure: {
+          kind: 'zip_parts',
+          value: Number(partsMatch[1]),
+          limit: Number(partsMatch[2]),
+        },
+        message,
+      }
+    }
+    if (/(?:zip|pptx) rejected:/i.test(message)) {
+      return { reason: 'too_large_to_open', message }
+    }
+    if (/out of memory/i.test(message)) {
+      return { reason: 'engine_out_of_memory', message }
+    }
+    return null
+  }
+
   /**
    * bytes of an OpenPayload -> the client's session; null after a fatal notice. `withDraft`
    * (the init and host `open` documents) offers the stored draft first: Restore opens the draft
@@ -450,7 +495,9 @@ export function createWebSlidesApi(
     fitWidthPx: number,
     withDraft = false,
   ): Promise<OpenResult | null> {
-    let bytes = await readSource(open.source)
+    const sourceBytes = await readSource(open.source)
+    const sourceByteLength = sourceBytes.byteLength
+    let bytes = sourceBytes
     // a new, still empty presentation file: start it as a blank deck bound to that file
     if (bytes.length === 0) bytes = await createBlankPptx()
     const cfb = cfbKind(bytes)
@@ -469,12 +516,35 @@ export function createWebSlidesApi(
     current = open.file.fileId
     revokeMedia()
     await loadBundledFonts()
-    const { session, result } = await openSessionFromBytes(WEB_CLIENT_ID, {
-      path: pathFor(open.file),
-      bytes,
-      fitWidthPx,
-      ...(draft ? { recovered: true } : {}),
-    })
+    let openedSession: Awaited<ReturnType<typeof openSessionFromBytes>>
+    try {
+      openedSession = await openSessionFromBytes(WEB_CLIENT_ID, {
+        path: pathFor(open.file),
+        bytes,
+        fitWidthPx,
+        ...(draft ? { recovered: true } : {}),
+      })
+    } catch (err) {
+      sessions.delete(WEB_CLIENT_ID)
+      current = null
+      port.setDirty(false)
+      const refusal = classifySlidesOpenRefusal(err)
+      if (refusal) {
+        // at most once per documentId per session (contract §3.1a)
+        if (!refusedIds.has(open.file.fileId)) {
+          refusedIds.add(open.file.fileId)
+          port.reportOpenRefused?.({
+            reason: refusal.reason,
+            bytes: sourceByteLength,
+            ...(refusal.measure ? { measure: refusal.measure } : {}),
+          })
+        }
+        fatal(err, 'webFatalBody')
+        return null
+      }
+      throw err
+    }
+    const { session, result } = openedSession
     fontsRelaid = false
     await fontsPending
     state.fatal = null
@@ -932,7 +1002,7 @@ export function createWebSlidesApi(
     // the frame is the UniWork document: no desktop working-copy state. A frame without the
     // host's `save` grant is read-only: the renderer then stays in Reading view (no text, cell or
     // notes editing surface), the same path as a view-only working copy on the desktop
-    uniworkState: async () => ({ bound: false, readOnly: viewOnly() }),
+    uniworkState: async () => ({ bound: false, readOnly: viewOnly() || state.fatal !== null }),
     saveAs: async (defaultName) => {
       const pending = hostSaveAs
       pending?.started()

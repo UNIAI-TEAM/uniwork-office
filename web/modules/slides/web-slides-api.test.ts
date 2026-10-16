@@ -951,3 +951,45 @@ describe('new version on UniWork (doc.remoteVersion)', () => {
     expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(1)
   })
 })
+
+describe('open_refused and zip part-count refusal (SIZE-F1)', () => {
+  it('refuses a pptx exceeding the 10 000 zip-parts limit with open_refused + the fatal open error, blocks newBlank and saves, and resets on another documentId', async () => {
+    const zip = new JSZip()
+    for (let i = 0; i < 10_001; i++) {
+      zip.file(`p/${i}.xml`, '')
+    }
+    const manyPartsBytes = await zip.generateAsync({ type: 'uint8array' })
+    const { mock, api } = await setup({ bytes: manyPartsBytes })
+
+    expect(await api.consumePendingOpen(FIT)).toBeNull()
+    expect(document.querySelector('[data-slides-web="fatal"]')).not.toBeNull()
+    expect(mock.openRefused).toEqual([
+      {
+        reason: 'too_complex',
+        bytes: manyPartsBytes.byteLength,
+        measure: {
+          kind: 'zip_parts',
+          value: 10_001,
+          limit: 10_000,
+        },
+      },
+    ])
+    expect(mock.errors.at(-1)).toMatchObject({ fatal: true })
+    expect((await api.uniworkState()).readOnly).toBe(true)
+    await expect(api.newBlank(FIT)).rejects.toThrow(/10001 parts exceeds the 10000 limit/i)
+    expect(await api.save()).toMatchObject({ ok: false })
+    expect(await api.saveAs('Copy.pptx')).toMatchObject({ ok: false })
+    expect(await mock.host.save({ reason: 'user' })).toMatchObject({ ok: false })
+    expect(await mock.host.saveAs({ name: 'Copy.pptx' })).toMatchObject({ ok: false })
+    expect(mock.calls.filter((c) => c.type === 'api.save' || c.type === 'api.saveAs')).toEqual([])
+
+    // Opening another documentId resets the refused state and allows saving
+    const other = mock.seed('valid.pptx', FIXTURE)
+    await mock.host.open(mock.openPayload(other.fileId))
+    expect((await api.uniworkState()).readOnly).toBe(false)
+    await api.setNotes({ slideIndex: 0, text: 'recovered' })
+    await flush()
+    expect((await api.save()).ok).toBe(true)
+    expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(1)
+  })
+})
