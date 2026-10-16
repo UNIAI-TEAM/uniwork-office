@@ -16,8 +16,9 @@ export class UniworkDocError extends Error {
   /** a `Retry-After` the server sent (ms), honoured by the queue's backoff */
   readonly retryAfterMs?: number
   /**
-   * FD-11: the depth cap a `document_too_deep` answer carries (the envelope's
-   * `max`, else the server's own default), so the renderer can name it.
+   * FD-11 / B-R2-01: the depth cap a `document_too_deep` answer carries so the
+   * renderer can name it. D's `document_too_deep` has no `fields` map and `max`
+   * is always the app constant 20 (matching the server's `maxDocumentDepth`).
    */
   readonly maxDepth?: number
 

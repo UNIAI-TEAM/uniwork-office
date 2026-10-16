@@ -384,9 +384,10 @@ export type UniworkDocActionResult<T> =
       ok: false
       error: UniworkDocActionError
       /**
-       * FD-11: `document_too_deep` carries the server's own depth cap (the
-       * envelope's `max`, else the server default 20) so the renderer can show
-       * it; absent for every other failure.
+       * FD-11 / B-R2-01: `document_too_deep` carries the depth cap so the
+       * renderer can show it; D's `document_too_deep` has no `fields` map and
+       * `max` is always the app constant 20 (matching the server's
+       * `maxDocumentDepth`). Absent for every other failure.
        */
       max?: number
     }
