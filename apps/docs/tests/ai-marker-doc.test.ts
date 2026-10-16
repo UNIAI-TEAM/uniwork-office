@@ -3,13 +3,14 @@
 // marked doc must still count as unchanged (the marker and the undo history survive an autosave).
 // The "any marker?" read is memoised per document so an idle panel render does not walk it.
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { Editor } from '@tiptap/core'
+import { Editor } from '@tiptap/core'
 import {
   carryAiMarks,
   docHasAiMarks,
   sameDocIgnoringAiMarks,
 } from '../src/renderer/editor/ai-marker'
 import type { PmNode } from '../src/renderer/editor/convert'
+import { editorExtensions } from '../src/renderer/editor/extensions'
 import { createDocsEditor } from './helpers/docs-ai-run-harness'
 
 let editor: Editor | null = null
@@ -96,6 +97,77 @@ describe('carryAiMarks', () => {
     mark(editor, [2])
     const next = carryAiMarks(editor.state.doc, reloaded(['one', 'inserted', 'two', 'three']))
     expect(marked(next)).toEqual([3])
+  })
+
+  // RF3D-2: the AI marks the paragraph inside a table cell, not the table itself (the table
+  // node has no marker attribute), so the carry has to walk down to the nested block
+  describe('a marked block nested in a table cell', () => {
+    const para = (text: string, docxIndex: number, aiChanged = false): PmNode => ({
+      type: 'docParagraph',
+      attrs: { docxIndex, aiChanged },
+      content: [{ type: 'text', text }],
+    })
+    const tableOf = (cells: string[][], firstIndex: number): PmNode => ({
+      type: 'docTable',
+      attrs: { docxIndex: firstIndex },
+      content: cells.map((row, r) => ({
+        type: 'docTableRow',
+        content: row.map((text, c) => ({
+          type: 'docTableCell',
+          content: [para(text, firstIndex + 1 + r * 10 + c)],
+        })),
+      })),
+    })
+    const docOf = (...content: PmNode[]): PmNode => ({ type: 'doc', content })
+    /** the texts of every paragraph under the node that carries the marker */
+    const markedTexts = (node: PmNode): string[] => [
+      ...(node.attrs?.aiChanged ? [(node.content ?? []).map((n) => n.text ?? '').join('')] : []),
+      ...(node.content ?? []).flatMap(markedTexts),
+    ]
+    const live = (cells: string[][]): Editor => {
+      const e = new Editor({
+        element: document.createElement('div'),
+        extensions: editorExtensions,
+        content: docOf(para('before', 0), tableOf(cells, 1), para('after', 20)),
+      })
+      const tr = e.state.tr
+      e.state.doc.descendants((node, pos) => {
+        if (node.type.name === 'docParagraph' && node.textContent === 'B2')
+          tr.setNodeMarkup(pos, undefined, { ...node.attrs, aiChanged: true })
+      })
+      e.view.dispatch(tr)
+      return e
+    }
+    const cells = [
+      ['A1', 'A2'],
+      ['B1', 'B2'],
+    ]
+
+    it('same structure with new anchors: the cell paragraph stays marked', () => {
+      editor = live(cells)
+      expect(docHasAiMarks(editor.state.doc)).toBe(true)
+      const next = carryAiMarks(
+        editor.state.doc,
+        docOf(para('before', 100), tableOf(cells, 101), para('after', 120)),
+      )
+      expect(markedTexts(next)).toEqual(['B2'])
+    })
+
+    it('a reload with another block count: the nested marker follows its text', () => {
+      editor = live(cells)
+      const next = carryAiMarks(
+        editor.state.doc,
+        docOf(para('new', 99), para('before', 100), tableOf(cells, 101), para('after', 120)),
+      )
+      expect(markedTexts(next)).toEqual(['B2'])
+    })
+
+    it('a marked block next to the table is still carried', () => {
+      editor = createDocsEditor(['one', 'two'])
+      mark(editor, [1])
+      const next = carryAiMarks(editor.state.doc, reloaded(['one', 'two']))
+      expect(marked(next)).toEqual([1])
+    })
   })
 
   it('no marker on the live doc: the reloaded doc is returned as it is', () => {
