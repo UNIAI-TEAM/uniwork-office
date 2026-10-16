@@ -2442,4 +2442,66 @@ describe('parameterised recursive arrow (G6-09d)', () => {
     for (const tool of ['two_params', 'block_body'])
       assert.match(hash(tool), /^unresolved:identifier:/)
   })
+
+  it('does not silently truncate an arrow call argument when tokens remain before ) (RBD9-1)', () => {
+    const flatSchema = (n) => ({
+      type: 'object',
+      properties: { v: { type: 'number', description: `n=${n}` } },
+    })
+    const { dir, sha } = fixture({
+      'packages/agent-core/src/types.ts': AGENT_TOOL_DEF_FIXTURE,
+      'apps/docs/src/renderer/ai/tools.ts': [
+        "import type { AgentToolDef } from '@genoffice/agent-core'",
+        '',
+        'const flat = (n: number) => ({',
+        "  type: 'object',",
+        "  properties: { v: { type: 'number', description: `n=${n}` } },",
+        '})',
+        'const chainOuter = (d: number) => ({',
+        "  type: 'object',",
+        '  properties: { inner: flat(d - 1 + 1) },',
+        '})',
+        'const badBranch = (depth: number) => ({',
+        "  type: 'object',",
+        '  properties: { count: depth > 0 ? depth * 2 : 0 },',
+        '})',
+        '',
+        'export const TOOLS: AgentToolDef[] = [',
+        "  { name: 'sub_arg', description: 'x', inputSchema: { type: 'object', ...flat(4 - 1) } },",
+        "  { name: 'mul_arg', description: 'x', inputSchema: { type: 'object', ...flat(4 * 2) } },",
+        "  { name: 'chain_arg', description: 'x', inputSchema: chainOuter(5) },",
+        "  { name: 'bad_branch', description: 'x', inputSchema: badBranch(2) },",
+        ']',
+        '',
+      ].join('\n'),
+    })
+    const res = extract({ repo: dir, rev: sha })
+    const file = build(dir, sha)
+    const rowHash = (name) => res.rows.find((r) => r.tool === name).hash
+    const offeredTool = (name) => file.docs.find((t) => t.function.name === name)
+
+    // flat(4 - 1) must never fold as n=4; it is either n=3 or unresolved
+    assert.notEqual(rowHash('sub_arg'), hashOf(flatSchema(4)))
+    assert.ok(
+      rowHash('sub_arg') === hashOf(flatSchema(3)) || /^unresolved:/.test(rowHash('sub_arg')),
+      `unexpected sub_arg hash: ${rowHash('sub_arg')}`,
+    )
+    if (offeredTool('sub_arg')) {
+      assert.deepEqual(offeredTool('sub_arg').function.parameters, flatSchema(3))
+    }
+
+    // flat(4 * 2) has an unsupported operator before `)` and must be refused, never n=4
+    assert.equal(rowHash('mul_arg'), 'unresolved:call:flat')
+    assert.equal(offeredTool('mul_arg'), undefined)
+
+    // chainOuter(5) passes `d - 1 + 1` (= 5) inside an arrow body; never truncated to n=4
+    assert.equal(
+      rowHash('chain_arg'),
+      hashOf({ type: 'object', properties: { inner: flatSchema(5) } }),
+    )
+
+    // unsupported `*` inside a taken ternary branch must not truncate to `depth`
+    assert.match(rowHash('bad_branch'), /^unresolved:operator/)
+    assert.equal(offeredTool('bad_branch'), undefined)
+  })
 })
