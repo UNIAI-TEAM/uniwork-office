@@ -47,7 +47,9 @@ function createMockGateEnv(opts?: {
   const events: Array<{ type: string; payload: unknown }> = []
   const requests: Array<{ type: string; payload: unknown }> = []
   const dirtyCalls: Array<{ dirty: boolean; force?: boolean }> = []
-  let downloadHandler: (() => Promise<ApiDownloadResult>) | null = null
+  let downloadHandler: NonNullable<
+    Parameters<NonNullable<SaveSizeGatePort['handleDownload']>>[0]
+  > | null = null
 
   const port: SaveSizeGatePort = {
     whenInitialized: () => Promise.resolve(session),
@@ -67,6 +69,7 @@ function createMockGateEnv(opts?: {
     }) as SaveSizeGatePort['request'],
     handleDownload(handler) {
       downloadHandler = handler
+      return () => {}
     },
     setDirty(dirty, options) {
       dirtyCalls.push({ dirty, ...(options?.force ? { force: true } : {}) })
@@ -81,14 +84,16 @@ function createMockGateEnv(opts?: {
     dirtyCalls,
     async invokeHostDownload() {
       if (!downloadHandler) throw new Error('doc.download handler not registered')
-      return downloadHandler()
+      return downloadHandler({}, { signal: new AbortController().signal })
     },
     async saveWithGate(gate, bytes) {
       const check = await gate.checkBeforeSave(bytes)
       if (!check.allowed) return { ok: false }
+      const copy = new ArrayBuffer(bytes.byteLength)
+      new Uint8Array(copy).set(bytes)
       await port.request('api.save', {
         fileId: session.documentId,
-        data: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
+        data: copy,
       })
       return { ok: true }
     },
@@ -346,7 +351,7 @@ describe('createSaveSizeGate (warn latch, save_blocked, doc.download, fallback U
     )
 
     expect(gate.limits().max_bytes).toBe(50 * MB)
-    expect(env.session.limits.max_bytes).toBe(50 * MB)
+    expect(env.session.limits?.max_bytes).toBe(50 * MB)
     expect(message).toContain('50 MB')
     expect(env.events).toEqual([
       {

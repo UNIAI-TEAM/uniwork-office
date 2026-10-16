@@ -121,7 +121,16 @@ export class WebSaveError extends Error {
 
 export interface WebHostDeps {
   port: Pick<FramePort, 'request' | 'reportSaved' | 'reportError'> &
-    Partial<Pick<FramePort, 'whenInitialized' | 'emit' | 'handleDownload' | 'setDirty'>>
+    Partial<
+      Pick<
+        FramePort,
+        | 'whenInitialized'
+        | 'reportSizeWarning'
+        | 'reportSaveBlocked'
+        | 'handleDownload'
+        | 'setDirty'
+      >
+    >
   clientId: number
   state: WebDocState
   /** host grants in force (capability object) */
@@ -210,7 +219,8 @@ export function createWebHostIO(deps: WebHostDeps): HostIO {
               limits: { ...DEFAULT_DOCUMENT_LIMITS },
             })),
         request: deps.port.request,
-        ...(deps.port.emit ? { emit: deps.port.emit } : {}),
+        ...(deps.port.reportSizeWarning ? { reportSizeWarning: deps.port.reportSizeWarning } : {}),
+        ...(deps.port.reportSaveBlocked ? { reportSaveBlocked: deps.port.reportSaveBlocked } : {}),
         ...(deps.port.handleDownload ? { handleDownload: deps.port.handleDownload } : {}),
         ...(deps.port.setDirty ? { setDirty: deps.port.setDirty } : {}),
       },

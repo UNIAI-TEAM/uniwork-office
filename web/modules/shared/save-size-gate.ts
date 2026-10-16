@@ -310,12 +310,8 @@ export function createSaveSizeGate(opts: SaveSizeGateOptions): SaveSizeGate {
 
   async function triggerDownload(bytes: ArrayBuffer): Promise<ApiDownloadResult> {
     const data = copyBuffer(bytes)
-    const res = await port.request(
-      'api.download',
-      { data },
-      { timeoutMs: TIMEOUTS.transfer, transfer: [data] },
-    )
-    return { delivered: res?.delivered === true }
+    await port.request('api.download', { data }, { timeoutMs: TIMEOUTS.transfer, transfer: [data] })
+    return { delivered: true }
   }
 
   function showBlockDialog(bytes: ArrayBuffer, maxBytes: number): void {
