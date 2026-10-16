@@ -186,6 +186,7 @@ export function LocationFields({
         <button
           type="button"
           className="uwf-location-btn"
+          title={label}
           aria-label={`${t('ufLocation')}: ${label}`}
           aria-haspopup="dialog"
           aria-disabled={locked || undefined}

@@ -283,6 +283,41 @@ describe('S18 new document', () => {
     expect(onClose).toHaveBeenCalled()
   })
 
+  it('V1-1: location row renders both controls, button carries path text + title, and flex layout shares/stacks without squeezing', async () => {
+    await render([])
+    await click(buttonByText(host, en.uwDocNew))
+    const dialog = modal()!
+    const locRow = dialog.querySelector<HTMLElement>('.uw-act-location-row')!
+    expect(locRow).not.toBeNull()
+    const select = locRow.querySelector<HTMLSelectElement>('.uw-act-select')!
+    const btn = locRow.querySelector<HTMLButtonElement>('.uwf-location-btn')!
+    expect(select).not.toBeNull()
+    expect(btn).not.toBeNull()
+    expect(btn.querySelector('.uwf-location-path')?.textContent).toBe(folderEn.ufLocationRoot)
+    expect(btn.getAttribute('title')).toBe(folderEn.ufLocationRoot)
+
+    await click(btn)
+    const picker = host.querySelector('.uwf-picker')!
+    const contracts = Array.from(picker.querySelectorAll<HTMLElement>('[role="treeitem"]')).find(
+      (el) => el.textContent?.includes('Contracts'),
+    )!
+    await click(contracts)
+    await click(buttonByText(picker as HTMLElement, folderEn.ufChoose))
+    expect(btn.querySelector('.uwf-location-path')?.textContent).toBe('UniWork › Contracts')
+    expect(btn.getAttribute('title')).toBe('UniWork › Contracts')
+
+    const homeCss = readFileSync(join(__dirname, '../src/renderer/src/home.css'), 'utf8')
+    const foldersCss = readFileSync(
+      join(__dirname, '../src/renderer/src/uniwork-folders/uniwork-folders.css'),
+      'utf8',
+    )
+    expect(homeCss).toMatch(/\.uw-act-location-row\s*>\s*\.uw-act-select\s*\{[^}]*width:\s*auto/)
+    expect(foldersCss).toMatch(/\.uwf-location-btn\s*>\s*svg\s*\{[^}]*flex:\s*0\s+0\s+auto/)
+    expect(homeCss).toMatch(
+      /@media\s*\(max-width:\s*900px\)\s*\{[\s\S]*?\.uw-act-location-row\s*\{[^}]*flex-direction:\s*column/,
+    )
+  })
+
   it('shows an empty name at the field, without calling main', async () => {
     await render([])
     await click(buttonByText(host, en.uwDocNew))
