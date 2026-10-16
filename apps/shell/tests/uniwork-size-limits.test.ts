@@ -956,6 +956,75 @@ describe('SIZE-F1 desktop document size limits', () => {
       expect(container.querySelector('.uw-save-block-modal')).toBeNull()
     })
 
+    it('focuses the primary "Lưu bản sao về máy" button on open and returns focus to the editor on close (d2-10)', async () => {
+      const saveLocal = vi.fn(async () => true)
+      const focusActive = vi.fn()
+      window.aiOffice = {
+        accountStatus: async () => ({ loggedIn: true, state: 'signed-in' }),
+        onAccountStatus: () => () => undefined,
+        onUniworkQueuePopover: () => () => undefined,
+        uniworkSaveLocalCopy: saveLocal,
+      } as never
+      window.aiOfficeTabs = { focusActive } as never
+
+      const base: UniworkDocStatus = {
+        path: '/tmp/Report.docx',
+        documentId: DOC_ID,
+        workspaceId: WS_ID,
+        title: 'Report.docx',
+        format: 'docx',
+        access: 'edit',
+        state: 'failed',
+        error: 'too_large',
+        sizeBytes: 220_000_000,
+        maxBytes: 209_715_200,
+      }
+
+      // 1. Open dialog (seq 1): initial focus lands on primary "Lưu bản sao về máy", not "Đóng"
+      await render(
+        createElement(UniworkStatusChip, {
+          status: { ...base, saveTooLargePrompt: true, saveTooLargePromptSeq: 1 },
+          onStatus: () => undefined,
+        }),
+      )
+      const primary = buttonWith('Lưu bản sao về máy')
+      expect(document.activeElement).toBe(primary)
+
+      // 2. Close via "Đóng" returns focus to the editor via window.aiOfficeTabs.focusActive()
+      await act(async () => {
+        buttonWith('Đóng').click()
+      })
+      expect(focusActive).toHaveBeenCalledTimes(1)
+
+      // 3. Re-open on a new prompt (seq 2) and close via Escape: also returns focus to the editor
+      await render(
+        createElement(UniworkStatusChip, {
+          status: { ...base, saveTooLargePrompt: true, saveTooLargePromptSeq: 2 },
+          onStatus: () => undefined,
+        }),
+      )
+      expect(document.activeElement).toBe(buttonWith('Lưu bản sao về máy'))
+      await act(async () => {
+        container
+          .querySelector('.uw-save-block-modal')!
+          .dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+      })
+      expect(focusActive).toHaveBeenCalledTimes(2)
+
+      // 4. Re-open on a new prompt (seq 3) and save a local copy: also returns focus to the editor
+      await render(
+        createElement(UniworkStatusChip, {
+          status: { ...base, saveTooLargePrompt: true, saveTooLargePromptSeq: 3 },
+          onStatus: () => undefined,
+        }),
+      )
+      await act(async () => {
+        buttonWith('Lưu bản sao về máy').click()
+      })
+      expect(saveLocal).toHaveBeenCalledTimes(1)
+      expect(focusActive).toHaveBeenCalledTimes(3)
+    })
+
     it('renders the Sync Center failed row with and without a limit', async () => {
       const snapshot: SyncCenterSnapshot = {
         header: {

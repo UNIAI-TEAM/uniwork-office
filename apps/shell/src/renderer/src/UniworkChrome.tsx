@@ -558,6 +558,7 @@ ${action ? t(action.labelKey) : ''}`,
     if (!blockLatchRef.current.open) return
     blockLatchRef.current.open = false
     setBlockTick((n) => n + 1)
+    window.aiOfficeTabs?.focusActive()
   }, [])
 
   useEffect(() => {
@@ -907,6 +908,8 @@ ${action ? t(action.labelKey) : ''}`,
             labelledBy={blockTitleId}
             describedBy={blockBodyId}
             className="uw-save-block-modal"
+            initialFocus=".btn-primary"
+            restoreFocus={false}
             onCancel={closeSaveBlock}
           >
             <h3 id={blockTitleId}>{saveBlockCopy.title}</h3>
