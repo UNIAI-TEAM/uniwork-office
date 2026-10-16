@@ -479,6 +479,7 @@ async function insertImageFromUrl(
   input: { afterIndex?: unknown; alt?: unknown },
   signal: AbortSignal | undefined,
   labels: { fail: string; done: string },
+  onAsset?: (rel: string, base64: string) => void,
 ): Promise<ToolExecution> {
   const fetched = await window.markdownApi.fetchImage(url)
   // never write after the user hit stop (the download may resolve long after the abort)
@@ -492,6 +493,8 @@ async function insertImageFromUrl(
     )
   }
   const rel = await window.markdownApi.saveImage({ base64: fetched.base64, ext })
+  // the file now exists (pending) whatever happens next: the run's Roll back must be able to drop it
+  if (rel) onAsset?.(rel, fetched.base64)
   if (signal?.aborted) return fail('stopped by the user; the image was not inserted', labels.fail)
   if (!rel) {
     return fail(
@@ -676,6 +679,8 @@ export function executeTool(
   ask?: AskClarification,
   /** image URLs this run may insert (image_search / generate_image results); absent = no rule */
   imageUrls?: ImageUrlRegistry,
+  /** told the path of every picture file the run saves beside the document (Roll back drops them) */
+  onAsset?: (rel: string, base64: string) => void,
 ): ToolExecution | Promise<ToolExecution> {
   if (call.name === 'ask_clarification') return askClarification(call, ask)
   const doc = editor.state.doc
@@ -762,10 +767,14 @@ export function executeTool(
       if (!/^https?:\/\//.test(url)) return fail('invalid url', t('aiToolInsertImage'))
       const refusal = imageUrls?.check(url)
       if (refusal) return fail(refusal, t('aiToolInsertImage'))
-      return insertImageFromUrl(editor, url, call.input, signal, {
-        fail: t('aiToolInsertImage'),
-        done: t('aiToolInsertImageDone'),
-      })
+      return insertImageFromUrl(
+        editor,
+        url,
+        call.input,
+        signal,
+        { fail: t('aiToolInsertImage'), done: t('aiToolInsertImageDone') },
+        onAsset,
+      )
     }
 
     case 'generate_image': {
@@ -783,10 +792,14 @@ export function executeTool(
             return fail(generated.error ?? 'image generation failed', t('aiToolGenImage'))
           }
           imageUrls?.register(generated.url, 'generate_image')
-          return insertImageFromUrl(editor, generated.url, call.input, signal, {
-            fail: t('aiToolGenImage'),
-            done: t('aiToolGenImageDone'),
-          })
+          return insertImageFromUrl(
+            editor,
+            generated.url,
+            call.input,
+            signal,
+            { fail: t('aiToolGenImage'), done: t('aiToolGenImageDone') },
+            onAsset,
+          )
         })
     }
 

@@ -89,7 +89,7 @@ import {
   writeImageIntoOwnedAssets,
 } from '../src/main/asset-lifecycle'
 import { createMarkdownView, requestMarkdownClose } from '../src/main/markdown-main'
-import { MARKDOWN_CHANNELS } from '../src/shared/ipc'
+import { MARKDOWN_CHANNELS, MAX_PASTED_IMAGE_BYTES } from '../src/shared/ipc'
 
 const temporaryDirectories: string[] = []
 
@@ -394,5 +394,169 @@ describe('Save As source pending ownership', () => {
       pending: { 'note.md': ['pending.png'] },
     })
     expect(existsSync(join(targetDirectory, 'assets', 'pending.png'))).toBe(false)
+  })
+})
+
+describe('discarding the assets one AI run created (Roll back)', () => {
+  it('removes only the named pending assets: a user-inserted one and a saved one survive', async () => {
+    const documentPath = await createDocument()
+    const directory = dirname(documentPath)
+    const saved = await writeImageIntoOwnedAssets(
+      documentPath,
+      'saved.png',
+      Buffer.from('saved image'),
+    )
+    await reconcileOwnedAssets(documentPath, [saved])
+    const userInserted = await writeImageIntoOwnedAssets(
+      documentPath,
+      'mine.png',
+      Buffer.from('user image'),
+    )
+    const aiMade = await writeImageIntoOwnedAssets(
+      documentPath,
+      'image.png',
+      Buffer.from('ai image'),
+    )
+    const view = createMarkdownView(documentPath)
+    const contents = view.webContents as unknown as FakeWebContents
+
+    // the renderer names the run's asset, and also (wrongly or late) a saved one and a stray name
+    const result = await handlers.get(MARKDOWN_CHANNELS.discardPendingAssets)?.(
+      { sender: contents },
+      ['image.png', 'saved.png', '../escape.png', 'nope.png'],
+    )
+
+    expect(result).toMatchObject({ deleted: ['image.png'] })
+    expect(existsSync(join(directory, aiMade))).toBe(false)
+    expect(existsSync(join(directory, userInserted))).toBe(true)
+    expect(existsSync(join(directory, saved))).toBe(true)
+    expect(await readOwnedAssetManifest(documentPath)).toMatchObject({
+      files: [{ name: 'mine.png' }, { name: 'saved.png' }],
+      documents: { 'note.md': ['saved.png'] },
+      pending: { 'note.md': ['mine.png'] },
+    })
+  })
+
+  it('does nothing for a window without a document path or a malformed argument', async () => {
+    const view = createMarkdownView(null)
+    const contents = view.webContents as unknown as FakeWebContents
+    await expect(
+      handlers.get(MARKDOWN_CHANNELS.discardPendingAssets)?.({ sender: contents }, ['a.png']),
+    ).resolves.toMatchObject({ deleted: [] })
+    await expect(
+      handlers.get(MARKDOWN_CHANNELS.discardPendingAssets)?.({ sender: contents }, 'a.png'),
+    ).resolves.toMatchObject({ deleted: [] })
+  })
+})
+
+describe('restoring the assets of a redone AI run', () => {
+  it('drops a malformed or oversized entry and restores only the pictures that came through', async () => {
+    const documentPath = await createDocument()
+    const assetsDirectory = join(dirname(documentPath), 'assets')
+    const view = createMarkdownView(documentPath)
+    const contents = view.webContents as unknown as FakeWebContents
+    const bytes = Buffer.from('run bytes')
+    await writeImageIntoOwnedAssets(documentPath, 'image.png', bytes)
+    await handlers.get(MARKDOWN_CHANNELS.discardPendingAssets)?.({ sender: contents }, [
+      'image.png',
+    ])
+
+    const result = await handlers.get(MARKDOWN_CHANNELS.restorePendingAssets)?.(
+      { sender: contents },
+      [
+        { name: 'image.png', base64: bytes.toString('base64') },
+        { name: 'no-bytes.png' },
+        { base64: bytes.toString('base64') },
+        'image.png',
+        {
+          name: 'oversized.png',
+          base64: 'A'.repeat(Math.ceil(MAX_PASTED_IMAGE_BYTES / 3) * 4 + 1),
+        },
+      ],
+    )
+
+    // the four rejected entries never reach the file system, and the short `restored` list is the
+    // signal the panel uses to refuse the redo
+    expect(result).toEqual({ restored: ['image.png'], errors: [] })
+    expect(existsSync(join(assetsDirectory, 'image.png'))).toBe(true)
+    expect(existsSync(join(assetsDirectory, 'no-bytes.png'))).toBe(false)
+    expect(existsSync(join(assetsDirectory, 'oversized.png'))).toBe(false)
+  })
+
+  it('answers every name as an error for a window without a document path', async () => {
+    const view = createMarkdownView(null)
+    const contents = view.webContents as unknown as FakeWebContents
+    const files = [
+      { name: 'a.png', base64: Buffer.from('a').toString('base64') },
+      { name: 'b.png', base64: Buffer.from('b').toString('base64') },
+    ]
+
+    await expect(
+      handlers.get(MARKDOWN_CHANNELS.restorePendingAssets)?.({ sender: contents }, files),
+    ).resolves.toEqual({ restored: [], errors: ['a.png', 'b.png'] })
+    // a malformed argument is not a restore request: nothing to report, nothing written
+    await expect(
+      handlers.get(MARKDOWN_CHANNELS.restorePendingAssets)?.({ sender: contents }, 'a.png'),
+    ).resolves.toEqual({ restored: [], errors: [] })
+  })
+})
+
+describe('first save of an untitled document (ask before writing, G6-09 W8)', () => {
+  const save = (contents: FakeWebContents, request: Record<string, unknown>) =>
+    handlers.get(MARKDOWN_CHANNELS.save)?.(
+      { sender: contents },
+      { text: '# Draft', imageSources: [], ...request },
+    ) as Promise<{ ok: boolean; canceled?: boolean; path?: string }>
+
+  async function targetIn(directory: string, name: string): Promise<string> {
+    return join(directory, name)
+  }
+
+  it('an AI-suggested name only fills the Save dialog: nothing is written until it is confirmed', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'markdown-first-save-'))
+    temporaryDirectories.push(directory)
+    const view = createMarkdownView(null)
+    const contents = view.webContents as unknown as FakeWebContents
+    showSaveDialogWithMemory.mockResolvedValue({ canceled: true })
+
+    const result = await save(contents, { mode: 'save', suggestedName: 'Quarterly plan' })
+
+    expect(result).toMatchObject({ ok: true, canceled: true })
+    expect(showSaveDialogWithMemory).toHaveBeenCalledTimes(1)
+    const options = showSaveDialogWithMemory.mock.calls[0]![2] as { defaultPath: string }
+    expect(options.defaultPath.endsWith('Quarterly plan.md')).toBe(true)
+    // nothing landed in the default save folder under the suggested name
+    expect(existsSync(options.defaultPath)).toBe(false)
+
+    const target = await targetIn(directory, 'Quarterly plan.md')
+    showSaveDialogWithMemory.mockResolvedValue({ canceled: false, filePath: target })
+    const confirmed = await save(contents, { mode: 'save', suggestedName: 'Quarterly plan' })
+    expect(confirmed).toMatchObject({ ok: true, path: target })
+    expect(await readFile(target, 'utf8')).toBe('# Draft')
+  })
+
+  it('Ctrl+S on an untitled document still opens the dialog with the untitled name', async () => {
+    const view = createMarkdownView(null)
+    const contents = view.webContents as unknown as FakeWebContents
+    showSaveDialogWithMemory.mockResolvedValue({ canceled: true })
+
+    await save(contents, { mode: 'save' })
+
+    expect(showSaveDialogWithMemory).toHaveBeenCalledTimes(1)
+    const options = showSaveDialogWithMemory.mock.calls[0]![2] as { defaultPath: string }
+    expect(options.defaultPath).toMatch(/\.md$/)
+    expect(options.defaultPath).not.toContain('Quarterly')
+  })
+
+  it('a titled document still saves in place with no dialog, whatever name is passed', async () => {
+    const documentPath = await createDocument()
+    const view = createMarkdownView(documentPath)
+    const contents = view.webContents as unknown as FakeWebContents
+
+    const result = await save(contents, { mode: 'save', suggestedName: 'Ignored' })
+
+    expect(result).toMatchObject({ ok: true, path: documentPath })
+    expect(showSaveDialogWithMemory).not.toHaveBeenCalled()
+    expect(await readFile(documentPath, 'utf8')).toBe('# Draft')
   })
 })

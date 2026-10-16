@@ -915,6 +915,11 @@ button {
   max-width: min(70vw, 560px);
 }
 
+/* Paused-edits reason while an AI run is open: stacks above the message toast slot */
+.ai-edits-paused {
+  bottom: 112px;
+}
+
 /* with the AI panel open the toasts centre on the document area: centred on the window they
    covered the panel's composer */
 .app-main:has(.ai-dock:not(.collapsed)) .pdf-toast {
@@ -3144,8 +3149,8 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
 }
 
 .ai-work-group-summary:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px var(--pdf-focus-ring);
+  outline: 2px solid var(--color-border-brand);
+  outline-offset: 1px;
   border-radius: 4px;
 }
 
@@ -3282,8 +3287,8 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
 }
 
 .ai-step-title.clickable:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px var(--pdf-focus-ring);
+  outline: 2px solid var(--color-border-brand);
+  outline-offset: 1px;
   border-radius: 4px;
 }
 
@@ -3797,7 +3802,59 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
   background: var(--color-bg-subtle);
 }
 
+.ai-result-view-changes:focus-visible {
+  outline: 2px solid var(--color-border-brand);
+  outline-offset: 1px;
+}
+
 .ai-result-edited-hint {
+  color: var(--color-text-tertiary);
+  text-wrap: balance;
+}
+
+/* "Undo this run" under an answer that changed the document; a blocked one keeps its reason beside it */
+.ai-run-undo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+}
+
+.ai-run-undo-btn {
+  padding: 2px 8px;
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  background: var(--color-bg-page);
+  color: var(--color-text-primary);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.ai-run-undo-btn:hover {
+  background: var(--color-bg-subtle);
+}
+
+.ai-run-undo-btn:focus-visible {
+  outline: 2px solid var(--color-border-brand);
+  outline-offset: 1px;
+}
+
+/* blocked: still focusable (the reason beside it is linked by aria-describedby) but visibly inert */
+.ai-run-undo-btn[aria-disabled='true'] {
+  background: var(--color-bg-subtle);
+  color: var(--color-text-tertiary);
+  cursor: not-allowed;
+}
+
+.ai-run-undo-btn[aria-disabled='true']:hover {
+  background: var(--color-bg-subtle);
+}
+
+.ai-run-undo-note {
   color: var(--color-text-tertiary);
 }
 

@@ -19,6 +19,8 @@ export const ar = {
   exportHtmlEntry: 'تصدير كملف HTML واحد',
   previewLimitNote:
     'تطلب هذه الصفحة بيانات عبر الشبكة أو تضمّن صفحات أخرى، وهذا ما تحظره المعاينة على الويب.',
+  previewLimitNoteApp:
+    'تطلب هذه الصفحة بيانات عبر الشبكة أو تضمّن صفحات أخرى، وهذا ما تحظره المعاينة.',
   useInAppMessage: 'افتح في تطبيق UniWork Office لاستخدام هذه الميزة',
   openInApp: 'افتح في التطبيق',
   printFailed: 'فشل الطباعة: {error}',

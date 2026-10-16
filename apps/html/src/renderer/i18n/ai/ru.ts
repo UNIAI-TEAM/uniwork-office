@@ -54,6 +54,8 @@ export const ru = {
   aiUndelivered: 'Не отправлено',
   aiUnknownError: 'Сбой запроса ИИ, попробуйте ещё раз',
   aiWorkedSteps: 'Готово · {n} шагов',
+  aiWorkedStepsOne: 'Готово · {n} шаг',
+  aiWorkedStepsFew: 'Готово · {n} шага',
   aiWorking: 'Работает',
   aiOpenAssistant: 'Открыть ИИ-ассистента',
   aiToolOutline: 'Чтение структуры документа',

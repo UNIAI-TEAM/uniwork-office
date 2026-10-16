@@ -69,6 +69,30 @@ describe('buildStandaloneHtml', () => {
   })
 })
 
+describe('buildStandaloneHtml and the AI change marker', () => {
+  // the live marker rule is `@media screen`, which is the active medium during export; jsdom
+  // resolves a plain stylesheet rule, so this one stands in for it
+  const style = document.createElement('style')
+  style.textContent = '.doc-page .ai-changed { background-color: rgb(255, 245, 157); }'
+  const blocks = (cls: string): string =>
+    `<p class="doc-p ${cls}">first</p><p class="doc-p">second</p><p class="doc-p ${cls}">third</p>`
+
+  it('exports a marked document byte-for-byte like the same document unmarked', () => {
+    document.head.appendChild(style)
+    try {
+      const plain = mount(blocks(''))
+      const unmarked = buildStandaloneHtml(plain, { title: 'T' })
+      const marked = mount(blocks('ai-changed'))
+      expect(marked.querySelectorAll('.ai-changed').length).toBe(2)
+      expect(buildStandaloneHtml(marked, { title: 'T' })).toBe(unmarked)
+      // the screen keeps its marker: the lifted class is back after the export
+      expect(marked.querySelectorAll('.ai-changed').length).toBe(2)
+    } finally {
+      style.remove()
+    }
+  })
+})
+
 describe('resolveContent', () => {
   it('resolves strings, escapes, attr() and the ordered counter', () => {
     const el = document.createElement('p')

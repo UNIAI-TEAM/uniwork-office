@@ -220,7 +220,13 @@ import {
 } from './docx-encryption'
 import { isExternallyModified, type DiskFileState } from './external-change'
 import { copyImageDisplaySize, validCopyImageDataUrl } from './copy-image-guard'
-import { hasNoPrinter, pdfExportPath, printScaleOption, validPrintGeometry } from './print-args'
+import {
+  hasNoPrinter,
+  htmlExportPath,
+  pdfExportPath,
+  printScaleOption,
+  validPrintGeometry,
+} from './print-args'
 import {
   assignStarredGroup,
   dropStarredItems,
@@ -5796,8 +5802,8 @@ export function registerDocsIpc(): void {
           filters: [{ name: 'HTML', extensions: ['html'] }],
         })
         if (result.canceled || !result.filePath) return { ok: false }
-        // same rule as docs:export-pdf: a merged export never lands on the open .docx either
-        filePath = pdfExportPath(result.filePath)
+        // like docs:export-pdf, a merged export never lands on the open .docx; the .html name stays
+        filePath = htmlExportPath(result.filePath)
         allowPdfWrite(event.sender.id, filePath)
       }
       try {

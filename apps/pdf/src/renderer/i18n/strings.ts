@@ -1,6 +1,7 @@
 import { webStrings } from './strings-web'
 import { serverCommentsStrings } from './strings-server-comments'
 import { certSignStrings } from './cert-sign-strings'
+import { aiRunUndoStrings } from './strings-ai-run-undo'
 
 const fillFormStrings = {
   ribbonTabFillForm: 'Fill Form',
@@ -209,6 +210,7 @@ export const strings = {
   zh: {
     ...fillFormStringsFor('zh'),
     ...webStrings.zh,
+    ...aiRunUndoStrings.zh,
     ...serverCommentsStrings.zh,
     aiViewOnlyNotice: '仅查看文档:AI 可以阅读并回答问题,但无法编辑。',
     ...certSignStrings['zh'],
@@ -311,6 +313,7 @@ export const strings = {
     aiStop: '停止',
     aiThinking: '思考中',
     aiWorkedSteps: '已完成 · {n} 个步骤',
+    aiWorkedStepOne: '已完成 · 1 个步骤',
     aiGroupWorking: '处理中…',
     aiReplying: '正在回复',
     loading: '正在打开…',
@@ -557,6 +560,7 @@ export const strings = {
   en: {
     ...fillFormStringsFor('en'),
     ...webStrings.en,
+    ...aiRunUndoStrings.en,
     ...serverCommentsStrings.en,
     aiViewOnlyNotice:
       'View-only document: AI can read it and answer questions, but editing is turned off.',
@@ -661,6 +665,7 @@ export const strings = {
     aiStop: 'Stop',
     aiThinking: 'Thinking',
     aiWorkedSteps: 'Worked · {n} steps',
+    aiWorkedStepOne: 'Worked · 1 step',
     aiGroupWorking: 'Working…',
     aiReplying: 'Replying',
     loading: 'Opening…',
@@ -915,6 +920,7 @@ export const strings = {
   vi: {
     ...fillFormStringsFor('vi'),
     ...webStrings.vi,
+    ...aiRunUndoStrings.vi,
     ...serverCommentsStrings.vi,
     aiViewOnlyNotice:
       'Tài liệu chỉ xem: AI có thể đọc và trả lời câu hỏi, nhưng không thể chỉnh sửa.',
@@ -1021,6 +1027,7 @@ export const strings = {
     aiStop: 'Dừng',
     aiThinking: 'Đang suy nghĩ',
     aiWorkedSteps: 'Đã xử lý · {n} bước',
+    aiWorkedStepOne: 'Đã xử lý · 1 bước',
     aiGroupWorking: 'Đang xử lý…',
     aiReplying: 'Đang trả lời',
     loading: 'Đang mở…',
@@ -1276,6 +1283,7 @@ export const strings = {
   ja: {
     ...fillFormStringsFor('ja'),
     ...webStrings.ja,
+    ...aiRunUndoStrings.ja,
     ...serverCommentsStrings.ja,
     aiViewOnlyNotice:
       '閲覧専用のドキュメント: AI は内容の読み取りと質問への回答はできますが、編集はできません。',
@@ -1379,6 +1387,7 @@ export const strings = {
     aiStop: '停止',
     aiThinking: '考え中',
     aiWorkedSteps: '完了 · {n} ステップ',
+    aiWorkedStepOne: '完了 · 1 ステップ',
     aiGroupWorking: '処理中…',
     aiReplying: '回答中',
     loading: '開いています…',
@@ -1633,6 +1642,7 @@ export const strings = {
   ko: {
     ...fillFormStringsFor('ko'),
     ...webStrings.ko,
+    ...aiRunUndoStrings.ko,
     ...serverCommentsStrings.ko,
     aiViewOnlyNotice:
       '보기 전용 문서: AI는 내용을 읽고 질문에 답할 수 있지만 편집할 수는 없습니다.',
@@ -1737,6 +1747,7 @@ export const strings = {
     aiStop: '중지',
     aiThinking: '생각 중',
     aiWorkedSteps: '완료 · {n}단계',
+    aiWorkedStepOne: '완료 · 1단계',
     aiGroupWorking: '작업 중…',
     aiReplying: '답변 중',
     loading: '여는 중…',
@@ -1989,6 +2000,7 @@ export const strings = {
   fr: {
     ...fillFormStringsFor('fr'),
     ...webStrings.fr,
+    ...aiRunUndoStrings.fr,
     ...serverCommentsStrings.fr,
     aiViewOnlyNotice:
       'Document en lecture seule : l’IA peut le lire et répondre à des questions, mais ne peut pas le modifier.',
@@ -2096,6 +2108,7 @@ export const strings = {
     aiStop: 'Arrêter',
     aiThinking: 'Réflexion',
     aiWorkedSteps: 'Terminé · {n} étapes',
+    aiWorkedStepOne: 'Terminé · 1 étape',
     aiGroupWorking: 'En cours…',
     aiReplying: 'Réponse en cours',
     loading: 'Ouverture…',
@@ -2355,6 +2368,7 @@ export const strings = {
   de: {
     ...fillFormStringsFor('de'),
     ...webStrings.de,
+    ...aiRunUndoStrings.de,
     ...serverCommentsStrings.de,
     aiViewOnlyNotice:
       'Schreibgeschütztes Dokument: Die KI kann es lesen und Fragen beantworten, aber nicht bearbeiten.',
@@ -2461,6 +2475,7 @@ export const strings = {
     aiStop: 'Stopp',
     aiThinking: 'Denkt nach',
     aiWorkedSteps: 'Erledigt · {n} Schritte',
+    aiWorkedStepOne: 'Erledigt · 1 Schritt',
     aiGroupWorking: 'In Arbeit…',
     aiReplying: 'Antwortet',
     loading: 'Wird geöffnet…',
@@ -2719,6 +2734,7 @@ export const strings = {
   es: {
     ...fillFormStringsFor('es'),
     ...webStrings.es,
+    ...aiRunUndoStrings.es,
     ...serverCommentsStrings.es,
     aiViewOnlyNotice:
       'Documento de solo lectura: la IA puede leerlo y responder preguntas, pero no puede editarlo.',
@@ -2824,6 +2840,7 @@ export const strings = {
     aiStop: 'Detener',
     aiThinking: 'Pensando',
     aiWorkedSteps: 'Completado · {n} pasos',
+    aiWorkedStepOne: 'Completado · 1 paso',
     aiGroupWorking: 'En curso…',
     aiReplying: 'Respondiendo',
     loading: 'Abriendo…',
@@ -3083,6 +3100,7 @@ export const strings = {
   th: {
     ...fillFormStringsFor('th'),
     ...webStrings.th,
+    ...aiRunUndoStrings.th,
     ...serverCommentsStrings.th,
     aiViewOnlyNotice: 'เอกสารแบบดูอย่างเดียว: AI อ่านและตอบคำถามได้ แต่แก้ไขไม่ได้',
     ...certSignStrings['th'],
@@ -3186,6 +3204,7 @@ export const strings = {
     aiStop: 'หยุด',
     aiThinking: 'กำลังคิด',
     aiWorkedSteps: 'เสร็จสิ้น · {n} ขั้นตอน',
+    aiWorkedStepOne: 'เสร็จสิ้น · 1 ขั้นตอน',
     aiGroupWorking: 'กำลังทำงาน…',
     aiReplying: 'กำลังตอบ',
     loading: 'กำลังเปิด…',
@@ -3438,6 +3457,7 @@ export const strings = {
   id: {
     ...fillFormStringsFor('id'),
     ...webStrings.id,
+    ...aiRunUndoStrings.id,
     ...serverCommentsStrings.id,
     aiViewOnlyNotice:
       'Dokumen hanya-lihat: AI dapat membaca dan menjawab pertanyaan, tetapi tidak dapat mengedit.',
@@ -3543,6 +3563,7 @@ export const strings = {
     aiStop: 'Berhenti',
     aiThinking: 'Berpikir',
     aiWorkedSteps: 'Selesai · {n} langkah',
+    aiWorkedStepOne: 'Selesai · 1 langkah',
     aiGroupWorking: 'Sedang bekerja…',
     aiReplying: 'Menjawab',
     loading: 'Membuka…',
@@ -3799,6 +3820,7 @@ export const strings = {
   ru: {
     ...fillFormStringsFor('ru'),
     ...webStrings.ru,
+    ...aiRunUndoStrings.ru,
     ...serverCommentsStrings.ru,
     aiViewOnlyNotice:
       'Документ только для просмотра: ИИ может читать его и отвечать на вопросы, но не может редактировать.',
@@ -3904,6 +3926,7 @@ export const strings = {
     aiStop: 'Стоп',
     aiThinking: 'Думает',
     aiWorkedSteps: 'Готово · {n} шагов',
+    aiWorkedStepOne: 'Готово · 1 шаг',
     aiGroupWorking: 'Выполняется…',
     aiReplying: 'Отвечает',
     loading: 'Открытие…',
@@ -4161,6 +4184,7 @@ export const strings = {
   ar: {
     ...fillFormStringsFor('ar'),
     ...webStrings.ar,
+    ...aiRunUndoStrings.ar,
     ...serverCommentsStrings.ar,
     aiViewOnlyNotice:
       'مستند للعرض فقط: يمكن للذكاء الاصطناعي قراءته والإجابة عن الأسئلة، لكنه لا يستطيع تعديله.',
@@ -4264,6 +4288,7 @@ export const strings = {
     aiStop: 'إيقاف',
     aiThinking: 'يفكر',
     aiWorkedSteps: 'اكتمل · {n} خطوات',
+    aiWorkedStepOne: 'اكتمل · خطوة واحدة',
     aiGroupWorking: 'جارٍ العمل…',
     aiReplying: 'جارٍ الرد',
     loading: 'جارٍ الفتح…',
@@ -4516,6 +4541,7 @@ export const strings = {
   pt: {
     ...fillFormStringsFor('pt'),
     ...webStrings.pt,
+    ...aiRunUndoStrings.pt,
     ...serverCommentsStrings.pt,
     aiViewOnlyNotice:
       'Documento somente leitura: a IA pode lê-lo e responder a perguntas, mas não pode editá-lo.',
@@ -4621,6 +4647,7 @@ export const strings = {
     aiStop: 'Parar',
     aiThinking: 'Pensando',
     aiWorkedSteps: 'Concluído · {n} etapas',
+    aiWorkedStepOne: 'Concluído · 1 etapa',
     aiGroupWorking: 'Em andamento…',
     aiReplying: 'Respondendo',
     loading: 'Abrindo…',
@@ -4879,6 +4906,7 @@ export const strings = {
   it: {
     ...fillFormStringsFor('it'),
     ...webStrings.it,
+    ...aiRunUndoStrings.it,
     ...serverCommentsStrings.it,
     aiViewOnlyNotice:
       'Documento di sola lettura: l’IA può leggerlo e rispondere a domande, ma non può modificarlo.',
@@ -4985,6 +5013,7 @@ export const strings = {
     aiStop: 'Interrompi',
     aiThinking: 'Sta pensando',
     aiWorkedSteps: 'Completato · {n} passaggi',
+    aiWorkedStepOne: 'Completato · 1 passaggio',
     aiGroupWorking: 'In corso…',
     aiReplying: 'Risposta in corso',
     loading: 'Apertura…',
@@ -5245,6 +5274,7 @@ export const strings = {
   pl: {
     ...fillFormStringsFor('pl'),
     ...webStrings.pl,
+    ...aiRunUndoStrings.pl,
     ...serverCommentsStrings.pl,
     aiViewOnlyNotice:
       'Dokument tylko do odczytu: AI może go czytać i odpowiadać na pytania, ale nie może go edytować.',
@@ -5350,6 +5380,7 @@ export const strings = {
     aiStop: 'Zatrzymaj',
     aiThinking: 'Myślenie',
     aiWorkedSteps: 'Ukończono · {n} kroków',
+    aiWorkedStepOne: 'Ukończono · 1 krok',
     aiGroupWorking: 'W toku…',
     aiReplying: 'Odpowiadanie',
     loading: 'Otwieranie…',
@@ -5606,6 +5637,7 @@ export const strings = {
   cs: {
     ...fillFormStringsFor('cs'),
     ...webStrings.cs,
+    ...aiRunUndoStrings.cs,
     ...serverCommentsStrings.cs,
     aiViewOnlyNotice:
       'Dokument jen pro čtení: AI jej může číst a odpovídat na otázky, ale nemůže jej upravovat.',
@@ -5710,6 +5742,7 @@ export const strings = {
     aiStop: 'Zastavit',
     aiThinking: 'Přemýšlí',
     aiWorkedSteps: 'Hotovo · {n} kroků',
+    aiWorkedStepOne: 'Hotovo · 1 krok',
     aiGroupWorking: 'Pracuje…',
     aiReplying: 'Odpovídá',
     loading: 'Otevírání…',
@@ -5965,6 +5998,7 @@ export const strings = {
   nl: {
     ...fillFormStringsFor('nl'),
     ...webStrings.nl,
+    ...aiRunUndoStrings.nl,
     ...serverCommentsStrings.nl,
     aiViewOnlyNotice:
       'Alleen-lezen document: AI kan het lezen en vragen beantwoorden, maar niet bewerken.',
@@ -6071,6 +6105,7 @@ export const strings = {
     aiStop: 'Stoppen',
     aiThinking: 'Denkt na',
     aiWorkedSteps: 'Klaar · {n} stappen',
+    aiWorkedStepOne: 'Klaar · 1 stap',
     aiGroupWorking: 'Bezig…',
     aiReplying: 'Bezig met antwoorden',
     loading: 'Openen…',
@@ -6326,6 +6361,7 @@ export const strings = {
   ms: {
     ...fillFormStringsFor('ms'),
     ...webStrings.ms,
+    ...aiRunUndoStrings.ms,
     ...serverCommentsStrings.ms,
     aiViewOnlyNotice:
       'Dokumen lihat sahaja: AI boleh membaca dan menjawab soalan, tetapi tidak boleh mengedit.',
@@ -6431,6 +6467,7 @@ export const strings = {
     aiStop: 'Berhenti',
     aiThinking: 'Sedang berfikir',
     aiWorkedSteps: 'Selesai · {n} langkah',
+    aiWorkedStepOne: 'Selesai · 1 langkah',
     aiGroupWorking: 'Sedang berjalan…',
     aiReplying: 'Sedang menjawab',
     loading: 'Membuka…',
@@ -6686,6 +6723,7 @@ export const strings = {
   he: {
     ...fillFormStringsFor('he'),
     ...webStrings.he,
+    ...aiRunUndoStrings.he,
     ...serverCommentsStrings.he,
     aiViewOnlyNotice: 'מסמך לצפייה בלבד: ה-AI יכול לקרוא אותו ולענות על שאלות, אך לא לערוך אותו.',
     ...certSignStrings['he'],
@@ -6788,6 +6826,7 @@ export const strings = {
     aiStop: 'עצירה',
     aiThinking: 'חושב',
     aiWorkedSteps: 'הושלם · {n} שלבים',
+    aiWorkedStepOne: 'הושלם · שלב אחד',
     aiGroupWorking: 'בעבודה…',
     aiReplying: 'משיב',
     loading: 'פותח…',
@@ -7036,6 +7075,7 @@ export const strings = {
   hi: {
     ...fillFormStringsFor('hi'),
     ...webStrings.hi,
+    ...aiRunUndoStrings.hi,
     ...serverCommentsStrings.hi,
     aiViewOnlyNotice:
       'केवल-देखने योग्य दस्तावेज़: AI इसे पढ़ सकता है और प्रश्नों के उत्तर दे सकता है, लेकिन संपादित नहीं कर सकता।',
@@ -7140,6 +7180,7 @@ export const strings = {
     aiStop: 'रोकें',
     aiThinking: 'सोच रहा है',
     aiWorkedSteps: 'पूर्ण · {n} चरण',
+    aiWorkedStepOne: 'पूर्ण · 1 चरण',
     aiGroupWorking: 'कार्य जारी…',
     aiReplying: 'उत्तर दिया जा रहा है',
     loading: 'खोला जा रहा है…',
@@ -7393,6 +7434,7 @@ export const strings = {
   'zh-TW': {
     ...fillFormStringsFor('zh-TW'),
     ...webStrings['zh-TW'],
+    ...aiRunUndoStrings['zh-TW'],
     ...serverCommentsStrings['zh-TW'],
     aiViewOnlyNotice: '唯讀文件:AI 可以閱讀並回答問題,但無法編輯。',
     ...certSignStrings['zh-TW'],
@@ -7495,6 +7537,7 @@ export const strings = {
     aiStop: '停止',
     aiThinking: '思考中',
     aiWorkedSteps: '已完成 · {n} 個步驟',
+    aiWorkedStepOne: '已完成 · 1 個步驟',
     aiGroupWorking: '處理中…',
     aiReplying: '正在回覆',
     loading: '正在開啟…',

@@ -50,6 +50,7 @@ import { printMarkdownPdf } from './print-pdf'
 import { atomicWriteFile } from './atomic-write'
 import {
   copyImageIntoOwnedAssets,
+  discardPendingOwnedAssetNames,
   discardPendingOwnedAssets,
   extractMarkdownImageSources,
   isInDocDir,
@@ -59,6 +60,7 @@ import {
   renameOwnedAssetDocument,
   resolveSafeRelativeImagePath,
   resolveSourcePendingAfterSaveAs,
+  restoreOwnedAssetFiles,
   rollbackPreparedSaveAsAssets,
   writeImageIntoOwnedAssets,
 } from './asset-lifecycle'
@@ -67,6 +69,7 @@ import { normalizeMarkdownTheme, type MarkdownTheme } from '../shared/markdown-t
 import { MARKDOWN_CHANNELS, MAX_PASTED_IMAGE_BYTES } from '../shared/ipc'
 import type { ImageHostConfig, WikiLinkResolveRequest, WikiLinkResolved } from '../shared/ipc'
 import { resolveWikiLinks } from './wiki-resolve'
+import { cleanDraftName } from '../shared/draft-name'
 import { rememberWikiFragment, takeWikiFragment } from './wiki-fragment'
 import { isImageHostUsable, normalizeImageHostConfig, uploadImageToHost } from './image-host'
 import {
@@ -670,24 +673,16 @@ async function resolveSaveTarget(
 ): Promise<string | null | 'canceled'> {
   const current = savePathByWc.get(e.sender.id)
   if (mode === 'save' && current) return current
-  // AI auto-naming: silent first save of an untitled document
-  if (mode === 'save' && !current && suggestedName) {
-    const base = suggestedName
-      .replace(/[/\\:*?"<>|]/g, '_')
-      .slice(0, 80)
-      .trim()
-    if (base) {
-      const dir = configuredDefaultSaveDir(app)
-      let target = join(dir, `${base}.md`)
-      for (let n = 1; existsSync(target); n++) target = join(dir, `${base}-${n}.md`)
-      return target
-    }
-  }
+  // a name the AI panel suggested after a run only pre-fills the dialog below: an untitled
+  // document is never written without the user seeing where it goes
+  const suggestedBase = cleanDraftName(
+    suggestedName?.replace(/[/\\:*?"<>|]/g, '_').slice(0, 80) ?? '',
+  )
   const win =
     BrowserWindow.fromWebContents(e.sender) ?? BrowserWindow.getFocusedWindow() ?? undefined
   const defaultPath = current
     ? uniworkSaveAsDefault(current)
-    : join(configuredDefaultSaveDir(app), `${tm('untitledFile')}.md`)
+    : join(configuredDefaultSaveDir(app), `${suggestedBase || tm('untitledFile')}.md`)
   const picked = await showSaveDialogWithMemory(dialog, win, {
     title: tm('dlgSaveTitle'),
     defaultPath,
@@ -962,6 +957,36 @@ function registerMarkdownIpc(): void {
       return writeImageIntoOwnedAssets(docPath, `image.${ext}`, Buffer.from(data.base64, 'base64'))
     },
   )
+
+  ipcMain.handle(MARKDOWN_CHANNELS.discardPendingAssets, async (e, names: unknown) => {
+    const docPath = savePathByWc.get(e.sender.id)
+    const list = Array.isArray(names)
+      ? names.filter((name): name is string => typeof name === 'string')
+      : []
+    if (!docPath) return { deleted: [], preserved: [], errors: [] }
+    const result = await discardPendingOwnedAssetNames(docPath, list)
+    if (result.errors.length > 0) {
+      console.warn('[markdown] AI run asset discard incomplete:', result.errors)
+    }
+    return result
+  })
+
+  ipcMain.handle(MARKDOWN_CHANNELS.restorePendingAssets, async (e, files: unknown) => {
+    const docPath = savePathByWc.get(e.sender.id)
+    const list = (Array.isArray(files) ? files : []).filter(
+      (f): f is { name: string; base64: string } =>
+        !!f &&
+        typeof (f as { name?: unknown }).name === 'string' &&
+        typeof (f as { base64?: unknown }).base64 === 'string' &&
+        (f as { base64: string }).base64.length <= Math.ceil(MAX_PASTED_IMAGE_BYTES / 3) * 4,
+    )
+    if (!docPath) return { restored: [], errors: list.map((f) => f.name) }
+    const result = await restoreOwnedAssetFiles(docPath, list)
+    if (result.errors.length > 0) {
+      console.warn('[markdown] AI run asset restore incomplete:', result.errors)
+    }
+    return result
+  })
 
   // markdown-owned (like docs:ai-generate-image): the shared ai:* handlers are
   // shell-registered, but image generation is gated per app

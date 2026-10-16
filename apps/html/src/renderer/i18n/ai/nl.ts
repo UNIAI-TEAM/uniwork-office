@@ -54,6 +54,8 @@ export const nl = {
   aiUndelivered: 'Niet verzonden',
   aiUnknownError: 'AI-verzoek mislukt, probeer opnieuw',
   aiWorkedSteps: 'Klaar · {n} stappen',
+  aiWorkedStepsOne: 'Klaar · {n} stap',
+  aiWorkedStepsFew: 'Klaar · {n} stappen',
   aiWorking: 'Bezig',
   aiOpenAssistant: 'AI-assistent openen',
   aiToolOutline: 'Documentstructuur lezen',

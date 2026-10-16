@@ -73,6 +73,10 @@ export const th = {
   aiStarterEventOutline: 'ร่างโครงร่างแผนจัดกิจกรรม',
   aiThinking: 'กำลังคิด',
   aiWorkedSteps: 'เสร็จสิ้น · {n} ขั้นตอน',
+  aiWorkedStepsOne: 'เสร็จสิ้น · {n} ขั้นตอน',
+  aiWorkedStepsFew: 'เสร็จสิ้น · {n} ขั้นตอน',
+  aiEditsPaused:
+    'ผู้ช่วยกำลังทำงานกับเอกสารนี้ การแก้ไขของคุณถูกหยุดชั่วคราว หยุดผู้ช่วยเพื่อดำเนินการต่อ',
   aiGroupWorking: 'กำลังทำงาน…',
   aiWorking: 'กำลังดำเนินการ',
   aiErrorPrefix: 'ข้อผิดพลาด: {error}',
@@ -81,6 +85,16 @@ export const th = {
   aiRegenerateTitle: 'สร้างใหม่',
   aiSnapshotsTitle: 'สแนปช็อตของเวอร์ชัน',
   aiRollback: 'ย้อนกลับ',
+  aiAcceptMarked: 'ยอมรับ',
+  aiAcceptMarkedTitle: 'เก็บการแก้ไขของ AI และเอาไฮไลต์ออก',
+  aiRollbackKept:
+    'คืนค่าข้อความแล้ว เอกสารถูกบันทึกระหว่างการตอบนี้ จึงคืนค่าส่วนต่อไปนี้ไม่ได้: {parts}',
+  aiSidePartComments: 'ข้อคิดเห็น',
+  aiSidePartHeaderFooter: 'หัวกระดาษและท้ายกระดาษ',
+  aiSidePartStyles: 'สไตล์',
+  aiSidePartPageSetup: 'การตั้งค่าหน้ากระดาษ',
+  aiSidePartWatermark: 'ลายน้ำ',
+  aiSidePartSep: ', ',
   aiScopeSelected: 'เลือก {count} ย่อหน้า',
   aiScopeEmptyDoc: 'เอกสารเปล่า',
   aiScopeCursor: 'ที่ตำแหน่งเคอร์เซอร์',
@@ -94,6 +108,8 @@ export const th = {
   aiAttachTitle: 'แนบไฟล์ในเครื่อง (หรือลากมาวางบนแผงก็ได้)',
   aiRemoveAttachmentTitle: 'เอาสิ่งที่แนบออก',
   aiTrackChanges: 'ติดตามการเปลี่ยนแปลง',
+  aiTrackForced:
+    'เอกสารนี้ได้รับการป้องกัน ต้องเปิดการติดตามการเปลี่ยนแปลงไว้เสมอ การแก้ไขของ AI จึงถูกบันทึกเป็นการแก้ไขที่ติดตาม',
   aiTrackOnTitle:
     'เปิดการติดตามการเปลี่ยนแปลง: การแก้ไขเนื้อหาของ AI จะถูกทำเครื่องหมายเป็นการเปลี่ยนแปลง (แทรกขีดเส้นใต้ ลบขีดทับ) ยอมรับหรือปฏิเสธได้ในรีวิว',
   aiTrackOffTitle:

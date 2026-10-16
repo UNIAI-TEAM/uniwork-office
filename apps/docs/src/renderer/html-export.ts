@@ -314,8 +314,9 @@ export interface HtmlExportOptions {
 }
 
 const SCREEN_ONLY_CLASSES = ['page-dark', 'show-marks', 'workspace-dark']
+const AI_MARKER_CLASS = 'ai-changed'
 
-/** Screen-only ancestor classes (dark page, marks) are lifted during the synchronous walk so every theme exports the same file. */
+/** Screen-only ancestor classes (dark page, marks) and the AI marker on blocks are lifted during the synchronous walk so every theme exports the same file. */
 export function buildStandaloneHtml(root: HTMLElement, opts: HtmlExportOptions): string {
   const restore: Array<() => void> = []
   for (let el: HTMLElement | null = root; el; el = el.parentElement) {
@@ -326,6 +327,12 @@ export function buildStandaloneHtml(root: HTMLElement, opts: HtmlExportOptions):
         restore.push(() => target.classList.add(c))
       }
     }
+  }
+  // the AI change marker is a screen affordance: its `@media screen` rule is the active medium
+  // here, so the computed background would be inlined into the file
+  for (const el of Array.from(root.querySelectorAll<HTMLElement>(`.${AI_MARKER_CLASS}`))) {
+    el.classList.remove(AI_MARKER_CLASS)
+    restore.push(() => el.classList.add(AI_MARKER_CLASS))
   }
   try {
     return serializeDocument(root, opts)

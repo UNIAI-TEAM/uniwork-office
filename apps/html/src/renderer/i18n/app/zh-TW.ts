@@ -18,6 +18,7 @@ export const zhTW = {
   exportFailed: '匯出失敗',
   exportHtmlEntry: '匯出為單檔 HTML',
   previewLimitNote: '此頁面會透過網路請求資料或嵌入其他頁面，網頁預覽已將其攔截。',
+  previewLimitNoteApp: '此頁面會透過網路請求資料或嵌入其他頁面，預覽已將其攔截。',
   useInAppMessage: '在 UniWork Office 應用程式中開啟即可使用此功能',
   openInApp: '在應用程式中開啟',
   printFailed: '列印失敗：{error}',

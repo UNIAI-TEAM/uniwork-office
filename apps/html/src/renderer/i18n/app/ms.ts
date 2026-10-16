@@ -19,6 +19,8 @@ export const ms = {
   exportHtmlEntry: 'Eksport sebagai HTML fail tunggal',
   previewLimitNote:
     'Halaman ini meminta data melalui rangkaian atau membenamkan halaman lain, yang disekat oleh pratonton web.',
+  previewLimitNoteApp:
+    'Halaman ini meminta data melalui rangkaian atau membenamkan halaman lain, yang disekat oleh pratonton.',
   useInAppMessage: 'Buka dalam aplikasi UniWork Office untuk menggunakan ciri ini',
   openInApp: 'Buka dalam aplikasi',
   printFailed: 'Gagal mencetak: {error}',

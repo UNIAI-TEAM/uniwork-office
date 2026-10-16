@@ -101,6 +101,9 @@ export function PrintDialog({
     const clone = src.cloneNode(true) as HTMLElement
     clone.classList.remove('pv-print-skip')
     clone.querySelector('.pv-pageno')?.remove()
+    // the AI change marker is a screen affordance (@media screen); the preview shows the printed
+    // sheet, and this copy lives in the screen document, so drop it from the copy only
+    clone.querySelectorAll('.ai-changed').forEach((el) => el.classList.remove('ai-changed'))
     host.appendChild(clone)
     applyZoom()
   }, [pageCount, current, applyZoom])

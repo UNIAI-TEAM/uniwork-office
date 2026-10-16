@@ -40,6 +40,8 @@ import { readSourceText, writeSourceText, type SourceTextFormat } from '../share
 import { PlainTextEditor, type PlainTextEditorHandle } from './source/PlainTextEditor'
 import { buildExtensions } from './editor/extensions'
 import { tiptapFindTarget } from './editor/findTarget'
+import { runHistoryOf, setRunFrontmatterSink } from './editor/aiRunHistory'
+import { clearAiHighlightsOnSave } from './editor/aiHighlight'
 import { syncEditorEditable } from './editor/editable-sync'
 import { collectOutline, type OutlineItem } from './editor/outline'
 import { rewriteRawHtmlImages } from './editor/rawHtml'
@@ -71,6 +73,7 @@ import type { ExportFormat, SaveMode, UniworkViewState } from '../shared/ipc'
 import type { AiSettings } from '@genoffice/ai-provider/browser'
 import { uiOp } from './editor/ops'
 import { cap, platform } from './capabilities'
+import { cleanDraftName } from '../shared/draft-name'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 type SaveState = 'idle' | 'saving' | 'saved' | 'failed'
@@ -137,8 +140,11 @@ export function deriveAutoFileName(editor: Editor): string {
     const node = doc.child(i)
     const text = node.textContent.replace(/\s+/g, ' ').trim()
     if (!text) continue
-    if (node.type.name === 'heading') return text.slice(0, 60)
-    return text.split(' ').slice(0, 8).join(' ').slice(0, 60)
+    const name =
+      node.type.name === 'heading'
+        ? text.slice(0, 60)
+        : text.split(' ').slice(0, 8).join(' ').slice(0, 60)
+    return cleanDraftName(name)
   }
   return ''
 }
@@ -720,6 +726,8 @@ export default function App() {
           }
           setImageBaseDir(dirOf(result.path))
           setFilePath(result.path)
+          // the AI marker goes with a user Save (an autosave keeps it)
+          if (editorRef.current) clearAiHighlightsOnSave(editorRef.current, origin)
           if (unchanged) {
             dirtyRef.current = false
             setDirty(false)
@@ -1164,14 +1172,32 @@ export default function App() {
     setAiPreset((prev) => ({ text, nonce: (prev?.nonce ?? 0) + 1 }))
   }, [])
 
+  // Ctrl/Cmd+Z / redo of an AI run (or a failed batch) also moves the properties block the run
+  // changed: the run's undo step carries it (editor/aiRunHistory.ts)
+  useEffect(() => {
+    if (!editor) return
+    setRunFrontmatterSink(editor, (raw) => {
+      envelopeRef.current.frontmatter = raw
+      const inner = frontmatterInner(raw)
+      setFmText(inner)
+      setFmOpen(inner !== '')
+      markDirty()
+    })
+    return () => setRunFrontmatterSink(editor, null)
+  }, [editor, markDirty])
+
   const aiDeps: MarkdownAiDeps = {
     getEditor: () => editorRef.current,
     // envelopeRef, not fmText state: a write-then-read within one AI run must
     // see the new value before React commits
     getFrontmatter: () => frontmatterInner(envelopeRef.current.frontmatter),
     setFrontmatter: (inner) => {
+      const before = envelopeRef.current.frontmatter
       onFrontmatterChange(inner)
       setFmOpen(inner.trim() !== '')
+      // inside an AI run the change joins the run's one undo step
+      if (editorRef.current)
+        runHistoryOf(editorRef.current).recordFrontmatter(before, envelopeRef.current.frontmatter)
     },
     // snapshots carry body + the raw frontmatter block (structured, no
     // file-text round-trip) so a rollback also reverts set_frontmatter and
@@ -1192,11 +1218,13 @@ export default function App() {
       markDirty()
     },
     onRunDone: (mutated) => {
-      // AI wrote into a never-saved document → name it from the content and save silently
-      if (!mutated || filePathRef.current || !editorRef.current) return
-      const name = deriveAutoFileName(editorRef.current)
-      if (name) void doSave('save', name)
+      // AI wrote into a never-saved document: the panel asks before anything is saved, offering
+      // a name from the content ('' = nothing to derive, the dialog starts with the untitled name)
+      if (!mutated || filePathRef.current || !editorRef.current) return null
+      return deriveAutoFileName(editorRef.current) ?? ''
     },
+    // the Save click on that offer: the normal first-save dialog, pre-filled with the name
+    onSaveOffer: (name) => void doSave('save', name || undefined),
   }
 
   const fileName = filePath ? filePath.replace(/^.*[/\\]/, '') : null

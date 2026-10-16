@@ -113,6 +113,8 @@ export function createMarkdownSkill(
   getAsk?: () => AskClarification | undefined,
   /** image URLs this run may insert (reset at every run); refuses unregistered ones while its enforce predicate holds */
   imageUrls?: ImageUrlRegistry,
+  /** told the path of each picture file a run saves beside the document (the panel's Roll back drops them) */
+  onImageAsset?: (rel: string, base64: string) => void,
 ): AgentSkill {
   /** ask_clarification only exists while a panel hosts its card; it never edits, so view-only keeps it */
   const withAsk = (tools: AgentToolDef[], readOnly: boolean): AgentToolDef[] =>
@@ -170,7 +172,16 @@ export function createMarkdownSkill(
       if (!editor) {
         return { output: 'editor not ready', isError: true, summary: call.name }
       }
-      return executeTool(editor, call, signal, fm, getWriter?.(), getAsk?.(), imageUrls)
+      return executeTool(
+        editor,
+        call,
+        signal,
+        fm,
+        getWriter?.(),
+        getAsk?.(),
+        imageUrls,
+        onImageAsset,
+      )
     },
   }
 }

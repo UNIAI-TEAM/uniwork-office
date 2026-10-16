@@ -7,13 +7,14 @@
 // duplicate tool name, a schema the evaluator must refuse to guess).
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { after, describe, it } from 'node:test'
 
 import { extract } from './genoffice-tools-extract.mjs'
+import * as extractor from './genoffice-tools-extract.mjs'
 
 const SCRIPT = fileURLToPath(new URL('./genoffice-tools-extract.mjs', import.meta.url))
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url))
@@ -1650,7 +1651,7 @@ describe('division after a property name (G7-06 r4)', () => {
       '      / 2 / write(call)',
       "  if (call.name === 'sib_div_postfix_dec') return write(call)",
       "  if (call.name === 'ctrl_regex_return')",
-      "    return / 2 /.test(String(read(call).output)) && write(call)",
+      '    return / 2 /.test(String(read(call).output)) && write(call)',
       "  if (call.name === 'sib_ctrl_regex_return') return write(call)",
       "  if (call.name === 'ctrl_regex_and')",
       '    return read(call) &&',
@@ -1854,5 +1855,352 @@ describe('real repo', () => {
       assert.ok(['yes', 'no', 'undeclared'].includes(row.write))
       assert.ok(!row.source.startsWith('/'))
     }
+  })
+})
+
+// ────────────────────────── --emit-schemas (G6-09 W10, R2) ──────────────────────────
+
+const EMIT_FIXTURE = {
+  'apps/docs/src/renderer/ai/tools.ts': [
+    "import type { AgentToolDef } from '@genoffice/agent-core'",
+    '',
+    "const SIZES = [{ label: 'A4' }, { label: 'Letter' }]",
+    '',
+    'export const AGENT_TOOLS: AgentToolDef[] = [',
+    '  {',
+    "    name: 'literal_tool',",
+    "    description: 'a literal schema',",
+    '    inputSchema: {',
+    "      type: 'object',",
+    '      properties: { zeta: { type: "string" }, alpha: { type: "integer" } },',
+    "      required: ['alpha'],",
+    '    },',
+    '  },',
+    '  {',
+    "    name: 'enum_tool',",
+    "    description: 'an enum built with an arrow function',",
+    '    inputSchema: {',
+    "      type: 'object',",
+    "      properties: { size: { type: 'string', enum: SIZES.map((p) => p.label) } },",
+    '    },',
+    '  },',
+    '  {',
+    "    name: 'guide_tool',",
+    "    description: 'Intro. ' + buildGuide(),",
+    "    inputSchema: { type: 'object', properties: {} },",
+    '  },',
+    '  {',
+    "    name: 'unresolvable',",
+    "    description: `built by ${'a call'}`,",
+    "    inputSchema: buildSchema('unresolvable'),",
+    '  },',
+    '  {',
+    "    name: 'computed_description',",
+    "    description: `ops: ${opNames().join(', ')}`,",
+    "    inputSchema: { type: 'object', properties: { ops: { type: 'array' } } },",
+    '  },',
+    '  {',
+    "    name: 'concat_tool',",
+    "    description: 'first part. ' +",
+    "      'second part.',",
+    '    inputSchema: {',
+    "      type: 'object',",
+    "      properties: { q: { type: 'string', description: 'long ' + 'text', } },",
+    '    },',
+    '  },',
+    '  {',
+    "    name: 'operator_tool',",
+    "    description: 'x' || 'y',",
+    "    inputSchema: { type: 'object', properties: { n: { type: 'number' } } },",
+    '  },',
+    '  {',
+    "    name: 'schemaless',",
+    "    description: 'a tool with no inputSchema',",
+    '  },',
+    ']',
+    '',
+  ].join('\n'),
+  'apps/sheets/src/renderer/ai/tools.ts': [
+    "import type { AgentToolDef } from '@genoffice/agent-core'",
+    '',
+    'export const WORKBOOK_TOOLS: AgentToolDef[] = [',
+    '  {',
+    "    name: 'sheet_tool',",
+    "    description: 'one tool in a second module',",
+    "    inputSchema: { type: 'object', properties: { range: { type: 'string' } } },",
+    '  },',
+    ']',
+    '',
+  ].join('\n'),
+  'packages/agent-core/src/shared-tools.ts': [
+    "import type { AgentToolDef } from './types'",
+    '',
+    'export const SHARED_TOOLS: AgentToolDef[] = [',
+    '  {',
+    "    name: 'ask_clarification',",
+    "    description: 'shared by every module',",
+    "    inputSchema: { type: 'object', properties: { question: { type: 'string' } } },",
+    '  },',
+    ']',
+    '',
+  ].join('\n'),
+}
+
+const RUNTIME_MARK = '[generated at runtime]'
+const MODULE_KEYS = ['docs', 'sheets', 'slides', 'pdf', 'markdown', 'html']
+
+describe('--emit-schemas', () => {
+  const build = (repo, rev) => {
+    assert.equal(typeof extractor.buildSchemaFile, 'function', 'buildSchemaFile is exported')
+    return extractor.buildSchemaFile(extract({ repo, rev }))
+  }
+
+  it('emits the schema file the G7-12 harness loads, with the incomplete tools listed', () => {
+    const { dir, sha } = fixture(EMIT_FIXTURE)
+    const result = extract({ repo: dir, rev: sha })
+    const file = build(dir, sha)
+
+    assert.deepEqual(Object.keys(file), ['header', ...MODULE_KEYS, 'catalogue'])
+    assert.deepEqual(file.header, {
+      kind: 'genoffice-tool-schemas',
+      version: 1,
+      rev: sha,
+      mechanicalBlockSha256: sha256(result.text),
+      counts: { docs: 8, sheets: 1, slides: 0, pdf: 0, markdown: 0, html: 0, 'agent-core': 1 },
+    })
+
+    // the shape holdout-backend.mjs reads: per module, `{ type: 'function', function: { name, description, parameters } }`
+    const tool = (module, name) => file[module].find((t) => t.function.name === name)
+    assert.deepEqual(
+      file.docs.map((t) => t.function.name),
+      ['computed_description', 'concat_tool', 'enum_tool', 'guide_tool', 'literal_tool'],
+    )
+    assert.deepEqual(tool('docs', 'literal_tool'), {
+      type: 'function',
+      function: {
+        name: 'literal_tool',
+        description: 'a literal schema',
+        parameters: LITERAL_SCHEMA,
+      },
+    })
+    // source key order is kept (`zeta` before `alpha`), not sorted
+    assert.deepEqual(Object.keys(tool('docs', 'literal_tool').function.parameters.properties), [
+      'zeta',
+      'alpha',
+    ])
+    assert.deepEqual(file.sheets, [
+      {
+        type: 'function',
+        function: {
+          name: 'sheet_tool',
+          description: 'one tool in a second module',
+          parameters: { type: 'object', properties: { range: { type: 'string' } } },
+        },
+      },
+    ])
+    for (const module of ['slides', 'pdf', 'markdown', 'html']) assert.deepEqual(file[module], [])
+
+    // `first part. ` + `second part.` is one description, not its first operand
+    assert.equal(tool('docs', 'concat_tool').function.description, 'first part. second part.')
+    // an arrow function inside a call (`.map((p) => p.label)`) is folded, not flagged as an operator
+    assert.deepEqual(tool('docs', 'enum_tool').function.parameters.properties.size.enum, [
+      'A4',
+      'Letter',
+    ])
+    // a description that needs product code is offered partial: the literal text, a neutral marker where the code ran
+    assert.equal(tool('docs', 'computed_description').function.description, `ops: ${RUNTIME_MARK}`)
+    assert.equal(tool('docs', 'guide_tool').function.description, `Intro. ${RUNTIME_MARK}`)
+
+    const CONCAT_FULL = {
+      type: 'object',
+      properties: { q: { type: 'string', description: 'long text' } },
+    }
+    const askSchema = { type: 'object', properties: { question: { type: 'string' } } }
+    const opsSchema = { type: 'object', properties: { ops: { type: 'array' } } }
+    const rangeSchema = { type: 'object', properties: { range: { type: 'string' } } }
+    const nSchema = { type: 'object', properties: { n: { type: 'number' } } }
+    const emptySchema = { type: 'object', properties: {} }
+    const enumSchema = {
+      type: 'object',
+      properties: { size: { type: 'string', enum: ['A4', 'Letter'] } },
+    }
+    const DOCS_SRC = 'apps/docs/src/renderer/ai/tools.ts'
+    const base = (module, name, source) => ({
+      module,
+      name,
+      host: source.startsWith('packages/') ? 'agent-core' : 'renderer',
+      source,
+    })
+    assert.deepEqual(file.catalogue, [
+      {
+        ...base('agent-core', 'ask_clarification', 'packages/agent-core/src/shared-tools.ts'),
+        schemaComplete: true,
+        descriptionComplete: true,
+        offered: true,
+        inputSchemaSha256: hashOf(askSchema),
+        tableHash: hashOf(askSchema),
+      },
+      {
+        // partial: the schema is real, the description has a marker where `opNames()` ran
+        ...base('docs', 'computed_description', DOCS_SRC),
+        schemaComplete: true,
+        descriptionComplete: false,
+        offered: true,
+        reason: 'description:identifier:opNames',
+        inputSchemaSha256: hashOf(opsSchema),
+        tableHash: hashOf(opsSchema),
+      },
+      {
+        ...base('docs', 'concat_tool', DOCS_SRC),
+        schemaComplete: true,
+        descriptionComplete: true,
+        offered: true,
+        inputSchemaSha256: hashOf(CONCAT_FULL),
+        // the table's evaluator stops the value at the `+` and reads `'text'` as a key of its own
+        tableHash: 'unresolved:identifier:text',
+      },
+      {
+        ...base('docs', 'enum_tool', DOCS_SRC),
+        schemaComplete: true,
+        descriptionComplete: true,
+        offered: true,
+        inputSchemaSha256: hashOf(enumSchema),
+        tableHash: hashOf(enumSchema),
+      },
+      {
+        ...base('docs', 'guide_tool', DOCS_SRC),
+        schemaComplete: true,
+        descriptionComplete: false,
+        offered: true,
+        reason: 'description:identifier:buildGuide',
+        inputSchemaSha256: hashOf(emptySchema),
+        tableHash: hashOf(emptySchema),
+      },
+      {
+        ...base('docs', 'literal_tool', DOCS_SRC),
+        schemaComplete: true,
+        descriptionComplete: true,
+        offered: true,
+        inputSchemaSha256: hashOf(LITERAL_SCHEMA),
+        tableHash: hashOf(LITERAL_SCHEMA),
+      },
+      {
+        // `'x' || 'y'` is an operator the evaluator does not fold: no description at all, so not offered
+        ...base('docs', 'operator_tool', DOCS_SRC),
+        schemaComplete: true,
+        descriptionComplete: false,
+        offered: false,
+        reason: 'description:operator:||',
+        description: null,
+        inputSchema: nSchema,
+        inputSchemaSha256: hashOf(nSchema),
+        tableHash: hashOf(nSchema),
+      },
+      {
+        ...base('docs', 'schemaless', DOCS_SRC),
+        schemaComplete: false,
+        descriptionComplete: true,
+        offered: false,
+        reason: 'missing',
+        description: 'a tool with no inputSchema',
+        inputSchemaSha256: null,
+        tableHash: 'unresolved:missing',
+      },
+      {
+        ...base('docs', 'unresolvable', DOCS_SRC),
+        schemaComplete: false,
+        descriptionComplete: true,
+        offered: false,
+        reason: 'identifier:buildSchema',
+        description: 'built by a call',
+        inputSchemaSha256: null,
+        tableHash: 'unresolved:identifier:buildSchema',
+      },
+      {
+        ...base('sheets', 'sheet_tool', 'apps/sheets/src/renderer/ai/tools.ts'),
+        schemaComplete: true,
+        descriptionComplete: true,
+        offered: true,
+        inputSchemaSha256: hashOf(rangeSchema),
+        tableHash: hashOf(rangeSchema),
+      },
+    ])
+  })
+
+  it('lists a table row whose object the default evaluator misread, instead of trusting its name', () => {
+    // a `+` right before the `}` of a nested object: the default evaluator reads the string as a shorthand key and
+    // swallows the closing brace, so the object runs on into the next tool and its `name` is overwritten
+    const { dir, sha } = fixture({
+      'apps/docs/src/renderer/ai/tools.ts': [
+        "import type { AgentToolDef } from '@genoffice/agent-core'",
+        '',
+        'export const AGENT_TOOLS: AgentToolDef[] = [',
+        '  {',
+        "    name: 'swallowed',",
+        "    description: 'first',",
+        '    inputSchema: {',
+        "      type: 'object',",
+        "      properties: { q: { type: 'string', description: 'long ' + 'text' } },",
+        '    },',
+        '  },',
+        '  {',
+        "    name: 'next_tool',",
+        "    description: 'second',",
+        "    inputSchema: { type: 'object', properties: {} },",
+        '  },',
+        ']',
+        '',
+      ].join('\n'),
+    })
+    const file = build(dir, sha)
+    const flagged = file.catalogue.filter((e) => !e.schemaComplete)
+    assert.ok(flagged.length > 0, 'the misread row is listed as incomplete')
+    for (const entry of flagged) assert.match(entry.reason, /^name:/)
+    // and it is never offered under a name it does not carry
+    assert.ok(!file.docs.some((t) => t.function.name === 'swallowed'))
+  })
+
+  it('is deterministic: two runs write byte-identical files', () => {
+    const { dir, sha } = fixture(EMIT_FIXTURE)
+    const a = JSON.stringify(build(dir, sha))
+    const b = JSON.stringify(build(dir, sha))
+    assert.equal(a, b)
+  })
+
+  it('lists one catalogue entry per mechanical table row, module by module', () => {
+    const { dir, sha } = fixture(FIXTURE)
+    const result = extract({ repo: dir, rev: sha })
+    const file = build(dir, sha)
+    const perModule = new Map()
+    for (const row of result.rows) perModule.set(row.module, (perModule.get(row.module) ?? 0) + 1)
+    const fromCatalogue = new Map()
+    for (const entry of file.catalogue)
+      fromCatalogue.set(entry.module, (fromCatalogue.get(entry.module) ?? 0) + 1)
+    assert.deepEqual(fromCatalogue, perModule)
+    assert.equal(file.catalogue.length, result.rows.length)
+    // a complete schema is offered, an incomplete one is only listed
+    const names = (module) => file[module].map((t) => t.function.name)
+    assert.ok(names('docs').includes('literal_tool'))
+    assert.ok(!names('docs').includes('unresolvable'))
+    assert.ok(file.catalogue.some((e) => e.name === 'unresolvable' && e.schemaComplete === false))
+  })
+
+  it('CLI --emit-schemas writes the file and leaves the default markdown untouched', () => {
+    const { dir, sha } = fixture(EMIT_FIXTURE)
+    const out = join(dir, '..', `emit-${sha.slice(0, 8)}.json`)
+    roots.push(out)
+    const plain = execFileSync(process.execPath, [SCRIPT, '--repo', dir, '--rev', sha], {
+      encoding: 'utf8',
+    })
+    assert.equal(plain, extract({ repo: dir, rev: sha }).text)
+    const withFlag = execFileSync(
+      process.execPath,
+      [SCRIPT, '--repo', dir, '--rev', sha, '--emit-schemas', out],
+      { encoding: 'utf8' },
+    )
+    assert.equal(withFlag, '')
+    const written = readFileSync(out, 'utf8')
+    assert.ok(written.endsWith('}\n'))
+    assert.deepEqual(JSON.parse(written), build(dir, sha))
   })
 })

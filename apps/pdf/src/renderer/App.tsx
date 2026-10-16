@@ -7,6 +7,7 @@ import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist/legacy/build/pdf.mj
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url'
 import { AiPanel } from './ai/AiPanel'
+import { aiRunSaveOffer, nameCandidateFromInserts, saveNameFor } from './ai-save-offer'
 import { AiAskPopover, type AskAnchorRect } from './AiAskPopover'
 import { AppOnlyNote } from './AppOnlyNote'
 import { narrowPane, widthFitScale } from './fit-scale'
@@ -231,6 +232,8 @@ import type { LocalTextEdit, LocalTextInsert, TextDraft } from './text-edit-prev
 import { planEditOps, reduceBucket } from './edit-ops'
 import type { Bucket, Op, OpContext, PlanResult } from './edit-ops'
 import { rectsNear } from './edit-state'
+import { EditHistory, sameEditSnapshot, type RunUndoDeps } from './ai/edit-history'
+import { EditsPausedNotice } from './ai/EditsPausedNotice'
 import type {
   StampConfig,
   SavedMarkupAnnot,
@@ -897,8 +900,17 @@ export default function App() {
   const [searchMatches, setSearchMatches] = useState<SearchMatch[]>([])
   const [searchCur, setSearchCur] = useState(0)
   const [printing, setPrinting] = useState(false)
-  const [undoStack, setUndoStack] = useState<EditSnapshot[]>([])
-  const [redoStack, setRedoStack] = useState<EditSnapshot[]>([])
+  // The undo/redo stacks live in an external store (an AI run folds into one entry and has to
+  // read them from async loop events); the tick re-renders the ribbon and the AI panel when they move
+  const [, setHistoryTick] = useState(0)
+  const historyRef = useRef<EditHistory<EditSnapshot> | null>(null)
+  historyRef.current ??= new EditHistory<EditSnapshot>({
+    same: sameEditSnapshot,
+    onChange: () => setHistoryTick((n) => n + 1),
+  })
+  const history = historyRef.current
+  // the name the ask-before-save card showed, applied by the save that follows its Save click
+  const offeredNameRef = useRef<string | null>(null)
   const [pwInput, setPwInput] = useState('')
   const [pwWrong, setPwWrong] = useState(false)
   const [extractDlg, setExtractDlg] = useState(false)
@@ -1340,8 +1352,7 @@ export default function App() {
       setFileSize(data.byteLength)
       setSelected(null)
       setDeleteToast(false)
-      setUndoStack([])
-      setRedoStack([])
+      history.clear()
       outlineDocRef.current = loaded
       // A save-reload keeps the current tree (page indices already remapped
       // above) visible while headings rescan
@@ -1368,7 +1379,7 @@ export default function App() {
       if (previous) void previous.loadingTask.destroy()
       return loaded.numPages
     },
-    [],
+    [history],
   )
 
   const openPath = useCallback(
@@ -1996,9 +2007,8 @@ export default function App() {
   const pushUndo = (coalesceKey?: string) => {
     if (coalesceKey && coalesceKeyRef.current === coalesceKey) return
     coalesceKeyRef.current = coalesceKey ?? null
-    const snap = snapshot()
-    setUndoStack((prev) => [...prev.slice(-49), snap])
-    setRedoStack([])
+    // inside an AI run the tools push nothing: the run leaves one entry when it ends
+    history.push(snapshot())
   }
 
   const newId = () => `d${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
@@ -2036,6 +2046,16 @@ export default function App() {
         failures: [
           { index: structuralIndex, op: ops[structuralIndex]!, error: t('redactStructureBlocked') },
         ],
+      }
+    }
+    // Hand edits are paused while an AI run is open (the run is one undo entry; the notice says
+    // why); the run's own tools reach this path inside history.asAi
+    if (!history.mayEdit()) {
+      return {
+        ops: [],
+        records: [],
+        touched: new Set(),
+        failures: ops.length > 0 ? [{ index: 0, op: ops[0]!, error: t('aiEditsPaused') }] : [],
       }
     }
     const plan = planEditOps(ops, editOpContext(), newId)
@@ -2158,24 +2178,43 @@ export default function App() {
   }
 
   const undo = () => {
-    const top = undoStack[undoStack.length - 1]
-    if (!top) return
-    // Taken before applySnapshot rewrites the refs; the updater may run after it
-    const cur = snapshot()
-    setRedoStack((r) => [...r, cur])
-    setUndoStack((u) => u.slice(0, -1))
-    applySnapshot(top)
+    // The current state is taken before applySnapshot rewrites the refs
+    const restore = history.undo(snapshot())
+    if (!restore) return
+    applySnapshot(restore)
     coalesceKeyRef.current = null
   }
 
   const redo = () => {
-    const top = redoStack[redoStack.length - 1]
-    if (!top) return
-    const cur = snapshot()
-    setUndoStack((u) => [...u, cur])
-    setRedoStack((r) => r.slice(0, -1))
-    applySnapshot(top)
+    const restore = history.redo(snapshot())
+    if (!restore) return
+    applySnapshot(restore)
     coalesceKeyRef.current = null
+  }
+
+  /** The AI panel's run hooks and its "Undo this run" button: one run = one undo entry */
+  const aiRunUndo: Required<RunUndoDeps> = {
+    runHistory: {
+      get activeRunId() {
+        return history.activeRunId
+      },
+      begin: (runId) => {
+        coalesceKeyRef.current = null
+        history.beginRun(runId, snapshot())
+      },
+      end: (runId, mutated) => {
+        coalesceKeyRef.current = null
+        history.endRun(runId, mutated, snapshot())
+      },
+    },
+    runUndoState: (runId) => history.runState(runId),
+    undoRun: (runId) => {
+      const restore = history.undoRun(runId, snapshot())
+      if (!restore) return false
+      applySnapshot(restore)
+      coalesceKeyRef.current = null
+      return true
+    },
   }
 
   // ── Full-text search ──
@@ -3891,12 +3930,7 @@ export default function App() {
       // carrying its untitled name takes its file name from the topmost text this
       // save inserted; the main process no-ops for every other file, so
       // user-chosen names are never touched.
-      const nameCandidate = [...textInserts]
-        .sort(
-          (a, b) => a.input.pageIndex - b.input.pageIndex || b.input.origin[1] - a.input.origin[1],
-        )[0]
-        ?.input.text.split('\n')[0]
-        ?.trim()
+      const nameCandidate = saveNameFor(offeredNameRef.current, textInserts)
       if (nameCandidate && cap('autoRename')) {
         try {
           const renamed = await window.pdfApi.autoRename(filePath, nameCandidate)
@@ -5784,7 +5818,8 @@ export default function App() {
     return `The document has ${bits.join(' and ')}; use read_annotations to read them.`
   }
 
-  const aiApi: PdfAppDeps = {
+  const aiApi: PdfAppDeps = history.scopeApi<PdfAppDeps>({
+    ...aiRunUndo,
     doc: () => doc,
     fileName: () => fileName,
     pageCount: () => sizes.length,
@@ -6040,25 +6075,35 @@ export default function App() {
     splitPdf: splitPdfToFolder,
     splitPages: splitPagesToFile,
     mergePages: mergePagesToFile,
-  }
+  })
 
   /**
-   * After an AI run that mutated a shell-created blank still carrying its untitled
-   * name, silently save once: the save's auto-rename then derives the file name from
-   * the inserted text — mirrors docs/sheets, where AI generation names the draft.
-   * PDFs the user merely opened keep the pending-until-⌘S contract (isUntitled is
-   * false for them, and the main process would refuse the rename anyway).
+   * After an AI run that mutated a shell-created blank still carrying its untitled name, the AI
+   * panel asks before anything is saved: this answers with the name to offer (null for every
+   * other document). PDFs the user merely opened keep the pending-until-⌘S contract (isUntitled
+   * is false for them, and the main process would refuse the rename anyway).
    */
-  const autoSaveAfterAiRun = async () => {
-    if (!filePath || readOnly) return
-    try {
-      if (!(await window.pdfApi.isUntitled(filePath))) return
-    } catch {
-      return
-    }
+  const aiSaveOffer = (): Promise<string | null> =>
+    aiRunSaveOffer({
+      filePath,
+      readOnly,
+      isUntitled: (path) => window.pdfApi.isUntitled(path),
+      name: nameCandidateFromInserts(textInsertsRef.current),
+    })
+
+  /**
+   * The Save click on that card: an explicit save writes the pending edits to the blank, and
+   * the save's auto-rename then derives the file name from the inserted text, the name the
+   * card showed.
+   */
+  const saveAfterAiOffer = (offeredName: string) => {
     // A file we created ourselves is safe to keep autosaving from here on
     savedOnceRef.current = true
-    void save('auto')
+    // The card's name is the name the file gets, even if inserts changed since it was shown
+    offeredNameRef.current = offeredName || null
+    void save('user').finally(() => {
+      offeredNameRef.current = null
+    })
   }
 
   /** Internal destination of a Link annotation → jump to that page */
@@ -6711,7 +6756,7 @@ export default function App() {
             className="qa-btn"
             data-tip={`${t('undo')} (${platformShortcuts('⌘Z')})`}
             aria-label={`${t('undo')} (${platformShortcuts('⌘Z')})`}
-            disabled={undoStack.length === 0}
+            disabled={!history.canUndo}
             onClick={undo}
           >
             <IconUndo />
@@ -6720,7 +6765,7 @@ export default function App() {
             className="qa-btn"
             data-tip={`${t('redo')} (${platformShortcuts('⇧⌘Z')})`}
             aria-label={`${t('redo')} (${platformShortcuts('⇧⌘Z')})`}
-            disabled={redoStack.length === 0}
+            disabled={!history.canRedo}
             onClick={redo}
           >
             <IconRedo />
@@ -7575,7 +7620,8 @@ export default function App() {
               onExpand={aiDock.open}
               onCollapse={aiDock.collapse}
               readOnly={readOnly}
-              onRunDone={() => void autoSaveAfterAiRun()}
+              onRunDone={aiSaveOffer}
+              onSaveOffer={saveAfterAiOffer}
               onClearSelection={() => setAiSelection(null)}
             />
           </div>
@@ -9255,6 +9301,7 @@ export default function App() {
                 </button>
               </div>
             )}
+            <EditsPausedNotice active={history.runOpen} />
             {notice && (
               <div className="pdf-toast pdf-toast-notice" role="status">
                 <span>{notice}</span>

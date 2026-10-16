@@ -1300,6 +1300,19 @@ html.genoffice-popover-open .ribbon-tabs {
   line-height: 1.45;
 }
 
+/* a redo that stayed refused because the run's picture could not be put back (shown above the composer) */
+.ai-redo-refused {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--warning-border);
+  border-radius: 6px;
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  font-size: 12px;
+  line-height: 1.4;
+  text-wrap: pretty;
+}
+
 .ai-sr-status {
   position: absolute;
   width: 1px;
@@ -1370,7 +1383,11 @@ html.genoffice-popover-open .ribbon-tabs {
 }
 
 .ai-result-edited-hint {
+  flex: 1 1 160px;
+  min-width: 0;
   color: var(--color-text-tertiary);
+  /* a two-line hint splits evenly instead of leaving one word on its own line */
+  text-wrap: balance;
 }
 
 /* the one stopped line of a UniWork AI turn the user stopped (aiRunStopped) */
@@ -1463,8 +1480,8 @@ html.genoffice-popover-open .ribbon-tabs {
 }
 
 .ai-work-group-summary:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px var(--md-focus-ring);
+  outline: 2px solid var(--color-border-brand);
+  outline-offset: 1px;
   border-radius: 4px;
 }
 
@@ -1601,8 +1618,8 @@ html.genoffice-popover-open .ribbon-tabs {
 }
 
 .ai-step-title.clickable:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px var(--md-focus-ring);
+  outline: 2px solid var(--color-border-brand);
+  outline-offset: 1px;
   border-radius: 4px;
 }
 

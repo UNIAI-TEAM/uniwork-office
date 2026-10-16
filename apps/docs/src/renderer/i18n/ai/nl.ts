@@ -76,6 +76,10 @@ export const nl = {
   aiStarterEventOutline: 'Maak een opzet voor een evenementenplan',
   aiThinking: 'Aan het denken',
   aiWorkedSteps: 'Klaar · {n} stappen',
+  aiWorkedStepsOne: 'Klaar · {n} stap',
+  aiWorkedStepsFew: 'Klaar · {n} stappen',
+  aiEditsPaused:
+    'De assistent werkt aan dit document. Je bewerkingen zijn gepauzeerd; stop de assistent om door te gaan.',
   aiGroupWorking: 'Bezig…',
   aiWorking: 'Bezig met verwerken',
   aiErrorPrefix: 'Fout: {error}',
@@ -84,6 +88,16 @@ export const nl = {
   aiRegenerateTitle: 'Opnieuw genereren',
   aiSnapshotsTitle: 'Versiesnapshots',
   aiRollback: 'Terugdraaien',
+  aiAcceptMarked: 'Accepteren',
+  aiAcceptMarkedTitle: 'AI-wijzigingen behouden en de markering verwijderen',
+  aiRollbackKept:
+    'De tekst is teruggezet. Het document is tijdens dit antwoord opgeslagen, daarom konden deze onderdelen niet worden teruggezet: {parts}',
+  aiSidePartComments: 'opmerkingen',
+  aiSidePartHeaderFooter: 'kop- en voettekst',
+  aiSidePartStyles: 'stijlen',
+  aiSidePartPageSetup: 'pagina-instelling',
+  aiSidePartWatermark: 'watermerk',
+  aiSidePartSep: ', ',
   aiScopeSelected: "{count} alinea('s) geselecteerd",
   aiScopeEmptyDoc: 'Leeg document',
   aiScopeCursor: 'Bij de cursor',
@@ -97,6 +111,8 @@ export const nl = {
   aiAttachTitle: 'Lokale bestanden bijvoegen (of sleep ze naar het paneel)',
   aiRemoveAttachmentTitle: 'Bijlage verwijderen',
   aiTrackChanges: 'Wijzigingen bijhouden',
+  aiTrackForced:
+    'Dit document is beveiligd: Wijzigingen bijhouden moet aan blijven, dus bewerkingen van de AI worden als revisies vastgelegd.',
   aiTrackOnTitle:
     'Wijzigingen bijhouden aan: AI-inhoudsbewerkingen worden gemarkeerd als revisies (invoegingen onderstreept, verwijderingen doorgehaald); accepteer of weiger ze in Controleren',
   aiTrackOffTitle:

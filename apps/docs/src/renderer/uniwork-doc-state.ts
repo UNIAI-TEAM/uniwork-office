@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { noteEditableIntent } from './editor/editable-intent'
 
 /**
  * UniWork seam, renderer half. The main process answers whether the open file
@@ -88,6 +89,7 @@ export function setEditorEditable(
   editor: { setEditable(editable: boolean, emitUpdate?: boolean): void },
   editable: boolean,
 ): void {
+  noteEditableIntent(editor, editable)
   editor.setEditable(editable, false)
 }
 

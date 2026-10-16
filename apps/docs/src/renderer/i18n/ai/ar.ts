@@ -73,6 +73,9 @@ export const ar = {
   aiStarterEventOutline: 'أعدّ مخططًا لخطة فعالية',
   aiThinking: 'جارٍ التفكير',
   aiWorkedSteps: 'اكتمل · {n} خطوات',
+  aiWorkedStepsOne: 'اكتمل · خطوة واحدة',
+  aiWorkedStepsFew: 'اكتمل · {n} خطوات',
+  aiEditsPaused: 'المساعد يعمل على هذا المستند. تعديلاتك متوقفة مؤقتًا؛ أوقف المساعد للمتابعة.',
   aiGroupWorking: 'جارٍ العمل…',
   aiWorking: 'جارٍ المعالجة',
   aiErrorPrefix: 'خطأ: {error}',
@@ -81,6 +84,16 @@ export const ar = {
   aiRegenerateTitle: 'إعادة الإنشاء',
   aiSnapshotsTitle: 'لقطات الإصدارات',
   aiRollback: 'استرجاع',
+  aiAcceptMarked: 'قبول',
+  aiAcceptMarkedTitle: 'الاحتفاظ بتعديلات الذكاء الاصطناعي وإزالة التمييز',
+  aiRollbackKept:
+    'تمت استعادة النص. حُفظ المستند أثناء هذا الرد، لذا تعذّرت استعادة هذه الأجزاء: {parts}',
+  aiSidePartComments: 'التعليقات',
+  aiSidePartHeaderFooter: 'الرأس والتذييل',
+  aiSidePartStyles: 'الأنماط',
+  aiSidePartPageSetup: 'إعداد الصفحة',
+  aiSidePartWatermark: 'العلامة المائية',
+  aiSidePartSep: '، ',
   aiScopeSelected: 'تم تحديد {count} فقرة',
   aiScopeEmptyDoc: 'مستند فارغ',
   aiScopeCursor: 'عند المؤشر',
@@ -94,6 +107,8 @@ export const ar = {
   aiAttachTitle: 'إرفاق ملفات محلية (أو اسحبها إلى اللوحة)',
   aiRemoveAttachmentTitle: 'إزالة المرفق',
   aiTrackChanges: 'تعقب التغييرات',
+  aiTrackForced:
+    'هذا المستند محمي: يجب إبقاء تعقب التغييرات قيد التشغيل، لذا تُسجَّل تعديلات الذكاء الاصطناعي كمراجعات.',
   aiTrackOnTitle:
     'تعقب التغييرات مفعّل: تُوضع علامة على تغييرات محتوى الذكاء الاصطناعي كمراجعات (الإدراجات مسطّرة والحذف مشطوب)؛ اقبلها أو ارفضها في «مراجعة»',
   aiTrackOffTitle:

@@ -32,10 +32,12 @@ interface Props {
 }
 
 /**
- * The document runs in a sandboxed frame with an opaque origin: scripts and
- * network are allowed (CDN-dependent pages must render), the app itself is out
- * of reach. Reloads go through the src attribute because the frame's window is
- * cross-origin to us; the inspector talks back over postMessage.
+ * The document runs in a sandboxed frame with an opaque origin: its scripts, styles and
+ * pictures run and load (CDN libraries over https must render), but the html-preview:// policy
+ * blocks fetch/XHR, nested frames, workers and form posts, and the app itself is out of reach.
+ * A page that uses a blocked feature gets the PreviewLimitNote above the frame. Reloads go
+ * through the src attribute because the frame's window is cross-origin to us; the inspector
+ * talks back over postMessage.
  *
  * Web frame, scripts on (`htmlApi.connectPreview`): the same sandbox flags plus
  * `credentialless`; `url` is the bundle's preview.html, served with a policy of its own

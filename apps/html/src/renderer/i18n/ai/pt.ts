@@ -55,6 +55,8 @@ export const pt = {
   aiUndelivered: 'Não enviado',
   aiUnknownError: 'A solicitação de IA falhou, tente novamente',
   aiWorkedSteps: 'Concluído · {n} etapas',
+  aiWorkedStepsOne: 'Concluído · {n} etapa',
+  aiWorkedStepsFew: 'Concluído · {n} etapas',
   aiWorking: 'Trabalhando',
   aiOpenAssistant: 'Abrir assistente de IA',
   aiToolOutline: 'Ler estrutura do documento',
