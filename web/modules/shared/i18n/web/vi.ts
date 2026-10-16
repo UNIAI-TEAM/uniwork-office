@@ -67,6 +67,8 @@ export const vi = {
 
   // S5 conflict dialog: step 1 extras, confirmation step and results
   uwConflictViewDiff: 'Xem khác biệt',
+  uwConflictDiffPending: 'Đang so sánh…',
+  uwConflictDiffFailed: 'Không thể so sánh các bản lúc này. Hãy thử lại sau.',
   uwConflictNoEdit: 'Bạn không còn quyền sửa tài liệu này.',
   uwConflictOverwriteTitle: 'Ghi đè bằng bản của bạn?',
   uwConflictOverwriteConfirm:

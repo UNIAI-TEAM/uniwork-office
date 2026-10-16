@@ -70,6 +70,8 @@ export const ru = {
 
   // S5 conflict dialog: step 1 extras, confirmation step and results
   uwConflictViewDiff: 'Показать различия',
+  uwConflictDiffPending: 'Сравнение…',
+  uwConflictDiffFailed: 'Сейчас не удалось сравнить версии. Повторите попытку позже.',
   uwConflictNoEdit: 'У вас больше нет прав на редактирование этого документа.',
   uwConflictOverwriteTitle: 'Перезаписать вашей версией?',
   uwConflictOverwriteConfirm:
