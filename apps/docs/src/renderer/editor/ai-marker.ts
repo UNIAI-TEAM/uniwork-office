@@ -44,45 +44,57 @@ export function sameDocIgnoringAiMarks(a: PmNode, b: PmNode): boolean {
   return JSON.stringify(unmarkedJson(a)) === JSON.stringify(unmarkedJson(b))
 }
 
+/** this node or something below it carries the AI marker */
+function carriesMark(node: PmNode): boolean {
+  return Boolean(node.attrs?.aiChanged) || docHasAiMarks(node)
+}
+
 /**
  * The reloaded document with the live doc's AI marker carried over. A save that has to rewrite
  * the editor from the written file (the file gives blocks new docxIndex anchors) would otherwise
  * drop the marker, which is not file content: an autosave must leave it on screen, only a user
  * Save or Accept clears it (a user Save clears it before writing, so nothing is carried then).
- * Top-level blocks pair by index when the block count is unchanged, else by their text.
+ * Children pair by index when their count is unchanged, else by their text; the walk goes down
+ * into containers (a table cell's paragraph carries the marker, the table does not).
  */
 export function carryAiMarks(live: PmNode, next: PmJson): PmJson {
-  if (!docHasAiMarks(live) || !next.content) return next
-  const marked = new Set<number>()
-  live.forEach((node, _offset, index) => {
-    let hit = Boolean(node.attrs?.aiChanged)
-    if (!hit)
-      node.descendants((child) => {
-        if (child.attrs?.aiChanged) hit = true
-        return !hit
-      })
-    if (hit) marked.add(index)
+  if (!docHasAiMarks(live)) return next
+  return carryInto(live, next)
+}
+
+function carryInto(live: PmNode, next: PmJson): PmJson {
+  let result = next
+  if (live.attrs?.aiChanged && next.attrs && 'aiChanged' in next.attrs)
+    result = { ...result, attrs: { ...next.attrs, aiChanged: true } }
+  const children = next.content
+  if (!children) return result
+  // live child index -> reloaded child index, for the children that carry a marker
+  const pairs = new Map<number, number>()
+  const marked: number[] = []
+  live.forEach((child, _offset, index) => {
+    if (carriesMark(child)) marked.push(index)
   })
-  const targets = new Set<number>()
-  if (live.childCount === next.content.length) for (const i of marked) targets.add(i)
+  if (marked.length === 0) return result
+  if (live.childCount === children.length) for (const i of marked) pairs.set(i, i)
   else {
-    const texts = next.content.map(jsonText)
+    const texts = children.map(jsonText)
     let from = 0
-    for (const i of [...marked].sort((a, b) => a - b)) {
+    for (const i of marked) {
       const at = texts.indexOf(live.child(i).textContent, from)
       if (at < 0) continue
-      targets.add(at)
+      pairs.set(i, at)
       from = at + 1
     }
   }
-  if (targets.size === 0) return next
+  if (pairs.size === 0) return result
+  const byTarget = new Map<number, number>()
+  for (const [liveIndex, at] of pairs) byTarget.set(at, liveIndex)
   return {
-    ...next,
-    content: next.content.map((block, i) =>
-      targets.has(i) && block.attrs && 'aiChanged' in block.attrs
-        ? { ...block, attrs: { ...block.attrs, aiChanged: true } }
-        : block,
-    ),
+    ...result,
+    content: children.map((child, i) => {
+      const liveIndex = byTarget.get(i)
+      return liveIndex === undefined ? child : carryInto(live.child(liveIndex), child)
+    }),
   }
 }
 
