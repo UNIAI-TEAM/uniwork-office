@@ -120,6 +120,7 @@ export const zh = {
   uwDocInfoByAt: '{name}，{time}',
   uwDocInfoVersionBy: '{version} · {name}',
   uwAccessView: '查看',
+  uwAccessComment: '评论',
   uwAccessEdit: '编辑',
   uwAccessManage: '管理',
   uwRoleOwner: '所有者',

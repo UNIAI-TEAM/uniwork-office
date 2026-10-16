@@ -8,4 +8,5 @@ export const ru = {
     'Среди тех, у кого есть доступ к этому документу, нет совпадений с «{query}».',
   collabMentionNoCandidates: 'Пока ни у кого больше нет доступа к этому документу.',
   collabMentionError: 'Не удалось загрузить список людей.',
+  collabMentionNoAccessBadge: 'Нет доступа',
 } satisfies Record<keyof typeof zh, string>

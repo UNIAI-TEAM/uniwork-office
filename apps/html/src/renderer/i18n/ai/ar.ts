@@ -54,6 +54,8 @@ export const ar = {
   aiUndelivered: 'لم يتم الإرسال',
   aiUnknownError: 'فشل طلب الذكاء الاصطناعي، أعد المحاولة',
   aiWorkedSteps: 'اكتمل · {n} خطوات',
+  aiWorkedStepsOne: 'اكتمل · خطوة واحدة',
+  aiWorkedStepsFew: 'اكتمل · {n} خطوات',
   aiWorking: 'يعمل',
   aiOpenAssistant: 'فتح مساعد الذكاء الاصطناعي',
   aiToolOutline: 'قراءة بنية المستند',

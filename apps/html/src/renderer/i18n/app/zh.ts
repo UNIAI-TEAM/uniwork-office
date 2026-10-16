@@ -17,6 +17,7 @@ export const zh = {
   exportFailed: '导出失败',
   exportHtmlEntry: '导出为单文件 HTML',
   previewLimitNote: '此页面会通过网络请求数据或嵌入其他页面，网页预览已将其拦截。',
+  previewLimitNoteApp: '此页面会通过网络请求数据或嵌入其他页面，预览已将其拦截。',
   useInAppMessage: '在 UniWork Office 应用中打开即可使用此功能',
   openInApp: '在应用中打开',
   printFailed: '打印失败：{error}',

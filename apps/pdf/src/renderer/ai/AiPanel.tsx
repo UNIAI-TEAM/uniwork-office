@@ -5,6 +5,7 @@ import {
   isUniworkQuestionRefusal,
   aiPanelWidthAtPointer,
   AiPanelSideButton,
+  AiSaveDraftCard,
   AiModelPicker,
   useCloudSignedIn,
   useAiModelNeedHint,
@@ -21,8 +22,10 @@ import {
   getEntryResultChipView,
   noticePatch,
   panelLiveAnnouncement as computePanelLiveAnnouncement,
+  runHistoryEvents,
   singleShortcutHint,
   type PanelNote,
+  type RunHistoryGroup,
 } from '@genoffice/agent-core'
 import {
   aiNoticeBody,
@@ -63,6 +66,8 @@ import { ClarifyCard } from './ClarifyCard'
 import { useClarify } from './use-clarify'
 import { PDF_NAV_SCHEME, parsePdfNavHref } from './pdf-nav'
 import type { FileOpConfirm, PdfAiDeps, PdfAppDeps } from './tools'
+import { RunUndoAction } from './RunUndoAction'
+import { workedStepsLabel } from './worked-steps-label'
 
 function readUniworkCloudStatus(): UniworkCloudStatusBridge | undefined {
   return (window as Window & { uniworkCloudStatus?: UniworkCloudStatusBridge }).uniworkCloudStatus
@@ -115,6 +120,8 @@ interface ChatEntry {
   streamedText?: boolean | undefined
   /** at least one tool mutated the document in this turn */
   mutated?: boolean | undefined
+  /** the loop run that changed the document: the id its undo step is addressed by */
+  runId?: string | undefined
   /** UniWork AI: the transport is waiting out a Retry-After; the run goes on, Stop is the only action */
   waitLine?: string | undefined
   /** UniWork AI: restarted conversation / provider boundary / dropped call, shown above the answer */
@@ -159,6 +166,7 @@ export function AiPanel({
   onCollapse,
   preset,
   onRunDone,
+  onSaveOffer,
   onClearSelection,
   open = true,
   onExpand,
@@ -170,8 +178,14 @@ export function AiPanel({
   onCollapse: () => void
   /** Ribbon AI buttons push a one-shot prompt; a new nonce triggers an auto-run */
   preset?: { text: string; nonce: number } | null
-  /** Fired when a run that mutated the document finishes (drives the untitled-blank auto-save) */
-  onRunDone?: () => void
+  /**
+   * Fired when a run that mutated the document finishes. Resolves to the file name to offer saving
+   * under when the document is a blank the user has not named (the panel then asks, nothing is
+   * saved), or null when no offer applies.
+   */
+  onRunDone?: () => Promise<string | null> | string | null
+  /** The user chose Save on the offer card: save the document (the shell then names the blank) */
+  onSaveOffer?: (name: string) => void
   /** The × on the scope chip: drop the cached selection so runs target the whole document */
   onClearSelection?: () => void
   /** false keeps the instance mounted (chat state) but skips panel render work */
@@ -375,8 +389,16 @@ export function AiPanel({
   apiRef.current = api
   const onRunDoneRef = useRef(onRunDone)
   onRunDoneRef.current = onRunDone
+  const onSaveOfferRef = useRef(onSaveOffer)
+  onSaveOfferRef.current = onSaveOffer
+  /** the ask-before-saving card of the last run; at most one, gone on the next send / New chat */
+  const [saveOffer, setSaveOffer] = useState<{ name: string } | null>(null)
+  /** bumped by every send and every run end: a late answer for an older run is dropped */
+  const offerEpochRef = useRef(0)
   /** Any tool in the current run reported mutated: true */
   const runMutatedRef = useRef(false)
+  /** id of the run in flight (or the last one): the answer that changed the document keeps it */
+  const runIdRef = useRef<string | null>(null)
 
   /** Confirmation card for irreversible file operations; one at a time, a second request is refused */
   const [fileOpConfirm, setFileOpConfirm] = useState<FileOpConfirm | null>(null)
@@ -514,6 +536,17 @@ export function AiPanel({
       skill: createPdfSkill(deps),
       systemSuffix: () => aiLangDirective(langRef.current),
       events: {
+        // every change of a run is ONE undo step of the document (the app closes the group at run end)
+        ...runHistoryEvents({
+          get activeRunId() {
+            return apiRef.current.runHistory?.activeRunId ?? null
+          },
+          begin: (runId) => {
+            runIdRef.current = runId
+            apiRef.current.runHistory?.begin(runId)
+          },
+          end: (runId, mutated) => apiRef.current.runHistory?.end(runId, mutated),
+        } satisfies RunHistoryGroup),
         onText: (text) => {
           setPhase('replying')
           segTextRef.current = text
@@ -591,6 +624,7 @@ export function AiPanel({
             stopped: cancelled,
             streamedText: Boolean(text?.trim()),
             mutated: mutatedThisRun,
+            ...(mutatedThisRun && runIdRef.current ? { runId: runIdRef.current } : {}),
             waitLine: undefined,
             // a restarted conversation or UniWork AI being off ends the turn on purpose: the note is the whole reply
             text:
@@ -600,7 +634,13 @@ export function AiPanel({
           setBusy(false)
           if (runMutatedRef.current) {
             runMutatedRef.current = false
-            onRunDoneRef.current?.()
+            const epoch = ++offerEpochRef.current
+            void Promise.resolve(onRunDoneRef.current?.())
+              .then((offer) => {
+                if (epoch === offerEpochRef.current)
+                  setSaveOffer(typeof offer === 'string' ? { name: offer } : null)
+              })
+              .catch(() => {})
           }
         },
         onError: (error) => {
@@ -658,6 +698,8 @@ export function AiPanel({
     if (uniworkGate.refuse()) return false
     stickToBottomRef.current = true
     runQuestionRef.current = instruction
+    offerEpochRef.current++
+    setSaveOffer(null)
     const scope = retryScope !== undefined ? (retryScope ?? undefined) : selectionScopeQuote()
     persistMessage('user', instruction, undefined, scope)
     segTextRef.current = ''
@@ -932,6 +974,8 @@ export function AiPanel({
                 clarify.clearReceipts()
                 msgQueue.clear()
                 setBusy(false)
+                offerEpochRef.current++
+                setSaveOffer(null)
                 setChat([])
               }}
               data-tip={t('aiNewChat')}
@@ -1124,6 +1168,14 @@ export function AiPanel({
                   )}
                 </div>
               )}
+              {entry.runId && !entry.isError && (
+                <RunUndoAction
+                  runId={entry.runId}
+                  state={apiRef.current.runUndoState?.(entry.runId) ?? 'none'}
+                  busy={busy}
+                  onUndo={() => apiRef.current.undoRun?.(entry.runId!)}
+                />
+              )}
               <AiErrorAction
                 chip={chip}
                 lang={lang}
@@ -1143,6 +1195,18 @@ export function AiPanel({
             </div>
           )
         })}
+        {saveOffer && !busy && (
+          <AiSaveDraftCard
+            lang={lang}
+            name={saveOffer.name}
+            onSave={() => {
+              const { name } = saveOffer
+              setSaveOffer(null)
+              onSaveOfferRef.current?.(name)
+            }}
+            onLater={() => setSaveOffer(null)}
+          />
+        )}
         {fileOpConfirm && (
           <div className="ai-confirm-card" role="group" aria-label={t('aiFileOpConfirmTitle')}>
             <div className="ai-confirm-title">{t('aiFileOpConfirmTitle')}</div>
@@ -1383,7 +1447,7 @@ function ToolChipList({ tools }: { tools: ToolActivity[] }) {
   }
 
   const open = userOpen ?? false
-  const label = tr('aiWorkedSteps', { n: tools.length })
+  const label = workedStepsLabel(tr, tools.length)
 
   return (
     <div className="ai-work-group">

@@ -125,6 +125,7 @@ export const pl = {
   uwDocInfoByAt: '{name}, {time}',
   uwDocInfoVersionBy: '{version} · {name}',
   uwAccessView: 'Wyświetlanie',
+  uwAccessComment: 'Komentowanie',
   uwAccessEdit: 'Edycja',
   uwAccessManage: 'Zarządzanie',
   uwRoleOwner: 'Właściciel',

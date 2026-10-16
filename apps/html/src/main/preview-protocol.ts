@@ -28,6 +28,56 @@ export function registerPrivilegedSchemes(): void {
   ])
 }
 
+/**
+ * Policy of the preview document, the desktop twin of the web preview's own policy
+ * (web/docs/build/modules.ts, html `documents`): the page's scripts, styles and pictures run
+ * and load as before, but nothing talks to the network (connect-src), nothing embeds another
+ * page (frame-src), no form leaves the preview. No 'self': relative assets arrive through
+ * html-asset://, the one extra source the web side does not need.
+ */
+export const PREVIEW_CONTENT_SECURITY_POLICY = [
+  "default-src 'none'",
+  "script-src 'unsafe-inline' 'unsafe-eval' https: html-asset:",
+  "style-src 'unsafe-inline' https: html-asset:",
+  'img-src data: blob: https: html-asset:',
+  'font-src data: https: html-asset:',
+  'media-src data: blob: https: html-asset:',
+  "connect-src 'none'",
+  "frame-src 'none'",
+  "worker-src 'none'",
+  "object-src 'none'",
+  'base-uri https: html-asset:',
+  "form-action 'none'",
+].join('; ')
+
+function previewHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  return {
+    ...extra,
+    'Cache-Control': 'no-store',
+    'Content-Security-Policy': PREVIEW_CONTENT_SECURITY_POLICY,
+  }
+}
+
+/**
+ * The same policy on an html-asset:// response (the scheme the preview loads its pictures,
+ * styles and scripts from; an .svg or .js link can also be navigated to as a document). Body,
+ * status and the file's own headers are kept; only the policy is added.
+ */
+export function withPreviewPolicy(response: Response): Response {
+  const headers = new Headers(response.headers)
+  headers.set('Content-Security-Policy', PREVIEW_CONTENT_SECURITY_POLICY)
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  })
+}
+
+/** An empty refusal (400/404/403) of a preview scheme, with the policy. */
+export function previewRefusal(status: number): Response {
+  return new Response(null, { status, headers: previewHeaders() })
+}
+
 export function registerPreviewProtocol(
   resolve: (webContentsId: number) => { text: string; baseHref: string | null } | null,
 ): void {
@@ -36,13 +86,13 @@ export function registerPreviewProtocol(
     try {
       host = new URL(request.url).host
     } catch {
-      return new Response(null, { status: 400 })
+      return new Response(null, { status: 400, headers: previewHeaders() })
     }
     const match = /^view-(\d+)$/.exec(host)
     const entry = match ? resolve(Number(match[1])) : null
-    if (!entry) return new Response(null, { status: 404 })
+    if (!entry) return new Response(null, { status: 404, headers: previewHeaders() })
     return new Response(buildPreviewDocument(entry.text, entry.baseHref), {
-      headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' },
+      headers: previewHeaders({ 'Content-Type': 'text/html; charset=utf-8' }),
     })
   })
 }

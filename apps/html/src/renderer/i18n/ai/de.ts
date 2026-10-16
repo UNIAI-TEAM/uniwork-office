@@ -55,6 +55,8 @@ export const de = {
   aiUndelivered: 'Nicht gesendet',
   aiUnknownError: 'KI-Anfrage fehlgeschlagen, bitte erneut versuchen',
   aiWorkedSteps: 'Erledigt · {n} Schritte',
+  aiWorkedStepsOne: 'Erledigt · {n} Schritt',
+  aiWorkedStepsFew: 'Erledigt · {n} Schritte',
   aiWorking: 'Arbeitet',
   aiOpenAssistant: 'KI-Assistent öffnen',
   aiToolOutline: 'Dokumentstruktur lesen',

@@ -125,6 +125,7 @@ export const ms = {
   uwDocInfoByAt: '{name}, {time}',
   uwDocInfoVersionBy: '{version} · {name}',
   uwAccessView: 'Lihat',
+  uwAccessComment: 'Komen',
   uwAccessEdit: 'Sunting',
   uwAccessManage: 'Urus',
   uwRoleOwner: 'Pemilik',

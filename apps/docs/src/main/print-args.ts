@@ -64,3 +64,14 @@ export function pdfExportPath(picked: string): string {
   if (/\.docx$/i.test(picked)) return picked.replace(/\.docx$/i, '.pdf')
   return `${picked}.pdf`
 }
+
+/**
+ * The file an "Export as HTML" save dialog result lands on: a picked `.html`/`.htm` name is kept
+ * as typed (it used to go through pdfExportPath and become `<name>.html.pdf`), a typed `.docx`
+ * becomes `.html` so the export never targets the open document, anything else gets `.html`.
+ */
+export function htmlExportPath(picked: string): string {
+  if (/\.html?$/i.test(picked)) return picked
+  if (/\.docx$/i.test(picked)) return picked.replace(/\.docx$/i, '.html')
+  return `${picked}.html`
+}

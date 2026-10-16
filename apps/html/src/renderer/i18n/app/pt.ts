@@ -19,6 +19,8 @@ export const pt = {
   exportHtmlEntry: 'Exportar como HTML de arquivo único',
   previewLimitNote:
     'Esta página pede dados à rede ou incorpora outras páginas, o que a visualização web bloqueia.',
+  previewLimitNoteApp:
+    'Esta página pede dados à rede ou incorpora outras páginas, o que a visualização bloqueia.',
   useInAppMessage: 'Abra no aplicativo UniWork Office para usar este recurso',
   openInApp: 'Abrir no aplicativo',
   printFailed: 'Falha ao imprimir: {error}',

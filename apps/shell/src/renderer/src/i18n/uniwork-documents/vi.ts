@@ -122,6 +122,7 @@ export const vi = {
   uwDocInfoByAt: '{name}, {time}',
   uwDocInfoVersionBy: '{version} · {name}',
   uwAccessView: 'Xem',
+  uwAccessComment: 'Bình luận',
   uwAccessEdit: 'Chỉnh sửa',
   uwAccessManage: 'Quản lý',
   uwRoleOwner: 'Chủ sở hữu',

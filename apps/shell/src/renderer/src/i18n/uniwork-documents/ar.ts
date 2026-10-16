@@ -121,6 +121,7 @@ export const ar = {
   uwDocInfoByAt: '{name}، {time}',
   uwDocInfoVersionBy: '{version} · {name}',
   uwAccessView: 'عرض',
+  uwAccessComment: 'تعليق',
   uwAccessEdit: 'تحرير',
   uwAccessManage: 'إدارة',
   uwRoleOwner: 'المالك',

@@ -89,6 +89,23 @@ const PANEL_KEYS = [
   // Bình luận trong tệp
   'collabInFileSection',
   'collabInFileHint',
+  // G8-18 mention access warning & post-send notice
+  'collabMentionWarnTitle',
+  'collabMentionWarnBody',
+  'collabShareViewThenSend',
+  'collabSendWithoutNotify',
+  'collabMentionAskManager',
+  'collabMentionMixedUnshareable',
+  'collabSharingView',
+  'collabShareViewFailed',
+  'collabShareViewPartial',
+  'collabSendComment',
+  'collabRetryShareFor',
+  'collabSendFailedAfterShare',
+  'collabPostSendNoAccess',
+  'collabPostSendShareAction',
+  'collabPostSendNoRetroNote',
+  'collabDismissNotice',
 ] as const
 
 // Picker mention (S14)
@@ -99,6 +116,7 @@ const MENTION_KEYS = [
   'collabMentionNoMatch',
   'collabMentionNoCandidates',
   'collabMentionError',
+  'collabMentionNoAccessBadge',
 ] as const
 
 // rows with D only: the fork must not carry them
@@ -199,6 +217,71 @@ describe('collab strings: spine text', () => {
       'Không có ai khớp “{query}” trong số người xem được tài liệu này.',
     )
     expect(m.en.collabMentionNoCandidates).toBe('No one else has access to this document yet.')
+    expect(m.vi.collabMentionNoAccessBadge).toBe('Chưa xem được')
+    expect(m.en.collabMentionNoAccessBadge).toBe("Can't view")
+    expect(p.vi.collabMentionWarnTitle).toBe('Người được nhắc chưa có quyền xem')
+    expect(p.en.collabMentionWarnTitle).toBe("Mentioned people can't view this document")
+    expect(p.vi.collabMentionWarnBody).toBe(
+      '{names} chưa xem được tài liệu này nên sẽ không nhận thông báo.',
+    )
+    expect(p.en.collabMentionWarnBody).toBe(
+      "{names} can't view this document, so they won't be notified.",
+    )
+    expect(p.vi.collabShareViewThenSend).toBe('Chia sẻ quyền Xem rồi gửi')
+    expect(p.en.collabShareViewThenSend).toBe('Share view access, then send')
+    expect(p.vi.collabSendWithoutNotify).toBe('Gửi, không thông báo')
+    expect(p.en.collabSendWithoutNotify).toBe('Send without notifying')
+    expect(p.vi.collabMentionAskManager).toBe(
+      'Hãy nhờ người quản lý tài liệu chia sẻ quyền Xem cho {names}.',
+    )
+    expect(p.en.collabMentionAskManager).toBe(
+      'Ask someone who manages this document to share view access with {names}.',
+    )
+    expect(p.vi.collabMentionMixedUnshareable).toBe(
+      'Không thể chia sẻ cho {unshareable}; những người này sẽ không nhận thông báo.',
+    )
+    expect(p.en.collabMentionMixedUnshareable).toBe(
+      "Can't share with {unshareable}; they won't be notified.",
+    )
+    expect(p.vi.collabSharingView).toBe('Đang chia sẻ quyền Xem…')
+    expect(p.en.collabSharingView).toBe('Sharing view access…')
+    expect(p.vi.collabShareViewFailed).toBe(
+      'Chưa chia sẻ được quyền Xem cho {failedNames}. Bạn có thể thử lại hoặc gửi mà không thông báo.',
+    )
+    expect(p.en.collabShareViewFailed).toBe(
+      "Couldn't share view access with {failedNames}. You can try again or send without notifying.",
+    )
+    expect(p.vi.collabShareViewPartial).toBe(
+      'Đã chia sẻ quyền Xem cho {sharedNames}. Chưa chia sẻ được cho {failedNames} (sẽ không nhận thông báo).',
+    )
+    expect(p.en.collabShareViewPartial).toBe(
+      "Shared view access with {sharedNames}. Couldn't share with {failedNames} (they won't be notified).",
+    )
+    expect(p.vi.collabSendComment).toBe('Gửi bình luận')
+    expect(p.en.collabSendComment).toBe('Send comment')
+    expect(p.vi.collabRetryShareFor).toBe('Thử lại cho {failedNames}')
+    expect(p.en.collabRetryShareFor).toBe('Try again for {failedNames}')
+    expect(p.vi.collabSendFailedAfterShare).toBe(
+      'Đã chia sẻ quyền Xem cho {sharedNames} nhưng chưa gửi được bình luận. Nội dung vẫn còn trong ô soạn — hãy thử gửi lại.',
+    )
+    expect(p.en.collabSendFailedAfterShare).toBe(
+      "Shared view access with {sharedNames}, but couldn't send the comment. Your text is still in the box — try sending again.",
+    )
+    expect(p.vi.collabPostSendNoAccess).toBe(
+      '{names} chưa xem được tài liệu này nên đã không nhận thông báo.',
+    )
+    expect(p.en.collabPostSendNoAccess).toBe(
+      "{names} can't view this document, so they weren't notified.",
+    )
+    expect(p.vi.collabPostSendShareAction).toBe('Chia sẻ quyền Xem')
+    expect(p.en.collabPostSendShareAction).toBe('Share view access')
+    expect(p.vi.collabPostSendNoRetroNote).toBe(
+      'Chia sẻ lúc này không gửi lại thông báo cho bình luận trên; hãy nhắc lại họ ở bình luận mới nếu cần.',
+    )
+    expect(p.en.collabPostSendNoRetroNote).toBe(
+      "Sharing now won't notify them about this comment; mention them in a new comment to notify.",
+    )
+    expect(p.en.collabDismissNotice).toBe('Dismiss')
   })
 
   it('uses the fork sign-in verb in en (spine: fork writes "Sign in", D writes "Log in")', () => {

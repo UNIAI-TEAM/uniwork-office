@@ -220,7 +220,6 @@ describe('AiPanel on a view-only copy', () => {
       access: fakeAccess().access,
       getSnapshot: () => ({}),
       restoreSnapshot: () => {},
-      onPrompt: () => {},
       onRunDone: () => {},
       clearHighlights: () => {},
       navigateTo: () => {},

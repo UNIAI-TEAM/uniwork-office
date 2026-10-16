@@ -123,6 +123,7 @@ export const en = {
   uwDocInfoByAt: '{name}, {time}',
   uwDocInfoVersionBy: '{version} · {name}',
   uwAccessView: 'View',
+  uwAccessComment: 'Comment',
   uwAccessEdit: 'Edit',
   uwAccessManage: 'Manage',
   uwRoleOwner: 'Owner',

@@ -123,6 +123,7 @@ export const hi = {
   uwDocInfoByAt: '{name}, {time}',
   uwDocInfoVersionBy: '{version} · {name}',
   uwAccessView: 'देखें',
+  uwAccessComment: 'टिप्पणी करें',
   uwAccessEdit: 'संपादित करें',
   uwAccessManage: 'प्रबंधित करें',
   uwRoleOwner: 'स्वामी',

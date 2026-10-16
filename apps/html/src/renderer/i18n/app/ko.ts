@@ -19,6 +19,8 @@ export const ko = {
   exportHtmlEntry: '단일 파일 HTML로 내보내기',
   previewLimitNote:
     '이 페이지는 네트워크로 데이터를 요청하거나 다른 페이지를 삽입하는데, 웹 미리보기에서는 차단됩니다.',
+  previewLimitNoteApp:
+    '이 페이지는 네트워크로 데이터를 요청하거나 다른 페이지를 삽입하는데, 미리보기에서는 차단됩니다.',
   useInAppMessage: '이 기능을 사용하려면 UniWork Office 앱에서 여세요',
   openInApp: '앱에서 열기',
   printFailed: '인쇄 실패: {error}',

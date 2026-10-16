@@ -10,13 +10,15 @@ import {
   AiQueueStrip,
   AI_QUEUE_LABELS,
   AiUsageChip,
+  ack as ackUniworkDisclosure,
   addTokenUsage,
+  isAcked as isUniworkDisclosureAcked,
   type AiTokenUsageView,
   useChatRunQueue,
   useUniworkDisclosureAck,
   useUniworkSendGate,
 } from '@genoffice/ui'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import '@genoffice/ui/ai-uniwork-composer.css'
 import type { Editor } from '@tiptap/core'
 import type { Block } from '@genoffice/docx-engine'
@@ -30,6 +32,7 @@ import {
   isTurnEnded,
   noticePatch,
   panelLiveAnnouncement as computePanelLiveAnnouncement,
+  runHistoryEvents,
   singleShortcutHint,
   streamText,
   uniworkErrorLineText,
@@ -47,9 +50,11 @@ import {
 import type { AiSettings, AttachmentAddResult, AttachmentMeta } from '../../shared/ipc'
 import { ATTACHMENT_IMAGE_EXTS } from '../../shared/ipc'
 import {
+  AI_SIDE_PARTS,
   captureRunSnapshot,
   restoreRunSnapshot,
   type AiRunSnapshot,
+  type AiSidePart,
   type AiSideState,
 } from './run-snapshot'
 import { countWords, findNumId, type NumIds } from './protocol'
@@ -86,6 +91,7 @@ import {
   type DocsEditQueueItem,
 } from './edit-queue'
 import { setInactiveSelectionShown } from '../editor/inactive-selection'
+import { createDocsRunHistoryGroup, type DocsRunHistoryGroup } from '../editor/ai-run-history'
 import { applyRevisionsBy } from '../editor/revisions'
 import { DOCS_CONTINUE_INSTRUCTION } from './continuation'
 import { waitForFullContent } from '../phased-content'
@@ -93,9 +99,18 @@ import { currentDocGeneration } from '../file-actions'
 import { createFilesSkill } from './files-skill'
 import { boundChatHistory } from './chat-retention'
 import { createElectronTransport } from './transport'
+import { workedStepsLabel } from './worked-steps'
+import { docHasAiMarks } from '../editor/ai-marker'
 import { useI18n, t as tModule, aiLangDirective, getLang, type StringKey } from '../i18n/locale'
 import { AiErrorAction, Markdown, uniworkErrorForChip, useAiModelNeedHint } from '@genoffice/ui'
 import { AiComposer, AiScopeQuote, AiTypingIndicator, type AiScopeQuoteData } from '@genoffice/ui'
+import { AiSaveDraftCard } from '@genoffice/ui'
+import {
+  AI_RUN_DONE_EVENT,
+  AI_SAVE_OFFER_EVENT,
+  type AiRunDoneDetail,
+  type AiSaveOfferDetail,
+} from './save-offer'
 import sendEnterOn from '../assets/send-enter-on.png'
 import sendEnterOff from '../assets/send-enter-off.png'
 import sendStop from '../assets/send-stop.png'
@@ -157,6 +172,8 @@ interface ChatEntry {
   mindmap?: MindMapTreeNode
   /** document state before this turn's first edit — rendered as an inline roll-back action */
   snapshot?: AiRunSnapshot
+  /** a Roll back after a save could not put these parts back (the notice under the turn) */
+  rollbackKept?: AiSidePart[]
   /** attachments consumed from the composer by this user message (read-only echo chips) */
   attachments?: AttachmentMeta[]
   /** the selection this user message targeted, frozen at send */
@@ -223,6 +240,15 @@ const EDIT_STARTER_PROMPTS: StringKey[] = [
 
 /** a view-only document keeps only the starter that does not edit it */
 const READ_ONLY_STARTER_PROMPTS: StringKey[] = ['aiStarterSummarize']
+
+/** the name of each side-state part in the Roll back notice */
+const SIDE_PART_KEYS: Record<AiSidePart, StringKey> = {
+  comments: 'aiSidePartComments',
+  headerFooter: 'aiSidePartHeaderFooter',
+  styles: 'aiSidePartStyles',
+  pageSetup: 'aiSidePartPageSetup',
+  watermark: 'aiSidePartWatermark',
+}
 
 /** resizable panel width: persisted, clamped so neither pane collapses */
 const PANEL_WIDTH_KEY = 'docs-ai-panel-width'
@@ -480,6 +506,11 @@ export function AiPanel({
   const uniworkGate = useUniworkSendGate()
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
+  /** the user clicked or typed into the page the open run holds: say why nothing happens */
+  const [editsPaused, setEditsPaused] = useState(false)
+  useEffect(() => {
+    if (!busy) setEditsPaused(false)
+  }, [busy])
   /** messages queued while a reply runs; the pump re-runs them through runWith on settle */
   const msgQueue = useChatRunQueue<{
     attachments: AttachmentMeta[]
@@ -499,6 +530,11 @@ export function AiPanel({
   /** a send waiting on a phased open's tail; Stop / New chat abort it before it runs */
   const pendingSendRef = useRef<{ aborted: boolean } | null>(null)
   const [chat, setChat] = useState<ChatEntry[]>([])
+  /** the ask-before-saving card of the last run (a never-saved document it changed); one per run */
+  const [saveOffer, setSaveOffer] = useState<{ name: string } | null>(null)
+  /** latest chat for listeners registered once (the pre-save hook reads its rollback points) */
+  const chatRef = useRef(chat)
+  chatRef.current = chat
   /** a streamed write stopped early: the draft stays in the document until the user keeps or discards it */
   const [activePartial, setActivePartial] = useState<{ blocks: number } | null>(null)
   /** ask_clarification card docked in the composer slot while the run waits for the user */
@@ -527,6 +563,9 @@ export function AiPanel({
   const [trackChanges, setTrackChanges] = useState(
     () => localStorage.getItem(TRACK_CHANGES_KEY) === '1',
   )
+  // the forced Track pill's reason tip opens on hover or keyboard focus of the pill
+  const [trackTipHover, setTrackTipHover] = useState(false)
+  const [trackTipFocus, setTrackTipFocus] = useState(false)
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null)
   const [attachments, setAttachments] = useState<AttachmentMeta[]>([])
   const [attachNotice, setAttachNotice] = useState<string | null>(null)
@@ -682,18 +721,18 @@ export function AiPanel({
   const notesAccessRef = useRef(notesAccess)
   notesAccessRef.current = notesAccess
 
-  /** drop every aiChanged flag; silent = skip undo history (auto-accept path) */
-  const clearAiHighlights = (silent = false) => {
+  /** drop every aiChanged flag (the marker is a screen affordance, not content: never an undo step) */
+  const clearAiHighlights = () => {
     const view = editorRef.current.view
     let tr = view.state.tr
     let touched = false
-    view.state.doc.forEach((node, offset) => {
+    view.state.doc.descendants((node, pos) => {
       if (node.attrs.aiChanged) {
-        tr = tr.setNodeMarkup(offset, undefined, { ...node.attrs, aiChanged: false })
+        tr = tr.setNodeMarkup(pos, undefined, { ...node.attrs, aiChanged: false })
         touched = true
       }
     })
-    if (silent) tr = tr.setMeta('addToHistory', false)
+    tr = tr.setMeta('addToHistory', false)
     if (touched) {
       view.dispatch(tr)
       // AI-pipeline housekeeping, not a user edit: keep the freshness baseline current
@@ -705,6 +744,23 @@ export function AiPanel({
   /** document state before the run's first edit — attached to the turn's final
       segment at run end (mid-turn segments never show the action toolbar) */
   const runSnapshotRef = useRef<AiRunSnapshot | null>(null)
+  /**
+   * Per rollback point: the side-state parts a save already wrote (Roll back can no longer put
+   * them back) and the capture later changes are measured from (null until the next tool after
+   * a save takes a fresh one). Side values are read through refs the App updates on render, so
+   * they are compared at quiet moments: a save, the next tool start, the Roll back click.
+   */
+  const keptRef = useRef(
+    new WeakMap<AiRunSnapshot, { base: unknown | null; parts: Set<AiSidePart> }>(),
+  )
+  const keptOf = (snap: AiRunSnapshot) => {
+    let k = keptRef.current.get(snap)
+    if (!k) {
+      k = { base: snap.side ?? null, parts: new Set() }
+      keptRef.current.set(snap, k)
+    }
+    return k
+  }
   /** last sent instruction, for one-click retry */
   const lastInstructionRef = useRef('')
   /** Tool activity of the whole run (with args/output, accumulated across turns) — for full
@@ -776,6 +832,11 @@ export function AiPanel({
       .catch(() => {
         /* silent */
       })
+  }, [filePath])
+
+  // the document got a file (Ctrl+S, Save As): the ask card has nothing left to ask
+  useEffect(() => {
+    if (filePath) setSaveOffer(null)
   }, [filePath])
 
   // answered receipts belong to the document they were given for: drop them when another
@@ -917,14 +978,24 @@ export function AiPanel({
     decidePartial(false)
   }
 
+  /** folds a run's document changes into one undo step (the loop's run hooks drive it) */
+  const runHistoryRef = useRef<DocsRunHistoryGroup | null>(null)
+  if (!runHistoryRef.current)
+    runHistoryRef.current = createDocsRunHistoryGroup({
+      onBlockedInput: () => setEditsPaused(true),
+    })
+  useEffect(() => {
+    const group = runHistoryRef.current!
+    group.attach(editor)
+    return () => group.attach(null)
+  }, [editor])
+
   const loopRef = useRef<AgentLoop<AiRunSnapshot> | null>(null)
   if (!loopRef.current) {
     const numIds = (): NumIds => ({
       bullet: findNumId(blocksRef.current, 'bullet') ?? numIdFallbackRef.current?.bullet ?? null,
       ordered: findNumId(blocksRef.current, 'ordered') ?? numIdFallbackRef.current?.ordered ?? null,
     })
-    // tracked-changes protection forces the recorder on, whatever the panel toggle says
-    const tracks = () => aiTracksChanges(trackChangesRef.current, protectionRef.current)
     loopRef.current = new AgentLoop<AiRunSnapshot>({
       transport: transportRef.current,
       systemSuffix: aiLangDirective,
@@ -961,6 +1032,7 @@ export function AiPanel({
       ]),
       captureSnapshot: () => captureRunSnapshot(editorRef.current, sideStateRef.current),
       events: {
+        ...runHistoryEvents(runHistoryRef.current),
         onText: (text) => patchLastAssistant({ text, waitLine: undefined }),
         // module-level getLang: the loop is created once, the component's lang would go stale
         onNotice: (notice) => {
@@ -978,6 +1050,21 @@ export function AiPanel({
           )
         },
         onToolStart: (call) => {
+          // after a save, side changes are measured from the reloaded state: for every rollback
+          // point still offered, an older run's too (its Roll back rewinds past this run, so
+          // what this run changes and a later save writes is kept for it as well)
+          const side = sideStateRef.current
+          if (side) {
+            let now: unknown
+            for (const snap of [
+              runSnapshotRef.current,
+              ...chatRef.current.map((e) => e.snapshot),
+            ]) {
+              if (snap?.side === undefined) continue
+              const k = keptOf(snap)
+              if (k.base === null) k.base = now ??= side.capture()
+            }
+          }
           // Live "running" chip: replaced in place by onToolExecuted
           patchLastAssistant((last) => ({
             tools: [
@@ -989,11 +1076,8 @@ export function AiPanel({
         onToolExecuted: ({ call, execution, snapshotBefore }) => {
           // The run's first pre-edit state wins so one roll-back undoes the whole run
           if (snapshotBefore && !runSnapshotRef.current) runSnapshotRef.current = snapshotBefore
-          if (execution.mutated) {
-            // tracking off: accept immediately (same tick, so the yellow never paints);
-            // tracking on: revisions stay pending, handled in the Review tab
-            if (!tracks()) clearAiHighlights(true)
-          }
+          // tracking off: the edited blocks keep the AI marker until the user Accepts or Saves;
+          // tracking on: revisions stay pending, handled in the Review tab
           // mind maps ride the UI-only display side channel onto the message
           const display = execution.display
           const mindmap = display?.kind === 'mindmap' ? display.tree : undefined
@@ -1060,9 +1144,13 @@ export function AiPanel({
             snapshot: runSnapshotRef.current ?? undefined,
           }))
           setBusy(false)
-          // App listens: a run that generated content into a never-saved document
-          // triggers a silent first save with a content-derived file name
-          window.dispatchEvent(new Event('ai-docs-run-done'))
+          // App listens: a run that changed a never-saved document gets the ask card (offerSave);
+          // nothing is written before the user's Save
+          const detail: AiRunDoneDetail = {
+            mutated: runSnapshotRef.current !== null,
+            offerSave: (name) => setSaveOffer({ name }),
+          }
+          window.dispatchEvent(new CustomEvent(AI_RUN_DONE_EVENT, { detail }))
           // persist outside the updater (a double-invoked updater would write history twice); tools stores the whole run's full activity.
           // Edits-only runs (tools ran, no text) persist too, or the whole turn vanishes from the restored transcript
           if (!cancelled && (finalText || runToolsRef.current.length > 0)) {
@@ -1252,6 +1340,8 @@ export function AiPanel({
     runToolsRef.current = []
     runSnapshotRef.current = null
     runUsageRef.current = undefined
+    // a new run replaces an unanswered ask card
+    setSaveOffer(null)
     stickToBottomRef.current = true
     setChat((prev) =>
       boundChatHistory([
@@ -1365,6 +1455,7 @@ export function AiPanel({
     loopRef.current?.reset()
     setBusy(false)
     setChat([])
+    setSaveOffer(null)
     // Restored history is painted above the live turn: without this the
     // previous conversation survives "New chat" on screen (#195).
     setHistoricChat([])
@@ -1432,7 +1523,38 @@ export function AiPanel({
     clearAiHighlights()
   }
 
+  // a Save accepts the marker: saveOnce fires this right before it snapshots the document, so
+  // the cleared marker is part of what it compares against the reloaded file (history survives)
+  useEffect(() => {
+    const onSave = (e: Event) => {
+      // what the run changed beside the text is written now: Roll back cannot take it back
+      const side = sideStateRef.current
+      if (side?.changedParts) {
+        const now = side.capture()
+        for (const snap of [runSnapshotRef.current, ...chatRef.current.map((e) => e.snapshot)]) {
+          if (snap?.side === undefined) continue
+          const k = keptOf(snap)
+          if (k.base === null) continue
+          for (const part of side.changedParts(k.base, now)) k.parts.add(part)
+          k.base = null
+        }
+      }
+      // only the user's own Save accepts the marker; an autosave leaves it on screen (the saved
+      // bytes never carry it, and the post-save reload ignores it)
+      if ((e as CustomEvent<{ auto?: boolean } | undefined>).detail?.auto !== true)
+        clearAiHighlights()
+    }
+    window.addEventListener('ai-docs-commit-tables', onSave)
+    return () => window.removeEventListener('ai-docs-commit-tables', onSave)
+  }, [])
+
+  // tracked-changes protection forces tracking on: the pill shows it on and cannot switch it off
+  // (switching off accepts the AI's revisions, which would bypass the forced tracking)
+  const trackForced = protection === 'trackedChanges'
+  const trackShown = aiTracksChanges(trackChanges, protection)
+
   const toggleTrackChanges = () => {
+    if (trackForced) return
     const next = !trackChanges
     setTrackChanges(next)
     localStorage.setItem(TRACK_CHANGES_KEY, next ? '1' : '0')
@@ -1441,12 +1563,28 @@ export function AiPanel({
   }
 
   const rollback = (entryIdx: number, snapshot: AiRunSnapshot) => {
+    const side = sideStateRef.current
+    const k = keptRef.current.get(snapshot)
     // the PM tree plus the state saved beside it (comments, header/footer, styles, page setup, watermark)
-    restoreRunSnapshot(editor, snapshot, sideStateRef.current)
+    const { sideRestored } = restoreRunSnapshot(editor, snapshot, side)
+    // a save since the run re-read the file: only the text came back, so say what stayed
+    let kept: AiSidePart[] = []
+    if (snapshot.side !== undefined && !sideRestored && side?.changedParts) {
+      const parts = new Set(k?.parts)
+      const base = k ? k.base : snapshot.side
+      if (base !== null) for (const part of side.changedParts(base, side.capture())) parts.add(part)
+      kept = AI_SIDE_PARTS.filter((part) => parts.has(part))
+    }
     // The document rewound to before this turn, so this and every later
     // rollback point now describe discarded futures
     setChat((prev) =>
-      prev.map((e, i) => (i >= entryIdx && e.snapshot ? { ...e, snapshot: undefined } : e)),
+      prev.map((e, i) =>
+        i === entryIdx
+          ? { ...e, snapshot: undefined, rollbackKept: kept.length > 0 ? kept : undefined }
+          : i > entryIdx && e.snapshot
+            ? { ...e, snapshot: undefined }
+            : e,
+      ),
     )
   }
 
@@ -1528,12 +1666,29 @@ export function AiPanel({
         }
       : null,
   )
+  // The ack key holds the document path, and an untitled document's first Save gives it one: the
+  // same document must not be asked again, so the ack of the untitled key moves to the new path
+  // (layout effect: the card never paints for the one render in between)
+  const ackPathRef = useRef(filePath)
+  useLayoutEffect(() => {
+    const previous = ackPathRef.current
+    ackPathRef.current = filePath
+    if (!isUniwork || previous || !filePath) return
+    const account = cloudSnapshot?.accountId ?? ''
+    const org = cloudSnapshot?.orgId ?? ''
+    if (isUniworkDisclosureAcked({ account, org, document: 'local' })) {
+      ackUniworkDisclosure({ account, org, document: filePath })
+    }
+  }, [filePath, isUniwork, cloudSnapshot])
   uniworkGate.setPanelBlocked(isUniwork && !uniworkDisclosureAcked)
   // a refusal while collapsed expands the panel; once open it announces and focuses the disclosure
   uniworkGate.setPanelOpen(open, onExpand)
   useEffect(() => {
     if (open) uniworkGate.flushPendingRefusal()
   }, [open, uniworkGate])
+
+  /** some block still carries the AI marker (read per render; the scope tick follows doc updates) */
+  const hasAiMarks = (): boolean => docHasAiMarks(editor.state.doc)
 
   const focusFirstAiChange = () => {
     let targetPos: number | null = null
@@ -1569,6 +1724,15 @@ export function AiPanel({
   }
 
   const lastEntry = chat[chat.length - 1]
+  // Accept sits under the latest turn that edited the document, while a marker is left
+  let lastEditIdx = -1
+  for (let k = chat.length - 1; k >= 0; k--) {
+    if (chat[k]!.snapshot) {
+      lastEditIdx = k
+      break
+    }
+  }
+  const acceptAt = !busy && lastEditIdx >= 0 && hasAiMarks() ? lastEditIdx : -1
   const panelLiveAnnouncement =
     chat.length > 0 || busy
       ? computePanelLiveAnnouncement({
@@ -1737,7 +1901,8 @@ export function AiPanel({
             !entry.notes?.length &&
             !entry.tools?.length &&
             !entry.stopped &&
-            !entry.snapshot
+            !entry.snapshot &&
+            !entry.rollbackKept
           ) {
             return null
           }
@@ -1823,7 +1988,16 @@ export function AiPanel({
                   {stoppedText}
                 </div>
               )}
-              {chip?.chip === 'edited' && (
+              {entry.rollbackKept && (
+                <div className="ai-run-stopped ai-rollback-kept" role="status" dir="auto">
+                  {t('aiRollbackKept', {
+                    parts: entry.rollbackKept
+                      .map((part) => t(SIDE_PART_KEYS[part]))
+                      .join(t('aiSidePartSep')),
+                  })}
+                </div>
+              )}
+              {(chip?.chip === 'edited' || i === acceptAt) && (
                 <div className="ai-result-actions">
                   <button
                     type="button"
@@ -1832,9 +2006,24 @@ export function AiPanel({
                   >
                     {aiUniworkText(lang, 'aiResultViewChanges')}
                   </button>
-                  <span className="ai-result-edited-hint">
-                    {singleShortcutHint(aiUniworkText(lang, 'aiResultEditedHint'))}
-                  </span>
+                  {i === acceptAt && (
+                    <button
+                      type="button"
+                      className="ai-result-view-changes ai-accept-changes"
+                      data-tip={t('aiAcceptMarkedTitle')}
+                      onClick={() => {
+                        clearAiHighlights()
+                        setScopeTick((n) => n + 1)
+                      }}
+                    >
+                      {t('aiAcceptMarked')}
+                    </button>
+                  )}
+                  {chip?.chip === 'edited' && (
+                    <span className="ai-result-edited-hint">
+                      {singleShortcutHint(aiUniworkText(lang, 'aiResultEditedHint'))}
+                    </span>
+                  )}
                 </div>
               )}
               {entry.role === 'assistant' && entry.usage && (
@@ -1980,6 +2169,18 @@ export function AiPanel({
             </div>
           )
         })}
+        {saveOffer && !busy && (
+          <AiSaveDraftCard
+            lang={lang}
+            name={saveOffer.name}
+            onSave={() => {
+              setSaveOffer(null)
+              const detail: AiSaveOfferDetail = { name: saveOffer.name }
+              window.dispatchEvent(new CustomEvent(AI_SAVE_OFFER_EVENT, { detail }))
+            }}
+            onLater={() => setSaveOffer(null)}
+          />
+        )}
       </div>
 
       {activeClarify && (
@@ -2021,6 +2222,11 @@ export function AiPanel({
                 {t('aiPartialAdopt')}
               </button>
             </div>
+          </div>
+        )}
+        {busy && editsPaused && (
+          <div className="ai-edits-paused" role="status">
+            {t('aiEditsPaused')}
           </div>
         )}
         <EditQueueCard
@@ -2210,14 +2416,66 @@ export function AiPanel({
                 <img src={attachIcon} alt="" aria-hidden />
               </button>
               {!readOnly && (
-                <button
-                  className={`ai-track-btn${trackChanges ? ' on' : ''}`}
-                  onClick={toggleTrackChanges}
-                  data-tip={trackChanges ? t('aiTrackOnTitle') : t('aiTrackOffTitle')}
+                // under tracked-changes protection the pill is on and locked: aria-disabled (not
+                // disabled) keeps it in the Tab order, and the reason is an in-panel tip that opens on
+                // hover and on keyboard focus (the global ScreenTip overflowed the panel)
+                <span
+                  className={`ai-track-wrap${trackForced ? ' forced' : ''}`}
+                  onMouseEnter={trackForced ? () => setTrackTipHover(true) : undefined}
+                  onMouseLeave={trackForced ? () => setTrackTipHover(false) : undefined}
                 >
-                  <span className="ai-track-dot" aria-hidden />
-                  <span className="ai-track-label">{t('aiTrackChanges')}</span>
-                </button>
+                  <button
+                    className={`ai-track-btn${trackShown ? ' on' : ''}${trackForced ? ' locked' : ''}`}
+                    onClick={toggleTrackChanges}
+                    aria-disabled={trackForced ? true : undefined}
+                    aria-describedby={trackForced ? 'ai-track-forced-reason' : undefined}
+                    onFocus={trackForced ? () => setTrackTipFocus(true) : undefined}
+                    onBlur={trackForced ? () => setTrackTipFocus(false) : undefined}
+                    onKeyDown={
+                      trackForced
+                        ? (e) => {
+                            if (e.key === 'Escape') {
+                              setTrackTipFocus(false)
+                              setTrackTipHover(false)
+                            }
+                          }
+                        : undefined
+                    }
+                    data-tip={
+                      trackForced
+                        ? undefined
+                        : trackShown
+                          ? t('aiTrackOnTitle')
+                          : t('aiTrackOffTitle')
+                    }
+                  >
+                    {trackForced ? (
+                      <svg
+                        className="ai-track-lock"
+                        width="10"
+                        height="10"
+                        viewBox="0 0 16 16"
+                        fill="currentColor"
+                        aria-hidden
+                      >
+                        <path d="M4 7V5a4 4 0 1 1 8 0v2h.5A1.5 1.5 0 0 1 14 8.5v5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 13.5v-5A1.5 1.5 0 0 1 3.5 7H4Zm1.5 0h5V5a2.5 2.5 0 0 0-5 0v2Z" />
+                      </svg>
+                    ) : (
+                      <span className="ai-track-dot" aria-hidden />
+                    )}
+                    <span className="ai-track-label">{t('aiTrackChanges')}</span>
+                  </button>
+                  {trackForced && (
+                    <span
+                      id="ai-track-forced-reason"
+                      className="ai-track-tip"
+                      role="tooltip"
+                      data-open={trackTipHover || trackTipFocus ? 'true' : 'false'}
+                    >
+                      {t('aiTrackForced')}
+                    </span>
+                  )}
+                </span>
               )}
             </>
           }
@@ -2312,7 +2570,7 @@ function RollbackButton({ disabled, onClick }: { disabled: boolean; onClick: () 
  *  that auto-opens while tools run, auto-collapses into "Worked · N steps" when they finish,
  *  and a manual toggle that always wins. Rows inside are step rows with 1px connectors. */
 function ToolChipList({ tools }: { tools: ToolActivity[] }) {
-  const { t: tr } = useI18n()
+  const { t: tr, lang } = useI18n()
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
   const [userOpen, setUserOpen] = useState<boolean | null>(null)
 
@@ -2327,7 +2585,7 @@ function ToolChipList({ tools }: { tools: ToolActivity[] }) {
 
   const anyRunning = tools.some((tool) => tool.running)
   const open = userOpen ?? anyRunning
-  const label = anyRunning ? tr('aiGroupWorking') : tr('aiWorkedSteps', { n: tools.length })
+  const label = anyRunning ? tr('aiGroupWorking') : workedStepsLabel(tr, lang, tools.length)
 
   return (
     <div className="ai-work-group">

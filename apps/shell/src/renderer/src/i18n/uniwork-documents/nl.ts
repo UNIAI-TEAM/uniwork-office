@@ -128,6 +128,7 @@ export const nl = {
   uwDocInfoByAt: '{name}, {time}',
   uwDocInfoVersionBy: '{version} · {name}',
   uwAccessView: 'Bekijken',
+  uwAccessComment: 'Reageren',
   uwAccessEdit: 'Bewerken',
   uwAccessManage: 'Beheren',
   uwRoleOwner: 'Eigenaar',

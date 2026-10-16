@@ -125,6 +125,7 @@ export const id = {
   uwDocInfoByAt: '{name}, {time}',
   uwDocInfoVersionBy: '{version} · {name}',
   uwAccessView: 'Lihat',
+  uwAccessComment: 'Komentar',
   uwAccessEdit: 'Edit',
   uwAccessManage: 'Kelola',
   uwRoleOwner: 'Pemilik',

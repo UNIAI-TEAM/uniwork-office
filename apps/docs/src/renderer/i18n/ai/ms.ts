@@ -75,6 +75,10 @@ export const ms = {
   aiStarterEventOutline: 'Sediakan rangka rancangan acara',
   aiThinking: 'Sedang berfikir',
   aiWorkedSteps: 'Selesai · {n} langkah',
+  aiWorkedStepsOne: 'Selesai · {n} langkah',
+  aiWorkedStepsFew: 'Selesai · {n} langkah',
+  aiEditsPaused:
+    'Pembantu sedang mengerjakan dokumen ini. Suntingan anda dijeda; hentikan pembantu untuk meneruskan.',
   aiGroupWorking: 'Sedang berjalan…',
   aiWorking: 'Sedang memproses',
   aiErrorPrefix: 'Ralat: {error}',
@@ -83,6 +87,16 @@ export const ms = {
   aiRegenerateTitle: 'Jana semula',
   aiSnapshotsTitle: 'Snapshot versi',
   aiRollback: 'Kembalikan',
+  aiAcceptMarked: 'Terima',
+  aiAcceptMarkedTitle: 'Kekalkan perubahan AI dan buang serlahan',
+  aiRollbackKept:
+    'Teks telah dipulihkan. Dokumen disimpan semasa balasan ini, jadi bahagian berikut tidak dapat dipulihkan: {parts}',
+  aiSidePartComments: 'ulasan',
+  aiSidePartHeaderFooter: 'pengepala dan pengaki',
+  aiSidePartStyles: 'gaya',
+  aiSidePartPageSetup: 'persediaan halaman',
+  aiSidePartWatermark: 'tera air',
+  aiSidePartSep: ', ',
   aiScopeSelected: '{count} perenggan dipilih',
   aiScopeEmptyDoc: 'Dokumen kosong',
   aiScopeCursor: 'Pada kursor',
@@ -96,6 +110,8 @@ export const ms = {
   aiAttachTitle: 'Lampirkan fail setempat (atau seret ke panel)',
   aiRemoveAttachmentTitle: 'Alih keluar lampiran',
   aiTrackChanges: 'Jejak perubahan',
+  aiTrackForced:
+    'Dokumen ini dilindungi: jejak perubahan mesti kekal hidup, jadi suntingan AI direkodkan sebagai semakan.',
   aiTrackOnTitle:
     'Jejak perubahan dihidupkan: suntingan kandungan AI ditandakan sebagai semakan (sisipan bergaris bawah, pemadaman bergaris batal); terima atau tolak dalam Semakan',
   aiTrackOffTitle:

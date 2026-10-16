@@ -1,0 +1,74 @@
+/* Ask-before-saving card under an AI answer on a never-saved document (see AiSaveDraftCard.tsx) */
+
+.ai-save-draft {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-subtle);
+  color: var(--text-primary);
+  font-family: var(--gs-font-sans);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.ai-save-draft .ai-save-draft-question {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.ai-save-draft .ai-save-draft-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary);
+}
+
+.ai-save-draft .ai-save-draft-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ai-save-draft .ai-save-draft-save {
+  padding: 4px 12px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: var(--color-btn-primary);
+  color: var(--color-btn-primary-text);
+  font-family: var(--gs-font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.ai-save-draft .ai-save-draft-save:hover {
+  background: var(--color-btn-primary-hover);
+}
+
+.ai-save-draft .ai-save-draft-later {
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--gs-font-sans);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.ai-save-draft .ai-save-draft-later:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.ai-save-draft .ai-save-draft-save:focus-visible,
+.ai-save-draft .ai-save-draft-later:focus-visible {
+  outline: 2px solid var(--color-border-brand);
+  outline-offset: 1px;
+}

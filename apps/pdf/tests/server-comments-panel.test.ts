@@ -411,6 +411,12 @@ describe('the shared comments seam: context + onSaved (G8-12 shape)', () => {
     expect(api.current?.context.level).toBe('edit')
   })
 
+  it('DOC5-W04: a comment-level caller keeps the comment level (it was read as edit before)', async () => {
+    const bridge = fakeBridge([comment({ id: 'c1' })], boundContext({ level: 'comment' }))
+    const { api } = await mount(bridge)
+    expect(api.current?.context.level).toBe('comment')
+  })
+
   it('a view-only copy writes nothing whatever the context says', async () => {
     const bridge = fakeBridge([comment({ id: 'c1' })], boundContext({ level: 'manage' }))
     const { api } = await mount(bridge, { readOnly: true })

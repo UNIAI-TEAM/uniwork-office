@@ -76,6 +76,10 @@ export const de = {
   aiStarterEventOutline: 'Erstelle eine Gliederung für eine Veranstaltungsplanung',
   aiThinking: 'Denkt nach',
   aiWorkedSteps: 'Erledigt · {n} Schritte',
+  aiWorkedStepsOne: 'Erledigt · {n} Schritt',
+  aiWorkedStepsFew: 'Erledigt · {n} Schritte',
+  aiEditsPaused:
+    'Der Assistent arbeitet an diesem Dokument. Ihre Änderungen sind pausiert; beenden Sie den Assistenten, um fortzufahren.',
   aiGroupWorking: 'In Arbeit…',
   aiWorking: 'Wird verarbeitet',
   aiErrorPrefix: 'Fehler: {error}',
@@ -84,6 +88,16 @@ export const de = {
   aiRegenerateTitle: 'Neu generieren',
   aiSnapshotsTitle: 'Versionsschnappschüsse',
   aiRollback: 'Zurücksetzen',
+  aiAcceptMarked: 'Annehmen',
+  aiAcceptMarkedTitle: 'KI-Änderungen behalten und die Markierung entfernen',
+  aiRollbackKept:
+    'Der Text wurde zurückgesetzt. Das Dokument wurde während dieser Antwort gespeichert, daher konnten diese Teile nicht wiederhergestellt werden: {parts}',
+  aiSidePartComments: 'Kommentare',
+  aiSidePartHeaderFooter: 'Kopf- und Fußzeile',
+  aiSidePartStyles: 'Formatvorlagen',
+  aiSidePartPageSetup: 'Seiteneinrichtung',
+  aiSidePartWatermark: 'Wasserzeichen',
+  aiSidePartSep: ', ',
   aiScopeSelected: '{count} Absatz/Absätze ausgewählt',
   aiScopeEmptyDoc: 'Leeres Dokument',
   aiScopeCursor: 'An der Cursorposition',
@@ -98,6 +112,8 @@ export const de = {
   aiAttachTitle: 'Lokale Dateien anhängen (oder auf den Bereich ziehen)',
   aiRemoveAttachmentTitle: 'Anlage entfernen',
   aiTrackChanges: 'Änderungen nachverfolgen',
+  aiTrackForced:
+    'Dieses Dokument ist geschützt: Die Nachverfolgung bleibt eingeschaltet, daher werden Änderungen der KI als Revisionen erfasst.',
   aiTrackOnTitle:
     'Änderungsnachverfolgung ein: KI-Inhaltsänderungen werden als Überarbeitungen markiert (Einfügungen unterstrichen, Löschungen durchgestrichen); unter „Überprüfen“ annehmen oder ablehnen',
   aiTrackOffTitle:

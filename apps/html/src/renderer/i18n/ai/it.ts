@@ -55,6 +55,8 @@ export const it = {
   aiUndelivered: 'Non inviato',
   aiUnknownError: 'Richiesta IA non riuscita, riprova',
   aiWorkedSteps: 'Completato · {n} passaggi',
+  aiWorkedStepsOne: 'Completato · {n} passaggio',
+  aiWorkedStepsFew: 'Completato · {n} passaggi',
   aiWorking: 'Sta lavorando',
   aiOpenAssistant: 'Apri assistente IA',
   aiToolOutline: 'Lettura struttura documento',

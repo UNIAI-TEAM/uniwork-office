@@ -7461,10 +7461,13 @@ body.docs-crop-active
   pointer-events: none !important;
 }
 
-/* AI diff highlight */
-.doc-page .ai-changed {
-  background: var(--ai-highlight);
-  box-shadow: -3px 0 0 var(--ai-highlight-border);
+/* AI diff highlight: a screen affordance only (kept until Accept or Save), so print and
+   PDF export (printToPDF of the live canvas) never paint it */
+@media screen {
+  .doc-page .ai-changed {
+    background: var(--ai-highlight);
+    box-shadow: -3px 0 0 var(--ai-highlight-border);
+  }
 }
 
 /* ================= start screen ================= */
@@ -7938,8 +7941,8 @@ body.docs-crop-active
 }
 
 .ai-work-group-summary:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px var(--docs-focus-ring);
+  outline: 2px solid var(--color-border-brand);
+  outline-offset: 1px;
   border-radius: 4px;
 }
 
@@ -8076,8 +8079,8 @@ body.docs-crop-active
 }
 
 .ai-step-title.clickable:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px var(--docs-focus-ring);
+  outline: 2px solid var(--color-border-brand);
+  outline-offset: 1px;
   border-radius: 4px;
 }
 
@@ -8670,7 +8673,7 @@ body.docs-crop-active
 
 .ai-result-chip[data-tone='ok'] {
   background: var(--docs-ok-bg);
-  color: var(--docs-ok-ink);
+  color: var(--docs-ins-ink);
 }
 
 .ai-result-chip[data-tone='error'] {
@@ -8704,6 +8707,21 @@ body.docs-crop-active
 .ai-result-edited-hint {
   font-size: 11px;
   color: var(--text-dim);
+  /* no one-word last line in the 360 px panel (the vi copy left "ổn." alone) */
+  text-wrap: pretty;
+}
+
+/* why the page ignores clicks and keys while an AI run holds it (shown after an attempt) */
+.ai-edits-paused {
+  margin: 0 12px 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--warning-border);
+  border-radius: 6px;
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  font-size: 12px;
+  line-height: 1.4;
+  text-wrap: pretty;
 }
 
 /* the one stopped line of a UniWork AI turn the user stopped (aiRunStopped) */
@@ -8711,6 +8729,20 @@ body.docs-crop-active
   margin-top: 4px;
   font-size: 11px;
   color: var(--text-dim);
+}
+
+/* what Roll back kept after a mid-turn Save: the panel's warning look (as the edits-paused note),
+   so it is not read as the grey hint under it */
+.ai-run-stopped.ai-rollback-kept {
+  margin-top: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--warning-border);
+  border-radius: 6px;
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  font-size: 12px;
+  line-height: 1.4;
+  text-wrap: pretty;
 }
 
 .ai-msg-actions {
@@ -9210,6 +9242,8 @@ body.docs-crop-active
 
 /* composer card — 16px radius, default border, production float shadow */
 .ai-input-box {
+  /* containing block of the forced Track pill's reason tip, so the tip stays inside the panel */
+  position: relative;
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-16);
   background: var(--color-bg-page);
@@ -9298,6 +9332,64 @@ body.docs-crop-active
   font-weight: 500;
   cursor: pointer;
   transition: all var(--transition-fast);
+}
+
+/* tracked-changes protection: the pill is on and locked; the wrapper takes the pointer so its tip shows */
+/* shrinkable on purpose: the shared panel skin ellipsizes the pill label so Send never leaves the box,
+   and that only works if this wrapper gives way with it */
+.ai-track-wrap {
+  display: inline-flex;
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.ai-track-wrap.forced {
+  cursor: not-allowed;
+}
+
+.ai-track-wrap.forced .ai-track-btn {
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+/* locked: still the "on" tint, but a dashed edge and a lock glyph (in place of the dot) say it is fixed */
+.ai-track-btn.locked {
+  border-style: dashed;
+}
+
+.ai-track-btn .ai-track-lock {
+  flex-shrink: 0;
+}
+
+.ai-track-btn:focus-visible {
+  outline: 2px solid var(--color-border-brand);
+  outline-offset: 2px;
+}
+
+/* reason tip of the locked pill: anchored to the composer box (.ai-input-box), above the footer, aligned to
+   its end and never wider than the box, so it cannot run past the panel edge (the global ScreenTip did) */
+.ai-track-tip {
+  position: absolute;
+  inset-inline-end: 8px;
+  bottom: calc(100% + 6px);
+  z-index: 20;
+  width: max-content;
+  max-width: min(280px, calc(100% - 16px));
+  padding: 5px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-6);
+  background: var(--surface);
+  color: var(--text-primary);
+  box-shadow: var(--docs-shadow-menu);
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: normal;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.ai-track-tip[data-open='true'] {
+  visibility: visible;
 }
 
 .ai-track-btn:hover {

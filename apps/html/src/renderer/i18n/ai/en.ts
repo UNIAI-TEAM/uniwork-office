@@ -54,6 +54,8 @@ export const en = {
   aiUndelivered: 'Not sent',
   aiUnknownError: 'AI request failed, please retry',
   aiWorkedSteps: 'Worked · {n} steps',
+  aiWorkedStepsOne: 'Worked · {n} step',
+  aiWorkedStepsFew: 'Worked · {n} steps',
   aiWorking: 'Working',
   aiOpenAssistant: 'Open AI assistant',
   aiToolOutline: 'Read document outline',

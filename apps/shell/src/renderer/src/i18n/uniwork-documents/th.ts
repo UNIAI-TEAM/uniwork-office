@@ -125,6 +125,7 @@ export const th = {
   uwDocInfoByAt: '{name}, {time}',
   uwDocInfoVersionBy: '{version} · {name}',
   uwAccessView: 'ดู',
+  uwAccessComment: 'แสดงความคิดเห็น',
   uwAccessEdit: 'แก้ไข',
   uwAccessManage: 'จัดการ',
   uwRoleOwner: 'เจ้าของ',

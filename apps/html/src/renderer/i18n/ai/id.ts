@@ -54,6 +54,8 @@ export const id = {
   aiUndelivered: 'Tidak terkirim',
   aiUnknownError: 'Permintaan AI gagal, coba lagi',
   aiWorkedSteps: 'Selesai · {n} langkah',
+  aiWorkedStepsOne: 'Selesai · {n} langkah',
+  aiWorkedStepsFew: 'Selesai · {n} langkah',
   aiWorking: 'Bekerja',
   aiOpenAssistant: 'Buka asisten AI',
   aiToolOutline: 'Membaca struktur dokumen',

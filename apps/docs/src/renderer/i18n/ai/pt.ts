@@ -76,6 +76,10 @@ export const pt = {
   aiStarterEventOutline: 'Esboce um plano de evento',
   aiThinking: 'Pensando',
   aiWorkedSteps: 'Concluído · {n} etapas',
+  aiWorkedStepsOne: 'Concluído · {n} etapa',
+  aiWorkedStepsFew: 'Concluído · {n} etapas',
+  aiEditsPaused:
+    'O assistente está trabalhando neste documento. Suas edições estão pausadas; pare o assistente para continuar.',
   aiGroupWorking: 'Em andamento…',
   aiWorking: 'Processando',
   aiErrorPrefix: 'Erro: {error}',
@@ -84,6 +88,16 @@ export const pt = {
   aiRegenerateTitle: 'Gerar novamente',
   aiSnapshotsTitle: 'Instantâneos de versão',
   aiRollback: 'Reverter',
+  aiAcceptMarked: 'Aceitar',
+  aiAcceptMarkedTitle: 'Manter as alterações da IA e remover o destaque',
+  aiRollbackKept:
+    'O texto foi restaurado. O documento foi salvo durante esta resposta, por isso estas partes não puderam ser restauradas: {parts}',
+  aiSidePartComments: 'comentários',
+  aiSidePartHeaderFooter: 'cabeçalho e rodapé',
+  aiSidePartStyles: 'estilos',
+  aiSidePartPageSetup: 'configuração da página',
+  aiSidePartWatermark: 'marca d’água',
+  aiSidePartSep: ', ',
   aiScopeSelected: '{count} parágrafo(s) selecionado(s)',
   aiScopeEmptyDoc: 'Documento em branco',
   aiScopeCursor: 'No cursor',
@@ -97,6 +111,8 @@ export const pt = {
   aiAttachTitle: 'Anexar arquivos locais (ou arraste-os para o painel)',
   aiRemoveAttachmentTitle: 'Remover anexo',
   aiTrackChanges: 'Controlar alterações',
+  aiTrackForced:
+    'Este documento está protegido: o controlo de alterações tem de ficar ativo, por isso as edições da IA são registadas como revisões.',
   aiTrackOnTitle:
     'Controle de alterações ativado: as edições de conteúdo da IA são marcadas como revisões (inserções sublinhadas, exclusões tachadas); aceite ou rejeite em Revisão',
   aiTrackOffTitle:

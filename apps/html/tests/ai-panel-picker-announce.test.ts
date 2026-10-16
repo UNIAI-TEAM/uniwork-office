@@ -96,7 +96,6 @@ describe('model picker announce (html panel)', () => {
     },
     getSnapshot: () => ({}),
     restoreSnapshot: () => {},
-    onPrompt: () => {},
     onRunDone: () => {},
     clearHighlights: () => {},
     navigateTo: () => {},

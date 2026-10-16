@@ -128,6 +128,7 @@ export const ru = {
   uwDocInfoByAt: '{name}, {time}',
   uwDocInfoVersionBy: '{version} · {name}',
   uwAccessView: 'Просмотр',
+  uwAccessComment: 'Комментирование',
   uwAccessEdit: 'Редактирование',
   uwAccessManage: 'Управление',
   uwRoleOwner: 'Владелец',

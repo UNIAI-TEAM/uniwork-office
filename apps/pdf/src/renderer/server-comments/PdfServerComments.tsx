@@ -290,13 +290,14 @@ export function PdfCommentsPanel(p: PdfCommentsPanelProps) {
   const create: CollabActions['create'] = async (body, np) => {
     const b = baseRef.current
     const before = new Set([...b.threads, ...b.resolved].map((th) => th.id))
-    await b.actions.create(body, np)
-    if (!np?.anchor) return
+    const created = await b.actions.create(body, np)
+    if (!np?.anchor) return created
     const active = document.activeElement
     if (!active || active === document.body || panelRef.current?.contains(active)) {
       panelRef.current?.querySelector<HTMLElement>('.collab-title')?.focus()
       setSent(before)
     }
+    return created
   }
   // Discard / Cancel of a new thread: the composer takes the focus with it, so it goes back to the opener
   const cancelThread = () => {

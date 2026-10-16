@@ -72,7 +72,11 @@ export const vi = {
   aiStarterLaunchPost: 'Soạn thảo thông báo ra mắt sản phẩm',
   aiStarterEventOutline: 'Lập dàn ý kế hoạch sự kiện',
   aiThinking: 'Đang suy nghĩ',
-  aiWorkedSteps: 'Đã thực hiện · {n} bước',
+  aiWorkedSteps: 'Đã xử lý · {n} bước',
+  aiWorkedStepsOne: 'Đã xử lý · {n} bước',
+  aiWorkedStepsFew: 'Đã xử lý · {n} bước',
+  aiEditsPaused:
+    'Trợ lý đang làm việc với tài liệu này. Bạn tạm thời không sửa được; hãy dừng trợ lý để tiếp tục.',
   aiGroupWorking: 'Đang xử lý…',
   aiWorking: 'Đang xử lý',
   aiErrorPrefix: 'Lỗi: {error}',
@@ -81,6 +85,16 @@ export const vi = {
   aiRegenerateTitle: 'Tạo lại',
   aiSnapshotsTitle: 'Bản chụp nhanh',
   aiRollback: 'Khôi phục',
+  aiAcceptMarked: 'Chấp nhận',
+  aiAcceptMarkedTitle: 'Giữ các thay đổi của AI và bỏ phần tô sáng',
+  aiRollbackKept:
+    'Đã khôi phục nội dung. Tài liệu đã được lưu trong lúc AI trả lời nên không khôi phục được các phần sau: {parts}',
+  aiSidePartComments: 'bình luận',
+  aiSidePartHeaderFooter: 'đầu trang và chân trang',
+  aiSidePartStyles: 'kiểu',
+  aiSidePartPageSetup: 'thiết lập trang',
+  aiSidePartWatermark: 'hình mờ',
+  aiSidePartSep: ', ',
   aiScopeSelected: 'Đã chọn {count} đoạn',
   aiScopeEmptyDoc: 'Tài liệu trống',
   aiScopeCursor: 'Tại vị trí con trỏ',
@@ -94,6 +108,8 @@ export const vi = {
   aiAttachTitle: 'Đính kèm tệp cục bộ (hoặc kéo thả vào bảng điều khiển)',
   aiRemoveAttachmentTitle: 'Xóa tệp đính kèm',
   aiTrackChanges: 'Theo dõi thay đổi',
+  aiTrackForced:
+    'Tài liệu này được bảo vệ: phải luôn bật theo dõi thay đổi, nên các chỉnh sửa của AI được ghi lại dưới dạng bản sửa đổi.',
   aiTrackOnTitle:
     'Bật theo dõi thay đổi: Các nội dung AI chỉnh sửa được đánh dấu là bản sửa đổi (chèn có gạch chân, xóa có gạch ngang); chấp nhận hoặc từ chối trong mục Xem lại',
   aiTrackOffTitle:

@@ -54,6 +54,8 @@ export const pl = {
   aiUndelivered: 'Nie wysłano',
   aiUnknownError: 'Żądanie AI nie powiodło się, spróbuj ponownie',
   aiWorkedSteps: 'Ukończono · {n} kroków',
+  aiWorkedStepsOne: 'Ukończono · {n} krok',
+  aiWorkedStepsFew: 'Ukończono · {n} kroki',
   aiWorking: 'Pracuje',
   aiOpenAssistant: 'Otwórz asystenta AI',
   aiToolOutline: 'Odczyt struktury dokumentu',

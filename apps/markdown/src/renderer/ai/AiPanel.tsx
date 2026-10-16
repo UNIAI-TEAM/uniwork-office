@@ -4,6 +4,7 @@ import {
   isUniworkQuestionRefusal,
   aiPanelWidthAtPointer,
   AiPanelSideButton,
+  AiSaveDraftCard,
   AiModelPicker,
   useCloudSignedIn,
   useAiModelNeedHint,
@@ -26,7 +27,9 @@ import {
   type MindMapTreeNode,
   type PanelNote,
   composeSkills,
+  runHistoryEvents,
   streamText,
+  type RunHistoryGroup,
 } from '@genoffice/agent-core'
 import {
   aiNoticeBody,
@@ -62,7 +65,9 @@ import { cap, platform } from '../capabilities'
 import sendEnterOn from '../assets/send-enter-on.png'
 import sendEnterOff from '../assets/send-enter-off.png'
 import sendStop from '../assets/send-stop.png'
+import { redoDepth, undoDepth } from '@tiptap/pm/history'
 import { clearAiHighlights } from '../editor/aiHighlight'
+import { onRunHistoryChange, runHistoryOf } from '../editor/aiRunHistory'
 import { setInactiveSelectionShown } from '../editor/inactiveSelection'
 import { queueAnchorRange } from '../editor/aiQueueAnchors'
 import {
@@ -99,6 +104,7 @@ import {
   type EditQueueItem,
 } from './edit-queue'
 import { DOC_NAV_SCHEME, navigateToBlock, parseDocNavHref } from './doc-nav'
+import { workedStepsLabel } from './worked-steps-label'
 
 function readUniworkCloudStatus(): UniworkCloudStatusBridge | undefined {
   return (window as Window & { uniworkCloudStatus?: UniworkCloudStatusBridge }).uniworkCloudStatus
@@ -117,6 +123,16 @@ const PANEL_WIDTH_KEY = 'markdown-ai-panel-width'
 const PANEL_WIDTH_DEFAULT = 360
 const PANEL_WIDTH_MIN = 280
 const MAX_SNAPSHOTS = 20
+
+/** `assets/pic%201.png` → `pic 1.png`: the owned-asset name the main process tracks */
+function assetFileName(rel: string): string {
+  const last = rel.slice(rel.lastIndexOf('/') + 1)
+  try {
+    return decodeURIComponent(last)
+  } catch {
+    return last
+  }
+}
 const TOOL_OUTPUT_MAX_CHARS = 2000
 /** progress chip refresh while a write streams */
 const CHIP_UPDATE_MS = 400
@@ -195,6 +211,10 @@ interface Snapshot {
   label: string
   time: string
   doc: DocSnapshot
+  /** file names of the pictures the run saved beside the document (live: later tools of the same run append) */
+  assets: string[]
+  /** the loop run that took it, so an undo of that run can retire its Roll back entry */
+  runId: string | null
 }
 
 /** Ribbon preset instruction; a new nonce triggers one auto-send */
@@ -213,8 +233,13 @@ export interface MarkdownAiDeps {
   getSnapshot(): DocSnapshot
   /** rollback: replace the document (body and frontmatter) with a snapshot */
   restoreSnapshot(snapshot: DocSnapshot): void
-  /** fired when a run with at least one mutation finishes (auto-save hook) */
-  onRunDone(mutated: boolean): void
+  /**
+   * fired when a run finishes. Returns the file name to offer saving under when the run changed a
+   * never-saved document (the panel then asks, nothing is written), or null when no offer applies.
+   */
+  onRunDone(mutated: boolean): string | null
+  /** the user chose Save on the offer card: run the first-save flow with this name */
+  onSaveOffer(name: string): void
 }
 
 const MODEL_BRIDGE: AiModelPickerBridge = {
@@ -370,6 +395,21 @@ export function AiPanel({
     })
   }
   const runMutatedRef = useRef(false)
+  /** the ask-before-saving card of the last run; at most one, gone on the next send / New chat */
+  const [saveOffer, setSaveOffer] = useState<{ name: string } | null>(null)
+  /** pictures the in-flight run saved; the run's snapshot keeps this same array so Roll back can name them */
+  const runAssetsRef = useRef<string[]>([])
+  /** id of the in-flight loop run (the editor's undo step of that run carries it) */
+  const runIdRef = useRef<string | null>(null)
+  /** pictures each run saved, by run id: an undo of the run drops them like Roll back */
+  const runAssetsByIdRef = useRef(new Map<string, string[]>())
+  /** the bytes of those pictures (base64), by run id and file name: a redo writes them back */
+  const runAssetBytesRef = useRef(new Map<string, Map<string, string>>())
+  /** runs whose pictures an undo discarded: their redo waits until the files are written back */
+  const discardedRunsRef = useRef(new Set<string>())
+  /** runs whose pictures are being written back right now */
+  const restoringRunsRef = useRef(new Set<string>())
+  const undoWatchRef = useRef<{ editor: Editor; stop: () => void } | null>(null)
   /** tool activity of the whole run, for transcript persistence */
   const runToolsRef = useRef<ToolActivity[]>([])
   /** tokens billed so far in the in-flight run (summed across turns) */
@@ -510,6 +550,112 @@ export function AiPanel({
     [],
   )
 
+  /** discard the pending pictures a Roll back or an undo of a run drops (desktop; main keeps what is saved) */
+  const discardPictures = (names: Iterable<string>): void => {
+    const list = [...new Set(names)]
+    if (list.length > 0) void window.markdownApi?.discardPendingAssets?.(list)?.catch(() => {})
+  }
+  /** the editor-side undo group of a loop run, resolved at call time (the loop is built once) */
+  const runGroup: RunHistoryGroup = {
+    get activeRunId() {
+      const ed = depsRef.current.getEditor()
+      return ed ? runHistoryOf(ed).activeRunId : null
+    },
+    begin: (runId) => {
+      runIdRef.current = runId
+      runAssetsByIdRef.current.set(runId, runAssetsRef.current)
+      const ed = depsRef.current.getEditor()
+      if (!ed) return
+      watchUndo(ed)
+      // the previous run's marker goes when the next run starts
+      clearAiHighlights(ed)
+      runHistoryOf(ed).begin(runId)
+    },
+    end: (runId, mutated) => {
+      const ed = depsRef.current.getEditor()
+      if (ed) runHistoryOf(ed).end(runId, mutated)
+    },
+  }
+  /** a picture the run saved: its name (for Roll back / undo) and its bytes (for a redo) */
+  const rememberRunPicture = (rel: string, base64: string): void => {
+    const name = assetFileName(rel)
+    runAssetsRef.current.push(name)
+    const runId = runIdRef.current
+    if (!runId) return
+    const byRun = runAssetBytesRef.current
+    const files = byRun.get(runId) ?? new Map<string, string>()
+    files.set(name, base64)
+    byRun.delete(runId)
+    byRun.set(runId, files)
+    // the oldest runs let go of their bytes (their redo then stays refused)
+    while (byRun.size > MAX_SNAPSHOTS) byRun.delete(byRun.keys().next().value!)
+  }
+  /**
+   * A redo of a run whose pictures an undo discarded: the pictures are written back first (same
+   * names, same bytes), then the redo is retried. Until they are back the redo is refused, so the
+   * markup never points at nothing; when they cannot be written back it stays refused.
+   */
+  function restoreRunPictures(editor: Editor, runId: string): void {
+    if (restoringRunsRef.current.has(runId)) return
+    const names = [...new Set(runAssetsByIdRef.current.get(runId) ?? [])]
+    const bytes = runAssetBytesRef.current.get(runId)
+    const files = names.flatMap((name) => {
+      const base64 = bytes?.get(name)
+      return base64 ? [{ name, base64 }] : []
+    })
+    const restore = window.markdownApi?.restorePendingAssets
+    if (!restore || files.length === 0 || files.length < names.length) {
+      setRedoRefused(true)
+      return
+    }
+    // the retry only runs while the history stands where the refused redo found it
+    const depths = [undoDepth(editor.state), redoDepth(editor.state)]
+    restoringRunsRef.current.add(runId)
+    void Promise.resolve(restore(files))
+      .then((result) => {
+        if (result.errors.length > 0 || result.restored.length < files.length) {
+          setRedoRefused(true)
+          return
+        }
+        setRedoRefused(false)
+        discardedRunsRef.current.delete(runId)
+        if (editor.isDestroyed) return
+        if (undoDepth(editor.state) === depths[0] && redoDepth(editor.state) === depths[1]) {
+          editor.commands.redo()
+        }
+      })
+      .catch(() => setRedoRefused(true))
+      .finally(() => restoringRunsRef.current.delete(runId))
+  }
+  /**
+   * Ctrl/Cmd+Z of a run's step (anywhere in the app) drops the pictures that run saved, exactly
+   * like Roll back; its Roll back entry goes with it. The redo of such a run puts the pictures
+   * back first (see restoreRunPictures).
+   */
+  function watchUndo(editor: Editor): void {
+    if (undoWatchRef.current?.editor === editor) return
+    undoWatchRef.current?.stop()
+    const stopListening = onRunHistoryChange(editor, ({ runId, direction }) => {
+      if (direction !== 'undo') return
+      const names = runAssetsByIdRef.current.get(runId) ?? []
+      if (names.length > 0) discardedRunsRef.current.add(runId)
+      discardPictures(names)
+      setSnapshots((prev) => prev.filter((s) => s.runId !== runId))
+    })
+    runHistoryOf(editor).refuseRedo((runId) => {
+      if (!discardedRunsRef.current.has(runId)) return false
+      restoreRunPictures(editor, runId)
+      return true
+    })
+    undoWatchRef.current = {
+      editor,
+      stop: () => {
+        stopListening()
+        if (!editor.isDestroyed) runHistoryOf(editor).refuseRedo(null)
+      },
+    }
+  }
+
   // The loop is built once; every mutable value goes through a ref getter
   const loopRef = useRef<AgentLoop<DocSnapshot> | null>(null)
   if (!loopRef.current) {
@@ -532,12 +678,15 @@ export function AiPanel({
           () => askClarification,
           // an image URL the AI inserts must come from this run's image_search / generate_image (UniWork AI turns only)
           createImageUrlRegistry({ enforce: () => settingsRef.current?.provider === 'uniwork' }),
+          rememberRunPicture,
         ),
         createSearchSkill(),
       ]),
       captureSnapshot: () => depsRef.current.getSnapshot(),
       systemSuffix: () => aiLangDirective(langRef.current),
       events: {
+        // every edit of a run is ONE undo step of the editor (the group closes at run end)
+        ...runHistoryEvents(runGroup),
         onText: (text) => patchLast({ text, waitLine: undefined }),
         // transport notices (UniWork AI); langRef: the loop is created once, `lang` would go stale
         onNotice: (notice) => {
@@ -572,7 +721,16 @@ export function AiPanel({
               minute: '2-digit',
             })
             setSnapshots((prev) =>
-              [...prev, { label, time, doc: snapshotBefore }].slice(-MAX_SNAPSHOTS),
+              [
+                ...prev,
+                {
+                  label,
+                  time,
+                  doc: snapshotBefore,
+                  assets: runAssetsRef.current,
+                  runId: runIdRef.current,
+                },
+              ].slice(-MAX_SNAPSHOTS),
             )
           }
           // mind maps ride the UI-only display side channel onto the message
@@ -626,11 +784,11 @@ export function AiPanel({
           }))
           persistMessage('assistant', final, runToolsRef.current)
           const editor = depsRef.current.getEditor()
-          if (editor) {
-            clearAiHighlights(editor)
-            endRunFence(editor)
-          }
-          depsRef.current.onRunDone(runMutatedRef.current)
+          // the AI marker stays after the run (until a user Save or the next run)
+          if (editor) endRunFence(editor)
+          // an offer only for an unsaved document the run changed: one card, replacing any older one
+          const offer = depsRef.current.onRunDone(runMutatedRef.current)
+          setSaveOffer(typeof offer === 'string' ? { name: offer } : null)
           setBusy(false)
         },
         onError: (error) => {
@@ -677,6 +835,8 @@ export function AiPanel({
       clarifyResolverRef.current?.({ answers: '', cancelled: true })
       clarifyResolverRef.current = null
       loopRef.current?.cancel()
+      undoWatchRef.current?.stop()
+      undoWatchRef.current = null
       const editor = depsRef.current.getEditor()
       if (editor) {
         clearAiHighlights(editor)
@@ -783,6 +943,8 @@ export function AiPanel({
     runInstructionRef.current = instruction
     runDisplayRef.current = displayText ?? instruction
     runMutatedRef.current = false
+    setSaveOffer(null)
+    runAssetsRef.current = []
     runToolsRef.current = []
     runUsageRef.current = undefined
     // a queue batch carries its own display text: no selection quote
@@ -968,6 +1130,11 @@ export function AiPanel({
   const rollback = (snapshot: Snapshot): void => {
     if (busy) return
     depsRef.current.restoreSnapshot(snapshot.doc)
+    // the document is back to before this run (and every later one): their pictures are no longer
+    // in it. Only files a run saved are named, so a picture the user added or one already saved
+    // with the document is never touched; the main process drops what is still pending.
+    const from = snapshots.indexOf(snapshot)
+    discardPictures((from < 0 ? [snapshot] : snapshots.slice(from)).flatMap((s) => s.assets))
     setSnapshots((prev) => prev.filter((s) => s !== snapshot))
   }
 
@@ -1012,6 +1179,11 @@ export function AiPanel({
   // the model picker's list note, written into the panel's own polite node (never a node of the
   // picker's); it stands while the announcement it was written over is the current one
   const [pickerNote, setPickerNote] = useState<{ text: string; over: string } | null>(null)
+  /** a redo was refused because the run's picture could not be put back: say why nothing happened */
+  const [redoRefused, setRedoRefused] = useState(false)
+  useEffect(() => {
+    if (busy) setRedoRefused(false)
+  }, [busy])
   useEffect(() => {
     const bridge = readUniworkCloudStatus()
     if (!bridge) return
@@ -1151,6 +1323,7 @@ export function AiPanel({
                 msgQueue.clear()
                 loopRef.current?.reset()
                 setBusy(false)
+                setSaveOffer(null)
                 setChat([])
               }}
               data-tip={t('aiNewChat')}
@@ -1450,6 +1623,18 @@ export function AiPanel({
             </div>
           )
         })}
+        {saveOffer && !busy && (
+          <AiSaveDraftCard
+            lang={lang}
+            name={saveOffer.name}
+            onSave={() => {
+              const { name } = saveOffer
+              setSaveOffer(null)
+              depsRef.current.onSaveOffer(name)
+            }}
+            onLater={() => setSaveOffer(null)}
+          />
+        )}
       </div>
 
       {snapshots.length > 0 && (
@@ -1490,6 +1675,11 @@ export function AiPanel({
         {readOnly && !isUniwork && (
           <div className="ai-readonly-notice" role="note">
             {t('aiViewOnlyNotice')}
+          </div>
+        )}
+        {redoRefused && (
+          <div className="ai-redo-refused" role="status">
+            {t('aiRedoPictureLost')}
           </div>
         )}
         {activePartial && (
@@ -1707,7 +1897,7 @@ function ToolChipList({ tools }: { tools: ToolActivity[] }) {
 
   const anyRunning = tools.some((tool) => tool.running)
   const open = userOpen ?? anyRunning
-  const label = anyRunning ? tr('aiGroupWorking') : tr('aiWorkedSteps', { n: tools.length })
+  const label = anyRunning ? tr('aiGroupWorking') : workedStepsLabel(tr, tools.length)
 
   return (
     <div className="ai-work-group">

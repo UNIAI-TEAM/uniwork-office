@@ -10,6 +10,7 @@ export const PICKER_STRINGS = {
   collabMentionNoMatch: 'No one with access to this document matches “{query}”.',
   collabMentionNoCandidates: 'No one else has access to this document yet.',
   collabMentionError: 'Couldn’t load people.',
+  collabMentionNoAccessBadge: "Can't view",
   collabRetry: 'Try again',
 }
 
@@ -30,6 +31,22 @@ export const COMPOSER_STRINGS = {
   collabDiscard: 'Discard',
   collabKeepWriting: 'Keep writing',
   collabAiDraftLabel: 'Draft suggested by UniWork AI. Review it, then send.',
+  collabMentionWarnTitle: "Mentioned people can't view this document",
+  collabMentionWarnBody: "{names} can't view this document, so they won't be notified.",
+  collabShareViewThenSend: 'Share view access, then send',
+  collabSendWithoutNotify: 'Send without notifying',
+  collabMentionAskManager:
+    'Ask someone who manages this document to share view access with {names}.',
+  collabMentionMixedUnshareable: "Can't share with {unshareable}; they won't be notified.",
+  collabSharingView: 'Sharing view access…',
+  collabShareViewFailed:
+    "Couldn't share view access with {failedNames}. You can try again or send without notifying.",
+  collabShareViewPartial:
+    "Shared view access with {sharedNames}. Couldn't share with {failedNames} (they won't be notified).",
+  collabSendComment: 'Send comment',
+  collabRetryShareFor: 'Try again for {failedNames}',
+  collabSendFailedAfterShare:
+    "Shared view access with {sharedNames}, but couldn't send the comment. Your text is still in the box — try sending again.",
 }
 
 export function makeHost(over: Partial<CollabHostState> = {}): CollabHostState {

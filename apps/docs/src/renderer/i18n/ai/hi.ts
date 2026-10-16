@@ -75,6 +75,10 @@ export const hi = {
   aiStarterEventOutline: 'कार्यक्रम योजना की रूपरेखा बनाएँ',
   aiThinking: 'सोच रहा है',
   aiWorkedSteps: 'पूर्ण · {n} चरण',
+  aiWorkedStepsOne: 'पूर्ण · {n} चरण',
+  aiWorkedStepsFew: 'पूर्ण · {n} चरण',
+  aiEditsPaused:
+    'सहायक इस दस्तावेज़ पर काम कर रहा है। आपके संपादन रोक दिए गए हैं; जारी रखने के लिए सहायक को रोकें।',
   aiGroupWorking: 'कार्य जारी…',
   aiWorking: 'प्रोसेस हो रहा है',
   aiErrorPrefix: 'त्रुटि: {error}',
@@ -83,6 +87,16 @@ export const hi = {
   aiRegenerateTitle: 'फिर से जनरेट करें',
   aiSnapshotsTitle: 'संस्करण स्नैपशॉट',
   aiRollback: 'रोलबैक',
+  aiAcceptMarked: 'स्वीकार करें',
+  aiAcceptMarkedTitle: 'AI के बदलाव रखें और हाइलाइट हटाएँ',
+  aiRollbackKept:
+    'टेक्स्ट पहले जैसा कर दिया गया। इस जवाब के दौरान दस्तावेज़ सहेजा गया था, इसलिए ये हिस्से वापस नहीं लाए जा सके: {parts}',
+  aiSidePartComments: 'टिप्पणियाँ',
+  aiSidePartHeaderFooter: 'हेडर और फ़ुटर',
+  aiSidePartStyles: 'शैलियाँ',
+  aiSidePartPageSetup: 'पेज सेटअप',
+  aiSidePartWatermark: 'वॉटरमार्क',
+  aiSidePartSep: ', ',
   aiScopeSelected: '{count} अनुच्छेद चयनित',
   aiScopeEmptyDoc: 'खाली दस्तावेज़',
   aiScopeCursor: 'कर्सर पर',
@@ -96,6 +110,8 @@ export const hi = {
   aiAttachTitle: 'स्थानीय फ़ाइलें संलग्न करें (या उन्हें पैनल पर खींचें)',
   aiRemoveAttachmentTitle: 'अनुलग्नक हटाएँ',
   aiTrackChanges: 'परिवर्तन ट्रैक करें',
+  aiTrackForced:
+    'यह दस्तावेज़ सुरक्षित है: परिवर्तन ट्रैक करना चालू रहना ज़रूरी है, इसलिए AI के संपादन संशोधन के रूप में दर्ज होते हैं।',
   aiTrackOnTitle:
     'परिवर्तन ट्रैकिंग चालू: AI के सामग्री बदलाव संशोधनों के रूप में चिह्नित होते हैं (सम्मिलन रेखांकित, विलोपन कटे हुए); समीक्षा में स्वीकारें या अस्वीकारें',
   aiTrackOffTitle:

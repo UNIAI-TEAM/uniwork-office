@@ -132,6 +132,7 @@ export const de = {
   uwDocInfoByAt: '{name}, {time}',
   uwDocInfoVersionBy: '{version} · {name}',
   uwAccessView: 'Ansehen',
+  uwAccessComment: 'Kommentieren',
   uwAccessEdit: 'Bearbeiten',
   uwAccessManage: 'Verwalten',
   uwRoleOwner: 'Eigentümer',

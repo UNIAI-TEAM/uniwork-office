@@ -40,6 +40,7 @@ import { cap, platform } from '../capabilities'
 import type { ChangePlan } from '@genoffice/xlsx-gateway/domain/workbook.types'
 import { ATTACHMENT_IMAGE_EXTS, type AttachmentMeta } from '../../shared/desktop-api'
 import { useI18n, type TFunc } from '../i18n/locale'
+import { describeFootprint, type ApplyFootprint } from './apply-footprint'
 import { Markdown } from '@genoffice/ui'
 import { SHEET_NAV_SCHEME } from './sheet-nav'
 import type { ClarifyQuestion } from './tools'
@@ -118,6 +119,18 @@ const ATTACHMENT_CARD_ICON_GROUPS: [icon: string, exts: string[]][] = [
 const ATTACHMENT_CARD_ICONS: Record<string, string> = Object.fromEntries(
   ATTACHMENT_CARD_ICON_GROUPS.flatMap(([icon, exts]) => exts.map((ext) => [ext, icon])),
 )
+
+/** the run's target range(s) and overwritten-cell count, plain text under the applied line */
+function FootprintLine({
+  footprint,
+  t,
+}: {
+  footprint: ApplyFootprint
+  t: TFunc
+}): React.JSX.Element | null {
+  const text = describeFootprint(footprint, t)
+  return text ? <div className="ai-result-meta ai-apply-footprint">{text}</div> : null
+}
 
 function AttachmentCardIcon({ ext }: { ext: string }) {
   return <img src={ATTACHMENT_CARD_ICONS[ext] ?? fileGeneralIcon} alt="" aria-hidden />
@@ -243,6 +256,8 @@ export interface AiChatMessage {
   readonly persisted?: boolean | undefined
   /** Set when this message reflects an auto-applied plan; renders an inline [Undo] button. */
   readonly autoApplied?: { readonly opCount: number; readonly undoSteps: number } | undefined
+  /** where this run wrote and how many cells with data it overwrote (shown with the applied line, before Save) */
+  readonly applyFootprint?: ApplyFootprint | undefined
   /** attachments consumed from the composer by this user message (read-only echo chips) */
   readonly attachments?: readonly AttachmentMeta[] | undefined
   /** the range this user message targeted, frozen at send */
@@ -984,6 +999,9 @@ export function AiChatPanel({
                         </button>
                       )}
                     </div>
+                  )}
+                  {entry.autoApplied && entry.applyFootprint && (
+                    <FootprintLine footprint={entry.applyFootprint} t={t} />
                   )}
                 </>
               )}

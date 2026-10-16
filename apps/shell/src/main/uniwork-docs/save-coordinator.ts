@@ -173,6 +173,7 @@ export function toStatus(doc: BoundDocument, pendingNext = false): UniworkDocSta
     title: b.title,
     format: b.format,
     access: b.access,
+    ...(b.level ? { commentsLevel: b.level } : {}),
     state: b.state,
     ...(b.error ? { error: b.error } : {}),
     ...(b.lastSavedAt ? { lastSavedAt: b.lastSavedAt } : {}),
@@ -830,8 +831,21 @@ export class SaveCoordinator {
       case 'quota_exceeded':
       case 'not_found':
       case 'document_deleted':
-      case 'document_archived':
       case 'deleted':
+        return this.commitState(doc, { ...base, state: 'blocked', error: error.code })
+      case 'document_archived':
+        // the archive is reversible, so this refusal is NOT terminal and the
+        // intent is kept (errors.ts:170-173). Unlike the codes above - whose
+        // record `cleanupIntent` has already dropped - this one is still stored,
+        // so it is parked in the SAME call the chip is parked with, exactly as
+        // the conflict branch does: a record left `queued` would show the sync
+        // center a pending row the pill already calls blocked, and the next poll
+        // would spend one more refused upload+commit on bytes the server has
+        // already refused (OQ-F12-be-d2-2)
+        await this.settleRecord(intents, doc, {
+          type: 'commitFailed',
+          error: 'document_archived',
+        })
         return this.commitState(doc, { ...base, state: 'blocked', error: error.code })
       case 'session_expired':
       case 'not_signed_in':

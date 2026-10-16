@@ -1,5 +1,6 @@
 export const strings = {
   zh: {
+    aiRedoPictureLost: '无法恢复这次运行插入的图片,所以未能重做。',
     aiClarifyTitle: '继续之前先确认几个问题',
     aiClarifyDecide: '帮我决定',
     aiClarifyDecideAnswer: '（帮我决定）',
@@ -252,6 +253,7 @@ export const strings = {
     aiReplying: '正在回复',
     aiWorking: '处理中',
     aiWorkedSteps: '已完成 · {n} 个步骤',
+    aiWorkedStepOne: '已完成 · 1 个步骤',
     aiGroupWorking: '处理中…',
     aiStopped: '已停止',
     aiNoReply: '（无回复）',
@@ -274,6 +276,7 @@ export const strings = {
     zoomOut: '缩小',
   },
   en: {
+    aiRedoPictureLost: "Couldn't put the picture back, so the redo was not applied.",
     aiClarifyTitle: 'A few questions before I continue',
     aiClarifyDecide: 'Decide for me',
     aiClarifyDecideAnswer: '(decide for me)',
@@ -536,6 +539,7 @@ export const strings = {
     aiReplying: 'Replying',
     aiWorking: 'Working',
     aiWorkedSteps: 'Worked · {n} steps',
+    aiWorkedStepOne: 'Worked · 1 step',
     aiGroupWorking: 'Working…',
     aiStopped: 'Stopped',
     aiNoReply: '(no reply)',
@@ -558,6 +562,7 @@ export const strings = {
     zoomOut: 'Zoom out',
   },
   vi: {
+    aiRedoPictureLost: 'Không khôi phục được ảnh nên chưa làm lại được.',
     aiClarifyTitle: 'Vài câu hỏi trước khi tiếp tục',
     aiClarifyDecide: 'Quyết định giúp tôi',
     aiClarifyDecideAnswer: '(quyết định giúp tôi)',
@@ -818,6 +823,7 @@ export const strings = {
     aiReplying: 'Đang trả lời',
     aiWorking: 'Đang xử lý',
     aiWorkedSteps: 'Đã xử lý · {n} bước',
+    aiWorkedStepOne: 'Đã xử lý · 1 bước',
     aiGroupWorking: 'Đang xử lý…',
     aiStopped: 'Đã dừng',
     aiNoReply: '(không có phản hồi)',
@@ -840,6 +846,7 @@ export const strings = {
     zoomOut: 'Thu nhỏ',
   },
   ja: {
+    aiRedoPictureLost: '画像を元に戻せなかったため、やり直しできませんでした。',
     aiClarifyTitle: '続ける前にいくつか確認させてください',
     aiClarifyDecide: 'おまかせ',
     aiClarifyDecideAnswer: '（おまかせ）',
@@ -1100,6 +1107,7 @@ export const strings = {
     aiReplying: '返信中',
     aiWorking: '処理中',
     aiWorkedSteps: '完了 · {n} ステップ',
+    aiWorkedStepOne: '完了 · 1 ステップ',
     aiGroupWorking: '処理中…',
     aiStopped: '停止しました',
     aiNoReply: '（返信なし）',
@@ -1122,6 +1130,7 @@ export const strings = {
     zoomOut: '縮小',
   },
   ko: {
+    aiRedoPictureLost: '이미지를 되돌리지 못해 다시 실행하지 못했습니다.',
     aiClarifyTitle: '계속하기 전에 몇 가지 확인할게요',
     aiClarifyDecide: '알아서 결정',
     aiClarifyDecideAnswer: '(알아서 결정)',
@@ -1383,6 +1392,7 @@ export const strings = {
     aiReplying: '답변 중',
     aiWorking: '작업 중',
     aiWorkedSteps: '완료 · {n}단계',
+    aiWorkedStepOne: '완료 · 1단계',
     aiGroupWorking: '작업 중…',
     aiStopped: '중지됨',
     aiNoReply: '(응답 없음)',
@@ -1405,6 +1415,8 @@ export const strings = {
     zoomOut: '축소',
   },
   fr: {
+    aiRedoPictureLost:
+      "L'image n'a pas pu être remise en place, le rétablissement n'a donc pas été appliqué.",
     aiClarifyTitle: 'Quelques questions avant de continuer',
     aiClarifyDecide: 'Décidez pour moi',
     aiClarifyDecideAnswer: '(décidez pour moi)',
@@ -1669,6 +1681,7 @@ export const strings = {
     aiReplying: 'Réponse en cours',
     aiWorking: 'Traitement',
     aiWorkedSteps: 'Terminé · {n} étapes',
+    aiWorkedStepOne: 'Terminé · 1 étape',
     aiGroupWorking: 'En cours…',
     aiStopped: 'Arrêté',
     aiNoReply: '(aucune réponse)',
@@ -1693,6 +1706,8 @@ export const strings = {
     zoomOut: 'Zoom arrière',
   },
   de: {
+    aiRedoPictureLost:
+      'Das Bild konnte nicht wiederhergestellt werden, daher wurde das Wiederholen nicht ausgeführt.',
     aiClarifyTitle: 'Ein paar Fragen, bevor ich weitermache',
     aiClarifyDecide: 'Entscheide für mich',
     aiClarifyDecideAnswer: '(entscheide für mich)',
@@ -1958,6 +1973,7 @@ export const strings = {
     aiReplying: 'Antwortet',
     aiWorking: 'Arbeitet',
     aiWorkedSteps: 'Erledigt · {n} Schritte',
+    aiWorkedStepOne: 'Erledigt · 1 Schritt',
     aiGroupWorking: 'In Arbeit…',
     aiStopped: 'Gestoppt',
     aiNoReply: '(keine Antwort)',
@@ -1981,6 +1997,7 @@ export const strings = {
     zoomOut: 'Verkleinern',
   },
   es: {
+    aiRedoPictureLost: 'No se pudo devolver la imagen, así que no se rehízo el cambio.',
     aiClarifyTitle: 'Unas preguntas antes de continuar',
     aiClarifyDecide: 'Decide por mí',
     aiClarifyDecideAnswer: '(decide por mí)',
@@ -2245,6 +2262,7 @@ export const strings = {
     aiReplying: 'Respondiendo',
     aiWorking: 'Trabajando',
     aiWorkedSteps: 'Completado · {n} pasos',
+    aiWorkedStepOne: 'Completado · 1 paso',
     aiGroupWorking: 'En curso…',
     aiStopped: 'Detenido',
     aiNoReply: '(sin respuesta)',
@@ -2269,6 +2287,7 @@ export const strings = {
     zoomOut: 'Alejar',
   },
   th: {
+    aiRedoPictureLost: 'ไม่สามารถนำรูปภาพกลับมาได้ จึงทำซ้ำไม่ได้',
     aiClarifyTitle: 'ขอถามสักครู่ก่อนดำเนินการต่อ',
     aiClarifyDecide: 'ตัดสินใจให้ฉัน',
     aiClarifyDecideAnswer: '(ตัดสินใจให้ฉัน)',
@@ -2526,6 +2545,7 @@ export const strings = {
     aiReplying: 'กำลังตอบ',
     aiWorking: 'กำลังทำงาน',
     aiWorkedSteps: 'เสร็จแล้ว · {n} ขั้นตอน',
+    aiWorkedStepOne: 'เสร็จแล้ว · 1 ขั้นตอน',
     aiGroupWorking: 'กำลังทำงาน…',
     aiStopped: 'หยุดแล้ว',
     aiNoReply: '(ไม่มีการตอบกลับ)',
@@ -2548,6 +2568,7 @@ export const strings = {
     zoomOut: 'ย่อ',
   },
   id: {
+    aiRedoPictureLost: 'Gambar tidak dapat dikembalikan, jadi pengulangan tidak diterapkan.',
     aiClarifyTitle: 'Beberapa pertanyaan sebelum melanjutkan',
     aiClarifyDecide: 'Putuskan untuk saya',
     aiClarifyDecideAnswer: '(putuskan untuk saya)',
@@ -2809,6 +2830,7 @@ export const strings = {
     aiReplying: 'Membalas',
     aiWorking: 'Bekerja',
     aiWorkedSteps: 'Selesai · {n} langkah',
+    aiWorkedStepOne: 'Selesai · 1 langkah',
     aiGroupWorking: 'Sedang bekerja…',
     aiStopped: 'Dihentikan',
     aiNoReply: '(tidak ada balasan)',
@@ -2831,6 +2853,7 @@ export const strings = {
     zoomOut: 'Perkecil',
   },
   ru: {
+    aiRedoPictureLost: 'Не удалось вернуть изображение, поэтому повтор не выполнен.',
     aiClarifyTitle: 'Несколько вопросов, прежде чем продолжить',
     aiClarifyDecide: 'Решите за меня',
     aiClarifyDecideAnswer: '(решите за меня)',
@@ -3093,6 +3116,7 @@ export const strings = {
     aiReplying: 'Отвечает',
     aiWorking: 'Работает',
     aiWorkedSteps: 'Готово · {n} шагов',
+    aiWorkedStepOne: 'Готово · 1 шаг',
     aiGroupWorking: 'Выполняется…',
     aiStopped: 'Остановлено',
     aiNoReply: '(нет ответа)',
@@ -3115,6 +3139,7 @@ export const strings = {
     zoomOut: 'Уменьшить',
   },
   ar: {
+    aiRedoPictureLost: 'تعذّرت إعادة الصورة، لذلك لم تُطبَّق الإعادة.',
     aiClarifyTitle: 'بعض الأسئلة قبل المتابعة',
     aiClarifyDecide: 'قرِّر بالنيابة عني',
     aiClarifyDecideAnswer: '(قرِّر بالنيابة عني)',
@@ -3373,6 +3398,7 @@ export const strings = {
     aiReplying: 'يرد',
     aiWorking: 'يعمل',
     aiWorkedSteps: 'اكتمل · {n} خطوات',
+    aiWorkedStepOne: 'اكتمل · خطوة واحدة',
     aiGroupWorking: 'جارٍ العمل…',
     aiStopped: 'تم الإيقاف',
     aiNoReply: '(لا يوجد رد)',
@@ -3395,6 +3421,7 @@ export const strings = {
     zoomOut: 'تصغير',
   },
   pt: {
+    aiRedoPictureLost: 'Não foi possível restaurar a imagem, então o refazer não foi aplicado.',
     aiClarifyTitle: 'Algumas perguntas antes de continuar',
     aiClarifyDecide: 'Decida por mim',
     aiClarifyDecideAnswer: '(decida por mim)',
@@ -3659,6 +3686,7 @@ export const strings = {
     aiReplying: 'Respondendo',
     aiWorking: 'Trabalhando',
     aiWorkedSteps: 'Concluído · {n} etapas',
+    aiWorkedStepOne: 'Concluído · 1 etapa',
     aiGroupWorking: 'Em andamento…',
     aiStopped: 'Parado',
     aiNoReply: '(sem resposta)',
@@ -3681,6 +3709,8 @@ export const strings = {
     zoomOut: 'Reduzir',
   },
   it: {
+    aiRedoPictureLost:
+      "Non è stato possibile ripristinare l'immagine, quindi il ripristino non è stato applicato.",
     aiClarifyTitle: 'Qualche domanda prima di continuare',
     aiClarifyDecide: 'Decidi tu per me',
     aiClarifyDecideAnswer: '(decidi tu per me)',
@@ -3944,6 +3974,7 @@ export const strings = {
     aiReplying: 'Sta rispondendo',
     aiWorking: 'Sta lavorando',
     aiWorkedSteps: 'Completato · {n} passaggi',
+    aiWorkedStepOne: 'Completato · 1 passaggio',
     aiGroupWorking: 'In corso…',
     aiStopped: 'Interrotto',
     aiNoReply: '(nessuna risposta)',
@@ -3967,6 +3998,7 @@ export const strings = {
     zoomOut: 'Riduci',
   },
   pl: {
+    aiRedoPictureLost: 'Nie udało się przywrócić obrazu, więc ponowienie nie zostało zastosowane.',
     aiClarifyTitle: 'Kilka pytań, zanim przejdę dalej',
     aiClarifyDecide: 'Zdecyduj za mnie',
     aiClarifyDecideAnswer: '(zdecyduj za mnie)',
@@ -4229,6 +4261,7 @@ export const strings = {
     aiReplying: 'Odpowiada',
     aiWorking: 'Pracuje',
     aiWorkedSteps: 'Ukończono · {n} kroków',
+    aiWorkedStepOne: 'Ukończono · 1 krok',
     aiGroupWorking: 'W toku…',
     aiStopped: 'Zatrzymano',
     aiNoReply: '(brak odpowiedzi)',
@@ -4251,6 +4284,7 @@ export const strings = {
     zoomOut: 'Pomniejsz',
   },
   cs: {
+    aiRedoPictureLost: 'Obrázek se nepodařilo vrátit, takže opakování nebylo provedeno.',
     aiClarifyTitle: 'Pár otázek, než budu pokračovat',
     aiClarifyDecide: 'Rozhodni za mě',
     aiClarifyDecideAnswer: '(rozhodni za mě)',
@@ -4492,6 +4526,7 @@ export const strings = {
     aiReplying: 'Odpovídá',
     aiWorking: 'Pracuje',
     aiWorkedSteps: 'Hotovo · {n} kroků',
+    aiWorkedStepOne: 'Hotovo · 1 krok',
     aiGroupWorking: 'Pracuje…',
     aiStopped: 'Zastaveno',
     aiNoReply: '(bez odpovědi)',
@@ -4534,6 +4569,8 @@ export const strings = {
     mermaidErrorDetails: 'Technické podrobnosti',
   },
   nl: {
+    aiRedoPictureLost:
+      'De afbeelding kon niet worden teruggezet, dus het opnieuw uitvoeren is niet toegepast.',
     aiClarifyTitle: 'Een paar vragen voordat ik verder ga',
     aiClarifyDecide: 'Beslis voor mij',
     aiClarifyDecideAnswer: '(beslis voor mij)',
@@ -4797,6 +4834,7 @@ export const strings = {
     aiReplying: 'Antwoordt',
     aiWorking: 'Bezig',
     aiWorkedSteps: 'Klaar · {n} stappen',
+    aiWorkedStepOne: 'Klaar · 1 stap',
     aiGroupWorking: 'Bezig…',
     aiStopped: 'Gestopt',
     aiNoReply: '(geen antwoord)',
@@ -4819,6 +4857,7 @@ export const strings = {
     zoomOut: 'Uitzoomen',
   },
   ms: {
+    aiRedoPictureLost: 'Gambar tidak dapat dikembalikan, jadi ulang semula tidak dilaksanakan.',
     aiClarifyTitle: 'Beberapa soalan sebelum meneruskan',
     aiClarifyDecide: 'Putuskan untuk saya',
     aiClarifyDecideAnswer: '(putuskan untuk saya)',
@@ -5080,6 +5119,7 @@ export const strings = {
     aiReplying: 'Membalas',
     aiWorking: 'Bekerja',
     aiWorkedSteps: 'Selesai · {n} langkah',
+    aiWorkedStepOne: 'Selesai · 1 langkah',
     aiGroupWorking: 'Sedang berjalan…',
     aiStopped: 'Dihentikan',
     aiNoReply: '(tiada balasan)',
@@ -5102,6 +5142,7 @@ export const strings = {
     zoomOut: 'Zum keluar',
   },
   he: {
+    aiRedoPictureLost: 'לא ניתן היה להחזיר את התמונה, ולכן הפעולה לא בוצעה מחדש.',
     aiClarifyTitle: 'כמה שאלות לפני שאמשיך',
     aiClarifyDecide: 'החלט בשבילי',
     aiClarifyDecideAnswer: '(החלט בשבילי)',
@@ -5357,6 +5398,7 @@ export const strings = {
     aiReplying: 'משיב',
     aiWorking: 'עובד',
     aiWorkedSteps: 'הושלם · {n} שלבים',
+    aiWorkedStepOne: 'הושלם · שלב אחד',
     aiGroupWorking: 'בעבודה…',
     aiStopped: 'נעצר',
     aiNoReply: '(אין תשובה)',
@@ -5379,6 +5421,7 @@ export const strings = {
     zoomOut: 'הקטנה',
   },
   hi: {
+    aiRedoPictureLost: 'तस्वीर वापस नहीं रखी जा सकी, इसलिए दोबारा लागू नहीं हो सका।',
     aiClarifyTitle: 'आगे बढ़ने से पहले कुछ सवाल',
     aiClarifyDecide: 'मेरे लिए तय करें',
     aiClarifyDecideAnswer: '(मेरे लिए तय करें)',
@@ -5640,6 +5683,7 @@ export const strings = {
     aiReplying: 'उत्तर दे रहा है',
     aiWorking: 'कार्य कर रहा है',
     aiWorkedSteps: 'पूर्ण · {n} चरण',
+    aiWorkedStepOne: 'पूर्ण · 1 चरण',
     aiGroupWorking: 'कार्य जारी…',
     aiStopped: 'रोका गया',
     aiNoReply: '(कोई उत्तर नहीं)',
@@ -5662,6 +5706,7 @@ export const strings = {
     zoomOut: 'ज़ूम आउट',
   },
   'zh-TW': {
+    aiRedoPictureLost: '無法復原這次執行插入的圖片,所以未能重做。',
     aiClarifyTitle: '繼續之前先確認幾個問題',
     aiClarifyDecide: '幫我決定',
     aiClarifyDecideAnswer: '（幫我決定）',
@@ -5914,6 +5959,7 @@ export const strings = {
     aiReplying: '回覆中',
     aiWorking: '處理中',
     aiWorkedSteps: '已完成 · {n} 個步驟',
+    aiWorkedStepOne: '已完成 · 1 個步驟',
     aiGroupWorking: '處理中…',
     aiStopped: '已停止',
     aiNoReply: '（無回覆）',

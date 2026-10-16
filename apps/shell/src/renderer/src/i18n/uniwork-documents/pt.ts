@@ -127,6 +127,7 @@ export const pt = {
   uwDocInfoByAt: '{name}, {time}',
   uwDocInfoVersionBy: '{version} · {name}',
   uwAccessView: 'Ver',
+  uwAccessComment: 'Comentar',
   uwAccessEdit: 'Editar',
   uwAccessManage: 'Gerenciar',
   uwRoleOwner: 'Proprietário',

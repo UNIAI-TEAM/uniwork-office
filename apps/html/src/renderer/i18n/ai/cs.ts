@@ -54,6 +54,8 @@ export const cs = {
   aiUndelivered: 'Neodesláno',
   aiUnknownError: 'Požadavek na AI se nezdařil, zkuste to znovu',
   aiWorkedSteps: 'Hotovo · {n} kroků',
+  aiWorkedStepsOne: 'Hotovo · {n} krok',
+  aiWorkedStepsFew: 'Hotovo · {n} kroky',
   aiWorking: 'Pracuji',
   aiOpenAssistant: 'Otevřít asistenta AI',
   aiToolOutline: 'Čtení osnovy dokumentu',

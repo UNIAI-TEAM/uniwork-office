@@ -19,6 +19,7 @@ export const he = {
   exportHtmlEntry: 'ייצוא כ-HTML בקובץ יחיד',
   previewLimitNote:
     'דף זה מבקש נתונים מהרשת או מטמיע דפים אחרים, והתצוגה המקדימה באינטרנט חוסמת זאת.',
+  previewLimitNoteApp: 'דף זה מבקש נתונים מהרשת או מטמיע דפים אחרים, והתצוגה המקדימה חוסמת זאת.',
   useInAppMessage: 'פתחו באפליקציית UniWork Office כדי להשתמש בתכונה זו',
   openInApp: 'פתח באפליקציה',
   printFailed: 'הדפסה נכשלה: {error}',

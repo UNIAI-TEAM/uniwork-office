@@ -19,6 +19,8 @@ export const hi = {
   exportHtmlEntry: 'एकल-फ़ाइल HTML के रूप में निर्यात',
   previewLimitNote:
     'यह पेज नेटवर्क से डेटा माँगता है या दूसरे पेज एम्बेड करता है, जिसे वेब पूर्वावलोकन रोक देता है।',
+  previewLimitNoteApp:
+    'यह पेज नेटवर्क से डेटा माँगता है या दूसरे पेज एम्बेड करता है, जिसे पूर्वावलोकन रोक देता है।',
   useInAppMessage: 'इस सुविधा का उपयोग करने के लिए UniWork Office ऐप में खोलें',
   openInApp: 'ऐप में खोलें',
   printFailed: 'प्रिंट विफल: {error}',

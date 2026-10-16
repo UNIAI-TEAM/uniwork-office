@@ -52,6 +52,8 @@ export const he = {
   aiUndelivered: 'לא נשלח',
   aiUnknownError: 'בקשת ה-AI נכשלה, נסו שוב',
   aiWorkedSteps: 'הושלם · {n} שלבים',
+  aiWorkedStepsOne: 'הושלם · שלב אחד',
+  aiWorkedStepsFew: 'הושלם · {n} שלבים',
   aiWorking: 'עובד',
   aiOpenAssistant: 'פתחו את עוזר ה-AI',
   aiToolOutline: 'קריאת מבנה המסמך',

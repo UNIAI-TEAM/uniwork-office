@@ -75,6 +75,10 @@ export const cs = {
   aiStarterEventOutline: 'Sestavte osnovu plánu akce',
   aiThinking: 'Přemýšlí',
   aiWorkedSteps: 'Hotovo · {n} kroků',
+  aiWorkedStepsOne: 'Hotovo · {n} krok',
+  aiWorkedStepsFew: 'Hotovo · {n} kroky',
+  aiEditsPaused:
+    'Asistent pracuje na tomto dokumentu. Vaše úpravy jsou pozastaveny; pro pokračování asistenta zastavte.',
   aiGroupWorking: 'Pracuje…',
   aiWorking: 'Pracuje',
   aiErrorPrefix: 'Chyba: {error}',
@@ -83,6 +87,16 @@ export const cs = {
   aiRegenerateTitle: 'Vygenerovat znovu',
   aiSnapshotsTitle: 'Snímky',
   aiRollback: 'Vrátit zpět',
+  aiAcceptMarked: 'Přijmout',
+  aiAcceptMarkedTitle: 'Ponechat změny AI a odebrat zvýraznění',
+  aiRollbackKept:
+    'Text byl obnoven. Dokument se během této odpovědi uložil, proto tyto části nešlo obnovit: {parts}',
+  aiSidePartComments: 'komentáře',
+  aiSidePartHeaderFooter: 'záhlaví a zápatí',
+  aiSidePartStyles: 'styly',
+  aiSidePartPageSetup: 'vzhled stránky',
+  aiSidePartWatermark: 'vodoznak',
+  aiSidePartSep: ', ',
   aiScopeSelected: 'Vybráno odstavců: {count}',
   aiScopeEmptyDoc: 'Prázdný dokument',
   aiScopeCursor: 'Na pozici kurzoru',
@@ -96,6 +110,8 @@ export const cs = {
   aiAttachTitle: 'Připojit místní soubory (nebo je přetáhněte na panel)',
   aiRemoveAttachmentTitle: 'Odebrat přílohu',
   aiTrackChanges: 'Sledování změn',
+  aiTrackForced:
+    'Tento dokument je chráněn: sledování změn musí zůstat zapnuté, proto se úpravy AI zaznamenávají jako revize.',
   aiTrackOnTitle:
     'Sledování změn zapnuto: úpravy obsahu od AI se označují jako revize (vložení podtržené, odstranění přeškrtnuté); přijměte nebo odmítněte v části Revize',
   aiTrackOffTitle:

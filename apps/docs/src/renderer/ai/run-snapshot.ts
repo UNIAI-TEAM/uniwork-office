@@ -24,6 +24,29 @@ export interface AiSideState {
   capture(): unknown
   /** false when the state no longer applies (the file was saved or reloaded since) */
   restore(state: unknown): boolean
+  /** parts whose value differs between two captures of the same file version ([] across versions) */
+  changedParts?(from: unknown, to: unknown): AiSidePart[]
+}
+
+/** the parts of the side state a user can name, in display order */
+export const AI_SIDE_PARTS = [
+  'comments',
+  'headerFooter',
+  'styles',
+  'pageSetup',
+  'watermark',
+] as const
+export type AiSidePart = (typeof AI_SIDE_PARTS)[number]
+
+/** the part a slice belongs to (the App's slice names, dirty flags included) */
+export function sidePartOf(slice: string): AiSidePart | null {
+  if (slice.startsWith('comment')) return 'comments'
+  if (slice.startsWith('style')) return 'styles'
+  if (slice.startsWith('watermark')) return 'watermark'
+  // before the page-setup test: sectionHfEdits is header/footer state
+  if (/^(header|footer|hf|sectionHf|titlePg|evenOddHf)/.test(slice)) return 'headerFooter'
+  if (/^(section|trailingStartType|pgNum)/.test(slice)) return 'pageSetup'
+  return null
 }
 
 interface CapturedSide {
@@ -55,6 +78,17 @@ export function createAiSideState(
         if (slice.get() !== value) slice.set(value)
       }
       return true
+    },
+    changedParts: (from, to) => {
+      const a = from as CapturedSide | undefined
+      const b = to as CapturedSide | undefined
+      if (!a || !b || a.key !== b.key) return []
+      const parts = new Set<AiSidePart>()
+      for (const name of Object.keys(slices)) {
+        const part = sidePartOf(name)
+        if (part && a.values[name] !== b.values[name]) parts.add(part)
+      }
+      return AI_SIDE_PARTS.filter((p) => parts.has(p))
     },
   }
 }

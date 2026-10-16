@@ -70,4 +70,28 @@ export const hi = {
   collabInFileSection: 'फ़ाइल में टिप्पणियाँ',
   collabInFileHint:
     'फ़ाइल में सहेजी गई और केवल पढ़ने के लिए: यहाँ संपादित नहीं किया जा सकता और न ही जवाब दिया जा सकता।',
+  collabMentionWarnTitle: 'उल्लिखित लोग इस दस्तावेज़ को नहीं देख सकते',
+  collabMentionWarnBody:
+    '{names} इस दस्तावेज़ को नहीं देख सकते, इसलिए उन्हें अधिसूचित नहीं किया जाएगा।',
+  collabShareViewThenSend: 'देखने की पहुँच साझा करें, फिर भेजें',
+  collabSendWithoutNotify: 'बिना अधिसूचित किए भेजें',
+  collabMentionAskManager:
+    'इस दस्तावेज़ का प्रबंधन करने वाले किसी व्यक्ति से {names} के साथ देखने की पहुँच साझा करने के लिए कहें।',
+  collabMentionMixedUnshareable:
+    '{unshareable} के साथ साझा नहीं किया जा सकता; उन्हें अधिसूचित नहीं किया जाएगा।',
+  collabSharingView: 'देखने की पहुँच साझा की जा रही है…',
+  collabShareViewFailed:
+    '{failedNames} के साथ देखने की पहुँच साझा नहीं की जा सकी। आप फिर से प्रयास कर सकते हैं या बिना अधिसूचित किए भेज सकते हैं।',
+  collabShareViewPartial:
+    '{sharedNames} के साथ देखने की पहुँच साझा की गई। {failedNames} के साथ साझा नहीं की जा सकी (उन्हें अधिसूचित नहीं किया जाएगा)।',
+  collabSendComment: 'टिप्पणी भेजें',
+  collabRetryShareFor: '{failedNames} के लिए फिर से प्रयास करें',
+  collabSendFailedAfterShare:
+    '{sharedNames} के साथ देखने की पहुँच साझा कर दी गई, लेकिन टिप्पणी भेजी नहीं जा सकी। आपका टेक्स्ट अब भी बॉक्स में है — फिर से भेजने का प्रयास करें।',
+  collabPostSendNoAccess:
+    '{names} इस दस्तावेज़ को नहीं देख सकते, इसलिए उन्हें अधिसूचित नहीं किया गया।',
+  collabPostSendShareAction: 'देखने की पहुँच साझा करें',
+  collabPostSendNoRetroNote:
+    'अभी साझा करने से उन्हें इस टिप्पणी के बारे में अधिसूचना नहीं मिलेगी; अधिसूचित करने के लिए नई टिप्पणी में उनका उल्लेख करें।',
+  collabDismissNotice: 'खारिज करें',
 } satisfies Record<keyof typeof zh, string>

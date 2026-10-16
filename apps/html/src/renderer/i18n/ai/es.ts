@@ -56,6 +56,8 @@ export const es = {
   aiUndelivered: 'No enviado',
   aiUnknownError: 'La solicitud de IA falló, reinténtalo',
   aiWorkedSteps: 'Completado · {n} pasos',
+  aiWorkedStepsOne: 'Completado · {n} paso',
+  aiWorkedStepsFew: 'Completado · {n} pasos',
   aiWorking: 'Trabajando',
   aiOpenAssistant: 'Abrir asistente de IA',
   aiToolOutline: 'Leer estructura del documento',

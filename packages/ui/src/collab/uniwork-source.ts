@@ -74,7 +74,10 @@ export interface UniworkCommentsLike {
     path: string
     q: string
     limit?: number
+    include?: 'no_access'
   }): Promise<CollabReply<{ candidates: CollabCandidate[] }>>
+  shareView?(input: { path: string; userId: string }): Promise<CollabReply<{ ok: true }>>
+  canListMembers?: boolean
 }
 
 /** the error a source call rejects with: an `Error` carrying the `CollabError` fields */
@@ -117,6 +120,7 @@ export function createUniworkCommentsSource(
   kind: CollabKind,
 ): CollabSource {
   return {
+    ...(api.canListMembers !== undefined ? { canListMembers: api.canListMembers } : {}),
     list: (p) =>
       unwrap(() =>
         api.list({
@@ -143,8 +147,19 @@ export function createUniworkCommentsSource(
     revisions: (p) => unwrap(() => api.revisions({ path, commentId: p.comment_id })),
     searchMentions: (p) =>
       unwrap(() =>
-        api.searchMentions({ path, q: p.q, ...(p.limit !== undefined ? { limit: p.limit } : {}) }),
+        api.searchMentions({
+          path,
+          q: p.q,
+          ...(p.limit !== undefined ? { limit: p.limit } : {}),
+          ...(p.include !== undefined ? { include: p.include } : {}),
+        }),
       ),
+    ...(api.shareView
+      ? {
+          shareView: (p: { user_id: string }) =>
+            unwrap(() => api.shareView!({ path, userId: p.user_id })),
+        }
+      : {}),
     anchors: (p) =>
       unwrap(() =>
         api.anchors({

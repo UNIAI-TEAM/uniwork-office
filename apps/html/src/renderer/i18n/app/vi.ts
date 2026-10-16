@@ -19,6 +19,8 @@ export const vi = {
   exportHtmlEntry: 'Xuất HTML',
   previewLimitNote:
     'Trang này gọi dữ liệu qua mạng hoặc nhúng trang khác; bản xem trước trên web chặn những thứ đó.',
+  previewLimitNoteApp:
+    'Trang này gọi dữ liệu qua mạng hoặc nhúng trang khác; bản xem trước chặn những thứ đó.',
   useInAppMessage: 'Mở trong ứng dụng UniWork Office để dùng tính năng này',
   openInApp: 'Mở trong ứng dụng',
   printFailed: 'In thất bại: {error}',

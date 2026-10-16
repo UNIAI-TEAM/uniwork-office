@@ -55,6 +55,8 @@ export const fr = {
   aiUndelivered: 'Non envoyé',
   aiUnknownError: 'La requête IA a échoué, réessayez',
   aiWorkedSteps: 'Terminé · {n} étapes',
+  aiWorkedStepsOne: 'Terminé · {n} étape',
+  aiWorkedStepsFew: 'Terminé · {n} étapes',
   aiWorking: 'Traitement',
   aiOpenAssistant: "Ouvrir l'assistant IA",
   aiToolOutline: 'Lecture de la structure',

@@ -131,8 +131,8 @@ text-module bridge. Contract: lane CONTRACT C1-C13, protocol `web/docs/protocol`
   the single `app.open` request (no request timeout: the host may wait on its unsaved-changes dialog; `unavailable`
   = the host already showed its own alert). HTML preview: a page that uses `fetch` / XHR or nested frames gets one
   note above the preview, in the preview chrome and never inside the document ("... Open in the UniWork Office app to
-  use this feature", with **Open in app** while `desktopOpen` is on); capability `htmlPreviewNetwork` is off on the
-  web, so the desktop shows nothing.
+  use this feature", with **Open in app** while `desktopOpen` is on); on the desktop app the same note only says the
+  page is blocked there, with no action.
 - **Hidden on both.** `autoSave` (toggle + timer), Markdown `openInDocs`, `createDocument`, `billing`.
 - **Pictures the host has no copy of.** A relative picture in a single uploaded `.md` (no sibling `assets/`) shows a
   labelled placeholder with its path instead of a broken-image icon; the saved Markdown keeps `![](path)`.

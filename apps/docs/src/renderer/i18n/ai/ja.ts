@@ -74,6 +74,10 @@ export const ja = {
   aiStarterEventOutline: 'イベント企画のアウトラインを作って',
   aiThinking: '考え中',
   aiWorkedSteps: '完了 · {n} ステップ',
+  aiWorkedStepsOne: '完了 · {n} ステップ',
+  aiWorkedStepsFew: '完了 · {n} ステップ',
+  aiEditsPaused:
+    'アシスタントがこのドキュメントを処理中です。あなたの編集は一時停止されています。続けるにはアシスタントを停止してください。',
   aiGroupWorking: '処理中…',
   aiWorking: '処理中',
   aiErrorPrefix: 'エラー: {error}',
@@ -82,6 +86,16 @@ export const ja = {
   aiRegenerateTitle: '再生成',
   aiSnapshotsTitle: 'バージョンスナップショット',
   aiRollback: 'ロールバック',
+  aiAcceptMarked: '承諾',
+  aiAcceptMarkedTitle: 'AI の変更を確定し、ハイライトを消します',
+  aiRollbackKept:
+    '本文を元に戻しました。この応答中に文書が保存されたため、次の部分は元に戻せませんでした: {parts}',
+  aiSidePartComments: 'コメント',
+  aiSidePartHeaderFooter: 'ヘッダーとフッター',
+  aiSidePartStyles: 'スタイル',
+  aiSidePartPageSetup: 'ページ設定',
+  aiSidePartWatermark: '透かし',
+  aiSidePartSep: '、',
   aiScopeSelected: '{count} 段落を選択中',
   aiScopeEmptyDoc: '空の文書',
   aiScopeCursor: 'カーソル位置',
@@ -95,6 +109,8 @@ export const ja = {
   aiAttachTitle: 'ローカルファイルを添付(パネルへのドラッグ&ドロップも可)',
   aiRemoveAttachmentTitle: '添付ファイルを削除',
   aiTrackChanges: '変更履歴',
+  aiTrackForced:
+    'この文書は保護されています。変更履歴は常にオンで、AI の編集は変更履歴として記録されます。',
   aiTrackOnTitle:
     '変更履歴オン:AI による内容の変更は変更履歴として記録されます(挿入は下線、削除は取り消し線)。校閲で承諾または元に戻せます',
   aiTrackOffTitle:

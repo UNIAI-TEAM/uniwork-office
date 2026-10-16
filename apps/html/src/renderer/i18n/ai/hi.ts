@@ -54,6 +54,8 @@ export const hi = {
   aiUndelivered: 'भेजा नहीं गया',
   aiUnknownError: 'AI अनुरोध विफल, पुनः प्रयास करें',
   aiWorkedSteps: 'पूर्ण · {n} चरण',
+  aiWorkedStepsOne: 'पूर्ण · {n} चरण',
+  aiWorkedStepsFew: 'पूर्ण · {n} चरण',
   aiWorking: 'कार्य कर रहा है',
   aiOpenAssistant: 'AI सहायक खोलें',
   aiToolOutline: 'दस्तावेज़ संरचना पढ़ी',

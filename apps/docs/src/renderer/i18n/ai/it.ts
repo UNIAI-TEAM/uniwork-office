@@ -77,6 +77,10 @@ export const it = {
   aiStarterEventOutline: 'Prepara la scaletta di un evento',
   aiThinking: 'Riflessione in corso',
   aiWorkedSteps: 'Completato · {n} passaggi',
+  aiWorkedStepsOne: 'Completato · {n} passaggio',
+  aiWorkedStepsFew: 'Completato · {n} passaggi',
+  aiEditsPaused:
+    "L'assistente sta lavorando a questo documento. Le tue modifiche sono in pausa; ferma l'assistente per continuare.",
   aiGroupWorking: 'In corso…',
   aiWorking: 'Elaborazione in corso',
   aiErrorPrefix: 'Errore: {error}',
@@ -85,6 +89,16 @@ export const it = {
   aiRegenerateTitle: 'Rigenera',
   aiSnapshotsTitle: 'Snapshot delle versioni',
   aiRollback: 'Ripristina',
+  aiAcceptMarked: 'Accetta',
+  aiAcceptMarkedTitle: 'Mantieni le modifiche dell’IA e rimuovi l’evidenziazione',
+  aiRollbackKept:
+    'Il testo è stato ripristinato. Il documento è stato salvato durante questa risposta, quindi queste parti non sono state ripristinate: {parts}',
+  aiSidePartComments: 'commenti',
+  aiSidePartHeaderFooter: 'intestazione e piè di pagina',
+  aiSidePartStyles: 'stili',
+  aiSidePartPageSetup: 'impostazione pagina',
+  aiSidePartWatermark: 'filigrana',
+  aiSidePartSep: ', ',
   aiScopeSelected: '{count} paragrafo/i selezionato/i',
   aiScopeEmptyDoc: 'Documento vuoto',
   aiScopeCursor: 'Al cursore',
@@ -98,6 +112,8 @@ export const it = {
   aiAttachTitle: 'Allega file locali (o trascinali sul pannello)',
   aiRemoveAttachmentTitle: 'Rimuovi allegato',
   aiTrackChanges: 'Revisioni',
+  aiTrackForced:
+    'Questo documento è protetto: le revisioni devono restare attive, quindi le modifiche dell’IA vengono registrate come revisioni.',
   aiTrackOnTitle:
     "Revisioni attivate: le modifiche ai contenuti dell'IA sono contrassegnate come revisioni (inserimenti sottolineati, eliminazioni barrate); accettale o rifiutale in Revisione",
   aiTrackOffTitle:

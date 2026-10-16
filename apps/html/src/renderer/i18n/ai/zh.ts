@@ -47,6 +47,8 @@ export const zh = {
   aiUndelivered: '未发送成功',
   aiUnknownError: 'AI 请求失败，请重试',
   aiWorkedSteps: '已完成 · {n} 个步骤',
+  aiWorkedStepsOne: '已完成 · {n} 个步骤',
+  aiWorkedStepsFew: '已完成 · {n} 个步骤',
   aiWorking: '处理中',
   aiOpenAssistant: '打开 AI 助手',
   aiToolOutline: '读取文档结构',

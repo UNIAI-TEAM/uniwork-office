@@ -74,6 +74,10 @@ export const en = {
   aiStarterEventOutline: 'Outline an event plan',
   aiThinking: 'Thinking',
   aiWorkedSteps: 'Worked · {n} steps',
+  aiWorkedStepsOne: 'Worked · {n} step',
+  aiWorkedStepsFew: 'Worked · {n} steps',
+  aiEditsPaused:
+    'The assistant is working on this document. Your edits are paused; stop the assistant to continue.',
   aiGroupWorking: 'Working…',
   aiWorking: 'Working',
   aiErrorPrefix: 'Error: {error}',
@@ -82,6 +86,16 @@ export const en = {
   aiRegenerateTitle: 'Regenerate',
   aiSnapshotsTitle: 'Snapshots',
   aiRollback: 'Roll back',
+  aiAcceptMarked: 'Accept',
+  aiAcceptMarkedTitle: 'Keep the AI edits and remove their highlight',
+  aiRollbackKept:
+    'Rolled back the text. The document was saved during this reply, so these parts could not be put back: {parts}',
+  aiSidePartComments: 'comments',
+  aiSidePartHeaderFooter: 'header and footer',
+  aiSidePartStyles: 'styles',
+  aiSidePartPageSetup: 'page setup',
+  aiSidePartWatermark: 'watermark',
+  aiSidePartSep: ', ',
   aiScopeSelected: 'Selected {count} paragraph(s)',
   aiScopeEmptyDoc: 'Blank document',
   aiScopeCursor: 'At cursor',
@@ -95,6 +109,8 @@ export const en = {
   aiAttachTitle: 'Attach local files (or drag them onto the panel)',
   aiRemoveAttachmentTitle: 'Remove attachment',
   aiTrackChanges: 'Track changes',
+  aiTrackForced:
+    'This document is protected: Track changes must stay on, so the AI’s edits are recorded as revisions.',
   aiTrackOnTitle:
     'Track changes on: AI content edits are marked as revisions (insertions underlined, deletions struck through); accept or reject in Review',
   aiTrackOffTitle:
