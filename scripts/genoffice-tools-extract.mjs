@@ -1385,23 +1385,27 @@ const MAX_ARROW_DEPTH = 32
  */
 function applyArrowFn(fn, args, scope) {
   const ctx = scope.ctx
-  const used = ctx && ctx.arrow ? ctx.arrow.depth : 0
-  if (used >= MAX_ARROW_DEPTH) return U('recursion')
   if (!ctx) return U(`call:${fn.name}`)
+  const arrow = ctx.arrow || { depth: 0, steps: 0 }
+  if (arrow.depth >= MAX_ARROW_DEPTH || arrow.steps >= MAX_ARROW_DEPTH) return U('recursion')
   const arg = args.length === 1 ? args[0] : undefined
+  if (isU(arg) && arg.__unresolved === 'recursion') return arg
   if (typeof arg !== 'number' || !Number.isInteger(arg) || Math.abs(arg) > MAX_ARROW_DEPTH)
     return U(`call:${fn.name}`)
+  arrow.steps += 1
+  arrow.depth += 1
   const bound = new Map(scope.bindings)
   bound.set(fn.param, arg)
   bound.set(fn.name, fn)
   const prevStrict = ctx.strict
   const prevArrow = ctx.arrow
   ctx.strict = true
-  ctx.arrow = { depth: used + 1 }
+  ctx.arrow = arrow
   let r
   try {
     r = parseExpression(fn.tokens, fn.bodyOpen, { ...scope, bindings: bound }, 0)
   } finally {
+    arrow.depth -= 1
     ctx.strict = prevStrict
     ctx.arrow = prevArrow
   }
