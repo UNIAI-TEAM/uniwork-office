@@ -860,11 +860,26 @@ function parseCall(callee, methodName, tokens, i, scope, depth) {
     if (tokens[i + 1] && tokens[i + 1].value === ')') {
       return { value: applyArrowFn(callee, [], scope), i: close }
     }
-    const r = parseExpression(tokens, i + 1, scope, depth + 1)
-    if (!tokens[r.i] || tokens[r.i].value !== ')') {
-      return { value: U(`call:${callee.name}`), i: close }
+    const ctx = scope.ctx
+    const prevStrict = ctx ? ctx.strict : false
+    const prevArrow = ctx ? ctx.arrow : undefined
+    const arrow = prevArrow || { depth: 0, steps: 0 }
+    if (ctx) {
+      ctx.strict = true
+      ctx.arrow = arrow
     }
-    return { value: applyArrowFn(callee, [r.value], scope), i: r.i + 1 }
+    try {
+      const r = parseExpression(tokens, i + 1, scope, depth + 1)
+      if (!tokens[r.i] || tokens[r.i].value !== ')') {
+        return { value: U(`call:${callee.name}`), i: close }
+      }
+      return { value: applyArrowFn(callee, [r.value], scope), i: r.i + 1 }
+    } finally {
+      if (ctx) {
+        ctx.strict = prevStrict
+        ctx.arrow = prevArrow
+      }
+    }
   }
   const args = []
   let idx = i + 1
