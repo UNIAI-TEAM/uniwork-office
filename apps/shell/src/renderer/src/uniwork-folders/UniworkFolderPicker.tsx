@@ -7,6 +7,7 @@ import type {
 import { useI18n } from '../locale'
 import { ActionModal } from '../UniworkDocActions'
 import { UNIWORK_ERROR_KEYS } from '../uniwork-docs-model'
+import { onTreeChanged } from '../uniwork-library-api'
 import { UniworkFolderTree } from './UniworkFolderTree'
 import {
   ROOT_KEY,
@@ -70,26 +71,35 @@ export function UniworkFolderPicker({
 
   useEffect(() => {
     if (givenNodes) return
+    return onTreeChanged((event) => {
+      if (event.workspaceId === workspaceId) setTick((n) => n + 1)
+    })
+  }, [workspaceId, givenNodes])
+
+  useEffect(() => {
+    if (givenNodes) return
     let live = true
-    setLoad({ status: 'loading' })
+    setLoad((prev) => (prev.status === 'ready' ? prev : { status: 'loading' }))
     void loadTree(workspaceId)
       .catch((): UniworkResult<UniworkFolderNode[]> => ({ ok: false, error: 'network' }))
       .then((result) => {
         if (!live) return
-        setLoad(
-          result.ok
-            ? { status: 'ready', nodes: result.value }
-            : { status: 'error', error: result.error },
-        )
+        if (result.ok) {
+          setLoad({ status: 'ready', nodes: result.value })
+        } else {
+          setLoad((prev) =>
+            prev.status === 'ready' ? prev : { status: 'error', error: result.error },
+          )
+        }
       })
     return () => {
       live = false
     }
-    // the tree is read once per workspace (and on Retry)
+    // the tree is read per workspace, on Retry, and on tree-changed when no host nodes are passed
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workspaceId, tick])
+  }, [workspaceId, tick, Boolean(givenNodes)])
 
-  const nodes = load.status === 'ready' ? load.nodes : null
+  const nodes = givenNodes ?? (load.status === 'ready' ? load.nodes : null)
   const index = useMemo(() => buildFolderIndex(nodes ?? []), [nodes])
 
   // the starting folder is visible once the tree is in

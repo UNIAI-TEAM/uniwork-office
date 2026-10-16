@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
+import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react'
 import type { UniworkDocSummary } from '../../../shared/home-api'
 import { useI18n } from '../locale'
 import { ActionToast } from '../UniworkDocActions'
@@ -201,23 +201,53 @@ export function UniworkBrowser({
     )
   }
 
+  const chipsRef = useRef<HTMLDivElement>(null)
+  const onChipKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>, index: number) => {
+    let next: number | null = null
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+      next = (index + 1) % SEARCH_KINDS.length
+    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+      next = (index - 1 + SEARCH_KINDS.length) % SEARCH_KINDS.length
+    } else if (event.key === 'Home') {
+      next = 0
+    } else if (event.key === 'End') {
+      next = SEARCH_KINDS.length - 1
+    }
+    if (next === null) return
+    event.preventDefault()
+    event.stopPropagation()
+    const target = SEARCH_KINDS[next]!
+    runSearch(query, target.kind)
+    chipsRef.current?.querySelectorAll<HTMLButtonElement>('[role="radio"]')[next]?.focus()
+  }
+
   const renderMain = () => (
     <>
       <div className="uwf-bar">
         {searching ? (
-          <div className="uwf-chips" role="radiogroup" aria-label={t('ufSearchKind')}>
-            {SEARCH_KINDS.map(({ kind, key }) => (
-              <button
-                key={kind}
-                type="button"
-                role="radio"
-                aria-checked={browser.search.kind === kind}
-                className={`uwf-chip${browser.search.kind === kind ? ' on' : ''}`}
-                onClick={() => runSearch(query, kind)}
-              >
-                {t(key)}
-              </button>
-            ))}
+          <div
+            className="uwf-chips"
+            role="radiogroup"
+            aria-label={t('ufSearchKind')}
+            ref={chipsRef}
+          >
+            {SEARCH_KINDS.map(({ kind, key }, index) => {
+              const checked = browser.search.kind === kind
+              return (
+                <button
+                  key={kind}
+                  type="button"
+                  role="radio"
+                  aria-checked={checked}
+                  tabIndex={checked ? 0 : -1}
+                  className={`uwf-chip${checked ? ' on' : ''}`}
+                  onClick={() => runSearch(query, kind)}
+                  onKeyDown={(e) => onChipKeyDown(e, index)}
+                >
+                  {t(key)}
+                </button>
+              )
+            })}
           </div>
         ) : (
           <BrowserCrumbs path={browser.path} onOpen={openFolder} />

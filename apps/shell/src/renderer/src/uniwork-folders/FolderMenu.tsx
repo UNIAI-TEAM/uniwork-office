@@ -57,7 +57,10 @@ export function FolderMenu({
   useEffect(() => {
     if (!open) return
     const onDown = (e: MouseEvent) => {
-      if (!menuRef.current?.contains(e.target as Node) && e.target !== buttonRef.current) {
+      if (
+        !menuRef.current?.contains(e.target as Node) &&
+        !buttonRef.current?.contains(e.target as Node)
+      ) {
         onOpenChange(false)
       }
     }

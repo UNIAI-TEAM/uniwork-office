@@ -549,6 +549,31 @@ describe('UniworkBrowser: search (S2)', () => {
     await flush()
     expect(optionTitles()).toEqual(['Hit1.docx', 'Hit2.docx'])
   })
+
+  it('search chips radiogroup uses roving tabindex and arrow keys (R1-2)', async () => {
+    await render()
+    await type($<HTMLInputElement>('.uwf-own-search')!, 'bud')
+    const chips = () => $$<HTMLButtonElement>('[role="radio"]')
+    expect(chips().map((c) => c.tabIndex)).toEqual([0, -1, -1])
+
+    await key(chips()[0]!, 'ArrowRight')
+    expect(chips().map((c) => c.tabIndex)).toEqual([-1, 0, -1])
+    expect(chips()[1]!.getAttribute('aria-checked')).toBe('true')
+    expect(document.activeElement).toBe(chips()[1])
+    expect(api.uniworkSearchDocuments).toHaveBeenLastCalledWith(
+      expect.objectContaining({ kind: 'folder' }),
+    )
+
+    await key(chips()[1]!, 'ArrowLeft')
+    expect(chips().map((c) => c.tabIndex)).toEqual([0, -1, -1])
+    expect(chips()[0]!.getAttribute('aria-checked')).toBe('true')
+    expect(document.activeElement).toBe(chips()[0])
+
+    await key(chips()[0]!, 'ArrowUp')
+    expect(chips().map((c) => c.tabIndex)).toEqual([-1, -1, 0])
+    expect(chips()[2]!.getAttribute('aria-checked')).toBe('true')
+    expect(document.activeElement).toBe(chips()[2])
+  })
 })
 
 describe('UniworkBrowser: folder actions (S3)', () => {
@@ -665,5 +690,38 @@ describe('UniworkBrowser: folder actions (S3)', () => {
     await key(input, 'Enter')
     expect(api.uniworkRenameDocument).toHaveBeenLastCalledWith('b', 'Gamma')
     expect($('.uwf-tree .uw-rename-input')).toBeNull()
+  })
+
+  it('updates the open folder picker when the workspace tree refreshes (R1-5)', async () => {
+    await render()
+    const row = $$('.uw-pick-item').find((el) => el.textContent?.includes('Report.docx'))!
+    await click(row.querySelector('[data-folder-menu-for]'))
+    await click($('[data-folder-action="move"]'))
+    const picker = $('.uwf-picker')!
+    const pickerTitles = () =>
+      Array.from(picker.querySelectorAll('.uwf-tree-title')).map((el) => el.textContent)
+    expect(pickerTitles()).toEqual(['UniWork', 'Alpha', 'Beta'])
+
+    tree = [...tree, folder('g', 'Gamma')]
+    await act(async () => api.pushTreeChanged({ workspaceId: 'w1' }))
+    await flush()
+    expect(pickerTitles()).toEqual(['UniWork', 'Alpha', 'Beta', 'Gamma'])
+  })
+
+  it('clicking the svg inside an open FolderMenu button closes the menu without reopening it (R1-13)', async () => {
+    await render()
+    const btn = $<HTMLButtonElement>('[data-folder-menu-for="a"]')!
+    await click(btn)
+    expect($('[role="menu"]')).toBeTruthy()
+    const svg = btn.querySelector('svg')!
+    await act(async () => {
+      svg.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+    })
+    await act(async () => {
+      svg.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))
+      svg.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    await flush()
+    expect($('[role="menu"]')).toBeNull()
   })
 })
