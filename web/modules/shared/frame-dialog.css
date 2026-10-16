@@ -287,8 +287,13 @@
   overflow-wrap: anywhere;
 }
 
-/* narrow frames: one column, each value under its row label */
+/* narrow frames: one column, each value under its row label; the card takes the full width
+ * minus the backdrop's 16 px margins (the 448 px cap is for wide frames) */
 @media (max-width: 767px) {
+  .ow-dlg {
+    max-width: none;
+  }
+
   .ow-dlg-compare,
   .ow-dlg-compare tbody,
   .ow-dlg-compare tr,
@@ -315,6 +320,17 @@
   .ow-dlg-compare tbody th {
     border-bottom: 0;
     padding-bottom: 0;
+  }
+}
+
+/* forced colors: the system palette replaces the opacity cue; a not-runnable choice reads as GrayText
+ * (text and border) whatever its tone, hover included */
+@media (forced-colors: active) {
+  .ow-dlg .ow-dlg-btn.ow-dlg-btn[aria-disabled='true'],
+  .ow-dlg .ow-dlg-btn.ow-dlg-btn[aria-disabled='true']:hover {
+    border-color: GrayText;
+    color: GrayText;
+    opacity: 1;
   }
 }
 
