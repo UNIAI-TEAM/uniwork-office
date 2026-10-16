@@ -69,7 +69,7 @@ import type { ModuleBridgePort } from '../../docs/bridge/module-bridge'
 import { idFromPath, pathFor } from '../../docs/bridge/webapi'
 import { bridgeDownloadCap, downloadVia, revisionOf } from '../shared/conflict-dialog'
 import { createRemoteVersion, type RemoteVersion } from '../shared/remote-version'
-import { bindLagDetectorPort, markDocumentLoaded } from '../shared/lag-detector'
+import { bindLagDetectorPort, documentMounted, queueDocumentLoaded } from '../shared/lag-detector'
 import { bridgeDraftRecovery } from '../shared/recovery-prompt'
 import { createSaveSizeGate } from '../shared/save-size-gate'
 import { ask, hideFatal, showFatal, text, type WebKey } from './dialogs'
@@ -496,7 +496,7 @@ export function createWebSlidesApi(
     port.setTitle(open.file.name)
     port.setDirty(!!draft)
     bindLagDetectorPort(port, state.effective)
-    markDocumentLoaded(open.file.fileId, bytes.byteLength)
+    queueDocumentLoaded(open.file.fileId, bytes.byteLength)
     // embedded faces registered while opening re-lay the text out with their real metrics
     return fontsRelaid ? openResultFor(session, fitWidthPx) : result
   }
@@ -929,6 +929,7 @@ export function createWebSlidesApi(
           return null
         }
       }
+
       // remount (renderer reload) with a live session: restore it, as the desktop does
       const session = sessions.get(WEB_CLIENT_ID)
       if (session) {
@@ -936,6 +937,10 @@ export function createWebSlidesApi(
         return openResultFor(session, fitWidthPx)
       }
       return null
+    },
+
+    noteDocumentMounted: () => {
+      documentMounted()
     },
     onOpened: (handler) => openedEvents.add(handler),
     onRenamed: (handler) => renamedEvents.add(handler),

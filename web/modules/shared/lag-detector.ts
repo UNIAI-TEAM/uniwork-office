@@ -97,7 +97,11 @@ export interface MarkDocumentLoadedCall {
 
 export interface LagDetector {
   markDocumentLoaded(documentId: string, bytes?: number): void
+  /**
+   * Follow the last serialized size (the save gate calls this from `checkBeforeSave`, §4.1.2:
    * `knownBytes` follows the last serialized save so `lag_detected.bytes` is never stale).
+   * Only updates while a document is the current one.
+   */
   bindPort(port: LagDetectorPort | null | undefined, capabilities?: Capabilities | null): void
   disconnect(): void
   readonly currentDocumentId: string | null
@@ -423,6 +427,11 @@ export function createLagDetector(options: LagDetectorOptions = {}): LagDetector
 
   return {
     markDocumentLoaded,
+      if (!currentDocId) return
+      if (typeof bytes === 'number' && Number.isFinite(bytes) && bytes >= 0) {
+        knownBytes = Math.round(bytes)
+      }
+    },
     bindPort,
     disconnect: stopObserver,
     get currentDocumentId() {
@@ -458,11 +467,11 @@ export function configureSharedLagDetector(options: LagDetectorOptions): LagDete
   sharedDetector = createLagDetector(sharedOptions)
   return sharedDetector
 }
-
 export function resetSharedLagDetector(): void {
   sharedDetector.disconnect()
   sharedOptions = {}
   sharedDetector = createLagDetector(sharedOptions)
+  pendingDocumentLoaded = null
 }
 
 export function onMarkDocumentLoaded(listener: (call: MarkDocumentLoadedCall) => void): () => void {
@@ -485,4 +494,24 @@ export function markDocumentLoaded(documentId: string, bytes?: number): void {
   }
   sharedDetector.markDocumentLoaded(documentId, bytes)
 }
+
+// d1-2: the bridge queues the opened document; the renderer calls
+// documentMounted() at its real mount/commit point so loadSettledAt (and the
+// 2 s grace) is measured from mount, not from the api.open result.
+let pendingDocumentLoaded: { documentId: string; bytes?: number } | null = null
+
+/** bridge open path: remember the document; the settle stamp waits for documentMounted() */
+export function queueDocumentLoaded(documentId: string, bytes?: number): void {
+  pendingDocumentLoaded = { documentId, ...(bytes !== undefined ? { bytes } : {}) }
+}
+
+/** renderer mount hook (the module api's `noteDocumentMounted`): commits the queued document */
+export function documentMounted(): void {
+  const pending = pendingDocumentLoaded
+  pendingDocumentLoaded = null
+  if (!pending) return
+  markDocumentLoaded(pending.documentId, pending.bytes)
+}
+
 /** `lag_detected.bytes` follows the last serialized save size (§4.1.2; called by the save gate) */
+}

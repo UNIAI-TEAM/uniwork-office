@@ -2223,7 +2223,9 @@ export function App() {
   const commitOpenedFile = useCallback(
     async (result: OpenDocxResult) => {
       if (!result) return
-      await loadFile(result)
+      const outcome = await loadFile(result)
+      // LAG-F1 (web frame): the document is mounted; the lag detector's settle stamp starts now
+      if (outcome === 'ok') window.desktop.noteDocumentMounted?.()
     },
     [loadFile],
   )
@@ -2270,6 +2272,7 @@ export function App() {
         // line explaining why (github.com/genspark-ai/genoffice issue #102).
         // 'password': the prompt is up; its cancel path lands on blank instead.
         const outcome = pending ? await loadFile(pending) : 'canceled'
+        if (outcome === 'ok') window.desktop.noteDocumentMounted?.()
         if (outcome === 'canceled') await resetFile()
         if (aiContent && !pending) {
           // fileCtxRef refreshes per render: wait until resetFile's setDoc landed

@@ -419,6 +419,10 @@ export interface DesktopApi {
   discardDocPasswordIntents(throughRevision: number): Promise<{ ok: boolean }>
   /** mark the renderer ready and consume a file passed by Finder/Explorer at launch */
   consumePendingOpenDocx(): Promise<OpenDocxResult>
+  /** Web frame only (UNI-1865): the renderer reports that the opened document finished
+   *  mounting, so the passive lag detector's settle stamp starts at first paint, not at the
+   *  api.open result. Absent on desktop. */
+  noteDocumentMounted?(): void
   /** returns true when this tab was created via "New Document" and should start blank */
   consumeNewBlankDoc(): Promise<boolean>
   /** AI-authored content queued for this tab by create_document; one-shot, null when none */

@@ -4794,6 +4794,8 @@ export function App({
         setMessage(t('appOpenFailed'))
         return
       }
+      // LAG-F1 (web frame): the workbook is mounted; the lag detector's settle stamp starts now
+      window.desktopApi.noteDocumentMounted?.()
       setEmptyCsvNotice(selected.emptyCsv === true)
       setMessage(selected.emptyCsv ? '' : t('appOpened', { name: selected.name }))
     } catch (error: unknown) {

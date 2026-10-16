@@ -993,6 +993,8 @@ export function App() {
             })
           : t('appStatusNewBlank'),
       )
+      // LAG-F1 (web frame): a real deck is mounted; the lag detector's settle stamp starts now
+      if (result.path) window.slidesApi.noteDocumentMounted?.()
       // Fetch the layout list asynchronously (doesn't block opening)
       void window.slidesApi.getLayouts().then((r) => setLayoutsResult(r))
     },

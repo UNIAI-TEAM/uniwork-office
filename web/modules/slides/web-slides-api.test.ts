@@ -148,6 +148,7 @@ describe('slidesApi contract', () => {
     expect(keys.filter((k) => !(k in api))).toEqual([])
     // the web-only optional members (SlidesApi: the desktop never sets them)
     expect(Object.keys(api).filter((k) => !keys.includes(k))).toEqual([
+      'noteDocumentMounted',
       'openInDesktopApp',
       'presenterOpenAudience',
       'presenterCloseAudience',

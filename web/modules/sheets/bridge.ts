@@ -62,7 +62,7 @@ import type { ModuleBridgePort } from '../../docs/bridge/module-bridge'
 import { decodeDataUrl, idFromPath, pathFor } from '../../docs/bridge/webapi'
 import type { DraftHost, DraftRecovery } from '../../docs/bridge/draft-recovery'
 import { bridgeDraftRecovery } from '../shared/recovery-prompt'
-import { bindLagDetectorPort, markDocumentLoaded } from '../shared/lag-detector'
+import { bindLagDetectorPort, documentMounted, queueDocumentLoaded } from '../shared/lag-detector'
 import { createRemoteVersion, type RemoteVersion, type SaveFailure } from '../shared/remote-version'
 import { saveFailureDetail } from '../shared/save-failure'
 import { createSaveSizeGate } from '../shared/save-size-gate'
@@ -392,7 +392,7 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
     port.setDirty(dirty)
     remote?.dirtyChanged(dirty)
     bindLagDetectorPort(port, effective)
-    markDocumentLoaded(payload.file.fileId, data.byteLength)
+    queueDocumentLoaded(payload.file.fileId, data.byteLength)
     return decorate(opened, payload.file, restored)
   }
 
@@ -798,6 +798,9 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
       }
     },
 
+    noteDocumentMounted(): void {
+      documentMounted()
+    },
     // merge sources need multi-pick + extra sessions: hidden on the web (C11, mergeWorkbooks); the
     // AI's merge tool (chat attachments) is not offered either (renderer ai/skill-gate.ts)
     selectWorkbooksForMerge: async () => null,

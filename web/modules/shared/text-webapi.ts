@@ -64,7 +64,7 @@ import {
 import { hideFatal, showFatal, text } from './notice'
 import { printHtmlDocument } from './print'
 import { bridgeDraftRecovery } from './recovery-prompt'
-import { bindLagDetectorPort, markDocumentLoaded } from './lag-detector'
+import { bindLagDetectorPort, documentMounted, queueDocumentLoaded } from './lag-detector'
 import {
   captureScroll,
   restoreScroll,
@@ -319,7 +319,7 @@ export function createTextWebApi(
     texts.set(path, decoded.text)
     port.setTitle(open.file.name)
     bindLagDetectorPort(port, { desktopOpen: desktopOpenGranted })
-    markDocumentLoaded(open.file.fileId, raw.byteLength)
+    queueDocumentLoaded(open.file.fileId, raw.byteLength)
     return path
   }
 
@@ -784,6 +784,10 @@ export function createTextWebApi(
         scrollBack = null
       }
       return path
+    },
+
+    noteDocumentMounted(): void {
+      documentMounted()
     },
 
     /**

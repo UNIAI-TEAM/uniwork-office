@@ -85,7 +85,11 @@ import {
 import { createSession, type SessionOptions } from './session'
 import type { DraftHost, DraftRecovery } from './draft-recovery'
 import { bridgeDraftRecovery } from '../../modules/shared/recovery-prompt'
-import { bindLagDetectorPort, markDocumentLoaded } from '../../modules/shared/lag-detector'
+import {
+  bindLagDetectorPort,
+  documentMounted,
+  queueDocumentLoaded,
+} from '../../modules/shared/lag-detector'
 import { saveFailureText } from '../../modules/shared/save-failure'
 import { createRemoteVersion, type RemoteVersion } from '../../modules/shared/remote-version'
 import { createSaveSizeGate } from '../../modules/shared/save-size-gate'
@@ -269,7 +273,7 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
     sizeGate.noteDocumentOpened(open.file.fileId, open.limits)
     remember(open.file)
     bindLagDetectorPort(port, grants)
-    markDocumentLoaded(open.file.fileId, data.byteLength)
+    queueDocumentLoaded(open.file.fileId, data.byteLength)
     return {
       path: pathFor(open.file),
       name: open.file.name,
@@ -666,6 +670,10 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       const pending = pendingOpen
       pendingOpen = null
       return pending ? await pending : null
+    },
+
+    noteDocumentMounted(): void {
+      documentMounted()
     },
 
     onOpenDocx(handler: OpenHandler): () => void {
