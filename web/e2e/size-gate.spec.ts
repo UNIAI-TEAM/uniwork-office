@@ -204,7 +204,10 @@ for (const { module, open } of MODULE_CASES) {
   test(`${module}: size-blocked save shows only the fallback dialog without sizeUi and shows nothing in-frame with sizeUi=1 (SIZE-v1-1)`, async ({
     page,
   }) => {
-    test.skip(!built(module), `no dist-web/${module} build: npm run build:web -- --module ${module}`)
+    test.skip(
+      !built(module),
+      `no dist-web/${module} build: npm run build:web -- --module ${module}`,
+    )
 
     // 1. sizeUi absent: only the fallback dialog (and its single live announcement), no .app-toast or status-bar error
     const frameFallback = await openModule(page, module, {
@@ -296,4 +299,3 @@ for (const { module, open } of MODULE_CASES) {
     }
   })
 }
-
