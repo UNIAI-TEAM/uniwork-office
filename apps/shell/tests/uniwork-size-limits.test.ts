@@ -1190,6 +1190,29 @@ describe('SIZE-F1 desktop document size limits', () => {
       expect(h.stored.get(DOC_ID)?.intent.intentId).toBe('new_gen_3')
       expect(h.stored.get(DOC_ID)?.intent.generation).toBe(3)
     })
+
+    it('does not publish sizeWarn or consume the warn latch when a paused warn-band save refuses the binding write (d2-1)', async () => {
+      const h = harness(OVER)
+      const warnPayloads = (): Array<{ sizeBytes: number; maxBytes: number } | undefined> =>
+        h.statuses.filter((push) => push.sizeWarn).map((push) => push.sizeWarn)
+
+      // 1. Paused warn-band save (forceOffline -> state = paused_offline) where store.write is refused
+      //    inside commitState/writeBinding: must clear activeSizeWarns before publishing doc
+      const warnBytes1 = new Uint8Array(940).fill(70)
+      writeFileSync(h.docPath, warnBytes1)
+      h.setAllowStoreWrite(false)
+      await h.coordinator.save(h.docPath, { forceOffline: true })
+      expect(warnPayloads()).toHaveLength(0)
+
+      // 2. Later permitted warn-band save emits sizeWarn (latch was not consumed by the refused write)
+      h.stored.delete(DOC_ID)
+      h.setAllowStoreWrite(true)
+      const warnBytes2 = new Uint8Array(955).fill(71)
+      writeFileSync(h.docPath, warnBytes2)
+      const saved = await h.coordinator.save(h.docPath)
+      expect(saved!.binding.state).toBe('saved')
+      expect(warnPayloads()).toContainEqual({ sizeBytes: 955, maxBytes: 1000 })
+    })
   })
 
   describe('4. the 413 and the too_large reason', () => {
