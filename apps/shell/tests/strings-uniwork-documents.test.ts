@@ -3,6 +3,7 @@ import { LANGS } from '@genoffice/i18n'
 import { uniworkDocumentStrings } from '../src/renderer/src/i18n/strings-uniwork-documents'
 import { accountStrings } from '../src/renderer/src/i18n/strings-account'
 import { syncStrings } from '../src/renderer/src/i18n/strings-sync'
+import { uniworkFolderStrings } from '../src/renderer/src/i18n/strings-uniwork-folders'
 import { strings } from '../src/renderer/src/strings'
 import { UNIWORK_ERROR_KEYS, UNIWORK_STATE_KEYS } from '../src/renderer/src/uniwork-docs-model'
 
@@ -82,10 +83,18 @@ describe('uniwork documents string shards', () => {
         'organization_suspended',
         'drafts_full',
         'other_window',
+        // FD-11 folder tree refusals
+        'document_too_deep',
+        'document_cycle',
+        'document_parent_kind',
       ].sort(),
     )
-    // the G5-04 / G5-06 refusals reuse the sync shard's sentences
-    const sentenceKeys = [...referenceKeys, ...Object.keys(syncStrings.zh)]
+    // the G5-04 / G5-06 refusals reuse the sync shard's sentences, FD-11's the folders shard's
+    const sentenceKeys = [
+      ...referenceKeys,
+      ...Object.keys(syncStrings.zh),
+      ...Object.keys(uniworkFolderStrings.zh),
+    ]
     for (const key of Object.values(UNIWORK_ERROR_KEYS)) expect(sentenceKeys).toContain(key)
   })
 

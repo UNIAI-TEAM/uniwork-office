@@ -46,6 +46,10 @@ export const UNIWORK_ERROR_KEYS: Record<UniworkDocErrorCode, StringKey> = {
   timeout: 'uwErrTimeout',
   server_error: 'uwErrServerError',
   malformed_response: 'uwErrMalformedResponse',
+  // FD-11 folder tree refusals (the {max} of ufTooDeep is filled by the caller)
+  document_too_deep: 'ufTooDeep',
+  document_cycle: 'ufCycle',
+  document_parent_kind: 'ufParentKind',
   // refusals before anything is queued: the keychain is locked, or the account's store is full
   keystore_locked: 'uwReasonKeystore',
   store_full: 'uwQueueFull',
@@ -1078,12 +1082,16 @@ export function hasRowActions(doc: LibraryDocRow): boolean {
   return a.rename || a.archive || a.restore
 }
 
-/** errors a name field shows in place; every other failure is a toast */
-export type DocNameError = 'name_empty' | 'name_too_long'
+/**
+ * errors a name field shows in place; every other failure is a toast.
+ * `folder_name_taken` (FD-11): only folders collide among their siblings.
+ */
+export type DocNameError = 'name_empty' | 'name_too_long' | 'folder_name_taken'
 
 export const DOC_NAME_ERROR_KEYS: Record<DocNameError, StringKey> = {
   name_empty: 'uwDocNameEmpty',
   name_too_long: 'uwDocNameTooLong',
+  folder_name_taken: 'ufNameTaken',
 }
 
 /** the longest name the server accepts, in runes (code points); a duplicate name is allowed */
@@ -1097,7 +1105,7 @@ export function isDocTitleTooLong(title: string): boolean {
 /** the trimmed name, or the empty / too-long error before any call goes out */
 export function checkDocName(
   raw: string,
-): { ok: true; name: string } | { ok: false; error: DocNameError } {
+): { ok: true; name: string } | { ok: false; error: 'name_empty' | 'name_too_long' } {
   const name = raw.trim()
   if (!name) return { ok: false, error: 'name_empty' }
   if (isDocTitleTooLong(name)) return { ok: false, error: 'name_too_long' }
@@ -1105,7 +1113,7 @@ export function checkDocName(
 }
 
 export function isDocNameError(error: string): error is DocNameError {
-  return error === 'name_empty' || error === 'name_too_long'
+  return error === 'name_empty' || error === 'name_too_long' || error === 'folder_name_taken'
 }
 
 /**
