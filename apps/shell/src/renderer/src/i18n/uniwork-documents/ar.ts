@@ -148,6 +148,7 @@ export const ar = {
   uwDocLocationTop: 'المستوى الأعلى',
   uwDocArchived: 'مؤرشف',
   uwSizeWarnChip: 'يقترب من الحد الأقصى {max} (حالياً {size}).',
+  uwSizeWarnDismiss: 'إغلاق تحذير الحجم',
   uwSaveBlockTitle: 'تعذّر الحفظ في UniWork',
   uwSaveBlockBody:
     'يتجاوز هذا المستند {max}. لا تزال تغييراتك موجودة هنا. نزّل نسختك إلى الكمبيوتر ثم قلّل حجم الصور أو قسّم المستند.',

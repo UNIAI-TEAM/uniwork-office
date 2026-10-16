@@ -150,6 +150,7 @@ export const hi = {
   uwDocLocationTop: 'सबसे ऊपर का स्तर',
   uwDocArchived: 'संग्रहित',
   uwSizeWarnChip: '{max} सीमा के करीब (अभी {size})।',
+  uwSizeWarnDismiss: 'आकार चेतावनी बंद करें',
   uwSaveBlockTitle: 'UniWork में सहेजा नहीं जा सका',
   uwSaveBlockBody:
     'यह दस्तावेज़ {max} से अधिक है। आपके बदलाव अभी भी यहीं हैं। अपनी प्रति कंप्यूटर पर डाउनलोड करें, फिर छवियों का आकार घटाएँ या दस्तावेज़ को विभाजित करें।',

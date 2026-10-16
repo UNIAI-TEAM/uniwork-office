@@ -148,6 +148,7 @@ export const zhTW = {
   uwDocLocationTop: '最上層',
   uwDocArchived: '已封存',
   uwSizeWarnChip: '即將達到 {max} 上限（目前 {size}）。',
+  uwSizeWarnDismiss: '關閉大小警告',
   uwSaveBlockTitle: '無法儲存到 UniWork',
   uwSaveBlockBody:
     '此文件已超過 {max}。你的變更仍保留在這裡。請先將副本下載到電腦，然後壓縮圖片或拆分文件。',

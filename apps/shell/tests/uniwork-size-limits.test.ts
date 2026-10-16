@@ -9,7 +9,7 @@
 import { chmodSync, mkdtempSync, readFileSync, rmSync, truncateSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { act, createElement, type ReactElement } from 'react'
+import { Fragment, act, createElement, type ReactElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Lang } from '@genoffice/i18n'
@@ -58,6 +58,8 @@ import { failedReasonKey, rowView } from '../src/renderer/src/sync-center-model'
 import { UploadDocDialog } from '../src/renderer/src/UniworkDocActions'
 import { SyncCenterPane } from '../src/renderer/src/SyncCenterPane'
 import { UniworkStatusChip } from '../src/renderer/src/UniworkChrome'
+import { LIVE_HOST_ID, UniworkLiveHost, resetLiveForTests } from '../src/renderer/src/uniwork-live'
+import { setTopInsetPart } from '../src/renderer/src/uniwork-top-inset'
 import { LocaleProvider, type StringKey } from '../src/renderer/src/locale'
 import { vi as viDocs } from '../src/renderer/src/i18n/uniwork-documents/vi'
 import { en as enDocs } from '../src/renderer/src/i18n/uniwork-documents/en'
@@ -456,13 +458,24 @@ describe('SIZE-F1 desktop document size limits', () => {
         sizeBytes: 1001,
         maxBytes: 1000,
       })
-      // the published status asks the shell for the save-block dialog
+      // the published status asks the shell for the save-block dialog with a monotonic sequence id
       expect(h.statuses.at(-1)).toMatchObject({
         state: 'failed',
         error: 'too_large',
         sizeBytes: 1001,
         maxBytes: 1000,
         saveTooLargePrompt: true,
+        saveTooLargePromptSeq: 1,
+      })
+      // a second over-cap save increments saveTooLargePromptSeq so the renderer can distinguish it
+      await h.coordinator.save(h.docPath)
+      expect(h.statuses.at(-1)).toMatchObject({
+        state: 'failed',
+        error: 'too_large',
+        sizeBytes: 1001,
+        maxBytes: 1000,
+        saveTooLargePrompt: true,
+        saveTooLargePromptSeq: 2,
       })
       // the local working copy keeps the user's bytes
       expect(readFileSync(h.docPath).byteLength).toBe(1001)
@@ -655,6 +668,10 @@ describe('SIZE-F1 desktop document size limits', () => {
     afterEach(() => {
       act(() => root.unmount())
       container.remove()
+      resetLiveForTests()
+      setTopInsetPart('bar', 0)
+      setTopInsetPart('popover', 0)
+      setTopInsetPart('saveBlock', 0)
       vi.unstubAllGlobals()
     })
 
@@ -770,6 +787,296 @@ describe('SIZE-F1 desktop document size limits', () => {
       expect(saveLocal).toHaveBeenCalledWith('/tmp/Report.docx')
     })
 
+    it('reserves top-inset band height above the editor WebContentsView while the save-block dialog is open and releases it on close (d2-1)', async () => {
+      const setBarInset = vi.fn(async () => undefined)
+      window.aiOffice = {
+        accountStatus: async () => ({ loggedIn: true, state: 'signed-in' }),
+        onAccountStatus: () => () => undefined,
+        onUniworkQueuePopover: () => () => undefined,
+        uniworkSaveLocalCopy: async () => true,
+        uniworkSetBarInset: setBarInset,
+      } as never
+      const rectSpy = vi
+        .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+        .mockImplementation(function (this: HTMLElement) {
+          const height = this.hasAttribute('data-uw-save-block-band') ? 164 : 0
+          return {
+            x: 0,
+            y: 0,
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: height,
+            width: 0,
+            height,
+          } as DOMRect
+        })
+      try {
+        setTopInsetPart('bar', 36)
+        expect(setBarInset).toHaveBeenLastCalledWith(36)
+
+        const base: UniworkDocStatus = {
+          path: '/tmp/Report.docx',
+          documentId: DOC_ID,
+          workspaceId: WS_ID,
+          title: 'Report.docx',
+          format: 'docx',
+          access: 'edit',
+          state: 'failed',
+          error: 'too_large',
+          sizeBytes: 220_000_000,
+          maxBytes: 209_715_200,
+          saveTooLargePrompt: true,
+        }
+        await render(createElement(UniworkStatusChip, { status: base, onStatus: () => undefined }))
+
+        const band = container.querySelector<HTMLElement>('[data-uw-save-block-band]')
+        const modal = container.querySelector<HTMLElement>('.uw-save-block-modal')
+        expect(band).not.toBeNull()
+        expect(band?.contains(modal)).toBe(true)
+        expect(band?.style.top).toContain('36px')
+        expect(band?.style.getPropertyValue('--uw-save-block-room')).toBe('364px')
+        expect(setBarInset).toHaveBeenLastCalledWith(36 + 164)
+
+        await act(async () => {
+          buttonWith('Đóng').click()
+        })
+        expect(container.querySelector('[data-uw-save-block-band]')).toBeNull()
+        expect(setBarInset).toHaveBeenLastCalledWith(36)
+      } finally {
+        rectSpy.mockRestore()
+      }
+    })
+
+    it('latches the save-block dialog across non-prompt statuses, does not re-open on the same prompt after Close, re-opens on a new over-cap save, and closes on local copy / document switch / saved state (d2-2)', async () => {
+      const saveLocal = vi.fn(async () => true)
+      window.aiOffice = {
+        accountStatus: async () => ({ loggedIn: true, state: 'signed-in' }),
+        onAccountStatus: () => () => undefined,
+        onUniworkQueuePopover: () => () => undefined,
+        uniworkSaveLocalCopy: saveLocal,
+      } as never
+
+      const base: UniworkDocStatus = {
+        path: '/tmp/Report.docx',
+        documentId: DOC_ID,
+        workspaceId: WS_ID,
+        title: 'Report.docx',
+        format: 'docx',
+        access: 'edit',
+        state: 'failed',
+        error: 'too_large',
+        sizeBytes: 220_000_000,
+        maxBytes: 209_715_200,
+      }
+
+      // 1. Prompt arrives (seq 1): dialog latches open
+      const prompt1: UniworkDocStatus = {
+        ...base,
+        saveTooLargePrompt: true,
+        saveTooLargePromptSeq: 1,
+      }
+      await render(createElement(UniworkStatusChip, { status: prompt1, onStatus: () => undefined }))
+      expect(container.querySelector('.uw-save-block-modal')).not.toBeNull()
+
+      // 2. Subsequent status without saveTooLargePrompt (e.g. edit/queue/account refresh): stays open
+      await render(
+        createElement(UniworkStatusChip, {
+          status: { ...base, saveTooLargePrompt: undefined },
+          onStatus: () => undefined,
+        }),
+      )
+      expect(container.querySelector('.uw-save-block-modal')).not.toBeNull()
+
+      // 3. Close dismisses the dialog; neither a status without prompt nor re-applying the same prompt (seq 1) re-opens it
+      await act(async () => {
+        buttonWith('Đóng').click()
+      })
+      expect(container.querySelector('.uw-save-block-modal')).toBeNull()
+
+      await render(
+        createElement(UniworkStatusChip, {
+          status: { ...base, saveTooLargePrompt: undefined },
+          onStatus: () => undefined,
+        }),
+      )
+      expect(container.querySelector('.uw-save-block-modal')).toBeNull()
+
+      await render(
+        createElement(UniworkStatusChip, {
+          status: { ...prompt1 },
+          onStatus: () => undefined,
+        }),
+      )
+      expect(container.querySelector('.uw-save-block-modal')).toBeNull()
+
+      // 4. A NEW over-cap save after Close (seq 2) opens the dialog again
+      const prompt2: UniworkDocStatus = {
+        ...base,
+        saveTooLargePrompt: true,
+        saveTooLargePromptSeq: 2,
+      }
+      await render(createElement(UniworkStatusChip, { status: prompt2, onStatus: () => undefined }))
+      expect(container.querySelector('.uw-save-block-modal')).not.toBeNull()
+
+      // 5. A successful local copy closes the latched dialog
+      await act(async () => {
+        buttonWith('Lưu bản sao về máy').click()
+      })
+      expect(container.querySelector('.uw-save-block-modal')).toBeNull()
+
+      // 6. Another new prompt (seq 3) opens, then a later `saved` state closes it
+      await render(
+        createElement(UniworkStatusChip, {
+          status: { ...base, saveTooLargePrompt: true, saveTooLargePromptSeq: 3 },
+          onStatus: () => undefined,
+        }),
+      )
+      expect(container.querySelector('.uw-save-block-modal')).not.toBeNull()
+      await render(
+        createElement(UniworkStatusChip, {
+          status: { ...base, state: 'saved', error: undefined },
+          onStatus: () => undefined,
+        }),
+      )
+      expect(container.querySelector('.uw-save-block-modal')).toBeNull()
+
+      // 7. Another new prompt (seq 4) opens, then a document switch closes it
+      await render(
+        createElement(UniworkStatusChip, {
+          status: { ...base, saveTooLargePrompt: true, saveTooLargePromptSeq: 4 },
+          onStatus: () => undefined,
+        }),
+      )
+      expect(container.querySelector('.uw-save-block-modal')).not.toBeNull()
+      await render(
+        createElement(UniworkStatusChip, {
+          status: { ...base, path: '/tmp/Other.docx', documentId: 'doc_other', state: 'saved' },
+          onStatus: () => undefined,
+        }),
+      )
+      expect(container.querySelector('.uw-save-block-modal')).toBeNull()
+    })
+
+    it('focuses the primary "Lưu bản sao về máy" button on open and returns focus to the editor on close (d2-10)', async () => {
+      const saveLocal = vi.fn(async () => true)
+      const focusActive = vi.fn()
+      window.aiOffice = {
+        accountStatus: async () => ({ loggedIn: true, state: 'signed-in' }),
+        onAccountStatus: () => () => undefined,
+        onUniworkQueuePopover: () => () => undefined,
+        uniworkSaveLocalCopy: saveLocal,
+      } as never
+      window.aiOfficeTabs = { focusActive } as never
+
+      const base: UniworkDocStatus = {
+        path: '/tmp/Report.docx',
+        documentId: DOC_ID,
+        workspaceId: WS_ID,
+        title: 'Report.docx',
+        format: 'docx',
+        access: 'edit',
+        state: 'failed',
+        error: 'too_large',
+        sizeBytes: 220_000_000,
+        maxBytes: 209_715_200,
+      }
+
+      // 1. Open dialog (seq 1): initial focus lands on primary "Lưu bản sao về máy", not "Đóng"
+      await render(
+        createElement(UniworkStatusChip, {
+          status: { ...base, saveTooLargePrompt: true, saveTooLargePromptSeq: 1 },
+          onStatus: () => undefined,
+        }),
+      )
+      const primary = buttonWith('Lưu bản sao về máy')
+      expect(document.activeElement).toBe(primary)
+
+      // 2. Close via "Đóng" returns focus to the editor via window.aiOfficeTabs.focusActive()
+      await act(async () => {
+        buttonWith('Đóng').click()
+      })
+      expect(focusActive).toHaveBeenCalledTimes(1)
+
+      // 3. Re-open on a new prompt (seq 2) and close via Escape: also returns focus to the editor
+      await render(
+        createElement(UniworkStatusChip, {
+          status: { ...base, saveTooLargePrompt: true, saveTooLargePromptSeq: 2 },
+          onStatus: () => undefined,
+        }),
+      )
+      expect(document.activeElement).toBe(buttonWith('Lưu bản sao về máy'))
+      await act(async () => {
+        container
+          .querySelector('.uw-save-block-modal')!
+          .dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+      })
+      expect(focusActive).toHaveBeenCalledTimes(2)
+
+      // 4. Re-open on a new prompt (seq 3) and save a local copy: also returns focus to the editor
+      await render(
+        createElement(UniworkStatusChip, {
+          status: { ...base, saveTooLargePrompt: true, saveTooLargePromptSeq: 3 },
+          onStatus: () => undefined,
+        }),
+      )
+      await act(async () => {
+        buttonWith('Lưu bản sao về máy').click()
+      })
+      expect(saveLocal).toHaveBeenCalledTimes(1)
+      expect(focusActive).toHaveBeenCalledTimes(3)
+    })
+
+    it('gives the size-warn chip dismiss button a distinct aria-label and announces the warning via the live host (d2-11)', async () => {
+      window.aiOffice = {
+        accountStatus: async () => ({ loggedIn: true, state: 'signed-in' }),
+        onAccountStatus: () => () => undefined,
+        onUniworkQueuePopover: () => () => undefined,
+      } as never
+
+      const warn = { sizeBytes: 185 * MB_BYTES + MB_BYTES / 2, maxBytes: 209_715_200 }
+      const base: UniworkDocStatus = {
+        path: '/tmp/Report.docx',
+        documentId: DOC_ID,
+        workspaceId: WS_ID,
+        title: 'Report.docx',
+        format: 'docx',
+        access: 'edit',
+        state: 'saved',
+      }
+
+      await render(
+        createElement(
+          Fragment,
+          null,
+          createElement(UniworkLiveHost),
+          createElement(UniworkStatusChip, {
+            status: { ...base, sizeWarn: warn },
+            onStatus: () => undefined,
+          }),
+        ),
+      )
+
+      const warnChip = container.querySelector('.uw-size-warn')
+      expect(warnChip).not.toBeNull()
+      // No mount-time role="status" on the newly inserted chip node
+      expect(warnChip?.querySelector('[role="status"]')).toBeNull()
+
+      // Dismiss button has a distinct aria-label naming what is being closed
+      const closeBtn = warnChip?.querySelector<HTMLButtonElement>('.uw-pill-close')
+      expect(closeBtn?.getAttribute('aria-label')).toBe(viDocs.uwSizeWarnDismiss)
+      expect(closeBtn?.getAttribute('aria-label')).not.toBe(viDocs.uwClose)
+
+      // Announced through the persistent #uw-live-host [role="status"] live region
+      const livePolite = document.querySelector(`#${LIVE_HOST_ID} [role="status"]`)
+      expect(livePolite?.textContent).toBe('Sắp chạm giới hạn 200 MB (đang 185,5 MB).')
+
+      await act(async () => {
+        closeBtn?.click()
+      })
+      expect(container.querySelector('.uw-size-warn')).toBeNull()
+    })
+
     it('renders the Sync Center failed row with and without a limit', async () => {
       const snapshot: SyncCenterSnapshot = {
         header: {
@@ -847,6 +1154,7 @@ describe('SIZE-F1 desktop document size limits', () => {
     it('has the whole SIZE-F1 key set in zh/vi/en, with no internal code in the copy', () => {
       const keys = [
         'uwSizeWarnChip',
+        'uwSizeWarnDismiss',
         'uwSaveBlockTitle',
         'uwSaveBlockBody',
         'uwSaveBlockSaveCopyLocal',

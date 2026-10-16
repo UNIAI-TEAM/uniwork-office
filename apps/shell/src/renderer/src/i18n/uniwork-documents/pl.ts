@@ -152,6 +152,7 @@ export const pl = {
   uwDocLocationTop: 'Najwyższy poziom',
   uwDocArchived: 'Zarchiwizowany',
   uwSizeWarnChip: 'Zbliża się do limitu {max} (obecnie {size}).',
+  uwSizeWarnDismiss: 'Zamknij ostrzeżenie o rozmiarze',
   uwSaveBlockTitle: 'Nie udało się zapisać w UniWork',
   uwSaveBlockBody:
     'Ten dokument przekracza {max}. Twoje zmiany nadal tu są. Pobierz kopię na komputer, a następnie zmniejsz rozmiar obrazów lub podziel dokument.',

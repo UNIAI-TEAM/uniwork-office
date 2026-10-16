@@ -152,6 +152,7 @@ export const th = {
   uwDocLocationTop: 'ระดับบนสุด',
   uwDocArchived: 'เก็บถาวรแล้ว',
   uwSizeWarnChip: 'ใกล้ถึงขีดจำกัด {max} (ปัจจุบัน {size})',
+  uwSizeWarnDismiss: 'ปิดคำเตือนขนาดไฟล์',
   uwSaveBlockTitle: 'ไม่สามารถบันทึกลงใน UniWork ได้',
   uwSaveBlockBody:
     'เอกสารนี้เกิน {max} การเปลี่ยนแปลงของคุณยังคงอยู่ที่นี่ ดาวน์โหลดสำเนาของคุณลงในคอมพิวเตอร์ แล้วลดขนาดรูปภาพหรือแบ่งเอกสาร',

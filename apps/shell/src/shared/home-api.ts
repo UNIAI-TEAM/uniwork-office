@@ -401,6 +401,8 @@ export interface UniworkDocStatus {
   sizeWarn?: { sizeBytes: number; maxBytes: number }
   /** True when a save just exceeded `max_bytes` and the over-cap save dialog should be offered. */
   saveTooLargePrompt?: boolean
+  /** Monotonic sequence id for `saveTooLargePrompt` so the renderer latches once per over-cap save. */
+  saveTooLargePromptSeq?: number
   /** an unsent N+1 exists behind the pending intent (G5-06) */
   pendingNext?: boolean
   lastSavedAt?: string

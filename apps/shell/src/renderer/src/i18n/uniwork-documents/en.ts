@@ -150,6 +150,7 @@ export const en = {
   uwDocLocationTop: 'Top level',
   uwDocArchived: 'Archived',
   uwSizeWarnChip: 'Approaching the {max} limit (currently {size}).',
+  uwSizeWarnDismiss: 'Dismiss size warning',
   uwSaveBlockTitle: 'Couldn’t save to UniWork',
   uwSaveBlockBody:
     'This document is over {max}. Your changes are still here. Download your copy to your computer, then reduce image sizes or split the document.',

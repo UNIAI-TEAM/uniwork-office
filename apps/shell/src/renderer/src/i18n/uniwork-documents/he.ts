@@ -148,6 +148,7 @@ export const he = {
   uwDocLocationTop: 'הרמה העליונה',
   uwDocArchived: 'בארכיון',
   uwSizeWarnChip: 'מתקרב למגבלת {max} (כעת {size}).',
+  uwSizeWarnDismiss: 'סגירת התראת גודל',
   uwSaveBlockTitle: 'לא ניתן היה לשמור ב-UniWork',
   uwSaveBlockBody:
     'מסמך זה חורג מ-{max}. השינויים שלך עדיין כאן. הורד את העותק למחשב ולאחר מכן הקטן את גודל התמונות או פצל את המסמך.',

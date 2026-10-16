@@ -155,6 +155,7 @@ export const nl = {
   uwDocLocationTop: 'Hoogste niveau',
   uwDocArchived: 'Gearchiveerd',
   uwSizeWarnChip: 'Nadert de limiet van {max} (momenteel {size}).',
+  uwSizeWarnDismiss: 'Groottewaarschuwing sluiten',
   uwSaveBlockTitle: 'Kon niet opslaan in UniWork',
   uwSaveBlockBody:
     'Dit document overschrijdt {max}. Je wijzigingen staan nog hier. Download je kopie naar je computer en verklein vervolgens de afbeeldingen of splits het document.',

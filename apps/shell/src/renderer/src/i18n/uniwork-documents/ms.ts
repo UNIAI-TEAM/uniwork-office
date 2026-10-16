@@ -152,6 +152,7 @@ export const ms = {
   uwDocLocationTop: 'Peringkat teratas',
   uwDocArchived: 'Diarkibkan',
   uwSizeWarnChip: 'Menghampiri had {max} (kini {size}).',
+  uwSizeWarnDismiss: 'Tutup amaran saiz',
   uwSaveBlockTitle: 'Tidak dapat menyimpan ke UniWork',
   uwSaveBlockBody:
     'Dokumen ini melebihi {max}. Perubahan anda masih ada di sini. Muat turun salinan anda ke komputer, kemudian kecilkan saiz imej atau bahagikan dokumen.',

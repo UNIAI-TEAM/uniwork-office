@@ -147,6 +147,7 @@ export const zh = {
   uwDocLocationTop: '顶层',
   uwDocArchived: '已归档',
   uwSizeWarnChip: '即将达到 {max} 上限（当前 {size}）。',
+  uwSizeWarnDismiss: '关闭大小警告',
   uwSaveBlockTitle: '无法保存到 UniWork',
   uwSaveBlockBody:
     '此文档已超过 {max}。你的更改仍保留在这里。请先将副本下载到电脑，然后压缩图片或拆分文档。',

@@ -66,6 +66,7 @@ export function ActionModal({
   className,
   onCancel,
   initialFocus,
+  restoreFocus = true,
   children,
 }: {
   labelledBy: string
@@ -74,6 +75,7 @@ export function ActionModal({
   className?: string
   onCancel: () => void
   initialFocus?: string
+  restoreFocus?: boolean
   children: ReactNode
 }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -85,6 +87,7 @@ export function ActionModal({
       ref.current?.querySelector<HTMLElement>(FOCUSABLE)
     first?.focus()
     return () => {
+      if (!restoreFocus) return
       // the opener may have been re-rendered away: then the library keeps focus
       if (opener?.isConnected) opener.focus()
     }

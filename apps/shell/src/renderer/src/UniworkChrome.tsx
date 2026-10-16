@@ -63,7 +63,13 @@ import {
   type PillWidths,
   type ToggleWidths,
 } from './uniwork-pill-fit'
-import { setTopInsetPart, uiScaleOf } from './uniwork-top-inset'
+import {
+  popoverRoomOf,
+  setTopInsetPart,
+  uiScaleOf,
+  unscaledHeightOf,
+  useTopInsetPart,
+} from './uniwork-top-inset'
 import type { SyncCenterRow } from '../../shared/sync-center'
 
 /**
@@ -488,16 +494,72 @@ ${action ? t(action.labelKey) : ''}`,
     shortLabel !== label,
   )
   const [warnDismissedFor, setWarnDismissedFor] = useState<string | null>(null)
-  const [blockDismissed, setBlockDismissed] = useState(false)
+  const [, setBlockTick] = useState(0)
+  const blockLatchRef = useRef<{
+    path: string
+    open: boolean
+    lastToken: string | null
+    wasPrompting: boolean
+    maxBytes?: number
+  }>({
+    path: '',
+    open: false,
+    lastToken: null,
+    wasPrompting: false,
+  })
   const [savingLocal, setSavingLocal] = useState(false)
   const blockTitleId = useId()
   const blockBodyId = useId()
 
-  // a new status carrying the prompt re-opens the dialog: the dismissal is per
-  // prompt, so a second over-cap save of the same document is shown again
-  useEffect(() => {
-    if (status.saveTooLargePrompt) setBlockDismissed(false)
-  }, [status])
+  // Latch the save-block dialog in the renderer (SIZE-fe-d2-2): open on the
+  // rising edge of a new prompt (keyed by monotonic saveTooLargePromptSeq, or
+  // size/rising-edge when seq is absent), keep open across status publishes
+  // that omit the one-shot flag, and close only on Close, a successful local
+  // copy, a document switch, or a later `saved` state.
+  const currentPath = pathKey(status.path)
+  const hasPrompt = Boolean(status.saveTooLargePrompt)
+  const hasExplicitSeq = typeof status.saveTooLargePromptSeq === 'number'
+  const promptToken = hasPrompt
+    ? `${currentPath}#${
+        hasExplicitSeq
+          ? `seq:${status.saveTooLargePromptSeq}`
+          : `size:${status.sizeBytes ?? 0}:${status.maxBytes ?? 0}`
+      }`
+    : null
+  if (blockLatchRef.current.path !== currentPath) {
+    blockLatchRef.current = {
+      path: currentPath,
+      open: false,
+      lastToken: null,
+      wasPrompting: false,
+      maxBytes: undefined,
+    }
+  }
+  if (status.state === 'saved') {
+    blockLatchRef.current.open = false
+    blockLatchRef.current.lastToken = null
+    blockLatchRef.current.wasPrompting = false
+  } else if (promptToken !== null) {
+    if (promptToken !== blockLatchRef.current.lastToken) {
+      blockLatchRef.current.lastToken = promptToken
+      blockLatchRef.current.open = true
+    }
+    blockLatchRef.current.wasPrompting = true
+  } else {
+    if (blockLatchRef.current.wasPrompting && blockLatchRef.current.lastToken?.includes('#size:')) {
+      blockLatchRef.current.lastToken = null
+    }
+    blockLatchRef.current.wasPrompting = false
+  }
+  if (maxBytes !== undefined) {
+    blockLatchRef.current.maxBytes = maxBytes
+  }
+  const closeSaveBlock = useCallback(() => {
+    if (!blockLatchRef.current.open) return
+    blockLatchRef.current.open = false
+    setBlockTick((n) => n + 1)
+    window.aiOfficeTabs?.focusActive()
+  }, [])
 
   useEffect(() => {
     if (!status.sizeWarn && status.state === 'saved') {
@@ -505,11 +567,47 @@ ${action ? t(action.labelKey) : ''}`,
     }
   }, [status.path, status.sizeWarn, status.state])
 
-  const warnKey = status.sizeWarn ? `${pathKey(status.path)}:${status.sizeWarn.maxBytes}` : null
+  const warnKey = status.sizeWarn ? `${currentPath}:${status.sizeWarn.maxBytes}` : null
   const showSizeWarn = Boolean(status.sizeWarn && warnKey && warnDismissedFor !== warnKey)
   const sizeWarnText = showSizeWarn ? sizeWarnTextOf(status.sizeWarn, t, dateLocale) : null
-  const showSaveBlock = Boolean(status.saveTooLargePrompt && !blockDismissed)
-  const saveBlockCopy = showSaveBlock ? saveBlockCopyOf(maxBytes, t, dateLocale) : null
+  const showSaveBlock = blockLatchRef.current.open
+  const saveBlockCopy = showSaveBlock
+    ? saveBlockCopyOf(blockLatchRef.current.maxBytes, t, dateLocale)
+    : null
+  const blockBandRef = useRef<HTMLDivElement>(null)
+  const barPx = useTopInsetPart('bar')
+  const popoverPx = useTopInsetPart('popover')
+  const blockAbovePx = barPx + popoverPx
+  const blockRoom = popoverRoomOf(blockAbovePx)
+  const blockRoomRef = useRef(blockRoom)
+  useLayoutEffect(() => {
+    blockRoomRef.current = blockRoom
+  })
+  useLayoutEffect(() => {
+    const band = blockBandRef.current
+    if (!showSaveBlock || !band) {
+      setTopInsetPart('saveBlock', 0)
+      return
+    }
+    const measure = () => {
+      setTopInsetPart('saveBlock', Math.min(unscaledHeightOf(band), blockRoomRef.current))
+    }
+    measure()
+    let observer: ResizeObserver | undefined
+    if (typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(measure)
+      observer.observe(band)
+    }
+    return () => {
+      observer?.disconnect()
+      setTopInsetPart('saveBlock', 0)
+    }
+  }, [showSaveBlock])
+  useLayoutEffect(() => {
+    const band = blockBandRef.current
+    if (!showSaveBlock || !band) return
+    setTopInsetPart('saveBlock', Math.min(unscaledHeightOf(band), blockRoom))
+  }, [showSaveBlock, blockRoom])
 
   // the button never leaves while focus is on it without the pill taking the focus first (a
   // callback ref runs before the node is removed; focus dropped to <body> would lose the place).
@@ -562,6 +660,21 @@ ${action ? t(action.labelKey) : ''}`,
     // t is not referentially stable (CLAUDE.md): the key is the dependency, the text is made now
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signature, status.pendingNext])
+
+  const sizeWarnTextRef = useRef(sizeWarnText)
+  sizeWarnTextRef.current = sizeWarnText
+  const lastAnnouncedWarnKeyRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!showSizeWarn || !warnKey) {
+      if (!warnKey) lastAnnouncedWarnKeyRef.current = null
+      return
+    }
+    if (lastAnnouncedWarnKeyRef.current === warnKey) return
+    lastAnnouncedWarnKeyRef.current = warnKey
+    if (sizeWarnTextRef.current) {
+      announce(sizeWarnTextRef.current)
+    }
+  }, [showSizeWarn, warnKey])
 
   // Ctrl/Cmd+S on a document with a waiting save: main asks for the popover (a conflict opens the
   // resolve choice instead). This chip only exists for the active tab, so another path is ignored.
@@ -653,14 +766,14 @@ ${action ? t(action.labelKey) : ''}`,
     <>
       {sizeWarnText && warnKey && (
         <div className="uw-pill uw-size-warn" data-tone="warn" title={sizeWarnText}>
-          <span className="uw-pill-status" role="status">
+          <span className="uw-pill-status">
             <span className="uw-pill-dot" aria-hidden="true" />
             <span className="uw-pill-label">{sizeWarnText}</span>
           </span>
           <button
             type="button"
             className="uw-pill-close"
-            aria-label={t('uwClose')}
+            aria-label={t('uwSizeWarnDismiss')}
             onClick={() => setWarnDismissedFor(warnKey)}
           >
             <svg width="10" height="10" viewBox="0 0 14 14" aria-hidden="true">
@@ -795,42 +908,52 @@ ${action ? t(action.labelKey) : ''}`,
         />
       )}
       {saveBlockCopy && (
-        <ActionModal
-          labelledBy={blockTitleId}
-          describedBy={blockBodyId}
-          className="uw-save-block-modal"
-          onCancel={() => setBlockDismissed(true)}
+        <div
+          ref={blockBandRef}
+          className="uw-save-block-band"
+          data-uw-save-block-band=""
+          style={
+            {
+              top: `calc(var(--tab-bar-height, 40px) + ${blockAbovePx}px)`,
+              '--uw-save-block-room': `${blockRoom}px`,
+            } as CSSProperties
+          }
         >
-          <h3 id={blockTitleId}>{saveBlockCopy.title}</h3>
-          <p id={blockBodyId}>{saveBlockCopy.body}</p>
-          <div className="modal-buttons">
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => setBlockDismissed(true)}
-            >
-              {saveBlockCopy.close}
-            </button>
-            <button
-              type="button"
-              className="btn btn-primary"
-              aria-disabled={savingLocal ? 'true' : undefined}
-              aria-busy={savingLocal ? 'true' : undefined}
-              onClick={() => {
-                if (savingLocal) return
-                setSavingLocal(true)
-                void saveLocalCopy(status.path)
-                  .then((saved) => {
-                    if (saved) setBlockDismissed(true)
-                  })
-                  .catch(() => undefined)
-                  .finally(() => setSavingLocal(false))
-              }}
-            >
-              {saveBlockCopy.saveLocal}
-            </button>
-          </div>
-        </ActionModal>
+          <ActionModal
+            labelledBy={blockTitleId}
+            describedBy={blockBodyId}
+            className="uw-save-block-modal"
+            initialFocus=".btn-primary"
+            restoreFocus={false}
+            onCancel={closeSaveBlock}
+          >
+            <h3 id={blockTitleId}>{saveBlockCopy.title}</h3>
+            <p id={blockBodyId}>{saveBlockCopy.body}</p>
+            <div className="modal-buttons">
+              <button type="button" className="btn btn-secondary" onClick={closeSaveBlock}>
+                {saveBlockCopy.close}
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                aria-disabled={savingLocal ? 'true' : undefined}
+                aria-busy={savingLocal ? 'true' : undefined}
+                onClick={() => {
+                  if (savingLocal) return
+                  setSavingLocal(true)
+                  void saveLocalCopy(status.path)
+                    .then((saved) => {
+                      if (saved) closeSaveBlock()
+                    })
+                    .catch(() => undefined)
+                    .finally(() => setSavingLocal(false))
+                }}
+              >
+                {saveBlockCopy.saveLocal}
+              </button>
+            </div>
+          </ActionModal>
+        </div>
       )}
     </>
   )
