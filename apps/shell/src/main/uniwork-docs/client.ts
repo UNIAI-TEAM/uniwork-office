@@ -87,7 +87,26 @@ export interface DownloadStreamOptions {
   onProgress?(progress: { receivedBytes: number; totalBytes: number | null }): void
 }
 
+/**
+ * MYFOLDER-01 / SAVE-01: where a create lands. `parentId` (null = the
+ * workspace root) or `destination: 'my_folder'` (the caller's personal My
+ * Folder, ensured lazily by the server) - D's validateDocumentDestination
+ * refuses a request carrying both with 400 `invalid_destination`, so the type
+ * makes it unwritable: a set `parentId` never shares the call with
+ * `destination` (`destination?: never`). `parentId: null` beside
+ * `destination` stays legal because it never reaches the wire.
+ */
+export type UniworkCreateTarget =
+  { parentId: string; destination?: never } | { parentId?: null; destination?: 'my_folder' }
+
 export interface UniworkDocsClient {
+  /**
+   * MYFOLDER-01 / SAVE-01: `POST /workspaces/{ws}/documents/my-folder` -
+   * lazily creates and returns the caller's personal "My Folder"
+   * (system_kind='my_folder'), always a 200 DocumentSDO. The Save dialog
+   * calls it on open so the "Đang lưu trong" row can name it.
+   */
+  ensureMyFolder(workspaceId: string): Promise<UniworkDocSummary>
   listWorkspaces(orgId: string): Promise<UniworkWorkspaceRef[]>
   /** the caller's effective role in one workspace, or null when the server sends none */
   workspaceRole(workspaceId: string): Promise<string | null>
@@ -153,23 +172,25 @@ export interface UniworkDocsClient {
     idempotencyKey: string
   }): Promise<{ summary: UniworkDocSummary; renamedTo: string | null }>
   /** create a blank document (S18); `format` must have a blank generator */
-  createBlank(input: {
-    workspaceId: string
-    format: UniworkDocNewFormat
-    title: string
-    parentId: string | null
-    idempotencyKey: string
-  }): Promise<UniworkDocSummary>
+  createBlank(
+    input: {
+      workspaceId: string
+      format: UniworkDocNewFormat
+      title: string
+      idempotencyKey: string
+    } & UniworkCreateTarget,
+  ): Promise<UniworkDocSummary>
   /** create one file document from local bytes (S18 upload); `signal` aborts the POST */
-  createFile(input: {
-    workspaceId: string
-    bytes: Uint8Array
-    filename: string
-    title: string
-    parentId: string | null
-    idempotencyKey: string
-    signal?: AbortSignal
-  }): Promise<UniworkDocSummary>
+  createFile(
+    input: {
+      workspaceId: string
+      bytes: Uint8Array
+      filename: string
+      title: string
+      idempotencyKey: string
+      signal?: AbortSignal
+    } & UniworkCreateTarget,
+  ): Promise<UniworkDocSummary>
   /**
    * rename a document (S18); the server compares `revision` and may answer a
    * conflict. The answer carries the row the renderer shows and the revision
@@ -462,6 +483,18 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       })
     },
 
+    async ensureMyFolder(workspaceId) {
+      // MYFOLDER-01: empty-body POST; the server creates the folder on the
+      // first call and answers the same DocumentSDO on every later one
+      const raw = await send({
+        method: 'POST',
+        route: `/workspaces/${id(workspaceId)}/documents/my-folder`,
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
+      return parseDocumentSummary(raw)
+    },
+
     async workspaceRole(workspaceId) {
       const raw = await send({
         method: 'GET',
@@ -616,6 +649,9 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
           format: input.format,
           title: input.title,
           ...(input.parentId ? { parent_id: input.parentId } : {}),
+          // MYFOLDER-01: mutually exclusive with parent_id (the input type
+          // cannot carry both); absent = the workspace root
+          ...(input.destination ? { destination: input.destination } : {}),
         },
         idempotencyKey: input.idempotencyKey,
         timeoutMs: metadataTimeout,
@@ -629,6 +665,9 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       // the text fields precede the file part: the server streams the file part
       // and a title that trails it would fall back to the file name
       if (input.parentId) form.set('parent_id', input.parentId)
+      // MYFOLDER-01: `destination` is a form field too, exclusive with
+      // parent_id (the input type cannot carry both)
+      if (input.destination) form.set('destination', input.destination)
       form.set('title', input.title)
       form.set(
         'file',

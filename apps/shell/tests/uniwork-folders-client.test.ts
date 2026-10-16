@@ -611,3 +611,93 @@ describe('the My Folder system_kind marker (SAVE-01)', () => {
     expect(created.systemKind).toBe('my_folder')
   })
 })
+
+// SAVE-01 / MYFOLDER-01: POST /workspaces/{ws}/documents/my-folder ensures the
+// caller's personal folder (200 DocumentSDO, same row on repeat); the
+// `destination` create field asks for it in one request and never combines
+// with parent_id (D validateDocumentDestination: both -> 400
+// invalid_destination).
+describe('My Folder ensure and the create destination (SAVE-01)', () => {
+  it('POSTs the my-folder ensure route and reads the summary', async () => {
+    const fetch = vi.fn<FetchLike>(async () =>
+      json(200, {
+        document: {
+          id: 'fold_my',
+          kind: 'folder',
+          title: 'My Folder',
+          workspace_id: WS,
+          revision: '3',
+          system_kind: 'my_folder',
+        },
+      }),
+    )
+    const api = client(fetch)
+
+    const folder = await api.ensureMyFolder(WS)
+    expect(folder).toMatchObject({ id: 'fold_my', kind: 'folder', systemKind: 'my_folder' })
+    const [url, init] = fetch.mock.calls[0]!
+    expect(url).toBe(`${ORIGIN}/api/v1/workspaces/${WS}/documents/my-folder`)
+    expect(init.method).toBe('POST')
+    // empty body: no JSON payload and no Content-Type header
+    expect(init.body).toBeUndefined()
+    expect((init.headers as Record<string, string>)['Content-Type'] ?? init.body).toBeUndefined()
+  })
+
+  it('sends destination=my_folder on a blank create instead of parent_id', async () => {
+    const fetch = vi.fn<FetchLike>(async () =>
+      json(201, {
+        document: {
+          id: 'doc_new',
+          kind: 'file',
+          title: 'Plan',
+          workspace_id: WS,
+          revision: '1',
+          parent_id: 'fold_my',
+        },
+      }),
+    )
+    const api = client(fetch)
+
+    const created = await api.createBlank({
+      workspaceId: WS,
+      format: 'docx',
+      title: 'Plan',
+      destination: 'my_folder',
+      idempotencyKey: 'k_dst',
+    })
+    expect(created.id).toBe('doc_new')
+    const body = JSON.parse(String(fetch.mock.calls[0]![1].body))
+    // the wire carries destination and no parent_id at all
+    expect(body).toEqual({ format: 'docx', title: 'Plan', destination: 'my_folder' })
+  })
+
+  it('sends destination=my_folder as a form field before file on an upload create', async () => {
+    const fetch = vi.fn<FetchLike>(async () =>
+      json(201, {
+        document: {
+          id: 'doc_up',
+          kind: 'file',
+          title: 'up.docx',
+          workspace_id: WS,
+          revision: '1',
+        },
+      }),
+    )
+    const api = client(fetch)
+
+    await api.createFile({
+      workspaceId: WS,
+      bytes: new Uint8Array([1, 2]),
+      filename: 'up.docx',
+      title: 'up.docx',
+      destination: 'my_folder',
+      idempotencyKey: 'k_up',
+    })
+    const form = fetch.mock.calls[0]![1].body as FormData
+    expect(form.get('destination')).toBe('my_folder')
+    expect(form.get('parent_id')).toBeNull()
+    // D reads the form fields before the file part (createDocumentFile); the
+    // field order is part of the contract, not a nicety
+    expect([...form.keys()]).toEqual(['destination', 'title', 'file'])
+  })
+})
