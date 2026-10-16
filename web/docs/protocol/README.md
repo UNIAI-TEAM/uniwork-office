@@ -56,6 +56,7 @@ gets no `init` within its retry budget (40 × 500 ms), or is opened top-level (`
 | `cancel`            | event   | {id} — abort a host→frame request                                                                                                                                                                                                                          |
 | `comments.changed`  | event   | {document_id} — reload the comment list (additive, G8-08; see "Server comments")                                                                                                                                                                           |
 | `comments.reveal`   | request | {comment_id} → {revealed} (additive, G8-08; only after an InitAck with `comments`)                                                                                                                                                                         |
+| `doc.download`      | request | {} → {delivered: true} (additive, SIZE-F1; asks the frame to send `api.download` with its last-blocked or live serialized bytes)                                                                                                                           |
 
 ### Frame → host
 
@@ -85,14 +86,21 @@ gets no `init` within its retry budget (40 × 500 ms), or is opened top-level (`
 | `cancel`                        | event   | {id} — abort a frame→host request                                                       |
 | `aiRun`                         | event   | {state: 'running' \| 'idle', run_id?} — an AI turn started / ended (additive, X-02)     |
 | `comments.*`, `mentions.search` | request | server comments (additive, G8-08, cap `comments`); see "Server comments" below          |
+| `size_warning`                  | event   | {bytes, max_bytes, warn_ratio} — serialized save size reached warn threshold (SIZE-F1)  |
+| `save_blocked`                  | event   | {bytes, max_bytes} — save blocked because serialized bytes exceeded max_bytes (SIZE-F1) |
 
 `api.*`, `file.pick`, `image.fetch` and `convert.altChunkHtml` are proxied by the host's `api` handlers; a type
 without a handler answers `unsupported` (e.g. AI-adjacent calls stay unavailable on the web).
 
 Capabilities: `save`, `saveAs`, `recents`, `filePick`, `print`, `exportPdf`, `exportHtml`, `attachments`, `images`,
-`ai`, and (additive, CONTRACT C16) `webSearch`, `imageSearch`, `imageGeneration`, and (additive, X-02) `download`, `uniworkAi`, and (additive, G8-08) `comments`. The effective set is the frame's ∩
+`ai`, and (additive, CONTRACT C16) `webSearch`, `imageSearch`, `imageGeneration`, and (additive, X-02) `download`, `uniworkAi`, and (additive, G8-08) `comments`, and (additive, SIZE-F1) `sizeUi`. The effective set is the frame's ∩
 the host's grant. `desktopOpen` (additive, default false) is the "Open in desktop app" grant, see "Open in desktop app (`app.open`)" below. The three cloud-tool keys only count together with `ai`; see "AI (web)" below. The frame hides File > Open / Ctrl+O unless `filePick`
 is granted (grant it only with an `api` handler for `file.pick`) and stops asking for recents without `recents`.
+`InitPayload.limits?: DocumentSizeLimits` and `OpenPayload.limits?: DocumentSizeLimits` (`{ max_bytes, warn_ratio }`,
+defaults `200 * 1024 * 1024` and `0.9`, resolved leniently field-by-field via `resolveDocumentSizeLimits` with
+precedence `open.limits ?? init.limits ?? DEFAULT_DOCUMENT_LIMITS`; `session.downloadMaxBytes` defaults to
+`limits.max_bytes` when `init.downloadMaxBytes` is omitted and `limits` is present) configure the frame's save-size
+gate. When `capabilities.sizeUi !== true`, the frame renders its own fallback warning chip and save-blocked dialog.
 
 `FileSource {kind:'url'}` (in `init.open`, `open`, `api.open`, `file.pick`) must be **same-origin** with the frame,
 or the host must send `{kind:'bytes'}`: the frame bundle's CSP is `connect-src 'self'` (baked in at build time,

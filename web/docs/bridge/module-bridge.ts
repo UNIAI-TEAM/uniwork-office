@@ -71,6 +71,9 @@ export type ModuleBridgePort = Pick<
   | 'reportError'
   | 'getToken'
   | 'refreshToken'
+  | 'handleDownload'
+  | 'reportSizeWarning'
+  | 'reportSaveBlocked'
 >
 
 export interface ModuleBridgeSpec {
@@ -139,12 +142,14 @@ export const MODULE_WEB_CAPABILITIES: Readonly<Record<string, unknown>> = Object
  * effective only with the host grant:
  *   - the web AI keys (CONTRACT C16; `uniworkAi` is the UniWork AI adapter's, effective with the host grant),
  *   - `desktopOpen`: the host's "Open in desktop app" flow for `app.open` (A7),
- *   - `download`: the host downloads the open bytes for `api.download` (X-02).
+ *   - `download`: the host downloads the open bytes for `api.download` (X-02),
+ *   - `sizeUi`: the host renders size warnings and save-blocked modals (SIZE-F1).
  */
 export const FRAME_BASE_CAPABILITIES: Capabilities = Object.freeze({
   ...AI_FRAME_CAPABILITIES,
   desktopOpen: true,
   download: true,
+  sizeUi: true,
 })
 
 /** NO_AUTO_SAVE_DEFAULT of @genoffice/ui auto-save-pref.ts: autosave off, never set */

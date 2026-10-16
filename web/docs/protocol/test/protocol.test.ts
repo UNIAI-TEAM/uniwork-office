@@ -114,6 +114,7 @@ describe('handshake', () => {
         uniworkAi: false,
         comments: false,
         commentsShareView: false,
+        sizeUi: false,
       },
     })
     expect(session).toMatchObject({
@@ -1498,5 +1499,98 @@ describe('doc.blocked (G5-03w, additive)', () => {
     await client.whenInitialized()
     await flush()
     expect(heard).toEqual([])
+  })
+})
+
+import { DEFAULT_DOCUMENT_LIMITS } from '../types'
+
+describe('document size limits, size_warning, save_blocked, and doc.download (SIZE-F1, additive)', () => {
+  it('resolves session.limits with precedence open.limits ?? init.limits ?? DEFAULT_DOCUMENT_LIMITS and defaults downloadMaxBytes to limits.max_bytes when omitted', async () => {
+    const { client: defaultClient } = setup()
+    const defaultSession = await defaultClient.whenInitialized()
+    expect(defaultSession.limits).toEqual(DEFAULT_DOCUMENT_LIMITS)
+    expect(defaultSession.downloadMaxBytes).toBeUndefined()
+
+    const { client: initClient, host } = setup(
+      {
+        getInit: async () =>
+          baseInit({
+            capabilities: { save: true, download: true, sizeUi: true },
+            limits: { max_bytes: 10_000, warn_ratio: 0.85 },
+          }),
+        api: {
+          'api.open': async ({ fileId }) => ({
+            file: { fileId, name: 'A.docx' },
+            source: { kind: 'bytes', data: new ArrayBuffer(2) },
+            limits: { max_bytes: 4_000, warn_ratio: 0.75 },
+          }),
+        },
+      },
+      { capabilities: { save: true, download: true, sizeUi: true } },
+    )
+    const session = await initClient.whenInitialized()
+    expect(session.capabilities.sizeUi).toBe(true)
+    expect(session.limits).toEqual({ max_bytes: 10_000, warn_ratio: 0.85 })
+    expect(session.downloadMaxBytes).toBe(10_000)
+
+    initClient.handleOpen(() => ({ opened: true }))
+    await host.open({
+      file: { fileId: 'doc-1', name: 'A.docx' },
+      source: { kind: 'bytes', data: new ArrayBuffer(1) },
+      limits: { max_bytes: 6_000, warn_ratio: 0.8 },
+    })
+    expect(session.limits).toEqual({ max_bytes: 6_000, warn_ratio: 0.8 })
+    expect(session.downloadMaxBytes).toBe(6_000)
+
+    await initClient.request('api.open', { fileId: 'doc-1' })
+    expect(session.limits).toEqual({ max_bytes: 4_000, warn_ratio: 0.75 })
+    expect(session.downloadMaxBytes).toBe(4_000)
+  })
+
+  it('emits size_warning and save_blocked and answers doc.download', async () => {
+    const { host, client, hostWin, frameWin } = setup()
+    await host.whenReady()
+    await client.whenInitialized()
+
+    client.reportSizeWarning({ bytes: 1800, max_bytes: 2000, warn_ratio: 0.9 })
+    client.reportSaveBlocked({ bytes: 2500, max_bytes: 2000 })
+    await flush()
+
+    const events = frameWin.sent.filter((m) => (m as { kind?: string }).kind === 'event')
+    expect(events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'size_warning',
+          payload: { bytes: 1800, max_bytes: 2000, warn_ratio: 0.9 },
+        }),
+        expect.objectContaining({
+          type: 'save_blocked',
+          payload: { bytes: 2500, max_bytes: 2000 },
+        }),
+      ]),
+    )
+
+    const onDownload = vi.fn(async () => ({ delivered: true as const }))
+    client.handleDownload(onDownload)
+    frameWin.deliver(
+      {
+        ns: PROTOCOL_NS,
+        v: PROTOCOL_VERSION,
+        id: 'h-dl-1',
+        kind: 'request',
+        type: 'doc.download',
+        payload: {},
+      },
+      ORIGIN,
+      hostWin,
+    )
+    await flush()
+    expect(onDownload).toHaveBeenCalledTimes(1)
+    expect(frameWin.sent.at(-1)).toMatchObject({
+      id: 'h-dl-1',
+      kind: 'response',
+      type: 'doc.download',
+      payload: { delivered: true },
+    })
   })
 })
