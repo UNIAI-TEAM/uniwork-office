@@ -513,3 +513,101 @@ describe('the folder refusals', () => {
     expect(formatForMime('toString')).toBeNull()
   })
 })
+
+// SAVE-01 / MYFOLDER-01 (D service/document_my_folder.go): the server's
+// `system_kind` marks the caller's personal "My Folder" row. It is omitempty
+// and a loose enum - the client keeps the known value on rows, list pages and
+// tree nodes and drops anything else instead of failing the parse.
+describe('the My Folder system_kind marker (SAVE-01)', () => {
+  it('keeps system_kind on tree nodes and drops unknown values', async () => {
+    const fetch = vi.fn<FetchLike>(async () =>
+      json(200, {
+        documents: [
+          {
+            id: 'fold_my',
+            kind: 'folder',
+            title: 'My Folder',
+            position: 0,
+            system_kind: 'my_folder',
+            children: [
+              {
+                id: 'fold_sub',
+                kind: 'folder',
+                title: 'Inbox',
+                parent_id: 'fold_my',
+                position: 0,
+                system_kind: 'something_new',
+                children: [],
+              },
+            ],
+          },
+          { id: 'fold_3', kind: 'folder', title: 'Archive', position: 1, children: [] },
+        ],
+      }),
+    )
+    const api = client(fetch)
+
+    const tree = await api.folderTree(WS)
+    expect(tree[0]!.systemKind).toBe('my_folder')
+    // an unknown marker the server adds later is dropped, never surfaced nor fatal
+    expect(tree[0]!.children[0]!.systemKind).toBeUndefined()
+    // absent stays absent: an ordinary folder carries no systemKind at all
+    expect(tree[1]!.systemKind).toBeUndefined()
+  })
+
+  it('keeps system_kind on list rows and on the create/move answer', async () => {
+    const fetch = vi.fn<FetchLike>(async (url, init) => {
+      const u = new URL(url)
+      // the children list and folder-create share one route; the POST is the create
+      if (u.pathname === `/api/v1/workspaces/${WS}/documents` && init.method === 'POST') {
+        return json(201, {
+          document: {
+            id: 'fold_new',
+            kind: 'folder',
+            title: 'x',
+            workspace_id: WS,
+            revision: '1',
+            system_kind: 'my_folder',
+          },
+        })
+      }
+      if (u.pathname === `/api/v1/workspaces/${WS}/documents`) {
+        return json(200, {
+          documents: [
+            {
+              id: 'fold_my',
+              kind: 'folder',
+              title: 'My Folder',
+              workspace_id: WS,
+              updated_at: '2026-10-13T09:00:00Z',
+              system_kind: 'my_folder',
+            },
+            {
+              id: 'doc_x',
+              kind: 'file',
+              title: 'a.docx',
+              workspace_id: WS,
+              updated_at: '2026-10-13T09:00:00Z',
+              system_kind: 'bogus',
+            },
+          ],
+          next_cursor: null,
+        })
+      }
+      return json(404, { error: { code: 'not_found', message: 'x' } })
+    })
+    const api = client(fetch)
+
+    const children = await api.listChildren({ workspaceId: WS, parentId: null })
+    expect(children.documents[0]!.systemKind).toBe('my_folder')
+    expect(children.documents[1]!.systemKind).toBeUndefined()
+
+    const created = await api.createFolder({
+      workspaceId: WS,
+      parentId: null,
+      title: 'x',
+      idempotencyKey: 'k_sys',
+    })
+    expect(created.systemKind).toBe('my_folder')
+  })
+})

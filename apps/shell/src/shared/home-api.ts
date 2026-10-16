@@ -239,6 +239,11 @@ export interface UniworkDocSummary {
   /** FD-11: the folder/page holding the document; null = the workspace root */
   parentId?: string | null
   /**
+   * MYFOLDER-01 / SAVE-01: the server's `system_kind`, kept only for the known
+   * `'my_folder'` marker (unknown values are dropped at parse).
+   */
+  systemKind?: UniworkSystemKind
+  /**
    * FD-11: the ancestors of a search row, root first. Only the title search
    * sends one (cut at the first unreadable ancestor).
    */
@@ -247,6 +252,14 @@ export interface UniworkDocSummary {
 
 /** FD-11: the three entry kinds the folder tree holds */
 export type UniworkEntryKind = 'folder' | 'file' | 'page'
+
+/**
+ * MYFOLDER-01 / SAVE-01: the server's `system_kind` (omitempty, loose enum).
+ * `'my_folder'` marks the caller's personal "My Folder" (D
+ * `DocumentSystemKindMyFolder`); anything else or absent is an ordinary row.
+ * The stored title is never the label - the renderer shows a localized name.
+ */
+export type UniworkSystemKind = 'my_folder'
 
 /**
  * FD-11: one node of `GET /workspaces/{ws}/documents/tree?folders_only=true`,
@@ -258,6 +271,8 @@ export interface UniworkFolderNode {
   title: string
   position: number
   children: UniworkFolderNode[]
+  /** MYFOLDER-01 / SAVE-01: `'my_folder'` on the caller's personal folder row */
+  systemKind?: UniworkSystemKind
 }
 
 /** FD-11: one contents page of a folder (folders + files + pages, server order) */
