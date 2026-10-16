@@ -290,6 +290,9 @@ const CLOSE_CHOICES: Record<UnsavedCloseKind, readonly UnsavedCloseChoice[]> = {
 function blockedReasonKey(reason: string | undefined): Parameters<typeof tUniworkDocs>[1] {
   if (reason === 'not_found') return 'closeBlockedNotFound'
   if (reason === 'deleted') return 'closeBlockedDeleted'
+  // `document_archived` deliberately keeps the generic sentence: the block is an
+  // info-tone state the user can lift (unarchive, then reopen), not the loss the
+  // deleted/not-found copy describes, and no dedicated string is spent on it
   return 'closeBlockedOther'
 }
 
