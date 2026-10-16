@@ -299,6 +299,7 @@ import type {
 } from '../shared/home-api'
 import { HOME_CHANNELS } from '../shared/home-api'
 import { UNIWORK_DOC_CHANNELS } from '../shared/home-api'
+import { OPEN_DIALOG_EXTENSIONS } from '../shared/open-extensions'
 import { extractAllowedFileExcerpts } from './file-excerpts'
 import { isAllowedWbKey, type WbKvMap } from './workbench-db'
 import { WorkbenchAccounts, loadWorkbenchSnapshot } from './workbench-accounts'
@@ -3760,30 +3761,6 @@ function createShellWindow(): void {
 
 // ---- routing: one dispatch function for every open path ----
 
-/**
- * Single source of truth for the open-dialog filter. Includes the
- * legacy .doc/.ppt binaries so they are selectable and surface the explicit
- * "not supported" dialog via openDocumentPath instead of being grayed out.
- */
-const OPEN_DIALOG_EXTENSIONS = [
-  'docx',
-  'doc',
-  'xlsx',
-  'xlsm',
-  'xls',
-  'csv',
-  'tsv',
-  'pptx',
-  'ppt',
-  'pdf',
-  'md',
-  'markdown',
-  'txt',
-  'json',
-  'html',
-  'htm',
-]
-
 function notifyUnsupportedFile(filePath: string): void {
   const ext = extname(filePath).slice(1).toLowerCase() || basename(filePath)
   showAppWarning(tm('errUnsupportedExt', { ext }))
@@ -4781,7 +4758,7 @@ function registerHomeIpc(): void {
     const result = await showOpenDialogWithMemory(dialog, win, {
       title: tm('dlgOpenTitle'),
       filters: [
-        { name: tm('filterSupported'), extensions: OPEN_DIALOG_EXTENSIONS },
+        { name: tm('filterSupported'), extensions: [...OPEN_DIALOG_EXTENSIONS] },
         { name: tm('filterWord'), extensions: ['docx', 'doc'] },
         { name: tm('filterExcel'), extensions: ['xlsx', 'xlsm', 'xls', 'csv', 'tsv'] },
         { name: tm('filterPpt'), extensions: ['pptx', 'ppt'] },
@@ -5691,7 +5668,7 @@ async function openFileViaDialog(): Promise<void> {
   const win = shellWindow ?? BrowserWindow.getFocusedWindow()
   if (!win) return
   const result = await showOpenDialogWithMemory(dialog, win, {
-    filters: [{ name: tm('filterSupported'), extensions: OPEN_DIALOG_EXTENSIONS }],
+    filters: [{ name: tm('filterSupported'), extensions: [...OPEN_DIALOG_EXTENSIONS] }],
     properties: ['openFile', 'multiSelections'],
   })
   if (!result.canceled) for (const path of result.filePaths) openDocumentPath(path)

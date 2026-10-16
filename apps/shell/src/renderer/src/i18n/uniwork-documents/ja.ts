@@ -26,7 +26,7 @@ export const ja = {
   uwPickNoResults: '「{query}」に一致するドキュメントはありません。',
   uwPickNoWorkspaces: 'ワークスペースはまだありません。',
   uwPickNoWorkspacesHint: 'まず UniWork でワークスペースを作成するか、参加してください。',
-  uwPickUnsupported: 'UniWork Office では未対応です',
+  uwPickHiddenFormats: 'UniWork Office で開けない形式のため非表示: {count}',
   uwPickOpening: '「{title}」を開いています…',
 
   uwErrNotSignedIn: '続行するには UniWork にサインインしてください。',

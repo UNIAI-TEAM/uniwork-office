@@ -26,7 +26,7 @@ export const ms = {
   uwPickNoResults: 'Tiada dokumen yang sepadan dengan “{query}”.',
   uwPickNoWorkspaces: 'Anda belum mempunyai ruang kerja.',
   uwPickNoWorkspacesHint: 'Cipta atau sertai ruang kerja dalam UniWork dahulu.',
-  uwPickUnsupported: 'Tidak disokong dalam UniWork Office',
+  uwPickHiddenFormats: 'Disembunyikan kerana UniWork Office tidak boleh membuka formatnya: {count}',
   uwPickOpening: 'Membuka “{title}”…',
 
   uwErrNotSignedIn: 'Log masuk ke UniWork untuk meneruskan.',

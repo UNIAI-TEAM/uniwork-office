@@ -26,7 +26,7 @@ export const th = {
   uwPickNoResults: 'ไม่พบเอกสารที่ตรงกับ “{query}”',
   uwPickNoWorkspaces: 'คุณยังไม่มีพื้นที่ทำงาน',
   uwPickNoWorkspacesHint: 'สร้างหรือเข้าร่วมพื้นที่ทำงานใน UniWork ก่อน',
-  uwPickUnsupported: 'ไม่รองรับใน UniWork Office',
+  uwPickHiddenFormats: 'ซ่อนไว้เพราะ UniWork Office เปิดรูปแบบไฟล์เหล่านี้ไม่ได้: {count}',
   uwPickOpening: 'กำลังเปิด “{title}”…',
 
   uwErrNotSignedIn: 'ลงชื่อเข้าใช้ UniWork เพื่อดำเนินการต่อ',

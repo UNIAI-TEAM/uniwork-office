@@ -1,10 +1,54 @@
 import { describe, expect, it } from 'vitest'
 import {
+  UPLOAD_EXTENSIONS,
   copyTitleFor,
+  formatForName,
   hasReplacementChar,
   sanitizeFilename,
   workingCopyName,
 } from '../src/main/uniwork-docs/formats'
+
+/**
+ * R1-3: the upload picker's filter and the resolver are both derived from
+ * BY_EXTENSION, so a test that compares them to each other is circular - a
+ * removed or accidentally added key moves both sides together. The intended set
+ * is pinned here, literally, so the offer and the resolver cannot drift apart
+ * (and an accidental alias such as `.txt` cannot slip into the picker).
+ */
+describe('the upload format table', () => {
+  const INTENDED = ['docx', 'xlsx', 'pptx', 'pdf', 'md', 'markdown', 'html', 'htm']
+  const EXPECTED_FORMAT: Record<(typeof INTENDED)[number], string> = {
+    docx: 'docx',
+    xlsx: 'xlsx',
+    pptx: 'pptx',
+    pdf: 'pdf',
+    md: 'md',
+    markdown: 'md',
+    html: 'html',
+    htm: 'html',
+  }
+
+  it('offers exactly the eight extensions UniWork Office opens', () => {
+    expect(UPLOAD_EXTENSIONS).toEqual(INTENDED)
+  })
+
+  it('resolves every offered extension to its canonical format, and no other', () => {
+    for (const ext of INTENDED) {
+      expect(formatForName(`plan.${ext}`), ext).toBe(EXPECTED_FORMAT[ext])
+    }
+    expect(formatForName('plan.markdown')).toBe('md')
+    expect(formatForName('plan.htm')).toBe('html')
+    expect(formatForName('plan.png')).toBeNull()
+    expect(formatForName('plan')).toBeNull()
+    expect(formatForName('photo.constructor')).toBeNull()
+    expect(formatForName('photo.__proto__')).toBeNull()
+  })
+
+  it('resolves the extensions case-insensitively, as the file system does', () => {
+    expect(formatForName('PLAN.DOCX')).toBe('docx')
+    expect(formatForName('plan.MD')).toBe('md')
+  })
+})
 
 describe('sanitizeFilename', () => {
   it('replaces separators, reserved and control characters with underscores', () => {
