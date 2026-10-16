@@ -832,6 +832,68 @@ describe('too large and open refusal (SIZE-F1)', () => {
     await t.desktop.saveWorkbookEdits(saveRequest(wb!.sessionId, [[0, 0, 99]]))
     expect(t.mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(1)
   })
+
+  it.each([
+    [
+      // Rust std::alloc::default_alloc_error_hook (library/std/src/alloc.rs)
+      'Rust alloc error without "out of memory" suffix',
+      () => new Error('memory allocation of 67108864 bytes failed'),
+    ],
+    [
+      // Rust alloc error wrapped by EngineCrashedError (web/modules/sheets/engine/host.ts:41-52)
+      'EngineCrashedError wrapping Rust alloc failure',
+      () =>
+        Object.assign(
+          new Error(
+            'engine_crashed: the workbook engine stopped (unreachable): memory allocation of 67108864 bytes failed',
+          ),
+          { code: 'engine_crashed' },
+        ),
+    ],
+    [
+      // Unrecovered EngineCrashedError during open (wasm-transport.ts:177-196 rethrows after recover())
+      'unrecovered engine_crashed during open',
+      () =>
+        Object.assign(new Error('engine_crashed: the workbook engine stopped (unreachable)'), {
+          code: 'engine_crashed',
+        }),
+    ],
+    [
+      // V8 WebAssembly memory instantiate/grow failure (v8/src/wasm/wasm-js.cc)
+      'V8 Cannot allocate Wasm memory',
+      () => new RangeError('Cannot allocate Wasm memory'),
+    ],
+    [
+      // V8 ArrayBuffer allocation failure (v8/src/builtins/builtins-arraybuffer.cc)
+      'V8 Array buffer allocation failed',
+      () => new RangeError('Array buffer allocation failed'),
+    ],
+  ])(
+    'classifies real OOM / unrecovered crash form (%s) as engine_out_of_memory + fatal too_large (d2-3)',
+    async (_label, makeError) => {
+      const fake = fakeTransport()
+      const transport: SheetsEngineTransport = {
+        ...fake.transport,
+        async open() {
+          throw makeError()
+        },
+      }
+      const t = setup({ transport })
+      t.mock.init({ documentId: t.file.fileId, capabilities: ALL_GRANTS })
+      await flush()
+      const err = await t.desktop.selectWorkbook().catch((e: unknown) => e)
+      expect((err as { code?: string }).code).toBe('too_large')
+      expect(t.mock.openRefused).toEqual([
+        {
+          reason: 'engine_out_of_memory',
+          bytes: 2,
+        },
+      ])
+      const fatal = t.mock.errors.filter((e) => (e.error as { code?: string }).code === 'too_large')
+      expect(fatal).toHaveLength(1)
+      expect(fatal[0]!.fatal).toBe(true)
+    },
+  )
 })
 
 describe('keyboard accelerators (the desktop File menu keys)', () => {
