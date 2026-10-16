@@ -71,6 +71,7 @@ import {
 } from './formats'
 import { pathKey } from '../../shared/path-key'
 import { LaunchController } from './launch'
+import { createDocumentLimitsCache, type DocumentLimits, type DocumentLimitsCache } from './limits'
 import { tUniworkDocs } from './strings'
 import type { CommentsContextResult } from '@genoffice/electron-utils/comments-ipc'
 import { actionFlags, type DocumentDetail, type LaunchDescriptor } from './parse'
@@ -340,6 +341,8 @@ export interface UniworkDocsServiceDeps {
   notifySaved?(path: string, versionId: string): void
   /** test seam: replaces the HTTP client */
   client?: UniworkDocsClient
+  /** SIZE-F1: overrides `documents.limits` (`GET /api/v1/config`); a test seam */
+  limits?: () => Promise<DocumentLimits> | DocumentLimits
   sleep?(ms: number): Promise<void>
   now?(): number
   /**
@@ -696,6 +699,7 @@ export class UniworkDocsService {
   readonly store: BindingStore
   readonly coordinator: SaveCoordinator
   readonly launch: LaunchController
+  readonly limitsCache: DocumentLimitsCache
   private readonly deps: UniworkDocsServiceDeps
   /** the build's own version, stamped into bindings (see binding-store's minAppVersion) */
   private readonly appVersion: () => string
@@ -823,6 +827,17 @@ export class UniworkDocsService {
       this.heldByMigration(dir),
     )
     this.lastOwner = this.store.readLastOwner()
+    this.limitsCache = createDocumentLimitsCache({
+      origin: () => this.deps.profile()?.apiOrigin ?? null,
+      fetchLimits: async () => {
+        if (this.deps.limits) return await this.deps.limits()
+        // a session that is not signed in has no deployment to ask: the
+        // defaults hold until one is, and `noteSessionIdentity` refreshes
+        if (!this.deps.identity()) return null
+        const client = this.api()
+        return client.getDocumentLimits ? await client.getDocumentLimits() : null
+      },
+    })
     this.coordinator = new SaveCoordinator({
       store: this.store,
       client: {
@@ -836,6 +851,7 @@ export class UniworkDocsService {
       publish: (status) => this.publish(status),
       requestQueuePopover: (path) => this.deps.pushQueuePopover?.({ path }),
       onSaved: (doc, versionId) => this.deps.notifySaved?.(doc.path, versionId),
+      limits: () => this.limitsCache.get(),
       capability: {
         get: (orgId) =>
           deps.capability
@@ -1129,7 +1145,14 @@ export class UniworkDocsService {
 
   /** the session's account may have changed: remember it as the last owner */
   noteSessionIdentity(): void {
-    this.liveIdentity()
+    const identity = this.liveIdentity()
+    if (identity) {
+      // session boot / deployment switch: the new server's `documents.limits`
+      // replace whatever the previous one published
+      void this.limitsCache.refresh().catch(() => undefined)
+    } else {
+      this.limitsCache.reset()
+    }
     // a live session opens its store: the scope's migration and every later
     // intent write go through this one open
     void this.openSyncStore().catch(() => undefined)
@@ -2537,6 +2560,8 @@ export class UniworkDocsService {
     this.orgMemberNamesOrg = null
     this.orgMemberNamesInFlight = null
     this.migratedScopes.delete(scopeToken)
+    this.limitsCache.reset()
+    this.coordinator.resetSessionWarnings()
 
     // Step 6: lock the encrypted store for this scope
     await this.deps.syncStore?.lock({
@@ -2823,12 +2848,16 @@ export class UniworkDocsService {
    * renderer on the same status push; nothing else here caches a library).
    */
   noteSelectedOrg(orgId: string | null): void {
+    const changed = this.orgMemberNamesOrg !== orgId
     if (this.orgMemberNamesOrg !== null && this.orgMemberNamesOrg !== orgId) {
       this.orgMemberNames = new Map()
       this.orgMemberNamesOrg = null
     }
     if (this.orgMemberNamesInFlight && this.orgMemberNamesInFlight.orgId !== orgId) {
       this.orgMemberNamesInFlight = null
+    }
+    if (changed && orgId && this.deps.identity()) {
+      void this.limitsCache.refresh().catch(() => undefined)
     }
   }
 
