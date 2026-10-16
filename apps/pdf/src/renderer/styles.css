@@ -3809,6 +3809,7 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
 
 .ai-result-edited-hint {
   color: var(--color-text-tertiary);
+  text-wrap: balance;
 }
 
 /* "Undo this run" under an answer that changed the document; a blocked one keeps its reason beside it */
