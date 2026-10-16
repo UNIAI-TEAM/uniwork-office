@@ -88,3 +88,22 @@ for (const [lang, label, mine, server] of [
     await expect(dialog).toHaveCount(0)
   })
 }
+
+// UXF-fe-d1-3: on a touch device the "View differences" link is as tall as the buttons (44 px)
+test.describe('coarse pointer', () => {
+  test.use({ hasTouch: true })
+  test('the "View differences" link has a 44px target like the dialog buttons', async ({
+    page,
+  }) => {
+    const { dialog } = await reachConflict(page, 'en')
+    const heights = await dialog.evaluate((d) => ({
+      coarse: matchMedia('(pointer: coarse)').matches,
+      link: d.querySelector('[data-choice="diff"]')!.getBoundingClientRect().height,
+      button: d.querySelector('[data-choice="reload"]')!.getBoundingClientRect().height,
+    }))
+    test.info().annotations.push({ type: 'measured', description: JSON.stringify(heights) })
+    expect(heights.coarse, 'the emulated device reports a coarse pointer').toBe(true)
+    expect(heights.link).toBeGreaterThanOrEqual(44)
+    expect(heights.button).toBeGreaterThanOrEqual(44)
+  })
+})

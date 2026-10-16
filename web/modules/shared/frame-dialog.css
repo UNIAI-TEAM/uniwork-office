@@ -412,6 +412,10 @@
     min-height: 44px;
   }
 
+  .ow-dlg-link {
+    min-height: 44px;
+  }
+
   .ow-dlg-close {
     width: 44px;
     height: 44px;

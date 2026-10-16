@@ -87,6 +87,47 @@ for (const width of [390, 600]) {
   })
 }
 
+// UXF-V1-F3: a frame only 390 px tall is shorter than the card (the S5 content + 3 stacked
+// actions): the backdrop scrolls (short-viewport rule), so the last button is reachable and works
+test('390x390 frame: the S5 card is taller than the frame, the overlay scrolls to every button', async ({
+  page,
+}) => {
+  const frame = await reachConflict(page)
+  await page.evaluate(() => {
+    const f = document.getElementById('frame') as HTMLIFrameElement
+    f.style.cssText += ';width:390px;max-width:390px;flex:0 0 390px;height:390px;max-height:390px'
+  })
+  await expect
+    .poll(() => frame.locator(CARD).evaluate(() => [innerWidth, innerHeight].join('x')), {
+      timeout: 10_000,
+    })
+    .toBe('390x390')
+  const measured = await frame.locator(CARD).evaluate((card) => {
+    const mask = card.parentElement!
+    const r = card.getBoundingClientRect()
+    return {
+      cardBottom: r.bottom,
+      inner: innerHeight,
+      overflowY: getComputedStyle(mask).overflowY,
+      scrollable: mask.scrollHeight > mask.clientHeight,
+    }
+  })
+  test.info().annotations.push({ type: 'measured', description: JSON.stringify(measured) })
+  expect(measured.cardBottom, 'the card really is taller than the frame').toBeGreaterThan(
+    measured.inner,
+  )
+  expect(measured.overflowY).toMatch(/auto|scroll/)
+  expect(measured.scrollable).toBe(true)
+  // scroll the overlay to the end: the Cancel button is inside the viewport, clickable
+  const cancel = frame.locator(`${CARD} [data-choice="cancel"]`)
+  await frame.locator(CARD).evaluate((card) => {
+    card.parentElement!.scrollTop = card.parentElement!.scrollHeight
+  })
+  await expect(cancel).toBeInViewport({ ratio: 1 })
+  await cancel.click()
+  await expect(frame.locator(CARD)).toHaveCount(0)
+})
+
 test('wide frame keeps the 448px card', async ({ page }) => {
   const frame = await reachConflict(page)
   await sizeFrame(page, 900)
