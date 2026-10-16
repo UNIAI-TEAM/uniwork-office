@@ -59,12 +59,19 @@ function mountEditor() {
     handle.runHistory.end('run-1', true)
     return { typed, afterRun: text() }
   }
-  const press = (key: string, code: string, keyCode: number, shiftKey = false) => {
+  const press = (
+    key: string,
+    code: string,
+    keyCode: number,
+    shiftKey = false,
+    isComposing = false,
+  ) => {
     const event = new KeyboardEvent('keydown', {
       key,
       code,
       ctrlKey: true,
       shiftKey,
+      isComposing,
       bubbles: true,
       cancelable: true,
     })
@@ -110,5 +117,24 @@ describe('html source pane: Ctrl+Shift+Z redoes the undone AI run', () => {
     ed.press('z', 'KeyZ', 90)
     expect(ed.text()).toBe('')
     expect(typed).not.toBe('')
+  })
+
+  // RF3O-1: an IME composition owns its keys; the redo must not be hijacked mid-composition
+  it.each([
+    ['isComposing set', true, 90],
+    ['keyCode 229 (the IME process key)', false, 229],
+  ])('ignores Ctrl+Shift+Z while composing (%s)', (_label, isComposing, keyCode) => {
+    const ed = mountEditor()
+    const { typed, afterRun } = ed.typedThenRun()
+    ed.press('z', 'KeyZ', 90)
+    expect(ed.text()).toBe(typed)
+
+    const event = ed.press('Z', 'KeyZ', keyCode, true, isComposing)
+    expect(ed.text()).toBe(typed)
+    expect(event.defaultPrevented).toBe(false)
+
+    // the same keys outside a composition still redo
+    ed.press('Z', 'KeyZ', 90, true)
+    expect(ed.text()).toBe(afterRun)
   })
 })
