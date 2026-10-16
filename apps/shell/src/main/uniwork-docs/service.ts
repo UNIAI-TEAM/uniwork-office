@@ -376,6 +376,7 @@ const KEEP_LOCAL_STATES: ReadonlySet<string> = new Set([
   'blocked',
   'signed-out',
   'error',
+  'failed',
 ])
 
 /** states whose local bytes are not in UniWork (the close prompt) */
@@ -386,6 +387,7 @@ const UNSENT_STATES: ReadonlySet<string> = new Set([
   'error',
   'blocked',
   'conflict',
+  'failed',
 ])
 
 /**
@@ -1161,6 +1163,41 @@ export class UniworkDocsService {
     void this.openSyncStore().catch(() => undefined)
   }
 
+  /**
+   * SIZE-F1: "Lưu bản sao về máy" / "Save a copy to computer" from the save-block
+   * prompt. Opens the native Save-As dialog pointed at the local working copy and
+   * writes the current working copy bytes to the user-chosen path.
+   */
+  async saveLocalCopy(path: string): Promise<boolean> {
+    if (typeof path !== 'string' || !path) return false
+    const doc = this.store.lookup(path)
+    const sourcePath = doc ? doc.path : path
+    let localBytes: Uint8Array
+    try {
+      localBytes = new Uint8Array(await readFile(sourcePath))
+    } catch {
+      return false
+    }
+    const defaultName = doc ? doc.binding.filename : basename(sourcePath)
+    let target: string | null = null
+    try {
+      if (this.deps.pickDownloadPath) {
+        target = await this.deps.pickDownloadPath(defaultName)
+      } else if (this.deps.ui?.pickCopyPath && doc) {
+        target = await this.deps.ui.pickCopyPath(doc.binding.title, doc.binding.format)
+      }
+    } catch {
+      return false
+    }
+    if (!target) return false
+    try {
+      await writeFile(target, localBytes)
+      return true
+    } catch {
+      return false
+    }
+  }
+
   /** this build's version, as stamped into bindings (display only, never a gate) */
   private buildVersion(): string {
     try {
@@ -1601,6 +1638,8 @@ export class UniworkDocsService {
       baseVersionId: record.receipt.versionId,
     }
     delete next.error
+    delete next.sizeBytes
+    delete next.maxBytes
     delete next.serverRevision
     delete next.serverVersion
     // the intent landed: nothing newer waits behind it (RBE6u-02)

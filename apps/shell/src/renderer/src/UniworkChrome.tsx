@@ -18,7 +18,8 @@ import { asSyncCenterSnapshot } from '../../shared/sync-center'
 import { useI18n, type StringKey } from './locale'
 import { useAccount } from './account-model'
 import { onLocalRename, onUniworkNotice } from './uniwork-notice-bus'
-import { onDocRenamed } from './uniwork-library-api'
+import { onDocRenamed, saveLocalCopy } from './uniwork-library-api'
+import { ActionModal } from './UniworkDocActions'
 import {
   DISCUSSION_PANEL_ID,
   DISCUSSION_TOGGLE_ID,
@@ -39,6 +40,8 @@ import {
   type MiniGlyph,
   pathKey,
   remoteBarModelOf,
+  saveBlockCopyOf,
+  sizeWarnTextOf,
   type ChipActionKind,
   type LaunchNotice,
   type RemoteBarAction,
@@ -467,7 +470,13 @@ export function UniworkStatusChip({
   const row = useQueueRowOf(status)
   const queuedAt = QUEUED_STATES.has(status.state) ? row?.savedAt : undefined
   const failedReasonKey = status.state === 'failed' ? failedReasonKeyOf(status, row) : undefined
-  const model = chipModelOf(status, { needsSignIn: !accountOk, queuedAt, failedReasonKey })
+  const maxBytes = row?.maxBytes ?? status.maxBytes
+  const model = chipModelOf(status, {
+    needsSignIn: !accountOk,
+    queuedAt,
+    failedReasonKey,
+    maxBytes,
+  })
   const { label, tip, title } = chipCopy(model, t, dateLocale)
   const action = model.action
   const shortLabel = shortLabelOf(label)
@@ -478,6 +487,29 @@ export function UniworkStatusChip({
 ${action ? t(action.labelKey) : ''}`,
     shortLabel !== label,
   )
+  const [warnDismissedFor, setWarnDismissedFor] = useState<string | null>(null)
+  const [blockDismissed, setBlockDismissed] = useState(false)
+  const [savingLocal, setSavingLocal] = useState(false)
+  const blockTitleId = useId()
+  const blockBodyId = useId()
+
+  // a new status carrying the prompt re-opens the dialog: the dismissal is per
+  // prompt, so a second over-cap save of the same document is shown again
+  useEffect(() => {
+    if (status.saveTooLargePrompt) setBlockDismissed(false)
+  }, [status])
+
+  useEffect(() => {
+    if (!status.sizeWarn && status.state === 'saved') {
+      setWarnDismissedFor(null)
+    }
+  }, [status.path, status.sizeWarn, status.state])
+
+  const warnKey = status.sizeWarn ? `${pathKey(status.path)}:${status.sizeWarn.maxBytes}` : null
+  const showSizeWarn = Boolean(status.sizeWarn && warnKey && warnDismissedFor !== warnKey)
+  const sizeWarnText = showSizeWarn ? sizeWarnTextOf(status.sizeWarn, t, dateLocale) : null
+  const showSaveBlock = Boolean(status.saveTooLargePrompt && !blockDismissed)
+  const saveBlockCopy = showSaveBlock ? saveBlockCopyOf(maxBytes, t, dateLocale) : null
 
   // the button never leaves while focus is on it without the pill taking the focus first (a
   // callback ref runs before the node is removed; focus dropped to <body> would lose the place).
@@ -619,6 +651,29 @@ ${action ? t(action.labelKey) : ''}`,
   const describedHere = !action
   return (
     <>
+      {sizeWarnText && warnKey && (
+        <div className="uw-pill uw-size-warn" data-tone="warn" title={sizeWarnText}>
+          <span className="uw-pill-status" role="status">
+            <span className="uw-pill-dot" aria-hidden="true" />
+            <span className="uw-pill-label">{sizeWarnText}</span>
+          </span>
+          <button
+            type="button"
+            className="uw-pill-close"
+            aria-label={t('uwClose')}
+            onClick={() => setWarnDismissedFor(warnKey)}
+          >
+            <svg width="10" height="10" viewBox="0 0 14 14" aria-hidden="true">
+              <path
+                d="M3 3l8 8M11 3l-8 8"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
+        </div>
+      )}
       <div
         ref={groupRef}
         className="uw-pill"
@@ -738,6 +793,44 @@ ${action ? t(action.labelKey) : ''}`,
           onSignIn={() => account.signIn()}
           onFocusEditor={() => window.aiOfficeTabs?.focusActive()}
         />
+      )}
+      {saveBlockCopy && (
+        <ActionModal
+          labelledBy={blockTitleId}
+          describedBy={blockBodyId}
+          className="uw-save-block-modal"
+          onCancel={() => setBlockDismissed(true)}
+        >
+          <h3 id={blockTitleId}>{saveBlockCopy.title}</h3>
+          <p id={blockBodyId}>{saveBlockCopy.body}</p>
+          <div className="modal-buttons">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setBlockDismissed(true)}
+            >
+              {saveBlockCopy.close}
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              aria-disabled={savingLocal ? 'true' : undefined}
+              aria-busy={savingLocal ? 'true' : undefined}
+              onClick={() => {
+                if (savingLocal) return
+                setSavingLocal(true)
+                void saveLocalCopy(status.path)
+                  .then((saved) => {
+                    if (saved) setBlockDismissed(true)
+                  })
+                  .catch(() => undefined)
+                  .finally(() => setSavingLocal(false))
+              }}
+            >
+              {saveBlockCopy.saveLocal}
+            </button>
+          </div>
+        </ActionModal>
       )}
     </>
   )
