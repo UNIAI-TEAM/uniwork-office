@@ -2875,13 +2875,25 @@ export class UniworkDocsService {
    * FD-11 / FD11-C-R1-04: changing the organization also bumps `sessionEpoch`
    * so an in-flight own action from the previous org never pushes `treeChanged`
    * after the switch.
+   *
+   * An org-less status push is ambiguous, so the caller says which it is:
+   * `orgGone` false = a transient `/orgs` read failure (status.orgsError set)
+   * keeps the last known org and does not bump, so A -> null -> A is not a
+   * boundary; `orgGone` true = a lasting loss (the chosen org deactivated or
+   * the S16 picker came back: org undefined without orgsError) latches null
+   * and bumps when the session actually had an org.
    */
-  noteSelectedOrg(orgId: string | null): void {
+  noteSelectedOrg(orgId: string | null, orgGone = false): void {
     const prevOrgId =
       this.sessionOrgId !== undefined ? this.sessionOrgId : (this.deps.selectedOrg()?.id ?? null)
     if (orgId !== null) {
       this.sessionOrgId = orgId
       if (prevOrgId !== null && prevOrgId !== orgId) {
+        this.sessionEpoch += 1
+      }
+    } else if (orgGone) {
+      this.sessionOrgId = null
+      if (prevOrgId !== null) {
         this.sessionEpoch += 1
       }
     } else if (this.sessionOrgId === undefined) {

@@ -1050,8 +1050,11 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
       onUniworkAccountStatus((status) => {
         // the session's account may have changed: it becomes the last owner
         service.noteSessionIdentity()
-        // G8-16 S16: changing the organization reloads the library data
-        service.noteSelectedOrg(status.org?.id ?? null)
+        // G8-16 S16: changing the organization reloads the library data. An
+        // org-less push carrying orgsError is a transient /orgs failure; an
+        // org-less push without it (deactivation, the picker) is a lasting
+        // loss and a real session boundary (R5-01).
+        service.noteSelectedOrg(status.org?.id ?? null, status.orgsError === undefined)
         void syncCenter.noteAccount()
         const identity = uniworkSessionIdentity()
         if (identity) {
