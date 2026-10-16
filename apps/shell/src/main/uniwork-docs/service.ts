@@ -857,6 +857,8 @@ export class UniworkDocsService {
    * An entry lives exactly as long as its upload call.
    */
   private readonly uploads = new Map<string, AbortController>()
+  /** bumped on lockSession so an own action started before sign-out/switch never pushes treeChanged after */
+  private sessionEpoch = 0
 
   constructor(deps: UniworkDocsServiceDeps) {
     this.deps = deps
@@ -2196,6 +2198,7 @@ export class UniworkDocsService {
     this.plannedRamOnly.delete(scopeToken)
 
     // Step 1: stop runtime, block new commits, bounded receipt wait (30s)
+    this.sessionEpoch += 1
     this.deps.stopRuntime?.()
     if (this.queueSession) {
       this.stoppingQueueSessions.add(this.queueSession.id)
@@ -3350,12 +3353,43 @@ export class UniworkDocsService {
    * is the server's 409 `folder_name_taken`, which the renderer also shows at
    * the field - only folders collide.
    */
+  /**
+   * FD-11: notify the tree-changed coalescer for `workspaceId` only while the
+   * session that started the action (`started`) is still the live session. A
+   * response arriving after sign-out, account switch, or `lockSession` must not
+   * reopen a coalescer window for the outgoing account.
+   */
+  private captureActionSession(): { identity: SessionIdentity; epoch: number } {
+    const identity = this.liveIdentity()
+    if (!identity) throw new UniworkDocError('not_signed_in')
+    return { identity, epoch: this.sessionEpoch }
+  }
+
+  private pushTreeChangedFor(
+    started: { identity: SessionIdentity | null; epoch: number },
+    workspaceId: string,
+  ): void {
+    if (this.sessionEpoch !== started.epoch) return
+    const current = this.deps.identity()
+    const owner = started.identity
+    if (
+      !owner ||
+      !current ||
+      current.accountId !== owner.accountId ||
+      current.deploymentId !== owner.deploymentId ||
+      current.deviceSessionId !== owner.deviceSessionId
+    ) {
+      return
+    }
+    this.deps.pushTreeChanged?.({ workspaceId })
+  }
+
   createFolder(
     input: UniworkCreateFolderInput,
   ): Promise<UniworkDocActionResult<UniworkDocSummary>> {
     return actionResult(
       async () => {
-        if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+        const session = this.captureActionSession()
         const workspaceId = typeof input.workspaceId === 'string' ? input.workspaceId : ''
         if (!workspaceId) throw new UniworkDocError('not_found')
         const title = requireName(input.title, MAX_FOLDER_NAME_RUNES)
@@ -3366,7 +3400,7 @@ export class UniworkDocsService {
           idempotencyKey: this.newIdempotencyKey(),
         })
         // FD-11: the new folder is a row in its parent's tree and contents
-        this.deps.pushTreeChanged?.({ workspaceId: created.workspaceId })
+        this.pushTreeChangedFor(session, created.workspaceId)
         return created
       },
       { nameField: true },
@@ -3383,7 +3417,7 @@ export class UniworkDocsService {
     input: UniworkMoveDocumentInput,
   ): Promise<UniworkDocActionResult<UniworkMoveResult>> {
     return actionResult(async () => {
-      if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+      const session = this.captureActionSession()
       const documentId = typeof input.documentId === 'string' ? input.documentId : ''
       if (!documentId) throw new UniworkDocError('not_found')
       const moved = await this.api().moveDocument({
@@ -3393,7 +3427,7 @@ export class UniworkDocsService {
       })
       // FD-11: the entry left one folder's rows and joined another's (both are
       // in the same workspace, which is all the push names)
-      this.deps.pushTreeChanged?.({ workspaceId: moved.summary.workspaceId })
+      this.pushTreeChangedFor(session, moved.summary.workspaceId)
       return moved
     })
   }
@@ -3408,7 +3442,7 @@ export class UniworkDocsService {
   createDocument(input: UniworkCreateDocInput): Promise<UniworkDocActionResult<UniworkDocSummary>> {
     return actionResult(
       async () => {
-        if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+        const session = this.captureActionSession()
         const target = this.docTarget(input)
         const name = requireName(input.name)
         const created = await this.api().createBlank({
@@ -3419,7 +3453,7 @@ export class UniworkDocsService {
           idempotencyKey: this.newIdempotencyKey(),
         })
         // FD-11: a new document changes the folder's contents for every view
-        this.deps.pushTreeChanged?.({ workspaceId: target.workspaceId })
+        this.pushTreeChangedFor(session, target.workspaceId)
         return created
       },
       { nameField: true },
@@ -3441,7 +3475,7 @@ export class UniworkDocsService {
    */
   uploadDocument(input: UniworkUploadDocInput): Promise<UniworkDocActionResult<UniworkDocSummary>> {
     return actionResult(async () => {
-      if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+      const session = this.captureActionSession()
       const target = this.docTarget(input)
       const uploadId = requireUploadId(input.uploadId)
       if (typeof input.path !== 'string' || !input.path) throw new UniworkDocError('not_found')
@@ -3493,7 +3527,7 @@ export class UniworkDocsService {
           })
         this.deps.pushUploadProgress?.({ uploadId, path: input.path, loaded: total, total })
         // FD-11: the uploaded document is a new row in its folder
-        this.deps.pushTreeChanged?.({ workspaceId: target.workspaceId })
+        this.pushTreeChangedFor(session, target.workspaceId)
         return created
       } finally {
         // a newer upload with the same id (never minted twice) keeps its controller
@@ -3532,7 +3566,7 @@ export class UniworkDocsService {
   ): Promise<UniworkDocActionResult<UniworkDocSummary>> {
     return actionResult(
       async () => {
-        if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+        const session = this.captureActionSession()
         if (typeof documentId !== 'string' || !documentId) throw new UniworkDocError('not_found')
         // the empty name and the widest cap are refused without a request; the
         // folder's own, tighter cap needs the document's kind, which the read
@@ -3551,7 +3585,7 @@ export class UniworkDocsService {
         this.selfRenamed.set(documentId, renamed.revision)
         // FD-11: the row's title changed for every view of the tree (not for a
         // no-op rename, which returned above)
-        this.deps.pushTreeChanged?.({ workspaceId: renamed.summary.workspaceId })
+        this.pushTreeChangedFor(session, renamed.summary.workspaceId)
         await this.afterLocalRename(documentId, renamed.summary.title)
         return renamed.summary
       },
@@ -5233,8 +5267,6 @@ export class UniworkDocsService {
       // the copy"
       return failed()
     }
-    // FD-11: the copy is a new row in the folder it landed in
-    this.deps.pushTreeChanged?.({ workspaceId: created.summary.workspaceId })
     const copyId = created.summary.id
 
     // step 2: the local bytes become version 2 of the copy; one retry, same keys
@@ -5242,6 +5274,7 @@ export class UniworkDocsService {
     // BE-12F-02: the account that made the copy; the cleanup below only talks to the server
     // while it is still signed in (the new account has no access to this copy)
     const owner = this.deps.identity()
+    const copySession = { identity: owner, epoch: this.sessionEpoch }
     let committed = false
     for (let attempt = 0; attempt < 2 && !committed && !aborted(); attempt += 1) {
       try {
@@ -5299,6 +5332,8 @@ export class UniworkDocsService {
       }
     }
     if (committed) {
+      // FD-11 / FD11-C-R1-05: announce the copy only once its bytes are committed
+      this.pushTreeChangedFor(copySession, created.summary.workspaceId)
       if (aborted()) {
         console.warn(`uniwork docs: save-copy: the dialog closed after copy ${copyId} was saved`)
         return { kind: 'closed' }

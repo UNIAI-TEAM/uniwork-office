@@ -414,17 +414,22 @@ function setup(server: ReturnType<typeof fakeServer>, options: { pathOpen?: bool
     showCopyFailed: vi.fn(),
     chooseUnsavedClose: vi.fn(async () => 'cancel'),
   }
+  let currentIdentity: {
+    accountId: string
+    deviceSessionId: string
+    deploymentId: string
+  } | null = { accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' }
   const service = new UniworkDocsService({
     userDataDir: dir,
     appVersion: () => '0.0.0',
     profile: () => profile,
     channel: () => 'stable',
     applyProfile: async () => 'unchanged',
-    identity: () => ({ accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' }),
+    identity: () => currentIdentity,
     keystoreLocked: () => false,
     selectedOrg: () => ({ id: 'org_a', slug: 'acme' }),
     authorized: <T>(call: (token: string) => Promise<T>) => call(TOKEN),
-    fetch: server.fetch,
+    fetch: (url, init) => server.fetch(url, init),
     openPath: () => true,
     isPathOpen: () => options.pathOpen === true,
     requestModuleSave: () => false,
@@ -450,6 +455,9 @@ function setup(server: ReturnType<typeof fakeServer>, options: { pathOpen?: bool
     titleRenames,
     uploadFile,
     treeChanged,
+    setIdentity: (next: typeof currentIdentity) => {
+      currentIdentity = next
+    },
   }
 }
 
@@ -1381,6 +1389,30 @@ describe('the FD-11 tree-changed push', () => {
     // service refuses itself: neither changed the tree
     await ctx.service.renameDocument(DOC, 'Q4 plan.docx')
     await ctx.service.createFolder({ workspaceId: WS, parentId: null, title: 'a'.repeat(256) })
+    expect(ctx.treeChanged).toEqual([])
+  })
+
+  it('FD11-C-R1-04: suppresses pushTreeChanged when an own folder action resolves after sign-out or account switch', async () => {
+    const server = fakeServer()
+    const origFetch = server.fetch
+    const ctx = setup(server)
+    server.fetch = (async (url: string, init: RequestInit) => {
+      const response = await origFetch(url, init)
+      if (
+        new URL(url).pathname === `/api/v1/workspaces/${WS}/documents` &&
+        init.method === 'POST'
+      ) {
+        ctx.setIdentity(null)
+      }
+      return response
+    }) as typeof server.fetch
+
+    const created = await ctx.service.createFolder({
+      workspaceId: WS,
+      parentId: null,
+      title: 'Late folder',
+    })
+    expect(created.ok).toBe(true)
     expect(ctx.treeChanged).toEqual([])
   })
 })

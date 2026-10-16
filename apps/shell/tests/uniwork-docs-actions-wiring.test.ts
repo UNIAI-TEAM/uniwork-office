@@ -227,4 +227,72 @@ describe('the S18 action IPC', () => {
       vi.unstubAllGlobals()
     }
   })
+
+  it('FD11-C-R1-06: pushes tree-changed over IPC when a feed page (including removal-only) commits through createSyncRuntime', async () => {
+    const { handle, sent } = await setup()
+    const { createSyncRuntime } = await import('../src/main/uniwork-docs/wiring')
+    const { createTreeChangedCoalescer } = await import('../src/main/uniwork-docs/tree-changed')
+    const coalescer = createTreeChangedCoalescer({
+      emit: (workspaceId) =>
+        sent.push({ channel: UNIWORK_DOC_CHANNELS.treeChanged, payload: { workspaceId } }),
+    })
+    const runtime = createSyncRuntime(handle.service, {
+      treeChanged: (workspaceId) => coalescer.notify(workspaceId),
+      fetch: async (input) => {
+        const url = new URL(String(input))
+        if (url.pathname.endsWith('/orgs/org_a/office/capabilities')) {
+          return new Response(
+            JSON.stringify({
+              sync_feed: true,
+              sync_write: true,
+              offline_library: false,
+              ai_uniwork: false,
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          )
+        }
+        if (url.pathname.endsWith('/orgs/org_a/workspaces')) {
+          return new Response(
+            JSON.stringify({ workspaces: [{ id: 'ws_1', name: 'Workspace 1', slug: 'ws-1' }] }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          )
+        }
+        if (url.pathname.endsWith('/workspaces/ws_1/documents/changes')) {
+          return new Response(
+            JSON.stringify({
+              phase: 'feed',
+              changes: [],
+              feed: [
+                {
+                  document_id: 'doc_1',
+                  change_kind: 'removal',
+                  kind: '',
+                  revision: 9,
+                  current_version: 0,
+                  version_id: null,
+                  archived: false,
+                  removal: 'permission_revoked',
+                },
+              ],
+              has_more: false,
+              next_cursor: 'feed:1',
+              expires_at: '2026-10-20T00:00:00Z',
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          )
+        }
+        return new Response('{}', { status: 404 })
+      },
+    })
+
+    await runtime.tick()
+    await vi.waitFor(() =>
+      expect(sent.some((message) => message.channel === UNIWORK_DOC_CHANNELS.treeChanged)).toBe(
+        true,
+      ),
+    )
+    expect(sent.filter((message) => message.channel === UNIWORK_DOC_CHANNELS.treeChanged)).toEqual([
+      { channel: UNIWORK_DOC_CHANNELS.treeChanged, payload: { workspaceId: 'ws_1' } },
+    ])
+  })
 })

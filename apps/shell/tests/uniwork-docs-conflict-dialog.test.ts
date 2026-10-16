@@ -1608,6 +1608,8 @@ describe('G5-12 Save as a copy (main)', () => {
     })
     expect(callsTo(server, `${COPY}/archive`)).toHaveLength(1)
     expect(server.state.copy!.archived).toBe(true)
+    // FD11-C-R1-05: an uncommitted copy that was archived never announces a tree change
+    expect(ctx.treeChanged).toEqual([])
     expect(binding(path)).toMatchObject({ state: 'conflict' })
     expect(await storedIntent(ctx, path)).toEqual(intentBefore)
     expect(readFileSync(path, 'utf8')).toBe('mine v4')
