@@ -85,6 +85,9 @@ function makeApi() {
         doc('c', 'Sheet.xlsx', 'xlsx'),
       ]),
     ),
+    uniworkListSharedWithMe: vi.fn(async (): Promise<UniworkResult<UniworkDocListPage>> =>
+      page([]),
+    ),
     uniworkOpenDocument: vi.fn(async (): Promise<UniworkResult<{ path: string }>> => ({
       ok: true,
       value: { path: 'C:\\x' },
@@ -461,6 +464,93 @@ describe('picker dialog', () => {
     const list = host.querySelector('#uw-pick-list')
     expect(list).not.toBeNull()
     expect(search().getAttribute('aria-controls')).toBe('uw-pick-list')
+  })
+
+  describe('FD-14: bodies where every loaded row is hidden but more pages exist', () => {
+    const picture = (id: string) => doc(id, `Pic ${id}.png`, null)
+    const hint = () => host.querySelector<HTMLElement>('.uw-pick-hidden')
+
+    const chooseShared = async () => {
+      const select = host.querySelector<HTMLSelectElement>('.uw-pick-ws')!
+      await act(async () => {
+        const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')!.set!
+        setter.call(select, '\u0000shared')
+        select.dispatchEvent(new Event('change', { bubbles: true }))
+      })
+      await flush()
+    }
+
+    it('FE14-R1-03: the workspace empty body offers Load more, and it loads the next page', async () => {
+      api.uniworkListDocuments
+        .mockResolvedValueOnce(page([picture('1'), picture('2')], 'cur-1'))
+        .mockResolvedValueOnce(page([doc('b', 'B.pdf', 'pdf')]))
+      await openPicker()
+      expect(rows()).toHaveLength(0)
+      expect(dialog()!.textContent).toContain('No documents in this workspace yet.')
+      await click(buttonByText('Load more'))
+      expect(api.uniworkListDocuments).toHaveBeenLastCalledWith({
+        workspaceId: 'w1',
+        query: undefined,
+        cursor: 'cur-1',
+        limit: 50,
+      })
+      expect(rows().map((r) => r.querySelector('.uw-pick-row-title')!.textContent)).toEqual([
+        'B.pdf',
+      ])
+      expect(buttonByText('Load more')).toBeUndefined()
+    })
+
+    it('FE14-R1-01/03: the shared empty body offers Load more, and it loads the next page', async () => {
+      api.uniworkListSharedWithMe
+        .mockResolvedValueOnce(page([picture('1')], 'sh-1'))
+        .mockResolvedValueOnce(page([doc('s', 'Shared.docx', 'docx')]))
+      await openPicker()
+      await chooseShared()
+      expect(rows()).toHaveLength(0)
+      expect(dialog()!.textContent).toContain('Nothing has been shared with you directly yet.')
+      expect(hint()!.textContent).toBe('Hidden because UniWork Office cannot open their format: 1')
+      await click(buttonByText('Load more'))
+      expect(api.uniworkListSharedWithMe).toHaveBeenLastCalledWith({ cursor: 'sh-1', limit: 50 })
+      expect(rows().map((r) => r.querySelector('.uw-pick-row-title')!.textContent)).toEqual([
+        'Shared.docx',
+      ])
+    })
+
+    it('FE14-R1-02: no "documents you add will show up" hint while rows are hidden or more pages exist', async () => {
+      // every loaded row hidden, no more pages: the count line explains the empty list
+      api.uniworkListDocuments.mockResolvedValueOnce(page([picture('1')]))
+      await openPicker()
+      expect(dialog()!.textContent).not.toContain('Documents you add in UniWork will show up here.')
+      expect(hint()).not.toBeNull()
+    })
+
+    it('FE14-R1-02: nothing hidden and nothing more to load keeps the plain empty hint', async () => {
+      api.uniworkListDocuments.mockResolvedValue(page([]))
+      await openPicker()
+      expect(dialog()!.textContent).toContain('Documents you add in UniWork will show up here.')
+    })
+
+    it('FE14-R1-02: a first page with no rows at all but a next cursor shows no empty hint', async () => {
+      api.uniworkListDocuments.mockResolvedValueOnce(page([], 'cur-1'))
+      await openPicker()
+      expect(dialog()!.textContent).not.toContain('Documents you add in UniWork will show up here.')
+      expect(buttonByText('Load more')).toBeTruthy()
+    })
+
+    it('FE14-R1-05: the count line is a polite status the search box is described by', async () => {
+      await openPicker()
+      const line = hint()!
+      expect(line.id).toBeTruthy()
+      expect(line.getAttribute('role')).toBe('status')
+      expect(search().getAttribute('aria-describedby')).toBe(line.id)
+    })
+
+    it('FE14-R1-05: with nothing hidden the search box has no description to point at', async () => {
+      api.uniworkListDocuments.mockResolvedValue(page([doc('b', 'B.pdf', 'pdf')]))
+      await openPicker()
+      expect(hint()).toBeNull()
+      expect(search().hasAttribute('aria-describedby')).toBe(false)
+    })
   })
 
   it('has labelled controls', async () => {

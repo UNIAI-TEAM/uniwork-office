@@ -31,7 +31,6 @@ import {
   isDocTitleTooLong,
   initialPickerState,
   hiddenDocCount,
-  isNavigable,
   isOpenable,
   pickerBodyOf,
   pickerReducer,
@@ -111,13 +110,6 @@ function fetchPage(s: PickerState, cursor?: string): Promise<UniworkResult<Uniwo
   )
 }
 
-/**
- * "Open from UniWork" picker: workspace selector, debounced search, a paged
- * document list. The search box owns focus (combobox pattern): arrow keys move
- * the highlighted row, Enter opens it, Escape closes. Documents UniWork Office
- * cannot open are listed disabled with a reason, never hidden, so paging and
- * the "why isn't my file here" question stay simple.
- */
 /** the bodies that sit on a loaded list, where a count of hidden rows makes sense */
 const HIDDEN_HINT_BODIES: readonly PickerBody['kind'][] = [
   'list',
@@ -126,6 +118,17 @@ const HIDDEN_HINT_BODIES: readonly PickerBody['kind'][] = [
   'no-results',
 ]
 
+/** id of the muted "hidden because the format does not open" line the search box is described by */
+const HIDDEN_HINT_ID = 'uw-pick-hidden'
+
+/**
+ * "Open from UniWork" picker: workspace selector, debounced search, a paged
+ * document list. The search box owns focus (combobox pattern): arrow keys move
+ * the highlighted row, Enter opens it, Escape closes. Documents UniWork Office
+ * cannot open are not listed: they are hidden and counted in one muted status
+ * line, and every body that can end up with hidden rows still offers Load more,
+ * so a later page that holds openable documents stays reachable.
+ */
 export function UniworkOpenDialog({
   onClose,
   accountView,
@@ -457,6 +460,7 @@ export function UniworkOpenDialog({
   const hiddenCount = hiddenDocCount(state)
   const activeIndex = docs.findIndex((d) => d.id === state.activeId)
   const optionId = (index: number) => `uw-doc-${index}`
+  const showHiddenHint = hiddenCount > 0 && HIDDEN_HINT_BODIES.includes(body.kind)
 
   useEffect(() => {
     if (activeIndex < 0) return
@@ -569,7 +573,10 @@ export function UniworkOpenDialog({
         return (
           <div className="uw-pick-state">
             <p className="uw-pick-state-title">{t('uwPickEmpty')}</p>
-            <p className="uw-pick-state-hint">{t('uwPickEmptyHint')}</p>
+            {/* rows hidden or pages not loaded yet: the count line / Load more explain it, "add documents" would not be true */}
+            {hiddenCount === 0 && !state.list.nextCursor && (
+              <p className="uw-pick-state-hint">{t('uwPickEmptyHint')}</p>
+            )}
             {/* every loaded row may be one that cannot open: a later page can still hold some */}
             {renderLoadMore()}
           </div>
@@ -578,6 +585,8 @@ export function UniworkOpenDialog({
         return (
           <div className="uw-pick-state">
             <p className="uw-pick-state-title">{t('uwLibSharedEmpty')}</p>
+            {/* same dead end as the workspace list: the first page may hold only rows that cannot open */}
+            {renderLoadMore()}
           </div>
         )
       case 'no-results':
@@ -612,7 +621,6 @@ export function UniworkOpenDialog({
                 const editing = renaming?.id === doc.id ? renaming : null
                 const active = doc.id === state.activeId
                 const archived = row.archived === true
-                const navigable = isNavigable(doc)
                 // an archived row is a supported document that is parked; rows that cannot open are not listed
                 const updated = pickerRowMeta(doc, t, dateLocale)
                 const meta = archived
@@ -630,7 +638,7 @@ export function UniworkOpenDialog({
                       aria-disabled={archived ? undefined : !openable}
                       className={`uw-pick-row${active ? ' active' : ''}${openable ? '' : ' disabled'}${archived ? ' archived' : ''}${state.opening?.id === doc.id ? ' opening' : ''}`}
                       onMouseMove={() => {
-                        if (navigable && !active) dispatch({ type: 'set-active', id: doc.id })
+                        if (!active) dispatch({ type: 'set-active', id: doc.id })
                       }}
                       onClick={() => {
                         if (!editing) openDoc(doc.id)
@@ -784,6 +792,7 @@ export function UniworkOpenDialog({
             aria-expanded={body.kind === 'list'}
             aria-controls={body.kind === 'list' ? 'uw-pick-list' : undefined}
             aria-activedescendant={activeIndex >= 0 ? optionId(activeIndex) : undefined}
+            aria-describedby={showHiddenHint ? HIDDEN_HINT_ID : undefined}
             placeholder={t('uwPickSearchPh')}
             value={draft}
             autoFocus
@@ -796,8 +805,10 @@ export function UniworkOpenDialog({
         <div className="uw-pick-main">
           <div className="uw-pick-body" aria-busy={body.kind === 'loading'}>
             {renderBody()}
-            {hiddenCount > 0 && HIDDEN_HINT_BODIES.includes(body.kind) && (
-              <p className="uw-pick-hidden">{t('uwPickHiddenFormats', { count: hiddenCount })}</p>
+            {showHiddenHint && (
+              <p className="uw-pick-hidden" id={HIDDEN_HINT_ID} role="status">
+                {t('uwPickHiddenFormats', { count: hiddenCount })}
+              </p>
             )}
           </div>
           {info && (
