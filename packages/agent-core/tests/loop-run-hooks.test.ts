@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   AgentLoop,
   type AgentMessage,
+  type AgentRunResult,
   type AgentSkill,
   type AgentStreamCallbacks,
   type AgentToolCall,
@@ -167,6 +168,66 @@ describe('AgentLoop run hooks', () => {
     expect(log.at(-2)).toBe(`end:${id}:false:error`)
   })
 
+  it('the unusable-input cap ends the run with outcome error, before onError', async () => {
+    const log: string[] = []
+    const transport = scriptedTransport(
+      Array.from({ length: 3 }, (_, n) => (cb: AgentStreamCallbacks) => {
+        cb.onToolCall({ id: `e${n}`, name: 'apply_ops', input: {} })
+        cb.onDone()
+      }),
+    )
+    const skill = makeSkill()
+    skill.tools = [
+      {
+        name: 'apply_ops',
+        description: 'd',
+        inputSchema: { type: 'object', properties: {}, required: ['ops'] },
+      },
+    ]
+    const loop = new AgentLoop({ transport, skill, events: recorder(log) })
+    loop.run('go')
+    await settle()
+    const id = onePair(log)
+    expect(log.slice(-2)).toEqual([`end:${id}:false:error`, 'error'])
+  })
+
+  it('the every-tool-failed cap ends the run with outcome error, before onError', async () => {
+    const log: string[] = []
+    const transport = scriptedTransport(
+      Array.from({ length: 8 }, (_, n) => (cb: AgentStreamCallbacks) => {
+        // vary the input so the identical-turn guard does not trip first
+        cb.onToolCall({ id: `t${n}`, name: 'do_thing', input: { n } })
+        cb.onDone()
+      }),
+    )
+    const skill = makeSkill(() => ({
+      output: 'Unknown tool: nope',
+      isError: true,
+      summary: 'nope',
+    }))
+    const loop = new AgentLoop({ transport, skill, events: recorder(log) })
+    loop.run('go')
+    await settle()
+    const id = onePair(log)
+    expect(log.slice(-2)).toEqual([`end:${id}:false:error`, 'error'])
+  })
+
+  it('the identical-turn cap ends the run with outcome error, before onError', async () => {
+    const log: string[] = []
+    const sameTurn = (cb: AgentStreamCallbacks) => {
+      cb.onToolCall(call('same'))
+      cb.onDone()
+    }
+    const transport = scriptedTransport(Array.from({ length: 4 }, () => sameTurn))
+    // read-only tool: identical output every time, nothing mutated
+    const skill = makeSkill(() => ({ output: 'attachment body', summary: 'read' }))
+    const loop = new AgentLoop({ transport, skill, events: recorder(log) })
+    loop.run('go')
+    await settle()
+    const id = onePair(log)
+    expect(log.slice(-2)).toEqual([`end:${id}:false:error`, 'error'])
+  })
+
   it('abort mid-tool ends the run with outcome aborted, paired', async () => {
     const log: string[] = []
     const transport = scriptedTransport([
@@ -219,6 +280,33 @@ describe('AgentLoop run hooks', () => {
     expect(log.slice(-2)).toEqual([`end:${id}:false:aborted`, 'done'])
   })
 
+  it('cancel() during a retry backoff ends the run as aborted, before onDone', async () => {
+    const log: string[] = []
+    const done: AgentRunResult[] = []
+    const transport = scriptedTransport([
+      (cb) => cb.onError('Claude returned no content (empty stream)'),
+    ])
+    const loop = new AgentLoop({
+      transport,
+      skill: makeSkill(),
+      events: {
+        ...recorder(log),
+        onDone: (result) => {
+          log.push('done')
+          done.push(result)
+        },
+      },
+    })
+    loop.run('go')
+    await settle() // the empty-stream retry now waits on its 1s timer
+    loop.cancel()
+    await settle()
+    const id = onePair(log)
+    expect(log.slice(-2)).toEqual([`end:${id}:false:aborted`, 'done'])
+    // the turn produced nothing: the run rolls back and reports a plain cancel
+    expect(done).toEqual([{ text: '', cancelled: true, turnLimit: false }])
+  })
+
   it('reset() during a run closes the open run as aborted', async () => {
     const log: string[] = []
     const transport = scriptedTransport([(cb) => cb.onDelta('thinking')])
@@ -229,6 +317,62 @@ describe('AgentLoop run hooks', () => {
     await settle()
     const id = onePair(log)
     expect(log.at(-1)).toBe(`end:${id}:false:aborted`)
+  })
+
+  it('reset() while a tool is in flight ends the run as aborted and may-have-mutated', async () => {
+    const log: string[] = []
+    const partial: string[] = []
+    const transport = scriptedTransport([
+      (cb) => {
+        cb.onToolCall(call('a'))
+        cb.onDone()
+      },
+    ])
+    const skill = makeSkill(() => {
+      partial.push('half the edit applied') // the tool wrote part of its edit...
+      return new Promise<ToolExecution>(() => {}) // ...then awaits something that never finishes
+    })
+    const loop = new AgentLoop({ transport, skill, events: recorder(log) })
+    loop.run('go')
+    await settle()
+    loop.reset()
+    await settle()
+    const id = onePair(log)
+    expect(partial).toEqual(['half the edit applied'])
+    // the run is dropped with the tool mid-execution: its partial edit must stay
+    // undoable, so the run reports may-have-mutated like a mid-tool stop
+    expect(log.at(-1)).toBe(`end:${id}:true:aborted`)
+  })
+
+  it('a tool left behind by reset() does not mark a later run as mutated', async () => {
+    const log: string[] = []
+    let release: () => void = () => {}
+    const hung = new Promise<ToolExecution>((resolve) => {
+      release = () => resolve({ output: 'late', summary: 'late', mutated: true })
+    })
+    const transport = scriptedTransport([
+      (cb) => {
+        cb.onToolCall(call('a'))
+        cb.onDone()
+      },
+      (cb) => {
+        cb.onDelta('answer')
+        cb.onDone()
+      },
+    ])
+    const loop = new AgentLoop({ transport, skill: makeSkill(() => hung), events: recorder(log) })
+    loop.run('one')
+    await settle()
+    loop.reset()
+    loop.run('two')
+    await settle()
+    const starts = log.filter((l) => l.startsWith('start:')).map((l) => l.slice('start:'.length))
+    const ends = () => log.filter((l) => l.startsWith('end:'))
+    expect(ends()).toEqual([`end:${starts[0]}:true:aborted`, `end:${starts[1]}:false:done`])
+    release() // the abandoned tool finally returns, after the second run ended
+    await settle()
+    // no late close, and the second run's verdict stands
+    expect(ends()).toEqual([`end:${starts[0]}:true:aborted`, `end:${starts[1]}:false:done`])
   })
 
   it('the turn limit still pairs the hooks with outcome done', async () => {
