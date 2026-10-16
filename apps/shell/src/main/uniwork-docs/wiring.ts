@@ -807,6 +807,17 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   ipcMain.handle(UNIWORK_DOC_CHANNELS.listFolders, (_event, workspaceId: unknown) =>
     service.listFolders(workspaceId as string),
   )
+  // FD-11: the folder-tree surface exists from this commit on so the renderer
+  // can be built against it in parallel. The client/service calls behind these
+  // channels land in the next commits; until then each answers a plain failure
+  // instead of leaving the channel unhandled (which would reject the invoke).
+  const folderTreePending = () =>
+    Promise.resolve({ ok: false as const, error: 'server_error' as const })
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.folderTree, folderTreePending)
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.listChildren, folderTreePending)
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.searchDocuments, folderTreePending)
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.createFolder, folderTreePending)
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.moveDocument, folderTreePending)
   ipcMain.handle(UNIWORK_DOC_CHANNELS.openDocument, (_event, documentId: unknown) =>
     service.openDocument(documentId as string),
   )

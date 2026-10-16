@@ -175,6 +175,13 @@ export type UniworkDocErrorCode =
   | 'timeout'
   | 'server_error'
   | 'malformed_response'
+  // FD-11 (UNI-1809): the folder tree's own refusals, mapped from the server's
+  // `document_too_deep` / `document_cycle` / `document_parent_kind` envelopes
+  // (never a generic server_error). `folder_name_taken` is a field error and
+  // lives in UniworkDocNameError.
+  | 'document_too_deep'
+  | 'document_cycle'
+  | 'document_parent_kind'
   // the account's durable sync store could not be opened (locked keychain) or
   // refused the pending intent (budget full)
   | 'keystore_locked'
@@ -223,6 +230,82 @@ export interface UniworkDocSummary {
   canManage?: boolean
   /** the row is in the trash (`archived_at` present); it stays listed so it can be restored */
   archived?: boolean
+  /**
+   * FD-11: what the row is. Absent on a row from a route the app reads as
+   * files only (`listDocuments`, shared-with-me), whose rows are all files
+   * anyway; `listChildren` and the title search carry it.
+   */
+  kind?: UniworkEntryKind
+  /** FD-11: the folder/page holding the document; null = the workspace root */
+  parentId?: string | null
+  /**
+   * FD-11: the ancestors of a search row, root first. Only the title search
+   * sends one (cut at the first unreadable ancestor).
+   */
+  path?: { id: string; title: string }[]
+}
+
+/** FD-11: the three entry kinds the folder tree holds */
+export type UniworkEntryKind = 'folder' | 'file' | 'page'
+
+/**
+ * FD-11: one node of `GET /workspaces/{ws}/documents/tree?folders_only=true`,
+ * to depth 20 (the server's own cap).
+ */
+export interface UniworkFolderNode {
+  id: string
+  parentId: string | null
+  title: string
+  position: number
+  children: UniworkFolderNode[]
+}
+
+/** FD-11: one contents page of a folder (folders + files + pages, server order) */
+export interface UniworkFolderChildren {
+  items: UniworkDocSummary[]
+  nextCursor: string | null
+}
+
+/** FD-11: the contents of one folder; `parentId: null` = the workspace root */
+export interface UniworkFolderQuery {
+  workspaceId: string
+  parentId: string | null
+  cursor?: string
+  limit?: number
+}
+
+/** FD-11: title search across a workspace; `kind: 'all'` sends no kind filter */
+export interface UniworkSearchQuery {
+  workspaceId: string
+  query: string
+  kind: 'all' | 'folder' | 'document'
+  cursor?: string
+  limit?: number
+}
+
+export type UniworkSearchPage = UniworkFolderChildren
+
+/** FD-11: create one folder in a workspace (root when `parentId` is null) */
+export interface UniworkCreateFolderInput {
+  workspaceId: string
+  parentId: string | null
+  title: string
+}
+
+/** FD-11: move a document/folder under another folder (null = the workspace root) */
+export interface UniworkMoveDocumentInput {
+  documentId: string
+  parentId: string | null
+}
+
+/**
+ * FD-11: the move's answer. `renamedTo` is the title the server gave the
+ * document when a name collision made it rename itself ("Name (2)"), null when
+ * the title is unchanged.
+ */
+export interface UniworkMoveResult {
+  summary: UniworkDocSummary
+  renamedTo: string | null
 }
 
 export interface UniworkDocListQuery {
@@ -278,18 +361,34 @@ export interface UniworkDocProperties {
   updatedById: string | null
 }
 
-/** errors a name field shows in place; every other failure is a toast */
-export type UniworkDocNameError = 'name_empty' | 'name_too_long'
+/**
+ * Errors a name field shows in place; every other failure is a toast.
+ * `folder_name_taken` (FD-11) is the server's 409 for a folder whose name
+ * already exists among its siblings: only folders collide, and the renderer
+ * shows it under the field, so it is a field error too.
+ */
+export type UniworkDocNameError = 'name_empty' | 'name_too_long' | 'folder_name_taken'
 /**
  * What a create/rename/archive/upload call may fail with. `name_empty` /
- * `name_too_long` are S18 field errors and `upload_cancelled` is an upload the
- * person aborted; none of them is part of `UniworkDocErrorCode`, because that
- * union is switched on exhaustively by the renderer's error copy table (a
- * cancelled upload is not an error to show at all).
+ * `name_too_long` / `folder_name_taken` are field errors and `upload_cancelled`
+ * is an upload the person aborted; none of them is part of
+ * `UniworkDocErrorCode`, because that union is switched on exhaustively by the
+ * renderer's error copy table (a cancelled upload is not an error to show at
+ * all).
  */
 export type UniworkDocActionError = UniworkDocErrorCode | UniworkDocNameError | 'upload_cancelled'
 export type UniworkDocActionResult<T> =
-  { ok: true; value: T } | { ok: false; error: UniworkDocActionError }
+  | { ok: true; value: T }
+  | {
+      ok: false
+      error: UniworkDocActionError
+      /**
+       * FD-11: `document_too_deep` carries the server's own depth cap (the
+       * envelope's `max`, else the server default 20) so the renderer can show
+       * it; absent for every other failure.
+       */
+      max?: number
+    }
 
 /** the formats the New document dialog offers (D accepts more; these three are the Office ones) */
 export type UniworkDocNewFormat = 'docx' | 'xlsx' | 'pptx'
@@ -334,6 +433,16 @@ export interface UniworkUploadProgress {
 export interface UniworkDocRenamedEvent {
   documentId: string
   title: string
+}
+
+/**
+ * FD-11: something in a workspace's document tree changed (a feed page with at
+ * least one row, or one of the app's own folder/tree actions), coalesced in
+ * main to at most one push per workspace per 500 ms. Carries the workspace id
+ * only - never a title or a path (no-PII rule).
+ */
+export interface UniworkTreeChangedEvent {
+  workspaceId: string
 }
 
 /**
@@ -947,6 +1056,31 @@ export interface HomeApi {
   uniworkRestoreDocument(documentId: string): Promise<UniworkDocActionResult<UniworkDocSummary>>
   /** the folders of one workspace, for the create/upload "Location" field */
   uniworkListFolders(workspaceId: string): Promise<UniworkResult<UniworkDocFolderRef[]>>
+  /**
+   * FD-11: the workspace's whole folder tree (`folders_only=true`), root nodes
+   * first, to the server's depth 20.
+   */
+  uniworkFolderTree(workspaceId: string): Promise<UniworkResult<UniworkFolderNode[]>>
+  /**
+   * FD-11: one folder's contents (folders + files + pages, server order);
+   * `parentId: null` is the workspace root.
+   */
+  uniworkListChildren(q: UniworkFolderQuery): Promise<UniworkResult<UniworkFolderChildren>>
+  /** FD-11: title search across a workspace; hits carry their `path` */
+  uniworkSearchDocuments(q: UniworkSearchQuery): Promise<UniworkResult<UniworkSearchPage>>
+  /** FD-11: create one folder in a workspace (root when `parentId` is null) */
+  uniworkCreateFolder(
+    i: UniworkCreateFolderInput,
+  ): Promise<UniworkDocActionResult<UniworkDocSummary>>
+  /**
+   * FD-11: move a document or folder under another folder (null = the root).
+   * `renamedTo` names the title the server gave it on a name collision.
+   */
+  uniworkMoveDocument(
+    i: UniworkMoveDocumentInput,
+  ): Promise<UniworkDocActionResult<UniworkMoveResult>>
+  /** FD-11: a workspace's document tree changed; returns an unsubscribe */
+  onUniworkTreeChanged(cb: (event: UniworkTreeChangedEvent) => void): () => void
   /** a document was renamed (here or elsewhere); returns an unsubscribe */
   onUniworkDocRenamed(cb: (event: UniworkDocRenamedEvent) => void): () => void
   uniworkOpenDocument(documentId: string): Promise<UniworkResult<{ path: string }>>
@@ -1529,6 +1663,18 @@ export const UNIWORK_DOC_CHANNELS = {
   restoreDocument: 'uniwork-doc:restore-document',
   /** invoke(workspaceId) -> the workspace's folders (S18 location field) */
   listFolders: 'uniwork-doc:list-folders',
+  /** invoke(workspaceId) -> the workspace's folder tree, root nodes first (FD-11) */
+  folderTree: 'uniwork-doc:folder-tree',
+  /** invoke(q) -> one folder's contents: folders + files + pages (FD-11) */
+  listChildren: 'uniwork-doc:list-children',
+  /** invoke(q) -> title search across the workspace; hits carry their path (FD-11) */
+  searchDocuments: 'uniwork-doc:search-documents',
+  /** invoke(i) -> create one folder in a workspace/folder (FD-11) */
+  createFolder: 'uniwork-doc:create-folder',
+  /** invoke(i) -> move a document or folder under another folder (FD-11) */
+  moveDocument: 'uniwork-doc:move-document',
+  /** push -> { workspaceId }: a workspace's document tree changed (FD-11; coalesced) */
+  treeChanged: 'uniwork-doc:tree-changed',
   /** push -> a document's title changed (S18 renamed-elsewhere announce) */
   docRenamed: 'uniwork-doc:doc-renamed',
   openDocument: 'uniwork-doc:open-document',
