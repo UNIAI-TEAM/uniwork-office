@@ -857,8 +857,13 @@ export class UniworkDocsService {
    * An entry lives exactly as long as its upload call.
    */
   private readonly uploads = new Map<string, AbortController>()
-  /** bumped on lockSession so an own action started before sign-out/switch never pushes treeChanged after */
+  /**
+   * bumped on lockSession and on an organization change so an own action
+   * started before sign-out/switch/org-change never pushes treeChanged after
+   */
   private sessionEpoch = 0
+  /** the org id of the current session epoch; undefined until first read or noted */
+  private sessionOrgId: string | null | undefined = undefined
 
   constructor(deps: UniworkDocsServiceDeps) {
     this.deps = deps
@@ -2867,8 +2872,17 @@ export class UniworkDocsService {
    * G8-16 S16: the selected organization changed. The member-name map belongs
    * to one org, so it is dropped (the library lists are re-read by the
    * renderer on the same status push; nothing else here caches a library).
+   * FD-11 / FD11-C-R1-04: changing the organization also bumps `sessionEpoch`
+   * so an in-flight own action from the previous org never pushes `treeChanged`
+   * after the switch.
    */
   noteSelectedOrg(orgId: string | null): void {
+    const prevOrgId =
+      this.sessionOrgId !== undefined ? this.sessionOrgId : (this.deps.selectedOrg()?.id ?? null)
+    this.sessionOrgId = orgId
+    if (prevOrgId !== orgId) {
+      this.sessionEpoch += 1
+    }
     if (this.orgMemberNamesOrg !== null && this.orgMemberNamesOrg !== orgId) {
       this.orgMemberNames = new Map()
       this.orgMemberNamesOrg = null
@@ -3356,12 +3370,15 @@ export class UniworkDocsService {
   /**
    * FD-11: notify the tree-changed coalescer for `workspaceId` only while the
    * session that started the action (`started`) is still the live session. A
-   * response arriving after sign-out, account switch, or `lockSession` must not
-   * reopen a coalescer window for the outgoing account.
+   * response arriving after sign-out, account switch, organization change, or
+   * `lockSession` must not reopen a coalescer window for the outgoing scope.
    */
   private captureActionSession(): { identity: SessionIdentity; epoch: number } {
     const identity = this.liveIdentity()
     if (!identity) throw new UniworkDocError('not_signed_in')
+    if (this.sessionOrgId === undefined) {
+      this.sessionOrgId = this.deps.selectedOrg()?.id ?? null
+    }
     return { identity, epoch: this.sessionEpoch }
   }
 
@@ -5152,6 +5169,7 @@ export class UniworkDocsService {
     if (!currentView.online) {
       return { kind: 'view', view: currentView }
     }
+    const copySession = this.captureActionSession()
     if (action.stopAi) this.deps.stopAiRun?.(chosen.path)
     const aborted = () => open.controller.signal.aborted
     const failed = async (): Promise<UniworkConflictReply> => ({
@@ -5279,10 +5297,11 @@ export class UniworkDocsService {
 
     // step 2: the local bytes become version 2 of the copy; one retry, same keys
     const commitKey = this.newIdempotencyKey()
-    // BE-12F-02: the account that made the copy; the cleanup below only talks to the server
-    // while it is still signed in (the new account has no access to this copy)
-    const owner = this.deps.identity()
-    const copySession = { identity: owner, epoch: this.sessionEpoch }
+    // BE-12F-02 / FD11-C-R2-01: the account and session epoch that started the
+    // copy (captured before the first await); the cleanup below only talks to
+    // the server while it is still signed in (the new account has no access to
+    // this copy) and the final push uses the immutable copySession.
+    const owner = copySession.identity
     let committed = false
     for (let attempt = 0; attempt < 2 && !committed && !aborted(); attempt += 1) {
       try {

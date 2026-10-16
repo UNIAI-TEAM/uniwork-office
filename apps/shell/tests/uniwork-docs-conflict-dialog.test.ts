@@ -19,7 +19,9 @@ import {
 import { BINDING_FILE, type Binding } from '../src/main/uniwork-docs/binding-store'
 import { INTENT_STORE_REGISTRATION, createIntentStore } from '../src/main/uniwork-sync/intent-store'
 import { DRAFTS_STORE_REGISTRATION, createDraftStore } from '../src/main/uniwork-sync/queue/drafts'
+import { PARKED_STORE_REGISTRATION } from '../src/main/uniwork-sync/queue/parked'
 import { PAUSE_STORE_REGISTRATION } from '../src/main/uniwork-sync/queue/pause'
+import { createTreeChangedCoalescer } from '../src/main/uniwork-docs/tree-changed'
 import { QUEUE_LIMITS } from '../src/main/uniwork-sync/queue/limits'
 import type { IntentRecordV2 } from '../src/main/uniwork-sync/queue/record'
 import { createSafeStorageKeyProvider } from '../src/main/uniwork-sync/keys'
@@ -366,6 +368,7 @@ function setup(
   })
   layer.register(INTENT_STORE_REGISTRATION)
   layer.register(DRAFTS_STORE_REGISTRATION)
+  layer.register(PARKED_STORE_REGISTRATION)
   layer.register(PAUSE_STORE_REGISTRATION)
   const syncStore = createSyncStoreAccess({
     layer,
@@ -1977,6 +1980,91 @@ describe('G5-12 Save as a copy (main)', () => {
     expect(warn).toHaveBeenCalledWith(expect.stringContaining(COPY))
     expect(binding(path)).toMatchObject({ state: 'conflict' })
     warn.mockRestore()
+  })
+
+  it('FD11-C-R1-04 / FD11-C-R2-01: suppresses treeChanged when lockSession runs while copy is gated and copy/upload/commit complete before view closure', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const emitted: Array<{ workspaceId: string }> = []
+    const scheduled: Array<{ run: () => void; ms: number; cancelled: boolean }> = []
+    const coalescer = createTreeChangedCoalescer({
+      emit: (workspaceId) => emitted.push({ workspaceId }),
+      schedule: (run, ms) => {
+        const entry = { run, ms, cancelled: false }
+        scheduled.push(entry)
+        return () => {
+          entry.cancelled = true
+        }
+      },
+    })
+    ctx.deps.pushTreeChanged = (event: { workspaceId: string }) =>
+      coalescer.notify(event.workspaceId)
+    ;(ctx.deps as Record<string, unknown>).stopRuntime = () => coalescer.cancel()
+
+    const path = await openAndConflict(ctx, server)
+    const { view } = await openDialog(ctx, path)
+
+    let copyReached!: () => void
+    const onCopyReached = new Promise<void>((resolve) => {
+      copyReached = resolve
+    })
+    let releaseCopy!: () => void
+    const copyGate = new Promise<void>((resolve) => {
+      releaseCopy = resolve
+    })
+    const origFetch = server.fetch.getMockImplementation()!
+    server.fetch.mockImplementation(async (url: string, init: RequestInit) => {
+      if (new URL(url).pathname === `/api/v1/documents/${DOC}/copies` && init.method === 'POST') {
+        copyReached()
+        await copyGate
+      }
+      return origFetch(url, init)
+    })
+
+    const saveCopyPromise = ctx.service.conflictAct(view.sessionId, {
+      kind: 'save-copy',
+      stopAi: false,
+    })
+    await onCopyReached
+
+    // Gate lockSession inside step 2 (after step 1 incremented sessionEpoch and
+    // cancelled the coalescer, before step 3 closes the conflict prompt) so the
+    // in-flight copy + upload + commit finish during the outgoing session teardown.
+    let lockStep2Reached!: () => void
+    const onLockStep2Reached = new Promise<void>((resolve) => {
+      lockStep2Reached = resolve
+    })
+    let releaseLockStep2!: () => void
+    const lockStep2Gate = new Promise<void>((resolve) => {
+      releaseLockStep2 = resolve
+    })
+    vi.mocked(ctx.deps.isPathOpen).mockReturnValue(true)
+    vi.mocked(ctx.deps.editorStateOf).mockImplementation(async () => {
+      lockStep2Reached()
+      await lockStep2Gate
+      return { dirty: false, aiRunning: false, aiEpoch: 0 }
+    })
+
+    const lockPromise = ctx.service.lockSession(undefined, undefined, { switch: true })
+    await onLockStep2Reached
+
+    releaseCopy()
+    const reply = await saveCopyPromise
+    expect(reply).toMatchObject({ kind: 'view', view: { notice: 'save_copy_done' } })
+    expect(callsTo(server, `${COPY}/uploads`)).toHaveLength(1)
+    expect(
+      callsTo(server, `${COPY}/versions/commit`).filter((c) => c.method === 'POST'),
+    ).toHaveLength(1)
+
+    releaseLockStep2()
+    await lockPromise
+
+    // Advance the 500 ms coalescer window: any live scheduled callback fires now.
+    for (const timer of scheduled) {
+      if (!timer.cancelled && timer.ms >= 500) timer.run()
+    }
+    expect(emitted).toEqual([])
+    expect(ctx.treeChanged).toEqual([])
   })
 })
 

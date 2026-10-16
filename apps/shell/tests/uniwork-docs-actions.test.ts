@@ -18,6 +18,7 @@ import { UniworkDocsService, type ConflictUi } from '../src/main/uniwork-docs/se
 import { BINDING_FILE, LAST_OWNER_FILE } from '../src/main/uniwork-docs/binding-store'
 import type { FetchLike } from '../src/main/uniwork-docs/client'
 import { UPLOAD_EXTENSIONS } from '../src/main/uniwork-docs/formats'
+import { createTreeChangedCoalescer } from '../src/main/uniwork-docs/tree-changed'
 
 /**
  * G8-17 S18: create a blank document, upload a file, rename, archive / restore
@@ -424,6 +425,10 @@ function setup(server: ReturnType<typeof fakeServer>, options: { pathOpen?: bool
     deviceSessionId: string
     deploymentId: string
   } | null = { accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' }
+  let currentOrg: { id: string; slug: string } | null = { id: 'org_a', slug: 'acme' }
+  let onStopRuntime: (() => void) | undefined
+  let onPushTreeChanged: (event: { workspaceId: string }) => void = (event) =>
+    treeChanged.push(event)
   const service = new UniworkDocsService({
     userDataDir: dir,
     appVersion: () => '0.0.0',
@@ -432,7 +437,7 @@ function setup(server: ReturnType<typeof fakeServer>, options: { pathOpen?: bool
     applyProfile: async () => 'unchanged',
     identity: () => currentIdentity,
     keystoreLocked: () => false,
-    selectedOrg: () => ({ id: 'org_a', slug: 'acme' }),
+    selectedOrg: () => currentOrg,
     authorized: <T>(call: (token: string) => Promise<T>) => call(TOKEN),
     fetch: (url, init) => server.fetch(url, init),
     openPath: () => true,
@@ -440,10 +445,11 @@ function setup(server: ReturnType<typeof fakeServer>, options: { pathOpen?: bool
     requestModuleSave: () => false,
     reloadPath: () => undefined,
     activePath: () => undefined,
+    stopRuntime: () => onStopRuntime?.(),
     pickUploadFile: async () => ({ path: uploadFile, name: basename(uploadFile) }),
     pushUploadProgress: (event) => progress.push(event),
     pushDocRenamed: (event) => renamed.push(event),
-    pushTreeChanged: (event) => treeChanged.push(event),
+    pushTreeChanged: (event) => onPushTreeChanged(event),
     notifyPathRenamed: (oldPath, newPath) => pathRenames.push({ oldPath, newPath }),
     notifyTitleRenamed: (path, title) => titleRenames.push({ path, title }),
     ui,
@@ -462,6 +468,15 @@ function setup(server: ReturnType<typeof fakeServer>, options: { pathOpen?: bool
     treeChanged,
     setIdentity: (next: typeof currentIdentity) => {
       currentIdentity = next
+    },
+    setSelectedOrg: (next: typeof currentOrg) => {
+      currentOrg = next
+    },
+    setStopRuntime: (fn: () => void) => {
+      onStopRuntime = fn
+    },
+    setPushTreeChanged: (fn: (event: { workspaceId: string }) => void) => {
+      onPushTreeChanged = fn
     },
   }
 }
@@ -1470,27 +1485,124 @@ describe('the FD-11 tree-changed push', () => {
     expect(ctx.treeChanged).toEqual([])
   })
 
-  it('FD11-C-R1-04: suppresses pushTreeChanged when an own folder action resolves after sign-out or account switch', async () => {
+  it('FD11-C-R1-04 / FD11-C-R2-02: suppresses pushTreeChanged when an own folder action resolves after lockSession() boundary', async () => {
     const server = fakeServer()
     const origFetch = server.fetch
     const ctx = setup(server)
+    const emitted: Array<{ workspaceId: string }> = []
+    const scheduled: Array<{ run: () => void; ms: number; cancelled: boolean }> = []
+    const coalescer = createTreeChangedCoalescer({
+      emit: (workspaceId) => emitted.push({ workspaceId }),
+      schedule: (run, ms) => {
+        const entry = { run, ms, cancelled: false }
+        scheduled.push(entry)
+        return () => {
+          entry.cancelled = true
+        }
+      },
+    })
+    ctx.setPushTreeChanged((event) => coalescer.notify(event.workspaceId))
+    ctx.setStopRuntime(() => coalescer.cancel())
+
+    let postReached!: () => void
+    const onPostReached = new Promise<void>((resolve) => {
+      postReached = resolve
+    })
+    let releasePost!: () => void
+    const postGate = new Promise<void>((resolve) => {
+      releasePost = resolve
+    })
     server.fetch = (async (url: string, init: RequestInit) => {
-      const response = await origFetch(url, init)
       if (
         new URL(url).pathname === `/api/v1/workspaces/${WS}/documents` &&
         init.method === 'POST'
       ) {
-        ctx.setIdentity(null)
+        postReached()
+        await postGate
       }
-      return response
+      return origFetch(url, init)
     }) as typeof server.fetch
 
-    const created = await ctx.service.createFolder({
+    const createPromise = ctx.service.createFolder({
       workspaceId: WS,
       parentId: null,
       title: 'Late folder',
     })
+    await onPostReached
+
+    // Drive the real lockSession() boundary while identity is still the outgoing
+    // session (before afterSignOut clears it), so only sessionEpoch suppresses
+    // the late own-action push.
+    await ctx.service.lockSession(undefined, undefined, { switch: true })
+
+    releasePost()
+    const created = await createPromise
     expect(created.ok).toBe(true)
+
+    for (const timer of scheduled) {
+      if (!timer.cancelled && timer.ms >= 500) timer.run()
+    }
+    expect(emitted).toEqual([])
+    expect(ctx.treeChanged).toEqual([])
+  })
+
+  it('FD11-C-R1-04: suppresses pushTreeChanged when an organization change occurs while an own folder action is gated', async () => {
+    const server = fakeServer()
+    const origFetch = server.fetch
+    const ctx = setup(server)
+    const emitted: Array<{ workspaceId: string }> = []
+    const scheduled: Array<{ run: () => void; ms: number; cancelled: boolean }> = []
+    const coalescer = createTreeChangedCoalescer({
+      emit: (workspaceId) => emitted.push({ workspaceId }),
+      schedule: (run, ms) => {
+        const entry = { run, ms, cancelled: false }
+        scheduled.push(entry)
+        return () => {
+          entry.cancelled = true
+        }
+      },
+    })
+    ctx.setPushTreeChanged((event) => coalescer.notify(event.workspaceId))
+    ctx.setStopRuntime(() => coalescer.cancel())
+
+    let postReached!: () => void
+    const onPostReached = new Promise<void>((resolve) => {
+      postReached = resolve
+    })
+    let releasePost!: () => void
+    const postGate = new Promise<void>((resolve) => {
+      releasePost = resolve
+    })
+    server.fetch = (async (url: string, init: RequestInit) => {
+      if (
+        new URL(url).pathname === `/api/v1/workspaces/${WS}/documents` &&
+        init.method === 'POST'
+      ) {
+        postReached()
+        await postGate
+      }
+      return origFetch(url, init)
+    }) as typeof server.fetch
+
+    const createPromise = ctx.service.createFolder({
+      workspaceId: WS,
+      parentId: null,
+      title: 'Org boundary folder',
+    })
+    await onPostReached
+
+    // Switch organization on the same account (as wiring.ts does on status change)
+    ctx.setSelectedOrg({ id: 'org_b', slug: 'beta' })
+    ctx.service.noteSelectedOrg('org_b')
+
+    releasePost()
+    const created = await createPromise
+    expect(created.ok).toBe(true)
+
+    for (const timer of scheduled) {
+      if (!timer.cancelled && timer.ms >= 500) timer.run()
+    }
+    expect(emitted).toEqual([])
     expect(ctx.treeChanged).toEqual([])
   })
 })
