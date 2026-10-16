@@ -62,9 +62,33 @@ describe('diffContent', () => {
     )
     const cards = [...el.querySelectorAll<HTMLElement>('.ow-dlg-diff-card')]
     expect(cards.map((c) => c.dataset.kind)).toEqual(['changed', 'added'])
-    expect(cards[0]!.querySelector('.ow-dlg-diff-left')!.textContent).toBe('mine')
-    expect(cards[0]!.querySelector('.ow-dlg-diff-right')!.textContent).toBe('theirs')
+    expect(cards[0]!.querySelector('.ow-dlg-diff-left .ow-dlg-diff-text')!.textContent).toBe('mine')
+    expect(cards[0]!.querySelector('.ow-dlg-diff-right .ow-dlg-diff-text')!.textContent).toBe(
+      'theirs',
+    )
     expect(cards[1]!.querySelector('.ow-dlg-diff-left')).toBeNull()
+  })
+
+  it('each card names its side in text: my version = the unsaved bytes, the head = the version on UniWork (UXF-V1-F1)', () => {
+    const lang = webLanguage()
+    const el = diffContent('Report.docx', [
+      { kind: 'changed', left: 'mine', right: 'theirs' },
+      { kind: 'removed', left: 'only mine' },
+      { kind: 'added', right: 'only theirs' },
+    ])
+    const sides = (c: HTMLElement) =>
+      [...c.querySelectorAll('.ow-dlg-diff-side')].map((n) => n.textContent)
+    const cards = [...el.querySelectorAll<HTMLElement>('.ow-dlg-diff-card')]
+    expect(sides(cards[0]!)).toEqual([
+      webText(lang, 'uwConflictColMine'),
+      webText(lang, 'uwConflictColServer'),
+    ])
+    expect(sides(cards[1]!)).toEqual([webText(lang, 'uwConflictColMine')])
+    expect(sides(cards[2]!)).toEqual([webText(lang, 'uwConflictColServer')])
+    // the label sits inside its own side, so it follows the text it names in reading order
+    expect(cards[0]!.querySelector('.ow-dlg-diff-left')!.textContent).toBe(
+      webText(lang, 'uwConflictColMine') + 'mine',
+    )
   })
 
   it('identical documents say so', () => {
@@ -83,14 +107,21 @@ describe('buildDiff', () => {
     )
     const card = el.querySelector<HTMLElement>('.ow-dlg-diff-card')!
     expect(card.dataset.kind).toBe('changed')
-    expect(card.querySelector('.ow-dlg-diff-left')!.textContent).toBe('Mine only')
-    expect(card.querySelector('.ow-dlg-diff-right')!.textContent).toBe('Theirs only')
+    expect(card.querySelector('.ow-dlg-diff-left .ow-dlg-diff-text')!.textContent).toBe('Mine only')
+    expect(card.querySelector('.ow-dlg-diff-right .ow-dlg-diff-text')!.textContent).toBe(
+      'Theirs only',
+    )
   })
 
   it('a file that is not a docx gives the failure line, never a throw', async () => {
     const el = await buildDiff(new Uint8Array([1, 2, 3]).buffer, new Uint8Array([4]).buffer, 'x')
-    expect(el.textContent).toContain(text('appCompareFailed', { error: '' }).split(':')[0]!)
+    // one localized sentence, no raw parser message in the copy; the error goes to the log
+    expect(el.textContent).toBe(webText(webLanguage(), 'uwConflictDiffFailed'))
     expect(el.querySelector('.ow-dlg-diff-card')).toBeNull()
+    const logged = vi.mocked(console.warn).mock.calls.flat()
+    const err = logged.find((a): a is Error => a instanceof Error)
+    expect(err, 'the error is logged').toBeDefined()
+    expect(el.textContent).not.toContain(err!.message)
   })
 })
 
@@ -129,8 +160,16 @@ describe('Docs web frame: save conflict dialog', () => {
     dlg.querySelector<HTMLButtonElement>('[data-choice="diff"]')!.click()
     for (let i = 0; i < 100 && !dlg.querySelector('.ow-dlg-diff'); i++) await flush()
     const card = dlg.querySelector<HTMLElement>('.ow-dlg-diff-card')!
-    expect(card.querySelector('.ow-dlg-diff-left')!.textContent).toBe('My change')
-    expect(card.querySelector('.ow-dlg-diff-right')!.textContent).toBe('Their change')
+    expect(card.querySelector('.ow-dlg-diff-left .ow-dlg-diff-text')!.textContent).toBe('My change')
+    expect(card.querySelector('.ow-dlg-diff-right .ow-dlg-diff-text')!.textContent).toBe(
+      'Their change',
+    )
+    expect(card.querySelector('.ow-dlg-diff-left .ow-dlg-diff-side')!.textContent).toBe(
+      t('uwConflictColMine'),
+    )
+    expect(card.querySelector('.ow-dlg-diff-right .ow-dlg-diff-side')!.textContent).toBe(
+      t('uwConflictColServer'),
+    )
     expect(dlg.querySelector('.ow-dlg-diff-meta')!.textContent).toContain('Report.docx')
     // the comparison is a step of the same dialog: still one dialog, Back returns to step 1
     expect(document.querySelectorAll('[data-docs-web="conflict"]')).toHaveLength(1)

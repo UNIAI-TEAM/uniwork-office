@@ -70,6 +70,8 @@ export const nl = {
 
   // S5 conflict dialog: step 1 extras, confirmation step and results
   uwConflictViewDiff: 'Verschillen bekijken',
+  uwConflictDiffPending: 'Vergelijken…',
+  uwConflictDiffFailed: 'De versies konden nu niet worden vergeleken. Probeer het later opnieuw.',
   uwConflictNoEdit: 'Je hebt geen bewerkrechten meer voor dit document.',
   uwConflictOverwriteTitle: 'Overschrijven met jouw versie?',
   uwConflictOverwriteConfirm:

@@ -1,12 +1,14 @@
 /**
  * "View differences" of the Docs save conflict dialog (S5): my version against the head, built in
- * the frame from the two docx byte sets (no host call, no editor change). It reuses the editor's
+ * the frame from the two docx byte sets (no editor change; the head is only read, never adopted). It reuses the editor's
  * paragraph diff (Review > Compare) and its wording, and renders into plain DOM the shared dialog
  * shows as a step of its own card: the editor's compare pane would sit behind the dialog's inert
  * backdrop, out of reach of every user.
  */
 import { parseDocx } from '@genoffice/docx-engine'
 import { blockTexts, compareParagraphs } from '../../../apps/docs/src/renderer/editor/compare-core'
+import { webText } from '../../modules/shared/i18n/strings-web'
+import { webLanguage } from './browser'
 import { text } from './notice'
 
 /** one paragraph-level difference, the editor compare's shape */
@@ -56,28 +58,48 @@ export function diffContent(headName: string, entries: readonly DiffEntry[]): HT
     const card = document.createElement('div')
     card.className = 'ow-dlg-diff-card'
     card.dataset.kind = entry.kind
-    if (entry.kind !== 'added') card.append(para('ow-dlg-diff-left', entry.left))
-    if (entry.kind !== 'removed') card.append(para('ow-dlg-diff-right', entry.right))
+    if (entry.kind !== 'added')
+      card.append(para('ow-dlg-diff-left', 'uwConflictColMine', entry.left))
+    if (entry.kind !== 'removed') {
+      card.append(para('ow-dlg-diff-right', 'uwConflictColServer', entry.right))
+    }
     root.append(card)
   }
   flush()
   return root
 }
 
-function para(className: string, value: string | undefined): HTMLElement {
+/**
+ * One side of a difference. The label says whose paragraph it is ("Your version" = the unsaved
+ * local bytes, "Version on UniWork" = the head: the S5 table's column names), so the meaning never
+ * depends on the tint or on colours at all (forced colors drop the tints).
+ */
+function para(
+  className: string,
+  side: 'uwConflictColMine' | 'uwConflictColServer',
+  value: string | undefined,
+): HTMLElement {
   const el = document.createElement('div')
   el.className = className
-  el.textContent = value || text('appEmptyParagraph')
+  const label = document.createElement('div')
+  label.className = 'ow-dlg-diff-side'
+  label.textContent = webText(webLanguage(), side)
+  const body = document.createElement('div')
+  body.className = 'ow-dlg-diff-text'
+  body.textContent = value || text('appEmptyParagraph')
+  el.append(label, body)
   return el
 }
 
-/** the failure variant: one line, the dialog still returns to step 1 with Back */
+/**
+ * The failure variant: one localized line (the raw error never reaches the UI copy, it is logged),
+ * the dialog still returns to step 1 with Back.
+ */
 export function diffFailure(err: unknown): HTMLElement {
+  console.warn('[docs-web] comparing with the head failed:', err)
   const el = document.createElement('p')
   el.className = 'ow-dlg-diff-same'
-  el.textContent = text('appCompareFailed', {
-    error: err instanceof Error ? err.message : String(err),
-  })
+  el.textContent = webText(webLanguage(), 'uwConflictDiffFailed')
   return el
 }
 
@@ -94,7 +116,6 @@ export async function buildDiff(
     ])
     return diffContent(headName, compareParagraphs(blockTexts(a.blocks), blockTexts(b.blocks)))
   } catch (err) {
-    console.warn('[docs-web] comparing with the head failed:', err)
     return diffFailure(err)
   }
 }

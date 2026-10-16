@@ -60,6 +60,8 @@ export const he = {
 
   // S5 conflict dialog: step 1 extras, confirmation step and results
   uwConflictViewDiff: 'הצגת ההבדלים',
+  uwConflictDiffPending: 'משווה…',
+  uwConflictDiffFailed: 'לא ניתן להשוות את הגרסאות כרגע. נסו שוב מאוחר יותר.',
   uwConflictNoEdit: 'אין לך עוד הרשאת עריכה למסמך הזה.',
   uwConflictOverwriteTitle: 'לדרוס עם הגרסה שלך?',
   uwConflictOverwriteConfirm:

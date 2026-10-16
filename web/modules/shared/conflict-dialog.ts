@@ -90,9 +90,11 @@ export interface ConflictIo {
   saveCopy?(): Promise<SaveCopyAttempt>
   /**
    * "View differences" (OQ-UX9): builds the module's comparison of my version against the head
-   * (in the frame, from bytes the module already holds or reads; no host call). The dialog shows
-   * the returned content as its own step with Back, so it stays usable and the rest of the frame
-   * stays inert. Set by Docs only; every other module leaves it out and the link is not shown.
+   * (in the frame, from the bytes it holds plus a read-only read of the head; it never writes and
+   * never adopts the head, so the etag the next save uses is unchanged). The dialog shows its
+   * own step at once with a pending line and swaps the returned content in when it arrives, so
+   * Back, Esc and the X work while it loads and the rest of the frame stays inert. Set by Docs
+   * only; every other module leaves it out and the link is not shown.
    */
   viewDiff?(): Promise<HTMLElement>
   /** the frame token still allows editing */
@@ -456,11 +458,11 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
     return b
   }
 
-  function diffStep(view: HTMLElement): Promise<Id> {
+  function diffStep(box: HTMLElement): Promise<Id> {
     return dialog.step({
       title: t('uwConflictViewDiff'),
       body: '',
-      content: view,
+      content: box,
       choices: [{ id: 'back', label: t('uwConflictBack') }],
       cancelId: 'back',
       closeId: 'cancel',
@@ -577,11 +579,33 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
 
       if (choice === 'diff') {
         // the comparison is a step of the same card; a module that cannot build it stays on step 1
-        const view = await io.viewDiff!().catch((err: unknown) => {
-          console.warn('[office-web] building the comparison failed:', err)
-          return null
+        // the step is on screen at once with a pending line (Back, Esc and X answer meanwhile);
+        // the comparison replaces the line when it is built, a failure puts the failed line there
+        const box = document.createElement('div')
+        box.setAttribute('aria-busy', 'true')
+        const pending = document.createElement('p')
+        pending.className = 'ow-dlg-diff-same'
+        pending.textContent = t('uwConflictDiffPending')
+        box.append(pending)
+        const shown = diffStep(box)
+        let settled = false
+        void shown.then(() => {
+          settled = true
         })
-        const left = view ? await diffStep(view) : 'back'
+        void io.viewDiff!()
+          .catch((err: unknown) => {
+            console.warn('[office-web] building the comparison failed:', err)
+            const failed = document.createElement('p')
+            failed.className = 'ow-dlg-diff-same'
+            failed.textContent = t('uwConflictDiffFailed')
+            return failed
+          })
+          .then((view) => {
+            if (settled) return
+            box.removeAttribute('aria-busy')
+            box.replaceChildren(view)
+          })
+        const left = await shown
         if (left === 'cancel') return failure ?? { kind: 'cancelled' }
         focus = 'diff'
         continue

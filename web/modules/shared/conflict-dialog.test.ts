@@ -765,7 +765,52 @@ describe('View differences (S5-04)', () => {
     expect(await done).toEqual({ kind: 'cancelled' })
   })
 
-  it('a compare view that throws leaves the dialog on step 1', async () => {
+  it('shows the comparison step at once with a pending line; Back, Esc and X answer while it loads (UXF-fe-d1-1)', async () => {
+    let release!: (el: HTMLElement) => void
+    const viewDiff = vi.fn(() => new Promise<HTMLElement>((r) => (release = r)))
+    const done = vi.fn()
+    void runConflictDialog(io({ viewDiff })).then(done)
+    await pick('diff')
+    // the step is on screen although the comparison is not built yet
+    expect(card().querySelector('.ow-dlg-title')!.textContent).toBe(t('uwConflictViewDiff'))
+    expect(choices()).toEqual(['back'])
+    expect(card().textContent).toContain(t('uwConflictDiffPending'))
+    expect(card().querySelector('[aria-busy="true"]')).not.toBeNull()
+    expect(document.activeElement).toBe(btn('back'))
+    // the comparison replaces the pending line
+    release(view())
+    await flush()
+    expect(card().textContent).not.toContain(t('uwConflictDiffPending'))
+    expect(card().querySelector('.the-diff')!.textContent).toBe('diff body')
+    expect(card().querySelector('[aria-busy="true"]')).toBeNull()
+    expect(done).not.toHaveBeenCalled()
+  })
+
+  it('Esc while the comparison loads goes back to step 1; a late comparison is ignored', async () => {
+    let release!: (el: HTMLElement) => void
+    const done = vi.fn()
+    void runConflictDialog(
+      io({ viewDiff: () => new Promise<HTMLElement>((r) => (release = r)) }),
+    ).then(done)
+    await pick('diff')
+    keydown('Escape')
+    await flush()
+    expect(choices()).toEqual(['diff', 'reload', 'overwrite', 'cancel'])
+    expect(document.activeElement).toBe(btn('diff'))
+    release(view('LATE-VIEW'))
+    await flush()
+    expect(card().textContent).not.toContain('LATE-VIEW')
+    expect(done).not.toHaveBeenCalled()
+  })
+
+  it('the X while the comparison loads cancels the whole dialog', async () => {
+    const done = runConflictDialog(io({ viewDiff: () => new Promise<HTMLElement>(() => {}) }))
+    await pick('diff')
+    card().querySelector<HTMLButtonElement>('.ow-dlg-close')!.click()
+    expect(await done).toEqual({ kind: 'cancelled' })
+  })
+
+  it('a compare view that throws shows the failed line with Back, never the raw error (UXF-fe-d1-2)', async () => {
     const done = vi.fn()
     void runConflictDialog(
       io({
@@ -775,6 +820,12 @@ describe('View differences (S5-04)', () => {
       }),
     ).then(done)
     await pick('diff')
+    await flush()
+    expect(card().textContent).toContain(t('uwConflictDiffFailed'))
+    expect(card().textContent).not.toContain('no panel')
+    expect(card().textContent).not.toContain(t('uwConflictDiffPending'))
+    expect(choices()).toEqual(['back'])
+    btn('back').click()
     await flush()
     expect(choices()).toEqual(['diff', 'reload', 'overwrite', 'cancel'])
     expect(done).not.toHaveBeenCalled()
