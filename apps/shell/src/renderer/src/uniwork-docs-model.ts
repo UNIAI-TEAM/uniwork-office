@@ -962,7 +962,7 @@ export function pickerReducer(state: PickerState, action: PickerAction): PickerS
           moreError: undefined,
         },
         activeId:
-          state.activeId && shown.some((d) => d.id === state.activeId && isNavigable(d))
+          state.activeId && shown.some((d) => d.id === state.activeId)
             ? state.activeId
             : firstOpenable(shown),
       }
