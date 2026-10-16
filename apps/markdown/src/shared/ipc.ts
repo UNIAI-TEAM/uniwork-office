@@ -317,7 +317,9 @@ export interface MarkdownApi {
   ): Promise<{ deleted: string[]; preserved: string[]; errors: string[] }>
   /**
    * Redo of an AI run whose pictures an undo discarded: write them back under the same names
-   * (pending again). A name another file took is reported in `errors`. Desktop only.
+   * (pending again). Only names this window's own undo discarded (or the manifest still owns)
+   * and the picture types an AI run can save are accepted; the rest, like a name another file
+   * took, is reported in `errors`. Desktop only.
    */
   restorePendingAssets?(
     files: Array<{ name: string; base64: string }>,

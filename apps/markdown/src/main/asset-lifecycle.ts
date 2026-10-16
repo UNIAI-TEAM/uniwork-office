@@ -117,6 +117,46 @@ function nameWithSuffix(name: string, suffix: number): string {
   return `${basename(name, ext)}-${suffix}${ext}`
 }
 
+/** The picture types an AI run can save (renderer/ai/tools.ts sniffImageExt), and nothing else. */
+const AI_RUN_IMAGE_EXTS = new Set(['png', 'jpg', 'gif'])
+
+/**
+ * Names this document's discards dropped (manifest path -> document -> names). A redo may only
+ * put back a file this window's own undo discarded: a name that never left this document's
+ * pending set is refused. The memory lives with the process, like the renderer's kept bytes, so
+ * a restart has nothing to restore anyway.
+ */
+const discardedAssetNames = new Map<string, Map<string, Set<string>>>()
+
+function discardedAssetNamesFor(documentPath: string): Set<string> {
+  const manifestKey = manifestPathFor(documentPath)
+  let byDocument = discardedAssetNames.get(manifestKey)
+  if (!byDocument) {
+    byDocument = new Map()
+    discardedAssetNames.set(manifestKey, byDocument)
+  }
+  const document = documentKey(documentPath)
+  let names = byDocument.get(document)
+  if (!names) {
+    names = new Set()
+    byDocument.set(document, names)
+  }
+  return names
+}
+
+function rememberDiscardedAssetNames(documentPath: string, names: Iterable<string>): void {
+  const discarded = discardedAssetNamesFor(documentPath)
+  for (const name of names) discarded.add(name)
+}
+
+function carryDiscardedAssetNames(oldDocumentPath: string, newDocumentPath: string): void {
+  const byDocument = discardedAssetNames.get(manifestPathFor(oldDocumentPath))
+  const names = byDocument?.get(documentKey(oldDocumentPath))
+  if (!byDocument || !names || names.size === 0) return
+  byDocument.delete(documentKey(oldDocumentPath))
+  rememberDiscardedAssetNames(newDocumentPath, names)
+}
+
 function normalizedManifest(value: unknown): OwnedAssetManifest {
   if (!value || typeof value !== 'object') throw new Error('asset manifest is not an object')
   const raw = value as {
@@ -284,16 +324,25 @@ async function sha256File(path: string): Promise<string> {
     .digest('hex')
 }
 
+/** Caller holds the manifest lock. */
+function mergeOwnedRecord(
+  manifest: OwnedAssetManifest,
+  documentPath: string,
+  record: OwnedAssetRecord,
+): void {
+  const existing = manifest.files.find((file) => file.name === record.name)
+  if (existing && existing.sha256 !== record.sha256) {
+    throw new Error('asset manifest already owns a different file with this name')
+  }
+  if (!existing) manifest.files.push(record)
+  const key = documentKey(documentPath)
+  manifest.pending[key] = [...new Set([...(manifest.pending[key] ?? []), record.name])].sort()
+}
+
 async function addOwnedRecord(documentPath: string, record: OwnedAssetRecord): Promise<void> {
   await withManifestLock(documentPath, async () => {
     const manifest = await readManifestUnlocked(documentPath)
-    const existing = manifest.files.find((file) => file.name === record.name)
-    if (existing && existing.sha256 !== record.sha256) {
-      throw new Error('asset manifest already owns a different file with this name')
-    }
-    if (!existing) manifest.files.push(record)
-    const key = documentKey(documentPath)
-    manifest.pending[key] = [...new Set([...(manifest.pending[key] ?? []), record.name])].sort()
+    mergeOwnedRecord(manifest, documentPath, record)
     await writeManifestUnlocked(documentPath, manifest)
   })
 }
@@ -1121,6 +1170,7 @@ async function resolvePendingOwnedAssets(
           if (references[referenceKey]!.length === 0) delete references[referenceKey]
         }
       }
+      rememberDiscardedAssetNames(documentPath, pendingNames)
       await writeManifestUnlocked(documentPath, manifest)
       return result
     })
@@ -1160,6 +1210,13 @@ export async function discardPendingOwnedAssetNames(
  * run's markup points at. A file that is still there with the same bytes counts as restored; a
  * different file under that name is never touched (the redo then stays refused). Restored files
  * are pending again, so a later undo or Roll back can drop them like the first time.
+ *
+ * Only this window's own assets are accepted (a name its discard dropped, or one the manifest
+ * still owns) and only the picture types an AI run can save, so a stray renderer cannot make the
+ * app adopt a file it never created. The whole write + record runs under the manifest lock the
+ * discard holds for its whole body: an undo's discard that is still running is either finished
+ * first (the file then really comes back) or still holding the lock (this restore waits) — the
+ * half state that reported a restored picture while the discard deleted it cannot happen.
  */
 export async function restoreOwnedAssetFiles(
   documentPath: string,
@@ -1167,26 +1224,48 @@ export async function restoreOwnedAssetFiles(
 ): Promise<{ restored: string[]; errors: string[] }> {
   const result = { restored: [] as string[], errors: [] as string[] }
   for (const { name, base64 } of files) {
-    if (name === '' || name !== basename(name) || name.includes('\0') || name.startsWith('.')) {
+    if (!isSafeAssetName(name) || name.startsWith('.')) {
       result.errors.push(`${name}: not a plain file name`)
+      continue
+    }
+    if (!AI_RUN_IMAGE_EXTS.has(extname(name).slice(1).toLowerCase())) {
+      result.errors.push(`${name}: not a picture an AI run can save`)
       continue
     }
     try {
       const bytes = Buffer.from(base64, 'base64')
-      const assetsDir = await ensureAssetsDir(documentPath)
-      const target = join(assetsDir, name)
-      try {
-        await writeFile(target, bytes, { flag: 'wx' })
-      } catch (error) {
-        if (errorCode(error) !== 'EEXIST') throw error
-        const info = await lstat(target)
-        if (!info.isFile() || info.isSymbolicLink())
-          throw new Error('not a plain file', { cause: error })
-        if ((await sha256File(target)) !== createHash('sha256').update(bytes).digest('hex')) {
-          throw new Error('a different file has this name', { cause: error })
+      const sha256 = createHash('sha256').update(bytes).digest('hex')
+      await withManifestLock(documentPath, async () => {
+        const manifest = await readManifestUnlocked(documentPath)
+        const own =
+          discardedAssetNamesFor(documentPath).has(name) ||
+          manifest.files.some((file) => file.name === name)
+        if (!own) throw new Error('not a file this document discarded or owns')
+        const assetsDir = await ensureAssetsDir(documentPath)
+        const target = join(assetsDir, name)
+        let created = false
+        try {
+          await writeFile(target, bytes, { flag: 'wx' })
+          created = true
+        } catch (error) {
+          if (errorCode(error) !== 'EEXIST') throw error
+          const info = await lstat(target)
+          if (!info.isFile() || info.isSymbolicLink()) {
+            throw new Error('not a plain file', { cause: error })
+          }
+          if ((await sha256File(target)) !== sha256) {
+            throw new Error('a different file has this name', { cause: error })
+          }
         }
-      }
-      await addOwnedRecord(documentPath, { name, sha256: await sha256File(target) })
+        try {
+          mergeOwnedRecord(manifest, documentPath, { name, sha256 })
+          await writeManifestUnlocked(documentPath, manifest)
+        } catch (error) {
+          // a file this call created must not stay behind with no record owning it
+          if (created) await rm(target, { force: true }).catch(() => {})
+          throw error
+        }
+      })
       result.restored.push(name)
     } catch (error) {
       result.errors.push(`${name}: ${error instanceof Error ? error.message : String(error)}`)
@@ -1338,10 +1417,12 @@ export async function renameOwnedAssetDocument(
   newDocumentPath: string,
 ): Promise<void> {
   if (resolve(dirname(oldDocumentPath)) !== resolve(dirname(newDocumentPath))) return
+  const oldKey = documentKey(oldDocumentPath)
+  const newKey = documentKey(newDocumentPath)
+  // a redo after a rename still finds the names this document's discard dropped
+  if (oldKey !== newKey) carryDiscardedAssetNames(oldDocumentPath, newDocumentPath)
   await withManifestLock(newDocumentPath, async () => {
     const manifest = await readManifestUnlocked(newDocumentPath)
-    const oldKey = documentKey(oldDocumentPath)
-    const newKey = documentKey(newDocumentPath)
     const oldReferences = manifest.documents[oldKey]
     const oldPending = manifest.pending[oldKey]
     if ((!oldReferences && !oldPending) || oldKey === newKey) return
